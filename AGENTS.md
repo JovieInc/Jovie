@@ -65,10 +65,10 @@ Context guidance: [agent context](docs/agent-context/README.md).
 | New fact (price, limit, copy) | [owner first](.claude/rules/source-of-truth.md): `canon/sources-of-truth.json`; derive, never copy |
 
 Other: ci-branching, event-driven, infra, linear, motion,
-pr-stacking, swarm, anti-slop, rate-limits, investor-deck.
-Company domain canon: [index](canon/README.md). API/cron/webhook maps:
+pr-stacking, swarm, anti-slop, rate-limits, investor-deck, hermetic-ci.
+Domain canon: [index](canon/README.md). API/cron/webhook:
 [AI_AGENT_GUIDE](docs/AI_AGENT_GUIDE.md). Codex: [CODEX](CODEX.md).
-<!-- doc-freshness:scoped-rules-count:26 -->
+<!-- doc-freshness:scoped-rules-count:27 -->
 
 ## Tools and workflow
 
