@@ -210,7 +210,7 @@ Otherwise keep the monorepo and address the measured payload, build, or ownershi
 
 One event should start a known, small number of runs. Workflow chains (`workflow_run`) and pull-request metadata triggers (`edited`, `labeled`, `unlabeled`) multiply runs, and every run, even a skipped one, spends the shared GitHub event pipeline and run list; cancelled and successful bookkeeping runs also take the hosted job slots (about 60) and the shared `GITHUB_TOKEN` bucket that merge-gate jobs need.
 
-Measured 2026-11-04 to 2026-11-10: 111,600 workflow runs for 415 merged PRs, 269 runs per merged PR; 32,213 runs (29%) skipped every job. Four workflows were over 95% skipped (Cheap Fixer, Legacy Human Hold Scrub, Security Suppression Audit, Auto-Merge Base Guard); their filters moved to the trigger in `fix/ci-skip-at-trigger`.
+Measured 2026-11-04 to 2026-11-10: 111,600 workflow runs for 415 merged PRs, 269 runs per merged PR; 32,213 runs (29%) skipped every job. Four workflows were over 95% skipped (Cheap Fixer, Legacy Human Hold Scrub, Security Suppression Audit, Auto-Merge Base Guard); their filters moved to the trigger in #25018, which took the declared total from 269.3 to 256.3.
 
 Budget: **60 runs per merged PR** across all workflows. The registry ceiling starts at 300, about 10% above the measured 269 to 277 (the week moves with merge volume), so a nightly measurement is not red from its first run. It only goes down toward the target.
 
