@@ -37,6 +37,7 @@ ROOT = Path(__file__).resolve().parents[2]
 # Literal header: the staged lanes release bundle carries no canon/ files.
 REGISTRY_HEADER = '{"schema": "jovie-automation-registry/v1"}\n'
 sys.path.insert(0, str(ROOT / "scripts/lanes"))
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 import git_housekeeping  # noqa: E402
 
 git_housekeeping.install_process_fixture_env()
@@ -1656,39 +1657,7 @@ class ProviderAndLockTest(unittest.TestCase):
         self.assertFalse(lane.needs_update("t1", ""))
 
 
-class FakeLinear:
-    def __init__(self, issues):
-        self.issues, self.moves, self.comments, self.triaged = issues, [], [], []
-        self.issue_state = {"name": "Todo", "type": "unstarted"}
-
-    def gql(self, query, variables):
-        # The issue-lookup used for terminal dispositions (pr_events.linear_issue).
-        number = int(variables.get("n") or 0)
-        issue_id = f"id-JOV-{number}"
-        comments = [{"body": body} for iid, body in self.comments if iid == issue_id]
-        node = {"id": issue_id, "state": self.issue_state, "comments": {"nodes": comments}}
-        return {"issues": {"nodes": [] if self.missing_issue(number) else [node]}}
-
-    def missing_issue(self, number):
-        return number in getattr(self, "missing", set())
-
-    def create_triage(self, title, description, dedupe=None):
-        if dedupe and any(dedupe in open_title for open_title in getattr(self, "open_titles", [])):
-            return "existing-id"
-        self.triaged.append(title)
-        return "triage-id"
-
-    def lane_issues(self, label):
-        return self.issues
-
-    def move(self, issue_id, state):
-        self.moves.append((issue_id, state))
-
-    def state_of(self, issue_id):
-        return getattr(self, "states", {}).get(issue_id, "Todo")
-
-    def comment(self, issue_id, body):
-        self.comments.append((issue_id, body))
+from test_cloud_lane_cases.__tests__.cloud_lane_runner_cases import FakeLinear
 
 
 class LinearClientTest(unittest.TestCase):
@@ -17831,3 +17800,13 @@ class FixNowTest(unittest.TestCase):
             lane.post_claim(22868, "a" * 40, "fix")
         self.assertNotIn("red_at=", calls[0][-1])
         self.assertFalse((self.state / "runs/red-dispatch.jsonl").exists())
+
+
+from test_cloud_lane_cases.__tests__.cloud_lane_runner_cases import CloudLaneGateMixin
+
+
+class CloudLaneGateTest(CloudLaneGateMixin, unittest.TestCase):
+    runner = lane
+    linear_fixture = FakeLinear
+    issue_fixture = staticmethod(issue)
+    proof_fixture = staticmethod(gate_proof)
