@@ -687,6 +687,16 @@
     "apps/web/components/features/release/AlbumArtworkContextMenu.tsx": {
       "error": "The menu has no error UI: a failed download falls back to opening the artwork URL in a new tab, and AlbumArtworkContextMenu.test.tsx asserts that fallback.",
       "offline": "An offline download fails like any other and takes the same new-tab fallback, so there is nothing to draw; the menu itself never fetches until a size is picked."
+    },
+    "apps/web/components/features/pricing/PricingComparisonChart.tsx": {
+      "empty": "The chart takes no props and always renders the fixed public comparison registry (PUBLIC_PRICING_COMPARISON), which is never empty; PricingComparisonChart.test.tsx asserts it has rows. The detector matched the .map calls over that registry.",
+      "permission-denied": "The comparison is public marketing copy with no gated action or permission input; the detector matched the word plan in the plan picker and price claims."
+    },
+    "apps/web/components/features/waitlist/WaitlistRoleForm.tsx": {
+      "permission-denied": "Request access is open to every visitor and the form has no gated action or permission input; the detector matched 'role', the field the visitor picks. The nearest refusal, a failed security check, keeps its message on screen and is covered in WaitlistRoleForm.test.tsx."
+    },
+    "apps/web/components/features/waitlist/WaitlistSpotifySearch.tsx": {
+      "permission-denied": "The artist search is an optional step open to every visitor and has no gated action or permission input; the detector matched role='combobox' on the search field."
     }
   }
 }
