@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server';
+import { operatorAccess } from '@/lib/api/route-access';
+import { defineRoute } from '@/lib/api/route-pipeline';
 import { captureError, getSafeErrorMessage } from '@/lib/error-tracking';
 import { seedDiscoveryKeywords } from '@/lib/leads/seed-keywords';
-import { getOvieOperatorEntitlements } from '@/lib/ovie/privacy-lock/access';
 
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 
@@ -10,21 +11,7 @@ export const runtime = 'nodejs';
 /**
  * POST /api/admin/leads/seed — Seed Feature.fm and tool-search discovery keywords.
  */
-export async function POST() {
-  const entitlements = await getOvieOperatorEntitlements({ session: 'fresh' });
-  if (!entitlements.isAuthenticated) {
-    return NextResponse.json(
-      { error: 'Unauthorized' },
-      { status: 401, headers: NO_STORE_HEADERS }
-    );
-  }
-  if (!entitlements.isAdmin) {
-    return NextResponse.json(
-      { error: 'Forbidden' },
-      { status: 403, headers: NO_STORE_HEADERS }
-    );
-  }
-
+async function postHandler() {
   try {
     const result = await seedDiscoveryKeywords();
     return NextResponse.json(
@@ -41,3 +28,12 @@ export async function POST() {
     );
   }
 }
+
+export const POST = defineRoute(
+  {
+    route: '/api/admin/leads/seed',
+    access: operatorAccess({ session: 'fresh' }),
+    legacy: { cache: 'pipeline-responses-only', unhandledErrors: 'rethrow' },
+  },
+  postHandler
+);
