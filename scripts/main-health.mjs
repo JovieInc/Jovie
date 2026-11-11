@@ -6,8 +6,8 @@
 // Gem lanes doctor reads the latest run (scripts/lanes/main_health.py) and pages
 // Summer on failure. Node only: no install, no network.
 //
-// --structural (2026-11-11) also runs the script contracts: every node contract
-// test of the structural lane and all of scripts/lib/__tests__. They fail by main's
+// --structural (2026-11-11) also runs the script contracts: the node and Vitest
+// contract lists of the structural lane plus its release-lineage group. They fail by main's
 // state alone (a date that expired, a checked-in baseline two green PRs broke
 // together), which no push announces: on 2026-11-10 one such test failed every
 // merge group for 8 h while this workflow, push-only and census-only, stayed green.
@@ -72,12 +72,17 @@ export function runChecks(root, { base = previousRef(root) } = {}) {
  * @returns {Promise<Array<{check:string, command:string, args:string[]}>>}
  */
 export async function structuralCommands(root) {
-  const { SCRIPT_CONTRACT_NODE_TESTS, scriptContractNodeArgs } = await import(
-    './ci-fast-lanes.mjs'
-  );
-  const present = SCRIPT_CONTRACT_NODE_TESTS.filter(test =>
-    existsSync(join(root, test))
-  );
+  const lanes = await import('./ci-fast-lanes.mjs');
+  const here = (/** @type {string} */ test) => existsSync(join(root, test));
+  const present = lanes.SCRIPT_CONTRACT_NODE_TESTS.filter(here);
+  const { scriptContractNodeArgs } = lanes;
+  // lib/__tests__ mixes node:test and Vitest files, so name the Vitest ones.
+  const vitest = [
+    ...new Set([
+      ...lanes.SCRIPT_CONTRACT_VITEST_TESTS,
+      ...lanes.RELEASE_LINEAGE_VITEST_TESTS,
+    ]),
+  ].filter(here);
   return [
     ...scriptContractNodeArgs(present).map((args, index) => ({
       check: `script-contracts-node-${index + 1}`,
@@ -95,7 +100,7 @@ export async function structuralCommands(root) {
         '--config',
         'vitest.config.mts',
         'run',
-        'lib/__tests__',
+        ...vitest.map(test => test.replace(/^scripts\//u, '')),
       ],
     },
   ];

@@ -28,9 +28,17 @@ const root = new URL('../../..', import.meta.url).pathname;
 test('structural mode derives the script contracts from the structural lane lists', async () => {
   const commands = await structuralCommands(root);
   const vitest = commands.find(c => c.check === 'script-contracts-vitest');
-  // The whole directory: the 2026-11-10 time bomb sat in
-  // production-release-supersession.test.mjs, outside the PR-time contract list.
-  assert.deepEqual(vitest.args.slice(-2), ['run', 'lib/__tests__']);
+  // The 2026-11-10 time bomb sat in production-release-supersession.test.mjs,
+  // outside the PR-time contract list: the release-lineage group is included.
+  assert.ok(
+    vitest.args.includes(
+      'lib/__tests__/production-release-supersession.test.mjs'
+    )
+  );
+  assert.ok(
+    vitest.args.includes('lib/__tests__/design-surface-census.test.mjs')
+  );
+  assert.ok(!vitest.args.includes('lib/__tests__'));
   const nodeTests = commands
     .filter(c => c.check.startsWith('script-contracts-node-'))
     .flatMap(c => c.args.filter(arg => arg.endsWith('.test.mjs')));

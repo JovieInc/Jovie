@@ -1322,6 +1322,27 @@ export const VALIDATION_LIFECYCLE_COVERAGE_COMMAND =
   'pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/validation-lifecycle.test.mjs lib/__tests__/validation-sync.test.mjs lib/__tests__/linear-sync-on-merge.test.mjs lib/__tests__/founder-taste-order.test.mjs --maxWorkers=1 --coverage --coverage.include="lib/{validation-lifecycle,validation-sync,linear-sync-on-merge,founder-taste-order}.mjs" --coverage.reporter=text --coverage.reporter=json-summary --coverage.reportsDirectory="${RUNNER_TEMP:-/tmp}/jovie-validation-lifecycle-coverage" --coverage.thresholds.perFile --coverage.thresholds.lines=90 --coverage.thresholds.statements=90 --coverage.thresholds.branches=75 --coverage.thresholds.functions=85';
 // Keep scanner-heavy script contracts outside V8 instrumentation; cover the
 // document helpers with the same behavior test in a small separate process.
+/**
+ * Release-lineage contracts of the structural lane. Main Health's idle probe runs
+ * the same files (scripts/main-health.mjs): production-release-supersession held
+ * the date that expired on 2026-11-10 and failed every merge group for 8 h.
+ */
+export const RELEASE_LINEAGE_VITEST_TESTS = Object.freeze([
+  'scripts/lib/__tests__/recheck-main-lineage-auth.test.mjs',
+  'scripts/lib/__tests__/recheck-main-lineage-advancing.test.mjs',
+  'scripts/lib/__tests__/production-release-supersession.test.mjs',
+  'scripts/lib/__tests__/staging-controller-supersession.test.mjs',
+  'scripts/lib/__tests__/staging-receipt-fetch-real-gh.test.mjs',
+  'scripts/lib/__tests__/staging-generation-lineage.test.mjs',
+  'scripts/lib/__tests__/release-lineage-gate.test.mjs',
+  'scripts/lib/__tests__/release-risk-policy.test.mjs',
+  'scripts/lib/__tests__/release-range-risk.test.mjs',
+  'scripts/lib/__tests__/vitest-retry-reporter.test.mjs',
+]);
+const RELEASE_LINEAGE_CONTRACT_COMMAND = `pnpm exec vitest --root scripts --config vitest.config.mts run ${RELEASE_LINEAGE_VITEST_TESTS.map(
+  test => test.replace(/^scripts\//u, '')
+).join(' ')}`;
+
 export const SCRIPT_CONTRACT_VITEST_COMMAND = `pnpm exec vitest --root scripts --config vitest.config.mts run ${SCRIPT_CONTRACT_VITEST_TESTS.map(
   test => test.replace(/^scripts\//u, '')
 ).join(
@@ -3085,7 +3106,7 @@ export async function runStructural(opts = {}) {
     'pnpm ci:control:test',
     'pnpm exec vitest --config scripts/vitest.config.mts run lib/__tests__/pr-visual-review.test.mjs lib/__tests__/pr-visual-capture-path.test.mjs --maxWorkers=1 --coverage --coverage.allowExternal --coverage.include="$PWD/.github/scripts/pr-visual-evidence-gate.mjs" --coverage.reportsDirectory="${RUNNER_TEMP:-/tmp}/jovie-pr-visual-policy-coverage"',
     // merge-group-workflow-contract runs in ci:control:test's Vitest run.
-    'pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/recheck-main-lineage-auth.test.mjs lib/__tests__/recheck-main-lineage-advancing.test.mjs lib/__tests__/production-release-supersession.test.mjs lib/__tests__/staging-controller-supersession.test.mjs lib/__tests__/staging-receipt-fetch-real-gh.test.mjs lib/__tests__/staging-generation-lineage.test.mjs lib/__tests__/release-lineage-gate.test.mjs lib/__tests__/release-risk-policy.test.mjs lib/__tests__/release-range-risk.test.mjs lib/__tests__/vitest-retry-reporter.test.mjs',
+    RELEASE_LINEAGE_CONTRACT_COMMAND,
     "pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts tests/unit/ci/production-marker-state.test.ts --coverage --coverage.include='**/production-marker-state.mjs' --coverage.allowExternal=true --coverage.thresholds.lines=82 --coverage.thresholds.branches=79 --coverage.thresholds.functions=97",
     'node --test --experimental-test-coverage --test-coverage-include=scripts/backlog-orchestrator/linear-client.mjs --test-coverage-lines=73 --test-coverage-branches=83 --test-coverage-functions=66 scripts/backlog-orchestrator/__tests__/linear-client.transport.test.mjs scripts/backlog-orchestrator/__tests__/linear-pagination.test.mjs',
     'pnpm ci:branching-guard:validate',
