@@ -384,6 +384,34 @@
       "offline": "WaitlistQualifyingSteps never fetches or submits by itself: the submit button posts the parent WaitlistRoleForm, which owns the join request and its failed and offline recovery, and the artist search's own request state belongs to WaitlistSpotifySearch. Lost connectivity reaches this step only as the parent's submitting flag, which disables every action (WaitlistQualifyingSteps.certificate.test.tsx).",
       "permission-denied": "The three questions are open to every visitor requesting access and have no gated action or permission input; the detector matched 'role' in the @/lib/waitlist/role-qualification import path."
     },
+    "apps/web/components/features/auth/AuthBrandPanel.tsx": {
+      "empty": "AuthBrandPanel renders one static product frame and an optional headline block and takes no collection; the detector matched 'releases' in the frame's scenario id. Hidden text is the TextHidden story."
+    },
+    "apps/web/components/features/auth/AuthLayout.tsx": {
+      "empty": "AuthLayout is the auth chrome around one children slot and takes no collection; the detector matched the items-center and items-stretch classes. An absent title and footer is the PartialFormOnly story."
+    },
+    "apps/web/components/features/waitlist/WaitlistOutcomeView.tsx": {
+      "empty": "WaitlistOutcomeView renders one outcome from a fixed copy table and its next steps are a fixed three-item list; it takes no collection that can be empty. The detector matched 'list' in the pending title and the list-decimal class."
+    },
+    "apps/web/components/organisms/MarketingSignInLink.tsx": {
+      "partial": "The link renders one label and one fixed sign-in route; variant and label are presentation choices with defaults, so there is no data to be partially present.",
+      "long-content": "The label prop is typed as the two fixed strings 'Sign in' and 'Log in', so no caller can pass longer copy."
+    },
+    "apps/web/components/features/auth/AuthProviderButtons.tsx": {
+      "empty": "The only product caller that renders a provider group, AuthShell, renders it only when at least one provider is enabled and otherwise leads with the email form (AuthShell.test.tsx, 'leads with the email form when no provider is enabled'); AuthProviderButtonSlots has no other caller, so an empty group never renders.",
+      "partial": "A slot takes one required provider and reads its label and glyph from the provider registry, so a pill is drawn whole or not at all; disabled-without-pending is the AppleDisabled hydration story.",
+      "long-content": "Pill labels come from the provider registry's two fixed strings ('Continue with Google', 'Continue with Apple'); callers cannot pass copy.",
+      "offline": "The pills never fetch; a press calls the owner's onClick and AuthShell starts OAuth, so a dropped connection reaches the pills only as AuthShell's failed-start state (its OfflineProviderStart story)."
+    },
+    "apps/web/components/features/auth/atoms/AuthInput.tsx": {
+      "partial": "AuthInput is one text field whose optional props are keyboard hints and styling with defaults, so nothing can be partially present; an empty field is Email and a filled one is LongContentEmail."
+    },
+    "apps/web/app/desktop-auth/DesktopAuthCodeForm.tsx": {
+      "long-content": "maxLength 9 caps the code at XXXX-XXXX and every label in the form is fixed product copy; the longest status copy renders in the owner's DesktopAuthStatus line (DesktopAuthClient's LongCopyPhoneSignIn story)."
+    },
+    "apps/web/app/desktop-auth/DesktopAuthClient.tsx": {
+      "permission-denied": "The handoff has no gated action, role or entitlement input; the detector matched role='img' on the QR tile. A refused Touch ID prompt falls back to the browser method with error copy, which tests/unit/app/desktop-auth-page.test.tsx covers."
+    },
     "apps/web/components/features/onboarding/OnboardingSecurityCheckRecovery.tsx": {
       "empty": "OnboardingSecurityCheckRecovery always renders one fixed heading, one status line and the retry button, and never a collection; the detector matched the items-start and items-center classes."
     },
