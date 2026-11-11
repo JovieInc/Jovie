@@ -14,7 +14,8 @@ were 'none-eligible' while work is waiting").
     routes; that order already carries cost, quota pressure and the use-or-lose pace discount)
       - a pool with a free new-issue seat left takes it; the seat is then spent for this pass
       - a pool whose free seats are spent hands the issue to the next pool
-      - a pool that went idle after it was offered this issue has declined it; next pool
+      - a pool that went idle after it was offered this issue has declined it, and stays declined
+        while the issue waits (even after the offer moved on); next pool
     an issue no pool can seat waits for its chosen pool, as before
 
 Nothing here admits work. The backlog passed in already cleared label, failure, in-flight,
@@ -43,6 +44,7 @@ SCHEMA = "symphony-lanes-pool-feed/v1"
 STATE_FILE, LOG_FILE = "pool-feed.json", "runs/pool-feed.jsonl"
 LOG_MAX_BYTES, LOG_KEEP_BYTES = 2_000_000, 1_000_000
 OFFERS_MAX = 512
+DECLINED_MAX = 8  # lanes remembered as having passed on one issue (more than the fleet has)
 _OFF, _OBSERVE = frozenset({"0", "off", "false"}), frozenset({"observe", "shadow"})
 
 # Idle-seat reasons, one per pool per pass.
@@ -189,31 +191,45 @@ def _write(path: Path, data: dict) -> None:
         temporary.unlink(missing_ok=True)
 
 
+def _declined_by(row) -> list[str]:
+    names = (row or {}).get("declinedBy") if isinstance(row, dict) else None
+    return [name for name in names if isinstance(name, str)] if isinstance(names, list) else []
+
+
 def declined_offers(offers: dict, idle_at: dict) -> frozenset:
     """An offer is declined once its lane recorded an idle exit after the offer was first made: the
-    lane's worker reached the claim scan with the issue routed to it and left without it."""
+    lane's worker reached the claim scan with the issue routed to it and left without it. Lanes that
+    declined the issue before it moved to its current lane stay declined (`declinedBy`), so a moved
+    offer does not swing back to a lane that already passed on it."""
     out = set()
     for identifier, row in (offers or {}).items():
+        out.update((identifier, name) for name in _declined_by(row))
         offered, idled = _epoch((row or {}).get("at")), _epoch(idle_at.get((row or {}).get("lane")))
         if offered is not None and idled is not None and idled > offered:
             out.add((identifier, row["lane"]))
     return frozenset(out)
 
 
-def merge_offers(previous: dict, new: dict, backlog: set, now: float) -> dict:
+def merge_offers(previous: dict, new: dict, backlog: set, now: float, declined=frozenset()) -> dict:
     """Keep the first time each standing offer was made; drop offers whose issue left the backlog or
-    moved to another pool."""
+    moved to another pool. An offer that moved because its lane declined it records that lane in
+    `declinedBy` (bounded, newest kept) for as long as the issue stays in the backlog."""
     kept = {}
     for identifier, name in new.items():
         old = (previous or {}).get(identifier) or {}
-        kept[identifier] = {"lane": name, "at": old["at"] if old.get("lane") == name and old.get("at") else _iso(now)}
+        by = _declined_by(old)
+        if old.get("lane") not in (None, name) and (identifier, old["lane"]) in declined and old["lane"] not in by:
+            by.append(old["lane"])
+        row = {"lane": name, "at": old["at"] if old.get("lane") == name and old.get("at") else _iso(now)}
+        kept[identifier] = {**row, "declinedBy": by[-DECLINED_MAX:]} if by else row
     for identifier, row in (previous or {}).items():
         if identifier in backlog and identifier not in kept and isinstance(row, dict):
             kept[identifier] = row
     return dict(sorted(kept.items(), key=lambda item: str(item[1].get("at")))[-OFFERS_MAX:])
 
 
-def record(state: Path, lane: str, result: dict, feed_mode: str, backlog: set, now: float) -> dict:
+def record(state: Path, lane: str, result: dict, feed_mode: str, backlog: set, now: float,
+           declined=frozenset()) -> dict:
     """One record per pass in pool-feed.json (latest per lane, standing offers) and the bounded log."""
     row = {"schema": SCHEMA, "at": _iso(now), "lane": lane, "mode": feed_mode, "backlog": result["backlog"],
            "took": getattr(result["take"], "identifier", None),
@@ -225,7 +241,7 @@ def record(state: Path, lane: str, result: dict, feed_mode: str, backlog: set, n
     passes = data.get("passes") if isinstance(data.get("passes"), dict) else {}
     passes[lane] = row
     _write(path, {"schema": SCHEMA, "passes": passes,
-                  "offers": merge_offers(data.get("offers") or {}, result["offers"], backlog, now)})
+                  "offers": merge_offers(data.get("offers") or {}, result["offers"], backlog, now, declined)})
     log = Path(state) / LOG_FILE
     log.parent.mkdir(parents=True, exist_ok=True)
     if log.exists() and log.stat().st_size > LOG_MAX_BYTES:
@@ -269,7 +285,7 @@ def attach(route, *, state: Path, lane: str, free, idle_at=None, order=None, env
             result = {**result, "take": take, "decision": decide(take) if take else None,
                       "wouldTake": getattr(result["take"], "identifier", None)}
         try:
-            record(state, lane, result, feed_mode, {issue.identifier for issue in issues}, when)
+            record(state, lane, result, feed_mode, {issue.identifier for issue in issues}, when, declined)
         except OSError as error:
             print(f"pool feed record unavailable: {type(error).__name__}", file=sys.stderr)
         if result["take"] is not None:

@@ -437,6 +437,50 @@ class PoolFeedReplayTest(unittest.TestCase):
         self.fed("hyperagent", free).feed([])
         self.assertEqual(json.loads((self.state / "pool-feed.json").read_text())["offers"], {})
 
+    def test_a_declined_pool_is_not_offered_the_issue_again_after_it_moves_on(self):
+        # Codex's worker plans; codex is last in the router's order, so grok and hyperagent get offers first.
+        free = {"hyperagent": 1, "grok": 1, "claude": 0, "codex": 0}
+        idle, one = {}, self.pool[:1]
+        issue = one[0].identifier
+
+        def offers():
+            return json.loads((self.state / "pool-feed.json").read_text())["offers"]
+
+        def codex_pass():
+            return lane.pick_issue(one, {}, now=self.now, provider="codex",
+                                   route=self.fed("codex", free, idle_at=lambda: idle))
+
+        self.assertIsNone(codex_pass())
+        self.assertEqual(offers()[issue]["lane"], "grok")
+        # Grok idles after its offer: the issue moves to hyperagent, and the row remembers grok passed.
+        self.now += 60
+        idle["grok"] = "2027-01-15T08:00:30Z"
+        self.assertIsNone(codex_pass())
+        moved = offers()[issue]
+        self.assertEqual(moved, {"lane": "hyperagent", "at": "2027-01-15T08:01:00Z", "declinedBy": ["grok"]})
+        # Hyperagent has not idled since. Grok still has its free seat, but it already passed on this
+        # issue: the offer stays with hyperagent and keeps its first time (no grok/hyperagent flapping).
+        self.now += 60
+        self.assertIsNone(codex_pass())
+        self.assertEqual(offers()[issue], moved)
+        self.assertEqual(pool_feed.declined_offers(offers(), idle), frozenset({(issue, "grok")}))
+        # Hyperagent passes too: both are remembered and the asking worker's own seat takes the issue.
+        self.now += 60
+        idle["hyperagent"] = "2027-01-15T08:02:30Z"
+        router = self.fed("codex", free, idle_at=lambda: idle)
+        self.assertEqual(lane.pick_issue(one, {}, now=self.now, provider="codex", route=router), one[0])
+        self.assertEqual(router.decisions[issue]["feed"]["skipped"],
+                         [{"lane": "grok", "why": "declined"}, {"lane": "hyperagent", "why": "declined"},
+                          {"lane": "claude", "why": "no-free-seat"}])
+        # The remembered passes are bounded and carried only while the issue stays in the backlog.
+        many = {issue: {"lane": "claude", "at": "2027-01-15T08:00:00Z",
+                        "declinedBy": [f"lane{index}" for index in range(20)]}}
+        merged = pool_feed.merge_offers(many, {issue: "codex"}, {issue}, self.now,
+                                        declined=frozenset({(issue, "claude")}))
+        self.assertEqual(len(merged[issue]["declinedBy"]), pool_feed.DECLINED_MAX)
+        self.assertEqual(merged[issue]["declinedBy"][-1], "claude")
+        self.assertEqual(pool_feed.merge_offers(many, {}, set(), self.now), {})
+
     def test_off_and_observe_modes_keep_the_old_claim(self):
         free = dict(self.replay["freeSeats"])
         raw = replay_router(self.replay)
