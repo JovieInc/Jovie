@@ -66,6 +66,21 @@ test('a layout-shift finding names the elements that moved', () => {
   );
 });
 
+test('a layout-shift finding says how far and when each element first moved', () => {
+  const [finding] = pageFindings({
+    ...clean('/tim', 'stranger'),
+    cls: 0.114,
+    clsSources: [
+      { node: 'footer', value: 0.114, dy: 184, atMs: 612 },
+      { node: 'div.hero', value: 0.02, dy: -8, atMs: 900 },
+    ],
+  });
+  assert.equal(
+    finding.detail,
+    'CLS 0.114 > 0.1; moved: footer (0.114, 184px down at 612ms), div.hero (0.020, 8px up at 900ms)'
+  );
+});
+
 test('jank, a stale or wrong build, or a gap in coverage is not ready', () => {
   const janky = {
     ...clean('/', 'stranger'),

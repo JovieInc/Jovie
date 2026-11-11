@@ -80,9 +80,14 @@ export const CLAIM_BANNER = /profile is unclaimed|claim (this|your) profile/i;
 
 export const IDENTITIES = Object.freeze(['stranger', 'signed-in']);
 
+const movedHow = s =>
+  Number.isFinite(s.dy) && Number.isFinite(s.atMs)
+    ? `, ${Math.abs(s.dy)}px ${s.dy < 0 ? 'up' : 'down'} at ${s.atMs}ms`
+    : '';
+
 const shiftedBy = page =>
   page.clsSources?.length
-    ? `; moved: ${page.clsSources.map(s => `${s.node} (${s.value.toFixed(3)})`).join(', ')}`
+    ? `; moved: ${page.clsSources.map(s => `${s.node} (${s.value.toFixed(3)}${movedHow(s)})`).join(', ')}`
     : '';
 
 const ofSamples = page =>
@@ -95,7 +100,7 @@ const ofSamples = page =>
  *   failedRequests?: string[], placeholder?: string|null,
  *   horizontalOverflow?: boolean, url?: string, expectClaimBanner?: boolean,
  *   claimBanner?: boolean, timingSamples?: number,
- *   clsSources?: { node: string, value: number }[] }} page
+ *   clsSources?: { node: string, value: number, dy?: number, atMs?: number }[] }} page
  * @returns {{ route: string, identity: string, viewport: string, kind: string, detail: string }[]}
  */
 export function pageFindings(page, closed = []) {
