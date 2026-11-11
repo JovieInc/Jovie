@@ -60,3 +60,40 @@ export const GetUpdates: StoryObj<typeof meta> = {
 export const UpdatesOn: StoryObj<typeof meta> = {
   args: { onGetUpdatesClick: fn(), isSubscribed: true },
 };
+
+/** No social links: the Listen pill takes the whole action row. */
+export const EmptySocialLinks: StoryObj<typeof meta> = {
+  args: { socialLinks: [] },
+};
+
+/** No portrait, not verified and nowhere to listen yet: the initials
+ *  fallback, name and handle only. */
+export const PartialNoPortrait: StoryObj<typeof meta> = {
+  args: {
+    imageUrl: null,
+    isVerified: false,
+    hasListenDestination: false,
+    socialLinks: [],
+  },
+};
+
+/** A long name and handle truncate inside the column. */
+export const LongContentName: StoryObj<typeof meta> = {
+  args: {
+    name: 'Tim White and the Los Angeles After Hours Orchestra',
+    handle: 'timwhiteandthelosangelesafterhoursorchestra',
+    onGetUpdatesClick: fn(),
+  },
+};
+
+/** Portrait, name and action row inside a right-to-left page. */
+export const Rtl: StoryObj<typeof meta> = {
+  args: { name: 'تيم وايت', onGetUpdatesClick: fn() },
+  decorators: [
+    Story => (
+      <div dir='rtl' lang='ar'>
+        <Story />
+      </div>
+    ),
+  ],
+};
