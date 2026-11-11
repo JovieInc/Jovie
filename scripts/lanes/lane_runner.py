@@ -98,6 +98,7 @@ import qualification_guard  # noqa: E402
 import dependency_diff  # noqa: E402  (immutable dependency-version chore evidence)
 import binding_turns, bindings, issue_turns, ledger_read  # noqa: E401,E402  (extra Linear team -> repo bindings, e.g. LYB)
 import binding_refill, pr_wip  # noqa: E401,E402  (Backlog -> Todo refill per extra binding; per-producer PR WIP cap)
+import pool_feed  # noqa: E402  (seats, not one free slot, decide how much backlog a lane holds; idle-seat reasons)
 import priority_admission  # noqa: E402  (Urgent/Summer-ranked admission, Todo WIP sanity, claim rank; JOV-7073)
 import macos_pool  # noqa: E402  (shared hosted-macOS pool: measure, record, gate LYB iOS intake)
 import decompose_pass  # noqa: E402  (standing epic decomposition when Todo < half target)
@@ -898,11 +899,16 @@ def pick_issue(issues: list[Issue], failures: dict, now: float | None = None,
     now = time.time() if now is None else now
     in_flight = frozenset(identifier.lower() for identifier in in_flight)
     duplicates = pool_rejections(issues, holds, target_files, now)
+    # A fed router (pool_feed) seats the admitted backlog in claim order; without one, each issue
+    # belongs to the single lane the router chose for it.
+    feed = getattr(route, "feed", None)
     eligible = [issue for issue in issues
                 if issue.identifier not in duplicates
                 and issue.identifier not in held_back
-                and admission_rejection(issue, failures, now, in_flight, provider, route) is None]
+                and admission_rejection(issue, failures, now, in_flight, provider, None if feed else route) is None]
     eligible.sort(key=lambda issue: admission_order(issue, now))
+    if feed:
+        return feed(eligible)
     return eligible[0] if eligible else None
 
 
@@ -9534,6 +9540,31 @@ def jovie_repair_pending(host: Host, now: float | None = None) -> bool:
     return True
 
 
+def free_intake_seats(host: Host, name: str, spec: dict) -> int:
+    """Seats of this lane that could claim a new issue right now: free slot locks below the
+    autoscaler's intake limit (a seat at or above it is maintenance-only, see worker())."""
+    limit = min(host.slots(name, spec.get("slots", 1)), host.intake_slots(name, spec.get("slots", 1)))
+    free = 0
+    for index in range(max(0, limit)):
+        lock = Locked(host.state / "slots" / f"{name}.{index}.lock", blocking=False)
+        free += bool(lock.held)
+        lock.release()
+    return free
+
+
+def fed_router(host: Host, name: str):
+    """The issue router with pool_feed attached: a lane's free seats, not one free slot, decide how
+    much of the backlog it holds, and every pass records why a seat stayed idle."""
+    providers = load_providers()
+
+    def idle_at() -> dict:
+        return {lane: row.get("at") for lane, row in read_json(host.state / "worker-idle.json").items()
+                if isinstance(row, dict)}
+
+    return pool_feed.attach(issue_router(host, name, providers), state=host.state, lane=name, idle_at=idle_at,
+                            free=lambda lane: free_intake_seats(host, lane, providers.get(lane) or {}))
+
+
 def worker_with_slot(host: Host, name: str, spec: dict, slot: Locked, *, maintenance_only=False) -> int:
     """Release ownership on every exceptional exit, including notification failures."""
     try:
@@ -9693,7 +9724,7 @@ def worker_with_slot(host: Host, name: str, spec: dict, slot: Locked, *, mainten
             overlap_prs, overlap_tasks = overlap_inventory_rows or ([], [])
             target_files = pr_events.revalidate_target_file_witnesses(target_files, overlap_prs,
                                                                       repository=REPO_SLUG)
-            router = issue_router(host, name)
+            router = fed_router(host, name)
             while pool and not overlap_unreadable:
                 issue = design_gate.pick_build_issue(
                     pool, failures, in_flight=in_flight, provider=name,

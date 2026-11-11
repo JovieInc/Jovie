@@ -912,6 +912,17 @@ Also in the same module and companions:
 - `codex_delegate.py --agent dots -- codex exec ...`: agents that delegate to Codex take a
   `slots/codex.N` seat under the lanes' admission lock and cap (exit 75 if none) and are logged per
   agent in `runs/delegations.jsonl`.
+- `pool_feed.py`: seats, not one free slot, decide how much backlog a lane holds. The router's
+  choice per issue used to stand while that lane had any free slot, so one free seat on the cheapest
+  lane took the routing of the whole backlog and every other lane left as `none-eligible`. A worker
+  now seats the admitted backlog in claim order along each issue's own candidate order (the router's:
+  cost, quota pressure, the use-or-lose pace discount): a lane takes as many issues as it has free
+  intake seats, the next issue goes to the next available lane, and a lane that idled after it was
+  offered an issue has declined it. Admission gates, capability floors, pins, the sensitive-surface
+  restriction, PR and WIP budgets and every quota limit are unchanged; no seat or limit is added.
+  Each pass records, per lane, free seats, seats fed and the reason any seat stayed idle
+  (`pool-feed.json`, `runs/pool-feed.jsonl`, `pool_feed.py status`). `LANES_POOL_FEED=0` restores
+  the old routing; `observe` records what it would do and claims as before.
 
 ## Tests
 
