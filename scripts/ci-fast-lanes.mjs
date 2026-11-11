@@ -1,8 +1,4 @@
 #!/usr/bin/env node
-import { SCRIPT_CONTRACT_NODE_TESTS } from './lib/script-contract-node-tests.mjs';
-
-export { SCRIPT_CONTRACT_NODE_TESTS };
-
 /**
  * Run the cheap CI cluster as labeled lanes.
  *
@@ -46,6 +42,7 @@ import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { selectDesignConformanceChecks } from './design-conformance-paths.mjs';
 import { isInvariantScannedPath } from './invariants/scanned-paths.mjs';
+import { LANE_GROUPS } from './lib/ci-lane-groups.mjs';
 import {
   affectsJovieTypecheck,
   affectsWebTestTypecheck,
@@ -54,8 +51,9 @@ import {
 import { STRUCTURAL_PYTEST_FILES } from './lib/ci-structural-pytest-files.mjs';
 import { scriptContractNodeArgs } from './lib/script-contract-node-args.mjs';
 import { testsAffectedBy } from './lib/test-file-dependencies.mjs';
+import { TEST_PLANNER_CONTRACT_TESTS } from './lib/test-planner-contract-tests.mjs';
 
-export { affectsWebTestTypecheck };
+export { affectsWebTestTypecheck, LANE_GROUPS };
 
 export const WEB_TESTS_TYPECHECK_COMMAND =
   'pnpm --filter=@jovie/web run typecheck:tests';
@@ -922,6 +920,195 @@ export const STRUCTURAL_PYTHON_REGRESSION_COMMANDS = Object.freeze([
   ...STRUCTURAL_PYTEST_PARTS,
 ]);
 
+export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
+  'scripts/company-guards/pin-drift.test.mjs',
+  'scripts/hostops/pen-golden-path-sync.test.mjs',
+  'scripts/design/pen-inspect.test.mjs',
+  'scripts/hostops/pen-files-worker/src/index.test.mjs',
+  'scripts/runner-pool-routing.test.mjs',
+  'scripts/sentry-build-config.test.mjs',
+  'scripts/next-telemetry.test.mjs',
+  'scripts/lib/__tests__/spend-guard.test.mjs',
+  'scripts/lib/__tests__/wins-ledger.test.mjs',
+  'scripts/lib/__tests__/wins-store.test.mjs',
+  'scripts/pr-open.test.mjs',
+  'scripts/pr-open-win.test.mjs',
+  'scripts/lib/__tests__/sources-of-truth.test.mjs',
+  'scripts/invariants/duplicate-literals.test.mjs',
+  'scripts/lib/__tests__/source-drift.test.mjs',
+  'scripts/lib/__tests__/typecheck-slot.test.mjs',
+  'scripts/preflight.test.mjs',
+  'scripts/installation-budget-sentinel.test.mjs',
+  'scripts/layout-guard-pen-contracts.test.mjs',
+  // JOV-INV-047: one shell and IA registry; ad-hoc chrome ratchet.
+  'scripts/invariants/shell-ia.test.mjs',
+  'scripts/ci-rounds-report.test.mjs',
+  'scripts/preflight-changed.test.mjs',
+  'scripts/preflight-source-size.test.mjs',
+  'scripts/preflight-remote.test.mjs',
+  'scripts/lib/__tests__/prepush-offload.test.mjs',
+  'scripts/preflight-install.test.mjs',
+  'scripts/lib/__tests__/ci-rounds.test.mjs',
+  'scripts/invariants/copy-leak/copy-leak.test.mjs',
+  'scripts/invariants/offer-claims/offer-claims.test.mjs',
+  'scripts/copy-inventory/extract.test.mjs',
+  'scripts/invariants/stat-claims/stat-claims.test.mjs',
+  'scripts/lib/__tests__/proof-loop.test.mjs',
+  'scripts/public-benchmark/proof-observations.test.mjs',
+  ...TEST_PLANNER_CONTRACT_TESTS,
+  'scripts/lib/__tests__/web-source-read-tests.test.mjs',
+  '.claude/hooks/post-task-validate.test.mjs',
+  '.claude/hooks/prod-db-session-guard.test.mjs',
+  'scripts/agent-context/check.test.mjs',
+  'scripts/agent-context/memory.test.mjs',
+  'scripts/agent/fix-claim.test.mjs',
+  'scripts/agent/pen-native-semantic-manifest-contract.test.mjs',
+  'scripts/agent/pen-registry-audit.test.mjs',
+  'scripts/api-route-pruning.test.mjs',
+  'scripts/artist-profile-conformance.test.mjs',
+  'scripts/backlog-orchestrator/__tests__/admission-disposition.test.mjs',
+  'scripts/backlog-orchestrator/__tests__/admission-receipt.test.mjs',
+  'scripts/backlog-orchestrator/__tests__/backlog-hygiene.test.mjs',
+  'scripts/backlog-orchestrator/__tests__/backlog-remediation.test.mjs',
+  'scripts/backlog-orchestrator/__tests__/conversation-intake.test.mjs',
+  'scripts/backlog-orchestrator/__tests__/deterministic-gates.test.mjs',
+  'scripts/backlog-orchestrator/__tests__/gbrain-metrics.test.mjs',
+  'scripts/backlog-orchestrator/__tests__/intake-readiness.test.mjs',
+  'scripts/backlog-orchestrator/__tests__/lane-capacity.test.mjs',
+  'scripts/backlog-orchestrator/__tests__/plan-gate.test.mjs',
+  'scripts/backlog-orchestrator/__tests__/runtime-state.test.mjs',
+  'scripts/backlog-orchestrator/__tests__/shipping-observability.test.mjs',
+  'scripts/backlog-orchestrator/__tests__/strategy-index.test.mjs',
+  'scripts/backlog-orchestrator/__tests__/summer-live-state.test.mjs',
+  'scripts/capability-benchmark/capability-benchmark.test.mjs',
+  'scripts/capability-benchmark/computer-use-decision.test.mjs',
+  'scripts/capability-benchmark/capability-reconciliation.test.mjs',
+  'scripts/ci-cache-policy.test.mjs',
+  'scripts/db/lint-changed-migrations.test.mjs',
+  'scripts/ci-release-incident-contract.test.mjs',
+  'scripts/company-assets/company-assets.test.mjs',
+  'scripts/deprecation-intake.test.mjs',
+  'scripts/deprecation-clearance.test.mjs',
+  'scripts/security-advisory-intake.test.mjs',
+  'scripts/sonar-token-validation.test.mjs',
+  'scripts/design-authority-guard.test.mjs',
+  'scripts/evals/artist-identity.test.mjs',
+  'scripts/evals/gtm-lead-copy.test.mjs',
+  'scripts/evals/release-task-cluster.test.mjs',
+  'scripts/evals/summer-ops-card-copy.test.mjs',
+  'scripts/buyer-eval/buyer-eval.test.mjs',
+  'scripts/buyer-eval/gate.test.mjs',
+  'scripts/investor-deck/investor-deck.test.mjs',
+  'scripts/investor-deck/eval.test.mjs',
+  'scripts/investor-deck/gate.test.mjs',
+  'scripts/queue-dequeue.test.mjs',
+  'scripts/fleet-audit/import-github-audit.test.mjs',
+  'scripts/golden-path-walk/latency-gate.test.mjs',
+  'scripts/product-crawl/closed-in-production.test.mjs',
+  'scripts/product-crawl/ready-gate.test.mjs',
+  'scripts/product-crawl/sample-params.test.mjs',
+  'scripts/product-crawl/throttle.test.mjs',
+  'scripts/positioning/positioning.test.mjs',
+  'scripts/funnel-judge/preview-gate.test.mjs',
+  'scripts/funnel-judge/proof-gate.test.mjs',
+  'scripts/funnel-judge/rubric.test.mjs',
+  'scripts/funnel-judge/coherence-screen.test.mjs',
+  'scripts/gate-ladder/gate-ladder.test.mjs',
+  'scripts/homepage-screenshot-output.test.mjs',
+  'scripts/invariants/art-direction/hue.test.mjs',
+  'scripts/hooks/pre-push-gate.test.mjs',
+  'scripts/node-runtime-bump.test.mjs',
+  'scripts/invariants/art-direction/hero-scroll.test.mjs',
+  'scripts/idea-radar/idea-radar.test.mjs',
+  'scripts/invariants/art-direction/images.test.mjs',
+  'scripts/invariants/art-direction/imagery-provenance.test.mjs',
+  'scripts/invariants/art-direction/no-invented-customer.test.mjs',
+  'scripts/invariants/assurance-matrix.test.mjs',
+  'scripts/invariants/browser-owned-input.test.mjs',
+  'scripts/invariants/founder-calibration.test.mjs',
+  'scripts/invariants/gate-weakening-detector.test.mjs',
+  'scripts/invariants/jev-revision-report.test.mjs',
+  'scripts/invariants/jev-writing-readiness.test.mjs',
+  'scripts/time-bomb/scan.test.mjs',
+  'scripts/invariants/model-audit-contract.test.mjs',
+  'scripts/invariants/pr-lifecycle-contract.test.mjs',
+  'scripts/invariants/quality-saturation.test.mjs',
+  'scripts/invariants/screen-audit.test.mjs',
+  'scripts/invariants/oasdiff-breaking-change.test.mjs',
+  'scripts/invariants/ui-escape-holdout.test.mjs',
+  'scripts/invariants/virtual-models.test.mjs',
+  'scripts/invariants/writing-surfaces.test.mjs',
+  'scripts/ios-ci-cache-contract.test.mjs',
+  '.github/scripts/testflight-release-lease.test.mjs',
+  'scripts/inbound-loop/inbound-loop.test.mjs',
+  'scripts/lanes/ops-report.test.mjs',
+  'scripts/merge-queue-green-enroll.test.mjs',
+  'scripts/lib/__tests__/merge-group-victim-rearm.test.mjs',
+  'scripts/lib/__tests__/pr-unacquired-runner-rerun.test.mjs',
+  'scripts/automation-liveness-gate.test.mjs',
+  'scripts/dequeue-held-reason.test.mjs',
+  'scripts/lib/__tests__/self-hosted-jobs.test.mjs',
+  'scripts/release-lag-check.test.mjs',
+  'scripts/production-controller-read-token.test.mjs',
+  'scripts/lib/__tests__/lane-fix-relay-wakes.test.mjs',
+  'scripts/lib/__tests__/fleet-rules-evidence-concurrency.test.mjs',
+  'scripts/lib/__tests__/fleet-rules-lane-evidence.test.mjs',
+  'scripts/lib/__tests__/fleet-rules-verdict-retry.test.mjs',
+  'scripts/lib/__tests__/pr-ready-evidence-pick.test.mjs',
+  'scripts/lib/__tests__/quota-deferred-heads.test.mjs',
+  'scripts/hold-contract.test.mjs',
+  'scripts/invariants/art-direction/surface-media.test.mjs',
+  'scripts/invariants/marketing-critic/marketing-critic.test.mjs',
+  'scripts/lib/__tests__/admission-hold-labels.test.mjs',
+  'scripts/lib/__tests__/source-validation-lane-classification.test.mjs',
+  'scripts/lib/__tests__/security-evidence-history-checkout.test.mjs',
+  'scripts/lib/__tests__/source-guard-dependency-generation.test.mjs',
+  'scripts/retire-coverage-reports.test.mjs',
+  'scripts/publish-coverage-report.test.mjs',
+  'scripts/lib/__tests__/canonical-artist-site-intake.test.mjs',
+  'scripts/lib/__tests__/canonical-json.test.mjs',
+  'scripts/lib/__tests__/format-biome-json.test.mjs',
+  'scripts/lib/__tests__/dependabot-workflow-run-adapter.test.mjs',
+  'scripts/lib/__tests__/linear-cooldown.test.mjs',
+  'scripts/lib/__tests__/policy-gate-liveness.test.mjs',
+  'scripts/lib/observability-fingerprint.test.mjs',
+  'scripts/logo-asset-normalization.test.mjs',
+  'scripts/observability-issue-github.test.mjs',
+  'scripts/observability-issue-sync.test.mjs',
+  'scripts/ops/firecrawl-crawl.test.mjs',
+  'scripts/performance-artifact-retention.test.mjs',
+  'scripts/postmortem-linkage-check.test.mjs',
+  'scripts/postmortem-review.test.mjs',
+  'scripts/prebuild-install-dep0176.test.mjs',
+  'scripts/public-benchmark/public-benchmark.test.mjs',
+  'scripts/catalog-completeness/check.test.mjs',
+  'scripts/quality-gap-finder.test.mjs',
+  'scripts/screenshot-loop/screenshot-bug-loop.test.mjs',
+  'scripts/security/audit-workflow-execution.test.mjs',
+  'scripts/security/findings.test.mjs',
+  'scripts/summer-commissioning/canonical-registry.test.mjs',
+  'scripts/summer-commissioning/commissioning.test.mjs',
+  'scripts/summer-commissioning/company-registry.test.mjs',
+  'scripts/summer-commissioning/contracts.test.mjs',
+  'scripts/summer-commissioning/impact-forecast.test.mjs',
+  'scripts/summer-commissioning/product-quality-governor.test.mjs',
+  'scripts/summer-commissioning/project-creation-policy.test.mjs',
+  'scripts/summer-commissioning/receipt-trust.test.mjs',
+  'scripts/docs-pagefind-staging.test.mjs',
+  'scripts/docs-proof-materialize.test.mjs',
+  'scripts/vercel-source-contract.test.mjs',
+  'scripts/verify-workflow-references.test.mjs',
+  'scripts/vision/art-evaluator.test.mjs',
+  'scripts/screenshot-publish-cadence.test.mjs',
+  'scripts/visual-baseline-adopt.test.mjs',
+  'scripts/voc/voc-mine.test.mjs',
+  'scripts/web-ai-health-intake.test.mjs',
+  'scripts/weekly-agent-readiness.test.mjs',
+  'scripts/lib/__tests__/pr-fleet-rules-workflow.test.mjs',
+  'scripts/lib/__tests__/wake-fanout-contract.test.mjs',
+  'scripts/design-system-source-ratchet.test.mjs',
+  'scripts/review-escapes.test.mjs',
+]);
 export const DEPRECATION_COVERAGE_COMMAND =
   'node --test --experimental-test-coverage --test-coverage-include=scripts/deprecation-clearance.mjs --test-coverage-include=scripts/lib/deprecation-observation.mjs --test-coverage-lines=90 --test-coverage-branches=80 --test-coverage-functions=90 scripts/deprecation-clearance.test.mjs';
 // Keep the existing native Node suite discoverable for affected PR guards;
@@ -1317,41 +1504,6 @@ const LANE_IDS = Object.freeze(LANES.map(lane => lane.id));
  * manifest here makes the split auditable and lets local callers omit the
  * selector to retain the historical all-lanes behavior.
  */
-export const LANE_GROUPS = Object.freeze({
-  typecheck: Object.freeze([
-    'typecheck',
-    'web-tests-typecheck',
-    'web-stories-typecheck',
-  ]),
-  remaining: Object.freeze([
-    'biome',
-    'eslint-server-boundaries',
-    'shadcn-lint-contracts',
-    'scripts-typecheck',
-    'guardrails',
-    'design-system-source-ratchet',
-    'design-exception-registry',
-    'design-governance-enforcement',
-    'pen-token-parity',
-    'ios-fast',
-    'billing-coverage',
-    'copy-gate',
-    'source-guards',
-    'node-runtime-contracts',
-    'structural',
-  ]),
-  // ci-fast (structural web) runs these in the background while its structural
-  // web commands run. They were the two slowest cheap lanes left in remaining
-  // (38s + 35s of a ~150s serial chain that outlasted remaining's structural
-  // lane, merge-group run 36270458408); web finished ~100s before remaining.
-  // merge-group-guards: repo-wide unit guards that used to run only in merge
-  // groups, so PRs green on PR CI poisoned the queue (3 stalls, 2026-09-27).
-  web: Object.freeze([
-    'design-conformance',
-    'profile-admission',
-    'merge-group-guards',
-  ]),
-});
 
 export const LANE_COMMANDS = Object.freeze(
   Object.fromEntries(LANES.map(lane => [lane.id, lane.nextLocalCommand]))
