@@ -18,6 +18,7 @@ import time
 from datetime import datetime, timezone
 
 import machine_gap
+import revert_first
 
 SCHEMA = "jovie.remediation-event/v1"
 CLASSES = (
@@ -587,9 +588,8 @@ def classify_event(event: dict) -> dict:
     excerpt = str(evidence.get("excerpt") or "")
     if source in {"main-ci", "schedule", "golden-path"} and (
             event.get("main_red") or INFRA_TEXT.search(excerpt)):
-        cls = "main-red" if event.get("main_red") or source == "main-ci" else "flaky-infra"
-        if event.get("main_red") or source == "main-ci":
-            return blocker("main-red", "main-red", [excerpt[:240] or source], "wait")
+        if event.get("main_red") or source == "main-ci":  # a named culprit commit is reverted, not waited on
+            return blocker("main-red", *revert_first.main_red_rung(event.get("culprit"), [excerpt[:240] or source]))
         return blocker("flaky-infra", source, [excerpt[:240] or source], "rerun")
     if source == "deploy":
         return blocker("fixable-by-model", "deploy", [excerpt[:240] or "deploy failure"], "route")
@@ -871,7 +871,7 @@ def plan_ladder(classified: dict, record: dict, providers: dict, now: float, hea
     if cls in {"obsolete", "needs-human-decision"}:
         return {"action": "surface", "reason": cls, "cls": cls}
     if cls == "main-red" or subtype == "main-red":
-        return {"action": "wait", "reason": "main-red", "cls": "main-red"}
+        return revert_first.ladder_rung(subtype)
     if cls == "ready":
         if subtype == "awaiting":
             return {"action": "wait", "reason": "awaiting", "cls": cls}
