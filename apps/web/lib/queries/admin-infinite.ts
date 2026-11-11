@@ -95,6 +95,8 @@ export interface WaitlistEntryRow {
   spotifyUrlNormalized: string | null;
   spotifyArtistName: string | null;
   heardAbout: string | null;
+  decisionReason: string | null;
+  wants: string | null;
   status:
     | 'new'
     | 'invited'
@@ -102,6 +104,8 @@ export interface WaitlistEntryRow {
     | 'chat_started'
     | 'qualified'
     | 'waitlisted'
+    | 'disqualified'
+    | 'queued'
     | 'approved'
     | 'signed_up'
     | 'rejected'

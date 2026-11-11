@@ -14,6 +14,7 @@ import {
   verifyTurnstileToken,
 } from '@/lib/turnstile/verify';
 import { logger } from '@/lib/utils/logger';
+import { decideRoleFormQualification } from '@/lib/waitlist/decision';
 import { isPublicSignupClosed } from '@/lib/waitlist/public-signup-gate';
 import { joinWaitlistWithRole } from '@/lib/waitlist/role-entry';
 import {
@@ -168,12 +169,21 @@ export async function POST(request: NextRequest) {
     readSpotifyArtist
   );
 
+  // Mom Test decision at the door (qualify/2026-11-v1). Full answers
+  // qualify; partial answers stay pending review with the gap recorded.
+  // The admission score only ranks — it never decides.
+  const decision = decideRoleFormQualification({
+    lastGrowthAttempt: parsed.data.momTest?.lastGrowthAttempt ?? null,
+    promoSpend: parsed.data.momTest?.promoSpend ?? null,
+  });
+
   try {
     await joinWaitlistWithRole({
       email: parsed.data.email,
       role: parsed.data.role,
       ...(parsed.data.name ? { name: parsed.data.name } : {}),
       ...(qualification ? { qualification } : {}),
+      decision,
     });
   } catch (error) {
     logger.error('[api/waitlist/join] join failed', error);

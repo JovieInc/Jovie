@@ -84,6 +84,11 @@ describe('POST /api/waitlist/join', () => {
     expect(mocks.joinWaitlistWithRole).toHaveBeenCalledWith({
       email: 'person@example.com',
       role: 'manager',
+      // Mom Test decision rides every join (qualify/2026-11-v1).
+      decision: expect.objectContaining({
+        ruleVersion: 'qualify/2026-11-v1',
+        outcome: 'request_evidence',
+      }),
     });
   });
 
@@ -103,6 +108,9 @@ describe('POST /api/waitlist/join', () => {
       email: 'person@example.com',
       role: 'team',
       name: 'Alex Example',
+      decision: expect.objectContaining({
+        ruleVersion: 'qualify/2026-11-v1',
+      }),
     });
   });
 

@@ -125,6 +125,30 @@ export function renderSpotifyCell(entry: WaitlistEntryRow) {
 }
 
 /**
+ * Renders the Mom Test decision cell (qualify/2026-11-v1): the decision code
+ * plus any wants/objections captured in their words.
+ */
+export function renderDecisionCell(entry: WaitlistEntryRow) {
+  if (!entry.decisionReason && !entry.wants) {
+    return <EmptyCell />;
+  }
+  return (
+    <div className='min-w-0 space-y-1'>
+      {entry.decisionReason ? (
+        <div className='text-tertiary-token font-mono text-xs'>
+          {entry.decisionReason}
+        </div>
+      ) : null}
+      {entry.wants ? (
+        <TruncatedText lines={2} className='text-secondary-token'>
+          {entry.wants}
+        </TruncatedText>
+      ) : null}
+    </div>
+  );
+}
+
+/**
  * Renders the "Heard About" cell with truncation and tooltip for long text
  */
 export function renderHeardAboutCell(value: string | null) {

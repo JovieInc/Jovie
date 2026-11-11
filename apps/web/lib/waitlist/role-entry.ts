@@ -2,8 +2,12 @@ import 'server-only';
 
 import { sql as drizzleSql } from 'drizzle-orm';
 import { db } from '@/lib/db';
-import { waitlistEntries } from '@/lib/db/schema/waitlist';
+import { capabilityWants, waitlistEntries } from '@/lib/db/schema/waitlist';
 import { normalizeEmail } from '@/lib/utils/email';
+import {
+  type QualificationDecision,
+  roleFormOutcomeToStatus,
+} from '@/lib/waitlist/decision';
 import {
   qualificationInputsPatch,
   type RoleEntrantQualification,
@@ -21,6 +25,7 @@ export const ROLE_FORM_WAITLIST_SOURCE = 'waitlist_role_form' as const;
 export interface JoinWaitlistWithRoleResult {
   /** True when this request created the entry; false for a known email. */
   readonly created: boolean;
+  readonly entryId: string | null;
 }
 
 /**
@@ -38,6 +43,8 @@ export async function joinWaitlistWithRole(input: {
   readonly name?: string;
   /** Request-access qualification; see `qualifyRoleEntrant`. */
   readonly qualification?: RoleEntrantQualification | null;
+  /** Mom Test decision (qualify/2026-11-v1); drives status + decision columns. */
+  readonly decision?: QualificationDecision | null;
   readonly now?: Date;
 }): Promise<JoinWaitlistWithRoleResult> {
   const email = normalizeEmail(input.email);
@@ -54,6 +61,15 @@ export async function joinWaitlistWithRole(input: {
       : null;
   const artistName = input.qualification?.spotifyArtistName ?? null;
 
+  // Mom Test funnel (qualify/2026-11-v1): the decision owns the initial
+  // status. No decision (no answers at all) stays pending review as `new` —
+  // never `waitlisted`, which is reachable only from disqualified.
+  const decision = input.decision ?? null;
+  const status = decision ? roleFormOutcomeToStatus(decision.outcome) : 'new';
+  const statusTimestamps = {
+    ...(status === 'qualified' ? { qualifiedAt: now } : {}),
+  };
+
   const [row] = await db
     .insert(waitlistEntries)
     .values({
@@ -62,9 +78,14 @@ export async function joinWaitlistWithRole(input: {
       emailHash: hashEmailForWaitlist(email),
       source: ROLE_FORM_WAITLIST_SOURCE,
       canonical: true,
-      status: 'waitlisted',
-      statusReason: 'role_form_pending_review',
-      waitlistedAt: now,
+      status,
+      statusReason: decision ? decision.reason : 'pending_review',
+      decisionReason: decision ? decision.reason : null,
+      decisionRuleVersion: decision ? decision.ruleVersion : null,
+      decidedAt: decision ? now : null,
+      decidedBy: decision ? 'rules' : null,
+      waitlistedAt: null,
+      ...statusTimestamps,
       ...(artistName ? { spotifyArtistName: artistName } : {}),
       qualificationInputs: {
         role: input.role,
@@ -89,7 +110,27 @@ export async function joinWaitlistWithRole(input: {
     })
     .returning({
       created: drizzleSql<boolean>`(xmax = 0)`,
+      id: waitlistEntries.id,
     });
 
-  return { created: row?.created === true };
+  const created = row?.created === true;
+  const entryId = row?.id ?? null;
+
+  // Store what they asked for / objected to / already use, in their words
+  // (JOV-6655). Only on create — a repeat submission never re-logs wants.
+  if (created && entryId && decision && decision.wants.length > 0) {
+    await db.insert(capabilityWants).values(
+      decision.wants.map(want => ({
+        waitlistEntryId: entryId,
+        kind: want.kind,
+        text: want.text,
+        capabilityKey: want.capabilityKey,
+        source: 'role_form',
+        sourceTurnId: want.sourceTurnId,
+        questionVariant: input.qualification?.momTest?.variant ?? null,
+      }))
+    );
+  }
+
+  return { created, entryId };
 }

@@ -125,6 +125,7 @@ describe('AdminWaitlistTableUnified', () => {
       'spotify',
       'heardAbout',
       'status',
+      'decision',
       'created',
       'actions',
     ]);

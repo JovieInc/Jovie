@@ -29,6 +29,7 @@ import {
   type WaitlistApprovalResult,
 } from '@/lib/waitlist/approval';
 import { insertWaitlistAuditLog } from '@/lib/waitlist/audit';
+import { insertChatCapabilityWants } from '@/lib/waitlist/capability-wants.server';
 import { enqueueWaitlistEmailJob } from '@/lib/waitlist/email-jobs';
 import type { GoldenPathAdmissionDecision } from '@/lib/waitlist/golden-path-admission';
 import {
@@ -412,7 +413,10 @@ async function decideAccess(params: {
     };
   }
 
-  if (qualification.status === 'waitlisted') {
+  if (
+    qualification.status === 'queued' ||
+    qualification.status === 'waitlisted'
+  ) {
     return {
       outcome: 'waitlisted_gate_on',
       approval: null,
@@ -431,7 +435,7 @@ async function decideAccess(params: {
     if (reservedAdmissionSlot) await releaseAutoAcceptSlot(params.tx);
     const failedQualification: QualificationDecision = {
       ...qualification,
-      status: 'waitlisted',
+      status: 'queued',
       reasonCode: 'waitlist_capacity_full',
       details: {
         ...qualification.details,
@@ -666,6 +670,10 @@ export async function submitWaitlistAccessRequest(
             .set({
               status: nextStatus,
               statusReason: decision.qualification.reasonCode,
+              decisionReason: decision.qualification.reasonCode,
+              decisionRuleVersion: 'qualify/2026-11-v1',
+              decidedAt: now,
+              decidedBy: 'rules',
               qualificationResult: {
                 qualified: decision.qualification.qualified,
                 status: decision.qualification.status,
@@ -692,6 +700,12 @@ export async function submitWaitlistAccessRequest(
               ...(syntheticCanary ? { syntheticCanary } : {}),
             },
           });
+
+          await insertChatCapabilityWants(
+            tx,
+            entry.id,
+            input.interviewResponses
+          );
 
           if (nextStatus === 'waitlisted' && !suppressCanaryCommunications) {
             await enqueueWaitlistEmailJob(tx, {

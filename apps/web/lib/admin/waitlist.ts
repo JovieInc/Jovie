@@ -1,6 +1,10 @@
-import { and, desc, sql as drizzleSql, eq } from 'drizzle-orm';
+import { and, desc, sql as drizzleSql, eq, inArray } from 'drizzle-orm';
 import { db, doesTableExist } from '@/lib/db';
-import { type WaitlistEntry, waitlistEntries } from '@/lib/db/schema/waitlist';
+import {
+  capabilityWants,
+  type WaitlistEntry,
+  waitlistEntries,
+} from '@/lib/db/schema/waitlist';
 import { organicWaitlistEntrySql } from './organic-waitlist';
 
 export interface WaitlistEntryRow {
@@ -16,6 +20,10 @@ export interface WaitlistEntryRow {
   spotifyArtistName: string | null;
   heardAbout: string | null;
   status: WaitlistEntry['status'];
+  /** Mom Test decision code (qualify/2026-11-v1), null for legacy entries. */
+  decisionReason: string | null;
+  /** Wants/objections/current tools in their words: "objection: …" lines. */
+  wants: string | null;
   primarySocialFollowerCount: number | null;
   createdAt: Date;
   updatedAt: Date;
@@ -116,6 +124,7 @@ export async function getWaitlistMetrics(): Promise<WaitlistMetrics> {
         row.status === 'new' ||
         row.status === 'chat_started' ||
         row.status === 'qualified' ||
+        row.status === 'queued' ||
         row.status === 'waitlisted'
       ) {
         metrics.waitlisted += count;
@@ -263,6 +272,31 @@ export async function getAdminWaitlistEntries(
       .limit(pageSize)
       .offset(offset);
 
+    // Wants/objections/current tools in their words (JOV-6655), one query
+    // for the page, grouped per entry.
+    const pageIds = entries.map(entry => entry.id);
+    const wantsRows =
+      pageIds.length > 0
+        ? await db
+            .select({
+              waitlistEntryId: capabilityWants.waitlistEntryId,
+              kind: capabilityWants.kind,
+              text: capabilityWants.text,
+            })
+            .from(capabilityWants)
+            .where(inArray(capabilityWants.waitlistEntryId, pageIds))
+            .orderBy(capabilityWants.createdAt)
+        : [];
+    const wantsByEntry = new Map<string, string>();
+    for (const row of wantsRows) {
+      const line = `${row.kind}: ${row.text}`;
+      const existing = wantsByEntry.get(row.waitlistEntryId);
+      wantsByEntry.set(
+        row.waitlistEntryId,
+        existing ? `${existing}\n${line}` : line
+      );
+    }
+
     return {
       entries: entries.map(entry => ({
         id: entry.id,
@@ -279,6 +313,8 @@ export async function getAdminWaitlistEntries(
         spotifyArtistName: entry.spotifyArtistName ?? null,
         heardAbout: entry.heardAbout,
         status: entry.status,
+        decisionReason: entry.decisionReason,
+        wants: wantsByEntry.get(entry.id) ?? null,
         primarySocialFollowerCount: entry.primarySocialFollowerCount,
         createdAt: entry.createdAt,
         updatedAt: entry.updatedAt,

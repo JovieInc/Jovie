@@ -311,7 +311,7 @@ describe.skip('POST /api/onboarding/intake — Better Auth email gate', () => {
     });
     mockSubmitWaitlistAccessRequest.mockResolvedValue({
       outcome: 'waitlisted_gate_on',
-      status: 'waitlisted',
+      status: 'queued',
       entryId: 'waitlist_entry_1',
     });
     const { onConflictDoUpdate, values } = setupSuccessfulIntakeDb();
@@ -424,7 +424,7 @@ describe.skip('POST /api/onboarding/intake — Better Auth email gate', () => {
     });
     mockSubmitWaitlistAccessRequest.mockResolvedValue({
       outcome: 'waitlisted_capacity_full',
-      status: 'waitlisted',
+      status: 'queued',
       entryId: 'entry_existing_interview',
     });
 
@@ -478,7 +478,7 @@ describe.skip('POST /api/onboarding/intake — Better Auth email gate', () => {
     });
     mockSubmitWaitlistAccessRequest.mockResolvedValue({
       outcome: 'waitlisted_capacity_full',
-      status: 'waitlisted',
+      status: 'queued',
       entryId: 'e3',
     });
     setupSuccessfulIntakeDb();
@@ -644,7 +644,7 @@ describe.skip('POST /api/onboarding/intake — Better Auth email gate', () => {
     });
     mockSubmitWaitlistAccessRequest.mockResolvedValue({
       outcome: 'waitlisted_gate_on',
-      status: 'waitlisted',
+      status: 'queued',
       entryId: 'entry_canary',
     });
     const { values } = setupSuccessfulIntakeDb();

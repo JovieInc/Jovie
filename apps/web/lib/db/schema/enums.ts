@@ -278,6 +278,8 @@ export const waitlistStatusEnum = pgEnum('waitlist_status', [
   'chat_started',
   'qualified',
   'waitlisted',
+  'disqualified',
+  'queued',
   'approved',
   'signed_up',
   'rejected',
