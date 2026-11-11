@@ -610,6 +610,54 @@
     },
     "apps/web/components/jovie/components/ChatToolSurface.tsx": {
       "partial": "ChatToolSurface is a slot wrapper: it renders whatever children its card passes and its optional props are only tone, className and a test id, so there is no data that can be partly present. Partial states belong to the cards that fill it, such as ChatLinkConfirmationCard."
+    },
+    "apps/web/app/app/(shell)/DashboardShellContent.tsx": {
+      "loading": "DashboardShellContent is an async server component awaited inside the shell layout's Suspense boundary, so it never renders a loading frame of its own; that fallback is shell-route-skeleton.tsx, which carries the loading stories.",
+      "offline": "DashboardShellContent runs only on the server for a request, so browser connectivity never reaches it. A server read that stalls past 10 seconds returns the PageErrorState branch, asserted in DashboardShellContent.test.tsx.",
+      "long-content": "Its only copy of its own is the fixed workspace-load PageErrorState message; everything else it renders is route children passed through, which certify their own long-content states.",
+      "rtl-overflow": "Its only copy of its own is the fixed English workspace-load message; text direction comes from the route children it passes through, which certify their own right-to-left states."
+    },
+    "apps/web/app/app/(shell)/shell-route-skeleton.tsx": {
+      "empty": "resolveShellRouteSkeleton maps a pathname to a route skeleton and renders no data collection; the detector matched the imported ReleaseTableSkeleton and LinksRouteSkeleton names. An unknown path returns undefined so the layout keeps its generic AppShellSkeleton.",
+      "offline": "Route skeletons paint as the shell layout's Suspense fallback before any request runs. The resolver never fetches or submits, so connectivity cannot reach it."
+    },
+    "apps/web/components/features/feedback/PageErrorState.tsx": {
+      "empty": "PageErrorState renders one title, one message and one retry action and takes no collection; the detector matched the items-center utility class.",
+      "permission-denied": "PageErrorState has no gated action or permission input; it is the error surface that owners render. The detector matched role='alert'."
+    },
+    "apps/web/components/organisms/AppShellFrame.tsx": {
+      "offline": "AppShellFrame is a presentational frame that never fetches or submits; the detector matched 'loading' and 'Suspense' in its doc comments. Connectivity reaches the shell only through the routes and rails it slots, which own their offline states."
+    },
+    "apps/web/components/organisms/AppShellFrameDedupe.tsx": {
+      "long-content": "AppShellFrameDedupe renders null. It only strips the frame attribute, duplicate test ids and retained text from hidden shell copies, so it has no text or box of its own that can overflow; the detector matched the textContent walk.",
+      "rtl-overflow": "AppShellFrameDedupe renders null and lays nothing out, so text direction never reaches it; the dedupe pass is direction-agnostic DOM bookkeeping on the frames it finds."
+    },
+    "apps/web/components/organisms/SharedCommandPalette.tsx": {
+      "permission-denied": "The palette renders caller-ranked sections and has no locked, gated or entitlement row; entitlement filtering happens before sections reach it. The detector matched role='option' and role='listbox'."
+    },
+    "apps/web/components/shell/AppShellRightRail.tsx": {
+      "partial": "AppShellRightRail is a layout slot. Its only optional props are className and the belowHeader placement flag, and it renders whatever drawer it is given, so the rail itself has no partially loaded state; each drawer owns its own."
+    },
+    "apps/web/components/jovie/components/ChatMessage.tsx": {
+      "offline": "ChatMessage renders the parts it is handed and never fetches; a lost connection reaches the transcript as a chat-level request error that ErrorDisplay shows (its NetworkOffline story), and a tool that could not reach its service arrives as a failed tool part, which ToolPartsRenderer's OfflineServiceUnreachable story shows."
+    },
+    "apps/web/components/jovie/components/ChatMarkdown.tsx": {
+      "offline": "ChatMarkdown never fetches; its only async step is importing the bundled SourceEvidence component maps, and until (or unless) that chunk loads it renders the same content through plain Streamdown, so connectivity changes nothing it draws."
+    },
+    "apps/web/components/jovie/components/ChatArtifactErrorCard.tsx": {
+      "offline": "The card never fetches: Try again only dispatches the jovie-chat-submit-prompt window event, and the chat that receives it owns the request and its network error (ErrorDisplay's NetworkOffline story). A tool that failed for lack of connectivity reaches the card as an ordinary error title and message, which ErrorRecoverableRetry shows."
+    },
+    "apps/web/components/jovie/components/ChatPresenceArtifactCard.tsx": {
+      "offline": "It renders a finished presence-build tool event and never fetches; a lookup that failed for lack of connectivity arrives as state 'error' with that message, which ErrorStepFailed shows, and Copy Draft only writes to the local clipboard."
+    },
+    "apps/web/components/jovie/components/ChatStepLimitAffordance.tsx": {
+      "error": "It takes no props and has no failure path: Continue only dispatches the jovie-chat-submit-prompt window event, and useJovieChat owns the resulting request and its errors. The detector matched 'submit' in that event name.",
+      "long-content": "Its only copy is the fixed CHAT_TOOL_STEP_LIMIT_AFFORDANCE_MESSAGE constant and the Continue label; no caller or model text reaches it, so nothing can overflow.",
+      "offline": "It never fetches or mutates; Continue hands the prompt to the chat through a window event, and the chat's own request shows any network error.",
+      "permission-denied": "It has no gated action or permission input; the detector matched role='status' on its live region."
+    },
+    "apps/web/components/molecules/drawer/DrawerButton.tsx": {
+      "partial": "DrawerButton holds no data: it forwards its children label and native button props to the shared Button and only maps tone and size (both defaulted) to classes, so nothing can be partially present."
     }
   }
 }

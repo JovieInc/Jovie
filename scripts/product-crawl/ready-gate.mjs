@@ -159,6 +159,7 @@ export function pageFindings(page, closed = []) {
  * @param {{ origin: string, sha?: string, at: string, routes: string[],
  *   uncovered?: { route: string, reason: string, accepted?: boolean }[],
  *   closedInProduction?: { prefix: string, reason: string, exact?: boolean }[],
+ *   outOfTime?: { loadsLeft: number, resamplesLeft: number } | null,
  *   pages: Parameters<typeof pageFindings>[0][] }} receipt
  * @param {{ now?: number, deployedSha?: string }} [opts]
  */
@@ -187,6 +188,15 @@ export function productReady(receipt, opts = {}) {
     const missing = (receipt.routes ?? []).filter(r => !seen.has(r));
     if (missing.length)
       reasons.push(`${missing.length} page routes not crawled`);
+    const late = receipt.outOfTime;
+    if (late?.loadsLeft)
+      reasons.push(
+        `crawl hit its deadline with ${late.loadsLeft} page loads not made`
+      );
+    if (late?.resamplesLeft)
+      reasons.push(
+        `crawl hit its deadline with ${late.resamplesLeft} timing suspects judged on one load`
+      );
   }
   if (findings.length) reasons.push(`${findings.length} findings`);
   return { ready: reasons.length === 0, reasons, findings };
