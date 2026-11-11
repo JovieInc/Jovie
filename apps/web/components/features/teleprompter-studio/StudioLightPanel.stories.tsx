@@ -19,3 +19,10 @@ export const Edges: Story = {};
 export const FullWhite: Story = {
   args: { settings: { ...DEFAULT_RING_LIGHT, mode: 'full', warmth: 0.2 } },
 };
+export const Rtl: Story = {
+  render: args => (
+    <div dir='rtl'>
+      <StudioLightPanel {...args} />
+    </div>
+  ),
+};

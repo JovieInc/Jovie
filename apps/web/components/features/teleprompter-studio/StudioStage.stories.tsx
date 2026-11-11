@@ -29,3 +29,4 @@ type Story = StoryObj<typeof meta>;
 export const Recording: Story = {};
 export const WithGrid: Story = { args: { grid: true } };
 export const BetweenTakes: Story = { args: { between: true } };
+export const EmptyNoCamera: Story = { args: { peek: true } };
