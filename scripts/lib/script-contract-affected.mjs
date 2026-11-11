@@ -69,6 +69,7 @@ export function copyInventoryScanPath(file) {
  * @param {readonly string[]} catalog
  * @param {readonly string[]} selected
  * @param {readonly string[]} changed
+ * @returns {string[]}
  */
 function unionCopyInventory(catalog, selected, changed) {
   if (
@@ -76,7 +77,7 @@ function unionCopyInventory(catalog, selected, changed) {
     selected.includes(COPY_INVENTORY_TEST) ||
     !changed.some(copyInventoryScanPath)
   ) {
-    return selected;
+    return [...selected];
   }
   return [...selected, COPY_INVENTORY_TEST];
 }
