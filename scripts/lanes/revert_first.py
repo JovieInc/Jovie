@@ -24,6 +24,7 @@ import json
 import re
 
 REVERT_SLA_S = 15 * 60
+MAX_ATTEMPTS = 2  # MAX_ATTEMPTS_PER_CHANGE in scripts/lib/main-red-eject.mjs: revert, re-land, revert, then a human
 COMPOUNDING_LABEL, REVERT_LABEL = "compounding", "main-red-revert"
 SOURCE = "main-health"
 CHECK = "Main health (census and certification)"
@@ -79,10 +80,12 @@ def name_culprit(runs: list[dict], commits: list[dict] | None) -> dict:
     if streak == 0:
         return {**out, "status": "green", "reason": "main-health-green", "sha": real[0].get("head_sha")}
     first_red = real[streak - 1]
-    out.update(redSince=first_red.get("created_at"), run=first_red.get("html_url"), failingSha=first_red.get("head_sha"))
+    out.update(redSince=first_red.get("created_at"), redEndedAt=first_red.get("updated_at"), run=first_red.get("html_url"),
+               failingSha=first_red.get("head_sha"))
     if streak == len(real):
         return {**out, "reason": "no-green-run-in-window"}
     green = real[streak]
+    out["greenSha"] = green.get("head_sha")
     if first_red.get("head_sha") == green.get("head_sha"):
         # Same tree, green then red: the clock or the environment changed, not a commit (JOV-8737 class).
         return {**out, "status": "no-culprit", "reason": "red-on-an-unchanged-commit"}
@@ -114,6 +117,8 @@ def decide(attribution: dict, *, open_reverts: list[dict] = (), mode: str = "app
         return verdict("alert", "culprit-has-no-pr")
     if any(row.get("culprit") == culprit.get("sha") for row in open_reverts):
         return verdict("skip", "revert-in-flight")
+    if int(culprit.get("priorAttempts") or 0) >= MAX_ATTEMPTS:
+        return verdict("alert", "attempt-cap")
     reason = "dependency-bump" if is_dependency_bump(culprit) else "culprit-named"
     return verdict("dry-revert" if mode == "dry" else "open-revert", reason)
 
@@ -128,12 +133,13 @@ def titles(culprit: dict) -> dict:
     return {"revert": fit("revert(main-red): ", f" (#{pr})"), "reopen": fit("fix(main-red): re-land ", f" (#{pr})")}
 
 
-def revert_plan(attribution: dict, *, named_at: float, repo: str = "JovieInc/Jovie", attempt: int = 1) -> dict:
+def revert_plan(attribution: dict, *, named_at: float, repo: str = "JovieInc/Jovie") -> dict:
     """Everything the opener needs: branch, commit message, PR title/body, labels and the SLA deadline."""
     culprit = attribution["culprit"]
+    attempt = int(culprit.get("priorAttempts") or 0) + 1
     sha, pr, check = str(culprit["sha"]), culprit.get("pr") or parse_pr(_subject(culprit)), attribution["check"]
     dependency = is_dependency_bump(culprit)
-    title = titles(culprit)["revert"]
+    title, url = titles(culprit)["revert"], f"https://github.com/{repo}/pull/{pr}"
     why = (f"#{pr} ({sha[:9]}) is the first commit Main Health failed on (`{check}`, green on its parent); every PR "
            "behind it inherits the red.")
     rule = ("Dependency bumps are always reverted, never debugged in place." if dependency else
@@ -146,6 +152,10 @@ def revert_plan(attribution: dict, *, named_at: float, repo: str = "JovieInc/Jov
         f"## Next\n\nThis revert jumps the queue (`{COMPOUNDING_LABEL}`). When it merges, #{pr} is re-landed as a repair "
         "PR with this failure attached. If a forward fix lands first and Main Health is green again, this PR is closed.",
         '<!-- customer-changelog/v1 {"releaseWorthy":false} -->',
+        # `compounding` PRs owe a Win section (Fleet Rules, scripts/lib/wins-ledger.mjs requiresWin).
+        "## Win\n\n- Claim: main is restored by a revert instead of waiting for a forward fix\n- Area: queue\n"
+        "- Theme: main-red-repair\n- Metric: main-red minutes to revert opened | min | lower | ? | ? | Main Health runs "
+        f"| first red Main Health run to this PR's created_at\n- Verify: {attribution.get('run') or url}\n- Pending: yes",
     ])
     return {
         "branch": f"compounding/revert-{pr}-{sha[:7]}",
@@ -154,7 +164,7 @@ def revert_plan(attribution: dict, *, named_at: float, repo: str = "JovieInc/Jov
         "commitMessage": f"{title}\n\nReverts {sha}. Revert first: `{check}` first failed on this commit "
                          f"({attribution.get('run') or 'Main Health'}).",
         "namedAt": named_at, "deadline": named_at + REVERT_SLA_S,
-        "url": f"https://github.com/{repo}/pull/{pr}",
+        "url": url,
     }
 
 

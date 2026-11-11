@@ -19,7 +19,7 @@ GREEN, RED, OTHER = "a" * 40, "b" * 40, "c" * 40
 
 def run(sha, conclusion, event="push", at="2026-11-11T10:00:00Z", rid=1):
     return {"head_sha": sha, "conclusion": conclusion, "event": event, "created_at": at,
-            "html_url": f"https://github.com/JovieInc/Jovie/actions/runs/{rid}"}
+            "updated_at": at.replace(":00Z", ":04Z"), "html_url": f"https://github.com/JovieInc/Jovie/actions/runs/{rid}"}
 
 
 def commit(sha=RED, subject="feat(pricing): new tier copy (#24100)", author="itstimwhite", labels=()):
@@ -51,6 +51,7 @@ class NameCulpritTest(unittest.TestCase):
         self.assertEqual(got["culprit"]["sha"], RED)
         self.assertEqual(got["run"], "https://github.com/JovieInc/Jovie/actions/runs/3")
         self.assertEqual(got["redSince"], "2026-11-11T10:05:00Z")
+        self.assertEqual((got["greenSha"], got["redEndedAt"]), (GREEN, "2026-11-11T10:05:04Z"))
 
     def test_the_oldest_red_run_of_the_streak_is_the_one_attributed(self):
         runs = [run(OTHER, "failure", rid=4), *RED_AFTER_GREEN]
@@ -113,6 +114,14 @@ class DecideTest(unittest.TestCase):
         labeled = commit(labels=[rf.REVERT_LABEL])
         self.assertEqual(rf.decide(self.named(labeled))["reason"], "culprit-is-a-revert")
 
+    def test_revert_re_land_revert_then_a_human(self):
+        relanded = {**commit(subject="fix(main-red): re-land new tier copy (#24120)"), "priorAttempts": 2}
+        self.assertEqual(rf.decide(self.named(relanded)), {"action": "alert", "reason": "attempt-cap"})
+        once = {**commit(), "priorAttempts": 1}
+        self.assertEqual(rf.decide(self.named(once))["action"], "open-revert")
+        plan = rf.revert_plan(self.named(once), named_at=NAMED_AT)
+        self.assertEqual(rf.read_marker(plan["body"])["attempt"], 2)
+
     def test_a_culprit_without_a_pr_cannot_be_re_landed(self):
         self.assertEqual(rf.decide(self.named(commit(subject="feat: direct push")))["reason"], "culprit-has-no-pr")
 
@@ -137,6 +146,10 @@ class RevertPlanTest(unittest.TestCase):
         self.assertIn("https://github.com/JovieInc/Jovie/actions/runs/3", plan["body"])
         self.assertIn(f"Reverts {RED}.", plan["commitMessage"])
         self.assertEqual(plan["deadline"] - plan["namedAt"], 15 * 60)
+        # A `compounding` PR owes a Win section or Fleet Rules fails it (scripts/lib/wins-ledger.mjs requiresWin).
+        self.assertIn("## Win\n\n- Claim:", plan["body"])
+        self.assertIn("- Area: queue\n", plan["body"])
+        self.assertIn("- Verify: https://github.com/JovieInc/Jovie/actions/runs/3\n- Pending: yes", plan["body"])
 
     def test_dependency_bump_plan_says_so(self):
         plan = self.plan(VERCEL_BUMP)
