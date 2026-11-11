@@ -114,26 +114,35 @@ const OBSERVE = `
       // The first move says how far and when, so the cause can be found.
       const a = s.previousRect, b = s.currentRect;
       if (a && b && !window.__crawl.moves[k])
-        window.__crawl.moves[k] = { dy: Math.round(b.y - a.y), atMs: Math.round(e.startTime) };
+        window.__crawl.moves[k] = {
+          dy: Math.round(b.y - a.y),
+          atMs: Math.round(e.startTime),
+          // What was inserted just before, sized as the shift happened.
+          added: window.__crawl.added
+            .filter(x => x.t >= e.startTime - 500 && x.n.isConnected)
+            .map(x => ({ node: label(x.n), atMs: Math.round(x.t), h: Math.round(x.n.getBoundingClientRect().height) }))
+            .filter(x => x.node && x.h >= 24),
+        };
     }
   });
-  // Elements inserted after first paint, so a shift can name what appeared
+  // Elements inserted in the last second, so a shift can name what appeared
   // just before it (the usual cause: a late block pushing the rest down).
+  // Only a recent window is kept, so a large first parse cannot crowd out
+  // later inserts.
   new MutationObserver(records => {
     const t = performance.now();
+    const added = window.__crawl.added;
+    let old = 0;
+    while (old < added.length && added[old].t < t - 1000) old++;
+    if (old) added.splice(0, old);
     for (const r of records)
       for (const n of r.addedNodes)
-        if (n.nodeType === 1 && window.__crawl.added.length < 5000)
-          window.__crawl.added.push({ n, node: label(n), atMs: Math.round(t) });
+        if (n.nodeType === 1) added.push({ n, t });
   }).observe(document, { childList: true, subtree: true });
   watch('largest-contentful-paint', e => { window.__crawl.lcp = Math.max(window.__crawl.lcp, e.startTime); });
   watch('longtask', e => { window.__crawl.longest = Math.max(window.__crawl.longest, e.duration); });
 `;
-const MEASURE = `({ ...window.__crawl,
-  added: window.__crawl.added
-    .filter(a => a.node && a.n.isConnected)
-    .map(a => ({ node: a.node, atMs: a.atMs, h: Math.round(a.n.getBoundingClientRect().height) }))
-    .filter(a => a.h >= 24),
+const MEASURE = `({ ...window.__crawl, added: undefined,
   text: document.body?.innerText ?? '',
   overflow: document.documentElement.scrollWidth > window.innerWidth + 1 })`;
 
@@ -212,13 +221,17 @@ async function visit({ route, target, viewport, identity, fixture, collect }) {
       .map(([node, value]) => ({
         node,
         value: Number(value.toFixed(4)),
-        ...m.moves?.[node],
       }))
       .map(s => {
-        const cause = causeOf(m.added, s.atMs);
+        const { added, ...move } = m.moves?.[s.node] ?? {};
+        const cause = causeOf(added, move.atMs);
         return cause
-          ? { ...s, after: { node: cause.node, h: cause.h, atMs: cause.atMs } }
-          : s;
+          ? {
+              ...s,
+              ...move,
+              after: { node: cause.node, h: cause.h, atMs: cause.atMs },
+            }
+          : { ...s, ...move };
       });
     row.lcpMs = Math.round(m.lcp);
     row.longestTaskMs = Math.round(m.longest);
