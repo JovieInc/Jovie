@@ -27,7 +27,7 @@ const have = spawnSync('jq', ['--version']).status === 0;
 // PR Ready picks the evidence run for the head. 2026-10-25: #22978's passing
 // run and a concurrency-cancelled twin were created in the same second and the
 // cancelled one won the tie, so PR Ready failed with "not a verdict" for good.
-function pick(runs) {
+function pick(runs, stale = []) {
   const done = spawnSync(
     'jq',
     [
@@ -45,11 +45,11 @@ function pick(runs) {
       'repo',
       '1',
       '--arg',
+      'sha',
       'head',
-      'head',
-      '--arg',
-      'base',
-      'base',
+      '--argjson',
+      'stale',
+      JSON.stringify(stale),
       program,
     ],
     { input: JSON.stringify({ workflow_runs: runs }), encoding: 'utf8' }
@@ -87,11 +87,14 @@ test('a superseded head failure never outranks the current head or the base sha'
 }, () => {
   const current = run(1, 'success');
   const stale = run(2, 'failure', '1970-01-01T00:05:00Z', 'previous');
-  assert.equal(pick([current, stale]), 'completed\tsuccess\tu1');
-  assert.equal(pick([stale, current]), 'completed\tsuccess\tu1');
-  assert.equal(pick([stale]), 'missing');
+  assert.equal(pick([current, stale], ['previous']), 'completed\tsuccess\tu1');
+  assert.equal(pick([stale, current], ['previous']), 'completed\tsuccess\tu1');
+  assert.equal(pick([stale], ['previous']), 'missing');
   assert.equal(
-    pick([stale, run(3, 'success', '1970-01-01T00:06:00Z', 'base')]),
+    pick(
+      [stale, run(3, 'success', '1970-01-01T00:06:00Z', 'base')],
+      ['previous']
+    ),
     'completed\tsuccess\tu3'
   );
 });
@@ -107,6 +110,46 @@ test('a cancelled twin created in the same second never wins the tie', {
     pick([run(2, 'cancelled'), run(1, 'success')]),
     'completed\tsuccess\tu1'
   );
+});
+
+// #24886 (2026-11-11): jovie-bot merged main and dropped a label in the same second,
+// so two evidence runs shared a created_at. The stale-head run failed ("re-run with
+// current PR metadata") and had the higher id, so PR Ready stayed red on re-run.
+test('a same-second run for the current head beats a stale-head run with a higher id', {
+  skip: !have,
+}, () => {
+  const stale = { ...run(9, 'failure'), head_sha: 'previous' };
+  assert.equal(pick([run(1, 'success'), stale]), 'completed\tsuccess\tu1');
+  assert.equal(pick([stale, run(1, 'success')]), 'completed\tsuccess\tu1');
+  // A genuinely newer run still wins whatever head_sha it carries.
+  const later = {
+    ...run(9, 'failure', '1970-01-01T00:06:00Z'),
+    head_sha: 'base',
+  };
+  assert.equal(pick([run(1, 'success'), later]), 'completed\tfailure\tu9');
+});
+
+// #24903 (2026-11-11): jovie-bot's main merge fired two runs a second apart. The
+// newer one carried the old head, failed closed, and PR Ready picked it.
+test('a newer run that carries an earlier PR head never decides', {
+  skip: !have,
+}, () => {
+  const current = run(1, 'success', '1970-01-01T00:05:00Z');
+  const stale = {
+    ...run(2, 'failure', '1970-01-01T00:05:01Z'),
+    head_sha: 'old',
+  };
+  assert.equal(pick([current, stale], ['old']), 'completed\tsuccess\tu1');
+  // Without the PR's commit list (lookup failed) nothing is dropped: still red.
+  assert.equal(pick([current, stale]), 'completed\tfailure\tu2');
+  // A newer edited-event run carries the base sha, not a PR commit, and still wins.
+  const edited = {
+    ...run(3, 'failure', '1970-01-01T00:05:02Z'),
+    head_sha: 'base',
+  };
+  assert.equal(pick([current, edited], ['old']), 'completed\tfailure\tu3');
+  // Only stale runs left means missing, never a pass.
+  assert.equal(pick([stale], ['old']), 'missing');
 });
 
 test('the newest non-cancelled run decides, and only cancelled runs mean missing', {
@@ -131,12 +174,6 @@ test('PR Ready looks evidence up by branch, never by head_sha', () => {
     /fleet-rules-evidence\.yml\/runs\?branch=\$ref_q&event=pull_request_target/
   );
   assert.doesNotMatch(workflow, /fleet-rules-evidence\.yml\/runs\?head_sha=/);
-  assert.match(workflow, /--arg head "\$HEAD_SHA"/);
-  assert.match(workflow, /--arg base "\$BASE_SHA"/);
-  assert.match(
-    workflow,
-    /BASE_SHA: \$\{\{ github\.event\.pull_request\.base\.sha \}\}/
-  );
 });
 
 test('an edited-event run (base-sha head_sha) created after the floor is picked', {
@@ -223,7 +260,6 @@ test('a deferred evidence lookup is exit 75 and is not read as an empty run list
       env: {
         PATH: process.env.PATH,
         HEAD_SHA: 'a'.repeat(40),
-        BASE_SHA: 'b'.repeat(40),
         PR_NUMBER: '24777',
         HEAD_REF: 'glm/jov-12120-doctor-blocker-dedup',
         HEAD_REPO_ID: '1',

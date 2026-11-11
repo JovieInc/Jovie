@@ -629,6 +629,16 @@ jobs:
           ref: ${{ needs.resolve-target.outputs.commit_sha }}
           fetch-depth: 1
           persist-credentials: false
+      - name: Establish crawl deadline
+        run: |
+          set -euo pipefail
+          # Job timeout-minutes: 40. Reserve 240s for the receipt write, upload
+          # and cleanup, so a slow crawl still leaves a receipt instead of a
+          # silent GitHub cancel. Runs right after checkout, which the
+          # safe-upload audit requires to be the first step.
+          deadline_s=$(( $(date +%s) + 40 * 60 - 240 ))
+          echo "CRAWL_DEADLINE_EPOCH_MS=$(( deadline_s * 1000 ))" >> "$GITHUB_ENV"
+          echo "Crawl stops starting page loads at epoch ms $(( deadline_s * 1000 ))"
       - name: Check the landed build has the crawl
         id: has-crawl
         run: |

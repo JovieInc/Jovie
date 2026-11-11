@@ -5,6 +5,7 @@ import { isValidElement, type ReactElement } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { APP_ROUTES } from '@/constants/routes';
 import { RightPanelProvider } from '@/contexts/RightPanelContext';
+import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import { CalendarRouteSkeleton } from './calendar/CalendarRouteSkeleton';
 import { LibraryLoadingState } from './library/LibraryLoadingState';
 import { LinksPageClient } from './links/LinksPageClient';
@@ -173,5 +174,35 @@ describe('route skeletons', () => {
     expect(
       skeleton.closest('[data-testid="settings-shell-content"]')
     ).not.toBeNull();
+  });
+});
+
+describe('resolved shell skeletons are accessible loading states', () => {
+  it.each([
+    APP_ROUTES.CHAT,
+    APP_ROUTES.RELEASES,
+    APP_ROUTES.LIBRARY,
+    APP_ROUTES.LYRICS,
+    APP_ROUTES.TASKS,
+    APP_ROUTES.CALENDAR,
+    APP_ROUTES.LINKS,
+    APP_ROUTES.PRESENCE,
+    APP_ROUTES.TOUR_DATES,
+    APP_ROUTES.SETTINGS_ACCOUNT,
+    APP_ROUTES.EARNINGS,
+  ])('renders an axe-clean skeleton for %s', async pathname => {
+    const node = resolveShellRouteSkeleton(pathname);
+    expect(isValidElement(node)).toBe(true);
+    const { container } = render(
+      <RightPanelProvider>
+        <main>{node}</main>
+      </RightPanelProvider>
+    );
+
+    // Table skeletons load through next/dynamic, so wait for the lazy chunk.
+    await vi.waitFor(() =>
+      expect(container.querySelector('main')?.childElementCount).toBe(1)
+    );
+    await expectNoA11yViolations(container);
   });
 });
