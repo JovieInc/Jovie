@@ -84,6 +84,7 @@
     "apps/web/tests/unit/lib/stripe/webhooks/utils.test.ts": 2,
     "apps/web/tests/unit/lib/tracking/forwarding/types.test.ts": 2,
     "apps/web/tests/unit/lib/waitlist/access-request.test.ts": 3,
+    "apps/web/tests/unit/marketing/recipe-manifest.test.ts": 1,
     "apps/web/tests/unit/memory/memory-core-services.test.ts": 1,
     "apps/web/tests/unit/ovie/approvals.test.ts": 2,
     "apps/web/tests/unit/ovie/shipping-state.test.ts": 1,

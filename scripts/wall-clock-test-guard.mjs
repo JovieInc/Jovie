@@ -50,12 +50,6 @@ const JS_CLOCK_CONTROL =
 const PY_CLOCK_CONTROL =
   /\bfreeze_time\b|\bfreezegun\b|\btime_machine\b|\bpatch(?:\.object)?\([^)\n]*(?:datetime|time\b)|\bmonkeypatch\.setattr\([^)\n]*(?:datetime|time\b)/u;
 
-const BLOCK_COMMENT = /\/\*[\s\S]*?\*\//gu;
-// A `//` comment, but not the `//` of a URL scheme (`https://`).
-const LINE_COMMENT = /(^|[^:\\])\/\/.*$/gmu;
-// A `#` comment that starts a line or follows whitespace (not `'#fff'`).
-const HASH_COMMENT = /(^|\s)#.*$/gmu;
-
 export function language(path) {
   if (SKIPPED.test(path)) return null;
   if (JS_TEST.test(path)) return 'js';
@@ -63,19 +57,65 @@ export function language(path) {
   return null;
 }
 
+/**
+ * Remove comments and keep everything else, strings included. String-aware:
+ * a glob such as 'apps/web/**' or a URL such as 'http://localhost/*' inside a
+ * string never opens a comment, so code after it is still scanned.
+ */
 export function stripComments(text, lang) {
-  return lang === 'py'
-    ? text.replace(HASH_COMMENT, '$1')
-    : text.replace(BLOCK_COMMENT, '').replace(LINE_COMMENT, '$1');
+  const py = lang === 'py';
+  let out = '';
+  let i = 0;
+  const n = text.length;
+  while (i < n) {
+    const c = text[i];
+    const two = text.slice(i, i + 2);
+    if (py ? c === '#' : two === '//') {
+      while (i < n && text[i] !== '\n') i += 1;
+      continue;
+    }
+    if (!py && two === '/*') {
+      const end = text.indexOf('*/', i + 2);
+      i = end === -1 ? n : end + 2;
+      out += ' ';
+      continue;
+    }
+    if (c === '"' || c === "'" || (!py && c === '`')) {
+      const triple = py && text.slice(i, i + 3) === c.repeat(3);
+      const close = triple ? c.repeat(3) : c;
+      let j = i + close.length;
+      while (j < n) {
+        if (text[j] === '\\') {
+          j += 2;
+          continue;
+        }
+        if (text.startsWith(close, j)) {
+          j += close.length;
+          break;
+        }
+        // An unterminated one-line string ends at the newline.
+        if (!triple && c !== '`' && text[j] === '\n') break;
+        j += 1;
+      }
+      out += text.slice(i, j);
+      i = j;
+      continue;
+    }
+    out += c;
+    i += 1;
+  }
+  return out;
 }
 
 /** Real-clock reads in a test that also pins a calendar date; 0 when safe. */
 export function countIn(text, lang = 'js') {
-  const code = stripComments(text, lang);
   const [real, fixed, control] =
     lang === 'py'
       ? [PY_REAL_CLOCK, PY_FIXED_DATE, PY_CLOCK_CONTROL]
       : [JS_REAL_CLOCK, JS_FIXED_DATE, JS_CLOCK_CONTROL];
+  // Most tests never read the clock: skip the comment pass for them.
+  if ((text.match(real) ?? []).length === 0) return 0;
+  const code = stripComments(text, lang);
   const reads = (code.match(real) ?? []).length;
   if (reads === 0 || !fixed.test(code) || control.test(code)) return 0;
   return reads;

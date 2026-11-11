@@ -7,6 +7,7 @@ import {
   RATCHET_PATH,
   RATCHET_SCHEMA,
   scan,
+  stripComments,
   tighten,
   violations,
 } from '../../wall-clock-test-guard.mjs';
@@ -79,6 +80,42 @@ describe('wall-clock-test-guard', () => {
       0
     );
     expect(countIn("const v = 'release-2026-11-07';\nDate.now();")).toBe(0);
+  });
+
+  it('keeps scanning after comment markers that sit inside strings', () => {
+    // Two globs would read as one block comment to a string-blind stripper
+    // and hide the clock read between them.
+    expect(
+      countIn(
+        "const a = 'apps/web/**';\nconst overdue = Date.now() > Date.parse('2026-11-07T06:00:00Z');\nconst b = '**/x';"
+      )
+    ).toBe(1);
+    expect(
+      countIn(
+        "const u = 'http://localhost/*';\nassert(new Date() < new Date(2027, 0, 1));\nconst v = 'x*/';"
+      )
+    ).toBe(1);
+    expect(
+      countIn(
+        'const u = "//cdn.example"; const d = \'2026-11-07\'; Date.now();'
+      )
+    ).toBe(1);
+    expect(
+      countIn(
+        'const t = `a/* ${1} `;\nconst d = "2026-11-07";\nDate.now();\nconst z = `*/`;'
+      )
+    ).toBe(1);
+    expect(
+      countIn("color = '#fff'; due = '2026-11-07'; now = time.time()\n", 'py')
+    ).toBe(1);
+    expect(
+      countIn(
+        'doc = \"\"\"# not a comment\"\"\"\ndue = datetime(2027, 1, 1)\nnow = datetime.now()\n',
+        'py'
+      )
+    ).toBe(1);
+    expect(stripComments("a = 'x' // tail\n/* b */c")).toBe("a = 'x' \n c");
+    expect(stripComments("a = 'x'  # tail\nb\n", 'py')).toBe("a = 'x'  \nb\n");
   });
 
   it('scans JS/TS and Python tests only, never vendored skill trees', () => {
