@@ -97,7 +97,7 @@ describe('isDogfoodAccountEmail', () => {
     ['', 'empty'],
     [null, 'null'],
     [undefined, 'undefined'],
-  ])('rejects %s (%s)', email => {
+  ])('rejects %s (%s)', (email, _label) => {
     expect(classifyDogfoodAccountEmail(email)).toBeNull();
     expect(isDogfoodAccountEmail(email)).toBe(false);
     expect(dogfoodAdmissionAudit(email)).toBeNull();

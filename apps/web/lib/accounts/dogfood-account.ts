@@ -98,3 +98,35 @@ export function dogfoodAdmissionAudit(email: string | null | undefined): {
     emailDomain: FOUNDER_EMAIL_DOMAIN,
   };
 }
+
+const WALK_ID_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+
+/**
+ * A fresh ephemeral dogfood address for one walk or E2E run:
+ * `<founder>+dogfood-tmp-<walkId>@<founder domain>`. Every walk must use its
+ * own address, because a second sign-in code to one address replaces the
+ * first. Without a `walkId` a unique one is minted (UTC date + random hex).
+ * The account is cleaned up EPHEMERAL_DOGFOOD_MAX_AGE_DAYS after creation.
+ */
+export function newDogfoodWalkEmail(
+  walkId?: string,
+  now: Date = new Date()
+): string {
+  const id = walkId?.trim().toLowerCase() ?? mintWalkId(now);
+  const email = `${FOUNDER_EMAIL_LOCAL_PART}+${DOGFOOD_ACCOUNT_EMAIL_TAG}-${EPHEMERAL_SLUG_PREFIX}${id}@${FOUNDER_EMAIL_DOMAIN}`;
+  if (!WALK_ID_PATTERN.test(id) || !isEphemeralDogfoodAccountEmail(email)) {
+    throw new TypeError(
+      'walkId must be hyphen-separated lowercase letters and digits, at most 36 characters'
+    );
+  }
+  return email;
+}
+
+function mintWalkId(now: Date): string {
+  const bytes = new Uint8Array(5);
+  globalThis.crypto.getRandomValues(bytes);
+  const random = Array.from(bytes, byte =>
+    byte.toString(16).padStart(2, '0')
+  ).join('');
+  return `${now.toISOString().slice(0, 10).replaceAll('-', '')}-${random}`;
+}
