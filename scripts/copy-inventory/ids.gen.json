@@ -371,6 +371,7 @@
     "apps/web/components/features/auth/EmailCodeAuthForm.tsx#Request A New Code": "WAIT-50",
     "apps/web/components/features/auth/EmailCodeAuthForm.tsx#Request a new code to try again.": "WAIT-49",
     "apps/web/components/features/auth/EmailCodeAuthForm.tsx#Resend code": "WAIT-54",
+    "apps/web/components/features/auth/EmailCodeAuthForm.tsx#Resend Code": "WAIT-67",
     "apps/web/components/features/auth/EmailCodeAuthForm.tsx#Resend in": "WAIT-52",
     "apps/web/components/features/auth/EmailCodeAuthForm.tsx#Resend Verification Code": "WAIT-53",
     "apps/web/components/features/auth/EmailCodeAuthForm.tsx#Too many incorrect attempts.": "WAIT-48",
