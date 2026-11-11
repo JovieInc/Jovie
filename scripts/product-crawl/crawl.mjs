@@ -3,6 +3,10 @@
 // session) signed in, and write a receipt that ready-gate.mjs judges. Usage:
 //   node scripts/product-crawl/crawl.mjs --origin https://jov.ie --out <dir>
 //     [--storage-state <signed-in Playwright state>] [--unclaimed-handle testartist]
+//     [--deadline-epoch-ms <ms>]  (or CRAWL_DEADLINE_EPOCH_MS)
+// Past the deadline it starts no new page loads and still writes the
+// receipt, which then names how many loads were left (never ready). A crawl
+// that ran into the job timeout used to leave no receipt at all.
 // Desktop (1440x900) and phone (390x844). Measures layout shift, LCP, the
 // longest main-thread stall, load time, console errors, failed same-origin
 // requests, placeholder text and sideways scroll. The public profile is also
@@ -43,8 +47,17 @@ const { values: args } = parseArgs({
     'unclaimed-handle': { type: 'string', default: 'testartist' },
     'storage-state': { type: 'string', default: '' },
     sha: { type: 'string', default: process.env.EXPECTED_COMMIT_SHA || '' },
+    'deadline-epoch-ms': {
+      type: 'string',
+      default: process.env.CRAWL_DEADLINE_EPOCH_MS || '',
+    },
   },
 });
+
+const DEADLINE = Number(args['deadline-epoch-ms']) || Infinity;
+const started = Date.now();
+const pastDeadline = () => Date.now() >= DEADLINE;
+const minutes = () => ((Date.now() - started) / 60_000).toFixed(1);
 
 const VIEWPORTS = {
   desktop: { width: 1440, height: 900 },
@@ -146,10 +159,16 @@ async function visit({ route, target, viewport, identity, fixture, collect }) {
       timeout: 30_000,
     });
     row.loadMs = Date.now() - t0;
-    await page.waitForTimeout(2500); // let late shifts and stalls land
     row.status = res?.status() ?? 0;
     const finalPath = new URL(page.url()).pathname;
     row.authGated = SIGN_IN.test(finalPath) && !SIGN_IN.test(target);
+    // A load that landed on the sign-in wall is judged only on that fact
+    // (ready-gate); the sign-in page itself is crawled as its own route.
+    if (row.authGated && !collect) {
+      await ctx.close();
+      return row;
+    }
+    await page.waitForTimeout(2500); // let late shifts and stalls land
     const m = await page.evaluate(MEASURE);
     row.cls = Number(m.cls.toFixed(4));
     row.lcpMs = Math.round(m.lcp);
@@ -273,15 +292,39 @@ for (const route of routes) {
   }
 }
 const jobs = new Map();
+let loadsLeft = 0;
 for (let i = 0; i < todo.length; i += 4) {
+  if (pastDeadline()) {
+    loadsLeft = todo.length - i;
+    console.warn(
+      `[crawl] deadline reached after ${minutes()}m: ${loadsLeft} of ${todo.length} page loads not made`
+    );
+    break;
+  }
   const batch = todo.slice(i, i + 4);
   const rows = await Promise.all(batch.map(safeVisit));
   rows.forEach((row, k) => jobs.set(row, batch[k]));
   pages.push(...rows);
+  if ((i / 4) % 25 === 24)
+    console.log(
+      `[crawl] ${i + batch.length}/${todo.length} page loads, ${minutes()}m`
+    );
 }
 // A page that trips a timing threshold is loaded again, one at a time so the
 // other pages' work doesn't count against it, and judged on the median.
-for (const row of pages.filter(timingSuspect)) {
+let resamplesLeft = 0;
+const suspects = pages.filter(timingSuspect);
+console.log(
+  `[crawl] re-loading ${suspects.length} timing suspects, ${minutes()}m`
+);
+for (const [k, row] of suspects.entries()) {
+  if (pastDeadline()) {
+    resamplesLeft = suspects.length - k;
+    console.warn(
+      `[crawl] deadline reached: ${resamplesLeft} timing suspects judged on one load`
+    );
+    break;
+  }
   const again = [];
   for (let n = 1; n < TIMING_SAMPLES; n += 1) {
     const r = await safeVisit(jobs.get(row));
@@ -307,6 +350,7 @@ const receipt = {
   sitemapProblem,
   uncovered,
   closedInProduction,
+  outOfTime: loadsLeft || resamplesLeft ? { loadsLeft, resamplesLeft } : null,
   pages,
 };
 const verdict = productReady(receipt);
