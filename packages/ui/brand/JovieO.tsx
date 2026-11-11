@@ -55,6 +55,11 @@ export interface JovieOProps {
 
 const BUSY: ReadonlySet<JovieOState> = new Set(['loading', 'thinking']);
 
+// Fixed luminance controls, never themed pigment. The fallbacks keep the
+// self-contained SVG usable without the app token stylesheet.
+const MASK_REVEAL = 'var(--brand-mask-reveal, white)';
+const MASK_CONCEAL = 'var(--brand-mask-conceal, black)';
+
 /**
  * The one O. Every Jovie mark, loader and Ovie eye is this component.
  * Colour is currentColor: the mark is one ink per surface, never an accent.
@@ -198,7 +203,7 @@ export function JovieO({
             d={parts.tailPath}
             pathLength={100}
             fill='none'
-            stroke='#fff'
+            stroke={MASK_REVEAL}
             strokeWidth={parts.tailWidth}
             strokeLinecap='round'
           />
@@ -206,7 +211,7 @@ export function JovieO({
             cx={parts.seed.cx}
             cy={parts.seed.cy}
             r={parts.seed.r}
-            fill='#fff'
+            fill={MASK_REVEAL}
           />
           {BUSY.has(domState) ? null : (
             <ellipse
@@ -214,7 +219,7 @@ export function JovieO({
               cy={parts.cy}
               rx={parts.counterRx + parts.box / 100}
               ry={parts.counterRy + parts.box / 100}
-              fill='#fff'
+              fill={MASK_REVEAL}
             />
           )}
           <ellipse
@@ -224,12 +229,12 @@ export function JovieO({
             cy={parts.cy}
             rx={parts.counterRx}
             ry={parts.counterRy}
-            fill='#000'
+            fill={MASK_CONCEAL}
           />
           <path
             d={parts.seamPath}
             fill='none'
-            stroke='#000'
+            stroke={MASK_CONCEAL}
             strokeWidth={parts.seam}
           />
         </mask>
@@ -242,12 +247,12 @@ export function JovieO({
             width={width}
             height={parts.box}
           >
-            <rect width={width} height={parts.box} fill='#fff' />
+            <rect width={width} height={parts.box} fill={MASK_REVEAL} />
             <polygon
               ref={notchRef}
               className='jo-lid'
               points={vPoints(notchWithBleed)}
-              fill='#000'
+              fill={MASK_CONCEAL}
             />
           </mask>
         ) : null}

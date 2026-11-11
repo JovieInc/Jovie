@@ -154,6 +154,15 @@ export const SOURCE_VALIDATION_GUARDS = Object.freeze([
     covers: ['scripts/layout-guard-pen-contracts.mjs'],
   },
   {
+    id: 'onboarding-browser',
+    name: 'onboarding recovery browser proof',
+    command:
+      'pnpm --filter @jovie/web exec playwright test --config=playwright.config.storybook.ts tests/e2e/storybook-onboarding-recovery.spec.ts --output=.cache/onboarding-recovery-results --project=chromium --reporter=line',
+    when: /^apps\/web\/(?:components\/features\/onboarding\/|tests\/e2e\/storybook-onboarding-recovery\.spec\.ts$)/,
+    covers: ['tests/e2e/storybook-onboarding-recovery.spec.ts'],
+    heavy: true,
+  },
+  {
     // Measured >180s on a laptop: CI-grade, run with --thorough.
     id: 'control-affected',
     name: 'control-plane affected tests (script wiring in ci-fast-lanes)',
@@ -215,6 +224,10 @@ export const NOT_LOCAL = Object.freeze([
   },
   { match: 'lint:motion-css', reason: 'covered by the web lint pass in CI' },
   { match: 'component-ship-gate', reason: 'preflight:changed ship-gate check' },
+  {
+    match: 'component-certificate:gate',
+    reason: 'pre-push runs it right after component-ship-gate',
+  },
   {
     match: 'mac-header-two-lines-v1',
     reason: 'preflight:changed merge-group-unit-guards (narrowed)',

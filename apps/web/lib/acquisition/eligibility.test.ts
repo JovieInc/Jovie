@@ -39,6 +39,34 @@ function withReceipt(next: ConeEvidence): ConeEvidence[] {
 }
 
 describe('evaluateAcquisitionEligibility', () => {
+  it('holds everyone on the waitlist until the would-they-buy test passes', () => {
+    const missing = evaluateAcquisitionEligibility({
+      evidence: allGreen().filter(
+        item => item.requirement !== 'buyer_would_pay'
+      ),
+      now: NOW,
+    });
+    expect(missing.eligible).toBe(false);
+    expect(missing.firstBlocker?.id).toBe('buyer_would_pay');
+
+    const noPay = evaluateAcquisitionEligibility({
+      evidence: withReceipt(
+        receipt('buyer_would_pay', {
+          detail: 'Latest completed main run concluded failure.',
+          status: 'red',
+        })
+      ),
+      now: NOW,
+    });
+    expect(noPay.verdict).toBe('BLOCKED');
+    expect(noPay.firstBlocker?.id).toBe('buyer_would_pay');
+    // It sits after the product surfaces, so a broken surface is worked first.
+    const ids = REVENUE_CONE_REQUIREMENTS.map(requirement => requirement.id);
+    expect(ids.indexOf('buyer_would_pay')).toBeGreaterThan(
+      ids.indexOf('profile_truth')
+    );
+  });
+
   it('is eligible only when every cone requirement is green and current', () => {
     const result = evaluateAcquisitionEligibility({
       evidence: allGreen(),

@@ -19,6 +19,6 @@ stale and caused failing PRs):
   `auth.jwt()` SQL. See `.claude/rules/db.md`.
 - **Auth:** self-hosted Better Auth. Clerk is retired — never import `@clerk/*`
   or add `CLERK_*` env vars. See `.claude/rules/auth.md`.
-- **Required checks:** PR Ready, Migration Guard, Fork PR Gate, PR Size Guard
-  (`.github/BRANCH_PROTECTION.md`). Report exact check failures — never ignore them.
+- **Required checks:** PR Ready, Migration Guard, Fork PR Gate, PR Size Guard,
+  Company guards (`.github/BRANCH_PROTECTION.md`). Report exact check failures — never ignore them.
 - **Design system:** `DESIGN.md` (Noir Ion) + `.claude/rules/ui.md`.

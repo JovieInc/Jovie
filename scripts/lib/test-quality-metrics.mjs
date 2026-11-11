@@ -9,6 +9,9 @@ export function aggregateByTier(state, surfaces) {
   const out = {};
   for (const [file, m] of Object.entries(state.modules ?? {})) {
     if (m.status !== 'scored' || !(m.valid > 0)) continue;
+    // Tiers map apps/web paths; @jovie/ui modules share the sweep state under
+    // their packages/ui/ key and are certified per component instead.
+    if (file.startsWith('packages/')) continue;
     const t = tierFor(file, surfaces).name;
     const a = (out[t] ??= {
       modules: 0,

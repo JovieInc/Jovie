@@ -14,6 +14,8 @@ import {
 import { homedir, tmpdir } from 'node:os';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { proseOnly } from './lib/pr-prose.mjs';
+import { wipGate } from './lib/pr-wip-gate.mjs';
 import { isRepairPr, lintPrBody } from './lib/preflight-changed.mjs';
 import { requiresWin } from './lib/wins-ledger.mjs';
 import {
@@ -26,30 +28,6 @@ const PR_URL_PLACEHOLDER = '<PR URL, set after open>';
 export const CUSTOMER_MARKER =
   '<!-- customer-changelog/v1 {"releaseWorthy":false} -->';
 const REPOSITORY = 'JovieInc/Jovie';
-
-export function proseOnly(body) {
-  let fence = '';
-  return body
-    .split('\n')
-    .map(line => {
-      const marker = line.match(/^ {0,3}(`{3,}|~{3,})/);
-      if (fence) {
-        if (
-          marker &&
-          marker[1][0] === fence[0] &&
-          marker[1].length >= fence.length
-        )
-          fence = '';
-        return '';
-      }
-      if (marker) {
-        fence = marker[1];
-        return '';
-      }
-      return line.replace(/(`+)([\s\S]*?)\1(?!`)/g, '');
-    })
-    .join('\n');
-}
 
 export function commonDirectories(paths) {
   let dirs = [...new Set(paths.map(p => path.posix.dirname(p)))].sort();
@@ -110,6 +88,11 @@ export function evidenceFromBody(body = '') {
   const red = section(body, 'Red-before-green');
   return {
     metric,
+    metricAfter:
+      metric && parts[4] !== '' && Number.isFinite(Number(parts[4]))
+        ? parts[4]
+        : undefined,
+    verifyLink: value(win, 'Verify'),
     claim: value(win, 'Claim'),
     area: value(win, 'Area'),
     theme: value(win, 'Theme'),
@@ -175,7 +158,7 @@ function blastRadius(paths) {
 
 /** @param {{
  *   title: string, files: Array<{ filename: string, status?: string, patch?: string, previous_filename?: string }>,
- *   labels?: string[], summary?: string, metric?: string, claim?: string, area?: string, theme?: string,
+ *   labels?: string[], summary?: string, metric?: string, metricAfter?: string, verifyLink?: string, claim?: string, area?: string, theme?: string,
  *   perMerge?: boolean, failingCommand?: string, failingRun?: string, customerVisible?: string, prUrl?: string, number?: string | number, failingLog?: string,
  * }} input */
 export function draftBody({
@@ -184,6 +167,8 @@ export function draftBody({
   labels = [],
   summary,
   metric,
+  metricAfter,
+  verifyLink,
   claim,
   area,
   theme,
@@ -209,7 +194,7 @@ export function draftBody({
     const parts = (metric ?? '').split('|').map(s => s.trim());
     const [name, unit, better, before, source, ...query] = parts;
     const line = metric
-      ? `- Metric: ${name} | ${unit} | ${better} | ${before} | ? | ${source} | ${query.join('|')}`
+      ? `- Metric: ${name} | ${unit} | ${better} | ${before} | ${metricAfter ?? '?'} | ${source} | ${query.join('|')}`
       : '';
     out.push(
       [
@@ -225,9 +210,9 @@ export function draftBody({
             .toLowerCase()
         }`,
         line,
-        `- Verify: ${prUrl}`,
+        `- Verify: ${verifyLink || prUrl}`,
         ...(perMerge ? ['- Per-merge: yes'] : []),
-        '- Pending: yes',
+        ...(metricAfter === undefined ? ['- Pending: yes'] : []),
       ].join('\n')
     );
   } else out.push('## Win\n\nn/a');
@@ -401,6 +386,8 @@ function parse(argv) {
     else if (f === '--summary') a.summary = v();
     else if (f === '--label') a.labels.push(v());
     else if (f === '--metric') a.metric = v();
+    else if (f === '--metric-after') a.metricAfter = v();
+    else if (f === '--verify-link') a.verifyLink = v();
     else if (f === '--claim') a.claim = v();
     else if (f === '--area') a.area = v();
     else if (f === '--theme') a.theme = v();
@@ -411,6 +398,7 @@ function parse(argv) {
     else if (f === '--customer-visible') a.customerVisible = v();
     else if (f === '--body-file') a.bodyFile = v();
     else if (f === '--draft') a.draft = true;
+    else if (f === '--wip-override') a.wipOverride = v();
     else if (f === '--dry-run') a.dryRun = true;
     else if (f === '--no-push') a.noPush = true;
     else if (!f.startsWith('--')) a.number = f;
@@ -731,6 +719,11 @@ export async function main(
           : evidenceFromBody(pr.body);
       }
     }
+    // A replacement baseline needs its own after-value and verification source.
+    if (a.metric !== undefined) {
+      derived.metricAfter = undefined;
+      derived.verifyLink = undefined;
+    }
     const input = {
       ...derived,
       ...Object.fromEntries(
@@ -806,6 +799,13 @@ export async function main(
       await refreshBodyChecks(a.repo, pr, body, title, { github, pause, log });
       return 0;
     }
+    const wip = wipGate(a, git(['branch', '--show-current']).stdout.trim(), {
+      execute,
+      log,
+      record,
+    });
+    if (wip.refused) return 3;
+    if (wip.override) labels.push('wip-override');
     const dir = mkdtempSync(path.join(tmpdir(), 'pr-open-create-'));
     try {
       const bodyFile = path.join(dir, 'body.md');

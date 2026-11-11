@@ -20,7 +20,7 @@
  * Schedule: every 15 minutes (configured in vercel.json)
  */
 
-import { sql as drizzleSql, eq } from 'drizzle-orm';
+import { asc, sql as drizzleSql, eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { describeAcquisitionBlock } from '@/lib/acquisition/eligibility';
 import { getAcquisitionEligibility } from '@/lib/acquisition/eligibility.server';
@@ -62,6 +62,7 @@ import { processOutreachBatch } from '@/lib/leads/outreach-batch';
 import { pipelineWarn } from '@/lib/leads/pipeline-logger';
 import { processLeadBatch } from '@/lib/leads/process-batch';
 import { cleanupExpiredSuppressions } from '@/lib/notifications/suppression';
+import { companyHistoryCronJob } from '@/lib/ovie/company-history/configured.server';
 import { refreshCompanyStateCache } from '@/lib/ovie/company-state.server';
 import { applySummerCardDefaults } from '@/lib/ovie/summer-cards.server';
 import { refreshProofStats } from '@/lib/proof-stats/publish.server';
@@ -222,6 +223,8 @@ export async function GET(request: Request) {
     };
   });
 
+  results.companyHistory = await companyHistoryCronJob(minute, runSubJob);
+
   // Default-plus-deadline contract: an overdue founder ask records its
   // declared default (approve or reject) so nothing waits on Tim forever.
   // One indexed KV read per run; at most 100 compare-and-set writes.
@@ -282,54 +285,61 @@ export async function GET(request: Request) {
         .returning();
     }
 
-    if (!settings?.enabled || !settings.discoveryEnabled) {
+    if (!settings?.enabled) {
       return { skipped: true, reason: 'pipeline_disabled' };
     }
 
-    // Reset daily query budget if past reset time (or never initialized)
-    settings = await resetBudgetIfNeeded(settings);
+    // Discovery (SerpAPI spend) stays behind its own `discoveryEnabled` flag.
+    let discoveryResult: Awaited<ReturnType<typeof runDiscovery>> | null = null;
+    if (settings.discoveryEnabled) {
+      // Reset daily query budget if past reset time (or never initialized)
+      settings = await resetBudgetIfNeeded(settings);
 
-    const keywords = await db.select().from(discoveryKeywords);
-    const discoveryResult = await runDiscovery(settings, keywords);
+      const keywords = await db.select().from(discoveryKeywords);
+      discoveryResult = await runDiscovery(settings, keywords);
 
-    // Health warning: zero results across all queries
-    if (
-      discoveryResult.queriesUsed > 0 &&
-      discoveryResult.newLeadsFound === 0 &&
-      discoveryResult.candidatesProcessed === 0
-    ) {
-      pipelineWarn(
-        'discovery',
-        'Zero results across all queries — check SerpAPI key and quota',
-        {
-          queriesUsed: discoveryResult.queriesUsed,
-          budgetRemaining: discoveryResult.budgetRemaining,
-        }
-      );
+      // Health warning: zero results across all queries
+      if (
+        discoveryResult.queriesUsed > 0 &&
+        discoveryResult.newLeadsFound === 0 &&
+        discoveryResult.candidatesProcessed === 0
+      ) {
+        pipelineWarn(
+          'discovery',
+          'Zero results across all queries — check SerpAPI key and quota',
+          {
+            queriesUsed: discoveryResult.queriesUsed,
+            budgetRemaining: discoveryResult.budgetRemaining,
+          }
+        );
+      }
     }
 
-    // Qualify any newly discovered leads
+    // Qualify any unqualified leads on every tick, whatever their source.
+    // Leads added by URL (POST /api/admin/leads) or left `discovered` after a
+    // failed scrape must not wait for discovery to find something new.
     let qualificationResult = null;
-    if (discoveryResult.newLeadsFound > 0) {
-      const newLeads = await db
-        .select({ id: leads.id })
-        .from(leads)
-        .where(eq(leads.status, 'discovered'))
-        .limit(30);
-      if (newLeads.length > 0) {
-        qualificationResult = await processLeadBatch(newLeads.map(l => l.id));
+    const unqualifiedLeads = await db
+      .select({ id: leads.id })
+      .from(leads)
+      .where(eq(leads.status, 'discovered'))
+      .orderBy(asc(leads.updatedAt))
+      .limit(30);
+    if (unqualifiedLeads.length > 0) {
+      qualificationResult = await processLeadBatch(
+        unqualifiedLeads.map(l => l.id)
+      );
 
-        // Health warning: high qualification error rate
-        if (
-          qualificationResult.total > 0 &&
-          qualificationResult.error > qualificationResult.total * 0.5
-        ) {
-          pipelineWarn('qualify', 'High error rate in qualification batch', {
-            errorRate: qualificationResult.error / qualificationResult.total,
-            errors: qualificationResult.error,
-            total: qualificationResult.total,
-          });
-        }
+      // Health warning: high qualification error rate
+      if (
+        qualificationResult.total > 0 &&
+        qualificationResult.error > qualificationResult.total * 0.5
+      ) {
+        pipelineWarn('qualify', 'High error rate in qualification batch', {
+          errorRate: qualificationResult.error / qualificationResult.total,
+          errors: qualificationResult.error,
+          total: qualificationResult.total,
+        });
       }
     }
 
@@ -337,7 +347,10 @@ export async function GET(request: Request) {
     const autoApproveResult = await runAutoApprove(settings);
 
     return {
-      discovery: discoveryResult,
+      discovery: discoveryResult ?? {
+        skipped: true,
+        reason: 'discovery_disabled',
+      },
       qualification: qualificationResult,
       autoApprove: autoApproveResult,
     } as unknown as Record<string, unknown>;

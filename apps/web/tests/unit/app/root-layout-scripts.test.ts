@@ -11,7 +11,7 @@ describe('root layout scripts', () => {
   it('keeps global bootstrap scripts outside client-rendered script tags', () => {
     expect(layoutSource).not.toContain("import Script from 'next/script';");
     expect(layoutSource).toContain(
-      "<script src='/electron-runtime-init.js' />"
+      "<script async src='/electron-runtime-init.js' />"
     );
     expect(layoutSource).toContain("<script src='/theme-init.js' />");
     expect(layoutSource).toContain(

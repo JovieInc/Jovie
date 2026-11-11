@@ -1,6 +1,7 @@
 import { render, screen } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { describe, expect, it, vi } from 'vitest';
+import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import { UnfazedProfileClient } from './UnfazedProfileClient';
 
 vi.mock('@/components/providers/QueryProvider', () => ({
@@ -23,10 +24,11 @@ vi.mock('./PublicProfileFixture', () => ({
 
 describe('UnfazedProfileClient', () => {
   it('mounts the deterministic fixture after hydration', async () => {
-    render(<UnfazedProfileClient />);
+    const { container } = render(<UnfazedProfileClient />);
 
     expect(
       await screen.findByTestId('public-profile-fixture')
     ).toHaveTextContent('short-name:unclaimed');
+    await expectNoA11yViolations(container);
   });
 });

@@ -4,6 +4,8 @@
 // the route manifest, copy truth sources, the one primary action, product
 // imagery, and tokenized styles. Changing the page means changing its typed
 // records, not rewriting a dozen source-string guards.
+// Frame checks (labels, keycaps and edges inside their frames) live in
+// homepage-frames.test.tsx, so this file stays under the size limit.
 import { readdirSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { render, screen, within } from '@testing-library/react';
@@ -76,7 +78,17 @@ const HOMEPAGE_SOURCES = [
   'components/homepage/HomepageSpecSections.tsx',
 ] as const;
 
-const HOMEPAGE_STYLES = ['components/homepage/HomepageEditorial.css'] as const;
+const HOMEPAGE_STYLES = [
+  'components/homepage/v3/stage.css',
+  'components/homepage/v3/product-ui.css',
+  'components/homepage/v3/surfaces.css',
+  'components/homepage/v3/phone.css',
+  'components/homepage/v3/chapters.css',
+  'components/homepage/v3/specs.css',
+  'components/homepage/v3/form.css',
+  'components/homepage/v3/responsive.css',
+  'components/homepage/v3/cinema.css',
+] as const;
 
 const PRICE_TEXT = /\$\s?\d|\d+\s?\/\s?mo\b|\bper month\b|\b\d+-day\b/i;
 
@@ -122,19 +134,21 @@ describe('homepage contract', { timeout: 60_000 }, () => {
 
   it('renders one h1, the locked line, and one h2 per chapter', async () => {
     const { HOMEPAGE_EDITORIAL_COPY: copy } = await loadCopy();
+    const { HOMEPAGE_SPECS_COPY: specs } = await import(
+      '@/data/homepageProductUi'
+    );
     await renderHomePage();
 
     const h1s = screen.getAllByRole('heading', { level: 1 });
     expect(h1s).toHaveLength(1);
-    expect(h1s[0]).toHaveTextContent(
-      'Jovie helps you move your music forward.'
-    );
-    expect(copy.hero.headline).toBe('Jovie helps you move your music forward.');
+    expect(h1s[0]).toHaveTextContent('Move your music forward.');
+    expect(copy.hero.headline).toBe('Move your music forward.');
     expect(
       screen.getAllByRole('heading', { level: 2 }).map(h => h.textContent)
     ).toEqual([
       copy.profile.headline,
       copy.releases.headline,
+      specs.headline,
       copy.invite.headline,
     ]);
   });
@@ -154,7 +168,7 @@ describe('homepage contract', { timeout: 60_000 }, () => {
       const close = container.querySelector(`#${HOMEPAGE_INVITE_ANCHOR}`);
       expect(close).toHaveAttribute('data-testid', 'marketing-section-cta');
       expect(close?.contains(forms[0] ?? null)).toBe(true);
-      expect(within(forms[0]!).getByRole('radiogroup')).toBeVisible();
+      expect(within(forms[0]!).getAllByRole('radio')).toHaveLength(6);
 
       // The hero's primary action scrolls to that form; no public signup.
       const primary = screen.getByTestId('homepage-primary-cta');
@@ -192,21 +206,33 @@ describe('homepage contract', { timeout: 60_000 }, () => {
     }
   });
 
-  it('shows only real product captures, with no person but Tim White', async () => {
+  it('shows no real person: only the featured demo artist inside the product UI', async () => {
     const { HOMEPAGE_EDITORIAL_COPY: copy } = await loadCopy();
+    const { HOMEPAGE_FEATURED_ARTIST: artist } = await import(
+      '@/data/demoArtists'
+    );
     const { container } = await renderHomePage();
     const sources = [...container.querySelectorAll('section img')].map(image =>
       (image.getAttribute('src') ?? '').replace(/\?v=\w+$/, '')
     );
-    // The template profile (jov.ie/you, monogram avatar, abstract art), then
-    // the releases workspace and the featured release from Tim White's own
-    // catalog. Every capture comes from the screenshot registry.
-    expect(sources).toEqual([
-      '/product-screenshots/template-profile-live-phone.png',
-      '/product-screenshots/releases-dashboard-full.png',
-      '/product-screenshots/profile-state-release.png',
-    ]);
-    expect(copy.profile.scenarioId).toBe('template-profile-live-mobile');
+    // Tim, 2026-11-08: the homepage does not feature him. Until a real artist
+    // opts in, the product UI is labeled Example artist (procedural art, no
+    // people, no verified badge). No real person renders on `/`.
+    const allowed = [
+      artist.avatarSrc,
+      ...artist.releases.map(release => release.src),
+    ];
+    expect(artist.demo).toBe(true);
+    expect(artist.name).toBe('Example artist');
+    expect(container.querySelector('.hv3-pp__badge, .hv3-insp__ok')).toBeNull();
+    expect(sources.length).toBeGreaterThan(0);
+    expect(sources.filter(src => !allowed.includes(src))).toEqual([]);
+    expect([...new Set(sources)].sort()).toEqual([...new Set(allowed)].sort());
+    expect(sources.some(src => /tim-white|img\/releases\//.test(src))).toBe(
+      false
+    );
+    expect(container.textContent).not.toContain('Tim White');
+    expect(copy.profile.alt).toBeTruthy();
   });
 
   it('keeps copy in data and free of em dashes and stock promotion', async () => {
@@ -214,7 +240,7 @@ describe('homepage contract', { timeout: 60_000 }, () => {
     const lines = JSON.stringify(HOMEPAGE_EDITORIAL_COPY);
     expect(lines).not.toContain('—');
     expect(lines).not.toMatch(
-      /\b(seamless|unlock|elevate|world-class|all-in-one|supercharge)\b/i
+      /\b(seamless|unlock|elevate|world-class|all-in-one|supercharge|quiet workspace)\b/i
     );
     const component = read('components/homepage/HomepageEditorial.tsx');
     // Rendered text comes from props/copy, not JSX literals.
@@ -330,5 +356,112 @@ describe('homepage contract', { timeout: 60_000 }, () => {
     for (const path of HOMEPAGE_SOURCES) {
       expect(read(path), `${path}: uppercase`).not.toMatch(/\buppercase\b/);
     }
+  });
+
+  it('moves the cinema layer by transform and opacity only, behind reduced motion', () => {
+    const css = read('components/homepage/v3/cinema.css').replace(
+      /\/\*[\s\S]*?\*\//g,
+      ''
+    );
+    // Scroll-driven only, and only where the user has not asked for less motion.
+    expect(css).toMatch(
+      /@supports \(animation-timeline: view\(\)\)\s*\{\s*@media \(prefers-reduced-motion: no-preference\)/
+    );
+    expect(css).not.toMatch(/addEventListener|position:\s*(?:fixed|sticky)/);
+    // view() binds to the nearest scroll container, so the hero and chapters
+    // clip without becoming one (overflow: hidden would idle every timeline).
+    expect(css).toMatch(
+      /@supports \(animation-timeline: view\(\)\)\s*\{\s*\.hv3-hero,\s*\.hv3-chapter\s*\{\s*overflow: clip;\s*\}/
+    );
+    // The horizon line paints above the chapter rule's hairline, which would
+    // otherwise cover it; the glow stays behind the copy.
+    expect(css).toMatch(
+      /\.hv3-chapter::after\s*\{[^}]*z-index:\s*1;[^}]*height:\s*1px;/
+    );
+    expect(css).toMatch(/\.hv3-chapter::before\s*\{[^}]*z-index:\s*-1;/);
+    // Keyframes touch only compositor properties, and never fade to nothing.
+    for (const [, body] of css.matchAll(
+      /@keyframes [\w-]+\s*\{([\s\S]*?\})\s*\}/g
+    )) {
+      const props = [...body.matchAll(/([a-z-]+)\s*:/g)].map(
+        ([, prop]) => prop
+      );
+      expect(new Set(props)).toEqual(new Set(['opacity', 'transform']));
+      expect(body).not.toMatch(/opacity:\s*0(?:\.0+)?\s*;/);
+    }
+  });
+
+  it('holds the premium bar: one grid, exact radii, no rings around the form', async () => {
+    const strip = (path: string) => read(path).replace(/\/\*[\s\S]*?\*\//g, '');
+    const cinema = strip('components/homepage/v3/cinema.css');
+    // Frame guides on both content edges, drawn as hard stops on the box.
+    expect(cinema).toMatch(
+      /\.hv3-hero,\s*\.hv3-chapter\s*\{\s*background-image: linear-gradient\([^;]*var\(--hv3-side\)[^;]*calc\(100% - var\(--hv3-side\)\)/
+    );
+    // Print-sheet crosses and gradient-clipped headlines are banned (ASR-033).
+    expect(cinema).not.toMatch(/\.hv3-rule::before/);
+    expect(cinema).not.toMatch(/--hv3-mark/);
+    expect(cinema).not.toMatch(/background-clip:\s*text/);
+    // The ion light stays on the chapter edge.
+    expect(cinema).toMatch(/\.hv3-chapter::before\s*\{[^}]*top:\s*0;/);
+    expect(cinema).toMatch(/\.hv3-chapter::after\s*\{[^}]*top:\s*0;/);
+    // One box: the camera is square to the page and no stage has depth, so
+    // every mockup's edges can sit on the frame guides.
+    const v3 = [
+      'stage',
+      'chapters',
+      'specs',
+      'surfaces',
+      'product-ui',
+      'responsive',
+    ].map(name => strip(`components/homepage/v3/${name}.css`));
+    expect(v3[0]).toMatch(/--hv3-cam: rotate\(0deg\);/);
+    expect(v3[0]).toMatch(/--hv3-box: 78rem;/);
+    for (const css of v3) {
+      expect(css).not.toMatch(
+        /perspective|translateZ|translate3d|rotate[XY]\(/
+      );
+    }
+    // Stages span exactly the content box, at every zoom.
+    const chapters = v3[1];
+    expect(chapters).toMatch(
+      /\.hv3-frame\s*\{\s*margin-inline: calc\(var\(--hv3-side\) \/ var\(--hv3-z\)\);/
+    );
+    expect(chapters).toMatch(
+      /\.hv3-stage--hero\s*\{[^}]*right: calc\(var\(--hv3-side\) \/ var\(--hv3-z\)\);\s*left: calc\(var\(--hv3-side\) \/ var\(--hv3-z\)\);/
+    );
+    for (const rig of ['hero', 'releases']) {
+      expect(chapters).toMatch(
+        new RegExp(
+          `\\.hv3-rig--${rig}\\s*\\{[^}]*left: 0;\\s*width: var\\(--hv3-box\\);`
+        )
+      );
+    }
+    // The hero rig scales from its top-left corner, so the 390 crop keeps the
+    // approved window region (the list, not the inspector) only with the
+    // offset recomputed for that origin.
+    expect(chapters).toMatch(/\.hv3-rig--hero\s*\{[^}]*transform-origin: 0 0;/);
+    expect(v3[5]).toMatch(
+      /\.hv3-rig--hero\s*\{[^}]*left: calc\(-9\.705rem - var\(--hv3-gutter\)\);[^}]*scale\(0\.72\)/
+    );
+    // The nav's backing runs edge to edge once scrolled.
+    expect(strip('components/homepage/v3/form.css')).toMatch(
+      /\.home-viewport \.header-nav--docked::before\s*\{\s*right: calc\(50% - 50vw\);\s*left: calc\(50% - 50vw\);/
+    );
+    // Controls are exact, never pills.
+    for (const path of [
+      'components/homepage/v3/chapters.css',
+      'components/homepage/v3/form.css',
+    ]) {
+      const css = strip(path);
+      for (const block of css.match(
+        /\.hv3-btn\s*\{[^}]*\}|waitlist-chip\s*\{[^}]*\}|inline-subscribe"\][^{]*\{[^}]*\}/g
+      ) ?? []) {
+        expect(block, path).not.toMatch(/radius-pill/);
+      }
+    }
+    // The invitation has no ring around its form.
+    const { container } = await renderHomePage();
+    expect(container.querySelector('.hv3-invite .hv3-orbit')).toBeNull();
   });
 });

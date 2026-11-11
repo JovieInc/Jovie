@@ -40,7 +40,7 @@
       "scripts/setup*",
       ".codex/**"
     ],
-    "bodySha256": "ef991019ec62499714178175681e240c3d7da523e236b57e4e09c5b66386086f"
+    "bodySha256": "e9c46b96f7549ccf1a2c9a380c6cae1497bda7c6e10c9ae8e957ae7944e62d7e"
   },
   {
     "file": ".claude/rules/event-driven.md",
@@ -90,6 +90,15 @@
     "bodySha256": "164b4bac543f555d7584cfdf8ba8e3d62767b14bbaae1f8128f98d1220470d3d"
   },
   {
+    "file": ".claude/rules/investor-deck.md",
+    "paths": [
+      "scripts/investor-deck/**",
+      "apps/web/lib/investors/**",
+      "apps/web/components/features/pitch/**"
+    ],
+    "bodySha256": "ebd4fe95307adefcf3ce0f8bf7ad5e5ff7ed876aa58a3ea6182b26d88daebabd"
+  },
+  {
     "file": ".claude/rules/ios.md",
     "paths": ["apps/ios/**", "**/*.swift"],
     "bodySha256": "030e26d1dbf17cde238efb27e147635a2a90ddd6434eb2196420779fb2af5135"
@@ -129,7 +138,7 @@
   {
     "file": ".claude/rules/pen.md",
     "paths": ["**/*.pen", "scripts/agent/pen*", "docs/design-system/**"],
-    "bodySha256": "6dcfcd4b052bd71873bfd431fdc265a7452384f4823f41575924c08598c53582"
+    "bodySha256": "7c5f12d61a0952c616c5f03f801a8742a61d33a9ab9a697fe3db259df5fe74a6"
   },
   {
     "file": ".claude/rules/pr-stacking.md",

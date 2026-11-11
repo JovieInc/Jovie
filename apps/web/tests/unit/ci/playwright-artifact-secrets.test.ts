@@ -40,6 +40,7 @@ import {
   MAX_PLAYWRIGHT_PNG_WIDTH,
   validPlaywrightPng,
 } from '../../../../../scripts/lib/playwright-png.mjs';
+import productionSmokeProducers from './fixtures/production-smoke-producers.json';
 
 const webRoot = resolve(import.meta.dirname, '../../..');
 const repoRoot = resolve(webRoot, '../..');
@@ -116,7 +117,7 @@ const producerStageExempt = new Set([
 ]);
 // Jobs that must keep the receipt even if their uploads move elsewhere.
 const producerStageRequired = [
-  ...'ci-fast-remaining ci-visual-snapshot-compare ci-build-layout ci-storybook-surfaces ci-layout-guard ci-mobile-overflow ci-lighthouse-pr ci-a11y ci-a11y-authed ci-e2e-smoke ci-golden-path ci-admin-smoke ci-e2e-tests ci-smoke-required'
+  ...'ci-fast-remaining ci-visual-snapshot-compare ci-build-layout ci-storybook-surfaces ci-layout-guard ci-mobile-overflow ci-lighthouse-pr ci-lighthouse-dashboard-pr ci-a11y ci-a11y-authed ci-e2e-smoke ci-golden-path ci-admin-smoke ci-e2e-tests ci-smoke-required'
     .split(' ')
     .map(job => `ci.yml:${job}`),
   'e2e-full-matrix.yml:e2e-full-matrix',
@@ -1562,11 +1563,7 @@ ${fixtureCheckout}
   );
 
   it('requires step-scoped Markdown allowance for every production smoke producer', () => {
-    const expected = [
-      'postdeploy-probes.yml:auth-smoke:Run production auth smoke tests',
-      'production-controller.yml:ci-post-deploy-auth-smoke:Run production auth smoke tests',
-      'production-release.yml:promote-production:Prove canonical navigation budgets on exact staged build',
-    ];
+    const expected = productionSmokeProducers;
     const discovered = readdirSync(workflowsRoot)
       .filter(name => /\.ya?ml$/.test(name))
       .flatMap(file => {

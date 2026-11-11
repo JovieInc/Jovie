@@ -52,6 +52,7 @@ HOSTED_DEEP_EVIDENCE_JOBS = (
     ("cost-anomaly-gate.yml", "evaluate"),
     ("visual-a11y.yml", "ci-visual-path-changes"),
     ("visual-a11y.yml", "storybook-a11y"),
+    ("visual-a11y.yml", "component-story-evidence"),
     ("visual-regression.yml", "visual-regression"),
 )
 
@@ -212,7 +213,7 @@ assert.throws(() => canary.createPlanBundle({rawPlan,plan,trustedDefaultBranchSh
   livePolicy:{defaultBranch:'main',sha:'b'.repeat(40)},nowMs:now}),/live default-branch head/);
 assert.throws(() => canary.createPlanBundle({rawPlan,plan,trustedDefaultBranchSha:sha,
   livePolicy:{defaultBranch:'main',sha},mode:'apply',confirmation:'wrong',nowMs:now}),/exact SHA-256/);
-const checks = ['PR Ready','Migration Guard','Fork PR Gate','PR Size Guard'].map(name =>
+const checks = ['PR Ready','Migration Guard','Fork PR Gate','PR Size Guard','Company guards'].map(name =>
   ({__typename:'CheckRun',name,status:'COMPLETED',conclusion:'SUCCESS'}));
 const pr = {number:16001,state:'OPEN',isDraft:false,baseRefName:'main',baseRefOid:sha,
   headRefName:entry.headRefName,headRefOid:entry.headOid,isCrossRepository:false,

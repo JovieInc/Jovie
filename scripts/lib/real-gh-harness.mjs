@@ -30,6 +30,31 @@ import { crc32 } from 'node:zlib';
 export const GH_FAKE_HOST = 'github.localhost';
 
 /**
+ * Watchdog budget for one harnessed script. A healthy run takes seconds on a
+ * workstation, but a loaded CI runner took 38 s for the TestFlight lease CLI
+ * test and a fixed 20 s kill turned PR #24572 red with no code cause. CI gets
+ * a CI-sized default; REAL_GH_HARNESS_TIMEOUT_MS overrides either default.
+ */
+export const REAL_GH_HARNESS_TIMEOUT_MS = Object.freeze({
+  local: 20_000,
+  ci: 90_000,
+});
+
+/** @param {Record<string, string | undefined>} [env] @returns {number} */
+export function realGhHarnessTimeoutMs(env = process.env) {
+  const raw = env.REAL_GH_HARNESS_TIMEOUT_MS?.trim();
+  if (!raw)
+    return env.CI && env.CI !== 'false'
+      ? REAL_GH_HARNESS_TIMEOUT_MS.ci
+      : REAL_GH_HARNESS_TIMEOUT_MS.local;
+  if (!/^[1-9]\d*$/.test(raw))
+    throw new Error(
+      `REAL_GH_HARNESS_TIMEOUT_MS must be a positive integer, got ${JSON.stringify(raw)}`
+    );
+  return Number(raw);
+}
+
+/**
  * A `#!` wrapper is not the real CLI. Hosts may prepend a shim that injects
  * state the harness deliberately isolates (e.g. lane_runner's `gh` shim mints
  * a GitHub App token from `~/.config/jovie-lanes/jovie-bot.pem`, which does
@@ -155,6 +180,8 @@ export function storedZip(files) {
  * @param {boolean} [opts.allowCallerGhOverride] Let a deliberate caller `gh`
  * fixture win for negative-control tests. Normal harness runs must leave this
  * false so host shims cannot replace the resolved real CLI.
+ * @param {number} [opts.timeoutMs] Watchdog budget; defaults to
+ * realGhHarnessTimeoutMs(). A fired watchdog resolves `timedOut: true`.
  */
 export async function runWithRealGh({
   script,
@@ -162,6 +189,7 @@ export async function runWithRealGh({
   route,
   gh,
   allowCallerGhOverride = false,
+  timeoutMs = realGhHarnessTimeoutMs(),
 }) {
   const binary = gh ?? resolveRealGh();
   if (!binary) throw new Error('real gh binary is not installed');
@@ -240,11 +268,20 @@ export async function runWithRealGh({
       child.stderr.on('data', chunk => {
         stderr += chunk;
       });
-      const timer = setTimeout(() => child.kill('SIGKILL'), 20_000);
+      let timedOut = false;
+      // Say so on the runner's stderr and in the result, so a real hang reads
+      // as one instead of a bare `code: null`.
+      const timer = setTimeout(() => {
+        timedOut = true;
+        const note = `real-gh harness killed after ${timeoutMs} ms (REAL_GH_HARNESS_TIMEOUT_MS sets the budget)\n`;
+        stderr += note;
+        process.stderr.write(note);
+        child.kill('SIGKILL');
+      }, timeoutMs);
       child.on('error', fail);
       child.on('close', code => {
         clearTimeout(timer);
-        done({ code, stdout, stderr, requests });
+        done({ code, timedOut, stdout, stderr, requests });
       });
     });
   } finally {

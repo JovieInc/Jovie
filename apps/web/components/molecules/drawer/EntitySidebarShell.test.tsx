@@ -72,6 +72,30 @@ describe('EntitySidebarShell', () => {
     await expectNoA11yViolations(container);
   });
 
+  it('lets a transient preview request the overlay; pinned rails push', () => {
+    const { rerender } = render(
+      <EntitySidebarShell
+        isOpen
+        ariaLabel='Release details'
+        presentation='push'
+      >
+        <div>Inspector content</div>
+      </EntitySidebarShell>
+    );
+    const drawer = screen.getByTestId('right-drawer');
+    expect(drawer).toHaveAttribute('data-rail-presentation', 'push');
+    rerender(
+      <EntitySidebarShell
+        isOpen
+        ariaLabel='Release details'
+        presentation='overlay'
+      >
+        <div>Inspector content</div>
+      </EntitySidebarShell>
+    );
+    expect(drawer).toHaveAttribute('data-rail-presentation', 'overlay');
+  });
+
   it('closes on Escape through the shell keyboard handler', () => {
     const onClose = vi.fn();
     render(
