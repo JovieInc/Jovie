@@ -274,6 +274,7 @@
     { "path": "apps/web/lib/outbound/readiness.server.ts", "rules": { "unresolved-prompt": ["1d238f3abf71b6ec"] }, "reason": "Exact schema/selector/serialization or diagnostic syntax reviewed in source; not a copy prompt." },
     { "path": "apps/web/lib/ovie/certifications/walkthrough.ts", "rules": { "markdown": ["103192d2873ce68b"] }, "reason": "Intentional Markdown serialization, parser delimiter, plain-text signature/list, or security mask; not stray formatting in visible copy." },
     { "path": "apps/web/lib/ovie/conversation-insights.server.ts", "rules": { "punctuation": ["943d4371b33d80c2"] }, "reason": "Exact SQL cast, IPv6/delimiter, route regex, diagnostic syntax, or urgent-priority glyph; not punctuation in prose." },
+    { "path": "apps/web/lib/ovie/fleet-room-send.server.ts", "rules": { "unresolved-prompt": ["00059e8288d29221"] }, "reason": "Exact diagnostic tag, redaction marker, schema path or security literal; not an authoring prompt." },
     { "path": "apps/web/lib/ovie/generated/invariant-stewardship.current-week.json", "rules": { "writer-imperative": ["44a743f4b9812c34"] }, "reason": "Exact product action, setting label, song title, or customer message; directs the product user, not a copy writer." },
     {
       "path": "apps/web/lib/ovie/mcp/artist-profile-inventory.ts",
