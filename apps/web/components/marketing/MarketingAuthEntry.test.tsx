@@ -1,6 +1,12 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import type { ComponentProps } from 'react';
-import { describe, expect, it, vi } from 'vitest';
+import { afterAll, describe, expect, it, vi } from 'vitest';
+
+// Shared workers may have evaluated these modules with another file's mocks.
+vi.hoisted(() => vi.resetModules());
+// Do not leave this file's mocked dependency graph cached for the next file.
+afterAll(() => vi.resetModules());
+
 import LaunchPage from '@/app/(marketing)/launch/page';
 import { SmartLinksLanding } from '@/app/(marketing)/smart-links/SmartLinksLanding';
 import { LandingCTAButton } from '@/components/features/landing/LandingCTAButton';

@@ -1,6 +1,14 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import {
+  afterEach,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  type MockInstance,
+  vi,
+} from 'vitest';
 import { PublicPageErrorFallback } from './PublicPageErrorFallback';
 
 const captureErrorInSentryMock = vi.fn();
@@ -11,13 +19,17 @@ vi.mock('@/lib/errors/capture', () => ({
 }));
 
 describe('PublicPageErrorFallback', () => {
-  const consoleErrorSpy = vi
-    .spyOn(console, 'error')
-    .mockImplementation(() => undefined);
+  let consoleErrorSpy: MockInstance<typeof console.error>;
 
   beforeEach(() => {
     captureErrorInSentryMock.mockReset();
-    consoleErrorSpy.mockClear();
+    consoleErrorSpy = vi
+      .spyOn(console, 'error')
+      .mockImplementation(() => undefined);
+  });
+
+  afterEach(() => {
+    consoleErrorSpy.mockRestore();
   });
 
   it('keeps the public-page recovery view to one action and collapsed details', async () => {

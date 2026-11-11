@@ -1,4 +1,17 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import {
+  afterAll,
+  afterEach,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from 'vitest';
+
+// Shared workers may have evaluated these modules with another file's mocks.
+vi.hoisted(() => vi.resetModules());
+// Do not leave this file's mocked dependency graph cached for the next file.
+afterAll(() => vi.resetModules());
 
 const mockRevenueFailure = vi.hoisted(() => vi.fn());
 vi.mock('@/lib/observability/revenue-spine', () => ({

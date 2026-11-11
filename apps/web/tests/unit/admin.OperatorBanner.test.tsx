@@ -1,6 +1,12 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render, screen } from '@testing-library/react';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterAll, afterEach, describe, expect, it, vi } from 'vitest';
+
+// Shared workers may have evaluated these modules with another file's mocks.
+vi.hoisted(() => vi.resetModules());
+// Do not leave this file's mocked dependency graph cached for the next file.
+afterAll(() => vi.resetModules());
+
 import { OperatorBanner } from '@/features/admin/OperatorBanner';
 
 const mockClientEnv = vi.hoisted(() => ({

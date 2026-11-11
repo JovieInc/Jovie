@@ -1,4 +1,17 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import {
+  afterAll,
+  afterEach,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from 'vitest';
+
+// Shared workers may have evaluated these modules with another file's mocks.
+vi.hoisted(() => vi.resetModules());
+// Do not leave this file's mocked dependency graph cached for the next file.
+afterAll(() => vi.resetModules());
 
 const { postJsonBeacon } = vi.hoisted(() => ({ postJsonBeacon: vi.fn() }));
 vi.mock('@/lib/tracking/json-beacon', () => ({ postJsonBeacon }));
@@ -6,11 +19,15 @@ vi.mock('@/lib/analytics', () => {
   throw new Error('analytics unavailable');
 });
 
+import { resetFunnelClockForTests } from '@/lib/analytics/signup-funnel-client';
 import { trackHomepageEvent } from './homepage-analytics';
 
 beforeEach(() => {
   postJsonBeacon.mockReset();
+  resetFunnelClockForTests();
 });
+
+afterEach(() => resetFunnelClockForTests());
 
 describe('homepage first-party submit producer', () => {
   it('sends only the allowlisted CTA fields before an unavailable analytics import', async () => {

@@ -1,5 +1,10 @@
 import { PgDialect } from 'drizzle-orm/pg-core';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest';
+
+// Shared workers may have evaluated these modules with another file's mocks.
+vi.hoisted(() => vi.resetModules());
+// Do not leave this file's mocked dependency graph cached for the next file.
+afterAll(() => vi.resetModules());
 
 const { mockDbExecute } = vi.hoisted(() => ({
   mockDbExecute: vi.fn(),

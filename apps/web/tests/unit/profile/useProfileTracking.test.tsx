@@ -1,5 +1,19 @@
 import { renderHook, waitFor } from '@testing-library/react';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import {
+  afterAll,
+  afterEach,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from 'vitest';
+
+// Shared workers may have evaluated these modules with another file's mocks.
+vi.hoisted(() => vi.resetModules());
+// Do not leave this file's mocked dependency graph cached for the next file.
+afterAll(() => vi.resetModules());
+
 import { useProfileVisitTracking } from '@/components/organisms/hooks/useProfileTracking';
 
 const { mutateMock } = vi.hoisted(() => ({
@@ -13,27 +27,37 @@ vi.mock('@/lib/queries/useTrackingMutation', () => ({
 }));
 
 describe('useProfileVisitTracking', () => {
-  const originalCi = process.env.NEXT_PUBLIC_CI;
+  const originalReferrer = Object.getOwnPropertyDescriptor(
+    document,
+    'referrer'
+  );
 
   beforeEach(() => {
     mutateMock.mockReset();
+    // The hook reads globalThis.location.search. Own the parsed campaign URL
+    // even when a sibling file replaced jsdom's live location with a shim.
+    vi.stubGlobal(
+      'location',
+      new URL('https://example.com/dualipa?utm_source=ig&utm_medium=social')
+    );
     Object.defineProperty(document, 'referrer', {
       value: 'https://example.com/source',
       configurable: true,
     });
-    window.history.replaceState(
-      null,
-      '',
-      '/dualipa?utm_source=ig&utm_medium=social'
-    );
   });
 
   afterEach(() => {
-    process.env.NEXT_PUBLIC_CI = originalCi;
+    vi.unstubAllEnvs();
+    vi.unstubAllGlobals();
+    if (originalReferrer) {
+      Object.defineProperty(document, 'referrer', originalReferrer);
+    } else {
+      Reflect.deleteProperty(document, 'referrer');
+    }
   });
 
   it('skips visit tracking in CI builds', async () => {
-    process.env.NEXT_PUBLIC_CI = 'true';
+    vi.stubEnv('NEXT_PUBLIC_CI', 'true');
 
     renderHook(() => useProfileVisitTracking('artist-123', 'token-123'));
 
@@ -43,7 +67,7 @@ describe('useProfileVisitTracking', () => {
   });
 
   it('tracks profile visits outside CI builds', async () => {
-    process.env.NEXT_PUBLIC_CI = 'false';
+    vi.stubEnv('NEXT_PUBLIC_CI', 'false');
 
     renderHook(() => useProfileVisitTracking('artist-123', 'token-123'));
 
@@ -63,7 +87,7 @@ describe('useProfileVisitTracking', () => {
   it('skips visit + visit-token calls for the demo profile (JOV-4932)', async () => {
     // Demo previews have no backing profile row — both audience endpoints
     // reject demo-profile with 400 and visits would pollute analytics.
-    process.env.NEXT_PUBLIC_CI = 'false';
+    vi.stubEnv('NEXT_PUBLIC_CI', 'false');
     const { DEMO_PROFILE_ID } = await import('@/lib/demo-personas');
     const fetchMock = vi.fn();
     vi.stubGlobal('fetch', fetchMock);

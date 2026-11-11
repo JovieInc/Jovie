@@ -5,7 +5,13 @@
  * privilege escalation attempts, handles inconsistent billing data,
  * and enforces plan boundaries under adversarial conditions.
  */
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest';
+
+// Shared workers may have evaluated these modules with another file's mocks.
+vi.hoisted(() => vi.resetModules());
+// Do not leave this file's mocked dependency graph cached for the next file.
+afterAll(() => vi.resetModules());
+
 import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 import type { UserEntitlements } from '@/types';
 
