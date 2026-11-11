@@ -4294,6 +4294,27 @@ html:not(.dark) .smart-link-powered-by {
   border-radius: var(--radius-sm);
 }
 
+/* About credits read as prose, not as accent links: the mention takes the
+   card's primary text color with a quiet underline that firms up on hover,
+   like the profile's AEO prose (walk 2026-11-09: bright blue underlines). */
+.profile-about-credits .profile-entity-mention {
+  color: var(--color-text-tooltip);
+  text-decoration-color: color-mix(
+    in oklab,
+    var(--color-text-tooltip) 32%,
+    transparent
+  );
+}
+
+.profile-about-credits .profile-entity-mention:hover,
+.profile-about-credits .profile-entity-mention:focus-visible {
+  text-decoration-color: var(--color-text-tooltip);
+}
+
+.profile-about-credits .profile-entity-mention:focus-visible {
+  outline-color: var(--color-text-tooltip);
+}
+
 /* ============================================
    GEIST ACCENT PALETTE — feature-surface accents
    ============================================
