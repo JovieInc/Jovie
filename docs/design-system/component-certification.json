@@ -687,6 +687,38 @@
     "apps/web/components/features/release/AlbumArtworkContextMenu.tsx": {
       "error": "The menu has no error UI: a failed download falls back to opening the artwork URL in a new tab, and AlbumArtworkContextMenu.test.tsx asserts that fallback.",
       "offline": "An offline download fails like any other and takes the same new-tab fallback, so there is nothing to draw; the menu itself never fetches until a size is picked."
+    },
+    "apps/web/components/features/admin/OvieRouteUsageBeacon.tsx": {
+      "error": "The beacon renders null in every state and is fire-and-forget: a failed POST is swallowed by its .catch, so there is no failure to draw. OvieRouteUsageBeacon.test.tsx rejects the fetch and asserts the page is unchanged and axe-clean."
+    },
+    "apps/web/components/features/dashboard/NavigationDestinationReady.tsx": {
+      "offline": "It never fetches or mutates: it renders null and only reports readiness once the caller's ready flag flips (LoadingDestinationData shows it held). The detector matched the word loading in its doc comment; the destination that owns the data owns any network failure."
+    },
+    "apps/web/components/molecules/drawer/DrawerSectionHeading.tsx": {
+      "partial": "The heading holds one required label (children); as and className only choose the element and extra classes, so nothing can be partially present. Default and SemanticHeading show both element choices."
+    },
+    "apps/web/components/molecules/drawer/DrawerInlineNote.tsx": {
+      "partial": "The note holds one required message string; tone, inset, className and testId are presentation options shown by Default, ErrorTone and EmptyListNote, so there is no second piece of data that can be missing."
+    },
+    "apps/web/components/organisms/table/organisms/UnifiedTableHeader.tsx": {
+      "empty": "Its only caller, UnifiedTable, passes table.getHeaderGroups(), which TanStack always returns with at least one group, and hides the header with hideHeader instead. The length-0 guard is defensive; UnifiedTableHeader.test.tsx asserts it renders no thead. The detector matched headerGroups.map(."
+    },
+    "apps/web/components/atoms/DotBadge.tsx": {
+      "partial": "label and variant are required, and size, title and className are presentation options, so the badge has no data that can be partially present. LongContent and Rtl cover the label's limits; DotBadge.test.tsx covers the title."
+    },
+    "apps/web/components/organisms/table/atoms/TableCell.tsx": {
+      "partial": "A cell wraps one required children slot; width, align, multiline, hideOnMobile, as and className are layout options, so there is nothing to be partially present. An empty or partial row is the caller's data, drawn by the cells it passes."
+    },
+    "apps/web/components/organisms/table/molecules/SemanticTable.tsx": {
+      "partial": "Each part (TableRoot, TableHead, TableBody, TableRow) wraps one required children slot; className and rowMode are styling and geometry options, so nothing can be partially present. Partial rows are the caller's cells."
+    },
+    "apps/web/components/shell/SidebarInboxLink.tsx": {
+      "offline": "The link never fetches: pending work arrives from the server as availability, and an unreadable status falls back to the plain Inbox bell (StatusUnavailable). Opening it is a normal navigation. The detector matched the pending flag."
+    },
+    "apps/web/components/shell/TasksRouteSkeleton.tsx": {
+      "empty": "A fixed skeleton with no props: TaskWorkspaceLoadingRows draws five constant rows, so there is no collection that can be empty. The detector matched the items-center layout class.",
+      "long-content": "It renders skeleton bars and a fixed Loading Tasks label only, with no text from any caller, so nothing can overflow. The detector matched aria-label.",
+      "offline": "A static loading frame with no fetch or mutation; the Tasks route that shows it owns any network failure. The detector matched the skeleton classes (Loading)."
     }
   }
 }
