@@ -160,8 +160,8 @@ nodes:
       - push
       - schedule
       - workflow_dispatch
-    terminalReceipt: job:measure
-    jobCount: 2
+    terminalReceipt: job:fan-out-budget
+    jobCount: 3
   - name: CI Shard Contract Canary
     path: .github/workflows/ci-shard-contract-canary.yml
     active: true
