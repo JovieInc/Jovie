@@ -103,6 +103,30 @@ describe('Spotify catalog scan binding', () => {
       ],
       [canonical, url(canonical), undefined, canonical],
       [canonical, url(other), undefined, null],
+      [
+        canonical,
+        url(other),
+        { status: 'confirmed', externalArtistId: canonical },
+        canonical,
+      ],
+      [
+        canonical,
+        url(other),
+        { status: 'confirmed', externalArtistId: other },
+        other,
+      ],
+      [
+        canonical,
+        url(other),
+        { status: 'confirmed', externalArtistId: 'c'.repeat(22) },
+        null,
+      ],
+      [
+        canonical,
+        url(other),
+        { status: 'suggested', externalArtistId: canonical },
+        null,
+      ],
       [null, 'https://example.com/artist/' + canonical, undefined, null],
       [null, 'https://open.spotify.com/album/' + canonical, undefined, null],
     ] as const)(

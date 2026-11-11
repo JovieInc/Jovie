@@ -39,12 +39,22 @@ export async function getBoundSpotifyArtistId(
     .limit(1);
 
   // Legacy profiles keep only spotify_url. Resolve the exact ID from either
-  // structured field; conflicting IDs fail closed (no scan authority).
+  // structured field. Conflicting IDs grant no authority of their own; only an
+  // explicit confirmation of one of the stored IDs settles which one it is.
   const identity = resolveSpotifyArtistIdentity([
     profile.spotifyId,
     profile.spotifyUrl,
   ]);
-  if (identity.status === 'conflict') return null;
+  if (identity.status === 'conflict') {
+    const stored = [profile.spotifyId, profile.spotifyUrl].map(
+      field => resolveSpotifyArtistIdentity([field]).spotifyArtistId
+    );
+    return match?.status === 'confirmed' &&
+      validArtistId(match.externalArtistId) &&
+      stored.includes(match.externalArtistId)
+      ? match.externalArtistId
+      : null;
+  }
   const canonical = validArtistId(identity.spotifyArtistId)
     ? identity.spotifyArtistId
     : null;
