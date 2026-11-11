@@ -235,6 +235,12 @@ describe('contrast floor (WCAG 1.4.3)', () => {
           resendCooldownEnd={0}
           isResending={false}
           isCountryOpen={false}
+          contentPrefs={{
+            newMusic: true,
+            tourDates: true,
+            merch: true,
+            general: true,
+          }}
           onClose={vi.fn()}
           onBack={vi.fn()}
           onChannelChange={vi.fn()}
