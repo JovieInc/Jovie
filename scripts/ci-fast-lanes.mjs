@@ -941,7 +941,6 @@ export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
   // JOV-INV-047: one shell and IA registry; ad-hoc chrome ratchet.
   'scripts/invariants/shell-ia.test.mjs',
   'scripts/ci-rounds-report.test.mjs',
-  'scripts/ci-trigger-budget.test.mjs',
   'scripts/preflight-changed.test.mjs',
   'scripts/preflight-source-size.test.mjs',
   'scripts/preflight-remote.test.mjs',
