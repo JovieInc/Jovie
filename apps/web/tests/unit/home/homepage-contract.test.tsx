@@ -196,7 +196,6 @@ describe('homepage contract', { timeout: 60_000 }, () => {
   });
 
   it('leads the hero with what listeners open, not the back office', async () => {
-    const { HOMEPAGE_EDITORIAL_COPY: copy } = await loadCopy();
     const { container } = await renderHomePage();
     const hero = container.querySelector('.hv3-hero');
     // The lifted panel is the release page a listener opens; the metadata
@@ -204,12 +203,9 @@ describe('homepage contract', { timeout: 60_000 }, () => {
     expect(hero?.querySelector('.hv3-lift--page .hv3-rp')).not.toBeNull();
     expect(hero?.querySelector('.hv3-insp')).toBeNull();
     expect(container.querySelector('#specs .hv3-insp')).not.toBeNull();
-    expect(hero?.querySelector('.hv3-callout')?.textContent ?? '').toContain(
-      copy.hero.pageCallout
-    );
-    // Its anchor sits before the title, so the label reads outward, not
-    // across the title.
-    expect(hero?.querySelector('.hv3-callout--l')).not.toBeNull();
+    // No callout here: any label beside the page crosses the release list
+    // or the box's frame guide, so the selected row and its page speak alone.
+    expect(hero?.querySelector('.hv3-callout')).toBeNull();
     // The masked lift drops outer shadows, so the page keeps an inner edge.
     expect(read('components/homepage/v3/chapters.css')).toMatch(
       /\.hv3-phone\.hv3-phone--hero\s*\{[^}]*box-shadow: inset 0 0 0 1px var\(--hv3-b2\);/

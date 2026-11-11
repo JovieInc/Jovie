@@ -156,15 +156,16 @@
 
 /* The release page sits on the third column of the box, its right edge on
    the window's, lifted by shadow alone. It is the 390 phone scaled to the
-   column and cropped above the window's foot, fading out the way a page
-   keeps going below the fold. */
+   column and runs past the window's foot far enough to show the first listen
+   rows under the title, fading out the way a page keeps going below the
+   fold. */
 .hv3-lift--page {
   top: 1.75rem;
   left: calc(var(--hv3-col2) + 1.5rem);
   width: var(--hv3-col1);
-  height: 33.25rem;
+  height: 44rem;
   border-radius: calc(var(--radius-3xl) + var(--radius-sm));
-  mask-image: linear-gradient(var(--hv3-shade) 72%, transparent);
+  mask-image: linear-gradient(var(--hv3-shade) 78%, transparent);
   transform: translateY(var(--hv3-par, 0px));
 }
 

@@ -40,7 +40,6 @@ export const HOMEPAGE_EDITORIAL_COPY = {
     secondaryHref: TIM_WHITE_PROFILE.publicProfilePath,
     note: 'two fields · we email when your spot opens',
     windowLabel: `Jovie for Mac: an example artist's Releases list, beside the ${HOMEPAGE_FEATURED_ARTIST.inspected.title} release page listeners open`,
-    pageCallout: 'what listeners open',
   },
   /** Chapter index (mono, lowercase, as approved). */
   chapters: ['profile', 'releases', 'specs', 'invitation'],

@@ -133,7 +133,7 @@ export function HomepageStoryHero({
             <div className='hv3-sheen' />
           </div>
           {/* What a listener gets from the selected row: its release page,
-              on the third column, cropped at the window's foot. */}
+              on the third column, down to its first listen rows. */}
           <div
             aria-hidden
             className='hv3-lift hv3-lift--page hv3-edge'
@@ -144,7 +144,6 @@ export function HomepageStoryHero({
             </div>
           </div>
         </div>
-        <Callout anchor='htitle' side='left' label={COPY.hero.pageCallout} />
       </div>
       <nav className='hv3-index' aria-label={COPY.chaptersLabel}>
         {COPY.chapters.map((label, index) => (

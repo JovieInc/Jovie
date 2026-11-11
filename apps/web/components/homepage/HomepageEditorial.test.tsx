@@ -57,15 +57,15 @@ describe('HomepageEditorial chapters', () => {
     await expectNoA11yViolations(container);
   });
 
-  it('shows the selected release page beside the app, labelled by its title callout', () => {
+  it('shows the selected release page beside the app, with no label across the list', () => {
     const { container } = render(<HomepageStoryHero />);
 
     const page = container.querySelector('.hv3-lift--page');
     expect(page).toHaveAttribute('aria-hidden', 'true');
     expect(page?.querySelector('[data-hv3-anchor="htitle"]')).not.toBeNull();
     expect(
-      container.querySelector('[data-hv3-callout="htitle"]')
-    ).toHaveTextContent(COPY.hero.pageCallout);
+      container.querySelector('.hv3-stage--hero [data-hv3-callout]')
+    ).toBeNull();
     expect(container.querySelector('.hv3-lift--inspector')).toBeNull();
   });
 
