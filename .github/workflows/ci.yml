@@ -701,9 +701,7 @@ jobs:
           IS_FORK="${IS_FORK_PULL_REQUEST}"
           # Determine changed files
           if [[ "${EVENT_NAME}" == "merge_group" ]]; then
-            # JOV-4446: never fall through to github.base_ref / event.before —
-            # those push/PR-only fields are empty on merge_group and produce
-            # "Could not resolve origin/" + false docs-only classification.
+            # JOV-4446: merge_group must use its exact SHAs; PR/push fields are empty.
             MERGE_GROUP_BASE_SHA="${EVENT_MERGE_GROUP_BASE_SHA}"
             MERGE_GROUP_HEAD_SHA="${EVENT_MERGE_GROUP_HEAD_SHA}"
             if [[ ! "$MERGE_GROUP_BASE_SHA" =~ ^[0-9a-f]{40}$ ]] ||
@@ -933,9 +931,7 @@ jobs:
             echo "run_storybook_a11y=false" >> "$GITHUB_OUTPUT"
           fi
 
-          # Screenshot-only product exports live under public/product-screenshots and
-          # must not force public Lighthouse + Neon on main (they are marketing assets,
-          # not route code). Filter that tree out before matching public/* paths.
+          # Exclude screenshot exports (marketing assets) from public Lighthouse + Neon.
           PUBLIC_LIGHTHOUSE_PATTERN='^(\.github/workflows/ci\.yml|scripts/lighthouse-retry\.mjs|apps/web/\.lighthouserc\.pr\.json|apps/web/\.lighthouserc\.public-launch\.json|apps/web/app/\(home\)/|apps/web/app/\(marketing\)/|apps/web/app/\(dynamic\)/legal/|apps/web/content/legal/|apps/web/app/\[username\]/|apps/web/app/layout\.tsx|apps/web/app/globals\.css|apps/web/public/|apps/web/styles/|apps/web/components/features/home/|apps/web/components/features/marketing/|apps/web/components/features/profile/|apps/web/components/homepage/|apps/web/components/marketing/|apps/web/scripts/run-public-lighthouse\.ts|apps/web/scripts/public-route-qa\.ts|apps/web/scripts/public-surface-qa\.ts|apps/web/scripts/performance-route-manifest\.ts|apps/web/tests/e2e/public-exhaustive\.spec\.ts|apps/web/tests/e2e/profile-mobile-viewport-stability\.spec\.ts|apps/web/tests/e2e/axe-audit\.spec\.ts|apps/web/tests/e2e/utils/(public-surface-(manifest|helpers)|smoke-test-utils|mobile-profile-viewports)\.ts|packages/|apps/web/package.*\.json|package.*\.json|apps/web/tailwind\.config\.|apps/web/postcss\.config\.)'
           PUBLIC_LIGHTHOUSE_FILES=$(echo "$CHANGED_FILES" | grep -v -E '^apps/web/public/product-screenshots/' || true)
           if echo "$PUBLIC_LIGHTHOUSE_FILES" | grep -q -E "$PUBLIC_LIGHTHOUSE_PATTERN"; then
