@@ -111,8 +111,12 @@ older one that has lapsed. `CALENDAR_DEADLINE_SCAN=1` reads the real clock.
 To close a gap, make the PR run the command, move the entry to `parity`, and
 delete the exemption. Seeded 2026-11-11 with 7 combined-head jobs, 21 gaps
 (including the 14 web unit shards, Lighthouse and the visual snapshot compare)
-and 3 PR-only jobs still in the queue (PR Size Guard, Fork PR Gate, PR Fleet
-Rules).
+and 3 PR-only jobs in the queue. PR Fleet Rules left the queue first: it
+was never required, and its policy returned no verdict on a synthetic head.
+PR Size Guard stays for now: 41 of its 42 queue failures from 2026-11-04 to
+2026-11-11 were the combined-tree byte budget, which only the combined head can
+answer, and it also reads hold labels at admission. Only its per-member size cap
+is PR-only.
 
 ## Canonical native configuration
 

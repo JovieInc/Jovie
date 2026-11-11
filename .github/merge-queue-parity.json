@@ -246,25 +246,19 @@
     },
     {
       "job": "pr-fleet-rules.yml#fleet",
-      "why": "PR Fleet Rules reads the PR body and labels (receipts, red-before-green) and is advisory everywhere."
+      "why": "PR Fleet Rules reads the PR body and labels (receipts, red-before-green); it runs on pull_request only."
     }
   ],
   "prOnlyExemptions": [
     {
       "job": "pr-size-guard.yml#merge-group-size",
-      "reason": "Also carries the hold-label check and the combined-tree payload budget, which are admission-time and combined-head checks; the size cap re-check leaves the queue in the next slice.",
+      "reason": "Mostly a combined-head check: 41 of its 42 queue failures from 2026-11-04 to 2026-11-11 were the combined-tree byte budget and holds are read at admission. Only the per-member size cap is PR-only; it leaves the queue once the PR side re-checks a removed big-pr label.",
       "createdOn": "2026-11-11",
       "expiresOn": "2027-02-09"
     },
     {
       "job": "pr-size-guard.yml#merge-group-fork",
       "reason": "The ruleset requires a Fork PR Gate context on merge_group; it spends no API call and is decided from the size job reads. Dropping it needs a ruleset change.",
-      "createdOn": "2026-11-11",
-      "expiresOn": "2027-02-09"
-    },
-    {
-      "job": "pr-fleet-rules.yml#fleet",
-      "reason": "Not a required context, so it never ejects a group, but it still spends a queue runner; drop its merge_group trigger in a later slice.",
       "createdOn": "2026-11-11",
       "expiresOn": "2027-02-09"
     }
