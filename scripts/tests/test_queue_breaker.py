@@ -110,5 +110,82 @@ class QueueBreakerSupersessionTest(unittest.TestCase):
             self.assertIn("lane-fix-red", flat)
 
 
+def poisoned_world(calls, prs, *, test="lib/__tests__/production-release-supersession.test.mjs", at=NOW - 600):
+    """Fake gh: one failed merge group per PR in `prs`, every one failing on the same top test; nothing queued."""
+    def run(args, **kwargs):
+        calls.append(args)
+        flat = " ".join(args)
+        if "workflows/ci.yml/runs" in flat:
+            rows = [] if "status=success" in flat else [
+                {"id": 100 + i, "head_branch": f"gh-readonly-queue/main/pr-{pr}-abc", "conclusion": "failure",
+                 "updated_at": iso(at), "head_sha": f"s{i}"} for i, pr in enumerate(prs)]
+            return SimpleNamespace(returncode=0, stderr="", stdout=json.dumps({"workflow_runs": rows}))
+        if "mergeQueue" in flat:
+            return SimpleNamespace(returncode=0, stderr="", stdout=json.dumps(
+                {"data": {"repository": {"mergeQueue": {"entries": {"nodes": []}}}}}))
+        if "/jobs?per_page=100" in flat:
+            jobs = [{"id": 9, "name": "ci-fast (remaining)", "conclusion": "failure", "steps": []}]
+            return SimpleNamespace(returncode=0, stderr="", stdout=json.dumps({"jobs": jobs}))
+        if "/logs" in flat:
+            return SimpleNamespace(returncode=0, stderr="", stdout=(
+                f"##[error]Structural command 41/60 failed (exit 1)\nFAIL   workspace-scripts  {test} > deadline\n"))
+        return SimpleNamespace(returncode=0, stderr="", stdout="{}")
+    return run
+
+
+class MainPoisonTest(unittest.TestCase):
+    """2026-11-11: one test failing every group (an expired review deadline on an unchanged main) stalled merges 8h
+    because shared evidence only released victims and remediation waits on main-red. The breaker now files one
+    remediation intake per shared signal so a fix lane repairs main."""
+
+    def setUp(self):
+        sys.path.insert(0, str(ROOT / "scripts/lanes"))
+
+    def tearDown(self):
+        sys.path.remove(str(ROOT / "scripts/lanes"))
+
+    def test_one_signal_across_three_prs_files_one_intake_once(self):
+        qb, calls, filed = load_breaker(), [], []
+        run = poisoned_world(calls, [24767, 24826, 24803])
+        with tempfile.TemporaryDirectory() as raw:
+            out = qb.sweep(Path(raw), run, NOW, file_intake=lambda _run, event: filed.append(event) or 4242)
+            self.assertEqual(len(filed), 1)
+            event = filed[0]
+            self.assertEqual(event["source"], "merge-group-shared")
+            self.assertTrue(event["fingerprint"].startswith("main-poison-"))
+            self.assertEqual(event["subject"]["prs"], [24767, 24803, 24826])
+            self.assertIn("production-release-supersession.test.mjs", event["evidence"]["excerpt"])
+            self.assertIn("Never skip, weaken or quarantine", event["evidence"]["excerpt"])
+            self.assertEqual(out["main-poison"][0]["issue"], 4242)
+            self.assertNotIn("dequeuePullRequest", "\n".join(" ".join(c) for c in calls), "victims are never dequeued")
+            again = qb.sweep(Path(raw), run, NOW + 60, file_intake=lambda _run, event: filed.append(event) or 1)
+            self.assertEqual(len(filed), 1, "one filing per signal per window")
+            self.assertNotIn("main-poison", again)
+
+    def test_two_prs_are_not_poison(self):
+        qb, filed = load_breaker(), []
+        with tempfile.TemporaryDirectory() as raw:
+            out = qb.sweep(Path(raw), poisoned_world([], [1, 2]), NOW, file_intake=lambda _r, e: filed.append(e))
+        self.assertEqual((filed, out.get("main-poison")), ([], None))
+
+    def test_remediation_routes_the_intake_to_a_fix_lane_not_wait(self):
+        import remediation
+        qb, filed = load_breaker(), []
+        with tempfile.TemporaryDirectory() as raw:
+            qb.sweep(Path(raw), poisoned_world([], [1, 2, 3]), NOW, file_intake=lambda _r, e: filed.append(e))
+        classified = remediation.classify_event(filed[0])
+        self.assertEqual(classified["cls"], "fixable-by-model")
+        self.assertNotEqual(classified["next_action"], "wait")
+
+    def test_a_filing_failure_never_breaks_the_sweep(self):
+        qb = load_breaker()
+        def boom(_run, _event):
+            raise RuntimeError("gh down")
+        with tempfile.TemporaryDirectory() as raw:
+            out = qb.sweep(Path(raw), poisoned_world([], [1, 2, 3]), NOW, file_intake=boom)
+        self.assertIn("gh down", out["main-poison"][0]["error"])
+        self.assertEqual(out["tripped"], [])
+
+
 if __name__ == "__main__":
     unittest.main()
