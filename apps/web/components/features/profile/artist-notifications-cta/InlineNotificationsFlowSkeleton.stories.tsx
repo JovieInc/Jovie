@@ -17,7 +17,7 @@ export default meta;
 /** Holds the inline email step's footprint while the form loads. */
 export const Inline: StoryObj<typeof InlineNotificationsFlowSkeleton> = {
   render: () => (
-    <div className='w-[390px] bg-black'>
+    <div className='w-[390px] bg-base'>
       <InlineNotificationsFlowSkeleton />
     </div>
   ),
