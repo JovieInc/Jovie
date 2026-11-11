@@ -7,7 +7,10 @@ import { SignInPageClient } from './SignInPageClient';
  * Storybook's next/navigation stand-in hands every component one shared,
  * mutable URLSearchParams, and per-story nextjs.navigation.query never reaches
  * it. This decorator writes the story's query into that shared instance before
- * the page renders and removes it again on unmount, so stories stay isolated.
+ * the page renders and removes it again on unmount, so stories stay isolated
+ * when they mount one at a time. Autodocs mounts every story on one page at
+ * once, where the shared query would leak between them, so this file opts out
+ * of autodocs (see meta tags).
  */
 function WithSignInQuery({
   query,
@@ -39,6 +42,7 @@ const withQuery = (query: string) => [
 const meta = {
   title: 'Auth/SignInPageClient',
   component: SignInPageClient,
+  tags: ['!autodocs'],
   parameters: {
     layout: 'fullscreen',
     nextjs: { appDirectory: true, navigation: { pathname: '/signin' } },
