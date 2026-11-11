@@ -174,6 +174,11 @@ before you open the PR (source: `.github/ci-harness/manifest.json` `riskRules`):
   GitHub enforces required checks, queue admission, merge-group checks, and the
   final merge. Do not use a direct merge or the retired `merge-queue` label.
   The retired Auto-Enroll bot identity and status receipt are not merge-group gates.
+- **Bot review threads never hold a green PR.** Resolve bot review comments
+  yourself after you fix or answer them (`sentry[bot]` Seer, `coderabbitai[bot]`
+  and similar); leave human comments for their author. Auto-Ready Agent Drafts
+  resolves bot threads still open once PR Ready is green on the head
+  ([release rule](../.claude/rules/release.md#resolve-bot-threads-yourself-founder-rule-2026-11-11)).
 - **The queue tolerates transient state.** A PR is only dequeued on a real merge
   conflict, `needs-conflict-resolution`, or a **terminal** failing check
   (`FAILURE`/`ERROR`/`TIMED_OUT`/`ACTION_REQUIRED`). A `pending`/`queued`/`cancelled`

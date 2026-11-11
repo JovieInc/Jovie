@@ -201,9 +201,12 @@ export function companionChecklist(files, read) {
     files,
     /^scripts\/(?:.+\/)?[^/]+\.test\.(?:mjs|ts|mts)$/
   )) {
-    const wired = ['scripts/ci-fast-lanes.mjs', 'package.json'].some(p =>
-      has(p)
-    );
+    // ci-fast-lanes.mjs also spreads in the planner contract list.
+    const wired =
+      ['scripts/ci-fast-lanes.mjs', 'package.json'].some(p => has(p)) ||
+      read('scripts/lib/test-planner-contract-tests.mjs').includes(
+        `'${file.filename}'`
+      );
     push(
       file.filename,
       'new scripts test wired into a CI lane',

@@ -45,6 +45,37 @@ export function debtEntry(criteria) {
   return [...new Set(criteria)].sort().join(',');
 }
 
+/**
+ * Registry maps keyed by component path (screen debt, state waivers, gates)
+ * are kept sorted by path, in plain code-unit order (the same as Python's
+ * sorted()), so a new entry lands at its own place instead of where every PR
+ * appends, and two PRs collide only when their components are neighbours.
+ */
+export const SORT_COMMAND = 'node scripts/component-certificate.mjs --sort';
+
+export function comparePaths(a, b) {
+  return a < b ? -1 : a > b ? 1 : 0;
+}
+
+export function sortByPath(map = {}) {
+  return Object.fromEntries(
+    Object.entries(map).sort(([a], [b]) => comparePaths(a, b))
+  );
+}
+
+/** One error when `map` is not sorted by path, naming the first key out of place. */
+export function unsortedPathErrors(label, map = {}) {
+  const keys = Object.keys(map);
+  const at = keys.findIndex(
+    (key, i) => i && comparePaths(keys[i - 1], key) > 0
+  );
+  return at < 0
+    ? []
+    : [
+        `${label} is not sorted by component path (${keys[at]} comes after ${keys[at - 1]}); run ${SORT_COMMAND}`,
+      ];
+}
+
 /** Roots whose .tsx files the certificate can judge as components. */
 export const SCREEN_COMPONENT_ROOTS = Object.freeze([
   'apps/web/components/',
@@ -172,6 +203,7 @@ export function evaluateScreenGates(report, screens, byScreen, base = null) {
   if (screens.schema !== SCREENS_SCHEMA)
     errors.push(`cert-screens: schema must be ${SCREENS_SCHEMA}`);
   if (!criteria.length) errors.push('cert-screens: needs a criteria list');
+  errors.push(...unsortedPathErrors('cert-screens: debt', screens.debt));
   const certs = new Map(report.certificates.map(c => [c.component, c]));
   const debt = screens.debt ?? {};
   const rendered = new Map(); // component -> screens
@@ -326,7 +358,5 @@ export function currentDebt(report, screens, byScreen) {
   const debt = {};
   for (const row of screenIssues(report, screens, byScreen))
     debt[row.component] = debtEntry(row.criteria);
-  return Object.fromEntries(
-    Object.entries(debt).sort(([a], [b]) => a.localeCompare(b))
-  );
+  return sortByPath(debt);
 }
