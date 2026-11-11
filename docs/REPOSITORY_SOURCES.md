@@ -15,7 +15,7 @@ Repository: `JovieInc/Jovie`
 
 A changed fingerprint requires review of its related documentation; it does not prove prose is accurate.
 
-- `.nvmrc` — Local manifest or workflow; review related instructions when changed (SHA-256 `9185b9f67843cabfa8054f65ce47ce0b52036b0bfe07ae5a6b834d97cc127140`)
+- `.nvmrc` — Local manifest or workflow; review related instructions when changed (SHA-256 `584f19ccde29925286e32f566a2aa06c89efb4e2eb2bb2fc9ea5d56e2d190ac4`)
 - `pnpm-workspace.yaml` — Local manifest or workflow; review related instructions when changed (SHA-256 `a44a810c60e53213e6d3720322c545cb93c523a5ed8b68e27bdf031c66fc87b9`)
 - `canon/OPERATING_SYSTEM.md` — Company canon; review portable repository contract after changes (SHA-256 `3de175a6cf430cdb3868d7a4f63adc157a2892ceb9657c7e698ef46a79e08260`)
 - `canon/ENGINEERING.md` — Company engineering canon; review portable repository contract after changes (SHA-256 `7ac8ba7ee87f72100be0b0d2f726705f1611ed728ff76593faf8c54461d3cf2e`)
