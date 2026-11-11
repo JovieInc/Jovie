@@ -443,10 +443,11 @@ def main(argv=None) -> int:
         reason = verdict(args.model, args.pool)
         print(reason or f"allowed: {args.model} on {args.pool}")
         return 1 if reason else 0
-    cwd = Path.cwd()
-    root = Path(args.root) if args.root else (cwd if (cwd / "scripts/lanes/model-pools.json").is_file() else ROOT)
+    # The checkout under review is the working directory; when it does not carry the table (a partial
+    # tree, or a base that predates it) it is scanned with the table next to this script.
+    root = Path(args.root) if args.root else Path.cwd()
     import model_pool_guard  # noqa: PLC0415
-    violations = model_pool_guard.scan(root)
+    violations = model_pool_guard.scan(root, None if (root / "scripts/lanes/model-pools.json").is_file() else load())
     if not violations:
         print("model-pools: every Anthropic route is on an allowed pool (Claude subscription or Hyperagent)")
         return 0

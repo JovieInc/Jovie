@@ -140,7 +140,9 @@ def _files(root: Path, entries, suffixes) -> list[Path]:
 
 def scan(root: Path, table: dict | None = None) -> list[dict]:
     """Every violation under `root`, after exceptions. An exception that matches nothing is itself a failure,
-    so the list only shrinks."""
+    so the list only shrinks. The tree is judged on the files it has: the trusted guard also scans partial
+    trees (a scripts-only base, source admission fixtures), and an absent file routes nothing. A listed
+    file that is present but unreadable fails."""
     root = Path(root)
     table = pools.load(root / "scripts/lanes/model-pools.json") if table is None else table
     if not table:
@@ -149,11 +151,13 @@ def scan(root: Path, table: dict | None = None) -> list[dict]:
     guard = table.get("guard") or {}
     found = []
     for entry in guard.get("structured") or ():
+        if not (root / entry).is_file():
+            continue
         try:
             data = json.loads((root / entry).read_text())
         except (OSError, ValueError):
-            found.append({"path": entry, "rule": "config-unreadable", "detail": "missing or invalid JSON",
-                          "fix": "Restore the file or remove it from guard.structured."})
+            found.append({"path": entry, "rule": "config-unreadable", "detail": "invalid JSON",
+                          "fix": "Fix the JSON or remove the file from guard.structured."})
             continue
         found += scan_structured(entry, data, table)
         if entry in (guard.get("commands") or ()):
@@ -176,6 +180,8 @@ def scan(root: Path, table: dict | None = None) -> list[dict]:
         else:
             used.add(match)
     for index, item in enumerate(exceptions):
+        if index not in used and not (root / str(item.get("path"))).exists():
+            continue
         if index not in used:
             kept.append({"path": str(item.get("path")), "rule": "stale-exception",
                          "detail": f"exception for {item.get('rule')} matches nothing",
