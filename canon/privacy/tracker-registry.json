@@ -2,7 +2,7 @@
   "schema": "jovie.tracker-registry/v1",
   "owner": "summer",
   "canon": "gbrain decisions/company/privacy-tracking-compliance-guidelines-2026-10-31",
-  "notes": "Approved third parties a page may load, and the surfaces the privacy inventory crawls. Behaviour config: a new tracker, SDK, pixel or data flow needs an entry with a rationale before it ships. Categories: pixel (ads/retargeting), analytics (third-party measurement), replay (session replay), chat-widget, ads, processor (needed to deliver a feature, e.g. payments, bot checks, error reporting), content (images, audio, fonts, embeds). Pixel, analytics, replay, chat-widget and ads categories are banned on input pages. Non-live entries document inactive/import-only or development inventory; they do not authorize browser requests. The privacy rules reject requests unless the matching vendor has live status.",
+  "notes": "Approved third parties a page may load, and the surfaces the privacy inventory crawls. Behaviour config: a new tracker, SDK, pixel or data flow needs an entry with a rationale before it ships. Categories: pixel (ads/retargeting), analytics (third-party measurement), replay (session replay), chat-widget, ads, processor (needed to deliver a feature, e.g. payments, bot checks, error reporting), content (images, audio, fonts, embeds). Pixel, analytics, replay, chat-widget and ads categories are banned on input pages.",
   "first_party_domains": ["jov.ie", "logyourbody.com"],
   "policies": {
     "jovie-privacy": "https://jov.ie/legal/privacy",
@@ -98,6 +98,22 @@
       "rationale": "Bot check on signup and onboarding."
     },
     {
+      "id": "sentry-replay",
+      "category": "replay",
+      "products": ["jovie"],
+      "hosts": ["sentry.io"],
+      "policy_names": ["Sentry"],
+      "status": "live",
+      "approved": "2026-11-07",
+      "approved_by": "pre-existing (PR #23555)",
+      "rationale": "Existing masked Sentry Replay, shipped in PR #23555 with buffer-mode funnel recording, trigger-based upload and a server-side monthly cap. Text and inputs are masked, media blocked and request bodies excluded. Records the existing integration; input-page, consent and GPC restrictions still apply. This is not approval for new recording surfaces. Shares Sentry ingestion hosts with error reporting, so the host-level inventory conservatively classifies shared-host traffic as replay.",
+      "code": [
+        "apps/web/lib/sentry/client-full.ts",
+        "apps/web/lib/sentry/replay-policy.ts",
+        "apps/web/lib/sentry/replay-start.ts"
+      ]
+    },
+    {
       "id": "sentry",
       "category": "processor",
       "products": ["jovie", "lyb"],
@@ -107,7 +123,7 @@
       "approved": "2026-10-31",
       "approved_by": "pre-existing",
       "allowed_on_input_pages": true,
-      "rationale": "Production error reporting only. client-full.ts forbids Session Replay during production synchronous and lazy setup; the separate sentry-replay inventory entry is development-only. Production recording requires separate privacy authority and remains banned on input pages."
+      "rationale": "Error reporting as a processor. Session Replay is separately inventoried as sentry-replay; PR #23555 enabled masked replay after this original registration. Processor approval does not waive the replay-category restrictions."
     },
     {
       "id": "statsig",
@@ -186,66 +202,6 @@
       "approved_by": "pre-existing (cdn-domains.ts)",
       "allowed_on_input_pages": true,
       "rationale": "Cover art and avatars from music platforms; the canonical list is apps/web/constants/platforms/cdn-domains.ts."
-    },
-    {
-      "id": "tiktok",
-      "category": "pixel",
-      "products": ["jovie"],
-      "hosts": ["analytics.tiktok.com"],
-      "policy_names": ["TikTok"],
-      "status": "inactive",
-      "approved": "2026-11-11",
-      "approved_by": "Inventory only; no runtime approval",
-      "rationale": "TikTok signatures are parsed from fetched Linktree HTML to discover creator-owned pixel IDs. This server-side importer does not load or execute the pixel. Inactive inventory only: any browser request to these hosts fails registered-third-parties; activating a pixel requires a separate privacy approval.",
-      "code": ["apps/web/lib/ingestion/strategies/linktree/config.ts"]
-    },
-    {
-      "id": "snap",
-      "category": "pixel",
-      "products": ["jovie"],
-      "hosts": ["sc-static.net"],
-      "policy_names": ["Snapchat"],
-      "status": "inactive",
-      "approved": "2026-11-11",
-      "approved_by": "Inventory only; no runtime approval",
-      "rationale": "Snapchat signatures are parsed from fetched Linktree HTML to discover creator-owned pixel IDs. This server-side importer does not load or execute the pixel. Inactive inventory only: any browser request to these hosts fails registered-third-parties; activating a pixel requires a separate privacy approval.",
-      "code": ["apps/web/lib/ingestion/strategies/linktree/tracking-pixels.ts"]
-    },
-    {
-      "id": "pinterest",
-      "category": "pixel",
-      "products": ["jovie"],
-      "hosts": ["s.pinimg.com", "ct.pinterest.com"],
-      "policy_names": ["Pinterest"],
-      "status": "inactive",
-      "approved": "2026-11-11",
-      "approved_by": "Inventory only; no runtime approval",
-      "rationale": "Pinterest signatures are parsed from fetched Linktree HTML to discover creator-owned pixel IDs. This server-side importer does not load or execute the pixel. Inactive inventory only: any browser request to these hosts fails registered-third-parties; activating a pixel requires a separate privacy approval.",
-      "code": ["apps/web/lib/ingestion/strategies/linktree/tracking-pixels.ts"]
-    },
-    {
-      "id": "x-ads",
-      "category": "pixel",
-      "products": ["jovie"],
-      "hosts": ["static.ads-twitter.com"],
-      "policy_names": ["X (Twitter)"],
-      "status": "inactive",
-      "approved": "2026-11-11",
-      "approved_by": "Inventory only; no runtime approval",
-      "rationale": "X (Twitter) signatures are parsed from fetched Linktree HTML to discover creator-owned pixel IDs. This server-side importer does not load or execute the pixel. Inactive inventory only: any browser request to these hosts fails registered-third-parties; activating a pixel requires a separate privacy approval.",
-      "code": ["apps/web/lib/ingestion/strategies/linktree/tracking-pixels.ts"]
-    },
-    {
-      "id": "sentry-replay",
-      "category": "replay",
-      "products": ["jovie"],
-      "hosts": ["sentry.io"],
-      "policy_names": ["Sentry"],
-      "status": "development-only",
-      "approved": "2026-11-11",
-      "approved_by": "Existing development diagnostics policy; production disabled",
-      "rationale": "Inventory of the existing development/test Replay integration. Production synchronous initialization and lazy addition both reject Replay, regardless of enableReplay or sample-rate overrides. This does not approve production recording or replay on input pages. Sentry error reporting remains the existing separate processor entry.",
-      "code": ["apps/web/lib/sentry/client-full.ts"]
     }
   ],
   "surfaces": [

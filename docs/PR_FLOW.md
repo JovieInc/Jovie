@@ -37,10 +37,11 @@ CI flight.
 
 A draft reaches ready on its own (Auto-Ready green-source) when its exact head
 is CLEAN with PR Ready and required checks SUCCESS, and its body carries either
-a complete writer-proof receipt or a trusted writer's on-green opt-in,
-`<!-- jovie-auto-ready: on-green -->`. `pnpm pr:open` adds it; pass `--park`
-only to keep a WIP draft parked. Holds, parks and controlled-proof markers
-still win.
+a complete writer-proof receipt or comes from a trusted writer, who ships on
+green by default (`pnpm pr:open` also writes `<!-- jovie-auto-ready: on-green -->`).
+To keep a WIP draft parked, pass `--park`: it writes
+`<!-- jovie-auto-ready: park -->`, and a refreshed body keeps it until
+`--on-green` replaces it. Holds, parks and controlled-proof markers still win.
 
 Missing ownership, stale/changed heads, failed checks, lost or duplicate events,
 and expired holds remain bounded repair/evidence outcomes. The policy digest is
