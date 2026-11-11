@@ -325,6 +325,10 @@
       "long-content": "BirthdayInput always renders exactly eight single-digit boxes (MM/DD/YYYY) under fixed Month, Day and Year labels; it takes no caller text, and useSegmentedInput strips non-digits and drops anything past the eighth digit, which BirthdayInput.test.tsx covers, so nothing can grow.",
       "offline": "BirthdayInput never fetches or submits; onSubmit is a callback fired on Enter and the notifications flow that owns it saves the birthday and reports connectivity. The detector matched onSubmit."
     },
+    "apps/web/components/features/profile/artist-notifications-cta/InlineNotificationsFlowSkeleton.tsx": {
+      "long-content": "The skeleton renders no caller text: its title and body are fixed non-breaking spaces and the consent line is invisible, so there is no content that can run long.",
+      "offline": "The skeleton never fetches; it stands in while the visitor's assignment resolves, and the live form that replaces it reports connectivity."
+    },
     "apps/web/components/features/release/ActionDial.tsx": {
       "error": "ActionDial never fetches or mutates; its only catch blocks guard localStorage for the first-use hint, and blocked storage still shows the hint, which ActionDial.test.tsx covers ('survives blocked storage').",
       "permission-denied": "ActionDial has no gated action or permission input; the detector matched role='listbox', 'option' and 'status', and its disabled prop is shown by the DisabledAction story."

@@ -316,4 +316,17 @@ describe('SidebarDock', () => {
     get.mockRestore();
     set.mockRestore();
   });
+  it('measures card positions only when the card stack changes', () => {
+    const measure = vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect');
+    const { rerender } = render(<SidebarDock userId='one' audio={audio} />);
+    const mounted = measure.mock.calls.length;
+    expect(mounted).toBeGreaterThan(0);
+    rerender(
+      <SidebarDock userId='one' audio={{ ...audio, isPlaying: false }} />
+    );
+    expect(measure.mock.calls.length).toBe(mounted);
+    rerender(<SidebarDock userId='one' audio={audio} update={update} />);
+    expect(measure.mock.calls.length).toBeGreaterThan(mounted);
+    measure.mockRestore();
+  });
 });
