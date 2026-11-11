@@ -12,6 +12,7 @@ import {
   runLiveness as runLivenessImpl,
   main as runMain,
 } from '../../automation-liveness.mjs';
+import { revisionFailureDisposition } from '../../merge-group-failure-hold.mjs';
 import { ADMISSION_BLOCKING_LABELS } from '../admission-hold-labels.mjs';
 import {
   livenessDecisions,
@@ -1345,6 +1346,21 @@ describe('dead-man liveness', () => {
     expect((await run(failing)).status).not.toBe('fresh');
   });
 
+  it('times enqueue dwell against the checked-in required source checks', () => {
+    const policy = load(
+      readFileSync(
+        join(repoRoot, '.github/rulesets/branch-protection.yml'),
+        'utf8'
+      )
+    );
+    const required = policy.rules
+      .find(rule => rule.type === 'required_status_checks')
+      .parameters.required_status_checks.map(check => check.context);
+    const observed = only('github:jovie:green-to-enqueue').entries[0].receipt
+      .requiredChecks;
+    expect([...observed].sort()).toEqual([...required].sort());
+  });
+
   // Tim 2026-10-21: a required-green PR is promoted and enqueued on the
   // check event. Ready + green + outside the queue for over 10 min is stale.
   it('a ready PR whose head is required-green but not enqueued for 10+ minutes is stale', async () => {
@@ -1358,8 +1374,9 @@ describe('dead-man liveness', () => {
       labels: { nodes: [], pageInfo: { hasNextPage: false } },
       ...extra,
     });
-    // PR Ready, Migration Guard and PR Size Guard are check runs; Fork PR
-    // Gate is a commit status. Green time is the latest required success.
+    // PR Ready, Migration Guard, PR Size Guard and Company guards are check
+    // runs; Fork PR Gate is a commit status. Green time is the latest required
+    // success.
     const heads = greenMinutesAgo => ({
       check_runs: [
         {
@@ -1376,6 +1393,11 @@ describe('dead-man liveness', () => {
           name: 'PR Size Guard',
           conclusion: 'success',
           completed_at: iso(greenMinutesAgo + 25),
+        },
+        {
+          name: 'Company guards',
+          conclusion: 'success',
+          completed_at: iso(greenMinutesAgo + 15),
         },
       ],
     });
@@ -1406,6 +1428,21 @@ describe('dead-man liveness', () => {
     expect(waiting.status).toBe('stale');
     expect(waiting.ageMinutes).toBe(30);
     expect(waiting.reason).toContain('#1:30m');
+    for (const conclusion of ['pending', 'failure']) {
+      const runs = heads(30);
+      runs.check_runs.find(
+        check => check.name === 'Company guards'
+      ).conclusion = conclusion;
+      expect((await run([pr(1)], 30, { runs })).status).toBe('fresh');
+    }
+    const latestRequired = heads(30);
+    latestRequired.check_runs.find(
+      check => check.name === 'Company guards'
+    ).completed_at = iso(4);
+    expect((await run([pr(1)], 30, { runs: latestRequired })).ageMinutes).toBe(
+      4
+    );
+
     // JOV-8788: #22378 was required-green but queue-poison deliberately
     // prevented admission. Use the writer's vocabulary, including machine
     // blocks, and keep held heads out of the capped timing reads.
@@ -1466,7 +1503,8 @@ describe('dead-man liveness', () => {
       ).status
     ).toBe('fresh');
     // A merge-queue failure hold for a real defect needs a new head from its
-    // owner: reported, not promotion latency. A transient hold still counts.
+    // owner, including retryable product failures: reported, not promotion
+    // latency. A transient infrastructure hold still counts.
     const holdStatus = cls => ({
       statuses: [
         ...status(30).statuses,
@@ -1474,15 +1512,29 @@ describe('dead-man liveness', () => {
           context: 'jovie-queue-failure-hold/v1',
           state: 'success',
           description: `class=${cls};n=1;run=1;try=1`,
+          creator: { type: 'Bot', login: 'jovie-ci-lane[bot]' },
+          target_url: 'https://github.com/JovieInc/Jovie/actions/runs/1',
           created_at: iso(20),
         },
       ],
     });
-    const defect = await run([pr(10)], 30, {
-      status: holdStatus('unclassified'),
-    });
-    expect(defect.status).toBe('fresh');
-    expect(defect.reason).toContain('defect-held=1[#10]');
+    for (const classification of [
+      'deterministic-source',
+      'retryable-product',
+      'unclassified',
+    ]) {
+      const status = holdStatus(classification);
+      expect(
+        revisionFailureDisposition({
+          repository: 'JovieInc/Jovie',
+          statuses: status.statuses,
+        }).action
+      ).toBe('block');
+      const defect = await run([pr(10)], 30, { status });
+      expect(defect.status, classification).toBe('fresh');
+      expect(defect.reason).toContain('defect-held=1[#10]');
+      expect(defect.reason).toContain('ready-green-unqueued=0[]');
+    }
     expect(
       (
         await run([pr(11)], 30, {

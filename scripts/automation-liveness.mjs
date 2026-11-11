@@ -679,7 +679,13 @@ const MERGEABLE_GREEN = new Set(['CLEAN', 'UNSTABLE', 'HAS_HOOKS']);
 const ADMISSION_BLOCKING = new Set(ADMISSION_BLOCKING_LABELS);
 const GREEN_TIMING_MAX_PRS = 10;
 const FAILURE_HOLD_CONTEXT = 'jovie-queue-failure-hold/v1';
-const DEFECT_HOLD_CLASSES = new Set(['deterministic-source', 'unclassified']);
+// Match revisionFailureDisposition: a product failure needs a new source head,
+// even when the failed product test is classified as retryable.
+const DEFECT_HOLD_CLASSES = new Set([
+  'deterministic-source',
+  'retryable-product',
+  'unclassified',
+]);
 
 /**
  * When the exact head turned required-green: the latest success among each
