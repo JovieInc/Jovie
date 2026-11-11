@@ -1,6 +1,6 @@
 'use client';
 
-// @coverage-via apps/web/lib/desktop/electron-bridge.test.ts
+// @coverage-via apps/web/lib/desktop/electron-native-state.test.ts
 
 import { getRawElectronAPI } from './electron-runtime';
 
