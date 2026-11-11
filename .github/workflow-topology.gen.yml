@@ -208,8 +208,8 @@ nodes:
     triggeringStateTransition:
       - workflow_dispatch
       - workflow_run
-    terminalReceipt: job:dogfood
-    jobCount: 1
+    terminalReceipt: job:layout-budget
+    jobCount: 2
   - name: CLI Chaos Nightly
     path: .github/workflows/cli-chaos-nightly.yml
     active: true

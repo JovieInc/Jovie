@@ -6,6 +6,9 @@
 //                 p50/p95 are measurable per run.
 //   intake        file or reopen one fingerprinted Linear issue (and post to
 //                 Slack) on red; resolve it on green.
+//   layout-intake the same for the layout-shift budget (perf class), under
+//                 its own fingerprint, so a layout breach never reopens or
+//                 resolves the revenue journey's P0.
 
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -19,6 +22,7 @@ import {
 import { parseStageEventFeed } from './lib/stage-events.mjs';
 
 export const CLAIM_DOGFOOD_KEY = 'claim-checkout-dogfood';
+export const CLAIM_LAYOUT_BUDGET_KEY = 'claim-checkout-layout-budget';
 const ENTITY = 'claim-dogfood';
 const SOURCE = 'claim-dogfood-receipts';
 
@@ -170,6 +174,64 @@ export async function reportClaimDogfoodResult(
   });
 }
 
+/**
+ * Layout-shift budget (perf class) for /claim and /billing/success. Its own
+ * fingerprinted issue: green resolves it, a breach files or reopens it.
+ */
+export async function reportClaimLayoutBudgetResult(
+  { outcome, runUrl = '', runId = '' },
+  {
+    env = process.env,
+    upsert = upsertLinearIssueByTitleFingerprint,
+    close = closeLinearIssueByFingerprint,
+    notify = postSlack,
+  } = {}
+) {
+  const key = CLAIM_LAYOUT_BUDGET_KEY;
+  const enabled = remediationTriggersEnabled(env);
+  if (outcome === 'success') {
+    if (!enabled) {
+      return logRemediationDryRun({ action: 'resolve', key, fingerprint: key });
+    }
+    return close({
+      fingerprint: key,
+      labelKey: key,
+      comment: 'Claim checkout layout-shift budget is green.',
+      runId,
+      apiKey: env.LINEAR_API_KEY,
+    });
+  }
+  await notify(
+    env,
+    `Claim checkout layout-shift budget is breached (perf; checkout itself is reported separately). Run: ${runUrl}`
+  );
+  if (!enabled) {
+    return logRemediationDryRun({ action: 'upsert', key, fingerprint: key });
+  }
+  return upsert({
+    fingerprint: key,
+    labelKey: key,
+    title: `Perf: claim checkout layout-shift budget breached (${key})`,
+    description: [
+      '## Source',
+      '- Workflow: claim-checkout-dogfood.yml, check "Claim checkout layout budget (perf)"',
+      `- Run: ${runUrl}`,
+      '',
+      '## Why it matters',
+      'Cumulative layout shift on /claim or /billing/success reached the 0.1 Web Vitals ceiling. A paying artist sees the screen jump. The functional checkout is a separate check and is not implied broken.',
+      '',
+      '## Repro',
+      'Run apps/web/tests/e2e/claim-checkout-layout.perf.spec.ts with Stripe test keys against a local server with E2E_USE_TEST_AUTH_BYPASS=1.',
+      '',
+      `Fingerprint: ${key}`,
+    ].join('\n'),
+    priority: 3,
+    createStateName: 'Todo',
+    reopenTerminal: true,
+    apiKey: env.LINEAR_API_KEY,
+  });
+}
+
 async function postSlack(env, text) {
   if (!env.SLACK_WEBHOOK_URL) return;
   try {
@@ -200,8 +262,20 @@ async function main(command) {
     }
     return;
   }
+  if (command === 'layout-intake') {
+    const outcome = await reportClaimLayoutBudgetResult({
+      outcome: process.env.LAYOUT_OUTCOME,
+      runUrl: process.env.RUN_URL,
+      runId: process.env.RUN_ID,
+    });
+    console.log(JSON.stringify(outcome));
+    if (outcome && outcome.ok === false) {
+      throw new Error(`Claim layout Linear intake failed: ${outcome.reason}`);
+    }
+    return;
+  }
   throw new Error(
-    `usage: claim-dogfood-report.mjs stage-events|intake (got ${command})`
+    `usage: claim-dogfood-report.mjs stage-events|intake|layout-intake (got ${command})`
   );
 }
 
