@@ -4,9 +4,30 @@ import { describe, expect, it, vi } from 'vitest';
 const mocks = vi.hoisted(() => ({
   sendStreamEmail: vi.fn(),
   backend: null as unknown,
+  updates: [] as { set: unknown }[],
+  rows: [] as Record<string, unknown>[],
 }));
 vi.mock('server-only', () => ({}));
-vi.mock('@/lib/db', () => ({ db: {} }));
+vi.mock('@/lib/db', () => {
+  // A select chain that resolves to mocks.rows, and an update that records .set.
+  const chain: Record<string, unknown> = {};
+  for (const step of ['from', 'innerJoin', 'leftJoin', 'where', 'orderBy']) {
+    chain[step] = () => chain;
+  }
+  chain.limit = async () => mocks.rows;
+  return {
+    db: {
+      select: () => chain,
+      update: () => ({
+        set: (set: unknown) => ({
+          where: async () => {
+            mocks.updates.push({ set });
+          },
+        }),
+      }),
+    },
+  };
+});
 vi.mock('@/lib/email/gateway', () => ({
   sendStreamEmail: mocks.sendStreamEmail,
 }));
@@ -30,6 +51,7 @@ import {
   FounderWelcomeBlocked,
 } from '@/lib/founder-welcome/email';
 import { createFounderWelcomeLedger } from '@/lib/founder-welcome/ledger';
+import { markFounderWelcomeSent } from '@/lib/founder-welcome/marker.server';
 import {
   type AdmittedVisitor,
   buildFounderWelcomeCard,
@@ -42,6 +64,7 @@ import {
 import {
   buildFounderWelcomeServerDeps,
   FOUNDER_WELCOME_PAGE_URL,
+  loadAdmittedVisitors,
 } from '@/lib/founder-welcome/server';
 import { memoryRecordBackend } from '@/lib/ovie/mcp/store';
 import { summerCardId } from '@/lib/ovie/summer-card-digest';
@@ -398,5 +421,47 @@ describe('server deps', () => {
     expect(FOUNDER_WELCOME_PAGE_URL).toBe(
       'https://jov.ie/app/dashboard/profile'
     );
+  });
+
+  it('stamps the shared welcome marker through the domain write', async () => {
+    mocks.updates.length = 0;
+    await buildFounderWelcomeServerDeps([alice], NOW).markWelcomed(
+      alice.entryId
+    );
+    await markFounderWelcomeSent(bob.entryId, NOW);
+    expect(mocks.updates).toEqual([
+      { set: { founderWelcomeSentAt: NOW, updatedAt: NOW } },
+      { set: { founderWelcomeSentAt: NOW, updatedAt: NOW } },
+    ]);
+  });
+
+  it('marks visitors the signup welcome already reached', async () => {
+    const row = {
+      entryId: alice.entryId,
+      email: ` ${alice.email} `,
+      fullName: 'Sam Rivera',
+      spotifyArtistName: 'Sam and the Tides',
+      userName: null,
+      outboundSuppressedAt: null,
+      founderWelcomeSentAt: null,
+      profileId: 'p1',
+      isClaimed: true,
+      displayName: null,
+    };
+    mocks.rows = [
+      row,
+      { ...row, entryId: bob.entryId, founderWelcomeSentAt: NOW },
+      { ...row, entryId: 'e-blank', email: '  ' },
+    ];
+    const visitors = await loadAdmittedVisitors(NOW);
+    expect(visitors.map(v => [v.entryId, v.alreadyWelcomed])).toEqual([
+      [alice.entryId, false],
+      [bob.entryId, true],
+    ]);
+    expect(visitors[0]).toMatchObject({
+      email: alice.email,
+      pageUrl: FOUNDER_WELCOME_PAGE_URL,
+      suppressed: false,
+    });
   });
 });
