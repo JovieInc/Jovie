@@ -184,15 +184,14 @@ export function Tooltip({
     [side]
   );
 
-  // Fallback path (non-single-element children): measure when the wrapper
-  // mounts/updates. Prefer the single-child path above for interactive rows.
-  const triggerRef = useCallback(
-    (node: HTMLElement | null) => {
-      if (!node || side !== 'right') return;
-      setSeamOffset(getSeamSideOffset(node));
-    },
-    [side]
-  );
+  // Keep the trigger node without reading layout. Measuring here ran
+  // getBoundingClientRect (a forced layout) and a state update in the commit of
+  // every right-side tooltip, on every render, inside the cold-load hydration
+  // task. The offset is measured when the hint opens instead.
+  const triggerNode = useRef<HTMLElement | null>(null);
+  const triggerRef = useCallback((node: HTMLElement | null) => {
+    triggerNode.current = node;
+  }, []);
 
   const triggerChild = getTriggerChild({
     children,
@@ -209,9 +208,13 @@ export function Tooltip({
     <TooltipProvider>
       <TooltipRoot
         open={!disabled && !touchActive && (open ?? hintOpen)}
-        onOpenChange={value =>
-          setHintOpen(!disabled && !touchInput.current && value)
-        }
+        onOpenChange={value => {
+          const opening = !disabled && !touchInput.current && value;
+          if (opening && side === 'right' && triggerNode.current) {
+            setSeamOffset(getSeamSideOffset(triggerNode.current));
+          }
+          setHintOpen(opening);
+        }}
       >
         <TooltipTrigger
           asChild
