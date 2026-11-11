@@ -41,8 +41,20 @@ export function DesktopQrOverlay({ handle }: Readonly<DesktopQrOverlayProps>) {
   useEffect(() => {
     if (!qrUrl || typeof globalThis.Image !== 'function') return;
 
-    const preloadImage = new globalThis.Image();
-    preloadImage.src = qrUrl;
+    // Warm the third-party QR image only after the document has loaded. An
+    // image request started before the load event holds that event, so a
+    // slow api.qrserver.com response kept desktop profiles "loading" for 30s+
+    // while the visitor only sees the small phone icon.
+    const preload = () => {
+      const preloadImage = new globalThis.Image();
+      preloadImage.src = qrUrl;
+    };
+    if (globalThis.document?.readyState === 'complete') {
+      preload();
+      return;
+    }
+    globalThis.addEventListener('load', preload, { once: true });
+    return () => globalThis.removeEventListener('load', preload);
   }, [qrUrl]);
 
   useEffect(() => {
