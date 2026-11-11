@@ -6,7 +6,8 @@
 // registered stat: `{stat:<id>}`. The number then comes from the live,
 // threshold- and freshness-checked observation, so it is never hand-typed,
 // never stale and never rounded up. Hand-written claims ratchet: a file may
-// never gain hits, and baseline entries that no longer hit must be removed.
+// never gain hits. Removing a hit passes without a baseline edit; `--tighten`
+// lowers the entry afterwards and can never raise one.
 //
 // Also checks that every `{stat:<id>}` binding names a registered stat.
 //
@@ -17,6 +18,11 @@ import { execFileSync } from 'node:child_process';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { extname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import {
+  announceShrink,
+  compareToBaseline,
+  tightenBaseline,
+} from '../../lib/shrink-only-baseline.mjs';
 import { literals } from '../offer-claims/check.mjs';
 
 const here = fileURLToPath(new URL('.', import.meta.url));
@@ -109,27 +115,10 @@ export function registeredIds(cwd = process.cwd()) {
 
 /** Ratchet + binding validity. */
 export function evaluate(current, baseline, ids) {
-  const errors = [];
-  for (const [file, counts] of Object.entries(current.unbound)) {
-    for (const [id, n] of Object.entries(counts)) {
-      const allowed = baseline[file]?.[id] ?? 0;
-      if (n > allowed) {
-        errors.push(
-          `${file}: ${n} hand-written ${id} claim(s), baseline ${allowed}. Bind the number to a proof stat ({stat:<id>}, apps/web/data/proof-stats/registry.json) instead of typing it.`
-        );
-      }
-    }
-  }
-  for (const [file, counts] of Object.entries(baseline)) {
-    for (const [id, n] of Object.entries(counts)) {
-      const now = current.unbound[file]?.[id] ?? 0;
-      if (now < n) {
-        errors.push(
-          `${file}: baseline ${id}=${n} but only ${now} now. Lower baseline.json (it only shrinks).`
-        );
-      }
-    }
-  }
+  const errors = compareToBaseline(current.unbound, baseline).growth.map(
+    ({ path: [file, id], count, baseline: allowed }) =>
+      `${file}: ${count} hand-written ${id} claim(s), baseline ${allowed}. Bind the number to a proof stat ({stat:<id>}, apps/web/data/proof-stats/registry.json) instead of typing it.`
+  );
   for (const [file, statIds] of Object.entries(current.bound)) {
     for (const id of statIds) {
       if (!ids.has(id)) {
@@ -157,13 +146,17 @@ export function measurement(current) {
   };
 }
 
-export function main(argv = process.argv.slice(2), cwd = process.cwd()) {
+export function main(
+  argv = process.argv.slice(2),
+  cwd = process.cwd(),
+  baselinePath = BASELINE_PATH
+) {
   const current = scan(cwd);
   if (argv.includes('--write-baseline')) {
     const sorted = Object.fromEntries(
       Object.entries(current.unbound).sort(([a], [b]) => (a < b ? -1 : 1))
     );
-    writeFileSync(BASELINE_PATH, `${JSON.stringify(sorted, null, 2)}\n`);
+    writeFileSync(baselinePath, `${JSON.stringify(sorted, null, 2)}\n`);
     const m = measurement(current);
     console.log(
       `stat-claims: wrote baseline, ${Object.keys(sorted).length} files, ${m.unbound} unbound claims`
@@ -174,7 +167,18 @@ export function main(argv = process.argv.slice(2), cwd = process.cwd()) {
     console.log(JSON.stringify(measurement(current)));
     return 0;
   }
-  const baseline = JSON.parse(readFileSync(BASELINE_PATH, 'utf8'));
+  let baseline = JSON.parse(readFileSync(baselinePath, 'utf8'));
+  let { shrink } = compareToBaseline(current.unbound, baseline);
+  if (argv.includes('--tighten')) {
+    // Lowers or removes entries only, so it cannot absorb a new claim; the
+    // growth check below still runs against the tightened baseline.
+    if (shrink.length > 0) {
+      baseline = tightenBaseline(current.unbound, baseline).baseline;
+      writeFileSync(baselinePath, `${JSON.stringify(baseline, null, 2)}\n`);
+    }
+    console.log(`stat-claims: tightened ${shrink.length} entries`);
+    shrink = [];
+  }
   const errors = evaluate(current, baseline, registeredIds(cwd));
   if (errors.length) {
     console.error(
@@ -183,6 +187,7 @@ export function main(argv = process.argv.slice(2), cwd = process.cwd()) {
     return 1;
   }
   const m = measurement(current);
+  announceShrink('stat-claims', shrink);
   console.log(
     `stat-claims: ok (${m.bound} bound, ${m.unbound} baselined hand-written numeric claims; bound share ${(m.boundShare * 100).toFixed(1)}%)`
   );
