@@ -2,7 +2,15 @@
 // dashboard gate runs signed-in shell navigation without an identity secret;
 // the onboarding gate still admits on E2E_CLERK_USER_ID.
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import {
+  chmodSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { runInNewContext } from 'node:vm';
@@ -191,8 +199,10 @@ describe('Lighthouse identity admission', () => {
     );
     // The restore is blocking and runs whether or not the base build worked.
     expect(restore['continue-on-error']).toBeUndefined();
+    // Not the workspace path: after the base checkout that file is the base
+    // commit's, or missing (dispatch run 42967736732 failed there).
     expect(restore.run).toBe(
-      'bash .github/scripts/lighthouse-build-baseline.sh restore'
+      'bash "$RUNNER_TEMP/lighthouse-build-baseline.sh" restore'
     );
     expect(restore.if).toBe(baseline.if);
     expect(names.indexOf(restore.name)).toBe(names.indexOf(baseline.name) + 1);
@@ -230,6 +240,93 @@ describe('Lighthouse identity admission', () => {
       'utf8'
     );
     expect(script).toContain('pnpm --filter=@jovie/web run build');
+  });
+
+  it('dashboard: the baseline builds from a checkout with nothing untracked, then restores head', () => {
+    // A clean checkout lists no untracked files outside node_modules. The
+    // listing must treat that as empty, not as a failed pipeline.
+    const dir = mkdtempSync(join(tmpdir(), 'lighthouse-baseline-clean-'));
+    const script = join(
+      REPO_ROOT,
+      '.github/scripts/lighthouse-build-baseline.sh'
+    );
+    const git = (cwd: string, ...args: string[]) => {
+      const result = spawnSync(
+        'git',
+        ['-c', 'user.email=ci@example.com', '-c', 'user.name=ci', ...args],
+        { cwd, encoding: 'utf8' }
+      );
+      expect(result.status, `git ${args.join(' ')}: ${result.stderr}`).toBe(0);
+      return result.stdout.trim();
+    };
+    try {
+      const origin = join(dir, 'origin');
+      const bin = join(dir, 'bin');
+      const temp = join(dir, 'temp');
+      for (const path of [join(origin, 'apps/web'), bin, temp]) {
+        mkdirSync(path, { recursive: true });
+      }
+      git(origin, 'init', '-q', '-b', 'main');
+      git(origin, 'config', 'uploadpack.allowAnySHA1InWant', 'true');
+      writeFileSync(join(origin, '.gitignore'), '.next/\nnode_modules/\n');
+      writeFileSync(join(origin, 'apps/web/page.txt'), 'base\n');
+      git(origin, 'add', '-A');
+      git(origin, 'commit', '-q', '-m', 'base');
+      const baseSha = git(origin, 'rev-parse', 'HEAD');
+      writeFileSync(join(origin, 'apps/web/page.txt'), 'head\n');
+      git(origin, 'commit', '-q', '-am', 'head');
+      const headSha = git(origin, 'rev-parse', 'HEAD');
+      // Stands in for `pnpm --filter=@jovie/web run build`: the "server" is
+      // the page of whatever commit is checked out.
+      writeFileSync(
+        join(bin, 'pnpm'),
+        '#!/usr/bin/env bash\nset -e\nmkdir -p apps/web/.next/standalone/apps/web node_modules/dep\ncp apps/web/page.txt apps/web/.next/standalone/apps/web/server.js\n'
+      );
+      chmodSync(join(bin, 'pnpm'), 0o755);
+      const work = join(dir, 'work');
+      git(dir, 'clone', '-q', '--depth=1', `file://${origin}`, work);
+      expect(
+        git(work, 'ls-files', '--others', '--ignored', '--exclude-standard')
+      ).toBe('');
+
+      const output = join(dir, 'output');
+      const env = {
+        ...process.env,
+        PATH: `${bin}:${process.env.PATH}`,
+        RUNNER_TEMP: temp,
+        GITHUB_OUTPUT: output,
+        BASELINE_DIR: join(temp, 'baseline'),
+        BASE_SHA: baseSha,
+      };
+      const run = (mode: string) =>
+        spawnSync(
+          'bash',
+          [
+            mode === 'restore'
+              ? join(temp, 'lighthouse-build-baseline.sh')
+              : script,
+            mode,
+          ],
+          { cwd: work, env, encoding: 'utf8' }
+        );
+
+      const build = run('build');
+      expect(build.status, build.stdout + build.stderr).toBe(0);
+      expect(readFileSync(output, 'utf8')).toContain('built=true\n');
+      expect(
+        readFileSync(join(temp, 'baseline/apps/web/server.js'), 'utf8')
+      ).toBe('base\n');
+
+      const restore = run('restore');
+      expect(restore.status, restore.stdout + restore.stderr).toBe(0);
+      expect(git(work, 'rev-parse', 'HEAD')).toBe(headSha);
+      expect(readFileSync(join(work, 'apps/web/page.txt'), 'utf8')).toBe(
+        'head\n'
+      );
+      expect(existsSync(join(work, 'apps/web/.next/standalone'))).toBe(false);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 
   it('dashboard: a change to any Lighthouse config it runs turns its measuring steps on', () => {

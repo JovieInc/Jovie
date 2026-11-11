@@ -4988,10 +4988,12 @@ jobs:
           NEXT_PRIVATE_SKIP_SIZE_CHECK: 'true'
           SKIP_SKILLS_CATALOG_SYNC: '1'
 
-      # Blocking: everything after this must run on the exact head tree.
+      # Blocking: everything after this must run on the exact head tree. The
+      # build step left a copy of the script in RUNNER_TEMP, because the
+      # workspace may be on a base commit that does not have it.
       - name: Restore workspace to the exact head
         if: steps.check_changes.outputs.run_full_ci == 'true'
-        run: bash .github/scripts/lighthouse-build-baseline.sh restore
+        run: bash "$RUNNER_TEMP/lighthouse-build-baseline.sh" restore
 
       - name: Download build artifact
         if: steps.check_changes.outputs.run_full_ci == 'true'

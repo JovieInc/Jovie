@@ -20,14 +20,25 @@ export LC_ALL=C
 
 mode="${1:?usage: lighthouse-build-baseline.sh build|restore}"
 state_dir="${RUNNER_TEMP:?}/lighthouse-baseline-state"
+
+# The build checks another commit out over this file, and the base commit may
+# not have it at all. Run from a copy outside the workspace; the workflow's
+# restore step calls that copy.
+stable_copy="$RUNNER_TEMP/lighthouse-build-baseline.sh"
+if [ "$(realpath "$0")" != "$(realpath -m "$stable_copy")" ]; then
+  cp "$0" "$stable_copy"
+  exec bash "$stable_copy" "$@"
+fi
 head_file="$state_dir/head-sha"
 before_file="$state_dir/untracked-before"
 
+# grep exits 1 when it prints nothing; an empty list is a valid answer (a
+# clean checkout has no untracked files outside node_modules), not a failure.
 list_untracked() {
   {
     git ls-files -z --others --exclude-standard --directory
     git ls-files -z --others --ignored --exclude-standard --directory
-  } | grep -zv -e '^node_modules/' -e '/node_modules/' | sort -z -u
+  } | { grep -zv -e '^node_modules/' -e '/node_modules/' || true; } | sort -z -u
 }
 
 clear_build_output() {
