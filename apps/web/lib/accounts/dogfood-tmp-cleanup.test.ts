@@ -3,7 +3,15 @@ import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { PGlite } from '@electric-sql/pglite';
 import { drizzle } from 'drizzle-orm/pglite';
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import {
+  afterAll,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from 'vitest';
 import { users } from '@/lib/db/schema/auth';
 import { baSessions, baUsers } from '@/lib/db/schema/better-auth';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
@@ -164,10 +172,16 @@ describe('runDogfoodTmpCleanup against PostgreSQL', () => {
       subscriptionId: 'sub_test_walk',
     });
 
+    const afterRemoval = vi.fn(async (_handles: readonly string[]) => {});
     const report = await runDogfoodTmpCleanup(cleanupDb(), {
       apply: true,
       now,
+      afterRemoval,
     });
+    expect(afterRemoval).toHaveBeenCalledTimes(1);
+    expect(afterRemoval.mock.calls[0]?.[0]).toEqual([
+      expect.stringMatching(/^walk\d+$/),
+    ]);
     expect(report).toMatchObject({
       mode: 'apply',
       matched: 1,
@@ -199,8 +213,10 @@ describe('runDogfoodTmpCleanup against PostgreSQL', () => {
     const again = await runDogfoodTmpCleanup(cleanupDb(), {
       apply: true,
       now,
+      afterRemoval,
     });
     expect(again).toMatchObject({ matched: 0, removed: 0 });
+    expect(afterRemoval).toHaveBeenCalledTimes(1);
   }, 60_000);
 });
 

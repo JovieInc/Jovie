@@ -1,9 +1,11 @@
 import { type NextRequest, NextResponse } from 'next/server';
 import { runDogfoodTmpCleanup } from '@/lib/accounts/dogfood-tmp-cleanup';
+import { invalidateProfileCache } from '@/lib/cache/profile';
 import { verifyCronRequest } from '@/lib/cron/auth';
 import { runAtomicDbOperation } from '@/lib/db/legacy-transaction';
 import { captureError } from '@/lib/error-tracking';
 import { NO_STORE_HEADERS } from '@/lib/http/headers';
+import { invalidateHandleCache } from '@/lib/onboarding/handle-availability-cache';
 import { logger } from '@/lib/utils/logger';
 
 export const runtime = 'nodejs';
@@ -31,7 +33,17 @@ export async function GET(request: NextRequest) {
             retry: 'never',
           }),
       },
-      { apply }
+      {
+        apply,
+        // Same cache busting as account deletion: freed handles show as
+        // available and removed profiles stop serving.
+        afterRemoval: async handles => {
+          for (const handle of handles) {
+            await invalidateHandleCache(handle);
+            await invalidateProfileCache(handle);
+          }
+        },
+      }
     );
     logger.info('Dogfood tmp account cleanup complete', {
       mode: report.mode,

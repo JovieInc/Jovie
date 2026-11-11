@@ -75,7 +75,13 @@ function tmpId(email: string): string {
 
 export async function runDogfoodTmpCleanup(
   db: DogfoodTmpCleanupDb,
-  options: { apply: boolean; now?: Date; sampleSize?: number }
+  options: {
+    apply: boolean;
+    now?: Date;
+    sampleSize?: number;
+    /** Runs after commit with the removed profiles' handles (cache busting). */
+    afterRemoval?: (handles: readonly string[]) => Promise<void>;
+  }
 ): Promise<DogfoodTmpCleanupReport> {
   const now = options.now ?? new Date();
   const cutoff = new Date(
@@ -88,7 +94,9 @@ export async function runDogfoodTmpCleanup(
     drizzleSql`lower(${users.email}) like ${TMP_EMAIL_LIKE}`
   );
 
-  return db.atomic(async tx => {
+  const handles: string[] = [];
+  const report = await db.atomic(async tx => {
+    handles.length = 0;
     const rows = await tx
       .select({
         id: users.id,
@@ -170,9 +178,11 @@ export async function runDogfoodTmpCleanup(
             .delete(agentVisibilityDrafts)
             .where(inArray(agentVisibilityDrafts.id, draftIds));
         }
-        await tx
+        const profiles = await tx
           .delete(creatorProfiles)
-          .where(inArray(creatorProfiles.userId, fencedIds));
+          .where(inArray(creatorProfiles.userId, fencedIds))
+          .returning({ handle: creatorProfiles.usernameNormalized });
+        handles.push(...profiles.map(profile => profile.handle));
         await tx
           .delete(preSaveTokens)
           .where(inArray(preSaveTokens.userId, fencedIds));
@@ -206,6 +216,8 @@ export async function runDogfoodTmpCleanup(
       sample: matched
         .slice(0, options.sampleSize ?? 10)
         .map(row => `tmp-${tmpId(row.email ?? '')}`),
-    };
+    } satisfies DogfoodTmpCleanupReport;
   });
+  if (handles.length > 0) await options.afterRemoval?.(handles);
+  return report;
 }

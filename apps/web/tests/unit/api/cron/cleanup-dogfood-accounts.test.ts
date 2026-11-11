@@ -11,6 +11,14 @@ vi.mock('@/lib/db/legacy-transaction', () => ({
   runAtomicDbOperation: mockAtomic,
 }));
 vi.mock('@/lib/error-tracking', () => ({ captureError: vi.fn() }));
+const mockInvalidateHandle = vi.hoisted(() => vi.fn());
+const mockInvalidateProfile = vi.hoisted(() => vi.fn());
+vi.mock('@/lib/onboarding/handle-availability-cache', () => ({
+  invalidateHandleCache: mockInvalidateHandle,
+}));
+vi.mock('@/lib/cache/profile', () => ({
+  invalidateProfileCache: mockInvalidateProfile,
+}));
 
 const ROUTE = 'http://localhost/api/cron/cleanup-dogfood-accounts';
 const auth = { Authorization: `${'Bear' + 'er'} test-secret` };
@@ -49,9 +57,7 @@ describe('GET /api/cron/cleanup-dogfood-accounts', () => {
     );
     const response = await GET(new NextRequest(ROUTE, { headers: auth }));
     expect(response.status).toBe(200);
-    expect(mockCleanup).toHaveBeenCalledWith(expect.anything(), {
-      apply: false,
-    });
+    expect(mockCleanup.mock.calls[0]?.[1]).toMatchObject({ apply: false });
     expect(await response.json()).toMatchObject({
       success: true,
       mode: 'dry-run',
@@ -67,8 +73,11 @@ describe('GET /api/cron/cleanup-dogfood-accounts', () => {
       new NextRequest(`${ROUTE}?apply=1`, { headers: auth })
     );
     expect(await response.json()).toMatchObject({ mode: 'apply', removed: 1 });
-    const [db] = mockCleanup.mock.calls[0]!;
+    const [db, options] = mockCleanup.mock.calls[0]!;
     await db.atomic(async () => null);
+    await options.afterRemoval(['walk1']);
+    expect(mockInvalidateHandle).toHaveBeenCalledWith('walk1');
+    expect(mockInvalidateProfile).toHaveBeenCalledWith('walk1');
     expect(mockAtomic).toHaveBeenCalledWith(expect.any(Function), {
       actorId: 'jovie-dogfood-tmp-cleanup',
       system: true,
@@ -77,7 +86,7 @@ describe('GET /api/cron/cleanup-dogfood-accounts', () => {
     for (const value of ['true', 'yes', '0']) {
       mockCleanup.mockClear();
       await GET(new NextRequest(`${ROUTE}?apply=${value}`, { headers: auth }));
-      expect(mockCleanup.mock.calls[0]?.[1]).toEqual({ apply: false });
+      expect(mockCleanup.mock.calls[0]?.[1]).toMatchObject({ apply: false });
     }
   });
 
