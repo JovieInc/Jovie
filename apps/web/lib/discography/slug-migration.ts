@@ -28,6 +28,7 @@ import {
   releaseArtists,
 } from '@/lib/db/schema/content';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
+import { renameReleaseSlug } from '@/lib/domain/releases';
 import { logger } from '@/lib/utils/logger';
 import {
   planLegacyReleaseSlugRenames,
@@ -147,34 +148,6 @@ async function loadReservedSlugs(
   );
 }
 
-async function applyReleaseRename(
-  profileId: string,
-  rename: SlugRename,
-  conn: Db
-): Promise<boolean> {
-  // Old URL keeps working: the release route 308s redirect rows.
-  await conn
-    .insert(contentSlugRedirects)
-    .values({
-      creatorProfileId: profileId,
-      oldSlug: rename.from,
-      contentType: 'release',
-      releaseId: rename.id,
-    })
-    .onConflictDoNothing();
-  const updated = await conn
-    .update(discogReleases)
-    .set({ slug: rename.to, updatedAt: new Date() })
-    .where(
-      and(
-        eq(discogReleases.id, rename.id),
-        eq(discogReleases.slug, rename.from)
-      )
-    )
-    .returning({ id: discogReleases.id });
-  return updated.length > 0;
-}
-
 async function applyTrackRename(
   rename: SlugRename,
   conn: Db
@@ -235,7 +208,13 @@ export async function migrateLegacySlugsForProfile(
 
   for (const rename of planLegacyReleaseSlugRenames(items, reserved)) {
     try {
-      if (await applyReleaseRename(profileId, rename, conn)) releasesRenamed++;
+      if (
+        await renameReleaseSlug(
+          { profileId, releaseId: rename.id, from: rename.from, to: rename.to },
+          conn
+        )
+      )
+        releasesRenamed++;
       else skipped++;
     } catch (error) {
       // A concurrent writer took the slug; the next run replans around it.

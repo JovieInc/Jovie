@@ -50,7 +50,7 @@
       "id": "release.create",
       "entity": "release",
       "module": "apps/web/lib/domain/releases.ts",
-      "exports": ["createReleaseForProfile"],
+      "exports": ["createReleaseForProfile", "renameReleaseSlug"],
       "tables": ["discogReleases"]
     },
     {
