@@ -28,16 +28,14 @@
  * VERCEL_GIT_REPO_OWNER / VERCEL_GIT_REPO_SLUG override.
  */
 
-import { createHmac } from 'node:crypto';
+import { createHmac, timingSafeEqual } from 'node:crypto';
 import { extractWorkBlocks } from '@jovie/agent-transport-contracts/work-order';
 import { NextRequest, NextResponse } from 'next/server';
 
 import { env } from '@/lib/env-server';
 import { captureCriticalError } from '@/lib/error-tracking';
 import { ServerFetchTimeoutError, serverFetch } from '@/lib/http/server-fetch';
-import { scheduleFleetRoomWebhook } from '@/lib/ovie/fleet-room.server';
 import { logger } from '@/lib/utils/logger';
-import { verifyLinearSignature } from '@/lib/webhooks/linear-signature';
 import {
   acquireRecentDispatch,
   clearRecentDispatch,
@@ -143,6 +141,24 @@ interface AutomationContract {
   verifyRequired: boolean;
   simplifyBounded: boolean;
   modelTier: 'premium' | 'economy';
+}
+
+function verifySignature(
+  body: string,
+  signature: string,
+  secret: string
+): boolean {
+  try {
+    const expected = createHmac('sha256', secret).update(body).digest('hex');
+    const sigBuffer = Buffer.from(signature, 'hex');
+    const expectedBuffer = Buffer.from(expected, 'hex');
+    return (
+      sigBuffer.length === expectedBuffer.length &&
+      timingSafeEqual(sigBuffer, expectedBuffer)
+    );
+  } catch {
+    return false;
+  }
 }
 
 function isCodeRabbitPlanComment(payload: LinearWebhookPayload): boolean {
@@ -478,7 +494,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (!verifyLinearSignature(body, signature, webhookSecret)) {
+    if (!verifySignature(body, signature, webhookSecret)) {
       return NextResponse.json(
         { error: 'Invalid signature' },
         { status: 401, headers: NO_STORE_HEADERS }
@@ -486,7 +502,6 @@ export async function POST(request: NextRequest) {
     }
 
     const payload = JSON.parse(body) as LinearWebhookPayload;
-    scheduleFleetRoomWebhook(payload); // Ovie fleet room, after the response
 
     // Check freshness before an authoritative read. Lookup failures are reads,
     // never an ambiguous GitHub dispatch, and must leave the event retryable.

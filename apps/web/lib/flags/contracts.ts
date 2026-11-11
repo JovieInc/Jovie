@@ -79,12 +79,6 @@ export const APP_FLAG_DEFAULTS = {
    */
   CREATOR_FINANCE: false,
   VISIBILITY_AUDIT_OFFER: false,
-  /**
-   * Ovie fleet room at /app/ov/room (docs/operations/AGENT_ROOM.md). Default
-   * off for everyone; admins resolve it on through the admin default-true
-   * rule, so only Ovie operators see it. An env override false stops it.
-   */
-  OVIE_FLEET_ROOM: false,
 } as const;
 
 export type AppFlagName = keyof typeof APP_FLAG_DEFAULTS;
@@ -116,7 +110,6 @@ export const APP_FLAG_KEYS = {
   AGENT_PROFILE_CREATE: 'agent_profile_create',
   CREATOR_FINANCE: 'creator_finance',
   VISIBILITY_AUDIT_OFFER: 'visibility_audit_offer',
-  OVIE_FLEET_ROOM: 'ovie_fleet_room',
 } as const satisfies Record<AppFlagName, string>;
 
 export const APP_FLAG_OVERRIDE_KEYS = {
@@ -143,7 +136,6 @@ export const APP_FLAG_OVERRIDE_KEYS = {
   AGENT_PROFILE_CREATE: 'code:AGENT_PROFILE_CREATE',
   CREATOR_FINANCE: 'code:CREATOR_FINANCE',
   VISIBILITY_AUDIT_OFFER: 'code:VISIBILITY_AUDIT_OFFER',
-  OVIE_FLEET_ROOM: 'code:OVIE_FLEET_ROOM',
 } as const satisfies Record<AppFlagName, string>;
 
 export const APP_FLAG_TO_STATSIG_GATE = {
@@ -198,8 +190,6 @@ export const APP_FLAG_DESCRIPTIONS = {
     'Creator Financial Health owner-only surfaces (JOV-4621). Release-blocking gate — stays off until the privacy/correctness matrix is certified.',
   VISIBILITY_AUDIT_OFFER:
     'Hidden unless the flag and a Stripe Payment Link are both set.',
-  OVIE_FLEET_ROOM:
-    'Ovie fleet room: the agent roster with live presence and the fleet activity feed from Linear.',
 } as const satisfies Record<AppFlagName, string>;
 
 /**
@@ -251,8 +241,6 @@ export const APP_FLAG_REMOVAL_CONDITIONS = {
   CREATOR_FINANCE:
     'Remove when the JOV-4621 release gate is certified and financial access no longer needs a fleet-wide stop control.',
   VISIBILITY_AUDIT_OFFER: 'Remove when the audit checkout is retired.',
-  OVIE_FLEET_ROOM:
-    'Remove when the fleet room is the permanent Ovie Fleet view or retired.',
 } as const satisfies Record<AppFlagName, string>;
 
 export const APP_FLAG_AUDIT_OWNER = '@itstimwhite' as const;
@@ -320,5 +308,4 @@ export const LOCAL_DEFAULT_ONLY_FLAGS = new Set<AppFlagName>([
   'AGENT_PROFILE_CREATE', // public agent write-path kill switch; env/admin override, no Statsig gate
   'CREATOR_FINANCE', // JOV-4621 release gate; env/admin override + FINANCE_DISABLE kill switch, no Statsig gate
   'VISIBILITY_AUDIT_OFFER', // default off; no Statsig gate
-  'OVIE_FLEET_ROOM', // Ovie-only admin surface; admin default-true + env stop, no Statsig gate
 ]);

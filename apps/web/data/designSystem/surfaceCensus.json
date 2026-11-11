@@ -68,7 +68,6 @@
         "apps/web/app/app/(shell)/admin/product/page.tsx",
         "apps/web/app/app/(shell)/admin/releases/page.tsx",
         "apps/web/app/app/(shell)/admin/revenue-lift/page.tsx",
-        "apps/web/app/app/(shell)/admin/room/page.tsx",
         "apps/web/app/app/(shell)/admin/screenshots/page.tsx",
         "apps/web/app/app/(shell)/admin/share-studio/page.tsx",
         "apps/web/app/app/(shell)/admin/shipping/page.tsx",
