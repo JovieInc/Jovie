@@ -104,7 +104,8 @@ describe('HomepageEditorial chapters', () => {
     expect(
       screen.getByRole('img', { name: COPY.releases.releasePageLabel })
     ).toBeInTheDocument();
-    expect(screen.getAllByRole('heading', { level: 3 })).toHaveLength(3);
+    // Three captions plus the mock release page's own title, all under the h2.
+    expect(screen.getAllByRole('heading', { level: 3 })).toHaveLength(4);
     await expectNoA11yViolations(container);
   });
 
