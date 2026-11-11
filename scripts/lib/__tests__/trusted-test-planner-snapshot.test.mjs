@@ -3,10 +3,12 @@ import { spawnSync } from 'node:child_process';
 import {
   existsSync,
   mkdirSync,
+  mkdtempSync,
   readFileSync,
   rmSync,
   writeFileSync,
 } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
 import { pathToFileURL } from 'node:url';
@@ -26,6 +28,36 @@ import {
 } from './trusted-planner-fixture.mjs';
 
 const ROOT = join(import.meta.dirname, '../../..');
+
+test('the isolated lane-runner snapshot carries the floors file read at module load', async t => {
+  // Move 3 review: ci-fast-lanes.mjs reads
+  // .github/ci-harness/lanes-coverage-floors.txt at module load, so a
+  // scripts-only snapshot without it dies with ENOENT in trusted tooling.
+  const head = spawnSync('git', ['rev-parse', 'HEAD'], {
+    cwd: ROOT,
+    encoding: 'utf8',
+  });
+  assert.equal(head.status, 0, head.stderr);
+  const base = head.stdout.trim();
+  const scratch = mkdtempSync(join(tmpdir(), 'trusted-lane-snapshot-'));
+  t.after(() => rmSync(scratch, { recursive: true, force: true }));
+  const out = join(scratch, 'snapshot');
+  const manifest = snapshotTrustedTestPlanner({ repo: ROOT, base, out });
+  assert.ok(
+    manifest.files.some(
+      file => file.path === '.github/ci-harness/lanes-coverage-floors.txt'
+    ),
+    'the module-initialization closure must include the floors file'
+  );
+  const mod = await import(
+    `${pathToFileURL(join(out, 'files', 'scripts/ci-fast-lanes.mjs')).href}?isolated=${base}`
+  );
+  assert.ok(
+    Array.isArray(mod.LANES_COVERAGE_FLOORS) &&
+      mod.LANES_COVERAGE_FLOORS.length > 0
+  );
+  assert.equal(typeof mod.runStructural, 'function');
+});
 
 test('trusted planner old BASE snapshots its actual imports without requiring future helpers', t => {
   const f = trustedPlannerFixture(t, false);

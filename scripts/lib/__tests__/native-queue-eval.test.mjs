@@ -201,12 +201,12 @@ function passingFixture() {
         run_attempt: 1,
         head_sha: head,
         conclusion: 'success',
-        name: 'ci-fast (remaining)',
+        name: 'ci-fast (structural python)',
         status: 'completed',
         completed_at: later(50),
         steps: [
           {
-            name: 'Run structural ci-fast lane',
+            name: 'Run structural pytest shards',
             status: 'completed',
             conclusion: 'success',
           },

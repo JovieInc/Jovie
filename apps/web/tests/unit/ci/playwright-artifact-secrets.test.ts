@@ -276,7 +276,8 @@ const jobBlock = (source: string, job: string) =>
   '';
 const stepBlock = (source: string, name: string) =>
   source
-    .split(/(?=^      - name:)/m)
+    // Step boundaries include aliased step references (`- &anchor` / `- *anchor`).
+    .split(/(?=^      - (?:name:|[&*]))/m)
     .find(block => block.startsWith(`      - name: ${name}\n`)) ?? '';
 const yamlPropertyBlock = (source: string, key: string, indent: number) => {
   const lines = source.split('\n');
@@ -948,7 +949,7 @@ describe('Playwright artifact secret boundary', () => {
     'keeps Storybook base-fetch auth scoped and propagates exit %i',
     fetchExit => {
       const workflow = readFileSync(join(workflowsRoot, 'ci.yml'), 'utf8');
-      const job = jobBlock(workflow, 'ci-fast-remaining');
+      const job = jobBlock(workflow, 'ci-fast-structural-core');
       const step = stepBlock(job, 'Decide structural lane');
       expect(step).toContain('GH_TOKEN: ${{ github.token }}');
       const command = step

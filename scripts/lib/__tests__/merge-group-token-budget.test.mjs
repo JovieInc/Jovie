@@ -62,7 +62,7 @@ const LEDGER = {
     kind: 'on-download-failure',
     greenGroupCalls: 0,
   },
-  'ci-fast-remaining/Run actionlint': {
+  'ci-actionlint/Run actionlint': {
     kind: 'on-download-failure',
     greenGroupCalls: 0,
   },
@@ -70,11 +70,19 @@ const LEDGER = {
     kind: 'git-auth',
     greenGroupCalls: 0,
   },
-  'ci-fast-remaining/Decide structural lane': {
+  'ci-fast-structural-core/Start base-branch history fetch': {
     kind: 'git-auth',
     greenGroupCalls: 0,
   },
-  'ci-fast-remaining/Run structural ci-fast lane': {
+  'ci-fast-structural-core/Decide structural lane': {
+    kind: 'git-auth',
+    greenGroupCalls: 0,
+  },
+  'ci-fast-structural-core/Run structural ci-fast lane': {
+    kind: 'git-auth',
+    greenGroupCalls: 0,
+  },
+  'ci-fast-structural-lanes-coverage/Decide structural lane': {
     kind: 'git-auth',
     greenGroupCalls: 0,
   },
