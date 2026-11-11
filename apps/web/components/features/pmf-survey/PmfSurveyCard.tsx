@@ -152,7 +152,7 @@ export function PmfSurveyCard({
             />
 
             {state === 'error' ? (
-              <p className='mt-3 text-sm text-destructive' role='alert'>
+              <p className='mt-3 text-sm text-error' role='alert'>
                 Your answer was not saved. Try again.
               </p>
             ) : null}
