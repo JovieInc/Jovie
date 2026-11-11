@@ -375,6 +375,33 @@
     "apps/web/components/organisms/PricingRecipeBody.tsx": {
       "partial": "The canonical Pricing story already renders the partial composition: the optional structuredData and auditOffer slots are both absent there (the audit offer renders nothing while it is off), and every other prop is required.",
       "permission-denied": "PricingRecipeBody is a public marketing page with no gated action or permission input; the detector matched the word plan in its pricing copy."
+    },
+    "apps/web/app/app/(shell)/DashboardShellContent.tsx": {
+      "loading": "DashboardShellContent is an async server component awaited inside the shell layout's Suspense boundary, so it never renders a loading frame of its own; that fallback is shell-route-skeleton.tsx, which carries the loading stories.",
+      "offline": "DashboardShellContent runs only on the server for a request, so browser connectivity never reaches it. A server read that stalls past 10 seconds returns the PageErrorState branch, asserted in DashboardShellContent.test.tsx.",
+      "long-content": "Its only copy of its own is the fixed workspace-load PageErrorState message; everything else it renders is route children passed through, which certify their own long-content states.",
+      "rtl-overflow": "Its only copy of its own is the fixed English workspace-load message; text direction comes from the route children it passes through, which certify their own right-to-left states."
+    },
+    "apps/web/app/app/(shell)/shell-route-skeleton.tsx": {
+      "empty": "resolveShellRouteSkeleton maps a pathname to a route skeleton and renders no data collection; the detector matched the imported ReleaseTableSkeleton and LinksRouteSkeleton names. An unknown path returns undefined so the layout keeps its generic AppShellSkeleton.",
+      "offline": "Route skeletons paint as the shell layout's Suspense fallback before any request runs. The resolver never fetches or submits, so connectivity cannot reach it."
+    },
+    "apps/web/components/features/feedback/PageErrorState.tsx": {
+      "empty": "PageErrorState renders one title, one message and one retry action and takes no collection; the detector matched the items-center utility class.",
+      "permission-denied": "PageErrorState has no gated action or permission input; it is the error surface that owners render. The detector matched role='alert'."
+    },
+    "apps/web/components/organisms/AppShellFrame.tsx": {
+      "offline": "AppShellFrame is a presentational frame that never fetches or submits; the detector matched 'loading' and 'Suspense' in its doc comments. Connectivity reaches the shell only through the routes and rails it slots, which own their offline states."
+    },
+    "apps/web/components/organisms/AppShellFrameDedupe.tsx": {
+      "long-content": "AppShellFrameDedupe renders null. It only strips the frame attribute, duplicate test ids and retained text from hidden shell copies, so it has no text or box of its own that can overflow; the detector matched the textContent walk.",
+      "rtl-overflow": "AppShellFrameDedupe renders null and lays nothing out, so text direction never reaches it; the dedupe pass is direction-agnostic DOM bookkeeping on the frames it finds."
+    },
+    "apps/web/components/organisms/SharedCommandPalette.tsx": {
+      "permission-denied": "The palette renders caller-ranked sections and has no locked, gated or entitlement row; entitlement filtering happens before sections reach it. The detector matched role='option' and role='listbox'."
+    },
+    "apps/web/components/shell/AppShellRightRail.tsx": {
+      "partial": "AppShellRightRail is a layout slot. Its only optional props are className and the belowHeader placement flag, and it renders whatever drawer it is given, so the rail itself has no partially loaded state; each drawer owns its own."
     }
   }
 }
