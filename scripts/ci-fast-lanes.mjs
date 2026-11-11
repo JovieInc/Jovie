@@ -322,8 +322,7 @@ export const SOURCE_GUARDS = Object.freeze([
     id: 'node-environment-files',
     command:
       'pnpm --filter @jovie/web exec vitest run --config=vitest.config.ci-contracts.mts tests/unit/ci/node-environment-files.test.ts',
-    // The list, any test file a list entry can name, and the setup/config
-    // files the guard pins.
+    // The list, any test file a list entry can name, and the setup/config files the guard pins.
     inputs:
       /^apps\/web\/(?:.+\.test\.[cm]?[jt]s|tests\/(?:node-environment-files\.json|setup-optimized\.ts)|vitest\.config\.fast\.mts)$/u,
     prOnly: true,
