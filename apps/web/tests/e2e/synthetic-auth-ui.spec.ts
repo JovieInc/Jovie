@@ -210,12 +210,15 @@ test.describe('Synthetic Monitoring — Layer A (auth UI, SSO + email)', () => {
     await waitForHydration(page);
 
     await assertNoFrontDoorConfigErrors(page);
-    // Invite-only GTM (PUBLIC_SIGNUP_CLOSED, canon/PRODUCT.md 2026-11-02):
-    // anonymous /signup redirects to /waitlist on purpose. That is the
-    // intended surface while signup is closed; it must be a working waitlist
-    // form and never an auth shell or a dead end. When signup reopens the
-    // full sign-up assertions below run unchanged.
-    if (new URL(page.url()).pathname === WAITLIST_PATH) {
+    // Public signup is open (canon/PRODUCT.md, 2026-11-09): anonymous
+    // /signup renders the sign-up auth shell. While the
+    // FEATURE_PUBLIC_SIGNUP_CLOSED kill switch is on, /signup redirects to
+    // /waitlist on purpose; that must be a working waitlist form and never
+    // an auth shell or a dead end.
+    if (
+      process.env.FEATURE_PUBLIC_SIGNUP_CLOSED === 'true' &&
+      new URL(page.url()).pathname === WAITLIST_PATH
+    ) {
       await assertClosedSignupWaitlist(page);
       console.log('[Synthetic][Layer A] Sign-up closed: waitlist surface OK');
       return;
