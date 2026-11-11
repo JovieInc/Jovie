@@ -5,6 +5,7 @@ const {
   mkdirSync,
   readdirSync,
   readFileSync,
+  rmSync,
 } = require('node:fs');
 const path = require('node:path');
 
@@ -274,8 +275,25 @@ function resolveCollectRuns() {
 // (scripts/lighthouse-relative-gate.mjs): measure, keep every run's report in
 // LIGHTHOUSE_COLLECT_DIR, and leave the verdict to the gate, which compares
 // head with base. `lhci assert` is not run here.
-function collectOnly({ collectDir, config, chromePath, collectUrls, env }) {
+function collectOnly({
+  collectDir,
+  config,
+  chromePath,
+  collectUrls,
+  env,
+  lhciDir = path.resolve(webRoot, '.lighthouseci'),
+}) {
   const runs = resolveCollectRuns();
+  const isReport = name => /^lhr-.*\.json$/.test(name);
+  // Head and base, and every suite, collect through this one directory. A
+  // report left by an earlier collection would be counted as this side's run:
+  // base's best run filed under head hides a regression. `lhci collect` clears
+  // them itself today; this does not depend on that.
+  if (existsSync(lhciDir)) {
+    for (const name of readdirSync(lhciDir).filter(isReport)) {
+      rmSync(path.join(lhciDir, name));
+    }
+  }
   const collected = spawnSync(
     'pnpm',
     [
@@ -291,14 +309,13 @@ function collectOnly({ collectDir, config, chromePath, collectUrls, env }) {
   );
   if ((collected.status ?? 1) !== 0) return collected.status ?? 1;
 
-  const lhciDir = path.resolve(webRoot, '.lighthouseci');
   const target = path.isAbsolute(collectDir)
     ? collectDir
     : path.resolve(webRoot, collectDir);
   mkdirSync(target, { recursive: true });
-  const reports = readdirSync(lhciDir).filter(name =>
-    /^lhr-.*\.json$/.test(name)
-  );
+  const reports = existsSync(lhciDir)
+    ? readdirSync(lhciDir).filter(isReport)
+    : [];
   if (reports.length === 0) {
     console.error(`lhci collect left no reports in ${lhciDir}.`);
     return 1;
@@ -358,4 +375,5 @@ if (require.main === module) {
 } else {
   module.exports = seedDashboardAuth;
   module.exports.resolveCollectUrls = resolveCollectUrls;
+  module.exports.collectOnly = collectOnly;
 }

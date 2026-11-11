@@ -18,6 +18,7 @@ import {
   existsSync,
   mkdirSync,
   readFileSync,
+  renameSync,
   rmSync,
   writeFileSync,
 } from 'node:fs';
@@ -34,7 +35,9 @@ const webRoot = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
   '..'
 );
-const HEAD_SERVER = '.next/standalone/apps/web/server.js';
+const STANDALONE_ROOT = '.next/standalone';
+const STANDALONE_APP = 'apps/web';
+const HEAD_SERVER = `${STANDALONE_ROOT}/${STANDALONE_APP}/server.js`;
 const REPORT_ROOT = '.lighthouseci/relative';
 const DEFAULT_CONFIG = '.lighthouserc.dashboard.pr.json';
 
@@ -175,6 +178,55 @@ export async function decide({
   };
 }
 
+/** The build a standalone tree holds, or null when it holds none. */
+export function readBuildId(standaloneRoot) {
+  try {
+    return readFileSync(
+      path.join(standaloneRoot, STANDALONE_APP, '.next', 'BUILD_ID'),
+      'utf8'
+    ).trim();
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Runs `work` with the base build standing where head's build normally does,
+ * then puts both back. A standalone build only runs from the place it was
+ * built: it finds packages such as react by walking up into the workspace's
+ * node_modules. Throws if head's build is not back in place afterwards, so
+ * nothing can measure base and call it head.
+ */
+export async function withBaselineInPlace(
+  { headRoot, baselineRoot, parkRoot = `${headRoot}-head` },
+  work
+) {
+  const headBuild = readBuildId(headRoot);
+  if (headBuild === null) throw new Error(`No head build at ${headRoot}.`);
+  if (readBuildId(baselineRoot) === null) {
+    throw new Error(`No base build at ${baselineRoot}.`);
+  }
+  if (existsSync(parkRoot)) {
+    throw new Error(`${parkRoot} already exists; refusing to overwrite it.`);
+  }
+  renameSync(headRoot, parkRoot);
+  try {
+    renameSync(baselineRoot, headRoot);
+  } catch (error) {
+    renameSync(parkRoot, headRoot);
+    throw error;
+  }
+  try {
+    return await work();
+  } finally {
+    renameSync(headRoot, baselineRoot);
+    renameSync(parkRoot, headRoot);
+    if (readBuildId(headRoot) !== headBuild) {
+      throw new Error(`Head build was not restored to ${headRoot}.`);
+    }
+  }
+}
+
 async function responds(url) {
   try {
     await fetch(url, {
@@ -252,8 +304,14 @@ async function main() {
   if (!existsSync(headServer)) {
     throw new Error(`Standalone server not found at ${headServer}.`);
   }
+  const headRoot = path.resolve(webRoot, STANDALONE_ROOT);
+  const headBuild = readBuildId(headRoot);
   const baselineServer = process.env.LIGHTHOUSE_BASELINE_SERVER?.trim();
   const hasBaseline = Boolean(baselineServer && existsSync(baselineServer));
+  // <root>/apps/web/server.js
+  const baselineRoot = baselineServer
+    ? path.resolve(path.dirname(baselineServer), '..', '..')
+    : null;
   if (baselineServer && !hasBaseline) {
     console.log(`Baseline server ${baselineServer} does not exist.`);
   }
@@ -279,14 +337,27 @@ async function main() {
     extraRuns,
     async withServer(side, work) {
       console.log(`::group::Lighthouse: measuring ${side}`);
-      const server = await startServer(
-        side === 'head' ? headServer : baselineServer,
-        baseUrl
-      );
+      // Both sides are served from the same path, one after the other.
+      const serve = async () => {
+        const server = await startServer(headServer, baseUrl);
+        try {
+          await work();
+        } finally {
+          await stopServer(server, baseUrl);
+        }
+      };
       try {
-        await work();
+        if (side === 'head') {
+          if (headBuild === null || readBuildId(headRoot) !== headBuild) {
+            throw new Error(
+              `${headRoot} does not hold the head build; refusing to measure it as head.`
+            );
+          }
+          await serve();
+        } else {
+          await withBaselineInPlace({ headRoot, baselineRoot }, serve);
+        }
       } finally {
-        await stopServer(server, baseUrl);
         console.log('::endgroup::');
       }
     },

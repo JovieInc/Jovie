@@ -1,5 +1,15 @@
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
+import {
+  chmodSync,
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
+import { createRequire } from 'node:module';
+import { tmpdir } from 'node:os';
+import { join, resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
   evaluateSuite,
@@ -8,7 +18,12 @@ import {
   parseAssertions,
   suiteNeedsBaseline,
 } from './lighthouse-relative-budget.mjs';
-import { decide, resolveSuites } from './lighthouse-relative-gate.mjs';
+import {
+  decide,
+  readBuildId,
+  resolveSuites,
+  withBaselineInPlace,
+} from './lighthouse-relative-gate.mjs';
 
 const webRoot = resolve(import.meta.dirname, '..');
 const readConfig = (name: string) =>
@@ -487,5 +502,141 @@ describe('relative Lighthouse gate flow', () => {
     });
     expect(blocked.passed).toBe(false);
     expect(unmeasured.evaluated).toEqual([]);
+  });
+});
+
+describe('collect-only report hand-off', () => {
+  const { collectOnly } = createRequire(import.meta.url)(
+    './lighthouse-dashboard-auth.cjs'
+  ) as {
+    collectOnly: (options: {
+      collectDir: string;
+      config: string;
+      chromePath: string;
+      collectUrls: string[];
+      env: NodeJS.ProcessEnv;
+      lhciDir: string;
+    }) => number;
+  };
+
+  it("hands over only the reports this collection wrote, never an earlier side's", () => {
+    const dir = mkdtempSync(join(tmpdir(), 'lighthouse-collect-'));
+    try {
+      const lhciDir = join(dir, '.lighthouseci');
+      const bin = join(dir, 'bin');
+      mkdirSync(lhciDir);
+      mkdirSync(bin);
+      // A collector that, unlike lhci today, does not clear old reports.
+      writeFileSync(
+        join(bin, 'pnpm'),
+        '#!/usr/bin/env bash\necho \'{"side":"head"}\' > "$STUB_LHCI_DIR/lhr-2.json"\n'
+      );
+      chmodSync(join(bin, 'pnpm'), 0o755);
+      // Left behind by the base collection that ran just before.
+      writeFileSync(join(lhciDir, 'lhr-1.json'), '{"side":"base"}');
+      writeFileSync(join(lhciDir, 'keep.txt'), 'not a report');
+
+      const collectDir = join(dir, 'head');
+      const status = collectOnly({
+        collectDir,
+        config: '.lighthouserc.dashboard.pr.json',
+        chromePath: '/bin/true',
+        collectUrls: ['http://localhost:3000/app'],
+        env: {
+          ...process.env,
+          PATH: `${bin}:${process.env.PATH}`,
+          STUB_LHCI_DIR: lhciDir,
+          LIGHTHOUSE_COLLECT_UPLOAD: '',
+        },
+        lhciDir,
+      });
+
+      expect(status).toBe(0);
+      expect(readdirSync(collectDir)).toEqual(['lhr-2.json']);
+      expect(readFileSync(join(collectDir, 'lhr-2.json'), 'utf8')).toContain(
+        'head'
+      );
+      expect(readdirSync(lhciDir).sort()).toEqual(['keep.txt', 'lhr-2.json']);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("serving the base build from the head build's place", () => {
+  const tree = (root: string, buildId: string) => {
+    mkdirSync(join(root, 'apps/web/.next'), { recursive: true });
+    writeFileSync(join(root, 'apps/web/.next/BUILD_ID'), buildId);
+  };
+  const setup = () => {
+    const dir = mkdtempSync(join(tmpdir(), 'lighthouse-swap-'));
+    const headRoot = join(dir, 'ws/.next/standalone');
+    const baselineRoot = join(dir, 'temp/baseline');
+    tree(headRoot, 'head-build');
+    tree(baselineRoot, 'base-build');
+    return { dir, headRoot, baselineRoot };
+  };
+
+  it('serves base where head was built, then puts head back', async () => {
+    const { dir, headRoot, baselineRoot } = setup();
+    try {
+      let served: string | null = null;
+      await withBaselineInPlace({ headRoot, baselineRoot }, async () => {
+        served = readBuildId(headRoot);
+      });
+      expect(served).toBe('base-build');
+      expect(readBuildId(headRoot)).toBe('head-build');
+      expect(readBuildId(baselineRoot)).toBe('base-build');
+      expect(readdirSync(join(dir, 'ws/.next'))).toEqual(['standalone']);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('puts head back when measuring base throws', async () => {
+    const { dir, headRoot, baselineRoot } = setup();
+    try {
+      await expect(
+        withBaselineInPlace({ headRoot, baselineRoot }, async () => {
+          throw new Error('server died');
+        })
+      ).rejects.toThrow('server died');
+      expect(readBuildId(headRoot)).toBe('head-build');
+      expect(readBuildId(baselineRoot)).toBe('base-build');
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('leaves head alone when there is no base build to serve', async () => {
+    const { dir, headRoot } = setup();
+    try {
+      await expect(
+        withBaselineInPlace(
+          { headRoot, baselineRoot: join(dir, 'temp/missing') },
+          async () => undefined
+        )
+      ).rejects.toThrow('No base build');
+      expect(readBuildId(headRoot)).toBe('head-build');
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("refuses when head's place does not hold head afterwards", async () => {
+    const { dir, headRoot, baselineRoot } = setup();
+    try {
+      await expect(
+        withBaselineInPlace({ headRoot, baselineRoot }, async () => {
+          // Something swapped the parked head build while base was served.
+          writeFileSync(
+            join(`${headRoot}-head`, 'apps/web/.next/BUILD_ID'),
+            'other'
+          );
+        })
+      ).rejects.toThrow('Head build was not restored');
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });

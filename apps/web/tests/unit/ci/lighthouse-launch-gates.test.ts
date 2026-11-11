@@ -235,6 +235,13 @@ describe('Lighthouse identity admission', () => {
         baseline: true,
       })
     ).toBe(false);
+    // ...and not fetched either: it is about 1.5 GB and nothing would read it.
+    const download = stepNamed(job, 'Download build artifact');
+    expect(selected(download, 'true', { baseline: true })).toBe(false);
+    expect(selected(download, 'true', { baseline: false })).toBe(true);
+    expect(
+      selected(fallback, 'true', { download: 'skipped', baseline: true })
+    ).toBe(true);
     const script = readFileSync(
       join(REPO_ROOT, '.github/scripts/lighthouse-build-baseline.sh'),
       'utf8'

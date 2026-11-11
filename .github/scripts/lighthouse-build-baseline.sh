@@ -3,7 +3,9 @@
 # dashboard Lighthouse gate can measure base and head on the same runner.
 #
 #   build    Check the base commit out in place, build it, move its standalone
-#            server to $BASELINE_DIR and report built=true. Any reason it
+#            server to $BASELINE_DIR and report built=true. The gate moves it
+#            back to apps/web/.next/standalone while it measures base: a
+#            standalone build only resolves its packages from there. Any reason it
 #            cannot (no base, changed dependencies, failed build, a crash)
 #            reports built=false and exits 0: the gate then enforces every
 #            configured budget as it is, so a missing baseline can neither

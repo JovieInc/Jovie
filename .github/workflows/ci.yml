@@ -4995,8 +4995,9 @@ jobs:
         if: steps.check_changes.outputs.run_full_ci == 'true'
         run: bash "$RUNNER_TEMP/lighthouse-build-baseline.sh" restore
 
+      # With a baseline head is built below, so the artifact is not fetched.
       - name: Download build artifact
-        if: steps.check_changes.outputs.run_full_ci == 'true'
+        if: steps.check_changes.outputs.run_full_ci == 'true' && steps.lighthouse-baseline.outputs.built != 'true'
         id: download-build
         continue-on-error: true
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
