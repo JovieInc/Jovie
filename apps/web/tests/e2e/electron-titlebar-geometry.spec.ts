@@ -314,12 +314,8 @@ test('titlebar sidebar-cell width matches CSS sidebar-width token (rail alignmen
 test('full-screen Electron shell collapses the native safe area while preserving the title row', async ({
   page,
 }) => {
-  // Skip outside the explicit dev-auth E2E lane; full-screen collapse checks
-  // need a bypassed Clerk session.
-  test.skip(
-    process.env.E2E_USE_TEST_AUTH_BYPASS !== '1',
-    'Requires E2E_USE_TEST_AUTH_BYPASS=1'
-  );
+  // The authenticated E2E lane must provide its normal test-auth setup.
+  expect(process.env.E2E_USE_TEST_AUTH_BYPASS).toBe('1');
   test.setTimeout(180_000);
 
   await installElectronRuntime(page);
