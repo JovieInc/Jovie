@@ -28,8 +28,9 @@ const UNAVAILABLE_COPY = {
  * store only (docs/operations/AGENT_ROOM.md); rendering calls no provider.
  */
 export default async function AdminRoomPage() {
-  const userId = await requireCurrentAdminPageAccess();
-  if (!(await getAppFlagValue('OVIE_FLEET_ROOM', { userId }))) notFound();
+  const actorId = await requireCurrentAdminPageAccess();
+  const enabled = await getAppFlagValue('OVIE_FLEET_ROOM', { userId: actorId });
+  if (!enabled) notFound();
 
   const room = await readOvieFleetRoom();
   return (

@@ -173,11 +173,16 @@ export function AgentRoom({
   const now = view.generatedAt;
   return (
     <div
-      className='grid gap-3 lg:grid-cols-[minmax(0,20rem)_minmax(0,1fr)]'
+      className='grid gap-3 lg:grid-cols-3'
       data-testid='agent-room'
       data-room-id={view.roomId}
     >
-      <ContentSurfaceCard surface='details' as='section' aria-label='Agents'>
+      <ContentSurfaceCard
+        surface='details'
+        as='section'
+        aria-label='Agents'
+        className='min-w-0'
+      >
         <div className='flex items-center justify-between gap-2 px-3 pt-3'>
           <h2 className='text-2xs font-semibold text-tertiary-token'>Agents</h2>
           <p className='text-2xs tabular-nums text-tertiary-token'>
@@ -192,7 +197,12 @@ export function AgentRoom({
         </ul>
       </ContentSurfaceCard>
 
-      <ContentSurfaceCard surface='details' as='section' aria-label='Activity'>
+      <ContentSurfaceCard
+        surface='details'
+        as='section'
+        aria-label='Activity'
+        className='min-w-0 lg:col-span-2'
+      >
         <div className='flex items-center justify-between gap-2 px-3 pt-3'>
           <h2 className='text-2xs font-semibold text-tertiary-token'>
             Activity
@@ -208,8 +218,8 @@ export function AgentRoom({
         ) : null}
         {view.events.length === 0 && !unavailableReason ? (
           <p className='px-3 py-6 text-app text-secondary-token' role='status'>
-            No fleet messages yet. Agents appear here when they post in a Linear
-            thread with a [From → To] prefix.
+            No fleet messages yet. Agents appear here when they post in a fleet
+            Linear thread and name who the message is from and to.
           </p>
         ) : (
           <ol className='divide-y divide-subtle py-1'>

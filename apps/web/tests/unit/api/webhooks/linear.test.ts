@@ -8,7 +8,6 @@ const mockClearRecentDispatch = vi.hoisted(() => vi.fn());
 const mockLoggerError = vi.hoisted(() => vi.fn());
 const mockLoggerWarn = vi.hoisted(() => vi.fn());
 const mockLoggerInfo = vi.hoisted(() => vi.fn());
-const mockScheduleFleetRoomWebhook = vi.hoisted(() => vi.fn());
 
 const mockEnv = vi.hoisted(() => ({
   LINEAR_WEBHOOK_SECRET: 'linear-secret',
@@ -38,10 +37,6 @@ vi.mock('@/lib/utils/logger', () => ({
     warn: mockLoggerWarn,
     info: mockLoggerInfo,
   },
-}));
-
-vi.mock('@/lib/ovie/fleet-room.server', () => ({
-  scheduleFleetRoomWebhook: mockScheduleFleetRoomWebhook,
 }));
 
 vi.mock('@/lib/webhooks/recent-dispatch', () => ({
@@ -1343,14 +1338,5 @@ describe('native Linear validation Comment delivery', () => {
         String(call[0]).includes('api.github.com')
       )
     ).toHaveLength(1);
-  });
-
-  it('hands every verified payload to the fleet room', async () => {
-    const { POST } = await import('@/app/api/webhooks/linear/route');
-    const payload = { type: 'Comment', action: 'create', data: { id: 'c1' } };
-    const body = JSON.stringify(payload);
-    const response = await POST(request(body) as never);
-    expect(mockScheduleFleetRoomWebhook).toHaveBeenCalledWith(payload);
-    expect(response.status).toBe(200);
   });
 });

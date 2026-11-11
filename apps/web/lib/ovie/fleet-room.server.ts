@@ -19,7 +19,7 @@ import {
 } from '@/lib/agent-room/store.server';
 import { env } from '@/lib/env-server';
 import { captureError } from '@/lib/error-tracking';
-import { fetchWithTimeout } from '@/lib/queries/fetch';
+import { linearGraphql } from '@/lib/ovie/linear-coordination-live';
 import { getRedis } from '@/lib/redis';
 import {
   OVIE_FLEET_HOME_THREADS,
@@ -46,26 +46,9 @@ export interface FleetRoomDeps {
   readonly linear: LinearGraphql | null;
 }
 
+/** Reuses Ovie's one Linear GraphQL transport (lib/ovie/linear-coordination-live). */
 function configuredLinear(): LinearGraphql | null {
-  const apiKey = env.LINEAR_API_KEY;
-  if (!apiKey) return null;
-  return async <T>(query: string, variables: Record<string, unknown>) => {
-    const payload = await fetchWithTimeout<{ data?: T; errors?: unknown[] }>(
-      'https://api.linear.app/graphql',
-      {
-        method: 'POST',
-        headers: {
-          Authorization: apiKey,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ query, variables }),
-        timeout: 4_500,
-      }
-    );
-    if (payload.errors?.length || !payload.data)
-      throw new Error('linear_provider_unavailable');
-    return payload.data;
-  };
+  return env.LINEAR_API_KEY ? linearGraphql : null;
 }
 
 export function configuredFleetRoomDeps(): FleetRoomDeps {
@@ -183,7 +166,7 @@ export type FleetRoomIngestResult =
  */
 export async function ingestFleetRoomLinearWebhook(
   payload: FleetRoomWebhookPayload,
-  deps: FleetRoomDeps = configuredFleetRoomDeps()
+  injected?: FleetRoomDeps
 ): Promise<FleetRoomIngestResult> {
   if (payload.type !== 'Comment')
     return { status: 'ignored', reason: 'not-a-comment' };
@@ -202,6 +185,8 @@ export async function ingestFleetRoomLinearWebhook(
     !resolveRosterUser(OVIE_FLEET_ROSTER, userId)
   )
     return { status: 'ignored', reason: 'unattributed' };
+  // Deps are built only for attributed comments: most webhooks cost nothing.
+  const deps = injected ?? configuredFleetRoomDeps();
   if (!deps.redis) return { status: 'ignored', reason: 'redis-unavailable' };
 
   const issue = await issueRefFor(data, str(payload.url), deps.linear);

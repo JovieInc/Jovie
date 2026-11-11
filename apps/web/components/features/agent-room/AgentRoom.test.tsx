@@ -39,7 +39,9 @@ describe('AgentRoom', () => {
 
   it('renders an empty room with the posting convention', () => {
     render(<AgentRoom view={fleetRoomFixtureView([])} />);
-    expect(screen.getByRole('status')).toHaveTextContent('[From → To]');
+    expect(screen.getByRole('status')).toHaveTextContent(
+      'name who the message is from and to'
+    );
   });
 
   it('formats relative time from the view clock, not the wall clock', () => {

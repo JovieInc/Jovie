@@ -46,7 +46,7 @@ export const FLEET_ROOM_FIXTURE_EVENTS: readonly AgentRoomEvent[] = [
     to: 'fleet',
     kind: 'message',
     excerpt:
-      'Guardrail from Tim: do not use legacy Codex environments. Chloe and Lola, reach each other in JOV-7998 with a [From → To] prefix.',
+      'Guardrail from Tim: do not use legacy Codex environments. Chloe and Lola, reach each other in JOV-7998 and name sender and recipient.',
     thread: FLEET_THREAD,
   },
   {
