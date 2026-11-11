@@ -199,7 +199,10 @@ describe('resolved shell skeletons are accessible loading states', () => {
       </RightPanelProvider>
     );
 
-    expect(container.querySelector('main')?.childElementCount).toBe(1);
+    // Table skeletons load through next/dynamic, so wait for the lazy chunk.
+    await vi.waitFor(() =>
+      expect(container.querySelector('main')?.childElementCount).toBe(1)
+    );
     await expectNoA11yViolations(container);
   });
 });
