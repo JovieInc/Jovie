@@ -14,7 +14,7 @@
       "requireCostClass": "subscription",
       "expiry": {
         "source": "claude-lane-window",
-        "note": "Local 5 hour run window from claude-quota.json. The registry has no provider quota read path for the Claude subscription, so weekly reset data does not exist."
+        "note": "Local 5 hour run window from claude-quota.json, read only while a window is open; an idle lane has no expiry. The registry has no provider quota read path for the Claude subscription, so weekly reset data does not exist."
       },
       "quota": "Flat-rate subscription; 5 hour usage window, soft cap from ops/registry/capacity.json anthropic-claude limits",
       "registryProvider": "anthropic-claude"

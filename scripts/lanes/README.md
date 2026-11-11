@@ -556,7 +556,7 @@ row says what quota or credit is behind the pool and where its reset or expiry i
   route, and the outcome judge refuses an Anthropic model on the Gateway. Each refusal is appended
   to `runs/model-pool-refusals.jsonl`.
 - Selection: among available routes of the chosen capability class that still have soft allowance
-  left, the pool whose unused allowance is lost first takes the run (Claude's 5 hour window,
+  left, the pool whose unused allowance is lost first takes the run (Claude's 5 hour window while one is open; an idle lane has no expiry,
   Hyperagent's UTC day cap and credit expiry, the weekly reset of Codex and Grok from the capacity
   registry and its live overlay, Devin's free window). A pool with no reading sorts last and the
   cost order decides ties. The choice is on the routing decision and the run receipt (`modelPool`).

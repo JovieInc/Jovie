@@ -229,9 +229,9 @@ def pool_expiry(pool: str | None, now: float, *, claude_state: dict | None = Non
     if source == "claude-lane-window":
         runs = [item["at"] for item in (claude_state or {}).get("runs") or ()
                 if isinstance(item, dict) and isinstance(item.get("at"), (int, float)) and 0 <= now - item["at"] < window_s]
-        start = min(runs) if runs else now
-        return {"pool": pool, "expiresAt": _iso(start + window_s),
-                "basis": "claude-lane-window-open" if runs else "claude-lane-window-would-open-now"}
+        if not runs:  # an idle lane has no open window: nothing is about to be lost, so no expiry is made up
+            return {"pool": pool, "expiresAt": None, "basis": "claude-lane-window-not-open"}
+        return {"pool": pool, "expiresAt": _iso(min(runs) + window_s), "basis": "claude-lane-window-open"}
     if source == "hyperagent-daily-cap-and-credits":
         day = datetime.fromtimestamp(now, timezone.utc)
         midnight = datetime(day.year, day.month, day.day, tzinfo=timezone.utc).timestamp() + 86400

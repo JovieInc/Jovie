@@ -184,12 +184,20 @@ class BalanceTest(unittest.TestCase):
         {"id": "founding-500", "credits": {"expiresAt": "2027-06-01T00:00:00Z"}}, "junk"]}]}
 
     def test_claude_window_expiry_comes_from_the_local_run_ledger(self):
-        fresh = pools.pool_expiry("claude-subscription", NOW, claude_state={})
-        self.assertEqual(fresh, {"pool": "claude-subscription", "expiresAt": "2026-11-11T17:00:00Z",
-                                 "basis": "claude-lane-window-would-open-now"})
+        # An idle lane has no open window, so nothing is about to be lost: no expiry is made up.
+        idle = {"pool": "claude-subscription", "expiresAt": None, "basis": "claude-lane-window-not-open"}
+        self.assertEqual(pools.pool_expiry("claude-subscription", NOW, claude_state={}), idle)
+        self.assertEqual(pools.pool_expiry("claude-subscription", NOW, claude_state={"runs": [{"at": NOW - 9 * 3600}]}), idle)
         opened = pools.pool_expiry("claude-subscription", NOW, claude_state={
             "runs": [{"at": NOW - 4 * 3600}, {"at": NOW - 60}, {"at": NOW - 9 * 3600}, {"at": "bad"}, "junk"]})
         self.assertEqual((opened["expiresAt"], opened["basis"]), ("2026-11-11T13:00:00Z", "claude-lane-window-open"))
+
+    def test_an_idle_claude_window_never_outranks_a_pool_with_a_real_expiry(self):
+        rows = [{"lane": "claude", "pool": "claude-subscription", "expiry": pools.pool_expiry("claude-subscription", NOW, claude_state={})},
+                {"lane": "hyperagent", "pool": "hyperagent", "expiry": pools.pool_expiry("hyperagent", NOW, registry=self.REGISTRY)}]
+        self.assertEqual(pools.choose(rows)[0]["lane"], "hyperagent")
+        rows[0]["expiry"] = pools.pool_expiry("claude-subscription", NOW, claude_state={"runs": [{"at": NOW - 3600}]})
+        self.assertEqual(pools.choose(rows)[0]["lane"], "claude")  # an open window (4h left) is lost before midnight UTC
 
     def test_hyperagent_expiry_is_the_daily_cap_day_then_the_credit_expiry(self):
         seen = pools.pool_expiry("hyperagent", NOW, registry=self.REGISTRY)
@@ -219,8 +227,11 @@ class BalanceTest(unittest.TestCase):
 
     def test_router_takes_the_pool_that_expires_first(self):
         providers = {"claude": claude_lane(), "hyperagent": hyperagent_lane()}
-        midday = self.route(providers, NOW)
-        self.assertEqual(midday["chosen"]["lane"], "claude")  # 5h window ends before the UTC day does
+        idle = self.route(providers, NOW)
+        self.assertEqual((idle["chosen"]["lane"], idle["pool"]["considered"][-1]["basis"]),
+                         ("hyperagent", "claude-lane-window-not-open"))  # no open window, nothing to lose on Claude
+        midday = self.route(providers, NOW, claude_state={"runs": [{"at": NOW - 3600}]})
+        self.assertEqual(midday["chosen"]["lane"], "claude")  # the open 5h window ends before the UTC day does
         self.assertEqual(midday["pool"]["rule"], "earliest-expiry")
         self.assertEqual(midday["pool"]["chosenPool"], "claude-subscription")
         self.assertEqual([row["pool"] for row in midday["pool"]["considered"]], ["claude-subscription", "hyperagent"])
@@ -340,7 +351,7 @@ class BalanceTest(unittest.TestCase):
         claude = by["claude-subscription"]
         self.assertEqual((claude["runs"], claude["busySeconds"], claude["slots"], claude["capacityBusySeconds"]), (2, 2400, 2, 172800))
         self.assertEqual((claude["softRuns"], claude["runShare"], claude["busyShare"]), (57.6, 0.035, 0.014))
-        self.assertEqual(claude["expiry"]["basis"], "claude-lane-window-would-open-now")
+        self.assertEqual(claude["expiry"]["basis"], "claude-lane-window-not-open")
         self.assertEqual((by["hyperagent"]["runs"], by["hyperagent"]["runShare"], by["hyperagent"]["busyShare"]), (1, 0.042, 0.0))
         self.assertEqual((by["kimi"]["slots"], by["kimi"]["busyShare"], by["kimi"]["runShare"]), (0, None, None))
         self.assertEqual((by["undeclared:local"]["runs"], by["undeclared:local"]["busySeconds"]), (1, 0))
