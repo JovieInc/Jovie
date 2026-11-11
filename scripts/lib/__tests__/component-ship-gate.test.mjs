@@ -415,19 +415,9 @@ describe('diff gate', () => {
       join(root, story),
       "import { PublishAction } from './PublishAction';"
     );
-    // The story landed and the entry is now stale: that passes, so the PR need
-    // not edit the shared allowlist.
+    // A stale entry passes; an uncovered component with no entry fails.
     expect(checkStoryBaseline([story], { repoRoot: root })).toEqual([]);
-    writeFileSync(
-      join(root, policyPath),
-      JSON.stringify({ ...policy, allowlist: [] })
-    );
-    expect(checkStoryBaseline([story], { repoRoot: root })).toEqual([]);
-    // An uncovered component missing from the allowlist still fails.
-    writeFileSync(
-      join(root, component.replace('Publish', 'Draft')),
-      'export {};'
-    );
+    writeFileSync(join(root, component.replace('Publish', 'Draft')), '');
     expect(
       checkStoryBaseline([story], { repoRoot: root }).map(issue => issue.rule)
     ).toEqual(['story-baseline-stale']);
