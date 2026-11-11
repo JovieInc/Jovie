@@ -45,14 +45,14 @@ describe('chat upload SDK stays out of the chat entry bundle', () => {
     const result = { url: 'https://blob.example/file.wav' };
     uploadPresignedMock.mockResolvedValue(result);
     const file = new Blob(['audio']);
-    const options = { access: 'private', presignedUrl: '/api/upload' };
+    const options: Parameters<typeof uploadPresignedLazy>[2] = {
+      access: 'public',
+      handleUploadUrl: '/api/library/audio/upload-token',
+      contentType: 'audio/wav',
+    };
 
     await expect(
-      uploadPresignedLazy(
-        'chat/u1/file.wav',
-        file,
-        options as Parameters<typeof uploadPresignedLazy>[2]
-      )
+      uploadPresignedLazy('chat/u1/file.wav', file, options)
     ).resolves.toBe(result);
     expect(uploadPresignedMock).toHaveBeenCalledWith(
       'chat/u1/file.wav',
