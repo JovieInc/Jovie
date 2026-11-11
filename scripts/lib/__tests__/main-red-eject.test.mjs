@@ -169,7 +169,10 @@ describe('decideEject', () => {
       createdAt: '2026-10-29T19:55:00Z',
       queued: true,
     };
-    expect(decideEject({ ...base, repairs: [repair] })).toEqual({
+    // decideEject takes no repair list at all now; an extra field is ignored.
+    expect(
+      decideEject(/** @type {any} */ ({ ...base, repairs: [repair] }))
+    ).toEqual({
       action: 'revert',
       reason: 'culprit-attributed',
     });

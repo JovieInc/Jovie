@@ -155,20 +155,20 @@ class GhFailoverTest(unittest.TestCase):
     def test_exhausted_installation_retries_on_the_job_token(self):
         calls = []
 
-        def fake_run(cmd, **kwargs):
-            calls.append(kwargs.get("env", {}).get("GH_TOKEN"))
-            code = 75 if len(calls) == 1 else 0
-            return subprocess.CompletedProcess(cmd, code, stdout="{}", stderr="")
-        with mock.patch.dict(os.environ, {"GH_FALLBACK_TOKEN": "fallback-placeholder"}), \
-                mock.patch.object(mhr.subprocess, "run", fake_run):
-            self.assertEqual(mhr._gh(["api", "x"]), "{}")
-        self.assertEqual(calls, [None, "fallback-placeholder"])
+        def fake_run(args, priority="default", env=None):
+            calls.append((priority, (env or {}).get("GH_TOKEN")))
+            if len(calls) == 1:
+                return {"code": 75, "stdout": "", "stderr": "shed", "deferred": True}
+            return {"code": 0, "stdout": "{}", "stderr": "", "deferred": False}
+        with mock.patch.dict(os.environ, {"GH_FALLBACK_TOKEN": "fallback-placeholder"}):
+            self.assertEqual(mhr._gh(["api", "x"], "poll", run=fake_run), "{}")
+        self.assertEqual(calls, [("poll", None), ("poll", "fallback-placeholder")])
 
     def test_other_failures_raise(self):
-        def fake_run(cmd, **kwargs):
-            return subprocess.CompletedProcess(cmd, 1, stdout="", stderr="HTTP 422")
-        with mock.patch.object(mhr.subprocess, "run", fake_run), self.assertRaises(RuntimeError):
-            mhr._gh(["api", "x"])
+        def fake_run(args, priority="default", env=None):
+            return {"code": 1, "stdout": "", "stderr": "HTTP 422", "deferred": False}
+        with mock.patch.dict(os.environ, {"GH_FALLBACK_TOKEN": "fallback-placeholder"}), self.assertRaises(RuntimeError):
+            mhr._gh(["api", "x"], run=fake_run)
 
 
 if __name__ == "__main__":

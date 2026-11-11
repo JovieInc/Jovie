@@ -1,12 +1,14 @@
 #!/usr/bin/env python3
+# api-budget: github-app-core 60/hr - estimate: 12 Main Health wakes/hr x 4 REST reads; a revert (4 writes) is exceptional.
+# api-budget: github-actions-token 60/hr - the same calls, only when the Jovie Bot installation bucket is exhausted.
 """Open the revert for a culprit commit Main Health named (revert first, canon/MERGE_QUEUE_STEWARD.md).
 
 Run by .github/workflows/main-red-eject.yml (eject job) on a Main Health wake, under the Jovie Bot app token and
 push credential that job already sets up: the same REST calls `scripts/main-red-eject.mjs apply` makes (open a PR,
 label it, dispatch Merge Queue Green Enroll, which jumps `compounding` PRs), plus closing a revert a forward fix
 superseded. No new permission or secret. Policy lives in scripts/lanes/revert_first.py; this file is I/O only.
-Every GitHub call goes through the budgeted client (`node packages/api-client/cli.ts gh`) and retries on
-GH_FALLBACK_TOKEN when the installation bucket is exhausted.
+Every GitHub call goes through the budgeted client (apiclient.gh.run_gh) and retries on GH_FALLBACK_TOKEN when
+the installation bucket is exhausted.
 
   python3 scripts/main_health_revert.py plan    read-only: print the attribution and decision
   python3 scripts/main_health_revert.py apply   close superseded reverts, then open the revert (MAIN_RED_EJECT_MODE)
@@ -21,23 +23,25 @@ import time
 from datetime import datetime
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 sys.path.insert(0, str(Path(__file__).resolve().parent / "lanes"))
 import revert_first as rf  # noqa: E402
+from apiclient.gh import run_gh  # noqa: E402
 
 REPO = os.environ.get("GITHUB_REPOSITORY") or "JovieInc/Jovie"
 DEFERRED = 75
 
 
-def _gh(args: list[str], priority: str = "repair") -> str:
-    cmd = ["node", "packages/api-client/cli.ts", "gh", "--priority", priority, "--", *args]
-    done = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
+def _gh(args: list[str], priority: str = "repair", run=run_gh) -> str:
+    result = run(list(args), priority=priority)
     fallback = os.environ.get("GH_FALLBACK_TOKEN")
-    if done.returncode != 0 and fallback and (done.returncode == DEFERRED or "rate limit" in done.stderr.lower()):
+    if result["code"] != 0 and fallback and (result.get("deferred") or result["code"] == DEFERRED
+                                             or "rate limit" in str(result.get("stderr")).lower()):
         print("::warning::github-app-quota-failover: Jovie Bot installation exhausted; retrying with GITHUB_TOKEN.")
-        done = subprocess.run(cmd, capture_output=True, text=True, timeout=120, env={**os.environ, "GH_TOKEN": fallback})
-    if done.returncode != 0:
-        raise RuntimeError(f"gh {' '.join(args[:3])}: {done.stderr.strip()[:300]}")
-    return done.stdout
+        result = run(list(args), priority=priority, env={**os.environ, "GH_TOKEN": fallback})
+    if result["code"] != 0:
+        raise RuntimeError(f"gh {' '.join(args[:3])}: {str(result.get('stderr')).strip()[:300]}")
+    return result["stdout"]
 
 
 def _git(*args: str) -> str:
