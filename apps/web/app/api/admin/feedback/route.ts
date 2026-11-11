@@ -1,21 +1,12 @@
 import { NextResponse } from 'next/server';
+import { operatorAccess } from '@/lib/api/route-access';
+import { defineRoute } from '@/lib/api/route-pipeline';
 import { getAdminFeedbackItems } from '@/lib/feedback';
-import { getOvieOperatorEntitlements } from '@/lib/ovie/privacy-lock/access';
 import { logger } from '@/lib/utils/logger';
 
 export const runtime = 'nodejs';
 
-export async function GET() {
-  const entitlements = await getOvieOperatorEntitlements({ purpose: 'read' });
-
-  if (!entitlements.isAuthenticated) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
-
-  if (!entitlements.isAdmin) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-  }
-
+async function getHandler() {
   let items: Awaited<ReturnType<typeof getAdminFeedbackItems>>;
   try {
     items = await getAdminFeedbackItems(200);
@@ -42,3 +33,12 @@ export async function GET() {
     })),
   });
 }
+
+export const GET = defineRoute(
+  {
+    route: '/api/admin/feedback',
+    access: operatorAccess({ purpose: 'read' }),
+    legacy: { cache: 'none', unhandledErrors: 'rethrow' },
+  },
+  getHandler
+);
