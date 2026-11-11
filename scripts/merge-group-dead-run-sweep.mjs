@@ -25,7 +25,8 @@
 // bucket); only the cancel requests spend the repo GITHUB_TOKEN (CANCEL_TOKEN,
 // actions: write), capped at MAX_CANCELS per run. Any failed read logs a
 // warning and cancels nothing; the sweep gates nothing and always exits 0.
-// api-budget: github-actions-token 100/run - one cancel request per dead merge-group run, capped at MAX_CANCELS
+// api-budget: github-app-core 120/hr - estimate: 30 sweeps/hr in a dequeue storm (one concurrency slot coalesces the rest) x 4 reads (three run listings and recent main)
+// api-budget: github-actions-token 100/hr - one cancel per dead merge-group run; dead runs are bounded by the groups that die, capped at MAX_CANCELS per sweep
 
 import { spawnSync } from 'node:child_process';
 import { pathToFileURL } from 'node:url';

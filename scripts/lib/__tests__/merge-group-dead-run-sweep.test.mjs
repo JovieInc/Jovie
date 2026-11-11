@@ -207,7 +207,7 @@ describe('Merge Group Dead Run Sweep workflow', () => {
     expect(mint.uses).toMatch(
       /^actions\/create-github-app-token@[0-9a-f]{40}$/
     );
-    expect(mint['continue-on-error']).toBe(true);
+    expect(mint['continue-on-error']).toBeUndefined();
     expect(mint.with['permission-actions']).toBe('read');
     expect(mint.with['permission-contents']).toBe('read');
     const sweep = job.steps.find(s => s.run?.includes('dead-run-sweep.mjs'));
