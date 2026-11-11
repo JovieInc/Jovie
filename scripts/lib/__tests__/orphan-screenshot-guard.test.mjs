@@ -167,6 +167,20 @@ describe('findOrphanReviewImages', () => {
     ]);
   });
 
+  it("a bare name in one review folder never keeps another folder's image (Seer review on #25014)", () => {
+    // pricing-390.jpg exists in two bundles; only one bundle lists it.
+    const orphans = orphansIn({
+      'docs/screenshots/audit-1029/README.md': '![m](pricing-390.jpg)',
+      'docs/screenshots/audit-1029/pricing-390.jpg': PNG,
+      'docs/screenshots/recert-1029/pricing-390.jpg': PNG,
+      'docs/ci/census.md': 'Evidence: docs/screenshots/audit-1029',
+      // Outside the review roots a bare file name still counts everywhere.
+      'docs/screenshots/recert-1109/pricing-1440.jpg': PNG,
+      'apps/web/data/census.json': '{"shot":"pricing-1440.jpg"}',
+    });
+    assert.deepEqual(orphans, ['docs/screenshots/recert-1029/pricing-390.jpg']);
+  });
+
   it('names the policy doc and where PR evidence belongs', () => {
     const { root, trackedPaths } = fixture({ 'docs/screenshots/a.png': PNG });
     const [error] = findOrphanReviewImages({
