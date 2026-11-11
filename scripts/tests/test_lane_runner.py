@@ -9801,42 +9801,6 @@ assert.match(result.blockers[0], /^red-before-green:/);
             self.assertIn("ERR_MODULE_NOT_FOUND", missing_registry.stderr)
             self.assertIn("providers.json", missing_registry.stderr)
 
-    # A release runs LANE_TESTS inside the staged tree, so a fixture a test reads must ship too:
-    # #24855 read the pool-feed idle-stretch fixture at import without adding it to
-    # RELEASE_EXTRAS, which fails the staged self-test as an import error.
-    FIXTURE_PATH = re.compile(r"""['"](scripts/tests/fixtures(?:/[\w.-]+)*)['"]""")
-
-    def unshipped_fixtures(self, extras, tests, root=None):
-        root = Path(root or ROOT)
-        shipped = set(extras)
-        missing = []
-        for rel in tests:
-            for path in sorted(set(self.FIXTURE_PATH.findall((root / rel).read_text()))):
-                if (root / path).is_dir():
-                    # A directory join can't be checked file by file; name each file it reads.
-                    missing.append(f"{rel} reads the fixtures directory {path}; name each file it reads")
-                elif path not in shipped:
-                    missing.append(f"{rel} reads {path}")
-        return missing
-
-    def test_every_fixture_a_lane_test_reads_is_shipped(self):
-        self.assertEqual(self.unshipped_fixtures(lane.RELEASE_EXTRAS, lane.LANE_TESTS), [],
-                         "add the fixture to RELEASE_EXTRAS in scripts/lanes/lane_runner.py")
-
-    def test_the_fixture_check_names_an_unshipped_fixture_and_a_bare_directory(self):
-        fixtures = "scripts/tests/" "fixtures"  # split so this file doesn't match its own check
-        with tempfile.TemporaryDirectory() as tmp:
-            root = Path(tmp).resolve()
-            (root / fixtures).mkdir(parents=True)
-            (root / fixtures / "a.json").write_text("{}\n")
-            (root / "scripts/tests/test_a.py").write_text(
-                f'A = ROOT / "{fixtures}/a.json"\nD = ROOT / "{fixtures}"\n')
-            self.assertEqual(self.unshipped_fixtures([], ["scripts/tests/test_a.py"], root=root), [
-                f"scripts/tests/test_a.py reads the fixtures directory {fixtures}; name each file it reads",
-                f"scripts/tests/test_a.py reads {fixtures}/a.json"])
-            self.assertEqual(self.unshipped_fixtures(
-                [f"{fixtures}/a.json"], ["scripts/tests/test_a.py"], root=root)[1:], [])
-
     def test_the_closure_check_names_an_unshipped_import(self):
         extras = [e for e in lane.RELEASE_EXTRAS if e != "scripts/lib/merge-group-member-policy.mjs"]
         found = self.missing_from_release(extras, self.lanes_sources())

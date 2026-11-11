@@ -196,6 +196,11 @@ def _declined_by(row) -> list[str]:
     return [name for name in names if isinstance(name, str)] if isinstance(names, list) else []
 
 
+def idle_exits(rows: dict) -> dict:
+    """{lane: last idle exit time} from the worker idle record (lane -> {at, ...})."""
+    return {lane: row.get("at") for lane, row in (rows or {}).items() if isinstance(row, dict)}
+
+
 def declined_offers(offers: dict, idle_at: dict) -> frozenset:
     """An offer is declined once its lane recorded an idle exit after the offer was first made: the
     lane's worker reached the claim scan with the issue routed to it and left without it. Lanes that
