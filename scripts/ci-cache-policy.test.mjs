@@ -75,10 +75,6 @@ test('font-exact producers install system packages through setup-playwright', ()
     /system_deps: 'true'\n\s+cache: restore\n/
   );
   const action = read('.github/actions/setup-playwright/action.yml');
-  assert.match(
-    action,
-    /if: steps\.runner-prereqs\.outputs\.playwright_warm != 'true' && inputs\.cache == 'true'/
-  );
   assert.match(action, /install-deps --dry-run chromium/);
   // Cached .debs install with dpkg (no network); only a save needs 'true'.
   assert.match(action, /sudo dpkg -i "\$\{debs\[@\]\}"/);
@@ -90,6 +86,56 @@ test('font-exact producers install system packages through setup-playwright', ()
   assert.match(
     action,
     /name: Save Playwright system packages\n\s+if: .*inputs\.cache == 'true'/
+  );
+});
+
+// The browser cache used to be one actions/cache step, whose post-job save ran
+// only when the whole job passed, and which cache: restore skipped entirely.
+// Split restore and save (the setup-doppler pattern) save right after the
+// install, so a job that fails later still leaves the next run warm.
+test('setup-playwright saves its caches right after the install, never silently skipping', () => {
+  const action = read('.github/actions/setup-playwright/action.yml');
+  assert.doesNotMatch(action, /uses: actions\/cache@/);
+  const step = name => {
+    const start = action.indexOf(`- name: ${name}\n`);
+    assert.ok(start > -1, name);
+    const end = action.indexOf('\n    - name: ', start + 1);
+    return action.slice(start, end === -1 ? undefined : end);
+  };
+  const restore = step('Restore Playwright browsers');
+  assert.match(
+    restore,
+    /uses: \.\/\.github\/actions\/vendor\/actions-cache\/restore /
+  );
+  assert.match(restore, /inputs\.cache != 'false'/);
+  assert.match(restore, /restore-keys:/);
+  const save = step('Save Playwright browsers');
+  assert.match(
+    save,
+    /uses: \.\/\.github\/actions\/vendor\/actions-cache\/save /
+  );
+  for (const guard of [
+    "steps.browser-cache.outputs.cache-hit != 'true'",
+    "inputs.cache == 'true'",
+    "runner.environment == 'github-hosted'",
+  ])
+    assert.ok(save.includes(guard), guard);
+  assert.ok(
+    action.indexOf('- name: Install Playwright (Chromium)') <
+      action.indexOf('- name: Save Playwright browsers')
+  );
+  const debSave = step('Save Playwright system packages');
+  for (const guard of [
+    "steps.system-debs-cache.outputs.cache-hit != 'true'",
+    "steps.system-install.outputs.fetched == 'true'",
+    "runner.environment == 'github-hosted'",
+  ])
+    assert.ok(debSave.includes(guard), guard);
+  const notice = step('Note skipped Playwright cache saves');
+  assert.match(notice, /::notice title=Playwright browser cache not saved::/);
+  assert.match(
+    notice,
+    /::notice title=Playwright system packages not cached::/
   );
 });
 
