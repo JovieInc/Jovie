@@ -313,6 +313,8 @@ def resolve_additive_certificate_waivers(worktree: Path, rel: str, sh) -> str | 
 
     This is authored policy, not generated metadata. Existing rows and every
     other policy field must be unchanged; ambiguous edits remain unresolved.
+    The union is written sorted by component path, as the certificate gate
+    requires (`node scripts/component-certificate.mjs --sort`).
     """
     if rel != "docs/design-system/component-certification.json":
         return None
@@ -328,7 +330,7 @@ def resolve_additive_certificate_waivers(worktree: Path, rel: str, sh) -> str | 
         if key in merged and merged[key] != value:
             return None
         merged[key] = value
-    theirs["waivers"] = merged
+    theirs["waivers"] = dict(sorted(merged.items()))
     return json.dumps(theirs, ensure_ascii=False, indent=2) + "\n"
 
 

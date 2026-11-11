@@ -35,9 +35,9 @@ class AdditiveCertificateWaiversTest(unittest.TestCase):
             return SimpleNamespace(returncode=0, stdout=values[int(args[-1][1]) - 1])
         return edits.resolve_additive_certificate_waivers(Path("."), rel or self.REL, sh)
 
-    def test_preserves_main_order_then_head_only_waivers(self):
+    def test_writes_the_union_sorted_by_component_path(self):
         result = json.loads(self.resolve())
-        self.assertEqual(list(result["waivers"]), ["existing.tsx", "main.tsx", "head.tsx"])
+        self.assertEqual(list(result["waivers"]), ["existing.tsx", "head.tsx", "main.tsx"])
         self.assertEqual(result["waivers"]["head.tsx"], self.ours["waivers"]["head.tsx"])
         self.assertEqual(result["policy"], self.base["policy"])
 

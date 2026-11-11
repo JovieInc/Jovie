@@ -1427,9 +1427,9 @@ describe('baked runner prerequisite contract', () => {
     expect(playwrightAction).toContain(
       'node .github/runner-image/verify-prerequisites.mjs --component playwright'
     );
-    // Version resolve, cache restore and browser download all skip on a warm image.
+    // Version resolve, cache restore/save, download and save notice skip on warm.
     expect(playwrightAction.match(/playwright_warm != 'true'/g)).toHaveLength(
-      3
+      5
     );
     expect(playwrightAction).toContain('PLAYWRIGHT_BROWSERS_PATH=');
   });

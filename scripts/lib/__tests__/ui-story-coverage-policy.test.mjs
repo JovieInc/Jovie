@@ -1,5 +1,12 @@
-import { existsSync, readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  writeFileSync,
+} from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join, resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { SCRIPT_CONTRACT_VITEST_TESTS } from '../../ci-fast-lanes.mjs';
 import {
@@ -7,6 +14,7 @@ import {
   auditUiStoryCoverage,
   classifyUiPath,
   listComponentsMissingAdjacentStories,
+  tightenAllowlist,
   validateUiStoryCoveragePolicy,
 } from '../../ui-story-coverage-policy.mjs';
 
@@ -131,5 +139,61 @@ describe('ui story coverage policy', () => {
       reason:
         'changed route surface has no Storybook or Playwright visual evidence in this change',
     });
+  });
+
+  it('lets a story land without editing the allowlist, and fails new debt', () => {
+    const root = mkdtempSync(join(tmpdir(), 'ui-story-baseline-'));
+    const dir = 'apps/web/components/example';
+    mkdirSync(join(root, dir), { recursive: true });
+    for (const name of ['Covered.tsx', 'Covered.stories.tsx', 'Bare.tsx'])
+      writeFileSync(join(root, dir, name), 'export {};\n');
+    const entry = path => ({ path: `${dir}/${path}`, linearIssue: 'JOV-8847' });
+    const policy = allowlist => ({
+      schemaVersion: 1,
+      owner: 'Gem',
+      mode: 'blocking',
+      cleanBaselineRunsRequired: 5,
+      verifiedCleanRunIds: [1, 2, 3, 4, 5],
+      blockingAfter: '2026-10-23T02:55:00.000Z',
+      minimumPullRequestNumber: 1,
+      allowlist,
+    });
+    // Covered.tsx gained its story; its entry is stale headroom and passes.
+    const stale = policy([entry('Bare.tsx'), entry('Covered.tsx')]);
+    expect(assertBaselineAllowlist(root, stale)).toEqual([`${dir}/Bare.tsx`]);
+    expect(tightenAllowlist(root, stale)).toEqual({
+      policy: policy([entry('Bare.tsx')]),
+      dropped: 1,
+    });
+    // An uncovered component with no entry is new debt and still fails.
+    expect(() => assertBaselineAllowlist(root, policy([]))).toThrow(
+      `missing components that lack an adjacent story: ${dir}/Bare.tsx`
+    );
+    expect(() => tightenAllowlist(root, policy([]))).toThrow();
+  });
+
+  it('fails a change that deletes a story, even under a stale allowlist entry', () => {
+    const root = mkdtempSync(join(tmpdir(), 'ui-story-delete-'));
+    const dir = 'apps/web/components/example';
+    mkdirSync(join(root, dir), { recursive: true });
+    writeFileSync(join(root, dir, 'Covered.tsx'), 'export {};\n');
+    const run = deletedFiles =>
+      auditUiStoryCoverage({
+        root,
+        changedFiles: [],
+        deletedFiles,
+        allowlist: [{ path: `${dir}/Covered.tsx`, linearIssue: 'JOV-8847' }],
+      }).issues.filter(issue => issue.path === `${dir}/Covered.tsx`);
+    expect(run([`${dir}/Covered.stories.tsx`])).toEqual([
+      {
+        path: `${dir}/Covered.tsx`,
+        reason:
+          'this change deletes the adjacent Storybook story of a component that still exists',
+      },
+    ]);
+    // Deleting the component with its story, or a story that moved in place, passes.
+    expect(run([`${dir}/Gone.stories.tsx`])).toEqual([]);
+    writeFileSync(join(root, dir, 'Covered.stories.tsx'), 'export {};\n');
+    expect(run([`${dir}/Covered.stories.tsx`])).toEqual([]);
   });
 });
