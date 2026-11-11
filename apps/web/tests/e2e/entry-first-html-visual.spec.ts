@@ -43,12 +43,15 @@ test('start keeps its first-HTML heading when a forged passage token is sent', a
 test('anonymous start stays on the chat instead of handing off to the waitlist', async ({
   request,
 }) => {
-  test.skip(
-    process.env.FEATURE_ONE_FLOW_ONBOARDING === 'false',
-    'one-flow onboarding is switched off for this run'
-  );
+  const waitlistHandoff =
+    process.env.FEATURE_ONE_FLOW_ONBOARDING === 'false' &&
+    process.env.FEATURE_PUBLIC_SIGNUP_CLOSED !== 'false';
   const response = await request.get('/start');
   expect(response.ok()).toBe(true);
-  expect(new URL(response.url()).pathname).toBe('/start');
-  expect(await response.text()).toContain('What are you working on?');
+  expect(new URL(response.url()).pathname).toBe(
+    waitlistHandoff ? '/waitlist' : '/start'
+  );
+  if (!waitlistHandoff) {
+    expect(await response.text()).toContain('What are you working on?');
+  }
 });
