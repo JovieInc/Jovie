@@ -105,13 +105,25 @@ async function visit({ route, target, viewport, identity, fixture, collect }) {
   if (BYPASS)
     await ctx.route(
       u => u.host === host,
-      r =>
-        r.continue({
-          headers: {
-            ...r.request().headers(),
-            'x-vercel-protection-bypass': BYPASS,
-          },
-        })
+      // Playwright dispatches route handlers fire-and-forget: a continuation
+      // that rejects (a request the browser aborted mid-navigation, or one
+      // still in flight when this visit's context closes) would escape as an
+      // unhandled promise rejection and kill the crawl before the receipt is
+      // written (the first landed-production crawl, run 42452329669). The
+      // continuation is best-effort: the aborted request already failed, and
+      // the page load itself lands in this row's error fields either way.
+      async r => {
+        try {
+          await r.continue({
+            headers: {
+              ...r.request().headers(),
+              'x-vercel-protection-bypass': BYPASS,
+            },
+          });
+        } catch {
+          // Observed by the row: a failed load becomes an unreachable finding.
+        }
+      }
     );
   const page = await ctx.newPage();
   const consoleErrors = [];
