@@ -245,6 +245,20 @@ class PoolFeedReplayTest(unittest.TestCase):
         self.assertEqual(merged[issue]["declinedBy"][-1], "claude")
         self.assertEqual(pool_feed.merge_offers(many, {}, set(), self.now), {})
 
+    def test_a_fed_decision_carries_the_pool_record_of_the_lane_it_moved_to(self):
+        raw = replay_router(self.replay)
+        considered = [{"lane": "grok", "model": "grok-4.7", "pool": "grok-subscription", "expiresAt": "2027-01-16T00:00:00Z"},
+                      {"lane": "hyperagent", "model": "z-ai/glm-5.3", "pool": "hyperagent", "expiresAt": None}]
+        balanced = lambda item: {**raw(item), "pool": {"rule": "earliest-expiry", "chosenPool": "grok-subscription",
+                                                       "considered": considered}}
+        plan = pool_feed.plan(self.pool[:2], balanced, lane="hyperagent", free={"grok": 1}, providers=PROVIDERS)
+        pool = plan["decision"]["pool"]
+        self.assertEqual((pool["chosenPool"], pool["considered"][0]["lane"]), ("hyperagent", "hyperagent"))
+        self.assertEqual(pool["fedFrom"], {"rule": "earliest-expiry", "chosenPool": "grok-subscription"})
+        # A decision the router never balanced gains no pool record.
+        unbalanced = pool_feed.plan(self.pool[:2], raw, lane="hyperagent", free={"grok": 1}, providers=PROVIDERS)
+        self.assertNotIn("pool", unbalanced["decision"])
+
     def test_off_and_observe_modes_keep_the_old_claim(self):
         free = dict(self.replay["freeSeats"])
         raw = replay_router(self.replay)

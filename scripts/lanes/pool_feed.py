@@ -40,6 +40,8 @@ from collections import Counter
 from datetime import datetime, timezone
 from pathlib import Path
 
+import model_pools
+
 SCHEMA = "symphony-lanes-pool-feed/v1"
 STATE_FILE, LOG_FILE = "pool-feed.json", "runs/pool-feed.jsonl"
 LOG_MAX_BYTES, LOG_KEEP_BYTES = 2_000_000, 1_000_000
@@ -167,6 +169,20 @@ def _route(providers, lane, model) -> dict:
                  if isinstance(item, dict) and item.get("model") == model), {})
 
 
+def _moved_pool(pool: dict, moved: dict, providers) -> dict:
+    """The pool record (model_pools.balanced) for the lane the decision moved to, built with the same
+    model_pools.choose, keeping its own expiry reading when the balancer considered it."""
+    lane, model = moved.get("lane"), moved.get("model")
+    seen = next((row for row in pool.get("considered") or () if isinstance(row, dict)
+                 and row.get("lane") == lane and row.get("model") == model), None)
+    expiry = ({key: value for key, value in seen.items() if key not in ("lane", "model", "pool")} if seen
+              else {"expiresAt": None, "basis": "not-considered"})
+    own = {"lane": lane, "model": model, "pool": model_pools.pool_for_lane((providers or {}).get(lane) or {}),
+           "expiry": expiry}
+    return {**model_pools.choose([own])[1], "rule": "pool-feed",
+            "fedFrom": {"rule": pool.get("rule"), "chosenPool": pool.get("chosenPool")}}
+
+
 def _moved(decision: dict, row: dict, skipped: list[dict], providers=None) -> dict:
     """The decision as this lane runs it. Unchanged when this lane was the router's choice."""
     chosen = decision["chosen"]
@@ -175,7 +191,10 @@ def _moved(decision: dict, row: dict, skipped: list[dict], providers=None) -> di
     route = _route(providers, row.get("lane"), row.get("model"))
     moved = {**chosen, **{key: row[key] for key in chosen if key in row},
              "alias": route.get("alias", row.get("alias")), "costClass": route.get("costClass", row.get("costClass"))}
-    return {**decision, "chosen": moved,
+    pool = decision.get("pool")
+    if isinstance(pool, dict):
+        pool = _moved_pool(pool, moved, providers)
+    return {**decision, "chosen": moved, **({"pool": pool} if pool is not None else {}),
             "feed": {"from": chosen.get("lane"), "skipped": skipped},
             "rationale": f"{decision.get('rationale', '')}; fed to {moved['lane']}: "
                          + ", ".join(f"{item['lane']} {item['why']}" for item in skipped)}
