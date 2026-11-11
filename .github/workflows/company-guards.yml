@@ -44,6 +44,8 @@ jobs:
           repository: JovieInc/ci
           ref: ${{ steps.pin.outputs.sha }}
           path: .company-ci
+          # Drift needs mainline merge dates, including history before this pin.
+          fetch-depth: 0
           persist-credentials: false
       - name: Materialize size baseline
         run: |
@@ -71,9 +73,9 @@ jobs:
         env:
           PR_BODY: ${{ github.event.pull_request.body }}
         run: node .company-ci/guards/run.mjs
-      # github-token-budget: 3 calls/run - pin drift lists commits on canon, guards, and this workflow
+      - name: Pin drift regression tests
+        run: node --test scripts/company-guards/pin-drift.test.mjs
       - name: Pin drift
         env:
           CI_PIN: ${{ steps.pin.outputs.sha }}
-          GITHUB_TOKEN: ${{ github.token }}
-        run: node .company-ci/guards/drift.mjs
+        run: node scripts/company-guards/pin-drift.mjs
