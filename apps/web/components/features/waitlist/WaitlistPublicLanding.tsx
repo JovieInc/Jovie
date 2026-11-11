@@ -39,13 +39,13 @@ export function WaitlistPublicLanding({
         showFormTitle={false}
         showFooterPrompt={signupClosed}
         footerPrompt='Already have an account?'
-        footerLinkText='Log In'
+        footerLinkText='Log in'
         footerLinkHref={APP_ROUTES.SIGNIN}
         layoutVariant='stack'
       >
         <AuthRoutePrefetch href={APP_ROUTES.SIGNIN} />
         {signupClosed ? (
-          <WaitlistRoleForm qualify />
+          <WaitlistRoleForm qualify title='Request an invite' />
         ) : (
           <AuthShell
             mode='sign-up'
