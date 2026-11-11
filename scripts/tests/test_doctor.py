@@ -124,7 +124,7 @@ class FactoryStayUpWatchdogTest(unittest.TestCase):
                             "reuseIssueId": "ISSUE-X", "reuseSince": now - 60}}
         tracker = mock.Mock()
         tracker.reopen.return_value = True
-        with mock.patch.object(doctor, "Tracker", return_value=tracker), \
+        with mock.patch("doctor.Tracker", return_value=tracker), \
                 mock.patch.object(lane_runner, "Linear"), mock.patch.object(lane_runner, "Host"):
             self.assertEqual(factory_watchdog.operator_alert(record), "ISSUE-X")
             self.assertEqual(tracker.reopen.call_args.args[0], "ISSUE-X")
