@@ -587,6 +587,29 @@
     },
     "apps/web/components/features/profile/ProfileWebVitalsReporter.tsx": {
       "error": "The reporter returns null and swallows a failed web-vitals import or start so the profile keeps rendering; there is nothing to draw for the failure, and ProfileWebVitalsReporter.test.tsx asserts the swallowed failure with axe."
+    },
+    "apps/web/components/jovie/components/AssistantMessageText.tsx": {
+      "offline": "AssistantMessageText makes no request and has no connectivity input: it parses the reply string it is given. The only thing it loads is the markdown chunk, and while that is pending the Suspense fallback shows the same text as plain prose (LoadingMarkdownChunk); a reply that never arrives is the chat transport's state, not this component's."
+    },
+    "apps/web/components/jovie/components/ChatAlbumArtSwipeReview.tsx": {
+      "error": "The swipe deck has no error state of its own: its catch blocks only guard the localStorage read and write of the swipe-mode preference and fall back to 'undecided' or in-session state. Applying a candidate is the owner's mutation, and ChatAlbumArtCard renders that failure next to the deck."
+    },
+    "apps/web/components/jovie/components/ChatFeedbackControl.tsx": {
+      "partial": "Every optional prop (turnId, conversationId, toolCallId, toolName, modelUsed, excerpt) is attribution sent with the vote and none is rendered, so a target with only messageId draws the same two thumbs as a full one.",
+      "long-content": "The control draws two fixed-size icon buttons with fixed labels and tooltips. The only free text, excerpt, is never rendered; it is sliced to 500 characters and sent in the vote payload."
+    },
+    "apps/web/components/jovie/components/ChatLinkConfirmationCard.tsx": {
+      "empty": "The card always confirms exactly one proposed link, which the tool call must supply (platform and URL are required). Its only .map draws the invisible status reservers that hold the row height, so there is no list that can be empty."
+    },
+    "apps/web/components/jovie/components/ChatMerchCard.tsx": {
+      "offline": "The options and selection cards never fetch: Save, Publish, Hoodie and Hat dispatch a jovie-chat-submit-prompt event that the chat composer sends as the next turn, so a lost connection is the chat transport's state. The nested publish confirmation is ChatMerchActionCard, which owns its own request states.",
+      "permission-denied": "Neither card has a permission or entitlement input; the detector matched role='status' on the mockup placeholder. An option that may not be published yet shows a disabled Publish button with its blocked reasons, which the Options and ErrorMockupFailed stories show."
+    },
+    "apps/web/components/jovie/components/ChatMerchDesignCarousel.tsx": {
+      "permission-denied": "The carousel has no permission or entitlement input; the detector matched role='status' on the rendering and mockup-failed placeholders. Without a profileId it does not call the merch action route at all and sends the choice as a chat prompt instead."
+    },
+    "apps/web/components/jovie/components/ChatToolSurface.tsx": {
+      "partial": "ChatToolSurface is a slot wrapper: it renders whatever children its card passes and its optional props are only tone, className and a test id, so there is no data that can be partly present. Partial states belong to the cards that fill it, such as ChatLinkConfirmationCard."
     }
   }
 }
