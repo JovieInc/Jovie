@@ -1,7 +1,6 @@
 import {
   Bell,
   CalendarDays,
-  CircleCheck,
   Ellipsis,
   House,
   Music2,
@@ -18,10 +17,10 @@ const PHONE_COPY = HOMEPAGE_EDITORIAL_COPY.profile.phone;
 const ARTIST = HOMEPAGE_FEATURED_ARTIST;
 
 /**
- * The featured artist's profile, Listen mode (Pen WyQJb). A demo artist until
- * real artists opt in to be featured (Tim, 2026-11-08): identity
- * with the verification badge, Get Updates, Instagram and TikTok, the latest
- * release as the one thing the profile leads with, and the profile tabs.
+ * The featured artist's profile, Listen mode (Pen WyQJb). Until a real artist
+ * opts in, this is the example artist (Tim, 2026-11-08): name and handle, no
+ * verified badge, Get Updates, Instagram and TikTok, the latest release as
+ * the one thing the profile leads with, and the profile tabs.
  * Static, no data fetch: the page stays fully static. The anchors are where
  * the homepage callouts attach.
  */
@@ -52,9 +51,6 @@ export function HomepageProfilePhone({
             height={72}
             sizes='160px'
           />
-          <i className='hv3-pp__badge'>
-            <CircleCheck className='hv3-ui-i' />
-          </i>
         </span>
         <p className='hv3-pp__name'>
           {ARTIST.name}

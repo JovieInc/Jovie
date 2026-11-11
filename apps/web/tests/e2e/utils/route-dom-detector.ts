@@ -3,8 +3,9 @@ import { inspectBlankMedia } from './route-dom-blank-media';
 import { inspectMarketingOutcomeDom } from './route-dom-outcome-dom';
 
 export {
+  BLANK_MEDIA_CONTENT_CELL_SHARE_MIN,
   BLANK_MEDIA_DOMINANT_SHARE_MIN,
-  BLANK_MEDIA_EMPTY_CELL_SHARE_MAX,
+  BLANK_MEDIA_INK_DEPARTURE_MIN,
   BLANK_MEDIA_LUMA_STDDEV_MAX,
   inspectBlankMedia,
 } from './route-dom-blank-media';
@@ -160,6 +161,29 @@ export async function inspectRouteDom(
             : '';
         return `${element.tagName.toLowerCase()}${suffix}`;
       };
+      const isClipHidden = (element: Element): boolean => {
+        // The sr-only recipe (1x1 box, clip:rect(0,0,0,0)) paints no ink and
+        // neither do its descendants: a layout-rect check alone would audit
+        // the clip-hidden compact slot at desktop widths as if it were on
+        // screen (JOV-11623). Same visibility notion the heading check uses.
+        for (
+          let node: Element | null = element;
+          node;
+          node = node.parentElement
+        ) {
+          if (node instanceof HTMLElement) {
+            const rect = node.getBoundingClientRect();
+            if (rect.width > 1 || rect.height > 1) continue;
+            const style = getComputedStyle(node);
+            if (
+              style.clip === 'rect(0px, 0px, 0px, 0px)' ||
+              style.clipPath === 'inset(50%)'
+            )
+              return true;
+          }
+        }
+        return false;
+      };
       const isRendered = (element: Element): boolean => {
         const rect = element.getBoundingClientRect();
         if (rect.width <= 0 || rect.height <= 0) return false;
@@ -168,7 +192,8 @@ export async function inspectRouteDom(
           style.display !== 'none' &&
           style.visibility !== 'hidden' &&
           style.visibility !== 'collapse' &&
-          Number.parseFloat(style.opacity || '1') > 0
+          Number.parseFloat(style.opacity || '1') > 0 &&
+          !isClipHidden(element)
         );
       };
       const isAccessibilityExposed = (element: Element): boolean =>
