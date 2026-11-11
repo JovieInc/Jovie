@@ -128,23 +128,35 @@ export function listComponentsMissingAdjacentStories(root) {
 }
 
 /**
- * The committed allowlist is the measured baseline. It can only shrink: a new
- * uncovered component is absent from the list and fails the audit, and a story
- * landing without removing its entry fails this check.
+ * The committed allowlist is a shrink-only baseline. A component that lacks an
+ * adjacent story and is not listed fails: that is new debt. A listed component
+ * that now has a story, or was deleted, is stale headroom and passes, so the
+ * PR that adds a story never has to edit this shared file (two such PRs used
+ * to conflict on it). `--tighten` drops stale entries in one sweep.
  */
 export function assertBaselineAllowlist(root, policy) {
   validateUiStoryCoveragePolicy(policy);
   const measured = listComponentsMissingAdjacentStories(root);
-  const listed = (policy.allowlist ?? []).map(entry => entry.path);
-  if (
-    measured.length !== listed.length ||
-    measured.some((path, index) => path !== listed[index])
-  ) {
+  const listed = new Set((policy.allowlist ?? []).map(entry => entry.path));
+  const unlisted = measured.filter(path => !listed.has(path));
+  if (unlisted.length > 0) {
     throw new Error(
-      'UI story coverage allowlist does not match components that lack an adjacent story'
+      `UI story coverage allowlist is missing components that lack an adjacent story: ${unlisted.join(', ')}`
     );
   }
   return measured;
+}
+
+/** The policy with stale allowlist entries dropped. Never adds an entry. */
+export function tightenAllowlist(root, policy) {
+  const measured = new Set(assertBaselineAllowlist(root, policy));
+  const allowlist = (policy.allowlist ?? []).filter(entry =>
+    measured.has(entry.path)
+  );
+  return {
+    policy: { ...policy, allowlist },
+    dropped: (policy.allowlist?.length ?? 0) - allowlist.length,
+  };
 }
 
 function adjacentStoryExists(root, sourcePath) {
@@ -294,12 +306,19 @@ function changedFilesFromGit(root, diffBase) {
 }
 
 function main(argv = process.argv.slice(2)) {
-  const args = parseArgs(argv);
+  const tighten = argv.includes('--tighten');
+  const args = parseArgs(argv.filter(argument => argument !== '--tighten'));
   const root = resolve(args.root ?? DEFAULT_ROOT);
   const policyPath = resolve(root, args.policy ?? DEFAULT_POLICY);
   const policy = validateUiStoryCoveragePolicy(
     JSON.parse(readFileSync(policyPath, 'utf8'))
   );
+  if (tighten) {
+    const next = tightenAllowlist(root, policy);
+    writeFileSync(policyPath, `${JSON.stringify(next.policy, null, 2)}\n`);
+    console.log(`[ui-story-coverage] dropped ${next.dropped} stale entries`);
+    return 0;
+  }
   const changedFiles = args.files
     ? readFileSync(resolve(args.files), 'utf8').split(/\r?\n/).filter(Boolean)
     : changedFilesFromGit(
