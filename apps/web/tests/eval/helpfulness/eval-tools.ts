@@ -5,9 +5,11 @@
  * data and never writes, calls a provider or touches the DB.
  */
 
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { z } from 'zod';
 import { CHAT_ROUTE_TOOL_IDS } from '@/lib/chat/chat-tool-inventory';
-import { findChatSkill } from '@/lib/chat/skills/registry';
+import { findChatSkill, parseSkillFile } from '@/lib/chat/skills/registry';
 import { TOOL_SCHEMAS } from '@/lib/chat/tool-schemas';
 import type { EvalFixture } from './fixtures';
 
@@ -73,8 +75,21 @@ function stubResult(
           ? String(input.name)
           : '';
       const skill = findChatSkill(wanted);
-      return skill
-        ? { success: true, name: skill.name, steps: skill.body }
+      const steps = skill
+        ? parseSkillFile(
+            readFileSync(
+              join(
+                import.meta.dirname,
+                '../../../lib/chat/skills/library',
+                skill.name,
+                'SKILL.md'
+              ),
+              'utf8'
+            )
+          )?.body
+        : undefined;
+      return skill && steps
+        ? { success: true, name: skill.name, steps }
         : { success: false, error: `No skill named "${wanted}".` };
     }
     case 'checkCanvasStatus':

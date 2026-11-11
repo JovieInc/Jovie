@@ -101,8 +101,21 @@ describe('skills library', () => {
     .map(entry => entry.name)
     .sort();
 
-  it('loads every skill folder', () => {
-    expect(CHAT_SKILLS.map(skill => skill.name)).toEqual(folders);
+  it('indexes every skill folder, matching its frontmatter', () => {
+    const fresh = folders.map(name => {
+      const skill = parseSkillFile(
+        readFileSync(join(dir, name, 'SKILL.md'), 'utf8')
+      );
+      return {
+        name: skill?.name,
+        description: skill?.description,
+        paidOnly: skill?.paidOnly,
+      };
+    });
+    expect(
+      CHAT_SKILLS,
+      'Stale index: run node apps/web/scripts/generate-chat-skill-index.mjs'
+    ).toEqual(fresh);
   });
 
   it.each(folders)('%s is a short method that says when to use it', name => {

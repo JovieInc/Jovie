@@ -3,6 +3,7 @@ import {
   buildSkillsPromptSection,
   CHAT_SKILLS,
   findChatSkill,
+  loadChatSkillBody,
   parseSkillFile,
 } from '@/lib/chat/skills/registry';
 import { createUseSkillTool } from '@/lib/chat/skills/tools';
@@ -19,14 +20,19 @@ describe('chat skills library', () => {
     ]);
     for (const skill of CHAT_SKILLS) {
       expect(skill.description.length).toBeGreaterThan(40);
-      expect(skill.body).toContain('## Never');
     }
   });
 
-  it('keeps drafts as drafts: no skill tells Jovie to post or send', () => {
+  it('keeps drafts as drafts: no skill tells Jovie to post or send', async () => {
     for (const skill of CHAT_SKILLS) {
-      expect(skill.body).toMatch(/Never (post|put)/);
+      const body = await loadChatSkillBody(skill.name);
+      expect(body).toContain('## Never');
+      expect(body).toMatch(/Never (post|put)/);
     }
+  });
+
+  it('reads no body for a name outside the index', async () => {
+    expect(await loadChatSkillBody('../../secrets')).toBeNull();
   });
 });
 
@@ -70,8 +76,8 @@ describe('buildSkillsPromptSection', () => {
   it('lists each skill and the rule for missing capabilities', () => {
     const section = buildSkillsPromptSection();
     expect(section).toContain('## Skills');
-    expect(section).toContain('- weekly-marketing-plan: ');
-    expect(section).toContain('- promo-strategy (Pro plan): ');
+    expect(section).toMatch(/^weekly-marketing-plan: /m);
+    expect(section).toMatch(/^promo-strategy \(Pro plan\): /m);
     expect(section).toContain('requestCapability');
     expect(section).toContain('Never pretend a capability exists');
   });

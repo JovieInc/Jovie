@@ -258,7 +258,9 @@ them. The fix is one rule for what is code and what is a skill.
   checklist, a tone. It is a markdown file,
   `apps/web/lib/chat/skills/library/<name>/SKILL.md`, with `name`,
   `description` (ending in "Use when ...") and optional `plan: pro`
-  frontmatter. Adding one needs no tool, route or prompt edit.
+  frontmatter. Adding one needs no tool, route or prompt edit; run
+  `node apps/web/scripts/generate-chat-skill-index.mjs` to refresh the
+  precomputed index the prompt reads.
 - A tool whose result is an instruction for the model is a skill in disguise.
   The system prompt holds rules that apply to every turn, not feature
   playbooks.

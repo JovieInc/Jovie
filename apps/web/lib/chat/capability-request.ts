@@ -49,7 +49,7 @@ export function buildFounderCapabilityIssue(
   const what = input.kind === 'skill' ? 'Skill' : 'Capability';
   const title = `${what} request (${FOUNDER_PRIORITY_LABEL}): ${oneLine(input.request, 90)}`;
   const parts = [
-    `**${FOUNDER_PRIORITY_LABEL}.** Tim asked for this inside Jovie chat while using Jovie as an artist. It outranks machine-filed work; Summer still decides when and how it ships.`,
+    `${FOUNDER_PRIORITY_LABEL}. Tim asked for this inside Jovie chat while using Jovie as an artist. It outranks machine-filed work; Summer still decides when and how it ships.`,
     '',
     '## What he asked for',
     input.request.trim(),
@@ -58,11 +58,9 @@ export function buildFounderCapabilityIssue(
     parts.push(
       '',
       '## Skill draft',
-      'Add it under `apps/web/lib/chat/skills/library/<name>/SKILL.md` once it reads right.',
+      'Add it as a new folder under apps/web/lib/chat/skills/library with this as its SKILL.md once it reads right, then run node apps/web/scripts/generate-chat-skill-index.mjs.',
       '',
-      '```markdown',
-      input.skillDraft.trim(),
-      '```'
+      input.skillDraft.trim()
     );
   }
   parts.push('', '_Filed by Jovie chat (requestCapability)._');

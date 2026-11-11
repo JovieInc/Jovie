@@ -2,7 +2,12 @@ import { tool } from 'ai';
 import { z } from 'zod';
 import { chatToolSchema } from '@/lib/chat/strict-schema';
 import { getPlanDisplayName } from '@/lib/entitlements/registry';
-import { CHAT_SKILLS, type ChatSkill, findChatSkill } from './registry';
+import {
+  CHAT_SKILLS,
+  type ChatSkillEntry,
+  findChatSkill,
+  loadChatSkillBody,
+} from './registry';
 
 /**
  * Loads one skill's steps by name. A `plan: pro` skill answers like a
@@ -11,10 +16,12 @@ import { CHAT_SKILLS, type ChatSkill, findChatSkill } from './registry';
 export function createUseSkillTool(
   options: {
     readonly paidPlan?: boolean;
-    readonly skills?: readonly ChatSkill[];
+    readonly skills?: readonly ChatSkillEntry[];
+    readonly loadBody?: (name: string) => Promise<string | null>;
   } = {}
 ) {
   const skills = options.skills ?? CHAT_SKILLS;
+  const loadBody = options.loadBody ?? loadChatSkillBody;
   return tool({
     description:
       'Load the full steps of one Jovie skill before doing work it covers. The skills and when to use each are listed under Skills in your instructions.',
@@ -43,7 +50,15 @@ export function createUseSkillTool(
           plan_required: plan,
         };
       }
-      return { success: true as const, name: skill.name, steps: skill.body };
+      const steps = await loadBody(skill.name);
+      if (!steps) {
+        return {
+          success: false as const,
+          error: `The ${skill.name} skill could not be loaded right now.`,
+          available: skills.map(item => item.name),
+        };
+      }
+      return { success: true as const, name: skill.name, steps };
     },
   });
 }

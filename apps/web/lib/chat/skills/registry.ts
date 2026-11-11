@@ -1,6 +1,7 @@
-import { readdirSync, readFileSync } from 'node:fs';
+import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { resolveAppPath } from '@/lib/filesystem-paths';
+import { CHAT_SKILL_INDEX } from './index.generated';
 
 /**
  * Jovie chat skills: markdown methods the model loads on demand.
@@ -8,18 +9,25 @@ import { resolveAppPath } from '@/lib/filesystem-paths';
  * Thin harness, thick skills. Each skill is `library/<name>/SKILL.md` with
  * `name` and `description` frontmatter. Only the descriptions go into the
  * system prompt; the model calls `useSkill` to read a body when a request
- * fits. Adding a skill is adding a markdown file, with no tool or route edit.
+ * fits. Adding a skill is adding a markdown file, then running
+ * `node apps/web/scripts/generate-chat-skill-index.mjs`, with no tool or
+ * route edit.
  *
- * Loaded once at cold start, like knowledge topics, and traced into the
- * serverless bundle by `next.config.js`.
+ * The index (name, description, plan) is precomputed into
+ * `index.generated.ts` so the stable prompt never reads the disk. Bodies are
+ * read with nonblocking I/O when useSkill asks for one, from files traced
+ * into the serverless bundle by `next.config.js`.
  */
 
-export interface ChatSkill {
+export interface ChatSkillEntry {
   readonly name: string;
   readonly description: string;
-  readonly body: string;
   /** `plan: pro` in frontmatter: only paid plans can load the steps. */
   readonly paidOnly: boolean;
+}
+
+export interface ChatSkill extends ChatSkillEntry {
+  readonly body: string;
 }
 
 const SKILLS_DIR = resolveAppPath('lib', 'chat', 'skills', 'library');
@@ -48,41 +56,41 @@ export function parseSkillFile(source: string): ChatSkill | null {
   return { name, description, body, paidOnly: plan === 'pro' };
 }
 
-function loadSkills(dir: string): readonly ChatSkill[] {
-  let entries: string[];
-  try {
-    entries = readdirSync(dir);
-  } catch (err) {
-    console.error(
-      `[skills] Failed to read skills from ${dir}:`,
-      err instanceof Error ? err.message : err
-    );
-    return [];
-  }
-  const skills: ChatSkill[] = [];
-  for (const entry of entries.sort()) {
-    try {
-      const skill = parseSkillFile(
-        readFileSync(join(dir, entry, 'SKILL.md'), 'utf-8')
-      );
-      if (skill && skill.name === entry) skills.push(skill);
-      else console.error(`[skills] Skipped invalid skill "${entry}"`);
-    } catch {
-      // Not a skill folder.
-    }
-  }
-  return skills;
-}
-
-/** Every chat skill, loaded at cold start. */
-export const CHAT_SKILLS: readonly ChatSkill[] = loadSkills(SKILLS_DIR);
+/** Every chat skill, from the precomputed index. */
+export const CHAT_SKILLS: readonly ChatSkillEntry[] = CHAT_SKILL_INDEX;
 
 export function findChatSkill(
   name: string,
-  skills: readonly ChatSkill[] = CHAT_SKILLS
-): ChatSkill | null {
+  skills: readonly ChatSkillEntry[] = CHAT_SKILLS
+): ChatSkillEntry | null {
   const wanted = name.trim().toLowerCase();
   return skills.find(skill => skill.name === wanted) ?? null;
+}
+
+const bodies = new Map<string, Promise<string | null>>();
+
+/**
+ * One skill's steps, read once per instance. Only names in the index are
+ * read, so a model-supplied name never reaches the filesystem path.
+ */
+export function loadChatSkillBody(name: string): Promise<string | null> {
+  const skill = findChatSkill(name);
+  if (!skill) return Promise.resolve(null);
+  let body = bodies.get(skill.name);
+  if (!body) {
+    body = readFile(join(SKILLS_DIR, skill.name, 'SKILL.md'), 'utf-8')
+      .then(source => parseSkillFile(source)?.body ?? null)
+      .catch((err: unknown) => {
+        console.error(
+          `[skills] Failed to read skill "${skill.name}":`,
+          err instanceof Error ? err.message : err
+        );
+        bodies.delete(skill.name);
+        return null;
+      });
+    bodies.set(skill.name, body);
+  }
+  return body;
 }
 
 /**
@@ -90,14 +98,14 @@ export function findChatSkill(
  * for anything Jovie can't do yet.
  */
 export function buildSkillsPromptSection(
-  skills: readonly ChatSkill[] = CHAT_SKILLS
+  skills: readonly ChatSkillEntry[] = CHAT_SKILLS
 ): string {
   const index =
     skills.length > 0
       ? `
 ## Skills
-Each one is a step-by-step method for work artists ask for often. When a request fits one, call useSkill with its name first, then follow it.
-${skills.map(skill => `- ${skill.name}${skill.paidOnly ? ' (Pro plan)' : ''}: ${skill.description}`).join('\n')}
+Each one is a step-by-step method for work artists ask for often. When a request fits one, call useSkill with its name first, then follow it. One skill per line, name first:
+${skills.map(skill => `${skill.name}${skill.paidOnly ? ' (Pro plan)' : ''}: ${skill.description}`).join('\n')}
 `
       : '';
   return `${index}
