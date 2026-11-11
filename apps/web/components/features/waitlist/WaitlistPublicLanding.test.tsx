@@ -107,8 +107,9 @@ describe('WaitlistPublicLanding', () => {
     render(<WaitlistPublicLanding signupClosed />);
 
     expect(screen.getByTestId('role-form')).toBeInTheDocument();
+    // Same invite words as the homepage form, and sentence case sign-in.
     expect(roleFormMock).toHaveBeenCalledWith(
-      expect.objectContaining({ qualify: true })
+      expect.objectContaining({ qualify: true, title: 'Request an invite' })
     );
     expect(screen.queryByTestId('auth-shell')).not.toBeInTheDocument();
     expect(authShellMock).not.toHaveBeenCalled();
@@ -116,6 +117,7 @@ describe('WaitlistPublicLanding', () => {
       expect.objectContaining({
         showFooterPrompt: true,
         footerLinkHref: APP_ROUTES.SIGNIN,
+        footerLinkText: 'Log in',
       })
     );
   });
