@@ -68,6 +68,7 @@
     "main-health.yml": {"runsPerMergedPr":0.5,"triggers":["push","workflow_dispatch"]},
     "main-red-eject.yml": {"runsPerMergedPr":27.4,"triggers":["pull_request_target:closed","workflow_dispatch","workflow_run:CI","workflow_run:Main Health","workflow_run:Merge Queue Green Enroll"]},
     "marketing-certification-producer.yml": {"runsPerMergedPr":0.6,"triggers":["push","workflow_dispatch"]},
+    "merge-group-dead-run-sweep.yml": {"runsPerMergedPr":2,"triggers":["pull_request_target:dequeued","workflow_dispatch"]},
     "merge-queue-green-enroll.yml": {"runsPerMergedPr":23,"triggers":["pull_request_target:converted_to_draft","pull_request_target:labeled","pull_request_target:ready_for_review","pull_request_target:reopened","pull_request_target:unlabeled","push","workflow_dispatch","workflow_run:CI","workflow_run:PR Size Guard","workflow_run:Source Validation"]},
     "merge-queue-ruleset-verify.yml": {"runsPerMergedPr":0,"triggers":["push","schedule","workflow_dispatch"]},
     "mutation-diff.yml": {"runsPerMergedPr":1.3,"triggers":["push","workflow_dispatch","workflow_run:CI"]},
