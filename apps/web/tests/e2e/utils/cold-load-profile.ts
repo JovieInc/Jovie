@@ -20,6 +20,7 @@ interface ProfileNode {
     readonly lineNumber: number;
     readonly columnNumber: number;
   };
+  readonly children?: readonly number[];
 }
 
 interface CpuProfile {
@@ -109,6 +110,113 @@ function snippetAt(lines: readonly string[], line: number, column: number) {
     .replace(/\s+/gu, ' ');
 }
 
+const APP_SOURCE = /^(apps\/web|packages)\//u;
+
+/** The longest stretch of consecutive non-idle samples: one long task. */
+export function longestBusyRun(profile: CpuProfile): {
+  readonly start: number;
+  readonly end: number;
+  readonly ms: number;
+} {
+  const samples = profile.samples ?? [];
+  const deltas = profile.timeDeltas ?? [];
+  const idle = new Set(
+    profile.nodes
+      .filter(node => node.callFrame.functionName === '(idle)')
+      .map(node => node.id)
+  );
+  let best = { start: 0, end: 0, ms: 0 };
+  let start = 0;
+  let us = 0;
+  for (let index = 1; index <= samples.length; index += 1) {
+    const busy = index < samples.length && !idle.has(samples[index - 1]);
+    if (busy) {
+      us += deltas[index] ?? 0;
+      continue;
+    }
+    if (us / 1000 > best.ms) best = { start, end: index, ms: us / 1000 };
+    start = index;
+    us = 0;
+  }
+  return best;
+}
+
+interface MappedFrame {
+  readonly source: string;
+  readonly label: string;
+}
+
+async function mapFrame(
+  page: Page,
+  origin: string,
+  node: ProfileNode,
+  chunks: Map<string, LoadedChunk>
+): Promise<MappedFrame | null> {
+  const { functionName, url, lineNumber, columnNumber } = node.callFrame;
+  if (!url.startsWith(origin)) return null;
+  const chunk = await loadChunk(page, url, chunks);
+  const entry = chunk.map?.findEntry(lineNumber, columnNumber) as
+    | { originalSource?: string; originalLine?: number; name?: string }
+    | undefined;
+  if (!entry?.originalSource) return null;
+  const source = shortSource(entry.originalSource);
+  return {
+    source,
+    label: `${entry.name ?? (functionName || '(anonymous)')} ${source}:${(entry.originalLine ?? 0) + 1}`,
+  };
+}
+
+/**
+ * Splits the longest task's samples by the nearest app or package frame on
+ * each sample's stack, so React's own frames are charged to the component
+ * that called into them.
+ */
+async function describeLongestTask(
+  page: Page,
+  origin: string,
+  profile: CpuProfile,
+  chunks: Map<string, LoadedChunk>
+): Promise<string> {
+  const run = longestBusyRun(profile);
+  const samples = profile.samples ?? [];
+  const deltas = profile.timeDeltas ?? [];
+  const byId = new Map(profile.nodes.map(node => [node.id, node]));
+  const parent = new Map<number, number>();
+  for (const node of profile.nodes) {
+    for (const child of node.children ?? []) parent.set(child, node.id);
+  }
+  const owner = new Map<number, string>();
+  const byOwner = new Map<string, number>();
+  for (let index = run.start + 1; index < run.end; index += 1) {
+    const leaf = samples[index - 1];
+    let label = owner.get(leaf);
+    if (label === undefined) {
+      label = '(no app frame on stack)';
+      for (
+        let id: number | undefined = leaf;
+        id !== undefined;
+        id = parent.get(id)
+      ) {
+        const node = byId.get(id);
+        if (!node) break;
+        const frame = await mapFrame(page, origin, node, chunks);
+        if (frame && APP_SOURCE.test(frame.source)) {
+          label = frame.label;
+          break;
+        }
+      }
+      owner.set(leaf, label);
+    }
+    byOwner.set(label, (byOwner.get(label) ?? 0) + (deltas[index] ?? 0) / 1000);
+  }
+  const rows = [...byOwner]
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, TOP_FUNCTIONS)
+    .map(([key, ms]) => `  ${formatMs(ms)} ${key}`)
+    .join('\n');
+  return `longest task ${formatMs(run.ms)}, by nearest app frame:\n${rows}`;
+}
+
 function formatMs(ms: number): string {
   return `${Math.round(ms)}ms`;
 }
@@ -182,7 +290,8 @@ export async function printColdLoadProfile(
         `${mapped} of ${Math.min(frames.length, MAPPED_CANDIDATES)} hot frames source-mapped ` +
         `(${[...new Set([...chunks.values()].map(chunk => chunk.mapStatus))].join(', ')})\n` +
         `[cold-load-profile] ${label} by source:\n${top(bySource, TOP_SOURCES)}\n` +
-        `[cold-load-profile] ${label} by function:\n${top(byFunction, TOP_FUNCTIONS)}\n`
+        `[cold-load-profile] ${label} by function:\n${top(byFunction, TOP_FUNCTIONS)}\n` +
+        `[cold-load-profile] ${label} ${await describeLongestTask(page, origin, profile, chunks)}\n`
     );
   } catch (error) {
     process.stdout.write(
