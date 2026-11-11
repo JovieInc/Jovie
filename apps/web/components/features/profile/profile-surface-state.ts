@@ -1,11 +1,7 @@
-import type {
-  ProfileMode,
-  ProfilePrimaryTab,
-} from '@/features/profile/contracts';
+import type { ProfilePrimaryTab } from '@/features/profile/contracts';
 import type { PublicRelease } from '@/features/profile/releases/types';
 import type { ConfirmedFeaturedPlaylistFallback } from '@/lib/profile/featured-playlist-fallback';
 import { getProfileReleaseVisibility } from '@/lib/profile/release-visibility';
-import { PUBLIC_PROFILE_NAVIGATION } from '@/lib/profile/route-config';
 import type { TourDateViewModel } from '@/lib/tour-dates/types';
 import type { AvatarSize } from '@/lib/utils/avatar-sizes';
 import { getHeaderSocialLinks } from '@/lib/utils/context-aware-links';
@@ -435,24 +431,6 @@ export type PublicProfileBackAction =
   | 'history-exit'
   | 'app-fallback'
   | 'none';
-
-/**
- * Music, Events and About sit beside Home in the visible tab row, so they are
- * siblings of the profile root, not pages nested under it. The top chrome on
- * a sibling tab matches Home's (no Back to a tab that is one tap away), and a
- * Back there exits the profile exactly as it does from Home. Nested modes
- * (releases, subscribe, pay, contact) keep their Back to the profile root.
- */
-export function isPublicProfileSiblingTab(mode: ProfileMode): boolean {
-  return PUBLIC_PROFILE_NAVIGATION.some(
-    destination => destination.id !== 'profile' && destination.id === mode
-  );
-}
-
-/** Home and its sibling tabs share one top chrome and one Back behaviour. */
-export function isPublicProfileRootLevel(mode: ProfileMode): boolean {
-  return mode === 'profile' || isPublicProfileSiblingTab(mode);
-}
 
 export function shouldShowPublicProfileBackChevron(params: {
   readonly isProfileRoot: boolean;

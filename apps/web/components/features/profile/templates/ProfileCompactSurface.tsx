@@ -34,14 +34,13 @@ import { ProofClaimCtaLink } from '@/features/profile/ProofClaimCtaLink';
 import {
   getPublicProfileHistoryServerSnapshot,
   getPublicProfileHistorySnapshot,
-  isPublicProfileRootLevel,
   resolveProfileSurfaceState,
-  shouldShowPublicProfileBackChevron,
   subscribeToPublicProfileHistory,
 } from '@/features/profile/profile-surface-state';
 import { getProfileModeDefinition } from '@/features/profile/registry';
 import type { PublicRelease } from '@/features/profile/releases/types';
 import { SubscriptionConfirmedBanner } from '@/features/profile/SubscriptionConfirmedBanner';
+import { shouldShowTabBackChevron } from '@/features/profile/sibling-tabs';
 import { useIsAuthenticated } from '@/hooks/useIsAuthenticated';
 import type { UserLocation } from '@/hooks/useUserLocation';
 import { track } from '@/lib/analytics';
@@ -494,12 +493,8 @@ export function ProfileCompactSurface({
     getPublicProfileHistorySnapshot,
     getPublicProfileHistoryServerSnapshot
   );
-  // With the tab row visible, Music / Events / About are Home's siblings:
-  // their top chrome matches Home's instead of growing a Back arrow.
-  const showBackChevron = shouldShowPublicProfileBackChevron({
-    isProfileRoot: showBottomNav
-      ? isPublicProfileRootLevel(activeMode)
-      : activeMode === 'profile',
+  const showBackChevron = shouldShowTabBackChevron({
+    mode: activeMode,
     hasHistoryDestination,
     isSignedIn,
     forceHidden: hideBackButton || isNotificationsFlowOpen,

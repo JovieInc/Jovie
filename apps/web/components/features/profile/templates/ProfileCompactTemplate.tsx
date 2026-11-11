@@ -25,9 +25,7 @@ import type {
 import type { DrawerView } from '@/features/profile/ProfileUnifiedDrawer';
 import {
   getPublicProfileHistoryExitDelta,
-  isPublicProfileRootLevel,
   readPublicProfileHistoryDepth,
-  resolvePublicProfileBackAction,
   withPublicProfileHistoryDepth,
 } from '@/features/profile/profile-surface-state';
 import {
@@ -35,6 +33,7 @@ import {
   getProfileModeHref,
 } from '@/features/profile/registry';
 import type { PublicRelease } from '@/features/profile/releases/types';
+import { resolveTabBackAction } from '@/features/profile/sibling-tabs';
 import { ReleaseCreditsDrawer } from '@/features/release/ReleaseCreditsDrawer';
 import { useIsAuthenticated } from '@/hooks/useIsAuthenticated';
 import { sortDSPsByGeoPopularity } from '@/lib/dsp';
@@ -1056,8 +1055,8 @@ export function ProfileCompactTemplate({
     const arrivalHistoryLength =
       arrivalHistoryLengthRef.current ?? historyLength;
     const internalHistoryDepth = profileHistoryDepthRef.current;
-    const action = resolvePublicProfileBackAction({
-      isProfileRoot: isPublicProfileRootLevel(requestedMode),
+    const action = resolveTabBackAction({
+      mode: requestedMode,
       historyLength,
       referrer: document.referrer,
       isSignedIn,

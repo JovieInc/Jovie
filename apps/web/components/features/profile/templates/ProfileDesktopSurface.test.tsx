@@ -185,11 +185,10 @@ describe('ProfileDesktopSurface', () => {
     ]);
   });
 
-  it.each(['listen', 'tour', 'about'] as const)(
-    'shows no desktop back control on the %s sibling tab',
+  it.each(['profile', 'listen', 'tour', 'about'] as const)(
+    'hides the desktop back control on the %s tab for logged-out visitors',
     activeMode => {
       mockUseIsAuthenticated.mockReturnValue(false);
-
       render(
         <ProfileDesktopSurface
           artist={artist}
@@ -206,37 +205,9 @@ describe('ProfileDesktopSurface', () => {
           profileHref='/timwhite'
         />
       );
-
-      expect(
-        screen.queryByRole('button', { name: 'Back' })
-      ).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Back' })).toBeNull();
     }
   );
-
-  it('hides the desktop back control on the public profile root for logged-out visitors', () => {
-    mockUseIsAuthenticated.mockReturnValue(false);
-
-    render(
-      <ProfileDesktopSurface
-        artist={artist}
-        socialLinks={[]}
-        contacts={contacts}
-        drawerOpen={false}
-        drawerView='menu'
-        activeMode='profile'
-        onDrawerOpenChange={vi.fn()}
-        onDrawerViewChange={vi.fn()}
-        onOpenMenu={vi.fn()}
-        onPlayClick={vi.fn()}
-        onBack={vi.fn()}
-        profileHref='/timwhite'
-      />
-    );
-
-    expect(
-      screen.queryByRole('button', { name: 'Back' })
-    ).not.toBeInTheDocument();
-  });
 
   it('shows the desktop back control for a signed-in session', () => {
     mockUseIsAuthenticated.mockReturnValue(true);

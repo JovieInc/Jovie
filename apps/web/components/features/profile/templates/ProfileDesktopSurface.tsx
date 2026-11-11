@@ -35,15 +35,14 @@ import { ProfileUnifiedDrawer } from '@/features/profile/ProfileUnifiedDrawer';
 import {
   getPublicProfileHistoryServerSnapshot,
   getPublicProfileHistorySnapshot,
-  isPublicProfileRootLevel,
   PUBLIC_EVENTS_NO_SURFACE,
   resolveProfileSurfaceState,
   resolvePublicMusicSurface,
   shouldOfferPublicEventsDestination,
-  shouldShowPublicProfileBackChevron,
   subscribeToPublicProfileHistory,
 } from '@/features/profile/profile-surface-state';
 import { StaticListenInterface } from '@/features/profile/StaticListenInterface';
+import { shouldShowTabBackChevron } from '@/features/profile/sibling-tabs';
 import { ReleasesView } from '@/features/profile/views/ReleasesView';
 import { useIsAuthenticated } from '@/hooks/useIsAuthenticated';
 import { sortDSPsByGeoPopularity } from '@/lib/dsp';
@@ -326,9 +325,8 @@ export function ProfileDesktopSurface({
     getPublicProfileHistorySnapshot,
     getPublicProfileHistoryServerSnapshot
   );
-  // The primary tabs are always visible here, so they are Home's siblings.
-  const showBackChevron = shouldShowPublicProfileBackChevron({
-    isProfileRoot: isPublicProfileRootLevel(activeMode),
+  const showBackChevron = shouldShowTabBackChevron({
+    mode: activeMode,
     hasHistoryDestination,
     isSignedIn,
   });

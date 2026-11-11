@@ -1,11 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import {
   hasPublicProfileHistoryDestination,
-  isPublicProfileRootLevel,
-  isPublicProfileSiblingTab,
   resolvePublicProfileBackAction,
   shouldShowPublicProfileBackChevron,
 } from '@/features/profile/profile-surface-state';
+import {
+  isPublicProfileRootLevel,
+  isPublicProfileSiblingTab,
+} from '@/features/profile/sibling-tabs';
 
 describe('public profile back destination', () => {
   it('hides the root chevron when there is no real history destination', () => {
