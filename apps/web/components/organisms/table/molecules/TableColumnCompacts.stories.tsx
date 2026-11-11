@@ -22,3 +22,30 @@ export const Folded: Story = {};
 export const Empty: Story = {
   args: { items: [] },
 };
+
+/** Long folded values stay on the one compact line beside the primary cell. */
+export const LongContent: Story = {
+  args: {
+    items: [
+      { id: 'state', node: 'Awaiting distributor approval' },
+      { id: 'last', node: 'Updated 3 weeks ago' },
+      { id: 'alerts', node: 'SMS, email and push' },
+    ],
+  },
+};
+
+export const Rtl: Story = {
+  args: {
+    items: [
+      { id: 'state', node: 'نشط' },
+      { id: 'last', node: 'منذ ساعتين' },
+    ],
+  },
+  decorators: [
+    Story => (
+      <div dir='rtl' lang='ar'>
+        <Story />
+      </div>
+    ),
+  ],
+};

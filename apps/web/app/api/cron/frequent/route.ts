@@ -1,14 +1,13 @@
 /**
  * Consolidated Frequent Cron Handler
  *
- * Runs every 15 minutes. Orchestrates sub-jobs that need sub-hourly frequency.
+ * Runs every 30 minutes. Orchestrates sub-jobs that need sub-hourly frequency.
  * One cold start + one DB connection serves all jobs.
  *
  * Representative sub-jobs (docs/CRON_REGISTRY.md is the complete registry):
- * - DB warm ping: every invocation (15 min) — keeps Neon from auto-suspending
- * - Process campaigns: every invocation (15 min)
- * - Pixel forwarding retry: every other invocation (~30 min)
- * - Schedule + send release notifications: every invocation (15 min)
+ * - DB warm ping (keeps Neon awake) and campaigns: every invocation
+ * - Pixel forwarding retry: every other invocation (hourly)
+ * - Schedule + send release notifications: every invocation
  * - Redis write/read operability canary: hourly
  * - Daily acquisition-canary receipt freshness alarm: hourly
  * - Summer company-state reconciliation: every invocation
@@ -16,8 +15,6 @@
  *
  * Each sub-job runs in an independent try-catch so one failure
  * doesn't block the others.
- *
- * Schedule: every 15 minutes (configured in vercel.json)
  */
 
 import { asc, sql as drizzleSql, eq } from 'drizzle-orm';
@@ -47,6 +44,7 @@ import {
 } from '@/lib/db/schema/leads';
 import { processCampaigns } from '@/lib/email/campaigns/processor';
 import { captureError } from '@/lib/error-tracking';
+import { founderWelcomeJob } from '@/lib/founder-welcome/server';
 import {
   claimPendingJobs,
   handleIngestionJobFailure,
@@ -232,6 +230,8 @@ export async function GET(request: Request) {
     'summerCardDefaults',
     async () => ({ ...(await applySummerCardDefaults(new Date())) })
   );
+  // Welcome cards per admitted visitor; sends only the ones Tim approved.
+  results.founderWelcome = await runSubJob('founderWelcome', founderWelcomeJob);
 
   // 2. Process campaigns — every invocation (15 min)
   results.campaigns = await runSubJob('campaigns', async () => {

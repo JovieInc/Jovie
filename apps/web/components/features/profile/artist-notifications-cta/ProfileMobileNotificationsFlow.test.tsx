@@ -77,6 +77,14 @@ describe('ProfileMobileNotificationsFlow', () => {
     }
   );
 
+  it('opens on a sentence-case Get updates sheet', () => {
+    renderFlow({ step: 'email', onDismissCapture: vi.fn() });
+
+    expect(screen.getByText('Get updates')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Switch to SMS' })).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Not now' })).toBeVisible();
+  });
+
   it('keeps the inline flow outside modal dialog semantics', () => {
     renderFlow({ presentation: 'inline', step: 'email' });
 

@@ -4,8 +4,10 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   buildClaimDogfoodEvents,
   CLAIM_DOGFOOD_KEY,
+  CLAIM_LAYOUT_BUDGET_KEY,
   journeyOutcome,
   reportClaimDogfoodResult,
+  reportClaimLayoutBudgetResult,
 } from '../../claim-dogfood-report.mjs';
 import { parseStageEventFeed } from '../stage-events.mjs';
 
@@ -109,6 +111,60 @@ describe('claim dogfood intake', () => {
       expect.objectContaining({
         fingerprint: `${CLAIM_DOGFOOD_KEY}:failure`,
         priority: 1,
+        reopenTerminal: true,
+      })
+    );
+  });
+});
+
+describe('claim layout-budget intake (perf class)', () => {
+  const env = { LINEAR_API_KEY: 'lin_test' };
+
+  it('never shares a fingerprint with the revenue journey', () => {
+    expect(CLAIM_LAYOUT_BUDGET_KEY).not.toBe(CLAIM_DOGFOOD_KEY);
+    expect(CLAIM_LAYOUT_BUDGET_KEY.startsWith(`${CLAIM_DOGFOOD_KEY}:`)).toBe(
+      false
+    );
+  });
+
+  it('resolves only its own issue on green', async () => {
+    const close = vi.fn(async () => ({
+      ok: true,
+      action: 'resolved',
+      id: 'issue-2',
+      identifier: 'JOV-2',
+      url: 'https://linear.app/jovie/issue/JOV-2',
+      commented: true,
+    }));
+    const upsert = vi.fn();
+    await reportClaimLayoutBudgetResult(
+      { outcome: 'success', runId: '1' },
+      { env, close, upsert, notify: vi.fn() }
+    );
+    expect(close).toHaveBeenCalledWith(
+      expect.objectContaining({ fingerprint: CLAIM_LAYOUT_BUDGET_KEY })
+    );
+    expect(upsert).not.toHaveBeenCalled();
+  });
+
+  it('files its own non-P0 issue and alerts on a breach', async () => {
+    const upsert = vi.fn(async () => ({
+      ok: true,
+      action: 'created',
+      id: 'issue-2',
+      identifier: 'JOV-2',
+      url: 'https://linear.app/jovie/issue/JOV-2',
+    }));
+    const notify = vi.fn();
+    await reportClaimLayoutBudgetResult(
+      { outcome: 'failure', runUrl: 'https://run' },
+      { env, close: vi.fn(), upsert, notify }
+    );
+    expect(notify).toHaveBeenCalledOnce();
+    expect(upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        fingerprint: CLAIM_LAYOUT_BUDGET_KEY,
+        priority: 3,
         reopenTerminal: true,
       })
     );

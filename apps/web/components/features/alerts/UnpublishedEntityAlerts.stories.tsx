@@ -30,3 +30,29 @@ export const WithEntityTitle: Story = {
 export const Loading: Story = {
   render: () => <UnpublishedEntityAlertsFallback />,
 };
+
+/** A long artist name and release title wrap inside the copy column. */
+export const LongContentNameAndTitle: Story = {
+  args: {
+    artist: {
+      ...mockArtist,
+      name: 'The Los Angeles After Hours Orchestra and Friends',
+    },
+    entityTitle: 'Never Say A Word (Extended Club Mix) feat. Sunrise Set',
+  },
+};
+
+/** The opt-in inside a right-to-left page. */
+export const Rtl: Story = {
+  args: {
+    artist: { ...mockArtist, name: 'تيم وايت' },
+    entityTitle: 'منتصف الليل',
+  },
+  decorators: [
+    Story => (
+      <div dir='rtl' lang='ar'>
+        <Story />
+      </div>
+    ),
+  ],
+};

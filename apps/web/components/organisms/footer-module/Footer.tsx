@@ -38,7 +38,7 @@ const FOOTER_COLUMNS = [
     heading: 'Account',
     links: [
       { href: APP_ROUTES.SIGNIN, label: 'Log In' },
-      { href: APP_ROUTES.SIGNUP, label: 'Get Started' },
+      { href: APP_ROUTES.START, label: 'Get Started' },
     ],
   },
   {

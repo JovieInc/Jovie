@@ -1,5 +1,9 @@
 # jovie-mesh-hub
 
+> **Frozen (2026-11-11).** Linear is the fleet bus ([canon/FLEET.md](../../canon/FLEET.md#fleet-bus), JOV-12296).
+> Add no new features here. The hub keeps running for agents that already poll it
+> until they read Linear; then it retires.
+
 The company agent mesh: durable, push-based, self-healing messaging between
 agents (Summer, Claude, Codex, Grok Bot, Lola, Chloe, ...). It runs on Cloudflare
 Workers and Durable Objects at `https://jovie-mesh-hub.tim-fd8.workers.dev`, and
