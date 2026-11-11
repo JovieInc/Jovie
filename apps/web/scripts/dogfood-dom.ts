@@ -23,34 +23,68 @@ export function collectDogfoodDocument(input: {
         return false;
       current = current.parentElement;
     }
-    return element.getClientRects().length > 0;
+    return (
+      getComputedStyle(element).display === 'contents' ||
+      element.getClientRects().length > 0
+    );
   };
-  const elements = (selector: string) =>
-    [...document.querySelectorAll(selector)].filter(visible);
+  const editable = (element: Element): boolean => {
+    if (document.designMode?.toLowerCase() === 'on') return true;
+    // Keep even non-editable widgets inside an editor private. The attribute
+    // fallback also supports DOM test environments without isContentEditable.
+    for (
+      let current: Element | null = element;
+      current;
+      current = current.parentElement
+    ) {
+      if (current instanceof HTMLElement && current.isContentEditable)
+        return true;
+      const value = current.getAttribute('contenteditable')?.toLowerCase();
+      if (value === '' || value === 'true' || value === 'plaintext-only')
+        return true;
+    }
+    return false;
+  };
   const visibleCopy = (element: Element) =>
     visible(element) &&
-    !element.closest('input, textarea, [contenteditable="true"]');
-  const text = (element: Element): string => {
-    const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT);
-    const parts: string[] = [];
-    while (walker.nextNode()) {
-      const node = walker.currentNode;
-      if (node.parentElement && visibleCopy(node.parentElement))
-        parts.push(node.textContent ?? '');
-    }
-    return parts.join(' ').replace(/\s+/g, ' ').trim();
+    !element.closest('input, textarea') &&
+    !editable(element);
+  const elements = (selector: string) =>
+    [...document.querySelectorAll(selector)].filter(visibleCopy);
+  const observations = (root: Element): string[] => {
+    const result: string[] = [];
+    let run = '';
+    const flush = () => {
+      const value = run.replace(/\s+/g, ' ').trim();
+      if (value) result.push(value);
+      run = '';
+    };
+    const visit = (node: Node) => {
+      if (node.nodeType === Node.TEXT_NODE) {
+        run += node.textContent ?? '';
+        return;
+      }
+      if (!(node instanceof Element)) return;
+      if (!visibleCopy(node)) {
+        flush();
+        return;
+      }
+      const display = getComputedStyle(node).display;
+      // Inline spans share one observation, preserving the original whitespace.
+      // Blocks, atomic inline boxes and explicit breaks delimit observations.
+      const boundary =
+        node.tagName === 'BR' ||
+        (display !== '' && display !== 'inline' && display !== 'contents');
+      if (boundary) flush();
+      for (const child of node.childNodes) visit(child);
+      if (boundary) flush();
+    };
+    visit(root);
+    flush();
+    return result;
   };
-  const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
-  const visibleText: string[] = [];
-  while (walker.nextNode()) {
-    const node = walker.currentNode;
-    if (
-      node.parentElement &&
-      visibleCopy(node.parentElement) &&
-      node.textContent?.trim()
-    )
-      visibleText.push(node.textContent.trim());
-  }
+  const text = (element: Element): string => observations(element).join(' ');
+  const visibleText = observations(document.body);
   const buttons = elements('button, [role="button"]');
   return {
     id: input.id,
