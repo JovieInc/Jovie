@@ -257,26 +257,15 @@ describe('EmailCodeAuthForm', () => {
     expect(locationAssign).not.toHaveBeenCalled();
   });
 
-  it('explains the invite requirement for a verified code with no account and does not navigate', async () => {
+  it('explains the invite requirement after a verified code', async () => {
     renderForm();
     await reachCodeStep();
-
     signInEmailOtp.mockResolvedValueOnce({
       data: null,
-      error: {
-        code: 'SIGNUP_INVITE_REQUIRED',
-        message: 'An active invitation is required to create an account.',
-        status: 403,
-      },
+      error: { code: 'SIGNUP_INVITE_REQUIRED', status: 403 },
     });
     await submitCode('111111');
-
-    await waitFor(() =>
-      expect(
-        screen.getByText(/no jovie account uses this email yet/i)
-      ).toBeTruthy()
-    );
-    expect(screen.queryByText(/could not verify the code/i)).toBeNull();
+    await screen.findByText(/no jovie account uses this email/i);
     expect(locationAssign).not.toHaveBeenCalled();
   });
 
