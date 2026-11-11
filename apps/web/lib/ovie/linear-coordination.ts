@@ -20,6 +20,8 @@ export type LinearCoordinationRequest = {
   readonly founderIntentRef: string;
   readonly sourceRefs: readonly string[];
   readonly author: string;
+  /** Linear priority on create: 1 urgent, 2 high, 3 medium, 4 low. */
+  readonly priority?: 1 | 2 | 3 | 4;
 };
 
 export type LinearCoordinationReceipt = {
@@ -81,6 +83,7 @@ export type LinearCoordinationDeps = {
     readonly title: string;
     readonly description: string;
     readonly teamId: string;
+    readonly priority?: 1 | 2 | 3 | 4;
   }) => Promise<LinearIssueSnapshot>;
   readonly updateIssue: (input: {
     readonly issueId: string;
@@ -148,6 +151,7 @@ export async function coordinateLinearWork(
         title: input.title.trim(),
         description: input.body.trim(),
         teamId: input.teamId.trim(),
+        ...(input.priority ? { priority: input.priority } : {}),
       });
     } else {
       mutated = await deps.updateIssue({

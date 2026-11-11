@@ -56,6 +56,7 @@ describe('submitCapabilityRequest', () => {
       teamId: 'team-jov',
       founderIntentRef: 'jovie-chat:conv-1',
       author: 'jovie-chat',
+      priority: 1,
     });
     expect(request.title).toContain('Founder priority');
     expect(mockFeedback).not.toHaveBeenCalled();

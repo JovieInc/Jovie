@@ -34,6 +34,8 @@ export type CapabilityRequestResult =
   | { readonly success: false; readonly error: string };
 
 export const FOUNDER_PRIORITY_LABEL = 'Founder priority';
+/** Linear's structured priority (1 = urgent) so triage ranks it, not just the text. */
+export const FOUNDER_LINEAR_PRIORITY = 1;
 
 function oneLine(text: string, max: number): string {
   const flat = text.replace(/\s+/g, ' ').trim();
@@ -83,6 +85,7 @@ export async function submitCapabilityRequest(
           founderIntentRef: ref,
           sourceRefs: [ref],
           author: 'jovie-chat',
+          priority: FOUNDER_LINEAR_PRIORITY,
         },
         createLiveLinearCoordinationDeps()
       );
