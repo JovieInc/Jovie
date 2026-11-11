@@ -247,7 +247,7 @@
     "apps/web/components/molecules/InfoBox.tsx": "a11y,states,tests",
     "apps/web/components/molecules/LocationPicker.tsx": "a11y,ds-owner,forced-caps,frontend-rules,states,tests",
     "apps/web/components/molecules/MerchPricingPresetPicker.tsx": "a11y,ds-owner,frontend-rules,states,tests",
-    "apps/web/components/molecules/MobileNav.tsx": "a11y,ds-owner,states,tokens",
+    "apps/web/components/molecules/MobileNav.tsx": "ds-owner",
     "apps/web/components/molecules/PhoneFrame.tsx": "a11y,states",
     "apps/web/components/molecules/ReleaseDueBadge.tsx": "a11y,ds-owner,states,tests,tokens",
     "apps/web/components/molecules/tab-bar/TabBar.tsx": "a11y,ds-owner,states,tests",
@@ -266,7 +266,6 @@
     "apps/web/components/organisms/entity-card/EntityCard.tsx": "a11y,ds-owner,forced-caps,states",
     "apps/web/components/organisms/HeaderNav.tsx": "ds-owner",
     "apps/web/components/organisms/keyboard-shortcuts-sheet/KeyboardShortcutsSheet.tsx": "a11y,frontend-rules,states",
-    "apps/web/components/organisms/MarketingSignInLink.tsx": "tokens",
     "apps/web/components/organisms/OperatorListsNav.tsx": "a11y,ds-owner,frontend-rules,states",
     "apps/web/components/organisms/OperatorMobileNavigation.tsx": "a11y,tests",
     "apps/web/components/organisms/PageShell.tsx": "a11y,states,tests",
@@ -305,7 +304,7 @@
     "apps/web/components/organisms/table/organisms/VirtualizedTableBody.tsx": "a11y,states,tests",
     "apps/web/components/organisms/table/organisms/VirtualizedTableRow.tsx": "a11y,states,tests",
     "apps/web/components/organisms/UnifiedSidebar.tsx": "a11y,ds-owner,states,tests",
-    "apps/web/components/organisms/user-button/UserButton.tsx": "a11y,ds-owner,states,tokens",
+    "apps/web/components/organisms/user-button/UserButton.tsx": "ds-owner",
     "apps/web/components/providers/ErrorBoundary.tsx": "a11y,ds-owner,states,tests",
     "apps/web/components/shell/ArtistProfileRailToggle.tsx": "a11y,tests",
     "apps/web/components/shell/AudioBar.tsx": "a11y,states,tests",
@@ -327,7 +326,7 @@
     "apps/web/components/shell/SidebarThreadsSection.tsx": "a11y,states,tokens",
     "apps/web/components/shell/TasksRouteSkeleton.tsx": "a11y,states",
     "apps/web/components/shell/useChatThreadContextMenu.tsx": "a11y,states",
-    "apps/web/components/site/theme-toggle/ThemeToggleSegmented.tsx": "a11y,ds-owner,states",
+    "apps/web/components/site/theme-toggle/ThemeToggleSegmented.tsx": "ds-owner",
     "apps/web/components/UnavailablePage.tsx": "a11y,states,tests"
   }
 }

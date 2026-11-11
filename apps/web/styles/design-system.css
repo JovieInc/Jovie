@@ -1744,6 +1744,15 @@ html[data-profile-flow-open="true"] .cookie-banner-card {
   --color-verified: #0084d1;
   --color-on-media: #ffffff;
   --color-verified-backing: var(--color-on-media);
+  /* Quiet header text link (marketing Sign in / Log in) and its hover. The
+     dark values live in the .dark block below so scoped dark wrappers match. */
+  --color-header-text-link: oklch(37.1% 0 none);
+  --color-header-text-link-hover: oklch(14.5% 0 none);
+  /* Mobile nav sheet: the scrim behind it and its upward shadow, the same in
+     light and dark. */
+  --mobile-nav-scrim: oklch(0% 0 0 / 0.6);
+  --shadow-mobile-nav-sheet:
+    0 -8px 40px oklch(0% 0 0 / 0.25), 0 -2px 12px oklch(0% 0 0 / 0.15);
   /* Glass (2026-10-26): one semantic material for frosted panels. Shell
      mixed 3% toward ion in OKLab (same recipe as JOV-8927 ds-glass), alpha per
      theme so secondary text clears 4.5:1 over black, white and every accent
@@ -2385,6 +2394,9 @@ html[data-profile-flow-open="true"] .cookie-banner-card {
 .dark {
   --color-verified: #00bcff;
   --color-verified-backing: var(--color-bg-base);
+  /* The quiet header text link reads the same wrapper (dark: variant parity). */
+  --color-header-text-link: color-mix(in oklab, #fff 60%, transparent);
+  --color-header-text-link-hover: color-mix(in oklab, #fff 90%, transparent);
 }
 
 /* Public-profile navigation is one distinct functional glass layer. It floats

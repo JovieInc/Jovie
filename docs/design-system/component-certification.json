@@ -687,6 +687,17 @@
     "apps/web/components/features/release/AlbumArtworkContextMenu.tsx": {
       "error": "The menu has no error UI: a failed download falls back to opening the artwork URL in a new tab, and AlbumArtworkContextMenu.test.tsx asserts that fallback.",
       "offline": "An offline download fails like any other and takes the same new-tab fallback, so there is nothing to draw; the menu itself never fetches until a size is picked."
+    },
+    "apps/web/components/site/theme-toggle/ThemeToggleSegmented.tsx": {
+      "empty": "The rail always draws the same three theme buttons (system, light, dark) and renders no data collection; the detector matched the items-center class.",
+      "long-content": "No caller text paints: the button names and icons are fixed in code, and the one caller string, shortcutDescription, renders only inside an sr-only span.",
+      "permission-denied": "Every theme choice is open to everyone and nothing is gated; the detector matched role='toolbar' on the rail."
+    },
+    "apps/web/components/organisms/user-button/UserButton.tsx": {
+      "empty": "The account menu always builds the same fixed items (profile, settings, help, billing, sign out); with no user the trigger shows its loading skeleton (the LoadingRow story), so there is no empty collection to draw.",
+      "error": "UserButton draws no error UI of its own: a failed iOS-access read falls back to the menu without that item, a failed billing-status read falls back to the Upgrade item and useUserButton reports it through the shared toast, and feedback errors stay inside DashboardFeedbackModal.",
+      "offline": "Offline takes the same paths as the error waiver: the session comes from the auth client, and the billing and feedback requests fall back or report through the shared toast and the feedback modal, so the trigger and menu have no offline drawing.",
+      "permission-denied": "Nothing in the menu is denied: Upgrade is the working checkout path for a free plan and Manage billing replaces it on Pro. The detector matched the upgrade and plan identifiers."
     }
   }
 }
