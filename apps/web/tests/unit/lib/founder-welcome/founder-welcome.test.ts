@@ -238,6 +238,36 @@ describe('runFounderWelcome', () => {
     expect(h.sends.some(send => send.to === bob.email)).toBe(false);
   });
 
+  it('one failing visitor never stops the pass, and a failed stamp retries later', async () => {
+    const h = harness([alice, bob]);
+    await runFounderWelcome(h.deps());
+    h.store.decide(keyOf(alice), 'approved');
+    h.store.decide(keyOf(bob), 'approved');
+    const backend = memoryRecordBackend();
+    const ledger = createFounderWelcomeLedger(backend);
+    const flaky = h.deps();
+    await expect(
+      runFounderWelcome({
+        ...flaky,
+        ledger,
+        async markWelcomed(entryId) {
+          if (entryId === alice.entryId) throw new Error('db down');
+          await flaky.markWelcomed(entryId);
+        },
+      })
+    ).rejects.toThrow('1 visitor(s) failed');
+    // Bob still got his welcome in the same pass.
+    expect(h.sends.map(send => send.to)).toEqual([alice.email, bob.email]);
+    expect(h.welcomed).toEqual([bob.entryId]);
+    // Alice's claim stays in flight, so a run after it goes stale retries her
+    // send under the same idempotency key and stamps her this time.
+    const later = new Date(NOW.getTime() + 16 * 60 * 1000);
+    const retry = await runFounderWelcome({ ...h.deps(), ledger, now: later });
+    expect(retry.sent).toBe(1);
+    expect(h.sends[2]?.idempotencyKey).toBe(h.sends[0]?.idempotencyKey);
+    expect(h.welcomed).toEqual([bob.entryId, alice.entryId]);
+  });
+
   it("an approved card for A never unlocks B, even if B's lookup returns it", async () => {
     const h = harness([alice, bob]);
     await runFounderWelcome(h.deps());
