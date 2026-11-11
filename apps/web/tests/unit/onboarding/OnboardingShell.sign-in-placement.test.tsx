@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { OnboardingChatEmptyIntro } from '@/components/features/onboarding/OnboardingChatEmptyIntro';
@@ -36,7 +36,7 @@ vi.mock('@/components/features/onboarding/useOnboardingClaim', () => ({
 }));
 
 describe('onboarding sign-in placement', () => {
-  it('keeps the quiet sign-in link in flow above chat messages', () => {
+  it('keeps the options trigger in flow above chat and sign-in in its menu', async () => {
     render(<OnboardingShell sessionLabel='pending' />);
 
     const header = screen.getByTestId('onboarding-sign-in-header');
@@ -46,13 +46,16 @@ describe('onboarding sign-in placement', () => {
     expect(
       header.compareDocumentPosition(chat) & Node.DOCUMENT_POSITION_FOLLOWING
     ).toBeTruthy();
-    expect(screen.getByRole('link', { name: 'Sign in' })).toHaveAttribute(
-      'href',
-      APP_ROUTES.SIGNIN
+    fireEvent.keyDown(
+      screen.getByRole('button', { name: 'Onboarding options' }),
+      { key: 'ArrowDown' }
     );
+    expect(
+      await screen.findByRole('menuitem', { name: 'Sign in' })
+    ).toHaveAttribute('href', APP_ROUTES.SIGNIN);
   });
 
-  it('keeps sign-in reachable when a taken handle tells the owner to sign in (JOV-7753)', () => {
+  it('keeps sign-in reachable when a taken handle tells the owner to sign in (JOV-7753)', async () => {
     render(
       <OnboardingShell
         sessionLabel='pending'
@@ -65,10 +68,13 @@ describe('onboarding sign-in placement', () => {
       />
     );
 
-    expect(screen.getByRole('link', { name: 'Sign in' })).toHaveAttribute(
-      'href',
-      APP_ROUTES.SIGNIN
+    fireEvent.keyDown(
+      screen.getByRole('button', { name: 'Onboarding options' }),
+      { key: 'ArrowDown' }
     );
+    expect(
+      await screen.findByRole('menuitem', { name: 'Sign in' })
+    ).toHaveAttribute('href', APP_ROUTES.SIGNIN);
   });
 
   it('hides sign-in after the server resolves an authenticated session', () => {

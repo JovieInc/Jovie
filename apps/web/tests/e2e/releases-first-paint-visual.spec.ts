@@ -68,7 +68,10 @@ test.describe('releases view first paint', () => {
         const recordFirstTop = () => {
           if (probe.firstTop !== null) return;
           const element = container();
-          if (element) {
+          // Streamed HTML lands in a hidden <div> before React swaps it in;
+          // a container there has no boxes and reads top 0, so wait for one
+          // that is laid out.
+          if (element && element.getClientRects().length > 0) {
             probe.firstTop = element.getBoundingClientRect().top;
             return;
           }

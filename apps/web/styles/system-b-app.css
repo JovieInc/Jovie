@@ -74,14 +74,6 @@
   padding: var(--space-3) var(--space-3) var(--space-4);
 }
 
-:where(.system-b-onboarding-draft-eyebrow) {
-  color: var(--color-text-secondary-token);
-  font-size: var(--text-3xs);
-  font-weight: var(--font-weight-semibold);
-  letter-spacing: 0.13em;
-  text-transform: uppercase;
-}
-
 :where(.system-b-onboarding-draft-title) {
   color: var(--color-text-primary-token);
   font-size: var(--text-3xl);
@@ -140,6 +132,34 @@
   font-size: var(--text-sm);
   font-weight: var(--font-weight-semibold);
   line-height: 1.4;
+}
+
+/* JOV-12045: the side rail's phone preview must fit the rail at rest. The
+   preview keeps the locked 402:874 screen aspect (JOV-7192, width-only
+   sizing), which is ~618px tall at its w-71 width and ran past the rail's
+   fold at the 1280x720 golden-path viewport, leaving the draft-profile card
+   cut at the bottom edge with no clean scroll position. The rail hero is a
+   size container; the phone shrinks only when the hero is short (45.9cqh
+   derives from the locked 402/874 ratio, one step under the exact fit) and
+   never grows past its w-71 width on tall viewports. Unlayered so the width
+   holds against the w-auto utility and PhoneFrame's base w-71. */
+.system-b-onboarding-rail-hero {
+  container-type: size;
+}
+
+.system-b-onboarding-rail-phone {
+  width: min(17.75rem, 45.9cqh);
+}
+
+/* Keep the full-width profile composition when the phone shrinks. Reflowing
+   its fixed-size identity and featured card into a narrower screen clips the
+   Listen now action even though the phone itself fits the rail. The screen
+   already owns the inline-size container; zoom scales content and hit areas
+   together without a measurement effect or a second preview implementation.
+   tan(atan2(width, full-width)) is the unitless width ratio, including in
+   browsers that do not yet support dividing two lengths in calc(). */
+.system-b-onboarding-rail-phone .mobile-web-screen > div {
+  zoom: min(1, tan(atan2(100cqi, 17.75rem)));
 }
 
 :where(.system-b-onboarding-empty-state) {
@@ -832,11 +852,12 @@
     color-mix(in oklab, var(--color-focus-ring) 35%, transparent);
 }
 
+/* Selection is a quiet fill, never a box: an inset ring on every selected
+ * row read as a hard bordered rectangle (Linear-precision bar, founder
+ * 2026-11-08). The ring is reserved for keyboard focus above. */
 :where(.system-b-table-row-selected),
 :where(.system-b-table-selection-selected) {
   background: var(--color-row-selected);
-  box-shadow: inset 0 0 0 1px
-    color-mix(in oklab, var(--color-focus-ring) 24%, transparent);
 }
 
 :where(.system-b-table-row-selected):hover,
@@ -3599,19 +3620,22 @@
 }
 
 /* Hide scrolled-away thread content under a floating header row (JOV-7192).
-   The clearance band above the first resting message stays fully clear and
-   only its last --space-4 ramps in, so a half-scrolled bubble dissolves
-   instead of reading as a clipped control. Resting content starts at
-   --space-16 (the scroll region's pt-16) and is never masked. */
+   The clearance band above the first resting message stays fully clear.
+   Resting content starts at --space-16 (the scroll region's pt-16) and is
+   never masked. JOV-12045: the old 16px reveal ramp (transparent until
+   --space-12) half-revealed a scrolled-away agent-turn brand row in recorded
+   visual review, which read as a clipped control — the band is now fully
+   masked, so scrolled-away content is either invisible above the clearance
+   or fully visible below it. */
 :where(.system-b-chat-thread-top-fade) {
   mask-image: linear-gradient(
     to bottom,
-    transparent var(--space-12),
+    transparent var(--space-16),
     black var(--space-16)
   );
   -webkit-mask-image: linear-gradient(
     to bottom,
-    transparent var(--space-12),
+    transparent var(--space-16),
     black var(--space-16)
   );
 }
@@ -6426,19 +6450,25 @@
   table-layout: fixed;
 }
 
-/* Settings owns its usable pane beside the companion overlay. Reserve on
-   the pane, so the capped form centers and shrinks inside the remaining
-   space. The shell's existing content inset already accounts for part of
-   the overlay padding; do not subtract that inset a second time. */
+/* Settings reserves its automatic Profile companion from the server paint,
+   so the capped form never moves while the rail mounts and opens. The rail
+   pushes the route (it is a column of the shell main plane), so the
+   reservation is exactly the rail's allocation: the drawer width plus the
+   shell gap. Before the rail mounts, the pane holds it; once the rail slot
+   exists, the slot holds it until the first opening settles, then the
+   drawer's own width takes over at the same size. */
 @media (min-width: 1024px) {
-  [data-testid="settings-shell-content"]:has(
-    [data-settings-companion-rail="true"]
-  ) {
-    margin-inline-end: calc(
-      360px +
-      2 *
-      var(--space-1-5) -
-      var(--app-shell-content-inset)
-    );
+  [data-app-shell-main-plane="true"]:not(
+      :has(> [data-testid="app-shell-right-rail"])
+    )
+    [data-testid="settings-shell-content"]:has(
+      [data-settings-companion-rail="true"]
+    ) {
+    margin-inline-end: calc(360px + var(--app-shell-gap));
+  }
+
+  [data-app-shell-main-plane="true"]:has([data-settings-companion-rail="true"])
+    > [data-testid="app-shell-right-rail"] {
+    min-width: calc(360px + var(--app-shell-gap));
   }
 }

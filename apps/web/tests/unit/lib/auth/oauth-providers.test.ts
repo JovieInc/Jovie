@@ -105,7 +105,7 @@ describe('OAuth provider guard', () => {
 
   describe('shared provider button copy', () => {
     it('uses full provider labels for the enabled auth providers', () => {
-      expect(getEnabledAuthOAuthProviders()).toEqual(['apple', 'google']);
+      expect(getEnabledAuthOAuthProviders()).toEqual(['google', 'apple']);
       expect(AUTH_OAUTH_PROVIDER_LABELS.google).toBe('Continue with Google');
       expect(AUTH_OAUTH_PROVIDER_LABELS.apple).toBe('Continue with Apple');
     });

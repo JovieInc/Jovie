@@ -155,6 +155,26 @@ jobs:
       # so it carries the same (absent) condition as that step.
       - name: Setup Playwright (Chromium)
         uses: ./.github/actions/setup-playwright
+      - name: Verify onboarding recovery browser behavior
+        if: ${{ steps.reuse.outputs.reuse != 'true' }}
+        shell: bash
+        env:
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha }}
+          BASE_BRANCH: ${{ github.base_ref }}
+          PLAYWRIGHT_ARTIFACT_ALLOW_IMAGES: 'true'
+          PLAYWRIGHT_ARTIFACT_ALLOW_PUBLIC_IMAGES: 'true'
+          PLAYWRIGHT_ARTIFACT_ALLOW_MARKDOWN: 'true'
+          PLAYWRIGHT_ARTIFACT_PATHS: apps/web/.cache/onboarding-recovery-results
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
+          base_sha="$(git merge-base "origin/$BASE_BRANCH" HEAD)"
+          changed_files="$(git diff --name-only "$base_sha" HEAD)"
+          if ! grep -qE '^apps/web/(components/features/onboarding/.*\.[tj]sx?|tests/e2e/storybook-onboarding-recovery\.spec\.ts)$' <<< "$changed_files"; then
+            exit 0
+          fi
+          node .github/scripts/guard-playwright-artifacts.mjs --run -- \
+            pnpm --filter @jovie/web exec playwright test --config=playwright.config.storybook.ts tests/e2e/storybook-onboarding-recovery.spec.ts --output=.cache/onboarding-recovery-results --project=chromium --reporter=line
       - name: Validate customer changelog decision from trusted base
         shell: bash
         env:

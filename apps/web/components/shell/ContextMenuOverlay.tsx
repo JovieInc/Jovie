@@ -151,7 +151,7 @@ export function ContextMenuOverlay({
                 item.disabled
                   ? 'opacity-50 cursor-not-allowed text-secondary-token'
                   : item.tone === 'danger'
-                    ? 'text-rose-300/90 hover:text-rose-200 hover:bg-rose-500/10'
+                    ? 'text-error-text hover:text-error-text hover:bg-error-subtle'
                     : 'text-secondary-token hover:text-primary-token hover:bg-surface-1'
               )}
             >
@@ -162,7 +162,7 @@ export function ContextMenuOverlay({
                     item.disabled
                       ? 'text-tertiary-token'
                       : item.tone === 'danger'
-                        ? 'text-rose-300/70 group-hover/mi:text-rose-200'
+                        ? 'text-error-text group-hover/mi:text-error-text'
                         : 'text-tertiary-token group-hover/mi:text-primary-token'
                   )}
                   strokeWidth={2.25}

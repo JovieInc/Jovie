@@ -91,6 +91,19 @@
   font-weight: 500;
 }
 
+/* From tablet up, the email field spans exactly the role chips above it, so
+   both rows share their left and right edges. */
+@media (min-width: 48rem) {
+  .hv3-form > div {
+    width: fit-content;
+    max-width: 100%;
+  }
+
+  .hv3-form [data-slot="inline-subscribe"] {
+    width: 100%;
+  }
+}
+
 .hv3-form .waitlist-chips__error:empty {
   display: none;
 }
@@ -204,6 +217,19 @@
 .home-viewport .header-nav--docked {
   /* container-width-allow: home-canonical-v3 header on the approved 96px page margins, the v3 section column */
   --ds-public-gutter: max(6rem, calc((100% - 78rem) / 2));
+}
+
+/* Once scrolled, the bar's backing runs the full width of the screen and is
+   opaque, so no stage or display heading scrolls into view beside the bar or
+   ghosts through it. The row itself stays on the content box. The viewport
+   clips the overshoot of 100vw past a scrollbar. */
+.home-viewport .header-nav--docked {
+  --marketing-dock-glass: var(--noir-ion-shell);
+}
+
+.home-viewport .header-nav--docked::before {
+  right: calc(50% - 50vw);
+  left: calc(50% - 50vw);
 }
 
 /* Brand: the 28px mark with the Jovie wordmark beside it, always shown. */

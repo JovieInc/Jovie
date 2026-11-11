@@ -14,6 +14,11 @@ import { newProdcertUserEmail } from '@/lib/synthetic/prodcert-identities';
 import { fillControlledInputUntilEnabled } from '../helpers/auth';
 import { recordPlaywrightSensitiveValues } from '../helpers/vercel-preview';
 import {
+  expectNoForcedCaps,
+  expectPreviewMediaPainted,
+  expectRequiredFieldsPainted,
+} from './helpers/preview-media-quality';
+import {
   certStep,
   certStepBlocked,
   createSurfaceTelemetry,
@@ -65,6 +70,9 @@ recordCertCapabilities({
 });
 
 const ORIGIN = process.env.PROD_CERT_START_ORIGIN ?? 'https://jov.ie';
+
+/** iPhone-sized viewport for the phone pass of the preview check. */
+const PHONE_VIEWPORT = { width: 390, height: 844 } as const;
 
 /**
  * Candidate fixture artists, in pool order (JOV-9928). UNMARKED stays first
@@ -230,10 +238,36 @@ test('anonymous /start reaches a real catalog preview on production', async ({
         .locator('a[href^="/onboarding/checkout"]')
         .count();
       expect(checkoutLinks, 'pricing rendered before the preview').toBe(0);
+      // Truthful preview: painted portrait and artwork, filled required fields,
+      // no forced caps.
+      await expectPreviewMediaPainted(rail);
+      await expectRequiredFieldsPainted(rail);
+      await expectNoForcedCaps(page.locator('main'));
+
+      // The same preview on a phone: the inline rail in the conversation must
+      // be just as real as the desktop side rail.
+      const desktopViewport = page.viewportSize();
+      await page.setViewportSize(PHONE_VIEWPORT);
+      try {
+        const phoneRail = page
+          .getByTestId('onboarding-profile-rail-inline')
+          .filter({ visible: true })
+          .first();
+        await expect(
+          phoneRail,
+          'phone showed no inline preview of the draft profile'
+        ).toBeVisible({ timeout: 15_000 });
+        await phoneRail.scrollIntoViewIfNeeded();
+        await expectPreviewMediaPainted(phoneRail);
+        await expectRequiredFieldsPainted(phoneRail);
+        await expectNoForcedCaps(page.locator('main'));
+      } finally {
+        if (desktopViewport) await page.setViewportSize(desktopViewport);
+      }
       return releases;
     },
     releases =>
-      `preview shows ${releases} real releases for the test artist, no pricing step`
+      `preview shows ${releases} real releases with painted portrait and artwork, filled fields, no forced caps, no pricing step, on desktop and phone`
   );
 
   telemetry.record('claim');

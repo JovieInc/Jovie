@@ -20,7 +20,7 @@
  * Schedule: every 15 minutes (configured in vercel.json)
  */
 
-import { sql as drizzleSql, eq } from 'drizzle-orm';
+import { asc, sql as drizzleSql, eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { describeAcquisitionBlock } from '@/lib/acquisition/eligibility';
 import { getAcquisitionEligibility } from '@/lib/acquisition/eligibility.server';
@@ -62,6 +62,7 @@ import { processOutreachBatch } from '@/lib/leads/outreach-batch';
 import { pipelineWarn } from '@/lib/leads/pipeline-logger';
 import { processLeadBatch } from '@/lib/leads/process-batch';
 import { cleanupExpiredSuppressions } from '@/lib/notifications/suppression';
+import { companyHistoryCronJob } from '@/lib/ovie/company-history/configured.server';
 import { refreshCompanyStateCache } from '@/lib/ovie/company-state.server';
 import { applySummerCardDefaults } from '@/lib/ovie/summer-cards.server';
 import { refreshProofStats } from '@/lib/proof-stats/publish.server';
@@ -222,6 +223,8 @@ export async function GET(request: Request) {
     };
   });
 
+  results.companyHistory = await companyHistoryCronJob(minute, runSubJob);
+
   // Default-plus-deadline contract: an overdue founder ask records its
   // declared default (approve or reject) so nothing waits on Tim forever.
   // One indexed KV read per run; at most 100 compare-and-set writes.
@@ -320,6 +323,7 @@ export async function GET(request: Request) {
       .select({ id: leads.id })
       .from(leads)
       .where(eq(leads.status, 'discovered'))
+      .orderBy(asc(leads.updatedAt))
       .limit(30);
     if (unqualifiedLeads.length > 0) {
       qualificationResult = await processLeadBatch(

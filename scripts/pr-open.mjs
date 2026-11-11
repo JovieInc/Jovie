@@ -88,6 +88,11 @@ export function evidenceFromBody(body = '') {
   const red = section(body, 'Red-before-green');
   return {
     metric,
+    metricAfter:
+      metric && parts[4] !== '' && Number.isFinite(Number(parts[4]))
+        ? parts[4]
+        : undefined,
+    verifyLink: value(win, 'Verify'),
     claim: value(win, 'Claim'),
     area: value(win, 'Area'),
     theme: value(win, 'Theme'),
@@ -153,7 +158,7 @@ function blastRadius(paths) {
 
 /** @param {{
  *   title: string, files: Array<{ filename: string, status?: string, patch?: string, previous_filename?: string }>,
- *   labels?: string[], summary?: string, metric?: string, claim?: string, area?: string, theme?: string,
+ *   labels?: string[], summary?: string, metric?: string, metricAfter?: string, verifyLink?: string, claim?: string, area?: string, theme?: string,
  *   perMerge?: boolean, failingCommand?: string, failingRun?: string, customerVisible?: string, prUrl?: string, number?: string | number, failingLog?: string,
  * }} input */
 export function draftBody({
@@ -162,6 +167,8 @@ export function draftBody({
   labels = [],
   summary,
   metric,
+  metricAfter,
+  verifyLink,
   claim,
   area,
   theme,
@@ -187,7 +194,7 @@ export function draftBody({
     const parts = (metric ?? '').split('|').map(s => s.trim());
     const [name, unit, better, before, source, ...query] = parts;
     const line = metric
-      ? `- Metric: ${name} | ${unit} | ${better} | ${before} | ? | ${source} | ${query.join('|')}`
+      ? `- Metric: ${name} | ${unit} | ${better} | ${before} | ${metricAfter ?? '?'} | ${source} | ${query.join('|')}`
       : '';
     out.push(
       [
@@ -203,9 +210,9 @@ export function draftBody({
             .toLowerCase()
         }`,
         line,
-        `- Verify: ${prUrl}`,
+        `- Verify: ${verifyLink || prUrl}`,
         ...(perMerge ? ['- Per-merge: yes'] : []),
-        '- Pending: yes',
+        ...(metricAfter === undefined ? ['- Pending: yes'] : []),
       ].join('\n')
     );
   } else out.push('## Win\n\nn/a');
@@ -379,6 +386,8 @@ function parse(argv) {
     else if (f === '--summary') a.summary = v();
     else if (f === '--label') a.labels.push(v());
     else if (f === '--metric') a.metric = v();
+    else if (f === '--metric-after') a.metricAfter = v();
+    else if (f === '--verify-link') a.verifyLink = v();
     else if (f === '--claim') a.claim = v();
     else if (f === '--area') a.area = v();
     else if (f === '--theme') a.theme = v();
@@ -709,6 +718,11 @@ export async function main(
           ? {}
           : evidenceFromBody(pr.body);
       }
+    }
+    // A replacement baseline needs its own after-value and verification source.
+    if (a.metric !== undefined) {
+      derived.metricAfter = undefined;
+      derived.verifyLink = undefined;
     }
     const input = {
       ...derived,

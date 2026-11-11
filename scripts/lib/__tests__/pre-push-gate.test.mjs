@@ -89,6 +89,7 @@ describe('resolve-repo-node.sh', () => {
         PATH: `${nodeBin}:/usr/bin:/bin`,
         NVM_DIR: nvmRoot,
         HOME: nvmRoot,
+        JOVIE_NODE_AUTOFETCH: '0',
       },
     });
     return { nvmRoot, result };

@@ -39,59 +39,58 @@
   overflow-wrap: anywhere;
 }
 
-@font-face {
-  font-family: "Auth Google Sans";
-  src: url("/auth/google-sans.woff2") format("woff2");
-  font-weight: 500;
-  font-display: swap;
-}
-
-/* Provider-owned colors and artwork are branded exceptions; geometry and type
-   are shared so stacked provider buttons always match. Apple HIG allows a
-   custom white button with the Apple logo and "Continue with Apple" wording. */
+/* Pen oaz9c ghost pills: a 44px tap target around a 28px hairline face, with
+   shared geometry so stacked providers match; only the artwork differs. */
 .auth-provider-button {
   display: flex;
-  position: relative;
   align-items: center;
-  gap: 10px;
+  justify-content: center;
   min-height: 44px;
-  padding: 6px 12px;
-  border: 1px solid var(--auth-provider-outline);
-  border-radius: var(--radius-md);
-  --auth-provider-paper: #fff;
-  --auth-provider-ink: #1f1f1f;
-  --auth-provider-outline: #747775;
-  background: var(--auth-provider-paper);
-  color: var(--auth-provider-ink);
-  overflow: hidden;
-  overflow-wrap: anywhere;
-  font:
-    500 0.875rem / 1.4286 "Auth Google Sans",
-    system-ui,
-    sans-serif;
+  padding: 8px 0;
+  border: 0;
+  outline: none;
+  background: transparent;
+  color: var(--color-text-primary);
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
 }
 
-/* Hydration disables the control so a click cannot no-op. That wait is not
-   a pending request, so the button stays at full strength until it is. */
+.auth-provider-face {
+  display: inline-flex;
+  width: 100%;
+  min-height: 28px;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 0 16px;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: 9999px;
+  font-size: 0.875rem;
+  font-weight: 510;
+  transition: background-color 150ms ease-out;
+}
+
+.auth-provider-button:enabled:hover .auth-provider-face {
+  background: rgb(255 255 255 / 0.05);
+}
+
+.auth-provider-button:focus-visible .auth-provider-face {
+  box-shadow: 0 0 0 2px rgb(255 255 255 / 0.5);
+}
+
+/* Hydration disables the control; that wait is not a pending request. */
 .auth-provider-button:disabled:not([data-auth-provider-pending]) {
   cursor: default;
   opacity: 1;
 }
 
-.auth-provider-button img {
-  width: 20px;
-  height: 20px;
+.auth-provider-face > :first-child {
   flex-shrink: 0;
 }
 
-/* The Apple artwork is a 24x44 padded glyph; crop it to the shared 20px icon box. */
-.auth-provider-button[data-auth-provider-slot="apple"] img {
-  object-fit: none;
-  object-position: center;
-}
-
 .auth-form-stack-offset {
-  padding-top: min(18vh, 7.5rem);
+  /* Pen oaz9c: the column's heading sits 206px down a 900px frame. */
+  padding-top: min(20vh, 11.375rem);
 }
 
 [data-auth-shell][data-auth-keyboard-visible] .auth-form-stack-offset {

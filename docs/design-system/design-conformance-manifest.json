@@ -123,7 +123,7 @@
       "storySources": ["packages/ui/atoms/icon-button.stories.tsx"],
       "testSources": ["packages/ui/atoms/icon-button.test.tsx"],
       "penRootId": "XYhft",
-      "sourceDigest": "0ef6aa1b5ca6a3dd9cfc3c948410a3e5beaadf2ddae29ecc4dc45160df668bd2"
+      "sourceDigest": "7ab4475b11ac4867ca6163f37e048a4ff86a3f9468677e8f5a773761e8801f20"
     }
   ],
   "legacy": {
