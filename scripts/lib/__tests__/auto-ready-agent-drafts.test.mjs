@@ -433,14 +433,26 @@ describe('Auto-Ready App-token workflow', () => {
 
 describe('shipIntent (pr:open opt-in)', () => {
   const ON = '<!-- jovie-auto-ready: on-green -->';
+  const PARK = '<!-- jovie-auto-ready: park -->';
   const count = body => body.split(ON).length - 1;
   it('opts a new PR in, once, and --park keeps it parked', () => {
     expect(shipIntent('Body', { cmd: 'open' })).toBe(`Body\n\n${ON}\n`);
     expect(count(shipIntent(`Body\n\n${ON}\n`, { cmd: 'open' }))).toBe(1);
     expect(shipIntent('Body', { cmd: 'draft' })).toContain(ON);
+    // --park writes the park marker (an unmarked writer draft ships on green).
     expect(shipIntent(`Body\n${ON}\n`, { cmd: 'open', park: true })).toBe(
-      'Body\n'
+      `Body\n\n${PARK}\n`
     );
+    const parked = shipIntent('Body', { cmd: 'open', park: true });
+    expect(promotion({ body: parked, greenSource: true }).reason).toBe(
+      'writer-parked'
+    );
+  });
+  it('a refresh keeps a park; --on-green replaces it', () => {
+    const opts = { cmd: 'update', number: '42' };
+    expect(shipIntent('New', opts, `Old\n${PARK}`)).toBe(`New\n\n${PARK}\n`);
+    const on = shipIntent(`New\n${PARK}`, { ...opts, onGreen: true }, 'Old');
+    expect(on).toBe(`New\n\n${ON}\n`);
   });
   it('keeps an existing opt-in on refresh and adds none uninvited', () => {
     const opts = { cmd: 'update', number: '42' };

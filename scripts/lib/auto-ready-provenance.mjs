@@ -68,19 +68,26 @@ const ON_GREEN_RE = /<!--\s*jovie-auto-ready:\s*on-green\s*-->/i;
 /**
  * The writer's ship intent on a PR body (`pnpm pr:open`). A new PR opts in by
  * default, so green ships without anyone marking it ready; a refreshed body
- * keeps an opt-in it already had; `--on-green` adds one; `--park` is the only
- * way to keep a draft parked, and it removes the opt-in.
+ * keeps the opt-in or park it already had; `--on-green` opts in (dropping a
+ * park); `--park` writes the park marker, the only way to keep a draft parked,
+ * since an unmarked writer draft ships on green by default.
  * @param {string} body
  * @param {{ cmd?: string, number?: string, park?: boolean, onGreen?: boolean }} [opts]
  * @param {string} [prior]
  */
 export function shipIntent(body, { cmd, number, park, onGreen } = {}, prior) {
+  const strip = re => new RegExp(`\\n*${re.source}\\n*`, 'gi');
   const bare = String(body ?? '')
-    .replace(new RegExp(`\\n*${ON_GREEN_RE.source}\\n*`, 'gi'), '\n')
+    .replace(strip(ON_GREEN_RE), '\n')
+    .replace(strip(PARK_RE), '\n')
     .trimEnd();
-  if (park) return `${bare}\n`;
+  const parked = `${bare}\n\n<!-- ${PARK_MARKER} -->\n`;
+  if (park) return parked;
   const fresh = cmd === 'open' || (cmd === 'draft' && !number);
-  if (!fresh && !onGreen && !ON_GREEN_RE.test(String(prior ?? ''))) return body;
+  if (!fresh && !onGreen) {
+    if (hasParkMarker(prior) && !hasParkMarker(body)) return parked;
+    if (!ON_GREEN_RE.test(String(prior ?? ''))) return body;
+  }
   return `${bare}\n\n<!-- ${ON_GREEN_MARKER} -->\n`;
 }
 
