@@ -135,6 +135,32 @@ describe('detectUnattributedRed', () => {
       ]).triggered
     ).toBe(false);
   });
+  it('leaves three PRs that each failed their own readable test alone', () => {
+    const own = (id, pr, test) => ({
+      ...row(id, pr),
+      signature: [`test:${test}`],
+    });
+    expect(
+      detectUnattributedRed([
+        own(3, 30, 'a.test.ts'),
+        own(2, 20, 'b.test.ts'),
+        own(1, 10, 'c.test.ts'),
+      ]).triggered
+    ).toBe(false);
+    // One readable failure in the window is enough to stand down.
+    expect(
+      detectUnattributedRed([row(3, 30), own(2, 20, 'b.test.ts'), row(1, 10)])
+        .triggered
+    ).toBe(false);
+    // Generic tokens (a bare exit code) are not a readable failure.
+    expect(
+      detectUnattributedRed([
+        { ...row(3, 30), signature: ['gate:Structural Contract'] },
+        row(2, 20),
+        row(1, 10),
+      ]).triggered
+    ).toBe(true);
+  });
 });
 
 describe('remediationIntake', () => {

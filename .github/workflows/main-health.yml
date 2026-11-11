@@ -42,6 +42,10 @@ jobs:
         with:
           node-version-file: .nvmrc
       - name: Run main-health checks
+        env:
+          # Certify the checked-out tree as it stands. On main this is what origin/main...HEAD
+          # already meant; a dispatch on another ref has no origin/main fetched (depth 2).
+          TURBO_SCM_BASE: HEAD
         run: node scripts/main-health.mjs --out "$RUNNER_TEMP/main-health.json"
 
   structural:

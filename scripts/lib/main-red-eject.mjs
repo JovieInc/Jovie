@@ -129,9 +129,11 @@ export const groupPr = branch =>
 
 /**
  * Red with no readable shared signature: the newest n decided merge groups all
- * failed, each for a different PR. One PR failing its own groups is that PR's
- * problem (the queue breaker holds it); n unrelated PRs in a row is main's.
- * @param {Array<{id:number, conclusion:string, branch?:string}>} groups newest first
+ * failed, each for a different PR, and none of those n named a test or a
+ * specific gate. One PR failing its own groups is that PR's problem (the queue
+ * breaker holds it), and so are n PRs that each failed a readable test of
+ * their own; n unreadable failures on n PRs in a row is main's.
+ * @param {Array<{id:number, conclusion:string, branch?:string, signature?:string[]}>} groups newest first
  */
 export function detectUnattributedRed(groups, n = UNATTRIBUTED_MIN_GROUPS) {
   const streak = [];
@@ -141,7 +143,10 @@ export function detectUnattributedRed(groups, n = UNATTRIBUTED_MIN_GROUPS) {
   }
   const prs = [...new Set(streak.map(g => groupPr(g.branch)).filter(Boolean))];
   return {
-    triggered: streak.length >= n && prs.length >= n,
+    triggered:
+      streak.length >= n &&
+      prs.length >= n &&
+      streak.slice(0, n).every(g => !specific(g.signature ?? []).length),
     groups: streak.map(g => g.id),
     prs,
   };
