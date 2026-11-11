@@ -65,9 +65,10 @@ const record = {
   updatedAt: '2026-11-08T00:00:00.000Z',
 };
 const params = { params: Promise.resolve({ takeId: TAKE_ID }) };
+const listRequest = new NextRequest('https://jov.ie/api/teleprompter/takes');
 
 function jsonRequest(method: string, body: unknown) {
-  return new Request('https://jov.ie/api/teleprompter/takes', {
+  return new NextRequest('https://jov.ie/api/teleprompter/takes', {
     method,
     headers: { 'Content-Type': 'application/json' },
     body: typeof body === 'string' ? body : JSON.stringify(body),
@@ -85,7 +86,7 @@ describe('teleprompter take routes', () => {
       userId: null,
       error: NextResponse.json({ error: 'Unauthorized' }, { status: 401 }),
     }));
-    const denied = await GET();
+    const denied = await GET(listRequest);
     expect(denied.status).toBe(401);
     expect(await denied.json()).toEqual({ error: 'Unauthorized' });
     expect((await DELETE(jsonRequest('DELETE', {}), params)).status).toBe(401);
@@ -95,7 +96,7 @@ describe('teleprompter take routes', () => {
   it('lists the owner takes as summaries without blob paths', async () => {
     mocks.listTeleprompterTakes.mockResolvedValue([record]);
 
-    const response = await GET();
+    const response = await GET(listRequest);
     const body = await response.json();
 
     expect(mocks.listTeleprompterTakes).toHaveBeenCalledWith('user_1');
@@ -110,12 +111,12 @@ describe('teleprompter take routes', () => {
     mocks.listTeleprompterTakes.mockRejectedValueOnce(
       new TeleprompterTakeError('take-not-found', 404)
     );
-    const known = await GET();
+    const known = await GET(listRequest);
     expect(known.status).toBe(404);
     expect(await known.json()).toEqual({ error: 'take-not-found' });
 
     mocks.listTeleprompterTakes.mockRejectedValueOnce(new Error('blob down'));
-    const unknown = await GET();
+    const unknown = await GET(listRequest);
     expect(unknown.status).toBe(500);
     expect(mocks.captureError).toHaveBeenCalled();
   });
@@ -185,7 +186,7 @@ describe('teleprompter take routes', () => {
     });
 
     const response = await GET_MEDIA(
-      new Request('https://jov.ie/x', { headers: { range: 'bytes=0-9' } }),
+      new NextRequest('https://jov.ie/x', { headers: { range: 'bytes=0-9' } }),
       params
     );
 
@@ -202,7 +203,7 @@ describe('teleprompter take routes', () => {
       new TeleprompterTakeError('take-media-unavailable', 404)
     );
     expect(
-      (await GET_MEDIA(new Request('https://jov.ie/x'), params)).status
+      (await GET_MEDIA(new NextRequest('https://jov.ie/x'), params)).status
     ).toBe(404);
   });
 
