@@ -359,8 +359,7 @@ describe('merge_group workflow contract', () => {
   it('revalidates size after contract edits without draft-state or label churn', () => {
     const sourceRevisionTrigger = 'types: [opened, synchronize, reopened]';
 
-    // Draft state does not change the source SHA. The original source checks
-    // remain authoritative when the owner pairs ready with native auto-merge.
+    // Draft transitions preserve the source SHA and its checks.
     expect(SIZE_GUARD_WORKFLOW).toContain(
       'types: [opened, synchronize, reopened, edited]'
     );
@@ -390,9 +389,7 @@ describe('merge_group workflow contract', () => {
         return workflowDeclaresReadyForReviewType(source);
       });
 
-    // A ready transition must never earn an unchanged head a second CI
-    // flight. merge-queue-green-enroll.yml is the sole subscriber: it admits
-    // the already-green head and still skips drafts.
+    // Only green-enroll consumes ready transitions; it preserves checks and skips drafts.
     expect(offenders).toEqual([]);
     expect(existsSync(resolve(workflowDir, 'auto-merge-default.yml'))).toBe(
       false
@@ -494,9 +491,7 @@ describe('merge_group workflow contract', () => {
       "policy='scripts/lib/merge-group-admission.mjs'"
     );
     expect(admission).toContain('node "$policy"');
-    // JOV-8754: the only secret admission may touch is the Jovie Bot key for a
-    // read-only installation token (the ci-merge-group-supersede pattern),
-    // with GITHUB_TOKEN as the fail-closed fallback.
+    // JOV-8754: admission uses a read-only Bot token, falling back to GITHUB_TOKEN.
     expect(admission.match(/secrets\.[A-Z_]+/g)).toEqual([
       'secrets.JOVIE_BOT_PRIVATE_KEY',
     ]);

@@ -12,7 +12,9 @@ const MODULE_INIT_FILES = {
     'scripts/invariants/latency-sensitive-execution-allowlist.json',
   ],
   // Read at ci-fast-lanes.mjs module load (lanes coverage floors, Move 3).
-  'scripts/ci-fast-lanes.mjs': ['.github/ci-harness/lanes-coverage-floors.txt'],
+  'scripts/lib/ci-structural-shards.mjs': [
+    '.github/ci-harness/lanes-coverage-floors.txt',
+  ],
 };
 
 const SHA = /^[a-f0-9]{40}(?:[a-f0-9]{24})?$/u;

@@ -898,10 +898,7 @@ function errorText(error) {
 }
 
 /**
- * GitHub removes a PR when its merge_group run fails. The Jovie Bot token
- * minted for this job does not include merge-queue write, so dequeuePullRequest
- * answers "Resource not accessible by integration". An already-removed PR
- * answers that it is not in the queue. Both are logged and non-fatal.
+ * Treat missing dequeue access and already-removed PRs as logged, non-fatal results.
  * @returns {'inaccessible' | 'not-in-queue' | null}
  */
 export function classifyDequeueDenial(error) {
@@ -1581,11 +1578,8 @@ function ciFastRemainingLog(
 
 // Shadow only (canon/MERGE_QUEUE_STEWARD.md invariant 4): did this group's
 // failing signal also fail in a recent group that does not contain the PR?
-// The verdict is logged, never applied: holds and enrollment are unchanged
-// until the shadow record qualifies a non-attributable class. Membership is
-// every queue entry ahead of main in the peer group (its base chain included),
-// so a PR riding in a peer's base counts as contained. Bounded to 5 peers and
-// never throws.
+// Log evidence without changing holds/enrollment. Membership includes the peer's
+// base chain. Check at most 5 peers; read errors never escape.
 export const PEER_RECURRENCE_WINDOW_MS = 6 * 60 * 60 * 1000;
 export const PEER_RECURRENCE_MAX_PEERS = 5;
 

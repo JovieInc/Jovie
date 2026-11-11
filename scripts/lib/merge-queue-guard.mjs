@@ -99,9 +99,7 @@ export const PRODUCTION_CONTROLLER_GENERATION_READBACK_SCHEMA =
   'jovie-production-controller-generation-readback/v1';
 
 /**
- * Decide whether a native cohort should merge now. GitHub owns the live
- * wait clock; this is the typed source contract for tests and readback.
- *
+ * Native cohort decision contract; GitHub owns the live wait clock.
  * @param {{ queuedCount?: unknown, waitedMinutes?: unknown }} [input]
  */
 export function evaluateNativeCohortMergeDecision({

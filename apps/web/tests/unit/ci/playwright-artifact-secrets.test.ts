@@ -95,8 +95,7 @@ const safeUploadUses = './.github/actions/upload-safe-playwright-artifact';
 // browser-derived files the guard scans before any upload can read them.
 const playwrightProducer =
   /(?:playwright test|run qa:routes| e2e:|run test:e2e|test:nightly-agent:(?:normalize|publish-status))/;
-// Reviewed producers that run without guard-playwright-artifacts.mjs, keyed
-// `file:job` to one step name or '*' for the whole job.
+// Reviewed unguarded producers: `file:job` to step name, or '*' for every step.
 const unguardedProducerSteps = new Map([
   // Captures publish through the catalog integrity/budget verifier instead.
   ['screenshots.yml:generate', '*'],
