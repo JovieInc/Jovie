@@ -1,0 +1,168 @@
+{
+  "schema": "company-trackers/v1",
+  "pin": "91b8065847117e18102d440199f9511788ca6800",
+  "notes": "Mirror of JovieInc/ci canon/trackers.json at the company-guards pin. The company guard does not scan this JSON. tracker-signature-scan.mjs reads it.",
+  "signatures": [
+    {
+      "id": "meta",
+      "category": "pixel",
+      "hosts": ["connect.facebook.net", "facebook.com/tr"],
+      "code": [
+        "fbevents\\.js",
+        "\\bfbq\\(\\s*['\"]init",
+        "react-facebook-pixel"
+      ]
+    },
+    {
+      "id": "google-analytics",
+      "category": "analytics",
+      "hosts": ["googletagmanager.com", "google-analytics.com"],
+      "code": [
+        "gtag\\/js\\?id=",
+        "@next\\/third-parties\\/google",
+        "react-ga4?\\b"
+      ]
+    },
+    {
+      "id": "tiktok",
+      "category": "pixel",
+      "hosts": ["analytics.tiktok.com"],
+      "code": ["\\bttq\\.load\\("]
+    },
+    {
+      "id": "snap",
+      "category": "pixel",
+      "hosts": ["sc-static.net"],
+      "code": ["\\bsnaptr\\("]
+    },
+    {
+      "id": "linkedin",
+      "category": "pixel",
+      "hosts": ["snap.licdn.com", "px.ads.linkedin.com"],
+      "code": ["_linkedin_partner_id"]
+    },
+    {
+      "id": "pinterest",
+      "category": "pixel",
+      "hosts": ["s.pinimg.com/ct", "ct.pinterest.com"],
+      "code": ["\\bpintrk\\("]
+    },
+    {
+      "id": "x-ads",
+      "category": "pixel",
+      "hosts": ["static.ads-twitter.com"],
+      "code": ["\\btwq\\("]
+    },
+    {
+      "id": "reddit",
+      "category": "pixel",
+      "hosts": ["redditstatic.com/ads"],
+      "code": ["\\brdt\\(\\s*['\"]init"]
+    },
+    {
+      "id": "instantly-leadsy",
+      "category": "pixel",
+      "hosts": ["leadsy.ai", "trovo-tag.com", "ddwl4m2hdecbv.cloudfront.net"],
+      "code": []
+    },
+    {
+      "id": "rb2b",
+      "category": "pixel",
+      "hosts": ["rb2b.com"],
+      "code": []
+    },
+    {
+      "id": "hotjar",
+      "category": "replay",
+      "hosts": ["static.hotjar.com"],
+      "code": ["@hotjar\\/browser"]
+    },
+    {
+      "id": "clarity",
+      "category": "replay",
+      "hosts": ["clarity.ms"],
+      "code": ["@microsoft\\/clarity"]
+    },
+    {
+      "id": "fullstory",
+      "category": "replay",
+      "hosts": ["fullstory.com"],
+      "code": ["@fullstory\\/browser"]
+    },
+    {
+      "id": "logrocket",
+      "category": "replay",
+      "hosts": ["cdn.logrocket.io", "cdn.lr-ingest.io"],
+      "code": ["from ['\"]logrocket['\"]"]
+    },
+    {
+      "id": "sentry-replay",
+      "category": "replay",
+      "hosts": [],
+      "code": ["\\breplayIntegration\\(", "@sentry\\/replay"]
+    },
+    {
+      "id": "posthog",
+      "category": "analytics",
+      "hosts": ["posthog.com"],
+      "code": ["posthog-js"]
+    },
+    {
+      "id": "statsig-replay",
+      "category": "replay",
+      "hosts": [],
+      "code": [
+        "@statsig\\/session-replay",
+        "StatsigSessionReplayPlugin",
+        "StatsigAutoCapturePlugin"
+      ]
+    },
+    {
+      "id": "mixpanel",
+      "category": "analytics",
+      "hosts": ["cdn.mxpnl.com", "api-js.mixpanel.com"],
+      "code": ["mixpanel-browser"]
+    },
+    {
+      "id": "segment",
+      "category": "analytics",
+      "hosts": ["cdn.segment.com"],
+      "code": ["@segment\\/analytics-next"]
+    },
+    {
+      "id": "amplitude",
+      "category": "analytics",
+      "hosts": ["cdn.amplitude.com"],
+      "code": ["@amplitude\\/analytics-browser"]
+    },
+    {
+      "id": "intercom",
+      "category": "chat-widget",
+      "hosts": ["widget.intercom.io"],
+      "code": ["@intercom\\/messenger-js-sdk", "react-use-intercom"]
+    },
+    {
+      "id": "crisp",
+      "category": "chat-widget",
+      "hosts": ["client.crisp.chat"],
+      "code": ["crisp-sdk-web"]
+    },
+    {
+      "id": "drift",
+      "category": "chat-widget",
+      "hosts": ["js.driftt.com"],
+      "code": []
+    },
+    {
+      "id": "zendesk-widget",
+      "category": "chat-widget",
+      "hosts": ["static.zdassets.com"],
+      "code": []
+    }
+  ],
+  "banned_claims": [
+    "we (do not|don't|never) track you",
+    "no third[- ]party tracking scripts",
+    "we never share (your )?(data|information|personal)"
+  ]
+}

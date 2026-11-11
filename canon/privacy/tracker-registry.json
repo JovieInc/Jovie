@@ -107,7 +107,17 @@
       "approved": "2026-10-31",
       "approved_by": "pre-existing",
       "allowed_on_input_pages": true,
-      "rationale": "Error reporting only. Session Replay is off in production (client-full.ts enableReplay defaults to development). Turning Replay on is a separate replay-category entry and is banned on input pages."
+      "rationale": "Error reporting. Session Replay is the separate vendor sentry-replay (masked text and inputs, media blocked, no request bodies). This processor entry stays first so a sentry.io load keeps the existing input-page exception."
+    },
+    {
+      "id": "sentry-replay",
+      "category": "replay",
+      "products": ["jovie"],
+      "hosts": ["sentry.io"],
+      "status": "live",
+      "approved": "2026-11-11",
+      "approved_by": "existing production replay path (client-full.ts)",
+      "rationale": "Sentry Session Replay initializes from apps/web/lib/sentry/client-full.ts. Text and inputs are masked, media is blocked, and request bodies are not captured. Production dashboard routes use the shared session sample rate. Activation routes buffer and send only through the monthly cap in signup-replay.server.ts. Do not add a second replay SDK."
     },
     {
       "id": "statsig",

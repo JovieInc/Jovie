@@ -250,7 +250,7 @@ export const SOURCE_GUARDS = Object.freeze([
     command:
       'node --test --test-isolation=none scripts/compliance/privacy-rules.test.mjs',
     inputs:
-      /^(?:apps\/web\/app\/|apps\/web\/components\/features\/tracking\/|apps\/web\/content\/legal\/|canon\/privacy\/|scripts\/compliance\/|scripts\/ci-fast-lanes\.mjs$)/u,
+      /^(?:apps\/web\/app\/|apps\/web\/components\/features\/tracking\/|apps\/web\/content\/legal\/|apps\/web\/lib\/(?:ingestion\/strategies\/linktree|sentry)\/|canon\/privacy\/|scripts\/compliance\/|\.github\/workflows\/company-guards\.yml$|scripts\/ci-fast-lanes\.mjs$)/u,
     prOnly: false,
   }),
   Object.freeze({

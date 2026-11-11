@@ -32,18 +32,18 @@ const PIXEL_DETECTORS = [
     initPattern: /gtag\s*\(\s*['"]config['"]\s*,\s*['"]([A-Z0-9-]+)['"]/g,
   },
   {
-    // X (Twitter) pixel: twq('init', 'o1234') and twq('config', 'o1234')
+    // X pixel: init or config call carrying a pixel id
     platform: 'twitter' as const,
     initPattern:
       /twq\s*\(\s*['"](?:init|config)['"]\s*,\s*['"]([a-z0-9]+)['"]/gi,
   },
   {
-    // Snapchat pixel: snaptr('init', 'xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx')
+    // Snapchat pixel: init call carrying a UUID pixel id
     platform: 'snapchat' as const,
     initPattern: /snaptr\s*\(\s*['"]init['"]\s*,\s*['"]([0-9a-f-]+)['"]/gi,
   },
   {
-    // Pinterest tag: pintrk('load', '2612345678901')
+    // Pinterest tag: load call carrying a numeric tag id
     platform: 'pinterest' as const,
     initPattern: /pintrk\s*\(\s*['"]load['"]\s*,\s*['"](\d+)['"]/g,
   },

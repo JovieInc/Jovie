@@ -10,6 +10,13 @@ import {
   runControls,
   vendorFor,
 } from './privacy-rules.mjs';
+import {
+  approved,
+  compileCatalog,
+  scanFile,
+  scanRepo,
+  selectPaths,
+} from './tracker-signature-scan.mjs';
 
 const registry = JSON.parse(
   readFileSync(
@@ -132,4 +139,52 @@ test('eu: a missing bar fails only where something consent-gated runs', () => {
     ).length,
     0
   );
+});
+
+const catalog = JSON.parse(
+  readFileSync(new URL('./company-trackers.pin.json', import.meta.url), 'utf8')
+);
+const signatures = compileCatalog(catalog);
+
+test('tracker signatures: a comment that quotes a loader call is unapproved', () => {
+  const hits = scanFile(
+    'apps/web/lib/ingestion/strategies/linktree/config.ts',
+    ' * records ttq.load() for a creator id\n',
+    signatures,
+    { vendors: [] }
+  );
+  assert.equal(hits.length, 1);
+  assert.equal(hits[0].id, 'tiktok');
+});
+
+test('tracker signatures: tests and stories are not scanned', () => {
+  assert.deepEqual(
+    selectPaths([
+      'apps/web/tests/unit/pixels.test.ts',
+      'apps/web/lib/ingestion/strategies/linktree/config.ts',
+    ]),
+    ['apps/web/lib/ingestion/strategies/linktree/config.ts']
+  );
+});
+
+test('tracker signatures: the session replay call is approved by vendor id', () => {
+  const source = 'clientSentry.replayIntegration({ maskAllText: true })\n';
+  const path = 'apps/web/lib/sentry/client-full.ts';
+  assert.equal(scanFile(path, source, signatures, { vendors: [] }).length, 1);
+  const replay = registry.vendors.find(vendor => vendor.id === 'sentry-replay');
+  assert.equal(
+    approved(
+      signatures.find(sig => sig.id === 'sentry-replay'),
+      registry
+    ),
+    true
+  );
+  assert.deepEqual(scanFile(path, source, signatures, registry), []);
+  assert.equal(replay.category, 'replay');
+  assert.ok(replay.rationale && replay.hosts.length);
+  assert.equal(vendorFor('sentry.io', registry)?.id, 'sentry');
+});
+
+test('tracker signatures: this repo has no unapproved company-catalog hit', () => {
+  assert.deepEqual(scanRepo(), []);
 });
