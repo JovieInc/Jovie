@@ -9,6 +9,7 @@ import { tmpdir } from 'node:os';
 import { delimiter, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
+
 import {
   ADVISORY_CHECK_NAMES,
   AGENT_BRANCH_RE,
@@ -23,6 +24,16 @@ import {
   MERGE_GATE_CHECK_NAMES,
   normalizeCheckName,
 } from '../pr-check-failures.mjs';
+
+// All-green required contexts; classifyQueueCheckBlockers derives its required
+// set from REQUIRED_MERGE_STATUSES, so every green-head fixture carries all five.
+const REQUIRED_GREEN = Object.freeze([
+  { bucket: 'pass', state: 'SUCCESS', name: 'PR Ready' },
+  { bucket: 'pass', state: 'SUCCESS', name: 'Migration Guard' },
+  { bucket: 'pass', state: 'SUCCESS', name: 'Fork PR Gate' },
+  { bucket: 'pass', state: 'SUCCESS', name: 'PR Size Guard' },
+  { bucket: 'pass', state: 'SUCCESS', name: 'Company guards' },
+]);
 
 const repoRoot = fileURLToPath(new URL('../../..', import.meta.url));
 
@@ -70,12 +81,7 @@ describe('pr-check-failures', () => {
   });
 
   it('keeps fleet-queue-hold receipts out of product gate classification', () => {
-    const required = [
-      { bucket: 'pass', state: 'SUCCESS', name: 'PR Ready' },
-      { bucket: 'pass', state: 'SUCCESS', name: 'Migration Guard' },
-      { bucket: 'pass', state: 'SUCCESS', name: 'Fork PR Gate' },
-      { bucket: 'pass', state: 'SUCCESS', name: 'PR Size Guard' },
-    ];
+    const required = REQUIRED_GREEN;
     expect(
       classifyQueueCheckBlockers([
         ...required,
@@ -94,12 +100,7 @@ describe('pr-check-failures', () => {
   });
 
   it('keeps failed merge-queue controller receipts out of product gate classification', () => {
-    const required = [
-      { bucket: 'pass', state: 'SUCCESS', name: 'PR Ready' },
-      { bucket: 'pass', state: 'SUCCESS', name: 'Migration Guard' },
-      { bucket: 'pass', state: 'SUCCESS', name: 'Fork PR Gate' },
-      { bucket: 'pass', state: 'SUCCESS', name: 'PR Size Guard' },
-    ];
+    const required = REQUIRED_GREEN;
     const controllerFailure = {
       bucket: 'fail',
       state: 'FAILURE',
@@ -122,12 +123,7 @@ describe('pr-check-failures', () => {
   });
 
   it('keeps failed fleet-refresh receipts out of product gate classification', () => {
-    const required = [
-      { bucket: 'pass', state: 'SUCCESS', name: 'PR Ready' },
-      { bucket: 'pass', state: 'SUCCESS', name: 'Migration Guard' },
-      { bucket: 'pass', state: 'SUCCESS', name: 'Fork PR Gate' },
-      { bucket: 'pass', state: 'SUCCESS', name: 'PR Size Guard' },
-    ];
+    const required = REQUIRED_GREEN;
     const fleetRefreshFailure = {
       bucket: 'fail',
       state: 'FAILURE',
@@ -150,16 +146,7 @@ describe('pr-check-failures', () => {
   });
 
   describe('ownerless recovery workflow admission', () => {
-    const required = [
-      'PR Ready',
-      'Migration Guard',
-      'Fork PR Gate',
-      'PR Size Guard',
-    ].map(name => ({
-      name,
-      bucket: 'pass',
-      state: 'SUCCESS',
-    }));
+    const required = REQUIRED_GREEN;
     const sweep = {
       name: 'sweep',
       workflow: 'Ownerless Recovery Sweep',
@@ -321,12 +308,7 @@ describe('pr-check-failures', () => {
   });
 
   it('treats a red Fork PR Gate Controller receipt with SKIPPED twin as advisory (JOV-4782)', () => {
-    const required = [
-      { bucket: 'pass', state: 'SUCCESS', name: 'PR Ready' },
-      { bucket: 'pass', state: 'SUCCESS', name: 'Migration Guard' },
-      { bucket: 'pass', state: 'SUCCESS', name: 'Fork PR Gate' },
-      { bucket: 'pass', state: 'SUCCESS', name: 'PR Size Guard' },
-    ];
+    const required = REQUIRED_GREEN;
     // pull_request-event run fails at create-github-app-token (no
     // JOVIE_BOT_PRIVATE_KEY); pull_request_target run of the same job is
     // SKIPPED for non-fork heads. The red controller receipt must not block
@@ -362,6 +344,7 @@ describe('pr-check-failures', () => {
         { bucket: 'pass', state: 'SUCCESS', name: 'Migration Guard' },
         { bucket: 'fail', state: 'FAILURE', name: 'Fork PR Gate' },
         { bucket: 'pass', state: 'SUCCESS', name: 'PR Size Guard' },
+        { bucket: 'pass', state: 'SUCCESS', name: 'Company guards' },
         ...controllerReceipts,
       ])
     ).toEqual(['Fork PR Gate', 'Fork PR Gate (not successful)']);
@@ -449,10 +432,7 @@ describe('pr-check-failures', () => {
 
   it('blocks pending and missing required or canonical gates', () => {
     const checks = [
-      { bucket: 'pass', state: 'SUCCESS', name: 'PR Ready' },
-      { bucket: 'pass', state: 'SUCCESS', name: 'Migration Guard' },
-      { bucket: 'pass', state: 'SUCCESS', name: 'Fork PR Gate' },
-      { bucket: 'pass', state: 'SUCCESS', name: 'PR Size Guard' },
+      ...REQUIRED_GREEN,
       {
         bucket: 'pending',
         state: 'IN_PROGRESS',
@@ -470,10 +450,7 @@ describe('pr-check-failures', () => {
 
   it('keeps opt-in Extended Smoke outside queue readiness', () => {
     const checks = [
-      { bucket: 'pass', state: 'SUCCESS', name: 'PR Ready' },
-      { bucket: 'pass', state: 'SUCCESS', name: 'Migration Guard' },
-      { bucket: 'pass', state: 'SUCCESS', name: 'Fork PR Gate' },
-      { bucket: 'pass', state: 'SUCCESS', name: 'PR Size Guard' },
+      ...REQUIRED_GREEN,
       {
         bucket: 'pending',
         state: 'IN_PROGRESS',
@@ -490,12 +467,7 @@ describe('pr-check-failures', () => {
   });
 
   it('fails closed on every unknown or non-advisory terminal red check', () => {
-    const required = [
-      { bucket: 'pass', state: 'SUCCESS', name: 'PR Ready' },
-      { bucket: 'pass', state: 'SUCCESS', name: 'Migration Guard' },
-      { bucket: 'pass', state: 'SUCCESS', name: 'Fork PR Gate' },
-      { bucket: 'pass', state: 'SUCCESS', name: 'PR Size Guard' },
-    ];
+    const required = REQUIRED_GREEN;
 
     expect(
       classifyQueueCheckBlockers([
@@ -508,12 +480,7 @@ describe('pr-check-failures', () => {
   });
 
   it('duplicate SKIPPED checks with equal timestamps do not block enrollment', () => {
-    const required = [
-      { bucket: 'pass', state: 'SUCCESS', name: 'PR Ready' },
-      { bucket: 'pass', state: 'SUCCESS', name: 'Migration Guard' },
-      { bucket: 'pass', state: 'SUCCESS', name: 'Fork PR Gate' },
-      { bucket: 'pass', state: 'SUCCESS', name: 'PR Size Guard' },
-    ];
+    const required = REQUIRED_GREEN;
     const skippedDupes = [
       {
         bucket: 'skipping',
@@ -553,12 +520,7 @@ describe('pr-check-failures', () => {
   });
 
   it('uses only the uniquely newest same-name check attempt', () => {
-    const required = [
-      { bucket: 'pass', state: 'SUCCESS', name: 'PR Ready' },
-      { bucket: 'pass', state: 'SUCCESS', name: 'Migration Guard' },
-      { bucket: 'pass', state: 'SUCCESS', name: 'Fork PR Gate' },
-      { bucket: 'pass', state: 'SUCCESS', name: 'PR Size Guard' },
-    ];
+    const required = REQUIRED_GREEN;
     const oldFailure = {
       bucket: 'fail',
       state: 'FAILURE',

@@ -42,6 +42,8 @@ describe('homepage v3 product UI', () => {
       screen.getByText(HOMEPAGE_PRODUCT_UI.inspector.upc)
     ).toBeInTheDocument();
     expect(container.querySelector('[data-hv3-anchor="upc"]')).not.toBeNull();
+    expect(screen.getByText('Example artist')).toBeInTheDocument();
+    expect(container.querySelector('.hv3-insp__ok')).toBeNull();
   });
 
   it('anchors the connector on the selected catalog row only', () => {
@@ -49,7 +51,7 @@ describe('homepage v3 product UI', () => {
     const anchors = container.querySelectorAll('[data-hv3-anchor]');
     expect(
       [...anchors].map(anchor => anchor.getAttribute('data-hv3-anchor'))
-    ).toEqual(['rowR', 'row']);
+    ).toEqual(['rowR']);
     expect(anchors[0]?.closest('.hv3-rrow')).toHaveTextContent(
       HOMEPAGE_PRODUCT_UI.inspector.title
     );

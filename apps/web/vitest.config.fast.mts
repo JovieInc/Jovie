@@ -79,6 +79,29 @@ const environmentProjects: TestProjectInlineConfiguration[] = [
   },
 ];
 
+// Merge-time pilot (Nov 2026): VITEST_ISOLATE=false opts a single CI shard into
+// shared-worker mode (isolate: false). The default — and every unset/other-value
+// environment — keeps per-file isolation. With isolation off, every test file in
+// a fork shares one module registry, so each test file MUST unwind its own
+// global state: restore spies, unstub env/globals, use real timers, and not leak
+// DOM/storage/global singletons. Rollback = unset VITEST_ISOLATE (or revert).
+//
+// The RESOLVED setting is authoritative: a CLI --isolate/--no-isolate flag wins
+// over the env string, so the resolved value is computed here and injected into
+// test.env as VITEST_ISOLATION_OFF for the setup file to gate on — the raw env
+// string can never desync from what Vitest actually does.
+const cliIsolateFlag = (() => {
+  for (const arg of process.argv) {
+    if (arg === '--no-isolate') return false;
+    if (arg === '--isolate') return true;
+    if (arg.startsWith('--isolate=')) {
+      return arg.slice('--isolate='.length) !== 'false';
+    }
+  }
+  return null;
+})();
+const isolate = cliIsolateFlag ?? process.env.VITEST_ISOLATE !== 'false';
+
 // Detect CI environment
 const isCI = process.env.CI === 'true';
 const isChangedRun = process.argv.includes('--changed');
@@ -184,6 +207,10 @@ export default defineConfig({
       URL_ENCRYPTION_KEY: 'test-encryption-key-32-chars!!',
       // Ensure tests run in test mode
       NODE_ENV: 'test',
+      // Merge-time pilot: the setup file gates its isolate-off unwind on the
+      // RESOLVED isolation setting, injected here so the raw VITEST_ISOLATE
+      // string (or a CLI override) cannot desync from actual behavior.
+      ...(isolate ? {} : { VITEST_ISOLATION_OFF: 'true' }),
     },
 
     // Exclude slow test categories
@@ -217,9 +244,10 @@ export default defineConfig({
     ],
 
     // Performance optimizations
-    // Use forks for better memory isolation (Vitest 4 style)
+    // Use forks for better memory isolation (Vitest 4 style).
+    // isolate is VITEST_ISOLATE-gated: see the comment at the top of the file.
     pool: 'forks',
-    isolate: true,
+    isolate,
     singleFork: isChangedRun && !isCoverageRun,
     // CI stability: reduce memory pressure. Exact-head coverage is a single
     // merge-queue job and must use the runner instead of the serial changed

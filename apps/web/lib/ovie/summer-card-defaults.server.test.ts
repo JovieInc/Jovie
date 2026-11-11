@@ -116,6 +116,7 @@ describe('summer card default-plus-deadline contract', () => {
     expect(summerCardDecisionContract(taste, FILED)).toEqual({
       decideBy: '2026-10-22T12:00:00.000Z',
       defaultDecision: 'approve',
+      policyDefaultIfSilent: null,
     });
     const undeclared = summerCardInputSchema.parse({
       ...tasteInput,
@@ -188,6 +189,79 @@ describe('summer card default-plus-deadline contract', () => {
         feedback: [],
       },
     });
+  });
+
+  it('lets risk and confidence set the deadline and default', async () => {
+    const declared = (overrides: Record<string, unknown>) =>
+      summerCardInputSchema.parse({
+        ...tasteInput,
+        defaultDecision: undefined,
+        defaultIfSilent: undefined,
+        ...overrides,
+      });
+    const lowSure = declared({ risk: 'low', confidence: 'high' });
+    expect(summerCardDecisionContract(lowSure, FILED)).toMatchObject({
+      decideBy: FILED.toISOString(),
+      defaultDecision: 'approve',
+    });
+    expect(
+      summerCardDecisionContract(
+        declared({ risk: 'high', confidence: 'low' }),
+        FILED
+      ).defaultDecision
+    ).toBe('reject');
+    hoisted.insertReturning.mockResolvedValue([{ key: 'k' }]);
+    const unsure = declared({ risk: 'low', confidence: 'low' });
+    await expect(submitSummerCard(unsure, FILED)).resolves.toMatchObject({
+      card: {
+        decideBy: '2026-10-22T12:00:00.000Z',
+        defaultDecision: 'approve',
+        defaultIfSilent: 'Ships in 48 hours unless you reject it.',
+      },
+    });
+    expect(summerCardPayloadDigest(unsure)).not.toBe(
+      summerCardPayloadDigest(declared({}))
+    );
+  });
+
+  it('adds no risk or confidence keys to a card that declares neither', () => {
+    // Receipts compare parsed cards deep-equal on replay; a pre-deploy card must still match.
+    expect(Object.keys(taste)).not.toContain('risk');
+    expect(Object.keys(taste)).not.toContain('confidence');
+  });
+
+  it('never lets risk and confidence ship outbound, or mix with a deadline', () => {
+    const outbound = summerCardInputSchema.parse({
+      ...tasteInput,
+      kind: 'outbound',
+      defaultDecision: undefined,
+      defaultIfSilent: undefined,
+      risk: 'low',
+      confidence: 'high',
+    });
+    expect(summerCardDecisionContract(outbound, FILED).defaultDecision).toBe(
+      'reject'
+    );
+    expect(
+      summerCardInputSchema.safeParse({ ...tasteInput, risk: 'low' }).success
+    ).toBe(false);
+    expect(
+      summerCardInputSchema.safeParse({
+        ...tasteInput,
+        risk: 'low',
+        confidence: 'high',
+      }).success
+    ).toBe(false);
+    expect(
+      summerCardInputSchema.safeParse({
+        ...tasteInput,
+        decideBy: undefined,
+        defaultDecision: undefined,
+        defaultIfSilent: 'Ships in 48 hours unless you reject it.',
+        risk: 'low',
+        confidence: 'low',
+      }).success
+    ).toBe(false);
   });
 
   it('reads a legacy card with the default window from filing and a reject default', async () => {
