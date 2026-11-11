@@ -150,7 +150,15 @@
     ],
     "commands": ["scripts/lanes/providers.json", "scripts/lanes/reason.json"],
     "workflows": [".github/workflows", ".github/actions"],
-    "sources": ["scripts/lanes", "scripts/hyperagent", "ops/agents"]
+    "sources": [
+      "scripts/lanes",
+      "scripts/hyperagent",
+      "scripts/swarm",
+      "scripts/apiclient",
+      "scripts/signals",
+      "scripts/capacity",
+      "ops/agents"
+    ]
   },
   "exceptions": [
     {

@@ -585,7 +585,7 @@ export function DesktopAuthHandoffActions({
           {qrSvg ? (
             <div
               aria-label='QR Code With Your Sign-in Link'
-              className='rounded-xl bg-white p-3 dark:bg-white [&_svg]:block'
+              className='rounded-xl bg-on-media p-3 [&_svg]:block'
               // biome-ignore lint/security/noDangerouslySetInnerHtml: generateQrCodeSvg emits a static QR matrix; the auth URL is data, never markup
               dangerouslySetInnerHTML={{ __html: qrSvg }}
               role='img'
