@@ -21,6 +21,22 @@ import {
 
 export const REQUEST_ACCESS_QUESTION_VARIANT = 'request-access/v1' as const;
 
+/**
+ * Canonical Mom Test questions for the role form (Tim, 2026-11-09). Every
+ * scripted question must pass `isLeadingQuestion` — we ask about past
+ * behavior, never "would you pay" enthusiasm.
+ */
+export const MOM_TEST_QUESTIONS = {
+  /** "What's the last thing you did to grow your fans, and how did it go?" */
+  lastGrowthAttempt:
+    "What's the last thing you did to grow your fans, and how did it go?",
+  /** "What do you pay each month to promote your music?" */
+  promoSpend: 'What do you pay each month to promote your music?',
+} as const;
+
+export const MOM_TEST_QUESTION_VALUES: readonly string[] =
+  Object.values(MOM_TEST_QUESTIONS);
+
 /** Past spend on promotion, one tap. Never a "would you pay" question. */
 export const PROMO_SPEND_BANDS = ['none', 'under_50', '50_plus'] as const;
 export type PromoSpendBand = (typeof PROMO_SPEND_BANDS)[number];

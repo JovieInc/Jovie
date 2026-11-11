@@ -65,6 +65,13 @@ export const waitlistEntries = pgTable(
     rejectedAt: timestamp('rejected_at'),
     expiredAt: timestamp('expired_at'),
     blockedAt: timestamp('blocked_at'),
+    // Mom Test funnel decision (qualify/2026-11-v1). `decisionReason` is a
+    // short machine code (hold_* / disqualified_* / needs_evidence:*), never
+    // free text; the person's words live in capability_wants.
+    decisionReason: text('decision_reason'),
+    decisionRuleVersion: text('decision_rule_version'),
+    decidedAt: timestamp('decided_at'),
+    decidedBy: text('decided_by'),
     adminActorId: text('admin_actor_id'),
     primarySocialFollowerCount: integer('primary_social_follower_count'),
     createdAt: timestamp('created_at').defaultNow().notNull(),
@@ -176,6 +183,33 @@ export const waitlistSettings = pgTable(
 // Schema validations
 export const insertWaitlistEntrySchema = createInsertSchema(waitlistEntries);
 export const selectWaitlistEntrySchema = createSelectSchema(waitlistEntries);
+// What a person said they want, objected to, or already uses, captured at the
+// decision point in their words (JOV-6655). Evidence pointer (`sourceTurnId`)
+// references a canonical turn id — never a raw transcript.
+export const capabilityWants = pgTable(
+  'capability_wants',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    waitlistEntryId: uuid('waitlist_entry_id')
+      .notNull()
+      .references(() => waitlistEntries.id, { onDelete: 'cascade' }),
+    kind: text('kind').notNull(),
+    text: text('text').notNull(),
+    capabilityKey: text('capability_key'),
+    source: text('source').notNull(),
+    sourceTurnId: text('source_turn_id'),
+    questionVariant: text('question_variant'),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+  },
+  table => ({
+    entryCreatedAtIndex: index('idx_capability_wants_entry_created_at').on(
+      table.waitlistEntryId,
+      table.createdAt
+    ),
+    kindIndex: index('idx_capability_wants_kind').on(table.kind),
+  })
+);
+
 export const insertWaitlistAuditLogSchema =
   createInsertSchema(waitlistAuditLogs);
 export const selectWaitlistAuditLogSchema =
@@ -197,3 +231,5 @@ export type NewWaitlistAuditLog = typeof waitlistAuditLogs.$inferInsert;
 export type WaitlistInvite = typeof waitlistInvites.$inferSelect;
 export type NewWaitlistInvite = typeof waitlistInvites.$inferInsert;
 export type WaitlistSettings = typeof waitlistSettings.$inferSelect;
+export type CapabilityWant = typeof capabilityWants.$inferSelect;
+export type NewCapabilityWant = typeof capabilityWants.$inferInsert;

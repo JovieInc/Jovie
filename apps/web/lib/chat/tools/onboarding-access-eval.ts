@@ -24,6 +24,7 @@ import {
   getDisplaySpotifyFollowers,
   normalizeArtistMetrics,
 } from '@/lib/onboarding/canonical-metrics';
+import { decideQualification } from '@/lib/waitlist/decision';
 import {
   decideGoldenPathAdmission,
   type GoldenPathAdmissionReason,
@@ -179,13 +180,26 @@ export function evaluateAccessSignal(
     };
   }
 
-  // 3. Turn cap reached — force decision into waitlist. Self-reported audience
-  //    size never grants access on its own (JOV-7144): it is unverified.
+  // 3. Turn cap reached — run the qualification decision on what was captured
+  //    (Tim 2026-11-09): never a silent default waitlist. Self-reported
+  //    audience size never grants access on its own (JOV-7144): it is
+  //    unverified. At the cap the decision can only land queued (our turn
+  //    budget, needs stored) or disqualified — never `waitlisted` directly.
   if (turnCount >= MAX_INTERVIEW_TURNS_BEFORE_FORCE) {
+    const capDecision = decideQualification({
+      receipt,
+      answers: toQualificationInput(signal).answers,
+      turnCapReached: true,
+    });
     return {
+      // User-facing kind stays `waitlist` (no disqualified card exists); the
+      // durable decision rides the rationale into the persisted record.
       kind: 'waitlist',
-      rationale: `max_turns_reached_${turnCount}`,
-      score: 30,
+      rationale:
+        capDecision.outcome === 'disqualified'
+          ? capDecision.reason
+          : `queued_${capDecision.reason}`,
+      score: capDecision.outcome === 'disqualified' ? 20 : 30,
       qualification,
     };
   }
