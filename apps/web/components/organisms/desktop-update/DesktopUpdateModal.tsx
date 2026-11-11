@@ -1,6 +1,6 @@
 'use client';
 
-import { Button, LoadingSkeleton, ProgressBar } from '@jovie/ui';
+import { Button, LoadingSkeleton, UpdatingScreen } from '@jovie/ui';
 import { useEffect, useState } from 'react';
 import {
   Dialog,
@@ -9,6 +9,7 @@ import {
   DialogDescription,
   DialogTitle,
 } from '@/components/organisms/Dialog';
+import { APP_ROUTES } from '@/constants/routes';
 import { DESKTOP_UPDATE_COPY } from '@/data/supportDesktopUpdateCopy';
 import type { DesktopUpdatePhase } from '@/lib/desktop/desktop-updates';
 
@@ -100,6 +101,55 @@ export function DesktopUpdateModalView({
             ? COPY.errorDescription
             : COPY.errorFinalDescription;
 
+  if (state.state === 'downloading') {
+    return (
+      <Dialog open={open} onClose={onLater} size='sm'>
+        <UpdatingScreen
+          layout='embedded'
+          title={
+            <DialogTitle className='text-center text-lg'>{title}</DialogTitle>
+          }
+          description={
+            <DialogDescription className='text-center'>
+              {description}
+            </DialogDescription>
+          }
+          progress={state.totalBytes > 0 ? state.percent : undefined}
+          progressLabel={COPY.progressLabel}
+          details={
+            <div className='flex flex-wrap items-center justify-center gap-x-3 gap-y-1'>
+              {state.totalBytes > 0 ? (
+                <span className='tabular-nums'>
+                  {COPY.transferred(
+                    formatDownloadSize(state.transferredBytes),
+                    formatDownloadSize(state.totalBytes)
+                  )}
+                </span>
+              ) : null}
+              {state.bytesPerSecond > 0 ? (
+                <span className='tabular-nums'>
+                  {COPY.speed(formatDownloadSize(state.bytesPerSecond))}
+                </span>
+              ) : null}
+            </div>
+          }
+          actions={
+            <>
+              <Button variant='secondary' onClick={onLater} autoFocus>
+                {COPY.hideAction}
+              </Button>
+              <Button variant='ghost' asChild>
+                <a href={APP_ROUTES.DOWNLOAD} target='_blank' rel='noreferrer'>
+                  {COPY.manualDownloadAction}
+                </a>
+              </Button>
+            </>
+          }
+        />
+      </Dialog>
+    );
+  }
+
   return (
     <Dialog open={open} onClose={onLater} size='sm'>
       <DialogTitle>{title}</DialogTitle>
@@ -155,30 +205,9 @@ export function DesktopUpdateModalView({
         </DialogBody>
       ) : null}
 
-      {state.state === 'downloading' ? (
-        <DialogBody className='space-y-1.5'>
-          <ProgressBar value={state.percent} aria-label={COPY.progressLabel} />
-          <div className='flex items-center justify-between gap-3 text-2xs tabular-nums text-tertiary-token'>
-            <span>
-              {state.totalBytes > 0
-                ? COPY.transferred(
-                    formatDownloadSize(state.transferredBytes),
-                    formatDownloadSize(state.totalBytes)
-                  )
-                : `${Math.round(state.percent)}%`}
-            </span>
-            {state.bytesPerSecond > 0 ? (
-              <span>
-                {COPY.speed(formatDownloadSize(state.bytesPerSecond))}
-              </span>
-            ) : null}
-          </div>
-        </DialogBody>
-      ) : null}
-
       <DialogActions>
         <Button variant='secondary' onClick={onLater}>
-          {state.state === 'downloading' ? COPY.hideAction : COPY.laterAction}
+          {COPY.laterAction}
         </Button>
         {primary ? (
           // Focus the one primary action so Return confirms it.

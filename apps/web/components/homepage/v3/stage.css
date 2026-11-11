@@ -257,16 +257,18 @@
   left: -0.375rem;
 }
 
+/* The catalog connector ends on the release title: its 4px dot clears the
+   first letter instead of touching it. */
+.hv3-phone--release .hv3-anchor--before {
+  left: -0.75rem;
+}
+
 .hv3-anchor--start {
   left: -2px;
 }
 
 .hv3-anchor--row-end {
   right: 0.5rem;
-}
-
-.hv3-anchor--row-start {
-  left: 0.25rem;
 }
 
 /* ── Callouts: Apple dimension-line style ─────────────────────────── */

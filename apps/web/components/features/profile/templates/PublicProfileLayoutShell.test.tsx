@@ -190,4 +190,18 @@ describe('PublicProfileLayoutShell', () => {
     );
     expect(screen.queryByTestId('desktop-content')).toBeNull();
   });
+
+  it('the build-time flag default and the e2e shipped-build helper agree', async () => {
+    vi.stubEnv('NEXT_PUBLIC_FEATURE_PROFILE_DESKTOP_SURFACE', undefined);
+    const { PROFILE_DESKTOP_SURFACE_ENABLED } = await import(
+      '@/lib/profile/desktop-surface-flag'
+    );
+    const { PROFILE_DESKTOP_SURFACE_SHIPPED } = await import(
+      '@/tests/e2e/utils/profile-desktop-surface'
+    );
+    expect(PROFILE_DESKTOP_SURFACE_ENABLED).toBe(true);
+    expect(PROFILE_DESKTOP_SURFACE_SHIPPED).toBe(
+      PROFILE_DESKTOP_SURFACE_ENABLED
+    );
+  });
 });

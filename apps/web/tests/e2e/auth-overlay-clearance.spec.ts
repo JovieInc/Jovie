@@ -253,6 +253,8 @@ for (const pathname of ['/signin', '/signup']) {
         const controls = startControls(page);
         for (const control of Object.values(controls))
           await expect(control).toBeVisible();
+        // Pen odZZY: the column sits on the blue gradient backdrop.
+        await expect(page.locator('[data-auth-backdrop]')).toHaveCount(1);
         // Pen sizes: 28px pill face inside a 44px tap target.
         const faceBox = await page
           .locator('[data-auth-provider-face]')
