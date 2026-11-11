@@ -412,6 +412,53 @@
     "apps/web/app/desktop-auth/DesktopAuthClient.tsx": {
       "permission-denied": "The handoff has no gated action, role or entitlement input; the detector matched role='img' on the QR tile. A refused Touch ID prompt falls back to the browser method with error copy, which tests/unit/app/desktop-auth-page.test.tsx covers."
     },
+    "apps/web/components/marketing/MarketingContainer.tsx": {
+      "partial": "MarketingContainer holds no data: width picks one of three boxes and children is whatever the caller places; its optional props (bleed, className) are layout and styling flags with defaults, so nothing can be partially present."
+    },
+    "apps/web/components/site/MarketingFooter.tsx": {
+      "permission-denied": "MarketingFooter is the public footer with no gated action or permission input; every visitor sees the same links. The detector matched the word 'locked' in the Pen node comment."
+    },
+    "apps/web/components/site/MarketingFooterControls.tsx": {
+      "empty": "MarketingFooterControls renders the fixed theme toggle and the single supported locale; it renders no collection. The detector matched 'list' in a comment, and enabled={false} renders nothing by route policy, not because data is missing.",
+      "long-content": "MarketingFooterControls takes no text: the only label is the code-owned locale name 'English' from MARKETING_SUPPORTED_LOCALES and the theme toggle's fixed accessible names, so no caller or record can lengthen it."
+    },
+    "apps/web/components/site/theme-toggle/ThemeToggle.tsx": {
+      "empty": "ThemeToggle always offers the same three themes (system, light, dark) and renders no data collection; the detector matched the items-center class.",
+      "long-content": "ThemeToggle shows no caller text: its labels ('Toggle theme', the theme names) are fixed in code and shortcutKey is a single key, so there is nothing that can grow long."
+    },
+    "apps/web/components/features/landing/LandingCTAButton.tsx": {
+      "partial": "LandingCTAButton draws one link from its required href, label, eventName and section; its optional props (variant, className, testId) are styling and test wiring with defaults, so no data can be partially present."
+    },
+    "apps/web/components/homepage/HomepageProfilePhone.tsx": {
+      "permission-denied": "HomepageProfilePhone is a static marketing picture of the demo artist's profile with no gated action or permission input; the detector matched role='img'."
+    },
+    "apps/web/components/homepage/HomepageSpecSections.tsx": {
+      "empty": "HomepageSpecSections cannot receive an empty spec: the content-record schema requires one to twelve sections with the hero first (lib/content-records/marketing-page.ts), and the code default always has all four.",
+      "permission-denied": "HomepageSpecSections renders the public homepage with no gated action or permission input; the detector matched 'locked headline', which is a copy rule, not access control."
+    },
+    "apps/web/components/homepage/v3/Orbit.tsx": {
+      "empty": "Orbit is decorative, aria-hidden geometry: every call site passes a fixed, non-empty literal ring list (homepage chapters, specs moment, home layout footer), so there is no data-driven collection that could be empty."
+    },
+    "apps/web/components/homepage/v3/ProductUi.tsx": {
+      "loading": "ProductUi is a static HTML mirror of Jovie for Mac built from code constants in data/homepageProductUi.ts; it fetches nothing. The detector matched the image loading attribute (eager or lazy).",
+      "empty": "ProductUi's rows come from the code-owned HOMEPAGE_CATALOG and fixed sidebar and inspector lists, which are never empty; no runtime data reaches it.",
+      "partial": "ProductUi takes no data props: AppWindow and CatalogPlate take none and ReleaseInspector takes only an anchor id and an eager flag, so no data can be partially present.",
+      "long-content": "ProductUi has no runtime text input: every string is fixed marketing copy in data/homepageProductUi.ts, reviewed at the approved 1440 and 390 frames, so no caller or record can lengthen it.",
+      "offline": "ProductUi makes no request and holds no live data, so being offline changes nothing it renders; the detector matched the image loading attribute."
+    },
+    "apps/web/components/homepage/v3/SpecsChapter.tsx": {
+      "empty": "SpecsChapter's meter and sheet rows come from the DSP registry and code-owned HOMEPAGE_SPECS_COPY, which are never empty; the chapter takes no props.",
+      "partial": "SpecsChapter takes no props and has no copy slots; its cells are code-owned copy whose optional mono and derived fields are formatting flags, and derived facts read from code constants that are always present.",
+      "long-content": "SpecsChapter has no runtime text input: its headline, rows and captions are fixed copy in data/homepageProductUi.ts and its numbers derive from the DSP registry, so no caller or record can lengthen them."
+    },
+    "apps/web/components/homepage/v3/Surfaces.tsx": {
+      "empty": "ReleasePage lists the fixed RELEASE_PAGE_SERVICES and CommandPaletteCard lists the fixed palette rows from data/homepageProductUi.ts; neither list is data-driven, so neither can be empty.",
+      "partial": "ReleasePage and CommandPaletteCard take no props; Callout's optional side and className are placement and styling flags with defaults, and both palette row shapes (with and without a shortcut) render in CommandPalette, so nothing can be partially present."
+    },
+    "apps/web/components/marketing/MarketingPageShell.tsx": {
+      "partial": "MarketingPageShell holds no data: it wraps children, and its optional props (className, penContractId) are class hooks and a design-diff id with defaults, so nothing can be partially present.",
+      "permission-denied": "MarketingPageShell is a layout wrapper with no gated action or permission input; the detector matched the word 'role' in its comment."
+    },
     "apps/web/components/features/profile/artist-notifications-cta/BirthdayInput.tsx": {
       "long-content": "BirthdayInput always renders exactly eight single-digit boxes (MM/DD/YYYY) under fixed Month, Day and Year labels; it takes no caller text, and useSegmentedInput strips non-digits and drops anything past the eighth digit, which BirthdayInput.test.tsx covers, so nothing can grow.",
       "offline": "BirthdayInput never fetches or submits; onSubmit is a callback fired on Enter and the notifications flow that owns it saves the birthday and reports connectivity. The detector matched onSubmit."
