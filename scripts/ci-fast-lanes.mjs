@@ -440,8 +440,6 @@ export const SOURCE_GUARDS = Object.freeze([
     // date without controlling the clock fails (44 merge groups on 2026-11-10).
     // Also runs hermetic-ci-guard: live network, unpinned tools, floating runner images,
     // unprovisioned toolchains, shared temp state and unseeded randomness (.claude/rules/hermetic-ci.md).
-    // Also runs the model-pool guard: an Anthropic model routed through the Vercel AI Gateway or a
-    // metered API key in lane config, registries or workflows fails (scripts/lanes/model-pools.json).
     command: `node ${shellQuote(fileURLToPath(new URL('./external-api-guard.mjs', import.meta.url)))} && node ${shellQuote(fileURLToPath(new URL('./model-id-guard.mjs', import.meta.url)))} && node ${shellQuote(fileURLToPath(new URL('./ai-call-guard.mjs', import.meta.url)))} && node ${shellQuote(fileURLToPath(new URL('./subscription-cli-guard.mjs', import.meta.url)))} && node ${shellQuote(fileURLToPath(new URL('./price-literal-guard.mjs', import.meta.url)))} && node ${shellQuote(fileURLToPath(new URL('./wall-clock-test-guard.mjs', import.meta.url)))} && node ${shellQuote(fileURLToPath(new URL('./hermetic-ci-guard.mjs', import.meta.url)))} && python3 ${shellQuote(fileURLToPath(new URL('./lanes/model_pools.py', import.meta.url)))} check`,
     inputs:
       /(?:\.(?:ts|tsx|js|mjs|cjs|mts|cts|py|sh|bash|ya?ml)$|^packages\/api-client\/providers\.json$|^apps\/web\/lib\/email\/stream-registry\.json$|^scripts\/lib\/(?:external-api-guard|mail-send-guard)\.|^scripts\/lib\/subscription-cli-guard\.json$|^scripts\/lib\/(?:price-literal-guard|wall-clock-test-guard|hermetic-ci-guard)\.ratchet\.json$|^scripts\/(?:lanes|hyperagent)\/[^/]+\.json$|^scripts\/backlog-orchestrator\/config\/model-registry\.json$|^ops\/(?:models\/task-registry|registry\/capacity)\.json$|^ops\/agents\/)/u,
@@ -912,9 +910,7 @@ export const LANES_COVERAGE_COMMAND = structuralPythonRegression(
     'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-lanes.coverage" python3 -m coverage report --include="*/scripts/lanes/worktree_pool.py" --fail-under=85',
     'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-lanes.coverage" python3 -m coverage report --include="*/scripts/lanes/dependency_diff.py" --fail-under=95',
     'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-lanes.coverage" python3 -m coverage report --include="*/scripts/lanes/remediation.py" --fail-under=85',
-    'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-lanes.coverage" python3 -m coverage report --include="*/scripts/lanes/model_radar.py" --fail-under=90',
-    'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-lanes.coverage" python3 -m coverage report --include="*/scripts/lanes/model_pools.py" --fail-under=95',
-    'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-lanes.coverage" python3 -m coverage report --include="*/scripts/lanes/model_pool_guard.py" --fail-under=95',
+    'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-lanes.coverage" python3 -m coverage report --include="*/scripts/lanes/model_radar.py" --fail-under=90 && COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-lanes.coverage" python3 -m coverage report --include="*/scripts/lanes/model_pools.py" --fail-under=95 && COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-lanes.coverage" python3 -m coverage report --include="*/scripts/lanes/model_pool_guard.py" --fail-under=95',
   ].join(' && ')
 );
 
