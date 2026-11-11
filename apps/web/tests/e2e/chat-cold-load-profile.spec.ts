@@ -18,10 +18,6 @@ import { waitForHydration } from './utils/smoke-test-utils';
 test.use({ storageState: { cookies: [], origins: [] } });
 
 test('cold chat load prints a source-mapped CPU profile', async ({ page }) => {
-  test.skip(
-    process.env.E2E_USE_TEST_AUTH_BYPASS !== '1',
-    'Requires E2E_USE_TEST_AUTH_BYPASS=1'
-  );
   test.setTimeout(120_000);
   await page.setViewportSize({ width: 1280, height: 800 });
   await setTestAuthBypassSession(page, 'creator-ready', 'e2e-chat-profile');
