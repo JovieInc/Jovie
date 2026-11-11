@@ -4,9 +4,30 @@ import { describe, expect, it, vi } from 'vitest';
 const mocks = vi.hoisted(() => ({
   sendStreamEmail: vi.fn(),
   backend: null as unknown,
+  updates: [] as { set: unknown }[],
+  rows: [] as Record<string, unknown>[],
 }));
 vi.mock('server-only', () => ({}));
-vi.mock('@/lib/db', () => ({ db: {} }));
+vi.mock('@/lib/db', () => {
+  // A select chain that resolves to mocks.rows, and an update that records .set.
+  const chain: Record<string, unknown> = {};
+  for (const step of ['from', 'innerJoin', 'leftJoin', 'where', 'orderBy']) {
+    chain[step] = () => chain;
+  }
+  chain.limit = async () => mocks.rows;
+  return {
+    db: {
+      select: () => chain,
+      update: () => ({
+        set: (set: unknown) => ({
+          where: async () => {
+            mocks.updates.push({ set });
+          },
+        }),
+      }),
+    },
+  };
+});
 vi.mock('@/lib/email/gateway', () => ({
   sendStreamEmail: mocks.sendStreamEmail,
 }));
@@ -30,6 +51,7 @@ import {
   FounderWelcomeBlocked,
 } from '@/lib/founder-welcome/email';
 import { createFounderWelcomeLedger } from '@/lib/founder-welcome/ledger';
+import { markFounderWelcomeSent } from '@/lib/founder-welcome/marker.server';
 import {
   type AdmittedVisitor,
   buildFounderWelcomeCard,
@@ -42,6 +64,7 @@ import {
 import {
   buildFounderWelcomeServerDeps,
   FOUNDER_WELCOME_PAGE_URL,
+  loadAdmittedVisitors,
 } from '@/lib/founder-welcome/server';
 import { memoryRecordBackend } from '@/lib/ovie/mcp/store';
 import { summerCardId } from '@/lib/ovie/summer-card-digest';
@@ -57,6 +80,7 @@ const visitor = (over: Partial<AdmittedVisitor> = {}): AdmittedVisitor => ({
   artistName: 'Sam and the Tides',
   pageUrl: PAGE,
   suppressed: false,
+  alreadyWelcomed: false,
   ...over,
 });
 const alice = visitor();
@@ -107,6 +131,7 @@ function harness(
 ) {
   const store = cardStore();
   const sends: FounderWelcomeSend[] = [];
+  const welcomed: string[] = [];
   const backend = memoryRecordBackend();
   const deps = (): FounderWelcomeDeps => ({
     visitors,
@@ -120,9 +145,12 @@ function harness(
       sends.push(email);
       return { ok: true };
     },
+    async markWelcomed(entryId) {
+      welcomed.push(entryId);
+    },
     ...over,
   });
-  return { store, sends, deps };
+  return { store, sends, welcomed, deps };
 }
 
 describe('founder welcome copy', () => {
@@ -228,7 +256,39 @@ describe('runFounderWelcome', () => {
     expect(h.sends).toHaveLength(1);
     expect(h.sends[0]?.to).toBe(alice.email);
     expect(h.sends[0]?.cardKey).toBe(keyOf(alice));
+    // Stamped where the signup welcome looks, so Alice never gets a second one.
+    expect(h.welcomed).toEqual([alice.entryId]);
     expect(h.sends.some(send => send.to === bob.email)).toBe(false);
+  });
+
+  it('one failing visitor never stops the pass, and a failed stamp retries later', async () => {
+    const h = harness([alice, bob]);
+    await runFounderWelcome(h.deps());
+    h.store.decide(keyOf(alice), 'approved');
+    h.store.decide(keyOf(bob), 'approved');
+    const backend = memoryRecordBackend();
+    const ledger = createFounderWelcomeLedger(backend);
+    const flaky = h.deps();
+    await expect(
+      runFounderWelcome({
+        ...flaky,
+        ledger,
+        async markWelcomed(entryId) {
+          if (entryId === alice.entryId) throw new Error('db down');
+          await flaky.markWelcomed(entryId);
+        },
+      })
+    ).rejects.toThrow('1 visitor(s) failed');
+    // Bob still got his welcome in the same pass.
+    expect(h.sends.map(send => send.to)).toEqual([alice.email, bob.email]);
+    expect(h.welcomed).toEqual([bob.entryId]);
+    // Alice's claim stays in flight, so a run after it goes stale retries her
+    // send under the same idempotency key and stamps her this time.
+    const later = new Date(NOW.getTime() + 16 * 60 * 1000);
+    const retry = await runFounderWelcome({ ...h.deps(), ledger, now: later });
+    expect(retry.sent).toBe(1);
+    expect(h.sends[2]?.idempotencyKey).toBe(h.sends[0]?.idempotencyKey);
+    expect(h.welcomed).toEqual([bob.entryId, alice.entryId]);
   });
 
   it("an approved card for A never unlocks B, even if B's lookup returns it", async () => {
@@ -302,6 +362,7 @@ describe('runFounderWelcome', () => {
     const h = harness([
       alice,
       visitor({ entryId: 'e-suppressed', suppressed: true }),
+      visitor({ entryId: 'e-welcomed', alreadyWelcomed: true }),
       visitor({ entryId: 'e-no-profile', pageUrl: null }),
       visitor({ entryId: 'e-no-artist', artistName: '  ' }),
     ]);
@@ -309,6 +370,7 @@ describe('runFounderWelcome', () => {
     expect(first.cardsFiled).toBe(1);
     expect(first.skipped).toEqual({
       suppressed: 1,
+      already_welcomed: 1,
       no_claimed_profile: 1,
       no_artist_name: 1,
     });
@@ -359,5 +421,47 @@ describe('server deps', () => {
     expect(FOUNDER_WELCOME_PAGE_URL).toBe(
       'https://jov.ie/app/dashboard/profile'
     );
+  });
+
+  it('stamps the shared welcome marker through the domain write', async () => {
+    mocks.updates.length = 0;
+    await buildFounderWelcomeServerDeps([alice], NOW).markWelcomed(
+      alice.entryId
+    );
+    await markFounderWelcomeSent(bob.entryId, NOW);
+    expect(mocks.updates).toEqual([
+      { set: { founderWelcomeSentAt: NOW, updatedAt: NOW } },
+      { set: { founderWelcomeSentAt: NOW, updatedAt: NOW } },
+    ]);
+  });
+
+  it('marks visitors the signup welcome already reached', async () => {
+    const row = {
+      entryId: alice.entryId,
+      email: ` ${alice.email} `,
+      fullName: 'Sam Rivera',
+      spotifyArtistName: 'Sam and the Tides',
+      userName: null,
+      outboundSuppressedAt: null,
+      founderWelcomeSentAt: null,
+      profileId: 'p1',
+      isClaimed: true,
+      displayName: null,
+    };
+    mocks.rows = [
+      row,
+      { ...row, entryId: bob.entryId, founderWelcomeSentAt: NOW },
+      { ...row, entryId: 'e-blank', email: '  ' },
+    ];
+    const visitors = await loadAdmittedVisitors(NOW);
+    expect(visitors.map(v => [v.entryId, v.alreadyWelcomed])).toEqual([
+      [alice.entryId, false],
+      [bob.entryId, true],
+    ]);
+    expect(visitors[0]).toMatchObject({
+      email: alice.email,
+      pageUrl: FOUNDER_WELCOME_PAGE_URL,
+      suppressed: false,
+    });
   });
 });
