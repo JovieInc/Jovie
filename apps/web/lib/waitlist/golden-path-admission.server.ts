@@ -1,6 +1,6 @@
 import 'server-only';
 
-import { and, count, desc, eq, gte, inArray } from 'drizzle-orm';
+import { and, desc, eq, inArray } from 'drizzle-orm';
 import { readCachedAcquisitionEligibility } from '@/lib/acquisition/eligibility.server';
 import {
   isProofBlockingPublication,
@@ -9,7 +9,6 @@ import {
 } from '@/lib/claim/claim-verification';
 import { db } from '@/lib/db';
 import { users } from '@/lib/db/schema/auth';
-import { feedbackItems } from '@/lib/db/schema/feedback';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { waitlistAuditLogs } from '@/lib/db/schema/waitlist';
 import { captureError } from '@/lib/error-tracking';
@@ -24,10 +23,8 @@ import {
   type GoldenPathVerdict,
 } from '@/lib/waitlist/golden-path-admission';
 import { getWaitlistSettings } from '@/lib/waitlist/settings';
-import {
-  decideSupportLoadCapacity,
-  SUPPORT_LOAD_WINDOW_DAYS,
-} from '@/lib/waitlist/support-load-capacity';
+import { countOpenBugReports } from '@/lib/waitlist/support-load.server';
+import { decideSupportLoadCapacity } from '@/lib/waitlist/support-load-capacity';
 
 const THROTTLE_CACHE_MS = 60_000;
 let throttleCache: { open: boolean; expiresAt: number } | null = null;
@@ -64,29 +61,6 @@ async function isLearningsThrottleOpen(now = Date.now()): Promise<boolean> {
 /** Test seam: forget the cached throttle read. */
 export function resetGoldenPathAdmissionCaches(): void {
   throttleCache = null;
-}
-
-/** Open verifiable bug reports in the support window; null when unreadable. */
-async function countOpenBugReports(now = Date.now()): Promise<number | null> {
-  const since = new Date(now - SUPPORT_LOAD_WINDOW_DAYS * 86_400_000);
-  try {
-    const [row] = await db
-      .select({ open: count() })
-      .from(feedbackItems)
-      .where(
-        and(
-          eq(feedbackItems.status, 'pending'),
-          eq(feedbackItems.classification, 'bug_verifiable'),
-          gte(feedbackItems.createdAt, since)
-        )
-      );
-    return row?.open ?? 0;
-  } catch (error) {
-    await captureError('Support load unreadable for admission', error, {
-      route: 'lib/waitlist/golden-path-admission.server',
-    });
-    return null;
-  }
 }
 
 async function readCapacityHold(): Promise<GoldenPathAdmissionReason | null> {
