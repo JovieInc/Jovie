@@ -1,0 +1,40 @@
+{
+  "provenance": "Synthetic regression examples for JOV-12235, not installed-Mac measurements. Source labels match aac92c18; heights and table cells are boundary fixtures.",
+  "baseline": {
+    "machineText": 2,
+    "routeTitle": 1,
+    "buttonHeight": 2,
+    "casing": 1,
+    "emptyColumn": 1
+  },
+  "samples": [
+    {
+      "id": "shell-regression-fixture",
+      "source": "app/app/(shell)/page.tsx; library/library-chat-context.ts; JOV-12235 P1/P6/P7 boundary examples",
+      "visibleText": [
+        "Copy rule: lifestyle_only.",
+        "{\"id\":\"fixture-id\"}",
+        "A human title"
+      ],
+      "route": {
+        "navLabel": "Inbox",
+        "heading": "Home",
+        "documentTitle": "Home | Jovie",
+        "brand": "Jovie"
+      },
+      "buttons": [
+        { "text": "Dismiss", "height": 29 },
+        { "text": "Done", "height": 34 },
+        { "text": "Add", "height": 28 }
+      ],
+      "labels": [
+        { "text": "High priority", "casing": "title" },
+        { "text": "High Priority", "casing": "title" }
+      ],
+      "columns": [
+        { "name": "Rank", "cells": [null, "—", ""] },
+        { "name": "Clicks", "cells": [0, 1, 2] }
+      ]
+    }
+  ]
+}
