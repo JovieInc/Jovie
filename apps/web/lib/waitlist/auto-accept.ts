@@ -128,11 +128,8 @@ export async function runWaitlistAutoAccept(
   const now = options.now ?? new Date();
   const settings = await getWaitlistSettings();
   // Spend the budget the support-load knob allows, not the stored limit.
-  const capacity = await readSupportLoadCapacity(settings.autoAcceptDailyLimit);
-  const capacityRemaining = Math.max(
-    0,
-    capacity.dailyLimit - settings.autoAcceptedToday
-  );
+  const capacity = await readSupportLoadCapacity(settings);
+  const capacityRemaining = capacity.remaining;
 
   if (
     !settings.autoAcceptEnabled ||
@@ -276,7 +273,7 @@ export async function runWaitlistAutoAccept(
               return { outcome: 'skipped' as const };
             }
 
-            const reservation = await tryReserveAutoAcceptSlot(tx);
+            const reservation = await tryReserveAutoAcceptSlot(tx, capacity);
             if (!reservation.shouldAutoAccept) {
               return { outcome: 'capacity_full' as const };
             }

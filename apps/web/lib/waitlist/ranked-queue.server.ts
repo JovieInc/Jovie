@@ -66,9 +66,7 @@ export async function getRankedWaitlistQueue(): Promise<RankedQueue> {
   });
   mapped.sort(compareRankedRows);
   // Show the budget the gate actually spends, after the support-load knob.
-  const effective = await readSupportLoadCapacity(
-    settings.autoAcceptDailyLimit
-  );
+  const effective = await readSupportLoadCapacity(settings);
 
   return {
     rows: mapped,

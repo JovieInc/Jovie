@@ -48,12 +48,17 @@ export async function countOpenBugReports(
   }
 }
 
-/** The daily admission budget after the support-load knob. */
-export async function readSupportLoadCapacity(
-  baseDailyLimit: number
-): Promise<SupportLoadCapacity> {
-  return decideSupportLoadCapacity({
-    baseDailyLimit,
+/** Today's admission budget after the support-load knob. */
+export async function readSupportLoadCapacity(settings: {
+  readonly autoAcceptDailyLimit: number;
+  readonly autoAcceptedToday: number;
+}): Promise<SupportLoadCapacity & { readonly remaining: number }> {
+  const capacity = decideSupportLoadCapacity({
+    baseDailyLimit: settings.autoAcceptDailyLimit,
     openBugReports: await countOpenBugReports(),
   });
+  return {
+    ...capacity,
+    remaining: Math.max(0, capacity.dailyLimit - settings.autoAcceptedToday),
+  };
 }

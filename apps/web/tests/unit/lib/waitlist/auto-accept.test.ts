@@ -16,9 +16,7 @@ const {
   mockIsNotNull,
   mockCountOpenCohortLearnings,
   mockReadCachedAcquisitionEligibility,
-  mockLoad,
 } = vi.hoisted(() => ({
-  mockLoad: vi.fn(async (b: number) => ({ band: 'normal', dailyLimit: b })),
   mockReadCachedAcquisitionEligibility: vi.fn(),
   mockIsNotNull: vi.fn((column: unknown) => ({ op: 'isNotNull', column })),
   mockCountOpenCohortLearnings: vi.fn(),
@@ -113,7 +111,10 @@ vi.mock('@/lib/waitlist/settings', () => ({
 }));
 
 vi.mock('@/lib/waitlist/support-load.server', () => ({
-  readSupportLoadCapacity: mockLoad,
+  readSupportLoadCapacity: async (s: { autoAcceptDailyLimit: number }) => ({
+    dailyLimit: s.autoAcceptDailyLimit,
+    remaining: s.autoAcceptDailyLimit,
+  }),
 }));
 vi.mock('@/lib/waitlist/approval', () => ({
   approveWaitlistEntryInTx: mockApproveWaitlistEntryInTx,

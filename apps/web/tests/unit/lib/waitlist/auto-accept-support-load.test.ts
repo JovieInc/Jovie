@@ -51,7 +51,11 @@ describe('daily auto-accept under support load', () => {
   });
 
   it('pauses the drain while open bug reports hold admission', async () => {
-    mocks.supportLoad.mockResolvedValue({ band: 'hold', dailyLimit: 0 });
+    mocks.supportLoad.mockResolvedValue({
+      band: 'hold',
+      dailyLimit: 0,
+      remaining: 0,
+    });
     expect(await runWaitlistAutoAccept()).toMatchObject({
       approved: 0,
       capacityRemaining: 0,
@@ -62,9 +66,15 @@ describe('daily auto-accept under support load', () => {
   });
 
   it('spends the narrowed budget, not the stored limit', async () => {
-    mocks.supportLoad.mockResolvedValue({ band: 'narrow', dailyLimit: 5 });
+    mocks.supportLoad.mockResolvedValue({
+      band: 'narrow',
+      dailyLimit: 5,
+      remaining: 0,
+    });
     const result = await runWaitlistAutoAccept();
-    expect(mocks.supportLoad).toHaveBeenCalledWith(10);
+    expect(mocks.supportLoad).toHaveBeenCalledWith(
+      expect.objectContaining({ autoAcceptDailyLimit: 10 })
+    );
     expect(result).toMatchObject({ approved: 0, capacityRemaining: 0 });
     expect(result.pausedReason).toBeUndefined();
     expect(mocks.select).not.toHaveBeenCalled();

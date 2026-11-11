@@ -51,8 +51,11 @@ describe('support load reads', () => {
 
   it('reports the effective budget the gate spends', async () => {
     mocks.where.mockResolvedValue([{ open: 5 }]);
-    expect(await readSupportLoadCapacity(10)).toEqual(
-      expect.objectContaining({ band: 'narrow', dailyLimit: 5 })
-    );
+    expect(
+      await readSupportLoadCapacity({
+        autoAcceptDailyLimit: 10,
+        autoAcceptedToday: 2,
+      })
+    ).toEqual({ band: 'narrow', dailyLimit: 5, remaining: 3 });
   });
 });
