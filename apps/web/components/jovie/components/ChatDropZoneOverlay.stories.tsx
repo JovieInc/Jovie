@@ -84,3 +84,45 @@ export const EmptyDrag: Story = {
     pendingFiles: [],
   },
 };
+
+const manyFiles: PendingFile[] = [
+  ...pendingFiles,
+  ...Array.from({ length: 18 }, (_, index): PendingFile => {
+    const kind = (['audio', 'video', 'document', 'archive'] as const)[
+      index % 4
+    ];
+    return {
+      id: `story-many-${index}`,
+      name: `session-take-${index + 1}-with-a-long-descriptive-file-name.${kind}`,
+      size: 180_000_000 + index * 7_500_000,
+      mediaType: 'application/octet-stream',
+      kind,
+      progress: 0,
+      speed: 0,
+      status: 'queued',
+      kindLabel: kind,
+    };
+  }),
+];
+
+/** Twenty files across every kind: the summary and badges wrap, never clip. */
+export const ManyFileKinds: Story = {
+  args: {
+    isDragOver: true,
+    pendingFiles: manyFiles,
+  },
+};
+
+export const RtlDrag: Story = {
+  args: {
+    isDragOver: true,
+    pendingFiles,
+  },
+  decorators: [
+    Story => (
+      <div dir='rtl' className='h-full w-full'>
+        <Story />
+      </div>
+    ),
+  ],
+};

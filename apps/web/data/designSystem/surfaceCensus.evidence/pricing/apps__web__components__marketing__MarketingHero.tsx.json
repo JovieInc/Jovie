@@ -1,0 +1,6 @@
+{
+  "file": "apps/web/components/marketing/MarketingHero.tsx",
+  "sha256": "0c9f7e33991d6df68ea09da7f77f03184fb91a543d0b1432762cf34c7c6a18bd",
+  "at": "2026-11-11T12:36:46.840Z",
+  "ref": "PR 24982: MarketingHero landing default primary CTA href /signup -> /start (PUBLIC_ENTRY_HREF); markup, copy and styles unchanged; pricing page passes no hero CTA, so its render is unchanged; MarketingHero unit tests pass"
+}

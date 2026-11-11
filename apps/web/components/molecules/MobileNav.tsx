@@ -12,7 +12,7 @@ import {
 } from 'react';
 import { createPortal } from 'react-dom';
 import { AnimatedIconSwap } from '@/components/atoms/AnimatedIconSwap';
-import { APP_ROUTES } from '@/constants/routes';
+import { APP_ROUTES, PUBLIC_ENTRY_HREF } from '@/constants/routes';
 import { useAuthSafe } from '@/hooks/useClerkSafe';
 import { useIsAuthenticated } from '@/hooks/useIsAuthenticated';
 import { usePublicPathname } from '@/lib/navigation/use-public-pathname';
@@ -76,7 +76,7 @@ function buildNavLinks(
 function MobileNavCta({
   showAuthenticatedAction,
   close,
-  publicCtaHref = APP_ROUTES.SIGNUP,
+  publicCtaHref = PUBLIC_ENTRY_HREF,
   publicCtaLabel = 'Sign up',
 }: Readonly<{
   showAuthenticatedAction: boolean;
