@@ -765,6 +765,18 @@ nodes:
       - workflow_dispatch
     terminalReceipt: job:produce
     jobCount: 1
+  - name: Merge Group Dead Run Sweep
+    path: .github/workflows/merge-group-dead-run-sweep.yml
+    active: true
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - pull_request_target
+      - workflow_dispatch
+    terminalReceipt: job:sweep
+    jobCount: 1
   - name: Merge Queue Green Enroll
     path: .github/workflows/merge-queue-green-enroll.yml
     active: true
