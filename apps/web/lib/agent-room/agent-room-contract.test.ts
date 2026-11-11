@@ -86,6 +86,16 @@ describe('agent room contract', () => {
       )
     ).toBe('error');
     expect(classifyMessageKind('All checks green')).toBe('message');
+    expect(classifyMessageKind('Rate limited by Linear, retrying at 3')).toBe(
+      'error'
+    );
+    // Talk about limits is not a failure receipt.
+    expect(
+      classifyMessageKind('Raised the Linear rate limit and usage limits doc')
+    ).toBe('message');
+    expect(
+      classifyMessageKind('Shipped it.\nEarlier we reached the usage limit.')
+    ).toBe('message');
     expect(
       roomExcerpt(
         '**Bold** `code` text\n<!-- receipt:v1 {"a":1} -->\n| a | b |\n|---|---|'
@@ -157,6 +167,20 @@ describe('agent room contract', () => {
     expect(view.agents.find(agent => agent.id === 'summer')?.presence).toBe(
       'quiet'
     );
+  });
+
+  it('lets a failure block for a day at most', () => {
+    const stale = event({
+      id: 'old-error',
+      agentId: 'lola',
+      at: '2026-11-09T19:00:00.000Z',
+      kind: 'error',
+    });
+    const view = projectAgentRoom(roster, [stale], NOW);
+    expect(view.agents.find(agent => agent.id === 'lola')?.presence).toBe(
+      'quiet'
+    );
+    expect(view.counts.blocked).toBe(0);
   });
 
   it('decodes stored events strictly', () => {

@@ -120,6 +120,7 @@ export const APP_ROUTES = {
   ADMIN_CREATORS_TOGGLE_VERIFY: '/app/ov/creators/toggle-verify',
   ADMIN_USERS: '/app/ov/users',
   ADMIN_ACTIVITY: '/app/ov/activity',
+  ADMIN_ROOM: '/app/ov/room',
   ADMIN_CAMPAIGNS: '/app/ov/campaigns',
   ADMIN_GROWTH_YC_METRICS: '/app/ov/growth/yc-metrics',
   ADMIN_INVESTORS: '/app/ov/investors',
