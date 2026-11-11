@@ -1004,6 +1004,7 @@ export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
   'scripts/queue-dequeue.test.mjs',
   'scripts/fleet-audit/import-github-audit.test.mjs',
   'scripts/golden-path-walk/latency-gate.test.mjs',
+  'scripts/product-crawl/closed-in-production.test.mjs',
   'scripts/product-crawl/ready-gate.test.mjs',
   'scripts/product-crawl/sample-params.test.mjs',
   'scripts/positioning/positioning.test.mjs',
