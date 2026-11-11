@@ -139,3 +139,30 @@ test('AI review stays advisory: blocking reviewers fail the boundary scan', t =>
   assert.match(flagged[0].signal, /request-changes/);
 });
 
+
+// ---- Trigger budget (audit finding 4): runs start only when work can happen ----
+const workflowYaml = file => /** @type {any} */ (yamlLoad(fs.readFileSync(`.github/workflows/${file}`, 'utf8')));
+
+test('trigger budget: always-skipped hops start no run of their own', () => {
+  // 2026-11-11: these four started ~3,900 runs a week; all but a handful skipped.
+  const guard = workflowYaml('auto-merge-base-guard.yml');
+  assert.deepEqual(guard.on.pull_request_target['branches-ignore'], ['main']);
+  assert.deepEqual(Object.keys(workflowYaml('cheap-fixer.yml').on), ['workflow_call']);
+  const audit = workflowYaml('security-suppression-audit.yml');
+  assert.deepEqual(audit.on.pull_request_review.types, ['edited', 'dismissed']);
+  assert.ok('workflow_call' in audit.on && 'workflow_dispatch' in audit.on);
+  assert.match(audit.concurrency['cancel-in-progress'], /github\.workflow == 'Security Suppression Audit'/);
+  const scrub = workflowYaml('legacy-human-hold-scrub.yml');
+  assert.deepEqual(Object.keys(scrub.on).sort(), ['label', 'push', 'workflow_dispatch']);
+  // Lane Fix Relay already wakes on the events the hosted hops need.
+  const relay = workflowYaml('lane-fix-relay.yml');
+  const ran = relay.on.workflow_run.workflows;
+  for (const name of ['Source Validation', 'CI', 'Changed-Evidence Test Suites']) assert.ok(ran.includes(name), name);
+  assert.equal(relay.jobs['cheap-fix'].uses, './.github/workflows/cheap-fixer.yml');
+  assert.match(relay.jobs['cheap-fix'].if, /vars\.CHEAP_FIXER_MODE == 'shadow'/);
+  assert.match(relay.jobs['cheap-fix'].if, /github\.event\.workflow_run\.conclusion == 'failure'/);
+  assert.deepEqual(relay.on.pull_request_review.types, ['submitted']);
+  assert.equal(relay.jobs['security-suppression-audit'].uses, './.github/workflows/security-suppression-audit.yml');
+  assert.match(relay.jobs['security-suppression-audit'].if, /github\.event\.action == 'submitted'/);
+});
+// ---- end trigger budget ----

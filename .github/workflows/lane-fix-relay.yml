@@ -258,6 +258,34 @@ jobs:
           MODE: relay
         run: python3 scripts/lanes/pr_events.py relay
 
+  # Hosted here, not on their own triggers: this relay already wakes on the
+  # same events, so these calls start no extra run. Their own triggers started
+  # ~3,100 always-skipped runs a week (2026-11-11 audit, JOV finding 4).
+  cheap-fix:
+    name: Cheap Fixer
+    if: >-
+      vars.CHEAP_FIXER_MODE == 'shadow' &&
+      github.event_name == 'workflow_run' &&
+      contains(fromJSON('["Source Validation","CI","Changed-Evidence Test Suites"]'), github.event.workflow_run.name) &&
+      github.event.workflow_run.conclusion == 'failure' &&
+      github.event.workflow_run.event == 'pull_request' &&
+      github.event.workflow_run.pull_requests[0].number != null
+    permissions:
+      contents: read
+    uses: ./.github/workflows/cheap-fixer.yml
+
+  security-suppression-audit:
+    name: Security Suppression Audit
+    # The bot-reviewer filter stays in the called workflow (one copy).
+    if: >-
+      github.event_name == 'pull_request_review' &&
+      github.event.action == 'submitted' &&
+      github.event.pull_request.base.ref == 'main'
+    permissions:
+      contents: read
+      pull-requests: read
+    uses: ./.github/workflows/security-suppression-audit.yml
+
   # JOV-8931: the lane host has no inbound webhook. This job runs on the gem
   # host and drops a wake file; jovie-lanes-wake.path runs fix-now the moment
   # the file appears. The 5-minute lanes timer is only the fallback.
@@ -301,3 +329,4 @@ jobs:
         run: |
           git sparse-checkout disable 2>/dev/null || true
           rm -f .git/info/sparse-checkout
+
