@@ -5,8 +5,11 @@
  * (docs/ON_CALL_PROCESS.md, "Red monitors need an owner"). For every
  * scheduled or post-deploy workflow in canon/automation-registry.jsonl, a red
  * streak of more than MAX_CONSECUTIVE_FAILURES conclusive failures, or a red
- * streak older than MAX_RED_HOURS since the last green run, needs an open
- * incident with a live owner lease in canon/monitor-incidents.jsonl.
+ * streak whose first failure is more than MAX_RED_HOURS old, needs an open
+ * incident with a live owner lease in canon/monitor-incidents.jsonl. The age
+ * counts from the first failure, not the last green: a weekly or daily
+ * monitor's last green is a cadence ago, so its first failure is not yet a
+ * day of red.
  *
  * A lease has the jovie-hold/v1 shape: an owner, an expiry (`until`) and a
  * reason, and lasts no longer than MAX_HOLD_MS (7 days) from `openedAt`, so an
@@ -54,7 +57,8 @@ export function isGatedMonitor(entry) {
  * Red streak from a list of GitHub workflow runs (any order, duplicates
  * allowed). Only success and failure carry a verdict. When no green run is in
  * the list, `lastGreenAt` is null and `greenBefore` is the oldest verdict seen:
- * the last green is no later than that.
+ * the last green is no later than that. `redSince` is the first failure of
+ * the streak in view (a lower bound on how long it has been red).
  */
 export function summarizeRunStreak(runs = []) {
   const seen = new Set();
@@ -79,6 +83,7 @@ export function summarizeRunStreak(runs = []) {
     lastGreenAt: green ? (green.updated_at ?? green.created_at) : null,
     greenBefore:
       green || !conclusive.length ? null : conclusive.at(-1).created_at,
+    redSince: failures.length ? failures.at(-1).created_at : null,
     failingRunIds: failures.slice(0, 5).map(run => run.id),
   };
 }
@@ -147,9 +152,10 @@ export function leaseIsLive(lease, nowMs) {
 export function needsOwner(streak, nowMs) {
   if (!streak || streak.consecutiveFailures === 0) return false;
   if (streak.consecutiveFailures > MAX_CONSECUTIVE_FAILURES) return true;
-  const green = ms(streak.lastGreenAt);
-  // No green in view: the last green is no later than the oldest verdict.
-  const bound = green ?? ms(streak.greenBefore);
+  // Red since the streak's first failure; an older observation without
+  // redSince falls back to the last green (or the oldest verdict in view).
+  const bound =
+    ms(streak.redSince) ?? ms(streak.lastGreenAt) ?? ms(streak.greenBefore);
   return bound === null || nowMs - bound > MAX_RED_HOURS * HOUR_MS;
 }
 
