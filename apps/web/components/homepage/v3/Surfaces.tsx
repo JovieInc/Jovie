@@ -29,7 +29,9 @@ export function ReleasePage() {
       <span className='hv3-rp__art'>
         <Cover src={PAGE.src} size={300} />
       </span>
-      <h4 className='hv3-rp__title text-balance'>
+      {/* A mock page title inside the homepage's labelled product image, not a
+          document heading: keeps the chapter's h2 → h3 outline (axe heading-order). */}
+      <h4 role='none' className='hv3-rp__title text-balance'>
         <Anchor id='title' className='hv3-anchor--before' />
         {PAGE.title}
       </h4>
