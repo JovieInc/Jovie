@@ -38,3 +38,45 @@ export const ThreeServices: Story = {};
 export const OneService: Story = {
   args: { providers: providers.slice(0, 1) },
 };
+
+/** No streaming service for this release: the dial renders nothing. */
+export const EmptyNoServices: Story = {
+  args: { providers: [] },
+};
+
+/** Every major service in the caller's order; the dial scrolls them. */
+export const ManyServices: Story = {
+  args: {
+    providers: [
+      ...providers,
+      { key: 'tidal', label: 'TIDAL', url: 'https://tidal.com' },
+      {
+        key: 'amazon_music',
+        label: 'Amazon Music',
+        url: 'https://music.amazon.com',
+      },
+      {
+        key: 'youtube_music',
+        label: 'YouTube Music',
+        url: 'https://music.youtube.com',
+      },
+      {
+        key: 'soundcloud',
+        label: 'SoundCloud',
+        url: 'https://soundcloud.com',
+      },
+      { key: 'bandcamp', label: 'Bandcamp', url: 'https://bandcamp.com' },
+    ],
+  },
+};
+
+/** The dial inside a right-to-left page. */
+export const Rtl: Story = {
+  decorators: [
+    Story => (
+      <div dir='rtl' lang='ar'>
+        <Story />
+      </div>
+    ),
+  ],
+};
