@@ -658,6 +658,35 @@
     },
     "apps/web/components/molecules/drawer/DrawerButton.tsx": {
       "partial": "DrawerButton holds no data: it forwards its children label and native button props to the shared Button and only maps tone and size (both defaulted) to classes, so nothing can be partially present."
+    },
+    "apps/web/app/[username]/[slug]/PreferredDspRedirect.tsx": {
+      "error": "The redirect returns null in every state; unreadable session storage or Performance API falls through to a single redirect, so there is no failure to draw. PreferredDspRedirect.test.tsx asserts the one redirect when storage throws and an axe-clean page."
+    },
+    "apps/web/app/[username]/[slug]/PreserveSearchRedirect.tsx": {
+      "offline": "It never fetches: it paints the shared SmartLink loading shell (Loading) and hands the hop to location.replace, a full navigation whose offline failure the browser shows on its own error page, outside this component."
+    },
+    "apps/web/components/features/release/SmartLinkLoadingState.tsx": {
+      "empty": "The skeleton draws a fixed five provider rows from a constant key list and takes no props, so there is no collection that can be empty; the detector matched that .map(.",
+      "long-content": "It renders skeleton bars only, with no text from any caller; the detector matched the text-center class, so nothing can overflow.",
+      "offline": "A static skeleton with no fetch or mutation; the route that shows it owns any network failure. The detector matched 'skeleton' in its row keys."
+    },
+    "apps/web/components/organisms/public-surface/PublicSurfaceStage.tsx": {
+      "empty": "The stage holds no data: children is required and is the profile card itself. The detector matched the items-stretch and items-center layout classes.",
+      "partial": "Nothing can be partially present: className and panelClassName are styling and afterPanel is one optional slot, which Default shows absent and WithAfterPanel shows present."
+    },
+    "apps/web/components/features/release/MusicServiceDial.tsx": {
+      "error": "The dial has no failure UI: its only catch skips the localStorage copy of the choice when storage is unavailable, and the cookie still remembers it. MusicServiceDial.test.tsx streams and checks the cookie with storage throwing, with axe."
+    },
+    "apps/web/components/features/alerts/UnpublishedEntityAlerts.tsx": {
+      "offline": "The copy and its fallback never fetch; the alert sign-up it hosts, AlertGrowthLanding, owns the subscribe request and its network error. The detector matched the loading test id on the Suspense fallback (Loading).",
+      "permission-denied": "It is a public opt-in with no gated action or permission input; the detector matched role='status' on the loading fallback."
+    },
+    "apps/web/components/features/profile/PublicProfileFixture.tsx": {
+      "permission-denied": "The fixture is a public profile with no gated action; claimed, owner and unclaimed only change the claim banner (Claimed, Unclaimed). The detector matched role: 'producer' in the release credit."
+    },
+    "apps/web/components/features/release/AlbumArtworkContextMenu.tsx": {
+      "error": "The menu has no error UI: a failed download falls back to opening the artwork URL in a new tab, and AlbumArtworkContextMenu.test.tsx asserts that fallback.",
+      "offline": "An offline download fails like any other and takes the same new-tab fallback, so there is nothing to draw; the menu itself never fetches until a size is picked."
     }
   }
 }
