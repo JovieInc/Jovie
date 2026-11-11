@@ -1,10 +1,20 @@
 import { tool } from 'ai';
 import { z } from 'zod';
 import { chatToolSchema } from '@/lib/chat/strict-schema';
+import { getPlanDisplayName } from '@/lib/entitlements/registry';
 import { CHAT_SKILLS, type ChatSkill, findChatSkill } from './registry';
 
-/** Loads one skill's steps by name. */
-export function createUseSkillTool(skills: readonly ChatSkill[] = CHAT_SKILLS) {
+/**
+ * Loads one skill's steps by name. A `plan: pro` skill answers like a
+ * plan-locked tool for artists without paid chat tools.
+ */
+export function createUseSkillTool(
+  options: {
+    readonly paidPlan?: boolean;
+    readonly skills?: readonly ChatSkill[];
+  } = {}
+) {
+  const skills = options.skills ?? CHAT_SKILLS;
   return tool({
     description:
       'Load the full steps of one Jovie skill before doing work it covers. The skills and when to use each are listed under Skills in your instructions.',
@@ -22,6 +32,15 @@ export function createUseSkillTool(skills: readonly ChatSkill[] = CHAT_SKILLS) {
           success: false as const,
           error: `No skill named "${name}".`,
           available: skills.map(item => item.name),
+        };
+      }
+      if (skill.paidOnly && !options.paidPlan) {
+        const plan = getPlanDisplayName('pro');
+        return {
+          success: false as const,
+          locked: true as const,
+          reason: `The ${skill.name} skill requires the ${plan} plan.`,
+          plan_required: plan,
         };
       }
       return { success: true as const, name: skill.name, steps: skill.body };

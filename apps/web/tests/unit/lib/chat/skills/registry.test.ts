@@ -10,7 +10,10 @@ import { createUseSkillTool } from '@/lib/chat/skills/tools';
 describe('chat skills library', () => {
   it('loads every SKILL.md in the library', () => {
     expect(CHAT_SKILLS.map(skill => skill.name)).toEqual([
+      'canvas-plan',
       'capture-a-skill',
+      'promo-strategy',
+      'related-artists',
       'release-launch',
       'weekly-marketing-plan',
     ]);
@@ -37,7 +40,21 @@ describe('parseSkillFile', () => {
       name: 'fan-thanks',
       description: 'Thank fans after a show.',
       body: '# Fan thanks\nSteps.',
+      paidOnly: false,
     });
+  });
+
+  it('marks plan: pro skills as paid only and rejects other plans', () => {
+    expect(
+      parseSkillFile(
+        '---\nname: ad-plan\ndescription: Plan ads.\nplan: pro\n---\nSteps.'
+      )?.paidOnly
+    ).toBe(true);
+    expect(
+      parseSkillFile(
+        '---\nname: ad-plan\ndescription: Plan ads.\nplan: gold\n---\nSteps.'
+      )
+    ).toBeNull();
   });
 
   it('rejects a file without frontmatter, a bad name or an empty body', () => {
@@ -54,6 +71,7 @@ describe('buildSkillsPromptSection', () => {
     const section = buildSkillsPromptSection();
     expect(section).toContain('## Skills');
     expect(section).toContain('- weekly-marketing-plan: ');
+    expect(section).toContain('- promo-strategy (Pro plan): ');
     expect(section).toContain('requestCapability');
     expect(section).toContain('Never pretend a capability exists');
   });
@@ -80,5 +98,19 @@ describe('useSkill tool', () => {
     const missing = await run({ name: 'nope' }, {});
     expect(missing.success).toBe(false);
     expect(missing.available).toContain('weekly-marketing-plan');
+  });
+
+  it('locks a Pro skill on a free plan and opens it on a paid one', async () => {
+    const runFor = (paidPlan: boolean) =>
+      createUseSkillTool({ paidPlan }).execute as (
+        input: { name: string },
+        options: unknown
+      ) => Promise<Record<string, unknown>>;
+    const free = await runFor(false)({ name: 'promo-strategy' }, {});
+    expect(free).toMatchObject({ success: false, locked: true });
+    expect(free.steps).toBeUndefined();
+    const paid = await runFor(true)({ name: 'promo-strategy' }, {});
+    expect(paid.success).toBe(true);
+    expect(String(paid.steps)).toContain('# Promo strategy');
   });
 });

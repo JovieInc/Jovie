@@ -18,6 +18,8 @@ export interface ChatSkill {
   readonly name: string;
   readonly description: string;
   readonly body: string;
+  /** `plan: pro` in frontmatter: only paid plans can load the steps. */
+  readonly paidOnly: boolean;
 }
 
 const SKILLS_DIR = resolveAppPath('lib', 'chat', 'skills', 'library');
@@ -40,8 +42,10 @@ export function parseSkillFile(source: string): ChatSkill | null {
   const name = fields.get('name') ?? '';
   const description = fields.get('description') ?? '';
   const body = match[2].trim();
+  const plan = fields.get('plan');
   if (!NAME_PATTERN.test(name) || !description || !body) return null;
-  return { name, description, body };
+  if (plan !== undefined && plan !== 'pro') return null;
+  return { name, description, body, paidOnly: plan === 'pro' };
 }
 
 function loadSkills(dir: string): readonly ChatSkill[] {
@@ -93,7 +97,7 @@ export function buildSkillsPromptSection(
       ? `
 ## Skills
 Skills are step-by-step methods for work artists ask for often. When a request fits one, call useSkill with its name first, then follow it.
-${skills.map(skill => `- ${skill.name}: ${skill.description}`).join('\n')}
+${skills.map(skill => `- ${skill.name}${skill.paidOnly ? ' (Pro plan)' : ''}: ${skill.description}`).join('\n')}
 `
       : '';
   return `${index}
