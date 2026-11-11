@@ -1,8 +1,8 @@
 {
-  "generated_at": "2026-11-09T08:29:57.219Z",
+  "generated_at": "2026-11-11T08:18:20.609Z",
   "surfaces": {
     "rls-access-control": {
-      "coverage_pct": 78,
+      "coverage_pct": 78.1,
       "branch_pct": 0,
       "risk_score": 42.1,
       "status": "RED"
@@ -38,8 +38,8 @@
       "status": "RED"
     },
     "public-profile-isr": {
-      "coverage_pct": 88,
-      "branch_pct": 81.8,
+      "coverage_pct": 88.1,
+      "branch_pct": 81.9,
       "risk_score": 27.5,
       "status": "YELLOW"
     },
