@@ -8,6 +8,7 @@ import tempfile
 from pathlib import Path
 
 from atomic_state import atomic_write_text
+from split_helper_import import resolve_split_helper_conflict
 
 LEGACY_CACHE_EXPORT = re.compile(
     r"^\s*export const (?:dynamic|fetchCache|revalidate)\s*=")
@@ -262,6 +263,52 @@ def resolve_additive_node_test_file(worktree: Path, rel: str, sh) -> str | None:
         return resolve_additive_node_tests_text(probe.stdout)
 
 
+def _unique_json_object(pairs):
+    result = {}
+    for key, value in pairs:
+        if key in result:
+            raise ValueError("duplicate JSON key")
+        result[key] = value
+    return result
+
+
+def _load_json_object_stages(worktree: Path, rel: str, sh, field: str, accept) -> tuple[dict, dict, dict] | None:
+    """Base, ours, and theirs for one JSON object field.
+
+    None unless every stage is one object, `accept` passes the field, and every
+    other field still matches base."""
+    documents = []
+    for stage in (1, 2, 3):
+        blob = sh(["git", "show", f":{stage}:{rel}"], cwd=worktree)
+        if blob.returncode:
+            return None
+        try:
+            document = json.loads(blob.stdout, object_pairs_hook=_unique_json_object)
+        except (ValueError, TypeError):
+            return None
+        if not isinstance(document, dict) or not accept(document.get(field)):
+            return None
+        documents.append(document)
+    base, ours, theirs = documents
+    base_rest = {key: value for key, value in base.items() if key != field}
+    for document in (ours, theirs):
+        if {key: value for key, value in document.items() if key != field} != base_rest:
+            return None
+    return base, ours, theirs
+
+
+def _waiver_rows(value) -> bool:
+    return isinstance(value, dict) and all(
+        isinstance(row, dict) and row and all(
+            isinstance(reason, str) and reason.strip() for reason in row.values())
+        for row in value.values())
+
+
+def _debt_rows(value) -> bool:
+    return isinstance(value, dict) and all(
+        isinstance(reason, str) and reason.strip() for reason in value.values())
+
+
 def resolve_additive_certificate_waivers(worktree: Path, rel: str, sh) -> str | None:
     """Union new component waiver rows, proven against Git's three stages.
 
@@ -270,36 +317,11 @@ def resolve_additive_certificate_waivers(worktree: Path, rel: str, sh) -> str | 
     """
     if rel != "docs/design-system/component-certification.json":
         return None
-
-    def unique_object(pairs):
-        result = {}
-        for key, value in pairs:
-            if key in result:
-                raise ValueError("duplicate JSON key")
-            result[key] = value
-        return result
-
-    documents = []
-    for stage in (1, 2, 3):
-        blob = sh(["git", "show", f":{stage}:{rel}"], cwd=worktree)
-        if blob.returncode:
-            return None
-        try:
-            document = json.loads(blob.stdout, object_pairs_hook=unique_object)
-        except (ValueError, TypeError):
-            return None
-        if not isinstance(document, dict) or not isinstance(document.get("waivers"), dict):
-            return None
-        if any(not isinstance(row, dict) or not row or
-               any(not isinstance(reason, str) or not reason.strip() for reason in row.values())
-               for row in document["waivers"].values()):
-            return None
-        documents.append(document)
-    base, ours, theirs = documents
-    base_policy = {key: value for key, value in base.items() if key != "waivers"}
+    loaded = _load_json_object_stages(worktree, rel, sh, "waivers", _waiver_rows)
+    if loaded is None:
+        return None
+    base, ours, theirs = loaded
     for document in (ours, theirs):
-        if {key: value for key, value in document.items() if key != "waivers"} != base_policy:
-            return None
         if any(document["waivers"].get(key) != value for key, value in base["waivers"].items()):
             return None
     merged = dict(theirs["waivers"])
@@ -311,8 +333,28 @@ def resolve_additive_certificate_waivers(worktree: Path, rel: str, sh) -> str | 
     return json.dumps(theirs, ensure_ascii=False, indent=2) + "\n"
 
 
+def resolve_subtractive_screen_debt(worktree: Path, rel: str, sh) -> str | None:
+    """Drop screen-debt rows either side removed, proven against Git's three stages.
+
+    Main's remaining order stays. An added row, a changed value, or any other
+    field edit stays unresolved. This is authored policy, not generated metadata.
+    """
+    if rel != "docs/design-system/cert-screens.json":
+        return None
+    loaded = _load_json_object_stages(worktree, rel, sh, "debt", _debt_rows)
+    if loaded is None:
+        return None
+    base, ours, theirs = loaded
+    for document in (ours, theirs):
+        if any(key not in base["debt"] or document["debt"][key] != base["debt"][key]
+               for key in document["debt"]):
+            return None
+    theirs["debt"] = {key: value for key, value in theirs["debt"].items() if key in ours["debt"]}
+    return json.dumps(theirs, ensure_ascii=False, indent=2) + "\n"
+
+
 def resolve_additive_list_conflict(worktree: Path, branch: str, log, *, sh, merge_entries, guard=lambda: None) -> bool:
-    """Union quoted list entries, additive node:test blocks or certificate rows.
+    """Union quoted lists, node:test blocks, waiver rows, dropped screen-debt rows, or split helper imports.
 
     Main's order stays, then head-only lines. A prose hunk or any other shape aborts
     and leaves the PR to the model. The push is a fast-forward of the PR branch."""
@@ -324,6 +366,7 @@ def resolve_additive_list_conflict(worktree: Path, branch: str, log, *, sh, merg
             sh(["git", "merge", "--abort"], cwd=worktree, log=log)
             return False
         resolved: dict[str, str] = {}
+        extras: dict[str, str] = {}
         for path in conflicted:
             target = worktree / path
             try:
@@ -332,6 +375,19 @@ def resolve_additive_list_conflict(worktree: Path, branch: str, log, *, sh, merg
                     text = resolve_additive_node_test_file(worktree, path, sh)
                 if text is None:
                     text = resolve_additive_certificate_waivers(worktree, path, sh)
+                if text is None:
+                    text = resolve_subtractive_screen_debt(worktree, path, sh)
+                if text is None:
+                    split = resolve_split_helper_conflict(worktree, path)
+                    if split is not None:
+                        candidate, writes = split
+                        clash = any(extra in conflicted or extras.get(extra, writes[extra]) != writes[extra]
+                                    for extra in writes)
+                        if clash:
+                            candidate = None
+                        if candidate is not None:
+                            text = candidate
+                            extras.update(writes)
             except OSError:
                 text = None
             if text is None:
@@ -341,11 +397,13 @@ def resolve_additive_list_conflict(worktree: Path, branch: str, log, *, sh, merg
         try:
             for path, text in resolved.items():
                 atomic_write_text(worktree / path, text)
+            for path, text in extras.items():
+                atomic_write_text(worktree / path, text)
         except OSError:
             sh(["git", "merge", "--abort"], cwd=worktree, log=log)
             return False
         guard()
-        if sh(["git", "add", "--", *conflicted], cwd=worktree, log=log).returncode != 0 \
+        if sh(["git", "add", "--", *conflicted, *extras], cwd=worktree, log=log).returncode != 0 \
                 or sh(["git", "commit", "--no-edit"], cwd=worktree, log=log).returncode != 0:
             sh(["git", "merge", "--abort"], cwd=worktree, log=log)
             return False

@@ -17,7 +17,6 @@ from __future__ import annotations
 
 import argparse
 import ast
-import hashlib
 import json
 import re
 import sys
@@ -26,8 +25,11 @@ from collections import defaultdict
 from datetime import datetime, timezone
 from pathlib import Path
 
+import machine_gap
 import migration_renumber
 import remediation
+from fix_red_failure_routing import (ALIAS_ACTION, ALIAS_REVIEW_FAILURE, alias_owner_metadata,
+                                     error_signature, fingerprint_key, owner_handoff_reason)
 from atomic_state import atomic_write_text
 from fix_red_source_edits import (  # noqa: F401
     snap_added_conservative_spacing, strip_added_legacy_cache_exports,
@@ -41,7 +43,7 @@ RERUN, SYNC_MAIN, WIRE_CI_FAST, RENUMBER, STAMP_CHANGELOG, SNAP_SPACING, STRIP_C
     "strip-cache-exports", "merge-narrowed-preflight", "register-domain-writes", "atomic-write", "agent")
 DETERMINISTIC = frozenset({
     RERUN, SYNC_MAIN, WIRE_CI_FAST, RENUMBER, STAMP_CHANGELOG, SNAP_SPACING, STRIP_CACHE, MERGE_NARROWED,
-    REGISTER_DOMAIN, ATOMIC_WRITE})
+    REGISTER_DOMAIN, ATOMIC_WRITE, ALIAS_ACTION})
 
 # remediation.INFRA_TEXT (runner loss, OOM, 5xx) plus the platform failures seen in 52 agent-declined
 # fix runs. Kept out of INFRA_TEXT: the exhausted-PR classifier deliberately routes a rate-limited
@@ -142,6 +144,7 @@ _JSON_KEY = re.compile(r'^\s*"([^"\n]+)"\s*:')
 
 # (class, pattern, action). First match wins per check; order is most specific first.
 SIGNATURES = (
+    ("alias-review-deadline", ALIAS_REVIEW_FAILURE, ALIAS_ACTION),
     ("component-test-evidence", COMPONENT_TEST_TEXT, AGENT),
     ("narrowed-preflight", NARROWED_CONFLICT, MERGE_NARROWED),
     # Before platform-infra: a Source Validation log can carry passing-test rate-limit lines beside the guard error that actually failed the job.
@@ -168,28 +171,8 @@ LLM_VERDICTS = frozenset({"fix-pushed", "fix-no-change", "cancelled", "failed"})
 DEFAULT_BREAKER_N, MAX_BREAKER_N, MIN_CELL_RUNS = 2, 3, 10
 
 
-def error_signature(text: str) -> str:
-    """Prefer the failed-test summary to setup/mock output; normalize volatile tokens."""
-    text = re.sub(r"\x1b\[[0-9;]*m", "", str(text or ""))
-    text = re.split(r"(?m)^.*?\bFailed (?:Tests|Suites) [1-9]\d*\s*[⎯─-]*\s*$", text)[-1]
-    for line in text.splitlines():
-        if re.search(r"\b(error|fail(?:ed|ure)?|assert|expected|unwired|violation)\b", line, re.IGNORECASE):
-            line = re.sub(r"^\S*\d{4}-\d\d-\d\dT[\d:.]+Z\s*", "", line.strip())
-            line = re.sub(r"\b[0-9a-f]{7,40}\b|\d+", "#", line)
-            return re.sub(r"\s+", " ", line)[:120]
-    return ""
-
-
 def real_failures(pr: dict) -> list[dict]:
-    return [check for check in pr.get("statusCheckRollup") or []
-            if str(check.get("conclusion") or "").upper() in RED and str(check.get("name") or "").lower() not in AGGREGATE]
-
-
-def fingerprint_key(cls: str, names: list[str], signature: str = "") -> str:
-    parts = [cls, *sorted({re.sub(r"\s+", " ", str(name)).strip().lower() for name in names})]
-    if cls in {"other", "mixed"}:
-        parts.append(signature)
-    return hashlib.sha256("|".join(parts).encode()).hexdigest()[:12]
+    return machine_gap.red_checks(pr.get("statusCheckRollup") or [], RED, AGGREGATE)
 
 
 def stamp_internal_changelog(body) -> str | None:
@@ -227,6 +210,9 @@ def classify(pr: dict, logs: dict[str, str] | None = None) -> dict:
     if cls == "quota-deferred" and CHANGELOG_QUOTA_READ.search("\n".join(logs.get(name) or "" for name in names)) \
             and stamp_internal_changelog(pr.get("body")) is not None:
         cls, action, signature = "changelog-metadata", STAMP_CHANGELOG, ""
+    owner = alias_owner_metadata(names, logs) if cls == "alias-review-deadline" else None
+    if cls == "alias-review-deadline" and owner is None:
+        cls, action, signature = "mixed", AGENT, error_signature("\n".join(logs.get(name) or "" for name in names))
     files = []
     if cls == "component-test-evidence":
         files = sorted({test for name in names for test in COMPONENT_TEST_TEXT.findall(logs.get(name) or "")})
@@ -238,7 +224,7 @@ def classify(pr: dict, logs: dict[str, str] | None = None) -> dict:
     elif cls == "domain-write":
         files = sorted(_domain_write_hits("\n".join(logs.get(name) or "" for name in names)))
     return {"schema": SCHEMA, "cls": cls, "key": fingerprint_key(cls, names, signature), "action": action,
-            "checks": names, "signature": signature, "files": files}
+            "checks": names, "signature": signature, "files": files, **({"evidenceOwner": owner} if owner else {})}
 
 
 def _split_shell_and(command: str) -> list[str] | None:
@@ -1060,8 +1046,8 @@ def _epoch(row: dict) -> float | None:
 def historic_key(row: dict) -> str:
     """Ledger rows keep the failing check names, not the log: coarser than the live fingerprint, stable."""
     source = row.get("requestSource") or {}
-    names = [name for name, verdict in source.get("checks") or []
-             if str(verdict).upper() in RED and str(name).lower() not in AGGREGATE]
+    names = [str(check.get("name")) for check in real_failures({"statusCheckRollup": [
+        {"name": name, "conclusion": verdict} for name, verdict in source.get("checks") or []]})]
     kinds = ",".join(source.get("eventKinds") or [])
     return fingerprint_key("history", names or [f"event:{kinds}"])
 

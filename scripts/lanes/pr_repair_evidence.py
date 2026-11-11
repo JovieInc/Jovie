@@ -2,29 +2,7 @@
 from __future__ import annotations
 
 import re
-
-RED_HEADING = re.compile(r"^#{1,6}\s*red-before-green\s*$", re.I)
-ANY_HEADING = re.compile(r"^#{1,6}\s")
-
-
-def red_section_bounds(lines: list[str], heading=RED_HEADING) -> tuple[int, int] | None:
-    """Match Fleet boundaries, ignoring fenced/hidden headings but preserving source line indexes."""
-    visible = re.sub(r"<!--[\s\S]*?-->", lambda match: "\n" * match.group().count("\n"), "\n".join(lines))
-    fenced = False
-    start = None
-    for index, line in enumerate(visible.split("\n")):
-        if re.match(r"^\s*(?:```|~~~)", line):
-            fenced = not fenced
-            continue
-        if fenced:
-            continue
-        if start is None:
-            if heading.match(line.strip()):
-                start = index
-        elif ANY_HEADING.match(line):
-            return start, index
-    return (start, len(lines)) if start is not None else None
-
+from pr_body_markup import red_section_bounds
 
 def with_locking_pr(body: str, locking_pr: int) -> str:
     """Fill an explicit placeholder without replacing citations, comments or notes."""
