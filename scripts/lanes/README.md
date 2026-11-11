@@ -538,6 +538,33 @@ Hyperagent runs agent `cmtj3n2q901i407adklzzq01t` (GLM 5.3 Developer, `auto`; th
 
 Hyperagent can also repair existing PRs remotely (`hyperagent_repair.py`, enabled by `remoteRepairs: true` in `providers.json`; it ships `false` until GLM 5.3 model timeouts stop ending repair threads early). The shared daily cap below applies either way. Each hyperagent lane turn first takes one DIRTY or required-check-red PR (revenue and golden-path first, then `compounding`, then oldest), sends the branch, head and failing-check log excerpt, and the agent pushes to the same branch with a `Hyperagent-Repair: <attempt>` trailer. The lane counts a success only when the PR head moved forward (no force push), the tip carries that trailer, and every required check is green; the receipt (`kind: remote-repair`, stage stamps, thread URL) goes to `runs/ledger.jsonl` and a PR comment. It never touches a hold-labelled PR or a head pushed in the last 30 minutes. One writer per PR: the local `locks/repair-pr-N.lock` flock, an in-flight `fix-attempts.json` record (no local attempt charged) and a lane claim comment; a definite failure releases all three, an unknown remote outcome keeps the record and comment until their TTLs. The 24 threads/day cap (`HYPERAGENT_RUNS_PER_DAY`) is shared with the mesh bridge counter and the lane's issue runs; a spent cap ends the hyperagent turn before it claims issues. `hyperagent_repair.py status` shows cap use and the queue; `run --pr N` does one repair by hand.
 
+### Model pools
+
+`model-pools.json` is the one table of the fleet's pools: the Claude subscription, Hyperagent,
+Codex, Grok, Devin, Kimi, and the two metered routes (Vercel AI Gateway, Anthropic API key). Each
+row says what quota or credit is behind the pool and where its reset or expiry is read from.
+`model_pools.py` uses it in four places:
+
+- Anthropic rule (Tim, 2026-11-11): Fable, Opus, Sonnet, Haiku and any `claude-*` run only on the
+  Claude subscription (`claude_lane.py`) or Hyperagent, never the Gateway or a metered API key.
+- CI: `python3 scripts/lanes/model_pools.py check` runs in the fast lane's guard chain and fails on
+  any lane config, registry row or workflow that routes an Anthropic model through a forbidden or
+  undeclared pool. Exceptions are named in the table with an owner and a removal trigger; one
+  that matches nothing fails, so the list only shrinks.
+- Runtime: `run_agent` refuses the command before it starts, the router never offers a forbidden
+  route, and the outcome judge refuses an Anthropic model on the Gateway. Each refusal is appended
+  to `runs/model-pool-refusals.jsonl`.
+- Selection: among available routes of the chosen capability class that still have soft allowance
+  left, the pool whose unused allowance is lost first takes the run (Claude's 5 hour window,
+  Hyperagent's UTC day cap and credit expiry, the weekly reset of Codex and Grok from the capacity
+  registry and its live overlay, Devin's free window). A pool with no reading sorts last and the
+  cost order decides ties. The choice is on the routing decision and the run receipt (`modelPool`).
+
+`python3 scripts/lanes/model_pools.py utilization [--window-hours 24] [--write]` prints, per pool,
+runs and agent busy time over the window against declared capacity (slots x window, soft run cap),
+with the pool's current expiry reading. `--write` saves it as `model-pool-utilization.json` in the
+lanes state dir for a board to read. Slots and concurrency are not set here.
+
 ## Install on a host
 
 Gem (systemd user timer) or a Mac (launchd), with a dedicated clone:

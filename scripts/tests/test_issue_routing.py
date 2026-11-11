@@ -232,8 +232,9 @@ class AvailabilityTest(unittest.TestCase):
         router = lane.issue_router(self.host, "claude", PROVIDERS, POLICY)
         frontier = lane_issue("JOV-9", "Staging controller blocks every authorization")
         self.assertIsNone(lane.admission_rejection(frontier, {}, time.time(), frozenset(), "claude", router))
-        self.assertEqual(lane.admission_rejection(lane_issue("JOV-10"), {}, time.time(), frozenset(), "claude",
-                                                  router), "routed:devin")
+        # Standard work: Devin is cheapest, but the Claude window is the allowance lost first (model-pools.json).
+        self.assertIsNone(lane.admission_rejection(lane_issue("JOV-10"), {}, time.time(), frozenset(), "claude", router))
+        self.assertEqual(router.decisions["JOV-10"]["pool"]["chosenPool"], "claude-subscription")
         decision = router.decisions["JOV-9"]
         self.assertEqual(decision["chosen"]["model"], "claude-opus-5-5")
         lane.log_route(self.host, "claude", decision)

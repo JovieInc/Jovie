@@ -80,6 +80,7 @@ import fleet_ledger  # noqa: E402  (external agent claims, stranded-claim view)
 import pr_events  # noqa: E402
 import repair_order  # noqa: E402  (one fair claim order for event and polling repair)
 import remediation  # noqa: E402  (classifier, router, escalation ladder)
+import model_pools  # noqa: E402  (Anthropic models: subscription or Hyperagent only; refusal before spawn)
 import shipping_attribution  # noqa: E402  (receipt-first merged-PR provenance)
 import workstreams  # noqa: E402  (shared workstream rank + duplicate identity)
 import worktree_sweep  # noqa: E402  (idle / merged-PR checkout retirement, JOV-7704)
@@ -1038,6 +1039,14 @@ def lane_availability(host: "Host", self_name: str, providers: dict, now: float 
     return availability
 
 
+def pool_routed(host: "Host", decision: dict, providers: dict) -> dict:
+    """Within the chosen capability class, the pool whose unused allowance is lost first takes the run."""
+    return model_pools.balanced(decision, providers, lambda lane: model_pools.pool_expiry(
+        model_pools.pool_for_lane(providers.get(lane) or {}), time.time(), registry=capacity_registry.load(),
+        claude_state=claude_lane.read_state(host.state / "claude-quota.json"),
+        live=capacity_registry.read_live(host.state), spec=providers.get(lane)))
+
+
 def issue_router(host: "Host", name: str, providers: dict | None = None, policy: dict | None = None):
     """The router as `admission_rejection` consumes it; decisions are memoized per issue.
     A registry that declares no `routes` keeps first-come lane admission (None)."""
@@ -1045,15 +1054,15 @@ def issue_router(host: "Host", name: str, providers: dict | None = None, policy:
     if not any(isinstance(spec, dict) and spec.get("routes") for spec in providers.values()):
         return None
     policy = read_json(ROUTING_POLICY) if policy is None else policy
-    availability = lane_availability(host, name, providers)
+    availability = model_pools.guarded(lane_availability(host, name, providers), providers)
     decisions = {}
 
     def route(issue: Issue) -> dict:
         if issue.identifier not in decisions:
-            decisions[issue.identifier] = remediation.route_issue(
+            decisions[issue.identifier] = pool_routed(host, remediation.route_issue(
                 {"identifier": issue.identifier, "title": issue.title, "description": issue.description,
                  "labels": issue.labels}, providers, policy, availability,
-                only_lanes=lane_restriction(issue, providers))
+                only_lanes=lane_restriction(issue, providers)), providers)
         return decisions[issue.identifier]
 
     route.decisions = decisions
@@ -3104,6 +3113,8 @@ def run_agent(cmd: list[str], cwd: Path, log, timeout: int, *, guard=None,
     (timeout, guard hold, SIGTERM/SIGINT) writes its revocation receipt first, so a
     stopped run can never be published later (JOV-5060).
     """
+    # Before anything starts: an Anthropic model outside an allowed pool is refused and recorded.
+    model_pools.command_guard(cmd)
     if _fleet_observation is not None:
         if (timeout != 60 or log is not None or guard is not None or on_kill is not None
                 or _lifecycle_helper or _lifecycle_terminal or stderr != subprocess.STDOUT):
@@ -3340,7 +3351,7 @@ def next_provider(host: Host, exclude: set[str], providers: dict | None = None, 
         allowed = set(catalog) if allowed is None else allowed
         allowed -= set(exclude) | host_excluded | cooled | {
             name for name, spec in catalog.items() if isinstance(spec, dict) and spec.get("repairs") is False}
-        availability = lane_availability(host, "", catalog)
+        availability = model_pools.guarded(lane_availability(host, "", catalog), catalog)
 
         def available(name, route):
             seen = availability(name, route)
@@ -3348,9 +3359,9 @@ def next_provider(host: Host, exclude: set[str], providers: dict | None = None, 
                 return {"ok": False, "why": "unhealthy", "pressure": seen.get("pressure", 0)}
             return seen
 
-        decision = remediation.route_issue(
+        decision = pool_routed(host, remediation.route_issue(
             {"identifier": issue.identifier, "title": issue.title, "description": issue.description,
-             "labels": issue.labels}, routing_catalog, read_json(ROUTING_POLICY), available, only_lanes=allowed)
+             "labels": issue.labels}, routing_catalog, read_json(ROUTING_POLICY), available, only_lanes=allowed), routing_catalog)
         if minimum_capability is not None and remediation.capability_rank(decision["required"]) < floor:
             decision.update(required=minimum_capability,
                             reasons=[*decision["reasons"], f"initial-handoff-floor:{minimum_capability}"],
@@ -3449,6 +3460,7 @@ def run_hyperagent_issue(host: Host, spec: dict, issue: Issue, linear: Linear | 
                "startedAt": now_iso(), "offer": {"eligible": True, "accepted": False},
                "attribution": {"category": "autonomous-created", "originProvider": "hyperagent", "finalProvider": "hyperagent"},
                **({"eventClaim": dict(issue.event_claim)} if issue.event_claim else {}),
+               "modelPool": model_pools.receipt(spec, (spec.get("route") or {}).get("pool")),
                **({"route": spec["route"]} if spec.get("route") else {})}
     def hold(reason):
         return {"verdict": "remote-held", "reasons": [reason], "next_action": "reconcile-existing-remote-attempt"}
@@ -3545,6 +3557,7 @@ def run_issue(host: Host, name: str, spec: dict, linear: Linear, issue: Issue) -
                "attribution": {"category": "autonomous-created", "originProvider": name,
                                "finalProvider": name}, "startedAt": now_iso(),
                **({"eventClaim": dict(issue.event_claim)} if issue.event_claim else {}),
+               "modelPool": model_pools.receipt(spec, (spec.get("route") or {}).get("pool")),
                **({"route": spec["route"]} if spec.get("route") else {})}
     ident = execution_attempt.identity("linear-work", {"issue": issue.identifier, "outcome": "draft-pr"},
                                        {"title": issue.title, "description": issue.description})
