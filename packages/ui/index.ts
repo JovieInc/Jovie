@@ -256,6 +256,12 @@ export type {
   NativeSelectProps,
 } from './atoms/native-select';
 export { NativeSelect } from './atoms/native-select';
+// One-time code digit field
+export type {
+  OtpDigitInputProps,
+  OtpDigitInputVariant,
+} from './atoms/otp-digit-input';
+export { OtpDigitInput } from './atoms/otp-digit-input';
 // Popover
 export {
   Popover,

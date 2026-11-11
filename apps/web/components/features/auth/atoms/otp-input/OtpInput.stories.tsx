@@ -30,3 +30,24 @@ export const ErrorState: Story = {
     error: true,
   },
 };
+
+export const Disabled: Story = {
+  args: {
+    value: '12',
+    disabled: true,
+  },
+};
+
+export const RtlLayout: Story = {
+  args: {
+    value: '12',
+    'aria-label': 'رمز التحقق',
+  },
+  decorators: [
+    Story => (
+      <div dir='rtl'>
+        <Story />
+      </div>
+    ),
+  ],
+};

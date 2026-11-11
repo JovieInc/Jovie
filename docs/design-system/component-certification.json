@@ -687,6 +687,15 @@
     "apps/web/components/features/release/AlbumArtworkContextMenu.tsx": {
       "error": "The menu has no error UI: a failed download falls back to opening the artwork URL in a new tab, and AlbumArtworkContextMenu.test.tsx asserts that fallback.",
       "offline": "An offline download fails like any other and takes the same new-tab fallback, so there is nothing to draw; the menu itself never fetches until a size is picked."
+    },
+    "packages/ui/atoms/otp-digit-input.tsx": {
+      "long-content": "The field holds one digit of a one-time code and draws no copy of its own; its only text is the caller's screen-reader label. The detector matched 'text' in type='text' and the text-size classes."
+    },
+    "apps/web/components/atoms/SegmentedDigitBox.tsx": {
+      "long-content": "Each box shows the single digit at its index (useSegmentedInput keeps one character per box) and its only other text is the fixed 'Digit n of 6' screen-reader label, so nothing can overflow."
+    },
+    "apps/web/components/features/auth/atoms/otp-input/OtpInput.tsx": {
+      "long-content": "The code is fixed at six one-digit boxes (OTP_LENGTH) and the only copy is the screen-reader label on the legend and overlay, which never paints, so no visible text can grow."
     }
   }
 }
