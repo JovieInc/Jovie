@@ -217,14 +217,14 @@ describe('ProfileDesktopSurface', () => {
     ]);
   });
 
-  it('hides the desktop back control on the public profile root for logged-out visitors', () => {
-    mockUseIsAuthenticated.mockReturnValue(false);
-    renderDesktopSurface({ onBack: vi.fn() });
-
-    expect(
-      screen.queryByRole('button', { name: 'Back' })
-    ).not.toBeInTheDocument();
-  });
+  it.each(['profile', 'listen', 'tour', 'about'] as const)(
+    'hides the desktop back control on the %s tab for logged-out visitors',
+    activeMode => {
+      mockUseIsAuthenticated.mockReturnValue(false);
+      renderDesktopSurface({ activeMode, onBack: vi.fn() });
+      expect(screen.queryByRole('button', { name: 'Back' })).toBeNull();
+    }
+  );
 
   it('bounds the public-profile Pen capture to the desktop surface (JOV-11623)', () => {
     const { container } = renderDesktopSurface(
