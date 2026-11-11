@@ -171,4 +171,29 @@ describe('ui story coverage policy', () => {
     );
     expect(() => tightenAllowlist(root, policy([]))).toThrow();
   });
+
+  it('fails a change that deletes a story, even under a stale allowlist entry', () => {
+    const root = mkdtempSync(join(tmpdir(), 'ui-story-delete-'));
+    const dir = 'apps/web/components/example';
+    mkdirSync(join(root, dir), { recursive: true });
+    writeFileSync(join(root, dir, 'Covered.tsx'), 'export {};\n');
+    const run = deletedFiles =>
+      auditUiStoryCoverage({
+        root,
+        changedFiles: [],
+        deletedFiles,
+        allowlist: [{ path: `${dir}/Covered.tsx`, linearIssue: 'JOV-8847' }],
+      }).issues.filter(issue => issue.path === `${dir}/Covered.tsx`);
+    expect(run([`${dir}/Covered.stories.tsx`])).toEqual([
+      {
+        path: `${dir}/Covered.tsx`,
+        reason:
+          'this change deletes the adjacent Storybook story of a component that still exists',
+      },
+    ]);
+    // Deleting the component with its story, or a story that moved in place, passes.
+    expect(run([`${dir}/Gone.stories.tsx`])).toEqual([]);
+    writeFileSync(join(root, dir, 'Covered.stories.tsx'), 'export {};\n');
+    expect(run([`${dir}/Covered.stories.tsx`])).toEqual([]);
+  });
 });
