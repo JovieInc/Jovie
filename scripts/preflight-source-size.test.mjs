@@ -102,6 +102,16 @@ test('files outside the changed set do not create size failures', () => {
   );
 });
 
+test('a new scripts test listed in the planner contract list counts as wired', () => {
+  const filename = 'scripts/lib/__tests__/new-planner.test.mjs';
+  const wiring = list =>
+    companionChecklist([{ filename, status: 'added' }], path =>
+      path === 'scripts/lib/test-planner-contract-tests.mjs' ? list : ''
+    ).find(item => item.item === 'new scripts test wired into a CI lane');
+  assert.equal(wiring(`['${filename}',]`).done, true);
+  assert.equal(wiring("['scripts/lib/__tests__/other.test.mjs',]").done, false);
+});
+
 test('size-500 budgets never rise: a raise or a new entry fails', () => {
   const base = { 'a.ts': 600, 'b.ts': 700 };
   assert.deepEqual(raisedEntries(base, base), []);
