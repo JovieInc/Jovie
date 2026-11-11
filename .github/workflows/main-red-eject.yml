@@ -187,16 +187,19 @@ jobs:
         with:
           python-version: '3.12'
       - name: Revert the culprit Main Health named (revert first)
+        id: revert-first
         if: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.name == 'Main Health' }}
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
         run: python3 scripts/main_health_revert.py apply
+      # A failed revert opener never skips the ejector on the wake meant to eject the culprit; the job still
+      # ends red and the failure alert below still fires.
       - name: Attribute and eject the culprit
         if: >-
-          ${{ inputs.command == 'plan' || inputs.command == 'apply' ||
+          ${{ (success() || steps.revert-first.outcome == 'failure') && (inputs.command == 'plan' || inputs.command == 'apply' ||
           (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'failure' &&
           (github.event.workflow_run.event == 'merge_group' || github.event.workflow_run.name == 'Main Health')) ||
-          contains(fromJSON('["red-groups","group-read-failed"]'), needs.gate.outputs.reason) }}
+          contains(fromJSON('["red-groups","group-read-failed"]'), needs.gate.outputs.reason)) }}
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
           # Manual plan is always a dry run; every automatic wake follows the mode variable.
