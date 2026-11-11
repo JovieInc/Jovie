@@ -1,7 +1,7 @@
 'use client';
 
 import dynamic from 'next/dynamic';
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import type { JovieChatProps } from '@/components/jovie/types';
 import { ChatLoadingBody } from './ChatLoadingState';
 
@@ -36,13 +36,11 @@ const LazyJovieChat = dynamic<MountReportingProps>(
  * the deferred chat still has to see the query to auto-submit it once.
  */
 export function useHeldUntilMounted<T>(value: T | null | undefined) {
-  const held = useRef(value);
-  const mounted = useRef(false);
-  if (!mounted.current && value) held.current = value;
-  const markMounted = useCallback(() => {
-    mounted.current = true;
-  }, []);
-  return [mounted.current ? value : held.current, markMounted] as const;
+  const [mounted, setMounted] = useState(false);
+  const [held, setHeld] = useState(value);
+  if (!mounted && value && value !== held) setHeld(value);
+  const markMounted = useCallback(() => setMounted(true), []);
+  return [mounted ? value : value || held, markMounted] as const;
 }
 
 export function JovieChat(props: JovieChatProps) {
