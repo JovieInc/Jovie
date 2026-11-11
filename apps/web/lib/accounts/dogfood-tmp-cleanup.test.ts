@@ -14,7 +14,9 @@ import {
 } from 'vitest';
 import { users } from '@/lib/db/schema/auth';
 import { baSessions, baUsers } from '@/lib/db/schema/better-auth';
+import { feedbackItems } from '@/lib/db/schema/feedback';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
+import { FOUNDER_REVIEW_SOURCE } from '@/lib/founder-review/contract';
 import { FOUNDER_EMAIL_DOMAIN } from '@/lib/utils/email';
 import { newDogfoodWalkEmail } from './dogfood-account';
 import {
@@ -217,6 +219,27 @@ describe('runDogfoodTmpCleanup against PostgreSQL', () => {
     });
     expect(again).toMatchObject({ matched: 0, removed: 0 });
     expect(afterRemoval).toHaveBeenCalledTimes(1);
+  }, 60_000);
+});
+
+describe('runDogfoodTmpCleanup uploads guard', () => {
+  it('skips an expired tmp account that holds founder-review uploads', async () => {
+    const withUploads = await seed(at('t+dogfood-tmp-up1'), { ageDays: 8 });
+    const plain = await seed(at('t+dogfood-tmp-up2'), { ageDays: 8 });
+    // Another account's founder-review row must not shield `plain`.
+    await database.insert(feedbackItems).values({
+      userId: withUploads.id,
+      source: FOUNDER_REVIEW_SOURCE,
+      message: 'walk upload',
+    } as never);
+
+    const report = await runDogfoodTmpCleanup(cleanupDb(), {
+      apply: true,
+      now,
+    });
+    expect(report).toMatchObject({ matched: 1, removed: 1, skippedUploads: 1 });
+    expect(await state(withUploads.id, withUploads.baId)).toMatchObject(KEPT);
+    expect(await state(plain.id, plain.baId)).toMatchObject({ deleted: true });
   }, 60_000);
 });
 

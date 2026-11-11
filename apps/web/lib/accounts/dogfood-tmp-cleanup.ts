@@ -104,14 +104,32 @@ export async function runDogfoodTmpCleanup(
         createdAt: users.createdAt,
         betterAuthUserId: users.betterAuthUserId,
         subscriptionId: users.stripeSubscriptionId,
-        hasUploads: drizzleSql<boolean>`exists (
-          select 1 from ${feedbackItems}
-          where ${feedbackItems.userId} = ${users.id}
-            and ${feedbackItems.source} in (${FOUNDER_REVIEW_SOURCE}, ${FOUNDER_REVIEW_UPLOAD_LEASE_SOURCE})
-        )`,
       })
       .from(users)
       .where(guard);
+
+    // A separate builder query, not a correlated `sql` subquery: Drizzle
+    // drops table qualifiers inside `sql` fields of a single-table select, so
+    // `users.id` there resolved to `feedback_items.id` and nothing was skipped.
+    const uploaders =
+      rows.length === 0
+        ? []
+        : await tx
+            .selectDistinct({ userId: feedbackItems.userId })
+            .from(feedbackItems)
+            .where(
+              and(
+                inArray(
+                  feedbackItems.userId,
+                  rows.map(row => row.id)
+                ),
+                inArray(feedbackItems.source, [
+                  FOUNDER_REVIEW_SOURCE,
+                  FOUNDER_REVIEW_UPLOAD_LEASE_SOURCE,
+                ])
+              )
+            );
+    const withUploads = new Set(uploaders.map(row => row.userId));
 
     let skippedNotEphemeral = 0;
     let skippedBilling = 0;
@@ -128,7 +146,7 @@ export async function runDogfoodTmpCleanup(
         skippedNotEphemeral++;
       } else if (row.subscriptionId) {
         skippedBilling++;
-      } else if (row.hasUploads === true) {
+      } else if (withUploads.has(row.id)) {
         skippedUploads++;
       } else {
         matched.push({ ...row, email });
