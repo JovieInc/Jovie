@@ -27,7 +27,7 @@ const have = spawnSync('jq', ['--version']).status === 0;
 // PR Ready picks the evidence run for the head. 2026-10-25: #22978's passing
 // run and a concurrency-cancelled twin were created in the same second and the
 // cancelled one won the tie, so PR Ready failed with "not a verdict" for good.
-function pick(runs) {
+function pick(runs, stale = []) {
   const done = spawnSync(
     'jq',
     [
@@ -47,6 +47,9 @@ function pick(runs) {
       '--arg',
       'sha',
       'head',
+      '--argjson',
+      'stale',
+      JSON.stringify(stale),
       program,
     ],
     { input: JSON.stringify({ workflow_runs: runs }), encoding: 'utf8' }
@@ -99,6 +102,29 @@ test('a same-second run for the current head beats a stale-head run with a highe
     head_sha: 'base',
   };
   assert.equal(pick([run(1, 'success'), later]), 'completed\tfailure\tu9');
+});
+
+// #24903 (2026-11-11): jovie-bot's main merge fired two runs a second apart. The
+// newer one carried the old head, failed closed, and PR Ready picked it.
+test('a newer run that carries an earlier PR head never decides', {
+  skip: !have,
+}, () => {
+  const current = run(1, 'success', '1970-01-01T00:05:00Z');
+  const stale = {
+    ...run(2, 'failure', '1970-01-01T00:05:01Z'),
+    head_sha: 'old',
+  };
+  assert.equal(pick([current, stale], ['old']), 'completed\tsuccess\tu1');
+  // Without the PR's commit list (lookup failed) nothing is dropped: still red.
+  assert.equal(pick([current, stale]), 'completed\tfailure\tu2');
+  // A newer edited-event run carries the base sha, not a PR commit, and still wins.
+  const edited = {
+    ...run(3, 'failure', '1970-01-01T00:05:02Z'),
+    head_sha: 'base',
+  };
+  assert.equal(pick([current, edited], ['old']), 'completed\tfailure\tu3');
+  // Only stale runs left means missing, never a pass.
+  assert.equal(pick([stale], ['old']), 'missing');
 });
 
 test('the newest non-cancelled run decides, and only cancelled runs mean missing', {

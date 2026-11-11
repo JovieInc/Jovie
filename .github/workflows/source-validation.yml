@@ -1127,9 +1127,17 @@ jobs:
           if [ "$rc" -ne 0 ]; then
             runs='{"workflow_runs":[]}'
           fi
+          # A run that carries an earlier head of this PR is stale: the bot moved the head while it ran, so
+          # it failed closed and must not decide (#24903, a second newer than the current head's run).
+          # Edited-event runs carry the base sha (#24184), which is not a PR commit, so they still count.
+          # A failed commits lookup drops nothing, so it can only keep PR Ready red, never turn it green.
+          stale='[]'
+          if commits="$(node packages/api-client/cli.ts gh --priority default -- api "repos/$REPOSITORY/pulls/$PR_NUMBER/commits?per_page=100" 2>/dev/null)"; then
+            stale="$(jq -c --arg sha "$HEAD_SHA" '[.[].sha | select(. != $sha)]' <<<"$commits" 2>/dev/null || echo '[]')"
+          fi
           # Two evidence runs can share a created_at second (bot merges main and drops a label at once).
           # Ties go to the run for the current head, so the stale-head run's id cannot win (#24886).
-          row="$(jq -r --argjson floor "$floor" --arg title "fleet-rules #$PR_NUMBER base=main" --arg ref "$HEAD_REF" --argjson repo "$HEAD_REPO_ID" --arg sha "$HEAD_SHA" '[.workflow_runs[] | select(.path == ".github/workflows/fleet-rules-evidence.yml" and .display_title == $title and .head_branch == $ref and .head_repository.id == $repo and (.created_at | fromdateiso8601) >= ($floor - 10) and .conclusion != "cancelled")] | sort_by([.created_at, (.head_sha == $sha), .id]) | last // {status: "missing"} | "\(.status)\t\(.conclusion // "")\t\(.html_url // "")"' <<<"$runs" 2>/dev/null || echo 'missing')"
+          row="$(jq -r --argjson floor "$floor" --arg title "fleet-rules #$PR_NUMBER base=main" --arg ref "$HEAD_REF" --argjson repo "$HEAD_REPO_ID" --arg sha "$HEAD_SHA" --argjson stale "$stale" '[.workflow_runs[] | select(.path == ".github/workflows/fleet-rules-evidence.yml" and .display_title == $title and .head_branch == $ref and .head_repository.id == $repo and (.created_at | fromdateiso8601) >= ($floor - 10) and .conclusion != "cancelled" and ((.head_sha // "") | IN($stale[]) | not))] | sort_by([.created_at, (.head_sha == $sha), .id]) | last // {status: "missing"} | "\(.status)\t\(.conclusion // "")\t\(.html_url // "")"' <<<"$runs" 2>/dev/null || echo 'missing')"
           IFS=$'\t' read -r status conclusion url <<<"$row"
           case "$status/$conclusion" in
             completed/success) echo "Fleet rules passed: $url" ;;
