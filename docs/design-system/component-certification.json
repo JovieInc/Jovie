@@ -514,6 +514,12 @@
       "loading": "The provider is pending only while the code-split source-facts module resolves, a microtask after mount; a static story cannot hold a resolved dynamic import, so source-evidence-context.test.tsx asserts data-source-evidence='pending' before 'ready'. Its children render unchanged either way.",
       "offline": "The provider never fetches; it projects facts it was handed through a lazily imported pure module, so lost connectivity can only stop that chunk from loading, and its children still render with no evidence (the Default story's content without source chips)."
     },
+    "apps/web/app/app/(shell)/chat/DeferredJovieChat.tsx": {
+      "error": "The wrapper only defers loading JovieChat; a chunk that fails to load throws to the chat route's error.tsx boundary, and every chat error is JovieChat's own state.",
+      "long-content": "The wrapper renders no text of its own: the skeleton has no copy and the mounted chat is JovieChat, which owns message length.",
+      "offline": "The wrapper never fetches or mutates; the only network it causes is the chunk request, whose failure is the error boundary's, and offline sends are JovieChat's.",
+      "rtl-overflow": "The wrapper renders no text or input of its own; the composer and messages are JovieChat's. The detector matched words in its doc comment."
+    },
     "apps/web/app/(auth)/DesktopAuthRouteHandoff.tsx": {
       "empty": "The route handoff takes no data and renders a fixed heading, status line and action set from DesktopAuthHandoffActions; there is no collection to empty. The detector matched the items-center class on its section."
     },
