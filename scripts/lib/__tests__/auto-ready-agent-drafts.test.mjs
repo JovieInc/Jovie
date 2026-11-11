@@ -8,6 +8,7 @@ import {
   FX_WRITER_EMAIL,
   FX_WRITER_NAME,
   parseFxSourceHeadTrailer,
+  shipIntent,
   TRUSTED_FX_WORKFLOW_NAME,
   TRUSTED_FX_WORKFLOW_PATH,
 } from '../auto-ready-provenance.mjs';
@@ -466,6 +467,16 @@ describe('Auto-Ready App-token workflow', () => {
     expect(workflow).toContain('persist-credentials: false');
   });
 
+  it('resolves bot review threads on the green head after the undraft', () => {
+    const step = workflow.split(
+      '- name: Resolve bot review threads on the green head'
+    )[1];
+    expect(step).toContain("github.event_name == 'workflow_run'");
+    expect(step).toContain(
+      'node scripts/lib/bot-review-threads.mjs --repo "$REPO" --pr "$TARGET_PR" --head "$TARGET_HEAD"'
+    );
+  });
+
   it('keeps workflow recovery manual-only and never source-event driven', () => {
     // Manual recovery plus completed source-check runs; no PR, schedule or
     // ready_for_review wake can start a cascade.
@@ -477,5 +488,25 @@ describe('Auto-Ready App-token workflow', () => {
       "github.event_name == 'workflow_dispatch' && inputs.pr_number == ''"
     );
     expect(workflow).not.toContain('ready_for_review/CI cascade');
+  });
+});
+
+describe('shipIntent (pr:open opt-in)', () => {
+  const ON = '<!-- jovie-auto-ready: on-green -->';
+  const count = body => body.split(ON).length - 1;
+  it('opts a new PR in, once, and --park keeps it parked', () => {
+    expect(shipIntent('Body', { cmd: 'open' })).toBe(`Body\n\n${ON}\n`);
+    expect(count(shipIntent(`Body\n\n${ON}\n`, { cmd: 'open' }))).toBe(1);
+    expect(shipIntent('Body', { cmd: 'draft' })).toContain(ON);
+    expect(shipIntent(`Body\n${ON}\n`, { cmd: 'open', park: true })).toBe(
+      'Body\n'
+    );
+  });
+  it('keeps an existing opt-in on refresh and adds none uninvited', () => {
+    const opts = { cmd: 'update', number: '42' };
+    expect(shipIntent('New', opts, `Old\n${ON}`)).toBe(`New\n\n${ON}\n`);
+    expect(shipIntent('New', opts, 'Old')).toBe('New');
+    expect(shipIntent('New', { ...opts, onGreen: true }, 'Old')).toContain(ON);
+    expect(shipIntent('New', { cmd: 'draft', number: '42' })).toBe('New');
   });
 });
