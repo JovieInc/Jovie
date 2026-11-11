@@ -64,23 +64,47 @@ function shortSource(source: string): string {
     .replace(/^\.\//u, '');
 }
 
-async function loadSourceMap(
+interface LoadedChunk {
+  readonly lines: readonly string[];
+  readonly map: SourceMap | null;
+  readonly mapStatus: string;
+}
+
+async function loadChunk(
   page: Page,
   url: string,
-  cache: Map<string, SourceMap | null>
-): Promise<SourceMap | null> {
-  if (cache.has(url)) return cache.get(url) ?? null;
+  cache: Map<string, LoadedChunk>
+): Promise<LoadedChunk> {
+  const cached = cache.get(url);
+  if (cached) return cached;
+  let lines: string[] = [];
   let map: SourceMap | null = null;
+  let mapStatus = 'chunk unreadable';
   try {
-    const response = await page.request.get(`${url.split('?')[0]}.map`);
+    const chunk = await page.request.get(url);
+    const text = chunk.ok() ? await chunk.text() : '';
+    lines = text.split('\n');
+    const comment = /\/\/# sourceMappingURL=(\S+)\s*$/u.exec(text)?.[1];
+    const mapUrl = new URL(comment ?? `${url.split('?')[0]}.map`, url).href;
+    const response = await page.request.get(mapUrl);
+    mapStatus = `${comment ? 'comment' : 'guessed'} map HTTP ${response.status()}`;
     if (response.ok()) {
       map = new SourceMap((await response.json()) as SourceMapPayload);
     }
-  } catch {
-    map = null;
+  } catch (error) {
+    mapStatus = `map failed (${String(error).slice(0, 80)})`;
   }
-  cache.set(url, map);
-  return map;
+  const loaded = { lines, map, mapStatus };
+  cache.set(url, loaded);
+  return loaded;
+}
+
+/** The minified code around a hot position, so an unmapped frame is findable. */
+function snippetAt(lines: readonly string[], line: number, column: number) {
+  const text = lines[line] ?? '';
+  return text
+    .slice(Math.max(0, column - 30), column + 90)
+    .replace(/\s+/gu, ' ');
 }
 
 function formatMs(ms: number): string {
@@ -118,7 +142,7 @@ export async function printColdLoadProfile(
     const frames = selfTimeByNode(profile);
     const totalMs = frames.reduce((sum, frame) => sum + frame.ms, 0);
     const origin = new URL(page.url()).origin;
-    const maps = new Map<string, SourceMap | null>();
+    const chunks = new Map<string, LoadedChunk>();
     const bySource = new Map<string, number>();
     const byFunction = new Map<string, number>();
     let mapped = 0;
@@ -128,14 +152,16 @@ export async function printColdLoadProfile(
       let source = url ? url.replace(origin, '') : functionName;
       let name = functionName || '(anonymous)';
       if (url.startsWith(origin)) {
-        const map = await loadSourceMap(page, url, maps);
-        const entry = map?.findEntry(lineNumber, columnNumber) as
+        const chunk = await loadChunk(page, url, chunks);
+        const entry = chunk.map?.findEntry(lineNumber, columnNumber) as
           | { originalSource?: string; originalLine?: number; name?: string }
           | undefined;
         if (entry?.originalSource) {
           mapped += 1;
           source = shortSource(entry.originalSource);
           name = `${entry.name ?? name} ${source}:${(entry.originalLine ?? 0) + 1}`;
+        } else {
+          name = `${name} ${source} \`${snippetAt(chunk.lines, lineNumber, columnNumber)}\``;
         }
       }
       bySource.set(source, (bySource.get(source) ?? 0) + ms);
@@ -151,7 +177,8 @@ export async function printColdLoadProfile(
 
     process.stdout.write(
       `[cold-load-profile] ${label}: ${formatMs(totalMs)} busy main thread; ` +
-        `${mapped} of ${Math.min(frames.length, MAPPED_CANDIDATES)} hot frames source-mapped\n` +
+        `${mapped} of ${Math.min(frames.length, MAPPED_CANDIDATES)} hot frames source-mapped ` +
+        `(${[...new Set([...chunks.values()].map(chunk => chunk.mapStatus))].join(', ')})\n` +
         `[cold-load-profile] ${label} by source:\n${top(bySource, TOP_SOURCES)}\n` +
         `[cold-load-profile] ${label} by function:\n${top(byFunction, TOP_FUNCTIONS)}\n`
     );
