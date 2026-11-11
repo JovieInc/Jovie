@@ -1,5 +1,6 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
+import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import { StudioDock } from './StudioDock';
 
 function renderDock(overrides: Partial<Parameters<typeof StudioDock>[0]> = {}) {
@@ -23,8 +24,8 @@ function renderDock(overrides: Partial<Parameters<typeof StudioDock>[0]> = {}) {
     onToggleTakes: vi.fn(),
     ...overrides,
   };
-  render(<StudioDock {...props} />);
-  return props;
+  const view = render(<StudioDock {...props} />);
+  return { ...props, container: view.container, unmount: view.unmount };
 }
 
 describe('StudioDock', () => {
@@ -53,5 +54,17 @@ describe('StudioDock', () => {
 
     expect(screen.getByLabelText('Stop recording')).toBeInTheDocument();
     expect(screen.getByText('Speed').closest('button')).toBeDisabled();
+  });
+
+  it('passes axe ready, recording and without voice support', async () => {
+    for (const overrides of [
+      {},
+      { isRecording: true, grid: true, takeCount: 2 },
+      { voiceEnabled: undefined },
+    ]) {
+      const { container, unmount } = renderDock(overrides);
+      await expectNoA11yViolations(container);
+      unmount();
+    }
   });
 });

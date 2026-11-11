@@ -3752,8 +3752,8 @@ html[data-profile-flow-open="true"] .cookie-banner-card {
 
 /* JOV-8780 — certified light mode for the marketing night stages.
 
-   home, pricing, launch, artist-profiles and artist-notifications are
-   art-directed night pages: they paint fixed cinematic-black surfaces
+   home, pricing, launch, artist-profiles, artist-notifications and the
+   teleprompter studio's camera are art-directed night pages: they paint fixed cinematic-black surfaces
    (.home-viewport, .system-b-pricing-page, .system-b-launch-page,
    .frame-skin, bg-black stages) in BOTH themes. In the light theme their
    text/badge/button tokens flipped to light-ink values over those dark
@@ -3776,7 +3776,8 @@ html:not(.dark) .home-viewport,
 html:not(.dark) .system-b-marketing:has(.system-b-pricing-page),
 html:not(.dark) .system-b-marketing:has(.system-b-launch-page),
 html:not(.dark) .system-b-marketing:has(.artist-profiles-home-system),
-html:not(.dark) .system-b-marketing:has(.artist-notifications-landing) {
+html:not(.dark) .system-b-marketing:has(.artist-notifications-landing),
+html:not(.dark) .teleprompter-studio {
   color-scheme: dark;
   --color-bg-base: #030406;
   --color-bg-surface-0: #07080a;

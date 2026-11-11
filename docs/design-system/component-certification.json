@@ -497,6 +497,20 @@
       "partial": "The region carries no data payload: its sample is a built-in constant and its optional props (fullBleed, stableDocked, showDockedWelcome, hideWelcomeHeader, alignAbove, onSelectSample) are layout switches, each shown by the JustAsk, AboveComposer and EmptyDockedRegion stories.",
       "permission-denied": "The region has no gated action or permission input; the detector matched 'Role-neutral' and the 'locked Just ask heading' in a doc comment."
     },
+    "apps/web/components/features/teleprompter-studio/StudioCameraBlocked.tsx": {
+      "empty": "Renders one fixed message for one camera error and no collection; the detector matched the items-start layout class.",
+      "long-content": "Title and body come only from cameraErrorCopy for the error code, never from caller text, so no copy can grow past what the PermissionDenied, ErrorNoCamera, ErrorInUse, ErrorUnsupported and ErrorUnknown stories show."
+    },
+    "apps/web/components/features/teleprompter-studio/StudioDock.tsx": {
+      "error": "The dock has no failure surface; 'error' matched only the bg-error token on the record dot. Camera failures render in StudioCameraBlocked and save failures in StudioTakesSheet, which have Error stories."
+    },
+    "apps/web/components/features/teleprompter-studio/StudioHeader.tsx": {
+      "error": "The header shows no failure; 'error' matched only the recording badge's error tone, which the Recording story shows. Save failures render in StudioTakesSheet's ErrorNoneSaved story."
+    },
+    "apps/web/components/features/teleprompter-studio/StudioLightPanel.tsx": {
+      "long-content": "Every label is fixed copy and every value is a bounded number (brightness 0 to 100%, warmth in kelvin, edge width in px), so no caller text reaches the panel and nothing can grow past the Edges and FullWhite stories.",
+      "empty": "The light panel always has settings: it opens with saved or default ring light values, so there is no empty state."
+    },
     "apps/web/components/features/onboarding/OnboardingSecurityCheckRecovery.tsx": {
       "empty": "OnboardingSecurityCheckRecovery always renders one fixed heading, one status line and the retry button, and never a collection; the detector matched the items-start and items-center classes."
     },
@@ -519,6 +533,36 @@
       "long-content": "The wrapper renders no text of its own: the skeleton has no copy and the mounted chat is JovieChat, which owns message length.",
       "offline": "The wrapper never fetches or mutates; the only network it causes is the chunk request, whose failure is the error boundary's, and offline sends are JovieChat's.",
       "rtl-overflow": "The wrapper renders no text or input of its own; the composer and messages are JovieChat's. The detector matched words in its doc comment."
+    },
+    "apps/web/app/(auth)/DesktopAuthRouteHandoff.tsx": {
+      "empty": "The route handoff takes no data and renders a fixed heading, status line and action set from DesktopAuthHandoffActions; there is no collection to empty. The detector matched the items-center class on its section."
+    },
+    "apps/web/app/(auth)/signin/SignInPageClient.tsx": {
+      "empty": "The sign-in page renders one AuthShell and at most one error banner; it owns no collection that could be empty. The detector matched the words links and list in its doc comments, and the provider list belongs to AuthShell (whose zero-provider branch AuthShell.test.tsx covers)."
+    },
+    "apps/web/app/(marketing)/changelog/ChangelogEmailSignup.tsx": {
+      "permission-denied": "Anyone can subscribe to the changelog: the form has no account, role or gated action. The detector matched role='status' and role='alert'; a failed security check is shown as the error state (ErrorRejectedAddress, and the unavailable form in ChangelogEmailSignup.test.tsx)."
+    },
+    "apps/web/app/desktop-auth/DesktopAuthMethodOptions.tsx": {
+      "empty": "The options list is a fixed set of buttons, and Copy Sign-in Link always renders, so an open list is never empty; the stories show the copy-only and full sets. The detector matched the items-center class on the utility row."
+    },
+    "apps/web/app/desktop-auth/DesktopAuthSharedView.tsx": {
+      "permission-denied": "The heading, status line and cancel button have no gated action or permission input; cancelling is always allowed. The detector matched role='status' on the live status line."
+    },
+    "apps/web/app/desktop-auth/MacCinematicSurface.tsx": {
+      "empty": "MacCinematicSurface is a visual shell around one handoff child and takes no collection; the detector matched the place-items-center class on its main landmark."
+    },
+    "apps/web/components/features/pricing/MarketingPricingPlans.tsx": {
+      "empty": "Plans are the three checked-in public plans filtered by NEXT_PUBLIC_MARKETING_VISIBLE_PLANS, and a filter naming no known plan falls back to all three, so the card list cannot be empty. A plan with no features drops its list, which PartialPlanDetails shows.",
+      "permission-denied": "Public pricing has no gated action: every visitor sees every visible plan and its CTA. The detector matched the word plan; entitlement checks happen after the CTA, in checkout."
+    },
+    "apps/web/components/homepage/HomepageEditorial.tsx": {
+      "empty": "Every list in the chapters (chapter index, profile rows, release captions, invite steps) maps over typed copy checked into data/homepageEditorialCopy.ts and is never fetched, so none can be empty; the detector matched those .map( calls.",
+      "partial": "Each chapter takes one complete copy object whose fields are all required strings (HeroCopy maps every key to string; chapter copy needs headline and body), defaulting to HOMEPAGE_EDITORIAL_COPY, so a chapter cannot render with part of its copy. The detector counted the optional copy and headingId props.",
+      "permission-denied": "The homepage chapters are public marketing with no gated action; whether an invite is granted is decided after the request, outside this component. The detector matched role='img' on the product mockups and the word locked in a comment."
+    },
+    "apps/web/components/marketing/MarketingHero.tsx": {
+      "permission-denied": "The hero renders public copy and links with no gated action or permission input. The detector matched the word permission in the logos prop's doc comment, which is about a page's permission to show distributor logos, decided by the caller."
     },
     "packages/ui/atoms/common-dropdown-renderer.tsx": {
       "offline": "The renderer never fetches or submits: it draws the search field and the rows its owner passes, and a submenu shows loading only when the caller sets isLoading (LoadingItems), so lost connectivity reaches it only as caller state.",

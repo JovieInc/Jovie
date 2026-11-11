@@ -1,5 +1,6 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
+import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import { type StudioTake, StudioTakesSheet } from './StudioTakesSheet';
 
 const takes: StudioTake[] = [
@@ -58,5 +59,25 @@ describe('StudioTakesSheet', () => {
     expect(props.onToggleKept).toHaveBeenCalledWith('take_1');
     expect(props.onRetry).toHaveBeenCalledWith('take_2');
     expect(props.onDone).toHaveBeenCalled();
+  });
+
+  it('passes axe with takes, with failed takes, and empty', async () => {
+    for (const list of [
+      takes,
+      takes.map(take => ({ ...take, status: 'failed' as const })),
+      [],
+    ]) {
+      const { container, unmount } = render(
+        <StudioTakesSheet
+          title='Release day shout-out'
+          takes={list}
+          onToggleKept={vi.fn()}
+          onRetry={vi.fn()}
+          onDone={vi.fn()}
+        />
+      );
+      await expectNoA11yViolations(container);
+      unmount();
+    }
   });
 });
