@@ -98,6 +98,22 @@
       "rationale": "Bot check on signup and onboarding."
     },
     {
+      "id": "sentry-replay",
+      "category": "replay",
+      "products": ["jovie"],
+      "hosts": ["sentry.io"],
+      "policy_names": ["Sentry"],
+      "status": "live",
+      "approved": "2026-11-07",
+      "approved_by": "pre-existing (PR #23555)",
+      "rationale": "Existing masked Sentry Replay, shipped in PR #23555 with buffer-mode funnel recording, trigger-based upload and a server-side monthly cap. Text and inputs are masked, media blocked and request bodies excluded. Records the existing integration; input-page, consent and GPC restrictions still apply. This is not approval for new recording surfaces. Shares Sentry ingestion hosts with error reporting, so the host-level inventory conservatively classifies shared-host traffic as replay.",
+      "code": [
+        "apps/web/lib/sentry/client-full.ts",
+        "apps/web/lib/sentry/replay-policy.ts",
+        "apps/web/lib/sentry/replay-start.ts"
+      ]
+    },
+    {
       "id": "sentry",
       "category": "processor",
       "products": ["jovie", "lyb"],
@@ -186,22 +202,6 @@
       "approved_by": "pre-existing (cdn-domains.ts)",
       "allowed_on_input_pages": true,
       "rationale": "Cover art and avatars from music platforms; the canonical list is apps/web/constants/platforms/cdn-domains.ts."
-    },
-    {
-      "id": "sentry-replay",
-      "category": "replay",
-      "products": ["jovie"],
-      "hosts": ["sentry.io"],
-      "policy_names": ["Sentry"],
-      "status": "live",
-      "approved": "2026-11-07",
-      "approved_by": "pre-existing (PR #23555)",
-      "rationale": "Existing masked Sentry Replay, shipped in PR #23555 with buffer-mode funnel recording, trigger-based upload and a server-side monthly cap. Text and inputs are masked, media blocked and request bodies excluded. Records the existing integration; input-page, consent and GPC restrictions still apply. This is not approval for new recording surfaces.",
-      "code": [
-        "apps/web/lib/sentry/client-full.ts",
-        "apps/web/lib/sentry/replay-policy.ts",
-        "apps/web/lib/sentry/replay-start.ts"
-      ]
     }
   ],
   "surfaces": [
