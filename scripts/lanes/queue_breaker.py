@@ -258,13 +258,18 @@ def _signal_key(check: dict) -> str | None:
     return None
 
 
-def poison_signals(run, repo: str, runs: list[dict], now: float, cache: dict) -> list[dict]:
+def poison_signals(run, repo: str, runs: list[dict], now: float, cache: dict, greens: dict | None = None) -> list[dict]:
     """Signals that failed POISON_PRS or more distinct PR groups inside SHARED_WINDOW_S. Reads the newest failed group
-    per PR, at most POISON_SCAN of them, through the shared per-sweep check cache."""
+    per PR, at most POISON_SCAN of them, through the shared per-sweep check cache. A failure that ended before the PR's
+    latest green merge-group run (`greens`, from latest_green_by_pr) is superseded (JOV-8492) and is no poison
+    evidence: that PR's tree has since passed, so it cannot count toward main failing without any one PR."""
+    greens = greens or {}
     newest: dict[int, dict] = {}
     for row in runs:
         match, ended = BRANCH.match(str(row.get("head_branch") or "")), _epoch(row.get("updated_at"))
         if row.get("conclusion") != "failure" or not match or ended is None or not 0 <= now - ended <= SHARED_WINDOW_S:
+            continue
+        if ended <= greens.get(int(match[1]), 0):
             continue
         if ended > (_epoch(newest.get(int(match[1]), {}).get("updated_at")) or 0):
             newest[int(match[1])] = row
@@ -276,10 +281,12 @@ def poison_signals(run, repo: str, runs: list[dict], now: float, cache: dict) ->
             continue
         key = _signal_key(check)
         if key:
-            entry = groups.setdefault(key, {"key": key, "check": check, "prs": set(), "runs": []})
+            entry = groups.setdefault(key, {"key": key, "check": check, "prs": set(), "runs": [], "ended": []})
             entry["prs"].add(pr)
             entry["runs"].append(row.get("id"))
-    return [{**g, "prs": sorted(g["prs"])} for g in groups.values() if len(g["prs"]) >= POISON_PRS]
+            entry["ended"].append(_epoch(row.get("updated_at")))
+    return [{**{k: v for k, v in g.items() if k != "ended"}, "prs": sorted(g["prs"]), "first": min(g["ended"]),
+             "last": max(g["ended"])} for g in groups.values() if len(g["prs"]) >= POISON_PRS]
 
 
 def _file_intake(run, event: dict):
@@ -292,25 +299,41 @@ def _file_intake(run, event: dict):
     return pr_events.upsert_intake(event, sh=sh)
 
 
-def main_poison(state: Path, run, runs: list[dict], now: float, repo: str, cache: dict, file_intake=None) -> list[dict]:
-    """File one remediation intake per shared signal so a fix lane repairs main (the base-branch class of
-    canon/MERGE_QUEUE_STEWARD.md invariant 4) instead of every lane waiting. Filed at most once per signal per
-    SHARED_WINDOW_S (local state); upsert_intake also dedupes on the open intake issue's fingerprint."""
-    signals = poison_signals(run, repo, runs, now, cache)
-    if not signals:
-        return []
+def main_poison(state: Path, run, runs: list[dict], now: float, repo: str, cache: dict, file_intake=None,
+                greens: dict | None = None) -> list[dict]:
+    """File one remediation intake per poisoning EPISODE so a fix lane repairs main (the base-branch class of
+    canon/MERGE_QUEUE_STEWARD.md invariant 4) instead of every lane waiting.
+
+    An episode is one run of a signal's failures: it starts when the signal first shows up and continues while each
+    newest failure lands within SHARED_WINDOW_S of the episode's last one. The intake fingerprint hashes the signal
+    AND the episode's first failure, so a recurrence after main was fixed (a gap longer than the window) files a fresh
+    intake and a fresh Linear issue; it never lands on the completed issue of the previous episode, which
+    ensure_linear_intake would otherwise reuse because its issue id is derived from the fingerprint. Within an episode
+    the intake is filed once, and again only if the signal is still failing a full SHARED_WINDOW_S after the last
+    filing (same fingerprint, so upsert_intake dedupes an open intake). State: POISON_FILE, keyed by a hash of the
+    signal; episodes idle for more than SHARED_WINDOW_S are dropped."""
+    signals = poison_signals(run, repo, runs, now, cache, greens)
     import hashlib
-    import remediation  # lazy, like pr_events: only a poisoned main pays for the import
     try:
-        filed = json.loads((state / POISON_FILE).read_text())
+        episodes = json.loads((state / POISON_FILE).read_text())
     except (OSError, ValueError):
-        filed = {}
-    filed = {k: v for k, v in filed.items() if isinstance(v, (int, float)) and now - v < SHARED_WINDOW_S}
+        episodes = {}
+    episodes = {k: v for k, v in episodes.items() if isinstance(v, dict) and isinstance(v.get("last_fail"), (int, float))
+                and now - v["last_fail"] <= SHARED_WINDOW_S}
     out = []
+    if signals:
+        import remediation  # lazy, like pr_events: only a poisoned main pays for the import
     for signal in signals:
-        # Pure hex: pr_events.convert_intake and ensure_linear_intake only accept [0-9a-f]+ fingerprints.
-        fp = hashlib.sha256(("main-poison|" + signal["key"]).encode()).hexdigest()[:16]
-        if fp in filed:
+        slot = hashlib.sha256(signal["key"].encode()).hexdigest()[:16]
+        episode = episodes.get(slot)
+        if episode is None or signal["last"] - episode["last_fail"] > SHARED_WINDOW_S:
+            # Pure hex: pr_events.convert_intake and ensure_linear_intake only accept [0-9a-f]+ fingerprints.
+            fp = hashlib.sha256(f"main-poison|{signal['key']}|{int(signal['first'])}".encode()).hexdigest()[:16]
+            episode = {"fp": fp, "first_fail": signal["first"], "last_fail": signal["last"], "filed": None}
+            episodes[slot] = episode
+        episode["last_fail"] = max(episode["last_fail"], signal["last"])
+        fp = episode["fp"]
+        if episode.get("filed") is not None and signal["last"] <= episode["filed"] + SHARED_WINDOW_S:
             continue
         check = signal["check"]
         excerpt = (f"Main is poisoned: `{check.get('test') or check.get('job')}` failed merge groups of {len(signal['prs'])} "
@@ -320,7 +343,7 @@ def main_poison(state: Path, run, runs: list[dict], now: float, repo: str, cache
                    "date, a stale checked-in baseline, a broken tool fetch), and do not dequeue or edit the victim PRs. "
                    "Never skip, weaken or quarantine the check to get green.")
         event = remediation.remediation_event(
-            source="merge-group-shared", fingerprint=fp, ws="ci", first_seen=remediation.now_iso(now),
+            source="merge-group-shared", fingerprint=fp, ws="ci", first_seen=remediation.now_iso(episode["first_fail"]),
             subject={"signal": signal["key"][:200], "prs": signal["prs"], "runs": signal["runs"][:POISON_SCAN]},
             evidence={"url": f"https://github.com/{repo}/actions/runs/{signal['runs'][0]}", "excerpt": excerpt})
         try:
@@ -329,13 +352,13 @@ def main_poison(state: Path, run, runs: list[dict], now: float, repo: str, cache
             out.append({"fingerprint": fp, "error": f"{type(error).__name__}: {error}"[:160]})
             continue
         if issue:  # an unfiled signal (gh error, or an open intake already holds it) is retried next sweep;
-            filed[fp] = now  # upsert_intake's fingerprint check keeps that from opening a duplicate
+            episode["filed"] = now  # upsert_intake's fingerprint check keeps that from opening a duplicate
         out.append({"fingerprint": fp, "signal": signal["key"][:200], "prs": signal["prs"], "issue": issue})
         with open(state / LOG_FILE, "a") as log:
             log.write(json.dumps({"at": now, "action": "filed-main-poison", "fingerprint": fp, "signal": signal["key"][:200],
                                   "prs": signal["prs"], "issue": issue}) + "\n")
     tmp = state / f".{POISON_FILE}.{os.getpid()}.tmp"
-    tmp.write_text(json.dumps(filed, sort_keys=True))
+    tmp.write_text(json.dumps(episodes, sort_keys=True))
     os.replace(tmp, state / POISON_FILE)
     return out
 
@@ -412,7 +435,7 @@ def sweep(state, run, now: float | None = None, repo: str = "JovieInc/Jovie", fi
         except RuntimeError as error:
             out["errors"].append(f"#{number} trip: {error}")
     try:
-        poison = main_poison(state, run, runs, now, repo, cache, file_intake)
+        poison = main_poison(state, run, runs, now, repo, cache, file_intake, greens)
         if poison:
             out["main-poison"] = poison
     except Exception as error:  # noqa: BLE001 - poison filing never breaks the trip/hold sweep

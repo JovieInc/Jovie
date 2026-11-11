@@ -110,13 +110,15 @@ class QueueBreakerSupersessionTest(unittest.TestCase):
             self.assertIn("lane-fix-red", flat)
 
 
-def poisoned_world(calls, prs, *, test="lib/__tests__/production-release-supersession.test.mjs", at=NOW - 600):
-    """Fake gh: one failed merge group per PR in `prs`, every one failing on the same top test; nothing queued."""
+def poisoned_world(calls, prs, *, test="lib/__tests__/production-release-supersession.test.mjs", at=NOW - 600, greens=()):
+    """Fake gh: one failed merge group per PR in `prs`, every one failing on the same top test; nothing queued.
+    Each PR in `greens` also has a SUCCESSFUL merge-group run that ended a minute after its failure."""
     def run(args, **kwargs):
         calls.append(args)
         flat = " ".join(args)
         if "workflows/ci.yml/runs" in flat:
-            rows = [] if "status=success" in flat else [
+            rows = [{"id": 500 + i, "head_branch": f"gh-readonly-queue/main/pr-{pr}-def", "conclusion": "success",
+                     "updated_at": iso(at + 60), "head_sha": f"g{i}"} for i, pr in enumerate(greens)] if "status=success" in flat else [
                 {"id": 100 + i, "head_branch": f"gh-readonly-queue/main/pr-{pr}-abc", "conclusion": "failure",
                  "updated_at": iso(at), "head_sha": f"s{i}"} for i, pr in enumerate(prs)]
             return SimpleNamespace(returncode=0, stderr="", stdout=json.dumps({"workflow_runs": rows}))
@@ -216,6 +218,37 @@ class MainPoisonTest(unittest.TestCase):
             qb.sweep(Path(raw), run, NOW, file_intake=lambda _r, e: filed.append(e))  # returns None: not filed
             qb.sweep(Path(raw), run, NOW + 60, file_intake=lambda _r, e: filed.append(e) or 7)
         self.assertEqual(len(filed), 2)
+
+    def test_a_failure_a_later_green_superseded_is_not_poison_evidence(self):
+        """Sentry on #24838: a PR whose failed group a later green group superseded (JOV-8492) must not count toward
+        three unrelated PRs failing, or a fixed main still files an intake."""
+        qb, filed = load_breaker(), []
+        with tempfile.TemporaryDirectory() as raw:
+            out = qb.sweep(Path(raw), poisoned_world([], [1, 2, 3], greens=[3]), NOW, file_intake=lambda _r, e: filed.append(e) or 1)
+        self.assertEqual((filed, out.get("main-poison")), ([], None))
+
+    def test_a_recurrence_after_main_was_fixed_files_a_new_episode(self):
+        """Sentry on #24838: the fingerprint picks the Linear issue id, so a later poisoning of the same test must get
+        its own fingerprint instead of landing on the completed issue of the earlier episode."""
+        qb, filed = load_breaker(), []
+        later = NOW + 8 * 3600  # more than SHARED_WINDOW_S after the first episode's last failure
+        with tempfile.TemporaryDirectory() as raw:
+            qb.sweep(Path(raw), poisoned_world([], [1, 2, 3]), NOW, file_intake=lambda _r, e: filed.append(e) or 1)
+            qb.sweep(Path(raw), poisoned_world([], [4, 5, 6], at=later - 600), later,
+                     file_intake=lambda _r, e: filed.append(e) or 2)
+        self.assertEqual(len(filed), 2)
+        first, second = (e["fingerprint"] for e in filed)
+        self.assertRegex(second, r"^[0-9a-f]{16}$")
+        self.assertNotEqual(first, second)
+
+    def test_one_episode_keeps_its_fingerprint_and_refiles_only_after_a_full_window(self):
+        qb, filed = load_breaker(), []
+        with tempfile.TemporaryDirectory() as raw:
+            for moment, prs, issue in ((NOW, [1, 2, 3], 1), (NOW + 3 * 3600, [4, 5, 6], 2), (NOW + 6.5 * 3600, [7, 8, 9], 3)):
+                qb.sweep(Path(raw), poisoned_world([], prs, at=moment - 600), moment,
+                         file_intake=lambda _r, e, n=issue: filed.append(e) or n)
+        self.assertEqual(len(filed), 2, "still failing 3h after filing is the same episode, not a new intake")
+        self.assertEqual(filed[0]["fingerprint"], filed[1]["fingerprint"])
 
 
 if __name__ == "__main__":
