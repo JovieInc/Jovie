@@ -3,7 +3,7 @@
 // scans comments, so a comment that quotes a loader call fails the same way
 // as an SDK import. privacy-rules.test.mjs runs this on the compliance lane.
 import { execFileSync } from 'node:child_process';
-import { readFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -144,7 +144,46 @@ export function scanRepo({
   return [...invalidEntries(registry), ...findings.map(hit => hit.message)];
 }
 
+/** Regenerate the mirror from committed upstream bytes at the workflow's exact pin. */
+export function syncCatalog({ root = ROOT, companyRoot }) {
+  const workflow = readFileSync(
+    join(root, '.github/workflows/company-guards.yml'),
+    'utf8'
+  );
+  const pin = workflow.match(/^# ci-ref: ([0-9a-f]{40})$/m)?.[1];
+  if (!pin) throw new Error('Missing exact company-guards workflow pin');
+  const catalog = JSON.parse(
+    execFileSync('git', ['show', `${pin}:canon/trackers.json`], {
+      cwd: companyRoot,
+      encoding: 'utf8',
+    })
+  );
+  if (
+    catalog.schema !== 'company-trackers/v1' ||
+    !Array.isArray(catalog.signatures) ||
+    !Array.isArray(catalog.banned_claims)
+  )
+    throw new Error('Invalid upstream company tracker catalog');
+  compileCatalog(catalog);
+  writeFileSync(
+    join(root, 'scripts/compliance/company-trackers.pin.json'),
+    `${JSON.stringify({ ...catalog, pin }, null, 2)}\n`
+  );
+  return pin;
+}
+
 function main() {
+  const args = process.argv.slice(2);
+  if (args.length) {
+    if (args.length !== 2 || args[0] !== '--sync-catalog')
+      throw new Error(
+        'Usage: tracker-signature-scan.mjs [--sync-catalog <company-repo>]'
+      );
+    console.log(
+      `tracker catalog synced: ${syncCatalog({ companyRoot: args[1] })}`
+    );
+    return;
+  }
   const findings = scanRepo();
   for (const finding of findings) console.error(finding);
   console.log(`tracker-signature-scan: ${findings.length} unapproved`);

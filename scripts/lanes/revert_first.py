@@ -115,6 +115,10 @@ def decide(attribution: dict, *, open_reverts: list[dict] = (), mode: str = "app
         return verdict("alert", "culprit-is-a-revert")
     if not (culprit.get("pr") or parse_pr(_subject(culprit))):
         return verdict("alert", "culprit-has-no-pr")
+    if culprit.get("revertedBy"):
+        # Its revert already merged and main is still red: the streak's first red push names the same commit
+        # every wake, so reverting it again does nothing. Something after it is also red; a human bisects.
+        return verdict("alert", "culprit-already-reverted-needs-bisect")
     if any(row.get("culprit") == culprit.get("sha") for row in open_reverts):
         return verdict("skip", "revert-in-flight")
     if int(culprit.get("priorAttempts") or 0) >= MAX_ATTEMPTS:

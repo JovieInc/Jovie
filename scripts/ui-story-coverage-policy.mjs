@@ -216,12 +216,14 @@ function harnessIssues(root) {
  * @param {{
  *   root: string,
  *   changedFiles: string[],
+ *   deletedFiles?: string[],
  *   allowlist?: { path: string, linearIssue: string }[],
  * }} input
  */
 export function auditUiStoryCoverage({
   root,
   changedFiles,
+  deletedFiles = [],
   allowlist = /** @type {{ path: string, linearIssue: string }[]} */ ([]),
 }) {
   const classified = changedFiles
@@ -250,8 +252,28 @@ export function auditUiStoryCoverage({
     }
   }
 
+  // The allowlist only shrinks, so an entry can outlive its component's story.
+  // Deleting the story of a component that still exists is new debt, whether
+  // or not a stale entry still names the component.
+  const removedStories = [];
+  for (const story of deletedFiles.filter(path => STORY_RE.test(path))) {
+    const component = story.replace(STORY_RE, '.tsx');
+    if (
+      classifyUiPath(component) === 'component' &&
+      existsSync(resolve(root, component)) &&
+      !adjacentStoryExists(root, component)
+    ) {
+      removedStories.push(component);
+      issues.push({
+        path: component,
+        reason:
+          'this change deletes the adjacent Storybook story of a component that still exists',
+      });
+    }
+  }
+
   return {
-    applicable: classified.length > 0,
+    applicable: classified.length > 0 || removedStories.length > 0,
     changedUiPaths: classified,
     issues,
     clean: issues.length === 0,
@@ -290,10 +312,10 @@ function parseArgs(argv) {
   );
 }
 
-function changedFilesFromGit(root, diffBase) {
+function changedFilesFromGit(root, diffBase, filter = ['--diff-filter=ACMR']) {
   const result = spawnSync(
     'git',
-    ['diff', '--name-only', '--diff-filter=ACMR', `${diffBase}...HEAD`],
+    ['diff', '--name-only', ...filter, `${diffBase}...HEAD`],
     { cwd: root, encoding: 'utf8' }
   );
   if (result.status !== 0) {
@@ -319,14 +341,17 @@ function main(argv = process.argv.slice(2)) {
     console.log(`[ui-story-coverage] dropped ${next.dropped} stale entries`);
     return 0;
   }
+  const diffBase =
+    args['diff-base'] ??
+    process.env.UI_STORY_COVERAGE_DIFF_BASE ??
+    'origin/main';
   const changedFiles = args.files
     ? readFileSync(resolve(args.files), 'utf8').split(/\r?\n/).filter(Boolean)
-    : changedFilesFromGit(
-        root,
-        args['diff-base'] ??
-          process.env.UI_STORY_COVERAGE_DIFF_BASE ??
-          'origin/main'
-      );
+    : changedFilesFromGit(root, diffBase);
+  // A story renamed away counts as deleted; one renamed in place still exists.
+  const deletedFiles = args.files
+    ? []
+    : changedFilesFromGit(root, diffBase, ['--no-renames', '--diff-filter=D']);
   const mode = resolveUiStoryCoverageMode({
     policy,
     pullRequestNumber: args['pr-number'],
@@ -335,6 +360,7 @@ function main(argv = process.argv.slice(2)) {
   const audit = auditUiStoryCoverage({
     root,
     changedFiles,
+    deletedFiles,
     allowlist: policy.allowlist ?? [],
   });
   const report = {

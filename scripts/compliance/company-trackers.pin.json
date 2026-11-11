@@ -1,7 +1,6 @@
 {
   "schema": "company-trackers/v1",
-  "pin": "9891c0ec01d1a19bc441977f2fa58c24d2611e4e",
-  "notes": "Mirror of JovieInc/ci canon/trackers.json at the company-guards pin. The company guard does not scan this JSON. tracker-signature-scan.mjs reads it.",
+  "notes": "Known third-party tracker, pixel, session-replay and chat-widget signatures for guards/plugins/tracker-registry.mjs. A consumer approves one by listing a vendor with the same id or an overlapping host in canon/privacy/tracker-registry.json, with a rationale. Add signatures here once; every repo gets them on the next pin bump.",
   "signatures": [
     {
       "id": "meta",
@@ -164,5 +163,6 @@
     "we (do not|don't|never) track you",
     "no third[- ]party tracking scripts",
     "we never share (your )?(data|information|personal)"
-  ]
+  ],
+  "pin": "9c6c3cbebe7aab6f0925e338350bc13f0d60a72a"
 }

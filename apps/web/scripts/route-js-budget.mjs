@@ -6,6 +6,9 @@
  * is the root main files plus every chunk in the page's client-reference
  * `entryJSFiles` (root layout, nested layouts, error/loading boundaries, and
  * the page). Sizes are gzip -9, which is deterministic for a given build.
+ * A trailing sourceMappingURL comment is omitted: non-Vercel CI emits it so
+ * the Lighthouse treemap can open the sibling map (JOV-12023), and Vercel
+ * production builds do not. The map file itself is not JS.
  *
  * Per-route ceilings in route-js-budgets.json only shrink; raises require an
  * unexpired design-exception-registry override for the exact key. Public
@@ -119,6 +122,18 @@ function collectRouteFiles(
 }
 
 /**
+ * Drop the CI sourceMappingURL trailer. It is not executed code, and the
+ * sibling map is not part of this budget.
+ * @param {Buffer} bytes
+ * @returns {Buffer}
+ */
+export function budgetJsBytes(bytes) {
+  const source = bytes.toString('utf8');
+  const stripped = source.replace(/\r?\n\/\/# sourceMappingURL=\S+\s*$/, '');
+  return stripped === source ? bytes : Buffer.from(stripped);
+}
+
+/**
  * @param {string} nextDir
  * @returns {RouteJsMeasurement[]}
  */
@@ -129,7 +144,7 @@ export function measureRouteJs(
   const gzipCache = new Map();
   const gzipBytes = file => {
     if (!gzipCache.has(file)) {
-      const bytes = readFileSync(join(nextDir, file));
+      const bytes = budgetJsBytes(readFileSync(join(nextDir, file)));
       gzipCache.set(file, gzipSync(bytes, { level: 9 }).length);
     }
     return gzipCache.get(file);

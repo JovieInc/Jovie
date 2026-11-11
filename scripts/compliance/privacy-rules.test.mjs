@@ -1,5 +1,14 @@
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
+import {
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import test from 'node:test';
 import {
   analyzePolicy,
@@ -16,6 +25,7 @@ import {
   scanFile,
   scanRepo,
   selectPaths,
+  syncCatalog,
 } from './tracker-signature-scan.mjs';
 
 const registry = JSON.parse(
@@ -182,7 +192,7 @@ test('tracker signatures: the session replay call is approved by vendor id', () 
   assert.deepEqual(scanFile(path, source, signatures, registry), []);
   assert.equal(replay.category, 'replay');
   assert.ok(replay.rationale && replay.hosts.length);
-  assert.equal(vendorFor('sentry.io', registry)?.id, 'sentry');
+  assert.equal(vendorFor('sentry.io', registry)?.id, 'sentry-replay');
 });
 
 test('tracker signatures: this repo has no unapproved company-catalog hit', () => {
@@ -196,4 +206,73 @@ test('tracker catalog pin matches the company-guards workflow pin', () => {
   );
   const pin = workflow.match(/^# ci-ref: ([0-9a-f]{40})$/m)?.[1];
   assert.equal(pin, catalog.pin);
+});
+
+test('catalog sync uses the pinned commit, preserves upstream fields, and fails without modifying the mirror', () => {
+  const root = mkdtempSync(join(tmpdir(), 'tracker-catalog-'));
+  try {
+    const companyRoot = join(root, 'company');
+    mkdirSync(join(companyRoot, 'canon'), { recursive: true });
+    mkdirSync(join(root, '.github/workflows'), { recursive: true });
+    mkdirSync(join(root, 'scripts/compliance'), { recursive: true });
+    const upstream = {
+      schema: 'company-trackers/v1',
+      signatures: [{ id: 'example', code: ['example\\('], hosts: [] }],
+      banned_claims: ['example claim'],
+      notes: 'Keep upstream metadata',
+    };
+    const git = args =>
+      execFileSync('git', args, { cwd: companyRoot, encoding: 'utf8' }).trim();
+    git(['init', '--quiet']);
+    writeFileSync(
+      join(companyRoot, 'canon/trackers.json'),
+      JSON.stringify(upstream)
+    );
+    git(['add', '.']);
+    git([
+      '-c',
+      'user.name=Test',
+      '-c',
+      'user.email=test@example.invalid',
+      'commit',
+      '--quiet',
+      '-m',
+      'catalog',
+    ]);
+    const pin = git(['rev-parse', 'HEAD']);
+    const workflow = join(root, '.github/workflows/company-guards.yml');
+    const mirror = join(root, 'scripts/compliance/company-trackers.pin.json');
+    writeFileSync(workflow, `# ci-ref: ${pin}\n`);
+    writeFileSync(join(companyRoot, 'canon/trackers.json'), '{}');
+    assert.equal(syncCatalog({ root, companyRoot }), pin);
+    assert.deepEqual(JSON.parse(readFileSync(mirror, 'utf8')), {
+      ...upstream,
+      pin,
+    });
+    const before = readFileSync(mirror, 'utf8');
+    syncCatalog({ root, companyRoot });
+    assert.equal(readFileSync(mirror, 'utf8'), before);
+    writeFileSync(workflow, '# ci-ref: missing\n');
+    assert.throws(() => syncCatalog({ root, companyRoot }), /Missing exact/);
+    writeFileSync(workflow, `# ci-ref: ${'f'.repeat(40)}\n`);
+    assert.throws(() => syncCatalog({ root, companyRoot }));
+    assert.equal(readFileSync(mirror, 'utf8'), before);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+test('shared Sentry ingestion hosts retain replay input-page restrictions', () => {
+  const host = 'o1.ingest.sentry.io';
+  assert.equal(vendorFor(host, registry)?.id, 'sentry-replay');
+  const snapshot = cleanControlSnapshot();
+  snapshot.pages.push({
+    ...snapshot.pages[1],
+    scenario: 'eu-accept',
+    third_party_requests: [{ host, phase: 'after-accept', count: 1 }],
+  });
+  assert.ok(
+    evaluate(snapshot, registry).some(
+      r => r.rule === 'no-tracker-on-input-page' && r.status === 'fail'
+    )
+  );
 });

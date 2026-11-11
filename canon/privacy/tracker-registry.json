@@ -98,6 +98,22 @@
       "rationale": "Bot check on signup and onboarding."
     },
     {
+      "id": "sentry-replay",
+      "category": "replay",
+      "products": ["jovie"],
+      "hosts": ["sentry.io"],
+      "policy_names": ["Sentry"],
+      "status": "live",
+      "approved": "2026-11-07",
+      "approved_by": "pre-existing (PR #23555)",
+      "rationale": "Existing masked Sentry Replay, shipped in PR #23555 with buffer-mode funnel recording, trigger-based upload and a server-side monthly cap. Text and inputs are masked, media blocked and request bodies excluded. Records the existing integration; input-page, consent and GPC restrictions still apply. This is not approval for new recording surfaces. Shares Sentry ingestion hosts with error reporting, so the host-level inventory conservatively classifies shared-host traffic as replay.",
+      "code": [
+        "apps/web/lib/sentry/client-full.ts",
+        "apps/web/lib/sentry/replay-policy.ts",
+        "apps/web/lib/sentry/replay-start.ts"
+      ]
+    },
+    {
       "id": "sentry",
       "category": "processor",
       "products": ["jovie", "lyb"],
@@ -107,17 +123,7 @@
       "approved": "2026-10-31",
       "approved_by": "pre-existing",
       "allowed_on_input_pages": true,
-      "rationale": "Error reporting. Session Replay is the separate vendor sentry-replay (masked text and inputs, media blocked, no request bodies). This processor entry stays first so a sentry.io load keeps the existing input-page exception."
-    },
-    {
-      "id": "sentry-replay",
-      "category": "replay",
-      "products": ["jovie"],
-      "hosts": ["sentry.io"],
-      "status": "live",
-      "approved": "2026-11-11",
-      "approved_by": "existing production replay path (client-full.ts)",
-      "rationale": "Sentry Session Replay initializes from apps/web/lib/sentry/client-full.ts. Text and inputs are masked, media is blocked, and request bodies are not captured. Production dashboard routes use the shared session sample rate. Activation routes buffer and send only through the monthly cap in signup-replay.server.ts. Do not add a second replay SDK."
+      "rationale": "Error reporting as a processor. Session Replay is separately inventoried as sentry-replay; PR #23555 enabled masked replay after this original registration. Processor approval does not waive the replay-category restrictions."
     },
     {
       "id": "statsig",

@@ -160,8 +160,8 @@ nodes:
       - push
       - schedule
       - workflow_dispatch
-    terminalReceipt: job:measure
-    jobCount: 2
+    terminalReceipt: job:fan-out-budget
+    jobCount: 3
   - name: CI Shard Contract Canary
     path: .github/workflows/ci-shard-contract-canary.yml
     active: true
@@ -765,6 +765,18 @@ nodes:
       - workflow_dispatch
     terminalReceipt: job:produce
     jobCount: 1
+  - name: Merge Group Dead Run Sweep
+    path: .github/workflows/merge-group-dead-run-sweep.yml
+    active: true
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - pull_request_target
+      - workflow_dispatch
+    terminalReceipt: job:sweep
+    jobCount: 1
   - name: Merge Queue Green Enroll
     path: .github/workflows/merge-queue-green-enroll.yml
     active: true
@@ -1012,7 +1024,6 @@ nodes:
     allowedConsumers:
       - Lane Fix Relay
     triggeringStateTransition:
-      - merge_group
       - pull_request
     terminalReceipt: job:fleet
     jobCount: 1
