@@ -906,7 +906,7 @@ export function ProfileMobileNotificationsFlow({
           presentation === 'modal' && 'min-[1180px]:max-w-130'
         )}
       >
-        <header className={INLINE_FLOW.header}>
+        <header className={INLINE_FLOW.topBar}>
           {showBackButton ? (
             <button
               type='button'

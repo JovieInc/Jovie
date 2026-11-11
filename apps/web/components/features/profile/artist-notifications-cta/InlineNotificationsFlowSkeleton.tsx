@@ -23,7 +23,7 @@ export function InlineNotificationsFlowSkeleton() {
         className={cn(INLINE_FLOW.body, INLINE_FLOW.inset)}
         aria-hidden='true'
       >
-        <div className={INLINE_FLOW.header}>
+        <div className={INLINE_FLOW.topBar}>
           <span className='h-10 w-10' />
           <span className='h-10 w-10' />
         </div>
