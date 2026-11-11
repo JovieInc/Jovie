@@ -73,9 +73,6 @@ export function runChecks(root, { base = previousRef(root) } = {}) {
  */
 export async function structuralCommands(root) {
   const lanes = await import('./ci-fast-lanes.mjs');
-  const { RELEASE_LINEAGE_VITEST_TESTS } = await import(
-    './lib/ci-release-lineage-tests.mjs'
-  );
   const here = (/** @type {string} */ test) => existsSync(join(root, test));
   const present = lanes.SCRIPT_CONTRACT_NODE_TESTS.filter(here);
   const { scriptContractNodeArgs } = lanes;
@@ -83,7 +80,10 @@ export async function structuralCommands(root) {
   const vitest = [
     ...new Set([
       ...lanes.SCRIPT_CONTRACT_VITEST_TESTS,
-      ...RELEASE_LINEAGE_VITEST_TESTS,
+      ...(
+        lanes.RELEASE_LINEAGE_CONTRACT_COMMAND.match(/lib\/__tests__\/\S+/g) ??
+        []
+      ).map(f => `scripts/${f}`),
     ]),
   ].filter(here);
   return [
