@@ -151,6 +151,35 @@ export function busyRuns(profile: CpuProfile): BusyRun[] {
   return runs.sort((x, y) => y.ms - x.ms);
 }
 
+interface MapEntry {
+  readonly generatedColumn?: number;
+  readonly originalSource?: string;
+  readonly originalLine?: number;
+  readonly name?: string;
+}
+
+/**
+ * A function's start often sits just before its first mapped segment (a
+ * module factory's arrow, for one), where findEntry returns the segment
+ * before it, which belongs to the previous module. Prefer the first segment
+ * at or after the position on the same line.
+ */
+function entryAtOrAfter(
+  map: SourceMap,
+  line: number,
+  column: number
+): MapEntry | undefined {
+  const at = map.findEntry(line, column) as MapEntry | undefined;
+  if (at?.generatedColumn === column) return at;
+  for (let step = 1; step <= 400; step += 1) {
+    const next = map.findEntry(line, column + step) as MapEntry | undefined;
+    if (next?.generatedColumn !== undefined && next.generatedColumn >= column) {
+      if (next.generatedColumn !== at?.generatedColumn) return next;
+    }
+  }
+  return at;
+}
+
 interface MappedFrame {
   readonly source: string;
   readonly label: string;
@@ -165,9 +194,9 @@ async function mapFrame(
   const { functionName, url, lineNumber, columnNumber } = node.callFrame;
   if (!url.startsWith(origin)) return null;
   const chunk = await loadChunk(page, url, chunks);
-  const entry = chunk.map?.findEntry(lineNumber, columnNumber) as
-    | { originalSource?: string; originalLine?: number; name?: string }
-    | undefined;
+  const entry = chunk.map
+    ? entryAtOrAfter(chunk.map, lineNumber, columnNumber)
+    : undefined;
   if (!entry?.originalSource) return null;
   const source = shortSource(entry.originalSource);
   return {
