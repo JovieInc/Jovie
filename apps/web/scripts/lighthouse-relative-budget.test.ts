@@ -56,7 +56,10 @@ function failures(evaluation: ReturnType<typeof evaluateSuite>) {
   return evaluation.pages.flatMap(page =>
     page.results
       .filter(result => result.status === 'fail')
-      .map(result => `${page.url} ${result.audit} ${result.reason}`)
+      .map(
+        result =>
+          `${page.url} ${result.audit} ${(result as { reason?: string }).reason}`
+      )
   );
 }
 

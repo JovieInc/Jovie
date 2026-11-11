@@ -4,9 +4,10 @@
 #
 #   build    Check the base commit out in place, build it, move its standalone
 #            server to $BASELINE_DIR and report built=true. Any reason it
-#            cannot (no base, changed dependencies, failed build) reports
-#            built=false and exits 0: the gate then enforces every configured
-#            budget as it is, so a missing baseline never weakens it.
+#            cannot (no base, changed dependencies, failed build, a crash)
+#            reports built=false and exits 0: the gate then enforces every
+#            configured budget as it is, so a missing baseline can neither
+#            fail the job nor weaken the gate.
 #   restore  Put the workspace back on the exact head, remove what the base
 #            build left behind, and fail if the tree is not the head's.
 #
@@ -46,6 +47,14 @@ skip() {
 case "$mode" in
   build)
     : "${BASELINE_DIR:?}" "${GITHUB_OUTPUT:?}"
+    # The work runs in a child so an unexpected error is a missing baseline,
+    # not a failed step. The restore step puts the workspace back either way.
+    if ! bash "$0" build-inner; then
+      echo "::warning::Lighthouse baseline build stopped unexpectedly. The gate enforces the configured budgets as they are."
+      echo "built=false" >> "$GITHUB_OUTPUT"
+    fi
+    ;;
+  build-inner)
     mkdir -p "$state_dir"
     head_sha="$(git rev-parse HEAD)"
     base_sha="${BASE_SHA:-}"
@@ -68,7 +77,7 @@ case "$mode" in
     echo "$head_sha" > "$head_file"
     git checkout --quiet --detach "$base_sha"
     echo "Building base $base_sha for the Lighthouse baseline."
-    if ! pnpm --filter=@jovie/web run build; then
+    if ! timeout --kill-after=15 600 pnpm --filter=@jovie/web run build; then
       skip "the base build failed"
     fi
     server=apps/web/.next/standalone/apps/web/server.js

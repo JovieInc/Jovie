@@ -121,7 +121,9 @@ describe('Lighthouse identity admission', () => {
     expect(selected(budgets, 'false')).toBe(true);
     expect(selected(budgets, 'false', { failed: true })).toBe(false);
     expect(selected(budgets, 'false', { relevant: false })).toBe(false);
-    expect(budgets.run).toContain('node scripts/lighthouse-relative-gate.mjs');
+    expect(budgets.run).toContain(
+      'node apps/web/scripts/lighthouse-relative-gate.mjs'
+    );
     expect(budgets.run).not.toMatch(/\|\|/);
     expect(budgets['continue-on-error']).toBeUndefined();
     expect(budgets.env.BASE_URL).toBe('http://localhost:3000');
@@ -151,7 +153,36 @@ describe('Lighthouse identity admission', () => {
       'Build base commit for relative Lighthouse budgets'
     );
     const restore = stepNamed(job, 'Restore workspace to the exact head');
-    expect(baseline['continue-on-error']).toBe(true);
+    // The script, not continue-on-error, makes a missing baseline harmless.
+    expect(baseline['continue-on-error']).toBeUndefined();
+    const dir = mkdtempSync(join(tmpdir(), 'lighthouse-baseline-'));
+    try {
+      // Not a git checkout: the build cannot even start.
+      const output = join(dir, 'output');
+      const result = spawnSync(
+        'bash',
+        [
+          join(REPO_ROOT, '.github/scripts/lighthouse-build-baseline.sh'),
+          'build',
+        ],
+        {
+          cwd: dir,
+          env: {
+            ...process.env,
+            GIT_CEILING_DIRECTORIES: dir,
+            RUNNER_TEMP: dir,
+            GITHUB_OUTPUT: output,
+            BASELINE_DIR: join(dir, 'baseline'),
+            BASE_SHA: '',
+          },
+          encoding: 'utf8',
+        }
+      );
+      expect(result.status, result.stderr).toBe(0);
+      expect(readFileSync(output, 'utf8')).toBe('built=false\n');
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
     expect(baseline.run).toBe(
       'bash .github/scripts/lighthouse-build-baseline.sh build'
     );

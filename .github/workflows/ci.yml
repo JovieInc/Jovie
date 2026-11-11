@@ -4962,7 +4962,6 @@ jobs:
         run: echo "hour=$(date -u +%Y%m%d%H)" >> "$GITHUB_OUTPUT"
       - name: Restore Next build cache for Lighthouse (read-only)
         if: steps.check_changes.outputs.run_full_ci == 'true'
-        continue-on-error: true
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: apps/web/.next/cache/turbopack
@@ -4974,13 +4973,12 @@ jobs:
       # Timing budgets are judged against the commit this change lands on,
       # built and measured in this job on this runner, so a busy runner slows
       # both sides instead of failing the change. No baseline (no base commit,
-      # changed dependencies, failed base build) is not a failure: the gate
-      # then enforces every configured budget as it is.
+      # changed dependencies, failed base build) is not a failure: the script
+      # exits 0 with built=false and the gate then enforces every configured
+      # budget as it is.
       - name: Build base commit for relative Lighthouse budgets
         id: lighthouse-baseline
         if: steps.check_changes.outputs.run_full_ci == 'true'
-        continue-on-error: true
-        timeout-minutes: 10
         run: bash .github/scripts/lighthouse-build-baseline.sh build
         env:
           BASE_SHA: ${{ github.event.merge_group.base_sha }}
@@ -5094,13 +5092,11 @@ jobs:
       - name: Run signed-in Lighthouse budgets
         if: steps.check_changes.outputs.run_full_ci == 'true'
         run: |
-          cd apps/web
-
           export E2E_USE_TEST_AUTH_BYPASS=1
           export NEXT_PUBLIC_AUTH_MOCK=1
           export NEXT_PUBLIC_AUTH_PROXY_DISABLED=1
 
-          node scripts/lighthouse-relative-gate.mjs
+          node apps/web/scripts/lighthouse-relative-gate.mjs
         env:
           CI: true
           BASE_URL: http://localhost:3000
