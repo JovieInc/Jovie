@@ -20,7 +20,7 @@ const meta = {
   },
   decorators: [
     Story => (
-      <div className='w-[min(28rem,calc(100vw-2rem))] bg-base p-6'>
+      <div className='w-full max-w-md bg-base p-6'>
         <Story />
       </div>
     ),
