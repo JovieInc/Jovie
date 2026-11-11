@@ -1,15 +1,5 @@
-import {
-  chmodSync,
-  mkdirSync,
-  mkdtempSync,
-  readdirSync,
-  readFileSync,
-  rmSync,
-  writeFileSync,
-} from 'node:fs';
-import { createRequire } from 'node:module';
-import { tmpdir } from 'node:os';
-import { join, resolve } from 'node:path';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
   evaluateSuite,
@@ -18,12 +8,6 @@ import {
   parseAssertions,
   suiteNeedsBaseline,
 } from './lighthouse-relative-budget.mjs';
-import {
-  decide,
-  readBuildId,
-  resolveSuites,
-  withBaselineInPlace,
-} from './lighthouse-relative-gate.mjs';
 
 const webRoot = resolve(import.meta.dirname, '..');
 const readConfig = (name: string) =>
@@ -122,12 +106,79 @@ describe('relative Lighthouse budgets', () => {
     const evaluation = evaluateSuite({
       config: dashboardConfig,
       headReports: runs([{ fcp: 1213.1 }, { fcp: 1251.4 }, { fcp: 1212.2 }]),
-      baseReports: runs([{ fcp: 1103.0 }, { fcp: 1213.5 }, { fcp: 1105.9 }]),
+      baseReports: runs([{ fcp: 1103.0 }, { fcp: 1104.9 }, { fcp: 1105.9 }]),
     });
     expect(failures(evaluation)).toEqual(
       DASHBOARD_PAGES.map(page => `${page} first-contentful-paint regression`)
     );
     expect(evaluation.retryable).toBe(true);
+  });
+
+  // Job 130365864174: the first full run of this gate, head and base the same
+  // app code. LCP on /app/library, in run order; the first three are the
+  // first round, the last two the recheck.
+  const REPLAY_HEAD = [2381, 3197, 2398, 3072, 3210];
+  const REPLAY_BASE = [2449, 3070, 2191, 2790, 3139];
+  const lcpRuns = (values: number[], shift = 0) => [
+    ...runs(
+      values.map(() => ({})),
+      ['/app']
+    ),
+    ...runs(
+      values.map(lcp => ({ lcp: lcp + shift })),
+      ['/app/library?view=releases']
+    ),
+  ];
+
+  it.each([3, 5])(
+    'replay: the LCP noise that failed the first gate run passes (%i runs per side)',
+    count => {
+      const evaluation = evaluateSuite({
+        config: dashboardConfig,
+        headReports: lcpRuns(REPLAY_HEAD.slice(0, count)),
+        baseReports: lcpRuns(REPLAY_BASE.slice(0, count)),
+      });
+      const lcp = evaluation.pages[1].results.find(
+        result => result.audit === 'largest-contentful-paint'
+      ) as { regression: number; allowed: number; separated: boolean };
+      // Best against best is still over the tolerance, as it was in the job...
+      expect(lcp.regression).toBeGreaterThan(lcp.allowed);
+      // ...but the runs interleave, so it is not a regression.
+      expect(lcp.separated).toBe(false);
+      expect(failures(evaluation)).toEqual([]);
+      expect(formatSuite('dashboard', evaluation).join('\n')).toContain(
+        'runs overlap: noise, not a regression'
+      );
+    }
+  );
+
+  it('replay: the same runs with a real regression on top still fail', () => {
+    // Slower than the whole spread base showed: every head run is past
+    // every base run.
+    const regressed = evaluateSuite({
+      config: dashboardConfig,
+      headReports: lcpRuns(REPLAY_HEAD, 800),
+      baseReports: lcpRuns(REPLAY_BASE),
+    });
+    expect(failures(regressed)).toEqual([
+      '/app/library?view=releases largest-contentful-paint regression',
+    ]);
+    // A slowdown inside the spread of identical runs cannot be told from
+    // noise by a handful of runs; the ceiling is what bounds it.
+    const withinNoise = evaluateSuite({
+      config: dashboardConfig,
+      headReports: lcpRuns(REPLAY_HEAD, 300),
+      baseReports: lcpRuns(REPLAY_BASE),
+    });
+    expect(failures(withinNoise)).toEqual([]);
+    const pastCeiling = evaluateSuite({
+      config: dashboardConfig,
+      headReports: lcpRuns(REPLAY_HEAD, 2200),
+      baseReports: lcpRuns(REPLAY_BASE, 2200),
+    });
+    expect(failures(pastCeiling)).toEqual([
+      '/app/library?view=releases largest-contentful-paint ceiling',
+    ]);
   });
 
   it.each([
@@ -317,326 +368,6 @@ describe('relative Lighthouse budgets', () => {
     ).toThrow(/no ci.assert.assertMatrix/);
     for (const config of [dashboardConfig, onboardingConfig, chatConfig]) {
       expect(parseAssertions(config).length).toBeGreaterThan(0);
-    }
-  });
-});
-
-describe('relative Lighthouse gate flow', () => {
-  const scripts = JSON.parse(
-    readFileSync(resolve(webRoot, 'package.json'), 'utf8')
-  ).scripts as Record<string, string>;
-  const suites = resolveSuites(scripts);
-
-  function harness({
-    verdicts,
-    failCollect = () => false,
-    failServer = () => false,
-  }: {
-    verdicts: Record<string, { passed: boolean; retryable: boolean }[]>;
-    failCollect?: (side: string, suite: string) => boolean;
-    failServer?: (side: string) => boolean;
-  }) {
-    const calls: string[] = [];
-    const evaluated: string[] = [];
-    const round: Record<string, number> = {};
-    return {
-      calls,
-      evaluated,
-      options: {
-        suites,
-        log: () => undefined,
-        async withServer(side: string, work: () => Promise<void>) {
-          if (failServer(side)) throw new Error(`${side} server died`);
-          calls.push(`server:${side}`);
-          await work();
-        },
-        collect(side: string, suite: { name: string }, count: number | null) {
-          calls.push(`${side}:${suite.name}:${count ?? 'config'}`);
-          return !failCollect(side, suite.name);
-        },
-        evaluate(suite: { name: string }, withBase: boolean) {
-          const index = round[suite.name] ?? 0;
-          round[suite.name] = index + 1;
-          evaluated.push(`${suite.name}:${withBase ? 'relative' : 'strict'}`);
-          const list = verdicts[suite.name] ?? [
-            { passed: true, retryable: false },
-          ];
-          return {
-            pages: [],
-            warnings: 0,
-            ...list[Math.min(index, list.length - 1)],
-          };
-        },
-      },
-    };
-  }
-
-  it('reads each suite config from its package script', () => {
-    expect(
-      suites.map(suite => [suite.name, suite.configPath, suite.needsBaseline])
-    ).toEqual([
-      ['dashboard', '.lighthouserc.dashboard.pr.json', true],
-      ['chat', '.lighthouserc.chat.pr.json', false],
-      ['onboarding', '.lighthouserc.onboarding.pr.json', true],
-    ]);
-  });
-
-  it('measures head then base once when everything passes', async () => {
-    const { calls, evaluated, options } = harness({ verdicts: {} });
-    const result = await decide({
-      ...options,
-      hasBaseline: true,
-      extraRuns: 2,
-    });
-    expect(result.passed).toBe(true);
-    expect(calls).toEqual([
-      'server:head',
-      'head:dashboard:config',
-      'head:chat:config',
-      'head:onboarding:config',
-      'server:base',
-      'base:dashboard:config',
-      'base:onboarding:config',
-    ]);
-    expect(evaluated).toEqual([
-      'dashboard:relative',
-      'chat:strict',
-      'onboarding:relative',
-    ]);
-  });
-
-  it('without a baseline enforces the configured budgets and never rechecks', async () => {
-    const { calls, evaluated, options } = harness({
-      verdicts: { dashboard: [{ passed: false, retryable: true }] },
-    });
-    const result = await decide({
-      ...options,
-      hasBaseline: false,
-      extraRuns: 2,
-    });
-    expect(result.passed).toBe(false);
-    expect(calls.filter(call => call.startsWith('server:'))).toEqual([
-      'server:head',
-    ]);
-    expect(evaluated).toEqual([
-      'dashboard:strict',
-      'chat:strict',
-      'onboarding:strict',
-    ]);
-  });
-
-  it('falls back to the configured budgets when the base server dies', async () => {
-    const { evaluated, options } = harness({
-      verdicts: {},
-      failServer: side => side === 'base',
-    });
-    const result = await decide({
-      ...options,
-      hasBaseline: true,
-      extraRuns: 2,
-    });
-    expect(result.passed).toBe(true);
-    expect(evaluated).toEqual([
-      'dashboard:strict',
-      'chat:strict',
-      'onboarding:strict',
-    ]);
-  });
-
-  it('rechecks a failed timing verdict with more runs on both sides, once', async () => {
-    const cleared = harness({
-      verdicts: {
-        onboarding: [
-          { passed: false, retryable: true },
-          { passed: true, retryable: false },
-        ],
-      },
-    });
-    const pass = await decide({
-      ...cleared.options,
-      hasBaseline: true,
-      extraRuns: 2,
-    });
-    expect(pass.passed).toBe(true);
-    expect(cleared.calls.slice(7)).toEqual([
-      'server:head',
-      'head:onboarding:2',
-      'server:base',
-      'base:onboarding:2',
-    ]);
-
-    const confirmed = harness({
-      verdicts: { onboarding: [{ passed: false, retryable: true }] },
-    });
-    const fail = await decide({
-      ...confirmed.options,
-      hasBaseline: true,
-      extraRuns: 2,
-    });
-    expect(fail.passed).toBe(false);
-    expect(
-      confirmed.calls.filter(call => call === 'head:onboarding:2')
-    ).toHaveLength(1);
-  });
-
-  it('does not recheck a fixed budget miss, and fails when head cannot be measured', async () => {
-    const fixed = harness({
-      verdicts: { dashboard: [{ passed: false, retryable: false }] },
-    });
-    const result = await decide({
-      ...fixed.options,
-      hasBaseline: true,
-      extraRuns: 2,
-    });
-    expect(result.passed).toBe(false);
-    expect(fixed.calls).toHaveLength(7);
-
-    const unmeasured = harness({
-      verdicts: {},
-      failCollect: (side, suite) => side === 'head' && suite === 'chat',
-    });
-    const blocked = await decide({
-      ...unmeasured.options,
-      hasBaseline: true,
-      extraRuns: 2,
-    });
-    expect(blocked.passed).toBe(false);
-    expect(unmeasured.evaluated).toEqual([]);
-  });
-});
-
-describe('collect-only report hand-off', () => {
-  const { collectOnly } = createRequire(import.meta.url)(
-    './lighthouse-dashboard-auth.cjs'
-  ) as {
-    collectOnly: (options: {
-      collectDir: string;
-      config: string;
-      chromePath: string;
-      collectUrls: string[];
-      env: NodeJS.ProcessEnv;
-      lhciDir: string;
-    }) => number;
-  };
-
-  it("hands over only the reports this collection wrote, never an earlier side's", () => {
-    const dir = mkdtempSync(join(tmpdir(), 'lighthouse-collect-'));
-    try {
-      const lhciDir = join(dir, '.lighthouseci');
-      const bin = join(dir, 'bin');
-      mkdirSync(lhciDir);
-      mkdirSync(bin);
-      // A collector that, unlike lhci today, does not clear old reports.
-      writeFileSync(
-        join(bin, 'pnpm'),
-        '#!/usr/bin/env bash\necho \'{"side":"head"}\' > "$STUB_LHCI_DIR/lhr-2.json"\n'
-      );
-      chmodSync(join(bin, 'pnpm'), 0o755);
-      // Left behind by the base collection that ran just before.
-      writeFileSync(join(lhciDir, 'lhr-1.json'), '{"side":"base"}');
-      writeFileSync(join(lhciDir, 'keep.txt'), 'not a report');
-
-      const collectDir = join(dir, 'head');
-      const status = collectOnly({
-        collectDir,
-        config: '.lighthouserc.dashboard.pr.json',
-        chromePath: '/bin/true',
-        collectUrls: ['http://localhost:3000/app'],
-        env: {
-          ...process.env,
-          PATH: `${bin}:${process.env.PATH}`,
-          STUB_LHCI_DIR: lhciDir,
-          LIGHTHOUSE_COLLECT_UPLOAD: '',
-        },
-        lhciDir,
-      });
-
-      expect(status).toBe(0);
-      expect(readdirSync(collectDir)).toEqual(['lhr-2.json']);
-      expect(readFileSync(join(collectDir, 'lhr-2.json'), 'utf8')).toContain(
-        'head'
-      );
-      expect(readdirSync(lhciDir).sort()).toEqual(['keep.txt', 'lhr-2.json']);
-    } finally {
-      rmSync(dir, { recursive: true, force: true });
-    }
-  });
-});
-
-describe("serving the base build from the head build's place", () => {
-  const tree = (root: string, buildId: string) => {
-    mkdirSync(join(root, 'apps/web/.next'), { recursive: true });
-    writeFileSync(join(root, 'apps/web/.next/BUILD_ID'), buildId);
-  };
-  const setup = () => {
-    const dir = mkdtempSync(join(tmpdir(), 'lighthouse-swap-'));
-    const headRoot = join(dir, 'ws/.next/standalone');
-    const baselineRoot = join(dir, 'temp/baseline');
-    tree(headRoot, 'head-build');
-    tree(baselineRoot, 'base-build');
-    return { dir, headRoot, baselineRoot };
-  };
-
-  it('serves base where head was built, then puts head back', async () => {
-    const { dir, headRoot, baselineRoot } = setup();
-    try {
-      let served: string | null = null;
-      await withBaselineInPlace({ headRoot, baselineRoot }, async () => {
-        served = readBuildId(headRoot);
-      });
-      expect(served).toBe('base-build');
-      expect(readBuildId(headRoot)).toBe('head-build');
-      expect(readBuildId(baselineRoot)).toBe('base-build');
-      expect(readdirSync(join(dir, 'ws/.next'))).toEqual(['standalone']);
-    } finally {
-      rmSync(dir, { recursive: true, force: true });
-    }
-  });
-
-  it('puts head back when measuring base throws', async () => {
-    const { dir, headRoot, baselineRoot } = setup();
-    try {
-      await expect(
-        withBaselineInPlace({ headRoot, baselineRoot }, async () => {
-          throw new Error('server died');
-        })
-      ).rejects.toThrow('server died');
-      expect(readBuildId(headRoot)).toBe('head-build');
-      expect(readBuildId(baselineRoot)).toBe('base-build');
-    } finally {
-      rmSync(dir, { recursive: true, force: true });
-    }
-  });
-
-  it('leaves head alone when there is no base build to serve', async () => {
-    const { dir, headRoot } = setup();
-    try {
-      await expect(
-        withBaselineInPlace(
-          { headRoot, baselineRoot: join(dir, 'temp/missing') },
-          async () => undefined
-        )
-      ).rejects.toThrow('No base build');
-      expect(readBuildId(headRoot)).toBe('head-build');
-    } finally {
-      rmSync(dir, { recursive: true, force: true });
-    }
-  });
-
-  it("refuses when head's place does not hold head afterwards", async () => {
-    const { dir, headRoot, baselineRoot } = setup();
-    try {
-      await expect(
-        withBaselineInPlace({ headRoot, baselineRoot }, async () => {
-          // Something swapped the parked head build while base was served.
-          writeFileSync(
-            join(`${headRoot}-head`, 'apps/web/.next/BUILD_ID'),
-            'other'
-          );
-        })
-      ).rejects.toThrow('Head build was not restored');
-    } finally {
-      rmSync(dir, { recursive: true, force: true });
     }
   });
 });

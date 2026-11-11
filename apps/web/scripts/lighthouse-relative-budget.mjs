@@ -12,10 +12,11 @@
 //   - Audits that do not depend on runner speed (accessibility, best
 //     practices, layout shift, anything not in NOISY_AUDIT_POLICY) keep their
 //     configured budget unchanged.
-//   - Timing audits with a base measurement fail when head is worse than base
-//     by more than the audit's tolerance (a regression), or when head is past
-//     the ceiling derived from the configured budget (the backstop against
-//     slow drift).
+//   - Timing audits with a base measurement fail on a regression: head's best
+//     run is worse than base's best run by more than the audit's tolerance
+//     AND every head run is worse than every base run. They also fail when
+//     head is past the ceiling derived from the configured budget (the
+//     backstop against slow drift).
 //   - Timing audits without a base measurement (no baseline build, or a page
 //     that does not exist on base) keep their configured budget unchanged, so
 //     a missing baseline can never make the gate weaker than it was.
@@ -25,6 +26,19 @@
 // here lands in separate modes about 10% apart (1103 / 1213 / 1251 ms), so
 // the median of three flips between modes on identical code while the best of
 // three does not. The medians are printed for the reader.
+//
+// Why the runs must not overlap: the first full run of this gate (job
+// 130365864174, head and base the same app code) measured LCP on
+// /app/library five times per side: head 2381 to 3210 ms, base 2191 to 3139.
+// Best against best differed by 191 ms, over the 175 ms tolerance, on noise
+// alone. Replaying those runs, any rule built on best, median or a spread
+// estimate from so few runs failed unchanged code 2% to 20% of the time per
+// audit. Runs that interleave are the same distribution as far as these few
+// samples can tell; a regression larger than the runner's noise moves every
+// head run past every base run. On unchanged code that happens about once in
+// 2000 audits after the recheck (3 runs, then 3 more per side). The price is
+// honest: a regression smaller than the spread between identical runs is not
+// caught here, only by the ceiling.
 //
 // Usage: node scripts/lighthouse-relative-budget.mjs --config <lhci config>
 //          --head <dir of lhr-*.json> [--base <dir of lhr-*.json>]
@@ -174,6 +188,7 @@ function summarize(values, kind) {
   return {
     values,
     best: kind === 'minScore' ? Math.max(...values) : Math.min(...values),
+    worst: kind === 'minScore' ? Math.min(...values) : Math.max(...values),
     median: median(values),
   };
 }
@@ -231,6 +246,8 @@ function evaluateAssertion({ assertion, headReports, baseReports }) {
     Math.abs(baseline.best) * policy.relativeTolerance,
     policy.absoluteTolerance
   );
+  // Every head run worse than every base run. Ties overlap.
+  const separated = worseThan(head.best, baseline.worst) > 0;
   const result = {
     ...base,
     mode: 'relative',
@@ -239,11 +256,14 @@ function evaluateAssertion({ assertion, headReports, baseReports }) {
     ceiling,
     regression,
     allowed,
+    separated,
   };
   if (worseThan(head.best, ceiling) > 0) {
     return { ...result, ...violated('ceiling') };
   }
-  if (regression > allowed) return { ...result, ...violated('regression') };
+  if (regression > allowed && separated) {
+    return { ...result, ...violated('regression') };
+  }
   return { ...result, status: 'pass' };
 }
 
@@ -357,7 +377,11 @@ export function formatSuite(name, evaluation) {
           )}; ${formatValue(Math.abs(result.regression), result.kind)} ${sign}, allowed ${formatValue(
             result.allowed,
             result.kind
-          )} worse; ceiling ${comparator}${formatValue(result.ceiling, result.kind)}${
+          )} worse${
+            result.regression > result.allowed && !result.separated
+              ? ' (runs overlap: noise, not a regression)'
+              : ''
+          }; ceiling ${comparator}${formatValue(result.ceiling, result.kind)}${
             result.reason ? ` [${result.reason}]` : ''
           }`
         );

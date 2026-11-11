@@ -12,7 +12,7 @@
 //   BASE_URL                     where the standalone server listens
 //   LIGHTHOUSE_BASELINE_SERVER   path to the base build's standalone server.js
 //   LIGHTHOUSE_EXTRA_RUNS        runs added per side when a timing verdict
-//                                fails (default 2, 0 turns the recheck off)
+//                                fails (default 3, 0 turns the recheck off)
 import { spawn, spawnSync } from 'node:child_process';
 import {
   existsSync,
@@ -165,10 +165,17 @@ export async function decide({
         );
       }
     }
-    // A failed recheck leaves the first verdict standing; whatever extra
-    // reports did land are still evidence for it.
-    if (!rechecked) log('::warning::Recheck was incomplete.');
-    evaluations = run();
+    // The best of more runs is never worse, so extra runs on one side only
+    // would tilt the comparison: more head runs than base runs could hide a
+    // regression. Unless every extra run landed on both sides, the first
+    // verdict (equal runs per side) stands.
+    if (rechecked) {
+      evaluations = run();
+    } else {
+      log(
+        '::warning::Recheck was incomplete; keeping the first verdict, which compared equal runs per side.'
+      );
+    }
   }
 
   return {
@@ -318,7 +325,7 @@ async function main() {
   const extraRunsRaw = process.env.LIGHTHOUSE_EXTRA_RUNS?.trim();
   const extraRuns =
     extraRunsRaw === undefined || extraRunsRaw === ''
-      ? 2
+      ? 3
       : Number(extraRunsRaw);
   if (!Number.isInteger(extraRuns) || extraRuns < 0 || extraRuns > 5) {
     throw new Error(
