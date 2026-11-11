@@ -95,21 +95,58 @@ def latest_checks(checks, skip_names=()) -> list[dict]:
     return list(chosen.values())
 
 
+def without_aggregate_sibling(checks: list, *, hard: set[str]) -> list:
+    """Drop PR Ready when another hard failure remains, or when PR Ready itself is not hard.
+
+    A lone hard PR Ready is the failure. Skipping it hashed an empty name list
+    (`fix-red-e3b0c44298`) and dispatched a model for a quota-deferred evidence
+    lookup. A cancelled-only PR Ready stays dropped. CI Summary, rollup, and
+    advisory names are the caller's filter, not this one.
+    """
+    def low(check: dict) -> str:
+        return str(check.get("name") or "").lower()
+
+    def is_hard(check: dict) -> bool:
+        return str(check.get("conclusion") or "").upper() in hard
+
+    if any(is_hard(check) and low(check) != "pr ready" for check in checks):
+        return [check for check in checks if low(check) != "pr ready"]
+    ready = [check for check in checks if low(check) == "pr ready" and is_hard(check)]
+    if ready:
+        return ready
+    return [check for check in checks if low(check) != "pr ready"]
+
+
+def red_checks(checks: list, red: set[str], aggregate: tuple[str, ...] = ("pr ready", "ci summary", "rollup")) -> list:
+    """Red checks whose logs decide a class. Summary and rollup never do.
+
+    A lone hard PR Ready stays, so a quota-deferred fleet lookup reruns. Any other
+    hard failure drops PR Ready. A cancelled-only PR Ready is dropped.
+    """
+    skip = {name for name in aggregate if name != "pr ready"}
+    hard = {item for item in red if item != "CANCELLED"}
+    latest = latest_checks(checks, skip)
+    reds = [check for check in latest if str(check.get("conclusion") or "").upper() in red]
+    return without_aggregate_sibling(reds, hard=hard)
+
+
 def check_fingerprint(pr: dict) -> str:
     """Hash the latest failing check names.
 
     A CANCELLED run does not count when a newer run of the same name succeeded, and it
     does not open a second class beside a FAILURE or TIMED_OUT. A rollup whose latest
     run is only cancelled still fingerprints that name. Advisory names are skipped.
+    PR Ready is skipped unless it is the only hard failure.
     """
     red = {"FAILURE", "TIMED_OUT", "CANCELLED"}
     hard = {"FAILURE", "TIMED_OUT"}
-    skip = {"pr ready", "ci summary", *(name.lower() for name in ADVISORY_CHECKS)}
+    skip = {"ci summary", *(name.lower() for name in ADVISORY_CHECKS)}
     latest = latest_checks(pr.get("statusCheckRollup"), skip)
-    checks = [check for check in latest if _check_state(check) in red]
-    if any(_check_state(check) in hard for check in checks):
-        checks = [check for check in checks if _check_state(check) in hard]
-    names = sorted({_check_name(check) for check in checks})
+    checks = [check for check in latest if str(check.get("conclusion") or "").upper() in red]
+    if any(str(check.get("conclusion") or "").upper() in hard for check in checks):
+        checks = [check for check in checks if str(check.get("conclusion") or "").upper() in hard]
+    checks = without_aggregate_sibling(checks, hard=hard)
+    names = sorted({str(check.get("name")) for check in checks})
     return "fix-red-" + hashlib.sha256("|".join(names).encode()).hexdigest()[:10]
 
 

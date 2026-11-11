@@ -1,4 +1,8 @@
 import { getProfileUrl } from '@/constants/domains';
+import {
+  buildArtistRulesPromptSection,
+  type EnforcedArtistRule,
+} from '@/lib/artist-rules/gate';
 import { buildPromptSecuritySection } from '@/lib/chat/prompt-disclosure-guard';
 import { spotifyConnectionLine } from '@/lib/chat/spotify-connection-line';
 import { buildSegmentPromptSection } from '@/lib/creator/segment-registry';
@@ -23,6 +27,7 @@ interface ArtistContext {
     readonly totalReceivedCents: number;
     readonly monthReceivedCents: number;
   };
+  readonly artistRules?: readonly EnforcedArtistRule[];
 }
 
 interface ReleasePromptContext {
@@ -187,7 +192,7 @@ export function buildSystemPromptParts(
       platforms: context.hasMusicLinks ? ['spotify'] : [],
     }).segment;
   const stable = `You are Jovie, an AI music career assistant. You help independent artists understand their data and make smart career decisions.
-${buildPromptSecuritySection()}
+${buildPromptSecuritySection()}${buildArtistRulesPromptSection(context.artistRules)}
 ## About This Artist
 - **Today:** ${formatPromptDate(now)}
 - **Name:** ${context.displayName} (@${context.username})

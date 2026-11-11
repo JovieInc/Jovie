@@ -390,3 +390,67 @@ test('pre-push-gate.sh refuses when nested inside a preflight', () => {
   assert.equal(result.status, 1);
   assert.match(result.stderr, /nested inside a preflight/);
 });
+
+test('affected qualification rejects stale surface certification before expensive checks', () => {
+  const root = mkdtempSync(path.join(os.tmpdir(), 'pre-push-census-'));
+  const write = (file, content) => {
+    const target = path.join(root, file);
+    mkdirSync(path.dirname(target), { recursive: true });
+    writeFileSync(target, content, { mode: 0o755 });
+  };
+  try {
+    write('scripts/hooks/pre-push-gate.sh', readFileSync(gateScript));
+    write('scripts/hooks/resolve-repo-node.sh', 'exit 0\n');
+    write('bin/git', '#!/bin/sh\nexit 0\n');
+    write(
+      'bin/pnpm',
+      `#!/bin/sh
+echo "$*" >> "$QUALIFICATION_CALLS"
+if [ "$*" = 'design:authority:check' ] && [ "$STALE_CENSUS" = 1 ]; then
+  echo 'Surface census: pricing/page.tsx: source changed; renew certification evidence' >&2
+  exit 17
+fi
+`
+    );
+    for (const file of ['preflight.mjs', 'preflight-changed.mjs'])
+      write(`scripts/${file}`, 'export {};\n');
+    write(
+      'scripts/automation-verify.sh',
+      'echo automation-verify >> "$QUALIFICATION_CALLS"\n'
+    );
+    const calls = path.join(root, 'calls');
+    for (const stale of ['1', '0']) {
+      writeFileSync(calls, '');
+      const result = spawnSync(
+        'bash',
+        [path.join(root, 'scripts/hooks/pre-push-gate.sh'), 'affected'],
+        {
+          cwd: root,
+          encoding: 'utf8',
+          env: {
+            ...process.env,
+            PATH: `${path.join(root, 'bin')}:${process.env.PATH}`,
+            JOVIE_SKIP_PRE_PUSH_GATE: '',
+            JOVIE_PREFLIGHT_DEPTH: '',
+            QUALIFICATION_CALLS: calls,
+            STALE_CENSUS: stale,
+          },
+        }
+      );
+      const commands = readFileSync(calls, 'utf8').trim().split('\n');
+      assert.equal(result.status, stale === '1' ? 17 : 0, result.stderr);
+      if (stale === '1') {
+        assert.deepEqual(commands, ['design:authority:check']);
+        assert.match(result.stderr, /renew certification evidence/);
+      } else {
+        assert.equal(commands[0], 'design:authority:check');
+        assert.ok(commands.includes('run pre-push'));
+        assert.ok(commands.includes('component-ship-gate'));
+        assert.ok(commands.includes('component-certificate:gate'));
+        assert.equal(commands.at(-1), 'automation-verify');
+      }
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});

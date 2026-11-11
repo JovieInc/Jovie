@@ -1,14 +1,17 @@
 import { expect, type Page } from '@playwright/test';
 
 /**
- * The wide public-profile desktop surface ships behind the build-time flag
- * NEXT_PUBLIC_FEATURE_PROFILE_DESKTOP_SURFACE (default off, Tim 2026-09-26).
- * Without it, desktop widths keep the compact profile centered in a
- * phone-width column. Run Playwright with the same value the server was built
- * with; `expectDesktopSurfaceBuildMatches` fails loudly on a mismatch.
+ * The wide public-profile desktop surface ships by default (canonical Pen
+ * frame D9kdx); a build opts out with the build-time flag
+ * NEXT_PUBLIC_FEATURE_PROFILE_DESKTOP_SURFACE=0 / `false` / empty. Run
+ * Playwright with the same value the server was built with (unset counts
+ * as shipped);
+ * `expectDesktopSurfaceBuildMatches` fails loudly on a mismatch.
  */
-export const PROFILE_DESKTOP_SURFACE_SHIPPED = ['1', 'true'].includes(
-  process.env.NEXT_PUBLIC_FEATURE_PROFILE_DESKTOP_SURFACE ?? ''
+export const PROFILE_DESKTOP_SURFACE_SHIPPED = !(
+  process.env.NEXT_PUBLIC_FEATURE_PROFILE_DESKTOP_SURFACE === '0' ||
+  process.env.NEXT_PUBLIC_FEATURE_PROFILE_DESKTOP_SURFACE === 'false' ||
+  process.env.NEXT_PUBLIC_FEATURE_PROFILE_DESKTOP_SURFACE === ''
 );
 
 export const PROFILE_DESKTOP_BREAKPOINT = 1180;

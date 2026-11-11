@@ -1,5 +1,6 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import { PayView } from './PayView';
 
 vi.mock('@/components/feedback', () => ({
@@ -25,7 +26,7 @@ describe('PayView', () => {
       ok: true,
       json: async () => ({ available: false }),
     });
-    render(<PayView {...props} />);
+    const { container } = render(<PayView {...props} />);
     expect(
       await screen.findByRole('button', { name: 'Continue with Venmo' })
     ).toBeInTheDocument();
@@ -38,6 +39,39 @@ describe('PayView', () => {
       screen.getByRole('group', { name: 'Choose a payment method' })
     ).toBeInTheDocument();
     expect(screen.queryByText('Apple Pay / Card')).not.toBeInTheDocument();
+    await expectNoA11yViolations(container);
+  });
+
+  it('keeps Venmo when the checkout lookup fails', async () => {
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: false,
+      json: async () => ({ error: 'Checkout temporarily unavailable' }),
+    });
+    const { container } = render(<PayView {...props} />);
+    expect(
+      await screen.findByRole('button', { name: 'Continue with Venmo' })
+    ).toBeInTheDocument();
+    expect(screen.queryByText('Apple Pay / Card')).not.toBeInTheDocument();
+    await expectNoA11yViolations(container);
+  });
+
+  it('says plainly when the lookup fails and the Venmo link is broken', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockRejectedValue(new TypeError('Failed to fetch'));
+    globalThis.fetch = fetchMock;
+    const { container } = render(
+      <PayView
+        {...props}
+        venmoLink='https://venmo-payments.example.net/artist'
+      />
+    );
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+    expect(
+      screen.getByText('Payments are not available for this artist yet.')
+    ).toBeInTheDocument();
+    expect(screen.queryByRole('button')).not.toBeInTheDocument();
+    await expectNoA11yViolations(container);
   });
 
   it('offers eligible Stripe checkout without creating a session on selection', async () => {

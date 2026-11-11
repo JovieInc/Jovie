@@ -92,8 +92,8 @@ describe('/start page', () => {
   afterEach(() => vi.unstubAllEnvs());
 
   beforeEach(() => {
-    // These fixtures exercise the explicit-reopen path; closed defaults are covered separately.
-    vi.stubEnv('FEATURE_PUBLIC_SIGNUP_CLOSED', 'false');
+    // These fixtures exercise the open default (Tim, 2026-11-09); the closed
+    // kill switch is covered in public-signup-closed.test.tsx.
     redirectMock.mockClear();
     getWaitlistAccessMock.mockReset();
     getWaitlistAccessMock.mockResolvedValue({ entryId: null, status: null });

@@ -41,3 +41,17 @@
 
 # Anti-slop guard config and baseline can only be changed with owner review.
 /config/slop-guard/ @itstimwhite
+
+# Merge-queue jump-policy surfaces (G-4): these routes only direct review
+# requests; CODEOWNERS enforces nothing while the ruleset requires 0 reviews
+# (require_code_owner_review: false).
+# NOTE: /scripts/invariants/jump-policy-pin.* is deliberately not listed yet —
+# no file matches that pattern and scripts/codeowners-drift.mjs fails any
+# CODEOWNERS pattern with no tracked file. Add it when the pin file lands.
+/scripts/merge-queue-green-enroll.test.mjs @itstimwhite
+/scripts/lib/main-red-eject.mjs @itstimwhite
+/scripts/main-red-eject.mjs @itstimwhite
+/scripts/lib/admission-hold-labels.* @itstimwhite
+/scripts/lib/wins-ledger.mjs @itstimwhite
+/scripts/lanes/bindings.py @itstimwhite
+/scripts/lanes/priority_admission.py @itstimwhite

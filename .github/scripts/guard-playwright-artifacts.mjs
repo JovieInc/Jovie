@@ -889,6 +889,9 @@ const ANNOTATION_MAX_TITLE_LENGTH = 250;
 const ANNOTATION_MAX_ERROR_LINES = 4;
 const ANNOTATION_MAX_MESSAGE_LENGTH = 2000;
 const ANNOTATION_FAILURE_HEADER = /^\s*\d+\)\s+(.+)$/;
+// CI tee'd reporter output prefixes lines with cursor-control escapes
+// (\x1B[1A\x1B[2K) even under CI=true; strip before matching (JOV-8805).
+const ANSI_CONTROL = /\x1B\[[0-9;?]*[A-Za-z]/g;
 const FAILURE_TAIL_LINE_COUNT = 30;
 const FAILURE_TAIL_MAX_LENGTH = 2800;
 const DIAGNOSTIC_LINE_PATTERNS = [/returned \d{3}:/, /\[claim-dogfood\]/];
@@ -901,15 +904,14 @@ function truncateAnnotation(value, maxLength) {
 }
 
 /**
- * Parse one line-reporter output stream into failure records.
- * Summary lines ("N flaky", "N passed", "N skipped", "N failed") and their
- * indented project/test echoes are deliberately not failures — only the
- * numbered `N)` blocks that the reporter prints for tests that exhausted
- * their retries.
+ * Parse numbered failure blocks for tests that exhausted retries; summary
+ * lines and their indented echoes are not failures.
  */
 export function parsePlaywrightFailures(output) {
+  const lines = String(output ?? '')
+    .replace(ANSI_CONTROL, '')
+    .split('\n');
   const failures = [];
-  const lines = String(output ?? '').split('\n');
   let current = null;
   for (const line of lines) {
     const header = line.match(ANNOTATION_FAILURE_HEADER);
@@ -1003,11 +1005,10 @@ export function collectPlaywrightFailureAnnotations(
 }
 
 /**
- * Bounded, redacted tail annotation for runs that exited non-zero without
- * any parseable per-test failure block (JOV-8805): crashes before/around
- * the reporter (config errors, browser launch failures, wrapper exits)
+ * Bounded, redacted tail annotation for runs that exited non-zero with no
+ * parseable failure block (JOV-8805): crashes before/around the reporter
  * otherwise leave only "Process completed with exit code 1" on an
- * admin-gated job log that no remediation sandbox can read.
+ * admin-gated job log no remediation sandbox can read.
  */
 export function formatPlaywrightFailureTailAnnotation(
   output,
@@ -1035,18 +1036,17 @@ export function formatPlaywrightFailureTailAnnotation(
 /**
  * Lines from the captured output that name the actual failure even when no
  * per-test failure block was parseable (JOV-8805): the spec's assertion
- * message (`... returned 500: {"error":"Failed to create checkout
- * session: <cause>"}`) and the server's `[claim-dogfood]` console sink both
- * appear in stdout but can sit thousands of lines above the tail, inside
- * the JSON reporter blob. Diagnostic lines beat the tail: they carry the
- * response body with the surfaced cause.
+ * message (`... returned 500: {"error":"... <cause>"}`) and the server's
+ * `[claim-dogfood]` console sink can sit thousands of lines above the tail,
+ * inside the JSON reporter blob, which hides the surfaced cause.
  */
 export function collectDiagnosticLines(
   output,
   { patterns = DIAGNOSTIC_LINE_PATTERNS, limit = DIAGNOSTIC_MAX_LINES } = {}
 ) {
   const hits = [];
-  for (const line of String(output ?? '').split('\n')) {
+  const stripped = String(output ?? '').replace(ANSI_CONTROL, '');
+  for (const line of stripped.split('\n')) {
     if (!patterns.some(pattern => pattern.test(line))) continue;
     if (hits.includes(line)) continue;
     hits.push(line);

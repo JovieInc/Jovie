@@ -1,6 +1,6 @@
 import { render, screen, within } from '@testing-library/react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ProfileHomeRail } from '@/features/profile/ProfileHomeRail';
 import type { ProfilePrimaryActionCardRelease } from '@/features/profile/ProfilePrimaryActionCard';
 import { ProfilePacCard } from '@/features/profile/pac/ProfilePacCard';
@@ -105,6 +105,17 @@ function makeTourDate(ticketUrl: string | null): TourDateViewModel {
 }
 
 describe('ProfileHomeRail', () => {
+  // The rail keeps only upcoming shows: pin the clock so the fixture show
+  // stays upcoming whatever day the suite runs.
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-08-14T12:00:00.000Z'));
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it('renders the PAC as the single featured card surface — no carousel stack', () => {
     render(
       <ProfileHomeRail
