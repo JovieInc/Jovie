@@ -225,6 +225,26 @@ describe('new-account admission through Better Auth', () => {
     expect(await counts()).toEqual({ users: 0, sessions: 0, accounts: 0 });
   });
 
+  it('logs the denial with the email domain only, so a blocked sign-in is never silent', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      const response = await otpSignIn(
+        createAuth(),
+        'public+alias@example.com'
+      );
+      expect(response.status).toBe(403);
+      const lines = warn.mock.calls.map(call => String(call[0]));
+      const denial = lines.find(line =>
+        line.startsWith('[auth] new account denied')
+      );
+      expect(denial).toContain('"reason":"no_active_invitation"');
+      expect(denial).toContain('"emailDomain":"example.com"');
+      expect(lines.join('\n')).not.toContain('public+alias');
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
   it.each(['invited', 'approved'])(
     'admits a verified recipient of an active %s invitation without redeeming it',
     async status => {

@@ -17,6 +17,7 @@ import {
 } from '@/lib/auth/auth-shell-intent';
 import { authClient } from '@/lib/auth/client';
 import { AUTH_CLASSES } from '@/lib/auth/constants';
+import { captureWarning } from '@/lib/error-tracking';
 import { logger } from '@/lib/utils/logger';
 
 /**
@@ -81,7 +82,17 @@ const VERIFY_ERROR_COPY: Record<string, string> = {
   too_many_attempts:
     'Too many incorrect attempts. Request a new code to try again.',
   rate_limit_exceeded: 'Too many attempts. Please wait a moment and try again.',
+  // signup-admission.ts denies a verified code for an address with no account
+  // and no active invitation. Better Auth has already consumed the code.
+  signup_invite_required:
+    'No Jovie account uses this email yet, and new accounts need an invitation. Use the email your invite went to, or request access.',
 };
+
+/**
+ * Codes for which Better Auth has already consumed the OTP. Resubmitting the
+ * same code would only report it as incorrect, so the form clears it.
+ */
+const SPENT_CODE_ERRORS = new Set(['signup_invite_required']);
 
 function readErrorCode(error: unknown): string | undefined {
   if (!error || typeof error !== 'object') return undefined;
@@ -112,6 +123,38 @@ function getVerifyErrorMessage(error: unknown): string {
   const code = readErrorCode(error);
   if (code && VERIFY_ERROR_COPY[code]) return VERIFY_ERROR_COPY[code];
   return 'Could not verify the code. Please try again.';
+}
+
+function readErrorStatus(error: unknown): number | undefined {
+  if (!error || typeof error !== 'object') return undefined;
+  const { status } = error as { status?: unknown };
+  return typeof status === 'number' ? status : undefined;
+}
+
+/**
+ * An unmapped verify failure shows the generic copy; report it so a new
+ * server code can never fail silently again (2026-11-09 sign-in incident).
+ */
+function reportUnmappedVerifyError(error: unknown): void {
+  const code = readErrorCode(error);
+  if (code && VERIFY_ERROR_COPY[code]) return;
+  const context = {
+    code: code ?? 'none',
+    status: readErrorStatus(error),
+    surface: 'EmailCodeAuthForm',
+  };
+  logger.warn('Email OTP verify failed', context, 'EmailCodeAuthForm');
+  try {
+    Promise.resolve(
+      captureWarning(
+        'Email OTP verify failed with an unmapped error code',
+        error,
+        context
+      )
+    ).catch(() => undefined);
+  } catch {
+    // Telemetry must never break the sign-in form.
+  }
 }
 
 function isMaxAttemptsError(error: unknown): boolean {
@@ -298,7 +341,10 @@ export function EmailCodeAuthForm({
           setStep('locked');
           setErrorMessage(null);
         } else {
+          const code = readErrorCode(error);
+          if (code && SPENT_CODE_ERRORS.has(code)) setCode('');
           setErrorMessage(getVerifyErrorMessage(error));
+          reportUnmappedVerifyError(error);
         }
         setIsPending(false);
       }
