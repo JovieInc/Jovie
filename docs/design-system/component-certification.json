@@ -497,6 +497,23 @@
       "partial": "The region carries no data payload: its sample is a built-in constant and its optional props (fullBleed, stableDocked, showDockedWelcome, hideWelcomeHeader, alignAbove, onSelectSample) are layout switches, each shown by the JustAsk, AboveComposer and EmptyDockedRegion stories.",
       "permission-denied": "The region has no gated action or permission input; the detector matched 'Role-neutral' and the 'locked Just ask heading' in a doc comment."
     },
+    "apps/web/components/features/onboarding/OnboardingSecurityCheckRecovery.tsx": {
+      "empty": "OnboardingSecurityCheckRecovery always renders one fixed heading, one status line and the retry button, and never a collection; the detector matched the items-start and items-center classes."
+    },
+    "apps/web/components/jovie/components/ChatEmptyStateGreeting.tsx": {
+      "offline": "ChatEmptyStateGreeting never fetches or mutates; its owner resolves the next step, and when that read cannot complete the owner passes no action, which the EmptyNoNextStep story shows (the profile review link).",
+      "permission-denied": "The greeting has no gated action or permission input: the only actions are the owner-supplied draft prompt and the profile review link; the detector matched role='status' on the loading line."
+    },
+    "apps/web/components/jovie/components/ChatDropZoneOverlay.tsx": {
+      "permission-denied": "The drop overlay only mirrors an active file drag and has no gated action or permission input; upload limits are enforced by the attachment hook before files reach it, and the detector matched role='status' on the live region."
+    },
+    "apps/web/components/jovie/components/ErrorDisplay.tsx": {
+      "empty": "ErrorDisplay renders exactly one required ChatError and never a collection; the only .filter is over the two parts of the support reference, and the detector matched the items-start and items-center classes."
+    },
+    "apps/web/components/jovie/source-evidence-context.tsx": {
+      "loading": "The provider is pending only while the code-split source-facts module resolves, a microtask after mount; a static story cannot hold a resolved dynamic import, so source-evidence-context.test.tsx asserts data-source-evidence='pending' before 'ready'. Its children render unchanged either way.",
+      "offline": "The provider never fetches; it projects facts it was handed through a lazily imported pure module, so lost connectivity can only stop that chunk from loading, and its children still render with no evidence (the Default story's content without source chips)."
+    },
     "apps/web/components/molecules/QRCode.tsx": {
       "loading": "The skeleton shows only while the third-party image request is in flight, and a static story cannot hold that request open; QRCode.test.tsx renders the skeleton before onLoad and asserts it clears on load.",
       "offline": "QRCode never fetches or mutates from JS; lost connectivity reaches it only as an <img> that fails to load, which the ErrorImageUnavailable story shows with the same-size fallback."
