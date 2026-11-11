@@ -18,10 +18,10 @@ describe('@sentry/nextjs pinned floor', () => {
     readFileSync(resolve(appWebRoot, 'package.json'), 'utf8')
   ) as { dependencies: Record<string, string> };
 
-  it('declares a caret range at or above ^11.2.0 so dependabot cannot silently downgrade', () => {
+  it('declares an exact pin or caret at or above 11.2.0 so a resolve cannot downgrade', () => {
     const declared = manifest.dependencies['@sentry/nextjs'];
-    expect(declared).toMatch(/^\^\d+\.\d+\.\d+$/);
-    const [major, minor] = majorMinor(declared.slice(1));
+    expect(declared).toMatch(/^\^?\d+\.\d+\.\d+$/);
+    const [major, minor] = majorMinor(declared.replace(/^\^/, ''));
     expect(major).toBeGreaterThanOrEqual(11);
     if (major === 11) {
       expect(minor).toBeGreaterThanOrEqual(2);

@@ -1,9 +1,11 @@
 import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { gzipSync } from 'node:zlib';
 import { afterEach, describe, expect, it } from 'vitest';
 import {
   BASELINE_HEADROOM_RATIO,
+  budgetJsBytes,
   checkBudgets,
   checkFirstLoadBudgets,
   evaluateBudgets,
@@ -78,6 +80,15 @@ describe('route-js-budget', () => {
     );
     expect(routeFromManifestKey('/app/(shell)/@modal/chat/page')).toBe(
       '/app/chat'
+    );
+  });
+
+  it('ignores the CI sourceMappingURL trailer when gzipping a chunk', () => {
+    const js = 'function home(){return 1}';
+    const mapped = Buffer.from(`${js}\n//# sourceMappingURL=home.js.map\n`);
+    expect(budgetJsBytes(mapped).toString('utf8')).toBe(js);
+    expect(gzipSync(mapped).length).toBeGreaterThan(
+      gzipSync(budgetJsBytes(mapped)).length
     );
   });
 
