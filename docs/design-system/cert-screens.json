@@ -258,7 +258,7 @@
     "apps/web/components/homepage/v3/ProductUi.tsx": "a11y,states",
     "apps/web/components/homepage/v3/SpecsChapter.tsx": "a11y,states",
     "apps/web/components/homepage/v3/StageMotion.tsx": "a11y,states",
-    "apps/web/components/homepage/v3/Surfaces.tsx": "a11y,states",
+    "apps/web/components/homepage/v3/Surfaces.tsx": "states",
     "apps/web/components/jovie/ChatWorkspaceSurface.tsx": "a11y,states,tests",
     "apps/web/components/jovie/components/artist-provider.tsx": "a11y,states,tests",
     "apps/web/components/jovie/components/AssistantMessageText.tsx": "a11y,states",
