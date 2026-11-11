@@ -284,7 +284,12 @@ def poison_signals(run, repo: str, runs: list[dict], now: float, cache: dict) ->
 
 def _file_intake(run, event: dict):
     import pr_events  # lazy: pr_events pulls in remediation and the gh CLI wrappers
-    return pr_events.upsert_intake(event, sh=lambda args: run(list(args), capture_output=True, text=True, timeout=60))
+    # upsert_intake builds full `gh ...` argv; the sweep's runner (throughput_sentinel._budgeted_gh -> run_gh) takes
+    # argv without the leading `gh`, like _gh() above, so strip it or every call runs as `gh gh issue ...`.
+    def sh(args):
+        argv = list(args)
+        return run(argv[1:] if argv[:1] == ["gh"] else argv, capture_output=True, text=True, timeout=60)
+    return pr_events.upsert_intake(event, sh=sh)
 
 
 def main_poison(state: Path, run, runs: list[dict], now: float, repo: str, cache: dict, file_intake=None) -> list[dict]:
@@ -303,7 +308,8 @@ def main_poison(state: Path, run, runs: list[dict], now: float, repo: str, cache
     filed = {k: v for k, v in filed.items() if isinstance(v, (int, float)) and now - v < SHARED_WINDOW_S}
     out = []
     for signal in signals:
-        fp = "main-poison-" + hashlib.sha256(signal["key"].encode()).hexdigest()[:12]
+        # Pure hex: pr_events.convert_intake and ensure_linear_intake only accept [0-9a-f]+ fingerprints.
+        fp = hashlib.sha256(("main-poison|" + signal["key"]).encode()).hexdigest()[:16]
         if fp in filed:
             continue
         check = signal["check"]
@@ -322,7 +328,8 @@ def main_poison(state: Path, run, runs: list[dict], now: float, repo: str, cache
         except Exception as error:  # noqa: BLE001 - a filing failure must never break the breaker sweep
             out.append({"fingerprint": fp, "error": f"{type(error).__name__}: {error}"[:160]})
             continue
-        filed[fp] = now
+        if issue:  # an unfiled signal (gh error, or an open intake already holds it) is retried next sweep;
+            filed[fp] = now  # upsert_intake's fingerprint check keeps that from opening a duplicate
         out.append({"fingerprint": fp, "signal": signal["key"][:200], "prs": signal["prs"], "issue": issue})
         with open(state / LOG_FILE, "a") as log:
             log.write(json.dumps({"at": now, "action": "filed-main-poison", "fingerprint": fp, "signal": signal["key"][:200],

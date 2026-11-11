@@ -152,7 +152,7 @@ class MainPoisonTest(unittest.TestCase):
             self.assertEqual(len(filed), 1)
             event = filed[0]
             self.assertEqual(event["source"], "merge-group-shared")
-            self.assertTrue(event["fingerprint"].startswith("main-poison-"))
+            self.assertRegex(event["fingerprint"], r"^[0-9a-f]{16}$")
             self.assertEqual(event["subject"]["prs"], [24767, 24803, 24826])
             self.assertIn("production-release-supersession.test.mjs", event["evidence"]["excerpt"])
             self.assertIn("Never skip, weaken or quarantine", event["evidence"]["excerpt"])
@@ -185,6 +185,37 @@ class MainPoisonTest(unittest.TestCase):
             out = qb.sweep(Path(raw), poisoned_world([], [1, 2, 3]), NOW, file_intake=boom)
         self.assertIn("gh down", out["main-poison"][0]["error"])
         self.assertEqual(out["tripped"], [])
+
+    def test_real_filing_path_uses_the_runner_convention_and_a_convertible_fingerprint(self):
+        """The fakes above bypass pr_events; this drives the real _file_intake -> upsert_intake. The sweep's runner
+        takes argv without `gh` (run_gh prepends it), and convert_intake only parses hex fingerprints."""
+        import re
+        qb, world_calls, intake_calls = load_breaker(), [], []
+        world = poisoned_world(world_calls, [1, 2, 3])
+        def run(args, **kw):
+            args = list(args)
+            if args[:2] == ["issue", "list"] or args[:2] == ["issue", "create"]:
+                intake_calls.append(args)
+                out = "[]" if args[1] == "list" else "https://github.com/JovieInc/Jovie/issues/9001\n"
+                return SimpleNamespace(returncode=0, stdout=out, stderr="")
+            return world(args, **kw)
+        with tempfile.TemporaryDirectory() as raw:
+            out = qb.sweep(Path(raw), run, NOW)
+        self.assertEqual([c[:2] for c in intake_calls], [["issue", "list"], ["issue", "create"]])
+        self.assertTrue(all(c[0] != "gh" for c in intake_calls), "runner must not see a leading gh")
+        self.assertEqual(out["main-poison"][0]["issue"], 9001)
+        body = intake_calls[1][intake_calls[1].index("--body") + 1]
+        self.assertRegex(body, r"<!-- symphony-remediation fingerprint=([0-9a-f]+) -->")
+        fp = re.search(r"fingerprint=([0-9a-f]+) -->", body).group(1)
+        self.assertEqual(fp, out["main-poison"][0]["fingerprint"])
+
+    def test_an_unfiled_signal_is_retried_next_sweep(self):
+        qb, filed = load_breaker(), []
+        run = poisoned_world([], [1, 2, 3])
+        with tempfile.TemporaryDirectory() as raw:
+            qb.sweep(Path(raw), run, NOW, file_intake=lambda _r, e: filed.append(e))  # returns None: not filed
+            qb.sweep(Path(raw), run, NOW + 60, file_intake=lambda _r, e: filed.append(e) or 7)
+        self.assertEqual(len(filed), 2)
 
 
 if __name__ == "__main__":
