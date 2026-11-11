@@ -17,7 +17,7 @@ const meta = {
       </div>
     ),
   ],
-  args: { words: WORDS, nextWordIndex: 0, onSeek: () => {} },
+  args: { words: WORDS, nextWordIndex: 0 },
 } satisfies Meta<typeof StudioScript>;
 
 export default meta;
@@ -26,3 +26,17 @@ type Story = StoryObj<typeof meta>;
 export const Start: Story = {};
 export const MidScript: Story = { args: { nextWordIndex: 9 } };
 export const Finished: Story = { args: { nextWordIndex: WORDS.length } };
+export const EmptyScript: Story = { args: { words: [] } };
+export const LongScript: Story = {
+  args: {
+    words: Array.from({ length: 12 }, () => WORDS).flat(),
+    nextWordIndex: 140,
+  },
+};
+export const Rtl: Story = {
+  render: args => (
+    <div dir='rtl'>
+      <StudioScript {...args} />
+    </div>
+  ),
+};
