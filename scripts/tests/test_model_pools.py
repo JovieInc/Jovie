@@ -247,6 +247,17 @@ class BalanceTest(unittest.TestCase):
         self.assertEqual(late["pool"]["chosenPool"], "hyperagent")
         self.assertIn("pool hyperagent expires first (was claude/claude-opus-5-5)", late["rationale"])
 
+    def test_a_moved_choice_records_the_metrics_of_the_lane_that_runs(self):
+        providers = {"claude": claude_lane(), "hyperagent": hyperagent_lane()}
+        late = datetime(2026, 11, 11, 22, 0, tzinfo=timezone.utc).timestamp()
+        moved = self.route(providers, late, claude_state={"runs": [{"at": late - 60}]}, availability=lambda lane, _route: {
+            "ok": True, "why": "ok", "pressure": 0.4 if lane == "hyperagent" else 0.1})
+        ran = next(row for row in moved["candidates"] if row["lane"] == "hyperagent")
+        self.assertEqual(moved["chosen"]["lane"], "hyperagent")
+        for key in ("cost", "pressure", "paceAdjust", "effectiveCost", "capability", "model"):
+            self.assertEqual(moved["chosen"][key], ran[key], key)
+        self.assertNotEqual(moved["chosen"]["effectiveCost"], moved["candidates"][0]["effectiveCost"])  # not the first pick's
+
     def test_an_exhausted_pool_hands_the_run_to_the_other(self):
         providers = {"claude": claude_lane(), "hyperagent": hyperagent_lane()}
         banked = self.route(providers, NOW, availability=lambda lane, _route: {
