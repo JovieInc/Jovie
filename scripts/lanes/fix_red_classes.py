@@ -28,7 +28,7 @@ from pathlib import Path
 import migration_renumber
 import remediation
 from fix_red_failure_routing import (ALIAS_ACTION, ALIAS_REVIEW_FAILURE, alias_owner_metadata,
-                                     error_signature, fingerprint_key)
+                                     error_signature, fingerprint_key, owner_handoff_reason)
 from atomic_state import atomic_write_text
 from fix_red_source_edits import (  # noqa: F401
     snap_added_conservative_spacing, strip_added_legacy_cache_exports,
