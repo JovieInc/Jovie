@@ -92,6 +92,12 @@ function renderIdentity(value = data) {
         <TooltipProvider>
           <ProfilesWorkspace
             data={value}
+            removalPrincipal={{
+              appActorId: 'user-one',
+              authUserId: 'user-one',
+              sessionId: 'session-one',
+              impersonationSubject: null,
+            }}
             scope={{
               actorId: 'user-one',
               workspaceId: 'profile-one',

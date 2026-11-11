@@ -78,7 +78,7 @@ function RemovalFixture() {
   const [client] = useState(() => {
     applyCacheScope({
       ready: true,
-      userId: 'synthetic-actor',
+      userId: 'synthetic-auth-actor',
       sessionId: 'synthetic-session',
       profileId: data.profileId,
     });
@@ -93,6 +93,12 @@ function RemovalFixture() {
             className='flex h-screen min-w-0 overflow-hidden bg-surface-0'
           >
             <ProfilesWorkspace
+              removalPrincipal={{
+                appActorId: 'synthetic-actor',
+                authUserId: 'synthetic-auth-actor',
+                sessionId: 'synthetic-session',
+                impersonationSubject: null,
+              }}
               data={data}
               scope={{
                 actorId: 'synthetic-actor',
