@@ -1055,9 +1055,12 @@ jobs:
       # a status named anything, but only main's copy of the workflow can
       # produce a pull_request_target run of fleet-rules-evidence.yml. The
       # newest run for this head must have completed after this PR event
-      # (stale pre-edit verdicts read as missing). Missing, in-flight or
-      # deferred evidence exits 75 with github-quota-deferred; the evidence
-      # workflow re-runs this job when it finishes, so nothing polls.
+      # (stale pre-edit verdicts read as missing). Missing or in-flight evidence
+      # exits 75. A client exit 75 is a deferred lookup, not an empty run list:
+      # substituting one reported a passing verdict as missing after the evidence
+      # run had already succeeded. The evidence workflow re-runs this job when a
+      # verdict lands later. A lone PR Ready failure with that deferral in the log
+      # is rerun by the fix-red classifier, so nothing polls.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         if: ${{ always() && github.event_name == 'pull_request' }}
         with:
@@ -1103,7 +1106,17 @@ jobs:
           # carries the BASE sha as its head_sha (#24184), so the head_sha filter hid
           # every post-edit verdict. Bind by PR title, head branch/repo and the floor.
           ref_q="$(jq -rn --arg r "$HEAD_REF" '$r | @uri')"
-          runs="$(node packages/api-client/cli.ts gh --priority default -- api "repos/$REPOSITORY/actions/workflows/fleet-rules-evidence.yml/runs?branch=$ref_q&event=pull_request_target&per_page=20")" || runs='{"workflow_runs":[]}'
+          # Exit 75 is the client's quota deferral. An empty list is a real answer
+          # (no matching run) and must not be invented from a failed lookup.
+          rc=0
+          runs="$(node packages/api-client/cli.ts gh --priority default -- api "repos/$REPOSITORY/actions/workflows/fleet-rules-evidence.yml/runs?branch=$ref_q&event=pull_request_target&per_page=20")" || rc=$?
+          if [ "$rc" -eq 75 ]; then
+            echo "::error::Fleet rule evidence lookup was github-quota-deferred; not a verdict on this PR. It re-runs when the lookup can complete."
+            exit 75
+          fi
+          if [ "$rc" -ne 0 ]; then
+            runs='{"workflow_runs":[]}'
+          fi
           row="$(jq -r --argjson floor "$floor" --arg title "fleet-rules #$PR_NUMBER base=main" --arg ref "$HEAD_REF" --argjson repo "$HEAD_REPO_ID" '[.workflow_runs[] | select(.path == ".github/workflows/fleet-rules-evidence.yml" and .display_title == $title and .head_branch == $ref and .head_repository.id == $repo and (.created_at | fromdateiso8601) >= ($floor - 10) and .conclusion != "cancelled")] | sort_by([.created_at, .id]) | last // {status: "missing"} | "\(.status)\t\(.conclusion // "")\t\(.html_url // "")"' <<<"$runs" 2>/dev/null || echo 'missing')"
           IFS=$'\t' read -r status conclusion url <<<"$row"
           case "$status/$conclusion" in
