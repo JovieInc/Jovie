@@ -19,6 +19,10 @@ Before adding a new test, check the heatmap to see which surface needs it most:
 
 **Enforcement:** `.github/pull_request_template.md`, `pnpm test:bug-to-test` (local + `/ship` Step 3.35), and Danger on PRs (`apps/web/dangerfile.ts`).
 
+## Hermetic contract
+
+Tests obey [hermetic-ci](hermetic-ci.md): no real wall clock, no live network, no shared state, seeded randomness. `scripts/wall-clock-test-guard.mjs` and `scripts/hermetic-ci-guard.mjs` fail the PR; ratchets only shrink.
+
 ## Stack
 
 - Unit tests: Vitest with jsdom

@@ -391,7 +391,7 @@ describe('ProfileInlineNotificationsCTA flow', () => {
 
     expect(screen.getByRole('status')).toHaveAttribute('aria-busy', 'true');
     expect(screen.getByText('Loading subscription form')).toBeInTheDocument();
-    expect(screen.queryByText('Get New Music')).not.toBeInTheDocument();
+    expect(screen.queryByText('Get updates')).not.toBeInTheDocument();
   });
 
   // JOV-1986: alert mode consistency across all three entry points.
