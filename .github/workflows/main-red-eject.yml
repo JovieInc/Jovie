@@ -181,6 +181,11 @@ jobs:
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
         run: node scripts/main-red-eject.mjs stuck-head --apply
+      - name: Set up Python for the Main Health revert opener
+        if: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.name == 'Main Health' }}
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: '3.12'
       - name: Revert the culprit Main Health named (revert first)
         if: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.name == 'Main Health' }}
         env:
