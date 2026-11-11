@@ -136,9 +136,21 @@ class RuntimeGuardTest(unittest.TestCase):
         self.assertEqual(pools.command_guard(["hyperagent", "run"], env={"HYPERAGENT_MODEL": "fable-5.1"}, table=TABLE, state_dir=self.state), "hyperagent")
         self.assertIsNone(pools.command_guard(["python3", "-m", "pytest", "-m=slow"], table=TABLE, state_dir=self.state))
 
+    def test_non_agent_commands_are_not_read_for_models(self):
+        # run_agent also runs gate commands (`lane_runner gate-command -- ...`): their -m and -c are not model flags.
+        for cmd in (["git", "commit", "-m", "fix claude routing"], ["git", "-c", "model=opus", "commit", "-m=claude"],
+                    ["python3", "-m", "pytest", "-m", "sonnet"], ["pnpm", "exec", "vitest", "-m"], ["gh", "pr", "create", "--model"]):
+            with self.subTest(cmd=cmd):
+                self.assertIsNone(pools.command_guard(cmd, env={"CODEX_LANE_MODEL": "claude-opus-5-5"}, table=TABLE, state_dir=self.state))
+        self.assertEqual(self.refusals(), [])
+        with self.assertRaises(pools.ModelPoolRefused):  # an explicit long-form Anthropic id is still refused anywhere
+            pools.command_guard(["fx", "ask", "--model=anthropic/claude-opus-5.5"], table=TABLE, state_dir=self.state)
+        with self.assertRaises(pools.ModelPoolRefused):  # and a configured lane command is an agent whatever its name
+            pools.command_guard(["fx", "-m", "claude-opus-5-5"], agent=True, table=TABLE, state_dir=self.state)
+
     def test_an_unresolved_model_fails_closed(self):
         # A raw Anthropic CLI picks its own default model, and a model flag with no value hides the choice.
-        for cmd in (["claude", "-p", "hi"], ["/usr/local/bin/claude"], ["grok", "--model"], ["fx", "-m="], ["codex", "exec", "--model", ""]):
+        for cmd in (["claude", "-p", "hi"], ["/usr/local/bin/claude"], ["grok", "--model"], ["kimi", "-m="], ["codex", "exec", "--model", ""]):
             with self.subTest(cmd=cmd), self.assertRaises(pools.ModelPoolRefused) as caught:
                 pools.command_guard(cmd, table=TABLE, state_dir=self.state)
             self.assertRegex(str(caught.exception), "cannot be resolved|declared executor")

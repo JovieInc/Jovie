@@ -103,6 +103,7 @@ def _program(cmd) -> tuple[list[str], int]:
     while index < len(args) and (args[index] == "env" or ASSIGNMENT.match(args[index])
                                  or _PYTHON.fullmatch(args[index].rsplit("/", 1)[-1])):
         index += 1
+    index += bool(index and args[index:index + 1] == ["-m"] and _PYTHON.fullmatch(args[index - 1].rsplit("/", 1)[-1]))
     return args, index
 
 
@@ -120,21 +121,29 @@ def pool_for_command(cmd, table: dict) -> str | None:
     return None
 
 
-def command_models(cmd, env=None, names=()) -> list[str | None]:
-    """Every model a command selects, in any spelling: `-m X`, `-m=X`, `--model X`, `--model=X`, a
-    `model=X` config override, and the environment variables in `names` (set inline or in `env`).
-    A selection with no value is None: the model cannot be resolved. Prompt text never counts."""
+def command_models(cmd, env=None, names=(), agent: bool = True) -> list[str | None]:
+    """Every model an agent command selects: `-m X`, `-m=X`, `--model X`, `--model=X`, a `model=X` config
+    override and the env variables in `names` (inline or in `env`). No value is None: unresolvable. For a
+    non-agent command (`git commit -m ...`, a gate) only a long `--model` with a value is read."""
     args, start = _program(cmd)
-    found: list[str | None] = [match.group(2) for match in map(ASSIGNMENT.match, args[:start]) if match and match.group(1) in names]
-    found += [value for name in names if (value := (env or {}).get(name)) and f"{name}=" not in "\0".join(args[:start])]
+    found: list[str | None] = []
+    if agent:
+        found = [match.group(2) for match in map(ASSIGNMENT.match, args[:start]) if match and match.group(1) in names]
+        found += [value for name in names if (value := (env or {}).get(name)) and f"{name}=" not in "\0".join(args[:start])]
     for index in range(start + 1, len(args)):
         flag, config = MODEL_FLAG.match(args[index]), MODEL_CONFIG.match(args[index])
-        if flag:
+        if flag and (agent or args[index].startswith("--")):
             value = flag.group(1) if flag.group(1) is not None else (args[index + 1] if index + 1 < len(args) else None)
-            found.append(value or None)
-        elif config and (args[index].startswith("-") or args[index - 1] in ("-c", "--config")):
+            found += [value or None] if agent or value else []
+        elif agent and config and (args[index].startswith("-") or args[index - 1] in ("-c", "--config")):
             found.append(config.group(1).strip("\"'") or None)
     return found
+
+
+def is_agent(cmd, table: dict) -> bool:
+    """An agent entry point: a declared executor of any pool, a listed agent CLI, or a raw Anthropic CLI."""
+    known = [name for pool in _pools(table).values() for name in pool.get("executors") or ()] + list(table.get("agentRunners") or ())
+    return executor(cmd) in [*known, *((table.get("anthropic") or {}).get("runners") or ("claude",))]
 
 
 def verdict(model, pool: str | None, table: dict | None = None) -> str | None:
@@ -176,19 +185,17 @@ def refusal(model, pool: str | None, *, site: str, table: dict | None = None, st
     """Verdict for one API call site. Returns the recorded refusal row, or None when the call may go."""
     table = load() if table is None else table
     reason = verdict(model, pool, table)
-    if reason is None:
-        return None
-    return record_refusal({"model": str(model), "pool": pool, "site": site, "reason": reason}, state_dir)
+    return reason and record_refusal({"model": str(model), "pool": pool, "site": site, "reason": reason}, state_dir)
 
 
-def command_refusal(cmd, env=None, table: dict | None = None) -> dict | None:
+def command_refusal(cmd, env=None, table: dict | None = None, agent: bool | None = None) -> dict | None:
     """Why a command may not run, as {model, pool, site, reason}; None when it may. Fails closed: a raw
     Anthropic CLI (its default model is Anthropic, and it skips the lane's credential scrub) and a model
     selection with no value are refused outside an allowed pool, since the model cannot be resolved."""
     table = load() if table is None else table
     name, pool = executor(cmd), pool_for_command(cmd, table)
     row = _pools(table).get(pool or "") or {}
-    models = command_models(cmd, env, tuple(row.get("modelEnv") or ()))
+    models = command_models(cmd, env, tuple(row.get("modelEnv") or ()), is_agent(cmd, table) if agent is None else agent)
     wanted = [model for model in models if model and is_anthropic(model, table)]
     reasons = [verdict(model, pool, table) for model in wanted]
     if row.get("anthropic") != "allowed":
@@ -201,12 +208,11 @@ def command_refusal(cmd, env=None, table: dict | None = None) -> dict | None:
     return reason and {"model": (wanted or ["unresolved"])[0], "pool": pool, "site": f"command:{name}", "reason": reason}
 
 
-def command_guard(cmd, *, env=None, table: dict | None = None, state_dir=None) -> str | None:
+def command_guard(cmd, *, env=None, agent: bool | None = None, table: dict | None = None, state_dir=None) -> str | None:
     """Refuse an agent command that would, or could, run an Anthropic model outside an allowed pool.
-    Returns the pool name for an Anthropic command that may run and None for any other command. The pool
-    is read from the executor: only a declared executor of an allowed pool passes."""
+    Returns the pool for an Anthropic command that may run, else None. Only a declared executor of an allowed pool passes."""
     table = load() if table is None else table
-    refused = command_refusal(cmd, env, table)
+    refused = command_refusal(cmd, env, table, agent)
     if refused:
         raise ModelPoolRefused(record_refusal(refused, state_dir))
     pool = pool_for_command(cmd, table)

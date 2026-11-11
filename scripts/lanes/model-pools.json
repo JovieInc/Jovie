@@ -6,6 +6,18 @@
     "tiers": ["fable", "opus", "sonnet", "haiku"],
     "runners": ["claude"]
   },
+  "agentRunners": [
+    "codex",
+    "claude",
+    "grok",
+    "hyperagent",
+    "devin",
+    "kimi",
+    "gemini",
+    "opencode",
+    "aider",
+    "cursor-agent"
+  ],
   "pools": {
     "claude-subscription": {
       "anthropic": "allowed",

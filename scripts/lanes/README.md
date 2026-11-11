@@ -556,8 +556,10 @@ row says what quota or credit is behind the pool and where its reset or expiry i
   route, and the outcome judge refuses an Anthropic model on the Gateway. Each refusal is appended
   to `runs/model-pool-refusals.jsonl`. The command check reads every model spelling (`-m X`, `-m=X`,
   `--model X`, `--model=X`, a `model=X` config override, the pool's `modelEnv` variables) and fails
-  closed: a raw `claude` CLI and a model flag with no value are refused. CI runs the same check on
-  every configured `cmd`.
+  closed: a raw `claude` CLI and a model flag with no value are refused. That reading applies to
+  agent entry points (pool executors and the table's `agentRunners`); a gate command such as
+  `git commit -m ...` is read only for a long `--model` value. CI runs the agent check on every
+  configured `cmd`.
 - Selection: among available routes of the chosen capability class that still have soft allowance
   left, the pool whose unused allowance is lost first takes the run (Claude's 5 hour window while one is open; an idle lane has no expiry,
   Hyperagent's UTC day cap and credit expiry, the weekly reset of Codex and Grok from the capacity
