@@ -53,7 +53,7 @@ describe('AdminRoomPage', () => {
     expect(mocks.read).not.toHaveBeenCalled();
   });
 
-  it('renders the room, and says why when activity is unavailable', async () => {
+  it('renders the room, and says so only when a read failed', async () => {
     mocks.flag.mockResolvedValue(true);
     mocks.read.mockResolvedValueOnce({ status: 'ok', view: {} });
     const { unmount } = render(await AdminRoomPage());
@@ -64,7 +64,18 @@ describe('AdminRoomPage', () => {
       reason: 'redis-unavailable',
       view: {},
     });
+    const second = render(await AdminRoomPage());
+    // No store: an empty feed, never an explanation of the missing store.
+    expect(screen.getByTestId('room-probe')).toHaveTextContent('ok');
+    second.unmount();
+    mocks.read.mockResolvedValueOnce({
+      status: 'unavailable',
+      reason: 'store-read-failed',
+      view: {},
+    });
     render(await AdminRoomPage());
-    expect(screen.getByTestId('room-probe')).toHaveTextContent('no room store');
+    expect(screen.getByTestId('room-probe')).toHaveTextContent(
+      'could not be read just now'
+    );
   });
 });

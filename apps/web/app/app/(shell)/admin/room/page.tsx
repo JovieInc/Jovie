@@ -14,12 +14,10 @@ export const metadata: Metadata = {
 
 export const runtime = 'nodejs';
 
-const UNAVAILABLE_COPY = {
-  'redis-unavailable':
-    'Activity is unavailable here: this environment has no room store. The roster still shows.',
-  'store-read-failed':
-    'Activity could not be read just now. Refresh to retry; the roster still shows.',
-} as const;
+// Without a room store the feed is empty and the roster still renders; only a
+// failed read gets a line, because a refresh can fix it.
+const READ_FAILED_COPY =
+  'Activity could not be read just now. Refresh to retry; the roster still shows.';
 
 /**
  * Ovie fleet room: every agent with live presence, and the fleet's messages
@@ -42,7 +40,9 @@ export default async function AdminRoomPage() {
       <AgentRoom
         view={room.view}
         unavailableReason={
-          room.status === 'unavailable' ? UNAVAILABLE_COPY[room.reason] : null
+          room.status === 'unavailable' && room.reason === 'store-read-failed'
+            ? READ_FAILED_COPY
+            : null
         }
       />
     </AdminPage>
