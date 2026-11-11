@@ -234,8 +234,19 @@ export function jobsOn(workflows, event) {
   return out;
 }
 
-const jobText = job =>
-  JSON.stringify(job).replace(/\\n/g, '\n').replace(/\s+/g, ' ');
+const squash = text => String(text).replace(/\s+/g, ' ').trim();
+
+/** Every string in the job (run, uses, with, env), raw and whitespace-squashed, so quotes and backslashes match as written. */
+const jobText = job => {
+  const parts = [];
+  const walk = value => {
+    if (typeof value === 'string') parts.push(value);
+    else if (value && typeof value === 'object')
+      Object.values(value).forEach(walk);
+  };
+  walk(job);
+  return squash(parts.join(' '));
+};
 
 const dayOf = value =>
   DATE.test(value ?? '') ? Date.parse(`${value}T00:00:00Z`) : Number.NaN;
@@ -349,7 +360,7 @@ export function validateQueueParity({
       [key, queue.jobs.get(key).job],
       [match.pr, counterpart.job],
     ]) {
-      if (!jobText(job).includes(match.command))
+      if (!jobText(job).includes(squash(match.command)))
         errors.push(
           `${key}: shared command "${match.command}" is not in ${side}`
         );

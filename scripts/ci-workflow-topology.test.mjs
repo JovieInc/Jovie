@@ -232,6 +232,17 @@ test('queue parity rejects queue-only jobs, missing commands, PR-only inputs on 
   assert.ok(parityClock(base, { CALENDAR_DEADLINE_SCAN: '1' }) instanceof Date);
 });
 
+test('queue parity matches shared commands with quotes, backslashes and extra spaces as written', () => {
+  const step = cmd => ({ 'runs-on': 'ubuntu-24.04', steps: [{ run: cmd }] });
+  const command = 'node gate.mjs --label "ship it" --re a\\.b';
+  const workflows = new Map([
+    ['ci.yml', { on: { merge_group: {} }, jobs: { gate: { name: 'Gate', ...step(`set -e\n${command.replace(' --re', '   --re')}`) } } }],
+    ['pr.yml', { on: { pull_request: {} }, jobs: { gate: { name: 'Gate', ...step(command) } } }],
+  ]);
+  const policy = { parity: { 'ci.yml#gate': { pr: 'pr.yml#gate', command } }, exemptions: [], prOnlyInputs: [], prOnlyExemptions: [] };
+  assert.deepEqual(validateQueueParity({ workflows, contexts: ['Gate'], policy, asOf: new Date('2026-11-15T00:00:00Z') }).errors, []);
+});
+
 // ---- Trigger registry (audit finding 4): fan-out needs a declared budget ----
 test('trigger registry: every workflow declares its triggers within the run budget', async () => {
   const { checkRegistry, readRegistry, scanWorkflows } = await import('./lib/ci-trigger-registry.mjs');
