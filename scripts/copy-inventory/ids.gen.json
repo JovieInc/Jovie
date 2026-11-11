@@ -529,6 +529,7 @@
     "apps/web/components/features/waitlist/WaitlistOutcomeView.tsx#You Have Access": "WAIT-5",
     "apps/web/components/features/waitlist/WaitlistOutcomeView.tsx#You Have Access#2": "WAIT-6",
     "apps/web/components/features/waitlist/WaitlistOutcomeView.tsx#You're on the list": "WAIT-10",
+    "apps/web/components/features/waitlist/WaitlistPublicLanding.tsx#Request an invite": "WAIT-66",
     "apps/web/components/features/waitlist/WaitlistRoleForm.tsx#Artist": "HOME-284",
     "apps/web/components/features/waitlist/WaitlistRoleForm.tsx#Label": "HOME-286",
     "apps/web/components/features/waitlist/WaitlistRoleForm.tsx#Manager": "HOME-285",
