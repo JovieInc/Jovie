@@ -37,6 +37,8 @@ describe('JovieIcon', () => {
   it('keeps dark and light contrast explicit instead of inheriting text color', () => {
     const { container } = render(<JovieIcon />);
     const svg = container.querySelector('svg');
-    expect(svg).toHaveClass('text-black', 'dark:text-white');
+    // The fixed #000000 and #ffffff tokens (ink-on-media, on-media) keep the
+    // explicit contrast the raw black and white classes drew.
+    expect(svg).toHaveClass('text-ink-on-media', 'dark:text-on-media');
   });
 });

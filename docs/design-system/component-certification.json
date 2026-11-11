@@ -687,6 +687,29 @@
     "apps/web/components/features/release/AlbumArtworkContextMenu.tsx": {
       "error": "The menu has no error UI: a failed download falls back to opening the artwork URL in a new tab, and AlbumArtworkContextMenu.test.tsx asserts that fallback.",
       "offline": "An offline download fails like any other and takes the same new-tab fallback, so there is nothing to draw; the menu itself never fetches until a size is picked."
+    },
+    "apps/web/components/features/profile/ProofClaimCtaLink.tsx": {
+      "empty": "The link holds no collection: label is required and, with no children, is drawn as the link text (RequestAccess, PartialFooterNoAriaLabel). The detector matched the items-center class in proofClaimFooterClassName."
+    },
+    "apps/web/app/[username]/_components/PublicProfileErrorState.tsx": {
+      "empty": "The alert holds no data; its only prop is retryHref. The detector matched the items-center layout classes. ErrorTransientRead shows the one face it draws.",
+      "long-content": "Every visible string is fixed copy in the component and retryHref only sets the Try Again href, so no caller text can grow. ErrorPhoneWidth shows the copy wrapping at 320px; the detector matched the heading id and the icon's title.",
+      "permission-denied": "A public read-failure page with no gated action or permission input; the detector matched role='alert' (ErrorTransientRead)."
+    },
+    "apps/web/components/features/profile/templates/PublicProfileLayoutShell.tsx": {
+      "empty": "The shell holds no collection: compactSurface is required, and PartialCompactOnly shows it alone with no desktop surface or claim footer. The detector matched the items-center and items-stretch layout classes.",
+      "offline": "The shell never fetches; the compact and desktop surfaces it hosts own their requests (ProfileCompactTemplate's OfflineAlertForm covers the offline fallback). The detector matched the desktop Loading profile placeholder, shown in LoadingEmbeddedPreview."
+    },
+    "apps/web/components/features/profile/templates/ProfileCompactSurface.tsx": {
+      "offline": "The surface makes no request: 'loading' is the lazy overlay import option and 'pending' a comment. The alert sign-up it hosts owns its submit; LoadingVisitorAssignment shows the held skeleton, and ProfileCompactTemplate's OfflineAlertForm story and test cover the offline assignment fallback.",
+      "permission-denied": "A public profile with no gated action or permission input; the detector matched 'locked' and 'upgrade' in code comments. hideJovieBranding only drops the footer mark (ProfileCompactSurface.test.tsx)."
+    },
+    "apps/web/components/atoms/JovieIcon.tsx": {
+      "partial": "The icon draws one fixed music-note path; its two optional props are size (Sized, Compact) and className, so nothing can be partly present.",
+      "long-content": "It renders no text; the detector matched its text- colour classes. Rtl shows the mark beside right-to-left copy."
+    },
+    "apps/web/components/atoms/ArtworkFallbackTile.tsx": {
+      "empty": "The tile holds no collection: seed is required and draws the whole face. The detector matched the items-center class; Default and PartialNoLabel show the tile with only a seed."
     }
   }
 }
