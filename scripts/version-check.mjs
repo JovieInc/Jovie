@@ -13,7 +13,10 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const ROOT = join(__dirname, '..');
+// JOVIE_RELEASE_ROOT: see scripts/desktop-release-guard.mjs — lets the
+// desktop-release workflow run this main-side tooling over the certified
+// release tree. Unset = operate on the tree this script is checked out in.
+const ROOT = process.env.JOVIE_RELEASE_ROOT ?? join(__dirname, '..');
 const VERSION_PATTERN = /^(\d{2})\.(1[0-2]|[1-9])\.(\d+)$/;
 
 const errors = [];

@@ -79,6 +79,7 @@ import { DSP_PLATFORMS } from '@/lib/services/social-links/types';
 import { isMissingTourDatesConfirmationStatusError } from '@/lib/tour-dates/queries';
 import {
   degradeAvatarQualityRead,
+  isCommitTransportFailure,
   isIdleTransactionTermination,
 } from './avatar-quality-degrade';
 import { mapSocialLinkExistence } from './social-link-utils';
@@ -953,11 +954,14 @@ async function fetchAvatarQualityWithSession(
   try {
     return await read();
   } catch (error) {
-    // Same recovery admission as the distribution read: idle termination, or
-    // a transient transport failure that is not a PostgreSQL timeout (a
+    // Same recovery admission as the distribution read: idle termination, a
+    // commit-wrapped transport failure (the `Failed query: commit` wrapper
+    // proves the callback succeeded and only the commit died — JOV-12096),
+    // or a transient transport failure that is not a PostgreSQL timeout (a
     // statement timeout replaying immediately would only double the wait).
     const recoverable =
       isIdleTransactionTermination(error) ||
+      (isCommitTransportFailure(error) && !isPostgresTimeoutError(error)) ||
       (isRetryableError(error) && !isPostgresTimeoutError(error));
     if (!recoverable || performance.now() >= retryDeadline) throw error;
 

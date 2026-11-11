@@ -91,6 +91,19 @@
   font-weight: 500;
 }
 
+/* From tablet up, the email field spans exactly the role chips above it, so
+   both rows share their left and right edges. */
+@media (min-width: 48rem) {
+  .hv3-form > div {
+    width: fit-content;
+    max-width: 100%;
+  }
+
+  .hv3-form [data-slot="inline-subscribe"] {
+    width: 100%;
+  }
+}
+
 .hv3-form .waitlist-chips__error:empty {
   display: none;
 }
@@ -207,15 +220,11 @@
 }
 
 /* Once scrolled, the bar's backing runs the full width of the screen and is
-   near-opaque, so no stage scrolls into view beside the bar or reads through
-   it. The row itself stays on the content box. The viewport clips the
-   overshoot of 100vw past a scrollbar. */
+   opaque, so no stage or display heading scrolls into view beside the bar or
+   ghosts through it. The row itself stays on the content box. The viewport
+   clips the overshoot of 100vw past a scrollbar. */
 .home-viewport .header-nav--docked {
-  --marketing-dock-glass: color-mix(
-    in oklab,
-    var(--noir-ion-shell) 94%,
-    transparent
-  );
+  --marketing-dock-glass: var(--noir-ion-shell);
 }
 
 .home-viewport .header-nav--docked::before {

@@ -11,6 +11,7 @@ machine instead of another run).
 Pure functions over parsed values; lane_runner owns every side effect (gh, git, state files).
 
     python3 fix_red_classes.py measure [--state DIR] [--days N]   # before/after numbers from the ledger
+    python3 fix_red_classes.py split-plan --plan FILE           # validate measured, ordered PR layers
 """
 from __future__ import annotations
 
@@ -96,7 +97,7 @@ CACHE_SURFACE_TEXT = re.compile(
 # Source Validation's merge probe. Deterministic unions:
 # - NARROWED vitest command in scripts/preflight-changed.mjs
 # - shell && chains (node --test or vitest paths, plus added prefixes)
-# - quoted list entries (both sides only add 'path', lines)
+# - quoted list entries (both sides only add 'path', lines, or one NAME = ["a", "b", line)
 # - one-line comma-separated identifier lists (main order, then head-only tokens)
 # Any other hunk stays a model fix.
 NARROWED_PREFLIGHT = "scripts/preflight-changed.mjs"
@@ -683,8 +684,36 @@ def resolve_additive_identifier_list_text(text: str) -> str | None:
     return resolved
 
 
+def merge_additive_quoted_path_line(ours: str, theirs: str) -> str | None:
+    """Union one `NAME = ["a", "b",` line (main order, then head-only paths); a second line, prose, a reordered shared path, or a repeated path returns None."""
+
+    def parse(side: str):
+        if not str(side or "").endswith("\n") or "\n" in side[:-1]:
+            return None
+        indent, bracket, rest = side[:-1].partition("[")
+        if not bracket or re.fullmatch(r"[ \t]*[A-Za-z_][A-Za-z0-9_]* = ", indent) is None:
+            return None
+        trail, body = rest.endswith(","), (rest[:-1] if rest.endswith(",") else rest).rstrip()
+        parts = [part.strip() for part in body.split(",")] if body else []
+        if any(len(part) < 2 or part[0] != '"' or part[-1] != '"' or part.count('"') != 2 or any(ch.isspace() for ch in part) for part in parts):
+            return None
+        tokens = [part[1:-1] for part in parts]
+        if not tokens or len(tokens) != len(set(tokens)) or body != ", ".join(f'"{t}"' for t in tokens):
+            return None
+        return indent, tokens, trail
+
+    left, right = parse(ours), parse(theirs)
+    if not left or not right or left[0] != right[0] or left[2] != right[2]:
+        return None
+    # `t in shared` for t in left[1]/right[1] is exactly `t in` the other side's list.
+    if [t for t in left[1] if t in right[1]] != [t for t in right[1] if t in left[1]]:
+        return None
+    merged = list(dict.fromkeys([*right[1], *left[1]]))
+    return left[0] + "[" + ", ".join(f'"{token}"' for token in merged) + ("," if left[2] else "") + "\n"
+
+
 def resolve_additive_quoted_list_text(text: str) -> str | None:
-    """Replace conflict hunks that are only quoted list entries. None when any hunk
+    """Replace quoted-entry hunks or one `NAME = ["a", "b",` line. None when any hunk
     has another shape, so the caller leaves that merge to a model."""
     if "<<<<<<<" not in str(text or ""):
         return None
@@ -696,7 +725,8 @@ def resolve_additive_quoted_list_text(text: str) -> str | None:
     pieces = []
     last = 0
     for hunk in hunks:
-        merged = merge_additive_quoted_entries(hunk.group("ours"), hunk.group("theirs"))
+        merged = (merge_additive_quoted_entries(hunk.group("ours"), hunk.group("theirs"))
+                  or merge_additive_quoted_path_line(hunk.group("ours"), hunk.group("theirs")))
         if merged is None:
             return None
         pieces.append(text[last:hunk.start()])
@@ -1119,13 +1149,51 @@ def costs_from_metrics(state: Path) -> dict:
     return out
 
 
+def reviewable_split(changes: dict[str, int], layers: list[list[str]], cap: int = 1500) -> list[int]:
+    """Validate an exhaustive split, counting tests. Caller measures generated paths as zero.
+
+    This plans file-level layers only; each layer still owes dependency/build/test proof.
+    No Git mutation or policy exception is authorized by a passing plan.
+    """
+    if type(cap) is not int or cap < 1 or not changes or not layers:
+        raise ValueError("nonempty measurements/layers and a positive integer cap required")
+    if any(type(count) is not int or count < 0 for count in changes.values()):
+        raise ValueError("unknown, binary or negative line count")
+    seen, totals = set(), []
+    for layer in layers:
+        if not isinstance(layer, list) or not layer:
+            raise ValueError("empty or invalid layer")
+        for path in layer:
+            if path not in changes or path in seen:
+                raise ValueError(f"unknown or duplicate path: {path}")
+            seen.add(path)
+        total = sum(changes[path] for path in layer)
+        if total > cap:
+            raise ValueError(f"layer {len(totals) + 1} exceeds cap: {total}/{cap}")
+        totals.append(total)
+    if seen != set(changes):
+        raise ValueError(f"unassigned paths: {sorted(set(changes) - seen)}")
+    return totals
+
+
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("command", choices=["measure"])
+    parser.add_argument("command", choices=["measure", "split-plan"])
+    parser.add_argument("--plan", type=Path, help="JSON {changes: {path: measured lines}, layers: [[path]]}")
     parser.add_argument("--state", default=str(Path.home() / ".local/state/jovie-lanes"))
     parser.add_argument("--days", type=int, default=5)
     parser.add_argument("--now", type=float, default=None)
     args = parser.parse_args(argv)
+    if args.command == "split-plan":
+        if args.plan is None:
+            parser.error("split-plan requires --plan")
+        plan = json.loads(args.plan.read_text())
+        try:
+            totals = reviewable_split(plan["changes"], plan["layers"])
+        except ValueError as error:
+            parser.error(str(error))
+        print(json.dumps({"reviewableLines": totals, "cap": 1500, "testsIncluded": True}))
+        return 0
     now = args.now or datetime.now(timezone.utc).timestamp()
     print(json.dumps(measure(read_ledger(Path(args.state)), now, args.days, costs_from_metrics(Path(args.state))), indent=1))
     return 0
