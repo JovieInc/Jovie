@@ -1,8 +1,58 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { getBaseClientConfig, getBaseServerConfig } from '@/lib/sentry/config';
+
+vi.unmock('@sentry/nextjs');
+afterEach(() => vi.unstubAllEnvs());
 
 // Exercise the installed SDK, not the shared test mock or only an options snapshot.
 describe('Sentry 11 collection policy', () => {
+  it('keeps production Replay disabled through synchronous and lazy setup while error reporting works', async () => {
+    vi.stubEnv('NODE_ENV', 'production');
+    const sdk =
+      await vi.importActual<typeof import('@sentry/nextjs')>('@sentry/nextjs');
+    const { getFullClientConfig, addReplayIntegration } = await vi.importActual<
+      typeof import('@/lib/sentry/client-full')
+    >('@/lib/sentry/client-full');
+    const envelopes: unknown[] = [];
+    const config = getFullClientConfig({
+      enableBreadcrumbs: false,
+      enableReplay: true,
+      replaysSessionSampleRate: 1,
+      replaysOnErrorSampleRate: 1,
+    });
+    const client = sdk.init({
+      ...config,
+      dsn: 'https://public@example.com/1',
+      defaultIntegrations: false,
+      enableOpenTelemetrySetup: false,
+      tracesSampleRate: 0,
+      transport: () => ({
+        send: async (envelope: unknown) => {
+          envelopes.push(envelope);
+          return { statusCode: 200 };
+        },
+        flush: async () => true,
+      }),
+    });
+    if (!client) throw new Error('Sentry client was not created');
+    try {
+      expect(config).toMatchObject({
+        replaysSessionSampleRate: 0,
+        replaysOnErrorSampleRate: 0,
+      });
+      expect(await addReplayIntegration(1, true)).toBe(false);
+      expect(client.getIntegrationByName('Replay')).toBeUndefined();
+      client.captureEvent({ message: 'production-error-reporting-probe' });
+      expect(await client.flush(2000)).toBe(true);
+      expect(JSON.stringify(envelopes)).toContain(
+        'production-error-reporting-probe'
+      );
+      expect(JSON.stringify(envelopes)).not.toContain('replay_event');
+    } finally {
+      await client.close(2000);
+      sdk.getCurrentScope().setClient(undefined);
+    }
+  });
   it('keeps client collection restrictive in resolved SDK options and serialized events', async () => {
     const sdk =
       await vi.importActual<typeof import('@sentry/nextjs')>('@sentry/nextjs');

@@ -108,8 +108,8 @@ export interface FullSentryConfig {
   enableBreadcrumbs?: boolean;
 
   /**
-   * Enable Session Replay (default: true)
-   * Set to false to disable replay even in full SDK mode
+   * Enable Session Replay outside production (default: true).
+   * Production Replay is disabled by the tracker registry policy.
    */
   enableReplay?: boolean;
 }
@@ -136,6 +136,7 @@ export function getFullClientConfig(
     enableBreadcrumbs = true,
     enableReplay = true,
   } = options;
+  const replayEnabled = enableReplay && process.env.NODE_ENV !== 'production';
 
   // Build integrations array - full set including Replay
   const integrations: SentryIntegration[] = [];
@@ -146,7 +147,7 @@ export function getFullClientConfig(
   }
 
   // Add Replay integration if enabled
-  if (enableReplay) {
+  if (replayEnabled) {
     integrations.push(
       clientSentry.replayIntegration({ ...REPLAY_PRIVACY_OPTIONS })
     );
@@ -166,8 +167,8 @@ export function getFullClientConfig(
     integrations,
 
     // Replay sample rates
-    replaysSessionSampleRate: enableReplay ? replaysSessionSampleRate : 0,
-    replaysOnErrorSampleRate: enableReplay ? replaysOnErrorSampleRate : 0,
+    replaysSessionSampleRate: replayEnabled ? replaysSessionSampleRate : 0,
+    replaysOnErrorSampleRate: replayEnabled ? replaysOnErrorSampleRate : 0,
   };
 }
 
@@ -222,8 +223,8 @@ export function initFullSentry(options: FullSentryConfig = {}): boolean {
  * Sentry client (lite or full).
  *
  * Replay's compression worker is an inline blob (CSP `worker-src 'self' blob:`
- * is already allowed); it does not need `unsafe-eval`, so this runs in
- * production too.
+ * is already allowed); it does not need `unsafe-eval`. The tracker registry
+ * policy restricts Replay to development/test environments.
  *
  * @param sessionSampleRate - Session sample rate for this route (see
  *   replay-policy). Defaults to the shared dashboard rate.
@@ -236,7 +237,7 @@ export async function addReplayIntegration(
   sessionSampleRate: number = REPLAY_SESSION_SAMPLE_RATE,
   buffer = false
 ): Promise<boolean> {
-  if (isReplayLoaded) {
+  if (process.env.NODE_ENV === 'production' || isReplayLoaded) {
     return false;
   }
 

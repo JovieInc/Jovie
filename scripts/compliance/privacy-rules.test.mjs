@@ -25,6 +25,26 @@ test('clean control snapshot passes every rule', () => {
   assert.deepEqual(fails, []);
 });
 
+test('inventory registration never permits inactive vendors to receive live requests', () => {
+  for (const status of [
+    'inactive',
+    'disabled',
+    'development-only',
+    'unknown',
+    undefined,
+  ]) {
+    const reg = structuredClone(CONTROL_REGISTRY);
+    reg.vendors.find(v => v.id === 'meta').status = status;
+    const results = evaluate(cleanControlSnapshot(), reg);
+    assert.ok(
+      results.some(
+        r => r.rule === 'registered-third-parties' && r.status === 'fail'
+      ),
+      `runtime request must fail for vendor status ${status}`
+    );
+  }
+});
+
 test('a crawl with no successful page, or no analysable policy, fails instead of passing vacuously', () => {
   const clean = cleanControlSnapshot();
   const noPages = evaluate({ ...clean, pages: [] }, CONTROL_REGISTRY);
@@ -51,7 +71,7 @@ test('a crawl with no successful page, or no analysable policy, fails instead of
 
 test('every rule has a seeded violation that fails it and only it', () => {
   const outcomes = runControls();
-  assert.equal(outcomes.length, Object.keys(RULES).length + 1);
+  assert.equal(outcomes.length, Object.keys(RULES).length + 2);
   for (const o of outcomes) assert.ok(o.ok, `${o.control}: ${o.detail}`);
 });
 
@@ -59,6 +79,20 @@ test('controls catch a rule that stops biting', () => {
   // A broken evaluator that never fails anything must fail the controls.
   const outcomes = runControls(() => []);
   assert.ok(outcomes.filter(o => o.control !== 'clean').every(o => !o.ok));
+});
+
+test('the inactive-vendor control catches registration checks that ignore activation status', () => {
+  const broken = (snapshot, reg) =>
+    evaluate(snapshot, {
+      ...reg,
+      vendors: reg.vendors.map(v => ({ ...v, status: 'live' })),
+    });
+  const outcomes = runControls(broken);
+  assert.equal(
+    outcomes.find(o => o.control === 'registered-third-parties').ok,
+    true
+  );
+  assert.equal(outcomes.find(o => o.control === 'inactive-vendor').ok, false);
 });
 
 test('analyzePolicy finds banned claims and named vendors in HTML', () => {
