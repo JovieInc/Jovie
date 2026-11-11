@@ -1,7 +1,6 @@
 'use client';
 
 import { Switch } from '@jovie/ui';
-import { CompositeField } from '@jovie/ui/atoms/composite-field';
 import {
   CalendarDays,
   Check,
@@ -348,38 +347,40 @@ function InlineCaptureField({
 }>) {
   return (
     <div className='space-y-3'>
-      <CompositeField shape='pill' surface='field' className='w-full'>
-        {channel === 'sms' ? (
-          <CountrySelector
-            country={country}
-            isOpen={isCountryOpen}
-            onOpenChange={onCountryOpenChange}
-            onSelect={onCountrySelect}
+      <div className='rounded-(--profile-action-radius) border border-white/10 bg-white/[0.035] p-1'>
+        <div className='flex min-h-14 items-center gap-1'>
+          {channel === 'sms' ? (
+            <CountrySelector
+              country={country}
+              isOpen={isCountryOpen}
+              onOpenChange={onCountryOpenChange}
+              onSelect={onCountrySelect}
+            />
+          ) : (
+            <span className='flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-white/60'>
+              <Mail className='size-4.5' />
+            </span>
+          )}
+          <input
+            data-testid='mobile-email-input'
+            type={channel === 'sms' ? 'tel' : 'email'}
+            inputMode={channel === 'sms' ? 'tel' : 'email'}
+            autoComplete={channel === 'sms' ? 'tel' : 'email'}
+            value={value}
+            placeholder={placeholder}
+            onChange={event => onValueChange(event.target.value)}
+            onKeyDown={event => {
+              if (event.key === 'Enter') {
+                event.preventDefault();
+                onSubmit();
+              }
+            }}
+            disabled={isSubmitting}
+            aria-label={channel === 'sms' ? 'Phone Number' : 'Email Address'}
+            className='h-11 min-w-0 flex-1 bg-transparent px-1 text-base font-medium tracking-[-0.005em] dark:text-white placeholder:text-(--profile-aeo-muted) focus:outline-none disabled:cursor-not-allowed disabled:opacity-60'
           />
-        ) : (
-          <span className='flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-white/60'>
-            <Mail className='size-4.5' />
-          </span>
-        )}
-        <input
-          data-testid='mobile-email-input'
-          type={channel === 'sms' ? 'tel' : 'email'}
-          inputMode={channel === 'sms' ? 'tel' : 'email'}
-          autoComplete={channel === 'sms' ? 'tel' : 'email'}
-          value={value}
-          placeholder={placeholder}
-          onChange={event => onValueChange(event.target.value)}
-          onKeyDown={event => {
-            if (event.key === 'Enter') {
-              event.preventDefault();
-              onSubmit();
-            }
-          }}
-          disabled={isSubmitting}
-          aria-label={channel === 'sms' ? 'Phone Number' : 'Email Address'}
-          className='h-11 min-w-0 flex-1 bg-transparent px-1 text-base font-medium tracking-[-0.005em] dark:text-white placeholder:text-(--profile-aeo-muted) focus:outline-none disabled:cursor-not-allowed disabled:opacity-60'
-        />
-      </CompositeField>
+        </div>
+      </div>
       <button
         type='button'
         onClick={onSubmit}
