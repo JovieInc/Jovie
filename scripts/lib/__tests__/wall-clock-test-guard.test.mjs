@@ -114,6 +114,20 @@ describe('wall-clock-test-guard', () => {
         'py'
       )
     ).toBe(1);
+    // Nested templates: the inner template must not flip string/code parity.
+    expect(
+      countIn(
+        "const html = `<ul>${items.map(i => `<li>${i.id}</li>`).join('')}</ul> see http://x/y`;\nconst due = '2026-11-07';\nconst late = Date.now() > 1;"
+      )
+    ).toBe(1);
+    expect(
+      stripComments(
+        'const a = `x ${f({ k: `y ${z /* c */} //n` })} //kept`; // gone\nb();'
+      )
+    ).toBe('const a = `x ${f({ k: `y ${z  } //n` })} //kept`; \nb();');
+    expect(stripComments('const t = `a \\` // b ${1}`; // c')).toBe(
+      'const t = `a \\` // b ${1}`; '
+    );
     expect(stripComments("a = 'x' // tail\n/* b */c")).toBe("a = 'x' \n c");
     expect(stripComments("a = 'x'  # tail\nb\n", 'py')).toBe("a = 'x'  \nb\n");
   });

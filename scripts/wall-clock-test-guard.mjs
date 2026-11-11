@@ -60,27 +60,65 @@ export function language(path) {
 /**
  * Remove comments and keep everything else, strings included. String-aware:
  * a glob such as 'apps/web/**' or a URL such as 'http://localhost/*' inside a
- * string never opens a comment, so code after it is still scanned.
+ * string never opens a comment, so code after it is still scanned. Template
+ * literals nest: `${...}` is code again (tracked on a stack with its brace
+ * depth), and a template inside it is a template again.
  */
 export function stripComments(text, lang) {
   const py = lang === 'py';
+  const n = text.length;
   let out = '';
   let i = 0;
-  const n = text.length;
+  // One frame per open `${`: the `{` depth inside that interpolation.
+  const interpolations = [];
+
+  /** Copy template text from i up to its closing backtick or the next `${`. */
+  const template = () => {
+    while (i < n) {
+      if (text[i] === '\\') {
+        out += text.slice(i, i + 2);
+        i += 2;
+      } else if (text[i] === '`') {
+        out += '`';
+        i += 1;
+        return;
+      } else if (text.startsWith('${', i)) {
+        out += '${';
+        i += 2;
+        interpolations.push(0);
+        return;
+      } else {
+        out += text[i];
+        i += 1;
+      }
+    }
+  };
+
   while (i < n) {
     const c = text[i];
     const two = text.slice(i, i + 2);
     if (py ? c === '#' : two === '//') {
       while (i < n && text[i] !== '\n') i += 1;
-      continue;
-    }
-    if (!py && two === '/*') {
+    } else if (!py && two === '/*') {
       const end = text.indexOf('*/', i + 2);
       i = end === -1 ? n : end + 2;
       out += ' ';
-      continue;
-    }
-    if (c === '"' || c === "'" || (!py && c === '`')) {
+    } else if (!py && c === '`') {
+      out += '`';
+      i += 1;
+      template();
+    } else if (!py && interpolations.length && c === '{') {
+      interpolations[interpolations.length - 1] += 1;
+      out += c;
+      i += 1;
+    } else if (!py && interpolations.length && c === '}') {
+      out += c;
+      i += 1;
+      if (interpolations[interpolations.length - 1] === 0) {
+        interpolations.pop();
+        template();
+      } else interpolations[interpolations.length - 1] -= 1;
+    } else if (c === '"' || c === "'") {
       const triple = py && text.slice(i, i + 3) === c.repeat(3);
       const close = triple ? c.repeat(3) : c;
       let j = i + close.length;
@@ -94,15 +132,15 @@ export function stripComments(text, lang) {
           break;
         }
         // An unterminated one-line string ends at the newline.
-        if (!triple && c !== '`' && text[j] === '\n') break;
+        if (!triple && text[j] === '\n') break;
         j += 1;
       }
       out += text.slice(i, j);
       i = j;
-      continue;
+    } else {
+      out += c;
+      i += 1;
     }
-    out += c;
-    i += 1;
   }
   return out;
 }
