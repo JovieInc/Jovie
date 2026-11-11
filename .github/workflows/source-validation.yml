@@ -263,6 +263,15 @@ jobs:
       # that fails it there ejects the whole group (#23060: an unquoted
       # run-name with " #" was read as a YAML comment). Lint at PR time so
       # the author sees it before enqueue. Same checksum-pinned toolchain.
+      # Same main-written, sha256-verified download cache as ci-fast; read-only.
+      - name: Restore pinned actionlint downloads
+        if: steps.reuse.outputs.reuse != 'true'
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: /tmp/jovie-pinned-downloads
+          key: pinned-downloads-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('.github/scripts/run-actionlint.sh') }}
+          restore-keys: |
+            pinned-downloads-${{ runner.os }}-${{ runner.arch }}-
       - name: Set up Go for source-pinned actionlint
         if: steps.reuse.outputs.reuse != 'true'
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
@@ -277,6 +286,7 @@ jobs:
           BASE_BRANCH: ${{ github.base_ref }}
           # Read-only token for the release-download fallback.
           RELEASE_DOWNLOAD_TOKEN: ${{ github.token }}
+          PINNED_DOWNLOAD_CACHE_DIR: /tmp/jovie-pinned-downloads
           SHELLCHECK_OPTS: >-
             --exclude=SC2001,SC2016,SC2028,SC2034,SC2086,SC2126,SC2129,SC2329
         run: |
