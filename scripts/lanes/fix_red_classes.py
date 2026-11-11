@@ -25,6 +25,7 @@ from collections import defaultdict
 from datetime import datetime, timezone
 from pathlib import Path
 
+import machine_gap
 import migration_renumber
 import remediation
 from fix_red_failure_routing import (ALIAS_ACTION, ALIAS_REVIEW_FAILURE, alias_owner_metadata,
@@ -171,8 +172,7 @@ DEFAULT_BREAKER_N, MAX_BREAKER_N, MIN_CELL_RUNS = 2, 3, 10
 
 
 def real_failures(pr: dict) -> list[dict]:
-    return [check for check in pr.get("statusCheckRollup") or []
-            if str(check.get("conclusion") or "").upper() in RED and str(check.get("name") or "").lower() not in AGGREGATE]
+    return machine_gap.red_checks(pr.get("statusCheckRollup") or [], RED, AGGREGATE)
 
 
 def stamp_internal_changelog(body) -> str | None:
@@ -1046,8 +1046,8 @@ def _epoch(row: dict) -> float | None:
 def historic_key(row: dict) -> str:
     """Ledger rows keep the failing check names, not the log: coarser than the live fingerprint, stable."""
     source = row.get("requestSource") or {}
-    names = [name for name, verdict in source.get("checks") or []
-             if str(verdict).upper() in RED and str(name).lower() not in AGGREGATE]
+    names = [str(check.get("name")) for check in real_failures({"statusCheckRollup": [
+        {"name": name, "conclusion": verdict} for name, verdict in source.get("checks") or []]})]
     kinds = ",".join(source.get("eventKinds") or [])
     return fingerprint_key("history", names or [f"event:{kinds}"])
 
