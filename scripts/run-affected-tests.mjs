@@ -122,6 +122,14 @@ const KNOWN_VITEST_FIXTURE_TESTS = new Map([
     ['apps/web/tests/unit/e2e/golden-path-tracking.test.ts'],
   ],
 ]);
+// Census evidence entries (surfaceCensus.evidence/) select the census validator.
+const CENSUS =
+  /^apps\/web\/data\/designSystem\/surfaceCensus\.(json$|evidence\/)/;
+const touchesCensus = files => files.some(file => CENSUS.test(file));
+const fixtureTestsFor = file =>
+  CENSUS.test(file) && !file.endsWith('surfaceCensus.json')
+    ? ['scripts/lib/__tests__/design-surface-census.test.mjs']
+    : KNOWN_VITEST_FIXTURE_TESTS.get(file);
 // Any web source that uses TanStack Virtual must stay out of React Compiler
 // memoization (JOV-6702); the invariant has no import edge to such files.
 const VIRTUALIZER_COMPILER_INVARIANT_TEST =
@@ -1308,10 +1316,8 @@ export function buildAffectedTestPlan(changedFiles, options) {
     nodeTestArgs: [],
     retouchPromptCoverage: false,
     ...plan,
-    censusValidation: files.includes(
-      'apps/web/data/designSystem/surfaceCensus.json'
-    ),
-    ...(files.includes('apps/web/data/designSystem/surfaceCensus.json') &&
+    censusValidation: touchesCensus(files),
+    ...(touchesCensus(files) &&
     plan.mode === 'full' &&
     isFileAvailable('scripts/lib/__tests__/design-surface-census.test.mjs')
       ? {
@@ -2256,9 +2262,7 @@ function planAffectedTests(
       'apps/web/tests/unit/design-system/arbitrary-values-ratchet.test.ts'
     );
   }
-  const fixtureProducers = files.flatMap(
-    file => KNOWN_VITEST_FIXTURE_TESTS.get(file) ?? []
-  );
+  const fixtureProducers = files.flatMap(file => fixtureTestsFor(file) ?? []);
   mandatoryTests.push(
     ...fixtureProducers.filter(test => !test.startsWith('scripts/'))
   );
@@ -2404,7 +2408,7 @@ function planAffectedTests(
       CERTIFICATION_NORMALIZATION_MANIFEST.has(file)
     )
       return true;
-    const fixtureTests = KNOWN_VITEST_FIXTURE_TESTS.get(file);
+    const fixtureTests = fixtureTestsFor(file);
     if (fixtureTests) return fixtureTests.every(isFileAvailable);
     if (file.startsWith('apps/web/components/features/profile/')) return true;
     if (file.startsWith('apps/web/app/[username]/')) return true;
