@@ -58,6 +58,9 @@ const ON_GREEN_RE = /<!--\s*jovie-auto-ready:\s*on-green\s*-->/i;
  * default, so green ships without anyone marking it ready; a refreshed body
  * keeps an opt-in it already had; `--on-green` adds one; `--park` is the only
  * way to keep a draft parked, and it removes the opt-in.
+ * @param {string} body
+ * @param {{ cmd?: string, number?: string, park?: boolean, onGreen?: boolean }} [opts]
+ * @param {string} [prior]
  */
 export function shipIntent(body, { cmd, number, park, onGreen } = {}, prior) {
   const bare = String(body ?? '')
