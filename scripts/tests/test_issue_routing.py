@@ -230,18 +230,19 @@ class AvailabilityTest(unittest.TestCase):
 
     def test_router_end_to_end_logs_its_rationale(self):
         router = lane.issue_router(self.host, "claude", PROVIDERS, POLICY)
+        now = time.time()
         frontier = lane_issue("JOV-9", "Staging controller blocks every authorization")
-        self.assertIsNone(lane.admission_rejection(frontier, {}, time.time(), frozenset(), "claude", router))
+        self.assertIsNone(lane.admission_rejection(frontier, {}, now, frozenset(), "claude", router))
         # Standard work: Devin is cheapest, but an idle Claude lane has no window to lose, so the pool with
         # a real expiry (Hyperagent's daily cap) takes it (model-pools.json).
-        self.assertEqual(lane.admission_rejection(lane_issue("JOV-10"), {}, time.time(), frozenset(), "claude", router),
+        self.assertEqual(lane.admission_rejection(lane_issue("JOV-10"), {}, now, frozenset(), "claude", router),
                          "routed:hyperagent")
         self.assertIn(("claude-subscription", None, "claude-lane-window-not-open"), [
             (row["pool"], row["expiresAt"], row["basis"]) for row in router.decisions["JOV-10"]["pool"]["considered"]])
         # Once the Claude 5h window is open it is the allowance lost first.
-        self.write("claude-quota.json", {"runs": [{"at": time.time() - 4 * 3600, "model": "claude-opus-5-5"}]})
+        self.write("claude-quota.json", {"runs": [{"at": now - 4 * 3600, "model": "claude-opus-5-5"}]})
         opened = lane.issue_router(self.host, "claude", PROVIDERS, POLICY)
-        self.assertIsNone(lane.admission_rejection(lane_issue("JOV-11"), {}, time.time(), frozenset(), "claude", opened))
+        self.assertIsNone(lane.admission_rejection(lane_issue("JOV-11"), {}, now, frozenset(), "claude", opened))
         self.assertEqual(opened.decisions["JOV-11"]["pool"]["chosenPool"], "claude-subscription")
         decision = router.decisions["JOV-9"]
         self.assertEqual(decision["chosen"]["model"], "claude-opus-5-5")
