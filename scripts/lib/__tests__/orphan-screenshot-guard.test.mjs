@@ -202,6 +202,18 @@ describe('findOrphanReviewImages', () => {
     assert.deepEqual(orphans, ['docs/screenshots/jov-8/after.png']);
   });
 
+  it('a ../ link resolves to one file, never a same-named image in another bundle (Seer review on #25126)', () => {
+    const orphans = orphansIn({
+      'docs/screenshots/jov-9/README.md':
+        '![a](after.png) ![s](../shared/hero.png)',
+      'docs/screenshots/jov-9/after.png': PNG,
+      'docs/screenshots/shared/hero.png': PNG,
+      'docs/screenshots/jov-10/shared/hero.png': PNG,
+      'docs/ci/census.md': 'Evidence: docs/screenshots/jov-9',
+    });
+    assert.deepEqual(orphans, ['docs/screenshots/jov-10/shared/hero.png']);
+  });
+
   it('names the policy doc and where PR evidence belongs', () => {
     const { root, trackedPaths } = fixture({ 'docs/screenshots/a.png': PNG });
     const [error] = findOrphanReviewImages({
