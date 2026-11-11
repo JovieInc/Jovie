@@ -34,8 +34,8 @@
       "id": "size-500",
       "baseline": "scripts/company-guards/size-baseline.json",
       "semantic": "shrink-only",
-      "check": "node scripts/company-guards/size-baseline.mjs --no-raise origin/main",
-      "tighten": "node scripts/company-guards/size-baseline.mjs --tighten"
+      "check": "node scripts/company-guards/size-ratchet.mjs --no-raise origin/main",
+      "tighten": "node scripts/company-guards/size-ratchet.mjs --tighten"
     }
   ],
   "combineSafe": {

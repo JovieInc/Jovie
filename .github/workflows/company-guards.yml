@@ -66,7 +66,7 @@ jobs:
       # that keeps or shrinks a file leaves the baseline alone.
       - name: Size budgets never rise
         if: env.SIZE_BASE_SHA != ''
-        run: node scripts/company-guards/size-baseline.mjs --no-raise "$SIZE_BASE_SHA"
+        run: node scripts/company-guards/size-ratchet.mjs --no-raise "$SIZE_BASE_SHA"
       - name: Run guards
         env:
           PR_BODY: ${{ github.event.pull_request.body }}
