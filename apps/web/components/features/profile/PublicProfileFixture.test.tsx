@@ -56,6 +56,16 @@ vi.mock('@/features/profile/templates/ProfileCompactTemplate', () => ({
 }));
 
 describe('PublicProfileFixture', () => {
+  it('renders the single-word clipping regression through the real fixture props', () => {
+    render(<PublicProfileFixture displayName='UNMARKED' />);
+
+    expect(
+      screen.getByRole('heading', { name: 'UNMARKED' })
+    ).toBeInTheDocument();
+    expect(screen.getByTestId('public-claim-banner')).toHaveTextContent(
+      'UNMARKED'
+    );
+  });
   it('paints the profile content in server HTML before JavaScript runs', () => {
     const html = renderToString(<PublicProfileFixture state='claimed' />);
     expect(html).toContain('data-testid="profile-template"');

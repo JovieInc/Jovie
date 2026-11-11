@@ -422,3 +422,5 @@ export {
   text,
   typography,
 } from './theme/tokens';
+
+export { UpdatingScreen, type UpdatingScreenProps } from './updating-screen';

@@ -9,6 +9,7 @@ import {
   COMPARATIVE_BENCHMARK,
   COMPARATIVE_CLAIM_RECEIPTS,
   COMPARATIVE_CLAIMS,
+  type ComparativeMetric,
   comparativeAnswer,
   comparativeRatio,
   evaluateComparativeClaim,
@@ -75,15 +76,26 @@ describe('comparative claims registry', () => {
       expect(text.length).toBeLessThan(120);
     }
     expect(renderComparativeClaim(COMPARATIVE_CLAIMS[0])).toBe(
-      'Main content appears 6x faster than on Linktree.'
+      'First paint is faster than Linktree.'
     );
   });
 
+  it('keeps the retired lcp multiplier claim unpublished until a re-measure clears 3x', () => {
+    expect(
+      COMPARATIVE_CLAIMS.some(
+        claim => claim.metric === ('lcp-ms' as ComparativeMetric)
+      )
+    ).toBe(false);
+  });
+
   it('never rounds a published figure above the measurement', () => {
-    const lcp = COMPARATIVE_CLAIMS[0];
-    const ratio = comparativeRatio(lcp.direction, lcp.baseline);
-    const published = Number(/(\d+)x/u.exec(renderComparativeClaim(lcp))?.[1]);
-    expect(published).toBeLessThanOrEqual(ratio);
+    const tbt = COMPARATIVE_CLAIMS.find(c => c.metric === 'tbt-ms');
+    const published = Number(
+      /(\d+)x/u.exec(renderComparativeClaim(tbt as never))?.[1]
+    );
+    expect(published).toBeLessThanOrEqual(
+      comparativeRatio('lower-is-better', tbt?.baseline as never)
+    );
     const weight = COMPARATIVE_CLAIMS.find(c => c.metric === 'total-bytes');
     const pct = Number(
       /(\d+)%/u.exec(renderComparativeClaim(weight as never))?.[1]
@@ -95,12 +107,18 @@ describe('comparative claims registry', () => {
   });
 
   it('flags a claim when the margin collapses or the measurement is invalid', () => {
-    const lcp = COMPARATIVE_CLAIMS[0];
+    const firstClaim = COMPARATIVE_CLAIMS[0];
     expect(
-      evaluateComparativeClaim(lcp, { jovie: 9000, competitor: 10_000 }).holds
+      evaluateComparativeClaim(firstClaim, {
+        jovie: 9000,
+        competitor: 10_000,
+      }).holds
     ).toBe(false);
     expect(
-      evaluateComparativeClaim(lcp, { jovie: Number.NaN, competitor: 1 }).holds
+      evaluateComparativeClaim(firstClaim, {
+        jovie: Number.NaN,
+        competitor: 1,
+      }).holds
     ).toBe(false);
   });
 

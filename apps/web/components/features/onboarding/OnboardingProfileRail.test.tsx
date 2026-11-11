@@ -259,6 +259,31 @@ describe('OnboardingProfileRail', () => {
     expect(badge?.className).not.toContain('bg-black/50');
   });
 
+  // JOV-12045: the side rail hands its height down as a definite chain and
+  // sizes the phone preview from the hero box, so the whole draft-profile
+  // card fits the scrollport at rest instead of running past the fold.
+  it('binds the side rail preview to the rail height so it fits at rest', () => {
+    render(<OnboardingProfileRail placement='side' state={CONFIRMED_STATE} />);
+
+    const rail = screen.getByTestId('onboarding-profile-rail');
+    expect(rail.className).toContain('h-full');
+
+    const bento = document.querySelector(
+      '[data-testid="onboarding-profile-bento"]'
+    );
+    expect(bento?.className).toContain('flex-1');
+    expect(bento?.className).not.toContain('h-full');
+
+    const phone = document.querySelector(
+      '[data-device="mobile-web"]'
+    )?.parentElement;
+    expect(phone?.className).toContain('system-b-onboarding-rail-phone');
+    expect(phone?.className).toContain('w-auto');
+
+    const hero = document.querySelector('.system-b-onboarding-rail-hero');
+    expect(hero).not.toBeNull();
+  });
+
   it('does not add a container tab stop to the inline preview', async () => {
     const user = userEvent.setup();
     render(

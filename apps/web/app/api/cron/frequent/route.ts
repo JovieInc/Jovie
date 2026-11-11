@@ -62,6 +62,7 @@ import { processOutreachBatch } from '@/lib/leads/outreach-batch';
 import { pipelineWarn } from '@/lib/leads/pipeline-logger';
 import { processLeadBatch } from '@/lib/leads/process-batch';
 import { cleanupExpiredSuppressions } from '@/lib/notifications/suppression';
+import { companyHistoryCronJob } from '@/lib/ovie/company-history/configured.server';
 import { refreshCompanyStateCache } from '@/lib/ovie/company-state.server';
 import { applySummerCardDefaults } from '@/lib/ovie/summer-cards.server';
 import { refreshProofStats } from '@/lib/proof-stats/publish.server';
@@ -221,6 +222,8 @@ export async function GET(request: Request) {
       investigations: snapshot.investigations.length,
     };
   });
+
+  results.companyHistory = await companyHistoryCronJob(minute, runSubJob);
 
   // Default-plus-deadline contract: an overdue founder ask records its
   // declared default (approve or reject) so nothing waits on Tim forever.
