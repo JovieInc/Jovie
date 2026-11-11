@@ -245,6 +245,26 @@ class PoolFeedReplayTest(unittest.TestCase):
         self.assertEqual(merged[issue]["declinedBy"][-1], "claude")
         self.assertEqual(pool_feed.merge_offers(many, {}, set(), self.now), {})
 
+    def test_only_an_idle_exit_from_a_scan_that_saw_the_offer_declines_it(self):
+        free, one, rows = {"hyperagent": 0, "grok": 1, "claude": 0, "codex": 0}, self.pool[:1], {}
+
+        def hyperagent_pass():
+            router = self.fed("hyperagent", free, idle_at=lambda: pool_feed.idle_exits(rows))
+            return router, lane.pick_issue(one, {}, now=self.now, provider="hyperagent", route=router)
+
+        self.assertIsNone(hyperagent_pass()[1])  # offered to grok
+        # Grok's worker left before scanning (rate limit, unobservable disk, budget gate): not a decline.
+        for reason in ("linear-rate-limited", "disk-unobservable", "maintenance-only-idle", "in-flight-unknown"):
+            rows["grok"] = {"at": "2027-01-15T08:00:30Z", "reason": reason}
+            self.assertIsNone(hyperagent_pass()[1], reason)
+            offer = json.loads((self.state / "pool-feed.json").read_text())["offers"][one[0].identifier]
+            self.assertEqual(offer, {"lane": "grok", "at": "2027-01-15T08:00:00Z"}, reason)
+        # Grok's scan saw the offer and took nothing: that declines it, and the next pool takes it.
+        rows["grok"] = {"at": "2027-01-15T08:00:40Z", "reason": "none-eligible"}
+        router, picked = hyperagent_pass()
+        self.assertEqual(picked, one[0])
+        self.assertEqual(router.decisions[one[0].identifier]["feed"]["skipped"], [{"lane": "grok", "why": "declined"}])
+
     def test_a_fed_decision_carries_the_pool_record_of_the_lane_it_moved_to(self):
         raw = replay_router(self.replay)
         considered = [{"lane": "grok", "model": "grok-4.7", "pool": "grok-subscription", "expiresAt": "2027-01-16T00:00:00Z"},
