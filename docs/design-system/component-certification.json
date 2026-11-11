@@ -330,6 +330,10 @@
     },
     "apps/web/components/molecules/drawer/EntityHeader.tsx": {
       "permission-denied": "EntityHeader has no gated action or permission input; callers choose what goes in the actions slot, and the detector matched role='img' on the thumbnail and status glyph."
+    },
+    "packages/ui/atoms/common-dropdown-renderer.tsx": {
+      "offline": "The renderer never fetches or submits: it draws the search field and the rows its owner passes, and a submenu shows loading only when the caller sets isLoading (LoadingItems), so lost connectivity reaches it only as caller state.",
+      "permission-denied": "The renderer has no permission input or gated action; the detector matched role='menuitem' on the loading and empty rows. A caller that withholds a submenu passes disabled, which Radix renders as an inert trigger."
     }
   }
 }
