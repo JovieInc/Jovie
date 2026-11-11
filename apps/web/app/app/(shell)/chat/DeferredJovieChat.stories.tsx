@@ -9,7 +9,7 @@ const meta = {
   args: { ambientOwnedByShell: true },
   decorators: [
     Story => (
-      <div className='relative h-[40rem] overflow-hidden bg-base'>
+      <div className='relative h-160 overflow-hidden bg-base'>
         <Story />
       </div>
     ),
