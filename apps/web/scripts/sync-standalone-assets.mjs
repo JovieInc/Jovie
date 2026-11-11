@@ -394,7 +394,7 @@ for (const packageName of standaloneRuntimePackages) {
  * hash (e.g. `@sentry/nextjs-223beba69777d308`, `require-in-the-middle-<hash>`).
  * Node cannot resolve these hash-suffixed names without re-export stubs.
  * Scan standalone chunks and create the stubs for runtime resolution in
- * stubs into BOTH `node_modules` lookup locations (the app-level dir and the
+ * BOTH `node_modules` lookup locations (the app-level dir and the
  * `.next/node_modules` dir Turbopack's chunk runtime resolves against) so
  * neither resolution path misses them.
  */
