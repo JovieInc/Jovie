@@ -80,11 +80,9 @@ test('font-exact producers install system packages through setup-playwright', ()
     /if: steps\.runner-prereqs\.outputs\.playwright_warm != 'true' && inputs\.cache == 'true'/
   );
   assert.match(action, /install-deps --dry-run chromium/);
-  // Cached .debs install with no network; only a save needs cache 'true'.
-  assert.match(
-    action,
-    /apt-get install -y --no-install-recommends --no-download/
-  );
+  // Cached .debs install with dpkg (no network); only a save needs 'true'.
+  assert.match(action, /sudo dpkg -i "\$\{debs\[@\]\}"/);
+  assert.match(action, /\$\{ImageVersion:-unknown\}/);
   assert.match(
     action,
     /name: Restore Playwright system packages\n.*\n\s+if: .*inputs\.cache != 'false'/

@@ -61,9 +61,10 @@ runs:
     # ubuntu-24.04, about 21 MB). `--with-deps` fetched them from the Ubuntu
     # mirrors on every run, and while azure.archive.ubuntu.com stopped
     # resolving (2026-11-11, about 13:40 to 16:50 UTC) every screenshot
-    # producer failed. The .debs are now cached per image and Playwright
-    # version, so a warm run never reaches apt's mirrors. The dry run reads
-    # local package state only, so a runner that already has them skips both.
+    # producer failed. The .debs are now cached per exact runner image and
+    # Playwright version (so their dependencies match) and installed with dpkg,
+    # so a warm run never reaches apt's mirrors. The dry run reads local
+    # package state only, so a runner that already has them skips both.
     - name: Check Playwright system packages
       id: system-deps
       if: inputs.system_deps == 'true'
@@ -78,7 +79,7 @@ runs:
         {
           echo "missing=true"
           echo "dir=$HOME/.cache/jovie-playwright-system-debs"
-          echo "key=${RUNNER_OS}-${RUNNER_ARCH}-playwright-system-debs-v1-${ImageOS:-unknown}-${PLAYWRIGHT_VERSION}"
+          echo "key=${RUNNER_OS}-${RUNNER_ARCH}-playwright-system-debs-v1-${ImageOS:-unknown}-${ImageVersion:-unknown}-${PLAYWRIGHT_VERSION}"
         } >> "$GITHUB_OUTPUT"
 
     - name: Restore Playwright system packages
@@ -101,7 +102,7 @@ runs:
         shopt -s nullglob
         debs=("$DEB_DIR"/*.deb)
         if (( ${#debs[@]} )) &&
-          sudo apt-get install -y --no-install-recommends --no-download "${debs[@]}" &&
+          sudo dpkg -i "${debs[@]}" &&
           pw install-deps --dry-run chromium; then
           echo "Installed ${#debs[@]} cached system packages; Ubuntu mirrors not contacted."
           exit 0
