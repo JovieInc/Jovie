@@ -146,10 +146,11 @@ export function FooterColumnsNav({
       )}
       aria-label='Footer'
     >
-      {footerColumns.map(column => {
-        const columnLabelId = `footer-column-${column.title
-          .toLowerCase()
-          .replace(/[^a-z0-9]+/g, '-')}`;
+      {footerColumns.map((column, index) => {
+        // Key by position, not a slug of the title: non-Latin titles (Arabic)
+        // collapse to the same [a-z0-9] slug. Not useId(), so server and
+        // client markup stay identical whatever the route (hydration test).
+        const columnLabelId = `footer-column-${index}`;
         return (
           <section key={column.title} aria-labelledby={columnLabelId}>
             <p id={columnLabelId} className='mf-eyebrow'>
