@@ -146,13 +146,17 @@ export function measurement(current) {
   };
 }
 
-export function main(argv = process.argv.slice(2), cwd = process.cwd()) {
+export function main(
+  argv = process.argv.slice(2),
+  cwd = process.cwd(),
+  baselinePath = BASELINE_PATH
+) {
   const current = scan(cwd);
   if (argv.includes('--write-baseline')) {
     const sorted = Object.fromEntries(
       Object.entries(current.unbound).sort(([a], [b]) => (a < b ? -1 : 1))
     );
-    writeFileSync(BASELINE_PATH, `${JSON.stringify(sorted, null, 2)}\n`);
+    writeFileSync(baselinePath, `${JSON.stringify(sorted, null, 2)}\n`);
     const m = measurement(current);
     console.log(
       `stat-claims: wrote baseline, ${Object.keys(sorted).length} files, ${m.unbound} unbound claims`
@@ -163,16 +167,17 @@ export function main(argv = process.argv.slice(2), cwd = process.cwd()) {
     console.log(JSON.stringify(measurement(current)));
     return 0;
   }
-  const baseline = JSON.parse(readFileSync(BASELINE_PATH, 'utf8'));
-  const { shrink } = compareToBaseline(current.unbound, baseline);
+  let baseline = JSON.parse(readFileSync(baselinePath, 'utf8'));
+  let { shrink } = compareToBaseline(current.unbound, baseline);
   if (argv.includes('--tighten')) {
-    // Lowers or removes entries only, so it cannot absorb a new claim.
+    // Lowers or removes entries only, so it cannot absorb a new claim; the
+    // growth check below still runs against the tightened baseline.
     if (shrink.length > 0) {
-      const next = tightenBaseline(current.unbound, baseline).baseline;
-      writeFileSync(BASELINE_PATH, `${JSON.stringify(next, null, 2)}\n`);
+      baseline = tightenBaseline(current.unbound, baseline).baseline;
+      writeFileSync(baselinePath, `${JSON.stringify(baseline, null, 2)}\n`);
     }
     console.log(`stat-claims: tightened ${shrink.length} entries`);
-    return 0;
+    shrink = [];
   }
   const errors = evaluate(current, baseline, registeredIds(cwd));
   if (errors.length) {

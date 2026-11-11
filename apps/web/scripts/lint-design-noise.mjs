@@ -185,41 +185,52 @@ const HINTS = {
   'filler-bio': 'Show the real bio or nothing; never a filler line.',
 };
 
-function main() {
-  const args = new Set(process.argv.slice(2));
-  const current = collect();
-  if (args.has('--list')) console.log(JSON.stringify(current, null, 2));
+/** Returns the exit code. `--tighten` lowers the baseline and still fails growth. */
+export function main(
+  argv = process.argv.slice(2),
+  {
+    baselinePath = BASELINE_PATH,
+    current = collect(),
+    log = console.log,
+    error = console.error,
+  } = {}
+) {
+  const args = new Set(argv);
+  if (args.has('--list')) log(JSON.stringify(current, null, 2));
   if (args.has('--update')) {
     writeFileSync(
-      BASELINE_PATH,
+      baselinePath,
       `${JSON.stringify({ files: current }, null, 2)}\n`
     );
-    console.log(
-      `design-noise baseline updated (${Object.keys(current).length} files)`
-    );
-    return;
+    log(`design-noise baseline updated (${Object.keys(current).length} files)`);
+    return 0;
   }
-  const baseline = JSON.parse(readFileSync(BASELINE_PATH, 'utf8')).files;
+  let baseline = JSON.parse(readFileSync(baselinePath, 'utf8')).files;
   if (args.has('--tighten')) {
     const next = tightenBaseline(current, baseline);
     if (next.tightened.length > 0) {
       writeFileSync(
-        BASELINE_PATH,
+        baselinePath,
         `${JSON.stringify({ files: next.baseline }, null, 2)}\n`
       );
     }
-    console.log(`design-noise: tightened ${next.tightened.length} entries`);
-    return;
+    log(`design-noise: tightened ${next.tightened.length} entries`);
+    baseline = next.baseline;
   }
   const problems = compareToBaseline(current, baseline);
   if (problems.length) {
-    console.error(problems.join('\n'));
-    process.exit(1);
+    error(problems.join('\n'));
+    return 1;
   }
-  announceShrink('design-noise', compareCounts(current, baseline).shrink);
-  console.log(
+  announceShrink('design-noise', compareCounts(current, baseline).shrink, {
+    log,
+  });
+  log(
     `design-noise guard ok (${Object.keys(baseline).length} baselined files)`
   );
+  return 0;
 }
 
-if (process.argv[1] === fileURLToPath(import.meta.url)) main();
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
+  process.exitCode = main();
+}

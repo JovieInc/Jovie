@@ -1,6 +1,10 @@
 import assert from 'node:assert/strict';
+import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { test } from 'node:test';
 import {
+  BASELINE_PATH,
   config,
   countFile,
   evaluate,
@@ -121,4 +125,28 @@ test('deliberate red: the original incident closer in a new file fails the guard
 
 test('the tree has no growth beyond the committed baseline', () => {
   assert.equal(main([], cwd), 0);
+});
+
+test('--tighten lowers stale entries but still fails growth and never adopts it', () => {
+  const real = JSON.parse(readFileSync(BASELINE_PATH, 'utf8'));
+  const [[stale, staleCounts], [grown]] = Object.entries(real);
+  const [id] = Object.keys(staleCounts);
+  const path = join(mkdtempSync(join(tmpdir(), 'offer-claims-')), 'b.json');
+  const write = baseline => writeFileSync(path, JSON.stringify(baseline));
+  const read = () => JSON.parse(readFileSync(path, 'utf8'));
+
+  // Headroom only: tighten restores the measured count and passes.
+  write({ ...real, [stale]: { ...staleCounts, [id]: staleCounts[id] + 2 } });
+  assert.equal(main([], cwd, path), 0, 'a shrink alone passes');
+  assert.equal(main(['--tighten'], cwd, path), 0);
+  assert.deepEqual(read(), real);
+
+  // Headroom plus a file with unbaselined claims: tighten exits 1.
+  const { [grown]: _dropped, ...withoutGrown } = real;
+  write({
+    ...withoutGrown,
+    [stale]: { ...staleCounts, [id]: staleCounts[id] + 2 },
+  });
+  assert.equal(main(['--tighten'], cwd, path), 1);
+  assert.deepEqual(read(), withoutGrown, 'tightened, growth not adopted');
 });

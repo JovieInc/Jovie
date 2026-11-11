@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, it } from 'node:test';
@@ -170,5 +170,25 @@ describe('stat-claims ratchet', () => {
     assert.equal(main([], REPO), 0);
     assert.equal(main(['--json'], REPO), 0);
     assert.ok(BASELINE_PATH.endsWith('baseline.json'));
+  });
+});
+
+describe('stat-claims --tighten', () => {
+  it('lowers stale entries but still fails growth and never adopts it', () => {
+    const real = JSON.parse(readFileSync(BASELINE_PATH, 'utf8'));
+    const [[file, counts]] = Object.entries(real);
+    const [id] = Object.keys(counts);
+    const path = join(mkdtempSync(join(tmpdir(), 'stat-claims-')), 'b.json');
+    writeFileSync(
+      path,
+      JSON.stringify({ ...real, [file]: { ...counts, [id]: counts[id] + 2 } })
+    );
+    assert.equal(main(['--tighten'], REPO, path), 0);
+    assert.deepEqual(JSON.parse(readFileSync(path, 'utf8')), real);
+
+    const { [file]: _dropped, ...withoutFile } = real;
+    writeFileSync(path, JSON.stringify(withoutFile));
+    assert.equal(main(['--tighten'], REPO, path), 1);
+    assert.deepEqual(JSON.parse(readFileSync(path, 'utf8')), withoutFile);
   });
 });

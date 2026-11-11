@@ -7,7 +7,8 @@
 // guard's `tighten` command from scripts/lib/queue-drift-guards.json. Those
 // commands only lower or delete entries (scripts/lib/shrink-only-baseline.mjs),
 // so this is safe to run on any tree at any time and can never turn a
-// failing check green.
+// failing check green: every tighten command also runs its guard's growth
+// check and exits non-zero on new debt.
 //
 //   node scripts/baselines-tighten.mjs          tighten every guard
 //   node scripts/baselines-tighten.mjs --list   print the commands only
