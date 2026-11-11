@@ -2669,6 +2669,7 @@ describe('ci-fast bounded parallel workflow', () => {
     const anchorHomes = `${remaining}\n${core}`;
     for (const name of aliases) expect(anchorHomes).toContain(`&${name}`);
     expect(core).toContain('CI_FAST_STRUCTURAL_PYTEST: skip');
+    expect(core).not.toContain('continue-on-error: true');
     expect(python).toContain('CI_FAST_STRUCTURAL_PYTEST: only');
     expect(python).not.toContain('CI_FAST_STRUCTURAL_WEB');
   });
