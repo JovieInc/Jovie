@@ -22,6 +22,9 @@
  * Dedupe: keyed digest of the verified webhook body held for six hours. Definite dispatch rejection releases the lock; an ambiguous
  * timeout stays locked for the reconciliation backstop instead of replaying.
  *
+ * Also schedules the Ovie fleet room upsert for signed Comment events
+ * (`scheduleFleetRoomWebhook`, after the response, outcome-neutral).
+ *
  * Side effects: POSTs to
  * `https://api.github.com/repos/{owner}/{repo}/dispatches` with
  * GH_DISPATCH_TOKEN. Repo defaults to JovieInc/Jovie unless
@@ -35,6 +38,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { env } from '@/lib/env-server';
 import { captureCriticalError } from '@/lib/error-tracking';
 import { ServerFetchTimeoutError, serverFetch } from '@/lib/http/server-fetch';
+import { scheduleFleetRoomWebhook } from '@/lib/ovie/fleet-room.server';
 import { logger } from '@/lib/utils/logger';
 import {
   acquireRecentDispatch,
@@ -502,6 +506,9 @@ export async function POST(request: NextRequest) {
     }
 
     const payload = JSON.parse(body) as LinearWebhookPayload;
+    // Ovie fleet room: an attributed agent comment is upserted after the
+    // response. It never changes this route's outcome (docs/operations/AGENT_ROOM.md).
+    scheduleFleetRoomWebhook(payload);
 
     // Check freshness before an authoritative read. Lookup failures are reads,
     // never an ambiguous GitHub dispatch, and must leave the event retryable.

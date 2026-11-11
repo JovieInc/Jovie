@@ -62,6 +62,7 @@ import { processLeadBatch } from '@/lib/leads/process-batch';
 import { cleanupExpiredSuppressions } from '@/lib/notifications/suppression';
 import { companyHistoryCronJob } from '@/lib/ovie/company-history/configured.server';
 import { refreshCompanyStateCache } from '@/lib/ovie/company-state.server';
+import { fleetRoomCronJob } from '@/lib/ovie/fleet-room.server';
 import { applySummerCardDefaults } from '@/lib/ovie/summer-cards.server';
 import { refreshProofStats } from '@/lib/proof-stats/publish.server';
 import {
@@ -222,6 +223,10 @@ export async function GET(request: Request) {
   });
 
   results.companyHistory = await companyHistoryCronJob(minute, runSubJob);
+
+  // Ovie fleet room backstop: hourly slot, one bounded Linear query over
+  // `fleet` issues and agent home threads. The webhook is the main path.
+  results.fleetRoom = await fleetRoomCronJob(minute, runSubJob);
 
   // Default-plus-deadline contract: an overdue founder ask records its
   // declared default (approve or reject) so nothing waits on Tim forever.
