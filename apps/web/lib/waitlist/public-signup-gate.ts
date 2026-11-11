@@ -12,3 +12,28 @@ export function isPublicSignupClosed(): boolean {
 }
 
 export const PUBLIC_SIGNUP_CLOSED_REDIRECT = APP_ROUTES.WAITLIST;
+
+/**
+ * One-flow onboarding (Tim, 2026-11-09). On by default; the
+ * `ONE_FLOW_ONBOARDING` code flag is the kill switch.
+ */
+export function isOneFlowOnboarding(): boolean {
+  return isCodeFlagEnabled('ONE_FLOW_ONBOARDING');
+}
+
+/**
+ * Anonymous `/start` leaves for `/waitlist` only while signup is closed and
+ * one-flow onboarding is off. Otherwise the chat runs and admission decides.
+ */
+export function shouldRedirectAnonymousStart(): boolean {
+  return isPublicSignupClosed() && !isOneFlowOnboarding();
+}
+
+/**
+ * While signup is closed, an anonymous chat always uses the controlled
+ * golden-path admission, whatever the DB gate says, so the chat can never
+ * promise instant access that the claim would then hold.
+ */
+export function mustControlAnonymousAccess(isSignedIn: boolean): boolean {
+  return !isSignedIn && isPublicSignupClosed();
+}

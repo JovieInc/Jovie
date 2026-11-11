@@ -14,8 +14,8 @@ import { documentTitle } from '@/lib/seo/document-title';
 import { resolveSyntheticPassage } from '@/lib/synthetic/passage.server';
 import { resolveSyntheticPassageToken } from '@/lib/synthetic/passage-token.server';
 import {
-  isPublicSignupClosed,
   PUBLIC_SIGNUP_CLOSED_REDIRECT,
+  shouldRedirectAnonymousStart,
 } from '@/lib/waitlist/public-signup-gate';
 
 /**
@@ -108,11 +108,12 @@ export default async function StartPage(
 
   const isSignedIn = authResult.state !== CanonicalUserState.UNAUTHENTICATED;
   const turnstileTestMode = await resolveSyntheticTurnstileTestMode(isSignedIn);
-  // Closed public signup (canon/PRODUCT.md, 2026-11-02): anonymous visitors
-  // join the waitlist. Signed-in users (including redeemed invitees) keep the
-  // golden path, and the production certification canary (verified passage
-  // token) still exercises anonymous /start.
-  if (!isSignedIn && !turnstileTestMode && isPublicSignupClosed()) {
+  // Closed public signup (canon/PRODUCT.md, 2026-11-02) with one-flow
+  // onboarding (Tim, 2026-11-09): anonymous visitors run the chat and see
+  // their own profile first; admission at the claim decides admit or hold.
+  // With one-flow off they join the waitlist instead. Signed-in users and the
+  // certification canary (verified passage token) always reach the chat.
+  if (!isSignedIn && !turnstileTestMode && shouldRedirectAnonymousStart()) {
     redirect(PUBLIC_SIGNUP_CLOSED_REDIRECT);
   }
   // No account and no onboarding cookie: there is nothing to restore, so the

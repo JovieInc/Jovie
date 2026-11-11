@@ -18,8 +18,11 @@ question variant), so the system can see where each cohort drops.
 
 ## Today (repo at 80de8b22)
 
-- Signup is closed (`PUBLIC_SIGNUP_CLOSED`). `/signup`, anonymous `/start` and
-  cold `/claim/start` all land on `/waitlist`.
+- Signup is closed (`PUBLIC_SIGNUP_CLOSED`). `/signup` and cold `/claim/start`
+  land on `/waitlist`. Since 2026-11-09 (`ONE_FLOW_ONBOARDING`, Tim: "there is
+  no separate waitlist versus onboarding. It's one flow") anonymous `/start`
+  runs the chat, always under controlled golden-path admission, and the claim
+  admits or holds.
 - The `/waitlist` role form stores a role and an email
   (`lib/waitlist/role-entry.ts`). It gets no score. Auto-accept needs a
   Spotify URL and a `users` row (`lib/waitlist/auto-accept.ts`), so a

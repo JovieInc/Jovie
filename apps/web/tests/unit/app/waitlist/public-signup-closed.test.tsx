@@ -3,7 +3,8 @@ import { CanonicalUserState } from '@/lib/auth/canonical-user-state';
 
 /**
  * Closed public signup (canon/PRODUCT.md, 2026-11-02): one test per path.
- *  1. /signup (and anonymous /start) go to the waitlist.
+ *  1. /signup goes to the waitlist; anonymous /start runs the one-flow chat
+ *     (Tim, 2026-11-09), or goes to the waitlist when one-flow is switched off.
  *  2. Sign-in still works for existing users.
  *  3. An invite link creates the account and enters the golden path.
  */
@@ -106,7 +107,7 @@ describe('closed public signup (PUBLIC_SIGNUP_CLOSED)', () => {
     expect(mocks.redirect).not.toHaveBeenCalled();
   });
 
-  it('path 1: sends /signup, the signup modal and anonymous /start to the waitlist', async () => {
+  it('path 1: sends /signup and the signup modal to the waitlist', async () => {
     const { default: SignUpPage } = await import('@/app/(auth)/signup/page');
     await expect(
       SignUpPage({ searchParams: Promise.resolve({}) })
@@ -118,11 +119,28 @@ describe('closed public signup (PUBLIC_SIGNUP_CLOSED)', () => {
     await expect(
       SignupModalPage({ searchParams: Promise.resolve({}) })
     ).rejects.toThrow('NEXT_REDIRECT:/waitlist');
+  });
 
+  it('path 1: runs the one-flow chat for anonymous /start, so the visitor sees their profile before admission', async () => {
+    const { CODE_FLAGS } = await import('@/lib/flags/code-flags');
+    expect(CODE_FLAGS.ONE_FLOW_ONBOARDING).toBe(true);
     const { default: StartPage } = await import('@/app/(dynamic)/start/page');
     await expect(
       StartPage({ searchParams: Promise.resolve({}) })
-    ).rejects.toThrow('NEXT_REDIRECT:/waitlist');
+    ).resolves.toBeTruthy();
+    expect(mocks.redirect).not.toHaveBeenCalled();
+  });
+
+  it('path 1: sends anonymous /start to the waitlist when one-flow onboarding is switched off', async () => {
+    process.env.FEATURE_ONE_FLOW_ONBOARDING = 'false';
+    try {
+      const { default: StartPage } = await import('@/app/(dynamic)/start/page');
+      await expect(
+        StartPage({ searchParams: Promise.resolve({}) })
+      ).rejects.toThrow('NEXT_REDIRECT:/waitlist');
+    } finally {
+      delete process.env.FEATURE_ONE_FLOW_ONBOARDING;
+    }
   });
 
   it('path 1: keeps the production certification canary on anonymous /start', async () => {

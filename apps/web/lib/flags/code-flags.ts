@@ -59,6 +59,13 @@ export const CODE_FLAGS = {
   // that catalog, and the upgrade page leads with it before the price.
   // FEATURE_ONBOARDING_VALUE_BEFORE_PAYWALL=false is the kill switch.
   ONBOARDING_VALUE_BEFORE_PAYWALL: true,
+  // One-flow onboarding (Tim, 2026-11-09): "there is no separate waitlist
+  // versus onboarding. It's one flow." With signup closed, anonymous /start
+  // still runs the chat so every visitor sees their own profile first, and the
+  // golden-path admission (green verdict, capacity, reach) decides admit or
+  // hold at the end. FEATURE_ONE_FLOW_ONBOARDING=false restores the /waitlist
+  // redirect.
+  ONE_FLOW_ONBOARDING: true,
   // Better Auth dynamic client registration. Default off: Better Auth
   // discovery omits registration_endpoint and /oauth2/register stays closed.
   // FEATURE_OVIE_MCP_DYNAMIC_CLIENT_REGISTRATION=true opens unauthenticated
