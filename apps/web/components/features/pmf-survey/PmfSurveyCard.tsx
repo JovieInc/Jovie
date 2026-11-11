@@ -25,7 +25,7 @@ const CHOICES: readonly { value: PmfSurveyChoice; label: string }[] = [
 
 const BENEFIT_MAX_LENGTH = 1000;
 
-type CardState = 'idle' | 'pending' | 'error' | 'done' | 'closed';
+type CardState = 'idle' | 'missing' | 'pending' | 'error' | 'done' | 'closed';
 
 export interface PmfSurveyCardProps {
   readonly onSubmit: (answer: PmfSurveyAnswer) => Promise<PmfSurveyCardResult>;
@@ -58,7 +58,11 @@ export function PmfSurveyCard({
 
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (!choice || state === 'pending') return;
+    if (state === 'pending') return;
+    if (!choice) {
+      setState('missing');
+      return;
+    }
     setState('pending');
     try {
       const result = await onSubmit({
@@ -114,7 +118,10 @@ export function PmfSurveyCard({
             <RadioGroup
               aria-labelledby={questionId}
               disabled={pending}
-              onValueChange={value => setChoice(value as PmfSurveyChoice)}
+              onValueChange={value => {
+                setChoice(value as PmfSurveyChoice);
+                if (state === 'missing') setState('idle');
+              }}
               value={choice ?? ''}
             >
               {CHOICES.map(option => {
@@ -151,6 +158,12 @@ export function PmfSurveyCard({
               value={benefit}
             />
 
+            {state === 'missing' ? (
+              <p className='mt-3 text-sm text-error' role='alert'>
+                Pick an answer first.
+              </p>
+            ) : null}
+
             {state === 'error' ? (
               <p className='mt-3 text-sm text-error' role='alert'>
                 Your answer was not saved. Try again.
@@ -160,7 +173,7 @@ export function PmfSurveyCard({
             <div className='mt-4 flex justify-end'>
               <Button
                 data-testid='pmf-survey-submit'
-                disabled={!choice || pending}
+                disabled={pending}
                 size='sm'
                 type='submit'
                 variant='primary'

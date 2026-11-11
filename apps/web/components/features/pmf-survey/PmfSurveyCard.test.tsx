@@ -34,11 +34,17 @@ describe('PmfSurveyCard', () => {
     ).toBeInTheDocument();
   });
 
-  it('keeps send disabled until an answer is picked', () => {
-    setup();
-    expect(screen.getByRole('button', { name: 'Send answer' })).toBeDisabled();
+  it('asks for an answer on send instead of greying out the button', () => {
+    const { onSubmit } = setup();
+    const send = screen.getByRole('button', { name: 'Send answer' });
+    expect(send).toBeEnabled();
+    fireEvent.click(send);
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      'Pick an answer first.'
+    );
+    expect(onSubmit).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole('radio', { name: 'Very Disappointed' }));
-    expect(screen.getByRole('button', { name: 'Send answer' })).toBeEnabled();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
 
   it('sends the answer with the trimmed benefit and thanks the user', async () => {
