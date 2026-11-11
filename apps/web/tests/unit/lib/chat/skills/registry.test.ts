@@ -86,7 +86,7 @@ describe('buildSkillsPromptSection', () => {
 describe('useSkill tool', () => {
   it('returns the steps for a listed skill and the list for an unknown one', async () => {
     const useSkill = createUseSkillTool();
-    const run = useSkill.execute as (
+    const run = useSkill.execute as unknown as (
       input: { name: string },
       options: unknown
     ) => Promise<Record<string, unknown>>;
@@ -102,7 +102,7 @@ describe('useSkill tool', () => {
 
   it('locks a Pro skill on a free plan and opens it on a paid one', async () => {
     const runFor = (paidPlan: boolean) =>
-      createUseSkillTool({ paidPlan }).execute as (
+      createUseSkillTool({ paidPlan }).execute as unknown as (
         input: { name: string },
         options: unknown
       ) => Promise<Record<string, unknown>>;
