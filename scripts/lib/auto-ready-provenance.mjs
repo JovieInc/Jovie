@@ -53,6 +53,25 @@ export const ON_GREEN_WRITERS = Object.freeze([
 ]);
 const ON_GREEN_RE = /<!--\s*jovie-auto-ready:\s*on-green\s*-->/i;
 
+/**
+ * The writer's ship intent on a PR body (`pnpm pr:open`). A new PR opts in by
+ * default, so green ships without anyone marking it ready; a refreshed body
+ * keeps an opt-in it already had; `--on-green` adds one; `--park` is the only
+ * way to keep a draft parked, and it removes the opt-in.
+ * @param {string} body
+ * @param {{ cmd?: string, number?: string, park?: boolean, onGreen?: boolean }} [opts]
+ * @param {string} [prior]
+ */
+export function shipIntent(body, { cmd, number, park, onGreen } = {}, prior) {
+  const bare = String(body ?? '')
+    .replace(new RegExp(`\\n*${ON_GREEN_RE.source}\\n*`, 'gi'), '\n')
+    .trimEnd();
+  if (park) return `${bare}\n`;
+  const fresh = cmd === 'open' || (cmd === 'draft' && !number);
+  if (!fresh && !onGreen && !ON_GREEN_RE.test(String(prior ?? ''))) return body;
+  return `${bare}\n\n<!-- ${ON_GREEN_MARKER} -->\n`;
+}
+
 export function hasOnGreenOptIn(input = {}) {
   const author = String(input.authorLogin ?? input.writerLogin ?? '').trim();
   return (

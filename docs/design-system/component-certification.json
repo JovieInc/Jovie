@@ -165,6 +165,9 @@
     "apps/web/components/atoms/BrandLogo.tsx": {
       "permission-denied": "BrandLogo only draws the brand mark and has no permission input or gated action; the detector matched role='img' on the svg."
     },
+    "apps/web/components/atoms/DotBadge.tsx": {
+      "partial": "label and variant are required, and size, title and className are presentation options, so the badge has no data that can be partially present. LongContent and Rtl cover the label's limits; DotBadge.test.tsx covers the title."
+    },
     "apps/web/components/atoms/DspLogo.tsx": {
       "partial": "DspLogo takes one required provider key and draws that platform's fixed glyph and name together; its optional props (className, height) are styling with defaults, so nothing can be partially present, and an unmapped provider renders nothing (UnmappedProvider)."
     },
@@ -219,6 +222,9 @@
       "partial": "VerifiedBadge takes no data; its only optional props are size and className, both styling with defaults, and its glyph and accessible name are fixed, so nothing can be partially present.",
       "permission-denied": "VerifiedBadge is a static verification mark with no gated action or permission input; the detector matched role='img' on its wrapper."
     },
+    "apps/web/components/features/admin/OvieRouteUsageBeacon.tsx": {
+      "error": "The beacon renders null in every state and is fire-and-forget: a failed POST is swallowed by its .catch, so there is no failure to draw. OvieRouteUsageBeacon.test.tsx rejects the fetch and asserts the page is unchanged and axe-clean."
+    },
     "apps/web/components/features/alerts/UnpublishedEntityAlerts.tsx": {
       "offline": "The copy and its fallback never fetch; the alert sign-up it hosts, AlertGrowthLanding, owns the subscribe request and its network error. The detector matched the loading test id on the Suspense fallback (Loading).",
       "permission-denied": "It is a public opt-in with no gated action or permission input; the detector matched role='status' on the loading fallback."
@@ -261,6 +267,9 @@
     "apps/web/components/features/auth/atoms/FormError.tsx": {
       "partial": "FormError has one content field: a message renders the alert (Default) and no message renders nothing (NoMessage); id and className are wiring and styling, so nothing can be partially present.",
       "permission-denied": "FormError only shows a caller's validation message and has no gated action or permission input; the detector matched role='alert'."
+    },
+    "apps/web/components/features/dashboard/NavigationDestinationReady.tsx": {
+      "offline": "It never fetches or mutates: it renders null and only reports readiness once the caller's ready flag flips (LoadingDestinationData shows it held). The detector matched the word loading in its doc comment; the destination that owns the data owns any network failure."
     },
     "apps/web/components/features/dashboard/dashboard-nav/InboxAttentionLink.tsx": {
       "offline": "InboxAttentionLink never fetches or mutates; it renders the pending count its owner passes, and with no connection that count stays unloaded, which the Partial story shows.",
@@ -516,8 +525,14 @@
     "apps/web/components/molecules/drawer/DrawerButton.tsx": {
       "partial": "DrawerButton holds no data: it forwards its children label and native button props to the shared Button and only maps tone and size (both defaulted) to classes, so nothing can be partially present."
     },
+    "apps/web/components/molecules/drawer/DrawerInlineNote.tsx": {
+      "partial": "The note holds one required message string; tone, inset, className and testId are presentation options shown by Default, ErrorTone and EmptyListNote, so there is no second piece of data that can be missing."
+    },
     "apps/web/components/molecules/drawer/DrawerMediaThumb.tsx": {
       "permission-denied": "DrawerMediaThumb only renders an image or its fallback and has no gated action or permission input; the detector matched role='img' on the thumb."
+    },
+    "apps/web/components/molecules/drawer/DrawerSectionHeading.tsx": {
+      "partial": "The heading holds one required label (children); as and className only choose the element and extra classes, so nothing can be partially present. Default and SemanticHeading show both element choices."
     },
     "apps/web/components/molecules/drawer/EntityHeader.tsx": {
       "permission-denied": "EntityHeader has no gated action or permission input; callers choose what goes in the actions slot, and the detector matched role='img' on the thumbnail and status glyph."
@@ -563,8 +578,25 @@
     "apps/web/components/organisms/sidebar/context.tsx": {
       "partial": "SidebarProvider holds no data: its optional props (defaultOpen, open, onOpenChange) choose uncontrolled or controlled open state, and Default and DefaultClosed show both starting states."
     },
+    "apps/web/components/organisms/table/atoms/TableCell.tsx": {
+      "partial": "A cell wraps one required children slot; width, align, multiline, hideOnMobile, as and className are layout options, so there is nothing to be partially present. An empty or partial row is the caller's data, drawn by the cells it passes."
+    },
+    "apps/web/components/organisms/table/molecules/SemanticTable.tsx": {
+      "partial": "Each part (TableRoot, TableHead, TableBody, TableRow) wraps one required children slot; className and rowMode are styling and geometry options, so nothing can be partially present. Partial rows are the caller's cells."
+    },
+    "apps/web/components/organisms/table/organisms/UnifiedTableHeader.tsx": {
+      "empty": "Its only caller, UnifiedTable, passes table.getHeaderGroups(), which TanStack always returns with at least one group, and hides the header with hideHeader instead. The length-0 guard is defensive; UnifiedTableHeader.test.tsx asserts it renders no thead. The detector matched headerGroups.map(."
+    },
     "apps/web/components/shell/AppShellRightRail.tsx": {
       "partial": "AppShellRightRail is a layout slot. Its only optional props are className and the belowHeader placement flag, and it renders whatever drawer it is given, so the rail itself has no partially loaded state; each drawer owns its own."
+    },
+    "apps/web/components/shell/SidebarInboxLink.tsx": {
+      "offline": "The link never fetches: pending work arrives from the server as availability, and an unreadable status falls back to the plain Inbox bell (StatusUnavailable). Opening it is a normal navigation. The detector matched the pending flag."
+    },
+    "apps/web/components/shell/TasksRouteSkeleton.tsx": {
+      "empty": "A fixed skeleton with no props: TaskWorkspaceLoadingRows draws five constant rows, so there is no collection that can be empty. The detector matched the items-center layout class.",
+      "long-content": "It renders skeleton bars and a fixed Loading Tasks label only, with no text from any caller, so nothing can overflow. The detector matched aria-label.",
+      "offline": "A static loading frame with no fetch or mutation; the Tasks route that shows it owns any network failure. The detector matched the skeleton classes (Loading)."
     },
     "apps/web/components/shell/Tooltip.tsx": {
       "empty": "The shell Tooltip wraps exactly one trigger with a required label and takes no collection; the detector matched the word rows in comments about sidebar nav rows."

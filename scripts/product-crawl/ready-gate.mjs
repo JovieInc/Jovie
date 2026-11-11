@@ -80,6 +80,11 @@ export const CLAIM_BANNER = /profile is unclaimed|claim (this|your) profile/i;
 
 export const IDENTITIES = Object.freeze(['stranger', 'signed-in']);
 
+const shiftedBy = page =>
+  page.clsSources?.length
+    ? `; moved: ${page.clsSources.map(s => `${s.node} (${s.value.toFixed(3)})`).join(', ')}`
+    : '';
+
 const ofSamples = page =>
   page.timingSamples > 1 ? ` (median of ${page.timingSamples} loads)` : '';
 
@@ -89,7 +94,8 @@ const ofSamples = page =>
  *   longestTaskMs?: number, loadMs?: number, consoleErrors?: string[],
  *   failedRequests?: string[], placeholder?: string|null,
  *   horizontalOverflow?: boolean, url?: string, expectClaimBanner?: boolean,
- *   claimBanner?: boolean, timingSamples?: number }} page
+ *   claimBanner?: boolean, timingSamples?: number,
+ *   clsSources?: { node: string, value: number }[] }} page
  * @returns {{ route: string, identity: string, viewport: string, kind: string, detail: string }[]}
  */
 export function pageFindings(page, closed = []) {
@@ -124,7 +130,10 @@ export function pageFindings(page, closed = []) {
     );
   if ((page.cls ?? 0) > THRESHOLDS.cls)
     out.push(
-      f('layout-shift', `CLS ${page.cls.toFixed(3)} > ${THRESHOLDS.cls}`)
+      f(
+        'layout-shift',
+        `CLS ${page.cls.toFixed(3)} > ${THRESHOLDS.cls}${shiftedBy(page)}`
+      )
     );
   if ((page.lcpMs ?? 0) > THRESHOLDS.lcpMs)
     out.push(
