@@ -231,3 +231,36 @@ test('queue parity rejects queue-only jobs, missing commands, PR-only inputs on 
   assert.equal(parityClock(base, {}).toISOString(), '2026-11-01T00:00:00.000Z');
   assert.ok(parityClock(base, { CALENDAR_DEADLINE_SCAN: '1' }) instanceof Date);
 });
+
+// ---- Trigger registry (audit finding 4): fan-out needs a declared budget ----
+test('trigger registry: every workflow declares its triggers within the run budget', async () => {
+  const { checkRegistry, readRegistry, scanWorkflows } = await import('./lib/ci-trigger-registry.mjs');
+  const { errors, expectedRunsPerMergedPr } = checkRegistry(readRegistry('.'), scanWorkflows('.'));
+  assert.deepEqual(errors, [], 'run: node scripts/ci-trigger-registry.mjs --write, then fill runsPerMergedPr');
+  assert.ok(expectedRunsPerMergedPr > 0);
+});
+
+test('trigger registry: a new workflow_run, edited or labeled trigger fails until registered', async t => {
+  const { checkRegistry, isFanOut, scanWorkflows } = await import('./lib/ci-trigger-registry.mjs');
+  const fixture = fs.mkdtempSync(path.join(os.tmpdir(), 'trigger-registry-'));
+  t.after(() => fs.rmSync(fixture, { recursive: true, force: true }));
+  const dir = path.join(fixture, '.github/workflows');
+  fs.mkdirSync(dir, { recursive: true });
+  fs.writeFileSync(path.join(dir, 'a.yml'), 'name: A\non:\n  push:\n  workflow_run:\n    workflows: [CI]\n    types: [completed]\n');
+  fs.writeFileSync(path.join(dir, 'b.yml'), 'name: B\non:\n  pull_request:\n    types: [opened, edited, labeled]\n');
+  const scanned = scanWorkflows(fixture);
+  assert.deepEqual(scanned['a.yml'], ['push', 'workflow_run:CI']);
+  assert.deepEqual(scanned['b.yml'].filter(isFanOut), ['pull_request:edited', 'pull_request:labeled']);
+  const budget = { runsPerMergedPr: 60, ceiling: 5 };
+  const registered = { budget, workflows: { 'a.yml': { triggers: ['push'], runsPerMergedPr: 1 } } };
+  const { errors } = checkRegistry(registered, scanned);
+  assert.ok(errors.some(e => /a\.yml: trigger workflow_run:CI \(fan-out\) is not registered/.test(e)), errors.join('\n'));
+  assert.ok(errors.some(e => /b\.yml: not in .*fan-out: pull_request:edited, pull_request:labeled/.test(e)), errors.join('\n'));
+  const complete = { budget, workflows: { 'a.yml': { triggers: scanned['a.yml'], runsPerMergedPr: 2 }, 'b.yml': { triggers: scanned['b.yml'], runsPerMergedPr: 2 } } };
+  assert.deepEqual(checkRegistry(complete, scanned).errors, []);
+  complete.workflows['b.yml'].runsPerMergedPr = 4;
+  assert.match(checkRegistry(complete, scanned).errors.join('\n'), /declared 6 runs per merged PR exceeds the ceiling 5/);
+  complete.workflows['b.yml'].runsPerMergedPr = null;
+  assert.match(checkRegistry(complete, scanned).errors.join('\n'), /b\.yml: runsPerMergedPr must be a number/);
+});
+// ---- end trigger registry ----
