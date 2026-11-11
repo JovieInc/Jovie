@@ -12,6 +12,7 @@
  */
 
 import { createGoldenPathLinearIssue } from './golden-path-intake.mjs';
+import { unrelatedToGoldenPath } from './golden-path-source-scope.mjs';
 import {
   addLinearIssueComment,
   listLinearIssueComments,
@@ -54,6 +55,7 @@ export const MERGE_GATE_TEST_FILES = Object.freeze([
 export const GOLDEN_PATH_LOCK_SELF_TEST_FILES = Object.freeze([
   'lib/__tests__/golden-path-lock.test.mjs',
   'lib/__tests__/golden-path-prod-autofix-workflow-contract.test.mjs',
+  'lib/__tests__/golden-path-source-scope.test.mjs',
 ]);
 
 /** @returns {{ mode: 'onboarding', messages: { id: string, role: 'user', parts: { type: 'text', text: string }[] }[] }} */
@@ -70,7 +72,7 @@ export function buildProdProbeChatPayload() {
   };
 }
 
-/** Prefixes/files that document the locked surfaces. Tests always run. */
+/** Locked surface annotations; unknown inputs still select the full product gate. */
 export const GOLDEN_PATH_PATH_PREFIXES = Object.freeze([
   'apps/web/app/api/chat/',
   'apps/web/app/api/waitlist/',
@@ -104,7 +106,7 @@ const FORBIDDEN_SKIP_REASONS = Object.freeze([
 
 /** @typedef {{ id: string, ok: boolean, reason: string, inconclusive?: boolean }} GoldenPathCheck */
 /** @typedef {{ changed: string[], matched: string[], touchesGoldenPath: boolean }} GoldenPathPathClassification */
-/** @typedef {{ schema: string, mode: 'merge-gate'|'prod-probe'|'autofix', ok: boolean, skipped?: boolean, stub?: boolean, alwaysRan?: boolean, inconclusive?: boolean, origin?: string, fingerprint?: string, testFiles?: string[], classification?: GoldenPathPathClassification, checks?: GoldenPathCheck[] }} GoldenPathReceipt */
+/** @typedef {{ schema: string, mode: 'merge-gate'|'prod-probe'|'autofix', ok: boolean, skipped?: boolean, stub?: boolean, alwaysRan?: boolean, sourceScope?: object, inconclusive?: boolean, origin?: string, fingerprint?: string, testFiles?: string[], classification?: GoldenPathPathClassification, checks?: GoldenPathCheck[] }} GoldenPathReceipt */
 /** @typedef {{ schema: string, mode: 'prod-probe', ok: boolean, inconclusive: boolean, skipped: boolean, origin: string, fingerprint: string, checks: GoldenPathCheck[] }} GoldenPathProdProbeReceipt */
 /** @typedef {{ action: 'fail_closed'|'dedup'|'escalate'|'launch', reason: string, fingerprint?: string, existingAgentIds?: string[], openPr?: unknown, openPrNumber?: number|null, priorAttemptCount?: number, openIssueUrl?: string|null, request?: { prompt: { text: string }, source: { repository: string, ref: string }, target: { autoCreatePr: boolean, branchName?: string } } }} GoldenPathAutofixPlan */
 
@@ -516,6 +518,38 @@ export function validateReceipt(candidate) {
   if (receipt.skipped === true) {
     errors.push('receipt must not skip; missing secrets fail closed');
   }
+  if (receipt.mode === 'merge-gate' && receipt.alwaysRan === false) {
+    const scope = /** @type {Record<string, any> | undefined} */ (
+      receipt.sourceScope
+    );
+    if (
+      !scope ||
+      scope.verified !== true ||
+      scope.runProduct !== false ||
+      !/^[0-9a-f]{40}$/.test(scope.head ?? '') ||
+      !Array.isArray(scope.bases) ||
+      scope.bases.length === 0 ||
+      !scope.bases.every(sha => /^[0-9a-f]{40}$/.test(sha)) ||
+      !Array.isArray(scope.files) ||
+      scope.files.length === 0 ||
+      !scope.files.every(unrelatedToGoldenPath) ||
+      !Array.isArray(receipt.testFiles) ||
+      receipt.testFiles.length !== 0 ||
+      !Array.isArray(receipt.checks) ||
+      !receipt.checks.some(
+        check => check.id === 'merge-gate-product-scope' && check.ok
+      ) ||
+      !receipt.checks.some(
+        check =>
+          check.id === 'merge-gate-lock-tests' &&
+          (check.ok === true || receipt.ok === false)
+      )
+    ) {
+      errors.push(
+        'product omission requires verified unrelated source and lock test evidence'
+      );
+    }
+  }
   if (receipt.stub === true) {
     errors.push('stub receipts are forbidden');
   }
@@ -531,11 +565,12 @@ export function validateReceipt(candidate) {
   return { ok: errors.length === 0, errors };
 }
 
-/** @param {{ ok?: boolean, checks?: GoldenPathCheck[], classification?: GoldenPathPathClassification, testFiles?: readonly string[] }} [input] @returns {GoldenPathReceipt} */
+/** @param {{ ok?: boolean, checks?: GoldenPathCheck[], classification?: GoldenPathPathClassification, sourceScope?: {runProduct: boolean}, testFiles?: readonly string[] }} [input] @returns {GoldenPathReceipt} */
 export function buildMergeGateReceipt({
   ok,
   checks,
   classification,
+  sourceScope,
   testFiles = MERGE_GATE_TEST_FILES,
 } = {}) {
   return {
@@ -543,7 +578,8 @@ export function buildMergeGateReceipt({
     mode: 'merge-gate',
     ok: Boolean(ok),
     skipped: false,
-    alwaysRan: true,
+    alwaysRan: sourceScope?.runProduct !== false,
+    ...(sourceScope ? { sourceScope } : {}),
     testFiles: [...testFiles],
     classification: classification ?? classifyChangedPaths([]),
     checks: Array.isArray(checks) ? checks : [],

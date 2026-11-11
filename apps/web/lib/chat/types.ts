@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import type { EnforcedArtistRule } from '@/lib/artist-rules/gate';
 import type { CanvasStatus } from '@/lib/services/canvas/types';
 
 /**
@@ -27,7 +28,13 @@ export const artistContextSchema = z.object({
   }),
 });
 
-export type ArtistContext = z.infer<typeof artistContextSchema>;
+/**
+ * `artistRules` is loaded server-side only; the client schema strips it, so a
+ * client-provided context can never carry rules.
+ */
+export type ArtistContext = z.infer<typeof artistContextSchema> & {
+  readonly artistRules?: readonly EnforcedArtistRule[];
+};
 
 /** Lightweight release info for chat context (avoids loading full provider data). */
 export interface ReleaseContext {

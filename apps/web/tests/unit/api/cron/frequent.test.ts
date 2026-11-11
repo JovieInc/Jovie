@@ -27,7 +27,12 @@ const {
   mockGetPublicProfileCanaryStatus,
   mockRefreshCompanyStateCache,
   mockApplySummerCardDefaults,
+  mockRefreshProofStats,
+  mockRunReleaseEmailCanary,
+  mockGetReleaseEmailCanaryStatus,
 } = vi.hoisted(() => ({
+  mockRunReleaseEmailCanary: vi.fn(),
+  mockGetReleaseEmailCanaryStatus: vi.fn(),
   mockDbExecute: vi.fn(),
   mockDbSelect: vi.fn(),
   mockDbInsert: vi.fn(),
@@ -54,11 +59,17 @@ const {
   mockGetPublicProfileCanaryStatus: vi.fn(),
   mockRefreshCompanyStateCache: vi.fn(),
   mockApplySummerCardDefaults: vi.fn(),
+  mockRefreshProofStats: vi.fn(),
 }));
 
 vi.mock('@/lib/admin/ops-queries', () => ({
   getAuthSignupOnboardingCanaryStatus: mockGetAuthSignupOnboardingCanaryStatus,
   getPublicProfileCanaryStatus: mockGetPublicProfileCanaryStatus,
+}));
+
+vi.mock('@/lib/canaries/release-email.server', () => ({
+  runReleaseEmailCanary: mockRunReleaseEmailCanary,
+  getReleaseEmailCanaryStatus: mockGetReleaseEmailCanaryStatus,
 }));
 
 vi.mock('@/lib/acquisition/eligibility.server', () => ({
@@ -67,6 +78,10 @@ vi.mock('@/lib/acquisition/eligibility.server', () => ({
 
 vi.mock('@/lib/ovie/company-state.server', () => ({
   refreshCompanyStateCache: mockRefreshCompanyStateCache,
+}));
+
+vi.mock('@/lib/proof-stats/publish.server', () => ({
+  refreshProofStats: mockRefreshProofStats,
 }));
 
 vi.mock('@/lib/ovie/summer-cards.server', () => ({
@@ -117,6 +132,13 @@ vi.mock('@/lib/error-tracking', () => ({
 }));
 
 vi.mock('@/lib/ingestion/processor', () => ({
+  SELF_MANAGED_JOB_TYPES: new Set([
+    'import_beacons',
+    'import_laylo',
+    'import_tiktok',
+    'import_twitter',
+    'import_youtube',
+  ]),
   claimPendingJobs: mockClaimPendingJobs,
   handleIngestionJobFailure: mockHandleIngestionJobFailure,
   processJob: mockProcessJob,
@@ -145,7 +167,7 @@ vi.mock('@/lib/leads/pipeline-logger', () => ({
 }));
 
 vi.mock('@/lib/leads/process-batch', () => ({
-  processLeadBatch: vi.fn(),
+  processLeadBatch: vi.fn(async () => ({ total: 0, error: 0 })),
 }));
 
 vi.mock('@/lib/notifications/suppression', () => ({
@@ -193,15 +215,14 @@ describe('GET /api/cron/frequent', () => {
     vi.setSystemTime(new Date('2026-03-24T10:15:00.000Z'));
 
     mockDbExecute.mockResolvedValue(undefined);
+    const settingsLimit = vi
+      .fn()
+      .mockResolvedValue([{ enabled: true, discoveryEnabled: false }]);
     mockDbSelect.mockReturnValue({
       from: vi.fn().mockReturnValue({
         where: vi.fn().mockReturnValue({
-          limit: vi.fn().mockResolvedValue([
-            {
-              enabled: true,
-              discoveryEnabled: false,
-            },
-          ]),
+          limit: settingsLimit,
+          orderBy: vi.fn().mockReturnValue({ limit: settingsLimit }),
         }),
       }),
     });
@@ -257,6 +278,14 @@ describe('GET /api/cron/frequent', () => {
       runAt: new Date().toISOString(),
     }));
     mockGetPublicProfileCanaryStatus.mockImplementation(async () => ({
+      runAt: new Date().toISOString(),
+    }));
+    mockRunReleaseEmailCanary.mockImplementation(async () => ({
+      runAt: new Date().toISOString(),
+      status: 'failed',
+      failureReason: 'not_configured',
+    }));
+    mockGetReleaseEmailCanaryStatus.mockImplementation(async () => ({
       runAt: new Date().toISOString(),
     }));
     mockApplySummerCardDefaults.mockResolvedValue({
@@ -355,6 +384,27 @@ describe('GET /api/cron/frequent', () => {
       error: expect.stringContaining('public-profile (missing)'),
     });
     expect(mockGetAcquisitionEligibility).not.toHaveBeenCalled();
+  });
+
+  // JOV-9779: the release-email canary runs in the hourly slot before the
+  // schedule/send steps, and its receipt joins the freshness check.
+  it('runs the release-email canary hourly and checks its receipt freshness', async () => {
+    vi.setSystemTime(new Date('2026-03-24T10:00:00.000Z'));
+    mockGetReleaseEmailCanaryStatus.mockResolvedValue(null);
+    const { GET } = await import('@/app/api/cron/frequent/route');
+    const body = await (
+      await GET(
+        new Request('http://localhost/api/cron/frequent', {
+          headers: { authorization: 'Bearer test-secret' },
+        })
+      )
+    ).json();
+    expect(mockRunReleaseEmailCanary).toHaveBeenCalledOnce();
+    expect(body.results.releaseEmailCanary).toMatchObject({ success: true });
+    expect(body.results.canaryReceiptFreshness).toMatchObject({
+      success: false,
+      error: expect.stringContaining('release-email (missing)'),
+    });
   });
 
   it('keeps hourly freshness reads out of the other frequent invocations', async () => {
@@ -470,6 +520,35 @@ describe('GET /api/cron/frequent', () => {
     );
 
     expect(mockProcessOutreachBatch).toHaveBeenCalledWith(10);
+  });
+
+  it('refreshes proof stats in the hourly slot only', async () => {
+    mockRefreshProofStats.mockResolvedValue({
+      measured: 4,
+      failed: [],
+      written: true,
+      events: 2,
+    });
+    const { GET } = await import('@/app/api/cron/frequent/route');
+    const call = () =>
+      GET(
+        new Request('http://localhost/api/cron/frequent', {
+          headers: { Authorization: 'Bearer test-secret' },
+        })
+      );
+
+    vi.setSystemTime(new Date('2026-03-24T10:00:00.000Z'));
+    const hourly = await (await call()).json();
+    expect(hourly.results.proofStats).toEqual({
+      success: true,
+      data: { measured: 4, failed: [], written: true, events: 2 },
+    });
+    expect(mockRefreshProofStats).toHaveBeenCalledOnce();
+
+    vi.setSystemTime(new Date('2026-03-24T10:30:00.000Z'));
+    const later = await (await call()).json();
+    expect(later.results.proofStats).toEqual({ success: true, skipped: true });
+    expect(mockRefreshProofStats).toHaveBeenCalledOnce();
   });
 
   it('returns 207 and classifies an exhausted Redis quota as a failed canary', async () => {

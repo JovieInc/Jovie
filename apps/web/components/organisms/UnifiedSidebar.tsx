@@ -42,12 +42,12 @@ import {
 } from '@/features/dashboard/dashboard-nav/config';
 import { NavMenuItem } from '@/features/dashboard/dashboard-nav/NavMenuItem';
 import type { NavItem } from '@/features/dashboard/dashboard-nav/types';
+import { ProfileCompletionCard } from '@/features/dashboard/molecules/ProfileCompletionCard';
 import { useProfileData } from '@/hooks/useProfileData';
 import { APP_SHELL_WORKSPACES } from '@/lib/app-shell/workspaces';
 import { BRAND_WORDMARKS, type BrandVariant } from '@/lib/brand/tokens';
 import { useIsElectronRuntime } from '@/lib/desktop/electron-bridge';
 import { useAppFlag } from '@/lib/flags/client';
-import { shippingStateQueryOptions } from '@/lib/queries/shipping-state';
 import { useDashboardProfileQuery } from '@/lib/queries/useDashboardProfileQuery';
 import { cn } from '@/lib/utils';
 import type { AppShellSection } from '@/types/app-shell';
@@ -123,9 +123,10 @@ function OperatorNavGroup({
 }>) {
   const queryClient = useQueryClient();
   const prefetchShipping = (item: NavItem) => {
-    if (item.href === APP_ROUTES.ADMIN_SHIPPING) {
-      void queryClient.prefetchQuery(shippingStateQueryOptions);
-    }
+    if (item.href !== APP_ROUTES.ADMIN_SHIPPING) return;
+    void import('@/lib/queries/shipping-state')
+      .then(m => queryClient.prefetchQuery(m.shippingStateQueryOptions))
+      .catch(() => undefined); // A missed prefetch must not reload the page.
   };
   const [stored, setStored] = useState(false);
   useEffect(() => {
@@ -457,7 +458,13 @@ export function UnifiedSidebar({
   variant = 'jovie',
   headerOwnsCollapsedToggle = false,
 }: UnifiedSidebarProps) {
-  const { identities, isAdmin: canSwitchWorkspaces, user } = useDashboardData();
+  const {
+    identities,
+    isAdmin: canSwitchWorkspaces,
+    user,
+    profileCompletion,
+    selectedProfile: dockProfile,
+  } = useDashboardData();
   const sidebarOverride = useShellSidebarOverride();
   const { state: sidebarState } = useSidebar();
   const pathname = usePathname();
@@ -469,6 +476,13 @@ export function UnifiedSidebar({
 
   const { profileHref } = useProfileData(section !== 'ov');
   const isSidebarCollapsed = sidebarState === 'closed';
+  // JOV-8137: the completion widget persists on every page's sidebar until
+  // the profile hits 100%, then disappears. Missing data reads as complete.
+  const showProfileCompletionWidget =
+    !isOperatorSection &&
+    !isRouteSidebar &&
+    !isDemoRoute &&
+    (profileCompletion?.percentage ?? 100) < 100;
 
   return (
     <Sidebar
@@ -528,11 +542,22 @@ export function UnifiedSidebar({
             )}
           </SidebarGroupContent>
         </SidebarGroup>
+        {/* JOV-8137: the completion widget persists on every page's sidebar
+            until the profile hits 100% — it hides itself once complete. */}
+        {showProfileCompletionWidget ? (
+          <div
+            className='group-data-[collapsible=icon]:hidden px-(--app-shell-sidebar-inset)'
+            data-testid='sidebar-profile-completion'
+          >
+            <ProfileCompletionCard />
+          </div>
+        ) : null}
       </SidebarContent>
 
       <SidebarFooter className='mt-auto gap-0 border-t border-subtle px-0 pt-(--space-2-5) pb-(--space-3-5) [&_[data-slot=common-dropdown-trigger]]:min-h-8'>
         <SidebarDockBridge
           userId={user?.id ?? ''}
+          userState={{ hasClaimedHandle: Boolean(dockProfile?.username) }}
           collapsed={isSidebarCollapsed}
         >
           {dockStatus => (

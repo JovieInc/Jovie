@@ -18,6 +18,7 @@ import {
 } from '@/lib/auth/plan-intent';
 import { isSelfServiceOffer } from '@/lib/billing/offer-truth';
 import { PRICING } from '@/lib/config/pricing';
+import { fetchOnboardingCatalogPreview } from '@/lib/onboarding/catalog-preview.server';
 import { normalizeOnboardingReturnTo } from '@/lib/onboarding/return-to';
 import {
   hasOnboardingUpgradeOfferState,
@@ -140,12 +141,14 @@ export default async function OnboardingCheckoutPage({
     username: string;
     avatarUrl: string | null;
     spotifyFollowers: number | null;
+    spotifyId: string | null;
   } = {
     id: null,
     displayName: '',
     username: '',
     avatarUrl: null,
     spotifyFollowers: null,
+    spotifyId: null,
   };
 
   // JOV-8068: a truthful "your profile is live" upsell requires a claimed,
@@ -165,6 +168,7 @@ export default async function OnboardingCheckoutPage({
           ((profile as Record<string, unknown>).spotifyFollowers as
             | number
             | null) ?? null,
+        spotifyId: profile.spotifyId ?? null,
       };
       profileLive = Boolean(
         profile.isPublic && profile.isClaimed && profile.onboardingCompletedAt
@@ -239,9 +243,13 @@ export default async function OnboardingCheckoutPage({
   }
 
   // JOV-7794: the paywall carries the visitor's own computed proof.
-  const proofFindings = profileData.id
-    ? await loadClaimTimeProof(profileData.id)
-    : [];
+  // JOV-9758: and their real catalog, above the price.
+  const [proofFindings, catalog] = await Promise.all([
+    profileData.id ? loadClaimTimeProof(profileData.id) : Promise.resolve([]),
+    profileData.spotifyId
+      ? fetchOnboardingCatalogPreview(profileData.spotifyId)
+      : Promise.resolve(null),
+  ]);
 
   return (
     <OnboardingCheckoutClient
@@ -258,6 +266,7 @@ export default async function OnboardingCheckoutPage({
       isDefaultUpsell={isDefaultUpsell}
       proofFindings={proofFindings}
       proofPending={proofPending}
+      catalog={catalog}
     />
   );
 }

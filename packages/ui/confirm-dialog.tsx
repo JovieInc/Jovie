@@ -1,6 +1,12 @@
 'use client';
 
-import { type MouseEvent, type ReactNode, useRef, useState } from 'react';
+import {
+  type MouseEvent,
+  type ReactNode,
+  useId,
+  useRef,
+  useState,
+} from 'react';
 import { Button } from './atoms/button';
 import {
   Dialog,
@@ -25,6 +31,7 @@ export interface ConfirmDialogProps {
   readonly variant?: 'default' | 'destructive';
   readonly onConfirm: () => void | Promise<void>;
   readonly onCancel?: () => void;
+  readonly onCloseAutoFocus?: (event: Event) => void;
   readonly onError?: (error: unknown) => void;
   readonly isLoading?: boolean;
   readonly confirmDisabled?: boolean;
@@ -42,6 +49,7 @@ export function ConfirmDialog({
   variant = 'default',
   onConfirm,
   onCancel,
+  onCloseAutoFocus,
   onError,
   isLoading = false,
   confirmDisabled = false,
@@ -50,6 +58,7 @@ export function ConfirmDialog({
   const [isPending, setIsPending] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const handlingRef = useRef(false);
+  const errorId = useId();
   const loading = isLoading || isPending;
   const content = body ?? description;
 
@@ -86,7 +95,11 @@ export function ConfirmDialog({
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
+      {/* APG Alert Dialog role (as Radix AlertDialog passes it). Overlay press
+          and Escape stay as Cancel, the safe choice, and pending blocks both. */}
       <DialogContent
+        role='alertdialog'
+        onCloseAutoFocus={onCloseAutoFocus}
         hideClose
         overlayProps={{ onClick: closeAsCancel }}
         onEscapeKeyDown={event => {
@@ -99,18 +112,25 @@ export function ConfirmDialog({
         onInteractOutside={event => {
           if (loading) event.preventDefault();
         }}
+        aria-describedby={errorMessage ? errorId : undefined}
       >
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
           {content ? (
-            <DialogDescription asChild={typeof content !== 'string'}>
-              {content}
-            </DialogDescription>
+            typeof content === 'string' ? (
+              <DialogDescription>{content}</DialogDescription>
+            ) : (
+              // A wrapper keeps the description id on a real element: Slot
+              // drops it on fragments, leaving aria-describedby dangling.
+              <DialogDescription asChild>
+                <div>{content}</div>
+              </DialogDescription>
+            )
           ) : null}
         </DialogHeader>
         {children}
         {errorMessage ? (
-          <p className='text-sm text-error' role='alert'>
+          <p id={errorId} className='text-sm text-error-text' role='alert'>
             {errorMessage}
           </p>
         ) : null}

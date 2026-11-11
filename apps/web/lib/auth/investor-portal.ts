@@ -162,10 +162,20 @@ export async function handleInvestorRequest(
   const tokenParam = req.nextUrl.searchParams.get(INVESTOR_TOKEN_PARAM);
 
   if (tokenParam) {
-    // Response links consume the token and action together in the page handler.
-    // Stripping ?t= here turns valid email links into 404s, and falling
-    // through to Clerk would make token-only links depend on session state.
     if (isResponseActionPath) {
+      // Response links are read-only confirmation pages now (JOV-8888): the
+      // stage change happens on the POST to /api/investors/respond, never in
+      // a GET render, so scanner prefetches cannot mutate pipeline stage.
+      // The token still rides ?t= for the page to render the right
+      // confirmation (stripping it or falling through to Clerk would break
+      // token-only email links), but it is a live token, so it gets the same
+      // shape-check + per-IP limiter as every other token path. The page
+      // owns the read-only DB validation.
+      if (!isInvestorClaimTokenShape(tokenParam)) {
+        return investorNotFound();
+      }
+      const limited = await investorTokenRateLimit(req);
+      if (limited) return limited;
       return withPrivateHeaders(NextResponse.next());
     }
 

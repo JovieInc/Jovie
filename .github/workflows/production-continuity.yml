@@ -178,6 +178,18 @@ jobs:
     runs-on: [self-hosted, Linux, X64, jovie-fixed]
     timeout-minutes: 3
     steps:
+      - name: Reset workspace git state (self-hosted)
+        if: runner.environment != 'github-hosted'
+        shell: bash
+        run: |
+          # Fixed runners reuse one workspace; a sparse checkout left by an earlier job hides files
+          # (.nvmrc, .github/scripts) from this full checkout (PR Fleet Rules merge_group 40908938908).
+          if [[ -d .git ]]; then
+            git sparse-checkout disable 2>/dev/null || true
+            git config --local --unset-all core.sparseCheckout 2>/dev/null || true
+            git config --local --unset-all core.sparseCheckoutCone 2>/dev/null || true
+            rm -f .git/info/sparse-checkout
+          fi
       - name: Checkout exact main policy source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:

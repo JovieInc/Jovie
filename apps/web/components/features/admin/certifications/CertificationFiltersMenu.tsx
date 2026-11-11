@@ -56,8 +56,8 @@ export function CertificationFiltersMenu({
           variant='ghost'
           size='sm'
           className={PAGE_TOOLBAR_MENU_TRIGGER_CLASS}
-          aria-label='Certification Filters'
         >
+          <span className='sr-only'>Certification Filters:</span>{' '}
           <SlidersHorizontal className='h-3 w-3' aria-hidden='true' />
           <span className='max-w-40 truncate'>
             {domain === 'all'

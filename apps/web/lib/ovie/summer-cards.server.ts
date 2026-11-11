@@ -34,6 +34,7 @@ const storedCardSchema = z.object({
   amountUsd: z.number().nullable(),
   preflightReceiptId: z.string().nullable().default(null),
   evidence: z.array(z.string()),
+  facts: z.array(z.string()).default([]),
   status: z.enum(['pending', 'approved', 'rejected']),
   comment: z.string().nullable(),
   decidedBy: z.string().nullable(),
@@ -128,11 +129,12 @@ export async function submitSummerCard(
     title: input.title,
     body: input.body,
     recommendation: input.recommendation,
-    defaultIfSilent: input.defaultIfSilent,
+    defaultIfSilent: contract.policyDefaultIfSilent ?? input.defaultIfSilent,
     recipient: input.recipient,
     amountUsd: input.amountUsd,
     preflightReceiptId: input.preflightReceiptId,
     evidence: input.evidence,
+    facts: [...(input.facts ?? [])],
     status: 'pending',
     comment: null,
     decidedBy: null,
@@ -237,6 +239,53 @@ export async function decideSummerCard(
   const raced = await readStoredCard(input.id);
   return raced
     ? { outcome: 'already_decided', card: toCard(raced) }
+    : { outcome: 'not_found' };
+}
+
+export const SUMMER_CARD_SUPERSEDER = 'premise-superseded';
+export type SummerCardSupersedeResult =
+  | { readonly outcome: 'superseded'; readonly card: SummerCard }
+  | { readonly outcome: 'already_decided'; readonly card: SummerCard }
+  | { readonly outcome: 'reserved'; readonly kind: string }
+  | { readonly outcome: 'not_found' };
+
+/**
+ * Closes a pending ask whose premise is gone (a human hold that no longer exists, a decision another
+ * decision replaced). The system records the close with a reason; nobody decides on the founder's
+ * behalf, nothing is approved, and no action follows. Spend, outbound and cards that explicitly
+ * require a founder decision are never superseded this way.
+ */
+export async function supersedeSummerCard(
+  input: { readonly id: string; readonly reason: string },
+  now = new Date()
+): Promise<SummerCardSupersedeResult> {
+  const current = await readStoredRow(input.id);
+  if (!current) return { outcome: 'not_found' };
+  if (current.card.status !== 'pending') {
+    return { outcome: 'already_decided', card: toCard(current.card) };
+  }
+  if (
+    current.card.kind === 'spend' ||
+    current.card.kind === 'outbound' ||
+    current.card.defaultDecision === 'none'
+  ) {
+    return { outcome: 'reserved', kind: current.card.kind };
+  }
+  const result = await decideSummerCard(
+    {
+      id: input.id,
+      decision: 'reject',
+      comment: `Closed by the system, premise superseded: ${input.reason}. No action taken.`,
+      decidedBy: SUMMER_CARD_SUPERSEDER,
+      resolution: 'default',
+    },
+    now
+  );
+  if (result.outcome === 'decided') {
+    return { outcome: 'superseded', card: result.card };
+  }
+  return result.outcome === 'already_decided'
+    ? { outcome: 'already_decided', card: result.card }
     : { outcome: 'not_found' };
 }
 

@@ -1045,7 +1045,7 @@ class CompletedFailureReconciliationTest(unittest.TestCase):
         def raced(coord, method, endpoint, body=None):
             if method == "POST" and "/append-" in str(body.get("ref", "")) and not triggered:
                 triggered.append(True)
-                result = attempt.claim(self.state / "remote.jsonl", self.identities[0], owner("remote"), policy(), {}, now=self.now, coordination=self.coord)
+                result = attempt.claim(self.state / "remote.jsonl", self.identities[0], owner("remote"), policy(wallSeconds=5), {}, now=self.now, coordination=self.coord)
                 self.assertEqual(result["reason"], "wallSeconds_budget_exhausted")
             return real(coord, method, endpoint, body)
         with patch.object(attempt, "_gh", side_effect=raced), self.assertRaisesRegex(RuntimeError, "unsupported-history"): self.reconcile()
@@ -1325,5 +1325,28 @@ class ExecutionAttemptCliLifecycleTest(unittest.TestCase):
             fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
         finally:
             os.close(fd)
+
+
+
+class TornTailTest(unittest.TestCase):
+    def test_torn_final_line_is_dropped_and_next_append_is_clean(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "attempts.jsonl"
+            good = {"schema": attempt.SCHEMA, "identityDigest": "a"}
+            path.write_text(json.dumps(good) + "\n" + '{"schema": "jovie-execution-attempt/v1", "iden')
+            self.assertEqual(attempt._rows(path), [good])
+            attempt._file_locked(path, lambda rows: (None, [{**good, "identityDigest": "b"}]))
+            self.assertEqual([r["identityDigest"] for r in attempt._rows(path)], ["a", "b"])
+            self.assertEqual(len(path.read_text().splitlines()), 2)
+
+    def test_interior_corruption_still_raises(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "attempts.jsonl"
+            path.write_text('{"bad\n{"schema": "x"}\n')
+            with self.assertRaises(json.JSONDecodeError):
+                attempt._rows(path)
+
 
 if __name__ == "__main__": unittest.main()

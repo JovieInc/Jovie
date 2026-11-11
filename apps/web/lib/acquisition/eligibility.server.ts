@@ -22,25 +22,25 @@ import { serverFetch } from '@/lib/http/server-fetch';
 import { getRedis } from '@/lib/redis';
 import { logger } from '@/lib/utils/logger';
 import {
-  COMMERCE_DECISION_PROJECTION_CONTRACT,
   type CommerceDecisionProjection,
   type CommerceEvidenceKind,
   projectCommerceDecisions,
 } from './commerce-decision';
 import {
-  ACQUISITION_ELIGIBILITY_CONTRACT,
   type AcquisitionEligibility,
   type ConeEvidence,
   type ConeRequirementId,
   evaluateAcquisitionEligibility,
   unknownAcquisitionEligibility,
 } from './eligibility';
+import {
+  DAILY_CANARY_MAX_AGE_MS,
+  DAILY_WORKFLOW_MAX_AGE_MS,
+  LIVE_MAX_AGE_MS,
+  revalidateAcquisitionEligibilityReport,
+} from './eligibility-cache';
 
 const PRODUCTION_BASE_URL = 'https://jov.ie';
-const HOUR_MS = 60 * 60_000;
-const LIVE_MAX_AGE_MS = 15 * 60_000;
-const DAILY_CANARY_MAX_AGE_MS = 30 * HOUR_MS;
-const DAILY_WORKFLOW_MAX_AGE_MS = 48 * HOUR_MS;
 const CACHE_KEY = 'acquisition:eligibility:v1';
 const CACHE_TTL_SECONDS = 10 * 60;
 
@@ -48,12 +48,10 @@ const CACHE_TTL_SECONDS = 10 * 60;
 export const CONE_WORKFLOWS = {
   /** Includes the canonical artist profile certificate (JOV-6920). */
   revenuePath: 'm2-revenue-path-canary.yml',
-  /**
-   * signup → claim → checkout → verified payment → entitlement → refund: the
-   * Golden Path job of the latest dispatched main ci.yml run. The nightly
-   * workflow only dispatches it, so its own run proves nothing.
-   */
+  // Golden Path job (signup to refund) of the latest dispatched main ci.yml
+  // run; the nightly only dispatches it, so its own run proves nothing.
   goldenPath: 'ci.yml#Golden Path (manual)',
+  buyerEval: 'buyer-eval-gate.yml', // green only when buyer-eval/gate.mjs passes
 } as const;
 
 const M2_STEP_REQUIREMENTS: Record<M2RevenuePathStepName, ConeRequirementId> = {
@@ -275,14 +273,23 @@ async function canaryEvidence(
         status: 'unknown',
       };
     }
-    const failed = report.checks.filter(check => !check.ok);
+    if (!Array.isArray(report.checks) || report.checks.length === 0) {
+      return {
+        ...base,
+        detail: 'No canary checks executed.',
+        observedAt: report.runAt,
+        status: 'unknown',
+      };
+    }
+    const failed = report.checks.filter(check => check?.ok !== true);
+    const passed = report.pass === true && failed.length === 0;
     return {
       ...base,
-      detail: report.pass
+      detail: passed
         ? `${report.checks.length} checks passed.`
         : `${failed.length} of ${report.checks.length} checks failed.`,
       observedAt: report.runAt,
-      status: report.pass ? 'green' : 'red',
+      status: passed ? 'green' : 'red',
     };
   } catch (error) {
     return {
@@ -484,7 +491,7 @@ export async function computeAcquisitionEligibility(
 ): Promise<AcquisitionEligibilityReport> {
   try {
     const now = deps.now();
-    const [m2, auth, profile, m2Workflow, goldenPath, funnel, commerce] =
+    const [m2, auth, profile, m2Workflow, goldenPath, funnel, commerce, buyer] =
       await Promise.all([
         revenuePathEvidence(deps),
         canaryEvidence(
@@ -505,6 +512,7 @@ export async function computeAcquisitionEligibility(
         ),
         funnelEvidence(deps),
         commerceDecisionEvidence(deps, now),
+        workflowEvidence('buyer_would_pay', CONE_WORKFLOWS.buyerEval, deps),
       ]);
     return {
       ...evaluateAcquisitionEligibility({
@@ -516,6 +524,7 @@ export async function computeAcquisitionEligibility(
           goldenPath,
           funnel.evidence,
           ...commerce.evidence,
+          buyer,
         ],
         now,
       }),
@@ -535,18 +544,6 @@ export async function computeAcquisitionEligibility(
   }
 }
 
-function isCachedReport(value: unknown): value is AcquisitionEligibilityReport {
-  return (
-    typeof value === 'object' &&
-    value !== null &&
-    (value as { contract?: unknown }).contract ===
-      ACQUISITION_ELIGIBILITY_CONTRACT &&
-    typeof (value as { eligible?: unknown }).eligible === 'boolean' &&
-    (value as { commerce?: { contract?: unknown } }).commerce?.contract ===
-      COMMERCE_DECISION_PROJECTION_CONTRACT
-  );
-}
-
 /**
  * Cache-only read for request paths that must never trigger the GitHub and
  * canary recompute (anonymous chat turns). A miss, an outage or a malformed
@@ -558,7 +555,7 @@ export async function readCachedAcquisitionEligibility(): Promise<AcquisitionEli
   try {
     const cached = await redis.get<unknown>(CACHE_KEY);
     const parsed = typeof cached === 'string' ? JSON.parse(cached) : cached;
-    return isCachedReport(parsed) ? parsed : null;
+    return revalidateAcquisitionEligibilityReport(parsed, new Date());
   } catch (error) {
     logger.warn('[acquisition/eligibility] cache-only read failed', error);
     return null;
@@ -579,7 +576,8 @@ export async function getAcquisitionEligibility(
     try {
       const cached = await redis.get<unknown>(CACHE_KEY);
       const parsed = typeof cached === 'string' ? JSON.parse(cached) : cached;
-      if (isCachedReport(parsed)) return parsed;
+      const report = revalidateAcquisitionEligibilityReport(parsed, deps.now());
+      if (report) return report;
     } catch (error) {
       logger.warn('[acquisition/eligibility] cache read failed', error);
     }

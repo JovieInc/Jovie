@@ -734,7 +734,6 @@ vi.mock('@/components/organisms/release-sidebar', () => ({
 }));
 
 import { HeaderSearchSurfaceFromContext } from '@/components/shell/HeaderSearchSurfaceFromContext';
-import type { HeaderSearchAdapter } from '@/contexts/HeaderActionsContext';
 import {
   HeaderActionsProvider,
   useOptionalHeaderActions,
@@ -745,14 +744,8 @@ const { TasksPageClient } = await import(
   '@/components/features/dashboard/tasks/TasksPageClient'
 );
 
-let latestHeaderSearchAdapter: HeaderSearchAdapter | null = null;
-
 function HeaderActionsHost() {
   const state = useOptionalHeaderActions();
-
-  React.useEffect(() => {
-    latestHeaderSearchAdapter = state?.headerSearchAdapter ?? null;
-  }, [state?.headerSearchAdapter]);
 
   return (
     <div data-testid='header-actions-host'>
@@ -822,7 +815,6 @@ describe('TasksPageClient', () => {
   beforeEach(() => {
     vi.useFakeTimers();
     editorTestState.real = false;
-    latestHeaderSearchAdapter = null;
     mockCreateTask.mockReset();
     mockDeleteTask.mockReset();
     mockUpdateTask.mockReset();
@@ -1021,7 +1013,7 @@ describe('TasksPageClient', () => {
     renderPage();
 
     expect(screen.getByTestId('task-document-pane')).toBeVisible();
-    expect(screen.getByText('Select a task')).toBeInTheDocument();
+    expect(screen.getByText('No Task Selected')).toBeInTheDocument();
     expect(screen.getByTestId('task-document-empty-state')).toHaveTextContent(
       'Choose a task from the list to view its details.'
     );
@@ -1083,7 +1075,7 @@ describe('TasksPageClient', () => {
     renderPage();
 
     expect(screen.getByTestId('task-document-pane')).toBeInTheDocument();
-    expect(screen.getByText('Select a task')).toBeInTheDocument();
+    expect(screen.getByText('No Task Selected')).toBeInTheDocument();
     expect(screen.queryByLabelText('Task Title')).not.toBeInTheDocument();
 
     act(() => {
@@ -1128,7 +1120,7 @@ describe('TasksPageClient', () => {
     );
 
     expect(screen.queryByLabelText('Task Title')).not.toBeInTheDocument();
-    expect(screen.getByText('Select a task')).toBeInTheDocument();
+    expect(screen.getByText('No Task Selected')).toBeInTheDocument();
     expect(getLatestTableProps()?.data?.map(task => task.id)).toEqual([
       'task-jovie',
     ]);
@@ -1911,13 +1903,12 @@ describe('TasksPageClient', () => {
     expect(screen.getByRole('button', { name: 'Next Task' })).toBeEnabled();
   }, 10000);
 
-  it('registers task filtering behind the shared global search trigger', () => {
+  it('keeps the global search trigger inside the header actions host', () => {
     renderPage();
 
-    expect(latestHeaderSearchAdapter?.totalCount).toBe(2);
     const searchTrigger = within(
       screen.getByTestId('header-actions-host')
-    ).getByRole('button', { name: 'Search Jovie' });
+    ).getByRole('button', { name: /^Search Jovie/ });
     expect(searchTrigger).toHaveAttribute('data-app-search-trigger', 'true');
     expect(
       within(screen.getByTestId('header-actions-host')).queryByRole('button', {
@@ -1938,7 +1929,7 @@ describe('TasksPageClient', () => {
 
     fireEvent.click(
       within(screen.getByTestId('header-actions-host')).getByRole('button', {
-        name: 'Search Jovie',
+        name: /^Search Jovie/,
       })
     );
 
@@ -1947,27 +1938,17 @@ describe('TasksPageClient', () => {
     ).not.toBeInTheDocument();
   });
 
-  it('keeps task title search wired into list filters', () => {
-    renderPage();
-
-    act(() => {
-      latestHeaderSearchAdapter?.onPillsChange([
-        {
-          id: 'pill-1',
-          field: 'title',
-          op: 'is',
-          values: ['metadata'],
-        },
-      ]);
-    });
-
-    act(() => {
-      vi.advanceTimersByTime(500);
-    });
-
-    expect(mockUseTasksQuery.mock.calls.at(-1)?.[1]).toEqual(
-      expect.objectContaining({ search: 'metadata' })
+  it('does not register a retired header search adapter (JOV-8792)', () => {
+    const source = readFileSync(
+      resolve(
+        __dirname,
+        '../../../components/features/dashboard/tasks/TasksPageClient.tsx'
+      ),
+      'utf8'
     );
+
+    expect(source).not.toContain('useRegisterHeaderSearch');
+    expect(source).not.toContain('headerSearchAdapter');
   });
 
   it('opts the task title cell into multiline row content', () => {
@@ -1979,31 +1960,6 @@ describe('TasksPageClient', () => {
 
     expect(titleColumn?.meta?.cellContentClassName).toBe(
       TASK_DATA_TABLE_MULTILINE_CELL_CONTENT_CLASSNAME
-    );
-  });
-
-  it('keeps task title search wired into board filters', () => {
-    mockViewMode = 'board';
-
-    renderPage();
-
-    act(() => {
-      latestHeaderSearchAdapter?.onPillsChange([
-        {
-          id: 'pill-1',
-          field: 'title',
-          op: 'is',
-          values: ['press'],
-        },
-      ]);
-    });
-
-    act(() => {
-      vi.advanceTimersByTime(500);
-    });
-
-    expect(mockUseTaskBoardQuery.mock.calls.at(-1)?.[1]).toEqual(
-      expect.objectContaining({ search: 'press' })
     );
   });
 
@@ -2077,7 +2033,7 @@ describe('TasksPageClient', () => {
       deleteItem?.onClick?.();
     });
 
-    const dialog = screen.getByRole('dialog', { name: 'Delete task?' });
+    const dialog = screen.getByRole('alertdialog', { name: 'Delete task?' });
     expect(dialog).toHaveTextContent('Delete task?');
     expect(dialog).toHaveTextContent(mockTaskTwo.title);
 
@@ -2120,7 +2076,7 @@ describe('TasksPageClient', () => {
   it('supports j and k keyboard navigation across visible tasks', () => {
     renderPage();
 
-    expect(screen.getByText('Select a task')).toBeInTheDocument();
+    expect(screen.getByText('No Task Selected')).toBeInTheDocument();
 
     fireEvent.keyDown(window, { key: 'j' });
     expect(screen.getByLabelText('Task Title')).toHaveValue(mockTaskTwo.title);
@@ -2322,7 +2278,7 @@ describe('TasksPageClient', () => {
     fireEvent.keyDown(window, { key: 'Escape' });
 
     expect(screen.queryByLabelText('Task Title')).not.toBeInTheDocument();
-    expect(screen.getByText('Select a task')).toBeInTheDocument();
+    expect(screen.getByText('No Task Selected')).toBeInTheDocument();
   });
 
   it('keeps task keyboard navigation out of text editors', () => {

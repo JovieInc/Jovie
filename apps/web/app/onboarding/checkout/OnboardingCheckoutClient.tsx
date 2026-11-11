@@ -1,14 +1,13 @@
 'use client';
 
 import { Button } from '@jovie/ui';
-import { BadgeCheck, BarChart3, Sparkles, Wallet } from 'lucide-react';
+import { BadgeCheck, BarChart3, Mail, Sparkles } from 'lucide-react';
+import Image from 'next/image';
 import { useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
 import { recordOnboardingUpgradeOfferDecision } from '@/app/onboarding/actions/upgrade-offer';
 import { Avatar } from '@/components/molecules/Avatar/Avatar';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
-import { AppShellFrame } from '@/components/organisms/AppShellFrame';
-import { SidebarProvider } from '@/components/organisms/sidebar';
 import {
   emitProofClaimEvent,
   hasStoredProofClaimAttribution,
@@ -19,11 +18,14 @@ import { track } from '@/lib/analytics';
 import { AUTH_SURFACE, FORM_LAYOUT } from '@/lib/auth/constants';
 import { clearPlanIntent, type PlanIntentTier } from '@/lib/auth/plan-intent';
 import { PROOF_PENDING_TERMS } from '@/lib/claim/proof-terms';
-import { getEntitlements } from '@/lib/entitlements/registry';
+import { getEntitlements, getLimit } from '@/lib/entitlements/registry';
+import type { OnboardingCatalogPreview } from '@/lib/onboarding/catalog-preview';
 import { normalizeOnboardingReturnTo } from '@/lib/onboarding/return-to';
 import type { ClaimTimeFinding } from '@/lib/proof/claim-time-proof';
 import { cn } from '@/lib/utils';
 import { formatAmount } from '@/lib/utils/format-number';
+import { OnboardingCheckoutColumn } from './OnboardingCheckoutColumn';
+import { OnboardingCheckoutFrame } from './OnboardingCheckoutFrame';
 
 interface OnboardingCheckoutClientProps {
   readonly plan: PlanIntentTier;
@@ -41,6 +43,8 @@ interface OnboardingCheckoutClientProps {
   readonly proofFindings?: readonly ClaimTimeFinding[];
   /** Free-admission page waiting for ownership proof: say so before paying. */
   readonly proofPending?: boolean;
+  /** JOV-9758: the artist's real catalog, shown above the price. */
+  readonly catalog?: OnboardingCatalogPreview | null;
 }
 
 // formatPrice replaced by formatAmount per @jovie/no-ad-hoc-currency rule
@@ -53,25 +57,91 @@ function getAnnualSavingsPercent(
   return Math.round(((yearlyAtMonthly - annualAmount) / yearlyAtMonthly) * 100);
 }
 
+const PRO_ANALYTICS_DAYS = getLimit('pro', 'analyticsRetentionDays');
+
+// Paid-only, entitlement-gated items. Tips are not plan-gated, so they are not
+// sold as an upgrade; verification is a reviewed request, not automatic.
 const OFFER_HIGHLIGHTS = [
   {
-    // JOV-7794: a certified capability, not internal-only monitoring.
-    icon: Wallet,
-    label: 'Payments',
-    detail: 'Take tips and payments on your profile',
+    icon: Mail,
+    label: 'Release Emails',
+    detail: 'Email your verified subscribers when new music drops',
   },
   {
     icon: BarChart3,
-    // eslint-disable-next-line @jovie/canonical-ui-label-casing -- Numeric-leading duration is valid Title Case; the rule's canonical suggestion is identical.
-    label: '90-day Analytics',
+    label: `${PRO_ANALYTICS_DAYS}-day Analytics`,
     detail: 'Geographic insights & advanced data',
   },
   {
     icon: BadgeCheck,
     label: 'Verified Badge',
-    detail: 'Build trust with your audience',
+    detail: 'Request verification, reviewed by our team',
   },
 ] as const;
+
+function releaseYear(releaseDate: string | null): string | null {
+  return releaseDate?.slice(0, 4) || null;
+}
+
+/**
+ * JOV-9758: value before price. The artist sees their own releases on their
+ * page before the plan and price render.
+ */
+function CatalogPreviewCard({
+  catalog,
+}: {
+  readonly catalog: OnboardingCatalogPreview;
+}) {
+  const visible = catalog.releases.slice(0, 3);
+  if (visible.length === 0) return null;
+  return (
+    <div className='mb-6' data-testid='checkout-catalog-preview'>
+      <ContentSurfaceCard>
+        <div className='p-4'>
+          <p className='mb-3 text-xs font-medium text-tertiary-token tabular-nums'>
+            {catalog.total === 1
+              ? '1 release on your page'
+              : `${catalog.total} releases on your page`}
+          </p>
+          <ul className='space-y-2'>
+            {visible.map((release, index) => (
+              <li
+                key={release.id}
+                className='flex items-center gap-3'
+                data-testid='checkout-catalog-release'
+              >
+                {release.artworkUrl ? (
+                  <Image
+                    src={release.artworkUrl}
+                    alt=''
+                    width={40}
+                    height={40}
+                    className='h-10 w-10 shrink-0 rounded-md object-cover'
+                  />
+                ) : (
+                  <div className='h-10 w-10 shrink-0 rounded-md bg-surface-2' />
+                )}
+                <div className='min-w-0'>
+                  <p className='truncate text-app font-medium text-primary-token'>
+                    {release.title}
+                  </p>
+                  <p className='text-xs text-tertiary-token tabular-nums'>
+                    {[
+                      index === 0 ? 'Latest' : null,
+                      releaseYear(release.releaseDate),
+                    ]
+                      .filter(Boolean)
+                      .join(' · ')}
+                  </p>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </div>
+      </ContentSurfaceCard>
+    </div>
+  );
+}
 
 interface ProfilePreviewCardProps {
   readonly avatarUrl: string | null;
@@ -252,6 +322,7 @@ export function OnboardingCheckoutClient({
   isDefaultUpsell,
   proofFindings = [],
   proofPending = false,
+  catalog = null,
 }: OnboardingCheckoutClientProps) {
   const searchParams = useSearchParams();
   // Pre-compute savings to determine annual default
@@ -329,7 +400,7 @@ export function OnboardingCheckoutClient({
       if (data.url) {
         globalThis.location.href = data.url;
       } else {
-        throw new Error('No checkout URL returned.');
+        throw new Error('Checkout failed. Please try again.');
       }
     } catch (err) {
       setError(
@@ -355,16 +426,16 @@ export function OnboardingCheckoutClient({
     globalThis.location.href = returnTo;
   }, [isDefaultUpsell, plan, profileId, returnTo]);
 
-  const checkoutContent = (
-    <div className='flex flex-col items-center justify-center py-8'>
-      <div className={`w-full max-w-md ${FORM_LAYOUT.formContainer}`}>
+  return (
+    <OnboardingCheckoutFrame>
+      <OnboardingCheckoutColumn>
         <div className={FORM_LAYOUT.headerSection}>
           <h1 className={FORM_LAYOUT.title}>
             {`Upgrade To ${planMarketing.displayName}`}
           </h1>
           <p className={FORM_LAYOUT.hint}>
             {isDefaultUpsell && username
-              ? `Congrats! Your profile, links, and fan capture are live at jov.ie/${username} — free forever. Here's what ${planMarketing.displayName} adds on top.`
+              ? `Your profile, links, and fan capture are live at jov.ie/${username}, free forever. Here's what ${planMarketing.displayName} adds on top.`
               : username
                 ? `Your profile is live and stays free either way. Here's what ${planMarketing.displayName} adds on top.`
                 : `Here's what ${planMarketing.displayName} adds on top of the free plan.`}
@@ -380,6 +451,8 @@ export function OnboardingCheckoutClient({
             username={username}
           />
         ) : null}
+
+        {catalog ? <CatalogPreviewCard catalog={catalog} /> : null}
 
         {proofPending ? (
           <p
@@ -430,16 +503,6 @@ export function OnboardingCheckoutClient({
           </span>
         </div>
 
-        {/* Error message */}
-        {error ? (
-          <ContentSurfaceCard
-            className='mb-4 border-error/30 bg-error/5 px-4 py-3 text-app text-error'
-            role='alert'
-          >
-            {error}
-          </ContentSurfaceCard>
-        ) : null}
-
         {/* CTA */}
         <Button
           onClick={handleCheckout}
@@ -453,6 +516,16 @@ export function OnboardingCheckoutClient({
             ? 'Redirecting to checkout...'
             : `Upgrade to ${planMarketing.displayName}`}
         </Button>
+
+        {/* Below the button, so a failed checkout never pushes it down */}
+        {error ? (
+          <ContentSurfaceCard
+            className='mt-4 border-error/30 bg-error/5 px-4 py-3 text-app text-error'
+            role='alert'
+          >
+            {error}
+          </ContentSurfaceCard>
+        ) : null}
 
         {/* Skip — the free profile is already live; never imply otherwise */}
         <button
@@ -468,19 +541,7 @@ export function OnboardingCheckoutClient({
             Your public profile stays live and free forever.
           </p>
         ) : null}
-      </div>
-    </div>
-  );
-
-  return (
-    <SidebarProvider defaultOpen={false}>
-      <AppShellFrame
-        sidebar={null}
-        containerClassName='[color-scheme:dark]'
-        contentClassName='overflow-hidden!'
-        main={checkoutContent}
-        rightPanel={null}
-      />
-    </SidebarProvider>
+      </OnboardingCheckoutColumn>
+    </OnboardingCheckoutFrame>
   );
 }

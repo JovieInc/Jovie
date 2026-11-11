@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { TooltipProvider } from '@jovie/ui';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
@@ -123,6 +125,9 @@ describe('DashboardAudienceTableUnified', () => {
     ).toBeInTheDocument();
     expect(screen.getAllByText('Grow Your Audience').length).toBeGreaterThan(0);
     expect(
+      screen.getByText('Track visitors and grow your audience')
+    ).toHaveClass('sr-only');
+    expect(
       screen.getAllByRole('link', { name: 'Open Profile Settings' })[0]
     ).toHaveAttribute('href', '/app/settings/profile');
     const headerLabels = screen
@@ -131,7 +136,7 @@ describe('DashboardAudienceTableUnified', () => {
       .filter(Boolean);
     expect(headerLabels).toEqual(
       expect.arrayContaining([
-        'Fan',
+        'Member',
         'State',
         'Alerts',
         'Engagement',
@@ -139,6 +144,9 @@ describe('DashboardAudienceTableUnified', () => {
         'Action',
       ])
     );
+    expect(
+      screen.queryByRole('columnheader', { name: /\bfans?\b/i })
+    ).toBeNull();
   });
 
   it('renders members on the 32px dense people row with a face', () => {
@@ -247,5 +255,23 @@ describe('DashboardAudienceTableUnified', () => {
     expect(text).not.toContain('level1@example.com');
     expect(text).not.toContain('+15550000001');
     expect(text).not.toContain('••• 0001');
+  });
+
+  it('keeps the analytics rail out of the first-load bundle', () => {
+    const source = readFileSync(
+      resolve(
+        process.cwd(),
+        'components/features/dashboard/organisms/dashboard-audience-table/DashboardAudienceTableUnified.tsx'
+      ),
+      'utf8'
+    );
+    // /demo/audience has a first-load JS budget; the rail renders only when
+    // its panel opens, so it comes through the next/dynamic wrapper.
+    expect(source).toContain(
+      "from '@/features/dashboard/organisms/analytics-sidebar-lazy'"
+    );
+    expect(source).not.toContain(
+      "from '@/features/dashboard/organisms/AnalyticsSidebar'"
+    );
   });
 });

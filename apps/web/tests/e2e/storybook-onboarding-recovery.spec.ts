@@ -20,6 +20,59 @@ const cases = [
 ] as const;
 
 for (const scenario of cases) {
+  test(`onboarding overflow preserves draft and keyboard focus: ${scenario.name}`, async ({
+    page,
+  }, testInfo) => {
+    await page.setViewportSize({ width: scenario.width, height: 720 });
+    await page.emulateMedia({ reducedMotion: scenario.reducedMotion });
+    await page.goto(
+      '/iframe.html?id=features-onboarding-onboardingshell--overflow-actions&viewMode=story'
+    );
+    await page.evaluate(theme => {
+      document.documentElement.classList.toggle('dark', theme === 'dark');
+    }, scenario.theme);
+    const trigger = page.getByRole('button', { name: 'Onboarding options' });
+    const input = page.getByRole('textbox', { name: 'Chat message' });
+    // Let the story's own keyboard play finish before checking the mounted UI.
+    await expect(trigger).toBeFocused();
+    await input.fill('My unfinished reply');
+    const before = await input.boundingBox();
+    await trigger.click();
+    const menu = page.getByRole('menu');
+    await expect(menu).toBeVisible();
+    await expect(
+      page.getByRole('menuitem', { name: 'Sign in' })
+    ).toHaveAttribute('href', '/signin');
+    const box = await menu.boundingBox();
+    expect(box).not.toBeNull();
+    expect(box!.x).toBeGreaterThanOrEqual(0);
+    expect(box!.x + box!.width).toBeLessThanOrEqual(scenario.width);
+    expect(await input.boundingBox()).toEqual(before);
+    await testInfo.attach(
+      `onboarding-options-${scenario.name.replaceAll(' ', '-')}.png`,
+      {
+        body: await page.screenshot(),
+        contentType: 'image/png',
+      }
+    );
+    await page.keyboard.press('Escape');
+    await expect(menu).toBeHidden();
+    await expect(trigger).toBeFocused();
+    await expect(input).toHaveValue('My unfinished reply');
+    await page.keyboard.press('Enter');
+    await expect(
+      page.getByRole('menuitem', { name: 'Start over' })
+    ).toBeFocused();
+    await page.keyboard.press('ArrowDown');
+    await expect(page.getByRole('menuitem', { name: 'Sign in' })).toBeFocused();
+    // The open menu may cover the input center on narrow screens.
+    // Click its visible left edge to exercise a real outside dismissal.
+    await input.click({ position: { x: 4, y: 4 } });
+    await expect(menu).toBeHidden();
+    await expect(input).toBeFocused();
+    await expect(input).toHaveValue('My unfinished reply');
+  });
+
   test(`artist confirmation keeps the handle turn reachable: ${scenario.name}`, async ({
     page,
   }) => {
@@ -42,13 +95,18 @@ for (const scenario of cases) {
     await input.fill('https://open.spotify.com/artist/1ZlSI1juLMMN1HU8X7RViN');
     await send.click();
     await expect(page.getByTestId('submitted-turn-count')).toHaveText('1');
-    await expect(
-      page.getByTestId(
-        scenario.width >= 1024
-          ? 'onboarding-profile-rail'
-          : 'onboarding-profile-rail-inline'
-      )
-    ).toBeVisible();
+    // The confirm-artist turn ships the handle card in the same turn
+    // (JOV-10168), so the handle turn is reachable without typing a reply.
+    await expect(page.getByTestId('onboarding-edit-handle')).toBeVisible();
+    // The preview renders the confirmed artist with the real proposed
+    // handle, never the fabricated jov.ie/your-handle identity (JOV-10169).
+    const rail = page.getByTestId(
+      scenario.width >= 1024
+        ? 'onboarding-profile-rail'
+        : 'onboarding-profile-rail-inline'
+    );
+    await expect(rail).toBeVisible();
+    await expect(rail).not.toContainText('your-handle');
     await input.fill('Set my profile handle');
     await expect(send).toBeEnabled();
     await send.scrollIntoViewIfNeeded();
@@ -67,13 +125,23 @@ for (const scenario of cases) {
     expect(receivesPointer).toBe(true);
     await send.click();
     await expect(page.getByTestId('submitted-turn-count')).toHaveText('2');
+    // Pen R6As7U: the handle field sits behind an explicit Change Handle.
+    const handleCards = page.getByTestId('onboarding-edit-handle');
+    await expect(handleCards).toHaveCount(2);
+    await handleCards.last().click();
     await expect(
       page.getByRole('textbox', { name: 'Proposed handle' })
     ).toBeVisible();
     await expect(input).toHaveValue('');
-    await expect(
-      page.getByRole('link', { name: 'Sign in', exact: true })
-    ).toBeVisible();
+    const options = page.getByRole('button', { name: 'Onboarding options' });
+    await options.click();
+    const signIn = page.getByRole('menuitem', { name: 'Sign in', exact: true });
+    await expect(signIn).toBeVisible();
+    await expect(signIn).toHaveAttribute('href', '/signin');
+    await page.keyboard.press('Escape');
+    await expect(page.getByRole('menu')).toBeHidden();
+    await expect(options).toBeFocused();
+    await expect(input).toHaveValue('');
     expect(
       await page.evaluate(
         () => document.documentElement.scrollWidth <= innerWidth

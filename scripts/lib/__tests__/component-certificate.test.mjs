@@ -20,8 +20,11 @@ import {
   findJank,
   findRawColors,
   findRawElements,
+  renderAgentSpec,
   statesCovered,
+  summarizeGuards,
 } from '../component-certificate.mjs';
+import { storyReceipt } from '../component-evidence.mjs';
 import { moduleKey } from '../mutation-sweep.mjs';
 
 const sourceHash = source => createHash('sha256').update(source).digest('hex');
@@ -31,18 +34,13 @@ const gitBlob = source =>
     .update(source)
     .digest('hex');
 
-const stories = [
-  'Loading',
-  'Empty',
-  'Error',
-  'Partial',
-  'LongContent',
-  'Offline',
-  'PermissionDenied',
-  'Rtl',
-]
-  .map(name => `export const ${name}={};`)
-  .join('\n');
+const stories =
+  'Loading Empty Error Partial LongContent Offline PermissionDenied Rtl'
+    .split(' ')
+    .map(name => `export const ${name}={};`)
+    .join('\n');
+// A reviewed benchmark judgment names its reference (component-benchmark-review).
+const reviewed = { reference: 'WAI-ARIA APG Button', gaps: [] };
 const criterion = (cert, id) => cert.criteria.find(row => row.id === id);
 function assertCriteria(cert, expected) {
   for (const [id, status] of Object.entries(expected)) {
@@ -68,7 +66,6 @@ const mutationReceipt = (source, tests = []) => ({
 
 describe('component certificate', () => {
   const clean = `export function Card({ title }: { title: string }) { return <div className="bg-surface-1 text-primary-token">{title}</div>; }`;
-
   it.each([
     `const a = "bg-blue-500 text-white"; const b = '#fff'; const c = "rgb(1,2,3)";`,
     `const A = () => <div className="bg-blue-500 text-white" data-hex="#fff" data-rgb="rgb(1,2,3)" />;`,
@@ -93,7 +90,6 @@ describe('component certificate', () => {
       ['button', 'input']
     );
   });
-
   it('jank: inline component, autoFocus, unstable key, img, reset-on-open effect', () => {
     const src = `
 export function Drawer({ open }) {
@@ -114,7 +110,6 @@ export function Drawer({ open }) {
     ]);
     assert.deepEqual(findJank(clean, 'a.tsx'), []);
   });
-
   it('state stories are matched by export name', () => {
     const c = statesCovered(
       'export const Loading = {}; export const EmptyState = {}; export const RtlLong = {};'
@@ -273,6 +268,9 @@ export function Drawer({ open }) {
     });
     assert.equal(report.totals.components, 1);
     assert.equal(report.totals.certified, 0);
+    const spec = renderAgentSpec(cert);
+    assert.match(spec, /Missing criteria/);
+    assert.match(spec, /component-certificate\.mjs --component/);
   });
 
   it('nested bordered surfaces: three levels flagged, flat surface is not', () => {
@@ -284,6 +282,26 @@ export function Drawer({ open }) {
     assert.ok(
       !findJank(flat, 'a.tsx').some(f => f.rule === 'surface:nested-bordered')
     );
+  });
+
+  it('defect-guard registry: every defect needs a guard; weekly human vs guard counts', () => {
+    const defects = [
+      ['human', '2026-10-25', 'lint-ast-rule', 'landed'],
+      ['guard', '2026-10-26', 'search-relevance-fixture', 'planned'],
+    ].map(([foundBy, foundAt, type, status], i) => ({
+      id: `D${i}`,
+      class: 'surface',
+      foundBy,
+      foundAt,
+      guard: { type, ref: 'x', status },
+    }));
+    const ok = summarizeGuards({ defects });
+    assert.deepEqual(ok.errors, []);
+    assert.equal(ok.guardsLanded, 1);
+    assert.deepEqual(ok.weeks['2026-W43'], { human: 1, guard: 0, agent: 0 });
+    assert.equal(ok.weeks['2026-W44'].guard, 1);
+    delete defects[0].guard;
+    assert.equal(summarizeGuards({ defects }).errors.length, 1);
   });
 });
 
@@ -297,7 +315,6 @@ describe('component certificate CLI evidence freshness', () => {
   const original = 'export function Card() { return <div />; }\n';
   const changed =
     'export function Card() { return <div title="updated" />; }\n';
-
   let f;
   beforeEach(() => {
     const root = mkdtempSync(join(tmpdir(), 'component-certificate-cli-'));
@@ -337,9 +354,13 @@ describe('component certificate CLI evidence freshness', () => {
           git(['hash-object', additionalTest]),
         ]),
       };
-      records.visual = { status: 'pass', captured: 1, sourceHash: binding };
-      records.a11y = { status: 'pass', sourceHash: binding };
-      records.benchmark = { libraryVersion: 1, sourceHash: binding, gaps: [] };
+      records.visual = storyReceipt(binding);
+      records.a11y = storyReceipt(binding);
+      records.benchmark = {
+        ...reviewed,
+        libraryVersion: 1,
+        sourceHash: binding,
+      };
       save();
     };
     const invoke = (entry = cli) => {
@@ -387,7 +408,13 @@ describe('component certificate CLI evidence freshness', () => {
       'scripts/component-certificate.mjs',
       'scripts/component-ship-policy.mjs',
       'scripts/lib/component-certificate.mjs',
+      'scripts/lib/component-benchmark-review.mjs',
+      'scripts/lib/component-certificate-mutation.mjs',
+      'scripts/lib/component-evidence.mjs',
+      'scripts/lib/design-rules/forced-caps.mjs',
+      'scripts/lib/design-rules/raw-colors.mjs',
       'scripts/lib/mutation-sweep.mjs',
+      'scripts/lib/mutation-sweep-root.mjs',
       'scripts/lib/mutation-diff.mjs',
     ]) {
       mkdirSync(dirname(join(f.root, path)), { recursive: true });
@@ -399,10 +426,8 @@ describe('component certificate CLI evidence freshness', () => {
       join(f.root, 'node_modules/typescript'),
       'dir'
     );
-    assert.equal(
-      f.invoke(join(f.root, 'scripts/component-certificate.mjs')).certified,
-      true
-    );
+    const entry = join(f.root, 'scripts/component-certificate.mjs');
+    assert.equal(f.invoke(entry).certified, true);
   });
 
   it('component edit and benchmark-only refresh cannot reuse old CI or mutation evidence', () => {

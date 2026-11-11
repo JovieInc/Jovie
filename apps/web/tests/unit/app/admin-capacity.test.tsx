@@ -116,6 +116,9 @@ describe('value and alerts', () => {
   it('raises the credits alarm while Grok is under pace', () => {
     board('hyperagent');
     const alerts = screen.getByTestId('capacity-alerts');
+    // The alerts list keeps real listitem children (axe list) while the
+    // alert role lives on the inner wrapper (JOV-8873 a11y residue).
+    expect(within(alerts).getAllByRole('listitem').length).toBeGreaterThan(0);
     expect(within(alerts).getByRole('alert').textContent).toMatch(
       /Hyperagent .* under pace: route work there first/
     );
@@ -166,9 +169,9 @@ describe('access paths and roles', () => {
     );
     const luna = within(paths)
       .getAllByRole('listitem')
-      .filter(r => r.textContent?.includes('gpt-5.6-luna'));
+      .filter(r => r.textContent?.includes('gpt-6-luna'));
     const text = luna.map(r => r.textContent).join(' ');
-    expect(text).toMatch(/API.*0\.2 \/ 1\.2.*list price, cash/);
+    expect(text).toMatch(/API.*0\.1 \/ 0\.5.*list price, cash/);
     expect(text).toMatch(
       /Subscription seat \(openai-codex\).*lyb-pro: ahead of pace: rising toward API/
     );

@@ -1,6 +1,8 @@
 import { spawnSync } from 'node:child_process';
 import {
+  chmodSync,
   copyFileSync,
+  existsSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
@@ -11,7 +13,9 @@ import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { runInNewContext } from 'node:vm';
+import { load as loadYaml } from 'js-yaml';
 import { describe, expect, it } from 'vitest';
+import { evaluateGateWeakening } from '../../invariants/gate-weakening-detector.mjs';
 import { formatDeprecationObservation } from '../deprecation-observation.mjs';
 import {
   COMMISSIONING_PARENT_ALLOWLIST,
@@ -22,9 +26,12 @@ import {
   isInstallationQuota403,
   lifecycleHolds,
   listOpenPullRequests,
+  orderSweepLookups,
   parentHoldReason,
   pullRequestLinksIssue,
   recordValidationReceipt,
+  reportQuotaDeferral,
+  reportSweepDeferral,
   syncLinearIssueOnMerge,
 } from '../linear-sync-on-merge.mjs';
 import {
@@ -1678,6 +1685,148 @@ describe('linear sync on merge', () => {
     }
   });
 
+  it('evaluates Merging and Validating issues before an older active backlog', async () => {
+    const { world, fetchImpl } = createWorld();
+    world.issues['JOV-1'].state = 'In Review';
+    world.issues['JOV-1'].updatedAt = '2026-10-03T08:00:00Z';
+    world.issues['JOV-2'] = {
+      ...structuredClone(world.issues['JOV-1']),
+      id: 'uuid-2',
+      identifier: 'JOV-2',
+      state: 'Merging',
+      updatedAt: '2026-10-03T15:00:00Z',
+      attachments: [],
+    };
+    const asked = [];
+    const watching = intercept(fetchImpl, async (_url, body) => {
+      if (body?.query?.includes('LifecycleIssueBatch')) {
+        asked.push(body.variables.id0);
+      }
+      return null;
+    });
+    await sweep(watching);
+    // The Merging issue is newer than the In Review one and still goes first,
+    // so a rate limit that stops the sweep partway cannot starve it.
+    expect(asked).toEqual(['JOV-2']);
+    expect(world.issues['JOV-1'].state).toBe('Done');
+    expect(world.issues['JOV-2'].state).toBe('Merging');
+  });
+
+  it('answers unmerged linked pulls from the batched snapshot without per-pull reads', async () => {
+    const { world, fetchImpl } = createWorld();
+    world.issues['JOV-1'].state = 'Merging';
+    world.pulls[555] = {
+      ...world.pulls[101],
+      mergedAt: null,
+      headRef: 'codex/jov-1-abandoned',
+    };
+    world.issues['JOV-1'].attachments = [
+      `https://github.com/${REPO}/pull/555`,
+      `https://github.com/${REPO}/pull/556`,
+    ];
+    world.openPulls = [
+      { number: 556, state: 'open', title: 'feat: card', body: '' },
+    ];
+    const reads = [];
+    const logs = [];
+    const guarded = intercept(fetchImpl, async url => {
+      if (/\/pulls\/55[56]$/.test(String(url))) {
+        reads.push(String(url));
+      }
+      return null;
+    });
+    await syncLinearIssueOnMerge({
+      env: { ...BASE_ENV, LIFECYCLE_MODE: 'sweep' },
+      fetchImpl: guarded,
+      harnessManifest: HARNESS_MANIFEST,
+      assuranceMatrix: NO_UI_MATRIX,
+      verifyMarker: () => true,
+      log: message => logs.push(message),
+    });
+    expect(reads).toEqual([]);
+    expect(world.issues['JOV-1'].state).toBe('Merging');
+    expect(world.updates).toEqual([]);
+    expect(logs.join('\n')).toContain(
+      'has no merged JovieInc/Jovie pull request on main'
+    );
+  });
+
+  it('defers the sweep visibly when the closed-pull snapshot hits the quota', async () => {
+    const { world, fetchImpl } = createWorld();
+    world.issues['JOV-1'].state = 'Merging';
+    const exhausted = intercept(fetchImpl, async url =>
+      url.includes('pulls?state=closed')
+        ? {
+            ok: false,
+            status: 403,
+            headers: new Headers({ 'x-ratelimit-remaining': '0' }),
+            json: async () => ({
+              message: 'API rate limit exceeded for installation.',
+            }),
+          }
+        : null
+    );
+    const logs = [];
+    const result = await syncLinearIssueOnMerge({
+      env: { ...BASE_ENV, LIFECYCLE_MODE: 'sweep' },
+      fetchImpl: exhausted,
+      harnessManifest: HARNESS_MANIFEST,
+      assuranceMatrix: NO_UI_MATRIX,
+      verifyMarker: () => true,
+      sleep: async () => {},
+      log: message => logs.push(message),
+    });
+    expect(result.action).toBe('deferred');
+    expect(result.deferred).toBe(0);
+    expect(world.updates).toEqual([]);
+    expect(world.issues['JOV-1'].state).toBe('Merging');
+    expect(logs.join('\n')).toContain('Closed pull request snapshot deferred');
+    expect(logs.join('\n')).toContain('installation-quota-403');
+  });
+
+  it('fails closed when the closed-pull snapshot is refused', async () => {
+    const { world, fetchImpl } = createWorld();
+    world.issues['JOV-1'].state = 'Merging';
+    const denied = intercept(fetchImpl, async url =>
+      url.includes('pulls?state=closed')
+        ? {
+            ok: false,
+            status: 403,
+            headers: new Headers({ 'x-ratelimit-remaining': '4000' }),
+            json: async () => ({
+              message: 'Resource not accessible by integration',
+            }),
+          }
+        : null
+    );
+    await expect(sweep(denied)).rejects.toThrow(
+      /Closed pull request snapshot refused/
+    );
+    expect(world.updates).toEqual([]);
+    expect(world.issues['JOV-1'].state).toBe('Merging');
+  });
+
+  it('falls back to per-pull reads when the snapshot is malformed', async () => {
+    const { world, fetchImpl } = createWorld();
+    world.issues['JOV-1'].state = 'Merging';
+    const malformed = intercept(fetchImpl, async url =>
+      url.includes('pulls?state=closed') ? json({ no: 'list' }) : null
+    );
+    const logs = [];
+    await syncLinearIssueOnMerge({
+      env: { ...BASE_ENV, LIFECYCLE_MODE: 'sweep' },
+      fetchImpl: malformed,
+      harnessManifest: HARNESS_MANIFEST,
+      assuranceMatrix: NO_UI_MATRIX,
+      verifyMarker: () => true,
+      log: message => logs.push(message),
+    });
+    expect(logs.join('\n')).toContain('Closed pull request snapshot failed');
+    expect(logs.join('\n')).toContain('falling back to per-pull reads');
+    // The per-pull read still binds #101, so the issue finishes normally.
+    expect(world.issues['JOV-1'].state).toBe('Done');
+  });
+
   it('skips one unreadable pull request and still closes the other issue', async () => {
     const { world, fetchImpl } = createWorld();
     world.issues['JOV-1'].state = 'Merging';
@@ -2393,5 +2542,350 @@ describe('conflictRemediationResolved', () => {
         { pulls: [], complete: true }
       )
     ).toBeNull();
+  });
+});
+
+describe('orderSweepLookups', () => {
+  const entry = (identifier, stateName, updatedAt) => ({
+    identifier,
+    updatedAt,
+    stateName,
+  });
+
+  it('puts Merging and Validating ahead of the active backlog, oldest first in each tier', () => {
+    expect(
+      orderSweepLookups([
+        entry('JOV-1', 'In Progress', '2026-10-03T08:00:00Z'),
+        entry('JOV-2', 'Rework', '2026-10-03T09:00:00Z'),
+        entry('JOV-3', 'Validating', '2026-10-03T14:00:00Z'),
+        entry('JOV-4', 'Merging', '2026-10-03T15:00:00Z'),
+        entry('JOV-5', 'Merging', '2026-10-03T13:00:00Z'),
+        entry('JOV-6', 'In Review', '2026-10-03T07:00:00Z'),
+      ])
+    ).toEqual(['JOV-5', 'JOV-3', 'JOV-4', 'JOV-6', 'JOV-1', 'JOV-2']);
+  });
+
+  it('rotates the active tier at the cursor while still running the lifecycle tier ahead of it', () => {
+    expect(
+      orderSweepLookups(
+        [
+          entry('JOV-1', 'Merging', '2026-10-03T08:00:00Z'),
+          entry('JOV-2', 'In Progress', '2026-10-03T09:00:00Z'),
+          entry('JOV-3', 'In Review', '2026-10-03T10:00:00Z'),
+        ],
+        'JOV-3'
+      )
+    ).toEqual(['JOV-1', 'JOV-3']);
+  });
+
+  it('resumes inside the lifecycle tier at the cursor and still reaches the backlog', () => {
+    expect(
+      orderSweepLookups(
+        [
+          entry('JOV-1', 'Merging', '2026-10-03T08:00:00Z'),
+          entry('JOV-2', 'Validating', '2026-10-03T09:00:00Z'),
+          entry('JOV-3', 'In Progress', '2026-10-03T10:00:00Z'),
+        ],
+        'JOV-2'
+      )
+    ).toEqual(['JOV-2', 'JOV-3']);
+  });
+
+  it('starts a fresh pass when the cursor names an issue that left the lifecycle states', () => {
+    expect(
+      orderSweepLookups(
+        [entry('JOV-1', 'Merging', '2026-10-03T08:00:00Z')],
+        'JOV-9'
+      )
+    ).toEqual(['JOV-1']);
+  });
+});
+
+describe('Linear Sync workflow closes its own loops', () => {
+  const workflow = readFileSync(
+    new URL(
+      '../../../.github/workflows/linear-sync-on-merge.yml',
+      import.meta.url
+    ),
+    'utf8'
+  );
+  const parsed =
+    /** @type {{ jobs: { sync_done: { 'timeout-minutes': number, steps: { id?: string, env?: Record<string, string>, run?: string }[] } } }} */ (
+      loadYaml(workflow)
+    );
+  const job = parsed.jobs.sync_done;
+  const quotaHold = job.steps.find(step => step.id === 'quota_hold');
+
+  it('matches the Production Controller by path, not by its run-name title', () => {
+    const step = workflow
+      .split('- name: Record screen-audit receipts')[1]
+      .split('- name:')[0];
+    expect(step).toContain(
+      "github.event.workflow_run.path == '.github/workflows/production-controller.yml'"
+    );
+    expect(step).not.toMatch(/workflow_run\.name\s*==/);
+    // The cause: production-controller.yml sets run-name, which replaces workflow_run.name.
+    expect(
+      readFileSync(
+        new URL(
+          '../../../.github/workflows/production-controller.yml',
+          import.meta.url
+        ),
+        'utf8'
+      )
+    ).toMatch(/^run-name:/m);
+  });
+
+  it('holds for the quota reset, retries once, then fails visibly', () => {
+    const order = [
+      '- name: Evaluate the validation lifecycle\n',
+      '- name: Hold for the GitHub quota reset',
+      '- name: Evaluate the validation lifecycle (retry after quota reset)',
+      '- name: Fail visibly when the sync stayed deferred',
+    ].map(marker => workflow.indexOf(marker));
+    expect(order.every(index => index > 0)).toBe(true);
+    expect([...order].sort((a, b) => a - b)).toEqual(order);
+    expect(workflow).toContain(
+      "steps.evaluate.outputs.quota_deferred == 'true'"
+    );
+    expect(workflow).toContain(
+      "steps.evaluate_retry.outputs.quota_deferred == 'true'"
+    );
+    expect(workflow).toContain('.github/scripts/gh-api-hold.sh\n');
+  });
+
+  it('keeps both screen-audit attempts and the lifecycle hold inside the original job budget', () => {
+    const timeout = job['timeout-minutes'];
+    const holds = job.steps
+      .filter(step => step.env?.GH_API_HOLD_BUDGET_SECONDS)
+      .map(step => Number(step.env.GH_API_HOLD_BUDGET_SECONDS));
+    expect(holds).toHaveLength(2);
+    // Two screen-audit attempts plus one lifecycle hold must leave at least
+    // half the original job window for checkout, evaluation and cache saves.
+    expect(holds.every(seconds => seconds > 0)).toBe(true);
+    expect(2 * holds[0] + holds[1]).toBeLessThanOrEqual(timeout * 30);
+    expect(
+      evaluateGateWeakening([
+        {
+          path: '.github/workflows/linear-sync-on-merge.yml',
+          before: workflow.replace(
+            /timeout-minutes: \d+/,
+            'timeout-minutes: 15'
+          ),
+          after: workflow,
+        },
+      ])
+    ).toEqual([]);
+  });
+
+  it.each([
+    ['within budget', 10, 0, 2],
+    ['outside budget', 3600, 1, 1],
+  ])(
+    'runs the workflow quota hold %s without passing an unevaluated sync',
+    (_, resetIn, status, attempts) => {
+      const dir = mkdtempSync(join(tmpdir(), 'linear-sync-hold-'));
+      try {
+        const gh = join(dir, 'gh');
+        writeFileSync(
+          gh,
+          `#!/usr/bin/env bash
+if [ "$2" = rate_limit ]; then echo "$FIXTURE_RESET"; exit 0; fi
+count=0
+[ ! -f "$FIXTURE_DIR/count" ] || read -r count < "$FIXTURE_DIR/count"
+count=$((count + 1))
+echo "$count" > "$FIXTURE_DIR/count"
+if [ "$count" -eq 1 ]; then
+  echo 'gh: API rate limit exceeded for installation ID 1. (HTTP 403)' >&2
+  exit 1
+fi
+`
+        );
+        const sleep = join(dir, 'sleep');
+        writeFileSync(
+          sleep,
+          '#!/usr/bin/env bash\necho "$1" > "$FIXTURE_DIR/sleep.txt"\n'
+        );
+        chmodSync(gh, 0o755);
+        chmodSync(sleep, 0o755);
+        const result = spawnSync(
+          'bash',
+          ['-euo', 'pipefail', '-c', quotaHold.run],
+          {
+            cwd: resolve(import.meta.dirname, '../../..'),
+            encoding: 'utf8',
+            timeout: 5000,
+            env: {
+              ...process.env,
+              ...quotaHold.env,
+              GH_TOKEN: 'fixture',
+              REPO: 'JovieInc/Jovie',
+              GH_API_HOLD_BIN: gh,
+              GH_API_HOLD_TOKEN_CAP_SECONDS: '3900',
+              GITHUB_STEP_SUMMARY: join(dir, 'summary'),
+              FIXTURE_DIR: dir,
+              FIXTURE_RESET: String(Math.floor(Date.now() / 1000) + resetIn),
+              PATH: `${dir}:${process.env.PATH}`,
+            },
+          }
+        );
+        expect(result.status, result.stderr).toBe(status);
+        expect(Number(readFileSync(join(dir, 'count'), 'utf8'))).toBe(attempts);
+        expect(existsSync(join(dir, 'sleep.txt'))).toBe(status === 0);
+        if (status === 0) {
+          expect(
+            Number(readFileSync(join(dir, 'sleep.txt'), 'utf8'))
+          ).toBeLessThanOrEqual(
+            Number(quotaHold.env.GH_API_HOLD_BUDGET_SECONDS)
+          );
+          expect(readFileSync(join(dir, 'summary'), 'utf8')).toContain(
+            'linear-sync-quota-hold'
+          );
+        }
+      } finally {
+        rmSync(dir, { recursive: true, force: true });
+      }
+    }
+  );
+
+  it('flags a soft-failed quota 403 in the step output and summary only', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'quota-deferral-'));
+    try {
+      const output = join(dir, 'out');
+      const summary = join(dir, 'summary');
+      const env = { GITHUB_OUTPUT: output, GITHUB_STEP_SUMMARY: summary };
+      expect(reportQuotaDeferral({ softFailed: false }, env)).toBe(false);
+      expect(existsSync(output)).toBe(false);
+      expect(reportQuotaDeferral({ softFailed: true }, env)).toBe(true);
+      expect(readFileSync(output, 'utf8')).toBe('quota_deferred=true\n');
+      expect(readFileSync(summary, 'utf8')).toContain('DEFERRED');
+      expect(reportQuotaDeferral({ softFailed: true }, {})).toBe(true);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('flags a resolved deferral in the step output so the hold-and-retry runs', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'sweep-deferral-'));
+    try {
+      const output = join(dir, 'out');
+      const summary = join(dir, 'summary');
+      const env = { GITHUB_OUTPUT: output, GITHUB_STEP_SUMMARY: summary };
+      expect(
+        reportSweepDeferral({ action: 'deferred', deferred: 194 }, env)
+      ).toBe(true);
+      expect(readFileSync(output, 'utf8')).toBe('quota_deferred=true\n');
+      expect(readFileSync(summary, 'utf8')).toContain(
+        '194 issue(s) deferred to the next sweep'
+      );
+      expect(
+        reportSweepDeferral({ action: 'deferred', deferred: 0 }, env)
+      ).toBe(true);
+      expect(readFileSync(summary, 'utf8')).toContain(
+        'before any lifecycle evaluation'
+      );
+      const before = readFileSync(output, 'utf8');
+      expect(reportSweepDeferral({ action: 'moved' }, env)).toBe(false);
+      expect(reportSweepDeferral(undefined, env)).toBe(false);
+      expect(readFileSync(output, 'utf8')).toBe(before);
+      expect(reportSweepDeferral({ action: 'deferred' }, {})).toBe(true);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('flags a partially deferred sweep from the direct run, lifecycle-first, and persists the cursor', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'linear-sync-deferred-'));
+    try {
+      const repository = resolve(import.meta.dirname, '../../..');
+      const cursorDir = join(dir, 'cursor');
+      mkdirSync(cursorDir);
+      const output = join(dir, 'out');
+      const summary = join(dir, 'summary');
+      const asked = join(dir, 'asked.json');
+      // Run 41157880216 shape: the sweep starts, the Linear rate limit kills
+      // the first batch read, and the run must still flag quota_deferred so
+      // the workflow's hold-and-retry runs instead of ending green.
+      const stub = join(dir, 'stub.mjs');
+      writeFileSync(
+        stub,
+        `import { appendFileSync } from 'node:fs';
+const ok = body => ({ ok: true, headers: { get: () => '' }, json: async () => body });
+globalThis.fetch = async (url, init) => {
+  const href = String(url);
+  if (href === 'https://api.github.com/repos/JovieInc/Jovie/pulls?state=open&per_page=100&page=1')
+    return ok([]);
+  if (href.startsWith('https://api.github.com/repos/JovieInc/Jovie/pulls?state=closed'))
+    return ok([]);
+  if (href === 'https://api.linear.app/graphql') {
+    const { query, variables } = JSON.parse(String(init?.body ?? '{}'));
+    if (query.includes('LifecycleSweep')) {
+      return ok({ data: { issues: { nodes: [
+        { identifier: 'JOV-1', updatedAt: '2026-10-03T08:00:00Z', state: { name: 'In Review' },
+          attachments: { nodes: [{ url: 'https://github.com/JovieInc/Jovie/pull/101' }] },
+          children: { nodes: [] }, labels: { nodes: [] } },
+        { identifier: 'JOV-2', updatedAt: '2026-10-03T15:00:00Z', state: { name: 'Merging' },
+          attachments: { nodes: [] }, children: { nodes: [] }, labels: { nodes: [] } },
+      ], pageInfo: { hasNextPage: false, endCursor: null } } } });
+    }
+    if (query.includes('LifecycleIssueBatch')) {
+      appendFileSync(process.env.ASKED_FILE, String(variables.id0) + String.fromCharCode(10));
+      return {
+        ok: false,
+        status: 400,
+        headers: { get: () => null },
+        json: async () => ({ errors: [{ message: 'Rate limit exceeded', extensions: { code: 'RATELIMITED' } }] }),
+      };
+    }
+    throw new Error('unexpected Linear query ' + query.slice(0, 50));
+  }
+  throw new Error('unexpected url ' + href);
+};
+`
+      );
+      const result = spawnSync(
+        process.execPath,
+        [
+          '--import',
+          pathToFileURL(stub).href,
+          join(repository, 'scripts/lib/linear-sync-on-merge.mjs'),
+        ],
+        {
+          cwd: repository,
+          encoding: 'utf8',
+          timeout: 20_000,
+          env: {
+            ...process.env,
+            LINEAR_API_KEY: 'lin_test',
+            GITHUB_TOKEN: 'gh_test',
+            GITHUB_REPOSITORY: 'JovieInc/Jovie',
+            LIFECYCLE_MODE: 'sweep',
+            GITHUB_WORKSPACE: repository,
+            LINEAR_SYNC_CURSOR_DIR: cursorDir,
+            GITHUB_OUTPUT: output,
+            GITHUB_STEP_SUMMARY: summary,
+            ASKED_FILE: asked,
+          },
+        }
+      );
+      expect(result.status, result.stdout + result.stderr).toBe(0);
+      // The deferral was resolved, not thrown: the direct run must still
+      // flag it or the workflow's hold-and-retry steps skip (run 41157880216).
+      expect(readFileSync(output, 'utf8')).toBe('quota_deferred=true\n');
+      expect(readFileSync(summary, 'utf8')).toContain(
+        '2 issue(s) deferred to the next sweep'
+      );
+      // The Merging issue is evaluated first even though it is newer, on
+      // every retry of the rate-limited batch read.
+      const askedLines = readFileSync(asked, 'utf8').trim().split('\n');
+      expect(askedLines[0]).toBe('JOV-2');
+      expect(askedLines.every(id => id === 'JOV-2')).toBe(true);
+      expect(
+        JSON.parse(readFileSync(join(cursorDir, 'cursor.json'), 'utf8'))
+          .nextIdentifier
+      ).toBe('JOV-2');
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });

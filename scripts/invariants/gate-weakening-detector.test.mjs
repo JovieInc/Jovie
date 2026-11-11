@@ -124,6 +124,16 @@ describe('JOV-INV-045 gate-weakening detector', () => {
     });
     assert.deepEqual(event.labels, ['codeowners-approved']);
   });
+  it('treats a new shrink-only ledger as tightening but still rejects growth of an existing one', () => {
+    const path = 'apps/web/new-guard.baseline.json';
+    assert.deepEqual(kindsOf({ path, before: null, after: '{"files":{"a.tsx":2}}' }), []);
+    assert.ok(
+      kindsOf({ path, before: '{"files":{"a.tsx":2}}', after: '{"files":{"a.tsx":3}}' }).includes('shrink-only-growth')
+    );
+    assert.ok(
+      kindsOf({ path, before: '{"files":{"a.tsx":2}}', after: '{"files":{"a.tsx":2,"b.tsx":1}}' }).includes('shrink-only-growth')
+    );
+  });
   it('rejects weakening the detector itself', () => {
     const path = 'scripts/invariants/gate-weakening-detector.config.json';
     const before = JSON.stringify(config);

@@ -246,41 +246,23 @@ function reportMissingBridgeMethod(method: keyof ElectronAPI): void {
   );
 }
 
-function getRawElectronAPI(): Partial<ElectronAPI> | undefined {
-  if (globalThis.window === undefined) return undefined;
-  const raw = (
-    globalThis.window as Window & { electronAPI?: Partial<ElectronAPI> }
-  ).electronAPI;
-  if (!raw || typeof raw !== 'object') return undefined;
-  return raw;
-}
+// Runtime detection lives in the leaf module ./electron-runtime so the
+// browser shell can import the hook without this module's desktop wiring.
+// Everything below keeps working through the re-exports.
 
-export function getElectronAPI(): ElectronAPI | undefined {
-  const api = getRawElectronAPI();
-  if (!api) return undefined;
-  if (
-    typeof api.platform === 'string' &&
-    typeof api.electronVersion === 'string' &&
-    typeof api.onUpdateAvailable === 'function' &&
-    typeof api.onUpdateDownloaded === 'function' &&
-    typeof api.installUpdateAndRestart === 'function' &&
-    typeof api.goBack === 'function' &&
-    typeof api.goForward === 'function' &&
-    typeof api.onNavStateChanged === 'function'
-  ) {
-    return api as ElectronAPI;
-  }
-  return undefined;
-}
+export {
+  getElectronAPI,
+  getRawElectronAPI,
+  isDesktopEnvironment,
+  isElectronRuntime,
+  useIsElectronRuntime,
+} from './electron-runtime';
 
-/**
- * Returns true when running inside the Electron desktop shell (regardless of
- * which bridge methods exist). Use this to gate desktop-only UI; for actual
- * bridge calls always go through the wrappers below — never the raw object.
- */
-export function isDesktopEnvironment(): boolean {
-  return getRawElectronAPI() !== undefined;
-}
+import {
+  getElectronAPI,
+  getRawElectronAPI,
+  isElectronRuntime,
+} from './electron-runtime';
 
 /** Unknown/older shells remain safe and ordinary web tabs schedule no heartbeat. */
 export function reportDesktopWorkState(
@@ -307,93 +289,10 @@ export function onDesktopNavigate(cb: (path: string) => void): () => void {
   return subscribe(cb);
 }
 
-/** Old binaries and browsers keep their existing visual behavior. */
-export function observeDesktopVisualActivity(
-  callback: (active: boolean) => void
-): () => void {
-  const api = getRawElectronAPI();
-  if (
-    typeof api?.getVisualActivity !== 'function' ||
-    typeof api.onVisualActivity !== 'function'
-  ) {
-    return () => undefined;
-  }
-  let disposed = false;
-  let revision = 0;
-  let unsubscribe: (() => void) | undefined;
-  try {
-    unsubscribe = api.onVisualActivity(active => {
-      if (disposed || typeof active !== 'boolean') return;
-      revision += 1;
-      callback(active);
-    });
-    const requestedRevision = revision;
-    void api
-      .getVisualActivity()
-      .then(active => {
-        // A live event wins over an older asynchronous snapshot.
-        if (
-          !disposed &&
-          revision === requestedRevision &&
-          typeof active === 'boolean'
-        )
-          callback(active);
-      })
-      .catch(() => undefined);
-  } catch {
-    // Optional stale bridge methods cannot break the transcript.
-  }
-  return () => {
-    disposed = true;
-    if (typeof unsubscribe === 'function') unsubscribe();
-  };
-}
-
-/**
- * Native full-screen transitions (JOV-8940). macOS hides the traffic lights
- * in full screen, so the renderer collapses its native-light reserve. The
- * snapshot closes the initial-state race; a live event always wins.
- */
-export function observeDesktopFullScreen(
-  callback: (isFullScreen: boolean) => void
-): () => void {
-  const api = getRawElectronAPI();
-  if (
-    typeof api?.getFullScreenState !== 'function' ||
-    typeof api.onFullScreenChanged !== 'function'
-  ) {
-    return () => undefined;
-  }
-  let disposed = false;
-  let revision = 0;
-  let unsubscribe: (() => void) | undefined;
-  try {
-    unsubscribe = api.onFullScreenChanged(isFullScreen => {
-      if (disposed || typeof isFullScreen !== 'boolean') return;
-      revision += 1;
-      callback(isFullScreen);
-    });
-    const requestedRevision = revision;
-    void api
-      .getFullScreenState()
-      .then(isFullScreen => {
-        // A live event wins over an older asynchronous snapshot.
-        if (
-          !disposed &&
-          revision === requestedRevision &&
-          typeof isFullScreen === 'boolean'
-        )
-          callback(isFullScreen);
-      })
-      .catch(() => undefined);
-  } catch {
-    // Optional stale bridge methods cannot break the title row.
-  }
-  return () => {
-    disposed = true;
-    if (typeof unsubscribe === 'function') unsubscribe();
-  };
-}
+export {
+  observeDesktopFullScreen,
+  observeDesktopVisualActivity,
+} from './electron-native-state';
 
 /**
  * Read package provenance from the context-isolated preload bridge.
@@ -567,25 +466,6 @@ async function safeInstallUpdateAndRestart(): Promise<boolean> {
 
   openManualDownload();
   return false;
-}
-
-export function isElectronRuntime(): boolean {
-  if (globalThis.window === undefined) return false;
-  if (isDesktopEnvironment()) return true;
-  if (/\bJovieDesktop\//.test(globalThis.navigator.userAgent)) return true;
-  return (
-    globalThis.document.documentElement.dataset.desktopRuntime === 'electron'
-  );
-}
-
-export function useIsElectronRuntime(): boolean {
-  const [isElectron, setIsElectron] = useState(false);
-
-  useEffect(() => {
-    setIsElectron(isElectronRuntime());
-  }, []);
-
-  return isElectron;
 }
 
 /**

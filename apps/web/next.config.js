@@ -32,6 +32,17 @@ const traceExcludes = [
   'eslint-rules/**',
 ];
 
+// Sentry build plugin gate. `vercel pull` writes the literal "[SENSITIVE]" for
+// sensitive-typed env vars, which is not a usable token and must not enable
+// source map emission or upload.
+const sentryAuthToken = process.env.SENTRY_AUTH_TOKEN?.trim();
+const hasSentryAuthToken = Boolean(
+  sentryAuthToken && sentryAuthToken !== '[SENSITIVE]'
+);
+const shouldUseSentryPlugin =
+  hasSentryAuthToken &&
+  (process.env.NODE_ENV === 'production' || !!process.env.VERCEL_ENV);
+
 const nextConfig = {
   // Local and CI E2E runs use loopback hosts (`localhost` and `127.0.0.1`).
   // Allow both so Next dev accepts asset/server-action requests from either host.
@@ -52,8 +63,12 @@ const nextConfig = {
     // CI sets NEXT_IGNORE_TYPECHECK=1 — skip during build since typecheck runs separately
     ignoreBuildErrors: !!process.env.NEXT_IGNORE_TYPECHECK,
   },
-  // Never ship source maps to browsers (Sentry plugin uploads them separately)
-  productionBrowserSourceMaps: false,
+  // Maps ship only when the Sentry plugin uploads them (deleted from .next
+  // after upload) or on non-Vercel CI production builds — the Lighthouse
+  // gate's treemap needs served .map files (run 42614405519, JOV-12023).
+  productionBrowserSourceMaps:
+    shouldUseSentryPlugin ||
+    (process.env.NODE_ENV === 'production' && !process.env.VERCEL_ENV),
   output: isVercelPreview ? undefined : 'standalone',
   // Monorepo root for standalone output file tracing (prevents lockfile detection warnings)
   outputFileTracingRoot: isVercelPreview
@@ -87,8 +102,6 @@ const nextConfig = {
     ],
     '/app/admin/screenshots': screenshotCatalogTraceIncludes,
     '/api/admin/screenshots/**': screenshotCatalogTraceIncludes,
-    // Gated investor deck PDF: kept out of public/ so no CDN URL serves it.
-    '/investor-portal/deck/[...path]': ['assets/investor-deck/**/*'],
   },
   // Dynamic fs paths make NFT over-approximate and copy repo files no route
   // reads into server functions (e2e PNG snapshots, 45 MB of drizzle migration
@@ -862,11 +875,6 @@ module.exports = exposeBaseStaticConfigForTooling(
 // The Sentry runtime SDK (sentry.server.config.ts) works independently.
 const { withSentryConfig } = require('@sentry/nextjs/config');
 
-const hasSentryAuthToken = Boolean(process.env.SENTRY_AUTH_TOKEN);
-const shouldUseSentryPlugin =
-  hasSentryAuthToken &&
-  (process.env.NODE_ENV === 'production' || !!process.env.VERCEL_ENV);
-
 module.exports = exposeBaseStaticConfigForTooling(
   shouldUseSentryPlugin
     ? withSentryConfig(module.exports, {
@@ -874,6 +882,7 @@ module.exports = exposeBaseStaticConfigForTooling(
         project: 'jovie-web',
         silent: !process.env.CI,
         widenClientFileUpload: true,
+        sourcemaps: { deleteSourcemapsAfterUpload: true },
         tunnelRoute: '/monitoring',
       })
     : module.exports

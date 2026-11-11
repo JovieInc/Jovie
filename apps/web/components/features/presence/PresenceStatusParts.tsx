@@ -1,4 +1,4 @@
-// @coverage-via apps/web/app/app/(shell)/profiles/ProfilesWorkspace.test.tsx
+// @coverage-via apps/web/components/features/presence/PresenceStatusParts.test.tsx
 'use client';
 import { SimpleTooltip } from '@jovie/ui';
 import { Circle, CircleAlert, CircleCheck, CircleX } from 'lucide-react';
@@ -40,7 +40,8 @@ export function PresenceStatusBadge({
         className={cn(
           'inline-flex min-h-8 items-center gap-1.5 text-xs text-tertiary-token',
           status.tone === 'success' && 'text-success',
-          status.tone === 'warning' && 'text-warning',
+          // JOV-8964: warning renders neutral — the loud orange read as an alarm.
+          status.tone === 'warning' && 'text-secondary-token',
           status.tone === 'error' && 'text-error'
         )}
       >

@@ -17,6 +17,7 @@ import { hasReleaseClickAnalytics } from '@/lib/db/queries/analytics';
 import {
   discogRecordings,
   discogReleases,
+  discogReleaseTracks,
   discogTracks,
 } from '@/lib/db/schema/content';
 import { dspArtistMatches } from '@/lib/db/schema/dsp-enrichment';
@@ -31,6 +32,7 @@ import {
   getReleaseTrackSummariesForReleases,
   getReleaseTracksForReleaseWithProviders,
   getTracksForRelease,
+  purgeOrphanRecordings,
   resetProviderLink as resetProviderLinkDb,
   upsertProviderLink,
   upsertRecording,
@@ -47,6 +49,7 @@ import type {
   TrackViewModel,
 } from '@/lib/discography/types';
 import { buildProviderLabels } from '@/lib/discography/view-models';
+import { createReleaseForProfile } from '@/lib/domain/releases';
 import {
   type AggregateEnrichmentStatus,
   applyTtlToEnrichmentStatus,
@@ -1094,7 +1097,6 @@ export async function checkSpotifyConnection(): Promise<{
     }
 
     // Fallback: check dspArtistMatches for a confirmed Spotify match.
-    // Keeps this consistent with ConnectedDspList which checks both sources.
     const [spotifyMatch] = await db
       .select({
         externalArtistId: dspArtistMatches.externalArtistId,
@@ -1679,7 +1681,6 @@ export async function checkAppleMusicConnection(): Promise<{
     }
 
     // Fallback: check profile.appleMusicId (set when connected directly).
-    // Keeps this consistent with ConnectedDspList which checks both sources.
     if (profile.appleMusicId) {
       return {
         connected: true,
@@ -1960,9 +1961,18 @@ export async function deleteRelease(params: DeleteReleaseParams): Promise<{
       creatorProfileId: profile.id,
     });
   } else {
+    const recordingRows = await db
+      .select({ recordingId: discogReleaseTracks.recordingId })
+      .from(discogReleaseTracks)
+      .where(eq(discogReleaseTracks.releaseId, params.releaseId));
     await db
       .delete(discogReleases)
       .where(eq(discogReleases.id, params.releaseId));
+    // Deleted songs must not survive as orphan recordings in any agent read.
+    await purgeOrphanRecordings(
+      profile.id,
+      recordingRows.map(row => row.recordingId)
+    );
   }
 
   // Invalidate cache and revalidate path
@@ -2215,22 +2225,6 @@ export async function revertReleaseArtwork(
   return { artworkUrl: originalArtworkUrl, originalArtworkUrl };
 }
 
-type ReleaseStatusValue = 'draft' | 'scheduled' | 'released';
-
-function determineReleaseStatus(releaseDate: Date | null): ReleaseStatusValue {
-  if (!releaseDate) return 'draft';
-  return releaseDate > new Date() ? 'scheduled' : 'released';
-}
-
-function computeRevealDate(
-  formRevealDate: string | null,
-  _releaseDate: Date | null,
-  _status: ReleaseStatusValue
-): Date | null {
-  if (formRevealDate) return new Date(formRevealDate);
-  return null;
-}
-
 export async function createRelease(formData: {
   title: string;
   releaseType: 'single' | 'ep' | 'album' | 'compilation' | 'live';
@@ -2253,54 +2247,32 @@ export async function createRelease(formData: {
 
   const profile = await requireProfile();
 
-  const title = formData.title.trim();
-  if (!title) {
-    return { success: false, message: 'Title is required.' };
+  // The write is the shared domain function (also used by the chat tool).
+  const created = await createReleaseForProfile({
+    userId,
+    profileId: profile.id,
+    title: formData.title,
+    releaseType: formData.releaseType,
+    releaseDate: formData.releaseDate,
+    revealDate: formData.revealDate,
+    genres: formData.genres,
+    isExplicit: formData.isExplicit,
+  });
+  if (!created.ok) {
+    if (created.code === 'failed') {
+      void captureError('createRelease failed', new Error(created.message), {
+        action: 'createRelease',
+        title: formData.title.trim(),
+      });
+    }
+    return { success: false, message: created.message };
   }
-
-  const slug = slugify(title);
-  if (!slug) {
-    return {
-      success: false,
-      message: 'Could not generate a valid slug from the title.',
-    };
-  }
-
-  const releaseDate = formData.releaseDate
-    ? new Date(formData.releaseDate)
-    : null;
-
-  const status = determineReleaseStatus(releaseDate);
-  const revealDate = computeRevealDate(
-    formData.revealDate ?? null,
-    releaseDate,
-    status
-  );
+  const title = created.release.title;
 
   try {
-    const [inserted] = await db
-      .insert(discogReleases)
-      .values({
-        creatorProfileId: profile.id,
-        title,
-        slug,
-        releaseType: formData.releaseType,
-        releaseDate,
-        status,
-        revealDate,
-        genres: formData.genres?.slice(0, 3) ?? null,
-        isExplicit: formData.isExplicit ?? false,
-        sourceType: 'manual',
-        totalTracks: formData.releaseType === 'single' ? 1 : 0,
-      })
-      .returning({ id: discogReleases.id });
-
-    const releaseId = inserted.id;
+    const releaseId = created.release.id;
     const insertedRelease = await getReleaseById(releaseId);
     const providerLabels = buildProviderLabels();
-
-    revalidatePath(APP_ROUTES.RELEASES);
-    invalidateReleaseCaches(userId, profile.id);
 
     if (insertedRelease == null) {
       return {
@@ -2326,14 +2298,6 @@ export async function createRelease(formData: {
     };
   } catch (error) {
     throwIfRedirect(error);
-
-    // Handle duplicate slug
-    if (isUniqueViolation(error)) {
-      return {
-        success: false,
-        message: `A release with the slug "${slug}" already exists. Please choose a different title.`,
-      };
-    }
 
     void captureError('createRelease failed', error as Error, {
       action: 'createRelease',

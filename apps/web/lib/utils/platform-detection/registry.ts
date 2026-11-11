@@ -11,6 +11,8 @@ import {
   type PlatformMetadata,
 } from '@/constants/platforms';
 
+import { DETECTION_ONLY_DSPS, URL_ONLY_DSPS } from '@/lib/dsp-url-only';
+
 import type { DetectionCategory, DomainPattern, PlatformInfo } from './types';
 
 /**
@@ -72,7 +74,26 @@ function createPlatformInfo(
  * Platform configuration registry
  * Uses canonical platform metadata from constants/platforms.ts with detection-specific placeholders
  */
+function escapeDomain(domain: string): string {
+  return domain.replaceAll('.', String.raw`\.`);
+}
+
+const DETECTION_DSPS = [...URL_ONLY_DSPS, ...DETECTION_ONLY_DSPS];
+
+// URL-only DSPs the hand-written table below does not list (lib/dsp-url-only.ts).
+const REGISTRY_DSP_PLATFORMS: Record<string, PlatformInfo> = Object.fromEntries(
+  DETECTION_DSPS.map(d => [
+    d.key,
+    createPlatformInfo(d.key, `https://${d.domains[0]}/...`, {
+      name: d.name,
+      category: 'dsp',
+      color: d.hex,
+    }),
+  ])
+);
+
 export const PLATFORMS: Record<string, PlatformInfo> = {
+  ...REGISTRY_DSP_PLATFORMS,
   // Music Platforms (DSPs)
   spotify: createPlatformInfo('spotify', 'https://open.spotify.com/artist/...'),
   apple_music: createPlatformInfo(
@@ -263,6 +284,16 @@ export const PLATFORMS: Record<string, PlatformInfo> = {
  * Domain pattern matching for platform detection
  * Uses canonical platform IDs from constants/platforms.ts (snake_case format)
  */
+function buildRegistryDomainPatterns(): DomainPattern[] {
+  return DETECTION_DSPS.map(d => ({
+    pattern: new RegExp(
+      String.raw`(?:^|[/.])(?:${d.domains.map(escapeDomain).join('|')})(?:[/:?#]|$)`,
+      'i'
+    ),
+    platformId: d.key,
+  }));
+}
+
 export const DOMAIN_PATTERNS: DomainPattern[] = [
   // DSP platforms (Digital Service Providers)
   { pattern: /(?:open\.)?spotify\.com/i, platformId: 'spotify' },
@@ -285,7 +316,7 @@ export const DOMAIN_PATTERNS: DomainPattern[] = [
   { pattern: /(?:www\.)?youtube\.com|youtu\.be/i, platformId: 'youtube' },
   { pattern: /(?:www\.)?instagram\.com/i, platformId: 'instagram' },
   { pattern: /(?:www\.)?tiktok\.com/i, platformId: 'tiktok' },
-  { pattern: /(?:twitter\.com|x\.com)/i, platformId: 'twitter' },
+  { pattern: /(?:^|[/.])(?:twitter|x)\.com/i, platformId: 'twitter' },
   { pattern: /(?:www\.)?facebook\.com/i, platformId: 'facebook' },
   { pattern: /(?:www\.)?twitch\.tv/i, platformId: 'twitch' },
   { pattern: /(?:www\.)?linkedin\.com/i, platformId: 'linkedin' },
@@ -344,6 +375,7 @@ export const DOMAIN_PATTERNS: DomainPattern[] = [
   { pattern: /(?:www\.)?wikidata\.org/i, platformId: 'wikidata' },
   { pattern: /y\.qq\.com/i, platformId: 'tencent_music' },
   { pattern: /music\.163\.com/i, platformId: 'netease' },
+  ...buildRegistryDomainPatterns(),
 ];
 
 /**

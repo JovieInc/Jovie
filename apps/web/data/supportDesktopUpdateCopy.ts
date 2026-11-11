@@ -32,6 +32,7 @@ export const DESKTOP_UPDATE_COPY = {
     laterAction: 'Later',
     hideAction: 'Hide',
     progressLabel: 'Download Progress',
+    manualDownloadAction: 'Download the latest version',
     transferred: (done: string, total: string) => `${done} of ${total}`,
     speed: (rate: string) => `${rate}/s`,
   },

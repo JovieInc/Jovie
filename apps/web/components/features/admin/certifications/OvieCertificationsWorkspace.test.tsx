@@ -140,7 +140,7 @@ describe('OvieCertificationsWorkspace', () => {
     });
     render(<OvieCertificationsWorkspace />);
     fireEvent.pointerDown(
-      screen.getByRole('button', { name: 'Certification Filters' }),
+      screen.getByRole('button', { name: /^Certification Filters: Filters/ }),
       { button: 0, ctrlKey: false }
     );
     fireEvent.click(
@@ -149,7 +149,7 @@ describe('OvieCertificationsWorkspace', () => {
     expect(screen.getByText('Flow signup-golden-path')).toBeInTheDocument();
     expect(screen.queryByText('Flow claim-profile')).not.toBeInTheDocument();
     fireEvent.pointerDown(
-      screen.getByRole('button', { name: 'Certification Filters' }),
+      screen.getByRole('button', { name: /^Certification Filters: Filters/ }),
       { button: 0, ctrlKey: false }
     );
     fireEvent.click(
@@ -157,7 +157,7 @@ describe('OvieCertificationsWorkspace', () => {
     );
     expect(screen.getByText('Flow signup-golden-path')).toBeInTheDocument();
     fireEvent.pointerDown(
-      screen.getByRole('button', { name: 'Certification Filters' }),
+      screen.getByRole('button', { name: /^Certification Filters: Filters/ }),
       { button: 0, ctrlKey: false }
     );
     fireEvent.click(
@@ -282,6 +282,41 @@ describe('OvieCertificationsWorkspace', () => {
       'data-stale',
       'false'
     );
+  });
+
+  it('labels an undecidable review-ready row Needs Evidence', () => {
+    const inventory = fixtureInventory();
+    const ready = inventory.rows.find(row => row.state === 'review_ready');
+    if (!ready) throw new Error('fixture needs a review-ready row');
+    const undecidable = {
+      ...ready,
+      id: 'flows:undecidable',
+      subject: {
+        ...ready.subject,
+        id: 'undecidable',
+        title: 'Flow undecidable',
+      },
+      decision: { ...ready.decision, available: false, evidenceDigest: null },
+    };
+    mockQuery({
+      data: { ...inventory, rows: [...inventory.rows, undecidable] },
+    });
+    render(<OvieCertificationsWorkspace />);
+
+    const toolbar = screen.getByRole('toolbar', { name: 'Filter By State' });
+    expect(
+      screen.getByTestId('certification-count-needs_evidence')
+    ).toHaveTextContent('1');
+    expect(
+      screen.getByTestId('certification-count-review_ready')
+    ).toHaveTextContent('1');
+    fireEvent.click(
+      within(toolbar).getByRole('button', { name: /Needs Evidence/ })
+    );
+    expect(screen.getByText('Flow undecidable')).toBeInTheDocument();
+    expect(
+      screen.queryByText('Flow signup-golden-path')
+    ).not.toBeInTheDocument();
   });
 
   it('labels data stale when a background refresh fails', () => {

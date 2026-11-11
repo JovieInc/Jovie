@@ -11,7 +11,7 @@ import { fileURLToPath } from 'node:url';
 /** Spare-compute gate: refuse to start when gem is busy. Exit 75 = skip. */
 export function preflight(repoRoot) {
   const minMemGb = Number(process.env.MUTATION_MIN_MEM_GB ?? 8);
-  const maxLoad = Number(process.env.MUTATION_MAX_LOAD ?? 10);
+  const maxLoad = Number(process.env.MUTATION_MAX_LOAD ?? 8);
   const minDiskGb = Number(process.env.MUTATION_MIN_DISK_GB ?? 15);
   const problems = [];
   if (existsSync('/proc/meminfo')) {
@@ -26,8 +26,9 @@ export function preflight(repoRoot) {
       );
   }
   if (existsSync('/proc/loadavg')) {
-    const load = Number(readFileSync('/proc/loadavg', 'utf8').split(' ')[0]);
-    if (load > maxLoad) problems.push(`load ${load} > ${maxLoad}`);
+    // Off-peak gate (2026-10-29): the 5-minute load average, not the instantaneous one.
+    const load = Number(readFileSync('/proc/loadavg', 'utf8').split(' ')[1]);
+    if (load > maxLoad) problems.push(`5-min load ${load} > ${maxLoad}`);
   }
   const df = spawnSync('df', ['-Pk', repoRoot], { encoding: 'utf8' });
   const avail = Number(

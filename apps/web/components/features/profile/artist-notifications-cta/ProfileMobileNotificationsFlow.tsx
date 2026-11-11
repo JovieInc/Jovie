@@ -25,6 +25,7 @@ import { PROFILE_Z } from '@/lib/profile/z-index-constants';
 import { cn } from '@/lib/utils';
 import type { NotificationContentType } from '@/types/notifications';
 import { BirthdayInput } from './BirthdayInput';
+import { useConsentCardYield } from './consent-card-yield';
 
 export type ProfileMobileNotificationsFlowStep =
   | 'email'
@@ -189,7 +190,7 @@ function ScreenShell({
               {title}
             </h2>
             {body ? (
-              <p className='max-w-96 text-sm leading-5 text-white/58'>{body}</p>
+              <p className='max-w-96 text-sm leading-5 text-white/60'>{body}</p>
             ) : null}
           </div>
           <div>{children}</div>
@@ -206,7 +207,7 @@ function ScreenShell({
           {title}
         </h2>
         {body ? (
-          <p className='max-w-96 text-sm leading-5 text-white/58'>{body}</p>
+          <p className='max-w-96 text-sm leading-5 text-white/60'>{body}</p>
         ) : null}
       </div>
       <div className='flex-1'>{children}</div>
@@ -270,7 +271,7 @@ function SecondaryTextButton({
       type='button'
       onClick={onClick}
       disabled={disabled}
-      className='inline-flex h-10 w-full items-center justify-center rounded-3xl px-5 text-app font-medium tracking-[-0.005em] text-white/58 transition-colors duration-subtle hover:text-white/76 disabled:cursor-not-allowed disabled:opacity-60'
+      className='inline-flex h-10 w-full items-center justify-center rounded-3xl px-5 text-app font-medium tracking-[-0.005em] text-white/60 transition-colors duration-subtle hover:text-white/76 disabled:cursor-not-allowed disabled:opacity-60'
     >
       {children}
     </button>
@@ -302,7 +303,7 @@ function LabeledInput({
 }>) {
   return (
     <label className='block space-y-2'>
-      <span className='text-app font-medium tracking-tight text-white/42'>
+      <span className='text-app font-medium tracking-tight text-white/60'>
         {label}
       </span>
       <input
@@ -356,7 +357,7 @@ function InlineCaptureField({
               onSelect={onCountrySelect}
             />
           ) : (
-            <span className='flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-white/46'>
+            <span className='flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-white/60'>
               <Mail className='size-4.5' />
             </span>
           )}
@@ -449,17 +450,16 @@ export function ProfileMobileNotificationsFlow({
   const isResendCooldownActive = resendCooldownEnd > Date.now();
   useModalFocusBoundary(dialogRef, open && presentation !== 'inline');
 
-  useEffect(() => {
-    setMounted(true);
-  }, []);
+  useEffect(() => setMounted(true), []);
+
+  useConsentCardYield(open);
 
   useEffect(() => {
     if (!open) {
       return;
     }
 
-    // Inline presentations live inside an existing layout — they should not
-    // hijack body scroll the way overlay/modal presentations do.
+    // Inline flows live in-layout; they must not hijack body scroll.
     if (presentation === 'inline') {
       return;
     }
@@ -585,7 +585,7 @@ export function ProfileMobileNotificationsFlow({
                     type='button'
                     onClick={onDismissCapture}
                     disabled={isSubmitting}
-                    className='inline-flex h-11 items-center rounded-full text-xs font-semibold text-white/48 transition-colors duration-subtle hover:text-white/70 disabled:cursor-not-allowed disabled:opacity-50'
+                    className='inline-flex h-11 items-center rounded-full text-xs font-semibold text-white/60 transition-colors duration-subtle hover:text-white/70 disabled:cursor-not-allowed disabled:opacity-50'
                   >
                     Not Now
                   </button>
@@ -621,7 +621,7 @@ export function ProfileMobileNotificationsFlow({
               : `${artistName} updates are on.`
           }
           footer={
-            <p className='min-h-10 text-sm text-white/46'>
+            <p className='min-h-10 text-sm text-white/60'>
               Setting up your preferences...
             </p>
           }
@@ -726,7 +726,7 @@ export function ProfileMobileNotificationsFlow({
           footer={
             <div className='space-y-3'>
               {birthdayHintShown ? (
-                <p className='text-sm text-white/52'>
+                <p className='text-sm text-white/60'>
                   Enter a full date to save it.
                 </p>
               ) : null}
@@ -781,7 +781,7 @@ export function ProfileMobileNotificationsFlow({
           <div className='space-y-6'>
             <div className='space-y-3'>
               <p
-                className='text-app font-semibold tracking-tight text-white/42'
+                className='text-app font-semibold tracking-tight text-white/60'
                 data-testid='profile-mobile-notifications-sent-from'
               >
                 Sent from Jovie
@@ -822,7 +822,7 @@ export function ProfileMobileNotificationsFlow({
               <>
                 <div className='h-px bg-white/8' />
                 <div className='space-y-3'>
-                  <p className='text-app font-semibold tracking-tight text-white/42'>
+                  <p className='text-app font-semibold tracking-tight text-white/60'>
                     Optional
                   </p>
 
@@ -835,7 +835,7 @@ export function ProfileMobileNotificationsFlow({
                         <p className='text-mid font-medium tracking-[-0.015em] text-white/88'>
                           Share My Email With {artistName}
                         </p>
-                        <p className='text-xs leading-4 text-white/42'>
+                        <p className='text-xs leading-4 text-white/60'>
                           They can see it, email you directly, and use it in
                           their own tools, including ads. Off unless you turn it
                           on. You can turn it off anytime.
@@ -989,8 +989,8 @@ export function ProfileMobileNotificationsFlow({
         </div>
       </div>
     ) : (
-      // Inline: transparent so the sheet sits on the page's own surface with
-      // no rounded seam against a mismatched background token.
+      // Inline: transparent so the sheet sits on the page's own surface,
+      // with no rounded seam against a mismatched background token.
       <div
         className='relative flex h-full min-h-full flex-1 flex-col dark:text-white'
         data-testid='profile-mobile-notifications-flow'

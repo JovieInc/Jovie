@@ -8,6 +8,10 @@ import {
   getOnboardingRateLimitMessage,
 } from '@/lib/onboarding/rate-limit';
 import { extractClientIP } from '@/lib/utils/ip-extraction';
+import {
+  recordInviteOpened,
+  recordInviteRedeemed,
+} from '@/lib/waitlist/invite-funnel';
 import { redeemWaitlistInviteToken } from '@/lib/waitlist/redeem';
 
 interface WaitlistInvitePageProps {
@@ -28,7 +32,10 @@ export default async function WaitlistInvitePage({
     );
   }
 
-  const { userId } = await getCachedAuth();
+  // Invite funnel: first open of a real invite link (never throws).
+  await recordInviteOpened(token);
+
+  const { userId } = await getCachedAuth({ session: 'fresh' });
   if (!userId) {
     const redirectUrl = `${APP_ROUTES.WAITLIST_INVITE}?token=${encodeURIComponent(token)}`;
     redirect(
@@ -36,11 +43,13 @@ export default async function WaitlistInvitePage({
     );
   }
 
-  const currentUser = await getCachedCurrentUser();
+  const currentUser = await getCachedCurrentUser({ session: 'fresh' });
   const verifiedEmails =
-    currentUser?.emailAddresses
-      ?.map(e => e.emailAddress)
-      .filter(email => email.trim().length > 0) ?? [];
+    currentUser?.emailVerified === true
+      ? currentUser.emailAddresses
+          .map(e => e.emailAddress)
+          .filter(email => email.trim().length > 0)
+      : [];
 
   if (verifiedEmails.length === 0) {
     return (
@@ -77,6 +86,8 @@ export default async function WaitlistInvitePage({
   });
 
   if (result.outcome === 'approved') {
+    // Invite funnel: account created and handed into the golden path.
+    await recordInviteRedeemed({ entryId: result.entryId, appUserId: userId });
     redirect(`${APP_ROUTES.START}?fresh_signup=true`);
   }
 

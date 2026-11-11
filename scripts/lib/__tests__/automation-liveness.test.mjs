@@ -2,11 +2,13 @@ import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { load } from 'js-yaml';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createApiClient } from '../../../packages/api-client/client.ts';
 import { MemoryLedgerStore } from '../../../packages/api-client/store.ts';
 import {
   lsRemoteMain,
+  observeWorkflowFailureStreak,
   runLiveness as runLivenessImpl,
   main as runMain,
 } from '../../automation-liveness.mjs';
@@ -1111,6 +1113,44 @@ describe('dead-man liveness', () => {
     expect(rowFor(report, 'gem:lanes-tick').status).toBe('unknown');
   });
 
+  // JOV-9006: when the essential public feed exceeds its byte cap, doctor.py
+  // publishes the bounded `symphony-lanes-status-unavailable/v1` view. That
+  // view still carries the tick heartbeat at the receipt path (`at`), so the
+  // dead-man stays green while the feed is explicitly degraded — only a host
+  // that stops ticking goes silent.
+  it('(b) the doctor unavailable view still carries the tick heartbeat', async () => {
+    const { report } = await runLiveness({
+      registry: only('gem:lanes-tick'),
+      nowMs: NOW,
+      fetchImpl: fakeFetch({
+        'lanes-status.json': {
+          schema: 'symphony-lanes-status-unavailable/v1',
+          status: 'unavailable',
+          reason: 'essential-public-feed-exceeds-byte-limit',
+          at: iso(4),
+          requiredBytes: 290185,
+          maxBytes: 262144,
+          fullEvidence: {
+            fileName: 'lanes-status-details.json',
+            sha256: '0'.repeat(64),
+            bytes: 580808,
+            at: iso(4),
+            host: 'gem',
+            release: '9cf0916',
+            binding: 'declared-feed-identity',
+          },
+        },
+      }),
+    });
+    expect(rowFor(report, 'gem:lanes-tick')).toMatchObject({
+      status: 'fresh',
+      lastProofAt: iso(4),
+      ageMinutes: 4,
+      budgetMinutes: 30,
+    });
+    expect(livenessDecisions(report)).toEqual([]);
+  });
+
   // JOV-8799: Summer's observeReceipt reports a succeeded read as `stale`
   // once it is older than the 10-minute provider TTL. This dead-man keeps
   // its own 60-minute silence budget and still rejects unknown or failed reads.
@@ -1759,5 +1799,90 @@ describe('alert state preservation (JOV-8843)', () => {
         action: 'skip',
       });
     }
+  });
+});
+
+describe('budget diagnostics failure isolation', () => {
+  /** @typedef {{id?: string, name?: string, if?: string, run?: string}} BudgetStep */
+  /** @typedef {{needs: string, if: string, steps: BudgetStep[]}} BudgetJob */
+  it('uses the same due gate without becoming a heartbeat dependency', () => {
+    const workflow = /** @type {{jobs: Record<string, BudgetJob>}} */ (
+      load(
+        readFileSync(
+          join(repoRoot, '.github/workflows/automation-liveness.yml'),
+          'utf8'
+        )
+      )
+    );
+    const budget = workflow.jobs['installation-budget'];
+    const heartbeat = workflow.jobs.liveness;
+    expect(budget.needs).toBe('gate');
+    expect(heartbeat.needs).toBe('gate');
+    expect(budget.if).toBe(heartbeat.if);
+    expect(heartbeat.steps.some(step => step.id === 'ci-app-token')).toBe(
+      false
+    );
+    expect(
+      heartbeat.steps.some(
+        step => step.name === 'Preserve synthetic dead-man failure'
+      )
+    ).toBe(true);
+    const sample = budget.steps.find(step => step.id === 'installation-budget');
+    expect(sample.if).toBe('${{ always() }}');
+    expect(sample.run).toBe('node scripts/installation-budget-sentinel.mjs');
+    const alert = budget.steps.find(
+      step => step.name === 'Send Slack Alert on Low Installation Budget'
+    );
+    expect(alert.if).toContain(
+      "steps.installation-budget.outputs.shared_github_token_low == 'true'"
+    );
+    expect(alert.if).toContain(
+      "steps.installation-budget.outputs.ci_app_low == 'true'"
+    );
+  });
+});
+
+describe('workflow failure streak (production controller alarm)', () => {
+  const nowMs = Date.parse('2026-10-29T23:00:00Z');
+  const receipt = {
+    repo: 'JovieInc/Jovie',
+    workflow: 'production-controller.yml',
+    streak: 3,
+  };
+  const runsFetch = conclusions => async () => ({
+    status: 200,
+    json: async () => ({
+      workflow_runs: conclusions.map((conclusion, index) => ({
+        id: 100 - index,
+        conclusion,
+        created_at: new Date(nowMs - index * 60_000).toISOString(),
+        updated_at: new Date(nowMs - index * 60_000).toISOString(),
+      })),
+    }),
+  });
+
+  it('goes silent after 3 consecutive failures, ignoring skipped runs', async () => {
+    const observed = await observeWorkflowFailureStreak(receipt, {
+      fetchImpl: runsFetch([
+        'failure',
+        'skipped',
+        'failure',
+        'failure',
+        'cancelled',
+      ]),
+      token: 'test-token',
+      nowMs,
+    });
+    expect(observed.reason).toContain('3-consecutive-failures');
+    expect(Date.parse(observed.lastProofAt)).toBeLessThan(nowMs - 60 * 60_000);
+  });
+
+  it('stays healthy when a success interrupts the failures', async () => {
+    const observed = await observeWorkflowFailureStreak(receipt, {
+      fetchImpl: runsFetch(['failure', 'failure', 'success', 'failure']),
+      token: 'test-token',
+      nowMs,
+    });
+    expect(observed.lastProofAt).toBe(new Date(nowMs).toISOString());
   });
 });

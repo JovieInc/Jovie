@@ -39,3 +39,34 @@ export const CompactPlainWithAction: Story = {
     actions: <Button size='sm'>Review</Button>,
   },
 };
+
+/** Partial: a title with no subtitle or actions keeps the header height. */
+export const PartialTitleOnly: Story = {
+  args: { title: 'Billing' },
+};
+
+/** Long content: a long title truncates instead of pushing the actions off the row. */
+export const LongTitleTruncates: Story = {
+  args: {
+    title:
+      'The Extraordinary Midnight Radio Orchestra and Friends — release campaign controls',
+    subtitle: 'The title truncates; the action stays on the row.',
+    actions: <Button size='sm'>Review</Button>,
+  },
+};
+
+/** RTL: title and actions swap sides under a right-to-left document. */
+export const RtlWithAction: Story = {
+  args: {
+    title: 'المطالبة بملفك الشخصي',
+    subtitle: 'نور الهدى',
+    actions: <Button size='sm'>متابعة</Button>,
+  },
+  decorators: [
+    Story => (
+      <div dir='rtl' lang='ar'>
+        {Story()}
+      </div>
+    ),
+  ],
+};

@@ -14,6 +14,8 @@ export const PREVIEW_ENV_ADMISSION_SCHEMA = 'jovie-preview-env-admission/v1';
 export const PREVIEW_ENV_CLEANUP_SCHEMA = 'jovie-preview-env-cleanup/v1';
 export const PREVIEW_ENV_REGISTRY_SCHEMA = 'jovie-preview-env-registry/v1';
 export const PREVIEW_ENV_REGISTRY_PATH = '.github/preview-env-registry.json';
+export const PREVIEW_ENV_PROJECTION_PATH =
+  'apps/web/lib/ovie/generated/preview-env-exceptions.json';
 
 /** Hosted isolation kinds that require an admission contract. */
 export const EPHEMERAL_KINDS = ['vercel-preview', 'neon-branch'];
@@ -166,6 +168,33 @@ export function validatePreviewEnvCleanupReceipt(record) {
     problems.push('cleanedBy must name the workflow/job that ran cleanup');
   }
   return problems;
+}
+
+/** Derive lane metadata while preserving lifecycle-owned active receipts. */
+export function projectPreviewEnvRegistry(registry, projection) {
+  const problems = validatePreviewEnvRegistry(registry);
+  if (problems.length) throw new Error(problems.join('; '));
+  const fields = [
+    'policy',
+    'owner',
+    'surface',
+    'evidencePurpose',
+    'ttlHours',
+    'cleanupTrigger',
+    'costBudget',
+  ];
+  return {
+    ...projection,
+    lanes: registry.entries
+      .filter(entry => entry.ephemeral)
+      .map(entry => ({
+        id: entry.id,
+        kind: entry.kind,
+        ...Object.fromEntries(
+          fields.map(field => [field, entry.admission[field]])
+        ),
+      })),
+  };
 }
 
 /** Build a validated admission record. Throws on contract violations. */

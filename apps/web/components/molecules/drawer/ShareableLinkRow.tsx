@@ -31,7 +31,7 @@ const DENSITY_CLASSES = {
     container: 'h-6 gap-1 rounded-full px-2',
     icon: 'h-3 w-3',
     value: 'text-3xs',
-    button: 'h-4 w-4 rounded-full',
+    button: 'h-6 w-6 rounded-full',
     glyph: 'h-3 w-3',
   },
   rail: {
@@ -133,6 +133,7 @@ export function ShareableLinkRow({
           ? 'border border-(--app-shell-frame-seam) bg-surface-0 hover:bg-surface-1'
           : 'border border-transparent bg-transparent hover:bg-surface-1/80',
         styles.container,
+        surface === 'flat' && 'px-0',
         className
       )}
     >
@@ -145,7 +146,7 @@ export function ShareableLinkRow({
       <span
         className={cn(
           'min-w-0 flex-1 truncate font-mono leading-none tracking-tight text-secondary-token',
-          styles.value,
+          surface === 'flat' ? 'text-xs' : styles.value,
           valueClassName
         )}
         title={url}

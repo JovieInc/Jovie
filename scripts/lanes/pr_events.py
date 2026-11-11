@@ -29,10 +29,12 @@ from pathlib import Path
 from urllib.parse import urlsplit
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import disk_guard  # noqa: E402
-import lifecycle  # noqa: E402
+import lifecycle, pr_wip, repair_order  # noqa: E402  (pr_wip: per-producer WIP census; repair_order: fair claims)
+from label_episodes import RELAY_RED_LABELLER, label_episode_applier  # noqa: E402  (JOV-8492 provenance gate)
 
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
+from atomic_state import append_json_object
 import remediation  # noqa: E402  (classifier + non-PR intake; no lane_runner import)
 REPO = os.environ.get("GITHUB_REPOSITORY", "JovieInc/Jovie")
 PREFIX = "lane-fix-"
@@ -46,13 +48,9 @@ RED_CONCLUSIONS = frozenset({"failure", "timed_out", "startup_failure"})
 # Same required-green set green enroll admits on. Missing, UNKNOWN, BLOCKED,
 # DIRTY and BEHIND keep lane-fix-red.
 REQUIRED_GREEN = frozenset({"CLEAN", "HAS_HOOKS", "UNSTABLE"})
-HOLD_LABELS = frozenset({"hold", "gated", "incident", "do-not-merge", "tim-hold", "tim:hold", "hold:tim",
-                         "queue-deferred"})
-# A hold the lanes apply from remediation's own structured needs-human-decision disposition and
-# never remove: only a human removing the label releases it. Always a member of HOLD_LABELS.
-HUMAN_DECISION_LABEL = "tim-hold"
-# Holds a human owns. A repair or sync must refuse these even where a bot `hold` may be lifted.
-HUMAN_HOLD_LABELS = frozenset({"tim-hold", "tim:hold", "hold:tim", "do-not-merge"})
+# No stop label is human-owned (tim-hold, tim:hold, hold:tim and do-not-merge are retired,
+# EVENT 2026-10-28): every hold here is a machine hold with a receipt and a release.
+HOLD_LABELS = frozenset({"hold", "gated", "incident", "queue-deferred"})
 LANE_BRANCH = re.compile(r"^(?P<lane>[a-z0-9-]+)/(?P<issue>jov-\d+)-\d{8}")
 # Agent/automation-owned prefixes that are not lane branches (a codex run, a manual agent
 # session). Their drafts are still lane-owned work: the reconcile sweep owes them a
@@ -289,8 +287,7 @@ def dependency_refs(body: str | None) -> set[int]:
 
 def pr_scalar(number: int, field: str, sh=run) -> str:
     """One field of one PR ("" when unreadable): the body/deps read for stale drafts only."""
-    viewed = sh(["gh", "pr", "view", str(number), "--repo", REPO, "--json", field,
-                 "--jq", f".{field}"])
+    viewed = sh(["gh", "pr", "view", str(number), "--repo", REPO, "--json", field, "--jq", f".{field}"])
     return (viewed.stdout or "") if viewed.returncode == 0 else ""
 
 
@@ -419,13 +416,7 @@ def label_names(pr: dict) -> list[str]:
 def add_label(number: int, kind: str, sh=run, *, prefix: str = PREFIX) -> bool:
     """The issues API creates a missing label, so the queue needs no setup. `prefix=""` applies
     an exact label name (the human-decision hold)."""
-    return sh(["gh", "api", "-X", "POST", f"repos/{REPO}/issues/{number}/labels",
-               "-f", f"labels[]={prefix}{kind}"]).returncode == 0
-
-
-def human_holds(pr: dict | None) -> list[str]:
-    """Human-owned hold labels on this PR snapshot, sorted; empty means none."""
-    return sorted({label.lower() for label in label_names(pr or {})} & HUMAN_HOLD_LABELS)
+    return sh(["gh", "api", "-X", "POST", f"repos/{REPO}/issues/{number}/labels", "-f", f"labels[]={prefix}{kind}"]).returncode == 0
 
 
 def stale_fix_labels(pr: dict, labels: set) -> list[str]:
@@ -446,14 +437,22 @@ HEAD_CHECKS_QUERY = """query($owner:String!,$name:String!,$number:Int!){reposito
 pullRequest(number:$number){commits(last:1){nodes{commit{statusCheckRollup{contexts(first:100){nodes{__typename
 ... on CheckRun{name conclusion startedAt completedAt} ... on StatusContext{context state createdAt}}}}}}}}}}"""
 RED_CHECK_STATES = frozenset({"FAILURE", "TIMED_OUT", "STARTUP_FAILURE", "ERROR"})
+# Advisory checks that never gate a merge: their red (Tently's provider was down all night on
+# 2026-11-01, ~100 PRs got lane-fix-red) is no repair signal.
+NON_REQUIRED_CHECKS = frozenset({"tently"})
+
+
+def read_head_rollup(number: int, sh=run):
+    """One GraphQL read of the head check rollup. Callers own True, False, and None."""
+    owner, name = REPO.split("/", 1)
+    return sh(["gh", "api", "graphql", "-f", f"query={HEAD_CHECKS_QUERY}", "-F", f"owner={owner}", "-F", f"name={name}", "-F", f"number={number}"])
 
 
 def head_red(number: int, sh=run) -> bool | None:
     """True only when the latest run of some check on the head failed. GitHub's rollup counts
-    a CANCELLED (superseded) run as FAILURE even after its replacement passed. None: unreadable."""
-    owner, name = REPO.split("/", 1)
-    read = sh(["gh", "api", "graphql", "-f", f"query={HEAD_CHECKS_QUERY}", "-F", f"owner={owner}",
-               "-F", f"name={name}", "-F", f"number={number}"])
+    a CANCELLED (superseded) run as FAILURE even after its replacement passed. None: unreadable.
+    A SUCCESS tying a FAILURE's completedAt is that replacement — the newer verdict (JOV-8492)."""
+    read = read_head_rollup(number, sh)
     try:
         commits = json.loads(read.stdout)["data"]["repository"]["pullRequest"]["commits"]["nodes"]
         nodes = ((commits[0]["commit"].get("statusCheckRollup") or {}).get("contexts") or {})["nodes"]
@@ -466,9 +465,52 @@ def head_red(number: int, sh=run) -> bool | None:
         key = node.get("name") or node.get("context")
         at = node.get("completedAt") or node.get("startedAt") or node.get("createdAt") or ""
         state = str(node.get("conclusion") or node.get("state") or "").upper()
-        if key and (key not in latest or at >= latest[key][0]):
+        if key and key.lower() in NON_REQUIRED_CHECKS:
+            continue
+        if key and (key not in latest or at > latest[key][0] or (at == latest[key][0] and latest[key][1] in RED_CHECK_STATES and state not in RED_CHECK_STATES)):
             latest[key] = (at, state)
     return any(state in RED_CHECK_STATES for _, state in latest.values())
+
+
+def head_settled_green(number: int, sh=run) -> bool:
+    """True only when every required check on this head has completed success.
+
+    Pending, failed, cancelled, or unreadable is not green. The next check
+    completion is the event that asks again; this does not sleep or poll.
+    """
+    read = read_head_rollup(number, sh)
+    try:
+        commits = json.loads(read.stdout)["data"]["repository"]["pullRequest"]["commits"]["nodes"]
+        nodes = ((commits[0]["commit"].get("statusCheckRollup") or {}).get("contexts") or {})["nodes"]
+    except (ValueError, KeyError, IndexError, TypeError):
+        return False
+    if read.returncode or not isinstance(nodes, list) or not nodes:
+        return False
+    latest: dict = {}
+    for node in nodes:
+        if not isinstance(node, dict):
+            continue
+        key = node.get("name") or node.get("context")
+        at = node.get("completedAt") or node.get("startedAt") or node.get("createdAt") or ""
+        state = str(node.get("conclusion") or node.get("state") or "").upper()
+        if key and str(key).lower() in NON_REQUIRED_CHECKS:
+            continue
+        if key and (key not in latest or at >= latest[key][0]):
+            latest[key] = (at, state)
+    return bool(latest) and all(state == "SUCCESS" for _, state in latest.values())
+
+
+def red_label_justified(number: int, pr: dict, sh=run) -> bool:
+    """May `lane-fix-red` go on this head? Only after a completed failure.
+
+    2026-11-01: #24141 had every required check green and Source Validation merely re-running
+    when this label landed on it; Green Enroll treated the label as a hold and dequeued it
+    (queue position lost for 2h+). A required-green merge state (CLEAN, HAS_HOOKS, UNSTABLE) or a
+    head whose latest run of every check is not a failure (pending re-run, passed) is not red.
+    An unreadable check list keeps the old behaviour: a real red must not be dropped."""
+    if pr.get("mergeStateStatus") in REQUIRED_GREEN:
+        return False
+    return head_red(number, sh) is not False
 
 
 def clear_stale_lane_fix_red(number: int, pr: dict, sh=run) -> bool:
@@ -483,10 +525,15 @@ def clear_stale_lane_fix_red(number: int, pr: dict, sh=run) -> bool:
         return False
     if LANE_FIX_RED not in {label.lower() for label in label_names(pr)}:
         return False
-    if pr.get("mergeStateStatus") not in REQUIRED_GREEN:
+    # Merge state lags the check rollup (a success wake sees BLOCKED). The
+    # rollup is the event's evidence. A pending or failed check keeps the label
+    # until that check's own completion.
+    if pr.get("mergeStateStatus") not in REQUIRED_GREEN and not head_settled_green(number, sh):
         return False
-    deleted = sh(["gh", "api", "-X", "DELETE",
-                  f"repos/{REPO}/issues/{number}/labels/{LANE_FIX_RED}"])
+    # JOV-8492: this rollup can only supersede a red the relay itself applied (see label_episodes.py).
+    if label_episode_applier(number, LANE_FIX_RED, sh) != RELAY_RED_LABELLER:
+        return False
+    deleted = sh(["gh", "api", "-X", "DELETE", f"repos/{REPO}/issues/{number}/labels/{LANE_FIX_RED}"])
     return deleted.returncode == 0
 
 
@@ -707,8 +754,7 @@ def mark_poison(number: int, pr: dict, now: float, sh=run) -> bool:
     the enroll workflow skips it; the lanes still fix it and drop the label with their fix."""
     if POISON_LABEL in label_names(pr) or (queue_ejections(number, now, sh, head=pr.get("headRefOid")) or 0) < 2:
         return False
-    viewed = sh(["gh", "pr", "view", str(number), "--repo", REPO, "--json",
-                 "state,isDraft,headRefName,headRefOid,isCrossRepository,labels"])
+    viewed = sh(["gh", "pr", "view", str(number), "--repo", REPO, "--json", "state,isDraft,headRefName,headRefOid,isCrossRepository,labels"])
     try:
         live = json.loads(viewed.stdout or "{}")
     except (ValueError, TypeError):
@@ -718,8 +764,7 @@ def mark_poison(number: int, pr: dict, now: float, sh=run) -> bool:
         return False
     if sh(["gh", "api", "-X", "POST", f"repos/{REPO}/issues/{number}/labels", "-f", f"labels[]={POISON_LABEL}"]).returncode:
         return False
-    sh(["gh", "pr", "comment", str(number), "--repo", REPO, "--body",
-        f"🤖 `{POISON_LABEL}`: the merge queue ejected this source revision twice in 24 h, so it stays out of the queue "
+    sh(["gh", "pr", "comment", str(number), "--repo", REPO, "--body", f"🤖 `{POISON_LABEL}`: the merge queue ejected this source revision twice in 24 h, so it stays out of the queue "
         "until a fix lands (each re-entry fails every merge group behind it). The lanes are fixing it from "
         "the merge-group failure and remove this label when their fix pushes; remove it by hand once the "
         "failing merge-group check passes locally."])
@@ -779,343 +824,12 @@ def hold_context(number: int, sh=run) -> dict | None:
             "headOid": commit.get("oid"), "headCommittedAt": iso_ts(commit.get("committedDate"))}
 
 
-# Reassessment proves one machine disposition; it never creates repair admission.
-MACHINE_HOLD_SCHEMA = "jovie-machine-hold-reassessment/v1"
-NARRATIVE_CLASSIFIER_COMMIT = "40408f69ea9d501f5508cd0614d60582a5db78ee"
-NARRATIVE_CLASSIFIER_BLOB = "0a125f1a51368e1a44d08d12a134b8554b38bfcb"
-HUMAN_STOP_NOTE = re.compile(r"(?i)\b(?:on hold|hold off|hold (?:this|the pr|until)|keep (?:this|it|the pr) (?:as )?(?:a )?draft|do not merge|don't merge|stop (?:this|the pr)|wait for (?:me|my|tim)|needs? (?:my|tim's?|founder) (?:approval|decision))\b")
-
-
-def machine_hold_source_proof() -> dict | None:
-    """Bind reassessment to installed, qualified source and the reviewed classifier bytes.
-
-    An uninstalled checkout or a later unknown classifier is insufficient proof. The
-    existing release validator binds the complete source tree and metadata; .tree or
-    caller-provided sourceCommit text alone is not a release proof.
-    """
-    try:
-        root = HERE.parent.parent
-        raw, _ = lifecycle._read_regular(HERE / ".release.json", 65536)
-        manifest = lifecycle.validate_release(root, json.loads(raw))
-        path = Path(remediation.__file__).resolve()
-        if path != HERE / "remediation.py":
-            return None
-        source, _ = lifecycle._read_regular(path)
-        blob = hashlib.sha1(b"blob " + str(len(source)).encode() + b"\0" + source).hexdigest()
-        if blob != NARRATIVE_CLASSIFIER_BLOB:
-            return None
-        return {"sourceCommit": manifest["sourceCommit"], "bundleDigest": manifest["bundleDigest"],
-                "classifierBlob": blob, "correctionCommit": NARRATIVE_CLASSIFIER_COMMIT}
-    except (OSError, ValueError, TypeError, KeyError, lifecycle.AdmissionHeld):
-        return None
-
-
-MACHINE_HOLD_QUERY = ('{repository(owner:"%s",name:"%s"){pullRequest(number:%d){'
-    'state headRefOid baseRefOid isCrossRepository '
-    'timelineItems(last:100,itemTypes:[LABELED_EVENT,UNLABELED_EVENT]){pageInfo{hasPreviousPage} nodes{__typename '
-    '... on LabeledEvent{id createdAt label{name} actor{__typename login}} '
-    '... on UnlabeledEvent{id createdAt label{name} actor{__typename login}}}} '
-    'comments(last:100){pageInfo{hasPreviousPage} nodes{id createdAt updatedAt author{__typename login} body}}}}}')
-
-
-def machine_hold_gh(args, **kwargs):
-    """Use the existing shared-budget client for every new recovery API operation."""
-    return api_gh(args[1:] if args and args[0] == "gh" else args, **kwargs)
-
-
-def machine_hold_context(number: int, sh=machine_hold_gh) -> dict | None:
-    owner, name = REPO.split("/")
-    try:
-        result = sh(["api", "graphql", "-f", f"query={MACHINE_HOLD_QUERY % (owner, name, number)}"])
-        payload = json.loads(result.stdout)
-        if result.returncode or payload.get("errors"):
-            return None
-        node = payload["data"]["repository"]["pullRequest"]
-        if not isinstance(node, dict):
-            return None
-        for key in ("timelineItems", "comments"):
-            connection = node[key]
-            if connection["pageInfo"]["hasPreviousPage"] is not False or not isinstance(connection["nodes"], list):
-                return None
-        return node
-    except (OSError, subprocess.SubprocessError, ValueError, TypeError, KeyError):
-        return None
-
-
-def assess_machine_hold(pr: dict, context: dict | None, surfaced: list, source: dict | None,
-                        attempts: dict, held: dict | None, *, active: bool = False, ancestry: dict | None = None) -> dict:
-    """Reassess an exact machine disposition without changing labels, budget or custody.
-
-    Ordinary human-hold guards remain authoritative. A candidate still needs its owner's
-    mutation boundary; the receipt is not a label-deletion or repair-admission token.
-    """
-    result = {"schema": MACHINE_HOLD_SCHEMA, "pr": pr.get("number"), "head": pr.get("headRefOid"),
-              "status": "pending", "holdRetained": True, "attemptsPreserved": attempts.get("count", 0)}
-    def pending(reason):
-        return {**result, "reason": reason}
-    labels = {name.lower() for name in label_names(pr)}
-    if active:
-        return pending("active-custody")
-    if not source or source.get("classifierBlob") != NARRATIVE_CLASSIFIER_BLOB \
-            or source.get("correctionCommit") != NARRATIVE_CLASSIFIER_COMMIT:
-        return pending("qualified-classifier-unavailable")
-    if (not context or context.get("state") != "OPEN" or context.get("isCrossRepository") is not False
-            or pr.get("isInMergeQueue") is not False or context.get("headRefOid") != pr.get("headRefOid") or context.get("baseRefOid") != pr.get("baseRefOid")
-            or not re.fullmatch(r"[a-f0-9]{40}", str(pr.get("baseRefOid") or "")) or pr.get("state") != "OPEN"
-            or not re.fullmatch(r"[a-f0-9]{40}", str(pr.get("headRefOid") or ""))):
-        return pending("current-provenance-unavailable")
-    if (pr.get("filesComplete") is not True or not isinstance(pr.get("files"), list)
-            or not re.fullmatch(r"[a-f0-9]{64}", str(pr.get("reviewAuthorityDigest") or ""))):
-        return pending("complete-authority-inputs-unavailable")
-    if PREFIX + EXHAUSTED not in labels:
-        return pending("terminal-fence-required")
-    if labels & (HOLD_LABELS | {"needs-human", "sensitive-surface"}) != {HUMAN_DECISION_LABEL}:
-        return pending("independent-stop")
-    try:
-        transitions = context["timelineItems"]["nodes"]
-        notes = context["comments"]["nodes"]
-        if any(context[key]["pageInfo"]["hasPreviousPage"] is not False for key in ("timelineItems", "comments")):
-            return pending("incomplete-provenance")
-        # Preserve any human-applied hold, even if a later bot wrote the same label.
-        events = [e for e in transitions if e["label"]["name"].lower() in HOLD_LABELS]
-        if any(e["actor"]["__typename"] != "Bot" or e["actor"]["login"] not in FAILURE_HOLD_WRITERS for e in events):
-            return pending("human-or-unknown-hold-writer")
-        matching = [e for e in events if e["label"]["name"].lower() == HUMAN_DECISION_LABEL]
-        event = max(matching, key=lambda e: e["createdAt"])
-        if event["__typename"] != "LabeledEvent" or not event["id"]:
-            return pending("hold-transition-unavailable")
-        label_at = iso_ts(event["createdAt"])
-        if label_at is None:
-            return pending("hold-transition-unavailable")
-        for human in (n for n in notes if n["author"]["__typename"] != "Bot"):
-            if HUMAN_STOP_NOTE.search(human["body"]):
-                return pending("human-stop-note")
-            # A human response to the disposition may ratify it in unstructured language.
-            # Do not infer permission from our inability to classify that response.
-            authored = iso_ts(human["createdAt"])
-            edited = iso_ts(human["updatedAt"])
-            if authored is None or edited is None or max(authored, edited) >= label_at:
-                return pending("human-response-needs-owner")
-        receipts = []
-        for note in notes:
-            author = note["author"]
-            if author["__typename"] != "Bot" or author["login"] != event["actor"]["login"]:
-                continue
-            at = iso_ts(note["createdAt"])
-            if at is None or not 0 <= label_at - at <= 60 or note["updatedAt"] != note["createdAt"]:
-                continue
-            for row in surfaced:
-                if (not isinstance(row, dict) or row.get("pr") != pr["number"]
-                        or row.get("cls") != "needs-human-decision" or row.get("reason") != "needs-human-decision"
-                        or row.get("holdApplied") is not True or row.get("holdPending")):
-                    continue
-                classified = {"cls": "needs-human-decision", "subtype": "human-gate",
-                              "evidence": ["strategy/pricing/credential/taste content"], "next_action": "tim-decides"}
-                expected = remediation.surface_body({**pr, "headRefOid": row.get("head")}, classified, "needs-human-decision")
-                if note["body"] == expected and note["id"]:
-                    receipts.append((row, note))
-        if len(receipts) != 1:
-            return pending("owner-receipt-unavailable")
-        row, note = receipts[0]
-        if not re.fullmatch(r"[a-f0-9]{40}", str(row.get("head") or "")):
-            return pending("surface-head-invalid")
-        if row["head"] != pr["headRefOid"] and ancestry != {
-                "base": row["head"], "head": pr["headRefOid"], "mergeBase": row["head"], "status": "ahead"}:
-            return {**pending("surface-head-ancestry-required"), "originalHead": row["head"]}
-        candidate = {**pr, "labels": [label for label in pr.get("labels") or []
-                                      if (label.get("name") if isinstance(label, dict) else label).lower() != HUMAN_DECISION_LABEL]}
-        classification = remediation.classify_blocker(candidate, held, attempts)
-        if classification["cls"] == "needs-human-decision":
-            return pending("current-human-decision")
-        return {**result, "status": "reassessed", "reason": "machine-cause-no-longer-present",
-                "source": source, "surfaceId": note["id"], "labelEventId": event["id"],
-                "originalHead": row["head"], "ancestry": ancestry, "classification": classification,
-                "next": "owner-bound-withdrawal-required; existing exhaustion and custody remain"}
-    except (KeyError, TypeError, ValueError, AttributeError):
-        return pending("malformed-provenance")
-
-
-def machine_hold_ancestry(before: str, after: str, sh=machine_hold_gh) -> dict | None:
-    if any(not isinstance(value, str) or not re.fullmatch(r"[a-f0-9]{40}", value) for value in (before, after)):
-        return None
-    try:
-        read = sh(["api", f"repos/{REPO}/compare/{before}...{after}"])
-        value = json.loads(read.stdout)
-        if (read.returncode or value["status"] != "ahead" or value["base_commit"]["sha"] != before
-                or value["merge_base_commit"]["sha"] != before):
-            return None
-        return {"base": before, "head": after, "mergeBase": before, "status": "ahead"}
-    except (OSError, subprocess.SubprocessError, ValueError, TypeError, KeyError):
-        return None
-
-
-def _machine_hold_new_intent(before: dict, after: dict, pr: dict, live: dict) -> bool:
-    """Only our one authenticated removal may differ after the write; anything else holds."""
-    try:
-        if (not after or live.get("headRefOid") != pr["headRefOid"] or live.get("state") != "OPEN"
-                or after["headRefOid"] != pr["headRefOid"] or after["state"] != "OPEN"
-                or live.get("isInMergeQueue") is not False or after["isCrossRepository"] is not False
-                or any(after[key]["pageInfo"]["hasPreviousPage"] is not False for key in ("timelineItems", "comments"))):
-            return True
-        expected = {name.lower() for name in label_names(pr)} - {HUMAN_DECISION_LABEL}
-        if {name.lower() for name in label_names(live)} != expected or PREFIX + EXHAUSTED not in expected:
-            return True
-        if any(live.get(key) != pr.get(key) for key in ("reviewAuthorityDigest", "dependencyMetadataDigest", "title", "body", "baseRefOid")):
-            return True
-        if after.get("baseRefOid") != pr.get("baseRefOid") or after["comments"]["nodes"] != before["comments"]["nodes"]:
-            return True
-        old = before["timelineItems"]["nodes"]
-        new = after["timelineItems"]["nodes"]
-        if len(new) != len(old) + 1 or new[:-1] != old:
-            return True
-        removal = new[-1]
-        return not (removal["__typename"] == "UnlabeledEvent" and removal["id"]
-                    and removal["label"]["name"].lower() == HUMAN_DECISION_LABEL
-                    and removal["actor"]["__typename"] == "Bot"
-                    and removal["actor"]["login"] in FAILURE_HOLD_WRITERS)
-    except (KeyError, TypeError, AttributeError):
-        return True
-
-
-def _machine_hold_pending(host, lane, pr: dict, pending: bool, result: dict) -> None:
-    """Reuse the existing holdPending custody fence across an ambiguous/crashed write."""
-    def update(data):
-        rows = data.setdefault("surfaced", [])
-        matches = [row for row in rows if isinstance(row, dict) and row.get("machineHoldRecovery") is True
-                   and row.get("pr") == pr["number"] and row.get("head") == pr["headRefOid"]]
-        if matches:
-            row = matches[-1]
-        else:
-            row = {"pr": pr["number"], "head": pr["headRefOid"], "machineHoldRecovery": True,
-                   "cls": "needs-human-decision", "reason": "machine-hold-withdrawal-pending"}
-            rows.append(row)
-        row.update(holdPending=pending, reassessment=result)
-        if not pending:
-            for previous in rows:
-                if isinstance(previous, dict) and previous.get("machineHoldRecovery") is True and previous.get("pr") == pr["number"]:
-                    previous.update(holdPending=False, resolvedBy=result)
-    lane.update_json(host.state / "escalation.json", update)
-
-
-def _restore_machine_hold(number: int, sh=machine_hold_gh) -> bool:
-    try:
-        return add_label(number, HUMAN_DECISION_LABEL, sh, prefix="")
-    except (OSError, subprocess.SubprocessError):
-        return False
-
-
-def _withdraw_machine_false_hold(host, lane, pr, fresh, context, source, record, result, now, sh):
-    repair = gate = None
-    try:
-        if not callable(getattr(lane, "Locked", None)) or not callable(getattr(lane, "reserve_gate", None)):
-            return {**result, "status": "pending", "reason": "local-custody-unavailable"}
-        repair = lane.Locked(host.state / "locks" / f"repair-pr-{pr['number']}.lock", blocking=False)
-        if not repair.held:
-            return {**result, "status": "pending", "reason": "active-local-repair"}
-        gate = lane.reserve_gate(host, fresh)
-        if gate is None:
-            return {**result, "status": "pending", "reason": "active-local-gate"}
-        reader = lane.reconcile_fix_target
-        # Preserve unknown/active custody and any changed authority before the mutation.
-        live = reader(pr)
-        current = machine_hold_context(pr["number"], sh)
-        latest_attempt = read_state(host, "fix-attempts.json").get(str(pr["number"]), {})
-        changed = (live != fresh or current != context or latest_attempt != record
-                   or machine_hold_source_proof() != source
-                   or claim_active(pr["number"], pr["headRefOid"], sh, now, kind=("fix", "gate", "adopt")))
-        if changed:
-            result.update(status="pending", reason="ownership-or-provenance-changed")
-        else:
-            label = HUMAN_DECISION_LABEL
-            try:
-                _machine_hold_pending(host, lane, pr, True, result)
-            except (OSError, ValueError, TypeError):
-                result.update(status="pending", reason="durable-owner-fence-unavailable")
-                return result
-            try:
-                deleted = sh(["api", "-X", "DELETE", f"repos/{REPO}/issues/{pr['number']}/labels/{label}"])
-                confirmed = deleted.returncode == 0
-            except (OSError, subprocess.SubprocessError):
-                confirmed = False
-            after = machine_hold_context(pr["number"], sh)
-            post = reader(pr)
-            if not confirmed or not post or _machine_hold_new_intent(context, after, fresh, post):
-                # A failed/ambiguous write may have reached GitHub. Restore fail-closed;
-                # no lane can enter through this window because exhaustion stayed set.
-                restored = _restore_machine_hold(pr["number"], sh)
-                result.update(status="pending", reason="withdrawal-unconfirmed-or-new-intent",
-                              holdRetained=restored, holdPending=not restored)
-            else:
-                result.update(status="withdrawn", reason="machine-false-disposition-withdrawn", holdRetained=False,
-                              next="existing terminal owner re-evaluates; no new repair admission")
-            _machine_hold_pending(host, lane, pr, bool(result.get("holdPending")), result)
-        return result
-    finally:
-        if gate is not None:
-            gate.lock.release()
-        if repair is not None:
-            repair.release()
-
-
-def reassess_machine_holds(host, lane, prs: list[dict], attempts: dict, held: dict, now: float, sh=machine_hold_gh) -> list[dict]:
-    """Reconcile only the owner's proven false disposition; retain terminal custody.
-
-    Never delete exhaustion or refund attempts. Re-read before deletion and inspect the
-    complete history afterward; concurrent/new or unreadable intent restores the hold.
-    This creates no queue wake, retry grant, or alternate repair/controller path.
-    """
-    surfaced = read_state(host, "escalation.json").get("surfaced")
-    surfaced = surfaced if isinstance(surfaced, list) else []
-    rows, recovering = [], set()
-    # A previous process may have died after DELETE. Reapply before any fresh assessment,
-    # even when the remote label is absent. The existing pending fence stays until success.
-    for pr in prs:
-        if any(isinstance(row, dict) and row.get("machineHoldRecovery") is True and row.get("holdPending") is True
-               and row.get("pr") == pr["number"] for row in surfaced):
-            recovering.add(pr["number"])
-            restored = _restore_machine_hold(pr["number"], sh)
-            result = {"schema": MACHINE_HOLD_SCHEMA, "pr": pr["number"], "head": pr["headRefOid"],
-                      "status": "pending", "reason": "restoration-confirmed" if restored else "restoration-pending",
-                      "holdRetained": restored, "holdPending": not restored, "observedAt": now}
-            _machine_hold_pending(host, lane, pr, not restored, result)
-            rows.append(result)
-    candidates = [pr for pr in prs if pr["number"] not in recovering
-                  and HUMAN_DECISION_LABEL in {name.lower() for name in label_names(pr)}]
-    if not candidates:
-        return rows
-    source = machine_hold_source_proof()
-    for pr in candidates:
-        record = attempts.get(str(pr["number"]), {})
-        active = in_flight(record, {"headRefOid": record.get("sha")}, now)
-        fresh, context, ancestry = pr, None, None
-        reader = getattr(lane, "reconcile_fix_target", None)
-        if source and not active and callable(reader):
-            live = reader(pr)
-            if live and live.get("headRefOid") == pr.get("headRefOid") and live.get("baseRefOid") == pr.get("baseRefOid"):
-                fresh = live
-                active = claim_active(pr["number"], pr.get("headRefOid"), sh, now, kind=("fix", "gate", "adopt"))
-                if not active:
-                    context = machine_hold_context(pr["number"], sh)
-        result = assess_machine_hold(fresh, context, surfaced, source, record,
-                                     held.get(str(pr["number"])), active=active)
-        if result["reason"] == "surface-head-ancestry-required":
-            ancestry = machine_hold_ancestry(result["originalHead"], pr["headRefOid"], sh)
-            result = assess_machine_hold(fresh, context, surfaced, source, record,
-                                         held.get(str(pr["number"])), ancestry=ancestry)
-        if result["status"] == "reassessed":
-            result = _withdraw_machine_false_hold(host, lane, pr, fresh, context, source, record, result, now, sh)
-        rows.append({**result, "observedAt": now})
-    return rows
-
-
 def stale_hold(number: int, pr: dict, now: float, sh=run) -> dict | None:
     """JOV-7066: a held PR reading CLEAN whose hold outlived its cause — applied more than
     24 h ago with no Tim-authored hold note. Tim's holds and notes naming a non-check
     blocker (a dependency, a qualification pass, a pricing red line) are human gates, not
     storm leftovers: no row, no alert. The row's `auto` marks the stricter mode's subset:
     the hold came from automation and the head moved after it."""
-    if human_holds(pr):
-        return None  # a human hold is released by a human removing it, never by staleness
     ctx = hold_context(number, sh)
     if not ctx or not ctx["events"]:
         return None
@@ -1139,8 +853,6 @@ def stale_hold(number: int, pr: dict, now: float, sh=run) -> dict | None:
 
 def auto_unhold_labels(pr: dict) -> list[str]:
     """Labels the stale-hold sweep may lift. The human-decision hold is never among them."""
-    if human_holds(pr):
-        return []  # any human-owned hold keeps every other hold and poison label in place too
     return [label for label in label_names(pr) if label.lower() in HOLD_LABELS or label == POISON_LABEL]
 
 
@@ -1296,29 +1008,49 @@ RED_BLOCK_MARKER = "<!-- lanes:red-before-green -->"
 RED_HEADING = re.compile(r"^#{1,6}\s*red-before-green\s*$", re.I)
 ANY_HEADING = re.compile(r"^#{1,6}\s")
 JOB_URL = re.compile(r"^(https://github\.com/[\w.-]+/[\w.-]+/actions/runs/[1-9]\d*)(?:/job/\d+)?")
+RED_RUN_URL = re.compile(r"https://github\.com/[\w.-]+/[\w.-]+/actions/runs/[1-9]\d*(?:/attempts/[1-9]\d*)?")
+
+
+def red_section_bounds(lines: list[str], heading=RED_HEADING) -> tuple[int, int] | None:
+    """Match Fleet boundaries, ignoring fenced/hidden headings but preserving source line indexes."""
+    visible = re.sub(r"<!--[\s\S]*?-->", lambda match: "\n" * match.group().count("\n"), "\n".join(lines))
+    fenced = False
+    start = None
+    for index, line in enumerate(visible.split("\n")):
+        if re.match(r"^\s*(?:```|~~~)", line):
+            fenced = not fenced
+            continue
+        if fenced:
+            continue
+        if start is None:
+            if heading.match(line.strip()):
+                start = index
+        elif ANY_HEADING.match(line):
+            return start, index
+    return (start, len(lines)) if start is not None else None
 
 
 def red_section_complete(body: str) -> bool:
     """Mirror of scripts/pr-fleet-rules.mjs: a Failing command plus a red-output fence or run URL."""
     lines = re.sub(r"<!--[\s\S]*?-->", "", body or "").split("\n")
-    start = next((i for i, line in enumerate(lines) if RED_HEADING.match(line.strip())), None)
-    if start is None:
+    bounds = red_section_bounds(lines)
+    if bounds is None:
         return False
-    end = next((i for i in range(start + 1, len(lines)) if ANY_HEADING.match(lines[i])), len(lines))
+    start, end = bounds
     section = "\n".join(lines[start + 1:end])
     command = re.search(r"^\s*(?:-\s*)?Failing command:\s*(.+)$", section, re.I | re.M)
     run_url = re.search(r"^\s*(?:-\s*)?Failing run \(before fix\):\s*`?(https://\S+?)`?\s*$", section, re.I | re.M)
     fence = re.search(r"```(?:text|console|log|bash|sh)?\n[\s\S]*?\b(?:FAIL|Error|AssertionError|ERR_|expected|not ok)[\s\S]*?```",
                       section, re.I)
     text = command.group(1).replace("`", "").strip() if command else ""
-    return len(text) > 2 and text.lower() not in {"todo", "tbd", "n/a", "none"} and bool(fence or run_url)
+    placeholder = re.fullmatch(r"(?:todo|tbd|n/?a|none|not applicable|\.\.\.|<[^>]*>)\s*[.!]?", text, re.I)
+    valid_run = run_url and RED_RUN_URL.fullmatch(run_url.group(1))
+    return len(text) > 2 and not placeholder and bool(fence or valid_run)
 
 
 def red_before_green_block(pr: dict, excerpt: str = "") -> str | None:
-    """A `## Red-before-green` section built from the PR's own red check: the failing run URL and
-    the failed jobs' error lines the fixer is shown. Fleet Rules treats lane-fix-red as a repair
-    label, so every red lane PR needs this evidence; agents forget it (45 of 138 Fleet Rules
-    failures on 2026-10-25) and the lane already has it. None when no red check names a run."""
+    """Build proof from the PR's red run/errors or observed merge conflict; otherwise None.
+    Use a failing command; `gh run view --log-failed` only displays logs."""
     for check in pr.get("statusCheckRollup") or []:
         if str(check.get("conclusion") or "").lower() not in RED_CONCLUSIONS:
             continue
@@ -1333,20 +1065,85 @@ def red_before_green_block(pr: dict, excerpt: str = "") -> str | None:
                 lines.append(" " + line if ANY_HEADING.match(line) else line)
         return "\n".join([
             "## Red-before-green", "",
-            f"Failing command: `gh run view {run_url.rsplit('/', 1)[-1]} --repo {REPO} --log-failed`",
-            f"Failing run (before fix): {run_url}", "",
+            f"- Failing command: `gh run watch {run_url.rsplit('/', 1)[-1]} --repo {REPO} --exit-status`",
+            f"- Failing run (before fix): {run_url}", "",
             "```text", *lines, "```", "", RED_BLOCK_MARKER])
+    # Conflict-only proof needs observed merge failure and conflicting state, not just a label.
+    observed = str(excerpt or "").splitlines()
+    conflicts = [line for line in observed if re.fullmatch(r"CONFLICT \([^)]+\): .+", line)]
+    if (pr.get("mergeable") == "CONFLICTING" or pr.get("mergeStateStatus") == "DIRTY") and conflicts and (
+            "Automatic merge failed; fix conflicts and then commit the result." in observed):
+        return "\n".join([
+            "## Red-before-green", "",
+            "- Failing command: `git merge origin/main --no-edit`", "",
+            "```text", *conflicts[:25],
+            "Automatic merge failed; fix conflicts and then commit the result.",
+            "```", "", RED_BLOCK_MARKER])
     return None
 
 
 def with_red_section(body: str, block: str) -> str:
     """Replace an empty/placeholder Red-before-green section with the block, or append one."""
     lines = (body or "").split("\n")
-    start = next((i for i, line in enumerate(lines) if RED_HEADING.match(line.strip())), None)
-    if start is None:
+    bounds = red_section_bounds(lines)
+    if bounds is None:
         return (body or "").rstrip("\n") + "\n\n" + block + "\n"
-    end = next((i for i in range(start + 1, len(lines)) if ANY_HEADING.match(lines[i])), len(lines))
+    start, end = bounds
     return "\n".join(lines[:start] + block.split("\n") + [""] + lines[end:])
+
+
+def repair_evidence_body(pr: dict, body: str, excerpt: str = "", *, customer_decision: dict | None = None,
+                         locking_pr: int | None = None, win_section: str | None = None,
+                         premise: dict | None = None, previous_win_section: str | None = None) -> str:
+    """Complete explicit evidence; preserve proof/decisions for Fleet/changelog validation."""
+    if len(re.findall(r"<!--\s*customer-changelog/v1\b[\s\S]*?-->", body)) > 1:
+        raise ValueError("repair requires exactly one customer changelog decision")
+    updated = body
+    if not red_section_complete(updated):
+        block = red_before_green_block(pr, excerpt)
+        if block:
+            updated = with_red_section(updated, block)
+    if customer_decision is not None and "customer-changelog/v1" not in updated:
+        if not isinstance(customer_decision, dict) or type(customer_decision.get("releaseWorthy")) is not bool:
+            raise ValueError("customer decision requires an explicit releaseWorthy boolean")
+        if customer_decision["releaseWorthy"] is False:
+            from fix_red_classes import stamp_internal_changelog
+            updated = stamp_internal_changelog(updated)
+        else:
+            note = json.dumps(customer_decision, separators=(",", ":")).replace("<", "\\u003c").replace(">", "\\u003e")
+            updated = updated.rstrip("\n") + "\n<!-- customer-changelog/v1 " + note + " -->\n"
+    if locking_pr is not None:
+        if type(locking_pr) is not int or locking_pr < 1:
+            raise ValueError("locking PR requires an explicit positive PR number")
+        visible = re.sub(r"<!--[\s\S]*?-->", "", updated)
+        if not re.search(r"^#{1,6}\s+Locked areas\s*$", visible, re.I | re.M):
+            updated = updated.rstrip("\n") + f"\n\n## Locked areas\n\nLocking PR: #{locking_pr}\n"
+    if previous_win_section is not None and not win_section:
+        raise ValueError("Win replacement requires explicit measured win evidence")
+    if win_section is not None and win_section != "":
+        if not isinstance(win_section, str) or not re.match(r"\A## Win\s*\n", win_section):
+            raise ValueError("measured win requires a complete ## Win section")
+        if re.search(r"^#{1,6}\s+|customer-changelog/v1", win_section.split("\n", 1)[1], re.M):
+            raise ValueError("measured win must contain only Win evidence; use the dedicated repair fields")
+        lines = updated.split("\n")
+        bounds = red_section_bounds(lines, re.compile(r"^#{2,3}\s*Win\s*$", re.I))
+        if previous_win_section is not None:
+            if not bounds or "\n".join(lines[bounds[0]:bounds[1]]).rstrip("\n") != previous_win_section.rstrip("\n"):
+                raise ValueError("Win section changed; re-read the evidence before replacement")
+            start, end = bounds
+            updated = "\n".join(lines[:start] + win_section.rstrip("\n").split("\n") + [""] + lines[end:])
+        elif bounds is None:
+            updated = updated.rstrip("\n") + "\n\n" + win_section.rstrip("\n") + "\n"
+    if premise is not None:
+        fields = ("Assumption", "Falsifying test", "Result")
+        if not isinstance(premise, dict) or any(
+                not isinstance(premise.get(field), str) or not premise[field].strip()
+                or "\n" in premise[field] or "\r" in premise[field] for field in fields):
+            raise ValueError("premise requires explicit single-line Assumption, Falsifying test and Result")
+        if red_section_bounds(updated.split("\n"), re.compile(r"^#{2,3}\s*Premise check\s*$", re.I)) is None:
+            block = "## Premise check\n\n" + "\n".join(f"- {field}: {premise[field]}" for field in fields)
+            updated = updated.rstrip("\n") + "\n\n" + block + "\n"
+    return updated
 
 
 def api_gh(args, **_):
@@ -1359,20 +1156,27 @@ def api_gh(args, **_):
     return subprocess.CompletedProcess(args, done["code"], done["stdout"], done["stderr"])
 
 
-def ensure_red_before_green(pr: dict, excerpt: str = "", sh=api_gh) -> bool:
-    """Write the evidence block into the PR body when its section is missing or incomplete."""
-    block = red_before_green_block(pr, excerpt)
-    if not block or not isinstance(pr.get("number"), int):
+def ensure_red_before_green(pr: dict, excerpt: str = "", sh=api_gh, *, customer_decision: dict | None = None,
+                            locking_pr: int | None = None, win_section: str | None = None,
+                            premise: dict | None = None) -> bool:
+    """Complete repair evidence and an optional caller-selected customer decision."""
+    if not isinstance(pr.get("number"), int) or (
+            customer_decision is None and locking_pr is None and win_section is None and premise is None
+            and red_before_green_block(pr, excerpt) is None):
         return False
     viewed = sh(["pr", "view", str(pr["number"]), "--repo", REPO, "--json", "body", "--jq", ".body"])
-    if viewed.returncode != 0 or red_section_complete(viewed.stdout or ""):
+    if viewed.returncode != 0:
         return False
-    updated = with_red_section(viewed.stdout or "", block)
+    body = viewed.stdout or ""
+    updated = repair_evidence_body(pr, body, excerpt, customer_decision=customer_decision, locking_pr=locking_pr,
+                                   win_section=win_section, premise=premise)
+    if updated == body:
+        return False
     with tempfile.TemporaryDirectory(prefix="red-before-green-") as tmp:
         path = Path(tmp) / "body.md"
         from atomic_state import atomic_write_text
         atomic_write_text(path, updated)
-        if RED_BLOCK_MARKER not in path.read_text():
+        if path.read_text() != updated:
             return False
         return sh(["pr", "edit", str(pr["number"]), "--repo", REPO, "--body-file", str(path)]).returncode == 0
 
@@ -1388,8 +1192,7 @@ def failure_held(sha: str | None, sh=run) -> bool:
     by the enroll controller until a new head that nothing was asked to push."""
     if not sha:
         return False
-    listed = sh(["gh", "api", f"repos/{REPO}/commits/{sha}/statuses?per_page=100", "--jq",
-                 f'[.[] | select(.context == "{FAILURE_HOLD_CONTEXT}" and .state == "success") '
+    listed = sh(["gh", "api", f"repos/{REPO}/commits/{sha}/statuses?per_page=100", "--jq", f'[.[] | select(.context == "{FAILURE_HOLD_CONTEXT}" and .state == "success") '
                  '| .creator.login] | unique | join(" ")'])
     return listed.returncode == 0 and bool(set((listed.stdout or "").split()) & FAILURE_HOLD_WRITERS)
 
@@ -1428,8 +1231,7 @@ def relay(event: str, payload: dict, sh=run, disabled: set[str] | None = None) -
             if not failure_held(sha, sh):
                 continue
             kind = "dequeued"
-        viewed = sh(["gh", "pr", "view", str(number), "--repo", REPO, "--json",
-                     "state,isDraft,headRefName,headRefOid,isCrossRepository,mergeStateStatus,labels"])
+        viewed = sh(["gh", "pr", "view", str(number), "--repo", REPO, "--json", "state,isDraft,headRefName,headRefOid,isCrossRepository,mergeStateStatus,labels"])
         if viewed.returncode != 0:
             continue
         pr = json.loads(viewed.stdout or "{}")
@@ -1454,6 +1256,8 @@ def relay(event: str, payload: dict, sh=run, disabled: set[str] | None = None) -
         if kind == "dequeued" and mark_poison(number, pr, time.time(), sh):
             added.append((number, POISON_LABEL))
         if PREFIX + kind in label_names(pr):
+            continue
+        if kind == "red" and not red_label_justified(number, pr, sh):
             continue
         if in_scope(pr, kind, disabled) and add_label(number, kind, sh):
             added.append((number, kind))
@@ -1897,21 +1701,7 @@ def preservation_reason(pr: dict, record: dict, max_attempts: int, *, held: dict
     return None
 
 
-def unconfirmed_human_hold(host, pr: dict) -> bool:
-    """Preserve an unconfirmed human hold; recovery of our own removal spans head changes.
-
-    Ordinary dispositions remain exact-head. A failed/ambiguous machine withdrawal stays
-    PR-owned until the hold is restored, even if another writer advances the head.
-    """
-    rows = read_state(host, "escalation.json").get("surfaced")
-    return isinstance(rows, list) and any(
-        isinstance(row, dict) and row.get("holdPending") is True and row.get("pr") == pr.get("number")
-        and (row.get("head") == pr.get("headRefOid") or row.get("machineHoldRecovery") is True) for row in rows)
-
-
 def maintenance_hold(host, lane, pr: dict, now: float, *, terminal_ok: bool = False) -> str | None:
-    if unconfirmed_human_hold(host, pr):
-        return "human-hold-pending"
     reason = preservation_reason(pr, read_state(host, "fix-attempts.json").get(str(pr["number"]), {}),
                                  lane.MAX_FIX_ATTEMPTS, held=read_state(host, "held.json").get(str(pr["number"])), now=now,
                                  terminal_ok=terminal_ok)
@@ -1927,7 +1717,7 @@ def record_attempt(attempts: dict, number: int, sha: str, lane_name: str, now: f
     record = attempts.get(str(number), {})
     rollover = record.get("count", 0) > 0 and not same_generation(record, sha)
     entry = {"sha": sha, "count": 1 if rollover else record.get("count", 0) + 1,
-             "lane": lane_name, "at": now}
+             "lane": lane_name, "at": now, "headClaims": repair_order.head_claims(record, sha) + 1}
     if not rollover and record.get("pushedHead"):
         entry["pushedHead"] = record["pushedHead"]  # self-pushes stay in the same generation
     if not rollover and record.get("reentry"):
@@ -2067,7 +1857,7 @@ def queue_failure(lane, number: int, limit: int = 4000) -> str:
 
 
 def claim_event_pr(host, lane, name: str, prs: list[dict], now: float | None = None) -> dict | None:
-    """Under the claim lock: the first event-queued PR this lane may fix. Records the attempt,
+    """Under the claim lock: the event-queued PR this lane may fix, in repair_order. Records the attempt,
     posts the cross-host claim and retains repair labels until a fix pushes. Resolved or
     out-of-scope labels wait for bounded cleanup after productive selection declines. Spent
     and active heads retain their signals, so the PR shows why it is waiting and the relay
@@ -2080,7 +1870,7 @@ def claim_event_pr(host, lane, name: str, prs: list[dict], now: float | None = N
     providers = lane.load_providers()
     order = cost_order(providers)
     disabled = set(providers) - set(order)
-    for pr in sorted(prs, key=lambda item: item["number"]):
+    for pr in sorted(prs, key=lambda item: repair_order.key(item, attempts)):
         if pr.get("isInMergeQueue") is True:
             continue  # Preserve events while native landing owns the target.
         record = attempts.get(str(pr["number"]), {})
@@ -2464,8 +2254,7 @@ def sync_failure_reason(result) -> str:
 
 def ledger(host, receipt: dict) -> None:
     (host.state / "runs").mkdir(parents=True, exist_ok=True)
-    with open(host.state / "runs" / "ledger.jsonl", "a") as handle:
-        handle.write(json.dumps(receipt) + "\n")
+    append_json_object(host.state / "runs" / "ledger.jsonl", receipt)
 
 
 OPEN_PRS_QUERY = """query($owner:String!,$name:String!,$cursor:String){repository(owner:$owner,name:$name){nameWithOwner
@@ -2853,7 +2642,7 @@ def reconcile_plan(prs: list[dict], attempts: dict, disabled: set[str], max_atte
         settling = age < ORPHAN_GRACE_S or pr.get("rollup") in ("PENDING", "EXPECTED")
         if not (explicitly_held or queued or settling):
             plan["orphans"].append(number)
-    plan["counts"] = counts
+    plan["counts"] = {**counts, "wip": pr_wip.census(prs, now)}
     plan["dispositions"] = dispositions(prs, plan, attempts, max_attempts, now, held)
     return plan
 
@@ -2876,7 +2665,7 @@ def reconcile(host, lane, linear_factory, now: float, force: bool = False) -> di
     deps = open_dependencies(prs, now, lane.sh)
     attempts = read_state(host, "fix-attempts.json")
     held = read_state(host, "held.json")
-    machine_holds = reassess_machine_holds(host, lane, prs, attempts, held, now)
+    breaker_held = read_state(host, "queue-breaker.json")
     plan = reconcile_plan(prs, attempts, disabled, lane.MAX_FIX_ATTEMPTS, now, deps, held)
     by_number = {pr["number"]: pr for pr in prs}
     labeled = []
@@ -2884,11 +2673,15 @@ def reconcile(host, lane, linear_factory, now: float, force: bool = False) -> di
         if kind == "conflict" and claim_active(
                 number, by_number[number].get("headRefOid"), lane.sh, now):
             continue
-        if kind == "red" and head_red(number, lane.sh) is not True:
-            continue  # a cancelled/superseded run reddens the rollup; unknown waits a pass
+        if kind == "red" and (by_number[number].get("mergeStateStatus") in REQUIRED_GREEN
+                              or head_red(number, lane.sh) is not True):
+            continue  # a cancelled/superseded run or a non-required red; unknown waits a pass
         if add_label(number, kind, lane.sh):
             labeled.append((number, kind))
     for number, kind in plan["unlabel"]:
+        # JOV-8492: the breaker still holds this head (merge-group reds invisible to the check above).
+        if kind == "red" and (breaker_held.get(str(number)) or {}).get("head") == (by_number.get(number) or {}).get("headRefOid"):
+            continue
         consume(lane, {"number": number}, [kind])
     if plan["reset"]:
         reset = {str(number) for number in plan["reset"]}
@@ -2922,8 +2715,7 @@ def reconcile(host, lane, linear_factory, now: float, force: bool = False) -> di
         next_nags[str(row["pr"])] = {"head": row["head"], "at": now}
         if auto_unhold and row["auto"]:
             for name in auto_unhold_labels(by_number[row["pr"]]):
-                lane.sh(["gh", "api", "-X", "DELETE",
-                         f"repos/{lane.REPO_SLUG}/issues/{row['pr']}/labels/{name}"])
+                lane.sh(["gh", "api", "-X", "DELETE", f"repos/{lane.REPO_SLUG}/issues/{row['pr']}/labels/{name}"])
             lane.sh(["gh", "pr", "comment", str(row["pr"]), "--repo", lane.REPO_SLUG, "--body",
                      f"🤖 lanes: the automation hold went stale: CLEAN, and the head moved past it "
                      f"(head `{row['head']}`), so `hold`/`{POISON_LABEL}` are removed and the "
@@ -2973,7 +2765,7 @@ def reconcile(host, lane, linear_factory, now: float, force: bool = False) -> di
     record = {"at": lane.now_iso(), "atEpoch": now, "counts": plan["counts"], "labeled": labeled,
               "closed": closed, "parkedRequeued": parked, "orphans": plan["orphans"],
               "depHolds": plan["depHolds"], "dispositions": plan["dispositions"], "staleHolds": stale,
-              "holdNags": next_nags, "machineHoldReassessments": machine_holds}
+              "holdNags": next_nags}
     lane.update_json(host.state / "reconcile.json", lambda data: (data.clear(), data.update(record)))
     return record
 
@@ -3083,15 +2875,31 @@ def write_wake_file(state, *, pr, sha, run_id, run_attempt, red_at):
 
 
 def wake(argv: list[str]) -> int:
-    """Gem-side wake job: for each red PR in --prs, write a wake file from the
-    workflow_run event (red_at = updated_at). Local state only; no secret, no
-    GitHub writes — fix-now (and only fix-now) does everything after that."""
+    """Gem-side wake job: write a wake file from the workflow_run event
+    (red_at = updated_at). Local state only; no secret, no GitHub writes.
+    fix-now (and only fix-now) does everything after that.
+
+    The check completion is the event. With no --prs, the PRs on that event
+    are the targets. A success or an unrelated event writes nothing.
+    """
+    explicit = "--prs" in argv
     prs = []
-    if "--prs" in argv:
+    if explicit:
         for token in argv[argv.index("--prs") + 1].split(","):
             token = token.strip()
             if token.isdigit():
                 prs.append(int(token))
+    event_path = os.environ.get("GITHUB_EVENT_PATH")
+    payload = json.loads(Path(event_path).read_text()) if event_path and Path(event_path).exists() else {}
+    run = payload.get("workflow_run") or {}
+    if not explicit and run.get("conclusion") not in RED_CONCLUSIONS:
+        print("wake: not a red check")
+        return 0
+    if not prs:
+        for item in run.get("pull_requests") or []:
+            number = item.get("number") if isinstance(item, dict) else None
+            if isinstance(number, int) and number > 0:
+                prs.append(number)
     if not prs:
         print("wake: no red PRs")
         return 0
@@ -3099,9 +2907,6 @@ def wake(argv: list[str]) -> int:
     if state is None:
         print("wake: no lane state dir configured; nothing written")
         return 0
-    event_path = os.environ.get("GITHUB_EVENT_PATH")
-    payload = json.loads(Path(event_path).read_text()) if event_path and Path(event_path).exists() else {}
-    run = payload.get("workflow_run") or {}
     sha = run.get("head_sha")
     if not re.fullmatch(r"[0-9a-f]{40}", sha or ""):
         print("wake: event carries no pull-request head sha; nothing written")

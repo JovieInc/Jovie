@@ -140,10 +140,11 @@ import { WorkspacePage } from '@/components/organisms/WorkspacePage';
 import type { FilterPill } from '@/components/shell/pill-search.types';
 import { RowWaveform } from '@/components/shell/RowWaveform';
 import { APP_ROUTES } from '@/constants/routes';
-import { useRegisterHeaderSearch } from '@/contexts/HeaderActionsContext';
+import { useFounderDoor } from '@/contexts/FounderDoorContext';
 import { COPY_FALLBACKS } from '@/data/copyFallbacks';
 import { useBreakpoint } from '@/hooks/useBreakpoint';
 import { useRegisterRightPanel } from '@/hooks/useRegisterRightPanel';
+import { openChatWithDraft } from '@/lib/chat/open-chat-with-prompt';
 import { SKELETON_ROW_COUNT } from '@/lib/constants/layout';
 import type { ProviderKey } from '@/lib/discography/types';
 import { captureError } from '@/lib/error-tracking';
@@ -151,7 +152,6 @@ import {
   formatLibraryApprovalStatus,
   LIBRARY_APPROVAL_STATUSES,
   type LibraryApprovalStatus,
-  libraryApprovalStatusClasses,
   libraryApprovalStatusDotClasses,
 } from '@/lib/library/approval-status';
 import type { LibraryAssetShareViewModel } from '@/lib/library/asset-share';
@@ -175,6 +175,7 @@ import {
   deriveWorkInspectorPresentation,
   scopeWorkInspectorBundle,
 } from '@/lib/library/work-inspector-read-model';
+import { getCacheScope } from '@/lib/queries/cache-isolation';
 import { useSyncReleasesFromSpotifyMutation } from '@/lib/queries/useReleaseMutations';
 import {
   type ColumnDef,
@@ -231,7 +232,13 @@ import {
   persistLibrarySavedView,
   readPersistedLibrarySavedView,
 } from './library-saved-views';
-import { PostReleasePanel } from './PostReleasePanel';
+import {
+  compareAssets,
+  countBy,
+  type LibrarySortKey,
+  uniqueSorted,
+} from './library-sort-helpers';
+import { PostReleasePanel, RightsholdersList } from './PostReleasePanel';
 import {
   YouTubeMerchRelationshipEditor,
   YouTubeOptimizationPanel,
@@ -252,7 +259,6 @@ const LIBRARY_DESKTOP_ICON_CONTROL_DENSITY_CLASS = cn(
   'w-8 min-w-8'
 );
 
-type LibrarySortKey = 'releaseDate' | 'title' | 'status' | 'providers';
 type LibraryPresetId = LibraryView;
 type LibraryPreviewToggle = (
   asset: LibraryReleaseAsset,
@@ -281,8 +287,6 @@ type LibraryFilters = {
   readonly assetKinds: Set<LibraryAssetKind>;
   readonly providers: Set<string>;
 };
-
-type CountMap<T extends string> = ReadonlyMap<T, number>;
 
 const ASSET_KIND_LABELS: Record<LibraryAssetKind, string> = {
   artwork: 'Artwork',
@@ -491,38 +495,6 @@ function hasActiveFilters(filters: LibraryFilters): boolean {
       filters.providers.size >
     0
   );
-}
-
-function releaseDateTime(asset: LibraryReleaseAsset): number {
-  if (!asset.releaseDate) return 0;
-  const date = new Date(asset.releaseDate);
-  return Number.isNaN(date.getTime()) ? 0 : date.getTime();
-}
-
-function compareAssets(sort: LibrarySortKey) {
-  return (a: LibraryReleaseAsset, b: LibraryReleaseAsset) => {
-    if (sort === 'releaseDate') return releaseDateTime(b) - releaseDateTime(a);
-    if (sort === 'title') return a.title.localeCompare(b.title);
-    if (sort === 'status') return a.status.localeCompare(b.status);
-    return b.providerCount - a.providerCount;
-  };
-}
-
-function uniqueSorted<T extends string>(values: readonly T[]): T[] {
-  return Array.from(new Set(values)).sort((a, b) => a.localeCompare(b));
-}
-
-function countBy<T extends string>(
-  assets: readonly LibraryReleaseAsset[],
-  getValues: (asset: LibraryReleaseAsset) => readonly T[]
-): CountMap<T> {
-  const counts = new Map<T, number>();
-  for (const asset of assets) {
-    for (const value of getValues(asset)) {
-      counts.set(value, (counts.get(value) ?? 0) + 1);
-    }
-  }
-  return counts;
 }
 
 const LibraryDependencyContext = createContext<
@@ -2029,25 +2001,15 @@ function EmptyCatalog({
       toolbar={
         <PageToolbar
           start={<span className={PAGE_TOOLBAR_META_TEXT_CLASS}>0 items</span>}
-          end={
-            <>
-              <YouTubeLedgerLink />
-              <LibraryFirstAction
-                canSyncSpotify={canSyncSpotify}
-                isSyncing={isSyncing}
-                onSyncSpotify={onSyncSpotify}
-                testId='library-sync-spotify-toolbar'
-              />
-            </>
-          }
+          end={<YouTubeLedgerLink />}
         />
       }
     >
       <NavigationDestinationReady destination='library' />
       <EmptyState
-        icon={<Music2 className='h-5 w-5' strokeWidth={2.25} />}
-        heading='No work yet'
-        description='Releases, merch, images, videos, and audio will appear here as they land.'
+        icon={<Music2 className='h-5 w-5' aria-hidden='true' />}
+        heading='No Work Yet'
+        description='Your releases, videos, images, audio, and merch live here.'
         presentation='workspace'
         testId='library-workspace-empty-state'
         className='min-h-90'
@@ -2067,8 +2029,8 @@ function EmptyCatalog({
 function NoResults({ onReset }: { readonly onReset: () => void }) {
   return (
     <TableEmptyState
-      heading='No work matches'
-      description='No releases, products, or files match the selected view or filters.'
+      heading='No Work Matches'
+      description='Nothing in this view matches the selected filters.'
       className='min-h-75'
       action={{
         label: 'Reset View',
@@ -2086,7 +2048,7 @@ function MetadataRow({
   readonly label: string;
   readonly value: ReactNode;
 }) {
-  return <InspectorRow label={label} value={value} />;
+  return <InspectorRow definitionList label={label} value={value} />;
 }
 
 function PreviewActionButton({
@@ -2120,7 +2082,7 @@ function PreviewActionButton({
 
   return (
     <Button
-      variant='ghost'
+      variant={compact ? 'ghost' : 'secondary'}
       size='sm'
       type='button'
       onClick={event => onTogglePreview(asset, event)}
@@ -2178,14 +2140,13 @@ function ApprovalStatusEditor({
           type='button'
           variant='ghost'
           disabled={isDisabled}
-          aria-label='Approval Status'
           data-testid={`library-approval-status-select-${asset.id}`}
           className={cn(
-            'system-b-library-status-pill inline-flex h-6 max-w-full items-center gap-1 truncate rounded-full border px-2',
-            libraryApprovalStatusClasses(asset.approvalStatus),
+            '-ml-1 inline-flex h-6 max-w-full items-center justify-start gap-1 truncate px-1 font-normal text-primary-token hover:bg-surface-1 disabled:opacity-100',
             LIBRARY_BUTTON_FOCUS_CLASS
           )}
         >
+          <span className='sr-only'>Approval Status:</span>{' '}
           <span>{formatLibraryApprovalStatus(asset.approvalStatus)}</span>
           <ChevronDown
             className='h-3 w-3 shrink-0 opacity-70'
@@ -2387,9 +2348,12 @@ function AssetDrawer({
       finding.status !== 'dismissed'
   );
   const hasPostReleaseActivity =
-    inspectorBundle.downloads.length > 0 ||
-    inspectorBundle.findings.length > 0 ||
-    inspectorBundle.rightsholders.length > 0;
+    inspectorBundle.downloads.length > 0 || inspectorBundle.findings.length > 0;
+  const showDestinationsSection =
+    current !== null &&
+    !isMerch &&
+    isDspQuietListScope(workKind ?? 'release') &&
+    current.providers.length > 0;
   const isPreviewPlaying =
     currentId !== null &&
     currentId === playingPreviewId &&
@@ -2402,6 +2366,11 @@ function AssetDrawer({
     },
     [onClose]
   );
+  const askJovieAction = current
+    ? getContextMenuItems(current).find(
+        item => 'id' in item && item.id === 'ask-jovie'
+      )
+    : undefined;
   const drawerHeaderActions = current ? (
     // The shared header shows the visible mobile Close for every drawer.
     <DrawerHeaderActions
@@ -2449,8 +2418,17 @@ function AssetDrawer({
             title={current.title}
             subtitle={current.artist}
             meta={
-              <div className='flex h-6 min-w-0 items-center'>
-                <LibraryStatusGlyph asset={current} showLabel />
+              <div className='-ml-1 flex h-6 min-w-0 items-center'>
+                <LibraryStatusGlyph
+                  asset={current}
+                  showLabel
+                  labelOverride={
+                    current.lifecycleStatus === 'archived' ||
+                    current.approvalStatus === 'archived'
+                      ? undefined
+                      : formatLibraryStatus(current)
+                  }
+                />
               </div>
             }
             stableLayout
@@ -2484,46 +2462,42 @@ function AssetDrawer({
           >
             {activeTab === 'overview' ? (
               <>
-                {!isMerch && hasVerifiedLibraryAudioPreview(current) ? (
-                  <InspectorSection title='Preview' className='pb-3 first:pt-0'>
-                    <div className='flex items-center justify-between gap-2'>
-                      <span className='system-b-library-drawer-panel-copy min-w-0 flex-1 truncate text-secondary-token'>
-                        {current.title}
-                      </span>
-                      <PreviewActionButton
-                        asset={current}
-                        isPreviewPlaying={isPreviewPlaying}
-                        onTogglePreview={onTogglePreview}
-                        compact
-                        disabledTabIndex={closedTabIndex}
-                      />
-                    </div>
-                  </InspectorSection>
-                ) : null}
-
                 {!isMerch ? (
-                  <InspectorSection title='Actions'>
+                  <InspectorSection title='Actions' className='py-3 first:pt-0'>
                     <WorkInspectorActions
                       asset={current}
                       launches={workLaunches}
                       canPublish={profileId !== null}
                       disabled={!open}
                       onSharePrivately={openPrivateShare}
+                      onAskJovie={
+                        askJovieAction &&
+                        'onClick' in askJovieAction &&
+                        !askJovieAction.disabled
+                          ? askJovieAction.onClick
+                          : undefined
+                      }
+                      preview={
+                        hasVerifiedLibraryAudioPreview(current) ? (
+                          <PreviewActionButton
+                            asset={current}
+                            isPreviewPlaying={isPreviewPlaying}
+                            onTogglePreview={onTogglePreview}
+                            disabledTabIndex={closedTabIndex}
+                          />
+                        ) : null
+                      }
                     />
                   </InspectorSection>
                 ) : null}
 
                 {presentation ? (
                   <InspectorSection
-                    title='Public presentation'
+                    title='Public Presentation'
                     className='py-3 first:pt-0'
                     data-testid='work-inspector-presentation'
                   >
                     <dl>
-                      <MetadataRow
-                        label='Lifecycle'
-                        value={formatLibraryStatus(current)}
-                      />
                       <MetadataRow
                         label='Public Page'
                         value={
@@ -2546,16 +2520,19 @@ function AssetDrawer({
                         label='Visitor Action'
                         value={presentation.primaryVisitorAction}
                       />
-                      <MetadataRow
-                        label='Destinations'
-                        value={
-                          presentation.destinationState === 'connected'
-                            ? presentation.destinations.join(', ')
-                            : presentation.destinationState === 'disconnected'
-                              ? 'Disconnected'
-                              : 'Not supported'
-                        }
-                      />
+                      {/* field-once-ok: row and Destinations section are exclusive */}
+                      {showDestinationsSection ? null : (
+                        <MetadataRow
+                          label='Destinations'
+                          value={
+                            presentation.destinationState === 'connected'
+                              ? presentation.destinations.join(', ')
+                              : presentation.destinationState === 'disconnected'
+                                ? 'Disconnected'
+                                : 'Not supported'
+                          }
+                        />
+                      )}
                     </dl>
                     {contextualBlockers.length > 0 ? (
                       <div className='space-y-1 border-l-2 border-warning pl-2'>
@@ -2733,15 +2710,19 @@ function AssetDrawer({
                     {!isMerch && current.source ? (
                       <MetadataRow
                         label='Source'
-                        value={`${capitalizeFirst(current.source.provider)} · ${current.source.canonicalId}`}
+                        value={capitalizeFirst(current.source.provider)}
                       />
                     ) : null}
                   </dl>
+                  {!isMerch ? (
+                    <RightsholdersList
+                      asset={current}
+                      bundle={inspectorBundle}
+                    />
+                  ) : null}
                 </InspectorSection>
 
-                {!isMerch &&
-                isDspQuietListScope(workKind ?? 'release') &&
-                current.providers.length > 0 ? (
+                {showDestinationsSection ? (
                   <InspectorSection title='Destinations' className='py-3'>
                     <div className='space-y-0.5'>
                       {current.providers.map(provider => (
@@ -2907,6 +2888,7 @@ export function LibrarySurface({
   readonly workLaunches?: readonly WorkLaunchSummary[];
 }) {
   const router = useRouter();
+  const { chatMode: founderChatMode } = useFounderDoor();
   const searchParams = useSearchParams();
   const { mutate: syncSpotify, isPending: isSyncingSpotify } =
     useSyncReleasesFromSpotifyMutation(profileId ?? '');
@@ -3101,32 +3083,6 @@ export function LibrarySurface({
     deferredStage,
     effectiveAssets,
   ]);
-
-  const artistOptions = useMemo(
-    () => uniqueSorted(effectiveAssets.map(asset => asset.artist)),
-    [effectiveAssets]
-  );
-  const titleOptions = useMemo(
-    () => uniqueSorted(effectiveAssets.map(asset => asset.title)),
-    [effectiveAssets]
-  );
-  const statusOptions = useMemo(
-    () => uniqueSorted(effectiveAssets.map(asset => asset.status)),
-    [effectiveAssets]
-  );
-  const approvalOptions = useMemo(
-    () =>
-      uniqueSorted(
-        effectiveAssets.map(asset =>
-          formatLibraryApprovalStatus(asset.approvalStatus)
-        )
-      ),
-    [effectiveAssets]
-  );
-  const hasOptions = useMemo(
-    () => uniqueSorted(effectiveAssets.flatMap(asset => asset.assetKinds)),
-    [effectiveAssets]
-  );
 
   const selectedAsset =
     visibleAssets.find(asset => asset.id === selectedId) ?? null;
@@ -3526,6 +3482,22 @@ export function LibrarySurface({
     [profileId]
   );
 
+  const handleAskJovie = useCallback(
+    (draft: string, targetProfileId: string) => {
+      if (founderChatMode === 'ov') {
+        toast.error('Switch to Jovie, then ask about this item again.');
+        return;
+      }
+      if (
+        getCacheScope().profileId !== targetProfileId ||
+        !openChatWithDraft(draft, router)
+      ) {
+        toast.error('Chat is unavailable. Reopen this item and try again.');
+      }
+    },
+    [router, founderChatMode]
+  );
+
   const getContextMenuItems = useCallback<LibraryContextMenuBuilder>(
     asset =>
       libraryEntityActionsToContextMenuItems(
@@ -3544,12 +3516,14 @@ export function LibrarySurface({
             isSaving: lifecycleSavingIds.has(asset.id),
             onChange: handleLifecycleChange,
           },
+          onAskJovie: handleAskJovie,
           onTogglePreview: handleTogglePreview,
           onApprovalStatusChange: handleApprovalStatusChange,
         })
       ),
     [
       approvalSavingIds,
+      handleAskJovie,
       handleApprovalStatusChange,
       handleLifecycleChange,
       handleProfileVisibilityChange,
@@ -3578,50 +3552,6 @@ export function LibrarySurface({
     filters.assetKinds.size +
     filters.providers.size +
     (preset === 'all' ? 0 : 1);
-
-  const headerSearchAdapter = useMemo(
-    () =>
-      effectiveAssets.length === 0
-        ? null
-        : {
-            key: 'library',
-            pills,
-            onPillsChange: setPills,
-            artistOptions,
-            titleOptions,
-            albumOptions: [],
-            statusOptions,
-            approvalOptions,
-            hasOptions,
-            totalCount: effectiveAssets.length,
-            visibleCount: visibleAssets.length,
-            triggerLabel:
-              pills.length > 0
-                ? `Filter Work (${pills.length})`
-                : 'Filter Work',
-            ariaLabel: 'Filter work',
-            placeholder: 'Search work',
-            allowedFields: [
-              'artist',
-              'title',
-              'status',
-              'approval',
-              'has',
-            ] as const,
-          },
-    [
-      approvalOptions,
-      artistOptions,
-      effectiveAssets.length,
-      hasOptions,
-      pills,
-      statusOptions,
-      titleOptions,
-      visibleAssets.length,
-    ]
-  );
-
-  useRegisterHeaderSearch(headerSearchAdapter);
 
   const filterPanel = useMemo(
     () => (

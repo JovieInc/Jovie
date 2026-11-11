@@ -135,11 +135,9 @@ jobs:
         run: pnpm turbo build --filter=@jovie/web
         env:
           DATABASE_URL: postgresql://localhost/noop
-          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: pk_test_mock
-          CLERK_SECRET_KEY: sk_test_mock
           NEXT_DISABLE_TOOLBAR: '1'
-          NEXT_PUBLIC_CLERK_PROXY_DISABLED: '1'
-          NEXT_PUBLIC_CLERK_MOCK: '1'
+          NEXT_PUBLIC_AUTH_PROXY_DISABLED: '1'
+          NEXT_PUBLIC_AUTH_MOCK: '1'
           NEXT_PUBLIC_E2E_MODE: '1'
           VERCEL_ENV: development
           E2E_USE_TEST_AUTH_BYPASS: '1'
@@ -156,7 +154,7 @@ jobs:
         continue-on-error: true
         run: |
           set -euo pipefail
-          (cd apps/web && PORT=3100 DATABASE_URL=postgresql://localhost/noop NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_test_mock CLERK_SECRET_KEY=sk_test_mock NEXT_DISABLE_TOOLBAR=1 NEXT_PUBLIC_CLERK_PROXY_DISABLED=1 NEXT_PUBLIC_CLERK_MOCK=1 NEXT_PUBLIC_E2E_MODE=1 VERCEL_ENV=development E2E_USE_TEST_AUTH_BYPASS=1 E2E_VISUAL_CAPTURE_SYNTHETIC_AUTH=1 E2E_TEST_AUTH_PERSONA=creator-ready E2E_CLERK_USER_ID=user_test HOSTNAME=localhost NEXT_PUBLIC_APP_URL=http://127.0.0.1:3100 BETTER_AUTH_URL=http://127.0.0.1:3100 NEXT_PUBLIC_BETTER_AUTH_URL=http://127.0.0.1:3100 pnpm run start) > "$RUNNER_TEMP/pr-visual-server.log" 2>&1 &
+          (cd apps/web && PORT=3100 DATABASE_URL=postgresql://localhost/noop NEXT_DISABLE_TOOLBAR=1 NEXT_PUBLIC_AUTH_PROXY_DISABLED=1 NEXT_PUBLIC_AUTH_MOCK=1 NEXT_PUBLIC_E2E_MODE=1 VERCEL_ENV=development E2E_USE_TEST_AUTH_BYPASS=1 E2E_VISUAL_CAPTURE_SYNTHETIC_AUTH=1 E2E_TEST_AUTH_PERSONA=creator-ready E2E_CLERK_USER_ID=user_test HOSTNAME=localhost NEXT_PUBLIC_APP_URL=http://127.0.0.1:3100 BETTER_AUTH_URL=http://127.0.0.1:3100 NEXT_PUBLIC_BETTER_AUTH_URL=http://127.0.0.1:3100 pnpm run start) > "$RUNNER_TEMP/pr-visual-server.log" 2>&1 &
           echo $! > "$RUNNER_TEMP/pr-visual-server.pid"
           for _ in $(seq 1 30); do curl -fsS http://127.0.0.1:3100 >/dev/null 2>&1 && exit 0; sleep 2; done
           cat "$RUNNER_TEMP/pr-visual-server.log"
@@ -191,7 +189,7 @@ jobs:
           ROUTE_DOM_CERTIFICATION_OUTPUT_DIR: ${{ github.workspace }}/pr-visual-artifacts/route-dom-certification
         run: |
           set -euo pipefail
-          marketing_surface='^(apps/web/(app/\((marketing|home)\)/|components/(marketing|site|homepage)/|data/marketing/|styles/|tests/e2e/utils/route-dom-detector\.ts|tests/product-screenshots/route-dom-)|packages/ui/)'
+          marketing_surface='^(apps/web/(app/\((marketing|home)\)/|components/(marketing|site|homepage)/|data/marketing/|styles/|tests/e2e/utils/route-dom-[a-z-]+\.ts|tests/product-screenshots/route-dom-)|packages/ui/)'
           # JOV-7710: the composed shell main plane must read as one material.
           shell_surface='^(apps/web/(app/demo/|components/(organisms|molecules|atoms|features|shell)/|styles/|tests/e2e/utils/shell-material-detector\.ts|tests/product-screenshots/(route-dom-|shell-material-))|packages/ui/)'
           tests=
@@ -212,6 +210,25 @@ jobs:
             --workers=1 \
             --retries=0 \
             -g "deliberate-red|$tests"
+
+      # Marketing visual critic (rubric: docs/design-system/marketing-critic-rubric.json).
+      # Warn-only by construction: the script exits 0 while
+      # marketing-critic.config.json is in shadow mode, and posts findings as
+      # warning annotations plus the step summary. Every finding is recorded to
+      # pr-visual-artifacts/marketing-critic/findings.jsonl so calibrate.mjs can
+      # measure precision before any detector is promoted to blocking.
+      - name: Marketing visual critic (shadow)
+        id: marketing_critic
+        if: ${{ !cancelled() && steps.route.outputs.should_review == 'true' && steps.build.outcome == 'success' && steps.server.outcome == 'success' }}
+        env:
+          BASE_URL: http://127.0.0.1:3100
+          EXPECTED_COMMIT_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          node scripts/invariants/marketing-critic/run.mjs \
+            --changed-files "$RUNNER_TEMP/changed-files.txt" \
+            --out pr-visual-artifacts/marketing-critic \
+            --source pr
 
       # The exact-route capture (console errors, HTTP/request failures,
       # registered axe quality checks per marketing route) ran only on main
@@ -287,6 +304,28 @@ jobs:
           CAPTURE_OUTCOME: ${{ steps.routed_capture.outcome }}
           PR_VISUAL_EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: node .github/scripts/pr-visual-evidence-gate.mjs
+
+      # Dogfood judge gate (reporting only). Judge receipts live on the runner
+      # host, not in CI, so a CI deny is expected and is not a failure here;
+      # blocking enforcement is in the certification kernel, waitlist
+      # auto-accept and outbound approval. Skipped until the judge CLI lands.
+      - name: Dogfood judge gate (report)
+        if: always()
+        env:
+          JUDGE_SURFACE: pr-visual-review
+          JUDGE_DIR: scripts/dogfood-judge
+        run: |
+          if [ -f "$JUDGE_DIR/cli.mjs" ]; then
+            if out="$(node "$JUDGE_DIR/cli.mjs" gate --surface "$JUDGE_SURFACE" 2>&1)"; then
+              echo "judge gate: allow (surface $JUDGE_SURFACE)" | tee -a "$GITHUB_STEP_SUMMARY"
+            else
+              reasons="$(printf '%s' "$out" | tr '\n' ' ' | cut -c1-500)"
+              echo "judge gate: deny, reasons ${reasons} (surface $JUDGE_SURFACE)" | tee -a "$GITHUB_STEP_SUMMARY"
+            fi
+          else
+            echo "judge gate: skipped, judge CLI not present in this checkout" | tee -a "$GITHUB_STEP_SUMMARY"
+          fi
+          exit 0
 
       - name: Upload visual evidence
         id: upload

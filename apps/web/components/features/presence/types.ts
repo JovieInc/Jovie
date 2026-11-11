@@ -12,6 +12,12 @@ export type ProfilesWorkspaceFilter =
   | 'catalog'
   | 'connector';
 
+export interface PresenceRemovalTarget {
+  readonly linkId: string;
+  readonly url: string;
+  readonly version: number;
+}
+
 export interface ProfileWorkspaceSurfaceRow {
   readonly id: string;
   readonly rowType: 'surface';
@@ -27,12 +33,15 @@ export interface ProfileWorkspaceSurfaceRow {
   readonly rank: number | null;
   readonly previousRank: number | null;
   readonly lastObservedAt: string | null;
+  /** Jovie page links out to this surface; undefined = not observed. */
+  readonly linksOut?: boolean;
   readonly identityEvidence?: {
     readonly sourceCount: number;
     readonly sourceTypes: readonly string[];
     readonly confidence: number | null;
   };
   readonly identityPhoto?: PresenceIdentityPhoto;
+  readonly removalTarget?: PresenceRemovalTarget;
 }
 
 export interface ProfileWorkspaceConnectorRow {
@@ -107,3 +116,11 @@ export type PresenceCheckEvidence =
       readonly summary: string;
       readonly checkedAt: string;
     };
+
+/** Server-captured binding; app actors and authentication principals are distinct. */
+export interface PresenceRemovalPrincipal {
+  readonly appActorId: string;
+  readonly authUserId: string;
+  readonly sessionId: string;
+  readonly impersonationSubject: string | null;
+}

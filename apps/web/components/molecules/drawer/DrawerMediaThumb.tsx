@@ -2,6 +2,7 @@
 
 import Image from 'next/image';
 import { type ReactEventHandler, type ReactNode, useState } from 'react';
+import { useDirectDspImage } from '@/lib/images/direct-dsp-images';
 import { cn } from '@/lib/utils';
 
 export interface DrawerMediaThumbProps {
@@ -32,6 +33,7 @@ export function DrawerMediaThumb({
 }: DrawerMediaThumbProps) {
   const [failedSrc, setFailedSrc] = useState<string | null>(null);
   const resolvedSrc = src && src !== failedSrc ? src : null;
+  const direct = useDirectDspImage(resolvedSrc);
 
   return (
     <div
@@ -50,6 +52,7 @@ export function DrawerMediaThumb({
           alt=''
           aria-hidden='true'
           priority={priority}
+          unoptimized={direct || undefined}
           width={dimension}
           height={dimension}
           className={cn('h-full w-full object-cover', imageClassName)}

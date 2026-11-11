@@ -7,7 +7,8 @@ Summer files a JOV issue labeled `reasoning-job` (Todo) whose description carrie
 
   1. gathers the referenced context (Linear issues, GBrain pages, open P0/P1 list) itself,
      so the models run with no tools and cannot be steered into acting;
-  2. asks the proposer (Claude Code headless, Opus, subscription login) for a ranked decision;
+  2. asks the proposer (Hyperagent GLM 5.3 agent on credits; Opus 5.5 on a Hyperagent agent for
+     money/auth/release judgment jobs; never a subscription login) for a ranked decision;
   3. asks the first healthy reviewer (Grok 4.7 CLI, then the Hyperagent Grok 4.7 Reviewer) to
      attack it: missing options, wrong assumptions, a counter-ranking;
   4. reconciles deterministically: agreement is high confidence, material disagreement low;
@@ -42,6 +43,9 @@ _sys.path[:0] = [p for p in [str(_pl.Path(__file__).resolve().parent)] if p not 
 from atomic_state import atomic_write_text  # noqa: E402
 JOB_SCHEMA = "summer.reasoning-job/v1"
 RESULT_SCHEMA = "summer.reasoning-result/v1"
+ESCALATION_SCHEMA = "summer.judgment-escalation/v1"
+RECEIPT_SCHEMA = "summer.judgment-escalation-receipt/v1"
+JUDGMENT_MODEL = "claude-opus-5-5"
 PRIOR_ART_SCHEMA = "summer.business-prior-art/v1"
 RESULT_MARKER = "<!-- summer-reasoning-result:v1 -->"
 DECISION_TYPES = frozenset({"ranking", "prioritization", "strategy", "revenue-plan", "capability-gap",
@@ -136,7 +140,12 @@ def parse_job(identifier: str, title: str, description: str) -> dict:
     decision = job.get("decisionType") if job.get("decisionType") in DECISION_TYPES else "ranking"
     refs = [str(ref).strip() for ref in job.get("contextRefs") or [] if str(ref).strip()][:25]
     top_n = job.get("topN")
+    escalation = job.get("escalation")
+    if not (isinstance(escalation, dict) and escalation.get("schema") == ESCALATION_SCHEMA
+            and escalation.get("model") == JUDGMENT_MODEL):
+        escalation = None
     return {
+        "escalation": escalation,
         "identifier": identifier,
         "question": str(job.get("question") or title).strip()[:4000],
         "decisionType": decision,
@@ -510,7 +519,7 @@ def run_model(spec: dict, prompt: str, schema: dict | None, required: tuple[str,
     with tempfile.NamedTemporaryFile("w", suffix=".md", delete=False) as handle:
         handle.write(prompt)
         prompt_file = handle.name
-    values = {"prompt": prompt, "prompt_file": prompt_file, "schema": json.dumps(schema or {}),
+    values = {"agent_id": spec.get("agentId") or "", "prompt": prompt, "prompt_file": prompt_file, "schema": json.dumps(schema or {}),
               "model": spec.get("model", ""), "max_budget_usd": str(spec.get("maxBudgetUsd", 3))}
     cmd = [arg.format(**values) for arg in spec["cmd"]]
     try:
@@ -626,7 +635,7 @@ def decision_slug(job: dict, day: str) -> str:
 
 def result_record(job: dict, verdict: dict, proposal: dict | None, review: dict | None, proposer: str,
                   reviewer: str | None, slug: str | None, research: str | None = None,
-                  prior_art: dict | None = None) -> dict:
+                  prior_art: dict | None = None, escalation: dict | None = None) -> dict:
     ranking = [{"id": item.get("id"), "option": item.get("option")} for item in (proposal or {}).get("ranking", [])]
     prior_art = prior_art or {"schema": PRIOR_ART_SCHEMA, "status": "not-applicable", "precedents": []}
     sourced = [precedent.get("sourceUrl") or f"gbrain:{precedent['slug']}"
@@ -657,6 +666,7 @@ def result_record(job: dict, verdict: dict, proposal: dict | None, review: dict 
         },
         "gbrainSlug": slug,
         "completedAt": now_iso(),
+        **({"escalation": escalation} if escalation else {}),
     }
 
 
@@ -714,6 +724,15 @@ def write_gbrain(slug: str, title: str, body: str, run=lifecycle.run) -> bool:
 
 # ---------------------------------------------------------------- one job
 
+def judgment_receipt(run_out: dict, seconds: float) -> dict:
+    """summer.judgment-escalation-receipt/v1: route, model, thread and latency. Hyperagent credits are not
+    exposed over MCP, so costUsd is null (the thread's Usage tab holds it)."""
+    thread = re.search(r'"thread_id"\s*:\s*"([A-Za-z0-9_-]{1,128})"', run_out.get("raw") or "")
+    return {"schema": RECEIPT_SCHEMA, "route": "hyperagent", "model": JUDGMENT_MODEL,
+            **({"threadId": thread.group(1)} if thread else {}),
+            "latencyMs": int(seconds * 1000), "costUsd": None}
+
+
 def execute(job: dict, config: dict, context: str, state: Path, run=lifecycle.run,
             prior_art: dict | None = None) -> dict:
     """Model work only (no Linear writes). Returns {record, comment}."""
@@ -732,9 +751,18 @@ def execute(job: dict, config: dict, context: str, state: Path, run=lifecycle.ru
         return {"record": record, "comment": render_comment(record, None, None, out.get("text")),
                 "retry": not out["ok"]}
     top_n = job.get("topN") or config["defaultTopN"]
-    proposer = config["proposer"]
+    judgment = job.get("escalation") is not None
+    proposer = config["judgmentProposer"] if judgment else config["proposer"]
+    if judgment and not proposer.get("agentId"):
+        # Fail closed: no agent id means no Opus run. Summer's capped Gateway fallback takes the job.
+        verdict = reconcile(None, None)
+        verdict["reasons"].append("judgment-agent-unconfigured")
+        record = result_record(job, verdict, None, None, proposer["model"], None, None, prior_art=prior_art)
+        return {"record": record, "comment": render_comment(record, None, None), "retry": False}
+    started = time.monotonic()
     first = run_model(proposer, proposer_prompt(job, context, top_n), PROPOSAL_SCHEMA,
                       tuple(PROPOSAL_SCHEMA["required"]), run=run)
+    receipt = judgment_receipt(first, time.monotonic() - started) if judgment and first["ok"] else None
     if not first["ok"]:
         verdict = reconcile(None, None)
         verdict["reasons"].append(first["error"] or "unknown")
@@ -758,7 +786,7 @@ def execute(job: dict, config: dict, context: str, state: Path, run=lifecycle.ru
     if review is None:
         verdict["reasons"] += attempts
     record = result_record(job, verdict, proposal, review, proposer["model"], reviewer_name, slug,
-                           prior_art=prior_art)
+                           prior_art=prior_art, escalation=receipt)
     return {"record": record, "comment": render_comment(record, proposal, review), "retry": False,
             "proposal": proposal, "review": review}
 

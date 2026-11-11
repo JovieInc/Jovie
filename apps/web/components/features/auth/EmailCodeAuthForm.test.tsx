@@ -425,6 +425,16 @@ describe('EmailCodeAuthForm page alignment', () => {
     return document.querySelector('[data-auth-email-code-step="code"]');
   }
 
+  it('renders the email address as one unbreakable truncating token with a full-address title', async () => {
+    const step = await reachCodeStepWithAlign('left');
+    const address = step?.querySelector('[data-auth-email-address]');
+    expect(address?.textContent).toBe('artist@example.com');
+    expect(address?.getAttribute('title')).toBe('artist@example.com');
+    expect(address?.className).toContain('whitespace-nowrap');
+    expect(address?.className).toContain('truncate');
+    expect(address?.className).not.toContain('break-all');
+  });
+
   it('left-aligns the code step on full-page shells', async () => {
     const step = await reachCodeStepWithAlign('left');
     const intro = step?.querySelector('p');
@@ -456,5 +466,13 @@ describe('Pen sign-in polish (glm/auth-focal-polish)', () => {
     expect(cta).toHaveClass('w-full');
     expect(cta.className).not.toMatch(/\bh-8\b/);
     expect(cta.className).not.toMatch(/\bmin-h-8\b/);
+  });
+
+  it('draws Send sign-in code as the 28px Pen oaz9c pill inside its tap layer', () => {
+    render(<EmailCodeAuthForm mode='sign-in' redirectUrl='/start' />);
+    const cta = screen.getByRole('button', { name: 'Send sign-in code' });
+    expect(cta).toHaveClass('h-7');
+    expect(cta).toHaveClass('min-h-7');
+    expect(cta).not.toHaveClass('my-2');
   });
 });

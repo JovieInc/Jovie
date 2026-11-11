@@ -28,7 +28,7 @@ Create agent worktrees with `scripts/agent/worktree-new <dir> -b <branch>`: it h
 
 | Tool | Required Version | Enforcement |
 |------|------------------|-------------|
-| **Node.js** | **24.x** (24.22.1+) | `.nvmrc`, `package.json` engines |
+| **Node.js** | **24.x** (24.22.2+) | `.nvmrc`, `package.json` engines |
 | **pnpm** | **9.15.9** (`packageManager`); engines `>=9.15.4 <10` | `package.json` |
 | **Turbo** | 2.8+ | Root devDependencies |
 
@@ -37,7 +37,7 @@ AI agents frequently default to Node 18/20/22 which **will fail** or cause subtl
 ### Pre-Flight Checklist
 
 ```bash
-node --version  # Expected: v24.22.1 or higher
+node --version  # Expected: v24.22.2 or higher
 pnpm --version  # Expected: 9.15.9
 
 # If wrong:
@@ -110,7 +110,7 @@ set -euo pipefail
 curl -fsSL https://fnm.vercel.app/install | bash
 export PATH="$HOME/.local/share/fnm:$PATH"
 eval "$(fnm env)"
-fnm install 24.22.1 && fnm use 24.22.1
+fnm install 24.22.2 && fnm use 24.22.2
 corepack enable && corepack prepare pnpm@9.15.9 --activate
 
 # 2. Doppler CLI
@@ -322,11 +322,11 @@ pnpm typecheck
 
 Three workspaces, each on a different machine, with a clear separation of concerns:
 
-- **Houston** (this repo, MacBook Pro 32 GB) — the **code** workspace. Default profile: `coder`. Claude Code, Codex CLI, Conductor worktrees, and Hermes issue runners all live here. PRs originate here.
+- **Houston** (this repo, MacBook Pro 32 GB) — the **code** workspace. Default profile: `coder`. Claude Code, Codex CLI, and Conductor worktrees live here. PRs originate here. Hermes issue runners are retired.
 - **Raleigh** (`/Users/timwhite/conductor/workspaces/ops/raleigh`) — the **ops / FounderOS** workspace. Source of truth for `company_state.md`, daily briefings, and task routing.
-- **Hermes-Air** (MacBook Air 16 GB, dedicated): since 2026-09-29 the fleet's always-on **Mac lane**. It hosts a self-hosted macOS Actions runner (`jovie-mac`) that runs Mac-first CI lanes with a hosted fallback and a nightly Mac dogfood verifier that files `mac-dogfood` Linear issues. It is a gbrain client of the ops Mac, and the Hermes gateway is retired. **Does not author code unattended.** See [`.claude/rules/hermes-air.md`](hermes-air.md) and [`docs/HERMES_AIR.md`](../../docs/HERMES_AIR.md).
+- **Mac lane** (MacBook Air 16 GB, dedicated): since 2026-09-29 the fleet's always-on Mac lane. It hosts a self-hosted macOS Actions runner (`jovie-mac`) that runs Mac-first CI lanes with a hosted fallback and a nightly Mac dogfood verifier that files `mac-dogfood` Linear issues. It is a gbrain client of the ops Mac. The Hermes gateway is retired. **Does not author code unattended.** Contract: [`.claude/rules/hermes-air.md`](hermes-air.md). `docs/HERMES_AIR.md` is a retired pointer.
 
-The contract between Hermes-Air and Houston is Linear issues. The contract between Hermes-Air and Raleigh is gbrain over Tailscale. Keep code changes in Houston; keep orchestration on the Air; keep company-state in Raleigh.
+The Air files Mac dogfood issues in Linear. It does not orchestrate JOV work. Code changes stay in Houston. Company state stays in Raleigh.
 
 ## Branch Switches And External Editors
 

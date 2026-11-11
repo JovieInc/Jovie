@@ -14,6 +14,7 @@ import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
+import { runInNewContext } from 'node:vm';
 import {
   evaluateSourceAdmission,
   runSourceAdmission,
@@ -25,7 +26,7 @@ test('trusted source-read guards reject a deleted test on an old head and execut
   const workflow = load(
     readFileSync('.github/workflows/source-validation.yml', 'utf8')
   );
-  const step = workflow.jobs.deterministic.steps.find(
+  const step = workflow.jobs.unit.steps.find(
     step =>
       step.name === 'Validate disk-read source contracts from trusted base'
   );
@@ -141,7 +142,7 @@ test('trusted source-read guards see files main added after the PR branched, and
   const workflow = load(
     readFileSync('.github/workflows/source-validation.yml', 'utf8')
   );
-  const step = workflow.jobs.deterministic.steps.find(
+  const step = workflow.jobs.unit.steps.find(
     step =>
       step.name === 'Validate disk-read source contracts from trusted base'
   );
@@ -1350,9 +1351,10 @@ test('reuse skips every proof step except body-dependent and exact-head evidence
   assert.equal(runtime.if, reuseStep.if);
   assert.equal(reuseStep.id, 'reuse');
   // Base retargets change the compared tree, so they never reuse a proof.
+  // Label changes leave the tree untouched, so they reuse it too (#23748).
   assert.equal(
     reuseStep.if,
-    "${{ github.event.action == 'edited' && !github.event.changes.base }}"
+    "${{ (github.event.action == 'edited' && !github.event.changes.base) || github.event.action == 'labeled' || github.event.action == 'unlabeled' }}"
   );
   for (const job of ['security', 'migration', 'coverage', 'unit']) {
     const [jobClient, jobPrime, jobRuntime, first, ...rest] =
@@ -1362,9 +1364,70 @@ test('reuse skips every proof step except body-dependent and exact-head evidence
     assert.deepEqual(jobRuntime, runtime, job);
     assert.equal(first.id, 'reuse', job);
     assert.ok(workflow.jobs[job].permissions.actions === 'read', job);
-    // Coverage's route-budget build and the unit lanes narrow further to the
-    // diff they can affect; none may run on a reused metadata-only edit.
-    for (const step of rest)
+    // Coverage/unit lanes and the trusted Dependabot handoff narrow further;
+    // none may run on a reused metadata-only edit. Check every handoff case
+    // rather than accepting an arbitrary condition after the reuse predicate.
+    for (const step of rest) {
+      if (job === 'unit') {
+        const guardStart = rest.findIndex(
+          item => item.id === 'source_guard_merge'
+        );
+        if (rest.indexOf(step) >= guardStart) {
+          assert.match(step.if, /matrix\.shard == '4\/4'/, step.name);
+          continue; // Executable matrix/cleanup coverage lives in the generation suite.
+        }
+        if (
+          [
+            'Checkout exact source head for unit and merged guard proofs',
+            'Fetch head and base history only',
+          ].includes(step.name)
+        ) {
+          assert.equal(step.if, `${gate} || matrix.shard == '4/4'`);
+          continue;
+        }
+        if (
+          ['Setup Node.js and pnpm', 'Setup Playwright warm path'].includes(
+            step.name
+          )
+        ) {
+          assert.match(
+            step.if,
+            /^matrix\.shard == '4\/4' \|\| \(steps\.reuse\.outputs\.reuse != 'true' && /
+          );
+          continue; // Full truth table covers reused/no-diff cases.
+        }
+      }
+      if (
+        job === 'security' &&
+        [
+          'Mint dependency review read token',
+          'Review added and upgraded dependencies',
+        ].includes(step.name)
+      ) {
+        assert.equal(
+          step.if,
+          `${gate} && (github.event.pull_request.user.login != 'dependabot[bot]' || github.event.pull_request.base.ref != 'main')`
+        );
+        for (const reuse of ['true', 'false'])
+          for (const login of ['dependabot[bot]', 'human'])
+            for (const ref of ['main', 'integration/test']) {
+              const actual = runInNewContext(step.if, {
+                steps: { reuse: { outputs: { reuse } } },
+                github: {
+                  event: { pull_request: { user: { login }, base: { ref } } },
+                },
+              });
+              const expected =
+                reuse !== 'true' &&
+                !(login === 'dependabot[bot]' && ref === 'main');
+              assert.equal(
+                actual,
+                expected,
+                `${step.name}: reuse=${reuse}, author=${login}, base=${ref}`
+              );
+            }
+        continue;
+      }
       assert.ok(
         step.if === gate ||
           (job === 'coverage' &&
@@ -1372,12 +1435,12 @@ test('reuse skips every proof step except body-dependent and exact-head evidence
           (job === 'unit' && step.if?.startsWith(`${gate} && `)),
         `${job}: ${step.name ?? step.uses}`
       );
+    }
   }
   const always = [
     // The disk-read guards run on every edit and can launch Chromium, so
     // their browser setup must run whenever they do (#21956, 2026-10-20).
     'Setup Playwright (Chromium)',
-    'Validate disk-read source contracts from trusted base',
     'Validate customer changelog decision from trusted base',
     'Measure actual installed source dependency graph',
     'Preserve exact source dependency evidence',
@@ -1409,10 +1472,7 @@ test('reuse skips every proof step except body-dependent and exact-head evidence
   // never broader than it.
   const names = deterministic.map(step => step.name);
   const setup = names.indexOf('Setup Playwright (Chromium)');
-  for (const name of [
-    'Validate disk-read source contracts from trusted base',
-    'Run deterministic source contract',
-  ]) {
+  for (const name of ['Run deterministic source contract']) {
     assert.ok(setup >= 0 && names.indexOf(name) > setup, name);
     const step = deterministic[names.indexOf(name)];
     assert.ok(

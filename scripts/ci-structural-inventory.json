@@ -70,6 +70,12 @@
       "kind": "suite"
     },
     {
+      "key": "node --test --experimental-test-coverage --test-coverage-include=.github/scripts/staging-supersession-policy.mjs --test-",
+      "part": "operationsParts",
+      "seconds": 1.2,
+      "kind": "suite"
+    },
+    {
       "key": "node --test --experimental-test-coverage --test-coverage-include=scripts/security/deepsec-policy.mjs --test-coverage-inc",
       "part": "operationsParts",
       "seconds": 0.7,
@@ -304,15 +310,21 @@
       "kind": "pr-cheap-scan"
     },
     {
+      "key": "pnpm design:no-dead-ends:check",
+      "part": "webParts",
+      "seconds": 1.2,
+      "kind": "pr-cheap-scan"
+    },
+    {
       "key": "pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts tests/unit/chat/mobile-chat-certification.test.ts",
       "part": "webParts",
       "seconds": 5.0,
       "kind": "suite"
     },
     {
-      "key": "pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/component-ship-gate.test.mjs",
+      "key": "pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/component-ship-gate.test.mjs lib/__tests__/",
       "part": "webParts",
-      "seconds": 4.2,
+      "seconds": 4.4,
       "kind": "suite"
     },
     {

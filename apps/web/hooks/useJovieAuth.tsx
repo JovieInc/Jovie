@@ -15,6 +15,10 @@ import {
   type JovieUser,
   toJovieUser,
 } from '@/lib/auth/jovie-user';
+import {
+  isDesktopShellDocument,
+  resolveDesktopSignOutRedirect,
+} from '@/lib/desktop/desktop-sign-out';
 import { applyCacheScope } from '@/lib/queries/cache-isolation';
 
 // ============================================================================
@@ -101,7 +105,10 @@ export async function signOut(options?: JovieSignOutOptions): Promise<void> {
   await authClient.signOut().catch(() => undefined);
   clearLegacyClerkSessionMarker();
 
-  const redirectUrl = options?.redirectUrl ?? '/signin';
+  const redirectUrl = resolveDesktopSignOutRedirect(
+    options?.redirectUrl ?? '/signin',
+    isDesktopShellDocument()
+  );
   if (typeof globalThis.location?.assign === 'function') {
     globalThis.location.assign(redirectUrl);
   }
@@ -224,8 +231,7 @@ export function JovieAuthValuesProvider({
 
 /**
  * Safe-defaults provider for mock/DB-less mode: build-time rendering, tests,
- * and bypassed-auth origins (keyed off NEXT_PUBLIC_AUTH_MOCK, with a
- * one-release NEXT_PUBLIC_CLERK_MOCK fallback). Everything renders
+ * and bypassed-auth origins (keyed off NEXT_PUBLIC_AUTH_MOCK). Everything renders
  * signed-out and auth UI stays hidden.
  */
 export function JovieAuthDefaultsProvider({

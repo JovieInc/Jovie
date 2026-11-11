@@ -716,7 +716,7 @@ describe('baked runner prerequisite contract', () => {
       readonly devDependencies: Readonly<Record<string, string>>;
     };
     expect(requirements.nodeMajor).toBe(24);
-    expect(requirements.nodeMinimum).toBe('24.22.1');
+    expect(requirements.nodeMinimum).toBe('24.22.2');
     expect(requirements.nodeMinimum).toBe(
       readFileSync(resolve(repoRoot, '.nvmrc'), 'utf8').trim()
     );
@@ -738,7 +738,7 @@ describe('baked runner prerequisite contract', () => {
       'sha256:f546db5932b903c81cf269a712dad679fdf139dc08b7676c08f391a11258de5e'
     );
     expect(runnerDockerfile).toContain(
-      '6c172a9ab6718f7b801fb5a7bd486af2ee5e32758086a04b84fcce2aa77095e6'
+      '48cc0e21e048790e54c0cf5749c2725005313d652651c40b7a21feb9697aaf75'
     );
     expect(runnerDockerfile).toContain('sha256sum --check --strict');
     expect(runnerDockerfile).not.toMatch(/curl[\s\S]*?\|\s*tar/);
@@ -748,7 +748,7 @@ describe('baked runner prerequisite contract', () => {
     expect(runnerDockerfile).toContain('COREPACK_HOME=/opt/corepack');
     expect(runnerDockerfile).toContain('su -s /bin/bash runner -c');
     expect(runnerDockerfile).toContain(
-      '/opt/hostedtoolcache/node/24.22.1/x64/bin/pnpm --version'
+      '/opt/hostedtoolcache/node/24.22.2/x64/bin/pnpm --version'
     );
     expect(
       runnerDockerfile.indexOf('FROM runner-base\n\n# Corepack')
@@ -812,9 +812,18 @@ describe('baked runner prerequisite contract', () => {
       '#!/usr/bin/env bash\nset -euo pipefail\nif [[ "${1:-}" == "cat-file" ]]; then\n  printf \'1\\n\' >> "${GIT_CAT_FILE_COUNT}"\nfi\nexec "${REAL_GIT}" "$@"\n'
     );
     chmodSync(gitWrapper, 0o755);
+    const environment = {
+      ...process.env,
+      GIT_INDEX_FILE: resolve(directory, 'index'),
+    };
+    execFileSync('git', ['read-tree', 'HEAD'], {
+      cwd: repoRoot,
+      env: environment,
+    });
     const buildTree = execFileSync('git', ['write-tree'], {
       cwd: repoRoot,
       encoding: 'utf8',
+      env: environment,
     }).trim();
     expect(buildTree).toMatch(/^[0-9a-f]{40}$/);
     const listedPaths = execFileSync(
