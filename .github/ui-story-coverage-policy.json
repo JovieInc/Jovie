@@ -466,23 +466,7 @@
       "linearIssue": "JOV-8847"
     },
     {
-      "path": "apps/web/components/jovie/components/ChatPresenceArtifactCard.tsx",
-      "linearIssue": "JOV-8847"
-    },
-    {
       "path": "apps/web/components/jovie/components/ChatProvidersRegistrar.tsx",
-      "linearIssue": "JOV-8847"
-    },
-    {
-      "path": "apps/web/components/jovie/components/ChatStepLimitAffordance.tsx",
-      "linearIssue": "JOV-8847"
-    },
-    {
-      "path": "apps/web/components/jovie/components/ChipTray.tsx",
-      "linearIssue": "JOV-8847"
-    },
-    {
-      "path": "apps/web/components/jovie/components/FileAttachmentChip.tsx",
       "linearIssue": "JOV-8847"
     },
     {
