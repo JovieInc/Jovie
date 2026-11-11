@@ -22,6 +22,12 @@ vi.mock('@/lib/db', () => ({
   },
 }));
 
+// The customer-voice handoff runs detached after capture and queries the db
+// on its own; left live, it can land in a later test's select assertions.
+vi.mock('@/lib/customer-voice/after-response', () => ({
+  runAfterResponse: vi.fn(),
+}));
+
 const ctx = {
   pathname: '/app',
   userAgent: 'test-agent',
