@@ -116,6 +116,16 @@ class QueueEvidenceTest(unittest.TestCase):
         self.assertEqual(route['evidenceOwner']['runId'], RUN)
         self.assertEqual(route['evidenceOwner']['attempt'], 1)
 
+    def test_native_status_contexts_are_green_but_pending_or_failed_contexts_are_not(self):
+        pr = {**feature(), 'statusCheckRollup': [
+            {'__typename': 'CheckRun', 'name': 'Source Validation', 'status': 'COMPLETED', 'conclusion': 'SUCCESS'},
+            {'__typename': 'StatusContext', 'context': 'jovie-queue-failure-hold/v1', 'state': 'SUCCESS'}]}
+        self.assertEqual(self.route(pr)['action'], 'alias-graduation-owner')
+        for state in ('PENDING', 'EXPECTED', 'ERROR', 'FAILURE'):
+            with self.subTest(state=state):
+                pr['statusCheckRollup'][1]['state'] = state
+                self.assertNotEqual((self.route(pr) or {}).get('action'), 'alias-graduation-owner')
+
     def test_stale_unknown_and_mixed_queue_evidence_cannot_route_around_product_work(self):
         variants = [
             ('status head', lambda: self.status.update(sha='a' * 40)),

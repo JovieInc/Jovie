@@ -145,7 +145,8 @@ def classify_repair(host, pr, read_logs, classify, read, repository):
         if route.get('checks') or any(str(check.get('conclusion') or '').upper() in _RED
                                      for check in pr.get('statusCheckRollup') or []):
             return route
-        if any(str(check.get('conclusion') or '').upper() not in {'SUCCESS', 'SKIPPED', 'NEUTRAL'}
+        if any(str(check.get('state') if check.get('__typename') == 'StatusContext'
+                   else check.get('conclusion') or '').upper() not in {'SUCCESS', 'SKIPPED', 'NEUTRAL'}
                for check in pr.get('statusCheckRollup') or []):
             return route
         if not pr.get('queueFailure') and 'dequeued' not in (pr.get('eventKinds') or []):
