@@ -125,7 +125,7 @@
     "apps/web/components/features/dashboard/molecules/ProfilePaySurface.tsx": "a11y,ds-owner,states,tests,tokens",
     "apps/web/components/features/dashboard/molecules/useEmailSignatureMenuAction.tsx": "a11y,states,tests",
     "apps/web/components/features/dashboard/NavigationDestinationReady.tsx": "a11y,states",
-    "apps/web/components/features/dashboard/organisms/DashboardFeedbackModal.tsx": "a11y,frontend-rules,states",
+    "apps/web/components/features/dashboard/organisms/DashboardFeedbackModal.tsx": "frontend-rules",
     "apps/web/components/features/dashboard/organisms/DashboardHeader.tsx": "a11y,states",
     "apps/web/components/features/dashboard/organisms/DashboardMobileTabs.tsx": "a11y,states,tests",
     "apps/web/components/features/dashboard/organisms/LiquidGlassMenu.tsx": "a11y,ds-owner,frontend-rules,states,tokens",
@@ -387,7 +387,6 @@
     "apps/web/components/shell/TasksRouteSkeleton.tsx": "a11y,states",
     "apps/web/components/shell/useChatThreadContextMenu.tsx": "a11y,states",
     "apps/web/components/site/theme-toggle/ThemeToggleSegmented.tsx": "a11y,ds-owner,states",
-    "apps/web/components/UnavailablePage.tsx": "a11y,states,tests",
-    "packages/ui/atoms/common-dropdown-renderer.tsx": "a11y,frontend-rules,states"
+    "apps/web/components/UnavailablePage.tsx": "a11y,states,tests"
   }
 }

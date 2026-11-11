@@ -563,6 +563,10 @@
     },
     "apps/web/components/marketing/MarketingHero.tsx": {
       "permission-denied": "The hero renders public copy and links with no gated action or permission input. The detector matched the word permission in the logos prop's doc comment, which is about a page's permission to show distributor logos, decided by the caller."
+    },
+    "packages/ui/atoms/common-dropdown-renderer.tsx": {
+      "offline": "The renderer never fetches or submits: it draws the search field and the rows its owner passes, and a submenu shows loading only when the caller sets isLoading (LoadingItems), so lost connectivity reaches it only as caller state.",
+      "permission-denied": "The renderer has no permission input or gated action; the detector matched role='menuitem' on the loading and empty rows. A caller that withholds a submenu passes disabled, which Radix renders as an inert trigger."
     }
   }
 }
