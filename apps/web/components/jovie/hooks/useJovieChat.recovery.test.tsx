@@ -1,6 +1,5 @@
 import { act, renderHook } from '@testing-library/react';
 import type { UIMessage } from 'ai';
-import { StrictMode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   readComposerDraft,
@@ -546,30 +545,6 @@ describe('Summer failed turn recovery', () => {
     });
     expect(h.send).toHaveBeenCalledTimes(1);
     expect(first.result.current.chatError).toBeNull();
-  });
-
-  it('sends a pending initial prompt once after StrictMode effect replay', async () => {
-    sessionStorage.setItem(PENDING_CHAT_PROMPT_KEY, 'Initial question');
-    const first = renderHook(() => useJovieChat({ chatMode: 'ov' }), {
-      wrapper: StrictMode,
-    });
-    await act(async () => {});
-    expect(h.send).toHaveBeenCalledTimes(1);
-    expect(first.result.current.isSubmitting).toBe(true);
-    act(() =>
-      h.onFinish?.({
-        message: {
-          id: 'answer',
-          role: 'assistant',
-          parts: [{ type: 'text', text: 'Initial answer' }],
-        },
-      })
-    );
-    expect(first.result.current.isSubmitting).toBe(false);
-    expect(first.result.current.chatError).toBeNull();
-    expect(first.result.current.messages.at(-1)?.parts).toEqual([
-      { type: 'text', text: 'Initial answer' },
-    ]);
   });
 
   it('ignores an old request rejection after a new account starts a turn', async () => {

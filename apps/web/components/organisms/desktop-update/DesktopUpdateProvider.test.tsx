@@ -6,6 +6,8 @@
  * workspace switch (which remounts this provider) cannot re-present it.
  */
 
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
 import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -55,6 +57,19 @@ afterEach(() => {
 });
 
 describe('DesktopUpdateProvider', () => {
+  it('keeps the update modal module out of the provider graph (JOV-12023)', () => {
+    // #24725 named this the remaining eager desktop edge; the modal must stay
+    // a deferred import so browser initial chunks never carry it.
+    const source = readFileSync(
+      path.join(__dirname, 'DesktopUpdateProvider.tsx'),
+      'utf8'
+    );
+    expect(source).not.toMatch(
+      /import \{ DesktopUpdateModal \} from '\.\/DesktopUpdateModal'/
+    );
+    expect(source).toMatch(/import\('\.\/DesktopUpdateModal'/);
+  });
+
   it('renders nothing update-related on web (no bridge)', async () => {
     render(
       <DesktopUpdateProvider>

@@ -9,6 +9,7 @@ import userEvent from '@testing-library/user-event';
 import { useState } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { OVERLAY_LOCK_ATTR } from '@/lib/a11y/overlay-interaction-lock';
+import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import { OverlayInteractionGuard } from './OverlayInteractionGuard';
 
 afterEach(() => {
@@ -168,7 +169,9 @@ describe('OverlayInteractionGuard', () => {
     const onSend = vi.fn();
     document.body.style.pointerEvents = 'none';
 
-    render(<WorkspaceFixture onAttach={onAttach} onSend={onSend} />);
+    const { container } = render(
+      <WorkspaceFixture onAttach={onAttach} onSend={onSend} />
+    );
 
     await waitFor(() => {
       expect(document.body.style.pointerEvents).not.toBe('none');
@@ -181,6 +184,7 @@ describe('OverlayInteractionGuard', () => {
     expect(onAttach).toHaveBeenCalledTimes(1);
     await user.click(screen.getByRole('button', { name: 'Send' }));
     expect(onSend).toHaveBeenCalledTimes(1);
+    await expectNoA11yViolations(container);
   });
 
   it('menu → dialog → close restores row selection and composer interaction', async () => {

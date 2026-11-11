@@ -154,11 +154,17 @@ export function useHudShippingStateQuery(kioskToken: string | null) {
         requestController.abort();
       }, SHIPPING_STATE_REQUEST_TIMEOUT_MS);
       let response: Response;
+      let payload: unknown = null;
       try {
         response = await fetch(url, {
           signal: requestController.signal,
           cache: 'no-store',
         });
+        try {
+          payload = await response.json();
+        } catch (error) {
+          if (requestController.signal.aborted) throw error;
+        }
       } catch {
         if (signal.aborted) {
           throw new DOMException('Aborted', 'AbortError');
@@ -179,12 +185,6 @@ export function useHudShippingStateQuery(kioskToken: string | null) {
         signal.removeEventListener('abort', abortRequest);
       }
 
-      let payload: unknown = null;
-      try {
-        payload = await response.json();
-      } catch {
-        payload = null;
-      }
       if (signal.aborted) {
         throw new DOMException('Aborted', 'AbortError');
       }

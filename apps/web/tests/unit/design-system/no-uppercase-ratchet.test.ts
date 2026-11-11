@@ -4,6 +4,7 @@ import { dirname, join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { evaluateShrinkOnlyCount } from '@/lib/design/shrink-only-count-ratchet';
+import { countForcedCapsInLine } from '../../../../../scripts/lib/design-rules/forced-caps.mjs';
 
 /**
  * All-caps UI text ratchet (ASR-022, Tim 2026-11-08: "caps lock should be
@@ -18,8 +19,10 @@ import { evaluateShrinkOnlyCount } from '@/lib/design/shrink-only-count-ratchet'
  * Artist and release names are data and keep the artist's own spelling; this
  * ratchet only bans the UI forcing text into capitals.
  *
- * Same shrink-only policy and merge-base attribution as
- * linear-namespace-ratchet.test.ts.
+ * The token pattern and comment skip come from the one shared rule,
+ * scripts/lib/design-rules/forced-caps.mjs, which the component certificate
+ * and the rendered-page check also use. Same shrink-only policy and
+ * merge-base attribution as linear-namespace-ratchet.test.ts.
  */
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -27,24 +30,14 @@ const WEB_ROOT = join(__dirname, '..', '..', '..');
 const REPO_ROOT = join(WEB_ROOT, '..', '..');
 const BASELINE_PATH = join(__dirname, 'no-uppercase.baseline.json');
 
-const UPPERCASE_TOKEN = /(?<![\w-])uppercase(?![\w-])/g;
 const SOURCE_EXT = /\.(tsx|ts|css)$/;
 const SKIP_DIRS = new Set(['node_modules', '.next', '.turbo', 'generated']);
 const SCANNED_ROOTS = ['app', 'components', 'styles'] as const;
 const NON_UI_FILE = /\.(test|spec|stories)\.[tj]sx?$/;
 
-function isCommentLine(line: string): boolean {
-  const trimmed = line.trim();
-  return (
-    trimmed.startsWith('*') ||
-    trimmed.startsWith('//') ||
-    trimmed.startsWith('/*')
-  );
-}
-
+/** The shared all-caps rule (scripts/lib/design-rules/forced-caps.mjs). */
 export function countUppercaseInLine(line: string): number {
-  if (isCommentLine(line)) return 0;
-  return (line.match(UPPERCASE_TOKEN) ?? []).length;
+  return countForcedCapsInLine(line);
 }
 
 function walk(dir: string, out: string[]): void {

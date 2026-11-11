@@ -29,3 +29,14 @@ export const ErrorState: Story = {
     error: true,
   },
 };
+
+export const RtlLayout: Story = {
+  args: {
+    value: '07151990',
+  },
+  render: args => (
+    <div dir='rtl'>
+      <BirthdayInput {...args} />
+    </div>
+  ),
+};

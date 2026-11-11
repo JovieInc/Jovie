@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, it } from 'node:test';
@@ -126,13 +126,15 @@ describe('stat-claims ratchet', () => {
     );
     assert.match(errors[0], /Bind the number to a proof stat/);
   });
-  it('fails a stale baseline entry (it only shrinks)', () => {
-    const errors = evaluate(
-      { unbound: {}, bound: {} },
-      { 'f.md': { count_claim: 1 } },
+  it('passes a removed claim without a baseline edit, and still fails growth', () => {
+    const baseline = { 'f.md': { count_claim: 2 } };
+    assert.deepEqual(evaluate({ unbound: {}, bound: {} }, baseline, ids), []);
+    const grown = evaluate(
+      { unbound: { 'f.md': { count_claim: 3 } }, bound: {} },
+      baseline,
       ids
     );
-    assert.match(errors[0], /only shrinks/);
+    assert.match(grown[0], /3 hand-written count_claim claim\(s\), baseline 2/);
   });
   it('fails a binding to an unregistered stat', () => {
     const errors = evaluate(
@@ -168,5 +170,25 @@ describe('stat-claims ratchet', () => {
     assert.equal(main([], REPO), 0);
     assert.equal(main(['--json'], REPO), 0);
     assert.ok(BASELINE_PATH.endsWith('baseline.json'));
+  });
+});
+
+describe('stat-claims --tighten', () => {
+  it('lowers stale entries but still fails growth and never adopts it', () => {
+    const real = JSON.parse(readFileSync(BASELINE_PATH, 'utf8'));
+    const [[file, counts]] = Object.entries(real);
+    const [id] = Object.keys(counts);
+    const path = join(mkdtempSync(join(tmpdir(), 'stat-claims-')), 'b.json');
+    writeFileSync(
+      path,
+      JSON.stringify({ ...real, [file]: { ...counts, [id]: counts[id] + 2 } })
+    );
+    assert.equal(main(['--tighten'], REPO, path), 0);
+    assert.deepEqual(JSON.parse(readFileSync(path, 'utf8')), real);
+
+    const { [file]: _dropped, ...withoutFile } = real;
+    writeFileSync(path, JSON.stringify(withoutFile));
+    assert.equal(main(['--tighten'], REPO, path), 1);
+    assert.deepEqual(JSON.parse(readFileSync(path, 'utf8')), withoutFile);
   });
 });

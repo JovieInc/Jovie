@@ -36,10 +36,11 @@ export function ReleasePage({
       <span className='hv3-rp__art'>
         <Cover src={PAGE.src} size={300} eager={eager} />
       </span>
-      <h4 className='hv3-rp__title text-balance'>
+      {/* h3: the page sits under its chapter's h2 (axe heading-order). */}
+      <h3 className='hv3-rp__title text-balance'>
         <Anchor id={titleAnchor} className='hv3-anchor--before' />
         {PAGE.title}
-      </h4>
+      </h3>
       <p className='hv3-rp__artist'>{PAGE.artist}</p>
       <ul className='hv3-rp__list'>
         {RELEASE_PAGE_SERVICES.map(glyph => (

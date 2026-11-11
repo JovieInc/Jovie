@@ -1,5 +1,18 @@
 {
   "schemaVersion": 1,
   "note": "Surviving mutants proven behavior-equivalent. Each entry needs a fingerprint from the sweep's survivor task (16 hex chars, line-drift stable) and a justification of at least 20 characters. Suppressed mutants leave the denominator of the module score. Do not use this to hide a missing test.",
-  "entries": []
+  "entries": [
+    {
+      "file": "lib/chat/open-chat-with-prompt.ts",
+      "fingerprint": "a7dd781bfff6488b",
+      "reason": "In browser environments the condition is already true. Without window, forcing the storage branch throws a TypeError at globalThis.window.sessionStorage inside the existing catch. Pending draft clearing and the subsequent router.push call, including its return/throw behavior, remain unchanged. Independently verified against browser, SSR, storage-failure and router-failure scenarios for JOV-12190.",
+      "addedBy": "JOV-12190"
+    },
+    {
+      "file": "lib/chat/open-chat-with-prompt.ts",
+      "fingerprint": "94e4c7bb2c9fd078",
+      "reason": "In browser environments the condition is already false. Without window, skipping the early null return throws a TypeError at globalThis.window.sessionStorage inside the existing catch, which returns the same null. Neither path changes storage or pending draft state. Independently verified against browser, SSR and storage-failure scenarios for JOV-12190.",
+      "addedBy": "JOV-12190"
+    }
+  ]
 }

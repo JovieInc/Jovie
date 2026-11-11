@@ -1,3 +1,4 @@
+import json
 import sys
 import subprocess
 from types import SimpleNamespace
@@ -9,11 +10,146 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "lanes"))
 import fix_red_classes as classes  # noqa: E402
 import lane_runner as lane  # noqa: E402
+import fix_red_source_edits as edits  # noqa: E402
 
 
 def pr(*names, merge="BLOCKED"):
     return {"mergeStateStatus": merge, "statusCheckRollup": [{"name": n, "conclusion": "FAILURE"} for n in names]
             + [{"name": "PR Ready", "conclusion": "FAILURE"}, {"name": "ok", "conclusion": "SUCCESS"}]}
+
+
+class AdditiveCertificateWaiversTest(unittest.TestCase):
+    REL = "docs/design-system/component-certification.json"
+
+    def setUp(self):
+        self.base = {"policy": {"mutationMin": 80}, "gates": {},
+                     "waivers": {"existing.tsx": {"offline": "No network"}}}
+        self.ours = json.loads(json.dumps(self.base))
+        self.theirs = json.loads(json.dumps(self.base))
+        self.ours["waivers"]["head.tsx"] = {"empty": "No collection"}
+        self.theirs["waivers"]["main.tsx"] = {"offline": "No network"}
+
+    def resolve(self, rel=None, blobs=None):
+        values = blobs or [json.dumps(value) for value in (self.base, self.ours, self.theirs)]
+        def sh(args, **kwargs):
+            return SimpleNamespace(returncode=0, stdout=values[int(args[-1][1]) - 1])
+        return edits.resolve_additive_certificate_waivers(Path("."), rel or self.REL, sh)
+
+    def test_preserves_main_order_then_head_only_waivers(self):
+        result = json.loads(self.resolve())
+        self.assertEqual(list(result["waivers"]), ["existing.tsx", "main.tsx", "head.tsx"])
+        self.assertEqual(result["waivers"]["head.tsx"], self.ours["waivers"]["head.tsx"])
+        self.assertEqual(result["policy"], self.base["policy"])
+
+    def test_refuses_edits_deletions_conflicting_additions_and_other_paths(self):
+        for mutate in (
+            lambda: self.ours["policy"].update(mutationMin=0),
+            lambda: self.ours["waivers"].pop("existing.tsx"),
+            lambda: self.theirs["waivers"]["existing.tsx"].update(offline="Changed"),
+            lambda: self.theirs["waivers"].update({"head.tsx": {"empty": "Different"}}),
+            lambda: self.ours["waivers"].update({"head.tsx": []}),
+        ):
+            self.setUp()
+            mutate()
+            self.assertIsNone(self.resolve())
+        self.assertIsNone(self.resolve("generated.json"))
+        self.assertIsNone(self.resolve(blobs=['{"waivers":{},"waivers":{}}'] * 3))
+        self.assertIsNone(self.resolve(blobs=["not JSON"] * 3))
+
+    def test_real_git_append_conflict_is_repaired_through_existing_machine(self):
+        debt_rel = "docs/design-system/cert-screens.json"
+        debt_base = {"schema": "jovie.cert-screens/v1", "debt": {
+            "kept.tsx": "a11y,states",
+            "drop-head.tsx": "states",
+            "also.tsx": "tests",
+            "drop-main.tsx": "a11y",
+        }}
+        debt_ours = json.loads(json.dumps(debt_base))
+        debt_theirs = json.loads(json.dumps(debt_base))
+        del debt_ours["debt"]["drop-head.tsx"]
+        del debt_theirs["debt"]["drop-main.tsx"]
+        with tempfile.TemporaryDirectory() as scratch:
+            work = Path(scratch)
+            def sh(args, **kwargs):
+                return subprocess.run(args, cwd=work, capture_output=True, text=True)
+            def git(*args):
+                result = sh(["git", *args])
+                self.assertEqual(result.returncode, 0, result.stderr)
+                return result.stdout.strip()
+            git("init", "-q", "-b", "main")
+            git("config", "user.name", "Test")
+            git("config", "user.email", "test@example.test")
+            git("config", "commit.gpgsign", "false")
+            git("config", "core.hooksPath", str(work / "hooks"))
+            target = work / self.REL
+            debt_target = work / debt_rel
+            target.parent.mkdir(parents=True)
+            def save(waiver, debt):
+                target.write_text(json.dumps(waiver, indent=2) + "\n")
+                debt_target.write_text(json.dumps(debt, indent=2) + "\n")
+                git("add", self.REL, debt_rel)
+                git("commit", "-qm", "fixture")
+            save(self.base, debt_base)
+            git("branch", "feature")
+            save(self.theirs, debt_theirs)
+            git("update-ref", "refs/remotes/origin/main", git("rev-parse", "HEAD"))
+            git("checkout", "-q", "feature")
+            save(self.ours, debt_ours)
+            def machine_sh(args, **kwargs):
+                # Leave mutation/verification/push ownership with the caller.
+                if args[:2] == ["git", "push"]:
+                    return SimpleNamespace(returncode=0)
+                return sh(args)
+            self.assertTrue(edits.resolve_additive_list_conflict(
+                work, "feature", None, sh=machine_sh, merge_entries=lambda _: None))
+            self.assertEqual(json.loads(target.read_text()), json.loads(self.resolve()))
+            debt = json.loads(debt_target.read_text())
+            self.assertEqual(list(debt["debt"]), ["kept.tsx", "also.tsx"])
+            self.assertEqual(debt["schema"], debt_base["schema"])
+            self.assertEqual(git("diff", "--name-only", "--diff-filter=U"), "")
+
+
+class SubtractiveScreenDebtTest(unittest.TestCase):
+    REL = "docs/design-system/cert-screens.json"
+
+    def setUp(self):
+        self.base = {"schema": "jovie.cert-screens/v1", "debt": {
+            "kept.tsx": "a11y,states",
+            "drop-head.tsx": "states",
+            "also.tsx": "tests",
+            "drop-main.tsx": "a11y",
+        }}
+        self.ours = json.loads(json.dumps(self.base))
+        self.theirs = json.loads(json.dumps(self.base))
+        del self.ours["debt"]["drop-head.tsx"]
+        del self.theirs["debt"]["drop-main.tsx"]
+
+    def resolve(self, rel=None, blobs=None):
+        values = blobs or [json.dumps(value) for value in (self.base, self.ours, self.theirs)]
+        def sh(args, **kwargs):
+            return SimpleNamespace(returncode=0, stdout=values[int(args[-1][1]) - 1])
+        return edits.resolve_subtractive_screen_debt(Path("."), rel or self.REL, sh)
+
+    def test_keeps_main_order_and_drops_either_sides_removals(self):
+        result = json.loads(self.resolve())
+        self.assertEqual(list(result["debt"]), ["kept.tsx", "also.tsx"])
+        self.assertEqual(result["debt"]["kept.tsx"], "a11y,states")
+        self.assertEqual(result["schema"], self.base["schema"])
+
+    def test_refuses_additions_edits_and_other_paths(self):
+        for mutate in (
+            lambda: self.ours["debt"].update({"new.tsx": "states"}),
+            lambda: self.ours["debt"].update({"kept.tsx": "changed"}),
+            lambda: self.theirs.update(schema="other"),
+            lambda: self.ours["debt"].update({"kept.tsx": ""}),
+            lambda: self.theirs["debt"].update({"added.tsx": "states"}),
+        ):
+            self.setUp()
+            mutate()
+            self.assertIsNone(self.resolve())
+        self.assertIsNone(self.resolve("docs/design-system/component-certification.json"))
+        self.assertIsNone(self.resolve(blobs=['{"debt":{},"debt":{}}'] * 3))
+        self.assertIsNone(self.resolve(blobs=["not JSON"] * 3))
 
 
 class SpacingSnapTest(unittest.TestCase):
@@ -237,6 +373,39 @@ class AdditiveNodeTestFileTest(unittest.TestCase):
             with self.subTest(code=code), patch.object(lane, "sh", side_effect=replies):
                 actual = classes.resolve_additive_node_test_file(Path("."), "draft.test.mjs", lane.sh)
                 self.assertEqual(actual, block("main") + block("head") if code == 127 else None)
+
+
+class Size500StaleTest(unittest.TestCase):
+    LOG = "\n".join([
+        "##[warning]vacuous-verdict: apps/web/lib/finance/metrics/engine.ts: 1 vacuous verdict site(s)",
+        "##[error]size-500: apps/web/lib/agent-os/certification.ts: grew 1220 -> 1265",
+        "##[error]size-500: scripts/lanes/lane_runner.py: grew 11721 -> 11736",
+        "##[error]Process completed with exit code 1.",
+        "company-guards: FAIL (2)",
+    ])
+
+    def test_blocked_size_growth_syncs_main(self):
+        got = classes.classify(pr("Company guards", merge="BLOCKED"), {"Company guards": self.LOG})
+        self.assertEqual((got["cls"], got["action"]), ("size-500-stale", "sync-main"))
+        self.assertIsNone(edits.size_500_stale_hit(None))
+        self.assertIsNone(edits.size_500_stale_hit("##[error]Process completed with exit code 1."))
+
+    def test_another_annotated_error_stays_with_the_model(self):
+        log = self.LOG + "\n##[error]AssertionError: expected 1"
+        got = classes.classify(pr("Company guards", merge="BLOCKED"), {"Company guards": log})
+        self.assertEqual((got["cls"], got["action"]), ("other", "agent"))
+
+    def test_a_known_signature_outranks_size_growth_in_the_same_log(self):
+        log = "API rate limit exceeded\n" + self.LOG
+        got = classes.classify(pr("Company guards"), {"Company guards": log})
+        self.assertEqual(got["action"], "rerun")
+
+    def test_size_growth_beside_another_failing_check_stays_mixed(self):
+        got = classes.classify(pr("Company guards", "Unit Tests"), {
+            "Company guards": self.LOG,
+            "Unit Tests": "AssertionError: expected 1",
+        })
+        self.assertEqual((got["cls"], got["action"]), ("mixed", "agent"))
 
 
 if __name__ == "__main__":

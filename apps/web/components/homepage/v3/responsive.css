@@ -103,9 +103,12 @@
     height: 35rem;
   }
 
+  /* The rig now scales from its top-left corner, so the offset that kept the
+     approved 390 crop (sidebar edge into the list) when it scaled from its
+     top centre gains 39rem x (1 - 0.72) = 10.92rem. */
   .hv3-rig--hero {
     top: 0.625rem;
-    left: calc(-20.625rem - var(--hv3-gutter));
+    left: calc(-9.705rem - var(--hv3-gutter));
     transform: var(--hv3-cam) scale(0.72);
   }
 
@@ -257,15 +260,18 @@
     height: 26.25rem;
   }
 
+  /* The palette keeps its width and runs off the card's right edge on a
+     phone; the keycaps stay above it. */
   .hv3-palette {
-    top: 2.5rem;
+    top: 6rem;
+    right: auto;
     left: 1.25rem;
     width: 35rem;
   }
 
   .hv3-keys {
+    top: 1.25rem;
     right: 1.25rem;
-    bottom: 1.5rem;
   }
 
   .hv3-key {
@@ -330,6 +336,25 @@
 
   .hv3-hero {
     height: 72rem;
+  }
+
+  /* The stages are zoomed to about three quarters here; the air between
+     sections follows them, so no band reads as empty. */
+  .hv3-chapter {
+    padding-bottom: 7.5rem;
+  }
+
+  .hv3-centered {
+    padding-top: 7.5rem;
+  }
+
+  .hv3-specs__head {
+    padding-top: 7.5rem;
+    padding-bottom: 3.75rem;
+  }
+
+  .hv3-invite__inner {
+    padding-top: 8.5rem;
   }
 }
 

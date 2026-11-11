@@ -552,6 +552,9 @@ jobs:
           echo '{"cookies":[],"origins":[]}' > tests/.auth/user.json
           test -n "$PRODUCTION_BASE_URL"
           specs=(tests/e2e/smoke-prod-auth.spec.ts)
+          # One browser at a time: the cert judges each surface's longest
+          # frame, and four browsers sharing the runner's CPUs stretch every
+          # React render (Nov 10: chat loads 274/103/269 ms in parallel).
           [ -f tests/e2e/prod-cert-start-chat.spec.ts ] && specs+=(tests/e2e/prod-cert-start-chat.spec.ts)
           doppler run --project jovie-web --config prd \
             --only-secrets=E2E_PROD_USER_EMAIL,DATABASE_URL \
@@ -562,7 +565,7 @@ jobs:
               EXPECTED_VERCEL_ENVIRONMENT=production \
               PLAYWRIGHT_DYNAMIC_SECRETS_FILE="$RUNNER_TEMP/playwright-dynamic-cookie-values" \
                 node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs" --run -- \
-                  pnpm exec playwright test "${specs[@]}" --project=chromium --reporter=line
+                  pnpm exec playwright test "${specs[@]}" --project=chromium --reporter=line --workers=1
           echo "auth_smoke_status=passed" >> "$GITHUB_OUTPUT"
         env:
           EXPECTED_COMMIT_SHA: ${{ needs.resolve-target.outputs.commit_sha }}
@@ -626,6 +629,16 @@ jobs:
           ref: ${{ needs.resolve-target.outputs.commit_sha }}
           fetch-depth: 1
           persist-credentials: false
+      - name: Establish crawl deadline
+        run: |
+          set -euo pipefail
+          # Job timeout-minutes: 40. Reserve 240s for the receipt write, upload
+          # and cleanup, so a slow crawl still leaves a receipt instead of a
+          # silent GitHub cancel. Runs right after checkout, which the
+          # safe-upload audit requires to be the first step.
+          deadline_s=$(( $(date +%s) + 40 * 60 - 240 ))
+          echo "CRAWL_DEADLINE_EPOCH_MS=$(( deadline_s * 1000 ))" >> "$GITHUB_ENV"
+          echo "Crawl stops starting page loads at epoch ms $(( deadline_s * 1000 ))"
       - name: Check the landed build has the crawl
         id: has-crawl
         run: |

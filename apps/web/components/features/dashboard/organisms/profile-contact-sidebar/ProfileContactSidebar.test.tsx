@@ -69,6 +69,7 @@ const mockState = vi.hoisted(() => ({
   useRealProfileMutation: false,
   selectedProfileId: 'profile-1',
   previewReady: true,
+  isFloating: false,
   routerPush: vi.fn(),
   routerReplace: vi.fn(),
   searchParams: new URLSearchParams(),
@@ -103,7 +104,11 @@ vi.mock('@/app/app/(shell)/dashboard/DashboardDataContext', () => ({
 vi.mock('@/app/app/(shell)/dashboard/PreviewPanelContext', async () => {
   const React = await vi.importActual<typeof import('react')>('react');
   return {
-    usePreviewPanelState: () => ({ isOpen: true, close: vi.fn() }),
+    usePreviewPanelState: () => ({
+      isOpen: true,
+      isFloating: mockState.isFloating,
+      close: vi.fn(),
+    }),
     usePreviewPanelData: () => {
       const [previewData, setPreviewData] = React.useState(() =>
         mockState.previewReady
@@ -142,61 +147,10 @@ vi.mock('@/components/atoms/AppIconButton', () => ({
   ),
 }));
 
-vi.mock('@/components/molecules/drawer', () => ({
-  EntitySidebarShell: ({
-    children,
-    'data-testid': testId,
-    id,
-    onClose,
-    showMobileDismissal = false,
-  }: {
-    children: React.ReactNode;
-    id?: string;
-    onClose?: () => void;
-    showMobileDismissal?: boolean;
-    'data-testid'?: string;
-  }) => (
-    <aside
-      id={id}
-      data-testid={testId}
-      data-close-handler={onClose ? 'present' : 'none'}
-      data-mobile-dismissal={String(showMobileDismissal)}
-    >
-      {children}
-    </aside>
-  ),
-  DrawerTabbedCard: ({
-    children,
-    tabs,
-    testId,
-  }: {
-    children: React.ReactNode;
-    tabs: React.ReactNode;
-    testId: string;
-  }) => (
-    <section data-testid={testId}>
-      {tabs}
-      <div data-testid={`${testId}-scroll-region`}>{children}</div>
-    </section>
-  ),
-  DrawerTabs: ({
-    onValueChange,
-    actions,
-  }: {
-    onValueChange: (value: string) => void;
-    actions?: React.ReactNode;
-  }) => (
-    <nav>
-      <button type='button' onClick={() => onValueChange('social')}>
-        Social
-      </button>
-      <button type='button' onClick={() => onValueChange('about')}>
-        About
-      </button>
-      {actions}
-    </nav>
-  ),
-}));
+vi.mock(
+  '@/components/molecules/drawer',
+  () => import('@/tests/utils/profile-contact-sidebar-drawer-doubles')
+);
 
 vi.mock('@/components/organisms/profile-sidebar/ProfileSidebarHeader', () => ({
   useProfileHeaderParts: () => ({ overflowActions: [] }),
@@ -482,6 +436,7 @@ describe('ProfileContactSidebar optimistic mutation sequencing', () => {
     mockState.toastError.mockReset();
     mockState.routerReplace.mockReset();
     mockState.useRealProfileMutation = false;
+    mockState.isFloating = false;
     mockState.selectedProfileId = 'profile-1';
     mockState.previewReady = true;
     mockState.searchParams = new URLSearchParams();
@@ -499,6 +454,23 @@ describe('ProfileContactSidebar optimistic mutation sequencing', () => {
     expect(
       screen.queryByRole('button', { name: 'Edit profile' })
     ).not.toBeInTheDocument();
+  });
+
+  it('pushes the route when pinned and floats only a transient preview', () => {
+    // Founder call (2026-11-08): an open/pinned rail pushes content; only the
+    // hover/focus preview overlays it.
+    const view = renderSidebar();
+    expect(screen.getByTestId('profile-contact-sidebar')).toHaveAttribute(
+      'data-presentation',
+      'push'
+    );
+    view.unmount();
+    mockState.isFloating = true;
+    renderSidebar();
+    expect(screen.getByTestId('profile-contact-sidebar')).toHaveAttribute(
+      'data-presentation',
+      'overlay'
+    );
   });
 
   it('exposes a deterministic readiness marker for the open profile rail', () => {
