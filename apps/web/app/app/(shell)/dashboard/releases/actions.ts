@@ -1097,7 +1097,6 @@ export async function checkSpotifyConnection(): Promise<{
     }
 
     // Fallback: check dspArtistMatches for a confirmed Spotify match.
-    // Keeps this consistent with ConnectedDspList which checks both sources.
     const [spotifyMatch] = await db
       .select({
         externalArtistId: dspArtistMatches.externalArtistId,
@@ -1682,7 +1681,6 @@ export async function checkAppleMusicConnection(): Promise<{
     }
 
     // Fallback: check profile.appleMusicId (set when connected directly).
-    // Keeps this consistent with ConnectedDspList which checks both sources.
     if (profile.appleMusicId) {
       return {
         connected: true,

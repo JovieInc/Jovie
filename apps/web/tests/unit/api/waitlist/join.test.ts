@@ -7,6 +7,8 @@ const mocks = vi.hoisted(() => ({
   verifyTurnstileToken: vi.fn(),
   joinWaitlistWithRole: vi.fn(),
   captureError: vi.fn(),
+  spotifyAvailable: vi.fn(),
+  getArtists: vi.fn(),
 }));
 
 vi.mock('server-only', () => ({}));
@@ -24,6 +26,12 @@ vi.mock('@/lib/waitlist/role-entry', () => ({
   joinWaitlistWithRole: mocks.joinWaitlistWithRole,
 }));
 vi.mock('@/lib/error-tracking', () => ({ captureError: mocks.captureError }));
+vi.mock('@/lib/spotify/client', () => ({
+  spotifyClient: {
+    isAvailable: mocks.spotifyAvailable,
+    getArtists: mocks.getArtists,
+  },
+}));
 
 import { POST } from '@/app/api/waitlist/join/route';
 
@@ -49,17 +57,24 @@ describe('POST /api/waitlist/join', () => {
     mocks.isTurnstileConfigured.mockReturnValue(true);
     mocks.verifyTurnstileToken.mockResolvedValue({ success: true });
     mocks.joinWaitlistWithRole.mockResolvedValue({ created: true });
+    mocks.spotifyAvailable.mockReturnValue(true);
+    mocks.getArtists.mockResolvedValue([]);
   });
 
   afterEach(() => {
     delete process.env.FEATURE_PUBLIC_SIGNUP_CLOSED;
   });
 
-  it('is inert while public signup is open', async () => {
+  it('keeps saving entries while the signup kill switch is off (open signup)', async () => {
+    // Public signup is open by default (Tim, 2026-11-09): the homepage
+    // waitlist role form keeps working. The rest of this suite runs with the
+    // kill switch on (beforeEach) and must save entries too — the route
+    // serves both modes.
     process.env.FEATURE_PUBLIC_SIGNUP_CLOSED = 'false';
     const response = await POST(request(validBody));
-    expect(response.status).toBe(404);
-    expect(mocks.joinWaitlistWithRole).not.toHaveBeenCalled();
+    expect(response.status).toBe(201);
+    await expect(response.json()).resolves.toEqual({ state: 'joined' });
+    expect(mocks.joinWaitlistWithRole).toHaveBeenCalled();
   });
 
   it('stores the role and normalized email after Turnstile passes', async () => {
@@ -137,5 +152,84 @@ describe('POST /api/waitlist/join', () => {
     const response = await POST(request(validBody));
     expect(response.status).toBe(500);
     expect(mocks.captureError).toHaveBeenCalled();
+  });
+
+  describe('request-access qualification', () => {
+    const artistId = '4Z8W4fKeB5YxbusRsdQVPb';
+
+    it('confirms the picked artist itself and stores the score and answers', async () => {
+      mocks.getArtists.mockResolvedValue([
+        {
+          spotifyId: artistId,
+          name: 'Example Artist',
+          followerCount: 12_000,
+          popularity: 40,
+        },
+      ]);
+      const response = await POST(
+        request({
+          ...validBody,
+          role: 'artist',
+          spotifyArtistId: artistId,
+          momTest: {
+            lastGrowthAttempt: 'Ran Instagram ads for my single, got 30 saves.',
+            promoSpend: 'under_50',
+          },
+        })
+      );
+      expect(response.status).toBe(201);
+      expect(mocks.getArtists).toHaveBeenCalledWith([artistId]);
+      const call = mocks.joinWaitlistWithRole.mock.calls[0][0];
+      expect(call.qualification.spotifyArtistName).toBe('Example Artist');
+      expect(call.qualification.admissionScore.components.identity).toBe(30);
+      expect(call.qualification.admissionScore.inputs.followers).toBe(12_000);
+      expect(call.qualification.momTest).toMatchObject({
+        promoSpend: 'under_50',
+        variant: 'request-access/v1',
+      });
+    });
+
+    it('still joins, unscored, when Spotify is unreachable', async () => {
+      mocks.spotifyAvailable.mockReturnValue(false);
+      const response = await POST(
+        request({ ...validBody, spotifyArtistId: artistId })
+      );
+      expect(response.status).toBe(201);
+      const call = mocks.joinWaitlistWithRole.mock.calls[0][0];
+      expect(call.qualification.spotifyArtistId).toBe(artistId);
+      expect(call.qualification.admissionScore).toBeNull();
+    });
+
+    it('saves the entrant unscored when Spotify outlasts the deadline', async () => {
+      vi.useFakeTimers();
+      try {
+        mocks.getArtists.mockReturnValue(new Promise(() => {}));
+        const pending = POST(
+          request({ ...validBody, spotifyArtistId: artistId })
+        );
+        await vi.advanceTimersByTimeAsync(3_000);
+        const response = await pending;
+        expect(response.status).toBe(201);
+        const call = mocks.joinWaitlistWithRole.mock.calls[0][0];
+        expect(call.qualification.admissionScore).toBeNull();
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('rejects a malformed artist id or an unknown answer before any work', async () => {
+      expect(
+        (await POST(request({ ...validBody, spotifyArtistId: 'nope' }))).status
+      ).toBe(400);
+      expect(
+        (
+          await POST(
+            request({ ...validBody, momTest: { promoSpend: 'a lot' } })
+          )
+        ).status
+      ).toBe(400);
+      expect(mocks.getArtists).not.toHaveBeenCalled();
+      expect(mocks.joinWaitlistWithRole).not.toHaveBeenCalled();
+    });
   });
 });

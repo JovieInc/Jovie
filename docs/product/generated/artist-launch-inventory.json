@@ -2345,6 +2345,14 @@
       "classification": "C"
     },
     {
+      "source": "apps/web/app/api/cron/cleanup-dogfood-accounts/route.ts",
+      "kind": "handler",
+      "route": "/api/cron/cleanup-dogfood-accounts",
+      "methods": ["GET"],
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
       "source": "apps/web/app/api/cron/cleanup-idempotency-keys/route.ts",
       "kind": "handler",
       "route": "/api/cron/cleanup-idempotency-keys",
@@ -2484,6 +2492,14 @@
       "source": "apps/web/app/api/cron/purge-pixel-ips/route.ts",
       "kind": "handler",
       "route": "/api/cron/purge-pixel-ips",
+      "methods": ["GET"],
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
+      "source": "apps/web/app/api/cron/queue-tick/route.ts",
+      "kind": "handler",
+      "route": "/api/cron/queue-tick",
       "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
@@ -3473,6 +3489,14 @@
       "classification": "C"
     },
     {
+      "source": "apps/web/app/api/internal/ovie/summer-company/charts/shipping/route.ts",
+      "kind": "handler",
+      "route": "/api/internal/ovie/summer-company/charts/shipping",
+      "methods": ["GET"],
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
       "source": "apps/web/app/api/internal/ovie/summer-company/cohorts/route.ts",
       "kind": "handler",
       "route": "/api/internal/ovie/summer-company/cohorts",
@@ -3505,6 +3529,14 @@
       "classification": "C"
     },
     {
+      "source": "apps/web/app/api/internal/ovie/summer-company/funnel-benchmarks/route.ts",
+      "kind": "handler",
+      "route": "/api/internal/ovie/summer-company/funnel-benchmarks",
+      "methods": ["GET"],
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
       "source": "apps/web/app/api/internal/ovie/summer-company/funnel/route.ts",
       "kind": "handler",
       "route": "/api/internal/ovie/summer-company/funnel",
@@ -3516,6 +3548,14 @@
       "source": "apps/web/app/api/internal/ovie/summer-company/golden-path/route.ts",
       "kind": "handler",
       "route": "/api/internal/ovie/summer-company/golden-path",
+      "methods": ["GET"],
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
+      "source": "apps/web/app/api/internal/ovie/summer-company/history/route.ts",
+      "kind": "handler",
+      "route": "/api/internal/ovie/summer-company/history",
       "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
@@ -4124,6 +4164,14 @@
       "source": "apps/web/app/api/ovie/fleet-audit/route.ts",
       "kind": "handler",
       "route": "/api/ovie/fleet-audit",
+      "methods": ["GET"],
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
+      "source": "apps/web/app/api/ovie/home/blocker/route.ts",
+      "kind": "handler",
+      "route": "/api/ovie/home/blocker",
       "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"

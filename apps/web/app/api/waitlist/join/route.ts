@@ -7,22 +7,31 @@ import {
   getClientIP,
   waitlistJoinLimiter,
 } from '@/lib/rate-limit';
+import { spotifyClient } from '@/lib/spotify/client';
 import {
   classifyTurnstileFailure,
   isTurnstileConfigured,
   verifyTurnstileToken,
 } from '@/lib/turnstile/verify';
 import { logger } from '@/lib/utils/logger';
-import { isPublicSignupClosed } from '@/lib/waitlist/public-signup-gate';
 import { joinWaitlistWithRole } from '@/lib/waitlist/role-entry';
-import { waitlistRoleSchema } from '@/lib/waitlist/roles';
+import {
+  momTestAnswersSchema,
+  qualifyRoleEntrant,
+  type SpotifyArtistReader,
+  spotifyArtistIdSchema,
+} from '@/lib/waitlist/role-qualification';
+import { WAITLIST_ROLE_VALUES } from '@/lib/waitlist/roles';
 
+// Kept here, not in lib/waitlist/roles.ts, so the homepage's waitlist form
+// does not download zod.
+const waitlistRoleSchema = z.enum(WAITLIST_ROLE_VALUES);
 /**
- * Anonymous closed-signup waitlist join (canon/PRODUCT.md, 2026-11-02).
- *
- * Bot protection matches the public changelog form: a durable per-IP limiter
- * (1 per 10 s, Redis, denies on outage) and Cloudflare Turnstile. The route
- * is inert (404) unless `PUBLIC_SIGNUP_CLOSED` is on. A known email gets the
+ * Anonymous waitlist join. Bot protection matches the public changelog form:
+ * a durable per-IP limiter (1 per 10 s, Redis, denies on outage) and
+ * Cloudflare Turnstile. The route stays live whether the signup kill switch
+ * (`FEATURE_PUBLIC_SIGNUP_CLOSED`) is on or off — the homepage waitlist role
+ * form posts here in both modes (Tim, 2026-11-09). A known email gets the
  * same response as a new one, so the form never reveals who is waitlisted.
  */
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
@@ -32,7 +41,45 @@ const joinSchema = z.object({
   role: waitlistRoleSchema,
   name: z.string().trim().min(1).max(120).optional(),
   turnstileToken: z.string().max(4096).optional(),
+  // Request-access qualification (docs/ONBOARDING_QUALIFICATION_SYSTEM.md).
+  // Optional, so today's form keeps working unchanged.
+  spotifyArtistId: spotifyArtistIdSchema.optional(),
+  momTest: momTestAnswersSchema.optional(),
 });
+
+/**
+ * The server's own read of the picked artist. The batch endpoint returns no
+ * row for an unknown id (scored as unresolved) and throws when Spotify is
+ * unreachable (left unscored), so the two never blur.
+ */
+/**
+ * The client's own timeout and retries can outlast the function, so the join
+ * waits at most this long for Spotify and then saves the entrant unscored.
+ */
+const SPOTIFY_QUALIFY_DEADLINE_MS = 3_000;
+
+const readSpotifyArtist: SpotifyArtistReader = async artistId => {
+  if (!spotifyClient.isAvailable()) throw new Error('Spotify unavailable');
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const deadline = new Promise<never>((_, reject) => {
+    timer = setTimeout(
+      () => reject(new Error('Spotify read timed out')),
+      SPOTIFY_QUALIFY_DEADLINE_MS
+    );
+  });
+  const [artist] = await Promise.race([
+    spotifyClient.getArtists([artistId]),
+    deadline,
+  ]).finally(() => clearTimeout(timer));
+  return artist
+    ? {
+        id: artist.spotifyId,
+        name: artist.name,
+        followers: artist.followerCount,
+        popularity: artist.popularity,
+      }
+    : null;
+};
 
 function json(body: Record<string, unknown>, status: number, headers = {}) {
   return NextResponse.json(body, {
@@ -59,10 +106,6 @@ async function verifyTurnstile(
 }
 
 export async function POST(request: NextRequest) {
-  if (!isPublicSignupClosed()) {
-    return json({ error: 'Not found' }, 404);
-  }
-
   const ip = getClientIP(request);
   const rateLimitResult = await waitlistJoinLimiter.limit(ip);
   if (!rateLimitResult.success) {
@@ -112,11 +155,20 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  const qualification = await qualifyRoleEntrant(
+    {
+      spotifyArtistId: parsed.data.spotifyArtistId ?? null,
+      momTest: parsed.data.momTest ?? null,
+    },
+    readSpotifyArtist
+  );
+
   try {
     await joinWaitlistWithRole({
       email: parsed.data.email,
       role: parsed.data.role,
       ...(parsed.data.name ? { name: parsed.data.name } : {}),
+      ...(qualification ? { qualification } : {}),
     });
   } catch (error) {
     logger.error('[api/waitlist/join] join failed', error);

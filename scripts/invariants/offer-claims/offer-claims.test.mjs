@@ -1,6 +1,10 @@
 import assert from 'node:assert/strict';
+import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { test } from 'node:test';
 import {
+  BASELINE_PATH,
   config,
   countFile,
   evaluate,
@@ -84,7 +88,7 @@ test('exclusions: offer module, tests and editorial; messages catalogs stay in s
   assert.ok(!isExcluded('apps/web/messages/en.json'));
 });
 
-test('ratchet: new file, increase and stale entry fail; equal passes', () => {
+test('ratchet: new file and increase fail; equal and removed claims pass', () => {
   const base = { 'a.ts': { trial_claim: 1 } };
   assert.deepEqual(evaluate({ 'a.ts': { trial_claim: 1 } }, base), []);
   assert.equal(evaluate({ 'a.ts': { trial_claim: 2 } }, base).length, 1);
@@ -93,7 +97,9 @@ test('ratchet: new file, increase and stale entry fail; equal passes', () => {
       .length,
     1
   );
-  assert.equal(evaluate({}, base).length, 1);
+  // A removed claim leaves stale headroom; it never fails the tree that
+  // removed it (8 merge groups failed on exactly that, 2026-11-04..11).
+  assert.deepEqual(evaluate({}, base), []);
 });
 
 test('deliberate red: the original incident closer in a new file fails the guard', () => {
@@ -117,6 +123,30 @@ test('deliberate red: the original incident closer in a new file fails the guard
   );
 });
 
-test('the committed baseline matches the tree', () => {
+test('the tree has no growth beyond the committed baseline', () => {
   assert.equal(main([], cwd), 0);
+});
+
+test('--tighten lowers stale entries but still fails growth and never adopts it', () => {
+  const real = JSON.parse(readFileSync(BASELINE_PATH, 'utf8'));
+  const [[stale, staleCounts], [grown]] = Object.entries(real);
+  const [id] = Object.keys(staleCounts);
+  const path = join(mkdtempSync(join(tmpdir(), 'offer-claims-')), 'b.json');
+  const write = baseline => writeFileSync(path, JSON.stringify(baseline));
+  const read = () => JSON.parse(readFileSync(path, 'utf8'));
+
+  // Headroom only: tighten restores the measured count and passes.
+  write({ ...real, [stale]: { ...staleCounts, [id]: staleCounts[id] + 2 } });
+  assert.equal(main([], cwd, path), 0, 'a shrink alone passes');
+  assert.equal(main(['--tighten'], cwd, path), 0);
+  assert.deepEqual(read(), real);
+
+  // Headroom plus a file with unbaselined claims: tighten exits 1.
+  const { [grown]: _dropped, ...withoutGrown } = real;
+  write({
+    ...withoutGrown,
+    [stale]: { ...staleCounts, [id]: staleCounts[id] + 2 },
+  });
+  assert.equal(main(['--tighten'], cwd, path), 1);
+  assert.deepEqual(read(), withoutGrown, 'tightened, growth not adopted');
 });

@@ -1,3 +1,4 @@
+import { NextRequest } from 'next/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mockEntitlements = vi.hoisted(() => vi.fn());
@@ -14,7 +15,7 @@ vi.mock('@/lib/feedback', () => ({
 }));
 
 function request(body: unknown) {
-  return new Request(
+  return new NextRequest(
     'http://localhost/api/admin/feedback/feedback_1/disposition',
     {
       method: 'POST',

@@ -10,6 +10,7 @@ import {
 import { reviewMerchContent } from './content-review';
 import { buildMerchPricingSnapshot } from './pricing';
 import {
+  assertMerchOrderSellable,
   getMerchCardSellability,
   getMerchOrderSellability,
   getPrintfulCostUpdatedAt,
@@ -145,7 +146,7 @@ describe('merch safety', () => {
   });
 
   it('blocks fulfillment when order economics violate the card guard', () => {
-    const result = getMerchOrderSellability({
+    const order = {
       quantity: 1,
       subtotalCents: 2500,
       printfulProductCostCents: 2300,
@@ -153,11 +154,15 @@ describe('merch safety', () => {
       refundReserveCents: 200,
       artistPayoutEstimateCents: 0,
       jovieShareEstimateCents: 0,
-    });
+    };
+    const result = getMerchOrderSellability(order);
 
     expect(result.sellable).toBe(false);
     expect(result.reasons).toContain(
       'Jovie margin must be at least $5.00 per unit.'
+    );
+    expect(() => assertMerchOrderSellable(order)).toThrow(
+      'Merch order is not sellable'
     );
   });
 });

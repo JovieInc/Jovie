@@ -4,7 +4,9 @@ vi.mock('server-only', () => ({}));
 
 const inserted = vi.hoisted(() => ({
   value: null as Record<string, unknown> | null,
+  kick: vi.fn(),
 }));
+vi.mock('@/lib/cron/kick-queue', () => ({ kickQueue: inserted.kick }));
 
 vi.mock('@/lib/db', () => ({
   db: {
@@ -55,5 +57,6 @@ describe('MusicFetch enqueue cutover', () => {
         spotifyArtistId: '6M2wZ9GZgrQXHCFfjv46we',
       },
     });
+    expect(inserted.kick).toHaveBeenCalledWith('ingestion');
   });
 });

@@ -6,6 +6,9 @@ const { store, mockDel, mockGet, mockHead, mockList, mockPut } = vi.hoisted(
       string,
       { body: string; uploadedAt: Date; size: number }
     >();
+    // A fixed, ticking clock for uploads so list order never depends on
+    // the real time.
+    let uploadClock = Date.UTC(2026, 10, 7, 23, 0, 0);
     const streamOf = (body: string) =>
       new Response(body).body as ReadableStream<Uint8Array>;
     return {
@@ -13,7 +16,7 @@ const { store, mockDel, mockGet, mockHead, mockList, mockPut } = vi.hoisted(
       mockPut: vi.fn(async (pathname: string, body: string) => {
         store.set(pathname, {
           body,
-          uploadedAt: new Date(),
+          uploadedAt: new Date((uploadClock += 1000)),
           size: body.length,
         });
         return { pathname };
@@ -70,6 +73,7 @@ import {
 const OWNER = 'user_owner';
 const TAKE_ID = '1b4e28ba-2fa1-41d2-883f-0016d3cca427';
 const VIDEO = `jovie/teleprompter/takes/${OWNER}/${TAKE_ID}.webm`;
+const VIDEO_UPLOADED_AT = new Date('2026-11-07T22:59:00Z');
 
 const input = {
   takeId: TAKE_ID,
@@ -87,7 +91,7 @@ describe('teleprompter take storage', () => {
   beforeEach(() => {
     store.clear();
     vi.clearAllMocks();
-    store.set(VIDEO, { body: 'video', uploadedAt: new Date(), size: 5 });
+    store.set(VIDEO, { body: 'video', uploadedAt: VIDEO_UPLOADED_AT, size: 5 });
   });
 
   it('writes a private sidecar once the video is uploaded', async () => {
@@ -114,7 +118,11 @@ describe('teleprompter take storage', () => {
       code: 'take-video-missing',
       status: 422,
     });
-    store.set(VIDEO, { body: 'video!', uploadedAt: new Date(), size: 6 });
+    store.set(VIDEO, {
+      body: 'video!',
+      uploadedAt: VIDEO_UPLOADED_AT,
+      size: 6,
+    });
     await expect(saveTeleprompterTake(OWNER, input)).rejects.toMatchObject({
       code: 'take-video-size-mismatch',
     });
@@ -149,7 +157,7 @@ describe('teleprompter take storage', () => {
     const second = '2b4e28ba-2fa1-41d2-883f-0016d3cca427';
     store.set(`jovie/teleprompter/takes/${OWNER}/${second}.webm`, {
       body: 'video',
-      uploadedAt: new Date(),
+      uploadedAt: VIDEO_UPLOADED_AT,
       size: 5,
     });
     await saveTeleprompterTake(

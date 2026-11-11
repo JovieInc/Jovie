@@ -17,6 +17,9 @@ vi.mock('@/lib/content-records/site-chrome.server', () => ({
   getSiteChrome: async () => undefined,
 }));
 vi.mock('./home.css', () => ({}));
+vi.mock('next/font/local', () => ({
+  default: () => ({ className: 'geist-mono', variable: 'geist-mono-var' }),
+}));
 vi.mock('../../components/marketing/MarketingSnapRail.css', () => ({}));
 
 import HomeLayout from './layout';
@@ -42,6 +45,10 @@ describe('(home) layout hydration', () => {
     expect(await renderHtml('/index')).toBe(server);
     expect(await renderHtml('/__prerender__')).toBe(server);
     expect(await renderHtml('/')).toBe(server);
+  });
+
+  it('scopes Geist Mono to the homepage shell', async () => {
+    expect(await renderHtml(null)).toContain('geist-mono-var home-viewport');
   });
 
   it('always renders the homepage page-contract marker and the invite CTA', async () => {

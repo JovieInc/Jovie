@@ -43,6 +43,7 @@ import { useReleasesQuery } from '@/lib/queries/useReleasesQuery';
 import { cn } from '@/lib/utils';
 import { useDashboardData } from '../dashboard/DashboardDataContext';
 import { buildCalendarEventActions } from './calendar-event-actions';
+import { useClientTodayMs } from './use-client-today';
 
 type FilterChip = 'all' | 'releases' | 'events' | 'needs_review';
 
@@ -90,10 +91,6 @@ function startOfMonth(d: Date): Date {
   return new Date(d.getFullYear(), d.getMonth(), 1);
 }
 
-function startOfDay(d: Date): Date {
-  return new Date(d.getFullYear(), d.getMonth(), d.getDate());
-}
-
 function isSameDay(a: Date, b: Date): boolean {
   return (
     a.getFullYear() === b.getFullYear() &&
@@ -114,11 +111,11 @@ function localDateKey(d: Date): string {
 
 function buildMonthGrid(
   cursor: Date,
+  todayMs: number | null,
   releasesByDay: Map<string, ReleaseDot[]>,
   eventsByDay: Map<string, EventRecord[]>
 ): DayCell[] {
   const monthStart = startOfMonth(cursor);
-  const today = startOfDay(new Date());
 
   const gridStart = new Date(monthStart);
   gridStart.setDate(monthStart.getDate() - monthStart.getDay());
@@ -131,7 +128,7 @@ function buildMonthGrid(
     cells.push({
       date,
       inMonth: date.getMonth() === cursor.getMonth(),
-      isToday: isSameDay(date, today),
+      isToday: date.getTime() === todayMs,
       releases: releasesByDay.get(key) ?? [],
       events: eventsByDay.get(key) ?? [],
     });
@@ -175,7 +172,7 @@ function formatReviewedAt(iso: string | null): string | null {
   if (!iso) return null;
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return null;
-  return date.toLocaleDateString(undefined, {
+  return date.toLocaleDateString('en-US', {
     month: 'short',
     day: 'numeric',
     year: 'numeric',
@@ -199,6 +196,7 @@ function fallbackActionFailureMessage(): string {
 
 export function CalendarPageClient() {
   const [cursor, setCursor] = useState<Date>(() => startOfMonth(new Date()));
+  const todayMs = useClientTodayMs();
   const [selectedDay, setSelectedDay] = useState<Date | null>(null);
   const [filter, setFilter] = useState<FilterChip>('all');
   const [selectedPendingIds, setSelectedPendingIds] = useState<
@@ -268,8 +266,8 @@ export function CalendarPageClient() {
   }, [events]);
 
   const grid = useMemo(
-    () => buildMonthGrid(cursor, releasesByDay, eventsByDay),
-    [cursor, releasesByDay, eventsByDay]
+    () => buildMonthGrid(cursor, todayMs, releasesByDay, eventsByDay),
+    [cursor, todayMs, releasesByDay, eventsByDay]
   );
 
   const pendingCount = useMemo(
@@ -626,7 +624,7 @@ export function CalendarPageClient() {
             {selectedDay && (
               <section className='system-b-calendar-panel system-b-calendar-detail-panel'>
                 <h3 className='system-b-calendar-detail-heading font-medium'>
-                  {selectedDay.toLocaleDateString(undefined, {
+                  {selectedDay.toLocaleDateString('en-US', {
                     weekday: 'long',
                     month: 'long',
                     day: 'numeric',

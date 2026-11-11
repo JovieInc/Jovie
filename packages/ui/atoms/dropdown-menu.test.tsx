@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
+import { expectNoA11yViolations } from '../test-utils/a11y';
 
 import {
   DropdownMenu,
@@ -141,7 +142,7 @@ describe('DropdownMenu', () => {
         </DropdownMenu>
       );
       const label = screen.getByTestId('label');
-      expect(label.className).toContain('pl-10');
+      expect(label.className).toContain('ps-10');
     });
   });
 
@@ -172,7 +173,7 @@ describe('DropdownMenu', () => {
         </DropdownMenu>
       );
       const item = screen.getByTestId('item');
-      expect(item.className).toContain('pl-10');
+      expect(item.className).toContain('ps-10');
     });
   });
 
@@ -404,5 +405,84 @@ describe('DropdownMenu submenu viewport fit', () => {
       'max-width: var(--radix-dropdown-menu-content-available-width)'
     );
     expect(screen.getByTestId('fit-sub').className).toContain('z-popover');
+  });
+});
+
+describe('DropdownMenu accessibility', () => {
+  // The menu portals to document.body outside any page landmark, so axe runs
+  // on the trigger's container and on the opened menu element itself.
+  it('has no axe violations when open', async () => {
+    const { container } = render(<TestDropdownMenu open />);
+    await expectNoA11yViolations(container);
+    await expectNoA11yViolations(screen.getByRole('menu'));
+  });
+
+  it('has no axe violations for an empty menu', async () => {
+    const { container } = render(
+      <DropdownMenu open modal={false}>
+        <DropdownMenuTrigger asChild>
+          <button type='button'>Saved views</button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent>
+          <DropdownMenuLabel>Saved views</DropdownMenuLabel>
+          <DropdownMenuItem disabled>No saved views yet</DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+    );
+    await expectNoA11yViolations(container);
+    await expectNoA11yViolations(screen.getByRole('menu'));
+  });
+
+  it('has no axe violations for long right-to-left items', async () => {
+    const { container } = render(
+      <DropdownMenu open modal={false} dir='rtl'>
+        <DropdownMenuTrigger asChild>
+          <button type='button'>الإجراءات</button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent>
+          <DropdownMenuItem>
+            نسخ الرابط الذكي لمشاركته مع الجمهور وقوائم التشغيل
+          </DropdownMenuItem>
+          <DropdownMenuItem variant='destructive'>حذف الإصدار</DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+    );
+    await expectNoA11yViolations(container);
+    await expectNoA11yViolations(screen.getByRole('menu'));
+  });
+
+  describe('RTL', () => {
+    it('lays rows, indicators, shortcuts and the submenu chevron out by reading direction', () => {
+      render(
+        <div dir='rtl' lang='ar'>
+          <DropdownMenu open={true}>
+            <DropdownMenuTrigger>Trigger</DropdownMenuTrigger>
+            <DropdownMenuContent>
+              <DropdownMenuCheckboxItem checked>إظهار</DropdownMenuCheckboxItem>
+              <DropdownMenuItem>
+                نسخ <DropdownMenuShortcut>⌘C</DropdownMenuShortcut>
+              </DropdownMenuItem>
+              <DropdownMenuSub>
+                <DropdownMenuSubTrigger inset>نقل إلى</DropdownMenuSubTrigger>
+                <DropdownMenuSubContent>
+                  <DropdownMenuItem>مجلد</DropdownMenuItem>
+                </DropdownMenuSubContent>
+              </DropdownMenuSub>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+      );
+      const checkbox = screen.getByRole('menuitemcheckbox', { name: 'إظهار' });
+      expect(checkbox).toHaveClass('ps-7', 'pe-2');
+      expect(checkbox).not.toHaveClass('pl-7', 'pr-2');
+      const indicatorSlot = checkbox.querySelector('span.absolute');
+      expect(indicatorSlot).toHaveClass('start-2');
+      expect(indicatorSlot).not.toHaveClass('left-2');
+      expect(screen.getByText('⌘C')).toHaveClass('ms-auto');
+      const sub = screen.getByRole('menuitem', { name: 'نقل إلى' });
+      expect(sub).toHaveClass('ps-10');
+      const chevron = sub.querySelector('svg');
+      expect(chevron).toHaveClass('ms-auto', 'rtl:rotate-180');
+    });
   });
 });

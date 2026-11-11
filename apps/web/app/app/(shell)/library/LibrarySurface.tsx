@@ -140,9 +140,11 @@ import { WorkspacePage } from '@/components/organisms/WorkspacePage';
 import type { FilterPill } from '@/components/shell/pill-search.types';
 import { RowWaveform } from '@/components/shell/RowWaveform';
 import { APP_ROUTES } from '@/constants/routes';
+import { useFounderDoor } from '@/contexts/FounderDoorContext';
 import { COPY_FALLBACKS } from '@/data/copyFallbacks';
 import { useBreakpoint } from '@/hooks/useBreakpoint';
 import { useRegisterRightPanel } from '@/hooks/useRegisterRightPanel';
+import { openChatWithDraft } from '@/lib/chat/open-chat-with-prompt';
 import { SKELETON_ROW_COUNT } from '@/lib/constants/layout';
 import type { ProviderKey } from '@/lib/discography/types';
 import { captureError } from '@/lib/error-tracking';
@@ -173,6 +175,7 @@ import {
   deriveWorkInspectorPresentation,
   scopeWorkInspectorBundle,
 } from '@/lib/library/work-inspector-read-model';
+import { getCacheScope } from '@/lib/queries/cache-isolation';
 import { useSyncReleasesFromSpotifyMutation } from '@/lib/queries/useReleaseMutations';
 import {
   type ColumnDef,
@@ -229,6 +232,12 @@ import {
   persistLibrarySavedView,
   readPersistedLibrarySavedView,
 } from './library-saved-views';
+import {
+  compareAssets,
+  countBy,
+  type LibrarySortKey,
+  uniqueSorted,
+} from './library-sort-helpers';
 import { PostReleasePanel, RightsholdersList } from './PostReleasePanel';
 import {
   YouTubeMerchRelationshipEditor,
@@ -250,7 +259,6 @@ const LIBRARY_DESKTOP_ICON_CONTROL_DENSITY_CLASS = cn(
   'w-8 min-w-8'
 );
 
-type LibrarySortKey = 'releaseDate' | 'title' | 'status' | 'providers';
 type LibraryPresetId = LibraryView;
 type LibraryPreviewToggle = (
   asset: LibraryReleaseAsset,
@@ -279,8 +287,6 @@ type LibraryFilters = {
   readonly assetKinds: Set<LibraryAssetKind>;
   readonly providers: Set<string>;
 };
-
-type CountMap<T extends string> = ReadonlyMap<T, number>;
 
 const ASSET_KIND_LABELS: Record<LibraryAssetKind, string> = {
   artwork: 'Artwork',
@@ -489,38 +495,6 @@ function hasActiveFilters(filters: LibraryFilters): boolean {
       filters.providers.size >
     0
   );
-}
-
-function releaseDateTime(asset: LibraryReleaseAsset): number {
-  if (!asset.releaseDate) return 0;
-  const date = new Date(asset.releaseDate);
-  return Number.isNaN(date.getTime()) ? 0 : date.getTime();
-}
-
-function compareAssets(sort: LibrarySortKey) {
-  return (a: LibraryReleaseAsset, b: LibraryReleaseAsset) => {
-    if (sort === 'releaseDate') return releaseDateTime(b) - releaseDateTime(a);
-    if (sort === 'title') return a.title.localeCompare(b.title);
-    if (sort === 'status') return a.status.localeCompare(b.status);
-    return b.providerCount - a.providerCount;
-  };
-}
-
-function uniqueSorted<T extends string>(values: readonly T[]): T[] {
-  return Array.from(new Set(values)).sort((a, b) => a.localeCompare(b));
-}
-
-function countBy<T extends string>(
-  assets: readonly LibraryReleaseAsset[],
-  getValues: (asset: LibraryReleaseAsset) => readonly T[]
-): CountMap<T> {
-  const counts = new Map<T, number>();
-  for (const asset of assets) {
-    for (const value of getValues(asset)) {
-      counts.set(value, (counts.get(value) ?? 0) + 1);
-    }
-  }
-  return counts;
 }
 
 const LibraryDependencyContext = createContext<
@@ -2027,25 +2001,15 @@ function EmptyCatalog({
       toolbar={
         <PageToolbar
           start={<span className={PAGE_TOOLBAR_META_TEXT_CLASS}>0 items</span>}
-          end={
-            <>
-              <YouTubeLedgerLink />
-              <LibraryFirstAction
-                canSyncSpotify={canSyncSpotify}
-                isSyncing={isSyncing}
-                onSyncSpotify={onSyncSpotify}
-                testId='library-sync-spotify-toolbar'
-              />
-            </>
-          }
+          end={<YouTubeLedgerLink />}
         />
       }
     >
       <NavigationDestinationReady destination='library' />
       <EmptyState
-        icon={<Music2 className='h-5 w-5' strokeWidth={2.25} />}
-        heading='No work yet'
-        description='Releases, merch, images, videos, and audio will appear here as they land.'
+        icon={<Music2 className='h-5 w-5' aria-hidden='true' />}
+        heading='No Work Yet'
+        description='Your releases, videos, images, audio, and merch live here.'
         presentation='workspace'
         testId='library-workspace-empty-state'
         className='min-h-90'
@@ -2065,8 +2029,8 @@ function EmptyCatalog({
 function NoResults({ onReset }: { readonly onReset: () => void }) {
   return (
     <TableEmptyState
-      heading='No work matches'
-      description='No releases, products, or files match the selected view or filters.'
+      heading='No Work Matches'
+      description='Nothing in this view matches the selected filters.'
       className='min-h-75'
       action={{
         label: 'Reset View',
@@ -2402,6 +2366,11 @@ function AssetDrawer({
     },
     [onClose]
   );
+  const askJovieAction = current
+    ? getContextMenuItems(current).find(
+        item => 'id' in item && item.id === 'ask-jovie'
+      )
+    : undefined;
   const drawerHeaderActions = current ? (
     // The shared header shows the visible mobile Close for every drawer.
     <DrawerHeaderActions
@@ -2501,6 +2470,13 @@ function AssetDrawer({
                       canPublish={profileId !== null}
                       disabled={!open}
                       onSharePrivately={openPrivateShare}
+                      onAskJovie={
+                        askJovieAction &&
+                        'onClick' in askJovieAction &&
+                        !askJovieAction.disabled
+                          ? askJovieAction.onClick
+                          : undefined
+                      }
                       preview={
                         hasVerifiedLibraryAudioPreview(current) ? (
                           <PreviewActionButton
@@ -2912,6 +2888,7 @@ export function LibrarySurface({
   readonly workLaunches?: readonly WorkLaunchSummary[];
 }) {
   const router = useRouter();
+  const { chatMode: founderChatMode } = useFounderDoor();
   const searchParams = useSearchParams();
   const { mutate: syncSpotify, isPending: isSyncingSpotify } =
     useSyncReleasesFromSpotifyMutation(profileId ?? '');
@@ -3505,6 +3482,22 @@ export function LibrarySurface({
     [profileId]
   );
 
+  const handleAskJovie = useCallback(
+    (draft: string, targetProfileId: string) => {
+      if (founderChatMode === 'ov') {
+        toast.error('Switch to Jovie, then ask about this item again.');
+        return;
+      }
+      if (
+        getCacheScope().profileId !== targetProfileId ||
+        !openChatWithDraft(draft, router)
+      ) {
+        toast.error('Chat is unavailable. Reopen this item and try again.');
+      }
+    },
+    [router, founderChatMode]
+  );
+
   const getContextMenuItems = useCallback<LibraryContextMenuBuilder>(
     asset =>
       libraryEntityActionsToContextMenuItems(
@@ -3523,12 +3516,14 @@ export function LibrarySurface({
             isSaving: lifecycleSavingIds.has(asset.id),
             onChange: handleLifecycleChange,
           },
+          onAskJovie: handleAskJovie,
           onTogglePreview: handleTogglePreview,
           onApprovalStatusChange: handleApprovalStatusChange,
         })
       ),
     [
       approvalSavingIds,
+      handleAskJovie,
       handleApprovalStatusChange,
       handleLifecycleChange,
       handleProfileVisibilityChange,

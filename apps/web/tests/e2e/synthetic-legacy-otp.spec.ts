@@ -180,6 +180,18 @@ test.describe('Synthetic Monitoring - Legacy OTP Signup (JOV-2446 cutover)', () 
     const otpSkipReason = syntheticOtpUnavailableReason(process.env);
     test.skip(otpSkipReason !== null, otpSkipReason ?? '');
 
+    // Invite-only GTM (PUBLIC_SIGNUP_CLOSED, canon/PRODUCT.md 2026-11-02):
+    // there is no public signup to exercise while it is closed. The waitlist
+    // surface is covered by synthetic-auth-ui and synthetic-start-chat.
+    await page.goto(SIGNUP_PATH, { waitUntil: 'commit' });
+    await page.waitForLoadState('domcontentloaded');
+    if (new URL(page.url()).pathname === '/waitlist') {
+      console.log(
+        '[Synthetic][legacy] Public signup is closed (invite-only); OTP signup is not reachable'
+      );
+      return;
+    }
+
     const config = validateProductionSignupCanaryConfig(process.env);
     if (!config.ok) {
       throw new Error(

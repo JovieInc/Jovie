@@ -15,6 +15,7 @@ import {
   interpretCompanyState,
   summarizeCompanyState,
 } from './company-state';
+import { type CompanyBlocker, companyBlocker } from './home/company-blocker';
 
 const LATEST_KEY = 'summer:company-state:v1:latest';
 const HISTORY_KEY = 'summer:company-state:v1:history';
@@ -27,7 +28,10 @@ type RedisStore = NonNullable<ReturnType<typeof getRedis>>;
 
 export interface CompanyStateReadback {
   readonly snapshot: CompanyStateSnapshot;
-  readonly answer: ReturnType<typeof summarizeCompanyState>;
+  readonly answer: ReturnType<typeof summarizeCompanyState> & {
+    /** The one revenue blocker Home and Summer's brief both name. */
+    readonly blocker: CompanyBlocker | null;
+  };
   readonly cache: {
     readonly hit: true;
     readonly hits: number;
@@ -89,7 +93,10 @@ export async function readCompanyStateCache(
   }
   return {
     snapshot,
-    answer: summarizeCompanyState(snapshot, options.now ?? new Date()),
+    answer: {
+      ...summarizeCompanyState(snapshot, options.now ?? new Date()),
+      blocker: companyBlocker(snapshot, options.now ?? new Date()),
+    },
     cache: {
       hit: true,
       hits,

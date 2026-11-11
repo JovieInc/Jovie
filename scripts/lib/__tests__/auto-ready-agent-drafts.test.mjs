@@ -204,6 +204,45 @@ describe('Auto-Ready provenance selector', () => {
     ).toEqual({ eligible: false, reason: 'writer-proof-proof-missing' });
   });
 
+  it('lets a trusted writer opt in to ship on green instead of a receipt', () => {
+    const marker = '<!-- jovie-auto-ready: on-green -->';
+    // The writer-proof path readies drafts with checks still pending, so the
+    // opt-in must never pass there; only green-source sets greenSource.
+    expect(promotion({ body: marker })).toEqual({
+      eligible: false,
+      reason: 'writer-proof-proof-missing',
+    });
+    const body = marker;
+    const greenSource = true;
+    expect(promotion({ body, greenSource })).toEqual({
+      eligible: true,
+      reason: 'writer-on-green-opt-in',
+    });
+    expect(
+      promotion({ body, greenSource, authorLogin: 'jovie-bot[bot]' })
+    ).toEqual({
+      eligible: true,
+      reason: 'writer-on-green-opt-in',
+    });
+    expect(
+      promotion({ body, greenSource, authorLogin: 'outside-contributor' })
+    ).toEqual({
+      eligible: false,
+      reason: 'writer-proof-proof-missing',
+    });
+    expect(promotion({ body, greenSource, labels: ['hold'] })).toEqual({
+      eligible: false,
+      reason: 'held',
+    });
+    expect(
+      promotion({
+        body,
+        greenSource,
+        title: '[canary] prove the gate stays red',
+      })
+    ).toEqual({ eligible: false, reason: 'controlled-proof' });
+  });
+
   it('allows an exact author-owned proof receipt on any branch', () => {
     expect(promotion()).toEqual({
       eligible: true,

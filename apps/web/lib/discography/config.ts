@@ -1,3 +1,4 @@
+import { URL_ONLY_DSPS } from '@/lib/dsp-url-only';
 import type { ProviderKey, ReleaseTemplate } from './types';
 
 export const PROVIDER_CONFIG: Record<
@@ -36,6 +37,12 @@ export const PROVIDER_CONFIG: Record<
   yandex: { label: 'Yandex Music', accent: '#FFCC00' },
   amazon: { label: 'Amazon', accent: '#FF9900' },
 };
+
+// URL-only services take label and accent from lib/dsp-url-only.ts so brand
+// data keeps a single source of truth without importing the DSP registry.
+for (const d of URL_ONLY_DSPS) {
+  PROVIDER_CONFIG[d.key] = { label: d.name, accent: `#${d.hex}` };
+}
 
 export const PRIMARY_PROVIDER_KEYS: ProviderKey[] = [
   'spotify',

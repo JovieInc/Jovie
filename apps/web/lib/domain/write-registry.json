@@ -169,6 +169,13 @@
       "tables": ["users"]
     },
     {
+      "id": "account.dogfood-tmp-cleanup",
+      "entity": "account",
+      "module": "apps/web/lib/accounts/dogfood-tmp-cleanup.ts",
+      "exports": ["runDogfoodTmpCleanup"],
+      "tables": ["users", "creatorProfiles"]
+    },
+    {
       "id": "merch.cards",
       "entity": "merch",
       "module": "apps/web/lib/merch/service.ts",
@@ -414,6 +421,30 @@
       "kind": "read"
     },
     "mcp:chatgpt:subscribe_to_updates": {
+      "kind": "read"
+    },
+    "mcp:draft:claim_handle": {
+      "kind": "domain",
+      "domain": "agent.draft"
+    },
+    "mcp:draft:answer_onboarding_question": {
+      "kind": "domain",
+      "domain": "agent.draft"
+    },
+    "mcp:draft:get_qualification": {
+      "kind": "read"
+    },
+    "mcp:draft:build_profile": {
+      "kind": "domain",
+      "domain": "agent.draft"
+    },
+    "mcp:draft:publish_profile": {
+      "kind": "read"
+    },
+    "mcp:draft:share_profile": {
+      "kind": "read"
+    },
+    "mcp:draft:start_upgrade": {
       "kind": "read"
     }
   }
