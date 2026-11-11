@@ -18,6 +18,7 @@ import {
 } from '@/lib/ovie/summer-cards.server';
 import { buildUnsubscribeUrl } from '@/lib/recovery/email';
 import { createFounderWelcomeLedger } from './ledger';
+import { markFounderWelcomeSent } from './marker.server';
 import {
   type AdmittedVisitor,
   type FounderWelcomeDeps,
@@ -135,18 +136,7 @@ export function buildFounderWelcomeServerDeps(
       });
       return { ok: result.status === 'sent' };
     },
-    async markWelcomed(entryId) {
-      // The signup welcome (lib/waitlist/email-jobs.ts) skips when this is set.
-      await db
-        .update(users)
-        .set({ founderWelcomeSentAt: now, updatedAt: now })
-        .where(
-          and(
-            eq(users.waitlistEntryId, entryId),
-            isNull(users.founderWelcomeSentAt)
-          )
-        );
-    },
+    markWelcomed: entryId => markFounderWelcomeSent(entryId, now),
   };
 }
 
