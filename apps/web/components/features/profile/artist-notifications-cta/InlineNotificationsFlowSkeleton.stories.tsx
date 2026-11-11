@@ -15,7 +15,7 @@ const meta: Meta<typeof InlineNotificationsFlowSkeleton> = {
 export default meta;
 
 /** Holds the inline email step's footprint while the form loads. */
-export const Inline: StoryObj<typeof InlineNotificationsFlowSkeleton> = {
+export const Loading: StoryObj<typeof InlineNotificationsFlowSkeleton> = {
   render: () => (
     <div className='w-[390px] bg-base'>
       <InlineNotificationsFlowSkeleton />
@@ -28,6 +28,15 @@ export const TwoStep: StoryObj<typeof InlineNotificationsFlowSkeleton> = {
   render: () => (
     <div className='w-80'>
       <NotificationsFlowSkeleton twoStep />
+    </div>
+  ),
+};
+
+/** Right-to-left pages keep the same reserved footprint. */
+export const Rtl: StoryObj<typeof InlineNotificationsFlowSkeleton> = {
+  render: () => (
+    <div dir='rtl' className='w-[390px] bg-base'>
+      <InlineNotificationsFlowSkeleton />
     </div>
   ),
 };

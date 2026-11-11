@@ -1,6 +1,7 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { COUNTRY_OPTIONS } from '@/features/profile/notifications';
+import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import {
   InlineNotificationsFlowSkeleton,
   NotificationsFlowSkeleton,
@@ -99,6 +100,14 @@ describe('InlineNotificationsFlowSkeleton', () => {
     expect(screen.getByText('Loading subscription form')).toBeInTheDocument();
     expect(screen.queryByText('Get updates')).not.toBeInTheDocument();
     expect(screen.queryByRole('textbox')).not.toBeInTheDocument();
+  });
+
+  it('has no axe violations in the inline and two-step loading states', async () => {
+    const inline = render(<InlineNotificationsFlowSkeleton />);
+    await expectNoA11yViolations(inline.container);
+    inline.unmount();
+    const twoStep = render(<NotificationsFlowSkeleton twoStep />);
+    await expectNoA11yViolations(twoStep.container);
   });
 
   it('keeps the short skeleton for the two-step form', () => {

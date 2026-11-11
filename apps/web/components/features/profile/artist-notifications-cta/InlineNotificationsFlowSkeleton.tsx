@@ -1,3 +1,4 @@
+import { LoadingSkeleton } from '@jovie/ui';
 import { cn } from '@/lib/utils';
 import { INLINE_FLOW } from './inline-flow-layout';
 import {
@@ -42,10 +43,15 @@ export function InlineNotificationsFlowSkeleton() {
             }
           >
             <div className='space-y-3'>
-              <div className='rounded-(--profile-action-radius) border border-white/10 bg-white/[0.035] p-1'>
-                <div className='min-h-14 animate-pulse' />
+              <div className='rounded-(--profile-action-radius) border border-subtle bg-surface-1 p-1'>
+                <div className='min-h-14' />
               </div>
-              <div className='h-11 w-full animate-pulse rounded-full bg-white/[0.08]' />
+              <LoadingSkeleton
+                height='h-11'
+                width='w-full'
+                rounded='full'
+                announce={false}
+              />
             </div>
           </ScreenShell>
         </div>
