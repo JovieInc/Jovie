@@ -34,4 +34,15 @@ export const Ready: Story = {};
 export const Recording: Story = {
   args: { isRecording: true, grid: true, takeCount: 2 },
 };
-export const NoVoiceSupport: Story = { args: { voiceEnabled: undefined } };
+export const PartialNoVoiceSupport: Story = {
+  args: { voiceEnabled: undefined },
+};
+export const EmptyNoTakes: Story = { args: { takeCount: 0 } };
+export const LongTakeCount: Story = { args: { takeCount: 128 } };
+export const Rtl: Story = {
+  render: args => (
+    <div dir='rtl'>
+      <StudioDock {...args} />
+    </div>
+  ),
+};

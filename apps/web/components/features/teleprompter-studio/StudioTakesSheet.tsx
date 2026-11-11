@@ -87,10 +87,10 @@ export function StudioTakesSheet({
               take.id === selected?.id && 'bg-surface-2'
             )}
           >
-            <button
-              type='button'
+            <Button
+              variant='ghost'
               onClick={() => setSelectedId(take.id)}
-              className='min-w-0 rounded-md text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus'
+              className='min-w-0 flex-col items-start'
             >
               <span className='block text-sm font-medium'>
                 Take {take.number}{' '}
@@ -108,7 +108,7 @@ export function StudioTakesSheet({
               >
                 {takeDetail(take)}
               </span>
-            </button>
+            </Button>
             {take.status === 'failed' ? (
               <Button
                 variant='secondary'
