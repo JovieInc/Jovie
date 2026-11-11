@@ -9,7 +9,7 @@
   },
   "budget": {
     "runsPerMergedPr": 60,
-    "ceiling": 270
+    "ceiling": 300
   },
   "workflows": {
     "actionlint.yml": {"runsPerMergedPr":0,"triggers":["workflow_dispatch"]},

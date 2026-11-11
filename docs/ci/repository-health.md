@@ -212,7 +212,7 @@ One event should start a known, small number of runs. Workflow chains (`workflow
 
 Measured 2026-11-04 to 2026-11-10: 111,600 workflow runs for 415 merged PRs, 269 runs per merged PR; 32,213 runs (29%) skipped every job. Four workflows were over 95% skipped (Cheap Fixer, Legacy Human Hold Scrub, Security Suppression Audit, Auto-Merge Base Guard); their filters moved to the trigger in `fix/ci-skip-at-trigger`.
 
-Budget: **60 runs per merged PR** across all workflows. The registry ceiling starts at today's declared total and only goes down toward the target.
+Budget: **60 runs per merged PR** across all workflows. The registry ceiling starts at 300, about 10% above the measured 269 to 277 (the week moves with merge volume), so a nightly measurement is not red from its first run. It only goes down toward the target.
 
 - Registry: `scripts/ci-trigger-registry.json` lists every workflow file, the exact triggers that may start it (`event`, `event:type`, or `workflow_run:<upstream>`) and its expected `runsPerMergedPr`. `budget.runsPerMergedPr` is the target; `budget.ceiling` caps the declared total.
 - Gate: `scripts/ci-workflow-topology.test.mjs` fails when a workflow or trigger is not registered (fan-out triggers are named in the error), when a registered trigger no longer exists, when `runsPerMergedPr` is missing, or when the declared total passes the ceiling.
