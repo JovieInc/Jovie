@@ -169,6 +169,13 @@
       "tables": ["users"]
     },
     {
+      "id": "account.founder-welcome-marker",
+      "entity": "account",
+      "module": "apps/web/lib/founder-welcome/marker.server.ts",
+      "exports": ["markFounderWelcomeSent"],
+      "tables": ["users"]
+    },
+    {
       "id": "account.dogfood-tmp-cleanup",
       "entity": "account",
       "module": "apps/web/lib/accounts/dogfood-tmp-cleanup.ts",
