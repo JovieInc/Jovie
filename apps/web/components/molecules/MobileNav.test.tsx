@@ -78,13 +78,13 @@ describe('MobileNav', () => {
     expect(source).not.toContain("label: 'Log In'");
   });
 
-  it('lands the public CTA on same-origin /signup by default (JOV-6436)', () => {
+  it('lands the public CTA in the /start flow by default', () => {
     render(<MobileNav navLinks={[{ href: '/pricing', label: 'Pricing' }]} />);
 
     fireEvent.click(screen.getByRole('button', { name: 'Open menu' }));
 
     const signupLink = screen.getByRole('link', { name: 'Sign up' });
-    expect(signupLink).toHaveAttribute('href', '/signup');
+    expect(signupLink).toHaveAttribute('href', '/start');
     expect(signupLink.getAttribute('href')).not.toContain('/waitlist');
   });
 
