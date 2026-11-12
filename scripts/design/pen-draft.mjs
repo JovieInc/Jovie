@@ -33,6 +33,7 @@ import {
 } from 'node:fs';
 import { basename, dirname, join, resolve } from 'node:path';
 import { parseArgs } from 'node:util';
+import { reportBlockedRun } from './pen-draft-annotation.mjs';
 
 export const PEN_CLI_VERSION = '0.3.14';
 export const PEN_MAX_FAILED_CALLS = 30;
@@ -397,7 +398,7 @@ async function main() {
   if (missing.length) {
     receipt.blocked = `missing ${missing.join(' and ')}`;
     write();
-    console.log(`pen-draft: blocked, ${receipt.blocked}`);
+    reportBlockedRun(receipt.blocked);
     process.exitCode = 1;
     return;
   }

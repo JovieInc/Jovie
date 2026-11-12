@@ -35,6 +35,7 @@ from fix_red_source_edits import (  # noqa: F401
     snap_added_conservative_spacing, strip_added_legacy_cache_exports,
     resolve_additive_node_tests_text, resolve_additive_node_test_file, resolve_additive_list_conflict, size_500_stale_hit,
 )
+import fix_red_node_imports  # noqa: E402  (named Node import unions; kept out of the size ceiling)
 
 SCHEMA = "jovie-fix-red-class/v1"
 # Actions a class can route to. `agent` is the default (a model run); the others spend no model.
@@ -644,9 +645,9 @@ def merge_additive_identifier_list(ours: str, theirs: str) -> str | None:
     return text + "\n"
 
 
-def resolve_additive_identifier_list_text(text: str) -> str | None:
-    """Replace conflict hunks that are only a one-line identifier list. None when any
-    hunk has another shape, so the caller leaves that merge to a model."""
+def resolve_additive_identifier_list_text(text: str, *, base: str = "") -> str | None:
+    """Replace identifier lists or base-proven additive named Node imports.
+    None when any hunk has another shape, leaving that merge to a model."""
     if "<<<<<<<" not in str(text or ""):
         return None
     hunks = list(_NARROWED_HUNK.finditer(text))
@@ -658,6 +659,9 @@ def resolve_additive_identifier_list_text(text: str) -> str | None:
     last = 0
     for hunk in hunks:
         merged = merge_additive_identifier_list(hunk.group("ours"), hunk.group("theirs"))
+        if merged is None and base:
+            merged = fix_red_node_imports.merge_additive_node_imports(
+                hunk.group("ours"), hunk.group("theirs"), base)
         if merged is None:
             return None
         pieces.append(text[last:hunk.start()])
