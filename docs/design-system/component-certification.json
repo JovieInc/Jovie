@@ -208,6 +208,10 @@
       "partial": "The icon draws one fixed music-note path; its two optional props are size (Sized, Compact) and className, so nothing can be partly present.",
       "long-content": "It renders no text; the detector matched its text- colour classes. Rtl shows the mark beside right-to-left copy."
     },
+    "apps/web/components/atoms/JovieMarkElectric.tsx": {
+      "partial": "The mark draws one fixed Jovie path; its props are size, className, style, idSeed and the spark switches (Default, SettledTrace, Static), so nothing can be partly present.",
+      "long-content": "It renders no text; it is a decorative aria-hidden SVG. Rtl shows the mark beside right-to-left copy."
+    },
     "apps/web/components/atoms/Logo.tsx": {
       "empty": "Logo draws the fixed Jovie wordmark or mark and takes no collection; the detector matched the .map( over the wordmark's own glyph paths from wordmarkGeometry, which always holds the five letters, so there is nothing that can be empty.",
       "permission-denied": "Logo only draws the brand wordmark or mark and has no permission input or gated action; the detector matched role='img' on the labelled svg."
@@ -293,6 +297,11 @@
     },
     "apps/web/components/features/landing/LandingCTAButton.tsx": {
       "partial": "LandingCTAButton draws one link from its required href, label, eventName and section; its optional props (variant, className, testId) are styling and test wiring with defaults, so no data can be partially present."
+    },
+    "apps/web/components/features/onboarding/ChatProposeCheckoutCard.tsx": {
+      "loading": "The card renders a finished proposeCheckout tool result: its label comes synchronously from offer truth and Continue is a plain route link, so nothing loads inside it.",
+      "offline": "It fetches nothing; Continue is a client route link to the checkout page, which owns its own network states.",
+      "permission-denied": "It has no gated mode: the onboarding chat shows it only to the person in that chat, and the checkout page decides access."
     },
     "apps/web/components/features/onboarding/OnboardingSecurityCheckRecovery.tsx": {
       "empty": "OnboardingSecurityCheckRecovery always renders one fixed heading, one status line and the retry button, and never a collection; the detector matched the items-start and items-center classes."

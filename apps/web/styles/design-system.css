@@ -1817,6 +1817,29 @@ html[data-profile-flow-open="true"] .cookie-banner-card {
   --noir-ion-selected: rgba(17, 175, 255, 0.1);
   --noir-ion-selected-strong: rgba(17, 175, 255, 0.16);
   --noir-ion-focus-ring: rgba(17, 175, 255, 0.72);
+  /* Electric Jovie mark (JovieMarkElectric): the faint outline, the settled
+     trace and the travelling spark with its bright core, the same in light
+     and dark. */
+  --jovie-mark-electric-outline: rgba(255, 255, 255, 0.065);
+  --jovie-mark-electric-trace: rgba(78, 190, 255, 0.46);
+  --jovie-mark-electric-spark: rgba(78, 190, 255, 0.82);
+  --jovie-mark-electric-spark-core: rgba(236, 250, 255, 0.88);
+  /* Profile preview bento (ProfilePreviewBento): the default hero, an accent
+     purple glow over a dark vertical gradient, and the fade into its base,
+     the same in light and dark. */
+  --profile-preview-bento-hero:
+    radial-gradient(
+      120% 90% at 50% -10%,
+      rgba(123, 108, 255, 0.42) 0%,
+      rgba(70, 58, 170, 0.14) 38%,
+      rgba(12, 12, 20, 0) 66%
+    ),
+    linear-gradient(180deg, #14131f 0%, #0c0c12 100%);
+  --profile-preview-bento-fade: linear-gradient(
+    to bottom,
+    transparent,
+    #0c0c12
+  );
   /* Light aliases keep shared marketing chrome on the same Noir Ion token
      family as the dark surface while the footer theme control is active. */
   --noir-ion-text-strong: var(--color-text-primary-token);
