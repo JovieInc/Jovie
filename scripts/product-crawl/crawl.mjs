@@ -28,6 +28,7 @@ import {
   rankFindings,
   TIMING_SAMPLES,
   timingSuspect,
+  verticalMove,
 } from './ready-gate.mjs';
 import {
   COLLECT,
@@ -104,6 +105,7 @@ const OBSERVE = `
     const testId = n.getAttribute('data-testid');
     return (n.tagName.toLowerCase() + (n.id ? '#' + n.id : '') + (testId ? '[data-testid=' + testId + ']' : '') + (cls ? '.' + cls : '')).slice(0, 100);
   };
+  const verticalMove = ${verticalMove};
   watch('layout-shift', e => {
     if (e.hadRecentInput) return;
     window.__crawl.cls += e.value;
@@ -111,11 +113,11 @@ const OBSERVE = `
       const k = label(s.node);
       if (!k) continue;
       window.__crawl.shifts[k] = (window.__crawl.shifts[k] ?? 0) + e.value;
-      // The first move says how far and when, so the cause can be found.
-      const a = s.previousRect, b = s.currentRect;
-      if (a && b && !window.__crawl.moves[k])
+      // The first vertical move says how far and when, so the cause can be found.
+      const dy = verticalMove(s.previousRect, s.currentRect);
+      if (dy !== undefined && !window.__crawl.moves[k])
         window.__crawl.moves[k] = {
-          dy: Math.round(b.y - a.y),
+          dy,
           atMs: Math.round(e.startTime),
           // What was inserted just before, sized as the shift happened.
           added: window.__crawl.added
