@@ -26,7 +26,8 @@ const { toDataURL } = vi.hoisted(() => ({
 vi.mock('qrcode', () => ({
   __esModule: true,
   default: {
-    toDataURL: (...args: unknown[]) => toDataURL(...(args as [string, object])),
+    toDataURL: (...args: unknown[]) =>
+      toDataURL(...(args as [string, { width: number; margin: number }])),
   },
 }));
 
