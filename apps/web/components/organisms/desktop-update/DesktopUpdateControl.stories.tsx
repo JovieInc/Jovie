@@ -77,6 +77,44 @@ export const RestartFailed: Story = {
 };
 export const Offline: Story = { args: { state: { kind: 'offline' } } };
 
+/** Loading: the updater is checking, so the button morphs into its loader. */
+export const LoadingChecking: Story = {
+  args: { state: { kind: 'checking' } },
+};
+
+/** Empty: nothing to report. The control renders nothing; the host keeps the slot. */
+export const EmptyHidden: Story = {
+  args: { state: DESKTOP_UPDATE_CONTROL_HIDDEN },
+  render: args => (
+    <SidebarSlot>
+      <div className='h-9'>
+        <DesktopUpdateControl {...args} />
+      </div>
+    </SidebarSlot>
+  ),
+};
+
+/** Long content: the longest status line in a rail narrower than the sidebar truncates; the button keeps its width. */
+export const LongContentNarrowRail: Story = {
+  args: { state: { kind: 'downloading', version: VERSION, percent: 100 } },
+  render: args => (
+    <div className='w-36 rounded-md border border-subtle bg-sidebar px-2 text-primary-token'>
+      <DesktopUpdateControl {...args} />
+    </div>
+  ),
+};
+
+/** Right-to-left page: the status line and the action swap sides and nothing overflows. */
+export const RtlSlot: Story = {
+  render: args => (
+    <div dir='rtl'>
+      <SidebarSlot>
+        <DesktopUpdateControl {...args} />
+      </SidebarSlot>
+    </div>
+  ),
+};
+
 function AllStatesGrid() {
   return (
     <div data-update-control-gallery className='flex flex-col gap-2'>

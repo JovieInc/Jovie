@@ -787,6 +787,9 @@
       "empty": "StandaloneProductPage is a layout shell that renders its required children in a main landmark; it owns no collection, and the detector matched the items-center class.",
       "partial": "Its optional props (className, contentClassName, width, centered) are layout options, not content fields, so there is no partially filled state; Centered and NarrowWidth show them."
     },
+    "apps/web/components/organisms/desktop-update/DesktopUpdateControl.tsx": {
+      "permission-denied": "Every desktop user may download, restart or retry an update; the control has no account, role or gated action. The detector matched role='status' on the polite announcement."
+    },
     "apps/web/components/organisms/public-surface/PublicSurfaceStage.tsx": {
       "empty": "The stage holds no data: children is required and is the profile card itself. The detector matched the items-stretch and items-center layout classes.",
       "partial": "Nothing can be partially present: className and panelClassName are styling and afterPanel is one optional slot, which Default shows absent and WithAfterPanel shows present."
