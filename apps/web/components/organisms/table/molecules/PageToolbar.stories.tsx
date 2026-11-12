@@ -121,7 +121,9 @@ export const LongContent: Story = {
     end: (
       <PageToolbarActionButton
         label='Display Options For Every Column'
-        ariaLabel='Display options'
+        /* label-content-name-mismatch: the accessible name must contain the
+           visible label, so a truncated name cannot replace it here. */
+        ariaLabel='Display options: Display Options For Every Column'
       />
     ),
   },

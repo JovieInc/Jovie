@@ -97,6 +97,9 @@ describe('CreateIdentityDialog', () => {
     await waitFor(() => {
       expect(screen.getByRole('alert')).toHaveTextContent('Username is taken');
     });
+    // Raw red (#f72a36) misses 4.5:1 on both themes; error copy uses the
+    // derived AA-safe -text token.
+    expect(screen.getByRole('alert')).toHaveClass('text-error-text');
     expect(mockToastSuccess).not.toHaveBeenCalled();
     expect(mockRefresh).not.toHaveBeenCalled();
   });

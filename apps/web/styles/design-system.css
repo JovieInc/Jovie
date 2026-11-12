@@ -1914,6 +1914,10 @@ html[data-profile-flow-open="true"] .cookie-banner-card {
   --color-accent-purple-text: #6d28d9;
   --color-accent-pink: #f52bb5;
   --color-accent-pink-subtle: rgba(245, 43, 181, 0.12);
+  /* Accent TEXT variants (light): raw Ion accents clear 4.5:1 only on dark
+     surfaces. On light paper they need darkened text mixes (WCAG 2.2 AA). */
+  --color-accent-blue-text: #0072c6;
+  --color-accent-pink-text: #c4187f;
   --color-accent-red: #f72a36;
   --color-accent-red-subtle: rgba(247, 42, 54, 0.12);
   --color-accent-orange: #ff7800;
@@ -2258,6 +2262,10 @@ html[data-profile-flow-open="true"] .cookie-banner-card {
   --color-accent-purple-text: #a47bff;
   --color-accent-pink: #f52bb5;
   --color-accent-pink-subtle: rgba(245, 43, 181, 0.12);
+  /* Accent TEXT variants (dark): the raw accents clear 4.5:1 on dark
+     surfaces, so the text variants rebind to them. */
+  --color-accent-blue-text: var(--color-accent-blue);
+  --color-accent-pink-text: var(--color-accent-pink);
   --color-accent-red: #f72a36;
   --color-accent-red-subtle: rgba(247, 42, 54, 0.12);
   --color-accent-orange: #ff7800;
@@ -3334,9 +3342,9 @@ html[data-profile-flow-open="true"] .cookie-banner-card {
    keep status copy at WCAG AA (4.5:1) on white (light) and on the error-tinted
    and elevated dark surfaces, without redefining the palette. */
 :root {
-  --color-success-text: color-mix(in srgb, var(--color-success) 48%, black);
-  --color-warning-text: color-mix(in srgb, var(--color-warning) 70%, black);
-  --color-error-text: color-mix(in srgb, var(--color-error) 85%, black);
+  --color-success-text: color-mix(in srgb, var(--color-success) 42%, black);
+  --color-warning-text: color-mix(in srgb, var(--color-warning) 60%, black);
+  --color-error-text: color-mix(in srgb, var(--color-error) 78%, black);
   --color-accent-text: color-mix(in srgb, var(--color-accent) 65%, black);
 }
 
@@ -3823,6 +3831,13 @@ html[data-profile-flow-open="true"] .cookie-banner-card {
   --color-accent-purple-subtle: rgba(169, 130, 255, 0.12);
   --color-accent-pink: #ff48d2;
   --color-accent-pink-subtle: rgba(255, 72, 210, 0.12);
+  /* Night-page palette paints dark surfaces, so the accent TEXT variants
+     must rebind to the dark-surface values: the light :root text variants
+     are tuned for white paper and fail 4.5:1 on the dark tiles (axe
+     color-contrast). */
+  --color-accent-blue-text: var(--color-accent-blue);
+  --color-accent-pink-text: var(--color-accent-pink);
+  --color-accent-purple-text: var(--color-accent-purple);
   --color-accent-red: #ff677d;
   --color-accent-red-subtle: rgba(255, 103, 125, 0.12);
   --color-accent-orange: #ffc857;
@@ -3929,6 +3944,13 @@ html:not(.dark) .teleprompter-studio {
   --color-accent-purple-subtle: rgba(169, 130, 255, 0.12);
   --color-accent-pink: #ff48d2;
   --color-accent-pink-subtle: rgba(255, 72, 210, 0.12);
+  /* Night-page palette paints dark surfaces, so the accent TEXT variants
+     must rebind to the dark-surface values: the light :root text variants
+     are tuned for white paper and fail 4.5:1 on the dark tiles (axe
+     color-contrast). */
+  --color-accent-blue-text: var(--color-accent-blue);
+  --color-accent-pink-text: var(--color-accent-pink);
+  --color-accent-purple-text: var(--color-accent-purple);
   --color-accent-red: #ff677d;
   --color-accent-red-subtle: rgba(255, 103, 125, 0.12);
   --color-accent-orange: #ffc857;

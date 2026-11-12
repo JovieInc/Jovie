@@ -332,7 +332,7 @@ export const MENU_SEARCH_INPUT_BASE =
   'h-7 w-full rounded-full border border-subtle bg-surface-1 py-1 ps-7 pe-7 text-xs text-primary-token placeholder:text-tertiary-token focus-visible:outline-none focus-visible:border-focus focus-visible:ring-2 focus-visible:ring-focus/25';
 
 export const MENU_SEARCH_CLEAR_BUTTON_BASE =
-  'absolute inset-y-0 end-1.5 my-auto inline-flex h-4 w-4 items-center justify-center rounded-full text-tertiary-token transition-colors duration-fast ease-interactive hover:bg-surface-2 hover:text-primary-token focus-visible:outline-none focus-visible:bg-surface-2 focus-visible:ring-1 focus-visible:ring-focus/35';
+  'absolute inset-y-0 end-1.5 my-auto inline-flex h-6 w-6 items-center justify-center rounded-full text-tertiary-token transition-colors duration-fast ease-interactive hover:bg-surface-2 hover:text-primary-token focus-visible:outline-none focus-visible:bg-surface-2 focus-visible:ring-1 focus-visible:ring-focus/35';
 
 /**
  * Empty and loading states inside menu surfaces

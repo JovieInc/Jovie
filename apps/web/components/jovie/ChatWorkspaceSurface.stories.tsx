@@ -37,7 +37,12 @@ export const LongContentTranscript: Story = {
   args: {
     children: (
       <div className='flex h-full flex-col p-4'>
-        <div className='min-h-0 flex-1 space-y-3 overflow-y-auto'>
+        <section
+          aria-label='Chat transcript'
+          // biome-ignore lint/a11y/noNoninteractiveTabindex: keyboard entry point for the scrollable region (axe scrollable-region-focusable)
+          tabIndex={0}
+          className='min-h-0 flex-1 space-y-3 overflow-y-auto'
+        >
           {Array.from({ length: 30 }, (_, index) => index + 1).map(turn => (
             <p
               key={`turn-${turn}`}
@@ -48,7 +53,7 @@ export const LongContentTranscript: Story = {
               Edition) that wraps across several lines.
             </p>
           ))}
-        </div>
+        </section>
         <div className='shrink-0 rounded-lg border border-subtle bg-surface-0 p-3 text-sm text-primary-token'>
           Composer
         </div>

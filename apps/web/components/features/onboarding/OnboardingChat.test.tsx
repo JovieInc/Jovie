@@ -107,6 +107,19 @@ describe('OnboardingChat states', () => {
     await expectNoA11yViolations(container);
   });
 
+  // The transcript scroll area is the scrollable region (axe
+  // scrollable-region-focusable): it carries a region label and a keyboard
+  // entry point.
+  it('gives the transcript scroll region keyboard access', async () => {
+    const { container } = render(<OnboardingChat {...verified} />);
+
+    const scrollRegion = await screen.findByRole('region', {
+      name: 'Onboarding Conversation',
+    });
+    expect(scrollRegion).toHaveAttribute('tabindex', '0');
+    await expectNoA11yViolations(container);
+  });
+
   it('shows the thinking row while the first reply is pending', async () => {
     chat.status = 'submitted';
     const { container } = render(

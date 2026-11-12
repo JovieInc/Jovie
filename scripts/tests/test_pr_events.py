@@ -484,8 +484,14 @@ class RelayTest(unittest.TestCase):
         disabled = {"claude", "hyperagent"}
         self.assertTrue(events.in_scope(pr(draft=True), "red", disabled))
         self.assertTrue(events.in_scope(pr(branch="tim/fix"), "red", disabled))
-        self.assertFalse(events.in_scope(pr(branch="claude/focused-davinci-x", draft=True), "red", disabled),
-                         "a human session's draft is not the lanes' work")
+        # Tim 2026-11-12: a red required check on any same-repo draft to main is repair scope;
+        # whether its writer still holds it is the active-worker gate's call (red_label_justified).
+        session = pr(branch="claude/focused-davinci-x", draft=True)
+        self.assertTrue(events.in_scope(session, "red", disabled))
+        self.assertFalse(events.in_scope(session, "conflict", disabled), "only red repair widened")
+        self.assertFalse(events.in_scope({**session, "baseRefName": "claude/parent"}, "red", disabled),
+                         "a stacked draft stays with its stack")
+        self.assertFalse(events.in_scope({**session, "isCrossRepository": True}, "red", disabled))
         self.assertFalse(events.in_scope(pr(isCrossRepository=True), "red", disabled))
         self.assertFalse(events.in_scope(pr(labels=["hold"]), "red", disabled))
         self.assertFalse(events.in_scope(pr(state="MERGED"), "red", disabled))
@@ -1957,7 +1963,9 @@ class GapTest(unittest.TestCase):
 
     def test_stalled_agent_drafts_are_repaired_or_held_on_a_live_dependency(self):
         """JOV-7079 canary: an old non-lane agent draft cannot sit forever. Past the 3d SLO
-        and stalled it enters repair unless a dependency it names is still open."""
+        and stalled it is reclaimed unless a dependency it names is still open; that age rule
+        is the close / reclaim-to-close authority only. A red required check is repaired within
+        the hour whatever the draft's age (Tim 2026-11-12), and never closes anything."""
         now = events.iso_ts("2033-05-18T03:00:00Z")
         old, recent = "2033-05-15T00:00:00Z", "2033-05-18T00:00:00Z"
         ancient = "2033-05-01T00:00:00Z"
@@ -2000,6 +2008,17 @@ class GapTest(unittest.TestCase):
         self.assertEqual(landed["close"], [])
         self.assertEqual(next(row for row in landed["dispositions"] if row["pr"] == 22)["state"], "advancing")
         self.assertIn((22, "stale"), landed["label"])
+        # New rule: red repair no longer waits for the 3d floor. The young draft (23) goes red
+        # with no commit for 2h: repaired now. A red draft committed 10 minutes ago keeps its
+        # writer. Neither red draft is closed, and the dependency hold is unchanged.
+        red = [{**prs[3], "rollup": "FAILURE", "lastCommitAt": "2033-05-18T01:00:00Z"},
+               self.node(25, isDraft=True, headRefName="claude/live-session", rollup="FAILURE",
+                         createdAt="2033-05-18T02:00:00Z", lastCommitAt="2033-05-18T02:50:00Z")]
+        repaired = events.reconcile_plan(prs[:3] + red, {}, set(), 2, now, deps={22: [9]})
+        self.assertIn((23, "red"), repaired["label"])
+        self.assertNotIn(25, [number for number, _ in repaired["label"]], "a commit inside the hour holds the head")
+        self.assertEqual(repaired["close"], [])
+        self.assertEqual(repaired["depHolds"], [(22, [9])])
 
     def test_reclaimed_abandoned_drafts_are_in_scope_for_repair_and_promotion(self):
         now = events.iso_ts("2033-05-18T03:00:00Z")
@@ -2009,7 +2028,10 @@ class GapTest(unittest.TestCase):
         self.assertTrue(events.in_scope(abandoned, "green", set(), now), "a reclaimed draft is readied when CLEAN")
         self.assertFalse(events.in_scope(abandoned, "orphan", set(), now))
         moving = pr(31, branch="codex/homepage-material", draft=True, merge="BLOCKED", createdAt=ancient, updatedAt=recent)
-        self.assertFalse(events.in_scope(moving, "red", set(), now), "a draft still being pushed stays with its writer")
+        self.assertFalse(events.in_scope(moving, "conflict", set(), now), "a draft still being pushed stays with its writer")
+        # Red repair is no longer gated on age (Tim 2026-11-12): any red draft to main is in
+        # scope, and the active-worker gate (claim or commit inside the hour) keeps live writers.
+        self.assertTrue(events.in_scope(moving, "red", set(), now))
         held = pr(32, branch="codex/held", draft=True, merge="BLOCKED", createdAt=ancient, updatedAt=old, labels=["hold"])
         self.assertFalse(events.in_scope(held, "red", set(), now))
         writer = pr(33, branch="feature/mine", draft=True, merge="DIRTY", createdAt=ancient, updatedAt=old)
@@ -2574,7 +2596,10 @@ class NativeQueueClaimTest(unittest.TestCase):
         for entrypoint in ("event", "poll"):
             with self.subTest(entrypoint=entrypoint), tempfile.TemporaryDirectory() as tmp:
                 host = runner.Host(state=Path(tmp));target = pr(branch="human/work", kinds=["red"], checks=[RED_CHECK])
-                shell = Shell();module = fake_lane(shell);live = {**target, "state": "OPEN", "isDraft": True}
+                # A head restacked onto another branch left red-repair scope (a red draft to main is
+                # in scope since 2026-11-12; a stacked one stays with its stack).
+                shell = Shell();module = fake_lane(shell)
+                live = {**target, "state": "OPEN", "isDraft": True, "baseRefName": "human/parent"}
                 module.reconcile_fix_target = lambda _: live
                 with patch.object(runner, "sh", shell), patch.object(runner, "reconcile_fix_target", return_value=live), \
                         patch.object(runner, "claimed_elsewhere", return_value=False), \
@@ -2611,8 +2636,11 @@ class NativeQueueClaimTest(unittest.TestCase):
                 self.assertEqual(path.exists(), allowed)
                 if allowed:self.assertEqual(json.loads(path.read_text())["5"]["count"], 1)
                 self.assertEqual(shell.calls, [])
-        self.assertFalse(events.in_scope(pr(branch=digest, draft=True), "red", {"hyperagent"}),
+        self.assertFalse(events.in_scope(pr(branch=digest, draft=True), "conflict", {"hyperagent"}),
                          "polling integration does not expand event ownership")
+        # Tim 2026-11-12: a red draft to main is red-repair scope whatever its prefix; the
+        # relay's active-worker gate (fresh claim or commit inside the hour) keeps live writers.
+        self.assertTrue(events.in_scope(pr(branch=digest, draft=True), "red", {"hyperagent"}))
 
     def test_cleanup_production_list_rotates_refused_row_and_preserves_current_ownership(self):
         for first in ("queued", "unreadable", "owner"):
