@@ -554,9 +554,7 @@ export async function getCanonicalContactByKey(
   }
 }
 
-export async function buildCanonicalContacts(): Promise<
-  CanonicalContactListRow[]
-> {
+export async function buildCanonicalContacts() {
   const [sourceRows, overrides, excluded] = await Promise.all([
     collectSourceRows(),
     getContactOverrides(),
