@@ -3,7 +3,7 @@
 // @coverage-via apps/web/tests/components/user-button.test.tsx
 
 import type { CommonDropdownItem, CommonDropdownSubmenu } from '@jovie/ui';
-import { Badge, Button, CommonDropdown } from '@jovie/ui';
+import { Badge, Button, CommonDropdown, PlainButton } from '@jovie/ui';
 import {
   ArrowDownToLine,
   CircleAlert,
@@ -698,7 +698,7 @@ export function UserButton({
   const triggerElement =
     trigger ??
     (showUserInfo ? (
-      <button
+      <PlainButton
         type='button'
         className={cn(
           'relative group/user-button flex w-full min-w-0 items-center gap-2 rounded-md px-2 py-1 text-left transition-colors hover:bg-sidebar-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring group-data-[collapsible=icon]:mx-auto group-data-[collapsible=icon]:size-7 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:gap-0 group-data-[collapsible=icon]:p-0',
@@ -748,7 +748,7 @@ export function UserButton({
           )}
           aria-hidden='true'
         />
-      </button>
+      </PlainButton>
     ) : (
       <Button
         variant='ghost'

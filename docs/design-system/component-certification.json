@@ -936,6 +936,11 @@
     "packages/ui/atoms/link.tsx": {
       "partial": "Link renders one label slot; its optional props (variant, active, visited, disabled, touchTarget, reserveLabel) are presentation flags with defaults, and the not-yet-arrived label case is shown by the EmptyStreamedLabel story."
     },
+    "packages/ui/atoms/plain-button.tsx": {
+      "empty": "PlainButton renders the children its caller passes and owns no collection or data, so it has no empty state of its own.",
+      "error": "PlainButton makes no request and validates nothing; an error belongs to the action its caller wires to onClick.",
+      "offline": "PlainButton makes no network request, so it behaves the same offline; connectivity belongs to the caller's action."
+    },
     "packages/ui/atoms/progress.tsx": {
       "permission-denied": "ProgressBar only reports completion of an upload or import and has no gated action or permission input; the detector matched role='progressbar'."
     },

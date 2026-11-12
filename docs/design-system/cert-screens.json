@@ -82,7 +82,6 @@
     "apps/web/components/features/admin/ImpersonationBanner.tsx": "a11y,frontend-rules,states,tokens",
     "apps/web/components/features/alerts/AlertGrowthLanding.tsx": "a11y,ds-owner,frontend-rules,states,tests",
     "apps/web/components/features/ask-jovie/AskJovieWidget.tsx": "a11y,ds-owner,frontend-rules,states",
-    "apps/web/components/features/auth/AuthProviderButtons.tsx": "ds-owner",
     "apps/web/components/features/auth/atoms/otp-input/OtpInput.tsx": "a11y,ds-owner,frontend-rules,states,tests,tokens",
     "apps/web/components/features/dashboard/dashboard-nav/NavMenuItem.tsx": "a11y,ds-owner,states,tests",
     "apps/web/components/features/dashboard/molecules/EmailSignatureDialog.tsx": "a11y,frontend-rules,states,tests,tokens",
@@ -112,7 +111,6 @@
     "apps/web/components/features/profile/DesktopQrOverlay.tsx": "a11y,ds-owner,states,tests,tokens",
     "apps/web/components/features/profile/ProfileAboutShare.tsx": "a11y,ds-owner,states,tests",
     "apps/web/components/features/profile/ProfileDrawerShell.tsx": "a11y,ds-owner,states,tests,tokens",
-    "apps/web/components/features/profile/ProfileIdentityHeader.tsx": "ds-owner",
     "apps/web/components/features/profile/ProfilePrimaryTabPanel.tsx": "a11y,states,tests,tokens",
     "apps/web/components/features/profile/ProfileUnifiedDrawer.tsx": "a11y,ds-owner,states,tests",
     "apps/web/components/features/profile/TourModePanel.tsx": "a11y,states,tests,tokens",
@@ -158,7 +156,6 @@
     "apps/web/components/molecules/GenrePicker.tsx": "a11y,ds-owner,frontend-rules,states,tests",
     "apps/web/components/molecules/LocationPicker.tsx": "a11y,ds-owner,forced-caps,frontend-rules,states,tests",
     "apps/web/components/molecules/MerchPricingPresetPicker.tsx": "a11y,ds-owner,frontend-rules,states,tests",
-    "apps/web/components/molecules/MobileNav.tsx": "ds-owner",
     "apps/web/components/molecules/ReleaseDueBadge.tsx": "a11y,ds-owner,states,tests,tokens",
     "apps/web/components/molecules/WorkspaceSelector.tsx": "a11y,ds-owner,states,tests",
     "apps/web/components/molecules/drawer/CollapsibleSectionHeading.tsx": "a11y,ds-owner,states",
@@ -176,7 +173,6 @@
     "apps/web/components/organisms/CmdKPalette.tsx": "a11y,ds-owner,frontend-rules,states",
     "apps/web/components/organisms/CommandPalette.tsx": "a11y,states,tests",
     "apps/web/components/organisms/DesktopTitlebar.tsx": "a11y,ds-owner,states,tests,tokens",
-    "apps/web/components/organisms/HeaderNav.tsx": "ds-owner",
     "apps/web/components/organisms/OperatorListsNav.tsx": "a11y,ds-owner,frontend-rules,states",
     "apps/web/components/organisms/OperatorMobileNavigation.tsx": "a11y,tests",
     "apps/web/components/organisms/PageShell.tsx": "a11y,states,tests",
@@ -196,7 +192,6 @@
     "apps/web/components/organisms/sidebar/sidebar.tsx": "a11y,states",
     "apps/web/components/organisms/table/atoms/ShellListRowFrame.tsx": "a11y,ds-owner,states,tests",
     "apps/web/components/organisms/table/molecules/TableHeaderCell.tsx": "a11y,ds-owner,states",
-    "apps/web/components/organisms/user-button/UserButton.tsx": "ds-owner",
     "apps/web/components/providers/ErrorBoundary.tsx": "a11y,ds-owner,states,tests",
     "apps/web/components/shell/ContextMenuOverlay.tsx": "a11y,ds-owner,forced-caps,states",
     "apps/web/components/shell/DictationWaveform.tsx": "a11y,states,tokens",
@@ -205,7 +200,6 @@
     "apps/web/components/shell/ScrubGradient.tsx": "a11y,ds-owner,frontend-rules,states,tests,tokens",
     "apps/web/components/shell/SidebarBottomNowPlaying.tsx": "a11y,states,tokens",
     "apps/web/components/shell/SidebarNavItem.tsx": "a11y,ds-owner,states",
-    "apps/web/components/shell/SidebarThreadsSection.tsx": "a11y,states,tokens",
-    "apps/web/components/site/theme-toggle/ThemeToggleSegmented.tsx": "ds-owner"
+    "apps/web/components/shell/SidebarThreadsSection.tsx": "a11y,states,tokens"
   }
 }

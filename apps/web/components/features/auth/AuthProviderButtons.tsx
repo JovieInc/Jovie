@@ -1,3 +1,4 @@
+import { PlainButton } from '@jovie/ui';
 // @coverage-via apps/web/tests/unit/auth/AuthProviderButtons.test.tsx
 import Image from 'next/image';
 import type { PrimaryAuthOAuthProvider } from '@/lib/auth/oauth-providers';
@@ -46,7 +47,7 @@ export function AuthProviderButtonSlot({
   const isDisabled = disabled || pending;
 
   return (
-    <button
+    <PlainButton
       type='button'
       disabled={isDisabled}
       aria-label={pending ? `${label} loading` : undefined}
@@ -73,7 +74,7 @@ export function AuthProviderButtonSlot({
         )}
         <span>{label}</span>
       </span>
-    </button>
+    </PlainButton>
   );
 }
 

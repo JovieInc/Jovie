@@ -222,7 +222,6 @@ export type {
   HostDrawnSelectProps,
 } from './atoms/host-drawn-field';
 export { HostDrawnInput, HostDrawnSelect } from './atoms/host-drawn-field';
-// IconButton
 export type { IconButtonName, IconButtonProps } from './atoms/icon-button';
 export { IconButton, iconButtonVariants } from './atoms/icon-button';
 export {
@@ -243,7 +242,6 @@ export { InlineSubscribe } from './atoms/inline-subscribe';
 // Input
 export type { InputProps } from './atoms/input';
 export { Input, inputVariants } from './atoms/input';
-
 // InputGroup
 export type { InputGroupProps } from './atoms/input-group';
 export { InputGroup } from './atoms/input-group';
@@ -262,6 +260,9 @@ export type {
   NativeSelectProps,
 } from './atoms/native-select';
 export { NativeSelect } from './atoms/native-select';
+// IconButton
+export type { PlainButtonProps } from './atoms/plain-button';
+export { PlainButton, plainButtonFocusClassName } from './atoms/plain-button';
 // Popover
 export {
   Popover,
