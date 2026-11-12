@@ -1406,7 +1406,7 @@ export function OnboardingChat({
       <section
         ref={scrollContainerRef}
         onScroll={onScroll}
-        aria-label='Onboarding conversation'
+        aria-label='Onboarding Conversation'
         // biome-ignore lint/a11y/noNoninteractiveTabindex: keyboard entry point for the scrollable transcript (axe scrollable-region-focusable)
         tabIndex={0}
         className={cn(

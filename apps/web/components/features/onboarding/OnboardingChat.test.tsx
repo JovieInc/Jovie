@@ -114,7 +114,7 @@ describe('OnboardingChat states', () => {
     const { container } = render(<OnboardingChat {...verified} />);
 
     const scrollRegion = await screen.findByRole('region', {
-      name: 'Onboarding conversation',
+      name: 'Onboarding Conversation',
     });
     expect(scrollRegion).toHaveAttribute('tabindex', '0');
     await expectNoA11yViolations(container);

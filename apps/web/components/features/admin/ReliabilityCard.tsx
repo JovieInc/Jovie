@@ -86,7 +86,7 @@ export function ReliabilityCard({ summary }: Readonly<ReliabilityCardProps>) {
     : '—';
 
   return (
-    <ContentSurfaceCard className='h-full overflow-hidden'>
+    <ContentSurfaceCard className='overflow-hidden'>
       <ContentSectionHeader
         title='Reliability'
         subtitle='System health metrics'

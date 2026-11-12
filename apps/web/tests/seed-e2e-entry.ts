@@ -13,7 +13,7 @@
 import { neon } from '@neondatabase/serverless';
 import { sql as drizzleSql } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/neon-http';
-import { creatorProfiles } from '@/lib/db/schema';
+import { creatorProfiles } from '@/lib/db/schema/profiles';
 
 /** Same resolution order as getSeedEnv in ./seed-test-data. */
 const databaseUrl =
