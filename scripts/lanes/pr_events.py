@@ -28,13 +28,16 @@ from datetime import datetime, timezone
 from pathlib import Path
 from urllib.parse import urlsplit
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+from pr_event_queries import linear_issue, RETIREMENT_QUERY
+import cloud_lane  # noqa: E402  (JOV-10357 draft-only origin check; leaf module, no runner import)
 import disk_guard  # noqa: E402
-import lifecycle, pr_wip, repair_order  # noqa: E402  (pr_wip: per-producer WIP census; repair_order: fair claims)
+import lifecycle, pr_wip, repair_order, repair_win  # noqa: E402  (pr_wip: per-producer WIP census; repair_order: fair claims)
 from label_episodes import RELAY_RED_LABELLER, label_episode_applier  # noqa: E402  (JOV-8492 provenance gate)
 
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 from atomic_state import append_json_object
+from pr_body_markup import ANY_HEADING, quote_revision_references, red_section_bounds, with_red_section
 import remediation  # noqa: E402  (classifier + non-PR intake; no lane_runner import)
 REPO = os.environ.get("GITHUB_REPOSITORY", "JovieInc/Jovie")
 PREFIX = "lane-fix-"
@@ -1005,29 +1008,8 @@ def quota_failure(workflow_run: dict, sh=run, classify=None) -> str | None:
 
 
 RED_BLOCK_MARKER = "<!-- lanes:red-before-green -->"
-RED_HEADING = re.compile(r"^#{1,6}\s*red-before-green\s*$", re.I)
-ANY_HEADING = re.compile(r"^#{1,6}\s")
 JOB_URL = re.compile(r"^(https://github\.com/[\w.-]+/[\w.-]+/actions/runs/[1-9]\d*)(?:/job/\d+)?")
 RED_RUN_URL = re.compile(r"https://github\.com/[\w.-]+/[\w.-]+/actions/runs/[1-9]\d*(?:/attempts/[1-9]\d*)?")
-
-
-def red_section_bounds(lines: list[str], heading=RED_HEADING) -> tuple[int, int] | None:
-    """Match Fleet boundaries, ignoring fenced/hidden headings but preserving source line indexes."""
-    visible = re.sub(r"<!--[\s\S]*?-->", lambda match: "\n" * match.group().count("\n"), "\n".join(lines))
-    fenced = False
-    start = None
-    for index, line in enumerate(visible.split("\n")):
-        if re.match(r"^\s*(?:```|~~~)", line):
-            fenced = not fenced
-            continue
-        if fenced:
-            continue
-        if start is None:
-            if heading.match(line.strip()):
-                start = index
-        elif ANY_HEADING.match(line):
-            return start, index
-    return (start, len(lines)) if start is not None else None
 
 
 def red_section_complete(body: str) -> bool:
@@ -1082,16 +1064,6 @@ def red_before_green_block(pr: dict, excerpt: str = "") -> str | None:
     return None
 
 
-def with_red_section(body: str, block: str) -> str:
-    """Replace an empty/placeholder Red-before-green section with the block, or append one."""
-    lines = (body or "").split("\n")
-    bounds = red_section_bounds(lines)
-    if bounds is None:
-        return (body or "").rstrip("\n") + "\n\n" + block + "\n"
-    start, end = bounds
-    return "\n".join(lines[:start] + block.split("\n") + [""] + lines[end:])
-
-
 def repair_evidence_body(pr: dict, body: str, excerpt: str = "", *, customer_decision: dict | None = None,
                          locking_pr: int | None = None, win_section: str | None = None,
                          premise: dict | None = None, previous_win_section: str | None = None) -> str:
@@ -1121,10 +1093,7 @@ def repair_evidence_body(pr: dict, body: str, excerpt: str = "", *, customer_dec
     if previous_win_section is not None and not win_section:
         raise ValueError("Win replacement requires explicit measured win evidence")
     if win_section is not None and win_section != "":
-        if not isinstance(win_section, str) or not re.match(r"\A## Win\s*\n", win_section):
-            raise ValueError("measured win requires a complete ## Win section")
-        if re.search(r"^#{1,6}\s+|customer-changelog/v1", win_section.split("\n", 1)[1], re.M):
-            raise ValueError("measured win must contain only Win evidence; use the dedicated repair fields")
+        repair_win.validate(win_section)
         lines = updated.split("\n")
         bounds = red_section_bounds(lines, re.compile(r"^#{2,3}\s*Win\s*$", re.I))
         if previous_win_section is not None:
@@ -1143,7 +1112,7 @@ def repair_evidence_body(pr: dict, body: str, excerpt: str = "", *, customer_dec
         if red_section_bounds(updated.split("\n"), re.compile(r"^#{2,3}\s*Premise check\s*$", re.I)) is None:
             block = "## Premise check\n\n" + "\n".join(f"- {field}: {premise[field]}" for field in fields)
             updated = updated.rstrip("\n") + "\n\n" + block + "\n"
-    return updated
+    return quote_revision_references(updated)
 
 
 def api_gh(args, **_):
@@ -1980,6 +1949,9 @@ def charge_reentry(lane, path: Path, pr: dict, expected: dict, name: str, now: f
 def ready_green(host, lane, pr: dict, held: dict, now: float) -> str:
     """The lane is the PR's writer (JOV-INV-022): a CLEAN lane draft whose head no diff policy
     held is marked ready together with its native merge intent. Returns what happened."""
+    if cloud_lane.is_cloud_origin(pr):
+        # JOV-10357: a cloud-origin draft is never readied or enrolled (draft-only, R3).
+        return "held:cloud-origin-draft-only"
     entry = held.get(str(pr["number"]), {})
     if entry.get("sha") == pr["headRefOid"]:
         code = entry.get("reason") or held_reason(entry.get("evidence") or [])[0]
@@ -2004,19 +1976,6 @@ def ready_green(host, lane, pr: dict, held: dict, now: float) -> str:
                "endedAt": lane.now_iso()}
     ledger(host, receipt)
     return receipt["verdict"]
-
-
-def linear_issue(linear, identifier: str) -> dict | None:
-    team, _, number = identifier.upper().partition("-")
-    data = linear.gql('query($n:Float!,$t:String!){issues(filter:{team:{key:{eq:$t}},number:{eq:$n}})'
-                      '{nodes{id state{name type} comments(last:20){nodes{body}}}}}', {"n": float(number), "t": team})
-    nodes = data["issues"]["nodes"]
-    return nodes[0] if nodes else None
-
-
-RETIREMENT_QUERY = """query($owner:String!,$name:String!,$number:Int!){repository(owner:$owner,name:$name){
-pullRequest(number:$number){number state headRefOid headRefName isCrossRepository isInMergeQueue
-labels(first:100){pageInfo{hasNextPage} nodes{name}}}}}"""
 
 
 def duplicate_authorized(pr: dict) -> bool:
@@ -2059,6 +2018,8 @@ def close_duplicate(lane, pr: dict, why: str, *, host, now: float | None = None)
 
 def return_to_pool(lane, linear, pr: dict, why: str, *, host, now: float | None = None) -> bool:
     """Return explicitly retired duplicate work to the pool only after a successful close."""
+    if cloud_lane.is_cloud_origin(pr):
+        return False  # JOV-10357: cloud-origin drafts are never closed or re-queued (R3).
     if maintenance_hold(host, lane, pr, time.time() if now is None else now):
         return False
     if not close_duplicate(lane, pr, why, host=host, now=now):
@@ -2077,6 +2038,8 @@ def return_to_pool(lane, linear, pr: dict, why: str, *, host, now: float | None 
 
 def retire_orphan(lane, linear, pr: dict, open_prs: list[dict], *, host, now: float | None = None) -> str:
     """Adopt disabled-lane work; retire only explicitly authorized, unheld duplicates."""
+    if cloud_lane.is_cloud_origin(pr):
+        return "held:cloud-origin-draft-only"  # JOV-10357: never adopted or retired (R3).
     if reason := maintenance_hold(host, lane, pr, time.time() if now is None else now):
         return f"held:{reason}"
     found = LANE_BRANCH.match(pr.get("headRefName") or "")

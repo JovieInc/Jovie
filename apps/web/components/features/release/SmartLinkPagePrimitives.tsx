@@ -57,7 +57,7 @@ export function SmartLinkArtworkCard({
   return (
     <ArtworkFrame
       size={272}
-      className={cn('aspect-square w-full bg-white/5 shadow-2xl', className)}
+      className={cn('aspect-square w-full bg-on-media/5 shadow-2xl', className)}
     >
       {artworkUrl ? (
         <Image
@@ -108,9 +108,9 @@ export function SmartLinkArtistName({
 const FOOTER_HIT_CLASSES =
   'relative before:absolute before:left-1/2 before:top-1/2 before:h-11 before:w-full before:min-w-11 before:-translate-x-1/2 before:-translate-y-1/2';
 // Primary: the single brand line (14px medium).
-const FOOTER_BRAND_CLASSES = `${FOOTER_HIT_CLASSES} smart-link-powered-by inline-flex items-center gap-2 text-sm font-medium text-neutral-700 transition-colors duration-subtle hover:text-neutral-950 dark:text-muted-foreground dark:hover:text-foreground/90`;
+const FOOTER_BRAND_CLASSES = `${FOOTER_HIT_CLASSES} smart-link-powered-by inline-flex items-center gap-2 text-sm font-medium text-(--color-smart-link-footer-text) transition-colors duration-subtle hover:text-(--color-smart-link-footer-text-hover) dark:text-muted-foreground dark:hover:text-foreground/90`;
 // Secondary: utility links (12px caption, regular weight).
-const FOOTER_UTILITY_CLASSES = `${FOOTER_HIT_CLASSES} inline-flex items-center text-xs font-normal text-muted-foreground transition-colors duration-subtle hover:text-neutral-950 dark:text-muted-foreground dark:hover:text-foreground/90`;
+const FOOTER_UTILITY_CLASSES = `${FOOTER_HIT_CLASSES} inline-flex items-center text-xs font-normal text-muted-foreground transition-colors duration-subtle hover:text-(--color-smart-link-footer-text-hover) dark:text-muted-foreground dark:hover:text-foreground/90`;
 
 /**
  * Abuse-report entry point for a smart link. The target must identify the

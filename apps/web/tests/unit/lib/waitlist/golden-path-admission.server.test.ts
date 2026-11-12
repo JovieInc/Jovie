@@ -4,6 +4,7 @@ const mocks = vi.hoisted(() => ({
   readCached: vi.fn(),
   settings: vi.fn(),
   learnings: vi.fn(),
+  bugReports: vi.fn(),
 }));
 
 vi.mock('server-only', () => ({}));
@@ -12,6 +13,11 @@ vi.mock('@/lib/error-tracking', () => ({
 }));
 vi.mock('@/lib/acquisition/eligibility.server', () => ({
   readCachedAcquisitionEligibility: mocks.readCached,
+}));
+vi.mock('@/lib/db', () => ({
+  db: {
+    select: () => ({ from: () => ({ where: mocks.bugReports }) }),
+  },
 }));
 vi.mock('@/lib/waitlist/settings', () => ({
   getWaitlistSettings: mocks.settings,
@@ -42,6 +48,7 @@ describe('golden-path admission server reads', () => {
     mocks.readCached.mockResolvedValue(green);
     mocks.settings.mockResolvedValue(roomy);
     mocks.learnings.mockResolvedValue(0);
+    mocks.bugReports.mockResolvedValue([{ open: 0 }]);
   });
 
   it('admits a resolved artist when green, with capacity and an open throttle', async () => {
@@ -66,6 +73,33 @@ describe('golden-path admission server reads', () => {
     });
     expect((await decideGoldenPathAdmissionForArtist(artist)).admit).toBe(
       false
+    );
+  });
+
+  it('pauses admission while open bug reports pile up (support load)', async () => {
+    mocks.bugReports.mockResolvedValue([{ open: 10 }]);
+    expect(await decideGoldenPathAdmissionForArtist(artist)).toEqual({
+      admit: false,
+      reason: 'hold_support_load',
+    });
+  });
+
+  it('halves the daily budget under moderate support load', async () => {
+    mocks.bugReports.mockResolvedValue([{ open: 4 }]);
+    mocks.settings.mockResolvedValue({ ...roomy, autoAcceptedToday: 5 });
+    expect(await decideGoldenPathAdmissionForArtist(artist)).toEqual({
+      admit: false,
+      reason: 'hold_capacity_full',
+    });
+    mocks.settings.mockResolvedValue({ ...roomy, autoAcceptedToday: 4 });
+    expect((await decideGoldenPathAdmissionForArtist(artist)).admit).toBe(true);
+  });
+
+  it('narrows, not opens, when the support load cannot be read', async () => {
+    mocks.bugReports.mockRejectedValue(new Error('db down'));
+    mocks.settings.mockResolvedValue({ ...roomy, autoAcceptedToday: 5 });
+    expect((await decideGoldenPathAdmissionForArtist(artist)).reason).toBe(
+      'hold_capacity_full'
     );
   });
 

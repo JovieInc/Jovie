@@ -1,6 +1,10 @@
 import { isPresenceObservationStale } from '@/components/features/presence/evidence';
 import { getDspArtistImageUrl } from '@/lib/dsp-enrichment/artist-image';
-import { getDspDisplayName } from '@/lib/dsp-registry';
+import {
+  isGeneratedArtistTitle,
+  isPlatformRestatingLabel,
+  platformDisplayName,
+} from './presence-labels';
 
 export {
   isPresenceObservationStale,
@@ -77,19 +81,6 @@ const PROFILE_METADATA_KEYS = [
   'avatar_url',
   'profileImageUrl',
 ] as const;
-
-function platformDisplayName(platform: string): string {
-  return (
-    getDspDisplayName(platform) ??
-    platform
-      .replaceAll('_', ' ')
-      .replaceAll(/\b\w/g, letter => letter.toUpperCase())
-  );
-}
-
-function normalizeLabel(value: string): string {
-  return value.trim().toLowerCase().replaceAll(/[_-]+/g, ' ');
-}
 
 function pickHttpsUrl(value: unknown): string | null {
   if (typeof value !== 'string') return null;
@@ -224,17 +215,16 @@ export function getPresenceEntityName(
   const label = subject.label.trim();
   const platformName = platformDisplayName(subject.platform);
   const artist = artistName.trim();
-  if (subject.kind === 'connector') return label || platformName;
+  if (subject.kind === 'connector') {
+    return !label || isPlatformRestatingLabel(label, subject.platform)
+      ? platformName
+      : label;
+  }
   if (!label) return artist || platformName;
-  const normalized = normalizeLabel(label);
   if (
     artist &&
-    (normalized === normalizeLabel(platformName) ||
-      normalized === normalizeLabel(subject.platform) ||
-      // Link titles auto-generated as "<artist> on <platform>" repeat the
-      // platform the row's subtitle already shows ("Tim on spotify").
-      normalized === normalizeLabel(`${artist} on ${platformName}`) ||
-      normalized === normalizeLabel(`${artist} on ${subject.platform}`))
+    (isPlatformRestatingLabel(label, subject.platform) ||
+      isGeneratedArtistTitle(label, artist, subject.platform))
   ) {
     return artist;
   }
@@ -255,16 +245,20 @@ export function getPresenceRowTitle(
   const platformName = platformDisplayName(subject.platform);
   const artist = artistName.trim();
   if (!label) return platformName;
-  const normalized = normalizeLabel(label);
   if (
-    artist &&
-    (normalized === normalizeLabel(`${artist} on ${platformName}`) ||
-      normalized === normalizeLabel(`${artist} on ${subject.platform}`))
+    // A platform-restating label ("spotify", "TikTok") is not a custom title.
+    isPlatformRestatingLabel(label, subject.platform) ||
+    (artist && isGeneratedArtistTitle(label, artist, subject.platform))
   ) {
     return platformName;
   }
   return label;
 }
+
+// "/artist" on a DSP provider is a resource route ("/artist?id=…"), never
+// a username; on username-rooted social platforms it IS one. Suppression
+// therefore applies only to DSP-kind subjects.
+const GENERIC_DSP_PATH_SEGMENTS = new Set(['artist']);
 
 export function getPresenceHandle(
   subject: Pick<PresenceIdentitySubject, 'kind' | 'handle' | 'url'>
@@ -287,7 +281,10 @@ export function getPresenceHandle(
     if (atSegment) return decodeURIComponent(atSegment);
     if (segments.length === 1) {
       const value = decodeURIComponent(segments[0] ?? '').replace(/^@/, '');
-      if (value) return `@${value}`;
+      const genericDsp =
+        subject.kind === 'dsp' &&
+        GENERIC_DSP_PATH_SEGMENTS.has(value.toLowerCase());
+      if (value && !genericDsp) return `@${value}`;
     }
   } catch {
     return handle || null;
