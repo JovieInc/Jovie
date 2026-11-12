@@ -69,8 +69,8 @@ export const PartialNoPhoto: Story = {
   args: {
     artist: {
       ...PROFILE_STORY_ARTIST,
-      image_url: null,
-      tagline: null,
+      image_url: undefined,
+      tagline: undefined,
       location: null,
     },
   },
