@@ -7,6 +7,12 @@ import {
 
 const SEARCH_COUNT_ALIAS_RE = /^[a-z][a-z0-9_]{0,40}$/;
 export const SEARCH_COUNTS_MAX_ALIASES = 60;
+/**
+ * GitHub evaluates every aliased search server-side before it answers, so a
+ * 60-alias backfill takes longer than the 2.5s single-read budget. Hourly
+ * sync only, never on a read path.
+ */
+export const SEARCH_COUNTS_TIMEOUT_MS = 8_000;
 
 export type SearchCountsRead =
   | {
@@ -44,7 +50,8 @@ export async function readSearchCounts(
       io,
       'github-merges',
       `query CompanyHistoryCounts(${variables}){${fields}}`,
-      queries
+      queries,
+      SEARCH_COUNTS_TIMEOUT_MS
     );
     if (isAuthorityRead(data)) {
       return { status: 'unavailable', reason: 'github-unavailable' };

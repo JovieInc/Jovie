@@ -77,7 +77,9 @@ describe('StartPage', () => {
   afterEach(() => vi.unstubAllEnvs());
 
   beforeEach(() => {
-    // These entry-property fixtures exercise explicit reopening; closure is covered separately.
+    // These entry-property fixtures exercise the open default (Tim,
+    // 2026-11-09); the closed kill switch is covered in
+    // public-signup-closed.test.tsx.
     vi.stubEnv('FEATURE_PUBLIC_SIGNUP_CLOSED', 'false');
   });
   it('renders the onboarding shell without minting a server-component cookie', async () => {

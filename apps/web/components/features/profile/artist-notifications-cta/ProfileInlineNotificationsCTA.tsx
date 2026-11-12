@@ -22,6 +22,7 @@ import {
 } from '@/lib/queries/useNotificationStatusQuery';
 import type { Artist } from '@/types/db';
 import type { NotificationContentType } from '@/types/notifications';
+import { InlineNotificationsFlowSkeleton } from './InlineNotificationsFlowSkeleton';
 import {
   ProfileMobileNotificationsFlow,
   type ProfileMobileNotificationsFlowStep,
@@ -29,7 +30,6 @@ import {
 import {
   noFontSynthesisStyle,
   profilePrimaryPillClassName,
-  SubscriptionFormSkeleton,
   subscriptionPrimaryActionClassName,
   subscriptionPrimaryLinkClassName,
 } from './shared';
@@ -854,7 +854,7 @@ export function ProfileInlineNotificationsCTA({
 
   if (hydrationStatus === 'checking') {
     if (isInline) {
-      return <SubscriptionFormSkeleton />;
+      return <InlineNotificationsFlowSkeleton />;
     }
     return null;
   }

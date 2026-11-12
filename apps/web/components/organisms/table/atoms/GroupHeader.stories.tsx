@@ -8,8 +8,8 @@ const meta = {
     layout: 'centered',
   },
   decorators: [
-    Story => (
-      <table className='w-96'>
+    (Story, { parameters }) => (
+      <table dir={parameters.dir} lang={parameters.lang} className='w-96'>
         <tbody>
           <Story />
         </tbody>
@@ -32,4 +32,19 @@ export const NotSticky: Story = {
   args: {
     isSticky: false,
   },
+};
+
+export const LongLabel: Story = {
+  args: {
+    label: 'Awaiting Confirmation From Their Label Before The Release Date',
+    count: 128_400,
+  },
+};
+
+export const RtlLabel: Story = {
+  args: {
+    label: 'المشتركون الجدد',
+    count: 12,
+  },
+  parameters: { dir: 'rtl', lang: 'ar' },
 };

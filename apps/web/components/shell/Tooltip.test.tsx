@@ -95,6 +95,23 @@ describe('getSeamSideOffset', () => {
 });
 
 describe('Tooltip (shell)', () => {
+  it('reads no layout when right-side tooltips mount in a seam container', () => {
+    const spy = vi.spyOn(Element.prototype, 'getBoundingClientRect');
+    render(
+      <nav data-sidebar='sidebar'>
+        <Tooltip label='Single child' side='right'>
+          <button type='button'>Row</button>
+        </Tooltip>
+        <Tooltip label='Wrapped children' side='right'>
+          <span>Icon</span>
+          <span>Text</span>
+        </Tooltip>
+      </nav>
+    );
+    expect(spy).not.toHaveBeenCalled();
+    spy.mockRestore();
+  });
+
   it('preserves the full label without a line clamp', () => {
     render(
       <Tooltip
