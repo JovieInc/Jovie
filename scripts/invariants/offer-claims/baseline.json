@@ -162,9 +162,6 @@
     "free_forever_claim": 1,
     "refund_guarantee_claim": 3
   },
-  "apps/web/data/product-truth/registry.ts": {
-    "trial_claim": 1
-  },
   "apps/web/docs/auth-visual-audit-2026-05-09T031254Z.md": {
     "no_card_claim": 1
   },
