@@ -3,6 +3,7 @@ import { z } from 'zod';
 import surfaceCensus from '@/data/designSystem/surfaceCensus.json';
 import { HOMEPAGE_EDITORIAL_COPY } from '@/data/homepageEditorialCopy';
 import { MARKETING_SECTIONS } from '@/data/marketing/sections';
+import { INVITATION_ACCESS_COPY } from '@/lib/copy/claim-front-door';
 import icpLanguage from '../../../../scripts/invariants/icp-language/config.json';
 import { experimentSchema } from './experiment';
 import type { ContentKindDefinition } from './kind';
@@ -244,6 +245,11 @@ function sectionsViolations(
     }
     seen.add(entry.section);
     for (const [slot, text] of Object.entries(entry.copy)) {
+      if (INVITATION_ACCESS_COPY.test(text)) {
+        errors.push(
+          `${at}.copy.${slot}: the public front door claims a handle through /start; invitation access wording is not allowed`
+        );
+      }
       if (PRICE_PATTERN.test(text)) {
         errors.push(
           `${at}.copy.${slot}: prices and plan terms come from offer truth, not page copy`

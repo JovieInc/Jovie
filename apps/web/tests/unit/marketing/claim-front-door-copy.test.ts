@@ -1,6 +1,7 @@
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, relative, resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { INVITATION_ACCESS_COPY } from '@/lib/copy/claim-front-door';
 
 /**
  * One front door (Tim, 2026-11-09): the claim copy invariant CPY-01..04.
@@ -8,11 +9,6 @@ import { describe, expect, it } from 'vitest';
  * an invitation — the primary CTA is 'Claim your handle', and waitlist
  * wording may appear only as the locked post-claim state.
  */
-const BANNED_COPY = new RegExp(
-  'request (an )?invite|invite[- ]only|by invitation|apply for access|join the waitlist',
-  'i'
-);
-
 const WEB_ROOT = process.cwd();
 
 const SCANNED_DIRS = [
@@ -45,7 +41,7 @@ describe('claim front-door copy lint (Tim, 2026-11-09 CPY-01..04)', () => {
       expect(statSync(root).isDirectory(), dir).toBe(true);
       for (const path of collectSources(root)) {
         const text = readFileSync(path, 'utf8');
-        if (BANNED_COPY.test(text)) {
+        if (INVITATION_ACCESS_COPY.test(text)) {
           offenders.push(relative(WEB_ROOT, path));
         }
       }

@@ -182,7 +182,7 @@ describe('HomepageEditorial chapters', () => {
       expect(start).toHaveAttribute('href', '/start');
       expect(start).toHaveAttribute('href', claim.href);
       expect(start).toHaveAttribute('data-primary-action', 'true');
-      expect(start).toHaveTextContent(claim.label);
+      expect(start).toHaveTextContent(COPY.hero.primaryAction);
       expect(screen.getByText(COPY.hero.note)).toBeInTheDocument();
       expect(screen.getByTestId('homepage-hero-live-profile')).toHaveAttribute(
         'href',

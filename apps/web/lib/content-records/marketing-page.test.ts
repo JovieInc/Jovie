@@ -33,6 +33,20 @@ const errorsOf = (data: unknown) => {
 };
 
 describe('marketing-page content kind', () => {
+  it.each([
+    'Request an invite',
+    'Invite-only',
+    'Jovie opens by invitation.',
+    'Apply for access',
+    'Join the waitlist',
+  ])('rejects stale access copy in a published homepage slot: %s', text => {
+    const spec = cleanSpec();
+    const hero = spec.sections[0];
+    if (hero?.section !== 'hero') throw new Error('hero first');
+    hero.copy.primaryAction = text;
+    expect(validate(spec).ok).toBe(false);
+  });
+
   it('accepts a spec built from registered DS sections', () => {
     expect(validate(cleanSpec())).toEqual({ ok: true, data: cleanSpec() });
   });

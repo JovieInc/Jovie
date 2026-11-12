@@ -1,6 +1,7 @@
 import { APP_ROUTES } from '@/constants/routes';
 import { HOMEPAGE_FEATURED_ARTIST } from '@/data/demoArtists';
 import { HOMEPAGE_INVITE_ANCHOR } from '@/data/homepageInviteAnchor';
+import { claim } from '@/lib/billing/offer/claims';
 import { TIM_WHITE_PROFILE } from '@/lib/tim-white';
 
 /**
@@ -39,7 +40,7 @@ export const HOMEPAGE_EDITORIAL_COPY = {
     primaryHref: APP_ROUTES.START,
     secondaryAction: 'See a live profile',
     secondaryHref: TIM_WHITE_PROFILE.publicProfilePath,
-    note: 'free to start · no credit card',
+    note: claim('profile.free_start_note') ?? '',
     windowLabel: `Jovie for Mac: an example artist's Releases list with ${HOMEPAGE_FEATURED_ARTIST.inspected.title} open in the inspector`,
     upcCallout: 'per release',
   },
