@@ -301,6 +301,10 @@
       "empty": "Plans are the three checked-in public plans filtered by NEXT_PUBLIC_MARKETING_VISIBLE_PLANS, and a filter naming no known plan falls back to all three, so the card list cannot be empty. A plan with no features drops its list, which PartialPlanDetails shows.",
       "permission-denied": "Public pricing has no gated action: every visitor sees every visible plan and its CTA. The detector matched the word plan; entitlement checks happen after the CTA, in checkout."
     },
+    "apps/web/components/features/pricing/PricingComparisonChart.tsx": {
+      "empty": "The chart takes no props and always renders the fixed public comparison registry (PUBLIC_PRICING_COMPARISON), which is never empty; PricingComparisonChart.test.tsx asserts it has rows. The detector matched the .map calls over that registry.",
+      "permission-denied": "The comparison is public marketing copy with no gated action or permission input; the detector matched the word plan in the plan picker and price claims."
+    },
     "apps/web/components/features/profile/AliasCollisionRecovery.tsx": {
       "error": "Recovery returns null in every state; a failed, non-OK or malformed alias decision only leaves the visitor on the mode page, which has no pixels of its own to show. AliasCollisionRecovery.certificate.test.tsx asserts no navigation or history change and an axe-clean page for each failure."
     },
@@ -402,6 +406,12 @@
     "apps/web/components/features/waitlist/WaitlistQualifyingSteps.tsx": {
       "offline": "WaitlistQualifyingSteps never fetches or submits by itself: the submit button posts the parent WaitlistRoleForm, which owns the join request and its failed and offline recovery, and the artist search's own request state belongs to WaitlistSpotifySearch. Lost connectivity reaches this step only as the parent's submitting flag, which disables every action (WaitlistQualifyingSteps.certificate.test.tsx).",
       "permission-denied": "The three questions are open to every visitor requesting access and have no gated action or permission input; the detector matched 'role' in the @/lib/waitlist/role-qualification import path."
+    },
+    "apps/web/components/features/waitlist/WaitlistRoleForm.tsx": {
+      "permission-denied": "Request access is open to every visitor and the form has no gated action or permission input; the detector matched 'role', the field the visitor picks. The nearest refusal, a failed security check, keeps its message on screen and is covered in WaitlistRoleForm.test.tsx."
+    },
+    "apps/web/components/features/waitlist/WaitlistSpotifySearch.tsx": {
+      "permission-denied": "The artist search is an optional step open to every visitor and has no gated action or permission input; the detector matched role='combobox' on the search field."
     },
     "apps/web/components/features/waitlist/WaitlistSuccessView.tsx": {
       "loading": "It mounts only once its owner already has an outcome (the /waitlist server route after resolving user state, or WaitlistIntakeChat after the request settles), so it never shows a loading state; 'pending' is the waitlist review status that Web214AuthenticatedPending shows, not a request in flight."

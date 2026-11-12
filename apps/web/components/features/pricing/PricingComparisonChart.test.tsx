@@ -6,6 +6,7 @@ import {
   PUBLIC_PRICING_COMPARISON,
 } from '@/lib/billing/public-pricing-features';
 import { PRICING_COMPARISON } from '@/lib/entitlements/registry';
+import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import { PricingComparisonChart } from './PricingComparisonChart';
 
 const COMPARISON = PUBLIC_PRICING_COMPARISON;
@@ -168,5 +169,25 @@ describe('PricingComparisonChart', () => {
     for (const name of getPaidPlanAdditionNames()) {
       expect(screen.getAllByText(name).length).toBeGreaterThan(0);
     }
+  });
+
+  it('has no axe violations with Pro or Free picked for comparison', async () => {
+    const { container } = render(<PricingComparisonChart />);
+    await expectNoA11yViolations(container);
+
+    fireEvent.change(
+      screen.getByRole('combobox', { name: 'Select Plan To Compare' }),
+      { target: { value: 'free' } }
+    );
+    await expectNoA11yViolations(container);
+  });
+
+  it('has no axe violations in a right-to-left page', async () => {
+    const { container } = render(
+      <div dir='rtl'>
+        <PricingComparisonChart />
+      </div>
+    );
+    await expectNoA11yViolations(container);
   });
 });
