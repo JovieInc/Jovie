@@ -33,6 +33,7 @@ vi.mock('@/components/atoms/ImageWithFallback', () => ({
   ImageWithFallback: ({
     alt,
     className,
+    decoding,
     fetchPriority,
     priority,
     sizes,
@@ -40,6 +41,7 @@ vi.mock('@/components/atoms/ImageWithFallback', () => ({
   }: {
     readonly alt: string;
     readonly className?: string;
+    readonly decoding?: 'sync' | 'async' | 'auto';
     readonly fetchPriority?: 'high' | 'low' | 'auto';
     readonly priority?: boolean;
     readonly sizes?: string;
@@ -48,6 +50,7 @@ vi.mock('@/components/atoms/ImageWithFallback', () => ({
     React.createElement('img', {
       alt,
       className,
+      decoding,
       fetchPriority,
       'data-priority': priority ? 'true' : 'false',
       'data-sizes': sizes,
@@ -789,8 +792,13 @@ describe('ProfilePacCard landscape states', () => {
           'fetchpriority',
           'high'
         );
+        // JOV-9611: the featured cover is the claim-invite LCP element, so
+        // an interactive profile decodes it with the frame that lays it out.
+        expect(art.querySelector('img')).toHaveAttribute('decoding', 'sync');
       } else {
         expect(art.querySelector('img')).not.toHaveAttribute('fetchpriority');
+        // Previews leave decoding to the image default.
+        expect(art.querySelector('img')).not.toHaveAttribute('decoding');
       }
     }
   );
