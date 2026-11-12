@@ -1,11 +1,15 @@
-import { HOMEPAGE_FEATURED_ARTIST } from '@/data/demoArtists';
 import { trackFunnelStep } from '@/lib/analytics/signup-funnel-client';
 
 /**
  * Every homepage event says which artist the page featured, so the featured
  * slot can rotate by what converts (Tim, 2026-11-12).
+ *
+ * A literal, not HOMEPAGE_FEATURED_ARTIST.slug: this module ships to the
+ * client, and importing the artist records would bundle their opt-in words
+ * and catalogs. homepage-analytics.featured-artist.test.ts fails if it drifts
+ * from the artist the page actually features.
  */
-export const HOMEPAGE_FEATURED_ARTIST_SLUG = HOMEPAGE_FEATURED_ARTIST.slug;
+export const HOMEPAGE_FEATURED_ARTIST_SLUG = 'tim-white';
 
 export function trackHomepageEvent(
   event: string,
