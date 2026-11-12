@@ -302,6 +302,10 @@
     "apps/web/components/features/dashboard/organisms/DashboardHeader.tsx": {
       "empty": "Every caller passes at least one breadcrumb: useAuthRouteConfig always builds one from the pathname and SettingsSection passes its title, so the header never renders without a title. It owns no collection; the detector matched the items-center class."
     },
+    "apps/web/components/features/dashboard/organisms/DashboardMobileTabs.tsx": {
+      "empty": "The tab bar is built from fixed navigation config (primaryNavigation, artistNavigation and the settings item), so it always has destinations; only the optional Public Profile row depends on data, and DashboardMobileTabs.test.tsx covers its absence. The detector matched the .map calls over that config.",
+      "long-content": "Every label it shows is fixed navigation copy, never caller text; the profile link carries only an href under the fixed Public Profile label. The Default story already renders at the 320px mobile1 viewport."
+    },
     "apps/web/components/features/dashboard/organisms/ReleaseTablePendingShell.tsx": {
       "empty": "The shell is the releases route's loading surface: it always draws a fixed SKELETON_ROW_COUNT.TABLE of skeleton rows and owns no data collection that could be empty. The detector matched the skeletonRows prop and the rows of its column config.",
       "partial": "It takes no data. Its only optional props are showHeader, whose headerless variant is the NoHeader story, and a test id, so nothing can be partially present.",
