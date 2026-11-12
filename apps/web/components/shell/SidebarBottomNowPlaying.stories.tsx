@@ -25,7 +25,7 @@ export const Playing: Story = {
   args: { isPlaying: true },
 };
 
-export const Idle: Story = {
+export const Empty: Story = {
   args: {
     track: { trackTitle: null, artistName: null, artworkUrl: null },
   },
@@ -64,4 +64,31 @@ export const LightAndDark: Story = {
       </div>
     </div>
   ),
+};
+
+export const PartialTrack: Story = {
+  args: {
+    track: {
+      trackTitle: 'Never Say A Word',
+      artistName: null,
+      artworkUrl: null,
+    },
+  },
+};
+
+export const RtlOverflow: Story = {
+  args: {
+    track: {
+      trackTitle: 'عنوان مسار طويل يجب اقتطاعه دون توسيع الشريط الجانبي',
+      artistName: 'اسم الفنان',
+      artworkUrl: null,
+    },
+  },
+  decorators: [
+    Story => (
+      <div dir='rtl' className='w-57'>
+        <Story />
+      </div>
+    ),
+  ],
 };
