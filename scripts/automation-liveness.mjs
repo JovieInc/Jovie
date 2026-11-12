@@ -80,6 +80,23 @@ function githubHeaders(token) {
 }
 
 /**
+ * Run-list read for the workflow observers. The Actions token is the cheap
+ * read, but it draws on the shared installation REST budget that runs dry
+ * under load: automation-liveness run 43150125408 answered `github-http-403`
+ * for a golden-path-nightly run list whose workflow was green, filing a false
+ * P0 (JOV-11677). Jovie is public, so on a 403 retry the same URL once
+ * without the token — the recovery readUnshippedRange already uses — so a
+ * denied or exhausted credential cannot hide a readable run list. Any other
+ * failure, or a public read that also fails, keeps the original failure so
+ * silence stays red.
+ */
+async function readGithubJson(url, { fetchImpl, token }) {
+  const read = await readJson(fetchImpl, url, githubHeaders(token));
+  if (read.ok || !token || read.reason !== 'http-403') return read;
+  return readJson(fetchImpl, url, {});
+}
+
+/**
  * Controller failure streak: healthy unless the newest `receipt.streak` (default 3) conclusive runs (success or
  * failure; skipped and cancelled runs carry no verdict) all failed. A streak reports the newest success time (or
  * epoch when none), which is always older than the entry's silence budget, so it goes silent with the run ids named.
@@ -93,7 +110,7 @@ export async function observeWorkflowFailureStreak(
     ? `&branch=${encodeURIComponent(receipt.branch)}`
     : '';
   const url = `${apiUrl}/repos/${receipt.repo}/actions/workflows/${encodeURIComponent(receipt.workflow)}/runs?status=completed&per_page=50${branch}`;
-  const read = await readJson(fetchImpl, url, githubHeaders(token));
+  const read = await readGithubJson(url, { fetchImpl, token });
   if (!read.ok) return { ok: false, reason: `github-${read.reason}` };
   if (!Array.isArray(read.body?.workflow_runs))
     return { ok: false, reason: 'github-runs-unreadable' };
@@ -151,7 +168,7 @@ export async function observeGithubWorkflow(
         : [query];
     });
     for (const url of urls) {
-      const read = await readJson(fetchImpl, url, githubHeaders(token));
+      const read = await readGithubJson(url, { fetchImpl, token });
       if (!read.ok) return { ok: false, reason: `github-${read.reason}` };
       if (!Array.isArray(read.body?.workflow_runs))
         return { ok: false, reason: 'github-runs-unreadable' };
