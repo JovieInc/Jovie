@@ -175,17 +175,14 @@ describe('profile mode query rewrite (JOV-12081)', () => {
     'tour',
     'releases',
     'tip',
-  ])(
-    'rewrites the mode query %s to the guarded marker destination',
-    mode => {
-      const rewrite = getProfileModeQueryRewrite(
-        gateRequest(`/dualipa?mode=${mode}`)
-      );
-      expect(rewrite?.headers.get('x-middleware-rewrite')).toBe(
-        `${GATE_ORIGIN}/dualipa/profile-mode-render/${mode}/__profile-mode-alias`
-      );
-    }
-  );
+  ])('rewrites the mode query %s to the guarded marker destination', mode => {
+    const rewrite = getProfileModeQueryRewrite(
+      gateRequest(`/dualipa?mode=${mode}`)
+    );
+    expect(rewrite?.headers.get('x-middleware-rewrite')).toBe(
+      `${GATE_ORIGIN}/dualipa/profile-mode-render/${mode}/__profile-mode-alias`
+    );
+  });
 
   it('lowercases the handle and keeps the request a rewrite, not a redirect', () => {
     const rewrite = getProfileModeQueryRewrite(
