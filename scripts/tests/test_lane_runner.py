@@ -8137,6 +8137,50 @@ class FixRedTest(unittest.TestCase):
             agent.assert_not_called()
             again.assert_called_once()
 
+    def ready_pr(self):
+        return self.pr(checks=[{
+            "name": "PR Ready", "status": "COMPLETED", "conclusion": "FAILURE",
+            "detailsUrl": "https://github.com/x/actions/runs/1/job/42"}])
+
+    def quota_stamp(self, offset_s):
+        stamp = datetime.fromtimestamp(time.time() + offset_s, timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.000Z")
+        return ("::warning::github-quota-deferred: gh api primary after 1 attempt(s) "
+                f"until {stamp}; not a verdict on this change.\n"
+                "::error::Fleet rule evidence lookup was github-quota-deferred; not a verdict on this PR.")
+
+    def test_quota_reset_in_the_future_waits_and_does_not_rerun_or_dispatch(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            host, receipt, agent, again = self.run_gate(tmp, self.quota_stamp(86400), pr=self.ready_pr())
+            self.assertEqual(receipt["reasons"], ["infra-rerun:quota-deferred-until"])
+            self.assertEqual(receipt["attemptRefunded"], "infra-rerun:quota-deferred-until")
+            agent.assert_not_called()
+            again.assert_not_called()
+            stored = json.loads((host.state / "infra-reruns.json").read_text())["5"]
+            self.assertIsNone(stored["claimedAt"])
+            _, second, agent2, again2 = self.run_gate(tmp, self.quota_stamp(86400), pr=self.ready_pr())
+            self.assertEqual(second["reasons"], ["infra-rerun:quota-deferred-until"])
+            agent2.assert_not_called()
+            again2.assert_not_called()
+
+    def test_quota_reset_in_the_past_reruns_once_then_reaches_the_agent(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            _, receipt, agent, again = self.run_gate(tmp, self.quota_stamp(-86400), pr=self.ready_pr())
+            self.assertEqual(receipt["reasons"], ["infra-rerun:quota-deferred"])
+            agent.assert_not_called()
+            again.assert_called_once()
+            _, second, agent2, again2 = self.run_gate(tmp, self.quota_stamp(-86400), pr=self.ready_pr())
+            agent2.assert_called_once()
+            again2.assert_not_called()
+            self.assertNotEqual(second["reasons"][:1], ["infra-rerun:quota-deferred"])
+
+    def test_legacy_head_claim_still_reruns_once_after_the_quota_reset(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            (Path(tmp) / "infra-reruns.json").write_text(json.dumps({"5": "h1"}))
+            _, receipt, agent, again = self.run_gate(tmp, self.quota_stamp(-86400), pr=self.ready_pr())
+            self.assertEqual(receipt["reasons"], ["infra-rerun:quota-deferred"])
+            agent.assert_not_called()
+            again.assert_called_once()
+
     def test_behind_branch_with_an_unclassified_red_is_synced_with_main_once_per_head(self):
         behind = {**self.pr(), "mergeStateStatus": "BEHIND"}
         with tempfile.TemporaryDirectory() as tmp, patch.object(lane.pr_events, "sync_main", return_value="synced") as sync:
