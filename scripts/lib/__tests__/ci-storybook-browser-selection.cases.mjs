@@ -154,6 +154,7 @@ export function defineStorybookBrowserSelectionTests(jobBlock) {
         desktop_update: 'false',
         dsp: 'false',
         smart_link: 'false',
+        account_surface: 'false',
         overlay: 'false',
         privacy: 'false',
         tasks: 'false',
@@ -386,6 +387,7 @@ export function defineStorybookBrowserSelectionTests(jobBlock) {
         desktop_update: 'false',
         dsp: 'false',
         smart_link: 'false',
+        account_surface: 'false',
         privacy: 'false',
       });
 
