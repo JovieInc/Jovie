@@ -534,7 +534,7 @@ export const SOURCE_GUARDS = Object.freeze([
   Object.freeze({
     id: 'release-lineage-contracts',
     command:
-      'pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/release-lineage-gate.test.mjs lib/__tests__/release-risk-policy.test.mjs lib/__tests__/release-range-risk.test.mjs lib/__tests__/promotion-journey-evidence.test.mjs lib/__tests__/promotion-gate-wiring.test.mjs',
+      'pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/release-lineage-gate.test.mjs lib/__tests__/release-risk-policy.test.mjs lib/__tests__/release-range-risk.test.mjs lib/__tests__/promotion-journey-evidence.test.mjs lib/__tests__/promotion-gate-wiring.test.mjs lib/__tests__/release-read-token.test.mjs',
     inputs:
       /^scripts\/(?:lib\/(?:__tests__\/)?(?:release-|recheck-main-lineage|production-release|staging-|promotion-|journey-evidence)|promotion-)/u,
     prOnly: true,
@@ -1236,6 +1236,7 @@ export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/projected-tree-budget.test.mjs',
   'scripts/lib/__tests__/promotion-gate-ci.test.mjs',
   'scripts/lib/__tests__/promotion-gate-wiring.test.mjs',
+  'scripts/lib/__tests__/release-read-token.test.mjs',
   'scripts/lib/__tests__/promotion-journey-evidence.test.mjs',
   'scripts/lib/__tests__/qa-swarm.test.mjs',
   'scripts/lib/__tests__/queue-deferred-release.test.mjs',

@@ -156,29 +156,6 @@ describe('workflow wiring', () => {
   const names = job.steps.map(s => s.name);
   const gateStep = job.steps.find(s => s.id === 'journey-gate');
   const promote = job.steps.find(s => s.id === 'promote');
-  it('reads release evidence with the Jovie Bot App token, not the shared GITHUB_TOKEN', () => {
-    // GITHUB_TOKEN is planned past its hourly limit; a quota deferral on these reads
-    // failed releases closed on 2026-11-12. The App token has its own budget.
-    const release = yaml('production-release.yml').jobs;
-    for (const [jobId, stepIds] of [
-      ['migrate-production', ['predecessor-verdict']],
-      ['promote-production', ['journey-gate', 'predecessor-verdict']],
-    ]) {
-      const steps = release[jobId].steps;
-      const mintAt = steps.findIndex(s => s.id === 'read-token');
-      expect(mintAt).toBeGreaterThanOrEqual(0);
-      expect(steps[mintAt].with['permission-actions']).toBe('read');
-      expect(steps[mintAt].with['permission-contents']).toBe('read');
-      for (const id of stepIds) {
-        const at = steps.findIndex(s => s.id === id);
-        expect(at).toBeGreaterThan(mintAt);
-        expect(steps[at].env.GH_TOKEN).toBe(
-          '${{ steps.read-token.outputs.token }}'
-        );
-      }
-    }
-  });
-
   it('runs the gate before promotion and promotion requires it to succeed', () => {
     expect(names.indexOf(gateStep.name)).toBeLessThan(
       names.indexOf(promote.name)
