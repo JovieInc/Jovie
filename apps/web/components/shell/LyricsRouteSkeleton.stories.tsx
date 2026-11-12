@@ -18,7 +18,7 @@ export const Default: Story = {};
 export const LoadingLyrics: Story = {
   decorators: [
     Story => (
-      <div className='h-[480px] w-[640px]'>
+      <div className='h-120 w-160'>
         <Story />
       </div>
     ),
@@ -28,7 +28,7 @@ export const LoadingLyrics: Story = {
 export const Rtl: Story = {
   decorators: [
     Story => (
-      <div dir='rtl' lang='ar' className='h-[480px] w-[640px]'>
+      <div dir='rtl' lang='ar' className='h-120 w-160'>
         <Story />
       </div>
     ),
