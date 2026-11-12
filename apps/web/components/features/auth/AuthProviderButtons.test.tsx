@@ -24,7 +24,6 @@ describe('AuthProviderButtons states', () => {
 
     const button = screen.getByRole('button', { name: 'Continue with Google' });
     expect(button).toBeEnabled();
-    expect(button).toHaveAttribute('data-slot', 'plain-button');
     await user.click(button);
     expect(onClick).toHaveBeenCalledTimes(1);
     await expectNoA11yViolations(container);

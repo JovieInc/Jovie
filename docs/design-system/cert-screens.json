@@ -76,6 +76,7 @@
     "apps/web/components/features/admin/ImpersonationBanner.tsx": "a11y,frontend-rules,states,tokens",
     "apps/web/components/features/alerts/AlertGrowthLanding.tsx": "a11y,ds-owner,frontend-rules,states,tests",
     "apps/web/components/features/ask-jovie/AskJovieWidget.tsx": "a11y,ds-owner,frontend-rules,states",
+    "apps/web/components/features/auth/AuthProviderButtons.tsx": "ds-owner",
     "apps/web/components/features/auth/atoms/otp-input/OtpInput.tsx": "a11y,ds-owner,frontend-rules,states,tests,tokens",
     "apps/web/components/features/dashboard/dashboard-nav/NavMenuItem.tsx": "a11y,ds-owner,states,tests",
     "apps/web/components/features/dashboard/molecules/EmailSignatureDialog.tsx": "a11y,frontend-rules,states,tests,tokens",
