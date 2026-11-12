@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, type Page, test } from '@playwright/test';
 import { SMOKE_TIMEOUTS, waitForHydration } from './utils/smoke-test-utils';
 
 /**
@@ -19,6 +19,36 @@ test.use({ storageState: { cookies: [], origins: [] } });
 const HOMEPAGE_PRIMARY_CTA_TEST_ID = 'homepage-primary-cta';
 const SIGNUP_PATH = '/signup';
 const START_PATH = '/start';
+const WAITLIST_PATH = '/waitlist';
+
+function isClosedSignupRedirect(page: Page, requestedPath: string) {
+  return (
+    [START_PATH, SIGNUP_PATH].includes(requestedPath) &&
+    new URL(page.url()).pathname === WAITLIST_PATH
+  );
+}
+
+// Public signup is open (Tim, 2026-11-09): /signup and anonymous /start must
+// render their own surfaces, never bounce to /waitlist. The closed handoff is
+// asserted only when the FEATURE_PUBLIC_SIGNUP_CLOSED kill switch is set.
+const SIGNUP_CLOSED_KILL_SWITCH =
+  process.env.FEATURE_PUBLIC_SIGNUP_CLOSED === 'true';
+
+async function assertClosedSignupWaitlist(page: Page) {
+  await expect(
+    page.getByTestId('waitlist-role-form'),
+    'Closed signup must land on a visible waitlist form'
+  ).toBeVisible({ timeout: 30_000 });
+  await expect(
+    page.locator('[data-auth-shell-mode="sign-up"]'),
+    'Closed signup must not render a sign-up auth shell'
+  ).toHaveCount(0);
+  await expect(
+    page.getByText(
+      /couldn.t start your chat|cannot complete the security check|taking longer than expected/i
+    )
+  ).toHaveCount(0);
+}
 const TURNSTILE_CONFIG_ERROR = 'turnstile is not configured';
 const TURNSTILE_DOMAIN_ERROR = 'verification failed (110200)';
 
@@ -62,10 +92,18 @@ test.describe('Synthetic Monitoring - Golden Path', () => {
       });
       await waitForHydration(page);
 
-      // Basic health checks
-      await expect(page).toHaveURL(
-        new RegExp(path.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
-      );
+      // Basic health checks. Public signup is open (canon/PRODUCT.md,
+      // 2026-11-09): anonymous /start and /signup must stay on their own
+      // surface. Only when the FEATURE_PUBLIC_SIGNUP_CLOSED kill switch is
+      // set do they redirect to /waitlist — accept that only as a working
+      // waitlist form.
+      if (SIGNUP_CLOSED_KILL_SWITCH && isClosedSignupRedirect(page, path)) {
+        await assertClosedSignupWaitlist(page);
+      } else {
+        await expect(page).toHaveURL(
+          new RegExp(path.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+        );
+      }
 
       // Check for critical errors
       const criticalErrorSelectors = [
@@ -108,6 +146,11 @@ test.describe('Synthetic Monitoring - Golden Path', () => {
       timeout: SMOKE_TIMEOUTS.NAVIGATION,
     });
     await waitForHydration(page);
+    if (SIGNUP_CLOSED_KILL_SWITCH && isClosedSignupRedirect(page, START_PATH)) {
+      // No chat or Turnstile exists while signup is closed; the waitlist is the surface.
+      await assertClosedSignupWaitlist(page);
+      return;
+    }
 
     // The Turnstile widget must be fully invisible (appearance: 'execute').
     // No "Security Check" heading, no visible bordered widget frame, no

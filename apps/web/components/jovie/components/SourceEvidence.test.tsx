@@ -3,7 +3,9 @@ import type { Virtualizer } from '@tanstack/react-virtual';
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
+import { TOOL_STATUS_PARTS } from '@/components/jovie/fixtures/tool-status';
 import type { EnrichedFact } from '@/lib/profile-facts/enrichment';
+import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import { fastRender } from '@/tests/utils/fast-render';
 import { ChatThreadMessages } from '../JovieChatSections';
 import { SourceEvidenceProvider } from '../source-evidence-context';
@@ -55,6 +57,75 @@ describe('inline typed source evidence', () => {
       </TooltipProvider>
     );
     expect(await findSourceChip()).toHaveTextContent('9.9K followers');
+  });
+
+  it.each(['succeeded', 'failed'] as const)(
+    'keeps one feedback row beside source evidence for a %s tool',
+    async state => {
+      fastRender(
+        <TooltipProvider>
+          <ChatMessage
+            {...sourceMessageFixture('tool-with-source', '9.9K followers')}
+            parts={[
+              { type: 'text', text: '9.9K followers' },
+              ...TOOL_STATUS_PARTS[state],
+            ]}
+            sourceFacts={[sourceFixture()]}
+            enableFeedback
+          />
+        </TooltipProvider>
+      );
+
+      expect(await findSourceChip()).toHaveTextContent('9.9K followers');
+      const feedback = screen.getAllByTestId('chat-feedback-control');
+      expect(feedback).toHaveLength(1);
+      expect(feedback[0]).toHaveAttribute(
+        'data-tool-call-id',
+        'press-source:attempt-1'
+      );
+      expect(
+        screen.getAllByRole('button', { name: 'Good response' })
+      ).toHaveLength(1);
+    }
+  );
+
+  it('retains message feedback when a separate surface renders the tool', () => {
+    fastRender(
+      <TooltipProvider>
+        <ChatMessage
+          {...sourceMessageFixture('separate-tool-surface', 'Source saved.')}
+          parts={[
+            { type: 'text', text: 'Source saved.' },
+            ...TOOL_STATUS_PARTS.succeeded,
+          ]}
+          renderTools={false}
+          enableFeedback
+        />
+      </TooltipProvider>
+    );
+
+    const feedback = screen.getAllByTestId('chat-feedback-control');
+    expect(feedback).toHaveLength(1);
+    expect(feedback[0]).not.toHaveAttribute('data-tool-call-id');
+  });
+
+  it('retains message feedback for a text-only reply', () => {
+    fastRender(
+      <TooltipProvider>
+        <ChatMessage
+          {...sourceMessageFixture(
+            'text-only',
+            'Tell me about your next release.'
+          )}
+          parts={[{ type: 'text', text: 'Tell me about your next release.' }]}
+          enableFeedback
+        />
+      </TooltipProvider>
+    );
+
+    const feedback = screen.getAllByTestId('chat-feedback-control');
+    expect(feedback).toHaveLength(1);
+    expect(feedback[0]).not.toHaveAttribute('data-tool-call-id');
   });
   it('keeps inline markdown fragments inline with inspectable evidence', async () => {
     fastRender(
@@ -278,4 +349,72 @@ it('forwards public tool evidence through the app transcript', async () => {
     </TooltipProvider>
   );
   expect(await findSourceChip()).toHaveTextContent('9.9K followers');
+});
+
+describe('source evidence certificate states', () => {
+  const longReply = [
+    'Your Spotify audience grew to 9.9K followers this quarter, which puts the Extended Midnight Drive Sessions campaign ahead of plan.',
+    '',
+    '- 9,900 followers is the figure Spotify reported on the latest fetch.',
+    '- Keep pitching the deluxe edition to editorial playlists through release week.',
+  ].join('\n');
+
+  async function renderMarkdown(
+    facts: readonly EnrichedFact[],
+    content: string,
+    dir?: 'rtl'
+  ) {
+    const view = fastRender(
+      <div dir={dir} lang={dir ? 'ar' : undefined}>
+        <SourceEvidenceProvider facts={facts}>
+          <ChatMarkdown content={content} />
+        </SourceEvidenceProvider>
+      </div>
+    );
+    await settleSourceEvidence();
+    return view;
+  }
+
+  it('leaves numbers as plain prose with no facts and stays axe-clean', async () => {
+    const { container } = await renderMarkdown(
+      [],
+      'You have 9.9K followers on Spotify.'
+    );
+    expect(screen.queryByTestId(SOURCE_CHIP)).toBeNull();
+    expect(screen.getByText(/9\.9K followers/)).toBeVisible();
+    await expectNoA11yViolations(container);
+  });
+
+  it('marks only the backed count when evidence is partial and stays axe-clean', async () => {
+    const { container } = await renderMarkdown(
+      [sourceFixture()],
+      '9.9K Spotify followers so far, and 19.9K followers is the next milestone.'
+    );
+    await waitFor(() =>
+      expect(screen.getAllByTestId(SOURCE_CHIP)).toHaveLength(1)
+    );
+    expect(
+      screen.getByText(/19\.9K followers is the next milestone/)
+    ).toBeVisible();
+    await expectNoA11yViolations(container);
+  });
+
+  it('marks every backed count across a long reply and stays axe-clean', async () => {
+    const { container } = await renderMarkdown([sourceFixture()], longReply);
+    await waitFor(() =>
+      expect(screen.getAllByTestId(SOURCE_CHIP)).toHaveLength(2)
+    );
+    expect(screen.getAllByRole('listitem')).toHaveLength(2);
+    await expectNoA11yViolations(container);
+  });
+
+  it('keeps an inspectable source inside right-to-left prose and stays axe-clean', async () => {
+    const { container } = await renderMarkdown(
+      [sourceFixture()],
+      'لديك الآن 9.9K followers على سبوتيفاي.',
+      'rtl'
+    );
+    expect(await findSourceChip()).toHaveTextContent('9.9K followers');
+    await expectNoA11yViolations(container);
+  });
 });

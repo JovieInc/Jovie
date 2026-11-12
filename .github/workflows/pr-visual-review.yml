@@ -76,8 +76,14 @@ jobs:
 
       - uses: ./.github/actions/setup-node-pnpm
 
-      - name: Install Playwright Chromium
-        run: pnpm --filter @jovie/web exec playwright install --with-deps chromium
+      # This job runs PR-controlled code, so it only restores caches that
+      # main's producers saved and never saves one. system_deps keeps the
+      # fonts the captures need.
+      - name: Setup Playwright Chromium
+        uses: ./.github/actions/setup-playwright
+        with:
+          system_deps: 'true'
+          cache: restore
 
       - name: Route changed files
         id: route
@@ -189,7 +195,7 @@ jobs:
           ROUTE_DOM_CERTIFICATION_OUTPUT_DIR: ${{ github.workspace }}/pr-visual-artifacts/route-dom-certification
         run: |
           set -euo pipefail
-          marketing_surface='^(apps/web/(app/\((marketing|home)\)/|components/(marketing|site|homepage)/|data/marketing/|styles/|tests/e2e/utils/route-dom-detector\.ts|tests/product-screenshots/route-dom-)|packages/ui/)'
+          marketing_surface='^(apps/web/(app/\((marketing|home)\)/|components/(marketing|site|homepage)/|data/marketing/|styles/|tests/e2e/utils/route-dom-[a-z-]+\.ts|tests/product-screenshots/route-dom-)|packages/ui/)'
           # JOV-7710: the composed shell main plane must read as one material.
           shell_surface='^(apps/web/(app/demo/|components/(organisms|molecules|atoms|features|shell)/|styles/|tests/e2e/utils/shell-material-detector\.ts|tests/product-screenshots/(route-dom-|shell-material-))|packages/ui/)'
           tests=

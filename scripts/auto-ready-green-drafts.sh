@@ -7,7 +7,8 @@
 #
 # This controller never enables native auto-merge and never enrolls the merge
 # queue. Auto-Enroll / jovie-bot own admission after ready_for_review.
-# All wakes require persisted exact-head, author-owned proof.
+# All wakes require the author's ship intent: trusted writers ship on green
+# unless parked; any other author needs exact-head, author-owned proof.
 #
 # Never mutates HOLD #17156. Tim/machine hold labels (GREEN_SOURCE_HOLD_LABELS)
 # cover other open holds — do not keep merged/closed PR numbers here.
@@ -236,7 +237,7 @@ undraft_if_eligible() {  # undraft_if_eligible <num> [expected-head]
   state_after="$(jq -r '.state // "UNKNOWN"' <<<"$after")"
   merge_after="$(jq -r '.mergeStateStatus // "UNKNOWN"' <<<"$after")"
   held_after="$(jq -r --arg hold_re "$HOLD_LABEL_RE" '[.labels[] | select(test($hold_re))] | join(",")' <<<"$after")"
-  proof_after="$(jq --argjson prNumber "$n" '. + {headSha: .head, prNumber: $prNumber}' <<<"$after" | node "$SCRIPT_DIR/lib/auto-ready-provenance.mjs" classify)"
+  proof_after="$(jq --argjson prNumber "$n" '. + {headSha: .head, prNumber: $prNumber, greenSource: true}' <<<"$after" | node "$SCRIPT_DIR/lib/auto-ready-provenance.mjs" classify)"
 
   if [[ "$state_after" != "OPEN" ]]; then
     upsert_status_comment "$n" "🤖 Auto-ready green-source: the exact head reached terminal state=${state_after} during verification. _(verified at $(date -u +%Y-%m-%dT%H:%M:%SZ))_"

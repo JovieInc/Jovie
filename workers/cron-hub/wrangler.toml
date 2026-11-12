@@ -1,0 +1,14 @@
+name = "jovie-cron-hub"
+main = "src/index.ts"
+compatibility_date = "2026-10-15"
+workers_dev = true
+keep_vars = true
+
+# KV id is filled at first deploy: `wrangler kv namespace create STATE`.
+[[kv_namespaces]]
+binding = "STATE"
+id = "REPLACE_AT_FIRST_DEPLOY"
+
+[triggers]
+# The only Cloudflare cron trigger (canon/schedulers.json). Secrets CRON_SECRET_<TASK> per adopted task.
+crons = ["* * * * *"]

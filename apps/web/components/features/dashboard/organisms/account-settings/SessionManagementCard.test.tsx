@@ -13,7 +13,10 @@ import {
   getDesktopWorkState,
   useDesktopWorkState,
 } from '@/lib/desktop/session-work-state';
-import { SessionManagementCard } from './SessionManagementCard';
+import {
+  SessionManagementCard,
+  SessionManagementSkeleton,
+} from './SessionManagementCard';
 
 const listSessions = vi.fn();
 const signOut = vi.fn();
@@ -92,7 +95,7 @@ describe('SessionManagementCard', () => {
           action === 'single' ? 'End session' : 'Sign out other sessions';
         await userEvent.click(await screen.findByRole('button', { name }));
         await userEvent.click(
-          within(screen.getByRole('dialog')).getByRole('button', { name })
+          within(screen.getByRole('alertdialog')).getByRole('button', { name })
         );
         expect(revoke).toHaveBeenCalledTimes(1);
         if (removal === 'hide') {
@@ -311,6 +314,23 @@ describe('SessionManagementCard', () => {
     expect(
       screen.getByTestId('session-management-frame').lastElementChild?.className
     ).toBe(listClass);
+  });
+
+  it('shows the card loading frame on its own while auth is still loading', () => {
+    // Account settings renders this before the session exists in production,
+    // so the card swapping in later keeps the same frame (phone CLS 0.175).
+    const { unmount } = render(<SessionManagementSkeleton />);
+    const skeletonFrame = screen.getByTestId('session-management-frame');
+    const skeletonListClass = skeletonFrame.lastElementChild?.className;
+    expect(screen.getAllByTestId('session-row-skeleton')).toHaveLength(3);
+    expect(listSessions).not.toHaveBeenCalled();
+    unmount();
+
+    listSessions.mockReturnValue(new Promise(() => {}));
+    render(<SessionManagementCard activeSessionId='session-current' />);
+    expect(
+      screen.getByTestId('session-management-frame').lastElementChild?.className
+    ).toBe(skeletonListClass);
   });
 
   it('previews the current device plus the most recent sessions behind Show All', async () => {

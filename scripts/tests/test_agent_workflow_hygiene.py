@@ -52,6 +52,7 @@ HOSTED_DEEP_EVIDENCE_JOBS = (
     ("cost-anomaly-gate.yml", "evaluate"),
     ("visual-a11y.yml", "ci-visual-path-changes"),
     ("visual-a11y.yml", "storybook-a11y"),
+    ("visual-a11y.yml", "component-story-evidence"),
     ("visual-regression.yml", "visual-regression"),
 )
 
@@ -212,7 +213,7 @@ assert.throws(() => canary.createPlanBundle({rawPlan,plan,trustedDefaultBranchSh
   livePolicy:{defaultBranch:'main',sha:'b'.repeat(40)},nowMs:now}),/live default-branch head/);
 assert.throws(() => canary.createPlanBundle({rawPlan,plan,trustedDefaultBranchSha:sha,
   livePolicy:{defaultBranch:'main',sha},mode:'apply',confirmation:'wrong',nowMs:now}),/exact SHA-256/);
-const checks = ['PR Ready','Migration Guard','Fork PR Gate','PR Size Guard'].map(name =>
+const checks = ['PR Ready','Migration Guard','Fork PR Gate','PR Size Guard','Company guards'].map(name =>
   ({__typename:'CheckRun',name,status:'COMPLETED',conclusion:'SUCCESS'}));
 const pr = {number:16001,state:'OPEN',isDraft:false,baseRefName:'main',baseRefOid:sha,
   headRefName:entry.headRefName,headRefOid:entry.headOid,isCrossRepository:false,
@@ -447,12 +448,11 @@ def test_retired_human_hold_labels_are_removed_at_the_pr_boundary() -> None:
     )
     trigger = scrub.split("\non:\n", 1)[1].split("\npermissions:", 1)[0]
 
-    assert "pull_request_target:" in trigger
-    assert "issues:" in trigger
-    assert "types: [labeled]" in trigger
-    # Event-driven only (JOV-INV-042): the labeled event deletes the label.
-    assert "schedule:" not in trigger
+    # The label's own created/edited event deletes it; no clock (JOV-INV-042).
+    assert "label:\n    types: [created, edited]" in trigger
+    assert "schedule:" not in trigger and "types: [labeled]" not in trigger
     assert "workflow_dispatch:" in trigger
+    assert "paths: [.github/workflows/legacy-human-hold-scrub.yml]" in trigger
     assert "actions/checkout" not in scrub
     assert 'gh api --method DELETE "repos/$GH_REPO/labels/$LABEL"' in scrub
     for label in (
@@ -464,6 +464,8 @@ def test_retired_human_hold_labels_are_removed_at_the_pr_boundary() -> None:
         "no-auto",
         "no-auto-merge",
         "no-automerge",
+        "tim-hold",
+        "do-not-merge",
     ):
         assert f"github.event.label.name == '{label}'" in scrub
         assert f" {label}" in scrub

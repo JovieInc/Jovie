@@ -149,7 +149,7 @@ describe('CertificationDetailRail', () => {
     renderRail();
     fireEvent.click(screen.getByRole('button', { name: 'Reject' }));
     expect(onDecide).not.toHaveBeenCalled();
-    const dialog = await screen.findByRole('dialog');
+    const dialog = await screen.findByRole('alertdialog');
     fireEvent.click(within(dialog).getByRole('button', { name: 'Reject' }));
     await vi.waitFor(() =>
       expect(onDecide).toHaveBeenCalledWith('rejected', null, target)

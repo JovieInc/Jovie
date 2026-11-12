@@ -699,7 +699,8 @@ class ClosureClassificationTests(unittest.TestCase):
 
     def test_clean_pr_requires_exact_live_required_check_set(self):
         failing = exact_green_promotion_evidence(13)
-        failing["requiredChecks"][0]["sources"][0]["state"] = "FAILURE"  # type: ignore[index]
+        # Fork PR Gate's status-context source drives the not-green verdict.
+        next(c for c in failing["requiredChecks"] if c["name"] == "Fork PR Gate")["sources"][0]["state"] = "FAILURE"  # type: ignore[index]
         missing = exact_green_promotion_evidence(14)
         missing["requiredChecks"] = missing["requiredChecks"][:-1]  # type: ignore[index]
 

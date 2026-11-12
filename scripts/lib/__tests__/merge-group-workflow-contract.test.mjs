@@ -375,7 +375,6 @@ describe('merge_group workflow contract', () => {
     expect(CI_WORKFLOW).not.toContain('ready_for_review');
     expect(SIZE_GUARD_WORKFLOW).not.toContain('ready_for_review');
     expect(FORK_GATE_WORKFLOW).not.toContain('ready_for_review');
-    expect(CI_WORKFLOW).toMatch(/merge_group:\n\s+types: \[checks_requested\]/);
     expect(SIZE_GUARD_WORKFLOW).toMatch(
       /merge_group:\n\s+types: \[checks_requested\]/
     );
@@ -3563,7 +3562,7 @@ ${selectedGateScript}`,
       .sort();
     expect(mergeGroupWorkflows).toEqual([
       'ci.yml',
-      'pr-fleet-rules.yml',
+      'company-guards.yml',
       'pr-size-guard.yml',
       'pr-targets-main.yml',
       'private-data-guard.yml',

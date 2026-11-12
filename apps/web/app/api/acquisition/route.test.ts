@@ -89,6 +89,19 @@ describe('POST /api/acquisition', () => {
     );
   });
 
+  it('captures under read committed so parallel tabs on one journey do not 500', async () => {
+    // Under serializable, two tabs posting the same acquisition id at once
+    // fail with "could not serialize access due to concurrent update"
+    // (40001): the signed-in product crawl got 36 such 500s in one run.
+    // Each statement here is a single-row upsert or a guarded UPDATE, and
+    // the partial unique index on user_id still stops a double link.
+    mockGetCachedAuth.mockResolvedValue({ userId: null });
+    await POST(request());
+    expect(mockAtomic).toHaveBeenCalledWith(
+      expect.objectContaining({ isolationLevel: 'read committed' })
+    );
+  });
+
   it('reports linked false when the link guard refused the journey', async () => {
     mockGetCachedAuth.mockResolvedValue({
       userId: '0f8b2c1e-5d3a-4f6b-9a7c-1e2d3c4b5a69',

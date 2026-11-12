@@ -42,6 +42,11 @@ import {
  * with Stripe's documented test PaymentMethod and the signed event goes
  * through the real webhook route.
  */
+// One spec asserts one class: this file is the functional journey only.
+// The layout-shift budget for /claim and /billing/success lives in
+// claim-checkout-layout.perf.spec.ts and reports as its own check, so a
+// layout regression never turns the revenue canary red (docs/ON_CALL_PROCESS.md).
+
 test.describe('Self-serve artist profile checkout', () => {
   test.use({ storageState: { cookies: [], origins: [] } });
 

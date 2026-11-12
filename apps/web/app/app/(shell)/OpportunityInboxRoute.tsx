@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation';
-import { PipelineBottleneckBanner } from '@/components/features/home/PipelineBottleneckBanner';
 import { OpportunityInboxPageClient } from '@/components/features/opportunity-inbox/OpportunityInboxPageClient';
+import { PmfSurveyCard } from '@/components/features/pmf-survey/PmfSurveyCard';
 import { APP_ROUTES } from '@/constants/routes';
 import { checkIsAdmin } from '@/lib/admin/middleware';
 import { buildAppShellSignInUrl } from '@/lib/auth/build-app-shell-signin-url';
@@ -9,6 +9,7 @@ import {
   loadOpportunityInboxTourDateSections,
 } from '@/lib/connectors/opportunity-inbox-data';
 import type { AvailableDSP } from '@/lib/dsp';
+import { shouldShowPmfSurvey } from '@/lib/pmf/prompt.server';
 import { getCanonicalProfileDSPs } from '@/lib/profile-dsps';
 import { logger } from '@/lib/utils/logger';
 import { loadAuthenticatedAppShellUserId } from './app-shell-route-context';
@@ -17,6 +18,8 @@ import {
   getProfileSocialLinks,
   type ProfileSocialLink,
 } from './dashboard/actions';
+import { PipelineBottleneckBannerLazy } from './PipelineBottleneckBannerLazy';
+import { dismissPmfSurvey, submitPmfSurveyAnswer } from './pmf-survey-actions';
 
 /**
  * Resolve the selected profile plus the data needed to hydrate the profile
@@ -80,6 +83,7 @@ export async function OpportunityInboxRoute({
   const adminPromise = checkIsAdmin();
   const profileRailSeedPromise = resolveProfileRailSeed(clerkUserId);
   const inboxPromise = loadOpportunityInboxData(clerkUserId);
+  const pmfSurveyPromise = shouldShowPmfSurvey({ now: new Date() });
   const profileRailSeed = await profileRailSeedPromise;
 
   const initialLinksPromise = profileRailSeed.profileId
@@ -89,12 +93,14 @@ export async function OpportunityInboxRoute({
     ? loadOpportunityInboxTourDateSections(profileRailSeed.profileId)
     : Promise.resolve(undefined);
 
-  const [baseInbox, initialLinks, tourDates, isAdmin] = await Promise.all([
-    inboxPromise,
-    initialLinksPromise,
-    tourDatesPromise,
-    adminPromise,
-  ]);
+  const [baseInbox, initialLinks, tourDates, isAdmin, showPmfSurvey] =
+    await Promise.all([
+      inboxPromise,
+      initialLinksPromise,
+      tourDatesPromise,
+      adminPromise,
+      pmfSurveyPromise,
+    ]);
 
   if (!baseInbox) {
     redirect(buildAppShellSignInUrl(APP_ROUTES.DASHBOARD));
@@ -128,7 +134,17 @@ export async function OpportunityInboxRoute({
     <>
       {isAdmin ? (
         <div className='h-24 shrink-0 px-6 py-2'>
-          <PipelineBottleneckBanner isAdmin={isAdmin} />
+          <PipelineBottleneckBannerLazy isAdmin={isAdmin} />
+        </div>
+      ) : null}
+      {showPmfSurvey ? (
+        <div className='shrink-0 px-6 pt-3'>
+          <div className='max-w-xl'>
+            <PmfSurveyCard
+              onDismiss={dismissPmfSurvey}
+              onSubmit={submitPmfSurveyAnswer}
+            />
+          </div>
         </div>
       ) : null}
       <OpportunityInboxPageClient

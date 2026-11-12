@@ -5,8 +5,10 @@ import {
   screen,
   waitFor,
 } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { InvisibleTurnstileState } from '@/components/atoms/InvisibleTurnstile';
+import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import { WaitlistRoleForm } from './WaitlistRoleForm';
 
 const challenge = vi.hoisted(() => ({
@@ -14,6 +16,8 @@ const challenge = vi.hoisted(() => ({
     | ((state: InvisibleTurnstileState) => void)
     | undefined,
 }));
+// Read the latest handler without the caller's narrowing sticking to it.
+const currentStateHandler = () => challenge.onStateChange;
 vi.mock('@/components/atoms/InvisibleTurnstile', () => ({
   InvisibleTurnstile: ({
     onStateChange,
@@ -79,17 +83,44 @@ describe('WaitlistRoleForm', () => {
     ).toBeNull();
   });
 
-  it('offers every role in Title Case', () => {
+  it('offers the homepage role choices, in the same order, on /waitlist', () => {
+    const { unmount } = render(<WaitlistRoleForm presentation='chips' />);
+    const chipLabels = screen
+      .getAllByRole('radio')
+      .map(radio => radio.closest('label')?.textContent);
+    unmount();
+
     render(<WaitlistRoleForm />);
-    for (const label of [
+    const radioLabels = screen
+      .getAllByRole('radio')
+      .map(radio => radio.closest('label')?.textContent);
+    expect(radioLabels).toEqual([
       'Artist',
       'Manager',
       'Label',
-      'Producer/Songwriter',
+      'Producer',
+      'Songwriter',
       'Other',
-    ]) {
-      expect(screen.getByRole('radio', { name: label })).toBeInTheDocument();
-    }
+    ]);
+    expect(radioLabels).toEqual(chipLabels);
+    // The choices span the form so they start on the email field's edge.
+    expect(screen.getByTestId('waitlist-role-radios')).toHaveClass('w-full');
+  });
+
+  it('stores Producer and Songwriter radios as the one producer_songwriter role', async () => {
+    fetchMock.mockResolvedValue(
+      new Response(JSON.stringify({ state: 'joined' }), { status: 201 })
+    );
+    render(<WaitlistRoleForm />);
+    fireEvent.click(screen.getByRole('radio', { name: 'Songwriter' }));
+    fireEvent.change(screen.getByLabelText('Email address'), {
+      target: { value: 'tim@example.com' },
+    });
+    fireEvent.submit(screen.getByTestId('waitlist-role-form'));
+    await waitFor(() => expect(fetchMock).toHaveBeenCalled());
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body).role).toBe(
+      'producer_songwriter'
+    );
   });
 
   it('captures a name and a general role on the company homepage without assuming an industry', async () => {
@@ -122,8 +153,9 @@ describe('WaitlistRoleForm', () => {
       email: 'person@example.com',
     });
     expect(
-      screen.getByRole('heading', { level: 3, name: 'Request received' })
+      screen.getByRole('heading', { level: 3, name: "You're on the list" })
     ).toBeVisible();
+    expect(confirmation).toHaveTextContent('person@example.com');
   });
 
   it('requires a useful name on the general form before sending a join', async () => {
@@ -174,6 +206,22 @@ describe('WaitlistRoleForm', () => {
     });
   });
 
+  it('sends an artist straight through when the host does not ask the questions', async () => {
+    fetchMock.mockResolvedValueOnce(
+      new Response(JSON.stringify({ state: 'joined' }), { status: 201 })
+    );
+    render(<WaitlistRoleForm />);
+    fireEvent.click(screen.getByRole('radio', { name: 'Artist' }));
+    fireEvent.change(screen.getByLabelText('Email address'), {
+      target: { value: 'artist@example.com' },
+    });
+    expect(screen.queryByTestId('waitlist-step-counter')).toBeNull();
+    fireEvent.submit(screen.getByTestId('waitlist-role-form'));
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(JSON.parse(String(init.body))).not.toHaveProperty('momTest');
+  });
+
   it('recovers a stalled join after 15 seconds and preserves input for retry', async () => {
     vi.useFakeTimers();
     const timeout = vi.spyOn(AbortSignal, 'timeout').mockImplementation(ms => {
@@ -203,7 +251,11 @@ describe('WaitlistRoleForm', () => {
       target: { value: 'person@example.com' },
     });
     fireEvent.submit(screen.getByTestId('waitlist-role-form'));
-    expect(screen.getByRole('button')).toBeDisabled();
+    // Submitting keeps the button and email field focusable (aria-disabled,
+    // readOnly) instead of native disabled, so focus is not dropped.
+    expect(screen.getByRole('button')).toHaveAttribute('aria-disabled', 'true');
+    expect(screen.getByRole('button')).not.toBeDisabled();
+    expect(screen.getByLabelText('Email address')).toHaveAttribute('readonly');
     await act(async () => {
       await vi.advanceTimersByTimeAsync(15_000);
     });
@@ -222,9 +274,16 @@ describe('WaitlistRoleForm', () => {
       new Response(JSON.stringify({ state: 'joined' }), { status: 201 })
     );
     fireEvent.submit(screen.getByTestId('waitlist-role-form'));
-    expect(
-      await screen.findByTestId('waitlist-role-form-joined')
-    ).toHaveFocus();
+    // Focus moves in an effect after the confirmation renders.
+    const confirmation = await screen.findByTestId('waitlist-role-form-joined');
+    await waitFor(() => expect(confirmation).toHaveFocus());
+  });
+
+  it('loads the security check only once the visitor touches the form', () => {
+    render(<WaitlistRoleForm />);
+    expect(screen.queryByTestId('turnstile-mock')).toBeNull();
+    fireEvent.focus(screen.getByLabelText('Email address'));
+    expect(screen.getByTestId('turnstile-mock')).toBeInTheDocument();
   });
 
   it('keeps the focused confirmation after a queued challenge failure arrives', async () => {
@@ -232,7 +291,9 @@ describe('WaitlistRoleForm', () => {
       new Response(JSON.stringify({ state: 'joined' }), { status: 201 })
     );
     render(<WaitlistRoleForm />);
-    const lateFailure = challenge.onStateChange;
+    challenge.onStateChange = undefined;
+    fireEvent.focus(screen.getByLabelText('Email address'));
+    const lateFailure = currentStateHandler();
     expect(lateFailure).toBeTypeOf('function');
     fireEvent.click(screen.getByRole('radio', { name: 'Artist' }));
     fireEvent.change(screen.getByLabelText('Email address'), {
@@ -249,6 +310,19 @@ describe('WaitlistRoleForm', () => {
     expect(screen.queryByRole('alert')).toBeNull();
     expect(screen.queryByTestId('turnstile-mock')).toBeNull();
     expect(screen.getByTestId('waitlist-role-form')).toHaveAttribute('inert');
+  });
+
+  it('asks for a full email instead of sending one without a domain', () => {
+    render(<WaitlistRoleForm />);
+    fireEvent.click(screen.getByRole('radio', { name: 'Artist' }));
+    fireEvent.change(screen.getByLabelText('Email address'), {
+      target: { value: 'person@gmail' },
+    });
+    fireEvent.submit(screen.getByTestId('waitlist-role-form'));
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      'Enter a full email address, like name@example.com.'
+    );
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it('keeps the input and shows the server error on failure', async () => {
@@ -269,5 +343,150 @@ describe('WaitlistRoleForm', () => {
     expect(screen.getByLabelText('Email address')).toHaveValue(
       'person@example.com'
     );
+  });
+
+  it('chips presentation preselects Artist and maps Producer and Songwriter to one role', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ state: 'joined' }),
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    render(
+      <WaitlistRoleForm
+        presentation='chips'
+        headingLevel={2}
+        title='Jovie opens by invitation.'
+        submitLabel='Request invite'
+        note='One email when your invite is ready. Nothing else.'
+      />
+    );
+    expect(screen.getByRole('radio', { name: 'Artist' })).toBeChecked();
+    fireEvent.click(screen.getByRole('radio', { name: 'Songwriter' }));
+    fireEvent.change(screen.getByLabelText('Email address'), {
+      target: { value: 'tim@example.com' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Request invite' }));
+    await waitFor(() => expect(fetchMock).toHaveBeenCalled());
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body).role).toBe(
+      'producer_songwriter'
+    );
+    vi.unstubAllGlobals();
+  });
+
+  it('moves the chip selection with the arrow keys and keeps one role checked', async () => {
+    const user = userEvent.setup();
+    render(<WaitlistRoleForm presentation='chips' />);
+    const artist = screen.getByRole('radio', { name: 'Artist' });
+    expect(artist).toHaveClass('sr-only');
+    expect(artist.closest('label')).toHaveAttribute('data-selected', 'true');
+
+    await user.click(screen.getByText('Manager'));
+    const manager = screen.getByRole('radio', { name: 'Manager' });
+    expect(manager).toBeChecked();
+    expect(manager).toHaveFocus();
+    expect(manager.closest('label')).toHaveAttribute('data-selected', 'true');
+    expect(artist.closest('label')).not.toHaveAttribute('data-selected');
+
+    await user.keyboard('{ArrowRight}');
+    expect(screen.getByRole('radio', { name: 'Label' })).toBeChecked();
+    expect(manager).not.toBeChecked();
+  });
+
+  it('keeps the typed email, the chosen chip and focus across a rerender, Escape and blur', async () => {
+    const user = userEvent.setup();
+    const { rerender } = render(
+      <WaitlistRoleForm presentation='chips' note='One email, nothing else.' />
+    );
+    await user.click(screen.getByText('Producer'));
+    const email = screen.getByLabelText('Email address');
+    await user.type(email, 'person@example.com');
+    expect(email).toHaveValue('person@example.com');
+
+    rerender(
+      <WaitlistRoleForm presentation='chips' note='We read every request.' />
+    );
+    expect(screen.getByLabelText('Email address')).toBe(email);
+    expect(email).toHaveValue('person@example.com');
+    expect(email).toHaveFocus();
+    expect(screen.getByRole('radio', { name: 'Producer' })).toBeChecked();
+
+    await user.keyboard('{Escape}');
+    expect(email).toHaveValue('person@example.com');
+    expect(email).toHaveFocus();
+
+    fireEvent.blur(email);
+    expect(email).toHaveValue('person@example.com');
+  });
+
+  it('keeps a typed name across a rerender on the general form', async () => {
+    const user = userEvent.setup();
+    const { rerender } = render(<WaitlistRoleForm variant='general' />);
+    const name = screen.getByLabelText('Name');
+    await user.type(name, 'Alex Example');
+    rerender(<WaitlistRoleForm variant='general' description='Say hi.' />);
+    expect(name).toHaveValue('Alex Example');
+    expect(name).toHaveFocus();
+  });
+
+  it('has no axe violations in the stack, general and chips forms', async () => {
+    for (const form of [
+      <WaitlistRoleForm key='stack' />,
+      <WaitlistRoleForm
+        key='general'
+        variant='general'
+        headingLevel={2}
+        description='We open to a small group at a time.'
+      />,
+      <WaitlistRoleForm
+        key='chips'
+        presentation='chips'
+        note='One email when your invite is ready.'
+      />,
+    ]) {
+      const { container, unmount } = render(form);
+      await expectNoA11yViolations(container);
+      unmount();
+    }
+  });
+
+  it('has no axe violations while submitting, on an error and once joined', async () => {
+    let finish: (response: Response) => void = () => {};
+    fetchMock.mockReturnValue(
+      new Promise<Response>(resolve => {
+        finish = resolve;
+      })
+    );
+    const { container } = render(<WaitlistRoleForm presentation='chips' />);
+
+    fireEvent.change(screen.getByLabelText('Email address'), {
+      target: { value: 'person' },
+    });
+    fireEvent.submit(screen.getByTestId('waitlist-role-form'));
+    expect(await screen.findByRole('alert')).toBeInTheDocument();
+    await expectNoA11yViolations(container);
+
+    fireEvent.change(screen.getByLabelText('Email address'), {
+      target: { value: 'person@example.com' },
+    });
+    fireEvent.submit(screen.getByTestId('waitlist-role-form'));
+    await waitFor(() => expect(fetchMock).toHaveBeenCalled());
+    await expectNoA11yViolations(container);
+
+    await act(async () => {
+      finish(
+        new Response(JSON.stringify({ state: 'joined' }), { status: 201 })
+      );
+    });
+    await screen.findByTestId('waitlist-role-form-joined');
+    await expectNoA11yViolations(container);
+  });
+
+  it('has no axe violations in a right-to-left page', async () => {
+    const { container } = render(
+      <div dir='rtl'>
+        <WaitlistRoleForm presentation='chips' title='اطلب دعوة' />
+      </div>
+    );
+    await expectNoA11yViolations(container);
   });
 });

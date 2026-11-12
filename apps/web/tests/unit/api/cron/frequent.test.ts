@@ -88,6 +88,10 @@ vi.mock('@/lib/ovie/summer-cards.server', () => ({
   applySummerCardDefaults: mockApplySummerCardDefaults,
 }));
 
+vi.mock('@/lib/founder-welcome/server', () => ({
+  founderWelcomeJob: vi.fn(async () => ({ filed: 0 })),
+}));
+
 vi.mock(
   '@/lib/connectors/workflows/reconcile-orphaned-approved-actions',
   () => ({
@@ -167,7 +171,7 @@ vi.mock('@/lib/leads/pipeline-logger', () => ({
 }));
 
 vi.mock('@/lib/leads/process-batch', () => ({
-  processLeadBatch: vi.fn(),
+  processLeadBatch: vi.fn(async () => ({ total: 0, error: 0 })),
 }));
 
 vi.mock('@/lib/notifications/suppression', () => ({
@@ -215,15 +219,14 @@ describe('GET /api/cron/frequent', () => {
     vi.setSystemTime(new Date('2026-03-24T10:15:00.000Z'));
 
     mockDbExecute.mockResolvedValue(undefined);
+    const settingsLimit = vi
+      .fn()
+      .mockResolvedValue([{ enabled: true, discoveryEnabled: false }]);
     mockDbSelect.mockReturnValue({
       from: vi.fn().mockReturnValue({
         where: vi.fn().mockReturnValue({
-          limit: vi.fn().mockResolvedValue([
-            {
-              enabled: true,
-              discoveryEnabled: false,
-            },
-          ]),
+          limit: settingsLimit,
+          orderBy: vi.fn().mockReturnValue({ limit: settingsLimit }),
         }),
       }),
     });
@@ -275,19 +278,14 @@ describe('GET /api/cron/frequent', () => {
       filed: [],
       skipped: false,
     });
-    mockGetAuthSignupOnboardingCanaryStatus.mockImplementation(async () => ({
-      runAt: new Date().toISOString(),
-    }));
-    mockGetPublicProfileCanaryStatus.mockImplementation(async () => ({
-      runAt: new Date().toISOString(),
-    }));
+    const freshReceipt = async () => ({ runAt: new Date().toISOString() });
+    mockGetAuthSignupOnboardingCanaryStatus.mockImplementation(freshReceipt);
+    mockGetPublicProfileCanaryStatus.mockImplementation(freshReceipt);
+    mockGetReleaseEmailCanaryStatus.mockImplementation(freshReceipt);
     mockRunReleaseEmailCanary.mockImplementation(async () => ({
       runAt: new Date().toISOString(),
       status: 'failed',
       failureReason: 'not_configured',
-    }));
-    mockGetReleaseEmailCanaryStatus.mockImplementation(async () => ({
-      runAt: new Date().toISOString(),
     }));
     mockApplySummerCardDefaults.mockResolvedValue({
       checked: 2,
@@ -353,6 +351,7 @@ describe('GET /api/cron/frequent', () => {
       success: true,
       data: { defaulted: 1, approvedByDefault: 1 },
     });
+    expect(body.results.founderWelcome?.data).toEqual({ filed: 0 });
 
     mockApplySummerCardDefaults.mockRejectedValueOnce(new Error('kv down'));
     const campaignsBefore = mockProcessCampaigns.mock.calls.length;

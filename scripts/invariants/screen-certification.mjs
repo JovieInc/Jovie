@@ -303,7 +303,7 @@ web.legal-privacy|web|legal-privacy|apps/web/app/(dynamic)/legal/privacy/|deskto
 web.legal-terms|web|legal-terms|apps/web/app/(dynamic)/legal/terms/|desktop,mobile
 web.legal-cookies|web|legal-cookies|apps/web/app/(dynamic)/legal/cookies/|desktop,mobile
 web.legal-dmca|web|legal-dmca|apps/web/app/(dynamic)/legal/dmca/|desktop,mobile
-web.playlists-index|web|public-playlists|apps/web/app/(dynamic)/playlists/page.tsx,apps/web/app/(dynamic)/playlists/layout.tsx|desktop,mobile
+web.playlists-index|web|public-playlists|apps/web/app/(dynamic)/playlists/page.tsx,apps/web/app/(dynamic)/playlists/layout.tsx,apps/web/app/(dynamic)/playlists/genre/[genre]/page.tsx,apps/web/app/(dynamic)/playlists/mood/[mood]/page.tsx|desktop,mobile
 web.brand|web|marketing-brand|apps/web/app/brand/page.tsx,apps/web/app/brand/layout.tsx|desktop,mobile
 web.marketing-renders|web|marketing-renders|apps/web/app/(marketing)/renders/|desktop,mobile
 web.profile-admission|web|profile-admission|apps/web/app/(profile-admission)/renders/profile-admission/page.tsx|desktop,mobile
@@ -384,7 +384,7 @@ web.settings-data-privacy|web|screen.settings.data-privacy|apps/web/app/app/(she
 web.settings-connectors|web|settings-connectors|apps/web/app/app/(shell)/settings/connectors/|desktop,mobile
 web.settings|web|screen.settings|apps/web/app/app/(shell)/settings/layout.tsx|desktop,mobile
 web.onboarding-checkout|web|onboarding-checkout|apps/web/app/onboarding/checkout/page.tsx,apps/web/app/onboarding/checkout/loading.tsx|desktop,mobile
-web.billing-success|web|billing-success|apps/web/app/billing/success/page.tsx|desktop,mobile
+web.billing-success|web|billing-success|apps/web/app/billing/success/page.tsx,apps/web/app/billing/success/loading.tsx|desktop,mobile
 web.billing-youtube-thumbnails|web|billing-youtube-thumbnails|apps/web/app/billing/youtube-thumbnails/page.tsx|desktop,mobile
 web.billing-youtube-thumbnails-success|web|billing-youtube-thumbnails-success|apps/web/app/billing/youtube-thumbnails/success/page.tsx|desktop,mobile
 web.billing-shell|web|billing-shell|apps/web/app/billing/layout.tsx|desktop,mobile

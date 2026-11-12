@@ -210,7 +210,9 @@
 
 /* Canonical allocation transition shared by sidebar, inspector, and drawers. */
 @utility transition-shell-rail-allocation {
-  transition-property: flex-basis, width, border-width, opacity, transform;
+  transition-property:
+    flex-basis, width, max-width, border-width, margin, padding, opacity,
+    transform;
 }
 
 /* Keep scrollports from shifting when a descendant receives focus. */
@@ -247,6 +249,12 @@
 }
 
 @theme inline {
+  --color-verified: var(--color-verified);
+  --color-verified-backing: var(--color-verified-backing);
+  --color-on-media: var(--color-on-media);
+  --color-header-text-link: var(--color-header-text-link);
+  --color-header-text-link-hover: var(--color-header-text-link-hover);
+  --color-ink-on-media: var(--color-ink-on-media);
   --color-sidebar: rgb(var(--sidebar-background));
   --color-sidebar-foreground: rgb(var(--sidebar-foreground));
   --color-sidebar-primary: rgb(var(--sidebar-primary));
@@ -313,43 +321,71 @@
   --color-accent-subtle: var(--color-accent-subtle);
 }
 
-/* Inspector widths resolve against the main surface, independently of their
-   interrupted width transition. Desktop-only usage preserves mobile fixed sheets. */
+/* Inspector widths resolve against the shell main plane (route column plus
+   the rail slot), independently of their interrupted width transition. */
 @utility shell-inspector-host {
   container-type: inline-size;
 }
 
-/* Keep geometry in one utility. With two Tailwind compilation contexts, a
-   later base .relative/.h-0 utility can otherwise override an earlier lg
-   variant. The inspector must never enter the route's flex allocation. */
-@utility shell-inspector-overlay {
+/* Shared desktop right rail slot (founder call 2026-11-08: the rail pushes
+   content, it never lays on top of it). At lg+ the slot is an in-flow column
+   beside the route column, so an open or pinned inspector narrows the route
+   by its own width plus the shell gap. Geometry stays in one utility: with
+   two Tailwind compilation contexts a later base utility can otherwise
+   override an earlier lg variant. Below lg the slot stays a 0x0 anchor;
+   RightDrawer portals its mobile sheet to the viewport. */
+@utility shell-inspector-rail {
   position: relative;
   height: 0;
   width: 0;
   overflow: visible;
   @media (min-width: 1024px) {
-    position: absolute;
-    inset-block: 0;
-    inset-inline-end: 0;
     display: flex;
+    flex: none;
     flex-direction: column;
+    /* Content hugs the slot's trailing edge. While the slot animates its
+       width (overlay -> pinned) the panel stays put and the route yields. */
+    align-items: flex-end;
     height: 100%;
-    width: fit-content;
-    max-width: 100%;
+    width: auto;
     min-height: 0;
-    overflow: hidden;
-    padding: var(--space-1-5);
-    border-radius: var(--app-shell-radius);
-    /* A closed drawer is width 0, but fit-content still counts this padding,
-       so the rail's border box stays 12px and covers the main plane. Collapse
-       only after the phase settles closed; opening and closing keep the inset. */
-    &:has([data-rail-phase="closed"]):not(
-        :has([data-rail-phase="open"]),
-        :has([data-rail-phase="opening"]),
-        :has([data-rail-phase="closing"])
+    /* Same cap as the drawer (half the main plane): the pushed route always
+       keeps a usable column. Overlay previews clamp this to 0, so pinning
+       one animates the clamp and the route yields without a jump. */
+    max-width: 50cqw;
+    /* The shell gap travels with the drawer: it opens with `opening` and
+       gives itself back through `closing`, so the route never steps 8px.
+       A slot whose drawer has not mounted yet (a lazily loaded panel)
+       reserves nothing; the settings companion holds its space with its own
+       min-width reservation in system-b-app.css. */
+    padding-inline-start: 0;
+    &:has([data-rail-phase="open"], [data-rail-phase="opening"]) {
+      padding-inline-start: var(--app-shell-gap);
+    }
+    /* A transient hover/focus preview (its drawer requests the overlay
+       presentation) floats over the route instead of allocating canvas,
+       inset like a peek and kept below the shell header so the control that
+       summoned it stays reachable. It holds through the preview's exit;
+       pinning drops the request and the route yields with the same motion. */
+    &:has([data-rail-presentation="overlay"]:not([data-rail-phase="closed"])) {
+      max-width: 0;
+      margin-inline-start: calc(var(--space-1-5) * -1);
+      padding-inline: 0 var(--space-1-5);
+      padding-block: var(--space-1-5);
+      /* Entering the overlay snaps the clamp so a preview never nudges the
+         route; leaving it (pinning) animates the clamp with the drawer. */
+      @media (prefers-reduced-motion: no-preference) {
+        transition-property:
+          flex-basis, width, border-width, margin, padding, opacity, transform;
+      }
+    }
+    &[data-rail-below-header="true"]:has(
+        [data-rail-presentation="overlay"]:not([data-rail-phase="closed"])
       ) {
-      width: 0;
-      padding: 0;
+      padding-block-start: calc(
+        var(--app-shell-header-height) +
+        var(--space-1-5)
+      );
     }
   }
 }

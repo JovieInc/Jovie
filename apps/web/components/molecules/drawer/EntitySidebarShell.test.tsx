@@ -53,6 +53,24 @@ describe('EntitySidebarShell', () => {
     expect(divider?.className).not.toContain('border-(--app-shell-frame-seam)');
   });
 
+  it('keeps the header band 1px seam as padding so the card is the only bordered surface', () => {
+    const { container } = render(
+      <EntitySidebarShell
+        isOpen
+        ariaLabel='Release details'
+        title='Release details'
+        tabs={TABS}
+        onClose={vi.fn()}
+      >
+        <div>Inspector content</div>
+      </EntitySidebarShell>
+    );
+    const band = container.querySelector('[data-entity-sidebar-header-band]');
+    expect(band).toHaveClass('pb-px', 'bg-transparent');
+    expect(band?.className).not.toMatch(/(^|\s)border(-|\s|$)/);
+    expect(band).toContainElement(screen.getByRole('tablist'));
+  });
+
   it('shows the empty state instead of the entity and tabs', async () => {
     const { container } = render(
       <EntitySidebarShell
@@ -70,6 +88,30 @@ describe('EntitySidebarShell', () => {
     ).toBeInTheDocument();
     expect(screen.queryByTestId('fixture-body')).toBeNull();
     await expectNoA11yViolations(container);
+  });
+
+  it('lets a transient preview request the overlay; pinned rails push', () => {
+    const { rerender } = render(
+      <EntitySidebarShell
+        isOpen
+        ariaLabel='Release details'
+        presentation='push'
+      >
+        <div>Inspector content</div>
+      </EntitySidebarShell>
+    );
+    const drawer = screen.getByTestId('right-drawer');
+    expect(drawer).toHaveAttribute('data-rail-presentation', 'push');
+    rerender(
+      <EntitySidebarShell
+        isOpen
+        ariaLabel='Release details'
+        presentation='overlay'
+      >
+        <div>Inspector content</div>
+      </EntitySidebarShell>
+    );
+    expect(drawer).toHaveAttribute('data-rail-presentation', 'overlay');
   });
 
   it('closes on Escape through the shell keyboard handler', () => {

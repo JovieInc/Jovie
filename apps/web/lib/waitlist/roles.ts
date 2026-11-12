@@ -1,5 +1,3 @@
-import { z } from 'zod';
-
 /**
  * Roles the closed-signup waitlist form asks for (canon/PRODUCT.md,
  * 2026-11-02). Stored on `waitlist_entries.qualification_inputs.role`, so no
@@ -17,6 +15,24 @@ export const WAITLIST_ROLES = [
   { value: 'other', label: 'Other' },
 ] as const;
 
+/**
+ * The one list of artist-side role choices a visitor picks from, on the
+ * homepage chips and the /waitlist radios alike. Producer and Songwriter are
+ * separate choices that store the one `producer_songwriter` role.
+ */
+export const WAITLIST_ROLE_CHOICES = [
+  { key: 'artist', label: 'Artist', role: 'artist' },
+  { key: 'manager', label: 'Manager', role: 'manager' },
+  { key: 'label', label: 'Label', role: 'label' },
+  { key: 'producer', label: 'Producer', role: 'producer_songwriter' },
+  { key: 'songwriter', label: 'Songwriter', role: 'producer_songwriter' },
+  { key: 'other', label: 'Other', role: 'other' },
+] as const satisfies ReadonlyArray<{
+  readonly key: string;
+  readonly label: string;
+  readonly role: (typeof WAITLIST_ROLES)[number]['value'];
+}>;
+
 /** The company homepage asks for context without assuming a particular industry. */
 export const GENERAL_WAITLIST_ROLES = [
   { value: 'individual', label: 'Myself' },
@@ -31,12 +47,6 @@ export type WaitlistRole = (typeof ALL_WAITLIST_ROLES)[number]['value'];
 export const WAITLIST_ROLE_VALUES = [
   ...new Set(ALL_WAITLIST_ROLES.map(role => role.value)),
 ] as [WaitlistRole, ...WaitlistRole[]];
-
-export const waitlistRoleSchema = z.enum(WAITLIST_ROLE_VALUES);
-
-export function isWaitlistRole(value: unknown): value is WaitlistRole {
-  return waitlistRoleSchema.safeParse(value).success;
-}
 
 export function getWaitlistRoleLabel(role: string): string {
   return (

@@ -365,3 +365,66 @@ export const CustomStyling: Story = {
     ),
   },
 };
+
+export const Empty: Story = {
+  args: {
+    className: 'max-w-md',
+    children: (
+      <>
+        <CardHeader>
+          <CardTitle>Upcoming releases</CardTitle>
+          <CardDescription>
+            Nothing scheduled yet. New releases appear here once you add them.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Button variant='secondary'>Add a release</Button>
+        </CardContent>
+      </>
+    ),
+  },
+  parameters: {
+    docs: {
+      description: {
+        story:
+          'An empty data card keeps its header and surface, with a short explanation and one next action in place of content.',
+      },
+    },
+  },
+};
+
+export const Rtl: Story = {
+  render: args => (
+    <div dir='rtl' className='box-border w-72 min-w-0'>
+      <Card {...args} />
+    </div>
+  ),
+  args: {
+    children: (
+      <>
+        <CardHeader>
+          <CardTitle maxLines={2}>
+            دليل الإيرادات للفنانين المستقلين لحملات الإصدار متعددة المنصات
+          </CardTitle>
+          <CardDescription>آخر مزامنة قبل دقيقتين</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <p className='text-sm text-secondary-token'>
+            يبقى النص الطويل داخل البطاقة ويلتف بدلاً من أن يتجاوز حدودها.
+          </p>
+        </CardContent>
+        <CardFooter>
+          <Button>عرض التفاصيل</Button>
+        </CardFooter>
+      </>
+    ),
+  },
+  parameters: {
+    docs: {
+      description: {
+        story:
+          'Right-to-left content in a narrow card: the long Arabic title clamps to two lines and body text wraps inside the surface.',
+      },
+    },
+  },
+};

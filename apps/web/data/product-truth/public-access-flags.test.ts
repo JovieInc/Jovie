@@ -22,10 +22,10 @@ describe('public access flag classifications', () => {
       );
     }
   );
-  it('keeps closed signup enabled without announcing a public capability', () => {
-    expect(CODE_FLAGS.PUBLIC_SIGNUP_CLOSED).toBe(true);
+  it('keeps the signup kill switch off by default without announcing a public capability', () => {
+    expect(CODE_FLAGS.PUBLIC_SIGNUP_CLOSED).toBe(false);
     expect(PRODUCT_FLAG_CAPABILITIES.PUBLIC_SIGNUP_CLOSED).toEqual({
-      nonMarketing: 'closed signup gate; default on',
+      nonMarketing: 'closed signup kill switch; default off',
     });
   });
 });

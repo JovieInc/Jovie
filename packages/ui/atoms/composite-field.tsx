@@ -31,7 +31,8 @@ const shapeClasses = {
 
 const sizeClasses = {
   sm: 'h-app-control-sm gap-1.5',
-  md: 'min-h-12 gap-2 py-2 pr-2 pl-4',
+  // Logical gutters: the prefix side and the submit side mirror in RTL.
+  md: 'min-h-12 gap-2 py-2 pe-2 ps-4',
 } satisfies Record<CompositeFieldSize, string>;
 
 /**

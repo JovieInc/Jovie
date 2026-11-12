@@ -1,6 +1,7 @@
 import { render, screen } from '@testing-library/react';
 import { useState } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { expectNoA11yViolations } from '@/tests/utils/a11y';
 
 const mocks = vi.hoisted(() => ({
   getFreshAuth: vi.fn(),
@@ -11,6 +12,7 @@ const mocks = vi.hoisted(() => ({
   dehydrated: vi.fn(),
   essential: vi.fn(),
   captureError: vi.fn(),
+  banned: false,
   boundaryMounts: 0,
 }));
 
@@ -19,7 +21,11 @@ vi.mock('next/headers', () => ({
 }));
 vi.mock('next/navigation', () => ({ redirect: vi.fn() }));
 vi.mock('@/components/UnavailablePage', () => ({
-  UnavailablePage: () => <div>Unavailable</div>,
+  UnavailablePage: () => (
+    <main>
+      <h1>Unavailable</h1>
+    </main>
+  ),
 }));
 vi.mock('@/components/organisms/AuthShellWrapper', () => ({
   AuthShellWrapper: ({ children }: { children: React.ReactNode }) => (
@@ -39,7 +45,7 @@ vi.mock('@/features/workspace-lock/WorkspaceLockScreen', () => ({
   WorkspaceLockScreen: () => <div>Unlock Ovie</div>,
 }));
 vi.mock('@/lib/auth/ban-check', () => ({
-  getUserBanStatus: async () => ({ isBanned: false }),
+  getUserBanStatus: async () => ({ isBanned: mocks.banned }),
 }));
 vi.mock('@/lib/auth/cached', () => ({ getFreshAuth: mocks.getFreshAuth }));
 vi.mock('@/lib/error-tracking', () => ({ captureError: mocks.captureError }));
@@ -175,6 +181,7 @@ describe('DashboardShellContent privacy decision', () => {
   afterEach(() => vi.clearAllMocks());
   beforeEach(() => {
     mocks.boundaryMounts = 0;
+    mocks.banned = false;
     mocks.shellDashboard.mockReset().mockResolvedValue(dashboardData);
     mocks.dashboard.mockReset().mockResolvedValue(dashboardData);
     mocks.flags.mockResolvedValue({});
@@ -307,5 +314,46 @@ describe('DashboardShellContent privacy decision', () => {
 
     expect(screen.getByText('Settings route')).toBeInTheDocument();
     expect(boundaryMount()).toBe(initialMount);
+  });
+
+  it('renders the workspace error state accessibly when the shell read fails', async () => {
+    mocks.shellDashboard.mockRejectedValue(new Error('DAL unavailable'));
+    const { container } = render(
+      await shell('customer', <div>Contacts page</div>, '/app/contacts')
+    );
+
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      'Failed to load your workspace. Please refresh the page.'
+    );
+    expect(screen.getByRole('button', { name: 'Try again' })).toBeEnabled();
+    expect(mocks.captureError).toHaveBeenCalledOnce();
+    await expectNoA11yViolations(container);
+  });
+
+  it('shows a banned account only the unavailable page, axe-clean', async () => {
+    mocks.banned = true;
+    const { container } = render(
+      await shell('customer', <div>Private route child</div>)
+    );
+
+    expect(
+      screen.getByRole('heading', { name: 'Unavailable' })
+    ).toBeInTheDocument();
+    expect(screen.queryByText('Private route child')).not.toBeInTheDocument();
+    expect(mocks.shellDashboard).not.toHaveBeenCalled();
+    await expectNoA11yViolations(container);
+  });
+
+  it.each([
+    ['unlocked Jovie shell', 'customer', false],
+    ['locked Ovie shell', 'ov', true],
+  ] as const)('keeps the %s axe-clean', async (_label, mode, locked) => {
+    if (mode === 'ov') ovieState(true, locked);
+    const { container } = render(await shell(mode, <main>Route content</main>));
+
+    expect(
+      screen.queryByText(locked ? 'Route content' : 'Unlock Ovie')
+    ).not.toBeInTheDocument();
+    await expectNoA11yViolations(container);
   });
 });

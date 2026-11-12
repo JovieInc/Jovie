@@ -3,6 +3,7 @@ import { join } from 'node:path';
 import { act, cleanup, render, screen, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { LIBRARY_LIFECYCLE_STAGES } from '@/lib/library/lifecycle-stage';
+import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import {
   LIBRARY_CATALOG_SKELETON_COLUMNS,
   LIBRARY_STAGE_CHIP_KEYS,
@@ -90,6 +91,19 @@ describe('LibraryLoadingState', () => {
     ).toBeInTheDocument();
     assertColumnCount(7);
   });
+  it('announces one busy Work region with decorative chips, axe-clean', async () => {
+    const { container } = render(<LibraryLoadingState />);
+    const region = screen.getByLabelText('Loading Work');
+    expect(region).toHaveAttribute('aria-busy', 'true');
+    const chips = screen
+      .getByTestId('library-view-filter-chips')
+      .querySelectorAll('span');
+    expect(chips).toHaveLength(LIBRARY_STAGE_CHIP_KEYS.length);
+    for (const chip of chips)
+      expect(chip).toHaveAttribute('aria-hidden', 'true');
+    await expectNoA11yViolations(container);
+  });
+
   it('matches the loaded Library table geometry so the swap cannot shift', () => {
     expect(geometry(LIBRARY_TABLE_SKELETON_COLUMNS)).toEqual(
       geometry(LIBRARY_TABLE_COLUMNS)
@@ -119,7 +133,12 @@ describe('LibraryLoadingState', () => {
     expect(source).not.toMatch(/from '\.\/LibrarySurface'/);
     expect(source).not.toMatch(/from '@\/components\/organisms\/table'/);
 
-    const layout = readFileSync(join(__dirname, '..', 'layout.tsx'), 'utf8');
-    expect(layout).not.toMatch(/from '\.\/library\/LibrarySurface'/);
+    for (const shellFile of ['layout.tsx', 'shell-route-skeleton.tsx']) {
+      const shellSource = readFileSync(
+        join(__dirname, '..', shellFile),
+        'utf8'
+      );
+      expect(shellSource).not.toMatch(/from '\.\/library\/LibrarySurface'/);
+    }
   });
 });

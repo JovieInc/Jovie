@@ -65,16 +65,13 @@ export interface ComparativeClaim {
 }
 
 export const COMPARATIVE_CLAIMS = [
-  {
-    id: 'benchmark.vs-linktree.lcp',
-    metric: 'lcp-ms',
-    direction: 'lower-is-better',
-    wording: 'Main content appears {x}x faster than on Linktree.',
-    baseline: { jovie: 1864, competitor: 11672 },
-    spread: { jovie: [1722, 2580], competitor: [11601, 15295] },
-    minMargin: 3,
-    robustness: 'robust',
-  },
+  // benchmark.vs-linktree.lcp was retired on 2026-11-09. The weekly
+  // GitHub-runner re-measure flagged it twice in a row (medians 2.11x and
+  // 2.52x against the 3x floor) after the profile hydration race tracked in
+  // JOV-10246. The floor was never lowered: the multiplier copy is simply gone
+  // until a runner re-measure puts the live margin back at or above 3x, at
+  // which point the claim returns with a fresh baseline and spread from that
+  // receipt.
   {
     id: 'benchmark.vs-linktree.fcp',
     metric: 'fcp-ms',

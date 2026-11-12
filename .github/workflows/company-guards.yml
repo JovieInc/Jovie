@@ -1,14 +1,20 @@
 # Shared company guard suite from JovieInc/ci (canon/COMPANY.md).
 # Pin is bumped by a bot PR; a pin more than 72h behind the newest canon/guard
 # commit fails this check. The bot rewrites these two lines only:
-# company-guards.yml@e9a2c8a5f9dc7e2f83f051e67cb6edb02904eda7
-# ci-ref: e9a2c8a5f9dc7e2f83f051e67cb6edb02904eda7
+# company-guards.yml@9891c0ec01d1a19bc441977f2fa58c24d2611e4e
+# ci-ref: 9891c0ec01d1a19bc441977f2fa58c24d2611e4e
 # Source Validation classifies with the trusted base, which has no
 # .company-guards/ rule. The baseline is committed under scripts/company-guards/
 # and this job copies it to the path guards/size.mjs reads.
 name: Company Guards
+# Required check: it must also report on merge_group, or queue entries wait
+# forever. The size guard compares the checked-out tree with the committed
+# baseline. size-500 is diff-scoped on pull_request and merge_group (only files
+# changed against the base fail; other growth warns) and repo-wide on push.
 on:
   pull_request:
+  merge_group:
+    types: [checks_requested]
   push:
     branches: [main]
 permissions:
@@ -44,6 +50,23 @@ jobs:
           set -euo pipefail
           mkdir -p .company-guards
           cp scripts/company-guards/size-baseline.json .company-guards/size-baseline.json
+      - name: Fetch diff base for size-500
+        if: github.event_name == 'pull_request' || github.event_name == 'merge_group'
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha }}
+        run: |
+          set -euo pipefail
+          # Fail closed: if the base cannot be fetched the guard runs repo-wide.
+          if git fetch --no-tags --depth=1 origin "$BASE_SHA"; then
+            echo "SIZE_BASE_SHA=$BASE_SHA" >> "$GITHUB_ENV"
+          else
+            echo "::warning::could not fetch $BASE_SHA; size-500 runs repo-wide"
+          fi
+      # Budgets only shrink: a PR that raises or adds an entry is growth. A PR
+      # that keeps or shrinks a file leaves the baseline alone.
+      - name: Size budgets never rise
+        if: env.SIZE_BASE_SHA != ''
+        run: node scripts/company-guards/size-ratchet.mjs --no-raise "$SIZE_BASE_SHA"
       - name: Run guards
         env:
           PR_BODY: ${{ github.event.pull_request.body }}

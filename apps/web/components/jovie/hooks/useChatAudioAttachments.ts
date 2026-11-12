@@ -1,6 +1,5 @@
 'use client';
 
-import { uploadPresigned } from '@vercel/blob/client';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useAuthSafe } from '@/hooks/useJovieAuth';
 import { buildAudioBlobPath } from '@/lib/audio/blob-path';
@@ -9,6 +8,7 @@ import {
   resolveAudioUploadMime,
   validateAudioFile,
 } from '@/lib/audio/constants';
+import { uploadPresignedLazy as uploadPresigned } from '@/lib/blob/upload-presigned-lazy';
 import type { AudioEntityInference } from '@/lib/chat/infer-audio-entity';
 import {
   canTransitionMediaLifecycle,
