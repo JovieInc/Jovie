@@ -94,7 +94,7 @@ export async function main(argv, io = console) {
       return 0;
     }
     if (wins.some(w => w.prs.some(p => p.number === number && p.repo === repo)))
-      return io.log(`#${number}: already in the ledger`), 0;
+      return (io.log(`#${number}: already in the ledger`), 0);
     save([...wins, win]);
     io.log(`added ${win.id}`);
     return 0;
