@@ -2594,9 +2594,7 @@ function runPenTokenParity() {
  * @property {(command: string) => {code: number, output: string, skipped?: boolean}} [execute]
  */
 
-/**
- * @param {DesignConformanceOpts} [opts]
- */
+/** @param {DesignConformanceOpts} [opts] */
 export function runDesignConformance(opts) {
   const options = opts ?? {};
   const execute = options.execute;
