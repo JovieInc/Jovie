@@ -256,6 +256,13 @@
       "kind": "domain",
       "domain": "feedback.submit"
     },
+    "chat:useSkill": {
+      "kind": "read"
+    },
+    "chat:requestCapability": {
+      "kind": "domain",
+      "domain": "feedback.submit"
+    },
     "chat:showAccountStatus": {
       "kind": "read"
     },
@@ -281,22 +288,13 @@
     "chat:checkCanvasStatus": {
       "kind": "read"
     },
-    "chat:suggestRelatedArtists": {
-      "kind": "read"
-    },
     "chat:writeWorldClassBio": {
-      "kind": "generate"
-    },
-    "chat:generateCanvasPlan": {
       "kind": "generate"
     },
     "chat:generateAlbumArt": {
       "kind": "generate"
     },
     "chat:retouchImage": {
-      "kind": "generate"
-    },
-    "chat:createPromoStrategy": {
       "kind": "generate"
     },
     "chat:voicePromo": {

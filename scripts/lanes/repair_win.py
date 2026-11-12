@@ -27,10 +27,10 @@ console.log(JSON.stringify([
         raise ValueError("measured win policy: " + "; ".join(problems))
 
 
-def company_guard_pin(files: list[dict], comparison: dict) -> str:
+def company_guard_pin(files: list[dict], comparison: dict, *, adopted_comparison: dict) -> str:
     """Generate a measured Win for a pin-only workflow edit, never a speed claim.
 
-    Pass fresh REST PR files and `node packages/api-client/cli.ts gh --priority repair -- api repos/JovieInc/ci/compare/OLD...NEW`.
+    Pass fresh REST PR files and GitHub comparisons for OLD...NEW and NEW...NEW.
     Feed the returned section to pr_events.repair_evidence_body(win_section=...).
     The caller owns the GitHub read and exact-head binding; this helper does no I/O
     except the existing canonical Win validation. Mismatched evidence fails closed.
@@ -70,11 +70,22 @@ def company_guard_pin(files: list[dict], comparison: dict) -> str:
             or len({commit["sha"] for commit in commits}) != count
             or commits[-1]["sha"] != new):
         raise ValueError("upstream comparison must completely match the workflow's forward pin bump")
+    if (not isinstance(adopted_comparison, dict)
+            or adopted_comparison.get("html_url") != f"https://github.com/JovieInc/ci/compare/{new}...{new}"
+            or adopted_comparison.get("status") != "identical"
+            or any(type(adopted_comparison.get(key)) is not int or adopted_comparison[key] != 0
+                   for key in ("ahead_by", "behind_by", "total_commits"))
+            or adopted_comparison.get("commits") != []
+            or any(not isinstance(adopted_comparison.get(key), dict)
+                   or adopted_comparison[key].get("sha") != new
+                   for key in ("base_commit", "merge_base_commit"))):
+        raise ValueError("adopted target comparison must prove zero remaining commits at the new pin")
+    after = adopted_comparison["ahead_by"]
     section = "\n".join([
         "## Win", "",
         "- Claim: Bring the shared company guard pin up to the verified upstream target.",
         "- Area: ci", "- Theme: guard-freshness",
-        f"- Metric: upstream guard commits behind target | commits | lower | {count} | 0 | "
+        f"- Metric: upstream guard commits behind target | commits | lower | {count} | {after} | "
         f"GitHub compare API, old pin versus adopted target | "
         f"node packages/api-client/cli.ts gh --priority repair -- api repos/JovieInc/ci/compare/{old}...{new} --jq .ahead_by && "
         f"node packages/api-client/cli.ts gh --priority repair -- api repos/JovieInc/ci/compare/{new}...{new} --jq .ahead_by",

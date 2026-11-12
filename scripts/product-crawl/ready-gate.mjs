@@ -35,7 +35,6 @@ export function timingSuspect(page) {
   );
 }
 
-/** Median of the samples; the lower middle for an even count. */
 /**
  * The element inserted last in the half second before a shift at `atMs`
  * (the tallest, among inserts in the same batch), which is usually what
@@ -55,6 +54,21 @@ export function causeOf(added, atMs) {
   return best;
 }
 
+/**
+ * How far a layout-shift source moved down (negative: up), in whole pixels,
+ * or undefined when its top edge stayed put (a sideways move or a resize in
+ * place), so the crawler keeps looking for the move that pushed it. Runs in
+ * the page too, so it uses nothing outside its arguments.
+ * @param {{ y: number } | undefined} a
+ * @param {{ y: number } | undefined} b
+ */
+export function verticalMove(a, b) {
+  if (!a || !b) return undefined;
+  const dy = Math.round(b.y - a.y);
+  return dy === 0 ? undefined : dy;
+}
+
+/** Median of the samples; the lower middle for an even count. */
 export function median(xs) {
   const s = [...xs].sort((a, b) => a - b);
   return s[Math.floor((s.length - 1) / 2)];

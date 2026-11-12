@@ -29,9 +29,13 @@ class CompanyGuardPinWinTests(unittest.TestCase):
                            "base_commit": {"sha": self.OLD}, "merge_base_commit": {"sha": self.OLD},
                            "commits": [{"sha": self.NEW}],
                            "html_url": f"https://github.com/JovieInc/ci/compare/{self.OLD}...{self.NEW}"}
+        self.adopted = {"status": "identical", "ahead_by": 0, "behind_by": 0, "total_commits": 0,
+                        "base_commit": {"sha": self.NEW}, "merge_base_commit": {"sha": self.NEW},
+                        "commits": [],
+                        "html_url": f"https://github.com/JovieInc/ci/compare/{self.NEW}...{self.NEW}"}
 
     def test_generated_evidence_fixes_fleet_and_reproduces_the_upstream_measurement(self):
-        win = repair_win.company_guard_pin(self.files, self.comparison)
+        win = repair_win.company_guard_pin(self.files, self.comparison, adopted_comparison=self.adopted)
         self.assertIn("| commits | lower | 1 | 0 |", win)
         self.assertIn(f"node packages/api-client/cli.ts gh --priority repair -- api repos/JovieInc/ci/compare/{self.OLD}...{self.NEW} --jq .ahead_by", win)
         self.assertIn("- Verify: " + self.comparison["html_url"], win)
@@ -59,7 +63,29 @@ console.log(JSON.stringify(['', win].map(body => evaluateFleetRules({
 
     def test_counts_multiple_upstream_commits_without_assuming_a_one_commit_bump(self):
         self.comparison.update(ahead_by=2, total_commits=2, commits=[{"sha": "c" * 40}, {"sha": self.NEW}])
-        self.assertIn("| commits | lower | 2 | 0 |", repair_win.company_guard_pin(self.files, self.comparison))
+        self.assertIn("| commits | lower | 2 | 0 |", repair_win.company_guard_pin(
+            self.files, self.comparison, adopted_comparison=self.adopted))
+
+    def test_after_value_requires_a_matching_observed_target_comparison(self):
+        adopted = self.adopted
+        win = repair_win.company_guard_pin(self.files, self.comparison, adopted_comparison=adopted)
+        self.assertIn("| commits | lower | 1 | 0 |", win)
+        for change in ({"status": "ahead"}, {"ahead_by": 1}, {"ahead_by": False},
+                       {"behind_by": False}, {"total_commits": False}, {"commits": [{"sha": self.NEW}]},
+                       {"base_commit": {"sha": self.OLD}}, {"merge_base_commit": {"sha": self.OLD}},
+                       {"base_commit": 1}, {"merge_base_commit": []},
+                       {"html_url": self.comparison["html_url"]}):
+            with self.subTest(change=change), self.assertRaisesRegex(ValueError, "adopted target"):
+                repair_win.company_guard_pin(self.files, self.comparison,
+                                            adopted_comparison={**adopted, **change})
+        for key in adopted:
+            incomplete = {**adopted}
+            del incomplete[key]
+            with self.subTest(missing=key), self.assertRaisesRegex(ValueError, "adopted target"):
+                repair_win.company_guard_pin(self.files, self.comparison, adopted_comparison=incomplete)
+        for malformed in (None, [], "zero"):
+            with self.subTest(malformed=malformed), self.assertRaisesRegex(ValueError, "adopted target"):
+                repair_win.company_guard_pin(self.files, self.comparison, adopted_comparison=malformed)
 
     def test_rejects_unbound_divergent_incomplete_or_non_numeric_comparisons(self):
         invalid = [
@@ -73,19 +99,20 @@ console.log(JSON.stringify(['', win].map(body => evaluateFleetRules({
         ]
         for change in invalid:
             with self.subTest(change=change), self.assertRaises(ValueError):
-                repair_win.company_guard_pin(self.files, {**self.comparison, **change})
+                repair_win.company_guard_pin(self.files, {**self.comparison, **change},
+                                            adopted_comparison=self.adopted)
         for key in self.comparison:
             comparison = deepcopy(self.comparison)
             del comparison[key]
             with self.subTest(missing=key), self.assertRaises(ValueError):
-                repair_win.company_guard_pin(self.files, comparison)
+                repair_win.company_guard_pin(self.files, comparison, adopted_comparison=self.adopted)
 
     def test_rejects_duplicate_or_malformed_intermediate_commit_identifiers(self):
         for intermediate in (None, {}, {"sha": "c" * 8}, {"sha": False}, {"sha": self.NEW}):
             comparison = {**self.comparison, "ahead_by": 2, "total_commits": 2,
                           "commits": [intermediate, {"sha": self.NEW}]}
             with self.subTest(intermediate=intermediate), self.assertRaises(ValueError):
-                repair_win.company_guard_pin(self.files, comparison)
+                repair_win.company_guard_pin(self.files, comparison, adopted_comparison=self.adopted)
 
     def test_rejects_missing_truncated_or_non_pin_workflow_changes(self):
         patch = self.files[0]["patch"]
@@ -96,7 +123,7 @@ console.log(JSON.stringify(['', win].map(body => evaluateFleetRules({
                         [{**self.files[0], "patch": patch.replace(f"+# ci-ref: {self.NEW}", f"+# ci-ref: {self.OLD}")}],
                         [{**self.files[0], "patch": patch.replace(f"-# ci-ref: {self.OLD}\n", "")}]]:
             with self.subTest(files=changed), self.assertRaises(ValueError):
-                repair_win.company_guard_pin(changed, self.comparison)
+                repair_win.company_guard_pin(changed, self.comparison, adopted_comparison=self.adopted)
 
 
 class MeasuredWinPolicyTests(unittest.TestCase):
