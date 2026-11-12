@@ -31,3 +31,31 @@ export const Generating: Story = {
     isLoading: true,
   },
 };
+
+/** The plan is generating: the action reads Generating... and is disabled. */
+export const LoadingGeneratingPlan: Story = {
+  args: {
+    isLoading: true,
+  },
+};
+
+/** At phone width the heading and description wrap inside the card. */
+export const LongContentPhoneWidth: Story = {
+  decorators: [
+    Story => (
+      <div className='w-80'>
+        <Story />
+      </div>
+    ),
+  ],
+};
+
+export const RtlReady: Story = {
+  decorators: [
+    Story => (
+      <div dir='rtl' lang='ar'>
+        <Story />
+      </div>
+    ),
+  ],
+};

@@ -2,9 +2,9 @@
 // @coverage-via apps/web/tests/unit/DesktopQrOverlay.test.tsx
 
 import { Smartphone, X } from 'lucide-react';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { CircleIconButton } from '@/components/atoms/CircleIconButton';
-import { getQrCodeUrl, QRCode } from '@/components/molecules/QRCode';
+import { getQrCodeDataUrl, QRCode } from '@/components/molecules/QRCode';
 import { PROFILE_Z } from '@/lib/profile/z-index-constants';
 
 interface DesktopQrOverlayProps {
@@ -33,15 +33,11 @@ export function DesktopQrOverlay({ handle }: Readonly<DesktopQrOverlayProps>) {
   const [mode, setMode] = useState<'hidden' | 'icon' | 'open'>('hidden');
   const [url, setUrl] = useState('');
   const openCardRef = useRef<HTMLDivElement>(null);
-  const qrUrl = useMemo(() => {
-    if (!url) return '';
-    return getQrCodeUrl(url, 120);
-  }, [url]);
 
-  // Every api.qrserver.com request (the warm-up below and the open card's
-  // <img>) waits for the window load event. An image fetched before load
-  // holds that event, so a slow QR response kept desktop profiles "loading"
-  // for 30s+; ?mode=pay opens the card at hydration, before load.
+  // Warm the QR cache after the window load event so the open card renders
+  // instantly. Generation is local CPU work (no network), so it can no longer
+  // hold the load event; the gate stays because the generation effect and the
+  // card's own render both belong after load on a cold visit.
   const [pageLoaded, setPageLoaded] = useState(false);
 
   useEffect(() => {
@@ -55,12 +51,11 @@ export function DesktopQrOverlay({ handle }: Readonly<DesktopQrOverlayProps>) {
   }, []);
 
   useEffect(() => {
-    if (!pageLoaded || !qrUrl || typeof globalThis.Image !== 'function') {
+    if (!pageLoaded || !url) {
       return;
     }
-    const preloadImage = new globalThis.Image();
-    preloadImage.src = qrUrl;
-  }, [pageLoaded, qrUrl]);
+    void getQrCodeDataUrl(url, 120).catch(() => null);
+  }, [pageLoaded, url]);
 
   useEffect(() => {
     if (typeof globalThis.matchMedia !== 'function') return;

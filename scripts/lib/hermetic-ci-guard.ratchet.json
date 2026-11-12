@@ -8,13 +8,11 @@
     "unpinned": {
       ".github/actions/setup-doppler/action.yml": 2,
       ".github/workflows/e2e-full-matrix.yml": 1,
-      ".github/workflows/marketing-certification-producer.yml": 1,
       ".github/workflows/neon-ephemeral-branch-cleanup.yml": 3,
       ".github/workflows/nightly-tests.yml": 1,
       ".github/workflows/remediation-sweep.yml": 1,
       ".github/workflows/repository-docs-shadow.yml": 2,
       ".github/workflows/security.yml": 1,
-      ".github/workflows/synthetic-monitoring.yml": 2,
       ".github/workflows/visual-regression.yml": 1
     },
     "runner-image": {

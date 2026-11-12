@@ -31,3 +31,43 @@ export const NoPlanChosen: Story = {
     },
   },
 };
+
+export const Empty: Story = {
+  args: {
+    payload: {
+      action: 'propose_checkout',
+      plan: null,
+      handoffUrl: '',
+    },
+  },
+};
+
+export const LongContentNarrow: Story = {
+  args: {
+    payload: {
+      action: 'propose_checkout',
+      plan: 'max',
+      handoffUrl: '/onboarding/checkout?plan=max',
+    },
+  },
+  render: args => (
+    <div className='w-60'>
+      <ChatProposeCheckoutCard {...args} />
+    </div>
+  ),
+};
+
+export const Rtl: Story = {
+  args: {
+    payload: {
+      action: 'propose_checkout',
+      plan: 'pro',
+      handoffUrl: '/onboarding/checkout?plan=pro',
+    },
+  },
+  render: args => (
+    <div dir='rtl' lang='ar' className='w-80'>
+      <ChatProposeCheckoutCard {...args} />
+    </div>
+  ),
+};

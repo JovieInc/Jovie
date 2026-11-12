@@ -449,7 +449,7 @@ describe('ci-fast bounded parallel workflow', () => {
     expect([...whole, ...keyed[0].files].sort()).toEqual(
       [...LANES_PYTEST_FILES].sort()
     );
-    expect(LANES_PYTEST_FILES).toHaveLength(45);
+    expect(LANES_PYTEST_FILES).toHaveLength(46);
     expect(whole).toContain('scripts/tests/test_pr_events_repair_evidence.py');
     expect(whole).toContain('scripts/tests/test_pr_body_markup.py');
     expect(whole).toContain('scripts/tests/test_board_intake.py');
@@ -461,7 +461,7 @@ describe('ci-fast bounded parallel workflow', () => {
     expect(whole).toContain('scripts/tests/test_factory_intake.py');
     expect(whole).toContain('scripts/tests/test_cloud_lane.py');
     expect(command).toContain(
-      'coverage report --include="*/scripts/lanes/cloud_lane.py" --fail-under=90'
+      'coverage report --include="*/scripts/lanes/cloud_lane*.py" --fail-under=90'
     );
     expect(whole).toContain('scripts/tests/test_hyperagent_cli.py');
     expect(whole).toContain('scripts/tests/test_model_radar.py');
@@ -2133,7 +2133,7 @@ describe('ci-fast bounded parallel workflow', () => {
 
   it('keeps workflow contracts in the bounded CI control suite', () => {
     expect(PACKAGE_JSON.scripts['ci:control:test']).toBe(
-      'node scripts/run-affected-tests.mjs --control && node --test scripts/ci-workflow-topology.test.mjs scripts/workflow-runner-pin-check.test.mjs && node scripts/ci-workflow-topology.mjs && pnpm ownership:check && node scripts/sources-of-truth.mjs && node scripts/invariants/duplicate-literals.mjs'
+      'node scripts/run-affected-tests.mjs --control && node --test scripts/ci-workflow-topology.test.mjs scripts/workflow-runner-pin-check.test.mjs scripts/ci-trigger-budget.test.mjs && node scripts/ci-workflow-topology.mjs && pnpm ownership:check && node scripts/sources-of-truth.mjs && node scripts/invariants/duplicate-literals.mjs'
     );
     expect(PACKAGE_JSON.scripts['ownership:check']).toBe(
       'node --test scripts/ownership-registry.test.mjs && node scripts/ownership-registry.mjs --report'

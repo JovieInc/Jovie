@@ -57,13 +57,18 @@ function pick(runs, stale = []) {
   assert.equal(done.status, 0, done.stderr);
   return done.stdout.trim();
 }
-const run = (id, conclusion, created = '1970-01-01T00:05:00Z') => ({
+const run = (
+  id,
+  conclusion,
+  created = '1970-01-01T00:05:00Z',
+  headSha = 'head'
+) => ({
   id,
   path: '.github/workflows/fleet-rules-evidence.yml',
   display_title: 'fleet-rules #7 base=main',
   head_branch: 'b',
+  head_sha: headSha,
   head_repository: { id: 1 },
-  head_sha: 'head',
   created_at: created,
   status: 'completed',
   conclusion,
@@ -72,6 +77,26 @@ const run = (id, conclusion, created = '1970-01-01T00:05:00Z') => ({
 
 test('the evidence picker exists in the workflow', () => {
   assert.ok(program, 'jq program not found in source-validation.yml');
+});
+
+// #23179 (2026-11-10): a superseded head failed in the same second as the
+// current head's success and the higher id won, so PR Ready went red on a
+// passing verdict. Edited events still count via the base sha.
+test('a superseded head failure never outranks the current head or the base sha', {
+  skip: !have,
+}, () => {
+  const current = run(1, 'success');
+  const stale = run(2, 'failure', '1970-01-01T00:05:00Z', 'previous');
+  assert.equal(pick([current, stale], ['previous']), 'completed\tsuccess\tu1');
+  assert.equal(pick([stale, current], ['previous']), 'completed\tsuccess\tu1');
+  assert.equal(pick([stale], ['previous']), 'missing');
+  assert.equal(
+    pick(
+      [stale, run(3, 'success', '1970-01-01T00:06:00Z', 'base')],
+      ['previous']
+    ),
+    'completed\tsuccess\tu3'
+  );
 });
 
 test('a cancelled twin created in the same second never wins the tie', {

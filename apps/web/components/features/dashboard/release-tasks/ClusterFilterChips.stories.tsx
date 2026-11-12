@@ -9,15 +9,17 @@ const CLUSTERS: ClusterChip[] = [
 ];
 
 function ControlledClusterFilterChips({
+  clusters = CLUSTERS,
   initialSelected = [],
 }: {
+  readonly clusters?: readonly ClusterChip[];
   readonly initialSelected?: readonly string[];
 }) {
   const [selectedSlugs, setSelectedSlugs] =
     useState<readonly string[]>(initialSelected);
   return (
     <ClusterFilterChips
-      clusters={CLUSTERS}
+      clusters={clusters}
       selectedSlugs={selectedSlugs}
       onChange={setSelectedSlugs}
     />
@@ -40,4 +42,9 @@ export const AllSelected: Story = {
 
 export const OneFiltered: Story = {
   render: () => <ControlledClusterFilterChips initialSelected={['social']} />,
+};
+
+/** A release with no task clusters yet: the chip row is left out entirely. */
+export const EmptyNoClusters: Story = {
+  render: () => <ControlledClusterFilterChips clusters={[]} />,
 };
