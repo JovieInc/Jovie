@@ -39,6 +39,11 @@ import {
   runStageEvents,
   validateRegistry,
 } from './lib/automation-registry.mjs';
+import {
+  githubHeaders,
+  readGithubJson,
+  readJson,
+} from './lib/github-json-read.mjs';
 import { projectJsonHeartbeat } from './lib/json-heartbeat-receipt.mjs';
 import * as redGate from './lib/red-monitor-owner-gate.mjs';
 
@@ -47,37 +52,6 @@ const TIMEOUT_MS = 10_000;
 const SHA_RE = /^[0-9a-f]{40}$/;
 // Overridable per observer for tests; one literal for the external-api guard.
 const GITHUB_API = 'https://api.github.com';
-
-async function readJson(fetchImpl, url, headers = {}) {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
-  try {
-    const response = await fetchImpl(url, {
-      headers: {
-        Accept: 'application/json',
-        'Cache-Control': 'no-cache',
-        ...headers,
-      },
-      signal: controller.signal,
-    });
-    if (response.status !== 200)
-      return { ok: false, reason: `http-${response.status}` };
-    return { ok: true, body: await response.json() };
-  } catch (error) {
-    return {
-      ok: false,
-      reason: error?.name === 'AbortError' ? 'timeout' : 'transport',
-    };
-  } finally {
-    clearTimeout(timer);
-  }
-}
-
-function githubHeaders(token) {
-  return token
-    ? { Authorization: `Bearer ${token}`, 'X-GitHub-Api-Version': '2022-11-28' }
-    : {};
-}
 
 /**
  * Controller failure streak: healthy unless the newest `receipt.streak` (default 3) conclusive runs (success or
@@ -93,7 +67,7 @@ export async function observeWorkflowFailureStreak(
     ? `&branch=${encodeURIComponent(receipt.branch)}`
     : '';
   const url = `${apiUrl}/repos/${receipt.repo}/actions/workflows/${encodeURIComponent(receipt.workflow)}/runs?status=completed&per_page=50${branch}`;
-  const read = await readJson(fetchImpl, url, githubHeaders(token));
+  const read = await readGithubJson(url, { fetchImpl, token });
   if (!read.ok) return { ok: false, reason: `github-${read.reason}` };
   if (!Array.isArray(read.body?.workflow_runs))
     return { ok: false, reason: 'github-runs-unreadable' };
@@ -151,7 +125,7 @@ export async function observeGithubWorkflow(
         : [query];
     });
     for (const url of urls) {
-      const read = await readJson(fetchImpl, url, githubHeaders(token));
+      const read = await readGithubJson(url, { fetchImpl, token });
       if (!read.ok) return { ok: false, reason: `github-${read.reason}` };
       if (!Array.isArray(read.body?.workflow_runs))
         return { ok: false, reason: 'github-runs-unreadable' };
