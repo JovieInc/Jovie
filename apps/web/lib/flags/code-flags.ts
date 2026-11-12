@@ -73,10 +73,6 @@ export const CODE_FLAGS = {
   // registration limited to the shared MCP redirect allowlist. The founder
   // Ovie issuer advertises /api/ovie/oauth/register on its own.
   OVIE_MCP_DYNAMIC_CLIENT_REGISTRATION: false,
-  // Sean Ellis PMF survey card on the dashboard home for admitted, activated
-  // creators. Default off. FEATURE_PMF_SURVEY_PROMPT=true shows the in-app
-  // card; answers are stored for the admin metric. No outbound of any kind.
-  PMF_SURVEY_PROMPT: false,
   // Public signup is OPEN (Tim, 2026-11-09 11:01 PM PT), superseding the
   // 2026-11-02 invite-only closure. /signup and anonymous /start render the
   // sign-up surfaces directly; the homepage waitlist role form keeps saving
