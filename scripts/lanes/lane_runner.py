@@ -66,6 +66,7 @@ import migration_renumber  # noqa: E402  (no-model fix for migration number coll
 import fix_red_rewrite  # noqa: E402
 import fix_red_failure_routing  # noqa: E402
 import fix_red_classes  # noqa: E402  (fingerprint + deterministic routing of fix-red failures)
+import fix_red_source_edits  # noqa: E402  (merge commits install lint-staged once when the hook cannot find it)
 import sourced_shell_conflict  # noqa: E402  (source-vs-inline shell conflict; ports retry into the helper)
 from gh_budget import gh_call  # noqa: E402  (budgeted gh for new lane code)
 import machine_gap  # noqa: E402
@@ -150,7 +151,7 @@ MAX_GATE_TIMEOUTS = 3
 CLAIM_TTL_S = pr_events.CLAIM_TTL_S
 HOST = socket.gethostname().split(".")[0]
 # Every file a release must pass before `current` moves to it.
-LANE_TESTS = ["scripts/tests/test_factory_signals.py", "scripts/tests/test_factory_intake.py", "scripts/tests/test_update_drain.py", "scripts/tests/test_machine_gap.py", "scripts/tests/test_slot_yield.py", "scripts/tests/test_machine_metrics.py", "scripts/tests/test_lanes_atomic_state.py", "scripts/tests/test_lifecycle.py", "scripts/tests/test_execution_attempt.py", "scripts/tests/test_backlog_admission.py", "scripts/tests/test_backlog_writer_guard.py", "scripts/tests/test_lane_runner.py", "scripts/tests/test_execution_budget.py", "scripts/tests/test_dispatch_budget.py", "scripts/tests/test_binding_turns.py", "scripts/tests/test_issue_turns.py", "scripts/tests/test_throughput_ghost_runs.py", "scripts/tests/test_ledger_read.py", "scripts/tests/test_hyperagent_lane.py", "scripts/tests/test_hyperagent_network.py", "scripts/tests/test_cloud_lane.py", "scripts/tests/test_hyperagent_repair.py", "scripts/tests/test_fix_red_classes.py", "scripts/tests/test_sourced_shell_conflict.py", "scripts/tests/test_fix_red_source_edits.py", "scripts/tests/test_fix_red_failure_evidence.py", "scripts/tests/test_fix_red_failure_routing.py", "scripts/tests/test_migration_renumber.py", "scripts/tests/test_host_git.py", "scripts/tests/test_reviewable_split.py", "scripts/tests/test_quoted_path_list_merge.py",
+LANE_TESTS = ["scripts/tests/test_factory_signals.py", "scripts/tests/test_factory_intake.py", "scripts/tests/test_update_drain.py", "scripts/tests/test_machine_gap.py", "scripts/tests/test_slot_yield.py", "scripts/tests/test_machine_metrics.py", "scripts/tests/test_lanes_atomic_state.py", "scripts/tests/test_lifecycle.py", "scripts/tests/test_execution_attempt.py", "scripts/tests/test_backlog_admission.py", "scripts/tests/test_backlog_writer_guard.py", "scripts/tests/test_lane_runner.py", "scripts/tests/test_execution_budget.py", "scripts/tests/test_dispatch_budget.py", "scripts/tests/test_binding_turns.py", "scripts/tests/test_issue_turns.py", "scripts/tests/test_throughput_ghost_runs.py", "scripts/tests/test_ledger_read.py", "scripts/tests/test_hyperagent_lane.py", "scripts/tests/test_hyperagent_network.py", "scripts/tests/test_cloud_lane.py", "scripts/tests/test_hyperagent_repair.py", "scripts/tests/test_fix_red_classes.py", "scripts/tests/test_sourced_shell_conflict.py", "scripts/tests/test_fix_red_source_edits.py", "scripts/tests/test_commit_open_merge.py", "scripts/tests/test_fix_red_failure_evidence.py", "scripts/tests/test_fix_red_failure_routing.py", "scripts/tests/test_migration_renumber.py", "scripts/tests/test_host_git.py", "scripts/tests/test_reviewable_split.py", "scripts/tests/test_quoted_path_list_merge.py",
               "scripts/tests/test_codex_lane.py", "scripts/tests/test_hud.py", "scripts/tests/test_devin_free_policy.py",
               "scripts/tests/test_doctor.py", "scripts/tests/test_public_feed.py", "scripts/tests/test_pr_events.py", "scripts/tests/test_pr_events_repair_evidence.py", "scripts/tests/test_pr_body_markup.py", "scripts/tests/test_repair_win.py",
               "scripts/tests/test_reason_lane.py", "scripts/tests/test_yc_corpus.py",
@@ -6402,8 +6403,7 @@ def resolve_generated_conflict(worktree: Path, branch: str, log, *, guard=lambda
                 worktree, conflicted | set(changed.stdout.splitlines()), log, guard=guard):
             sh(["git", "merge", "--abort"], cwd=worktree, log=log)
             return False
-        if sh(["git", "commit", "--no-edit"], cwd=worktree, log=log).returncode != 0:
-            sh(["git", "merge", "--abort"], cwd=worktree, log=log)
+        if not fix_red_source_edits.commit_open_merge(worktree, None, sh, log, guard=guard):
             return False
     guard()
     return sh(["git", "push", "-q", "origin", f"HEAD:refs/heads/{branch}"], cwd=worktree, log=log).returncode == 0
@@ -6435,10 +6435,8 @@ def resolve_narrowed_preflight_conflict(worktree: Path, branch: str, log, *, gua
         except OSError:
             sh(["git", "merge", "--abort"], cwd=worktree, log=log)
             return False
-        guard()
-        if sh(["git", "add", "--", fix_red_classes.NARROWED_PREFLIGHT], cwd=worktree, log=log).returncode != 0 \
-                or sh(["git", "commit", "--no-edit"], cwd=worktree, log=log).returncode != 0:
-            sh(["git", "merge", "--abort"], cwd=worktree, log=log)
+        if not fix_red_source_edits.commit_open_merge(
+                worktree, [fix_red_classes.NARROWED_PREFLIGHT], sh, log, guard=guard):
             return False
     guard()
     pushed = sh(["git", "push", "-q", "origin", f"HEAD:refs/heads/{branch}"], cwd=worktree, log=log).returncode == 0
@@ -6479,10 +6477,8 @@ def resolve_and_chain_conflict(worktree: Path, branch: str, log, *, guard=lambda
         except OSError:
             sh(["git", "merge", "--abort"], cwd=worktree, log=log)
             return False
-        guard()
-        if sh(["git", "add", "--", *conflicted, *extras], cwd=worktree, log=log).returncode != 0 \
-                or sh(["git", "commit", "--no-edit"], cwd=worktree, log=log).returncode != 0:
-            sh(["git", "merge", "--abort"], cwd=worktree, log=log)
+        if not fix_red_source_edits.commit_open_merge(
+                worktree, [*conflicted, *extras], sh, log, guard=guard):
             return False
     guard()
     return sh(["git", "push", "-q", "origin", f"HEAD:refs/heads/{branch}"], cwd=worktree, log=log).returncode == 0
@@ -6523,10 +6519,7 @@ def resolve_identifier_list_conflict(worktree: Path, branch: str, log, *, guard=
         except OSError:
             sh(["git", "merge", "--abort"], cwd=worktree, log=log)
             return False
-        guard()
-        if sh(["git", "add", "--", *conflicted], cwd=worktree, log=log).returncode != 0 \
-                or sh(["git", "commit", "--no-edit"], cwd=worktree, log=log).returncode != 0:
-            sh(["git", "merge", "--abort"], cwd=worktree, log=log)
+        if not fix_red_source_edits.commit_open_merge(worktree, conflicted, sh, log, guard=guard):
             return False
     guard()
     return sh(["git", "push", "-q", "origin", f"HEAD:refs/heads/{branch}"], cwd=worktree, log=log).returncode == 0
