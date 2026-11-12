@@ -234,6 +234,9 @@
       "partial": "VerifiedBadge takes no data; its only optional props are size and className, both styling with defaults, and its glyph and accessible name are fixed, so nothing can be partially present.",
       "permission-denied": "VerifiedBadge is a static verification mark with no gated action or permission input; the detector matched role='img' on its wrapper."
     },
+    "apps/web/components/features/admin/OperatorBanner.tsx": {
+      "permission-denied": "The banner has no permission check of its own: the admin and environment gate lives in OperatorBannerWrapper, which returns null for non-admins (its PermissionDeniedNonAdmin story and OperatorBannerWrapper.test.tsx). The detector matched role='alert'."
+    },
     "apps/web/components/features/admin/OvieRouteUsageBeacon.tsx": {
       "error": "The beacon renders null in every state and is fire-and-forget: a failed POST is swallowed by its .catch, so there is no failure to draw. OvieRouteUsageBeacon.test.tsx rejects the fetch and asserts the page is unchanged and axe-clean."
     },
@@ -286,6 +289,9 @@
     "apps/web/components/features/dashboard/dashboard-nav/InboxAttentionLink.tsx": {
       "offline": "InboxAttentionLink never fetches or mutates; it renders the pending count its owner passes, and with no connection that count stays unloaded, which the Partial story shows.",
       "permission-denied": "InboxAttentionLink links to the signed-in Inbox that every account can open and has no gated action; a viewer who cannot reach the dashboard never sees the app rail."
+    },
+    "apps/web/components/features/dashboard/organisms/DashboardHeader.tsx": {
+      "empty": "Every caller passes at least one breadcrumb: useAuthRouteConfig always builds one from the pathname and SettingsSection passes its title, so the header never renders without a title. It owns no collection; the detector matched the items-center class."
     },
     "apps/web/components/features/feedback/PageErrorState.tsx": {
       "empty": "PageErrorState renders one title, one message and one retry action and takes no collection; the detector matched the items-center utility class.",
