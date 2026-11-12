@@ -247,6 +247,52 @@ export async function recordBlindSource(
     throw new Error('Failed to persist the blind advisory repair card');
 }
 
+/**
+ * Run the planned closes against the scanned candidates. Fail-closed by
+ * construction: any close failure (including a rate limit on the last group,
+ * where no deferred group would otherwise fail the run) marks the result not
+ * ok, and the caller exits 1. Rate-limited closes stop the loop; the remaining
+ * groups are deferred with ok:false so incomplete Linear work is never green.
+ */
+export async function runAdvisoryCloses({
+  closes,
+  candidates,
+  runId,
+  comment,
+  close = closeLinearIssueByFingerprint,
+}) {
+  const actions = [];
+  let rateLimited = false;
+  let failed = false;
+  for (const g of closes) {
+    const candidate = rateLimited
+      ? null
+      : resolveLinearIssueByFingerprint(candidates, g.fingerprint);
+    if (!candidate) {
+      actions.push({
+        fingerprint: g.fingerprint,
+        op: 'close',
+        ok: !rateLimited,
+        action: rateLimited ? 'deferred_rate_limited' : 'none',
+      });
+      if (rateLimited) failed = true;
+      continue;
+    }
+    const r = await close({ fingerprint: g.fingerprint, runId, comment });
+    actions.push({
+      fingerprint: g.fingerprint,
+      op: 'close',
+      ok: r.ok,
+      action: r.action,
+    });
+    if (!r.ok) {
+      if (r.reason === 'linear_rate_limited') rateLimited = true;
+      failed = true;
+    }
+  }
+  return { actions, ok: !failed };
+}
+
 async function main() {
   const argv = new Set(process.argv.slice(2));
   const check = argv.has('--check');
@@ -342,37 +388,13 @@ async function main() {
           scanned: scan.nodes.length,
           truncated: scan.truncated,
         };
-        let rateLimited = false;
-        for (const g of plan.closes) {
-          const candidate = rateLimited
-            ? null
-            : resolveLinearIssueByFingerprint(scan.nodes, g.fingerprint);
-          if (!candidate) {
-            receipt.actions.push({
-              fingerprint: g.fingerprint,
-              op: 'close',
-              ok: !rateLimited,
-              action: rateLimited ? 'deferred_rate_limited' : 'none',
-            });
-            if (rateLimited) process.exitCode = 1;
-            continue;
-          }
-          const r = await closeLinearIssueByFingerprint({
-            fingerprint: g.fingerprint,
-            runId: process.env.GITHUB_RUN_ID || now.toISOString(),
-            comment: `Fixed on main at ${g.fixedAt} and deployed: Production deployment at ${g.deployedAt} postdates the fix.`,
-          });
-          receipt.actions.push({
-            fingerprint: g.fingerprint,
-            op: 'close',
-            ok: r.ok,
-            action: r.action,
-          });
-          if (!r.ok) {
-            if (r.reason === 'linear_rate_limited') rateLimited = true;
-            else process.exitCode = 1;
-          }
-        }
+        const closeResult = await runAdvisoryCloses({
+          closes: plan.closes,
+          candidates: scan.nodes,
+          runId: process.env.GITHUB_RUN_ID || now.toISOString(),
+        });
+        receipt.actions.push(...closeResult.actions);
+        if (!closeResult.ok) process.exitCode = 1;
       }
     }
   }

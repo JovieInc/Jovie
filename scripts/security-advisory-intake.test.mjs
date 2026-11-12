@@ -31,6 +31,7 @@ import {
   CLOSE_SCAN_MAX_PAGES,
   listSecadvIssueCandidates,
   recordBlindSource,
+  runAdvisoryCloses,
   stageMetrics,
 } from './security-advisory-intake.mjs';
 import { resolveLinearIssueByFingerprint } from './lib/linear-issue-intake.mjs';
@@ -593,4 +594,118 @@ test('scan nodes resolve candidates by title fingerprint and label, and skip non
     resolveLinearIssueByFingerprint(nodes, 'secadv-ghsa-zzzz-yyyy-xxxx-none'),
     null
   );
+});
+
+const closeGroup = (fingerprint, fixedAt = '2026-10-25T00:00:00Z') => ({
+  fingerprint,
+  fixedAt,
+  deployedAt: '2026-10-25T01:00:00Z',
+});
+
+test('runAdvisoryCloses defers the tail after a rate limit and fails closed', async () => {
+  const calls = [];
+  const r = await runAdvisoryCloses({
+    closes: [
+      closeGroup('secadv-ghsa-aaaa-bbbb-cccc-left-pad'),
+      closeGroup('secadv-ghsa-cccc-dddd-eeee-right-pad'),
+    ],
+    candidates: [
+      candidateNode('i1', '[secadv-ghsa-aaaa-bbbb-cccc-left-pad] HIGH left-pad'),
+      candidateNode('i2', '[secadv-ghsa-cccc-dddd-eeee-right-pad] MED right-pad'),
+    ],
+    runId: 'run-1',
+    comment: 'fixed',
+    close: async input => {
+      calls.push(input.fingerprint);
+      return { ok: false, reason: 'linear_rate_limited' };
+    },
+  });
+  assert.equal(r.ok, false);
+  assert.deepEqual(calls, ['secadv-ghsa-aaaa-bbbb-cccc-left-pad']);
+  assert.deepEqual(r.actions, [
+    {
+      fingerprint: 'secadv-ghsa-aaaa-bbbb-cccc-left-pad',
+      op: 'close',
+      ok: false,
+      action: undefined,
+    },
+    {
+      fingerprint: 'secadv-ghsa-cccc-dddd-eeee-right-pad',
+      op: 'close',
+      ok: false,
+      action: 'deferred_rate_limited',
+    },
+  ]);
+});
+
+test('runAdvisoryCloses fails closed when a rate limit lands on the LAST group', async () => {
+  const r = await runAdvisoryCloses({
+    closes: [closeGroup('secadv-ghsa-aaaa-bbbb-cccc-left-pad')],
+    candidates: [
+      candidateNode('i1', '[secadv-ghsa-aaaa-bbbb-cccc-left-pad] HIGH left-pad'),
+    ],
+    close: async () => ({ ok: false, reason: 'linear_rate_limited' }),
+  });
+  assert.equal(r.ok, false);
+  assert.equal(r.actions[0].ok, false);
+});
+
+test('runAdvisoryCloses records noop for groups without a candidate issue', async () => {
+  let calls = 0;
+  const r = await runAdvisoryCloses({
+    closes: [closeGroup('secadv-ghsa-zzzz-yyyy-xxxx-none')],
+    candidates: [
+      candidateNode('i1', '[secadv-ghsa-aaaa-bbbb-cccc-left-pad] HIGH left-pad'),
+    ],
+    close: async () => {
+      calls += 1;
+      return { ok: true, action: 'resolved' };
+    },
+  });
+  assert.equal(r.ok, true);
+  assert.equal(calls, 0, 'no Linear close must fire without a candidate');
+  assert.deepEqual(r.actions, [
+    {
+      fingerprint: 'secadv-ghsa-zzzz-yyyy-xxxx-none',
+      op: 'close',
+      ok: true,
+      action: 'none',
+    },
+  ]);
+});
+
+test('runAdvisoryCloses closes matched groups and stays green while all succeed', async () => {
+  const r = await runAdvisoryCloses({
+    closes: [closeGroup('secadv-ghsa-aaaa-bbbb-cccc-left-pad')],
+    candidates: [
+      candidateNode('i1', '[secadv-ghsa-aaaa-bbbb-cccc-left-pad] HIGH left-pad'),
+    ],
+    runId: 'run-9',
+    comment: 'deployed',
+    close: async input => {
+      assert.equal(input.fingerprint, 'secadv-ghsa-aaaa-bbbb-cccc-left-pad');
+      assert.equal(input.runId, 'run-9');
+      return { ok: true, action: 'resolved' };
+    },
+  });
+  assert.equal(r.ok, true);
+  assert.deepEqual(r.actions, [
+    {
+      fingerprint: 'secadv-ghsa-aaaa-bbbb-cccc-left-pad',
+      op: 'close',
+      ok: true,
+      action: 'resolved',
+    },
+  ]);
+});
+
+test('runAdvisoryCloses fails closed on a non-rate-limit close failure', async () => {
+  const r = await runAdvisoryCloses({
+    closes: [closeGroup('secadv-ghsa-aaaa-bbbb-cccc-left-pad')],
+    candidates: [
+      candidateNode('i1', '[secadv-ghsa-aaaa-bbbb-cccc-left-pad] HIGH left-pad'),
+    ],
+    close: async () => ({ ok: false, reason: 'linear_close_unsuccessful' }),
+  });
+  assert.equal(r.ok, false);
 });
