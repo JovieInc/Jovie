@@ -330,3 +330,37 @@ test('a sideways move or a resize in place records no vertical move, so a later 
   assert.equal(verticalMove({ y: 100 }, { y: 300 }), 200);
   assert.equal(verticalMove({ y: 300 }, { y: 100 }), -200);
 });
+
+test('a frozen-frame finding names the scripts that ran in the longest frame', () => {
+  const page = {
+    route: '/app/library',
+    identity: 'signed-in',
+    viewport: 'desktop',
+    status: 200,
+    longestTaskMs: 267,
+    timingSamples: 3,
+    frame: {
+      ms: 310,
+      atMs: 820,
+      layoutMs: 22,
+      scripts: [
+        {
+          src: '0abc.js',
+          fn: 'UnifiedTable',
+          invoker: 'MessagePort.onmessage',
+          ms: 180,
+        },
+        { src: '0def.js', fn: '', invoker: 'classic-script', ms: 61 },
+      ],
+    },
+  };
+  const finding = pageFindings(page).find(f => f.kind === 'frozen-frame');
+  assert.equal(
+    finding.detail,
+    'main thread blocked 267ms (median of 3 loads); longest frame 310ms at 820ms (layout 22ms): UnifiedTable in 0abc.js via MessagePort.onmessage 180ms, 0def.js via classic-script 61ms'
+  );
+  const bare = pageFindings({ ...page, frame: undefined }).find(
+    f => f.kind === 'frozen-frame'
+  );
+  assert.equal(bare.detail, 'main thread blocked 267ms (median of 3 loads)');
+});
