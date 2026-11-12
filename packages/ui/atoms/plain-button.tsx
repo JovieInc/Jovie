@@ -34,6 +34,9 @@ export const PlainButton = React.forwardRef<
   { type = 'button', className, disabled, ...props },
   ref
 ) {
+  // Nothing here is worth caching: the compiler's memo slots would cost more
+  // bytes on every page than the one className join they save.
+  'use no memo';
   const ownsFocus =
     typeof className === 'string' && CALLER_FOCUS_STYLING.test(className);
   return (

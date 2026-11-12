@@ -39,7 +39,6 @@ import { useIsElectronRuntime } from '@/lib/desktop/electron-runtime';
 import { GLYPH_CMD, GLYPH_OPT, GLYPH_SHIFT } from '@/lib/keyboard-shortcuts';
 import { useFeedbackMutation } from '@/lib/queries';
 import { cn } from '@/lib/utils';
-import { ensurePrivacyLockCanBeEnabled } from '@/lib/workspace-lock/unlock-with-passkey';
 import {
   isMoneyHidden,
   setMoneyHidden,
@@ -49,6 +48,7 @@ import { Avatar } from '../../molecules/Avatar/Avatar';
 import { useDesktopUpdateContext } from '../desktop-update/DesktopUpdateProvider';
 import { DesktopReleaseIdentity } from './desktop-release-identity.lazy';
 import { OviePrivacyLockControl } from './OviePrivacyLockControl';
+import { ensurePrivacyLockCanBeEnabled } from './privacy-lock-readiness.lazy';
 import type { UserButtonProps } from './types';
 import { UsageMenuItem } from './UsageMenuItem';
 import { useUserButton } from './useUserButton';
