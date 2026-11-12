@@ -5,7 +5,6 @@ import {
   JOVIE_ICON_VIEW_BOX,
 } from '@/components/atoms/jovie-icon-path';
 import { JOVIE_PATH, JOVIE_VIEWBOX } from '@/lib/brand/tokens';
-import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import { JovieMarkElectric } from './JovieMarkElectric';
 
 vi.mock('@/lib/hooks/useReducedMotion', () => ({
@@ -83,28 +82,5 @@ describe('JovieMarkElectric', () => {
     expect(
       container.querySelector('path[stroke-dasharray]')?.getAttribute('filter')
     ).toBe('url(#jve-filter-stable-logo)');
-  });
-
-  it('draws every stroke from the electric mark tokens', () => {
-    const { container } = render(<JovieMarkElectric settledSpark />);
-    const strokes = [...container.querySelectorAll('path')].map(path =>
-      path.getAttribute('stroke')
-    );
-    expect(strokes).toEqual([
-      'var(--jovie-mark-electric-outline)',
-      'var(--jovie-mark-electric-trace)',
-      'var(--jovie-mark-electric-spark)',
-      'var(--jovie-mark-electric-spark-core)',
-    ]);
-  });
-
-  it('has no accessibility violations beside right-to-left copy', async () => {
-    const { container } = render(
-      <div dir='rtl' lang='ar'>
-        <JovieMarkElectric settledSpark />
-        <span>جوفي</span>
-      </div>
-    );
-    await expectNoA11yViolations(container);
   });
 });

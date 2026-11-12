@@ -31,16 +31,3 @@ export const Static: Story = {
     settledSpark: true,
   },
 };
-
-export const Rtl: Story = {
-  args: {
-    size: 48,
-    settledSpark: true,
-  },
-  render: args => (
-    <div dir='rtl' lang='ar' className='flex items-center gap-3'>
-      <JovieMarkElectric {...args} />
-      <span className='text-sm text-primary-token'>جوفي</span>
-    </div>
-  ),
-};

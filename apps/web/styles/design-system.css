@@ -1826,13 +1826,6 @@ html[data-profile-flow-open="true"] .cookie-banner-card {
   --noir-ion-selected: rgba(17, 175, 255, 0.1);
   --noir-ion-selected-strong: rgba(17, 175, 255, 0.16);
   --noir-ion-focus-ring: rgba(17, 175, 255, 0.72);
-  /* Electric Jovie mark (JovieMarkElectric): the faint outline, the settled
-     trace and the travelling spark with its bright core, the same in light
-     and dark. */
-  --jovie-mark-electric-outline: rgba(255, 255, 255, 0.065);
-  --jovie-mark-electric-trace: rgba(78, 190, 255, 0.46);
-  --jovie-mark-electric-spark: rgba(78, 190, 255, 0.82);
-  --jovie-mark-electric-spark-core: rgba(236, 250, 255, 0.88);
   /* Profile preview bento (ProfilePreviewBento): the default hero, an accent
      purple glow over a dark vertical gradient, and the fade into its base,
      the same in light and dark. */

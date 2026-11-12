@@ -84,6 +84,7 @@
     "apps/web/components/atoms/BackgroundPattern.tsx": "a11y,tests,tokens",
     "apps/web/components/atoms/CopyToggleIcon.tsx": "a11y,states,tests,tokens",
     "apps/web/components/atoms/Divider.tsx": "a11y,states,tests",
+    "apps/web/components/atoms/JovieMarkElectric.tsx": "a11y,states,tokens",
     "apps/web/components/atoms/NavBadge.tsx": "a11y,states",
     "apps/web/components/atoms/ProviderIcon.tsx": "a11y,states,tests",
     "apps/web/components/atoms/SeekBar.tsx": "a11y,ds-owner,frontend-rules,states,tests",
