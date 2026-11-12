@@ -14,13 +14,17 @@ vi.mock('@/components/molecules/QRCode', () => ({
   // Plain <img> stand-in: the real component renders a locally generated
   // data URL, so the overlay contract under test is what it feeds the
   // generator and that no image network request is ever constructed.
-  QRCode: ({ data, label }: Readonly<{ data: string; label?: string }>) => (
+  QRCode: ({
+    data,
+    label,
+    size,
+  }: Readonly<{ data: string; label?: string; size?: number }>) => (
     <img
       src={DATA_URL}
       alt={label}
       data-encoded={data}
-      width={120}
-      height={120}
+      width={size ?? 120}
+      height={size ?? 120}
     />
   ),
   getQrCodeDataUrl: (...args: unknown[]) =>
