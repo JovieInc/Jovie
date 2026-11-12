@@ -355,6 +355,9 @@ describe('UserButton states', () => {
 
     const trigger = screen.getByRole('button', { name: /Adele Adkins/i });
     expect(trigger).toHaveAttribute('type', 'button');
+    // The PlainButton trigger keeps its own sidebar focus ring, not the default one.
+    expect(trigger).toHaveClass('focus-visible:ring-sidebar-ring');
+    expect(trigger).not.toHaveClass('focus-visible:ring-focus');
     await expectNoA11yViolations(container);
 
     trigger.focus();

@@ -111,6 +111,7 @@ describe('HeaderNav states', () => {
 
     const trigger = screen.getByRole('button', { name: 'Product' });
     expect(trigger).toHaveAttribute('aria-expanded', 'false');
+    expect(trigger).toHaveAttribute('data-slot', 'plain-button');
     await expectNoA11yViolations(container);
 
     await user.hover(trigger);
