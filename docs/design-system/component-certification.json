@@ -550,6 +550,10 @@
       "offline": "Avatar never fetches or mutates; lost connectivity reaches it only as an image that fails to load, which the ErrorState story shows.",
       "permission-denied": "Avatar only renders an identity image or initials and has no gated action or permission input; the detector matched role='img' on the named avatar frame."
     },
+    "apps/web/components/molecules/AvatarProgressRing.tsx": {
+      "empty": "The ring draws one SVG from a number and a status; it owns no collection. Zero progress is the Idle story, and AvatarProgressRing.test.tsx asserts the empty sweep. The detector matched the items-center class.",
+      "long-content": "The ring renders no text: it is an aria-hidden SVG and a status icon sized from the size prop, so there is no content to grow. The detector matched text-* colour classes."
+    },
     "apps/web/components/molecules/ContentSectionHeader.tsx": {
       "empty": "ContentSectionHeader renders no collection: a required title with optional subtitle and actions (PartialTitleOnly); the detector matched the items-center class."
     },
@@ -579,6 +583,9 @@
     "apps/web/components/molecules/drawer/DrawerAnalyticsSummaryCard.tsx": {
       "offline": "The card fetches nothing and has no connectivity input: it draws the state its owner passes, so analytics that cannot load while offline reach it as state='error' (ErrorState story). The detector matched state='loading'."
     },
+    "apps/web/components/molecules/drawer/DrawerAsyncToggle.tsx": {
+      "partial": "label, ariaLabel, checked and onToggle are required; the optional props only add a success toast, density, className and testId, so there is no partial record to draw. A toggle without successMessage is the Default story."
+    },
     "apps/web/components/molecules/drawer/DrawerButton.tsx": {
       "partial": "DrawerButton holds no data: it forwards its children label and native button props to the shared Button and only maps tone and size (both defaulted) to classes, so nothing can be partially present."
     },
@@ -590,6 +597,10 @@
     },
     "apps/web/components/molecules/drawer/DrawerSectionHeading.tsx": {
       "partial": "The heading holds one required label (children); as and className only choose the element and extra classes, so nothing can be partially present. Default and SemanticHeading show both element choices."
+    },
+    "apps/web/components/molecules/drawer/DrawerSettingsToggle.tsx": {
+      "empty": "The toggle renders one label and one switch from scalar props; it owns no collection that could be empty. The detector matched the items-center class.",
+      "partial": "label, checked, ariaLabel and onCheckedChange are required; the optional props only choose density, disabled styling, className and testId (CompactDensity and Disabled stories), so there is no partial record to draw."
     },
     "apps/web/components/molecules/drawer/EntityHeader.tsx": {
       "permission-denied": "EntityHeader has no gated action or permission input; callers choose what goes in the actions slot, and the detector matched role='img' on the thumbnail and status glyph."
