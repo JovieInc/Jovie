@@ -225,6 +225,11 @@
       "partial": "LogoLink takes no data; its optional props (href, sizes, variant, reveal, prefetch, className) are presentation defaults and its mark and accessible name are fixed, so nothing can be partially present.",
       "long-content": "LogoLink renders no caller text; its only strings are the fixed 'Jovie' wordmark and aria-label, which the detector matched as label."
     },
+    "apps/web/components/atoms/ProviderIcon.tsx": {
+      "loading": "The icon is a bundled SVG resolved synchronously from PROVIDER_CONFIG and SocialIcon, so nothing loads. The detector matched the phrase 'centralized icon loading' in the file's doc comment.",
+      "offline": "The icon makes no network request; brand marks ship as bundled SVGs, so it renders identically offline. The detector matched the word loading in the doc comment.",
+      "long-content": "The component renders a single fixed-size icon and no visible text (the label is an aria-label), so there is no content that could run long. The detector matched text- colour classes."
+    },
     "apps/web/components/atoms/RailToggleButton.tsx": {
       "partial": "RailToggleButton draws one icon button from its required side, open state and labels; its optional props (pinned, previewTrigger, iconOverride, controlsId, shortcut, disabled, test ids) are behaviour and wiring flags with defaults, so no data can be partially present."
     },
