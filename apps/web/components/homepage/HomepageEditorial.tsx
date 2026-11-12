@@ -1,4 +1,5 @@
 // @coverage-via apps/web/tests/unit/home/homepage-contract.test.tsx
+import { Button, Input } from '@jovie/ui';
 import { ArrowRight } from 'lucide-react';
 import Link from 'next/link';
 import { Fragment, type ReactNode } from 'react';
@@ -333,7 +334,7 @@ export function HomepageInviteClose({
             >
               {invite.claimLabel}
             </label>
-            <input
+            <Input
               id='homepage-claim-entry-handle'
               name='handle'
               type='text'
@@ -343,7 +344,7 @@ export function HomepageInviteClose({
               placeholder={invite.claimPlaceholder}
               aria-label={invite.claimLabel}
             />
-            <button type='submit'>{invite.action}</button>
+            <Button type='submit'>{invite.action}</Button>
           </form>
         </div>
         <ol className='hv3-steps hv3-reveal'>

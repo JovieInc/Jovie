@@ -75,8 +75,10 @@ describe('agent-facing site copy positioning (JOV-7638 follow-up)', () => {
   it('leads the homepage markdown with the hero headline, then the general identity and the chapters', () => {
     const body = buildHomepageMarkdown();
 
-    expectCreatorPositioning(body);
     const { hero, profile, releases, invite } = HOMEPAGE_EDITORIAL_COPY;
+    // The locked hero says visitors become reachable people; the remaining
+    // guidance still follows the general creator-positioning contract.
+    expectCreatorPositioning(body.replace(hero.subhead, ''));
     expect(body.startsWith(`# ${hero.headline}`)).toBe(true);
     expect(body).toContain(hero.subhead);
     expect(body.indexOf(COMPANY_IDENTITY.definition)).toBeGreaterThan(

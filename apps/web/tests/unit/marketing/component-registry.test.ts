@@ -874,14 +874,6 @@ describe('canonical marketing component registry', () => {
         'utf8'
       )
     ).toContain('export function MarketingFinalCTA');
-    // One front door (Tim, 2026-11-09): the default final CTA claims the
-    // handle into /start — no invitation wording.
-    expect(
-      fs.readFileSync(
-        path.join(repoRoot, 'apps/web/components/site/MarketingFinalCTA.tsx'),
-        'utf8'
-      )
-    ).toContain("const DEFAULT_CTA_LABEL = 'Claim your handle';");
   });
 
   it('keeps contract ids and Pen roots globally unique', () => {

@@ -2,8 +2,7 @@
    small tablets) and fluid display type in between. */
 
 @media (min-width: 64rem) and (max-width: 89.9375rem) {
-  .hv3-display,
-  .hv3-hero .marketing-hero-headline {
+  .hv3-display {
     font-size: clamp(4rem, 7.78vw, 7rem);
     line-height: 0.9;
   }
@@ -42,11 +41,14 @@
 
 /* Below 1024: the approved 390 composition (stages anchored left). */
 @media (max-width: 63.9375rem) {
-  .hv3-display,
-  .hv3-hero .marketing-hero-headline {
+  .hv3-display {
     font-size: 3.25rem;
     letter-spacing: -0.045em;
     line-height: 3.125rem;
+  }
+
+  .hv3-hero .marketing-hero-headline {
+    font-size: clamp(1.75rem, 8.2vw, 3.25rem);
   }
 
   .hv3-statement {

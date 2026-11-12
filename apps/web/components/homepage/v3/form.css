@@ -37,9 +37,13 @@
   white-space: nowrap;
 }
 
-.hv3-form .hv3-claim input {
+.hv3-form .hv3-claim > div {
   flex: 1;
   min-width: 0;
+}
+
+.hv3-form .hv3-claim input {
+  height: 2.75rem;
   padding: 0 1rem;
   border: 0;
   background: transparent;
@@ -57,6 +61,7 @@
 }
 
 .hv3-form .hv3-claim button {
+  flex-shrink: 0;
   height: 2.75rem;
   padding: 0 1.375rem;
   border: 0;

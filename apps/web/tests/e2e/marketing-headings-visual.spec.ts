@@ -65,6 +65,7 @@ for (const lines of [2, 3]) {
 // JOV-7772: baseline allowances cannot certify the hero contract. Check both
 // complete text and two natural lines so removing a clamp cannot hide a failure.
 for (const route of [
+  '/',
   '/about',
   '/ai',
   '/artist-notifications',
@@ -79,6 +80,12 @@ for (const route of [
     // At lg the download hero splits into columns before the xl type fits.
     ...(route === '/download'
       ? [{ name: 'split-desktop', size: { width: 1024, height: 900 } }]
+      : []),
+    ...(route === '/'
+      ? [
+          { name: 'split-desktop', size: { width: 1024, height: 900 } },
+          { name: 'small-mobile', size: { width: 320, height: 900 } },
+        ]
       : []),
   ];
   for (const viewport of viewports) {

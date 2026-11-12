@@ -72,7 +72,10 @@
    home-canonical-v3) is larger than the shared marketing title ramp. */
 .hv3-hero .marketing-hero-headline {
   color: var(--color-text-primary-token);
-  font-size: 7rem;
+  /* Fit the locked claim headline in its two authored lines. */
+  font-size: clamp(2rem, 4.444vw, 4rem);
+  line-height: 1.06;
+  padding-block-end: 0.16em;
 }
 
 .hv3-hero .marketing-hero-subtitle {
