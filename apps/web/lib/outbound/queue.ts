@@ -3,6 +3,7 @@ import {
   NON_ARTIST_KIND_LABELS,
   possibleNonArtist,
 } from '@/lib/leads/entity-eligibility';
+import { EXISTING_RELATIONSHIP_LABEL } from '@/lib/leads/existing-relationships';
 import { cleanScrapedDisplayName } from '@/lib/profile/scraped-display-name';
 import {
   draftOutboundCopy,
@@ -176,7 +177,9 @@ function classify(
     return 'sent';
   if (approval.target === 'rejected' || facts.status === 'rejected')
     return 'rejected';
-  if (approval.target === 'held') return 'held';
+  // An existing relationship resolves to a held target, so it lands here and
+  // can never reach approved, certified or ready.
+  if (approval.target === 'held' || approval.relationshipHold) return 'held';
   if (approval.sendableCopy) return 'approved';
   if (facts.certified) return 'certified';
   if (flags.includes('possible_non_artist') || flags.includes('unscored'))
@@ -230,6 +233,7 @@ export function buildOutboundRow(input: {
   });
   const basis = fitBasis(facts.fitScore, facts.fitScoreBreakdown);
   const flags: OutboundFlag[] = [];
+  if (approval.relationshipHold) flags.push('existing_relationship');
   if (nonArtist) flags.push('possible_non_artist');
   if (basis === 'unscored') flags.push('unscored');
   if (basis === 'presence_only') flags.push('presence_only_fit');
@@ -239,19 +243,22 @@ export function buildOutboundRow(input: {
   // A saved draft keeps its channel only while its recipient is on file.
   const channel = saved && reachable(saved, facts) ? saved : channelFor(facts);
   const name = cleanOutboundName(facts.displayName, facts.linktreeHandle);
-  const message = approval.latestCopy
-    ? approval.latestCopy
-    : channel && target.claimUrl
-      ? {
-          ...draftOutboundCopy({
-            channel,
-            displayName: name,
-            claimUrl: target.claimUrl,
-            dmCopy: facts.dmCopy,
-          }),
-          revision: null,
-        }
-      : null;
+  // No cold draft exists for an artist Tim already works with.
+  const message = approval.relationshipHold
+    ? null
+    : approval.latestCopy
+      ? approval.latestCopy
+      : channel && target.claimUrl
+        ? {
+            ...draftOutboundCopy({
+              channel,
+              displayName: name,
+              claimUrl: target.claimUrl,
+              dmCopy: facts.dmCopy,
+            }),
+            revision: null,
+          }
+        : null;
   return {
     leadId: facts.id,
     dedupeKey: input.dedupeKey,
@@ -267,6 +274,10 @@ export function buildOutboundRow(input: {
     fitBasis: basis,
     flags,
     entityNote: nonArtist ? NON_ARTIST_KIND_LABELS[nonArtist] : null,
+    relationshipHold: approval.relationshipHold
+      ? EXISTING_RELATIONSHIP_LABEL
+      : null,
+    relationshipNotes: approval.relationshipNotes,
     missingEvidence: missing,
     ability: 'unknown',
     intent: 'unknown',

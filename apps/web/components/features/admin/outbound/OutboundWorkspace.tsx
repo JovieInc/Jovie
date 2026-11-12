@@ -120,6 +120,25 @@ function NameCell({ row }: Readonly<{ row: OutboundRow }>) {
       <span className='max-w-28 truncate text-xs text-tertiary-token'>
         @{row.handle}
       </span>
+      {row.relationshipHold ? (
+        <span
+          className='shrink-0 rounded-sm border border-subtle px-1 text-2xs text-secondary-token'
+          title={row.relationshipHold}
+          data-testid='outbound-flag-existing-relationship'
+        >
+          {OUTBOUND_FLAG_LABELS.existing_relationship}
+        </span>
+      ) : null}
+      {row.relationshipNotes.map(note => (
+        <span
+          key={note}
+          className='max-w-56 shrink-0 truncate rounded-sm border border-subtle px-1 text-2xs text-secondary-token'
+          title={note}
+          data-testid='outbound-relationship-note'
+        >
+          {note}
+        </span>
+      ))}
       {nonArtist ? (
         <span
           className='shrink-0 rounded-sm border border-subtle px-1 text-2xs text-secondary-token'

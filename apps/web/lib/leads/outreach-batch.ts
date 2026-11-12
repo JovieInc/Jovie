@@ -162,6 +162,8 @@ interface ClaimedLead {
   contactEmail: string | null;
   instagramHandle: string | null;
   creatorProfileId: string | null;
+  /** Read by the existing-relationship hold in evaluateOutboundSend. */
+  bio: string | null;
   /** Derived in memory from the stored hash inputs; never persisted. */
   claimToken: string | null;
   claimTokenHash: string | null;
@@ -255,6 +257,7 @@ async function claimOutreachLeads(
         contactEmail: leads.contactEmail,
         instagramHandle: leads.instagramHandle,
         creatorProfileId: leads.creatorProfileId,
+        bio: leads.bio,
         claimTokenHash: leads.claimTokenHash,
         claimTokenExpiresAt: leads.claimTokenExpiresAt,
         priorityScore: leads.priorityScore,
