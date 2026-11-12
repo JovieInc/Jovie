@@ -51,6 +51,8 @@ RED_CONCLUSIONS = frozenset({"failure", "timed_out", "startup_failure"})
 # Same required-green set green enroll admits on. Missing, UNKNOWN, BLOCKED,
 # DIRTY and BEHIND keep lane-fix-red.
 REQUIRED_GREEN = frozenset({"CLEAN", "HAS_HOOKS", "UNSTABLE"})
+PASSING_CHECK_STATES = frozenset({"SUCCESS", "NEUTRAL", "SKIPPED"})  # as GitHub counts them (#25157)
+SWEEP_ENROLL_WAKES = 5  # enroll wakes per push sweep; the rest drain on the next landing
 # No stop label is human-owned (tim-hold, tim:hold, hold:tim and do-not-merge are retired,
 # EVENT 2026-10-28): every hold here is a machine hold with a receipt and a release.
 HOLD_LABELS = frozenset({"hold", "gated", "incident", "queue-deferred"})
@@ -472,7 +474,7 @@ def head_red(number: int, sh=run) -> bool | None:
 
 
 def head_settled_green(number: int, sh=run) -> bool:
-    """True only when every required check on this head has completed success.
+    """True only when every required check on this head passed and at least one succeeded.
 
     Pending, failed, cancelled, or unreadable is not green. The next check
     completion is the event that asks again; this does not sleep or poll.
@@ -496,7 +498,8 @@ def head_settled_green(number: int, sh=run) -> bool:
             continue
         if key and (key not in latest or at >= latest[key][0]):
             latest[key] = (at, state)
-    return bool(latest) and all(state == "SUCCESS" for _, state in latest.values())
+    states = [state for _, state in latest.values()]
+    return "SUCCESS" in states and all(state in PASSING_CHECK_STATES for state in states)
 
 
 def red_label_justified(number: int, pr: dict, sh=run, gates: dict | None = None, now: float | None = None) -> bool:
@@ -558,17 +561,9 @@ def clear_stale_lane_fix_red(number: int, pr: dict, sh=run) -> bool:
 
 
 def wake_green_enroll(number: int, sh=run) -> bool:
-    """Dispatch Merge Queue Green Enroll for this exact PR (JOV-8788).
-
-    Label writes stay on GITHUB_TOKEN so a relay label never fans out into
-    label-triggered runs, which also means the DELETE that clears lane-fix-red
-    wakes nothing: with an already required-green, unchanged head no later
-    check completion comes either (#22417 sat green and unqueued 33 minutes
-    until an unrelated main push sweep). workflow_dispatch is the recursion-guard
-    exception, the relay job's actions: write grant pays for it, and green
-    enroll's own blocked recheck already uses the same hop. The enroll run
-    re-reads eligibility itself, so a hold, freeze or newer head stays safe.
-    """
+    """Dispatch Merge Queue Green Enroll for this exact PR (JOV-8788): a GITHUB_TOKEN label
+    DELETE wakes nothing and an unchanged green head gets no new check (#22417 sat 33 min).
+    workflow_dispatch is the recursion-guard exception; enroll re-reads eligibility itself."""
     args = ["workflow", "run", GREEN_ENROLL_WORKFLOW,
             "--repo", REPO, "--ref", "main", "-f", f"pr_number={number}"]
     # Production goes through the budgeted client layer (external-api-guard ratchet);
@@ -1473,10 +1468,17 @@ def label_backlog(sh=run, disabled: set[str] | None = None, kinds=("conflict", "
             continue
         if add_label(number, kind, sh):
             added.append((number, kind))
+    # A green head behind a stale lane-fix-red gets no further event (#25157), so wake enroll.
+    wakes = 0
     for pr in prs:
         number = pr.get("number")
-        if isinstance(number, int) and clear_stale_lane_fix_red(number, pr, sh):
+        if not isinstance(number, int) or (not pr.get("isDraft") and wakes >= SWEEP_ENROLL_WAKES):
+            continue  # past the cap the label stays, so every clear keeps its wake
+        if clear_stale_lane_fix_red(number, pr, sh):
             added.append((number, "cleared-red"))
+            if not pr.get("isDraft"):
+                wakes += 1
+                added.append((number, "enroll-wake" if wake_green_enroll(number, sh) else "enroll-wake-failed"))
     return added
 
 
