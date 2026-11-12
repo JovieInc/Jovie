@@ -351,9 +351,9 @@ describe('ProfileDesktopSurface', () => {
       'before:min-h-11',
       'before:min-w-11'
     );
-    expect(listenCta.className).toContain('before:min-w-11');
     const profileHeader = screen.getByTestId('profile-header');
     expect(profileHeader).toHaveClass('min-w-0', 'max-w-full');
+    expect(profileHeader).toHaveClass('focus-visible:ring-focus');
     expect(within(profileHeader).getByText('Tim White')).toHaveClass(
       'min-w-0',
       'line-clamp-2 wrap-anywhere'
