@@ -125,13 +125,17 @@ export function findOrphanReviewImages({
     IMAGE_EXTENSIONS.map(extension => `.${extension}`),
     (source, text) => {
       const sourceDir = posix.dirname(source);
+      // Inside a review root a bare file name lists the source's own folder
+      // (a bundle README), never a same-named image in another folder.
+      const bareIsLocal = REVIEW_IMAGE_ROOTS.some(r => source.startsWith(r));
       for (const token of referenceTokens(text)) {
         const tokenSegments = segmentsOf(token);
         for (const image of byName.get(tokenSegments.at(-1)) ?? []) {
           if (live.has(image) || !tailMatches(image.split('/'), tokenSegments))
             continue;
           if (posix.dirname(image) === sourceDir) listedBySibling.add(image);
-          else live.add(image);
+          else if (!(bareIsLocal && tokenSegments.length === 1))
+            live.add(image);
         }
       }
     }
