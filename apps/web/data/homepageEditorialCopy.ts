@@ -68,7 +68,6 @@ export const HOMEPAGE_EDITORIAL_COPY = {
     body: 'Your catalog comes in once. Each release gets its own page with listen links for every service, and your profile always leads with the newest one.',
     catalogLabel: 'An example artist’s release catalog in Jovie',
     releasePageLabel: `The ${HOMEPAGE_FEATURED_ARTIST.inspected.title} release page`,
-    rowCallout: 'catalog row → its own page',
     captions: {
       page: {
         title: 'One page per release.',

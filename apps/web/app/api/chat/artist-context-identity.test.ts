@@ -7,14 +7,18 @@ const ROUTE_SOURCE = readFileSync(
   resolve(process.cwd(), 'app/api/chat/route.ts'),
   'utf8'
 );
+const CONTEXT_SOURCE = readFileSync(
+  resolve(process.cwd(), 'lib/chat/artist-context.server.ts'),
+  'utf8'
+);
 
 function getFetchArtistContextSource(): string {
-  const start = ROUTE_SOURCE.indexOf('async function fetchArtistContext(');
-  const end = ROUTE_SOURCE.indexOf('\n/**\n * Find a release by title', start);
+  const start = CONTEXT_SOURCE.indexOf(
+    'export async function fetchArtistContext('
+  );
 
   expect(start).toBeGreaterThanOrEqual(0);
-  expect(end).toBeGreaterThan(start);
-  return ROUTE_SOURCE.slice(start, end);
+  return CONTEXT_SOURCE.slice(start);
 }
 
 describe('chat artist-context identity contract', () => {

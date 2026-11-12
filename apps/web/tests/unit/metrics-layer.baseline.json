@@ -17,10 +17,6 @@
       "tables": 0,
       "rates": 1
     },
-    "app/api/chat/route.ts": {
-      "tables": 4,
-      "rates": 0
-    },
     "app/api/cron/generate-insights/route.ts": {
       "tables": 4,
       "rates": 0

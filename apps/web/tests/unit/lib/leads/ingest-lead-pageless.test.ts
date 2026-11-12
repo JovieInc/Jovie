@@ -303,7 +303,30 @@ describe('ingestLeadAsCreator for leads whose page is never read', () => {
     );
 
     expect(mocks.fetchFullExtractionProfile).toHaveBeenCalledWith(
-      false,
+      true,
+      'https://laylo.com/novaray',
+      'novaray'
+    );
+    expect(mocks.searchArtists).not.toHaveBeenCalled();
+  });
+
+  it('reads a manually added Laylo lead that kept the default platform', async () => {
+    mocks.fetchFullExtractionProfile.mockResolvedValue({
+      links: [],
+      avatarUrl: null,
+      displayName: 'Nova Ray',
+    });
+
+    await ingestLeadAsCreator(
+      lead({
+        linktreeUrl: 'https://laylo.com/novaray',
+        linktreeHandle: 'laylocom-novaray',
+        sourcePlatform: 'linktree',
+      })
+    );
+
+    expect(mocks.fetchFullExtractionProfile).toHaveBeenCalledWith(
+      true,
       'https://laylo.com/novaray',
       'novaray'
     );

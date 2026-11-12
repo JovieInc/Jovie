@@ -233,7 +233,11 @@ async function readBetterAuthSession(
 }
 
 function resolveTargetRoute(persona: DevTestAuthPersona) {
-  return persona === 'admin' ? APP_ROUTES.ADMIN : APP_ROUTES.CHAT;
+  if (persona === 'admin') return APP_ROUTES.ADMIN;
+  // The creator persona has not finished onboarding, so the app sends it to
+  // /start; landing anywhere else would mean the persona is wrong.
+  if (persona === 'creator') return APP_ROUTES.START;
+  return APP_ROUTES.CHAT;
 }
 
 export async function bootstrapPerformanceAuth(
