@@ -201,18 +201,24 @@ describe('WaitlistSpotifySearch', () => {
       'aria-activedescendant',
       'spotify-result-1'
     );
+    // Check the result while the list is open. Enter selects the artist and
+    // switches to the URL row, which replaces these buttons with the name.
+    // The buttons are real keyboard-operable controls and must not sit in an
+    // aria-hidden subtree (axe aria-hidden-focus).
+    const resultButton = screen.getByRole('button', { name: /Neon Harbor/ });
+    expect(resultButton.closest('.max-h-64')).not.toHaveAttribute(
+      'aria-hidden'
+    );
+
     await user.keyboard('{ArrowUp}{Enter}');
     expect(onUrlChange).toHaveBeenLastCalledWith(
       'https://open.spotify.com/artist/neon-harbor'
     );
     expect(onArtistNameChange).toHaveBeenLastCalledWith('Neon Harbor');
     expect(screen.getByText('Neon Harbor')).toBeVisible();
-    // The rendered result buttons are real keyboard-operable controls; they
-    // must not sit in an aria-hidden subtree (axe aria-hidden-focus).
-    const resultButton = screen.getByRole('button', { name: /Neon Harbor/ });
-    expect(resultButton.closest('.max-h-64')).not.toHaveAttribute(
-      'aria-hidden'
-    );
+    expect(
+      screen.queryByRole('button', { name: /Neon Harbor/ })
+    ).not.toBeInTheDocument();
   });
 
   it('closes the results on Escape and keeps the typed query', async () => {

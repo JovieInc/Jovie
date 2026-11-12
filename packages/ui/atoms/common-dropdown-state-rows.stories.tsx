@@ -22,3 +22,21 @@ export const Loading: Story = {
 export const Empty: Story = {
   render: () => <EmptyState message='No actions found' />,
 };
+
+/** A caller message longer than the menu wraps inside the menu width. */
+export const LongContent: Story = {
+  render: () => (
+    <div className='w-64' role='menu' aria-label='Release actions'>
+      <EmptyState message='No actions match this search in the summer single menu, including the extended club mix and its territorial variants' />
+    </div>
+  ),
+};
+
+/** A right-to-left caller message follows the page direction inside the menu. */
+export const Rtl: Story = {
+  render: () => (
+    <div className='w-64' dir='rtl' role='menu' aria-label='إجراءات الإصدار'>
+      <EmptyState message='لا توجد إجراءات مطابقة لهذا البحث في قائمة الإصدار' />
+    </div>
+  ),
+};
