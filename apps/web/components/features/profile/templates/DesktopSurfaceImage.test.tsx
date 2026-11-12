@@ -1,5 +1,7 @@
+import { fireEvent, render } from '@testing-library/react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
+import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import {
   DesktopSurfaceImage,
   PROFILE_DESKTOP_SURFACE_MEDIA_QUERY,
@@ -72,5 +74,42 @@ describe('DesktopSurfaceImage', () => {
     expect(document.querySelector('link[rel="preload"]')).toBeNull();
     expect(document.querySelector('img')).toBeNull();
     expect(document.querySelector('[role="img"]')).not.toBeNull();
+  });
+
+  it('has no axe violations for the cover, its failed-load placeholder and a missing source', async () => {
+    const frame = (element: React.ReactElement) => (
+      <div style={{ position: 'relative', height: 320, width: 480 }}>
+        {element}
+      </div>
+    );
+
+    const cover = render(
+      frame(
+        <DesktopSurfaceImage src={HERO_URL} alt='Cover' sizes={HERO_SIZES} />
+      )
+    );
+    const image = cover.getByRole('img', { name: 'Cover' });
+    expect(image).toHaveAttribute('loading', 'lazy');
+    await expectNoA11yViolations(cover.container);
+
+    // Offline or an expired CDN URL: the request fails and the placeholder
+    // takes the image's place.
+    fireEvent.error(image);
+    expect(cover.container.querySelector('img')).toBeNull();
+    expect(cover.getByRole('img', { name: 'Cover' })).toBeInTheDocument();
+    await expectNoA11yViolations(cover.container);
+    cover.unmount();
+
+    const missing = render(
+      frame(
+        <DesktopSurfaceImage
+          src={null}
+          alt='Cover'
+          sizes='320px'
+          fallbackVariant='release'
+        />
+      )
+    );
+    await expectNoA11yViolations(missing.container);
   });
 });

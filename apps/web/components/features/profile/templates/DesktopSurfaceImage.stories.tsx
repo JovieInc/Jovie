@@ -35,3 +35,33 @@ export const MissingSource: Story = {
     fallbackVariant: 'release',
   },
 };
+
+/**
+ * Loading: the image is lazy, so while it sits outside the viewport (or, on a
+ * phone, inside the hidden desktop surface) the browser has not requested it.
+ * Scroll the frame to watch it load.
+ */
+export const LoadingBelowFold: Story = {
+  decorators: [
+    Story => (
+      <div style={{ height: 320, width: 480, overflowY: 'auto' }}>
+        <div style={{ height: 1600 }} />
+        <div style={{ position: 'relative', height: 320, width: 480 }}>
+          <Story />
+        </div>
+      </div>
+    ),
+  ],
+};
+
+/**
+ * Offline: the cover request fails (no network, or an expired CDN URL), so the
+ * placeholder takes its place. The broken data URL fails deterministically
+ * without a network call.
+ */
+export const OfflineBrokenSource: Story = {
+  args: {
+    src: 'data:image/png;base64,AAAA',
+    fallbackVariant: 'avatar',
+  },
+};
