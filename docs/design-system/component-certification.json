@@ -650,6 +650,19 @@
     "apps/web/components/shell/AppShellRightRail.tsx": {
       "partial": "AppShellRightRail is a layout slot. Its only optional props are className and the belowHeader placement flag, and it renders whatever drawer it is given, so the rail itself has no partially loaded state; each drawer owns its own."
     },
+    "apps/web/components/shell/AudioPlayControl.tsx": {
+      "offline": "The play button fetches nothing and has no connectivity input: it renders isPlaying and isLoading from its owner, so a source that cannot load while offline reaches it as the Loading story. The detector matched the isLoading prop."
+    },
+    "apps/web/components/shell/DashboardSegmentSkeleton.tsx": {
+      "empty": "The skeleton takes no data: each variant maps a fixed constant array of placeholder rows, so there is no collection that can be empty. The detector matched those .map calls.",
+      "partial": "Both props (rowKeyPrefix, variant) have defaults and the skeleton renders no data or copy, so there is no partial record to draw; every variant is in its own story.",
+      "long-content": "The skeleton renders no visible text: only Skeleton blocks of fixed width and a fixed aria-label per variant, so there is no content to grow.",
+      "offline": "The skeleton is a static Suspense fallback that fetches nothing; when the segment cannot load, the route's error boundary replaces it, not the skeleton.",
+      "permission-denied": "The skeleton draws the same placeholders for everyone. The detector matched role='status' and the admin layout variant; access to the admin segment is decided by the route before the loaded surface, not by this fallback."
+    },
+    "apps/web/components/shell/InstallBanner.tsx": {
+      "empty": "The banner renders one card from scalar props (title, description, CTA) and owns no collection that could be empty; omitted copy falls back to defaults (PartialCustomTitle story). The detector matched the items-center class."
+    },
     "apps/web/components/shell/SidebarInboxLink.tsx": {
       "offline": "The link never fetches: pending work arrives from the server as availability, and an unreadable status falls back to the plain Inbox bell (StatusUnavailable). Opening it is a normal navigation. The detector matched the pending flag."
     },
