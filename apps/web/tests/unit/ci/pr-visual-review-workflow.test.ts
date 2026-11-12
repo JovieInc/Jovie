@@ -17,12 +17,13 @@ function jobBlock(workflow: string, jobId: string) {
 }
 
 describe('PR visual review workflow', () => {
-  it("uses Playwright's default absolute browser cache after installing Chromium", () => {
+  it('installs Chromium and its system fonts through the shared action, restore-only', () => {
     const workflow = readFileSync(workflowPath, 'utf8');
 
-    expect(workflow).toContain(
-      'pnpm --filter @jovie/web exec playwright install --with-deps chromium'
+    expect(workflow).toMatch(
+      /uses: \.\/\.github\/actions\/setup-playwright\n\s+with:\n\s+system_deps: 'true'\n\s+cache: restore\n/
     );
+    expect(workflow).not.toContain('--with-deps');
     expect(workflow).not.toMatch(
       /PLAYWRIGHT_BROWSERS_PATH:\s*~\/\.cache\/ms-playwright/
     );

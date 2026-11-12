@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import {
   CLAIM_BANNER,
+  causeOf,
   fromThirdPartyFrame,
   isClosedInProduction,
   median,
@@ -64,6 +65,58 @@ test('a layout-shift finding names the elements that moved', () => {
     finding.detail,
     'CLS 0.114 > 0.1; moved: div.subscribe-card (0.090), footer (0.024)'
   );
+});
+
+test('a layout-shift finding says how far and when each element first moved', () => {
+  const [finding] = pageFindings({
+    ...clean('/tim', 'stranger'),
+    cls: 0.114,
+    clsSources: [
+      { node: 'footer', value: 0.114, dy: 184, atMs: 612 },
+      { node: 'div.hero', value: 0.02, dy: -8, atMs: 900 },
+    ],
+  });
+  assert.equal(
+    finding.detail,
+    'CLS 0.114 > 0.1; moved: footer (0.114, 184px down at 612ms), div.hero (0.020, 8px up at 900ms)'
+  );
+});
+
+test('a layout-shift finding names the element that appeared just before it', () => {
+  const [finding] = pageFindings({
+    ...clean('/tim', 'stranger'),
+    cls: 0.114,
+    clsSources: [
+      {
+        node: 'footer',
+        value: 0.114,
+        dy: 200,
+        atMs: 1198,
+        after: { node: 'form.signup', h: 328, atMs: 1180 },
+      },
+    ],
+  });
+  assert.equal(
+    finding.detail,
+    'CLS 0.114 > 0.1; moved: footer (0.114, 200px down at 1198ms after form.signup (328px) appeared at 1180ms)'
+  );
+});
+
+test('the cause of a shift is the last element inserted in the half second before it', () => {
+  const added = [
+    { node: 'p.early', atMs: 100, h: 900 },
+    { node: 'section.card', atMs: 943, h: 472 },
+    { node: 'span.badge', atMs: 1180, h: 24 },
+    { node: 'form.signup', atMs: 1180, h: 328 },
+    { node: 'div.later', atMs: 1300, h: 600 },
+  ];
+  assert.deepEqual(causeOf(added, 1198), {
+    node: 'form.signup',
+    atMs: 1180,
+    h: 328,
+  });
+  assert.equal(causeOf(added, 50), undefined);
+  assert.equal(causeOf(added, undefined), undefined);
 });
 
 test('jank, a stale or wrong build, or a gap in coverage is not ready', () => {

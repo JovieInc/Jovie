@@ -50,6 +50,8 @@ jobs:
     environment: Preview – jovie
     runs-on: ubuntu-24.04
     timeout-minutes: 45
+    outputs:
+      layout_outcome: ${{ steps.journey.outputs.layout_outcome }}
     env:
       PLAYWRIGHT_ARTIFACT_REQUIRE_PRODUCER_STAGE: 'true'
       DOGFOOD_SHA: ${{ (github.event.workflow_run.name == 'Staging Controller' && github.event.workflow_run.head_sha) || inputs.ref || 'main' }}
@@ -221,6 +223,24 @@ jobs:
           set -e
           tail -n 120 "$RECEIPT_DIR/playwright.log"
           echo "JOURNEY_FINISHED_AT=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_ENV"
+
+          # Perf class, measured on the same server and reported by the
+          # layout-budget job, never by this one (one spec asserts one class).
+          # Green only when both layout tests ran: a skipped test (Stripe test
+          # prerequisites unavailable) exits 0 too, and is `unmeasured`.
+          set +e
+          E2E_SKIP_WEB_SERVER=1 BASE_URL=http://localhost:3260 \
+            PLAYWRIGHT_JSON_OUTPUT_FILE="$RECEIPT_DIR/playwright-layout.json" \
+            node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs" --run -- \
+            pnpm exec playwright test tests/e2e/claim-checkout-layout.perf.spec.ts \
+              --project=chromium --reporter=line,json --output=test-results/layout-budget \
+            > "$RECEIPT_DIR/playwright-layout.log" 2>&1
+          layout_status=$?
+          set -e
+          tail -n 60 "$RECEIPT_DIR/playwright-layout.log"
+          layout_outcome=$(node "$GITHUB_WORKSPACE/scripts/claim-dogfood-report.mjs" layout-outcome \
+            "$layout_status" "$RECEIPT_DIR/playwright-layout.json") || layout_outcome=failure
+          echo "layout_outcome=$layout_outcome" >> "$GITHUB_OUTPUT"
           exit "$status"
 
       - name: Emit stage events (claim-dogfood)
@@ -264,6 +284,27 @@ jobs:
           RUN_ID: ${{ github.run_id }}-${{ github.run_attempt }}
         run: node scripts/claim-dogfood-report.mjs intake
 
+      - name: Upload layout-budget artifacts on breach
+        if: ${{ always() && steps.journey.outputs.layout_outcome == 'failure' && hashFiles('apps/web/test-results/layout-budget/**') != '' }}
+        uses: ./.github/actions/upload-safe-playwright-artifact
+        with:
+          name: claim-layout-budget-report-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            apps/web/test-results/layout-budget/
+          allow-markdown: 'true'
+          retention-days: 7
+
+      - name: File, reopen or resolve the layout-budget Linear issue
+        if: ${{ always() && !cancelled() && steps.journey.outputs.layout_outcome != '' }}
+        env:
+          LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          REMEDIATION_TRIGGERS_DISABLED: ${{ vars.REMEDIATION_TRIGGERS_DISABLED }}
+          LAYOUT_OUTCOME: ${{ steps.journey.outputs.layout_outcome }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          RUN_ID: ${{ github.run_id }}-${{ github.run_attempt }}
+        run: node scripts/claim-dogfood-report.mjs layout-intake
+
       - name: Cleanup ephemeral Neon branch
         if: always() && steps.neon-branch.outputs.branch_id != ''
         continue-on-error: true
@@ -272,3 +313,33 @@ jobs:
             -H "Authorization: Bearer ${{ secrets.NEON_API_KEY }}" \
             -H "Content-Type: application/json" \
             "https://console.neon.tech/api/v2/projects/${{ vars.NEON_PROJECT_ID }}/branches/${{ steps.neon-branch.outputs.branch_id }}"
+
+  # Perf class, its own check. The dogfood job above measures the layout-shift
+  # budget on the same server and only reports it; this job is red when the
+  # budget is breached or was never measured, so the revenue journey and the
+  # layout budget never share one red (docs/ON_CALL_PROCESS.md: one spec
+  # asserts one class).
+  layout-budget:
+    name: Claim checkout layout budget (perf)
+    needs: dogfood
+    if: ${{ !cancelled() && needs.dogfood.result != 'skipped' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Report the layout-shift budget
+        env:
+          LAYOUT_OUTCOME: ${{ needs.dogfood.outputs.layout_outcome }}
+        run: |
+          case "$LAYOUT_OUTCOME" in
+            success)
+              echo "Layout-shift budget held on /claim and /billing/success." ;;
+            failure)
+              echo "::error::Layout-shift budget breached (CLS >= 0.1). See the dogfood job log (Run the claim dogfood step) and the claim-layout-budget-report artifact."
+              exit 1 ;;
+            unmeasured)
+              echo "::error::Layout-shift budget was not measured: the perf spec was skipped (Stripe test prerequisites unavailable) or ran no test. See the dogfood job log."
+              exit 1 ;;
+            *)
+              echo "::error::Layout-shift budget was not measured: the dogfood job stopped before the perf spec ran."
+              exit 1 ;;
+          esac

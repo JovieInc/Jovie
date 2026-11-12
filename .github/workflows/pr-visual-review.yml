@@ -76,8 +76,14 @@ jobs:
 
       - uses: ./.github/actions/setup-node-pnpm
 
-      - name: Install Playwright Chromium
-        run: pnpm --filter @jovie/web exec playwright install --with-deps chromium
+      # This job runs PR-controlled code, so it only restores caches that
+      # main's producers saved and never saves one. system_deps keeps the
+      # fonts the captures need.
+      - name: Setup Playwright Chromium
+        uses: ./.github/actions/setup-playwright
+        with:
+          system_deps: 'true'
+          cache: restore
 
       - name: Route changed files
         id: route

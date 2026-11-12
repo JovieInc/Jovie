@@ -354,6 +354,7 @@ describe('Lighthouse identity admission', () => {
       'apps/web/scripts/lighthouse-relative-budget.mjs',
       'apps/web/scripts/lighthouse-relative-gate.mjs',
       '.github/scripts/lighthouse-build-baseline.sh',
+      '.github/scripts/lighthouse-install-scope.mjs',
     ]) {
       expect(pattern.test(path), path).toBe(true);
     }

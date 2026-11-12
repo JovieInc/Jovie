@@ -13,6 +13,7 @@
  * scoped) or NOT_LOCAL (heavy, CI-only or covered elsewhere, with the reason).
  */
 import { readFileSync } from 'node:fs';
+import { selectLocalGuards } from './preflight-local-guards.mjs';
 
 const WORKFLOWS = /^\.github\/(?:workflows|actions)\//;
 
@@ -280,10 +281,17 @@ export const coveredBy = atom =>
   NOT_LOCAL.some(n => atom.includes(n.match));
 
 /** Guards whose trigger matches the changed paths, `{base}` expanded. */
+/**
+ * Guards for these changed paths: Source Validation's, then the pre-push-only
+ * guards for checks PR CI leaves to the merge group (preflight-local-guards).
+ */
 export function selectManifestGuards(paths, base = 'main') {
-  return SOURCE_VALIDATION_GUARDS.filter(g =>
-    paths.some(p => g.when.test(p))
-  ).map(g => ({ ...g, command: g.command.replaceAll('{base}', base) }));
+  return [
+    ...SOURCE_VALIDATION_GUARDS.filter(g =>
+      paths.some(p => g.when.test(p))
+    ).map(g => ({ ...g, command: g.command.replaceAll('{base}', base) })),
+    ...selectLocalGuards(paths),
+  ];
 }
 
 export function readRunScripts(workflowText, deriveSteps) {

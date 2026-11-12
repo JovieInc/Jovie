@@ -16,6 +16,15 @@ ds-owner, tokens, states, tests, a11y and frontend-rules as each component is
 certified; mutation, visual and benchmark join once their producers record
 source-bound evidence.
 
+Order: `gates` and `waivers` in `component-certification.json` and screen
+`debt` in `cert-screens.json` stay sorted by component path (plain code-unit
+order), so a new entry lands at its own place instead of at the end, where
+every PR appends; two PRs then conflict only when their components are path
+neighbours. The gate fails on a map out of order, and
+`node scripts/component-certificate.mjs --sort` sorts all three (the state
+order inside a waiver stays as written). `--refresh` and `--enroll` write debt
+sorted.
+
 Fail-closed: a criterion with no evidence is `unknown` and counts as missing.
 Invalid JSON in an input file blocks report generation with a nonzero exit.
 
