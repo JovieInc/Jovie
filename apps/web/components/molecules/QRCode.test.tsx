@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { act, render, screen } from '@testing-library/react';
 import type { ImgHTMLAttributes } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { expectNoA11yViolations } from '@/tests/utils/a11y';
@@ -37,12 +37,27 @@ function skeleton(container: HTMLElement) {
 
 describe('QRCode: certificate states', () => {
   it('shows a hidden skeleton while the code is generated', async () => {
+    // Hold generation open so the skeleton state is observable, not a
+    // race against the mocked encoder's microtask.
+    let resolveGeneration: ((url: string) => void) | undefined;
+    toDataURL.mockImplementationOnce(
+      () =>
+        new Promise<string>(resolve => {
+          resolveGeneration = resolve;
+        })
+    );
     const { container } = render(
       <QRCode data='https://jov.ie/skeleton' label={LABEL} />
     );
     expect(skeleton(container)).toHaveAttribute('aria-hidden', 'true');
     expect(skeleton(container)).toHaveClass('motion-reduce:animate-none');
+    expect(screen.queryByRole('img', { name: LABEL })).toBeNull();
+
+    await act(async () => {
+      resolveGeneration?.(DATA_URL);
+    });
     expect(await screen.findByRole('img', { name: LABEL })).toBeInTheDocument();
+    expect(skeleton(container)).toBeNull();
     await expectNoA11yViolations(container);
   });
 
