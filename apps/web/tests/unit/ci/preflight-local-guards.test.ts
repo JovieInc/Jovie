@@ -47,6 +47,11 @@ describe('preflight:changed local guards', () => {
       'pnpm-lock.yaml',
       'apps/web/scripts/route-js-budgets.json',
       'apps/web/scripts/route-js-budget.mjs',
+      'apps/web/scripts/route-js-budget-policy.mjs',
+      'apps/web/scripts/route-js-ratchet.mjs',
+      'apps/web/scripts/route-render-modes-policy.mjs',
+      'apps/web/scripts/route-render-modes.mjs',
+      'apps/web/scripts/route-render-modes.json',
     ]) {
       expect(ids([path]), path).toContain('route-js-budget');
     }
@@ -71,6 +76,9 @@ describe('preflight:changed local guards', () => {
     expect(budget).toContain('pnpm turbo build --filter=@jovie/web');
     expect(budget).toContain(
       'node apps/web/scripts/route-js-budget.mjs --next-dir apps/web/.next'
+    );
+    expect(budget).toContain(
+      'node apps/web/scripts/route-render-modes.mjs --next-dir apps/web/.next'
     );
     for (const env of [
       'NEXT_PUBLIC_AUTH_MOCK=1',
