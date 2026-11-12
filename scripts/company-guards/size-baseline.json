@@ -62,7 +62,7 @@
   "apps/extension/src/sidepanel.ts": 1248,
   "apps/ios/Jovie/App/AppRouteManifest.swift": 868,
   "apps/ios/Jovie/App/AppState.swift": 759,
-  "apps/ios/Jovie/App/RootView.swift": 999,
+  "apps/ios/Jovie/App/RootView.swift": 990,
   "apps/ios/Jovie/Core/APIClient.swift": 785,
   "apps/ios/Jovie/Core/ChatRepository.swift": 957,
   "apps/ios/Jovie/Core/MobileChatContentParser.swift": 710,
