@@ -9,6 +9,9 @@ const mockRunWaitlistAutoAccept = vi.hoisted(() => vi.fn());
 const mockReconcileWaitlistAdmission = vi.hoisted(() => vi.fn());
 const mockSweepUnderEnrichedProfilesForCron = vi.hoisted(() => vi.fn());
 const mockSweepAppleMusicCatalog = vi.hoisted(() => vi.fn());
+const mockSweepLegacySlugs = vi.hoisted(() =>
+  vi.fn(async () => ({ renamed: 1 }))
+);
 const mockRunOnboardingScriptAggregation = vi.hoisted(() => vi.fn());
 const mockRunProfileSearchMonitoring = vi.hoisted(() => vi.fn());
 const mockSyncAiCrawlerAnalyticsCron = vi.hoisted(() => vi.fn());
@@ -100,7 +103,9 @@ vi.mock('@/lib/waitlist/auto-accept', () => ({
 vi.mock('@/lib/discography/apple-music-import', () => ({
   sweepAppleMusicCatalogCompletenessForCron: mockSweepAppleMusicCatalog,
 }));
-
+vi.mock('@/lib/discography/slug-migration', () => ({
+  sweepLegacySlugsForCron: mockSweepLegacySlugs,
+}));
 vi.mock('@/lib/discography/re-enrich', () => ({
   sweepUnderEnrichedProfilesForCron: mockSweepUnderEnrichedProfilesForCron,
 }));
@@ -288,6 +293,7 @@ describe('GET /api/cron/daily-maintenance', () => {
       releasesImported: 3,
       failed: 0,
     });
+    expect(data.results.legacySlugMigration.data).toEqual({ renamed: 1 });
     expect(data.results.onboardingScriptAggregation.success).toBe(true);
     expect(data.results.onboardingScriptAggregation.data).toEqual({
       syncedSeeds: 2,
