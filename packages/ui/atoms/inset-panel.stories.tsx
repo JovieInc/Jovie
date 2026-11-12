@@ -119,6 +119,19 @@ export const ActionRow: Story = {
   ),
 };
 
+/** A disabled action row stays in place and stops responding. */
+export const DisabledRow: Story = {
+  render: args => (
+    <InsetPanel {...args} asChild>
+      <section aria-label='App update'>
+        <InsetPanelRow icon={<Sparkles />} onClick={() => {}} disabled>
+          Downloading update
+        </InsetPanelRow>
+      </section>
+    </InsetPanel>
+  ),
+};
+
 /** A long label truncates before the trailing slot instead of wrapping. */
 export const LongContent: Story = {
   render: args => (

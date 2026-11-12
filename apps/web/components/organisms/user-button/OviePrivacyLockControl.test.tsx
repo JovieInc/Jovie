@@ -48,6 +48,10 @@ describe('OviePrivacyLockControl', () => {
       <OviePrivacyLockControl ensurePrivacyLockCanBeEnabled={ensureReady} />
     );
     await screen.findByText('Off · requires an existing admin passkey');
+    // The block starts on the same gutter as every other menu row.
+    expect(screen.getByTestId('ovie-privacy-lock-control')).toHaveClass(
+      'px-(--space-2-5)'
+    );
     fireEvent.click(
       screen.getByRole('button', { name: 'Enable Ovie privacy lock' })
     );
