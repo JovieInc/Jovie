@@ -169,11 +169,8 @@ The source defaults below are preserved in this slice.
 | Flag | Source default | Disposition |
 |---|---|---|
 | `AUTH_OFFER_SUMMARY` | `false` | Remove copy/layout gate after selecting the supported offer recap; no pricing, auth or entitlement change. |
-| `CANVAS_GRAIN` | `true` | Remove presentation gate in favor of the supported enabled behavior. |
 | `CLAIM_LEGACY_PROOF_SWEEP` | `false` | Keep rollout stop for the grandfathered-claim sweep that takes 50k+ pages private after the 30-day nudge; remove once the first flip is observed. |
 | `CHATGPT_APP_DIRECTORY_MCP` | `false` | Keep public API exposure security control; no dynamic client registration grant. |
-| `CHAT_COMPOSER_V2` | `true` | Remove presentation gate in favor of the supported enabled behavior. |
-| `CYAN_FOCUS_GLOW` | `true` | Remove presentation gate in favor of the supported enabled behavior. |
 | `HOMEPAGE_START_CTA` | `false` | Keep copy-approval gate for the homepage hero action entering `/start`; remove in favor of the enabled behavior once the copy is approved. |
 | `INVESTOR_PORTAL_YC_DECK` | `false` | Remove narrative/layout gate in favor of the supported private brief; preserve financial privacy and sourced claims. |
 | `IN_HOUSE_RESOLVER` | `false` | Keep resolver rollback compatibility control (JOV-7323). |
@@ -182,7 +179,6 @@ The source defaults below are preserved in this slice.
 | `MUSICFETCH_FALLBACK` | `false` | Keep vendor spend/provider fallback stop (JOV-7323). |
 | `MUSIC_RESOLVER_PROVIDER_LINKS` | `false` | Keep provider-family routing/rollback control (JOV-7323). |
 | `MUSIC_RESOLVER_RELEASE_FACTS` | `false` | Keep provider-family routing/rollback control (JOV-7323). |
-| `NEW_RELEASE_PAGE` | `true` | Remove presentation gate in favor of the supported enabled behavior. |
 | `ONBOARDING_VALUE_BEFORE_PAYWALL` | `true` | Keep funnel-order kill switch (JOV-9758) until the catalog-before-pricing read-out; then remove in favor of the enabled behavior. |
 | `OVIE_MCP_DYNAMIC_CLIENT_REGISTRATION` | `false` | Keep unauthenticated client-registration security boundary and redirect allowlist. |
 | `PMF_SURVEY_PROMPT` | `false` | Keep measurement rollout stop for the in-app Sean Ellis survey card; remove once the survey has enough responses to read against the 40% target. |

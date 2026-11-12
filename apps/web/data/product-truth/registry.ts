@@ -607,14 +607,10 @@ export const PRODUCT_FLAG_CAPABILITIES = {
   VISIBILITY_AUDIT_OFFER: {
     nonMarketing: 'hidden until the flag and a Stripe Payment Link are set',
   },
-  NEW_RELEASE_PAGE: { nonMarketing: 'UI layout toggle' },
   ONBOARDING_VALUE_BEFORE_PAYWALL: {
     nonMarketing:
       'onboarding funnel order: real catalog preview before pricing; env kill switch (JOV-9758)',
   },
-  CANVAS_GRAIN: { nonMarketing: 'UI visual treatment' },
-  CYAN_FOCUS_GLOW: { nonMarketing: 'UI visual treatment' },
-  CHAT_COMPOSER_V2: { nonMarketing: 'UI layout toggle' },
   MEMORY_STUDIO_SESSION_V0: { nonMarketing: 'internal memory loop' },
   YOUTUBE_THUMBNAILS_PASTE_GENERATE: { capabilityId: 'youtube-thumbnails' },
   MARKETING_GENERIC_CREATOR_NAV: {
