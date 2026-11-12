@@ -312,9 +312,24 @@
       "long-content": "It renders no caller text: the column headers are fixed product copy and every cell is a skeleton bar. The detector matched its aria-label.",
       "offline": "The shell does no network work; it is what the route shows while its data loads, so going offline cannot change what it draws (the route's own error boundary owns failed loads)."
     },
+    "apps/web/components/features/dashboard/release-tasks/ReleaseTaskEmptyState.tsx": {
+      "offline": "The empty state makes no request: generating the plan is the parent checklist's onSetUp, which owns the network call and its failure. The detector matched the isLoading prop, shown in LoadingGeneratingPlan.",
+      "permission-denied": "It has no gated action or role check; the parent only renders it for someone who can set up the release. The detector matched the word plan in its fixed action label."
+    },
     "apps/web/components/features/dashboard/release-tasks/ReleaseTaskProgressBar.tsx": {
       "error": "The bar draws counts its parent already has and makes no request, so it has no failure of its own. The detector matched the text-error class on the overdue count, which the WithOverdue story shows.",
       "permission-denied": "The bar has no gated action or role check; anyone who can see the release's tasks sees the same counts. The detector matched role='progressbar'."
+    },
+    "apps/web/components/features/dashboard/release-tasks/ReleaseTaskRow.tsx": {
+      "empty": "The row renders one task and owns no collection that could be empty. The detector matched the items-center class."
+    },
+    "apps/web/components/features/dashboard/release-tasks/ReleaseTaskRowPrimitives.tsx": {
+      "partial": "The primitives take a required task, done flag or children; their optional props are className and style, which are presentation, so nothing can be partially present."
+    },
+    "apps/web/components/features/dashboard/tasks/TaskWorkspaceLoadingRows.tsx": {
+      "empty": "It is the Tasks loading geometry: it always draws the same five fixed placeholder rows and owns no data that could be empty. The detector matched the .map over that fixed row list.",
+      "offline": "It takes no props and makes no request; it is what the Tasks route shows while its data loads, so going offline cannot change what it draws.",
+      "permission-denied": "It has no gated action or role check. The detector matched role='status'."
     },
     "apps/web/components/features/feedback/PageErrorState.tsx": {
       "empty": "PageErrorState renders one title, one message and one retry action and takes no collection; the detector matched the items-center utility class.",

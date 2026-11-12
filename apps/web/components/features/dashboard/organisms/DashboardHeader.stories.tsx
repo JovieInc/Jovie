@@ -74,7 +74,7 @@ export const LongContentTitle: Story = {
   },
   decorators: [
     Story => (
-      <div className='w-[420px]'>
+      <div className='w-105'>
         <Story />
       </div>
     ),
