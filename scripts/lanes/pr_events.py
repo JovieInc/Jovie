@@ -38,7 +38,7 @@ HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 from atomic_state import append_json_object
 from pr_body_markup import ANY_HEADING, quote_revision_references, red_section_bounds, with_red_section
-import remediation  # noqa: E402  (classifier + non-PR intake; no lane_runner import)
+import empty_review, remediation  # noqa: E402  (classifier + non-PR intake; no lane_runner import)
 REPO = os.environ.get("GITHUB_REPOSITORY", "JovieInc/Jovie")
 PREFIX = "lane-fix-"
 LANE_FIX_RED = PREFIX + "red"
@@ -1535,12 +1535,12 @@ def may_take(name: str, pr: dict, record: dict, order: list[str], now: float) ->
 
 
 def needs_work(lane, pr: dict) -> bool:
-    """The PR's own state still backs its labels: conflicts and red checks are re-read, while a
-    merge-queue removal or review feedback stands until a new head answers it."""
+    """The PR's own state still backs its labels. Conflicts and red checks are re-read. A
+    loaded review with no current-head body is idle; an unread review still needs a read."""
     if pr.get("isInMergeQueue") is True:
         return False
     kinds = set(pr.get("eventKinds") or [])
-    if kinds & {"dequeued", "review", "stale"}:
+    if kinds & {"dequeued", "stale"} or ("review" in kinds and empty_review.review_needs_model(pr)):
         return True
     if "conflict" in kinds and pr.get("mergeStateStatus") == "DIRTY":
         return True
@@ -1907,7 +1907,7 @@ def cleanup_one_event(host, lane, prs: list[dict], now: float | None = None) -> 
         disabled = set(providers) - set(cost_order(providers))
         candidates = sorted((pr for pr in prs if pr.get("isInMergeQueue") is not True
                              and set(pr.get("eventKinds") or []) & set(FIX_KINDS)
-                             and (not in_scope(pr, "red", disabled) or not needs_work(lane, pr))),
+                             and (not in_scope(pr, "red", disabled) or not needs_work(lane, pr) or empty_review.unloaded_review_only(pr, lambda row: needs_work(lane, row)))),
                             key=lambda pr: pr["number"])
         if not candidates:
             return None

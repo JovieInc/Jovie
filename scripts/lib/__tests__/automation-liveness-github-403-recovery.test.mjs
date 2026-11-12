@@ -17,6 +17,8 @@ import {
   loadRegistry,
 } from '../automation-registry.mjs';
 
+import { mapTestReferences } from '../ci-script-test-inventory.mjs';
+
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
 const registry = loadRegistry(repoRoot);
 
@@ -185,9 +187,13 @@ describe('403 recovery CI admission', () => {
       const guard = selectSourceGuards(event, [path]).find(
         candidate => candidate.id === 'automation-registry'
       );
-      expect(guard?.command.split(' ')).toContain(
-        'lib/__tests__/automation-liveness-github-403-recovery.test.mjs'
+      const file =
+        'scripts/lib/__tests__/automation-liveness-github-403-recovery.test.mjs';
+      const refs = mapTestReferences(
+        [{ source: 'automation-registry', text: guard?.command ?? '' }],
+        [file]
       );
+      expect(refs.get(file)?.has('automation-registry')).toBe(true);
     }
   });
 });

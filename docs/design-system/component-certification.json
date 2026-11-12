@@ -687,8 +687,8 @@
       "permission-denied": "LoadingSkeleton has no gated action or permission input; the detector matched role='status' on its loading regions."
     },
     "apps/web/components/molecules/QRCode.tsx": {
-      "loading": "The skeleton shows only while the third-party image request is in flight, and a static story cannot hold that request open; QRCode.test.tsx renders the skeleton before onLoad and asserts it clears on load.",
-      "offline": "QRCode never fetches or mutates from JS; lost connectivity reaches it only as an <img> that fails to load, which the ErrorImageUnavailable story shows with the same-size fallback."
+      "loading": "The skeleton shows only while local generation is in flight, and a static story cannot hold that promise open; QRCode.test.tsx renders the skeleton before the encoder resolves and asserts it clears.",
+      "offline": "QRCode generates locally and never fetches. A data URL that fails to decode uses the same same-size unavailable fallback as a generation error, which FailedGeneration names and QRCode.test.tsx asserts."
     },
     "apps/web/components/molecules/UpgradeButton.tsx": {
       "empty": "UpgradeButton renders one button and an optional error line and takes no collection; the detector matched the items-center class.",
@@ -751,6 +751,10 @@
     "apps/web/components/organisms/AuthShellWrapper.tsx": {
       "empty": "The wrapper composes providers around one route child and owns no collection. The detector matched the 'releases' pending-shell route name and the items-center class; the pending Releases overlay is covered by AuthShellWrapper.test.tsx."
     },
+    "apps/web/components/organisms/CookieBannerMount.tsx": {
+      "loading": "The only in-flight state is a null Suspense fallback while PrivacyChoices loads. A static story cannot hold that chunk, and CookieBannerMount.test.tsx covers the banner after the lazy import.",
+      "offline": "CookieBannerMount never fetches or mutates. The detector treats Suspense as offline. A chunk that has not resolved leaves the null fallback, which CookieBannerMount.test.tsx covers by waiting for the runtime."
+    },
     "apps/web/components/organisms/CookieBannerSection.tsx": {
       "partial": "The card always shows the same fixed consent message and three actions; its two optional props are a test-only pathname override and the server-resolved visibility flag, so no content can be partially present.",
       "long-content": "The consent message, Privacy link and action labels are fixed copy with no props or user text, so the card's content cannot grow; the detector matched the aria-label and the text-* utility classes."
@@ -766,6 +770,12 @@
     "apps/web/components/organisms/PricingRecipeBody.tsx": {
       "partial": "The canonical Pricing story already renders the partial composition: the optional structuredData and auditOffer slots are both absent there (the audit offer renders nothing while it is off), and every other prop is required.",
       "permission-denied": "PricingRecipeBody is a public marketing page with no gated action or permission input; the detector matched the word plan in its pricing copy."
+    },
+    "apps/web/components/organisms/PrivacyChoices.tsx": {
+      "empty": "The dialog always shows the opt-out switch and fixed copy and owns no collection. The detector matched the items-center class.",
+      "error": "A rejected saveConsent shows the alert inside the open dialog. A static story cannot reject that module. PrivacyChoices.test.tsx covers it in the server-save failure case.",
+      "partial": "The dialog's only prop is onClose. The optional analytics and onSave fields belong to stored consent and the cookie modal, not to partial content of this dialog.",
+      "long-content": "The title, description, switch label and status lines are fixed copy with no caller text, so the dialog cannot grow. The detector matched text utilities and the description prop name."
     },
     "apps/web/components/organisms/SharedCommandPalette.tsx": {
       "permission-denied": "The palette renders caller-ranked sections and has no locked, gated or entitlement row; entitlement filtering happens before sections reach it. The detector matched role='option' and role='listbox'."
