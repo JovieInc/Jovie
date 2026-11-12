@@ -41,7 +41,7 @@ import {
   tool,
   type UIMessageChunk,
 } from 'ai';
-import { and, count, sql as drizzleSql, eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { tryHandleAnonymousOnboardingChat } from '@/app/api/chat/onboarding-handler';
@@ -59,9 +59,7 @@ import { createImportBioFromUrlTool } from '@/lib/ai/tools/import-bio-from-url';
 import { createInspectPressSourceTool } from '@/lib/ai/tools/inspect-press-source';
 import { createProfileEditTool } from '@/lib/ai/tools/profile-edit';
 import { createVoicePromoTool } from '@/lib/ai/tools/voice-promo';
-import { readAuthorizedProfileViews } from '@/lib/analytics/authorized-read';
 import { getOptionalAuth } from '@/lib/auth/cached';
-import { getExactProfileAccess } from '@/lib/auth/profile-access';
 import { getSessionContext } from '@/lib/auth/session';
 import { resolveChatAccountContext } from '@/lib/chat/account-context';
 import { createAccountChatTools } from '@/lib/chat/account-tools';
@@ -70,6 +68,7 @@ import {
   detectAlbumArtGenerationIntent,
   resolveAlbumArtCapability,
 } from '@/lib/chat/album-art-capability';
+import { fetchArtistContext } from '@/lib/chat/artist-context.server';
 import { fetchCatalogTrackTitlesForChat } from '@/lib/chat/catalog-titles';
 import { assertChatToolsRegistered } from '@/lib/chat/chat-tool-inventory';
 import {
@@ -81,11 +80,8 @@ import {
   extractLastUserImageUrl,
   extractLastUserText,
 } from '@/lib/chat/message-text';
-import { resolveHasMusicLinks } from '@/lib/chat/music-link-presence';
 import { canUseOvChatMode, parseChatMode } from '@/lib/chat/ov-mode';
 import { sanitizeAssistantResponse } from '@/lib/chat/prompt-disclosure-guard';
-import { buildRelatedSuggestionsFraming } from '@/lib/chat/related-recommendations';
-import { countVisibleReleaseListenLinks } from '@/lib/chat/release-listen-links';
 import {
   updateOwnedReleaseGeneratedPitches,
   updateOwnedReleaseMetadata,
@@ -102,6 +98,10 @@ import {
 } from '@/lib/chat/retouch-capability';
 import { executeChatTurn, isClientDisconnect } from '@/lib/chat/run';
 import { isShowTopInsightsTurnRelevant } from '@/lib/chat/show-top-insights-relevance';
+import {
+  createRequestCapabilityTool,
+  createUseSkillTool,
+} from '@/lib/chat/skills/tools';
 import { chatToolSchema } from '@/lib/chat/strict-schema';
 import { resolveSummerHandoff } from '@/lib/chat/summer-summon';
 import {
@@ -143,11 +143,9 @@ import {
 import { gateAssistantReply } from '@/lib/chat/voice-lint';
 import { wrapToolSetFailSoft } from '@/lib/chat/wrap-tool-execute';
 import { loadCustomerChatPinnedOpportunity } from '@/lib/connectors/customer-pinned-opportunity';
+import { isArtistRuleViolation } from '@/lib/copy/outbound-floor';
 import { db } from '@/lib/db';
-import { clickEvents, tips } from '@/lib/db/schema/analytics';
 import { socialLinks } from '@/lib/db/schema/links';
-import { creatorProfiles } from '@/lib/db/schema/profiles';
-import { sqlAny } from '@/lib/db/sql-helpers';
 import { getPlanDisplayName } from '@/lib/entitlements/registry';
 import { env } from '@/lib/env-server';
 import { captureError } from '@/lib/error-tracking';
@@ -229,7 +227,6 @@ import {
   resolvePitchDestination,
 } from '@/lib/services/pitch';
 import { isRetouchConfigured } from '@/lib/services/retouching/provider-gemini';
-import { DSP_PLATFORMS } from '@/lib/services/social-links/types';
 import { isWeeklyQuotaExemptCanaryEmail } from '@/lib/synthetic/prodcert-identities';
 import { logger } from '@/lib/utils/logger';
 import { detectPlatform } from '@/lib/utils/platform-detection/detector';
@@ -256,116 +253,6 @@ const CHAT_KILL_SWITCH_GATES = {
   DISABLED: 'ai_chat_disabled',
   FORCE_LIGHT: 'ai_chat_force_light',
 } as const;
-
-/**
- * Fetches artist context server-side from the database.
- * Validates that the authenticated user can manage the profile.
- */
-async function fetchArtistContext(
-  profileId: string,
-  appUserId: string
-): Promise<ArtistContext | null> {
-  const access = await getExactProfileAccess(db, appUserId, profileId);
-  if (!access.ok) {
-    return null;
-  }
-
-  const [result] = await db
-    .select({
-      displayName: creatorProfiles.displayName,
-      username: creatorProfiles.username,
-      bio: creatorProfiles.bio,
-      genres: creatorProfiles.genres,
-      spotifyFollowers: creatorProfiles.spotifyFollowers,
-      spotifyPopularity: creatorProfiles.spotifyPopularity,
-      spotifyUrl: creatorProfiles.spotifyUrl,
-      appleMusicUrl: creatorProfiles.appleMusicUrl,
-    })
-    .from(creatorProfiles)
-    .where(eq(creatorProfiles.id, profileId))
-    .limit(1);
-
-  if (!result) {
-    return null;
-  }
-
-  // Fetch link counts and tipping stats in parallel
-  const startOfMonth = new Date();
-  startOfMonth.setUTCDate(1);
-  startOfMonth.setUTCHours(0, 0, 0, 0);
-  const startOfMonthISO = startOfMonth.toISOString();
-
-  // Release listen links render on the public profile too.
-  const releaseListenCount = countVisibleReleaseListenLinks(profileId);
-  const [linkCounts, tipTotals, clickStats, profileViews] = await Promise.all([
-    db
-      .select({
-        totalActive: count(),
-        musicActive: drizzleSql<number>`count(*) filter (where ${socialLinks.platformType} = 'dsp' OR ${socialLinks.platform} = ${sqlAny(DSP_PLATFORMS)})`,
-      })
-      .from(socialLinks)
-      .where(
-        and(
-          eq(socialLinks.creatorProfileId, profileId),
-          eq(socialLinks.state, 'active')
-        )
-      )
-      .then(r => r[0]),
-    db
-      .select({
-        totalReceived: drizzleSql<number>`COALESCE(SUM(${tips.amountCents}), 0)`,
-        monthReceived: drizzleSql<number>`COALESCE(SUM(CASE WHEN ${tips.createdAt} >= ${startOfMonthISO}::timestamp THEN ${tips.amountCents} ELSE 0 END), 0)`,
-        tipsSubmitted: drizzleSql<number>`COALESCE(COUNT(${tips.id}), 0)`,
-      })
-      .from(tips)
-      .where(eq(tips.creatorProfileId, profileId))
-      .then(r => r[0]),
-    db
-      .select({
-        total: drizzleSql<number>`count(*)`,
-      })
-      .from(clickEvents)
-      .where(
-        and(
-          eq(clickEvents.creatorProfileId, profileId),
-          eq(clickEvents.linkType, 'tip')
-        )
-      )
-      .then(r => r[0]),
-    readAuthorizedProfileViews(appUserId).catch(error => {
-      logger.warn('Authorized analytics unavailable for chat context', {
-        profileId,
-        error,
-      });
-      return 0;
-    }),
-  ]);
-
-  return {
-    displayName: result.displayName ?? result.username,
-    username: result.username,
-    bio: result.bio,
-    genres: result.genres ?? [],
-    spotifyFollowers: result.spotifyFollowers,
-    spotifyPopularity: result.spotifyPopularity,
-    spotifyUrl: result.spotifyUrl,
-    appleMusicUrl: result.appleMusicUrl,
-    profileViews,
-    hasSocialLinks: Number(linkCounts?.totalActive ?? 0) > 0,
-    hasMusicLinks: resolveHasMusicLinks({
-      dspSocialLinkCount: Number(linkCounts?.musicActive ?? 0),
-      releaseListenLinkCount: await releaseListenCount,
-      spotifyUrl: result.spotifyUrl,
-      appleMusicUrl: result.appleMusicUrl,
-    }),
-    tippingStats: {
-      tipClicks: Number(clickStats?.total ?? 0),
-      tipsSubmitted: Number(tipTotals?.tipsSubmitted ?? 0),
-      totalReceivedCents: Number(tipTotals?.totalReceived ?? 0),
-      monthReceivedCents: Number(tipTotals?.monthReceived ?? 0),
-    },
-  };
-}
 
 /**
  * Find a release by title (exact match first, then partial).
@@ -917,91 +804,6 @@ function createCheckCanvasStatusTool(
   });
 }
 
-/**
- * Creates the suggestRelatedArtists tool.
- * Uses the creator's profile data to suggest related subjects for pitching,
- * outreach, and ad targeting. The framing is source-aware (JOV-7635): music
- * similarity language only applies when the creator's work is music;
- * everything else stays "related creators".
- */
-function createSuggestRelatedArtistsTool(context: ArtistContext) {
-  const framing = buildRelatedSuggestionsFraming(context);
-
-  return tool({
-    description: framing.description,
-    inputSchema: chatToolSchema({
-      purpose: z
-        .enum(['playlist_pitching', 'ad_targeting', 'collaboration', 'all'])
-        .describe(`What the ${framing.subjectTerm} will be used for`),
-      count: z
-        .number()
-        .int()
-        .min(3)
-        .max(15)
-        .optional()
-        .describe('Number of suggestions to return (default 5)'),
-    }),
-    execute: async ({ purpose, count: suggestionCount }) => {
-      // Provide the AI with structured context to generate recommendations
-      return {
-        success: true,
-        summary: framing.summary,
-        subjectKind: framing.isMusicSource ? 'artist' : 'creator',
-        creatorContext: {
-          name: context.displayName,
-          genres: context.genres,
-          spotifyFollowers: context.spotifyFollowers,
-          spotifyPopularity: context.spotifyPopularity,
-          purpose,
-          requestedCount: suggestionCount ?? 5,
-        },
-        instructions: framing.instructions,
-      };
-    },
-  });
-}
-
-/**
- * Creates the generateCanvasPlan tool.
- * Helps the artist plan a canvas video generation from their album artwork.
- */
-function createGenerateCanvasPlanTool(
-  profileId: string | null,
-  releases: ReleaseContext[]
-) {
-  return tool({
-    description:
-      'Generate a detailed plan for creating a Spotify Canvas video from album artwork. Includes artwork processing steps, animation style recommendations, and technical specs. Use this when an artist wants to create a canvas for a specific release.',
-    inputSchema: chatToolSchema({
-      releaseTitle: z
-        .string()
-        .describe('The title of the release to generate canvas for'),
-      motionPreference: z
-        .enum(['zoom', 'pan', 'particles', 'morph', 'ambient'])
-        .optional()
-        .describe(
-          'Preferred animation style. Default: ambient (subtle motion with color shifts)'
-        ),
-    }),
-    execute: async ({ releaseTitle, motionPreference }) => {
-      if (!profileId) {
-        return { success: false, error: 'Profile ID required' };
-      }
-
-      const release = findReleaseByTitle(releases, releaseTitle);
-
-      if (!release) {
-        return {
-          success: false,
-          error: `Release "${releaseTitle}" not found. Available releases: ${formatAvailableReleases(releases)}`,
-        };
-      }
-
-      return buildCanvasPlan(release, motionPreference);
-    },
-  });
-}
-
 function createGenerateAlbumArtTool(params: {
   readonly profileId: string | null;
   readonly clerkUserId: string;
@@ -1367,132 +1169,6 @@ function createMerchPayoutsTool(profileId: string | null) {
   });
 }
 
-function buildCanvasPlan(
-  release: ReleaseContext,
-  motionPreference = 'ambient'
-) {
-  const motion = motionPreference;
-  const hasArtwork = Boolean(release.artworkUrl);
-
-  return {
-    success: true,
-    plan: {
-      release: {
-        title: release.title,
-        type: release.releaseType,
-        hasArtwork,
-        artworkUrl: release.artworkUrl,
-        currentCanvasStatus: release.canvasStatus,
-      },
-      steps: [
-        {
-          step: 1,
-          action: 'Process Artwork',
-          description: hasArtwork
-            ? 'AI removes text/logos from album art and upscales to 1080x1920 (9:16 portrait)'
-            : 'No artwork available — upload album art first, then we can generate a canvas',
-          status: hasArtwork ? 'ready' : 'blocked',
-        },
-        {
-          step: 2,
-          action: 'Generate Video',
-          description: `Create a ${motion} animation loop (3-8 seconds) from the processed artwork`,
-          status: hasArtwork ? 'ready' : 'blocked',
-        },
-        {
-          step: 3,
-          action: 'Encode & Download',
-          description:
-            'Encode to H.264 MP4 at 30fps, ready for upload to Spotify for Artists',
-          status: hasArtwork ? 'ready' : 'blocked',
-        },
-        {
-          step: 4,
-          action: 'Upload to Spotify',
-          description:
-            'Download the video and upload it via Spotify for Artists → Music → Select track → Canvas',
-          status: 'manual',
-        },
-      ],
-      motionStyle: motion,
-      specs: {
-        resolution: '1080x1920',
-        aspectRatio: '9:16',
-        duration: '3-8 seconds (loops)',
-        format: 'MP4 (H.264)',
-        fps: 30,
-      },
-    },
-  };
-}
-
-/**
- * Creates the createPromoStrategy tool.
- * Generates a promotional strategy including social ads, TikTok, and canvas.
- */
-function createPromoStrategyTool(
-  context: ArtistContext,
-  profileId: string | null,
-  releases: ReleaseContext[]
-) {
-  return tool({
-    description:
-      'Create a comprehensive promotion strategy for a release, including social media video ads, TikTok strategy, Spotify Canvas, and ad targeting recommendations. Use this when an artist asks for help promoting their music.',
-    inputSchema: chatToolSchema({
-      releaseTitle: z
-        .string()
-        .optional()
-        .describe(
-          'Specific release to promote. If not provided, uses the latest release.'
-        ),
-      budget: z
-        .enum(['free', 'low', 'medium', 'high'])
-        .optional()
-        .describe(
-          'Budget level: free (organic only), low ($50-200), medium ($200-1000), high ($1000+)'
-        ),
-      platforms: z
-        .array(
-          z.enum(['tiktok', 'instagram', 'youtube', 'spotify', 'hulu', 'meta'])
-        )
-        .optional()
-        .describe('Target platforms for the promotion'),
-    }),
-    execute: async ({ releaseTitle, budget, platforms }) => {
-      const targetRelease = profileId
-        ? releaseTitle
-          ? findReleaseByTitle(releases, releaseTitle)
-          : (releases[0] ?? null)
-        : null;
-
-      return {
-        success: true,
-        context: {
-          artist: {
-            name: context.displayName,
-            genres: context.genres,
-            followers: context.spotifyFollowers,
-            popularity: context.spotifyPopularity,
-          },
-          release: targetRelease
-            ? {
-                title: targetRelease.title,
-                type: targetRelease.releaseType,
-                hasArtwork: Boolean(targetRelease.artworkUrl),
-                canvasStatus: targetRelease.canvasStatus,
-                popularity: targetRelease.spotifyPopularity,
-              }
-            : null,
-          budget: budget ?? 'low',
-          platforms: platforms ?? ['tiktok', 'instagram', 'spotify'],
-        },
-        instructions:
-          'Create a specific, actionable promo strategy. Include: (1) Spotify Canvas plan if not set, (2) Social video ad concepts using album art + 30s song clip + promo text + QR code to Jovie, (3) TikTok sound strategy with best clip selection advice, (4) Related artist targeting for ads, (5) Timeline with specific daily/weekly actions. Be concrete — no vague advice.',
-      };
-    },
-  });
-}
-
 function createShowTopInsightsTool(
   profileId: string | null,
   lastUserText: string
@@ -1744,7 +1420,8 @@ function createSubmitFeedbackTool(clerkUserId: string) {
 function createGenerateReleasePitchTool(
   resolvedProfileId: string,
   identity: { clerkUserId: string; conversationId: string | null },
-  releases: ReleaseContext[]
+  releases: ReleaseContext[],
+  artistRules?: ArtistContext['artistRules']
 ) {
   return tool({
     description: `Generate one copy-paste-ready release pitch for a specific destination. Use for playlist, radio, Sirius XM, install, playback/music supervisor, editorial post, record label, or collaborator pitching. Ask the artist where they want to pitch it before calling this tool unless a task or user message clearly maps to one of these destinations: ${PITCH_TARGET_OPTIONS_TEXT}. Ask which release they want to pitch if unclear. If the artist provides custom guidance, pass it via instructions. ${PITCH_GRILL_PROCEDURE}`,
@@ -1847,6 +1524,7 @@ function createGenerateReleasePitchTool(
             userId: identity.clerkUserId,
             sessionId: identity.conversationId,
           },
+          artistRules,
         });
 
         const updated = await updateOwnedReleaseGeneratedPitches({
@@ -1880,7 +1558,9 @@ function createGenerateReleasePitchTool(
 
         return {
           success: false as const,
-          error: 'Failed to generate pitches. Please try again.',
+          error: isArtistRuleViolation(error)
+            ? 'That pitch broke one of your artist rules, so I held it back.'
+            : 'Failed to generate pitches. Please try again.',
         };
       }
     },
@@ -1894,7 +1574,8 @@ function createGenerateReleasePitchTool(
 function buildFreeChatTools(
   resolvedProfileId: string | null,
   clerkUserId: string,
-  accountContext: Awaited<ReturnType<typeof resolveChatAccountContext>>
+  accountContext: Awaited<ReturnType<typeof resolveChatAccountContext>>,
+  conversationId: string | null = null
 ) {
   return {
     ...createAccountChatTools(accountContext),
@@ -1902,6 +1583,14 @@ function buildFreeChatTools(
     proposeSocialLink: createSocialLinkTool(),
     proposeSocialLinkRemoval: createSocialLinkRemovalTool(resolvedProfileId),
     submitFeedback: createSubmitFeedbackTool(clerkUserId),
+    useSkill: createUseSkillTool({
+      paidPlan: canUsePaidChatTools(accountContext),
+    }),
+    requestCapability: createRequestCapabilityTool({
+      clerkUserId,
+      founder: authorizeFounderSummerUser(clerkUserId) === 'authorized',
+      conversationId,
+    }),
   };
 }
 
@@ -1947,13 +1636,8 @@ function buildChatTools(
     importBioFromUrl: createImportBioFromUrlTool({ userId: clerkUserId }),
     inspectPressSource: createInspectPressSourceTool({ userId: clerkUserId }),
     checkCanvasStatus: createCheckCanvasStatusTool(resolvedProfileId, releases),
-    suggestRelatedArtists: createSuggestRelatedArtistsTool(artistContext),
     writeWorldClassBio: createWorldClassBioTool(
       artistContext,
-      resolvedProfileId,
-      releases
-    ),
-    generateCanvasPlan: createGenerateCanvasPlanTool(
       resolvedProfileId,
       releases
     ),
@@ -1979,11 +1663,6 @@ function buildChatTools(
           }),
         }
       : {}),
-    createPromoStrategy: createPromoStrategyTool(
-      artistContext,
-      resolvedProfileId,
-      releases
-    ),
     // gh-9808 HOT ZONE: voice promo audio generation from cloned voice (premium, 11Labs)
     // "clone my voice" / "voice promo" / "radio drop" intent loads via system prompt
     voicePromo: createVoicePromoTool({
@@ -2007,7 +1686,8 @@ function buildChatTools(
               clerkUserId,
               conversationId: reservedTurn?.conversationId ?? null,
             },
-            releases
+            releases,
+            artistContext.artistRules
           ),
         }
       : {}),
@@ -2918,7 +2598,8 @@ export async function POST(req: Request) {
     const freeTools = buildFreeChatTools(
       resolvedProfileId,
       userId,
-      accountContext
+      accountContext,
+      dispatchConversationId
     );
     // Advanced tools gated behind paid plans
     const paidTools = canUsePaidChatTools(accountContext)
@@ -3164,10 +2845,10 @@ export async function POST(req: Request) {
             responseMessage.parts as Array<{ type: string; text?: string }>
           )
         ).text;
-        // Copy floor (canon/VOICE.md): a streamed reply can't be blocked
-        // mid-flight, so gate the completed text before it persists. A floor
-        // violation swaps in a safe fallback and logs the rules that fired.
-        const gatedReply = gateAssistantReply(assistantText);
+        // Copy floor (canon/VOICE.md) and artist rules: a streamed reply can't
+        // be blocked mid-flight, so gate the completed text before it persists.
+        // A violation swaps in a safe fallback and logs the rules that fired.
+        const gatedReply = gateAssistantReply(assistantText, artistContext);
         if (gatedReply.violations.length > 0) {
           logger.warn(
             'Assistant reply failed copy floor; persisting fallback',

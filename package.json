@@ -1,6 +1,6 @@
 {
   "name": "jovie-monorepo",
-  "version": "26.10.16",
+  "version": "26.11.1",
   "private": true,
   "config": {
     "commitizen": {
@@ -8,7 +8,7 @@
     }
   },
   "engines": {
-    "node": ">=24.22.2 <25",
+    "node": ">=24.22.3 <25",
     "pnpm": ">=9.15.4 <10"
   },
   "packageManager": "pnpm@9.15.9",
@@ -66,7 +66,7 @@
       "webpack": "5.105.0",
       "qs": "6.16.1",
       "js-cookie": "3.0.7",
-      "ws": "8.22.0",
+      "ws": "8.22.1",
       "devalue": "5.9.3",
       "postcss": "8.5.30",
       "@lhci/cli>uuid": "11.1.1",
@@ -304,6 +304,7 @@
     "design:shared-ui-visual-arbitrary:check": "node scripts/shared-ui-visual-arbitrary-audit.mjs",
     "design:shared-ui-visual-arbitrary:update": "node scripts/shared-ui-visual-arbitrary-audit.mjs --update-baseline",
     "design:no-dead-ends:check": "tsx packages/copy/dead-ends.ts check",
+    "pen:review": "node scripts/pen-review/run.mjs",
     "design:no-dead-ends:update": "tsx packages/copy/dead-ends.ts update",
     "design:shell-ia:check": "node scripts/invariants/shell-ia.mjs",
     "design:shell-ia:update": "node scripts/invariants/shell-ia.mjs --update",
@@ -331,7 +332,7 @@
     "invariants:stewardship:test": "node --test scripts/invariant-stewardship/audit.test.mjs",
     "invariants:harness:receipt": "node scripts/invariants/validate.mjs --harness-json",
     "golden-path-lock": "node scripts/golden-path-lock.mjs",
-    "ci:control:test": "node scripts/run-affected-tests.mjs --control && node --test scripts/ci-workflow-topology.test.mjs scripts/workflow-runner-pin-check.test.mjs && node scripts/ci-workflow-topology.mjs && pnpm ownership:check && node scripts/sources-of-truth.mjs && node scripts/invariants/duplicate-literals.mjs",
+    "ci:control:test": "node scripts/run-affected-tests.mjs --control && node --test scripts/ci-workflow-topology.test.mjs scripts/workflow-runner-pin-check.test.mjs scripts/ci-trigger-budget.test.mjs && node scripts/ci-workflow-topology.mjs && pnpm ownership:check && node scripts/sources-of-truth.mjs && node scripts/invariants/duplicate-literals.mjs",
     "fleet:check": "node scripts/fleet-registry.mjs check",
     "surfaces:check": "node scripts/invariants/one-surface-per-product.mjs && node --test scripts/invariants/one-surface-per-product.test.mjs",
     "ownership:check": "node --test scripts/ownership-registry.test.mjs && node scripts/ownership-registry.mjs --report",
@@ -349,6 +350,7 @@
     "story-coverage:audit": "node scripts/ui-story-coverage-policy.mjs",
     "component-ship-gate": "node scripts/component-ship-gate.mjs",
     "component-certificate:gate": "node scripts/component-certificate.mjs --gate",
+    "component-cert:screens": "node scripts/component-cert-screens.mjs",
     "screen-certification-gate": "node scripts/invariants/screen-certification.mjs",
     "screen-registration-gate": "node scripts/invariants/screen-certification.mjs --registration-only",
     "run-outcome:check": "node --test --experimental-test-coverage --test-coverage-include=scripts/invariants/run-outcome.mjs --test-coverage-include=scripts/invariants/jev-shadow.mjs --test-coverage-lines=90 --test-coverage-branches=85 --test-coverage-functions=90 scripts/invariants/run-outcome.test.mjs scripts/invariants/jev-shadow.test.mjs scripts/invariants/jev-shadow-integration.test.mjs && node --test --experimental-test-coverage --test-coverage-include=scripts/invariants/jev-gateway.mjs --test-coverage-lines=100 --test-coverage-functions=100 --test-coverage-branches=90 scripts/invariants/jev-gateway.test.mjs scripts/invariants/jev-release-task.test.mjs && node --test --experimental-test-coverage --test-coverage-include=scripts/invariants/jev-revision-evidence.mjs --test-coverage-include=scripts/invariants/jev-revision-report.mjs --test-coverage-include=scripts/invariants/jev-revision-report-cli.mjs --test-coverage-lines=95 --test-coverage-branches=90 --test-coverage-functions=100 scripts/invariants/jev-revision-report.test.mjs && node --test --experimental-test-coverage --test-coverage-include=scripts/invariants/jev-task-classification.mjs --test-coverage-include=scripts/invariants/jev-task-pilot.mjs --test-coverage-lines=90 --test-coverage-branches=80 --test-coverage-functions=90 scripts/invariants/jev-task-classification.test.mjs scripts/invariants/jev-task-pilot.test.mjs && node --test --experimental-test-coverage --test-coverage-include=scripts/invariants/jev-writing-controller.mjs --test-coverage-include=scripts/invariants/jev-writing-receipt.mjs --test-coverage-lines=95 --test-coverage-branches=90 --test-coverage-functions=100 scripts/invariants/jev-writing-controller.test.mjs && node --test --experimental-test-coverage --test-coverage-include=scripts/invariants/jev-writing-quality.mjs --test-coverage-lines=90 --test-coverage-branches=80 --test-coverage-functions=90 scripts/invariants/jev-writing-quality.test.mjs && node --test --experimental-test-coverage --test-coverage-include=scripts/invariants/jev-writing-readiness.mjs --test-coverage-lines=95 --test-coverage-branches=90 --test-coverage-functions=100 scripts/invariants/jev-writing-readiness.test.mjs && node --test --experimental-test-coverage --test-coverage-include=scripts/lanes/ops-report.mjs --test-coverage-lines=90 --test-coverage-branches=80 --test-coverage-functions=90 scripts/lanes/ops-report.test.mjs && node --test --experimental-test-coverage --test-coverage-include=scripts/invariants/jev-inbox-triage.mjs --test-coverage-include=scripts/invariants/jev-inbox-pilot.mjs --test-coverage-lines=90 --test-coverage-branches=80 --test-coverage-functions=90 scripts/invariants/jev-inbox-triage.test.mjs && node --test --experimental-test-coverage --test-coverage-include=scripts/invariants/jev-ci-failure-triage.mjs --test-coverage-lines=95 --test-coverage-branches=90 --test-coverage-functions=100 scripts/invariants/jev-ci-failure-triage.test.mjs && node --test --experimental-test-coverage --test-coverage-include=scripts/invariants/clef-screenshot-evaluator.mjs --test-coverage-lines=75 --test-coverage-branches=70 --test-coverage-functions=75 scripts/invariants/clef-screenshot-evaluator.test.mjs && pnpm evals:management-judgment && node --test --experimental-test-coverage --test-coverage-include=scripts/cheap-fixer/cheap-fixer.mjs --test-coverage-lines=95 --test-coverage-branches=85 --test-coverage-functions=100 scripts/cheap-fixer/cheap-fixer.test.mjs",

@@ -20,8 +20,8 @@ describe('consent geo fail-closed', () => {
     ['LI', true],
     ['BR', true],
     ['KR', true],
-    ['US', true], // region unknown inside a region-gated country
-    ['CA', true],
+    ['US', false], // US uses opt-out privacy choices; GPC still overrides
+    ['CA', true], // region unknown inside a region-gated country (Quebec)
     ['JP', false],
     ['AU', false],
     ['in', false],
@@ -151,16 +151,27 @@ describe('absent required flag blocks non-essential tracking', () => {
     expect(isMarketingAllowed()).toBe(false);
   });
 
-  it('honors the existing opt-out despite affirmative granular consent', () => {
+  it('honors the advertising opt-out without overriding affirmative analytics consent', () => {
     document.cookie = 'jv_cc_required=0; path=/';
     localStorage.setItem('jovie_tracking_consent', 'rejected');
     localStorage.setItem(
       'jv_cc',
       JSON.stringify({ essential: true, analytics: true, marketing: true })
     );
-    expect(isAnalyticsAllowed()).toBe(false);
+    expect(isAnalyticsAllowed()).toBe(true);
     expect(isMarketingAllowed()).toBe(false);
   });
+
+  it.each(['', '{}', 'null', 'not-json', '{"analytics":true}'])(
+    'keeps legacy rejection as the fallback for unusable granular consent: %j',
+    raw => {
+      document.cookie = 'jv_cc_required=0; path=/';
+      localStorage.setItem('jovie_tracking_consent', 'rejected');
+      localStorage.setItem('jv_cc', raw);
+      expect(isAnalyticsAllowed()).toBe(false);
+      expect(isMarketingAllowed()).toBe(false);
+    }
+  );
 
   it('keeps analytics allowed for a valid opt-in in a required region', () => {
     document.cookie = 'jv_cc_required=1; path=/';

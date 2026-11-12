@@ -197,12 +197,9 @@ const ruleset = {
       type: 'required_status_checks',
       parameters: {
         strict_required_status_checks_policy: false,
-        required_status_checks: [
-          'PR Ready',
-          'Migration Guard',
-          'Fork PR Gate',
-          'PR Size Guard',
-        ].map(context => ({ context })),
+        required_status_checks: ['PR Ready', 'Migration Guard']
+          .concat(['Fork PR Gate', 'PR Size Guard', 'Company guards'])
+          .map(context => ({ context })),
       },
     },
     { type: 'merge_queue', parameters: {} },
@@ -236,9 +233,10 @@ const native = () => ({
   successRunId: 901,
   successRunAttempt: 2,
   checks: {
-    total_count: 3,
-    check_runs: ['PR Ready', 'Migration Guard', 'PR Size Guard'].map(
-      (name, index) => ({
+    total_count: 4,
+    check_runs: ['PR Ready', 'Migration Guard', 'PR Size Guard']
+      .concat(['Company guards'])
+      .map((name, index) => ({
         id: index + 1,
         name,
         head_sha: repairedHead,
@@ -246,8 +244,7 @@ const native = () => ({
         conclusion: 'success',
         started_at: '2026-09-24T02:59:00Z',
         completed_at: createdAt,
-      })
-    ),
+      })),
   },
   statuses: [
     {

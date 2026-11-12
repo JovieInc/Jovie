@@ -1,5 +1,6 @@
 import { render } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import { StageMotion } from './StageMotion';
 
 function mockReducedMotion(reduce: boolean) {
@@ -39,12 +40,42 @@ afterEach(() => {
 });
 
 describe('StageMotion', () => {
-  it('turns motion on, and off again on unmount', () => {
+  it('zooms each stage to the content box between 1024 and 1439', () => {
+    const zoomed = { value: true };
+    vi.stubGlobal(
+      'matchMedia',
+      vi.fn((query: string) => ({
+        matches: query.includes('reduce') ? false : zoomed.value,
+        media: query,
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+      }))
+    );
+    document.body.innerHTML = `
+      <section class="hv3"><div class="hv3-rule" style="padding-left: 96px"></div></section>`;
+    const section = document.querySelector('.hv3') as HTMLElement;
+    Object.defineProperty(section, 'clientWidth', { value: 1280 });
+    document.documentElement.style.fontSize = '16px';
+    render(<StageMotion paletteQuery='releases' paletteTarget='Releases' />);
+    // (1280 - 2 x 96) / (78 x 16) = 1088 / 1248
+    expect(Number(section.style.getPropertyValue('--hv3-z'))).toBeCloseTo(
+      1088 / 1248,
+      6
+    );
+    zoomed.value = false;
+    window.dispatchEvent(new Event('resize'));
+    expect(section.style.getPropertyValue('--hv3-z')).toBe('');
+    document.documentElement.style.fontSize = '';
+  });
+
+  it('turns motion on, and off again on unmount', async () => {
     mockReducedMotion(false);
-    const { unmount } = render(
+    const { container, unmount } = render(
       <StageMotion paletteQuery='releases' paletteTarget='Releases' />
     );
     expect(document.documentElement).toHaveClass('hv3-motion');
+    expect(container).toBeEmptyDOMElement();
+    await expectNoA11yViolations(container);
     unmount();
     expect(document.documentElement).not.toHaveClass('hv3-motion');
   });
@@ -84,10 +115,13 @@ describe('StageMotion', () => {
     Object.defineProperty(window, 'scrollY', { value: 0, configurable: true });
   });
 
-  it('keeps everything still under prefers-reduced-motion', () => {
+  it('keeps everything still under prefers-reduced-motion', async () => {
     mockReducedMotion(true);
-    render(<StageMotion paletteQuery='releases' paletteTarget='Releases' />);
+    const { container } = render(
+      <StageMotion paletteQuery='releases' paletteTarget='Releases' />
+    );
     expect(document.documentElement).not.toHaveClass('hv3-motion');
+    await expectNoA11yViolations(container);
   });
 
   it('keeps a callout label inside its section frame guides', () => {

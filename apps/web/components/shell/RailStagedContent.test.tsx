@@ -1,5 +1,6 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
+import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import { RailStagedContent } from './RailStagedContent';
 
 function Fixture({ hidden }: { hidden: boolean }) {
@@ -17,8 +18,8 @@ function Fixture({ hidden }: { hidden: boolean }) {
 }
 
 describe('staged rail chrome', () => {
-  it('removes hidden chrome from AX/tab navigation and returns owned focus without scrolling', () => {
-    const { rerender } = render(<Fixture hidden={false} />);
+  it('removes hidden chrome from AX/tab navigation and returns owned focus without scrolling', async () => {
+    const { container, rerender } = render(<Fixture hidden={false} />);
     screen.getByRole('button', { name: 'Switch workspace' }).focus();
     rerender(<Fixture hidden />);
     expect(screen.getByTestId('chrome')).toHaveAttribute('inert');
@@ -26,11 +27,13 @@ describe('staged rail chrome', () => {
     expect(
       screen.getByRole('button', { name: 'Toggle left rail' })
     ).toHaveFocus();
+    await expectNoA11yViolations(container);
     rerender(<Fixture hidden={false} />);
     expect(screen.getByTestId('chrome')).not.toHaveAttribute('inert');
     expect(
       screen.getByRole('button', { name: 'Switch workspace' })
     ).toBeVisible();
+    await expectNoA11yViolations(container);
   });
 
   it('does not take focus from a live editor on close or reopen', () => {

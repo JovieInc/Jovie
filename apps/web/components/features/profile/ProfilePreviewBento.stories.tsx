@@ -56,3 +56,54 @@ export const WithOverlay: Story = {
     ),
   },
 };
+
+export const EmptyNoReleases: Story = {
+  args: {
+    releases: [],
+    genres: null,
+    caption: 'Preview · nothing released yet',
+  },
+};
+
+export const PartialNoPhoto: Story = {
+  args: {
+    artist: {
+      ...PROFILE_STORY_ARTIST,
+      image_url: undefined,
+      tagline: undefined,
+      location: null,
+    },
+  },
+};
+
+export const LongContent: Story = {
+  args: {
+    artist: {
+      ...PROFILE_STORY_ARTIST,
+      name: 'The Extraordinarily Long Named Midnight Orchestra Collective',
+      tagline:
+        'Producer, songwriter, arranger and after-hours romantic who writes long, winding songs for late drives along the coast.',
+    },
+    showLiveBadge: true,
+    caption: 'Your live profile, shared with every fan who follows the link',
+  },
+};
+
+export const Rtl: Story = {
+  args: {
+    artist: {
+      ...PROFILE_STORY_ARTIST,
+      name: 'فرقة منتصف الليل',
+      tagline: 'منتج وكاتب أغاني',
+    },
+    showLiveBadge: true,
+    caption: 'ملفك المباشر',
+  },
+  decorators: [
+    Story => (
+      <div dir='rtl' lang='ar'>
+        <Story />
+      </div>
+    ),
+  ],
+};

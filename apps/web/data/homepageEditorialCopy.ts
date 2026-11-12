@@ -33,12 +33,12 @@ export const HOMEPAGE_EDITORIAL_COPY = {
   hero: {
     headline: 'Move your music forward.',
     subhead:
-      'Your profile, every release and the people who follow your work, in one quiet workspace.',
+      'Your profile, every release, and a link to each place the music is streaming.',
     primaryAction: 'Request an invite',
     primaryHref: `#${HOMEPAGE_INVITE_ANCHOR}`,
     secondaryAction: 'See a live profile',
     secondaryHref: TIM_WHITE_PROFILE.publicProfilePath,
-    note: 'jovie opens by invitation',
+    note: 'two fields · we email when your spot opens',
     windowLabel: `Jovie for Mac: an example artist's Releases list with ${HOMEPAGE_FEATURED_ARTIST.inspected.title} open in the inspector`,
     upcCallout: 'per release',
   },
@@ -68,7 +68,6 @@ export const HOMEPAGE_EDITORIAL_COPY = {
     body: 'Your catalog comes in once. Each release gets its own page with listen links for every service, and your profile always leads with the newest one.',
     catalogLabel: 'An example artist’s release catalog in Jovie',
     releasePageLabel: `The ${HOMEPAGE_FEATURED_ARTIST.inspected.title} release page`,
-    rowCallout: 'catalog row → its own page',
     captions: {
       page: {
         title: 'One page per release.',

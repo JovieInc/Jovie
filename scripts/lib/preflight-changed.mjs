@@ -114,6 +114,36 @@ export function companionChecklist(files, read) {
   const push = (trigger, item, done, hint) =>
     items.push({ trigger, item, done: Boolean(done), hint });
 
+  // Mirror the pinned company size ratchet for changed working-tree files,
+  // including untracked additions. CI remains the policy authority.
+  let sizeBaseline;
+  for (const { filename, status } of files) {
+    if (
+      status === 'removed' ||
+      !/\.(ts|tsx|js|jsx|mjs|cjs|py|swift|ex|exs|sh|rb|go|rs)$/.test(
+        filename
+      ) ||
+      /(^|\/)(node_modules|vendor|dist|build|\.next|Pods)\/|\.gen\.|\.generated\.|\.min\.|\.d\.ts$|lock/.test(
+        filename
+      )
+    )
+      continue;
+    const content = read(filename);
+    const lines = content.split('\n').length - (content.endsWith('\n') ? 1 : 0);
+    if (lines <= 500) continue;
+    sizeBaseline ??= JSON.parse(
+      read('scripts/company-guards/size-baseline.json') || '{}'
+    );
+    const budget = Math.max(500, sizeBaseline[filename] ?? 500);
+    if (lines > budget)
+      push(
+        filename,
+        'source file fits company size budget',
+        false,
+        `${lines} lines exceeds ${budget}; extract a cohesive module before pushing (scripts/company-guards/size-baseline.json).`
+      );
+  }
+
   const fixture = 'scripts/tests/test_disk_guard.py';
   if (has(fixture)) {
     const policy = 'scripts/lanes/qualification_guard.py';
@@ -171,9 +201,12 @@ export function companionChecklist(files, read) {
     files,
     /^scripts\/(?:.+\/)?[^/]+\.test\.(?:mjs|ts|mts)$/
   )) {
-    const wired = ['scripts/ci-fast-lanes.mjs', 'package.json'].some(p =>
-      has(p)
-    );
+    // ci-fast-lanes.mjs also spreads in the planner contract list.
+    const wired =
+      ['scripts/ci-fast-lanes.mjs', 'package.json'].some(p => has(p)) ||
+      read('scripts/lib/test-planner-contract-tests.mjs').includes(
+        `'${file.filename}'`
+      );
     push(
       file.filename,
       'new scripts test wired into a CI lane',

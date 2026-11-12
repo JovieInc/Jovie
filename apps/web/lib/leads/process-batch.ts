@@ -4,8 +4,9 @@ import {
   experimentIdForLeadSource,
 } from '@/lib/acquisition';
 import { db } from '@/lib/db';
-import { leads } from '@/lib/db/schema/leads';
+import { type LeadSignalSnapshot, leads } from '@/lib/db/schema/leads';
 import { captureError } from '@/lib/error-tracking';
+import { isCoreSocialHtmlHost } from '@/lib/ingestion/social-html-policy';
 import { ExtractionError } from '@/lib/ingestion/strategies/base';
 import { cleanScrapedDisplayName } from '@/lib/profile/scraped-display-name';
 import {
@@ -15,6 +16,7 @@ import {
 import { recordLeadFunnelEvent } from './funnel-events';
 import { pipelineLog, pipelineWarn } from './pipeline-logger';
 import { qualifyLead } from './qualify';
+import { qualifyFromSearchEvidence } from './search-evidence';
 
 const MAX_SCRAPE_ATTEMPTS = 3;
 
@@ -28,8 +30,9 @@ export interface BatchResult {
 }
 
 /**
- * Qualifies a batch of discovered leads by fetching their Linktree pages.
- * Processes with limited concurrency and inter-request delays.
+ * Qualifies a batch of discovered leads. Linktree and Beacons leads are scored
+ * from stored search evidence (their pages are never fetched); other sources
+ * go through qualifyLead. Processes with limited concurrency.
  */
 export async function processLeadBatch(
   leadIds: string[],
@@ -71,6 +74,11 @@ async function processOneLead(
       .select({
         linktreeUrl: leads.linktreeUrl,
         discoveryQuery: leads.discoveryQuery,
+        linktreeHandle: leads.linktreeHandle,
+        sourceHandle: leads.sourceHandle,
+        sourcePlatform: leads.sourcePlatform,
+        displayName: leads.displayName,
+        signalSnapshot: leads.signalSnapshot,
       })
       .from(leads)
       .where(eq(leads.id, leadId))
@@ -79,6 +87,12 @@ async function processOneLead(
     if (!lead) {
       pipelineLog('qualify', 'Lead not found in DB', { leadId });
       return 'error';
+    }
+
+    // Linktree and Beacons pages are never read; their leads are scored from
+    // the search results that showed them.
+    if (isSearchOnlyLinkPage(lead)) {
+      return await qualifyFromSearch(leadId, lead);
     }
 
     const qualification = await qualifyLead(lead.linktreeUrl);
@@ -158,15 +172,7 @@ async function processOneLead(
       error instanceof ExtractionError &&
       error.code === 'SOCIAL_HTML_DISABLED'
     ) {
-      try {
-        await db
-          .update(leads)
-          .set({ updatedAt: new Date() })
-          .where(eq(leads.id, leadId));
-      } catch {
-        // Rotation is best-effort; the lead stays discovered either way.
-      }
-      return 'deferred';
+      return deferLead(leadId);
     }
     await captureError('Lead qualification failed', error, {
       route: 'leads/process-batch',
@@ -219,6 +225,91 @@ async function processOneLead(
 
     return 'error';
   }
+}
+
+interface SearchOnlyLead {
+  linktreeUrl: string;
+  linktreeHandle: string;
+  sourceHandle: string | null;
+  sourcePlatform: string | null;
+  displayName: string | null;
+  signalSnapshot: LeadSignalSnapshot | null;
+}
+
+function isSearchOnlyLinkPage(lead: SearchOnlyLead): boolean {
+  if (lead.sourcePlatform === 'linktree' || lead.sourcePlatform === 'beacons')
+    return true;
+  try {
+    return isCoreSocialHtmlHost(new URL(lead.linktreeUrl).hostname);
+  } catch {
+    return false;
+  }
+}
+
+/** Touch updatedAt only, so the cron's oldest-first pick rotates past it. */
+async function deferLead(leadId: string): Promise<'deferred'> {
+  try {
+    await db
+      .update(leads)
+      .set({ updatedAt: new Date() })
+      .where(eq(leads.id, leadId));
+  } catch {
+    // Rotation is best-effort; the lead stays discovered either way.
+  }
+  return 'deferred';
+}
+
+/**
+ * Scores a Linktree or Beacons lead from its stored search evidence with the
+ * buyer pre-screen. No evidence: the lead stays discovered. Nothing here
+ * requests the link page or any other blocked host.
+ */
+async function qualifyFromSearch(
+  leadId: string,
+  lead: SearchOnlyLead
+): Promise<'qualified' | 'disqualified' | 'deferred'> {
+  const decision = qualifyFromSearchEvidence({
+    handle: lead.sourceHandle ?? lead.linktreeHandle,
+    displayName: lead.displayName,
+    evidence: lead.signalSnapshot?.searchEvidence,
+  });
+  if (decision.outcome === 'no_evidence') return deferLead(leadId);
+
+  const now = new Date();
+  const qualified = decision.outcome === 'qualified';
+  await db
+    .update(leads)
+    .set({
+      status: decision.outcome,
+      displayName: cleanScrapedDisplayName(decision.displayName),
+      musicToolsDetected: decision.musicToolsDetected,
+      fitScore: decision.fitScore,
+      fitScoreBreakdown: decision.fitScoreBreakdown,
+      disqualificationReason: decision.disqualificationReason,
+      qualifiedAt: qualified ? now : undefined,
+      disqualifiedAt: qualified ? undefined : now,
+      updatedAt: now,
+    })
+    .where(eq(leads.id, leadId));
+
+  await recordLeadFunnelEvent(
+    {
+      leadId,
+      eventType: decision.outcome,
+      ...acquisitionFunnelAttribution(
+        experimentIdForLeadSource(lead.sourcePlatform)
+      ),
+      metadata: {
+        qualificationSource: 'search_evidence',
+        disqualificationReason: decision.disqualificationReason,
+        fitScore: decision.fitScore,
+        musicToolsDetected: decision.musicToolsDetected,
+        searchTools: decision.fitScoreBreakdown.searchTools,
+      },
+    },
+    { idempotent: true }
+  );
+  return decision.outcome;
 }
 
 function sleep(ms: number): Promise<void> {

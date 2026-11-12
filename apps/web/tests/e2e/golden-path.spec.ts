@@ -24,6 +24,7 @@ import {
   watchKeyframeErrors,
 } from './helpers/golden-path-keyframes';
 import { interceptGoldenPathTrackingCalls } from './helpers/golden-path-tracking';
+import { expectPreviewIsReal } from './helpers/preview-media-quality';
 import {
   installRuntimeAutomationBypass,
   resetAuthStatePreservingOnboardingSession,
@@ -604,9 +605,8 @@ async function driveAnonymousOnboardingJourney(page: Page, handle: string) {
     'Real Spotify artist confirmation did not render the resolved identity'
   ).toBeVisible({ timeout: 60_000 });
 
-  // JOV-9758 guard: value before paywall. The preview must render at least
-  // one release from the artist's real Spotify catalog before any pricing
-  // step exists on the page. An empty "name and a photo" preview fails here.
+  // JOV-9758 guard: value before paywall. The preview shows a real release,
+  // a painted portrait and artwork, and no forced caps, before any pricing.
   const previewRail = page
     .locator(
       '[data-testid="onboarding-profile-rail"], [data-testid="onboarding-profile-rail-inline"]'
@@ -617,13 +617,10 @@ async function driveAnonymousOnboardingJourney(page: Page, handle: string) {
     .poll(
       async () =>
         Number((await previewRail.getAttribute('data-catalog-releases')) ?? 0),
-      {
-        message:
-          'Onboarding preview did not show any release from the real catalog',
-        timeout: 60_000,
-      }
+      { message: 'Preview showed no real catalog release', timeout: 60_000 }
     )
     .toBeGreaterThanOrEqual(1);
+  await expectPreviewIsReal(page.locator('main'), previewRail);
   expect(
     await page.locator('a[href^="/onboarding/checkout"]').count(),
     'A pricing step rendered before the catalog preview'

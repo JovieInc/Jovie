@@ -63,21 +63,20 @@ const nextConfig = {
     // CI sets NEXT_IGNORE_TYPECHECK=1 — skip during build since typecheck runs separately
     ignoreBuildErrors: !!process.env.NEXT_IGNORE_TYPECHECK,
   },
-  // Browser source maps are emitted only when the Sentry plugin will upload
-  // them, and the plugin deletes them from .next after upload
-  // (sourcemaps.deleteSourcemapsAfterUpload below). They are never served to
-  // browsers; the release workflows fail closed if any .map reaches
-  // .vercel/output/static.
-  productionBrowserSourceMaps: shouldUseSentryPlugin,
+  // Maps ship only when the Sentry plugin uploads them (deleted from .next
+  // after upload) or on non-Vercel CI production builds — the Lighthouse
+  // gate's treemap needs served .map files (run 42614405519, JOV-12023).
+  productionBrowserSourceMaps:
+    shouldUseSentryPlugin ||
+    (process.env.NODE_ENV === 'production' && !process.env.VERCEL_ENV),
   output: isVercelPreview ? undefined : 'standalone',
   // Monorepo root for standalone output file tracing (prevents lockfile detection warnings)
   outputFileTracingRoot: isVercelPreview
     ? undefined
     : path.join(__dirname, '../../'),
-  // These request-time readers build data paths dynamically, so NFT cannot
-  // reliably infer their files from the compiled route bundles. Keep this
-  // list limited to the data they actually read; the broad directory entries
-  // are small content and chat-topic catalogs.
+  // Request-time readers build data paths dynamically, so NFT cannot infer
+  // their files. List only the data they read; the broad directory entries
+  // are small content, chat-topic and chat-skill catalogs.
   // Monorepo files are staged into apps/web/runtime-data by
   // scripts/stage-runtime-data.mjs; never trace outside apps/web (Vercel's
   // project root), which breaks deployment extraction.
@@ -92,6 +91,7 @@ const nextConfig = {
       // Blog catalog validation checks these assets with fs.access at request time.
       'public/images/blog/**/*',
       'lib/chat/knowledge/topics/**/*',
+      'lib/chat/skills/library/**/*',
       'public/fonts/Satoshi-Bold.ttf',
       'public/fonts/DMSans-Regular.ttf',
     ],

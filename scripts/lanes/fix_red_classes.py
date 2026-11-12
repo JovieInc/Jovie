@@ -11,12 +11,12 @@ machine instead of another run).
 Pure functions over parsed values; lane_runner owns every side effect (gh, git, state files).
 
     python3 fix_red_classes.py measure [--state DIR] [--days N]   # before/after numbers from the ledger
+    python3 fix_red_classes.py split-plan --plan FILE           # validate measured, ordered PR layers
 """
 from __future__ import annotations
 
 import argparse
 import ast
-import hashlib
 import json
 import re
 import sys
@@ -25,12 +25,15 @@ from collections import defaultdict
 from datetime import datetime, timezone
 from pathlib import Path
 
+import machine_gap
 import migration_renumber
 import remediation
+from fix_red_failure_routing import (ALIAS_ACTION, ALIAS_REVIEW_FAILURE, alias_owner_metadata,
+                                     error_signature, fingerprint_key, owner_handoff_reason)
 from atomic_state import atomic_write_text
 from fix_red_source_edits import (  # noqa: F401
     snap_added_conservative_spacing, strip_added_legacy_cache_exports,
-    resolve_additive_node_tests_text, resolve_additive_node_test_file, resolve_additive_list_conflict,
+    resolve_additive_node_tests_text, resolve_additive_node_test_file, resolve_additive_list_conflict, size_500_stale_hit,
 )
 
 SCHEMA = "jovie-fix-red-class/v1"
@@ -40,7 +43,7 @@ RERUN, SYNC_MAIN, WIRE_CI_FAST, RENUMBER, STAMP_CHANGELOG, SNAP_SPACING, STRIP_C
     "strip-cache-exports", "merge-narrowed-preflight", "register-domain-writes", "atomic-write", "agent")
 DETERMINISTIC = frozenset({
     RERUN, SYNC_MAIN, WIRE_CI_FAST, RENUMBER, STAMP_CHANGELOG, SNAP_SPACING, STRIP_CACHE, MERGE_NARROWED,
-    REGISTER_DOMAIN, ATOMIC_WRITE})
+    REGISTER_DOMAIN, ATOMIC_WRITE, ALIAS_ACTION})
 
 # remediation.INFRA_TEXT (runner loss, OOM, 5xx) plus the platform failures seen in 52 agent-declined
 # fix runs. Kept out of INFRA_TEXT: the exhausted-PR classifier deliberately routes a rate-limited
@@ -96,7 +99,7 @@ CACHE_SURFACE_TEXT = re.compile(
 # Source Validation's merge probe. Deterministic unions:
 # - NARROWED vitest command in scripts/preflight-changed.mjs
 # - shell && chains (node --test or vitest paths, plus added prefixes)
-# - quoted list entries (both sides only add 'path', lines)
+# - quoted list entries (both sides only add 'path', lines, or one NAME = ["a", "b", line)
 # - one-line comma-separated identifier lists (main order, then head-only tokens)
 # Any other hunk stays a model fix.
 NARROWED_PREFLIGHT = "scripts/preflight-changed.mjs"
@@ -141,6 +144,7 @@ _JSON_KEY = re.compile(r'^\s*"([^"\n]+)"\s*:')
 
 # (class, pattern, action). First match wins per check; order is most specific first.
 SIGNATURES = (
+    ("alias-review-deadline", ALIAS_REVIEW_FAILURE, ALIAS_ACTION),
     ("component-test-evidence", COMPONENT_TEST_TEXT, AGENT),
     ("narrowed-preflight", NARROWED_CONFLICT, MERGE_NARROWED),
     # Before platform-infra: a Source Validation log can carry passing-test rate-limit lines beside the guard error that actually failed the job.
@@ -167,28 +171,8 @@ LLM_VERDICTS = frozenset({"fix-pushed", "fix-no-change", "cancelled", "failed"})
 DEFAULT_BREAKER_N, MAX_BREAKER_N, MIN_CELL_RUNS = 2, 3, 10
 
 
-def error_signature(text: str) -> str:
-    """Prefer the failed-test summary to setup/mock output; normalize volatile tokens."""
-    text = re.sub(r"\x1b\[[0-9;]*m", "", str(text or ""))
-    text = re.split(r"(?m)^.*?\bFailed (?:Tests|Suites) [1-9]\d*\s*[⎯─-]*\s*$", text)[-1]
-    for line in text.splitlines():
-        if re.search(r"\b(error|fail(?:ed|ure)?|assert|expected|unwired|violation)\b", line, re.IGNORECASE):
-            line = re.sub(r"^\S*\d{4}-\d\d-\d\dT[\d:.]+Z\s*", "", line.strip())
-            line = re.sub(r"\b[0-9a-f]{7,40}\b|\d+", "#", line)
-            return re.sub(r"\s+", " ", line)[:120]
-    return ""
-
-
 def real_failures(pr: dict) -> list[dict]:
-    return [check for check in pr.get("statusCheckRollup") or []
-            if str(check.get("conclusion") or "").upper() in RED and str(check.get("name") or "").lower() not in AGGREGATE]
-
-
-def fingerprint_key(cls: str, names: list[str], signature: str = "") -> str:
-    parts = [cls, *sorted({re.sub(r"\s+", " ", str(name)).strip().lower() for name in names})]
-    if cls in {"other", "mixed"}:
-        parts.append(signature)
-    return hashlib.sha256("|".join(parts).encode()).hexdigest()[:12]
+    return machine_gap.red_checks(pr.get("statusCheckRollup") or [], RED, AGGREGATE)
 
 
 def stamp_internal_changelog(body) -> str | None:
@@ -210,7 +194,7 @@ def classify(pr: dict, logs: dict[str, str] | None = None) -> dict:
     for name in names:
         text = logs.get(name) or ""
         hit = next(((cls, action) for cls, pattern, action in SIGNATURES if pattern.search(text)), None)
-        per_check.append(hit or ("other", AGENT))
+        per_check.append(hit or size_500_stale_hit(text) or ("other", AGENT))
     classes = {cls for cls, _ in per_check}
     if len(classes) == 1:
         cls, action = per_check[0]
@@ -226,6 +210,9 @@ def classify(pr: dict, logs: dict[str, str] | None = None) -> dict:
     if cls == "quota-deferred" and CHANGELOG_QUOTA_READ.search("\n".join(logs.get(name) or "" for name in names)) \
             and stamp_internal_changelog(pr.get("body")) is not None:
         cls, action, signature = "changelog-metadata", STAMP_CHANGELOG, ""
+    owner = alias_owner_metadata(names, logs) if cls == "alias-review-deadline" else None
+    if cls == "alias-review-deadline" and owner is None:
+        cls, action, signature = "mixed", AGENT, error_signature("\n".join(logs.get(name) or "" for name in names))
     files = []
     if cls == "component-test-evidence":
         files = sorted({test for name in names for test in COMPONENT_TEST_TEXT.findall(logs.get(name) or "")})
@@ -237,7 +224,7 @@ def classify(pr: dict, logs: dict[str, str] | None = None) -> dict:
     elif cls == "domain-write":
         files = sorted(_domain_write_hits("\n".join(logs.get(name) or "" for name in names)))
     return {"schema": SCHEMA, "cls": cls, "key": fingerprint_key(cls, names, signature), "action": action,
-            "checks": names, "signature": signature, "files": files}
+            "checks": names, "signature": signature, "files": files, **({"evidenceOwner": owner} if owner else {})}
 
 
 def _split_shell_and(command: str) -> list[str] | None:
@@ -725,8 +712,36 @@ def resolve_additive_identifier_list_text(text: str, *, base: str = "") -> str |
     return resolved
 
 
+def merge_additive_quoted_path_line(ours: str, theirs: str) -> str | None:
+    """Union one `NAME = ["a", "b",` line (main order, then head-only paths); a second line, prose, a reordered shared path, or a repeated path returns None."""
+
+    def parse(side: str):
+        if not str(side or "").endswith("\n") or "\n" in side[:-1]:
+            return None
+        indent, bracket, rest = side[:-1].partition("[")
+        if not bracket or re.fullmatch(r"[ \t]*[A-Za-z_][A-Za-z0-9_]* = ", indent) is None:
+            return None
+        trail, body = rest.endswith(","), (rest[:-1] if rest.endswith(",") else rest).rstrip()
+        parts = [part.strip() for part in body.split(",")] if body else []
+        if any(len(part) < 2 or part[0] != '"' or part[-1] != '"' or part.count('"') != 2 or any(ch.isspace() for ch in part) for part in parts):
+            return None
+        tokens = [part[1:-1] for part in parts]
+        if not tokens or len(tokens) != len(set(tokens)) or body != ", ".join(f'"{t}"' for t in tokens):
+            return None
+        return indent, tokens, trail
+
+    left, right = parse(ours), parse(theirs)
+    if not left or not right or left[0] != right[0] or left[2] != right[2]:
+        return None
+    # `t in shared` for t in left[1]/right[1] is exactly `t in` the other side's list.
+    if [t for t in left[1] if t in right[1]] != [t for t in right[1] if t in left[1]]:
+        return None
+    merged = list(dict.fromkeys([*right[1], *left[1]]))
+    return left[0] + "[" + ", ".join(f'"{token}"' for token in merged) + ("," if left[2] else "") + "\n"
+
+
 def resolve_additive_quoted_list_text(text: str) -> str | None:
-    """Replace conflict hunks that are only quoted list entries. None when any hunk
+    """Replace quoted-entry hunks or one `NAME = ["a", "b",` line. None when any hunk
     has another shape, so the caller leaves that merge to a model."""
     if "<<<<<<<" not in str(text or ""):
         return None
@@ -738,7 +753,8 @@ def resolve_additive_quoted_list_text(text: str) -> str | None:
     pieces = []
     last = 0
     for hunk in hunks:
-        merged = merge_additive_quoted_entries(hunk.group("ours"), hunk.group("theirs"))
+        merged = (merge_additive_quoted_entries(hunk.group("ours"), hunk.group("theirs"))
+                  or merge_additive_quoted_path_line(hunk.group("ours"), hunk.group("theirs")))
         if merged is None:
             return None
         pieces.append(text[last:hunk.start()])
@@ -1072,8 +1088,8 @@ def _epoch(row: dict) -> float | None:
 def historic_key(row: dict) -> str:
     """Ledger rows keep the failing check names, not the log: coarser than the live fingerprint, stable."""
     source = row.get("requestSource") or {}
-    names = [name for name, verdict in source.get("checks") or []
-             if str(verdict).upper() in RED and str(name).lower() not in AGGREGATE]
+    names = [str(check.get("name")) for check in real_failures({"statusCheckRollup": [
+        {"name": name, "conclusion": verdict} for name, verdict in source.get("checks") or []]})]
     kinds = ",".join(source.get("eventKinds") or [])
     return fingerprint_key("history", names or [f"event:{kinds}"])
 
@@ -1161,13 +1177,51 @@ def costs_from_metrics(state: Path) -> dict:
     return out
 
 
+def reviewable_split(changes: dict[str, int], layers: list[list[str]], cap: int = 1500) -> list[int]:
+    """Validate an exhaustive split, counting tests. Caller measures generated paths as zero.
+
+    This plans file-level layers only; each layer still owes dependency/build/test proof.
+    No Git mutation or policy exception is authorized by a passing plan.
+    """
+    if type(cap) is not int or cap < 1 or not changes or not layers:
+        raise ValueError("nonempty measurements/layers and a positive integer cap required")
+    if any(type(count) is not int or count < 0 for count in changes.values()):
+        raise ValueError("unknown, binary or negative line count")
+    seen, totals = set(), []
+    for layer in layers:
+        if not isinstance(layer, list) or not layer:
+            raise ValueError("empty or invalid layer")
+        for path in layer:
+            if path not in changes or path in seen:
+                raise ValueError(f"unknown or duplicate path: {path}")
+            seen.add(path)
+        total = sum(changes[path] for path in layer)
+        if total > cap:
+            raise ValueError(f"layer {len(totals) + 1} exceeds cap: {total}/{cap}")
+        totals.append(total)
+    if seen != set(changes):
+        raise ValueError(f"unassigned paths: {sorted(set(changes) - seen)}")
+    return totals
+
+
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("command", choices=["measure"])
+    parser.add_argument("command", choices=["measure", "split-plan"])
+    parser.add_argument("--plan", type=Path, help="JSON {changes: {path: measured lines}, layers: [[path]]}")
     parser.add_argument("--state", default=str(Path.home() / ".local/state/jovie-lanes"))
     parser.add_argument("--days", type=int, default=5)
     parser.add_argument("--now", type=float, default=None)
     args = parser.parse_args(argv)
+    if args.command == "split-plan":
+        if args.plan is None:
+            parser.error("split-plan requires --plan")
+        plan = json.loads(args.plan.read_text())
+        try:
+            totals = reviewable_split(plan["changes"], plan["layers"])
+        except ValueError as error:
+            parser.error(str(error))
+        print(json.dumps({"reviewableLines": totals, "cap": 1500, "testsIncluded": True}))
+        return 0
     now = args.now or datetime.now(timezone.utc).timestamp()
     print(json.dumps(measure(read_ledger(Path(args.state)), now, args.days, costs_from_metrics(Path(args.state))), indent=1))
     return 0

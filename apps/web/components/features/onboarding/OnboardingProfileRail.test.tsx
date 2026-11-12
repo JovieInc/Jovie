@@ -7,9 +7,11 @@ import {
   emptyOnboardingProfileDraft,
   onboardingRoleSchema,
 } from '@/lib/onboarding/profile-draft';
+import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import { OnboardingProfileRail } from './OnboardingProfileRail';
 import { deriveProfileBuilderState } from './onboardingChatHelpers';
 import {
+  EMPTY_ONBOARDING_PROFILE_BUILDER_STATE,
   type OnboardingProfileBuilderState,
   resolvePreviewArtist,
 } from './onboardingProfileRailState';
@@ -254,9 +256,34 @@ describe('OnboardingProfileRail', () => {
   it('keeps the side-rail badge readable over light imagery (AA)', () => {
     render(<OnboardingProfileRail placement='side' state={CONFIRMED_STATE} />);
 
-    const badge = document.querySelector('[class*="bg-black/60"]');
+    const badge = document.querySelector('[class*="bg-ink-on-media/60"]');
     expect(badge).not.toBeNull();
-    expect(badge?.className).not.toContain('bg-black/50');
+    expect(badge?.className).not.toContain('bg-ink-on-media/50');
+  });
+
+  // JOV-12045: the side rail hands its height down as a definite chain and
+  // sizes the phone preview from the hero box, so the whole draft-profile
+  // card fits the scrollport at rest instead of running past the fold.
+  it('binds the side rail preview to the rail height so it fits at rest', () => {
+    render(<OnboardingProfileRail placement='side' state={CONFIRMED_STATE} />);
+
+    const rail = screen.getByTestId('onboarding-profile-rail');
+    expect(rail.className).toContain('h-full');
+
+    const bento = document.querySelector(
+      '[data-testid="onboarding-profile-bento"]'
+    );
+    expect(bento?.className).toContain('flex-1');
+    expect(bento?.className).not.toContain('h-full');
+
+    const phone = document.querySelector(
+      '[data-device="mobile-web"]'
+    )?.parentElement;
+    expect(phone?.className).toContain('system-b-onboarding-rail-phone');
+    expect(phone?.className).toContain('w-auto');
+
+    const hero = document.querySelector('.system-b-onboarding-rail-hero');
+    expect(hero).not.toBeNull();
   });
 
   it('does not add a container tab stop to the inline preview', async () => {
@@ -330,6 +357,23 @@ describe('resolvePreviewArtist', () => {
 // the browser default, which the live chat's focus/keyboard layers can shadow
 // mid-journey — leaving the rail at its bottom edge with the preview badge
 // clipped at the scrollport top (golden-path toBeInViewport ratio 0.8125).
+// 2026-11-08 production: the draft profile shouted at the artist with an
+// all-caps eyebrow and badges. The rail chrome now forces no caps at all.
+describe('OnboardingProfileRail casing (ASR-022)', () => {
+  it('forces no text into all caps in the rail chrome', () => {
+    render(<OnboardingProfileRail state={CONFIRMED_STATE} />);
+
+    const rail = screen.getByTestId('onboarding-profile-rail');
+    const shouting = Array.from(rail.querySelectorAll('[class]')).filter(el =>
+      /(?:^|\s)uppercase(?:\s|$)/.test(el.getAttribute('class') ?? '')
+    );
+    expect(shouting.map(el => el.textContent)).toEqual([]);
+    expect(
+      screen.getByTestId('onboarding-profile-preview-badge')
+    ).toHaveTextContent('Preview');
+  });
+});
+
 describe('OnboardingProfileRail keyboard scrolling (JOV-7973)', () => {
   it('scrolls itself to the top edge on Home', async () => {
     const user = userEvent.setup();
@@ -389,4 +433,21 @@ describe('OnboardingProfileRail keyboard scrolling (JOV-7973)', () => {
     await user.type(rail, '{ArrowDown}');
     expect(scrollTo).not.toHaveBeenCalled();
   });
+});
+
+describe('OnboardingProfileRail accessibility', () => {
+  it.each([
+    ['empty', EMPTY_ONBOARDING_PROFILE_BUILDER_STATE],
+    ['a confirmed artist', CONFIRMED_STATE],
+  ] as const)(
+    'has no accessibility violations when %s',
+    async (_name, state) => {
+      const { container } = render(
+        <div dir='rtl' lang='ar'>
+          <OnboardingProfileRail state={state} placement='inline' />
+        </div>
+      );
+      await expectNoA11yViolations(container);
+    }
+  );
 });

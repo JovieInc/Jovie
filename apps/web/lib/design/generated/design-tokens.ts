@@ -1,9 +1,11 @@
 // GENERATED FILE — do not edit. Source: apps/web/design/tokens.json. Rebuild: pnpm --filter @jovie/web run tokens:build
 export const DESIGN_TOKENS = {
   "brand": {
-    "$description": "Canonical monochrome colors for generated Jovie marks, wordmarks, lockups, and app icons. Product and marketing UI continue to use semantic color tokens.",
+    "$description": "Canonical monochrome colors for generated Jovie marks, wordmarks, lockups, and app icons. Product and marketing UI continue to use semantic color tokens. Mask values are fixed SVG luminance controls, not visible pigment; never theme or tint them.",
     "ink": "#08090a",
-    "cream": "#F5F4F0"
+    "cream": "#F5F4F0",
+    "mask-reveal": "white",
+    "mask-conceal": "black"
   },
   "gray": {
     "1": "hsl(0, 0%, 99%)",

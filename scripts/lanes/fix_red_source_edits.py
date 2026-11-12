@@ -2,11 +2,13 @@
 strip added legacy Cache Components exports and resolve additive source conflicts. Split from fix_red_classes to keep it under its size ceiling."""
 from __future__ import annotations
 
+import json
 import re
 import tempfile
 from pathlib import Path
 
 from atomic_state import atomic_write_text
+from fix_red_statement_merge import contained_by_main, contained_by_main_file, resolve_additive_statements_text
 
 LEGACY_CACHE_EXPORT = re.compile(
     r"^\s*export const (?:dynamic|fetchCache|revalidate)\s*=")
@@ -241,10 +243,8 @@ def resolve_additive_node_tests_text(text: str) -> str | None:
     return None if re.search(r"(?m)^(?:<{7}|\|{7}|={7}|>{7})", text) else text
 
 
-def resolve_additive_node_test_file(worktree: Path, rel: str, sh) -> str | None:
-    """Use Git's actual three stages to prove test conflicts are insertions only."""
-    if not re.fullmatch(r"[\w./-]+\.(?:test|spec)\.mjs", rel):
-        return None
+def _diff3_conflict(worktree: Path, rel: str, sh) -> str | None:
+    """Render Git's three stages as one diff3 conflict. None unless merge-file reports conflicts."""
     with tempfile.TemporaryDirectory() as scratch:
         paths = []
         for stage in (2, 1, 3):  # merge-file expects ours, base, theirs
@@ -258,14 +258,164 @@ def resolve_additive_node_test_file(worktree: Path, rel: str, sh) -> str | None:
         # Git returns the conflict count (capped at 127); errors wrap above it.
         if not 1 <= probe.returncode <= 127:
             return None
-        return resolve_additive_node_tests_text(probe.stdout)
+        return probe.stdout
 
 
-def resolve_additive_list_conflict(worktree: Path, branch: str, log, *, sh, merge_entries, guard=lambda: None) -> bool:
-    """Union quoted list entries or proven additive node:test blocks.
+def resolve_additive_node_test_file(worktree: Path, rel: str, sh) -> str | None:
+    """Use Git's actual three stages to prove test conflicts are insertions only."""
+    if not re.fullmatch(r"[\w./-]+\.(?:test|spec)\.mjs", rel):
+        return None
+    conflict = _diff3_conflict(worktree, rel, sh)
+    if conflict is None:
+        return None
+    return resolve_additive_node_tests_text(conflict)
+
+
+def resolve_additive_statement_file(worktree: Path, rel: str, sh) -> str | None:
+    """Union empty-base statement insertions in a Vitest file, proven from Git's three stages."""
+    if not re.fullmatch(r"[\w./-]+\.(?:test|spec)\.tsx?", rel):
+        return None
+    conflict = _diff3_conflict(worktree, rel, sh)
+    if conflict is None:
+        return None
+    return resolve_additive_statements_text(conflict)
+
+
+def _unique_json_object(pairs):
+    result = {}
+    for key, value in pairs:
+        if key in result:
+            raise ValueError("duplicate JSON key")
+        result[key] = value
+    return result
+
+
+def _load_json_object_stages(worktree: Path, rel: str, sh, field: str, accept) -> tuple[dict, dict, dict] | None:
+    """Base, ours, and theirs for one JSON object field.
+
+    None unless every stage is one object, `accept` passes the field, and every
+    other field still matches base."""
+    documents = []
+    for stage in (1, 2, 3):
+        blob = sh(["git", "show", f":{stage}:{rel}"], cwd=worktree)
+        if blob.returncode:
+            return None
+        try:
+            document = json.loads(blob.stdout, object_pairs_hook=_unique_json_object)
+        except (ValueError, TypeError):
+            return None
+        if not isinstance(document, dict) or not accept(document.get(field)):
+            return None
+        documents.append(document)
+    base, ours, theirs = documents
+    base_rest = {key: value for key, value in base.items() if key != field}
+    for document in (ours, theirs):
+        if {key: value for key, value in document.items() if key != field} != base_rest:
+            return None
+    return base, ours, theirs
+
+
+def _waiver_rows(value) -> bool:
+    return isinstance(value, dict) and all(
+        isinstance(row, dict) and row and all(
+            isinstance(reason, str) and reason.strip() for reason in row.values())
+        for row in value.values())
+
+
+def _debt_rows(value) -> bool:
+    return isinstance(value, dict) and all(
+        isinstance(reason, str) and reason.strip() for reason in value.values())
+
+
+def resolve_additive_certificate_waivers(worktree: Path, rel: str, sh) -> str | None:
+    """Union new component waiver rows, proven against Git's three stages.
+
+    This is authored policy, not generated metadata. Existing rows and every
+    other policy field must be unchanged; ambiguous edits remain unresolved.
+    The union is written sorted by component path, as the certificate gate
+    requires (`node scripts/component-certificate.mjs --sort`).
+    """
+    if rel != "docs/design-system/component-certification.json":
+        return None
+    loaded = _load_json_object_stages(worktree, rel, sh, "waivers", _waiver_rows)
+    if loaded is None:
+        return None
+    base, ours, theirs = loaded
+    for document in (ours, theirs):
+        if any(document["waivers"].get(key) != value for key, value in base["waivers"].items()):
+            return None
+    merged = dict(theirs["waivers"])
+    for key, value in ours["waivers"].items():
+        if key in merged and merged[key] != value:
+            return None
+        merged[key] = value
+    theirs["waivers"] = dict(sorted(merged.items()))
+    return json.dumps(theirs, ensure_ascii=False, indent=2) + "\n"
+
+
+def resolve_subtractive_screen_debt(worktree: Path, rel: str, sh) -> str | None:
+    """Drop screen-debt rows either side removed, proven against Git's three stages.
+
+    Main's remaining order stays. An added row, a changed value, or any other
+    field edit stays unresolved. This is authored policy, not generated metadata.
+    """
+    if rel != "docs/design-system/cert-screens.json":
+        return None
+    loaded = _load_json_object_stages(worktree, rel, sh, "debt", _debt_rows)
+    if loaded is None:
+        return None
+    base, ours, theirs = loaded
+    for document in (ours, theirs):
+        if any(key not in base["debt"] or document["debt"][key] != base["debt"][key]
+               for key in document["debt"]):
+            return None
+    theirs["debt"] = {key: value for key, value in theirs["debt"].items() if key in ours["debt"]}
+    return json.dumps(theirs, ensure_ascii=False, indent=2) + "\n"
+
+
+# Same argv as lane_runner.WORKTREE_INSTALL. A fresh repair worktree has no
+# node_modules, so the pre-commit hook cannot find lint-staged and the merge
+# is aborted before the hook checks any file. Keep these flags identical.
+MERGE_COMMIT_INSTALL = [
+    "pnpm", "install", "--frozen-lockfile", "--prefer-offline",
+    "--package-import-method=hardlink",
+]
+_LINT_STAGED_MISSING = re.compile(r'Command "lint-staged" not found')
+
+
+def _command_text(result) -> str:
+    return f"{getattr(result, 'stdout', '') or ''}{getattr(result, 'stderr', '') or ''}"
+
+
+def commit_open_merge(worktree, paths, sh, log, *, guard=lambda: None) -> bool:
+    """Stage `paths` and commit the open merge. None means the caller already staged.
+
+    When the hook fails only because `pnpm exec lint-staged` is not installed,
+    install once and retry that commit. Any other failure aborts the merge.
+    """
+    guard()
+    if paths:
+        if sh(["git", "add", "--", *paths], cwd=worktree, log=log).returncode != 0:
+            sh(["git", "merge", "--abort"], cwd=worktree, log=log)
+            return False
+    commit = sh(["git", "commit", "--no-edit"], cwd=worktree, log=log)
+    if commit.returncode != 0 and _LINT_STAGED_MISSING.search(_command_text(commit)):
+        guard()
+        installed = sh(MERGE_COMMIT_INSTALL, cwd=worktree, timeout=1800, log=log)
+        if installed.returncode == 0:
+            commit = sh(["git", "commit", "--no-edit"], cwd=worktree, log=log)
+    if commit.returncode != 0:
+        sh(["git", "merge", "--abort"], cwd=worktree, log=log)
+        return False
+    return True
+
+
+def resolve_additive_list_conflict(worktree: Path, branch: str, log, *, sh, merge_entries, guard=lambda: None, push: bool = True, stage_choice=None) -> bool:
+    """Union quoted lists, node:test blocks, Vitest statement insertions, waiver rows, or dropped screen-debt rows.
 
     Main's order stays, then head-only lines. A prose hunk or any other shape aborts
-    and leaves the PR to the model. The push is a fast-forward of the PR branch."""
+    and leaves the PR to the model. The push is a fast-forward of the PR branch.
+    `push=False` leaves that fast-forward to the caller."""
     guard()
     merged = sh(["git", "merge", "--no-edit", "origin/main"], cwd=worktree, log=log)
     if merged.returncode != 0:
@@ -277,9 +427,15 @@ def resolve_additive_list_conflict(worktree: Path, branch: str, log, *, sh, merg
         for path in conflicted:
             target = worktree / path
             try:
-                text = merge_entries(target.read_text())
-                if text is None:
+                text = stage_choice(worktree, path, sh) if stage_choice else merge_entries(target.read_text())
+                if text is None and not stage_choice:
                     text = resolve_additive_node_test_file(worktree, path, sh)
+                if text is None and not stage_choice:
+                    text = resolve_additive_statement_file(worktree, path, sh)
+                if text is None and not stage_choice:
+                    text = resolve_additive_certificate_waivers(worktree, path, sh)
+                if text is None and not stage_choice:
+                    text = resolve_subtractive_screen_debt(worktree, path, sh)
             except OSError:
                 text = None
             if text is None:
@@ -292,10 +448,30 @@ def resolve_additive_list_conflict(worktree: Path, branch: str, log, *, sh, merg
         except OSError:
             sh(["git", "merge", "--abort"], cwd=worktree, log=log)
             return False
-        guard()
-        if sh(["git", "add", "--", *conflicted], cwd=worktree, log=log).returncode != 0 \
-                or sh(["git", "commit", "--no-edit"], cwd=worktree, log=log).returncode != 0:
-            sh(["git", "merge", "--abort"], cwd=worktree, log=log)
+        if not commit_open_merge(worktree, conflicted, sh, log, guard=guard):
             return False
     guard()
+    if not push:
+        return True
     return sh(["git", "push", "-q", "origin", f"HEAD:refs/heads/{branch}"], cwd=worktree, log=log).returncode == 0
+
+
+# Company guards annotates each over-baseline file, then Actions appends
+# "Process completed with exit code 1." A stale branch still carries files
+# main already shrunk, and a red check reports BLOCKED so the BEHIND fallback
+# never runs. Sync main when those growth lines are the only errors. Another
+# error stays with the model. classify() checks this after SIGNATURES.
+_SIZE_500_ERROR = re.compile(r"size-500: \S+: grew \d+ -> \d+\s*$")
+_ANNOTATED_ERROR = re.compile(r"##\[error\]([^\n]+)")
+_GHA_EXIT = re.compile(r"Process completed with exit code \d+\.?\s*$")
+
+
+def size_500_stale_hit(text: object) -> tuple[str, str] | None:
+    """Return `("size-500-stale", "sync-main")` when every annotated error is size growth."""
+    if not isinstance(text, str):
+        return None
+    errors = [item.strip() for item in _ANNOTATED_ERROR.findall(text)]
+    errors = [item for item in errors if _GHA_EXIT.fullmatch(item) is None]
+    if not errors or any(_SIZE_500_ERROR.fullmatch(item) is None for item in errors):
+        return None
+    return ("size-500-stale", "sync-main")

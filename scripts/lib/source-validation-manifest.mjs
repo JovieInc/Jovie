@@ -13,6 +13,7 @@
  * scoped) or NOT_LOCAL (heavy, CI-only or covered elsewhere, with the reason).
  */
 import { readFileSync } from 'node:fs';
+import { selectLocalGuards } from './preflight-local-guards.mjs';
 
 const WORKFLOWS = /^\.github\/(?:workflows|actions)\//;
 
@@ -154,6 +155,15 @@ export const SOURCE_VALIDATION_GUARDS = Object.freeze([
     covers: ['scripts/layout-guard-pen-contracts.mjs'],
   },
   {
+    id: 'onboarding-browser',
+    name: 'onboarding recovery browser proof',
+    command:
+      'pnpm --filter @jovie/web exec playwright test --config=playwright.config.storybook.ts tests/e2e/storybook-onboarding-recovery.spec.ts --output=.cache/onboarding-recovery-results --project=chromium --reporter=line',
+    when: /^apps\/web\/(?:components\/features\/onboarding\/|tests\/e2e\/storybook-onboarding-recovery\.spec\.ts$)/,
+    covers: ['tests/e2e/storybook-onboarding-recovery.spec.ts'],
+    heavy: true,
+  },
+  {
     // Measured >180s on a laptop: CI-grade, run with --thorough.
     id: 'control-affected',
     name: 'control-plane affected tests (script wiring in ci-fast-lanes)',
@@ -271,10 +281,17 @@ export const coveredBy = atom =>
   NOT_LOCAL.some(n => atom.includes(n.match));
 
 /** Guards whose trigger matches the changed paths, `{base}` expanded. */
+/**
+ * Guards for these changed paths: Source Validation's, then the pre-push-only
+ * guards for checks PR CI leaves to the merge group (preflight-local-guards).
+ */
 export function selectManifestGuards(paths, base = 'main') {
-  return SOURCE_VALIDATION_GUARDS.filter(g =>
-    paths.some(p => g.when.test(p))
-  ).map(g => ({ ...g, command: g.command.replaceAll('{base}', base) }));
+  return [
+    ...SOURCE_VALIDATION_GUARDS.filter(g =>
+      paths.some(p => g.when.test(p))
+    ).map(g => ({ ...g, command: g.command.replaceAll('{base}', base) })),
+    ...selectLocalGuards(paths),
+  ];
 }
 
 export function readRunScripts(workflowText, deriveSteps) {
