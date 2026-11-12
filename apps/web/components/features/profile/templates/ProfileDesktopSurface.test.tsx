@@ -1206,3 +1206,16 @@ describe('ProfileDesktopSurface', () => {
     ).not.toBeInTheDocument();
   });
 });
+
+describe('ProfileDesktopSurface focus ring', () => {
+  it('draws the hero title link focus ring from the canonical focus token', () => {
+    renderDesktopSurface();
+
+    const header = screen.getByTestId('profile-header');
+    expect(header).toHaveClass(
+      'focus-visible:ring-2',
+      'focus-visible:ring-focus'
+    );
+    expect(header.className).not.toContain('var(--focus-ring)');
+  });
+});
