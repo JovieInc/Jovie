@@ -13,3 +13,24 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {};
+
+/** The skeleton is the lyrics route's loading state. */
+export const LoadingLyrics: Story = {
+  decorators: [
+    Story => (
+      <div className='h-[480px] w-[640px]'>
+        <Story />
+      </div>
+    ),
+  ],
+};
+
+export const Rtl: Story = {
+  decorators: [
+    Story => (
+      <div dir='rtl' lang='ar' className='h-[480px] w-[640px]'>
+        <Story />
+      </div>
+    ),
+  ],
+};

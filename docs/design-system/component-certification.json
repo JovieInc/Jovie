@@ -576,6 +576,9 @@
     "apps/web/components/molecules/UsageMeter.tsx": {
       "error": "UsageMeter only draws a valid UsageMeterModel; createUsageMeterModel returns null for invalid counts and the owner (UsageMenuItem) shows the unavailable or unverified copy instead of a meter. The detector matched the bg-error exhausted tone, which the Exhausted story shows."
     },
+    "apps/web/components/molecules/drawer/DrawerAnalyticsSummaryCard.tsx": {
+      "offline": "The card fetches nothing and has no connectivity input: it draws the state its owner passes, so analytics that cannot load while offline reach it as state='error' (ErrorState story). The detector matched state='loading'."
+    },
     "apps/web/components/molecules/drawer/DrawerButton.tsx": {
       "partial": "DrawerButton holds no data: it forwards its children label and native button props to the shared Button and only maps tone and size (both defaulted) to classes, so nothing can be partially present."
     },
@@ -663,6 +666,14 @@
     "apps/web/components/shell/InstallBanner.tsx": {
       "empty": "The banner renders one card from scalar props (title, description, CTA) and owns no collection that could be empty; omitted copy falls back to defaults (PartialCustomTitle story). The detector matched the items-center class."
     },
+    "apps/web/components/shell/LoopBtn.tsx": {
+      "long-content": "The button renders an icon and a one-glyph badge; its accessible name is derived from the three-value mode ('Loop: off', 'Loop: track 1', 'Loop: section ⤴'), so no caller text can grow. Every mode has a story."
+    },
+    "apps/web/components/shell/LyricsRouteSkeleton.tsx": {
+      "empty": "The skeleton takes no props: it maps a fixed constant list of six placeholder lines, so there is no collection that can be empty. The detector matched that .map call.",
+      "long-content": "The skeleton renders no visible text, only fixed-size placeholder blocks and a fixed 'Loading lyrics' label, so there is no content to grow.",
+      "offline": "The skeleton is a static route fallback that fetches nothing; when the lyrics route cannot load, the route's error boundary replaces it, not the skeleton."
+    },
     "apps/web/components/shell/SidebarInboxLink.tsx": {
       "offline": "The link never fetches: pending work arrives from the server as availability, and an unreadable status falls back to the plain Inbox bell (StatusUnavailable). Opening it is a normal navigation. The detector matched the pending flag."
     },
@@ -673,6 +684,10 @@
     },
     "apps/web/components/shell/Tooltip.tsx": {
       "empty": "The shell Tooltip wraps exactly one trigger with a required label and takes no collection; the detector matched the word rows in comments about sidebar nav rows."
+    },
+    "apps/web/components/shell/useChatThreadContextMenu.tsx": {
+      "empty": "The hook always builds the same two menu items (Copy Session ID, Archive) for any thread and renders no menu while closed (Closed story), so there is no empty item list. The detector matched the items field of the menu state.",
+      "long-content": "The menu shows only the two fixed labels Copy Session ID and Archive; the thread title is never rendered by the hook (the sidebar row owns it), so no caller text can grow."
     },
     "apps/web/components/site/MarketingFooter.tsx": {
       "permission-denied": "MarketingFooter is the public footer with no gated action or permission input; every visitor sees the same links. The detector matched the word 'locked' in the Pen node comment."
