@@ -33,7 +33,7 @@ export const HOMEPAGE_EDITORIAL_COPY = {
   hero: {
     headline: 'Move your music forward.',
     subhead:
-      'Your profile, every release and the people who follow your work, in one quiet workspace.',
+      'Your profile, every release, and a link to each place the music is streaming.',
     primaryAction: 'Request an invite',
     primaryHref: `#${HOMEPAGE_INVITE_ANCHOR}`,
     secondaryAction: 'See a live profile',

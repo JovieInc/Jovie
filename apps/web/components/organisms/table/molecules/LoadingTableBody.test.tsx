@@ -1,5 +1,6 @@
 import { render } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
+import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import { LoadingTableBody } from './LoadingTableBody';
 
 describe('LoadingTableBody', () => {
@@ -55,5 +56,48 @@ describe('LoadingTableBody', () => {
     const [nameCell, otherCell] = container.querySelectorAll('td');
     expect(nameCell).toHaveClass('schema-name-col');
     expect(otherCell).not.toHaveClass('schema-name-col');
+  });
+
+  it('keeps the same row nodes when the column config arrives', () => {
+    const { container, rerender } = render(
+      <table>
+        <LoadingTableBody rows={2} columns={2} />
+      </table>
+    );
+    const [firstRow] = container.querySelectorAll('tbody tr');
+    rerender(
+      <table>
+        <LoadingTableBody
+          rows={2}
+          columns={2}
+          columnConfig={[{ variant: 'person' }]}
+        />
+      </table>
+    );
+    expect(container.querySelector('tbody tr')).toBe(firstRow);
+    expect(
+      firstRow.querySelector('.system-b-table-skeleton-person-face')
+    ).not.toBeNull();
+  });
+
+  it.each([
+    ['ltr', undefined],
+    ['rtl', 'rtl'],
+  ] as const)('has no accessibility violations in %s', async (_name, dir) => {
+    const { container } = render(
+      <table dir={dir} lang={dir === 'rtl' ? 'ar' : 'en'}>
+        <caption>Loading audience</caption>
+        <LoadingTableBody
+          rows={3}
+          columns={3}
+          columnConfig={[
+            { variant: 'person' },
+            { variant: 'badge' },
+            { variant: 'text' },
+          ]}
+        />
+      </table>
+    );
+    await expectNoA11yViolations(container);
   });
 });

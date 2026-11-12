@@ -1,3 +1,4 @@
+import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { getProfileModeRenderStaticParams } from '@/app/[username]/_lib/profile-static-params';
 import ArtistPage, {
@@ -56,9 +57,25 @@ export default async function ProfileModeRenderPage({
 
 export async function generateMetadata({
   params,
-}: Readonly<ProfileModeRenderPageProps>) {
+}: Readonly<ProfileModeRenderPageProps>): Promise<Metadata> {
   const { username, profileMode, marker } = await params;
-  if (!resolvePrivateProfileMode(profileMode, marker)) notFound();
+  if (!resolvePrivateProfileMode(profileMode, marker)) {
+    // notFound() inside generateMetadata bypasses the app router's not-found
+    // boundary and renders Next's raw __next_error__ 404 shell (observed on
+    // production and in the workflow_dispatch CI lanes). Return miss metadata
+    // here and let the page's own notFound() below render the branded
+    // app/[username]/not-found.tsx boundary with its data-testid="not-found"
+    // sentinel and a real 404 status.
+    //
+    // No robots on the miss metadata: the 404 render already gets Next's
+    // automatic <meta name="robots" content="noindex"> for every status > 400
+    // render (app-render NonIndex), so an explicit robots here emitted a
+    // SECOND robots meta and failed the synthetic smoke's noindex-count-1
+    // assertion (JOV-12153). Same title-only shape as the [slug] miss
+    // pattern; the X-Robots-Tag: noindex, nofollow header from next.config
+    // still covers this destination.
+    return { title: 'Not Found' };
+  }
 
   const profileMetadata = await generatePublicProfileMetadata({
     params: Promise.resolve({ username }),

@@ -56,6 +56,7 @@ const ATOM = 'packages/ui/atoms/button.tsx';
 const COVERED_PRODUCTION_SOURCES = [
   'packages/ui/index.ts',
   'packages/ui/confirm-dialog.tsx',
+  'packages/ui/updating-screen.tsx',
   'packages/ui/hooks/index.ts',
   'packages/ui/hooks/useTabOverflow.ts',
   'packages/ui/media/logo-normalization.ts',
@@ -158,7 +159,7 @@ test('repo shared-UI visual arbitrary findings match the shrink-only baseline', 
   assert.equal(result.status, 'pass');
   assert.equal(result.totalFindings, 0);
   assert.deepEqual(result.findings, []);
-  assert.equal(result.scannedFiles.length, 73);
+  assert.equal(result.scannedFiles.length, 75);
   for (const relativePath of COVERED_PRODUCTION_SOURCES) {
     assert.ok(result.scannedFiles.includes(relativePath), relativePath);
   }

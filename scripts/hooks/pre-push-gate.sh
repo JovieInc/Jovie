@@ -67,6 +67,9 @@ run_test() {
 }
 
 run_affected() {
+  # Certified source/owner edits need renewed browser evidence on this branch.
+  # Catch stale census digests before typecheck, rather than in the merge group.
+  pnpm design:authority:check
   # Keep pushes independent of the full repository suite while catching the
   # changed surface before CI has to spend a runner on it.
   run_lint

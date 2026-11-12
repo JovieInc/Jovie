@@ -15,6 +15,7 @@ import {
   CHECK_COMMAND,
   DESIGN_EXCEPTION_REGISTRIES,
   evaluateDesignExceptionRegistries,
+  exceptionMetadataIssues,
   ISSUE_CODES,
 } from '../../design-exception-registry.mjs';
 
@@ -78,6 +79,48 @@ function evaluatePair(candidateOverrides = {}, drop = {}) {
 }
 
 describe('design exception-registry contract (JOV-5447)', () => {
+  it.each(
+    [
+      '2024-1-5',
+      '2024/01/05',
+      '2026-99-99',
+      '2026-02-30',
+      '2027-02-29',
+      20270101,
+      null,
+      [],
+      {},
+    ].map(expiresOn => ({ expiresOn }))
+  )(
+    'rejects invalid expiry $expiresOn even with a removal condition',
+    ({ expiresOn }) => {
+      const entry = exception({
+        expiresOn,
+        removalCondition: 'Remove after the canonical component migration',
+      });
+      expect(exceptionMetadataIssues(entry, 'exception')).toContain(
+        'exception: expiresOn must be a valid date (YYYY-MM-DD)'
+      );
+      expect(
+        evaluatePair({ [SERIF]: { serif: [entry] } }).issues.map(
+          item => item.code
+        )
+      ).toContain(ISSUE_CODES.MISSING_EXCEPTION_METADATA);
+    }
+  );
+
+  it.each([undefined, '', '2027-01-01', '2028-02-29'])(
+    'accepts optional or valid expiry %j with a removal condition',
+    expiresOn => {
+      expect(
+        exceptionMetadataIssues(
+          exception({ expiresOn, removalCondition: 'Remove after migration' }),
+          'exception'
+        )
+      ).toEqual([]);
+    }
+  );
+
   it('fails closed for every required rejection', () => {
     expect(LANE_GROUPS.remaining).toContain('design-exception-registry');
     expect(CHECK_COMMAND).not.toMatch(/vitest|playwright|e2e/i);

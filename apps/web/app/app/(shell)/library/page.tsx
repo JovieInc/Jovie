@@ -28,6 +28,11 @@ import {
   loadReleaseMatrixForProfile,
 } from '@/lib/releases/release-matrix-loader';
 import {
+  type TeleprompterTakeSummary,
+  toTeleprompterTakeSummary,
+} from '@/lib/teleprompter/takes/contract';
+import { listTeleprompterTakes } from '@/lib/teleprompter/takes/server';
+import {
   hasConnectedYouTubeAccount,
   listVideosForLibraryProjection,
   type PublicVideoListItem,
@@ -77,6 +82,15 @@ export default async function LibraryPage({
   }
 
   const selectedProfile = routeContext.dashboardData.selectedProfile;
+  // Studio takes are private to the signed-in creator, not the profile.
+  const takesPromise = listTeleprompterTakes(routeContext.userId)
+    .then(records => records.map(toTeleprompterTakeSummary))
+    .catch((error): TeleprompterTakeSummary[] => {
+      void captureError('Studio takes load failed on library page', error, {
+        route: APP_ROUTES.LIBRARY,
+      });
+      return [];
+    });
   const profileId = selectedProfile?.id ?? null;
   let merchCards: Awaited<ReturnType<typeof getLibraryMerchCardsForProfile>> =
     [];
@@ -241,6 +255,8 @@ export default async function LibraryPage({
     creatorDocumentsLoadFailed = creatorDocumentsResult.loadFailed;
   }
 
+  const teleprompterTakes = await takesPromise;
+
   return (
     <HydrateClient state={getDehydratedState()}>
       <LibraryPageClient
@@ -256,6 +272,7 @@ export default async function LibraryPage({
         creatorDocumentsLoadFailed={creatorDocumentsLoadFailed}
         youtubeVideos={youtubeVideos}
         youtubeConnected={youtubeConnected}
+        teleprompterTakes={teleprompterTakes}
         relationships={relationships}
         postReleaseBundle={postReleaseBundle}
       />

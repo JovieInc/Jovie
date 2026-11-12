@@ -62,6 +62,33 @@ class MainHealthTests(unittest.TestCase):
         self.assertEqual(again["status"], "failing")
         self.assertFalse(mh.feed_block(data)["healthy"])
 
+    def test_idle_main_is_probed_once_an_hour_and_dispatch_runs_count_2026_11_10(self):
+        # 2026-11-10 20:11Z to 04:13Z: zero merges, so no push, so Main Health never ran while main was red by the clock.
+        now = mh.sentinel._iso_epoch("2026-11-10T22:00:00Z")
+        rows = [dict(run_row("success", "2026-11-10T20:05:00Z", "a"), event="push")]
+        calls = []
+        def gh(args, **kw):
+            calls.append(args)
+            return SimpleNamespace(returncode=0, stdout=json.dumps({"workflow_runs": rows}), stderr="")
+        with tempfile.TemporaryDirectory() as tmp:
+            data, _ = mh.sample(Path(tmp), now, run=gh)
+            self.assertNotIn("event=push", calls[0][1])  # dispatch runs on main are evidence too
+            receipt = mh.idle_probe(Path(tmp), data, now, run=gh)
+            self.assertEqual((receipt["ok"], receipt["idleS"]), (True, 6900))
+            self.assertEqual(calls[-1], ["workflow", "run", "main-health.yml", "-R", "JovieInc/Jovie", "--ref", "main"])
+            self.assertIsNone(mh.idle_probe(Path(tmp), data, now + 600, run=gh))  # once per hour
+            self.assertEqual(len(calls), 2)
+            busy = dict(data, newestRunAt=now - 120)
+            Path(tmp, mh.IDLE_PROBE_FILE).unlink()
+            self.assertIsNone(mh.idle_probe(Path(tmp), busy, now, run=gh))  # a push two minutes ago tested main
+            self.assertIsNone(mh.idle_probe(Path(tmp), dict(data, observedAt=now - 3600), now, run=gh))  # stale sample
+            self.assertIsNone(mh.idle_probe(Path(tmp), {"observedAt": now, "status": "ok"}, now, run=gh))  # old cache shape
+            self.assertEqual(len(calls), 2)
+        # The probe's failed run pages exactly like a push run; a pull-request-ref run of the workflow never does.
+        red = [dict(run_row("failure", "2026-11-10T22:01:00Z", "a"), event="workflow_dispatch")] + rows
+        self.assertEqual(list(mh.judge(mh.evaluate(red))), ["main-health"])
+        self.assertEqual(mh.evaluate([dict(red[0], event="pull_request")] + rows)["status"], "ok")
+
 
 if __name__ == "__main__":
     unittest.main()

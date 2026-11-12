@@ -149,6 +149,21 @@ class RenumberTest(unittest.TestCase):
             self.assertEqual(journal.read_text(), git(root, "show", f"main:{META}/_journal.json"))
             self.assertEqual((root / META / "0148_snapshot.json").read_text(), git(root, "show", f"main:{META}/0148_snapshot.json"))
 
+    def test_regeneration_preparation_restores_a_conflicted_snapshot_from_main(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.build(root)
+            merged = subprocess.run(["git", "merge", "--no-commit", "--no-ff", "main"], cwd=root, capture_output=True, text=True)
+            self.assertIn(merged.returncode, (0, 1), merged.stderr)
+            snapshot = root / META / "0148_snapshot.json"
+            self.assertIn("<<<<<<<", snapshot.read_text())
+            changed = mr.prepare_regeneration(root, lambda *a: git(root, *a), "main")
+            self.assertIn(f"{MIG}/0148_mine.sql", changed)
+            self.assertFalse((root / MIG / "0148_mine.sql").exists())
+            self.assertEqual(snapshot.read_text(), git(root, "show", f"main:{META}/0148_snapshot.json"))
+            self.assertEqual((root / META / "_journal.json").read_text(), git(root, "show", f"main:{META}/_journal.json"))
+            self.assertTrue((root / MIG / "0148_theirs.sql").exists())
+
 
 class LaneFixTest(RenumberTest):
     def test_the_lane_fix_renumbers_merges_main_and_pushes_without_a_model(self):

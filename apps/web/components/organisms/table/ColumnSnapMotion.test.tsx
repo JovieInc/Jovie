@@ -1,7 +1,14 @@
-import { act, render, screen, waitFor } from '@testing-library/react';
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from '@testing-library/react';
 import type { FeatureBundle } from 'motion/react';
 import type { ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import { ColumnSnapMotion } from './ColumnSnapMotion';
 
 const state = vi.hoisted(() => ({
@@ -133,4 +140,39 @@ describe('ColumnSnapMotion', () => {
     expect(screen.getByRole('cell')).toHaveTextContent('Select fan');
     warning.mockRestore();
   });
+
+  it('keeps children interactive while the layout engine loads', async () => {
+    state.imports.mockReturnValue(new Promise<FeatureBundle>(() => {}));
+    const onSelect = vi.fn();
+    render(
+      <ColumnSnapMotion enabled>
+        <button type='button' onClick={onSelect}>
+          Show streams
+        </button>
+      </ColumnSnapMotion>
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Show streams' }));
+    expect(onSelect).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(state.imports).toHaveBeenCalledTimes(1));
+  });
+
+  it.each([
+    ['static', false, undefined],
+    ['enabled', true, undefined],
+    ['rtl', true, 'rtl'],
+  ] as const)(
+    'has no accessibility violations when %s',
+    async (_name, enabled, dir) => {
+      state.imports.mockReturnValue(new Promise<FeatureBundle>(() => {}));
+      const { container } = render(
+        <div dir={dir} lang={dir === 'rtl' ? 'ar' : 'en'}>
+          {table(enabled)}
+        </div>
+      );
+      await act(async () => {
+        await Promise.resolve();
+      });
+      await expectNoA11yViolations(container);
+    }
+  );
 });

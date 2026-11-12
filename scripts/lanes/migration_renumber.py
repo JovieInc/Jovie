@@ -34,6 +34,12 @@ class Unmergeable(Exception):
     pass
 
 
+def _unresolved_merge(text: str) -> bool:
+    """True when git left conflict markers in a generated snapshot."""
+    marked = f"\n{text}"
+    return "\n<<<<<<< " in marked and "\n=======\n" in marked and "\n>>>>>>> " in marked
+
+
 def assign(pr_number: int, others: dict[int, list[int]], mine: list[int], base_latest: int) -> dict[int, int]:
     """{old: new} for this PR's migration numbers. `others` maps every other open PR to its migration numbers."""
     everyone = {**{int(k): list(v) for k, v in others.items()}, pr_number: list(mine)}
@@ -78,6 +84,8 @@ def prepare_regeneration(root: Path, git, base_ref: str) -> list[str]:
     """Restore base metadata and remove pristine PR artifacts before canonical generation.
 
     Prevalidate all removals; refuse local edits. Never merge generated snapshot contents.
+    An in-progress merge may leave conflict markers in a snapshot; that file is restored
+    from the base below. A changed or conflicted SQL file still fails closed.
     """
     root = Path(root)
     ancestor = git("merge-base", base_ref, "HEAD").strip()
@@ -86,8 +94,15 @@ def prepare_regeneration(root: Path, git, base_ref: str) -> list[str]:
     base_files = set(git("ls-tree", "-r", "--name-only", base_ref, MIG_DIR).splitlines())
     metadata = {p: git("show", f"{base_ref}:{p}") for p in sorted(base_files) if p.startswith(META + "/")}
     for path in artifacts:
-        if (root / path).exists() and (root / path).read_text() != git("show", f"HEAD:{path}"):
-            raise Unmergeable(f"local artifact edits: {path}")
+        current = root / path
+        if not current.exists():
+            continue
+        text = current.read_text()
+        if text == git("show", f"HEAD:{path}"):
+            continue
+        if path.endswith("_snapshot.json") and _unresolved_merge(text):
+            continue
+        raise Unmergeable(f"local artifact edits: {path}")
     removed = [p for p in artifacts if p not in base_files and (root / p).exists()]
     for path in removed:
         (root / path).unlink()

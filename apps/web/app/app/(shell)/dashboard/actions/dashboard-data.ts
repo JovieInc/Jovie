@@ -54,7 +54,6 @@ import {
   type BioLinkActivation,
   getBioLinkActivationWindowEnd,
   INSTAGRAM_DISTRIBUTION_PLATFORM,
-  isMissingCreatorDistributionEventsTableError,
   resolveBioLinkActivationStatus,
 } from '@/lib/distribution/instagram-activation';
 import {
@@ -76,11 +75,17 @@ import {
 import { calculateRequiredProfileCompletion } from '@/lib/profile/completion';
 import { executeWithRetry } from '@/lib/resilience/primitives';
 import { DSP_PLATFORMS } from '@/lib/services/social-links/types';
-import { isMissingTourDatesConfirmationStatusError } from '@/lib/tour-dates/queries';
 import {
   degradeAvatarQualityRead,
+  isCommitTransportFailure,
   isIdleTransactionTermination,
 } from './avatar-quality-degrade';
+import {
+  degradeDistributionEventsRead,
+  degradeSocialLinksRead,
+  isDashboardReadRecoveryAdmitted,
+  tolerateMissingTourDatesConfirmationStatus,
+} from './dashboard-read-recovery';
 import { mapSocialLinkExistence } from './social-link-utils';
 
 const { logger } = Sentry;
@@ -282,48 +287,13 @@ async function buildBioLinkActivation(
     {
       maxRetries: 1,
       baseDelayMs: DB_CONFIG.retryDelay,
-      isRetryable: error =>
-        isIdleTransactionTermination(error) ||
-        (isRetryableError(error) && !isPostgresTimeoutError(error)),
+      isRetryable: isDashboardReadRecoveryAdmitted,
     }
-  ).catch((error: unknown) => {
+  ).catch((error: unknown) =>
     // The transaction wrapper has completed rollback/release before a
     // tolerated failure becomes fallback data or another read is attempted.
-    if (isMissingCreatorDistributionEventsTableError(error)) {
-      Sentry.logger.warn(
-        '[Dashboard] creator_distribution_events table missing; skipping activation lookup',
-        { profileId: profile.id }
-      );
-      return [];
-    }
-
-    const migrationResult = handleMigrationErrors(error, {
-      userId: profile.id,
-      operation: 'creator_distribution_events',
-    });
-
-    if (!migrationResult.shouldRetry) {
-      return (migrationResult.fallbackData ?? []) as Array<{
-        createdAt: Date;
-        eventType: string;
-      }>;
-    }
-
-    const level =
-      isQueryTimeoutError(error) || isPostgresTimeoutError(error)
-        ? 'warning'
-        : 'error';
-
-    Sentry.captureException(error, {
-      level,
-      tags: {
-        query: 'creator_distribution_events',
-        context: 'dashboard_data_settled',
-      },
-      extra: { profileId: profile.id },
-    });
-    return [];
-  });
+    degradeDistributionEventsRead(error, profile.id)
+  );
 
   for (const eventRow of eventRows) {
     const eventType = eventRow.eventType as BioLinkActivationEventType;
@@ -393,31 +363,15 @@ async function fetchSocialLinkExistence(
       maxRetries: 1,
       baseDelayMs: 0,
       isRetryable: error =>
-        isIdleTransactionTermination(error) &&
+        isDashboardReadRecoveryAdmitted(error) &&
         performance.now() < retryDeadline,
     }
   )
     .then(result => mapSocialLinkExistence(result?.[0]))
-    .catch((error: unknown) => {
+    .catch((error: unknown) =>
       // Cleanup has finished before tolerated failures become fallback data.
-      const migrationResult = handleMigrationErrors(error, {
-        userId,
-        operation,
-      });
-
-      if (!migrationResult.shouldRetry) {
-        return { hasLinks: false, hasMusicLinks: false };
-      }
-
-      Sentry.captureException(error, {
-        level: 'warning',
-        tags: {
-          query: operation,
-          context,
-        },
-      });
-      return { hasLinks: false, hasMusicLinks: false };
-    });
+      degradeSocialLinksRead(error, { context, operation, userId })
+    );
 }
 
 function buildProfileCompletion(
@@ -556,20 +510,9 @@ async function loadInboxNavigationAvailability(
           ),
       'Inbox navigation tour dates count query',
       { db: tx, timeoutMs: QUERY_TIMEOUTS.api }
-    ).catch((error: unknown) => {
-      // Migration drift (JOV-4857): migration 0042 (tour_dates
-      // .confirmation_status) not yet applied on prod. Degrade to 0 pending
-      // so the dashboard still renders and the 'Failed query' Sentry alert
-      // stops firing. Any other error still throws to the outer catch.
-      if (!isMissingTourDatesConfirmationStatusError(error)) {
-        throw error;
-      }
-      Sentry.logger.warn(
-        '[Dashboard] tour_dates.confirmation_status missing (migration drift); treating pending tour-date count as 0',
-        { profileId }
-      );
-      return [{ count: 0 }];
-    });
+    ).catch((error: unknown) =>
+      tolerateMissingTourDatesConfirmationStatus(error, profileId)
+    );
 
     return resolveInboxNavigationAvailability(
       Number(pendingSuggestedActions[0]?.count ?? 0),
@@ -953,11 +896,14 @@ async function fetchAvatarQualityWithSession(
   try {
     return await read();
   } catch (error) {
-    // Same recovery admission as the distribution read: idle termination, or
-    // a transient transport failure that is not a PostgreSQL timeout (a
+    // Same recovery admission as the distribution read: idle termination, a
+    // commit-wrapped transport failure (the `Failed query: commit` wrapper
+    // proves the callback succeeded and only the commit died — JOV-12096),
+    // or a transient transport failure that is not a PostgreSQL timeout (a
     // statement timeout replaying immediately would only double the wait).
     const recoverable =
       isIdleTransactionTermination(error) ||
+      (isCommitTransportFailure(error) && !isPostgresTimeoutError(error)) ||
       (isRetryableError(error) && !isPostgresTimeoutError(error));
     if (!recoverable || performance.now() >= retryDeadline) throw error;
 

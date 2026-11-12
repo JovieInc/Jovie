@@ -85,6 +85,8 @@ function FileManifestRow({ file }: { readonly file: PendingFile }) {
           <img
             src={file.previewUrl}
             alt={file.name}
+            width={30}
+            height={30}
             className='h-full w-full object-cover'
           />
         ) : (

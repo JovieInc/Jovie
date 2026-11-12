@@ -35,6 +35,39 @@ export function timingSuspect(page) {
   );
 }
 
+/**
+ * The element inserted last in the half second before a shift at `atMs`
+ * (the tallest, among inserts in the same batch), which is usually what
+ * pushed the moved element. An earlier, larger insert already settled
+ * before the shift, so it is not the cause.
+ * @param {{ node: string, atMs: number, h: number }[] | undefined} added
+ * @param {number | undefined} atMs
+ */
+export function causeOf(added, atMs) {
+  if (!Number.isFinite(atMs)) return undefined;
+  let best;
+  for (const a of added ?? []) {
+    if (a.atMs > atMs || a.atMs < atMs - 500) continue;
+    if (!best || a.atMs > best.atMs || (a.atMs === best.atMs && a.h > best.h))
+      best = a;
+  }
+  return best;
+}
+
+/**
+ * How far a layout-shift source moved down (negative: up), in whole pixels,
+ * or undefined when its top edge stayed put (a sideways move or a resize in
+ * place), so the crawler keeps looking for the move that pushed it. Runs in
+ * the page too, so it uses nothing outside its arguments.
+ * @param {{ y: number } | undefined} a
+ * @param {{ y: number } | undefined} b
+ */
+export function verticalMove(a, b) {
+  if (!a || !b) return undefined;
+  const dy = Math.round(b.y - a.y);
+  return dy === 0 ? undefined : dy;
+}
+
 /** Median of the samples; the lower middle for an even count. */
 export function median(xs) {
   const s = [...xs].sort((a, b) => a - b);
@@ -80,6 +113,33 @@ export const CLAIM_BANNER = /profile is unclaimed|claim (this|your) profile/i;
 
 export const IDENTITIES = Object.freeze(['stranger', 'signed-in']);
 
+const movedHow = s =>
+  Number.isFinite(s.dy) && Number.isFinite(s.atMs)
+    ? `, ${Math.abs(s.dy)}px ${s.dy < 0 ? 'up' : 'down'} at ${s.atMs}ms${
+        s.after
+          ? ` after ${s.after.node} (${s.after.h}px) appeared at ${s.after.atMs}ms`
+          : ''
+      }`
+    : '';
+
+const shiftedBy = page =>
+  page.clsSources?.length
+    ? `; moved: ${page.clsSources.map(s => `${s.node} (${s.value.toFixed(3)}${movedHow(s)})`).join(', ')}`
+    : '';
+
+/** What ran in the page's longest animation frame, slowest script first. */
+const blockedBy = page => {
+  const fr = page.frame;
+  if (!fr?.scripts?.length) return '';
+  const scripts = fr.scripts
+    .map(
+      x =>
+        `${x.fn ? `${x.fn} in ` : ''}${x.src || 'inline'} via ${x.invoker} ${x.ms}ms`
+    )
+    .join(', ');
+  return `; longest frame ${fr.ms}ms at ${fr.atMs}ms (layout ${fr.layoutMs}ms): ${scripts}`;
+};
+
 const ofSamples = page =>
   page.timingSamples > 1 ? ` (median of ${page.timingSamples} loads)` : '';
 
@@ -89,7 +149,11 @@ const ofSamples = page =>
  *   longestTaskMs?: number, loadMs?: number, consoleErrors?: string[],
  *   failedRequests?: string[], placeholder?: string|null,
  *   horizontalOverflow?: boolean, url?: string, expectClaimBanner?: boolean,
- *   claimBanner?: boolean, timingSamples?: number }} page
+ *   claimBanner?: boolean, timingSamples?: number,
+ *   frame?: { ms: number, atMs: number, layoutMs: number,
+ *     scripts: { src: string, fn: string, invoker: string, ms: number }[] },
+ *   clsSources?: { node: string, value: number, dy?: number, atMs?: number,
+ *     after?: { node: string, h: number, atMs: number } }[] }} page
  * @returns {{ route: string, identity: string, viewport: string, kind: string, detail: string }[]}
  */
 export function pageFindings(page, closed = []) {
@@ -124,7 +188,10 @@ export function pageFindings(page, closed = []) {
     );
   if ((page.cls ?? 0) > THRESHOLDS.cls)
     out.push(
-      f('layout-shift', `CLS ${page.cls.toFixed(3)} > ${THRESHOLDS.cls}`)
+      f(
+        'layout-shift',
+        `CLS ${page.cls.toFixed(3)} > ${THRESHOLDS.cls}${shiftedBy(page)}`
+      )
     );
   if ((page.lcpMs ?? 0) > THRESHOLDS.lcpMs)
     out.push(
@@ -137,7 +204,7 @@ export function pageFindings(page, closed = []) {
     out.push(
       f(
         'frozen-frame',
-        `main thread blocked ${Math.round(page.longestTaskMs)}ms${ofSamples(page)}`
+        `main thread blocked ${Math.round(page.longestTaskMs)}ms${ofSamples(page)}${blockedBy(page)}`
       )
     );
   if ((page.loadMs ?? 0) > THRESHOLDS.loadMs)
@@ -159,6 +226,7 @@ export function pageFindings(page, closed = []) {
  * @param {{ origin: string, sha?: string, at: string, routes: string[],
  *   uncovered?: { route: string, reason: string, accepted?: boolean }[],
  *   closedInProduction?: { prefix: string, reason: string, exact?: boolean }[],
+ *   outOfTime?: { loadsLeft: number, resamplesLeft: number } | null,
  *   pages: Parameters<typeof pageFindings>[0][] }} receipt
  * @param {{ now?: number, deployedSha?: string }} [opts]
  */
@@ -187,6 +255,15 @@ export function productReady(receipt, opts = {}) {
     const missing = (receipt.routes ?? []).filter(r => !seen.has(r));
     if (missing.length)
       reasons.push(`${missing.length} page routes not crawled`);
+    const late = receipt.outOfTime;
+    if (late?.loadsLeft)
+      reasons.push(
+        `crawl hit its deadline with ${late.loadsLeft} page loads not made`
+      );
+    if (late?.resamplesLeft)
+      reasons.push(
+        `crawl hit its deadline with ${late.resamplesLeft} timing suspects judged on one load`
+      );
   }
   if (findings.length) reasons.push(`${findings.length} findings`);
   return { ready: reasons.length === 0, reasons, findings };

@@ -247,7 +247,7 @@ describe('Shared fenced-attempt coverage contract', () => {
   it('preserves the existing lane floor and enforces fenced-attempt coverage', () => {
     const command = STRUCTURAL_PYTHON_REGRESSION_COMMANDS[0];
     expect(command).toContain(
-      'lane_runner.py,*/scripts/lanes/pr_events.py,*/scripts/lanes/reason_lane.py,*/scripts/lanes/gbrain_catalog.py,*/scripts/lanes/design_gate.py,*/scripts/lanes/doctor.py,*/scripts/lanes/disk_guard.py,*/scripts/lanes/continuity_clock.py" --fail-under=85'
+      'lane_runner.py,*/scripts/lanes/pr_events.py,*/scripts/lanes/reason_lane.py,*/scripts/lanes/gbrain_catalog.py,*/scripts/lanes/design_gate.py,*/scripts/lanes/doctor.py,*/scripts/lanes/public_feed.py,*/scripts/lanes/disk_guard.py,*/scripts/lanes/continuity_clock.py" --fail-under=85'
     );
     expect(command).toContain(
       '*/scripts/lanes/execution_attempt.py\" --fail-under=85'
@@ -1426,8 +1426,8 @@ describe('structural command pool', () => {
     expect(started).toEqual([LANES_COVERAGE_COMMAND]);
     // Every per-module coverage floor still runs, after the shards combine.
     expect(LANES_COVERAGE_COMMAND).toContain('coverage combine');
-    expect(LANES_COVERAGE_COMMAND.match(/--fail-under=/g)?.length).toBe(23);
-    expect(LANES_COVERAGE_COMMAND).toContain('cloud_lane.py" --fail-under=90');
+    expect(LANES_COVERAGE_COMMAND.match(/--fail-under=/g)?.length).toBe(26);
+    expect(LANES_COVERAGE_COMMAND).toContain('cloud_lane*.py" --fail-under=90');
     expect(LANES_COVERAGE_COMMAND).toContain(
       'priority_admission.py" --fail-under=80'
     );
