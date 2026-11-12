@@ -1,6 +1,8 @@
 // The opt-in featured slot: the top opted-in artist with certified content,
 // the demo artist when none is. Tim (2026-11-12): Tim, with his own catalog,
 // for now, rotating to other artists by what converts later.
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
   DEMO_ARTIST_IVO_LINDQVIST,
@@ -158,6 +160,52 @@ describe('featured artist slot', () => {
     const copy = JSON.stringify(HOMEPAGE_EDITORIAL_COPY);
     if (!isDemoArtist(HOMEPAGE_FEATURED_ARTIST)) {
       expect(copy).not.toMatch(/example artist/i);
+    }
+  });
+
+  it('backs every opt-in with the approved-people registry', () => {
+    // The record's people are declarations; the registry is the evidence.
+    const registry = JSON.parse(
+      readFileSync(
+        resolve(
+          process.cwd(),
+          '../../scripts/invariants/art-direction/approved-people.json'
+        ),
+        'utf8'
+      )
+    ) as {
+      people: { id: string }[];
+      images: {
+        path: string;
+        person: string;
+        routes: string[];
+        homepage?: { at?: string; inTheirWords?: string };
+      }[];
+    };
+    const approved = new Set(registry.people.map(person => person.id));
+    for (const record of FEATURED_ARTIST_OPT_INS) {
+      const declared = record.certification?.peopleInImages ?? [];
+      for (const person of declared) {
+        expect(approved.has(person), `${record.artist.slug}: ${person}`).toBe(
+          true
+        );
+      }
+      const shown = new Set<string>();
+      for (const src of featuredArtistImages(record.artist)) {
+        const image = registry.images.find(
+          entry => entry.path === `apps/web/public${src}`
+        );
+        if (!image) continue;
+        shown.add(image.person);
+        expect(declared, src).toContain(image.person);
+        expect(image.routes, src).toContain('/');
+        expect(image.homepage?.inTheirWords?.trim(), src).toBeTruthy();
+        expect(Date.parse(image.homepage?.at ?? ''), src).not.toBeNaN();
+      }
+      // A declared person with no registered slot image is a stale claim.
+      expect([...shown].sort(), record.artist.slug).toEqual(
+        [...declared].sort()
+      );
     }
   });
 });
