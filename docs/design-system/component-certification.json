@@ -562,6 +562,9 @@
       "partial": "Its three handlers are required and its optional props (className, disabled, compact) are presentation flags with defaults, so there is no partially present data; Compact, Standard and Disabled show them.",
       "long-content": "The three button labels are fixed consent copy with no props or caller text, so the content cannot grow; the detector matched text in the --linear-text-primary token and a layout comment."
     },
+    "apps/web/components/molecules/InfoBox.tsx": {
+      "permission-denied": "InfoBox shows caller copy in a variant tone and has no account, role or gated action of its own. The detector matched role='alert' on the error variant (Error story)."
+    },
     "apps/web/components/molecules/LoadingSkeleton.tsx": {
       "empty": "LoadingSkeleton is itself the loading placeholder and takes no data; its .map( calls only iterate fixed placeholder keys, and the detector matched rows and the items-center class.",
       "partial": "LoadingSkeleton holds no data; its optional props (rows and columns on TableSkeleton) are placeholder geometry with defaults, so nothing can be partially present.",
@@ -601,6 +604,12 @@
     "apps/web/components/molecules/drawer/DrawerSettingsToggle.tsx": {
       "empty": "The toggle renders one label and one switch from scalar props; it owns no collection that could be empty. The detector matched the items-center class.",
       "partial": "label, checked, ariaLabel and onCheckedChange are required; the optional props only choose density, disabled styling, className and testId (CompactDensity and Disabled stories), so there is no partial record to draw."
+    },
+    "apps/web/components/molecules/drawer/DrawerSurfaceCard.tsx": {
+      "partial": "The card is a styling wrapper: children is its only content and the optional props only pick the element, variant and data attributes (Flat, Card, BusySemanticSection stories), so there is no partial record to draw."
+    },
+    "apps/web/components/molecules/drawer/DrawerTabbedCard.tsx": {
+      "partial": "tabs and children are required slots; the optional props only add a controls slot, a section kind, class names and the surface variant (Card and Flat stories), so there is no partial record to draw."
     },
     "apps/web/components/molecules/drawer/EntityHeader.tsx": {
       "permission-denied": "EntityHeader has no gated action or permission input; callers choose what goes in the actions slot, and the detector matched role='img' on the thumbnail and status glyph."
