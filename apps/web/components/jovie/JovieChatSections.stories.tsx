@@ -1,10 +1,86 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
+import type { Virtualizer } from '@tanstack/react-virtual';
 import { fn } from 'storybook/test';
 import { CHAT_EMPTY_SAMPLE_STORAGE_KEY } from './chat-empty-starters';
+import type { PendingFile } from './hooks/useChatFileAttachments';
 import {
+  ChatComposerSurface,
   ChatEmptyStateComposerRegion,
+  ChatInlineError,
   ChatLoadingConversationSkeleton,
+  ChatThreadMessages,
 } from './JovieChatSections';
+import type { ChatError } from './types';
+
+const serverError: ChatError = {
+  type: 'server',
+  message: 'We encountered a temporary issue. Please try again.',
+  failedMessage: 'What should I release next month?',
+};
+
+const networkError: ChatError = {
+  type: 'network',
+  message: 'You appear to be offline. Check your connection and try again.',
+  failedMessage: 'What should I release next month?',
+};
+
+const longError: ChatError = {
+  type: 'server',
+  message:
+    'We encountered a temporary issue while drafting the rollout plan for the deluxe edition, the acoustic sessions, the remix bundle and every regional pre-save campaign. Please try again in a moment.',
+  failedMessage:
+    'Plan the full rollout for the deluxe edition including acoustic sessions, remix bundle, regional pre-saves and the follow-up tour announcement.',
+};
+
+function lockedFile(id: string): PendingFile {
+  return {
+    id,
+    name: `${id}.png`,
+    size: 2048,
+    mediaType: 'image/png',
+    kind: 'image',
+    kindLabel: 'Image',
+    progress: 0,
+    speed: 0,
+    status: 'locked',
+  };
+}
+
+function StoryThread({
+  collapsedFailureCount,
+  chatError,
+}: {
+  readonly collapsedFailureCount: number;
+  readonly chatError: ChatError;
+}) {
+  return (
+    <ChatThreadMessages
+      messages={[]}
+      shouldVirtualizeMessages={false}
+      virtualizer={{} as Virtualizer<HTMLDivElement, Element>}
+      virtualizedMessageViewportHeight={0}
+      virtualizedMinHeight={0}
+      messageViewportPaddingBottom={undefined}
+      totalSizeRef={() => undefined}
+      bottomSentinelRef={() => undefined}
+      isStreaming={false}
+      lastAssistantIndex={-1}
+      knownMessageIds={new Set()}
+      inlineChatError={
+        <ChatInlineError
+          chatError={chatError}
+          onRetry={fn()}
+          isLoading={false}
+          isSubmitting={false}
+        />
+      }
+      isStuckToBottom
+      onScrollToBottom={fn()}
+      collapsedFailureCount={collapsedFailureCount}
+      onShowCollapsedFailures={fn()}
+    />
+  );
+}
 
 function StoryComposerDock() {
   return (
@@ -103,4 +179,100 @@ export const JustAskEmpty: Story = {
 
 export const LoadingSkeleton: Story = {
   render: () => <ChatLoadingConversationSkeleton />,
+};
+
+export const EmptyJustAsk: Story = {
+  args: {
+    stableDocked: true,
+    showDockedWelcome: true,
+    children: <StoryComposerDock />,
+    onSelectSample: fn(),
+  },
+};
+
+export const PartialWithoutWelcome: Story = {
+  args: {
+    stableDocked: true,
+    showDockedWelcome: false,
+    children: <StoryComposerDock />,
+    onSelectSample: fn(),
+  },
+};
+
+export const ErrorInlineRetry: Story = {
+  render: () => (
+    <ChatInlineError
+      chatError={serverError}
+      onRetry={fn()}
+      isLoading={false}
+      isSubmitting={false}
+    />
+  ),
+};
+
+export const OfflineInlineRetry: Story = {
+  render: () => (
+    <ChatInlineError
+      chatError={networkError}
+      onRetry={fn()}
+      isLoading={false}
+      isSubmitting={false}
+    />
+  ),
+};
+
+export const LongContentCollapsedFailures: Story = {
+  render: () => (
+    <StoryThread collapsedFailureCount={12} chatError={longError} />
+  ),
+};
+
+export const LockedUploadsOverQuota: Story = {
+  render: () => (
+    <ChatComposerSurface
+      chatInputProps={{
+        value: 'Make cover art for the deluxe edition',
+        onChange: fn(),
+        onSubmit: fn(),
+        isLoading: false,
+        isSubmitting: false,
+      }}
+      showThreadView
+      suppressUsageAlert
+      isRateLimited={false}
+      showManifest
+      manifestCollapsed={false}
+      showChips={false}
+      pendingFiles={[lockedFile('cover-front'), lockedFile('cover-back')]}
+      aggregate={{
+        total: 2,
+        done: 0,
+        overallPct: 0,
+        speed: '',
+        eta: '',
+        locked: 2,
+      }}
+      isUploading={false}
+      isPro={false}
+      onRemoveFile={fn()}
+      onCollapseManifest={fn()}
+      onExpandManifest={fn()}
+    />
+  ),
+};
+
+export const RtlJustAsk: Story = {
+  args: {
+    stableDocked: true,
+    showDockedWelcome: true,
+    children: <StoryComposerDock />,
+    onSelectSample: fn(),
+  },
+  decorators: [
+    Story => (
+      <div dir='rtl' lang='ar'>
+        <Story />
+      </div>
+    ),
+  ],
 };

@@ -53,19 +53,102 @@ def fingerprint(title: str, labels=()) -> str:
 ADVISORY_CHECKS = frozenset({"tently"})
 
 
+def _check_name(check: dict) -> str:
+    return str(check.get("name") or check.get("context") or "")
+
+
+def _check_stamp(check: dict) -> str:
+    return str(check.get("completedAt") or check.get("startedAt") or check.get("createdAt") or "")
+
+
+def _check_state(check: dict) -> str:
+    return str(check.get("conclusion") or check.get("state") or "").upper()
+
+
+def _newer_check(check: dict, prev: dict) -> bool:
+    """Newest stamp wins. An equal stamp keeps a real conclusion over CANCELLED."""
+    stamp, prev_stamp = _check_stamp(check), _check_stamp(prev)
+    if stamp != prev_stamp:
+        return stamp > prev_stamp
+    return _check_state(prev) == "CANCELLED" and _check_state(check) != "CANCELLED"
+
+
+def latest_checks(checks, skip_names=()) -> list[dict]:
+    """One check per name: the newest run.
+
+    GitHub's rollup stays FAILURE after a concurrency cancel even when the replacement
+    run of the same name succeeded. Fleet Rules Evidence did that on 41 lane runs
+    (fix-red-72d43f8ba6) while head_red already treated the latest success as green.
+    """
+    skip = {str(name).lower() for name in skip_names}
+    chosen: dict[str, dict] = {}
+    for check in checks or []:
+        if not isinstance(check, dict):
+            continue
+        name = _check_name(check)
+        key = name.lower()
+        if not name or key in skip:
+            continue
+        prev = chosen.get(key)
+        if prev is None or _newer_check(check, prev):
+            chosen[key] = check
+    return list(chosen.values())
+
+
+def without_aggregate_sibling(checks: list, *, hard: set[str]) -> list:
+    """Drop PR Ready when another hard failure remains, or when PR Ready itself is not hard.
+
+    A lone hard PR Ready is the failure. Skipping it hashed an empty name list
+    (`fix-red-e3b0c44298`) and dispatched a model for a quota-deferred evidence
+    lookup. A cancelled-only PR Ready stays dropped. CI Summary, rollup, and
+    advisory names are the caller's filter, not this one.
+    """
+    def low(check: dict) -> str:
+        return str(check.get("name") or "").lower()
+
+    def is_hard(check: dict) -> bool:
+        return str(check.get("conclusion") or "").upper() in hard
+
+    if any(is_hard(check) and low(check) != "pr ready" for check in checks):
+        return [check for check in checks if low(check) != "pr ready"]
+    ready = [check for check in checks if low(check) == "pr ready" and is_hard(check)]
+    if ready:
+        return ready
+    return [check for check in checks if low(check) != "pr ready"]
+
+
+def red_checks(checks: list, red: set[str], aggregate: tuple[str, ...] = ("pr ready", "ci summary", "rollup")) -> list:
+    """Red checks whose logs decide a class. Summary and rollup never do.
+
+    A lone hard PR Ready stays, so a quota-deferred fleet lookup reruns. Any other
+    hard failure drops PR Ready. A cancelled-only PR Ready is dropped.
+    """
+    skip = {name for name in aggregate if name != "pr ready"}
+    hard = {item for item in red if item != "CANCELLED"}
+    latest = latest_checks(checks, skip)
+    reds = [check for check in latest if str(check.get("conclusion") or "").upper() in red]
+    return without_aggregate_sibling(reds, hard=hard)
+
+
 def check_fingerprint(pr: dict) -> str:
-    """Hash the failing check names. A CANCELLED sibling does not open a second class when a
-    FAILURE or TIMED_OUT is present: Fleet Rules Evidence cancelled beside Source Validation
-    recorded fix-red-6c3efaf400 on seven unrelated lane runs (2026-10-29..31). A rollup that
-    is only cancelled still fingerprints those names. Advisory names are always skipped."""
+    """Hash the latest failing check names.
+
+    A CANCELLED run does not count when a newer run of the same name succeeded, and it
+    does not open a second class beside a FAILURE or TIMED_OUT. A rollup whose latest
+    run is only cancelled still fingerprints that name. Advisory names are skipped.
+    PR Ready is skipped unless it is the only hard failure.
+    An empty name list is fix-red-e3b0c44298. empty_review.stale_review_only refuses that
+    dispatch when the only signal is a loaded review with no current-head body.
+    """
     red = {"FAILURE", "TIMED_OUT", "CANCELLED"}
     hard = {"FAILURE", "TIMED_OUT"}
-    skip = {"pr ready", "ci summary", *(name.lower() for name in ADVISORY_CHECKS)}
-    checks = [c for c in pr.get("statusCheckRollup") or []
-              if str(c.get("conclusion") or "").upper() in red and str(c.get("name") or "").lower() not in skip]
-    if any(str(c.get("conclusion") or "").upper() in hard for c in checks):
-        checks = [c for c in checks if str(c.get("conclusion") or "").upper() in hard]
-    names = sorted({str(c.get("name")) for c in checks})
+    skip = {"ci summary", *(name.lower() for name in ADVISORY_CHECKS)}
+    latest = latest_checks(pr.get("statusCheckRollup"), skip)
+    checks = [check for check in latest if str(check.get("conclusion") or "").upper() in red]
+    if any(str(check.get("conclusion") or "").upper() in hard for check in checks):
+        checks = [check for check in checks if str(check.get("conclusion") or "").upper() in hard]
+    checks = without_aggregate_sibling(checks, hard=hard)
+    names = sorted({str(check.get("name")) for check in checks})
     return "fix-red-" + hashlib.sha256("|".join(names).encode()).hexdigest()[:10]
 
 

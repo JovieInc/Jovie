@@ -1913,7 +1913,9 @@ body:has(.system-b-pricing-page) .marketing-glass-header__cta:focus-visible {
   }
 }
 
-:where(.system-b-pricing-select) {
+/* The plan picker is the selector's only select; @jovie/ui HostDrawnSelect
+   renders it with no class, so the selector draws it. */
+:where(.system-b-pricing-mobile-selector > select) {
   width: 100%;
   min-height: calc(var(--space-10) + var(--space-1));
   border: 1px solid

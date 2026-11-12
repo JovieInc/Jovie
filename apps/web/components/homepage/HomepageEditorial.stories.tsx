@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
+import { HOMEPAGE_EDITORIAL_COPY } from '@/data/homepageEditorialCopy';
 import {
   HomepageInviteClose,
   HomepageProfileChapter,
@@ -41,4 +42,41 @@ export const Releases: Story = {
 
 export const ClaimClose: Story = {
   render: () => <HomepageInviteClose />,
+};
+
+/**
+ * Long content: a published headline with no reviewed line breaks wraps
+ * naturally, beside a body twice the approved length.
+ */
+export const LongContentProfileCopy: Story = {
+  render: () => (
+    <HomepageProfileChapter
+      copy={{
+        headline:
+          'One name that every listener, promoter, label and playlist editor finds the same way, everywhere.',
+        body: 'Your profile at jov.ie leads with what matters now: your latest release, your links, the shows you have coming up and a way for listeners to get updates. Every service, every release and every update stays in one place under the one name people already search for.',
+      }}
+    />
+  ),
+};
+
+/** Right-to-left: translated hero lede and profile chapter in an Arabic document. */
+export const RtlArabic: Story = {
+  render: () => (
+    <div dir='rtl' lang='ar'>
+      <HomepageStoryHero
+        headingId='home-hero-heading-rtl'
+        copy={{
+          ...HOMEPAGE_EDITORIAL_COPY.hero,
+          subhead: 'ملفك، وكل إصدار، ورابط لكل منصة تُبث عليها موسيقاك.',
+        }}
+      />
+      <HomepageProfileChapter
+        copy={{
+          headline: 'اسم واحد. في كل مكان.',
+          body: 'ملفك على jov.ie يبدأ بما يهم الآن: أحدث إصدار، وروابطك، وطريقة ليتابعك المستمعون.',
+        }}
+      />
+    </div>
+  ),
 };
