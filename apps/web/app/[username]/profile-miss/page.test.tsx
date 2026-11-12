@@ -1,8 +1,10 @@
 import { describe, expect, it, vi } from 'vitest';
 
-const notFoundMock = vi.fn(() => {
-  throw new Error('NEXT_NOT_FOUND');
-});
+const notFoundMock = vi.hoisted(() =>
+  vi.fn(() => {
+    throw new Error('NEXT_NOT_FOUND');
+  })
+);
 
 vi.mock('next/navigation', () => ({
   notFound: notFoundMock,
