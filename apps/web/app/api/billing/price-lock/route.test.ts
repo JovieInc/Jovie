@@ -1,12 +1,13 @@
+import { NextResponse } from 'next/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
-  getCachedAuth: vi.fn(),
+  requireAuth: vi.fn(),
   ensure: vi.fn(),
   critical: vi.fn().mockResolvedValue(undefined),
 }));
 
-vi.mock('@/lib/auth/cached', () => ({ getCachedAuth: mocks.getCachedAuth }));
+vi.mock('@/lib/auth/require-auth', () => ({ requireAuth: mocks.requireAuth }));
 vi.mock('@/lib/billing/price-lock.server', () => ({
   ensurePriceLockForUser: mocks.ensure,
 }));
@@ -28,20 +29,29 @@ const LOCK = {
   lockedAt: '2026-10-29T00:00:00.000Z',
 };
 
+const request = () => new Request('http://localhost/api/billing/price-lock');
+
 beforeEach(() => vi.clearAllMocks());
 
 describe('GET /api/billing/price-lock', () => {
   it('401s a signed-out visitor and never creates a lock', async () => {
-    mocks.getCachedAuth.mockResolvedValue({ userId: null });
-    const response = await GET();
+    mocks.requireAuth.mockResolvedValue({
+      userId: null,
+      error: NextResponse.json(
+        { error: 'Unauthorized' },
+        { status: 401, headers: { 'Cache-Control': 'no-store' } }
+      ),
+    });
+    const response = await GET(request());
     expect(response.status).toBe(401);
+    expect(await response.json()).toEqual({ error: 'Unauthorized' });
     expect(mocks.ensure).not.toHaveBeenCalled();
   });
 
   it("returns the person's locked price, uncached", async () => {
-    mocks.getCachedAuth.mockResolvedValue({ userId: 'user_1' });
+    mocks.requireAuth.mockResolvedValue({ userId: 'user_1', error: null });
     mocks.ensure.mockResolvedValue(LOCK);
-    const response = await GET();
+    const response = await GET(request());
     expect(response.status).toBe(200);
     expect(response.headers.get('Cache-Control')).toBe('no-store');
     expect(mocks.ensure).toHaveBeenCalledWith('user_1', 'first_view');
@@ -55,10 +65,13 @@ describe('GET /api/billing/price-lock', () => {
   });
 
   it('fails with 500 (never a list price) when the lock cannot be loaded', async () => {
-    mocks.getCachedAuth.mockResolvedValue({ userId: 'user_1' });
+    mocks.requireAuth.mockResolvedValue({ userId: 'user_1', error: null });
     mocks.ensure.mockRejectedValue(new Error('db down'));
-    const response = await GET();
+    const response = await GET(request());
     expect(response.status).toBe(500);
+    expect(await response.json()).toEqual({
+      error: 'Failed to load your price',
+    });
     expect(mocks.critical).toHaveBeenCalledTimes(1);
   });
 });

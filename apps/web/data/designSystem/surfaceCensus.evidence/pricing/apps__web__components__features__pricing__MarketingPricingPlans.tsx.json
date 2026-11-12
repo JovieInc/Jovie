@@ -2,5 +2,5 @@
   "file": "apps/web/components/features/pricing/MarketingPricingPlans.tsx",
   "sha256": "d54482e2f07f5bd10f7ea22c2dc75d163659716c3c0811ebc4ca768d6f9a7ac8",
   "at": "2026-11-12T12:32:47.762Z",
-  "ref": "MarketingPricingPlans renders LockedPlanPrice for a signed-in price lock. Verified by MarketingPricingPlans.test.tsx and LockedPlanPrice.test.tsx: 15 jsdom tests passed, locked Pro card shows $9/mo and the lock note, signed-out visitors see the list price."
+  "ref": "MarketingPricingPlans renders LockedPlanPrice for a signed-in lock. Verified by MarketingPricingPlans.test.tsx and LockedPlanPrice.test.tsx: 15 jsdom tests passed. Signed-out visitors see the public offer."
 }

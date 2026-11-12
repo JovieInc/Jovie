@@ -1,37 +1,38 @@
 /** The signed-in person's own (locked) price; locks on first view if none. */
 
 import { NextResponse } from 'next/server';
-import { getCachedAuth } from '@/lib/auth/cached';
+import { defineRoute } from '@/lib/api/route-pipeline';
+import {
+  type SignedInRouteInput,
+  signedInAccess,
+} from '@/lib/api/signed-in-access';
 import { ensurePriceLockForUser } from '@/lib/billing/price-lock.server';
 import { buildPriceLockView } from '@/lib/billing/price-lock-view';
 import { captureCriticalError } from '@/lib/error-tracking';
+import { NO_STORE_HEADERS } from '@/lib/http/headers';
 
 export const runtime = 'nodejs';
 
-const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
+const ROUTE = '/api/billing/price-lock';
 
-export async function GET() {
-  try {
-    const { userId } = await getCachedAuth();
-    if (!userId) {
+export const GET = defineRoute(
+  { route: ROUTE, access: signedInAccess() },
+  async ({ auth }: SignedInRouteInput) => {
+    try {
+      const lock = await ensurePriceLockForUser(auth.userId, 'first_view');
       return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401, headers: NO_STORE_HEADERS }
+        { priceLock: buildPriceLockView(lock) },
+        { headers: NO_STORE_HEADERS }
+      );
+    } catch (error) {
+      await captureCriticalError('Price lock quote failed', error, {
+        route: ROUTE,
+        method: 'GET',
+      });
+      return NextResponse.json(
+        { error: 'Failed to load your price' },
+        { status: 500, headers: NO_STORE_HEADERS }
       );
     }
-    const lock = await ensurePriceLockForUser(userId, 'first_view');
-    return NextResponse.json(
-      { priceLock: buildPriceLockView(lock) },
-      { headers: NO_STORE_HEADERS }
-    );
-  } catch (error) {
-    await captureCriticalError('Price lock quote failed', error, {
-      route: '/api/billing/price-lock',
-      method: 'GET',
-    });
-    return NextResponse.json(
-      { error: 'Failed to load your price' },
-      { status: 500, headers: NO_STORE_HEADERS }
-    );
   }
-}
+);
