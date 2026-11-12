@@ -9,7 +9,6 @@ import {
   UniversalLinkInput,
   type UniversalLinkInputRef,
 } from '@/features/dashboard/molecules/universal-link-input';
-import { publicEnv } from '@/lib/env-public';
 import { cn } from '@/lib/utils';
 import type { DetectedLink } from '@/lib/utils/platform-detection';
 import type { InlineChatAreaRef } from '../InlineChatArea';
@@ -220,8 +219,6 @@ function GroupedLinksManagerInner<T extends DetectedLink = DetectedLink>({
   );
 
   const hasAnyLinks = links.length > 0;
-  const voiceInputEnabled =
-    publicEnv.NEXT_PUBLIC_FEATURE_VOICE_INPUT === 'true';
 
   // Hint state for drag-and-drop validation messages
   const [hint, setHint] = useState<string | null>(null);
@@ -264,7 +261,7 @@ function GroupedLinksManagerInner<T extends DetectedLink = DetectedLink>({
         clearSignal={clearSignal}
         chatEnabled={chatEnabled}
         onChatSubmit={handleChatSubmit}
-        voiceInputEnabled={voiceInputEnabled}
+        voiceInputEnabled
       />
 
       {/* Ingested AI-discovered suggestions */}
