@@ -1,6 +1,6 @@
 import 'server-only';
 
-import { and, notIlike, sql } from 'drizzle-orm';
+import { and, sql as drizzleSql, notIlike } from 'drizzle-orm';
 import type { AnyPgColumn } from 'drizzle-orm/pg-core';
 import { OPERATOR_INBOX_SOURCE_PREFIXES } from './creator-inbox-source-policy';
 import { WORKFLOW_CAPTURE_REQUEST_KIND } from './suggested-action-kinds';
@@ -18,7 +18,7 @@ import { WORKFLOW_CAPTURE_REQUEST_KIND } from './suggested-action-kinds';
  */
 export function creatorInboxSourceCondition(column: AnyPgColumn) {
   return and(
-    sql`lower(${column}) <> ${WORKFLOW_CAPTURE_REQUEST_KIND}`,
+    drizzleSql`lower(${column}) <> ${WORKFLOW_CAPTURE_REQUEST_KIND}`,
     ...OPERATOR_INBOX_SOURCE_PREFIXES.map(prefix =>
       notIlike(column, `${prefix}%`)
     )

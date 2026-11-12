@@ -112,7 +112,7 @@ describe('central Inbox bell', () => {
       />
     );
     const link = screen.getByRole('link', {
-      name: 'Inbox — 12840 items need attention',
+      name: 'Inbox — 12840 Items Need Attention',
     });
     expect(link).toHaveClass('size-7');
     expect(link.querySelectorAll('[aria-hidden="true"]')).toHaveLength(2);
@@ -128,7 +128,7 @@ describe('central Inbox bell', () => {
       </div>
     );
     const link = screen.getByRole('link', {
-      name: 'Inbox — 3 items need attention',
+      name: 'Inbox — 3 Items Need Attention',
     });
     expect(link).toHaveAttribute('data-inbox-attention', 'available');
     await expectNoA11yViolations(container);
