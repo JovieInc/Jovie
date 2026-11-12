@@ -228,7 +228,10 @@ class AvailabilityTest(unittest.TestCase):
         with patch.object(lane, "codex_lane_module", side_effect=OSError):
             self.assertEqual(lane.quota_pressure(self.host, "codex", PROVIDERS["codex"], 0)["why"], "accounts unread")
 
-    def test_router_end_to_end_logs_its_rationale(self):
+    # Pinned to midday UTC: Hyperagent's cap resets at UTC midnight, so between 23:00 and 24:00 UTC its
+    # allowance is lost before a Claude window opened 4h earlier and the routing assertions flip.
+    @patch("time.time", return_value=1_794_484_800.0)  # 2026-11-12T12:00:00Z
+    def test_router_end_to_end_logs_its_rationale(self, _clock):
         router = lane.issue_router(self.host, "claude", PROVIDERS, POLICY)
         now = time.time()
         frontier = lane_issue("JOV-9", "Staging controller blocks every authorization")
