@@ -1,10 +1,11 @@
 import 'server-only';
+import { and, eq } from 'drizzle-orm';
 import { revalidatePath } from 'next/cache';
 import { APP_ROUTES } from '@/constants/routes';
 import { invalidateReleaseCaches } from '@/lib/cache/releases';
 import { db } from '@/lib/db';
 import { isUniqueViolation } from '@/lib/db/errors';
-import { discogReleases } from '@/lib/db/schema/content';
+import { contentSlugRedirects, discogReleases } from '@/lib/db/schema/content';
 import { generateUniqueSlug } from '@/lib/discography/slug';
 
 /**
@@ -150,4 +151,42 @@ export async function createReleaseForProfile(
       message: 'Failed to create release. Please try again.',
     };
   }
+}
+
+/**
+ * Release slug rename: the ONE domain function that changes a release URL.
+ * The old slug gets a `content_slug_redirects` row first, so the release
+ * route keeps 308ing it to the new slug. The update is optimistic (only while
+ * the slug is still `from`), so a concurrent edit wins and false is returned.
+ * Callers invalidate the public caches once per batch.
+ */
+export async function renameReleaseSlug(
+  input: {
+    readonly profileId: string;
+    readonly releaseId: string;
+    readonly from: string;
+    readonly to: string;
+  },
+  conn: typeof db = db
+): Promise<boolean> {
+  await conn
+    .insert(contentSlugRedirects)
+    .values({
+      creatorProfileId: input.profileId,
+      oldSlug: input.from,
+      contentType: 'release',
+      releaseId: input.releaseId,
+    })
+    .onConflictDoNothing();
+  const updated = await conn
+    .update(discogReleases)
+    .set({ slug: input.to, updatedAt: new Date() })
+    .where(
+      and(
+        eq(discogReleases.id, input.releaseId),
+        eq(discogReleases.slug, input.from)
+      )
+    )
+    .returning({ id: discogReleases.id });
+  return updated.length > 0;
 }

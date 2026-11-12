@@ -1,6 +1,6 @@
 {
   "file": "apps/web/components/marketing/artist-profile/ArtistProfileLandingPage.css",
-  "sha256": "572431a29fafc09c9ab78cb3c4e2de8407f29bd519e162c6a554a963e94b466c",
-  "at": "2026-11-09T03:00:11.997Z",
-  "ref": "Carried over unchanged from the single pricing row digest 8e1f02b52a25 certified at 2026-11-09T03:00:11.997Z; that certification is described in the row's evidence.ref in surfaceCensus.json."
+  "sha256": "7bbc6022fac2af28a76ee2cacb6edbedac47745003c5a464ecba9c9f1fbf9f38",
+  "at": "2026-11-11T18:29:20.962Z",
+  "ref": "PR #25053: plan picker select moved to @jovie/ui HostDrawnSelect; its CSS rule now selects .system-b-pricing-mobile-selector > select instead of a class. Rendered DOM identical across Pro and Free states apart from the removed class attribute; computed styles under the full stylesheet match on every property jsdom computes."
 }

@@ -18,8 +18,10 @@ import { join } from 'node:path';
 import { parseArgs } from 'node:util';
 import { chromium } from 'playwright';
 import { skipSignedIn, uncoveredEntry } from './accepted-uncovered.mjs';
+import { MEASURE, OBSERVE } from './observe.mjs';
 import {
   CLAIM_BANNER,
+  causeOf,
   fromThirdPartyFrame,
   median,
   PLACEHOLDER,
@@ -92,31 +94,6 @@ function concrete(route) {
   return simple.includes('[') ? null : simple;
 }
 
-// Runs in the page, so it is a string: these scripts type-check as Node.
-const OBSERVE = `
-  window.__crawl = { cls: 0, lcp: 0, longest: 0, shifts: {} };
-  const watch = (type, fn) => new PerformanceObserver(l => l.getEntries().forEach(fn)).observe({ type, buffered: true });
-  // Names the elements that moved, so a layout-shift finding says what to fix.
-  const label = n => {
-    if (!n || n.nodeType !== 1) return null;
-    const cls = typeof n.className === 'string' ? n.className.split(' ').filter(Boolean).slice(0, 2).join('.') : '';
-    const testId = n.getAttribute('data-testid');
-    return (n.tagName.toLowerCase() + (n.id ? '#' + n.id : '') + (testId ? '[data-testid=' + testId + ']' : '') + (cls ? '.' + cls : '')).slice(0, 100);
-  };
-  watch('layout-shift', e => {
-    if (e.hadRecentInput) return;
-    window.__crawl.cls += e.value;
-    for (const s of e.sources ?? []) {
-      const k = label(s.node);
-      if (k) window.__crawl.shifts[k] = (window.__crawl.shifts[k] ?? 0) + e.value;
-    }
-  });
-  watch('largest-contentful-paint', e => { window.__crawl.lcp = Math.max(window.__crawl.lcp, e.startTime); });
-  watch('longtask', e => { window.__crawl.longest = Math.max(window.__crawl.longest, e.duration); });
-`;
-const MEASURE = `({ ...window.__crawl, text: document.body?.innerText ?? '',
-  overflow: document.documentElement.scrollWidth > window.innerWidth + 1 })`;
-
 const browser = await chromium.launch();
 const pages = [];
 const uncovered = [];
@@ -152,7 +129,13 @@ async function visit({ route, target, viewport, identity, fixture, collect }) {
       thirdPartyConsole += 1;
       return;
     }
-    consoleErrors.push(m.text().slice(0, 200));
+    // Chrome leaves the address out of a failed load's text; add its path.
+    const at = m.location()?.url;
+    const path =
+      at && /^Failed to load resource/.test(m.text())
+        ? ` (${new URL(at).pathname})`
+        : '';
+    consoleErrors.push((m.text() + path).slice(0, 200));
   });
   page.on('pageerror', e => consoleErrors.push(String(e).slice(0, 200)));
   page.on('response', r => {
@@ -189,9 +172,24 @@ async function visit({ route, target, viewport, identity, fixture, collect }) {
     row.clsSources = Object.entries(m.shifts ?? {})
       .sort((a, b) => b[1] - a[1])
       .slice(0, 3)
-      .map(([node, value]) => ({ node, value: Number(value.toFixed(4)) }));
+      .map(([node, value]) => ({
+        node,
+        value: Number(value.toFixed(4)),
+      }))
+      .map(s => {
+        const { added, ...move } = m.moves?.[s.node] ?? {};
+        const cause = causeOf(added, move.atMs);
+        return cause
+          ? {
+              ...s,
+              ...move,
+              after: { node: cause.node, h: cause.h, atMs: cause.atMs },
+            }
+          : { ...s, ...move };
+      });
     row.lcpMs = Math.round(m.lcp);
     row.longestTaskMs = Math.round(m.longest);
+    if (m.frame) row.frame = m.frame;
     row.placeholder = m.text.match(PLACEHOLDER)?.[0] ?? null;
     row.horizontalOverflow = m.overflow;
     if (row.expectClaimBanner) row.claimBanner = CLAIM_BANNER.test(m.text);
@@ -356,6 +354,11 @@ for (const [k, row] of suspects.entries()) {
   row.longestTaskSamplesMs = all.map(r => r.longestTaskMs);
   row.lcpMs = median(row.lcpSamplesMs);
   row.longestTaskMs = median(row.longestTaskSamplesMs);
+  // Name the scripts from the load the reported stall came from.
+  const at = row.longestTaskSamplesMs.indexOf(row.longestTaskMs);
+  const frame = all[at]?.frame;
+  if (frame) row.frame = frame;
+  else delete row.frame;
 }
 // A page whose request got a 429 is judged on one quiet reload (throttle.mjs).
 const throttled = pages.filter(wasThrottled);

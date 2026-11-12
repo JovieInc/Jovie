@@ -189,6 +189,15 @@ export function failingCriteria(cert, criteria) {
   });
 }
 
+/** State names whose certificate row failed. Empty when states is not recorded. */
+export function failedStateNames(cert) {
+  const states = cert?.criteria?.find(entry => entry.id === 'states')?.states;
+  if (!states || typeof states !== 'object') return [];
+  return Object.entries(states)
+    .filter(([, row]) => row?.status === 'fail')
+    .map(([name]) => name);
+}
+
 /**
  * @param {{certificates: any[]}} report
  * @param {any} screens registry
@@ -223,8 +232,14 @@ export function evaluateScreenGates(report, screens, byScreen, base = null) {
     const failing = failingCriteria(certs.get(component), criteria);
     const allowed = new Set(owedCriteria(debt[component]));
     const fresh = failing.filter(id => !allowed.has(id));
-    if (fresh.length)
-      failures.push({ component, screens: ids, criteria: fresh });
+    if (fresh.length) {
+      const failure = { component, screens: ids, criteria: fresh };
+      if (fresh.includes('states')) {
+        const missingStates = failedStateNames(certs.get(component));
+        if (missingStates.length) failure.missingStates = missingStates;
+      }
+      failures.push(failure);
+    }
   }
   for (const [component, entry] of Object.entries(debt)) {
     const owed = owedCriteria(entry);
@@ -288,6 +303,12 @@ export function evaluateScreenGates(report, screens, byScreen, base = null) {
   };
 }
 
+function formatCriterion(failure, id) {
+  if (id === 'states' && failure.missingStates?.length)
+    return `states missing ${failure.missingStates.join(', ')}`;
+  return id;
+}
+
 export function formatScreenGate(result) {
   const lines = result.perScreen.map(
     s =>
@@ -299,7 +320,7 @@ export function formatScreenGate(result) {
     ...result.errors.map(e => `  config: ${e}`),
     ...result.failures.map(
       f =>
-        `  ${f.component} [${f.criteria.join(', ')}] on ${f.screens.join(', ')}`
+        `  ${f.component} [${f.criteria.map(id => formatCriterion(f, id)).join(', ')}] on ${f.screens.join(', ')}`
     ),
     ...result.stale.map(
       s =>
@@ -332,10 +353,7 @@ export function screenIssues(report, screens, byScreen) {
             const crit = certs.get(component)?.criteria.find(x => x.id === k);
             const states =
               k === 'states'
-                ? Object.entries(crit?.states ?? {})
-                    .filter(([, v]) => v.status === 'fail')
-                    .map(([s]) => s)
-                    .join(', ')
+                ? failedStateNames(certs.get(component)).join(', ')
                 : null;
             return [k, states || crit?.detail || crit?.status || 'unknown'];
           })

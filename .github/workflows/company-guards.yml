@@ -1,8 +1,8 @@
 # Shared company guard suite from JovieInc/ci (canon/COMPANY.md).
 # Pin is bumped by a bot PR; a pin more than 72h behind the newest canon/guard
 # commit fails this check. The bot rewrites these two lines only:
-# company-guards.yml@ba6ecacf5833a50cc1f13998ba4f08153b322916
-# ci-ref: ba6ecacf5833a50cc1f13998ba4f08153b322916
+# company-guards.yml@9891c0ec01d1a19bc441977f2fa58c24d2611e4e
+# ci-ref: 9891c0ec01d1a19bc441977f2fa58c24d2611e4e
 # Source Validation classifies with the trusted base, which has no
 # .company-guards/ rule. The baseline is committed under scripts/company-guards/
 # and this job copies it to the path guards/size.mjs reads.
