@@ -57,13 +57,17 @@ const TOUR_ROWS = Array.from(
 export const LongContentScrolls: Story = {
   args: {
     ambientMediaUrl: '/images/avatars/tim-white.jpg',
-    className: 'overflow-y-auto',
     children: (
-      <div className='space-y-4 p-6 text-sm text-primary-token'>
+      <section
+        aria-label='Tour dates'
+        // biome-ignore lint/a11y/noNoninteractiveTabindex: keyboard entry point for the scrollable region (axe scrollable-region-focusable)
+        tabIndex={0}
+        className='h-dvh space-y-4 overflow-y-auto p-6 text-sm text-primary-token'
+      >
         {TOUR_ROWS.map(row => (
           <p key={row}>{row}</p>
         ))}
-      </div>
+      </section>
     ),
   },
 };
