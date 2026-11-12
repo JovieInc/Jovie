@@ -680,6 +680,25 @@ const nextConfig = {
     return {
       beforeFiles: [
         {
+          // The ?mode= render rewrite MUST be a beforeFiles rewrite: the
+          // profile document is prerendered/ISR-cached (profile document
+          // ISR), and an afterFiles rewrite never applies to a
+          // prerendered route — ?mode=listen silently rendered the home
+          // document, so every mode surface (listen dial, subscribe flow)
+          // served the home body instead (daily ci.yml dispatch run
+          // 43271726565, 2026-11-12; prod 4fd78e95b).
+          source: '/:username',
+          has: [
+            {
+              type: 'query',
+              key: 'mode',
+              value: profileQueryModePattern,
+            },
+          ],
+          destination:
+            '/:username/profile-mode-render/:profileMode/__profile-mode-alias',
+        },
+        {
           source: '/hud/wiki',
           destination: '/app/ov/wiki',
         },
@@ -714,18 +733,6 @@ const nextConfig = {
       afterFiles: [
         ...profileModeAliasRewrites,
         ...socialShortcutAliasRewrites,
-        {
-          source: '/:username',
-          has: [
-            {
-              type: 'query',
-              key: 'mode',
-              value: profileQueryModePattern,
-            },
-          ],
-          destination:
-            '/:username/profile-mode-render/:profileMode/__profile-mode-alias',
-        },
         {
           source: '/app/ov/:path*',
           destination: '/app/admin/:path*',
