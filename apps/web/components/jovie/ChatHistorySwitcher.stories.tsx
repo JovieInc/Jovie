@@ -2,6 +2,7 @@ import '../../styles/system-b-app.css';
 import type { Decorator, Meta, StoryObj } from '@storybook/nextjs-vite';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { expect, userEvent, within } from 'storybook/test';
+import { THREAD_READ_STORAGE_KEY } from '@/components/shell/SidebarThreadsSection';
 import { queryKeys } from '@/lib/queries/keys';
 import type { ChatConversation } from '@/lib/queries/useChatConversationsQuery';
 import { ChatHistorySwitcher } from './ChatHistorySwitcher';
@@ -92,6 +93,34 @@ export const Open: Story = {
     await expect(
       within(menu).getByPlaceholderText('Chat History')
     ).toBeInTheDocument();
+  },
+};
+
+/** New replies since this browser last read them get a dot; read rows don't. */
+export const Unread: Story = {
+  beforeEach: () => {
+    const previous = globalThis.localStorage.getItem(THREAD_READ_STORAGE_KEY);
+    const readLater = new Date(Date.now() + HOUR).toISOString();
+    const readAt = Object.fromEntries(
+      HISTORY.filter(row => !['release', 'merch'].includes(row.id)).map(row => [
+        row.id,
+        readLater,
+      ])
+    );
+    globalThis.localStorage.setItem(
+      THREAD_READ_STORAGE_KEY,
+      JSON.stringify(readAt)
+    );
+    return () => {
+      if (previous === null) {
+        globalThis.localStorage.removeItem(THREAD_READ_STORAGE_KEY);
+      } else {
+        globalThis.localStorage.setItem(THREAD_READ_STORAGE_KEY, previous);
+      }
+    };
+  },
+  play: async ({ canvasElement }) => {
+    await openMenu(canvasElement);
   },
 };
 
