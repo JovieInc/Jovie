@@ -1,7 +1,6 @@
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { join, resolve } from 'node:path';
+import { readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 const REPO_ROOT = resolve(import.meta.dirname, '../../..');
@@ -139,24 +138,28 @@ describe('Biome a11y exemption scope', () => {
   });
 
   it('fails committed deliberate-red siblings when biome actually sees them', () => {
-    const dir = mkdtempSync(join(tmpdir(), 'biome-a11y-red-'));
+    // Biome 2.6 exits 101 with empty stdout for a path outside the project
+    // root. Probes stay in-repo, beside the fixtures. *.a11y-red.tsx is excluded.
+    const probes = RED_FIXTURE_PATHS.map(rel =>
+      rel.replace(/\.a11y-red\.tsx$/, '.probe.tsx')
+    );
     try {
-      const probes = RED_FIXTURE_PATHS.map(rel => {
+      for (const [index, rel] of RED_FIXTURE_PATHS.entries()) {
         const source = readFileSync(resolve(REPO_ROOT, rel), 'utf8');
         expect(source).toContain('data-deliberate-red');
-        const file = join(dir, `${rel.replaceAll('/', '__')}.probe.tsx`);
-        writeFileSync(file, source);
-        return file;
-      });
+        writeFileSync(resolve(REPO_ROOT, probes[index]), source);
+      }
       // One Biome process for every probe; each file must still fail on its own.
       const byPath = a11yCategoriesByPath(parseBiomeReport(runBiome(probes)));
-      for (const file of probes) {
-        expect((byPath.get(file) ?? []).join('\n'), file).toMatch(
+      for (const rel of probes) {
+        expect((byPath.get(rel) ?? []).join('\n'), rel).toMatch(
           /lint\/a11y\/(noStaticElementInteractions|noNoninteractiveElementInteractions|useKeyWithClickEvents)/
         );
       }
     } finally {
-      rmSync(dir, { recursive: true, force: true });
+      for (const rel of probes) {
+        rmSync(resolve(REPO_ROOT, rel), { force: true });
+      }
     }
   });
 });
