@@ -53,6 +53,27 @@ describe('shared Presence status vocabulary', () => {
     }
   );
 
+  // Raw mint (#3ffa8b) as text fails 4.5:1 on light surfaces; status copy
+  // uses the derived AA-safe -text token (axe color-contrast).
+  it('renders the success and error tones in the AA-safe -text tokens', () => {
+    render(
+      <TooltipProvider>
+        <PresenceStatusBadge
+          status={{
+            label: 'Connected',
+            tone: 'success',
+            needsAttention: false,
+            nextAction: 'All good.',
+            sortPriority: 1,
+          }}
+        />
+      </TooltipProvider>
+    );
+
+    expect(screen.getByText('Connected')).toHaveClass('text-success-text');
+    expect(screen.getByText('Connected')).not.toHaveClass('text-success');
+  });
+
   it('does not invent evidence for an empty signal list', () => {
     render(<PresenceSignalList signals={[]} />);
     expect(screen.getByTestId('presence-signal-list')).toBeEmptyDOMElement();

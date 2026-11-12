@@ -107,6 +107,19 @@ describe('TableActionMenu', () => {
     await expectNoA11yViolations(screen.getByRole('menu'));
   });
 
+  // A modal menu aria-hides the page behind it while open, which axe
+  // reports as aria-hidden-focus; held-open audits use the non-modal menu.
+  it('passes the modal through so open-menu audits can run non-modal', () => {
+    const { rerender } = render(
+      <TableActionMenu open items={[]} modal={false} />
+    );
+    const nonModal = screen.getByRole('group');
+    expect(nonModal.getAttribute('data-slot')).toBe('common-dropdown-content');
+    rerender(<TableActionMenu open items={[]} />);
+    // Default stays modal: the surface keeps the menu role.
+    expect(screen.getByRole('menu')).not.toBeNull();
+  });
+
   it('has no axe violations in a right-to-left document', async () => {
     const user = userEvent.setup();
     const onCopy = vi.fn();

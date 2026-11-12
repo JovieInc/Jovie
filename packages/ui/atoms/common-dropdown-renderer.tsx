@@ -98,7 +98,11 @@ function focusSiblingMenuItem(
   input: HTMLInputElement | null,
   placement: 'first' | 'last'
 ): HTMLElement | undefined {
-  const menu = input?.closest('[role="menu"]');
+  // The searchable root content is role="group" (the search input is not an
+  // allowed menu child — axe aria-required-children); the items live in the
+  // inner role="menu" region, so look up to the group for item queries.
+  const menu =
+    input?.closest('[role="menu"]') ?? input?.closest('[role="group"]');
   if (!menu) return undefined;
 
   const menuItems = Array.from(
@@ -405,6 +409,7 @@ function CommonDropdownSubmenuRenderer({
       data-menu-surface='toolbar'
       data-slot='common-dropdown-subcontent'
       aria-busy={item.isLoading || undefined}
+      role={searchable ? 'group' : undefined}
       className={cn(subMenuContentClasses, transformOrigin)}
       style={getContentStyle(
         item.minWidth ?? measuredMinWidth,
@@ -437,13 +442,27 @@ function CommonDropdownSubmenuRenderer({
           inputRef={inputRef}
         />
       ) : null}
-      {renderRootBody({
-        isLoading: item.isLoading ?? false,
-        items: filteredItems,
-        emptyMessage: item.emptyMessage ?? 'No items found',
-        renderItems: itemsToRender =>
-          itemsToRender.map(child => renderItem(child, context)),
-      })}
+      {searchable ? (
+        /* Searchable submenus split group/menu the same way the root
+           content does: the input cannot be a role="menu" child. */
+        <div role='menu'>
+          {renderRootBody({
+            isLoading: item.isLoading ?? false,
+            items: filteredItems,
+            emptyMessage: item.emptyMessage ?? 'No items found',
+            renderItems: itemsToRender =>
+              itemsToRender.map(child => renderItem(child, context)),
+          })}
+        </div>
+      ) : (
+        renderRootBody({
+          isLoading: item.isLoading ?? false,
+          items: filteredItems,
+          emptyMessage: item.emptyMessage ?? 'No items found',
+          renderItems: itemsToRender =>
+            itemsToRender.map(child => renderItem(child, context)),
+        })
+      )}
     </SubContent>
   );
 

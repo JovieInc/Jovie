@@ -207,6 +207,11 @@ describe('WaitlistSpotifySearch', () => {
     );
     expect(onArtistNameChange).toHaveBeenLastCalledWith('Neon Harbor');
     expect(screen.getByText('Neon Harbor')).toBeVisible();
+    // The rendered result buttons are real keyboard-operable controls; they
+    // must not sit in an aria-hidden subtree (axe aria-hidden-focus).
+    expect(
+      screen.getByText('Neon Harbor').closest('.max-h-64')
+    ).not.toHaveAttribute('aria-hidden');
   });
 
   it('closes the results on Escape and keeps the typed query', async () => {

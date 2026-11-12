@@ -110,7 +110,7 @@ describe('ProviderCell actions', () => {
         ),
         'utf8'
       )
-    ).toContain("isCopied ? 'text-success' : undefined");
+    ).toContain("isCopied ? 'text-success-text' : undefined");
     expect(
       readFileSync(
         resolve(
@@ -119,7 +119,7 @@ describe('ProviderCell actions', () => {
         ),
         'utf8'
       )
-    ).toContain("isCopied ? 'text-success' : undefined");
+    ).toContain("isCopied ? 'text-success-text' : undefined");
   });
 });
 

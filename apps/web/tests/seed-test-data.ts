@@ -2071,6 +2071,13 @@ export async function seedTestData(options: SeedTestDataOptions = {}) {
   // Use Neon HTTP driver (same as the app) instead of WebSocket driver
   // This ensures we write to the same connection pool the app reads from
   const db = drizzle(neon(databaseUrl), { schema });
+
+  // The public-surface manifests probe a profile handle that must stay
+  // MISSING (the 404 boundary asserts [data-testid="not-found"]). If a
+  // stale seed or run ever created it, every not-found surface fails, so
+  // the seed enforces the precondition up front.
+  const missingProbeHandle =
+    process.env.PUBLIC_SURFACE_MISSING_PROFILE?.trim() || 'missing-qa-user';
   const seedRetryOptions = {
     attempts: process.env.CI ? 6 : 2,
     initialDelayMs: process.env.CI ? 2_000 : 1_500,
@@ -2078,6 +2085,19 @@ export async function seedTestData(options: SeedTestDataOptions = {}) {
   } as const;
 
   try {
+    await withSeedDatabaseRetry(async () => {
+      const removed = await db
+        .delete(creatorProfiles)
+        .where(
+          drizzleSql`lower(${creatorProfiles.usernameNormalized}) = lower(${missingProbeHandle}) or lower(${creatorProfiles.username}) = lower(${missingProbeHandle})`
+        )
+        .returning({ id: creatorProfiles.id });
+      if (removed.length > 0) {
+        console.log(
+          `  Removed ${removed.length} stale profile(s) holding the not-found probe handle ${missingProbeHandle}`
+        );
+      }
+    }, seedRetryOptions);
     if (options.readyCreatorReleasesOnly) {
       await withSeedDatabaseRetry(
         () => seedReadyCreatorReleaseFixtures(db),

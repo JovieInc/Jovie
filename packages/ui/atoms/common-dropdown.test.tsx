@@ -776,6 +776,30 @@ describe('CommonDropdown', () => {
       expect(screen.getByPlaceholderText('Search...')).toBeInTheDocument();
     });
 
+    // A text input is not an allowed role="menu" child (axe
+    // aria-required-children): the searchable surface presents as a group
+    // and the item rows stay in an inner menu.
+    it('presents a searchable menu as a group with an inner item menu', () => {
+      render(
+        <CommonDropdown items={basicItems} open={true} searchable={true} />
+      );
+
+      const input = screen.getByPlaceholderText('Search...');
+      const surface = input.closest('[role="group"]');
+      expect(surface).not.toBeNull();
+      const menu = surface?.querySelector('[role="menu"]');
+      expect(menu).not.toBeNull();
+      expect(menu?.querySelector('[role="menuitem"]')).not.toBeNull();
+      expect(input.closest('[role="menu"]')).toBeNull();
+    });
+
+    it('keeps a non-searchable menu on the menu role', () => {
+      render(<CommonDropdown items={basicItems} open={true} />);
+      expect(
+        screen.getByRole('menuitem').closest('[role="menu"]')
+      ).not.toBeNull();
+    });
+
     it('renders custom search placeholder', () => {
       render(
         <CommonDropdown
