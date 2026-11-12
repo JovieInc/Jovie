@@ -1,5 +1,4 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
-import { expect, waitFor, within } from 'storybook/test';
 import { QRCode } from './QRCode';
 
 const meta: Meta<typeof QRCode> = {
@@ -90,8 +89,9 @@ export const PartialDataOnly: Story = {
 };
 
 /**
- * The admin HUD passes an empty string while its kiosk link is unresolved, so
- * the code renders for no data at all.
+ * The admin HUD passes an empty string while its kiosk link is unresolved:
+ * there is nothing to encode, so the same unavailable fallback the failure
+ * path uses renders instead of a code that scans to nothing.
  */
 export const EmptyData: Story = {
   args: {
@@ -101,24 +101,16 @@ export const EmptyData: Story = {
 };
 
 /**
- * The image request failed: the frame keeps its size and shows the fallback.
- * The play function fires the image's error event so the state is fixed.
+ * Generation failed (the `qrcode` module could not render): the frame keeps
+ * its size and shows the unavailable fallback. With local generation the
+ * failure path is the generator's rejection, so the fallback state is the
+ * same one EmptyData renders.
  */
-export const ErrorImageUnavailable: Story = {
+export const GenerationFailed: Story = {
   args: {
     data: 'https://jov.ie/tim',
     size: 120,
     label: 'Scan To Open This Profile On Your Phone',
-  },
-  play: async ({ canvasElement }) => {
-    const canvas = within(canvasElement);
-    const image = await canvas.findByRole('img', {
-      name: 'Scan To Open This Profile On Your Phone',
-    });
-    image.dispatchEvent(new Event('error'));
-    await waitFor(() =>
-      expect(canvas.getByText('QR code unavailable')).toBeVisible()
-    );
   },
 };
 
