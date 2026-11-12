@@ -11,7 +11,7 @@
  * so an approval can never carry later, unseen changes into a baseline.
  *
  * Usage:
- *   node scripts/homepage-baseline-approval.mjs digest   # print the sources digest of HEAD
+ *   node scripts/homepage-baseline-approval.mjs digest [ref]   # print the sources digest of ref (HEAD)
  *   node scripts/homepage-baseline-approval.mjs verify   # exit 1 unless the receipt matches HEAD
  */
 import { spawnSync } from 'node:child_process';
@@ -23,11 +23,19 @@ export const RECEIPT_SCHEMA = 'jovie-homepage-baseline-approval/v1';
 export const RECEIPT_PATH =
   'docs/design-system/approvals/homepage-baselines.json';
 
-/** The sources that decide what the homepage renders. */
+/**
+ * The sources that decide what the homepage renders: its route and
+ * components, plus the artist data, product UI copy and release art they read.
+ */
 export const HOMEPAGE_SOURCES = Object.freeze([
   'apps/web/app/(home)',
   'apps/web/components/homepage',
   'apps/web/components/features/home',
+  'apps/web/data/demoArtists.ts',
+  'apps/web/data/featuredArtists.ts',
+  'apps/web/data/homepageProductUi.ts',
+  'apps/web/lib/tim-white.ts',
+  'apps/web/public/img/releases',
 ]);
 
 const REPO_ROOT = resolve(import.meta.dirname, '..');
@@ -77,7 +85,8 @@ export function receiptProblems(receipt, digest) {
 function main(argv) {
   const command = argv[0];
   if (command === 'digest') {
-    console.log(sourcesDigest());
+    // Pass the reviewed commit (e.g. the approved preview's SHA) to pin it.
+    console.log(sourcesDigest(REPO_ROOT, argv[1] ?? 'HEAD'));
     return 0;
   }
   if (command === 'verify') {
