@@ -731,7 +731,7 @@
       "from": null,
       "to": "holdout",
       "at": "2026-11-12T20:38:19Z",
-      "evidence": "PR #25184 introduces the /<handle>/profile-miss miss destination (JOV-12081): the dynamic route notFound() rewrites unknown handles into; source registration only, not rendered certification."
+      "evidence": "PR #25184 introduces the profile-miss miss destination (JOV-12081): the dynamic route notFound() rewrites unknown handles into; source registration only, not rendered certification."
     }
   ]
 }
