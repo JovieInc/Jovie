@@ -60,11 +60,8 @@ SURFACE_MARKER = "symphony-surface"
 CLAIM_WINDOW_S = 30 * 60
 HOLD_NAG_S = 24 * 3600
 LOCKFILES = frozenset({"pnpm-lock.yaml"})
-# Conflicts confined to machine-derived files resolve without a model: take main's copy,
-# run the file's canonical regenerator, push. JOV-6837 covered the lockfile; JOV-7594
-# extends the same deterministic rung to the generated workflow topology so Symphony PRs
-# stop hand-merging `.gen.` output. rule-scopes.json hashes are derived from
-# .claude/rules; --write rebuilds them from the merged rule files.
+# Generated conflicts restore main's copy, then regenerate from merged sources
+# (JOV-6837/JOV-7594). Each output keeps its canonical generator.
 GENERATED_RESOLVERS = {
     "docs/REPOSITORY_SOURCES.md": ("python3", "scripts/repository_docs.py", "--write"),
     "canon/SOURCES_OF_TRUTH.md": ("node", "scripts/sources-of-truth.mjs", "--write"),
