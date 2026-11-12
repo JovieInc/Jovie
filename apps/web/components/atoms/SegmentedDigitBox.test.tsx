@@ -1,6 +1,5 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { useState } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import { SegmentedDigitBox } from './SegmentedDigitBox';
@@ -74,27 +73,29 @@ describe('SegmentedDigitBox', () => {
 
   it('keeps the typed digit and focus when the parent re-renders', async () => {
     const user = userEvent.setup();
-    function Harness() {
-      const [digit, setDigit] = useState('');
-      const [focused, setFocused] = useState(false);
-      const [tick, setTick] = useState(0);
-      return (
-        <div data-tick={tick}>
-          <SegmentedDigitBox
-            {...BASE_PROPS}
-            digit={digit}
-            isFocused={focused}
-            onInputChange={(_, value) => {
-              setDigit(value.slice(-1));
-              setTick(tick + 1);
-            }}
-            onFocus={() => setFocused(true)}
-            onBlur={() => setFocused(false)}
-          />
-        </div>
-      );
-    }
-    render(<Harness />);
+    // Props-driven parent: every change and focus event re-renders the box
+    // with new props, as OtpInput does.
+    const state = { digit: '', focused: false };
+    const ui = () => (
+      <SegmentedDigitBox
+        {...BASE_PROPS}
+        digit={state.digit}
+        isFocused={state.focused}
+        onInputChange={(_, value) => {
+          state.digit = value.slice(-1);
+          view.rerender(ui());
+        }}
+        onFocus={() => {
+          state.focused = true;
+          view.rerender(ui());
+        }}
+        onBlur={() => {
+          state.focused = false;
+          view.rerender(ui());
+        }}
+      />
+    );
+    const view = render(ui());
 
     const input = screen.getByLabelText('Digit 1 of 6');
     await user.type(input, '8');
