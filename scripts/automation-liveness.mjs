@@ -335,8 +335,9 @@ async function shaFromGit(readGitTip) {
  * HTTP 403 while production is inside the silence budget (runs 39674054063
  * and 39682307911; the second ran after the commits/main fallback landed).
  * `GET /commits/main` is the same 403 the production controller already left
- * for `git ls-remote`. On a 403, ask git for refs/heads/main, then try one
- * last commit-SHA read. Any other failure stays unreadable.
+ * for `git ls-remote`. On a denied or rate-limited read (including local
+ * shed/budget errors), ask git for refs/heads/main without spending REST
+ * quota, then try one last commit-SHA read. Other failures stay unreadable.
  */
 async function readMainSha(client, repo, headers, apiUrl, readGitTip) {
   const request = (url, accept) =>
@@ -366,10 +367,14 @@ async function readMainSha(client, repo, headers, apiUrl, readGitTip) {
         : { ok: false, reason: 'main-sha-unreadable' };
     }
     failure = mainRefFailure(null, response.status);
-    if (response.status !== 403) return failure;
+    if (![403, 429].includes(response.status)) return failure;
   } catch (error) {
     failure = mainRefFailure(error);
-    if (error?.status !== 403) return failure;
+    if (
+      ![403, 429].includes(error?.status) &&
+      !['shed', 'budget'].includes(error?.kind)
+    )
+      return failure;
   }
   const fromGit = await shaFromGit(readGitTip);
   if (fromGit) return { ok: true, sha: fromGit };
