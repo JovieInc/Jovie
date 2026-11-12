@@ -1,6 +1,6 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import { ProfileClaimFooter } from './ProfileClaimFooter';
 
@@ -30,6 +30,21 @@ describe('ProfileClaimFooter', () => {
     emitProofClaimEvent.mockClear();
     document.addEventListener('click', stayOnPage);
     return () => document.removeEventListener('click', stayOnPage);
+  });
+
+  afterEach(() => window.history.replaceState(null, '', '/'));
+
+  it('preserves campaign attribution on the footer claim CTA', () => {
+    window.history.replaceState(
+      null,
+      '',
+      '/artist?utm_campaign=claim-link-outreach&utm_source=claim_link&utm_medium=dm&token=synthetic'
+    );
+    render(<ProfileClaimFooter href='/artist/claim?next=auth' />);
+    expect(screen.getByTestId('profile-claim-footer-cta')).toHaveAttribute(
+      'href',
+      '/artist/claim?next=auth&utm_source=claim_link&utm_medium=dm&utm_campaign=claim-link-outreach'
+    );
   });
 
   it('renders the proof-to-claim Request access CTA without calling the profile unclaimed', () => {
