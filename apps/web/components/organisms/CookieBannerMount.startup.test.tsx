@@ -46,9 +46,7 @@ it('keeps consent controls and privacy requests available while the privacy chun
     await screen.findByRole('dialog', { name: 'Cookie Preferences' })
   ).toBeVisible();
 
-  act(() =>
-    screen.getByRole('button', { name: 'Cancel', exact: true }).click()
-  );
+  act(() => screen.getByRole('button', { name: 'Cancel' }).click());
 
   const privacyClick = new MouseEvent('click', {
     bubbles: true,
@@ -68,7 +66,6 @@ it('keeps consent controls and privacy requests available while the privacy chun
   expect(
     await screen.findByRole('dialog', {
       name: 'Your Privacy Choices',
-      exact: true,
     })
   ).toBeVisible();
   unsubscribe?.();
