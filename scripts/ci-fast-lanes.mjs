@@ -1167,6 +1167,7 @@ export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/brand-deals-skill-contract.test.mjs',
   'scripts/lib/__tests__/brand-construction.test.mjs',
   'scripts/lib/__tests__/changelog-parser.test.mjs',
+  'scripts/lib/__tests__/automation-liveness-github-403-recovery.test.mjs',
   'scripts/lib/__tests__/ci-script-test-inventory.test.mjs',
   'scripts/lib/__tests__/no-wall-clock-assertions.test.mjs',
   'scripts/lib/__tests__/run-actionlint.test.mjs',
