@@ -19,12 +19,32 @@ export function resolveMenuOriginTrigger(
 ): HTMLElement | null {
   let node = start;
   for (let depth = 0; node && depth < MAX_MENU_DEPTH; depth += 1) {
-    const menu = node.closest('[role="menu"]');
+    // Searchable surfaces split the search input (role="group" content,
+    // which carries the trigger labelling) from the item rows (an inner
+    // role="menu" with no label of its own), so the walk climbs through
+    // the group surface too.
+    const menu = node.closest(
+      '[role="menu"], [role="group"][data-menu-surface]'
+    );
     if (!menu) {
       return node !== start && node instanceof HTMLElement ? node : null;
     }
+    if (!(menu instanceof HTMLElement)) return null;
     const labelledBy = menu.getAttribute('aria-labelledby');
-    node = labelledBy ? document.getElementById(labelledBy) : null;
+    if (!labelledBy) {
+      // An unlabelled inner menu climbs to its labelled parent; an
+      // unlabelled root menu has no resolvable trigger.
+      const parent = menu.parentElement;
+      if (
+        !parent ||
+        !parent.closest('[role="menu"], [role="group"][data-menu-surface]')
+      ) {
+        return null;
+      }
+      node = parent;
+      continue;
+    }
+    node = document.getElementById(labelledBy);
   }
   return null;
 }
