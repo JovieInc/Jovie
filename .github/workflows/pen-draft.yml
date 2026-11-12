@@ -134,7 +134,10 @@ jobs:
         env:
           PEN_CLI_KEY: ${{ secrets.PEN_CLI_KEY }}
           PEN_GOLDEN_PATH_FILE_URL: ${{ secrets.PEN_GOLDEN_PATH_FILE_URL }}
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          # The Pen agent is Claude Code: run it on the paid subscription, never a
+          # metered API key (Tim, 2026-11-10). The metered key ran out of credit
+          # and every draft since failed with billing_error.
+          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           FRAME: ${{ matrix.frame }}
         run: node scripts/design/pen-draft.mjs --out "$RUNNER_TEMP/pen-draft" --only "$FRAME"
 

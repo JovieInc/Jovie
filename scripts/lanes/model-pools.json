@@ -162,13 +162,6 @@
   },
   "exceptions": [
     {
-      "path": ".github/workflows/pen-draft.yml",
-      "rule": "metered-anthropic-credential",
-      "reason": "Pen frame drafting in CI calls the Anthropic API with ANTHROPIC_API_KEY. It predates this table.",
-      "owner": "Summer",
-      "removeWhen": "Pen drafts run inside the design loop on the Pen Mac (Claude Code subscription), as the workflow's own removal trigger says."
-    },
-    {
       "path": "ops/models/task-registry.json",
       "rule": "anthropic-on-forbidden-pool",
       "match": "screenshot-bug-loop",
