@@ -34,3 +34,47 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const FoldedIntoPrimary: Story = {};
+
+export const EmptyNoHiddenColumns: Story = {
+  args: {
+    value: { primaryId: 'fan', items: [] },
+    children: <PrimaryCell row={{ name: 'Avery Chen' }} />,
+  },
+};
+
+export const LongContentFolded: Story = {
+  args: {
+    value: {
+      primaryId: 'fan',
+      items: [
+        { id: 'state', render: () => 'Awaiting Confirmation From Label' },
+        { id: 'source', render: () => 'Instagram Story Link In Bio Campaign' },
+        { id: 'last', render: () => '3 weeks ago' },
+      ],
+    },
+    children: (
+      <PrimaryCell
+        row={{
+          name: 'Alexandria Constantinople-Whitfield of The Midnight Orchestra',
+        }}
+      />
+    ),
+  },
+};
+
+export const RtlFolded: Story = {
+  args: {
+    value: {
+      primaryId: 'fan',
+      items: [
+        { id: 'state', render: () => 'نشط' },
+        { id: 'last', render: () => 'قبل ساعتين' },
+      ],
+    },
+    children: (
+      <div dir='rtl' lang='ar'>
+        <PrimaryCell row={{ name: 'ليلى حداد' }} />
+      </div>
+    ),
+  },
+};

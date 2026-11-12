@@ -82,10 +82,12 @@ export function shipIntent(body, { cmd, number, park, onGreen } = {}, prior) {
     .replace(strip(PARK_RE), '\n')
     .trimEnd();
   const parked = `${bare}\n\n<!-- ${PARK_MARKER} -->\n`;
-  if (park) return parked;
+  // --park, or a park marker the writer put in the body itself, keeps it parked
+  // unless --on-green explicitly replaces it.
+  if (park || (hasParkMarker(body) && !onGreen)) return parked;
   const fresh = cmd === 'open' || (cmd === 'draft' && !number);
   if (!fresh && !onGreen) {
-    if (hasParkMarker(prior) && !hasParkMarker(body)) return parked;
+    if (hasParkMarker(prior)) return parked;
     if (!ON_GREEN_RE.test(String(prior ?? ''))) return body;
   }
   return `${bare}\n\n<!-- ${ON_GREEN_MARKER} -->\n`;

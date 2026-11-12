@@ -59,7 +59,7 @@ export function YouTubeEmbed({
       className={`relative aspect-video overflow-hidden rounded-xl ${className ?? ''}`}
     >
       {!loaded && (
-        <div className='absolute inset-0 animate-pulse bg-white/[0.05]' />
+        <div className='absolute inset-0 animate-pulse bg-on-media/[0.05]' />
       )}
       {/* biome-ignore lint/a11y/noNoninteractiveElementInteractions: iframe onLoad detects embed readiness for loading skeleton */}
       <iframe

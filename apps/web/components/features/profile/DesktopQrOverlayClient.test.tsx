@@ -94,9 +94,9 @@ describe('DesktopQrOverlayClient', () => {
     await user.click(screen.getByRole('button', { name: 'Open On Phone' }));
     expect(showPopover).toHaveBeenCalledTimes(1);
     const image = screen.getByRole('img', { name: QR_LABEL });
-    expect(image.getAttribute('src')).toContain(
-      encodeURIComponent(`${globalThis.location.origin}/tim`)
-    );
+    // The profile URL is encoded into the PNG. The src is that local data
+    // URL, not a third-party request that contains the profile URL as text.
+    expect(image.getAttribute('src') ?? '').toMatch(/^data:image\/png;base64,/);
     expect(screen.getByText('Open On Phone')).toBeVisible();
     await expectNoA11yViolations(container);
 

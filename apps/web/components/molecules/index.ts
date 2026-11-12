@@ -20,7 +20,7 @@ export { FrostedContainer } from './FrostedContainer';
 export { OptimizedImage } from './OptimizedImage';
 export { PaySelector } from './PaySelector';
 export { ProfileNavButton } from './ProfileNavButton';
-export { getQrCodeUrl, QRCode } from './QRCode';
+export { getQrCodeDataUrl, QRCode } from './QRCode';
 export { QRCodeCard } from './QRCodeCard';
 export { SocialLink } from './SocialLink';
 export type { StepCardProps } from './StepCard';

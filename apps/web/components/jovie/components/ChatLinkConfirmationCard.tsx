@@ -315,7 +315,7 @@ function ChatLinkConfirmationTask({
           aria-atomic='true'
           className={cn(
             'col-start-1 row-start-1 min-h-8',
-            state === 'failed' ? 'text-error' : 'text-secondary-token'
+            state === 'failed' ? 'text-error-text' : 'text-secondary-token'
           )}
         >
           {message}

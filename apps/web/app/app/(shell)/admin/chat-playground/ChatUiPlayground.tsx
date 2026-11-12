@@ -283,7 +283,7 @@ function GroupedToolsFixture() {
           }),
           toolPart({
             id: 'grouped-running',
-            toolName: 'suggestRelatedArtists',
+            toolName: 'useSkill',
             state: 'running',
           }),
           toolPart({
