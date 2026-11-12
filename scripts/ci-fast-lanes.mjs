@@ -937,8 +937,7 @@ export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
   'scripts/preflight.test.mjs',
   'scripts/installation-budget-sentinel.test.mjs',
   'scripts/layout-guard-pen-contracts.test.mjs',
-  // JOV-INV-047: one shell and IA registry; ad-hoc chrome ratchet.
-  'scripts/invariants/shell-ia.test.mjs',
+  'scripts/invariants/shell-ia.test.mjs', // JOV-INV-047 shell+IA registry.
   'scripts/ci-rounds-report.test.mjs',
   'scripts/preflight-changed.test.mjs',
   'scripts/preflight-source-size.test.mjs',
@@ -987,6 +986,7 @@ export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
   'scripts/deprecation-intake.test.mjs',
   'scripts/deprecation-clearance.test.mjs',
   'scripts/security-advisory-intake.test.mjs',
+  'scripts/security-advisory-intake.close-scan.test.mjs',
   'scripts/sonar-token-validation.test.mjs',
   'scripts/design-authority-guard.test.mjs',
   'scripts/evals/artist-identity.test.mjs',
