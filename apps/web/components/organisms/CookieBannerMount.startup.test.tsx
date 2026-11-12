@@ -21,7 +21,7 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-it('notifies subscribers and retains Cookie Settings requests while the privacy chunk is delayed', async () => {
+it('notifies subscribers and opens Cookie Settings while the privacy chunk is delayed', async () => {
   vi.spyOn(document, 'cookie', 'get').mockReturnValue('jv_cc_required=0');
   render(<CookieBannerMount />);
   expect(globalThis.JVConsent).toBeDefined();
@@ -35,6 +35,10 @@ it('notifies subscribers and retains Cookie Settings requests while the privacy 
   });
   expect(subscriber).toHaveBeenCalledWith(choice);
   expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+
+  expect(
+    await screen.findByRole('dialog', { name: 'Cookie Preferences' })
+  ).toBeVisible();
 
   await act(async () => {
     privacyChunk.release();
