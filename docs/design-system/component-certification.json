@@ -655,14 +655,56 @@
     "apps/web/components/organisms/sidebar/context.tsx": {
       "partial": "SidebarProvider holds no data: its optional props (defaultOpen, open, onOpenChange) choose uncontrolled or controlled open state, and Default and DefaultClosed show both starting states."
     },
+    "apps/web/components/organisms/table/atoms/GroupHeader.tsx": {
+      "empty": "GroupHeader renders one group's label and count, not a collection; groups come from useTableGrouping, which only creates a group for a row it has seen, so the count is never zero. The detector matched the items-center class.",
+      "partial": "label, count and colSpan are required; isSticky, stickyOffset and the three className props are geometry and styling with defaults, so nothing can be partially present."
+    },
+    "apps/web/components/organisms/table/atoms/PersonCell.tsx": {
+      "empty": "PersonCell renders one person with a required name, not a collection, so there is nothing that can be empty. The detector matched the items-center class.",
+      "offline": "PersonCell never fetches or mutates; its photo falls back to initials when it cannot load, which the Partial and Anonymous stories show. The detector matched LoadingSkeleton in PersonCellSkeleton.",
+      "permission-denied": "PersonCell has no gated action or permission input; its only interactive part is an optional name link that the caller decides to pass. The detector matched role in a prop comment."
+    },
+    "apps/web/components/organisms/table/atoms/SkeletonCell.tsx": {
+      "empty": "SkeletonCell is itself a loading placeholder of fixed shape and takes no data, so there is no collection that can be empty. The detector matched the items-center class.",
+      "partial": "It holds no data: width, variant and className are placeholder geometry with defaults, so nothing can be partially present.",
+      "long-content": "It renders skeleton bars only, with no text from any caller, so nothing can run long. The detector matched the text variant name.",
+      "offline": "SkeletonCell never fetches or mutates; the table that shows it owns any network failure. The detector matched Skeleton."
+    },
+    "apps/web/components/organisms/table/atoms/SkeletonRow.tsx": {
+      "empty": "SkeletonRow is itself the loading placeholder and takes no data; its .map( only iterates the fixed skeleton-col keys built from columns, so there is no collection that can be empty.",
+      "long-content": "It renders skeleton bars only, with no text from any caller, so nothing can run long. The detector matched the text variant name and prop comments.",
+      "offline": "SkeletonRow never fetches or mutates; the table that shows it owns any network failure. The detector matched the word Skeleton."
+    },
     "apps/web/components/organisms/table/atoms/TableCell.tsx": {
       "partial": "A cell wraps one required children slot; width, align, multiline, hideOnMobile, as and className are layout options, so there is nothing to be partially present. An empty or partial row is the caller's data, drawn by the cells it passes."
+    },
+    "apps/web/components/organisms/table/atoms/TableEmptyState.tsx": {
+      "loading": "TableEmptyState is the settled empty result and has no loading branch; tables render skeleton rows while loading and swap this in only after data arrives. The detector matched the loading-to-empty layout-shift comment."
+    },
+    "apps/web/components/organisms/table/molecules/ActionBar.tsx": {
+      "empty": "ActionBar lays out the buttons its caller passes as required children and holds no collection of its own; a toolbar with no actions passes no ActionBar (PageToolbar renders it only when end is set). The detector matched the items-center class."
+    },
+    "apps/web/components/organisms/table/molecules/GroupedTableBody.tsx": {
+      "empty": "Its only caller, UnifiedTable, renders it only when groupedData.length > 0 and shows the table's emptyState otherwise; useTableGrouping only creates a group for a row it has seen, so every group holds at least one row.",
+      "partial": "Its required props carry the data; the optional visibleGroupIndex and stickyOffset are scroll geometry with defaults, so nothing can be partially present. Partial rows are the caller's renderRow output."
+    },
+    "apps/web/components/organisms/table/molecules/LoadingTableBody.tsx": {
+      "empty": "LoadingTableBody is itself the loading placeholder and takes no data; its .map( only iterates fixed loading-row keys built from rows, so there is no collection that can be empty.",
+      "long-content": "It renders skeleton rows only, with no text from any caller, so nothing can run long. The detector matched the text variant name and prop comments.",
+      "offline": "LoadingTableBody never fetches or mutates; the table that shows it owns any network failure. The detector matched SkeletonRow."
+    },
+    "apps/web/components/organisms/table/molecules/PageToolbar.tsx": {
+      "empty": "PageToolbar lays out a required start slot and an optional end slot rather than a collection; with no actions it drops the end slot, which PartialStartOnly shows. The detector matched the items-center classes."
     },
     "apps/web/components/organisms/table/molecules/SemanticTable.tsx": {
       "partial": "Each part (TableRoot, TableHead, TableBody, TableRow) wraps one required children slot; className and rowMode are styling and geometry options, so nothing can be partially present. Partial rows are the caller's cells."
     },
     "apps/web/components/organisms/table/organisms/UnifiedTableHeader.tsx": {
       "empty": "Its only caller, UnifiedTable, passes table.getHeaderGroups(), which TanStack always returns with at least one group, and hides the header with hideHeader instead. The length-0 guard is defensive; UnifiedTableHeader.test.tsx asserts it renders no thead. The detector matched headerGroups.map(."
+    },
+    "apps/web/components/organisms/table/organisms/UnifiedTableSkeleton.tsx": {
+      "empty": "It always passes data={[]} with isLoading, and UnifiedTable draws at least max(skeletonRows, the empty-state min-height in rows) placeholder rows, so it never shows an empty result; the loaded table owns that state.",
+      "offline": "A Suspense loading frame that never fetches or mutates; the loaded table that streams in after it owns any network failure. The detector matched isLoading and skeleton props."
     },
     "apps/web/components/organisms/user-button/UserButton.tsx": {
       "empty": "The account menu always builds the same fixed items (profile, settings, help, billing, sign out); with no user the trigger shows its loading skeleton (the LoadingRow story), so there is no empty collection to draw.",
