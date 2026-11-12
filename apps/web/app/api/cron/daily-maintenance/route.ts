@@ -34,6 +34,7 @@ import { runLegacyClaimVerificationSweep } from '@/lib/claim/legacy-verification
 import { verifyCronRequest } from '@/lib/cron/auth';
 import { sweepAppleMusicCatalogCompletenessForCron } from '@/lib/discography/apple-music-import';
 import { sweepUnderEnrichedProfilesForCron } from '@/lib/discography/re-enrich';
+import { sweepLegacySlugsForCron } from '@/lib/discography/slug-migration';
 import { env } from '@/lib/env-server';
 import { captureError } from '@/lib/error-tracking';
 import { cleanupFounderReviewUploadLeases } from '@/lib/founder-review/server';
@@ -260,6 +261,13 @@ export async function GET(request: Request) {
         families: summary.families,
       };
     }
+  );
+
+  // 12a. Legacy `-2`/`-3` release and track URLs -> plain-language slugs,
+  //      old URLs 308ing (slug policy follow-up to #23143), bounded batch.
+  results.legacySlugMigration = await runSubJob(
+    'legacySlugMigration',
+    sweepLegacySlugsForCron
   );
 
   // 12b. Expired agent connector drafts (privacy policy retention, #23772).
