@@ -102,8 +102,21 @@ export function evaluateRenderModes({
   now = new Date(),
 }) {
   const shape = validateSnapshotShape(snapshot);
-  if (shape.length > 0) return { shape, errors: shape, notices: [], ok: false };
-  const comparison = compareRenderModes({ build, snapshot });
+  // An unreadable snapshot is compared as empty so the result keeps one shape.
+  const comparison = compareRenderModes({
+    build,
+    snapshot: shape.length > 0 ? { routes: {} } : snapshot,
+  });
+  if (shape.length > 0) {
+    return {
+      shape,
+      ...comparison,
+      weakened: /** @type {string[]} */ ([]),
+      errors: shape,
+      notices: /** @type {string[]} */ ([]),
+      ok: false,
+    };
+  }
   const weakened = weakenedEntries(snapshot, ancestor, now);
   const errors = [
     ...weakened.map(
