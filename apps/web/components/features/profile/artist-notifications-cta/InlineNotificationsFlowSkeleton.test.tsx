@@ -2,10 +2,7 @@ import { render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { COUNTRY_OPTIONS } from '@/features/profile/notifications';
 import { expectNoA11yViolations } from '@/tests/utils/a11y';
-import {
-  InlineNotificationsFlowSkeleton,
-  NotificationsFlowSkeleton,
-} from './InlineNotificationsFlowSkeleton';
+import { InlineNotificationsFlowSkeleton } from './InlineNotificationsFlowSkeleton';
 import { ProfileMobileNotificationsFlow } from './ProfileMobileNotificationsFlow';
 
 vi.unmock('motion/react');
@@ -102,24 +99,8 @@ describe('InlineNotificationsFlowSkeleton', () => {
     expect(screen.queryByRole('textbox')).not.toBeInTheDocument();
   });
 
-  it('has no axe violations in the inline and two-step loading states', async () => {
-    const inline = render(<InlineNotificationsFlowSkeleton />);
-    await expectNoA11yViolations(inline.container);
-    inline.unmount();
-    const twoStep = render(<NotificationsFlowSkeleton twoStep />);
-    await expectNoA11yViolations(twoStep.container);
-  });
-
-  it('keeps the short skeleton for the two-step form', () => {
-    const { rerender } = render(<NotificationsFlowSkeleton twoStep />);
-    expect(
-      screen.queryByTestId('profile-mobile-notifications-flow-skeleton')
-    ).not.toBeInTheDocument();
-    expect(screen.getByText('Loading subscription form')).toBeInTheDocument();
-
-    rerender(<NotificationsFlowSkeleton />);
-    expect(
-      screen.getByTestId('profile-mobile-notifications-flow-skeleton')
-    ).toBeInTheDocument();
+  it('has no axe violations in the loading state', async () => {
+    const { container } = render(<InlineNotificationsFlowSkeleton />);
+    await expectNoA11yViolations(container);
   });
 });

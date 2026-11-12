@@ -16,6 +16,13 @@ describe('MarketingSignInLink states', () => {
     const link = screen.getByRole('link', { name: 'Sign in' });
     expect(link).toHaveAttribute('href', APP_ROUTES.SIGNIN);
     expect(link).not.toHaveAttribute('data-variant');
+    // Its colour comes from the header link tokens (light and dark), never a
+    // raw neutral or white-alpha class.
+    expect(link).toHaveClass(
+      'text-header-text-link',
+      'hover:text-header-text-link-hover'
+    );
+    expect(link.className).not.toMatch(/neutral-|white\//);
 
     await user.tab();
     expect(link).toHaveFocus();

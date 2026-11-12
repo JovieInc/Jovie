@@ -117,6 +117,11 @@
     "apps/web/app/[username]/[slug]/PreserveSearchRedirect.tsx": {
       "offline": "It never fetches: it paints the shared SmartLink loading shell (Loading) and hands the hop to location.replace, a full navigation whose offline failure the browser shows on its own error page, outside this component."
     },
+    "apps/web/app/[username]/_components/PublicProfileErrorState.tsx": {
+      "empty": "The alert holds no data; its only prop is retryHref. The detector matched the items-center layout classes. ErrorTransientRead shows the one face it draws.",
+      "long-content": "Every visible string is fixed copy in the component and retryHref only sets the Try Again href, so no caller text can grow. ErrorPhoneWidth shows the copy wrapping at 320px; the detector matched the heading id and the icon's title.",
+      "permission-denied": "A public read-failure page with no gated action or permission input; the detector matched role='alert' (ErrorTransientRead)."
+    },
     "apps/web/app/app/(shell)/DashboardShellContent.tsx": {
       "loading": "DashboardShellContent is an async server component awaited inside the shell layout's Suspense boundary, so it never renders a loading frame of its own; that fallback is shell-route-skeleton.tsx, which carries the loading stories.",
       "offline": "DashboardShellContent runs only on the server for a request, so browser connectivity never reaches it. A server read that stalls past 10 seconds returns the PageErrorState branch, asserted in DashboardShellContent.test.tsx.",
@@ -159,6 +164,9 @@
       "long-content": "The control is a fixed 28px or 32px icon square; its label is announced through aria-label rather than rendered, and tooltip text layout belongs to TooltipShortcut, so no content can overflow the button.",
       "rtl-overflow": "The control is a symmetric icon square with no text or inline-direction classes and its tooltip opens below it, so it renders the same under dir='rtl'; mirroring a directional glyph is the caller's choice of child icon."
     },
+    "apps/web/components/atoms/ArtworkFallbackTile.tsx": {
+      "empty": "The tile holds no collection: seed is required and draws the whole face. The detector matched the items-center class; Default and PartialNoLabel show the tile with only a seed."
+    },
     "apps/web/components/atoms/ArtworkFrame.tsx": {
       "long-content": "ArtworkFrame renders no text of its own: children is one square media slot clipped by overflow-hidden at the size the caller sets, so its content cannot grow; the detector matched the children prop."
     },
@@ -195,6 +203,10 @@
       "long-content": "InvisibleTurnstile renders no caller text; its only string is the fixed aria-label 'Security Verification', and the status messages it reports go to the owning form (the detector matched message and label).",
       "offline": "InvisibleTurnstile never fetches or mutates itself; losing the connection reaches it only as the vendor script failing or timing out, which it reports as status 'error' or 'timeout' through onStateChange, as InvisibleTurnstile.test.tsx covers.",
       "rtl-overflow": "InvisibleTurnstile renders no text of its own; the challenge panel is Cloudflare's iframe, which follows the browser locale, and its status messages are shown by the owning form (the detector matched message and label)."
+    },
+    "apps/web/components/atoms/JovieIcon.tsx": {
+      "partial": "The icon draws one fixed music-note path; its two optional props are size (Sized, Compact) and className, so nothing can be partly present.",
+      "long-content": "It renders no text; the detector matched its text- colour classes. Rtl shows the mark beside right-to-left copy."
     },
     "apps/web/components/atoms/Logo.tsx": {
       "empty": "Logo draws the fixed Jovie wordmark or mark and takes no collection; the detector matched the .map( over the wordmark's own glyph paths from wordmarkGeometry, which always holds the five letters, so there is nothing that can be empty.",
@@ -289,6 +301,10 @@
       "empty": "Plans are the three checked-in public plans filtered by NEXT_PUBLIC_MARKETING_VISIBLE_PLANS, and a filter naming no known plan falls back to all three, so the card list cannot be empty. A plan with no features drops its list, which PartialPlanDetails shows.",
       "permission-denied": "Public pricing has no gated action: every visitor sees every visible plan and its CTA. The detector matched the word plan; entitlement checks happen after the CTA, in checkout."
     },
+    "apps/web/components/features/pricing/PricingComparisonChart.tsx": {
+      "empty": "The chart takes no props and always renders the fixed public comparison registry (PUBLIC_PRICING_COMPARISON), which is never empty; PricingComparisonChart.test.tsx asserts it has rows. The detector matched the .map calls over that registry.",
+      "permission-denied": "The comparison is public marketing copy with no gated action or permission input; the detector matched the word plan in the plan picker and price claims."
+    },
     "apps/web/components/features/profile/AliasCollisionRecovery.tsx": {
       "error": "Recovery returns null in every state; a failed, non-OK or malformed alias decision only leaves the visitor on the mode page, which has no pixels of its own to show. AliasCollisionRecovery.certificate.test.tsx asserts no navigation or history change and an axe-clean page for each failure."
     },
@@ -311,6 +327,9 @@
     "apps/web/components/features/profile/ProfileWebVitalsReporter.tsx": {
       "error": "The reporter returns null and swallows a failed web-vitals import or start so the profile keeps rendering; there is nothing to draw for the failure, and ProfileWebVitalsReporter.test.tsx asserts the swallowed failure with axe."
     },
+    "apps/web/components/features/profile/ProofClaimCtaLink.tsx": {
+      "empty": "The link holds no collection: label is required and, with no children, is drawn as the link text (RequestAccess, PartialFooterNoAriaLabel). The detector matched the items-center class in proofClaimFooterClassName."
+    },
     "apps/web/components/features/profile/PublicProfileFixture.tsx": {
       "permission-denied": "The fixture is a public profile with no gated action; claimed, owner and unclaimed only change the claim banner (Claimed, Unclaimed). The detector matched role: 'producer' in the release credit."
     },
@@ -329,6 +348,14 @@
       "long-content": "The skeleton renders no caller text: its title and body are fixed non-breaking spaces and the consent line is invisible, so there is no content that can run long.",
       "offline": "The skeleton never fetches; it stands in while the visitor's assignment resolves, and the live form that replaces it reports connectivity."
     },
+    "apps/web/components/features/profile/templates/ProfileCompactSurface.tsx": {
+      "offline": "The surface makes no request: 'loading' is the lazy overlay import option and 'pending' a comment. The alert sign-up it hosts owns its submit; LoadingVisitorAssignment shows the held skeleton, and ProfileCompactTemplate's OfflineAlertForm story and test cover the offline assignment fallback.",
+      "permission-denied": "A public profile with no gated action or permission input; the detector matched 'locked' and 'upgrade' in code comments. hideJovieBranding only drops the footer mark (ProfileCompactSurface.test.tsx)."
+    },
+    "apps/web/components/features/profile/templates/PublicProfileLayoutShell.tsx": {
+      "empty": "The shell holds no collection: compactSurface is required, and PartialCompactOnly shows it alone with no desktop surface or claim footer. The detector matched the items-center and items-stretch layout classes.",
+      "offline": "The shell never fetches; the compact and desktop surfaces it hosts own their requests (ProfileCompactTemplate's OfflineAlertForm covers the offline fallback). The detector matched the desktop Loading profile placeholder, shown in LoadingEmbeddedPreview."
+    },
     "apps/web/components/features/release/ActionDial.tsx": {
       "error": "ActionDial never fetches or mutates; its only catch blocks guard localStorage for the first-use hint, and blocked storage still shows the hint, which ActionDial.test.tsx covers ('survives blocked storage').",
       "permission-denied": "ActionDial has no gated action or permission input; the detector matched role='listbox', 'option' and 'status', and its disabled prop is shown by the DisabledAction story."
@@ -344,6 +371,18 @@
       "empty": "The skeleton draws a fixed five provider rows from a constant key list and takes no props, so there is no collection that can be empty; the detector matched that .map(.",
       "long-content": "It renders skeleton bars only, with no text from any caller; the detector matched the text-center class, so nothing can overflow.",
       "offline": "A static skeleton with no fetch or mutation; the route that shows it owns any network failure. The detector matched 'skeleton' in its row keys."
+    },
+    "apps/web/components/features/release/SmartLinkShell.tsx": {
+      "error": "The shell has no failure UI: its only catch is useSmartLinkShare swallowing a cancelled share sheet or a refused clipboard copy, which draws nothing. SmartLinkShell.test.tsx asserts the swallowed copy failure; EmptyArtwork shows the nearest degraded state (no artwork)."
+    },
+    "apps/web/components/features/release/VideoReleasePage.tsx": {
+      "error": "The page never draws a broken embed: on an embed failure it posts the video_embed_failed beacon and replaces the location with the artist profile, so there is no error screen to show (a story would navigate the frame away). VideoReleasePage.test.tsx asserts the beacon and the redirect."
+    },
+    "apps/web/components/features/release/YouTubeEmbed.tsx": {
+      "error": "The embed draws no error UI by design: when the frame has not loaded after eight seconds it calls onError and its parent leaves the page (VideoReleasePage redirects to the profile). Until then it shows the LoadingSkeleton story's frame; YouTubeEmbed.test.tsx asserts the eight-second onError.",
+      "offline": "Offline, the cross-origin frame simply never fires load, which is the same held skeleton and timed-out onError as the error state (LoadingSkeleton story, YouTubeEmbed.test.tsx); the embed itself never fetches.",
+      "partial": "Nothing can be partially present: videoId and title are required, className is styling and onError is a callback, so the frame either has its video or is still loading (LoadingSkeleton).",
+      "long-content": "The title is only the iframe's accessible name and is never drawn, so no text can overflow the 16:9 frame; the detector matched the title prop. YouTubeEmbed.test.tsx asserts the title lands on the frame as its accessible name."
     },
     "apps/web/components/features/teleprompter-studio/StudioCameraBlocked.tsx": {
       "empty": "Renders one fixed message for one camera error and no collection; the detector matched the items-start layout class.",
@@ -379,6 +418,12 @@
     "apps/web/components/features/waitlist/WaitlistQualifyingSteps.tsx": {
       "offline": "WaitlistQualifyingSteps never fetches or submits by itself: the submit button posts the parent WaitlistRoleForm, which owns the join request and its failed and offline recovery, and the artist search's own request state belongs to WaitlistSpotifySearch. Lost connectivity reaches this step only as the parent's submitting flag, which disables every action (WaitlistQualifyingSteps.certificate.test.tsx).",
       "permission-denied": "The three questions are open to every visitor requesting access and have no gated action or permission input; the detector matched 'role' in the @/lib/waitlist/role-qualification import path."
+    },
+    "apps/web/components/features/waitlist/WaitlistRoleForm.tsx": {
+      "permission-denied": "Request access is open to every visitor and the form has no gated action or permission input; the detector matched 'role', the field the visitor picks. The nearest refusal, a failed security check, keeps its message on screen and is covered in WaitlistRoleForm.test.tsx."
+    },
+    "apps/web/components/features/waitlist/WaitlistSpotifySearch.tsx": {
+      "permission-denied": "The artist search is an optional step open to every visitor and has no gated action or permission input; the detector matched role='combobox' on the search field."
     },
     "apps/web/components/features/waitlist/WaitlistSuccessView.tsx": {
       "loading": "It mounts only once its owner already has an outcome (the /waitlist server route after resolving user state, or WaitlistIntakeChat after the request settles), so it never shows a loading state; 'pending' is the waitlist review status that Web214AuthenticatedPending shows, not a request in flight."
@@ -591,6 +636,12 @@
     "apps/web/components/organisms/table/organisms/UnifiedTableHeader.tsx": {
       "empty": "Its only caller, UnifiedTable, passes table.getHeaderGroups(), which TanStack always returns with at least one group, and hides the header with hideHeader instead. The length-0 guard is defensive; UnifiedTableHeader.test.tsx asserts it renders no thead. The detector matched headerGroups.map(."
     },
+    "apps/web/components/organisms/user-button/UserButton.tsx": {
+      "empty": "The account menu always builds the same fixed items (profile, settings, help, billing, sign out); with no user the trigger shows its loading skeleton (the LoadingRow story), so there is no empty collection to draw.",
+      "error": "UserButton draws no error UI of its own: a failed iOS-access read falls back to the menu without that item, a failed billing-status read falls back to the Upgrade item and useUserButton reports it through the shared toast, and feedback errors stay inside DashboardFeedbackModal.",
+      "offline": "Offline takes the same paths as the error waiver: the session comes from the auth client, and the billing and feedback requests fall back or report through the shared toast and the feedback modal, so the trigger and menu have no offline drawing.",
+      "permission-denied": "Nothing in the menu is denied: Upgrade is the working checkout path for a free plan and Manage billing replaces it on Pro. The detector matched the upgrade and plan identifiers."
+    },
     "apps/web/components/shell/AppShellRightRail.tsx": {
       "partial": "AppShellRightRail is a layout slot. Its only optional props are className and the belowHeader placement flag, and it renders whatever drawer it is given, so the rail itself has no partially loaded state; each drawer owns its own."
     },
@@ -625,6 +676,11 @@
     "apps/web/components/site/theme-toggle/ThemeToggle.tsx": {
       "empty": "ThemeToggle always offers the same three themes (system, light, dark) and renders no data collection; the detector matched the items-center class.",
       "long-content": "ThemeToggle shows no caller text: its labels ('Toggle theme', the theme names) are fixed in code and shortcutKey is a single key, so there is nothing that can grow long."
+    },
+    "apps/web/components/site/theme-toggle/ThemeToggleSegmented.tsx": {
+      "empty": "The rail always draws the same three theme buttons (system, light, dark) and renders no data collection; the detector matched the items-center class.",
+      "long-content": "No caller text paints: the button names and icons are fixed in code, and the one caller string, shortcutDescription, renders only inside an sr-only span.",
+      "permission-denied": "Every theme choice is open to everyone and nothing is gated; the detector matched role='toolbar' on the rail."
     },
     "apps/web/components/site/theme-toggle/ThemeToggleSkeleton.tsx": {
       "empty": "ThemeToggleSkeleton always reserves a fixed shape (one icon button or exactly three segments) and never a collection; the detector matched the items-center class.",

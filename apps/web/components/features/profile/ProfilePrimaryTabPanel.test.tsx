@@ -244,7 +244,9 @@ describe('ProfilePrimaryTabPanel', () => {
     ).not.toBeInTheDocument();
   });
 
-  it('holds the two-step subscribe CTA too while the visitor assignment resolves', () => {
+  it('holds the two-step subscribe CTA in the same full inline-flow skeleton', () => {
+    // The two-step CTA starts expanded here, so it mounts the same inline
+    // flow; a short placeholder grew 328px on load (CLS 0.114 on phones).
     renderPanel({
       mode: 'subscribe',
       subscribeTwoStep: true,
@@ -253,8 +255,8 @@ describe('ProfilePrimaryTabPanel', () => {
 
     expect(screen.getByText('Loading subscription form')).toBeInTheDocument();
     expect(
-      screen.queryByTestId('profile-mobile-notifications-flow-skeleton')
-    ).not.toBeInTheDocument();
+      screen.getByTestId('profile-mobile-notifications-flow-skeleton')
+    ).toBeInTheDocument();
     expect(
       screen.queryByTestId('mock-two-step-notifications-cta')
     ).not.toBeInTheDocument();
