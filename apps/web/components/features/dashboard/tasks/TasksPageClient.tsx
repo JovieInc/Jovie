@@ -140,10 +140,12 @@ import {
 } from './task-action-registry';
 import { taskSearchFromPills } from './task-header-search';
 import {
+  getReleasePanelStatus,
   getTaskAssigneeVisual,
   getTaskPriorityVisual,
   getTaskStageVisual,
   getTaskStatusVisual,
+  type ReleasePanelStatus,
   TASK_STATUS_LABEL_CLASSNAME,
 } from './task-presentation';
 
@@ -177,7 +179,6 @@ const TASK_WORKSPACE_PANE_CLASSNAME = 'min-h-0 overflow-hidden';
 const TASK_VIEW_MODES: Array<'board' | 'list'> = ['board', 'list'];
 
 type MobileTaskScope = 'all' | 'open' | 'done';
-type ReleasePanelStatus = 'loading' | 'error' | 'empty';
 type TaskEditorSaveStatus =
   | 'idle'
   | 'dirty'
@@ -2098,12 +2099,12 @@ export function TasksPageClient() {
     };
   }, [handleCloseShortcut, handleRowNavigationShortcut]);
 
-  const closeReleaseSidebar = useCallback(() => {
-    setSelectedReleaseId(null);
-  }, []);
-
-  const sidebarPanel = selectedReleaseId ? (
-    selectedRelease ? (
+  const closeReleaseSidebar = useCallback(() => setSelectedReleaseId(null), []);
+  const releasePanelStatus = getReleasePanelStatus(selectedReleaseQuery);
+  const refetchRelease = selectedReleaseQuery.refetch;
+  const sidebarPanel = useMemo(() => {
+    if (!selectedReleaseId) return null;
+    return selectedRelease ? (
       <ReleaseSidebar
         release={selectedRelease}
         mode='admin'
@@ -2115,20 +2116,19 @@ export function TasksPageClient() {
       />
     ) : (
       <TaskReleasePanelStatus
-        status={
-          selectedReleaseQuery.isError
-            ? 'error'
-            : selectedReleaseQuery.isLoading
-              ? 'loading'
-              : 'empty'
-        }
+        status={releasePanelStatus}
         onClose={closeReleaseSidebar}
-        onRetry={() => {
-          Promise.resolve(selectedReleaseQuery.refetch()).catch(() => {});
-        }}
+        onRetry={() => void Promise.resolve(refetchRelease()).catch(() => {})}
       />
-    )
-  ) : null;
+    );
+  }, [
+    artistName,
+    closeReleaseSidebar,
+    refetchRelease,
+    releasePanelStatus,
+    selectedRelease,
+    selectedReleaseId,
+  ]);
   useRegisterRightPanel(sidebarPanel);
 
   const showAssigneeInListRows = assigneeFilter === 'all';

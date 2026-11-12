@@ -68,10 +68,7 @@ function AuthShellInner({
   // left-sidebar toggle in Electron. Keep the initial client tree identical to
   // SSR; the runtime CSS hides the header slot before paint, and this hook
   // removes it after hydration without replacing the shell or losing drafts.
-  const sidebarTrigger =
-    isMobile || isElectron ? null : !sidebarPinned ? (
-      <SidebarCollapseButton previewTrigger={false} />
-    ) : null;
+  const showSidebarTrigger = !isMobile && !isElectron && !sidebarPinned;
 
   const isInSettings = section === 'settings';
   const hideTopHeader = isInSettings || isLyricsRoute;
@@ -105,32 +102,56 @@ function AuthShellInner({
   );
   const audioPlayer = useMemo(() => <PersistentAudioBar />, []);
 
+  // Memoize the header element. AuthShellInner re-renders on every sidebar
+  // context change (hover peek included); a rebuilt element would defeat the
+  // AppShellFrame memo and re-render the whole header each time.
+  const togglePreviewPanel = previewPanelState.toggle;
+  const header = useMemo(
+    () =>
+      hideTopHeader ? null : (
+        <DashboardHeader
+          breadcrumbs={breadcrumbs}
+          sidebarTrigger={
+            showSidebarTrigger ? (
+              <SidebarCollapseButton previewTrigger={false} />
+            ) : null
+          }
+          railToggle={railToggle}
+          breadcrumbSuffix={headerBadge}
+          action={headerAction}
+          commandPaletteHeader={commandPaletteHeader}
+          mobileProfileSlot={
+            // The rail toggle opens the same profile panel; render the
+            // mobile fallback only when no rail toggle exists.
+            section === 'ov' || section === 'admin' || railToggle ? null : (
+              <MobileProfileDrawer onOpen={togglePreviewPanel} />
+            )
+          }
+          showDivider={isTableRoute}
+          transparent={isChatRoute}
+        />
+      ),
+    [
+      breadcrumbs,
+      commandPaletteHeader,
+      headerAction,
+      headerBadge,
+      hideTopHeader,
+      isChatRoute,
+      isTableRoute,
+      railToggle,
+      section,
+      showSidebarTrigger,
+      togglePreviewPanel,
+    ]
+  );
+
   return (
     <RuntimeUpdateProvider>
       <AppShellFrame
         brandVariant={section === 'ov' ? 'ov' : 'jovie'}
         sidebar={sidebar}
-        header={
-          hideTopHeader ? null : (
-            <DashboardHeader
-              breadcrumbs={breadcrumbs}
-              sidebarTrigger={sidebarTrigger}
-              railToggle={railToggle}
-              breadcrumbSuffix={headerBadge}
-              action={headerAction}
-              commandPaletteHeader={commandPaletteHeader}
-              mobileProfileSlot={
-                // The rail toggle opens the same profile panel; render the
-                // mobile fallback only when no rail toggle exists.
-                section === 'ov' || section === 'admin' || railToggle ? null : (
-                  <MobileProfileDrawer onOpen={previewPanelState.toggle} />
-                )
-              }
-              showDivider={isTableRoute}
-              transparent={isChatRoute}
-            />
-          )
-        }
+        header={header}
         // Ovie Home and dashboards share one flat shell canvas.
         chatAmbientGradient={isChatRoute && section !== 'ov'}
         main={children}

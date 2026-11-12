@@ -337,6 +337,7 @@ const mockSetViewMode = vi.fn((viewMode: 'board' | 'list') => {
   mockViewMode = viewMode;
 });
 const mockRefetchTasks = vi.fn();
+const mockRefetchRelease = vi.fn();
 const mockRefetchTaskBoard = vi.fn();
 
 function createMockTaskBoardResult(
@@ -429,7 +430,7 @@ vi.mock('@/lib/queries/useReleaseEntityQuery', () => ({
       data: releaseId ? mockReleaseEntityData : null,
       isError: mockReleaseEntityIsError,
       isLoading: mockReleaseEntityIsLoading,
-      refetch: vi.fn(),
+      refetch: mockRefetchRelease,
     };
   },
 }));
@@ -757,6 +758,17 @@ function HeaderActionsHost() {
 
 function renderPage() {
   return render(
+    <TooltipProvider>
+      <HeaderActionsProvider>
+        <HeaderActionsHost />
+        <TasksPageClient />
+      </HeaderActionsProvider>
+    </TooltipProvider>
+  );
+}
+
+function rerenderPage(view: ReturnType<typeof render>) {
+  view.rerender(
     <TooltipProvider>
       <HeaderActionsProvider>
         <HeaderActionsHost />
@@ -1364,7 +1376,7 @@ describe('TasksPageClient', () => {
   });
 
   it('registers the release side panel from the selected task document', () => {
-    renderPage();
+    const view = renderPage();
     openTask();
 
     fireEvent.click(screen.getByRole('button', { name: 'QA Release' }));
@@ -1373,11 +1385,11 @@ describe('TasksPageClient', () => {
       'profile-1',
       'release-1'
     );
-    expect(mockRegisterRightPanel).toHaveBeenLastCalledWith(
-      expect.objectContaining({
-        type: expect.any(Function),
-      })
-    );
+    const panel = mockRegisterRightPanel.mock.calls.at(-1)?.[0];
+    expect(panel?.type).toEqual(expect.any(Function));
+    // A page render with the same selection must reuse the panel element.
+    rerenderPage(view);
+    expect(mockRegisterRightPanel.mock.calls.at(-1)?.[0]).toBe(panel);
   });
 
   it.each([
@@ -1643,14 +1655,7 @@ describe('TasksPageClient', () => {
       mockTask,
     ];
 
-    view.rerender(
-      <TooltipProvider>
-        <HeaderActionsProvider>
-          <HeaderActionsHost />
-          <TasksPageClient />
-        </HeaderActionsProvider>
-      </TooltipProvider>
-    );
+    rerenderPage(view);
 
     expect(screen.getByLabelText('Task Title')).toHaveValue(
       'Unsaved metadata-safe title'
@@ -2193,14 +2198,7 @@ describe('TasksPageClient', () => {
       vi.advanceTimersByTime(500);
     });
     mockTasksData = [{ ...mockTaskTwo, title: 'Optimistic title' }, mockTask];
-    view.rerender(
-      <TooltipProvider>
-        <HeaderActionsProvider>
-          <HeaderActionsHost />
-          <TasksPageClient />
-        </HeaderActionsProvider>
-      </TooltipProvider>
-    );
+    rerenderPage(view);
     fireEvent.click(
       screen.getByRole('button', { name: 'Emit unchanged editor update' })
     );

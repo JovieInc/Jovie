@@ -1692,13 +1692,28 @@ function ProfilesWorkspaceContent({
     ]
   );
 
-  useRegisterRightPanel(
-    data ? (
-      isAddConnectionOpen ? (
+  // Memoized: built inline, this panel was a new element on every render of
+  // the workspace, which re-rendered the shell frame and header each time.
+  const selectedId = selected?.id ?? null;
+  const selectedSourceQuery =
+    data && selectedId
+      ? sourceIdentityQueries[
+          (data.rows ?? []).findIndex(row => row.id === selectedId)
+        ]
+      : undefined;
+  const selectedSourceIdentity = selectedSourceQuery?.data;
+  const selectedSourceLoading = selectedSourceQuery?.isFetching ?? false;
+  const refetchSelectedSource = selectedSourceQuery?.refetch;
+  const suggestedCount = connectionSuggestions.length;
+  const suggestionsLoading = connectionSuggestionsQuery.isLoading;
+  const rightPanel = useMemo(() => {
+    if (!data) return null;
+    if (isAddConnectionOpen) {
+      return (
         <AddConnectionRail
           data={data}
-          suggestedCount={connectionSuggestions.length}
-          suggestionsLoading={connectionSuggestionsQuery.isLoading}
+          suggestedCount={suggestedCount}
+          suggestionsLoading={suggestionsLoading}
           onClose={() => {
             setPendingCandidate(null);
             setIsAddConnectionOpen(false);
@@ -1720,34 +1735,39 @@ function ProfilesWorkspaceContent({
             setIsAddConnectionOpen(false);
           }}
         />
-      ) : selected ? (
-        <ConnectionRail
-          data={data}
-          row={selected}
-          onClose={() => setSelected(null)}
-          onIdentityDecision={handleIdentityDecision}
-          sourceIdentity={
-            sourceIdentityQueries[
-              (data.rows ?? []).findIndex(row => row.id === selected.id)
-            ]?.data
-          }
-          sourceLoading={
-            sourceIdentityQueries[
-              (data.rows ?? []).findIndex(row => row.id === selected.id)
-            ]?.isFetching ?? false
-          }
-          onRetrySource={() => {
-            void sourceIdentityQueries[
-              (data.rows ?? []).findIndex(row => row.id === selected.id)
-            ]?.refetch();
-          }}
-          contextMenuItems={convertToCommonDropdownItems(
-            getContextMenuItems(selected)
-          )}
-        />
-      ) : null
-    ) : null
-  );
+      );
+    }
+    if (!selected) return null;
+    return (
+      <ConnectionRail
+        data={data}
+        row={selected}
+        onClose={() => setSelected(null)}
+        onIdentityDecision={handleIdentityDecision}
+        sourceIdentity={selectedSourceIdentity}
+        sourceLoading={selectedSourceLoading}
+        onRetrySource={() => {
+          void refetchSelectedSource?.();
+        }}
+        contextMenuItems={convertToCommonDropdownItems(
+          getContextMenuItems(selected)
+        )}
+      />
+    );
+  }, [
+    data,
+    getContextMenuItems,
+    handleIdentityDecision,
+    isAddConnectionOpen,
+    refetchSelectedSource,
+    selected,
+    selectedSourceIdentity,
+    selectedSourceLoading,
+    setSelected,
+    suggestedCount,
+    suggestionsLoading,
+  ]);
+  useRegisterRightPanel(rightPanel);
 
   if (!data) {
     return (

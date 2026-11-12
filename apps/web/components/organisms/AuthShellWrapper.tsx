@@ -144,16 +144,31 @@ function AuthShellWrapperInner({
   // rendered once by UnifiedSidebar's notification region.
   // Wrap page-injected header elements in ErrorBoundary so a throwing badge/action
   // degrades gracefully (renders nothing + toast) instead of crashing the shell.
+  // Memoized so an unrelated wrapper render keeps the header props stable
+  // and the memoized header element in AuthShell is reused.
   const rawHeaderAction = headerActions.headerActions ?? null;
-  const headerAction = rawHeaderAction ? (
-    <ErrorBoundary fallback={null}>{rawHeaderAction}</ErrorBoundary>
-  ) : null;
+  const headerAction = useMemo(
+    () =>
+      rawHeaderAction ? (
+        <ErrorBoundary fallback={null}>{rawHeaderAction}</ErrorBoundary>
+      ) : null,
+    [rawHeaderAction]
+  );
 
   // Header badge from context (shown after breadcrumb on left side)
   const rawHeaderBadge = headerActions.headerBadge ?? null;
-  const headerBadge = rawHeaderBadge ? (
-    <ErrorBoundary fallback={null}>{rawHeaderBadge}</ErrorBoundary>
-  ) : null;
+  const headerBadge = useMemo(
+    () =>
+      rawHeaderBadge ? (
+        <ErrorBoundary fallback={null}>{rawHeaderBadge}</ErrorBoundary>
+      ) : null,
+    [rawHeaderBadge]
+  );
+
+  const railToggle = useMemo(
+    () => (showArtistProfileRailToggle ? <ArtistProfileRailToggle /> : null),
+    [showArtistProfileRailToggle]
+  );
 
   // Stable handler (or undefined, so useSidebarCookieState manages internal
   // state). The cookie is written synchronously on toggle; the database write
@@ -279,11 +294,7 @@ function AuthShellWrapperInner({
                 breadcrumbs={config.breadcrumbs}
                 headerBadge={headerBadge}
                 headerAction={headerAction}
-                railToggle={
-                  showArtistProfileRailToggle ? (
-                    <ArtistProfileRailToggle />
-                  ) : null
-                }
+                railToggle={railToggle}
                 commandPaletteHeader={headerActions.commandPaletteHeader}
                 showMobileTabs={config.showMobileTabs}
                 isTableRoute={config.isTableRoute}
