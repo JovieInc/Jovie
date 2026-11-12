@@ -65,6 +65,7 @@ import {
 
 export { baseRefCandidates, resolveBaseRef };
 
+import { dateChecks } from './lib/preflight-date-checks.mjs';
 import { checkInstallMatchesLockfile } from './lib/preflight-install.mjs';
 import { remoteHint } from './lib/remote-hint.mjs';
 
@@ -710,8 +711,9 @@ export async function main({
       deferred.push(g.id);
       continue;
     }
-    cmd(g.id, g.name, g.command, g.phase ?? 1);
+    cmd(g.id, g.name, g.command, g.phase ?? 1, g.timeoutMs);
   }
+  for (const c of dateChecks(paths, baseRef)) cmd(c.id, c.name, c.command);
 
   const bio = biomeTargets(files);
   if (bio.length)

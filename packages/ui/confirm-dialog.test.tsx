@@ -92,6 +92,31 @@ describe('ConfirmDialog', () => {
     });
   });
 
+  it('allows a caller to restore its current scoped trigger on close', async () => {
+    const onCloseAutoFocus = vi.fn((event: Event) => {
+      event.preventDefault();
+      screen.getByRole('button', { name: 'Current row action' }).focus();
+    });
+    const view = (open: boolean) => (
+      <>
+        <button type='button'>Current row action</button>
+        <ConfirmDialog
+          open={open}
+          onOpenChange={vi.fn()}
+          title='Remove saved link?'
+          onConfirm={vi.fn()}
+          onCloseAutoFocus={onCloseAutoFocus}
+        />
+      </>
+    );
+    const { rerender } = render(view(true));
+    rerender(view(false));
+    await waitFor(() => expect(onCloseAutoFocus).toHaveBeenCalledOnce());
+    expect(
+      screen.getByRole('button', { name: 'Current row action' })
+    ).toHaveFocus();
+  });
+
   it('blocks confirm when confirmDisabled is true', () => {
     const onConfirm = vi.fn();
 

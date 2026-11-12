@@ -1,6 +1,8 @@
 import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import type { ReactNode } from 'react';
 import { describe, expect, it, vi } from 'vitest';
+import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import { TableEmptyState } from './TableEmptyState';
 
 vi.mock('next/link', () => {
@@ -90,5 +92,59 @@ describe('TableEmptyState', () => {
       'data-content-state',
       'error'
     );
+  });
+
+  it('runs the structured action when its CTA is clicked', async () => {
+    const user = userEvent.setup();
+    const onClick = vi.fn();
+    render(
+      <TableEmptyState
+        heading='You are offline'
+        variant='error'
+        action={{ label: 'Try Again', onClick }}
+      />
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Try Again' }));
+    expect(onClick).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([
+    [
+      'empty with actions',
+      <TableEmptyState
+        key='empty'
+        heading='No Releases Yet'
+        description='Add your first release to start building your smart links.'
+        action={{ label: 'Add Release', onClick: () => undefined }}
+        secondaryAction={{ label: 'Learn More', href: '/docs/releases' }}
+      />,
+    ],
+    [
+      'heading only',
+      <TableEmptyState key='partial' heading='No Contacts Match This View' />,
+    ],
+    [
+      'offline error',
+      <TableEmptyState
+        key='offline'
+        variant='error'
+        heading='You are offline'
+        description='Reconnect to load your releases.'
+        action={{ label: 'Try Again', onClick: () => undefined }}
+      />,
+    ],
+    [
+      'rtl',
+      <div key='rtl' dir='rtl' lang='ar'>
+        <TableEmptyState
+          heading='لا توجد إصدارات بعد'
+          description='أضف إصدارك الأول لبدء إنشاء روابطك الذكية.'
+        />
+      </div>,
+    ],
+  ])('has no accessibility violations when %s', async (_name, ui) => {
+    const { container } = render(ui);
+    await expectNoA11yViolations(container);
   });
 });

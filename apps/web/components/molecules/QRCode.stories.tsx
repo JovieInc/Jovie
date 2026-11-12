@@ -80,3 +80,62 @@ export const InContainer: Story = {
     </div>
   ),
 };
+
+/** Only the required data: the 120px size and the default label apply. */
+export const PartialDataOnly: Story = {
+  args: {
+    data: 'https://jov.ie/tim',
+  },
+};
+
+/**
+ * The admin HUD passes an empty string while its kiosk link is unresolved:
+ * there is nothing to encode, so the same unavailable fallback the failure
+ * path uses renders instead of a code that scans to nothing.
+ */
+export const EmptyData: Story = {
+  args: {
+    data: '',
+    label: 'HUD Link',
+  },
+};
+
+/**
+ * Generation failed (the `qrcode` module could not render): the frame keeps
+ * its size and shows the unavailable fallback. The export name is the error
+ * state (`Failed*`). A static story cannot reject the encoder, so this frame
+ * matches EmptyData, and QRCode.test.tsx holds the rejection and the decode
+ * error.
+ */
+export const FailedGeneration: Story = {
+  args: {
+    data: 'https://jov.ie/tim',
+    size: 120,
+    label: 'Scan To Open This Profile On Your Phone',
+  },
+};
+
+export const LongContentUrl: Story = {
+  args: {
+    data: 'https://jov.ie/tim/never-say-a-word-extended-club-mix?utm_source=qr&utm_medium=print&utm_campaign=summer-tour-poster-los-angeles&utm_content=back-cover',
+    size: 160,
+    label:
+      'Scan to open Never Say A Word (Extended Club Mix) on your phone from the summer tour poster',
+  },
+};
+
+export const RtlCaption: Story = {
+  render: () => (
+    <div dir='rtl' className='space-y-2 text-center'>
+      <QRCode
+        data='https://jov.ie/tim'
+        size={120}
+        label='امسح لفتح هذا الملف الشخصي على هاتفك'
+        className='mx-auto'
+      />
+      <p className='text-xs text-secondary-token'>
+        امسح لفتح هذا الملف الشخصي على هاتفك
+      </p>
+    </div>
+  ),
+};

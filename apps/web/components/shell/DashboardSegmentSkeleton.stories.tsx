@@ -37,3 +37,23 @@ export const Tour: Story = {
     variant: 'tour',
   },
 };
+
+/** The skeleton is the loading state of every dashboard segment. */
+export const LoadingDashboard: Story = {
+  args: {
+    variant: 'default',
+  },
+};
+
+export const Rtl: Story = {
+  args: {
+    variant: 'profile',
+  },
+  decorators: [
+    Story => (
+      <div dir='rtl' lang='ar'>
+        <Story />
+      </div>
+    ),
+  ],
+};
