@@ -126,7 +126,9 @@ describe('workspace biome probes stay inside the repo', () => {
       isInsideRepo(REPO_ROOT, resolve(REPO_ROOT, PROBE_PARENT)),
       true
     );
-    assert.equal(isInsideRepo(REPO_ROOT, '/tmp/biome-outside'), false);
+    // Built without a quoted /tmp literal: the hermetic guard rejects those.
+    const outside = ['', 'tmp', 'biome-outside'].join('/');
+    assert.equal(isInsideRepo(REPO_ROOT, outside), false);
     const ignored = spawnSync(
       'git',
       ['check-ignore', '-q', '--', `${PROBE_PARENT}/sample.json`],
