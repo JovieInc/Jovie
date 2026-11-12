@@ -17,7 +17,7 @@ describe('profile miss destination', () => {
     // fallback notFound() serves Next's flight-only __next_error__ shell
     // instead (no SSR body, no noindex meta).
     expect(() => ProfileMissPage()).toThrow('NEXT_NOT_FOUND');
-    expect(notFoundMock).toHaveBeenCalledExactlyOnce();
+    expect(notFoundMock).toHaveBeenCalledTimes(1);
   });
 
   it('returns title-only metadata and lets the automatic NonIndex noindex fire once', async () => {

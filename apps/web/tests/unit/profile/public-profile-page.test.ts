@@ -128,6 +128,16 @@ function getAfterFilesRewrites(
   return Array.isArray(rewrites) ? rewrites : (rewrites.afterFiles ?? []);
 }
 
+function getBeforeFilesRewrites(
+  rewrites:
+    | RewriteRule[]
+    | {
+        readonly beforeFiles?: readonly RewriteRule[];
+      }
+): readonly RewriteRule[] {
+  return Array.isArray(rewrites) ? [] : (rewrites.beforeFiles ?? []);
+}
+
 const mockProfile = {
   id: 'profile-123',
   user_id: 'user-456',
@@ -1187,8 +1197,14 @@ sourceDescribe('profile mode route redirects', () => {
   it('server-renders bounded query modes through the private profile route', async () => {
     const nextConfigModule = await import('../../../next.config.js');
     const nextConfig = nextConfigModule.default ?? nextConfigModule;
-    const afterFiles = getAfterFilesRewrites(await nextConfig.rewrites());
-    const queryModeRewrite = afterFiles.find(
+    const rewrites = await nextConfig.rewrites();
+    // JOV-12081: the mode rewrite must be a beforeFiles rewrite — afterFiles
+    // rewrites never apply to the prerendered profile route, so ?mode=listen
+    // silently rendered the home document.
+    const queryModeRewrite = [
+      ...getBeforeFilesRewrites(rewrites),
+      ...getAfterFilesRewrites(rewrites),
+    ].find(
       rule =>
         rule.source === '/:username' &&
         rule.destination.includes('/profile-mode-render/:profileMode')
@@ -1207,6 +1223,13 @@ sourceDescribe('profile mode route redirects', () => {
       destination:
         '/:username/profile-mode-render/:profileMode/__profile-mode-alias',
     });
+    expect(
+      getAfterFilesRewrites(rewrites).find(
+        rule =>
+          rule.source === '/:username' &&
+          rule.destination.includes('/profile-mode-render/:profileMode')
+      )
+    ).toBeUndefined();
     expect(PRIVATE_PROFILE_MODE_PAGE_SOURCE).toContain('return ArtistPage({');
     expect(PRIVATE_PROFILE_MODE_PAGE_SOURCE).toContain(
       '__profileMode: initialMode'
@@ -1223,8 +1246,11 @@ sourceDescribe('profile mode route redirects', () => {
   it('keeps unknown and profile query values on the canonical root renderer', async () => {
     const nextConfigModule = await import('../../../next.config.js');
     const nextConfig = nextConfigModule.default ?? nextConfigModule;
-    const afterFiles = getAfterFilesRewrites(await nextConfig.rewrites());
-    const queryModeRewrite = afterFiles.find(
+    const rewrites = await nextConfig.rewrites();
+    const queryModeRewrite = [
+      ...getBeforeFilesRewrites(rewrites),
+      ...getAfterFilesRewrites(rewrites),
+    ].find(
       rule =>
         rule.source === '/:username' &&
         rule.destination.includes('/profile-mode-render/:profileMode')
