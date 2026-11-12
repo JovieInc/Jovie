@@ -1,24 +1,44 @@
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import {
+  ApiError,
+  createApiClient,
+} from '../../../packages/api-client/client.ts';
+import { MemoryLedgerStore } from '../../../packages/api-client/store.ts';
 import {
   observeWorkflowFailureStreak,
   runLiveness as runLivenessImpl,
 } from '../../automation-liveness.mjs';
 import { selectSourceGuards } from '../../ci-fast-lanes.mjs';
-import { livenessDecisions, loadRegistry } from '../automation-registry.mjs';
+import {
+  livenessDecisions,
+  livenessFingerprint,
+  loadRegistry,
+} from '../automation-registry.mjs';
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
 const registry = loadRegistry(repoRoot);
 
 const NOW = Date.parse('2026-10-20T19:35:00Z');
 const iso = minutesAgo => new Date(NOW - minutesAgo * 60_000).toISOString();
+const MAIN = 'a'.repeat(40);
+const LIVE = 'b'.repeat(40);
 
 function runLiveness(options) {
   return runLivenessImpl({
-    // Keep the suite off the network.
+    // Keep the suite off the network and the host's shared budget ledger.
     lsRemote: async () => null,
     ...options,
+    githubClient: createApiClient({
+      provider: 'github',
+      credential: 'test',
+      fetch: options.fetchImpl,
+      store: new MemoryLedgerStore(),
+      now: () => NOW,
+      sleep: async () => {},
+      random: () => 0,
+    }),
   });
 }
 
@@ -170,4 +190,142 @@ describe('403 recovery CI admission', () => {
       );
     }
   });
+});
+
+/** URL substring -> JSON body or response for the production identity probe. */
+function fakeFetch(routes) {
+  return async input => {
+    const hit = Object.entries(routes).find(([key]) =>
+      String(input).includes(key)
+    );
+    if (!hit) return new Response('{}', { status: 404 });
+    return hit[1] instanceof Response
+      ? hit[1]
+      : new Response(JSON.stringify(hit[1]), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        });
+  };
+}
+
+describe('main-ref quota recovery (JOV-7973)', () => {
+  beforeEach(() => vi.stubEnv('JOVIE_API_STATE', 'memory'));
+  afterEach(() => vi.unstubAllEnvs());
+  // Run 43196902039: local REST shedding hid a readable main.
+  it.each(/** @type {const} */ (['shed', 'budget']))(
+    'recovers both production heartbeats through git after a %s error',
+    async kind => {
+      const ids = [
+        'derived:jovie:production-promotion',
+        'derived:jovie:production-lag-2h',
+      ];
+      const request = vi.fn(async () => {
+        throw new ApiError(kind, 'github', 'report budget unavailable');
+      });
+      const lsRemote = vi.fn(async () => MAIN);
+      const { report } = await runLivenessImpl({
+        registry: only(...ids),
+        nowMs: NOW,
+        token: 'actions-token',
+        fetchImpl: fakeFetch({
+          'jov.ie/api/health/build-info': { commitSha: MAIN },
+        }),
+        githubClient: {
+          provider: 'github',
+          credential: 'test',
+          state: async () => null,
+          request,
+        },
+        lsRemote,
+      });
+      for (const id of ids) {
+        expect(rowFor(report, id)).toMatchObject({
+          status: 'fresh',
+          reason: 'production-current',
+        });
+      }
+      expect(request).toHaveBeenCalledTimes(2);
+      expect(lsRemote).toHaveBeenCalledTimes(2);
+      expect(lsRemote).toHaveBeenCalledWith('JovieInc/Jovie', 'actions-token');
+      expect(
+        livenessDecisions(
+          report,
+          Object.fromEntries(ids.map(id => [livenessFingerprint(id), 'red']))
+        )
+      ).toEqual(
+        ids.map(id =>
+          expect.objectContaining({
+            action: 'green',
+            fingerprint: livenessFingerprint(id),
+          })
+        )
+      );
+    }
+  );
+
+  it.each([null, 'invalid', new Error('git down')])(
+    'keeps shedding red when git cannot prove main (%j)',
+    async gitResult => {
+      const { report } = await runLivenessImpl({
+        registry: only('derived:jovie:production-promotion'),
+        nowMs: NOW,
+        fetchImpl: fakeFetch({
+          'jov.ie/api/health/build-info': { commitSha: MAIN },
+        }),
+        githubClient: {
+          provider: 'github',
+          credential: 'test',
+          state: async () => null,
+          request: async () => {
+            throw new ApiError('shed', 'github', 'report budget unavailable');
+          },
+        },
+        lsRemote: async () => {
+          if (gitResult instanceof Error) throw gitResult;
+          return gitResult;
+        },
+      });
+      expect(
+        rowFor(report, 'derived:jovie:production-promotion')
+      ).toMatchObject({
+        status: 'unknown',
+        reason: 'main-ref-shed',
+      });
+      expect(livenessDecisions(report)[0].action).toBe('red');
+    }
+  );
+
+  it.each([0, 300])(
+    'still measures production lag after a rate-limited ref read (%sm)',
+    async age => {
+      const lsRemote = vi.fn(async () => MAIN);
+      const { report } = await runLiveness({
+        registry: only('derived:jovie:production-promotion'),
+        nowMs: NOW,
+        token: 'actions-token',
+        lsRemote,
+        fetchImpl: fakeFetch({
+          'jov.ie/api/health/build-info': { commitSha: age ? LIVE : MAIN },
+          '/git/ref/heads/main': new Response('{}', {
+            status: 429,
+            headers: { 'Retry-After': '60' },
+          }),
+          [`/compare/${LIVE}...${MAIN}`]: {
+            ahead_by: 1,
+            commits: [{ commit: { committer: { date: iso(age) } } }],
+          },
+        }),
+      });
+      expect(lsRemote).toHaveBeenCalledTimes(1);
+      expect(
+        rowFor(report, 'derived:jovie:production-promotion')
+      ).toMatchObject({
+        status: age ? 'stale' : 'fresh',
+        ...(age ? { ageMinutes: age } : { reason: 'production-current' }),
+      });
+      expect(
+        livenessDecisions(report).map(decision => decision.action)
+      ).toEqual(age ? ['red'] : []);
+    }
+  );
 });
