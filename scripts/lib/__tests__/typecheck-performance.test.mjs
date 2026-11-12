@@ -1,11 +1,21 @@
 import { spawnSync } from 'node:child_process';
-import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import {
+  chmodSync,
+  copyFileSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
   applyConfirmations,
+  commandResult,
   evaluateRatchet,
   sampleEnv,
   statistics,
@@ -15,6 +25,165 @@ const ROOT = resolve(import.meta.dirname, '../../..');
 const require = createRequire(import.meta.url);
 
 describe('typecheck performance', () => {
+  it('retains normal command output and exit codes, and refuses an exhausted budget', async () => {
+    expect(
+      await commandResult(
+        [
+          process.execPath,
+          '-e',
+          "console.log('measured'); process.exitCode = 7",
+        ],
+        {},
+        1000
+      )
+    ).toMatchObject({
+      exitCode: 7,
+      timedOut: false,
+      output: expect.stringContaining('measured'),
+    });
+    expect(
+      await commandResult(
+        [process.execPath, '-e', "throw Error('must not run')"],
+        {},
+        0
+      )
+    ).toMatchObject({ exitCode: 1, timedOut: true, output: '\n' });
+  });
+
+  it('writes a failing report when the shared deadline interrupts confirmation', () => {
+    const directory = mkdtempSync(join(tmpdir(), 'typecheck-confirm-budget-'));
+    try {
+      mkdirSync(join(directory, 'scripts'));
+      mkdirSync(join(directory, '.github/ci-harness'), { recursive: true });
+      copyFileSync(
+        join(ROOT, 'scripts/typecheck-performance.mjs'),
+        join(directory, 'scripts/typecheck-performance.mjs')
+      );
+      writeFileSync(
+        join(directory, '.github/ci-harness/typecheck-performance.json'),
+        JSON.stringify({
+          ratchet: {
+            minimumSamples: 3,
+            warningRegression: 0.1,
+            failureRegression: 0.2,
+          },
+          scenarios: { ci: { baselineP95Ms: 1, targetP95Ms: 1 } },
+        })
+      );
+      // Six complete samples take at least 1.2s; the same 1s budget covers
+      // both rounds, retaining the full first round and a partial confirmation.
+      writeFileSync(
+        join(directory, 'corepack'),
+        `#!${process.execPath}\nsetTimeout(() => {}, 200);\n`
+      );
+      chmodSync(join(directory, 'corepack'), 0o755);
+      const output = join(directory, 'report.json');
+      const result = spawnSync(
+        process.execPath,
+        [
+          join(directory, 'scripts/typecheck-performance.mjs'),
+          '--scenario',
+          'ci',
+          '--samples',
+          '3',
+          '--enforce',
+          '--max-duration-ms',
+          '1000',
+          '--output',
+          output,
+        ],
+        {
+          encoding: 'utf8',
+          env: { ...process.env, PATH: `${directory}:${process.env.PATH}` },
+          timeout: 10000,
+        }
+      );
+      expect(result.status, result.stderr).toBe(1);
+      const report = JSON.parse(readFileSync(output, 'utf8'));
+      expect(report.scenarios[0].samples).toHaveLength(3);
+      expect(report.confirmations).toHaveLength(1);
+      expect(
+        report.confirmations[0].samples.some(sample => sample.timedOut)
+      ).toBe(true);
+      expect(report.ratchet.ci.status).toBe('fail');
+      expect(report.maxDurationMs).toBe(1000);
+    } finally {
+      rmSync(directory, { recursive: true, force: true });
+    }
+  });
+
+  it('kills a stalled measurement and its descendants within the remaining budget', async () => {
+    const directory = mkdtempSync(join(tmpdir(), 'typecheck-deadline-'));
+    const marker = join(directory, 'orphan');
+    try {
+      const child = `setTimeout(() => require('node:fs').writeFileSync(${JSON.stringify(marker)}, 'orphan'), 800)`;
+      const result = await commandResult(
+        [
+          process.execPath,
+          join(ROOT, 'scripts/typecheck-slot.mjs'),
+          '--',
+          process.execPath,
+          '-e',
+          `require('node:child_process').spawn(process.execPath, ['-e', ${JSON.stringify(child)}], {stdio:'inherit'}); setInterval(() => {}, 1000)`,
+        ],
+        {},
+        200
+      );
+      expect(result.timedOut).toBe(true);
+      expect(result.exitCode).not.toBe(0);
+      await new Promise(resolve => setTimeout(resolve, 900));
+      expect(existsSync(marker)).toBe(false);
+    } finally {
+      rmSync(directory, { recursive: true, force: true });
+    }
+  });
+
+  it('retains the breach when confirmation has too few samples', () => {
+    expect(
+      applyConfirmations({ ci: { status: 'fail' } }, [
+        {
+          scenario: 'ci',
+          verdict: { status: 'observe', reason: 'insufficient-samples' },
+        },
+      ]).ci.status
+    ).toBe('fail');
+  });
+
+  it.each([
+    { timedOut: true, exitCode: 1, reason: 'measurement-timeout' },
+    { timedOut: false, exitCode: 2, reason: 'sample-error' },
+  ])(
+    'never clears a breach using a truncated or failing third sample ($reason)',
+    failure => {
+      const policy = {
+        baselineP95Ms: 100,
+        targetP95Ms: 125,
+        minimumSamples: 3,
+        warningRegression: 0.1,
+        failureRegression: 0.2,
+      };
+      const verdict = evaluateRatchet(
+        [
+          { durationMs: 90, exitCode: 0 },
+          { durationMs: 90, exitCode: 0 },
+          { durationMs: 10, ...failure },
+        ],
+        policy
+      );
+      expect(verdict).toEqual({ status: 'fail', reason: failure.reason });
+      expect(
+        applyConfirmations({ ci: verdict }, [
+          { scenario: 'ci', verdict: { status: 'pass' } },
+        ]).ci
+      ).toEqual(verdict);
+      expect(
+        applyConfirmations({ ci: { status: 'fail' } }, [
+          { scenario: 'ci', verdict },
+        ]).ci.status
+      ).toBe('fail');
+    }
+  );
+
   it('reports stable distribution statistics and noisy ratchet outcomes', () => {
     expect(statistics([4, 1, 2, 3])).toMatchObject({
       min: 1,

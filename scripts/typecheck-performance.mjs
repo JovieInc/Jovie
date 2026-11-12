@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import { spawnSync } from 'node:child_process';
+import { spawn } from 'node:child_process';
 import {
   existsSync,
   mkdirSync,
@@ -39,6 +39,7 @@ const SCENARIOS = {
   diagnostics: { diagnostics: true },
 };
 let activeRestore = null;
+let activeCommandStop = null;
 
 export function statistics(values) {
   const sorted = values.filter(Number.isFinite).sort((a, b) => a - b);
@@ -60,6 +61,10 @@ export function statistics(values) {
 }
 
 export function evaluateRatchet(samples, policy) {
+  if (samples.some(sample => sample.timedOut))
+    return { status: 'fail', reason: 'measurement-timeout' };
+  if (samples.some(sample => sample.exitCode != null && sample.exitCode !== 0))
+    return { status: 'fail', reason: 'sample-error' };
   const duration = statistics(samples.map(sample => sample.durationMs));
   if (!duration || duration.count < policy.minimumSamples) {
     return { status: 'observe', reason: 'insufficient-samples' };
@@ -83,6 +88,10 @@ function parseArgs(argv) {
   };
   return {
     confirmRetries: Number(value('--confirm-retries', '1')),
+    // Leave five minutes of the CI job's 15-minute limit for setup/reporting.
+    maxDurationMs: Number(
+      value('--max-duration-ms', argv.includes('--enforce') ? '600000' : '0')
+    ),
     enforce: argv.includes('--enforce'),
     output: resolve(
       ROOT,
@@ -106,23 +115,79 @@ function parseArgs(argv) {
 export function applyConfirmations(ratchet, confirmations) {
   const resolved = { ...ratchet };
   for (const { scenario, verdict } of confirmations) {
-    if (resolved[scenario]?.status === 'fail' && verdict.status !== 'fail')
+    if (
+      resolved[scenario]?.status === 'fail' &&
+      !resolved[scenario].reason &&
+      ['pass', 'warn'].includes(verdict.status)
+    )
       resolved[scenario] = verdict;
   }
   return resolved;
 }
 
-function commandResult(command, env = {}) {
+export async function commandResult(command, env = {}, timeoutMs = Infinity) {
   const timeArgs = process.platform === 'darwin' ? ['-l'] : ['-v'];
   const timed = existsSync('/usr/bin/time');
   const executable = timed ? '/usr/bin/time' : command[0];
   const args = timed ? [...timeArgs, ...command] : command.slice(1);
   const started = process.hrtime.bigint();
-  const result = spawnSync(executable, args, {
-    cwd: ROOT,
-    encoding: 'utf8',
-    env: { ...process.env, ...env },
-    maxBuffer: MAX_BUFFER,
+  const result = await new Promise(resolve => {
+    if (timeoutMs <= 0) {
+      resolve({ status: 1, timedOut: true, stdout: '', stderr: '' });
+      return;
+    }
+    const child = spawn(executable, args, {
+      cwd: ROOT,
+      // The slot launcher must keep tsc inside this owned process group.
+      env: { ...process.env, ...env, JOVIE_PREFLIGHT_MANAGED_GROUP: '1' },
+      detached: process.platform !== 'win32',
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    let stdout = '';
+    let stderr = '';
+    let timedOut = false;
+    let failed = false;
+    const stop = () => {
+      if (!child.pid) return;
+      // Kill time/corepack/turbo/tsc together, including inherited pipe owners.
+      try {
+        if (process.platform === 'win32') child.kill('SIGKILL');
+        else process.kill(-child.pid, 'SIGKILL');
+      } catch (error) {
+        if (error.code !== 'ESRCH') throw error;
+      }
+    };
+    activeCommandStop = stop;
+    const timer = Number.isFinite(timeoutMs)
+      ? setTimeout(() => {
+          timedOut = true;
+          stop();
+        }, timeoutMs)
+      : null;
+    const collect = (chunk, isError) => {
+      if (isError) stderr += chunk;
+      else stdout += chunk;
+      if (Buffer.byteLength(stdout) + Buffer.byteLength(stderr) > MAX_BUFFER) {
+        failed = true;
+        stop();
+      }
+    };
+    child.stdout.setEncoding('utf8').on('data', chunk => collect(chunk, false));
+    child.stderr.setEncoding('utf8').on('data', chunk => collect(chunk, true));
+    child.on('error', error => {
+      failed = true;
+      stderr += error.message;
+    });
+    child.on('close', status => {
+      clearTimeout(timer);
+      activeCommandStop = null;
+      resolve({
+        status: failed || timedOut ? 1 : status,
+        stdout,
+        stderr,
+        timedOut,
+      });
+    });
   });
   const durationMs = Number(process.hrtime.bigint() - started) / 1e6;
   const output = `${result.stdout ?? ''}\n${result.stderr ?? ''}`;
@@ -140,6 +205,7 @@ function commandResult(command, env = {}) {
   return {
     durationMs,
     exitCode: result.status ?? 1,
+    timedOut: result.timedOut,
     output,
     cpuPercent:
       cpuSeconds === null ? null : (cpuSeconds * 100_000) / durationMs,
@@ -188,13 +254,18 @@ function turboSummary(previous) {
   };
 }
 
-function runCommand(command, env) {
+async function runCommand(command, env, deadline = Infinity) {
   const before = new Set(existsSync(TURBO_RUNS) ? readdirSync(TURBO_RUNS) : []);
-  const result = commandResult(command, env);
-  const turbo = turboSummary(before);
+  const result = await commandResult(
+    command,
+    env,
+    deadline - performance.now()
+  );
+  const turbo = result.exitCode === 0 ? turboSummary(before) : null;
   return {
     durationMs: result.durationMs,
     exitCode: result.exitCode,
+    timedOut: result.timedOut,
     cpuPercent: result.cpuPercent,
     peakRssKb: result.peakRssKb,
     cacheHitRate: turbo?.cacheHitRate ?? null,
@@ -285,9 +356,13 @@ export function sampleEnv(index) {
   };
 }
 
-async function runScenario(name, definition, count) {
+async function runScenario(name, definition, count, deadline = Infinity) {
   if (EDITS[name])
-    runCommand([...TURBO, '--summarize', '--output-logs=errors-only']);
+    await runCommand(
+      [...TURBO, '--summarize', '--output-logs=errors-only'],
+      {},
+      deadline
+    );
   const samples = [];
   for (let index = 0; index < count; index += 1) {
     const execute = () => {
@@ -308,7 +383,8 @@ async function runScenario(name, definition, count) {
             '--pretty',
             'false',
           ],
-          sampleEnv(index)
+          sampleEnv(index),
+          deadline
         );
       return runCommand(
         [
@@ -318,7 +394,8 @@ async function runScenario(name, definition, count) {
           '--output-logs=errors-only',
           '--env-mode=loose',
         ],
-        sampleEnv(index)
+        sampleEnv(index),
+        deadline
       );
     };
     const measured = () => {
@@ -332,8 +409,9 @@ async function runScenario(name, definition, count) {
             `\nexport type __TypecheckBenchmark${index} = never;\n`,
             measured
           )
-        : measured()
+        : await measured()
     );
+    if (samples.at(-1).timedOut) break;
   }
   return { name, samples, aggregate: aggregate(samples) };
 }
@@ -344,6 +422,17 @@ async function main() {
     throw new Error('--samples must be a positive integer');
   if (!Number.isInteger(options.confirmRetries) || options.confirmRetries < 0)
     throw new Error('--confirm-retries must be a non-negative integer');
+  if (
+    !Number.isSafeInteger(options.maxDurationMs) ||
+    options.maxDurationMs < 0 ||
+    (options.enforce && options.maxDurationMs === 0)
+  )
+    throw new Error(
+      '--max-duration-ms must be a positive integer when enforcing'
+    );
+  const deadline = options.maxDurationMs
+    ? performance.now() + options.maxDurationMs
+    : Infinity;
   const names = options.scenarios.includes('all')
     ? Object.keys(SCENARIOS)
     : options.scenarios;
@@ -358,7 +447,9 @@ async function main() {
     });
   const scenarios = [];
   for (const name of names)
-    scenarios.push(await runScenario(name, SCENARIOS[name], options.samples));
+    scenarios.push(
+      await runScenario(name, SCENARIOS[name], options.samples, deadline)
+    );
   const ratchet = Object.fromEntries(
     scenarios.map(scenario => [
       scenario.name,
@@ -368,16 +459,27 @@ async function main() {
   const confirmations = [];
   if (options.enforce && options.confirmRetries > 0) {
     let pending = scenarios
-      .filter(scenario => ratchet[scenario.name]?.status === 'fail')
+      .filter(
+        scenario =>
+          ratchet[scenario.name]?.status === 'fail' &&
+          scenario.samples.every(sample => sample.exitCode === 0)
+      )
       .map(scenario => scenario.name);
     for (
       let round = 1;
-      pending.length > 0 && round <= options.confirmRetries;
+      pending.length > 0 &&
+      round <= options.confirmRetries &&
+      performance.now() < deadline;
       round += 1
     ) {
       const stillFailing = [];
       for (const name of pending) {
-        const rerun = await runScenario(name, SCENARIOS[name], options.samples);
+        const rerun = await runScenario(
+          name,
+          SCENARIOS[name],
+          options.samples,
+          deadline
+        );
         const verdict = ratchetFor(rerun.samples, name);
         confirmations.push({
           round,
@@ -402,6 +504,7 @@ async function main() {
     },
     scenarios,
     confirmations,
+    maxDurationMs: options.maxDurationMs,
     ratchet: resolvedRatchet,
   };
   mkdirSync(dirname(options.output), { recursive: true });
@@ -425,6 +528,7 @@ async function main() {
 
 for (const signal of ['SIGINT', 'SIGTERM'])
   process.once(signal, () => {
+    activeCommandStop?.();
     activeRestore?.();
     process.exit(signal === 'SIGINT' ? 130 : 143);
   });
