@@ -100,7 +100,9 @@ def red_episode_route(reply, login="github-actions[bot]", created="2026-01-01T00
     `gh api graphql`; the Shell routes by prefix, so one callable dispatches on the query."""
     def route(args):
         if "LABELED_EVENT" in " ".join(args):
-            actor = {"__typename": "Bot" if login.endswith("[bot]") else "User", "login": login}
+            # Real GraphQL: a Bot's login has no "[bot]" suffix (REST adds it).
+            bot = login.endswith("[bot]")
+            actor = {"__typename": "Bot" if bot else "User", "login": login.removesuffix("[bot]")}
             nodes = [] if absent else [{"createdAt": created, "label": {"name": "lane-fix-red"},
                                         "actor": actor}]
             return {"data": {"repository": {"pullRequest": {"timelineItems": {"nodes": nodes}}}}}
@@ -651,7 +653,7 @@ class RelayTest(unittest.TestCase):
         run = {"event": "pull_request", "conclusion": "success", "head_sha": "h1",
                "pull_requests": [{"number": 5}]}
         view = pr(branch="cursor/fix", sha="h1", merge="CLEAN", labels=["lane-fix-red"], state="OPEN")
-        for login, cleared in (("github-actions[bot]", True), ("jovie-bot[bot]", False), ("tim", False)):
+        for login, cleared in (("github-actions[bot]", True), ("github-actions", False), ("jovie-bot[bot]", False), ("tim", False)):
             shell = Shell({("gh", "pr", "view"): view,
                            ("gh", "api", "graphql"): red_episode_route(lambda args: None, login=login)})
             result = events.relay("workflow_run", {"workflow_run": run}, shell, set())
