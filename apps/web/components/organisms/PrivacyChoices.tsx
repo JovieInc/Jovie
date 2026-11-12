@@ -13,7 +13,6 @@ import { shouldSuppressCookieBannerForPathname } from '@/lib/cookies/banner-visi
 import { saveConsent } from '@/lib/cookies/consent';
 import {
   GPC_CONFIRMATION,
-  PRIVACY_CHOICES_HREF,
   PRIVACY_CHOICES_LABEL,
 } from '@/lib/cookies/consent-state';
 import { usePublicPathname } from '@/lib/navigation/use-public-pathname';
@@ -138,40 +137,14 @@ export function PrivacyChoices({ onClose }: Readonly<{ onClose: () => void }>) {
  */
 export function PrivacyChoicesHost({
   open,
-  onOpen,
   onClose,
-}: Readonly<{ open: boolean; onOpen: () => void; onClose: () => void }>) {
+}: Readonly<{ open: boolean; onClose: () => void }>) {
   const [gpc, setGpc] = useState(false);
   const pathname = usePublicPathname();
 
   useEffect(() => {
     setGpc(isGPCEnabled());
-    const onHash = () => {
-      if (globalThis.location.hash === '#privacy-choices') onOpen();
-    };
-    const onClick = (event: MouseEvent) => {
-      if (
-        event.button !== 0 ||
-        event.metaKey ||
-        event.ctrlKey ||
-        event.shiftKey ||
-        event.altKey
-      )
-        return;
-      const link =
-        event.target instanceof Element ? event.target.closest('a') : null;
-      if (link?.getAttribute('href') !== PRIVACY_CHOICES_HREF) return;
-      event.preventDefault();
-      onOpen();
-    };
-    onHash();
-    document.addEventListener('click', onClick, true);
-    globalThis.addEventListener('hashchange', onHash);
-    return () => {
-      document.removeEventListener('click', onClick, true);
-      globalThis.removeEventListener('hashchange', onHash);
-    };
-  }, [onOpen]);
+  }, []);
 
   if (open) return <PrivacyChoices onClose={onClose} />;
   if (!gpc || shouldSuppressCookieBannerForPathname(pathname)) return null;

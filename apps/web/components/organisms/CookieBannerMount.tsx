@@ -13,6 +13,7 @@ import {
 import { shouldSuppressCookieBannerForPathname } from '@/lib/cookies/banner-visibility';
 import type { Consent } from '@/lib/cookies/consent';
 import { isCookieBannerRequiredFromCookieString } from '@/lib/cookies/consent-regions';
+import { PRIVACY_CHOICES_HREF } from '@/lib/cookies/consent-state';
 import { isGPCEnabled, setConsentState } from '@/lib/tracking/consent';
 
 declare global {
@@ -100,6 +101,34 @@ export function CookieBannerMount() {
   }, [openPreferences]);
 
   useEffect(() => {
+    const onHash = () => {
+      if (globalThis.location.hash === '#privacy-choices') openPrivacy();
+    };
+    const onClick = (event: MouseEvent) => {
+      if (
+        event.button !== 0 ||
+        event.metaKey ||
+        event.ctrlKey ||
+        event.shiftKey ||
+        event.altKey
+      )
+        return;
+      const link =
+        event.target instanceof Element ? event.target.closest('a') : null;
+      if (link?.getAttribute('href') !== PRIVACY_CHOICES_HREF) return;
+      event.preventDefault();
+      openPrivacy();
+    };
+    onHash();
+    document.addEventListener('click', onClick, true);
+    globalThis.addEventListener('hashchange', onHash);
+    return () => {
+      document.removeEventListener('click', onClick, true);
+      globalThis.removeEventListener('hashchange', onHash);
+    };
+  }, [openPrivacy]);
+
+  useEffect(() => {
     // A page that server-renders the card (see
     // resolveInitialCookieBannerVisible) already owns it; mounting a second
     // one would double the dialog.
@@ -126,11 +155,7 @@ export function CookieBannerMount() {
   return (
     <>
       <Suspense fallback={null}>
-        <PrivacyChoicesHost
-          open={privacyOpen}
-          onOpen={openPrivacy}
-          onClose={closePrivacy}
-        />
+        <PrivacyChoicesHost open={privacyOpen} onClose={closePrivacy} />
       </Suspense>
       {Banner && !privacyOpen ? <Banner /> : null}
       {Modal ? (

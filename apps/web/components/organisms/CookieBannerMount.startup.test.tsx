@@ -1,4 +1,5 @@
 import { act, cleanup, render, screen } from '@testing-library/react';
+import Link from 'next/link';
 import { afterEach, expect, it, vi } from 'vitest';
 import { CookieBannerMount } from './CookieBannerMount';
 
@@ -21,9 +22,14 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-it('notifies subscribers and opens Cookie Settings while the privacy chunk is delayed', async () => {
+it('keeps consent controls and privacy requests available while the privacy chunk is delayed', async () => {
   vi.spyOn(document, 'cookie', 'get').mockReturnValue('jv_cc_required=0');
-  render(<CookieBannerMount />);
+  render(
+    <>
+      <Link href='/legal/privacy#privacy-choices'>Your Privacy Choices</Link>
+      <CookieBannerMount />
+    </>
+  );
   expect(globalThis.JVConsent).toBeDefined();
 
   const subscriber = vi.fn();
@@ -40,12 +46,30 @@ it('notifies subscribers and opens Cookie Settings while the privacy chunk is de
     await screen.findByRole('dialog', { name: 'Cookie Preferences' })
   ).toBeVisible();
 
+  act(() =>
+    screen.getByRole('button', { name: 'Cancel', exact: true }).click()
+  );
+
+  const privacyClick = new MouseEvent('click', {
+    bubbles: true,
+    cancelable: true,
+  });
+  act(() => {
+    screen
+      .getByRole('link', { name: 'Your Privacy Choices' })
+      .dispatchEvent(privacyClick);
+  });
+  expect(privacyClick.defaultPrevented).toBe(true);
+
   await act(async () => {
     privacyChunk.release();
     await privacyChunk.loaded;
   });
   expect(
-    await screen.findByRole('dialog', { name: 'Cookie Preferences' })
+    await screen.findByRole('dialog', {
+      name: 'Your Privacy Choices',
+      exact: true,
+    })
   ).toBeVisible();
   unsubscribe?.();
 });
