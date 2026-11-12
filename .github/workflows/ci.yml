@@ -5074,12 +5074,15 @@ jobs:
           # fails on console errors, uncaught exceptions and error boundaries.
           # releases-first-paint-visual fails if the release list moves after
           # it first paints.
+          # chat-history-switcher fails if opening the chat history menu
+          # shifts layout, drops frames, or breaks search and keyboard select.
           # Blocking, and run first so a nav break fails fast.
           node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs" --run -- \
             pnpm exec playwright test tests/e2e/dashboard-click-navigation.spec.ts \
             tests/e2e/shell-nav-click-through.spec.ts \
             tests/e2e/shell-route-health.spec.ts \
             tests/e2e/releases-first-paint-visual.spec.ts \
+            tests/e2e/chat-history-switcher.spec.ts \
             --config=playwright.config.noauth.ts --project=chromium --reporter=line
 
         env:

@@ -174,6 +174,7 @@ The source defaults below are preserved in this slice.
 | `CHATGPT_APP_DIRECTORY_MCP` | `false` | Keep public API exposure security control; no dynamic client registration grant. |
 | `CHAT_COMPOSER_V2` | `true` | Remove presentation gate in favor of the supported enabled behavior. |
 | `CYAN_FOCUS_GLOW` | `true` | Remove presentation gate in favor of the supported enabled behavior. |
+| `HOMEPAGE_START_CTA` | `false` | Keep copy-approval gate for the homepage hero action entering `/start`; remove in favor of the enabled behavior once the copy is approved. |
 | `INVESTOR_PORTAL_YC_DECK` | `false` | Remove narrative/layout gate in favor of the supported private brief; preserve financial privacy and sourced claims. |
 | `IN_HOUSE_RESOLVER` | `false` | Keep resolver rollback compatibility control (JOV-7323). |
 | `MARKETING_GENERIC_CREATOR_NAV` | `true` | Remove presentation switch in favor of supported creator wording; no new capability claim. |
