@@ -1509,120 +1509,99 @@ describe('dead-man liveness', () => {
     ).not.toBe('fresh');
   });
 
-  // JOV-8788: run 43163802915 filed green-enqueue-checks-unreadable while the
-  // run's own budget sampler showed the shared-github-token REST budget at
-  // 0/5000. A denied or exhausted Actions token on a per-head timing read
+  // JOV-8788: run 43163802915 filed green-enqueue-checks-unreadable while
+  // the run's own budget sampler showed the shared-github-token REST budget
+  // at 0/5000. A denied or exhausted Actions token on a per-head timing read
   // must not flip the whole observation unknown: retry once unauthenticated,
   // like the run-list observers (JOV-11677). A public read that also fails
   // keeps the observation red.
+  const readyGreenPr = () => ({
+    number: 1,
+    isDraft: false,
+    isInMergeQueue: false,
+    mergeStateStatus: 'CLEAN',
+    baseRefName: 'main',
+    headRefOid: '1'.repeat(40),
+    labels: { nodes: [], pageInfo: { hasNextPage: false } },
+  });
+  const timingRoutes = ready => ({
+    '/graphql': {
+      data: { repository: { pullRequests: { nodes: [ready] } } },
+    },
+    '/check-runs': {
+      check_runs: [
+        { name: 'PR Ready', conclusion: 'success', completed_at: iso(5) },
+        {
+          name: 'Migration Guard',
+          conclusion: 'success',
+          completed_at: iso(25),
+        },
+        { name: 'PR Size Guard', conclusion: 'success', completed_at: iso(30) },
+      ],
+    },
+    '/status': {
+      statuses: [
+        {
+          context: 'Fork PR Gate',
+          state: 'success',
+          created_at: iso(35),
+        },
+      ],
+    },
+  });
+  const deniedTokenFetch = (network, deniedPath, alsoPublic = false) => {
+    const authorizations = [];
+    return {
+      authorizations,
+      fetchImpl: async (url, init) => {
+        if (!String(url).includes(deniedPath)) return network(url, init);
+        const authorization = new Headers(init.headers).get('authorization');
+        authorizations.push(authorization);
+        if (authorization || alsoPublic)
+          return new Response(
+            '{"message":"Resource not accessible by integration"}',
+            { status: 403 }
+          );
+        return network(url, init);
+      },
+    };
+  };
   it.each(['/check-runs', '/status'])(
     'recovers a denied Actions token on the per-head %s timing read',
     async deniedPath => {
-      const ready = {
-        number: 1,
-        isDraft: false,
-        isInMergeQueue: false,
-        mergeStateStatus: 'CLEAN',
-        baseRefName: 'main',
-        headRefOid: '1'.repeat(40),
-        labels: { nodes: [], pageInfo: { hasNextPage: false } },
-      };
-      const network = fakeFetch({
-        '/graphql': {
-          data: { repository: { pullRequests: { nodes: [ready] } } },
-        },
-        '/check-runs': {
-          check_runs: [
-            {
-              name: 'PR Ready',
-              conclusion: 'success',
-              completed_at: iso(5),
-            },
-            {
-              name: 'Migration Guard',
-              conclusion: 'success',
-              completed_at: iso(25),
-            },
-            {
-              name: 'PR Size Guard',
-              conclusion: 'success',
-              completed_at: iso(30),
-            },
-          ],
-        },
-        '/status': {
-          statuses: [
-            {
-              context: 'Fork PR Gate',
-              state: 'success',
-              created_at: iso(35),
-            },
-          ],
-        },
-      });
-      const authorizations = [];
+      const network = fakeFetch(timingRoutes(readyGreenPr()));
+      const { authorizations, fetchImpl } = deniedTokenFetch(
+        network,
+        deniedPath
+      );
       const { report } = await runLiveness({
         registry: only('github:jovie:green-to-enqueue'),
         nowMs: NOW,
         token: 't',
-        fetchImpl: async (url, init) => {
-          if (String(url).includes(deniedPath)) {
-            const authorization = new Headers(init.headers).get(
-              'authorization'
-            );
-            authorizations.push(authorization);
-            if (authorization)
-              return new Response(
-                '{"message":"Resource not accessible by integration"}',
-                { status: 403 }
-              );
-          }
-          return network(url, init);
-        },
+        fetchImpl,
       });
       expect(authorizations).toEqual(['Bearer t', null]);
-      expect(rowFor(report, 'github:jovie:green-to-enqueue')).toMatchObject({
-        status: 'fresh',
-        ageMinutes: 5,
-      });
-      expect(rowFor(report, 'github:jovie:green-to-enqueue').reason).toContain(
-        'ready-green-unqueued=1[#1:5m]'
-      );
+      const row = rowFor(report, 'github:jovie:green-to-enqueue');
+      expect(row).toMatchObject({ status: 'fresh', ageMinutes: 5 });
+      expect(row.reason).toContain('ready-green-unqueued=1[#1:5m]');
       expect(livenessDecisions(report)).toEqual([]);
     }
   );
 
   it('keeps a denied token red when the public timing read also fails', async () => {
-    const ready = {
-      number: 1,
-      isDraft: false,
-      isInMergeQueue: false,
-      mergeStateStatus: 'CLEAN',
-      baseRefName: 'main',
-      headRefOid: '1'.repeat(40),
-      labels: { nodes: [], pageInfo: { hasNextPage: false } },
-    };
-    const network = fakeFetch({
-      '/graphql': {
-        data: { repository: { pullRequests: { nodes: [ready] } } },
-      },
-      '/check-runs': 403,
-      '/status': {
-        statuses: [
-          {
-            context: 'Fork PR Gate',
-            state: 'success',
-            created_at: iso(35),
-          },
-        ],
-      },
-    });
+    const network = fakeFetch(timingRoutes(readyGreenPr()));
+    const { authorizations, fetchImpl } = deniedTokenFetch(
+      network,
+      '/check-runs',
+      true
+    );
     const { report } = await runLiveness({
       registry: only('github:jovie:green-to-enqueue'),
       nowMs: NOW,
       token: 't',
-      fetchImpl: network,
+      fetchImpl,
     });
+    expect(authorizations).toEqual(['Bearer t', null]);
     expect(rowFor(report, 'github:jovie:green-to-enqueue')).toMatchObject({
       status: 'unknown',
       reason: 'green-enqueue-checks-unreadable',
