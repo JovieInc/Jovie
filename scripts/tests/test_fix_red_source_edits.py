@@ -11,6 +11,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "lanes"))
 import fix_red_classes as classes  # noqa: E402
 import lane_runner as lane  # noqa: E402
 import fix_red_source_edits as edits  # noqa: E402
+import fix_red_statement_merge as statements  # noqa: E402
 
 
 def pr(*names, merge="BLOCKED"):
@@ -373,6 +374,61 @@ class AdditiveNodeTestFileTest(unittest.TestCase):
             with self.subTest(code=code), patch.object(lane, "sh", side_effect=replies):
                 actual = classes.resolve_additive_node_test_file(Path("."), "draft.test.mjs", lane.sh)
                 self.assertEqual(actual, block("main") + block("head") if code == 127 else None)
+
+
+class AdditiveStatementMergeTest(unittest.TestCase):
+    @staticmethod
+    def conflict(ours, theirs, base=""):
+        return f"<<<<<<< HEAD\n{ours}||||||| base\n{base}=======\n{theirs}>>>>>>> main\n"
+
+    def test_unions_empty_base_statements_in_main_order(self):
+        ours = (
+            "const mockSweepLegacySlugs = vi.hoisted(() =>\n"
+            "  vi.fn(async () => ({ renamed: 1 }))\n"
+            ");\n"
+        )
+        theirs = "const mockSweepAppleMusicCatalog = vi.hoisted(() => vi.fn());\n"
+        mock_ours = (
+            "vi.mock('@/lib/discography/slug-migration', () => ({\n"
+            "  sweepLegacySlugsForCron: mockSweepLegacySlugs,\n"
+            "}));\n"
+        )
+        mock_theirs = (
+            "vi.mock('@/lib/discography/apple-music-import', () => ({\n"
+            "  sweepAppleMusicCatalogCompletenessForCron: mockSweepAppleMusicCatalog,\n"
+            "}));\n"
+        )
+        expect_ours = "    expect(data.results.legacySlugMigration.data).toEqual({ renamed: 1 });\n"
+        expect_theirs = (
+            "    expect(data.results.appleMusicCatalogImport.data).toEqual({\n"
+            "      profilesChecked: 2,\n"
+            "      releasesImported: 3,\n"
+            "      failed: 0,\n"
+            "    });\n"
+        )
+        text = (
+            "before\n"
+            + self.conflict(ours, theirs)
+            + "middle\n"
+            + self.conflict(mock_ours, mock_theirs)
+            + "after\n"
+            + self.conflict(expect_ours, expect_theirs)
+        )
+        merged = statements.resolve_additive_statements_text(text)
+        self.assertEqual(merged, "before\n" + theirs + ours + "middle\n" + mock_theirs + mock_ours + "after\n" + expect_theirs + expect_ours)
+
+    def test_edits_control_flow_and_unknown_shapes_stay_unresolved(self):
+        added = "const head = vi.fn();\n"
+        for value in (
+            self.conflict(added, "const main = vi.fn();\n", "const old = vi.fn();\n"),
+            self.conflict("  return 1;\n", "  return 2;\n"),
+            self.conflict("const head = vi.fn();\n", "const head = vi.fn(async () => 1);\n"),
+            self.conflict("vi.mock('@/a', () => ({\n", "vi.mock('@/b', () => ({\n"),
+            self.conflict(added, "const main = vi.fn();\n").replace("||||||| base\n", ""),
+            "const clean = vi.fn();\n",
+        ):
+            with self.subTest(value=value):
+                self.assertIsNone(statements.resolve_additive_statements_text(value))
 
 
 class Size500StaleTest(unittest.TestCase):
