@@ -5,6 +5,7 @@ import {
   observeWorkflowFailureStreak,
   runLiveness as runLivenessImpl,
 } from '../../automation-liveness.mjs';
+import { selectSourceGuards } from '../../ci-fast-lanes.mjs';
 import { livenessDecisions, loadRegistry } from '../automation-registry.mjs';
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
@@ -151,5 +152,22 @@ describe('workflow run-list reads survive a denied Actions token (JOV-11677)', (
       }
     );
     expect(observed).toMatchObject({ ok: true, reason: 'no-failure-streak' });
+  });
+});
+
+describe('403 recovery CI admission', () => {
+  it.each([
+    'scripts/automation-liveness.mjs',
+    'scripts/lib/github-json-read.mjs',
+    'scripts/lib/__tests__/automation-liveness-github-403-recovery.test.mjs',
+  ])('runs the recovery suite when %s changes', path => {
+    for (const event of ['pull_request', 'merge_group', 'push']) {
+      const guard = selectSourceGuards(event, [path]).find(
+        candidate => candidate.id === 'automation-registry'
+      );
+      expect(guard?.command.split(' ')).toContain(
+        'lib/__tests__/automation-liveness-github-403-recovery.test.mjs'
+      );
+    }
   });
 });
