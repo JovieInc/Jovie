@@ -8,11 +8,16 @@ import {
   resolveCiFastTrustedBase,
 } from './lib/ci-fast-trusted-base.mjs';
 
+import {
+  exceptionMetadataIssues,
+  expiryMs,
+} from './lib/design-exception-metadata.mjs';
+
+export { exceptionMetadataIssues };
+
 const THIS_DIR = dirname(fileURLToPath(import.meta.url));
 export const REPO_ROOT = join(THIS_DIR, '..');
 export const CHECK_COMMAND = 'pnpm design:exception-registry:check';
-const LINEAR_ISSUE = /^JOV-\d+$/;
-const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
 export const ISSUE_CODES = Object.freeze({
   MISSING_TRUSTED_BASE: 'missing-trusted-base',
@@ -96,36 +101,6 @@ function readBaseFile(repoRoot, ref, relativePath) {
   return parseJsonText(text, relativePath);
 }
 
-function expiryMs(expiresOn) {
-  if (!ISO_DATE.test(expiresOn ?? '')) return NaN;
-  return Date.parse(`${expiresOn}T23:59:59.999Z`);
-}
-
-export function exceptionMetadataIssues(entry, prefix) {
-  /** @type {string[]} */
-  const issues = [];
-  if (typeof entry?.owner !== 'string' || entry.owner.trim() === '') {
-    issues.push(`${prefix}: owner is required`);
-  }
-  if (typeof entry?.reason !== 'string' || entry.reason.trim().length < 10) {
-    issues.push(`${prefix}: reason is required`);
-  }
-  if (!LINEAR_ISSUE.test(entry?.issue ?? '')) {
-    issues.push(`${prefix}: Linear issue is required (JOV-NNNN)`);
-  }
-  const hasRemoval =
-    typeof entry?.removalCondition === 'string' &&
-    entry.removalCondition.trim() !== '';
-  const hasExpiry = ISO_DATE.test(entry?.expiresOn ?? '');
-  if (!hasRemoval && !hasExpiry) {
-    issues.push(`${prefix}: removal condition or expiry is required`);
-  }
-  if (typeof entry?.evidence !== 'string' || entry.evidence.trim() === '') {
-    issues.push(`${prefix}: evidence is required`);
-  }
-  return issues;
-}
-
 function fail(spec, code, detail) {
   return issue(code, spec.id, `${spec.path}: ${detail}`);
 }
@@ -150,9 +125,7 @@ function compareCounts(spec, candidateRecord, baseRecord, keys, raises, now) {
       const approval = isObject(raises) ? raises[key] : undefined;
       const prefix = `${spec.path} raises entry ${key}`;
       const approvalIssues = exceptionMetadataIssues(approval, prefix);
-      const expired =
-        ISO_DATE.test(approval?.expiresOn ?? '') &&
-        expiryMs(approval.expiresOn) < now.getTime();
+      const expired = expiryMs(approval?.expiresOn) < now.getTime();
       if (approvalIssues.length === 0 && !expired) continue;
       issues.push(
         fail(
@@ -304,10 +277,7 @@ function compareExceptions(spec, candidateRecord, baseRecord, now) {
         )
       );
     }
-    if (
-      ISO_DATE.test(entry.expiresOn ?? '') &&
-      expiryMs(entry.expiresOn) < now.getTime()
-    ) {
+    if (expiryMs(entry.expiresOn) < now.getTime()) {
       issues.push(
         issue(
           ISSUE_CODES.EXPIRED_EXCEPTION,
@@ -373,10 +343,7 @@ function compareRegistry(spec, candidateRecord, baseRecord, now) {
               metadataIssues.join('; ')
             )
           );
-        } else if (
-          ISO_DATE.test(entry.expiresOn ?? '') &&
-          expiryMs(entry.expiresOn) < now.getTime()
-        ) {
+        } else if (expiryMs(entry.expiresOn) < now.getTime()) {
           issues.push(
             fail(
               spec,

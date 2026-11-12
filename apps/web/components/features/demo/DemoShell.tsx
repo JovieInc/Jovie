@@ -46,7 +46,7 @@ import {
   PageToolbarActionButton,
   PageToolbarTabButton,
 } from '@/components/organisms/table';
-import { APP_ROUTES } from '@/constants/routes';
+import { PUBLIC_ENTRY_HREF } from '@/constants/routes';
 import { DashboardHeaderActionButton } from '@/features/dashboard/atoms/DashboardHeaderActionButton';
 import { DashboardHeaderActionGroup } from '@/features/dashboard/atoms/DashboardHeaderActionGroup';
 import { INTERNAL_DJ_DEMO_PERSONA } from '@/lib/demo-personas';
@@ -321,7 +321,7 @@ export function DemoShell({
 
             <SidebarFooter className='px-2 pb-3.5 pt-1'>
               <a
-                href={APP_ROUTES.SIGNUP}
+                href={PUBLIC_ENTRY_HREF}
                 className='flex h-7 items-center justify-center rounded-sm bg-surface-2 text-app text-secondary-token [font-weight:var(--font-weight-medium)]'
               >
                 Sign up for Jovie

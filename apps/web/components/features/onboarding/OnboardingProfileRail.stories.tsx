@@ -178,3 +178,80 @@ export const UnavailableFounderSource: Story = {
     },
   },
 };
+
+const SIDE_FRAME = { height: 692, width: 380 } as const;
+
+export const EmptyRail: Story = {
+  args: {
+    state: EMPTY_ONBOARDING_PROFILE_BUILDER_STATE,
+  },
+  render: args => (
+    <div style={SIDE_FRAME}>
+      <OnboardingProfileRail {...args} />
+    </div>
+  ),
+};
+
+export const ErrorUnavailableSource: Story = {
+  args: UnavailableFounderSource.args,
+};
+
+export const PartialArtistNoImage: Story = {
+  args: {
+    state: {
+      ...CONFIRMED_ARTIST_STATE,
+      artist: {
+        ...(CONFIRMED_ARTIST_STATE.artist as NonNullable<
+          OnboardingProfileBuilderState['artist']
+        >),
+        imageUrl: null,
+        followers: null,
+        genres: [],
+      },
+    },
+  },
+  render: args => (
+    <div style={SIDE_FRAME}>
+      <OnboardingProfileRail {...args} />
+    </div>
+  ),
+};
+
+export const LongArtistName: Story = {
+  args: {
+    state: {
+      ...CONFIRMED_ARTIST_STATE,
+      artist: {
+        ...(CONFIRMED_ARTIST_STATE.artist as NonNullable<
+          OnboardingProfileBuilderState['artist']
+        >),
+        name: 'The Extraordinarily Long Named Midnight Orchestra Collective',
+      },
+      handle: 'theextraordinarilylongnamedmidnightorchestra',
+    },
+  },
+  render: args => (
+    <div style={SIDE_FRAME}>
+      <OnboardingProfileRail {...args} />
+    </div>
+  ),
+};
+
+export const RtlArtist: Story = {
+  args: {
+    state: {
+      ...CONFIRMED_ARTIST_STATE,
+      artist: {
+        ...(CONFIRMED_ARTIST_STATE.artist as NonNullable<
+          OnboardingProfileBuilderState['artist']
+        >),
+        name: 'فرقة منتصف الليل',
+      },
+    },
+  },
+  render: args => (
+    <div dir='rtl' lang='ar' style={SIDE_FRAME}>
+      <OnboardingProfileRail {...args} />
+    </div>
+  ),
+};

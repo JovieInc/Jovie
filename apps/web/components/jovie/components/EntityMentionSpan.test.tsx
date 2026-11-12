@@ -1,5 +1,6 @@
 import { screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
+import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import { fastRender } from '@/tests/utils/fast-render';
 import { EntityMentionSpan } from './EntityMentionSpan';
 
@@ -34,4 +35,51 @@ describe('EntityMentionSpan', () => {
       );
     }
   );
+});
+
+describe('EntityMentionSpan certificate states', () => {
+  const longLabel =
+    'The Extended Midnight Drive Sessions (Deluxe Anniversary Edition, Remastered)';
+
+  it.each([
+    [
+      'default',
+      <EntityMentionSpan key='d' kind='artist' label='9.9K followers' />,
+    ],
+    [
+      'long label in prose',
+      <p key='l' className='w-64'>
+        Your latest release{' '}
+        <EntityMentionSpan kind='release' label={longLabel} /> is now live.
+      </p>,
+    ],
+    [
+      'right to left',
+      <p key='r' dir='rtl' lang='ar'>
+        استمع إلى <EntityMentionSpan kind='track' label='ليلة في القاهرة' />{' '}
+        الليلة.
+      </p>,
+    ],
+  ])('has no axe violations: %s', async (_state, ui) => {
+    const { container } = fastRender(ui);
+    await expectNoA11yViolations(container);
+  });
+
+  it('keeps a long label whole inside one inline span', () => {
+    fastRender(<EntityMentionSpan kind='release' label={longLabel} />);
+    const span = screen.getByTestId('entity-mention-span');
+    expect(span.tagName).toBe('SPAN');
+    expect(span).toHaveTextContent(longLabel);
+  });
+
+  it('inherits the transcript direction instead of forcing one', () => {
+    fastRender(
+      <p dir='rtl'>
+        <EntityMentionSpan kind='track' label='ليلة في القاهرة' />
+      </p>
+    );
+    const span = screen.getByTestId('entity-mention-span');
+    expect(span).not.toHaveAttribute('dir');
+    expect(span.closest('[dir]')).toHaveAttribute('dir', 'rtl');
+  });
 });

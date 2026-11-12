@@ -35,9 +35,9 @@ class AdditiveCertificateWaiversTest(unittest.TestCase):
             return SimpleNamespace(returncode=0, stdout=values[int(args[-1][1]) - 1])
         return edits.resolve_additive_certificate_waivers(Path("."), rel or self.REL, sh)
 
-    def test_preserves_main_order_then_head_only_waivers(self):
+    def test_writes_the_union_sorted_by_component_path(self):
         result = json.loads(self.resolve())
-        self.assertEqual(list(result["waivers"]), ["existing.tsx", "main.tsx", "head.tsx"])
+        self.assertEqual(list(result["waivers"]), ["existing.tsx", "head.tsx", "main.tsx"])
         self.assertEqual(result["waivers"]["head.tsx"], self.ours["waivers"]["head.tsx"])
         self.assertEqual(result["policy"], self.base["policy"])
 
@@ -373,6 +373,39 @@ class AdditiveNodeTestFileTest(unittest.TestCase):
             with self.subTest(code=code), patch.object(lane, "sh", side_effect=replies):
                 actual = classes.resolve_additive_node_test_file(Path("."), "draft.test.mjs", lane.sh)
                 self.assertEqual(actual, block("main") + block("head") if code == 127 else None)
+
+
+class Size500StaleTest(unittest.TestCase):
+    LOG = "\n".join([
+        "##[warning]vacuous-verdict: apps/web/lib/finance/metrics/engine.ts: 1 vacuous verdict site(s)",
+        "##[error]size-500: apps/web/lib/agent-os/certification.ts: grew 1220 -> 1265",
+        "##[error]size-500: scripts/lanes/lane_runner.py: grew 11721 -> 11736",
+        "##[error]Process completed with exit code 1.",
+        "company-guards: FAIL (2)",
+    ])
+
+    def test_blocked_size_growth_syncs_main(self):
+        got = classes.classify(pr("Company guards", merge="BLOCKED"), {"Company guards": self.LOG})
+        self.assertEqual((got["cls"], got["action"]), ("size-500-stale", "sync-main"))
+        self.assertIsNone(edits.size_500_stale_hit(None))
+        self.assertIsNone(edits.size_500_stale_hit("##[error]Process completed with exit code 1."))
+
+    def test_another_annotated_error_stays_with_the_model(self):
+        log = self.LOG + "\n##[error]AssertionError: expected 1"
+        got = classes.classify(pr("Company guards", merge="BLOCKED"), {"Company guards": log})
+        self.assertEqual((got["cls"], got["action"]), ("other", "agent"))
+
+    def test_a_known_signature_outranks_size_growth_in_the_same_log(self):
+        log = "API rate limit exceeded\n" + self.LOG
+        got = classes.classify(pr("Company guards"), {"Company guards": log})
+        self.assertEqual(got["action"], "rerun")
+
+    def test_size_growth_beside_another_failing_check_stays_mixed(self):
+        got = classes.classify(pr("Company guards", "Unit Tests"), {
+            "Company guards": self.LOG,
+            "Unit Tests": "AssertionError: expected 1",
+        })
+        self.assertEqual((got["cls"], got["action"]), ("mixed", "agent"))
 
 
 if __name__ == "__main__":

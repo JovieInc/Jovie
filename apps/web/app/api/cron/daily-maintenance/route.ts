@@ -32,6 +32,7 @@ import { recordDailyGatewaySpend } from '@/lib/ai/gateway-spend';
 import { runDataRetentionCleanup } from '@/lib/analytics/data-retention';
 import { runLegacyClaimVerificationSweep } from '@/lib/claim/legacy-verification.server';
 import { verifyCronRequest } from '@/lib/cron/auth';
+import { sweepAppleMusicCatalogCompletenessForCron } from '@/lib/discography/apple-music-import';
 import { sweepUnderEnrichedProfilesForCron } from '@/lib/discography/re-enrich';
 import { env } from '@/lib/env-server';
 import { captureError } from '@/lib/error-tracking';
@@ -169,6 +170,13 @@ export async function GET(request: Request) {
   results.discographyReEnrich = await runSubJob(
     'discographyReEnrich',
     sweepUnderEnrichedProfilesForCron
+  );
+
+  // 7b. Apple Music catalog completeness — add releases that exist only on
+  //     Apple Music, weekly per profile, bounded batch (JOV-7140)
+  results.appleMusicCatalogImport = await runSubJob(
+    'appleMusicCatalogImport',
+    sweepAppleMusicCatalogCompletenessForCron
   );
 
   // 8. Onboarding script self-improvement — recompute conversion counters,

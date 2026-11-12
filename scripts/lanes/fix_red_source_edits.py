@@ -314,6 +314,8 @@ def resolve_additive_certificate_waivers(worktree: Path, rel: str, sh) -> str | 
 
     This is authored policy, not generated metadata. Existing rows and every
     other policy field must be unchanged; ambiguous edits remain unresolved.
+    The union is written sorted by component path, as the certificate gate
+    requires (`node scripts/component-certificate.mjs --sort`).
     """
     if rel != "docs/design-system/component-certification.json":
         return None
@@ -329,7 +331,7 @@ def resolve_additive_certificate_waivers(worktree: Path, rel: str, sh) -> str | 
         if key in merged and merged[key] != value:
             return None
         merged[key] = value
-    theirs["waivers"] = merged
+    theirs["waivers"] = dict(sorted(merged.items()))
     return json.dumps(theirs, ensure_ascii=False, indent=2) + "\n"
 
 
@@ -409,3 +411,24 @@ def resolve_additive_list_conflict(worktree: Path, branch: str, log, *, sh, merg
             return False
     guard()
     return sh(["git", "push", "-q", "origin", f"HEAD:refs/heads/{branch}"], cwd=worktree, log=log).returncode == 0
+
+
+# Company guards annotates each over-baseline file, then Actions appends
+# "Process completed with exit code 1." A stale branch still carries files
+# main already shrunk, and a red check reports BLOCKED so the BEHIND fallback
+# never runs. Sync main when those growth lines are the only errors. Another
+# error stays with the model. classify() checks this after SIGNATURES.
+_SIZE_500_ERROR = re.compile(r"size-500: \S+: grew \d+ -> \d+\s*$")
+_ANNOTATED_ERROR = re.compile(r"##\[error\]([^\n]+)")
+_GHA_EXIT = re.compile(r"Process completed with exit code \d+\.?\s*$")
+
+
+def size_500_stale_hit(text: object) -> tuple[str, str] | None:
+    """Return `("size-500-stale", "sync-main")` when every annotated error is size growth."""
+    if not isinstance(text, str):
+        return None
+    errors = [item.strip() for item in _ANNOTATED_ERROR.findall(text)]
+    errors = [item for item in errors if _GHA_EXIT.fullmatch(item) is None]
+    if not errors or any(_SIZE_500_ERROR.fullmatch(item) is None for item in errors):
+        return None
+    return ("size-500-stale", "sync-main")

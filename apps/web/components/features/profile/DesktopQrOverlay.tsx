@@ -38,12 +38,29 @@ export function DesktopQrOverlay({ handle }: Readonly<DesktopQrOverlayProps>) {
     return getQrCodeUrl(url, 120);
   }, [url]);
 
-  useEffect(() => {
-    if (!qrUrl || typeof globalThis.Image !== 'function') return;
+  // Every api.qrserver.com request (the warm-up below and the open card's
+  // <img>) waits for the window load event. An image fetched before load
+  // holds that event, so a slow QR response kept desktop profiles "loading"
+  // for 30s+; ?mode=pay opens the card at hydration, before load.
+  const [pageLoaded, setPageLoaded] = useState(false);
 
+  useEffect(() => {
+    if (globalThis.document?.readyState === 'complete') {
+      setPageLoaded(true);
+      return;
+    }
+    const onLoad = () => setPageLoaded(true);
+    globalThis.addEventListener('load', onLoad, { once: true });
+    return () => globalThis.removeEventListener('load', onLoad);
+  }, []);
+
+  useEffect(() => {
+    if (!pageLoaded || !qrUrl || typeof globalThis.Image !== 'function') {
+      return;
+    }
     const preloadImage = new globalThis.Image();
     preloadImage.src = qrUrl;
-  }, [qrUrl]);
+  }, [pageLoaded, qrUrl]);
 
   useEffect(() => {
     if (typeof globalThis.matchMedia !== 'function') return;
@@ -157,13 +174,20 @@ export function DesktopQrOverlay({ handle }: Readonly<DesktopQrOverlayProps>) {
               <X className='h-4 w-4' aria-hidden='true' />
             </button>
           </div>
-          {url && (
+          {url && pageLoaded ? (
             <QRCode
               data={url}
               size={120}
               label='Scan To Open This Profile On Your Phone'
             />
-          )}
+          ) : url ? (
+            <div
+              aria-hidden='true'
+              data-testid='desktop-qr-placeholder'
+              className='rounded-lg bg-surface-2 animate-pulse motion-reduce:animate-none'
+              style={{ width: 120, height: 120 }}
+            />
+          ) : null}
         </div>
       )}
 

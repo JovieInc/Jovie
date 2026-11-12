@@ -32,7 +32,7 @@ git_housekeeping.install_isolated_tempdirs()
 # the host lane tuning (LANES_/SYMPHONY_). CODEX_ subsumes the old
 # CODEX_LANE_/CODEX_LEDGER_ prefixes. Coverage is pinned by
 # scripts/tests/test_conftest_host_isolation.py.
-_SCRUB_PREFIXES = ("LANES_", "SYMPHONY_", "CODEX_", "CLAUDE_", "HYPERAGENT_")
+_SCRUB_PREFIXES = ("LANES_", "SYMPHONY_", "CODEX_", "CLAUDE_", "HYPERAGENT_", "CLOUD_LANE_")
 _SCRUB_EXACT = {
     "LINEAR_API_KEY",
     "LINEAR_API_URL",
