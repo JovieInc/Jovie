@@ -181,7 +181,6 @@ The source defaults below are preserved in this slice.
 | `MUSIC_RESOLVER_RELEASE_FACTS` | `false` | Keep provider-family routing/rollback control (JOV-7323). |
 | `ONBOARDING_VALUE_BEFORE_PAYWALL` | `true` | Keep funnel-order kill switch (JOV-9758) until the catalog-before-pricing read-out; then remove in favor of the enabled behavior. |
 | `OVIE_MCP_DYNAMIC_CLIENT_REGISTRATION` | `false` | Keep unauthenticated client-registration security boundary and redirect allowlist. |
-| `PMF_SURVEY_PROMPT` | `false` | Keep measurement rollout stop for the in-app Sean Ellis survey card; remove once the survey has enough responses to read against the 40% target. |
 | `PUBLIC_SIGNUP_CLOSED` | `true` | Keep access-control switch: on sends `/signup` and anonymous `/start` to the `/waitlist` role form; sign-in and invite links still create accounts. Reopen criteria: golden path certified and first paying artists live (canon/PRODUCT.md). |
 | `SOCIAL_HTML_ISOLATED_PROVIDER` | `false` | Keep off: isolation provider is absent; server-IP scraping remains prohibited. |
 | `YOUTUBE_THUMBNAILS_PASTE_GENERATE` | `false` | Keep model-spend/output-certification control (JOV-5862); provider publication restrictions remain. |
