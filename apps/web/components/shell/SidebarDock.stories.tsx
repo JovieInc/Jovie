@@ -143,6 +143,66 @@ export const IOSInstall: Story = {
   args: { install: { isIOS: true, onInstall: fn(), onDismiss: fn() } },
 };
 
+export const ErrorUpdateFailed: Story = {
+  args: {
+    update: { state: 'error', message: 'Offline', retryable: true },
+    audio,
+  },
+};
+/** Audio with only a track title: no artist and no artwork. */
+export const PartialAudio: Story = {
+  args: {
+    release,
+    audio: {
+      ...audio,
+      track: {
+        trackTitle: 'Untitled demo',
+        artistName: null,
+        artworkUrl: null,
+      },
+    },
+  },
+};
+export const LongContent: Story = {
+  args: {
+    release: {
+      ...release,
+      title:
+        'Release pages now show every streaming service, presave countdowns and per-territory analytics',
+    },
+    audio: {
+      ...audio,
+      track: {
+        trackTitle:
+          'Midnight Drive Through the Neon City (Extended Club Mix featuring the Late Night Strings)',
+        artistName:
+          'The Long Weekend Collective, Avery Stone and the Northern Lights',
+        artworkUrl: null,
+      },
+    },
+  },
+};
+export const Rtl: Story = {
+  args: {
+    update,
+    audio: {
+      ...audio,
+      track: {
+        trackTitle: 'ليالي المدينة الطويلة',
+        artistName: 'فرقة الشرق',
+        artworkUrl: null,
+      },
+    },
+  },
+  decorators: [
+    Story => (
+      <div dir='rtl' lang='ar'>
+        <Story />
+      </div>
+    ),
+  ],
+};
+
 const light = { themes: { themeOverride: 'light' } };
 export const EmptyLight: Story = { ...Empty, parameters: light };
 export const AudioOnlyLight: Story = { ...AudioOnly, parameters: light };
