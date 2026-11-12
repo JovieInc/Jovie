@@ -2033,6 +2033,8 @@ html[data-profile-flow-open="true"] .cookie-banner-card {
   --profile-pearl-bg-hover: rgba(255, 255, 255, 0.84);
   --profile-pearl-bg-active: rgba(255, 255, 255, 0.96);
   --profile-pearl-border: rgba(255, 255, 255, 0.74);
+  /* Error wash under a pearl digit box (OTP), mixed 10% over pearl-bg. */
+  --profile-pearl-error-tint: rgba(127, 29, 29, 0.12);
   --profile-pearl-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.64), 0 10px 24px rgba(15, 17, 24, 0.08);
   --profile-pearl-primary-bg: rgba(12, 12, 15, 0.94);
@@ -2364,6 +2366,8 @@ html[data-profile-flow-open="true"] .cookie-banner-card {
   --profile-pearl-bg-hover: rgba(255, 255, 255, 0.16);
   --profile-pearl-bg-active: rgba(255, 255, 255, 0.22);
   --profile-pearl-border: rgba(255, 255, 255, 0.16);
+  /* Error wash under a pearl digit box (OTP), mixed 10% over pearl-bg. */
+  --profile-pearl-error-tint: rgba(127, 29, 29, 0.12);
   --profile-pearl-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.12), 0 12px 28px rgba(0, 0, 0, 0.24);
   --profile-pearl-primary-bg: rgba(255, 255, 255, 0.96);

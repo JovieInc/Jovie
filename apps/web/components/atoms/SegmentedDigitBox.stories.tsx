@@ -90,3 +90,27 @@ export const OtpSequence: Story = {
     </fieldset>
   ),
 };
+
+export const PartialCode: Story = {
+  name: 'Partial (2 of 6 entered)',
+  render: OtpSequence.render,
+};
+
+export const RtlSequence: Story = {
+  name: 'Right-to-left row',
+  render: args => (
+    <fieldset dir='rtl' className='flex justify-center gap-2 border-0 p-0'>
+      <legend className='sr-only'>رمز التحقق</legend>
+      {OTP_SEQUENCE_SLOTS.map(({ slot, digit }, index) => (
+        <SegmentedDigitBox
+          {...args}
+          key={slot}
+          digit={digit}
+          index={index}
+          isFocused={index === 2}
+          ariaLabel={`Digit ${index + 1} of 6`}
+        />
+      ))}
+    </fieldset>
+  ),
+};

@@ -248,6 +248,16 @@
   );
 }
 
+/* Pearl surface in its error state (segmented code boxes). Mixed on the
+   element so a profile theme's own --profile-pearl-bg still shows through. */
+@utility bg-pearl-error {
+  background-color: color-mix(
+    in srgb,
+    var(--profile-pearl-bg) 90%,
+    var(--profile-pearl-error-tint)
+  );
+}
+
 @theme inline {
   --color-verified: var(--color-verified);
   --color-verified-backing: var(--color-verified-backing);

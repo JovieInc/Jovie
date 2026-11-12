@@ -223,6 +223,9 @@
     "apps/web/components/atoms/ReleaseArtworkThumb.tsx": {
       "long-content": "ReleaseArtworkThumb paints no text: the release title is only the image alt and a screen-reader label on the fallback inside a fixed square, so a long title cannot overflow it."
     },
+    "apps/web/components/atoms/SegmentedDigitBox.tsx": {
+      "long-content": "Each box shows the single digit at its index (useSegmentedInput keeps one character per box) and its only other text is the fixed 'Digit n of 6' screen-reader label, so nothing can overflow."
+    },
     "apps/web/components/atoms/SkipToContent.tsx": {
       "partial": "SkipToContent renders one link from two optional props that both have defaults (targetId 'main-content', linkText 'Skip to content') plus className, so nothing can be partially present."
     },
@@ -279,6 +282,9 @@
     "apps/web/components/features/auth/atoms/FormError.tsx": {
       "partial": "FormError has one content field: a message renders the alert (Default) and no message renders nothing (NoMessage); id and className are wiring and styling, so nothing can be partially present.",
       "permission-denied": "FormError only shows a caller's validation message and has no gated action or permission input; the detector matched role='alert'."
+    },
+    "apps/web/components/features/auth/atoms/otp-input/OtpInput.tsx": {
+      "long-content": "The code is fixed at six one-digit boxes (OTP_LENGTH) and the only copy is the screen-reader label on the legend and overlay, which never paints, so no visible text can grow."
     },
     "apps/web/components/features/dashboard/NavigationDestinationReady.tsx": {
       "offline": "It never fetches or mutates: it renders null and only reports readiness once the caller's ready flag flips (LoadingDestinationData shows it held). The detector matched the word loading in its doc comment; the destination that owns the data owns any network failure."
@@ -830,6 +836,9 @@
     },
     "packages/ui/atoms/link.tsx": {
       "partial": "Link renders one label slot; its optional props (variant, active, visited, disabled, touchTarget, reserveLabel) are presentation flags with defaults, and the not-yet-arrived label case is shown by the EmptyStreamedLabel story."
+    },
+    "packages/ui/atoms/otp-digit-input.tsx": {
+      "long-content": "The field holds one digit of a one-time code and draws no copy of its own; its only text is the caller's screen-reader label. The detector matched 'text' in type='text' and the text-size classes."
     },
     "packages/ui/atoms/progress.tsx": {
       "permission-denied": "ProgressBar only reports completion of an upload or import and has no gated action or permission input; the detector matched role='progressbar'."
