@@ -355,7 +355,8 @@ for (const [k, row] of suspects.entries()) {
   row.lcpMs = median(row.lcpSamplesMs);
   row.longestTaskMs = median(row.longestTaskSamplesMs);
   // Name the scripts from the load the reported stall came from.
-  const frame = all.find(r => r.longestTaskMs === row.longestTaskMs)?.frame;
+  const at = row.longestTaskSamplesMs.indexOf(row.longestTaskMs);
+  const frame = all[at]?.frame;
   if (frame) row.frame = frame;
   else delete row.frame;
 }
