@@ -56,7 +56,7 @@ describe('resolveMenuOriginTrigger', () => {
       resolveMenuOriginTrigger(document.getElementById('grouped-item'))?.id
     ).toBe('root-trigger');
     expect(
-      resolveMenuOriginTrigger(document.getElementById('search-input'))?.id
+      resolveMenuOriginTrigger(document.getElementById('search-input'))
     ).toBe(null);
   });
 

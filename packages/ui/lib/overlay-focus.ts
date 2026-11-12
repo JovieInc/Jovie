@@ -30,6 +30,13 @@ export function resolveMenuOriginTrigger(
       return node !== start && node instanceof HTMLElement ? node : null;
     }
     if (!(menu instanceof HTMLElement)) return null;
+    // A group surface only labels the menu that sits inside it. The search
+    // field is a sibling of that menu, so focus that started there did not
+    // start inside a menu and must not restore to the trigger.
+    if (menu.getAttribute('role') === 'group') {
+      const itemMenu = start?.closest('[role="menu"]');
+      if (!itemMenu || !menu.contains(itemMenu)) return null;
+    }
     const labelledBy = menu.getAttribute('aria-labelledby');
     if (!labelledBy) {
       // An unlabelled inner menu climbs to its labelled parent; an
