@@ -170,8 +170,16 @@
     "apps/web/components/atoms/ArtworkFrame.tsx": {
       "long-content": "ArtworkFrame renders no text of its own: children is one square media slot clipped by overflow-hidden at the size the caller sets, so its content cannot grow; the detector matched the children prop."
     },
+    "apps/web/components/atoms/AvatarUploadOverlay.tsx": {
+      "empty": "The overlay draws one upload icon over an avatar and owns no collection. The detector matched the items-center class.",
+      "long-content": "The overlay renders no text, only an aria-hidden upload icon sized by iconSize, so there is no content that could run long. The detector matched text- colour classes.",
+      "rtl-overflow": "The overlay renders no text and centres a single icon on an inset-0 box, so it is direction-neutral. The detector matched text- colour classes."
+    },
     "apps/web/components/atoms/BrandLogo.tsx": {
       "permission-denied": "BrandLogo only draws the brand mark and has no permission input or gated action; the detector matched role='img' on the svg."
+    },
+    "apps/web/components/atoms/Divider.tsx": {
+      "permission-denied": "A divider is a styled separator line with no action, data or account; nothing can be gated. The detector matched role='separator'."
     },
     "apps/web/components/atoms/DotBadge.tsx": {
       "partial": "label and variant are required, and size, title and className are presentation options, so the badge has no data that can be partially present. LongContent and Rtl cover the label's limits; DotBadge.test.tsx covers the title."
