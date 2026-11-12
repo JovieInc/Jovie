@@ -2,15 +2,13 @@
 
 import * as ContextMenuPrimitive from '@radix-ui/react-context-menu';
 import * as DropdownMenuPrimitive from '@radix-ui/react-dropdown-menu';
-import { ChevronRight, Loader2, Search, X } from 'lucide-react';
+import { ChevronRight, Search, X } from 'lucide-react';
 import * as React from 'react';
 
 import {
   CONTEXT_TRANSFORM_ORIGIN,
   DROPDOWN_TRANSFORM_ORIGIN,
-  MENU_EMPTY_STATE_BASE,
   MENU_LEADING_SLOT_BASE,
-  MENU_LOADING_STATE_BASE,
   MENU_SEARCH_CLEAR_BUTTON_BASE,
   MENU_SEARCH_HEADER_BASE,
   MENU_SEARCH_ICON_BASE,
@@ -27,6 +25,7 @@ import {
   renderRadioGroup,
   renderSeparator,
 } from './common-dropdown-item-renderers';
+import { EmptyState, LoadingState } from './common-dropdown-state-rows';
 import type {
   CommonDropdownItem,
   CommonDropdownSubmenu,
@@ -98,7 +97,11 @@ function focusSiblingMenuItem(
   input: HTMLInputElement | null,
   placement: 'first' | 'last'
 ): HTMLElement | undefined {
-  const menu = input?.closest('[role="menu"]');
+  // The searchable root content is role="group" (the search input is not an
+  // allowed menu child — axe aria-required-children); the items live in the
+  // inner role="menu" region, so look up to the group for item queries.
+  const menu =
+    input?.closest('[role="menu"]') ?? input?.closest('[role="group"]');
   if (!menu) return undefined;
 
   const menuItems = Array.from(
@@ -202,46 +205,6 @@ export function SearchableContent({
           </button>
         ) : null}
       </div>
-    </div>
-  );
-}
-
-// Loading and empty menus still own one item (APG Menu): a disabled row that
-// arrow keys skip, holding the polite status that announces the state.
-function LoadingState() {
-  return (
-    <div
-      role='menuitem'
-      aria-disabled='true'
-      data-disabled=''
-      tabIndex={-1}
-      data-slot='common-dropdown-loading'
-      className={MENU_LOADING_STATE_BASE}
-    >
-      <Loader2
-        aria-hidden='true'
-        className='h-4 w-4 animate-spin motion-reduce:animate-none'
-      />
-      <span role='status' aria-live='polite' className='sr-only'>
-        Loading menu items
-      </span>
-    </div>
-  );
-}
-
-function EmptyState({ message }: { readonly message: string }) {
-  return (
-    <div
-      role='menuitem'
-      aria-disabled='true'
-      data-disabled=''
-      tabIndex={-1}
-      data-slot='common-dropdown-empty'
-      className={MENU_EMPTY_STATE_BASE}
-    >
-      <span role='status' aria-live='polite'>
-        {message}
-      </span>
     </div>
   );
 }
@@ -405,6 +368,7 @@ function CommonDropdownSubmenuRenderer({
       data-menu-surface='toolbar'
       data-slot='common-dropdown-subcontent'
       aria-busy={item.isLoading || undefined}
+      role={searchable ? 'group' : 'menu'}
       className={cn(subMenuContentClasses, transformOrigin)}
       style={getContentStyle(
         item.minWidth ?? measuredMinWidth,
@@ -437,13 +401,27 @@ function CommonDropdownSubmenuRenderer({
           inputRef={inputRef}
         />
       ) : null}
-      {renderRootBody({
-        isLoading: item.isLoading ?? false,
-        items: filteredItems,
-        emptyMessage: item.emptyMessage ?? 'No items found',
-        renderItems: itemsToRender =>
-          itemsToRender.map(child => renderItem(child, context)),
-      })}
+      {searchable ? (
+        /* Searchable submenus split group/menu the same way the root
+           content does: the input cannot be a role="menu" child. */
+        <div role='menu'>
+          {renderRootBody({
+            isLoading: item.isLoading ?? false,
+            items: filteredItems,
+            emptyMessage: item.emptyMessage ?? 'No items found',
+            renderItems: itemsToRender =>
+              itemsToRender.map(child => renderItem(child, context)),
+          })}
+        </div>
+      ) : (
+        renderRootBody({
+          isLoading: item.isLoading ?? false,
+          items: filteredItems,
+          emptyMessage: item.emptyMessage ?? 'No items found',
+          renderItems: itemsToRender =>
+            itemsToRender.map(child => renderItem(child, context)),
+        })
+      )}
     </SubContent>
   );
 
