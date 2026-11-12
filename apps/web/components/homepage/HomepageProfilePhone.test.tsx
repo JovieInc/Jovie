@@ -44,20 +44,18 @@ describe('HomepageProfilePhone', () => {
     await expectNoA11yViolations(container);
   });
 
-  it('never features Tim on the homepage while the slot is a demo artist', () => {
-    expect(isDemoArtist(ARTIST)).toBe(true);
+  it('draws the featured artist from the slot, Tim for now, with no verified badge', () => {
+    expect(isDemoArtist(ARTIST)).toBe(false);
     render(
       <HomepageProfilePhone
-        alt='An example artist’s Jovie profile.'
+        alt='Tim White’s Jovie profile.'
         release={{ title: LATEST.title, src: LATEST.src }}
       />
     );
     const phone = screen.getByRole('img');
-    expect(phone).not.toHaveTextContent('Tim White');
-    expect(phone).not.toHaveTextContent('jov.ie/tim');
-    expect(phone.innerHTML).not.toContain('tim-white');
-    // A demo slot is labeled as an example. It does not wear a verified badge.
-    expect(ARTIST.name).toBe('Example artist');
+    expect(phone).toHaveTextContent('Tim White');
+    expect(phone).toHaveTextContent('jov.ie/tim');
+    expect(phone).toHaveTextContent('Never Say A Word');
     expect(phone.querySelector('.hv3-pp__badge')).toBeNull();
   });
 });
