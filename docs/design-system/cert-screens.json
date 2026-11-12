@@ -244,6 +244,7 @@
     "apps/web/components/organisms/PaySection.tsx": "a11y,ds-owner,frontend-rules,states,tests",
     "apps/web/components/organisms/PersistentAudioBar.tsx": "a11y,ds-owner,states,tests",
     "apps/web/components/organisms/ProfileSwitcher.tsx": "a11y,ds-owner,states,tests",
+    "apps/web/components/organisms/SharedCommandPalette.tsx": "forced-caps",
     "apps/web/components/organisms/SidebarCollapsibleGroup.tsx": "a11y,states,tests",
     "apps/web/components/organisms/SidebarDockBridge.tsx": "a11y,states",
     "apps/web/components/organisms/UnifiedSidebar.tsx": "a11y,ds-owner,states,tests",
