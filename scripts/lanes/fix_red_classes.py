@@ -57,8 +57,6 @@ PLATFORM_TEXT = re.compile(
 # scripts/security/dual-license-elections.json. Never drop a deny-licenses id.
 DEPENDENCY_LICENSE = re.compile(r"Dependency review detected incompatible licenses")
 QUOTA_TEXT = re.compile(r"github-quota-deferred|Fleet rule evidence is (?:missing|deferred)", re.IGNORECASE)
-# The api client prints the bucket reset as `until <ISO Z>` before PR Ready exits 75.
-_QUOTA_RESET_AT = re.compile(r"until (\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z)")
 UNWIRED = re.compile(r"Unwired: (.+?)\. Wire each file into a ci-fast lane")
 ATOMIC_TEXT = re.compile(r"use atomic_state\.atomic_write_text for whole-file state")
 BODY_TEXT = re.compile(r"red-before-green:|PR body is missing|missing (?:a )?`?## ?(?:Red-before-green|Blast radius)",
@@ -175,55 +173,6 @@ DEFAULT_BREAKER_N, MAX_BREAKER_N, MIN_CELL_RUNS = 2, 3, 10
 
 def real_failures(pr: dict) -> list[dict]:
     return machine_gap.red_checks(pr.get("statusCheckRollup") or [], RED, AGGREGATE)
-
-
-def quota_reset_epoch(text: str) -> float | None:
-    """Latest `until <ISO-8601 Z>` stamp in a quota-deferred log, else None."""
-    epochs = []
-    for stamp in _QUOTA_RESET_AT.findall(text or ""):
-        try:
-            epochs.append(datetime.fromisoformat(stamp.replace("Z", "+00:00")).timestamp())
-        except ValueError:
-            continue
-    return max(epochs) if epochs else None
-
-
-def quota_rerun_decision(stored, head: str, reset_at: float | None, now: float):
-    """Return `(decision, replacement)` for one PR entry in infra-reruns.json.
-
-    `decision` is `wait`, `rerun`, or `spent`. A log that names a quota reset must
-    not spend its single rerun before that instant: the same exit 75 comes back
-    and the next pass would dispatch a model. A claim taken before the reset,
-    including a legacy entry that is only the head sha, still allows one rerun
-    after it. Logs with no reset keep one rerun per head.
-    """
-    if (not isinstance(head, str) or not head or isinstance(now, bool)
-            or not isinstance(now, (int, float))):
-        raise ValueError("quota rerun needs a head and a timestamp")
-    if isinstance(stored, str):
-        row = {"head": head, "claimedAt": None, "reset": None} if stored == head else None
-        legacy = stored == head
-    elif isinstance(stored, dict) and stored.get("head") == head:
-        row = {"head": head, "claimedAt": stored.get("claimedAt"), "reset": stored.get("reset")}
-        legacy = False
-    else:
-        row, legacy = None, False
-    if reset_at is not None and now < float(reset_at):
-        waiting = row or {"head": head, "claimedAt": None, "reset": None}
-        waiting["reset"] = float(reset_at)
-        return "wait", waiting
-    claimed_at = None if row is None else row.get("claimedAt")
-    claimed = isinstance(claimed_at, (int, float)) and not isinstance(claimed_at, bool)
-    if reset_at is None:
-        # Keep a legacy head string. Replacing it with claimedAt null looks unclaimed
-        # and the next pass would spend a second rerun.
-        if row is not None and (legacy or claimed):
-            return "spent", stored if isinstance(stored, str) else row
-        return "rerun", {"head": head, "claimedAt": float(now), "reset": None}
-    reset_at = float(reset_at)
-    if isinstance(claimed_at, (int, float)) and not isinstance(claimed_at, bool) and claimed_at >= reset_at:
-        return "spent", row
-    return "rerun", {"head": head, "claimedAt": float(now), "reset": reset_at}
 
 
 def stamp_internal_changelog(body) -> str | None:

@@ -7012,34 +7012,6 @@ def infra_only_red(host: Host, pr: dict) -> str | None:
     return "+".join(sorted(found))[:60]
 
 
-def quota_deferred_rerun(host: Host, pr: dict) -> str | None:
-    """Rerun a quota-deferred head once after the log's advertised reset.
-
-    A rerun before that instant returns the same exit 75 and must not spend the
-    claim or dispatch a model. The lane ticks again after the reset. Logs with
-    no reset keep the one immediate rerun.
-    """
-    logs = failed_logs(host, pr) or {}
-    reset_at = fix_red_classes.quota_reset_epoch("\n".join(logs.values()))
-    decision = "spent"
-
-    def change(data: dict) -> None:
-        nonlocal decision
-        key = str(pr["number"])
-        decision, data[key] = fix_red_classes.quota_rerun_decision(
-            data.get(key), pr["headRefOid"], reset_at, time.time())
-
-    try:
-        update_json(host.state / "infra-reruns.json", change)
-    except (OSError, ValueError):
-        return None
-    if decision == "wait":
-        return "infra-rerun:quota-deferred-until"
-    if decision != "rerun":
-        return None
-    return "infra-rerun:quota-deferred" if _rerun_failed(pr) else None
-
-
 def claim_infra_rerun(host: Host, pr: dict) -> bool:
     """True once per (PR, head): the caller may rerun instead of dispatching an agent."""
     taken = []
@@ -7243,10 +7215,10 @@ def deterministic_route_taken(host: Host, pr: dict, route: dict | None) -> str |
         if not claim_route(host, pr, route["action"]):
             return None
         return "infra-rerun:changelog-metadata" if stamp_changelog_decision(host, pr) else None
-    # A quota reset named in the log gets one rerun after that instant. Spending
-    # it earlier leaves the head red and the next pass dispatches a model.
+    # A named quota reset gets one rerun after that instant (quota_rerun).
     if route["action"] == fix_red_classes.RERUN and route.get("cls") == "quota-deferred":
-        return quota_deferred_rerun(host, pr)
+        import quota_rerun
+        return quota_rerun.deferred_rerun(host, pr, failed_logs, update_json, _rerun_failed)
     # One rerun per head, shared with the platform-red gate above; one sync per head.
     if not (claim_infra_rerun(host, pr) if route["action"] == fix_red_classes.RERUN else claim_route(host, pr, route["action"])):
         return None
