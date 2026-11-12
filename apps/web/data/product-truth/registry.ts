@@ -604,6 +604,10 @@ export const PRODUCT_FLAG_CAPABILITIES = {
   CREATOR_FINANCE: {
     nonMarketing: 'owner-only finance release gate; no public claim (JOV-4621)',
   },
+  OUTBOUND_DOGFOOD_GATE: {
+    nonMarketing:
+      'internal outbound draft visibility; default off outside tests; no send authority (JOV-12380)',
+  },
   VISIBILITY_AUDIT_OFFER: {
     nonMarketing: 'hidden until the flag and a Stripe Payment Link are set',
   },

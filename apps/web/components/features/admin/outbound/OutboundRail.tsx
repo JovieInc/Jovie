@@ -147,9 +147,11 @@ function MessageSection({
           className='px-1 pb-2 text-xs text-secondary-token'
           data-testid='outbound-message-empty'
         >
-          {row.channel
-            ? 'No claim link yet. Build the profile to draft a message.'
-            : 'No reachable channel: no email address or Instagram handle on file.'}
+          {row.view === 'needs_judge'
+            ? 'Draft hidden until the page and onboarding pass the dogfood judge.'
+            : row.channel
+              ? 'No claim link yet. Build the profile to draft a message.'
+              : 'No reachable channel: no email address or Instagram handle on file.'}
         </p>
       </DrawerSection>
     );
