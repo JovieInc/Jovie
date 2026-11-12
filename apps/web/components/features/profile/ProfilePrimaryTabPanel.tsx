@@ -457,7 +457,7 @@ export function ProfilePrimaryTabPanel({
         >
           <div>
             <div className='px-4 pb-2 pt-3'>
-              <h2 className='text-xl font-semibold leading-none tracking-[-0.014em] text-on-media dark:text-on-media'>
+              <h2 className='text-balance text-xl font-semibold leading-none tracking-[-0.014em] text-on-media dark:text-on-media'>
                 Music
               </h2>
             </div>
@@ -481,7 +481,7 @@ export function ProfilePrimaryTabPanel({
         data-testid='profile-primary-tab-listen'
       >
         <div className='px-4 pb-2 pt-3'>
-          <h2 className='text-xl font-semibold leading-none tracking-[-0.014em] text-on-media dark:text-on-media'>
+          <h2 className='text-balance text-xl font-semibold leading-none tracking-[-0.014em] text-on-media dark:text-on-media'>
             Music
           </h2>
         </div>
