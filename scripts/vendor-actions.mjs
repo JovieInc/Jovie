@@ -12,7 +12,8 @@
 //     for the same action (so Dependabot bumps force a refresh).
 //   node scripts/vendor-actions.mjs --refresh <dir> [--sha <sha>]
 //     re-fetch <dir>'s repo at the workflows' pinned SHA (or --sha), copy the
-//     manifest's file list, and rewrite hashes. Review the diff like any
+//     manifest's file list, rewrite hashes and synchronize declared pin
+//     consumers (contract assertions and local-action provenance). Review like any
 //     dependency bump.
 
 import { execFileSync } from 'node:child_process';
@@ -119,6 +120,25 @@ export function workflowPins(repoRoot) {
   return pins;
 }
 
+/** Prepare exact-SHA consumer updates before refresh mutates the vendored tree. */
+export function pinConsumerUpdates(repoRoot, action, sha) {
+  return (action.pinConsumers ?? []).map(file => {
+    const path = resolve(repoRoot, file);
+    const scoped = relative(repoRoot, path);
+    if (scoped.startsWith('../') || scoped === '..' || scoped.startsWith('/'))
+      throw new Error(`${file}: pin consumer must be inside the repository`);
+    const source = readFileSync(path, 'utf8');
+    const prefix = `${action.repo}@`;
+    const refs = source.split(prefix).slice(1);
+    if (!refs.length || refs.some(ref => !ref.startsWith(action.sha)))
+      throw new Error(`${file}: expected only ${prefix}${action.sha}`);
+    return {
+      path,
+      source: source.replaceAll(`${prefix}${action.sha}`, `${prefix}${sha}`),
+    };
+  });
+}
+
 /** @returns {string[]} problems; empty when the vendored trees are intact. */
 export function checkVendored(repoRoot) {
   const problems = [];
@@ -127,6 +147,11 @@ export function checkVendored(repoRoot) {
   const pins = workflowPins(repoRoot);
   const listed = new Set();
   for (const action of manifest.actions ?? []) {
+    try {
+      pinConsumerUpdates(repoRoot, action, action.sha);
+    } catch (error) {
+      problems.push(error.message);
+    }
     if (action.processing && action.processing !== BUILD_DIRECTIVES)
       problems.push(`${action.dir}: unknown processing ${action.processing}`);
     const base = resolve(repoRoot, VENDOR_ROOT, action.dir);
@@ -174,6 +199,7 @@ function refresh(repoRoot, dir, shaOverride) {
       `${action.repo}: conflicting workflow pins; align them or select --sha explicitly`
     );
   const sha = shaOverride ?? pins?.values().next().value ?? action.sha;
+  const consumers = pinConsumerUpdates(repoRoot, action, sha);
   const work = mkdtempSync(join(tmpdir(), 'vendor-action-'));
   try {
     execFileSync('git', ['init', '-q', work]);
@@ -204,6 +230,8 @@ function refresh(repoRoot, dir, shaOverride) {
         );
       files[file] = sha256(target);
     }
+    for (const consumer of consumers)
+      writeFileSync(consumer.path, consumer.source);
     action.sha = sha;
     action.files = files;
     if (action.processing) action.upstreamFiles = upstreamFiles;
