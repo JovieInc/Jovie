@@ -354,6 +354,10 @@ for (const [k, row] of suspects.entries()) {
   row.longestTaskSamplesMs = all.map(r => r.longestTaskMs);
   row.lcpMs = median(row.lcpSamplesMs);
   row.longestTaskMs = median(row.longestTaskSamplesMs);
+  // Name the scripts from the load the reported stall came from.
+  const frame = all.find(r => r.longestTaskMs === row.longestTaskMs)?.frame;
+  if (frame) row.frame = frame;
+  else delete row.frame;
 }
 // A page whose request got a 429 is judged on one quiet reload (throttle.mjs).
 const throttled = pages.filter(wasThrottled);
