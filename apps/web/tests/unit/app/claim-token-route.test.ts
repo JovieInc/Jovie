@@ -157,16 +157,16 @@ describe('Claim token route', () => {
         ),
         { params: Promise.resolve({ token: 'synthetic-token' }) }
       );
-      const location = new URL(response.headers.get('location')!);
-      expect(location.searchParams.get('utm_campaign')).toBe(
+      const redirectUrl = new URL(response.headers.get('location')!);
+      expect(redirectUrl.searchParams.get('utm_campaign')).toBe(
         'claim-link-outreach'
       );
-      expect(location.searchParams.get('utm_source')).toBe('claim_link');
-      expect(location.searchParams.get('utm_medium')).toBe('dm');
-      expect(location.searchParams.has('redirect_url')).toBe(false);
-      expect(location.searchParams.has('email')).toBe(false);
-      expect(location.searchParams.has('utm_content')).toBe(false);
-      expect(location.origin).toBe('https://jov.ie');
+      expect(redirectUrl.searchParams.get('utm_source')).toBe('claim_link');
+      expect(redirectUrl.searchParams.get('utm_medium')).toBe('dm');
+      expect(redirectUrl.searchParams.has('redirect_url')).toBe(false);
+      expect(redirectUrl.searchParams.has('email')).toBe(false);
+      expect(redirectUrl.searchParams.has('utm_content')).toBe(false);
+      expect(redirectUrl.origin).toBe('https://jov.ie');
       expect(response.cookies.getAll().map(cookie => cookie.name)).toEqual([
         'jovie_pending_claim',
       ]);
@@ -178,11 +178,11 @@ describe('Claim token route', () => {
         ? new URL(
             claimHrefWithAttribution(
               '/claimableartist/claim?next=auth',
-              location.searchParams
+              redirectUrl.searchParams
             ),
-            location.origin
+            redirectUrl.origin
           )
-        : location;
+        : redirectUrl;
       const signup = await claimAuth(new NextRequest(handoff), {
         params: Promise.resolve({ username: 'claimableartist' }),
       });
