@@ -13,6 +13,7 @@
 
 import type { DbOrTransaction } from '@/lib/db';
 import type { ingestionJobs } from '@/lib/db/schema/ingestion';
+import { importMissingAppleMusicReleases } from '@/lib/discography/apple-music-import';
 import {
   processDspArtistDiscoveryJob,
   processMusicFetchEnrichmentJob,
@@ -118,8 +119,14 @@ export async function processJob(
       return processWaitlistEmailJob(conn, job.payload, { jobId: job.id });
     case 'dsp_artist_discovery':
       return processDspArtistDiscoveryJob(conn, job.payload);
-    case 'dsp_track_enrichment':
-      return processReleaseEnrichmentJob(conn, job.payload);
+    case 'dsp_track_enrichment': {
+      const result = await processReleaseEnrichmentJob(conn, job.payload);
+      // Links never create releases; add Apple-only ones too (JOV-7140).
+      if (result.providerId === 'apple_music') {
+        await importMissingAppleMusicReleases(result.creatorProfileId, conn);
+      }
+      return result;
+    }
     case 'musicfetch_enrichment': {
       const parsed = musicFetchEnrichmentPayloadSchema.safeParse(job.payload);
       const recoveryProfileId =

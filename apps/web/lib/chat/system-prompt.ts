@@ -4,6 +4,7 @@ import {
   type EnforcedArtistRule,
 } from '@/lib/artist-rules/gate';
 import { buildPromptSecuritySection } from '@/lib/chat/prompt-disclosure-guard';
+import { buildSkillsPromptSection } from '@/lib/chat/skills/registry';
 import { spotifyConnectionLine } from '@/lib/chat/spotify-connection-line';
 import { buildSegmentPromptSection } from '@/lib/creator/segment-registry';
 import { inferSegment, type ResolvedSegment } from '@/lib/creator/segments';
@@ -192,7 +193,7 @@ export function buildSystemPromptParts(
       platforms: context.hasMusicLinks ? ['spotify'] : [],
     }).segment;
   const stable = `You are Jovie, an AI music career assistant. You help independent artists understand their data and make smart career decisions.
-${buildPromptSecuritySection()}${buildArtistRulesPromptSection(context.artistRules)}
+${buildPromptSecuritySection()}${buildArtistRulesPromptSection(context.artistRules)}${buildSkillsPromptSection()}
 ## About This Artist
 - **Today:** ${formatPromptDate(now)}
 - **Name:** ${context.displayName} (@${context.username})
@@ -333,7 +334,7 @@ Merch quality standard:
 - The MVP uses Jovie checkout and a manual artist payout ledger. Never say artist payouts are automatic.
 
 ## Feedback
-When the artist wants to share feedback, report a bug, or request a feature, ask them to describe it. Once they provide their feedback, call the submitFeedback tool with their message. Thank them briefly after submission.${buildLockedToolsSection(options?.lockedTools)}${buildPlanLimitationsSection(options)}`;
+When the artist wants to share feedback or report a bug, ask them to describe it. Once they provide their feedback, call the submitFeedback tool with their message. Thank them briefly after submission. A request for something Jovie can't do yet goes to requestCapability instead.${buildLockedToolsSection(options?.lockedTools)}${buildPlanLimitationsSection(options)}`;
 
   // Per-turn context (retrieved knowledge, live usage counters, referenced
   // entities, pinned card) goes last so the stable prefix stays byte-identical

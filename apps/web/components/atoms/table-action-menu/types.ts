@@ -20,6 +20,12 @@ export interface TableActionMenuProps {
   readonly align?: 'start' | 'center' | 'end';
   readonly open?: boolean;
   readonly onOpenChange?: (open: boolean) => void;
+  /**
+   * Passed through to CommonDropdown. Stories that hold the menu open for
+   * the a11y audit set false: a modal menu aria-hides the page behind it,
+   * which axe reports as aria-hidden-focus while the audit runs.
+   */
+  readonly modal?: boolean;
   readonly searchable?: boolean;
   readonly searchPlaceholder?: string;
   readonly searchMode?: 'root' | 'recursive';

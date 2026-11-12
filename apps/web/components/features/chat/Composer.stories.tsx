@@ -27,3 +27,34 @@ export const Default: Story = {
     ),
   },
 };
+
+/**
+ * Long content: the provider renders long composer copy untouched; wrapping
+ * belongs to the children it hosts.
+ */
+export const LongContentChildren: Story = {
+  args: {
+    children: (
+      <div className='w-80 rounded-lg border border-subtle p-4 text-sm text-primary-token'>
+        Tell Jovie about the release you are planning, the cities where fans are
+        growing, the merch you want to drop with it and anything else you want
+        on your profile before launch day.
+      </div>
+    ),
+  },
+};
+
+/** Right-to-left: an Arabic composer hint inside an RTL shell. */
+export const RtlArabicChildren: Story = {
+  args: {
+    children: (
+      <div
+        dir='rtl'
+        lang='ar'
+        className='w-80 rounded-lg border border-subtle p-4 text-sm text-primary-token'
+      >
+        اكتب رسالتك إلى جوفي حول إصدارك القادم والمدن التي ينمو فيها جمهورك
+      </div>
+    ),
+  },
+};

@@ -44,7 +44,7 @@ describe('FormError', () => {
     render(<FormError message='Code expired.' className='mt-2' />);
 
     const alert = screen.getByRole('alert');
-    expect(alert).toHaveClass('mt-2', 'text-error', 'text-xs');
+    expect(alert).toHaveClass('mt-2', 'text-error-text', 'text-xs');
   });
 
   it('removes the alert when the message clears', () => {
