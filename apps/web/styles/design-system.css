@@ -3602,6 +3602,44 @@ html[data-profile-flow-open="true"] .cookie-banner-card {
 }
 
 /* ============================================
+   PUBLIC SURFACE + SMART LINK TOKENS (2026-11-11)
+   ============================================
+   Theme-constant on purpose: each token carries the exact literal its
+   component drew before it existed (component certification, tokens), so
+   light and dark compute what they did. The pattern pairs keep their own
+   light and dark members because the components pick one with dark:. */
+:root {
+  /* SmartLinkPoweredByFooter light brand line and link hover; dark: keeps
+     muted-foreground. Same values as Tailwind neutral-700 and neutral-950. */
+  --color-smart-link-footer-text: oklch(37.1% 0 none);
+  --color-smart-link-footer-text-hover: oklch(14.5% 0 none);
+  /* PublicSurfaceShell scrim over blurred ambient artwork. */
+  --public-surface-ambient-scrim:
+    radial-gradient(circle at top, rgba(255, 255, 255, 0.06), transparent 26%),
+    linear-gradient(
+      180deg,
+      rgba(6, 8, 13, 0.34) 0%,
+      rgba(7, 8, 10, 0.82) 42%,
+      rgba(8, 9, 10, 0.98) 100%
+    );
+  /* BackgroundPattern grid lines and dots. */
+  --background-pattern-grid:
+    linear-gradient(rgba(0, 0, 0, 0.02) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0, 0, 0, 0.02) 1px, transparent 1px);
+  --background-pattern-grid-dark:
+    linear-gradient(rgba(255, 255, 255, 0.02) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
+  --background-pattern-dots: radial-gradient(
+    rgba(0, 0, 0, 0.1) 1px,
+    transparent 1px
+  );
+  --background-pattern-dots-dark: radial-gradient(
+    rgba(255, 255, 255, 0.1) 1px,
+    transparent 1px
+  );
+}
+
+/* ============================================
    MENU/DROPDOWN TOKENS
    ============================================ */
 :root {
