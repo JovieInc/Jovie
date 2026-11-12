@@ -63,14 +63,9 @@
     }
   },
   "debt": {
-    "apps/web/app/app/(shell)/DashboardLoadTracker.tsx": "a11y,states,tests",
-    "apps/web/app/app/(shell)/DashboardShellContent.tsx": "states",
     "apps/web/app/app/(shell)/ProfileCompletionRedirect.tsx": "a11y,states,tests",
-    "apps/web/app/app/(shell)/calendar/CalendarRouteSkeleton.tsx": "a11y,states,tests",
     "apps/web/app/app/(shell)/chat/ChatEntityRightPanelHost.tsx": "a11y,ds-owner,states,tests",
-    "apps/web/app/app/(shell)/chat/ChatLoadingState.tsx": "a11y,states,tests",
     "apps/web/app/app/(shell)/chat/ChatPageClient.tsx": "a11y,states,tests",
-    "apps/web/app/app/(shell)/library/LibraryLoadingState.tsx": "a11y,states",
     "apps/web/app/app/(shell)/links/LinksRouteSkeleton.tsx": "a11y,states,tests",
     "apps/web/app/app/(shell)/profiles/ProfilesRouteSkeleton.tsx": "a11y,states,tests",
     "apps/web/app/app/(shell)/settings/SettingsRouteSkeleton.tsx": "a11y,states,tests",
