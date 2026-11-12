@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
+import { expect, waitFor, within } from 'storybook/test';
 import { QRCode } from './QRCode';
 
 const meta: Meta<typeof QRCode> = {
@@ -76,6 +77,71 @@ export const InContainer: Story = {
       />
       <p className='text-sm text-gray-600 dark:text-gray-400'>
         Scan to pay via Apple Pay
+      </p>
+    </div>
+  ),
+};
+
+/** Only the required data: the 120px size and the default label apply. */
+export const PartialDataOnly: Story = {
+  args: {
+    data: 'https://jov.ie/tim',
+  },
+};
+
+/**
+ * The admin HUD passes an empty string while its kiosk link is unresolved, so
+ * the code renders for no data at all.
+ */
+export const EmptyData: Story = {
+  args: {
+    data: '',
+    label: 'HUD Link',
+  },
+};
+
+/**
+ * The image request failed: the frame keeps its size and shows the fallback.
+ * The play function fires the image's error event so the state is fixed.
+ */
+export const ErrorImageUnavailable: Story = {
+  args: {
+    data: 'https://jov.ie/tim',
+    size: 120,
+    label: 'Scan To Open This Profile On Your Phone',
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const image = await canvas.findByRole('img', {
+      name: 'Scan To Open This Profile On Your Phone',
+    });
+    image.dispatchEvent(new Event('error'));
+    await waitFor(() =>
+      expect(canvas.getByText('QR code unavailable')).toBeVisible()
+    );
+  },
+};
+
+export const LongContentUrl: Story = {
+  args: {
+    data: 'https://jov.ie/tim/never-say-a-word-extended-club-mix?utm_source=qr&utm_medium=print&utm_campaign=summer-tour-poster-los-angeles&utm_content=back-cover',
+    size: 160,
+    label:
+      'Scan to open Never Say A Word (Extended Club Mix) on your phone from the summer tour poster',
+  },
+};
+
+export const RtlCaption: Story = {
+  render: () => (
+    <div dir='rtl' className='space-y-2 text-center'>
+      <QRCode
+        data='https://jov.ie/tim'
+        size={120}
+        label='امسح لفتح هذا الملف الشخصي على هاتفك'
+        className='mx-auto'
+      />
+      <p className='text-xs text-secondary-token'>
+        امسح لفتح هذا الملف الشخصي على هاتفك
       </p>
     </div>
   ),

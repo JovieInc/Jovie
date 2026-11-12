@@ -43,6 +43,7 @@ describe('Footer', () => {
       Support: APP_ROUTES.SUPPORT,
       Blog: APP_ROUTES.BLOG,
       Changelog: APP_ROUTES.CHANGELOG,
+      'Get Started': APP_ROUTES.START,
     } as const;
 
     for (const [label, href] of Object.entries(expectedLinks)) {

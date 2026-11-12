@@ -40,3 +40,19 @@ export const LinearSegmented: Story = {
     variant: 'linear',
   },
 };
+
+/**
+ * Right-to-left: the segmented control inside an RTL document. The sliding
+ * indicator must still sit under the selected segment.
+ */
+export const RtlSegmented: Story = {
+  args: {
+    appearance: 'segmented',
+    shortcutKey: 'T',
+  },
+  render: args => (
+    <div dir='rtl'>
+      <ThemeToggle {...args} />
+    </div>
+  ),
+};

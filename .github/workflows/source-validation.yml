@@ -263,6 +263,15 @@ jobs:
       # that fails it there ejects the whole group (#23060: an unquoted
       # run-name with " #" was read as a YAML comment). Lint at PR time so
       # the author sees it before enqueue. Same checksum-pinned toolchain.
+      # Same main-written, sha256-verified download cache as ci-fast; read-only.
+      - name: Restore pinned actionlint downloads
+        if: steps.reuse.outputs.reuse != 'true'
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: /tmp/jovie-pinned-downloads
+          key: pinned-downloads-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('.github/scripts/run-actionlint.sh') }}
+          restore-keys: |
+            pinned-downloads-${{ runner.os }}-${{ runner.arch }}-
       - name: Set up Go for source-pinned actionlint
         if: steps.reuse.outputs.reuse != 'true'
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
@@ -277,6 +286,7 @@ jobs:
           BASE_BRANCH: ${{ github.base_ref }}
           # Read-only token for the release-download fallback.
           RELEASE_DOWNLOAD_TOKEN: ${{ github.token }}
+          PINNED_DOWNLOAD_CACHE_DIR: /tmp/jovie-pinned-downloads
           SHELLCHECK_OPTS: >-
             --exclude=SC2001,SC2016,SC2028,SC2034,SC2086,SC2126,SC2129,SC2329
         run: |
@@ -1055,9 +1065,12 @@ jobs:
       # a status named anything, but only main's copy of the workflow can
       # produce a pull_request_target run of fleet-rules-evidence.yml. The
       # newest run for this head must have completed after this PR event
-      # (stale pre-edit verdicts read as missing). Missing, in-flight or
-      # deferred evidence exits 75 with github-quota-deferred; the evidence
-      # workflow re-runs this job when it finishes, so nothing polls.
+      # (stale pre-edit verdicts read as missing). Missing or in-flight evidence
+      # exits 75. A client exit 75 is a deferred lookup, not an empty run list:
+      # substituting one reported a passing verdict as missing after the evidence
+      # run had already succeeded. The evidence workflow re-runs this job when a
+      # verdict lands later. A lone PR Ready failure with that deferral in the log
+      # is rerun by the fix-red classifier, so nothing polls.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         if: ${{ always() && github.event_name == 'pull_request' }}
         with:
@@ -1103,8 +1116,28 @@ jobs:
           # carries the BASE sha as its head_sha (#24184), so the head_sha filter hid
           # every post-edit verdict. Bind by PR title, head branch/repo and the floor.
           ref_q="$(jq -rn --arg r "$HEAD_REF" '$r | @uri')"
-          runs="$(node packages/api-client/cli.ts gh --priority default -- api "repos/$REPOSITORY/actions/workflows/fleet-rules-evidence.yml/runs?branch=$ref_q&event=pull_request_target&per_page=20")" || runs='{"workflow_runs":[]}'
-          row="$(jq -r --argjson floor "$floor" --arg title "fleet-rules #$PR_NUMBER base=main" --arg ref "$HEAD_REF" --argjson repo "$HEAD_REPO_ID" '[.workflow_runs[] | select(.path == ".github/workflows/fleet-rules-evidence.yml" and .display_title == $title and .head_branch == $ref and .head_repository.id == $repo and (.created_at | fromdateiso8601) >= ($floor - 10) and .conclusion != "cancelled")] | sort_by([.created_at, .id]) | last // {status: "missing"} | "\(.status)\t\(.conclusion // "")\t\(.html_url // "")"' <<<"$runs" 2>/dev/null || echo 'missing')"
+          # Exit 75 is the client's quota deferral. An empty list is a real answer
+          # (no matching run) and must not be invented from a failed lookup.
+          rc=0
+          runs="$(node packages/api-client/cli.ts gh --priority default -- api "repos/$REPOSITORY/actions/workflows/fleet-rules-evidence.yml/runs?branch=$ref_q&event=pull_request_target&per_page=20")" || rc=$?
+          if [ "$rc" -eq 75 ]; then
+            echo "::error::Fleet rule evidence lookup was github-quota-deferred; not a verdict on this PR. It re-runs when the lookup can complete."
+            exit 75
+          fi
+          if [ "$rc" -ne 0 ]; then
+            runs='{"workflow_runs":[]}'
+          fi
+          # A run that carries an earlier head of this PR is stale: the bot moved the head while it ran, so
+          # it failed closed and must not decide (#24903, a second newer than the current head's run).
+          # Edited-event runs carry the base sha (#24184), which is not a PR commit, so they still count.
+          # A failed commits lookup drops nothing, so it can only keep PR Ready red, never turn it green.
+          stale='[]'
+          if commits="$(node packages/api-client/cli.ts gh --priority default -- api "repos/$REPOSITORY/pulls/$PR_NUMBER/commits?per_page=100" 2>/dev/null)"; then
+            stale="$(jq -c --arg sha "$HEAD_SHA" '[.[].sha | select(. != $sha)]' <<<"$commits" 2>/dev/null || echo '[]')"
+          fi
+          # Two evidence runs can share a created_at second (bot merges main and drops a label at once).
+          # Ties go to the run for the current head, so the stale-head run's id cannot win (#24886).
+          row="$(jq -r --argjson floor "$floor" --arg title "fleet-rules #$PR_NUMBER base=main" --arg ref "$HEAD_REF" --argjson repo "$HEAD_REPO_ID" --arg sha "$HEAD_SHA" --argjson stale "$stale" '[.workflow_runs[] | select(.path == ".github/workflows/fleet-rules-evidence.yml" and .display_title == $title and .head_branch == $ref and .head_repository.id == $repo and (.created_at | fromdateiso8601) >= ($floor - 10) and .conclusion != "cancelled" and ((.head_sha // "") | IN($stale[]) | not))] | sort_by([.created_at, (.head_sha == $sha), .id]) | last // {status: "missing"} | "\(.status)\t\(.conclusion // "")\t\(.html_url // "")"' <<<"$runs" 2>/dev/null || echo 'missing')"
           IFS=$'\t' read -r status conclusion url <<<"$row"
           case "$status/$conclusion" in
             completed/success) echo "Fleet rules passed: $url" ;;
