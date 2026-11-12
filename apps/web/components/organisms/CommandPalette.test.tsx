@@ -78,6 +78,8 @@ function makeDashboard(isAdmin: boolean): DashboardData {
     isAdmin,
     tippingStats: {
       tipClicks: 0,
+      qrTipClicks: 0,
+      linkTipClicks: 0,
       tipsSubmitted: 0,
       totalReceivedCents: 0,
       monthReceivedCents: 0,
