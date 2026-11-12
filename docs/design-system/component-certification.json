@@ -951,8 +951,13 @@
       "offline": "The renderer never fetches or submits: it draws the search field and the rows its owner passes, and a submenu shows loading only when the caller sets isLoading (LoadingItems), so lost connectivity reaches it only as caller state.",
       "permission-denied": "The renderer has no permission input or gated action; the detector matched role='menuitem' on the loading and empty rows. A caller that withholds a submenu passes disabled, which Radix renders as an inert trigger."
     },
+    "packages/ui/atoms/common-dropdown-state-rows.tsx": {
+      "offline": "LoadingState and EmptyState never fetch or submit. They only draw the in-flight or empty row the menu owner asks for, and the detector marked them offline because the loading slot id contains the word loading. Lost connectivity stays the owner's state, shown by the Loading story.",
+      "permission-denied": "The rows have no permission input or gated action. The detector matched role='menuitem' and role='status'. A caller that must not offer an action omits that item instead of asking these rows to gate it."
+    },
     "packages/ui/atoms/common-dropdown.tsx": {
-      "offline": "CommonDropdown renders caller-supplied items and never fetches or submits; isLoading is a caller flag, so lost connectivity can only reach it as the existing LoadingState or EmptyState stories."
+      "offline": "CommonDropdown renders caller-supplied items and never fetches or submits; isLoading is a caller flag, so lost connectivity can only reach it as the existing LoadingState or EmptyState stories.",
+      "permission-denied": "CommonDropdown has no permission, entitlement, or account-role input. The detector matched role='menu' and role='group' on the content. Callers disable the whole control with the disabled prop (DisabledDropdown) or omit an item they must not offer."
     },
     "packages/ui/atoms/composite-field.tsx": {
       "offline": "CompositeField is a layout and focus-ring container that never submits or fetches (\"submit\" appears only in its doc comment); the form that owns its input and button reports offline."

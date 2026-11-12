@@ -119,8 +119,9 @@ describe('ChatHistorySwitcher', () => {
     expect(
       within(menu).getByRole('menuitem', { name: 'Tour Budget' })
     ).toHaveAttribute('data-selected', 'true');
+    // The rows' menu sits inside the scrolling list, under the pinned search.
     expect(
-      menu.querySelector('[data-slot="common-dropdown-scroll-body"]')
+      menu.closest('[data-slot="common-dropdown-scroll-body"]')
     ).not.toBeNull();
   });
 

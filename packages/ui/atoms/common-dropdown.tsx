@@ -255,6 +255,10 @@ export function CommonDropdown(props: CommonDropdownProps) {
         data-menu-surface='toolbar'
         data-slot='common-dropdown-content'
         aria-busy={isLoading || undefined}
+        /* A text input is not an allowed child of role="menu" (axe
+           aria-required-children), so a searchable menu presents its
+           surface as a group and keeps the item rows in an inner menu. */
+        role={searchable ? 'group' : 'menu'}
         data-scroll-body={scrollBody ? 'true' : undefined}
         data-motion={motion?.name ?? 'fade'}
         className={cn(
@@ -296,7 +300,11 @@ export function CommonDropdown(props: CommonDropdownProps) {
           />
         ) : null}
         {scrollBody ? (
-          <scrollBody.Body>{dropdownBody}</scrollBody.Body>
+          <scrollBody.Body>
+            {searchable ? <div role='menu'>{dropdownBody}</div> : dropdownBody}
+          </scrollBody.Body>
+        ) : searchable ? (
+          <div role='menu'>{dropdownBody}</div>
         ) : (
           dropdownBody
         )}
@@ -325,6 +333,8 @@ export function CommonDropdown(props: CommonDropdownProps) {
         data-menu-surface='toolbar'
         data-slot='common-dropdown-content'
         aria-busy={isLoading || undefined}
+        /* Same searchable group/menu split as the dropdown content above. */
+        role={searchable ? 'group' : 'menu'}
         className={cn(contextContentBase, contentClassName)}
         style={getContentStyle(minWidth, maxHeight, 'context')}
         onEscapeKeyDown={event => {
@@ -343,12 +353,24 @@ export function CommonDropdown(props: CommonDropdownProps) {
             onClear={clearSearch}
           />
         ) : null}
-        {renderRootBody({
-          isLoading,
-          items: filteredItems,
-          emptyMessage,
-          renderItems: itemsToRender => renderItems(itemsToRender, 'context'),
-        })}
+        {searchable ? (
+          <div role='menu'>
+            {renderRootBody({
+              isLoading,
+              items: filteredItems,
+              emptyMessage,
+              renderItems: itemsToRender =>
+                renderItems(itemsToRender, 'context'),
+            })}
+          </div>
+        ) : (
+          renderRootBody({
+            isLoading,
+            items: filteredItems,
+            emptyMessage,
+            renderItems: itemsToRender => renderItems(itemsToRender, 'context'),
+          })
+        )}
       </ContextMenuPrimitive.Content>
     );
 
