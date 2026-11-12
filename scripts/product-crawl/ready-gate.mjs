@@ -37,17 +37,21 @@ export function timingSuspect(page) {
 
 /** Median of the samples; the lower middle for an even count. */
 /**
- * The tallest element inserted in the half second before a shift at `atMs`,
- * which is usually what pushed the moved element.
+ * The element inserted last in the half second before a shift at `atMs`
+ * (the tallest, among inserts in the same batch), which is usually what
+ * pushed the moved element. An earlier, larger insert already settled
+ * before the shift, so it is not the cause.
  * @param {{ node: string, atMs: number, h: number }[] | undefined} added
  * @param {number | undefined} atMs
  */
 export function causeOf(added, atMs) {
   if (!Number.isFinite(atMs)) return undefined;
   let best;
-  for (const a of added ?? [])
-    if (a.atMs <= atMs && a.atMs >= atMs - 500 && (!best || a.h > best.h))
+  for (const a of added ?? []) {
+    if (a.atMs > atMs || a.atMs < atMs - 500) continue;
+    if (!best || a.atMs > best.atMs || (a.atMs === best.atMs && a.h > best.h))
       best = a;
+  }
   return best;
 }
 

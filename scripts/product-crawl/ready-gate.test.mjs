@@ -102,10 +102,11 @@ test('a layout-shift finding names the element that appeared just before it', ()
   );
 });
 
-test('the cause of a shift is the tallest element inserted in the half second before it', () => {
+test('the cause of a shift is the last element inserted in the half second before it', () => {
   const added = [
     { node: 'p.early', atMs: 100, h: 900 },
-    { node: 'span.badge', atMs: 1100, h: 24 },
+    { node: 'section.card', atMs: 943, h: 472 },
+    { node: 'span.badge', atMs: 1180, h: 24 },
     { node: 'form.signup', atMs: 1180, h: 328 },
     { node: 'div.later', atMs: 1300, h: 600 },
   ];
