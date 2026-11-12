@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
+import { runCli } from './cli.js';
 import { JovieInputError, JovieRequestError } from './client.js';
 import { findCommand } from './commands.js';
 import {
@@ -64,6 +65,127 @@ describe('command table registration', () => {
       expect(findCommand([first, second]), `${first} ${second}`).toBeTruthy();
     }
   });
+});
+
+describe('golden-path CLI dispatch', () => {
+  const ref = { draft_id: DRAFT_ID, draft_token: REF_FLAGS['draft-token'] };
+  const cases = [
+    {
+      path: ['claim', 'handle', 'radiohead'],
+      tool: 'claim_handle',
+      args: { ...ref, handle: 'radiohead' },
+    },
+    {
+      path: [
+        'onboarding',
+        'answer',
+        '--question',
+        'promoSpend',
+        '--answer',
+        'under_50',
+      ],
+      tool: 'answer_onboarding_question',
+      args: { ...ref, question: 'promoSpend', answer: 'under_50' },
+    },
+    { path: ['onboarding', 'qualify'], tool: 'get_qualification', args: ref },
+    { path: ['onboarding', 'setup'], tool: 'build_profile', args: ref },
+    { path: ['onboarding', 'publish'], tool: 'publish_profile', args: ref },
+    {
+      path: ['profile', 'share', 'radiohead'],
+      tool: 'share_profile',
+      args: { username: 'radiohead' },
+    },
+    { path: ['profile', 'upgrade'], tool: 'start_upgrade', args: ref },
+  ];
+
+  it.each(cases)(
+    'dispatches $tool and prints its result',
+    async ({ path, tool, args }) => {
+      const calls: unknown[] = [];
+      let stdout = '';
+      let stderr = '';
+      const result = { status: 'ok', tool };
+      const flags =
+        tool === 'share_profile'
+          ? []
+          : ['--draft-id', DRAFT_ID, '--draft-token', REF_FLAGS['draft-token']];
+      const code = await runCli([...path, ...flags, '--json'], {
+        stdout: {
+          write: chunk => {
+            stdout += chunk;
+          },
+        },
+        stderr: {
+          write: chunk => {
+            stderr += chunk;
+          },
+        },
+        fetchImpl: async (input, init) => {
+          expect(String(input)).toBe('https://jov.ie/api/mcp');
+          expect(init?.method).toBe('POST');
+          calls.push(JSON.parse(String(init?.body)));
+          return mcpFetch(result)(input, init);
+        },
+      });
+      expect(code).toBe(0);
+      expect(stderr).toBe('');
+      expect(JSON.parse(stdout)).toEqual(result);
+      expect(calls).toEqual([
+        {
+          jsonrpc: '2.0',
+          id: 'jovie-golden-path',
+          method: 'tools/call',
+          params: { name: tool, arguments: args },
+        },
+      ]);
+    }
+  );
+
+  it.each(cases)(
+    'rejects missing inputs for $tool before requesting',
+    async ({ path, tool }) => {
+      let calls = 0;
+      let stdout = '';
+      const code = await runCli([...path.slice(0, 2), '--json'], {
+        stdout: {
+          write: chunk => {
+            stdout += chunk;
+          },
+        },
+        fetchImpl: async () => {
+          calls++;
+          return Response.json({});
+        },
+      });
+      expect(code).toBe(2);
+      expect(JSON.parse(stdout).error.code).toBe(
+        tool === 'claim_handle' || tool === 'share_profile'
+          ? 'USAGE_ERROR'
+          : 'INVALID_INPUT'
+      );
+      expect(calls).toBe(0);
+    }
+  );
+
+  it.each(cases.filter(({ tool }) => tool !== 'share_profile'))(
+    'rejects an absent draft capability in the $tool handler',
+    async ({ path }) => {
+      const command = findCommand(path)!;
+      let calls = 0;
+      await expect(async () =>
+        command.run(
+          { arg: 'radiohead' },
+          {
+            fetchImpl: async () => {
+              calls++;
+              return Response.json({});
+            },
+          }
+        )
+      ).rejects.toBeInstanceOf(JovieInputError);
+      expect(calls).toBe(0);
+    }
+  );
 });
 
 describe('draftRef', () => {
