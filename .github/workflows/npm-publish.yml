@@ -144,7 +144,7 @@ jobs:
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
         # The engines floor, the next major, and the Node 22 line that still runs.
-        node: ['22.13.0', '24.22.2', '26']
+        node: ['22.13.0', '24.22.3', '26']
     # macOS cells try an idle self-hosted Mac first and fall back to hosted,
     # so the LYB-saturated hosted macOS pool never holds a CLI release.
     permissions:
@@ -204,8 +204,8 @@ jobs:
             echo "::error::This workflow may only publish from refs/heads/main."
             exit 1
           }
-          test "$(node --version)" = v24.22.2 || {
-            echo "::error::The release lane requires Node.js v24.22.2."
+          test "$(node --version)" = v24.22.3 || {
+            echo "::error::The release lane requires Node.js v24.22.3."
             exit 1
           }
 

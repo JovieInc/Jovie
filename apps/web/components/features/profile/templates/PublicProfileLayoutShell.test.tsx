@@ -1,15 +1,22 @@
 import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
+import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import { PublicProfileLayoutShell } from './PublicProfileLayoutShell';
 
 vi.mock('@/hooks/useIsAuthenticated', () => ({
   useIsAuthenticated: () => false,
 }));
 
+const emitProofClaimEvent = vi.fn();
+
 vi.mock('@/lib/acquisition/proof-claim-client', () => ({
-  emitProofClaimEvent: vi.fn(),
+  emitProofClaimEvent: (...args: unknown[]) => emitProofClaimEvent(...args),
   rememberProofClaimAttribution: vi.fn(),
 }));
+
+// Clicks stay on the page: jsdom cannot navigate to another document.
+const stayOnPage = (event: MouseEvent) => event.preventDefault();
 
 const commonProps = {
   artistName: 'Unfazed',
@@ -203,5 +210,135 @@ describe('PublicProfileLayoutShell', () => {
     expect(PROFILE_DESKTOP_SURFACE_SHIPPED).toBe(
       PROFILE_DESKTOP_SURFACE_ENABLED
     );
+  });
+});
+
+describe('PublicProfileLayoutShell states', () => {
+  it('draws the stage scrim and the plain accent glow from profile tokens', async () => {
+    const { container } = render(
+      <PublicProfileLayoutShell {...commonProps} isDesktopLayout={false} />
+    );
+
+    // Both layers resolve on the shell's own .profile-viewport element, so the
+    // inline artist accent still drives the glow.
+    expect(
+      container.querySelector('.bg-\\(image\\:--profile-stage-scrim\\)')
+    ).not.toBeNull();
+    expect(
+      container.querySelector('.bg-\\(image\\:--profile-stage-ambient-glow\\)')
+    ).toBeNull();
+    await expectNoA11yViolations(container);
+  });
+
+  it('keeps compact and desktop surfaces while the desktop hand-off loads', async () => {
+    const { container } = render(
+      <PublicProfileLayoutShell {...commonProps} isDesktopLayout />
+    );
+
+    expect(
+      screen.getByTestId('public-profile-layout-shell')
+    ).not.toHaveAttribute('data-desktop-ready');
+    expect(screen.getByTestId('compact-content')).toBeInTheDocument();
+    expect(screen.getByTestId('desktop-content')).toBeInTheDocument();
+    await expectNoA11yViolations(container);
+  });
+
+  it('lets a keyboard user leave an embedded preview for the full profile', async () => {
+    const user = userEvent.setup();
+    const { container } = render(
+      <PublicProfileLayoutShell
+        {...commonProps}
+        isDesktopLayout={false}
+        embedded
+        previewExitHref='/unfazed'
+      />
+    );
+
+    expect(screen.getByTestId('public-profile-layout-shell')).toHaveAttribute(
+      'data-profile-preview',
+      'true'
+    );
+    expect(screen.getByTestId('profile-desktop-loading')).toHaveTextContent(
+      'Loading profile…'
+    );
+    await user.tab();
+    expect(
+      screen.getByRole('link', { name: 'Open full profile' })
+    ).toHaveFocus();
+    await expectNoA11yViolations(container);
+  });
+
+  it('renders only the compact column with no desktop surface or footer', async () => {
+    const { desktopSurface: _desktopSurface, ...compactOnlyProps } =
+      commonProps;
+    const { container } = render(
+      <PublicProfileLayoutShell {...compactOnlyProps} isDesktopLayout={false} />
+    );
+
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(
+      'Unfazed'
+    );
+    expect(screen.queryByTestId('profile-claim-footer')).toBeNull();
+    expect(screen.queryByTestId('profile-desktop-shell')).toBeNull();
+    await expectNoA11yViolations(container);
+  });
+
+  it('carries a long name and claim label and sends the claim click', async () => {
+    const user = userEvent.setup();
+    document.addEventListener('click', stayOnPage);
+    const label =
+      'Request early access to your own Jovie profile for every release and tour date';
+    const artistName =
+      'The Los Angeles After Hours Orchestra and Friends Featuring Everyone';
+    const { container } = render(
+      <PublicProfileLayoutShell
+        {...commonProps}
+        artistName={artistName}
+        heroImageUrl='/images/avatars/tim-white-founder.jpg'
+        isDesktopLayout
+        desktopSurfaceReady
+        showClaimFooter
+        claimFooterHref='/waitlist?campaign=proof-to-claim'
+        claimFooterLabel={label}
+        proofClaim
+      />
+    );
+
+    expect(
+      container.querySelector('.bg-\\(image\\:--profile-stage-ambient-glow\\)')
+    ).not.toBeNull();
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(
+      artistName
+    );
+    await user.click(screen.getByRole('link', { name: `Jovie · ${label}` }));
+    expect(emitProofClaimEvent).toHaveBeenCalledWith(
+      'claim_started',
+      expect.objectContaining({ label })
+    );
+    document.removeEventListener('click', stayOnPage);
+    await expectNoA11yViolations(container);
+  });
+
+  it('keeps the stage and footer readable in a right-to-left page', async () => {
+    const { container } = render(
+      <div dir='rtl' lang='ar'>
+        <PublicProfileLayoutShell
+          {...commonProps}
+          artistName='منتصف الليل'
+          isDesktopLayout={false}
+          showClaimFooter
+          claimFooterHref='/claim'
+          claimFooterLabel='اطلب الوصول'
+        />
+      </div>
+    );
+
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(
+      'منتصف الليل'
+    );
+    expect(screen.getByTestId('profile-claim-footer-cta')).toHaveTextContent(
+      'اطلب الوصول'
+    );
+    await expectNoA11yViolations(container);
   });
 });

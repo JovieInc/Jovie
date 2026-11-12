@@ -42,6 +42,8 @@ function* referenceTokens(text) {
 export const isReviewImage = path =>
   IMAGE_PATH.test(path) && REVIEW_IMAGE_ROOTS.some(r => path.startsWith(r));
 
+const RELATIVE_TOKEN = /^\.\.?\//;
+
 const segmentsOf = token =>
   token.split('/').filter(part => part && part !== '.' && part !== '..');
 
@@ -114,6 +116,7 @@ export function findOrphanReviewImages({
       visit(source, text);
     }
   };
+  const imageSet = new Set(images);
   const byName = new Map();
   for (const image of images) {
     const name = posix.basename(image);
@@ -125,13 +128,25 @@ export function findOrphanReviewImages({
     IMAGE_EXTENSIONS.map(extension => `.${extension}`),
     (source, text) => {
       const sourceDir = posix.dirname(source);
+      // Inside a review root a bare file name lists the source's own folder
+      // (a bundle README), never a same-named image in another folder.
+      const bareIsLocal = REVIEW_IMAGE_ROOTS.some(r => source.startsWith(r));
       for (const token of referenceTokens(text)) {
+        // There a ./ or ../ link names exactly one file, resolved from the
+        // source's own folder, never every image that shares its tail.
+        if (bareIsLocal && RELATIVE_TOKEN.test(token)) {
+          const image = posix.normalize(posix.join(sourceDir, token));
+          if (!imageSet.has(image)) continue;
+          if (posix.dirname(image) === sourceDir) listedBySibling.add(image);
+          else live.add(image);
+          continue;
+        }
         const tokenSegments = segmentsOf(token);
         for (const image of byName.get(tokenSegments.at(-1)) ?? []) {
           if (live.has(image) || !tailMatches(image.split('/'), tokenSegments))
             continue;
           if (posix.dirname(image) === sourceDir) listedBySibling.add(image);
-          else live.add(image);
+          else if (!(bareIsLocal && !token.includes('/'))) live.add(image);
         }
       }
     }

@@ -35,6 +35,39 @@ export function timingSuspect(page) {
   );
 }
 
+/**
+ * The element inserted last in the half second before a shift at `atMs`
+ * (the tallest, among inserts in the same batch), which is usually what
+ * pushed the moved element. An earlier, larger insert already settled
+ * before the shift, so it is not the cause.
+ * @param {{ node: string, atMs: number, h: number }[] | undefined} added
+ * @param {number | undefined} atMs
+ */
+export function causeOf(added, atMs) {
+  if (!Number.isFinite(atMs)) return undefined;
+  let best;
+  for (const a of added ?? []) {
+    if (a.atMs > atMs || a.atMs < atMs - 500) continue;
+    if (!best || a.atMs > best.atMs || (a.atMs === best.atMs && a.h > best.h))
+      best = a;
+  }
+  return best;
+}
+
+/**
+ * How far a layout-shift source moved down (negative: up), in whole pixels,
+ * or undefined when its top edge stayed put (a sideways move or a resize in
+ * place), so the crawler keeps looking for the move that pushed it. Runs in
+ * the page too, so it uses nothing outside its arguments.
+ * @param {{ y: number } | undefined} a
+ * @param {{ y: number } | undefined} b
+ */
+export function verticalMove(a, b) {
+  if (!a || !b) return undefined;
+  const dy = Math.round(b.y - a.y);
+  return dy === 0 ? undefined : dy;
+}
+
 /** Median of the samples; the lower middle for an even count. */
 export function median(xs) {
   const s = [...xs].sort((a, b) => a - b);
@@ -80,9 +113,18 @@ export const CLAIM_BANNER = /profile is unclaimed|claim (this|your) profile/i;
 
 export const IDENTITIES = Object.freeze(['stranger', 'signed-in']);
 
+const movedHow = s =>
+  Number.isFinite(s.dy) && Number.isFinite(s.atMs)
+    ? `, ${Math.abs(s.dy)}px ${s.dy < 0 ? 'up' : 'down'} at ${s.atMs}ms${
+        s.after
+          ? ` after ${s.after.node} (${s.after.h}px) appeared at ${s.after.atMs}ms`
+          : ''
+      }`
+    : '';
+
 const shiftedBy = page =>
   page.clsSources?.length
-    ? `; moved: ${page.clsSources.map(s => `${s.node} (${s.value.toFixed(3)})`).join(', ')}`
+    ? `; moved: ${page.clsSources.map(s => `${s.node} (${s.value.toFixed(3)}${movedHow(s)})`).join(', ')}`
     : '';
 
 const ofSamples = page =>
@@ -95,7 +137,8 @@ const ofSamples = page =>
  *   failedRequests?: string[], placeholder?: string|null,
  *   horizontalOverflow?: boolean, url?: string, expectClaimBanner?: boolean,
  *   claimBanner?: boolean, timingSamples?: number,
- *   clsSources?: { node: string, value: number }[] }} page
+ *   clsSources?: { node: string, value: number, dy?: number, atMs?: number,
+ *     after?: { node: string, h: number, atMs: number } }[] }} page
  * @returns {{ route: string, identity: string, viewport: string, kind: string, detail: string }[]}
  */
 export function pageFindings(page, closed = []) {

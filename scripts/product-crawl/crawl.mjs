@@ -20,6 +20,7 @@ import { chromium } from 'playwright';
 import { skipSignedIn, uncoveredEntry } from './accepted-uncovered.mjs';
 import {
   CLAIM_BANNER,
+  causeOf,
   fromThirdPartyFrame,
   median,
   PLACEHOLDER,
@@ -27,6 +28,7 @@ import {
   rankFindings,
   TIMING_SAMPLES,
   timingSuspect,
+  verticalMove,
 } from './ready-gate.mjs';
 import {
   COLLECT,
@@ -94,7 +96,7 @@ function concrete(route) {
 
 // Runs in the page, so it is a string: these scripts type-check as Node.
 const OBSERVE = `
-  window.__crawl = { cls: 0, lcp: 0, longest: 0, shifts: {} };
+  window.__crawl = { cls: 0, lcp: 0, longest: 0, shifts: {}, moves: {}, added: [] };
   const watch = (type, fn) => new PerformanceObserver(l => l.getEntries().forEach(fn)).observe({ type, buffered: true });
   // Names the elements that moved, so a layout-shift finding says what to fix.
   const label = n => {
@@ -103,18 +105,47 @@ const OBSERVE = `
     const testId = n.getAttribute('data-testid');
     return (n.tagName.toLowerCase() + (n.id ? '#' + n.id : '') + (testId ? '[data-testid=' + testId + ']' : '') + (cls ? '.' + cls : '')).slice(0, 100);
   };
+  const verticalMove = ${verticalMove};
   watch('layout-shift', e => {
     if (e.hadRecentInput) return;
     window.__crawl.cls += e.value;
     for (const s of e.sources ?? []) {
       const k = label(s.node);
-      if (k) window.__crawl.shifts[k] = (window.__crawl.shifts[k] ?? 0) + e.value;
+      if (!k) continue;
+      window.__crawl.shifts[k] = (window.__crawl.shifts[k] ?? 0) + e.value;
+      // The first vertical move says how far and when, so the cause can be found.
+      const dy = verticalMove(s.previousRect, s.currentRect);
+      if (dy !== undefined && !window.__crawl.moves[k])
+        window.__crawl.moves[k] = {
+          dy,
+          atMs: Math.round(e.startTime),
+          // What was inserted just before, sized as the shift happened.
+          added: window.__crawl.added
+            .filter(x => x.t >= e.startTime - 500 && x.n.isConnected)
+            .map(x => ({ node: label(x.n), atMs: Math.round(x.t), h: Math.round(x.n.getBoundingClientRect().height) }))
+            .filter(x => x.node && x.h >= 24),
+        };
     }
   });
+  // Elements inserted in the last second, so a shift can name what appeared
+  // just before it (the usual cause: a late block pushing the rest down).
+  // Only a recent window is kept, so a large first parse cannot crowd out
+  // later inserts.
+  new MutationObserver(records => {
+    const t = performance.now();
+    const added = window.__crawl.added;
+    let old = 0;
+    while (old < added.length && added[old].t < t - 1000) old++;
+    if (old) added.splice(0, old);
+    for (const r of records)
+      for (const n of r.addedNodes)
+        if (n.nodeType === 1) added.push({ n, t });
+  }).observe(document, { childList: true, subtree: true });
   watch('largest-contentful-paint', e => { window.__crawl.lcp = Math.max(window.__crawl.lcp, e.startTime); });
   watch('longtask', e => { window.__crawl.longest = Math.max(window.__crawl.longest, e.duration); });
 `;
-const MEASURE = `({ ...window.__crawl, text: document.body?.innerText ?? '',
+const MEASURE = `({ ...window.__crawl, added: undefined,
+  text: document.body?.innerText ?? '',
   overflow: document.documentElement.scrollWidth > window.innerWidth + 1 })`;
 
 const browser = await chromium.launch();
@@ -189,7 +220,21 @@ async function visit({ route, target, viewport, identity, fixture, collect }) {
     row.clsSources = Object.entries(m.shifts ?? {})
       .sort((a, b) => b[1] - a[1])
       .slice(0, 3)
-      .map(([node, value]) => ({ node, value: Number(value.toFixed(4)) }));
+      .map(([node, value]) => ({
+        node,
+        value: Number(value.toFixed(4)),
+      }))
+      .map(s => {
+        const { added, ...move } = m.moves?.[s.node] ?? {};
+        const cause = causeOf(added, move.atMs);
+        return cause
+          ? {
+              ...s,
+              ...move,
+              after: { node: cause.node, h: cause.h, atMs: cause.atMs },
+            }
+          : { ...s, ...move };
+      });
     row.lcpMs = Math.round(m.lcp);
     row.longestTaskMs = Math.round(m.longest);
     row.placeholder = m.text.match(PLACEHOLDER)?.[0] ?? null;

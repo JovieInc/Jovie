@@ -273,6 +273,27 @@ describe('evaluateRedMonitors', () => {
     expect(redMonitorAnnotations(result)).toContain('::error::');
   });
 
+  it('reports redHours from the first failure, falling back to the last green without redSince', () => {
+    const one = {
+      entries: [entry('github:jovie:nightly', 'nightly.yml')],
+    };
+    const streak = {
+      consecutiveFailures: 5,
+      countIsLowerBound: false,
+      lastGreenAt: at(30),
+      greenBefore: null,
+      failingRunIds: [5, 4, 3, 2, 1],
+    };
+    const hours = s =>
+      evaluateRedMonitors({
+        registry: one,
+        observations: new Map([['github:jovie:nightly', { streak: s }]]),
+        nowMs: NOW,
+      }).offenders[0].redHours;
+    expect(hours({ ...streak, redSince: at(6) })).toBe(6);
+    expect(hours({ ...streak, redSince: null })).toBe(30);
+  });
+
   it('a live owner lease on an open incident covers every registry entry of that workflow', () => {
     const incidents = {
       leases: [
@@ -377,7 +398,8 @@ describe('automation-liveness wiring', () => {
         workflow: 'claim-checkout-dogfood.yml',
         consecutiveFailures: 4,
         reason: 'no-incident',
-        redHours: 30,
+        // Red since the first failure 4h ago, not since the green 30h ago.
+        redHours: 4,
       }),
     ]);
   });

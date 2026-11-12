@@ -152,11 +152,18 @@ export function leaseIsLive(lease, nowMs) {
 export function needsOwner(streak, nowMs) {
   if (!streak || streak.consecutiveFailures === 0) return false;
   if (streak.consecutiveFailures > MAX_CONSECUTIVE_FAILURES) return true;
-  // Red since the streak's first failure; an older observation without
-  // redSince falls back to the last green (or the oldest verdict in view).
-  const bound =
-    ms(streak.redSince) ?? ms(streak.lastGreenAt) ?? ms(streak.greenBefore);
+  const bound = redBoundMs(streak);
   return bound === null || nowMs - bound > MAX_RED_HOURS * HOUR_MS;
+}
+
+/**
+ * When the streak went red: its first failure; an older observation without
+ * redSince falls back to the last green (or the oldest verdict in view).
+ */
+function redBoundMs(streak) {
+  return (
+    ms(streak.redSince) ?? ms(streak.lastGreenAt) ?? ms(streak.greenBefore)
+  );
 }
 
 /**
@@ -197,7 +204,7 @@ export function evaluateRedMonitors({
     );
   for (const row of byWorkflow.values()) {
     if (!needsOwner(row.streak, nowMs)) continue;
-    const green = ms(row.streak.lastGreenAt ?? row.streak.greenBefore);
+    const redFrom = redBoundMs(row.streak);
     const detail = {
       workflow: row.workflow,
       repo: row.repo,
@@ -205,7 +212,8 @@ export function evaluateRedMonitors({
       consecutiveFailures: row.streak.consecutiveFailures,
       countIsLowerBound: row.streak.countIsLowerBound,
       lastGreenAt: row.streak.lastGreenAt,
-      redHours: green === null ? null : Math.floor((nowMs - green) / HOUR_MS),
+      redHours:
+        redFrom === null ? null : Math.floor((nowMs - redFrom) / HOUR_MS),
       failingRunIds: row.streak.failingRunIds,
     };
     const leases = leaseFor(row);
