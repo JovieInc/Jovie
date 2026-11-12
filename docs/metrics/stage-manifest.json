@@ -12,6 +12,33 @@
     "minAbsoluteSeconds": 60
   },
   "entities": {
+    "pen-review": {
+      "entityId": "frame id:attempt start[:round]; one observation per timed round or frame",
+      "description": "Opt-in Pen review timings; local state ledger and stage-timings-latest.json, not live Mac certification.",
+      "stages": [
+        {
+          "id": "pen-review-round",
+          "meaning": "render/check/judge/fix round duration",
+          "producer": "scripts/pen-review/metrics.mjs",
+          "status": "pushed",
+          "source": "pen-review-ledger"
+        },
+        {
+          "id": "pen-review-frame",
+          "meaning": "whole frame attempt duration",
+          "producer": "scripts/pen-review/metrics.mjs",
+          "status": "pushed",
+          "source": "pen-review-ledger"
+        },
+        {
+          "id": "finished",
+          "meaning": "terminal frame outcome",
+          "producer": "scripts/pen-review/metrics.mjs",
+          "status": "pushed",
+          "source": "pen-review-ledger"
+        }
+      ]
+    },
     "chat-comparison": {
       "entityId": "source SHA (build) or source SHA:attempt (smoke)",
       "stages": [
@@ -186,6 +213,48 @@
           "status": "spec",
           "source": "lanes-stage-feed",
           "owner": "lanes worker"
+        },
+        {
+          "id": "green",
+          "meaning": "first later commit whose check rollup is SUCCESS",
+          "producer": "github",
+          "status": "derived",
+          "source": "github-pr"
+        }
+      ]
+    },
+    "remediation-repair": {
+      "entityId": "owner/repo#pr@red-sha",
+      "description": "Red-to-green dwell per red head SHA, greened by lanes repair only (a lane-fix-<kind> label was applied between red and green). Split from remediation so lanes repair and writer self-fix p50/p95 are tracked apart (red-repair admission, 2026-11-12).",
+      "endToEnd": [["red", "green"]],
+      "stages": [
+        {
+          "id": "red",
+          "meaning": "first failing GitHub Actions check suite on a PR commit",
+          "producer": "github",
+          "status": "derived",
+          "source": "github-pr"
+        },
+        {
+          "id": "green",
+          "meaning": "first later commit whose check rollup is SUCCESS",
+          "producer": "github",
+          "status": "derived",
+          "source": "github-pr"
+        }
+      ]
+    },
+    "remediation-writer": {
+      "entityId": "owner/repo#pr@red-sha",
+      "description": "Red-to-green dwell per red head SHA, greened by its own writer only (no lane-fix-<kind> label between red and green). Split from remediation so lanes repair and writer self-fix p50/p95 are tracked apart (red-repair admission, 2026-11-12).",
+      "endToEnd": [["red", "green"]],
+      "stages": [
+        {
+          "id": "red",
+          "meaning": "first failing GitHub Actions check suite on a PR commit",
+          "producer": "github",
+          "status": "derived",
+          "source": "github-pr"
         },
         {
           "id": "green",
@@ -749,6 +818,11 @@
     }
   },
   "sources": {
+    "pen-review-ledger": {
+      "kind": "events",
+      "url": null,
+      "owner": "design-system; ~/.local/state/jovie-pen-review/ledger.jsonl and local stage-timings-latest.json"
+    },
     "preflight-stages.jsonl": {
       "kind": "events",
       "url": null,

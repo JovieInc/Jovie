@@ -26,7 +26,6 @@ import {
 import dynamic from 'next/dynamic';
 import { usePathname } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
-import { DesktopReleaseIdentity } from '@/components/organisms/DesktopTitlebar';
 import { SHELL_RAIL_STAGE } from '@/components/shell/rail-motion';
 import { Tooltip } from '@/components/shell/Tooltip';
 import { APP_ROUTES } from '@/constants/routes';
@@ -36,7 +35,7 @@ import { track } from '@/lib/analytics';
 import { getCurrentAppShellWorkspace } from '@/lib/app-shell/workspaces';
 import { isCookieBannerRequiredFromCookieString } from '@/lib/cookies/consent-regions';
 import type { DesktopUpdateViewState } from '@/lib/desktop/desktop-updates';
-import { useIsElectronRuntime } from '@/lib/desktop/electron-bridge';
+import { useIsElectronRuntime } from '@/lib/desktop/electron-runtime';
 import { GLYPH_CMD, GLYPH_OPT, GLYPH_SHIFT } from '@/lib/keyboard-shortcuts';
 import { useFeedbackMutation } from '@/lib/queries';
 import { cn } from '@/lib/utils';
@@ -48,6 +47,7 @@ import {
 import { Icon } from '../../atoms/Icon';
 import { Avatar } from '../../molecules/Avatar/Avatar';
 import { useDesktopUpdateContext } from '../desktop-update/DesktopUpdateProvider';
+import { DesktopReleaseIdentity } from './desktop-release-identity.lazy';
 import { OviePrivacyLockControl } from './OviePrivacyLockControl';
 import type { UserButtonProps } from './types';
 import { UsageMenuItem } from './UsageMenuItem';
@@ -386,8 +386,8 @@ function buildDropdownItems({
       render: () => (
         <div className='cursor-default px-2.5 py-2 text-app h-9'>
           <div className='flex w-full items-center gap-2.5'>
-            <div className='h-4 w-4 animate-pulse motion-reduce:animate-none rounded bg-white/10' />
-            <div className='h-3 w-20 animate-pulse motion-reduce:animate-none rounded bg-white/10' />
+            <div className='h-4 w-4 animate-pulse motion-reduce:animate-none rounded bg-on-media/10' />
+            <div className='h-3 w-20 animate-pulse motion-reduce:animate-none rounded bg-on-media/10' />
           </div>
         </div>
       ),

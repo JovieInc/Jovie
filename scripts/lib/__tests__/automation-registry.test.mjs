@@ -37,7 +37,7 @@ describe('automation registry', () => {
           '-c',
           [
             'import ast,json,pathlib',
-            'tree=ast.parse(pathlib.Path("scripts/lanes/doctor.py").read_text())',
+            'tree=ast.parse(pathlib.Path("scripts/lanes/public_feed.py").read_text())',
             'value=next(n.value for n in tree.body if isinstance(n,ast.Assign) and any(isinstance(t,ast.Name) and t.id=="HEARTBEAT_FEED_KEYS" for t in n.targets))',
             'print(json.dumps(ast.literal_eval(value)))',
           ].join('; '),

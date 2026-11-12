@@ -55,12 +55,25 @@ function useActiveMobileDrawer(
   // document keydown listener unarmed.
   const [supersededById, setSupersededById] = useState<string | null>(null);
 
+  // Each open or close starts a fresh presentation that no other rail has
+  // superseded yet. Reset during render when that input changes (React's
+  // adjust-state-on-prop-change pattern) instead of in an effect, so the
+  // reset lands on the same render as the open/close itself.
+  const presenting = isOpen && isMobile;
+  const [wasPresenting, setWasPresenting] = useState(presenting);
+  if (wasPresenting !== presenting) {
+    setWasPresenting(presenting);
+    setSupersededById(null);
+  }
+
   useEffect(() => {
     const handleDrawerOpen = (event: Event) => {
       const openedDrawerId = (event as CustomEvent<string>).detail;
-      if (openedDrawerId !== drawerId) {
-        setSupersededById(openedDrawerId);
-      }
+      // A rail also hears its own open event, which clears any superseding
+      // it picked up earlier in the same commit. When two rails open
+      // together the last one to dispatch wins, as before, instead of each
+      // superseding the other and both going inert.
+      setSupersededById(openedDrawerId === drawerId ? null : openedDrawerId);
     };
 
     document.addEventListener('jovie:right-drawer-open', handleDrawerOpen);
@@ -69,20 +82,16 @@ function useActiveMobileDrawer(
   }, [drawerId]);
 
   useEffect(() => {
-    if (!isOpen || !isMobile) {
-      setSupersededById(null);
-      return;
-    }
+    if (!presenting) return;
 
-    setSupersededById(null);
     document.dispatchEvent(
       new CustomEvent<string>('jovie:right-drawer-open', {
         detail: drawerId,
       })
     );
-  }, [drawerId, isMobile, isOpen]);
+  }, [drawerId, presenting]);
 
-  return isOpen && isMobile && supersededById === null;
+  return presenting && supersededById === null;
 }
 
 function isRestorableFocusTarget(

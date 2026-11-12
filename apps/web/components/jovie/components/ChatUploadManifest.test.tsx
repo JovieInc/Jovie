@@ -1,8 +1,10 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import type { ComponentProps, ReactNode } from 'react';
 import { describe, expect, it, vi } from 'vitest';
+import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import type { PendingFile } from '../hooks/useChatFileAttachments';
 import { ChatUploadManifest } from './ChatUploadManifest';
 
@@ -191,5 +193,64 @@ describe('ChatUploadManifest', () => {
     expect(manifestSource).toContain("return 'text-success-text';");
     expect(manifestSource).not.toContain("return 'text-error';");
     expect(manifestSource).not.toContain("return 'text-warning';");
+  });
+
+  it('collapses the expanded manifest from its header control', async () => {
+    const onCollapse = vi.fn();
+    const user = userEvent.setup();
+    const { container } = renderManifest({ onCollapse });
+
+    await user.click(
+      screen.getByRole('button', { name: 'Collapse Upload Manifest' })
+    );
+
+    expect(onCollapse).toHaveBeenCalledTimes(1);
+    await expectNoA11yViolations(container);
+  });
+
+  it('expands the collapsed summary when it is pressed', async () => {
+    const onExpand = vi.fn();
+    const user = userEvent.setup();
+    const { container } = renderManifest({ collapsed: true, onExpand });
+
+    await user.click(
+      screen.getByRole('button', { name: /Uploading 2 attachments/ })
+    );
+
+    expect(onExpand).toHaveBeenCalledTimes(1);
+    await expectNoA11yViolations(container);
+  });
+
+  it('renders nothing without files', async () => {
+    const { container } = renderManifest({
+      files: [],
+      aggregate: { total: 0, done: 0, overallPct: 0, speed: '0 B/s', eta: '—' },
+    });
+
+    expect(container).toBeEmptyDOMElement();
+    await expectNoA11yViolations(container);
+  });
+
+  it('keeps the locked-files and duplicate states accessible', async () => {
+    const { container } = renderManifest({
+      files: [readyFile, { ...uploadingFile, id: 'dup', status: 'duplicate' }],
+      lockedCount: 1,
+      isPro: false,
+      isUploading: false,
+    });
+
+    expect(screen.getByText('1 duplicate skipped')).toBeInTheDocument();
+    expect(screen.getByText('1 file locked')).toBeInTheDocument();
+    await expectNoA11yViolations(container);
+  });
+
+  it('reserves the thumbnail box with explicit image dimensions', () => {
+    renderManifest({
+      files: [{ ...readyFile, previewUrl: 'blob:cover-art' }],
+    });
+
+    const thumb = screen.getByRole('img', { name: 'cover-art.png' });
+    expect(thumb).toHaveAttribute('width', '30');
+    expect(thumb).toHaveAttribute('height', '30');
   });
 });

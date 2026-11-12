@@ -52,7 +52,6 @@ describe('cookie banner coverage receipts', () => {
 });
 
 describe('CookieBannerSection consent sync', () => {
-  // Floating card redesign (bottom-right compact surface) preserves all action handlers,
   // persistence, error paths, and modal open. New render tested in sibling cookie-banner.test.tsx
   // (positioning, classes, height var, no Manage chrome, compact actions prop).
   beforeEach(() => {
@@ -99,6 +98,7 @@ describe('CookieBannerSection consent sync', () => {
         css
       )?.[1];
 
+    expect(phoneRule).toContain('left: 50%;');
     expect(phoneRule).toContain('top: auto;');
     expect(phoneRule).toContain('bottom: var(--profile-bottom-nav-height);');
   });

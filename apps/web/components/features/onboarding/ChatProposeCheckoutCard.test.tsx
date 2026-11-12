@@ -4,6 +4,7 @@ import {
   formatPublicPriceDisplay,
   getPublicPriceClaim,
 } from '@/lib/billing/offer-truth';
+import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import { ChatProposeCheckoutCard } from './ChatProposeCheckoutCard';
 
 function expectedLabel(plan: 'free' | 'pro' | 'max'): string {
@@ -107,4 +108,39 @@ describe('ChatProposeCheckoutCard', () => {
       '/onboarding/checkout?source=intent'
     );
   });
+
+  it('paints Continue with the on-media tokens', () => {
+    render(
+      <ChatProposeCheckoutCard
+        payload={{
+          action: 'propose_checkout',
+          plan: 'pro',
+          handoffUrl: '/onboarding/checkout?plan=pro',
+        }}
+      />
+    );
+
+    expect(screen.getByRole('link', { name: 'Continue' })).toHaveClass(
+      'bg-on-media',
+      'text-ink-on-media',
+      'dark:text-on-media'
+    );
+  });
+
+  it.each([
+    ['a proposed plan', 'max', '/onboarding/checkout?plan=max'],
+    ['no plan', null, ''],
+  ] as const)(
+    'has no accessibility violations with %s',
+    async (_name, plan, handoffUrl) => {
+      const { container } = render(
+        <div dir='rtl' lang='ar'>
+          <ChatProposeCheckoutCard
+            payload={{ action: 'propose_checkout', plan, handoffUrl }}
+          />
+        </div>
+      );
+      await expectNoA11yViolations(container);
+    }
+  );
 });
