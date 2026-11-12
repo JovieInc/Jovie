@@ -21,7 +21,7 @@ import { join, resolve } from 'node:path';
 
 export const RECEIPT_SCHEMA = 'jovie-homepage-baseline-approval/v1';
 export const RECEIPT_PATH =
-  'docs/design-system/approvals/homepage-baselines.json';
+  'docs/design-system/approvals/homepage-visual-approval.json';
 
 /**
  * The sources that decide what the homepage renders: its route and

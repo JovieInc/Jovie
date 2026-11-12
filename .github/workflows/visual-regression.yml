@@ -28,7 +28,7 @@ on:
         description: >-
           Render only the homepage baselines on the dispatched branch and commit
           them there. Needs a founder approval receipt
-          (docs/design-system/approvals/homepage-baselines.json) whose sources
+          (docs/design-system/approvals/homepage-visual-approval.json) whose sources
           digest matches the branch. Never runs on main.
         type: boolean
         default: false
@@ -499,7 +499,7 @@ jobs:
           set -euo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          RECEIPT_MESSAGE=$(node -e "console.log(require('./docs/design-system/approvals/homepage-baselines.json').approvalMessage)")
+          RECEIPT_MESSAGE=$(node -e "console.log(require('./docs/design-system/approvals/homepage-visual-approval.json').approvalMessage)")
           git add "$SNAPSHOT_DIR"/homepage-*.png
           git commit -m "chore(visual): adopt founder-approved homepage baselines [auto]
 
