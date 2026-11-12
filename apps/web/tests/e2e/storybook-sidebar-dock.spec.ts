@@ -9,7 +9,7 @@ const combinations = [
   ['update-and-audio', ['update', 'now-playing']],
   ['update-and-whats-new', ['update']],
   ['all-three', ['update', 'now-playing']],
-  ['with-install', ['update', 'now-playing']],
+  ['with-install', ['whats-new', 'now-playing']],
   ['collapsed', []],
   ['collapsed-empty', []],
 ] as const;
@@ -58,10 +58,6 @@ test('dock changes preserve navigation coordinates and scroll', async ({
   const anchor = rail.getByTestId('nav-anchor');
   await expect(rail.locator('[data-dock-card]')).toHaveCount(2);
   const before = await anchor.boundingBox();
-  await rail.getByRole('button', { name: 'Collapse update' }).click();
-  expect(await anchor.boundingBox()).toEqual(before);
-  await rail.getByRole('button', { name: 'Dismiss update' }).click();
-  expect(await anchor.boundingBox()).toEqual(before);
   await rail.getByRole('button', { name: "Dismiss what's new" }).click();
   expect(await anchor.boundingBox()).toEqual(before);
   await rail.getByRole('button', { name: 'Dismiss Player' }).click();
@@ -91,21 +87,16 @@ test('collapsed status stays on the working user menu and carries tooltip text',
   await expect(page.getByRole('menu')).toBeVisible();
 });
 
-test('downloading and ready updates stay visible and cannot be dismissed', async ({
+test('the update control owns its card: no dismiss, no collapse', async ({
   page,
 }) => {
-  for (const story of ['downloading', 'ready']) {
+  for (const story of ['update-only', 'downloading', 'ready', 'update-error']) {
     await page.goto(
       `/iframe.html?id=shell-sidebardock--${story}&viewMode=story`
     );
-    const rail = page.locator('[data-dock-preview]');
-    await expect(rail.locator('[data-dock-card="update"]')).toBeVisible();
-    await expect(
-      rail.getByRole('button', { name: 'Dismiss update' })
-    ).toHaveCount(0);
-    await rail.getByRole('button', { name: 'Collapse update' }).click();
-    await expect(
-      rail.getByRole('button', { name: 'Expand update' })
-    ).toHaveAttribute('aria-expanded', 'false');
+    const card = page.locator('[data-dock-preview] [data-dock-card="update"]');
+    await expect(card).toBeVisible();
+    await expect(card.locator('[data-desktop-update-control]')).toBeVisible();
+    await expect(card.getByRole('button')).toHaveCount(1);
   }
 });
