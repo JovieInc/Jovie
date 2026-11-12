@@ -284,9 +284,9 @@ export const SOURCE_GUARDS = Object.freeze([
     // measured and auditable), and the dead-man liveness contract stays green.
     id: 'automation-registry',
     command:
-      'node --test --experimental-test-coverage --test-coverage-include=scripts/installation-budget-sentinel.mjs --test-coverage-lines=95 --test-coverage-branches=90 --test-coverage-functions=100 scripts/installation-budget-sentinel.test.mjs && pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/automation-registry.test.mjs lib/__tests__/automation-liveness.test.mjs lib/__tests__/red-monitor-owner-gate.test.mjs lib/__tests__/workers-inventory.test.mjs',
+      'node --test --experimental-test-coverage --test-coverage-include=scripts/installation-budget-sentinel.mjs --test-coverage-lines=95 --test-coverage-branches=90 --test-coverage-functions=100 scripts/installation-budget-sentinel.test.mjs && pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/automation-registry.test.mjs lib/__tests__/automation-liveness.test.mjs lib/__tests__/automation-liveness-github-403-recovery.test.mjs lib/__tests__/red-monitor-owner-gate.test.mjs lib/__tests__/workers-inventory.test.mjs',
     inputs:
-      /^(?:\.github\/workflows\/[^/]+\.ya?ml|(?:apps\/[^/]+\/)?vercel\.json|workers\/[^/]+\/wrangler[\w.-]*\.(?:toml|jsonc?)|scripts\/lanes\/continuity_clock\.py|canon\/(?:automation-registry\.jsonl|monitor-incidents\.jsonl|deployed-workers\.json|schedulers\.json)|scripts\/(?:automation-liveness\.mjs|installation-budget-sentinel(?:\.test)?\.mjs)|scripts\/lib\/(?:automation-registry\.mjs|red-monitor-owner-gate\.mjs|workers-inventory\.mjs|__tests__\/(?:automation-(?:registry|liveness)|red-monitor-owner-gate|workers-inventory)\.test\.mjs))/u,
+      /^(?:\.github\/workflows\/[^/]+\.ya?ml|(?:apps\/[^/]+\/)?vercel\.json|workers\/[^/]+\/wrangler[\w.-]*\.(?:toml|jsonc?)|scripts\/lanes\/continuity_clock\.py|canon\/(?:automation-registry\.jsonl|monitor-incidents\.jsonl|deployed-workers\.json|schedulers\.json)|scripts\/(?:automation-liveness\.mjs|installation-budget-sentinel(?:\.test)?\.mjs)|scripts\/lib\/(?:automation-registry\.mjs|github-json-read\.mjs|red-monitor-owner-gate\.mjs|workers-inventory\.mjs|__tests__\/(?:automation-(?:registry|liveness(?:-github-403-recovery)?)|red-monitor-owner-gate|workers-inventory)\.test\.mjs))/u,
     prOnly: false,
   }),
   Object.freeze({
@@ -534,7 +534,7 @@ export const SOURCE_GUARDS = Object.freeze([
   Object.freeze({
     id: 'release-lineage-contracts',
     command:
-      'pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/release-lineage-gate.test.mjs lib/__tests__/release-risk-policy.test.mjs lib/__tests__/release-range-risk.test.mjs lib/__tests__/promotion-journey-evidence.test.mjs lib/__tests__/promotion-gate-wiring.test.mjs',
+      'pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/release-lineage-gate.test.mjs lib/__tests__/release-risk-policy.test.mjs lib/__tests__/release-range-risk.test.mjs lib/__tests__/promotion-journey-evidence.test.mjs lib/__tests__/promotion-gate-wiring.test.mjs lib/__tests__/release-read-token.test.mjs',
     inputs:
       /^scripts\/(?:lib\/(?:__tests__\/)?(?:release-|recheck-main-lineage|production-release|staging-|promotion-|journey-evidence)|promotion-)/u,
     prOnly: true,
