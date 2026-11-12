@@ -400,9 +400,7 @@ describe('ProfileDesktopSurface', () => {
 
     expect(screen.getByTestId('mock-static-listen-interface')).toBeVisible();
     expect(screen.getByRole('button', { name: 'Spotify' })).toBeVisible();
-    // Desktop-only art is never an unconditional `priority` image: phones
-    // render this surface hidden, so it loads lazily and is preloaded only
-    // at the desktop breakpoint (DesktopSurfaceImage, JOV-9611).
+    // JOV-9611: desktop-only art is lazy, never an unconditional priority image.
     const listenArtwork = screen.getByAltText('Never Say A Word');
     expect(listenArtwork).toHaveAttribute('data-priority', 'false');
     expect(listenArtwork).toHaveAttribute('loading', 'lazy');

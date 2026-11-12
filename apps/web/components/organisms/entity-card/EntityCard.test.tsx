@@ -778,27 +778,20 @@ describe('ProfilePacCard landscape states', () => {
         />
       );
 
-      const art = screen.getByTestId('profile-pac-featured-art');
-      expect(art.querySelector('img')).toHaveAttribute(
+      const img = screen
+        .getByTestId('profile-pac-featured-art')
+        .querySelector('img');
+      expect(img).toHaveAttribute(
         'data-sizes',
         '(min-width: 1024px) 400px, 104px'
       );
-      expect(art.querySelector('img')).toHaveAttribute(
-        'data-priority',
-        'false'
-      );
+      expect(img).toHaveAttribute('data-priority', 'false');
       if (renderMode === 'interactive') {
-        expect(art.querySelector('img')).toHaveAttribute(
-          'fetchpriority',
-          'high'
-        );
-        // JOV-9611: the featured cover is the claim-invite LCP element, so
-        // an interactive profile decodes it with the frame that lays it out.
-        expect(art.querySelector('img')).toHaveAttribute('decoding', 'sync');
+        expect(img).toHaveAttribute('fetchpriority', 'high');
+        expect(img).toHaveAttribute('decoding', 'sync');
       } else {
-        expect(art.querySelector('img')).not.toHaveAttribute('fetchpriority');
-        // Previews leave decoding to the image default.
-        expect(art.querySelector('img')).not.toHaveAttribute('decoding');
+        expect(img).not.toHaveAttribute('fetchpriority');
+        expect(img).not.toHaveAttribute('decoding');
       }
     }
   );
