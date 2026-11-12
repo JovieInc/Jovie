@@ -54,6 +54,7 @@ export {
   compareRenderModes,
   DYNAMIC_PREFIXES,
   formatEntry,
+  HTML_GROWS_BY_DESIGN,
   HTML_GROWTH_FLOOR_BYTES,
   HTML_GROWTH_RATIO,
   htmlAllowance,
@@ -116,6 +117,10 @@ export function evaluateRenderModes({
     ...comparison.htmlGrowth.map(
       ({ route, prev, next, allowedBytes }) =>
         `${route} prerendered HTML grew ${prev.htmlBytes} -> ${next.htmlBytes} bytes (allowed ${allowedBytes}: +${HTML_GROWTH_RATIO * 100}% or +${HTML_GROWTH_FLOOR_BYTES} B). Trim the markup or inlined data this change added. ${OVERRIDE_HELP(route)}`
+    ),
+    ...comparison.missingHtml.map(
+      ({ route, next }) =>
+        `${route} has no \`html=\` size in ${SNAPSHOT_RELATIVE} but the build prerenders ${next.htmlBytes} bytes for it. Restore the size, or run \`${WRITE_COMMAND}\`.`
     ),
     ...comparison.added.map(({ route, next }) =>
       next.mode === 'dynamic' &&

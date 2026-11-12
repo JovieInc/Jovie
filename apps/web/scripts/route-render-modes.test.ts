@@ -3,6 +3,7 @@ import {
   cacheabilityLoss,
   classifyRoutes,
   formatEntry,
+  HTML_GROWS_BY_DESIGN,
   HTML_GROWTH_FLOOR_BYTES,
   htmlAllowance,
   isDynamicAllowed,
@@ -15,6 +16,7 @@ import {
   manifests,
   page,
   SNAPSHOT_ROUTES,
+  snapshot,
 } from './route-render-modes-fixtures';
 
 describe('render-mode classification', () => {
@@ -164,6 +166,29 @@ describe('render-mode ratchet', () => {
       ),
     ]);
     expect(over.errors[0]).toContain('overrides["/"]');
+  });
+
+  it('ratchets the mode but not the bytes of a content index', () => {
+    const input = manifests();
+    input.appPathRoutes['/(marketing)/changelog/page'] = '/changelog';
+    input.prerenderManifest.routes['/changelog'] = {
+      ...page(140_000),
+      srcRoute: '/changelog',
+    };
+    expect(HTML_GROWS_BY_DESIGN).toContain('/changelog');
+    expect(formatEntry(classifyRoutes(input).routes['/changelog']!)).toBe(
+      'static'
+    );
+  });
+
+  it('fails an entry stripped of its html size', () => {
+    const result = judge(
+      () => {},
+      snapshot({ ...SNAPSHOT_ROUTES, '/pricing': 'static' })
+    );
+    expect(result.errors).toEqual([
+      expect.stringContaining('/pricing has no `html=` size'),
+    ]);
   });
 
   it('fails closed on a route with no entry, and on an entry with no route', () => {

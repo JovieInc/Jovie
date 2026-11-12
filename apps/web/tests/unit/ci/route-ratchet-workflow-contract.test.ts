@@ -1,11 +1,22 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { load } from 'js-yaml';
+import { load as parseYaml } from 'js-yaml';
 import { describe, expect, it } from 'vitest';
 
-const REPO_ROOT = resolve(import.meta.dirname, '..', '..', '..');
-const workflow = name =>
-  load(readFileSync(resolve(REPO_ROOT, '.github/workflows', name), 'utf8'));
+type Step = {
+  name?: string;
+  run?: string;
+  if?: string;
+  env?: Record<string, string>;
+  'continue-on-error'?: boolean;
+};
+type Workflow = { jobs: Record<string, { steps: Step[] }> };
+
+const REPO_ROOT = resolve(import.meta.dirname, '..', '..', '..', '..', '..');
+const workflow = (name: string) =>
+  parseYaml(
+    readFileSync(resolve(REPO_ROOT, '.github/workflows', name), 'utf8')
+  ) as Workflow;
 
 const BUDGET_STEP = 'Enforce authed route initial JS budgets';
 const RENDER_STEP = 'Enforce route render modes and HTML weight';
@@ -42,19 +53,19 @@ describe('build-output performance ratchets are wired as blocking steps', () => 
         names.indexOf(BUDGET_STEP)
       );
       // Same condition as the budget step, so a build that ran is always read.
-      expect(render.if).toBe(budget.if);
+      expect(render?.if).toBe(budget?.if);
       for (const step of [budget, render]) {
-        expect(step['continue-on-error']).toBeUndefined();
-        expect(step.run).not.toMatch(/\|\|\s*true|--write|--init/);
+        expect(step?.['continue-on-error']).toBeUndefined();
+        expect(step?.run).not.toMatch(/\|\|\s*true|--write|--init/);
         // Build output only: no secrets, no deployment, no network.
-        expect(JSON.stringify(step.env ?? {})).not.toMatch(/secrets\./);
+        expect(JSON.stringify(step?.env ?? {})).not.toMatch(/secrets\./);
       }
     }
   );
 
   it('measures the same hermetic build in both jobs', () => {
     const [pr, queue] = JOBS.map(({ steps, build }) => {
-      const env = steps.find(step => step.name === build).env;
+      const env = steps.find(step => step.name === build)?.env ?? {};
       return Object.fromEntries(
         Object.entries(env).filter(([key]) => /^NEXT_/.test(key))
       );

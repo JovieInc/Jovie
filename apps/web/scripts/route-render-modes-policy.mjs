@@ -79,6 +79,17 @@ export function parseEntry(value) {
   };
 }
 
+/**
+ * Content indexes list one more entry per post or release, so their HTML
+ * grows without any code change. Their render mode is still ratcheted; their
+ * byte size is not, or every release would trip the allowance.
+ */
+export const HTML_GROWS_BY_DESIGN = Object.freeze([
+  '/blog',
+  '/changelog',
+  '/engineering',
+]);
+
 export function isDynamicAllowed(route) {
   return DYNAMIC_PREFIXES.some(
     prefix => route === prefix || route.startsWith(`${prefix}/`)
@@ -147,7 +158,9 @@ export function classifyRoutes({ prerenderManifest, appPathRoutes }) {
         ...(typeof seconds === 'number'
           ? { mode: 'isr', revalidate: seconds }
           : { mode: 'static' }),
-        ...(Number.isInteger(entry.htmlSize) && entry.htmlSize > 0
+        ...(Number.isInteger(entry.htmlSize) &&
+        entry.htmlSize > 0 &&
+        !HTML_GROWS_BY_DESIGN.includes(route)
           ? { htmlBytes: entry.htmlSize }
           : {}),
       };
@@ -221,6 +234,7 @@ export function validateSnapshotShape(snapshot) {
 export function compareRenderModes({ build, snapshot }) {
   const regressions = [];
   const htmlGrowth = [];
+  const missingHtml = [];
   const improvements = [];
   const added = [];
   const removed = [];
@@ -239,6 +253,12 @@ export function compareRenderModes({ build, snapshot }) {
         htmlGrowth.push({ route, prev, next, allowedBytes });
       else if (next.htmlBytes < prev.htmlBytes && !loss)
         improvements.push({ route, prev, next });
+    } else if (
+      next.htmlBytes !== undefined &&
+      (prev.mode === 'static' || prev.mode === 'isr')
+    ) {
+      // An entry stripped of its `html=` would silently drop the byte gate.
+      missingHtml.push({ route, prev, next });
     }
   }
   for (const [route, value] of Object.entries(snapshot.routes ?? {})) {
@@ -254,7 +274,14 @@ export function compareRenderModes({ build, snapshot }) {
       else removed.push({ route, prev });
     } else removed.push({ route, prev });
   }
-  return { regressions, htmlGrowth, improvements, added, removed };
+  return {
+    regressions,
+    htmlGrowth,
+    missingHtml,
+    improvements,
+    added,
+    removed,
+  };
 }
 
 /**

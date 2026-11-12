@@ -112,9 +112,13 @@ It fails when:
 - a prerendered handler (`/robots.txt`, feeds, `/llms.txt`) starts running per
   request;
 - a static or ISR page's HTML grows past its recorded bytes plus the larger of
-  5% and 4096 bytes;
+  5% and 4096 bytes, or its entry has lost its `html=` size;
 - a route has no entry (new routes fail closed), or an entry has no route;
 - a new page is `dynamic` outside `/app`, `/api`, `/billing`, `/auth`, `/hud`.
+
+The content indexes `/blog`, `/changelog` and `/engineering` gain an entry per
+post or release, so their mode is ratcheted but their bytes are not
+(`HTML_GROWS_BY_DESIGN` in `route-render-modes-policy.mjs`).
 
 A route that got cheaper passes and the job prints a notice.
 `node apps/web/scripts/route-render-modes.mjs --next-dir apps/web/.next --write`
