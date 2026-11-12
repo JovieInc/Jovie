@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
-import { randomUUID } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
+import { randomUUID } from 'node:crypto';
 import {
   existsSync,
   mkdirSync,
@@ -19,6 +19,7 @@ import {
   FileLedgerStore,
   hashCredential,
 } from '../packages/api-client/store.ts';
+import { resolveLinearIssueByFingerprint } from './lib/linear-issue-intake.mjs';
 import {
   advisoryFingerprint,
   groupAlerts,
@@ -34,7 +35,6 @@ import {
   runAdvisoryCloses,
   stageMetrics,
 } from './security-advisory-intake.mjs';
-import { resolveLinearIssueByFingerprint } from './lib/linear-issue-intake.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const NOW = new Date('2026-10-25T12:00:00Z');
@@ -483,7 +483,12 @@ function candidateNode(id, title, labelNames = []) {
 test('close-candidate scan pages Linear results until exhausted', async () => {
   const pages = [
     linearPage(
-      [candidateNode('i1', '[secadv-ghsa-aaaa-bbbb-cccc-left-pad] HIGH left-pad: bad')],
+      [
+        candidateNode(
+          'i1',
+          '[secadv-ghsa-aaaa-bbbb-cccc-left-pad] HIGH left-pad: bad'
+        ),
+      ],
       true,
       'cursor-1'
     ),
@@ -499,11 +504,13 @@ test('close-candidate scan pages Linear results until exhausted', async () => {
     ),
   ];
   let calls = 0;
-  const fetchImpl = /** @type {any} */ (async () => ({
-    ok: true,
-    status: 200,
-    text: async () => JSON.stringify(pages[calls++]),
-  }));
+  const fetchImpl = /** @type {any} */ (
+    async () => ({
+      ok: true,
+      status: 200,
+      text: async () => JSON.stringify(pages[calls++]),
+    })
+  );
   const scan = await listSecadvIssueCandidates({
     apiKey: `k-${randomUUID()}`,
     fetchImpl,
@@ -516,21 +523,23 @@ test('close-candidate scan pages Linear results until exhausted', async () => {
 
 test('close-candidate scan reports truncation at the page cap', async () => {
   let calls = 0;
-  const fetchImpl = /** @type {any} */ (async () => {
-    calls += 1;
-    return {
-    ok: true,
-    status: 200,
-    text: async () =>
-      JSON.stringify(
-        linearPage(
-          [candidateNode(`i${calls}`, '[secadv-x] always another page')],
-          true,
-          `cursor-${calls}`
-        )
-      ),
-    };
-  });
+  const fetchImpl = /** @type {any} */ (
+    async () => {
+      calls += 1;
+      return {
+        ok: true,
+        status: 200,
+        text: async () =>
+          JSON.stringify(
+            linearPage(
+              [candidateNode(`i${calls}`, '[secadv-x] always another page')],
+              true,
+              `cursor-${calls}`
+            )
+          ),
+      };
+    }
+  );
   const scan = await listSecadvIssueCandidates({
     apiKey: `k-${randomUUID()}`,
     fetchImpl,
@@ -541,11 +550,13 @@ test('close-candidate scan reports truncation at the page cap', async () => {
 });
 
 test('close-candidate scan fails closed on a Linear rate limit', async () => {
-  const fetchImpl = /** @type {any} */ (async () => ({
-    ok: false,
-    status: 429,
-    text: async () => '',
-  }));
+  const fetchImpl = /** @type {any} */ (
+    async () => ({
+      ok: false,
+      status: 429,
+      text: async () => '',
+    })
+  );
   const scan = await listSecadvIssueCandidates({
     apiKey: `k-${randomUUID()}`,
     fetchImpl,
@@ -555,11 +566,13 @@ test('close-candidate scan fails closed on a Linear rate limit', async () => {
 });
 
 test('close-candidate scan fails closed on a GraphQL error', async () => {
-  const fetchImpl = /** @type {any} */ (async () => ({
-    ok: true,
-    status: 200,
-    text: async () => JSON.stringify({ errors: [{ message: 'nope' }] }),
-  }));
+  const fetchImpl = /** @type {any} */ (
+    async () => ({
+      ok: true,
+      status: 200,
+      text: async () => JSON.stringify({ errors: [{ message: 'nope' }] }),
+    })
+  );
   const scan = await listSecadvIssueCandidates({
     apiKey: `k-${randomUUID()}`,
     fetchImpl,
@@ -582,7 +595,10 @@ test('scan nodes resolve candidates by title fingerprint and label, and skip non
     ]),
   ];
   assert.ok(
-    resolveLinearIssueByFingerprint(nodes, 'secadv-ghsa-aaaa-bbbb-cccc-left-pad')
+    resolveLinearIssueByFingerprint(
+      nodes,
+      'secadv-ghsa-aaaa-bbbb-cccc-left-pad'
+    )
   );
   assert.ok(
     resolveLinearIssueByFingerprint(
@@ -610,8 +626,14 @@ test('runAdvisoryCloses defers the tail after a rate limit and fails closed', as
       closeGroup('secadv-ghsa-cccc-dddd-eeee-right-pad'),
     ],
     candidates: [
-      candidateNode('i1', '[secadv-ghsa-aaaa-bbbb-cccc-left-pad] HIGH left-pad'),
-      candidateNode('i2', '[secadv-ghsa-cccc-dddd-eeee-right-pad] MED right-pad'),
+      candidateNode(
+        'i1',
+        '[secadv-ghsa-aaaa-bbbb-cccc-left-pad] HIGH left-pad'
+      ),
+      candidateNode(
+        'i2',
+        '[secadv-ghsa-cccc-dddd-eeee-right-pad] MED right-pad'
+      ),
     ],
     runId: 'run-1',
     comment: 'fixed',
@@ -642,7 +664,10 @@ test('runAdvisoryCloses fails closed when a rate limit lands on the LAST group',
   const r = await runAdvisoryCloses({
     closes: [closeGroup('secadv-ghsa-aaaa-bbbb-cccc-left-pad')],
     candidates: [
-      candidateNode('i1', '[secadv-ghsa-aaaa-bbbb-cccc-left-pad] HIGH left-pad'),
+      candidateNode(
+        'i1',
+        '[secadv-ghsa-aaaa-bbbb-cccc-left-pad] HIGH left-pad'
+      ),
     ],
     close: async () => ({ ok: false, reason: 'linear_rate_limited' }),
   });
@@ -655,7 +680,10 @@ test('runAdvisoryCloses records noop for groups without a candidate issue', asyn
   const r = await runAdvisoryCloses({
     closes: [closeGroup('secadv-ghsa-zzzz-yyyy-xxxx-none')],
     candidates: [
-      candidateNode('i1', '[secadv-ghsa-aaaa-bbbb-cccc-left-pad] HIGH left-pad'),
+      candidateNode(
+        'i1',
+        '[secadv-ghsa-aaaa-bbbb-cccc-left-pad] HIGH left-pad'
+      ),
     ],
     close: async () => {
       calls += 1;
@@ -678,14 +706,20 @@ test('runAdvisoryCloses closes matched groups and stays green while all succeed'
   const r = await runAdvisoryCloses({
     closes: [closeGroup('secadv-ghsa-aaaa-bbbb-cccc-left-pad')],
     candidates: [
-      candidateNode('i1', '[secadv-ghsa-aaaa-bbbb-cccc-left-pad] HIGH left-pad'),
+      candidateNode(
+        'i1',
+        '[secadv-ghsa-aaaa-bbbb-cccc-left-pad] HIGH left-pad'
+      ),
     ],
     runId: 'run-9',
     commentFor: g => `Fixed on main at ${g.fixedAt} and deployed.`,
     close: async input => {
       assert.equal(input.fingerprint, 'secadv-ghsa-aaaa-bbbb-cccc-left-pad');
       assert.equal(input.runId, 'run-9');
-      assert.equal(input.comment, 'Fixed on main at 2026-10-25T00:00:00Z and deployed.');
+      assert.equal(
+        input.comment,
+        'Fixed on main at 2026-10-25T00:00:00Z and deployed.'
+      );
       return { ok: true, action: 'resolved' };
     },
   });
@@ -704,7 +738,10 @@ test('runAdvisoryCloses fails closed on a non-rate-limit close failure', async (
   const r = await runAdvisoryCloses({
     closes: [closeGroup('secadv-ghsa-aaaa-bbbb-cccc-left-pad')],
     candidates: [
-      candidateNode('i1', '[secadv-ghsa-aaaa-bbbb-cccc-left-pad] HIGH left-pad'),
+      candidateNode(
+        'i1',
+        '[secadv-ghsa-aaaa-bbbb-cccc-left-pad] HIGH left-pad'
+      ),
     ],
     close: async () => ({ ok: false, reason: 'linear_close_unsuccessful' }),
   });

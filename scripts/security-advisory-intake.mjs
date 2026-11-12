@@ -13,8 +13,8 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { runGh } from '../packages/api-client/gh.ts';
-import { linearRequest } from './lib/linear-cooldown.mjs';
 import { resolveLabelId } from './deprecation-intake.mjs';
+import { linearRequest } from './lib/linear-cooldown.mjs';
 import {
   closeLinearIssueByFingerprint,
   JOVIE_TEAM_ID,
