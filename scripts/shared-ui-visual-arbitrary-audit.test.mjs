@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
 import {
   mkdirSync,
   mkdtempSync,
@@ -67,6 +68,7 @@ const COVERED_PRODUCTION_SOURCES = [
   'packages/ui/atoms/founder-pen-atoms.ts',
   'packages/ui/atoms/status-glyph.tsx',
   'packages/ui/atoms/inline-subscribe.tsx',
+  'packages/ui/atoms/plain-button.tsx',
   'packages/ui/atoms/searchable-submenu-helpers.ts',
   'packages/ui/brand/JovieO.tsx',
   'packages/ui/brand/JovieWordmark.tsx',
@@ -159,7 +161,17 @@ test('repo shared-UI visual arbitrary findings match the shrink-only baseline', 
   assert.equal(result.status, 'pass');
   assert.equal(result.totalFindings, 0);
   assert.deepEqual(result.findings, []);
-  assert.equal(result.scannedFiles.length, 76);
+  // Bind coverage to the actual tracked inventory so new sources cannot be
+  // omitted and legitimate additions do not require a count-only repair.
+  const productionFiles = execFileSync(
+    'git',
+    ['ls-files', '-z', '--', 'packages/ui'],
+    { cwd: REPO_ROOT, encoding: 'utf8' }
+  )
+    .split('\0')
+    .filter(isSharedUiProductionSource)
+    .sort((left, right) => left.localeCompare(right));
+  assert.deepEqual(result.scannedFiles, productionFiles);
   for (const relativePath of COVERED_PRODUCTION_SOURCES) {
     assert.ok(result.scannedFiles.includes(relativePath), relativePath);
   }
@@ -581,6 +593,42 @@ test('scanner covers the full package and skips non-production sources', () => {
         'packages/ui/theme/live.ts tracking-[-0.01em]',
       ]
     );
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('new production sources enter the audit and cannot add visual debt', () => {
+  const root = mkdtempSync(join(tmpdir(), 'shared-ui-visual-addition-'));
+  try {
+    mkdirSync(join(root, 'packages/ui/atoms'), { recursive: true });
+    const options = {
+      repoRoot: root,
+      baseline: toVisualArbitraryBaseline([]),
+      eventName: 'local',
+    };
+    const before = evaluateSharedUiVisualArbitraryAudit(options);
+    assert.equal(before.ok, true);
+    assert.deepEqual(before.scannedFiles, []);
+
+    const source = 'packages/ui/atoms/new-control.tsx';
+    writeFileSync(join(root, source), 'export const style = "rounded-md";\n');
+    const clean = evaluateSharedUiVisualArbitraryAudit(options);
+    assert.equal(clean.ok, true);
+    assert.deepEqual(clean.scannedFiles, [source]);
+    assert.equal(clean.totalFindings, 0);
+
+    writeFileSync(
+      join(root, source),
+      'export const style = "rounded-[12px]";\n'
+    );
+    const red = evaluateSharedUiVisualArbitraryAudit(options);
+    assert.equal(red.ok, false);
+    assert.equal(red.status, 'regression');
+    assert.deepEqual(red.scannedFiles, [source]);
+    assert.deepEqual(red.findings, [
+      { file: source, value: 'rounded-[12px]', count: 1 },
+    ]);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
