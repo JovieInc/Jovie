@@ -499,11 +499,11 @@ test('close-candidate scan pages Linear results until exhausted', async () => {
     ),
   ];
   let calls = 0;
-  const fetchImpl = async () => ({
+  const fetchImpl = /** @type {any} */ (async () => ({
     ok: true,
     status: 200,
     text: async () => JSON.stringify(pages[calls++]),
-  });
+  }));
   const scan = await listSecadvIssueCandidates({
     apiKey: `k-${randomUUID()}`,
     fetchImpl,
@@ -516,7 +516,7 @@ test('close-candidate scan pages Linear results until exhausted', async () => {
 
 test('close-candidate scan reports truncation at the page cap', async () => {
   let calls = 0;
-  const fetchImpl = async () => {
+  const fetchImpl = /** @type {any} */ (async () => {
     calls += 1;
     return {
     ok: true,
@@ -530,7 +530,7 @@ test('close-candidate scan reports truncation at the page cap', async () => {
         )
       ),
     };
-  };
+  });
   const scan = await listSecadvIssueCandidates({
     apiKey: `k-${randomUUID()}`,
     fetchImpl,
@@ -541,11 +541,11 @@ test('close-candidate scan reports truncation at the page cap', async () => {
 });
 
 test('close-candidate scan fails closed on a Linear rate limit', async () => {
-  const fetchImpl = async () => ({
+  const fetchImpl = /** @type {any} */ (async () => ({
     ok: false,
     status: 429,
     text: async () => '',
-  });
+  }));
   const scan = await listSecadvIssueCandidates({
     apiKey: `k-${randomUUID()}`,
     fetchImpl,
@@ -555,11 +555,11 @@ test('close-candidate scan fails closed on a Linear rate limit', async () => {
 });
 
 test('close-candidate scan fails closed on a GraphQL error', async () => {
-  const fetchImpl = async () => ({
+  const fetchImpl = /** @type {any} */ (async () => ({
     ok: true,
     status: 200,
     text: async () => JSON.stringify({ errors: [{ message: 'nope' }] }),
-  });
+  }));
   const scan = await listSecadvIssueCandidates({
     apiKey: `k-${randomUUID()}`,
     fetchImpl,

@@ -254,6 +254,22 @@ export async function recordBlindSource(
  * ok, and the caller exits 1. Rate-limited closes stop the loop; the remaining
  * groups are deferred with ok:false so incomplete Linear work is never green.
  */
+/**
+ * @typedef {Object} AdvisoryCloseResult
+ * @property {boolean} ok
+ * @property {string} [action]
+ * @property {string} [reason]
+ */
+/**
+ * @param {Object} input
+ * @param {Array<{fingerprint: string, fixedAt?: string, deployedAt?: string}>} input.closes
+ * @param {Array<unknown>} input.candidates
+ * @param {string} [input.runId]
+ * @param {string} [input.comment]
+ * @param {(group: {fingerprint: string, fixedAt?: string, deployedAt?: string}) => string} [input.commentFor]
+ * @param {(input: {fingerprint: string, runId?: string, comment?: string}) => Promise<AdvisoryCloseResult>} [input.close]
+ * @returns {Promise<{actions: Array<{fingerprint: string, op: string, ok: boolean, action: string | undefined}>, ok: boolean}>}
+ */
 export async function runAdvisoryCloses({
   closes,
   candidates,
