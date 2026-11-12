@@ -8,7 +8,7 @@ import tempfile
 from pathlib import Path
 
 from atomic_state import atomic_write_text
-from fix_red_statement_merge import resolve_additive_statements_text
+from fix_red_statement_merge import contained_by_main, contained_by_main_file, resolve_additive_statements_text
 
 LEGACY_CACHE_EXPORT = re.compile(
     r"^\s*export const (?:dynamic|fetchCache|revalidate)\s*=")
@@ -410,7 +410,7 @@ def commit_open_merge(worktree, paths, sh, log, *, guard=lambda: None) -> bool:
     return True
 
 
-def resolve_additive_list_conflict(worktree: Path, branch: str, log, *, sh, merge_entries, guard=lambda: None, push: bool = True) -> bool:
+def resolve_additive_list_conflict(worktree: Path, branch: str, log, *, sh, merge_entries, guard=lambda: None, push: bool = True, stage_choice=None) -> bool:
     """Union quoted lists, node:test blocks, Vitest statement insertions, waiver rows, or dropped screen-debt rows.
 
     Main's order stays, then head-only lines. A prose hunk or any other shape aborts
@@ -427,14 +427,14 @@ def resolve_additive_list_conflict(worktree: Path, branch: str, log, *, sh, merg
         for path in conflicted:
             target = worktree / path
             try:
-                text = merge_entries(target.read_text())
-                if text is None:
+                text = stage_choice(worktree, path, sh) if stage_choice else merge_entries(target.read_text())
+                if text is None and not stage_choice:
                     text = resolve_additive_node_test_file(worktree, path, sh)
-                if text is None:
+                if text is None and not stage_choice:
                     text = resolve_additive_statement_file(worktree, path, sh)
-                if text is None:
+                if text is None and not stage_choice:
                     text = resolve_additive_certificate_waivers(worktree, path, sh)
-                if text is None:
+                if text is None and not stage_choice:
                     text = resolve_subtractive_screen_debt(worktree, path, sh)
             except OSError:
                 text = None

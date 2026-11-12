@@ -6526,6 +6526,13 @@ def resolve_identifier_list_conflict(worktree: Path, branch: str, log, *, guard=
     return sh(["git", "push", "-q", "origin", f"HEAD:refs/heads/{branch}"], cwd=worktree, log=log).returncode == 0
 
 
+def resolve_contained_by_main_conflict(worktree: Path, branch: str, log, *, guard=lambda: None) -> bool:
+    """Keep main only when its exact edits contain every PR edit at the same base range."""
+    return fix_red_source_edits.resolve_additive_list_conflict(
+        worktree, branch, log, sh=sh, merge_entries=lambda _: None, guard=guard,
+        stage_choice=fix_red_source_edits.contained_by_main_file)
+
+
 def conflict_resolvers():
     """DIRTY conflict classes in try order. Each one charges one mutation.
 
@@ -6538,6 +6545,7 @@ def conflict_resolvers():
         ("repair-and-chain", resolve_and_chain_conflict, "and-chain-merged"),
         ("repair-additive-list", resolve_additive_list_conflict, "additive-list-merged"),
         ("repair-identifier-list", resolve_identifier_list_conflict, "identifier-list-merged"),
+        ("repair-contained-by-main", resolve_contained_by_main_conflict, "contained-by-main"),
     )
 
 
