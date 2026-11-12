@@ -607,6 +607,9 @@
       "offline": "The skeleton is a static Suspense fallback that makes no request; connectivity belongs to the route that replaces it. The detector matched the word skeleton.",
       "permission-denied": "The fallback renders before any session or role is known and gates nothing. The detector matched role='status' on its loading announcement."
     },
+    "apps/web/components/organisms/AuthShellWrapper.tsx": {
+      "empty": "The wrapper composes providers around one route child and owns no collection. The detector matched the 'releases' pending-shell route name and the items-center class; the pending Releases overlay is covered by AuthShellWrapper.test.tsx."
+    },
     "apps/web/components/organisms/CookieBannerSection.tsx": {
       "partial": "The card always shows the same fixed consent message and three actions; its two optional props are a test-only pathname override and the server-resolved visibility flag, so no content can be partially present.",
       "long-content": "The consent message, Privacy link and action labels are fixed copy with no props or user text, so the card's content cannot grow; the detector matched the aria-label and the text-* utility classes."
