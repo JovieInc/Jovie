@@ -55,11 +55,12 @@ describe('SegmentedDigitBox design tokens', () => {
     expect(box.className).not.toContain('var(--focus-ring)');
   });
 
-  it('tints the error state with the error-subtle token, not a raw colour', () => {
+  it('marks the error state with error tokens only, no raw colour', () => {
     const { container } = render(<SegmentedDigitBox {...BASE_PROPS} error />);
 
     const box = container.firstElementChild as HTMLElement;
-    expect(box.className).toContain('var(--color-error-subtle)');
+    expect(box.className).toContain('border-error/55');
+    expect(box.className).toContain('ring-error/14');
     expect(box.className).not.toMatch(/rgba?\(/);
   });
 });

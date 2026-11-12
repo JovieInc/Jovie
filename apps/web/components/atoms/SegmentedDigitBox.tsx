@@ -62,8 +62,7 @@ export function SegmentedDigitBox({
         isFocused
           ? 'border-(--profile-pearl-border) bg-(--profile-pearl-bg-hover) ring-2 ring-focus/18'
           : 'hover:bg-(--profile-pearl-bg-hover)',
-        error &&
-          'border-error/55 bg-[color:color-mix(in_srgb,var(--profile-pearl-bg)_90%,var(--color-error-subtle))] ring-2 ring-error/14',
+        error && 'border-error/55 ring-2 ring-error/14',
         disabled && 'opacity-50 cursor-not-allowed',
         'active:bg-(--profile-pearl-bg-hover)'
       )}

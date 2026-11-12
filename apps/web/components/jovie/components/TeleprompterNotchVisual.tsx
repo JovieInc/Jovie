@@ -13,6 +13,11 @@ const PHONE_SHELL_STYLE: CSSProperties = {
     'color-mix(in oklab, var(--color-accent-blue) 8%, var(--color-ink-on-media))',
 };
 
+const PHONE_GLOW_STYLE: CSSProperties = {
+  backgroundImage:
+    'radial-gradient(circle at 50% 0%, color-mix(in oklab, var(--color-accent-purple) 18%, transparent), transparent 55%)',
+};
+
 /**
  * Hero visual for the teleprompter showcase — a phone silhouette with a
  * notch-adjacent script preview, inspired by Moody's teleprompter demo.
@@ -48,7 +53,8 @@ export function TeleprompterNotchVisual({
       </div>
       <span
         aria-hidden='true'
-        className='pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,color-mix(in_oklab,var(--color-accent-purple)_18%,transparent),transparent_55%)]'
+        className='pointer-events-none absolute inset-0'
+        style={PHONE_GLOW_STYLE}
       />
     </div>
   );
