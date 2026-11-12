@@ -13,6 +13,8 @@ import {
   readBaseScreens,
   screenComponents,
   screenIssues,
+  sortByPath,
+  unsortedPathErrors,
 } from '../component-cert-screens.mjs';
 import {
   importClosure,
@@ -290,6 +292,43 @@ describe('screen gate', () => {
     assert.deepEqual(owedCriteria(['tests']), ['tests']);
     assert.deepEqual(owedCriteria(undefined), []);
     assert.equal(debtEntry(['tests', 'a11y', 'tests']), 'a11y,tests');
+  });
+
+  it('keeps debt sorted by path in code-unit order, so entries land in place', () => {
+    const shell = 'apps/web/app/app/(shell)/';
+    const sorted = sortByPath({
+      [`${shell}DashboardLoadTracker.tsx`]: 'a11y',
+      [`${shell}chat/ChatPageClient.tsx`]: 'states',
+      'apps/web/app/[username]/X.tsx': 'tests',
+    });
+    // Code-unit order: uppercase and `[` sort before lowercase letters.
+    assert.deepEqual(Object.keys(sorted), [
+      'apps/web/app/[username]/X.tsx',
+      `${shell}DashboardLoadTracker.tsx`,
+      `${shell}chat/ChatPageClient.tsx`,
+    ]);
+    assert.deepEqual(unsortedPathErrors('debt', sorted), []);
+    const [error] = unsortedPathErrors('debt', { b: 'x', a: 'y', c: 'z' });
+    assert.match(
+      error,
+      /debt is not sorted by component path \(a comes after b\)/
+    );
+    assert.match(error, /node scripts\/component-certificate\.mjs --sort/);
+    const report = { certificates: [] };
+    const byScreen = new Map([['claim/claim', ['B.tsx', 'A.tsx']]]);
+    const owed = registry({ 'B.tsx': 'tests,a11y', 'A.tsx': 'tests,a11y' });
+    const unsorted = evaluateScreenGates(report, owed, byScreen);
+    assert.equal(unsorted.ok, false);
+    assert.match(
+      unsorted.errors.join('\n'),
+      /cert-screens: debt is not sorted/
+    );
+    const ok = evaluateScreenGates(
+      report,
+      { ...owed, debt: sortByPath(owed.debt) },
+      byScreen
+    );
+    assert.equal(ok.ok, true, JSON.stringify(ok));
   });
 });
 

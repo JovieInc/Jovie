@@ -95,6 +95,19 @@ def pr(number=5, branch="devin/jov-1-20260926t0900", sha="h1", draft=False, merg
             "isInMergeQueue": False, **extra}
 
 
+def red_episode_route(reply, login="github-actions[bot]", created="2026-01-01T00:00:00Z", absent=False):
+    """Serve the JOV-8492 label-episode provenance read alongside the rollup read. Both go to
+    `gh api graphql`; the Shell routes by prefix, so one callable dispatches on the query."""
+    def route(args):
+        if "LABELED_EVENT" in " ".join(args):
+            actor = {"__typename": "Bot" if login.endswith("[bot]") else "User", "login": login}
+            nodes = [] if absent else [{"createdAt": created, "label": {"name": "lane-fix-red"},
+                                        "actor": actor}]
+            return {"data": {"repository": {"pullRequest": {"timelineItems": {"nodes": nodes}}}}}
+        return reply(args) if callable(reply) else reply
+    return route
+
+
 def retirement_page(pr, **overrides):
     live = {**pr, "state": "OPEN", "isInMergeQueue": False,
             "labels": {"pageInfo": {"hasNextPage": False}, "nodes": pr["labels"]}, **overrides}
@@ -542,7 +555,8 @@ class RelayTest(unittest.TestCase):
         def success(status, **extra):
             view = pr(branch="cursor/fix", sha="h1", merge=status, labels=["lane-fix-red"],
                       state="OPEN", **extra)
-            shell = Shell({("gh", "pr", "view"): view})
+            shell = Shell({("gh", "pr", "view"): view,
+                           ("gh", "api", "graphql"): red_episode_route(lambda args: {})})
             run = {"event": "pull_request", "conclusion": "success", "head_sha": "h1",
                    "pull_requests": [{"number": 5}]}
             return events.relay("workflow_run", {"workflow_run": run}, shell, set()), shell
@@ -591,18 +605,21 @@ class RelayTest(unittest.TestCase):
         run = {"event": "pull_request", "conclusion": "success", "head_sha": "h1",
                "pull_requests": [{"number": 5}]}
 
-        settled = Shell({("gh", "pr", "view"): blocked, ("gh", "api", "graphql"): green_checks})
+        settled = Shell({("gh", "pr", "view"): blocked,
+                         ("gh", "api", "graphql"): red_episode_route(green_checks)})
         self.assertEqual(events.relay("workflow_run", {"workflow_run": run}, settled, set()),
                          [(5, "cleared-red"), (5, "enroll-wake")])
         self.assertEqual(settled.made("gh", "api", "-X", "DELETE"),
                          [["gh", "api", "-X", "DELETE",
                            f"repos/{events.REPO}/issues/5/labels/lane-fix-red"]])
 
-        waiting = Shell({("gh", "pr", "view"): blocked, ("gh", "api", "graphql"): waiting_checks})
+        waiting = Shell({("gh", "pr", "view"): blocked,
+                         ("gh", "api", "graphql"): red_episode_route(waiting_checks)})
         self.assertEqual(events.relay("workflow_run", {"workflow_run": run}, waiting, set()), [])
         self.assertEqual(waiting.made("gh", "api", "-X", "DELETE"), [])
 
-        failing = Shell({("gh", "pr", "view"): blocked, ("gh", "api", "graphql"): red_checks})
+        failing = Shell({("gh", "pr", "view"): blocked,
+                         ("gh", "api", "graphql"): red_episode_route(red_checks)})
         self.assertEqual(events.relay("workflow_run", {"workflow_run": run}, failing, set()), [])
         self.assertEqual(failing.made("gh", "api", "-X", "DELETE"), [])
 
@@ -620,9 +637,45 @@ class RelayTest(unittest.TestCase):
         self.assertEqual(labeled.made("gh", "api", "-X", "DELETE"), [])
         self.assertEqual(labeled.made("gh", "api", "-X", "POST"), [])
 
+    def test_the_relay_clears_only_its_own_lane_fix_red_episode(self):
+        # JOV-8492: a jovie-bot episode is the queue breaker's merge-group hold — the PR-head
+        # rollup cannot supersede those reds, and clearing one re-armed the hold/re-enroll churn
+        # (#24694 flew a green head through ~35 merge-group builds). A human label is a human
+        # hold. An unreadable episode keeps the label too (fail closed).
+        run = {"event": "pull_request", "conclusion": "success", "head_sha": "h1",
+               "pull_requests": [{"number": 5}]}
+        view = pr(branch="cursor/fix", sha="h1", merge="CLEAN", labels=["lane-fix-red"], state="OPEN")
+        for login, cleared in (("github-actions[bot]", True), ("jovie-bot[bot]", False), ("tim", False)):
+            shell = Shell({("gh", "pr", "view"): view,
+                           ("gh", "api", "graphql"): red_episode_route(lambda args: None, login=login)})
+            result = events.relay("workflow_run", {"workflow_run": run}, shell, set())
+            self.assertEqual(result, [(5, "cleared-red"), (5, "enroll-wake")] if cleared else [], login)
+            self.assertEqual(bool(shell.made("gh", "api", "-X", "DELETE")), cleared, login)
+        for kwargs in ({"absent": True},):
+            shell = Shell({("gh", "pr", "view"): view,
+                           ("gh", "api", "graphql"): red_episode_route(lambda args: None, **kwargs)})
+            self.assertEqual(events.relay("workflow_run", {"workflow_run": run}, shell, set()), [], kwargs)
+            self.assertEqual(shell.made("gh", "api", "-X", "DELETE"), [], kwargs)
+        shell = Shell({("gh", "pr", "view"): view, ("gh", "api", "graphql"): (1, "")})
+        self.assertEqual(events.relay("workflow_run", {"workflow_run": run}, shell, set()), [])
+        self.assertEqual(shell.made("gh", "api", "-X", "DELETE"), [], "an unreadable applier keeps the label")
+
+    def test_label_episode_query_is_structurally_valid(self):
+        # JOV-8492: an unbalanced brace in the provenance query is rejected by GitHub's GraphQL
+        # parser, the applier returns None (fail closed) and the relay never clears its own
+        # labels — so the string itself is pinned, not just the parsing of its replies.
+        events2 = load("label_episodes")
+        query = events2.LABEL_EPISODE_QUERY
+        self.assertEqual(query.count("{"), query.count("}"))
+        self.assertEqual(query.count("("), query.count(")"))
+        for token in ("timelineItems", "LABELED_EVENT", "... on LabeledEvent", "actor{__typename login}",
+                      "label{name}", "createdAt"):
+            self.assertIn(token, query)
+
     def test_a_failed_delete_leaves_lane_fix_red_in_place(self):
         view = pr(branch="cursor/fix", sha="h1", merge="CLEAN", labels=["lane-fix-red"], state="OPEN")
-        shell = Shell({("gh", "pr", "view"): view, ("gh", "api", "-X", "DELETE"): (1, "")})
+        shell = Shell({("gh", "pr", "view"): view, ("gh", "api", "-X", "DELETE"): (1, ""),
+                       ("gh", "api", "graphql"): red_episode_route(lambda args: None)})
         run = {"event": "pull_request", "conclusion": "success", "head_sha": "h1",
                "pull_requests": [{"number": 5}]}
         self.assertEqual(events.relay("workflow_run", {"workflow_run": run}, shell, set()), [])
@@ -631,7 +684,8 @@ class RelayTest(unittest.TestCase):
 
     def test_a_green_success_that_fails_the_enroll_wake_records_it(self):
         view = pr(branch="cursor/fix", sha="h1", merge="CLEAN", labels=["lane-fix-red"], state="OPEN")
-        shell = Shell({("gh", "pr", "view"): view, ("gh", "workflow", "run"): (1, "")})
+        shell = Shell({("gh", "pr", "view"): view, ("gh", "workflow", "run"): (1, ""),
+                       ("gh", "api", "graphql"): red_episode_route(lambda args: None)})
         run = {"event": "pull_request", "conclusion": "success", "head_sha": "h1",
                "pull_requests": [{"number": 5}]}
         self.assertEqual(events.relay("workflow_run", {"workflow_run": run}, shell, set()),
@@ -640,7 +694,8 @@ class RelayTest(unittest.TestCase):
 
     def test_a_green_lane_draft_drops_lane_fix_red_and_can_still_be_marked_green(self):
         view = pr(draft=True, merge="CLEAN", labels=["lane-fix-red"], state="OPEN", sha="h1")
-        shell = Shell({("gh", "pr", "view"): view})
+        shell = Shell({("gh", "pr", "view"): view,
+                       ("gh", "api", "graphql"): red_episode_route(lambda args: None)})
         run = {"event": "pull_request", "conclusion": "success", "head_sha": "h1",
                "pull_requests": [{"number": 5}]}
         self.assertEqual(events.relay("workflow_run", {"workflow_run": run}, shell, set()),
@@ -654,7 +709,8 @@ class RelayTest(unittest.TestCase):
             pr(number=8, branch="cursor/fork", merge="HAS_HOOKS", labels=["lane-fix-red"], state="OPEN",
                isCrossRepository=True),
         ]
-        shell = Shell({("gh", "pr", "list"): rows})
+        shell = Shell({("gh", "pr", "list"): rows,
+                       ("gh", "api", "graphql"): red_episode_route(lambda args: None)})
         self.assertEqual(events.relay("push", {}, shell, set()), [(5, "cleared-red")])
         self.assertEqual(shell.made("gh", "api", "-X", "DELETE"),
                          [["gh", "api", "-X", "DELETE",
@@ -1850,6 +1906,22 @@ class GapTest(unittest.TestCase):
         self.assertIsNone(events.head_red(1, reply(passed, code=1)))
         self.assertIsNone(events.head_red(1, lambda *a, **k: SimpleNamespace(returncode=0, stdout="nope", stderr="")))
 
+    def test_a_success_that_ties_a_failure_is_the_newer_verdict(self):
+        # JOV-8492: a superseded (cancelled) run reports FAILURE with a completion second that
+        # can tie the replacement's; on a tie the success is the newer verdict, whatever order
+        # the node list came in. A strictly later failure is still red.
+        def reply(*nodes, code=0):
+            body = {"data": {"repository": {"pullRequest": {"commits": {"nodes": [
+                {"commit": {"statusCheckRollup": {"contexts": {"nodes": list(nodes)}}}}]}}}}}
+            return lambda args, **kwargs: SimpleNamespace(returncode=code, stdout=json.dumps(body), stderr="")
+        tied = "2026-11-09T05:00:00Z"
+        failed = {"name": "CI", "conclusion": "FAILURE", "completedAt": tied}
+        passed = {"name": "CI", "conclusion": "SUCCESS", "completedAt": tied}
+        self.assertIs(events.head_red(1, reply(failed, passed)), False)
+        self.assertIs(events.head_red(1, reply(passed, failed)), False, "node order must not decide")
+        newer_red = {"name": "CI", "conclusion": "FAILURE", "completedAt": "2026-11-09T05:00:01Z"}
+        self.assertIs(events.head_red(1, reply(failed, passed, newer_red)), True)
+
     def test_reconcile_labels_missed_events_and_names_orphans(self):
         now = events.iso_ts("2033-05-18T03:00:00Z")
         old = "2033-05-15T00:00:00Z"
@@ -2057,6 +2129,26 @@ class GapTest(unittest.TestCase):
         no_linear = Shell({("gh", "api", "graphql"): page})
         events.reconcile(self.host, fake_lane(no_linear), lambda: (_ for _ in ()).throw(OSError("x")), NOW, force=True)
         self.assertEqual(len(no_linear.made("gh", "pr", "close")), 0, "terminal work is preserved even with Linear unavailable")
+
+    def test_reconcile_does_not_unlabel_a_head_the_breaker_still_holds(self):
+        # JOV-8492: the breaker's reds are merge-group failures the required-green check above
+        # cannot see; unlabeing here re-armed its re-block and churned #24694 for hours. The
+        # breaker's own sweep releases on supersession or a new head — anything else waits.
+        row = {**self.node(8, mergeStateStatus="CLEAN", labels=[{"name": "lane-fix-red"}], headRefOid="a" * 40),
+               "commits": {"nodes": [{"commit": {"statusCheckRollup": {"state": "SUCCESS"}}}]},
+               "labels": {"nodes": [{"name": "lane-fix-red"}]}}
+        page = {"data": {"repository": {"pullRequests": {"pageInfo": {"hasNextPage": False, "endCursor": None},
+                                                         "nodes": [row]}}}}
+        linear = SimpleNamespace(gql=lambda q, v: {"issues": {"nodes": []}})
+        (self.host.state / "queue-breaker.json").write_text(json.dumps({"8": {"head": "a" * 40, "at": NOW}}))
+        shell = Shell({("gh", "api", "graphql"): page})
+        events.reconcile(self.host, fake_lane(shell), lambda: linear, NOW, force=True)
+        self.assertEqual(shell.made("gh", "api", "-X", "DELETE"), [], "the breaker's hold is not the sweep's to lift")
+        # A record for a moved head (or none) puts the label back in ordinary repair.
+        (self.host.state / "queue-breaker.json").write_text(json.dumps({"8": {"head": "b" * 40, "at": NOW}}))
+        shell = Shell({("gh", "api", "graphql"): page})
+        events.reconcile(self.host, fake_lane(shell), lambda: linear, NOW, force=True)
+        self.assertIn(["gh", "api", "-X", "DELETE", f"repos/{events.REPO}/issues/8/labels/lane-fix-red"], shell.calls)
 
     def test_reconcile_does_not_relabel_a_head_with_an_active_repair_claim(self):
         target = self.node(6, headRefOid="claimed-head", mergeStateStatus="DIRTY")
@@ -3126,3 +3218,73 @@ class WakeFileTest(unittest.TestCase):
                                          "GITHUB_EVENT_PATH": str(event_path)}):
                 self.assertEqual(events.main(["wake", "--prs", "22868"]), 0)
             self.assertFalse((state / "wake").exists())
+
+
+class CloudOriginGuardTest(unittest.TestCase):
+    """JOV-10357 (R3): cloud-origin drafts are never readied, adopted, retired or re-queued."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.host = SimpleNamespace(state=Path(self.tmp.name))
+        proofs = {f"{n}:h1": {"schema": runner.GATE_RESULT_SCHEMA, "headSha": "h1",
+                              "verdict": "verified-not-queued", "completedAt": runner.now_iso(),
+                              "policyDigest": runner.GATE_POLICY_DIGEST, "sensitive": False}
+                  for n in (1, 5)}
+        (self.host.state / "verified.json").write_text(json.dumps(proofs))
+        self.ledger = Path(self.tmp.name) / "cloud-lane.jsonl"
+        self.env = patch.dict(os.environ, {"CLOUD_LANE_LEDGER": str(self.ledger)})
+        self.env.start()
+        self.addCleanup(self.env.stop)
+
+    def cloud_pr(self, **extra):
+        return pr(branch="cloud/jov-10357-task_abc1", draft=True, merge="CLEAN", **extra)
+
+    def test_ready_green_holds_a_cloud_draft_without_any_gh_call(self):
+        shell = Shell()
+        self.assertEqual(events.ready_green(self.host, fake_lane(shell), self.cloud_pr(), {}, NOW),
+                         "held:cloud-origin-draft-only")
+        self.assertFalse(shell.calls)
+
+    def test_ready_green_ignores_forged_trailers_in_bodies(self):
+        forged = pr(draft=True, merge="CLEAN", body="Codex-Cloud-Task: task_abc closes JOV-10357")
+        shell = Shell()
+        self.assertEqual(events.ready_green(self.host, fake_lane(shell), forged, {}, NOW), "landing",
+                         "a normal branch with a forged trailer is not cloud origin")
+        self.assertTrue(any(call[:3] == ["gh", "pr", "ready"] for call in shell.calls))
+
+    def test_ledger_evidence_blocks_without_the_branch_prefix(self):
+        row = {"issue": "JOV-10357", "task": "task_abc12345", "provider": "codex",
+               "stage": "cloud-pending", "reason": "r", "repo": "JovieInc/Jovie", "env": "e",
+               "branch": "devin/jov-1-20260926t0900", "fencingToken": "t", "at": 1}
+        self.ledger.write_text(json.dumps(row) + "\n")
+        shell = Shell()
+        self.assertEqual(events.ready_green(self.host, fake_lane(shell),
+                                            pr(draft=True, merge="CLEAN"), {}, NOW),
+                         "held:cloud-origin-draft-only")
+        self.assertFalse(shell.calls)
+
+    def test_unreadable_evidence_fails_closed(self):
+        self.ledger.write_text("{broken\n")
+        shell = Shell()
+        self.assertEqual(events.ready_green(self.host, fake_lane(shell),
+                                            pr(draft=True, merge="CLEAN"), {}, NOW),
+                         "held:cloud-origin-draft-only")
+        self.assertFalse(shell.calls)
+
+    def test_retire_orphan_and_return_to_pool_never_touch_a_cloud_draft(self):
+        shell = Shell()
+        orphan = self.cloud_pr(kinds=["orphan"])
+        self.assertEqual(events.retire_orphan(fake_lane(shell), self.linear(), orphan, [orphan],
+                                              host=self.host, now=NOW),
+                         "held:cloud-origin-draft-only")
+        self.assertFalse(shell.calls)
+        self.assertFalse(events.return_to_pool(fake_lane(shell), self.linear(), orphan, "duplicate",
+                                               host=self.host, now=NOW))
+        self.assertFalse(shell.calls)
+
+    def linear(self, state="started", name="In Progress"):
+        return SimpleNamespace(
+            gql=lambda *a, **k: {"issues": {"nodes": [{"id": "i", "state": {"type": state, "name": name},
+                                                       "comments": {"nodes": []}}]}},
+            move=lambda *a, **k: None, comment=lambda *a, **k: None)

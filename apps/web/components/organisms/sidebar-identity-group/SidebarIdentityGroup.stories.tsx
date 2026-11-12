@@ -120,9 +120,31 @@ export const SidebarAndProfileSweep: Story = {
   ),
 };
 
-export const WithoutPublicProfile: Story = {
+export const PartialWithoutPublicProfile: Story = {
   ...Expanded,
   args: { profileHref: undefined },
+};
+
+/** A long handle stays clipped inside the rail; the URL lives in the tooltip. */
+export const LongContentProfileHandle: Story = {
+  ...Expanded,
+  args: {
+    profileHref:
+      '/the-extraordinarily-long-artist-handle-that-keeps-going-past-the-rail',
+  },
+};
+
+export const RtlIdentityGroup: Story = {
+  args: { label: 'هوية المبدع' },
+  decorators: [
+    Story => (
+      <div dir='rtl' lang='ar'>
+        <RailFrame width={224}>
+          <Story />
+        </RailFrame>
+      </div>
+    ),
+  ],
 };
 
 export const DockStatus: Story = {

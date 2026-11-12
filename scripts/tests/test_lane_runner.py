@@ -37,6 +37,7 @@ ROOT = Path(__file__).resolve().parents[2]
 # Literal header: the staged lanes release bundle carries no canon/ files.
 REGISTRY_HEADER = '{"schema": "jovie-automation-registry/v1"}\n'
 sys.path.insert(0, str(ROOT / "scripts/lanes"))
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 import git_housekeeping  # noqa: E402
 
 git_housekeeping.install_process_fixture_env()
@@ -1656,39 +1657,7 @@ class ProviderAndLockTest(unittest.TestCase):
         self.assertFalse(lane.needs_update("t1", ""))
 
 
-class FakeLinear:
-    def __init__(self, issues):
-        self.issues, self.moves, self.comments, self.triaged = issues, [], [], []
-        self.issue_state = {"name": "Todo", "type": "unstarted"}
-
-    def gql(self, query, variables):
-        # The issue-lookup used for terminal dispositions (pr_events.linear_issue).
-        number = int(variables.get("n") or 0)
-        issue_id = f"id-JOV-{number}"
-        comments = [{"body": body} for iid, body in self.comments if iid == issue_id]
-        node = {"id": issue_id, "state": self.issue_state, "comments": {"nodes": comments}}
-        return {"issues": {"nodes": [] if self.missing_issue(number) else [node]}}
-
-    def missing_issue(self, number):
-        return number in getattr(self, "missing", set())
-
-    def create_triage(self, title, description, dedupe=None):
-        if dedupe and any(dedupe in open_title for open_title in getattr(self, "open_titles", [])):
-            return "existing-id"
-        self.triaged.append(title)
-        return "triage-id"
-
-    def lane_issues(self, label):
-        return self.issues
-
-    def move(self, issue_id, state):
-        self.moves.append((issue_id, state))
-
-    def state_of(self, issue_id):
-        return getattr(self, "states", {}).get(issue_id, "Todo")
-
-    def comment(self, issue_id, body):
-        self.comments.append((issue_id, body))
+from test_cloud_lane_cases.__tests__.cloud_lane_runner_cases import FakeLinear
 
 
 class LinearClientTest(unittest.TestCase):
@@ -2923,7 +2892,7 @@ class HostHandoffAdmissionTest(unittest.TestCase):
                       "routes": [{"model": "standard", "capability": "standard", "cost": 0}]},
             "codex": {"tier": 1, "slots": 1, "model": "frontier", "cmd": ["codex-test"],
                       "routes": [{"model": "frontier", "capability": "frontier", "cost": 3}]},
-            "claude": {"tier": 2, "slots": 1, "model": "sonnet", "cmd": ["claude-test", "{model}"],
+            "claude": {"tier": 2, "slots": 1, "model": "sonnet", "cmd": ["claude-test", "{model}"], "accountClass": "claude-subscription",
                        "routes": [{"model": "sonnet", "capability": "standard", "cost": 1},
                                   {"model": "opus", "capability": "frontier", "cost": 2}]},
             "hyperagent": {"tier": 0, "slots": 1, "repairs": False, "cmd": ["remote-test"],
@@ -8168,6 +8137,50 @@ class FixRedTest(unittest.TestCase):
             agent.assert_not_called()
             again.assert_called_once()
 
+    def ready_pr(self):
+        return self.pr(checks=[{
+            "name": "PR Ready", "status": "COMPLETED", "conclusion": "FAILURE",
+            "detailsUrl": "https://github.com/x/actions/runs/1/job/42"}])
+
+    def quota_stamp(self, offset_s):
+        stamp = datetime.fromtimestamp(time.time() + offset_s, timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.000Z")
+        return ("::warning::github-quota-deferred: gh api primary after 1 attempt(s) "
+                f"until {stamp}; not a verdict on this change.\n"
+                "::error::Fleet rule evidence lookup was github-quota-deferred; not a verdict on this PR.")
+
+    def test_quota_reset_in_the_future_waits_and_does_not_rerun_or_dispatch(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            host, receipt, agent, again = self.run_gate(tmp, self.quota_stamp(86400), pr=self.ready_pr())
+            self.assertEqual(receipt["reasons"], ["infra-rerun:quota-deferred-until"])
+            self.assertEqual(receipt["attemptRefunded"], "infra-rerun:quota-deferred-until")
+            agent.assert_not_called()
+            again.assert_not_called()
+            stored = json.loads((host.state / "infra-reruns.json").read_text())["5"]
+            self.assertIsNone(stored["claimedAt"])
+            _, second, agent2, again2 = self.run_gate(tmp, self.quota_stamp(86400), pr=self.ready_pr())
+            self.assertEqual(second["reasons"], ["infra-rerun:quota-deferred-until"])
+            agent2.assert_not_called()
+            again2.assert_not_called()
+
+    def test_quota_reset_in_the_past_reruns_once_then_reaches_the_agent(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            _, receipt, agent, again = self.run_gate(tmp, self.quota_stamp(-86400), pr=self.ready_pr())
+            self.assertEqual(receipt["reasons"], ["infra-rerun:quota-deferred"])
+            agent.assert_not_called()
+            again.assert_called_once()
+            _, second, agent2, again2 = self.run_gate(tmp, self.quota_stamp(-86400), pr=self.ready_pr())
+            agent2.assert_called_once()
+            again2.assert_not_called()
+            self.assertNotEqual(second["reasons"][:1], ["infra-rerun:quota-deferred"])
+
+    def test_legacy_head_claim_still_reruns_once_after_the_quota_reset(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            (Path(tmp) / "infra-reruns.json").write_text(json.dumps({"5": "h1"}))
+            _, receipt, agent, again = self.run_gate(tmp, self.quota_stamp(-86400), pr=self.ready_pr())
+            self.assertEqual(receipt["reasons"], ["infra-rerun:quota-deferred"])
+            agent.assert_not_called()
+            again.assert_called_once()
+
     def test_behind_branch_with_an_unclassified_red_is_synced_with_main_once_per_head(self):
         behind = {**self.pr(), "mergeStateStatus": "BEHIND"}
         with tempfile.TemporaryDirectory() as tmp, patch.object(lane.pr_events, "sync_main", return_value="synced") as sync:
@@ -12725,197 +12738,6 @@ class AtomicWriteRouteTest(unittest.TestCase):
              patch.object(lane, "sh", return_value=SimpleNamespace(returncode=1)) as shell:
             self.assertIsNone(lane.atomic_state_fix(None, {}, {}, Path("/unused"), None, {}))
         self.assertEqual(shell.call_count, 1)
-
-
-class LockfileConflictTest(unittest.TestCase):
-    """JOV-6837/JOV-7594: a generated-file-only conflict is resolved without a model; anything else is not."""
-
-    def test_rechecks_target_immediately_before_runner_owned_install_and_push(self):
-        for conflict in (True, False):
-            calls = []
-            def shell(args, **kwargs):
-                calls.append(args)
-                return SimpleNamespace(returncode=1 if args[:2] == ["git", "merge"] and conflict else 0,
-                                       stdout="pnpm-lock.yaml\n" if args[:2] == ["git", "diff"] else "", stderr="")
-            guard = Mock(side_effect=[None, lane.RepairStopped("target-pr-merged", {"state": "MERGED"}, "command")])
-            with self.subTest(conflict=conflict), patch.object(lane, "sh", side_effect=shell):
-                with self.assertRaises(lane.RepairStopped):
-                    lane.resolve_generated_conflict(Path("/not-used"), "branch", None, guard=guard)
-            self.assertFalse(any(cmd[:2] == ["pnpm", "install"] or cmd[:2] == ["git", "push"] for cmd in calls))
-
-    def git(self, *args, cwd):
-        return subprocess.run(["git", "-c", "user.email=t@t", "-c", "user.name=t", *args], cwd=cwd,
-                              check=True, capture_output=True, text=True).stdout.strip()
-
-    def repo(self, tmp: Path, pr_changes: dict, main_changes: dict | None = None):
-        origin, work = tmp / "origin.git", tmp / "work"
-        self.git("init", "-q", "--bare", "-b", "main", str(origin), cwd=tmp)
-        self.git("clone", "-q", str(origin), str(work), cwd=tmp)
-        for name, text in {"package.json": "{}\n", "pnpm-lock.yaml": "base\n", "a.ts": "a\n"}.items():
-            (work / name).write_text(text)
-        self.git("add", "-A", cwd=work)
-        self.git("commit", "-qm", "base", cwd=work)
-        self.git("push", "-q", "origin", "HEAD:main", cwd=work)
-        self.git("checkout", "-q", "-b", "devin/jov-1-20260927", cwd=work)
-        for name, text in pr_changes.items():
-            (work / name).parent.mkdir(parents=True, exist_ok=True)
-            (work / name).write_text(text)
-        self.git("add", "-A", cwd=work)
-        self.git("commit", "-qm", "pr", cwd=work)
-        self.git("push", "-q", "origin", "HEAD:devin/jov-1-20260927", cwd=work)
-        self.git("checkout", "-q", "main", cwd=work)
-        for name, text in (main_changes or {"pnpm-lock.yaml": "main\n", "a.ts": "main\n"}).items():
-            (work / name).parent.mkdir(parents=True, exist_ok=True)
-            (work / name).write_text(text)
-        self.git("add", "-A", cwd=work)
-        self.git("commit", "-qm", "main moves", cwd=work)
-        self.git("push", "-q", "origin", "HEAD:main", cwd=work)
-        self.git("checkout", "-q", "devin/jov-1-20260927", cwd=work)
-        self.git("fetch", "-q", "origin", cwd=work)
-        return origin, work
-
-    def run_resolve(self, work: Path):
-        real, calls = lane.sh, []
-
-        def sh(args, cwd=None, timeout=600, env=None, log=None, stream=False):
-            calls.append(args)
-            if args[:2] == ["pnpm", "install"]:
-                (Path(cwd) / "pnpm-lock.yaml").write_text("regenerated\n")
-                return SimpleNamespace(returncode=0, stdout="", stderr="")
-            if args == ["pnpm", "ci:topology:write"]:
-                target = Path(cwd) / ".github/workflow-topology.gen.yml"
-                target.parent.mkdir(parents=True, exist_ok=True)
-                target.write_text("regenerated\n")
-                return SimpleNamespace(returncode=0, stdout="", stderr="")
-            return real(args, cwd=cwd, timeout=timeout, env=env)
-        lane.sh = sh
-        try:
-            with open(os.devnull, "w") as log:
-                env = {**os.environ, "GIT_AUTHOR_NAME": "t", "GIT_AUTHOR_EMAIL": "t@t",
-                       "GIT_COMMITTER_NAME": "t", "GIT_COMMITTER_EMAIL": "t@t"}
-                saved = dict(os.environ)
-                os.environ.update(env)
-                try:
-                    return lane.resolve_generated_conflict(work, "devin/jov-1-20260927", log), calls
-                finally:
-                    os.environ.clear()
-                    os.environ.update(saved)
-        finally:
-            lane.sh = real
-
-    def test_lockfile_only_conflict_is_regenerated_and_pushed(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            origin, work = self.repo(Path(tmp), {"pnpm-lock.yaml": "pr\n"})
-            ok, calls = self.run_resolve(work)
-            self.assertTrue(ok)
-            self.assertIn(["pnpm", "install", "--lockfile-only", "--ignore-scripts"], calls)
-            pushed = self.git("show", "devin/jov-1-20260927:pnpm-lock.yaml", cwd=origin)
-            self.assertEqual(pushed, "regenerated")
-            self.assertEqual(self.git("show", "devin/jov-1-20260927:a.ts", cwd=origin), "main")
-
-    def test_generated_topology_conflict_is_regenerated_and_pushed(self):
-        """JOV-7594: a generated-file conflict regenerates instead of hand-merging."""
-        path = ".github/workflow-topology.gen.yml"
-        with tempfile.TemporaryDirectory() as tmp:
-            origin, work = self.repo(Path(tmp), {path: "pr\n"},
-                                     main_changes={path: "main\n", "a.ts": "main\n"})
-            ok, calls = self.run_resolve(work)
-            self.assertTrue(ok)
-            self.assertIn(["pnpm", "ci:topology:write"], calls)
-            self.assertNotIn(["pnpm", "install", "--lockfile-only", "--ignore-scripts"], calls)
-            self.assertEqual(self.git("show", f"devin/jov-1-20260927:{path}", cwd=origin), "regenerated")
-            self.assertEqual(self.git("show", "devin/jov-1-20260927:a.ts", cwd=origin), "main")
-
-    def test_append_only_registry_conflict_keeps_both_sides_without_a_model(self):
-        """2026-10-29: canon/automation-registry.jsonl conflicted on 4 PRs; both sides' lines are the merge."""
-        path = "canon/automation-registry.jsonl"
-        header = REGISTRY_HEADER
-        with tempfile.TemporaryDirectory() as tmp:
-            origin, work = self.repo(Path(tmp), {path: header + '{"id":"base"}\n{"id":"pr"}\n'},
-                                     main_changes={path: header + '{"id":"base"}\n{"id":"main"}\n', "a.ts": "main\n"})
-            ok, calls = self.run_resolve(work)
-            self.assertTrue(ok)
-            merged = self.git("show", f"devin/jov-1-20260927:{path}", cwd=origin)
-            self.assertIn('"id":"pr"', merged)
-            self.assertIn('"id":"main"', merged)
-            self.assertNotIn("<<<<<<<", merged)
-
-    def test_rule_scopes_record_is_a_generated_resolver(self):
-        self.assertEqual(lane.remediation.GENERATED_RESOLVERS["scripts/agent-context/rule-scopes.json"],
-                         ("node", "scripts/agent-context/rule-scopes.mjs", "--write"))
-        self.assertIn("canon/automation-registry.jsonl", lane.remediation.RESOLVABLE_CONFLICT_FILES)
-
-    def test_registry_edits_to_the_same_id_stay_unresolved(self):
-        path = "canon/automation-registry.jsonl"
-        header = REGISTRY_HEADER
-        with tempfile.TemporaryDirectory() as tmp:
-            _, work = self.repo(Path(tmp), {path: header + '{"id":"base","value":"pr"}\n'},
-                                main_changes={path: header + '{"id":"base","value":"main"}\n'})
-            ok, _ = self.run_resolve(work)
-            self.assertFalse(ok)
-            self.assertEqual((work / path).read_text(), header + '{"id":"base","value":"pr"}\n')
-    def test_sources_of_truth_conflict_regenerates_from_merged_source(self):
-        path = "canon/SOURCES_OF_TRUTH.md"
-        generator = "scripts/sources-of-truth.mjs"
-        source = "canon/sources-of-truth.json"
-        script = (
-            "import {readFileSync,writeFileSync} from 'node:fs';\n"
-            f"if(readFileSync('{path}','utf8') !== 'main\\n') throw Error('must restore main');\n"
-            f"writeFileSync('{path}',JSON.parse(readFileSync('{source}','utf8')).domains.join('\\n'));\n"
-        )
-        with tempfile.TemporaryDirectory() as tmp:
-            origin, work = self.repo(Path(tmp), {path: "pr\n", generator: script,
-                                     source: '{"domains":["engineering-wins","proof-stats"]}'},
-                                     main_changes={path: "main\n", "a.ts": "main\n"})
-            ok, calls = self.run_resolve(work)
-            self.assertTrue(ok)
-            self.assertEqual(calls.count(["node", generator, "--write"]), 1)
-            self.assertEqual(self.git("show", f"devin/jov-1-20260927:{path}", cwd=origin),
-                             "engineering-wins\nproof-stats")
-            self.assertEqual(self.git("show", "devin/jov-1-20260927:a.ts", cwd=origin), "main")
-
-    def test_mixed_generated_conflicts_run_each_resolver_once(self):
-        topology = ".github/workflow-topology.gen.yml"
-        with tempfile.TemporaryDirectory() as tmp:
-            origin, work = self.repo(Path(tmp), {"pnpm-lock.yaml": "pr\n", topology: "pr\n"},
-                                     main_changes={"pnpm-lock.yaml": "main\n", topology: "main\n"})
-            ok, calls = self.run_resolve(work)
-            self.assertTrue(ok)
-            self.assertEqual(calls.count(["pnpm", "install", "--lockfile-only", "--ignore-scripts"]), 1)
-            self.assertEqual(calls.count(["pnpm", "ci:topology:write"]), 1)
-
-    def test_cleanly_merged_generated_file_is_also_regenerated(self):
-        topology = ".github/workflow-topology.gen.yml"
-        with tempfile.TemporaryDirectory() as tmp:
-            origin, work = self.repo(Path(tmp), {"pnpm-lock.yaml": "pr\n"},
-                                     main_changes={"pnpm-lock.yaml": "main\n", topology: "main topology\n"})
-            ok, calls = self.run_resolve(work)
-            self.assertTrue(ok)
-            self.assertEqual(calls.count(["pnpm", "ci:topology:write"]), 1)
-            self.assertEqual(self.git("show", f"devin/jov-1-20260927:{topology}", cwd=origin), "regenerated")
-
-    def test_a_source_conflict_is_left_to_the_agent_untouched(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            origin, work = self.repo(Path(tmp), {"pnpm-lock.yaml": "pr\n", "a.ts": "pr\n"})
-            before = self.git("rev-parse", "devin/jov-1-20260927", cwd=origin)
-            ok, calls = self.run_resolve(work)
-            self.assertFalse(ok)
-            self.assertNotIn(["pnpm", "install", "--lockfile-only", "--ignore-scripts"], calls)
-            self.assertFalse((work / ".git" / "MERGE_HEAD").exists(), "merge aborted")
-            self.assertEqual(self.git("rev-parse", "devin/jov-1-20260927", cwd=origin), before)
-
-    def test_failed_generated_restore_or_generator_stops_before_staging(self):
-        for failure in ("checkout", "generator"):
-            calls = []
-            def shell(args, **kwargs):
-                calls.append(args)
-                failed = (failure == "checkout" and args[:2] == ["git", "checkout"]
-                          or failure == "generator" and args[0] == "pnpm")
-                return SimpleNamespace(returncode=int(failed), stdout="", stderr="")
-            with self.subTest(failure=failure), patch.object(lane, "sh", side_effect=shell):
-                self.assertFalse(lane.regenerate_merged_generated(
-                    Path("/not-used"), [".github/workflow-topology.gen.yml"], None))
-            self.assertFalse(any(cmd[:2] == ["git", "add"] for cmd in calls))
 
 
 class GateOutcomeTest(unittest.TestCase):
@@ -17831,3 +17653,13 @@ class FixNowTest(unittest.TestCase):
             lane.post_claim(22868, "a" * 40, "fix")
         self.assertNotIn("red_at=", calls[0][-1])
         self.assertFalse((self.state / "runs/red-dispatch.jsonl").exists())
+
+
+from test_cloud_lane_cases.__tests__.cloud_lane_runner_cases import CloudLaneGateMixin
+
+
+class CloudLaneGateTest(CloudLaneGateMixin, unittest.TestCase):
+    runner = lane
+    linear_fixture = FakeLinear
+    issue_fixture = staticmethod(issue)
+    proof_fixture = staticmethod(gate_proof)

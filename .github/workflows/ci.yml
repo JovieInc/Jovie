@@ -174,7 +174,7 @@ jobs:
             --volume "$PWD:/repo:ro" \
             "$IMAGE_TAG" -lc '
               set -euo pipefail
-              test "$(node --version)" = v24.22.2
+              test "$(node --version)" = v24.22.3
               test "$(cd / && COREPACK_ENABLE_NETWORK=0 pnpm --version)" = 9.15.9
 
               dependency_status=$(JOVIE_RUNNER_REPO_ROOT=/repo \
@@ -315,7 +315,7 @@ jobs:
           assert_line 'pnpm store path' 'pnpm_store_path=/opt/jovie-pnpm-store' "$dependency_status"
           assert_line 'Playwright warm status' 'playwright_warm=true' "$playwright_status"
           assert_line 'Playwright browser path' 'playwright_browsers_path=/opt/ms-playwright' "$playwright_status"
-          assert_equal 'Node version' v24.22.2 "$(node --version)"
+          assert_equal 'Node version' v24.22.3 "$(node --version)"
           assert_equal 'pnpm version' 9.15.9 "$(pnpm --version)"
           assert_equal 'PLAYWRIGHT_BROWSERS_PATH' /opt/ms-playwright "$PLAYWRIGHT_BROWSERS_PATH"
           assert_executable 'Chromium' /opt/ms-playwright/chromium-1223/chrome-linux64/chrome
@@ -944,7 +944,7 @@ jobs:
             echo "run_public_lighthouse=false" >> "$GITHUB_OUTPUT"
           fi
 
-          DASHBOARD_LIGHTHOUSE_PATTERN='^(\.github/workflows/ci\.yml|apps/web/(\.lighthouserc\.(dashboard|chat|onboarding)\.pr\.json|scripts/lighthouse-dashboard-auth\.cjs))$'
+          DASHBOARD_LIGHTHOUSE_PATTERN='^(\.github/(workflows/ci\.yml|scripts/lighthouse-.*)|apps/web/(\.lighthouserc\.(dashboard|chat|onboarding)\.pr\.json|scripts/lighthouse-.*))$'
           dash_lh=false
           if [[ "$RUN_BUILD" == "true" || "$RUN_TEST" == "true" ]] || echo "$CHANGED_FILES" | grep -q -E "$DASHBOARD_LIGHTHOUSE_PATTERN"; then dash_lh=true; fi
           echo "run_dashboard_lighthouse=$dash_lh" >> "$GITHUB_OUTPUT"
@@ -2228,6 +2228,18 @@ jobs:
             mv "$BASE_FETCH_DIR/status.tmp" "$BASE_FETCH_DIR/status"
           ) < /dev/null > "$BASE_FETCH_DIR/fetch.log" 2>&1 &
           echo "Base-branch history fetch started in the background (pid $!)."
+      # Pinned actionlint downloads (source, patch, shellcheck, pyflakes) from the
+      # cache main writes in tsc-cache-warm.yml. Warm: none of them is fetched, so
+      # a GitHub release outage cannot fail this step (29 merge groups on
+      # 2026-11-08 and 2026-11-10). Read-only here; every entry is re-verified
+      # against its sha256 pin before use, so an older key is safe to restore.
+      - name: Restore pinned actionlint downloads
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: /tmp/jovie-pinned-downloads
+          key: pinned-downloads-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('.github/scripts/run-actionlint.sh') }}
+          restore-keys: |
+            pinned-downloads-${{ runner.os }}-${{ runner.arch }}-
       - uses: ./.github/actions/setup-node-pnpm
         with:
           reuse_merge_group_workspace: 'true'
@@ -2247,6 +2259,7 @@ jobs:
         env:
           # Read-only token for the release-download fallback.
           RELEASE_DOWNLOAD_TOKEN: ${{ github.token }}
+          PINNED_DOWNLOAD_CACHE_DIR: /tmp/jovie-pinned-downloads
         run: bash .github/scripts/run-actionlint.sh
       - name: Fetch base-branch history
         # Await the background fetch. Fails closed on a non-zero fetch exit,
@@ -3803,7 +3816,10 @@ jobs:
     strategy:
       fail-fast: true
       matrix:
-        shard: [1, 2, 3]
+        # JOV-12094: the unchanged component gate used to run three times,
+        # serially before each browser shard (up to 300s each). Keep it in
+        # this required matrix, once and alongside the full browser suite.
+        shard: ${{ fromJSON(github.event_name == 'merge_group' && '[1, 2, 3, "certification"]' || '[1, 2, 3]') }}
     env: { PLAYWRIGHT_ARTIFACT_REQUIRE_PRODUCER_STAGE: 'true' }
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -3863,7 +3879,10 @@ jobs:
               exit 1
             }
             if curl -sf http://localhost:6006/iframe.html >/dev/null 2>&1; then
-              node "$GITHUB_WORKSPACE/scripts/component-merge-group-storybook-cert.mjs"
+              if [[ "$STORYBOOK_SHARD" == 'certification' ]]; then
+                node "$GITHUB_WORKSPACE/scripts/component-merge-group-storybook-cert.mjs"
+                exit 0
+              fi
               node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs" --run -- \
                 pnpm exec playwright test \
                   tests/e2e/storybook-agent-status.spec.ts \
@@ -3888,7 +3907,7 @@ jobs:
                   tests/e2e/storybook-dsp-details.spec.ts \
                   tests/e2e/storybook-smart-link-reachability.spec.ts \
                   --config=playwright.config.storybook.ts --project=chromium --reporter=line \
-                  --workers=2 --shard="$STORYBOOK_SHARD"
+                  --workers=2 --shard="$STORYBOOK_SHARD/3"
               exit 0
             fi
             sleep 2
@@ -3897,7 +3916,7 @@ jobs:
           exit 1
         env:
           STORYBOOK_BASE_URL: http://localhost:6006
-          STORYBOOK_SHARD: ${{ matrix.shard }}/3
+          STORYBOOK_SHARD: ${{ matrix.shard }}
           MERGE_GROUP_DIFF_BASE_SHA: ${{ needs.ci-path-changes.outputs.path_diff_base_sha }}
           CI: true
           JOVIE_STORYBOOK_MANUAL_AXE: '1'
@@ -4947,8 +4966,51 @@ jobs:
           GIT_BRANCH: pr-${{ github.event.pull_request.number }}
           ALLOW_PROD_MIGRATIONS: 'true'
 
-      - name: Download build artifact
+      # Same read-only Turbopack compiler cache Build + Layout restores (writer:
+      # next-build-cache-warm.yml; keep the key scheme identical). This job
+      # now compiles twice, base then head, and head reuses base's state.
+      - name: Resolve Next build cache hour (Lighthouse)
+        id: next-build-cache-hour
         if: steps.check_changes.outputs.run_full_ci == 'true'
+        run: echo "hour=$(date -u +%Y%m%d%H)" >> "$GITHUB_OUTPUT"
+      - name: Restore Next build cache for Lighthouse (read-only)
+        if: steps.check_changes.outputs.run_full_ci == 'true'
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: apps/web/.next/cache/turbopack
+          key: ${{ runner.os }}-next-build-web-v1-${{ hashFiles('pnpm-lock.yaml', 'apps/web/package.json', 'apps/web/next.config.js') }}-${{ steps.next-build-cache-hour.outputs.hour }}
+          restore-keys: |
+            ${{ runner.os }}-next-build-web-v1-${{ hashFiles('pnpm-lock.yaml', 'apps/web/package.json', 'apps/web/next.config.js') }}-
+            ${{ runner.os }}-next-build-web-v1-
+
+      # Timing budgets are judged against the commit this change lands on,
+      # built and measured in this job on this runner, so a busy runner slows
+      # both sides instead of failing the change. No baseline (no base commit,
+      # changed dependencies, failed base build) is not a failure: the script
+      # exits 0 with built=false and the gate then enforces every configured
+      # budget as it is.
+      - name: Build base commit for relative Lighthouse budgets
+        id: lighthouse-baseline
+        if: steps.check_changes.outputs.run_full_ci == 'true'
+        run: bash .github/scripts/lighthouse-build-baseline.sh build
+        env:
+          BASE_SHA: ${{ github.event.merge_group.base_sha }}
+          BASELINE_DIR: ${{ runner.temp }}/lighthouse-baseline
+          NEXT_IGNORE_ESLINT: '1'
+          NEXT_IGNORE_TYPECHECK: '1'
+          NEXT_PRIVATE_SKIP_SIZE_CHECK: 'true'
+          SKIP_SKILLS_CATALOG_SYNC: '1'
+
+      # Blocking: everything after this must run on the exact head tree. The
+      # build step left a copy of the script in RUNNER_TEMP, because the
+      # workspace may be on a base commit that does not have it.
+      - name: Restore workspace to the exact head
+        if: steps.check_changes.outputs.run_full_ci == 'true'
+        run: bash "$RUNNER_TEMP/lighthouse-build-baseline.sh" restore
+
+      # With a baseline head is built below, so the artifact is not fetched.
+      - name: Download build artifact
+        if: steps.check_changes.outputs.run_full_ci == 'true' && steps.lighthouse-baseline.outputs.built != 'true'
         id: download-build
         continue-on-error: true
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
@@ -4957,11 +5019,13 @@ jobs:
           path: ${{ runner.temp }}/nextjs-build-download
 
       - name: Extract build artifact
-        if: steps.check_changes.outputs.run_full_ci == 'true' && steps.download-build.outcome == 'success'
+        if: steps.check_changes.outputs.run_full_ci == 'true' && steps.download-build.outcome == 'success' && steps.lighthouse-baseline.outputs.built != 'true'
         run: tar -xf "$RUNNER_TEMP/nextjs-build-download/nextjs-build.tar" -C apps/web
 
+      # With a baseline, head is always built here: same command and env as
+      # the base build, so the two differ only by the change.
       - name: Build app fallback for dashboard Lighthouse
-        if: steps.check_changes.outputs.run_full_ci == 'true' && steps.download-build.outcome != 'success'
+        if: steps.check_changes.outputs.run_full_ci == 'true' && (steps.download-build.outcome != 'success' || steps.lighthouse-baseline.outputs.built == 'true')
         run: pnpm --filter=@jovie/web run build
         env:
           NEXT_IGNORE_ESLINT: '1'
@@ -4969,7 +5033,7 @@ jobs:
           NEXT_PRIVATE_SKIP_SIZE_CHECK: 'true'
           SKIP_SKILLS_CATALOG_SYNC: '1'
 
-      - name: Run signed-in shell navigation and dashboard Lighthouse
+      - name: Run signed-in shell navigation
         if: steps.check_changes.outputs.run_full_ci == 'true'
         run: |
           cd apps/web
@@ -5018,17 +5082,6 @@ jobs:
             tests/e2e/releases-first-paint-visual.spec.ts \
             --config=playwright.config.noauth.ts --project=chromium --reporter=line
 
-          # Chat and onboarding Lighthouse reuse this signed-in server. Their
-          # own jobs need an identity secret and skip green without it, so
-          # these runs are what hold the pages to their budgets. Onboarding
-          # needs the creator persona, which has not finished onboarding.
-          # Every page runs so one miss still prints the others; any miss
-          # fails the step.
-          lh_failed=0
-          pnpm run test:lighthouse:dashboard:pr || lh_failed=1
-          pnpm run test:lighthouse:chat:pr || lh_failed=1
-          LIGHTHOUSE_TEST_PERSONA=creator pnpm run test:lighthouse:onboarding:pr || lh_failed=1
-          exit "$lh_failed"
         env:
           CI: true
           BASE_URL: http://localhost:3000
@@ -5041,6 +5094,36 @@ jobs:
           FLAGS_SECRET: ${{ secrets.FLAGS_SECRET }}
           E2E_SKIP_SEED: '1'
           E2E_SKIP_WARMUP: '1'
+
+      # Its own step, so a budget miss is not reported as a navigation
+      # failure or the other way round. Dashboard, chat and onboarding are
+      # measured here: chat's and onboarding's own jobs need an identity
+      # secret and skip green without it. The gate starts the head server,
+      # measures every page, then measures the base build on the same port
+      # and database. Timing audits fail on a regression against base beyond
+      # runner noise or past a ceiling derived from the configured budget;
+      # accessibility, best practices and layout shift keep their configured
+      # budgets. Rules: apps/web/scripts/lighthouse-relative-budget.mjs.
+      # Every page runs so one miss still prints the others.
+      - name: Run signed-in Lighthouse budgets
+        if: steps.check_changes.outputs.run_full_ci == 'true'
+        run: |
+          export E2E_USE_TEST_AUTH_BYPASS=1
+          export NEXT_PUBLIC_AUTH_MOCK=1
+          export NEXT_PUBLIC_AUTH_PROXY_DISABLED=1
+
+          node apps/web/scripts/lighthouse-relative-gate.mjs
+        env:
+          CI: true
+          BASE_URL: http://localhost:3000
+          DATABASE_URL: ${{ env.DATABASE_URL }}
+          URL_ENCRYPTION_KEY: lighthouse-dashboard-ci-url-encryption-key
+          AI_GATEWAY_API_KEY: lighthouse-dashboard-ci
+          FLAGS_SECRET: ${{ secrets.FLAGS_SECRET }}
+          E2E_SKIP_SEED: '1'
+          E2E_SKIP_WARMUP: '1'
+          LIGHTHOUSE_BASELINE_SERVER: ${{ steps.lighthouse-baseline.outputs.server }}
+          LIGHTHOUSE_BASELINE_SHA: ${{ steps.lighthouse-baseline.outputs.sha }}
 
       - name: Upload shell navigation failure evidence
         if: ${{ failure() && steps.check_changes.outputs.run_full_ci == 'true' && hashFiles('apps/web/test-results/**') != '' }}
@@ -5070,6 +5153,7 @@ jobs:
             apps/web/.lighthouseci/dashboard-pr/
             apps/web/.lighthouseci/chat-pr/
             apps/web/.lighthouseci/onboarding-pr/
+            apps/web/.lighthouseci/relative/
           if-no-files-found: ignore
           retention-days: 3
 

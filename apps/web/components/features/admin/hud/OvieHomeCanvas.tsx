@@ -459,6 +459,7 @@ export function OvieHomeCanvas({ chat }: Readonly<OvieHomeCanvasProps>) {
       constraint={constraint}
       constraintStatus={revenueRead ? 'ready' : undefined}
       pulse={home?.pulse ?? []}
+      reservePulseSourceCaption
       asks={asks}
       rows={home?.rows ?? []}
       done={home?.done ?? []}

@@ -62,6 +62,8 @@ export function ChatFileChips({ files, onRemove }: ChatFileChipsProps) {
                 <img
                   src={f.previewUrl}
                   alt={f.name}
+                  width={24}
+                  height={24}
                   className='h-full w-full object-cover'
                 />
               ) : (

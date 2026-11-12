@@ -27,3 +27,17 @@ export const Default: Story = {};
 export const ComposerSkeleton: Story = {
   render: () => <ChatConversationComposerSkeleton />,
 };
+
+/** The conversation is loading: one user pill and one assistant reply. */
+export const LoadingMessages: Story = {};
+
+/** In a right-to-left thread the user pill sits on the inline end. */
+export const RtlMessages: Story = {
+  decorators: [
+    Story => (
+      <div dir='rtl' lang='ar'>
+        <Story />
+      </div>
+    ),
+  ],
+};
