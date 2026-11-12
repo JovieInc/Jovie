@@ -46,3 +46,18 @@ export const Idle: Story = {
     status: 'idle',
   },
 };
+
+/** The ring keeps its clockwise sweep in a right-to-left layout. */
+export const Rtl: Story = {
+  args: {
+    progress: 70,
+    status: 'uploading',
+  },
+  decorators: [
+    Story => (
+      <div dir='rtl' lang='ar'>
+        <Story />
+      </div>
+    ),
+  ],
+};

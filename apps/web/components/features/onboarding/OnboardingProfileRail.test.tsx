@@ -7,9 +7,11 @@ import {
   emptyOnboardingProfileDraft,
   onboardingRoleSchema,
 } from '@/lib/onboarding/profile-draft';
+import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import { OnboardingProfileRail } from './OnboardingProfileRail';
 import { deriveProfileBuilderState } from './onboardingChatHelpers';
 import {
+  EMPTY_ONBOARDING_PROFILE_BUILDER_STATE,
   type OnboardingProfileBuilderState,
   resolvePreviewArtist,
 } from './onboardingProfileRailState';
@@ -254,9 +256,9 @@ describe('OnboardingProfileRail', () => {
   it('keeps the side-rail badge readable over light imagery (AA)', () => {
     render(<OnboardingProfileRail placement='side' state={CONFIRMED_STATE} />);
 
-    const badge = document.querySelector('[class*="bg-black/60"]');
+    const badge = document.querySelector('[class*="bg-ink-on-media/60"]');
     expect(badge).not.toBeNull();
-    expect(badge?.className).not.toContain('bg-black/50');
+    expect(badge?.className).not.toContain('bg-ink-on-media/50');
   });
 
   // JOV-12045: the side rail hands its height down as a definite chain and
@@ -431,4 +433,21 @@ describe('OnboardingProfileRail keyboard scrolling (JOV-7973)', () => {
     await user.type(rail, '{ArrowDown}');
     expect(scrollTo).not.toHaveBeenCalled();
   });
+});
+
+describe('OnboardingProfileRail accessibility', () => {
+  it.each([
+    ['empty', EMPTY_ONBOARDING_PROFILE_BUILDER_STATE],
+    ['a confirmed artist', CONFIRMED_STATE],
+  ] as const)(
+    'has no accessibility violations when %s',
+    async (_name, state) => {
+      const { container } = render(
+        <div dir='rtl' lang='ar'>
+          <OnboardingProfileRail state={state} placement='inline' />
+        </div>
+      );
+      await expectNoA11yViolations(container);
+    }
+  );
 });

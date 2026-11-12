@@ -16,7 +16,7 @@
 import { track } from '@/lib/analytics';
 import { DEMO_PROFILE_ID } from '@/lib/demo-personas';
 import { publicEnv } from '@/lib/env-public';
-import { getConsentState } from '@/lib/tracking/consent';
+import { getConsentState, isAnalyticsAllowed } from '@/lib/tracking/consent';
 import { postJsonBeacon } from '@/lib/tracking/json-beacon';
 import {
   buildPacVariantId,
@@ -118,6 +118,7 @@ export function trackPacClientEvent(
   // pollute production analytics with a fake profile (JOV-4932).
   if (context.profileId === DEMO_PROFILE_ID) return null;
 
+  const consentState = getConsentState();
   const payload: PacEventPayload = {
     event,
     jv_aid: null,
@@ -125,7 +126,11 @@ export function trackPacClientEvent(
     pac_state: context.pacState,
     variant_id: context.variantId,
     session_id: getPacSessionId(),
-    consent: getConsentState(),
+    consent: isAnalyticsAllowed()
+      ? 'accepted'
+      : consentState === 'gpc-opted-out'
+        ? 'gpc-opted-out'
+        : 'rejected',
     ts: Date.now(),
     ...(extras ? { extras } : {}),
   };

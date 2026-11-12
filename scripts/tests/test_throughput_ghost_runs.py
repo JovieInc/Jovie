@@ -54,6 +54,25 @@ class GhostQueuedRunsTest(unittest.TestCase):
         self.assertEqual(len(queued), 2)
         self.assertTrue(all("created=%3E%3D" in path for path in queued))
 
+    def test_queued_window_is_two_hours_so_same_day_ghosts_release_the_brake(self):
+        """2026-11-12: 134 runs created 2026-11-11 20:19-20:52Z sat "queued" with no jobs and refused
+        cancellation (409 "not been queued yet"). Inside the old 24h window they held every lane's
+        intake at 0 (ci-runner-backlog) for 14 hours. A real backlog's oldest run is minutes old."""
+        calls = []
+
+        def run(args, **kwargs):
+            calls.append(args[-1])
+            if "status=queued" in args[-1]:
+                return SimpleNamespace(returncode=0, stderr="", stdout=json.dumps({"total_count": 0}))
+            return SimpleNamespace(returncode=0, stderr="", stdout=json.dumps({"workflow_runs": []}))
+
+        with tempfile.TemporaryDirectory() as raw:
+            signal, error = ts.sample_release_flow(Path(raw), NOW, run)
+        self.assertIsNone(error)
+        window = iso(NOW - 2 * 3600)
+        queued = [path for path in calls if "status=queued" in path]
+        self.assertTrue(queued and all(f"created=%3E%3D{window}" in path for path in queued))
+
 
 if __name__ == "__main__":
     unittest.main()

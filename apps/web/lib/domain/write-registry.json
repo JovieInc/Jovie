@@ -50,7 +50,7 @@
       "id": "release.create",
       "entity": "release",
       "module": "apps/web/lib/domain/releases.ts",
-      "exports": ["createReleaseForProfile"],
+      "exports": ["createReleaseForProfile", "renameReleaseSlug"],
       "tables": ["discogReleases"]
     },
     {
@@ -169,6 +169,20 @@
       "tables": ["users"]
     },
     {
+      "id": "account.founder-welcome-marker",
+      "entity": "account",
+      "module": "apps/web/lib/founder-welcome/marker.server.ts",
+      "exports": ["markFounderWelcomeSent"],
+      "tables": ["users"]
+    },
+    {
+      "id": "account.dogfood-tmp-cleanup",
+      "entity": "account",
+      "module": "apps/web/lib/accounts/dogfood-tmp-cleanup.ts",
+      "exports": ["runDogfoodTmpCleanup"],
+      "tables": ["users", "creatorProfiles"]
+    },
+    {
       "id": "merch.cards",
       "entity": "merch",
       "module": "apps/web/lib/merch/service.ts",
@@ -242,6 +256,13 @@
       "kind": "domain",
       "domain": "feedback.submit"
     },
+    "chat:useSkill": {
+      "kind": "read"
+    },
+    "chat:requestCapability": {
+      "kind": "domain",
+      "domain": "feedback.submit"
+    },
     "chat:showAccountStatus": {
       "kind": "read"
     },
@@ -267,22 +288,13 @@
     "chat:checkCanvasStatus": {
       "kind": "read"
     },
-    "chat:suggestRelatedArtists": {
-      "kind": "read"
-    },
     "chat:writeWorldClassBio": {
-      "kind": "generate"
-    },
-    "chat:generateCanvasPlan": {
       "kind": "generate"
     },
     "chat:generateAlbumArt": {
       "kind": "generate"
     },
     "chat:retouchImage": {
-      "kind": "generate"
-    },
-    "chat:createPromoStrategy": {
       "kind": "generate"
     },
     "chat:voicePromo": {

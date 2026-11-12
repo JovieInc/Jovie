@@ -65,6 +65,7 @@ export function SidebarDock({
 }: SidebarDockProps) {
   const regionRef = useRef<HTMLElement>(null);
   const positions = useRef(new Map<string, number>());
+  const measuredStack = useRef<string | null>(null);
   const reducedMotion = useReducedMotion();
   const [seen, setSeen] = useState<{ key: string; id: string | null } | null>(
     null
@@ -154,9 +155,16 @@ export function SidebarDock({
 
   // FLIP only the cards' paint positions. Footer geometry resolves locally;
   // the flex-1 nav retains its top edge and scroll position. Tokens own timing.
+  // Measuring forces a layout, so it runs only when the card stack changes.
   useLayoutEffect(() => {
     const region = regionRef.current;
     if (!region) return;
+    const stack = `${compactUpdate}|${Array.from(
+      region.querySelectorAll<HTMLElement>('[data-dock-card]'),
+      card => card.dataset.dockCard
+    ).join()}`;
+    if (stack === measuredStack.current) return;
+    measuredStack.current = stack;
     const style = getComputedStyle(region);
     const duration = style.getPropertyValue('--duration-normal').trim();
     const milliseconds =

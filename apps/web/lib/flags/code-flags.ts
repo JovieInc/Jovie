@@ -30,6 +30,14 @@ export const CODE_FLAGS = {
   // the 30-day nudge and reopens 50k+ claims past it as proof-only requests.
   CLAIM_LEGACY_PROOF_SWEEP: false,
   CYAN_FOCUS_GLOW: true,
+  // Homepage hero primary action enters the one onboarding flow at /start
+  // (public signup reopened 2026-11-09, canon/PRODUCT.md). Default off: the
+  // hero keeps "Request an invite" until Tim approves the copy by
+  // screenshot. FEATURE_HOMEPAGE_START_CTA=true swaps the hero action to the
+  // shared claim-profile CTA intent and drops the invite note under it. No
+  // effect while PUBLIC_SIGNUP_CLOSED is on. The homepage is static, so the
+  // flip needs a redeploy.
+  HOMEPAGE_START_CTA: false,
   // Fundraising YC section order. Default off until Tim approves the
   // narrative in Pen. FEATURE_INVESTOR_PORTAL_YC_DECK=true reorders the
   // existing brief sentences and shows only sourced traction stats.
@@ -65,13 +73,18 @@ export const CODE_FLAGS = {
   // registration limited to the shared MCP redirect allowlist. The founder
   // Ovie issuer advertises /api/ovie/oauth/register on its own.
   OVIE_MCP_DYNAMIC_CLIENT_REGISTRATION: false,
-  // Closed public signup (Tim, 2026-11-02). Closed by default. With
-  // FEATURE_PUBLIC_SIGNUP_CLOSED=true, /signup and anonymous /start send
-  // visitors to the /waitlist role form (Turnstile-gated, no account). Sign-in
-  // and waitlist invite links still create accounts and enter /start.
-  // Reopen criteria: the golden path is certified AND the first paying
-  // artists are live. Decision: canon/PRODUCT.md (2026-11-02).
-  PUBLIC_SIGNUP_CLOSED: true,
+  // Sean Ellis PMF survey card on the dashboard home for admitted, activated
+  // creators. Default off. FEATURE_PMF_SURVEY_PROMPT=true shows the in-app
+  // card; answers are stored for the admin metric. No outbound of any kind.
+  PMF_SURVEY_PROMPT: false,
+  // Public signup is OPEN (Tim, 2026-11-09 11:01 PM PT), superseding the
+  // 2026-11-02 invite-only closure. /signup and anonymous /start render the
+  // sign-up surfaces directly; the homepage waitlist role form keeps saving
+  // entries via /api/waitlist/join either way. Kill switch: set
+  // FEATURE_PUBLIC_SIGNUP_CLOSED=true in Vercel production env and redeploy
+  // (or revert the reopen PR) to send those visitors back to the /waitlist
+  // role form. Decision: canon/PRODUCT.md (2026-11-09).
+  PUBLIC_SIGNUP_CLOSED: false,
   // Social-network HTML must not be fetched from Jovie server IPs. Default
   // off. FEATURE_SOCIAL_HTML_ISOLATED_PROVIDER=true is reserved for a future
   // isolated provider and still fails closed until that provider exists.
