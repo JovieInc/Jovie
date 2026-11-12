@@ -96,4 +96,22 @@ describe('RightDrawer', () => {
     expect(second.inert).toBe(true);
     await expectNoA11yViolations(first);
   });
+
+  it('leaves the last rail active when two open rails become mobile together', async () => {
+    // Both rails are open on desktop, then the viewport drops below lg in one
+    // render. Both start presenting in the same commit and announce
+    // themselves; the later announcement must win instead of each rail
+    // superseding the other and both going inert.
+    const view = render(<Rails firstOpen secondOpen />);
+    mockUseBreakpointDown.mockReturnValue(true);
+    view.rerender(<Rails firstOpen secondOpen />);
+
+    const first = screen.getByLabelText('First rail');
+    const second = screen.getByLabelText('Second rail');
+    await waitFor(() => expect(second).toHaveAttribute('aria-modal', 'true'));
+    expect(second.inert).toBeFalsy();
+    expect(first).toHaveAttribute('aria-hidden', 'true');
+    expect(first.inert).toBe(true);
+    await expectNoA11yViolations(second);
+  });
 });

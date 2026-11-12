@@ -69,9 +69,11 @@ function useActiveMobileDrawer(
   useEffect(() => {
     const handleDrawerOpen = (event: Event) => {
       const openedDrawerId = (event as CustomEvent<string>).detail;
-      if (openedDrawerId !== drawerId) {
-        setSupersededById(openedDrawerId);
-      }
+      // A rail also hears its own open event, which clears any superseding
+      // it picked up earlier in the same commit. When two rails open
+      // together the last one to dispatch wins, as before, instead of each
+      // superseding the other and both going inert.
+      setSupersededById(openedDrawerId === drawerId ? null : openedDrawerId);
     };
 
     document.addEventListener('jovie:right-drawer-open', handleDrawerOpen);
