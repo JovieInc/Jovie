@@ -67,11 +67,26 @@ describe('shared Presence status vocabulary', () => {
             sortPriority: 1,
           }}
         />
+        <PresenceStatusBadge
+          status={{
+            label: 'Disconnected',
+            tone: 'error',
+            needsAttention: true,
+            nextAction: 'Reconnect this source.',
+            sortPriority: 2,
+          }}
+        />
       </TooltipProvider>
     );
 
-    expect(screen.getByText('Connected')).toHaveClass('text-success-text');
-    expect(screen.getByText('Connected')).not.toHaveClass('text-success');
+    // The tone sits on the badge, beside the icon. The label is an inner span
+    // that only carries layout classes, same as the warning assertion above.
+    const connected = screen.getByText('Connected').parentElement;
+    expect(connected).toHaveClass('text-success-text');
+    expect(connected).not.toHaveClass('text-success');
+    const disconnected = screen.getByText('Disconnected').parentElement;
+    expect(disconnected).toHaveClass('text-error-text');
+    expect(disconnected).not.toHaveClass('text-error');
   });
 
   it('does not invent evidence for an empty signal list', () => {
