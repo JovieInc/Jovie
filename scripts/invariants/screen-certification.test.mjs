@@ -4223,7 +4223,6 @@ if (p.endsWith('/zip')) {
     const screen = SCREEN_REGISTRY.find(
       entry => entry.id === 'web.profile-mode-render'
     );
-
     assert.deepEqual(screen, {
       id: 'web.profile-mode-render',
       platform: 'web',
