@@ -668,6 +668,12 @@ const DEFECT_HOLD_CLASSES = new Set(['deterministic-source', 'unclassified']);
  * When the exact head turned required-green: the latest success among each
  * required name's check runs (completed_at) and commit statuses (created_at).
  * Null when any required name has no success yet.
+ *
+ * JOV-8788: run 43163802915 reported green-enqueue-checks-unreadable while
+ * its own budget sampler showed the shared-github-token REST budget at
+ * 0/5000. A denied or exhausted Actions token must not flip the observation
+ * unknown, so these reads retry once unauthenticated, like the run-list
+ * observers (JOV-11677); a public read that also fails keeps it red.
  */
 async function requiredGreenAt(
   repo,
@@ -675,16 +681,13 @@ async function requiredGreenAt(
   checks,
   { fetchImpl, token, apiUrl }
 ) {
-  const headers = githubHeaders(token);
-  const runs = await readJson(
-    fetchImpl,
+  const runs = await readGithubJson(
     `${apiUrl}/repos/${repo}/commits/${sha}/check-runs?filter=latest&per_page=100`,
-    headers
+    { fetchImpl, token }
   );
-  const statuses = await readJson(
-    fetchImpl,
+  const statuses = await readGithubJson(
     `${apiUrl}/repos/${repo}/commits/${sha}/status?per_page=100`,
-    headers
+    { fetchImpl, token }
   );
   if (!runs.ok || !statuses.ok) return { ok: false };
   let greenAt = -Infinity;
