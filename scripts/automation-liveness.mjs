@@ -39,6 +39,11 @@ import {
   runStageEvents,
   validateRegistry,
 } from './lib/automation-registry.mjs';
+import {
+  githubHeaders,
+  readGithubJson,
+  readJson,
+} from './lib/github-json-read.mjs';
 import { projectJsonHeartbeat } from './lib/json-heartbeat-receipt.mjs';
 import * as redGate from './lib/red-monitor-owner-gate.mjs';
 
@@ -47,54 +52,6 @@ const TIMEOUT_MS = 10_000;
 const SHA_RE = /^[0-9a-f]{40}$/;
 // Overridable per observer for tests; one literal for the external-api guard.
 const GITHUB_API = 'https://api.github.com';
-
-async function readJson(fetchImpl, url, headers = {}) {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
-  try {
-    const response = await fetchImpl(url, {
-      headers: {
-        Accept: 'application/json',
-        'Cache-Control': 'no-cache',
-        ...headers,
-      },
-      signal: controller.signal,
-    });
-    if (response.status !== 200)
-      return { ok: false, reason: `http-${response.status}` };
-    return { ok: true, body: await response.json() };
-  } catch (error) {
-    return {
-      ok: false,
-      reason: error?.name === 'AbortError' ? 'timeout' : 'transport',
-    };
-  } finally {
-    clearTimeout(timer);
-  }
-}
-
-function githubHeaders(token) {
-  return token
-    ? { Authorization: `Bearer ${token}`, 'X-GitHub-Api-Version': '2022-11-28' }
-    : {};
-}
-
-/**
- * Run-list read for the workflow observers. The Actions token is the cheap
- * read, but it draws on the shared installation REST budget that runs dry
- * under load: automation-liveness run 43150125408 answered `github-http-403`
- * for a golden-path-nightly run list whose workflow was green, filing a false
- * P0 (JOV-11677). Jovie is public, so on a 403 retry the same URL once
- * without the token — the recovery readUnshippedRange already uses — so a
- * denied or exhausted credential cannot hide a readable run list. Any other
- * failure, or a public read that also fails, keeps the original failure so
- * silence stays red.
- */
-async function readGithubJson(url, { fetchImpl, token }) {
-  const read = await readJson(fetchImpl, url, githubHeaders(token));
-  if (read.ok || !token || read.reason !== 'http-403') return read;
-  return readJson(fetchImpl, url, {});
-}
 
 /**
  * Controller failure streak: healthy unless the newest `receipt.streak` (default 3) conclusive runs (success or
