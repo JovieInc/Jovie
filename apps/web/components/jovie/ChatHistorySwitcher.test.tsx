@@ -91,6 +91,12 @@ describe('ChatHistorySwitcher', () => {
     expect(screen.getByTestId('chat-history-trigger')).toHaveTextContent(
       'New Chat'
     );
+
+    // An existing chat still waiting on its title matches its row in the list.
+    rerender(<ChatHistorySwitcher title='  ' activeConversationId='c2' />);
+    expect(screen.getByTestId('chat-history-trigger')).toHaveTextContent(
+      'Conversation'
+    );
   });
 
   it('does not fetch history until the title is hovered, focused or opened', async () => {

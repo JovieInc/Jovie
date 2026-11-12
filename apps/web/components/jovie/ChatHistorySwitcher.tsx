@@ -14,6 +14,7 @@ import {
   readThreadReadState,
   writeThreadReadState,
 } from '@/components/shell/SidebarThreadsSection';
+import { COPY_FALLBACKS } from '@/data/copyFallbacks';
 import { useChatConversationsQuery } from '@/lib/queries/useChatConversationsQuery';
 import {
   buildChatHistoryRows,
@@ -103,7 +104,11 @@ export function ChatHistorySwitcher({
     refetch,
   } = useChatConversationsQuery({ limit: 50, enabled: hasIntent || open });
 
-  const label = title?.trim() || NEW_CHAT_LABEL;
+  // An open chat whose title hasn't been generated yet uses the same name as
+  // its row in the list; only a chat that doesn't exist yet is "New Chat".
+  const label =
+    title?.trim() ||
+    (activeConversationId ? COPY_FALLBACKS.conversation : NEW_CHAT_LABEL);
   const showError = isError && !conversations;
 
   const handleOpenChange = useCallback((nextOpen: boolean) => {
