@@ -9,7 +9,7 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { dirname, join, resolve } from 'node:path';
+import { dirname, join, resolve, win32 } from 'node:path';
 import { runInNewContext } from 'node:vm';
 import { describe, expect, it } from 'vitest';
 import {
@@ -38,6 +38,20 @@ function sandbox() {
 }
 
 describe('vendored actions (JOV-8754)', () => {
+  it.each(['..\\outside', 'D:\\outside'])(
+    'rejects the Windows consumer escape %s before reading it',
+    file => {
+      expect(() =>
+        pinConsumerUpdates(
+          'C:\\repo',
+          { pinConsumers: [file] },
+          'a'.repeat(40),
+          win32
+        )
+      ).toThrow('inside the repository');
+    }
+  );
+
   it('synchronizes exact pin consumers and detects stale or missing consumers', () => {
     const root = sandbox();
     try {

@@ -30,7 +30,7 @@ import {
 } from 'node:fs';
 import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
-import { dirname, join, relative, resolve } from 'node:path';
+import path, { dirname, join, relative, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 export const VENDOR_ROOT = '.github/actions/vendor';
@@ -121,19 +121,23 @@ export function workflowPins(repoRoot) {
 }
 
 /** Prepare exact-SHA consumer updates before refresh mutates the vendored tree. */
-export function pinConsumerUpdates(repoRoot, action, sha) {
+export function pinConsumerUpdates(repoRoot, action, sha, paths = path) {
   return (action.pinConsumers ?? []).map(file => {
-    const path = resolve(repoRoot, file);
-    const scoped = relative(repoRoot, path);
-    if (scoped.startsWith('../') || scoped === '..' || scoped.startsWith('/'))
+    const consumer = paths.resolve(repoRoot, file);
+    const scoped = paths.relative(repoRoot, consumer);
+    if (
+      scoped === '..' ||
+      scoped.startsWith(`..${paths.sep}`) ||
+      paths.isAbsolute(scoped)
+    )
       throw new Error(`${file}: pin consumer must be inside the repository`);
-    const source = readFileSync(path, 'utf8');
+    const source = readFileSync(consumer, 'utf8');
     const prefix = `${action.repo}@`;
     const refs = source.split(prefix).slice(1);
     if (!refs.length || refs.some(ref => !ref.startsWith(action.sha)))
       throw new Error(`${file}: expected only ${prefix}${action.sha}`);
     return {
-      path,
+      path: consumer,
       source: source.replaceAll(`${prefix}${action.sha}`, `${prefix}${sha}`),
     };
   });
