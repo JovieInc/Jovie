@@ -56,7 +56,10 @@ describe('ReleaseTaskRow', () => {
     const user = userEvent.setup();
     const { container } = render(
       <ReleaseTaskRow
-        task={createTask({ status: 'done', completedAt: new Date() })}
+        task={createTask({
+          status: 'done',
+          completedAt: new Date('2026-06-02T00:00:00.000Z'),
+        })}
         onToggle={onToggle}
       />
     );
