@@ -255,8 +255,6 @@ function SubscribePanel({
       <ProfileStayCloseCard accent={accent}>
         <div className='-mx-4 -mb-4'>
           {!visitorAssignmentResolved ? (
-            // Both CTAs below mount the same inline flow here (the two-step
-            // one starts expanded), so one full-height placeholder fits both.
             <InlineNotificationsFlowSkeleton />
           ) : subscribeTwoStep ? (
             <TwoStepNotificationsCTA
