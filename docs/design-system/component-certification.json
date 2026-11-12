@@ -578,6 +578,9 @@
       "empty": "ReleasePage lists the fixed RELEASE_PAGE_SERVICES and CommandPaletteCard lists the fixed palette rows from data/homepageProductUi.ts; neither list is data-driven, so neither can be empty.",
       "partial": "ReleasePage and CommandPaletteCard take no props; Callout's optional side and className are placement and styling flags with defaults, and both palette row shapes (with and without a shortcut) render in CommandPalette, so nothing can be partially present."
     },
+    "apps/web/components/jovie/ChatHistorySwitcher.tsx": {
+      "offline": "ChatHistorySwitcher only reads the chat list through useChatConversationsQuery and never submits; lost connectivity reaches it as the failed load, which the ErrorLoadingHistory story shows with its Retry row."
+    },
     "apps/web/components/jovie/components/AssistantMessageText.tsx": {
       "offline": "AssistantMessageText makes no request and has no connectivity input: it parses the reply string it is given. The only thing it loads is the markdown chunk, and while that is pending the Suspense fallback shows the same text as plain prose (LoadingMarkdownChunk); a reply that never arrives is the chat transport's state, not this component's."
     },
@@ -1014,6 +1017,9 @@
     },
     "packages/ui/atoms/textarea.tsx": {
       "offline": "Textarea never fetches or submits; its only async signal is the pending validationState its owner passes in, so the owning form shows offline status."
+    },
+    "packages/ui/atoms/title-menu-trigger.tsx": {
+      "empty": "TitleMenuTrigger renders one title slot and a fixed chevron and takes no collection; the detector matched the items-center utility class. A blank title is the caller's to replace (ChatHistorySwitcher shows New Chat)."
     },
     "packages/ui/atoms/tooltip.tsx": {
       "empty": "TooltipContent only renders caller-supplied children and owns no data or collection; callers omit the Tooltip rather than open an empty one, and the detector matched the items-center utility class.",

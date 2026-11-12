@@ -716,7 +716,7 @@ describe('CommonDropdown', () => {
         <CommonDropdown items={basicItems} open={true} isLoading={true} />
       );
       const menu = screen.getByRole('menu');
-      expect(menu).toBeInTheDocument();
+      expect(menu).toHaveAttribute('data-motion', 'fade');
       expect(menu).toHaveAttribute('data-slot', 'common-dropdown-content');
       expect(menu).toHaveAttribute('aria-busy', 'true');
       expect(screen.getByRole('status')).toHaveTextContent(
