@@ -8,7 +8,7 @@ import { cn } from '@/lib/utils';
  * CopyToggleIcon — Copy ↔ Check icon swap for copy-to-clipboard buttons.
  *
  * Renders the lucide `Copy` icon when `copied === false`, and the
- * `CheckCircle2` icon (cyan-300) when `copied === true`. The swap morphs
+ * `CheckCircle2` icon (accent blue) when `copied === true`. The swap morphs
  * through the shared {@link AnimatedIconSwap} primitive (opacity + scale +
  * blur on an interruptible spring) instead of snapping.
  *
@@ -50,7 +50,7 @@ export function CopyToggleIcon({
     <AnimatedIconSwap activeKey={copied ? 'copied' : 'idle'}>
       {copied ? (
         <CheckCircle2
-          className={cn(sizing, 'text-cyan-300', className)}
+          className={cn(sizing, 'text-accent-blue', className)}
           strokeWidth={strokeWidth}
         />
       ) : (

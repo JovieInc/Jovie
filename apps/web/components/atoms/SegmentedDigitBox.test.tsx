@@ -34,3 +34,33 @@ describe('SegmentedDigitBox', () => {
     expect(box.className).not.toContain('border-error');
   });
 });
+
+describe('SegmentedDigitBox design tokens', () => {
+  it('takes its resting shadow from the profile pearl surface token', () => {
+    const { container } = render(<SegmentedDigitBox {...BASE_PROPS} />);
+
+    const box = container.firstElementChild as HTMLElement;
+    expect(box.className).toContain('shadow-(--profile-pearl-shadow)');
+    expect(box.className).not.toMatch(/rgba?\(/);
+  });
+
+  it('draws the focused ring from the canonical focus token', () => {
+    const { container } = render(
+      <SegmentedDigitBox {...BASE_PROPS} isFocused />
+    );
+
+    const box = container.firstElementChild as HTMLElement;
+    expect(box.className).toContain('ring-2');
+    expect(box.className).toContain('ring-focus/18');
+    expect(box.className).not.toContain('var(--focus-ring)');
+  });
+
+  it('marks the error state with error tokens only, no raw colour', () => {
+    const { container } = render(<SegmentedDigitBox {...BASE_PROPS} error />);
+
+    const box = container.firstElementChild as HTMLElement;
+    expect(box.className).toContain('border-error/55');
+    expect(box.className).toContain('ring-error/14');
+    expect(box.className).not.toMatch(/rgba?\(/);
+  });
+});

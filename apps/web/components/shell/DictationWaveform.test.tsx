@@ -42,7 +42,7 @@ describe('DictationWaveform', () => {
       'utf8'
     );
     expect(source).toContain(
-      "className='dictation-waveform-bar block w-1 rounded-full bg-cyan-300/85'"
+      "className='dictation-waveform-bar block w-1 rounded-full bg-accent-blue/85'"
     );
   });
 });
