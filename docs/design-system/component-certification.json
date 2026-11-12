@@ -234,6 +234,9 @@
       "partial": "VerifiedBadge takes no data; its only optional props are size and className, both styling with defaults, and its glyph and accessible name are fixed, so nothing can be partially present.",
       "permission-denied": "VerifiedBadge is a static verification mark with no gated action or permission input; the detector matched role='img' on its wrapper."
     },
+    "apps/web/components/features/admin/OperatorBanner.tsx": {
+      "permission-denied": "The banner has no permission check of its own: the admin and environment gate lives in OperatorBannerWrapper, which returns null for non-admins (its PermissionDeniedNonAdmin story and OperatorBannerWrapper.test.tsx). The detector matched role='alert'."
+    },
     "apps/web/components/features/admin/OvieRouteUsageBeacon.tsx": {
       "error": "The beacon renders null in every state and is fire-and-forget: a failed POST is swallowed by its .catch, so there is no failure to draw. OvieRouteUsageBeacon.test.tsx rejects the fetch and asserts the page is unchanged and axe-clean."
     },
@@ -283,9 +286,50 @@
     "apps/web/components/features/dashboard/NavigationDestinationReady.tsx": {
       "offline": "It never fetches or mutates: it renders null and only reports readiness once the caller's ready flag flips (LoadingDestinationData shows it held). The detector matched the word loading in its doc comment; the destination that owns the data owns any network failure."
     },
+    "apps/web/components/features/dashboard/atoms/ConfidenceBadge.tsx": {
+      "partial": "Its one required score is its only data; size, showLabel and className are presentation switches shown in the Small and WithLabel stories, so nothing can be partially present.",
+      "long-content": "Its text is a whole percentage of a 0 to 1 score and one of three fixed level labels, so the longest it can read is '100% Medium', and DotBadge keeps it on one line (AllLevels shows every label)."
+    },
+    "apps/web/components/features/dashboard/atoms/DspProviderIcon.tsx": {
+      "empty": "It draws one provider's icon and owns no collection that could be empty. The detector matched the items-center class.",
+      "partial": "Its one required provider is its only data and every DSP_PROVIDER_IDS entry has a registry name and colour (DspProviderIcon.test.tsx checks this); a provider without a dedicated logo falls back to SocialIcon, the NonStreamingProvider story.",
+      "long-content": "Its only text is the provider's fixed registry name, never caller text; AllProviders shows every name, the longest included."
+    },
     "apps/web/components/features/dashboard/dashboard-nav/InboxAttentionLink.tsx": {
       "offline": "InboxAttentionLink never fetches or mutates; it renders the pending count its owner passes, and with no connection that count stays unloaded, which the Partial story shows.",
       "permission-denied": "InboxAttentionLink links to the signed-in Inbox that every account can open and has no gated action; a viewer who cannot reach the dashboard never sees the app rail."
+    },
+    "apps/web/components/features/dashboard/organisms/DashboardHeader.tsx": {
+      "empty": "Every caller passes at least one breadcrumb: useAuthRouteConfig always builds one from the pathname and SettingsSection passes its title, so the header never renders without a title. It owns no collection; the detector matched the items-center class."
+    },
+    "apps/web/components/features/dashboard/organisms/DashboardMobileTabs.tsx": {
+      "empty": "The tab bar is built from fixed navigation config (primaryNavigation, artistNavigation and the settings item), so it always has destinations; only the optional Public Profile row depends on data, and DashboardMobileTabs.test.tsx covers its absence. The detector matched the .map calls over that config.",
+      "long-content": "Every label it shows is fixed navigation copy, never caller text; the profile link carries only an href under the fixed Public Profile label. The Default story already renders at the 320px mobile1 viewport."
+    },
+    "apps/web/components/features/dashboard/organisms/ReleaseTablePendingShell.tsx": {
+      "empty": "The shell is the releases route's loading surface: it always draws a fixed SKELETON_ROW_COUNT.TABLE of skeleton rows and owns no data collection that could be empty. The detector matched the skeletonRows prop and the rows of its column config.",
+      "partial": "It takes no data. Its only optional props are showHeader, whose headerless variant is the NoHeader story, and a test id, so nothing can be partially present.",
+      "long-content": "It renders no caller text: the column headers are fixed product copy and every cell is a skeleton bar. The detector matched its aria-label.",
+      "offline": "The shell does no network work; it is what the route shows while its data loads, so going offline cannot change what it draws (the route's own error boundary owns failed loads)."
+    },
+    "apps/web/components/features/dashboard/release-tasks/ReleaseTaskEmptyState.tsx": {
+      "offline": "The empty state makes no request: generating the plan is the parent checklist's onSetUp, which owns the network call and its failure. The detector matched the isLoading prop, shown in LoadingGeneratingPlan.",
+      "permission-denied": "It has no gated action or role check; the parent only renders it for someone who can set up the release. The detector matched the word plan in its fixed action label."
+    },
+    "apps/web/components/features/dashboard/release-tasks/ReleaseTaskProgressBar.tsx": {
+      "error": "The bar draws counts its parent already has and makes no request, so it has no failure of its own. The detector matched the text-error class on the overdue count, which the WithOverdue story shows.",
+      "permission-denied": "The bar has no gated action or role check; anyone who can see the release's tasks sees the same counts. The detector matched role='progressbar'."
+    },
+    "apps/web/components/features/dashboard/release-tasks/ReleaseTaskRow.tsx": {
+      "empty": "The row renders one task and owns no collection that could be empty. The detector matched the items-center class."
+    },
+    "apps/web/components/features/dashboard/release-tasks/ReleaseTaskRowPrimitives.tsx": {
+      "partial": "The primitives take a required task, done flag or children; their optional props are className and style, which are presentation, so nothing can be partially present."
+    },
+    "apps/web/components/features/dashboard/tasks/TaskWorkspaceLoadingRows.tsx": {
+      "empty": "It is the Tasks loading geometry: it always draws the same five fixed placeholder rows and owns no data that could be empty. The detector matched the .map over that fixed row list.",
+      "offline": "It takes no props and makes no request; it is what the Tasks route shows while its data loads, so going offline cannot change what it draws.",
+      "permission-denied": "It has no gated action or role check. The detector matched role='status'."
     },
     "apps/web/components/features/feedback/PageErrorState.tsx": {
       "empty": "PageErrorState renders one title, one message and one retry action and takes no collection; the detector matched the items-center utility class.",
@@ -432,6 +476,9 @@
     },
     "apps/web/components/features/waitlist/WaitlistSuccessView.tsx": {
       "loading": "It mounts only once its owner already has an outcome (the /waitlist server route after resolving user state, or WaitlistIntakeChat after the request settles), so it never shows a loading state; 'pending' is the waitlist review status that Web214AuthenticatedPending shows, not a request in flight."
+    },
+    "apps/web/components/features/workspace-lock/WorkspaceLockScreen.tsx": {
+      "empty": "The lock screen holds one action and one status line; it owns no collection that could be empty. The detector matched the items-center class."
     },
     "apps/web/components/feedback/Banner.tsx": {
       "permission-denied": "Banner only renders caller-supplied status copy with an optional action and dismiss, and has no gated action or permission input; the detector matched role='alert' and role='status' on its live region."

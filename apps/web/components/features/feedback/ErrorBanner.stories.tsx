@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { useState } from 'react';
-import { fn } from 'storybook/test';
+import { expect, fn, userEvent, within } from 'storybook/test';
 import { ErrorBanner } from './ErrorBanner';
 
 const meta: Meta<typeof ErrorBanner> = {
@@ -163,4 +163,87 @@ export const InteractiveDismiss: Story = {
       />
     );
   },
+};
+
+/** No recovery actions: the banner shows its message and details toggle only. */
+export const EmptyNoActions: Story = {
+  args: {
+    title: 'Failed to load tasks',
+    description: 'The task list could not be loaded right now.',
+    actions: [],
+    className: 'w-96',
+  },
+};
+
+/** A thrown error with a digest; the details panel is opened to show its ID. */
+export const ErrorWithDigest: Story = {
+  args: {
+    title: 'Something went wrong',
+    description: 'We could not finish loading this page.',
+    error: Object.assign(new Error('Render failed'), { digest: 'a1b2c3d4' }),
+    actions: [{ label: 'Try again', onClick: fn() }],
+    className: 'w-96',
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await userEvent.click(
+      canvas.getByRole('button', { name: 'Show error details' })
+    );
+    await expect(canvas.getByText('Error ID: a1b2c3d4')).toBeInTheDocument();
+  },
+};
+
+/** A title and an action without a description. */
+export const PartialNoDescription: Story = {
+  args: {
+    title: 'Failed to save changes',
+    actions: [{ label: 'Retry', onClick: fn() }],
+    className: 'w-96',
+  },
+};
+
+/** Long title, description and action labels wrap at phone width. */
+export const LongContentPhoneWidth: Story = {
+  args: {
+    title:
+      'We could not save the changes you made to your release plan, tour dates and connected streaming profiles',
+    description:
+      'The server stopped responding before the last update finished. Your earlier edits are safe, but the most recent changes to the deluxe edition schedule, the press kit links and the playlist pitch notes were not stored.',
+    actions: [
+      { label: 'Retry saving every change', onClick: fn() },
+      { label: 'Contact Support', href: '/support' },
+    ],
+    onDismiss: fn(),
+    className: 'w-80',
+  },
+};
+
+/** How a denied request reads: the one recovery is to ask for access. */
+export const PermissionDeniedMessage: Story = {
+  args: {
+    title: "You don't have access to this workspace",
+    description: 'Ask an owner of this workspace to invite you.',
+    actions: [{ label: 'Request access', onClick: fn() }],
+    className: 'w-96',
+  },
+};
+
+export const RtlWithActions: Story = {
+  args: {
+    title: 'تعذر حفظ التغييرات',
+    description: 'يرجى التحقق من اتصالك والمحاولة مرة أخرى.',
+    actions: [
+      { label: 'إعادة المحاولة', onClick: fn() },
+      { label: 'الدعم', href: '/support' },
+    ],
+    onDismiss: fn(),
+    className: 'w-96',
+  },
+  decorators: [
+    Story => (
+      <div dir='rtl' lang='ar'>
+        <Story />
+      </div>
+    ),
+  ],
 };
