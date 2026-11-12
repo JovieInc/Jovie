@@ -1,5 +1,6 @@
 'use client';
 
+import { HostDrawnInput } from '@jovie/ui/atoms/host-drawn-field';
 import { InlineSubscribe } from '@jovie/ui/atoms/inline-subscribe';
 import { Input } from '@jovie/ui/atoms/input';
 import { RadioGroup, RadioGroupItem } from '@jovie/ui/atoms/radio-group';
@@ -403,12 +404,12 @@ export function WaitlistRoleForm({
                           chipKey === chip.key ? 'true' : undefined
                         }
                       >
-                        <input
+                        <HostDrawnInput
+                          visuallyHidden
                           type='radio'
                           name={`${formId}-role`}
                           value={chip.key}
                           checked={chipKey === chip.key}
-                          className='sr-only'
                           onChange={() => {
                             setChipKey(chip.key);
                             setRole(chip.role);

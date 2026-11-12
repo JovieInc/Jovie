@@ -171,10 +171,7 @@ import { updateLibraryProfileVisibility } from '@/lib/library/profile-visibility
 import { releaseStatusDotClasses } from '@/lib/library/release-status';
 import type { LibraryRelationshipView } from '@/lib/library/track-drawer-types';
 import type { WorkLaunchSummary } from '@/lib/library/work-actions';
-import {
-  deriveWorkInspectorPresentation,
-  scopeWorkInspectorBundle,
-} from '@/lib/library/work-inspector-read-model';
+import { scopeWorkInspectorBundle } from '@/lib/library/work-inspector-read-model';
 import { getCacheScope } from '@/lib/queries/cache-isolation';
 import { useSyncReleasesFromSpotifyMutation } from '@/lib/queries/useReleaseMutations';
 import {
@@ -192,6 +189,7 @@ import {
   LIBRARY_TABLE_SKELETON_CONFIG,
 } from './LibraryLoadingState';
 import { LibraryMediaThumbnail } from './LibraryMediaThumbnail';
+import { LibraryTakeActions, libraryWorkView } from './LibraryTakeActions';
 import {
   attachLibraryProductGraph,
   formatLibraryDuration,
@@ -2293,7 +2291,12 @@ function AssetDrawer({
   // One attach concept: ⌘U from anywhere in the open inspector.
   const [attachRequested, setAttachRequested] = useState(false);
   const clearAttachRequest = useCallback(() => setAttachRequested(false), []);
-  const canAttachFiles = open && current !== null && !isMerch;
+  const { isTake, presentation } = useMemo(
+    () => libraryWorkView(current),
+    [current]
+  );
+  const canAttachFiles = open && current !== null && !isMerch && !isTake;
+  const noFilesFor = isTake ? 'take' : 'merch item';
   useEffect(() => {
     if (!canAttachFiles) return;
     const handleKeyDown = (event: globalThis.KeyboardEvent) => {
@@ -2335,10 +2338,6 @@ function AssetDrawer({
         ? scopeWorkInspectorBundle(current, { ...postReleaseBundle, findings })
         : EMPTY_LIBRARY_POST_RELEASE_BUNDLE,
     [current, postReleaseBundle, findings]
-  );
-  const presentation = useMemo(
-    () => (current ? deriveWorkInspectorPresentation(current) : null),
-    [current]
   );
   const contextualBlockers = inspectorBundle.findings.filter(
     finding =>
@@ -2462,7 +2461,8 @@ function AssetDrawer({
           >
             {activeTab === 'overview' ? (
               <>
-                {!isMerch ? (
+                <LibraryTakeActions asset={current} open={open} />
+                {!isMerch && !isTake ? (
                   <InspectorSection title='Actions' className='py-3 first:pt-0'>
                     <WorkInspectorActions
                       asset={current}
@@ -2590,18 +2590,20 @@ function AssetDrawer({
                     </p>
                   ) : null}
                   <dl>
-                    <MetadataRow
-                      label='Review Status'
-                      value={
-                        <ApprovalStatusEditor
-                          asset={current}
-                          profileId={profileId}
-                          disabled={!open}
-                          saving={approvalSavingIds.has(current.id)}
-                          onStatusChange={onApprovalStatusChange}
-                        />
-                      }
-                    />
+                    {isTake ? null : (
+                      <MetadataRow
+                        label='Review Status'
+                        value={
+                          <ApprovalStatusEditor
+                            asset={current}
+                            profileId={profileId}
+                            disabled={!open}
+                            saving={approvalSavingIds.has(current.id)}
+                            onStatusChange={onApprovalStatusChange}
+                          />
+                        }
+                      />
+                    )}
                     <MetadataRow
                       label='Type'
                       value={formatLibraryItemType(current)}
@@ -2798,8 +2800,8 @@ function AssetDrawer({
                   </InspectorSection>
                 ) : null}
               </>
-            ) : isMerch ? (
-              <InspectorEmpty message='No files for this merch item.' />
+            ) : isMerch || isTake ? (
+              <InspectorEmpty message={`No files for this ${noFilesFor}.`} />
             ) : (
               <LibraryFilesPanel
                 asset={current}

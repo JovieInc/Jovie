@@ -2,18 +2,20 @@ import { spawnSync } from 'node:child_process';
 import {
   appendFileSync,
   cpSync,
+  mkdirSync,
   mkdtempSync,
   readFileSync,
   rmSync,
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join, resolve } from 'node:path';
+import { dirname, join, resolve, win32 } from 'node:path';
 import { runInNewContext } from 'node:vm';
 import { describe, expect, it } from 'vitest';
 import {
   checkVendored,
   loadManifest,
+  pinConsumerUpdates,
   stripBuildDirectives,
   VENDOR_ROOT,
   workflowPins,
@@ -29,10 +31,69 @@ function sandbox() {
   const root = mkdtempSync(join(tmpdir(), 'vendored-actions-'));
   for (const dir of ['.github/workflows', '.github/actions'])
     cpSync(resolve(repoRoot, dir), join(root, dir), { recursive: true });
+  const consumer = 'packages/jovie-cli/scripts/npm-publish-workflow.test.ts';
+  mkdirSync(dirname(join(root, consumer)), { recursive: true });
+  cpSync(resolve(repoRoot, consumer), join(root, consumer));
   return root;
 }
 
 describe('vendored actions (JOV-8754)', () => {
+  it.each(['..\\outside', 'D:\\outside'])(
+    'rejects the Windows consumer escape %s before reading it',
+    file => {
+      expect(() =>
+        pinConsumerUpdates(
+          'C:\\repo',
+          { pinConsumers: [file] },
+          'a'.repeat(40),
+          win32
+        )
+      ).toThrow('inside the repository');
+    }
+  );
+
+  it('synchronizes exact pin consumers and detects stale or missing consumers', () => {
+    const root = sandbox();
+    try {
+      const action = loadManifest(root).actions.find(
+        item => item.dir === 'pnpm-action-setup'
+      );
+      const next = 'a'.repeat(40);
+      const updates = pinConsumerUpdates(root, action, next);
+      expect(updates).toHaveLength(2);
+      for (const update of updates) {
+        expect(readFileSync(update.path, 'utf8')).toContain(
+          `${action.repo}@${action.sha}`
+        );
+        expect(update.source).toContain(`${action.repo}@${next}`);
+        expect(update.source).not.toContain(`${action.repo}@${action.sha}`);
+        writeFileSync(update.path, update.source);
+      }
+      expect(
+        checkVendored(root).filter(problem => problem.includes('expected only'))
+      ).toHaveLength(1);
+      expect(pinConsumerUpdates(root, { ...action, sha: next }, next)).toEqual(
+        updates
+      );
+      for (const update of updates) writeFileSync(update.path, 'no pin here');
+      expect(() => pinConsumerUpdates(root, action, next)).toThrow(
+        'expected only'
+      );
+      expect(() =>
+        pinConsumerUpdates(
+          root,
+          { ...action, pinConsumers: ['../outside'] },
+          next
+        )
+      ).toThrow('inside the repository');
+      expect(
+        pinConsumerUpdates(root, { ...action, pinConsumers: undefined }, next)
+      ).toEqual([]);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
   it('removes build directives without changing runtime strings, tokens or licenses', () => {
     const lint = ['eslint', 'disable-next-line'].join('-');
     const type = ['@ts', 'ignore'].join('-');

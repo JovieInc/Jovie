@@ -47,14 +47,14 @@ function assertPublishWorkflowContract(source: string): void {
     'actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1'
   );
   expect(source).toContain(
-    'pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413'
+    'pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115'
   );
   expect(source).toContain(
     'actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1'
   );
   expect(source).toMatch(/node-version-file: .nvmrc/);
   expect(source).toContain('registry-url: https://registry.npmjs.org');
-  expect(source).toMatch(/node --version.*v24\.22\.2/s);
+  expect(source).toMatch(/node --version.*v24\.22\.3/s);
   expect(source).toContain('pnpm install --frozen-lockfile');
   expect(source).toContain('pnpm --filter @jovie/cli run test:coverage');
   expect(source).toContain('pnpm --filter @jovie/cli run typecheck');
@@ -138,7 +138,7 @@ function assertPublishWorkflowContract(source: string): void {
   // JOV-7714: publish only bytes that passed the black-box chaos matrix.
   expect(source).toContain('needs: [chaos-tarball, chaos-matrix]');
   expect(source).toContain('os: [ubuntu-latest, macos-latest, windows-latest]');
-  expect(source).toMatch(/node: \[[^\]]*'24\.22\.2'[^\]]*'26'\]/);
+  expect(source).toMatch(/node: \[[^\]]*'24\.22\.3'[^\]]*'26'\]/);
   expect(source).toContain('fail-fast: false');
   // macOS cells try an idle self-hosted Mac first, hosted otherwise.
   expect(source).toContain('uses: ./.github/workflows/cli-chaos.yml');

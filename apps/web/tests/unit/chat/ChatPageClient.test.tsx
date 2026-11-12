@@ -65,9 +65,10 @@ function hasRegisteredRightPanel(): boolean {
   return mockUseRegisterRightPanel.mock.calls.some(([panel]) => panel !== null);
 }
 
-// Mock next/dynamic without kicking off real async imports. The chat panel
-// tests only care whether a right panel registers, not the lazy component
-// implementation behind that boundary.
+vi.mock(
+  '@/app/app/(shell)/chat/DeferredJovieChat',
+  () => import('@/components/jovie/JovieChat')
+);
 vi.mock('next/dynamic', () => ({
   default: () =>
     function DynamicWrapper(props: Record<string, unknown>) {
@@ -108,7 +109,6 @@ vi.mock('@/lib/sentry/client-lite', () => ({
   captureMessage: mockSentryCaptureMessage,
 }));
 
-// Mock the HeaderActionsContext
 vi.mock('@/contexts/HeaderActionsContext', () => ({
   useSetHeaderActions: () => ({
     setHeaderActions: mockSetHeaderActions,

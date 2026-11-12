@@ -1,8 +1,12 @@
-import { type NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { getArtistOfferFunnelReport } from '@/lib/acquisition/artist-offer-funnel.server';
+import {
+  type OperatorRouteInput,
+  operatorAccess,
+} from '@/lib/api/route-access';
+import { defineRoute } from '@/lib/api/route-pipeline';
 import { captureError, getSafeErrorMessage } from '@/lib/error-tracking';
-import { getOvieOperatorEntitlements } from '@/lib/ovie/privacy-lock/access';
 
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 
@@ -11,21 +15,7 @@ const filterSchema = z.object({
   end: z.coerce.date().optional(),
 });
 
-export async function GET(request: NextRequest) {
-  const entitlements = await getOvieOperatorEntitlements({ purpose: 'read' });
-  if (!entitlements.isAuthenticated) {
-    return NextResponse.json(
-      { error: 'Unauthorized' },
-      { status: 401, headers: NO_STORE_HEADERS }
-    );
-  }
-  if (!entitlements.isAdmin) {
-    return NextResponse.json(
-      { error: 'Forbidden' },
-      { status: 403, headers: NO_STORE_HEADERS }
-    );
-  }
-
+async function getHandler({ request }: OperatorRouteInput) {
   try {
     const parsed = filterSchema.safeParse(
       Object.fromEntries(request.nextUrl.searchParams)
@@ -57,3 +47,12 @@ export async function GET(request: NextRequest) {
     );
   }
 }
+
+export const GET = defineRoute(
+  {
+    route: '/api/admin/acquisition/artist-offer-funnel',
+    access: operatorAccess({ purpose: 'read' }),
+    legacy: { cache: 'pipeline-responses-only', unhandledErrors: 'rethrow' },
+  },
+  getHandler
+);

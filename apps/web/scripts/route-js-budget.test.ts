@@ -1,16 +1,11 @@
-import { randomBytes } from 'node:crypto';
-import {
-  mkdirSync,
-  mkdtempSync,
-  readFileSync,
-  rmSync,
-  writeFileSync,
-} from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { gzipSync } from 'node:zlib';
 import { afterEach, describe, expect, it } from 'vitest';
 import {
   BASELINE_HEADROOM_RATIO,
+  budgetJsBytes,
   checkBudgets,
   checkFirstLoadBudgets,
   evaluateBudgets,
@@ -27,21 +22,19 @@ import {
   validateBudgetShape,
 } from './route-js-budget.mjs';
 
-const fixtureRoots: string[] = [];
+import {
+  buildFirstLoadFixture,
+  cleanupFixtures,
+  firstLoadBudgets,
+  fixtureRoots,
+  growth,
+  judge,
+  NOW,
+  validRaise,
+  writeChunk,
+} from './route-js-budget-fixtures';
 
-afterEach(() => {
-  for (const root of fixtureRoots.splice(0)) {
-    rmSync(root, { recursive: true, force: true });
-  }
-});
-
-/** Incompressible bytes so gzip size tracks the byte count. */
-function writeChunk(nextDir: string, name: string, bytes: number) {
-  const path = join(nextDir, 'static', 'chunks', name);
-  mkdirSync(join(nextDir, 'static', 'chunks'), { recursive: true });
-  writeFileSync(path, randomBytes(bytes));
-  return `static/chunks/${name}`;
-}
+afterEach(cleanupFixtures);
 
 function writeManifest(
   nextDir: string,
@@ -87,6 +80,15 @@ describe('route-js-budget', () => {
     );
     expect(routeFromManifestKey('/app/(shell)/@modal/chat/page')).toBe(
       '/app/chat'
+    );
+  });
+
+  it('ignores the CI sourceMappingURL trailer when gzipping a chunk', () => {
+    const js = 'function home(){return 1}';
+    const mapped = Buffer.from(`${js}\n//# sourceMappingURL=home.js.map\n`);
+    expect(budgetJsBytes(mapped).toString('utf8')).toBe(js);
+    expect(gzipSync(mapped).length).toBeGreaterThan(
+      gzipSync(budgetJsBytes(mapped)).length
     );
   });
 
@@ -188,79 +190,6 @@ const MEASURED_BASELINES = {
   '/demo': 815,
   '/': 650,
 };
-
-const NOW = new Date('2026-10-22T00:00:00.000Z');
-
-function firstLoadBudgets() {
-  return {
-    defaultMaxGzipKb: 900,
-    routes: { '/app/chat': 1385 } as Record<string, number>,
-    firstLoad: {
-      headroomKb: HEADROOM_KB,
-      marketingMaxGzipKb: 32,
-      defaultMaxGzipKb: 80,
-      marketingRoutes: ['/', '/product', '/solutions/*'],
-      routes: { '/': 32, '/product': 32 } as Record<string, number>,
-      baselines: {} as Record<string, number>,
-    },
-    raises: {} as Record<string, ReturnType<typeof validRaise>>,
-  };
-}
-
-function validRaise(overrides: Record<string, string> = {}) {
-  return {
-    owner: '@jovie',
-    reason: 'Measured first-load JS exceeded the previous ceiling',
-    issue: 'JOV-1001',
-    removalCondition: 'Split the route chunk and lower the ceiling',
-    evidence: 'apps/web/scripts/route-js-budget.test.ts',
-    ...overrides,
-  };
-}
-
-function judge(
-  budgets: ReturnType<typeof firstLoadBudgets>,
-  firstRows: ReturnType<typeof measureFirstLoadJs>,
-  ancestor: ReturnType<typeof firstLoadBudgets> = budgets
-) {
-  return evaluateBudgets({
-    appRows: [],
-    firstRows,
-    budgets,
-    ancestor,
-    now: NOW,
-  });
-}
-
-function growth(next: object, previous: object) {
-  return grownBudgetNumbers(next, previous, NOW).join('\n');
-}
-
-function buildFirstLoadFixture() {
-  const nextDir = mkdtempSync(join(tmpdir(), 'first-load-js-'));
-  fixtureRoots.push(nextDir);
-  const main = writeChunk(nextDir, 'main.js', 8 * 1024);
-  const home = writeChunk(nextDir, 'home.js', 8 * 1024);
-  const product = writeChunk(nextDir, 'product.js', 8 * 1024);
-  const about = writeChunk(nextDir, 'about.js', 40 * 1024);
-  writeFileSync(
-    join(nextDir, 'build-manifest.json'),
-    JSON.stringify({ rootMainFiles: [main], polyfillFiles: [] })
-  );
-  writeFileSync(
-    join(nextDir, 'app-build-manifest.json'),
-    JSON.stringify({
-      pages: {
-        '/page': [main, home],
-        '/product/page': [main, product],
-        '/about/page': [main, about],
-        '/solutions/[audience]/page': [main, product],
-        '/app/(shell)/chat/page': [main, about],
-      },
-    })
-  );
-  return nextDir;
-}
 
 describe('first-load JS budgets', () => {
   it('keeps fixed headroom and recorded baselines within two percent of measured sizes', () => {
