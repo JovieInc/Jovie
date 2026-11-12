@@ -70,18 +70,6 @@
     padding-top: 7.5rem;
   }
 
-  .hv3-hero > .hv3-orbit {
-    top: 5rem;
-    left: -45.3125rem;
-    transform: rotate(47deg);
-  }
-
-  .hv3-hero
-    > .hv3-orbit
-    :is(.hv3-orbit__arc, .hv3-orbit__bloom, .hv3-orbit__sweep) {
-    display: none;
-  }
-
   .hv3-hero__copy {
     grid-template-columns: 1fr;
     row-gap: 1.25rem;
@@ -117,11 +105,12 @@
     visibility: hidden;
   }
 
-  .hv3-stage--hero .hv3-bounce {
-    top: 20rem;
-    left: 0;
-    width: 37.5rem;
-    height: 7.5rem;
+  /* The 390 crop shows the sidebar edge into the list: the beam lands there. */
+  .hv3-key {
+    top: -22rem;
+    left: 2rem;
+    width: 20rem;
+    height: 52rem;
   }
 
   .hv3-stage--hero .hv3-callout {

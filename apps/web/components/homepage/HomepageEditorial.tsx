@@ -61,8 +61,9 @@ function ChapterRule({
 }
 
 /**
- * Hero: the locked line beside the lede and actions, then Jovie for Mac under
- * the one camera, its inspector lifted out of the window, lit by the Orbit.
+ * Hero: the locked line beside the lede and actions, then Jovie for Mac shot
+ * straight on, its release page lifted out of the window, standing in one
+ * key light from above. No rings or glow blobs: light, edge and shadow only.
  */
 export function HomepageStoryHero({
   copy = HOMEPAGE_EDITORIAL_COPY.hero,
@@ -78,12 +79,6 @@ export function HomepageStoryHero({
       aria-labelledby={headingId}
       className='hv3 hv3-hero marketing-hero-dock'
     >
-      <Orbit
-        id='hv3-orbit-hero'
-        rings={[1800, 1400, 1000]}
-        arc={[282, 34]}
-        arcRing={1}
-      />
       <div className='hv3-hero__copy'>
         <h1
           id={headingId}
@@ -122,7 +117,10 @@ export function HomepageStoryHero({
         className='hv3-stage hv3-stage--hero'
         data-dom-certification='ignore'
       >
-        <div className='hv3-bounce' />
+        {/* The key light: one Ion wedge from above the frame, falling onto the
+            selected release. The window stands in it; it shows only as haze
+            above the window and as spill below it. */}
+        <div aria-hidden className='hv3-key' />
         <div
           className='hv3-rig hv3-rig--hero'
           role='img'
