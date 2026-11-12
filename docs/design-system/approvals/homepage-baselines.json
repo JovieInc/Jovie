@@ -1,0 +1,14 @@
+{
+  "schema": "jovie-homepage-baseline-approval/v1",
+  "approvedBy": "tim",
+  "approvedAt": "2026-11-12T21:25:05Z",
+  "approvalMessage": "cmsg_01AgKv1abQyxVAdD8PvqKyxsHxTuqWjp3UXVdEKhZovXiA",
+  "question": "Ship it, or does something still feel off?",
+  "answer": "Ship it",
+  "evidence": [
+    "Production before: screenshot 2026-11-12T21-05-15Z",
+    "Preview after (jovie-6ckqsje3f, d526b34fff): screenshot 2026-11-12T21-21-19Z"
+  ],
+  "pr": 24671,
+  "sourcesDigest": "de00b1f52a3e12e05ed7c5eae63b181b3872ddf12369c330552c520895c06d59"
+}
