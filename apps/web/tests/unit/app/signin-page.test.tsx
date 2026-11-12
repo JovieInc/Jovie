@@ -56,8 +56,6 @@ vi.mock('@/features/auth', async () => {
       authShellMock(props);
       return reactModule.createElement('div', { 'data-testid': 'auth-shell' });
     },
-    AuthOfferSummary: () =>
-      reactModule.createElement('div', { 'data-testid': 'auth-offer-summary' }),
   };
 });
 
@@ -75,19 +73,12 @@ describe('signin page', () => {
       '__client_uat=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
   });
 
-  it('keeps sign-in copy unchanged while the offer summary flag is off', () => {
+  it('renders no offer card of its own: AuthShell owns the plan recap', () => {
     searchParamsState.value = 'plan=pro&interval=month';
     render(<SignInPageClient />);
 
     expect(screen.queryByTestId('auth-offer-summary')).not.toBeInTheDocument();
-    expect(screen.queryByText('Continue to Pro')).not.toBeInTheDocument();
     expect(screen.getByTestId('auth-shell')).toBeInTheDocument();
-  });
-
-  it('shows the offer recap only when the page enables it', () => {
-    render(<SignInPageClient showOfferSummary />);
-
-    expect(screen.getByTestId('auth-offer-summary')).toBeInTheDocument();
   });
 
   it('renders AuthShell with the expected auth props', () => {

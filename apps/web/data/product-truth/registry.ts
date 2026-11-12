@@ -627,10 +627,6 @@ export const PRODUCT_FLAG_CAPABILITIES = {
       'ChatGPT directory MCP kill switch; anonymous public creator reads; default off',
   },
   ...INTERNAL_FLAG_CAPABILITIES,
-  AUTH_OFFER_SUMMARY: {
-    nonMarketing:
-      'auth offer recap; default off; no price, trial, or entitlement change',
-  },
   SOCIAL_HTML_ISOLATED_PROVIDER: {
     nonMarketing:
       'internal ingestion routing kill switch; reserved for future isolated provider rollout',

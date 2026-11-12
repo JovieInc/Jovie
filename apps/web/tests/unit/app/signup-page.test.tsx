@@ -66,8 +66,6 @@ vi.mock('@/features/auth', async () => {
       authShellMock(props);
       return reactModule.createElement('div', { 'data-testid': 'auth-shell' });
     },
-    AuthOfferSummary: () =>
-      reactModule.createElement('div', { 'data-testid': 'auth-offer-summary' }),
   };
 });
 
@@ -501,12 +499,12 @@ describe('signup page', () => {
     );
   });
 
-  it('shows the offer recap only when the page enables it', () => {
+  it('renders no offer card of its own: AuthShell owns the plan recap', () => {
     searchParamsState.value = 'plan=pro&interval=month';
 
-    render(<SignUpPageClient showOfferSummary />);
+    render(<SignUpPageClient />);
 
-    expect(screen.getByTestId('auth-offer-summary')).toBeInTheDocument();
+    expect(screen.queryByTestId('auth-offer-summary')).not.toBeInTheDocument();
     expect(screen.getByTestId('auth-shell')).toBeInTheDocument();
   });
 

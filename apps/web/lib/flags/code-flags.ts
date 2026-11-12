@@ -14,10 +14,6 @@
  */
 
 export const CODE_FLAGS = {
-  // JOV-6202: signup/signin offer recap. Default off so auth pages and copy
-  // stay unchanged. FEATURE_AUTH_OFFER_SUMMARY=true shows the 14-day Pro
-  // trial recap. No price, trial-length, Stripe, or entitlement effect.
-  AUTH_OFFER_SUMMARY: false,
   CANVAS_GRAIN: true,
   // ChatGPT app-directory MCP at /api/chatgpt/mcp. Default off: the route
   // 404s and is not a live connector. FEATURE_CHATGPT_APP_DIRECTORY_MCP=true

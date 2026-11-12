@@ -26,7 +26,6 @@
       "apps/web/app/llms-full.txt/route.ts": 1,
       "apps/web/app/onboarding/actions/upgrade-offer.ts": 1,
       "apps/web/app/onboarding/checkout/page.tsx": 1,
-      "apps/web/components/features/auth/AuthOfferSummary.tsx": 2,
       "apps/web/components/marketing/homepage-v2/HomepageV2Ctas.tsx": 1,
       "apps/web/content/legal/terms.md": 2,
       "apps/web/data/artistNotificationsCopy.ts": 3,
