@@ -37,7 +37,13 @@ export function firstLoadBudgets(
       defaultMaxGzipKb: 80,
       marketingRoutes: ['/', '/product', '/solutions/*'],
       routes: { '/': 32, '/product': 32 } as Record<string, number>,
-      baselines: {} as Record<string, number>,
+      // Every measured route needs its own baseline: there is no default.
+      baselines: {
+        '/': 32,
+        '/product': 32,
+        '/solutions/[audience]': 32,
+        '/about': 80,
+      } as Record<string, number>,
     },
     raises: {} as Record<string, ReturnType<typeof validRaise>>,
     groups: (groups ?? {}) as Record<string, { baselineKb: number }>,

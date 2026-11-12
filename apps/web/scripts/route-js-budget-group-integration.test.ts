@@ -32,6 +32,8 @@ function control() {
     firstRows: [
       { route: '/', gzipKb: 20, chunks: 1 },
       { route: '/product', gzipKb: 20, chunks: 1 },
+      { route: '/solutions/[audience]', gzipKb: 20, chunks: 1 },
+      { route: '/about', gzipKb: 60, chunks: 1 },
     ],
     budgets,
     ancestor: structuredClone(budgets),
