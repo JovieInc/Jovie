@@ -12,7 +12,6 @@ import {
   useMemo,
   useRef,
   useState,
-  useTransition,
 } from 'react';
 import { PreviewPanelProvider } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
 import { ComposerFocusProvider } from '@/components/features/chat/Composer';
@@ -40,6 +39,7 @@ import { RightRailKeyboardHandler } from '@/hooks/RightRailKeyboardHandler';
 import { useAuthRouteConfig } from '@/hooks/useAuthRouteConfig';
 import { useDashboardShortcuts } from '@/hooks/useDashboardShortcuts';
 import { useGlobalShortcutActions } from '@/hooks/useGlobalShortcutActions';
+import { useSidebarPreferencePersist } from '@/hooks/useSidebarPreferencePersist';
 import { OPERATOR_SEQUENCE_SHORTCUTS } from '@/lib/ovie/operator-commands';
 import type { AppShellMode } from '@/types/app-shell';
 import { AuthShell } from './AuthShell';
@@ -103,7 +103,6 @@ function AuthShellWrapperInner({
   const config = useAuthRouteConfig(mode);
   const pathname = usePathname();
   const headerActions = useHeaderActions();
-  const [, startTransition] = useTransition();
   const [pendingShellRoute, setPendingShellRoute] =
     useState<PendingShellRoute>(null);
   const pendingShellTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
@@ -156,18 +155,12 @@ function AuthShellWrapperInner({
     <ErrorBoundary fallback={null}>{rawHeaderBadge}</ErrorBoundary>
   ) : null;
 
-  // Memoize the sidebar open change handler to prevent context value changes
-  // that would cause infinite re-render loops in sidebar consumers.
-  // Only create a callback when persistSidebarCollapsed is defined, otherwise
-  // useSidebarCookieState needs undefined to manage internal state.
-  const handleSidebarOpenChange = useCallback(
-    (open: boolean) => {
-      startTransition(() => {
-        // Fire-and-forget: persist sidebar preference in background
-        persistSidebarCollapsed?.(!open)?.catch?.(() => {});
-      });
-    },
-    [persistSidebarCollapsed, startTransition]
+  // Stable handler (or undefined, so useSidebarCookieState manages internal
+  // state). The cookie is written synchronously on toggle; the database write
+  // is debounced so a burst of toggles costs one server action, after the
+  // rail has settled.
+  const handleSidebarOpenChange = useSidebarPreferencePersist(
+    persistSidebarCollapsed
   );
 
   const clearPendingShell = useCallback((route?: PendingShellRoute) => {
@@ -296,9 +289,7 @@ function AuthShellWrapperInner({
                 isTableRoute={config.isTableRoute}
                 isLyricsRoute={config.isLyricsRoute}
                 isChatRoute={config.isChatRoute}
-                onSidebarOpenChange={
-                  persistSidebarCollapsed ? handleSidebarOpenChange : undefined
-                }
+                onSidebarOpenChange={handleSidebarOpenChange}
                 sidebarDefaultOpen={sidebarDefaultOpen}
               >
                 {shellChildren}
