@@ -13,9 +13,14 @@ vi.mock('next/image', () => ({
 // The QR is generated locally from the `qrcode` dependency — no third-party
 // request is made for QR images (the profile pages publish a zero
 // third-party-requests claim, apps/web/content/comparative-claims.ts).
-const { DATA_URL, toDataURL } = vi.hoisted(() => ({
+const { toDataURL } = vi.hoisted(() => ({
   DATA_URL: 'data:image/png;base64,QRPNG',
-  toDataURL: vi.fn(async () => 'data:image/png;base64,QRPNG'),
+  toDataURL: vi.fn<
+    (
+      data: string,
+      options: { width: number; margin: number }
+    ) => Promise<string>
+  >(async () => 'data:image/png;base64,QRPNG'),
 }));
 
 vi.mock('qrcode', () => ({

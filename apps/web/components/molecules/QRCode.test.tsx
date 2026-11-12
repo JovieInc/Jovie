@@ -19,7 +19,12 @@ vi.mock('next/image', () => ({
 
 const { DATA_URL, toDataURL } = vi.hoisted(() => ({
   DATA_URL: 'data:image/png;base64,QRPNG',
-  toDataURL: vi.fn(async () => 'data:image/png;base64,QRPNG'),
+  toDataURL: vi.fn<
+    (
+      data: string,
+      options: { width: number; margin: number }
+    ) => Promise<string>
+  >(async () => 'data:image/png;base64,QRPNG'),
 }));
 
 vi.mock('qrcode', () => ({

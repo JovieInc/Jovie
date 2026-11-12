@@ -4,7 +4,9 @@ import { DesktopQrOverlay } from '@/features/profile/DesktopQrOverlay';
 
 const { DATA_URL, getQrCodeDataUrl } = vi.hoisted(() => ({
   DATA_URL: 'data:image/png;base64,QRPNG',
-  getQrCodeDataUrl: vi.fn(async () => 'data:image/png;base64,QRPNG'),
+  getQrCodeDataUrl: vi.fn<(data: string, size: number) => Promise<string>>(
+    async () => 'data:image/png;base64,QRPNG'
+  ),
 }));
 
 vi.mock('@/components/molecules/QRCode', () => ({
