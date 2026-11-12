@@ -31,9 +31,11 @@ export function trackHomepageEvent(
     });
   }
 
+  // Read the page now: a link click can navigate before the chunk loads.
+  const tagged = { ...featuredArtistTag(), ...properties };
   void import('../../lib/analytics')
     .then(({ track }) => {
-      track(event, { ...featuredArtistTag(), ...properties });
+      track(event, tagged);
     })
     .catch(() => {});
 }

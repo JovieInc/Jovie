@@ -31,4 +31,18 @@ describe('homepage events name the featured artist', () => {
       window.history.pushState({}, '', '/');
     }
   });
+
+  it('keeps the tag when a homepage link navigates before the chunk loads', async () => {
+    track.mockClear();
+    trackHomepageEvent('homepage_cta_clicked');
+    window.history.pushState({}, '', '/signup');
+    try {
+      await vi.dynamicImportSettled();
+      expect(track).toHaveBeenCalledExactlyOnceWith('homepage_cta_clicked', {
+        featured_artist: HOMEPAGE_FEATURED_ARTIST.slug,
+      });
+    } finally {
+      window.history.pushState({}, '', '/');
+    }
+  });
 });
