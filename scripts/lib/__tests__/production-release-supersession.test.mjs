@@ -1,4 +1,4 @@
-import { execFileSync, spawn, spawnSync } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { EventEmitter } from 'node:events';
 import {
@@ -12,7 +12,6 @@ import {
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { delimiter, dirname, join, resolve } from 'node:path';
-import { pathToFileURL } from 'node:url';
 import { load } from 'js-yaml';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
@@ -29,7 +28,6 @@ import {
   parseAliasSamples,
   selectAliasWindow,
   uniformSamplesPerRoute,
-  writeAliasGraduation,
 } from '../public-profile-alias-graduation.mjs';
 import {
   realGhVersion,
@@ -37,6 +35,7 @@ import {
   runWithRealGh,
   storedZip,
 } from '../real-gh-harness.mjs';
+import { assertAliasWriter } from './alias-writer-fixture.mjs';
 
 vi.mock('node:child_process', async importOriginal => {
   const actual = /** @type {typeof import('node:child_process')} */ (
@@ -71,56 +70,10 @@ const DEPLOYMENT_URL = 'https://jovie-exact-generation-jovie.vercel.app';
 const tempRoots = [];
 
 describe('public-profile alias graduation policy', () => {
-  it('writes formatter-clean receipts without changing evidence or decisions', () => {
-    const dir = mkdtempSync(join(tmpdir(), 'alias-graduation-format-'));
-    tempRoots.push(dir);
-    const root = pathToFileURL(`${dir}/`);
-    const receipt = PUBLIC_PROFILE_ALIAS_GRADUATION;
-    const evidenceRoot = resolve(REPO_ROOT, 'docs/performance');
-    const inventoryText = readFileSync(
-      join(evidenceRoot, receipt.evidence.inventory),
-      'utf8'
-    );
-    const measurementsText = readFileSync(
-      join(evidenceRoot, receipt.evidence.measurements),
-      'utf8'
-    );
-    writeAliasGraduation({ receipt, inventoryText, measurementsText }, root);
-    const path = join(dir, 'public-profile-alias-graduation.json');
-    expect(JSON.parse(readFileSync(path, 'utf8'))).toEqual(receipt);
-    for (const [file, contents, sha] of [
-      [
-        receipt.evidence.inventory,
-        inventoryText,
-        receipt.evidence.inventorySha256,
-      ],
-      [
-        receipt.evidence.measurements,
-        measurementsText,
-        receipt.evidence.measurementsSha256,
-      ],
-    ]) {
-      const actual = readFileSync(join(dir, file), 'utf8');
-      expect(actual).toBe(contents);
-      expect(createHash('sha256').update(actual).digest('hex')).toBe(sha);
-    }
-    expect(readFileSync(path, 'utf8')).toBe(
-      execFileSync(
-        'pnpm',
-        [
-          'exec',
-          'biome',
-          'format',
-          `--stdin-file-path=${resolve(evidenceRoot, 'public-profile-alias-graduation.json')}`,
-        ],
-        {
-          cwd: REPO_ROOT,
-          input: readFileSync(path, 'utf8'),
-          encoding: 'utf8',
-        }
-      )
-    );
-  });
+  it(
+    'writes formatter-clean receipts and preserves evidence',
+    assertAliasWriter
+  );
   it('reproduces each independent window from the complete controller inventory', () => {
     const receipt = PUBLIC_PROFILE_ALIAS_GRADUATION;
     const { policy, selection, evidence, windows } = receipt;
