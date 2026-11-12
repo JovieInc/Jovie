@@ -13,6 +13,7 @@ import {
   renderDailyDigest,
   validateDailySource,
 } from '../daily-changelog.mjs';
+import { lintDailyDigestStories } from '../daily-changelog-copy-gate.mjs';
 
 const SHA_A = 'a'.repeat(40);
 const SHA_B = 'b'.repeat(40);
@@ -214,30 +215,25 @@ describe('evaluateDailyWindow', () => {
     expect(wrongClaim.findings.map(f => f.rule)).toContain('unsupported-claim');
   });
 
-  it('fails closed on copy the marketing lint blocks (em dash)', () => {
-    const dashed = draft({
-      summary:
-        'Pages load with zero third-party requests — keeping the promise we publish on our comparison page.',
-    });
-    const result = evaluateDailyWindow({
-      windowKey: WINDOW,
-      sources: [source()],
-      drafts: [dashed],
-    });
-    expect(result.passed).toBe(false);
-    expect(result.findings.map(f => f.rule)).toContain('draft-copy-lint');
-
-    const clean = evaluateDailyWindow({
-      windowKey: WINDOW,
-      sources: [source()],
-      drafts: [
-        draft({
-          summary:
-            'Pages load with zero third-party requests, keeping the promise we publish on our comparison page.',
-        }),
-      ],
-    });
-    expect(clean.findings.map(f => f.rule)).not.toContain('draft-copy-lint');
+  it('copy gate: fails writer copy the marketing lint blocks (em dash)', () => {
+    const dashed = lintDailyDigestStories([
+      {
+        id: 'story-1',
+        summary:
+          'Pages load with zero third-party requests \u2014 keeping the promise we publish on our comparison page.',
+        bullets: [],
+      },
+    ]);
+    expect(dashed.map(f => f.rule)).toEqual(['draft-copy-lint']);
+    const clean = lintDailyDigestStories([
+      {
+        id: 'story-1',
+        summary:
+          'Pages load with zero third-party requests, keeping the promise we publish on our comparison page.',
+        bullets: ['Pages load with zero third-party requests.'],
+      },
+    ]);
+    expect(clean).toEqual([]);
   });
 
   it('passes when every number traces to approvedFacts', () => {

@@ -19,7 +19,6 @@
  */
 
 import { createHash } from 'node:crypto';
-import { validateDailyDraftSpans } from './daily-changelog-draft-validation.mjs';
 
 export const DAILY_SOURCE_SCHEMA = 'daily-changelog-source/v1';
 export const DAILY_RECEIPT_SCHEMA = 'daily-changelog-receipt/v1';
@@ -42,6 +41,7 @@ const SHA_RE = /^[0-9a-f]{40}$/;
 const OUTCOME_KEY_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const ENTRY_ID_RE = /^customer-update:[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const FRAGMENT_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+const NUMBER_TOKEN_RE = /\d[\d.,%x-]*/g;
 const RECEIPT_COMMENT_RE =
   /<!--\s*daily-changelog-receipt\/v1\s+(\{[\s\S]*?\})\s*-->/g;
 const DIGEST_SECTIONS = Object.freeze(['Added', 'Changed', 'Fixed', 'Removed']);
@@ -314,14 +314,33 @@ export function validateDailyDraft(draft, eligibleById) {
     }
     spans.push({ text: bullet.text, claimIds: bullet.claimIds ?? [] });
   }
-  findings.push(
-    ...validateDailyDraftSpans(spans, {
-      draftId: draft.id,
-      prefix,
-      approvedClaims,
-      approvedFacts,
-    })
-  );
+  for (const span of spans) {
+    if (span.claimIds.length === 0) {
+      findings.push({
+        rule: 'unmapped-claim',
+        storyId: draft.id,
+        message: `${prefix} has copy with no approved claim mapping.`,
+      });
+    }
+    for (const claimId of span.claimIds) {
+      if (!approvedClaims.has(claimId)) {
+        findings.push({
+          rule: 'unsupported-claim',
+          storyId: draft.id,
+          message: `${prefix} cites claim ${claimId}, which no mapped source approved.`,
+        });
+      }
+    }
+    for (const token of span.text.match(NUMBER_TOKEN_RE) ?? []) {
+      if (!approvedFacts.includes(token)) {
+        findings.push({
+          rule: 'unsupported-fact',
+          storyId: draft.id,
+          message: `${prefix} states "${token}", which no mapped source approved as a fact.`,
+        });
+      }
+    }
+  }
   return findings;
 }
 
