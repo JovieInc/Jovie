@@ -72,7 +72,7 @@ export const LongHeaderLabels: Story = {
   },
   decorators: [
     Story => (
-      <div className='w-[28rem]'>
+      <div className='w-112'>
         <Story />
       </div>
     ),
