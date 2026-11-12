@@ -22,6 +22,7 @@ import {
   type InteractionFamilyId,
   type InteractionRegistryEntry,
 } from './interactionRegistry';
+
 const words = (value: string): readonly string[] => value.split(' ');
 export const UI_OWNERSHIP_REGISTRY_SCHEMA = 'jovie.ui-ownership/v1' as const;
 export const UI_OWNERSHIP_SURFACES = words(
@@ -130,7 +131,6 @@ export type UIOwnershipRegistryEntry = {
   readonly visibleControlGeometry?: UIVisibleControlGeometry;
   readonly interaction?: InteractionContract;
 };
-
 type AdapterOptions = {
   readonly ios?: readonly string[];
   readonly macosElectron?: readonly string[];
