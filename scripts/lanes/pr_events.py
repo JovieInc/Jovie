@@ -28,6 +28,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from urllib.parse import urlsplit
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+from pr_event_queries import linear_issue, RETIREMENT_QUERY
+import cloud_lane  # noqa: E402  (JOV-10357 draft-only origin check; leaf module, no runner import)
 import disk_guard  # noqa: E402
 import lifecycle, pr_wip, repair_order, repair_win  # noqa: E402  (pr_wip: per-producer WIP census; repair_order: fair claims)
 from label_episodes import RELAY_RED_LABELLER, label_episode_applier  # noqa: E402  (JOV-8492 provenance gate)
@@ -1947,6 +1949,9 @@ def charge_reentry(lane, path: Path, pr: dict, expected: dict, name: str, now: f
 def ready_green(host, lane, pr: dict, held: dict, now: float) -> str:
     """The lane is the PR's writer (JOV-INV-022): a CLEAN lane draft whose head no diff policy
     held is marked ready together with its native merge intent. Returns what happened."""
+    if cloud_lane.is_cloud_origin(pr):
+        # JOV-10357: a cloud-origin draft is never readied or enrolled (draft-only, R3).
+        return "held:cloud-origin-draft-only"
     entry = held.get(str(pr["number"]), {})
     if entry.get("sha") == pr["headRefOid"]:
         code = entry.get("reason") or held_reason(entry.get("evidence") or [])[0]
@@ -1971,19 +1976,6 @@ def ready_green(host, lane, pr: dict, held: dict, now: float) -> str:
                "endedAt": lane.now_iso()}
     ledger(host, receipt)
     return receipt["verdict"]
-
-
-def linear_issue(linear, identifier: str) -> dict | None:
-    team, _, number = identifier.upper().partition("-")
-    data = linear.gql('query($n:Float!,$t:String!){issues(filter:{team:{key:{eq:$t}},number:{eq:$n}})'
-                      '{nodes{id state{name type} comments(last:20){nodes{body}}}}}', {"n": float(number), "t": team})
-    nodes = data["issues"]["nodes"]
-    return nodes[0] if nodes else None
-
-
-RETIREMENT_QUERY = """query($owner:String!,$name:String!,$number:Int!){repository(owner:$owner,name:$name){
-pullRequest(number:$number){number state headRefOid headRefName isCrossRepository isInMergeQueue
-labels(first:100){pageInfo{hasNextPage} nodes{name}}}}}"""
 
 
 def duplicate_authorized(pr: dict) -> bool:
@@ -2026,6 +2018,8 @@ def close_duplicate(lane, pr: dict, why: str, *, host, now: float | None = None)
 
 def return_to_pool(lane, linear, pr: dict, why: str, *, host, now: float | None = None) -> bool:
     """Return explicitly retired duplicate work to the pool only after a successful close."""
+    if cloud_lane.is_cloud_origin(pr):
+        return False  # JOV-10357: cloud-origin drafts are never closed or re-queued (R3).
     if maintenance_hold(host, lane, pr, time.time() if now is None else now):
         return False
     if not close_duplicate(lane, pr, why, host=host, now=now):
@@ -2044,6 +2038,8 @@ def return_to_pool(lane, linear, pr: dict, why: str, *, host, now: float | None 
 
 def retire_orphan(lane, linear, pr: dict, open_prs: list[dict], *, host, now: float | None = None) -> str:
     """Adopt disabled-lane work; retire only explicitly authorized, unheld duplicates."""
+    if cloud_lane.is_cloud_origin(pr):
+        return "held:cloud-origin-draft-only"  # JOV-10357: never adopted or retired (R3).
     if reason := maintenance_hold(host, lane, pr, time.time() if now is None else now):
         return f"held:{reason}"
     found = LANE_BRANCH.match(pr.get("headRefName") or "")

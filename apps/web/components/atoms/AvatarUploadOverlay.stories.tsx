@@ -39,3 +39,10 @@ export const Artwork: Story = {
     </div>
   ),
 };
+
+/** Only the required icon size: default person shape, hover affordance. */
+export const PartialIconSizeOnly: Story = {
+  args: {
+    iconSize: 16,
+  },
+};

@@ -1540,12 +1540,10 @@ tests:
           - confirmSpotifyArtist
           - createMerch
           - createMerchAlternativeItem
-          - createPromoStrategy
           - createRelease
           - deleteOrArchiveMerchCard
           - formatLyrics
           - generateAlbumArt
-          - generateCanvasPlan
           - generateReleasePitch
           - importBioFromUrl
           - inspectPressSource
@@ -1574,9 +1572,10 @@ tests:
           - showMerchSales
           - showTopInsights
           - showUsage
+          - requestCapability
           - submitFeedback
-          - suggestRelatedArtists
           - unpauseMerchCard
+          - useSkill
           - writeWorldClassBio
           - researchArtistPresence
           - checkLinkDrift
@@ -2029,7 +2028,7 @@ tests:
       coverage:
         expectedToolNames:
           - generateAlbumArt
-          - generateCanvasPlan
+          - canvasService
           - writeWorldClassBio
     assert:
       - type: javascript
@@ -3126,18 +3125,17 @@ tests:
       - type: javascript
         value: file://assertions.cjs:assertToolExecuted
 
-  - description: Tool contract accepts paid related artist suggestions
+  - description: Tool contract accepts free useSkill loading related-artists
     metadata:
       cost: deterministic
     vars:
       input: "Find related artists for playlist pitching."
       target: tool-contract
-      toolName: suggestRelatedArtists
+      toolName: useSkill
       mode: app
-      plan: pro
+      plan: free
       toolInput:
-        purpose: playlist_pitching
-        count: 5
+        name: related-artists
     assert:
       - type: javascript
         value: file://assertions.cjs:assertDeterministicNoSpend
@@ -3171,18 +3169,17 @@ tests:
       - type: javascript
         value: file://assertions.cjs:assertToolExecuted
 
-  - description: Tool contract accepts paid Canvas plan
+  - description: Tool contract accepts paid useSkill loading canvas-plan
     metadata:
       cost: deterministic
     vars:
       input: "Plan a Canvas for Neon Reef."
       target: tool-contract
-      toolName: generateCanvasPlan
+      toolName: useSkill
       mode: app
       plan: pro
       toolInput:
-        releaseTitle: Neon Reef
-        motionPreference: ambient
+        name: canvas-plan
     assert:
       - type: javascript
         value: file://assertions.cjs:assertDeterministicNoSpend
@@ -3386,21 +3383,18 @@ tests:
       - type: javascript
         value: file://assertions.cjs:assertToolExecuted
 
-  - description: Tool contract accepts paid promo strategy
+  - description: Tool contract accepts free capability request
     metadata:
       cost: deterministic
     vars:
-      input: "Make a low-budget promo plan."
+      input: "Can you schedule my Instagram posts for release week?"
       target: tool-contract
-      toolName: createPromoStrategy
+      toolName: requestCapability
       mode: app
-      plan: pro
+      plan: free
       toolInput:
-        releaseTitle: Neon Reef
-        budget: low
-        platforms:
-          - tiktok
-          - instagram
+        kind: capability
+        request: Schedule Instagram posts so release week runs itself.
     assert:
       - type: javascript
         value: file://assertions.cjs:assertDeterministicNoSpend

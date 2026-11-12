@@ -82,6 +82,7 @@ export function createLiveLinearCoordinationDeps(): LinearCoordinationDeps {
             title: input.title,
             description: input.description,
             teamId: input.teamId,
+            ...(input.priority ? { priority: input.priority } : {}),
           },
         }
       );

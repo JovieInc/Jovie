@@ -27,7 +27,6 @@ export const INCIDENT_LABEL = 'main-health-incident';
 export const MIN_CONSECUTIVE_GROUPS = 2;
 export const MAX_LOOKBACK_COMMITS = 30;
 export const MAX_ATTEMPTS_PER_CHANGE = 2;
-export const REPAIR_GRACE_MIN = 20;
 export const UNMERGEABLE_DWELL_MIN = 5;
 
 const ABORTED = new Set(['cancelled', 'skipped', 'neutral', 'stale']);
@@ -246,8 +245,10 @@ export async function bisectFirstRed(candidates, probe) {
 }
 
 /**
- * May the culprit be reverted automatically? One revert in flight per check,
- * never a revert, bounded attempts per change, and give an existing repair a grace.
+ * May the culprit be reverted automatically? One revert in flight per check and
+ * per culprit, never a revert, bounded attempts per change. Revert first
+ * (canon/MERGE_QUEUE_STEWARD.md): an open forward fix does not hold the revert
+ * back; it replaces the revert only by landing first.
  */
 export function decideEject({
   culprit,
@@ -255,8 +256,6 @@ export function decideEject({
   openReverts = [],
   priorAttempts = 0,
   culpritLabels = [],
-  repairs = [],
-  now = Date.now(),
   mode = 'apply',
   ambiguous = false,
 }) {
@@ -269,13 +268,12 @@ export function decideEject({
     return no('alert', 'culprit-is-a-revert');
   if (openReverts.some(pr => pr.check === check))
     return no('skip', 'revert-in-flight-for-check');
+  // Main Health's opener (scripts/main_health_revert.py) may already revert this commit.
+  if (openReverts.some(pr => pr.culprit === culprit.sha))
+    return no('skip', 'revert-in-flight-for-culprit');
   if (priorAttempts >= MAX_ATTEMPTS_PER_CHANGE)
     return no('alert', 'attempt-cap');
   if (!culprit.pr) return no('alert', 'culprit-has-no-pr');
-  const live = repairs.find(
-    r => now - Date.parse(r.createdAt) < REPAIR_GRACE_MIN * 60_000 || r.queued
-  );
-  if (live) return no('alert', `repair-in-flight:#${live.number}`);
   return no(mode === 'dry' ? 'dry-revert' : 'revert', 'culprit-attributed');
 }
 

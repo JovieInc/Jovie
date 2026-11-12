@@ -25,3 +25,71 @@ console.log(JSON.stringify([
     problems = json.loads(checked.stdout)
     if problems:
         raise ValueError("measured win policy: " + "; ".join(problems))
+
+
+def company_guard_pin(files: list[dict], comparison: dict, *, adopted_comparison: dict) -> str:
+    """Generate a measured Win for a pin-only workflow edit, never a speed claim.
+
+    Pass fresh REST PR files and GitHub comparisons for OLD...NEW and NEW...NEW.
+    Feed the returned section to pr_events.repair_evidence_body(win_section=...).
+    The caller owns the GitHub read and exact-head binding; this helper does no I/O
+    except the existing canonical Win validation. Mismatched evidence fails closed.
+    """
+    workflows = [file for file in files if file.get("filename") == ".github/workflows/company-guards.yml"]
+    if len(workflows) != 1 or workflows[0].get("status") != "modified":
+        raise ValueError("company guard Win requires one modified workflow pin")
+    patch = workflows[0].get("patch")
+    if not isinstance(patch, str):
+        raise ValueError("company guard pin patch unavailable")
+    changed = [line for line in patch.splitlines() if line.startswith(("+", "-"))]
+    pins = {}
+    for sign in ("-", "+"):
+        for marker in ("company-guards.yml@", "ci-ref: "):
+            matches = [re.fullmatch(re.escape(sign + "# " + marker) + r"([0-9a-f]{40})", line)
+                       for line in changed]
+            matches = [match.group(1) for match in matches if match]
+            if len(matches) != 1:
+                raise ValueError("company guard Win requires both exact old and new pins")
+            pins[sign, marker] = matches[0]
+    old, new = pins["-", "ci-ref: "], pins["+", "ci-ref: "]
+    if len(changed) != 4 or old == new or any(
+            pins[sign, "company-guards.yml@"] != pins[sign, "ci-ref: "] for sign in ("-", "+")):
+        raise ValueError("company guard workflow change is not a consistent pin-only bump")
+    url = f"https://github.com/JovieInc/ci/compare/{old}...{new}"
+    count = comparison.get("ahead_by")
+    commits = comparison.get("commits")
+    if (comparison.get("html_url") != url or comparison.get("status") != "ahead"
+            or type(count) is not int or count <= 0
+            or type(comparison.get("behind_by")) is not int or comparison["behind_by"] != 0
+            or type(comparison.get("total_commits")) is not int or comparison["total_commits"] != count
+            or (comparison.get("base_commit") or {}).get("sha") != old
+            or (comparison.get("merge_base_commit") or {}).get("sha") != old
+            or not isinstance(commits, list) or len(commits) != count
+            or any(not isinstance(commit, dict) or not isinstance(commit.get("sha"), str)
+                   or not re.fullmatch(r"[0-9a-f]{40}", commit["sha"]) for commit in commits)
+            or len({commit["sha"] for commit in commits}) != count
+            or commits[-1]["sha"] != new):
+        raise ValueError("upstream comparison must completely match the workflow's forward pin bump")
+    if (not isinstance(adopted_comparison, dict)
+            or adopted_comparison.get("html_url") != f"https://github.com/JovieInc/ci/compare/{new}...{new}"
+            or adopted_comparison.get("status") != "identical"
+            or any(type(adopted_comparison.get(key)) is not int or adopted_comparison[key] != 0
+                   for key in ("ahead_by", "behind_by", "total_commits"))
+            or adopted_comparison.get("commits") != []
+            or any(not isinstance(adopted_comparison.get(key), dict)
+                   or adopted_comparison[key].get("sha") != new
+                   for key in ("base_commit", "merge_base_commit"))):
+        raise ValueError("adopted target comparison must prove zero remaining commits at the new pin")
+    after = adopted_comparison["ahead_by"]
+    section = "\n".join([
+        "## Win", "",
+        "- Claim: Bring the shared company guard pin up to the verified upstream target.",
+        "- Area: ci", "- Theme: guard-freshness",
+        f"- Metric: upstream guard commits behind target | commits | lower | {count} | {after} | "
+        f"GitHub compare API, old pin versus adopted target | "
+        f"node packages/api-client/cli.ts gh --priority repair -- api repos/JovieInc/ci/compare/{old}...{new} --jq .ahead_by && "
+        f"node packages/api-client/cli.ts gh --priority repair -- api repos/JovieInc/ci/compare/{new}...{new} --jq .ahead_by",
+        f"- Verify: {url}", "",
+    ])
+    validate(section)
+    return section

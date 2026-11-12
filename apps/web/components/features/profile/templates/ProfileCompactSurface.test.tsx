@@ -324,8 +324,8 @@ describe('ProfileCompactSurface', () => {
       const cta = screen.getByTestId('profile-proof-claim-bar-cta');
       expect(bar).toHaveClass('md:hidden');
       expect(cta).toHaveAttribute('href', '/start');
-      // WCAG 2.5.3 / axe label-content-name-mismatch: the accessible name
-      // starts with the visible "jov.ie/you" text.
+      expect(cta).toHaveClass('text-on-media/88', 'hover:text-on-media');
+      // WCAG 2.5.3 label-content-name-mismatch: name starts with jov.ie/you.
       expect(cta.getAttribute('aria-label')).toBe(`jov.ie/you ${label}`);
       expect(cta.textContent).toBe(`jov.ie/you ${label}`);
       // Rides inside the dock, directly above the nav, so it moves with it.
