@@ -103,6 +103,17 @@ for (const route of [
       await expect(heading).toBeVisible();
       await page.evaluate(() => document.fonts.ready);
 
+      if (route === '/') {
+        const support = page.locator('.marketing-hero-subtitle');
+        const headingSize = await heading.evaluate(element =>
+          Number.parseFloat(getComputedStyle(element).fontSize)
+        );
+        const supportSize = await support.evaluate(element =>
+          Number.parseFloat(getComputedStyle(element).fontSize)
+        );
+        expect(headingSize / supportSize).toBeGreaterThanOrEqual(1.8);
+      }
+
       const geometry = await measureHeading(heading);
       expect(geometry.lineHeight).toBeGreaterThan(0);
       expect(

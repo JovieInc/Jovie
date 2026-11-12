@@ -73,7 +73,7 @@
 .hv3-hero .marketing-hero-headline {
   color: var(--color-text-primary-token);
   /* Fit the locked claim headline in its two authored lines. */
-  font-size: clamp(2rem, 4.444vw, 4rem);
+  font-size: clamp(2.25rem, 4.444vw, 4rem);
   line-height: 1.06;
   padding-block-end: 0.16em;
 }
