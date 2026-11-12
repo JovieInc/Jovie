@@ -2576,12 +2576,12 @@ describe('Linear Sync workflow closes its own loops', () => {
     ).toMatch(/^run-name:/m);
   });
 
-  it('holds for the quota reset, retries once, then fails visibly', () => {
+  it('holds for the quota reset, retries once, then reports the deferral visibly', () => {
     const order = [
       '- name: Evaluate the validation lifecycle\n',
       '- name: Hold for the GitHub quota reset',
       '- name: Evaluate the validation lifecycle (retry after quota reset)',
-      '- name: Fail visibly when the sync stayed deferred',
+      '- name: Report the deferred sync',
     ].map(marker => workflow.indexOf(marker));
     expect(order.every(index => index > 0)).toBe(true);
     expect([...order].sort((a, b) => a - b)).toEqual(order);
@@ -2592,6 +2592,11 @@ describe('Linear Sync workflow closes its own loops', () => {
       "steps.evaluate_retry.outputs.quota_deferred == 'true'"
     );
     expect(workflow).toContain('.github/scripts/gh-api-hold.sh\n');
+    // The hold's out-of-budget exit is a deferral signal captured in hold_ok,
+    // never a job-failing exit after the evaluator already deferred visibly
+    // (2026-11-12: runs 43221247895 / 43221156905 red nothing was evaluated).
+    expect(quotaHold.run).toContain('exit 0');
+    expect(workflow).toContain("steps.quota_hold.outputs.hold_ok == 'false'");
   });
 
   it('keeps both screen-audit attempts and the lifecycle hold inside the original job budget', () => {
@@ -2619,11 +2624,11 @@ describe('Linear Sync workflow closes its own loops', () => {
   });
 
   it.each([
-    ['within budget', 10, 0, 2],
-    ['outside budget', 3600, 1, 1],
+    ['within budget', 10, 'true', 2],
+    ['outside budget', 3600, 'false', 1],
   ])(
-    'runs the workflow quota hold %s without passing an unevaluated sync',
-    (_, resetIn, status, attempts) => {
+    'runs the workflow quota hold %s and reports hold_ok instead of failing the job',
+    (_, resetIn, holdOk, attempts) => {
       const dir = mkdtempSync(join(tmpdir(), 'linear-sync-hold-'));
       try {
         const gh = join(dir, 'gh');
@@ -2662,6 +2667,7 @@ fi
               REPO: 'JovieInc/Jovie',
               GH_API_HOLD_BIN: gh,
               GH_API_HOLD_TOKEN_CAP_SECONDS: '3900',
+              GITHUB_OUTPUT: join(dir, 'output'),
               GITHUB_STEP_SUMMARY: join(dir, 'summary'),
               FIXTURE_DIR: dir,
               FIXTURE_RESET: String(Math.floor(Date.now() / 1000) + resetIn),
@@ -2669,10 +2675,15 @@ fi
             },
           }
         );
-        expect(result.status, result.stderr).toBe(status);
+        // The hold step itself never fails the job: a reset outside the
+        // budget is a deferral captured in hold_ok, not a sync failure.
+        expect(result.status, result.stderr).toBe(0);
+        expect(readFileSync(join(dir, 'output'), 'utf8')).toBe(
+          `hold_ok=${holdOk}\n`
+        );
         expect(Number(readFileSync(join(dir, 'count'), 'utf8'))).toBe(attempts);
-        expect(existsSync(join(dir, 'sleep.txt'))).toBe(status === 0);
-        if (status === 0) {
+        expect(existsSync(join(dir, 'sleep.txt'))).toBe(holdOk === 'true');
+        if (holdOk === 'true') {
           expect(
             Number(readFileSync(join(dir, 'sleep.txt'), 'utf8'))
           ).toBeLessThanOrEqual(

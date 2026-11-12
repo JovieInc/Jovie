@@ -212,14 +212,22 @@ describe('wake fan-out wiring (2026-10-31 installation 112037986 exhaustion)', (
       new URL(`../../../.github/workflows/${n}`, import.meta.url),
       'utf8'
     );
-  it('gates Main Red Eject before checkout and the app-token mint', () => {
+  it('gates Main Red Eject before the ejector and reads on the Jovie Bot read token', () => {
     const t = wf('main-red-eject.yml');
     const gate = t.indexOf('  gate:');
     const eject = t.indexOf('  eject:');
     expect(gate).toBeGreaterThan(0);
     expect(gate).toBeLessThan(eject);
-    expect(t.slice(gate, eject)).not.toContain('create-github-app-token');
-    expect(t.slice(gate, eject)).toContain('GH_TOKEN: ${{ github.token }}');
+    // 2026-11-12: the gate's reads moved off the shared ~1,000 REST/h job
+    // GITHUB_TOKEN bucket onto the Jovie Bot installation's own quota (the
+    // 2026-10-13 Lane Fix Relay split; the shared bucket ran dry within 45
+    // minutes while Linear Sync deferred behind it). The mint is read-only
+    // and the gate still fails open through the github.token failover.
+    expect(t.slice(gate, eject)).toContain('create-github-app-token');
+    expect(t.slice(gate, eject)).toContain('permission-checks: read');
+    expect(t.slice(gate, eject)).toContain(
+      'GH_TOKEN: ${{ steps.read-token.outputs.token || github.token }}'
+    );
     expect(t).toContain("needs.gate.outputs.active == 'true'");
     expect(t).toContain('queue-read-failed'); // fails open
   });
