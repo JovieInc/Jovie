@@ -1,7 +1,19 @@
 import '../../styles/system-b-app.css';
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { fn } from 'storybook/test';
+import { DesktopUpdateControl } from '@/components/organisms/desktop-update/DesktopUpdateControl';
+import type { DesktopUpdateControlState } from '@/lib/desktop/desktop-update-control-state';
 import { DockUpdateCard, DockWhatsNewCard } from './SidebarDockCards';
+
+/** The update slot, filled with the desktop app's one update control. */
+const control = (state: DesktopUpdateControlState) => (
+  <DesktopUpdateControl
+    state={state}
+    onDownload={fn()}
+    onRestart={fn()}
+    onRetry={fn()}
+  />
+);
 
 /** The cards at the width they get inside the open sidebar. */
 const meta = {
@@ -15,34 +27,31 @@ const meta = {
       </div>
     ),
   ],
-  args: {
-    label: 'Update available',
-    dismissible: true,
-    onOpen: fn(),
-    onDismiss: fn(),
-  },
+  args: { children: control({ kind: 'available', version: '2' }) },
 } satisfies Meta<typeof DockUpdateCard>;
 export default meta;
 type Story = StoryObj<typeof meta>;
 
 const light = { themes: { themeOverride: 'light' } };
 
-/** An available update can be dismissed. */
+/** An available update offers the download. */
 export const UpdateAvailable: Story = {};
-/** A ready update has one action and no dismiss. */
+/** A ready update has one action: restart. */
 export const UpdateReady: Story = {
-  args: { label: 'Restart to update', dismissible: false },
+  args: { children: control({ kind: 'ready', version: '2' }) },
 };
 export const UpdateDownloading: Story = {
-  args: { label: 'Downloading 42%', dismissible: false },
+  args: {
+    children: control({ kind: 'downloading', version: '2', percent: 42 }),
+  },
 };
 export const UpdateFailed: Story = {
-  args: { label: 'Update failed', dismissible: false },
+  args: {
+    children: control({ kind: 'failed', retry: 'check', version: '2' }),
+  },
 };
-/** No label yet: the slot keeps its 32px footprint. */
-export const UpdateEmptyLabel: Story = {
-  args: { label: null, dismissible: false },
-};
+/** Nothing to show yet: the slot keeps its 32px footprint. */
+export const UpdateEmptySlot: Story = { args: { children: null } };
 
 export const WhatsNew: Story = {
   render: () => (
