@@ -294,6 +294,11 @@
     "apps/web/components/features/landing/LandingCTAButton.tsx": {
       "partial": "LandingCTAButton draws one link from its required href, label, eventName and section; its optional props (variant, className, testId) are styling and test wiring with defaults, so no data can be partially present."
     },
+    "apps/web/components/features/onboarding/ChatProposeCheckoutCard.tsx": {
+      "loading": "The card renders a finished proposeCheckout tool result: its label comes synchronously from offer truth and Continue is a plain route link, so nothing loads inside it.",
+      "offline": "It fetches nothing; Continue is a client route link to the checkout page, which owns its own network states.",
+      "permission-denied": "It has no gated mode: the onboarding chat shows it only to the person in that chat, and the checkout page decides access."
+    },
     "apps/web/components/features/onboarding/OnboardingSecurityCheckRecovery.tsx": {
       "empty": "OnboardingSecurityCheckRecovery always renders one fixed heading, one status line and the retry button, and never a collection; the detector matched the items-start and items-center classes."
     },
