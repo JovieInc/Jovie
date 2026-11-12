@@ -60,3 +60,31 @@ export const Disabled: Story = {
     ).toBeDisabled();
   },
 };
+
+/** Long content: a long action label inside a narrow drawer footer. */
+export const LongContentLabel: Story = {
+  args: {
+    children: 'Save changes and publish to every connected platform',
+  },
+  decorators: [
+    Story => (
+      <div className='w-60'>
+        <Story />
+      </div>
+    ),
+  ],
+};
+
+/** Right-to-left: an Arabic label inside an RTL drawer. */
+export const RtlArabicLabel: Story = {
+  args: {
+    children: 'حفظ التغييرات',
+  },
+  decorators: [
+    Story => (
+      <div dir='rtl' lang='ar'>
+        <Story />
+      </div>
+    ),
+  ],
+};

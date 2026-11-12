@@ -133,7 +133,7 @@ export function VideoReleasePage({
             target='_blank'
             rel='noopener noreferrer'
             aria-label='Watch On YouTube (Opens In New Tab)'
-            className='inline-flex items-center gap-1.5 text-app font-book text-white/40 transition-colors hover:text-white/60'
+            className='inline-flex items-center gap-1.5 text-app font-book text-on-media/60 transition-colors hover:text-on-media/80'
           >
             <ExternalLink className='size-3.5' />
             Watch on YouTube

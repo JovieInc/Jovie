@@ -2,6 +2,7 @@ import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { MerchDesignCarouselResult } from '@/lib/merch/types';
+import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import {
   ChatMerchDesignCarousel,
   ChatMerchDesignCarouselLoading,
@@ -253,5 +254,164 @@ describe('ChatMerchDesignCarousel', () => {
     } finally {
       globalThis.removeEventListener('jovie-chat-submit-prompt', submitted);
     }
+  });
+});
+
+describe('ChatMerchDesignCarousel certificate states', () => {
+  beforeEach(() => mutateMock.mockReset());
+
+  const [ready, second, third] = result.designs;
+  const withDesigns = (
+    designs: MerchDesignCarouselResult['designs']
+  ): MerchDesignCarouselResult => ({ ...result, designs });
+  const partial = withDesigns([
+    ready,
+    { ...second, status: 'generating', preview_url: undefined },
+    {
+      ...third,
+      status: 'generating',
+      mockup_status: 'mockup_failed',
+      preview_url: undefined,
+    },
+  ]);
+  const long = withDesigns([
+    {
+      ...ready,
+      design_name:
+        'The Extended Midnight Drive Sessions Deluxe Anniversary Edition Tee',
+    },
+    {
+      ...second,
+      design_name:
+        'Neon Highway Hoodie With Hand-Lettered Back Print And Sleeve Tour Dates',
+    },
+    third,
+  ]);
+
+  function failProductsWith(error: unknown) {
+    mutateMock.mockImplementation(
+      (_input: unknown, callbacks?: { onError: (e: unknown) => void }) =>
+        callbacks?.onError(error)
+    );
+  }
+
+  it.each([
+    ['three ready concepts', result],
+    ['partial readiness', partial],
+    ['long concept names', long],
+    ['empty batch', withDesigns([])],
+  ] as const)('has no axe violations: %s', async (_state, value) => {
+    const { container } = render(<ChatMerchDesignCarousel result={value} />);
+    await expectNoA11yViolations(container);
+  });
+
+  it('has no axe violations while concepts are still generating', async () => {
+    const { container } = render(<ChatMerchDesignCarouselLoading />);
+    await expectNoA11yViolations(container);
+  });
+
+  it('only lets ready concepts be selected when readiness is partial', () => {
+    render(<ChatMerchDesignCarousel result={partial} />);
+    const buttons = screen.getAllByRole('button', { name: 'Select' });
+    expect(buttons.map(button => button.hasAttribute('disabled'))).toEqual([
+      false,
+      true,
+      true,
+    ]);
+    expect(screen.getByTestId('chat-merch-mockup-fallback')).toHaveTextContent(
+      'Rendering'
+    );
+    expect(screen.getByTestId('chat-merch-mockup-failed')).toHaveTextContent(
+      'Preview unavailable'
+    );
+  });
+
+  it('keeps long concept names whole behind the three-line clamp', () => {
+    render(<ChatMerchDesignCarousel result={long} />);
+    const heading = screen.getByRole('heading', {
+      name: 'The Extended Midnight Drive Sessions Deluxe Anniversary Edition Tee',
+    });
+    expect(heading).toHaveClass('line-clamp-3');
+  });
+
+  it.each([
+    ['a server error', new Error('503 Printful unavailable')],
+    ['an offline request', new TypeError('Failed to fetch')],
+  ])(
+    'keeps the concepts and says the products could not load after %s',
+    async (_cause, error) => {
+      failProductsWith(error);
+      const user = userEvent.setup();
+      const { container } = render(
+        <ChatMerchDesignCarousel result={result} profileId='profile-1' />
+      );
+      await user.click(screen.getAllByRole('button', { name: 'Select' })[0]);
+      expect(
+        screen.getByText('Unable to load products. Try again.')
+      ).toBeInTheDocument();
+      expect(screen.getAllByTestId('chat-merch-option-card')).toHaveLength(3);
+      expect(
+        screen.getAllByRole('button', { name: 'Select' })[0]
+      ).toBeEnabled();
+      await expectNoA11yViolations(container);
+    }
+  );
+
+  it('says so when the product lookup returns nothing', async () => {
+    mutateMock.mockImplementation(
+      (
+        _input: unknown,
+        callbacks?: { onSuccess: (response: unknown) => void }
+      ) => callbacks?.onSuccess({ success: true, products: [] })
+    );
+    const user = userEvent.setup();
+    render(<ChatMerchDesignCarousel result={result} profileId='profile-1' />);
+    await user.click(screen.getAllByRole('button', { name: 'Select' })[0]);
+    expect(
+      screen.getByText('No products are available right now.')
+    ).toBeInTheDocument();
+  });
+
+  it('has no axe violations on the product chooser', async () => {
+    mutateMock.mockImplementation(
+      (
+        _input: unknown,
+        callbacks?: { onSuccess: (response: unknown) => void }
+      ) =>
+        callbacks?.onSuccess({
+          success: true,
+          products: [
+            {
+              catalogProductId: 71,
+              productName: 'Unisex Staple T-Shirt',
+              productType: 't-shirt',
+              colorway: 'Black',
+            },
+          ],
+        })
+    );
+    const user = userEvent.setup();
+    const { container } = render(
+      <ChatMerchDesignCarousel result={result} profileId='profile-1' />
+    );
+    await user.click(screen.getAllByRole('button', { name: 'Select' })[0]);
+    expect(screen.getByText('Choose the product.')).toBeInTheDocument();
+    await expectNoA11yViolations(container);
+  });
+
+  it('renders right-to-left concepts and stays axe-clean', async () => {
+    const { container } = render(
+      <div dir='rtl' lang='ar'>
+        <ChatMerchDesignCarousel
+          result={withDesigns([
+            { ...ready, design_name: 'قميص الليل' },
+            { ...second, design_name: 'هودي الطريق السريع' },
+            { ...third, design_name: 'ملصق الأفق' },
+          ])}
+        />
+      </div>
+    );
+    expect(screen.getByRole('heading', { name: 'قميص الليل' })).toBeVisible();
+    await expectNoA11yViolations(container);
   });
 });

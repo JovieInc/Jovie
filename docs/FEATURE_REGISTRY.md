@@ -174,6 +174,7 @@ The source defaults below are preserved in this slice.
 | `CHATGPT_APP_DIRECTORY_MCP` | `false` | Keep public API exposure security control; no dynamic client registration grant. |
 | `CHAT_COMPOSER_V2` | `true` | Remove presentation gate in favor of the supported enabled behavior. |
 | `CYAN_FOCUS_GLOW` | `true` | Remove presentation gate in favor of the supported enabled behavior. |
+| `HOMEPAGE_START_CTA` | `false` | Keep copy-approval gate for the homepage hero action entering `/start`; remove in favor of the enabled behavior once the copy is approved. |
 | `INVESTOR_PORTAL_YC_DECK` | `false` | Remove narrative/layout gate in favor of the supported private brief; preserve financial privacy and sourced claims. |
 | `IN_HOUSE_RESOLVER` | `false` | Keep resolver rollback compatibility control (JOV-7323). |
 | `MARKETING_GENERIC_CREATOR_NAV` | `true` | Remove presentation switch in favor of supported creator wording; no new capability claim. |
@@ -184,6 +185,7 @@ The source defaults below are preserved in this slice.
 | `NEW_RELEASE_PAGE` | `true` | Remove presentation gate in favor of the supported enabled behavior. |
 | `ONBOARDING_VALUE_BEFORE_PAYWALL` | `true` | Keep funnel-order kill switch (JOV-9758) until the catalog-before-pricing read-out; then remove in favor of the enabled behavior. |
 | `OVIE_MCP_DYNAMIC_CLIENT_REGISTRATION` | `false` | Keep unauthenticated client-registration security boundary and redirect allowlist. |
+| `PMF_SURVEY_PROMPT` | `false` | Keep measurement rollout stop for the in-app Sean Ellis survey card; remove once the survey has enough responses to read against the 40% target. |
 | `PUBLIC_SIGNUP_CLOSED` | `true` | Keep access-control switch: on sends `/signup` and anonymous `/start` to the `/waitlist` role form; sign-in and invite links still create accounts. Reopen criteria: golden path certified and first paying artists live (canon/PRODUCT.md). |
 | `SOCIAL_HTML_ISOLATED_PROVIDER` | `false` | Keep off: isolation provider is absent; server-IP scraping remains prohibited. |
 | `YOUTUBE_THUMBNAILS_PASTE_GENERATE` | `false` | Keep model-spend/output-certification control (JOV-5862); provider publication restrictions remain. |

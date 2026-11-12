@@ -1,6 +1,6 @@
 'use client';
 
-import { Button, Spinner as LoadingSpinner } from '@jovie/ui';
+import { Button, HostDrawnInput, HostDrawnSelect, Spinner } from '@jovie/ui';
 import { BadgeCheck, Link2 } from 'lucide-react';
 import Image from 'next/image';
 import {
@@ -289,7 +289,7 @@ export function WaitlistSpotifySearch({
             className='w-3.5 h-3.5 text-brand-spotify'
           />
         </div>
-        <input
+        <HostDrawnInput
           ref={el => {
             inputRef.current = el;
             setInputRef(el);
@@ -315,16 +315,16 @@ export function WaitlistSpotifySearch({
           }
         />
         {state === 'loading' && (
-          <LoadingSpinner size='sm' tone='muted' label='Searching' />
+          <Spinner size='sm' tone='muted' label='Searching' />
         )}
       </div>
 
       {/* Dropdown results */}
       {shouldShowDropdown && (
         <ContentSurfaceCard className='absolute top-full z-50 mt-2 w-full overflow-hidden p-1'>
-          <select
+          <HostDrawnSelect
+            visuallyHidden
             id='spotify-search-results'
-            className='sr-only'
             size={Math.min(totalItems, 6)}
             aria-label='Spotify Artist Results'
             value={
@@ -363,7 +363,7 @@ export function WaitlistSpotifySearch({
             <option id={`spotify-result-${manualAddIndex}`} value='__manual__'>
               Manually add URL
             </option>
-          </select>
+          </HostDrawnSelect>
           {/* Loading skeleton */}
           {state === 'loading' && results.length === 0 && (
             <div className='p-3 space-y-2'>
@@ -396,13 +396,12 @@ export function WaitlistSpotifySearch({
             </div>
           )}
 
-          {/* Artist results */}
+          {/* Artist results. The buttons are real, keyboard-operable results;
+              the visually hidden HostDrawnSelect above mirrors the value for
+              form semantics. Hiding this list from AT would strand focusable
+              controls (axe aria-hidden-focus). */}
           {results.length > 0 && (
-            <div
-              ref={resultsListRef}
-              className='max-h-64 overflow-y-auto px-1'
-              aria-hidden='true'
-            >
+            <div ref={resultsListRef} className='max-h-64 overflow-y-auto px-1'>
               {results.map((artist, index) => (
                 <Button
                   key={artist.id}

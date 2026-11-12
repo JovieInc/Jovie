@@ -47,6 +47,10 @@ import {
   titles,
   verifyJump,
 } from './lib/main-red-eject.mjs';
+import {
+  remediateUnrevertable,
+  unattributedPlan,
+} from './main-red-remediate.mjs';
 
 const REPO = process.env.GITHUB_REPOSITORY || 'JovieInc/Jovie';
 const CI_WORKFLOW = 'ci.yml';
@@ -192,12 +196,7 @@ export async function plan({
   const trigger = detectConsecutiveGroupFailure(
     recent.map(r => ({ ...r, signature: r.signature }))
   );
-  if (!trigger.triggered)
-    return {
-      ...result,
-      action: 'none',
-      reason: 'failures-do-not-share-a-signature',
-    };
+  if (!trigger.triggered) return unattributedPlan(result, recent, mode);
   const check = checkKey(trigger.signature);
 
   const commits = await mainCommits();
@@ -235,18 +234,7 @@ export async function plan({
   const open = await api(`repos/${REPO}/pulls?state=open&per_page=100`, 'poll');
   const openReverts = open
     .filter(p => p.labels.some(l => l.name === REVERT_LABEL))
-    .map(p => ({ number: p.number, check: readMarker(p.body)?.check }));
-  const repairs = open
-    .filter(
-      p =>
-        p.labels.some(l => l.name === COMPOUNDING_LABEL) &&
-        /main (is )?red|recert|renew|census/i.test(p.title)
-    )
-    .map(p => ({
-      number: p.number,
-      createdAt: p.created_at,
-      queued: Boolean(p.auto_merge),
-    }));
+    .map(p => ({ number: p.number, ...readMarker(p.body) }));
   const prior = culprit?.pr
     ? await api(`repos/${REPO}/issues/${culprit.pr}`, 'poll').catch(() => null)
     : null;
@@ -255,9 +243,7 @@ export async function plan({
     culprit,
     check,
     openReverts,
-    repairs,
     priorAttempts,
-    now,
     mode,
     ambiguous: attribution.status === 'ambiguous',
     culpritLabels: (prior?.labels ?? []).map(l => l.name),
@@ -489,18 +475,9 @@ export async function apply(p) {
   if (!p.decision) return { ...p, applied: false };
   const { culprit, check, decision } = p;
   if (decision.action !== 'revert') {
-    if (
-      decision.action === 'alert' ||
-      decision.action === 'skip' ||
-      decision.action === 'dry-revert'
-    )
-      if (decision.action === 'alert')
-        await incident(
-          `alert:${check}`,
-          `main-red: ${check} (manual: ${decision.reason})`,
-          `Main is red on \`${check}\`. Automatic revert not taken: ${decision.reason}. Culprit candidate: ${culprit ? `#${culprit.pr} ${culprit.sha}` : 'unknown'}.`
-        );
-    return { ...p, applied: false };
+    // Alerts page; a red main with nothing to revert also files a fix intake.
+    const io = { api, gh, incident, repo: REPO };
+    return { ...p, applied: false, ...(await remediateUnrevertable(p, io)) };
   }
   const t = p.titles;
   const branch = `compounding/revert-${culprit.pr}-${culprit.sha.slice(0, 7)}`;
@@ -541,6 +518,8 @@ export async function apply(p) {
       culprit.pr +
       ' is re-landed as a repair PR with this failure attached.',
     '<!-- customer-changelog/v1 {"releaseWorthy":false} -->',
+    // `compounding` PRs owe a Win section (Fleet Rules, scripts/lib/wins-ledger.mjs requiresWin).
+    `## Win\n\n- Claim: main is restored by a revert instead of waiting for a forward fix\n- Area: queue\n- Theme: main-red-repair\n- Metric: main-red minutes to revert opened | min | lower | ? | ? | merge-group CI runs | first failed merge group to this PR's created_at\n- Verify: https://github.com/${REPO}/actions/runs/${p.trigger.groups[0]}\n- Pending: yes`,
   ].join('\n\n');
   const pr = JSON.parse(
     await gh(
