@@ -2,9 +2,17 @@ import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import {
+  type ColumnCompactItem,
   ColumnCompactProvider,
   usePrimaryColumnCompacts,
 } from './column-priority-context';
+
+const ACTIVE_ITEMS: readonly ColumnCompactItem[] = [
+  { id: 'state', render: () => 'Active' },
+];
+const ARABIC_ITEMS: readonly ColumnCompactItem[] = [
+  { id: 'state', render: () => 'نشط' },
+];
 
 function PrimaryCell({ row }: { readonly row: { readonly name: string } }) {
   const { primaryId, node } = usePrimaryColumnCompacts(row);
@@ -78,9 +86,9 @@ describe('ColumnCompactProvider', () => {
   });
 
   it.each([
-    ['folded', [{ id: 'state', render: () => 'Active' }], 'Avery Chen', 'ltr'],
+    ['folded', ACTIVE_ITEMS, 'Avery Chen', 'ltr'],
     ['empty', [], 'Avery Chen', 'ltr'],
-    ['rtl', [{ id: 'state', render: () => 'نشط' }], 'ليلى حداد', 'rtl'],
+    ['rtl', ARABIC_ITEMS, 'ليلى حداد', 'rtl'],
   ] as const)(
     'has no accessibility violations when %s',
     async (_name, items, name, dir) => {
