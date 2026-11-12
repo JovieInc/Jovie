@@ -4,6 +4,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
+import { selectDesignConformanceChecks } from './design-conformance-paths.mjs';
 import {
   evaluateSharedUiVisualArbitraryAudit,
   isSharedUiProductionSource,
@@ -11,6 +12,14 @@ import {
   scanSharedUiVisualArbitrary,
   toVisualArbitraryBaseline,
 } from './shared-ui-visual-arbitrary-audit.mjs';
+
+test('inventory test edits select design conformance', () => {
+  const file = 'scripts/shared-ui-visual-arbitrary-inventory.test.mjs';
+  const selection = selectDesignConformanceChecks([file]);
+  assert.equal(selection.applicable, true);
+  assert.deepEqual(selection.domains, ['governance']);
+  assert.deepEqual(selection.selectedPaths, [file]);
+});
 
 test('scanner covers the exact tracked production inventory as sources change', () => {
   // A literal file count needs repair after every clean source addition and
