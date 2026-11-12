@@ -5,7 +5,6 @@ import {
   CAPTURE_CONSENT_COPY,
   ScreenShell,
 } from './ProfileMobileNotificationsFlow';
-import { SubscriptionFormSkeleton } from './shared';
 
 /**
  * Loading state for the inline flow. It lays out the email step with the
@@ -57,16 +56,5 @@ export function InlineNotificationsFlowSkeleton() {
         </div>
       </div>
     </output>
-  );
-}
-
-/** The loading state that matches whichever subscribe form will mount. */
-export function NotificationsFlowSkeleton({
-  twoStep = false,
-}: Readonly<{ twoStep?: boolean }>) {
-  return twoStep ? (
-    <SubscriptionFormSkeleton />
-  ) : (
-    <InlineNotificationsFlowSkeleton />
   );
 }

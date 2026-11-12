@@ -1,8 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
-import {
-  InlineNotificationsFlowSkeleton,
-  NotificationsFlowSkeleton,
-} from './InlineNotificationsFlowSkeleton';
+import { InlineNotificationsFlowSkeleton } from './InlineNotificationsFlowSkeleton';
 
 const meta: Meta<typeof InlineNotificationsFlowSkeleton> = {
   title: 'Profile/InlineNotificationsFlowSkeleton',
@@ -19,15 +16,6 @@ export const Loading: StoryObj<typeof InlineNotificationsFlowSkeleton> = {
   render: () => (
     <div className='w-96 bg-base'>
       <InlineNotificationsFlowSkeleton />
-    </div>
-  ),
-};
-
-/** The two-step form keeps its short placeholder. */
-export const TwoStep: StoryObj<typeof InlineNotificationsFlowSkeleton> = {
-  render: () => (
-    <div className='w-80'>
-      <NotificationsFlowSkeleton twoStep />
     </div>
   ),
 };
