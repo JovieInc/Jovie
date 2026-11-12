@@ -93,3 +93,76 @@ def company_guard_pin(files: list[dict], comparison: dict, *, adopted_comparison
     ])
     validate(section)
     return section
+
+
+def dependabot_patch_ignores(before: dict, after: dict, *, before_sha: str, after_sha: str) -> str:
+    """Measure exact-name, unrestricted ignores for unchanged pnpm patches.
+
+    Snapshots contain parsed package.json (manifest) and dependabot.yml (config).
+    This proves configuration coverage, not updater runtime or elapsed savings.
+    """
+    if any(not isinstance(sha, str) or not re.fullmatch(r"[0-9a-f]{40}", sha)
+           for sha in (before_sha, after_sha)):
+        raise ValueError("Dependabot evidence requires exact Git revisions")
+    patches = before.get("manifest", {}).get("pnpm", {}).get("patchedDependencies")
+    if not isinstance(patches, dict) or not patches or patches != after.get(
+            "manifest", {}).get("pnpm", {}).get("patchedDependencies"):
+        raise ValueError("Dependabot evidence requires unchanged, nonempty patch mappings")
+    names = set()
+    for spec in patches:
+        match = re.fullmatch(r"((?:@[^/@]+/)?[^/@]+)@\d+\.\d+\.\d+(?:[-+][\w.-]+)?", spec)
+        if not match:
+            raise ValueError("Dependabot evidence requires exact-version patch keys")
+        names.add(match[1])
+
+    def uncovered(snapshot):
+        updates = snapshot.get("config", {}).get("updates", [])
+        roots = [row for row in updates if row.get("package-ecosystem") == "npm"
+                 and (row.get("directory") == "/" or "/" in row.get("directories", []))]
+        if len(roots) != 1:
+            raise ValueError("Dependabot evidence requires one root npm update policy")
+        ignored = {row.get("dependency-name") for row in roots[0].get("ignore", [])
+                   if not row.get("versions") and not row.get("update-types")}
+        return names - ignored
+
+    old, new = uncovered(before), uncovered(after)
+    if new:
+        raise ValueError("Dependabot ignores must fully cover patched packages: " + ", ".join(sorted(new)))
+    if not old:
+        raise ValueError("Dependabot evidence requires an observed improvement")
+    section = "\n".join([
+        "## Win", "",
+        "- Claim: Exclude every exact-version pnpm-patched package from root Dependabot version bumps.",
+        "- Area: ci", "- Theme: dependency-update-reliability",
+        f"- Metric: patched packages without unrestricted root Dependabot ignores | packages | lower | "
+        f"{len(old)} | {len(new)} | parsed Git configuration snapshots (not updater runtime) | "
+        f"python3 scripts/lanes/repair_win.py dependabot-patches {before_sha} {after_sha}",
+        f"- Verify: https://github.com/JovieInc/Jovie/compare/{before_sha}...{after_sha}", "",
+    ])
+    validate(section)
+    return section
+
+
+def dependabot_snapshot(sha: str) -> dict:
+    """Read immutable repository data; parse YAML with the installed repo parser."""
+    if not re.fullmatch(r"[0-9a-f]{40}", sha):
+        raise ValueError("snapshot requires an exact Git revision")
+    def read(path):
+        return subprocess.check_output(["git", "show", f"{sha}:{path}"], cwd=ROOT, text=True)
+    yaml = subprocess.run(["node", "--input-type=module", "-e", """
+import { readFileSync } from 'node:fs';
+import { load } from 'js-yaml';
+console.log(JSON.stringify(load(readFileSync(0, 'utf8'))));
+"""], cwd=ROOT, input=read(".github/dependabot.yml"), text=True, capture_output=True, check=True, timeout=10)
+    return {"manifest": json.loads(read("package.json")), "config": json.loads(yaml.stdout)}
+
+
+if __name__ == "__main__":
+    import argparse
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("kind", choices=["dependabot-patches"])
+    parser.add_argument("before_sha")
+    parser.add_argument("after_sha")
+    args = parser.parse_args()
+    print(dependabot_patch_ignores(dependabot_snapshot(args.before_sha), dependabot_snapshot(args.after_sha),
+                                  before_sha=args.before_sha, after_sha=args.after_sha), end="")

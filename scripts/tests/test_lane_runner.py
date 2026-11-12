@@ -7825,6 +7825,81 @@ def Locked_free(host):
         probe.release()
 
 
+class ContainedByMainTest(unittest.TestCase):
+    def test_exact_edits_are_bound_to_their_base_range(self):
+        contained = lane.fix_red_source_edits.contained_by_main
+        base = "before\nold\nafter\ntail\n"
+        for ours, theirs, expected in (
+            (base, "main alone\n", True),
+            (base.replace("old", "new"), base.replace("old", "new").replace("tail", "later"), True),
+            (base.replace("old", "new"), base.replace("old", "new\nmain addition"), True),
+            (base.replace("old\n", ""), base.replace("old\n", ""), True),
+            (base.replace("old", "new"), base + "new\n", False),
+            (base.replace("old\n", ""), base, False),
+            (base.replace("old", "new"), base.replace("old\nafter", "new\nrewritten"), False),
+            ("// instruction\n" + base, "// different\n" + base, False),
+            (base.replace("old", "`// text`"), base.replace("old", "`// other`"), False),
+            (base.replace("old", "new"), "<<<<<<< HEAD\n" + base, False),
+            (base.replace("old", "new"), base.replace("old", "new").rstrip(), True),
+        ):
+            with self.subTest(ours=ours, theirs=theirs):
+                result = contained(base, ours, theirs)
+                self.assertEqual(result, theirs if expected else None)
+
+    def test_real_conflict_preserves_main_and_fast_forwards_the_branch(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root, work, remote = Path(tmp), Path(tmp) / "work", Path(tmp) / "origin.git"
+            work.mkdir()
+            def git(*args):
+                return subprocess.run(["git", *args], cwd=work, capture_output=True, text=True, check=True).stdout.strip()
+            git("init", "-q", "-b", "main")
+            git("init", "-q", "--bare", str(remote))
+            for key, value in (("user.name", "Test"), ("user.email", "test@example.test"),
+                               ("commit.gpgsign", "false"), ("core.hooksPath", str(root / "hooks"))):
+                git("config", key, value)
+            git("remote", "add", "origin", str(remote))
+            path = work / "probe.mjs"
+            base = "before\nold\nafter\n" + "unchanged\n" * 10 + "tail\n"
+            path.write_text(base)
+            git("add", "probe.mjs")
+            git("commit", "-qm", "base")
+            git("branch", "feature")
+            ours = base.replace("old", "new")
+            theirs = ours.replace("new", "new\nmain addition").replace("tail", "main tail")
+            path.write_text(theirs)
+            git("commit", "-qam", "main already has the repair and later work")
+            git("push", "-q", "origin", "main")
+            git("checkout", "-q", "feature")
+            path.write_text(ours)
+            git("commit", "-qam", "repair")
+            before = git("rev-parse", "HEAD")
+            git("push", "-q", "origin", "feature")
+            # Force a real content conflict while keeping the exact patch on main.
+            path.write_text(ours.replace("before", "head before"))
+            git("commit", "-qam", "head context")
+            # This extra PR edit is absent on main, so the machine must abort without a push.
+            self.assertFalse(lane.resolve_contained_by_main_conflict(work, "feature", None))
+            self.assertEqual(git("rev-parse", "origin/feature"), before)
+            self.assertEqual(git("diff", "--name-only", "--diff-filter=U"), "")
+            # Build an identical-edit conflict: main changes an adjacent context line too.
+            git("checkout", "-q", "main")
+            theirs = theirs.replace("before", "head before")
+            path.write_text(theirs)
+            git("commit", "-qam", "same head context plus main tail")
+            git("push", "-q", "origin", "main")
+            git("checkout", "-q", "feature")
+            head = git("rev-parse", "HEAD")
+            conflict = subprocess.run(["git", "merge", "--no-edit", "origin/main"], cwd=work, capture_output=True)
+            self.assertEqual(conflict.returncode, 1)
+            self.assertEqual(git("diff", "--name-only", "--diff-filter=U"), "probe.mjs")
+            git("merge", "--abort")
+            self.assertTrue(lane.resolve_contained_by_main_conflict(work, "feature", None))
+            self.assertEqual(path.read_text(), theirs)
+            self.assertEqual(git("rev-parse", "HEAD"), git("rev-parse", "origin/feature"))
+            git("merge-base", "--is-ancestor", head, "HEAD")
+            self.assertEqual(len(git("show", "-s", "--format=%P").split()), 2)
+
+
 class FixRedTest(unittest.TestCase):
     def setUp(self):
         disk = patch.object(lane.disk_guard, "free_pct", return_value=50.0)
@@ -8496,6 +8571,23 @@ class FixRedTest(unittest.TestCase):
                 lane.run_agent = real_agent
         self.assertEqual((receipt["verdict"], receipt["resolution"]), ("fix-pushed", "identifier-list-merged"))
 
+    def test_a_contained_by_main_conflict_skips_the_agent(self):
+        names = [name for name in (
+            "resolve_generated_conflict", "resolve_narrowed_preflight_conflict",
+            "resolve_and_chain_conflict", "resolve_additive_list_conflict",
+            "resolve_identifier_list_conflict", "resolve_contained_by_main_conflict")]
+        with patch.multiple(lane, **{name: (lambda *a, **k: False) for name in names[:-1]}), \
+             patch.object(lane, names[-1], return_value=True), \
+             patch.object(lane, "run_agent", side_effect=AssertionError("contained edits need no model")), \
+             patch.object(lane, "sh", side_effect=lambda args, **kwargs: SimpleNamespace(
+                 returncode=0, stderr="", stdout="h9\n" if args[:2] == ["git", "rev-parse"] else
+                 "h9\0commit: repair\n" if args[:2] == ["git", "reflog"] else
+                 "h9\trefs/heads/devin/jov-1\n" if args[:2] == ["git", "ls-remote"] else "")), \
+             tempfile.TemporaryDirectory() as tmp:
+            receipt = lane.fix_red_pr(lane.Host(state=Path(tmp), repo=Path(tmp)), "devin", {"cmd": ["true"]},
+                                      {**self.pr(), "isDraft": False, "mergeStateStatus": "DIRTY"})
+        self.assertEqual((receipt["verdict"], receipt["resolution"]), ("fix-pushed", "contained-by-main"))
+
     def test_unknown_conflict_still_reaches_the_model_after_every_class(self):
         real_sh = lane.sh
         real_agent = lane.run_agent
@@ -8505,6 +8597,7 @@ class FixRedTest(unittest.TestCase):
             "resolve_and_chain_conflict",
             "resolve_additive_list_conflict",
             "resolve_identifier_list_conflict",
+            "resolve_contained_by_main_conflict",
         )
         saved = {name: getattr(lane, name) for name in names}
         for name in names:

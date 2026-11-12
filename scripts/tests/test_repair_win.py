@@ -155,5 +155,73 @@ class MeasuredWinPolicyTests(unittest.TestCase):
         self.assertEqual(writes, [])
 
 
+class DependabotPatchWinTests(unittest.TestCase):
+    """Configuration evidence must not invent a live Dependabot success."""
+    OLD, NEW = "a" * 40, "b" * 40
+
+    def snapshot(self, ignores):
+        return {"manifest": {"pnpm": {"patchedDependencies": {
+            "next@16.4.1": "patches/next.patch",
+            "@storybook/nextjs-vite@10.6.2": "patches/storybook.patch",
+        }}}, "config": {"updates": [{"package-ecosystem": "npm", "directory": "/", "ignore": ignores}]}}
+
+    def generate(self, before, after):
+        return events.repair_win.dependabot_patch_ignores(
+            before, after, before_sha=self.OLD, after_sha=self.NEW)
+
+    def test_generated_measurement_repairs_fleet_without_a_runtime_claim(self):
+        before = self.snapshot([{"dependency-name": "next", "versions": ["16.4.2"]}])
+        after = self.snapshot([{"dependency-name": name} for name in ("next", "@storybook/nextjs-vite")])
+        win = self.generate(before, after)
+        self.assertIn("| packages | lower | 2 | 0 |", win)
+        self.assertIn(f"python3 scripts/lanes/repair_win.py dependabot-patches {self.OLD} {self.NEW}", win)
+        self.assertIn(f"- Verify: https://github.com/JovieInc/Jovie/compare/{self.OLD}...{self.NEW}", win)
+        self.assertNotIn("- Per-merge: yes", win)
+        self.assertNotIn("- Pending: yes", win)
+        body = events.repair_evidence_body(fixtures.RedBeforeGreenEvidenceTests.PR, "Summary", "FAIL Fleet",
+                                          customer_decision={"releaseWorthy": False}, win_section=win)
+        self.assertEqual(body.count("customer-changelog/v1"), 1)
+        self.assertEqual(events.repair_evidence_body(fixtures.RedBeforeGreenEvidenceTests.PR, body,
+                                                    win_section=win), body)
+
+    def test_root_directories_form_uses_the_same_coverage_measurement(self):
+        before = self.snapshot([])
+        after = self.snapshot([{"dependency-name": name} for name in ("next", "@storybook/nextjs-vite")])
+        for snapshot in (before, after):
+            row = snapshot["config"]["updates"][0]
+            row["directories"] = [row.pop("directory")]
+        self.assertIn("| packages | lower | 2 | 0 |", self.generate(before, after))
+
+    def test_restricted_ignores_and_other_workspace_ignores_do_not_count(self):
+        for restricted in ({"versions": ["16.4.2"]}, {"update-types": ["version-update:semver-major"]}):
+            after = self.snapshot([{"dependency-name": "next", **restricted},
+                                   {"dependency-name": "@storybook/nextjs-vite"}])
+            with self.subTest(restricted=restricted), self.assertRaisesRegex(ValueError, "fully cover"):
+                self.generate(self.snapshot([]), after)
+        after = self.snapshot([])
+        after["config"]["updates"].append({"package-ecosystem": "npm", "directory": "/apps/web",
+                                           "ignore": [{"dependency-name": "next"}]})
+        with self.assertRaisesRegex(ValueError, "fully cover"):
+            self.generate(self.snapshot([]), after)
+
+    def test_missing_ambiguous_or_changed_sources_are_rejected(self):
+        complete = self.snapshot([{"dependency-name": name} for name in ("next", "@storybook/nextjs-vite")])
+        for mutate in (
+            lambda s: s["config"].update(updates=[]),
+            lambda s: s["config"]["updates"].append(s["config"]["updates"][0]),
+            lambda s: s["manifest"]["pnpm"].update(patchedDependencies={}),
+            lambda s: s["manifest"]["pnpm"]["patchedDependencies"].update({"new@1.0.0": "new.patch"}),
+        ):
+            after = json.loads(json.dumps(complete))
+            mutate(after)
+            with self.subTest(after=after), self.assertRaises(ValueError):
+                self.generate(self.snapshot([]), after)
+        with self.assertRaisesRegex(ValueError, "improvement"):
+            self.generate(complete, complete)
+        with self.assertRaisesRegex(ValueError, "exact"):
+            events.repair_win.dependabot_patch_ignores(self.snapshot([]), complete,
+                                                      before_sha="main", after_sha=self.NEW)
+
+
 if __name__ == "__main__":
     unittest.main()

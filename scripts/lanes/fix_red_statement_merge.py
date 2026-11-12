@@ -6,6 +6,7 @@ body stays unresolved. The caller proves the diff3 base is empty.
 """
 from __future__ import annotations
 
+import difflib
 import re
 
 _HUNK = re.compile(
@@ -123,3 +124,44 @@ def resolve_additive_statements_text(text: str) -> str | None:
     if _MARKERS.search(text):
         return None
     return text
+
+
+def contained_by_main(base: str, ours: str, theirs: str) -> str | None:
+    """Take main when every PR edit is retained within main's edit of the same base range.
+
+    Keep comments, whitespace, directives and string contents significant. Broader
+    overlapping base ranges, renamed locals and text elsewhere remain unresolved.
+    """
+    if any(_MARKERS.search(side) for side in (base, ours, theirs)):
+        return None
+    base_lines = base.splitlines(keepends=True)
+
+    def changes(side):
+        lines = side.splitlines(keepends=True)
+        return {(i1, i2): lines[j1:j2]
+                for tag, i1, i2, j1, j2 in difflib.SequenceMatcher(
+                    a=base_lines, b=lines, autojunk=False).get_opcodes() if tag != "equal"}
+
+    main_changes = changes(theirs)
+    for span, replacement in changes(ours).items():
+        landed = main_changes.get(span)
+        if landed is None:
+            return None
+        if not replacement:
+            if landed:
+                return None
+        elif not any(landed[start:start + len(replacement)] == replacement
+                     for start in range(len(landed) - len(replacement) + 1)):
+            return None
+    return theirs
+
+
+def contained_by_main_file(worktree, rel, sh) -> str | None:
+    """Read Git's actual base/PR/main stages, refusing missing stages."""
+    stages = []
+    for stage in (1, 2, 3):
+        blob = sh(["git", "show", f":{stage}:{rel}"], cwd=worktree)
+        if blob.returncode:
+            return None
+        stages.append(blob.stdout)
+    return contained_by_main(*stages)
