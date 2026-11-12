@@ -120,7 +120,7 @@ export function HomepageStoryHero({
         {/* The key light: one Ion wedge from above the frame, falling onto the
             selected release. The window stands in it; it shows only as haze
             above the window and as spill below it. */}
-        <div aria-hidden className='hv3-key' />
+        <div aria-hidden className='hv3-keylight' />
         <div
           className='hv3-rig hv3-rig--hero'
           role='img'

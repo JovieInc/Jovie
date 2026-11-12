@@ -120,7 +120,7 @@
  * reads as haze above the window and spill below it. Everything else falls
  * to black. Replaces the hero's rings, arc and glow blobs.
  */
-.hv3-key {
+.hv3-keylight {
   position: absolute;
   top: -26rem;
   left: 46%;
