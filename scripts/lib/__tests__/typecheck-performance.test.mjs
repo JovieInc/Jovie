@@ -172,6 +172,12 @@ describe('typecheck performance', () => {
       );
       expect(verdict).toEqual({ status: 'fail', reason: failure.reason });
       expect(
+        applyConfirmations({ ci: { status: 'fail' } }, [
+          { scenario: 'ci', verdict },
+          { scenario: 'ci', verdict: { status: 'pass' } },
+        ]).ci
+      ).toEqual(verdict);
+      expect(
         applyConfirmations({ ci: verdict }, [
           { scenario: 'ci', verdict: { status: 'pass' } },
         ]).ci

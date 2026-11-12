@@ -118,7 +118,8 @@ export function applyConfirmations(ratchet, confirmations) {
     if (
       resolved[scenario]?.status === 'fail' &&
       !resolved[scenario].reason &&
-      ['pass', 'warn'].includes(verdict.status)
+      (['pass', 'warn'].includes(verdict.status) ||
+        (verdict.status === 'fail' && verdict.reason))
     )
       resolved[scenario] = verdict;
   }
@@ -487,7 +488,8 @@ async function main() {
           scenario: name,
           verdict,
         });
-        if (verdict.status === 'fail') stillFailing.push(name);
+        if (verdict.status === 'fail' && !verdict.reason)
+          stillFailing.push(name);
       }
       pending = stillFailing;
     }
