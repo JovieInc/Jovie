@@ -51,7 +51,7 @@ export const UpdateFailed: Story = {
   },
 };
 /** Nothing to show yet: the slot keeps its 32px footprint. */
-export const UpdateEmptySlot: Story = { args: { children: null } };
+export const EmptyUpdateSlot: Story = { args: { children: null } };
 
 export const WhatsNew: Story = {
   render: () => (
@@ -63,7 +63,7 @@ export const WhatsNew: Story = {
   ),
 };
 /** A long release title truncates before the trailing arrow. */
-export const WhatsNewLongContent: Story = {
+export const LongContentWhatsNew: Story = {
   render: () => (
     <DockWhatsNewCard
       title='Release pages now show every streaming service, presave countdowns and per-territory analytics'

@@ -132,6 +132,26 @@ export const DisabledRow: Story = {
   ),
 };
 
+/** A panel with a header and no rows yet keeps its inset and outline. */
+export const EmptyNoRows: Story = {
+  render: args => (
+    <InsetPanel {...args}>
+      <InsetPanelHeader title='Nothing here yet' />
+    </InsetPanel>
+  ),
+};
+
+/** Rows without an icon or trailing content keep the shared label edge. */
+export const PartialRows: Story = {
+  render: args => (
+    <InsetPanel {...args}>
+      <InsetPanelRow icon={<BookOpen />}>Docs</InsetPanelRow>
+      <InsetPanelRow>Contact us</InsetPanelRow>
+      <InsetPanelRow trailing='⌘ /'>Keyboard shortcuts</InsetPanelRow>
+    </InsetPanel>
+  ),
+};
+
 /** A long label truncates before the trailing slot instead of wrapping. */
 export const LongContent: Story = {
   render: args => (
