@@ -32,8 +32,7 @@ export const HeroAndClose: Story = {
 
 /**
  * `HOMEPAGE_START_CTA` forced off: the invite-only story, whatever the
- * environment says. Paired with `StartCtaOn` by
- * tests/e2e/storybook-homepage-start-cta.spec.ts.
+ * environment says.
  */
 export const StartCtaOff: Story = { args: { startCta: false } };
 
