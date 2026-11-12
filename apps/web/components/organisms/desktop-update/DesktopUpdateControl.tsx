@@ -17,7 +17,7 @@ export interface DesktopUpdateControlView {
   /** Visible button label; also reserves the button's footprint when busy. */
   readonly actionLabel: string;
   /** Accessible button name, spelled out because the visible label is short. */
-  readonly actionName: string;
+  readonly actionAriaLabel: string;
   readonly intent: DesktopUpdateControlIntent;
   /** The updater is working; the button shows its loading state. */
   readonly busy: boolean;
@@ -27,17 +27,17 @@ export interface DesktopUpdateControlView {
 
 const DOWNLOAD = {
   actionLabel: 'Download',
-  actionName: 'Download update',
+  actionAriaLabel: 'Download update',
   intent: 'download',
 } as const;
 const RESTART = {
   actionLabel: 'Restart',
-  actionName: 'Restart to update',
+  actionAriaLabel: 'Restart to update',
   intent: 'restart',
 } as const;
 const RETRY = {
   actionLabel: 'Retry',
-  actionName: 'Retry update',
+  actionAriaLabel: 'Retry update',
   intent: 'retry',
 } as const;
 
@@ -190,7 +190,7 @@ export function DesktopUpdateControl({
         loading={view.busy}
         // The status line already announces progress; keep the button quiet.
         stateLabels={{ pending: '' }}
-        aria-label={view.actionName}
+        aria-label={view.actionAriaLabel}
         onClick={act}
         className='w-18 shrink-0'
       >

@@ -225,7 +225,7 @@ describe('describeDesktopUpdateControl', () => {
         view?.label,
         view?.announcement,
         view?.actionLabel,
-        view?.actionName,
+        view?.actionAriaLabel,
       ]) {
         expect(text).toBeTruthy();
         expect(text).not.toMatch(/\.$/);
