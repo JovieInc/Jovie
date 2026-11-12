@@ -26,7 +26,7 @@ export function TeleprompterNotchVisual({
   return (
     <div
       className={cn(
-        'relative mx-auto aspect-[10/16] w-full max-w-55 overflow-hidden rounded-[28px] border border-on-media/14 shadow-[0_24px_60px_rgba(0,0,0,0.45)]',
+        'relative mx-auto aspect-[10/16] w-full max-w-55 overflow-hidden rounded-[28px] border border-white/14 shadow-[0_24px_60px_rgba(0,0,0,0.45)]',
         className
       )}
       style={PHONE_SHELL_STYLE}
@@ -37,7 +37,7 @@ export function TeleprompterNotchVisual({
         className='absolute left-1/2 top-2 h-5 w-24 -translate-x-1/2 rounded-full bg-black dark:bg-black'
       />
       <div className='absolute inset-x-3 top-10 bottom-4 flex flex-col items-center justify-start px-2 pt-3 text-center'>
-        <p className='text-[11px] font-medium leading-snug tracking-tight text-on-media/88 dark:text-on-media/88'>
+        <p className='text-[11px] font-medium leading-snug tracking-tight text-white/88 dark:text-white/88'>
           {preview}
         </p>
         <span

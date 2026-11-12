@@ -36,15 +36,6 @@ describe('TeleprompterNotchVisual', () => {
     );
   });
 
-  it('draws the rim and script with on-media tokens, not raw white', () => {
-    render(<TeleprompterNotchVisual script='Hi' />);
-
-    const shell = screen.getByTestId('teleprompter-notch-visual');
-    expect(shell).toHaveClass('border-on-media/14');
-    expect(screen.getByText('Hi')).toHaveClass('text-on-media/88');
-    expect(shell.outerHTML).not.toMatch(/\b(?:text|border)-white\b/);
-  });
-
   it('has no accessibility violations with a short or a cut script', async () => {
     const { container, rerender } = render(
       <TeleprompterNotchVisual script='Say hi and name the release.' />
