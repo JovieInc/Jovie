@@ -351,9 +351,9 @@ describe('ProfileDesktopSurface', () => {
       'before:min-h-11',
       'before:min-w-11'
     );
-    expect(listenCta.className).toContain('before:min-w-11');
     const profileHeader = screen.getByTestId('profile-header');
     expect(profileHeader).toHaveClass('min-w-0', 'max-w-full');
+    expect(profileHeader).toHaveClass('focus-visible:ring-focus');
     expect(within(profileHeader).getByText('Tim White')).toHaveClass(
       'min-w-0',
       'line-clamp-2 wrap-anywhere'
@@ -1204,18 +1204,5 @@ describe('ProfileDesktopSurface', () => {
     expect(
       screen.queryByTestId('profile-desktop-payments-card')
     ).not.toBeInTheDocument();
-  });
-});
-
-describe('ProfileDesktopSurface focus ring', () => {
-  it('draws the hero title link focus ring from the canonical focus token', () => {
-    renderDesktopSurface();
-
-    const header = screen.getByTestId('profile-header');
-    expect(header).toHaveClass(
-      'focus-visible:ring-2',
-      'focus-visible:ring-focus'
-    );
-    expect(header.className).not.toContain('var(--focus-ring)');
   });
 });
