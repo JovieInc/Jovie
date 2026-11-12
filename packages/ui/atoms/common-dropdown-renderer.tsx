@@ -27,7 +27,10 @@ import {
   renderRadioGroup,
   renderSeparator,
 } from './common-dropdown-item-renderers';
-import type { CommonDropdownItem, CommonDropdownSubmenu } from './common-dropdown-types';
+import type {
+  CommonDropdownItem,
+  CommonDropdownSubmenu,
+} from './common-dropdown-types';
 import {
   isActionItem,
   isActionRow,
@@ -95,8 +98,7 @@ function focusSiblingMenuItem(
   input: HTMLInputElement | null,
   placement: 'first' | 'last'
 ): HTMLElement | undefined {
-  const menu =
-    input?.closest('[role="menu"]') ?? input?.closest('[role="group"]');
+  const menu = input?.closest('[role="menu"]') ?? input?.closest('[role="group"]');
   if (!menu) return undefined;
 
   const menuItems = Array.from(
