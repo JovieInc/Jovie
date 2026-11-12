@@ -681,10 +681,11 @@ test('runAdvisoryCloses closes matched groups and stays green while all succeed'
       candidateNode('i1', '[secadv-ghsa-aaaa-bbbb-cccc-left-pad] HIGH left-pad'),
     ],
     runId: 'run-9',
-    comment: 'deployed',
+    commentFor: g => `Fixed on main at ${g.fixedAt} and deployed.`,
     close: async input => {
       assert.equal(input.fingerprint, 'secadv-ghsa-aaaa-bbbb-cccc-left-pad');
       assert.equal(input.runId, 'run-9');
+      assert.equal(input.comment, 'Fixed on main at 2026-10-25T00:00:00Z and deployed.');
       return { ok: true, action: 'resolved' };
     },
   });

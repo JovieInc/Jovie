@@ -259,6 +259,7 @@ export async function runAdvisoryCloses({
   candidates,
   runId,
   comment,
+  commentFor = null,
   close = closeLinearIssueByFingerprint,
 }) {
   const actions = [];
@@ -278,7 +279,11 @@ export async function runAdvisoryCloses({
       if (rateLimited) failed = true;
       continue;
     }
-    const r = await close({ fingerprint: g.fingerprint, runId, comment });
+    const r = await close({
+      fingerprint: g.fingerprint,
+      runId,
+      comment: commentFor ? commentFor(g) : comment,
+    });
     actions.push({
       fingerprint: g.fingerprint,
       op: 'close',
@@ -392,6 +397,8 @@ async function main() {
           closes: plan.closes,
           candidates: scan.nodes,
           runId: process.env.GITHUB_RUN_ID || now.toISOString(),
+          commentFor: g =>
+            `Fixed on main at ${g.fixedAt} and deployed: Production deployment at ${g.deployedAt} postdates the fix.`,
         });
         receipt.actions.push(...closeResult.actions);
         if (!closeResult.ok) process.exitCode = 1;
