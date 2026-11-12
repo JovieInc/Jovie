@@ -143,6 +143,21 @@ const OBSERVE = `
   }).observe(document, { childList: true, subtree: true });
   watch('largest-contentful-paint', e => { window.__crawl.lcp = Math.max(window.__crawl.lcp, e.startTime); });
   watch('longtask', e => { window.__crawl.longest = Math.max(window.__crawl.longest, e.duration); });
+  // The longest animation frame, with the scripts that ran in it, so a
+  // frozen-frame finding says what blocked the main thread.
+  watch('long-animation-frame', e => {
+    if (e.duration <= (window.__crawl.frame?.ms ?? 0)) return;
+    const file = u => (u || '').split('?')[0].split('/').pop().slice(0, 80);
+    window.__crawl.frame = {
+      ms: Math.round(e.duration),
+      atMs: Math.round(e.startTime),
+      layoutMs: Math.round(e.styleAndLayoutDuration ?? 0),
+      scripts: [...(e.scripts ?? [])]
+        .sort((a, b) => b.duration - a.duration)
+        .slice(0, 3)
+        .map(x => ({ src: file(x.sourceURL), fn: (x.sourceFunctionName || '').slice(0, 60), invoker: /^https?:/.test(x.invoker || '') ? file(x.invoker) : (x.invoker || x.invokerType || '').slice(0, 80), ms: Math.round(x.duration) })),
+    };
+  });
 `;
 const MEASURE = `({ ...window.__crawl, added: undefined,
   text: document.body?.innerText ?? '',
@@ -183,7 +198,13 @@ async function visit({ route, target, viewport, identity, fixture, collect }) {
       thirdPartyConsole += 1;
       return;
     }
-    consoleErrors.push(m.text().slice(0, 200));
+    // Chrome leaves the address out of a failed load's text; add its path.
+    const at = m.location()?.url;
+    const path =
+      at && /^Failed to load resource/.test(m.text())
+        ? ` (${new URL(at).pathname})`
+        : '';
+    consoleErrors.push((m.text() + path).slice(0, 200));
   });
   page.on('pageerror', e => consoleErrors.push(String(e).slice(0, 200)));
   page.on('response', r => {
@@ -237,6 +258,7 @@ async function visit({ route, target, viewport, identity, fixture, collect }) {
       });
     row.lcpMs = Math.round(m.lcp);
     row.longestTaskMs = Math.round(m.longest);
+    if (m.frame) row.frame = m.frame;
     row.placeholder = m.text.match(PLACEHOLDER)?.[0] ?? null;
     row.horizontalOverflow = m.overflow;
     if (row.expectClaimBanner) row.claimBanner = CLAIM_BANNER.test(m.text);
