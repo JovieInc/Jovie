@@ -324,7 +324,7 @@ const CREDIT_DISPUTE_PATTERN =
 const CREDIT_FIX_PATTERN = /\b(fixed|corrected|resolved|updated)\b/i;
 /** A fix word that is negated or still pending reads as an open dispute. */
 const CREDIT_FIX_NEGATED_PATTERN =
-  /\b(not|never|isn['’]t|hasn['’]t|haven['’]t|wasn['’]t|weren['’]t|yet to be|needs? to be|to be)\s+(?:\w+\s+){0,2}(fixed|corrected|resolved|updated)\b/i;
+  /\b(not|never|cannot|no longer|\w+n['’]t|yet to be|needs? to be|to be)\s+(?:\w+\s+){0,2}(fixed|corrected|resolved|updated)\b/i;
 
 const REPLY_PREFIX_PATTERN =
   /^\s*(re|fw|fwd|aw|completed|please docusign|signature requested|reminder)\s*:\s*/i;
