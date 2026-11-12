@@ -5,6 +5,7 @@ import {
   HOMEPAGE_EDITORIAL_COPY,
   HOMEPAGE_INVITE_ANCHOR,
 } from '@/data/homepageEditorialCopy';
+import { getClaimProfileIntent } from '@/data/marketingCtaIntents';
 import { expectNoA11yViolations } from '@/tests/utils/a11y';
 
 // Per-chapter rendered-state and accessibility coverage. The page-level copy,
@@ -163,5 +164,34 @@ describe('HomepageEditorial chapters', () => {
       screen.getByText('ملفك وكل إصدار ورابط لكل منصة.')
     ).toBeInTheDocument();
     await expectNoA11yViolations(container);
+  });
+
+  it('keeps the invitation action by default and enters /start when HOMEPAGE_START_CTA is on', async () => {
+    const off = render(<HomepageStoryHero />);
+    const invite = screen.getByTestId('homepage-primary-cta');
+    expect(invite).toHaveAttribute('href', COPY.hero.primaryHref);
+    expect(invite).toHaveTextContent(COPY.hero.primaryAction);
+    expect(screen.getByText(COPY.hero.note)).toBeInTheDocument();
+    off.unmount();
+
+    vi.stubEnv('FEATURE_HOMEPAGE_START_CTA', 'true');
+    try {
+      const claim = getClaimProfileIntent();
+      const { container } = render(<HomepageStoryHero />);
+      const start = screen.getByTestId('homepage-primary-cta');
+      expect(start).toHaveAttribute('href', '/start');
+      expect(start).toHaveAttribute('href', claim.href);
+      expect(start).toHaveAttribute('data-primary-action', 'true');
+      expect(start).toHaveTextContent(claim.label);
+      // The note describes the invitation form, so it leaves with that action.
+      expect(screen.queryByText(COPY.hero.note)).not.toBeInTheDocument();
+      expect(screen.getByTestId('homepage-hero-live-profile')).toHaveAttribute(
+        'href',
+        COPY.hero.secondaryHref
+      );
+      await expectNoA11yViolations(container);
+    } finally {
+      vi.unstubAllEnvs();
+    }
   });
 });

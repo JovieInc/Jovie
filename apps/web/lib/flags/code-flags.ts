@@ -30,6 +30,14 @@ export const CODE_FLAGS = {
   // the 30-day nudge and reopens 50k+ claims past it as proof-only requests.
   CLAIM_LEGACY_PROOF_SWEEP: false,
   CYAN_FOCUS_GLOW: true,
+  // Homepage hero primary action enters the one onboarding flow at /start
+  // (public signup reopened 2026-11-09, canon/PRODUCT.md). Default off: the
+  // hero keeps "Request an invite" until Tim approves the copy by
+  // screenshot. FEATURE_HOMEPAGE_START_CTA=true swaps the hero action to the
+  // shared claim-profile CTA intent and drops the invite note under it. No
+  // effect while PUBLIC_SIGNUP_CLOSED is on. The homepage is static, so the
+  // flip needs a redeploy.
+  HOMEPAGE_START_CTA: false,
   // Fundraising YC section order. Default off until Tim approves the
   // narrative in Pen. FEATURE_INVESTOR_PORTAL_YC_DECK=true reorders the
   // existing brief sentences and shows only sourced traction stats.
