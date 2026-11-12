@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const h = vi.hoisted(() => ({
   findRedirectByOldSlug: vi.fn(),
   getTrackBySlugInRelease: vi.fn(),
+  trackSlugExistsInRelease: vi.fn(),
 }));
 
 vi.mock('server-only', () => ({}));
@@ -11,6 +12,9 @@ vi.mock('@/lib/discography/slug', () => ({
 }));
 vi.mock('./data', () => ({
   getTrackBySlugInRelease: h.getTrackBySlugInRelease,
+}));
+vi.mock('./track-slug-exists', () => ({
+  trackSlugExistsInRelease: h.trackSlugExistsInRelease,
 }));
 
 import { resolveMovedTrackPath } from './moved-track-path';
@@ -21,6 +25,8 @@ describe('resolveMovedTrackPath', () => {
   beforeEach(() => {
     h.findRedirectByOldSlug.mockReset();
     h.getTrackBySlugInRelease.mockReset();
+    h.trackSlugExistsInRelease.mockReset();
+    h.trackSlugExistsInRelease.mockResolvedValue(false);
   });
 
   it('follows a renamed release to the same track', async () => {
@@ -86,5 +92,23 @@ describe('resolveMovedTrackPath', () => {
       })
     ).resolves.toBeNull();
     expect(h.getTrackBySlugInRelease).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps a suffixed track that still exists, even with no links yet', async () => {
+    h.trackSlugExistsInRelease.mockResolvedValue(true);
+    h.getTrackBySlugInRelease.mockResolvedValue({ title: 'Song' });
+    await expect(
+      resolveMovedTrackPath({
+        ...base,
+        releaseSlug: 'album',
+        trackSlug: 'song-2',
+        releaseId: 'rel-album',
+      })
+    ).resolves.toBeNull();
+    expect(h.trackSlugExistsInRelease).toHaveBeenCalledWith(
+      'rel-album',
+      'song-2'
+    );
+    expect(h.getTrackBySlugInRelease).not.toHaveBeenCalled();
   });
 });
