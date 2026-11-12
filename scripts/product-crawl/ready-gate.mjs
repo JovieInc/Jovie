@@ -127,6 +127,19 @@ const shiftedBy = page =>
     ? `; moved: ${page.clsSources.map(s => `${s.node} (${s.value.toFixed(3)}${movedHow(s)})`).join(', ')}`
     : '';
 
+/** What ran in the page's longest animation frame, slowest script first. */
+const blockedBy = page => {
+  const fr = page.frame;
+  if (!fr?.scripts?.length) return '';
+  const scripts = fr.scripts
+    .map(
+      x =>
+        `${x.fn ? `${x.fn} in ` : ''}${x.src || 'inline'} via ${x.invoker} ${x.ms}ms`
+    )
+    .join(', ');
+  return `; longest frame ${fr.ms}ms at ${fr.atMs}ms (layout ${fr.layoutMs}ms): ${scripts}`;
+};
+
 const ofSamples = page =>
   page.timingSamples > 1 ? ` (median of ${page.timingSamples} loads)` : '';
 
@@ -137,6 +150,8 @@ const ofSamples = page =>
  *   failedRequests?: string[], placeholder?: string|null,
  *   horizontalOverflow?: boolean, url?: string, expectClaimBanner?: boolean,
  *   claimBanner?: boolean, timingSamples?: number,
+ *   frame?: { ms: number, atMs: number, layoutMs: number,
+ *     scripts: { src: string, fn: string, invoker: string, ms: number }[] },
  *   clsSources?: { node: string, value: number, dy?: number, atMs?: number,
  *     after?: { node: string, h: number, atMs: number } }[] }} page
  * @returns {{ route: string, identity: string, viewport: string, kind: string, detail: string }[]}
@@ -189,7 +204,7 @@ export function pageFindings(page, closed = []) {
     out.push(
       f(
         'frozen-frame',
-        `main thread blocked ${Math.round(page.longestTaskMs)}ms${ofSamples(page)}`
+        `main thread blocked ${Math.round(page.longestTaskMs)}ms${ofSamples(page)}${blockedBy(page)}`
       )
     );
   if ((page.loadMs ?? 0) > THRESHOLDS.loadMs)
