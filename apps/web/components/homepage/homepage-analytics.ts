@@ -1,4 +1,11 @@
+import { HOMEPAGE_FEATURED_ARTIST } from '@/data/demoArtists';
 import { trackFunnelStep } from '@/lib/analytics/signup-funnel-client';
+
+/**
+ * Every homepage event says which artist the page featured, so the featured
+ * slot can rotate by what converts (Tim, 2026-11-12).
+ */
+export const HOMEPAGE_FEATURED_ARTIST_SLUG = HOMEPAGE_FEATURED_ARTIST.slug;
 
 export function trackHomepageEvent(
   event: string,
@@ -15,7 +22,10 @@ export function trackHomepageEvent(
 
   void import('../../lib/analytics')
     .then(({ track }) => {
-      track(event, properties);
+      track(event, {
+        featured_artist: HOMEPAGE_FEATURED_ARTIST_SLUG,
+        ...properties,
+      });
     })
     .catch(() => {});
 }

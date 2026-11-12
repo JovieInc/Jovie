@@ -14,12 +14,17 @@
       "path": "apps/web/public/images/avatars/tim-white.jpg",
       "person": "tim-white",
       "routes": [
+        "/",
         "/artist-profiles",
         "/product",
         "/about",
         "/smart-links",
         "/pricing"
-      ]
+      ],
+      "homepage": {
+        "at": "2026-11-12T19:58:13Z",
+        "inTheirWords": "approve new hero. use me for now."
+      }
     },
     {
       "path": "apps/web/public/images/avatars/tim-white-founder.jpg",

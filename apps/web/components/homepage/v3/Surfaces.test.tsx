@@ -22,12 +22,11 @@ describe('homepage v3 surfaces', () => {
     await expectNoA11yViolations(container);
   });
 
-  it('shows the featured demo artist release, never Tim', async () => {
+  it('shows the featured artist’s inspected release', async () => {
     const { container } = render(<ReleasePage />);
     const page = HOMEPAGE_PRODUCT_UI.releasePage;
     expect(container).toHaveTextContent(page.title);
     expect(container).toHaveTextContent(page.artist);
-    expect(container).not.toHaveTextContent('Tim White');
     await expectNoA11yViolations(container);
   });
 

@@ -228,7 +228,7 @@ describe('homepage contract', { timeout: 60_000 }, () => {
     }
   });
 
-  it('shows no real person: only the featured demo artist inside the product UI', async () => {
+  it('shows only the featured artist inside the product UI, and nobody else', async () => {
     const { HOMEPAGE_EDITORIAL_COPY: copy } = await loadCopy();
     const { HOMEPAGE_FEATURED_ARTIST: artist } = await import(
       '@/data/demoArtists'
@@ -237,24 +237,20 @@ describe('homepage contract', { timeout: 60_000 }, () => {
     const sources = [...container.querySelectorAll('section img')].map(image =>
       (image.getAttribute('src') ?? '').replace(/\?v=\w+$/, '')
     );
-    // Tim, 2026-11-08: the homepage does not feature him. Until a real artist
-    // opts in, the product UI is labeled Example artist (procedural art, no
-    // people, no verified badge). No real person renders on `/`.
+    // Tim, 2026-11-12: feature him with his own catalog for now, from the
+    // featured slot, so any opted-in artist can take it later. Only the slot's
+    // images render: no other person, no verified badge.
     const allowed = [
       artist.avatarSrc,
       ...artist.releases.map(release => release.src),
     ];
-    expect(artist.demo).toBe(true);
-    expect(artist.name).toBe('Example artist');
+    expect(artist.name).toBe('Tim White');
     expect(container.querySelector('.hv3-pp__badge, .hv3-insp__ok')).toBeNull();
     expect(sources.length).toBeGreaterThan(0);
     expect(sources.filter(src => !allowed.includes(src))).toEqual([]);
     expect([...new Set(sources)].sort()).toEqual([...new Set(allowed)].sort());
-    expect(sources.some(src => /tim-white|img\/releases\//.test(src))).toBe(
-      false
-    );
-    expect(container.textContent).not.toContain('Tim White');
-    expect(copy.profile.alt).toBeTruthy();
+    expect(container.textContent).not.toContain('Example artist');
+    expect(copy.profile.alt).toContain('Tim White’s Jovie profile');
   });
 
   it('keeps copy in data and free of em dashes and stock promotion', async () => {
