@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { randomUUID } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
 import {
   existsSync,
@@ -27,9 +28,12 @@ import {
   slaDueAt,
 } from './lib/security-advisory-policy.mjs';
 import {
+  CLOSE_SCAN_MAX_PAGES,
+  listSecadvIssueCandidates,
   recordBlindSource,
   stageMetrics,
 } from './security-advisory-intake.mjs';
+import { resolveLinearIssueByFingerprint } from './lib/linear-issue-intake.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const NOW = new Date('2026-10-25T12:00:00Z');
@@ -456,4 +460,137 @@ test('workflow check preserves the sync receipt when both record a blind source'
   const uploaded = upload.with.path.trim().split(/\s+/);
   assert.ok(uploaded.includes(path.basename(syncPath)));
   assert.ok(uploaded.includes(path.basename(env.RECEIPT_PATH)));
+});
+
+function linearPage(nodes, hasNextPage, endCursor) {
+  return {
+    data: { issues: { nodes, pageInfo: { hasNextPage, endCursor } } },
+  };
+}
+
+function candidateNode(id, title, labelNames = []) {
+  return {
+    id,
+    identifier: 'JOV-1',
+    url: 'https://linear.app/jovie/issue/JOV-1',
+    title,
+    state: { id: 's1', name: 'Todo', type: 'unstarted' },
+    labels: { nodes: labelNames.map(name => ({ id: name, name })) },
+  };
+}
+
+test('close-candidate scan pages Linear results until exhausted', async () => {
+  const pages = [
+    linearPage(
+      [candidateNode('i1', '[secadv-ghsa-aaaa-bbbb-cccc-left-pad] HIGH left-pad: bad')],
+      true,
+      'cursor-1'
+    ),
+    linearPage(
+      [
+        candidateNode(
+          'i2',
+          '[secadv-ghsa-cccc-dddd-eeee-right-pad] MEDIUM right-pad: worse'
+        ),
+      ],
+      false,
+      null
+    ),
+  ];
+  let calls = 0;
+  const fetchImpl = async () => ({
+    ok: true,
+    status: 200,
+    text: async () => JSON.stringify(pages[calls++]),
+  });
+  const scan = await listSecadvIssueCandidates({
+    apiKey: `k-${randomUUID()}`,
+    fetchImpl,
+  });
+  assert.equal(scan.ok, true);
+  assert.equal(scan.nodes.length, 2);
+  assert.equal(scan.truncated, false);
+  assert.equal(calls, 2);
+});
+
+test('close-candidate scan reports truncation at the page cap', async () => {
+  let calls = 0;
+  const fetchImpl = async () => {
+    calls += 1;
+    return {
+    ok: true,
+    status: 200,
+    text: async () =>
+      JSON.stringify(
+        linearPage(
+          [candidateNode(`i${calls}`, '[secadv-x] always another page')],
+          true,
+          `cursor-${calls}`
+        )
+      ),
+    };
+  };
+  const scan = await listSecadvIssueCandidates({
+    apiKey: `k-${randomUUID()}`,
+    fetchImpl,
+  });
+  assert.equal(scan.ok, true);
+  assert.equal(calls, CLOSE_SCAN_MAX_PAGES);
+  assert.equal(scan.truncated, true);
+});
+
+test('close-candidate scan fails closed on a Linear rate limit', async () => {
+  const fetchImpl = async () => ({
+    ok: false,
+    status: 429,
+    text: async () => '',
+  });
+  const scan = await listSecadvIssueCandidates({
+    apiKey: `k-${randomUUID()}`,
+    fetchImpl,
+  });
+  assert.equal(scan.ok, false);
+  assert.equal(scan.reason, 'linear_rate_limited');
+});
+
+test('close-candidate scan fails closed on a GraphQL error', async () => {
+  const fetchImpl = async () => ({
+    ok: true,
+    status: 200,
+    text: async () => JSON.stringify({ errors: [{ message: 'nope' }] }),
+  });
+  const scan = await listSecadvIssueCandidates({
+    apiKey: `k-${randomUUID()}`,
+    fetchImpl,
+  });
+  assert.equal(scan.ok, false);
+  assert.equal(scan.reason, 'linear_close_scan_graphql_error');
+});
+
+test('close-candidate scan requires an api key', async () => {
+  const scan = await listSecadvIssueCandidates({ apiKey: '' });
+  assert.equal(scan.ok, false);
+  assert.equal(scan.reason, 'missing_linear_api_key');
+});
+
+test('scan nodes resolve candidates by title fingerprint and label, and skip non-matches', () => {
+  const nodes = [
+    candidateNode('i1', '[secadv-ghsa-aaaa-bbbb-cccc-left-pad] HIGH left-pad'),
+    candidateNode('i2', 'Secadv intake hand-retitled', [
+      'remediation:secadv-ghsa-aaaa-bbbb-cccc-right-pad',
+    ]),
+  ];
+  assert.ok(
+    resolveLinearIssueByFingerprint(nodes, 'secadv-ghsa-aaaa-bbbb-cccc-left-pad')
+  );
+  assert.ok(
+    resolveLinearIssueByFingerprint(
+      nodes,
+      'secadv-ghsa-aaaa-bbbb-cccc-right-pad'
+    )
+  );
+  assert.equal(
+    resolveLinearIssueByFingerprint(nodes, 'secadv-ghsa-zzzz-yyyy-xxxx-none'),
+    null
+  );
 });

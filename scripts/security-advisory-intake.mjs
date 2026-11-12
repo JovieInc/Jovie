@@ -13,9 +13,12 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { runGh } from '../packages/api-client/gh.ts';
+import { linearRequest } from './lib/linear-cooldown.mjs';
 import { resolveLabelId } from './deprecation-intake.mjs';
 import {
   closeLinearIssueByFingerprint,
+  JOVIE_TEAM_ID,
+  resolveLinearIssueByFingerprint,
   upsertLinearIssueByTitleFingerprint,
 } from './lib/linear-issue-intake.mjs';
 import {
@@ -26,6 +29,96 @@ import {
 } from './lib/security-advisory-policy.mjs';
 
 export const MAX_UPSERTS_PER_RUN = 60;
+
+// One paged scan replaces one Linear search per fixed advisory. The close list
+// re-attempts every historical fixed group on every run (~340 groups on run
+// 43179965779): those per-group searches sustained several hundred Linear
+// requests per run, tripped the shared key's rate limit mid-loop, and every
+// later close then failed with linear_rate_limited, failing the run. A close
+// can only act on an issue that exists, so candidates are resolved from a
+// single scan and groups with no issue are recorded as `none` for free.
+export const CLOSE_SCAN_TITLE_TEXT = 'secadv-';
+export const CLOSE_SCAN_LABEL_PREFIX = 'remediation:secadv-';
+export const CLOSE_SCAN_PAGE_SIZE = 100;
+export const CLOSE_SCAN_MAX_PAGES = 5;
+
+const CLOSE_CANDIDATE_FIELDS = `
+  id identifier url title
+  state { id name type }
+  labels(first: 50) { nodes { id name } }
+`;
+
+export async function listSecadvIssueCandidates({
+  apiKey = process.env.LINEAR_API_KEY,
+  fetchImpl = fetch,
+} = {}) {
+  if (!apiKey) return { ok: false, reason: 'missing_linear_api_key' };
+  const nodes = [];
+  let cursor = null;
+  for (let page = 0; page < CLOSE_SCAN_MAX_PAGES; page += 1) {
+    const result = await linearRequest({
+      key: apiKey,
+      query: `
+        query ListSecadvCloseCandidates(
+          $teamFilterId: ID!
+          $titleText: String!
+          $labelPrefix: String!
+          $pageSize: Int!
+          $cursor: String
+        ) {
+          issues(
+            filter: {
+              team: { id: { eq: $teamFilterId } }
+              or: [
+                { title: { contains: $titleText } }
+                { labels: { some: { name: { startsWith: $labelPrefix } } } }
+              ]
+            }
+            first: $pageSize
+            after: $cursor
+          ) {
+            nodes { ${CLOSE_CANDIDATE_FIELDS} }
+            pageInfo { hasNextPage endCursor }
+          }
+        }
+      `,
+      variables: {
+        teamFilterId: JOVIE_TEAM_ID,
+        titleText: CLOSE_SCAN_TITLE_TEXT,
+        labelPrefix: CLOSE_SCAN_LABEL_PREFIX,
+        pageSize: CLOSE_SCAN_PAGE_SIZE,
+        cursor,
+      },
+      fetchImpl,
+    });
+    if (result.rateLimited) {
+      return {
+        ok: false,
+        reason: 'linear_rate_limited',
+        resetAt: result.resetAt,
+      };
+    }
+    if (!result.ok) {
+      return {
+        ok: false,
+        reason: `linear_close_scan_${result.status ?? 'error'}`,
+      };
+    }
+    if (Array.isArray(result.data?.errors) && result.data.errors.length > 0) {
+      return {
+        ok: false,
+        reason: 'linear_close_scan_graphql_error',
+        body: result.data.errors,
+      };
+    }
+    const collection = result.data?.data?.issues;
+    nodes.push(...(collection?.nodes ?? []));
+    const pageInfo = collection?.pageInfo;
+    if (!pageInfo?.hasNextPage) return { ok: true, nodes, truncated: false };
+    cursor = pageInfo.endCursor;
+  }
+  return { ok: true, nodes, truncated: true };
+}
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
 async function gh(args, token, { paginate = true } = {}) {
@@ -232,19 +325,55 @@ async function main() {
       });
       if (!r.ok) process.exitCode = 1;
     }
-    for (const g of plan.closes) {
-      const r = await closeLinearIssueByFingerprint({
-        fingerprint: g.fingerprint,
-        runId: process.env.GITHUB_RUN_ID || now.toISOString(),
-        comment: `Fixed on main at ${g.fixedAt} and deployed: Production deployment at ${g.deployedAt} postdates the fix.`,
+    if (plan.closes.length > 0) {
+      const scan = await listSecadvIssueCandidates({
+        apiKey: process.env.LINEAR_API_KEY,
       });
-      receipt.actions.push({
-        fingerprint: g.fingerprint,
-        op: 'close',
-        ok: r.ok,
-        action: r.action,
-      });
-      if (!r.ok && r.reason !== 'not_found') process.exitCode = 1;
+      if (!scan.ok) {
+        receipt.actions.push({
+          fingerprint: 'secadv-close-scan',
+          op: 'scan',
+          ok: false,
+          action: scan.reason,
+        });
+        process.exitCode = 1;
+      } else {
+        receipt.closeScan = {
+          scanned: scan.nodes.length,
+          truncated: scan.truncated,
+        };
+        let rateLimited = false;
+        for (const g of plan.closes) {
+          const candidate = rateLimited
+            ? null
+            : resolveLinearIssueByFingerprint(scan.nodes, g.fingerprint);
+          if (!candidate) {
+            receipt.actions.push({
+              fingerprint: g.fingerprint,
+              op: 'close',
+              ok: !rateLimited,
+              action: rateLimited ? 'deferred_rate_limited' : 'none',
+            });
+            if (rateLimited) process.exitCode = 1;
+            continue;
+          }
+          const r = await closeLinearIssueByFingerprint({
+            fingerprint: g.fingerprint,
+            runId: process.env.GITHUB_RUN_ID || now.toISOString(),
+            comment: `Fixed on main at ${g.fixedAt} and deployed: Production deployment at ${g.deployedAt} postdates the fix.`,
+          });
+          receipt.actions.push({
+            fingerprint: g.fingerprint,
+            op: 'close',
+            ok: r.ok,
+            action: r.action,
+          });
+          if (!r.ok) {
+            if (r.reason === 'linear_rate_limited') rateLimited = true;
+            else process.exitCode = 1;
+          }
+        }
+      }
     }
   }
 
