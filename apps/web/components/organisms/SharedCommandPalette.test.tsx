@@ -167,14 +167,4 @@ describe('SharedCommandPalette InlinePalette', () => {
     );
     await expectNoA11yViolations(container);
   });
-
-  it('shows inline section labels as written, never forced into capitals', () => {
-    renderPalette([navSection, partialSection]);
-
-    for (const label of ['Go To', 'Releases']) {
-      const heading = screen.getByText(label);
-      expect(heading).not.toHaveClass('uppercase');
-      expect(heading.className).not.toMatch(/tracking-\[/);
-    }
-  });
 });

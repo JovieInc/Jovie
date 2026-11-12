@@ -293,7 +293,7 @@ export function PaletteList({
               className={cn(
                 variant === 'cmdk'
                   ? 'px-3 pb-1 pt-2 text-2xs font-medium text-quaternary-token'
-                  : 'px-3 pb-1 pt-3 text-3xs font-semibold text-tertiary-token'
+                  : 'px-3 pb-1 pt-3 text-3xs font-semibold uppercase tracking-[0.1em] text-tertiary-token'
               )}
             >
               {section.label}
