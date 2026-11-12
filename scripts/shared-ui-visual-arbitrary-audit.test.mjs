@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
 import {
   mkdirSync,
   mkdtempSync,
@@ -159,7 +160,18 @@ test('repo shared-UI visual arbitrary findings match the shrink-only baseline', 
   assert.equal(result.status, 'pass');
   assert.equal(result.totalFindings, 0);
   assert.deepEqual(result.findings, []);
-  assert.equal(result.scannedFiles.length, 75);
+  // A literal count needs repair after every clean source addition and
+  // cannot detect a missing source replaced by an unexpected one; compare
+  // the scanned set against the exact tracked production inventory instead.
+  const productionFiles = execFileSync(
+    'git',
+    ['ls-files', '-z', '--', 'packages/ui'],
+    { cwd: REPO_ROOT, encoding: 'utf8' }
+  )
+    .split('\0')
+    .filter(isSharedUiProductionSource)
+    .sort((left, right) => left.localeCompare(right));
+  assert.deepEqual(result.scannedFiles, productionFiles);
   for (const relativePath of COVERED_PRODUCTION_SOURCES) {
     assert.ok(result.scannedFiles.includes(relativePath), relativePath);
   }
