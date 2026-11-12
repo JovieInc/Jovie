@@ -953,7 +953,6 @@ export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
   'scripts/lib/__tests__/proof-loop.test.mjs',
   'scripts/public-benchmark/proof-observations.test.mjs',
   ...TEST_PLANNER_CONTRACT_TESTS,
-  'scripts/lib/__tests__/product-shot-test-producers.test.mjs',
   'scripts/lib/__tests__/web-source-read-tests.test.mjs',
   '.claude/hooks/post-task-validate.test.mjs',
   '.claude/hooks/prod-db-session-guard.test.mjs',
