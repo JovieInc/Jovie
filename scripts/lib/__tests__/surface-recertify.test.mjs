@@ -6,9 +6,15 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { load as yamlLoad } from 'js-yaml';
 import { test } from 'vitest';
-import { CENSUS_PATH, sourceDigest } from '../../design-surface-census.mjs';
+import {
+  CENSUS_PATH,
+  checkCensus,
+  evidenceEntryPath,
+  fileDigest,
+} from '../../design-surface-census.mjs';
 import { evaluateFleetRules } from '../../pr-fleet-rules.mjs';
 import {
+  evidenceEntries,
   renewGroup,
   requiresAuth,
   routePath,
@@ -40,11 +46,27 @@ function repo(pageSources = [PAGE]) {
     sources: pageSources,
   };
   const census = { groups: [group] };
-  group.evidence.sourceDigest = sourceDigest(root, {
-    source: pageSources[0],
-    expectedOwners: [OWNER],
-  });
+  for (const file of [...pageSources, OWNER]) certify(root, file);
   return { root, census, group };
+}
+function write(root, entries) {
+  for (const { path, entry } of entries) {
+    mkdirSync(dirname(join(root, path)), { recursive: true });
+    writeFileSync(join(root, path), `${JSON.stringify(entry, null, 2)}\n`);
+  }
+}
+function certify(root, file, ref = 'old evidence for this file') {
+  write(root, [
+    {
+      path: evidenceEntryPath('pricing', file),
+      entry: {
+        file,
+        sha256: fileDigest(root, file),
+        at: '2026-10-01T00:00:00Z',
+        ref,
+      },
+    },
+  ]);
 }
 const shot = width => ({
   width,
@@ -67,17 +89,16 @@ test('a certified surface with unchanged bytes is not stale', () => {
   assert.deepEqual(staleGroups(root, census), []);
 });
 
-test('changing an owner file makes the group stale with the new digest', () => {
+test('changing an owner file makes exactly that file stale, with its new digest', () => {
   const { root, census } = repo();
   writeFileSync(join(root, OWNER), 'edited');
   const [stale] = staleGroups(root, census);
   assert.equal(stale.id, 'pricing');
   assert.equal(stale.route, '/pricing');
   assert.equal(stale.recertifiable, true);
-  assert.equal(
-    stale.digest,
-    sourceDigest(root, { source: PAGE, expectedOwners: [OWNER] })
-  );
+  assert.deepEqual(stale.files, [
+    { file: OWNER, sha256: fileDigest(root, OWNER) },
+  ]);
 });
 
 test('dynamic routes and multi-source groups are never recertified blindly', () => {
@@ -88,7 +109,7 @@ test('dynamic routes and multi-source groups are never recertified blindly', () 
     false
   );
   const multi = repo([PAGE, 'apps/web/app/(marketing)/pricing/other/page.tsx']);
-  multi.census.groups[0].evidence.sourceDigest = 'stale';
+  writeFileSync(join(multi.root, OWNER), 'edited');
   assert.equal(staleGroups(multi.root, multi.census)[0].recertifiable, false);
 });
 
@@ -171,38 +192,53 @@ test('route helpers normalise paths and flag app routes for sign-in', () => {
   assert.equal(requiresAuth('/pricing'), false);
 });
 
-test('renewal writes the real digest, evidence pointers and keeps prior history', () => {
+test('renewal writes the real digest and evidence pointers for the stale file only', () => {
   const { root, census } = repo();
   writeFileSync(join(root, OWNER), 'edited');
   const [group] = staleGroups(root, census);
-  const next = renewGroup(census, group, {
+  const entries = renewGroup(group, {
     capture,
     at: '2026-10-29T20:00:00.000Z',
     runUrl: 'https://github.com/JovieInc/Jovie/actions/runs/1',
     artifactName: 'surface-recert-1',
     sha: 'abcdef1234567890',
   });
-  const evidence = next.groups[0].evidence;
-  assert.equal(evidence.sourceDigest, group.digest);
-  assert.equal(evidence.at, '2026-10-29T20:00:00.000Z');
-  assert.match(evidence.ref, /abcdef123/);
-  assert.match(evidence.ref, /surface-recert-1/);
-  assert.match(evidence.ref, /1440px sha256 a{64}/);
-  assert.match(evidence.ref, /Prior: old evidence$/);
-  assert.deepEqual(staleGroups(root, next), []);
-  // A second renewal replaces, never stacks, the generated sentence.
-  writeFileSync(join(root, OWNER), 'edited again');
-  const [again] = staleGroups(root, next);
-  const twice = renewGroup(next, again, {
-    capture,
-    at: '2026-10-29T21:00:00.000Z',
-    runUrl: 'https://github.com/JovieInc/Jovie/actions/runs/2',
-    artifactName: 'surface-recert-2',
-    sha: '0123456789abcdef',
-  });
+  assert.deepEqual(
+    entries.map(item => item.path),
+    [evidenceEntryPath('pricing', OWNER)]
+  );
+  const [{ entry }] = entries;
+  assert.equal(entry.sha256, fileDigest(root, OWNER));
+  assert.equal(entry.at, '2026-10-29T20:00:00.000Z');
+  assert.match(entry.ref, /abcdef123/);
+  assert.match(entry.ref, /surface-recert-1/);
+  assert.match(entry.ref, /1440px sha256 a{64}/);
+  write(root, entries);
+  assert.deepEqual(staleGroups(root, census), []);
+  // The untouched page keeps its own, older evidence.
   assert.equal(
-    twice.groups[0].evidence.ref.match(/Automatic recertification/g).length,
-    1
+    JSON.parse(
+      readFileSync(join(root, evidenceEntryPath('pricing', PAGE)), 'utf8')
+    ).ref,
+    'old evidence for this file'
+  );
+});
+
+test('a renewal must say what changed; a bare hash is not evidence', () => {
+  const { root, census } = repo();
+  writeFileSync(join(root, OWNER), 'edited');
+  const [group] = staleGroups(root, census);
+  assert.throws(
+    () => evidenceEntries(group, { at: '2026-10-29T20:00:00.000Z', ref: 'ok' }),
+    /what changed and how it was verified/
+  );
+  assert.throws(
+    () =>
+      evidenceEntries(group, {
+        at: '2026-10-29T20:00:00.000Z',
+        ref: undefined,
+      }),
+    /what changed and how it was verified/
   );
 });
 
@@ -288,7 +324,7 @@ test('renewal CLI and bot PR body report the measured win required by Fleet', ()
         labels: ['compounding'],
         body,
       },
-      files: [{ filename: CENSUS_PATH }],
+      files: [{ filename: evidenceEntryPath('pricing', OWNER) }],
     }),
     { errors: [], warnings: [] }
   );
@@ -296,4 +332,124 @@ test('renewal CLI and bot PR body report the measured win required by Fleet', ()
   assert.equal(win.metrics[0].before, 1);
   assert.equal(win.metrics[0].after, 0);
   assert.equal(win.verifyLink, runUrl);
+});
+
+// Two individually green PRs must stay green when a merge group combines
+// them. With one digest per row this failed 30 merge groups in a week
+// (2026-11-04..11): each PR renewed the row against its own base, so the
+// combined bytes matched neither digest, and both had rewritten the same line.
+test('two PRs that each renew their own certified file combine green; an unrenewed change stays red', () => {
+  const HEADER = 'apps/web/components/site/MarketingHeader.tsx';
+  const root = mkdtempSync(join(tmpdir(), 'census-combine-'));
+  const git = (...args) =>
+    execFileSync('git', args, {
+      cwd: root,
+      encoding: 'utf8',
+      env: {
+        ...process.env,
+        GIT_CONFIG_GLOBAL: '/dev/null',
+        GIT_CONFIG_SYSTEM: '/dev/null',
+        GIT_AUTHOR_NAME: 't',
+        GIT_AUTHOR_EMAIL: 't@example.com',
+        GIT_COMMITTER_NAME: 't',
+        GIT_COMMITTER_EMAIL: 't@example.com',
+      },
+    });
+  const cli = fileURLToPath(
+    new URL('../../surface-recertify.mjs', import.meta.url)
+  );
+  const renew = ref =>
+    execFileSync(process.execPath, [
+      cli,
+      'renew',
+      '--ref',
+      ref,
+      '--root',
+      root,
+    ]);
+  git('init', '-q', '-b', 'main');
+  for (const file of [PAGE, OWNER, HEADER]) {
+    mkdirSync(dirname(join(root, file)), { recursive: true });
+    writeFileSync(join(root, file), `content of ${file}\n`);
+  }
+  mkdirSync(dirname(join(root, CENSUS_PATH)), { recursive: true });
+  writeFileSync(
+    join(root, CENSUS_PATH),
+    JSON.stringify({
+      schema: 'jovie.design-surface-census/v1',
+      startedAt: '2026-10-15T04:36:00Z',
+      groups: [
+        {
+          id: 'pricing',
+          area: 'marketing',
+          owner: '@itstimwhite',
+          issue: 'JOV-8097',
+          importance: { acquisition: 3, revenue: 3, usage: 3 },
+          status: 'canonical',
+          expectedOwners: [OWNER, HEADER],
+          remainingScope: 'Certified',
+          divergence: 'None',
+          evidence: {
+            kind: 'certification',
+            at: '2026-10-21T04:36:00Z',
+            ref: 'exact-build-render',
+          },
+          sources: [PAGE],
+        },
+      ],
+      excluded: { reason: 'Internal fixtures', sources: [] },
+      transitions: [],
+    })
+  );
+  renew('Initial certification of the pricing fixture surface.');
+  git('add', '.');
+  git('commit', '-q', '-m', 'seed');
+  checkCensus(root, 'main');
+
+  const branch = (name, file, renewed) => {
+    git('checkout', '-q', '-b', name, 'main');
+    writeFileSync(join(root, file), `${name} changed ${file}\n`);
+    if (renewed)
+      renew(`${name}: changed ${file}; rendered /pricing, no change.`);
+    git('add', '.');
+    git('commit', '-q', '-m', name);
+  };
+
+  branch('pr-footer', OWNER, true);
+  checkCensus(root, 'main');
+  assert.deepEqual(
+    git('diff', '--name-only', 'main').trim().split('\n').sort(),
+    [evidenceEntryPath('pricing', OWNER), OWNER].sort(),
+    'a renewal touches only the entry of the file it changed'
+  );
+  branch('pr-header', HEADER, true);
+  checkCensus(root, 'main');
+
+  git('checkout', '-q', '-b', 'merge-group', 'main');
+  git('merge', '-q', '--no-ff', '-m', 'footer', 'pr-footer');
+  git('merge', '-q', '--no-ff', '-m', 'header', 'pr-header');
+  assert.equal(git('status', '--porcelain'), '');
+  checkCensus(root, 'main');
+  assert.deepEqual(staleGroups(root), []);
+
+  // Still a gate: certified bytes changed with no renewal fail, alone and
+  // when combined behind a PR that did renew.
+  branch('pr-unrenewed', PAGE, false);
+  assert.throws(
+    () => checkCensus(root, 'main'),
+    /pricing\/page\.tsx: source changed; renew certification evidence \(apps\/web\/app\/\(marketing\)\/pricing\/page\.tsx\)/
+  );
+  git('checkout', '-q', 'merge-group');
+  git('merge', '-q', '--no-ff', '-m', 'unrenewed', 'pr-unrenewed');
+  assert.throws(() => checkCensus(root, 'main'), /source changed/);
+
+  // Evidence left behind for a file that is no longer certified also fails.
+  git('checkout', '-q', '-b', 'orphan', 'main');
+  const census = JSON.parse(readFileSync(join(root, CENSUS_PATH), 'utf8'));
+  census.groups[0].expectedOwners = [OWNER];
+  writeFileSync(join(root, CENSUS_PATH), JSON.stringify(census));
+  assert.throws(
+    () => checkCensus(root, 'main'),
+    /MarketingHeader\.tsx\.json: evidence for a file that is not certified/
+  );
 });

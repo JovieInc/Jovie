@@ -1,11 +1,15 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
+import {
+  type OperatorRouteInput,
+  operatorAccess,
+} from '@/lib/api/route-access';
+import { defineRoute } from '@/lib/api/route-pipeline';
 import { getCachedAuth } from '@/lib/auth/cached';
 import {
   getFeedbackDecisions,
   recordFeedbackDisposition,
 } from '@/lib/feedback';
-import { getOvieOperatorEntitlements } from '@/lib/ovie/privacy-lock/access';
 
 export const runtime = 'nodejs';
 
@@ -24,37 +28,28 @@ const bodySchema = z.object({
  * POST records a now/later/never disposition: ledger row first, then the
  * item's disposition. Event-driven only; nothing reshuffles on a timer.
  */
-export async function GET(
-  _request: Request,
+async function getHandler(
+  _input: OperatorRouteInput,
   context: { params: Promise<{ id: string }> }
 ) {
-  const entitlements = await getOvieOperatorEntitlements({ purpose: 'read' });
-
-  if (!entitlements.isAuthenticated) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
-  if (!entitlements.isAdmin) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-  }
-
   const { id } = await context.params;
   const decisions = await getFeedbackDecisions(id);
   return NextResponse.json({ decisions });
 }
 
-export async function POST(
-  request: Request,
+export const GET = defineRoute(
+  {
+    route: '/api/admin/feedback/[id]/disposition',
+    access: operatorAccess({ purpose: 'read' }),
+    legacy: { cache: 'none', unhandledErrors: 'rethrow' },
+  },
+  getHandler
+);
+
+async function postHandler(
+  { request }: OperatorRouteInput,
   context: { params: Promise<{ id: string }> }
 ) {
-  const entitlements = await getOvieOperatorEntitlements({ session: 'fresh' });
-
-  if (!entitlements.isAuthenticated) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
-  if (!entitlements.isAdmin) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-  }
-
   const parsed = bodySchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) {
     return NextResponse.json(
@@ -79,3 +74,12 @@ export async function POST(
 
   return NextResponse.json({ ok: true });
 }
+
+export const POST = defineRoute(
+  {
+    route: '/api/admin/feedback/[id]/disposition',
+    access: operatorAccess({ session: 'fresh' }),
+    legacy: { cache: 'none', unhandledErrors: 'rethrow' },
+  },
+  postHandler
+);

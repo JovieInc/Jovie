@@ -32,7 +32,7 @@ export function ArtworkFallbackTile({
   return (
     <div
       className={cn(
-        'relative flex h-full w-full items-center justify-center overflow-hidden text-white/40',
+        'relative flex h-full w-full items-center justify-center overflow-hidden text-on-media/40',
         className
       )}
       data-artwork-fallback='true'
@@ -43,7 +43,7 @@ export function ArtworkFallbackTile({
         <span
           aria-hidden='true'
           className={cn(
-            'absolute inset-[8%] bg-[linear-gradient(135deg,rgba(255,255,255,0.09),rgba(255,255,255,0.012)_52%,rgba(0,0,0,0.13))] shadow-[inset_0_1px_0_rgba(255,255,255,0.08),inset_0_-24px_48px_rgba(0,0,0,0.14)]',
+            'absolute inset-[8%] bg-(image:--artwork-fallback-sleeve) shadow-(--artwork-fallback-sleeve-shadow)',
             size === 'hero' ? 'rounded-[10%]' : 'rounded-[7%]'
           )}
           data-artwork-fallback-sleeve='true'

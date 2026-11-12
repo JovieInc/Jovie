@@ -40,7 +40,7 @@ interface ActionDialProps {
   readonly actionLabel: string;
   readonly groupLabel: string;
   readonly onActivate?: (id: string) => void;
-  readonly hint?: string;
+  readonly hint?: string | null;
   readonly className?: string;
   readonly disabled?: boolean;
 }
@@ -605,11 +605,11 @@ export function ActionDial({
             </svg>
           </span>
         </div>
-      ) : (
+      ) : hint ? (
         <p id={hintId} className='mt-1 text-center text-xs text-primary-token'>
           {hint}
         </p>
-      )}
+      ) : null}
       <p className='sr-only' role='status' aria-live='polite'>
         {(options[restIndex] ?? active).label} selected
       </p>

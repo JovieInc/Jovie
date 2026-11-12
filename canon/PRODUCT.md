@@ -2,7 +2,7 @@
 
 Status: Canon
 Inherits: [`OPERATING_SYSTEM.md`](./OPERATING_SYSTEM.md)
-Last updated: 2026-10-15
+Last updated: 2026-11-09
 
 Product exists to increase customer value delivered per week.
 
@@ -295,6 +295,21 @@ people by invite from a role-qualifying waitlist.
 - **Then:** reopen signup with `FEATURE_PUBLIC_SIGNUP_CLOSED=false`, and delete the flag
   once the reopened funnel is stable.
 
+### Public signup reopens (founder decision, 2026-11-09 11:01 PM PT)
+
+Tim White directed on 2026-11-09 11:01 PM PT: open public signup immediately,
+with a one-switch kill path. This supersedes the 2026-11-02 closure above;
+that section's history is kept.
+
+- **Ship now:** `PUBLIC_SIGNUP_CLOSED` defaults to `false`
+  (`apps/web/lib/flags/code-flags.ts`). `/signup` and anonymous `/start`
+  render the sign-up surfaces directly; the homepage waitlist role form keeps
+  saving entries via `/api/waitlist/join` in both modes.
+- **Kill switch:** set `FEATURE_PUBLIC_SIGNUP_CLOSED=true` in Vercel
+  production env and redeploy (or revert the reopen PR). `/signup` and
+  anonymous `/start` then send visitors back to the `/waitlist` role form.
+- **Then:** once the reopened funnel is stable, delete the flag.
+
 ---
 
 ## Anti-Goals
@@ -322,6 +337,7 @@ Do not optimize for:
 
 | Date | Change | Source |
 |---|---|---|
+| 2026-11-09 | Public signup reopens; FEATURE_PUBLIC_SIGNUP_CLOSED=true is the kill switch. | Tim White |
 | 2026-10-21 | Ovie is one no-scroll Home plus a collapsed Tools group. | Tim White |
 | 2026-10-20 | Jovie and Ovie mirror one shell and IA; Ovie Home is a living canvas. | Tim White |
 | 2026-10-15 | Recorded September 3 lock: YouTube artist loop first; APIs/MCPs are a core line on the same contract and workstream. | Tim White / JOV-5891 |

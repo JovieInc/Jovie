@@ -1,0 +1,91 @@
+name: Merge Group Dead Run Sweep
+# github-token-budget: 100 calls/run - only the cancel requests spend GITHUB_TOKEN (one per dead merge-group run, capped at 100); every read uses the Jovie Bot app token.
+# controller-hop-exception: jovie-controller-hop/v1
+# accountable-writer: Gem
+# capability-gap: GitHub keeps every workflow's merge_group runs queued or running after their queue group's ref is deleted (dequeued or rebuilt), and merge_group concurrency cannot key on the queued PR.
+# removal-trigger: Remove when GitHub cancels the merge_group runs of a deleted queue ref natively.
+#
+# 2026-11-11 ~21:10Z: nothing merged for 2.5 h. 64 queued/in-progress merge_group
+# runs (CI, Private Data Guard, PR Targets Main, PR Size Guard, Company Guards,
+# PR Fleet Rules, Fork PR Gate) belonged to groups whose ref was gone, so live
+# groups waited past the ruleset's 30-minute check timeout, were dequeued as
+# UNMERGEABLE and re-formed into more runs. ci-merge-group-supersede only
+# cancels CI runs of a PR that has a newer group, from inside that group's CI.
+# Every dequeue (the moment groups die or are rebuilt) sweeps all workflows:
+# a run on a ref git still lists, or on a SHA that landed on main, is never
+# cancelled (scripts/merge-group-dead-run-sweep.mjs). It gates nothing.
+
+on:
+  pull_request_target:
+    types: [dequeued]
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  # A dequeue storm keeps one sweep running and one pending; the pending one
+  # reads fresh state, so nothing is lost by coalescing.
+  group: merge-group-dead-run-sweep
+  cancel-in-progress: false
+
+jobs:
+  sweep:
+    name: Cancel dead merge-group runs
+    if: github.repository == 'JovieInc/Jovie'
+    runs-on: ${{ fromJSON(vars.RUNNER_CONTROL_PLANE || '"ubuntu-24.04"') }}
+    timeout-minutes: 3
+    permissions:
+      actions: write
+      contents: read
+    steps:
+      - name: Generate Jovie Bot read token
+        id: app-token
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        with:
+          app-id: ${{ vars.JOVIE_BOT_APP_ID }}
+          private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}
+          permission-actions: read
+          permission-contents: read
+
+      - name: Checkout trusted sweep policy
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          fetch-depth: 1
+          persist-credentials: false
+          sparse-checkout: |
+            scripts/merge-group-dead-run-sweep.mjs
+            packages/api-client
+            .github/actions/prime-node-toolcache
+            .nvmrc
+          sparse-checkout-cone-mode: false
+
+      - name: Prime Node toolcache (no GitHub API manifest call)
+        uses: ./.github/actions/prime-node-toolcache
+      - name: Set up pinned Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+
+      - name: Cancel merge-group runs whose queue ref is gone
+        env:
+          READ_TOKEN: ${{ steps.app-token.outputs.token }}
+          CANCEL_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          GIT_SERVER: ${{ github.server_url }}
+        run: |
+          if [[ ! -f scripts/merge-group-dead-run-sweep.mjs ]]; then
+            echo '::notice::Sweep policy is not on main yet; nothing to do.'
+            exit 0
+          fi
+          node scripts/merge-group-dead-run-sweep.mjs
+
+      - name: Clear sparse checkout for the next job on this workspace
+        if: always() && runner.environment != 'github-hosted'
+        shell: bash
+        run: |
+          # Fixed runners reuse one workspace; a leftover sparse checkout hides .github/scripts from the next job.
+          if [[ -d .git ]]; then
+            git sparse-checkout disable 2>/dev/null || true
+            rm -f .git/info/sparse-checkout
+          fi

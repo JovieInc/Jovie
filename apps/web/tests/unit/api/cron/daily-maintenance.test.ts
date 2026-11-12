@@ -8,6 +8,7 @@ const mockCleanupSmsIntents = vi.hoisted(() => vi.fn());
 const mockRunWaitlistAutoAccept = vi.hoisted(() => vi.fn());
 const mockReconcileWaitlistAdmission = vi.hoisted(() => vi.fn());
 const mockSweepUnderEnrichedProfilesForCron = vi.hoisted(() => vi.fn());
+const mockSweepAppleMusicCatalog = vi.hoisted(() => vi.fn());
 const mockSweepLegacySlugs = vi.hoisted(() =>
   vi.fn(async () => ({ renamed: 1 }))
 );
@@ -99,10 +100,12 @@ vi.mock('@/lib/waitlist/auto-accept', () => ({
   runWaitlistAutoAccept: mockRunWaitlistAutoAccept,
 }));
 
+vi.mock('@/lib/discography/apple-music-import', () => ({
+  sweepAppleMusicCatalogCompletenessForCron: mockSweepAppleMusicCatalog,
+}));
 vi.mock('@/lib/discography/slug-migration', () => ({
   sweepLegacySlugsForCron: mockSweepLegacySlugs,
 }));
-
 vi.mock('@/lib/discography/re-enrich', () => ({
   sweepUnderEnrichedProfilesForCron: mockSweepUnderEnrichedProfilesForCron,
 }));
@@ -176,6 +179,11 @@ describe('GET /api/cron/daily-maintenance', () => {
       totalLinksDiscovered: 4,
       errors: [],
       hasMoreProfiles: true,
+    });
+    mockSweepAppleMusicCatalog.mockResolvedValue({
+      profilesChecked: 2,
+      releasesImported: 3,
+      failed: 0,
     });
     mockRunOnboardingScriptAggregation.mockResolvedValue({
       syncedSeeds: 2,
@@ -280,6 +288,11 @@ describe('GET /api/cron/daily-maintenance', () => {
       hasMoreProfiles: true,
     });
     expect(mockSweepUnderEnrichedProfilesForCron).toHaveBeenCalledTimes(1);
+    expect(data.results.appleMusicCatalogImport.data).toEqual({
+      profilesChecked: 2,
+      releasesImported: 3,
+      failed: 0,
+    });
     expect(data.results.legacySlugMigration.data).toEqual({ renamed: 1 });
     expect(data.results.onboardingScriptAggregation.success).toBe(true);
     expect(data.results.onboardingScriptAggregation.data).toEqual({
