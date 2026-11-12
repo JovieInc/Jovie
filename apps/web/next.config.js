@@ -680,14 +680,6 @@ const nextConfig = {
     return {
       beforeFiles: [
         {
-          // Must be beforeFiles: afterFiles rewrites never beat the
-          // prerendered profile route (JOV-12081).
-          source: '/:username',
-          has: [{ type: 'query', key: 'mode', value: profileQueryModePattern }],
-          destination:
-            '/:username/profile-mode-render/:profileMode/__profile-mode-alias',
-        },
-        {
           source: '/hud/wiki',
           destination: '/app/ov/wiki',
         },
@@ -722,6 +714,18 @@ const nextConfig = {
       afterFiles: [
         ...profileModeAliasRewrites,
         ...socialShortcutAliasRewrites,
+        {
+          source: '/:username',
+          has: [
+            {
+              type: 'query',
+              key: 'mode',
+              value: profileQueryModePattern,
+            },
+          ],
+          destination:
+            '/:username/profile-mode-render/:profileMode/__profile-mode-alias',
+        },
         {
           source: '/app/ov/:path*',
           destination: '/app/admin/:path*',
