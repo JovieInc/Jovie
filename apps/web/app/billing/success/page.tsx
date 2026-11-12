@@ -348,8 +348,9 @@ export default function CheckoutSuccessPage() {
     successSubtitle = "Your plan is active. Here's what you just unlocked.";
   }
 
-  // The page settles in place: no confetti and no entrance slide, so the
-  // headline, the next steps and the button never move once drawn.
+  // The page settles in place: no confetti, no entrance slide and no vertical
+  // centering — the card is top-anchored so the pending-to-paid swap grows it
+  // downward without moving anything already drawn (CLS budget 0.1).
   const contentClassName = 'space-y-6 px-5 py-5 text-center sm:px-6';
   const viewTestId =
     view.kind === 'pending'
@@ -361,7 +362,6 @@ export default function CheckoutSuccessPage() {
   return (
     <StandaloneProductPage
       width='lg'
-      centered
       className='relative'
       contentClassName='relative z-10'
     >

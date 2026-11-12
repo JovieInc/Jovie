@@ -1,5 +1,6 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
+import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import {
   StableHeaderChipRail,
   StableHeaderTextSlot,
@@ -16,8 +17,8 @@ describe('StableHeaderTextSlot', () => {
     expect(slot).toHaveClass('invisible', 'min-h-8', 'line-clamp-2');
   });
 
-  it('shows content without hiding it from assistive tech', () => {
-    render(
+  it('shows content without hiding it from assistive tech', async () => {
+    const { container } = render(
       <StableHeaderTextSlot lineCount={1} size='md' testId='slot'>
         Subtitle
       </StableHeaderTextSlot>
@@ -26,12 +27,13 @@ describe('StableHeaderTextSlot', () => {
     expect(slot).toHaveTextContent('Subtitle');
     expect(slot).not.toHaveAttribute('aria-hidden');
     expect(slot).toHaveClass('min-h-6', 'truncate');
+    await expectNoA11yViolations(container);
   });
 });
 
 describe('StableHeaderChipRail', () => {
-  it('makes a populated scrollable chip rail keyboard focusable', () => {
-    render(
+  it('makes a populated scrollable chip rail keyboard focusable', async () => {
+    const { container } = render(
       <StableHeaderChipRail testId='rail'>
         <span>Live</span>
       </StableHeaderChipRail>
@@ -39,6 +41,7 @@ describe('StableHeaderChipRail', () => {
     const scroller = screen.getByText('Live').parentElement as HTMLElement;
     expect(scroller).toHaveAttribute('tabindex', '0');
     expect(screen.getByTestId('rail')).not.toHaveAttribute('aria-hidden');
+    await expectNoA11yViolations(container);
   });
 
   it('keeps a reserved empty rail hidden and out of the tab order', () => {

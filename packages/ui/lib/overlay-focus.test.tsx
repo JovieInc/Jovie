@@ -39,6 +39,27 @@ describe('resolveMenuOriginTrigger', () => {
     ).toBe('root-trigger');
   });
 
+  // Searchable surfaces: the trigger-labelled radix content is role="group"
+  // (it holds the search input) and the item rows sit in an unlabelled inner
+  // role="menu"; the walk climbs through the group to the trigger.
+  it('walks the searchable group/menu split back to the root trigger', () => {
+    document.body.innerHTML = `
+      <button id="root-trigger">Actions</button>
+      <div role="group" data-menu-surface="toolbar" aria-labelledby="root-trigger">
+        <input id="search-input" aria-label="Search..." />
+        <div role="menu">
+          <div role="menuitem" id="grouped-item" tabindex="-1">Rename</div>
+        </div>
+      </div>
+    `;
+    expect(
+      resolveMenuOriginTrigger(document.getElementById('grouped-item'))?.id
+    ).toBe('root-trigger');
+    expect(
+      resolveMenuOriginTrigger(document.getElementById('search-input'))
+    ).toBe(null);
+  });
+
   it('returns null when focus did not start in a menu', () => {
     mountMenuTree();
     expect(resolveMenuOriginTrigger(document.getElementById('plain'))).toBe(

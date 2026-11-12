@@ -6,6 +6,7 @@ import type {
 import type { CodeFlagName } from '@/lib/flags/code-flags';
 import type { AppFlagName } from '@/lib/flags/contracts';
 import type { MarketingStaticFlagName } from '@/lib/flags/marketing-static';
+import { INTERNAL_FLAG_CAPABILITIES } from './internal-flags';
 import { PUBLIC_ACCESS_FLAG_CAPABILITIES } from './public-access-flags';
 import type {
   FeatureAccessState,
@@ -625,19 +626,7 @@ export const PRODUCT_FLAG_CAPABILITIES = {
     nonMarketing:
       'ChatGPT directory MCP kill switch; anonymous public creator reads; default off',
   },
-  IN_HOUSE_RESOLVER: {
-    nonMarketing:
-      'legacy JOV-7323 umbrella rollback override for resolver families',
-  },
-  MUSICFETCH_FALLBACK: {
-    nonMarketing: 'reversible JOV-7323 MusicFetch vendor-off switch',
-  },
-  MUSIC_RESOLVER_PROVIDER_LINKS: {
-    nonMarketing: 'JOV-7323 provider-link resolver family cutover',
-  },
-  MUSIC_RESOLVER_RELEASE_FACTS: {
-    nonMarketing: 'JOV-7323 release-facts resolver family cutover',
-  },
+  ...INTERNAL_FLAG_CAPABILITIES,
   AUTH_OFFER_SUMMARY: {
     nonMarketing:
       'auth offer recap; default off; no price, trial, or entitlement change',

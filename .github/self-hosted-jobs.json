@@ -98,11 +98,6 @@
       "reason": "the heartbeat proves the self-hosted pool itself"
     },
     {
-      "workflow": "pr-fleet-rules.yml",
-      "job": "*",
-      "reason": "light merge_group gate job; hosted by default, routed to the fixed pool only while repo variable MERGE_GATE_POOL=fixed (hosted saturation fallback, #23586)"
-    },
-    {
       "workflow": "pr-targets-main.yml",
       "job": "*",
       "reason": "light merge_group gate job; hosted by default, routed to the fixed pool only while repo variable MERGE_GATE_POOL=fixed (hosted saturation fallback, #23586)"
