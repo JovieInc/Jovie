@@ -12840,6 +12840,34 @@ class LockfileConflictTest(unittest.TestCase):
             self.assertIn('"id":"main"', merged)
             self.assertNotIn("<<<<<<<", merged)
 
+    def test_repository_source_map_conflict_regenerates_from_both_sources(self):
+        path = "docs/REPOSITORY_SOURCES.md"
+        generator = "scripts/repository_docs.py"
+        registry = json.dumps({
+            "schemaVersion": 1, "repository": "JovieInc/fixture", "output": path,
+            "entrypoints": ["package.json"], "imports": [],
+            "sources": [{"path": name, "purpose": "fixture source"}
+                        for name in ("a.ts", "package.json")],
+        })
+        with tempfile.TemporaryDirectory() as tmp:
+            origin, work = self.repo(Path(tmp), {
+                path: "pr\n", generator: (ROOT / generator).read_text(),
+                "repository-docs.json": registry, "package.json": '{"name":"branch"}\n',
+            }, main_changes={path: "main\n", "a.ts": "main\n"})
+            ok, calls = self.run_resolve(work)
+            self.assertTrue(ok)
+            command = ["python3", generator, "--write"]
+            self.assertEqual(calls.count(command), 1)
+            restored = ["git", "checkout", "origin/main", "--", path]
+            self.assertLess(calls.index(restored), calls.index(command))
+            pushed = self.git("show", f"devin/jov-1-20260927:{path}", cwd=origin)
+            self.assertEqual(pushed, (work / path).read_text().strip())
+            for source in (b"main\n", b'{"name":"branch"}\n'):
+                self.assertIn(hashlib.sha256(source).hexdigest(), pushed)
+            self.assertNotIn("<<<<<<<", pushed)
+            checked = subprocess.run(["python3", generator], cwd=work, capture_output=True, text=True)
+            self.assertEqual(checked.returncode, 0, checked.stdout + checked.stderr)
+
     def test_rule_scopes_record_is_a_generated_resolver(self):
         self.assertEqual(lane.remediation.GENERATED_RESOLVERS["scripts/agent-context/rule-scopes.json"],
                          ("node", "scripts/agent-context/rule-scopes.mjs", "--write"))

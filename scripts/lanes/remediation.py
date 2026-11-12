@@ -66,6 +66,7 @@ LOCKFILES = frozenset({"pnpm-lock.yaml"})
 # stop hand-merging `.gen.` output. rule-scopes.json hashes are derived from
 # .claude/rules; --write rebuilds them from the merged rule files.
 GENERATED_RESOLVERS = {
+    "docs/REPOSITORY_SOURCES.md": ("python3", "scripts/repository_docs.py", "--write"),
     "canon/SOURCES_OF_TRUTH.md": ("node", "scripts/sources-of-truth.mjs", "--write"),
     ".github/workflow-topology.gen.yml": ("pnpm", "ci:topology:write"),
     "pnpm-lock.yaml": ("pnpm", "install", "--lockfile-only", "--ignore-scripts"),

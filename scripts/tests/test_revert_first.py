@@ -114,6 +114,13 @@ class DecideTest(unittest.TestCase):
         labeled = commit(labels=[rf.REVERT_LABEL])
         self.assertEqual(rf.decide(self.named(labeled))["reason"], "culprit-is-a-revert")
 
+    def test_a_culprit_already_reverted_on_main_is_not_reverted_again(self):
+        # Seer review on #25020: the revert merged, Main Health is still red, and the oldest red push of the
+        # streak still names the same commit. Reverting it again does nothing; a human bisects the rest.
+        reverted = {**commit(), "revertedBy": "c" * 40}
+        self.assertEqual(rf.decide(self.named(reverted)),
+                         {"action": "alert", "reason": "culprit-already-reverted-needs-bisect"})
+
     def test_revert_re_land_revert_then_a_human(self):
         relanded = {**commit(subject="fix(main-red): re-land new tier copy (#24120)"), "priorAttempts": 2}
         self.assertEqual(rf.decide(self.named(relanded)), {"action": "alert", "reason": "attempt-cap"})
