@@ -451,6 +451,10 @@ describe('shipIntent (pr:open opt-in)', () => {
   it('a refresh keeps a park; --on-green replaces it', () => {
     const opts = { cmd: 'update', number: '42' };
     expect(shipIntent('New', opts, `Old\n${PARK}`)).toBe(`New\n\n${PARK}\n`);
+    // A park the writer wrote in the body itself survives a fresh open.
+    expect(shipIntent(`Body\n${PARK}\n`, { cmd: 'open' })).toBe(
+      `Body\n\n${PARK}\n`
+    );
     const on = shipIntent(`New\n${PARK}`, { ...opts, onGreen: true }, 'Old');
     expect(on).toBe(`New\n\n${ON}\n`);
   });
