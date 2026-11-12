@@ -400,10 +400,12 @@ describe('ProfileDesktopSurface', () => {
 
     expect(screen.getByTestId('mock-static-listen-interface')).toBeVisible();
     expect(screen.getByRole('button', { name: 'Spotify' })).toBeVisible();
-    expect(screen.getByAltText('Never Say A Word')).toHaveAttribute(
-      'data-priority',
-      'true'
-    );
+    // Desktop-only art is never an unconditional `priority` image: phones
+    // render this surface hidden, so it loads lazily and is preloaded only
+    // at the desktop breakpoint (DesktopSurfaceImage, JOV-9611).
+    const listenArtwork = screen.getByAltText('Never Say A Word');
+    expect(listenArtwork).toHaveAttribute('data-priority', 'false');
+    expect(listenArtwork).toHaveAttribute('loading', 'lazy');
 
     const listenGrid = screen.getByTestId('profile-listen-desktop-grid');
     expect(listenGrid).toHaveClass(PROFILE_LISTEN_DESKTOP_GRID_CLASSNAME);

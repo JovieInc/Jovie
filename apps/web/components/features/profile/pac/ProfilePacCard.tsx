@@ -965,6 +965,13 @@ export function ProfilePacCard({
                     fill
                     priority={artPriority}
                     fetchPriority={isInteractive ? 'high' : undefined}
+                    // This 104px cover is the LCP element on the claim-invite
+                    // landing (JOV-9611). It is preloaded and tiny (~5 KB), so
+                    // decode it with the frame that first lays it out. With
+                    // the default async decode the first paint can go out
+                    // without it and the next frame waits behind hydration
+                    // (observed element render delay ~1.1s vs ~0.1s in CI).
+                    decoding={isInteractive ? 'sync' : undefined}
                     loading={artPriority ? undefined : 'eager'}
                     sizes='(min-width: 1024px) 400px, 104px'
                     className={

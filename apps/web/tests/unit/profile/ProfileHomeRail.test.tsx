@@ -272,8 +272,11 @@ describe('ProfileHomeRail', () => {
       expect(artwork).toHaveAttribute('loading', 'eager');
       if (renderMode === 'interactive') {
         expect(artwork).toHaveAttribute('fetchpriority', 'high');
+        // JOV-9611: the LCP cover decodes with its first frame.
+        expect(artwork).toHaveAttribute('decoding', 'sync');
       } else {
         expect(artwork).not.toHaveAttribute('fetchpriority');
+        expect(artwork).toHaveAttribute('decoding', 'async');
       }
     }
   );
@@ -325,6 +328,13 @@ describe('ProfileHomeRail', () => {
     expect(preload?.getAttribute('imagesizes')).toBe(
       artwork?.getAttribute('sizes')
     );
+    // JOV-9611: phones request the 104px slot (x DPR), never a wide
+    // candidate, and the preload applies at every width (no media scope).
+    expect(artwork?.getAttribute('sizes')).toBe(
+      '(min-width: 1024px) 400px, 104px'
+    );
+    expect(artwork?.getAttribute('decoding')).toBe('sync');
+    expect(preload?.hasAttribute('media')).toBe(false);
   });
 
   it('renders tip-only inventory as a support PAC instead of a blank Listen card', () => {
