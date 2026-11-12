@@ -15,11 +15,12 @@ import { join, resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
   applyConfirmations,
-  commandResult,
   evaluateRatchet,
   sampleEnv,
   statistics,
 } from '../../typecheck-performance.mjs';
+
+import { commandResult } from '../typecheck-command.mjs';
 
 const ROOT = resolve(import.meta.dirname, '../../..');
 const require = createRequire(import.meta.url);
@@ -53,7 +54,11 @@ describe('typecheck performance', () => {
   it('writes a failing report when the shared deadline interrupts confirmation', () => {
     const directory = mkdtempSync(join(tmpdir(), 'typecheck-confirm-budget-'));
     try {
-      mkdirSync(join(directory, 'scripts'));
+      mkdirSync(join(directory, 'scripts/lib'), { recursive: true });
+      copyFileSync(
+        join(ROOT, 'scripts/lib/typecheck-command.mjs'),
+        join(directory, 'scripts/lib/typecheck-command.mjs')
+      );
       mkdirSync(join(directory, '.github/ci-harness'), { recursive: true });
       copyFileSync(
         join(ROOT, 'scripts/typecheck-performance.mjs'),
