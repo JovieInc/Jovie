@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
@@ -29,7 +29,8 @@ const LOCK = {
   lockedAt: '2026-10-29T00:00:00.000Z',
 };
 
-const request = () => new Request('http://localhost/api/billing/price-lock');
+const request = () =>
+  new NextRequest('http://localhost/api/billing/price-lock');
 
 beforeEach(() => vi.clearAllMocks());
 
