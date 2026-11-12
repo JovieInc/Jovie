@@ -144,7 +144,7 @@ describe('ChatLinkConfirmationCard', () => {
 
     const error = screen.getByRole('status', { name: 'Link Confirmation' });
     expect(error).toHaveTextContent('Unable to add link. Try again.');
-    expect(error).toHaveClass('text-error');
+    expect(error).toHaveClass('text-error-text');
     expect(error).not.toHaveClass('text-danger-token');
   });
 });
@@ -359,7 +359,7 @@ describe('ChatLinkConfirmationCard certificate states', () => {
     const { container } = render(<ChatLinkConfirmationCard {...props} />);
     pressAddThen(o => o.onError(new FetchHttpError('rejected', 422)));
     expect(linkStatus()).toHaveTextContent('Unable to add link. Try again.');
-    expect(linkStatus()).toHaveClass('text-error');
+    expect(linkStatus()).toHaveClass('text-error-text');
     await expectNoA11yViolations(container);
   });
 
