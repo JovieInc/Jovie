@@ -69,4 +69,11 @@ describe('public playlist hub pages — malformed URL decoding', () => {
     expect(source).toContain('safeDecodeURIPathComponent');
     expect(source).not.toMatch(/\bsafeDecodeURIComponent\b/);
   });
+
+  it('both hubs answer 404 when no published playlist carries the tag', () => {
+    for (const page of [GENRE_PAGE, MOOD_PAGE]) {
+      const source = readFileSync(page, 'utf8');
+      expect(source).toMatch(/if \(playlists\.length === 0\) notFound\(\);/);
+    }
+  });
 });
