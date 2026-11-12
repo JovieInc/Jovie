@@ -507,6 +507,10 @@
     "apps/web/components/jovie/components/ChatMessage.tsx": {
       "offline": "ChatMessage renders the parts it is handed and never fetches; a lost connection reaches the transcript as a chat-level request error that ErrorDisplay shows (its NetworkOffline story), and a tool that could not reach its service arrives as a failed tool part, which ToolPartsRenderer's OfflineServiceUnreachable story shows."
     },
+    "apps/web/components/jovie/components/ChatMessageSkeleton.tsx": {
+      "long-content": "The skeleton renders fixed-width placeholder bars and no text, so there is no content that could run long. The detector matched text- colour classes.",
+      "offline": "The skeleton is a static aria-hidden placeholder that fetches nothing; offline handling belongs to the conversation that replaces it. The detector matched the word loading in its class names."
+    },
     "apps/web/components/jovie/components/ChatPresenceArtifactCard.tsx": {
       "offline": "It renders a finished presence-build tool event and never fetches; a lookup that failed for lack of connectivity arrives as state 'error' with that message, which ErrorStepFailed shows, and Copy Draft only writes to the local clipboard."
     },
