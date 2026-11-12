@@ -7185,9 +7185,30 @@ def stamp_changelog_decision(host: Host, pr: dict) -> bool:
     return edited.returncode == 0
 
 
+def _apply_mixed_body_repairs(host: Host, pr: dict, route: dict) -> str | None:
+    """Stamp a missing internal changelog and complete Red-before-green once per head.
+
+    Mixed rollups used to skip both because the overall action is `agent`. The claim is spent
+    before the edit; a failed edit returns None so the model still runs on this tick."""
+    repairs = route.get("repairs") or []
+    if fix_red_classes.STAMP_CHANGELOG not in repairs and "red-before-green" not in repairs:
+        return None
+    if not claim_route(host, pr, "mixed-body-repairs"):
+        return None
+    decision = {"releaseWorthy": False} if fix_red_classes.STAMP_CHANGELOG in repairs else None
+    if pr_events.ensure_red_before_green(pr, "", customer_decision=decision):
+        return "infra-rerun:mixed-body-repairs"
+    return None
+
+
 def deterministic_route_taken(host: Host, pr: dict, route: dict | None) -> str | None:
     """Run the no-model action for a routed class once per head; the reason on success (None: use the model)."""
-    if not route or route["action"] not in {fix_red_classes.RERUN, fix_red_classes.SYNC_MAIN, fix_red_classes.STAMP_CHANGELOG}:
+    if not route:
+        return None
+    repaired = _apply_mixed_body_repairs(host, pr, route)
+    if repaired:
+        return repaired
+    if route["action"] not in {fix_red_classes.RERUN, fix_red_classes.SYNC_MAIN, fix_red_classes.STAMP_CHANGELOG}:
         return None
     if route["action"] == fix_red_classes.STAMP_CHANGELOG:
         # No body, or a note already present: do not spend the once-per-head claim. An invalid
