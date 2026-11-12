@@ -122,11 +122,30 @@
       "long-content": "Every visible string is fixed copy in the component and retryHref only sets the Try Again href, so no caller text can grow. ErrorPhoneWidth shows the copy wrapping at 320px; the detector matched the heading id and the icon's title.",
       "permission-denied": "A public read-failure page with no gated action or permission input; the detector matched role='alert' (ErrorTransientRead)."
     },
+    "apps/web/app/app/(shell)/DashboardLoadTracker.tsx": {
+      "error": "The tracker returns null in every state. Unreadable or full session storage is caught and falls through to a single tracked event, so there is no failure to draw; DashboardLoadTracker.test.tsx asserts the one event when storage throws and an axe-clean render."
+    },
     "apps/web/app/app/(shell)/DashboardShellContent.tsx": {
       "loading": "DashboardShellContent is an async server component awaited inside the shell layout's Suspense boundary, so it never renders a loading frame of its own; that fallback is shell-route-skeleton.tsx, which carries the loading stories.",
       "offline": "DashboardShellContent runs only on the server for a request, so browser connectivity never reaches it. A server read that stalls past 10 seconds returns the PageErrorState branch, asserted in DashboardShellContent.test.tsx.",
       "long-content": "Its only copy of its own is the fixed workspace-load PageErrorState message; everything else it renders is route children passed through, which certify their own long-content states.",
       "rtl-overflow": "Its only copy of its own is the fixed English workspace-load message; text direction comes from the route children it passes through, which certify their own right-to-left states."
+    },
+    "apps/web/app/app/(shell)/ProfileCompletionRedirect.tsx": {
+      "loading": "The guard returns null in every state and has no pending phase: it reads DashboardDataContext, which the shell has already resolved before it mounts. The detector matched the words data loading error in a comment.",
+      "error": "With dashboardLoadError set the guard deliberately does nothing and draws nothing, so the error is the dashboard's own state. ProfileCompletionRedirect.test.tsx asserts no redirect on a failed read and an axe-clean render.",
+      "offline": "It never fetches: it reads context and calls router.replace, a client navigation whose network failure belongs to the router. The detector matched the loading wording that also triggers the loading state.",
+      "permission-denied": "isAdmin only skips the redirect; the guard renders nothing for any role, so there is no gated face to draw. ProfileCompletionRedirect.test.tsx asserts an admin is never redirected."
+    },
+    "apps/web/app/app/(shell)/calendar/CalendarRouteSkeleton.tsx": {
+      "empty": "The skeleton draws a fixed four-chip rail, seven weekday stubs and a 42-cell month grid; it holds no data that could be empty. An empty calendar is CalendarPageClient's own state once events load.",
+      "long-content": "It renders no visible text: every bar is an empty skeleton block and its only string is the fixed aria-label, which the detector matched. CalendarRouteSkeleton.test.tsx asserts the grid holds no text.",
+      "offline": "The skeleton paints as the shell layout's Suspense fallback before any request runs and never fetches or submits, so connectivity cannot reach it."
+    },
+    "apps/web/app/app/(shell)/chat/ChatLoadingState.tsx": {
+      "empty": "The skeleton draws one greeting bar and two composer stubs; it holds no data that could be empty. The detector matched the items-start and items-center layout classes. An empty conversation is JovieChat's own state.",
+      "long-content": "It renders no visible text: the greeting is a LoadingSkeleton bar and the composer stubs carry their labels only as data-label attributes, which the detector matched. Message and title length belong to JovieChat.",
+      "offline": "The skeleton paints as the chat route's loading fallback before any request runs and never fetches or submits, so connectivity cannot reach it."
     },
     "apps/web/app/app/(shell)/chat/DeferredJovieChat.tsx": {
       "error": "The wrapper only defers loading JovieChat; a chunk that fails to load throws to the chat route's error.tsx boundary, and every chat error is JovieChat's own state.",
@@ -134,9 +153,36 @@
       "offline": "The wrapper never fetches or mutates; the only network it causes is the chunk request, whose failure is the error boundary's, and offline sends are JovieChat's.",
       "rtl-overflow": "The wrapper renders no text or input of its own; the composer and messages are JovieChat's. The detector matched words in its doc comment."
     },
+    "apps/web/app/app/(shell)/library/LibraryLoadingState.tsx": {
+      "empty": "The skeleton draws a fixed SKELETON_ROW_COUNT.TABLE of placeholder rows and one chip per lifecycle stage; it holds no data that could be empty. An empty Library is LibrarySurface's own state once data loads.",
+      "partial": "LibraryLoadingState takes no props; the detector counted the optional width and variant fields of its column-config type. Narrow panes drop whole columns from header and rows together (LoadingNarrowPane, and the resize test in LibraryLoadingState.test.tsx).",
+      "long-content": "Every visible string is a fixed column header from LIBRARY_CATALOG_SKELETON_COLUMNS; no caller text reaches it. Width pressure is shown by LoadingNarrowPane, where low-priority columns drop instead of the headers wrapping.",
+      "offline": "The skeleton paints as the shell layout's Suspense fallback before any request runs and never fetches or submits, so connectivity cannot reach it."
+    },
+    "apps/web/app/app/(shell)/links/LinksRouteSkeleton.tsx": {
+      "empty": "The skeleton draws a fixed header row and eight placeholder rows from constant keys; it holds no data that could be empty. An empty Links table is LinksPageClient's own state once links load.",
+      "long-content": "Its only visible text is the fixed LINKS_TABLE_HEADERS labels, kept on one line with whitespace-nowrap; no caller text reaches it. LoadingNarrow shows the header row at phone width.",
+      "offline": "The skeleton paints as the shell layout's Suspense fallback before any request runs and never fetches or submits, so connectivity cannot reach it."
+    },
+    "apps/web/app/app/(shell)/profiles/ProfilesRouteSkeleton.tsx": {
+      "empty": "The skeleton draws the table header over eight placeholder rows; it holds no data that could be empty. An empty Profiles table is ProfilesWorkspace's own state once data loads.",
+      "long-content": "Its only visible text is the fixed Profiles toolbar label and the PROFILES_TABLE_SKELETON_COLUMNS headers; no caller text reaches it. LoadingNarrow shows the narrow column set.",
+      "offline": "The skeleton paints as the shell layout's Suspense fallback before any request runs and never fetches or submits, so connectivity cannot reach it."
+    },
+    "apps/web/app/app/(shell)/settings/SettingsRouteSkeleton.tsx": {
+      "empty": "The skeleton draws one section header and three field rows from constant keys; it holds no data that could be empty. Each settings page owns its own empty states once it loads.",
+      "long-content": "It renders no visible text: every bar is an empty skeleton block and its only string is the fixed aria-label, which the detector matched. SettingsRouteSkeleton.test.tsx asserts the status holds no text.",
+      "offline": "The skeleton paints as the shell layout's Suspense fallback before any request runs and never fetches or submits, so connectivity cannot reach it."
+    },
     "apps/web/app/app/(shell)/shell-route-skeleton.tsx": {
       "empty": "resolveShellRouteSkeleton maps a pathname to a route skeleton and renders no data collection; the detector matched the imported ReleaseTableSkeleton and LinksRouteSkeleton names. An unknown path returns undefined so the layout keeps its generic AppShellSkeleton.",
       "offline": "Route skeletons paint as the shell layout's Suspense fallback before any request runs. The resolver never fetches or submits, so connectivity cannot reach it."
+    },
+    "apps/web/app/app/(shell)/tour-dates/TourDatesPageFrame.tsx": {
+      "offline": "The frame is a static PageShell around its children and never fetches or submits; the detector matched the word skeleton in its doc comment. Offline tour data is TourDatesPageClient's own state."
+    },
+    "apps/web/app/app/(shell)/tour-dates/TourDatesRouteSkeleton.tsx": {
+      "offline": "The skeleton paints as the shell layout's Suspense fallback before any request runs and never fetches or submits, so connectivity cannot reach it."
     },
     "apps/web/app/desktop-auth/DesktopAuthClient.tsx": {
       "permission-denied": "The handoff has no gated action, role or entitlement input; the detector matched role='img' on the QR tile. A refused Touch ID prompt falls back to the browser method with error copy, which tests/unit/app/desktop-auth-page.test.tsx covers."
@@ -152,6 +198,11 @@
     },
     "apps/web/app/desktop-auth/MacCinematicSurface.tsx": {
       "empty": "MacCinematicSurface is a visual shell around one handoff child and takes no collection; the detector matched the place-items-center class on its main landmark."
+    },
+    "apps/web/components/UnavailablePage.tsx": {
+      "empty": "The page holds no data: it takes no props and draws a fixed mark, heading and line. The detector matched the words support links in its doc comment.",
+      "long-content": "Every visible string is fixed copy in the component and it takes no props, so no caller text can grow. ErrorPhoneWidth shows the heading wrapping at 320px.",
+      "rtl-overflow": "Its only copy is the fixed English heading and line, centred, with no caller text or input; the page is served in English to blocked accounts, so no right-to-left text can reach it."
     },
     "apps/web/components/atoms/AnimatedIconSwap.tsx": {
       "empty": "AnimatedIconSwap renders exactly one keyed icon and never a collection; the detector matched the items-center class.",
