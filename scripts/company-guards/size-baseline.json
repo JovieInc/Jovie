@@ -1174,6 +1174,7 @@
   "scripts/repo-hygiene-guard.test.mjs": 1079,
   "scripts/run-affected-tests.mjs": 3481,
   "scripts/screenshot-loop/screenshot-bug-loop.mjs": 551,
+  "scripts/security-advisory-intake.test.mjs": 749,
   "scripts/security/deepsec-loop.mjs": 695,
   "scripts/security/deepsec-loop.test.mjs": 801,
   "scripts/security/prepare-ci-secret-scan-range.test.sh": 807,
