@@ -136,6 +136,10 @@ export function QRCode({
           height={size}
           unoptimized // data URLs are final renders, not optimizable sources
           className={cn(className)}
+          onError={() => {
+            setHasError(true);
+            setIsLoading(false);
+          }}
         />
       )}
     </div>

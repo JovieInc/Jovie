@@ -102,11 +102,12 @@ export const EmptyData: Story = {
 
 /**
  * Generation failed (the `qrcode` module could not render): the frame keeps
- * its size and shows the unavailable fallback. With local generation the
- * failure path is the generator's rejection, so the fallback state is the
- * same one EmptyData renders.
+ * its size and shows the unavailable fallback. The export name is the error
+ * state (`Failed*`). A static story cannot reject the encoder, so this frame
+ * matches EmptyData, and QRCode.test.tsx holds the rejection and the decode
+ * error.
  */
-export const GenerationFailed: Story = {
+export const FailedGeneration: Story = {
   args: {
     data: 'https://jov.ie/tim',
     size: 120,

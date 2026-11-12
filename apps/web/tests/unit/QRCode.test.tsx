@@ -23,8 +23,12 @@ const { toDataURL } = vi.hoisted(() => ({
   >(async () => 'data:image/png;base64,QRPNG'),
 }));
 
+// `import('qrcode')` reads the named export. A default-only mock throws
+// "No toDataURL export is defined" and every success path renders the fallback.
 vi.mock('qrcode', () => ({
   __esModule: true,
+  toDataURL: (...args: unknown[]) =>
+    toDataURL(...(args as [string, { width: number; margin: number }])),
   default: {
     toDataURL: (...args: unknown[]) =>
       toDataURL(...(args as [string, { width: number; margin: number }])),
@@ -81,7 +85,11 @@ describe('QRCode', () => {
 
   it('shows error state when generation fails', async () => {
     toDataURL.mockRejectedValueOnce(new Error('encoding failed'));
-    render(<QRCode data={mockData} label='Test QR' />);
+    // A fresh payload: earlier cases cache `mockData` at this size, and a
+    // cache hit would skip the rejection.
+    render(
+      <QRCode data='https://example.com/encoding-failed' label='Test QR' />
+    );
 
     // Should show error fallback (aria-hidden div with text)
     expect(await screen.findByText('QR code unavailable')).toBeInTheDocument();

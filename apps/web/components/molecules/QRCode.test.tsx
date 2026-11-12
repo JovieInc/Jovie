@@ -1,4 +1,4 @@
-import { act, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import type { ImgHTMLAttributes } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { expectNoA11yViolations } from '@/tests/utils/a11y';
@@ -27,8 +27,12 @@ const { DATA_URL, toDataURL } = vi.hoisted(() => ({
   >(async () => 'data:image/png;base64,QRPNG'),
 }));
 
+// `import('qrcode')` reads the named export. A default-only mock throws
+// "No toDataURL export is defined" and the component renders the fallback.
 vi.mock('qrcode', () => ({
   __esModule: true,
+  toDataURL: (...args: unknown[]) =>
+    toDataURL(...(args as [string, { width: number; margin: number }])),
   default: {
     toDataURL: (...args: unknown[]) =>
       toDataURL(...(args as [string, { width: number; margin: number }])),
@@ -43,18 +47,24 @@ function skeleton(container: HTMLElement) {
 
 describe('QRCode: certificate states', () => {
   it('shows a hidden skeleton while the code is generated', async () => {
-    // Hold generation open so the skeleton state is observable, not a
-    // race against the mocked encoder's microtask.
+    // The encoder runs only after `import('qrcode')` resolves. Hold that
+    // call open, and wait until it has started, before resolving it.
     let resolveGeneration: ((url: string) => void) | undefined;
-    toDataURL.mockImplementationOnce(
-      () =>
-        new Promise<string>(resolve => {
-          resolveGeneration = resolve;
-        })
-    );
+    const generationStarted = new Promise<void>(resolve => {
+      toDataURL.mockImplementationOnce(
+        () =>
+          new Promise<string>(done => {
+            resolveGeneration = done;
+            resolve();
+          })
+      );
+    });
     const { container } = render(
       <QRCode data='https://jov.ie/skeleton' label={LABEL} />
     );
+    await act(async () => {
+      await generationStarted;
+    });
     expect(skeleton(container)).toHaveAttribute('aria-hidden', 'true');
     expect(skeleton(container)).toHaveClass('motion-reduce:animate-none');
     expect(screen.queryByRole('img', { name: LABEL })).toBeNull();
@@ -106,6 +116,21 @@ describe('QRCode: certificate states', () => {
     await screen.findByText('QR code unavailable');
     expect(screen.queryByRole('img')).toBeNull();
     expect(toDataURL).not.toHaveBeenCalledWith('', expect.anything());
+    await expectNoA11yViolations(container);
+  });
+
+  it('shows the same-size fallback when the rendered image cannot decode', async () => {
+    const { container } = render(
+      <QRCode data='https://jov.ie/decode' size={140} label={LABEL} />
+    );
+    fireEvent.error(await screen.findByRole('img', { name: LABEL }));
+    await screen.findByText('QR code unavailable');
+    expect(screen.queryByRole('img')).toBeNull();
+    const frame = screen.getByText('QR code unavailable')
+      .parentElement as HTMLElement;
+    expect(frame.style.width).toBe('140px');
+    expect(frame.style.height).toBe('140px');
+    expect(skeleton(container)).toBeNull();
     await expectNoA11yViolations(container);
   });
 

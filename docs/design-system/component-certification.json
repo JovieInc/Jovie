@@ -687,8 +687,8 @@
       "permission-denied": "LoadingSkeleton has no gated action or permission input; the detector matched role='status' on its loading regions."
     },
     "apps/web/components/molecules/QRCode.tsx": {
-      "loading": "The skeleton shows only while the third-party image request is in flight, and a static story cannot hold that request open; QRCode.test.tsx renders the skeleton before onLoad and asserts it clears on load.",
-      "offline": "QRCode never fetches or mutates from JS; lost connectivity reaches it only as an <img> that fails to load, which the ErrorImageUnavailable story shows with the same-size fallback."
+      "loading": "The skeleton shows only while local generation is in flight, and a static story cannot hold that promise open; QRCode.test.tsx renders the skeleton before the encoder resolves and asserts it clears.",
+      "offline": "QRCode generates locally and never fetches. A data URL that fails to decode uses the same same-size unavailable fallback as a generation error, which FailedGeneration names and QRCode.test.tsx asserts."
     },
     "apps/web/components/molecules/UpgradeButton.tsx": {
       "empty": "UpgradeButton renders one button and an optional error line and takes no collection; the detector matched the items-center class.",
