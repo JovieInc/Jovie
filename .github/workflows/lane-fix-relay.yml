@@ -108,6 +108,10 @@ jobs:
   # and do not sleep. `green` is still applied only to a lane draft
   # (pr_events.in_scope). A stale lane-fix-red is deleted when the rollup is settled
   # success, including while merge state still says BLOCKED.
+  # Red path (Tim 2026-11-12, scripts/lanes/red_repair.py): drafts get lane-fix-red too,
+  # whatever their branch prefix, unless an active worker holds the head (an unexpired
+  # exact-head lane claim, or a commit under an hour old). No label while Main Health is
+  # red on main, and none for a check failing on more than 5 PRs in 30 min (one intake).
   relay:
     name: Queue lane repair
     needs: rerun-unacquired
