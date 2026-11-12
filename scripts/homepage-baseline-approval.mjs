@@ -25,36 +25,62 @@ export const RECEIPT_PATH =
 
 /**
  * The sources that decide what the homepage renders: its route and
- * components, plus the artist data, product UI copy and release art they read.
+ * components, the homepage copy and artist data they read, and the release
+ * art. A trailing `*` matches a file-name prefix.
  */
 export const HOMEPAGE_SOURCES = Object.freeze([
-  'apps/web/app/(home)',
-  'apps/web/components/homepage',
-  'apps/web/components/features/home',
+  'apps/web/app/(home)/',
+  'apps/web/components/homepage/',
+  'apps/web/components/features/home/',
+  'apps/web/data/homepage*',
   'apps/web/data/demoArtists.ts',
   'apps/web/data/featuredArtists.ts',
-  'apps/web/data/homepageProductUi.ts',
   'apps/web/lib/tim-white.ts',
-  'apps/web/public/img/releases',
+  'apps/web/public/img/releases/',
+]);
+
+/** Files under the sources that never change a pixel: tests, stories, analytics. */
+export const NON_RENDERING = Object.freeze([
+  /\.(test|spec|stories)\.[cm]?[jt]sx?$/,
+  /\/__tests__\//,
+  /^apps\/web\/components\/homepage\/homepage-analytics\.ts$/,
 ]);
 
 const REPO_ROOT = resolve(import.meta.dirname, '..');
 
+/** True when a repo path is one the approval covers. */
+export function isHomepageSource(path) {
+  const listed = HOMEPAGE_SOURCES.some(source =>
+    source.endsWith('*')
+      ? path.startsWith(source.slice(0, -1)) &&
+        !path.slice(source.length - 1).includes('/')
+      : source.endsWith('/')
+        ? path.startsWith(source)
+        : path === source
+  );
+  return listed && !NON_RENDERING.some(pattern => pattern.test(path));
+}
+
 /**
- * sha256 of `git ls-tree -r <ref> -- <sources>`: every blob id and path under
- * the homepage sources, so any edit, add, delete or rename changes it.
+ * sha256 of the `git ls-tree -r <ref>` lines (blob id and path) for every
+ * homepage source, so any edit, add, delete or rename of one changes it.
  */
 export function sourcesDigest(repoRoot = REPO_ROOT, ref = 'HEAD') {
   const result = spawnSync(
     'git',
-    ['ls-tree', '-r', '--full-tree', ref, '--', ...HOMEPAGE_SOURCES],
-    { cwd: repoRoot, encoding: 'utf8' }
+    ['ls-tree', '-r', '--full-tree', ref, '--', 'apps/web'],
+    { cwd: repoRoot, encoding: 'utf8', maxBuffer: 256 * 1024 * 1024 }
   );
   if (result.status !== 0)
     throw new Error(`git ls-tree failed: ${result.stderr.trim()}`);
-  if (!result.stdout.trim())
+  const lines = result.stdout
+    .split('\n')
+    .filter(line => line && isHomepageSource(line.split('\t')[1]));
+  if (lines.length === 0)
     throw new Error(`no homepage sources found at ${ref}`);
-  return createHash('sha256').update(result.stdout).digest('hex');
+  return createHash('sha256')
+    .update(`${lines.join('\n')}\n`)
+    .digest('hex');
 }
 
 /** Returns the problems with a receipt against a digest; empty means valid. */

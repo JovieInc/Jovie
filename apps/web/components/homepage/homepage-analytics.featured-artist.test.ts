@@ -16,4 +16,19 @@ describe('homepage events name the featured artist', () => {
       surface: 'hero',
     });
   });
+
+  it('leaves events from tracked links on other pages untagged', async () => {
+    track.mockClear();
+    window.history.pushState({}, '', '/artist-profiles');
+    try {
+      trackHomepageEvent('artist_profiles_adaptive_cta_clicked');
+      await vi.dynamicImportSettled();
+      expect(track).toHaveBeenCalledExactlyOnceWith(
+        'artist_profiles_adaptive_cta_clicked',
+        {}
+      );
+    } finally {
+      window.history.pushState({}, '', '/');
+    }
+  });
 });

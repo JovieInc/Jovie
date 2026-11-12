@@ -11,6 +11,13 @@ import { trackFunnelStep } from '@/lib/analytics/signup-funnel-client';
  */
 export const HOMEPAGE_FEATURED_ARTIST_SLUG = 'tim-white';
 
+/** Only `/` features the artist; tracked links elsewhere carry no tag. */
+function featuredArtistTag(): { featured_artist?: string } {
+  return typeof window !== 'undefined' && window.location.pathname === '/'
+    ? { featured_artist: HOMEPAGE_FEATURED_ARTIST_SLUG }
+    : {};
+}
+
 export function trackHomepageEvent(
   event: string,
   properties?: Record<string, unknown>
@@ -26,10 +33,7 @@ export function trackHomepageEvent(
 
   void import('../../lib/analytics')
     .then(({ track }) => {
-      track(event, {
-        featured_artist: HOMEPAGE_FEATURED_ARTIST_SLUG,
-        ...properties,
-      });
+      track(event, { ...featuredArtistTag(), ...properties });
     })
     .catch(() => {});
 }

@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
 import {
+  isHomepageSource,
   RECEIPT_SCHEMA,
   receiptProblems,
   sourcesDigest,
@@ -168,4 +169,22 @@ test('a receipt without the approval fields is refused', () => {
 test('a wrong schema is refused', () => {
   const problems = receiptProblems({ ...receipt('d'), schema: 'other' }, 'd');
   assert.ok(problems.some(p => p.startsWith('schema must be')));
+});
+
+test('the approval covers rendering sources, not tests, stories or analytics', () => {
+  for (const path of [
+    'apps/web/components/homepage/v3/Hero.tsx',
+    'apps/web/data/homepageEditorialCopy.ts',
+    'apps/web/data/featuredArtists.ts',
+    'apps/web/public/img/releases/a.webp',
+  ])
+    assert.equal(isHomepageSource(path), true, path);
+  for (const path of [
+    'apps/web/components/homepage/Hero.test.tsx',
+    'apps/web/components/homepage/Hero.stories.tsx',
+    'apps/web/components/homepage/homepage-analytics.ts',
+    'apps/web/data/homepage/nested.ts',
+    'apps/web/data/pricing.ts',
+  ])
+    assert.equal(isHomepageSource(path), false, path);
 });
