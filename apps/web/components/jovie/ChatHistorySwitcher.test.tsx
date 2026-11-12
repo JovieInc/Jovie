@@ -51,6 +51,7 @@ function setQuery(state: Record<string, unknown>) {
     data: undefined,
     isLoading: false,
     isError: false,
+    isPaused: false,
     refetch,
     ...state,
   };
@@ -273,6 +274,14 @@ describe('ChatHistorySwitcher', () => {
     await user.click(within(menu).getByRole('menuitem', { name: 'Retry' }));
     expect(refetch).toHaveBeenCalledTimes(1);
     expect(screen.getByRole('menu')).toBeInTheDocument();
+  });
+
+  it('shows the load error, not an empty list, when offline with nothing cached', async () => {
+    setQuery({ data: undefined, isPaused: true });
+    const { menu } = await openSwitcher();
+    expect(menu).toHaveTextContent("Couldn't Load Chats");
+    expect(within(menu).getByRole('menuitem', { name: 'Retry' })).toBeVisible();
+    expect(menu).not.toHaveTextContent('No Chats Yet');
   });
 
   it('keeps the load error and Retry visible while a search is typed', async () => {

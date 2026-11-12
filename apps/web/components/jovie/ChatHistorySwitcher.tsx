@@ -101,6 +101,7 @@ export function ChatHistorySwitcher({
     data: conversations,
     isLoading,
     isError,
+    isPaused,
     refetch,
   } = useChatConversationsQuery({ limit: 50, enabled: hasIntent || open });
 
@@ -109,7 +110,9 @@ export function ChatHistorySwitcher({
   const label =
     title?.trim() ||
     (activeConversationId ? COPY_FALLBACKS.conversation : NEW_CHAT_LABEL);
-  const showError = isError && !conversations;
+  // Offline with nothing cached, the query pauses instead of failing; show
+  // the load error and Retry rather than an empty "No Chats Yet".
+  const showError = (isError || isPaused) && !conversations;
 
   const handleOpenChange = useCallback((nextOpen: boolean) => {
     // Read state is browser-only; read it when the panel opens, not on render.
