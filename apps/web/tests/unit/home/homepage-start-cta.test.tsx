@@ -73,6 +73,20 @@ describe('homepage start CTA flag', { timeout: 60_000 }, () => {
     expect(primary).toHaveTextContent(copy.hero.primaryAction);
     expect(screen.getByText(copy.hero.note)).toBeInTheDocument();
     expect(signupEntries(container.innerHTML)).toEqual([]);
+    // The close is the invitation form, and the header keeps its invite action.
+    const close = container.querySelector(`#${anchor}`);
+    expect(close).toHaveTextContent(copy.invite.headline);
+    expect(
+      close?.querySelector('[data-testid="waitlist-role-form"]')
+    ).not.toBeNull();
+    expect(screen.queryByTestId('homepage-close-cta')).toBeNull();
+    const { resolveHomepageHeaderCta, resolveHomepageClaimClose } =
+      await import('@/data/homepageStartCta');
+    expect(resolveHomepageHeaderCta()).toEqual({
+      label: 'Request an Invite',
+      href: `/#${anchor}`,
+    });
+    expect(resolveHomepageClaimClose()).toBeNull();
   });
 
   it('on: the hero primary action is the shared claim-profile intent into /start', async () => {
@@ -100,10 +114,37 @@ describe('homepage start CTA flag', { timeout: 60_000 }, () => {
       'href',
       copy.hero.secondaryHref
     );
-    const close = container.querySelector(`#${anchor}`);
+
+    // The close is the same intent, in the approved artist-profile closing
+    // copy: no form, and nothing on the page still says invitation.
+    const { ARTIST_PROFILE_COPY } = await import('@/data/artistProfileCopy');
+    const close = screen.getByTestId('marketing-section-cta');
+    expect(close).toHaveTextContent(ARTIST_PROFILE_COPY.finalCta.headline);
+    expect(close).toHaveTextContent(ARTIST_PROFILE_COPY.finalCta.subhead);
     expect(
-      close?.querySelector('[data-testid="waitlist-role-form"]')
-    ).not.toBeNull();
+      close.querySelector('[data-testid="waitlist-role-form"]')
+    ).toBeNull();
+    const closeCta = screen.getByTestId('homepage-close-cta');
+    expect(close).toContainElement(closeCta);
+    expect(closeCta).toHaveAttribute('href', claim.href);
+    expect(closeCta).toHaveTextContent(claim.label);
+    expect(container.textContent).not.toMatch(/invit/i);
+    expect(container.innerHTML).not.toContain(anchor);
+  });
+
+  it('on: the header action resolves to the same claim intent', async () => {
+    vi.stubEnv('FEATURE_HOMEPAGE_START_CTA', 'true');
+    const { claim } = await load();
+    const { resolveHomepageHeaderCta, resolveHomepageClaimClose } =
+      await import('@/data/homepageStartCta');
+    expect(resolveHomepageHeaderCta()).toEqual({
+      label: claim.label,
+      href: claim.href,
+    });
+    expect(resolveHomepageClaimClose()).toMatchObject({
+      label: claim.label,
+      href: claim.href,
+    });
   });
 
   it('on, but public signup closed: the hero keeps the invitation action', async () => {
@@ -116,5 +157,13 @@ describe('homepage start CTA flag', { timeout: 60_000 }, () => {
     expect(primary).toHaveAttribute('href', `#${anchor}`);
     expect(primary).toHaveTextContent(copy.hero.primaryAction);
     expect(signupEntries(container.innerHTML)).toEqual([]);
+    expect(container.querySelector(`#${anchor}`)).toHaveTextContent(
+      copy.invite.headline
+    );
+    expect(screen.queryByTestId('homepage-close-cta')).toBeNull();
+    const { resolveHomepageHeaderCta } = await import(
+      '@/data/homepageStartCta'
+    );
+    expect(resolveHomepageHeaderCta().href).toBe(`/#${anchor}`);
   });
 });

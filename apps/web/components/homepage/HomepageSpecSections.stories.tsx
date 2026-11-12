@@ -29,3 +29,16 @@ export const HeroAndClose: Story = {
     ),
   },
 };
+
+/**
+ * `HOMEPAGE_START_CTA` forced off: the invite-only story, whatever the
+ * environment says. Paired with `StartCtaOn` by
+ * tests/e2e/storybook-homepage-start-cta.spec.ts.
+ */
+export const StartCtaOff: Story = { args: { startCta: false } };
+
+/**
+ * `HOMEPAGE_START_CTA` forced on: the hero and the close both enter /start
+ * with the shared claim-profile intent, and no invitation copy remains.
+ */
+export const StartCtaOn: Story = { args: { startCta: true } };

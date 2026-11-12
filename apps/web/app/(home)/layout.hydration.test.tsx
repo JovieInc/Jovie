@@ -1,5 +1,5 @@
 import { render } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 const pathnameRef = vi.hoisted(() => ({ current: null as string | null }));
 
@@ -56,5 +56,46 @@ describe('(home) layout hydration', () => {
     expect(html).toContain('data-primary-cta="true"');
     expect(html).toContain('href="/#request-invite"');
     expect(html).not.toContain('href="/start"');
+  });
+
+  describe('with HOMEPAGE_START_CTA on', () => {
+    afterEach(() => {
+      vi.unstubAllEnvs();
+      vi.resetModules();
+    });
+
+    async function renderFlaggedHtml() {
+      vi.resetModules();
+      pathnameRef.current = null;
+      const { default: FlaggedLayout } = await import('./layout');
+      const { container, unmount } = render(
+        await FlaggedLayout({ children: <p>hero</p> })
+      );
+      const html = container.innerHTML;
+      unmount();
+      return html;
+    }
+
+    it('points the header action and the page-contract marker at the claim intent', async () => {
+      vi.stubEnv('FEATURE_HOMEPAGE_START_CTA', 'true');
+      const html = await renderFlaggedHtml();
+      const { getClaimProfileIntent } = await import(
+        '@/data/marketingCtaIntents'
+      );
+      const claim = getClaimProfileIntent();
+      expect(html).toContain('data-primary-cta="true"');
+      expect(html).toContain(`href="${claim.href}"`);
+      expect(html).toContain(claim.label);
+      expect(html).not.toContain('#request-invite');
+      expect(html).not.toMatch(/request an invite/i);
+    });
+
+    it('keeps the invite action while public signup is closed', async () => {
+      vi.stubEnv('FEATURE_HOMEPAGE_START_CTA', 'true');
+      vi.stubEnv('FEATURE_PUBLIC_SIGNUP_CLOSED', 'true');
+      const html = await renderFlaggedHtml();
+      expect(html).toContain('href="/#request-invite"');
+      expect(html).not.toContain('href="/start"');
+    });
   });
 });

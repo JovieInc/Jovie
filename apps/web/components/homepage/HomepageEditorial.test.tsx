@@ -1,6 +1,7 @@
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
+import { ARTIST_PROFILE_COPY } from '@/data/artistProfileCopy';
 import {
   HOMEPAGE_EDITORIAL_COPY,
   HOMEPAGE_INVITE_ANCHOR,
@@ -122,6 +123,60 @@ describe('HomepageEditorial chapters', () => {
     expect(steps).toHaveLength(COPY.invite.steps.length);
     expect(steps[0]).toHaveTextContent(`01${COPY.invite.steps[0].title}`);
     await expectNoA11yViolations(container);
+  });
+
+  it('closes on one claim link, with no invitation copy, when the start CTA is forced on', async () => {
+    const claim = getClaimProfileIntent();
+    const { container } = render(
+      <>
+        <HomepageStoryHero startCta />
+        <HomepageInviteClose startCta />
+      </>
+    );
+
+    const section = screen.getByTestId('marketing-section-cta');
+    expect(
+      within(section).getByRole('heading', {
+        level: 2,
+        name: ARTIST_PROFILE_COPY.finalCta.headline,
+      })
+    ).toBeInTheDocument();
+    expect(
+      within(section).getByText(ARTIST_PROFILE_COPY.finalCta.subhead)
+    ).toBeInTheDocument();
+    const close = within(section).getByTestId('homepage-close-cta');
+    expect(close).toHaveAttribute('href', claim.href);
+    expect(close).toHaveTextContent(claim.label);
+    expect(close).toHaveAttribute('data-analytics-event', claim.eventName);
+    expect(section).toHaveAttribute('id', 'claim-profile');
+    expect(
+      within(
+        screen.getByRole('navigation', { name: COPY.chaptersLabel })
+      ).getByRole('link', { name: /claim/ })
+    ).toHaveAttribute('href', '#claim-profile');
+    // The form, its steps and every invitation word are gone, on both the
+    // close and the hero's chapter index.
+    expect(within(section).queryByRole('button')).not.toBeInTheDocument();
+    expect(within(section).queryByRole('listitem')).not.toBeInTheDocument();
+    expect(container.textContent).not.toMatch(/invit/i);
+    // One primary action on the page: the hero's.
+    expect(
+      container.querySelectorAll('[data-primary-action="true"]')
+    ).toHaveLength(1);
+    await expectNoA11yViolations(container);
+  });
+
+  it('keeps the invitation close when the start CTA is forced off', () => {
+    vi.stubEnv('FEATURE_HOMEPAGE_START_CTA', 'true');
+    try {
+      render(<HomepageInviteClose startCta={false} />);
+      expect(
+        screen.getByRole('heading', { level: 2, name: COPY.invite.headline })
+      ).toBeInTheDocument();
+      expect(screen.queryByTestId('homepage-close-cta')).toBeNull();
+    } finally {
+      vi.unstubAllEnvs();
+    }
   });
 
   it('wraps long caller copy without dropping any of it', async () => {

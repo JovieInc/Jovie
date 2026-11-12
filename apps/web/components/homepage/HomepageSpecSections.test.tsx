@@ -44,6 +44,30 @@ describe('HomepageSpecSections', () => {
     expect(screen.getByText('Spec close headline.')).toBeTruthy();
   });
 
+  it('forwards a forced start CTA to the hero and the close', () => {
+    const { container, rerender } = render(
+      <HomepageSpecSections sections={DEFAULT_HOME_SPEC.sections} startCta />
+    );
+    expect(screen.getByTestId('homepage-primary-cta')).toHaveAttribute(
+      'href',
+      '/start'
+    );
+    expect(screen.getByTestId('homepage-close-cta')).toHaveAttribute(
+      'href',
+      '/start'
+    );
+    expect(container.textContent).not.toMatch(/invit/i);
+
+    rerender(
+      <HomepageSpecSections
+        sections={DEFAULT_HOME_SPEC.sections}
+        startCta={false}
+      />
+    );
+    expect(screen.queryByTestId('homepage-close-cta')).toBeNull();
+    expect(screen.getByTestId('waitlist-role-form')).toBeTruthy();
+  });
+
   it('renders sections in spec order', async () => {
     const spec = structuredClone(DEFAULT_HOME_SPEC);
     const { container } = render(

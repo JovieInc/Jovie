@@ -2422,6 +2422,7 @@ jobs:
             echo "desktop_update=false"
             echo "dsp=false"
             echo "smart_link=false"
+            echo "homepage_start_cta=false"
             echo "run=false"
           } >> "$GITHUB_OUTPUT"
           if [[ "${{ github.event_name }}" != "pull_request" ]]; then
@@ -2434,6 +2435,8 @@ jobs:
           DESKTOP_UPDATE_STORYBOOK_PATTERN='^apps/web/(components/organisms/desktop-update/DesktopUpdateModal(\.stories)?\.tsx|tests/e2e/storybook-desktop-update-modal\.spec\.ts)$'
           DSP_STORYBOOK_PATTERN='^apps/web/(components/shell/DspAvatarStack(\.mobile-drawer)?(\.stories|\.test)?\.tsx|components/features/dashboard/organisms/release-provider-matrix/shell-releases/ShellReleaseRow(\.stories)?\.tsx|components/organisms/release-sidebar/ReleaseSidebarSections\.tsx|components/molecules/drawer/RightDrawer\.tsx|lib/a11y/modal-focus-boundary\.ts|tests/e2e/storybook-dsp-details\.spec\.ts)$'
           SMART_LINK_STORYBOOK_PATTERN='^apps/web/(components/features/release/(SmartLinkShell|MusicServiceDial|ActionDial)(\.stories|\.test)?\.tsx|components/organisms/public-surface/PublicSurface(Shell|Stage)(\.stories|\.test)?\.tsx|components/organisms/ReleaseLandingPage\.stories\.tsx|app/r/\[slug\]/ReleaseLandingPage\.tsx|app/globals\.css|styles/design-system\.css|tests/e2e/storybook-smart-link-reachability\.spec\.ts)$'
+          # The homepage start CTA flag: both states of the full editorial page.
+          HOMEPAGE_START_CTA_STORYBOOK_PATTERN='^apps/web/(components/homepage/(HomepageEditorial|HomepageSpecSections)(\.stories)?\.tsx|data/homepageStartCta\.ts|tests/e2e/storybook-homepage-start-cta\.spec\.ts)$'
           # Overlay primitives, their layer tokens, and the
           # collision harness re-prove stacking, focus, and viewport fit.
           OVERLAY_STORYBOOK_PATTERN='^(packages/ui/atoms/(dialog|alert-dialog|sheet|popover|dropdown-menu|context-menu|select|tooltip)\.tsx|packages/ui/lib/(overlay-styles|overlay-focus|dropdown-styles|utils)\.ts|apps/web/styles/tailwind-foundation\.css|apps/web/\.storybook/stories/overlay-collisions\.stories\.tsx|apps/web/tests/e2e/storybook-overlay-collisions\.spec\.ts)$'
@@ -2479,6 +2482,12 @@ jobs:
           if grep -qE "$SMART_LINK_STORYBOOK_PATTERN" "$changed_files"; then
             {
               echo "smart_link=true"
+              echo "run=true"
+            } >> "$GITHUB_OUTPUT"
+          fi
+          if grep -qE "$HOMEPAGE_START_CTA_STORYBOOK_PATTERN" "$changed_files"; then
+            {
+              echo "homepage_start_cta=true"
               echo "run=true"
             } >> "$GITHUB_OUTPUT"
           fi
@@ -2575,6 +2584,7 @@ jobs:
           RUN_DESKTOP_UPDATE: ${{ steps.storybook-browser.outputs.desktop_update }}
           RUN_DSP: ${{ steps.storybook-browser.outputs.dsp }}
           RUN_SMART_LINK: ${{ steps.storybook-browser.outputs.smart_link }}
+          RUN_HOMEPAGE_START_CTA: ${{ steps.storybook-browser.outputs.homepage_start_cta }}
           STORYBOOK_BASE_URL: http://localhost:6006
           PLAYWRIGHT_ARTIFACT_ALLOW_IMAGES: 'true'
           PLAYWRIGHT_ARTIFACT_ALLOW_PUBLIC_IMAGES: 'true'
@@ -2609,6 +2619,9 @@ jobs:
           fi
           if [[ "${RUN_SMART_LINK:-false}" == 'true' ]]; then
             specs+=(tests/e2e/storybook-smart-link-reachability.spec.ts)
+          fi
+          if [[ "${RUN_HOMEPAGE_START_CTA:-false}" == 'true' ]]; then
+            specs+=(tests/e2e/storybook-homepage-start-cta.spec.ts)
           fi
           test "${#specs[@]}" -gt 0
           pnpm exec storybook dev -p 6006 --no-open &

@@ -10,7 +10,10 @@ import {
   HOMEPAGE_INVITE_ANCHOR,
 } from '@/data/homepageEditorialCopy';
 import { HOMEPAGE_LATEST_RELEASE } from '@/data/homepageProductUi';
-import { resolveHomepageHeroPrimaryAction } from '@/data/homepageStartCta';
+import {
+  resolveHomepageClaimClose,
+  resolveHomepageHeroPrimaryAction,
+} from '@/data/homepageStartCta';
 import { MARKETING_PEN_CONTRACT_IDS } from '@/data/marketing/penContracts';
 import { HOME_SPEC } from './v3/home-spec';
 import { Orbit } from './v3/Orbit';
@@ -34,6 +37,11 @@ const CHAPTER_ANCHORS = [
   'specs',
   HOMEPAGE_INVITE_ANCHOR,
 ];
+
+/** Forces `HOMEPAGE_START_CTA` on or off (stories, tests); unset reads the flag. */
+interface StartCtaProp {
+  readonly startCta?: boolean;
+}
 
 type HeroCopy = {
   readonly [K in keyof typeof HOMEPAGE_EDITORIAL_COPY.hero]: string;
@@ -68,8 +76,10 @@ function ChapterRule({
 export function HomepageStoryHero({
   copy = HOMEPAGE_EDITORIAL_COPY.hero,
   headingId = 'home-hero-heading',
-}: Readonly<{ copy?: HeroCopy; headingId?: string }>) {
-  const primary = resolveHomepageHeroPrimaryAction(copy);
+  startCta,
+}: Readonly<{ copy?: HeroCopy; headingId?: string } & StartCtaProp>) {
+  const primary = resolveHomepageHeroPrimaryAction(copy, startCta);
+  const close = resolveHomepageClaimClose(startCta);
   return (
     <section
       data-pen-section='hero'
@@ -149,11 +159,11 @@ export function HomepageStoryHero({
         {COPY.chapters.map((label, index) => (
           <a
             key={label}
-            href={`#${CHAPTER_ANCHORS[index]}`}
+            href={`#${(index === 3 && close?.anchor) || CHAPTER_ANCHORS[index]}`}
             className='hv3-mono'
           >
             <b>{`0${index + 1}`}</b>
-            {label}
+            {(index === 3 && close?.chapter) || label}
           </a>
         ))}
       </nav>
@@ -299,16 +309,24 @@ export function HomepageReleasesChapter({
   );
 }
 
-/** 04 invitation: the role waitlist form, the page's one conversion. */
+/**
+ * 04 invitation: the role waitlist form, the page's one conversion. With
+ * `HOMEPAGE_START_CTA` on it is the claim close instead: one link into /start.
+ */
 export function HomepageInviteClose({
   copy = HOMEPAGE_EDITORIAL_COPY.invite,
-}: Readonly<{
-  copy?: { readonly headline: string; readonly subhead: string };
-}>) {
+  startCta,
+}: Readonly<
+  {
+    copy?: { readonly headline: string; readonly subhead: string };
+  } & StartCtaProp
+>) {
   const invite = COPY.invite;
+  const claim = resolveHomepageClaimClose(startCta);
+  const { headline, subhead } = claim ?? copy;
   return (
     <section
-      id={HOMEPAGE_INVITE_ANCHOR}
+      id={claim?.anchor ?? HOMEPAGE_INVITE_ANCHOR}
       data-pen-section='invite'
       data-testid='marketing-section-cta'
       data-marketing-variant='final-single-claim'
@@ -316,29 +334,46 @@ export function HomepageInviteClose({
       data-pen-contract={MARKETING_PEN_CONTRACT_IDS.section.cta}
       className='hv3 hv3-chapter hv3-invite'
     >
-      <ChapterRule index='04' label={COPY.chapters[3]} />
+      <ChapterRule index='04' label={claim?.chapter ?? COPY.chapters[3]} />
       <div className='hv3-invite__inner'>
-        <h2 className='hv3-statement text-balance'>{lines(copy.headline)}</h2>
-        <p className='hv3-lede hv3-lede--center'>{copy.subhead}</p>
-        <div className='hv3-form'>
-          <WaitlistRoleForm
-            presentation='chips'
-            align='center'
-            headingLevel={2}
-            title={copy.headline}
-            roleLabel={invite.roleLabel}
-            submitLabel={invite.action}
-          />
-        </div>
-        <ol className='hv3-steps hv3-reveal'>
-          {invite.steps.map((step, index) => (
-            <li key={step.title}>
-              <span className='hv3-mono'>{`0${index + 1}`}</span>
-              <b>{step.title}</b>
-              <span>{step.body}</span>
-            </li>
-          ))}
-        </ol>
+        <h2 className='hv3-statement text-balance'>{lines(headline)}</h2>
+        <p className='hv3-lede hv3-lede--center'>{subhead}</p>
+        {claim ? (
+          <div className='hv3-form'>
+            <Link
+              href={claim.href}
+              prefetch={false}
+              className='hv3-btn hv3-btn--primary'
+              data-testid='homepage-close-cta'
+              data-analytics-event={claim.eventName}
+              data-analytics-source='homepage-close'
+            >
+              {claim.label}
+            </Link>
+          </div>
+        ) : (
+          <>
+            <div className='hv3-form'>
+              <WaitlistRoleForm
+                presentation='chips'
+                align='center'
+                headingLevel={2}
+                title={copy.headline}
+                roleLabel={invite.roleLabel}
+                submitLabel={invite.action}
+              />
+            </div>
+            <ol className='hv3-steps hv3-reveal'>
+              {invite.steps.map((step, index) => (
+                <li key={step.title}>
+                  <span className='hv3-mono'>{`0${index + 1}`}</span>
+                  <b>{step.title}</b>
+                  <span>{step.body}</span>
+                </li>
+              ))}
+            </ol>
+          </>
+        )}
       </div>
     </section>
   );
