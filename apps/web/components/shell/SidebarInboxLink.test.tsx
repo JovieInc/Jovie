@@ -24,6 +24,31 @@ vi.mock('./RuntimeUpdateProvider', () => ({
 import { SidebarInboxLink } from './SidebarInboxLink';
 
 describe('central Inbox bell', () => {
+  it('keeps the destination visible without inventing an unavailable count', () => {
+    render(
+      <SidebarInboxLink
+        availability={{ state: 'available', pendingCount: null }}
+      />
+    );
+    const link = screen.getByRole('link', { name: 'Inbox' });
+    expect(link).toBeVisible();
+    expect(link).toHaveAttribute('data-inbox-attention', 'unknown');
+    expect(link.querySelector('span')).toBeNull();
+  });
+
+  it.each([
+    [1, 'Inbox — 1 item needs attention'],
+    [2, 'Inbox — 2 items need attention'],
+  ])(
+    'agrees the attention label with %i pending items',
+    (pendingCount, name) => {
+      render(
+        <SidebarInboxLink availability={{ state: 'available', pendingCount }} />
+      );
+      expect(screen.getByRole('link', { name })).toBeVisible();
+    }
+  );
+
   it('keeps pending work on view and keyboard navigation', async () => {
     const { container } = render(
       <SidebarInboxLink

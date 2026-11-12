@@ -270,6 +270,20 @@ function expectDesktop32Control(
 }
 
 describe('LibrarySurface', () => {
+  it.each([
+    [1, '1 of 1 Item'],
+    [2, '2 of 2 Items'],
+  ])('agrees the status bar noun with %i total assets', (count, label) => {
+    renderLibrary(
+      Array.from({ length: Number(count) }, (_, index) =>
+        buildAsset({ id: `asset-${index}`, title: `Asset ${index}` })
+      )
+    );
+    expect(
+      screen.getByText(String(label), { exact: true })
+    ).toBeInTheDocument();
+  });
+
   it('renders stored child assets under a visible album with dependency guides and working selection', async () => {
     window.localStorage.setItem(LIBRARY_VIEW_MODE_STORAGE_KEY, 'list');
     const album = buildAsset({
