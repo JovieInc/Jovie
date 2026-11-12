@@ -157,6 +157,7 @@ LANE_TESTS = ["scripts/tests/test_factory_signals.py", "scripts/tests/test_facto
               "scripts/tests/test_reason_lane.py", "scripts/tests/test_yc_corpus.py",
               "scripts/tests/test_gh_app_token.py", "scripts/tests/test_linear_app_token.py",
               "scripts/tests/test_disk_guard.py", "scripts/tests/test_qualification_guard.py",
+              "scripts/tests/test_quota_rerun.py",
               "scripts/tests/test_git_housekeeping.py",
               "scripts/tests/test_continuity_clock.py",
               "scripts/tests/test_worktree_sweep.py", "scripts/tests/test_service_census.py",
@@ -7191,6 +7192,10 @@ def deterministic_route_taken(host: Host, pr: dict, route: dict | None) -> str |
         if not claim_route(host, pr, route["action"]):
             return None
         return "infra-rerun:changelog-metadata" if stamp_changelog_decision(host, pr) else None
+    # A named quota reset gets one rerun after that instant (quota_rerun).
+    if route["action"] == fix_red_classes.RERUN and route.get("cls") == "quota-deferred":
+        import quota_rerun
+        return quota_rerun.deferred_rerun(host, pr, failed_logs, update_json, _rerun_failed)
     # One rerun per head, shared with the platform-red gate above; one sync per head.
     if not (claim_infra_rerun(host, pr) if route["action"] == fix_red_classes.RERUN else claim_route(host, pr, route["action"])):
         return None
