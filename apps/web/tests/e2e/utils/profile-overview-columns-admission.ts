@@ -4,10 +4,7 @@ import {
   waitForSettledProfile,
   waitForSettledProfileLayout,
 } from './profile-admission-layout';
-import {
-  expectedPublicProfileLayout,
-  PROFILE_DESKTOP_SURFACE_SHIPPED,
-} from './profile-desktop-surface';
+import { expectedPublicProfileLayout } from './profile-desktop-surface';
 import { auditPublicProfileLayout } from './public-profile-layout-invariant';
 import { installPublicRouteMocks } from './public-surface-helpers';
 
@@ -86,10 +83,6 @@ export function registerProfileOverviewColumnTests() {
   test('deliberate red detects overlapping home overview columns', async ({
     page,
   }) => {
-    test.skip(
-      !PROFILE_DESKTOP_SURFACE_SHIPPED,
-      'Exercises the canonical desktop surface; opt-out builds skip it'
-    );
     await installPublicRouteMocks(page);
     await page.setViewportSize({ width: 1440, height: 900 });
     await page.goto(FIXTURE_ROUTE);

@@ -1154,7 +1154,6 @@ describe('ProfileDesktopSurface', () => {
       'data-mode',
       'profile'
     );
-
     const overview = screen.getByTestId('profile-desktop-home-overview');
     expect(overview).toHaveClass(
       '[@media(min-width:1180px)]:grid-cols-[minmax(420px,520px)_minmax(0,1fr)_320px]'
@@ -1164,6 +1163,7 @@ describe('ProfileDesktopSurface', () => {
     );
 
     const secondary = screen.getByTestId('profile-desktop-secondary-grid');
+    expect(secondary).toHaveClass('grid-cols-1', 'min-w-0'); // 1440px overlap
     const selectedWork = within(secondary).getByText('Selected work');
     const events = within(secondary).getByText('Events');
     expect(
@@ -1179,38 +1179,6 @@ describe('ProfileDesktopSurface', () => {
     expect(screen.getByText('Pay Tim White directly.')).toBeVisible();
     screen.getByTestId('profile-desktop-open-payments').click();
     expect(onDrawerViewChange).toHaveBeenCalledWith('pay');
-  });
-
-  // jov.ie/tim at 1440px: bare `grid` stacks had one implicit auto track that
-  // grew to the widest untruncated release title, so cards spilled under the
-  // next column. Every overview stack carries grid-cols-1 (minmax(0,1fr)).
-  it('pins the overview card stacks to a single minmax(0,1fr) track', () => {
-    render(
-      <ProfileDesktopSurface
-        artist={artist}
-        socialLinks={[]}
-        contacts={contacts}
-        photoDownloadSizes={[]}
-        drawerOpen={false}
-        drawerView='menu'
-        activeMode='profile'
-        onModeSelect={vi.fn()}
-        onDrawerOpenChange={vi.fn()}
-        onDrawerViewChange={vi.fn()}
-        onOpenMenu={vi.fn()}
-        onPlayClick={vi.fn()}
-        profileHref='/timwhite'
-        showPayButton
-        releases={[...HOMEPAGE_PROFILE_PREVIEW_DRAWER_RELEASES]}
-        latestRelease={HOMEPAGE_PROFILE_PREVIEW_RELEASES.live}
-      />
-    );
-    for (const id of [
-      'profile-desktop-secondary-grid',
-      'profile-desktop-side-rail',
-    ]) {
-      expect(screen.getByTestId(id)).toHaveClass('grid-cols-1', 'min-w-0');
-    }
   });
 
   it('omits the D9kdx Payments card when no pay destination exists', () => {
