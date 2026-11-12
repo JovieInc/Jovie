@@ -19,7 +19,7 @@
  */
 
 import { createHash } from 'node:crypto';
-import { lintCopy } from '../../packages/copy/lint.ts';
+import { validateDailyDraftSpans } from './daily-changelog-draft-validation.mjs';
 
 export const DAILY_SOURCE_SCHEMA = 'daily-changelog-source/v1';
 export const DAILY_RECEIPT_SCHEMA = 'daily-changelog-receipt/v1';
@@ -42,7 +42,6 @@ const SHA_RE = /^[0-9a-f]{40}$/;
 const OUTCOME_KEY_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const ENTRY_ID_RE = /^customer-update:[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const FRAGMENT_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
-const NUMBER_TOKEN_RE = /\d[\d.,%x-]*/g;
 const RECEIPT_COMMENT_RE =
   /<!--\s*daily-changelog-receipt\/v1\s+(\{[\s\S]*?\})\s*-->/g;
 const DIGEST_SECTIONS = Object.freeze(['Added', 'Changed', 'Fixed', 'Removed']);
@@ -315,49 +314,14 @@ export function validateDailyDraft(draft, eligibleById) {
     }
     spans.push({ text: bullet.text, claimIds: bullet.claimIds ?? [] });
   }
-  // The digest renders at the jovie-marketing register on /changelog, where
-  // seo:certify blocks on @jovie/copy findings. Fail the draft here, at the
-  // writer's own output, instead of ejecting the release PR from the queue.
-  const lintedCopyKeys = new Set();
-  for (const span of spans) {
-    if (span.claimIds.length === 0) {
-      findings.push({
-        rule: 'unmapped-claim',
-        storyId: draft.id,
-        message: `${prefix} has copy with no approved claim mapping.`,
-      });
-    }
-    for (const claimId of span.claimIds) {
-      if (!approvedClaims.has(claimId)) {
-        findings.push({
-          rule: 'unsupported-claim',
-          storyId: draft.id,
-          message: `${prefix} cites claim ${claimId}, which no mapped source approved.`,
-        });
-      }
-    }
-    for (const token of span.text.match(NUMBER_TOKEN_RE) ?? []) {
-      if (!approvedFacts.includes(token)) {
-        findings.push({
-          rule: 'unsupported-fact',
-          storyId: draft.id,
-          message: `${prefix} states "${token}", which no mapped source approved as a fact.`,
-        });
-      }
-    }
-    for (const copyFinding of lintCopy(span.text, {
-      register: 'jovie-marketing',
-    }).blocking) {
-      const key = `${copyFinding.rule}:${copyFinding.match}`;
-      if (lintedCopyKeys.has(key)) continue;
-      lintedCopyKeys.add(key);
-      findings.push({
-        rule: 'draft-copy-lint',
-        storyId: draft.id,
-        message: `${prefix} copy fails @jovie/copy ${copyFinding.rule} ("${copyFinding.match}"): ${copyFinding.message}`,
-      });
-    }
-  }
+  findings.push(
+    ...validateDailyDraftSpans(spans, {
+      draftId: draft.id,
+      prefix,
+      approvedClaims,
+      approvedFacts,
+    })
+  );
   return findings;
 }
 
