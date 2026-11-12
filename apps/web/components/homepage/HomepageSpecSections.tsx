@@ -22,8 +22,7 @@ import type {
  */
 function renderSection(
   entry: MarketingPageSection,
-  headingId: string,
-  startCta: boolean | undefined
+  headingId: string
 ): ReactNode {
   switch (entry.section) {
     case 'hero':
@@ -31,7 +30,6 @@ function renderSection(
         <HomepageStoryHero
           key='hero'
           headingId={headingId}
-          startCta={startCta}
           copy={{ ...HOMEPAGE_EDITORIAL_COPY.hero, ...entry.copy }}
         />
       );
@@ -47,25 +45,20 @@ function renderSection(
         </Fragment>
       );
     case 'cta':
-      return (
-        <HomepageInviteClose key='cta' copy={entry.copy} startCta={startCta} />
-      );
+      return <HomepageInviteClose key='cta' copy={entry.copy} />;
   }
 }
 
 export function HomepageSpecSections({
   sections,
   headingId = 'home-hero-heading',
-  startCta,
 }: Readonly<{
   sections: MarketingPageSections;
   headingId?: string;
-  /** Forces `HOMEPAGE_START_CTA` on or off (stories); unset reads the flag. */
-  startCta?: boolean;
 }>) {
   return (
     <>
-      {sections.map(entry => renderSection(entry, headingId, startCta))}
+      {sections.map(entry => renderSection(entry, headingId))}
       <StageMotion
         paletteQuery={HOMEPAGE_PRODUCT_UI.palette.query}
         paletteTarget={HOMEPAGE_PRODUCT_UI.palette.queryTarget}

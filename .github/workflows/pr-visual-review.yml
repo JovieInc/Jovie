@@ -298,54 +298,6 @@ jobs:
           fi
           node -e "const m=require('./pr-visual-artifacts/screen-audit-manifest.json');console.log('changed screens:',m.screens.map(s=>s.screenId+' ('+s.producer+')').join(', ')||'none');for(const s of m.screens.filter(s=>s.producer==='none'))console.log('::warning::'+s.screenId+' changed but has no rendered producer; Validating needs a runtime receipt.')"
 
-      # HOMEPAGE_START_CTA is read when the static homepage is prerendered, so
-      # the captures above only ever show it off. When a PR changes the flag's
-      # own surface, rebuild with the flag on and capture `/` again, so the
-      # artifact holds the before (root) and the after (homepage-start-cta-on)
-      # of the same head. Remove this step together with the flag.
-      - name: Capture homepage with HOMEPAGE_START_CTA on
-        id: homepage_start_cta
-        if: ${{ !cancelled() && steps.route.outputs.should_review == 'true' && steps.build.outcome == 'success' && steps.server.outcome == 'success' }}
-        env:
-          BASE_URL: http://127.0.0.1:3101
-          PR_VISUAL_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-          PR_VISUAL_ROUTES: '["/"]'
-          PR_VISUAL_OUT: pr-visual-artifacts/homepage-start-cta-on
-          FEATURE_HOMEPAGE_START_CTA: 'true'
-        run: |
-          set -euo pipefail
-          flag_surface='^apps/web/(data/homepageStartCta\.ts|components/homepage/HomepageEditorial\.tsx|app/\(home\)/layout\.tsx)$'
-          if ! grep -Eq "$flag_surface" "$RUNNER_TEMP/changed-files.txt"; then
-            echo "The start CTA flag surface did not change; flag-on capture skipped."
-            exit 0
-          fi
-          # Built directly, not through turbo: its strict env mode drops the
-          # undeclared FEATURE_ override and would replay the flag-off build.
-          DATABASE_URL=postgresql://localhost/noop NEXT_DISABLE_TOOLBAR=1 NEXT_PUBLIC_AUTH_PROXY_DISABLED=1 NEXT_PUBLIC_AUTH_MOCK=1 NEXT_PUBLIC_E2E_MODE=1 VERCEL_ENV=development E2E_USE_TEST_AUTH_BYPASS=1 E2E_VISUAL_CAPTURE_SYNTHETIC_AUTH=1 E2E_TEST_AUTH_PERSONA=creator-ready E2E_CLERK_USER_ID=user_test NEXT_PUBLIC_FEATURE_THEME_SWITCHING=1 \
-            pnpm --filter @jovie/web run build
-          (cd apps/web && PORT=3101 DATABASE_URL=postgresql://localhost/noop NEXT_DISABLE_TOOLBAR=1 NEXT_PUBLIC_AUTH_PROXY_DISABLED=1 NEXT_PUBLIC_AUTH_MOCK=1 NEXT_PUBLIC_E2E_MODE=1 VERCEL_ENV=development E2E_USE_TEST_AUTH_BYPASS=1 E2E_VISUAL_CAPTURE_SYNTHETIC_AUTH=1 E2E_TEST_AUTH_PERSONA=creator-ready E2E_CLERK_USER_ID=user_test HOSTNAME=localhost NEXT_PUBLIC_APP_URL=http://127.0.0.1:3101 BETTER_AUTH_URL=http://127.0.0.1:3101 NEXT_PUBLIC_BETTER_AUTH_URL=http://127.0.0.1:3101 pnpm run start) > "$RUNNER_TEMP/pr-visual-flag-server.log" 2>&1 &
-          flag_server=$!
-          trap 'kill "$flag_server" 2>/dev/null || true' EXIT
-          ready=false
-          for _ in $(seq 1 30); do
-            if curl -fsS "$BASE_URL" >/dev/null 2>&1; then ready=true; break; fi
-            sleep 2
-          done
-          if [ "$ready" != true ]; then
-            cat "$RUNNER_TEMP/pr-visual-flag-server.log"
-            exit 1
-          fi
-          # Fail closed when the build ignored the flag: the capture would be a
-          # second copy of the flag-off page labelled as the flag-on one.
-          curl -fsS "$BASE_URL" > "$RUNNER_TEMP/pr-visual-flag-home.html"
-          if ! grep -q 'data-testid="homepage-close-cta"' "$RUNNER_TEMP/pr-visual-flag-home.html"; then
-            echo "::error::The flag-on build still serves the invitation close."
-            exit 1
-          fi
-          mkdir -p "$PR_VISUAL_OUT"
-          node .github/scripts/pr-visual-review-capture.mjs
-          test -f "$PR_VISUAL_OUT/manifest.json"
-
       - name: Stop server
         if: always()
         run: kill "$(cat "$RUNNER_TEMP/pr-visual-server.pid" 2>/dev/null)" 2>/dev/null || true

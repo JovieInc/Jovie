@@ -31,7 +31,7 @@ const geistMono = localFont({
 // the default /signup CTA and an extra footer CTA). The browser then rendered both from "/" and React
 // threw hydration error #418 on every visit. Resolve the route-owned values
 // here, once, so the server and the client render identical markup.
-// With HOMEPAGE_START_CTA on, the header action is the hero's claim intent.
+// While public signup is open, the header action is the hero's claim intent.
 const HOME_HEADER_CTA = resolveHomepageHeaderCta();
 const HOME_HEADER_BRAND = resolveMarketingHeaderBrand(APP_ROUTES.HOME);
 const HOME_INVITE_PAGE_CONTRACT =

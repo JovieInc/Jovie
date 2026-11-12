@@ -9,6 +9,7 @@ import {
   HOMEPAGE_HEADLINE_BREAKS,
   HOMEPAGE_INVITE_ANCHOR,
 } from '@/data/homepageEditorialCopy';
+import { HOMEPAGE_CLAIM_ANCHOR } from '@/data/homepageInviteAnchor';
 import { HOMEPAGE_LATEST_RELEASE } from '@/data/homepageProductUi';
 import {
   resolveHomepageClaimClose,
@@ -37,11 +38,6 @@ const CHAPTER_ANCHORS = [
   'specs',
   HOMEPAGE_INVITE_ANCHOR,
 ];
-
-/** Forces `HOMEPAGE_START_CTA` on or off (stories, tests); unset reads the flag. */
-interface StartCtaProp {
-  readonly startCta?: boolean;
-}
 
 type HeroCopy = {
   readonly [K in keyof typeof HOMEPAGE_EDITORIAL_COPY.hero]: string;
@@ -76,10 +72,9 @@ function ChapterRule({
 export function HomepageStoryHero({
   copy = HOMEPAGE_EDITORIAL_COPY.hero,
   headingId = 'home-hero-heading',
-  startCta,
-}: Readonly<{ copy?: HeroCopy; headingId?: string } & StartCtaProp>) {
-  const primary = resolveHomepageHeroPrimaryAction(copy, startCta);
-  const close = resolveHomepageClaimClose(startCta);
+}: Readonly<{ copy?: HeroCopy; headingId?: string }>) {
+  const primary = resolveHomepageHeroPrimaryAction(copy);
+  const close = resolveHomepageClaimClose();
   return (
     <section
       data-pen-section='hero'
@@ -310,19 +305,17 @@ export function HomepageReleasesChapter({
 }
 
 /**
- * 04 invitation: the role waitlist form, the page's one conversion. With
- * `HOMEPAGE_START_CTA` on it is the claim close instead: one link into /start.
+ * 04 claim: one link into /start, the page's one conversion. While public
+ * signup is closed it is the invitation instead: the role waitlist form.
+ * Either way the section answers both `#claim-profile` and `#request-invite`.
  */
 export function HomepageInviteClose({
   copy = HOMEPAGE_EDITORIAL_COPY.invite,
-  startCta,
-}: Readonly<
-  {
-    copy?: { readonly headline: string; readonly subhead: string };
-  } & StartCtaProp
->) {
+}: Readonly<{
+  copy?: { readonly headline: string; readonly subhead: string };
+}>) {
   const invite = COPY.invite;
-  const claim = resolveHomepageClaimClose(startCta);
+  const claim = resolveHomepageClaimClose();
   const { headline, subhead } = claim ?? copy;
   return (
     <section
@@ -334,6 +327,14 @@ export function HomepageInviteClose({
       data-pen-contract={MARKETING_PEN_CONTRACT_IDS.section.cta}
       className='hv3 hv3-chapter hv3-invite'
     >
+      {/* Alias for links to the other closing section's id. Out of flow, so it
+          adds no row to the chapter layout. */}
+      <span
+        id={claim ? HOMEPAGE_INVITE_ANCHOR : HOMEPAGE_CLAIM_ANCHOR}
+        data-testid='homepage-close-anchor-alias'
+        aria-hidden='true'
+        className='absolute'
+      />
       <ChapterRule index='04' label={claim?.chapter ?? COPY.chapters[3]} />
       <div className='hv3-invite__inner'>
         <h2 className='hv3-statement text-balance'>{lines(headline)}</h2>

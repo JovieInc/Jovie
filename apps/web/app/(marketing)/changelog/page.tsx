@@ -180,7 +180,7 @@ export default async function ChangelogPage() {
 
       <MarketingFooterCta
         ctaLabel='Request an Invite'
-        ctaHref='/#request-invite'
+        ctaHref='/#claim-profile'
       />
     </div>
   );

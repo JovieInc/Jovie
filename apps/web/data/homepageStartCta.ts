@@ -1,25 +1,25 @@
 import { ARTIST_PROFILE_COPY } from '@/data/artistProfileCopy';
+import { HOMEPAGE_CLAIM_ANCHOR } from '@/data/homepageInviteAnchor';
 import { HOME_MARKETING_HEADER_CTA } from '@/data/marketing/headerCta';
 import { getClaimProfileIntent } from '@/data/marketingCtaIntents';
-import { isCodeFlagEnabled } from '@/lib/flags/code-flags';
 import { isPublicSignupClosed } from '@/lib/waitlist/public-signup-gate';
 
 /**
  * Homepage start CTA. Public signup reopened on 2026-11-09
- * (canon/PRODUCT.md) and onboarding is one flow, so a stranger should be able
- * to start it from the homepage.
+ * (canon/PRODUCT.md) and onboarding is one flow, so a stranger starts it from
+ * the homepage.
  *
- * `HOMEPAGE_START_CTA` (default off) swaps every invitation entry point on the
- * page (hero action, header action, closing section) for the shared
- * claim-profile CTA intent, which enters `/start`. Off, or while the
- * `PUBLIC_SIGNUP_CLOSED` kill switch sends `/start` back to the waitlist, the
- * page keeps its invite-only story: each action scrolls to the on-page form.
+ * Every entry point on the page (hero action, header action, closing section)
+ * is the shared claim-profile CTA intent, which enters `/start`. Only while
+ * the `PUBLIC_SIGNUP_CLOSED` kill switch sends `/start` back to the waitlist
+ * does the page tell its invite-only story: each action scrolls to the
+ * on-page form.
  *
- * Read on the server at build time (the homepage is static), so a flip takes
- * a redeploy.
+ * Read on the server at build time (the homepage is static), so the kill
+ * switch takes a redeploy.
  */
 export function isHomepageStartCtaEnabled(): boolean {
-  return isCodeFlagEnabled('HOMEPAGE_START_CTA') && !isPublicSignupClosed();
+  return !isPublicSignupClosed();
 }
 
 export interface HomepageHeroPrimaryAction {
@@ -66,7 +66,7 @@ export interface HomepageClaimClose {
 }
 
 /**
- * Closing section with the flag on, or null to keep the invitation form. No
+ * Closing section while signup is open, or null to keep the invitation form. No
  * new marketing copy: the headline and subhead are the approved closing of the
  * artist-profile page (`ARTIST_PROFILE_COPY.finalCta`, JOV-8565), and the
  * action is the shared claim-profile intent.
@@ -83,6 +83,6 @@ export function resolveHomepageClaimClose(
     href: intent.href,
     eventName: intent.eventName,
     chapter: 'claim',
-    anchor: 'claim-profile',
+    anchor: HOMEPAGE_CLAIM_ANCHOR,
   };
 }

@@ -1,5 +1,7 @@
 import { render, screen } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { ARTIST_PROFILE_COPY } from '@/data/artistProfileCopy';
+import { getClaimProfileIntent } from '@/data/marketingCtaIntents';
 import { DEFAULT_HOME_SPEC } from '@/lib/content-records/marketing-page';
 import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import { HomepageSpecSections } from './HomepageSpecSections';
@@ -12,6 +14,10 @@ vi.mock('next/navigation', async importOriginal => ({
 }));
 
 describe('HomepageSpecSections', () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
   it('fills copy slots from the spec and keeps the locked headline', () => {
     const spec = structuredClone(DEFAULT_HOME_SPEC);
     const [hero, split, gallery, cta] = spec.sections;
@@ -29,7 +35,7 @@ describe('HomepageSpecSections', () => {
     gallery.copy.headline = 'Spec gallery headline.';
     cta.copy.headline = 'Spec close headline.';
 
-    render(<HomepageSpecSections sections={spec.sections} />);
+    const open = render(<HomepageSpecSections sections={spec.sections} />);
 
     expect(
       screen.getByRole('heading', {
@@ -38,15 +44,31 @@ describe('HomepageSpecSections', () => {
       })
     ).toBeTruthy();
     expect(screen.getByText('Spec subhead.')).toBeTruthy();
-    expect(screen.getByRole('link', { name: 'Ask In' })).toBeTruthy();
     expect(screen.getByText('Spec profile headline.')).toBeTruthy();
     expect(screen.getByText('Spec gallery headline.')).toBeTruthy();
-    expect(screen.getByText('Spec close headline.')).toBeTruthy();
+    // The claim action and the closing copy are code-owned: the shared
+    // claim-profile intent and the approved artist-profile close.
+    expect(screen.getByTestId('homepage-primary-cta')).toHaveTextContent(
+      getClaimProfileIntent().label
+    );
+    expect(
+      screen.getByText(ARTIST_PROFILE_COPY.finalCta.headline)
+    ).toBeTruthy();
+    expect(screen.queryByText('Spec close headline.')).toBeNull();
+    open.unmount();
+
+    // The invitation slots fill only while signup is closed.
+    vi.stubEnv('FEATURE_PUBLIC_SIGNUP_CLOSED', 'true');
+    render(<HomepageSpecSections sections={spec.sections} />);
+    expect(screen.getByRole('link', { name: 'Ask In' })).toBeTruthy();
+    expect(screen.getAllByText('Spec close headline.').length).toBeGreaterThan(
+      0
+    );
   });
 
-  it('forwards a forced start CTA to the hero and the close', () => {
-    const { container, rerender } = render(
-      <HomepageSpecSections sections={DEFAULT_HOME_SPEC.sections} startCta />
+  it('enters /start from the hero and the close, and shows the invitation form only while signup is closed', () => {
+    const { container, unmount } = render(
+      <HomepageSpecSections sections={DEFAULT_HOME_SPEC.sections} />
     );
     expect(screen.getByTestId('homepage-primary-cta')).toHaveAttribute(
       'href',
@@ -58,12 +80,10 @@ describe('HomepageSpecSections', () => {
     );
     expect(container.textContent).not.toMatch(/invit/i);
 
-    rerender(
-      <HomepageSpecSections
-        sections={DEFAULT_HOME_SPEC.sections}
-        startCta={false}
-      />
-    );
+    unmount();
+
+    vi.stubEnv('FEATURE_PUBLIC_SIGNUP_CLOSED', 'true');
+    render(<HomepageSpecSections sections={DEFAULT_HOME_SPEC.sections} />);
     expect(screen.queryByTestId('homepage-close-cta')).toBeNull();
     expect(screen.getByTestId('waitlist-role-form')).toBeTruthy();
   });
@@ -77,6 +97,7 @@ describe('HomepageSpecSections', () => {
       node => node.tagName
     );
     expect(headings).toEqual(['H1', 'H2']);
+    expect(container.querySelector('section#claim-profile')).toBeTruthy();
     expect(container.querySelector('#request-invite')).toBeTruthy();
     await expectNoA11yViolations(container);
   });

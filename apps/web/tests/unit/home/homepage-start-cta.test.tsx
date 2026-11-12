@@ -1,9 +1,9 @@
-// Homepage start CTA (HOMEPAGE_START_CTA, default off). Public signup
-// reopened on 2026-11-09 (canon/PRODUCT.md), so with the flag on the hero's
-// primary action enters the one onboarding flow at /start, which is what the
-// production certification check `stranger-homepage-signup-entry`
-// (scripts/lib/prod-cert-truth.mjs) looks for in the homepage HTML. Off, the
-// page is the invite-only story pinned by homepage-contract.test.tsx.
+// Homepage start CTA. Public signup reopened on 2026-11-09
+// (canon/PRODUCT.md), so the hero's primary action enters the one onboarding
+// flow at /start, which is what the production certification check
+// `stranger-homepage-signup-entry` (scripts/lib/prod-cert-truth.mjs) looks for
+// in the homepage HTML. Only the PUBLIC_SIGNUP_CLOSED kill switch brings back
+// the invite-only story.
 import { render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { signupEntries } from '../../../../../scripts/lib/prod-cert-truth.mjs';
@@ -56,41 +56,15 @@ async function load() {
   };
 }
 
-describe('homepage start CTA flag', { timeout: 60_000 }, () => {
+describe('homepage start CTA', { timeout: 60_000 }, () => {
   afterEach(() => {
     vi.unstubAllEnvs();
     vi.resetModules();
   });
 
-  it('is off by default: the hero scrolls to the invitation form and nothing links to signup', async () => {
+  it('the hero primary action is the shared claim-profile intent into /start', async () => {
     const { CODE_FLAGS } = await import('@/lib/flags/code-flags');
-    expect(CODE_FLAGS.HOMEPAGE_START_CTA).toBe(false);
-    const { copy, anchor } = await load();
-    const { container } = await renderHomePage();
-
-    const primary = screen.getByTestId('homepage-primary-cta');
-    expect(primary).toHaveAttribute('href', `#${anchor}`);
-    expect(primary).toHaveTextContent(copy.hero.primaryAction);
-    expect(screen.getByText(copy.hero.note)).toBeInTheDocument();
-    expect(signupEntries(container.innerHTML)).toEqual([]);
-    // The close is the invitation form, and the header keeps its invite action.
-    const close = container.querySelector(`#${anchor}`);
-    expect(close).toHaveTextContent(copy.invite.headline);
-    expect(
-      close?.querySelector('[data-testid="waitlist-role-form"]')
-    ).not.toBeNull();
-    expect(screen.queryByTestId('homepage-close-cta')).toBeNull();
-    const { resolveHomepageHeaderCta, resolveHomepageClaimClose } =
-      await import('@/data/homepageStartCta');
-    expect(resolveHomepageHeaderCta()).toEqual({
-      label: 'Request an Invite',
-      href: `/#${anchor}`,
-    });
-    expect(resolveHomepageClaimClose()).toBeNull();
-  });
-
-  it('on: the hero primary action is the shared claim-profile intent into /start', async () => {
-    vi.stubEnv('FEATURE_HOMEPAGE_START_CTA', 'true');
+    expect(CODE_FLAGS).not.toHaveProperty('HOMEPAGE_START_CTA');
     const { copy, anchor, claim } = await load();
     const { container } = await renderHomePage();
 
@@ -106,7 +80,7 @@ describe('homepage start CTA flag', { timeout: 60_000 }, () => {
 
     // The note under the actions describes the invitation form, so it goes.
     expect(screen.queryByText(copy.hero.note)).not.toBeInTheDocument();
-    // The locked headline, the secondary action and the form are untouched.
+    // The locked headline and the secondary action are untouched.
     expect(
       screen.getByRole('heading', { level: 1, name: copy.hero.headline })
     ).toBeInTheDocument();
@@ -119,6 +93,7 @@ describe('homepage start CTA flag', { timeout: 60_000 }, () => {
     // copy: no form, and nothing on the page still says invitation.
     const { ARTIST_PROFILE_COPY } = await import('@/data/artistProfileCopy');
     const close = screen.getByTestId('marketing-section-cta');
+    expect(close).toHaveAttribute('id', 'claim-profile');
     expect(close).toHaveTextContent(ARTIST_PROFILE_COPY.finalCta.headline);
     expect(close).toHaveTextContent(ARTIST_PROFILE_COPY.finalCta.subhead);
     expect(
@@ -129,11 +104,15 @@ describe('homepage start CTA flag', { timeout: 60_000 }, () => {
     expect(closeCta).toHaveAttribute('href', claim.href);
     expect(closeCta).toHaveTextContent(claim.label);
     expect(container.textContent).not.toMatch(/invit/i);
-    expect(container.innerHTML).not.toContain(anchor);
+    // The old invitation anchor survives only as an empty alias in the close,
+    // so links to /#request-invite still scroll there. Nothing links to it.
+    const alias = container.querySelector(`#${anchor}`);
+    expect(close).toContainElement(alias as HTMLElement);
+    expect(alias).toBeEmptyDOMElement();
+    expect(container.querySelector(`a[href$="#${anchor}"]`)).toBeNull();
   });
 
-  it('on: the header action resolves to the same claim intent', async () => {
-    vi.stubEnv('FEATURE_HOMEPAGE_START_CTA', 'true');
+  it('the header action resolves to the same claim intent', async () => {
     const { claim } = await load();
     const { resolveHomepageHeaderCta, resolveHomepageClaimClose } =
       await import('@/data/homepageStartCta');
@@ -147,8 +126,7 @@ describe('homepage start CTA flag', { timeout: 60_000 }, () => {
     });
   });
 
-  it('on, but public signup closed: the hero keeps the invitation action', async () => {
-    vi.stubEnv('FEATURE_HOMEPAGE_START_CTA', 'true');
+  it('public signup closed: the hero, the header and the close keep the invitation', async () => {
     vi.stubEnv('FEATURE_PUBLIC_SIGNUP_CLOSED', 'true');
     const { copy, anchor } = await load();
     const { container } = await renderHomePage();
@@ -156,14 +134,20 @@ describe('homepage start CTA flag', { timeout: 60_000 }, () => {
     const primary = screen.getByTestId('homepage-primary-cta');
     expect(primary).toHaveAttribute('href', `#${anchor}`);
     expect(primary).toHaveTextContent(copy.hero.primaryAction);
+    expect(screen.getByText(copy.hero.note)).toBeInTheDocument();
     expect(signupEntries(container.innerHTML)).toEqual([]);
-    expect(container.querySelector(`#${anchor}`)).toHaveTextContent(
-      copy.invite.headline
-    );
+    const close = container.querySelector(`#${anchor}`);
+    expect(close).toHaveTextContent(copy.invite.headline);
+    expect(
+      close?.querySelector('[data-testid="waitlist-role-form"]')
+    ).not.toBeNull();
     expect(screen.queryByTestId('homepage-close-cta')).toBeNull();
-    const { resolveHomepageHeaderCta } = await import(
-      '@/data/homepageStartCta'
-    );
-    expect(resolveHomepageHeaderCta().href).toBe(`/#${anchor}`);
+    const { resolveHomepageHeaderCta, resolveHomepageClaimClose } =
+      await import('@/data/homepageStartCta');
+    expect(resolveHomepageHeaderCta()).toEqual({
+      label: 'Request an Invite',
+      href: `/#${anchor}`,
+    });
+    expect(resolveHomepageClaimClose()).toBeNull();
   });
 });

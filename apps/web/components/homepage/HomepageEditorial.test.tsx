@@ -1,11 +1,12 @@
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ARTIST_PROFILE_COPY } from '@/data/artistProfileCopy';
 import {
   HOMEPAGE_EDITORIAL_COPY,
   HOMEPAGE_INVITE_ANCHOR,
 } from '@/data/homepageEditorialCopy';
+import { HOMEPAGE_CLAIM_ANCHOR } from '@/data/homepageInviteAnchor';
 import { getClaimProfileIntent } from '@/data/marketingCtaIntents';
 import { expectNoA11yViolations } from '@/tests/utils/a11y';
 
@@ -36,7 +37,16 @@ import {
 
 const COPY = HOMEPAGE_EDITORIAL_COPY;
 
+/** The PUBLIC_SIGNUP_CLOSED kill switch brings the invite-only page back. */
+function closePublicSignup() {
+  vi.stubEnv('FEATURE_PUBLIC_SIGNUP_CLOSED', 'true');
+}
+
 describe('HomepageEditorial chapters', () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
   it('renders the hero as one labelled section with the locked headline and two actions', async () => {
     const { container } = render(<HomepageStoryHero />);
 
@@ -47,7 +57,7 @@ describe('HomepageEditorial chapters', () => {
     ).toHaveAttribute('id', 'home-hero-heading');
     expect(screen.getByTestId('homepage-primary-cta')).toHaveAttribute(
       'href',
-      `#${HOMEPAGE_INVITE_ANCHOR}`
+      getClaimProfileIntent().href
     );
     expect(screen.getByTestId('homepage-hero-live-profile')).toHaveAttribute(
       'href',
@@ -72,7 +82,7 @@ describe('HomepageEditorial chapters', () => {
       '#feature-split',
       '#product-gallery',
       '#specs',
-      `#${HOMEPAGE_INVITE_ANCHOR}`,
+      `#${HOMEPAGE_CLAIM_ANCHOR}`,
     ]);
 
     await user.tab();
@@ -111,11 +121,34 @@ describe('HomepageEditorial chapters', () => {
     await expectNoA11yViolations(container);
   });
 
-  it('closes on the invite form and the three numbered steps', async () => {
-    const { container } = render(<HomepageInviteClose />);
+  it('closes on the invite form and the three numbered steps while signup is closed', async () => {
+    closePublicSignup();
+    const { container } = render(
+      <>
+        <HomepageStoryHero />
+        <HomepageInviteClose />
+      </>
+    );
 
     const section = screen.getByTestId('marketing-section-cta');
     expect(section).toHaveAttribute('id', HOMEPAGE_INVITE_ANCHOR);
+    // Links to the claim section still land here.
+    expect(
+      within(section).getByTestId('homepage-close-anchor-alias')
+    ).toHaveAttribute('id', HOMEPAGE_CLAIM_ANCHOR);
+    expect(
+      screen.getByRole('heading', { level: 2, name: COPY.invite.headline })
+    ).toBeInTheDocument();
+    expect(screen.queryByTestId('homepage-close-cta')).toBeNull();
+    expect(screen.getByTestId('homepage-primary-cta')).toHaveAttribute(
+      'href',
+      `#${HOMEPAGE_INVITE_ANCHOR}`
+    );
+    expect(
+      within(screen.getByRole('navigation', { name: COPY.chaptersLabel }))
+        .getAllByRole('link')
+        .at(-1)
+    ).toHaveAttribute('href', `#${HOMEPAGE_INVITE_ANCHOR}`);
     expect(
       screen.getAllByRole('button', { name: COPY.invite.action }).length
     ).toBeGreaterThan(0);
@@ -125,12 +158,12 @@ describe('HomepageEditorial chapters', () => {
     await expectNoA11yViolations(container);
   });
 
-  it('closes on one claim link, with no invitation copy, when the start CTA is forced on', async () => {
+  it('closes on one claim link, with no invitation copy', async () => {
     const claim = getClaimProfileIntent();
     const { container } = render(
       <>
-        <HomepageStoryHero startCta />
-        <HomepageInviteClose startCta />
+        <HomepageStoryHero />
+        <HomepageInviteClose />
       </>
     );
 
@@ -148,7 +181,11 @@ describe('HomepageEditorial chapters', () => {
     expect(close).toHaveAttribute('href', claim.href);
     expect(close).toHaveTextContent(claim.label);
     expect(close).toHaveAttribute('data-analytics-event', claim.eventName);
-    expect(section).toHaveAttribute('id', 'claim-profile');
+    expect(section).toHaveAttribute('id', HOMEPAGE_CLAIM_ANCHOR);
+    // Old links to the invitation form still land here.
+    const alias = within(section).getByTestId('homepage-close-anchor-alias');
+    expect(alias).toHaveAttribute('id', HOMEPAGE_INVITE_ANCHOR);
+    expect(alias).toBeEmptyDOMElement();
     expect(
       within(
         screen.getByRole('navigation', { name: COPY.chaptersLabel })
@@ -164,19 +201,6 @@ describe('HomepageEditorial chapters', () => {
       container.querySelectorAll('[data-primary-action="true"]')
     ).toHaveLength(1);
     await expectNoA11yViolations(container);
-  });
-
-  it('keeps the invitation close when the start CTA is forced off', () => {
-    vi.stubEnv('FEATURE_HOMEPAGE_START_CTA', 'true');
-    try {
-      render(<HomepageInviteClose startCta={false} />);
-      expect(
-        screen.getByRole('heading', { level: 2, name: COPY.invite.headline })
-      ).toBeInTheDocument();
-      expect(screen.queryByTestId('homepage-close-cta')).toBeNull();
-    } finally {
-      vi.unstubAllEnvs();
-    }
   });
 
   it('wraps long caller copy without dropping any of it', async () => {
@@ -221,32 +245,28 @@ describe('HomepageEditorial chapters', () => {
     await expectNoA11yViolations(container);
   });
 
-  it('keeps the invitation action by default and enters /start when HOMEPAGE_START_CTA is on', async () => {
-    const off = render(<HomepageStoryHero />);
+  it('enters /start from the hero, and keeps the invitation action only while signup is closed', async () => {
+    const claim = getClaimProfileIntent();
+    const open = render(<HomepageStoryHero />);
+    const start = screen.getByTestId('homepage-primary-cta');
+    expect(start).toHaveAttribute('href', '/start');
+    expect(start).toHaveAttribute('href', claim.href);
+    expect(start).toHaveAttribute('data-primary-action', 'true');
+    expect(start).toHaveTextContent(claim.label);
+    // The note describes the invitation form, so it leaves with that action.
+    expect(screen.queryByText(COPY.hero.note)).not.toBeInTheDocument();
+    expect(screen.getByTestId('homepage-hero-live-profile')).toHaveAttribute(
+      'href',
+      COPY.hero.secondaryHref
+    );
+    await expectNoA11yViolations(open.container);
+    open.unmount();
+
+    closePublicSignup();
+    render(<HomepageStoryHero />);
     const invite = screen.getByTestId('homepage-primary-cta');
     expect(invite).toHaveAttribute('href', COPY.hero.primaryHref);
     expect(invite).toHaveTextContent(COPY.hero.primaryAction);
     expect(screen.getByText(COPY.hero.note)).toBeInTheDocument();
-    off.unmount();
-
-    vi.stubEnv('FEATURE_HOMEPAGE_START_CTA', 'true');
-    try {
-      const claim = getClaimProfileIntent();
-      const { container } = render(<HomepageStoryHero />);
-      const start = screen.getByTestId('homepage-primary-cta');
-      expect(start).toHaveAttribute('href', '/start');
-      expect(start).toHaveAttribute('href', claim.href);
-      expect(start).toHaveAttribute('data-primary-action', 'true');
-      expect(start).toHaveTextContent(claim.label);
-      // The note describes the invitation form, so it leaves with that action.
-      expect(screen.queryByText(COPY.hero.note)).not.toBeInTheDocument();
-      expect(screen.getByTestId('homepage-hero-live-profile')).toHaveAttribute(
-        'href',
-        COPY.hero.secondaryHref
-      );
-      await expectNoA11yViolations(container);
-    } finally {
-      vi.unstubAllEnvs();
-    }
   });
 });

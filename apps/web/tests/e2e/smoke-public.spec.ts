@@ -95,11 +95,9 @@ test('homepage loads with hero heading, CTA, sections, and footer', async ({
     'Homepage did not render the expected main content shell'
   ).toBeVisible({ timeout: 60_000 });
 
-  // CTA must be present — the invite action is the homepage's one conversion
+  // CTA must be present: the claim action is the homepage's one conversion
   const cta = page
-    .locator(
-      '[data-testid="homepage-primary-cta"], a[href="#request-invite"], a[href="/#request-invite"]'
-    )
+    .locator('[data-testid="homepage-primary-cta"], a[href="/start"]')
     .first();
   await expect(cta).toBeVisible({ timeout: 20_000 });
 

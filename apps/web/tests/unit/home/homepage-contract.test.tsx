@@ -1,5 +1,6 @@
 // Homepage page contract (Tim, 2026-11-03: "Jovie helps you move your music
-// forward." on `/`; invite-only, the story ends in the role waitlist form).
+// forward." on `/`; the story ends in the claim action, or in the role
+// waitlist form while PUBLIC_SIGNUP_CLOSED is on).
 // One table-driven contract: it renders the real `/` page module and checks
 // the route manifest, copy truth sources, the one primary action, product
 // imagery, and tokenized styles. Changing the page means changing its typed
@@ -97,6 +98,7 @@ describe('homepage contract', { timeout: 60_000 }, () => {
     gate.WAITLIST_ENABLED = true;
   });
   afterEach(() => {
+    vi.unstubAllEnvs();
     vi.resetModules();
   });
 
@@ -149,13 +151,27 @@ describe('homepage contract', { timeout: 60_000 }, () => {
       copy.profile.headline,
       copy.releases.headline,
       specs.headline,
-      copy.invite.headline,
+      (await import('@/data/artistProfileCopy')).ARTIST_PROFILE_COPY.finalCta
+        .headline,
     ]);
   });
 
+  it('ends in the one claim action into /start, with no form', async () => {
+    const { container } = await renderHomePage();
+    expect(container.querySelectorAll('form')).toHaveLength(0);
+    expect(
+      container.querySelectorAll('[data-primary-action="true"]')
+    ).toHaveLength(1);
+    const entries = [...container.querySelectorAll('a[href]')]
+      .map(link => link.getAttribute('href') ?? '')
+      .filter(href => /^\/(signup|sign-up|start|claim)\b/.test(href));
+    expect(new Set(entries)).toEqual(new Set(['/start']));
+  });
+
   it.each([true, false])(
-    'ends in the one role waitlist form and links nowhere near signup, waitlist=%s',
+    'signup closed: ends in the one role waitlist form and links nowhere near signup, waitlist=%s',
     async waitlist => {
+      vi.stubEnv('FEATURE_PUBLIC_SIGNUP_CLOSED', 'true');
       gate.WAITLIST_ENABLED = waitlist;
       const { HOMEPAGE_EDITORIAL_COPY: copy, HOMEPAGE_INVITE_ANCHOR } =
         await loadCopy();
@@ -247,49 +263,58 @@ describe('homepage contract', { timeout: 60_000 }, () => {
     expect(component).not.toMatch(/>\s*[A-Z][a-z]+(?: [a-z]+){2,}[.!]?\s*</);
   });
 
-  it('reconciles homepage fragment anchors with the ids the page renders', async () => {
-    const { container } = await renderHomePage();
-    const renderedIds = new Set(
-      [...container.querySelectorAll('[id]')].map(element => element.id)
-    );
+  it.each(['open', 'closed'])(
+    'reconciles homepage fragment anchors with the ids the page renders, signup %s',
+    async signup => {
+      if (signup === 'closed')
+        vi.stubEnv('FEATURE_PUBLIC_SIGNUP_CLOSED', 'true');
+      const { container } = await renderHomePage();
+      const renderedIds = new Set(
+        [...container.querySelectorAll('[id]')].map(element => element.id)
+      );
 
-    // Every `/#fragment` href in app/components navigates to the homepage
-    // root with an anchor, so the fragment must name an id the homepage
-    // actually renders. A renamed target (e.g. the old claim input)
-    // otherwise silently dead-ends every dependent CTA at the top of `/`.
-    const anchors = new Set<string>();
-    const collectAnchors = (dir: string): void => {
-      for (const entry of readdirSync(dir, { withFileTypes: true })) {
-        const path = `${dir}/${entry.name}`;
-        if (entry.isDirectory()) {
-          if (entry.name === '__tests__' || entry.name === 'node_modules') {
-            continue;
-          }
-          collectAnchors(path);
-        } else if (
-          /\.(ts|tsx)$/.test(entry.name) &&
-          !/(\.test\.|\.spec\.|\.stories\.)/.test(entry.name)
-        ) {
-          for (const match of read(path).matchAll(
-            /['"`]\/#([A-Za-z0-9][A-Za-z0-9_-]*)['"`]/g
-          )) {
-            anchors.add(match[1]);
+      // Every `/#fragment` href in app/components navigates to the homepage
+      // root with an anchor, so the fragment must name an id the homepage
+      // actually renders. A renamed target (e.g. the old claim input)
+      // otherwise silently dead-ends every dependent CTA at the top of `/`.
+      const anchors = new Set<string>();
+      const collectAnchors = (dir: string): void => {
+        for (const entry of readdirSync(dir, { withFileTypes: true })) {
+          const path = `${dir}/${entry.name}`;
+          if (entry.isDirectory()) {
+            if (entry.name === '__tests__' || entry.name === 'node_modules') {
+              continue;
+            }
+            collectAnchors(path);
+          } else if (
+            /\.(ts|tsx)$/.test(entry.name) &&
+            !/(\.test\.|\.spec\.|\.stories\.)/.test(entry.name)
+          ) {
+            for (const match of read(path).matchAll(
+              /['"`]\/#([A-Za-z0-9][A-Za-z0-9_-]*)['"`]/g
+            )) {
+              anchors.add(match[1]);
+            }
           }
         }
+      };
+      for (const dir of ['app', 'components', 'data', 'lib', 'constants']) {
+        collectAnchors(dir);
       }
-    };
-    collectAnchors('app');
-    collectAnchors('components');
 
-    expect(
-      anchors.size,
-      `no homepage fragment anchors found — the guard scan went stale: ${[
-        ...anchors,
-      ].join(', ')}`
-    ).toBeGreaterThan(0);
-    const missing = [...anchors].filter(id => !renderedIds.has(id));
-    expect(missing).toEqual([]);
-  });
+      expect(
+        anchors.size,
+        `no homepage fragment anchors found — the guard scan went stale: ${[
+          ...anchors,
+        ].join(', ')}`
+      ).toBeGreaterThan(0);
+      // Template-literal links are built from the two closing-section ids;
+      // each closing section aliases the other's id.
+      for (const id of ['request-invite', 'claim-profile']) anchors.add(id);
+      const missing = [...anchors].filter(id => !renderedIds.has(id));
+      expect(missing).toEqual([]);
+    }
+  );
 
   it('keeps the homepage JSON-LD on the approved artist-profile copy and canonical billing (JOV-8565)', async () => {
     const { container } = await renderHomePage();

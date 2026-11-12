@@ -51,25 +51,18 @@ describe('(home) layout hydration', () => {
     expect(await renderHtml(null)).toContain('geist-mono-var home-viewport');
   });
 
-  it('always renders the homepage page-contract marker and the invite CTA', async () => {
-    const html = await renderHtml(null);
-    expect(html).toContain('data-primary-cta="true"');
-    expect(html).toContain('href="/#request-invite"');
-    expect(html).not.toContain('href="/start"');
-  });
-
-  describe('with HOMEPAGE_START_CTA on', () => {
+  describe('header action', () => {
     afterEach(() => {
       vi.unstubAllEnvs();
       vi.resetModules();
     });
 
-    async function renderFlaggedHtml() {
+    async function renderFreshHtml() {
       vi.resetModules();
       pathnameRef.current = null;
-      const { default: FlaggedLayout } = await import('./layout');
+      const { default: FreshLayout } = await import('./layout');
       const { container, unmount } = render(
-        await FlaggedLayout({ children: <p>hero</p> })
+        await FreshLayout({ children: <p>hero</p> })
       );
       const html = container.innerHTML;
       unmount();
@@ -77,8 +70,7 @@ describe('(home) layout hydration', () => {
     }
 
     it('points the header action and the page-contract marker at the claim intent', async () => {
-      vi.stubEnv('FEATURE_HOMEPAGE_START_CTA', 'true');
-      const html = await renderFlaggedHtml();
+      const html = await renderFreshHtml();
       const { getClaimProfileIntent } = await import(
         '@/data/marketingCtaIntents'
       );
@@ -91,9 +83,9 @@ describe('(home) layout hydration', () => {
     });
 
     it('keeps the invite action while public signup is closed', async () => {
-      vi.stubEnv('FEATURE_HOMEPAGE_START_CTA', 'true');
       vi.stubEnv('FEATURE_PUBLIC_SIGNUP_CLOSED', 'true');
-      const html = await renderFlaggedHtml();
+      const html = await renderFreshHtml();
+      expect(html).toContain('data-primary-cta="true"');
       expect(html).toContain('href="/#request-invite"');
       expect(html).not.toContain('href="/start"');
     });
