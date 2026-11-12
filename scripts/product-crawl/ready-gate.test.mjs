@@ -11,6 +11,7 @@ import {
   productReady,
   rankFindings,
   timingSuspect,
+  verticalMove,
 } from './ready-gate.mjs';
 
 const now = Date.parse('2026-11-08T03:00:00Z');
@@ -320,4 +321,12 @@ test('a crawl that finished in time adds no deadline reason', () => {
     { now }
   );
   assert.equal(r.ready, true);
+});
+
+test('a sideways move or a resize in place records no vertical move, so a later real one is kept', () => {
+  assert.equal(verticalMove({ y: 100 }, { y: 100 }), undefined);
+  assert.equal(verticalMove({ y: 100 }, { y: 100.4 }), undefined);
+  assert.equal(verticalMove(undefined, { y: 300 }), undefined);
+  assert.equal(verticalMove({ y: 100 }, { y: 300 }), 200);
+  assert.equal(verticalMove({ y: 300 }, { y: 100 }), -200);
 });
