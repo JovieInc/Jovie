@@ -127,7 +127,9 @@ routes that left the build. It never records a loss: a route that regressed
 keeps its entry and the run still fails. An intended loss is a hand edit of
 the entry plus a complete, unexpired `overrides["<route>"]` entry (same fields
 as `raises` above), judged against `origin/main`. Use the same mock-env build
-as row 5.
+as row 5. Build with `CI=true`, as the workflows do: the `/renders` fixture routes
+are admitted only then (they 404 as small static pages otherwise), so a
+snapshot written from a `CI=1` build records them wrong.
 
 The first snapshot (main `0b82835e`) records 94 static, 2 ISR, 19 parameterised-prerender and 168 dynamic routes (113 of the dynamic ones under `/app`). The dynamic public
 pages in it (`/start`, `/signin`, `/claim`, `/r/[slug]`, seven `/[username]/*`
