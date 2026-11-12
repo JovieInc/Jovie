@@ -241,5 +241,3 @@ class LockfileConflictTest(unittest.TestCase):
                 self.assertFalse(lane.regenerate_merged_generated(
                     Path("/not-used"), [".github/workflow-topology.gen.yml"], None))
             self.assertFalse(any(cmd[:2] == ["git", "add"] for cmd in calls))
-
-
