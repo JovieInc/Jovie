@@ -50,6 +50,24 @@ describe('PublicClaimBanner', () => {
     document.body.innerHTML = '';
   });
 
+  it('carries campaign attribution to the real claim CTA without forwarding unsafe parameters', () => {
+    window.history.replaceState(
+      null,
+      '',
+      '/test-artist?claim=1&utm_campaign=claim-link-outreach&utm_source=claim_link&utm_medium=dm&token=synthetic&redirect_url=https://evil.example'
+    );
+    render(banner());
+    const href = screen.getByTestId('claim-banner-cta').getAttribute('href');
+    const destination = new URL(href!, 'https://jov.ie');
+    expect(destination.pathname).toBe('/test-artist/claim');
+    expect(destination.searchParams.get('next')).toBe('auth');
+    expect(destination.searchParams.get('utm_campaign')).toBe(
+      'claim-link-outreach'
+    );
+    expect(destination.searchParams.has('token')).toBe(false);
+    expect(destination.searchParams.has('redirect_url')).toBe(false);
+  });
+
   it('server-renders both copies in one cell so a claim link cannot change its height', () => {
     const html = renderToString(banner());
 

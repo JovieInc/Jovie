@@ -1,6 +1,5 @@
 'use client';
 
-import Link from 'next/link';
 import {
   ProofClaimCtaLink,
   proofClaimFooterClassName,
@@ -8,6 +7,7 @@ import {
 import { useIsAuthenticated } from '@/hooks/useIsAuthenticated';
 import { track } from '@/lib/analytics';
 import { cn } from '@/lib/utils';
+import { ClaimAttributionLink } from './ClaimAttributionLink';
 
 export interface ProfileClaimFooterProps {
   readonly href: string;
@@ -63,7 +63,7 @@ export function ProfileClaimFooter({
           {content}
         </ProofClaimCtaLink>
       ) : (
-        <Link
+        <ClaimAttributionLink
           href={href}
           className={proofClaimFooterClassName()}
           data-testid='profile-claim-footer-cta'
@@ -74,7 +74,7 @@ export function ProfileClaimFooter({
           }}
         >
           {content}
-        </Link>
+        </ClaimAttributionLink>
       )}
     </div>
   );

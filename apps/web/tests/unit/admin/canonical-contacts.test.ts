@@ -100,6 +100,7 @@ import {
   getCanonicalContactByKey,
   getCanonicalContactMetrics,
   getCanonicalContacts,
+  getCanonicalContactsByKeys,
   getContactStageTimeline,
   setCanonicalContactStage,
 } from '@/lib/admin/contacts';
@@ -163,6 +164,36 @@ beforeEach(() => {
 });
 
 describe('canonical contacts read model (JOV-6888)', () => {
+  it('resolves requested keys from the canonical projection and propagates unreadable sources', async () => {
+    seed({
+      leads: [
+        leadRow({
+          id: 'a',
+          contactEmail: 'a@fixture.example',
+          handle: 'artist-a',
+        }),
+        leadRow({
+          id: 'b',
+          contactEmail: 'b@fixture.example',
+          handle: 'artist-b',
+        }),
+      ],
+    });
+    const result = await getCanonicalContactsByKeys([
+      'email:a@fixture.example',
+      'email:missing@fixture.example',
+    ]);
+    expect([...result.keys()]).toEqual(['email:a@fixture.example']);
+    expect(result.get('email:a@fixture.example')?.leadId).toBe('a');
+    expect(await getCanonicalContactsByKeys([])).toEqual(new Map());
+    state.failedTable = TABLES.leads;
+    await expect(
+      getCanonicalContactsByKeys(['email:a@fixture.example'])
+    ).rejects.toThrow();
+    expect(state.inserts).toEqual([]);
+    expect(state.updates).toEqual([]);
+  });
+
   it('merges sources by dedupe key and reports one funnel of metrics', async () => {
     seed({
       waitlist: [

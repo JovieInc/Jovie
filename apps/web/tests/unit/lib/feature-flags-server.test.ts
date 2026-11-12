@@ -123,6 +123,33 @@ describe('Statsig server initialization', () => {
     delete process.env.VERCEL_ENV;
   });
 
+  it.each(['production', 'development', 'test'] as const)(
+    'keeps cold draft composition off for admins and users in %s',
+    async environment => {
+      vi.stubEnv('NODE_ENV', environment);
+      vi.stubEnv(
+        'VERCEL_ENV',
+        environment === 'production' ? 'production' : 'preview'
+      );
+      mockIsAdmin.mockResolvedValue(true);
+      vi.doMock('flags/next', () => ({ dedupe: (fn: unknown) => fn }));
+      const run = vi.fn().mockResolvedValue(false);
+      vi.doMock('@/lib/flags/registry', () => ({
+        APP_FLAG_REGISTRY: { OUTBOUND_COLD_DRAFTS: { run } },
+      }));
+      const { getAppFlagValue } = await import('@/lib/flags/server');
+      expect(
+        await getAppFlagValue('OUTBOUND_COLD_DRAFTS', { userId: 'admin_123' })
+      ).toBe(false);
+      expect(await getAppFlagValue('OUTBOUND_COLD_DRAFTS')).toBe(false);
+      expect(run).toHaveBeenCalledTimes(2);
+      mockGetFlagOverrideMap.mockRejectedValue(new Error('unavailable'));
+      expect(
+        await getAppFlagValue('OUTBOUND_COLD_DRAFTS', { userId: 'admin_123' })
+      ).toBe(false);
+    }
+  );
+
   it('warns only once when server secret is missing across multiple checkGate calls', async () => {
     const { logger } = await import('@/lib/utils/logger');
     const warnSpy = vi.spyOn(logger, 'warn').mockImplementation(() => {});

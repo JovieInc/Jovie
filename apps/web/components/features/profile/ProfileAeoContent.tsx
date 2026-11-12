@@ -1,11 +1,11 @@
 import { Badge } from '@jovie/ui';
 import { ArrowRight } from 'lucide-react';
-import Link from 'next/link';
 import { SocialIcon } from '@/components/atoms/SocialIcon';
 import { ProfileAboutShare } from '@/features/profile/ProfileAboutShare';
 import { normalizePlatformKey } from '@/lib/dsp-registry';
 import type { ProfileAeoContent as ProfileAeoContentModel } from '@/lib/profile/aeo-content';
 import { publicLinkAriaLabel } from '@/lib/utils/public-url';
+import { ClaimAttributionLink } from './ClaimAttributionLink';
 import { EntityMentionText } from './EntityMentionText';
 
 interface ProfileAeoContentProps {
@@ -191,7 +191,7 @@ export function ProfileAeoContent({
                 <p className='profile-aeo-claim-card__note text-xs font-medium'>
                   Free · Claim with Spotify
                 </p>
-                <Link
+                <ClaimAttributionLink
                   href={claimHref}
                   prefetch={false}
                   className='profile-aeo-claim-card__cta inline-flex min-h-12 items-center justify-center gap-3 rounded-full px-6 text-sm font-semibold transition-colors duration-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--profile-aeo-claim-ink) focus-visible:ring-offset-2'
@@ -200,7 +200,7 @@ export function ProfileAeoContent({
                 >
                   Claim artist profile
                   <ArrowRight className='size-4' aria-hidden='true' />
-                </Link>
+                </ClaimAttributionLink>
               </div>
             </div>
           </aside>

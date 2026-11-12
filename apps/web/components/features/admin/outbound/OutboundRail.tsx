@@ -149,9 +149,11 @@ function MessageSection({
         >
           {row.view === 'needs_judge'
             ? 'Draft hidden until the page and onboarding pass the dogfood judge.'
-            : row.channel
-              ? 'No claim link yet. Build the profile to draft a message.'
-              : 'No reachable channel: no email address or Instagram handle on file.'}
+            : row.flags.includes('cold_draft_unavailable')
+              ? 'Draft hidden until certified page facts and email compliance checks are available.'
+              : row.channel
+                ? 'No claim link yet. Build the profile to draft a message.'
+                : 'No reachable channel: no email address or Instagram handle on file.'}
         </p>
       </DrawerSection>
     );
