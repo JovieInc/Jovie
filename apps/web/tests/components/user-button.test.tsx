@@ -366,7 +366,7 @@ describe('UserButton billing actions', () => {
     const diagnostics = await screen.findByTestId('app-build-diagnostics');
     expect(diagnostics).toHaveTextContent('Version 26.9.1 (abc1234)');
     expect(diagnostics).toHaveClass(
-      'min-h-8',
+      'h-8',
       'text-2xs',
       'text-tertiary-token',
       'select-none'
@@ -1066,7 +1066,7 @@ describe('UserButton billing actions', () => {
     expect(screen.queryByRole('menu')).not.toBeInTheDocument();
   });
 
-  it('uses spacing instead of visible rules to group account actions', async () => {
+  it('groups account actions with spacing and two restrained hairlines', async () => {
     mockUseBillingStatusQuery.mockReturnValue({
       data: { isPro: true, plan: 'pro', hasStripeCustomer: true },
       isLoading: false,
@@ -1080,7 +1080,19 @@ describe('UserButton billing actions', () => {
     const separators = screen.getAllByRole('separator');
     expect(separators).toHaveLength(5);
     for (const separator of separators) {
-      expect(separator).toHaveClass('h-2', 'border-0');
+      expect(separator).toHaveClass('border-0');
+    }
+    // Only the header and footer dividers draw a hairline, and it stops at
+    // the row gutter. Inner groups are separated by space alone.
+    const hairlines = separators.filter(separator =>
+      separator.classList.contains('h-px')
+    );
+    expect(hairlines).toHaveLength(2);
+    for (const hairline of hairlines) {
+      expect(hairline).toHaveClass('mx-(--space-2-5)', 'bg-subtle');
+    }
+    for (const separator of separators) {
+      if (!hairlines.includes(separator)) expect(separator).toHaveClass('h-2');
     }
 
     for (const menuItem of screen.getAllByRole('menuitem')) {

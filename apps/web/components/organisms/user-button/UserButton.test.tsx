@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -68,6 +68,7 @@ vi.mock('@/lib/workspace-lock/unlock-with-passkey', () => ({
 
 import { usePathname, useRouter } from 'next/navigation';
 import { useDesktopUpdateContext } from '@/components/organisms/desktop-update/DesktopUpdateProvider';
+import { ACCOUNT_LOADING_FILL } from '@/components/organisms/user-button/account-loading-fill';
 import { UserButton } from '@/components/organisms/user-button/UserButton';
 import { useAuthSafe, useUserSafe } from '@/hooks/useClerkSafe';
 import {
@@ -95,6 +96,9 @@ const mockUsePathname = vi.mocked(usePathname);
 const mockUseDesktopUpdateContext = vi.mocked(useDesktopUpdateContext);
 
 const originalLocation = window.location;
+
+/** ACCOUNT_LOADING_FILL as a CSS class selector (escapes the opacity slash). */
+const FILL_SELECTOR = ACCOUNT_LOADING_FILL.replace('/', '\\/');
 
 describe('UserButton browser chunk diet (JOV-12023)', () => {
   // #24725 named these the last eager desktop edges; UserButton must never
@@ -341,7 +345,22 @@ describe('UserButton states', () => {
       } as any);
       const { container } = render(<UserButton showUserInfo={showUserInfo} />);
 
-      expect(screen.getByTestId('user-button-loading')).toHaveClass(shape);
+      const loading = screen.getByTestId('user-button-loading');
+      expect(loading).toHaveClass(shape);
+      // JOV-12383: every placeholder uses the fill that clears 3:1 on the
+      // light surface; the invisible legacy fills are gone.
+      const fills = [
+        ...(loading.matches('[data-user-button-loading-fill]')
+          ? [loading]
+          : []),
+        ...loading.querySelectorAll('[data-user-button-loading-fill]'),
+      ];
+      expect(fills).toHaveLength(showUserInfo ? 2 : 1);
+      for (const fill of fills) {
+        expect(fill).toHaveClass(ACCOUNT_LOADING_FILL);
+        expect(fill).not.toHaveClass('bg-sidebar-accent');
+        expect(fill).not.toHaveClass('bg-surface-2');
+      }
       expect(screen.queryByRole('button')).toBeNull();
       await expectNoA11yViolations(container);
     }
@@ -386,7 +405,13 @@ describe('UserButton states', () => {
     trigger.focus();
     await user.keyboard('{Enter}');
     const menu = await screen.findByRole('menu');
-    expect(menu.querySelectorAll('.bg-on-media\\/10')).toHaveLength(2);
+    // JOV-12383: the placeholders use the contrast-checked fill, never the
+    // on-media white wash that vanished on the light menu surface.
+    const billingLoading = within(menu).getByTestId('billing-loading');
+    expect(billingLoading.querySelectorAll(`.${FILL_SELECTOR}`)).toHaveLength(
+      2
+    );
+    expect(menu.querySelector('.bg-on-media\\/10')).toBeNull();
     expect(
       screen.queryByRole('menuitem', { name: /Upgrade/i })
     ).not.toBeInTheDocument();
@@ -451,5 +476,117 @@ describe('UserButton states', () => {
     const name = screen.getByTitle(longName);
     expect(name).toHaveClass('truncate');
     await expectNoA11yViolations(container);
+  });
+});
+
+// The menu's custom rows sit on the shared inset-panel geometry: one gutter,
+// one icon column, one label edge.
+describe('UserButton account surface layout', () => {
+  const FREE_BILLING = {
+    data: { isPro: false, plan: null, hasStripeCustomer: false },
+    isLoading: false,
+    error: null,
+  };
+
+  beforeEach(() => {
+    mockSignedInAccount();
+    mockUseBillingStatusQuery.mockReturnValue(FREE_BILLING as any);
+  });
+
+  afterAll(() => {
+    Object.defineProperty(window, 'location', {
+      value: originalLocation,
+      configurable: true,
+      writable: true,
+    });
+  });
+
+  async function openMenu(calm = false) {
+    const user = userEvent.setup();
+    const view = render(<UserButton showUserInfo calm={calm} />);
+    const trigger = screen.getByRole('button', { name: /Adele Adkins/i });
+    await user.click(trigger);
+    const menu = await screen.findByRole('menu');
+    return { ...view, menu, trigger, user };
+  }
+
+  it('keeps every menu entry reachable by role and name', async () => {
+    const { menu } = await openMenu();
+    for (const name of [
+      'Open profile for Adele Adkins',
+      'Help',
+      /^Settings/,
+      /^Send Feedback/,
+    ]) {
+      expect(within(menu).getByRole('menuitem', { name })).toBeInTheDocument();
+    }
+    expect(
+      within(menu).getByRole('button', { name: /Usage remaining/ })
+    ).toBeInTheDocument();
+    expect(within(menu).getAllByRole('separator').length).toBeGreaterThan(2);
+  });
+
+  it('aligns the custom rows to the shared gutter and icon column', async () => {
+    const { menu, trigger } = await openMenu(true);
+
+    // Header: no extra row inset; the avatar sits in the icon column and the
+    // name starts on the label edge shared with every other row.
+    const profileRow = menu.querySelector(
+      '[data-menu-action-row="profile-help"]'
+    );
+    expect(profileRow).not.toHaveClass('px-1');
+    const profile = within(menu).getByRole('menuitem', {
+      name: 'Open profile for Adele Adkins',
+    });
+    expect(profile).toHaveClass('gap-2', 'px-(--space-2-5)');
+    const avatarColumn = profile.firstElementChild as HTMLElement;
+    expect(avatarColumn).toHaveClass('w-4', 'shrink-0', 'justify-center');
+
+    // Help ends on the same right gutter as the shortcuts.
+    const help = within(menu).getByRole('menuitem', { name: 'Help' });
+    expect(help).toHaveClass('px-2.5');
+    expect(help).not.toHaveClass('px-2');
+
+    // Header and footer dividers are hairlines that stop at the gutter.
+    const separators = within(menu).getAllByRole('separator');
+    expect(separators[0]).toHaveClass('mx-(--space-2-5)', 'h-px', 'bg-subtle');
+
+    // Version reads as a muted section label on the same gutter.
+    expect(within(menu).getByTestId('app-build-diagnostics')).toHaveClass(
+      'h-8',
+      'px-(--space-2-5)',
+      'text-tertiary-token'
+    );
+
+    // Usage is a normal row: concentric radius, not a square strip.
+    const usage = within(menu).getByRole('button', { name: /Usage remaining/ });
+    expect(usage).not.toHaveClass('rounded-none');
+    expect(usage).toHaveClass('h-8', 'px-(--space-2-5)');
+
+    // Sidebar account row: avatar centred on the nav icon column.
+    expect(trigger).toHaveClass('px-0', 'gap-2');
+    expect(trigger.querySelector('[data-user-button-icon-column]')).toHaveClass(
+      'w-4',
+      'justify-center'
+    );
+  });
+
+  it('keeps arrow-key navigation and Escape focus return', async () => {
+    const user = userEvent.setup();
+    render(<UserButton showUserInfo />);
+    const trigger = screen.getByRole('button', { name: /Adele Adkins/i });
+    trigger.focus();
+    await user.keyboard('{Enter}');
+    const menu = await screen.findByRole('menu');
+    const items = within(menu).getAllByRole('menuitem');
+    await user.keyboard('{ArrowDown}');
+    expect(items).toContain(document.activeElement);
+    const first = document.activeElement;
+    await user.keyboard('{ArrowDown}');
+    expect(document.activeElement).not.toBe(first);
+    expect(items).toContain(document.activeElement);
+    await user.keyboard('{Escape}');
+    expect(screen.queryByRole('menu')).toBeNull();
+    expect(trigger).toHaveFocus();
   });
 });

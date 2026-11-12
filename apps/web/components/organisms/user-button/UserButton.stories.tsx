@@ -1,5 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { withSignedInSession } from '@/.storybook/signed-in-session';
+import { SidebarIdentityGroup } from '@/components/organisms/sidebar-identity-group';
 import { APP_ROUTES } from '@/constants/routes';
 import { JovieAuthValuesProvider } from '@/hooks/useJovieAuth';
 import type { Artist } from '@/types/db';
@@ -117,4 +118,52 @@ export const Rtl: Story = {
       </div>
     ),
   ],
+};
+
+const light = { themes: { themeOverride: 'light' } };
+const dark = { themes: { themeOverride: 'dark' } };
+const mobile = { viewport: { defaultViewport: 'mobile1' } };
+
+/**
+ * The account row as it sits at the foot of the open sidebar, inside the
+ * identity group that owns its inset. Click it to open the menu.
+ */
+const sidebarRow: NonNullable<Story['decorators']> = [
+  ...signedIn,
+  Story => (
+    <div
+      data-account-menu-preview
+      className='flex w-56 flex-col bg-sidebar py-2 text-primary-token'
+    >
+      <Story />
+    </div>
+  ),
+];
+
+/** One icon column, one label edge, even inset: row and menu together. */
+export const AccountMenu: Story = {
+  render: () => <SidebarIdentityGroup calm profileHref={undefined} />,
+  decorators: sidebarRow,
+  parameters: dark,
+};
+export const AccountMenuLight: Story = { ...AccountMenu, parameters: light };
+export const AccountMenuMobile: Story = {
+  ...AccountMenu,
+  parameters: { ...dark, ...mobile },
+};
+export const AccountMenuMobileLight: Story = {
+  ...AccountMenu,
+  parameters: { ...light, ...mobile },
+};
+
+/** The loading row on the light sidebar surface (JOV-12383). */
+export const LoadingRowLight: Story = {
+  decorators: [
+    Story => (
+      <div className='w-56 bg-sidebar px-3 py-2'>
+        <Story />
+      </div>
+    ),
+  ],
+  parameters: light,
 };

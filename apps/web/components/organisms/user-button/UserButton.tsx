@@ -3,7 +3,16 @@
 // @coverage-via apps/web/tests/components/user-button.test.tsx
 
 import type { CommonDropdownItem, CommonDropdownSubmenu } from '@jovie/ui';
-import { Badge, Button, CommonDropdown, PlainButton } from '@jovie/ui';
+import {
+  Badge,
+  Button,
+  CommonDropdown,
+  INSET_PANEL_ICON_COLUMN,
+  INSET_PANEL_ROW_LAYOUT,
+  INSET_PANEL_SECTION_LABEL,
+  INSET_PANEL_SEPARATOR,
+  PlainButton,
+} from '@jovie/ui';
 import {
   ArrowDownToLine,
   CircleAlert,
@@ -46,6 +55,7 @@ import {
 import { Icon } from '../../atoms/Icon';
 import { Avatar } from '../../molecules/Avatar/Avatar';
 import { useDesktopUpdateContext } from '../desktop-update/DesktopUpdateProvider';
+import { ACCOUNT_LOADING_FILL } from './account-loading-fill';
 import { DesktopReleaseIdentity } from './desktop-release-identity.lazy';
 import { OviePrivacyLockControl } from './OviePrivacyLockControl';
 import { ensurePrivacyLockCanBeEnabled } from './privacy-lock-readiness.lazy';
@@ -117,6 +127,12 @@ export const USER_MENU_MAX_HEIGHT =
   'var(--radix-dropdown-menu-content-available-height)';
 const USER_MENU_GROUP_SPACER_CLASS = '-mx-1 my-0 h-2 border-0';
 
+/**
+ * A restrained hairline that stops at the row gutter marks the header and
+ * footer; inner groups keep the quiet gap above.
+ */
+const USER_MENU_DIVIDER_CLASS = INSET_PANEL_SEPARATOR;
+
 const UPDATE_MENU_COPY = DESKTOP_UPDATE_COPY.menu;
 
 /**
@@ -155,7 +171,7 @@ export function buildDesktopUpdateMenuItem(
     {
       type: 'separator',
       id: 'sep-update',
-      className: USER_MENU_GROUP_SPACER_CLASS,
+      className: USER_MENU_DIVIDER_CLASS,
     },
   ];
 }
@@ -197,30 +213,35 @@ function buildDropdownItems({
   const updateItems = desktopUpdate
     ? buildDesktopUpdateMenuItem(desktopUpdate.state, desktopUpdate.openModal)
     : [];
+  const profileAvatar = (
+    <Avatar
+      src={userImageUrl}
+      alt={displayName || 'User avatar'}
+      name={displayName || userInitials}
+      size='xs'
+      className='shrink-0'
+    />
+  );
 
   const items: CommonDropdownItem[] = [
     ...updateItems,
     {
       type: 'action-row',
       id: 'profile-help',
+      // The row sits on the surface inset itself, so the avatar lands in the
+      // icon column and Help ends on the shortcut edge.
       className:
-        'grid min-h-12 w-full grid-cols-[minmax(0,1fr)_auto] items-center gap-1 px-1',
+        'grid min-h-12 w-full grid-cols-[minmax(0,1fr)_auto] items-center gap-1',
       items: [
         {
           type: 'action',
           id: 'profile-card',
           label: `Open profile for ${displayName}`,
           onClick: handleProfile,
-          className: 'min-h-12 min-w-0 gap-2.5 px-1.5 py-1.5',
+          className: 'min-h-12 min-w-0 gap-2 px-(--space-2-5) py-1.5',
           content: (
             <>
-              <Avatar
-                src={userImageUrl}
-                alt={displayName || 'User avatar'}
-                name={displayName || userInitials}
-                size='xs'
-                className='shrink-0'
-              />
+              <span className={INSET_PANEL_ICON_COLUMN}>{profileAvatar}</span>
               <div className='min-w-0 flex-1'>
                 <div className='flex min-w-0 items-center gap-2'>
                   <span
@@ -255,14 +276,24 @@ function buildDropdownItems({
           label: 'Help',
           icon: HelpCircle,
           onClick: handleHelp,
-          className: 'min-h-8 shrink-0 px-2',
+          className: 'min-h-8 shrink-0',
+          // Icon and label only, so "Help" ends on the same right edge as
+          // the shortcuts instead of trailing an empty slot.
+          content: (
+            <>
+              <span className={INSET_PANEL_ICON_COLUMN}>
+                <HelpCircle aria-hidden='true' />
+              </span>
+              <span>Help</span>
+            </>
+          ),
         },
       ],
     },
     {
       type: 'separator',
       id: 'sep-1',
-      className: USER_MENU_GROUP_SPACER_CLASS,
+      className: USER_MENU_DIVIDER_CLASS,
     },
     {
       type: 'action',
@@ -384,11 +415,24 @@ function buildDropdownItems({
       type: 'custom',
       id: 'billing-loading',
       render: () => (
-        <div className='cursor-default px-2.5 py-2 text-app h-9'>
-          <div className='flex w-full items-center gap-2.5'>
-            <div className='h-4 w-4 animate-pulse motion-reduce:animate-none rounded bg-on-media/10' />
-            <div className='h-3 w-20 animate-pulse motion-reduce:animate-none rounded bg-on-media/10' />
-          </div>
+        <div
+          className={cn(INSET_PANEL_ROW_LAYOUT, 'cursor-default')}
+          data-testid='billing-loading'
+        >
+          <span className={INSET_PANEL_ICON_COLUMN}>
+            <span
+              className={cn(
+                'size-4 animate-pulse rounded motion-reduce:animate-none',
+                ACCOUNT_LOADING_FILL
+              )}
+            />
+          </span>
+          <span
+            className={cn(
+              'h-3 w-20 animate-pulse rounded motion-reduce:animate-none',
+              ACCOUNT_LOADING_FILL
+            )}
+          />
         </div>
       ),
     });
@@ -462,14 +506,14 @@ function buildDropdownItems({
     {
       type: 'separator',
       id: 'sep-2',
-      className: USER_MENU_GROUP_SPACER_CLASS,
+      className: USER_MENU_DIVIDER_CLASS,
     },
     {
       type: 'custom',
       id: 'version',
       render: () => (
         <div
-          className='flex min-h-8 items-center px-2.5 py-1.5 text-2xs leading-4 text-tertiary-token select-none'
+          className={cn(INSET_PANEL_SECTION_LABEL, 'select-none font-normal')}
           data-testid='app-build-diagnostics'
         >
           {isElectronRuntime ? (
@@ -654,18 +698,34 @@ export function UserButton({
           calm && 'h-8'
         )}
       >
-        <div className='h-6 w-6 shrink-0 rounded-full bg-interactive-hover animate-pulse motion-reduce:animate-none' />
+        <div
+          data-user-button-loading-fill
+          className={cn(
+            'h-6 w-6 shrink-0 rounded-full animate-pulse motion-reduce:animate-none',
+            ACCOUNT_LOADING_FILL
+          )}
+        />
         <div
           data-user-button-loading-copy
           className={cn('flex-1', SHELL_RAIL_STAGE)}
         >
-          <div className='h-3 w-20 rounded-sm bg-interactive-hover animate-pulse motion-reduce:animate-none' />
+          <div
+            data-user-button-loading-fill
+            className={cn(
+              'h-3 w-20 rounded-sm animate-pulse motion-reduce:animate-none',
+              ACCOUNT_LOADING_FILL
+            )}
+          />
         </div>
       </div>
     ) : (
       <div
         data-testid='user-button-loading'
-        className='h-10 w-10 shrink-0 rounded-full bg-surface-2 animate-pulse motion-reduce:animate-none'
+        data-user-button-loading-fill
+        className={cn(
+          'h-10 w-10 shrink-0 rounded-full animate-pulse motion-reduce:animate-none',
+          ACCOUNT_LOADING_FILL
+        )}
       />
     );
   }
@@ -706,21 +766,38 @@ export function UserButton({
           // name only (no workspace subtitle line). The 44px touch target is
           // an invisible hit container, not the visible row height (DS
           // Foundation V1 touch-target rule) — enlarge before:, not h-8.
+          // No inner inset and the nav icon gap, so the avatar centres on the
+          // nav icon column and the name starts on the nav label edge.
           calm &&
-            'relative h-8 px-0.5 gap-(--space-2-5) before:absolute before:inset-x-0 before:top-1/2 before:h-11 before:-translate-y-1/2 before:content-[""]'
+            'relative h-8 px-0 gap-2 before:absolute before:inset-x-0 before:top-1/2 before:h-11 before:-translate-y-1/2 before:content-[""]'
         )}
       >
         {dockStatus ? (
           <span className='sr-only'>Open user menu · {dockStatus.label} </span>
         ) : null}
         {dockStatus?.badges}
-        <Avatar
-          src={userImageUrl}
-          alt={displayName || 'User avatar'}
-          name={displayName || userInitials}
-          size={calm ? 'sm' : 'xs'}
-          className='shrink-0'
-        />
+        {calm ? (
+          <span
+            data-user-button-icon-column
+            className={INSET_PANEL_ICON_COLUMN}
+          >
+            <Avatar
+              src={userImageUrl}
+              alt={displayName || 'User avatar'}
+              name={displayName || userInitials}
+              size='sm'
+              className='shrink-0'
+            />
+          </span>
+        ) : (
+          <Avatar
+            src={userImageUrl}
+            alt={displayName || 'User avatar'}
+            name={displayName || userInitials}
+            size={calm ? 'sm' : 'xs'}
+            className='shrink-0'
+          />
+        )}
         <div
           data-user-button-display-name
           className={cn('min-w-0 flex-1', SHELL_RAIL_STAGE)}

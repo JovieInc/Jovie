@@ -14,7 +14,7 @@ const combinations = [
   ['collapsed-empty', []],
 ] as const;
 
-test('every stack combination fits with 28px faces and 44px hit targets', async ({
+test('every stack combination fits in light and dark with 28px faces and 44px hit targets', async ({
   page,
 }) => {
   test.setTimeout(240_000);
@@ -38,7 +38,12 @@ test('every stack combination fits with 28px faces and 44px hit targets', async 
         await dock.evaluate(node => node.scrollWidth <= node.clientWidth)
       ).toBe(true);
       for (const control of await dock.getByRole('button').all()) {
-        // Morph buttons paint a compact face inside a native 44px target.
+        // Panel rows are 32px. Morph buttons paint a compact 28px face
+        // inside a native 44px target.
+        if ((await control.getAttribute('data-slot')) === 'inset-panel-row') {
+          expect((await control.boundingBox())?.height).toBe(32);
+          continue;
+        }
         const morphFace = control.locator('[data-part="morph-surface"]');
         const face = (await morphFace.count()) ? morphFace : control;
         expect((await face.boundingBox())?.height).toBe(28);
@@ -102,7 +107,8 @@ test('the update control owns its card: no dismiss, no collapse', async ({
     );
     const card = page.locator('[data-dock-preview] [data-dock-card="update"]');
     await expect(card).toBeVisible();
-    await expect(card.locator('[data-desktop-update-control]')).toBeVisible();
+    const slot = card.locator('[data-dock-update-slot]');
+    await expect(slot.locator('[data-desktop-update-control]')).toBeVisible();
     await expect(card.getByRole('button')).toHaveCount(1);
   }
 });
