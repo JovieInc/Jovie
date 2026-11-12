@@ -1,5 +1,6 @@
 import { render } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
+import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import { AppShellSkeleton } from './AppShellSkeleton';
 
 describe('AppShellSkeleton', () => {
@@ -95,5 +96,35 @@ describe('AppShellSkeleton', () => {
     const status = container.querySelector('[role="status"]');
     expect(status).toBeTruthy();
     expect(status?.textContent).toContain('Loading your workspace');
+  });
+
+  it.each([
+    ['default loading', {}],
+    ['collapsed sidebar', { sidebarCollapsed: true }],
+    ['Ovie brand', { brandVariant: 'ov' as const }],
+    ['no sidebar', { sidebar: null }],
+    [
+      'long main override',
+      {
+        main: (
+          <p>
+            Preparing the release workspace for The Extraordinarily Long Album
+            Title That Keeps Going Well Past Any Reasonable Line Length
+          </p>
+        ),
+      },
+    ],
+  ])('has no axe violations in the %s state', async (_label, props) => {
+    const { container } = render(<AppShellSkeleton {...props} />);
+    await expectNoA11yViolations(container);
+  });
+
+  it('has no axe violations in a right-to-left document', async () => {
+    const { container } = render(
+      <div dir='rtl' lang='ar'>
+        <AppShellSkeleton main={<p>جارٍ تحميل مساحة العمل الخاصة بك…</p>} />
+      </div>
+    );
+    await expectNoA11yViolations(container);
   });
 });

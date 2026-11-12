@@ -1,7 +1,7 @@
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import type { ComponentProps, ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import { CreateIdentityDialog } from './CreateProfileDialog';
 
 const { mockRefresh, mockToastSuccess, mockOnOpenChange } = vi.hoisted(() => ({
@@ -16,41 +16,6 @@ vi.mock('next/navigation', () => ({
 
 vi.mock('@/components/feedback', () => ({
   toast: { success: mockToastSuccess },
-}));
-
-vi.mock('@jovie/ui', () => ({
-  Button: ({
-    children,
-    loading: _loading,
-    variant: _variant,
-    ...props
-  }: ComponentProps<'button'> & {
-    readonly loading?: boolean;
-    readonly variant?: string;
-  }) => (
-    <button type='button' {...props}>
-      {children}
-    </button>
-  ),
-  Dialog: ({ children, open }: { children: ReactNode; open: boolean }) =>
-    open ? <div>{children}</div> : null,
-  DialogContent: ({ children }: { children: ReactNode }) => (
-    <div>{children}</div>
-  ),
-  DialogDescription: ({ children }: { children: ReactNode }) => (
-    <p>{children}</p>
-  ),
-  DialogFooter: ({ children }: { children: ReactNode }) => (
-    <div>{children}</div>
-  ),
-  DialogHeader: ({ children }: { children: ReactNode }) => (
-    <div>{children}</div>
-  ),
-  DialogTitle: ({ children }: { children: ReactNode }) => <h2>{children}</h2>,
-  Input: (props: ComponentProps<'input'>) => <input {...props} />,
-  Label: ({ children, htmlFor }: { children: ReactNode; htmlFor?: string }) => (
-    <label htmlFor={htmlFor}>{children}</label>
-  ),
 }));
 
 const fetchMock = vi.fn();
@@ -132,6 +97,9 @@ describe('CreateIdentityDialog', () => {
     await waitFor(() => {
       expect(screen.getByRole('alert')).toHaveTextContent('Username is taken');
     });
+    // Raw red (#f72a36) misses 4.5:1 on both themes; error copy uses the
+    // derived AA-safe -text token.
+    expect(screen.getByRole('alert')).toHaveClass('text-error-text');
     expect(mockToastSuccess).not.toHaveBeenCalled();
     expect(mockRefresh).not.toHaveBeenCalled();
   });
@@ -151,5 +119,44 @@ describe('CreateIdentityDialog', () => {
       );
     });
     expect(mockToastSuccess).not.toHaveBeenCalled();
+  });
+
+  it('focuses Display Name when the dialog opens, without autoFocus', async () => {
+    const { rerender } = render(
+      <CreateIdentityDialog open={false} onOpenChange={mockOnOpenChange} />
+    );
+    rerender(<CreateIdentityDialog open onOpenChange={mockOnOpenChange} />);
+
+    const displayName = await screen.findByLabelText('Display Name');
+    await waitFor(() => expect(displayName).toHaveFocus());
+    expect(displayName).not.toHaveAttribute('autofocus');
+    await expectNoA11yViolations(screen.getByRole('dialog'));
+  });
+
+  it('is axe-clean while saving and with an inline error', async () => {
+    const user = userEvent.setup();
+    let answer: (value: unknown) => void = () => {};
+    fetchMock.mockReturnValue(
+      new Promise(resolve => {
+        answer = resolve;
+      })
+    );
+    renderDialog();
+
+    await user.type(screen.getByLabelText('Display Name'), 'Second Act');
+    await user.type(screen.getByLabelText('Username'), 'taken');
+    await user.click(screen.getByRole('button', { name: 'Create Identity' }));
+    await waitFor(() =>
+      expect(screen.getByLabelText('Display Name')).toBeDisabled()
+    );
+    await expectNoA11yViolations(screen.getByRole('dialog'));
+
+    answer({
+      json: async () => ({ success: false, error: 'Username is taken' }),
+    });
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Username is taken'
+    );
+    await expectNoA11yViolations(screen.getByRole('dialog'));
   });
 });

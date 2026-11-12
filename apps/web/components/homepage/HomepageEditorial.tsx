@@ -10,6 +10,7 @@ import {
   HOMEPAGE_INVITE_ANCHOR,
 } from '@/data/homepageEditorialCopy';
 import { HOMEPAGE_LATEST_RELEASE } from '@/data/homepageProductUi';
+import { resolveHomepageHeroPrimaryAction } from '@/data/homepageStartCta';
 import { MARKETING_PEN_CONTRACT_IDS } from '@/data/marketing/penContracts';
 import { HOME_SPEC } from './v3/home-spec';
 import { Orbit } from './v3/Orbit';
@@ -68,6 +69,7 @@ export function HomepageStoryHero({
   copy = HOMEPAGE_EDITORIAL_COPY.hero,
   headingId = 'home-hero-heading',
 }: Readonly<{ copy?: HeroCopy; headingId?: string }>) {
+  const primary = resolveHomepageHeroPrimaryAction(copy);
   return (
     <section
       data-pen-section='hero'
@@ -95,13 +97,13 @@ export function HomepageStoryHero({
           <p className='hv3-lede marketing-hero-subtitle'>{copy.subhead}</p>
           <div className='hv3-ctas'>
             <Link
-              href={copy.primaryHref}
+              href={primary.href}
               prefetch={false}
               className='hv3-btn hv3-btn--primary'
               data-testid='homepage-primary-cta'
               data-primary-action='true'
             >
-              {copy.primaryAction}
+              {primary.label}
             </Link>
             <Link
               href={copy.secondaryHref}
@@ -113,7 +115,9 @@ export function HomepageStoryHero({
               <ArrowRight className='size-4' aria-hidden />
             </Link>
           </div>
-          <p className='hv3-mono hv3-hero__note'>{COPY.hero.note}</p>
+          {primary.showInviteNote ? (
+            <p className='hv3-mono hv3-hero__note'>{COPY.hero.note}</p>
+          ) : null}
         </div>
       </div>
       {/* Product mockups under the 3D camera: their boxes overlap by projection,

@@ -26,6 +26,7 @@ import { cn } from '@/lib/utils';
 import type { NotificationContentType } from '@/types/notifications';
 import { BirthdayInput } from './BirthdayInput';
 import { useConsentCardYield } from './consent-card-yield';
+import { INLINE_FLOW } from './inline-flow-layout';
 
 export type ProfileMobileNotificationsFlowStep =
   | 'email'
@@ -112,21 +113,21 @@ const PROMISE_LABEL: Record<PromisedContent, string> = {
   merch: 'merch',
 };
 
-/** Promise only the content types this artist actually has. */
+/** Heading matches the Get updates action; body promises only what exists. */
 export function describeUpdatePromise(
   artistName: string,
   available: readonly PromisedContent[]
 ): { readonly title: string; readonly body: string } {
   const types = available.length > 0 ? available : (['newMusic'] as const);
   if (types.length === 1 && types[0] === 'newMusic') {
-    return { title: 'Get New Music', body: `New music from ${artistName}.` };
+    return { title: 'Get updates', body: `New music from ${artistName}.` };
   }
   const labels = types.map(type => PROMISE_LABEL[type]);
   const list =
     labels.length > 1
       ? `${labels.slice(0, -1).join(', ')} and ${labels.at(-1)}`
       : labels[0];
-  return { title: 'Get Updates', body: `${artistName}: ${list}.` };
+  return { title: 'Get updates', body: `${artistName}: ${list}.` };
 }
 
 const PREFERENCE_META: Record<
@@ -162,7 +163,7 @@ function formatCountdown(endTime: number) {
   return `Resend in ${remainingSeconds}s`;
 }
 
-function ScreenShell({
+export function ScreenShell({
   title,
   body,
   children,
@@ -530,9 +531,8 @@ export function ProfileMobileNotificationsFlow({
     };
   }, [onClose, open]);
 
-  if (!mounted || !open) {
-    return null;
-  }
+  // Inline needs no mount gate (no portal); an empty frame shifts the page.
+  if (!open || (!mounted && presentation !== 'inline')) return null;
 
   const updatePromise = describeUpdatePromise(artistName, availableContent);
 
@@ -578,7 +578,7 @@ export function ProfileMobileNotificationsFlow({
                   ) : (
                     <MessageCircle className='size-3.5' />
                   )}
-                  {isSms ? 'Use Email' : 'Use SMS'}
+                  {isSms ? 'Switch to email' : 'Switch to SMS'}
                 </button>
                 {onDismissCapture ? (
                   <button
@@ -587,7 +587,7 @@ export function ProfileMobileNotificationsFlow({
                     disabled={isSubmitting}
                     className='inline-flex h-11 items-center rounded-full text-xs font-semibold text-white/60 transition-colors duration-subtle hover:text-white/70 disabled:cursor-not-allowed disabled:opacity-50'
                   >
-                    Not Now
+                    Not now
                   </button>
                 ) : null}
               </div>
@@ -614,7 +614,7 @@ export function ProfileMobileNotificationsFlow({
       return (
         <ScreenShell
           compact
-          title='You’re On The List'
+          title='You’re on the list'
           body={
             successContactEcho
               ? `Updates are on for ${successContactEcho}.`
@@ -899,14 +899,14 @@ export function ProfileMobileNotificationsFlow({
 
       <div
         className={cn(
-          'relative mx-auto flex w-full max-w-108 flex-col px-5',
+          INLINE_FLOW.body,
           presentation === 'overlay'
             ? 'h-full pb-[max(env(safe-area-inset-bottom),28px)] pt-[max(env(safe-area-inset-top),18px)]'
-            : 'h-full pb-8 pt-6',
+            : INLINE_FLOW.inset,
           presentation === 'modal' && 'min-[1180px]:max-w-130'
         )}
       >
-        <header className='flex items-center justify-between pb-5'>
+        <header className={INLINE_FLOW.topBar}>
           {showBackButton ? (
             <button
               type='button'
@@ -936,7 +936,7 @@ export function ProfileMobileNotificationsFlow({
 
         <div
           key={step}
-          className='flex min-h-0 flex-1 flex-col'
+          className={INLINE_FLOW.step}
           data-testid={`profile-mobile-notifications-step-${step}`}
         >
           {screen}
@@ -992,7 +992,7 @@ export function ProfileMobileNotificationsFlow({
       // Inline: transparent so the sheet sits on the page's own surface,
       // with no rounded seam against a mismatched background token.
       <div
-        className='relative flex h-full min-h-full flex-1 flex-col dark:text-white'
+        className={INLINE_FLOW.root}
         data-testid='profile-mobile-notifications-flow'
         data-shell-variant='inline-full-height'
         style={contentStyle}

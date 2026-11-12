@@ -24,9 +24,11 @@ import { fileURLToPath } from 'node:url';
 import {
   codexOverlays,
   grantOverlays,
+  LANES_LINEAR_APP_ID,
   localVercelToken,
   readCodexAccounts,
   readGatewayCredits,
+  readLanesLinearStatus,
   readProviderTrialLedger,
   readSummerGrants,
 } from './lib/credentials-live-reads.mjs';
@@ -34,6 +36,7 @@ import {
   evaluateRegistry,
   planFindings,
   RUN_SCHEMA,
+  sortFindings,
 } from './lib/credentials-registry.mjs';
 
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -162,6 +165,7 @@ export async function runCheck({
     privateDataIssues = [],
   } = loaded.value;
   const reads = {};
+  let lanesObservationError = null;
   for (const issue of privateDataIssues) {
     // Loud, specific, recorded: the stage fails with the reason and the finding
     // below files an alert. Never a silent pass with zero grants.
@@ -176,6 +180,22 @@ export async function runCheck({
   }
   const overlay = { spend: {}, credentials: [] };
   if (live) {
+    if (Object.hasOwn(env, 'LANES_LINEAR_APP_STATUS')) {
+      const lanes = await stage(
+        stages,
+        'read-lanes-linear-status',
+        now,
+        async () => readLanesLinearStatus(env.LANES_LINEAR_APP_STATUS, now())
+      );
+      reads.lanesLinearApp = lanes.ok ? 'ok' : lanes.reason;
+      if (lanes.ok) overlay.credentials.push(lanes.value);
+      else lanesObservationError = lanes.reason;
+    } else if (
+      credentials.credentials.some(entry => entry.id === LANES_LINEAR_APP_ID)
+    ) {
+      // The host owns this observation; off-host sweeps must not reuse a dated token snapshot.
+      reads.lanesLinearApp = 'not-observed:owned-by-gem-lanes';
+    }
     const gateway = await stage(stages, 'read-gateway-credits', now, () =>
       readGatewayCredits({
         token: env.AI_GATEWAY_API_KEY || env.VERCEL_OIDC_TOKEN,
@@ -236,6 +256,22 @@ export async function runCheck({
   }));
   if (!evaluated.ok) throw new Error(evaluated.reason);
   const result = evaluated.value;
+  if (lanesObservationError) {
+    result.findings = sortFindings([
+      ...result.findings,
+      {
+        fingerprint: `credential-observation:${LANES_LINEAR_APP_ID}:unavailable`,
+        type: 'observation',
+        severity: 'high',
+        priority: 2,
+        subject: LANES_LINEAR_APP_ID,
+        owner: 'gem-lanes',
+        message: `Lanes Linear app expiry could not be verified: ${lanesObservationError}. Inspect the redacted host status; do not assume a client-secret expiry.`,
+      },
+    ]);
+    result.counts.findings = result.findings.length;
+    result.counts.bySeverity.high += 1;
+  }
   const plans = planFindings(result.findings);
   let filed = [];
   if (fileLinear) {

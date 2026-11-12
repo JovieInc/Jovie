@@ -75,6 +75,7 @@ export type ProfileShowcaseStateId =
   | 'alerts-fallback'
   | 'events-empty'
   | 'more-menu'
+  | 'share'
   | 'fans-opt-in'
   | 'fans-confirmed'
   | 'fans-song-alert'
@@ -100,6 +101,7 @@ export type ProfileShowcaseDrawerView =
   | 'pay'
   | 'contact'
   | 'menu'
+  | 'share'
   | null;
 
 export interface ProfilePreviewNotificationsState {

@@ -21,6 +21,7 @@ import {
   SIDEBAR_IDENTITY_SPLIT_FIXTURE_TEST_ID,
   SidebarIdentitySplitLayoutFixture,
 } from '@/components/organisms/sidebar-identity-group/fixtures/split-layout';
+import { expectNoA11yViolations } from '@/tests/utils/a11y';
 
 const pathnameMock = vi.hoisted(() => vi.fn(() => '/app'));
 
@@ -378,5 +379,54 @@ describe('UnifiedSidebar identity composition contract', () => {
     );
     expect(source).not.toContain("tooltip='Public Profile'");
     expect(source).not.toContain('CustomerUserPanel');
+  });
+});
+
+describe('SidebarIdentityGroup accessibility', () => {
+  beforeEach(() => {
+    pathnameMock.mockReturnValue('/app');
+  });
+
+  it.each([
+    ['with a public profile', { profileHref: PROFILE_HREF }],
+    ['without a public profile', { profileHref: undefined }],
+    ['calm', { calm: true, profileHref: PROFILE_HREF }],
+    [
+      'with a long profile handle',
+      {
+        profileHref:
+          '/the-extraordinarily-long-artist-handle-that-keeps-going-past-the-rail',
+      },
+    ],
+  ])('has no axe violations %s', async (_label, props) => {
+    const { container } = render(
+      <RailFrame width={224}>
+        <SidebarIdentityGroup {...props} />
+      </RailFrame>
+    );
+    await expectNoA11yViolations(container);
+  });
+
+  it('has no axe violations in a right-to-left rail and keeps the profile link active', async () => {
+    pathnameMock.mockReturnValue(PROFILE_HREF);
+    const user = userEvent.setup();
+    const { container } = render(
+      <div dir='rtl' lang='ar'>
+        <RailFrame width={224}>
+          <SidebarIdentityGroup
+            label='هوية المبدع'
+            profileHref={PROFILE_HREF}
+          />
+        </RailFrame>
+      </div>
+    );
+
+    expect(screen.getByRole('group', { name: 'هوية المبدع' })).toBeVisible();
+    await user.tab();
+    await user.tab();
+    const profileLink = screen.getByRole('link', { name: PROFILE_LINK_NAME });
+    expect(profileLink).toHaveFocus();
+    expect(profileLink).toHaveAttribute('aria-current', 'page');
+    await expectNoA11yViolations(container);
   });
 });
