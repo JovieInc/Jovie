@@ -214,6 +214,32 @@ describe('evaluateDailyWindow', () => {
     expect(wrongClaim.findings.map(f => f.rule)).toContain('unsupported-claim');
   });
 
+  it('fails closed on copy the marketing lint blocks (em dash)', () => {
+    const dashed = draft({
+      summary:
+        'Pages load with zero third-party requests — keeping the promise we publish on our comparison page.',
+    });
+    const result = evaluateDailyWindow({
+      windowKey: WINDOW,
+      sources: [source()],
+      drafts: [dashed],
+    });
+    expect(result.passed).toBe(false);
+    expect(result.findings.map(f => f.rule)).toContain('draft-copy-lint');
+
+    const clean = evaluateDailyWindow({
+      windowKey: WINDOW,
+      sources: [source()],
+      drafts: [
+        draft({
+          summary:
+            'Pages load with zero third-party requests, keeping the promise we publish on our comparison page.',
+        }),
+      ],
+    });
+    expect(clean.findings.map(f => f.rule)).not.toContain('draft-copy-lint');
+  });
+
   it('passes when every number traces to approvedFacts', () => {
     const numeric = source({
       linear: {

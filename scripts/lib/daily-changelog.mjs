@@ -19,6 +19,7 @@
  */
 
 import { createHash } from 'node:crypto';
+import { lintCopy } from '../../packages/copy/lint.ts';
 
 export const DAILY_SOURCE_SCHEMA = 'daily-changelog-source/v1';
 export const DAILY_RECEIPT_SCHEMA = 'daily-changelog-receipt/v1';
@@ -314,6 +315,10 @@ export function validateDailyDraft(draft, eligibleById) {
     }
     spans.push({ text: bullet.text, claimIds: bullet.claimIds ?? [] });
   }
+  // The digest renders at the jovie-marketing register on /changelog, where
+  // seo:certify blocks on @jovie/copy findings. Fail the draft here, at the
+  // writer's own output, instead of ejecting the release PR from the queue.
+  const lintedCopyKeys = new Set();
   for (const span of spans) {
     if (span.claimIds.length === 0) {
       findings.push({
@@ -339,6 +344,18 @@ export function validateDailyDraft(draft, eligibleById) {
           message: `${prefix} states "${token}", which no mapped source approved as a fact.`,
         });
       }
+    }
+    for (const copyFinding of lintCopy(span.text, {
+      register: 'jovie-marketing',
+    }).blocking) {
+      const key = `${copyFinding.rule}:${copyFinding.match}`;
+      if (lintedCopyKeys.has(key)) continue;
+      lintedCopyKeys.add(key);
+      findings.push({
+        rule: 'draft-copy-lint',
+        storyId: draft.id,
+        message: `${prefix} copy fails @jovie/copy ${copyFinding.rule} ("${copyFinding.match}"): ${copyFinding.message}`,
+      });
     }
   }
   return findings;
