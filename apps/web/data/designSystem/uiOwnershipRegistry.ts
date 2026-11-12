@@ -310,6 +310,7 @@ const nativeBindingsByEntry: Partial<
         'apps/ios/Jovie/Features/Library/LibrarySurfaceView.swift',
         'apps/ios/Jovie/Features/NeedsOnboarding/NeedsOnboardingView.swift',
         'apps/ios/Jovie/Features/Teleprompter/TeleprompterProposal.swift',
+        'apps/ios/Jovie/App/WhatsNewFeed.swift',
       ],
       testEvidence: nativeButtonStyleTests,
     },
