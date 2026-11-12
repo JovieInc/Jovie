@@ -39,3 +39,10 @@ export const AsAdmin: Story = {
     isAdmin: true,
   },
 };
+
+/** Non-admins never see the operator banner: the wrapper renders nothing. */
+export const PermissionDeniedNonAdmin: Story = {
+  args: {
+    isAdmin: false,
+  },
+};
