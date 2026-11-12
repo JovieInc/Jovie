@@ -250,7 +250,7 @@ export function CommonDropdown(props: CommonDropdownProps) {
         /* A text input is not an allowed child of role="menu" (axe
            aria-required-children), so a searchable menu presents its
            surface as a group and keeps the item rows in an inner menu. */
-        role={searchable ? 'group' : undefined}
+        role={searchable ? 'group' : 'menu'}
         className={cn(dropdownContentBase, contentClassName)}
         style={getContentStyle(minWidth, maxHeight, 'dropdown')}
         onEscapeKeyDown={event => {
@@ -314,7 +314,7 @@ export function CommonDropdown(props: CommonDropdownProps) {
         data-slot='common-dropdown-content'
         aria-busy={isLoading || undefined}
         /* Same searchable group/menu split as the dropdown content above. */
-        role={searchable ? 'group' : undefined}
+        role={searchable ? 'group' : 'menu'}
         className={cn(contextContentBase, contentClassName)}
         style={getContentStyle(minWidth, maxHeight, 'context')}
         onEscapeKeyDown={event => {

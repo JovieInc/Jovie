@@ -368,7 +368,7 @@ function CommonDropdownSubmenuRenderer({
       data-menu-surface='toolbar'
       data-slot='common-dropdown-subcontent'
       aria-busy={item.isLoading || undefined}
-      role={searchable ? 'group' : undefined}
+      role={searchable ? 'group' : 'menu'}
       className={cn(subMenuContentClasses, transformOrigin)}
       style={getContentStyle(
         item.minWidth ?? measuredMinWidth,

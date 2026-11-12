@@ -19,7 +19,12 @@ describe('ReliabilityCard', () => {
   it('renders healthy status copy with the AA-safe success text token', () => {
     render(<ReliabilityCard summary={healthySummary} />);
 
-    const label = screen.getByText('Healthy');
+    // 'Healthy' also appears in the score row; the tone label is the one
+    // carrying the status class.
+    const label = screen
+      .getAllByText('Healthy')
+      .find(node => node.className.includes('text-success-text'));
+    expect(label).toBeDefined();
     // Raw mint (#3ffa8b) as text fails 4.5:1 on light surfaces; status copy
     // uses the derived AA-safe -text token.
     expect(label).toHaveClass('text-success-text');
