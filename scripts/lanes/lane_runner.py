@@ -67,6 +67,7 @@ import fix_red_rewrite  # noqa: E402
 import fix_red_failure_routing  # noqa: E402
 import fix_red_classes  # noqa: E402  (fingerprint + deterministic routing of fix-red failures)
 import fix_red_source_edits  # noqa: E402  (merge commits install lint-staged once when the hook cannot find it)
+import fix_red_node_imports  # noqa: E402  (named Node import unions; kept out of the size ceiling)
 import sourced_shell_conflict  # noqa: E402  (source-vs-inline shell conflict; ports retry into the helper)
 from gh_budget import gh_call  # noqa: E402  (budgeted gh for new lane code)
 import machine_gap  # noqa: E402
@@ -6503,32 +6504,9 @@ def resolve_identifier_list_conflict(worktree: Path, branch: str, log, *, guard=
         if not conflicted:
             sh(["git", "merge", "--abort"], cwd=worktree, log=log)
             return False
-        resolved: dict[str, str] = {}
-        for path in conflicted:
-            target = worktree / path
-            try:
-                ancestor = sh(["git", "show", f":1:{path}"], cwd=worktree)
-                base = ancestor.stdout if ancestor.returncode == 0 and target.suffix in {".js", ".mjs"} else ""
-                text = fix_red_classes.resolve_additive_identifier_list_text(target.read_text(), base=base)
-            except (OSError, UnicodeError):
-                text = None
-            if text is None:
-                sh(["git", "merge", "--abort"], cwd=worktree, log=log)
-                return False
-            resolved[path] = text
-        try:
-            for path, text in resolved.items():
-                atomic_write_text(worktree / path, text)
-        except OSError:
+        if not fix_red_node_imports.apply_identifier_resolution(worktree, conflicted, sh, log):
             sh(["git", "merge", "--abort"], cwd=worktree, log=log)
             return False
-        # A union can collide with bindings in another hunk or untouched code.
-        # Use Node's parser for the whole file; other source formats stay unresolved.
-        for path in resolved:
-            if Path(path).suffix in {".js", ".mjs"} and sh(
-                    ["node", "--check", "--", path], cwd=worktree, log=log).returncode != 0:
-                sh(["git", "merge", "--abort"], cwd=worktree, log=log)
-                return False
         if not fix_red_source_edits.commit_open_merge(worktree, conflicted, sh, log, guard=guard):
             return False
     guard()

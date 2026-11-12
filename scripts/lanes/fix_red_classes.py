@@ -35,6 +35,7 @@ from fix_red_source_edits import (  # noqa: F401
     snap_added_conservative_spacing, strip_added_legacy_cache_exports,
     resolve_additive_node_tests_text, resolve_additive_node_test_file, resolve_additive_list_conflict, size_500_stale_hit,
 )
+import fix_red_node_imports  # noqa: E402  (named Node import unions; kept out of the size ceiling)
 
 SCHEMA = "jovie-fix-red-class/v1"
 # Actions a class can route to. `agent` is the default (a model run); the others spend no model.
@@ -644,46 +645,6 @@ def merge_additive_identifier_list(ours: str, theirs: str) -> str | None:
     return text + "\n"
 
 
-def _merge_additive_node_imports(ours: str, theirs: str, base: str) -> str | None:
-    """Union named Node imports only when both sides retain every base binding.
-
-    No aliases, default imports, module changes or duplicate local bindings.
-    The caller supplies Git's stage-1 source, never an inferred ancestor."""
-    pattern = re.compile(r"import \{ ([A-Za-z][A-Za-z0-9]*(?:, [A-Za-z][A-Za-z0-9]*)*) \} from '(node:[a-z_]+)';")
-
-    def parse(side):
-        if not side.endswith("\n"):
-            return None
-        matches = [pattern.fullmatch(line) for line in side.splitlines()]
-        if not matches or any(match is None for match in matches):
-            return None
-        rows = [(match[2], match[1]) for match in matches]
-        return None if len({module for module, _ in rows}) != len(rows) else rows
-
-    head, main = parse(ours), parse(theirs)
-    if not head or not main or [row[0] for row in head] != [row[0] for row in main]:
-        return None
-    merged = []
-    bindings = set()
-    for (module, head_names), (_, main_names) in zip(head, main):
-        ancestor = [match[1] for line in base.splitlines()
-                    if (match := pattern.fullmatch(line)) and match[2] == module]
-        if len(ancestor) > 1 or (not ancestor and module in base):
-            return None
-        original = ancestor[0].split(", ") if ancestor else []
-        if any(not set(original).issubset(names.split(", ")) for names in (head_names, main_names)):
-            return None
-        names = merge_additive_identifier_list(head_names + "\n", main_names + "\n")
-        if names is None:
-            return None
-        tokens = names.strip().split(", ")
-        if bindings.intersection(tokens):
-            return None
-        bindings.update(tokens)
-        merged.append(f"import {{ {names.strip()} }} from '{module}';\n")
-    return "".join(merged)
-
-
 def resolve_additive_identifier_list_text(text: str, *, base: str = "") -> str | None:
     """Replace identifier lists or base-proven additive named Node imports.
     None when any hunk has another shape, leaving that merge to a model."""
@@ -699,7 +660,8 @@ def resolve_additive_identifier_list_text(text: str, *, base: str = "") -> str |
     for hunk in hunks:
         merged = merge_additive_identifier_list(hunk.group("ours"), hunk.group("theirs"))
         if merged is None and base:
-            merged = _merge_additive_node_imports(hunk.group("ours"), hunk.group("theirs"), base)
+            merged = fix_red_node_imports.merge_additive_node_imports(
+                hunk.group("ours"), hunk.group("theirs"), base)
         if merged is None:
             return None
         pieces.append(text[last:hunk.start()])
