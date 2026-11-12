@@ -1763,6 +1763,15 @@ html[data-profile-flow-open="true"] .cookie-banner-card {
      label), in light and dark alike. */
   --color-ink-on-media: #000000;
   --color-verified-backing: var(--color-on-media);
+  /* Quiet header text link (marketing Sign in / Log in) and its hover. The
+     dark values live in the .dark block below so scoped dark wrappers match. */
+  --color-header-text-link: oklch(37.1% 0 none);
+  --color-header-text-link-hover: oklch(14.5% 0 none);
+  /* Mobile nav sheet: the scrim behind it and its upward shadow, the same in
+     light and dark. */
+  --mobile-nav-scrim: oklch(0% 0 0 / 0.6);
+  --shadow-mobile-nav-sheet:
+    0 -8px 40px oklch(0% 0 0 / 0.25), 0 -2px 12px oklch(0% 0 0 / 0.15);
   /* Fallback cover art sleeve (ArtworkFallbackTile): the same light-on-dark
      bevel over the seeded surface in light and dark. */
   --artwork-fallback-sleeve: linear-gradient(
@@ -2423,6 +2432,9 @@ html[data-profile-flow-open="true"] .cookie-banner-card {
 .dark {
   --color-verified: #00bcff;
   --color-verified-backing: var(--color-bg-base);
+  /* The quiet header text link reads the same wrapper (dark: variant parity). */
+  --color-header-text-link: color-mix(in oklab, #fff 60%, transparent);
+  --color-header-text-link-hover: color-mix(in oklab, #fff 90%, transparent);
 }
 
 /* Public-profile navigation is one distinct functional glass layer. It floats
