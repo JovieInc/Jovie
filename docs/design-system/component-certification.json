@@ -757,8 +757,15 @@
       "empty": "The stage holds no data: children is required and is the profile card itself. The detector matched the items-stretch and items-center layout classes.",
       "partial": "Nothing can be partially present: className and panelClassName are styling and afterPanel is one optional slot, which Default shows absent and WithAfterPanel shows present."
     },
+    "apps/web/components/organisms/sidebar-identity-group/SidebarIdentityGroup.tsx": {
+      "empty": "The group renders one identity control and at most one Public Profile link; it owns no collection. A missing profile is the partial state (PartialWithoutPublicProfile). The detector matched the items-center class."
+    },
     "apps/web/components/organisms/sidebar/context.tsx": {
       "partial": "SidebarProvider holds no data: its optional props (defaultOpen, open, onOpenChange) choose uncontrolled or controlled open state, and Default and DefaultClosed show both starting states."
+    },
+    "apps/web/components/organisms/sidebar/menu.tsx": {
+      "empty": "These are list primitives that render the children a caller passes; they hold no data, so an empty section belongs to the caller (see the sidebar group EmptyGroup story). The detector matched the items-center class.",
+      "offline": "The primitives make no request; SidebarMenuSkeleton is a static placeholder the caller shows while its own data loads. The detector matched the Skeleton import."
     },
     "apps/web/components/organisms/table/atoms/GroupHeader.tsx": {
       "empty": "GroupHeader renders one group's label and count, not a collection; groups come from useTableGrouping, which only creates a group for a row it has seen, so the count is never zero. The detector matched the items-center class.",
