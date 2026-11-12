@@ -120,6 +120,44 @@ export interface ProfilePublicationGateRequest {
   readonly nextUrl: URL;
 }
 
+// Mirrors next.config.js's profileQueryModePattern; the shape pins in
+// public-profile-page.test.ts keep the two in sync.
+const PROFILE_QUERY_MODES = new Set([
+  'listen',
+  'pay',
+  'subscribe',
+  'about',
+  'contact',
+  'tour',
+  'releases',
+  'tip',
+]);
+
+/**
+ * JOV-12081: a published profile's `?mode=` view must render through the
+ * guarded mode-render marker destination, but the next.config afterFiles
+ * rewrite that owns this never applies to the prerendered profile route
+ * (`?mode=listen` silently rendered the home document), and beforeFiles
+ * rewrites are contractually reserved for the /hud interceptors — a
+ * `/:username`-sourced beforeFiles rewrite would hijack concrete
+ * single-segment pages that carry a mode query. The proxy runs per request
+ * ahead of the ISR cache, so the rewrite happens here, URL unchanged.
+ */
+export function getProfileModeQueryRewrite(
+  request: ProfilePublicationGateRequest
+): NextResponse | null {
+  if (request.method !== 'GET' && request.method !== 'HEAD') return null;
+  const handle = getGatedProfileHandle(request.nextUrl.pathname);
+  if (!handle) return null;
+  const mode = request.nextUrl.searchParams.get('mode');
+  if (!mode || !PROFILE_QUERY_MODES.has(mode)) return null;
+  const rewriteUrl = new URL(
+    `/${encodeURIComponent(handle)}/profile-mode-render/${mode}/__profile-mode-alias`,
+    request.nextUrl.origin
+  );
+  return NextResponse.rewrite(rewriteUrl);
+}
+
 /**
  * Returns a terminal response when the cached profile body must not be
  * served, or null when the handle is published (or the path is not a

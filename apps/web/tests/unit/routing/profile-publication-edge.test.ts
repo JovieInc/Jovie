@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   gateProfilePublicationAtEdge,
   getGatedProfileHandle,
+  getProfileModeQueryRewrite,
   type ProfilePublicationGateRequest,
 } from '@/lib/routing/profile-publication-edge';
 
@@ -161,5 +162,56 @@ describe('fixture handles', () => {
     expect(res?.headers.get('x-middleware-rewrite')).toBe(
       `${GATE_ORIGIN}/unfazed/profile-miss`
     );
+  });
+});
+
+describe('profile mode query rewrite (JOV-12081)', () => {
+  it.each([
+    'listen',
+    'pay',
+    'subscribe',
+    'about',
+    'contact',
+    'tour',
+    'releases',
+    'tip',
+  ])(
+    'rewrites the mode query %s to the guarded marker destination',
+    mode => {
+      const rewrite = getProfileModeQueryRewrite(
+        gateRequest(`/dualipa?mode=${mode}`)
+      );
+      expect(rewrite?.headers.get('x-middleware-rewrite')).toBe(
+        `${GATE_ORIGIN}/dualipa/profile-mode-render/${mode}/__profile-mode-alias`
+      );
+    }
+  );
+
+  it('lowercases the handle and keeps the request a rewrite, not a redirect', () => {
+    const rewrite = getProfileModeQueryRewrite(
+      gateRequest('/DuaLipa?mode=listen')
+    );
+    expect(rewrite?.headers.get('x-middleware-rewrite')).toBe(
+      `${GATE_ORIGIN}/dualipa/profile-mode-render/listen/__profile-mode-alias`
+    );
+    expect(rewrite?.status).toBe(200);
+  });
+
+  it.each([
+    '/dualipa?mode=profile',
+    '/dualipa?mode=music',
+    '/dualipa?mode=listen%2F..%2F..%2Fapp',
+    '/pricing?mode=listen',
+    '/signin?mode=listen',
+    '/dualipa/listen?mode=pay',
+    '/dualipa?mode=',
+  ])('never rewrites %s', path => {
+    expect(getProfileModeQueryRewrite(gateRequest(path))).toBeNull();
+  });
+
+  it('never rewrites non-navigation methods', () => {
+    expect(
+      getProfileModeQueryRewrite(gateRequest('/dualipa?mode=listen', 'POST'))
+    ).toBeNull();
   });
 });
