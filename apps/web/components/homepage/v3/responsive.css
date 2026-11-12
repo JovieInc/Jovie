@@ -107,10 +107,16 @@
 
   /* The 390 crop shows the sidebar edge into the list: the beam lands there. */
   .hv3-keylight {
-    top: -22rem;
+    top: -12rem;
     left: 2rem;
     width: 20rem;
-    height: 52rem;
+    height: 40rem;
+  }
+
+  /* The lifted release page lands past the stage's right edge at this crop,
+     where overflow clips it: take it out, so its cover is never fetched. */
+  .hv3-rig--hero .hv3-lift--page {
+    display: none;
   }
 
   .hv3-stage--hero .hv3-callout {

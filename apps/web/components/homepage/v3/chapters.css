@@ -114,11 +114,15 @@
 
 /*
  * Key light (Tim, 2026-11-12: "less ai slop more premium artdirected
- * lighting"). One source, one hue, asymmetric: a narrow Ion wedge from above
- * the frame, right of the headline so the headline's zone stays black, opening
- * onto the selected release. The window stands in front of it, so the beam
- * reads as haze above the window and spill below it. Everything else falls
- * to black. Replaces the hero's rings, arc and glow blobs.
+ * lighting"). One source, one hue, asymmetric: an Ion wedge from above the
+ * frame, right of the headline so the headline's zone stays black. Its apex
+ * stays out of sight: the beam only comes up out of the dark under the
+ * actions and opens onto the window's top edge, so it reads as light falling
+ * on the product, not as a shape behind the copy. The window stands in front
+ * of it; below the window it is spill. Everything else falls to black.
+ * The wedge is clipped on ::before and blurred here, so its edges are soft
+ * (a filter on the clipped element itself would leave them hard).
+ * Replaces the hero's rings, arc and glow blobs.
  */
 .hv3-keylight {
   position: absolute;
@@ -127,17 +131,23 @@
   /* container-width-allow: light geometry in the approved 1440 frame, not a page column */
   width: 34rem;
   height: 78rem;
-  background: linear-gradient(
-    180deg,
-    transparent,
-    color-mix(in srgb, var(--hv3-ion) 5%, transparent) 30%,
-    color-mix(in srgb, var(--hv3-ion) 13%, transparent) 46%,
-    color-mix(in srgb, var(--hv3-ion) 7%, transparent) 70%,
-    transparent
-  );
-  clip-path: polygon(44% 0, 56% 0, 100% 100%, 0 100%);
   filter: blur(1.75rem);
   pointer-events: none;
+}
+
+.hv3-keylight::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    180deg,
+    transparent 15%,
+    color-mix(in srgb, var(--hv3-ion) 4%, transparent) 20%,
+    color-mix(in srgb, var(--hv3-ion) 11%, transparent) 27%,
+    color-mix(in srgb, var(--hv3-ion) 7%, transparent) 55%,
+    transparent 80%
+  );
+  clip-path: polygon(44% 0, 56% 0, 100% 100%, 0 100%);
 }
 
 /* Where the beam meets the window's top edge: a hard 1px rim, brightest

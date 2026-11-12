@@ -138,7 +138,7 @@ export function HomepageStoryHero({
             data-hv3-parallax
           >
             <div className='hv3-phone hv3-phone--hero'>
-              <ReleasePage titleAnchor='htitle' eager />
+              <ReleasePage titleAnchor='htitle' />
             </div>
           </div>
         </div>
