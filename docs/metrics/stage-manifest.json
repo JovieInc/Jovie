@@ -86,6 +86,13 @@
           "source": "github-pr"
         },
         {
+          "id": "prepush-preflight",
+          "meaning": "pre-push preflight:changed run on the exact head (slot wait excluded; per-guard wall times in preflight-timings.jsonl)",
+          "producer": "preflight-changed.mjs",
+          "status": "pushed",
+          "source": "preflight-stages.jsonl"
+        },
+        {
           "id": "gate-seat",
           "meaning": "lane gate waiting for a host gate seat (admission deferrals exit as abandoned)",
           "producer": "lanes",
@@ -670,6 +677,11 @@
     }
   },
   "sources": {
+    "preflight-stages.jsonl": {
+      "kind": "events",
+      "url": null,
+      "owner": "scripts/lib/preflight-timing.mjs (~/.local/state/jovie-lanes/preflight-stages.jsonl)"
+    },
     "content-record-events": {
       "kind": "events",
       "url": "https://jov.ie/api/content-records/stage-events",
