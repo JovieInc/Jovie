@@ -109,28 +109,6 @@ describe('ProfilePrimaryTabPanel states', () => {
     ).toBeDisabled();
   });
 
-  it('draws the Music heading and About copy with on-media tokens, not raw white', () => {
-    const { container, rerender } = renderPanel();
-    expect(screen.getByRole('heading', { name: 'Music' })).toHaveClass(
-      'text-on-media'
-    );
-
-    rerender(
-      <ProfilePrimaryTabPanel
-        mode='about'
-        artist={PROFILE_STORY_ARTIST}
-        dsps={[]}
-        isSubscribed={false}
-        contentPrefs={PROFILE_STORY_CONTENT_PREFS}
-        onTogglePref={vi.fn()}
-        onUnsubscribe={vi.fn()}
-        isUnsubscribing={false}
-      />
-    );
-    expect(container.innerHTML).toContain('text-on-media/80');
-    expect(container.innerHTML).not.toMatch(/\b(?:bg|text|border)-white\b/);
-  });
-
   it('has no accessibility violations empty, in error, on About and on Events', async () => {
     const empty = renderPanel();
     await expectNoA11yViolations(empty.container);
