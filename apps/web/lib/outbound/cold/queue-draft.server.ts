@@ -2,10 +2,10 @@ import 'server-only';
 
 import { eq } from 'drizzle-orm';
 import { getContactCertificationInspection } from '@/lib/admin/contact-certification';
+import { getCanonicalContactsByKeys } from '@/lib/admin/contact-lookup';
 import {
   type CanonicalContactListRow,
   getCanonicalContactByKey,
-  getCanonicalContactsByKeys,
 } from '@/lib/admin/contacts';
 import { contactDedupeKey } from '@/lib/contacts/lifecycle';
 import { db } from '@/lib/db';

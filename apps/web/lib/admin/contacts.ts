@@ -554,21 +554,9 @@ export async function getCanonicalContactByKey(
   }
 }
 
-/** Resolve many queue identities from one canonical projection, with no writes. */
-export async function getCanonicalContactsByKeys(
-  keys: readonly string[]
-): Promise<Map<string, CanonicalContactListRow>> {
-  if (!keys.length) return new Map();
-  const wanted = new Set(keys);
-  const all = await buildCanonicalContacts();
-  return new Map(
-    all
-      .filter(row => wanted.has(row.dedupeKey))
-      .map(row => [row.dedupeKey, row])
-  );
-}
-
-async function buildCanonicalContacts(): Promise<CanonicalContactListRow[]> {
+export async function buildCanonicalContacts(): Promise<
+  CanonicalContactListRow[]
+> {
   const [sourceRows, overrides, excluded] = await Promise.all([
     collectSourceRows(),
     getContactOverrides(),

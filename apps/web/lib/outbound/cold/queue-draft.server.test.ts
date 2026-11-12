@@ -16,6 +16,8 @@ const mocks = vi.hoisted(() => ({
 }));
 vi.mock('@/lib/admin/contacts', () => ({
   getCanonicalContactByKey: mocks.contact,
+}));
+vi.mock('@/lib/admin/contact-lookup', () => ({
   getCanonicalContactsByKeys: mocks.contacts,
 }));
 vi.mock('@/lib/admin/contact-certification', () => ({
