@@ -118,24 +118,18 @@ function collectStaticRoutes(directory: string): string[][] {
   return routes;
 }
 
-function getAfterFilesRewrites(
-  rewrites:
-    | RewriteRule[]
-    | {
-        readonly afterFiles?: readonly RewriteRule[];
-      }
-): readonly RewriteRule[] {
-  return Array.isArray(rewrites) ? rewrites : (rewrites.afterFiles ?? []);
+function getAfterFilesList(rewrites: unknown) {
+  const rules = rewrites as Record<string, RewriteRule[] | undefined>;
+  return rules.afterFiles ?? [];
 }
 
-function getBeforeFilesRewrites(
-  rewrites:
-    | RewriteRule[]
-    | {
-        readonly beforeFiles?: readonly RewriteRule[];
-      }
-): readonly RewriteRule[] {
-  return Array.isArray(rewrites) ? [] : (rewrites.beforeFiles ?? []);
+function getQueryModeRewrite(rewrites: unknown) {
+  const rules = rewrites as Record<string, RewriteRule[] | undefined>;
+  return [...(rules.beforeFiles ?? []), ...(rules.afterFiles ?? [])].find(
+    rule =>
+      rule.source === '/:username' &&
+      rule.destination.includes('/profile-mode-render/:profileMode')
+  );
 }
 
 const mockProfile = {
@@ -1170,7 +1164,7 @@ sourceDescribe('profile mode route redirects', () => {
   it('routes legacy aliases through the collision-safe resolver after filesystem matches', async () => {
     const nextConfigModule = await import('../../../next.config.js');
     const nextConfig = nextConfigModule.default ?? nextConfigModule;
-    const afterFiles = getAfterFilesRewrites(await nextConfig.rewrites());
+    const afterFiles = getAfterFilesList(await nextConfig.rewrites());
 
     const aliasSlugs = Object.keys(LEGACY_PROFILE_MODE_BY_SLUG);
     expect(afterFiles.slice(0, aliasSlugs.length * 2)).toEqual(
@@ -1197,18 +1191,8 @@ sourceDescribe('profile mode route redirects', () => {
   it('server-renders bounded query modes through the private profile route', async () => {
     const nextConfigModule = await import('../../../next.config.js');
     const nextConfig = nextConfigModule.default ?? nextConfigModule;
-    const rewrites = await nextConfig.rewrites();
-    // JOV-12081: the mode rewrite must be a beforeFiles rewrite — afterFiles
-    // rewrites never apply to the prerendered profile route, so ?mode=listen
-    // silently rendered the home document.
-    const queryModeRewrite = [
-      ...getBeforeFilesRewrites(rewrites),
-      ...getAfterFilesRewrites(rewrites),
-    ].find(
-      rule =>
-        rule.source === '/:username' &&
-        rule.destination.includes('/profile-mode-render/:profileMode')
-    );
+    // JOV-12081: ?mode= must be beforeFiles (afterFiles loses to prerender).
+    const queryModeRewrite = getQueryModeRewrite(await nextConfig.rewrites());
 
     expect(queryModeRewrite).toEqual({
       source: '/:username',
@@ -1223,13 +1207,6 @@ sourceDescribe('profile mode route redirects', () => {
       destination:
         '/:username/profile-mode-render/:profileMode/__profile-mode-alias',
     });
-    expect(
-      getAfterFilesRewrites(rewrites).find(
-        rule =>
-          rule.source === '/:username' &&
-          rule.destination.includes('/profile-mode-render/:profileMode')
-      )
-    ).toBeUndefined();
     expect(PRIVATE_PROFILE_MODE_PAGE_SOURCE).toContain('return ArtistPage({');
     expect(PRIVATE_PROFILE_MODE_PAGE_SOURCE).toContain(
       '__profileMode: initialMode'
@@ -1246,15 +1223,7 @@ sourceDescribe('profile mode route redirects', () => {
   it('keeps unknown and profile query values on the canonical root renderer', async () => {
     const nextConfigModule = await import('../../../next.config.js');
     const nextConfig = nextConfigModule.default ?? nextConfigModule;
-    const rewrites = await nextConfig.rewrites();
-    const queryModeRewrite = [
-      ...getBeforeFilesRewrites(rewrites),
-      ...getAfterFilesRewrites(rewrites),
-    ].find(
-      rule =>
-        rule.source === '/:username' &&
-        rule.destination.includes('/profile-mode-render/:profileMode')
-    );
+    const queryModeRewrite = getQueryModeRewrite(await nextConfig.rewrites());
     const pattern = new RegExp(queryModeRewrite?.has?.[0]?.value ?? '');
 
     expect(pattern.test('listen')).toBe(true);
@@ -1268,7 +1237,7 @@ sourceDescribe('profile mode route redirects', () => {
   it('bounds cacheable attribution variants to Jovie-issued source values', async () => {
     const nextConfigModule = await import('../../../next.config.js');
     const nextConfig = nextConfigModule.default ?? nextConfigModule;
-    const afterFiles = getAfterFilesRewrites(await nextConfig.rewrites());
+    const afterFiles = getAfterFilesList(await nextConfig.rewrites());
     const sourcePattern = new RegExp(afterFiles[0]?.has?.[0]?.value ?? '');
 
     expect(sourcePattern.test('qr')).toBe(true);
