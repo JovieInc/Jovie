@@ -341,6 +341,22 @@ describe('GET /api/billing/checkout-session', () => {
     });
   });
 
+  it('keeps canonical trial access for a trialing subscription with a paid-plan price', async () => {
+    mocks.entitlement.plan = 'trial';
+    mocks.mappedPlan = 'pro';
+    mocks.session.payment_status = 'no_payment_required';
+    mocks.session.subscription = {
+      ...(mocks.session.subscription as Record<string, unknown>),
+      status: 'trialing',
+    };
+    const { GET } = await import('@/app/api/billing/checkout-session/route');
+    expect(await (await GET(request())).json()).toMatchObject({
+      status: 'confirmed',
+      plan: 'trial',
+      paymentStatus: 'no_payment_required',
+    });
+  });
+
   it('does not certify unsupported payment status', async () => {
     mocks.session.payment_status = null;
     const { GET } = await import('@/app/api/billing/checkout-session/route');

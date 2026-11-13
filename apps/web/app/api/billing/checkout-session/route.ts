@@ -145,6 +145,11 @@ export async function GET(request: NextRequest) {
       getCurrentUserEntitlements(),
       getUserBillingInfo(),
     ]);
+    const entitlementPlan = resolvePaidPlan(entitlement.plan);
+    const confirmedPlan =
+      entitlementPlan === 'trial' && subscription.status === 'trialing'
+        ? entitlementPlan
+        : plan;
     const customerId =
       typeof session.customer === 'string'
         ? session.customer
@@ -160,7 +165,7 @@ export async function GET(request: NextRequest) {
       entitlement.userId !== userId ||
       entitlement.billingVerification !== 'verified' ||
       !entitlement.isPro ||
-      resolvePaidPlan(entitlement.plan) !== plan ||
+      entitlementPlan !== confirmedPlan ||
       !billing.success ||
       billing.data?.stripeSubscriptionId !== subscription.id ||
       !customerId ||
@@ -199,7 +204,7 @@ export async function GET(request: NextRequest) {
       {
         status: 'confirmed',
         paymentStatus: session.payment_status,
-        plan,
+        plan: confirmedPlan,
         priceId: lineItemPriceId,
         needsProfile,
         proofPending,
