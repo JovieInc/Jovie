@@ -396,13 +396,12 @@ export function WaitlistSpotifySearch({
             </div>
           )}
 
-          {/* Artist results */}
+          {/* Artist results. The buttons are real, keyboard-operable results;
+              the visually hidden HostDrawnSelect above mirrors the value for
+              form semantics. Hiding this list from AT would strand focusable
+              controls (axe aria-hidden-focus). */}
           {results.length > 0 && (
-            <div
-              ref={resultsListRef}
-              className='max-h-64 overflow-y-auto px-1'
-              aria-hidden='true'
-            >
+            <div ref={resultsListRef} className='max-h-64 overflow-y-auto px-1'>
               {results.map((artist, index) => (
                 <Button
                   key={artist.id}

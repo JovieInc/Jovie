@@ -1403,9 +1403,12 @@ export function OnboardingChat({
       data-picker-open={composerPickerOpen ? 'true' : undefined}
     >
       {/* Scroll area (flex-1) — upper content morphs on first message */}
-      <div
+      <section
         ref={scrollContainerRef}
         onScroll={onScroll}
+        aria-label='Onboarding Conversation'
+        // biome-ignore lint/a11y/noNoninteractiveTabindex: keyboard entry point for the scrollable transcript (axe scrollable-region-focusable)
+        tabIndex={0}
         className={cn(
           'relative min-h-0 flex-1 overflow-y-auto px-4 pb-5 sm:px-6 lg:px-8',
           // Under the floating sign-in row, scrolled-away messages fade out
@@ -1447,7 +1450,7 @@ export function OnboardingChat({
             pinThreadToTop={hasInitialStarterPrompt}
           />
         </div>
-      </div>
+      </section>
 
       {shouldDockComposer ? (
         <div

@@ -172,7 +172,7 @@ function vocalistGaps(input: RecordFileGapInput): RecordFileGap[] {
       kind: 'unknown_vocalist_credit',
       severity: 'medium',
       message:
-        'Vocals are discussed on this record but no vocalist is credited.',
+        'Vocals are discussed on this record but no vocalist credit is on file yet.',
       confidence: 0.65,
       sourceRecordIds: [...vocalThreads]
         .sort(compareThreadsByDate)
