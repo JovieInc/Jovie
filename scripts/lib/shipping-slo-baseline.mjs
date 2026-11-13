@@ -101,17 +101,12 @@ export function ratchetBaseline(baseline, flat, evaluation, { now }) {
 export function stageHistorySummary(timings) {
   const out = {};
   for (const [type, entity] of Object.entries(timings?.entities ?? {})) {
-    for (const [id, row] of Object.entries(entity?.stages ?? {})) {
+    for (const [id, row] of [
+      ...Object.entries(entity?.stages ?? {}),
+      ...Object.entries(entity?.endToEnd ?? {}),
+    ]) {
       const w = row?.['7d'] ?? {};
       out[`${type}:${id}`] = {
-        n: w.n ?? 0,
-        p50: w.p50 ?? null,
-        p95: w.p95 ?? null,
-      };
-    }
-    for (const [pair, row] of Object.entries(entity?.endToEnd ?? {})) {
-      const w = row?.['7d'] ?? {};
-      out[`${type}:${pair}`] = {
         n: w.n ?? 0,
         p50: w.p50 ?? null,
         p95: w.p95 ?? null,
