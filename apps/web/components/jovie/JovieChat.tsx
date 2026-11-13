@@ -67,24 +67,13 @@ import {
   ChatThreadMessages,
 } from './JovieChatSections';
 import type { JovieChatProps } from './types';
-import { isWeeklyPlanLimitError } from './utils';
+import { findLastAssistantIndex, isWeeklyPlanLimitError } from './utils';
 
 const VIRTUALIZATION_THRESHOLD =
   CHAT_TRANSCRIPT_WINDOW.virtualizeAfterMessageCount;
 const CHAT_PICKER_THREAD_CLEARANCE = 'min(620px, calc(100vh - 8rem))';
 // Match the insights fetch deadline without waiting through query retries.
 const EMPTY_NEXT_STEP_TIMEOUT_MS = 10_000;
-
-function findLastAssistantIndex(
-  messages: readonly { id: string; role: string }[]
-): number {
-  for (let i = messages.length - 1; i >= 0; i--) {
-    if (messages[i].role === 'assistant') {
-      return i;
-    }
-  }
-  return -1;
-}
 
 export function JovieChat({
   profileId,
@@ -145,6 +134,7 @@ export function JovieChat({
     isRateLimited,
     stop,
     chipTray,
+    handleSuggestedPrompt,
   } = useJovieChatController({
     profileId,
     artistContext,
@@ -876,7 +866,11 @@ export function JovieChat({
     ) : null;
 
   const content = (
-    <EntityResolutionProvider profileId={profileId}>
+    <EntityResolutionProvider
+      profileId={profileId}
+      ownProfileLabel={profileRailLabel}
+      ownProfileAvatarUrl={avatarUrl}
+    >
       <div
         className={cn(
           'relative flex h-full flex-col',
@@ -1058,6 +1052,7 @@ export function JovieChat({
                   conversationId={activeConversationId ?? conversationId}
                   collapsedFailureCount={collapsedSummerFailureCount}
                   onShowCollapsedFailures={showCollapsedSummerFailures}
+                  onFollowUp={handleSuggestedPrompt}
                 />
                 <ChatStickScrollButton
                   subscribe={subscribeStuckToBottom}

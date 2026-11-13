@@ -216,3 +216,17 @@ describe('SuggestedProfilesCarousel nudges (JOV-8137)', () => {
     expect(reject).toHaveBeenCalledTimes(1);
   });
 });
+
+describe('SuggestedProfilesCarousel scale tokens', () => {
+  it('uses the 16px text-base step instead of the text-lg alias', async () => {
+    const { readFileSync } = await import('node:fs');
+    const { join } = await import('node:path');
+    const source = readFileSync(
+      join(import.meta.dirname, 'SuggestedProfilesCarousel.tsx'),
+      'utf8'
+    );
+
+    expect(source).not.toMatch(/(?<![\w-])text-lg\b/);
+    expect(source).toContain('text-base');
+  });
+});
