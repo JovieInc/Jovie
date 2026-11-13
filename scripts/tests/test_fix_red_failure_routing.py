@@ -201,10 +201,6 @@ class QueueEvidenceTest(unittest.TestCase):
             operation.assert_not_called()
 
 
-if __name__ == '__main__':
-    unittest.main()
-
-
 class RouteBudgetRoutingTest(unittest.TestCase):
     def test_route_budget_ratchet_syncs_main_before_mocked_infra_noise(self):
         # PR #25125: main tightened budgets while this head retained the old
@@ -225,3 +221,6 @@ class RouteBudgetRoutingTest(unittest.TestCase):
             got = classes.classify(red("Exact-head Coverage"), {"Exact-head Coverage": text})
             self.assertEqual((got["cls"], got["action"]), ("other", "agent"), text)
 
+
+if __name__ == '__main__':
+    unittest.main()
