@@ -227,6 +227,7 @@ jobs:
 
           STORYBOOK_BASE_URL=http://localhost:6006 \
             node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs" --run -- pnpm exec playwright test tests/e2e/storybook-elevation.spec.ts \
+            tests/e2e/storybook-chat-history-switcher.spec.ts \
             --config=playwright.config.storybook.ts --project=chromium --reporter=line $UPDATE_FLAG
 
           kill "$STORYBOOK_PID" 2>/dev/null || true
