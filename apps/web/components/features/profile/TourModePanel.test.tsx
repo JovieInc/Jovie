@@ -187,6 +187,15 @@ describe('TourModePanel tickets and states', () => {
 
     expect(screen.queryAllByRole('link')).toHaveLength(0);
     expect(screen.getAllByText('The Novo')).toHaveLength(3);
+
+    // The plain-text status labels hold the AA contrast floor on the media
+    // stage: on-media/52 (~5.6:1 on the dark stage), not the old /38 (~3.4:1).
+    for (const label of [
+      screen.getByText('Sold Out'),
+      ...screen.getAllByText('No Tickets'),
+    ]) {
+      expect(label).toHaveClass('text-on-media/52');
+    }
   });
 
   it('draws row text and dividers with on-media tokens, not raw white', () => {

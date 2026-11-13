@@ -80,17 +80,16 @@ function unavailableResponse(): NextResponse {
 }
 
 /**
- * Private rewrite destination for gated handles. The
- * `profile-mode-render/[profileMode]/[marker]` page renders `notFound()` for
- * any profileMode that resolves to no mode, so the miss sentinel falls
- * through to the canonical `app/[username]/not-found.tsx` boundary — the
- * branded profile 404 with a real 404 status (JOV-10267). The marker segment
- * must stay `__profile-mode-alias` (matching PRIVATE_PROFILE_ALIAS_MARKER in
- * proxy.ts, which drops direct requests carrying it), so only this
- * server-side rewrite can reach the destination.
+ * Rewrite destination for gated handles: the dedicated DYNAMIC
+ * `app/[username]/profile-miss/page.tsx` route, whose notFound() renders the
+ * branded `app/[username]/not-found.tsx` boundary server-side with a real
+ * 404 status and Next's automatic NonIndex noindex meta (JOV-10267). The
+ * destination must stay a non-prerendered route: notFound() thrown during a
+ * prerendered ISR route's fallback render serves Next's flight-only
+ * `__next_error__` shell instead — no branded body, no robots meta
+ * (observed on production and the daily ci.yml dispatch, 2026-11-12).
  */
-const PROFILE_MISS_REWRITE_SEGMENTS =
-  'profile-mode-render/__profile-miss/__profile-mode-alias';
+const PROFILE_MISS_REWRITE_SEGMENTS = 'profile-miss';
 
 function notPublishedResponse(
   handle: string,
@@ -119,6 +118,44 @@ function notPublishedResponse(
 export interface ProfilePublicationGateRequest {
   readonly method: string;
   readonly nextUrl: URL;
+}
+
+// Mirrors next.config.js's profileQueryModePattern; the shape pins in
+// public-profile-page.test.ts keep the two in sync.
+const PROFILE_QUERY_MODES = new Set([
+  'listen',
+  'pay',
+  'subscribe',
+  'about',
+  'contact',
+  'tour',
+  'releases',
+  'tip',
+]);
+
+/**
+ * JOV-12081: a published profile's `?mode=` view must render through the
+ * guarded mode-render marker destination, but the next.config afterFiles
+ * rewrite that owns this never applies to the prerendered profile route
+ * (`?mode=listen` silently rendered the home document), and beforeFiles
+ * rewrites are contractually reserved for the /hud interceptors — a
+ * `/:username`-sourced beforeFiles rewrite would hijack concrete
+ * single-segment pages that carry a mode query. The proxy runs per request
+ * ahead of the ISR cache, so the rewrite happens here, URL unchanged.
+ */
+export function getProfileModeQueryRewrite(
+  request: ProfilePublicationGateRequest
+): NextResponse | null {
+  if (request.method !== 'GET' && request.method !== 'HEAD') return null;
+  const handle = getGatedProfileHandle(request.nextUrl.pathname);
+  if (!handle) return null;
+  const mode = request.nextUrl.searchParams.get('mode');
+  if (!mode || !PROFILE_QUERY_MODES.has(mode)) return null;
+  const rewriteUrl = new URL(
+    `/${encodeURIComponent(handle)}/profile-mode-render/${mode}/__profile-mode-alias`,
+    request.nextUrl.origin
+  );
+  return NextResponse.rewrite(rewriteUrl);
 }
 
 /**
