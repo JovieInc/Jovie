@@ -7,7 +7,6 @@ import {
   QUOTA_DEFERRED_MARKER,
   runWithGitHubRetry,
 } from './lib/github-rate-limit.mjs';
-import { evaluateFleetRules } from './pr-fleet-rules.mjs';
 
 // Local preflight reuses the hosted contract without GitHub calls or writes.
 // Supply a REST PR snapshot and optionally the body proposed for --body-file.
@@ -100,8 +99,10 @@ if (local || pr) {
     throw new Error(
       `Customer outcome decision missing or invalid (${verdict.reason}). This PR changes customer-facing code (apps/web/{app,components/features,lib}, apps/ios Swift, apps/desktop/src), so its body needs one marker. Internal work: add the line <!-- customer-changelog/v1 {"releaseWorthy":false} --> to the PR body (the PR template already has it). Customer-visible work: see docs/CHANGELOG_PUBLICATION.md for the releaseWorthy:true form with availability.`
     );
+  // Hosted admission bootstraps only the changelog dependencies. Fleet is a
+  // local opt-in and must not expand that bootstrap's required module graph.
   const fleet = values.fleet
-    ? evaluateFleetRules({
+    ? (await import('./pr-fleet-rules.mjs')).evaluateFleetRules({
         pr: { ...pr, body: current.body },
         files: files.filter(Boolean).map(filename => ({
           filename,
