@@ -1,5 +1,7 @@
 import { fireEvent, render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
+import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import { CmdKMainPlaneSearchInput } from './CmdKMainPlaneSearchInput';
 
 const baseProps = {
@@ -13,6 +15,93 @@ const baseProps = {
 };
 
 describe('CmdKMainPlaneSearchInput', () => {
+  it('retains typed input and focus through rerender, Escape and blur recovery', async () => {
+    const user = userEvent.setup();
+    const onQueryChange = vi.fn();
+    const onKeyDown = vi.fn();
+    const props = { ...baseProps, onQueryChange, onKeyDown };
+    const { rerender } = render(<CmdKMainPlaneSearchInput {...props} />);
+    const input = screen.getByRole('combobox', {
+      name: 'Command Palette Search',
+    });
+
+    await user.type(input, 'Release plan');
+    rerender(<CmdKMainPlaneSearchInput {...props} activeRowId={null} />);
+    expect(input).toHaveValue('Release plan');
+    expect(input).toHaveFocus();
+    expect(onQueryChange).toHaveBeenLastCalledWith('Release plan');
+
+    await user.keyboard('{Escape}');
+    expect(onKeyDown.mock.lastCall?.[0].key).toBe('Escape');
+    expect(input).toHaveValue('Release plan');
+    expect(input).toHaveFocus();
+
+    input.blur();
+    expect(input).not.toHaveFocus();
+    rerender(<CmdKMainPlaneSearchInput {...props} open={false} />);
+    expect(input).toHaveValue('Release plan');
+    expect(input).not.toHaveFocus();
+    expect(input).toHaveAttribute('aria-expanded', 'false');
+    rerender(<CmdKMainPlaneSearchInput {...props} open />);
+    expect(input).toHaveValue('Release plan');
+    expect(input).toHaveFocus();
+    expect(input).toHaveAttribute('aria-expanded', 'true');
+  });
+
+  it.each([
+    { state: 'empty', value: '', open: true, activeRowId: null, dir: 'ltr' },
+    {
+      state: 'active',
+      value: 'Release plan',
+      open: true,
+      activeRowId: 'palette-row-1',
+      dir: 'ltr',
+    },
+    {
+      state: 'long content',
+      value:
+        'Find the release plan and all upcoming tasks for the next international tour',
+      open: true,
+      activeRowId: null,
+      dir: 'ltr',
+    },
+    {
+      state: 'RTL overflow',
+      value: 'ابحث عن خطة الإصدار وجميع المهام القادمة للجولة الدولية التالية',
+      open: true,
+      activeRowId: null,
+      dir: 'rtl',
+    },
+    {
+      state: 'closed',
+      value: 'Release plan',
+      open: false,
+      activeRowId: null,
+      dir: 'ltr',
+    },
+  ])(
+    'has no axe violations in the $state state',
+    async ({ state: _state, dir, ...props }) => {
+      const { container } = render(
+        <div dir={dir}>
+          <p id='palette-description'>Type to search every matching item.</p>
+          <CmdKMainPlaneSearchInput {...baseProps} {...props} />
+          <div id='palette-results' role='listbox' aria-label='Search Results'>
+            <div
+              id='palette-row-1'
+              role='option'
+              tabIndex={-1}
+              aria-selected={props.activeRowId !== null}
+            >
+              Release plan
+            </div>
+          </div>
+        </div>
+      );
+      await expectNoA11yViolations(container);
+    }
+  );
+
   it('keeps each mounted search independently addressable for focus recovery', () => {
     render(
       <>

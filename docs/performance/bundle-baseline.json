@@ -1,7 +1,0 @@
-{
-  "capturedAt": null,
-  "commit": null,
-  "totalInitialJS_bytes": 0,
-  "chunks": {},
-  "_note": "Run `pnpm --filter @jovie/web compare-chunks:snapshot` to capture baseline after a clean build"
-}

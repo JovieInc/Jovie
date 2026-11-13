@@ -209,4 +209,55 @@ describe('approveLead', () => {
     expect(result.ingestion?.success).toBe(true);
     expect(result.routing?.route).toBe('email');
   });
+
+  it('never approves, builds or routes an artist Tim already works with', async () => {
+    const lead = makeLead({
+      id: 'lead-dannic',
+      linktreeHandle: 'djdannic',
+      displayName: 'Dannic',
+    });
+    const result = await approveLead(lead);
+
+    expect(result).toEqual({
+      ingestion: null,
+      routing: null,
+      relationshipHold: {
+        reason:
+          'Existing relationship: Tim has written on Dannic tracks via their management/publisher',
+        label: 'Existing relationship: flag to Tim, no cold outreach',
+      },
+    });
+    // The only write flags the lead for manual review; status is untouched.
+    expect(mockDb._updateSet).toHaveBeenCalledTimes(1);
+    const written = mockDb._updateSet.mock.calls[0]?.[0];
+    expect(written).toMatchObject({
+      outreachRoute: 'manual_review',
+      hasRepresentation: true,
+      dmCopy: null,
+    });
+    expect(written).not.toHaveProperty('status');
+    expect(written).not.toHaveProperty('approvedAt');
+    expect(mockIngestLeadAsCreator).not.toHaveBeenCalled();
+    expect(mockSpotifyEnrichLead).not.toHaveBeenCalled();
+    expect(mockRouteLead).not.toHaveBeenCalled();
+    expect(mockPushLeadToInstantly).not.toHaveBeenCalled();
+  });
+
+  it('holds a lead whose contact email is at a registered management domain', async () => {
+    const result = await approveLead(
+      makeLead({ contactEmail: 'bookings@sortedmanagement.com' })
+    );
+    expect(result.relationshipHold?.reason).toBe(
+      'Existing relationship via Sorted Management: flag to Tim, no cold outreach'
+    );
+    expect(mockRouteLead).not.toHaveBeenCalled();
+  });
+
+  it('approves an Armada artist as usual (note, not a hold)', async () => {
+    const result = await approveLead(
+      makeLead({ bio: 'Out now on Armada Music' })
+    );
+    expect(result.relationshipHold).toBeUndefined();
+    expect(mockRouteLead).toHaveBeenCalledWith('lead-1');
+  });
 });
