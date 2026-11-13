@@ -417,6 +417,13 @@ const config: StorybookConfig = {
           'react-dom/client',
           // Sentry's browser entry imports this CommonJS module by name.
           'next/constants.js',
+          // QR images are generated locally (components/molecules/QRCode)
+          // through a dynamic import('qrcode'). Discovered mid-run, a cold
+          // dynamic dep makes the dev server re-optimize and reload the
+          // preview iframe, which kills the in-flight QR download stories
+          // before they can report the failure toast (a11y lane shard 12;
+          // the vitest config's own include list never reaches this server).
+          'qrcode',
         ]),
       ],
       esbuildOptions: {
