@@ -149,7 +149,7 @@ export function selectScriptContracts(changed, options = {}) {
   };
 }
 
-/** @param {string} command @param {string[]} args */
+/** @param {string} command @param {string[]} args @returns {Promise<number>} */
 function run(command, args) {
   return new Promise(done => {
     const child = spawn(command, args, { cwd: REPO_ROOT, stdio: 'inherit' });
@@ -173,12 +173,23 @@ async function main(args) {
     for (const test of [...node, ...vitest]) console.log(test);
     return 0;
   }
+  return runSelectedContracts({ node, vitest });
+}
+
+/** Run every selected batch with its original arguments and failure result.
+ * @param {{node: string[], vitest: string[]}} selection
+ * @param {{runBatch?: typeof run, env?: NodeJS.ProcessEnv}} options
+ */
+export async function runSelectedContracts(
+  { node, vitest },
+  { runBatch = run, env = process.env } = {}
+) {
   const runs = [];
   for (const args of scriptContractNodeArgs(node))
-    runs.push(run(process.execPath, args));
+    runs.push(() => runBatch(process.execPath, args));
   if (vitest.length > 0)
-    runs.push(
-      run('pnpm', [
+    runs.push(() =>
+      runBatch('pnpm', [
         'exec',
         'vitest',
         '--root',
@@ -191,7 +202,23 @@ async function main(args) {
         ),
       ])
     );
-  const codes = await Promise.all(runs);
+  // Preflight already owns the local resource bound; do not fan out beneath it.
+  // With no configured bound, retain the existing parallel CI behavior.
+  const requested = Number(env.JOVIE_PREFLIGHT_JOBS);
+  const jobs =
+    Number.isSafeInteger(requested) && requested > 0
+      ? Math.min(requested, runs.length)
+      : runs.length;
+  const codes = Array(runs.length).fill(0);
+  let next = 0;
+  await Promise.all(
+    Array.from({ length: jobs }, async () => {
+      while (next < runs.length) {
+        const index = next++;
+        codes[index] = await runs[index]();
+      }
+    })
+  );
   return codes.find(code => code !== 0) ?? 0;
 }
 

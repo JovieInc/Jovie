@@ -15,6 +15,7 @@ import { buildAffectedTestPlan } from '../../run-affected-tests.mjs';
 import {
   COPY_INVENTORY_TEST,
   copyInventoryScanPath,
+  runSelectedContracts,
   selectScriptContracts,
 } from '../script-contract-affected.mjs';
 import { testsAffectedBy } from '../test-file-dependencies.mjs';
@@ -318,3 +319,49 @@ test('waitlist producer mapping edits require the complete selector regression p
   assert.equal(buildAffectedTestPlan([...files, selector[0]]).mode, 'full');
   assert.equal(buildAffectedTestPlan([...files, selector[1]]).mode, 'full');
 });
+
+for (const [jobs, expectedPeak] of [
+  ['1', 1],
+  ['2', 2],
+  [undefined, 3],
+]) {
+  test(`selected contract batches honor existing preflight jobs=${jobs ?? 'default'} without skipping failures`, async () => {
+    let live = 0;
+    let peak = 0;
+    const calls = [];
+    const code = await runSelectedContracts(
+      {
+        node: ['scripts/preflight.test.mjs', 'scripts/hold-contract.test.mjs'],
+        vitest: ['scripts/lib/__tests__/capability-request.test.mjs'],
+      },
+      {
+        env: { JOVIE_PREFLIGHT_JOBS: jobs },
+        runBatch: async (command, args) => {
+          calls.push({ command, args });
+          peak = Math.max(peak, ++live);
+          await new Promise(resolve => setImmediate(resolve));
+          live -= 1;
+          return args.includes('scripts/hold-contract.test.mjs') ? 7 : 0;
+        },
+      }
+    );
+    assert.equal(peak, expectedPeak);
+    assert.equal(code, 7);
+    assert.equal(calls.length, 3);
+    for (const path of [
+      'scripts/preflight.test.mjs',
+      'scripts/hold-contract.test.mjs',
+      'lib/__tests__/capability-request.test.mjs',
+    ])
+      assert.equal(calls.filter(call => call.args.includes(path)).length, 1);
+    const coverage = calls.find(call =>
+      call.args.includes('scripts/preflight.test.mjs')
+    );
+    assert.ok(coverage.args.includes('--experimental-test-coverage'));
+    assert.ok(
+      coverage.args.includes(
+        '--test-coverage-include=scripts/lib/source-guard-action-snapshot.mjs'
+      )
+    );
+  });
+}
