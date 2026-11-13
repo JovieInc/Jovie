@@ -71,6 +71,14 @@ function ChatHistoryRowContent({ row }: { readonly row: ChatHistoryRow }) {
         ) : null}
       </span>
       <span className='min-w-0 flex-1 truncate'>{row.title}</span>
+      {/* A real space between the title and the age: the two spans sit in a
+          flex row, so the whitespace text node never becomes a flex item and
+          the layout is unchanged — but the item's textContent now separates
+          the age's words from the title's. axe tokenizes the visible text
+          and the accessible name into words (Intl.Segmenter, UAX #29 keeps
+          "Plan6m" a single word) and requires the visible words inside the
+          name; a glued "Plan6m" can never be found in the spaced aria-label
+          (label-content-name-mismatch, WCAG 2.5.3). */}{' '}
       <span className='shrink-0 text-2xs tabular-nums text-tertiary-token'>
         {row.age}
       </span>
