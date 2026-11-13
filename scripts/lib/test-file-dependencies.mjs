@@ -97,6 +97,10 @@ export function testsAffectedBy(tests, changed, root) {
   const changes = new Set(changed);
   if (changes.size === 0) return [];
   return tests.filter(test =>
-    [...testDependencies(test, root)].some(file => changes.has(file))
+    test
+      .split(' ')
+      .some(part =>
+        [...testDependencies(part, root)].some(file => changes.has(file))
+      )
   );
 }

@@ -648,6 +648,10 @@
     "apps/web/components/jovie/components/ErrorDisplay.tsx": {
       "empty": "ErrorDisplay renders exactly one required ChatError and never a collection; the only .filter is over the two parts of the support reference, and the detector matched the items-start and items-center classes."
     },
+    "apps/web/components/jovie/merch-tool-artifacts.tsx": {
+      "error": "It never draws its own failure. The only submit signal is the jovie-chat-submit-prompt event it dispatches, and the chat that receives it owns the request and its errors. A failed tool event returns null so the shared failure card draws it. The detector matched submit in that event name.",
+      "offline": "It never fetches. The only submit signal is the jovie-chat-submit-prompt event it dispatches, and the chat composer owns the request and its network error. The detector matched submit in that event name."
+    },
     "apps/web/components/jovie/source-evidence-context.tsx": {
       "loading": "The provider is pending only while the code-split source-facts module resolves, a microtask after mount; a static story cannot hold a resolved dynamic import, so source-evidence-context.test.tsx asserts data-source-evidence='pending' before 'ready'. Its children render unchanged either way.",
       "offline": "The provider never fetches; it projects facts it was handed through a lazily imported pure module, so lost connectivity can only stop that chunk from loading, and its children still render with no evidence (the Default story's content without source chips)."
