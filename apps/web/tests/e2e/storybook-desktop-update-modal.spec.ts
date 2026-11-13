@@ -1,5 +1,80 @@
 import { expect, test } from '@playwright/test';
 
+test.describe('Desktop update typography', () => {
+  for (const runtime of ['browser', 'electron']) {
+    for (const width of [390, 1440]) {
+      test(`inherits the app face and features in ${runtime} at ${width}px`, async ({
+        page,
+      }) => {
+        await page.setViewportSize({ width, height: 900 });
+        await page.emulateMedia({ reducedMotion: 'reduce' });
+        await page.goto(
+          '/iframe.html?id=organisms-desktopupdatemodal--ready&viewMode=story'
+        );
+        const dialog = page.getByRole('dialog');
+        await expect(dialog).toBeVisible();
+        // Storybook does not mount next/font's root layout. Load the same
+        // bundled variable face so this checks real glyphs, not a fallback.
+        await page.evaluate(async desktop => {
+          const font = new FontFace(
+            'Inter Variable',
+            'url(/fonts/Inter-Latin.woff2)',
+            { weight: '100 900' }
+          );
+          document.fonts.add(await font.load());
+          if (desktop)
+            document.documentElement.dataset.desktopRuntime = 'electron';
+          await document.fonts.ready;
+        }, runtime === 'electron');
+
+        const typography = await dialog.evaluate(element => {
+          const probe = document.createElement('span');
+          probe.className = 'font-sans';
+          document.body.append(probe);
+          const canonicalFace = getComputedStyle(probe).fontFamily;
+          probe.remove();
+          return {
+            canonicalFace,
+            text: Array.from(element.querySelectorAll('h2, p, button')).map(
+              node => {
+                const style = getComputedStyle(node);
+                return {
+                  face: style.fontFamily,
+                  features: style.fontFeatureSettings,
+                };
+              }
+            ),
+          };
+        });
+        for (const text of typography.text) {
+          expect(text.face).toBe(typography.canonicalFace);
+          expect(text.features).toContain('"cv01"');
+          expect(text.features).toContain('"ss03"');
+        }
+
+        const restart = page.getByRole('button', { name: 'Restart To Update' });
+        await expect(restart).toBeFocused();
+        const before = await restart.boundingBox();
+        await restart.hover();
+        expect(await restart.boundingBox()).toEqual(before);
+        expect(
+          await restart.evaluate(element => {
+            const range = document.createRange();
+            range.selectNodeContents(element);
+            const label = range.getBoundingClientRect();
+            const box = element.getBoundingClientRect();
+            return label.left >= box.left && label.right <= box.right;
+          })
+        ).toBe(true);
+        const box = await dialog.boundingBox();
+        if (!box) throw new Error('Missing modal geometry');
+        expect(box.x).toBeGreaterThanOrEqual(0);
+        expect(box.x + box.width).toBeLessThanOrEqual(width);
+      });
+    }
+  }
+});
+
 test.describe('Desktop update release notes geometry', () => {
   test('does not persist a light override into the next default story', async ({
     page,

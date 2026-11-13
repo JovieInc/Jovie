@@ -11,3 +11,16 @@ describe('HomepageV2Route hero demo', () => {
     expect(demo).toHaveAttribute('inert');
   });
 });
+
+describe('HomepageV2Route sections', () => {
+  it('always mounts the power grid and social proof sections', () => {
+    const { container } = render(<HomepageV2Route />);
+
+    expect(
+      container.querySelector('[data-testid="homepage-v2-power-grid"]')
+    ).not.toBeNull();
+    expect(
+      container.querySelector('[data-testid="homepage-v2-social-proof"]')
+    ).not.toBeNull();
+  });
+});

@@ -132,6 +132,63 @@ describe('start route layout', () => {
     ]);
   });
 
+  it.each(['production', 'preview'])(
+    'never reads the session on a secure %s deployment',
+    async vercelEnv => {
+      vi.stubEnv('PUBLIC_NOAUTH_SMOKE', '1');
+      vi.stubEnv('NEXT_PUBLIC_E2E_MODE', '1');
+      vi.stubEnv('VERCEL_ENV', vercelEnv);
+      const { default: StartLayout } = await import('./layout');
+
+      render(await StartLayout({ children: <div data-testid='child' /> }));
+
+      expect(mocks.getRequestSession).not.toHaveBeenCalled();
+      expect(mocks.providerProps).toEqual([
+        { forceSignedOutDefaults: false, skipCoreProviders: true },
+      ]);
+    }
+  );
+
+  it('never reads the session when no smoke or E2E flag asks for forced defaults', async () => {
+    vi.stubEnv('PUBLIC_NOAUTH_SMOKE', '');
+    vi.stubEnv('NEXT_PUBLIC_E2E_MODE', '');
+    vi.stubEnv('VERCEL_ENV', '');
+    const { default: StartLayout } = await import('./layout');
+
+    render(await StartLayout({ children: <div data-testid='child' /> }));
+
+    expect(mocks.getRequestSession).not.toHaveBeenCalled();
+    expect(mocks.providerProps).toEqual([
+      { forceSignedOutDefaults: false, skipCoreProviders: true },
+    ]);
+  });
+
+  it('reads flags while the session read is still pending', async () => {
+    vi.stubEnv('NEXT_PUBLIC_E2E_MODE', '1');
+    vi.stubEnv('VERCEL_ENV', '');
+    let resolveSession: (session: null) => void = () => {};
+    mocks.getRequestSession.mockImplementation(
+      () =>
+        new Promise<null>(resolve => {
+          resolveSession = resolve;
+        })
+    );
+    const { default: StartLayout } = await import('./layout');
+
+    const pending = StartLayout({ children: <div data-testid='child' /> });
+
+    await vi.waitFor(() => {
+      expect(mocks.getRequestSession).toHaveBeenCalledWith('cookie');
+      expect(mocks.getAppFlagsSnapshot).toHaveBeenCalledOnce();
+    });
+
+    resolveSession(null);
+    render(await pending);
+    expect(mocks.providerProps).toEqual([
+      { forceSignedOutDefaults: true, skipCoreProviders: true },
+    ]);
+  });
+
   it('falls back to forced defaults when the session read cannot resolve (DB-less capture)', async () => {
     vi.stubEnv('NEXT_PUBLIC_E2E_MODE', '1');
     vi.stubEnv('VERCEL_ENV', '');

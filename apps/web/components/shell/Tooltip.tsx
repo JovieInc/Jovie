@@ -131,6 +131,12 @@ export function Tooltip({
   useLayoutEffect(() => {
     if (disabled || touchActive) setHintOpen(false);
   }, [disabled, touchActive]);
+  // A forced-closed tooltip (`open={false}`) holds no latent intent: when the
+  // owner releases it (sidebar collapse flips the label), it needs a fresh
+  // hover or focus instead of popping open with no pointer on it.
+  useLayoutEffect(() => {
+    if (open === false) setHintOpen(false);
+  }, [open]);
   const onPointerInput = useCallback((event: PointerEvent<HTMLElement>) => {
     touchInput.current = event.pointerType === 'touch';
     setTouchActive(touchInput.current);
@@ -172,7 +178,9 @@ export function Tooltip({
       <TooltipRoot
         open={!disabled && !touchActive && (open ?? hintOpen)}
         onOpenChange={value =>
-          setHintOpen(!disabled && !touchInput.current && value)
+          setHintOpen(
+            open !== false && !disabled && !touchInput.current && value
+          )
         }
       >
         <TooltipTrigger
