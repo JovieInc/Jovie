@@ -50,6 +50,12 @@
       "reason": "JOV-4522: shared rail-collapse state variant for the sidebar's collapsible=icon data attribute; the same selector was already used inline across shell components. No canonical design token applies."
     },
     {
+      "file": "apps/web/components/organisms/user-button/UserButtonLoading.tsx",
+      "rule": "arbitrary-value",
+      "value": "group-data-[collapsible=icon]",
+      "reason": "Moved unchanged from UserButton.tsx, where it is baselined: the account button loading placeholder must collapse to the same 28px icon box as the live button when the sidebar rail is collapsed (collapsible=icon). It is the sidebar's state selector, not a visual value. No canonical design token applies."
+    },
+    {
       "file": "apps/web/components/shell/rail-motion.ts",
       "rule": "arbitrary-value",
       "value": "transition-[flex-basis,width,opacity,transform]",
