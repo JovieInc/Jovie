@@ -26,7 +26,8 @@ const { captureExceptionMock, loggerWarnMock, outcomes, withDbSessionTxMock } =
       const tx = {
         execute: vi.fn(async () => ({ rows: [] })),
         select: vi.fn(() => {
-          const outcome = outcomes.shift() ?? (() => ({ rows: [] }));
+          const outcome: QueryOutcome =
+            outcomes.shift() ?? (() => ({ rows: [] }));
           const builder: Record<string, unknown> = {};
           const chain = () => builder;
           builder.from = chain;
