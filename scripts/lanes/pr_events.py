@@ -29,7 +29,7 @@ from pathlib import Path
 from urllib.parse import urlsplit
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import disk_guard  # noqa: E402
-import lifecycle, pr_wip, repair_order  # noqa: E402  (pr_wip: per-producer WIP census; repair_order: fair claims)
+import lifecycle, pr_wip, repair_order, sha_mentions  # noqa: E402
 from label_episodes import RELAY_RED_LABELLER, label_episode_applier  # noqa: E402  (JOV-8492 provenance gate)
 
 HERE = Path(__file__).resolve().parent
@@ -1143,7 +1143,7 @@ def repair_evidence_body(pr: dict, body: str, excerpt: str = "", *, customer_dec
         if red_section_bounds(updated.split("\n"), re.compile(r"^#{2,3}\s*Premise check\s*$", re.I)) is None:
             block = "## Premise check\n\n" + "\n".join(f"- {field}: {premise[field]}" for field in fields)
             updated = updated.rstrip("\n") + "\n\n" + block + "\n"
-    return updated
+    return sha_mentions.neutralize(updated)
 
 
 def api_gh(args, **_):

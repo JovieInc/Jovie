@@ -22,7 +22,7 @@ const { load } = createRequire(import.meta.url)('js-yaml');
 
 const pin = JSON.parse(read('scripts/invariants/jump-policy-pin.json'));
 const script = load(
-  read('.github/workflows/merge-queue-green-enroll.yml', 'utf8')
+  read('.github/workflows/merge-queue-green-enroll.yml')
 ).jobs.enroll.steps.find(step => step.with?.script).with.script;
 
 // Strip block and line comments, then remove ALL whitespace. Comment-only

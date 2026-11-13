@@ -484,3 +484,49 @@ console.log(JSON.stringify(bodies.map(body => evaluateFleetRules({
         for before, after in zip(verdicts[::2], verdicts[1::2]):
             self.assertTrue(any(error.startswith("red-before-green:") for error in before), before)
             self.assertEqual(after, [])
+
+    def test_repair_neutralizes_commit_sha_mentions_for_the_mention_guard(self):
+        mentions = sys.modules["sha_mentions"]
+        sha = "036b3506"
+        full = "a" * 40
+        short = "abc123"
+        sample = "\n".join([
+            f"main @{sha} tip",
+            f"full @{full} tip",
+            f"short @{short} stays",
+            "ask @timwhite",
+            f"quoted `@{sha}`",
+            f"```\n@{sha}\n```",
+            f"path @{sha}/file",
+            "mail dev@example.com",
+            f"end @{sha}.",
+        ])
+        wrapped = mentions.neutralize(sample)
+        self.assertEqual(mentions.neutralize(wrapped), wrapped)
+        self.assertIn(f"main `@{sha}` tip", wrapped)
+        self.assertIn(f"full `@{full}` tip", wrapped)
+        self.assertIn(f"short @{short} stays", wrapped)
+        self.assertIn("ask @timwhite", wrapped)
+        self.assertIn(f"```\n@{sha}\n```", wrapped)
+        self.assertIn(f"path @{sha}/file", wrapped)
+        self.assertIn("mail dev@example.com", wrapped)
+        body = events.red_before_green_block(self.PR) + f"\n\nCopied from main @{sha}.\n"
+        updated = events.repair_evidence_body(self.PR, body)
+        self.assertIn(f"Copied from main `@{sha}`.", updated)
+        self.assertEqual(events.repair_evidence_body(self.PR, updated), updated)
+        checked = subprocess.run(["node", "--input-type=module", "-e", """
+import { readFileSync } from 'node:fs';
+const re = /(?<![\\w@./`-])@([A-Za-z0-9](?:[A-Za-z0-9-]{0,38}[A-Za-z0-9])?(?:\\[bot\\])?)(?![\\w-]*\\/|\\w*\\.\\w)/g;
+const extract = text => {
+  const stripped = String(text).replace(/```[\\s\\S]*?```/g, ' ').replace(/`[^`\\n]*`/g, ' ');
+  return [...new Set([...stripped.matchAll(re)].map(match => match[1]))];
+};
+const bodies = JSON.parse(readFileSync(0, 'utf8'));
+console.log(JSON.stringify(bodies.map(extract)));
+"""], cwd=ROOT, input=json.dumps([sample, wrapped, updated]), text=True,
+                                  capture_output=True, check=True)
+        sample_hits, wrapped_hits, updated_hits = json.loads(checked.stdout)
+        self.assertEqual(sample_hits, [sha, full, short, "timwhite"])
+        self.assertEqual(wrapped_hits, [short, "timwhite"])
+        self.assertNotIn(sha, updated_hits)
+        self.assertNotIn(full, updated_hits)
