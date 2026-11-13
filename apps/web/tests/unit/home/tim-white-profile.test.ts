@@ -30,7 +30,7 @@ describe('Tim White canonical mock identity', () => {
   it('keeps the homepage real-profile fixture aligned with the canonical profile', () => {
     expect(HOMEPAGE_PROFILE_PREVIEW_ARTIST.name).toBe(TIM_WHITE_PROFILE.name);
     expect(HOMEPAGE_PROFILE_PREVIEW_ARTIST.handle).toBe(
-      TIM_WHITE_PROFILE.publicProfileHandle
+      TIM_WHITE_PROFILE.handle
     );
     expect(HOMEPAGE_PROFILE_PREVIEW_ARTIST.image_url).toBe(
       TIM_WHITE_PROFILE.avatarSrc
