@@ -1,7 +1,7 @@
 import { spawnSync } from 'node:child_process';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   baselineWithHeadroom,
   evaluateBudgets,
@@ -21,7 +21,10 @@ import {
   writeChunk,
 } from './route-js-budget-fixtures';
 
-afterEach(cleanupFixtures);
+afterEach(() => {
+  vi.unstubAllEnvs();
+  cleanupFixtures();
+});
 
 const row = (route: string, gzipKb: number) => ({ route, gzipKb, chunks: 1 });
 
@@ -234,7 +237,7 @@ describe('route-js-budget --write', () => {
       {
         encoding: 'utf8',
         timeout: 20000,
-        env: { ...process.env, ...env },
+        env,
       }
     );
   }
@@ -269,6 +272,9 @@ describe('route-js-budget --write', () => {
         'utf8'
       ),
     });
+
+    // A parent Git common directory must not leak back into CLI subprocesses.
+    vi.stubEnv('GIT_COMMON_DIR', join(nextDir, 'unrelated-parent-git'));
 
     const closed = cli(nextDir, budgetPath, cliEnv);
     expect(closed.status).toBe(1);

@@ -1,7 +1,7 @@
 import { spawnSync } from 'node:child_process';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { evaluateBudgets } from './route-js-budget.mjs';
 import {
   buildFirstLoadFixture,
@@ -13,7 +13,10 @@ import {
   writeChunk,
 } from './route-js-budget-fixtures';
 
-afterEach(cleanupFixtures);
+afterEach(() => {
+  vi.unstubAllEnvs();
+  cleanupFixtures();
+});
 
 function control() {
   const budgets = firstLoadBudgets({
@@ -82,6 +85,43 @@ function runCli(nextDir: string, budgetPath: string, env = process.env) {
 }
 
 describe('route-group policy reaches the existing evaluator and CLI', () => {
+  it('isolates fixture Git commands from an inherited parent repository', () => {
+    const parentDir = buildFirstLoadFixture();
+    const parentEnv = writeAncestorGitRepo(parentDir, {
+      'parent.txt': 'parent',
+    });
+    const parentIndex = join(parentDir, '.git', 'index');
+    const indexBefore = readFileSync(parentIndex);
+    const git = (dir: string, env: NodeJS.ProcessEnv, args: string[]) => {
+      const run = spawnSync('git', args, {
+        cwd: dir,
+        env,
+        encoding: 'utf8',
+        timeout: 10000,
+      });
+      expect(run.status, run.stderr).toBe(0);
+      return run.stdout.trim();
+    };
+    const parentHead = git(parentDir, parentEnv, ['rev-parse', 'HEAD']);
+    vi.stubEnv('GIT_DIR', join(parentDir, '.git'));
+    vi.stubEnv('GIT_WORK_TREE', parentDir);
+    vi.stubEnv('GIT_COMMON_DIR', join(parentDir, '.git'));
+    vi.stubEnv('GIT_INDEX_FILE', parentIndex);
+
+    const fixtureDir = buildFirstLoadFixture();
+    const env = writeAncestorGitRepo(fixtureDir, { 'budget.json': '{}' });
+    expect(env.GIT_INDEX_FILE).toBeUndefined();
+    expect(env.GIT_COMMON_DIR).toBeUndefined();
+    expect(git(fixtureDir, env, ['rev-parse', '--show-toplevel'])).toBe(
+      fixtureDir
+    );
+    expect(git(fixtureDir, env, ['show', 'origin/main:budget.json'])).toBe(
+      '{}'
+    );
+    expect(git(parentDir, parentEnv, ['rev-parse', 'HEAD'])).toBe(parentHead);
+    expect(readFileSync(parentIndex)).toEqual(indexBefore);
+  });
+
   it.each(['2024-1-5', '2024/01/05', '2099-99-99', '2099-02-30'])(
     'rejects group baseline and target raises with malformed expiry %s',
     expiresOn => {

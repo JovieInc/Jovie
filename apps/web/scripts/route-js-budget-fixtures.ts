@@ -140,7 +140,7 @@ export function writeAncestorGitRepo(
   const git = (args: string[]): void => {
     const result = spawnSync('git', args, {
       cwd: nextDir,
-      env: { ...process.env, ...env },
+      env,
       encoding: 'utf8',
       timeout: 10000,
     });
