@@ -218,6 +218,39 @@ describe('EntityChipPopover', () => {
     });
   });
 
+  it('presents a profile chip as the artist card marked as you', async () => {
+    const user = userEvent.setup();
+    mockEntityPanelState.entityPanel = { open: vi.fn() };
+    fastRender(
+      <EntityChipPopover
+        kind='profile'
+        id='p1'
+        label='Tim White'
+        entity={{ kind: 'profile', id: 'p1', label: 'Tim White' }}
+      >
+        <EntityChip
+          data={{ kind: 'profile', id: 'p1', label: 'Tim White' }}
+          variant='transcript'
+        />
+      </EntityChipPopover>
+    );
+
+    const trigger = screen.getByTestId('entity-chip-popover-trigger');
+    expect(trigger.querySelector('.sr-only')?.textContent).toBe(
+      'Profile: Tim White — '
+    );
+
+    await user.click(trigger);
+    const content = await screen.findByTestId('entity-chip-popover-content');
+    expect(content).toHaveAttribute('data-entity-kind', 'profile');
+    expect(
+      screen.getByRole('heading', { name: 'Tim White' })
+    ).toBeInTheDocument();
+    expect(content.textContent).toContain('Artist · You');
+    // A profile has no entity rail to open, even when the panel is mounted.
+    expect(screen.queryByRole('button', { name: /Open/i })).toBeNull();
+  });
+
   it('degrades gracefully for unresolved entities without layout thrash', async () => {
     const user = userEvent.setup();
     fastRender(
