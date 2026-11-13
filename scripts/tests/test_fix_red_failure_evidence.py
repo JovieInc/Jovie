@@ -1,4 +1,6 @@
+import importlib.util
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -60,3 +62,74 @@ class FailureEvidenceTest(unittest.TestCase):
                 self.assertEqual((result["cls"], result["action"]), ("platform-infra", "rerun"))
                 event = classes.remediation.classify_event({"source": "schedule", "evidence": {"excerpt": message}})
                 self.assertEqual(event["cls"], "flaky-infra")
+
+
+def lane_harness():
+    """Reuse the collected lane_runner tests when pytest already loaded them."""
+    for module in sys.modules.values():
+        path = getattr(module, "__file__", None) or ""
+        if path.endswith("scripts/tests/test_lane_runner.py") and hasattr(module, "FixRedTest"):
+            return module
+    spec = importlib.util.spec_from_file_location(
+        "test_lane_runner_fleet_harness", Path(__file__).with_name("test_lane_runner.py"))
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+class FleetBodyRouteTest(unittest.TestCase):
+    def test_annotated_red_stamps_and_a_win_stays_with_the_model(self):
+        red = "##[error]red-before-green: this repair PR has no section"
+        win = "##[error]win: this PR needs a measured win"
+        got = classes.classify(pr("Source Validation"), {"Source Validation": red})
+        self.assertEqual((got["cls"], got["action"]), ("fleet-body", "stamp-repair-evidence"))
+        self.assertIn(got["action"], classes.DETERMINISTIC)
+        for log in (win, red + "\n" + win):
+            got = classes.classify(pr("Fleet Rules Evidence", "PR Fleet Rules"), {
+                "Fleet Rules Evidence": log, "PR Fleet Rules": log})
+            self.assertEqual((got["cls"], got["action"]), ("fleet-body", "agent"), log)
+            self.assertNotIn(got["action"], classes.DETERMINISTIC)
+        split = classes.classify(pr("Fleet Rules Evidence", "PR Fleet Rules"), {
+            "Fleet Rules Evidence": red, "PR Fleet Rules": win})
+        self.assertEqual((split["cls"], split["action"]), ("fleet-body", "agent"))
+        mixed = classes.classify(pr("Fleet Rules Evidence", "Source Validation"), {
+            "Fleet Rules Evidence": red, "Source Validation": "AssertionError: expected 1"})
+        self.assertEqual((mixed["cls"], mixed["action"]), ("mixed", "agent"))
+
+    def test_missing_red_section_is_stamped_once_and_a_win_reaches_the_model(self):
+        harness = lane_harness()
+        patches = (
+            harness._qualification_prepare_fixture, harness._disk_capacity_fixture,
+            harness._devin_free_fixture, harness._qualification_fixture)
+        started = [item for item in patches if not hasattr(item, "is_local")]
+        for item in started:
+            item.start()
+        case = harness.FixRedTest()
+        case.setUp()
+        try:
+            red = "##[error]red-before-green: this repair PR has no section\n"
+            target = {**case.pr(), "body": "## Summary\nrepair\n", "statusCheckRollup": [{
+                "name": "Fleet Rules Evidence", "status": "COMPLETED", "conclusion": "FAILURE",
+                "detailsUrl": "https://github.com/JovieInc/Jovie/actions/runs/123/job/456"}]}
+            with tempfile.TemporaryDirectory() as tmp:
+                host, receipt, agent, again = case.run_gate(tmp, red, pr=target)
+                self.assertEqual(receipt["reasons"], ["stamped-fleet-body"])
+                self.assertEqual(receipt["failureFingerprint"]["cls"], "fleet-body")
+                agent.assert_not_called()
+                again.assert_not_called()
+                written = (host.state / "runs" / "fleet-body-5.md").read_text()
+                self.assertIn("## Red-before-green", written)
+                self.assertIn("- Failing command:", written)
+                self.assertNotIn("## Win", written)
+                _, second, agent2, _ = case.run_gate(tmp, red, pr=target)
+                agent2.assert_called_once()
+                self.assertNotEqual(second["reasons"][:1], ["stamped-fleet-body"])
+            win = red + "##[error]win: this PR needs a measured win\n"
+            with tempfile.TemporaryDirectory() as tmp:
+                host, _, agent, _ = case.run_gate(tmp, win, pr=target)
+                agent.assert_called_once()
+                self.assertFalse((host.state / "runs" / "fleet-body-5.md").exists())
+        finally:
+            case.doCleanups()
+            for item in reversed(started):
+                item.stop()

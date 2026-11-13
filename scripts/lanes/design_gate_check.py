@@ -11,6 +11,8 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
+import subprocess
 import sys
 import urllib.request
 from pathlib import Path
@@ -162,6 +164,51 @@ def emit(result: dict) -> int:
     return int(result["exit"])
 
 
+def files_from_git(event_path: str, repo: Path, merge_sha: str) -> list[str]:
+    """Prove the complete PR diff locally, without paginated GitHub API reads.
+
+    Pin to the Actions merge commit and its ordered parents. Like Secret Scan,
+    accept a stale event base only when it is an ancestor of merge parent1.
+    Diff the unique merge-base to the exact source head, never the merge tree
+    or a moving branch. Full history is required to rule out shallow boundaries.
+    """
+    event = json.loads(Path(event_path).read_text(encoding="utf-8"))
+    pr = event["pull_request"]
+    head = pr["head"]["sha"]
+    base = pr["base"]["sha"]
+    for sha in (merge_sha, head, base):
+        if not isinstance(sha, str) or not re.fullmatch(r"[0-9a-f]{40}", sha) or sha == "0" * 40:
+            raise ValueError("missing or invalid exact event SHA")
+
+    def git(*args: str) -> bytes:
+        return subprocess.run(
+            ["git", "-C", str(repo), *args], check=True, capture_output=True,
+            env={**os.environ, "GIT_NO_LAZY_FETCH": "1"}, timeout=30,
+        ).stdout
+
+    if git("rev-parse", "--is-shallow-repository").strip() != b"false":
+        raise ValueError("shallow checkout cannot prove complete changed paths")
+    if git("rev-parse", "HEAD").decode().strip() != merge_sha:
+        raise ValueError("checkout does not match the exact Actions merge SHA")
+    parents = git("rev-list", "--parents", "-n", "1", merge_sha).decode().split()
+    if len(parents) != 3 or parents[2] != head:
+        raise ValueError("event merge parents do not match the exact PR head")
+    git("merge-base", "--is-ancestor", base, parents[1])
+    merge_bases = git("merge-base", "--all", parents[1], head).decode().split()
+    if len(merge_bases) != 1:
+        raise ValueError("PR diff requires one unambiguous merge-base")
+    # No rename detection: retain both sides of renames across gated prefixes.
+    # NUL framing preserves whitespace, newlines and non-ASCII filenames.
+    raw = git("diff", "--no-ext-diff", "--no-renames", "--name-only", "-z",
+              merge_bases[0], head, "--")
+    if raw and not raw.endswith(b"\0"):
+        raise ValueError("truncated changed-path evidence")
+    files = [path.decode("utf-8") for path in raw.split(b"\0")[:-1]]
+    print(f"Changed-path proof: merge={merge_sha} base={parents[1]} "
+          f"merge-base={merge_bases[0]} head={head} paths={len(files)}")
+    return files
+
+
 def _read_files(path: str) -> list[str]:
     return [line.strip() for line in Path(path).read_text(encoding="utf-8").splitlines() if line.strip()]
 
@@ -176,7 +223,10 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Warn on marketing PRs with no completed design brief.")
     parser.add_argument("--event", help="GitHub event JSON path (pull_request.body)")
     parser.add_argument("--body-file", help="PR body text file")
-    parser.add_argument("--files-from", help="Newline-separated changed paths")
+    paths = parser.add_mutually_exclusive_group()
+    paths.add_argument("--files-from", help="Newline-separated changed paths")
+    paths.add_argument("--git-diff", action="store_true",
+                       help="Prove changed paths from the exact Actions PR merge checkout")
     parser.add_argument("--repo", default=".", help="Checkout root for brief paths")
     args = parser.parse_args(argv)
     if args.event:
@@ -185,8 +235,17 @@ def main(argv: list[str] | None = None) -> int:
         body = Path(args.body_file).read_text(encoding="utf-8")
     else:
         body = ""
-    files = _read_files(args.files_from) if args.files_from else []
     root = Path(args.repo)
+    if args.git_diff:
+        if not args.event:
+            parser.error("--git-diff requires --event")
+        try:
+            files = files_from_git(args.event, root, os.environ.get("GITHUB_SHA", ""))
+        except (KeyError, TypeError, ValueError, OSError, subprocess.SubprocessError) as error:
+            print(f"::error::Design gate changed-path evidence unavailable: {error}")
+            return 1
+    else:
+        files = _read_files(args.files_from) if args.files_from else []
     fetch = linear_issue_description if os.environ.get("LINEAR_API_KEY", "").strip() else None
     result = check(
         files, body, enforce=design_gate.enforce_enabled(),

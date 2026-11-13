@@ -7171,27 +7171,48 @@ def route_fix_red(host: Host, pr: dict) -> dict | None:
     return fix_red_failure_routing.classify_repair(host, pr, failed_logs, fix_red_classes.classify, gh_call, REPO_SLUG)
 
 
+def _publish_pr_body(host: Host, pr: dict, name: str, text: str) -> bool:
+    """Write one PR body through the repair client. The caller decides whether the text is complete."""
+    runs = host.state / "runs"
+    runs.mkdir(parents=True, exist_ok=True)
+    path = runs / f"{name}-{int(pr['number'])}.md"
+    atomic_write_text(path, text)
+    edited = gh_call(["pr", "edit", str(int(pr["number"])), "--repo", REPO_SLUG, "--body-file", str(path)],
+                     priority="repair")
+    return edited.returncode == 0
+
+
 def stamp_changelog_decision(host: Host, pr: dict) -> bool:
     """Write the internal customer-changelog note onto the PR body. False when the body cannot
     take one or GitHub rejects the edit (the model then gets the head)."""
     stamped = fix_red_classes.stamp_internal_changelog(pr.get("body"))
     if stamped is None:
         return False
-    runs = host.state / "runs"
-    runs.mkdir(parents=True, exist_ok=True)
-    path = runs / f"changelog-{int(pr['number'])}.md"
-    atomic_write_text(path, stamped)
-    edited = gh_call(["pr", "edit", str(int(pr["number"])), "--repo", REPO_SLUG, "--body-file", str(path)],
-                     priority="repair")
-    return edited.returncode == 0
+    return _publish_pr_body(host, pr, "changelog", stamped)
+
+
+def stamp_fleet_body(host: Host, pr: dict) -> str | None:
+    """Stamp a missing Red-before-green block once per head. None leaves the head with the model.
+    A measured win is never added here."""
+    body = pr.get("body")
+    if not isinstance(body, str) or pr_events.red_section_complete(body):
+        return None
+    updated = pr_events.repair_evidence_body(pr, body, "")
+    if updated == body or not claim_route(host, pr, fix_red_classes.STAMP_REPAIR):
+        return None
+    return "stamped-fleet-body" if _publish_pr_body(host, pr, "fleet-body", updated) else None
 
 
 def deterministic_route_taken(host: Host, pr: dict, route: dict | None) -> str | None:
     """Run the no-model action for a routed class once per head; the reason on success (None: use the model)."""
     if reason := fix_red_failure_routing.owner_handoff_reason(route):
         return reason
-    if not route or route["action"] not in {fix_red_classes.RERUN, fix_red_classes.SYNC_MAIN, fix_red_classes.STAMP_CHANGELOG}:
+    if not route or route["action"] not in {
+            fix_red_classes.RERUN, fix_red_classes.SYNC_MAIN, fix_red_classes.STAMP_CHANGELOG,
+            fix_red_classes.STAMP_REPAIR}:
         return None
+    if route["action"] == fix_red_classes.STAMP_REPAIR:
+        return stamp_fleet_body(host, pr)
     if route["action"] == fix_red_classes.STAMP_CHANGELOG:
         # No body, or a note already present: do not spend the once-per-head claim. An invalid
         # note is a different defect and still belongs to the model.
