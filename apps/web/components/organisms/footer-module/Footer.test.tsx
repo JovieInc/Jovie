@@ -41,10 +41,12 @@ describe('Footer', () => {
 
     const brandingRow = screen
       .getByRole('link', { name: 'Powered by Jovie Home' })
-      .closest('div');
-    // The mobile reservation lifts the branding link's 44pt hit box clear
-    // of the absolute legal links (bottom-2 right-4, 44pt boxes); desktop
-    // keeps the tight band because its legal links are viewport-pinned.
+      .closest('div')?.parentElement;
+    // The wrapper is the branding group div's parent (FooterBranding renders
+    // its own inner group div); the mobile reservation lifts the branding
+    // link's 44pt hit box clear of the absolute legal links (bottom-2
+    // right-4, 44pt boxes), while desktop keeps the tight band because its
+    // legal links are viewport-pinned.
     expect(brandingRow).toHaveClass('pb-16', 'md:pb-2');
     expect(container.querySelector('footer')?.className).toContain('relative');
   });
