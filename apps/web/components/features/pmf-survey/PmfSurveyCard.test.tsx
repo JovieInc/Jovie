@@ -1,4 +1,5 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { PmfSurveyCard } from './PmfSurveyCard';
 
@@ -10,11 +11,58 @@ function setup(
 ) {
   const onSubmit = vi.fn(overrides.onSubmit ?? (async () => ({ ok: true })));
   const onDismiss = vi.fn(overrides.onDismiss ?? (async () => ({ ok: true })));
-  render(<PmfSurveyCard onDismiss={onDismiss} onSubmit={onSubmit} />);
+  render(
+    <PmfSurveyCard initialExpanded onDismiss={onDismiss} onSubmit={onSubmit} />
+  );
   return { onSubmit, onDismiss };
 }
 
 describe('PmfSurveyCard', () => {
+  it('keeps the question discoverable and opens the form with the keyboard without recording an answer', async () => {
+    const user = userEvent.setup();
+    const onSubmit = vi.fn();
+    const onDismiss = vi.fn();
+    render(<PmfSurveyCard onSubmit={onSubmit} onDismiss={onDismiss} />);
+    const answer = screen.getByRole('button', { name: 'Answer' });
+    expect(screen.getByRole('region')).toHaveAccessibleName(
+      'How would you feel if you could no longer use Jovie?'
+    );
+    expect(answer).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.queryByRole('radio')).not.toBeInTheDocument();
+    await user.tab();
+    expect(answer).toHaveFocus();
+    await user.keyboard('{Enter}');
+    expect(answer).toHaveAttribute('aria-expanded', 'true');
+    expect(
+      screen.getByRole('radio', { name: 'Very Disappointed' })
+    ).toBeVisible();
+    await user.click(
+      screen.getByRole('radio', { name: 'Somewhat Disappointed' })
+    );
+    await user.type(screen.getByLabelText(/main benefit/), 'Release planning');
+    await user.click(screen.getByRole('button', { name: 'Hide' }));
+    expect(answer).toHaveFocus();
+    await user.keyboard(' ');
+    expect(
+      screen.getByRole('radio', { name: 'Somewhat Disappointed' })
+    ).toBeChecked();
+    expect(screen.getByLabelText(/main benefit/)).toHaveValue(
+      'Release planning'
+    );
+    expect(onSubmit).not.toHaveBeenCalled();
+    expect(onDismiss).not.toHaveBeenCalled();
+  });
+
+  it('can dismiss the compact prompt without opening or answering it', () => {
+    const onDismiss = vi.fn().mockResolvedValue({ ok: true });
+    const onSubmit = vi.fn();
+    render(<PmfSurveyCard onSubmit={onSubmit} onDismiss={onDismiss} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Dismiss' }));
+    expect(screen.queryByTestId('pmf-survey-card')).not.toBeInTheDocument();
+    expect(onDismiss).toHaveBeenCalledOnce();
+    expect(onSubmit).not.toHaveBeenCalled();
+  });
+
   it('asks the Sean Ellis question with its three answers', () => {
     setup();
     expect(
@@ -88,6 +136,23 @@ describe('PmfSurveyCard', () => {
       screen.getByRole('radio', { name: 'Somewhat Disappointed' })
     ).toBeChecked();
     expect(screen.getByRole('button', { name: 'Send answer' })).toBeEnabled();
+  });
+
+  it('keeps pending feedback open until a failed submission can be retried', async () => {
+    let complete!: (value: { ok: boolean }) => void;
+    setup({
+      onSubmit: () =>
+        new Promise(resolve => {
+          complete = resolve;
+        }),
+    });
+    fireEvent.click(screen.getByRole('radio', { name: 'Very Disappointed' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Send answer' }));
+    expect(screen.getByRole('button', { name: 'Sending' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Hide' })).toBeDisabled();
+    complete({ ok: false });
+    expect(await screen.findByRole('alert')).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Hide' })).toBeEnabled();
   });
 
   it('hides at once on dismiss and records the dismissal', () => {

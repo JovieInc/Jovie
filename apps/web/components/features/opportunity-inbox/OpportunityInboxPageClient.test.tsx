@@ -1,24 +1,3 @@
-vi.mock(
-  '@/components/features/dashboard/organisms/jovie-work-feed/JovieWorkFeed',
-  () => ({
-    JovieWorkFeed: ({
-      profileId,
-      completedOnly,
-    }: {
-      profileId: string;
-      completedOnly: boolean;
-    }) => (
-      <div
-        data-testid='completed-work'
-        data-profile={profileId}
-        data-completed-only={String(completedOnly)}
-      >
-        Verified work
-      </div>
-    ),
-  })
-);
-
 import {
   act,
   fireEvent,
@@ -29,149 +8,18 @@ import {
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { OpportunityInboxData } from '@/lib/connectors/opportunity-inbox-types';
-import { OpportunityInboxPageClient } from './OpportunityInboxPageClient';
+import {
+  mutateAsyncMock,
+  mutateMock,
+  refreshMock,
+  runtimeState,
+  tourDateMutateMock,
+} from '@/tests/fixtures/opportunity-inbox-page-client';
 
-const runtimeState = vi.hoisted(() => ({
-  update: null as null | {
-    available: boolean;
-    busy: boolean;
-    title: string;
-    description: string;
-    apply: () => void;
-  },
-}));
-vi.mock('@/components/shell/RuntimeUpdateProvider', () => ({
-  useRuntimeUpdate: () => runtimeState.update,
-}));
-const mutateMock = vi.fn();
-const refreshMock = vi.fn();
-const mutateAsyncMock = vi.fn().mockResolvedValue({ ok: true });
-
-vi.mock('next/navigation', () => ({
-  usePathname: () => '/app',
-  useRouter: () => ({
-    push: vi.fn(),
-    replace: vi.fn(),
-    prefetch: vi.fn(),
-    refresh: refreshMock,
-  }),
-}));
-
-vi.mock('@/lib/founder-review/client', () => ({
-  listFounderReviewReceipts: vi.fn().mockResolvedValue([]),
-  deleteFounderReviewAudio: vi.fn(),
-  uploadFounderReviewAudio: vi.fn(),
-  createFounderReviewClient: vi.fn().mockImplementation(async review => ({
-    id: review.segmentId,
-    target: review.target,
-    decision: review.decision,
-    recording: { mediaAvailable: false },
-    actionOutcome: {
-      status:
-        review.decision === 'approved' || review.decision === 'rejected'
-          ? 'pending'
-          : 'not-applicable',
-      updatedAt: '2026-09-01T18:00:08.000Z',
-      errorCode: null,
-    },
-  })),
-  updateFounderReviewActionOutcome: vi.fn().mockImplementation(async input => ({
-    id: input.receiptId,
-    target: {
-      type: 'inbox-card',
-      id: 'card-1',
-      title: 'Saved founder review',
-      sourceKind: 'test.suggestion',
-      category: 'suggestion',
-    },
-    decision: 'approved',
-    recording: { mediaAvailable: false },
-    actionOutcome: {
-      status: input.status,
-      updatedAt: '2026-09-01T18:00:08.000Z',
-      errorCode: input.errorCode,
-    },
-  })),
-}));
-
-vi.mock('@/lib/chat/transcriber', () => ({
-  createWebSpeechTranscriber: () => ({
-    isSupported: false,
-    start: vi.fn(),
-    stop: vi.fn(),
-    dispose: vi.fn(),
-  }),
-}));
-
-vi.mock('@/features/dashboard/organisms/PreviewDataHydrator', () => ({
-  PreviewDataHydrator: ({
-    initialLinks,
-  }: {
-    initialLinks: readonly unknown[];
-  }) => (
-    <div
-      data-testid='preview-data-hydrator'
-      data-initial-link-count={initialLinks.length}
-    />
-  ),
-}));
-
-vi.mock('@/lib/queries/useOpportunityInboxMutations', () => ({
-  useOpportunityInboxMutations: () => ({
-    approveMutation: {
-      isPending: false,
-      variables: undefined,
-      mutate: mutateMock,
-      mutateAsync: mutateAsyncMock,
-    },
-    dismissMutation: {
-      isPending: false,
-      variables: undefined,
-      mutate: mutateMock,
-      mutateAsync: mutateAsyncMock,
-    },
-    feedbackMutation: {
-      isPending: false,
-      variables: undefined,
-      mutate: mutateMock,
-      mutateAsync: mutateAsyncMock,
-    },
-    reviseMutation: {
-      isPending: false,
-      variables: undefined,
-      mutate: mutateMock,
-      mutateAsync: mutateAsyncMock,
-    },
-    nextStepMutation: {
-      isPending: false,
-      variables: undefined,
-      mutate: mutateMock,
-      mutateAsync: mutateAsyncMock,
-    },
-  }),
-}));
-
-const tourDateMutateMock = vi.fn();
-
-vi.mock('@/lib/queries/useTourDateReviewMutations', () => ({
-  useTourDateReviewMutations: () => ({
-    confirmMutation: {
-      isPending: false,
-      variables: undefined,
-      mutate: tourDateMutateMock,
-    },
-    rejectMutation: {
-      isPending: false,
-      variables: undefined,
-      mutate: tourDateMutateMock,
-    },
-    undoRejectMutation: {
-      isPending: false,
-      variables: undefined,
-      mutate: tourDateMutateMock,
-    },
-  }),
-}));
+// Load the subject after the shared mocks have registered.
+const { OpportunityInboxPageClient } = await import(
+  './OpportunityInboxPageClient'
+);
 
 const HEALTHY_AVAILABILITY = {
   suggestedActions: 'available',
@@ -190,6 +38,40 @@ const pendingTourDate = {
 };
 
 describe('OpportunityInboxPageClient', () => {
+  it.each(['available', 'unknown'] as const)(
+    'keeps supplementary content after primary work on a %s inbox and across view changes',
+    async availability => {
+      const user = userEvent.setup();
+      render(
+        <OpportunityInboxPageClient
+          inbox={{
+            cards: [],
+            emptyActionCards: [],
+            availability: {
+              suggestedActions: availability,
+              tourDates: 'not_requested',
+            },
+          }}
+          supplementaryContent={<button type='button'>Survey Fixture</button>}
+        />
+      );
+      const survey = screen.getByRole('button', { name: 'Survey Fixture' });
+      const primary =
+        availability === 'available'
+          ? screen.getByRole('link', { name: 'Start A Chat' })
+          : screen.getByRole('button', { name: 'Try Again' });
+      expect(screen.getByTestId('opportunity-inbox-content')).toContainElement(
+        survey
+      );
+      expect(
+        primary.compareDocumentPosition(survey) &
+          Node.DOCUMENT_POSITION_FOLLOWING
+      ).toBeTruthy();
+      await user.click(screen.getByRole('button', { name: 'Done For You' }));
+      expect(survey).toBeVisible();
+    }
+  );
+
   afterEach(() => {
     runtimeState.update = null;
 
