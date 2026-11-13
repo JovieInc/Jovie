@@ -141,7 +141,7 @@ export const BUTTON_PEN_PROPAGATION_FIXTURES = [
     route: '/artist-profiles',
     source: 'apps/web/components/site/MarketingTerminalCta.tsx',
     labelSource: 'apps/web/components/site/MarketingFinalCTA.tsx',
-    label: 'Request Access',
+    label: 'Claim your handle',
     variant: 'primary',
     size: 'lg',
   },

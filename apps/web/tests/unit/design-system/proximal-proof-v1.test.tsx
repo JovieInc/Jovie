@@ -3,14 +3,12 @@
 // "Claims need proximal, route-specific proof. Proof should support the
 // promise being made on that route, not generic proof inserted mechanically."
 //
-// The shipped homepage is invite-only: its one action ("Request an Invite")
-// scrolls to the waitlist form that closes the same page, and its proof is the
-// real template profile and releases workspace captures. Since Tim
-// (2026-11-12, "use me for now") the product UI shows his own catalog from
-// the featured-artist slot; the homepage-no-person-images guard owns which
-// person images may render. This receipt asserts the action stays bound to
-// the on-page form (no signup link while signup is closed) and that the hero
-// shows the product, not a person's capture.
+// The homepage closes on its claim entry, with every door routing into /start
+// (Tim, 2026-11-09). Its proof is the profile and releases workspace captures.
+// Since Tim (2026-11-12, "use me for now"), the product UI shows his own catalog
+// from the featured-artist slot; homepage-no-person-images owns which person
+// images may render. This receipt keeps the claim entry beside the promise
+// and verifies the hero shows the product, with no direct signup link.
 import { render, screen, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import {
@@ -24,13 +22,6 @@ import {
 
 vi.mock('@/lib/analytics', () => ({ track: vi.fn(), page: vi.fn() }));
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn() }) }));
-vi.mock('@/components/features/waitlist/WaitlistRoleForm', () => ({
-  WaitlistRoleForm: ({ title }: { title: string }) => (
-    <form data-testid='waitlist-role-form'>
-      <h2>{title}</h2>
-    </form>
-  ),
-}));
 vi.mock('next/image', () => ({
   default: (props: Record<string, unknown>) => {
     const { fill, priority, quality, ...rest } = props;
@@ -57,11 +48,12 @@ describe('JOV-INV-038 proximal-proof evaluator (homepage hero)', () => {
     expect(claim).toHaveTextContent(HOMEPAGE_EDITORIAL_COPY.hero.headline);
 
     const action = within(hero).getByTestId('homepage-primary-cta');
-    expect(action).toHaveAttribute('href', `#${HOMEPAGE_INVITE_ANCHOR}`);
+    expect(action).toHaveAttribute('href', '/start');
+    // The claim entry stays proximal: it closes the same page as the promise.
     const target = container.querySelector(`#${HOMEPAGE_INVITE_ANCHOR}`);
     expect(target).not.toBeNull();
     expect(
-      within(target as HTMLElement).getByTestId('waitlist-role-form')
+      within(target as HTMLElement).getByTestId('homepage-claim-entry')
     ).toBeInTheDocument();
   });
 
@@ -75,9 +67,7 @@ describe('JOV-INV-038 proximal-proof evaluator (homepage hero)', () => {
     })) {
       expect(image).toHaveAccessibleName(/^Jovie for Mac:/);
     }
-    expect(
-      hero.querySelector('a[href="/start"], a[href="/signup"]')
-    ).toBeNull();
+    expect(hero.querySelector('a[href="/signup"]')).toBeNull();
     expect(
       screen.queryByText(/Claimed|Verified customer|Illustrative/i)
     ).toBeNull();

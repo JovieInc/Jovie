@@ -56,15 +56,16 @@ async function gotoHomepage(page: PlaywrightPage) {
   throw new Error('Homepage rendered a transient Next.js dev overlay');
 }
 
-// Editorial homepage (Tim, 2026-11-03): the music-line hero, the profile and
-// releases chapters, then the role waitlist form. Invite-only, no prices.
+// Editorial homepage (Tim, 2026-11-03; Tim, 2026-11-09 one front door): the
+// locked hero, the profile and releases chapters, then the claim entry that
+// routes into /start. No prices.
 test.describe('Homepage', () => {
   test.beforeEach(async ({ page }) => {
     await interceptAnalytics(page);
     await gotoHomepage(page);
   });
 
-  test('renders the locked headline with one invite action and a live-profile link', async ({
+  test('renders the locked headline with the claim action and a live-profile link', async ({
     page,
   }) => {
     const hero = page.getByTestId('marketing-section-hero');
@@ -75,7 +76,7 @@ test.describe('Homepage', () => {
 
     const cta = page.getByTestId('homepage-primary-cta');
     await expect(cta).toHaveText(COPY.hero.primaryAction);
-    await expect(cta).toHaveAttribute('href', `#${HOMEPAGE_INVITE_ANCHOR}`);
+    await expect(cta).toHaveAttribute('href', '/start');
     const live = page.getByTestId('homepage-hero-live-profile');
     await expect(live).toHaveText(COPY.hero.secondaryAction);
     await expect(live).toHaveAttribute(
@@ -85,36 +86,25 @@ test.describe('Homepage', () => {
     await expect(page.getByPlaceholder('Search your name')).toHaveCount(0);
   });
 
-  test('offers no signup path and no prices while invite-only', async ({
-    page,
-  }) => {
-    await expect(
-      page.locator(
-        'main a:visible[href*="/signup"], main a:visible[href*="/start"], main a:visible[href*="/claim"]'
-      )
-    ).toHaveCount(0);
-    await expect(page.locator('#homepage-claim-handle')).toHaveCount(0);
+  test('offers no signup path and no prices', async ({ page }) => {
+    await expect(page.locator('main a:visible[href*="/signup"]')).toHaveCount(
+      0
+    );
     await expect(page.locator('main')).not.toContainText(/\$\d/);
   });
 
-  test('the hero action scrolls to the role waitlist form', async ({
+  test('closes on the claim entry that routes into /start', async ({
     page,
   }) => {
-    await page.getByTestId('homepage-primary-cta').click();
-    await expect(page).toHaveURL(new RegExp(`#${HOMEPAGE_INVITE_ANCHOR}$`));
-    const form = page
-      .locator(`#${HOMEPAGE_INVITE_ANCHOR}`)
-      .getByTestId('waitlist-role-form');
-    await expect(form).toBeInViewport();
-    await expect(form.getByRole('radio').first()).toBeVisible();
-    expect(await form.getByRole('radio').count()).toBeGreaterThan(1);
-    await expect(form.getByLabel('Email address')).toBeVisible();
-    await expect(
-      form.getByRole('heading', { name: COPY.invite.headline })
-    ).toBeVisible();
+    const close = page.locator(`#${HOMEPAGE_INVITE_ANCHOR}`);
+    await expect(close.getByTestId('homepage-claim-entry')).toHaveAttribute(
+      'action',
+      '/start'
+    );
+    await expect(close.locator('input[name="handle"]')).toBeVisible();
   });
 
-  test('mounts hero, profile, releases, and the invitation close in order', async ({
+  test('mounts hero, profile, releases, and the claim close in order', async ({
     page,
   }) => {
     const headings = await page
@@ -153,10 +143,10 @@ test.describe('Homepage', () => {
       'href',
       '/signin'
     );
-    // Invite-only: the header action scrolls to the on-page invitation form.
+    // One front door: the header action routes into /start.
     await expect(
-      header.getByRole('link', { name: 'Request an Invite' })
-    ).toHaveAttribute('href', `/#${HOMEPAGE_INVITE_ANCHOR}`);
+      header.getByRole('link', { name: 'Claim your handle' })
+    ).toHaveAttribute('href', '/start');
     await expect(
       header.getByRole('link', { name: 'Request access' })
     ).toHaveCount(0);
@@ -453,12 +443,12 @@ test.describe('Homepage without JavaScript', () => {
       });
       await expect(page.getByTestId('homepage-primary-cta')).toHaveAttribute(
         'href',
-        `#${HOMEPAGE_INVITE_ANCHOR}`
+        '/start'
       );
       await expect(
         page
           .locator(`#${HOMEPAGE_INVITE_ANCHOR}`)
-          .getByTestId('waitlist-role-form')
+          .getByTestId('homepage-claim-entry')
       ).toBeAttached();
     } finally {
       await context.close();

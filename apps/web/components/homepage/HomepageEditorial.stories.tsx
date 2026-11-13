@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
+import { expect, userEvent, within } from 'storybook/test';
 import { HOMEPAGE_EDITORIAL_COPY } from '@/data/homepageEditorialCopy';
 import {
   HomepageInviteClose,
@@ -8,8 +9,9 @@ import {
 } from './HomepageEditorial';
 
 /**
- * The editorial homepage (Tim, 2026-11-03): the locked line, the jov.ie/you
- * profile, the releases workspace, then the role waitlist form.
+ * The editorial homepage (Tim, 2026-11-03; Tim, 2026-11-09 one front door):
+ * the locked line, the jov.ie/you profile, the releases workspace, then the
+ * claim entry.
  */
 const meta = {
   title: 'Marketing/HomepageEditorial',
@@ -19,7 +21,7 @@ const meta = {
     docs: {
       description: {
         component:
-          'Invite-only homepage chapters. The hero action scrolls to the on-page role waitlist form; product imagery comes from the screenshot registry.',
+          'Homepage chapters. The hero action claims your handle at /start; product imagery comes from the screenshot registry.',
       },
     },
   },
@@ -39,8 +41,40 @@ export const Releases: Story = {
   render: () => <HomepageReleasesChapter />,
 };
 
-export const InviteClose: Story = {
+export const ClaimClose: Story = {
   render: () => <HomepageInviteClose />,
+};
+
+/** getLiveContent uses these code defaults when published copy is unavailable. */
+export const ErrorPublishedCopyUnavailable: Story = {
+  render: () => <HomepageInviteClose copy={HOMEPAGE_EDITORIAL_COPY.invite} />,
+  parameters: {
+    docs: {
+      description: {
+        story:
+          'The content-store error fallback keeps the default claim entry available. Store fallback behavior is covered in store.server.test.ts.',
+      },
+    },
+  },
+};
+
+/**
+ * Offline, this native form stays editable before navigation. The real
+ * offline-browser case in marketing-headings-visual.spec.ts verifies that
+ * environment; navigation failures belong to the browser and /start.
+ */
+export const OfflineClaimEntry: Story = {
+  render: () => <HomepageInviteClose />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const input = canvas.getByRole('textbox', { name: 'Your handle' });
+    await userEvent.type(input, 'myhandle');
+    await expect(input).toHaveValue('myhandle');
+    await expect(input).toHaveFocus();
+    await expect(
+      canvas.getByRole('button', { name: 'Claim your handle' })
+    ).toBeEnabled();
+  },
 };
 
 /**

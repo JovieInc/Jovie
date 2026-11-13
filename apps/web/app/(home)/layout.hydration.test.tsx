@@ -51,10 +51,10 @@ describe('(home) layout hydration', () => {
     expect(await renderHtml(null)).toContain('geist-mono-var home-viewport');
   });
 
-  it('always renders the homepage page-contract marker and the invite CTA', async () => {
+  it('always renders the homepage page-contract marker and the /start claim CTA', async () => {
     const html = await renderHtml(null);
     expect(html).toContain('data-primary-cta="true"');
-    expect(html).toContain('href="/#request-invite"');
-    expect(html).not.toContain('href="/start"');
+    expect(html).toContain('href="/start"');
+    expect(html).not.toContain('href="/#request-invite"');
   });
 });

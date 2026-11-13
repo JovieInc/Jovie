@@ -93,10 +93,10 @@ describe('homepage frames', { timeout: 60_000 }, () => {
     );
     // US spelling throughout.
     expect(container.textContent).not.toMatch(/recognis/i);
-    // 04: the email field spans the role chips; the scrolled nav is opaque.
+    // 04: the claim row spans the panel width; the scrolled nav is opaque.
     const form = strip('components/homepage/v3/form.css');
     expect(form).toMatch(
-      /@media \(min-width: 48rem\)\s*\{\s*\.hv3-form > div\s*\{\s*width: fit-content;\s*max-width: 100%;\s*\}\s*\.hv3-form \[data-slot="inline-subscribe"\]\s*\{\s*width: 100%;/
+      /\.hv3-form \.hv3-claim\s*\{\s*display: flex;\s*align-items: center;\s*gap: 0\.5rem;\s*width: min\(28\.75rem, calc\(100vw - 4rem\)\);\s*margin: 0 auto;/
     );
     expect(form).toMatch(
       /\.home-viewport \.header-nav--docked\s*\{\s*--marketing-dock-glass: var\(--noir-ion-shell\);/

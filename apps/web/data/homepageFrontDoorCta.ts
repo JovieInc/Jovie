@@ -5,12 +5,12 @@ export const HOMEPAGE_REQUEST_ACCESS_STARTER_PROMPT =
   'Hey, I want to get access to Jovie.';
 
 /**
- * Canonical public acquisition destination for waitlist-on marketing CTAs.
- * Lands on `/signup` (working AuthShell, same-origin) rather than `/waitlist`,
- * which 404s for several authenticated and half-provisioned states (JOV-6436).
- * Durable waitlist receipts stay on `APP_ROUTES.WAITLIST`.
+ * Canonical public acquisition destination for marketing CTAs. Every door
+ * routes into `/start` (the chat onboarding), which admits or reserves
+ * server-side; nothing lands on `/signup` or `/waitlist` from marketing
+ * surfaces. Durable waitlist receipts stay on `APP_ROUTES.WAITLIST`.
  */
-export const PUBLIC_WAITLIST_URL = APP_ROUTES.SIGNUP;
+export const PUBLIC_WAITLIST_URL = APP_ROUTES.START;
 
 /** Stable variant identity for the splash-B waitlist-first handoff. */
 export const WAITLIST_FRONT_DOOR_VARIANT_ID =
@@ -48,28 +48,19 @@ export interface HomepageFrontDoorCtaContract {
 export function getHomepageFrontDoorCtaContract(
   waitlistEnabled: boolean
 ): HomepageFrontDoorCtaContract {
-  if (waitlistEnabled) {
-    return {
-      // Claim, not a request: the paid profile is self-serve
-      // (EVENT: Tim, 2026-10-20). Signup still runs the post-auth waitlist gate.
-      primary: {
-        label: 'Claim your profile',
-        href: PUBLIC_WAITLIST_URL,
-      },
-      secondary: null,
-      fallbackSupport: 'Free to start. Reserve your name now.',
-    };
-  }
-
+  // One front door (Tim, 2026-11-09): both modes resolve the same claim
+  // CTA into /start; the server-side gate decides admit vs reserve. The
+  // secondary stays the quiet live-profile proof path in both modes.
+  void waitlistEnabled;
   return {
     primary: {
-      label: 'Claim your free profile',
+      label: 'Claim your handle',
       href: buildHomepageStartHref(),
     },
     secondary: {
       label: 'See a live profile',
       href: TIM_WHITE_PROFILE.publicProfilePath,
     },
-    fallbackSupport: 'Free forever. No credit card.',
+    fallbackSupport: 'Free to start. Reserve your name now.',
   };
 }

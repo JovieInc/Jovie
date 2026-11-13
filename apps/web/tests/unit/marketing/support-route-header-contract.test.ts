@@ -1,7 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { HOMEPAGE_INVITE_ANCHOR } from '@/data/homepageEditorialCopy';
 import { HOME_MARKETING_HEADER_CTA } from '@/data/marketing/headerCta';
 
 function readWebSource(path: string): string {
@@ -37,24 +36,23 @@ describe('support route header contract', () => {
     expect(headerSource).toContain(
       'getHomepageFrontDoorCtaContract(FEATURE_FLAGS.WAITLIST_ENABLED).primary'
     );
-    // JOV-6860: every marketing-header route shares the waitlist-mode
-    // front-door CTA via the single resolver; no per-route CTA overrides
-    // other than the locked homepage entry.
+    // JOV-6860: every marketing-header route shares the front-door CTA via
+    // the single resolver; no per-route CTA overrides other than the locked
+    // homepage entry.
     expect(headerSource).toContain('resolveMarketingHeaderPrimaryCta');
     expect(headerSource).toContain(
       'getHomepageFrontDoorCtaContract(waitlistEnabled).primary'
     );
     expect(headerSource).not.toContain('MARKETING_CTA_INTENTS');
     expect(headerSource).not.toContain('APP_ROUTES.ARTIST_PROFILES]:');
-    // Homepage conversion lock (JOV-5085, label EVENT 2026-11-03): / is
-    // invite-only, so its header action scrolls to the on-page invitation
-    // form; other routes keep the front-door CTA.
+    // Homepage header CTA (Tim, 2026-11-09: one front door): / routes into
+    // /start like every other door.
     expect(headerSource).toContain(
       '[APP_ROUTES.HOME]: HOME_MARKETING_HEADER_CTA'
     );
     expect(HOME_MARKETING_HEADER_CTA).toEqual({
-      label: 'Request an Invite',
-      href: `/#${HOMEPAGE_INVITE_ANCHOR}`,
+      label: 'Claim your handle',
+      href: '/start',
     });
     expect(headerSource).toContain("treatment: 'wordmark'");
     expect(headerSource).toContain('MARKETING_NAV_LINKS.map');
@@ -156,7 +154,7 @@ describe('prerendered homepage pathname', () => {
 });
 
 describe('homepage header CTA', () => {
-  it('MarketingHeader.tsx can hide the primary CTA for the invite-only homepage', async () => {
+  it('MarketingHeader.tsx can hide the primary CTA for hero-owned pages', async () => {
     const { readFileSync } = await import('node:fs');
     const { resolve } = await import('node:path');
     const source = readFileSync(

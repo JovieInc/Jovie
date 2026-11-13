@@ -6,9 +6,10 @@ import { MARKETING_PAGE_CONTRACTS } from '@/data/marketing/pageContracts';
 
 /**
  * JOV-6860: the marketing header's primary CTA label must come from the one
- * waitlist-mode front-door source on every route. Per-route divergence (the
- * artist-profiles "Get started" drift) fails here. The homepage claim
- * → /start lock (JOV-5085) is the only sanctioned override.
+ * front-door source on every route. Per-route divergence (the
+ * artist-profiles "Get started" drift) fails here. The homepage entry is the
+ * one sanctioned override, and it routes into /start like the shared CTA
+ * (Tim, 2026-11-09: one front door).
  */
 const HEADER_MANIFEST_ROUTES = Object.values(MARKETING_PAGE_CONTRACTS)
   .map(contract => contract.url)
@@ -37,22 +38,20 @@ describe('marketing header CTA consistency', () => {
     });
   }
 
-  it('keeps the homepage header on the on-page invitation form in both modes', () => {
-    // Signup is invite-only (PUBLIC_SIGNUP_CLOSED): the homepage header
-    // scrolls to the homepage's own role waitlist form, like the hero.
+  it('keeps the homepage header on the /start claim in both modes', () => {
     for (const waitlistEnabled of [true, false]) {
       expect(
         resolveMarketingHeaderPrimaryCta(APP_ROUTES.HOME, waitlistEnabled)
-      ).toEqual({ label: 'Request an Invite', href: '/#request-invite' });
+      ).toEqual({ label: 'Claim your handle', href: APP_ROUTES.START });
     }
   });
 
-  it('keeps artist-profiles on the shared waitlist CTA', () => {
+  it('keeps artist-profiles on the shared claim CTA', () => {
     expect(
       resolveMarketingHeaderPrimaryCta(APP_ROUTES.ARTIST_PROFILES, true)
-    ).toEqual({ label: 'Claim your profile', href: APP_ROUTES.SIGNUP });
+    ).toEqual({ label: 'Claim your handle', href: APP_ROUTES.START });
     expect(
       resolveMarketingHeaderPrimaryCta(APP_ROUTES.ARTIST_PROFILE_LEGACY, true)
-    ).toEqual({ label: 'Claim your profile', href: APP_ROUTES.SIGNUP });
+    ).toEqual({ label: 'Claim your handle', href: APP_ROUTES.START });
   });
 });

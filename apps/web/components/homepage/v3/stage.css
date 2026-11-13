@@ -94,10 +94,11 @@
 
 .hv3-statement {
   font-family: var(--hv3-display);
-  font-size: 4.5rem;
+  /* Section titles stay subordinate to the two-line claim headline. */
+  font-size: clamp(2rem, 4vw, 3.5rem);
   font-weight: 500;
   letter-spacing: -0.035em;
-  line-height: 4.5rem;
+  line-height: 1.05;
 }
 
 .hv3-line {

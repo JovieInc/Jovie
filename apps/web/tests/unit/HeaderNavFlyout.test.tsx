@@ -53,9 +53,9 @@ describe('HeaderNav flyout interactions', () => {
     // Default public CTA (no publicCta override) follows the front-door contract.
     // MarketingHeader supplies route-specific CTA labels separately.
     expect(
-      screen.getByRole('link', { name: 'Claim your profile' })
-    ).toHaveAttribute('href', '/signup');
-    const publicCta = screen.getByRole('link', { name: 'Claim your profile' });
+      screen.getByRole('link', { name: 'Claim your handle' })
+    ).toHaveAttribute('href', '/start');
+    const publicCta = screen.getByRole('link', { name: 'Claim your handle' });
     expect(publicCta).not.toHaveAttribute('data-pen-contract');
     expect(publicCta).toHaveAttribute('data-variant', 'primary');
     expect(publicCta).toHaveAttribute('data-size', 'marketing');

@@ -11,40 +11,33 @@ import { MARKETING_PRICING_PLANS } from '@/data/marketingPricingPlans';
 import { TIM_WHITE_PROFILE } from '@/lib/tim-white';
 
 describe('auth front-door contract', () => {
-  it('keeps waitlist-on front-door CTAs on the claim label, routed to signup', () => {
-    const contract = getHomepageFrontDoorCtaContract(true);
+  it('keeps both front-door modes on the one claim CTA routed into /start', () => {
+    for (const waitlistEnabled of [true, false]) {
+      const contract = getHomepageFrontDoorCtaContract(waitlistEnabled);
 
-    expect(PUBLIC_WAITLIST_URL).toBe(APP_ROUTES.SIGNUP);
-    expect(contract.primary).toEqual({
-      label: 'Claim your profile',
-      href: APP_ROUTES.SIGNUP,
-    });
-    expect(contract.primary.href).not.toBe(APP_ROUTES.WAITLIST);
-    expect(contract.secondary).toBeNull();
-    expect(contract.fallbackSupport).toBe(
-      'Free to start. Reserve your name now.'
-    );
-    // Retired with the self-serve offer (EVENT: Tim, 2026-10-20).
-    expect(contract.primary.label).not.toMatch(/request access/i);
-    expect(contract.fallbackSupport).not.toMatch(/limited/i);
+      // One front door (Tim, 2026-11-09): every mode resolves the same
+      // claim CTA into /start; the server gate decides admit vs reserve.
+      expect(contract.primary).toEqual({
+        label: 'Claim your handle',
+        href: APP_ROUTES.START,
+      });
+      expect(PUBLIC_WAITLIST_URL).toBe(APP_ROUTES.START);
+      expect(contract.primary.href).not.toBe(APP_ROUTES.WAITLIST);
+      expect(contract.secondary).toEqual({
+        label: 'See a live profile',
+        href: TIM_WHITE_PROFILE.publicProfilePath,
+      });
+      expect(contract.fallbackSupport).toBe(
+        'Free to start. Reserve your name now.'
+      );
+      // Retired with the self-serve offer (EVENT: Tim, 2026-10-20).
+      expect(contract.primary.label).not.toMatch(/request access/i);
+      expect(contract.fallbackSupport).not.toMatch(/limited/i);
+    }
   });
 
-  it('keeps waitlist-off homepage CTAs in open-signup mode', () => {
-    const contract = getHomepageFrontDoorCtaContract(false);
-
-    expect(contract.primary).toEqual({
-      label: 'Claim your free profile',
-      href: APP_ROUTES.START,
-    });
-    expect(contract.secondary).toEqual({
-      label: 'See a live profile',
-      href: TIM_WHITE_PROFILE.publicProfilePath,
-    });
-    expect(contract.fallbackSupport).toBe('Free forever. No credit card.');
-  });
-
-  it('keeps free acquisition on signup, claims on the qualify chat, and Pro on the self-serve claim checkout', () => {
-    expect(HOMEPAGE_FRONT_DOOR_CTA.primary.href).toBe(APP_ROUTES.SIGNUP);
+  it('keeps free acquisition off the marketing doors, claims on the qualify chat, and Pro on the self-serve claim checkout', () => {
+    expect(HOMEPAGE_FRONT_DOOR_CTA.primary.href).toBe(APP_ROUTES.START);
     // Claims enter the /start qualify chat (Tim 2026-09-28, JOV-3379).
     expect(MARKETING_CTA_INTENTS.claimProfile.href).toBe(APP_ROUTES.START);
     expect(

@@ -178,10 +178,7 @@ export default async function ChangelogPage() {
         </div>
       </MarketingContainer>
 
-      <MarketingFooterCta
-        ctaLabel='Request an Invite'
-        ctaHref='/#request-invite'
-      />
+      <MarketingFooterCta ctaLabel='Claim your handle' ctaHref='/start' />
     </div>
   );
 }

@@ -34,6 +34,27 @@ describe('canonical offer facts', () => {
 });
 
 describe('registered claims', () => {
+  it('keeps the homepage free-start note conditional on a free start without a card', () => {
+    expect(claim('profile.free_start_note')).toBe(
+      'free to start · no credit card'
+    );
+    expect(
+      claim('profile.free_start_note', {
+        ...OFFER,
+        trial: { ...OFFER.trial, requiresCard: true },
+      } as unknown as Offer)
+    ).toBeNull();
+    expect(
+      claim('profile.free_start_note', {
+        ...OFFER,
+        plans: {
+          ...OFFER.plans,
+          free: { ...OFFER.plans.free, amountCents: 100 },
+        },
+      } as unknown as Offer)
+    ).toBeNull();
+  });
+
   it('renders the current offer', () => {
     expect(claim('price.pro')).toBe('Artist Presence is $12/month.');
     expect(claim('trial.summary')).toBe(

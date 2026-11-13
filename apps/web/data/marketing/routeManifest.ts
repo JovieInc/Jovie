@@ -308,7 +308,7 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
     bindingEvidence: {
       status: 'verified',
       source:
-        'Tim 2026-11-03 music-line homepage, invite-only close (HomepageEditorial.tsx); homepage-contract render test; marketing-route-health observer on the reviewed head',
+        'Tim 2026-11-03 music-line homepage, claim close (HomepageEditorial.tsx); homepage-contract render test; marketing-route-health observer on the reviewed head',
       notes:
         'One source owner for the hero, the profile and releases chapters, and the invitation close. Deployment, visual certification, and Tim Taste remain separate receipts.',
     },

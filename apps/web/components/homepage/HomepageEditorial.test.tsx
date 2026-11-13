@@ -46,7 +46,7 @@ describe('HomepageEditorial chapters', () => {
     ).toHaveAttribute('id', 'home-hero-heading');
     expect(screen.getByTestId('homepage-primary-cta')).toHaveAttribute(
       'href',
-      `#${HOMEPAGE_INVITE_ANCHOR}`
+      '/start'
     );
     expect(screen.getByTestId('homepage-hero-live-profile')).toHaveAttribute(
       'href',
@@ -122,7 +122,7 @@ describe('HomepageEditorial chapters', () => {
     await expectNoA11yViolations(container);
   });
 
-  it('closes on the invite form and the three numbered steps', async () => {
+  it('closes on the claim form and the three numbered steps', async () => {
     const { container } = render(<HomepageInviteClose />);
 
     const section = screen.getByTestId('marketing-section-cta');
@@ -178,7 +178,7 @@ describe('HomepageEditorial chapters', () => {
     await expectNoA11yViolations(container);
   });
 
-  it('keeps the invitation action by default and enters /start when HOMEPAGE_START_CTA is on', async () => {
+  it('keeps the claim action and free-start note in both legacy flag modes', async () => {
     const off = render(<HomepageStoryHero />);
     const invite = screen.getByTestId('homepage-primary-cta');
     expect(invite).toHaveAttribute('href', COPY.hero.primaryHref);
@@ -194,9 +194,8 @@ describe('HomepageEditorial chapters', () => {
       expect(start).toHaveAttribute('href', '/start');
       expect(start).toHaveAttribute('href', claim.href);
       expect(start).toHaveAttribute('data-primary-action', 'true');
-      expect(start).toHaveTextContent(claim.label);
-      // The note describes the invitation form, so it leaves with that action.
-      expect(screen.queryByText(COPY.hero.note)).not.toBeInTheDocument();
+      expect(start).toHaveTextContent(COPY.hero.primaryAction);
+      expect(screen.getByText(COPY.hero.note)).toBeInTheDocument();
       expect(screen.getByTestId('homepage-hero-live-profile')).toHaveAttribute(
         'href',
         COPY.hero.secondaryHref
@@ -206,4 +205,31 @@ describe('HomepageEditorial chapters', () => {
       vi.unstubAllEnvs();
     }
   });
+});
+
+it('keeps the handle and focus through a parent update, Escape, and blur', async () => {
+  const user = userEvent.setup();
+  const { container, rerender } = render(<HomepageInviteClose />);
+  const input = screen.getByRole('textbox', { name: 'Your handle' });
+  await user.type(input, 'myhandle');
+  rerender(
+    <HomepageInviteClose
+      copy={{ headline: 'Claim your handle.', subhead: 'Your page is ready.' }}
+    />
+  );
+  expect(input).toHaveValue('myhandle');
+  expect(input).toHaveFocus();
+  await user.keyboard('{Escape}');
+  expect(input).toHaveValue('myhandle');
+  expect(input).toHaveFocus();
+  await user.tab();
+  expect(input).toHaveValue('myhandle');
+  expect(
+    screen.getByRole('button', { name: 'Claim your handle' })
+  ).toHaveFocus();
+  const form = container.querySelector('form');
+  expect(form).toHaveAttribute('action', '/start');
+  expect(form).toHaveAttribute('method', 'get');
+  expect(new FormData(form ?? undefined).get('handle')).toBe('myhandle');
+  await expectNoA11yViolations(container);
 });

@@ -11,6 +11,7 @@ import { OFFER, type Offer } from './offer';
 
 export type ClaimId =
   | 'price.free'
+  | 'profile.free_start_note'
   | 'price.pro'
   | 'currency'
   | 'trial.summary'
@@ -39,6 +40,13 @@ const money = (cents: number): string =>
 const trialOn = (o: Offer): boolean => o.trial.enabled;
 
 const DEFS: readonly ClaimDef[] = [
+  {
+    id: 'profile.free_start_note',
+    appliesTo: o =>
+      o.plans.free.amountCents === 0 &&
+      (!o.trial.enabled || !o.trial.requiresCard),
+    render: () => 'free to start · no credit card',
+  },
   {
     id: 'price.free',
     appliesTo: () => true,

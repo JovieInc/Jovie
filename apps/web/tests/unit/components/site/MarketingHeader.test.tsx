@@ -199,10 +199,10 @@ describe('MarketingHeader', () => {
       'href',
       '/signin'
     );
-    // The shared public CTA follows the waitlist-on front-door contract on /signup.
+    // The shared public CTA follows the front-door contract into /start.
     expect(
-      screen.getByRole('link', { name: 'Claim your profile' })
-    ).toHaveAttribute('href', '/signup');
+      screen.getByRole('link', { name: 'Claim your handle' })
+    ).toHaveAttribute('href', '/start');
   });
 
   it('orders Customers, Product, and Pricing after the wordmark', () => {
@@ -253,14 +253,14 @@ describe('MarketingHeader', () => {
     ).toHaveLength(0);
   });
 
-  it('uses the one invite CTA on the invite-only homepage header', () => {
+  it('routes the homepage header CTA into /start', () => {
     mockUsePathname.mockReturnValue('/');
     render(<MarketingHeader />);
 
-    const ctas = screen.getAllByRole('link', { name: 'Request an Invite' });
+    const ctas = screen.getAllByRole('link', { name: 'Claim your handle' });
     expect(ctas.length).toBeGreaterThanOrEqual(1);
     for (const cta of ctas) {
-      expect(cta).toHaveAttribute('href', '/#request-invite');
+      expect(cta).toHaveAttribute('href', '/start');
     }
     expect(
       screen.queryByRole('link', { name: 'Claim your profile' })
@@ -280,8 +280,8 @@ describe('MarketingHeader', () => {
       'marketing-glass'
     );
     expect(
-      screen.getByRole('link', { name: 'Claim your profile' })
-    ).toHaveAttribute('href', '/signup');
+      screen.getByRole('link', { name: 'Claim your handle' })
+    ).toHaveAttribute('href', '/start');
     expect(screen.queryByRole('link', { name: 'Get started' })).toBeNull();
   });
 
@@ -312,8 +312,8 @@ describe('MarketingHeader', () => {
       '/product'
     );
     expect(
-      screen.getByRole('link', { name: 'Request an Invite' })
-    ).toHaveAttribute('href', '/#request-invite');
+      screen.getByRole('link', { name: 'Claim your handle' })
+    ).toHaveAttribute('href', '/start');
   });
 
   it('docks with no glass at the top and fades it in once the sentinel scrolls away', () => {

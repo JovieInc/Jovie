@@ -1,9 +1,5 @@
-// Homepage start CTA (HOMEPAGE_START_CTA, default off). Public signup
-// reopened on 2026-11-09 (canon/PRODUCT.md), so with the flag on the hero's
-// primary action enters the one onboarding flow at /start, which is what the
-// production certification check `stranger-homepage-signup-entry`
-// (scripts/lib/prod-cert-truth.mjs) looks for in the homepage HTML. Off, the
-// page is the invite-only story pinned by homepage-contract.test.tsx.
+// One front door: the homepage always enters /start. Legacy CTA and signup
+// flags control downstream availability, not the public claim entry.
 import { render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { signupEntries } from '../../../../../scripts/lib/prod-cert-truth.mjs';
@@ -62,20 +58,20 @@ describe('homepage start CTA flag', { timeout: 60_000 }, () => {
     vi.resetModules();
   });
 
-  it('is off by default: the hero scrolls to the invitation form and nothing links to signup', async () => {
+  it('claims a handle through /start with the legacy flag off by default', async () => {
     const { CODE_FLAGS } = await import('@/lib/flags/code-flags');
     expect(CODE_FLAGS.HOMEPAGE_START_CTA).toBe(false);
-    const { copy, anchor } = await load();
+    const { copy } = await load();
     const { container } = await renderHomePage();
 
     const primary = screen.getByTestId('homepage-primary-cta');
-    expect(primary).toHaveAttribute('href', `#${anchor}`);
+    expect(primary).toHaveAttribute('href', '/start');
     expect(primary).toHaveTextContent(copy.hero.primaryAction);
     expect(screen.getByText(copy.hero.note)).toBeInTheDocument();
-    expect(signupEntries(container.innerHTML)).toEqual([]);
+    expect(signupEntries(container.innerHTML)).toEqual(['/start']);
   });
 
-  it('on: the hero primary action is the shared claim-profile intent into /start', async () => {
+  it('keeps the claim-handle action and form when the legacy flag is on', async () => {
     vi.stubEnv('FEATURE_HOMEPAGE_START_CTA', 'true');
     const { copy, anchor, claim } = await load();
     const { container } = await renderHomePage();
@@ -83,15 +79,14 @@ describe('homepage start CTA flag', { timeout: 60_000 }, () => {
     const primary = screen.getByTestId('homepage-primary-cta');
     expect(claim.href).toBe('/start');
     expect(primary).toHaveAttribute('href', claim.href);
-    expect(primary).toHaveTextContent(claim.label);
+    expect(primary).toHaveTextContent('Claim your handle');
     expect(
       container.querySelectorAll('[data-primary-action="true"]')
     ).toHaveLength(1);
     // What the stranger certification check reads from the homepage HTML.
     expect(signupEntries(container.innerHTML)).toEqual(['/start']);
 
-    // The note under the actions describes the invitation form, so it goes.
-    expect(screen.queryByText(copy.hero.note)).not.toBeInTheDocument();
+    expect(screen.getByText(copy.hero.note)).toBeInTheDocument();
     // The locked headline, the secondary action and the form are untouched.
     expect(
       screen.getByRole('heading', { level: 1, name: copy.hero.headline })
@@ -101,20 +96,20 @@ describe('homepage start CTA flag', { timeout: 60_000 }, () => {
       copy.hero.secondaryHref
     );
     const close = container.querySelector(`#${anchor}`);
-    expect(
-      close?.querySelector('[data-testid="waitlist-role-form"]')
-    ).not.toBeNull();
+    const form = close?.querySelector('[data-testid="homepage-claim-entry"]');
+    expect(form).toHaveAttribute('method', 'get');
+    expect(form).toHaveAttribute('action', '/start');
   });
 
-  it('on, but public signup closed: the hero keeps the invitation action', async () => {
+  it('keeps /start as the front door while signup availability is gated downstream', async () => {
     vi.stubEnv('FEATURE_HOMEPAGE_START_CTA', 'true');
     vi.stubEnv('FEATURE_PUBLIC_SIGNUP_CLOSED', 'true');
-    const { copy, anchor } = await load();
+    const { copy } = await load();
     const { container } = await renderHomePage();
 
     const primary = screen.getByTestId('homepage-primary-cta');
-    expect(primary).toHaveAttribute('href', `#${anchor}`);
+    expect(primary).toHaveAttribute('href', '/start');
     expect(primary).toHaveTextContent(copy.hero.primaryAction);
-    expect(signupEntries(container.innerHTML)).toEqual([]);
+    expect(signupEntries(container.innerHTML)).toEqual(['/start']);
   });
 });

@@ -1,5 +1,5 @@
-/* Homepage v3: the invitation form (WaitlistRoleForm, chips) and the footer
-   (MarketingFooter) in the approved presentation. */
+/* Homepage v3: the claim entry and the footer (MarketingFooter) in the
+   approved presentation. */
 
 .hv3-form {
   display: flex;
@@ -11,8 +11,24 @@
   gap: 1rem;
 }
 
-/* The role group keeps its label for assistive tech; the design shows chips only. */
-.hv3-form .waitlist-chips__label {
+/* The claim entry: one handle input with its submit in one row, the same
+   panel treatment the form always had. A plain GET form: it lands on
+   /start?handle=<name>. */
+.hv3-form .hv3-claim {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: min(28.75rem, calc(100vw - 4rem));
+  margin: 0 auto;
+  padding: 0.375rem;
+  border-radius: calc(var(--radius-sm) + var(--space-1-5));
+  background: var(--hv3-panel);
+  box-shadow: inset 0 0 0 1px var(--hv3-b2);
+}
+
+/* The input keeps its visible label in the placeholder; the real label is
+   for assistive tech only. */
+.hv3-form .hv3-claim__label {
   position: absolute;
   width: 1px;
   height: 1px;
@@ -21,91 +37,40 @@
   white-space: nowrap;
 }
 
-.hv3-form .waitlist-chips__row {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 0.5rem;
+.hv3-form .hv3-claim > div {
+  flex: 1;
   min-width: 0;
-  margin: 0;
-  padding: 0;
-  border: 0;
 }
 
-.hv3-form .waitlist-chips__break {
-  display: none;
-}
-
-.hv3-form .waitlist-chip {
-  display: grid;
-  place-items: center;
-  height: 2rem;
-  padding: 0 0.875rem;
-  border-radius: var(--radius-sm);
-  box-shadow: inset 0 0 0 1px var(--hv3-b2);
-  color: var(--hv3-t2);
-  cursor: pointer;
-  font-size: 0.8125rem;
-}
-
-.hv3-form .waitlist-chip[data-selected="true"] {
-  background: var(--hv3-floating);
-  box-shadow: inset 0 0 0 1px var(--hv3-b3);
-  color: var(--hv3-t1);
-}
-
-.hv3-form .waitlist-chip:has(:focus-visible) {
-  outline: 2px solid var(--color-border-focus);
-  outline-offset: 2px;
-}
-
-.hv3-form [data-slot="inline-subscribe"] {
-  width: 28.75rem;
-  min-height: 0;
-  margin: 0 auto;
-  padding: 0.375rem;
-  border: 0;
-  /* Concentric with the button inside it: its radius plus the padding. */
-  border-radius: calc(var(--radius-sm) + var(--space-1-5));
-  background: var(--hv3-panel);
-  box-shadow: inset 0 0 0 1px var(--hv3-b2);
-}
-
-.hv3-form [data-slot="inline-subscribe"] input {
+.hv3-form .hv3-claim input {
+  height: 2.75rem;
   padding: 0 1rem;
+  border: 0;
+  background: transparent;
   color: var(--hv3-t1);
   font-size: 0.9375rem;
 }
 
-.hv3-form [data-slot="inline-subscribe"] input::placeholder {
+.hv3-form .hv3-claim input::placeholder {
   color: var(--hv3-t4);
 }
 
-.hv3-form [data-slot="inline-subscribe"] button {
+.hv3-form .hv3-claim input:focus-visible {
+  outline: 2px solid var(--color-border-focus);
+  outline-offset: 2px;
+}
+
+.hv3-form .hv3-claim button {
+  flex-shrink: 0;
   height: 2.75rem;
   padding: 0 1.375rem;
+  border: 0;
   border-radius: var(--radius-sm);
   background: var(--hv3-t1);
   color: var(--hv3-canvas);
   font-size: 0.9375rem;
   font-weight: 500;
-}
-
-/* From tablet up, the email field spans exactly the role chips above it, so
-   both rows share their left and right edges. */
-@media (min-width: 48rem) {
-  .hv3-form > div {
-    width: fit-content;
-    max-width: 100%;
-  }
-
-  .hv3-form [data-slot="inline-subscribe"] {
-    width: 100%;
-  }
-}
-
-.hv3-form .waitlist-chips__error:empty {
-  display: none;
+  cursor: pointer;
 }
 
 /* ── Footer ───────────────────────────────────────────────────────── */
@@ -170,20 +135,12 @@
 }
 
 @media (max-width: 47.9375rem) {
-  .hv3-form [data-slot="inline-subscribe"] {
+  .hv3-form .hv3-claim {
     width: calc(100% - 2rem);
   }
 
-  .hv3-form [data-slot="inline-subscribe"] input {
-    min-width: 0;
-  }
-
-  .hv3-form [data-slot="inline-subscribe"] button {
+  .hv3-form .hv3-claim button {
     padding: 0 1rem;
-  }
-
-  .hv3-form .waitlist-chips__row {
-    padding: 0 var(--hv3-gutter);
   }
 
   .hv3-footer .public-container {

@@ -1,16 +1,16 @@
 // @coverage-via apps/web/tests/unit/home/homepage-contract.test.tsx
+import { Button, Input } from '@jovie/ui';
 import { ArrowRight } from 'lucide-react';
 import Link from 'next/link';
 import { Fragment, type ReactNode } from 'react';
-import { WaitlistRoleForm } from '@/components/features/waitlist/WaitlistRoleForm';
 import { HomepageProfilePhone } from '@/components/homepage/HomepageProfilePhone';
+import { APP_ROUTES } from '@/constants/routes';
 import {
   HOMEPAGE_EDITORIAL_COPY,
   HOMEPAGE_HEADLINE_BREAKS,
   HOMEPAGE_INVITE_ANCHOR,
 } from '@/data/homepageEditorialCopy';
 import { HOMEPAGE_LATEST_RELEASE } from '@/data/homepageProductUi';
-import { resolveHomepageHeroPrimaryAction } from '@/data/homepageStartCta';
 import { MARKETING_PEN_CONTRACT_IDS } from '@/data/marketing/penContracts';
 import { HOME_SPEC } from './v3/home-spec';
 import { Orbit } from './v3/Orbit';
@@ -70,7 +70,6 @@ export function HomepageStoryHero({
   copy = HOMEPAGE_EDITORIAL_COPY.hero,
   headingId = 'home-hero-heading',
 }: Readonly<{ copy?: HeroCopy; headingId?: string }>) {
-  const primary = resolveHomepageHeroPrimaryAction(copy);
   return (
     <section
       data-pen-section='hero'
@@ -92,13 +91,13 @@ export function HomepageStoryHero({
           <p className='hv3-lede marketing-hero-subtitle'>{copy.subhead}</p>
           <div className='hv3-ctas'>
             <Link
-              href={primary.href}
+              href={copy.primaryHref}
               prefetch={false}
               className='hv3-btn hv3-btn--primary'
               data-testid='homepage-primary-cta'
               data-primary-action='true'
             >
-              {primary.label}
+              {copy.primaryAction}
             </Link>
             <Link
               href={copy.secondaryHref}
@@ -110,9 +109,7 @@ export function HomepageStoryHero({
               <ArrowRight className='size-4' aria-hidden />
             </Link>
           </div>
-          {primary.showInviteNote ? (
-            <p className='hv3-mono hv3-hero__note'>{COPY.hero.note}</p>
-          ) : null}
+          <p className='hv3-mono hv3-hero__note'>{COPY.hero.note}</p>
         </div>
       </div>
       {/* Product mockups under the 3D camera: their boxes overlap by projection,
@@ -301,7 +298,11 @@ export function HomepageReleasesChapter({
   );
 }
 
-/** 04 invitation: the role waitlist form, the page's one conversion. */
+/**
+ * 04 claim: the handle entry, the page's one conversion. A plain GET form:
+ * it lands on /start?handle=<name>, where the onboarding chat shows the
+ * visitor's real page first (JOV-7753). No client JS.
+ */
 export function HomepageInviteClose({
   copy = HOMEPAGE_EDITORIAL_COPY.invite,
 }: Readonly<{
@@ -323,14 +324,30 @@ export function HomepageInviteClose({
         <h2 className='hv3-statement text-balance'>{lines(copy.headline)}</h2>
         <p className='hv3-lede hv3-lede--center'>{copy.subhead}</p>
         <div className='hv3-form'>
-          <WaitlistRoleForm
-            presentation='chips'
-            align='center'
-            headingLevel={2}
-            title={copy.headline}
-            roleLabel={invite.roleLabel}
-            submitLabel={invite.action}
-          />
+          <form
+            method='get'
+            action={APP_ROUTES.START}
+            data-testid='homepage-claim-entry'
+            className='hv3-claim'
+          >
+            <label
+              className='hv3-claim__label'
+              htmlFor='homepage-claim-entry-handle'
+            >
+              {invite.claimLabel}
+            </label>
+            <Input
+              id='homepage-claim-entry-handle'
+              name='handle'
+              type='text'
+              autoComplete='off'
+              spellCheck={false}
+              maxLength={30}
+              placeholder={invite.claimPlaceholder}
+              aria-label={invite.claimLabel}
+            />
+            <Button type='submit'>{invite.action}</Button>
+          </form>
         </div>
         <ol className='hv3-steps hv3-reveal'>
           {invite.steps.map((step, index) => (

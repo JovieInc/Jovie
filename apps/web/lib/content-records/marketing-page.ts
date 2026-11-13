@@ -3,6 +3,7 @@ import { z } from 'zod';
 import surfaceCensus from '@/data/designSystem/surfaceCensus.json';
 import { HOMEPAGE_EDITORIAL_COPY } from '@/data/homepageEditorialCopy';
 import { MARKETING_SECTIONS } from '@/data/marketing/sections';
+import { INVITATION_ACCESS_COPY } from '@/lib/copy/claim-front-door';
 import icpLanguage from '../../../../scripts/invariants/icp-language/config.json';
 import { experimentSchema } from './experiment';
 import type { ContentKindDefinition } from './kind';
@@ -19,12 +20,12 @@ import type { ContentKindDefinition } from './kind';
  * - Prices, plan names, and included features. Those come from offer truth
  *   and the entitlement registry (same price everywhere); copy slots reject
  *   currency and price-period text.
- * - Locked lines. The homepage headline ("Jovie helps you move your music
- *   forward.", Tim 2026-11-03) has no slot.
+ * - Locked lines. The homepage headline ("The page people find when they
+ *   look you up.", Tim 2026-11-09) has no slot.
  */
 
-// 2026-11-07: the editorial invite-only homepage replaced the artist-profile
-// claim sections. A record stored with the old section variants no longer
+// 2026-11-07: the editorial homepage replaced the artist-profile claim
+// sections. A record stored with the old section variants no longer
 // validates, so `getLiveContent` serves the code default below (source
 // 'incompatible') until a valid version is published.
 const MARKETING_PAGE_SPEC_SCHEMA_VERSION = 1;
@@ -150,7 +151,7 @@ export type MarketingPageSections = MarketingPageSpec['sections'];
 export const MARKETING_PAGE_KEYS = ['home'] as const;
 export type MarketingPageKey = (typeof MARKETING_PAGE_KEYS)[number];
 
-/** The code default: the editorial story, ending in the invitation form. */
+/** The code default: the editorial story, ending in the claim entry. */
 export const DEFAULT_HOME_SPEC: MarketingPageSpec = {
   sections: [
     {
@@ -244,6 +245,11 @@ function sectionsViolations(
     }
     seen.add(entry.section);
     for (const [slot, text] of Object.entries(entry.copy)) {
+      if (INVITATION_ACCESS_COPY.test(text)) {
+        errors.push(
+          `${at}.copy.${slot}: the public front door claims a handle through /start; invitation access wording is not allowed`
+        );
+      }
       if (PRICE_PATTERN.test(text)) {
         errors.push(
           `${at}.copy.${slot}: prices and plan terms come from offer truth, not page copy`
