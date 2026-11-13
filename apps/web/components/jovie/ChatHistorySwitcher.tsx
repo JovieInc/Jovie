@@ -32,6 +32,13 @@ export interface ChatHistorySwitcherProps {
   readonly title: string | null;
   /** Current conversation id, used to mark its row selected. */
   readonly activeConversationId: string | null;
+  /**
+   * Radix menu modality. Default `true` (production behavior). Stories pass
+   * `false`: a modal Radix menu `hideOthers`-ARIA-hides the story canvas
+   * around the portaled content, which fails axe aria-hidden-focus on the
+   * focusable trigger. Non-modal is visually identical for demos.
+   */
+  readonly modal?: boolean;
 }
 
 const MAX_LIST_HEIGHT = 'min(30rem, calc(100dvh - 6rem))';
@@ -81,6 +88,7 @@ function ChatHistoryRowContent({ row }: { readonly row: ChatHistoryRow }) {
 export function ChatHistorySwitcher({
   title,
   activeConversationId,
+  modal = true,
 }: ChatHistorySwitcherProps) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -163,7 +171,11 @@ export function ChatHistorySwitcher({
     }).map(row => ({
       id: row.id,
       type: 'action' as const,
-      label: row.title,
+      // The custom row content shows the title and the age, so the
+      // accessible name carries both: an aria-label of the title alone
+      // leaves the visible age outside the name (axe
+      // label-content-name-mismatch, WCAG 2.5.3 Label in Name).
+      label: `${row.title} ${row.age}`,
       selected: row.active,
       content: <ChatHistoryRowContent row={row} />,
       onClick: () => handleSelect(row),
@@ -175,6 +187,7 @@ export function ChatHistorySwitcher({
       items={items}
       open={open}
       onOpenChange={handleOpenChange}
+      modal={modal}
       align='start'
       sideOffset={6}
       searchable

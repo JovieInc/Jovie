@@ -23,6 +23,8 @@ import {
   useHeaderActions,
 } from '@/contexts/HeaderActionsContext';
 import { useRegisterRightPanel } from '@/hooks/useRegisterRightPanel';
+import { ARTIST_VISIBILITY_OFFER, toCents } from '@/lib/config/plan-prices';
+import { queryKeys } from '@/lib/queries/keys';
 import type { ProfilesWorkspaceData, ProfileWorkspaceSurfaceRow } from './data';
 import { ProfilesWorkspace } from './ProfilesWorkspace';
 
@@ -50,12 +52,25 @@ vi.mock('@/hooks/useRegisterRightPanel', () => ({
 }));
 
 function createQueryClient() {
-  return new QueryClient({
+  const client = new QueryClient({
     defaultOptions: {
       queries: { retry: false },
       mutations: { retry: false },
     },
   });
+  const offer = ARTIST_VISIBILITY_OFFER.pro;
+  client.setQueryData(queryKeys.billing.pricingOptions(), {
+    options: [
+      {
+        priceId: 'price_profiles',
+        amount: toCents(offer.monthlyUsd),
+        currency: offer.currency,
+        interval: offer.interval,
+        description: offer.displayName,
+      },
+    ],
+  });
+  return client;
 }
 
 function jsonResponse(body: unknown, init: ResponseInit = {}) {
@@ -1402,8 +1417,8 @@ describe('ProfilesWorkspace', { timeout: 15_000 }, () => {
     );
     await user.keyboard('{Tab}');
     expect(
-      within(explanation).getByRole('link', { name: 'Upgrade' })
-    ).toHaveAttribute('href', '/app/settings/billing');
+      await within(explanation).findByRole('button', { name: 'Upgrade' })
+    ).toBeEnabled();
   });
 
   it('keeps the monitoring restriction explanation open after a click', async () => {
@@ -1420,8 +1435,8 @@ describe('ProfilesWorkspace', { timeout: 15_000 }, () => {
       'Upgrade required to monitor this page.'
     );
     expect(
-      within(explanation).getByRole('link', { name: 'Upgrade' })
-    ).toHaveAttribute('href', '/app/settings/billing');
+      await within(explanation).findByRole('button', { name: 'Upgrade' })
+    ).toBeEnabled();
 
     await user.keyboard('{Escape}');
     expect(
