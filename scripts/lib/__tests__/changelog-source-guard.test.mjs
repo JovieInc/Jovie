@@ -95,6 +95,41 @@ describe('local customer decision preflight', () => {
     expect(result.status).not.toBe(0);
     expect(result.stderr).toContain('ambiguous');
   });
+  it('optionally checks Fleet repair evidence on the same proposed body', () => {
+    const prPath = join(checkout, 'repair.json');
+    writeFileSync(
+      prPath,
+      JSON.stringify({ ...localPr, title: 'fix(merch): publish gate' })
+    );
+    const bodyPath = join(checkout, 'repair.md');
+    const decision = '<!-- customer-changelog/v1 {"releaseWorthy":false} -->';
+    writeFileSync(bodyPath, decision);
+    const red = preflight(
+      '--pr-file',
+      prPath,
+      '--body-file',
+      bodyPath,
+      '--fleet'
+    );
+    expect(red.status).not.toBe(0);
+    expect(red.stderr).toContain('red-before-green');
+    writeFileSync(
+      bodyPath,
+      `${decision}\n\n## Red-before-green\n\n- Failing command: pnpm test\n- Failing run (before fix): https://github.com/JovieInc/Jovie/actions/runs/123\n`
+    );
+    const green = preflight(
+      '--pr-file',
+      prPath,
+      '--body-file',
+      bodyPath,
+      '--fleet'
+    );
+    expect(green.status, green.stderr).toBe(0);
+    expect(JSON.parse(green.stdout)).toMatchObject({
+      passed: true,
+      fleet: { errors: [] },
+    });
+  });
   it('rejects stale and absent PR snapshots and a body override without a PR', () => {
     const stalePath = join(checkout, 'stale.json');
     writeFileSync(
@@ -114,11 +149,12 @@ describe('local customer decision preflight', () => {
       'Missing exact PR revision evidence'
     );
     expect(preflight('--body-file', emptyPath).status).not.toBe(0);
+    expect(preflight('--fleet').stderr).toContain('--fleet requires --pr-file');
   });
   it('cannot override the hosted CI evidence source', () => {
     const result = spawnSync(
       process.execPath,
-      [guard, '--pr-file', localPrPath],
+      [guard, '--pr-file', localPrPath, '--fleet'],
       {
         cwd: checkout,
         encoding: 'utf8',

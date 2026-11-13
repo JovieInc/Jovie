@@ -188,6 +188,7 @@
   "lib/merch/orders.test.ts",
   "lib/merch/pricing.test.ts",
   "lib/merch/safety.test.ts",
+  "lib/merch/service-publish.test.ts",
   "lib/merch/service.test.ts",
   "lib/merch/source-candidates.test.ts",
   "lib/metrics/revenue-lift-dashboard.test.ts",
