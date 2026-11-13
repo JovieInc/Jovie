@@ -60,6 +60,8 @@ jobs:
         with:
           ref: ${{ inputs.checkout-ref || github.sha }}
           persist-credentials: false
+          # The gzip ratchet compares the committed ceiling with the base ref.
+          fetch-depth: 0
       - uses: ./.github/actions/setup-node-pnpm
         # A cold macOS pnpm cache save can outlive all product evidence and
         # consume the merge-queue deadline. Keep the exact fetch/install path,

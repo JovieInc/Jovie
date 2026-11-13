@@ -9,8 +9,10 @@ const desktopRoot = dirname(dirname(fileURLToPath(import.meta.url)));
 export async function bundleDesktopPreload({
   entryPoint = join(desktopRoot, 'src', 'preload.ts'),
   outfile = join(desktopRoot, 'dist-electron', 'preload.js'),
+  absWorkingDir,
 } = {}) {
   await build({
+    absWorkingDir,
     bundle: true,
     entryPoints: [entryPoint],
     external: ['electron'],
