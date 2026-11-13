@@ -140,7 +140,7 @@ export function DemoReleaseTasksSurface() {
                 <p className='text-2xs uppercase tracking-[0.08em] text-tertiary-token'>
                   Demo · Apr 2, 2026
                 </p>
-                <h2 className='mt-2 text-2xl font-[580] tracking-[-0.03em] text-primary-token'>
+                <h2 className='mt-2 text-2xl font-[580] tracking-[-0.03em] text-primary-token text-balance'>
                   Revival
                 </h2>
                 <p className='mt-2 max-w-[34rem] text-sm leading-6 text-secondary-token'>
@@ -163,7 +163,7 @@ export function DemoReleaseTasksSurface() {
               </div>
               <div className='rounded-xl border border-white/8 bg-white/[0.03] px-3 py-3'>
                 <p className='text-2xs text-tertiary-token'>Done</p>
-                <p className='mt-2 text-xl font-[580] tracking-[-0.03em] text-primary-token'>
+                <p className='mt-2 text-xl font-[580] tracking-[-0.03em] text-primary-token tabular-nums'>
                   {doneCount}
                 </p>
               </div>
