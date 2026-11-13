@@ -58,6 +58,7 @@ export type OutboundCopyState = 'draft' | 'approved' | 'rejected' | 'stale';
 export const OUTBOUND_VIEWS = [
   'ready',
   'needs_evidence',
+  'needs_judge',
   'flagged',
   'certified',
   'approved',
@@ -73,6 +74,7 @@ export type OutboundView = (typeof OUTBOUND_VIEWS)[number];
 export const OUTBOUND_VIEW_LABELS: Record<OutboundView, string> = {
   ready: 'Ready to certify',
   needs_evidence: 'Needs evidence',
+  needs_judge: 'Needs judge',
   flagged: 'Flagged',
   certified: 'Certified',
   approved: 'Approved',
@@ -93,6 +95,7 @@ export type OutboundNextAction =
   | 'review_facts'
   | 'approve_message'
   | 'send'
+  | 'await_judge'
   | 'await_reply'
   | 'await_claim'
   | 'await_payment'
@@ -105,6 +108,7 @@ export const OUTBOUND_NEXT_ACTION_LABELS: Record<OutboundNextAction, string> = {
   review_facts: 'Review facts',
   approve_message: 'Approve message',
   send: 'Ready to send',
+  await_judge: 'Awaiting dogfood judge',
   await_reply: 'Awaiting reply',
   await_claim: 'Awaiting claim',
   await_payment: 'Awaiting payment',
