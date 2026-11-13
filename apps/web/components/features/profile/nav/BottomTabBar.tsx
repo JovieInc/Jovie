@@ -257,7 +257,7 @@ export function BottomTabBar({
                 onClick={() => onTabSelect(tab.id)}
                 className={cn(
                   'profile-liquid-glass-nav__item relative flex h-full min-w-0 touch-manipulation items-center justify-center rounded-full text-center transition-colors duration-subtle ease-subtle',
-                  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))] focus-visible:ring-offset-2 focus-visible:ring-offset-transparent',
+                  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:ring-offset-transparent',
                   isActive
                     ? 'text-white dark:text-white'
                     : 'text-white/40 hover:text-white/62'

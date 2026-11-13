@@ -417,6 +417,51 @@ class AdditiveStatementMergeTest(unittest.TestCase):
         merged = statements.resolve_additive_statements_text(text)
         self.assertEqual(merged, "before\n" + theirs + ours + "middle\n" + mock_theirs + mock_ours + "after\n" + expect_theirs + expect_ours)
 
+    def test_unions_an_import_with_new_mocks_and_refuses_a_changed_specifier(self):
+        imported = "import { getRequestSession } from '@/lib/auth/request-session';\n"
+        mocks = (
+            "const winbackMocks = vi.hoisted(() => ({\n"
+            "  resolveWinbackResumeToken: vi.fn().mockResolvedValue(null),\n"
+            "}));\n"
+            "\n"
+            "vi.mock('@/lib/waitlist/winback-resume.server', () => ({\n"
+            "  resolveWinbackResumeToken: winbackMocks.resolveWinbackResumeToken,\n"
+            "}));\n"
+            "\n"
+        )
+        self.assertEqual(
+            statements.resolve_additive_statements_text(self.conflict(imported, mocks)),
+            mocks.rstrip("\n") + "\n" + imported)
+        self.assertEqual(
+            statements.resolve_additive_statements_text(self.conflict(imported, imported)),
+            imported)
+        self.assertIsNone(statements.resolve_additive_statements_text(self.conflict(
+            imported, "import { other } from '@/lib/auth/request-session';\n")))
+        self.assertIsNone(statements.resolve_additive_statements_text(self.conflict(
+            "import {\n  getRequestSession,\n} from '@/lib/auth/request-session';\n",
+            mocks)))
+
+    def test_route_group_vitest_paths_reach_the_stage_reader(self):
+        calls = []
+
+        def sh(args, **_kwargs):
+            calls.append(args)
+            return SimpleNamespace(returncode=1, stdout="")
+
+        accepted = (
+            "apps/web/app/(dynamic)/start/page.test.ts",
+            "apps/web/app/[username]/page.test.tsx",
+            "apps/web/app/(.)photo/page.test.ts",
+        )
+        for rel in accepted:
+            calls.clear()
+            with self.subTest(rel=rel):
+                self.assertIsNone(edits.resolve_additive_statement_file(Path("."), rel, sh))
+                self.assertTrue(calls)
+        calls.clear()
+        self.assertIsNone(edits.resolve_additive_statement_file(Path("."), "README.md", sh))
+        self.assertEqual(calls, [])
+
     def test_edits_control_flow_and_unknown_shapes_stay_unresolved(self):
         added = "const head = vi.fn();\n"
         for value in (
