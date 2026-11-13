@@ -14,7 +14,7 @@ const combinations = [
   ['collapsed-empty', []],
 ] as const;
 
-test('every stack combination fits in light and dark with 28px controls', async ({
+test('every stack combination fits with 28px faces and 44px hit targets', async ({
   page,
 }) => {
   test.setTimeout(240_000);
@@ -38,9 +38,15 @@ test('every stack combination fits in light and dark with 28px controls', async 
         await dock.evaluate(node => node.scrollWidth <= node.clientWidth)
       ).toBe(true);
       for (const control of await dock.getByRole('button').all()) {
-        expect((await control.boundingBox())?.height).toBe(28);
+        // Morph buttons paint a compact face inside a native 44px target.
+        const morphFace = control.locator('[data-part="morph-surface"]');
+        const face = (await morphFace.count()) ? morphFace : control;
+        expect((await face.boundingBox())?.height).toBe(28);
         const hitHeight = await control.evaluate(node =>
-          Number.parseFloat(getComputedStyle(node, '::before').height)
+          Math.max(
+            node.getBoundingClientRect().height,
+            Number.parseFloat(getComputedStyle(node, '::before').height) || 0
+          )
         );
         expect(hitHeight).toBeGreaterThanOrEqual(44);
       }

@@ -1,87 +1,94 @@
 import assert from 'node:assert/strict';
+import { EventEmitter } from 'node:events';
 import { readFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
+import { runInNewContext } from 'node:vm';
+import { build } from 'esbuild';
 
 const desktopRoot = dirname(dirname(fileURLToPath(import.meta.url)));
 
-// The renderer's DesktopUpdateControl is driven only by these forwards. The
-// receiver name and indentation are left open (`.on(`) so a lazily required
-// updater still satisfies the contract; the events, payloads and channels may
-// not drift. electron-updater's `update-cancelled` and `login` are not
-// forwarded: the app never cancels a download or answers a proxy login.
-const FORWARDED_UPDATER_EVENTS = [
-  'checking-for-update',
-  'update-available',
-  'update-not-available',
-  'download-progress',
-  'update-downloaded',
-  'error',
-];
-
-function updaterListenerBody(mainSource, eventName) {
-  const escaped = eventName.replaceAll('-', '\\-');
-  const matches = [
-    ...mainSource.matchAll(
-      new RegExp(`\\.on\\(\\s*'${escaped}',[\\s\\S]*?\\n\\s*\\}\\);`, 'g')
-    ),
-  ];
-  assert.equal(
-    matches.length,
-    1,
-    `expected exactly one '${eventName}' updater listener`
-  );
-  return matches[0][0];
-}
-
+// Exercise the production event binding rather than its location or spelling.
+// The startup contract also verifies that main binds it once before checking.
 test('every updater event the renderer control needs is forwarded as a typed phase', async () => {
-  const mainSource = await readFile(join(desktopRoot, 'src/main.ts'), 'utf8');
-
-  for (const eventName of FORWARDED_UPDATER_EVENTS) {
-    const body = updaterListenerBody(mainSource, eventName);
-    if (eventName === 'error') {
-      assert.match(body, /pushUpdateEvent\(updateErrorEvent\(error\)\)/);
-    } else {
-      assert.match(
-        body,
-        new RegExp(`pushUpdateEvent\\(\\{\\s*type: '${eventName}'`),
-        `'${eventName}' must be pushed to the renderer`
-      );
-    }
+  const load = async name => {
+    const result = await build({
+      entryPoints: [join(desktopRoot, 'src', name)],
+      bundle: true,
+      platform: 'node',
+      format: 'cjs',
+      write: false,
+    });
+    const module = { exports: {} };
+    runInNewContext(result.outputFiles[0].text, { module, Error });
+    return module.exports;
+  };
+  const { bindDesktopAutoUpdaterEvents } = await load(
+    'desktop-auto-update-events.ts'
+  );
+  const { reduceDesktopUpdateState } = await load('desktop-auto-update.ts');
+  const updater = new EventEmitter();
+  const events = [];
+  const phases = [];
+  const notesUrl = 'https://example.test/changelog';
+  bindDesktopAutoUpdaterEvents(updater, event => {
+    events.push(event);
+    phases.push(reduceDesktopUpdateState(event, notesUrl));
+  });
+  const inputs = [
+    ['checking-for-update'],
+    ['update-available', { version: '26.11.3', releaseDate: '2026-11-13' }],
+    [
+      'download-progress',
+      { percent: 25, transferred: 10, total: 40, bytesPerSecond: 2 },
+    ],
+    ['update-downloaded', { version: '26.11.3' }],
+    ['update-not-available'],
+    ['error', new Error('Download failed')],
+  ];
+  assert.deepEqual(
+    updater.eventNames().sort(),
+    inputs.map(([name]) => name).sort()
+  );
+  for (const [name, payload] of inputs) {
+    assert.equal(updater.listenerCount(name), 1);
+    updater.emit(name, payload);
   }
-
-  // Determinate progress: all four numbers reach the renderer.
-  const progress = updaterListenerBody(mainSource, 'download-progress');
-  assert.match(progress, /percent: progress\.percent/);
-  assert.match(progress, /transferredBytes: progress\.transferred/);
-  assert.match(progress, /totalBytes: progress\.total/);
-  assert.match(progress, /bytesPerSecond: progress\.bytesPerSecond/);
-
-  // The version travels with the phases that name a build.
-  assert.match(
-    updaterListenerBody(mainSource, 'update-available'),
-    /version: info\.version/
-  );
-  assert.match(
-    updaterListenerBody(mainSource, 'update-downloaded'),
-    /pushUpdateEvent\(\{ type: 'update-downloaded', version: info\.version \}\)/
-  );
-
-  // One reducer owns the event-to-phase mapping, and each phase is both
-  // remembered for late subscribers and pushed to trusted app windows.
-  assert.match(
-    mainSource,
-    /function pushUpdateEvent\(event: DesktopUpdateEvent\): void \{\s*emitDesktopUpdatePhase\(\s*reduceDesktopUpdateState\(event, DESKTOP_UPDATE_NOTES_URL\)\s*\);\s*\}/
-  );
-  assert.match(
-    mainSource,
-    /function emitDesktopUpdatePhase\(phase: DesktopUpdatePhase\): void \{\s*desktopUpdatePhase = phase;\s*sendToAppWindows\(DESKTOP_UPDATE_STATE_CHANNEL, phase\);\s*\}/
-  );
-  assert.match(
-    mainSource,
-    /ipcMain\.handle\(DESKTOP_UPDATE_GET_STATE_CHANNEL, event =>\s*isTrustedIpcSender\(event\) \? desktopUpdatePhase : null\s*\)/
-  );
+  // Normalize VM object prototypes before comparing observable payloads.
+  assert.deepEqual(JSON.parse(JSON.stringify(events)), [
+    { type: 'checking-for-update' },
+    { type: 'update-available', version: '26.11.3', releaseDate: '2026-11-13' },
+    {
+      type: 'download-progress',
+      percent: 25,
+      transferredBytes: 10,
+      totalBytes: 40,
+      bytesPerSecond: 2,
+    },
+    { type: 'update-downloaded', version: '26.11.3' },
+    { type: 'update-not-available' },
+    { type: 'error', message: 'Download failed' },
+  ]);
+  assert.deepEqual(JSON.parse(JSON.stringify(phases)), [
+    { state: 'checking' },
+    {
+      state: 'available',
+      version: '26.11.3',
+      releaseDate: '2026-11-13',
+      notesUrl,
+    },
+    {
+      state: 'downloading',
+      percent: 25,
+      transferredBytes: 10,
+      totalBytes: 40,
+      bytesPerSecond: 2,
+    },
+    { state: 'ready', version: '26.11.3' },
+    { state: 'not-available' },
+    { state: 'error', message: 'Download failed', retryable: true },
+  ]);
 });
 
 test('the renderer update bridge and the main process agree on every channel', async () => {
