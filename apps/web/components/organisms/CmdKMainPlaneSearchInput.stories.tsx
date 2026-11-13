@@ -15,7 +15,12 @@ const meta = {
           Type to search every matching item.
         </p>
         <Story />
-        <div id='palette-results' role='listbox' className='sr-only'>
+        <div
+          id='palette-results'
+          role='listbox'
+          aria-label='Search Results'
+          className='sr-only'
+        >
           <div
             id='palette-row-1'
             role='option'
@@ -48,4 +53,28 @@ export const ActiveQuery: Story = {
   args: {
     value: 'Release plan',
   },
+};
+
+export const LongContent: Story = {
+  args: {
+    value:
+      'Find the release plan and all upcoming tasks for the next international tour',
+  },
+};
+
+export const RtlOverflow: Story = {
+  decorators: [
+    Story => (
+      <div dir='rtl' className='w-64'>
+        <Story />
+      </div>
+    ),
+  ],
+  args: {
+    value: 'ابحث عن خطة الإصدار وجميع المهام القادمة للجولة الدولية التالية',
+  },
+};
+
+export const Closed: Story = {
+  args: { open: false, activeRowId: null },
 };

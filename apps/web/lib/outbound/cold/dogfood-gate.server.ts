@@ -1,5 +1,8 @@
 import 'server-only';
 
+import { evaluateDogfoodJudgeGate } from '@/lib/agent-os/dogfood-judge-gate';
+import { getDogfoodJudgeLedger } from '@/lib/agent-os/dogfood-judge-runtime-store';
+
 import {
   DOGFOOD_GATE_CLOSED,
   type DogfoodGateResult,
@@ -8,30 +11,58 @@ import {
   evaluateOnboardingGate,
 } from './dogfood-gate';
 
-/**
- * Verdict source for the outreach dogfood gate.
- *
- * The LLM dogfood judge (vision review against Tim's taste rubric and the Pen
- * designs) is being built separately and has no verdict store yet. Until it
- * publishes one, this reader returns no verdicts, so the gate stays closed:
- * no draft reaches Tim and nothing sends. Binding the judge is a change to
- * this file only; the gate rule in dogfood-gate.ts does not move.
- */
+/** One request-scoped read keeps onboarding and artifacts on the same ledger. */
 export interface DogfoodVerdictSource {
-  readOnboarding(): Promise<DogfoodVerdict | null>;
-  readArtifacts(
-    profileIds: readonly string[]
-  ): Promise<Map<string, DogfoodVerdict>>;
+  readVerdicts(
+    profileIds: readonly string[],
+    now: Date
+  ): Promise<{
+    readonly onboarding: DogfoodVerdict | null;
+    readonly artifacts: ReadonlyMap<string, DogfoodVerdict>;
+  }>;
 }
 
 export const unboundDogfoodVerdictSource: DogfoodVerdictSource = {
-  readOnboarding: async () => null,
-  readArtifacts: async () => new Map(),
+  readVerdicts: async () => ({ onboarding: null, artifacts: new Map() }),
 };
 
-let source: DogfoodVerdictSource = unboundDogfoodVerdictSource;
+export const ledgerDogfoodVerdictSource: DogfoodVerdictSource = {
+  async readVerdicts(profileIds, now) {
+    const ledger = await getDogfoodJudgeLedger().read();
+    const prodSha = process.env.VERCEL_GIT_COMMIT_SHA ?? null;
+    function verdict(
+      surfaceId: string,
+      subject: DogfoodVerdict['subject'],
+      subjectId: string
+    ): DogfoodVerdict | null {
+      const record = ledger?.surfaces[surfaceId];
+      if (!ledger || !record) return null;
+      return {
+        subject,
+        subjectId,
+        // Includes verified signature, signoff, fingerprint, deployed SHA and
+        // the ledger's stricter seven-day freshness limit. Never trust pass alone.
+        pass: evaluateDogfoodJudgeGate(ledger, surfaceId, { now, prodSha })
+          .allow,
+        judgedAt: new Date(record.judgedAt),
+        rubricVersion: ledger.currentFingerprint,
+      };
+    }
+    const artifacts = new Map<string, DogfoodVerdict>();
+    for (const id of profileIds) {
+      const result = verdict(`outbound-artifact:${id}`, 'artifact', id);
+      if (result) artifacts.set(id, result);
+    }
+    return {
+      onboarding: verdict('onboarding', 'onboarding', 'onboarding'),
+      artifacts,
+    };
+  },
+};
 
-/** Test seam and the judge's binding point. */
+let source: DogfoodVerdictSource = ledgerDogfoodVerdictSource;
+
+/** Test seam; restore ledgerDogfoodVerdictSource after overriding. */
 export function setDogfoodVerdictSource(next: DogfoodVerdictSource): void {
   source = next;
 }
@@ -45,10 +76,10 @@ export async function readDogfoodGates(
   readonly byProfile: Map<string, DogfoodGateResult>;
 }> {
   try {
-    const [onboarding, artifacts] = await Promise.all([
-      source.readOnboarding(),
-      source.readArtifacts(profileIds),
-    ]);
+    const { onboarding, artifacts } = await source.readVerdicts(
+      profileIds,
+      now
+    );
     const byProfile = new Map<string, DogfoodGateResult>();
     for (const id of profileIds)
       byProfile.set(

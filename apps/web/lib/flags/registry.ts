@@ -67,6 +67,7 @@ export const APP_FLAG_REGISTRY = {
   AGENT_PROFILE_CREATE: buildBooleanFlag('AGENT_PROFILE_CREATE'),
   CREATOR_FINANCE: buildBooleanFlag('CREATOR_FINANCE'),
   VISIBILITY_AUDIT_OFFER: buildBooleanFlag('VISIBILITY_AUDIT_OFFER'),
+  OUTBOUND_DOGFOOD_GATE: buildBooleanFlag('OUTBOUND_DOGFOOD_GATE'),
 } as const satisfies Record<AppFlagName, Flag<boolean>>;
 
 export const SUBSCRIBE_CTA_VARIANT_FLAG = flag<

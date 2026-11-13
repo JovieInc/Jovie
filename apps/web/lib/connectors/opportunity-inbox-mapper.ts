@@ -257,6 +257,41 @@ export function mapSuggestedActionToInboxCard(
   };
 }
 
+/**
+ * A pending row is renderable creator work only when its payload survives
+ * the same validation the card mapper applies. Rows that fail parse are
+ * dropped from the feed rather than rendered as broken cards — invalid
+ * payloads never inflate the creator-work set.
+ */
+export function isCreatorReviewRenderableRow(row: SuggestedActionRow): boolean {
+  const signalType = classifyOpportunitySignalType(row);
+  if (
+    signalType === 'brand_deal' &&
+    !parseBrandDealOpportunity(row.kind, row.payload)
+  ) {
+    return false;
+  }
+  if (
+    row.kind === WORKFLOW_CAPTURE_REQUEST_KIND &&
+    !WorkflowCaptureRequestPayloadSchema.safeParse(row.payload).success
+  ) {
+    return false;
+  }
+  if (
+    row.kind === YOUTUBE_THUMBNAIL_CANDIDATE_KIND &&
+    !parseYouTubeThumbnailCandidate(row.kind, row.payload)
+  ) {
+    return false;
+  }
+  if (
+    row.kind === SOCIAL_REPLY_DRAFT_KIND &&
+    !parseSocialReplyDraft(row.kind, row.payload)
+  ) {
+    return false;
+  }
+  return true;
+}
+
 export function buildOpportunityInboxData(
   rows: readonly SuggestedActionRow[],
   tourDates?: OpportunityInboxTourDates,
@@ -265,34 +300,11 @@ export function buildOpportunityInboxData(
     readonly preferences?: SocialInboxRankingPreferences;
   }
 ): OpportunityInboxData {
-  const entries = rows.flatMap(row => {
-    const signalType = classifyOpportunitySignalType(row);
-    if (
-      signalType === 'brand_deal' &&
-      !parseBrandDealOpportunity(row.kind, row.payload)
-    ) {
-      return [];
-    }
-    if (
-      row.kind === WORKFLOW_CAPTURE_REQUEST_KIND &&
-      !WorkflowCaptureRequestPayloadSchema.safeParse(row.payload).success
-    ) {
-      return [];
-    }
-    if (
-      row.kind === YOUTUBE_THUMBNAIL_CANDIDATE_KIND &&
-      !parseYouTubeThumbnailCandidate(row.kind, row.payload)
-    ) {
-      return [];
-    }
-    if (
-      row.kind === SOCIAL_REPLY_DRAFT_KIND &&
-      !parseSocialReplyDraft(row.kind, row.payload)
-    ) {
-      return [];
-    }
-    return [{ card: mapSuggestedActionToInboxCard(row), row }];
-  });
+  const entries = rows.flatMap(row =>
+    isCreatorReviewRenderableRow(row)
+      ? [{ card: mapSuggestedActionToInboxCard(row), row }]
+      : []
+  );
   // Preserve the existing report and brand-deal lanes, then rank inbound social
   // replies by ROI. The score stays server-internal and is never rendered.
   const reportCards = entries

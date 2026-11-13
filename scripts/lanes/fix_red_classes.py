@@ -189,12 +189,13 @@ def classify(pr: dict, logs: dict[str, str] | None = None) -> dict:
     """{cls, key, action, checks, signature, files}. `logs` maps a failing check name to its failed-job log;
     a check with no log is `other`. A BEHIND branch with nothing deterministic to say is `stale-branch`."""
     logs = logs or {}
+    import detached_native_sync
     names = sorted({str(check.get("name")) for check in real_failures(pr)})
     per_check = []
     for name in names:
         text = logs.get(name) or ""
         hit = next(((cls, action) for cls, pattern, action in SIGNATURES if pattern.search(text)), None)
-        per_check.append(hit or size_500_stale_hit(text) or ("other", AGENT))
+        per_check.append(detached_native_sync.hit(text) or hit or size_500_stale_hit(text) or ("other", AGENT))
     classes = {cls for cls, _ in per_check}
     if len(classes) == 1:
         cls, action = per_check[0]
@@ -223,6 +224,8 @@ def classify(pr: dict, logs: dict[str, str] | None = None) -> dict:
         files = sorted(set(files))
     elif cls == "domain-write":
         files = sorted(_domain_write_hits("\n".join(logs.get(name) or "" for name in names)))
+    elif cls == "detached-native-consumer":
+        files = detached_native_sync.paths("\n".join(logs.get(name) or "" for name in names))
     return {"schema": SCHEMA, "cls": cls, "key": fingerprint_key(cls, names, signature), "action": action,
             "checks": names, "signature": signature, "files": files, **({"evidenceOwner": owner} if owner else {})}
 
