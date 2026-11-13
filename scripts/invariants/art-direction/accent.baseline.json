@@ -28,8 +28,6 @@
     "missing-accent:apps/web/app/(marketing)/card/JovieCardLanding.tsx",
     "missing-accent:apps/web/app/(marketing)/changelog/ChangelogEmailSignup.tsx",
     "missing-accent:apps/web/app/(marketing)/changelog/[version]/page.tsx",
-    "missing-accent:apps/web/app/(marketing)/changelog/loading.tsx",
-    "missing-accent:apps/web/app/(marketing)/changelog/page.tsx",
     "missing-accent:apps/web/app/(marketing)/compare/page.tsx",
     "missing-accent:apps/web/app/(marketing)/developers/page.tsx",
     "missing-accent:apps/web/app/(marketing)/download/page.tsx",

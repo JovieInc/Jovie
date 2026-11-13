@@ -1,14 +1,12 @@
 'use client';
 
 import { Button } from '@jovie/ui/atoms/button';
-import { ArrowRight } from 'lucide-react';
+import { Rss } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { NoOrphanText } from '@/components/marketing/NoOrphanText';
 import { FilterChip } from '@/components/molecules/filters/FilterChip';
 import { APP_ROUTES } from '@/constants/routes';
-import { isSafeChangelogActionHref } from '@/lib/changelog-parser';
 import {
   CUSTOMER_CHANGELOG_CATEGORIES,
   CUSTOMER_CHANGELOG_CATEGORY_LABELS,
@@ -18,8 +16,9 @@ import {
   type CustomerChangelogTombstone,
   customerChangelogEntryPath,
   formatCustomerChangelogDate,
-  formatCustomerChangelogTertiary,
+  groupCustomerChangelogByDay,
 } from '@/lib/customer-changelog';
+import { ChangelogDayRow, changelogVersionHref } from './ChangelogDayRow';
 
 const INITIAL_MONTH_COUNT = 1;
 const MONTH_FRAGMENT_PREFIX = 'changelog-month-';
@@ -34,13 +33,8 @@ type FragmentTarget =
     }
   | { readonly kind: 'month'; readonly monthKey: string };
 
-/**
- * JOV-7489 adds persistent `aliases` to published entries; tolerate their
- * absence until that contract lands so legacy links keep resolving.
- */
 function entryFragments(entry: CustomerChangelogEntry): readonly string[] {
-  const aliases = (entry as { readonly aliases?: readonly string[] }).aliases;
-  return aliases?.length ? [entry.slug, ...aliases] : [entry.slug];
+  return [entry.slug, ...entry.aliases];
 }
 
 /**
@@ -93,6 +87,8 @@ function filterMonthsByCategory(
     .filter(group => group.entries.length > 0);
 }
 
+const RSS_LABEL = 'RSS feed';
+
 const CATEGORY_FILTER_LABELS: Record<CategoryFilter, string> = {
   all: 'All',
   ...CUSTOMER_CHANGELOG_CATEGORY_LABELS,
@@ -102,28 +98,6 @@ export interface CustomerChangelogArchiveProps {
   readonly months: readonly CustomerChangelogMonthGroup[];
   readonly tombstones?: readonly CustomerChangelogTombstone[];
   readonly technicalReleases?: readonly { version: string; date: string }[];
-}
-
-function PermalinkAnchors({
-  entry,
-  includeCanonical = false,
-}: {
-  readonly entry: Pick<CustomerChangelogEntry, 'slug' | 'aliases'>;
-  readonly includeCanonical?: boolean;
-}) {
-  const fragments = includeCanonical
-    ? [entry.slug, ...entry.aliases]
-    : entry.aliases;
-  // Out of flow: `.changelog-entry` is a grid, so in-flow anchors would take
-  // grid cells and push the date rail and body into the wrong columns.
-  return fragments.map(fragment => (
-    <span
-      key={fragment}
-      id={fragment}
-      aria-hidden='true'
-      className='absolute left-0 top-0 h-0 w-0 scroll-mt-24'
-    />
-  ));
 }
 
 function TombstoneNotices({
@@ -137,7 +111,7 @@ function TombstoneNotices({
         key={fragment}
         id={fragment}
         role='status'
-        className='hidden scroll-mt-24 text-secondary-token target:block'
+        className='hidden scroll-mt-24 py-4 text-secondary-token target:block'
       >
         This update is no longer published.
       </p>
@@ -158,7 +132,7 @@ function TechnicalReleaseNav({
         {releases.map(release => (
           <li key={release.version}>
             <Link
-              href={versionHref(release.version)}
+              href={changelogVersionHref(release.version)}
               className='changelog-archive-nav__link'
             >
               <span className='changelog-archive-nav__link-date'>
@@ -175,17 +149,12 @@ function TechnicalReleaseNav({
   );
 }
 
-function versionHref(version: string): string {
-  return `${APP_ROUTES.CHANGELOG}/${encodeURIComponent(version)}`;
-}
-
 /**
- * One approved feature visual per entry, rendered only when the projected
- * media contract supplies an asset. Null, unsupported, or failed media
- * yields no region at all — the entry stays compact and text-first rather
- * than showing decorative placeholder artwork.
+ * One approved feature visual per post, rendered only when the entry carries
+ * an asset. Missing or failed media yields no region at all: the post stays
+ * text-first instead of showing placeholder artwork.
  */
-function EntryMedia({
+export function ChangelogEntryMedia({
   media,
 }: {
   readonly media: NonNullable<CustomerChangelogEntry['media']>;
@@ -207,15 +176,14 @@ function EntryMedia({
           onError={() => setFailed(true)}
         />
       ) : (
-        // Unoptimized: media srcs come from the receipt-backed contract and
-        // are not limited to the optimizer's allowlisted hosts. The 16:9
-        // frame reserves the box so fill+lazy loading never shifts layout.
+        // The 16:9 frame reserves the box, so fill + lazy loading never
+        // shifts layout.
         <Image
           className='changelog-entry-media__asset'
           src={media.src}
           alt={media.alt}
           fill
-          sizes='(min-width: 1024px) 56rem, 100vw'
+          sizes='(min-width: 1024px) 45rem, 100vw'
           unoptimized
           onError={() => setFailed(true)}
         />
@@ -224,162 +192,40 @@ function EntryMedia({
   );
 }
 
-/**
- * Receipt-approved next step (JOV-7493). The parser already fails closed on
- * unsafe destinations; the render re-checks so a stale or hand-built entry
- * can never mint an arbitrary link.
- */
-function EntryActionLink({
-  action,
-}: {
-  readonly action: NonNullable<CustomerChangelogEntry['action']>;
-}) {
-  if (!isSafeChangelogActionHref(action.href)) return null;
-  const content = (
-    <>
-      {action.label}
-      <ArrowRight
-        aria-hidden='true'
-        size={16}
-        className='changelog-archive-nav__link-arrow'
-      />
-    </>
-  );
-  if (action.href.startsWith('/')) {
-    return (
-      <Link href={action.href} className='changelog-entry__action'>
-        {content}
-      </Link>
-    );
-  }
-  return (
-    <a
-      href={action.href}
-      target='_blank'
-      rel='noopener noreferrer'
-      className='changelog-entry__action'
-    >
-      {content}
-    </a>
-  );
-}
-
-function EntryRow({ entry }: { readonly entry: CustomerChangelogEntry }) {
-  const tertiary = formatCustomerChangelogTertiary(
-    entry.date,
-    entry.technicalVersion
-  );
-  const hasLevel2 =
-    Boolean(entry.explanation) ||
-    entry.supporting.length > 0 ||
-    Boolean(entry.prerequisites?.length);
-  const hasLevel3 = entry.technical.length > 0;
-  const action =
-    entry.action && isSafeChangelogActionHref(entry.action.href)
-      ? entry.action
-      : null;
-
-  return (
-    <article
-      id={entry.slug}
-      tabIndex={-1}
-      className='changelog-entry'
-      data-changelog-entry-id={entry.id}
-      data-changelog-prominence={entry.prominence}
-    >
-      <PermalinkAnchors entry={entry} />
-      <p className='changelog-entry__date'>
-        {formatCustomerChangelogDate(entry.date)}
-      </p>
-      <div className='changelog-entry__main'>
-        <div className='changelog-entry__content'>
-          <p className='changelog-entry__category'>
-            {/* ui-casing-allow: tiny taxonomy caption, not IA heading */}
-            {CUSTOMER_CHANGELOG_CATEGORY_LABELS[entry.category]}
-          </p>
-          {entry.availability === 'preview' ||
-          entry.availability === 'limited' ? (
-            <p className='text-sm text-secondary-token'>
-              {entry.availability === 'preview'
-                ? 'Preview'
-                : 'Limited availability'}
-            </p>
-          ) : null}
-          <h3 className='changelog-entry__title text-balance'>
-            <NoOrphanText>{entry.title}</NoOrphanText>
-          </h3>
-          {entry.media ? <EntryMedia media={entry.media} /> : null}
-          {hasLevel2 ? (
-            <div className='space-y-2'>
-              {entry.explanation ? (
-                <p className='changelog-entry__excerpt'>{entry.explanation}</p>
-              ) : null}
-              {entry.prerequisites?.length ? (
-                <p className='changelog-entry__excerpt'>
-                  {entry.prerequisites.join(' · ')}
-                </p>
-              ) : null}
-              {entry.supporting.length > 0 ? (
-                <ul className='space-y-1'>
-                  {entry.supporting.map(item => (
-                    <li
-                      key={item}
-                      className='text-sm leading-relaxed text-secondary-token'
-                    >
-                      {item}
-                    </li>
-                  ))}
-                </ul>
-              ) : null}
-            </div>
-          ) : null}
-          {action ? (
-            <p className='changelog-entry__action-row'>
-              <EntryActionLink action={action} />
-            </p>
-          ) : null}
-          <p className='changelog-entry__tertiary'>
-            <Link href={versionHref(entry.technicalVersion)}>{tertiary}</Link>
-          </p>
-          {hasLevel3 ? (
-            <details className='text-xs text-tertiary-token'>
-              <summary className='cursor-pointer select-none text-tertiary-token transition-colors hover:text-secondary-token'>
-                Technical details
-              </summary>
-              <p className='mt-1.5 leading-relaxed'>
-                {entry.technical.join(' · ')}
-              </p>
-            </details>
-          ) : null}
-        </div>
-      </div>
-    </article>
-  );
-}
+const renderEntryMedia = (
+  media: NonNullable<CustomerChangelogEntry['media']>
+) => <ChangelogEntryMedia media={media} />;
 
 function MonthSection({
   group,
 }: {
   readonly group: CustomerChangelogMonthGroup;
 }) {
+  const days = useMemo(
+    () => groupCustomerChangelogByDay(group.entries),
+    [group.entries]
+  );
   return (
     <section
-      id={`changelog-month-${group.monthKey}`}
+      id={`${MONTH_FRAGMENT_PREFIX}${group.monthKey}`}
       tabIndex={-1}
-      aria-labelledby={`changelog-month-${group.monthKey}-heading`}
+      aria-labelledby={`${MONTH_FRAGMENT_PREFIX}${group.monthKey}-heading`}
       className='changelog-month-section'
     >
+      {/* Every day row carries its full date, so the month is structure only. */}
       <h2
-        id={`changelog-month-${group.monthKey}-heading`}
-        className='truncate pb-6 text-sm font-medium text-tertiary-token'
+        id={`${MONTH_FRAGMENT_PREFIX}${group.monthKey}-heading`}
+        className='sr-only'
       >
         {group.label}
       </h2>
-      <div>
-        {group.entries.map(entry => (
-          <EntryRow key={entry.id} entry={entry} />
-        ))}
-      </div>
+      {days.map(day => (
+        <ChangelogDayRow
+          key={day.date || 'undated'}
+          day={day}
+          renderMedia={renderEntryMedia}
+        />
+      ))}
     </section>
   );
 }
@@ -389,10 +235,6 @@ const CATEGORY_FILTER_OPTIONS: readonly CategoryFilter[] = [
   ...CUSTOMER_CHANGELOG_CATEGORIES,
 ];
 
-/**
- * Secondary category filter (pen O64tu): quiet chips below the outcome
- * hero/lead copy, never the primary IA.
- */
 function CategoryFilterToolbar({
   active,
   onChange,
@@ -406,15 +248,24 @@ function CategoryFilterToolbar({
       aria-label='Filter Updates By Category'
       className='changelog-filter-toolbar'
     >
-      {CATEGORY_FILTER_OPTIONS.map(option => (
-        <FilterChip
-          key={option}
-          pressed={active === option}
-          onClick={() => onChange(option)}
-        >
-          {CATEGORY_FILTER_LABELS[option]}
-        </FilterChip>
-      ))}
+      <div className='changelog-filter-toolbar__chips'>
+        {CATEGORY_FILTER_OPTIONS.map(option => (
+          <FilterChip
+            key={option}
+            pressed={active === option}
+            onClick={() => onChange(option)}
+          >
+            {CATEGORY_FILTER_LABELS[option]}
+          </FilterChip>
+        ))}
+      </div>
+      <Link
+        href={`${APP_ROUTES.CHANGELOG}/feed.xml`}
+        className='changelog-subscribe__alt'
+      >
+        <Rss aria-hidden='true' size={14} />
+        <span className='changelog-subscribe__alt-label'>{RSS_LABEL}</span>
+      </Link>
     </div>
   );
 }
@@ -430,12 +281,11 @@ function ArchiveJumpNav({
         <div key={group.monthKey} className='changelog-archive-nav__row'>
           <div className='changelog-archive-nav__rail'>
             <Link
-              href={`#changelog-month-${group.monthKey}`}
+              href={`#${MONTH_FRAGMENT_PREFIX}${group.monthKey}`}
               className='changelog-archive-nav__month'
             >
               {group.label}
             </Link>
-            <p className='changelog-archive-nav__hint'>Jump to an update</p>
           </div>
           <ul className='changelog-archive-nav__links'>
             {group.entries.map(entry => (
@@ -448,15 +298,7 @@ function ArchiveJumpNav({
                     {formatCustomerChangelogDate(entry.date)}
                   </span>
                   <span className='changelog-archive-nav__link-title'>
-                    {/* One flex item: a bare fragment would split the title into gap-separated items. */}
-                    <span>
-                      <NoOrphanText>{entry.title}</NoOrphanText>
-                    </span>
-                    <ArrowRight
-                      aria-hidden='true'
-                      size={16}
-                      className='changelog-archive-nav__link-arrow'
-                    />
+                    {entry.title}
                   </span>
                 </Link>
               </li>
@@ -469,9 +311,10 @@ function ArchiveJumpNav({
 }
 
 /**
- * Public `/changelog` archive (pen O64tu entry rows + Q3JwYT jump nav):
- * month-grouped customer outcomes with a sticky date rail. Version pages
- * keep ChangelogTimeline for technical detail.
+ * Public `/changelog` feed: day posts newest first, with a sticky date rail
+ * and a reading column. Each day leads with its outcome posts; the day's
+ * small fixes collapse into one "Fixes and polish" list. Every entry keeps
+ * its permalink, legacy aliases, and month anchor.
  */
 export function CustomerChangelogArchive({
   months,
@@ -519,8 +362,8 @@ export function CustomerChangelogArchive({
   );
 
   // Resolve deep links on fresh loads, hash changes (in-page links,
-  // Back/Forward, legacy aliases), and clicks on same-page fragment links
-  // such as the hero timeline, which may not emit a hashchange.
+  // Back/Forward, legacy aliases), and clicks on same-page fragment links,
+  // which may not emit a hashchange.
   useEffect(() => {
     const onHashChange = () => revealFragment(globalThis.location.hash);
     const onClick = (event: MouseEvent) => {
@@ -558,11 +401,11 @@ export function CustomerChangelogArchive({
 
   if (months.length === 0) {
     return (
-      <div data-reduced-motion='static'>
+      <div data-reduced-motion='static' className='changelog-feed'>
         <TombstoneNotices tombstones={tombstones} />
         <p className='text-secondary-token'>No updates yet. Check back soon!</p>
-        <details className='mb-6'>
-          <summary className='min-h-11 cursor-pointer text-sm text-secondary-token'>
+        <details className='changelog-archive'>
+          <summary className='flex min-h-11 w-fit cursor-pointer items-center text-sm text-secondary-token'>
             Browse engineering history
           </summary>
           <TechnicalReleaseNav releases={technicalReleases} />
@@ -576,15 +419,15 @@ export function CustomerChangelogArchive({
   const remainingCount = filteredMonths.length - visibleCount;
 
   return (
-    <div data-reduced-motion='static'>
-      <TombstoneNotices tombstones={tombstones} />
+    <div data-reduced-motion='static' className='changelog-feed'>
       <CategoryFilterToolbar
         active={activeCategory}
         onChange={handleCategoryChange}
       />
+      <TombstoneNotices tombstones={tombstones} />
 
       {filteredMonths.length === 0 ? (
-        <p className='text-secondary-token'>
+        <p className='border-t border-subtle py-10 text-secondary-token'>
           {`No ${CATEGORY_FILTER_LABELS[activeCategory].toLowerCase()} updates yet.`}
         </p>
       ) : (
@@ -608,14 +451,15 @@ export function CustomerChangelogArchive({
               )
             }
           >
-            Load Earlier Updates
+            {/* ui-casing-allow: marketing changelog, sentence case (Tim, 2026-11-12) */}
+            Load earlier updates
           </Button>
         </div>
       ) : null}
 
       {filteredMonths.length > 0 ? (
-        <details className='mt-6'>
-          <summary className='min-h-11 cursor-pointer text-sm text-secondary-token'>
+        <details className='changelog-archive'>
+          <summary className='flex min-h-11 w-fit cursor-pointer items-center text-sm text-secondary-token'>
             Browse all updates
           </summary>
           <ArchiveJumpNav months={filteredMonths} />

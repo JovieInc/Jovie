@@ -55,6 +55,7 @@ export function ChangelogEmailSignup({
   copy = DEFAULT_COPY,
   marketingSection = false,
   deferSecurityCheck = false,
+  align = 'center',
 }: {
   readonly source?: string;
   readonly initialEmail?: string;
@@ -67,6 +68,8 @@ export function ChangelogEmailSignup({
    * LCP/INP and keeps the page from ever reaching network idle.
    */
   readonly deferSecurityCheck?: boolean;
+  /** `start` sets the module flush left, for a column beside page copy. */
+  readonly align?: 'center' | 'start';
 }) {
   const formId = useId();
   const [securityCheckArmed, setSecurityCheckArmed] = useState(
@@ -343,7 +346,11 @@ export function ChangelogEmailSignup({
       aria-labelledby={`${formId}-heading`}
       data-pen-source='qKrDn'
       data-visual-state={status}
-      className='mx-auto flex w-full max-w-md flex-col items-center gap-3 text-center'
+      className={
+        align === 'start'
+          ? 'flex w-full max-w-md flex-col items-start gap-3 text-left'
+          : 'mx-auto flex w-full max-w-md flex-col items-center gap-3 text-center'
+      }
     >
       <h2
         id={`${formId}-heading`}

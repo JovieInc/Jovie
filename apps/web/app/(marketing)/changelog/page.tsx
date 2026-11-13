@@ -1,30 +1,30 @@
 import type { Metadata } from 'next';
-import Link from 'next/link';
 import { MarketingContainer } from '@/components/marketing';
 import { ChangelogSubscribeColumn } from '@/components/marketing/changelog/ChangelogSubscribeColumn';
 import { CustomerChangelogArchive } from '@/components/marketing/changelog/CustomerChangelogArchive';
-import { NoOrphanText } from '@/components/marketing/NoOrphanText';
 import { MarketingFooterCta } from '@/components/site/MarketingFooterCta';
 import { APP_NAME, BASE_URL } from '@/constants/app';
 import { APP_ROUTES } from '@/constants/routes';
 import { getChangelogSnapshot } from '@/lib/changelog-source';
+import { jsonLd } from '@/lib/constants/schemas';
 import {
-  type CustomerChangelogEntry,
   customerChangelogEntryPath,
-  formatCustomerChangelogDate,
   groupCustomerChangelogByMonth,
   projectCustomerChangelogArchive,
 } from '@/lib/customer-changelog';
 import { documentTitle } from '@/lib/seo/document-title';
+import './changelog-day-row.css';
 import './changelog-editorial.css';
+
+const CHANGELOG_URL = `${BASE_URL}${APP_ROUTES.CHANGELOG}`;
 
 export const revalidate = false;
 
 export const metadata: Metadata = {
   title: documentTitle('Changelog: product updates and new features'),
-  description: `Audience and control updates in ${APP_NAME}. What got better for you, not every deploy.`,
+  description: `New features, improvements and fixes in ${APP_NAME}.`,
   alternates: {
-    canonical: `${BASE_URL}${APP_ROUTES.CHANGELOG}`,
+    canonical: CHANGELOG_URL,
     types: {
       'application/atom+xml': `${BASE_URL}${APP_ROUTES.CHANGELOG}/feed.xml`,
       'application/rss+xml': `${BASE_URL}${APP_ROUTES.CHANGELOG}/rss.xml`,
@@ -33,155 +33,55 @@ export const metadata: Metadata = {
   },
 };
 
-/** Hero timeline tone order by recency rank (pen bBTae: ion, pulse, mint). */
-const TIMELINE_TONES = ['ion', 'pulse', 'mint'] as const;
-
-function formatTimelineDate(iso: string): string {
-  if (!iso) return '';
-  const parsed = new Date(`${iso}T00:00:00Z`);
-  if (Number.isNaN(parsed.getTime())) return iso;
-  return parsed
-    .toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
-      timeZone: 'UTC',
-    })
-    .toUpperCase();
-}
-
-function ReleaseJournalHero({
-  latest,
-}: {
-  readonly latest: readonly CustomerChangelogEntry[];
-}) {
-  return (
-    <div className='marketing-hero-dock relative overflow-hidden'>
-      <section
-        className='changelog-hero relative z-10'
-        aria-labelledby='changelog-hero-title'
-      >
-        <MarketingContainer width='page' className='changelog-hero__inner'>
-          <div className='changelog-hero__masthead'>
-            <p className='changelog-hero__kicker'>Changelog</p>
-            <h1
-              id='changelog-hero-title'
-              className='changelog-hero__title line-clamp-2'
-            >
-              {/* eslint-disable-next-line @jovie/canonical-ui-label-casing -- pen editorial headline casing */}
-              {"What's new in Jovie"}
-            </h1>
-            <p className='changelog-hero__support'>
-              Versioned, dated, and source-backed.
-            </p>
-          </div>
-
-          {latest.length > 0 ? (
-            <div className='changelog-hero__timeline'>
-              <ol className='changelog-hero__timeline-entries'>
-                {latest.map((entry, index) => (
-                  <li key={entry.id}>
-                    <Link
-                      href={customerChangelogEntryPath(entry)}
-                      className='changelog-hero__timeline-link'
-                    >
-                      <span
-                        aria-hidden='true'
-                        className={`changelog-hero__tone-dot changelog-hero__tone-dot--${TIMELINE_TONES[index % TIMELINE_TONES.length]}`}
-                      />
-                      <span className='changelog-hero__timeline-date'>
-                        {formatTimelineDate(entry.date)}
-                      </span>
-                      <span className='changelog-hero__timeline-title'>
-                        <NoOrphanText>{entry.title}</NoOrphanText>
-                      </span>
-                    </Link>
-                  </li>
-                ))}
-              </ol>
-            </div>
-          ) : null}
-        </MarketingContainer>
-      </section>
-    </div>
-  );
-}
-
-function ChangelogFreshnessNotice({
-  latestPublished,
-  hasUnpublishedReleases,
-}: {
-  readonly latestPublished: readonly CustomerChangelogEntry[];
-  readonly hasUnpublishedReleases: boolean;
-}) {
-  if (!hasUnpublishedReleases) return null;
-
-  const latestDate = latestPublished[0]?.date
-    ? formatCustomerChangelogDate(latestPublished[0].date)
-    : null;
-
-  return (
-    <p className='changelog-freshness' role='status'>
-      Release notes are being prepared for newer release slots.{' '}
-      {latestDate
-        ? `The latest published update is ${latestDate}.`
-        : latestPublished.length
-          ? 'The latest published update is listed below.'
-          : 'No customer updates have been published yet.'}
-    </p>
-  );
-}
-
 export default async function ChangelogPage() {
   const snapshot = await getChangelogSnapshot();
   const projection = projectCustomerChangelogArchive(snapshot.sourceReleases);
   const months = groupCustomerChangelogByMonth(projection.entries);
-  const latest = months.flatMap(group => group.entries).slice(0, 3);
+
+  // The same posts the page renders, for answer engines: headline, date and
+  // permalink per update.
+  const changelogSchema = jsonLd({
+    '@context': 'https://schema.org',
+    '@type': 'Blog',
+    name: `${APP_NAME} changelog`,
+    description: `New features, improvements and fixes in ${APP_NAME}.`,
+    url: CHANGELOG_URL,
+    blogPost: projection.entries.map(entry => ({
+      '@type': 'BlogPosting',
+      headline: entry.title,
+      ...(entry.date ? { datePublished: entry.date } : {}),
+      url: `${BASE_URL}${customerChangelogEntryPath(entry)}`,
+    })),
+  });
 
   return (
     <div className='min-h-screen bg-page text-primary-token'>
-      <ReleaseJournalHero latest={latest} />
-
-      <MarketingContainer width='page' className='changelog-content'>
-        <div className='changelog-content__grid'>
-          <div className='changelog-lead__copy'>
-            <p id='changelog-lead-intro' className='changelog-lead__intro'>
-              {
-                'Audience and control updates that change what you can do. Not a log of every deploy.'
-              }
+      <script type='application/ld+json'>{changelogSchema}</script>
+      <MarketingContainer width='page'>
+        <header className='changelog-header'>
+          <div className='changelog-header__copy'>
+            <h1 className='marketing-type-display line-clamp-2 text-primary-token'>
+              Changelog
+            </h1>
+            <p className='marketing-type-lede changelog-header__lede'>
+              {`New features, improvements and fixes in ${APP_NAME}.`}
             </p>
-            <ChangelogFreshnessNotice
-              latestPublished={latest}
-              hasUnpublishedReleases={snapshot.unpublishedReleases.some(
-                release => release.date > (latest[0]?.date ?? '')
-              )}
-            />
           </div>
+          <ChangelogSubscribeColumn />
+        </header>
 
-          <aside
-            className='changelog-subscribe-rail'
-            aria-label='Subscribe To Changelog Updates'
-          >
-            <ChangelogSubscribeColumn />
-          </aside>
-
-          <div className='changelog-entries'>
-            <CustomerChangelogArchive
-              months={months}
-              tombstones={projection.tombstones}
-              technicalReleases={snapshot.releases.map(({ version, date }) => ({
-                version,
-                date,
-              }))}
-            />
-          </div>
-        </div>
+        <CustomerChangelogArchive
+          months={months}
+          tombstones={projection.tombstones}
+          technicalReleases={snapshot.releases.map(({ version, date }) => ({
+            version,
+            date,
+          }))}
+        />
       </MarketingContainer>
 
-      <MarketingFooterCta
-        ctaLabel='Request an Invite'
-        ctaHref='/#request-invite'
-      />
+      {/* Defaults to the shared claim-profile intent, as the site header does. */}
+      <MarketingFooterCta />
     </div>
   );
 }
