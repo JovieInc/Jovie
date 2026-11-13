@@ -11,7 +11,7 @@ import { LogoLink } from '@/components/atoms/LogoLink';
 import { AuthActions } from '@/components/molecules/AuthActions';
 import { MobileNav } from '@/components/molecules/MobileNav';
 import { MarketingSignInLink } from '@/components/organisms/MarketingSignInLink';
-import { UserButton } from '@/components/organisms/user-button';
+import { LazyUserButton } from '@/components/organisms/user-button/user-button.lazy';
 import { APP_ROUTES } from '@/constants/routes';
 import { getHomepageFrontDoorCtaContract } from '@/data/homepageFrontDoorCta';
 import { resolveMarketingAuthPrefetch } from '@/data/marketing/authEntryPrefetch';
@@ -711,7 +711,7 @@ export function HeaderNav({
                   publicCtaHref={publicCta?.href}
                   publicCtaLabel={publicCta?.label}
                   authenticatedUserSlot={
-                    <UserButton
+                    <LazyUserButton
                       showUserInfo
                       settingsHref={APP_ROUTES.SETTINGS}
                     />

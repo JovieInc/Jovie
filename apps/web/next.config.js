@@ -74,10 +74,9 @@ const nextConfig = {
   outputFileTracingRoot: isVercelPreview
     ? undefined
     : path.join(__dirname, '../../'),
-  // These request-time readers build data paths dynamically, so NFT cannot
-  // reliably infer their files from the compiled route bundles. Keep this
-  // list limited to the data they actually read; the broad directory entries
-  // are small content and chat-topic catalogs.
+  // Request-time readers build data paths dynamically, so NFT cannot infer
+  // their files. List only the data they read; the broad directory entries
+  // are small content, chat-topic and chat-skill catalogs.
   // Monorepo files are staged into apps/web/runtime-data by
   // scripts/stage-runtime-data.mjs; never trace outside apps/web (Vercel's
   // project root), which breaks deployment extraction.
@@ -92,6 +91,7 @@ const nextConfig = {
       // Blog catalog validation checks these assets with fs.access at request time.
       'public/images/blog/**/*',
       'lib/chat/knowledge/topics/**/*',
+      'lib/chat/skills/library/**/*',
       'public/fonts/Satoshi-Bold.ttf',
       'public/fonts/DMSans-Regular.ttf',
     ],

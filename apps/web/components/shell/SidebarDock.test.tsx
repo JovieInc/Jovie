@@ -1,3 +1,4 @@
+import { checkTooltipCopy } from '@jovie/copy/tooltip-copy';
 import {
   act,
   fireEvent,
@@ -9,11 +10,13 @@ import { type ComponentPropsWithoutRef, forwardRef } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { BannerViewport } from '@/components/feedback/BannerViewport';
 import { banner } from '@/components/feedback/banner-store';
+import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import {
   SidebarDock,
   type SidebarDockProps,
   sidebarDockSeenKey,
 } from './SidebarDock';
+import { Tooltip } from './Tooltip';
 
 // Expose the Next Link contract without starting a router in jsdom.
 vi.mock('next/link', () => ({
@@ -65,7 +68,7 @@ beforeEach(() => {
 describe('SidebarDock', () => {
   it.each(Array.from({ length: 8 }, (_, mask) => mask))(
     'keeps fixed order for combination %i',
-    mask => {
+    async mask => {
       const { container } = render(
         <SidebarDock
           userId='one'
@@ -81,10 +84,11 @@ describe('SidebarDock', () => {
           mask & 1 ? 'now-playing' : null,
         ].filter(Boolean)
       );
+      await expectNoA11yViolations(container);
     }
   );
 
-  it('puts install last and routes all actions', () => {
+  it('puts install last and routes all actions', async () => {
     const onUpdate = vi.fn();
     const { container } = render(
       <SidebarDock
@@ -97,6 +101,7 @@ describe('SidebarDock', () => {
       />
     );
     expect(cards(container)).toEqual(['update', 'now-playing']);
+    await expectNoA11yViolations(container);
     fireEvent.click(screen.getByRole('button', { name: 'Update available' }));
     expect(onUpdate).toHaveBeenCalledOnce();
     fireEvent.click(screen.getByRole('button', { name: 'Dismiss update' }));
@@ -107,6 +112,7 @@ describe('SidebarDock', () => {
     expect(audio.onDismiss).toHaveBeenCalledOnce();
     fireEvent.click(screen.getByRole('button', { name: 'Install' }));
     expect(install.onInstall).toHaveBeenCalledOnce();
+    await expectNoA11yViolations(container);
     fireEvent.click(screen.getByRole('button', { name: 'Dismiss Prompt' }));
     expect(install.onDismiss).toHaveBeenCalledOnce();
   });
@@ -224,9 +230,9 @@ describe('SidebarDock', () => {
     }
   );
 
-  it('keeps update recovery reachable', () => {
+  it('keeps update recovery reachable', async () => {
     const onUpdate = vi.fn();
-    render(
+    const { container } = render(
       <SidebarDock
         userId='one'
         onUpdate={onUpdate}
@@ -236,6 +242,76 @@ describe('SidebarDock', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Update failed' }));
     expect(onUpdate).toHaveBeenCalledOnce();
     expect(screen.getByText('Open update details to try again.')).toBeVisible();
+    await expectNoA11yViolations(container);
+  });
+
+  it('shows audio with only a track title', async () => {
+    const onPlay = vi.fn();
+    const { container } = render(
+      <SidebarDock
+        userId='one'
+        audio={{
+          ...audio,
+          onPlay,
+          track: {
+            trackTitle: 'Untitled demo',
+            artistName: null,
+            artworkUrl: null,
+          },
+        }}
+      />
+    );
+    expect(cards(container)).toEqual(['now-playing']);
+    expect(screen.getByText('Untitled demo')).toBeVisible();
+    fireEvent.click(screen.getByRole('button', { name: 'Pause' }));
+    expect(onPlay).toHaveBeenCalledOnce();
+    await expectNoA11yViolations(container);
+  });
+
+  it('keeps long release and track titles reachable', async () => {
+    const title =
+      'Release pages now show every streaming service, presave countdowns and per-territory analytics';
+    const trackTitle =
+      'Midnight Drive Through the Neon City (Extended Club Mix featuring the Late Night Strings)';
+    const { container } = render(
+      <SidebarDock
+        userId='one'
+        release={{ ...release, title }}
+        audio={{
+          ...audio,
+          track: { ...audio.track, trackTitle },
+        }}
+      />
+    );
+    expect(cards(container)).toEqual(['whats-new', 'now-playing']);
+    expect(screen.getByText(title)).toHaveClass('truncate');
+    expect(screen.getByText(trackTitle)).toBeInTheDocument();
+    await expectNoA11yViolations(container);
+  });
+
+  it('routes update actions in a right-to-left sidebar', async () => {
+    const onUpdate = vi.fn();
+    const { container } = render(
+      <div dir='rtl' lang='ar'>
+        <SidebarDock
+          userId='one'
+          update={update}
+          onUpdate={onUpdate}
+          audio={{
+            ...audio,
+            track: {
+              trackTitle: 'ليالي المدينة الطويلة',
+              artistName: 'فرقة الشرق',
+              artworkUrl: null,
+            },
+          }}
+        />
+      </div>
+    );
+    expect(screen.getByText('ليالي المدينة الطويلة')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Update available' }));
+    expect(onUpdate).toHaveBeenCalledOnce();
+    await expectNoA11yViolations(container);
   });
 
   it('collapses cards to named user-button badges', () => {
@@ -270,6 +346,76 @@ describe('SidebarDock', () => {
       </SidebarDock>
     );
     expect(container.querySelector('[data-dock-badges]')).toBeNull();
+  });
+
+  // Founder report: the sidebar opened, the status tooltip armed, the sidebar
+  // collapsed, and the tooltip stayed up with no pointer on it. UserButton
+  // wires the dock status exactly like this harness.
+  describe('status tooltip across collapse', () => {
+    const qrNote =
+      'Profile QR codes are now drawn right on your device. Visiting a profile no longer reaches an outside service to render them, so pages load with zero third-party requests, keeping the promise we publish on our comparison page.';
+    const Dock = ({ collapsed }: { readonly collapsed: boolean }) => (
+      <SidebarDock
+        userId='one'
+        collapsed={collapsed}
+        release={{ ...release, title: qrNote }}
+      >
+        {status => (
+          <Tooltip
+            label={status?.label ?? 'Open user menu'}
+            side='right'
+            open={status ? undefined : false}
+          >
+            <button type='button'>Account</button>
+          </Tooltip>
+        )}
+      </SidebarDock>
+    );
+    const tooltip = () => screen.queryByRole('tooltip');
+    const settle = () => act(async () => {});
+
+    it('never leaves the tooltip up after the sidebar collapses', async () => {
+      const { rerender } = render(<Dock collapsed={false} />);
+      const trigger = screen.getByRole('button', { name: 'Account' });
+
+      // Sidebar open: hover arms the tooltip, then the pointer leaves.
+      fireEvent.focus(trigger);
+      await settle();
+      expect(tooltip()).not.toBeInTheDocument();
+      fireEvent.blur(trigger);
+      await settle();
+
+      rerender(<Dock collapsed />);
+      await settle();
+      expect(tooltip()).not.toBeInTheDocument();
+    });
+
+    it('closes when collapsed flips, even with focus still on the trigger', async () => {
+      const { rerender } = render(<Dock collapsed />);
+      const trigger = screen.getByRole('button', { name: 'Account' });
+      fireEvent.focus(trigger);
+      expect(await screen.findByRole('tooltip')).toBeInTheDocument();
+
+      rerender(<Dock collapsed={false} />);
+      await settle();
+      expect(tooltip()).not.toBeInTheDocument();
+      rerender(<Dock collapsed />);
+      await settle();
+      expect(tooltip()).not.toBeInTheDocument();
+
+      // Fresh intent still works.
+      fireEvent.blur(trigger);
+      fireEvent.focus(trigger);
+      expect(await screen.findByRole('tooltip')).toBeInTheDocument();
+    });
+
+    it('shows a short title, not the changelog paragraph', async () => {
+      render(<Dock collapsed />);
+      fireEvent.focus(screen.getByRole('button', { name: 'Account' }));
+      const label = "What's new: Profile QR codes are now drawn…";
+      expect(await screen.findByRole('tooltip')).toHaveTextContent(label);
+      expect(checkTooltipCopy(label)).toEqual([]);
+    });
   });
 
   it('reserves the audio slot without a duplicate transport while the full player is visible', () => {
@@ -315,5 +461,18 @@ describe('SidebarDock', () => {
     expect(screen.queryByRole('link')).toBeNull();
     get.mockRestore();
     set.mockRestore();
+  });
+  it('measures card positions only when the card stack changes', () => {
+    const measure = vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect');
+    const { rerender } = render(<SidebarDock userId='one' audio={audio} />);
+    const mounted = measure.mock.calls.length;
+    expect(mounted).toBeGreaterThan(0);
+    rerender(
+      <SidebarDock userId='one' audio={{ ...audio, isPlaying: false }} />
+    );
+    expect(measure.mock.calls.length).toBe(mounted);
+    rerender(<SidebarDock userId='one' audio={audio} update={update} />);
+    expect(measure.mock.calls.length).toBeGreaterThan(mounted);
+    measure.mockRestore();
   });
 });

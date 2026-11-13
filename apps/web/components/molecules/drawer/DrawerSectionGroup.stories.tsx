@@ -55,3 +55,58 @@ export const OpeningOneClosesTheOther: Story = {
     await expect(factsTrigger).toHaveAttribute('aria-expanded', 'false');
   },
 };
+
+export const LongContent: Story = {
+  args: {
+    defaultOpenSectionId: 'links',
+    children: (
+      <>
+        <DrawerSection
+          title='Release facts, credits and distribution metadata'
+          sectionId='facts'
+        >
+          <p className='text-sm text-secondary-token'>Fact content.</p>
+        </DrawerSection>
+        <DrawerSection
+          title='Streaming links, presave destinations and store pages'
+          sectionId='links'
+        >
+          <p className='text-sm text-secondary-token'>
+            Spotify, Apple Music, YouTube Music, Tidal, Deezer, Amazon Music,
+            SoundCloud, Beatport, Bandcamp and Audiomack links appear here once
+            the catalog sync finishes for every territory.
+          </p>
+        </DrawerSection>
+        <DrawerSection
+          title='Analytics for the last 28 days across every territory'
+          sectionId='analytics'
+        >
+          <p className='text-sm text-secondary-token'>Analytics content.</p>
+        </DrawerSection>
+      </>
+    ),
+  },
+};
+
+export const Rtl: Story = {
+  args: {
+    defaultOpenSectionId: 'facts',
+    children: (
+      <>
+        <DrawerSection title='الحقائق' sectionId='facts'>
+          <p className='text-sm text-secondary-token'>محتوى الحقائق.</p>
+        </DrawerSection>
+        <DrawerSection title='الروابط' sectionId='links'>
+          <p className='text-sm text-secondary-token'>محتوى الروابط.</p>
+        </DrawerSection>
+      </>
+    ),
+  },
+  decorators: [
+    Story => (
+      <div dir='rtl' lang='ar'>
+        <Story />
+      </div>
+    ),
+  ],
+};

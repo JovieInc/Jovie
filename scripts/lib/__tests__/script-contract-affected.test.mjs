@@ -12,7 +12,11 @@ import {
   selectSourceGuards,
 } from '../../ci-fast-lanes.mjs';
 import { buildAffectedTestPlan } from '../../run-affected-tests.mjs';
-import { selectScriptContracts } from '../script-contract-affected.mjs';
+import {
+  COPY_INVENTORY_TEST,
+  copyInventoryScanPath,
+  selectScriptContracts,
+} from '../script-contract-affected.mjs';
 import { testsAffectedBy } from '../test-file-dependencies.mjs';
 
 const ROOT = join(import.meta.dirname, '../../..');
@@ -140,6 +144,51 @@ test('is a PR-only source guard resolved beside ci-fast-lanes', () => {
     );
   assert.ok(ids('pull_request').includes('script-contracts'));
   assert.ok(!ids('merge_group').includes('script-contracts'));
+});
+
+test('a marketing copy source selects the inventory contract without the full lists', () => {
+  const landing =
+    'apps/web/components/features/waitlist/WaitlistPublicLanding.tsx';
+  const catalog = [COPY_INVENTORY_TEST, 'scripts/agent-context/check.test.mjs'];
+  const options = { root: ROOT, node: catalog, vitest: [] };
+  assert.deepEqual(testsAffectedBy([COPY_INVENTORY_TEST], [landing], ROOT), []);
+  assert.equal(copyInventoryScanPath(landing), true);
+  assert.equal(copyInventoryScanPath('apps/web/lib/leads/constants.ts'), false);
+  assert.equal(copyInventoryScanPath('apps/web/data/marketing/copy.ts'), false);
+  assert.equal(
+    copyInventoryScanPath('apps/web/lib/content-records/home.ts'),
+    false
+  );
+  assert.equal(copyInventoryScanPath('apps/web/lib/marketing/copy.ts'), true);
+  assert.deepEqual(selectScriptContracts([landing], options), {
+    full: false,
+    node: [COPY_INVENTORY_TEST],
+    vitest: [],
+  });
+  assert.deepEqual(
+    selectScriptContracts([landing], { ...options, derivedOnly: true }).node,
+    [COPY_INVENTORY_TEST]
+  );
+  assert.deepEqual(
+    selectScriptContracts(['scripts/copy-inventory/ids.gen.json'], options),
+    { full: false, node: [COPY_INVENTORY_TEST], vitest: [] }
+  );
+  assert.deepEqual(
+    selectScriptContracts(['apps/web/data/marketing/copy.ts'], options).node,
+    []
+  );
+  assert.deepEqual(
+    selectScriptContracts(['apps/web/lib/leads/constants.ts'], options).node,
+    []
+  );
+  assert.deepEqual(
+    selectScriptContracts([landing], {
+      root: ROOT,
+      node: ['scripts/agent-context/check.test.mjs'],
+      vitest: [],
+    }).node,
+    []
+  );
 });
 
 test('the CLI lists the selection for explicit paths', () => {

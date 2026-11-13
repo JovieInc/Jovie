@@ -9,6 +9,7 @@ import {
   buildLibraryReleaseAssets,
   buildLibraryYouTubeAssets,
 } from '@/app/app/(shell)/library/library-data';
+import { buildLibraryTakeAssets } from '@/app/app/(shell)/library/library-take-assets';
 import { ShellReleasesView } from '@/components/features/dashboard/organisms/release-provider-matrix/shell-releases/ShellReleasesView';
 import { PageErrorState } from '@/features/feedback/PageErrorState';
 import type { CreatorDocumentListItem } from '@/lib/creator-documents/types';
@@ -27,6 +28,7 @@ import {
 import type { LibraryRelationshipView } from '@/lib/library/track-drawer-types';
 import type { LibraryMerchCard } from '@/lib/merch/types';
 import { useReleasesQuery } from '@/lib/queries/useReleasesQuery';
+import type { TeleprompterTakeSummary } from '@/lib/teleprompter/takes/contract';
 import type { PublicVideoListItem } from '@/lib/youtube-library/queries';
 import { primaryProviderKeys, providerConfig } from './config';
 import { ReleaseTableSkeleton } from './loading';
@@ -45,6 +47,8 @@ interface ReleaseCatalogPageClientProps {
   >;
   readonly creatorDocuments?: readonly CreatorDocumentListItem[];
   readonly youtubeVideos?: readonly PublicVideoListItem[];
+  /** Private studio takes; listed in Work but never shared or shown on profile. */
+  readonly teleprompterTakes?: readonly TeleprompterTakeSummary[];
   readonly merchProducts?: readonly LibraryMerchProductOption[];
   readonly relationships?: readonly LibraryRelationshipView[];
   readonly postReleaseBundle?: LibraryPostReleaseBundle;
@@ -86,6 +90,7 @@ export function ReleaseCatalogPageClient({
   assetShareByAssetId = {},
   creatorDocuments = [],
   youtubeVideos = [],
+  teleprompterTakes = [],
   merchProducts = [],
   relationships = [],
   postReleaseBundle,
@@ -208,6 +213,7 @@ export function ReleaseCatalogPageClient({
             approvalStatusMap,
             profileVisibilityMap
           ).map(withShare),
+          ...buildLibraryTakeAssets(teleprompterTakes, artistName),
         ]}
       />
     );

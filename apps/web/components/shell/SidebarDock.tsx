@@ -1,5 +1,6 @@
 'use client';
 
+import { shortTooltipTitle } from '@jovie/copy/tooltip-copy';
 import { Button, IconButton } from '@jovie/ui';
 import {
   ArrowUp,
@@ -65,6 +66,7 @@ export function SidebarDock({
 }: SidebarDockProps) {
   const regionRef = useRef<HTMLElement>(null);
   const positions = useRef(new Map<string, number>());
+  const measuredStack = useRef<string | null>(null);
   const reducedMotion = useReducedMotion();
   const [seen, setSeen] = useState<{ key: string; id: string | null } | null>(
     null
@@ -147,16 +149,25 @@ export function SidebarDock({
     : '';
   const statusLabels = [
     showUpdate && updateLabel,
-    showRelease && `What's new: ${release?.title}`,
+    // Tooltip copy rule: a short title only. The story lives on /changelog,
+    // which the expanded What's new card links to.
+    showRelease && `What's new: ${shortTooltipTitle(release?.title ?? '')}`,
     showAudio && audioLabel,
     install && 'Install Jovie',
   ].filter(Boolean);
 
   // FLIP only the cards' paint positions. Footer geometry resolves locally;
   // the flex-1 nav retains its top edge and scroll position. Tokens own timing.
+  // Measuring forces a layout, so it runs only when the card stack changes.
   useLayoutEffect(() => {
     const region = regionRef.current;
     if (!region) return;
+    const stack = `${compactUpdate}|${Array.from(
+      region.querySelectorAll<HTMLElement>('[data-dock-card]'),
+      card => card.dataset.dockCard
+    ).join()}`;
+    if (stack === measuredStack.current) return;
+    measuredStack.current = stack;
     const style = getComputedStyle(region);
     const duration = style.getPropertyValue('--duration-normal').trim();
     const milliseconds =

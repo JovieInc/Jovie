@@ -58,3 +58,48 @@ export const DarkTheme: Story = {
     ),
   ],
 };
+
+/** A public header with no nav links: the desktop group and divider drop out. */
+export const EmptyNavLinks: Story = {
+  args: {
+    authMode: 'public-static',
+    navLinks: [],
+  },
+};
+
+/** The minimal header: a Log in text link and no public CTA. */
+export const PartialMinimalAuth: Story = {
+  args: {
+    authMode: 'public-static',
+    minimalAuth: true,
+    minimalAuthLabel: 'Log in',
+  },
+};
+
+/** Long nav labels and CTA copy share the header row. */
+export const LongContent: Story = {
+  args: {
+    authMode: 'public-static',
+    navLinks: [
+      { href: '/artist-profiles', label: 'Artist Profiles And Press Kits' },
+      { href: APP_ROUTES.PRICING, label: 'Pricing For Labels And Managers' },
+    ],
+    publicCta: { href: APP_ROUTES.SIGNUP, label: 'Claim Your Profile' },
+  },
+};
+
+/** The public header inside a right-to-left page. */
+export const Rtl: Story = {
+  args: {
+    authMode: 'public-static',
+    navLinks: [{ href: APP_ROUTES.PRICING, label: 'Pricing' }],
+    publicCta: { href: APP_ROUTES.SIGNUP, label: 'Get Started' },
+  },
+  decorators: [
+    Story => (
+      <div dir='rtl' lang='ar'>
+        <Story />
+      </div>
+    ),
+  ],
+};
