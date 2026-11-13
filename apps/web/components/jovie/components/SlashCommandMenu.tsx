@@ -61,6 +61,7 @@ const KIND_ICON_MAP: Record<EntityKind, LucideIcon> = {
   artist: UserCircle,
   track: Music2,
   event: Calendar,
+  profile: UserCircle,
 };
 
 /**

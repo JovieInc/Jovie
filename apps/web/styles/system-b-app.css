@@ -5257,9 +5257,19 @@
   line-height: 1.25rem;
 }
 
+/* The user bubble inverts with the theme (light bubble in dark mode, dark
+   bubble in light mode), so mix against the bubble itself, not white. */
 .system-b-entity-chip[data-entity-variant="transcript"][data-entity-tone="onLight"] {
-  border-color: color-mix(in srgb, var(--jovie-entity-accent) 30%, white);
-  background: color-mix(in srgb, var(--jovie-entity-accent) 8%, white);
+  border-color: color-mix(
+    in srgb,
+    var(--jovie-entity-accent) 30%,
+    var(--system-b-chat-user-bubble-bg, white)
+  );
+  background: color-mix(
+    in srgb,
+    var(--jovie-entity-accent) 10%,
+    var(--system-b-chat-user-bubble-bg, white)
+  );
   color: var(
     --system-b-entity-chip-on-light-text,
     var(--color-text-primary-token)
