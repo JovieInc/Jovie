@@ -1,6 +1,6 @@
 'use client';
 
-// @coverage-via apps/web/tests/components/dashboard/organisms/onboarding-v2-performance.test.tsx
+// @coverage-via apps/web/tests/components/dashboard/organisms/OnboardingPlanOffer.test.tsx
 
 import { Button, Spinner as LoadingSpinner } from '@jovie/ui';
 import { ArrowRight, AudioLines, Music2, RefreshCw } from 'lucide-react';

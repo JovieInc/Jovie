@@ -2,6 +2,7 @@ import { cleanup, render, screen, within } from '@testing-library/react';
 import type { ElementType, ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { OnboardingCheckoutClient } from '@/app/onboarding/checkout/OnboardingCheckoutClient';
+import { OnboardingPlanOffer } from '@/components/features/dashboard/organisms/onboarding-v2/OnboardingPlanOffer';
 import { OnboardingV2Form } from '@/components/features/dashboard/organisms/onboarding-v2/OnboardingV2Form';
 import { MARKETING_PRICING_PLANS } from '@/data/marketingPricingPlans';
 import { ARTIST_VISIBILITY_OFFER, toCents } from '@/lib/config/plan-prices';
@@ -327,6 +328,13 @@ describe('Paid offer consistency', () => {
     const features = MARKETING_PRICING_PLANS.find(
       plan => plan.id === 'pro'
     )!.features;
+    render(<OnboardingPlanOffer />);
+    expect(
+      within(screen.getByRole('list', { name: offer.displayName }))
+        .getAllByRole('listitem')
+        .map(item => item.textContent)
+    ).toEqual(features);
+    cleanup();
     render(
       <OnboardingV2Form
         initialDisplayName='Test Artist'

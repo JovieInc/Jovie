@@ -1,3 +1,5 @@
+// @coverage-via apps/web/tests/components/dashboard/organisms/OnboardingPlanOffer.test.tsx
+
 import { getPaidPlanAdditionNames } from '@/lib/billing/public-pricing-features';
 import { ARTIST_VISIBILITY_OFFER, toCents } from '@/lib/config/plan-prices';
 import { formatAmount } from '@/lib/utils/format-number';
