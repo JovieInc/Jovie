@@ -40,18 +40,10 @@ SCHEMA = "jovie-fix-red-class/v1"
 # Actions a class can route to. `agent` is the default (a model run); the others spend no model.
 RERUN, SYNC_MAIN, WIRE_CI_FAST, RENUMBER, STAMP_CHANGELOG, SNAP_SPACING, STRIP_CACHE, MERGE_NARROWED, REGISTER_DOMAIN, ATOMIC_WRITE, AGENT, COMPOSE = (
     "rerun", "sync-main", "wire-ci-fast", "renumber-migrations", "stamp-changelog", "snap-spacing",
-    "strip-cache-exports", "merge-narrowed-preflight", "register-domain-writes", "atomic-write", "agent",
-    "compose")
+    "strip-cache-exports", "merge-narrowed-preflight", "register-domain-writes", "atomic-write", "agent", "compose")
 DETERMINISTIC = frozenset({
     RERUN, SYNC_MAIN, WIRE_CI_FAST, RENUMBER, STAMP_CHANGELOG, SNAP_SPACING, STRIP_CACHE, MERGE_NARROWED,
     REGISTER_DOMAIN, ATOMIC_WRITE, ALIAS_ACTION})
-# Sync the branch, stamp the body, then file fixers, then rerun. The stamp has to land before a
-# fixer push so the synchronize event carries the note. `compose` is the route, not a leaf action.
-# Alias graduation stays a single-action route: it is deterministic, and compose drops a head that
-# pairs it with another class rather than running half of the pair.
-_COMPOSE_ORDER = (
-    SYNC_MAIN, STAMP_CHANGELOG, WIRE_CI_FAST, RENUMBER, SNAP_SPACING, STRIP_CACHE, MERGE_NARROWED,
-    REGISTER_DOMAIN, ATOMIC_WRITE, RERUN)
 
 # remediation.INFRA_TEXT (runner loss, OOM, 5xx) plus the platform failures seen in 52 agent-declined
 # fix runs. Kept out of INFRA_TEXT: the exhausted-PR classifier deliberately routes a rate-limited
@@ -193,21 +185,9 @@ def stamp_internal_changelog(body) -> str | None:
     return body + INTERNAL_CHANGELOG_NOTE + "\n"
 
 
-def compose_actions(actions: list[str]) -> list[str]:
-    """Stable order for leaf actions. Drops anything outside `_COMPOSE_ORDER`, including `compose` itself."""
-    rank = {name: index for index, name in enumerate(_COMPOSE_ORDER)}
-    chosen: list[str] = []
-    for action in actions:
-        if action in rank and action not in chosen:
-            chosen.append(action)
-    return sorted(chosen, key=rank.__getitem__)
-
-
 def classify(pr: dict, logs: dict[str, str] | None = None) -> dict:
-    """{cls, key, action, actions, checks, signature, files}. `logs` maps a failing check name to its
-    failed-job log; a check with no log is `other`. A BEHIND branch with nothing deterministic to say
-    is `stale-branch`. Two or more deterministic classes compose (stamp, then wire, no model). One
-    non-deterministic class keeps the head on the model."""
+    """{cls, key, action, actions, checks, signature, files}. `logs` maps a failing check name to its failed-job log;
+    a check with no log is `other`. A BEHIND branch with nothing deterministic to say is `stale-branch`."""
     logs = logs or {}
     import detached_native_sync
     names = sorted({str(check.get("name")) for check in real_failures(pr)})
@@ -221,19 +201,9 @@ def classify(pr: dict, logs: dict[str, str] | None = None) -> dict:
     if len(classes) == 1:
         cls, action = per_check[0]
     elif classes and all(item_action in DETERMINISTIC for _, item_action in per_check):
-        raw = [item_action for _, item_action in per_check]
-        actions = compose_actions(raw)
-        # compose_actions drops anything outside _COMPOSE_ORDER. A dropped action (alias
-        # graduation) must not run as a partial compose.
-        if len(actions) != len(dict.fromkeys(raw)):
-            cls, action, actions = "mixed", AGENT, []
-        elif len(actions) > 1:
-            cls, action = "composed", COMPOSE
-        elif len(actions) == 1:
-            # Two classes, one leaf (census + design both sync). The existing single-action route runs it.
-            cls, action = "composed", actions[0]
-        else:
-            cls, action = "mixed", AGENT
+        import fix_red_compose
+        cls, action, actions = fix_red_compose.composed_route(
+            [item_action for _, item_action in per_check], COMPOSE, AGENT)
     elif classes:
         cls, action = "mixed", AGENT
     else:
@@ -249,7 +219,6 @@ def classify(pr: dict, logs: dict[str, str] | None = None) -> dict:
     owner = alias_owner_metadata(names, logs) if cls == "alias-review-deadline" else None
     if cls == "alias-review-deadline" and owner is None:
         cls, action, signature = "mixed", AGENT, error_signature("\n".join(logs.get(name) or "" for name in names))
-        actions = []
     if action != COMPOSE:
         actions = [action] if action in DETERMINISTIC else []
     files = []
@@ -257,19 +226,17 @@ def classify(pr: dict, logs: dict[str, str] | None = None) -> dict:
     if cls == "component-test-evidence":
         files = sorted({test for name in names for test in COMPONENT_TEST_TEXT.findall(logs.get(name) or "")})
     if "ci-fast-wiring" in wanted and action in {WIRE_CI_FAST, COMPOSE}:
-        found_files = []
         for name in names:
             found = UNWIRED.search(logs.get(name) or "")
-            found_files.extend(item.strip() for item in (found.group(1).split(",") if found else []) if item.strip())
-        files = sorted(set(files) | set(found_files))
+            files.extend(item.strip() for item in (found.group(1).split(",") if found else []) if item.strip())
+        files = sorted(set(files))
     if "domain-write" in wanted and action in {REGISTER_DOMAIN, COMPOSE}:
         files = sorted(set(files) | set(_domain_write_hits("\n".join(logs.get(name) or "" for name in names))))
     if "detached-native-consumer" in wanted and (cls == "detached-native-consumer" or action == COMPOSE):
         files = sorted(set(files) | set(detached_native_sync.paths(
             "\n".join(logs.get(name) or "" for name in names))))
     return {"schema": SCHEMA, "cls": cls, "key": fingerprint_key(cls, names, signature), "action": action,
-            "actions": actions, "checks": names, "signature": signature, "files": files,
-            **({"evidenceOwner": owner} if owner else {})}
+            "actions": actions, "checks": names, "signature": signature, "files": files, **({"evidenceOwner": owner} if owner else {})}
 
 
 def _split_shell_and(command: str) -> list[str] | None:

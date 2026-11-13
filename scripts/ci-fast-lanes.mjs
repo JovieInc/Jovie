@@ -14,9 +14,6 @@
  * later lanes behind the first red one. Skipped lanes still emit a receipt.
  * CI_FAST_FAIL_FAST=false retains structural after failures; no selector runs all lanes.
  *
- * Usage:
- *   node scripts/ci-fast-lanes.mjs [with CI_FAST_LANE_GROUP=<group>]
- *
  * Env:
  *   GITHUB_EVENT_NAME, GITHUB_BASE_REF, GITHUB_REF, GITHUB_STEP_SUMMARY
  *   CI_FAST_LANE_GROUP — hosted group selector; omitted locally runs all lanes
