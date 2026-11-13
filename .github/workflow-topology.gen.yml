@@ -1637,7 +1637,7 @@ nodes:
       - schedule
       - workflow_dispatch
     terminalReceipt: job:report-scheduled-failure
-    jobCount: 2
+    jobCount: 3
   - name: VOC Mine
     path: .github/workflows/voc-mine.yml
     active: true
