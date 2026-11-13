@@ -1,7 +1,11 @@
 'use client';
 
 import { lazy, memo, Suspense, useMemo } from 'react';
-import { type ChatToken, parseTokens } from '@/lib/chat/tokens';
+import {
+  type ChatToken,
+  type EntityKind,
+  parseTokens,
+} from '@/lib/chat/tokens';
 import { skillById } from '@/lib/commands/registry';
 import { EntityChipPopover } from './EntityChipPopover';
 import { EntityMentionSpan } from './EntityMentionSpan';
@@ -114,7 +118,7 @@ export function AssistantMessageText({
 }
 
 interface AssistantEntityMentionProps {
-  readonly kind: 'release' | 'artist' | 'track' | 'event';
+  readonly kind: EntityKind;
   readonly id: string;
   readonly label: string;
 }
