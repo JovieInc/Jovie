@@ -532,6 +532,39 @@ describe('POST /api/stripe/checkout', () => {
     expect(mockCreateCheckoutSession).toHaveBeenCalledTimes(1);
   });
 
+  it('returns in-app upgrades to their screen without claiming entitlement', async () => {
+    mockGetCachedAuth.mockResolvedValue({ userId: 'user_123' });
+    mockCreateCheckoutSession.mockResolvedValue({
+      id: 'cs_in_app',
+      url: 'https://checkout.stripe.com/pay/cs_in_app',
+    });
+    const makeRequest = (returnTo: string) =>
+      new NextRequest('http://localhost/api/stripe/checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          priceId: 'price_123',
+          source: 'in_app',
+          returnTo,
+          humanConfirmed: true,
+        }),
+      });
+    expect((await POST(makeRequest('/app/releases?release=123'))).status).toBe(
+      200
+    );
+    const first = mockCreateCheckoutSession.mock.calls.at(-1)?.[0];
+    expect(first.successUrl).toMatch(/\/app\/releases\?release=123$/);
+    expect(first.cancelUrl).toBe(first.successUrl);
+    expect((await POST(makeRequest('/app/profiles'))).status).toBe(200);
+    expect(
+      mockCreateCheckoutSession.mock.calls.at(-1)?.[0].idempotencyKey
+    ).not.toBe(first.idempotencyKey);
+    expect((await POST(makeRequest('//evil.test'))).status).toBe(200);
+    expect(mockCreateCheckoutSession.mock.calls.at(-1)?.[0].successUrl).toMatch(
+      /\/app$/
+    );
+  });
+
   it('returns thumbnail founder checkout to the product-specific flow', async () => {
     mockGetCachedAuth.mockResolvedValue({ userId: 'user_123' });
     mockCreateCheckoutSession.mockResolvedValue({

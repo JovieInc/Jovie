@@ -7,6 +7,11 @@ import { SettingsUsageStatsSection } from '../../../components/features/dashboar
 const mockUseChatUsageQuery = vi.fn();
 const refetch = vi.fn();
 vi.mock('@/lib/queries', () => ({
+  usePricingOptionsQuery: () => ({
+    data: { options: [] },
+    isPending: false,
+    error: null,
+  }),
   useCheckoutMutation: () => ({
     error: null,
     isPending: false,

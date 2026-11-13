@@ -57,6 +57,11 @@ vi.mock('@/lib/queries', async importOriginal => {
   return {
     ...actual,
     usePlanGate: mockUsePlanGate,
+    usePricingOptionsQuery: () => ({
+      data: { options: [] },
+      isPending: false,
+      error: null,
+    }),
     useCheckoutMutation: () => ({
       mutate: vi.fn(),
       isPending: false,
