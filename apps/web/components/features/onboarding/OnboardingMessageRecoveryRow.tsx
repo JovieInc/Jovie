@@ -2,9 +2,10 @@
 
 import { RefreshCw, WifiOff } from 'lucide-react';
 import Link from 'next/link';
-import { useRef } from 'react';
+import { useState } from 'react';
 import type { ChatError } from '@/components/jovie/types';
 import { APP_ROUTES } from '@/constants/routes';
+import { useReleaseAwareNow } from '@/hooks/useReleaseAwareNow';
 import { formatTimeRemaining } from '@/lib/utils/date-formatting';
 
 interface OnboardingMessageRecoveryRowProps {
@@ -21,33 +22,40 @@ export function OnboardingMessageRecoveryRow({
   isSubmitted,
 }: OnboardingMessageRecoveryRowProps) {
   // `retryAfter` is a DURATION (seconds) captured when the request failed.
-  // Convert it to an absolute deadline once per error (refs capture during
-  // render) so re-renders count down toward a fixed point instead of re-adding
-  // the duration to the current time — which previously kept retry hidden
-  // permanently and restarted the wait label from the full duration on every
-  // render (PR #18095 review follow-up).
-  const retryAfterDeadlineRef = useRef<number | null>(null);
-  const retryAfterKeyRef = useRef<string | null>(null);
+  // Capture one deadline per request so parent re-renders cannot extend it.
   const retryAfterKey =
     chatError.retryAfter != null
       ? `${chatError.type}:${chatError.requestId ?? ''}:${chatError.retryAfter}`
       : null;
-  if (retryAfterKey !== retryAfterKeyRef.current) {
-    retryAfterKeyRef.current = retryAfterKey;
-    retryAfterDeadlineRef.current =
-      chatError.retryAfter != null
-        ? Date.now() + chatError.retryAfter * 1000
-        : null;
+  const [retryWait, setRetryWait] = useState(() => ({
+    key: retryAfterKey,
+    deadline:
+      chatError.retryAfter == null
+        ? null
+        : Date.now() + chatError.retryAfter * 1000,
+  }));
+  if (retryAfterKey !== retryWait.key) {
+    setRetryWait({
+      key: retryAfterKey,
+      deadline:
+        chatError.retryAfter == null
+          ? null
+          : Date.now() + chatError.retryAfter * 1000,
+    });
   }
-  const retryAfterDeadline = retryAfterDeadlineRef.current;
+  const retryAfterDeadline = retryWait.deadline;
+  // Wake once at expiry, including after a suspended tab resumes. Reuse the
+  // shared deadline timer without announcing a live-region countdown each second.
+  useReleaseAwareNow(
+    retryAfterDeadline === null ? null : new Date(retryAfterDeadline)
+  );
 
-  const canRetry =
-    Boolean(chatError.failedMessage) && retryAfterDeadline === null;
+  const isWaiting =
+    retryAfterDeadline !== null && retryAfterDeadline > Date.now();
+
+  const canRetry = Boolean(chatError.failedMessage) && !isWaiting;
   const isRateLimited = chatError.type === 'rate_limit';
-  const waitLabel =
-    retryAfterDeadline !== null
-      ? formatTimeRemaining(retryAfterDeadline)
-      : null;
+  const waitLabel = isWaiting ? formatTimeRemaining(retryAfterDeadline) : null;
 
   return (
     <div

@@ -44,6 +44,19 @@ export const RetryableServer: Story = {
   },
 };
 
+export const TimedRetry: Story = {
+  args: {
+    ...RetryableServer.args,
+    chatError: {
+      type: 'server',
+      message: 'Your message could not be sent. Your draft is still here.',
+      failedMessage: 'Help me finish my profile',
+      retryAfter: 3,
+      requestId: 'storybook-timed-retry',
+    },
+  },
+};
+
 export const Busy: Story = {
   args: {
     chatError: {

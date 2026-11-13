@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import type { ChatError } from '@/components/jovie/types';
@@ -116,7 +116,7 @@ describe('OnboardingMessageRecoveryRow', () => {
     ).not.toBeInTheDocument();
   });
 
-  it('counts down to a fixed deadline instead of restarting the wait on every render', () => {
+  it('restores retry automatically at the fixed deadline without sending the message', () => {
     vi.useFakeTimers();
     try {
       vi.setSystemTime(new Date('2026-01-01T00:00:00Z'));
@@ -124,11 +124,13 @@ describe('OnboardingMessageRecoveryRow', () => {
         type: 'rate_limit',
         message: 'Too many anonymous chat requests from this IP.',
         retryAfter: 90,
+        failedMessage: 'Keep my profile draft',
       });
+      const handleRetry = vi.fn();
       const { rerender } = render(
         <OnboardingMessageRecoveryRow
           chatError={chatError}
-          handleRetry={noop}
+          handleRetry={handleRetry}
           isBusy={false}
           isSubmitted={false}
         />
@@ -138,11 +140,11 @@ describe('OnboardingMessageRecoveryRow', () => {
       expect(screen.getByText('Try again in 2 minutes.')).toBeInTheDocument();
 
       // 30 seconds pass and the parent re-renders (e.g. a streaming tick).
-      vi.setSystemTime(new Date('2026-01-01T00:00:30Z'));
+      act(() => vi.advanceTimersByTime(30_000));
       rerender(
         <OnboardingMessageRecoveryRow
           chatError={chatError}
-          handleRetry={noop}
+          handleRetry={handleRetry}
           isBusy={false}
           isSubmitted={false}
         />
@@ -152,17 +154,14 @@ describe('OnboardingMessageRecoveryRow', () => {
       // NOT restart from the full duration.
       expect(screen.getByText('Try again in 1 minute.')).toBeInTheDocument();
 
-      // After the deadline passes, the label reports "now".
-      vi.setSystemTime(new Date('2026-01-01T00:01:31Z'));
-      rerender(
-        <OnboardingMessageRecoveryRow
-          chatError={chatError}
-          handleRetry={noop}
-          isBusy={false}
-          isSubmitted={false}
-        />
-      );
-      expect(screen.getByText('Try again in now.')).toBeInTheDocument();
+      // No parent render or user input should be needed to recover.
+      act(() => vi.advanceTimersByTime(60_050));
+      expect(screen.queryByText(/^Try again in /)).not.toBeInTheDocument();
+      const retry = screen.getByRole('button', { name: 'Retry message' });
+      expect(retry).toBeEnabled();
+      expect(handleRetry).not.toHaveBeenCalled();
+      fireEvent.click(retry);
+      expect(handleRetry).toHaveBeenCalledTimes(1);
     } finally {
       vi.useRealTimers();
     }
@@ -183,5 +182,87 @@ describe('OnboardingMessageRecoveryRow', () => {
         name: 'Create a free account to keep going',
       })
     ).not.toBeInTheDocument();
+  });
+
+  it('starts a fresh wait for a new request and cancels it on unmount', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-01-01T00:00:00Z'));
+    const props = {
+      handleRetry: vi.fn(),
+      isBusy: false,
+      isSubmitted: false,
+    };
+    const error = makeChatError({
+      retryAfter: 3,
+      failedMessage: 'Keep my draft',
+      requestId: 'request-1',
+    });
+    const { rerender, unmount } = render(
+      <OnboardingMessageRecoveryRow {...props} chatError={error} />
+    );
+    try {
+      act(() => vi.advanceTimersByTime(2_000));
+      rerender(
+        <OnboardingMessageRecoveryRow
+          {...props}
+          chatError={{ ...error, requestId: 'request-2' }}
+        />
+      );
+      act(() => vi.advanceTimersByTime(1_050));
+      expect(screen.queryByRole('button')).not.toBeInTheDocument();
+      act(() => vi.advanceTimersByTime(2_000));
+      expect(
+        screen.getByRole('button', { name: 'Retry message' })
+      ).toBeEnabled();
+      expect(props.handleRetry).not.toHaveBeenCalled();
+      rerender(
+        <OnboardingMessageRecoveryRow
+          {...props}
+          chatError={{ ...error, requestId: 'request-3' }}
+        />
+      );
+      expect(vi.getTimerCount()).toBeGreaterThan(0);
+      unmount();
+      expect(vi.getTimerCount()).toBe(0);
+    } finally {
+      unmount();
+      vi.useRealTimers();
+    }
+  });
+
+  it.each([
+    { failedMessage: undefined, isBusy: false, isSubmitted: false },
+    { failedMessage: 'Keep my draft', isBusy: true, isSubmitted: false },
+    { failedMessage: 'Keep my draft', isBusy: false, isSubmitted: true },
+  ])('preserves retry guards after expiry: %j', props => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-01-01T00:00:00Z'));
+    const handleRetry = vi.fn();
+    const { unmount } = render(
+      <OnboardingMessageRecoveryRow
+        chatError={makeChatError({
+          retryAfter: 1,
+          failedMessage: props.failedMessage,
+        })}
+        handleRetry={handleRetry}
+        isBusy={props.isBusy}
+        isSubmitted={props.isSubmitted}
+      />
+    );
+    try {
+      act(() => vi.advanceTimersByTime(1_050));
+      expect(screen.queryByText(/^Try again in /)).not.toBeInTheDocument();
+      const retry = screen.queryByRole('button', { name: 'Retry message' });
+      if (props.failedMessage) {
+        expect(retry).toBeDisabled();
+        fireEvent.click(retry!);
+      } else {
+        expect(retry).not.toBeInTheDocument();
+      }
+      expect(handleRetry).not.toHaveBeenCalled();
+    } finally {
+      unmount();
+      vi.useRealTimers();
+    }
   });
 });
