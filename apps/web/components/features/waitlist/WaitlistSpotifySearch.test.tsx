@@ -259,6 +259,23 @@ describe('WaitlistSpotifySearch', () => {
     vi.useRealTimers();
   });
 
+  it('clears the pending blur-hide timer on unmount so no deferred setState outlives teardown', () => {
+    vi.useFakeTimers();
+    try {
+      const { unmount } = renderSearch();
+      const combobox = screen.getByRole('combobox');
+
+      fireEvent.change(combobox, { target: { value: 'a' } });
+      fireEvent.blur(combobox);
+      expect(vi.getTimerCount()).toBeGreaterThan(0);
+
+      unmount();
+      expect(vi.getTimerCount()).toBe(0);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('keeps a typed link across a rerender in link mode', async () => {
     const user = userEvent.setup();
     let url = '';

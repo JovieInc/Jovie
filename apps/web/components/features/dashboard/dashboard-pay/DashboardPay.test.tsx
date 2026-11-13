@@ -127,6 +127,17 @@ describe('DashboardPay', () => {
   });
 });
 
+describe('DashboardPay scale tokens', () => {
+  it('uses the 16px text-base step instead of the text-lg alias', () => {
+    const source = readFileSync(
+      resolve(__dirname, './DashboardPay.tsx'),
+      'utf8'
+    );
+
+    expect(source).not.toMatch(/(?<![\w-])text-lg\b/);
+  });
+});
+
 describe('DashboardPay icon geometry', () => {
   it('keeps glyphs on the 4px grid (16px, never the 18px half step)', () => {
     const source = readFileSync(

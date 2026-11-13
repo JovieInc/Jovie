@@ -428,7 +428,7 @@ function DocumentEditor({
             setIsDirty(true);
             setStatus('idle');
           }}
-          className='w-full bg-transparent text-lg font-semibold text-primary-token outline-none focus-visible:outline-2 focus-visible:outline-offset-2'
+          className='w-full bg-transparent text-base font-semibold text-primary-token outline-none focus-visible:outline-2 focus-visible:outline-offset-2'
         />
         <label className='flex items-center justify-between gap-3 text-xs text-secondary-token'>
           <span>Document Type</span>

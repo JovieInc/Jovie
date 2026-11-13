@@ -317,7 +317,7 @@ export function DrawerHero({
               lineCount={resolvedSubtitleLineClamp}
               size='xs'
               className={cn(
-                'mt-1 text-xs leading-[16px] text-tertiary-token',
+                'mt-1 text-xs leading-4 text-tertiary-token',
                 subtitleClassName
               )}
               testId='drawer-hero-subtitle-slot'
