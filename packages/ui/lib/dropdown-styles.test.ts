@@ -295,9 +295,15 @@ describe('dropdown-styles', () => {
   });
 
   describe('search styles', () => {
-    it('MENU_SEARCH_INPUT_BASE includes shared search field sizing', () => {
+    it('menu search blends into its surface without changing compact size or focus', () => {
       expect(MENU_SEARCH_INPUT_BASE).toContain('h-7');
+      expect(MENU_SEARCH_INPUT_BASE).toContain('bg-transparent');
+      expect(MENU_SEARCH_INPUT_BASE).toContain('border-transparent');
+      expect(MENU_SEARCH_INPUT_BASE).not.toContain('bg-surface-1');
+      expect(MENU_SEARCH_INPUT_BASE).not.toContain('border-subtle');
       expect(MENU_SEARCH_INPUT_BASE).toContain('focus-visible:border-focus');
+      expect(MENU_SEARCH_INPUT_BASE).toContain('focus-visible:ring-2');
+      expect(MENU_SEARCH_INPUT_BASE).toContain('focus-visible:ring-focus/25');
     });
 
     it('search icon and clear button avoid transform-based centering', () => {
