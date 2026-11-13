@@ -9,13 +9,14 @@ test.describe('Outbound review geometry', () => {
     await page.goto(
       '/iframe.html?id=admin-outbound-workspace--long-imported-identity&viewMode=story'
     );
-    await page.getByRole('button', { name: /Needs evidence 1/ }).click();
+    await page.getByRole('button', { name: /All Outbound views/ }).click();
+    await page.getByRole('menuitemradio', { name: 'Needs evidence 1' }).click();
     const row = page.locator('[data-testid^="outbound-row-"]');
     await expect(row).toBeVisible({ timeout: 60_000 });
     await expect(
       row.getByTitle('Ada — Listen on YouTube, Spotify, Apple Music')
     ).toHaveText('Ada — Listen on YouTube, Spotify, Apple Music');
-    const action = row.getByRole('button', { name: 'Gather Evidence' });
+    const action = row.getByRole('button', { name: /^Review / });
     const box = await action.boundingBox();
     expect(box).not.toBeNull();
     expect(box!.x + box!.width).toBeLessThanOrEqual(390);
@@ -42,7 +43,7 @@ test.describe('Outbound review geometry', () => {
       const tableBox = await table.boundingBox();
       expect(tableBox).not.toBeNull();
       for (const row of await rows.all()) {
-        const action = row.getByRole('button', { name: 'Review Facts' });
+        const action = row.getByRole('button', { name: /^Review / });
         const actionBox = await action.boundingBox();
         expect(actionBox).not.toBeNull();
         expect(actionBox!.x + actionBox!.width).toBeLessThanOrEqual(
@@ -50,9 +51,7 @@ test.describe('Outbound review geometry', () => {
         );
         expect((await row.boundingBox())!.height).toBe(40);
       }
-      for (const status of await table
-        .getByText(/^(Not scored|Presence only)$/)
-        .all()) {
+      for (const status of await table.getByText(/^Presence only$/).all()) {
         await expect(status).toBeVisible();
         const fits = await status.evaluate(element => {
           const cell = element.closest('[data-table-cell-content]')!;
@@ -75,6 +74,81 @@ test.describe('Outbound review geometry', () => {
         await page.keyboard.press('k');
         await expect(rows.first()).toHaveClass(/system-b-table-row-selected/);
       }
+
+      const views = page.getByRole('button', { name: /All Outbound views/ });
+      const viewsBox = await views.boundingBox();
+      expect(viewsBox!.x + viewsBox!.width).toBeLessThanOrEqual(width);
+      await views.focus();
+      await page.keyboard.press('Enter');
+      await expect(
+        page.getByRole('menuitemradio', { name: 'Sent 1' })
+      ).toBeVisible();
+      await expect(
+        page.getByRole('menuitemradio', { name: 'Paid 0' })
+      ).toBeVisible();
+      await page.keyboard.press('End');
+      await page.keyboard.press('Enter');
+      await expect(page.getByText('Nobody in Rejected')).toBeVisible();
+      await views.click();
+      await page.keyboard.press('Home');
+      await page.keyboard.press('Enter');
+      await expect(rows).toHaveCount(2);
+
+      const shortcuts = page.getByText('Keyboard shortcuts');
+      await shortcuts.focus();
+      await page.keyboard.press('Enter');
+      await expect(page.getByText(/j\/k person/)).toBeVisible();
+      await page.keyboard.press('Enter');
+      await expect(page.getByText(/j\/k person/)).not.toBeVisible();
+      await expect(
+        page.getByText(
+          'Approving records your decision; nothing sends automatically.'
+        )
+      ).toBeVisible();
     });
   }
+
+  test('keeps scored bands and presence-only provenance beside explicit unknown markers', async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto(
+      '/iframe.html?id=admin-outbound-workspace--mixed-scores&viewMode=story'
+    );
+    await expect(page.getByTestId('ovie-outbound-table')).toBeVisible({
+      timeout: 60_000,
+    });
+    await expect(page.getByTitle('High. Ability to pay band')).toHaveText(
+      'High'
+    );
+    await expect(page.getByTitle('Med. Buying intent band')).toHaveText('Med');
+    const unknown = page.getByTitle('Not scored. Ability to pay band');
+    await expect(
+      unknown.getByRole('img', { name: 'Not scored' })
+    ).toBeVisible();
+    await expect(page.getByText('Presence only')).toBeVisible();
+    await expect(page.getByText('Not scored or no trigger')).toBeVisible();
+  });
+
+  test('collapses views by available table width on a desktop viewport', async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto(
+      '/iframe.html?id=admin-outbound-workspace--queue&viewMode=story'
+    );
+    await page.getByTestId('ovie-outbound-page').evaluate(element => {
+      element.style.width = '420px';
+    });
+    await expect(
+      page.getByRole('button', { name: 'Ready to certify 2', exact: true })
+    ).not.toBeVisible();
+    const menu = page.getByRole('button', { name: /All Outbound views/ });
+    const box = await menu.boundingBox();
+    expect(box!.x + box!.width).toBeLessThanOrEqual(420);
+    await menu.click();
+    await expect(
+      page.getByRole('menuitemradio', { name: 'Sent 1' })
+    ).toBeVisible();
+  });
 });

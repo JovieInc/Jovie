@@ -5,6 +5,20 @@ import { OutboundNameCell } from './OutboundNameCell';
 import { outboundFixtureRow } from './outbound-fixtures';
 
 describe('OutboundNameCell', () => {
+  it('retains the source handle without inventing a missing display name', () => {
+    const row = outboundFixtureRow({ name: '', handle: 'source_handle' });
+    render(
+      <TooltipProvider>
+        <OutboundNameCell row={row} />
+      </TooltipProvider>
+    );
+    expect(screen.getByTitle('')).toBeEmptyDOMElement();
+    expect(screen.getByTitle('@source_handle')).toHaveTextContent(
+      '@source_handle'
+    );
+    expect(row.name).toBe('');
+  });
+
   it('preserves the full imported identity when the cell truncates visually', () => {
     const row = outboundFixtureRow({
       name: 'Ada — Listen on YouTube, Spotify, Apple Music',

@@ -1,6 +1,6 @@
 'use client';
 
-import { Button, Checkbox } from '@jovie/ui';
+import { Button, Checkbox, StatusGlyph } from '@jovie/ui';
 import { AlertTriangle, RefreshCw } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { toast } from '@/components/feedback';
@@ -24,7 +24,6 @@ import type {
 import {
   OUTBOUND_NEXT_ACTION_LABELS,
   OUTBOUND_VIEW_LABELS,
-  OUTBOUND_VIEWS,
   type OutboundBand,
   type OutboundCopy,
   type OutboundRejectReason,
@@ -46,6 +45,7 @@ import { formatTimeAgo } from '@/lib/utils/date-formatting';
 import { OutboundNameCell } from './OutboundNameCell';
 import { OutboundRail } from './OutboundRail';
 import { OutboundReadinessPanel } from './OutboundReadinessPanel';
+import { OutboundViews } from './OutboundViews';
 import {
   isTypingTarget,
   resolveOutboundKey,
@@ -70,8 +70,8 @@ const BAND_TITLES = {
   fit: 'Fit band from the qualification fit score',
   presence:
     'Score counts only link and tool presence (Spotify link, link-in-bio, tools), so it says nothing about fit',
-  ability: 'Ability to pay is not measured yet (JOV-6650)',
-  intent: 'Buying intent is not measured yet (JOV-6650)',
+  ability: 'Ability to pay band',
+  intent: 'Buying intent band',
 } as const;
 
 function BandCell({
@@ -83,13 +83,17 @@ function BandCell({
   const label = presenceOnly ? 'Presence only' : BAND_LABELS[band];
   return (
     <span
-      title={presenceOnly ? BAND_TITLES.presence : BAND_TITLES[id]}
+      title={`${label}. ${presenceOnly ? BAND_TITLES.presence : BAND_TITLES[id]}`}
       className={cn(
         'whitespace-nowrap text-xs tabular-nums',
         band === 'unknown' ? 'text-quaternary-token' : 'text-secondary-token'
       )}
     >
-      {label}
+      {band === 'unknown' && !presenceOnly ? (
+        <StatusGlyph state='unknown' size='sm' tooltipLabel='Not scored' />
+      ) : (
+        label
+      )}
     </span>
   );
 }
@@ -155,12 +159,19 @@ function buildColumns(
         const trigger = getValue() as string | null;
         return (
           <span
+            title={trigger ?? 'No trigger'}
             className={cn(
               'block max-w-56 truncate text-xs',
               trigger ? 'text-secondary-token' : 'text-quaternary-token'
             )}
           >
-            {trigger ?? 'No trigger'}
+            {trigger ?? (
+              <StatusGlyph
+                state='unknown'
+                size='sm'
+                tooltipLabel='No trigger'
+              />
+            )}
           </span>
         );
       },
@@ -201,12 +212,14 @@ function buildColumns(
           <Button
             size='sm'
             variant={row.original.leadId === activeId ? 'secondary' : 'ghost'}
+            aria-label={`Review ${row.original.name}`}
+            title={`Open review. Suggested next step: ${label}.`}
             onClick={event => {
               event.stopPropagation();
               open(row.original);
             }}
           >
-            {label.replace(/\b\w/g, letter => letter.toUpperCase())}
+            Review
           </Button>
         );
       },
@@ -520,46 +533,29 @@ export function OutboundWorkspace() {
         <AdminTableSubheader
           className='border-b border-(--app-shell-frame-seam)'
           start={
-            <div
-              className='flex items-center gap-0.5 overflow-x-auto'
-              role='toolbar'
-              aria-label='Outbound Views'
-            >
-              {OUTBOUND_VIEWS.map(option => (
-                <PageToolbarTabButton
-                  key={option}
-                  active={view === option}
-                  onClick={() => {
-                    setView(option);
-                    setFocusedIndex(0);
-                    setBulk(new Set());
-                  }}
-                  label={
-                    <span className='inline-flex items-center gap-1.5 whitespace-nowrap'>
-                      {OUTBOUND_VIEW_LABELS[option]}
-                      <span
-                        className='min-w-4 text-left tabular-nums text-quaternary-token'
-                        data-testid={`outbound-count-${option}`}
-                      >
-                        {queue ? queue.counts[option] : ''}
-                      </span>
-                    </span>
-                  }
-                />
-              ))}
-            </div>
+            <OutboundViews
+              view={view}
+              counts={queue?.counts}
+              onViewChange={option => {
+                setView(option);
+                setFocusedIndex(0);
+                setBulk(new Set());
+              }}
+            />
           }
           end={
             <>
-              <span
-                className={cn(
-                  PAGE_TOOLBAR_META_TEXT_CLASS,
-                  'min-w-24 text-right'
-                )}
-                data-testid='outbound-bulk-count'
-              >
-                {bulk.size ? `${bulk.size} selected · h hold · r reject` : ''}
-              </span>
+              {bulk.size ? (
+                <span
+                  className={cn(
+                    PAGE_TOOLBAR_META_TEXT_CLASS,
+                    'min-w-24 text-right'
+                  )}
+                  data-testid='outbound-bulk-count'
+                >
+                  {`${bulk.size} selected · h hold · r reject`}
+                </span>
+              ) : null}
               <PageToolbarTabButton
                 active={showReadiness}
                 onClick={() => setShowReadiness(current => !current)}
@@ -638,11 +634,22 @@ export function OutboundWorkspace() {
             />
           )}
         </AdminTableShell>
-        <p className='border-t border-(--app-shell-frame-seam) px-3 py-1.5 text-2xs text-tertiary-token'>
-          j/k person · [/] fact · y/n/u answer fact · a approve message · h hold
-          · r reject · x select. Approving records your decision; nothing sends
-          automatically.
-        </p>
+        <div className='flex flex-wrap items-baseline gap-x-3 border-t border-(--app-shell-frame-seam) px-3 py-1.5 text-2xs text-tertiary-token'>
+          <p className='inline-flex items-center gap-1.5'>
+            <StatusGlyph state='unknown' size='sm' aria-hidden='true' />
+            Not scored or no trigger
+          </p>
+          <details>
+            <summary className='cursor-pointer rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus/35'>
+              Keyboard shortcuts
+            </summary>
+            <p>
+              j/k person · left/right bracket: previous/next fact · y/n/u answer
+              fact · a approve message · h hold · r reject · x select.
+            </p>
+          </details>
+          <p>Approving records your decision; nothing sends automatically.</p>
+        </div>
       </div>
     </PageShell>
   );

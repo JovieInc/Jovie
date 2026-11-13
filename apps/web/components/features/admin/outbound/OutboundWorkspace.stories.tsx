@@ -115,6 +115,23 @@ export const EmptyQueue: Story = {
   ],
 };
 
+export const MixedScores: Story = {
+  decorators: [
+    Story => (
+      <SeededQuery
+        data={outboundFixtureQueue([
+          outboundFixtureRow({ ability: 'high', intent: 'medium' }),
+          queue.rows[1],
+        ])}
+      >
+        <div className='h-screen bg-base text-primary-token'>
+          <Story />
+        </div>
+      </SeededQuery>
+    ),
+  ],
+};
+
 /** Imported display names stay intact; the fixture never cleans canonical data. */
 export const LongImportedIdentity: Story = {
   decorators: [

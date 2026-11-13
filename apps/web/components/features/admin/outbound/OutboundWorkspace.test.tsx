@@ -10,6 +10,7 @@ import { OUTBOUND_RAIL_COMMAND_EVENT } from './outbound-keys';
 const mocks = vi.hoisted(() => ({
   query: vi.fn(),
   decide: vi.fn(),
+  refreshEvidence: vi.fn(),
   panels: [] as ReactElement[],
 }));
 
@@ -24,7 +25,9 @@ vi.mock('@/lib/queries/useOutboundQuery', () => ({
   }),
   useOutboundDecisionMutation: () => ({ mutateAsync: mocks.decide }),
   useOutboundFactReviewMutation: () => ({ mutateAsync: vi.fn() }),
-  useOutboundRefreshEvidenceMutation: () => ({ mutateAsync: vi.fn() }),
+  useOutboundRefreshEvidenceMutation: () => ({
+    mutateAsync: mocks.refreshEvidence,
+  }),
   getOutboundDecisionErrorMessage: () => 'refused',
 }));
 vi.mock('@/hooks/useRegisterRightPanel', () => ({
@@ -95,6 +98,9 @@ describe('OutboundWorkspace', () => {
     expect(screen.getAllByRole('columnheader')).toEqual(headers);
     expect(screen.getByText('Nobody in Ready to certify')).toBeInTheDocument();
     expect(container.querySelector('[data-empty-state-card]')).toBeNull();
+    expect(screen.queryByRole('button', { name: /^Review / })).toBeNull();
+    expect(mocks.decide).not.toHaveBeenCalled();
+    expect(mocks.refreshEvidence).not.toHaveBeenCalled();
   });
 
   beforeEach(() => {
@@ -106,15 +112,19 @@ describe('OutboundWorkspace', () => {
   it('defaults to Ready to certify with ranked people and view counts', () => {
     mockQueue(outboundFixtureQueue([ADA, BEA, SENT]));
     renderWorkspace();
-    expect(screen.getByTestId('outbound-count-ready')).toHaveTextContent('2');
-    expect(screen.getByTestId('outbound-count-sent')).toHaveTextContent('1');
+    expect(
+      screen.getByRole('button', { name: 'Ready to certify 2' })
+    ).toHaveAttribute('aria-pressed', 'true');
+    expect(
+      screen.getByRole('button', { name: 'Needs evidence 0' })
+    ).toBeInTheDocument();
     expect(screen.getByText('Ada')).toBeInTheDocument();
     expect(screen.getByText('Bea')).toBeInTheDocument();
     expect(screen.queryByText('Cy')).toBeNull();
     expect(screen.getAllByText('Released 5 days ago')).toHaveLength(2);
   });
 
-  it('shows "No trigger" instead of a static attribute and flags non-artists', () => {
+  it('explicitly marks an absent trigger and flags non-artists', () => {
     mockQueue(
       outboundFixtureQueue([
         outboundFixtureRow({
@@ -131,20 +141,51 @@ describe('OutboundWorkspace', () => {
       ])
     );
     renderWorkspace();
-    expect(screen.getByText('No trigger')).toBeInTheDocument();
+    expect(screen.getByRole('img', { name: 'No trigger' })).toBeInTheDocument();
     expect(screen.getByText('Presence only')).toBeInTheDocument();
     expect(screen.getByTestId('outbound-flag-non-artist')).toHaveTextContent(
       'Possible non-artist'
     );
     expect(
-      screen.getByTestId('outbound-count-needs_evidence')
+      screen.getByRole('button', { name: 'Needs evidence 0' })
     ).toHaveTextContent('0');
   });
 
   it('shows a retryable error state', () => {
-    mockQueue(undefined, { isError: true });
+    const refetch = vi.fn();
+    mockQueue(undefined, { isError: true, refetch });
     renderWorkspace();
     expect(screen.getByText('Outbound queue unavailable')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^Review / })).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
+    expect(refetch).toHaveBeenCalledOnce();
+    expect(mocks.decide).not.toHaveBeenCalled();
+    expect(mocks.refreshEvidence).not.toHaveBeenCalled();
+  });
+
+  it('explains unknown markers once and keeps the no-auto-send explanation outside shortcuts', () => {
+    mockQueue(outboundFixtureQueue([ADA, BEA]));
+    renderWorkspace();
+    expect(screen.getByText('Not scored or no trigger')).toBeInTheDocument();
+    const shortcuts = screen.getByText('Keyboard shortcuts').closest('details');
+    expect(shortcuts).not.toHaveAttribute('open');
+    const safety = screen.getByText(
+      'Approving records your decision; nothing sends automatically.'
+    );
+    expect(safety.closest('details')).toBeNull();
+    expect(screen.getAllByRole('img', { name: 'Not scored' })).toHaveLength(4);
+  });
+
+  it('labels rail navigation as Review without dispatching the suggested action', () => {
+    const row = outboundFixtureRow({ nextAction: 'gather_evidence' });
+    mockQueue(outboundFixtureQueue([row]));
+    renderWorkspace();
+    fireEvent.click(screen.getByRole('button', { name: 'Review Ada' }));
+    expect(mocks.decide).not.toHaveBeenCalled();
+    expect(mocks.refreshEvidence).not.toHaveBeenCalled();
+    expect(
+      (mocks.panels.at(-1) as ReactElement<{ row: typeof row }>).props.row
+    ).toBe(row);
   });
 
   it('holds every selected person in bulk, one decision per person', () => {
@@ -181,6 +222,7 @@ describe('OutboundWorkspace', () => {
     window.removeEventListener(OUTBOUND_RAIL_COMMAND_EVENT, listener);
     expect(commands).toEqual(['approve']);
     expect(mocks.decide).not.toHaveBeenCalled();
+    expect(mocks.refreshEvidence).not.toHaveBeenCalled();
   });
 
   it('moves through people with j and k', () => {
@@ -201,17 +243,23 @@ describe('OutboundWorkspace', () => {
   it('shows the next action as a button that opens the person', () => {
     mockQueue(outboundFixtureQueue([ADA, BEA]));
     renderWorkspace();
-    fireEvent.click(screen.getAllByRole('button', { name: 'Review Facts' })[1]);
+    fireEvent.click(screen.getByRole('button', { name: 'Review Bea' }));
     const rail = mocks.panels.at(-1) as ReactElement<{
       row: { leadId: string } | null;
     }>;
     expect(rail.props.row?.leadId).toBe(BEA.leadId);
-    expect(screen.getAllByText('Not scored').length).toBeGreaterThan(0);
+    expect(
+      screen.getAllByRole('img', { name: 'Not scored' }).length
+    ).toBeGreaterThan(0);
   });
 
   it.each([
-    ['build_profile', 'Build Profile'],
-    ['gather_evidence', 'Gather Evidence'],
+    ['build_profile', 'Build profile'],
+    ['gather_evidence', 'Gather evidence'],
+    ['check_entity', 'Check entity'],
+    ['review_facts', 'Review facts'],
+    ['approve_message', 'Approve message'],
+    ['send', 'Ready to send'],
   ] as const)(
     'keeps %s as navigation with the full imported identity',
     (nextAction, label) => {
@@ -222,7 +270,12 @@ describe('OutboundWorkspace', () => {
       mockQueue(outboundFixtureQueue([row]));
       renderWorkspace();
       expect(screen.getByTitle(row.name)).toHaveTextContent(row.name);
-      fireEvent.click(screen.getByRole('button', { name: label }));
+      const review = screen.getByRole('button', { name: `Review ${row.name}` });
+      expect(review).toHaveAttribute(
+        'title',
+        `Open review. Suggested next step: ${label}.`
+      );
+      fireEvent.click(review);
       const rail = mocks.panels.at(-1) as ReactElement<{
         row: { leadId: string; name: string } | null;
       }>;
@@ -231,6 +284,7 @@ describe('OutboundWorkspace', () => {
         name: row.name,
       });
       expect(mocks.decide).not.toHaveBeenCalled();
+      expect(mocks.refreshEvidence).not.toHaveBeenCalled();
     }
   );
 });
