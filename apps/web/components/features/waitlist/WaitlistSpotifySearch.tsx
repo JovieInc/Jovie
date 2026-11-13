@@ -19,6 +19,7 @@ import { type SpotifyArtistResult, useArtistSearchQuery } from '@/lib/queries';
 import { cn } from '@/lib/utils';
 import { handleActivationKeyDown } from '@/lib/utils/keyboard';
 import type { FormErrors } from './types';
+import { useResultsVisibility } from './useResultsVisibility';
 
 interface WaitlistSpotifySearchProps {
   readonly spotifyUrl: string;
@@ -50,7 +51,6 @@ export function WaitlistSpotifySearch({
 }: WaitlistSpotifySearchProps) {
   const [mode, setMode] = useState<'search' | 'url'>('search');
   const [searchQuery, setSearchQuery] = useState('');
-  const [showResults, setShowResults] = useState(false);
   const [activeIndex, setActiveIndex] = useState(-1);
   const [selectedArtistName, setSelectedArtistName] = useState<string | null>(
     null
@@ -58,33 +58,7 @@ export function WaitlistSpotifySearch({
 
   const inputRef = useRef<HTMLInputElement | null>(null);
   const resultsListRef = useRef<HTMLDivElement>(null);
-  const hideResultsTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
-    null
-  );
-
-  // Clear the pending blur-hide timer on unmount so the deferred
-  // setShowResults can never fire after the DOM environment is gone
-  // (vitest teardown: unhandled `ReferenceError: window is not defined`).
-  useEffect(
-    () => () => {
-      if (hideResultsTimeoutRef.current !== null) {
-        clearTimeout(hideResultsTimeoutRef.current);
-        hideResultsTimeoutRef.current = null;
-      }
-    },
-    []
-  );
-
-  // Grace period after blur so a fast click on a result still lands.
-  const scheduleHideResults = useCallback(() => {
-    if (hideResultsTimeoutRef.current !== null) {
-      clearTimeout(hideResultsTimeoutRef.current);
-    }
-    hideResultsTimeoutRef.current = setTimeout(() => {
-      hideResultsTimeoutRef.current = null;
-      setShowResults(false);
-    }, 150);
-  }, []);
+  const { showResults, show, hideNow, scheduleHide } = useResultsVisibility();
 
   const { results, state, search, clear } = useArtistSearchQuery({
     debounceMs: 300,
@@ -122,9 +96,9 @@ export function WaitlistSpotifySearch({
       setActiveIndex(-1);
       setSelectedArtistName(null);
       search(value);
-      setShowResults(true);
+      show();
     },
-    [search]
+    [search, show]
   );
 
   const handleArtistSelect = useCallback(
@@ -133,17 +107,17 @@ export function WaitlistSpotifySearch({
       setSelectedArtistName(artist.name);
       onArtistNameChange(artist.name);
       setSearchQuery('');
-      setShowResults(false);
+      hideNow();
       setActiveIndex(-1);
       clear();
       setMode('url');
     },
-    [onUrlChange, onArtistNameChange, clear]
+    [onUrlChange, onArtistNameChange, clear, hideNow]
   );
 
   const handleManualAddClick = useCallback(() => {
     setSearchQuery('');
-    setShowResults(false);
+    hideNow();
     setActiveIndex(-1);
     clear();
     setMode('url');
@@ -164,7 +138,7 @@ export function WaitlistSpotifySearch({
       if (!showResults) {
         if (e.key === 'Escape') {
           e.preventDefault();
-          setShowResults(false);
+          hideNow();
         }
         return;
       }
@@ -189,11 +163,11 @@ export function WaitlistSpotifySearch({
           break;
         case 'Escape':
           e.preventDefault();
-          setShowResults(false);
+          hideNow();
           setActiveIndex(-1);
           break;
         case 'Tab':
-          setShowResults(false);
+          hideNow();
           setActiveIndex(-1);
           break;
       }
@@ -326,8 +300,8 @@ export function WaitlistSpotifySearch({
           value={searchQuery}
           onChange={handleSearchInputChange}
           onKeyDown={handleKeyDown}
-          onFocus={() => searchQuery.length >= 1 && setShowResults(true)}
-          onBlur={scheduleHideResults}
+          onFocus={() => searchQuery.length >= 1 && show()}
+          onBlur={scheduleHide}
           placeholder='Search artist name (optional)'
           disabled={isSubmitting}
           autoCapitalize='none'
