@@ -156,3 +156,26 @@ describe('ReleasesView text contrast contract (JOV-8873)', () => {
     expect(source).not.toContain('text-white/42');
   });
 });
+
+describe('ReleasesView focus ring', () => {
+  it('draws each release row focus ring from the canonical focus token', () => {
+    render(
+      <ReleasesView
+        releases={releases}
+        artistId='artist-1'
+        artistHandle='tim'
+        artistName='Tim White'
+      />
+    );
+
+    const links = screen.getAllByRole('link');
+    expect(links.length).toBeGreaterThan(0);
+    for (const link of links) {
+      expect(link).toHaveClass(
+        'focus-visible:ring-2',
+        'focus-visible:ring-focus'
+      );
+      expect(link.className).not.toContain('var(--focus-ring)');
+    }
+  });
+});

@@ -150,3 +150,17 @@ describe('SegmentedDigitBox', () => {
     await expectNoA11yViolations(container);
   });
 });
+
+describe('SegmentedDigitBox focus ring', () => {
+  it('draws the focused ring from the canonical focus token', () => {
+    const { container } = render(
+      <SegmentedDigitBox {...BASE_PROPS} isFocused />
+    );
+
+    const box = container.firstElementChild as HTMLElement;
+    expect(box.className).toContain('ring-2');
+    expect(box.className).toContain('ring-focus/18');
+    // --focus-ring is defined nowhere; a ring keyed to it has no colour.
+    expect(box.className).not.toContain('var(--focus-ring)');
+  });
+});
