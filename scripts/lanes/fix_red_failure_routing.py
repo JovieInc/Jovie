@@ -19,6 +19,31 @@ _ROLLUPS = {'ci-fast', 'PR Ready', 'Product Lane Receipt'}
 _RED = {'FAILURE', 'ERROR', 'TIMED_OUT', 'CANCELLED', 'STARTUP_FAILURE'}
 
 
+class RouteBudgetGrowth:
+    """Try the existing bounded main sync for stale ceilings, never relax a budget."""
+
+    def search(self, text):
+        clean = _ANSI.sub('', str(text or ''))
+        growth = re.compile(
+            r'^(?:\d{4}-\d\d-\d\dT[\d:.]+Z )?##\[error\]'
+            r'(?:routes\.\S+|firstLoad\.baselines\.\S+|groups\.[a-z]+\.baselineKb)'
+            r' grew (\d+(?:\.\d+)?) -> (\d+(?:\.\d+)?)\s*$')
+        matches = []
+        for line in clean.splitlines():
+            match = growth.fullmatch(line)
+            if match:
+                if float(match[2]) <= float(match[1]):
+                    return None
+                matches.append(match)
+            elif ('##[error]' in line and 'Process completed with exit code 1.' not in line
+                  or re.search(r'\bFAIL\b|\b(?:Error|AssertionError|TypeError|ReferenceError|SyntaxError):|error TS\d+:', line)):
+                return None
+        return matches[0] if matches else None
+
+
+ROUTE_BUDGET_GROWTH = RouteBudgetGrowth()
+
+
 class SoleAliasReviewFailure:
     """Signature matcher used by the existing ordered failure-class table."""
 

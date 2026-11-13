@@ -361,7 +361,9 @@ it('never resumes a running/completed job, a changed policy or expired custody',
 it('late delivery completion cannot overwrite a newer confirmed readback', async () => {
   const { record, transaction } = store();
   const req = record.capabilityRequests[0];
-  let release, started;
+  /** @type {((value?: unknown) => void) | undefined} */
+  let release;
+  let started;
   const entered = new Promise(resolve => {
     started = resolve;
   });
