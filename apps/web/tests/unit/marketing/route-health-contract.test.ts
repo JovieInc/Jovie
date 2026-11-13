@@ -264,34 +264,22 @@ describe('marketing route health contract', () => {
       requiresSharedChrome: false,
     });
 
-    for (const [url, selector] of [
-      ['/pay', '[data-testid="pay-hero"]'],
-      ['/support', '[data-testid="marketing-section-hero"]'],
+    for (const [url, selector, finalPath] of [
+      ['/pay', '[data-testid="pay-hero"]', '/pay'],
+      ['/support', '[data-testid="marketing-section-hero"]', '/support'],
+      // One front door: /waitlist capture follows the redirect to /start.
+      ['/waitlist', '[data-testid="onboarding-chat"]', '/start'],
     ] as const) {
       expect(
         MARKETING_EXACT_PUBLIC_ROUTE_TARGETS.find(target => target.url === url)
       ).toMatchObject({
         fixturePath: url,
-        expectedPath: url,
+        expectedPath: finalPath,
         expectedRuntimeSelector: selector,
         sourceSha: 'capture-time-git-sha',
         viewports: ['desktop', 'mobile'],
       });
     }
-    // One front door (Tim, 2026-11-09): anonymous /waitlist redirects into
-    // the /start onboarding chat when public signup is open, so the exact
-    // capture follows the redirect and certifies the destination DOM.
-    expect(
-      MARKETING_EXACT_PUBLIC_ROUTE_TARGETS.find(
-        target => target.url === '/waitlist'
-      )
-    ).toMatchObject({
-      fixturePath: '/waitlist',
-      expectedPath: '/start',
-      expectedRuntimeSelector: '[data-testid="onboarding-chat"]',
-      sourceSha: 'capture-time-git-sha',
-      viewports: ['desktop', 'mobile'],
-    });
 
     const waitlist = MARKETING_ROUTE_MANIFEST.find(
       entry => entry.url === '/waitlist'
@@ -367,10 +355,9 @@ describe('marketing route health contract', () => {
         for (const path of target.allowedFinalPaths) {
           // One front door (Tim, 2026-11-09): a redirect may declare an
           // app-route destination outside this manifest
-          // (healthCheck.destinationIsAppRoute — e.g. the (dynamic)/start
-          // onboarding chat, whose journey the auth/onboarding canaries and
-          // the claim checkout dogfood certify). Undeclared destinations
-          // must still be canonical active manifest pages.
+          // (healthCheck.destinationIsAppRoute, e.g. /start — certified by
+          // the canaries + claim dogfood). Undeclared destinations must
+          // still be canonical active pages.
           if (entry.healthCheck?.destinationIsAppRoute === true) {
             expect(path.startsWith('/'), path).toBe(true);
             continue;
@@ -405,9 +392,7 @@ describe('marketing route health contract', () => {
       entry =>
         entry.status === 'active' &&
         ((entry.healthCheck?.expected ?? 'page') === 'page' ||
-          // Declared app-route redirect recoveries (e.g. /waitlist -> /start)
-          // are captured too: the cert follows the redirect and certifies the
-          // destination DOM.
+          // Declared app-route recoveries (/waitlist -> /start) are captured.
           entry.healthCheck?.destinationIsAppRoute === true) &&
         !entry.url.includes('*') &&
         entry.url !== '/renders' &&
