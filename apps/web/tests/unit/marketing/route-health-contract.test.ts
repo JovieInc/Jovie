@@ -365,6 +365,16 @@ describe('marketing route health contract', () => {
       if (entry.status === 'active' && target.expected === 'redirect') {
         expect(target.allowedFinalPaths.length).toBeGreaterThan(0);
         for (const path of target.allowedFinalPaths) {
+          // One front door (Tim, 2026-11-09): a redirect may declare an
+          // app-route destination outside this manifest
+          // (healthCheck.destinationIsAppRoute — e.g. the (dynamic)/start
+          // onboarding chat, whose journey the auth/onboarding canaries and
+          // the claim checkout dogfood certify). Undeclared destinations
+          // must still be canonical active manifest pages.
+          if (entry.healthCheck?.destinationIsAppRoute === true) {
+            expect(path.startsWith('/'), path).toBe(true);
+            continue;
+          }
           const destination = MARKETING_ROUTE_MANIFEST.find(
             entry => entry.url === path
           );
@@ -394,7 +404,11 @@ describe('marketing route health contract', () => {
     const expectedGlobs = MARKETING_ROUTE_MANIFEST.filter(
       entry =>
         entry.status === 'active' &&
-        (entry.healthCheck?.expected ?? 'page') === 'page' &&
+        ((entry.healthCheck?.expected ?? 'page') === 'page' ||
+          // Declared app-route redirect recoveries (e.g. /waitlist -> /start)
+          // are captured too: the cert follows the redirect and certifies the
+          // destination DOM.
+          entry.healthCheck?.destinationIsAppRoute === true) &&
         !entry.url.includes('*') &&
         entry.url !== '/renders' &&
         !entry.url.startsWith('/renders/')
