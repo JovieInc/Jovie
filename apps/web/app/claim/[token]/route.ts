@@ -1,5 +1,6 @@
 import { type NextRequest, NextResponse } from 'next/server';
 import { recordArtistOfferStage } from '@/lib/acquisition/artist-offer-funnel.server';
+import { claimHrefWithAttribution } from '@/lib/claim/attribution';
 import {
   applyPendingClaimCookie,
   writePendingClaimContext,
@@ -109,7 +110,12 @@ export async function GET(
       : `/${encodeURIComponent(profile.usernameNormalized)}/claim?token=${encodeURIComponent(token)}&next=auth`;
 
   return applyPendingClaimCookie(
-    NextResponse.redirect(buildAbsoluteUrl(request, destination)),
+    NextResponse.redirect(
+      buildAbsoluteUrl(
+        request,
+        claimHrefWithAttribution(destination, request.nextUrl.searchParams)
+      )
+    ),
     context
   );
 }

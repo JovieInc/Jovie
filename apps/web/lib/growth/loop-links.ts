@@ -25,3 +25,28 @@ export function viaJovieQuery(medium: ViaJovieMedium): string {
 export function viaJovieHref(medium: ViaJovieMedium, path = '/'): string {
   return `${path}${viaJovieQuery(medium)}`;
 }
+
+/** App-safe counterpart of scripts/lib/growth-registry.mjs trackedLink. */
+export function trackedLink(
+  loop: {
+    readonly id: string;
+    readonly utmSource: string;
+    readonly utmMedium: string;
+  },
+  url: string,
+  { content }: { readonly content?: string } = {}
+): string {
+  const result = new URL(url);
+  result.searchParams.set('utm_source', loop.utmSource);
+  result.searchParams.set('utm_medium', loop.utmMedium);
+  result.searchParams.set('utm_campaign', loop.id);
+  if (content) result.searchParams.set('utm_content', content);
+  return result.toString();
+}
+
+// Pinned to canon/growth-loops.jsonl by claim-url.test.ts, like Via Jovie above.
+export const CLAIM_LINK_OUTREACH_LOOP = {
+  id: 'claim-link-outreach',
+  utmSource: 'claim_link',
+  utmMedium: 'dm',
+} as const;

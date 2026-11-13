@@ -15,6 +15,7 @@ import {
   DOGFOOD_GATE_CLOSED,
   type DogfoodGateResult,
 } from './cold/dogfood-gate';
+import { type ColdQueueDraftContext, coldQueueDraft } from './cold/queue-draft';
 import type {
   OutboundBand,
   OutboundChannel,
@@ -228,6 +229,8 @@ export function buildOutboundRow(input: {
   readonly now: Date;
   /** Null explicitly disables the feature; missing evidence always closes it. */
   readonly dogfoodGate?: DogfoodGateResult | null;
+  readonly coldDraftEnabled?: boolean;
+  readonly coldDraftContext?: ColdQueueDraftContext | null;
 }): Omit<OutboundRow, 'rank'> {
   const { facts, target } = input;
   const approval = resolveOutboundApproval(target, input.ledger);
@@ -243,10 +246,10 @@ export function buildOutboundRow(input: {
   if (basis === 'presence_only') flags.push('presence_only_fit');
   const missing = missingEvidence(facts);
   const gate =
-    input.dogfoodGate === null
+    input.dogfoodGate === null && !input.coldDraftEnabled
       ? null
       : (input.dogfoodGate ?? DOGFOOD_GATE_CLOSED);
-  const view =
+  let view =
     gate && !gate.passed
       ? 'needs_judge'
       : classify(facts, approval, flags, missing);
@@ -257,19 +260,44 @@ export function buildOutboundRow(input: {
   const message =
     gate && !gate.passed
       ? null
-      : approval.latestCopy
-        ? approval.latestCopy
-        : channel && target.claimUrl
-          ? {
-              ...draftOutboundCopy({
-                channel,
-                displayName: name,
-                claimUrl: target.claimUrl,
-                dmCopy: facts.dmCopy,
-              }),
-              revision: null,
-            }
-          : null;
+      : input.coldDraftEnabled && channel === 'email'
+        ? facts.certified
+          ? coldQueueDraft(
+              target,
+              input.coldDraftContext,
+              approval.latestCopy,
+              input.now
+            )
+          : null
+        : approval.latestCopy
+          ? approval.latestCopy.channel === channel
+            ? approval.latestCopy
+            : null
+          : channel && target.claimUrl
+            ? {
+                ...draftOutboundCopy({
+                  channel,
+                  displayName: name,
+                  claimUrl: target.claimUrl,
+                  dmCopy: facts.dmCopy,
+                }),
+                revision: null,
+              }
+            : null;
+  if (
+    input.coldDraftEnabled &&
+    channel === 'email' &&
+    !message &&
+    view !== 'needs_judge'
+  ) {
+    flags.push('cold_draft_unavailable');
+    if (
+      ['ready', 'certified', 'approved', 'flagged', 'needs_evidence'].includes(
+        view
+      )
+    )
+      view = 'flagged';
+  }
   return {
     leadId: facts.id,
     dedupeKey: input.dedupeKey,

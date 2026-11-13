@@ -6,6 +6,7 @@ import {
   claimStateHref,
   requiresManualVerification,
 } from '@/lib/claim/artist-offer-claim';
+import { appendClaimAttribution } from '@/lib/claim/attribution';
 import {
   applyPendingClaimCookie,
   clearPendingClaimContext,
@@ -79,10 +80,13 @@ function buildAuthStartPath(params: {
   spotifyArtistName: string;
   spotifyUrl: string | null;
   isSignedIn: boolean;
+  attribution: URLSearchParams;
 }): string {
   const onboardingParams = new URLSearchParams({
     handle: params.username,
   });
+
+  appendClaimAttribution(onboardingParams, params.attribution);
 
   if (params.isSignedIn) {
     return `${APP_ROUTES.START}?${onboardingParams.toString()}`;
@@ -92,6 +96,8 @@ function buildAuthStartPath(params: {
     handle: params.username,
     redirect_url: `${APP_ROUTES.START}?${onboardingParams.toString()}`,
   });
+
+  appendClaimAttribution(signUpParams, params.attribution);
 
   if (params.spotifyUrl) {
     signUpParams.set('spotify_url', params.spotifyUrl);
@@ -160,6 +166,7 @@ export async function GET(
               spotifyArtistName: profile.displayName ?? profile.username,
               spotifyUrl: getCanonicalSpotifyUrl(profile),
               isSignedIn: Boolean(userId),
+              attribution: searchParams,
             })
           ),
           context
@@ -205,6 +212,7 @@ export async function GET(
           spotifyArtistName: profile.displayName ?? profile.username,
           spotifyUrl: getCanonicalSpotifyUrl(profile),
           isSignedIn: Boolean(userId),
+          attribution: searchParams,
         })
       );
     }
@@ -247,6 +255,7 @@ export async function GET(
           spotifyArtistName: profile.displayName ?? profile.username,
           spotifyUrl: getCanonicalSpotifyUrl(profile),
           isSignedIn: Boolean(userId),
+          attribution: searchParams,
         })
       ),
       context

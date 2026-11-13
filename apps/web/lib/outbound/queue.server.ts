@@ -9,6 +9,7 @@ import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { getAppFlagValue } from '@/lib/flags/server';
 import { resolveLeadClaimToken } from '@/lib/leads/lead-claim-token';
 import { readDogfoodGates } from './cold/dogfood-gate.server';
+import { createColdQueueDraftContextReader } from './cold/queue-draft.server';
 import { outboundTargetFromLead, readOutboundLedger } from './ledger.server';
 import {
   buildOutboundRow,
@@ -154,6 +155,9 @@ export async function getOutboundQueue(
   const gateEnabled = await getAppFlagValue('OUTBOUND_DOGFOOD_GATE').catch(
     () => true
   );
+  const coldDraftEnabled = await getAppFlagValue('OUTBOUND_COLD_DRAFTS').catch(
+    () => false
+  );
   const [ledger, certifications, replies, evidence, dogfood] =
     await Promise.all([
       readOutboundLedger(leadIds),
@@ -185,29 +189,52 @@ export async function getOutboundQueue(
   const certified = new Set(certifications.map(row => row.dedupeKey));
   const replied = new Set(replies.map(row => row.leadId));
 
-  const built = leadRows.map(row => {
-    const dedupeKey = dedupeKeys.get(row.id) ?? null;
-    const facts: OutboundLeadFacts = {
-      ...row,
-      certified: dedupeKey !== null && certified.has(dedupeKey),
-      replied: replied.has(row.id),
-      evidenceClasses: row.creatorProfileId
-        ? (evidence.get(row.creatorProfileId) ?? [])
-        : null,
-    };
-    return buildOutboundRow({
-      facts,
-      target: outboundTargetFromLead(row),
-      dedupeKey,
-      ledger: ledger.get(row.id) ?? [],
-      now,
-      dogfoodGate: gateEnabled
-        ? row.creatorProfileId
-          ? dogfood?.byProfile.get(row.creatorProfileId)
-          : undefined
-        : null,
-    });
-  });
+  const readDraftContext = createColdQueueDraftContextReader(keys);
+  const built: ReturnType<typeof buildOutboundRow>[] = [];
+  // Bound catalog/suppression read concurrency for the admin inventory.
+  for (let offset = 0; offset < leadRows.length; offset += 8) {
+    built.push(
+      ...(await Promise.all(
+        leadRows.slice(offset, offset + 8).map(async row => {
+          const dedupeKey = dedupeKeys.get(row.id) ?? null;
+          const facts: OutboundLeadFacts = {
+            ...row,
+            certified: dedupeKey !== null && certified.has(dedupeKey),
+            replied: replied.has(row.id),
+            evidenceClasses: row.creatorProfileId
+              ? (evidence.get(row.creatorProfileId) ?? [])
+              : null,
+          };
+          const dogfoodGate = gateEnabled
+            ? row.creatorProfileId
+              ? dogfood?.byProfile.get(row.creatorProfileId)
+              : undefined
+            : null;
+          const input = {
+            facts,
+            target: outboundTargetFromLead(row),
+            dedupeKey,
+            ledger: ledger.get(row.id) ?? [],
+            now,
+            dogfoodGate,
+            coldDraftEnabled,
+          };
+          const initial = buildOutboundRow(input);
+          if (
+            !coldDraftEnabled ||
+            !dogfoodGate?.passed ||
+            !facts.certified ||
+            initial.channel !== 'email'
+          )
+            return initial;
+          return buildOutboundRow({
+            ...input,
+            coldDraftContext: await readDraftContext(facts, now),
+          });
+        })
+      ))
+    );
+  }
   const rows = rankOutboundRows(
     built,
     new Map(leadRows.map(row => [row.id, row.priorityScore]))

@@ -44,7 +44,8 @@ const ADMIN_DEFAULT_TRUE_FLAGS = new Set<AppFlagName>(
       // admins — until the privacy/correctness matrix is certified.
       flagName !== 'CREATOR_FINANCE' &&
       flagName !== 'VISIBILITY_AUDIT_OFFER' &&
-      flagName !== 'OUTBOUND_DOGFOOD_GATE'
+      flagName !== 'OUTBOUND_DOGFOOD_GATE' &&
+      flagName !== 'OUTBOUND_COLD_DRAFTS'
   )
 );
 
@@ -94,6 +95,7 @@ export async function getAppFlagValue(
   } catch {
     // Draft gating fails closed even if the cache wrapper itself is unreadable.
     if (flagName === 'OUTBOUND_DOGFOOD_GATE') return true;
+    if (flagName === 'OUTBOUND_COLD_DRAFTS') return false;
     // Retain registry/default behavior for other flags.
   }
   if (envOverride === false) {

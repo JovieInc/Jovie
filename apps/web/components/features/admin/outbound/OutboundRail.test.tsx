@@ -52,6 +52,20 @@ function renderRail(overrides: Partial<OutboundRailProps> = {}) {
 }
 
 describe('OutboundRail', () => {
+  it('explains unavailable cold draft facts or compliance without offering message actions', () => {
+    renderRail({
+      row: outboundFixtureRow({
+        view: 'flagged',
+        flags: ['cold_draft_unavailable'],
+        message: null,
+      }),
+    });
+    expect(screen.getByTestId('outbound-message-empty')).toHaveTextContent(
+      'certified page facts and email compliance'
+    );
+    expect(screen.queryByRole('textbox')).not.toBeInTheDocument();
+  });
+
   it('explains a judge-blocked draft without offering message actions', () => {
     const props = renderRail({
       row: outboundFixtureRow({
