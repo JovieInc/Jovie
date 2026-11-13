@@ -509,7 +509,7 @@ export const selectSuggestedActionSchema = createSelectSchema(suggestedActions);
 
 /**
  * Durable workflow execution state, intentionally separate from `ingestionJobs`.
- * `ingestionJobStatusEnum` is immutable and only covers `pending/processing/succeeded/failed`;
+ * `ingestionJobStatusEnum` includes `held_for_approval` for win-back drafts;
  * workflows need `waiting_for_approval` to pause until a `suggested_actions` row
  * transitions to `approved`.
  *

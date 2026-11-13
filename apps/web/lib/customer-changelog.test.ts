@@ -386,7 +386,7 @@ describe('customer changelog projection', () => {
 
     expect(entries[0]).toMatchObject({
       title: 'Library Approval Status',
-      explanation: 'reviewers see the current state.',
+      explanation: 'Reviewers see the current state.',
     });
     expect(entries[0]?.title).not.toContain('#10384');
     expect(entries[0]?.explanation).not.toContain('#10384');
@@ -421,7 +421,7 @@ describe('customer changelog projection', () => {
       )
     ).toEqual({
       title: 'Library is one catalog with Ideas, In Progress, and Out',
-      explanation: 'documents share filters.',
+      explanation: 'Documents share filters.',
     });
   });
 

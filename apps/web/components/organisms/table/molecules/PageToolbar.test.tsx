@@ -4,6 +4,8 @@ import type { ReactNode } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import {
+  PAGE_TOOLBAR_ACTION_BUTTON_CLASS,
+  PAGE_TOOLBAR_TAB_BUTTON_CLASS,
   PageToolbar,
   PageToolbarActionButton,
   PageToolbarBackLink,
@@ -28,6 +30,21 @@ vi.mock('next/link', () => ({
     </a>
   ),
 }));
+
+describe('PageToolbar control geometry', () => {
+  it('keeps view tabs on the 28px control height so the bar renders at 40px', () => {
+    // 28px tab + py-1.5 = min-h-10. A taller tab pushes the bar past the
+    // Pen ftsrB height and off the height of the action buttons beside it.
+    const tabHeights = PAGE_TOOLBAR_TAB_BUTTON_CLASS.split(' ').filter(token =>
+      /^h-/.test(token)
+    );
+    const actionHeights = PAGE_TOOLBAR_ACTION_BUTTON_CLASS.split(' ').filter(
+      token => /^h-\d/.test(token)
+    );
+    expect(tabHeights).toEqual(['h-7']);
+    expect(actionHeights).toEqual(['h-7']);
+  });
+});
 
 describe('PageToolbar', () => {
   it('switches tabs and runs toolbar actions', async () => {

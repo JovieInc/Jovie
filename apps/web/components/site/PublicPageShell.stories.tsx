@@ -90,6 +90,35 @@ export const PartialPublishedChrome: Story = {
   },
 };
 
+/**
+ * The frame `app/brand/layout.tsx` renders: homepage header variant, icon
+ * mark, expanded footer. The centre nav shows without any flag prop.
+ */
+export const BrandLayoutFrame: Story = {
+  args: { children: null },
+  render: () => (
+    <PublicPageShell
+      chrome={toResolvedSiteChrome(DEFAULT_SITE_CHROME)}
+      className='system-b-marketing dark system-b-brand-layout'
+      footerVariant='expanded'
+      logoSize='sm'
+      logoVariant='icon'
+      mainClassName='system-b-brand-main'
+      mainOffset={false}
+      headerVariant='homepage'
+    >
+      <section className='bg-base px-6 py-16 text-primary-token'>
+        <div className='mx-auto max-w-public-content'>
+          <h1 className='text-3xl font-semibold'>Brand page content</h1>
+          <p className='mt-4 max-w-prose-canonical text-secondary-token'>
+            The brand route keeps the homepage header and the expanded footer.
+          </p>
+        </div>
+      </section>
+    </PublicPageShell>
+  ),
+};
+
 /** Long content: a long headline, an unbroken URL and a long CTA label. */
 export const LongContentPage: Story = {
   args: { children: null },

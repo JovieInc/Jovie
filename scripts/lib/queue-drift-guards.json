@@ -123,7 +123,6 @@
       "config/slop-guard/baseline.json",
       "docs/metrics/shipping-slo-baseline.json",
       "docs/pen-stills/pen-variable-baseline.json",
-      "docs/performance/bundle-baseline.json",
       "ops/registry/secrets-lint-baseline.json",
       "scripts/design-authority-interactive-baseline.json",
       "scripts/invariants/overlay-layer-contract.baseline.json",

@@ -230,7 +230,7 @@ Contract tokens below are the semantic surface for AI edits. DSP brand colors an
 - `--app-shell-content-padding-y`: 8px
 - `--app-shell-content-surface`: var(--linear-bg-surface-0)
 - `--app-shell-control-height-sm`: 28px
-- `--app-shell-control-padding-x`: 11px
+- `--app-shell-control-padding-x`: 10px
 - `--app-shell-control-radius`: 9999px
 - `--app-shell-drawer-shadow`: 0 0 0 1px rgba(0, 0, 0, 0.03), 0 14px 32px rgba(0, 0, 0, 0.05)
 - `--app-shell-footer-row-height`: calc(var(--space-6) + var(--space-1-5))

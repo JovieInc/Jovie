@@ -164,8 +164,8 @@ unless linked below.
 | `linear-namespace` | `error` | G + I | Yes | 687 |
 | `shadcn/no-restyle` | `error` | L + G | Yes | 212 files; 2991 messages (grandfathered) |
 | `off-scale-step` | `error` | G + I | Yes | None; vs base |
-| `source-identity` | `error` | I | Yes | 1918 |
-| `spacing-scale (conservative)` | `error` | S + G | Yes | 589; armed=true; marketing=46; packages/ui=11; web-other=289; web-shell=243 |
+| `source-identity` | `error` | I | Yes | 1909 |
+| `spacing-scale (conservative)` | `error` | S + G | Yes | 587; armed=true; marketing=46; packages/ui=11; web-other=289; web-shell=241 |
 | `spacing-scale (strict)` | `warn` | S + G | No | 2190; armed=false; marketing=143; packages/ui=60; web-other=1126; web-shell=837 |
 | `touch-target` | `error` | D | Yes | 153 |
 | `ui-feel ratchet` | `error` | D | Yes | headingNeedsBalance=253; missingTabularNums=70; nonConcentricRadius=0; undersizedHitArea=71 |
