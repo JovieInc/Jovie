@@ -1,13 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
-import {
-  clearAllMocks,
-  expect,
-  fn,
-  sb,
-  userEvent,
-  waitFor,
-  within,
-} from 'storybook/test';
+import { expect, spyOn, userEvent, waitFor, within } from 'storybook/test';
 import { toast } from '@/components/feedback';
 import { useProfileHeaderParts } from './ProfileSidebarHeader';
 
@@ -15,15 +7,11 @@ import { useProfileHeaderParts } from './ProfileSidebarHeader';
 // treats as a profile route — and FeedbackProvider mounts no Toaster on
 // profile routes — so the failure toast can never render in this lane.
 // Following the ShareableLinkRow convention (the surface reports the failure
-// to its owner), these stories assert the error report — the toast call —
-// instead of the toast DOM.
-sb.mock(import('@/components/feedback'), async importOriginal => {
-  const actual = await importOriginal<typeof import('@/components/feedback')>();
-  return {
-    ...actual,
-    toast: { ...actual.toast, error: fn(), success: fn() },
-  };
-});
+// to its owner), these stories assert the error report — the toast.error
+// call — instead of the toast DOM. (sb.mock's factory form is unsupported
+// here: storybook's mock transform only understands { spy: true }; spying
+// the toast object's method directly needs no module machinery.)
+const toastErrorSpy = spyOn(toast, 'error');
 
 /**
  * Download QR Code fetches the QR image; these stories answer that request
@@ -72,7 +60,7 @@ async function downloadQrAndExpectErrorReport({
     })
   );
   await waitFor(() =>
-    expect(toast.error).toHaveBeenCalledWith('Unable to download QR code')
+    expect(toastErrorSpy).toHaveBeenCalledWith('Unable to download QR code')
   );
 }
 
@@ -141,7 +129,7 @@ export const EmptyIdentity: Story = {
 /** The QR image read fails: the menu reports it as an error toast. */
 export const ErrorQrDownload: Story = {
   beforeEach: () => {
-    clearAllMocks();
+    toastErrorSpy.mockClear();
     return stubQrFetch(async () => new Response(null, { status: 500 }));
   },
   play: downloadQrAndExpectErrorReport,
@@ -150,7 +138,7 @@ export const ErrorQrDownload: Story = {
 /** Offline: the QR image read never completes. */
 export const OfflineQrDownload: Story = {
   beforeEach: () => {
-    clearAllMocks();
+    toastErrorSpy.mockClear();
     return stubQrFetch(async () => {
       throw new TypeError('Failed to fetch');
     });
