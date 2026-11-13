@@ -3,7 +3,7 @@
 import { X } from 'lucide-react';
 import Image from 'next/image';
 import { type CSSProperties } from 'react';
-import type { EntityKind } from '@/lib/chat/tokens';
+import { ENTITY_KIND_LABEL, type EntityKind } from '@/lib/chat/tokens';
 import { ENTITY_KIND_ACCENT_VAR } from './entity-accent';
 
 export interface EntityChipData {
@@ -31,13 +31,6 @@ interface EntityChipProps {
   readonly removeLabel?: string;
 }
 
-const KIND_PREFIX: Record<EntityKind, string> = {
-  release: 'Release',
-  artist: 'Artist',
-  track: 'Track',
-  event: 'Event',
-};
-
 /**
  * Non-interactive presentational chip primitive. Interaction (click, popover,
  * keyboard activation) is the wrapper's job — wrapping `EntityChip` in
@@ -53,7 +46,7 @@ export function EntityChip({
   onRemove,
   removeLabel,
 }: EntityChipProps) {
-  const prefix = KIND_PREFIX[data.kind];
+  const prefix = ENTITY_KIND_LABEL[data.kind];
   const inputChipAttributes = isInputChip
     ? {
         contentEditable: false,

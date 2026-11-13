@@ -39,10 +39,10 @@ import {
   resolveProfileSurfaceState,
   resolvePublicMusicSurface,
   shouldOfferPublicEventsDestination,
-  shouldShowPublicProfileBackChevron,
   subscribeToPublicProfileHistory,
 } from '@/features/profile/profile-surface-state';
 import { StaticListenInterface } from '@/features/profile/StaticListenInterface';
+import { shouldShowTabBackChevron } from '@/features/profile/sibling-tabs';
 import { ReleasesView } from '@/features/profile/views/ReleasesView';
 import { useIsAuthenticated } from '@/hooks/useIsAuthenticated';
 import { sortDSPsByGeoPopularity } from '@/lib/dsp';
@@ -228,7 +228,7 @@ function DesktopSurfaceCard({
   return (
     <section
       className={cn(
-        'rounded-2xl border border-white/6 bg-white/[0.025] p-5',
+        'min-w-0 rounded-2xl border border-white/6 bg-white/[0.025] p-5',
         className
       )}
       data-testid={testId}
@@ -320,8 +320,8 @@ export function ProfileDesktopSurface({
     getPublicProfileHistorySnapshot,
     getPublicProfileHistoryServerSnapshot
   );
-  const showBackChevron = shouldShowPublicProfileBackChevron({
-    isProfileRoot: activeMode === 'profile',
+  const showBackChevron = shouldShowTabBackChevron({
+    mode: activeMode,
     hasHistoryDestination,
     isSignedIn,
   });
@@ -490,7 +490,7 @@ export function ProfileDesktopSurface({
       data-side-rail-enabled={canGetUpdates ? 'true' : 'false'}
     >
       <div
-        className='grid min-h-0 min-w-0 gap-3.5 [@media(min-width:1180px)]:contents'
+        className='grid min-h-0 min-w-0 grid-cols-1 gap-3.5 [@media(min-width:1180px)]:contents'
         data-testid='profile-desktop-main-content'
       >
         {/* Composition rule (#11899): the desktop cover is a fixed standard
@@ -529,7 +529,7 @@ export function ProfileDesktopSurface({
                 <Link
                   href={profileHref}
                   data-testid='profile-header'
-                  className='inline-flex min-w-0 max-w-full items-start gap-2 rounded-md text-[clamp(2.5rem,16cqi,5.75rem)] font-semibold leading-[0.92] tracking-[-0.06em] text-white dark:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))] focus-visible:ring-offset-2 focus-visible:ring-offset-transparent'
+                  className='inline-flex min-w-0 max-w-full items-start gap-2 rounded-md text-[clamp(2.5rem,16cqi,5.75rem)] font-semibold leading-[0.92] tracking-[-0.06em] text-white dark:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:ring-offset-transparent'
                 >
                   <span className='min-w-0 line-clamp-2 wrap-anywhere'>
                     {artist.name}
@@ -597,7 +597,7 @@ export function ProfileDesktopSurface({
         </section>
 
         <div
-          className='grid min-h-0 min-w-0 content-start gap-3.5 [@media(min-width:1180px)]:col-start-2 [@media(min-width:1180px)]:row-start-1'
+          className='grid min-h-0 min-w-0 grid-cols-1 content-start gap-3.5 [@media(min-width:1180px)]:col-start-2 [@media(min-width:1180px)]:row-start-1'
           data-testid='profile-desktop-secondary-grid'
         >
           <DesktopSurfaceCard
@@ -707,7 +707,7 @@ export function ProfileDesktopSurface({
 
       <div
         className={cn(
-          'min-h-0 min-w-0 gap-3.5',
+          'min-h-0 min-w-0 grid-cols-1 gap-3.5',
           canGetUpdates
             ? 'grid [@media(min-width:1180px)]:col-start-3 [@media(min-width:1180px)]:row-start-1'
             : 'hidden'

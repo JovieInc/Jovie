@@ -155,6 +155,61 @@ describe('buildSystemPrompt', () => {
     expect(prompt).not.toContain('- **Total Releases:** 0');
   });
 
+  it('appends a named release that is outside the shown rows', () => {
+    const releases = Array.from({ length: 30 }, (_, index) => ({
+      title: `Track ${index + 1}`,
+      releaseType: 'single',
+      releaseDate: '2025-01-01T00:00:00.000Z',
+      totalTracks: 1,
+    }));
+
+    const prompt = buildSystemPrompt(baseContext, releases, {
+      aiCanUseTools: true,
+      aiWeeklyMessageLimit: 10,
+      releaseCatalog: { status: 'ok', total: 120 },
+      namedReleases: [
+        {
+          title: 'Never Say A Word',
+          releaseType: 'single',
+          releaseDate: '2024-02-02T00:00:00.000Z',
+          totalTracks: 1,
+        },
+        {
+          title: 'Track 1',
+          releaseType: 'single',
+          releaseDate: '2025-01-01T00:00:00.000Z',
+          totalTracks: 1,
+        },
+      ],
+    });
+
+    expect(prompt).toContain(
+      '- Named this turn, resolved from the full catalog:'
+    );
+    expect(prompt).toContain('Never Say A Word');
+    const namedAt = prompt.indexOf('Named this turn');
+    expect(prompt.slice(namedAt)).not.toContain('Track 1');
+  });
+
+  it('does not render named releases when the catalog could not be read', () => {
+    const prompt = buildSystemPrompt(baseContext, [], {
+      aiCanUseTools: true,
+      aiWeeklyMessageLimit: 10,
+      releaseCatalog: { status: 'unavailable', total: null },
+      namedReleases: [
+        {
+          title: 'Never Say A Word',
+          releaseType: 'single',
+          releaseDate: '2024-02-02T00:00:00.000Z',
+          totalTracks: 1,
+        },
+      ],
+    });
+
+    expect(prompt).not.toContain('Never Say A Word');
+    expect(prompt).not.toContain('Named this turn');
+  });
+
   it('keeps an explicit creator segment together with the pinned release clock', () => {
     const prompt = buildSystemPrompt(
       baseContext,

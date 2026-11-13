@@ -1,9 +1,8 @@
 'use client';
 
-import Link from 'next/link';
 import { Icon } from '@/components/atoms/Icon';
 import { DrawerButton, DrawerSurfaceCard } from '@/components/molecules/drawer';
-import { APP_ROUTES } from '@/constants/routes';
+import { UpgradeButton } from '@/components/molecules/UpgradeButton';
 import { LINEAR_SURFACE } from '@/features/dashboard/tokens';
 import { PRO_PLAN_DISPLAY_NAME } from '@/lib/config/plan-prices';
 import { usePlanGate } from '@/lib/queries/usePlanGate';
@@ -135,14 +134,13 @@ export function SmartLinkGateBanner(props: SmartLinkGateBannerProps) {
                   <p className='mt-0.5 text-2xs leading-[1.35] text-secondary-token'>
                     {copy.body}
                   </p>
-                  <DrawerButton
-                    asChild
-                    tone='ghost'
+                  <UpgradeButton
+                    variant='ghost'
                     size='sm'
                     className='mt-1.5 w-fit'
                   >
-                    <Link href={APP_ROUTES.PRICING}>{copy.cta}</Link>
-                  </DrawerButton>
+                    {copy.cta}
+                  </UpgradeButton>
                 </>
               );
             })()

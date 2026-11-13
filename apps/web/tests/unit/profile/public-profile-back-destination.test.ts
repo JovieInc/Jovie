@@ -4,6 +4,12 @@ import {
   resolvePublicProfileBackAction,
   shouldShowPublicProfileBackChevron,
 } from '@/features/profile/profile-surface-state';
+import {
+  isPublicProfileRootLevel,
+  isPublicProfileSiblingTab,
+  resolveTabBackAction,
+  shouldShowTabBackChevron,
+} from '@/features/profile/sibling-tabs';
 
 describe('public profile back destination', () => {
   it('hides the root chevron when there is no real history destination', () => {
@@ -122,5 +128,43 @@ describe('public profile back destination', () => {
         internalHistoryDepth: 0,
       })
     ).toBe('history-back');
+  });
+
+  it('treats the tab-row destinations as Home siblings, not nested pages', () => {
+    for (const mode of ['listen', 'tour', 'about'] as const) {
+      expect(isPublicProfileSiblingTab(mode)).toBe(true);
+      expect(isPublicProfileRootLevel(mode)).toBe(true);
+    }
+    expect(isPublicProfileSiblingTab('profile')).toBe(false);
+    expect(isPublicProfileRootLevel('profile')).toBe(true);
+    for (const mode of ['releases', 'subscribe', 'pay', 'contact'] as const) {
+      expect(isPublicProfileSiblingTab(mode)).toBe(false);
+      expect(isPublicProfileRootLevel(mode)).toBe(false);
+    }
+  });
+
+  it("gives sibling tabs Home's chevron and exit, and nested modes a Back home", () => {
+    for (const mode of ['profile', 'listen', 'tour', 'about'] as const) {
+      expect(
+        shouldShowTabBackChevron({ mode, hasHistoryDestination: false })
+      ).toBe(false);
+      expect(
+        resolveTabBackAction({
+          mode,
+          historyLength: 1,
+          referrer: '',
+          isSignedIn: true,
+        })
+      ).toBe('app-fallback');
+    }
+    expect(
+      shouldShowTabBackChevron({
+        mode: 'releases',
+        hasHistoryDestination: false,
+      })
+    ).toBe(true);
+    expect(
+      resolveTabBackAction({ mode: 'releases', historyLength: 1, referrer: '' })
+    ).toBe('profile-root');
   });
 });

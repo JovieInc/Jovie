@@ -1,6 +1,6 @@
 import 'server-only';
 
-import { and, desc, eq, isNull, sql } from 'drizzle-orm';
+import { and, desc, sql as drizzleSql, eq, isNull } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import { discogReleases } from '@/lib/db/schema/content';
 import { getCanvasStatusFromMetadata } from '@/lib/services/canvas/service';
@@ -41,7 +41,7 @@ export async function fetchReleaseCatalogForChat(
         metadata: discogReleases.metadata,
         // Window count (evaluated before LIMIT): the full catalog size, not
         // just the rows this query returns.
-        total: sql<number>`count(*) over ()`.mapWith(Number),
+        total: drizzleSql<number>`count(*) over ()`.mapWith(Number),
       })
       .from(discogReleases)
       .where(
@@ -51,7 +51,7 @@ export async function fetchReleaseCatalogForChat(
         )
       )
       .orderBy(
-        sql`${discogReleases.releaseDate} DESC NULLS LAST`,
+        drizzleSql`${discogReleases.releaseDate} DESC NULLS LAST`,
         desc(discogReleases.id)
       )
       .limit(CHAT_RELEASE_LIMIT);

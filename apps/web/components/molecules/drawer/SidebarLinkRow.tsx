@@ -20,7 +20,7 @@ import {
 import { cn } from '@/lib/utils';
 
 const SWIPE_ACTION_BUTTON_CLASS =
-  'flex h-full items-center justify-center px-4 text-white dark:text-white transition-colors active:opacity-80';
+  'flex h-full items-center justify-center px-4 text-on-media dark:text-on-media transition-colors active:opacity-80';
 
 export interface SidebarLinkRowProps {
   readonly deepLinkPlatform?: string;

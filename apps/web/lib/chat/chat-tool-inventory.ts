@@ -23,12 +23,14 @@
  */
 
 export const CHAT_ROUTE_TOOL_IDS = [
-  // Free-tier profile / feedback / catalog lookup
+  // Free-tier profile / feedback
   'proposeAvatarUpload',
   'proposeSocialLink',
   'proposeSocialLinkRemoval',
   'submitFeedback',
-  'lookupRelease',
+  // Skills and capability requests (all plans)
+  'useSkill',
+  'requestCapability',
   // Account (all plans)
   'showAccountStatus',
   'showUsage',
@@ -39,12 +41,9 @@ export const CHAT_ROUTE_TOOL_IDS = [
   'importBioFromUrl',
   'inspectPressSource',
   'checkCanvasStatus',
-  'suggestRelatedArtists',
   'writeWorldClassBio',
-  'generateCanvasPlan',
   'generateAlbumArt',
   'retouchImage',
-  'createPromoStrategy',
   'voicePromo',
   'markCanvasUploaded',
   'formatLyrics',

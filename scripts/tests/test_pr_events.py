@@ -100,7 +100,9 @@ def red_episode_route(reply, login="github-actions[bot]", created="2026-01-01T00
     `gh api graphql`; the Shell routes by prefix, so one callable dispatches on the query."""
     def route(args):
         if "LABELED_EVENT" in " ".join(args):
-            actor = {"__typename": "Bot" if login.endswith("[bot]") else "User", "login": login}
+            # Real GraphQL: a Bot's login has no "[bot]" suffix (REST adds it).
+            bot = login.endswith("[bot]")
+            actor = {"__typename": "Bot" if bot else "User", "login": login.removesuffix("[bot]")}
             nodes = [] if absent else [{"createdAt": created, "label": {"name": "lane-fix-red"},
                                         "actor": actor}]
             return {"data": {"repository": {"pullRequest": {"timelineItems": {"nodes": nodes}}}}}
@@ -484,8 +486,14 @@ class RelayTest(unittest.TestCase):
         disabled = {"claude", "hyperagent"}
         self.assertTrue(events.in_scope(pr(draft=True), "red", disabled))
         self.assertTrue(events.in_scope(pr(branch="tim/fix"), "red", disabled))
-        self.assertFalse(events.in_scope(pr(branch="claude/focused-davinci-x", draft=True), "red", disabled),
-                         "a human session's draft is not the lanes' work")
+        # Tim 2026-11-12: a red required check on any same-repo draft to main is repair scope;
+        # whether its writer still holds it is the active-worker gate's call (red_label_justified).
+        session = pr(branch="claude/focused-davinci-x", draft=True)
+        self.assertTrue(events.in_scope(session, "red", disabled))
+        self.assertFalse(events.in_scope(session, "conflict", disabled), "only red repair widened")
+        self.assertFalse(events.in_scope({**session, "baseRefName": "claude/parent"}, "red", disabled),
+                         "a stacked draft stays with its stack")
+        self.assertFalse(events.in_scope({**session, "isCrossRepository": True}, "red", disabled))
         self.assertFalse(events.in_scope(pr(isCrossRepository=True), "red", disabled))
         self.assertFalse(events.in_scope(pr(labels=["hold"]), "red", disabled))
         self.assertFalse(events.in_scope(pr(state="MERGED"), "red", disabled))
@@ -645,7 +653,7 @@ class RelayTest(unittest.TestCase):
         run = {"event": "pull_request", "conclusion": "success", "head_sha": "h1",
                "pull_requests": [{"number": 5}]}
         view = pr(branch="cursor/fix", sha="h1", merge="CLEAN", labels=["lane-fix-red"], state="OPEN")
-        for login, cleared in (("github-actions[bot]", True), ("jovie-bot[bot]", False), ("tim", False)):
+        for login, cleared in (("github-actions[bot]", True), ("github-actions", False), ("jovie-bot[bot]", False), ("tim", False)):
             shell = Shell({("gh", "pr", "view"): view,
                            ("gh", "api", "graphql"): red_episode_route(lambda args: None, login=login)})
             result = events.relay("workflow_run", {"workflow_run": run}, shell, set())
@@ -711,10 +719,70 @@ class RelayTest(unittest.TestCase):
         ]
         shell = Shell({("gh", "pr", "list"): rows,
                        ("gh", "api", "graphql"): red_episode_route(lambda args: None)})
-        self.assertEqual(events.relay("push", {}, shell, set()), [(5, "cleared-red")])
+        self.assertEqual(events.relay("push", {}, shell, set()), [(5, "cleared-red"), (5, "enroll-wake")])
         self.assertEqual(shell.made("gh", "api", "-X", "DELETE"),
                          [["gh", "api", "-X", "DELETE",
                            f"repos/{events.REPO}/issues/5/labels/lane-fix-red"]])
+        self.assertEqual(shell.made("gh", "workflow", "run"),
+                         [["gh", "workflow", "run", events.GREEN_ENROLL_WORKFLOW,
+                           "--repo", events.REPO, "--ref", "main", "-f", "pr_number=5"]])
+
+    def test_a_push_sweep_clears_a_stale_relay_red_on_a_settled_head_and_wakes_enroll(self):
+        # #25157: required-green since 21:04Z, lane-fix-red from an older head (relay, 14:28Z),
+        # merge state lagging after the main push, and 14 skipped jobs in the rollup. No check
+        # completion comes for an unchanged green head, so the push sweep is the exit.
+        def node(name, conclusion, **extra):
+            return {"__typename": "CheckRun", "name": name, "conclusion": conclusion,
+                    "completedAt": "2026-11-12T21:04:00Z", **extra}
+
+        def rollup(*nodes):
+            return {"data": {"repository": {"pullRequest": {"commits": {"nodes": [{"commit": {
+                "statusCheckRollup": {"contexts": {"nodes": list(nodes)}}}}]}}}}}
+
+        def sweep(nodes, merge="UNKNOWN", login="github-actions[bot]", **extra):
+            row = pr(number=5, branch="tim/fix", merge=merge, labels=["lane-fix-red"], state="OPEN",
+                     mergeable="MERGEABLE", **extra)
+            shell = Shell({("gh", "pr", "list"): [row],
+                           ("gh", "api", "graphql"): red_episode_route(rollup(*nodes), login=login)})
+            return events.relay("push", {}, shell, set()), shell
+
+        green = [node("Source Validation", "SUCCESS"), node("CodeRabbit", "SKIPPED"),
+                 node("Advisory", "NEUTRAL"), node("Tently", "FAILURE")]
+        for merge in ("UNKNOWN", "BLOCKED"):
+            result, shell = sweep(green, merge)
+            self.assertEqual(result, [(5, "cleared-red"), (5, "enroll-wake")], merge)
+            self.assertEqual(len(shell.made("gh", "api", "-X", "DELETE")), 1, merge)
+            self.assertEqual(len(shell.made("gh", "workflow", "run")), 1, merge)
+        result, shell = sweep(green, draft=True)
+        self.assertEqual(result, [(5, "cleared-red")], "auto-ready promotes a draft, not enroll")
+        self.assertEqual(shell.made("gh", "workflow", "run"), [])
+
+        pending = node("Source Validation", None, completedAt=None, startedAt="2026-11-12T21:27:00Z")
+        for why, nodes in (("red", [node("Source Validation", "FAILURE"), node("CodeRabbit", "SKIPPED")]),
+                           ("pending", [node("CI", "SUCCESS"), pending]),
+                           ("cancelled", [node("Source Validation", "CANCELLED"), node("CI", "SUCCESS")]),
+                           ("nothing succeeded", [node("CodeRabbit", "SKIPPED")])):
+            result, shell = sweep(nodes)
+            self.assertEqual(result, [], why)
+            self.assertEqual(shell.made("gh", "api", "-X", "DELETE"), [], why)
+            self.assertEqual(shell.made("gh", "workflow", "run"), [], why)
+
+        for login in ("jovie-bot[bot]", "tim"):
+            for merge in ("CLEAN", "UNKNOWN"):
+                result, shell = sweep(green, merge, login=login)
+                self.assertEqual(result, [], (login, merge))
+                self.assertEqual(shell.made("gh", "api", "-X", "DELETE"), [], (login, merge))
+                self.assertEqual(shell.made("gh", "workflow", "run"), [], (login, merge))
+
+    def test_a_push_sweep_bounds_its_enroll_wakes(self):
+        rows = [pr(number=n, branch=f"tim/fix-{n}", merge="CLEAN", labels=["lane-fix-red"], state="OPEN")
+                for n in range(1, events.SWEEP_ENROLL_WAKES + 3)]
+        shell = Shell({("gh", "pr", "list"): rows,
+                       ("gh", "api", "graphql"): red_episode_route(lambda args: None)})
+        result = events.relay("push", {}, shell, set())
+        self.assertEqual(len([row for row in result if row[1] == "cleared-red"]), events.SWEEP_ENROLL_WAKES,
+                         "past the cap the label stays for the next landing: no clear without its wake")
+        self.assertEqual(len(shell.made("gh", "workflow", "run")), events.SWEEP_ENROLL_WAKES)
 
     def test_a_failure_hold_dequeue_is_relayed_and_a_plain_hand_dequeue_is_not(self):
         view = {"state": "OPEN", "isDraft": False, "headRefName": "codex/jov-6577-20261012t075744",
@@ -1957,7 +2025,9 @@ class GapTest(unittest.TestCase):
 
     def test_stalled_agent_drafts_are_repaired_or_held_on_a_live_dependency(self):
         """JOV-7079 canary: an old non-lane agent draft cannot sit forever. Past the 3d SLO
-        and stalled it enters repair unless a dependency it names is still open."""
+        and stalled it is reclaimed unless a dependency it names is still open; that age rule
+        is the close / reclaim-to-close authority only. A red required check is repaired within
+        the hour whatever the draft's age (Tim 2026-11-12), and never closes anything."""
         now = events.iso_ts("2033-05-18T03:00:00Z")
         old, recent = "2033-05-15T00:00:00Z", "2033-05-18T00:00:00Z"
         ancient = "2033-05-01T00:00:00Z"
@@ -2000,6 +2070,17 @@ class GapTest(unittest.TestCase):
         self.assertEqual(landed["close"], [])
         self.assertEqual(next(row for row in landed["dispositions"] if row["pr"] == 22)["state"], "advancing")
         self.assertIn((22, "stale"), landed["label"])
+        # New rule: red repair no longer waits for the 3d floor. The young draft (23) goes red
+        # with no commit for 2h: repaired now. A red draft committed 10 minutes ago keeps its
+        # writer. Neither red draft is closed, and the dependency hold is unchanged.
+        red = [{**prs[3], "rollup": "FAILURE", "lastCommitAt": "2033-05-18T01:00:00Z"},
+               self.node(25, isDraft=True, headRefName="claude/live-session", rollup="FAILURE",
+                         createdAt="2033-05-18T02:00:00Z", lastCommitAt="2033-05-18T02:50:00Z")]
+        repaired = events.reconcile_plan(prs[:3] + red, {}, set(), 2, now, deps={22: [9]})
+        self.assertIn((23, "red"), repaired["label"])
+        self.assertNotIn(25, [number for number, _ in repaired["label"]], "a commit inside the hour holds the head")
+        self.assertEqual(repaired["close"], [])
+        self.assertEqual(repaired["depHolds"], [(22, [9])])
 
     def test_reclaimed_abandoned_drafts_are_in_scope_for_repair_and_promotion(self):
         now = events.iso_ts("2033-05-18T03:00:00Z")
@@ -2009,7 +2090,10 @@ class GapTest(unittest.TestCase):
         self.assertTrue(events.in_scope(abandoned, "green", set(), now), "a reclaimed draft is readied when CLEAN")
         self.assertFalse(events.in_scope(abandoned, "orphan", set(), now))
         moving = pr(31, branch="codex/homepage-material", draft=True, merge="BLOCKED", createdAt=ancient, updatedAt=recent)
-        self.assertFalse(events.in_scope(moving, "red", set(), now), "a draft still being pushed stays with its writer")
+        self.assertFalse(events.in_scope(moving, "conflict", set(), now), "a draft still being pushed stays with its writer")
+        # Red repair is no longer gated on age (Tim 2026-11-12): any red draft to main is in
+        # scope, and the active-worker gate (claim or commit inside the hour) keeps live writers.
+        self.assertTrue(events.in_scope(moving, "red", set(), now))
         held = pr(32, branch="codex/held", draft=True, merge="BLOCKED", createdAt=ancient, updatedAt=old, labels=["hold"])
         self.assertFalse(events.in_scope(held, "red", set(), now))
         writer = pr(33, branch="feature/mine", draft=True, merge="DIRTY", createdAt=ancient, updatedAt=old)
@@ -2574,7 +2658,10 @@ class NativeQueueClaimTest(unittest.TestCase):
         for entrypoint in ("event", "poll"):
             with self.subTest(entrypoint=entrypoint), tempfile.TemporaryDirectory() as tmp:
                 host = runner.Host(state=Path(tmp));target = pr(branch="human/work", kinds=["red"], checks=[RED_CHECK])
-                shell = Shell();module = fake_lane(shell);live = {**target, "state": "OPEN", "isDraft": True}
+                # A head restacked onto another branch left red-repair scope (a red draft to main is
+                # in scope since 2026-11-12; a stacked one stays with its stack).
+                shell = Shell();module = fake_lane(shell)
+                live = {**target, "state": "OPEN", "isDraft": True, "baseRefName": "human/parent"}
                 module.reconcile_fix_target = lambda _: live
                 with patch.object(runner, "sh", shell), patch.object(runner, "reconcile_fix_target", return_value=live), \
                         patch.object(runner, "claimed_elsewhere", return_value=False), \
@@ -2611,8 +2698,11 @@ class NativeQueueClaimTest(unittest.TestCase):
                 self.assertEqual(path.exists(), allowed)
                 if allowed:self.assertEqual(json.loads(path.read_text())["5"]["count"], 1)
                 self.assertEqual(shell.calls, [])
-        self.assertFalse(events.in_scope(pr(branch=digest, draft=True), "red", {"hyperagent"}),
+        self.assertFalse(events.in_scope(pr(branch=digest, draft=True), "conflict", {"hyperagent"}),
                          "polling integration does not expand event ownership")
+        # Tim 2026-11-12: a red draft to main is red-repair scope whatever its prefix; the
+        # relay's active-worker gate (fresh claim or commit inside the hour) keeps live writers.
+        self.assertTrue(events.in_scope(pr(branch=digest, draft=True), "red", {"hyperagent"}))
 
     def test_cleanup_production_list_rotates_refused_row_and_preserves_current_ownership(self):
         for first in ("queued", "unreadable", "owner"):
@@ -3218,3 +3308,150 @@ class WakeFileTest(unittest.TestCase):
                                          "GITHUB_EVENT_PATH": str(event_path)}):
                 self.assertEqual(events.main(["wake", "--prs", "22868"]), 0)
             self.assertFalse((state / "wake").exists())
+
+class EmptyReviewTest(unittest.TestCase):
+    """fix-red-e3b0c44298: a review label with no current-head text is not a failing check."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.host = SimpleNamespace(state=Path(self.tmp.name))
+
+    def loaded(self, **extra):
+        fields = {"kinds": ["review"], "labels": ["lane-fix-review"], "merge": "UNSTABLE",
+                  "reviewDecision": None, "reviewAuthorityDigest": "d",
+                  "reviewSummaries": [], "reviewThreads": []}
+        fields.update(extra)
+        return pr(**fields)
+
+    def reconcile(self, module, live):
+        module.reconcile_fix_target = lambda src: {
+            **live, "state": "OPEN", "headRefOid": src["headRefOid"], "headRefName": src["headRefName"]}
+
+    def test_unloaded_review_still_needs_a_read(self):
+        row = pr(kinds=["review"], labels=["lane-fix-review"])
+        self.assertTrue(events.needs_work(fake_lane(Shell()), row))
+        self.assertFalse(events.empty_review.review_evidence_loaded(row))
+        self.assertFalse(events.empty_review.stale_review_only(row))
+        self.assertTrue(events.empty_review.unloaded_review_only(row, lambda item: events.needs_work(fake_lane(Shell()), item)))
+
+    def test_loaded_empty_review_is_not_work_and_cleanup_drops_the_label(self):
+        shell = Shell()
+        module = fake_lane(shell)
+        row = pr(kinds=["review"], labels=["lane-fix-review"], merge="UNSTABLE")
+        live = self.loaded()
+        self.reconcile(module, live)
+        self.assertFalse(events.needs_work(module, live))
+        self.assertIsNone(events.claim_event_pr(self.host, module, "devin", [row], NOW))
+        self.assertFalse((self.host.state / "fix-attempts.json").exists())
+        self.assertEqual(events.cleanup_one_event(self.host, module, [row], NOW), 5)
+        self.assertEqual(len(shell.made("gh", "api", "-X", "DELETE")), 1)
+
+    def test_loaded_review_text_is_still_claimed(self):
+        shell = Shell()
+        module = fake_lane(shell)
+        live = self.loaded(reviewSummaries=[{"author": {"login": "reviewer"}, "body": "rename the prop"}])
+        self.reconcile(module, live)
+        claimed = events.claim_event_pr(self.host, module, "devin",
+                                        [pr(kinds=["review"], labels=["lane-fix-review"])], NOW)
+        self.assertEqual(claimed["number"], 5)
+        self.assertEqual(shell.made("gh", "api", "-X", "DELETE"), [])
+
+    def test_changes_requested_with_no_body_still_needs_a_model(self):
+        row = self.loaded(reviewDecision="CHANGES_REQUESTED")
+        self.assertTrue(events.needs_work(fake_lane(Shell()), row))
+        self.assertFalse(events.empty_review.stale_review_only(row))
+
+    def test_empty_excerpt_is_not_a_failing_check(self):
+        self.assertEqual(runner.review_excerpt(self.loaded()), "")
+        prompt = runner.render_fix_prompt({**self.loaded(), "title": "t"}, "")
+        self.assertNotIn("no active current-head", prompt)
+        self.assertIn("(no failing check excerpt)", prompt)
+        asked = self.loaded(reviewSummaries=[{"author": {"login": "reviewer"}, "body": "rename the prop"}])
+        self.assertIn("rename the prop", runner.review_excerpt(asked))
+
+    def test_stale_review_only_rejects_other_repair_signals(self):
+        empty = events.empty_review
+        self.assertTrue(empty.stale_review_only(self.loaded()))
+        self.assertFalse(empty.stale_review_only(self.loaded(checks=[{"name": "ci", "conclusion": "FAILURE"}])))
+        self.assertFalse(empty.stale_review_only(self.loaded(merge="DIRTY")))
+        self.assertFalse(empty.stale_review_only(self.loaded(kinds=["review", "conflict"])))
+        self.assertFalse(empty.stale_review_only(self.loaded(kinds=["review", "red"])))
+        self.assertFalse(empty.stale_review_only(self.loaded(kinds=["review", "dequeued"])))
+        self.assertFalse(empty.stale_review_only(self.loaded(kinds=["review", "stale"])))
+        self.assertFalse(empty.stale_review_only(self.loaded(reviewThreads=[{"body": "still open"}])))
+        self.assertFalse(empty.stale_review_only(pr(kinds=["review"])))
+        consumed = []
+        self.assertTrue(empty.skip_model(self.loaded(), lambda: consumed.append("review")))
+        self.assertEqual(consumed, ["review"])
+        self.assertFalse(empty.skip_model(self.loaded(reviewDecision="CHANGES_REQUESTED"), lambda: consumed.append("no")))
+        self.assertEqual(consumed, ["review"])
+
+class CloudOriginGuardTest(unittest.TestCase):
+    """JOV-10357 (R3): cloud-origin drafts are never readied, adopted, retired or re-queued."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.host = SimpleNamespace(state=Path(self.tmp.name))
+        proofs = {f"{n}:h1": {"schema": runner.GATE_RESULT_SCHEMA, "headSha": "h1",
+                              "verdict": "verified-not-queued", "completedAt": runner.now_iso(),
+                              "policyDigest": runner.GATE_POLICY_DIGEST, "sensitive": False}
+                  for n in (1, 5)}
+        (self.host.state / "verified.json").write_text(json.dumps(proofs))
+        self.ledger = Path(self.tmp.name) / "cloud-lane.jsonl"
+        self.env = patch.dict(os.environ, {"CLOUD_LANE_LEDGER": str(self.ledger)})
+        self.env.start()
+        self.addCleanup(self.env.stop)
+
+    def cloud_pr(self, **extra):
+        return pr(branch="cloud/jov-10357-task_abc1", draft=True, merge="CLEAN", **extra)
+
+    def test_ready_green_holds_a_cloud_draft_without_any_gh_call(self):
+        shell = Shell()
+        self.assertEqual(events.ready_green(self.host, fake_lane(shell), self.cloud_pr(), {}, NOW),
+                         "held:cloud-origin-draft-only")
+        self.assertFalse(shell.calls)
+
+    def test_ready_green_ignores_forged_trailers_in_bodies(self):
+        forged = pr(draft=True, merge="CLEAN", body="Codex-Cloud-Task: task_abc closes JOV-10357")
+        shell = Shell()
+        self.assertEqual(events.ready_green(self.host, fake_lane(shell), forged, {}, NOW), "landing",
+                         "a normal branch with a forged trailer is not cloud origin")
+        self.assertTrue(any(call[:3] == ["gh", "pr", "ready"] for call in shell.calls))
+
+    def test_ledger_evidence_blocks_without_the_branch_prefix(self):
+        row = {"issue": "JOV-10357", "task": "task_abc12345", "provider": "codex",
+               "stage": "cloud-pending", "reason": "r", "repo": "JovieInc/Jovie", "env": "e",
+               "branch": "devin/jov-1-20260926t0900", "fencingToken": "t", "at": 1}
+        self.ledger.write_text(json.dumps(row) + "\n")
+        shell = Shell()
+        self.assertEqual(events.ready_green(self.host, fake_lane(shell),
+                                            pr(draft=True, merge="CLEAN"), {}, NOW),
+                         "held:cloud-origin-draft-only")
+        self.assertFalse(shell.calls)
+
+    def test_unreadable_evidence_fails_closed(self):
+        self.ledger.write_text("{broken\n")
+        shell = Shell()
+        self.assertEqual(events.ready_green(self.host, fake_lane(shell),
+                                            pr(draft=True, merge="CLEAN"), {}, NOW),
+                         "held:cloud-origin-draft-only")
+        self.assertFalse(shell.calls)
+
+    def test_retire_orphan_and_return_to_pool_never_touch_a_cloud_draft(self):
+        shell = Shell()
+        orphan = self.cloud_pr(kinds=["orphan"])
+        self.assertEqual(events.retire_orphan(fake_lane(shell), self.linear(), orphan, [orphan],
+                                              host=self.host, now=NOW),
+                         "held:cloud-origin-draft-only")
+        self.assertFalse(shell.calls)
+        self.assertFalse(events.return_to_pool(fake_lane(shell), self.linear(), orphan, "duplicate",
+                                               host=self.host, now=NOW))
+        self.assertFalse(shell.calls)
+
+    def linear(self, state="started", name="In Progress"):
+        return SimpleNamespace(
+            gql=lambda *a, **k: {"issues": {"nodes": [{"id": "i", "state": {"type": state, "name": name},
+                                                       "comments": {"nodes": []}}]}},
+            move=lambda *a, **k: None, comment=lambda *a, **k: None)

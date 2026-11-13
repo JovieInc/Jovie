@@ -164,4 +164,19 @@ describe('assembleAppModeSystemPrompt catalog threading', () => {
 
     expect(parts.dynamic).not.toContain("in THIS artist's own catalog");
   });
+
+  it('hydrates an @profile token for the signed-in artist', async () => {
+    const { assembleAppModeSystemPrompt } = await import(
+      '@/lib/chat/turn-app-prompt'
+    );
+
+    const parts = await assembleAppModeSystemPrompt({
+      ...baseInput,
+      userTexts: ['Look at @profile:profile-1[The Artist]'],
+    });
+
+    expect(parts.dynamic).toContain(
+      'profile:profile-1 "The Artist" (@theartist) — the user\'s own Jovie profile. The artist facts above describe it.'
+    );
+  });
 });

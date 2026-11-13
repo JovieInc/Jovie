@@ -43,7 +43,7 @@ concurrency:
   # older one, but events for different heads never touch each other. With the
   # PR number alone, the older head's run could start last and cancel the
   # current head's run, leaving PR Ready with no evidence (#23270, 2026-10-25).
-  # PR Ready reads the run by head sha, so a superseded head's run is harmless.
+  # PR Ready keeps this head sha or the base sha, so a superseded head is harmless.
   # workflow_run re-run hops get their own group.
   group: ${{ github.event_name == 'workflow_run' && format('fleet-rules-rerun-{0}', github.event.workflow_run.id) || format('fleet-rules-evidence-{0}-{1}', github.event.pull_request.number, github.event.pull_request.head.sha) }}
   cancel-in-progress: ${{ github.event_name == 'pull_request_target' }}

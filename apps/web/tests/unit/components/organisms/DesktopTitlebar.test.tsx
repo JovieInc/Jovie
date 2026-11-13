@@ -97,7 +97,6 @@ describe('DesktopTitlebar', () => {
 
     expect(screen.getByTestId('electron-titlebar-row')).toBeInTheDocument();
 
-    // Sidebar toggle is in the sidebar cell (single canonical toggle)
     expect(
       screen.getByTestId('electron-titlebar-sidebar-cell')
     ).toContainElement(screen.getByTestId('electron-sidebar-toggle'));
@@ -105,7 +104,7 @@ describe('DesktopTitlebar', () => {
       screen.getByTestId('electron-titlebar-sidebar-cell')
     ).toContainElement(screen.getByTestId('electron-traffic-light-safe-area'));
     expect(screen.getByTestId('electron-titlebar-sidebar-cell')).toHaveClass(
-      'gap-(--app-shell-sidebar-icon-gap)'
+      'gap-(--electron-traffic-light-toggle-gap)'
     );
     expect(
       screen.getByTestId('electron-titlebar-sidebar-cell')
@@ -127,8 +126,7 @@ describe('DesktopTitlebar', () => {
     expect(
       screen.getByRole('button', { name: 'Collapse sidebar' })
     ).toBeInTheDocument();
-    // The desktop toggle is the canonical rail-control primitive — same
-    // pressed/expanded semantics and icon family as the header's control.
+    // The desktop toggle uses the canonical rail-control semantics.
     const sidebarToggle = screen.getByTestId('electron-sidebar-toggle');
     expect(sidebarToggle).toHaveAttribute('data-rail-toggle', 'left');
     expect(sidebarToggle).toHaveAttribute('aria-expanded', 'true');
@@ -144,9 +142,7 @@ describe('DesktopTitlebar', () => {
   ])(
     'labels the mobile drawer from its own state, not the desktop rail state',
     (overrides, expectedLabel, expectedExpanded) => {
-      // Keep the desktop rail open in both fixtures. On compact layouts the
-      // titlebar button controls openMobile, so its name and expanded state
-      // must follow the drawer instead.
+      // The compact titlebar follows openMobile even with the desktop rail open.
       renderTitlebar(overrides);
 
       const toggle = screen.getByRole('button', { name: expectedLabel });
@@ -155,11 +151,15 @@ describe('DesktopTitlebar', () => {
     }
   );
 
-  it('renders no Electron controls in the browser runtime', () => {
+  it('preserves preload fullscreen before the runtime hydrates', () => {
     electronRuntimeMock.isElectronRuntime = false;
-
+    const root = document.documentElement;
+    root.dataset.electronFullscreenManaged = 'preload';
+    root.dataset.electronFullscreen = 'true';
     renderTitlebar();
-
+    expect(root.dataset.electronFullscreen).toBe('true');
+    root.removeAttribute('data-electron-fullscreen-managed');
+    root.removeAttribute('data-electron-fullscreen');
     expect(screen.getByTestId('electron-titlebar-row')).toBeEmptyDOMElement();
     expect(
       screen.queryByTestId('electron-titlebar-sidebar-cell')

@@ -28,7 +28,7 @@ Create agent worktrees with `scripts/agent/worktree-new <dir> -b <branch>`: it h
 
 | Tool | Required Version | Enforcement |
 |------|------------------|-------------|
-| **Node.js** | **24.x** (24.22.2+) | `.nvmrc`, `package.json` engines |
+| **Node.js** | **24.x** (24.22.3+) | `.nvmrc`, `package.json` engines |
 | **pnpm** | **9.15.9** (`packageManager`); engines `>=9.15.4 <10` | `package.json` |
 | **Turbo** | 2.8+ | Root devDependencies |
 
@@ -37,7 +37,7 @@ AI agents frequently default to Node 18/20/22 which **will fail** or cause subtl
 ### Pre-Flight Checklist
 
 ```bash
-node --version  # Expected: v24.22.2 or higher
+node --version  # Expected: v24.22.3 or higher
 pnpm --version  # Expected: 9.15.9
 
 # If wrong:
@@ -110,7 +110,7 @@ set -euo pipefail
 curl -fsSL https://fnm.vercel.app/install | bash
 export PATH="$HOME/.local/share/fnm:$PATH"
 eval "$(fnm env)"
-fnm install 24.22.2 && fnm use 24.22.2
+fnm install 24.22.3 && fnm use 24.22.3
 corepack enable && corepack prepare pnpm@9.15.9 --activate
 
 # 2. Doppler CLI

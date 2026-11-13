@@ -37,6 +37,7 @@ ROOT = Path(__file__).resolve().parents[2]
 # Literal header: the staged lanes release bundle carries no canon/ files.
 REGISTRY_HEADER = '{"schema": "jovie-automation-registry/v1"}\n'
 sys.path.insert(0, str(ROOT / "scripts/lanes"))
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 import git_housekeeping  # noqa: E402
 
 git_housekeeping.install_process_fixture_env()
@@ -1656,39 +1657,7 @@ class ProviderAndLockTest(unittest.TestCase):
         self.assertFalse(lane.needs_update("t1", ""))
 
 
-class FakeLinear:
-    def __init__(self, issues):
-        self.issues, self.moves, self.comments, self.triaged = issues, [], [], []
-        self.issue_state = {"name": "Todo", "type": "unstarted"}
-
-    def gql(self, query, variables):
-        # The issue-lookup used for terminal dispositions (pr_events.linear_issue).
-        number = int(variables.get("n") or 0)
-        issue_id = f"id-JOV-{number}"
-        comments = [{"body": body} for iid, body in self.comments if iid == issue_id]
-        node = {"id": issue_id, "state": self.issue_state, "comments": {"nodes": comments}}
-        return {"issues": {"nodes": [] if self.missing_issue(number) else [node]}}
-
-    def missing_issue(self, number):
-        return number in getattr(self, "missing", set())
-
-    def create_triage(self, title, description, dedupe=None):
-        if dedupe and any(dedupe in open_title for open_title in getattr(self, "open_titles", [])):
-            return "existing-id"
-        self.triaged.append(title)
-        return "triage-id"
-
-    def lane_issues(self, label):
-        return self.issues
-
-    def move(self, issue_id, state):
-        self.moves.append((issue_id, state))
-
-    def state_of(self, issue_id):
-        return getattr(self, "states", {}).get(issue_id, "Todo")
-
-    def comment(self, issue_id, body):
-        self.comments.append((issue_id, body))
+from test_cloud_lane_cases.__tests__.cloud_lane_runner_cases import FakeLinear
 
 
 class LinearClientTest(unittest.TestCase):
@@ -2923,7 +2892,7 @@ class HostHandoffAdmissionTest(unittest.TestCase):
                       "routes": [{"model": "standard", "capability": "standard", "cost": 0}]},
             "codex": {"tier": 1, "slots": 1, "model": "frontier", "cmd": ["codex-test"],
                       "routes": [{"model": "frontier", "capability": "frontier", "cost": 3}]},
-            "claude": {"tier": 2, "slots": 1, "model": "sonnet", "cmd": ["claude-test", "{model}"],
+            "claude": {"tier": 2, "slots": 1, "model": "sonnet", "cmd": ["claude-test", "{model}"], "accountClass": "claude-subscription",
                        "routes": [{"model": "sonnet", "capability": "standard", "cost": 1},
                                   {"model": "opus", "capability": "frontier", "cost": 2}]},
             "hyperagent": {"tier": 0, "slots": 1, "repairs": False, "cmd": ["remote-test"],
@@ -7856,6 +7825,81 @@ def Locked_free(host):
         probe.release()
 
 
+class ContainedByMainTest(unittest.TestCase):
+    def test_exact_edits_are_bound_to_their_base_range(self):
+        contained = lane.fix_red_source_edits.contained_by_main
+        base = "before\nold\nafter\ntail\n"
+        for ours, theirs, expected in (
+            (base, "main alone\n", True),
+            (base.replace("old", "new"), base.replace("old", "new").replace("tail", "later"), True),
+            (base.replace("old", "new"), base.replace("old", "new\nmain addition"), True),
+            (base.replace("old\n", ""), base.replace("old\n", ""), True),
+            (base.replace("old", "new"), base + "new\n", False),
+            (base.replace("old\n", ""), base, False),
+            (base.replace("old", "new"), base.replace("old\nafter", "new\nrewritten"), False),
+            ("// instruction\n" + base, "// different\n" + base, False),
+            (base.replace("old", "`// text`"), base.replace("old", "`// other`"), False),
+            (base.replace("old", "new"), "<<<<<<< HEAD\n" + base, False),
+            (base.replace("old", "new"), base.replace("old", "new").rstrip(), True),
+        ):
+            with self.subTest(ours=ours, theirs=theirs):
+                result = contained(base, ours, theirs)
+                self.assertEqual(result, theirs if expected else None)
+
+    def test_real_conflict_preserves_main_and_fast_forwards_the_branch(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root, work, remote = Path(tmp), Path(tmp) / "work", Path(tmp) / "origin.git"
+            work.mkdir()
+            def git(*args):
+                return subprocess.run(["git", *args], cwd=work, capture_output=True, text=True, check=True).stdout.strip()
+            git("init", "-q", "-b", "main")
+            git("init", "-q", "--bare", str(remote))
+            for key, value in (("user.name", "Test"), ("user.email", "test@example.test"),
+                               ("commit.gpgsign", "false"), ("core.hooksPath", str(root / "hooks"))):
+                git("config", key, value)
+            git("remote", "add", "origin", str(remote))
+            path = work / "probe.mjs"
+            base = "before\nold\nafter\n" + "unchanged\n" * 10 + "tail\n"
+            path.write_text(base)
+            git("add", "probe.mjs")
+            git("commit", "-qm", "base")
+            git("branch", "feature")
+            ours = base.replace("old", "new")
+            theirs = ours.replace("new", "new\nmain addition").replace("tail", "main tail")
+            path.write_text(theirs)
+            git("commit", "-qam", "main already has the repair and later work")
+            git("push", "-q", "origin", "main")
+            git("checkout", "-q", "feature")
+            path.write_text(ours)
+            git("commit", "-qam", "repair")
+            before = git("rev-parse", "HEAD")
+            git("push", "-q", "origin", "feature")
+            # Force a real content conflict while keeping the exact patch on main.
+            path.write_text(ours.replace("before", "head before"))
+            git("commit", "-qam", "head context")
+            # This extra PR edit is absent on main, so the machine must abort without a push.
+            self.assertFalse(lane.resolve_contained_by_main_conflict(work, "feature", None))
+            self.assertEqual(git("rev-parse", "origin/feature"), before)
+            self.assertEqual(git("diff", "--name-only", "--diff-filter=U"), "")
+            # Build an identical-edit conflict: main changes an adjacent context line too.
+            git("checkout", "-q", "main")
+            theirs = theirs.replace("before", "head before")
+            path.write_text(theirs)
+            git("commit", "-qam", "same head context plus main tail")
+            git("push", "-q", "origin", "main")
+            git("checkout", "-q", "feature")
+            head = git("rev-parse", "HEAD")
+            conflict = subprocess.run(["git", "merge", "--no-edit", "origin/main"], cwd=work, capture_output=True)
+            self.assertEqual(conflict.returncode, 1)
+            self.assertEqual(git("diff", "--name-only", "--diff-filter=U"), "probe.mjs")
+            git("merge", "--abort")
+            self.assertTrue(lane.resolve_contained_by_main_conflict(work, "feature", None))
+            self.assertEqual(path.read_text(), theirs)
+            self.assertEqual(git("rev-parse", "HEAD"), git("rev-parse", "origin/feature"))
+            git("merge-base", "--is-ancestor", head, "HEAD")
+            self.assertEqual(len(git("show", "-s", "--format=%P").split()), 2)
+
+
 class FixRedTest(unittest.TestCase):
     def setUp(self):
         disk = patch.object(lane.disk_guard, "free_pct", return_value=50.0)
@@ -8165,6 +8209,50 @@ class FixRedTest(unittest.TestCase):
             self.assertEqual(receipt["verdict"], "skipped")
             self.assertEqual(receipt["reasons"], ["infra-rerun:quota-deferred"])
             self.assertEqual(receipt["failureFingerprint"]["cls"], "quota-deferred")
+            agent.assert_not_called()
+            again.assert_called_once()
+
+    def ready_pr(self):
+        return self.pr(checks=[{
+            "name": "PR Ready", "status": "COMPLETED", "conclusion": "FAILURE",
+            "detailsUrl": "https://github.com/x/actions/runs/1/job/42"}])
+
+    def quota_stamp(self, offset_s):
+        stamp = datetime.fromtimestamp(time.time() + offset_s, timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.000Z")
+        return ("::warning::github-quota-deferred: gh api primary after 1 attempt(s) "
+                f"until {stamp}; not a verdict on this change.\n"
+                "::error::Fleet rule evidence lookup was github-quota-deferred; not a verdict on this PR.")
+
+    def test_quota_reset_in_the_future_waits_and_does_not_rerun_or_dispatch(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            host, receipt, agent, again = self.run_gate(tmp, self.quota_stamp(86400), pr=self.ready_pr())
+            self.assertEqual(receipt["reasons"], ["infra-rerun:quota-deferred-until"])
+            self.assertEqual(receipt["attemptRefunded"], "infra-rerun:quota-deferred-until")
+            agent.assert_not_called()
+            again.assert_not_called()
+            stored = json.loads((host.state / "infra-reruns.json").read_text())["5"]
+            self.assertIsNone(stored["claimedAt"])
+            _, second, agent2, again2 = self.run_gate(tmp, self.quota_stamp(86400), pr=self.ready_pr())
+            self.assertEqual(second["reasons"], ["infra-rerun:quota-deferred-until"])
+            agent2.assert_not_called()
+            again2.assert_not_called()
+
+    def test_quota_reset_in_the_past_reruns_once_then_reaches_the_agent(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            _, receipt, agent, again = self.run_gate(tmp, self.quota_stamp(-86400), pr=self.ready_pr())
+            self.assertEqual(receipt["reasons"], ["infra-rerun:quota-deferred"])
+            agent.assert_not_called()
+            again.assert_called_once()
+            _, second, agent2, again2 = self.run_gate(tmp, self.quota_stamp(-86400), pr=self.ready_pr())
+            agent2.assert_called_once()
+            again2.assert_not_called()
+            self.assertNotEqual(second["reasons"][:1], ["infra-rerun:quota-deferred"])
+
+    def test_legacy_head_claim_still_reruns_once_after_the_quota_reset(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            (Path(tmp) / "infra-reruns.json").write_text(json.dumps({"5": "h1"}))
+            _, receipt, agent, again = self.run_gate(tmp, self.quota_stamp(-86400), pr=self.ready_pr())
+            self.assertEqual(receipt["reasons"], ["infra-rerun:quota-deferred"])
             agent.assert_not_called()
             again.assert_called_once()
 
@@ -8483,6 +8571,23 @@ class FixRedTest(unittest.TestCase):
                 lane.run_agent = real_agent
         self.assertEqual((receipt["verdict"], receipt["resolution"]), ("fix-pushed", "identifier-list-merged"))
 
+    def test_a_contained_by_main_conflict_skips_the_agent(self):
+        names = [name for name in (
+            "resolve_generated_conflict", "resolve_narrowed_preflight_conflict",
+            "resolve_and_chain_conflict", "resolve_additive_list_conflict",
+            "resolve_identifier_list_conflict", "resolve_contained_by_main_conflict")]
+        with patch.multiple(lane, **{name: (lambda *a, **k: False) for name in names[:-1]}), \
+             patch.object(lane, names[-1], return_value=True), \
+             patch.object(lane, "run_agent", side_effect=AssertionError("contained edits need no model")), \
+             patch.object(lane, "sh", side_effect=lambda args, **kwargs: SimpleNamespace(
+                 returncode=0, stderr="", stdout="h9\n" if args[:2] == ["git", "rev-parse"] else
+                 "h9\0commit: repair\n" if args[:2] == ["git", "reflog"] else
+                 "h9\trefs/heads/devin/jov-1\n" if args[:2] == ["git", "ls-remote"] else "")), \
+             tempfile.TemporaryDirectory() as tmp:
+            receipt = lane.fix_red_pr(lane.Host(state=Path(tmp), repo=Path(tmp)), "devin", {"cmd": ["true"]},
+                                      {**self.pr(), "isDraft": False, "mergeStateStatus": "DIRTY"})
+        self.assertEqual((receipt["verdict"], receipt["resolution"]), ("fix-pushed", "contained-by-main"))
+
     def test_unknown_conflict_still_reaches_the_model_after_every_class(self):
         real_sh = lane.sh
         real_agent = lane.run_agent
@@ -8492,6 +8597,7 @@ class FixRedTest(unittest.TestCase):
             "resolve_and_chain_conflict",
             "resolve_additive_list_conflict",
             "resolve_identifier_list_conflict",
+            "resolve_contained_by_main_conflict",
         )
         saved = {name: getattr(lane, name) for name in names}
         for name in names:
@@ -12725,197 +12831,6 @@ class AtomicWriteRouteTest(unittest.TestCase):
              patch.object(lane, "sh", return_value=SimpleNamespace(returncode=1)) as shell:
             self.assertIsNone(lane.atomic_state_fix(None, {}, {}, Path("/unused"), None, {}))
         self.assertEqual(shell.call_count, 1)
-
-
-class LockfileConflictTest(unittest.TestCase):
-    """JOV-6837/JOV-7594: a generated-file-only conflict is resolved without a model; anything else is not."""
-
-    def test_rechecks_target_immediately_before_runner_owned_install_and_push(self):
-        for conflict in (True, False):
-            calls = []
-            def shell(args, **kwargs):
-                calls.append(args)
-                return SimpleNamespace(returncode=1 if args[:2] == ["git", "merge"] and conflict else 0,
-                                       stdout="pnpm-lock.yaml\n" if args[:2] == ["git", "diff"] else "", stderr="")
-            guard = Mock(side_effect=[None, lane.RepairStopped("target-pr-merged", {"state": "MERGED"}, "command")])
-            with self.subTest(conflict=conflict), patch.object(lane, "sh", side_effect=shell):
-                with self.assertRaises(lane.RepairStopped):
-                    lane.resolve_generated_conflict(Path("/not-used"), "branch", None, guard=guard)
-            self.assertFalse(any(cmd[:2] == ["pnpm", "install"] or cmd[:2] == ["git", "push"] for cmd in calls))
-
-    def git(self, *args, cwd):
-        return subprocess.run(["git", "-c", "user.email=t@t", "-c", "user.name=t", *args], cwd=cwd,
-                              check=True, capture_output=True, text=True).stdout.strip()
-
-    def repo(self, tmp: Path, pr_changes: dict, main_changes: dict | None = None):
-        origin, work = tmp / "origin.git", tmp / "work"
-        self.git("init", "-q", "--bare", "-b", "main", str(origin), cwd=tmp)
-        self.git("clone", "-q", str(origin), str(work), cwd=tmp)
-        for name, text in {"package.json": "{}\n", "pnpm-lock.yaml": "base\n", "a.ts": "a\n"}.items():
-            (work / name).write_text(text)
-        self.git("add", "-A", cwd=work)
-        self.git("commit", "-qm", "base", cwd=work)
-        self.git("push", "-q", "origin", "HEAD:main", cwd=work)
-        self.git("checkout", "-q", "-b", "devin/jov-1-20260927", cwd=work)
-        for name, text in pr_changes.items():
-            (work / name).parent.mkdir(parents=True, exist_ok=True)
-            (work / name).write_text(text)
-        self.git("add", "-A", cwd=work)
-        self.git("commit", "-qm", "pr", cwd=work)
-        self.git("push", "-q", "origin", "HEAD:devin/jov-1-20260927", cwd=work)
-        self.git("checkout", "-q", "main", cwd=work)
-        for name, text in (main_changes or {"pnpm-lock.yaml": "main\n", "a.ts": "main\n"}).items():
-            (work / name).parent.mkdir(parents=True, exist_ok=True)
-            (work / name).write_text(text)
-        self.git("add", "-A", cwd=work)
-        self.git("commit", "-qm", "main moves", cwd=work)
-        self.git("push", "-q", "origin", "HEAD:main", cwd=work)
-        self.git("checkout", "-q", "devin/jov-1-20260927", cwd=work)
-        self.git("fetch", "-q", "origin", cwd=work)
-        return origin, work
-
-    def run_resolve(self, work: Path):
-        real, calls = lane.sh, []
-
-        def sh(args, cwd=None, timeout=600, env=None, log=None, stream=False):
-            calls.append(args)
-            if args[:2] == ["pnpm", "install"]:
-                (Path(cwd) / "pnpm-lock.yaml").write_text("regenerated\n")
-                return SimpleNamespace(returncode=0, stdout="", stderr="")
-            if args == ["pnpm", "ci:topology:write"]:
-                target = Path(cwd) / ".github/workflow-topology.gen.yml"
-                target.parent.mkdir(parents=True, exist_ok=True)
-                target.write_text("regenerated\n")
-                return SimpleNamespace(returncode=0, stdout="", stderr="")
-            return real(args, cwd=cwd, timeout=timeout, env=env)
-        lane.sh = sh
-        try:
-            with open(os.devnull, "w") as log:
-                env = {**os.environ, "GIT_AUTHOR_NAME": "t", "GIT_AUTHOR_EMAIL": "t@t",
-                       "GIT_COMMITTER_NAME": "t", "GIT_COMMITTER_EMAIL": "t@t"}
-                saved = dict(os.environ)
-                os.environ.update(env)
-                try:
-                    return lane.resolve_generated_conflict(work, "devin/jov-1-20260927", log), calls
-                finally:
-                    os.environ.clear()
-                    os.environ.update(saved)
-        finally:
-            lane.sh = real
-
-    def test_lockfile_only_conflict_is_regenerated_and_pushed(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            origin, work = self.repo(Path(tmp), {"pnpm-lock.yaml": "pr\n"})
-            ok, calls = self.run_resolve(work)
-            self.assertTrue(ok)
-            self.assertIn(["pnpm", "install", "--lockfile-only", "--ignore-scripts"], calls)
-            pushed = self.git("show", "devin/jov-1-20260927:pnpm-lock.yaml", cwd=origin)
-            self.assertEqual(pushed, "regenerated")
-            self.assertEqual(self.git("show", "devin/jov-1-20260927:a.ts", cwd=origin), "main")
-
-    def test_generated_topology_conflict_is_regenerated_and_pushed(self):
-        """JOV-7594: a generated-file conflict regenerates instead of hand-merging."""
-        path = ".github/workflow-topology.gen.yml"
-        with tempfile.TemporaryDirectory() as tmp:
-            origin, work = self.repo(Path(tmp), {path: "pr\n"},
-                                     main_changes={path: "main\n", "a.ts": "main\n"})
-            ok, calls = self.run_resolve(work)
-            self.assertTrue(ok)
-            self.assertIn(["pnpm", "ci:topology:write"], calls)
-            self.assertNotIn(["pnpm", "install", "--lockfile-only", "--ignore-scripts"], calls)
-            self.assertEqual(self.git("show", f"devin/jov-1-20260927:{path}", cwd=origin), "regenerated")
-            self.assertEqual(self.git("show", "devin/jov-1-20260927:a.ts", cwd=origin), "main")
-
-    def test_append_only_registry_conflict_keeps_both_sides_without_a_model(self):
-        """2026-10-29: canon/automation-registry.jsonl conflicted on 4 PRs; both sides' lines are the merge."""
-        path = "canon/automation-registry.jsonl"
-        header = REGISTRY_HEADER
-        with tempfile.TemporaryDirectory() as tmp:
-            origin, work = self.repo(Path(tmp), {path: header + '{"id":"base"}\n{"id":"pr"}\n'},
-                                     main_changes={path: header + '{"id":"base"}\n{"id":"main"}\n', "a.ts": "main\n"})
-            ok, calls = self.run_resolve(work)
-            self.assertTrue(ok)
-            merged = self.git("show", f"devin/jov-1-20260927:{path}", cwd=origin)
-            self.assertIn('"id":"pr"', merged)
-            self.assertIn('"id":"main"', merged)
-            self.assertNotIn("<<<<<<<", merged)
-
-    def test_rule_scopes_record_is_a_generated_resolver(self):
-        self.assertEqual(lane.remediation.GENERATED_RESOLVERS["scripts/agent-context/rule-scopes.json"],
-                         ("node", "scripts/agent-context/rule-scopes.mjs", "--write"))
-        self.assertIn("canon/automation-registry.jsonl", lane.remediation.RESOLVABLE_CONFLICT_FILES)
-
-    def test_registry_edits_to_the_same_id_stay_unresolved(self):
-        path = "canon/automation-registry.jsonl"
-        header = REGISTRY_HEADER
-        with tempfile.TemporaryDirectory() as tmp:
-            _, work = self.repo(Path(tmp), {path: header + '{"id":"base","value":"pr"}\n'},
-                                main_changes={path: header + '{"id":"base","value":"main"}\n'})
-            ok, _ = self.run_resolve(work)
-            self.assertFalse(ok)
-            self.assertEqual((work / path).read_text(), header + '{"id":"base","value":"pr"}\n')
-    def test_sources_of_truth_conflict_regenerates_from_merged_source(self):
-        path = "canon/SOURCES_OF_TRUTH.md"
-        generator = "scripts/sources-of-truth.mjs"
-        source = "canon/sources-of-truth.json"
-        script = (
-            "import {readFileSync,writeFileSync} from 'node:fs';\n"
-            f"if(readFileSync('{path}','utf8') !== 'main\\n') throw Error('must restore main');\n"
-            f"writeFileSync('{path}',JSON.parse(readFileSync('{source}','utf8')).domains.join('\\n'));\n"
-        )
-        with tempfile.TemporaryDirectory() as tmp:
-            origin, work = self.repo(Path(tmp), {path: "pr\n", generator: script,
-                                     source: '{"domains":["engineering-wins","proof-stats"]}'},
-                                     main_changes={path: "main\n", "a.ts": "main\n"})
-            ok, calls = self.run_resolve(work)
-            self.assertTrue(ok)
-            self.assertEqual(calls.count(["node", generator, "--write"]), 1)
-            self.assertEqual(self.git("show", f"devin/jov-1-20260927:{path}", cwd=origin),
-                             "engineering-wins\nproof-stats")
-            self.assertEqual(self.git("show", "devin/jov-1-20260927:a.ts", cwd=origin), "main")
-
-    def test_mixed_generated_conflicts_run_each_resolver_once(self):
-        topology = ".github/workflow-topology.gen.yml"
-        with tempfile.TemporaryDirectory() as tmp:
-            origin, work = self.repo(Path(tmp), {"pnpm-lock.yaml": "pr\n", topology: "pr\n"},
-                                     main_changes={"pnpm-lock.yaml": "main\n", topology: "main\n"})
-            ok, calls = self.run_resolve(work)
-            self.assertTrue(ok)
-            self.assertEqual(calls.count(["pnpm", "install", "--lockfile-only", "--ignore-scripts"]), 1)
-            self.assertEqual(calls.count(["pnpm", "ci:topology:write"]), 1)
-
-    def test_cleanly_merged_generated_file_is_also_regenerated(self):
-        topology = ".github/workflow-topology.gen.yml"
-        with tempfile.TemporaryDirectory() as tmp:
-            origin, work = self.repo(Path(tmp), {"pnpm-lock.yaml": "pr\n"},
-                                     main_changes={"pnpm-lock.yaml": "main\n", topology: "main topology\n"})
-            ok, calls = self.run_resolve(work)
-            self.assertTrue(ok)
-            self.assertEqual(calls.count(["pnpm", "ci:topology:write"]), 1)
-            self.assertEqual(self.git("show", f"devin/jov-1-20260927:{topology}", cwd=origin), "regenerated")
-
-    def test_a_source_conflict_is_left_to_the_agent_untouched(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            origin, work = self.repo(Path(tmp), {"pnpm-lock.yaml": "pr\n", "a.ts": "pr\n"})
-            before = self.git("rev-parse", "devin/jov-1-20260927", cwd=origin)
-            ok, calls = self.run_resolve(work)
-            self.assertFalse(ok)
-            self.assertNotIn(["pnpm", "install", "--lockfile-only", "--ignore-scripts"], calls)
-            self.assertFalse((work / ".git" / "MERGE_HEAD").exists(), "merge aborted")
-            self.assertEqual(self.git("rev-parse", "devin/jov-1-20260927", cwd=origin), before)
-
-    def test_failed_generated_restore_or_generator_stops_before_staging(self):
-        for failure in ("checkout", "generator"):
-            calls = []
-            def shell(args, **kwargs):
-                calls.append(args)
-                failed = (failure == "checkout" and args[:2] == ["git", "checkout"]
-                          or failure == "generator" and args[0] == "pnpm")
-                return SimpleNamespace(returncode=int(failed), stdout="", stderr="")
-            with self.subTest(failure=failure), patch.object(lane, "sh", side_effect=shell):
-                self.assertFalse(lane.regenerate_merged_generated(
-                    Path("/not-used"), [".github/workflow-topology.gen.yml"], None))
-            self.assertFalse(any(cmd[:2] == ["git", "add"] for cmd in calls))
 
 
 class GateOutcomeTest(unittest.TestCase):
@@ -17831,3 +17746,51 @@ class FixNowTest(unittest.TestCase):
             lane.post_claim(22868, "a" * 40, "fix")
         self.assertNotIn("red_at=", calls[0][-1])
         self.assertFalse((self.state / "runs/red-dispatch.jsonl").exists())
+
+
+class MixedBodyRepairTest(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.host = lane.Host(state=Path(self.tmp.name))
+        self.pr = {"number": 24804, "headRefOid": "a" * 40, "body": "## Summary\n"}
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def test_mixed_repairs_write_the_body_once_per_head(self):
+        route = {"action": "agent", "cls": "mixed", "repairs": ["stamp-changelog", "red-before-green"]}
+        with patch.object(lane.pr_events, "ensure_red_before_green", return_value=True) as ensure:
+            reason = lane.deterministic_route_taken(self.host, self.pr, route)
+        self.assertEqual(reason, "infra-rerun:mixed-body-repairs")
+        ensure.assert_called_once_with(self.pr, "", customer_decision={"releaseWorthy": False})
+        with patch.object(lane.pr_events, "ensure_red_before_green", return_value=True) as again:
+            self.assertIsNone(lane.deterministic_route_taken(self.host, self.pr, route))
+        again.assert_not_called()
+
+    def test_agent_route_without_body_repairs_stays_on_the_model(self):
+        route = {"action": "agent", "cls": "mixed", "repairs": []}
+        with patch.object(lane.pr_events, "ensure_red_before_green", return_value=True) as ensure:
+            self.assertIsNone(lane.deterministic_route_taken(self.host, self.pr, route))
+        ensure.assert_not_called()
+
+    def test_failed_body_edit_still_hands_the_head_to_the_model(self):
+        route = {"action": "agent", "cls": "mixed", "repairs": ["stamp-changelog"]}
+        with patch.object(lane.pr_events, "ensure_red_before_green", return_value=False):
+            self.assertIsNone(lane.deterministic_route_taken(self.host, self.pr, route))
+
+    def test_single_class_changelog_keeps_the_primary_stamp_route(self):
+        route = {"action": "stamp-changelog", "cls": "changelog-metadata", "repairs": []}
+        with patch.object(lane, "stamp_changelog_decision", return_value=True) as stamp:
+            reason = lane.deterministic_route_taken(self.host, self.pr, route)
+        self.assertEqual(reason, "infra-rerun:changelog-metadata")
+        stamp.assert_called_once_with(self.host, self.pr)
+
+
+from test_cloud_lane_cases.__tests__.cloud_lane_runner_cases import CloudLaneGateMixin
+
+
+class CloudLaneGateTest(CloudLaneGateMixin, unittest.TestCase):
+    runner = lane
+    linear_fixture = FakeLinear
+    issue_fixture = staticmethod(issue)
+    proof_fixture = staticmethod(gate_proof)

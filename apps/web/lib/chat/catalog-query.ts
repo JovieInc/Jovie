@@ -1,6 +1,14 @@
 import 'server-only';
 
-import { and, asc, desc, eq, ilike, isNull, sql } from 'drizzle-orm';
+import {
+  and,
+  asc,
+  desc,
+  sql as drizzleSql,
+  eq,
+  ilike,
+  isNull,
+} from 'drizzle-orm';
 import { db } from '@/lib/db';
 import {
   discogReleases,
@@ -9,6 +17,7 @@ import {
 } from '@/lib/db/schema/content';
 import { getCanvasStatusFromMetadata } from '@/lib/services/canvas/service';
 import { toISOStringOrNull } from '@/lib/utils/date';
+import { DISCOGRAPHY_PROMPT_ROW_LIMIT } from './discography-prompt';
 import { extractEntities } from './tokens';
 import type { ChatReleaseLookup, ReleaseContext } from './types';
 
@@ -20,6 +29,18 @@ const PROVIDER_LINK_LIMIT = 20;
 
 /** Bound on per-turn beyond-slice token hydration queries. */
 const TOKEN_HYDRATION_LIMIT = 8;
+
+/** Candidate rows scanned when a turn names a release outside the shown list. */
+const NAMED_CANDIDATE_LIMIT = 20;
+
+/** Named releases appended to the discography section. */
+const NAMED_PROMPT_LIMIT = 3;
+
+/**
+ * Unquoted single-word titles shorter than this are too easy to false-match
+ * ("love", "single"). Quoted titles and multi-word titles stay eligible.
+ */
+const UNQUOTED_SINGLE_WORD_MIN = 8;
 
 function releaseColumns() {
   return {
@@ -54,7 +75,7 @@ type ReleaseRow = {
 /** Deterministic known-dates-first ordering for every release query here. */
 function releaseOrder() {
   return [
-    sql`${discogReleases.releaseDate} DESC NULLS LAST`,
+    drizzleSql`${discogReleases.releaseDate} DESC NULLS LAST`,
     desc(discogReleases.id),
   ] as const;
 }
@@ -117,7 +138,7 @@ export async function findOwnedReleaseForChat(
     row = (
       await queryOwnedReleases(
         ownership,
-        sql`lower(${discogReleases.title}) = lower(${releaseTitle})`,
+        drizzleSql`lower(${discogReleases.title}) = lower(${releaseTitle})`,
         true
       )
     )[0];
@@ -270,4 +291,104 @@ export async function resolveOwnedReleaseTokensForHydration(
     if (release) resolved.push(release);
   }
   return resolved;
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function titleMentioned(blob: string, title: string): boolean {
+  const trimmed = title.trim();
+  if (trimmed.length < 2) return false;
+  const lowerBlob = blob.toLowerCase();
+  const needle = trimmed.toLowerCase();
+  const quoted =
+    lowerBlob.includes(`"${needle}"`) ||
+    lowerBlob.includes(`'${needle}'`) ||
+    lowerBlob.includes(`“${needle}”`) ||
+    lowerBlob.includes(`‘${needle}’`);
+  if (quoted) return true;
+  const specific =
+    trimmed.length >= UNQUOTED_SINGLE_WORD_MIN ||
+    (trimmed.length >= 4 && /\s/u.test(trimmed));
+  if (!specific) return false;
+  const pattern = new RegExp(
+    `(?:^|[^\\p{L}\\p{N}])${escapeRegExp(needle)}(?:[^\\p{L}\\p{N}]|$)`,
+    'iu'
+  );
+  return pattern.test(lowerBlob);
+}
+
+function toReleaseContext(row: ReleaseRow): ReleaseContext {
+  return {
+    id: row.id,
+    title: row.title,
+    releaseType: row.releaseType,
+    releaseDate: toISOStringOrNull(row.releaseDate),
+    artworkUrl: row.artworkUrl,
+    spotifyPopularity: row.spotifyPopularity,
+    totalTracks: row.totalTracks,
+    canvasStatus: getCanvasStatusFromMetadata(row.metadata),
+    metadata: row.metadata,
+  };
+}
+
+/**
+ * Releases the artist named in prose that are not already in the shown
+ * discography rows. Loaded-but-unshown rows are matched in memory; anything
+ * past the loaded slice is one profile-scoped scan. Callers must skip this
+ * when the catalog read itself failed.
+ */
+export async function resolveNamedOwnedReleasesForPrompt(
+  releases: readonly ReleaseContext[],
+  userTexts: readonly string[],
+  profileId: string | null
+): Promise<ReleaseContext[]> {
+  const blob = userTexts.join('\n').trim();
+  if (blob.length === 0) return [];
+
+  const shown = releases.slice(0, DISCOGRAPHY_PROMPT_ROW_LIMIT);
+  const shownIds = new Set(shown.map(release => release.id));
+  const shownTitles = new Set(
+    shown.map(release => release.title.toLowerCase())
+  );
+  const picked: ReleaseContext[] = [];
+
+  const consider = (release: ReleaseContext) => {
+    if (picked.length >= NAMED_PROMPT_LIMIT) return;
+    if (
+      shownIds.has(release.id) ||
+      shownTitles.has(release.title.toLowerCase())
+    ) {
+      return;
+    }
+    if (picked.some(item => item.id === release.id)) return;
+    if (!titleMentioned(blob, release.title)) return;
+    picked.push(release);
+  };
+
+  for (const release of releases.slice(DISCOGRAPHY_PROMPT_ROW_LIMIT)) {
+    consider(release);
+  }
+  if (!profileId || picked.length >= NAMED_PROMPT_LIMIT) return picked;
+
+  const rows = await db
+    .select(releaseColumns())
+    .from(discogReleases)
+    .where(
+      and(
+        eq(discogReleases.creatorProfileId, profileId),
+        isNull(discogReleases.deletedAt),
+        drizzleSql`char_length(${discogReleases.title}) >= 2`,
+        drizzleSql`strpos(lower(${blob}), lower(${discogReleases.title})) > 0`
+      )
+    )
+    .orderBy(
+      drizzleSql`char_length(${discogReleases.title}) desc`,
+      ...releaseOrder()
+    )
+    .limit(NAMED_CANDIDATE_LIMIT);
+
+  for (const row of rows) consider(toReleaseContext(row));
+  return picked;
 }

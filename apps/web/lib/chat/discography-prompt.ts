@@ -60,6 +60,26 @@ function formatReleaseLine(release: DiscographyRelease, now: Date): string {
   return `- ${release.title} (${release.releaseType}, ${release.totalTracks} ${trackLabel}; ${describeReleaseTiming(release.releaseDate, now)})`;
 }
 
+/** Titles named this turn that are absent from the shown rows. No new heading. */
+function namedReleaseBlock(
+  named: readonly DiscographyRelease[] | undefined,
+  shown: readonly DiscographyRelease[],
+  now: Date
+): string {
+  if (!named || named.length === 0) return '';
+  const shownTitles = new Set(
+    shown
+      .slice(0, DISCOGRAPHY_PROMPT_ROW_LIMIT)
+      .map(release => release.title.toLowerCase())
+  );
+  const lines = named
+    .filter(release => !shownTitles.has(release.title.toLowerCase()))
+    .slice(0, 3)
+    .map(release => formatReleaseLine(release, now));
+  if (lines.length === 0) return '';
+  return `- Named this turn, resolved from the full catalog:\n${lines.join('\n')}`;
+}
+
 /**
  * The `- **Total Releases:** …` fact line. Distinct total / loaded / shown
  * counts whenever catalog metadata is supplied; the legacy loaded-count
@@ -83,7 +103,8 @@ export function discographyTotalLine(
 export function buildDiscographySection(
   releases: readonly DiscographyRelease[],
   now: Date,
-  catalog?: ReleaseCatalogMeta
+  catalog?: ReleaseCatalogMeta,
+  namedReleases?: readonly DiscographyRelease[]
 ): string {
   if (catalog?.status === 'unavailable') {
     return [
@@ -93,7 +114,8 @@ export function buildDiscographySection(
   }
 
   if (releases.length === 0) {
-    return '- No releases found in the connected discography yet.';
+    const named = namedReleaseBlock(namedReleases, releases, now);
+    return named || '- No releases found in the connected discography yet.';
   }
 
   const total = catalog?.total ?? releases.length;
@@ -116,6 +138,8 @@ export function buildDiscographySection(
     releases.length > DISCOGRAPHY_PROMPT_ROW_LIMIT
       ? '\n- This list is truncated. If the artist names a release that is not shown, never claim it is not theirs; tool calls resolve titles against the full catalog.'
       : '';
+  const named = namedReleaseBlock(namedReleases, releases, now);
+  const namedSuffix = named ? `\n${named}` : '';
 
-  return `${releaseLines}${overflowLine}${truncationNote}`;
+  return `${releaseLines}${overflowLine}${truncationNote}${namedSuffix}`;
 }

@@ -19,3 +19,20 @@ export const Default: Story = {
 export const NoHeader: Story = {
   args: { showHeader: false },
 };
+
+/** The releases route while its table data loads. */
+export const LoadingReleases: Story = {
+  args: {},
+};
+
+/** Right-to-left layout mirrors the toolbar and skeleton columns. */
+export const RtlLayout: Story = {
+  args: {},
+  decorators: [
+    Story => (
+      <div dir='rtl' lang='ar'>
+        <Story />
+      </div>
+    ),
+  ],
+};

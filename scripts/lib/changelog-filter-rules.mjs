@@ -197,3 +197,147 @@ export function isCustomerCopy(entry) {
     )
   );
 }
+
+// ---------------------------------------------------------------------------
+// Customer changelog copy rules (deterministic; no model, no network).
+//
+// One headline rule for two owners: the `customer-changelog/v1` marker in a
+// source PR body (Source Validation) and the editorial overlay in
+// apps/web/data/customer-changelog-editorial.json. The web projection applies
+// the same rule in apps/web/lib/customer-changelog-editorial.ts; the parity
+// test in __tests__/changelog-source-guard.test.mjs keeps the two in step.
+// ---------------------------------------------------------------------------
+
+export const HEADLINE_MAX = 60;
+/** Markers in PRs created from this instant must pass the copy lint. */
+export const COPY_LINT_FROM = '2026-11-14T00:00:00Z';
+
+const TITLE_CASE_MIN_WORDS = 4;
+
+/** Sentence case: a capital or digit first, and the rest not Title Case. */
+export function isSentenceCaseHeadline(headline) {
+  if (!/^[\p{Lu}\p{N}]/u.test(headline)) return false;
+  const rest = headline
+    .split(/\s+/)
+    .slice(1)
+    .filter(word => /^\p{L}/u.test(word) && !/^\p{Lu}+$/u.test(word));
+  if (rest.length + 1 < TITLE_CASE_MIN_WORDS) return true;
+  const capitalised = rest.filter(word => /^\p{Lu}/u.test(word)).length;
+  return capitalised * 2 <= rest.length;
+}
+
+/** Every reason a headline breaks the rule; empty when it is compliant. */
+export function headlineProblems(headline) {
+  const value = String(headline ?? '');
+  if (!value.trim()) return ['is empty'];
+  const problems = [];
+  if (value !== value.trim()) problems.push('has surrounding whitespace');
+  if (value.length > HEADLINE_MAX)
+    problems.push(`is ${value.length} characters (max ${HEADLINE_MAX})`);
+  if (/[.!:;,]$/.test(value.trim())) problems.push('ends with punctuation');
+  if (/[\r\n<>]/.test(value)) problems.push('contains markup or a newline');
+  if (!isSentenceCaseHeadline(value.trim()))
+    problems.push('is not sentence case');
+  return problems;
+}
+
+/** "Headline: explanation" (or an em/en dash), as the web projection splits it. */
+export function splitHeadline(text) {
+  const value = String(text ?? '').trim();
+  const match =
+    /^(.+?):\s+(.+)$/s.exec(value) ?? /^(.+?)\s+[—–]\s+(.+)$/s.exec(value);
+  return match
+    ? { headline: match[1].trim(), explanation: match[2].trim() }
+    : null;
+}
+
+/**
+ * Words that describe how we build, not what a customer gets. Each entry is
+ * [pattern, what to write instead].
+ * @type {[RegExp, string][]}
+ */
+const INTERNAL_WORDS = [
+  [/\bPRs?\b/, 'drop the pull request; say what changed for the customer'],
+  [/\bdeploy(?:s|ed|ment|ments|ing)?\b/i, 'say "now" or "today", not a deploy'],
+  [/\bCI\b/, 'leave the build pipeline out'],
+  [/\b(?:feature )?flags?\b/i, 'say who has it: availability carries rollout'],
+  [/\bAPIs?\b/, 'name what the customer or their tools can do'],
+  [/\bendpoints?\b/i, 'name what the customer or their tools can do'],
+  [/\bregress(?:ion|ions|ed)\b/i, 'describe how it works now'],
+  [/\bstaging\b/i, 'leave environments out'],
+  [/\bJOV-\d+\b/, 'leave issue ids out'],
+  [
+    /\b(?:refactor(?:ed|ing)?|cron|webhooks?|backend|frontend|middleware)\b/i,
+    'describe the outcome, not the implementation',
+  ],
+  [
+    /\b(?:Redis|Sentry|Vercel|Neon|Postgres|Cloudflare|Turnstile|Doppler|Statsig|Upstash|Inngest|Supabase|PostHog|Clerk|Datadog)\b/,
+    'leave the vendor out; it is an implementation detail',
+  ],
+];
+
+/**
+ * Phrases that read as an apology. Each entry is [pattern, the fix].
+ * @type {[RegExp, string][]}
+ */
+const UNFLATTERING_PHRASES = [
+  [/\bagain\b/i, 'say what works now; "again" says it was broken'],
+  [/\bfinally\b/i, 'drop "finally"'],
+  [/\b(?:was|were) broken\b/i, 'describe how it works now'],
+  [
+    /\bno longer (?:crash|crashes|crashing|fails?|breaks?|errors?)\b/i,
+    'describe how it works now',
+  ],
+  [/\b(?:bug|bugs|bugfix|buggy)\b/i, 'describe what works now, not the bug'],
+  [/\b(?:crash|crashes|crashed|crashing)\b/i, 'describe what works now'],
+  [/\boops\b|\bsorry\b|\bembarrass/i, 'state the outcome plainly'],
+  [/\binstead of an error\b/i, 'describe what the customer sees now'],
+];
+
+/**
+ * Lint the `text` of a release-worthy marker. Returns fix-it lines; empty
+ * when the copy is publishable.
+ */
+export function lintCustomerNoteCopy(text) {
+  const value = String(text ?? '');
+  const problems = [];
+  const split = splitHeadline(value);
+  if (!split) {
+    problems.push(
+      `text must read "Headline: explanation" (a short outcome headline, a colon, then one or two full sentences).`
+    );
+  } else {
+    for (const problem of headlineProblems(split.headline))
+      problems.push(
+        `headline "${split.headline}" ${problem}. Write a sentence-case outcome of at most ${HEADLINE_MAX} characters with no trailing punctuation.`
+      );
+    if (!/^[\p{Lu}\p{N}"“]/u.test(split.explanation))
+      problems.push(
+        'explanation must start with a capital letter: it is its own sentence, not the tail of the headline.'
+      );
+  }
+  for (const [pattern, fix] of INTERNAL_WORDS) {
+    const match = pattern.exec(value);
+    if (match) problems.push(`internal word "${match[0]}": ${fix}.`);
+  }
+  for (const [pattern, fix] of UNFLATTERING_PHRASES) {
+    const match = pattern.exec(value);
+    if (match) problems.push(`unflattering phrasing "${match[0]}": ${fix}.`);
+  }
+  return problems;
+}
+
+/** True when a PR created at `createdAt` is held to the copy lint. */
+export function isCopyLintApplicable(createdAt) {
+  return Date.parse(createdAt) >= Date.parse(COPY_LINT_FROM);
+}
+
+/**
+ * Fix-it lines for a parsed release-worthy marker, or [] when it passes, is
+ * internal, or predates the lint (older PRs keep their admission contract).
+ */
+export function customerNoteCopyProblems(note, createdAt) {
+  return note?.releaseWorthy === true && isCopyLintApplicable(createdAt)
+    ? lintCustomerNoteCopy(note.text)
+    : [];
+}

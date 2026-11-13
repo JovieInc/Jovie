@@ -1,10 +1,16 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
+import {
+  getMarketingPlanHref,
+  getVisibleMarketingPricingPlans,
+} from '@/data/marketingPricingPlans';
 import { ARTIST_VISIBILITY_OFFER_CONTRACT_ID } from '@/lib/billing/offer-truth';
 import {
   getPaidPlanAdditionNames,
   PUBLIC_PRICING_COMPARISON,
 } from '@/lib/billing/public-pricing-features';
+import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import { MarketingPricingPlans } from './MarketingPricingPlans';
 
 describe('MarketingPricingPlans', () => {
@@ -73,5 +79,78 @@ describe('MarketingPricingPlans', () => {
           ?.firstElementChild
       ).toHaveClass('marketing-pricing-plan-card__name');
     }
+  });
+
+  it.each([
+    ['tier-cards-neutral', 'compact'],
+    ['tier-cards-recommended', 'expanded'],
+  ] as const)(
+    'renders the %s %s cards with one CTA per plan and no axe violations',
+    async (variant, mode) => {
+      const { container } = render(
+        <MarketingPricingPlans variant={variant} mode={mode} />
+      );
+
+      const plans = getVisibleMarketingPricingPlans();
+      expect(container.querySelectorAll('article')).toHaveLength(plans.length);
+      for (const plan of plans) {
+        const card = screen.getByTestId(`marketing-pricing-plan-${plan.id}`);
+        const cta = within(card).getByRole('link');
+        expect(cta).toHaveAttribute('href', getMarketingPlanHref(plan.id));
+        expect(card).toHaveAttribute(
+          'data-recommended',
+          variant === 'tier-cards-recommended' && plan.id === 'pro'
+            ? 'true'
+            : 'false'
+        );
+      }
+      await expectNoA11yViolations(container);
+    }
+  );
+
+  it('drops the cadence and feature rows a plan does not have', async () => {
+    const { container } = render(
+      <MarketingPricingPlans variant='tier-cards-neutral' mode='expanded' />
+    );
+
+    const enterprise = screen.getByTestId('marketing-pricing-plan-enterprise');
+    expect(enterprise.querySelector('ul')).toBeNull();
+    expect(
+      enterprise.querySelector('.marketing-pricing-plan-card__price span')
+    ).toBeNull();
+    expect(
+      screen
+        .getByTestId('marketing-pricing-plan-pro')
+        .querySelector('.marketing-pricing-plan-card__price span')
+    ).toHaveTextContent('/mo');
+    await expectNoA11yViolations(container);
+  });
+
+  it('reaches every plan CTA by keyboard in card order', async () => {
+    const user = userEvent.setup();
+    render(<MarketingPricingPlans variant='tier-cards-recommended' />);
+
+    const ctas = getVisibleMarketingPricingPlans().map(plan =>
+      within(screen.getByTestId(`marketing-pricing-plan-${plan.id}`)).getByRole(
+        'link'
+      )
+    );
+    for (const cta of ctas) {
+      await user.tab();
+      expect(cta).toHaveFocus();
+    }
+  });
+
+  it('keeps every plan and CTA inside a right-to-left document', async () => {
+    const { container } = render(
+      <div dir='rtl' lang='ar'>
+        <MarketingPricingPlans variant='tier-cards-recommended' />
+      </div>
+    );
+
+    expect(screen.getAllByRole('link')).toHaveLength(
+      getVisibleMarketingPricingPlans().length
+    );
+    await expectNoA11yViolations(container);
   });
 });

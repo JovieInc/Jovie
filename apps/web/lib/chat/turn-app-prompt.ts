@@ -8,12 +8,16 @@
  */
 
 import type { ChatAccountContext } from '@/lib/chat/account-context';
-import { resolveOwnedReleaseTokensForHydration } from '@/lib/chat/catalog-query';
+import {
+  resolveNamedOwnedReleasesForPrompt,
+  resolveOwnedReleaseTokensForHydration,
+} from '@/lib/chat/catalog-query';
 import { buildReferencedEntitiesBlock } from '@/lib/chat/entity-hydration';
 import {
   buildPinnedOpportunityBlock,
   type PinnedOpportunityContext,
 } from '@/lib/chat/pinned-opportunity';
+import { captureError } from '@/lib/error-tracking';
 import {
   applyEveIdentityToSystemPrompt,
   type EveIdentityId,
@@ -25,8 +29,35 @@ import {
 import type {
   ArtistContext,
   ReleaseCatalogMeta,
+  ReleaseCatalogStatus,
   ReleaseContext,
 } from './types';
+
+async function namedReleasesForTurn(
+  releases: readonly ReleaseContext[],
+  userTexts: readonly string[],
+  profileId: string | null,
+  status: ReleaseCatalogStatus | undefined
+): Promise<ReleaseContext[]> {
+  if (status === 'unavailable') return [];
+  try {
+    return await resolveNamedOwnedReleasesForPrompt(
+      releases,
+      userTexts,
+      profileId
+    );
+  } catch (error) {
+    try {
+      await captureError('Named release lookup failed', error, {
+        feature: 'chat-named-release',
+        profileId,
+      });
+    } catch {
+      // Observability must not fail a turn whose catalog read already succeeded.
+    }
+    return [];
+  }
+}
 
 export interface AssembleAppPromptInput {
   readonly artistContext: ArtistContext;
@@ -41,7 +72,7 @@ export interface AssembleAppPromptInput {
   readonly aiWeeklyMessageLimit: number;
   readonly insightsEnabled: boolean;
   readonly knowledgeContext: string;
-  readonly pinnedOpportunity?: PinnedOpportunityContext;
+  readonly pinnedOpportunity?: PinnedOpportunityContext | null;
   readonly identity?: {
     readonly id: EveIdentityId;
     readonly instructions: string;
@@ -71,6 +102,12 @@ export async function assembleAppModeSystemPrompt(
     userTexts,
     profileId
   );
+  const namedReleases = await namedReleasesForTurn(
+    releases,
+    userTexts,
+    profileId,
+    input.releaseCatalog?.status
+  );
   const referencedEntities = buildReferencedEntitiesBlock({
     userTexts,
     ownedReleases: [...releases, ...beyondSlice],
@@ -79,6 +116,7 @@ export async function assembleAppModeSystemPrompt(
       username: artistContext.username,
       spotifyUrl: artistContext.spotifyUrl,
     },
+    ownProfileId: profileId,
   });
   const pinnedOpportunityBlock = buildPinnedOpportunityBlock(
     input.pinnedOpportunity
@@ -96,6 +134,7 @@ export async function assembleAppModeSystemPrompt(
       status: 'ok',
       total: releases.length,
     },
+    namedReleases,
   });
   return identity
     ? {

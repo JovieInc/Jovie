@@ -39,6 +39,7 @@ import {
   getFeaturedTrackStaticParams,
   getTrackBySlugInRelease,
 } from '../_lib/data';
+import { resolveMovedTrackPath } from '../_lib/moved-track-path';
 import {
   SCREEN_CERT_SMARTLINK_FIXTURE_CREATOR,
   SCREEN_CERT_SMARTLINK_RELEASE_CONTENT,
@@ -74,6 +75,16 @@ interface PageProps {
     slug: string;
     trackSlug: string;
   }>;
+}
+
+/** 308 an old track URL (legacy `-N` release or track slug) to its new one. */
+async function redirectIfTrackMoved(
+  isFixtureRequest: boolean,
+  input: Parameters<typeof resolveMovedTrackPath>[0]
+): Promise<void> {
+  if (isFixtureRequest) return;
+  const moved = await resolveMovedTrackPath(input);
+  if (moved) permanentRedirect(moved);
 }
 
 async function guardUnreleasedContent(
@@ -133,6 +144,13 @@ export default async function TrackDeepLinkPage({
     ? SCREEN_CERT_SMARTLINK_RELEASE_CONTENT
     : await getContentBySlug(creator.id, slug);
   if (releaseContent?.type !== 'release') {
+    await redirectIfTrackMoved(isFixtureRequest, {
+      creatorId: creator.id,
+      handle: creator.usernameNormalized,
+      releaseSlug: slug,
+      trackSlug,
+      releaseId: null,
+    });
     notFound();
   }
 
@@ -141,6 +159,13 @@ export default async function TrackDeepLinkPage({
     ? SCREEN_CERT_SMARTLINK_TRACK_CONTENT
     : await getTrackBySlugInRelease(releaseContent.id, trackSlug);
   if (!track) {
+    await redirectIfTrackMoved(isFixtureRequest, {
+      creatorId: creator.id,
+      handle: creator.usernameNormalized,
+      releaseSlug: slug,
+      trackSlug,
+      releaseId: releaseContent.id,
+    });
     notFound();
   }
 
