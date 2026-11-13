@@ -139,20 +139,18 @@ function MessageSection({
 
   if (!message || !copy) {
     return (
-      <DrawerSection title='Message' collapsible={false}>
-        <p
-          className='px-1 pb-2 text-xs text-secondary-token'
-          data-testid='outbound-message-empty'
-        >
-          {row.view === 'needs_judge'
-            ? 'Draft hidden until the page and onboarding pass the dogfood judge.'
-            : row.flags.includes('cold_draft_unavailable')
-              ? 'Draft hidden until certified page facts and email compliance checks are available.'
-              : row.channel
-                ? 'No draft is available for this profile yet.'
-                : 'No reachable channel: no email address or Instagram handle on file.'}
-        </p>
-      </DrawerSection>
+      <p
+        className='px-1 pb-2 text-xs text-secondary-token'
+        data-testid='outbound-message-empty'
+      >
+        {row.view === 'needs_judge'
+          ? 'Draft hidden until the page and onboarding pass the dogfood judge.'
+          : row.flags.includes('cold_draft_unavailable')
+            ? 'Draft hidden until certified page facts and email compliance checks are available.'
+            : row.channel
+              ? 'No draft is available for this profile yet.'
+              : 'No reachable channel: no email address or Instagram handle on file.'}
+      </p>
     );
   }
   const edited =
@@ -378,36 +376,39 @@ function OutboundRailContent({
             onApprove={onApprove}
             onSaveCopy={onSaveCopy}
           />
-          <DrawerSection title='Profile & source' defaultOpen={false}>
-            <div className='flex items-center gap-2 px-1 pb-2 text-xs'>
-              {row.profilePath ? (
-                <a
-                  className='inline-flex items-center gap-1 text-primary-token underline-offset-2 hover:underline'
-                  href={row.profilePath}
-                  target='_blank'
-                  rel='noreferrer'
-                >
-                  jov.ie{row.profilePath}
-                  <ExternalLink className='h-3 w-3' aria-hidden='true' />
-                </a>
-              ) : (
-                <span className='text-secondary-token'>
-                  No Jovie profile built yet.
-                </span>
-              )}
+          <nav
+            aria-label='Profile And Source'
+            className='flex flex-wrap items-center gap-2 px-1 pb-2 text-xs'
+          >
+            {row.profilePath ? (
               <a
-                className='ml-auto inline-flex items-center gap-1 text-tertiary-token'
-                href={row.sourceUrl}
+                className='inline-flex min-w-0 max-w-full items-center gap-1 text-primary-token underline-offset-2 hover:underline'
+                href={row.profilePath}
                 target='_blank'
                 rel='noreferrer'
               >
-                Source
-                <ExternalLink className='h-3 w-3' aria-hidden='true' />
+                <span className='min-w-0 break-all'>
+                  jov.ie{row.profilePath}
+                </span>
+                <ExternalLink className='h-3 w-3 shrink-0' aria-hidden='true' />
               </a>
-            </div>
-          </DrawerSection>
-          <DrawerSection title='Certification details' defaultOpen={false}>
-            {certification ? (
+            ) : (
+              <span className='text-secondary-token'>
+                No Jovie profile built yet.
+              </span>
+            )}
+            <a
+              className='ml-auto inline-flex items-center gap-1 text-tertiary-token'
+              href={row.sourceUrl}
+              target='_blank'
+              rel='noreferrer'
+            >
+              Source
+              <ExternalLink className='h-3 w-3' aria-hidden='true' />
+            </a>
+          </nav>
+          {certification ? (
+            <DrawerSection title='Certification details' defaultOpen={false}>
               <div className='space-y-2 px-1 pb-2'>
                 <p className='text-xs tabular-nums text-secondary-token'>
                   {(['confirmed', 'rejected', 'unresolved', 'stale'] as const)
@@ -425,14 +426,8 @@ function OutboundRailContent({
                   Evidence revision: {certification.evidenceRevision}
                 </p>
               </div>
-            ) : (
-              <p className='min-h-12 px-1 pb-2 text-xs text-secondary-token'>
-                {certificationLoading
-                  ? 'Loading discovered facts…'
-                  : 'No canonical contact matches this lead yet.'}
-              </p>
-            )}
-          </DrawerSection>
+            </DrawerSection>
+          ) : null}
           {[...grouped].map(([category, items]) => (
             <DrawerSection
               key={category}

@@ -2,7 +2,6 @@
 
 import { Button } from '@jovie/ui';
 import { useState } from 'react';
-import { DrawerSection } from '@/components/molecules/drawer';
 import type {
   ContactEvidenceDecision,
   ContactEvidenceItem,
@@ -72,75 +71,71 @@ export function OutboundRailFact({
           </Button>
         ))}
       </fieldset>
-      <DrawerSection
-        title={`Source and review details: ${item.label}`}
-        defaultOpen={false}
-      >
-        <div className='space-y-1.5 text-2xs text-secondary-token'>
-          <p>
-            {item.source} · {item.observedAt ?? 'Observation date unknown'}
-          </p>
-          {item.url ? (
-            <a
-              href={item.url}
-              target='_blank'
-              rel='noreferrer'
-              className='break-words text-link'
-            >
-              Open source
-            </a>
-          ) : null}
-          <p>{item.rationale}</p>
-          <p>
-            Recorded decision: {item.decision ?? 'Not reviewed'}. Evidence
-            revision: <span className='break-all'>{item.revision}</span>
-          </p>
-          {correctable ? (
-            <form
-              className='space-y-1.5'
-              onSubmit={event => {
-                event.preventDefault();
-                if (pending) return;
-                if (!correction.trim()) {
-                  setCorrectionError(true);
-                  return;
-                }
-                void onDecision(item, 'no', correction);
-              }}
-            >
-              <label className='block text-xs'>
-                Correct {item.label}
-                <input
-                  value={correction}
-                  onChange={event => {
-                    setCorrection(event.target.value);
-                    setCorrectionError(false);
-                  }}
-                  placeholder='Correct value'
-                  className='mt-1 h-7 w-full rounded-md border border-strong bg-surface-0 px-2 text-xs text-primary-token'
-                />
-              </label>
-              {correctionError ? (
-                <p role='alert' className='text-error'>
-                  Enter a correction before saving.
-                </p>
-              ) : null}
-              <p>
-                Saving changes the name or handle on record and requires fresh
-                review.
+      <div className='space-y-1.5 text-2xs text-secondary-token'>
+        <p>
+          {item.source || 'Source unknown'} ·{' '}
+          {item.observedAt ?? 'Observation date unknown'}
+        </p>
+        {item.url ? (
+          <a
+            href={item.url}
+            target='_blank'
+            rel='noreferrer'
+            className='break-words text-link'
+          >
+            Open source
+          </a>
+        ) : null}
+        {item.rationale ? <p>{item.rationale}</p> : null}
+        <p>
+          Recorded decision: {item.decision ?? 'Not reviewed'}. Evidence
+          revision: <span className='break-all'>{item.revision}</span>
+        </p>
+        {correctable ? (
+          <form
+            className='space-y-1.5'
+            onSubmit={event => {
+              event.preventDefault();
+              if (pending) return;
+              if (!correction.trim()) {
+                setCorrectionError(true);
+                return;
+              }
+              void onDecision(item, 'no', correction);
+            }}
+          >
+            <label className='block text-xs'>
+              Correct {item.label}
+              <input
+                value={correction}
+                onChange={event => {
+                  setCorrection(event.target.value);
+                  setCorrectionError(false);
+                }}
+                placeholder='Correct value'
+                className='mt-1 h-7 w-full rounded-md border border-strong bg-surface-0 px-2 text-xs text-primary-token'
+              />
+            </label>
+            {correctionError ? (
+              <p role='alert' className='text-error'>
+                Enter a correction before saving.
               </p>
-              <Button
-                size='sm'
-                variant='secondary'
-                disabled={pending}
-                type='submit'
-              >
-                Save Correction
-              </Button>
-            </form>
-          ) : null}
-        </div>
-      </DrawerSection>
+            ) : null}
+            <p>
+              Saving changes the name or handle on record and requires fresh
+              review.
+            </p>
+            <Button
+              size='sm'
+              variant='secondary'
+              disabled={pending}
+              type='submit'
+            >
+              Save Correction
+            </Button>
+          </form>
+        ) : null}
+      </div>
     </article>
   );
 }

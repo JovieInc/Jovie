@@ -19,6 +19,47 @@ const item: ContactEvidenceItem = {
 };
 
 describe('OutboundRailFact', () => {
+  it('keeps provenance, audit evidence and correction inline without disclosures', () => {
+    render(
+      <OutboundRailFact
+        item={item}
+        active={false}
+        pending={false}
+        onDecision={vi.fn()}
+      />
+    );
+    expect(screen.getByText(/public link page/)).toBeVisible();
+    expect(screen.getByText(item.rationale)).toBeVisible();
+    expect(screen.getByText(/synthetic-revision/)).toBeVisible();
+    expect(screen.getByRole('link', { name: 'Open source' })).toBeVisible();
+    expect(screen.getByLabelText('Correct Display name')).toBeVisible();
+    expect(
+      screen.queryByRole('button', { expanded: false })
+    ).not.toBeInTheDocument();
+  });
+  it('keeps unavailable provenance explicit without empty controls', () => {
+    render(
+      <OutboundRailFact
+        item={{
+          ...item,
+          source: '',
+          observedAt: null,
+          url: null,
+          rationale: '',
+        }}
+        active={false}
+        pending={false}
+        onDecision={vi.fn()}
+      />
+    );
+    expect(
+      screen.getByText('Source unknown · Observation date unknown')
+    ).toBeVisible();
+    expect(
+      screen.queryByRole('link', { name: 'Open source' })
+    ).not.toBeInTheDocument();
+    expect(screen.getByText(/synthetic-revision/)).toBeVisible();
+  });
   it.each(['', 'Ada and the Midnight Orchestra | Instagram, Spotify'])(
     'keeps missing or long recorded names truthful: %s',
     value => {
@@ -70,8 +111,8 @@ describe('OutboundRailFact', () => {
     expect(screen.getByRole('article')).toHaveAttribute('aria-current', 'true');
     expect(onDecision).not.toHaveBeenCalled();
     expect(
-      screen.getByRole('button', { name: /Source and review details/ })
-    ).toHaveAttribute('aria-expanded', 'false');
+      screen.queryByRole('button', { name: /Source and review details/ })
+    ).not.toBeInTheDocument();
   });
 
   it.each(['Yes', 'No', 'Unsure'])(
@@ -104,9 +145,6 @@ describe('OutboundRailFact', () => {
         pending={false}
         onDecision={onDecision}
       />
-    );
-    fireEvent.click(
-      screen.getByRole('button', { name: /Source and review details/ })
     );
     expect(screen.getByText(/synthetic-revision/)).toBeVisible();
     expect(screen.getByRole('link', { name: 'Open source' })).toHaveAttribute(

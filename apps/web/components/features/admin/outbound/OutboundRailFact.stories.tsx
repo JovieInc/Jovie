@@ -27,3 +27,15 @@ const meta = {
 } satisfies Meta<typeof OutboundRailFact>;
 export default meta;
 export const RecordedName: StoryObj<typeof meta> = {};
+
+export const UnknownSource: StoryObj<typeof meta> = {
+  args: {
+    item: {
+      ...meta.args.item,
+      source: '',
+      observedAt: null,
+      url: null,
+      rationale: '',
+    },
+  },
+};

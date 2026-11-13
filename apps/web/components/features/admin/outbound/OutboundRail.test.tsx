@@ -52,6 +52,25 @@ function renderRail(overrides: Partial<OutboundRailProps> = {}) {
 }
 
 describe('OutboundRail', () => {
+  it('omits empty certification and message sections while keeping unknown state and sources inline', () => {
+    renderRail({
+      row: outboundFixtureRow({ message: null }),
+      certification: null,
+    });
+    expect(
+      screen.queryByRole('button', { name: 'Certification details' })
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByText('Message', { exact: true })
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByRole('link', { name: 'Source', exact: true })
+    ).toBeVisible();
+    expect(screen.getByTestId('outbound-readiness')).toHaveTextContent(
+      'Current certification is unknown.'
+    );
+  });
+
   it('focuses the current message for review without approving it', () => {
     const props = renderRail();
     fireEvent.click(screen.getByRole('button', { name: 'Review Message' }));

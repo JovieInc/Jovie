@@ -13,6 +13,7 @@ const blocked = [
   ['stale-facts', 'Certification is stale', 'Refresh Evidence'],
   ['rejected', 'Rejected: Wrong person', 'Review Facts'],
   ['held', 'on hold', 'Review Facts'],
+  ['no-canonical-facts', 'Current certification is unknown', 'Review Source'],
   ['loading-facts', 'Current facts are loading', 'Review Source'],
   ['decision-failed', 'Approval refused: facts changed', 'Review Message'],
 ] as const;
@@ -102,13 +103,15 @@ test('fact provenance and correction are keyboard accessible without implicit wr
   await expect(
     group.getByRole('button', { name: 'Unsure', exact: true })
   ).toBeFocused();
-  const disclosure = page.getByRole('button', {
-    name: 'Source and review details: Display name',
-  });
-  await expect(disclosure).toHaveAttribute('aria-expanded', 'false');
-  await disclosure.focus();
-  await page.keyboard.press('Enter');
-  await expect(disclosure).toHaveAttribute('aria-expanded', 'true');
+  await expect(
+    page.getByText('Joined across the lead and the built profile.')
+  ).toBeVisible();
+  await page.keyboard.press('Tab');
+  await expect(
+    page.getByRole('link', { name: 'Open source' }).first()
+  ).toBeFocused();
+  await page.keyboard.press('Tab');
+  await expect(page.getByLabel('Correct Display name')).toBeFocused();
   await expect(page.getByLabel('Correct Display name')).toHaveValue('');
   await page.getByRole('button', { name: 'Save Correction' }).click();
   await expect(page.getByRole('alert')).toHaveText(
@@ -132,7 +135,7 @@ test('rapid person navigation resets draft edits, corrections and disclosures', 
   await page.getByTestId('outbound-rail').waitFor({ timeout: 90_000 });
   await page.getByLabel('Message Body').fill('Unsaved Ada edit');
   const disclosure = page.getByRole('button', {
-    name: 'Source and review details: Display name',
+    name: 'Certification details',
   });
   await disclosure.click();
   await page.getByLabel('Correct Display name').fill('Unsaved correction');
@@ -141,10 +144,27 @@ test('rapid person navigation resets draft edits, corrections and disclosures', 
   await expect(
     page.getByRole('button', { name: 'Certification details' })
   ).toHaveAttribute('aria-expanded', 'false');
-  await expect(disclosure).toHaveAttribute('aria-expanded', 'false');
-  await disclosure.click();
   await expect(page.getByLabel('Correct Display name')).toHaveValue('');
   await expect(
     page.getByText('Cy | Instagram, Spotify', { exact: true })
   ).toBeVisible();
+});
+
+test('inline profile and source links fit a long valid handle on narrow mobile', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 320, height: 640 });
+  await page.goto(
+    '/iframe.html?id=admin-outbound-rail--long-profile-path&viewMode=story',
+    { waitUntil: 'domcontentloaded' }
+  );
+  await page.getByTestId('outbound-rail').waitFor({ timeout: 90_000 });
+  const nav = page.getByRole('navigation', { name: 'Profile And Source' });
+  for (const link of await nav.getByRole('link').all()) {
+    await expect(link).toBeVisible();
+    const bounds = await link.boundingBox();
+    expect(bounds!.x).toBeGreaterThanOrEqual(0);
+    expect(bounds!.x + bounds!.width).toBeLessThanOrEqual(320);
+    expect(await link.evaluate(e => e.scrollWidth <= e.clientWidth)).toBe(true);
+  }
 });

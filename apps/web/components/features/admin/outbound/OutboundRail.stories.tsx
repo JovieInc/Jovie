@@ -62,7 +62,7 @@ const meta: Meta<typeof OutboundRail> = {
   parameters: {
     layout: 'fullscreen',
     jovie: {
-      // `item` belongs to the reused EvidenceItemCard, rendered from certification.items.
+      // `item` belongs to OutboundRailFact, rendered from certification.items.
       uncoveredProps: ['item'],
     },
   },
@@ -113,6 +113,10 @@ export const DecisionFailed: Story = {
     pending: null,
     error: 'Approval refused: facts changed since certification.',
   },
+};
+
+export const NoCanonicalFacts: Story = {
+  args: { row: outboundFixtureRow({ message: null }), certification: null },
 };
 
 export const Empty: Story = {
@@ -228,6 +232,7 @@ export const LongNameEvidence: Story = {
           value:
             'Ada and the Midnight Orchestra | Instagram, Spotify, YouTube, Live Tickets & Official Merch',
           decision: null,
+          url: 'https://example.com/ada',
         },
       ],
     },
@@ -271,4 +276,13 @@ function PersonNavigation(args: ComponentProps<typeof OutboundRail>) {
 }
 export const RapidPersonNavigation: Story = {
   render: args => <PersonNavigation {...args} />,
+};
+
+export const LongProfilePath: Story = {
+  args: {
+    row: outboundFixtureRow({
+      profilePath: '/' + 'w'.repeat(30),
+      handle: 'w'.repeat(30),
+    }),
+  },
 };
