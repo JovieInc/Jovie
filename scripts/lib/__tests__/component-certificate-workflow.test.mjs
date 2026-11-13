@@ -6,12 +6,17 @@ import {
   mkdtempSync,
   readFileSync,
   rmSync,
+  statSync,
   writeFileSync,
 } from 'node:fs';
 import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
+import {
+  buildDeliveryPayload,
+  serializeDeliveryPayload,
+} from '../component-certificate-delivery.mjs';
 import { renderCertificateSummary } from '../component-certificate-summary.mjs';
 
 const REPO_ROOT = resolve(import.meta.dirname, '..', '..', '..');
@@ -22,6 +27,15 @@ const workflow = workflowText('component-certificate.yml');
 const { load } = createRequire(import.meta.url)('js-yaml');
 const job = load(workflow).jobs.certify;
 const steps = job.steps;
+/** A minimal report the real delivery builder accepts. */
+function minimalReport() {
+  return JSON.stringify({
+    generatedAt: '2026-11-13T00:00:00.000Z',
+    headSha: 'fixture-sha',
+    totals: { byCriterion: {}, certified: 0, components: 0 },
+    certificates: [],
+  });
+}
 const fixtureRoots = [];
 function fixtureRoot(prefix) {
   const root = mkdtempSync(resolve(tmpdir(), prefix));
@@ -240,6 +254,13 @@ ${gate?.run || 'true'}`,
     expect(steps.indexOf(install)).toBeLessThan(steps.indexOf(resolver));
     expect(install.if).toBe(resolver.if);
     expect(post.if).toContain('!cancelled()');
+    // JOV-12456: delivery posts the bounded compact payload built from the
+    // report; the full report is never the request body.
+    expect(post.run).toContain(
+      'node scripts/lib/component-certificate-delivery.mjs "$report" --out "$payload"'
+    );
+    expect(post.run).toContain('--data-binary "@${payload}"');
+    expect(post.run).not.toContain('--data-binary "@${report}"');
     const receipt = steps.find(step => step.name === 'Upload delivery receipt');
     expect(receipt.if).toContain('always()');
     expect(receipt.with.path).toBe(
@@ -442,12 +463,14 @@ describe('Ovie delivery outcome from the real workflow shell', () => {
       if (fixture.report)
         writeFileSync(
           resolve(root, 'component-certificate/report.json'),
-          '{"headSha":"fixture-sha"}'
+          minimalReport()
         );
       // Offline transport double: never print or persist request headers.
+      // It records which file curl was pointed at so tests can assert the
+      // step posts the compact payload, not the full report.
       writeFileSync(
         resolve(root, 'bin/curl'),
-        '#!/bin/bash\ntouch "$RUNNER_TEMP/sent"\nprintf "%s" "$FIXTURE_HTTP_CODE"\n[ "$FIXTURE_HTTP_CODE" != 000 ]\n',
+        '#!/bin/bash\ntouch "$RUNNER_TEMP/sent"\nprintf "%s" "${@: -1}" > "$RUNNER_TEMP/posted-arg.txt"\nprintf "%s" "$FIXTURE_HTTP_CODE"\n[ "$FIXTURE_HTTP_CODE" != 000 ]\n',
         { mode: 0o755 }
       );
       const summary = resolve(root, 'summary.md');
@@ -456,6 +479,7 @@ describe('Ovie delivery outcome from the real workflow shell', () => {
         'bash',
         ['-c', steps.find(step => step.name === 'Post to Ovie').run],
         {
+          cwd: REPO_ROOT,
           encoding: 'utf8',
           env: {
             ...process.env,
@@ -485,6 +509,23 @@ describe('Ovie delivery outcome from the real workflow shell', () => {
         ingestion: 'unverified',
       });
       expect(existsSync(resolve(root, 'sent'))).toBe(fixture.sent);
+      if (fixture.sent) {
+        // The step must post the compact payload, never the full report.
+        const postedArg = readFileSync(resolve(root, 'posted-arg.txt'), 'utf8');
+        expect(postedArg).toBe(
+          `@${resolve(root, 'component-certificate/delivery-payload.json')}`
+        );
+        const posted = JSON.parse(
+          readFileSync(
+            resolve(root, 'component-certificate/delivery-payload.json'),
+            'utf8'
+          )
+        );
+        expect(posted).toMatchObject({
+          headSha: 'fixture-sha',
+          schema: 'jovie.component-certificate-evidence/v1',
+        });
+      }
       expect(readFileSync(output, 'utf8')).toContain(
         `outcome=${fixture.outcome}`
       );
@@ -497,4 +538,138 @@ describe('Ovie delivery outcome from the real workflow shell', () => {
       ).not.toContain('fixture-secret-value');
     }
   );
+
+  it('delivers an oversized report as a compact payload under the ingest cap', () => {
+    // The real failure class (JOV-12456): the full report with evidence
+    // receipts exceeds the ~4.5MB function-body limit enforced at the edge
+    // before routing. Delivery must still succeed by posting the compact
+    // payload instead.
+    const root = fixtureRoot('certificate-delivery-oversized-');
+    mkdirSync(resolve(root, 'component-certificate'));
+    mkdirSync(resolve(root, 'bin'));
+    const bigCertificates = Array.from({ length: 30000 }, (_, i) => ({
+      applicable: 10,
+      certified: false,
+      component: `apps/web/components/features/area/component-${i}.tsx`,
+      criteria: [
+        { id: 'tests', status: 'fail' },
+        { id: 'tokens', status: 'pass' },
+      ],
+      passing: 8,
+      schema: 'jovie.component-certificate/v1',
+    }));
+    const reportPath = resolve(root, 'component-certificate/report.json');
+    writeFileSync(
+      reportPath,
+      JSON.stringify({
+        generatedAt: '2026-11-13T00:00:00.000Z',
+        headSha: 'fixture-sha',
+        totals: {
+          byCriterion: { tests: { fail: 30000, na: 0, pass: 0, unknown: 0 } },
+          certified: 0,
+          components: 30000,
+        },
+        certificates: bigCertificates,
+      })
+    );
+    expect(statSync(reportPath).size).toBeGreaterThan(4.5 * 1024 * 1024);
+    writeFileSync(
+      resolve(root, 'bin/curl'),
+      '#!/bin/bash\ntouch "$RUNNER_TEMP/sent"\nprintf "%s" "${@: -1}" > "$RUNNER_TEMP/posted-arg.txt"\nprintf "%s" "$FIXTURE_HTTP_CODE"\n',
+      { mode: 0o755 }
+    );
+    const summary = resolve(root, 'summary.md');
+    const output = resolve(root, 'output');
+    const result = spawnSync(
+      'bash',
+      ['-c', steps.find(step => step.name === 'Post to Ovie').run],
+      {
+        cwd: REPO_ROOT,
+        encoding: 'utf8',
+        env: {
+          ...process.env,
+          PATH: `${resolve(root, 'bin')}:${process.env.PATH}`,
+          RUNNER_TEMP: root,
+          GITHUB_STEP_SUMMARY: summary,
+          GITHUB_OUTPUT: output,
+          CERT_SHA: 'fixture-sha',
+          POST_REQUESTED: 'true',
+          CRON_SECRET: 'fixture-secret-value',
+          OVIE_BASE_URL: 'https://ovie.invalid',
+          FIXTURE_HTTP_CODE: '200',
+        },
+      }
+    );
+    expect(result.status, result.stdout + result.stderr).toBe(0);
+    const payloadPath = resolve(
+      root,
+      'component-certificate/delivery-payload.json'
+    );
+    const payloadSize = statSync(payloadPath).size;
+    expect(payloadSize).toBeLessThan(64 * 1024);
+    const posted = JSON.parse(readFileSync(payloadPath, 'utf8'));
+    expect(posted).toMatchObject({
+      headSha: 'fixture-sha',
+      reportBytes: expect.any(Number),
+      schema: 'jovie.component-certificate-evidence/v1',
+      totals: { certified: 0, components: 30000 },
+    });
+    expect(posted.failingComponents.length).toBe(25);
+    expect(posted.failingComponentsTotal).toBe(30000);
+    expect(payloadSize).toBeLessThan(statSync(reportPath).size);
+  });
+});
+
+describe('component-certificate delivery payload builder', () => {
+  const fullReport = {
+    certificates: Array.from({ length: 40 }, (_, i) => ({
+      applicable: 10,
+      certified: i >= 25,
+      component: `apps/web/components/c${i}.tsx`,
+      passing: 8,
+    })),
+    generatedAt: '2026-11-13T00:00:00.000Z',
+    headSha: 'a'.repeat(40),
+    totals: {
+      byCriterion: { tests: { fail: 15, na: 0, pass: 25, unknown: 0 } },
+      certified: 15,
+      components: 40,
+    },
+  };
+
+  it('builds a bounded compact payload with totals and capped failing components', () => {
+    const payload = buildDeliveryPayload(fullReport, {
+      artifactName: 'component-certificate-1',
+      evaluatedAt: '2026-11-13T00:00:00.000Z',
+      reportBytes: 4_500_000,
+      runUrl: 'https://github.com/JovieInc/Jovie/actions/runs/1',
+    });
+    expect(payload.schema).toBe('jovie.component-certificate-evidence/v1');
+    expect(payload.totals).toMatchObject({ certified: 15, components: 40 });
+    expect(payload.failingComponentsTotal).toBe(40 - 15);
+    expect(payload.failingComponents).toHaveLength(25);
+    expect(serializeDeliveryPayload(payload).length).toBeLessThan(64 * 1024);
+  });
+
+  it('throws on a report without totals so delivery fails loudly', () => {
+    expect(() => buildDeliveryPayload({})).toThrow();
+    expect(() => buildDeliveryPayload(null)).toThrow();
+  });
+
+  it('fails closed when the compact payload would outgrow the ingest cap', () => {
+    const bloated = buildDeliveryPayload({
+      ...fullReport,
+      totals: {
+        byCriterion: Object.fromEntries(
+          Array.from({ length: 2000 }, (_, i) => [
+            `criterion-${i}`,
+            { fail: 1, na: 0, pass: 1, unknown: 0 },
+          ])
+        ),
+        certified: 0,
+        components: 0,
+      },
+    });
+    expect(() => serializeDeliveryPayload(bloated)).toThrow(/exceeds .* bytes/);
+  });
 });
