@@ -4,6 +4,7 @@ import { test } from 'node:test';
 import {
   COOLDOWN_MAX_WAIT_MS,
   censusFailureFields,
+  censusFailureReceipt,
   censusRetryDelay,
   discoverCensusWithRetry,
   RETRY_TOTAL_WAIT_MS,
@@ -75,7 +76,7 @@ test('an active cooldown whose reset fits the budget waits out the published res
   assert.deepEqual(waits, [31_000, 31_000]);
 });
 
-test('a persistent miss still fails visibly with the precise remediable cause', async () => {
+test('an active published cooldown defers the census like the Triage catch-up', async () => {
   let calls = 0;
   const receipt = await sweepWithRealModule(
     /** @type {any} */ ({}),
@@ -85,28 +86,59 @@ test('a persistent miss still fails visibly with the precise remediable cause', 
       timeBudgetMs: 185_000,
       discover: async () => {
         calls += 1;
-        // Beyond the in-sweep cooldown cap: waiting it out belongs to the next
-        // tick, so the row must name the reset instead of an anonymous miss.
+        // Beyond the in-sweep cooldown cap: waiting it out belongs to the
+        // next tick, so the receipt defers with the published reset, exactly
+        // like the Triage catch-up defers on the same credential condition.
         throw cooldownError(NOW_MS + 10 * 60_000);
       },
-      sleepImpl: async () => assert.fail('must not sleep on a persistent miss'),
+      sleepImpl: async () => assert.fail('must not sleep on a deferred census'),
+    }
+  );
+  assert.equal(receipt.failed, 0);
+  assert.equal(receipt.inventoryUnknown, true);
+  assert.equal(receipt.census.status, 'deferred');
+  assert.equal(receipt.census.reason, 'RATE_LIMITED');
+  assert.equal(receipt.census.resetAt, NOW_MS + 10 * 60_000);
+  assert.equal(
+    receipt.census.retryAt,
+    new Date(NOW_MS + 10 * 60_000).toISOString()
+  );
+  const row = receipt.results[0];
+  assert.equal(row.disposition, 'census-deferred');
+  assert.equal(row.reason, 'backlog-catch-up-census-deferred');
+  assert.equal(row.resetAt, receipt.census.resetAt);
+  assert.equal(row.retryAt, receipt.census.retryAt);
+  assert.ok(
+    !JSON.stringify(receipt).includes('postgres') &&
+      !JSON.stringify(receipt).includes('Authorization')
+  );
+  assert.equal(calls, 1);
+});
+
+test('a persistent non-cooldown miss still fails visibly with its cause', async () => {
+  let calls = 0;
+  const waits = [];
+  const receipt = await sweepWithRealModule(
+    /** @type {any} */ ({}),
+    undefined,
+    {
+      now: () => NOW_MS,
+      timeBudgetMs: 185_000,
+      discover: async () => {
+        calls += 1;
+        throw transportError('SERVER');
+      },
+      sleepImpl: async ms => waits.push(ms),
     }
   );
   assert.equal(receipt.failed, 1);
   assert.equal(receipt.inventoryUnknown, true);
   const row = receipt.results[0];
   assert.equal(row.reason, 'backlog-catch-up-census-unavailable');
-  assert.match(String(row.error), /cooling down/);
-  assert.equal(row.cooldown.resetAt, NOW_MS + 10 * 60_000);
-  assert.equal(
-    row.cooldown.retryAt,
-    new Date(NOW_MS + 10 * 60_000).toISOString()
-  );
-  assert.ok(
-    !JSON.stringify(receipt).includes('postgres') &&
-      !JSON.stringify(receipt).includes('Authorization')
-  );
-  assert.equal(calls, 1);
+  assert.match(String(row.error), /server/);
+  assert.equal(row.cooldown, undefined);
+  assert.equal(calls, 3);
+  assert.deepEqual(waits, [2_000, 8_000]);
 });
 
 test('non-retryable census failures fail fast without sleeping', async () => {
@@ -253,4 +285,21 @@ test('discoverCensusWithRetry passes options through and returns discovery rows'
   );
   assert.equal(result, rows);
   assert.deepEqual(seen, [[{ probe: 'client' }, options]]);
+});
+
+test('censusFailureReceipt defers only on an active cooldown and names other causes', () => {
+  const deferred = censusFailureReceipt(cooldownError(NOW_MS + 60_000), NOW_MS);
+  assert.equal(deferred.failed, 0);
+  assert.equal(deferred.census.status, 'deferred');
+  assert.equal(deferred.results[0].disposition, 'census-deferred');
+  const failed = censusFailureReceipt(transportError('AUTH'), NOW_MS);
+  assert.equal(failed.failed, 1);
+  assert.equal(failed.census, undefined);
+  const failedRow = /** @type {any} */ (failed.results[0]);
+  assert.equal(failedRow.disposition, 'assessment-failed');
+  assert.match(String(failedRow.error), /auth/);
+  // An expired cooldown is not an active one: it fails like any other miss.
+  const expired = censusFailureReceipt(cooldownError(NOW_MS - 60_000), NOW_MS);
+  assert.equal(expired.failed, 1);
+  assert.equal(expired.census, undefined);
 });

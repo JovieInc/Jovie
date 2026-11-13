@@ -974,6 +974,7 @@ export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
   'scripts/backlog-orchestrator/__tests__/admission-disposition.test.mjs',
   'scripts/backlog-orchestrator/__tests__/admission-receipt.test.mjs',
   'scripts/backlog-orchestrator/__tests__/backlog-census-retry.test.mjs',
+  'scripts/backlog-orchestrator/__tests__/mutation-sweep-rate-limit-stop.test.mjs',
   'scripts/backlog-orchestrator/__tests__/backlog-hygiene.test.mjs',
   'scripts/backlog-orchestrator/__tests__/backlog-remediation.test.mjs',
   'scripts/backlog-orchestrator/__tests__/conversation-intake.test.mjs',
