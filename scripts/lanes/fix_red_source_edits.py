@@ -9,6 +9,7 @@ from pathlib import Path
 
 from atomic_state import atomic_write_text
 from fix_red_statement_merge import contained_by_main, contained_by_main_file, resolve_additive_statements_text, unique_import_bindings
+from screen_debt_merge import resolve_subtractive_screen_debt
 
 LEGACY_CACHE_EXPORT = re.compile(
     r"^\s*export const (?:dynamic|fetchCache|revalidate)\s*=")
@@ -372,46 +373,6 @@ def resolve_additive_certificate_waivers(worktree: Path, rel: str, sh) -> str | 
             return None
         merged[key] = value
     theirs["waivers"] = dict(sorted(merged.items()))
-    return json.dumps(theirs, ensure_ascii=False, indent=2) + "\n"
-
-
-def _shrunk_criteria(base: str, ours: str, theirs: str) -> str | None:
-    """Criteria still open on both sides, in main's order. Additions and reorders stay unresolved."""
-    parsed = []
-    for side in (base, ours, theirs):
-        tokens = side.split(",")
-        if (not tokens or len(tokens) != len(set(tokens))
-                or any(re.fullmatch(r"[a-z][a-z0-9-]*", token) is None for token in tokens)):
-            return None
-        parsed.append(tokens)
-    base_tokens, ours_tokens, theirs_tokens = parsed
-    if any(token not in base_tokens for token in (*ours_tokens, *theirs_tokens)):
-        return None
-    if any(side != [token for token in base_tokens if token in side] for side in (ours_tokens, theirs_tokens)):
-        return None
-    return ",".join(token for token in theirs_tokens if token in ours_tokens)
-
-
-def resolve_subtractive_screen_debt(worktree: Path, rel: str, sh) -> str | None:
-    """Drop debt rows and criteria either side cleared, in main's order. Additions, reorders and other edits stay unresolved."""
-    if rel != "docs/design-system/cert-screens.json":
-        return None
-    loaded = _load_json_object_stages(worktree, rel, sh, "debt", _debt_rows)
-    if loaded is None:
-        return None
-    base, ours, theirs = loaded
-    if any(key not in base["debt"] for document in (ours, theirs) for key in document["debt"]):
-        return None
-    merged = {}
-    for key, theirs_value in theirs["debt"].items():
-        if key not in ours["debt"]:
-            continue
-        value = _shrunk_criteria(base["debt"][key], ours["debt"][key], theirs_value)
-        if value is None:
-            return None
-        if value:
-            merged[key] = value
-    theirs["debt"] = merged
     return json.dumps(theirs, ensure_ascii=False, indent=2) + "\n"
 
 
