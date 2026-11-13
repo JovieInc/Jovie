@@ -286,7 +286,7 @@ test('S6 CI captures on Ubuntu with sandbox intact and uploads the receipt on fa
   assert.match(source, /path: artifacts\/desktop-test-results\/startup-budget/);
   assert.doesNotMatch(source, /--no-sandbox|disable-setuid-sandbox/);
   const job = load(source).jobs['startup-budget'];
-  assert.equal(job['continue-on-error'], true);
+  assert.equal(job['continue-on-error'], undefined);
   assert.equal(job['runs-on'], 'ubuntu-24.04');
   assert.equal(job.steps.at(-1).if, '${{ always() }}');
 });

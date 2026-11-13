@@ -99,8 +99,7 @@ jobs:
           inputs.native &&
           github.event_name == 'push' &&
           steps.electron-downloads.outputs.cache-hit != 'true'
-        continue-on-error: true
-        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+            uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: |
             ~/Library/Caches/electron
@@ -129,7 +128,6 @@ jobs:
   # Report-only targets: unavailable samples are artifacts, never fake zeros.
   startup-budget:
     name: Desktop startup receipt (report-only)
-    continue-on-error: true
     if: ${{ !inputs.mac-child }}
     runs-on: ubuntu-24.04
     timeout-minutes: 10
