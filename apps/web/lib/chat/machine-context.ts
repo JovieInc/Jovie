@@ -12,14 +12,23 @@
 
 const SELECTED_IDENTITY_LABEL = /(^|\n|\s)Selected identity\b[\s\S]*$/;
 const HELP_ME_WITH = /^Help me with (.+?)\.?$/;
-const TRAILING_JSON_FRAGMENT = /\s*\{"[\s\S]*$/;
+/**
+ * Keys only the legacy entry points wrote. A person's own JSON is kept unless
+ * it carries one of them, so pasted JSON never disappears from their bubble.
+ */
+const ENVELOPE_KEYS = ['profileId', 'entityId', 'entityKind'] as const;
+const TRAILING_ENVELOPE_FRAGMENT =
+  /\s*\{"(?:kind|profileId|entityId|entityKind)"[\s\S]*$/;
 
-function isJsonObjectLine(line: string): boolean {
+function isEnvelopeJsonLine(line: string): boolean {
   const trimmed = line.trim();
   if (!trimmed.startsWith('{') || !trimmed.endsWith('}')) return false;
   try {
     const parsed: unknown = JSON.parse(trimmed);
-    return Boolean(parsed) && typeof parsed === 'object';
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+      return false;
+    }
+    return ENVELOPE_KEYS.some(key => key in parsed);
   } catch {
     return false;
   }
@@ -30,7 +39,7 @@ export function stripMachineContext(text: string): string {
   if (!text) return text;
   const withoutIdentity = text.replace(SELECTED_IDENTITY_LABEL, '$1');
   const lines = withoutIdentity.split('\n');
-  const kept = lines.filter(line => !isJsonObjectLine(line));
+  const kept = lines.filter(line => !isEnvelopeJsonLine(line));
   if (kept.length === lines.length && withoutIdentity === text) return text;
   return kept.join('\n').trim();
 }
@@ -48,7 +57,7 @@ export function hasMachineContext(text: string): boolean {
 export function stripMachineContextFromTitle(value: string): string {
   const hadIdentity = SELECTED_IDENTITY_LABEL.test(value);
   const stripped = stripMachineContext(value)
-    .replace(TRAILING_JSON_FRAGMENT, '')
+    .replace(TRAILING_ENVELOPE_FRAGMENT, '')
     .trim();
   if (hadIdentity) {
     const subject = HELP_ME_WITH.exec(stripped)?.[1]?.trim();
