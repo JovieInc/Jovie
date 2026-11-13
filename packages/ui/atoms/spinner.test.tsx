@@ -17,9 +17,22 @@ describe('Spinner', () => {
     expect(spinner.tagName).toBe('SPAN');
   });
 
-  it('applies size classes', () => {
-    render(<Spinner size='sm' />);
-    expect(screen.getByRole('status')).toHaveClass('h-4', 'w-4');
+  it.each([
+    ['sm', 'h-4', 'w-4'],
+    ['md', 'h-6', 'w-6'],
+    ['lg', 'h-8', 'w-8'],
+  ] as const)('preserves the %s loading indicator dimensions', (size, h, w) => {
+    render(<Spinner size={size} />);
+    expect(screen.getByRole('status')).toHaveClass(h, w);
+  });
+
+  it.each([
+    ['primary', 'text-primary-token'],
+    ['muted', 'text-muted-foreground'],
+    ['inverse', 'text-btn-primary-foreground'],
+  ] as const)('uses the semantic %s tone', (tone, color) => {
+    render(<Spinner tone={tone} />);
+    expect(screen.getByRole('status')).toHaveClass(color);
   });
 
   it('applies tone and custom className', () => {
@@ -36,13 +49,23 @@ describe('Spinner', () => {
     const animated = spinner.querySelector('.border-t-transparent');
     expect(animated).toHaveClass('animate-spin');
     expect(animated).toHaveAttribute('data-part', 'indicator');
-    expect(spinner.querySelector('[data-part="track"]')).toBeInTheDocument();
+    expect(spinner.querySelector('[data-part="track"]')).toHaveClass(
+      'absolute',
+      'inset-0',
+      'rounded-full',
+      'border-2',
+      'border-current/20'
+    );
   });
 
   it('renders a static ring under reduced motion', () => {
     render(<Spinner />);
     const spinner = screen.getByRole('status');
     const animated = spinner.querySelector('.border-t-transparent');
+    expect(spinner).toHaveClass('motion-reduce:transition-none');
+    expect(spinner.querySelector('[data-part="track"]')).toHaveClass(
+      'motion-reduce:transition-none'
+    );
     expect(animated).toHaveClass('motion-reduce:animate-none');
     expect(animated).toHaveClass('motion-reduce:transform-none');
     expect(animated).toHaveClass('motion-reduce:will-change-auto');
