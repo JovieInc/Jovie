@@ -653,6 +653,33 @@ describe('JovieChat styling regressions', () => {
     expect(mockChatState.showCollapsedSummerFailures).toHaveBeenCalledTimes(1);
   });
 
+  it('offers next moves under the first reply of a chat opened from the profile chip', () => {
+    mockChatState.isLoading = false;
+    mockChatState.status = 'ready';
+    mockChatState.messages = [
+      {
+        id: 'u1',
+        role: 'user',
+        parts: [{ type: 'text', text: '@profile:profile-1[Tim White]' }],
+      },
+      {
+        id: 'a1',
+        role: 'assistant',
+        parts: [{ type: 'text', text: 'Your profile pulled 40 views.' }],
+      },
+    ];
+
+    const { container } = renderWithQueryClient(
+      <JovieChat profileId='profile-1' />
+    );
+
+    const followUps = container.querySelector(
+      '[data-testid="chat-follow-ups"]'
+    );
+    expect(followUps?.querySelectorAll('button')).toHaveLength(4);
+    expect(followUps?.textContent).toContain('Plan My Next Release');
+  });
+
   it('keeps the collapsed unanswered-turns control hidden when there are none', () => {
     const { container } = renderWithQueryClient(
       <JovieChat profileId='profile-1' />

@@ -533,3 +533,55 @@ describe('ChatThreadMessages virtualized window', () => {
     ).toEqual(['m0', 'm1', 'm2', 'm3', 'm4', 'm5']);
   });
 });
+
+describe('ChatThreadMessages profile follow-ups', () => {
+  const thread = (firstText: string) => [
+    {
+      id: 'u1',
+      role: 'user' as const,
+      parts: [{ type: 'text' as const, text: firstText }],
+    },
+    {
+      id: 'a1',
+      role: 'assistant' as const,
+      parts: [{ type: 'text' as const, text: 'Your profile pulled 40 views.' }],
+    },
+  ];
+  const renderProfileThread = (
+    firstText: string,
+    onFollowUp: (prompt: string) => void
+  ) =>
+    render(
+      <ChatThreadMessages
+        messages={thread(firstText)}
+        shouldVirtualizeMessages={false}
+        virtualizer={{} as Virtualizer<HTMLDivElement, Element>}
+        virtualizedMessageViewportHeight={0}
+        virtualizedMinHeight={0}
+        messageViewportPaddingBottom={undefined}
+        totalSizeRef={() => undefined}
+        bottomSentinelRef={() => undefined}
+        isStreaming={false}
+        lastAssistantIndex={1}
+        profileId='profile-own'
+        knownMessageIds={new Set(['u1', 'a1'])}
+        inlineChatError={null}
+        isStuckToBottom
+        onScrollToBottom={() => undefined}
+        onFollowUp={onFollowUp}
+      />
+    );
+
+  it('shows next moves after the first reply to the profile chip and sends a tap', () => {
+    const onFollowUp = vi.fn();
+    renderProfileThread('@profile:profile-own[Tim White]', onFollowUp);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Grow My Audience' }));
+    expect(onFollowUp).toHaveBeenCalledWith('How do I grow my audience?');
+  });
+
+  it('shows no next moves when the chat opened with a question', () => {
+    renderProfileThread('What should I post this week?', vi.fn());
+    expect(screen.queryByTestId('chat-follow-ups')).not.toBeInTheDocument();
+  });
+});
