@@ -83,7 +83,7 @@ def _status_pages(pages) -> list[dict]:
 def _trusted_creator(creator) -> bool:
     return isinstance(creator, dict) and creator.get("login") in {"jovie-bot[bot]", "jovie-ci-lane[bot]", "jovie-symphony-lane[bot]", "jovie-agents-lane[bot]"} and creator.get("type") == "Bot"
 SUCCESS_TERMINAL = frozenset({"succeeded", "no_op_stale", "superseded"})
-LIVE_EVENTS = frozenset({"attempt_started", "boundary_admitted"})
+LIVE_EVENTS = frozenset({"attempt_started", "boundary_admitted", "capability_checkpoint"})
 # A completion seal stays pending until the same reconcile operation appends its
 # disposition; an interrupted reconcile resumes from it (operator-owned, never swept).
 PENDING_EVENTS = LIVE_EVENTS | {"completion_fenced"}

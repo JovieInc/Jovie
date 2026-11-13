@@ -75,16 +75,30 @@ COMMENTS_QUERY = 'query($id:String!){issue(id:$id){comments(first:20){nodes{body
 def _read(path: Path, schema: str) -> dict:
     try:
         data = json.loads(path.read_text())
-    except (OSError, ValueError):
+    except FileNotFoundError:
         return {"schema": schema}
+    except (OSError, ValueError):
+        if schema == OUTBOX:
+            raise ValueError("linear-outbox-unreadable-preserve-delivery-history") from None
+        return {"schema": schema}
+    if schema == OUTBOX and (not isinstance(data, dict) or data.get("schema") != schema):
+        raise ValueError("linear-outbox-schema-invalid-preserve-delivery-history")
     return data if isinstance(data, dict) and data.get("schema") == schema else {"schema": schema}
 
 
 def _write(path: Path, data: dict) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp = path.with_name(f".{path.name}.{os.getpid()}.tmp")
-    tmp.write_text(json.dumps(data, separators=(",", ":")))
+    with open(tmp, "w") as handle:
+        handle.write(json.dumps(data, separators=(",", ":")))
+        handle.flush()
+        os.fsync(handle.fileno())
     os.replace(tmp, path)
+    directory = os.open(path.parent, os.O_RDONLY)
+    try:
+        os.fsync(directory)
+    finally:
+        os.close(directory)
 
 
 @contextmanager
@@ -487,9 +501,15 @@ def _deliver_label(state: Path, linear, entry: dict) -> str:
 
 
 def flush(state: Path, linear, admit, transient=(), limit: int = FLUSH_LIMIT, budget_s: float = FLUSH_BUDGET_S) -> dict:
+    # Same scheduler and budget; capability uncertainty never enters generic comment retries.
+    import capability_outbox
+    started = time.monotonic()
+    try:
+        capability_delivery = capability_outbox.flush(state, linear, admit, limit=min(limit, 10), budget_s=budget_s)
+    except Exception as error:
+        capability_delivery = [{"delivered": False, "reason": f"capability-adapter:{type(error).__name__}"}]
     entries = list(_read(_outbox_path(state), OUTBOX).get("entries") or [])
     delivered, outcome = [], "drained"
-    started = time.monotonic()
     for entry in entries[:limit]:
         if time.monotonic() - started > budget_s:
             outcome = "partial"
@@ -512,7 +532,7 @@ def flush(state: Path, linear, admit, transient=(), limit: int = FLUSH_LIMIT, bu
     else:
         if len(entries) > limit:
             outcome = "partial"
-    return {"outcome": outcome, "delivered": delivered}
+    return {"outcome": outcome, "delivered": delivered, "capabilityDelivery": capability_delivery}
 
 
 def tick(state: Path, linear, admit, transient=(), teams=TEAMS) -> dict:
@@ -547,6 +567,8 @@ def status(state: Path, now: float | None = None) -> dict:
                          "filling": bool((data.get("resume") or {}).get("fill")) or not data.get("cursor")}
     outbox = _read(_outbox_path(state), OUTBOX)
     entries = outbox.get("entries") or []
+    capability_requests = [request for row in outbox.get("capabilityRequests", {}).values()
+                           for request in row["record"]["capabilityRequests"]]
     oldest = min((entry.get("enqueuedAt") or now for entry in entries), default=None)
     claims = _claims(state)
     backlog = {}
@@ -557,7 +579,8 @@ def status(state: Path, now: float | None = None) -> dict:
                                                            "readyAgeDaysP95", "deficitSince", "alarm", "at")}
     return {"mirror": mirrors, "backlog": backlog,
             "outbox": {"depth": len(entries), "oldestAgeS": round(now - oldest) if oldest else None,
-                       "dead": len(outbox.get("dead") or [])},
+                       "dead": len(outbox.get("dead") or []),
+                       "capabilityUndelivered": sum(request["delivery"]["status"] != "confirmed" for request in capability_requests)},
             "claims": {"active": sum(1 for row in claims.values() if row.get("status") == "active"),
                        "superseded": sum(1 for row in claims.values() if row.get("status") == "superseded")}}
 
@@ -579,6 +602,9 @@ def alerts(view: dict) -> dict[str, str]:
                                         f"oldest {outbox['oldestAgeS'] // 60}m")
     if outbox.get("dead"):
         found["linear-outbox-dead"] = f"Linear outbox: {outbox['dead']} writes dead-lettered after {DEAD_AFTER} attempts"
+    if outbox.get("capabilityUndelivered"):
+        found["capability-request-undelivered"] = (f"{outbox['capabilityUndelivered']} capability requests lack delivery readback; "
+                                                   "inspect the existing outbox for job, exact head, owner, safe action and expiry")
     return found
 
 

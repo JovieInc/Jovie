@@ -59,6 +59,7 @@ import git_housekeeping  # noqa: E402  (detached git maintenance vs cleanup)
 import fleet_gate_emitter  # noqa: E402
 import doctor  # noqa: E402  (sibling module of the release)
 import execution_attempt  # noqa: E402
+import execution_capability  # noqa: E402
 import file_overlap  # noqa: E402
 import claude_lane  # noqa: E402  (subscription quota bank read by the router)
 import hyperagent_lane  # noqa: E402
@@ -189,6 +190,10 @@ RELEASE_EXTRAS = ["scripts/shipping_origin.py", "scripts/hostops/install-lane-ho
                   "scripts/apiclient/__init__.py", "scripts/apiclient/__main__.py", "scripts/apiclient/cache.py", "scripts/apiclient/client.py", "scripts/apiclient/contract.py", "scripts/apiclient/credentials.py", "scripts/apiclient/fake.py", "scripts/apiclient/gh.py", "scripts/apiclient/github.py", "scripts/apiclient/headers.py", "scripts/apiclient/legacy.py", "scripts/apiclient/linear.py", "scripts/apiclient/policy.py", "scripts/apiclient/store.py",
                   "packages/api-client/providers.json",
                   "scripts/lib/github-rate-limit.mjs",
+                  # Capability checkpoints/outbox run from this immutable release, never a checkout fallback.
+                  "scripts/lib/native-capability-adapter.mjs", "scripts/lib/capability-admission.mjs",
+                  "scripts/lib/capability-request.mjs", "scripts/summer-commissioning/receipt-trust.mjs",
+                  "scripts/summer-commissioning/registry.json", "scripts/lib/__tests__/fixtures/capability-request.mjs",
                   # The shipped failure-hold module uses the canonical Node client.
                   "packages/api-client/gh.ts", "packages/api-client/client.ts",
                   "packages/api-client/cache.ts", "packages/api-client/contract.ts",
@@ -3584,6 +3589,17 @@ def run_issue(host: Host, name: str, spec: dict, linear: Linear, issue: Issue) -
     cloud = cloud_lane_dispatch.execution_gate(THIS, host, issue, linear, name, claimed)
     if cloud is not None:
         return cloud_lane_dispatch.record_receipt(THIS, runs, receipt, cloud)
+    try:
+        capability_hold = execution_capability.before_local_dispatch(
+            THIS, host, name, spec, issue, receipt, ident, claimed, coordination)
+    except (OSError, ValueError, subprocess.SubprocessError, RuntimeError) as error:
+        # Unknown adapter/transport state is not a product failure or permission to dispatch.
+        receipt.update(verdict="capability-blocked", reasons=[f"capability-adapter-unavailable:{type(error).__name__}"],
+                       endedAt=now_iso(), result={"verdict": "capability-blocked", "pr": None, "commit": None})
+        append_json_object(runs / "ledger.jsonl", receipt)
+        capability_hold = receipt
+    if capability_hold is not None:
+        return capability_hold
     receipt["offer"]["accepted"] = True
     with open(runs / f"{run_id}.log", "w") as log:
         try:
@@ -9845,6 +9861,10 @@ def worker_with_slot(host: Host, name: str, spec: dict, slot: Locked, *, mainten
         linear.move(issue.id, "Todo")
         slot.release()
         return 1  # do not charge the issue's retry budget or re-exec into pressure
+    if verdict == "capability-blocked":
+        # Keep the original run/fence and request; no issue failure or replacement provider.
+        slot.release()
+        return 1
     if verdict == "duplicate-active":
         linear.comment(issue.id, "🤖 lane claim reconciled to the existing durable attempt; no second provider call ran.")
         slot.release()

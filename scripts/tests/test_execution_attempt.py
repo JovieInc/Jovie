@@ -1147,6 +1147,16 @@ class StaleStatusSweepTest(unittest.TestCase):
         retried = attempt.claim(self.dir / "next.jsonl", self.ident, owner(), policy(leaseSeconds=50, wallSeconds=1000), {"triggerId": "run-2"}, 400, self.coord)
         self.assertTrue(retried["admitted"]); self.assertEqual(retried["attempt"], 2)
         self.assertEqual(self.posts[-1]["state"], "pending")
+    def test_capability_checkpoint_remains_pending_and_expires_through_original_lease(self):
+        rows = self.local()[:1]
+        rows.append({**rows[0], "event": "capability_checkpoint", "at": 101,
+                     "capability": {"execution": {"outcome": "not-started"}}})
+        self.publish(rows)
+        self.assertEqual(self.sweep(140), ["live"])
+        self.assertEqual(self.posts, [])
+        self.assertEqual(self.sweep(151), ["expired"])
+        self.assertEqual(self.posts[-1]["state"], "failure")
+
     def test_live_lease_is_left_pending(self):
         self.publish(self.local())
         self.assertEqual(self.sweep(140), ["live"])
@@ -1347,6 +1357,107 @@ class TornTailTest(unittest.TestCase):
             path.write_text('{"bad\n{"schema": "x"}\n')
             with self.assertRaises(json.JSONDecodeError):
                 attempt._rows(path)
+
+
+class CapabilityCheckpointTest(unittest.TestCase):
+    setUp = ExecutionAttemptTest.setUp
+    claim = ExecutionAttemptTest.claim
+
+    def checkpoint(self, claimed, **extra):
+        import execution_capability as capability
+        job = {"id": "run-1", "head": "a" * 40, "action": "issue-dispatch", "principal": "fixture",
+               "environment": "test", "owner": "worker-a"}
+        return capability.checkpoint(self.path, self.ident, claimed["fencingToken"], extra.pop("who", owner()),
+                                     extra.pop("job", job), [{"kind": "tool", "capability": "provider", "scope": "test"}], {},
+                                     now=extra.pop("now", 101), coordination=extra.pop("coordination", LOCAL), **extra)
+
+    def test_native_checkpoint_retains_owner_fence_and_does_not_charge_spend(self):
+        claimed = self.claim()
+        blocked = self.checkpoint(claimed)
+        self.assertFalse(blocked["allowed"])
+        self.assertEqual(blocked["reason"], "await-explicit-resolution")
+        record = blocked["record"]
+        self.assertEqual(record["custody"]["lease"], claimed["fencingToken"])
+        self.assertEqual(record["capabilityRequests"][0]["kind"], "tool")
+        self.assertEqual(attempt._usage(attempt._rows(self.path), 102)["spend"], 0)
+        self.assertEqual(attempt.status_state(attempt._rows(self.path)[-1]), "pending")
+        self.assertFalse(self.checkpoint(claimed)["allowed"])
+        self.assertEqual(self.checkpoint(claimed)["record"]["capabilityRequests"][0]["id"], record["capabilityRequests"][0]["id"])
+
+    def test_no_local_fallback_expired_or_foreign_owner_and_executed_attempt(self):
+        claimed = self.claim()
+        for arguments in ({"who": owner("other")}, {"now": 111}):
+            self.assertEqual(self.checkpoint(claimed, **arguments)["reason"], "accepted-custody-required")
+        with self.assertRaisesRegex(ValueError, "execution-coordination-required"):
+            self.checkpoint(claimed, coordination=None)
+        attempt.boundary(self.path, self.ident, claimed["fencingToken"], {"spend": 1}, now=102,
+                         coordination=LOCAL, boundary_id="issue-dispatch")
+        self.assertEqual(self.checkpoint(claimed, now=103)["reason"], "execution-readback-required")
+
+    def test_existing_tick_recovers_checkpoint_to_outbox_crash_without_new_execution(self):
+        import capability_outbox
+        claimed = self.claim()
+        job = {"id": "run-1", "head": "a" * 40, "action": "issue-dispatch", "principal": "fixture",
+               "environment": "test", "owner": "worker-a", "linearIssueId": "cause"}
+        self.checkpoint(claimed, job=job)
+        state = Path(self.tmp.name) / "state"
+        ledger = state / "runs" / "execution-attempts.jsonl"
+        ledger.parent.mkdir(parents=True)
+        ledger.write_text(self.path.read_text())
+        capability_outbox.reconcile(state)
+        first = (state / "linear" / "outbox.json").read_text()
+        capability_outbox.reconcile(state)
+        self.assertEqual((state / "linear" / "outbox.json").read_text(), first)
+        self.assertEqual(len(json.loads(first)["capabilityRequests"]), 1)
+        self.assertEqual(attempt._usage(attempt._rows(ledger), 102)["attempts"], 1)
+
+    def test_native_signed_resolution_reserves_same_fence_once_under_concurrent_callers(self):
+        import capability_outbox
+        import execution_capability
+        source = """
+import { readFileSync } from 'node:fs';
+import { nativeCapabilityTransition } from './scripts/lib/native-capability-adapter.mjs';
+import { keys, receipt } from './scripts/lib/__tests__/fixtures/capability-request.mjs';
+import { CAPABILITY_PROBE_SCHEMA } from './scripts/lib/capability-request.mjs';
+const input = JSON.parse(readFileSync(0, 'utf8'));
+keys.fixture.owner = input.record.job.owner;
+input.resolution = {}; input.probe = {};
+for (const req of input.record.capabilityRequests ?? []) {
+  const times = { issuedAt: new Date(input.nowMs).toISOString(), expiresAt: req.expiresAt };
+  input.resolution[req.id] = receipt(req, undefined, times);
+  input.probe[req.id] = receipt(req, CAPABILITY_PROBE_SCHEMA, times);
+}
+process.stdout.write(JSON.stringify(await nativeCapabilityTransition(input, keys)));
+"""
+        claimed = self.claim(now=1794600000, policy=policy(leaseSeconds=600))
+        first = self.checkpoint(claimed, now=1794600001)
+        def signed(payload):
+            ran = subprocess.run(["node", "--input-type=module", "-e", source], cwd=ROOT,
+                                 input=json.dumps(payload), capture_output=True, text=True, check=True, timeout=10)
+            return json.loads(ran.stdout)
+        with patch.object(capability_outbox, "transition", signed):
+            with ThreadPoolExecutor(max_workers=2) as pool:
+                answers = list(pool.map(lambda _: self.checkpoint(claimed, now=1794600002), range(2)))
+        self.assertEqual(sum(result["allowed"] for result in answers), 1)
+        accepted = next(result for result in answers if result["allowed"])
+        self.assertEqual(accepted["record"]["custody"]["lease"], claimed["fencingToken"])
+        self.assertEqual(accepted["record"]["job"], first["record"]["job"])
+        attempt.boundary(self.path, self.ident, claimed["fencingToken"], {"spend": 1}, now=1794600003,
+                         coordination=LOCAL, boundary_id="issue-dispatch")
+        self.assertEqual(self.checkpoint(claimed, now=1794600004)["reason"], "execution-readback-required")
+        self.assertEqual(attempt._usage(attempt._rows(self.path), 1794600004)["attempts"], 1)
+
+
+    def test_changed_head_and_untrusted_resolution_cannot_resume(self):
+        claimed = self.claim()
+        blocked = self.checkpoint(claimed)
+        record = blocked["record"]
+        changed = self.checkpoint(claimed, job={**record["job"], "head": "b" * 40})
+        self.assertFalse(changed["allowed"])
+        self.assertEqual(changed["reason"], "current-job-binding-unverified")
+        req = record["capabilityRequests"][0]
+        result = self.checkpoint(claimed, resolution={req["id"]: {"decision": "approved", "signature": "untrusted"}})
+        self.assertFalse(result["allowed"])
 
 
 if __name__ == "__main__": unittest.main()

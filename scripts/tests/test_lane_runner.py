@@ -3067,13 +3067,34 @@ class RunIssueTest(unittest.TestCase):
         runs = self.host.state / "runs"
         runs.mkdir()
         (runs / "ledger.jsonl").write_text(json.dumps(previous) + "\n")
-        with patch.object(lane, "run_agent", return_value=SimpleNamespace(returncode=0)) as agent:
+        with patch.object(lane, "run_agent", return_value=SimpleNamespace(returncode=0)) as agent, \
+                patch.object(lane.execution_capability.shutil, "which", return_value="/fixture/agent"):
             receipt = lane.run_issue(self.host, "codex", {"cmd": ["agent", "{prompt_file}"]}, FakeLinear([]), task)
         prompt = Path(agent.call_args.args[0][1]).read_text()
         self.assertIn("earlier-session", prompt)
         context = json.loads(Path(receipt["contextManifests"][0]["path"]).read_text())
         self.assertEqual(context["inputs"]["prior_attempts"]["status"], "present")
         self.assertEqual(receipt["workstream"], "memory-gbrain")
+
+    def test_missing_executable_retains_attempt_and_outboxes_request_before_expensive_work(self):
+        real_run = subprocess.run
+        def read_head(args, **kwargs):
+            if args == ["git", "rev-parse", "origin/main"]:
+                return SimpleNamespace(stdout="a" * 40 + "\n", returncode=0)
+            return real_run(args, **kwargs)
+        with patch.object(lane.execution_capability.subprocess, "run", side_effect=read_head), \
+                patch.object(lane, "install_dependencies") as install, \
+                patch.object(lane, "run_agent") as agent, \
+                patch.object(lane.worktree_pool, "take") as checkout:
+            receipt = lane.run_issue(self.host, "codex", {"cmd": ["missing-fixture-executable"]},
+                                     FakeLinear([]), issue("JOV-12452"))
+        self.assertEqual(receipt["verdict"], "capability-blocked")
+        self.assertFalse(install.called or agent.called or checkout.called)
+        self.assertEqual(receipt["capability"]["custody"]["lease"], receipt["execution"]["fencingToken"])
+        self.assertEqual(receipt["capability"]["job"]["id"], receipt["runId"])
+        outbox = lane.linear_sync._read(lane.linear_sync._outbox_path(self.host.state), lane.linear_sync.OUTBOX)
+        self.assertEqual(len(outbox["capabilityRequests"]), 1)
+        self.assertEqual(self.ledger()[0]["verdict"], "capability-blocked")
 
     def test_unknown_pr_readback_preserves_source_and_failed_unknown_attempt(self):
         lane.verify_and_land = lambda *a, **k: {"verdict": "pr-readback-pending", "reasons": ["pr-inventory-unavailable"],
@@ -3195,7 +3216,8 @@ class RunIssueTest(unittest.TestCase):
                 with patch.object(lane, "next_provider", side_effect=self.real_next), \
                         patch.object(lane, "load_providers", return_value=providers), \
                         patch.object(lane, "provider_healthy", return_value=True), \
-                        patch.object(lane, "run_agent", side_effect=agent):
+                        patch.object(lane, "run_agent", side_effect=agent), \
+                        patch.object(lane.execution_capability.shutil, "which", return_value="/fixture/provider"):
                     receipt = lane.run_issue(self.host, "codex", initial, FakeLinear([]),
                                              issue(f"JOV-{90 + index}", labels=labels))
                 if labels or index == 2:
@@ -3222,7 +3244,8 @@ class RunIssueTest(unittest.TestCase):
         with patch.object(lane, "next_provider", side_effect=self.real_next), \
                 patch.object(lane, "load_providers", return_value=providers), \
                 patch.object(lane, "provider_healthy", return_value=True), \
-                patch.object(lane, "run_agent", side_effect=agent):
+                patch.object(lane, "run_agent", side_effect=agent), \
+                patch.object(lane.execution_capability.shutil, "which", return_value="/fixture/provider"):
             receipt = lane.run_issue(self.host, "codex", providers["codex"], FakeLinear([]),
                                      issue(labels=["route:frontier"]))
         self.assertEqual(seen, [["codex-test"], ["claude-test", "opus"]])
@@ -9906,6 +9929,25 @@ assert.match(result.blockers[0], /^red-before-green:/);
             self.assertNotEqual(missing_registry.returncode, 0)
             self.assertIn("ERR_MODULE_NOT_FOUND", missing_registry.stderr)
             self.assertIn("providers.json", missing_registry.stderr)
+
+    def test_staged_capability_adapter_executes_without_checkout_or_authority_substitution(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            staging = Path(tmp).resolve()
+            for relative in lane.RELEASE_EXTRAS:
+                target = staging / relative
+                target.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copyfile(ROOT / relative, target)
+            command = ["node", str(staging / "scripts/lib/native-capability-adapter.mjs")]
+            payload = {"op": "delivery-select", "record": {"capabilityRequests": []},
+                       "requestId": "missing", "nowMs": 1794600000000}
+            result = subprocess.run(command, input=json.dumps(payload), cwd=staging,
+                                    capture_output=True, text=True, timeout=15)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual(json.loads(result.stdout)["result"], {"reason": "request-missing"})
+            (staging / "scripts/summer-commissioning/registry.json").unlink()
+            missing = subprocess.run(command, input=json.dumps(payload), cwd=staging,
+                                     capture_output=True, text=True, timeout=15)
+            self.assertNotEqual(missing.returncode, 0)
 
     def test_the_closure_check_names_an_unshipped_import(self):
         extras = [e for e in lane.RELEASE_EXTRAS if e != "scripts/lib/merge-group-member-policy.mjs"]

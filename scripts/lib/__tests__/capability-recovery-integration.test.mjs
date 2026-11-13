@@ -91,7 +91,7 @@ it('canonical incident readback verifies request delivery without approving or d
   expect(observed.writable).toBe(false);
 });
 
-it('failed and denied request delivery persists with bounded retry rather than being dropped', () => {
+it('unknown and denied delivery persist without blind replay', () => {
   const initial = plan(null, {
     capabilityBlockers: [
       {
@@ -108,14 +108,16 @@ it('failed and denied request delivery persists with bounded retry rather than b
     'red'
   );
   const retry = plan(failed.recovery);
-  expect(retry.writable).toBe(true);
-  const second = retainQueueCapabilityOutbox(
-    failed,
-    retry.state,
-    { ok: false, reason: 'transport' },
-    'red'
-  );
-  expect(plan(second.recovery).writable).toBe(false);
+  expect(retry.writable).toBe(false);
+  expect(retry.state.capabilityRequests[0].delivery).toMatchObject({
+    status: 'unknown',
+    attempts: 1,
+  });
+  expect(
+    plan(failed.recovery, {
+      snapshot: snapshot({ open: [repair({ headRefOid: sha('f') })] }),
+    }).writable
+  ).toBe(false);
   const denied = retainQueueCapabilityOutbox(
     'red',
     initial.state,

@@ -90,6 +90,8 @@ export function queueCapabilityHold({
       0,
       ...priorScope.map(existing => existing.delivery.attempts)
     );
+    if (priorScope.some(existing => existing.delivery.status === 'unknown'))
+      request.delivery.status = 'unknown';
     if (!requests.some(existing => existing.id === request.id))
       requests.push(request);
   }
@@ -115,8 +117,6 @@ export function queueCapabilityHold({
         receipt: issue.identifier,
         destination: 'canonical-incident',
       };
-    else if (request.delivery.status === 'unknown')
-      request.delivery.status = 'pending';
   }
   const current = requests.filter(request => request.binding.head === head);
   const writable =

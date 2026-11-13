@@ -143,40 +143,9 @@ export async function deliverCapabilityRequest({
   readback,
   nowMs,
 }) {
-  const selected = await transaction(jobId, record => {
-    const request = record?.capabilityRequests?.find(
-      row => row.id === requestId
-    );
-    if (!request) return { reason: 'request-missing' };
-    if (nowMs >= Date.parse(request.expiresAt) && request.status !== 'denied')
-      request.status = 'expired';
-    if (['denied', 'expired', 'superseded'].includes(request.status))
-      return { reason: 'request-not-deliverable' };
-    const delivery = request.delivery;
-    if (delivery.status === 'confirmed')
-      return { reason: 'delivery-already-confirmed' };
-    if (['sending', 'checking'].includes(delivery.status)) {
-      const age = nowMs - Date.parse(delivery.startedAt);
-      if (Number.isFinite(age) && age >= 0 && age < 300_000)
-        return { reason: 'delivery-in-flight' };
-      delivery.status = 'unknown'; // crashed sender: read back only, never blindly replay
-    }
-    if (delivery.status === 'denied') return { reason: 'delivery-denied' };
-    if (delivery.nextAttemptAt && nowMs < Date.parse(delivery.nextAttemptAt))
-      return { reason: 'outbox-backoff' };
-    const readOnly = delivery.status === 'unknown';
-    if (!readOnly && delivery.attempts >= 2)
-      return { reason: 'delivery-attempts-exhausted' };
-    delivery.status = readOnly ? 'checking' : 'sending';
-    if (!readOnly) delivery.attempts += 1;
-    delivery.generation = (delivery.generation ?? 0) + 1;
-    delivery.startedAt = new Date(nowMs).toISOString();
-    return {
-      request: structuredClone(request),
-      readOnly,
-      generation: delivery.generation,
-    };
-  });
+  const selected = await transaction(jobId, record =>
+    selectCapabilityDelivery(record, requestId, nowMs)
+  );
   if (!selected.request) return { delivered: false, reason: selected.reason };
   let sent;
   if (!selected.readOnly) {
@@ -192,44 +161,88 @@ export async function deliverCapabilityRequest({
   } catch {
     receipt = null;
   }
-  return transaction(jobId, record => {
-    const request = record?.capabilityRequests?.find(
-      row => row.id === requestId
-    );
-    if (!request) return { delivered: false, reason: 'request-changed' };
-    if (request.delivery.generation !== selected.generation)
-      return {
-        delivered: request.delivery.status === 'confirmed',
-        reason: 'stale-delivery-result',
-      };
-    const confirmed =
-      receipt?.requestId === request.id &&
-      receipt?.bindingDigest === request.id &&
-      typeof receipt?.id === 'string' &&
-      receipt.id.length > 0;
-    if (confirmed)
-      request.delivery = {
-        ...request.delivery,
-        status: 'confirmed',
-        receipt: receipt.id,
-      };
-    else if (sent?.status === 'denied') request.delivery.status = 'denied';
-    else if (
-      sent?.status === 'not-sent' &&
-      Number.isFinite(Date.parse(sent.nextAttemptAt)) &&
-      Date.parse(sent.nextAttemptAt) > nowMs
-    )
-      request.delivery = {
-        ...request.delivery,
-        status: 'failed',
-        nextAttemptAt: sent.nextAttemptAt,
-      };
-    else request.delivery.status = 'unknown';
+  return transaction(jobId, record =>
+    settleCapabilityDelivery(record, requestId, selected, sent, receipt, nowMs)
+  );
+}
+
+export function selectCapabilityDelivery(record, requestId, nowMs) {
+  const request = record?.capabilityRequests?.find(row => row.id === requestId);
+  if (!request) return { reason: 'request-missing' };
+  if (nowMs >= Date.parse(request.expiresAt) && request.status !== 'denied')
+    request.status = 'expired';
+  if (['denied', 'expired', 'superseded'].includes(request.status))
+    return { reason: 'request-not-deliverable' };
+  const delivery = request.delivery;
+  if (delivery.status === 'confirmed')
+    return { reason: 'delivery-already-confirmed' };
+  if (['sending', 'checking'].includes(delivery.status)) {
+    const age = nowMs - Date.parse(delivery.startedAt);
+    if (Number.isFinite(age) && age >= 0 && age < 300_000)
+      return { reason: 'delivery-in-flight' };
+    delivery.status = 'unknown'; // crashed sender: read back only, never blindly replay
+  }
+  if (delivery.status === 'denied') return { reason: 'delivery-denied' };
+  if (delivery.nextAttemptAt && nowMs < Date.parse(delivery.nextAttemptAt))
+    return { reason: 'outbox-backoff' };
+  const readOnly = delivery.status === 'unknown';
+  if (!readOnly && delivery.attempts >= 2)
+    return { reason: 'delivery-attempts-exhausted' };
+  delivery.status = readOnly ? 'checking' : 'sending';
+  if (!readOnly) delivery.attempts += 1;
+  delivery.generation = (delivery.generation ?? 0) + 1;
+  delivery.startedAt = new Date(nowMs).toISOString();
+  return {
+    request: structuredClone(request),
+    readOnly,
+    generation: delivery.generation,
+  };
+}
+
+export function settleCapabilityDelivery(
+  record,
+  requestId,
+  selected,
+  sent,
+  receipt,
+  nowMs
+) {
+  const request = record?.capabilityRequests?.find(row => row.id === requestId);
+  if (!request) return { delivered: false, reason: 'request-changed' };
+  if (request.delivery.generation !== selected.generation)
     return {
-      delivered: confirmed,
-      reason: confirmed
-        ? 'delivery-readback-confirmed'
-        : `delivery-${request.delivery.status}`,
+      delivered: request.delivery.status === 'confirmed',
+      reason: 'stale-delivery-result',
     };
-  });
+  const confirmed =
+    receipt?.requestId === request.id &&
+    receipt?.bindingDigest === request.id &&
+    typeof receipt?.id === 'string' &&
+    receipt.id.length > 0;
+  if (confirmed)
+    request.delivery = {
+      ...request.delivery,
+      status: 'confirmed',
+      receipt: receipt.id,
+    };
+  else if (sent?.status === 'denied') {
+    request.delivery.status = 'denied';
+    request.delivery.mutationOutcome = 'unknown';
+  } else if (
+    sent?.status === 'not-sent' &&
+    Number.isFinite(Date.parse(sent.nextAttemptAt)) &&
+    Date.parse(sent.nextAttemptAt) > nowMs
+  )
+    request.delivery = {
+      ...request.delivery,
+      status: 'failed',
+      nextAttemptAt: sent.nextAttemptAt,
+    };
+  else request.delivery.status = 'unknown';
+  return {
+    delivered: confirmed,
+    reason: confirmed
+      ? 'delivery-readback-confirmed'
+      : `delivery-${request.delivery.status}`,
+  };
 }
