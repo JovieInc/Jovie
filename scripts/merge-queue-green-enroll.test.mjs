@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
-import { test } from 'node:test';
+import { mock, test } from 'node:test';
 import {
   ADMISSION_STEP,
   applyMergeGroupFailure,
@@ -23,7 +23,7 @@ const run = new AsyncFunction(
   script
 );
 // Record requested delays and freeze Date.now; never assert elapsed runtime.
-// Replace the Date wrapper, not its now property: the clock-shift preload proxies it.
+// Use the test runner clock; direct Date.now mutation breaks the shifted-Date preload.
 async function recordTimers(fn) {
   const realSetTimeout = globalThis.setTimeout;
   const delays = [];
@@ -40,18 +40,11 @@ async function recordTimers(fn) {
   }
 }
 async function withFakeClock(fn) {
-  const realDate = globalThis.Date;
-  let now = realDate.now();
-  globalThis.Date = new Proxy(realDate, {
-    get: (target, key, receiver) =>
-      key === 'now' ? () => now : Reflect.get(target, key, receiver),
-  });
+  mock.timers.enable({ apis: ['Date'], now: Date.now() });
   try {
-    return await fn(ms => {
-      now += ms;
-    });
+    return await fn(ms => mock.timers.tick(ms));
   } finally {
-    globalThis.Date = realDate;
+    mock.timers.reset();
   }
 }
 const sha = 'a'.repeat(40);
