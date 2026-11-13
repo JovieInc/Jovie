@@ -7,11 +7,6 @@
     line-height: 0.9;
   }
 
-  .hv3-statement {
-    font-size: clamp(3rem, 5vw, 4.5rem);
-    line-height: 1;
-  }
-
   .hv3-sheet__row {
     grid-template-columns: minmax(7.5rem, 20.8vw) 1fr 1fr 1fr;
   }
@@ -52,8 +47,7 @@
   }
 
   .hv3-statement {
-    font-size: 2.5rem;
-    line-height: 2.625rem;
+    font-size: clamp(1.5rem, 7vw, 2.5rem);
   }
 
   .hv3-lede,

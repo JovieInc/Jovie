@@ -126,7 +126,11 @@ for (const route of [
       ).toBeLessThanOrEqual(1);
       const snapshot = await inspectRouteDom(page, { surface: 'marketing' });
       expect(
-        snapshot.findings.filter(finding => finding.kind === 'clipped-heading')
+        snapshot.findings.filter(
+          finding =>
+            finding.kind === 'clipped-heading' ||
+            (route === '/' && finding.kind === 'heading-hierarchy-inversion')
+        )
       ).toEqual([]);
       await testInfo.attach('hero', {
         body: await page.screenshot(),
