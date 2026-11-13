@@ -1341,7 +1341,7 @@ export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/api-budget.test.mjs',
   'scripts/lib/__tests__/domain-write-guard.test.mjs',
   'scripts/lib/__tests__/screen-audit-receipts.test.mjs',
-  'scripts/lib/__tests__/component-certificate.test.mjs',
+  'scripts/lib/__tests__/component-certificate.test.mjs scripts/lib/__tests__/screen-cert-repair.test.mjs',
   'scripts/lib/__tests__/verify-patched-dependencies.test.mjs',
   'scripts/lib/__tests__/incident-dedupe.test.mjs',
   'scripts/lib/__tests__/ci-capacity.test.mjs',
@@ -1352,7 +1352,7 @@ export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/setup-pinned-node.test.mjs',
 ]);
 export const SCRIPT_CONTRACT_VITEST_COMMAND = `pnpm exec vitest --root scripts --config vitest.config.mts run ${SCRIPT_CONTRACT_VITEST_TESTS.map(
-  test => test.replace(/^scripts\//u, '')
+  test => test.replace(/(^| )scripts\//gu, '$1')
 ).join(
   ' '
 )} && pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/doc-freshness.test.mjs --coverage --coverage.include=lib/doc-review.mjs --coverage.include=lib/doc-freshness.mjs --coverage.reporter=text --coverage.reporter=json --coverage.reportsDirectory="\${RUNNER_TEMP:-/tmp}/jovie-document-review-coverage" --coverage.thresholds.perFile=true --coverage.thresholds.lines=90 --coverage.thresholds.branches=80 --coverage.thresholds.functions=90 && pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/daily-changelog.test.mjs lib/__tests__/daily-changelog-publication.test.mjs --coverage --coverage.include=lib/daily-changelog.mjs --coverage.include=lib/daily-changelog-publication.mjs --coverage.include=lib/daily-changelog-collector.mjs --coverage.reporter=text --coverage.reporter=json --coverage.reportsDirectory="\${RUNNER_TEMP:-/tmp}/jovie-changelog-coverage" --coverage.thresholds.perFile=true --coverage.thresholds.lines=85 --coverage.thresholds.branches=75 --coverage.thresholds.functions=82`;
