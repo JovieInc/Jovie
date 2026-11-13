@@ -8,6 +8,7 @@ base proves an additive import change and a full-file binding check passes.
 from __future__ import annotations
 
 import difflib
+import json
 import re
 import tempfile
 from pathlib import Path
@@ -75,6 +76,19 @@ const ts = require(process.argv[1]);
 const text = require('node:fs').readFileSync(process.argv[2], 'utf8');
 const source = ts.createSourceFile('merged.tsx', text, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
 if (source.parseDiagnostics.length) process.exit(1);
+const spans = JSON.parse(process.argv[3]);
+const byteOffset = offset => Buffer.byteLength(text.slice(0, offset));
+const imports = source.statements.filter(ts.isImportDeclaration).map(statement => [
+  byteOffset(statement.getStart(source)), byteOffset(statement.end + (text[statement.end] === '\\n' ? 1 : 0)),
+]);
+for (const [start, end] of spans) {
+  let cursor = start;
+  for (const [from, to] of imports.filter(([from]) => from >= start && from < end)) {
+    if (from !== cursor || to > end) process.exit(1);
+    cursor = to;
+  }
+  if (cursor !== end) process.exit(1);
+}
 const imported = new Set();
 let valid = true;
 function names(name, visit) {
@@ -108,14 +122,14 @@ process.exit(valid ? 0 : 1);
 """
 
 
-def unique_import_bindings(text: str, worktree: Path, sh) -> bool:
+def unique_import_bindings(text: str, worktree: Path, sh, spans=()) -> bool:
     """Check the full resolved TSX file; missing installed parser leaves it manual."""
     parser = Path(__file__).resolve().parents[2] / 'node_modules' / 'typescript'
     try:
         with tempfile.TemporaryDirectory() as scratch:
             source = Path(scratch) / 'merged.tsx'
             atomic_write_text(source, text)
-            return sh(['node', '-e', _IMPORT_BINDINGS_CHECK, str(parser), str(source)],
+            return sh(['node', '-e', _IMPORT_BINDINGS_CHECK, str(parser), str(source), json.dumps(spans)],
                       cwd=worktree).returncode == 0
     except OSError:
         return False
@@ -203,14 +217,20 @@ def resolve_additive_statements_text(text: str, *, validate_imports=None) -> str
     matches = list(_HUNK.finditer(text))
     if not matches:
         return None
-    imports_changed = False
+    import_spans = []
+
+    def replace(match, replacement):
+        nonlocal text
+        delta = len(replacement) - (match.end() - match.start())
+        import_spans[:] = [(start + delta, end + delta) for start, end in import_spans]
+        text = text[:match.start()] + replacement + text[match.end():]
     for match in reversed(matches):
         if match["base"].strip():
             merged = _additive_named_imports(match['base'], match['ours'], match['theirs'])
             if merged is None:
                 return None
-            text = text[:match.start()] + merged + text[match.end():]
-            imports_changed = True
+            replace(match, merged)
+            import_spans.append((match.start(), match.start() + len(merged)))
             continue
         ours = _statements(match["ours"])
         theirs = _statements(match["theirs"])
@@ -228,11 +248,14 @@ def resolve_additive_statements_text(text: str, *, validate_imports=None) -> str
             if prior is None:
                 seen[key] = statement.strip()
                 ordered.append(statement)
-        text = text[:match.start()] + "".join(ordered) + text[match.end():]
+        replace(match, "".join(ordered))
     if _MARKERS.search(text):
         return None
-    if imports_changed and (validate_imports is None or not validate_imports(text)):
-        return None
+    if import_spans:
+        # TypeScript reports UTF-16 positions; byte spans keep Unicode context exact.
+        spans = [(len(text[:start].encode()), len(text[:end].encode())) for start, end in import_spans]
+        if validate_imports is None or not validate_imports(text, spans):
+            return None
     return text
 
 

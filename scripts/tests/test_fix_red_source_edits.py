@@ -386,7 +386,7 @@ class AdditiveStatementMergeTest(unittest.TestCase):
         def sh(args, **kwargs):
             return subprocess.run(args, cwd=kwargs.get('cwd'), capture_output=True, text=True)
         return statements.resolve_additive_statements_text(
-            text, validate_imports=lambda value: statements.unique_import_bindings(value, Path.cwd(), sh))
+            text, validate_imports=lambda value, spans: statements.unique_import_bindings(value, Path.cwd(), sh, spans))
 
     def test_unions_named_import_additions_against_the_actual_base(self):
         base = "import { describe, expect, it, vi } from 'vitest';\n"
@@ -444,12 +444,22 @@ class AdditiveStatementMergeTest(unittest.TestCase):
             alpha.replace('alpha }', 'alpha, mainAlpha }') + beta.replace('beta }', 'beta, mainBeta }'),
             alpha + beta)))
 
+    def test_refuses_import_looking_strings_and_comments_and_tracks_unicode_offsets(self):
+        base = "import { it } from 'vitest';\n"
+        conflict = self.conflict("import { it, expect } from 'vitest';\n", base, base)
+        for before, after in (("const fixture = `\n", "`;\n"), ("/*\n", "*/\n")):
+            self.assertIsNone(self.resolve(before + conflict + after))
+        # Earlier replacements change later offsets, including in non-ASCII context.
+        prefix = "// 🎵 café\n" + self.conflict("const head = 1;\n", "const main = 2;\n")
+        self.assertEqual(self.resolve(prefix + conflict),
+                         "// 🎵 café\nconst main = 2;\nconst head = 1;\nimport { it, expect } from 'vitest';\n")
+
     def test_named_import_resolution_requires_the_full_file_validator(self):
         base = "import { it } from 'vitest';\n"
         conflict = self.conflict("import { it, expect } from 'vitest';\n", base, base)
         self.assertIsNone(statements.resolve_additive_statements_text(conflict))
         self.assertIsNone(statements.resolve_additive_statements_text(
-            conflict, validate_imports=lambda _: False))
+            conflict, validate_imports=lambda *_: False))
         self.assertFalse(statements.unique_import_bindings(base, Path.cwd(),
                          lambda *args, **kwargs: SimpleNamespace(returncode=1)))
         with patch.object(statements, 'atomic_write_text', side_effect=OSError('unavailable')):

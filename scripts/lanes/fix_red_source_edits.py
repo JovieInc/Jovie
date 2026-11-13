@@ -283,7 +283,7 @@ def resolve_additive_statement_file(worktree: Path, rel: str, sh) -> str | None:
     if conflict is None:
         return None
     return resolve_additive_statements_text(
-        conflict, validate_imports=lambda text: unique_import_bindings(text, worktree, sh))
+        conflict, validate_imports=lambda text, spans: unique_import_bindings(text, worktree, sh, spans))
 
 
 def _unique_json_object(pairs):
