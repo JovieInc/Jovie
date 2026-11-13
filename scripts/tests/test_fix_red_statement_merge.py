@@ -132,7 +132,3 @@ class AdditiveStatementMergeTest(unittest.TestCase):
                              "import { describe, it, expect, afterEach } from 'vitest';\n")
             self.assertIn("<<<<<<<", target.read_text())
             self.assertIsNone(edits.resolve_additive_statement_file(work, "README.md", sh))
-
-
-
-
