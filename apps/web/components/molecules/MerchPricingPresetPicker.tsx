@@ -1,5 +1,6 @@
 'use client';
 
+import { HostDrawnInput } from '@jovie/ui/atoms/host-drawn-field';
 import type { MerchMarginPreset } from '@/lib/merch/pricing';
 import { cn } from '@/lib/utils';
 
@@ -41,13 +42,13 @@ export function MerchPricingPresetPicker({
                 : 'border-subtle bg-surface-0 text-tertiary-token hover:border-default hover:text-secondary-token'
             )}
           >
-            <input
+            <HostDrawnInput
+              visuallyHidden
               type='radio'
               name={groupName}
               value={option.preset}
               checked={active}
               onChange={() => onChange(option.preset)}
-              className='sr-only'
             />
             {option.label}
           </label>
