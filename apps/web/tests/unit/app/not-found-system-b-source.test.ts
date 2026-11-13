@@ -55,7 +55,8 @@ describe('root not-found System B source tokens', () => {
     expect(source).not.toMatch(rawVisualUtilityPattern);
     expect(source).not.toMatch(negativeTrackingPattern);
     expect(source).not.toContain('style={{');
-    expect(source).toContain("variant='minimal'");
+    expect(source).toContain('<RootNotFoundHeader />');
+    expect(source).toContain('<RootNotFoundFooter />');
     expect(source).toContain('system-b-root-not-found-main');
     expect(source).toContain('NotFoundPageContent');
     expect(source).toContain("variant='generic'");

@@ -1,3 +1,10 @@
+// The shell owns the CSS of the chrome it renders. HeaderNav and
+// MarketingFooter also import their own stylesheets, but a not-found boundary
+// does not reliably pick up CSS imported only by a client component
+// (JOV-2145), and several boundaries render this shell. The root layout used
+// to carry these two files for every route.
+import '@/components/organisms/HeaderNav.css';
+import './MarketingFooter.css';
 import type { ReactNode } from 'react';
 import type { LogoVariant } from '@/components/atoms/Logo';
 import { SkipToContent } from '@/components/atoms/SkipToContent';
