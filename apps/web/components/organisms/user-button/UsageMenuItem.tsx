@@ -154,6 +154,7 @@ export function UsageMenuItem({
   return (
     <div data-testid='usage-menu-item'>
       <Button
+        asChild
         type='button'
         variant='ghost'
         ref={toggleRef}
@@ -166,28 +167,30 @@ export function UsageMenuItem({
           'justify-start font-normal'
         )}
       >
-        <span className={INSET_PANEL_ICON_COLUMN}>
-          <Gauge className='h-4 w-4' aria-hidden />
-        </span>
-        <span className='min-w-0 flex-1'>Usage remaining</span>
-        <span className='shrink-0 tabular-nums text-tertiary-token'>
-          {isLoading ? (
-            <span
-              className={cn(
-                'inline-block h-3 w-8 animate-pulse rounded motion-reduce:animate-none',
-                ACCOUNT_LOADING_FILL
-              )}
-              aria-hidden
-            />
+        <button type='button'>
+          <span className={INSET_PANEL_ICON_COLUMN}>
+            <Gauge className='h-4 w-4' aria-hidden />
+          </span>
+          <span className='min-w-0 flex-1'>Usage remaining</span>
+          <span className='shrink-0 tabular-nums text-tertiary-token'>
+            {isLoading ? (
+              <span
+                className={cn(
+                  'inline-block h-3 w-8 animate-pulse rounded motion-reduce:animate-none',
+                  ACCOUNT_LOADING_FILL
+                )}
+                aria-hidden
+              />
+            ) : (
+              collapsedUsageLabel
+            )}
+          </span>
+          {expanded ? (
+            <ChevronDown className='h-3.5 w-3.5 shrink-0 text-tertiary-token' />
           ) : (
-            collapsedUsageLabel
+            <ChevronRight className='h-3.5 w-3.5 shrink-0 text-tertiary-token' />
           )}
-        </span>
-        {expanded ? (
-          <ChevronDown className='h-3.5 w-3.5 shrink-0 text-tertiary-token' />
-        ) : (
-          <ChevronRight className='h-3.5 w-3.5 shrink-0 text-tertiary-token' />
-        )}
+        </button>
       </Button>
 
       {expanded ? (

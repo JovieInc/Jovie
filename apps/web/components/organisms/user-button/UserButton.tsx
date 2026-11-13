@@ -128,7 +128,6 @@ const USER_MENU_SIDEBAR_CONTENT_CLASS =
  */
 export const USER_MENU_MAX_HEIGHT =
   'var(--radix-dropdown-menu-content-available-height)';
-const USER_MENU_GROUP_SPACER_CLASS = '-mx-1 my-0 h-2 border-0';
 
 const UPDATE_MENU_COPY = DESKTOP_UPDATE_COPY.menu;
 
@@ -223,69 +222,41 @@ function buildDropdownItems({
   const items: CommonDropdownItem[] = [
     ...updateItems,
     {
-      type: 'action-row',
-      id: 'profile-help',
-      // The row sits on the surface inset itself, so the avatar lands in the
-      // icon column and Help ends on the shortcut edge.
-      className:
-        'grid min-h-12 w-full grid-cols-[minmax(0,1fr)_auto] items-center gap-1',
-      items: [
-        {
-          type: 'action',
-          id: 'profile-card',
-          label: `Open profile for ${displayName}`,
-          onClick: handleProfile,
-          className: 'min-h-12 min-w-0 gap-2 px-(--space-2-5) py-1.5',
-          content: (
-            <>
-              <span className={INSET_PANEL_ICON_COLUMN}>{profileAvatar}</span>
-              <div className='min-w-0 flex-1'>
-                <div className='flex min-w-0 items-center gap-2'>
-                  <span
-                    title={displayName}
-                    className='min-w-0 flex-1 truncate text-app font-medium text-primary-token'
-                  >
-                    {displayName}
-                  </span>
-                  {billingStatus.isPro && (
-                    <Badge
-                      variant='secondary'
-                      size='sm'
-                      className='shrink-0 rounded-full px-1.5 py-0 text-3xs font-medium'
-                    >
-                      Pro
-                    </Badge>
-                  )}
-                </div>
-                <p
-                  aria-hidden={formattedUsername ? undefined : true}
-                  className='mt-0.5 h-4 truncate text-2xs text-tertiary-token'
-                >
-                  {formattedUsername ?? '\u00A0'}
-                </p>
-              </div>
-            </>
-          ),
-        },
-        {
-          type: 'action',
-          id: 'help',
-          label: 'Help',
-          icon: HelpCircle,
-          onClick: handleHelp,
-          className: 'min-h-8 shrink-0',
-          // Icon and label only, so "Help" ends on the same right edge as
-          // the shortcuts instead of trailing an empty slot.
-          content: (
-            <>
-              <span className={INSET_PANEL_ICON_COLUMN}>
-                <HelpCircle aria-hidden='true' />
+      type: 'action',
+      id: 'profile-card',
+      label: `Open profile for ${displayName}`,
+      onClick: handleProfile,
+      className: 'min-h-12 min-w-0 gap-2 px-(--space-2-5) py-1.5',
+      content: (
+        <>
+          <span className={INSET_PANEL_ICON_COLUMN}>{profileAvatar}</span>
+          <div className='min-w-0 flex-1'>
+            <div className='flex min-w-0 items-center gap-2'>
+              <span
+                title={displayName}
+                className='min-w-0 flex-1 truncate text-app font-medium text-primary-token'
+              >
+                {displayName}
               </span>
-              <span>Help</span>
-            </>
-          ),
-        },
-      ],
+              {billingStatus.isPro && (
+                <Badge
+                  variant='secondary'
+                  size='sm'
+                  className='shrink-0 rounded-full px-1.5 py-0 text-3xs font-medium'
+                >
+                  Pro
+                </Badge>
+              )}
+            </div>
+            <p
+              aria-hidden={formattedUsername ? undefined : true}
+              className='mt-0.5 h-4 truncate text-2xs text-tertiary-token'
+            >
+              {formattedUsername ?? '\u00A0'}
+            </p>
+          </div>
+        </>
+      ),
     },
     {
       type: 'separator',
@@ -404,7 +375,6 @@ function buildDropdownItems({
     icon: HelpCircle,
     items: learnMoreItems,
   };
-  items.push(learnMoreSubmenu);
 
   // Add billing item based on status
   if (billingStatus.loading) {
@@ -438,11 +408,6 @@ function buildDropdownItems({
   // Ovie privacy lock is opt-in and server-owned; money visibility remains a
   // separate customer preference.
   items.push(
-    {
-      type: 'separator',
-      id: 'sep-privacy',
-      className: USER_MENU_GROUP_SPACER_CLASS,
-    },
     ...(showWorkspaceLock
       ? [
           {
@@ -471,8 +436,16 @@ function buildDropdownItems({
     {
       type: 'separator',
       id: 'sep-support',
-      className: USER_MENU_GROUP_SPACER_CLASS,
+      className: INSET_PANEL_SEPARATOR,
     },
+    {
+      type: 'action',
+      id: 'help',
+      label: 'Help',
+      icon: HelpCircle,
+      onClick: handleHelp,
+    },
+    learnMoreSubmenu,
     {
       type: 'action',
       id: 'feedback',
@@ -486,6 +459,16 @@ function buildDropdownItems({
       className: INSET_PANEL_SEPARATOR,
     },
     {
+      type: 'action',
+      id: 'sign-out',
+      label: loading.signOut ? 'Signing out…' : 'Sign out',
+      icon: LogOut,
+      onClick: handleSignOut,
+      disabled: loading.signOut,
+      className: 'disabled:cursor-not-allowed disabled:opacity-60',
+      shortcut: `${GLYPH_OPT} ${GLYPH_SHIFT} Q`,
+    },
+    {
       type: 'custom',
       id: 'version',
       render: () => (
@@ -496,7 +479,7 @@ function buildDropdownItems({
           {isElectronRuntime ? (
             <DesktopReleaseIdentity />
           ) : (
-            <span>
+            <span className='truncate'>
               Version {process.env.NEXT_PUBLIC_APP_VERSION ?? '0.0.0'}
               {process.env.NEXT_PUBLIC_BUILD_SHA
                 ? ` (${process.env.NEXT_PUBLIC_BUILD_SHA})`
@@ -505,21 +488,6 @@ function buildDropdownItems({
           )}
         </div>
       ),
-    },
-    {
-      type: 'separator',
-      id: 'sep-signout',
-      className: USER_MENU_GROUP_SPACER_CLASS,
-    },
-    {
-      type: 'action',
-      id: 'sign-out',
-      label: loading.signOut ? 'Signing out…' : 'Sign out',
-      icon: LogOut,
-      onClick: handleSignOut,
-      disabled: loading.signOut,
-      className: 'disabled:cursor-not-allowed disabled:opacity-60',
-      shortcut: `${GLYPH_OPT} ${GLYPH_SHIFT} Q`,
     }
   );
 

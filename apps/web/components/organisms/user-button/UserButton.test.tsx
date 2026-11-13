@@ -460,10 +460,6 @@ describe('UserButton account surface layout', () => {
 
     // Header: no extra row inset; the avatar sits in the icon column and the
     // name starts on the label edge shared with every other row.
-    const profileRow = menu.querySelector(
-      '[data-menu-action-row="profile-help"]'
-    );
-    expect(profileRow).not.toHaveClass('px-1');
     const profile = within(menu).getByRole('menuitem', {
       name: 'Open profile for Adele Adkins',
     });
@@ -471,14 +467,17 @@ describe('UserButton account surface layout', () => {
     const avatarColumn = profile.firstElementChild as HTMLElement;
     expect(avatarColumn).toHaveClass('w-4', 'shrink-0', 'justify-center');
 
-    // Help ends on the same right gutter as the shortcuts.
+    // Help uses the normal action row, leaving the header for identity.
     const help = within(menu).getByRole('menuitem', { name: 'Help' });
     expect(help).toHaveClass('px-2.5');
     expect(help).not.toHaveClass('px-2');
 
     // Header and footer dividers are hairlines that stop at the gutter.
     const separators = within(menu).getAllByRole('separator');
-    expect(separators[0]).toHaveClass('mx-(--space-2-5)', 'h-px', 'bg-subtle');
+    for (const separator of separators) {
+      expect(separator).toHaveClass('mx-(--space-2-5)', 'h-px', 'bg-subtle');
+      expect(separator).not.toHaveClass('h-2');
+    }
 
     // Version reads as a muted section label on the same gutter.
     expect(within(menu).getByTestId('app-build-diagnostics')).toHaveClass(

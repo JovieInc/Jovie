@@ -1,5 +1,8 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
-import { withSignedInSession } from '@/.storybook/signed-in-session';
+import {
+  createSignedInApiMock,
+  withSignedInSession,
+} from '@/.storybook/signed-in-session';
 import { SidebarIdentityGroup } from '@/components/organisms/sidebar-identity-group';
 import { APP_ROUTES } from '@/constants/routes';
 import { JovieAuthValuesProvider } from '@/hooks/useJovieAuth';
@@ -166,4 +169,84 @@ export const LoadingRowLight: Story = {
     ),
   ],
   parameters: light,
+};
+
+/** Deterministic Mac menu data; the production UserButton owns every row. */
+function setupMacMenu(noUsername = false) {
+  const target = window as Window & {
+    __jovieApiMock?: ReturnType<typeof createSignedInApiMock>;
+  };
+  const previous = target.__jovieApiMock;
+  const previousRuntime = document.documentElement.dataset.desktopRuntime;
+  const session = createSignedInApiMock(noUsername ? { username: '' } : {});
+  document.documentElement.dataset.desktopRuntime = 'electron';
+  target.__jovieApiMock = request => {
+    switch (request.url.pathname) {
+      case '/api/billing/status':
+        return Response.json({
+          isPro: true,
+          plan: 'pro',
+          stripeCustomerId: 'story-customer',
+        });
+      case '/api/mobile/v1/ios-access':
+        return Response.json({ hasAccess: true, installUrl: null });
+      case '/api/chat/usage':
+        return Response.json({
+          plan: 'pro',
+          weeklyLimit: 100,
+          used: 14,
+          remaining: 86,
+          resetAt: '2026-11-16T00:00:00Z',
+          isExhausted: false,
+          warningThreshold: 10,
+          isNearLimit: false,
+        });
+      default:
+        return session(request);
+    }
+  };
+  return () => {
+    target.__jovieApiMock = previous;
+    if (previousRuntime === undefined)
+      delete document.documentElement.dataset.desktopRuntime;
+    else document.documentElement.dataset.desktopRuntime = previousRuntime;
+  };
+}
+
+export const MacAccountMenu: Story = {
+  args: { calm: true },
+  beforeEach: () => setupMacMenu(),
+  decorators: [
+    Story => (
+      <JovieAuthValuesProvider>
+        <div className='flex min-h-screen items-end bg-sidebar p-2 text-primary-token'>
+          <div className='w-52'>
+            <Story />
+          </div>
+        </div>
+      </JovieAuthValuesProvider>
+    ),
+  ],
+  parameters: { ...dark, layout: 'fullscreen' },
+};
+export const MacAccountMenuLight: Story = {
+  ...MacAccountMenu,
+  parameters: { ...light, layout: 'fullscreen' },
+};
+export const MacAccountMenuLongName: Story = {
+  ...MacAccountMenu,
+  args: { calm: true, artist: LONG_NAME_ARTIST },
+};
+export const MacAccountMenuNoUsername: Story = {
+  ...MacAccountMenu,
+  beforeEach: () => setupMacMenu(true),
+};
+
+export const MacAccountMenuLongNameLight: Story = {
+  ...MacAccountMenuLongName,
+  parameters: { ...light, layout: 'fullscreen' },
+};
+export const MacAccountMenuNoUsernameLight: Story = {
+  ...MacAccountMenuNoUsername,
+  parameters: { ...light, layout: 'fullscreen' },
 };

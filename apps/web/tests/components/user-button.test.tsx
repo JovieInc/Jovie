@@ -966,31 +966,17 @@ describe('UserButton billing actions', () => {
 
     await user.click(screen.getByText(longDisplayName));
 
-    const identityRow = document.querySelector<HTMLElement>(
-      '[data-menu-action-row="profile-help"]'
-    );
-    expect(identityRow).not.toBeNull();
-    expect(screen.getByRole('menu')).toHaveClass(
+    const menu = screen.getByRole('menu');
+    expect(menu).toHaveClass(
       'w-(--radix-dropdown-menu-trigger-width)',
       'min-w-60',
       'max-w-[calc(100vw-1rem)]'
     );
-    expect(screen.getByRole('menu')).not.toHaveClass('w-80');
-    expect(identityRow).toHaveClass(
-      'grid',
-      'grid-cols-[minmax(0,1fr)_auto]',
-      'min-h-12',
-      'w-full'
-    );
-    expect(identityRow?.querySelectorAll('[role="menuitem"]')).toHaveLength(2);
-    expect(identityRow?.querySelector('button, a')).toBeNull();
-
-    const profileItem = within(identityRow as HTMLElement).getByRole(
-      'menuitem',
-      {
-        name: `Open profile for ${longDisplayName}`,
-      }
-    );
+    expect(menu).not.toHaveClass('w-80');
+    const profileItem = within(menu).getByRole('menuitem', {
+      name: `Open profile for ${longDisplayName}`,
+    });
+    expect(profileItem.querySelector('button, a')).toBeNull();
     expect(profileItem).toHaveClass('min-w-0');
     expect(within(profileItem).getByText(longDisplayName)).toHaveClass(
       'truncate'
@@ -1006,17 +992,13 @@ describe('UserButton billing actions', () => {
     // Keep the viewport bound when matching the expanded sidebar trigger.
     expect(screen.getByRole('menu')).toHaveClass('max-w-[calc(100vw-1rem)]');
 
-    const helpItem = within(identityRow as HTMLElement).getByRole('menuitem', {
-      name: 'Help',
-    });
-    expect(helpItem).toHaveClass('min-h-8', 'shrink-0');
+    const helpItem = within(menu).getByRole('menuitem', { name: 'Help' });
+    expect(profileItem).not.toContainElement(helpItem);
     await user.keyboard('{ArrowDown}');
     expect(profileItem).toHaveFocus();
     await user.keyboard('{ArrowDown}');
-    expect(helpItem).toHaveFocus();
-    await user.keyboard('{ArrowDown}');
     expect(screen.getByRole('menuitem', { name: /Settings/u })).toHaveFocus();
-    await user.keyboard('{ArrowUp}');
+    await user.keyboard('Help');
     expect(helpItem).toHaveFocus();
     await user.keyboard('{Enter}');
     expect(openMock).toHaveBeenCalledWith(
@@ -1027,7 +1009,7 @@ describe('UserButton billing actions', () => {
     expect(screen.queryByRole('menu')).not.toBeInTheDocument();
   });
 
-  it('groups account actions with spacing and two restrained hairlines', async () => {
+  it('groups account actions with three restrained hairlines', async () => {
     mockUseBillingStatusQuery.mockReturnValue({
       data: { isPro: true, plan: 'pro', hasStripeCustomer: true },
       isLoading: false,
@@ -1039,22 +1021,22 @@ describe('UserButton billing actions', () => {
     await user.click(screen.getByRole('button', { name: /Adele Adkins/i }));
 
     const separators = screen.getAllByRole('separator');
-    expect(separators).toHaveLength(5);
+    expect(separators).toHaveLength(3);
     for (const separator of separators) {
-      expect(separator).toHaveClass('border-0');
+      expect(separator).toHaveClass(
+        'border-0',
+        'h-px',
+        'mx-(--space-2-5)',
+        'bg-subtle'
+      );
+      expect(separator).not.toHaveClass('h-2');
     }
-    // Only the header and footer dividers draw a hairline, and it stops at
-    // the row gutter. Inner groups are separated by space alone.
-    const hairlines = separators.filter(separator =>
-      separator.classList.contains('h-px')
-    );
-    expect(hairlines).toHaveLength(2);
-    for (const hairline of hairlines) {
-      expect(hairline).toHaveClass('mx-(--space-2-5)', 'bg-subtle');
-    }
-    for (const separator of separators) {
-      if (!hairlines.includes(separator)) expect(separator).toHaveClass('h-2');
-    }
+    const signOut = screen.getByRole('menuitem', { name: /Sign out/ });
+    const diagnostics = screen.getByTestId('app-build-diagnostics');
+    expect(
+      signOut.compareDocumentPosition(diagnostics) &
+        Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy();
 
     for (const menuItem of screen.getAllByRole('menuitem')) {
       if (menuItem.getAttribute('aria-label')?.startsWith('Open profile for')) {

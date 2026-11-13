@@ -146,3 +146,105 @@ test('account loading row is visible on the light sidebar', async ({
   expect(ratio).toBeGreaterThanOrEqual(3);
   await capture(page, 'account-loading-row-light', testInfo);
 });
+
+// The actual 224px sidebar leaves 208px after its horizontal inset.
+for (const [viewportName, viewport] of VIEWPORTS) {
+  for (const theme of THEMES) {
+    test(`Mac account identity and keyboard · ${viewportName} · ${theme}`, async ({
+      page,
+    }, testInfo) => {
+      await page.setViewportSize(viewport);
+      for (const state of ['', '-long-name', '-no-username']) {
+        const suffix = theme === 'light' ? '-light' : '';
+        await openStory(
+          page,
+          `organisms-userbutton--mac-account-menu${state}${suffix}`,
+          theme
+        );
+        const trigger = page
+          .getByTestId('user-button-loaded')
+          .getByRole('button')
+          .first();
+        await trigger.focus();
+        await page.keyboard.press('Enter');
+        const menu = page.getByRole('menu');
+        await expect(menu).toBeVisible();
+        const profile = menu.getByRole('menuitem', {
+          name: /Open profile for/,
+        });
+        await expect(profile.getByText('Pro', { exact: true })).toBeVisible();
+        await expect(
+          menu.getByRole('menuitem', { name: 'Install iOS Alpha' })
+        ).toBeVisible();
+        await expect(
+          menu.getByRole('menuitem', { name: 'Manage billing' })
+        ).toBeVisible();
+        await expect(
+          menu.getByTestId('electron-release-identity')
+        ).toBeVisible();
+        const usage = menu.getByRole('button', { name: /Usage remaining/ });
+        const usageArrow = await usage.locator('svg').last().boundingBox();
+        const supportArrow = await menu
+          .getByRole('menuitem', { name: 'Learn More' })
+          .locator('svg')
+          .last()
+          .boundingBox();
+        expect(
+          Math.abs(
+            usageArrow!.x +
+              usageArrow!.width -
+              supportArrow!.x -
+              supportArrow!.width
+          )
+        ).toBeLessThanOrEqual(2);
+        const name = profile.locator('[title]');
+        const fits = await name.evaluate(
+          node => node.scrollWidth <= node.clientWidth
+        );
+        expect(fits).toBe(state !== '-long-name');
+        if (state === '-no-username')
+          await expect(profile).not.toContainText('@');
+        const geometry = await menu.evaluate(node => ({
+          width: node.getBoundingClientRect().width,
+          overflow: node.scrollWidth > node.clientWidth,
+          separators: [...node.querySelectorAll('[role="separator"]')].map(
+            separator => separator.getBoundingClientRect().height
+          ),
+        }));
+        expect(geometry.width).toBeLessThanOrEqual(240);
+        expect(geometry.overflow).toBe(false);
+        expect(geometry.separators.every(height => height <= 1)).toBe(true);
+        const signOut = menu.getByRole('menuitem', { name: /Sign out/ });
+        await expect(signOut).toBeInViewport();
+        const signOutBox = await signOut.boundingBox();
+        const diagnosticsBox = await menu
+          .getByTestId('app-build-diagnostics')
+          .boundingBox();
+        expect(signOutBox!.y + signOutBox!.height).toBeLessThanOrEqual(
+          diagnosticsBox!.y
+        );
+        await page.keyboard.press('End');
+        await expect(signOut).toBeFocused();
+        await page.keyboard.press('Home');
+        await expect(profile).toBeFocused();
+        await page.keyboard.press('ArrowDown');
+        await expect(
+          menu.getByRole('menuitem', { name: /^Settings/ })
+        ).toBeFocused();
+        await capture(
+          page,
+          `mac-account-${viewportName}-${theme}${state}`,
+          testInfo
+        );
+        await page.keyboard.press('Escape');
+        await expect(menu).toBeHidden();
+        await expect(trigger).toBeFocused();
+        await trigger.click();
+        await expect(menu).toBeVisible();
+        await menu.getByRole('menuitem', { name: 'Help', exact: true }).focus();
+        await page.keyboard.press('Escape');
+        await expect(trigger).toBeFocused();
+      }
+    });
+  }
+}
