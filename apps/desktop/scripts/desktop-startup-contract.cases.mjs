@@ -351,7 +351,7 @@ test('S4 real bundled preload owns fullscreen before hydration and ignores stale
   }
 });
 
-test('S5 titlebar import begins at module evaluation only in Electron, before rendering', async () => {
+test('S5 titlebar warms only in Electron and rejected warmup preserves the render loader', async () => {
   const slot = await readFile(
     new URL(
       '../../web/components/organisms/DesktopTitlebarSlot.tsx',
@@ -360,75 +360,37 @@ test('S5 titlebar import begins at module evaluation only in Electron, before re
     'utf8'
   );
   for (const electron of [false, true]) {
-    let loads = 0;
-    runInNewContext(compile(slot), {
-      exports: {},
-      require: id => {
-        if (id === 'next/dynamic') return { default: () => () => null };
-        if (id === '@/lib/desktop/electron-runtime')
-          return { isElectronRuntime: () => electron };
-        if (id === '@/components/organisms/DesktopTitlebar') {
-          loads++;
-          return { DesktopTitlebar() {} };
-        }
-        if (id === 'react/jsx-runtime') return {};
-        throw new Error(`unexpected import ${id}`);
-      },
-    });
-    await Promise.resolve();
-    assert.equal(loads, electron ? 1 : 0);
-  }
-});
-
-test('S5 rejected titlebar warmup leaves browser output and the desktop render loader intact', async () => {
-  const slot = await readFile(
-    new URL(
-      '../../web/components/organisms/DesktopTitlebarSlot.tsx',
-      import.meta.url
-    ),
-    'utf8'
-  );
-  for (const electron of [false, true]) {
-    let loads = 0;
-    let loadTitlebar;
-    const titlebar = () => null;
-    const lazyTitlebar = () => null;
-    const exports = {};
-    runInNewContext(compile(slot), {
-      exports,
-      require: id => {
-        if (id === 'next/dynamic')
-          return {
-            default: loader => {
-              loadTitlebar = loader;
-              return lazyTitlebar;
-            },
-          };
-        if (id === '@/lib/desktop/electron-runtime')
-          return {
-            isElectronRuntime: () => electron,
-            useIsElectronRuntime: () => electron,
-          };
-        if (id === '@/components/organisms/DesktopTitlebar') {
-          loads++;
-          if (loads === 1) throw new Error('titlebar warmup unavailable');
-          return { DesktopTitlebar: titlebar };
-        }
-        if (id === 'react/jsx-runtime') return { jsx: type => ({ type }) };
-        throw new Error(`unexpected import ${id}`);
-      },
-    });
-    // Flush the real import rejection, including any unhandled rejection.
-    await new Promise(resolve => setImmediate(resolve));
-    assert.equal(loads, electron ? 1 : 0);
-    const rendered = exports.DesktopTitlebarSlot();
-    if (electron) {
-      assert.equal(rendered.type, lazyTitlebar);
-      assert.equal(await loadTitlebar(), titlebar);
-      assert.equal(loads, 2);
-    } else {
-      assert.equal(rendered, null);
-      assert.equal(loads, 0);
+    for (const rejectWarmup of [false, true]) {
+      let loads = 0;
+      const titlebar = () => null;
+      const exports = {};
+      runInNewContext(compile(slot), {
+        exports,
+        require: id => {
+          if (id === 'next/dynamic') return { default: loader => loader };
+          if (id === '@/lib/desktop/electron-runtime')
+            return {
+              isElectronRuntime: () => electron,
+              useIsElectronRuntime: () => electron,
+            };
+          if (id === '@/components/organisms/DesktopTitlebar') {
+            loads++;
+            if (rejectWarmup && loads === 1)
+              throw new Error('titlebar warmup unavailable');
+            return { DesktopTitlebar: titlebar };
+          }
+          if (id === 'react/jsx-runtime') return { jsx: type => ({ type }) };
+          throw new Error(`unexpected import ${id}`);
+        },
+      });
+      // Flush the real import rejection, including any unhandled rejection.
+      await new Promise(resolve => setImmediate(resolve));
+      assert.equal(loads, electron ? 1 : 0);
+      const rendered = exports.DesktopTitlebarSlot();
+      if (electron) {
+        assert.equal(await rendered.type(), titlebar);
+        assert.equal(loads, 2);
+      } else assert.equal(rendered, null);
     }
   }
 });
