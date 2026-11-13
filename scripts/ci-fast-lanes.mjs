@@ -941,6 +941,7 @@ export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
   'scripts/ci-rounds-report.test.mjs',
   'scripts/preflight-changed.test.mjs',
   'scripts/preflight-source-size.test.mjs',
+  'scripts/preflight-changed-format.test.mjs',
   'scripts/preflight-remote.test.mjs',
   'scripts/lib/__tests__/prepush-offload.test.mjs',
   'scripts/preflight-install.test.mjs',
@@ -1185,6 +1186,7 @@ export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/changelog-staleness.test.mjs',
   'scripts/lib/__tests__/changelog-source-guard.test.mjs',
   'scripts/lib/__tests__/attach-changelog-writer-proof.test.mjs',
+  'scripts/lib/__tests__/attach-changelog-writer-proof-head-guard.test.mjs',
   'scripts/lib/__tests__/delivery-control-receipts-workflow.test.mjs',
   'scripts/lib/__tests__/dependabot-update-policy.test.mjs',
   'scripts/lib/__tests__/design-surface-census.test.mjs',
@@ -2293,8 +2295,11 @@ export function runEslintServerBoundaries(cwd = REPO_ROOT) {
   return shell('pnpm --filter=@jovie/web run lint:server-boundaries');
 }
 
-function runTypecheck() {
-  // --force is mandatory (JOV-3499). Gate guard scans this file + ci.yml.
+/**
+ * Shared PR preselection: a 'false' run_jovie_typecheck receipt (written by
+ * ci-path-changes) means no typecheck graph inputs changed on this PR.
+ */
+function typecheckReceiptSkip() {
   const event = process.env.GITHUB_EVENT_NAME || '';
   if (
     event === 'pull_request' &&
@@ -2307,6 +2312,14 @@ function runTypecheck() {
       skipped: true,
     };
   }
+  return null;
+}
+
+function runTypecheck() {
+  // --force is mandatory (JOV-3499). Gate guard scans this file + ci.yml.
+  const event = process.env.GITHUB_EVENT_NAME || '';
+  const receiptSkip = typecheckReceiptSkip();
+  if (receiptSkip) return receiptSkip;
   if (event !== 'workflow_dispatch' && !repoLanes().runJovieProduct) {
     return {
       code: 0,
@@ -2336,17 +2349,8 @@ function runWebTestsTypecheck() {
   // (run_jovie_typecheck) already counts its JS and baseline inputs via
   // affectsWebTestTypecheck, so a 'false' receipt means none changed.
   const event = process.env.GITHUB_EVENT_NAME || '';
-  if (
-    event === 'pull_request' &&
-    process.env.CI_FAST_RUN_JOVIE_TYPECHECK === 'false'
-  ) {
-    return {
-      code: 0,
-      output:
-        'No TypeScript graph files changed (ci-path-changes preselection)\n',
-      skipped: true,
-    };
-  }
+  const receiptSkip = typecheckReceiptSkip();
+  if (receiptSkip) return receiptSkip;
   if (event !== 'workflow_dispatch' && !repoLanes().runJovieProduct) {
     return {
       code: 0,
@@ -2378,17 +2382,8 @@ function runWebStoriesTypecheck() {
   // web-tests-typecheck, since any .stories.tsx or component-source .tsx
   // change already satisfies affectsWebTestTypecheck.
   const event = process.env.GITHUB_EVENT_NAME || '';
-  if (
-    event === 'pull_request' &&
-    process.env.CI_FAST_RUN_JOVIE_TYPECHECK === 'false'
-  ) {
-    return {
-      code: 0,
-      output:
-        'No TypeScript graph files changed (ci-path-changes preselection)\n',
-      skipped: true,
-    };
-  }
+  const receiptSkip = typecheckReceiptSkip();
+  if (receiptSkip) return receiptSkip;
   if (event !== 'workflow_dispatch' && !repoLanes().runJovieProduct) {
     return {
       code: 0,
