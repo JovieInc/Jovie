@@ -9,6 +9,7 @@ import {
   firstLoadBudgets,
   NOW,
   validRaise,
+  writeAncestorGitRepo,
   writeChunk,
 } from './route-js-budget-fixtures';
 
@@ -135,7 +136,20 @@ describe('route-group policy reaches the existing evaluator and CLI', () => {
       const { nextDir, budgets, budgetPath } = cliFixture();
       budgets.groups.marketing.baselineKb = baseline;
       writeFileSync(budgetPath, JSON.stringify(budgets));
-      const run = runCli(nextDir, budgetPath);
+      // Hermetic ancestor: the CLI compares the budgets file with origin/main
+      // through git, so point git at a fixture repo holding these fixture
+      // budgets instead of the real repository's baselines.
+      const env = writeAncestorGitRepo(nextDir, {
+        'apps/web/scripts/route-js-budgets.json': readFileSync(
+          budgetPath,
+          'utf8'
+        ),
+        'docs/performance/route-budgets.json': readFileSync(
+          join(__dirname, '../../../docs/performance/route-budgets.json'),
+          'utf8'
+        ),
+      });
+      const run = runCli(nextDir, budgetPath, env);
       expect(run.status, run.stderr).toBe(status);
       const result = JSON.parse(run.stdout);
       expect(result.first.violations).toEqual([]);
