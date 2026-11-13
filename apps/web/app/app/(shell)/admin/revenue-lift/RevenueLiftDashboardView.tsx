@@ -313,7 +313,7 @@ export function RevenueLiftDashboardView({
           // scrollable-region-focusable); the wide tables overflow on mobile.
           tabIndex={0}
         >
-          <table className='w-full min-w-[32rem] text-left text-sm'>
+          <table className='w-full min-w-lg text-left text-sm'>
             <thead className='border-b border-subtle bg-surface-0 text-xs text-secondary-token'>
               <tr>
                 <th className='px-3 py-2 font-medium whitespace-nowrap'>
@@ -403,7 +403,7 @@ export function RevenueLiftDashboardView({
           // scrollable-region-focusable); the wide tables overflow on mobile.
           tabIndex={0}
         >
-          <table className='w-full min-w-[36rem] text-left text-sm'>
+          <table className='w-full min-w-xl text-left text-sm'>
             <thead className='border-b border-subtle bg-surface-0 text-xs text-secondary-token'>
               <tr>
                 <th className='px-3 py-2 font-medium whitespace-nowrap'>

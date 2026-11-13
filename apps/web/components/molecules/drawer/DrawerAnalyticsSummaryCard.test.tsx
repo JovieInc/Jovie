@@ -208,3 +208,17 @@ describe('DrawerAnalyticsSummaryCard dimmed contrast (JOV-8873)', () => {
     expect(container.querySelector('.opacity-60')).toBeNull();
   });
 });
+
+describe('DrawerAnalyticsSummaryCard scale tokens', () => {
+  it('keeps type and size utilities on scale tokens instead of arbitrary values', async () => {
+    const { readFileSync } = await import('node:fs');
+    const { join } = await import('node:path');
+    const source = readFileSync(
+      join(import.meta.dirname, 'DrawerAnalyticsSummaryCard.tsx'),
+      'utf8'
+    );
+
+    expect(source).not.toMatch(/leading-\[14px\]/);
+    expect(source).toContain('leading-3.5');
+  });
+});
