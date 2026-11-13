@@ -16,6 +16,14 @@ vi.mock('@clerk/nextjs', () => ({
   SignedOut: ({ children }: { children: React.ReactNode }) => children,
 }));
 
+// Records whether the account menu module was evaluated. The marketing header
+// must reach it only through the code-split wrapper, never a static import.
+const accountMenu = vi.hoisted(() => ({ evaluated: false }));
+vi.mock('@/components/organisms/user-button/UserButton', () => {
+  accountMenu.evaluated = true;
+  return { UserButton: () => null };
+});
+
 import { type HeaderFlyoutMenu, HeaderNav } from './HeaderNav';
 
 const FLYOUTS: readonly HeaderFlyoutMenu[] = [
@@ -86,6 +94,21 @@ describe('HeaderNav states', () => {
     );
     expect(screen.getAllByRole('link')).toHaveLength(2);
     await expectNoA11yViolations(container);
+  });
+
+  it('does not load the account menu for a signed-out visitor', () => {
+    render(
+      <HeaderNav
+        authMode='public-static'
+        navLinks={[{ href: APP_ROUTES.PRICING, label: 'Pricing' }]}
+        publicCta={{ href: APP_ROUTES.SIGNUP, label: 'Get Started' }}
+      />
+    );
+
+    expect(
+      within(primaryNav()).getByRole('link', { name: 'Log in' })
+    ).toBeInTheDocument();
+    expect(accountMenu.evaluated).toBe(false);
   });
 
   it('drops the desktop nav group and its divider when there are no nav links', async () => {

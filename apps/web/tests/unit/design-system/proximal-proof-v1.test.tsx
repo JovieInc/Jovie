@@ -3,12 +3,12 @@
 // "Claims need proximal, route-specific proof. Proof should support the
 // promise being made on that route, not generic proof inserted mechanically."
 //
-// The shipped homepage closes on the claim entry that sits on the same page,
-// and every door routes into /start (Tim, 2026-11-09). Its proof is the real
-// template profile and releases workspace captures. It shows no real person:
-// Tim, 2026-10-26, "no real person's face on /". The homepage-no-person-images
-// guard owns that rule; this receipt asserts the promise and its claim entry
-// stay on the page, with no signup link, without borrowing a person's capture.
+// The homepage closes on its claim entry, with every door routing into /start
+// (Tim, 2026-11-09). Its proof is the profile and releases workspace captures.
+// Since Tim (2026-11-12, "use me for now"), the product UI shows his own catalog
+// from the featured-artist slot; homepage-no-person-images owns which person
+// images may render. This receipt keeps the claim entry beside the promise
+// and verifies the hero shows the product, with no direct signup link.
 import { render, screen, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import {
@@ -61,7 +61,12 @@ describe('JOV-INV-038 proximal-proof evaluator (homepage hero)', () => {
     render(<HomepageStoryHero />);
     const hero = screen.getByTestId('marketing-section-hero');
 
-    expect(within(hero).queryByRole('img', { name: /Tim White/i })).toBeNull();
+    // The only labelled image naming the artist is the product mockup.
+    for (const image of within(hero).queryAllByRole('img', {
+      name: /Tim White/i,
+    })) {
+      expect(image).toHaveAccessibleName(/^Jovie for Mac:/);
+    }
     expect(hero.querySelector('a[href="/signup"]')).toBeNull();
     expect(
       screen.queryByText(/Claimed|Verified customer|Illustrative/i)
