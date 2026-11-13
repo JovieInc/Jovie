@@ -29,6 +29,7 @@ export function OutboundRailFact({
   onDecision,
 }: OutboundRailFactProps) {
   const [correction, setCorrection] = useState('');
+  const [correctionError, setCorrectionError] = useState(false);
   const name = item.key === 'canonical:display-name';
   const suggested = name ? cleanScrapedDisplayName(item.value) : null;
   const correctable = name || item.key === 'canonical:handle';
@@ -99,18 +100,31 @@ export function OutboundRailFact({
               className='space-y-1.5'
               onSubmit={event => {
                 event.preventDefault();
-                if (correction.trim()) void onDecision(item, 'no', correction);
+                if (pending) return;
+                if (!correction.trim()) {
+                  setCorrectionError(true);
+                  return;
+                }
+                void onDecision(item, 'no', correction);
               }}
             >
               <label className='block text-xs'>
                 Correct {item.label}
                 <input
                   value={correction}
-                  onChange={event => setCorrection(event.target.value)}
+                  onChange={event => {
+                    setCorrection(event.target.value);
+                    setCorrectionError(false);
+                  }}
                   placeholder='Correct value'
                   className='mt-1 h-7 w-full rounded-md border border-strong bg-surface-0 px-2 text-xs text-primary-token'
                 />
               </label>
+              {correctionError ? (
+                <p role='alert' className='text-error'>
+                  Enter a correction before saving.
+                </p>
+              ) : null}
               <p>
                 Saving changes the name or handle on record and requires fresh
                 review.
@@ -118,7 +132,7 @@ export function OutboundRailFact({
               <Button
                 size='sm'
                 variant='secondary'
-                disabled={pending || !correction.trim()}
+                disabled={pending}
                 type='submit'
               >
                 Save Correction

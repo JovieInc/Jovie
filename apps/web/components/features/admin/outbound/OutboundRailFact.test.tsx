@@ -114,7 +114,12 @@ describe('OutboundRailFact', () => {
       item.url
     );
     const save = screen.getByRole('button', { name: 'Save Correction' });
-    expect(save).toBeDisabled();
+    expect(save).toBeEnabled();
+    fireEvent.click(save);
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      'Enter a correction before saving.'
+    );
+    expect(onDecision).not.toHaveBeenCalled();
     expect(screen.getByLabelText('Correct Display name')).toHaveValue('');
     fireEvent.change(screen.getByLabelText('Correct Display name'), {
       target: { value: 'Ada Artist' },

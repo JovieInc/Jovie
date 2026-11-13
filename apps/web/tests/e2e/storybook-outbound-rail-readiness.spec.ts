@@ -110,9 +110,10 @@ test('fact provenance and correction are keyboard accessible without implicit wr
   await page.keyboard.press('Enter');
   await expect(disclosure).toHaveAttribute('aria-expanded', 'true');
   await expect(page.getByLabel('Correct Display name')).toHaveValue('');
-  await expect(
-    page.getByRole('button', { name: 'Save Correction' })
-  ).toBeDisabled();
+  await page.getByRole('button', { name: 'Save Correction' }).click();
+  await expect(page.getByRole('alert')).toHaveText(
+    'Enter a correction before saving.'
+  );
   await expect(
     page.getByText(
       'Recorded decision: Not reviewed. Evidence revision: evidence-revision-1',
