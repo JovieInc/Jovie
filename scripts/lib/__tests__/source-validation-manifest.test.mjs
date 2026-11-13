@@ -47,6 +47,26 @@ describe('Source Validation manifest parity', () => {
     expect(dead.map(n => n.match)).toEqual([]);
   });
 
+  it.each([
+    'apps/web/components/features/profile/ClaimAttributionLink.test.tsx',
+    'apps/web/app/[username]/page.tsx',
+    'apps/web/hooks/useLocationSearch.ts',
+    'packages/ui/atoms/button.tsx',
+    'docs/design-system/cert-screens.json',
+    'scripts/lib/component-certificate.mjs',
+  ])('runs the screen/component certificate for %s', changedPath => {
+    const guards = selectManifestGuards([changedPath], 'release-test');
+    const certificates = guards.filter(g => g.id === 'component-certificate');
+    expect(certificates).toHaveLength(1);
+    expect(certificates[0].command).toBe(
+      'pnpm component-certificate:gate --screens-base origin/release-test'
+    );
+    expect(certificates[0].heavy).not.toBe(true);
+    expect(NOT_LOCAL.some(g => g.match === 'component-certificate:gate')).toBe(
+      false
+    );
+  });
+
   it('selects path-scoped guards, including the ones that failed PR #24021', () => {
     const ids = selectManifestGuards(['.github/workflows/x.yml']).map(
       g => g.id

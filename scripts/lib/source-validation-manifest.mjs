@@ -141,6 +141,13 @@ export const SOURCE_VALIDATION_GUARDS = Object.freeze([
     covers: ['pnpm ci:harness:check'],
   },
   {
+    id: 'component-certificate',
+    name: 'component and screen certificate gate',
+    command: 'pnpm component-certificate:gate --screens-base origin/{base}',
+    when: /^(?:apps\/web\/(?:app|components|hooks|lib)\/|packages\/ui\/|docs\/design-system\/|scripts\/(?:component-|lib\/component-))/,
+    covers: ['pnpm component-certificate:gate'],
+  },
+  {
     id: 'screen-registration',
     name: 'screen registration gate',
     command: 'pnpm screen-registration-gate',
@@ -225,10 +232,6 @@ export const NOT_LOCAL = Object.freeze([
   },
   { match: 'lint:motion-css', reason: 'covered by the web lint pass in CI' },
   { match: 'component-ship-gate', reason: 'preflight:changed ship-gate check' },
-  {
-    match: 'component-certificate:gate',
-    reason: 'pre-push runs it right after component-ship-gate',
-  },
   {
     match: 'mac-header-two-lines-v1',
     reason: 'preflight:changed merge-group-unit-guards (narrowed)',
