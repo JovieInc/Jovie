@@ -1,0 +1,71 @@
+import { render, screen } from '@testing-library/react';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+const mocks = vi.hoisted(() => ({ resolve: vi.fn() }));
+vi.mock('next/headers', () => ({ headers: async () => new Headers() }));
+vi.mock('@/lib/services/tips/checkout-return.server', () => ({
+  resolveTipCheckoutReturn: mocks.resolve,
+}));
+vi.mock('@/components/site/PublicPageShell', () => ({
+  PublicPageShell: ({ children }: { children: React.ReactNode }) => (
+    <main>{children}</main>
+  ),
+}));
+
+const { default: Page, metadata, dynamic } = await import('./page');
+const props = {
+  params: Promise.resolve({ username: 'artist' }),
+  searchParams: Promise.resolve({ session_id: 'cs_test_private' }),
+};
+
+describe('tip checkout return page', () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it.each(['unverified', 'pending', 'incomplete', 'unavailable'])(
+    'never claims payment succeeded for %s',
+    async state => {
+      mocks.resolve.mockResolvedValue(state);
+      render(await Page(props));
+      expect(
+        screen.queryByRole('heading', { name: 'Payment confirmed' })
+      ).toBeNull();
+      expect(
+        screen.getByRole('link', { name: 'Back to profile' })
+      ).toHaveAttribute('href', '/artist');
+      expect(document.body.textContent).not.toContain('cs_test_private');
+    }
+  );
+
+  it('renders confirmation only from verified server evidence', async () => {
+    mocks.resolve.mockResolvedValue('confirmed');
+    render(await Page(props));
+    expect(
+      screen.getByRole('heading', { name: 'Payment confirmed' })
+    ).toBeVisible();
+    expect(mocks.resolve).toHaveBeenCalledWith(
+      'artist',
+      'cs_test_private',
+      expect.any(Headers)
+    );
+    expect(document.body.innerHTML).not.toContain('cs_test_private');
+  });
+
+  it('does not index or statically cache a payment return', () => {
+    expect(dynamic).toBe('force-dynamic');
+    expect(metadata.robots).toMatchObject({ index: false, follow: false });
+    expect(metadata.referrer).toBe('no-referrer');
+  });
+
+  it('accepts a missing session without claiming success', async () => {
+    mocks.resolve.mockResolvedValue('unverified');
+    render(await Page({ ...props, searchParams: Promise.resolve({}) }));
+    expect(mocks.resolve).toHaveBeenCalledWith(
+      'artist',
+      undefined,
+      expect.any(Headers)
+    );
+    expect(
+      screen.getByRole('heading', { name: 'Payment not verified' })
+    ).toBeVisible();
+  });
+});
