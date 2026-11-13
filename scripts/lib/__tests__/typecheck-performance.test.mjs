@@ -75,12 +75,16 @@ describe('typecheck performance', () => {
           scenarios: { ci: { baselineP95Ms: 1, targetP95Ms: 1 } },
         })
       );
-      // Six complete samples take at least 1.2s; the same 1s budget covers
-      // both rounds, retaining the full first round and a partial confirmation.
-      writeFileSync(
-        join(directory, 'corepack'),
-        `#!${process.execPath}\nsetTimeout(() => {}, 200);\n`
-      );
+      // /bin/sh + sleep keeps per-sample spawn cost at ~5 ms regardless of
+      // runner load; a node-based shim boots the interpreter per sample and
+      // that boot is load-sensitive enough (three round-one samples plus a
+      // confirmation round sharing one budget) to consume the whole deadline
+      // inside round one, leaving confirmations empty on loaded merge-queue
+      // runners (2026-11-13). Three round-one samples take ~3.1 s of the
+      // 3.5 s shared budget and the remaining ~0.4 s can never fit another
+      // 1 s sample, so the deadline deterministically interrupts the
+      // confirmation round while round one still completes with ~0.4 s slack.
+      writeFileSync(join(directory, 'corepack'), '#!/bin/sh\nsleep 1\n');
       chmodSync(join(directory, 'corepack'), 0o755);
       const output = join(directory, 'report.json');
       const result = spawnSync(
@@ -93,14 +97,16 @@ describe('typecheck performance', () => {
           '3',
           '--enforce',
           '--max-duration-ms',
-          '1000',
+          '3500',
           '--output',
           output,
         ],
         {
           encoding: 'utf8',
           env: { ...process.env, PATH: `${directory}:${process.env.PATH}` },
-          timeout: 10000,
+          // Harness slack only: the 3.5 s shared budget plus boot fits well
+          // inside 30 s even on loaded runners; the assertions are unchanged.
+          timeout: 30000,
         }
       );
       expect(result.status, result.stderr).toBe(1);
@@ -111,7 +117,7 @@ describe('typecheck performance', () => {
         report.confirmations[0].samples.some(sample => sample.timedOut)
       ).toBe(true);
       expect(report.ratchet.ci.status).toBe('fail');
-      expect(report.maxDurationMs).toBe(1000);
+      expect(report.maxDurationMs).toBe(3500);
     } finally {
       rmSync(directory, { recursive: true, force: true });
     }

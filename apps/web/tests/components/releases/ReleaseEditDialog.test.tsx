@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { ReactNode } from 'react';
@@ -220,5 +222,33 @@ describe('ReleaseEditDialog token compliance', () => {
     const badge = screen.getByText('Manual');
     expect(badge.className).not.toMatch(/amber|emerald|orange/);
     expect(badge.className).toContain('rounded-md');
+  });
+});
+
+describe('ReleaseEditDialog scale tokens', () => {
+  it('uses the 16px text-base step instead of the text-lg alias', () => {
+    const source = readFileSync(
+      resolve(
+        __dirname,
+        '../../../components/features/dashboard/organisms/releases/ReleaseEditDialog.tsx'
+      ),
+      'utf8'
+    );
+
+    expect(source).not.toMatch(/(?<![\w-])text-lg\b/);
+    expect(source).toContain('text-base');
+  });
+});
+
+describe('ReleaseEditDialog icon geometry', () => {
+  it('keeps glyphs on the 4px grid (16px, never the 18px half step)', () => {
+    const source = readFileSync(
+      resolve(
+        __dirname,
+        '../../../components/features/dashboard/organisms/releases/ReleaseEditDialog.tsx'
+      ),
+      'utf8'
+    );
+    expect(source).not.toMatch(/\b[hw]-4\.5\b|\bsize-4\.5\b/);
   });
 });

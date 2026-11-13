@@ -16,7 +16,7 @@ def compose_actions(actions: list[str]) -> list[str]:
     order = (
         classes.SYNC_MAIN, classes.STAMP_CHANGELOG, classes.WIRE_CI_FAST, classes.RENUMBER,
         classes.SNAP_SPACING, classes.STRIP_CACHE, classes.MERGE_NARROWED, classes.REGISTER_DOMAIN,
-        classes.ATOMIC_WRITE, classes.RERUN)
+        classes.ATOMIC_WRITE, classes.REPAIR_SCREEN_CERT, classes.BALANCE_HEADINGS, classes.RERUN)
     rank = {name: index for index, name in enumerate(order)}
     chosen: list[str] = []
     for action in actions:
@@ -38,26 +38,21 @@ def composed_route(raw: list[str], compose: str, agent: str) -> tuple[str, str, 
     return "mixed", agent, []
 
 
-def deterministic_fixer(action: str):
-    """Leaf no-model fixers. Resolved on lane_runner so a test patch is visible."""
+def deterministic_fixer(lane, action: str):
+    """Resolve leaf fixers on the owning runner, including after a loader rebind."""
     import fix_red_classes as classes
-    import lane_runner as lane
 
-    return {
-        classes.WIRE_CI_FAST: lane.wire_ci_fast_fix,
-        classes.ATOMIC_WRITE: lane.atomic_state_fix,
-        classes.RENUMBER: lane.renumber_migrations_fix,
-        classes.SNAP_SPACING: lane.snap_spacing_fix,
-        classes.STRIP_CACHE: lane.strip_cache_exports_fix,
-        classes.MERGE_NARROWED: lane.merge_narrowed_preflight_fix,
-        classes.REGISTER_DOMAIN: lane.register_domain_writes_fix,
-    }.get(action)
+    return lane.fix_red_screen_cert.dispatch(classes, lane.sh, {
+        "wire": lane.wire_ci_fast_fix, "atomic": lane.atomic_state_fix,
+        "renumber": lane.renumber_migrations_fix, "snap": lane.snap_spacing_fix,
+        "strip": lane.strip_cache_exports_fix, "merge": lane.merge_narrowed_preflight_fix,
+        "register": lane.register_domain_writes_fix,
+    }).get(action)
 
 
-def compose_deterministic_fix(host, pr, route, worktree, log, receipt):
+def compose_deterministic_fix(lane, host, pr, route, worktree, log, receipt):
     """Run every deterministic action on one red head. None sends the head to the model."""
     import fix_red_classes as classes
-    import lane_runner as lane
 
     actions = compose_actions(route.get("actions") or [])
     if len(actions) < 2 or any(action not in classes.DETERMINISTIC for action in actions):
@@ -75,7 +70,7 @@ def compose_deterministic_fix(host, pr, route, worktree, log, receipt):
             if lane.pr_events.sync_main(host, lane.THIS, pr, lane.time.time(), terminal_ok=True) != "synced":
                 return None
         else:
-            fixer = deterministic_fixer(action)
+            fixer = deterministic_fixer(lane, action)
             if fixer is None or (agent := fixer(host, pr, route, worktree, log, receipt)) is None:
                 return None
         done.append(action)

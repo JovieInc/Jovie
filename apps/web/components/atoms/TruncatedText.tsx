@@ -36,7 +36,7 @@ interface TruncatedTextProps {
  *
  * @example
  * // Two-line truncation with fixed height
- * <TruncatedText lines={2} className="min-h-[2.5rem]">
+ * <TruncatedText lines={2} className="min-h-10">
  *   This is a longer description that spans multiple lines
  * </TruncatedText>
  */

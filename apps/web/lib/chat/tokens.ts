@@ -8,12 +8,13 @@
  *   @release:rel_abc123[Midnight Drive]
  *   @artist:art_xyz[Porter Robinson]
  *   @track:trk_001[Opus]
+ *   @profile:<creator profile id>[Tim White]
  *   /skill:generateAlbumArt
  *
  * Pure functions — no React, no fetching. Safe to import from server code.
  */
 
-export type EntityKind = 'release' | 'artist' | 'track' | 'event';
+export type EntityKind = 'release' | 'artist' | 'track' | 'event' | 'profile';
 
 export interface EntityMentionToken {
   readonly type: 'entity';
@@ -34,21 +35,31 @@ export interface TextToken {
 
 export type ChatToken = TextToken | EntityMentionToken | SkillToken;
 
+/** Human name for each entity kind, used in chip tooltips and popovers. */
+export const ENTITY_KIND_LABEL: Readonly<Record<EntityKind, string>> = {
+  release: 'Release',
+  artist: 'Artist',
+  track: 'Track',
+  event: 'Event',
+  profile: 'Profile',
+};
+
 const ENTITY_KINDS: ReadonlySet<EntityKind> = new Set([
   'release',
   'artist',
   'track',
   'event',
+  'profile',
 ]);
 
 /**
  * Match an entity mention: @kind:id[label]
- * - kind: release | artist | track | event
+ * - kind: release | artist | track | event | profile
  * - id: non-empty, no whitespace, no ] or [
  * - label: any sequence of (escaped char `\x`) or (non-] non-\ char)
  */
 const ENTITY_PATTERN =
-  /@(release|artist|track|event):([^\s[\]]+)\[((?:\\.|[^\]\\])*)\]/g;
+  /@(release|artist|track|event|profile):([^\s[\]]+)\[((?:\\.|[^\]\\])*)\]/g;
 
 /** Match a skill invocation: /skill:id (id: word chars, digits, underscores) */
 const SKILL_PATTERN = /\/skill:([A-Za-z]\w*)/g;
@@ -160,4 +171,31 @@ export function extractSkill(input: string): SkillToken | null {
     (t): t is SkillToken => t.type === 'skill'
   );
   return found ?? null;
+}
+
+/**
+ * Split leading entity mentions off a draft so the composer can show them as
+ * chips and keep only the human-readable remainder in the text field.
+ * Mentions after the first non-whitespace text stay inline.
+ */
+export function splitLeadingEntityMentions(input: string): {
+  readonly mentions: EntityMentionToken[];
+  readonly text: string;
+} {
+  const tokens = parseTokens(input);
+  const mentions: EntityMentionToken[] = [];
+  let index = 0;
+  for (; index < tokens.length; index += 1) {
+    const token = tokens[index];
+    if (token.type === 'entity') {
+      mentions.push(token);
+      continue;
+    }
+    if (token.type === 'text' && token.value.trim() === '') continue;
+    break;
+  }
+  return {
+    mentions,
+    text: serializeTokens(tokens.slice(index)).trim(),
+  };
 }

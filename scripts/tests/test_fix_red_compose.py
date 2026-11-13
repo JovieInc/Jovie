@@ -12,6 +12,13 @@ def pr(*names, merge="BLOCKED"):
 
 
 class ComposeRouteTest(unittest.TestCase):
+    def test_current_deterministic_leaves_are_preserved_when_main_adds_fixers(self):
+        from fix_red_compose import compose_actions
+
+        leaves = classes.DETERMINISTIC - {classes.ALIAS_ACTION}
+        self.assertEqual(set(compose_actions(sorted(leaves))), leaves)
+        self.assertEqual(compose_actions([classes.ALIAS_ACTION]), [])
+
     def test_a_mixed_agent_head_has_no_leaf_actions(self):
         mixed = classes.classify(pr("A", "B"), {"A": "API rate limit exceeded", "B": "AssertionError"})
         self.assertEqual((mixed["cls"], mixed["action"]), ("mixed", "agent"))

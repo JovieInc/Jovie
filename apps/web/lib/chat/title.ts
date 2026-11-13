@@ -1,4 +1,5 @@
 import { skillById } from '@/lib/commands/registry';
+import { stripMachineContextFromTitle } from './machine-context';
 import { parseTokens } from './tokens';
 
 const DEFAULT_MAX_TITLE_LENGTH = 80;
@@ -26,7 +27,7 @@ function stripResidualTokenSyntax(value: string): string {
     .replaceAll(/\/skill:[A-Za-z]\w*/g, ' ')
     .replaceAll(/\bskill\b/gi, ' ')
     .replaceAll(
-      /@(release|artist|track|event):[^\s[\]]+\[((?:\\.|[^\]\\])*)\]/g,
+      /@(release|artist|track|event|profile):[^\s[\]]+\[((?:\\.|[^\]\\])*)\]/g,
       '$2'
     )
     .replaceAll(/[\\/[\]{}]+/g, ' ');
@@ -49,7 +50,7 @@ export function sanitizeConversationTitle(
   value: string | null | undefined,
   maxLength = DEFAULT_MAX_TITLE_LENGTH
 ): string | null {
-  const input = value?.trim();
+  const input = value ? stripMachineContextFromTitle(value.trim()) : '';
   if (!input) return null;
 
   const rendered = parseTokens(input)
