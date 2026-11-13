@@ -381,6 +381,88 @@ class AdditiveStatementMergeTest(unittest.TestCase):
     def conflict(ours, theirs, base=""):
         return f"<<<<<<< HEAD\n{ours}||||||| base\n{base}=======\n{theirs}>>>>>>> main\n"
 
+    def test_unions_named_import_additions_against_the_actual_base(self):
+        base = "import { describe, expect, it, vi } from 'vitest';\n"
+        ours = "import { afterEach, describe, expect, it, vi } from 'vitest';\n"
+        extra = "import { HOME_MARKETING_HEADER_CTA } from '@/data/marketing/headerCta';\n"
+        theirs = base + extra
+        self.assertEqual(statements.resolve_additive_statements_text(
+            self.conflict(ours, theirs, base)),
+            "import { describe, expect, it, vi, afterEach } from 'vitest';\n" + extra)
+
+    def test_named_import_deletions_aliases_and_binding_collisions_stay_unresolved(self):
+        base = "import { describe, it } from 'vitest';\n"
+        added = "import { describe, it, expect } from 'vitest';\n"
+        for ours, theirs in (
+            ("import { describe, afterEach } from 'vitest';\n", added),
+            (added, "import { it, beforeEach } from 'vitest';\n"),
+            ("import { describe, it, expect as check } from 'vitest';\n", added),
+            ("import type { describe, it } from 'vitest';\n", added),
+            (added, base + "import { expect } from 'other';\n"),
+            (base + "import { afterEach } from 'vitest';\n", added),
+            (base + "const extra = 1;\n", added),
+            (base.replace("vitest", "other"), added),
+            ("import { describe, it, it } from 'vitest';\n", added),
+        ):
+            with self.subTest(ours=ours, theirs=theirs):
+                self.assertIsNone(statements.resolve_additive_statements_text(
+                    self.conflict(ours, theirs, base)))
+        self.assertIsNone(statements.resolve_additive_statements_text(
+            self.conflict(added, base, base) + self.conflict("changed\n", "other\n", "old\n")))
+
+    def test_refuses_collisions_outside_the_hunk_and_existing_module_reorders(self):
+        base = "import { describe, it } from 'vitest';\n"
+        ours = "import { describe, it, afterEach } from 'vitest';\n"
+        theirs = "import { describe, it, beforeEach } from 'vitest';\n"
+        conflict = self.conflict(ours, theirs, base)
+        for context in (
+            "import { afterEach } from './helper';\n",
+            "import afterEach from './helper';\n",
+            "import { helper as afterEach } from './helper';\n",
+            "const afterEach = () => {};\n",
+            self.conflict("import { afterEach } from './helper';\n", ""),
+        ):
+            with self.subTest(context=context):
+                self.assertIsNone(statements.resolve_additive_statements_text(conflict + context))
+        alpha = "import { alpha } from './alpha';\n"
+        beta = "import { beta } from './beta';\n"
+        self.assertIsNone(statements.resolve_additive_statements_text(self.conflict(
+            beta.replace('beta }', 'beta, headBeta }') + alpha.replace('alpha }', 'alpha, headAlpha }'),
+            alpha.replace('alpha }', 'alpha, mainAlpha }') + beta.replace('beta }', 'beta, mainBeta }'),
+            alpha + beta)))
+
+    def test_real_git_named_import_conflict_uses_the_existing_file_resolver(self):
+        with tempfile.TemporaryDirectory() as scratch:
+            work = Path(scratch)
+            def sh(args, **kwargs):
+                return subprocess.run(args, cwd=work, capture_output=True, text=True)
+            def git(*args):
+                result = sh(["git", *args])
+                self.assertEqual(result.returncode, 0, result.stderr)
+            git("init", "-q", "-b", "main")
+            git("config", "user.name", "Test")
+            git("config", "user.email", "test@example.test")
+            git("config", "commit.gpgsign", "false")
+            git("config", "core.hooksPath", str(work / "hooks"))
+            rel = "apps/web/app/(home)/layout.hydration.test.tsx"
+            target = work / rel
+            target.parent.mkdir(parents=True)
+            def save(text):
+                target.write_text(text)
+                git("add", rel)
+                git("commit", "-qm", "fixture")
+            base = "import { describe, it } from 'vitest';\n"
+            save(base)
+            git("branch", "feature")
+            save("import { describe, it, expect } from 'vitest';\n")
+            git("checkout", "-q", "feature")
+            save("import { afterEach, describe, it } from 'vitest';\n")
+            self.assertEqual(sh(["git", "merge", "--no-commit", "main"]).returncode, 1)
+            self.assertEqual(edits.resolve_additive_statement_file(work, rel, sh),
+                             "import { describe, it, expect, afterEach } from 'vitest';\n")
+            self.assertIn("<<<<<<<", target.read_text())
+            self.assertIsNone(edits.resolve_additive_statement_file(work, "README.md", sh))
+
     def test_unions_empty_base_statements_in_main_order(self):
         ours = (
             "const mockSweepLegacySlugs = vi.hoisted(() =>\n"
@@ -416,6 +498,37 @@ class AdditiveStatementMergeTest(unittest.TestCase):
         )
         merged = statements.resolve_additive_statements_text(text)
         self.assertEqual(merged, "before\n" + theirs + ours + "middle\n" + mock_theirs + mock_ours + "after\n" + expect_theirs + expect_ours)
+
+    def test_unions_an_import_and_accepts_route_group_paths(self):
+        imported = "import { getRequestSession } from '@/lib/auth/request-session';\n"
+        mocks = (
+            "const winbackMocks = vi.hoisted(() => ({ resolveWinbackResumeToken: vi.fn() }));\n"
+            "vi.mock('@/lib/waitlist/winback-resume.server', () => ({\n"
+            "  resolveWinbackResumeToken: winbackMocks.resolveWinbackResumeToken,\n"
+            "}));\n"
+        )
+        merge = statements.resolve_additive_statements_text
+        self.assertEqual(merge(self.conflict(imported, mocks)), mocks + imported)
+        self.assertEqual(merge(self.conflict(imported, imported)), imported)
+        self.assertIsNone(merge(self.conflict(
+            imported, "import { other } from '@/lib/auth/request-session';\n")))
+        self.assertIsNone(merge(self.conflict(
+            "import {\n  getRequestSession,\n} from '@/lib/auth/request-session';\n", mocks)))
+        calls = []
+
+        def sh(args, **_kwargs):
+            calls.append(args)
+            return SimpleNamespace(returncode=1, stdout="")
+
+        for rel in (
+            "apps/web/app/(dynamic)/start/page.test.ts",
+            "apps/web/app/[username]/page.test.tsx",
+            "apps/web/app/(.)photo/page.test.ts",
+            "README.md",
+        ):
+            calls.clear()
+            self.assertIsNone(edits.resolve_additive_statement_file(Path("."), rel, sh))
+            self.assertEqual(bool(calls), rel != "README.md")
 
     def test_edits_control_flow_and_unknown_shapes_stay_unresolved(self):
         added = "const head = vi.fn();\n"

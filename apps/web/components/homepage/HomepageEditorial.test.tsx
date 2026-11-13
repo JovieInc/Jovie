@@ -1,7 +1,6 @@
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
-import { ARTIST_PROFILE_COPY } from '@/data/artistProfileCopy';
 import {
   HOMEPAGE_EDITORIAL_COPY,
   HOMEPAGE_INVITE_ANCHOR,
@@ -47,7 +46,7 @@ describe('HomepageEditorial chapters', () => {
     ).toHaveAttribute('id', 'home-hero-heading');
     expect(screen.getByTestId('homepage-primary-cta')).toHaveAttribute(
       'href',
-      `#${HOMEPAGE_INVITE_ANCHOR}`
+      getClaimProfileIntent().href
     );
     expect(screen.getByTestId('homepage-hero-live-profile')).toHaveAttribute(
       'href',
@@ -57,6 +56,18 @@ describe('HomepageEditorial chapters', () => {
       screen.getByRole('img', { name: COPY.hero.windowLabel })
     ).toBeInTheDocument();
     await expectNoA11yViolations(container);
+  });
+
+  it('shows the selected release page beside the app, with no label across the list', () => {
+    const { container } = render(<HomepageStoryHero />);
+
+    const page = container.querySelector('.hv3-lift--page');
+    expect(page).toHaveAttribute('aria-hidden', 'true');
+    expect(page?.querySelector('[data-hv3-anchor="htitle"]')).not.toBeNull();
+    expect(
+      container.querySelector('.hv3-stage--hero [data-hv3-callout]')
+    ).toBeNull();
+    expect(container.querySelector('.hv3-lift--inspector')).toBeNull();
   });
 
   it('indexes every chapter and reaches the hero actions by keyboard', async () => {
@@ -111,69 +122,36 @@ describe('HomepageEditorial chapters', () => {
     await expectNoA11yViolations(container);
   });
 
-  it('closes on the invite form and the three numbered steps', async () => {
+  it('closes on the claim action and the three numbered steps', async () => {
     const { container } = render(<HomepageInviteClose />);
 
     const section = screen.getByTestId('marketing-section-cta');
     expect(section).toHaveAttribute('id', HOMEPAGE_INVITE_ANCHOR);
-    expect(
-      screen.getAllByRole('button', { name: COPY.invite.action }).length
-    ).toBeGreaterThan(0);
-    const steps = within(section).getAllByRole('listitem');
-    expect(steps).toHaveLength(COPY.invite.steps.length);
-    expect(steps[0]).toHaveTextContent(`01${COPY.invite.steps[0].title}`);
-    await expectNoA11yViolations(container);
-  });
-
-  it('closes on one claim link, with no invitation copy, when the start CTA is forced on', async () => {
     const claim = getClaimProfileIntent();
-    const { container } = render(
-      <>
-        <HomepageStoryHero startCta />
-        <HomepageInviteClose startCta />
-      </>
-    );
-
-    const section = screen.getByTestId('marketing-section-cta');
     expect(
-      within(section).getByRole('heading', {
-        level: 2,
-        name: ARTIST_PROFILE_COPY.finalCta.headline,
-      })
-    ).toBeInTheDocument();
+      within(section).getByRole('link', { name: claim.label })
+    ).toHaveAttribute('href', claim.href);
     expect(
-      within(section).getByText(ARTIST_PROFILE_COPY.finalCta.subhead)
-    ).toBeInTheDocument();
-    const close = within(section).getByTestId('homepage-close-cta');
-    expect(close).toHaveAttribute('href', claim.href);
-    expect(close).toHaveTextContent(claim.label);
-    expect(close).toHaveAttribute('data-analytics-event', claim.eventName);
-    expect(section).toHaveAttribute('id', 'claim-profile');
-    expect(
-      within(
-        screen.getByRole('navigation', { name: COPY.chaptersLabel })
-      ).getByRole('link', { name: /claim/ })
-    ).toHaveAttribute('href', '#claim-profile');
-    // The form, its steps and every invitation word are gone, on both the
-    // close and the hero's chapter index.
-    expect(within(section).queryByRole('button')).not.toBeInTheDocument();
-    expect(within(section).queryByRole('listitem')).not.toBeInTheDocument();
-    expect(container.textContent).not.toMatch(/invit/i);
-    // One primary action on the page: the hero's.
-    expect(
-      container.querySelectorAll('[data-primary-action="true"]')
-    ).toHaveLength(1);
+      within(section).queryByTestId('waitlist-role-form')
+    ).not.toBeInTheDocument();
+    const steps = within(section).getAllByRole('listitem');
+    expect(steps).toHaveLength(COPY.claim.steps.length);
+    expect(steps[0]).toHaveTextContent(`01${COPY.claim.steps[0].title}`);
     await expectNoA11yViolations(container);
   });
 
-  it('keeps the invitation close when the start CTA is forced off', () => {
-    vi.stubEnv('FEATURE_HOMEPAGE_START_CTA', 'true');
+  it('closes on the invite form only while public signup is closed', async () => {
+    vi.stubEnv('FEATURE_PUBLIC_SIGNUP_CLOSED', 'true');
     try {
-      render(<HomepageInviteClose startCta={false} />);
+      const { container } = render(<HomepageInviteClose />);
+      const section = screen.getByTestId('marketing-section-cta');
       expect(
-        screen.getByRole('heading', { level: 2, name: COPY.invite.headline })
-      ).toBeInTheDocument();
-      expect(screen.queryByTestId('homepage-close-cta')).toBeNull();
+        screen.getAllByRole('button', { name: COPY.invite.action }).length
+      ).toBeGreaterThan(0);
+      const steps = within(section).getAllByRole('listitem');
+      expect(steps).toHaveLength(COPY.invite.steps.length);
+      expect(steps[0]).toHaveTextContent(`01${COPY.invite.steps[0].title}`);
+      await expectNoA11yViolations(container);
     } finally {
       vi.unstubAllEnvs();
     }
@@ -221,30 +199,30 @@ describe('HomepageEditorial chapters', () => {
     await expectNoA11yViolations(container);
   });
 
-  it('keeps the invitation action by default and enters /start when HOMEPAGE_START_CTA is on', async () => {
-    const off = render(<HomepageStoryHero />);
-    const invite = screen.getByTestId('homepage-primary-cta');
-    expect(invite).toHaveAttribute('href', COPY.hero.primaryHref);
-    expect(invite).toHaveTextContent(COPY.hero.primaryAction);
-    expect(screen.getByText(COPY.hero.note)).toBeInTheDocument();
-    off.unmount();
+  it('enters /start by default and keeps the invitation action only while public signup is closed', async () => {
+    const claim = getClaimProfileIntent();
+    const open = render(<HomepageStoryHero />);
+    const start = screen.getByTestId('homepage-primary-cta');
+    expect(start).toHaveAttribute('href', '/start');
+    expect(start).toHaveAttribute('href', claim.href);
+    expect(start).toHaveAttribute('data-primary-action', 'true');
+    expect(start).toHaveTextContent(claim.label);
+    // The note describes the invitation form, so it leaves with that action.
+    expect(screen.queryByText(COPY.hero.note)).not.toBeInTheDocument();
+    expect(screen.getByTestId('homepage-hero-live-profile')).toHaveAttribute(
+      'href',
+      COPY.hero.secondaryHref
+    );
+    await expectNoA11yViolations(open.container);
+    open.unmount();
 
-    vi.stubEnv('FEATURE_HOMEPAGE_START_CTA', 'true');
+    vi.stubEnv('FEATURE_PUBLIC_SIGNUP_CLOSED', 'true');
     try {
-      const claim = getClaimProfileIntent();
-      const { container } = render(<HomepageStoryHero />);
-      const start = screen.getByTestId('homepage-primary-cta');
-      expect(start).toHaveAttribute('href', '/start');
-      expect(start).toHaveAttribute('href', claim.href);
-      expect(start).toHaveAttribute('data-primary-action', 'true');
-      expect(start).toHaveTextContent(claim.label);
-      // The note describes the invitation form, so it leaves with that action.
-      expect(screen.queryByText(COPY.hero.note)).not.toBeInTheDocument();
-      expect(screen.getByTestId('homepage-hero-live-profile')).toHaveAttribute(
-        'href',
-        COPY.hero.secondaryHref
-      );
-      await expectNoA11yViolations(container);
+      render(<HomepageStoryHero />);
+      const invite = screen.getByTestId('homepage-primary-cta');
+      expect(invite).toHaveAttribute('href', COPY.hero.primaryHref);
+      expect(invite).toHaveTextContent(COPY.hero.primaryAction);
+      expect(screen.getByText(COPY.hero.note)).toBeInTheDocument();
     } finally {
       vi.unstubAllEnvs();
     }

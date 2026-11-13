@@ -14,6 +14,10 @@ import type { TourDateViewModel } from '@/lib/tour-dates/types';
 
 export interface PublicProfileFixtureProps {
   readonly displayName?: string;
+  /** Turns fan capture on so the desktop Get-updates/Payments rail mounts. */
+  readonly fanCapture?: boolean;
+  /** Swaps in release titles far wider than any desktop overview column. */
+  readonly longTitles?: boolean;
   readonly longName?: boolean;
   readonly preview?: boolean;
   readonly state?: string;
@@ -30,6 +34,8 @@ export interface PublicProfileFixtureProps {
  */
 export function PublicProfileFixture({
   displayName,
+  fanCapture = false,
+  longTitles = false,
   longName = false,
   preview = false,
   state = 'unclaimed',
@@ -51,7 +57,7 @@ export function PublicProfileFixture({
       socialLinks={[...HOMEPAGE_PROFILE_PREVIEW_SOCIAL_LINKS]}
       contacts={[...HOMEPAGE_PROFILE_PREVIEW_CONTACTS]}
       showPayButton
-      allowFanCapture={false}
+      allowFanCapture={fanCapture}
       latestRelease={HOMEPAGE_PROFILE_PREVIEW_RELEASES.live}
       profileSettings={{ showOldReleases: true }}
       genres={artist.genres ?? []}
@@ -59,7 +65,14 @@ export function PublicProfileFixture({
       pressPhotos={[]}
       allowPhotoDownloads={false}
       tourDates={[...tourDates]}
-      releases={[...HOMEPAGE_PROFILE_PREVIEW_DRAWER_RELEASES]}
+      releases={HOMEPAGE_PROFILE_PREVIEW_DRAWER_RELEASES.map(release =>
+        longTitles
+          ? {
+              ...release,
+              title: `${release.title} (Extended Midnight Radio Orchestra Remix)`,
+            }
+          : release
+      )}
       releaseCredits={[
         {
           role: 'producer',

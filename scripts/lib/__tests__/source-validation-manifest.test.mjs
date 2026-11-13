@@ -60,4 +60,21 @@ describe('Source Validation manifest parity', () => {
       expect(ids).toContain(id);
     expect(selectManifestGuards(['README.md'])).toEqual([]);
   });
+
+  it.each([
+    'apps/web/components/organisms/DesktopTitlebarSlot.tsx',
+    'apps/web/components/organisms/DesktopTitlebarSlot.stories.tsx',
+    'apps/web/app/app/layout.tsx',
+    'packages/ui/atoms/button.tsx',
+    'docs/design-system/component-certification.json',
+    'docs/design-system/cert-screens.json',
+    'scripts/lib/component-certificate.mjs',
+    'scripts/lib/component-cert-screens.mjs',
+  ])('runs the component and screen certificate gate for %s', file => {
+    const gate = selectManifestGuards([file]).find(
+      guard => guard.id === 'component-certificate'
+    );
+    expect(gate?.command).toBe('pnpm component-certificate:gate');
+    expect(gate?.heavy).not.toBe(true);
+  });
 });

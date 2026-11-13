@@ -261,9 +261,13 @@ def _diff3_conflict(worktree: Path, rel: str, sh) -> str | None:
         return probe.stdout
 
 
+# Next.js route groups, dynamic segments, parallel routes and intercepts.
+_TEST_PATH = r"[\w./()[\]@+-]+"
+
+
 def resolve_additive_node_test_file(worktree: Path, rel: str, sh) -> str | None:
     """Use Git's actual three stages to prove test conflicts are insertions only."""
-    if not re.fullmatch(r"[\w./-]+\.(?:test|spec)\.mjs", rel):
+    if not re.fullmatch(_TEST_PATH + r"\.(?:test|spec)\.mjs", rel):
         return None
     conflict = _diff3_conflict(worktree, rel, sh)
     if conflict is None:
@@ -273,7 +277,7 @@ def resolve_additive_node_test_file(worktree: Path, rel: str, sh) -> str | None:
 
 def resolve_additive_statement_file(worktree: Path, rel: str, sh) -> str | None:
     """Union empty-base statement insertions in a Vitest file, proven from Git's three stages."""
-    if not re.fullmatch(r"[\w./-]+\.(?:test|spec)\.tsx?", rel):
+    if not re.fullmatch(_TEST_PATH + r"\.(?:test|spec)\.tsx?", rel):
         return None
     conflict = _diff3_conflict(worktree, rel, sh)
     if conflict is None:

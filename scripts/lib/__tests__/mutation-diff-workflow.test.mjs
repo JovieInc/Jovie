@@ -1,6 +1,15 @@
-import { readFileSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
+import {
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
+import { createRequire } from 'node:module';
+import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 
 const REPO_ROOT = resolve(import.meta.dirname, '..', '..', '..');
 const workflow = readFileSync(
@@ -62,5 +71,120 @@ describe('Mutation Diff Gem contract', () => {
     expect(sweep).toContain('group: mutation-sweep');
     expect(sweep).toContain('cancel-in-progress: false');
     expect(sweep).toContain('scripts/mutation-sweep-preflight.mjs');
+  });
+});
+
+const { load } = createRequire(import.meta.url)('js-yaml');
+const steps = load(
+  readFileSync(
+    resolve(REPO_ROOT, '.github/workflows/component-certificate.yml'),
+    'utf8'
+  )
+).jobs.certify.steps;
+const fixtureRoots = [];
+afterEach(() => {
+  for (const root of fixtureRoots.splice(0))
+    rmSync(root, { recursive: true, force: true });
+});
+
+describe('portable mutation evidence', () => {
+  it('archives relative to the checkout and restores identical scores across runner homes', () => {
+    const root = mkdtempSync(resolve(tmpdir(), 'certificate-cache-'));
+    fixtureRoots.push(root);
+    const producer = load(
+      readFileSync(
+        resolve(REPO_ROOT, '.github/workflows/mutation-diff.yml'),
+        'utf8'
+      )
+    ).jobs.sweep.steps;
+    const stage = producer.find(
+      step => step.name === 'Stage portable sweep state'
+    );
+    const save = producer.find(step => step.name === 'Save sweep state');
+    const restore = steps.find(
+      step => step.name === 'Restore mutation evidence'
+    );
+    const producerRestore = producer.find(
+      step => step.name === 'Restore sweep state'
+    );
+    expect(save.with.path).toBe(restore.with.path);
+    expect(save.with.path).toBe(producerRestore.with.path);
+    expect(save.with.key).toBe(restore.with.key);
+    expect(producerRestore.with['restore-keys'].trim()).toBe(
+      restore.with['restore-keys']
+    );
+    expect(restore.with['restore-keys']).not.toBe('mutation-sweep-state-');
+    const home = resolve(root, 'producer-home');
+    const workspace = resolve(root, 'producer-workspace');
+    const target = resolve(root, 'consumer-workspace');
+    const stateDir = resolve(home, '.local/state/jovie-mutation');
+    mkdirSync(stateDir, { recursive: true });
+    mkdirSync(workspace);
+    mkdirSync(target);
+    const state = JSON.stringify({
+      schemaVersion: 1,
+      modules: {
+        'packages/ui/atoms/badge.tsx': {
+          blob: 'source-and-test-key',
+          sha: 'measured-sha',
+          score: 82,
+          valid: 11,
+        },
+      },
+    });
+    writeFileSync(resolve(stateDir, 'sweep-state.json'), state);
+    const history = '{"durationMs":42}\n';
+    writeFileSync(resolve(stateDir, 'sweep-state.json.runs.jsonl'), history);
+    const run = (command, args, cwd, env = process.env) => {
+      const result = spawnSync(command, args, { cwd, env, encoding: 'utf8' });
+      expect(result.status, result.stdout + result.stderr).toBe(0);
+      return result.stdout;
+    };
+    run('bash', ['-c', stage.run], workspace, { ...process.env, HOME: home });
+    const archive = resolve(root, 'cache.tar');
+    run('tar', ['-cf', archive, save.with.path], workspace);
+    const entries = run('tar', ['-tf', archive], workspace).trim().split('\n');
+    expect(
+      entries.every(path => path.startsWith('.cache/jovie-mutation/'))
+    ).toBe(true);
+    expect(
+      entries.some(path => path.includes('..') || path.includes(home))
+    ).toBe(false);
+    run('tar', ['-xf', archive], target);
+    expect(
+      readFileSync(
+        resolve(target, restore.with.path, 'sweep-state.json'),
+        'utf8'
+      )
+    ).toBe(state);
+    expect(readFileSync(resolve(stateDir, 'sweep-state.json'), 'utf8')).toBe(
+      state
+    );
+    expect(
+      readFileSync(
+        resolve(target, restore.with.path, 'sweep-state.json.runs.jsonl'),
+        'utf8'
+      )
+    ).toBe(history);
+    // An older local HOME must not replace the restored CI cache.
+    writeFileSync(
+      resolve(stateDir, 'sweep-state.json'),
+      '{"older":"local-result"}'
+    );
+    run('bash', ['-c', stage.run], target, { ...process.env, HOME: home });
+    expect(
+      readFileSync(
+        resolve(target, restore.with.path, 'sweep-state.json'),
+        'utf8'
+      )
+    ).toBe(state);
+    expect(
+      producer.find(step => step.name === 'Score the next modules').run
+    ).toContain('state_dir=".cache/jovie-mutation"');
+    expect(stage.run).toContain('flock -n 9');
+    expect(save.if).toContain("steps.portable_state.outcome == 'success'");
+    expect(save.if).toContain(
+      "hashFiles('.cache/jovie-mutation/sweep-state.json')"
+    );
   });
 });

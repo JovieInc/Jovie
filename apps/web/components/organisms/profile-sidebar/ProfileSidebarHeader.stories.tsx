@@ -5,11 +5,17 @@ import { useProfileHeaderParts } from './ProfileSidebarHeader';
 /**
  * Download QR Code fetches the QR image; these stories answer that request
  * so the failure toast shows without leaving the browser.
+ *
+ * The QR image is generated locally (#25170): the component fetches a
+ * `data:` URL carrying the generated PNG. Match on that scheme — the old
+ * `includes('qr')` URL match leaned on the third-party QR service's domain
+ * and silently missed the local payload, so the download succeeded and the
+ * failure toast never rendered.
  */
 function stubQrFetch(respond: () => Promise<Response>) {
   const originalFetch = globalThis.fetch;
   globalThis.fetch = async (input, init) =>
-    String(input).includes('qr') ? respond() : originalFetch(input, init);
+    String(input).startsWith('data:') ? respond() : originalFetch(input, init);
   return () => {
     globalThis.fetch = originalFetch;
   };

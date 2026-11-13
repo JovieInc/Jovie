@@ -1,5 +1,6 @@
 import { render } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { HOME_MARKETING_HEADER_CTA } from '@/data/marketing/headerCta';
 
 const pathnameRef = vi.hoisted(() => ({ current: null as string | null }));
 
@@ -51,25 +52,25 @@ describe('(home) layout hydration', () => {
     expect(await renderHtml(null)).toContain('geist-mono-var home-viewport');
   });
 
-  it('always renders the homepage page-contract marker and the invite CTA', async () => {
+  it('always renders the homepage page-contract marker and the claim CTA', async () => {
     const html = await renderHtml(null);
     expect(html).toContain('data-primary-cta="true"');
-    expect(html).toContain('href="/#request-invite"');
-    expect(html).not.toContain('href="/start"');
+    expect(html).toContain(`href="${HOME_MARKETING_HEADER_CTA.href}"`);
+    expect(html).not.toContain('href="/#request-invite"');
   });
 
-  describe('with HOMEPAGE_START_CTA on', () => {
+  describe('homepage claim intent', () => {
     afterEach(() => {
       vi.unstubAllEnvs();
       vi.resetModules();
     });
 
-    async function renderFlaggedHtml() {
+    async function renderFreshLayout() {
       vi.resetModules();
       pathnameRef.current = null;
-      const { default: FlaggedLayout } = await import('./layout');
+      const { default: FreshLayout } = await import('./layout');
       const { container, unmount } = render(
-        await FlaggedLayout({ children: <p>hero</p> })
+        await FreshLayout({ children: <p>hero</p> })
       );
       const html = container.innerHTML;
       unmount();
@@ -77,8 +78,7 @@ describe('(home) layout hydration', () => {
     }
 
     it('points the header action and the page-contract marker at the claim intent', async () => {
-      vi.stubEnv('FEATURE_HOMEPAGE_START_CTA', 'true');
-      const html = await renderFlaggedHtml();
+      const html = await renderFreshLayout();
       const { getClaimProfileIntent } = await import(
         '@/data/marketingCtaIntents'
       );
@@ -90,12 +90,11 @@ describe('(home) layout hydration', () => {
       expect(html).not.toMatch(/request an invite/i);
     });
 
-    it('keeps the invite action while public signup is closed', async () => {
-      vi.stubEnv('FEATURE_HOMEPAGE_START_CTA', 'true');
+    it('keeps the shared claim entry while /start owns the closed-signup gate', async () => {
       vi.stubEnv('FEATURE_PUBLIC_SIGNUP_CLOSED', 'true');
-      const html = await renderFlaggedHtml();
-      expect(html).toContain('href="/#request-invite"');
-      expect(html).not.toContain('href="/start"');
+      const html = await renderFreshLayout();
+      expect(html).toContain(`href="${HOME_MARKETING_HEADER_CTA.href}"`);
+      expect(html).not.toContain('href="/#request-invite"');
     });
   });
 });
