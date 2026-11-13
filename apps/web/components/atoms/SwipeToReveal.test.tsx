@@ -112,29 +112,45 @@ describe('SwipeToReveal gestures', () => {
   it('keeps only the latest row open in a swipe group', async () => {
     const firstClose = vi.fn();
     render(
-      <SwipeToRevealGroup>
-        <SwipeToReveal
-          forceEnabled
-          itemId='first'
-          onClose={firstClose}
-          actions={<Button>Edit Spotify</Button>}
-        >
-          <span>Spotify</span>
-        </SwipeToReveal>
-        <SwipeToReveal
-          forceEnabled
-          itemId='second'
-          actions={<Button>Edit Apple Music</Button>}
-        >
-          <span>Apple Music</span>
-        </SwipeToReveal>
-      </SwipeToRevealGroup>
+      <div onTouchStart={event => event.stopPropagation()}>
+        <SwipeToRevealGroup>
+          <SwipeToReveal
+            forceEnabled
+            itemId='first'
+            onClose={firstClose}
+            actions={<Button>Edit Spotify</Button>}
+          >
+            <span>Spotify</span>
+          </SwipeToReveal>
+          <SwipeToReveal
+            forceEnabled
+            itemId='second'
+            actions={<Button>Edit Apple Music</Button>}
+          >
+            <span>Apple Music</span>
+          </SwipeToReveal>
+        </SwipeToRevealGroup>
+      </div>
     );
     swipe(screen.getByText('Spotify'), -60);
     expect(
       screen.getByRole('button', { name: 'Edit Spotify' })
     ).toBeInTheDocument();
-    swipe(screen.getByText('Apple Music'), -60);
+    const secondRow = screen.getByText('Apple Music');
+    // The parent stops the document's outside-touch listener, so only the
+    // group's open-row change can dismiss the first row in this test.
+    fireEvent.touchStart(secondRow, {
+      touches: [{ clientX: 200, clientY: 50 }],
+    });
+    expect(firstClose).not.toHaveBeenCalled();
+    expect(
+      screen.getByRole('button', { name: 'Edit Spotify' })
+    ).toBeInTheDocument();
+    clock += 500;
+    fireEvent.touchMove(secondRow, {
+      touches: [{ clientX: 140, clientY: 50 }],
+    });
+    fireEvent.touchEnd(secondRow);
     await finishClosing('Edit Spotify');
     expect(firstClose).toHaveBeenCalledOnce();
     expect(screen.queryByRole('button', { name: 'Edit Spotify' })).toBeNull();
