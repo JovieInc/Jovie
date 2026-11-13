@@ -78,9 +78,44 @@ npx -y @jovie/cli report feedback --title "<one line>" --details "<what was conf
 Returns \`{"reportId":"..."}\`. Never include secrets, tokens, or private user data
 in a report. The CLI only attaches its version, platform, and runtime.
 
+## Golden path (claim, onboard, publish, share, upgrade)
+
+Walk an artist from a Spotify identity to a claimed, published profile. Every
+step needs the private draft_id/draft_token from \`creator lookup\` ->
+\`artist.search_or_import\` -> \`workspace.create_draft\` (MCP) — the CLI
+holds no state, so pass \`--draft-id\` and \`--draft-token\` on each step
+and never share the token.
+
+\`\`\`sh
+npx -y @jovie/cli claim handle <handle> --draft-id <id> --draft-token <token> --json
+npx -y @jovie/cli onboarding answer --question lastGrowthAttempt --answer "..." --draft-id <id> --draft-token <token> --json
+npx -y @jovie/cli onboarding answer --question promoSpend --answer under_50 --draft-id <id> --draft-token <token> --json
+npx -y @jovie/cli onboarding qualify --draft-id <id> --draft-token <token> --json
+npx -y @jovie/cli onboarding setup --draft-id <id> --draft-token <token> --json
+npx -y @jovie/cli onboarding publish --draft-id <id> --draft-token <token> --json
+\`\`\`
+
+- The Mom Test questions, verbatim: "What's the last thing you did to grow
+  your fans, and how did it go?" and "What do you pay each month to promote
+  your music?" (answer: none, under_50, or 50_plus). Ask in your own voice;
+  never lead or ask willingness-to-pay.
+- \`onboarding qualify\` returns qualified or queued. When queued, show the
+  returned message exactly: it is the locked not-qualified line.
+- \`onboarding publish\` never publishes: show the returned claim_url so the
+  artist signs in on Jovie and publishes from their dashboard. Nothing is
+  public until they publish it.
+- After the artist publishes: \`npx -y @jovie/cli profile share <username> --json\`
+  returns the public URL plus a share line, and
+  \`npx -y @jovie/cli profile upgrade --draft-id <id> --draft-token <token> --json\`
+  returns the checkout entry. Plans and prices are shown on Jovie; never
+  state a price yourself.
+
 ## MCP
 
 The same tools are available as an MCP server: \`npx -y @jovie/cli mcp\`
-(stdio). Tools: lookup_creator, create_profile, get_artist, get_artist_guide, get_openapi,
-get_docs, report_issue, report_feedback.
+(stdio) and at \`https://jov.ie/api/mcp\` (HTTP). Tools: lookup_creator,
+create_profile, get_artist, get_artist_guide, get_openapi,
+get_docs, report_issue, report_feedback, claim_handle,
+answer_onboarding_question, get_qualification, build_profile, publish_profile,
+share_profile, start_upgrade.
 `;

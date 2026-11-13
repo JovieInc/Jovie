@@ -112,6 +112,7 @@ describe('feature flag registry integrity', () => {
             'RELEASE_PLAN_DEMO',
             'VISIBILITY_AUDIT_OFFER',
             'OVIE_FLEET_ROOM',
+            'OUTBOUND_DOGFOOD_GATE',
           ].includes(name)
       )
       .map(([, value]) => value);
@@ -126,6 +127,7 @@ describe('feature flag registry integrity', () => {
     expect(APP_FLAG_DEFAULTS.VISIBILITY_AUDIT_OFFER).toBe(false);
     // Ovie-only surface: off for customers, on for admins via the admin rule.
     expect(APP_FLAG_DEFAULTS.OVIE_FLEET_ROOM).toBe(false);
+    expect(APP_FLAG_DEFAULTS.OUTBOUND_DOGFOOD_GATE).toBe(false);
   });
 
   it('keeps all runtime app-flag references registered', () => {

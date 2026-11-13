@@ -85,6 +85,8 @@ export const APP_FLAG_DEFAULTS = {
    * rule, so only Ovie operators see it. An env override false stops it.
    */
   OVIE_FLEET_ROOM: false,
+  /** JOV-12380: draft visibility only; no outbound send authority. */
+  OUTBOUND_DOGFOOD_GATE: false,
 } as const;
 
 export type AppFlagName = keyof typeof APP_FLAG_DEFAULTS;
@@ -117,6 +119,7 @@ export const APP_FLAG_KEYS = {
   CREATOR_FINANCE: 'creator_finance',
   VISIBILITY_AUDIT_OFFER: 'visibility_audit_offer',
   OVIE_FLEET_ROOM: 'ovie_fleet_room',
+  OUTBOUND_DOGFOOD_GATE: 'outbound_dogfood_gate',
 } as const satisfies Record<AppFlagName, string>;
 
 export const APP_FLAG_OVERRIDE_KEYS = {
@@ -144,6 +147,7 @@ export const APP_FLAG_OVERRIDE_KEYS = {
   CREATOR_FINANCE: 'code:CREATOR_FINANCE',
   VISIBILITY_AUDIT_OFFER: 'code:VISIBILITY_AUDIT_OFFER',
   OVIE_FLEET_ROOM: 'code:OVIE_FLEET_ROOM',
+  OUTBOUND_DOGFOOD_GATE: 'code:OUTBOUND_DOGFOOD_GATE',
 } as const satisfies Record<AppFlagName, string>;
 
 export const APP_FLAG_TO_STATSIG_GATE = {
@@ -196,6 +200,8 @@ export const APP_FLAG_DESCRIPTIONS = {
     'Anonymous agent profile creation via POST /api/agents/profiles (public CLI/MCP write path).',
   CREATOR_FINANCE:
     'Creator Financial Health owner-only surfaces (JOV-4621). Release-blocking gate — stays off until the privacy/correctness matrix is certified.',
+  OUTBOUND_DOGFOOD_GATE:
+    'Require verified onboarding and profile judge evidence before exposing outbound drafts (JOV-12380). Default on only in tests.',
   VISIBILITY_AUDIT_OFFER:
     'Hidden unless the flag and a Stripe Payment Link are both set.',
   OVIE_FLEET_ROOM:
@@ -250,6 +256,8 @@ export const APP_FLAG_REMOVAL_CONDITIONS = {
     'Retain while the anonymous public write path needs an abuse stop control.',
   CREATOR_FINANCE:
     'Remove when the JOV-4621 release gate is certified and financial access no longer needs a fleet-wide stop control.',
+  OUTBOUND_DOGFOOD_GATE:
+    'Remove after the claim-link loop is certified and draft gating is permanently enabled (JOV-12379).',
   VISIBILITY_AUDIT_OFFER: 'Remove when the audit checkout is retired.',
   OVIE_FLEET_ROOM:
     'Remove when the fleet room is the permanent Ovie Fleet view or retired.',
@@ -319,6 +327,7 @@ export const LOCAL_DEFAULT_ONLY_FLAGS = new Set<AppFlagName>([
   'PAID_WELCOME_EMAIL', // JOV-6445 external-recipient send; founder-gated default off, no Statsig gate
   'AGENT_PROFILE_CREATE', // public agent write-path kill switch; env/admin override, no Statsig gate
   'CREATOR_FINANCE', // JOV-4621 release gate; env/admin override + FINANCE_DISABLE kill switch, no Statsig gate
+  'OUTBOUND_DOGFOOD_GATE', // JOV-12380: local default off; audited override, no remote gate
   'VISIBILITY_AUDIT_OFFER', // default off; no Statsig gate
   'OVIE_FLEET_ROOM', // Ovie-only admin surface; admin default-true + env stop, no Statsig gate
 ]);
