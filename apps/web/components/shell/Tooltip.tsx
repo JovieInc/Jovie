@@ -92,47 +92,20 @@ function getTriggerChild({
   children,
   className,
   block,
-  onTriggerIntent,
-  triggerRef,
-}: Pick<TooltipProps, 'children' | 'className' | 'block'> & {
-  readonly onTriggerIntent?: (target: HTMLElement) => void;
-  readonly triggerRef?: (node: HTMLElement | null) => void;
-}) {
+}: Pick<TooltipProps, 'children' | 'className' | 'block'>) {
   if (Children.count(children) === 1) {
     const onlyChild = Children.only(children);
     if (isElementWithClassName(onlyChild)) {
       return cloneElement(onlyChild, {
         className: cn(onlyChild.props.className, className),
-        ref: (node: HTMLElement | null) => {
-          triggerRef?.(node);
-          const existingRef = onlyChild.props.ref;
-          if (typeof existingRef === 'function') {
-            existingRef(node);
-          } else if (existingRef && typeof existingRef === 'object') {
-            (existingRef as { current: HTMLElement | null }).current = node;
-          }
-        },
-        // Measure on the interactive child (button/link) — not a static wrapper.
-        onPointerEnter: (event: PointerEvent<HTMLElement>) => {
-          onlyChild.props.onPointerEnter?.(event);
-          onTriggerIntent?.(event.currentTarget);
-        },
-        onFocus: (event: FocusEvent<HTMLElement>) => {
-          onlyChild.props.onFocus?.(event);
-          onTriggerIntent?.(event.currentTarget);
-        },
       });
     }
   }
 
-  // Non-element / multi-child fallback: layout wrapper only. Seam offset is
-  // measured via ref callback (no pointer/focus handlers on a static span).
-  // Handlers on a static <span> would trip a11y noStaticElementInteractions.
+  // Non-element / multi-child fallback: layout wrapper only. The seam offset
+  // is measured from the trigger's own pointer and focus events.
   return (
-    <span
-      ref={triggerRef}
-      className={cn(block ? 'flex w-full' : 'inline-flex', className)}
-    >
+    <span className={cn(block ? 'flex w-full' : 'inline-flex', className)}>
       {children}
     </span>
   );
@@ -158,6 +131,12 @@ export function Tooltip({
   useLayoutEffect(() => {
     if (disabled || touchActive) setHintOpen(false);
   }, [disabled, touchActive]);
+  // A forced-closed tooltip (`open={false}`) holds no latent intent: when the
+  // owner releases it (sidebar collapse flips the label), it needs a fresh
+  // hover or focus instead of popping open with no pointer on it.
+  useLayoutEffect(() => {
+    if (open === false) setHintOpen(false);
+  }, [open]);
   const onPointerInput = useCallback((event: PointerEvent<HTMLElement>) => {
     touchInput.current = event.pointerType === 'touch';
     setTouchActive(touchInput.current);
@@ -174,22 +153,13 @@ export function Tooltip({
   }, [touchActive, onKeyboardInput]);
   const [seamOffset, setSeamOffset] = useState<number | null>(null);
 
-  // Measured on hover/focus of the interactive trigger (just before Radix
-  // opens) so the offset tracks the live layout without observers.
-  const handleTriggerIntent = useCallback(
+  // Measured on pointer or focus intent on the trigger, just before Radix
+  // opens. Measuring from a ref callback ran getBoundingClientRect (a forced
+  // layout) and a state update in the commit of every right-side tooltip, on
+  // every render, inside the cold-load hydration task.
+  const measureSeam = useCallback(
     (target: HTMLElement) => {
-      if (side !== 'right') return;
-      setSeamOffset(getSeamSideOffset(target));
-    },
-    [side]
-  );
-
-  // Fallback path (non-single-element children): measure when the wrapper
-  // mounts/updates. Prefer the single-child path above for interactive rows.
-  const triggerRef = useCallback(
-    (node: HTMLElement | null) => {
-      if (!node || side !== 'right') return;
-      setSeamOffset(getSeamSideOffset(node));
+      if (side === 'right') setSeamOffset(getSeamSideOffset(target));
     },
     [side]
   );
@@ -198,8 +168,6 @@ export function Tooltip({
     children,
     className,
     block,
-    onTriggerIntent: side === 'right' ? handleTriggerIntent : undefined,
-    triggerRef: side === 'right' ? triggerRef : undefined,
   });
 
   const sideOffset =
@@ -210,13 +178,19 @@ export function Tooltip({
       <TooltipRoot
         open={!disabled && !touchActive && (open ?? hintOpen)}
         onOpenChange={value =>
-          setHintOpen(!disabled && !touchInput.current && value)
+          setHintOpen(
+            open !== false && !disabled && !touchInput.current && value
+          )
         }
       >
         <TooltipTrigger
           asChild
-          onPointerEnter={onPointerInput}
+          onPointerEnter={event => {
+            onPointerInput(event);
+            measureSeam(event.currentTarget);
+          }}
           onPointerDown={onPointerInput}
+          onFocus={event => measureSeam(event.currentTarget)}
           onKeyDown={onKeyboardInput}
         >
           {triggerChild}

@@ -47,6 +47,10 @@ vi.mock('@/lib/synthetic/passage-token.server', () => ({
 vi.mock('@/lib/onboarding/start-entry-profile.server', () => ({
   resolveStartEntryProfile: vi.fn().mockResolvedValue(null),
 }));
+vi.mock('@/lib/waitlist/winback-resume.server', () => ({
+  resolveWinbackResumeToken: vi.fn().mockResolvedValue(null),
+  recordWinbackResumeClick: vi.fn().mockResolvedValue(undefined),
+}));
 
 vi.mock('@/components/features/onboarding/OnboardingSessionBoundary', () => ({
   OnboardingSessionBoundary: ({
@@ -92,8 +96,8 @@ describe('/start page', () => {
   afterEach(() => vi.unstubAllEnvs());
 
   beforeEach(() => {
-    // These fixtures exercise the explicit-reopen path; closed defaults are covered separately.
-    vi.stubEnv('FEATURE_PUBLIC_SIGNUP_CLOSED', 'false');
+    // These fixtures exercise the open default (Tim, 2026-11-09); the closed
+    // kill switch is covered in public-signup-closed.test.tsx.
     redirectMock.mockClear();
     getWaitlistAccessMock.mockReset();
     getWaitlistAccessMock.mockResolvedValue({ entryId: null, status: null });

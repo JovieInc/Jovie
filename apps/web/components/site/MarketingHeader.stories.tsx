@@ -58,3 +58,54 @@ export const PublishedChrome: Story = {
     </div>
   ),
 };
+
+/**
+ * Empty: a page passes no nav links. The header keeps the mark and the auth
+ * actions and draws no empty nav row or menu button.
+ */
+export const EmptyNavLinks: Story = {
+  render: () => (
+    <div className='min-h-40 bg-base'>
+      <MarketingHeader variant='landing' navLinks={[]} />
+    </div>
+  ),
+};
+
+/**
+ * Partial: the page withholds the primary CTA (the invite-only homepage keeps
+ * its one action in the hero), so only Log in remains beside the mark.
+ */
+export const PartialLogInOnly: Story = {
+  render: () => (
+    <div className='min-h-40 bg-base'>
+      <MarketingHeader variant='landing' navLinks={[]} hidePrimaryCta />
+    </div>
+  ),
+};
+
+/** Long content: a long primary CTA label beside Log in on a narrow bar. */
+export const LongContentCtaLabel: Story = {
+  render: () => (
+    <div className='min-h-40 bg-base'>
+      <MarketingHeader
+        variant='landing'
+        primaryCta={{
+          href: '/#request-invite',
+          label: 'Request an invite to set up your page in the next wave',
+        }}
+      />
+    </div>
+  ),
+};
+
+/** Right-to-left: the landing header inside an RTL document. */
+export const RtlArabicCta: Story = {
+  render: () => (
+    <div dir='rtl' className='min-h-40 bg-base'>
+      <MarketingHeader
+        variant='landing'
+        primaryCta={{ href: '/#request-invite', label: 'اطلب دعوة' }}
+      />
+    </div>
+  ),
+};

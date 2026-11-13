@@ -386,8 +386,8 @@ function buildDropdownItems({
       render: () => (
         <div className='cursor-default px-2.5 py-2 text-app h-9'>
           <div className='flex w-full items-center gap-2.5'>
-            <div className='h-4 w-4 animate-pulse motion-reduce:animate-none rounded bg-white/10' />
-            <div className='h-3 w-20 animate-pulse motion-reduce:animate-none rounded bg-white/10' />
+            <div className='h-4 w-4 animate-pulse motion-reduce:animate-none rounded bg-on-media/10' />
+            <div className='h-3 w-20 animate-pulse motion-reduce:animate-none rounded bg-on-media/10' />
           </div>
         </div>
       ),
@@ -654,12 +654,12 @@ export function UserButton({
           calm && 'h-8'
         )}
       >
-        <div className='h-6 w-6 shrink-0 rounded-full bg-sidebar-accent animate-pulse motion-reduce:animate-none' />
+        <div className='h-6 w-6 shrink-0 rounded-full bg-interactive-hover animate-pulse motion-reduce:animate-none' />
         <div
           data-user-button-loading-copy
           className={cn('flex-1', SHELL_RAIL_STAGE)}
         >
-          <div className='h-3 w-20 rounded-sm bg-sidebar-accent animate-pulse motion-reduce:animate-none' />
+          <div className='h-3 w-20 rounded-sm bg-interactive-hover animate-pulse motion-reduce:animate-none' />
         </div>
       </div>
     ) : (

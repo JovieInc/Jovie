@@ -3,7 +3,7 @@
 Status: Canon
 Inherits: [`ENGINEERING.md`](./ENGINEERING.md)
 Owner: Summer
-Last updated: 2026-10-31
+Last updated: 2026-11-11
 Source: merge-queue steward session 2026-10-31 (gbrain `ops/merge-queue-steward-2026-10-31`)
 
 The merge queue is Jovie's shipping bottleneck when merge groups fail, not when CI is slow.
@@ -28,7 +28,8 @@ a group runs about 47). Raising it starves groups. It is not a tuning knob (#240
 
 ## Invariants
 
-1. **Never jump the queue.** Re-enqueue only at the back.
+1. **Never jump the queue.** Re-enqueue only at the back. The one exception is a revert of a named
+   culprit commit (see [Revert first](#revert-first)): it carries `compounding` and Green Enroll jumps it.
 2. **Dequeue only a proven culprit.** Proof means a reproduction: the failing signal passes on
    `origin/main` and fails on `origin/main` plus the candidate PR, in a scratch worktree. Log
    similarity is not proof.
@@ -37,6 +38,31 @@ a group runs about 47). Raising it starves groups. It is not a tuning knob (#240
 4. **A signal that also failed in a group without the PR is not that PR's culprit.** Treat it
    as a flake or base-branch class: re-enqueue the PR at the back and fix the signal.
 5. **Owner boundaries hold.** If a culprit belongs to another agent's lane, comment and stop.
+
+## Revert first
+
+When main is red and a culprit commit is named, restore the last good state first and diagnose
+after. On 2026-09-21 a Dependabot bump of the Vercel CLI froze production for 5 days and 573
+commits while six stacked defects were fixed forward one at a time; on 2026-10-31 and 2026-11-10 the
+forward fix queued behind the stall it was fixing. A revert is minutes.
+
+1. **A named culprit gets a revert PR within 15 minutes, automatically.** A culprit is named when
+   Main Health's first red push run is exactly one commit on top of its last green run
+   (`scripts/lanes/revert_first.py`), or when the merge-group ejector attributes it
+   (`scripts/lib/main-red-eject.mjs`). `main-red-eject.yml` opens it under the Jovie Bot
+   (`scripts/main_health_revert.py` for Main Health, `scripts/main-red-eject.mjs` for merge groups),
+   labeled `compounding` and `main-red-revert` so Green Enroll jumps it to the head of the queue once its
+   checks pass, and the original change is re-landed as a repair PR once the revert merges.
+2. **A forward fix replaces the revert only if it lands first.** An open fix PR never holds the revert
+   back. When the fix lands and main is green again, the revert is closed as superseded.
+3. **Dependency bumps are always reverted, never debugged in place.** Dependabot or Renovate bumps
+   the pin again later, against a green main.
+4. **No culprit, no revert.** A red on an unchanged commit (a test that expired by the clock, a tool
+   or environment break) has nothing to revert; it goes to the remediation intake and a fix lane.
+5. **Every incident record states when the revert opened, or why no culprit existed**
+   (`revert_opened` in [`docs/postmortems/TEMPLATE.md`](../docs/postmortems/TEMPLATE.md)).
+
+A revert is never reverted again, and one revert per culprit is in flight at a time.
 
 ## Culprit triage (within 15 minutes of a group failure)
 
@@ -62,15 +88,18 @@ Every culprit or flake is a class until a guard makes it impossible to reach the
 
 | Class | Guard home | Example (2026-10-31) |
 |---|---|---|
-| Main-dependent drift (baseline, census, ratchet, registry) | `scripts/lib/queue-drift-guards.json`, run by the pre-enroll drift precheck | `postmortem-class-actions` added after #23978 |
+| Main-dependent drift (baseline, census, ratchet, registry) | `scripts/lib/queue-drift-guards.json` lists every baseline with its semantic. Use `scripts/lib/shrink-only-baseline.mjs` (growth fails, a shrink passes, `node scripts/baselines-tighten.mjs` lowers it later) or one entry per file | 2026-11: design-noise, marketing invariants, offer and stat claims (baseline class: 94 of 322 failed groups in 7 days) |
 | PR-level check that only ran in the queue | Move the check onto the PR (path-scoped) | #24057 runs the staged-release proof on PRs that change a release test |
 | Pre-push parity gap | `scripts/lib/source-validation-manifest.mjs`, run by pre-push | #24046 |
 | Load-sensitive timeout | Per-test timeout or cheaper fixture, assertions unchanged | #24077 (ci-fast-lanes Mac discovery) |
 | Staged bundle reads an unshipped file | Self-contained test or `RELEASE_EXTRAS` | #23706 fix 048709a4 |
 
 A new class needs, in one PR: the guard, a test that fails without it, and a row in this table.
-Check first whether `queue-drift-guards.json` already covers the signal; the precheck test fails
-when a baseline-class script is neither listed nor exempt with a reason.
+Check first whether `queue-drift-guards.json` already covers the signal;
+`scripts/lib/__tests__/queue-drift-guards.test.mjs` fails when a tracked baseline file is not
+listed there. Entries under `exactMatch` or `unreviewed` can still fail a combined head:
+migrate one when it shows up in a failed group. There is no pre-enroll drift precheck; combine
+safety comes from the baseline semantic, not from re-running guards before enrollment.
 
 ## Automation
 
@@ -79,9 +108,12 @@ What the machines already do, so the steward does not repeat it:
 - `merge-group-failure-hold` classifies each failed group (`deterministic-source`,
   `retryable-product`, `transient-infrastructure`, `base-branch`, `unclassified`), holds
   culprits, retries bounded infrastructure failures once, and uses ahead-run attribution.
-- `main-red-eject` dequeues a failing head when main is green; victim re-arm and green-head
+- `main-red-eject` reverts a named culprit (Main Health or merge groups) and dequeues a failing head
+  when main is green; victim re-arm and green-head
   re-enrollment put non-culprits back.
-- The pre-enroll drift precheck holds PRs whose drift guards fail against latest main.
+- Shrink-only baselines pass when debt is removed, so a fix never needs a baseline edit to stay
+  green in a group. Nothing lowers them automatically yet: run `node scripts/baselines-tighten.mjs`
+  when a check prints a "baseline can be tightened" notice.
 
 Still on the steward until automated: two-sided reproduction, fixing the culprit, and writing
 the new guard.
@@ -89,3 +121,4 @@ the new guard.
 ## Changelog
 
 - 2026-10-31: created from the merge-queue steward session (Summer owns).
+- 2026-11-11: revert first, diagnose second (audit finding 3); invariant 1 excepts culprit reverts.

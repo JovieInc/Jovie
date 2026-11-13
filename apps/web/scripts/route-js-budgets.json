@@ -75,5 +75,20 @@
       "/demo": 831,
       "/": 663
     }
+  },
+  "$groupsComment": "Per-route-group initial-JS ceilings (JOV-8561), gzip -9 KB. Every measured route is attributed to a docs/performance/route-budgets.json group (admin: /app/admin*, dashboard: other /app routes, marketing: firstLoad.marketingRoutes patterns, public: every other first-load route) and must fit that group's baselineKb — never the max ceiling across groups. Each baseline starts at that group's worst committed operative budget, so nothing loosens on adoption: marketing 663 = firstLoad.baselines[\"/\"] (measured 650), public 1309 = firstLoad.baselines[\"/demo/showcase/[surface]\"] (measured 1284), dashboard 1385 = routes[\"/app/chat\"], admin 1345 = routes[\"/app/admin\"]. Targets are the group's initialJS_gzip_kb in route-budgets.json (150/180/250/300); the baselines shrink toward them and deleting a baseline at the target is the goal. Raising a baseline, or a route-budgets.json group target, requires an unexpired raises override (owner, reason, Linear ID, expiry, evidence); lowering is free.",
+  "groups": {
+    "public": {
+      "baselineKb": 1309
+    },
+    "marketing": {
+      "baselineKb": 663
+    },
+    "dashboard": {
+      "baselineKb": 1385
+    },
+    "admin": {
+      "baselineKb": 1345
+    }
   }
 }

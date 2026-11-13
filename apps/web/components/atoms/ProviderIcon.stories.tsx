@@ -43,11 +43,30 @@ export const DSPRow: Story = {
   ),
 };
 
-export const UnknownProvider: Story = {
+export const EmptyUnknownProvider: Story = {
   name: 'Unknown provider (fallback)',
   args: {
     // @ts-expect-error — exercising the not-found fallback path.
     provider: 'unknown-provider',
     'aria-label': 'Unknown provider',
   },
+};
+
+/** A right-to-left row reverses its order; brand marks are never mirrored. */
+export const RtlDspRow: Story = {
+  render: () => (
+    <div dir='rtl' lang='ar'>
+      <fieldset className='flex items-center gap-4'>
+        <legend className='sr-only'>منصات البث</legend>
+        {DSP_PROVIDERS.map(provider => (
+          <ProviderIcon
+            key={provider}
+            provider={provider}
+            className='h-6 w-6'
+            aria-label={provider}
+          />
+        ))}
+      </fieldset>
+    </div>
+  ),
 };

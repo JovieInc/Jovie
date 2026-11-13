@@ -6,14 +6,17 @@
  * is the root main files plus every chunk in the page's client-reference
  * `entryJSFiles` (root layout, nested layouts, error/loading boundaries, and
  * the page). Sizes are gzip -9, which is deterministic for a given build.
+ * A trailing sourceMappingURL comment is omitted: non-Vercel CI emits it so
+ * the Lighthouse treemap can open the sibling map (JOV-12023), and Vercel
+ * production builds do not. The map file itself is not JS.
  *
- * Budgets live in route-js-budgets.json: a default for every /app route plus
- * per-route ceilings for routes that are heavier today. They are a ratchet,
- * set just above measured sizes, so any regression fails. Lower them when a
- * route gets lighter; raises require an unexpired design-exception-registry
- * override for that exact key. Public routes use first-load app-build manifests
- * (or client-reference fallback), tighter marketing ceilings, and measured
- * downward-only baselines for existing over-target routes.
+ * Per-route ceilings in route-js-budgets.json only shrink; raises require an
+ * unexpired design-exception-registry override for the exact key. Public
+ * first-load manifests (with client-reference fallback) keep tighter marketing
+ * ceilings and measured baselines for existing over-target routes.
+ *
+ * Route-group targets and downward-only ceilings are enforced alongside
+ * existing per-route budgets; shared policy lives in route-js-budget-policy.mjs.
  *
  * Usage: node scripts/route-js-budget.mjs [--next-dir .next] [--budgets file] [--json]
  */
@@ -23,16 +26,42 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { runInNewContext } from 'node:vm';
 import { gzipSync } from 'node:zlib';
-import { exceptionMetadataIssues } from '../../../scripts/design-exception-registry.mjs';
+
+import {
+  checkGroupBudgets,
+  grownBudgetNumbers,
+  grownRouteBudgetNumbers,
+  isAuthedAppRoute,
+  isKb,
+  isMarketingRoute,
+  loadRouteGroups,
+  ROUTE_BUDGETS_RELATIVE,
+  validateBudgetShape,
+  validateGroupBudgetShape,
+} from './route-js-budget-policy.mjs';
+
+export {
+  BASELINE_HEADROOM_RATIO,
+  checkGroupBudgets,
+  gateWeakeningOverrideApplies,
+  grownBudgetNumbers,
+  grownRouteBudgetNumbers,
+  HEADROOM_KB,
+  isAuthedAppRoute,
+  isMarketingRoute,
+  loadRouteGroups,
+  ROUTE_BUDGETS_RELATIVE,
+  routeGroupFor,
+  validateBudgetShape,
+  validateGroupBudgetShape,
+} from './route-js-budget-policy.mjs';
+
+/** @typedef {import('./route-js-budget-policy.mjs').RouteGroups} RouteGroups */
 
 const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(SCRIPT_DIR, '../..');
 const MANIFEST_NAME = 'page_client-reference-manifest.js';
 export const BUDGET_RELATIVE = 'apps/web/scripts/route-js-budgets.json';
-export const HEADROOM_KB = 16;
-export const BASELINE_HEADROOM_RATIO = 0.02;
-const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
-
 /** @param {string} key */
 export function routeFromManifestKey(key) {
   const route = key
@@ -40,20 +69,6 @@ export function routeFromManifestKey(key) {
     .replace(/\/\([^/)]+\)/g, '')
     .replace(/\/@[^/]+/g, '');
   return route === '' ? '/' : route;
-}
-
-export function isAuthedAppRoute(route) {
-  return route === '/app' || route.startsWith('/app/');
-}
-
-export function isMarketingRoute(route, patterns) {
-  return patterns.some(pattern => {
-    if (pattern.endsWith('/*')) {
-      const prefix = pattern.slice(0, -2);
-      return route === prefix || route.startsWith(`${prefix}/`);
-    }
-    return route === pattern;
-  });
 }
 
 function findManifests(dir, out = []) {
@@ -107,6 +122,18 @@ function collectRouteFiles(
 }
 
 /**
+ * Drop the CI sourceMappingURL trailer. It is not executed code, and the
+ * sibling map is not part of this budget.
+ * @param {Buffer} bytes
+ * @returns {Buffer}
+ */
+export function budgetJsBytes(bytes) {
+  const source = bytes.toString('utf8');
+  const stripped = source.replace(/\r?\n\/\/# sourceMappingURL=\S+\s*$/, '');
+  return stripped === source ? bytes : Buffer.from(stripped);
+}
+
+/**
  * @param {string} nextDir
  * @returns {RouteJsMeasurement[]}
  */
@@ -117,7 +144,7 @@ export function measureRouteJs(
   const gzipCache = new Map();
   const gzipBytes = file => {
     if (!gzipCache.has(file)) {
-      const bytes = readFileSync(join(nextDir, file));
+      const bytes = budgetJsBytes(readFileSync(join(nextDir, file)));
       gzipCache.set(file, gzipSync(bytes, { level: 9 }).length);
     }
     return gzipCache.get(file);
@@ -276,120 +303,6 @@ export function checkFirstLoadBudgets(measurements, firstLoad) {
   };
 }
 
-function isKb(value) {
-  return Number.isInteger(value) && value > 0;
-}
-
-export function validateBudgetShape(budgets) {
-  const first = budgets?.firstLoad;
-  if (!first) return ['firstLoad budgets are required'];
-  const errors = [];
-  if (first.headroomKb !== HEADROOM_KB)
-    errors.push(`firstLoad.headroomKb must stay ${HEADROOM_KB}`);
-  if (
-    ![
-      first.marketingMaxGzipKb,
-      first.defaultMaxGzipKb,
-      budgets.defaultMaxGzipKb,
-    ].every(isKb)
-  ) {
-    return [...errors, 'budget ceilings must be positive integers'];
-  }
-  if (
-    first.marketingMaxGzipKb >=
-    Math.min(first.defaultMaxGzipKb, budgets.defaultMaxGzipKb)
-  ) {
-    errors.push('marketingMaxGzipKb must be tighter than both defaults');
-  }
-  const patterns = first.marketingRoutes;
-  if (!Array.isArray(patterns) || !patterns.includes('/')) {
-    return [...errors, 'marketingRoutes must include the homepage'];
-  }
-  for (const pattern of patterns) {
-    if (!pattern.includes('*') && !isKb(first.routes?.[pattern]))
-      errors.push(`marketing route ${pattern} needs an explicit budget`);
-  }
-  for (const [kind, values] of Object.entries({
-    routes: first.routes,
-    baselines: first.baselines,
-  })) {
-    for (const [route, kb] of Object.entries(values ?? {})) {
-      if (!isKb(kb)) errors.push(`${route} ${kind} must be positive integers`);
-      else if (kind === 'baselines') {
-        if (route.includes('*'))
-          errors.push(`${route} baseline must name one measured route`);
-      } else if (
-        isMarketingRoute(route, patterns) !==
-        kb <= first.marketingMaxGzipKb
-      ) {
-        errors.push(
-          `${route} must respect its marketing or non-marketing ceiling`
-        );
-      }
-    }
-  }
-  return errors;
-}
-
-function budgetNumbers(budgets) {
-  return [
-    ['', budgets],
-    ['firstLoad.', budgets?.firstLoad],
-  ].flatMap(([prefix, section]) =>
-    Object.entries(section ?? {}).flatMap(([key, value]) => {
-      if (key === 'routes' || key === 'baselines') {
-        return Object.entries(value ?? {}).map(([route, kb]) => [
-          `${prefix}${key}.${route}`,
-          kb,
-        ]);
-      }
-      return ['defaultMaxGzipKb', 'marketingMaxGzipKb', 'headroomKb'].includes(
-        key
-      ) && typeof value === 'number'
-        ? [[`${prefix}${key}`, value]]
-        : [];
-    })
-  );
-}
-
-export function gateWeakeningOverrideApplies(entry, now = new Date()) {
-  if (!entry || typeof entry !== 'object') return false;
-  if (exceptionMetadataIssues(entry, 'raise').length > 0) return false;
-  const expiresOn = /** @type {{ expiresOn?: string }} */ (entry).expiresOn;
-  if (ISO_DATE.test(expiresOn ?? '')) {
-    const expiry = Date.parse(`${expiresOn}T23:59:59.999Z`);
-    if (expiry < now.getTime()) return false;
-  }
-  return true;
-}
-
-// New keys inherit their section ceiling; new sections establish the initial ratchet.
-function ancestorCeiling(key, ancestor, previous) {
-  if (previous.has(key)) return previous.get(key);
-  if (key.startsWith('routes.') && isKb(ancestor?.defaultMaxGzipKb))
-    return ancestor.defaultMaxGzipKb;
-  const match = /^firstLoad\.(routes|baselines)\.(.+)$/.exec(key);
-  const first = ancestor?.firstLoad;
-  if (!match || !isKb(first?.defaultMaxGzipKb)) return;
-  if (match[1] === 'baselines' && !first.baselines) return;
-  return isMarketingRoute(match[2], first.marketingRoutes ?? [])
-    ? first.marketingMaxGzipKb
-    : first.defaultMaxGzipKb;
-}
-
-export function grownBudgetNumbers(budgets, ancestor, now = new Date()) {
-  if (!ancestor) return [];
-  const previous = new Map(budgetNumbers(ancestor));
-  return budgetNumbers(budgets).flatMap(([key, next]) => {
-    const prev = ancestorCeiling(key, ancestor, previous);
-    return prev !== undefined &&
-      next > prev &&
-      !gateWeakeningOverrideApplies(budgets.raises?.[key], now)
-      ? [`${key} grew ${prev} -> ${next}`]
-      : [];
-  });
-}
-
 export function missingExplicitRoutes(measurements, firstLoad) {
   const measured = new Set(measurements.map(row => row.route));
   const named = new Set([
@@ -401,23 +314,61 @@ export function missingExplicitRoutes(measurements, firstLoad) {
   );
 }
 
+/**
+ * @param {{
+ *   appRows: RouteJsMeasurement[],
+ *   firstRows: RouteJsMeasurement[],
+ *   budgets: any,
+ *   ancestor?: any,
+ *   routeGroups?: RouteGroups,
+ *   routeGroupsAncestor?: any,
+ *   now?: Date
+ * }} args
+ */
 export function evaluateBudgets({
   appRows,
   firstRows,
   budgets,
   ancestor,
+  routeGroups,
+  routeGroupsAncestor,
   now = new Date(),
 }) {
-  const shape = validateBudgetShape(budgets);
-  const growth = grownBudgetNumbers(budgets, ancestor, now);
+  const shape = [
+    ...validateBudgetShape(budgets),
+    ...validateGroupBudgetShape(budgets, routeGroups),
+  ];
+  const growth = [
+    ...grownBudgetNumbers(budgets, ancestor, now),
+    ...grownRouteBudgetNumbers(
+      routeGroups,
+      routeGroupsAncestor,
+      budgets?.raises,
+      now
+    ),
+  ];
   const app = checkBudgets(appRows, budgets);
   const publicRows = firstRows.filter(row => !isAuthedAppRoute(row.route));
   const first = checkFirstLoadBudgets(publicRows, budgets.firstLoad ?? {});
   const missing = missingExplicitRoutes(publicRows, budgets.firstLoad);
-  const ok = [shape, growth, app.violations, first.violations, missing].every(
-    errors => errors.length === 0
-  );
-  return { shape, growth, app, first, missing, ok };
+  const groups = routeGroups
+    ? checkGroupBudgets({
+        appRows,
+        publicRows,
+        groups: budgets.groups ?? {},
+        routeGroups,
+        marketingPatterns: budgets.firstLoad?.marketingRoutes ?? [],
+      })
+    : null;
+  const ok = [
+    shape,
+    growth,
+    app.violations,
+    first.violations,
+    missing,
+    groups?.violations ?? [],
+  ].every(errors => errors.length === 0);
+  return { shape, growth, app, first, groups, missing, ok };
 }
 
 function git(repoRoot, args) {
@@ -426,6 +377,8 @@ function git(repoRoot, args) {
 
 export function readBudgetAncestor(repoRoot = REPO_ROOT, options = {}) {
   const spawn = options.spawn ?? git;
+  const relativePath = options.relativePath ?? BUDGET_RELATIVE;
+  const subject = options.subject ?? 'bundle budget';
   const available = () =>
     spawn(repoRoot, ['rev-parse', '--verify', 'origin/main']).status === 0;
   if (
@@ -437,11 +390,10 @@ export function readBudgetAncestor(repoRoot = REPO_ROOT, options = {}) {
   ) {
     return {
       ok: false,
-      error:
-        'origin/main is not available; the bundle budget cannot prove it only shrinks',
+      error: `origin/main is not available; the ${subject} cannot prove it only shrinks`,
     };
   }
-  const spec = `origin/main:${BUDGET_RELATIVE}`;
+  const spec = `origin/main:${relativePath}`;
   if (spawn(repoRoot, ['cat-file', '-e', spec]).status !== 0)
     return { ok: true, ancestor: null };
   const show = spawn(repoRoot, ['show', spec]);
@@ -481,11 +433,32 @@ function printRows(rows) {
   }
 }
 
+/**
+ * JOV-8561: the per-route-group table. One row per route-budgets.json group:
+ * worst measured route against the group's own operative baseline, with the
+ * group target from route-budgets.json alongside it.
+ */
+function printGroupRows(groups) {
+  console.log('\nRoute-group initial-JS budgets (JOV-8561)');
+  for (const row of groups.rows) {
+    const mark = row.ok ? 'ok  ' : 'OVER';
+    console.log(
+      `${mark} ${String(row.worstKb).padStart(5)} / ${String(row.baselineKb).padStart(5)} KB gz  ${row.group} group (target ${row.targetKb} KB; ${row.routes} routes; worst ${row.worstRoute})`
+    );
+  }
+}
+
 function main() {
   const options = parseArgs(process.argv.slice(2));
   const budgets = JSON.parse(readFileSync(options.budgetsPath, 'utf8'));
   const ancestor = readBudgetAncestor(REPO_ROOT);
   if (!ancestor.ok) throw new Error(ancestor.error);
+  const routeGroups = loadRouteGroups();
+  const routeBudgetsAncestor = readBudgetAncestor(REPO_ROOT, {
+    relativePath: ROUTE_BUDGETS_RELATIVE,
+    subject: 'route-budget target file',
+  });
+  if (!routeBudgetsAncestor.ok) throw new Error(routeBudgetsAncestor.error);
   const appRows = measureRouteJs(options.nextDir);
   if (!appRows.length)
     throw new Error(`No /app client manifests under ${options.nextDir}`);
@@ -494,11 +467,14 @@ function main() {
     firstRows: measureFirstLoadJs(options.nextDir),
     budgets,
     ancestor: ancestor.ancestor,
+    routeGroups,
+    routeGroupsAncestor: routeBudgetsAncestor.ancestor?.routes ?? null,
   });
   if (options.json) console.log(JSON.stringify(result, null, 2));
   else {
     printRows(result.app.rows);
     printRows(result.first.rows);
+    if (result.groups) printGroupRows(result.groups);
   }
   for (const error of [...result.shape, ...result.growth])
     console.error(`::error::${error}`);
@@ -513,6 +489,11 @@ function main() {
   for (const row of [...result.app.violations, ...result.first.violations]) {
     console.error(
       `::error::${row.route} ships ${row.gzipKb} KB gzip first-load JS; budget is ${row.budgetKb} KB. Split heavy client code; do not raise budgets or baselines.`
+    );
+  }
+  for (const row of result.groups?.violations ?? []) {
+    console.error(
+      `::error::${row.route} (${row.group} group) ships ${row.gzipKb} KB gzip initial JS; the ${row.group} group baseline is ${row.baselineKb} KB (target ${row.targetKb} KB from docs/performance/route-budgets.json). Split heavy client code; do not raise budgets or baselines.`
     );
   }
   const forbidden = findForbiddenClientCode(options.nextDir);
