@@ -8,7 +8,6 @@ import {
   Button,
   CommonDropdown,
   INSET_PANEL_ICON_COLUMN,
-  INSET_PANEL_ROW_LAYOUT,
   INSET_PANEL_SECTION_LABEL,
   INSET_PANEL_SEPARATOR,
   PlainButton,
@@ -55,12 +54,16 @@ import {
 import { Icon } from '../../atoms/Icon';
 import { Avatar } from '../../molecules/Avatar/Avatar';
 import { useDesktopUpdateContext } from '../desktop-update/DesktopUpdateProvider';
-import { ACCOUNT_LOADING_FILL } from './account-loading-fill';
 import { DesktopReleaseIdentity } from './desktop-release-identity.lazy';
 import { OviePrivacyLockControl } from './OviePrivacyLockControl';
 import { ensurePrivacyLockCanBeEnabled } from './privacy-lock-readiness.lazy';
 import type { UserButtonProps } from './types';
 import { UsageMenuItem } from './UsageMenuItem';
+import {
+  BillingLoadingRow,
+  UserButtonLoadingPlaceholder,
+  UserButtonTriggerAvatar,
+} from './UserButtonLoading';
 import { useUserButton } from './useUserButton';
 
 const DashboardFeedbackModal = dynamic(
@@ -127,12 +130,6 @@ export const USER_MENU_MAX_HEIGHT =
   'var(--radix-dropdown-menu-content-available-height)';
 const USER_MENU_GROUP_SPACER_CLASS = '-mx-1 my-0 h-2 border-0';
 
-/**
- * A restrained hairline that stops at the row gutter marks the header and
- * footer; inner groups keep the quiet gap above.
- */
-const USER_MENU_DIVIDER_CLASS = INSET_PANEL_SEPARATOR;
-
 const UPDATE_MENU_COPY = DESKTOP_UPDATE_COPY.menu;
 
 /**
@@ -171,7 +168,7 @@ export function buildDesktopUpdateMenuItem(
     {
       type: 'separator',
       id: 'sep-update',
-      className: USER_MENU_DIVIDER_CLASS,
+      className: INSET_PANEL_SEPARATOR,
     },
   ];
 }
@@ -293,7 +290,7 @@ function buildDropdownItems({
     {
       type: 'separator',
       id: 'sep-1',
-      className: USER_MENU_DIVIDER_CLASS,
+      className: INSET_PANEL_SEPARATOR,
     },
     {
       type: 'action',
@@ -414,27 +411,7 @@ function buildDropdownItems({
     items.push({
       type: 'custom',
       id: 'billing-loading',
-      render: () => (
-        <div
-          className={cn(INSET_PANEL_ROW_LAYOUT, 'cursor-default')}
-          data-testid='billing-loading'
-        >
-          <span className={INSET_PANEL_ICON_COLUMN}>
-            <span
-              className={cn(
-                'size-4 animate-pulse rounded motion-reduce:animate-none',
-                ACCOUNT_LOADING_FILL
-              )}
-            />
-          </span>
-          <span
-            className={cn(
-              'h-3 w-20 animate-pulse rounded motion-reduce:animate-none',
-              ACCOUNT_LOADING_FILL
-            )}
-          />
-        </div>
-      ),
+      render: () => <BillingLoadingRow />,
     });
   } else if (billingStatus.isPro) {
     items.push({
@@ -506,7 +483,7 @@ function buildDropdownItems({
     {
       type: 'separator',
       id: 'sep-2',
-      className: USER_MENU_DIVIDER_CLASS,
+      className: INSET_PANEL_SEPARATOR,
     },
     {
       type: 'custom',
@@ -689,44 +666,8 @@ export function UserButton({
       );
     }
 
-    return showUserInfo ? (
-      <div
-        data-testid='user-button-loading'
-        className={cn(
-          'flex w-full items-center gap-2 rounded-md px-2 py-1 group-data-[collapsible=icon]:mx-auto group-data-[collapsible=icon]:size-7 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:gap-0 group-data-[collapsible=icon]:p-0',
-          // Founder lock 2026-09-25: single compact 32px row.
-          calm && 'h-8'
-        )}
-      >
-        <div
-          data-user-button-loading-fill
-          className={cn(
-            'h-6 w-6 shrink-0 rounded-full animate-pulse motion-reduce:animate-none',
-            ACCOUNT_LOADING_FILL
-          )}
-        />
-        <div
-          data-user-button-loading-copy
-          className={cn('flex-1', SHELL_RAIL_STAGE)}
-        >
-          <div
-            data-user-button-loading-fill
-            className={cn(
-              'h-3 w-20 rounded-sm animate-pulse motion-reduce:animate-none',
-              ACCOUNT_LOADING_FILL
-            )}
-          />
-        </div>
-      </div>
-    ) : (
-      <div
-        data-testid='user-button-loading'
-        data-user-button-loading-fill
-        className={cn(
-          'h-10 w-10 shrink-0 rounded-full animate-pulse motion-reduce:animate-none',
-          ACCOUNT_LOADING_FILL
-        )}
-      />
+    return (
+      <UserButtonLoadingPlaceholder showUserInfo={showUserInfo} calm={calm} />
     );
   }
 
@@ -776,28 +717,12 @@ export function UserButton({
           <span className='sr-only'>Open user menu · {dockStatus.label} </span>
         ) : null}
         {dockStatus?.badges}
-        {calm ? (
-          <span
-            data-user-button-icon-column
-            className={INSET_PANEL_ICON_COLUMN}
-          >
-            <Avatar
-              src={userImageUrl}
-              alt={displayName || 'User avatar'}
-              name={displayName || userInitials}
-              size='sm'
-              className='shrink-0'
-            />
-          </span>
-        ) : (
-          <Avatar
-            src={userImageUrl}
-            alt={displayName || 'User avatar'}
-            name={displayName || userInitials}
-            size={calm ? 'sm' : 'xs'}
-            className='shrink-0'
-          />
-        )}
+        <UserButtonTriggerAvatar
+          calm={calm}
+          src={userImageUrl}
+          name={displayName || userInitials}
+          alt={displayName || 'User avatar'}
+        />
         <div
           data-user-button-display-name
           className={cn('min-w-0 flex-1', SHELL_RAIL_STAGE)}

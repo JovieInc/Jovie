@@ -902,6 +902,10 @@
       "offline": "Offline takes the same paths as the error waiver: the session comes from the auth client, and the billing and feedback requests fall back or report through the shared toast and the feedback modal, so the trigger and menu have no offline drawing.",
       "permission-denied": "Nothing in the menu is denied: Upgrade is the working checkout path for a free plan and Manage billing replaces it on Pro. The detector matched the upgrade and plan identifiers."
     },
+    "apps/web/components/organisms/user-button/UserButtonLoading.tsx": {
+      "offline": "These are the placeholders shown while the session or the plan is still loading, and the trigger avatar. They take no connectivity input and fetch nothing; an offline account button stays on the same placeholder, which the Loading stories show.",
+      "permission-denied": "The placeholders and the avatar carry no action and no account, role or plan check, so nothing in them can be denied. The detector matched the billing identifier in BillingLoadingRow."
+    },
     "apps/web/components/shell/AppShellRightRail.tsx": {
       "partial": "AppShellRightRail is a layout slot. Its only optional props are className and the belowHeader placement flag, and it renders whatever drawer it is given, so the rail itself has no partially loaded state; each drawer owns its own."
     },

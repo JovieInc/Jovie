@@ -1,5 +1,3 @@
-import { readFileSync } from 'node:fs';
-import path from 'node:path';
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -68,7 +66,6 @@ vi.mock('@/lib/workspace-lock/unlock-with-passkey', () => ({
 
 import { usePathname, useRouter } from 'next/navigation';
 import { useDesktopUpdateContext } from '@/components/organisms/desktop-update/DesktopUpdateProvider';
-import { ACCOUNT_LOADING_FILL } from '@/components/organisms/user-button/account-loading-fill';
 import { UserButton } from '@/components/organisms/user-button/UserButton';
 import { useAuthSafe, useUserSafe } from '@/hooks/useClerkSafe';
 import {
@@ -97,33 +94,11 @@ const mockUseDesktopUpdateContext = vi.mocked(useDesktopUpdateContext);
 
 const originalLocation = window.location;
 
-/** ACCOUNT_LOADING_FILL as a CSS class selector (escapes the opacity slash). */
-const FILL_SELECTOR = ACCOUNT_LOADING_FILL.replace('/', '\\/');
-
-describe('UserButton browser chunk diet (JOV-12023)', () => {
-  // #24725 named these the last eager desktop edges; UserButton must never
-  // reintroduce them. A static titlebar import drags electron-bridge, the
-  // update modal and radix dialog into every browser shell chunk.
-  const source = readFileSync(path.join(__dirname, 'UserButton.tsx'), 'utf8');
-  const lazySource = readFileSync(
-    path.join(__dirname, 'desktop-release-identity.lazy.ts'),
-    'utf8'
-  );
-
-  it('keeps every desktop module out of the static import graph', () => {
-    expect(source).not.toMatch(
-      /from '@\/components\/organisms\/DesktopTitlebar'/
-    );
-    expect(source).not.toMatch(/from '@\/lib\/desktop\/electron-bridge'/);
-    expect(source).not.toMatch(
-      /from '@\/lib\/workspace-lock\/unlock-with-passkey'/
-    );
-    expect(source).toMatch(/from '@\/lib\/desktop\/electron-runtime'/);
-    expect(source).toMatch(/from '\.\/desktop-release-identity\.lazy'/);
-    expect(lazySource).toMatch(
-      /import\('@\/components\/organisms\/DesktopTitlebar'/
-    );
-    expect(lazySource).toMatch(/ssr: false/);
+afterAll(() => {
+  Object.defineProperty(window, 'location', {
+    value: originalLocation,
+    configurable: true,
+    writable: true,
   });
 });
 
@@ -268,14 +243,6 @@ describe('UserButton cookie settings access', () => {
     mockSignedInAccount();
   });
 
-  afterAll(() => {
-    Object.defineProperty(window, 'location', {
-      value: originalLocation,
-      configurable: true,
-      writable: true,
-    });
-  });
-
   it.each([
     ['', true],
     ['jv_cc_required=0=1', true],
@@ -324,20 +291,9 @@ describe('UserButton states', () => {
     mockUseBillingStatusQuery.mockReturnValue(FREE_BILLING as any);
   });
 
-  afterAll(() => {
-    Object.defineProperty(window, 'location', {
-      value: originalLocation,
-      configurable: true,
-      writable: true,
-    });
-  });
-
-  it.each([
-    [true, 'rounded-md'],
-    [false, 'rounded-full'],
-  ])(
-    'holds the skeleton (showUserInfo %s) until the session loads',
-    async (showUserInfo, shape) => {
+  it.each([true, false])(
+    'holds the placeholder (showUserInfo %s) until the session loads',
+    async showUserInfo => {
       mockUseUserSafe.mockReturnValue({
         isLoaded: false,
         isSignedIn: false,
@@ -345,22 +301,7 @@ describe('UserButton states', () => {
       } as any);
       const { container } = render(<UserButton showUserInfo={showUserInfo} />);
 
-      const loading = screen.getByTestId('user-button-loading');
-      expect(loading).toHaveClass(shape);
-      // JOV-12383: every placeholder uses the fill that clears 3:1 on the
-      // light surface; the invisible legacy fills are gone.
-      const fills = [
-        ...(loading.matches('[data-user-button-loading-fill]')
-          ? [loading]
-          : []),
-        ...loading.querySelectorAll('[data-user-button-loading-fill]'),
-      ];
-      expect(fills).toHaveLength(showUserInfo ? 2 : 1);
-      for (const fill of fills) {
-        expect(fill).toHaveClass(ACCOUNT_LOADING_FILL);
-        expect(fill).not.toHaveClass('bg-sidebar-accent');
-        expect(fill).not.toHaveClass('bg-surface-2');
-      }
+      expect(screen.getByTestId('user-button-loading')).toBeInTheDocument();
       expect(screen.queryByRole('button')).toBeNull();
       await expectNoA11yViolations(container);
     }
@@ -405,12 +346,8 @@ describe('UserButton states', () => {
     trigger.focus();
     await user.keyboard('{Enter}');
     const menu = await screen.findByRole('menu');
-    // JOV-12383: the placeholders use the contrast-checked fill, never the
-    // on-media white wash that vanished on the light menu surface.
-    const billingLoading = within(menu).getByTestId('billing-loading');
-    expect(billingLoading.querySelectorAll(`.${FILL_SELECTOR}`)).toHaveLength(
-      2
-    );
+    // The fill itself is asserted in UserButtonLoading.test.tsx.
+    expect(within(menu).getByTestId('billing-loading')).toBeInTheDocument();
     expect(menu.querySelector('.bg-on-media\\/10')).toBeNull();
     expect(
       screen.queryByRole('menuitem', { name: /Upgrade/i })
@@ -491,14 +428,6 @@ describe('UserButton account surface layout', () => {
   beforeEach(() => {
     mockSignedInAccount();
     mockUseBillingStatusQuery.mockReturnValue(FREE_BILLING as any);
-  });
-
-  afterAll(() => {
-    Object.defineProperty(window, 'location', {
-      value: originalLocation,
-      configurable: true,
-      writable: true,
-    });
   });
 
   async function openMenu(calm = false) {

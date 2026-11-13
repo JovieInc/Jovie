@@ -113,6 +113,15 @@ const mockUseDesktopUpdateContext = vi.mocked(useDesktopUpdateContext);
 const originalLocation = window.location;
 const UPGRADE_CTA = `Get Verified — ${FALLBACK_VERIFIED_PRICE_LABEL}`;
 
+/** Billing resolved for an account on the free plan. */
+function mockFreeBilling(): void {
+  mockUseBillingStatusQuery.mockReturnValue({
+    data: { isPro: false, plan: null, hasStripeCustomer: false },
+    isLoading: false,
+    error: null,
+  } as any);
+}
+
 describe('UserButton billing actions', () => {
   let fetchMock: Mock;
   let pushMock: Mock;
@@ -321,11 +330,7 @@ describe('UserButton billing actions', () => {
   });
 
   it('keeps the calm workspace identity and account menu together', async () => {
-    mockUseBillingStatusQuery.mockReturnValue({
-      data: { isPro: false, plan: null, hasStripeCustomer: false },
-      isLoading: false,
-      error: null,
-    } as any);
+    mockFreeBilling();
     render(<UserButton calm showUserInfo profileHref='/adele' />);
     // Founder lock 2026-09-25: single compact 32px row, name only — the
     // workspace subtitle line is hidden.
@@ -353,11 +358,7 @@ describe('UserButton billing actions', () => {
   it('shows web build diagnostics in the account menu', async () => {
     vi.stubEnv('NEXT_PUBLIC_APP_VERSION', '26.9.1');
     vi.stubEnv('NEXT_PUBLIC_BUILD_SHA', 'abc1234');
-    mockUseBillingStatusQuery.mockReturnValue({
-      data: { isPro: false, plan: null, hasStripeCustomer: false },
-      isLoading: false,
-      error: null,
-    } as any);
+    mockFreeBilling();
 
     const user = userEvent.setup();
     render(<UserButton showUserInfo />);
@@ -380,11 +381,7 @@ describe('UserButton billing actions', () => {
 
   it('shows desktop release identity in account-menu diagnostics', async () => {
     document.documentElement.dataset.desktopRuntime = 'electron';
-    mockUseBillingStatusQuery.mockReturnValue({
-      data: { isPro: false, plan: null, hasStripeCustomer: false },
-      isLoading: false,
-      error: null,
-    } as any);
+    mockFreeBilling();
 
     const user = userEvent.setup();
     render(<UserButton showUserInfo />);
@@ -408,11 +405,7 @@ describe('UserButton billing actions', () => {
   });
 
   it('renders the compact trigger avatar on the canonical app frame size', () => {
-    mockUseBillingStatusQuery.mockReturnValue({
-      data: { isPro: false, plan: null, hasStripeCustomer: false },
-      isLoading: false,
-      error: null,
-    } as any);
+    mockFreeBilling();
 
     render(<UserButton />);
 
@@ -432,11 +425,7 @@ describe('UserButton billing actions', () => {
   it('offers a direct upgrade checkout when the user is not on Pro', async () => {
     const checkoutUrl = 'https://checkout.stripe.com/session/test';
 
-    mockUseBillingStatusQuery.mockReturnValue({
-      data: { isPro: false, plan: null, hasStripeCustomer: false },
-      isLoading: false,
-      error: null,
-    } as any);
+    mockFreeBilling();
 
     // Pricing options are fetched via usePricingOptionsQuery (already mocked in beforeEach)
     // Only checkout goes through fetch
@@ -480,11 +469,7 @@ describe('UserButton billing actions', () => {
   it('uses a monthly interval alias when starting checkout', async () => {
     const checkoutUrl = 'https://checkout.stripe.com/session/monthly';
 
-    mockUseBillingStatusQuery.mockReturnValue({
-      data: { isPro: false, plan: null, hasStripeCustomer: false },
-      isLoading: false,
-      error: null,
-    } as any);
+    mockFreeBilling();
 
     mockUsePricingOptionsQuery.mockReturnValue({
       data: {
@@ -528,11 +513,7 @@ describe('UserButton billing actions', () => {
   it('falls back to the first available pricing option when monthly is unavailable', async () => {
     const checkoutUrl = 'https://checkout.stripe.com/session/fallback';
 
-    mockUseBillingStatusQuery.mockReturnValue({
-      data: { isPro: false, plan: null, hasStripeCustomer: false },
-      isLoading: false,
-      error: null,
-    } as any);
+    mockFreeBilling();
 
     mockUsePricingOptionsQuery.mockReturnValue({
       data: {
@@ -819,11 +800,7 @@ describe('UserButton billing actions', () => {
   });
 
   it('renders a custom trigger while user data is still loading', () => {
-    mockUseBillingStatusQuery.mockReturnValue({
-      data: { isPro: false, plan: null, hasStripeCustomer: false },
-      isLoading: false,
-      error: null,
-    } as any);
+    mockFreeBilling();
 
     mockUseUserSafe.mockReturnValue({
       isLoaded: false,
@@ -867,11 +844,7 @@ describe('UserButton billing actions', () => {
 
   it('only offers manual workspace lock inside Ovie', async () => {
     const user = userEvent.setup();
-    mockUseBillingStatusQuery.mockReturnValue({
-      data: { isPro: false, plan: null, hasStripeCustomer: false },
-      isLoading: false,
-      error: null,
-    } as any);
+    mockFreeBilling();
     mockUsePathname.mockReturnValue('/app');
     const jovie = render(<UserButton showUserInfo />);
     await user.click(screen.getByText('Adele Adkins'));
@@ -881,22 +854,14 @@ describe('UserButton billing actions', () => {
     jovie.unmount();
 
     mockUsePathname.mockReturnValue('/app/ov/ops');
-    mockUseBillingStatusQuery.mockReturnValue({
-      data: { isPro: false, plan: null, hasStripeCustomer: false },
-      isLoading: false,
-      error: null,
-    } as any);
+    mockFreeBilling();
     render(<UserButton showUserInfo />);
     await user.click(screen.getByText('Adele Adkins'));
     expect(screen.getByTestId('ovie-privacy-control')).toBeInTheDocument();
   });
 
   it('shows an inline usage remaining row in the user menu', async () => {
-    mockUseBillingStatusQuery.mockReturnValue({
-      data: { isPro: false, plan: null, hasStripeCustomer: false },
-      isLoading: false,
-      error: null,
-    } as any);
+    mockFreeBilling();
 
     const user = userEvent.setup();
     render(<UserButton showUserInfo />);
@@ -909,11 +874,7 @@ describe('UserButton billing actions', () => {
   });
 
   it('shows the desktop update entry only when actionable and opens the modal from the menu', async () => {
-    mockUseBillingStatusQuery.mockReturnValue({
-      data: { isPro: false, plan: null, hasStripeCustomer: false },
-      isLoading: false,
-      error: null,
-    } as any);
+    mockFreeBilling();
     const openModal = vi.fn();
     mockUseDesktopUpdateContext.mockReturnValue({
       state: { state: 'idle' },
@@ -1105,11 +1066,7 @@ describe('UserButton billing actions', () => {
   });
 
   it('preserves trigger keyboard and escape-to-close menu semantics', async () => {
-    mockUseBillingStatusQuery.mockReturnValue({
-      data: { isPro: false, plan: null, hasStripeCustomer: false },
-      isLoading: false,
-      error: null,
-    } as any);
+    mockFreeBilling();
     const user = userEvent.setup();
     render(<UserButton showUserInfo />);
 
@@ -1124,11 +1081,7 @@ describe('UserButton billing actions', () => {
   });
 
   it('collapses the sidebar identity trigger to a centered avatar-only control', () => {
-    mockUseBillingStatusQuery.mockReturnValue({
-      data: { isPro: false, plan: null, hasStripeCustomer: false },
-      isLoading: false,
-      error: null,
-    } as any);
+    mockFreeBilling();
 
     render(<UserButton showUserInfo />);
 
@@ -1155,11 +1108,7 @@ describe('UserButton billing actions', () => {
   });
 
   it('anchors the sidebar identity menu to the start edge', async () => {
-    mockUseBillingStatusQuery.mockReturnValue({
-      data: { isPro: false, plan: null, hasStripeCustomer: false },
-      isLoading: false,
-      error: null,
-    } as any);
+    mockFreeBilling();
     const user = userEvent.setup();
 
     render(<UserButton showUserInfo />);
@@ -1172,11 +1121,7 @@ describe('UserButton billing actions', () => {
   });
 
   it('uses distinct semantic icons for the Learn More menu items', async () => {
-    mockUseBillingStatusQuery.mockReturnValue({
-      data: { isPro: false, plan: null, hasStripeCustomer: false },
-      isLoading: false,
-      error: null,
-    } as any);
+    mockFreeBilling();
     const user = userEvent.setup();
 
     render(<UserButton showUserInfo />);
