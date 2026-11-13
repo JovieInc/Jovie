@@ -271,7 +271,7 @@ jobs:
         id: diff
         # Only main may publish baselines: a dispatch on any other ref would
         # commit that ref's unreviewed source into the bot PR with auto-merge.
-        if: env.REFRESH_MODE == 'true' && (steps.visual.outcome == 'success' || steps.storybook.outcome == 'success') && github.ref == 'refs/heads/main'
+        if: ${{ !cancelled() && env.REFRESH_MODE == 'true' && (steps.visual.outcome == 'success' || steps.storybook.outcome == 'success') && github.ref == 'refs/heads/main' }}
         env:
           APP_OUTCOME: ${{ steps.visual.outcome }}
           STORYBOOK_OUTCOME: ${{ steps.storybook.outcome }}
@@ -302,14 +302,14 @@ jobs:
 
       - name: Generate Jovie Bot token (refresh only)
         id: app-token
-        if: env.REFRESH_MODE == 'true' && steps.diff.outputs.changed == 'true'
+        if: ${{ !cancelled() && env.REFRESH_MODE == 'true' && steps.diff.outputs.changed == 'true' }}
         uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
         with:
           app-id: ${{ vars.JOVIE_BOT_APP_ID }}
           private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}
 
       - name: Create or update baseline PR (refresh only)
-        if: env.REFRESH_MODE == 'true' && steps.diff.outputs.changed == 'true'
+        if: ${{ !cancelled() && env.REFRESH_MODE == 'true' && steps.diff.outputs.changed == 'true' }}
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
         run: |
