@@ -134,7 +134,7 @@ export interface DesktopUpdateControlProps {
  * Fixed footprint: the row is always 36px tall and fills its container, the
  * status truncates, and the button keeps one width, so no state change moves
  * a neighbour. Status copy is sized for the 224px rail: every line fits
- * beside the 72px button without truncating. The button never unmounts while the control is visible, so
+ * beside the 80px button without truncating. The button never unmounts while the control is visible, so
  * focus survives every transition. Renders nothing when hidden; the host
  * decides whether to keep the slot.
  */
@@ -157,7 +157,7 @@ export function DesktopUpdateControl({
       data-desktop-update-control=''
       data-state={state.kind}
       data-testid='desktop-update-control'
-      className={cn('flex h-9 w-full min-w-0 items-center gap-2', className)}
+      className={cn('flex h-9 w-full min-w-0 items-center gap-1', className)}
     >
       <div className='relative flex h-full min-w-0 flex-1 items-center'>
         <p className='min-w-0 flex-1 text-xs text-primary-token'>
@@ -192,7 +192,7 @@ export function DesktopUpdateControl({
         stateLabels={{ pending: '' }}
         aria-label={view.actionAriaLabel}
         onClick={act}
-        className='w-18 shrink-0'
+        className='w-20 shrink-0'
       >
         {view.actionLabel}
       </Button>

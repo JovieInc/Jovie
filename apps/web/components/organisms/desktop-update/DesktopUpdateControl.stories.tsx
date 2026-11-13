@@ -16,7 +16,7 @@ const VERSION = '26.11.12';
 const STATES = [
   ['Checking', { kind: 'checking' }],
   ['Available', { kind: 'available', version: VERSION }],
-  ['Downloading', { kind: 'downloading', version: VERSION, percent: 42 }],
+  ['Downloading', { kind: 'downloading', version: VERSION, percent: 100 }],
   ['Ready', { kind: 'ready', version: VERSION }],
   ['Restarting', { kind: 'restarting', version: VERSION }],
   ['Failed', { kind: 'failed', retry: 'check', version: VERSION }],

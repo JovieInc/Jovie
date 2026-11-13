@@ -76,6 +76,9 @@ test.describe('Desktop update control', () => {
       }
 
       await expect(
+        page.locator('[data-state="downloading"] [data-part="status"]')
+      ).toHaveText('Downloading 100%');
+      await expect(
         page.getByRole('progressbar', { name: 'Download Progress' })
       ).toHaveCount(1);
 
