@@ -34,6 +34,30 @@ def red(*names):
             'statusCheckRollup': [{'name': n, 'conclusion': 'FAILURE'} for n in names]}
 
 
+class RouteBudgetGrowthTest(unittest.TestCase):
+    def test_annotated_budget_growth_syncs_main_before_fixture_infra(self):
+        growth = ('2026-11-13T03:11:53.2279082Z ##[error]routes./app/chat/[id] grew 823 -> 1385\n'
+                  '##[error]firstLoad.baselines./start grew 804 -> 1247\n'
+                  '##[error]groups.dashboard.baselineKb grew 1199 -> 1385\n')
+        for log in (growth, '\x1b[31m' + growth + '\x1b[0m',
+                    'passing fixture: API rate limit exceeded; HTTP 503\n' + growth):
+            route = classes.classify(red('Exact-head Coverage'), {'Exact-head Coverage': log})
+            self.assertEqual((route['cls'], route['action']), ('route-budget-growth', 'sync-main'))
+
+    def test_runtime_budget_failures_and_passing_fixtures_stay_with_agent(self):
+        growth = '##[error]routes./app/chat grew 822 -> 1385\n'
+        for log in ('routes./app/chat grew 822 -> 1385\n',
+                    'echo "' + growth.strip() + '"\n',
+                    '##[error]routes./app/chat grew 1385 -> 822\n',
+                    '##[error]routes./app/chat grew 822 -> 822\n',
+                    growth + '##[error]/app grew beyond its measured JS budget\n',
+                    growth + 'FAIL home.test.tsx > shows setup\nAssertionError: hidden setup\n',
+                    growth + 'Error: the build failed\n',
+                    'FAIL /app/chat: 1400 / 822 KB gz\n'):
+            route = classes.classify(red('Exact-head Coverage'), {'Exact-head Coverage': log})
+            self.assertEqual(route['action'], 'agent', log)
+
+
 class AliasClassificationTest(unittest.TestCase):
     def test_real_annotation_and_complete_failure_have_owned_no_model_route(self):
         for log in (ANNOTATION, LOG, '\x1b[31m' + LOG + '\x1b[0m',
@@ -214,7 +238,7 @@ class RouteBudgetRoutingTest(unittest.TestCase):
         for error in errors:
             log = "passing fixture: API rate limit exceeded; github-quota-deferred\n" + error
             got = classes.classify(red("Exact-head Coverage"), {"Exact-head Coverage": log})
-            self.assertEqual((got["cls"], got["action"]), ("route-budget-ratchet", "sync-main"), error)
+            self.assertEqual((got["cls"], got["action"]), ("route-budget-growth", "sync-main"), error)
         # Measurement overruns and passing test titles are not stale-policy proof.
         for text in ["routes./app/chat grew 822 -> 1385", "✔ rejects routes./app/chat grew 822 -> 1385",
                      "::error::/app/chat: 1400 KB exceeds 822 KB budget", "::error::routes./app/chat grew invalid"]:

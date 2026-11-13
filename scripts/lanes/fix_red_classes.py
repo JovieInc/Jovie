@@ -30,22 +30,22 @@ import migration_renumber
 import remediation
 from fix_red_mixed_repairs import first_route_reason, mixed_repairs  # noqa: F401
 from fix_red_screen_cert import SCREEN_CERT_TEXT, screen_cert_paths
-from fix_red_failure_routing import (ALIAS_ACTION, ALIAS_REVIEW_FAILURE, ROUTE_BUDGET_RATCHET, alias_owner_metadata,
+from fix_red_failure_routing import (ALIAS_ACTION, ALIAS_REVIEW_FAILURE, ROUTE_BUDGET_GROWTH, alias_owner_metadata,
                                      error_signature, fingerprint_key, owner_handoff_reason)
 from atomic_state import atomic_write_text
 from fix_red_source_edits import (  # noqa: F401
-    snap_added_conservative_spacing, strip_added_legacy_cache_exports,
+    balance_added_headings, snap_added_conservative_spacing, strip_added_legacy_cache_exports,
     resolve_additive_node_tests_text, resolve_additive_node_test_file, resolve_additive_list_conflict, size_500_stale_hit,
 )
 
 SCHEMA = "jovie-fix-red-class/v1"
 # Actions a class can route to. `agent` is the default (a model run); the others spend no model.
-RERUN, SYNC_MAIN, WIRE_CI_FAST, RENUMBER, STAMP_CHANGELOG, SNAP_SPACING, STRIP_CACHE, MERGE_NARROWED, REGISTER_DOMAIN, ATOMIC_WRITE, REPAIR_SCREEN_CERT, AGENT = (
+RERUN, SYNC_MAIN, WIRE_CI_FAST, RENUMBER, STAMP_CHANGELOG, SNAP_SPACING, STRIP_CACHE, MERGE_NARROWED, REGISTER_DOMAIN, ATOMIC_WRITE, REPAIR_SCREEN_CERT, BALANCE_HEADINGS, AGENT, COMPOSE = (
     "rerun", "sync-main", "wire-ci-fast", "renumber-migrations", "stamp-changelog", "snap-spacing",
-    "strip-cache-exports", "merge-narrowed-preflight", "register-domain-writes", "atomic-write", "repair-screen-cert", "agent")
+    "strip-cache-exports", "merge-narrowed-preflight", "register-domain-writes", "atomic-write", "repair-screen-cert", "balance-headings", "agent", "compose")
 DETERMINISTIC = frozenset({
     RERUN, SYNC_MAIN, WIRE_CI_FAST, RENUMBER, STAMP_CHANGELOG, SNAP_SPACING, STRIP_CACHE, MERGE_NARROWED,
-    REGISTER_DOMAIN, ATOMIC_WRITE, REPAIR_SCREEN_CERT, ALIAS_ACTION})
+    REGISTER_DOMAIN, ATOMIC_WRITE, REPAIR_SCREEN_CERT, BALANCE_HEADINGS, ALIAS_ACTION})
 
 # remediation.INFRA_TEXT (runner loss, OOM, 5xx) plus the platform failures seen in 52 agent-declined
 # fix runs. Kept out of INFRA_TEXT: the exhausted-PR classifier deliberately routes a rate-limited
@@ -93,6 +93,8 @@ DESIGN_SOURCE_CLI = re.compile(
 # PR added a 10px/14px utility. Snap those added utilities; do not raise the floor.
 SPACING_RATCHET_TEXT = re.compile(
     r"off-grid 10px/14px spacing steps \(\*-2\.5, \*-3\.5\) grew")
+# Changed-line ui-feel. Before platform text: Source Validation echoes rate-limit lines.
+HEADING_BALANCE_TEXT = re.compile(r"[\w./()-]+\.tsx:\d+\s+headingNeedsBalance")
 # Cache Components ratchet (assertStackPatternRatchet). Growth is a newly added
 # `export const dynamic|fetchCache|revalidate`. Delete that added line. Never
 # raise the ceiling. Checked before platform text: the count can look like HTTP 5xx.
@@ -154,10 +156,10 @@ SIGNATURES = (
     ("changelog-metadata", CHANGELOG_MISSING, STAMP_CHANGELOG),
     ("cache-surface", CACHE_SURFACE_TEXT, STRIP_CACHE),
     ("spacing-scale", SPACING_RATCHET_TEXT, SNAP_SPACING),
+    ("heading-balance", HEADING_BALANCE_TEXT, BALANCE_HEADINGS),
     ("census-certification", CENSUS_CERTIFICATION, SYNC_MAIN),
     ("design-source-cli", DESIGN_SOURCE_CLI, SYNC_MAIN),
-    ("route-budget-ratchet", ROUTE_BUDGET_RATCHET, SYNC_MAIN),
-    # Inventory assertion outranks quota/infra noise echoed in the same log.
+    ("route-budget-growth", ROUTE_BUDGET_GROWTH, SYNC_MAIN),
     ("ci-fast-wiring", UNWIRED, WIRE_CI_FAST),
     # The license error is the job failure. A passing fixture can echo quota text.
     ("dependency-license", DEPENDENCY_LICENSE, AGENT),
@@ -183,7 +185,7 @@ def real_failures(pr: dict) -> list[dict]:
 def stamp_internal_changelog(body) -> str | None:
     """Append the internal customer-changelog note. None when `body` is not a string or already
     contains a note (a second note is an ambiguous contract, not a stamp)."""
-    if not isinstance(body, str) or "customer-changelog/v1" in body:
+    if not isinstance(body, str) or re.search(r"<!--\s*customer-changelog/v1\b", body):
         return None
     if body and not body.endswith("\n"):
         body += "\n"
@@ -191,7 +193,7 @@ def stamp_internal_changelog(body) -> str | None:
 
 
 def classify(pr: dict, logs: dict[str, str] | None = None) -> dict:
-    """{cls, key, action, checks, signature, files, repairs}. `logs` maps a failing check name to its failed-job log;
+    """{cls, key, action, actions, checks, signature, files, repairs}. `logs` maps a failing check name to its failed-job log;
     a check with no log is `other`. A BEHIND branch with nothing deterministic to say is `stale-branch`."""
     logs = logs or {}
     import detached_native_sync
@@ -202,8 +204,13 @@ def classify(pr: dict, logs: dict[str, str] | None = None) -> dict:
         hit = next(((cls, action) for cls, pattern, action in SIGNATURES if pattern.search(text)), None)
         per_check.append(detached_native_sync.hit(text) or hit or size_500_stale_hit(text) or ("other", AGENT))
     classes = {cls for cls, _ in per_check}
+    actions: list[str] = []
     if len(classes) == 1:
         cls, action = per_check[0]
+    elif classes and all(item_action in DETERMINISTIC for _, item_action in per_check):
+        import fix_red_compose
+        cls, action, actions = fix_red_compose.composed_route(
+            [item_action for _, item_action in per_check], COMPOSE, AGENT)
     elif classes:
         cls, action = "mixed", AGENT
     else:
@@ -219,24 +226,13 @@ def classify(pr: dict, logs: dict[str, str] | None = None) -> dict:
     owner = alias_owner_metadata(names, logs) if cls == "alias-review-deadline" else None
     if cls == "alias-review-deadline" and owner is None:
         cls, action, signature = "mixed", AGENT, error_signature("\n".join(logs.get(name) or "" for name in names))
-    files = []
-    if cls == "component-test-evidence":
-        files = sorted({test for name in names for test in COMPONENT_TEST_TEXT.findall(logs.get(name) or "")})
-    if cls == "ci-fast-wiring":
-        for name in names:
-            found = UNWIRED.search(logs.get(name) or "")
-            files.extend(item.strip() for item in (found.group(1).split(",") if found else []) if item.strip())
-        files = sorted(set(files))
-    elif cls == "screen-certificate":
-        files = screen_cert_paths("\n".join(logs.get(name) or "" for name in names))
-    elif cls == "domain-write":
-        files = sorted(_domain_write_hits("\n".join(logs.get(name) or "" for name in names)))
-    elif cls == "detached-native-consumer":
-        files = detached_native_sync.paths("\n".join(logs.get(name) or "" for name in names))
+    if action != COMPOSE:
+        actions = [action] if action in DETERMINISTIC else []
+    from fix_red_compose import repair_files
+    files = repair_files(cls, action, names, logs, per_check)
     repairs = mixed_repairs(pr, per_check) if cls == "mixed" else []
     return {"schema": SCHEMA, "cls": cls, "key": fingerprint_key(cls, names, signature), "action": action,
-            "checks": names, "signature": signature, "files": files, "repairs": repairs,
-            **({"evidenceOwner": owner} if owner else {})}
+            "actions": actions, "checks": names, "signature": signature, "files": files, "repairs": repairs, **({"evidenceOwner": owner} if owner else {})}
 
 
 def _split_shell_and(command: str) -> list[str] | None:

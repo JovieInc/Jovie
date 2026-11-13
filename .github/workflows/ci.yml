@@ -2431,7 +2431,7 @@ jobs:
           KBD_STORYBOOK_PATTERN='^(packages/ui/atoms/kbd(\.stories)?\.tsx|apps/web/\.storybook/(motion-fixtures\.ts|preview\.tsx|preview-head\.html|main\.ts)|apps/web/tests/e2e/storybook-kbd-motion\.spec\.ts)$'
           CRAWLER_STORYBOOK_PATTERN='^apps/web/(components/features/dashboard/organisms/ai-crawler/AiCrawler(DetailPanel|IntelligenceCard)(\.stories)?\.tsx|tests/e2e/storybook-ai-crawler\.spec\.ts)$'
           TASKS_STORYBOOK_PATTERN='^apps/web/(components/features/dashboard/tasks/(Task(DataTable|ListRow)(\.stories)?\.tsx|TasksPageClient\.tsx)|components/organisms/table/(atoms/TableCell\.tsx|table\.types\.ts|organisms/VirtualizedTableRow\.tsx|molecules/TaskProjectionListRow\.tsx)|tests/e2e/storybook-task-row-geometry\.spec\.ts)$'
-          DESKTOP_UPDATE_STORYBOOK_PATTERN='^apps/web/(components/organisms/desktop-update/DesktopUpdateModal(\.stories)?\.tsx|tests/e2e/storybook-desktop-update-modal\.spec\.ts)$'
+          DESKTOP_UPDATE_STORYBOOK_PATTERN='^apps/web/(components/organisms/desktop-update/DesktopUpdate(Modal|Control)(\.stories)?\.tsx|lib/desktop/desktop-update-control-state\.ts|tests/e2e/storybook-desktop-update-(modal|control)\.spec\.ts)$'
           DSP_STORYBOOK_PATTERN='^apps/web/(components/shell/DspAvatarStack(\.mobile-drawer)?(\.stories|\.test)?\.tsx|components/features/dashboard/organisms/release-provider-matrix/shell-releases/ShellReleaseRow(\.stories)?\.tsx|components/organisms/release-sidebar/ReleaseSidebarSections\.tsx|components/molecules/drawer/RightDrawer\.tsx|lib/a11y/modal-focus-boundary\.ts|tests/e2e/storybook-dsp-details\.spec\.ts)$'
           SMART_LINK_STORYBOOK_PATTERN='^apps/web/(components/features/release/(SmartLinkShell|MusicServiceDial|ActionDial)(\.stories|\.test)?\.tsx|components/organisms/public-surface/PublicSurface(Shell|Stage)(\.stories|\.test)?\.tsx|components/organisms/ReleaseLandingPage\.stories\.tsx|app/r/\[slug\]/ReleaseLandingPage\.tsx|app/globals\.css|styles/design-system\.css|tests/e2e/storybook-smart-link-reachability\.spec\.ts)$'
           # Overlay primitives, their layer tokens, and the
@@ -2603,6 +2603,7 @@ jobs:
           fi
           if [[ "$RUN_DESKTOP_UPDATE" == 'true' ]]; then
             specs+=(tests/e2e/storybook-desktop-update-modal.spec.ts)
+            specs+=(tests/e2e/storybook-desktop-update-control.spec.ts)
           fi
           if [[ "$RUN_DSP" == 'true' ]]; then
             specs+=(tests/e2e/storybook-dsp-details.spec.ts)
@@ -3904,6 +3905,7 @@ jobs:
                   tests/e2e/storybook-onboarding-recovery.spec.ts \
                   tests/e2e/storybook-task-row-geometry.spec.ts \
                   tests/e2e/storybook-desktop-update-modal.spec.ts \
+                  tests/e2e/storybook-desktop-update-control.spec.ts \
                   tests/e2e/storybook-dsp-details.spec.ts \
                   tests/e2e/storybook-smart-link-reachability.spec.ts \
                   --config=playwright.config.storybook.ts --project=chromium --reporter=line \

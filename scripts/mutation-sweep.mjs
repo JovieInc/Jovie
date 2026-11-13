@@ -315,6 +315,8 @@ mkdirSync(tasksDir, { recursive: true });
 /** @type {string[]} */ const summaryRows = [];
 /** @type {{ file: string, reason: string }[]} */ const regressions = [];
 let issuesFiled = 0;
+let linearFilingStopped = false;
+let unfiledBatches = 0;
 
 for (const file of batch) {
   // Off-peak only: re-check the 5-minute load before every module, not just at start.
@@ -395,7 +397,7 @@ for (const file of batch) {
       join(tasksDir, `${file.replace(/[^\w.-]+/gu, '_')}.json`),
       `${JSON.stringify({ file, sha: headSha, score: entry.score, valid: entry.valid, tests, survivors: real }, null, 1)}\n`
     );
-    if (values['file-issues'] && real.length > 0) {
+    if (values['file-issues'] && real.length > 0 && !linearFilingStopped) {
       const {
         remediationTriggersEnabled,
         upsertLinearIssueByTitleFingerprint,
@@ -420,7 +422,13 @@ for (const file of batch) {
         console.log(
           `Linear survivors issue (${file}): ${res.action ?? 'failed'} ${res.url ?? res.reason ?? ''}`
         );
-        issuesFiled += 1;
+        if (res.reason === 'linear_rate_limited') {
+          // The shared Linear credential is spent. Stop spending: filing more
+          // survivors cannot succeed, and every retry starves the Fleet Gate
+          // / Triage consumers of the same credential for longer (JOV-12500).
+          linearFilingStopped = true;
+          unfiledBatches += 1;
+        } else issuesFiled += 1;
       } else
         logRemediationDryRun({
           action: 'upsert',
@@ -466,6 +474,9 @@ const summary = [
   ...summaryRows,
   '',
   issuesFiled ? `${issuesFiled} survivor work item(s) filed.\n` : '',
+  linearFilingStopped
+    ? `Survivor filing stopped early: the shared Linear credential was rate-limited; ${unfiledBatches} module(s) with survivors left unfiled and the next sweep retries them.\n`
+    : '',
 ].join('\n');
 console.log(`\n${summary}`);
 if (values.summary) appendFileSync(values.summary, summary);

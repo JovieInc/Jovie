@@ -47,7 +47,7 @@ function Stat({
   return (
     <div className='min-w-0'>
       <p className='text-2xs text-tertiary-token'>{label}</p>
-      <p className='break-words text-lg font-semibold tabular-nums text-primary-token'>
+      <p className='break-words text-base font-semibold tabular-nums text-primary-token'>
         {value}
       </p>
       {hint ? <p className='text-2xs text-tertiary-token'>{hint}</p> : null}
@@ -530,7 +530,7 @@ function ProviderScreen({
       <ContentSurfaceCard surface='details'>
         <div className='space-y-3 p-4'>
           <div className='flex flex-wrap items-center gap-2'>
-            <h2 className='text-balance text-lg font-semibold text-primary-token'>
+            <h2 className='text-balance text-base font-semibold text-primary-token'>
               {provider.label}
             </h2>
             <span className='rounded-full border border-subtle px-2 py-0.5 text-2xs text-secondary-token'>
