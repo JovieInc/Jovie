@@ -79,6 +79,7 @@ function row(lead: OutboundLeadFacts, ledger: OutboundLedgerRow[] = []) {
     dedupeKey: `email:${lead.contactEmail}`,
     ledger,
     now: NOW,
+    dogfoodGate: null,
   });
 }
 
@@ -416,5 +417,41 @@ describe('existing-relationship hold in the outbound queue', () => {
     expect(approved.view).toBe('approved');
     expect(approved.relationshipNotes).toEqual([tag]);
     expect(row(facts()).relationshipNotes).toEqual([]);
+  });
+
+  it('shows a held artist as held, not awaiting the judge, when the gate is closed', () => {
+    const lead = dannic();
+    const held = buildOutboundRow({
+      facts: lead,
+      target: target(lead),
+      dedupeKey: null,
+      ledger: [],
+      now: NOW,
+    });
+    expect(held).toMatchObject({
+      view: 'held',
+      nextAction: 'none',
+      message: null,
+      relationshipHold: 'Existing relationship: flag to Tim, no cold outreach',
+    });
+  });
+});
+
+describe('draft gate defaults', () => {
+  it('fails closed when the caller omits gate evidence', () => {
+    const lead = facts();
+    expect(
+      buildOutboundRow({
+        facts: lead,
+        target: target(lead),
+        dedupeKey: null,
+        ledger: [],
+        now: NOW,
+      })
+    ).toMatchObject({
+      view: 'needs_judge',
+      nextAction: 'await_judge',
+      message: null,
+    });
   });
 });

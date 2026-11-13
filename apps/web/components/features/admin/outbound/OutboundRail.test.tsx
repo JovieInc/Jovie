@@ -52,6 +52,25 @@ function renderRail(overrides: Partial<OutboundRailProps> = {}) {
 }
 
 describe('OutboundRail', () => {
+  it('explains a judge-blocked draft without offering message actions', () => {
+    const props = renderRail({
+      row: outboundFixtureRow({
+        view: 'needs_judge',
+        nextAction: 'await_judge',
+        message: null,
+      }),
+    });
+    expect(screen.getByTestId('outbound-message-empty')).toHaveTextContent(
+      'Draft hidden until the page and onboarding pass the dogfood judge.'
+    );
+    expect(screen.queryByLabelText('Message Body')).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Approve' })
+    ).not.toBeInTheDocument();
+    act(() => sendOutboundRailCommand('approve'));
+    expect(props.onApprove).not.toHaveBeenCalled();
+  });
+
   it('blocks approval and says so when no recipient is on file (A17)', () => {
     renderRail({ row: outboundFixtureRow({ channel: null }) });
     expect(screen.getByRole('button', { name: 'Approve' })).toBeDisabled();

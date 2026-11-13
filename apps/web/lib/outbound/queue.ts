@@ -12,6 +12,10 @@ import {
   type OutboundTarget,
   resolveOutboundApproval,
 } from './approval';
+import {
+  DOGFOOD_GATE_CLOSED,
+  type DogfoodGateResult,
+} from './cold/dogfood-gate';
 import type {
   OutboundBand,
   OutboundChannel,
@@ -194,6 +198,8 @@ function nextActionFor(
   flags: readonly OutboundFlag[]
 ): OutboundNextAction {
   switch (view) {
+    case 'needs_judge':
+      return 'await_judge';
     case 'ready':
       return 'review_facts';
     case 'needs_evidence':
@@ -223,6 +229,8 @@ export function buildOutboundRow(input: {
   readonly dedupeKey: string | null;
   readonly ledger: readonly OutboundLedgerRow[];
   readonly now: Date;
+  /** Null explicitly disables the feature; missing evidence always closes it. */
+  readonly dogfoodGate?: DogfoodGateResult | null;
 }): Omit<OutboundRow, 'rank'> {
   const { facts, target } = input;
   const approval = resolveOutboundApproval(target, input.ledger);
@@ -238,27 +246,36 @@ export function buildOutboundRow(input: {
   if (basis === 'unscored') flags.push('unscored');
   if (basis === 'presence_only') flags.push('presence_only_fit');
   const missing = missingEvidence(facts);
-  const view = classify(facts, approval, flags, missing);
+  const gate =
+    input.dogfoodGate === null
+      ? null
+      : (input.dogfoodGate ?? DOGFOOD_GATE_CLOSED);
+  // A relationship hold shows as held, with its reason, whatever the judge says.
+  const view =
+    gate && !gate.passed && !approval.relationshipHold
+      ? 'needs_judge'
+      : classify(facts, approval, flags, missing);
   const saved = approval.latestCopy?.channel;
   // A saved draft keeps its channel only while its recipient is on file.
   const channel = saved && reachable(saved, facts) ? saved : channelFor(facts);
   const name = cleanOutboundName(facts.displayName, facts.linktreeHandle);
   // No cold draft exists for an artist Tim already works with.
-  const message = approval.relationshipHold
-    ? null
-    : approval.latestCopy
-      ? approval.latestCopy
-      : channel && target.claimUrl
-        ? {
-            ...draftOutboundCopy({
-              channel,
-              displayName: name,
-              claimUrl: target.claimUrl,
-              dmCopy: facts.dmCopy,
-            }),
-            revision: null,
-          }
-        : null;
+  const message =
+    approval.relationshipHold || (gate && !gate.passed)
+      ? null
+      : approval.latestCopy
+        ? approval.latestCopy
+        : channel && target.claimUrl
+          ? {
+              ...draftOutboundCopy({
+                channel,
+                displayName: name,
+                claimUrl: target.claimUrl,
+                dmCopy: facts.dmCopy,
+              }),
+              revision: null,
+            }
+          : null;
   return {
     leadId: facts.id,
     dedupeKey: input.dedupeKey,
@@ -305,7 +322,8 @@ const ACTION_ORDER: Record<OutboundNextAction, number> = {
   await_reply: 6,
   await_claim: 7,
   await_payment: 8,
-  none: 9,
+  await_judge: 9,
+  none: 10,
 };
 
 /**
