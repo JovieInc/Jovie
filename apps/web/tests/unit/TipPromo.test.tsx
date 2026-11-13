@@ -1,5 +1,5 @@
 import { render, screen } from '@testing-library/react';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import PayPromo from '@/components/organisms/PayPromo';
 
 describe('PayPromo', () => {
@@ -8,34 +8,7 @@ describe('PayPromo', () => {
     vi.clearAllMocks();
   });
 
-  afterEach(() => {
-    // Clean up environment variable mocks
-    vi.unstubAllEnvs();
-  });
-
-  it('renders the component when NEXT_PUBLIC_FEATURE_TIPS is absent', () => {
-    vi.stubEnv('NEXT_PUBLIC_FEATURE_TIPS', undefined);
-    render(<PayPromo />);
-
-    expect(screen.getByText('Pay,')).toBeInTheDocument();
-    expect(screen.getByText('instantly.')).toBeInTheDocument();
-  });
-
-  it('renders null when NEXT_PUBLIC_FEATURE_TIPS is false', () => {
-    vi.stubEnv('NEXT_PUBLIC_FEATURE_TIPS', 'false');
-    render(<PayPromo />);
-    expect(screen.queryByText('Pay,')).not.toBeInTheDocument();
-  });
-
-  it('renders null when NEXT_PUBLIC_FEATURE_TIPS is an empty string', () => {
-    vi.stubEnv('NEXT_PUBLIC_FEATURE_TIPS', '');
-    render(<PayPromo />);
-    expect(screen.queryByText('Pay,')).not.toBeInTheDocument();
-  });
-
-  it('renders the component when NEXT_PUBLIC_FEATURE_TIPS is "true"', () => {
-    vi.stubEnv('NEXT_PUBLIC_FEATURE_TIPS', 'true');
-
+  it('renders with no environment switch set', () => {
     render(<PayPromo />);
 
     // Check main heading with emphasis
@@ -56,8 +29,6 @@ describe('PayPromo', () => {
   });
 
   it('has correct styling classes when rendered', () => {
-    vi.stubEnv('NEXT_PUBLIC_FEATURE_TIPS', 'true');
-
     render(<PayPromo />);
 
     // Check section has surface-0 background and primary-token text (shell-v1 tokens)
@@ -71,8 +42,6 @@ describe('PayPromo', () => {
   });
 
   it('contains "Pay, instantly." heading when feature flag is enabled', () => {
-    vi.stubEnv('NEXT_PUBLIC_FEATURE_TIPS', 'true');
-
     render(<PayPromo />);
 
     // This specifically tests the requirement from the problem statement
@@ -81,8 +50,6 @@ describe('PayPromo', () => {
   });
 
   it('has responsive design classes', () => {
-    vi.stubEnv('NEXT_PUBLIC_FEATURE_TIPS', 'true');
-
     render(<PayPromo />);
 
     // Check responsive text sizing - SectionHeading with size="xl" has these classes
@@ -95,8 +62,6 @@ describe('PayPromo', () => {
   });
 
   it('has the correct link destination', () => {
-    vi.stubEnv('NEXT_PUBLIC_FEATURE_TIPS', 'true');
-
     render(<PayPromo />);
 
     const ctaButton = screen.getByRole('link', { name: 'See it live' });

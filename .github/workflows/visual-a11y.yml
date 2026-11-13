@@ -25,6 +25,7 @@ on:
       - 'packages/ui/**'
       - 'pnpm-lock.yaml'
       - '.github/workflows/visual-a11y.yml'
+      - 'scripts/lib/component-certificate-summary.mjs'
   workflow_dispatch:
 
 permissions:
@@ -89,17 +90,17 @@ jobs:
         id: a11y-test
         run: |
           set -o pipefail
-          pnpm --filter @jovie/web test:a11y --shard=${{ matrix.shard }}/16 2>&1 \
+          pnpm --filter @jovie/web test:a11y --shard=${{ matrix.shard }}/16 \
+            --reporter=default --reporter=json \
+            --outputFile="$RUNNER_TEMP/a11y-shard-${{ matrix.shard }}.json" 2>&1 \
             | tee "$RUNNER_TEMP/a11y-shard-${{ matrix.shard }}.log"
       - name: A11y Results Summary
         if: always()
         run: |
-          if [ "${{ steps.a11y-test.outcome }}" == "failure" ]; then
-            echo "## A11y Check Results" >> "$GITHUB_STEP_SUMMARY"
-            echo "" >> "$GITHUB_STEP_SUMMARY"
-            echo "FAIL: Accessibility violations detected - blocking this PR." >> "$GITHUB_STEP_SUMMARY"
-            echo "" >> "$GITHUB_STEP_SUMMARY"
-            echo "To run locally: pnpm --filter @jovie/web test:a11y" >> "$GITHUB_STEP_SUMMARY"
+          node scripts/lib/component-certificate-summary.mjs --a11y \
+            "$A11Y_OUTCOME" "$RUNNER_TEMP/a11y-shard-${{ matrix.shard }}.json" \
+            "${{ matrix.shard }}" >> "$GITHUB_STEP_SUMMARY"
+          if [ "$A11Y_OUTCOME" != "success" ]; then
             # Surface the failing axe nodes in the run summary so readers
             # without job-log access can see them. Last 2000 lines of this
             # shard's output, ANSI stripped, capped under the 1 MiB
@@ -116,11 +117,20 @@ jobs:
                 echo "</details>"
               } >> "$GITHUB_STEP_SUMMARY"
             fi
-          else
-            echo "## A11y Check Results" >> "$GITHUB_STEP_SUMMARY"
-            echo "" >> "$GITHUB_STEP_SUMMARY"
-            echo "PASS: All Storybook components passed accessibility checks." >> "$GITHUB_STEP_SUMMARY"
           fi
+        env:
+          A11Y_OUTCOME: ${{ steps.a11y-test.outcome }}
+      - name: Upload shard execution evidence
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: a11y-shard-${{ matrix.shard }}-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/a11y-shard-${{ matrix.shard }}.json
+            ${{ runner.temp }}/a11y-shard-${{ matrix.shard }}.log
+          if-no-files-found: warn
+          retention-days: 14
+
 
   component-story-evidence:
     # Certificate evidence (docs/design-system/COMPONENT_CERTIFICATE.md): every

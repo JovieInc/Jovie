@@ -38,7 +38,10 @@ describe('MobileNav', () => {
       />
     );
 
-    fireEvent.click(screen.getByRole('button', { name: 'Open menu' }));
+    const toggle = screen.getByRole('button', { name: 'Open menu' });
+    expect(toggle).toHaveAttribute('data-slot', 'plain-button');
+    expect(toggle).toHaveAttribute('type', 'button');
+    fireEvent.click(toggle);
 
     expect(
       screen.getByRole('navigation', { name: 'Mobile Navigation' })

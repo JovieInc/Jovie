@@ -776,11 +776,11 @@ describe('CommonDropdown', () => {
       // A text input is not an allowed role="menu" child (axe
       // aria-required-children): input in the group, items in the inner menu.
       const input = screen.getByPlaceholderText('Search...');
-      expect(input.closest('[role="group"]')).not.toBeNull();
+      const group = input.closest('[role="group"]');
+      // axe aria-allowed-attr: orientation is not allowed on role="group".
+      expect(group?.hasAttribute('aria-orientation')).toBe(false);
       expect(input.closest('[role="menu"]')).toBeNull();
-      expect(
-        input.closest('[role="group"]')?.querySelector('[role="menuitem"]')
-      ).not.toBeNull();
+      expect(group?.querySelector('[role="menuitem"]')).not.toBeNull();
     });
 
     // A text input is not an allowed role="menu" child (axe

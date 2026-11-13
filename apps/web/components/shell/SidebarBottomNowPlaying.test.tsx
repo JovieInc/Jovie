@@ -1,5 +1,7 @@
 import { fireEvent, render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
+import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import { SidebarBottomNowPlaying } from './SidebarBottomNowPlaying';
 
 const fullTrack = {
@@ -9,6 +11,115 @@ const fullTrack = {
 };
 
 describe('SidebarBottomNowPlaying', () => {
+  it.each([
+    { trackTitle: fullTrack.trackTitle, hint: fullTrack.trackTitle },
+    { trackTitle: null, hint: 'Now playing' },
+  ])(
+    'identifies the collapsed player on keyboard focus with $hint',
+    async ({ trackTitle, hint }) => {
+      const user = userEvent.setup();
+      const onPlay = vi.fn();
+      render(
+        <SidebarBottomNowPlaying
+          track={{ ...fullTrack, trackTitle }}
+          isPlaying={false}
+          onPlay={onPlay}
+          collapsed
+        />
+      );
+
+      await user.tab();
+
+      expect(screen.getByRole('button')).toHaveFocus();
+      expect(await screen.findByRole('tooltip')).toHaveTextContent(hint);
+      await user.keyboard('{Enter}');
+      expect(onPlay).toHaveBeenCalledOnce();
+    }
+  );
+
+  it('shows the supplied title without inventing an absent artist or artwork', () => {
+    const { container } = render(
+      <SidebarBottomNowPlaying
+        track={{ ...fullTrack, artistName: null, artworkUrl: null }}
+        isPlaying={false}
+        onPlay={vi.fn()}
+      />
+    );
+
+    expect(container).toHaveTextContent(fullTrack.trackTitle);
+    expect(container.textContent).toBe(fullTrack.trackTitle);
+    expect(container.querySelector('img')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Play' })).toBeEnabled();
+  });
+
+  it.each([
+    { state: 'paused', track: fullTrack, isPlaying: false },
+    { state: 'playing', track: fullTrack, isPlaying: true },
+    {
+      state: 'empty',
+      track: { trackTitle: null, artistName: null, artworkUrl: null },
+      isPlaying: false,
+    },
+    {
+      state: 'partial track',
+      track: { ...fullTrack, artistName: null, artworkUrl: null },
+      isPlaying: false,
+    },
+    {
+      state: 'artwork only',
+      track: { ...fullTrack, trackTitle: null, artistName: null },
+      isPlaying: false,
+    },
+    {
+      state: 'long title',
+      track: {
+        ...fullTrack,
+        trackTitle:
+          'A Very Long Track Title That Must Truncate Without Widening the Sidebar',
+      },
+      isPlaying: false,
+    },
+    {
+      state: 'RTL',
+      track: {
+        ...fullTrack,
+        trackTitle: 'عنوان مسار طويل يجب اقتطاعه دون توسيع الشريط الجانبي',
+        artistName: 'اسم الفنان',
+      },
+      isPlaying: false,
+      dir: 'rtl',
+    },
+    {
+      state: 'collapsed paused',
+      track: fullTrack,
+      isPlaying: false,
+      collapsed: true,
+    },
+    {
+      state: 'collapsed playing',
+      track: fullTrack,
+      isPlaying: true,
+      collapsed: true,
+    },
+    {
+      state: 'expanded controls',
+      track: fullTrack,
+      isPlaying: true,
+      onExpand: vi.fn(),
+      onDismiss: vi.fn(),
+    },
+  ])(
+    'has no axe violations with $state',
+    async ({ state: _state, dir, ...props }) => {
+      const { container } = render(
+        <div dir={dir}>
+          <SidebarBottomNowPlaying {...props} onPlay={vi.fn()} />
+        </div>
+      );
+      await expectNoA11yViolations(container);
+    }
+  );
+
   it('renders track title + artist + play button', () => {
     const { container } = render(
       <SidebarBottomNowPlaying
