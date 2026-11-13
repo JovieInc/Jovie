@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import { fastRender } from '@/tests/utils/fast-render';
 import { AssistantMessageText } from './AssistantMessageText';
+import { EntityResolutionProvider } from './EntityResolutionProvider';
 
 vi.mock('./ChatMarkdown', () => ({
   ChatMarkdown: ({
@@ -59,6 +60,38 @@ describe('AssistantMessageText', () => {
     const content = await screen.findByTestId('entity-chip-popover-content');
     expect(content).toHaveAttribute('data-entity-kind', 'release');
     expect(content.textContent).toContain('Unavailable reference');
+  });
+
+  it('renders an own-profile mention with the creator name and a You card', async () => {
+    const user = userEvent.setup();
+    fastRender(
+      <EntityResolutionProvider profileId='p1' ownProfileLabel='Tim White'>
+        <AssistantMessageText content='Your page @profile:p1[Stale Name] is live.' />
+      </EntityResolutionProvider>
+    );
+
+    const trigger = screen.getByTestId('entity-chip-popover-trigger');
+    expect(trigger).toHaveTextContent('Profile: Tim White');
+    expect(screen.queryByText(/Stale Name/)).toBeNull();
+    expect(screen.queryByText(/@profile:/)).toBeNull();
+
+    await user.click(trigger);
+    const content = await screen.findByTestId('entity-chip-popover-content');
+    expect(content).toHaveAttribute('data-entity-kind', 'profile');
+    expect(content.textContent).toContain('Artist · You');
+  });
+
+  it("shows another creator's profile id as unavailable", () => {
+    fastRender(
+      <EntityResolutionProvider profileId='p1' ownProfileLabel='Tim White'>
+        <AssistantMessageText content='See @profile:p2[Someone Else] too.' />
+      </EntityResolutionProvider>
+    );
+
+    expect(screen.getByTestId('entity-chip-popover-trigger')).toHaveTextContent(
+      'Unavailable reference'
+    );
+    expect(screen.queryByText(/Someone Else/)).toBeNull();
   });
 
   it('keeps structured markdown on the normal block renderer', () => {

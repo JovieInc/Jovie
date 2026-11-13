@@ -123,6 +123,43 @@ describe('SlashCommandMenu attachment actions', () => {
     expect(source).toContain('release: Layers,');
   });
 
+  it('gives every entity kind, including profile, a header icon', () => {
+    const source = readFileSync(
+      resolve(__dirname, './SlashCommandMenu.tsx'),
+      'utf8'
+    );
+    expect(source).toContain('profile: UserCircle,');
+
+    const { container } = render(
+      withProviders(
+        <SlashCommandMenu
+          state={{
+            status: 'entity',
+            kind: 'profile',
+            query: 'tim',
+            startIdx: 0,
+            selectedIndex: 0,
+          }}
+          profileId='profile-test'
+          onSelectSkill={vi.fn()}
+          onSelectEntity={vi.fn()}
+          onSetSelected={vi.fn()}
+          onMoveSelected={vi.fn()}
+          onClose={vi.fn()}
+        />
+      )
+    );
+
+    const header = container.querySelector(
+      '.system-b-slash-header-token-entity'
+    );
+    expect(header?.querySelector('svg')).toHaveClass('lucide-user-circle');
+    // The profile picker has no provider: it shows the empty row, not a crash.
+    const options = screen.getAllByRole('option');
+    expect(options).toHaveLength(1);
+    expect(options[0]).toHaveAttribute('aria-disabled', 'true');
+  });
+
   it('moves selection when Firefox reports keyCode 229 for ArrowDown', () => {
     const onMoveSelected = vi.fn();
     render(

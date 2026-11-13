@@ -1,3 +1,4 @@
+import { checkTooltipCopy } from '@jovie/copy/tooltip-copy';
 import {
   act,
   fireEvent,
@@ -15,6 +16,7 @@ import {
   type SidebarDockProps,
   sidebarDockSeenKey,
 } from './SidebarDock';
+import { Tooltip } from './Tooltip';
 
 // Expose the Next Link contract without starting a router in jsdom.
 vi.mock('next/link', () => ({
@@ -350,6 +352,76 @@ describe('SidebarDock', () => {
       </SidebarDock>
     );
     expect(container.querySelector('[data-dock-badges]')).toBeNull();
+  });
+
+  // Founder report: the sidebar opened, the status tooltip armed, the sidebar
+  // collapsed, and the tooltip stayed up with no pointer on it. UserButton
+  // wires the dock status exactly like this harness.
+  describe('status tooltip across collapse', () => {
+    const qrNote =
+      'Profile QR codes are now drawn right on your device. Visiting a profile no longer reaches an outside service to render them, so pages load with zero third-party requests, keeping the promise we publish on our comparison page.';
+    const Dock = ({ collapsed }: { readonly collapsed: boolean }) => (
+      <SidebarDock
+        userId='one'
+        collapsed={collapsed}
+        release={{ ...release, title: qrNote }}
+      >
+        {status => (
+          <Tooltip
+            label={status?.label ?? 'Open user menu'}
+            side='right'
+            open={status ? undefined : false}
+          >
+            <button type='button'>Account</button>
+          </Tooltip>
+        )}
+      </SidebarDock>
+    );
+    const tooltip = () => screen.queryByRole('tooltip');
+    const settle = () => act(async () => {});
+
+    it('never leaves the tooltip up after the sidebar collapses', async () => {
+      const { rerender } = render(<Dock collapsed={false} />);
+      const trigger = screen.getByRole('button', { name: 'Account' });
+
+      // Sidebar open: hover arms the tooltip, then the pointer leaves.
+      fireEvent.focus(trigger);
+      await settle();
+      expect(tooltip()).not.toBeInTheDocument();
+      fireEvent.blur(trigger);
+      await settle();
+
+      rerender(<Dock collapsed />);
+      await settle();
+      expect(tooltip()).not.toBeInTheDocument();
+    });
+
+    it('closes when collapsed flips, even with focus still on the trigger', async () => {
+      const { rerender } = render(<Dock collapsed />);
+      const trigger = screen.getByRole('button', { name: 'Account' });
+      fireEvent.focus(trigger);
+      expect(await screen.findByRole('tooltip')).toBeInTheDocument();
+
+      rerender(<Dock collapsed={false} />);
+      await settle();
+      expect(tooltip()).not.toBeInTheDocument();
+      rerender(<Dock collapsed />);
+      await settle();
+      expect(tooltip()).not.toBeInTheDocument();
+
+      // Fresh intent still works.
+      fireEvent.blur(trigger);
+      fireEvent.focus(trigger);
+      expect(await screen.findByRole('tooltip')).toBeInTheDocument();
+    });
+
+    it('shows a short title, not the changelog paragraph', async () => {
+      render(<Dock collapsed />);
+      fireEvent.focus(screen.getByRole('button', { name: 'Account' }));
+      const label = "What's new: Profile QR codes are now drawn…";
+      expect(await screen.findByRole('tooltip')).toHaveTextContent(label);
+      expect(checkTooltipCopy(label)).toEqual([]);
+    });
   });
 
   it('reserves the audio slot without a duplicate transport while the full player is visible', () => {

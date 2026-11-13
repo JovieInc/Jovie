@@ -1,5 +1,6 @@
 'use client';
 
+import { shortTooltipTitle } from '@jovie/copy/tooltip-copy';
 import { IconButton } from '@jovie/ui';
 import { ArrowUp, AudioLines, Download, X } from 'lucide-react';
 import Link from 'next/link';
@@ -135,7 +136,9 @@ export function SidebarDock({
     : '';
   const statusLabels = [
     showUpdate && updateLabel,
-    showRelease && `What's new: ${release?.title}`,
+    // Tooltip copy rule: a short title only. The story lives on /changelog,
+    // which the expanded What's new card links to.
+    showRelease && `What's new: ${shortTooltipTitle(release?.title ?? '')}`,
     showAudio && audioLabel,
     install && 'Install Jovie',
   ].filter(Boolean);
