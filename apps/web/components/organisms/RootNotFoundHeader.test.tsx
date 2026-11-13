@@ -8,7 +8,9 @@ describe('RootNotFoundHeader', () => {
     render(<RootNotFoundHeader />);
 
     const nav = screen.getByRole('navigation', { name: 'Primary Navigation' });
-    expect(screen.getByTestId('header-nav')).toContainElement(nav);
+    const header = screen.getByTestId('header-nav');
+    expect(header).toContainElement(nav);
+    expect(header.style.zIndex).toBe('var(--z-index-site-header)');
     const home = within(nav)
       .getAllByRole('link')
       .find(link => link.getAttribute('href') === APP_ROUTES.HOME);

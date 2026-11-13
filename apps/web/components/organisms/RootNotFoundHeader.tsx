@@ -28,7 +28,7 @@ export function RootNotFoundHeader() {
         fontSynthesisWeight: 'none',
         borderColor: 'var(--linear-border-default)',
         backgroundColor: 'var(--linear-bg-header)',
-        zIndex: 100,
+        zIndex: 'var(--z-index-site-header)',
         backdropFilter: 'blur(var(--blur-header))',
         WebkitBackdropFilter: 'blur(var(--blur-header))',
         minWidth: 0,

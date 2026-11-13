@@ -246,7 +246,12 @@ describe('root not-found client import graph', () => {
     const reached = forbiddenPackageImports(marketingChrome).map(
       entry => entry.split(' <- ')[0]
     );
-    expect(reached).toEqual(expect.arrayContaining(['sonner']));
+    // HeaderNav loads UserButton through next/dynamic, so sonner is not a
+    // static import of this graph. Motion and the auth client still are: if
+    // the walker stops seeing them, the 404 prohibitions above prove nothing.
+    expect(reached).toEqual(
+      expect.arrayContaining(['motion/react', 'better-auth/react'])
+    );
     expect(forbiddenFirstPartyModules(marketingChrome)).toEqual(
       expect.arrayContaining([
         'components/organisms/HeaderNav.tsx',

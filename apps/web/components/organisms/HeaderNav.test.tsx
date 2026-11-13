@@ -92,6 +92,9 @@ describe('HeaderNav states', () => {
       'href',
       APP_ROUTES.SIGNIN
     );
+    expect(screen.getByTestId('header-nav').style.zIndex).toBe(
+      'var(--z-index-site-header)'
+    );
     expect(screen.getAllByRole('link')).toHaveLength(2);
     await expectNoA11yViolations(container);
   });
