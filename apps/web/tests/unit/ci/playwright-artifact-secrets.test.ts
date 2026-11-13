@@ -147,7 +147,6 @@ const imageAllowedJobs = new Set([
   'ci.yml:ci-visual-snapshot-compare',
   // Manual public-profile CTA identity captures only (dispatch-gated flag).
   'e2e-full-matrix.yml:e2e-full-matrix',
-  // Orphaned-overlay captures from the signed-out production crawl (public pages only).
   'product-crawl.yml:crawl',
   'screenshots.yml:generate',
   'synthetic-monitoring.yml:synthetic-test',
