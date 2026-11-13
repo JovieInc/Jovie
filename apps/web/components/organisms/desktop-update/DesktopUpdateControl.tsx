@@ -200,7 +200,7 @@ export function DesktopUpdateControl({
         role='status'
         aria-live='polite'
         aria-atomic='true'
-        className='sr-only'
+        className='sr-only tabular-nums'
       >
         {view.announcement}
       </span>
