@@ -1,5 +1,6 @@
 import { TooltipProvider } from '@jovie/ui';
 import { fireEvent, render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import type { ReactElement } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { OutboundQueue } from '@/lib/outbound/types';
@@ -149,6 +150,67 @@ describe('OutboundWorkspace', () => {
     expect(
       screen.getByRole('button', { name: 'Needs evidence 0' })
     ).toHaveTextContent('0');
+  });
+
+  it('labels a held existing relationship and tags a noted one', async () => {
+    const user = userEvent.setup();
+    mockQueue(
+      outboundFixtureQueue([
+        outboundFixtureRow({
+          leadId: 'n',
+          name: 'Nova Lane',
+          handle: 'novalane',
+          view: 'ready',
+          relationshipNotes: [
+            "Relationship: Armada Music, Tim's vocalist deals",
+          ],
+        }),
+        outboundFixtureRow({
+          leadId: 'd',
+          name: 'Dannic',
+          handle: 'djdannic',
+          view: 'held',
+          flags: ['existing_relationship'],
+          relationshipHold:
+            'Existing relationship: flag to Tim, no cold outreach',
+          message: null,
+        }),
+      ])
+    );
+    renderWorkspace();
+    // The noted artist stays in Ready to certify, with the tag on the row.
+    expect(
+      screen.getByRole('button', { name: 'Ready to certify 1' })
+    ).toBeInTheDocument();
+    expect(screen.getByTestId('outbound-relationship-note')).toHaveTextContent(
+      "Relationship: Armada Music, Tim's vocalist deals"
+    );
+    // The held artist is not offered in Ready to certify.
+    expect(screen.queryByText('Dannic')).toBeNull();
+    expect(
+      screen.queryByTestId('outbound-flag-existing-relationship')
+    ).toBeNull();
+    await user.click(
+      screen.getByRole('button', { name: /All Outbound views/ })
+    );
+    await user.click(screen.getByRole('menuitemradio', { name: 'Held 1' }));
+    expect(screen.getByText('Dannic')).toBeInTheDocument();
+    expect(
+      screen.getByTestId('outbound-flag-existing-relationship')
+    ).toHaveAttribute(
+      'title',
+      'Existing relationship: flag to Tim, no cold outreach'
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Review Dannic' }));
+    expect(mocks.decide).not.toHaveBeenCalled();
+    expect(mocks.refreshEvidence).not.toHaveBeenCalled();
+    expect(
+      (
+        mocks.panels.at(-1) as ReactElement<{
+          row: { relationshipHold: string };
+        }>
+      ).props.row.relationshipHold
+    ).toBe('Existing relationship: flag to Tim, no cold outreach');
   });
 
   it('shows a retryable error state', () => {

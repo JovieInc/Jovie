@@ -18,13 +18,24 @@ afterEach(() => {
   cleanupFixtures();
 });
 
+// The CLI compares this fixture with origin/main's route-js-budgets.json.
+// Group and route ceilings that the cases do not intentionally move must stay
+// at the committed ratchet, or a later --write looks like growth.
+const committedBudgets = JSON.parse(
+  readFileSync(join(__dirname, 'route-js-budgets.json'), 'utf8')
+) as {
+  routes: { '/app/chat': number };
+  groups: { admin: { baselineKb: number }; dashboard: { baselineKb: number } };
+};
+
 function control() {
   const budgets = firstLoadBudgets({
-    admin: { baselineKb: 1345 },
-    dashboard: { baselineKb: 1385 },
+    admin: { baselineKb: committedBudgets.groups.admin.baselineKb },
+    dashboard: { baselineKb: committedBudgets.groups.dashboard.baselineKb },
     marketing: { baselineKb: 50 },
     public: { baselineKb: 80 },
   });
+  budgets.routes['/app/chat'] = committedBudgets.routes['/app/chat'];
   const routeGroups = {
     admin: { budgets: { initialJS_gzip_kb: 300 } },
     dashboard: { budgets: { initialJS_gzip_kb: 250 } },

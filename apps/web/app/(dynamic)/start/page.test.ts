@@ -14,6 +14,8 @@ const mocks = vi.hoisted(() => ({
   resolveSyntheticPassageToken: vi.fn().mockResolvedValue(null),
   resolveStartEntryProfile: vi.fn().mockResolvedValue(null),
   getCurrentOnboardingSessionId: vi.fn().mockResolvedValue(null),
+  // Null gives every headers() call its own object (no cross-test memo).
+  requestHeaders: null as Headers | null,
 }));
 
 vi.mock('@/lib/onboarding/session', () => ({
@@ -21,7 +23,7 @@ vi.mock('@/lib/onboarding/session', () => ({
 }));
 
 vi.mock('next/headers', () => ({
-  headers: async () => new Headers(),
+  headers: async () => mocks.requestHeaders ?? new Headers(),
 }));
 
 vi.mock('@/lib/auth/better-auth', () => ({
@@ -71,10 +73,14 @@ vi.mock('@/lib/waitlist/winback-resume.server', () => ({
   recordWinbackResumeClick: winbackMocks.recordWinbackResumeClick,
 }));
 
+import { getRequestSession } from '@/lib/auth/request-session';
 import StartPage from './page';
 
 describe('StartPage', () => {
-  afterEach(() => vi.unstubAllEnvs());
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    mocks.requestHeaders = null;
+  });
 
   beforeEach(() => {
     // These entry-property fixtures exercise the open default (Tim,
@@ -313,6 +319,30 @@ describe('StartPage', () => {
         'onboarding_chat'
       );
       expect(result.props.turnstileTestMode).toBe(true);
+    });
+
+    it('reuses the session the auth gate already read for this request', async () => {
+      // One request: Next returns the same headers() object throughout.
+      mocks.requestHeaders = new Headers();
+      const session = { user: { id: 'u3' } };
+      mocks.getSession.mockReset().mockResolvedValue(session);
+      // The gate's own cookie-mode read (resolveUserState is mocked here).
+      await getRequestSession();
+      mocks.resolveUserState.mockResolvedValueOnce({
+        state: 'NEEDS_ONBOARDING',
+        context: { email: 'artist@band.com' },
+      });
+
+      await StartPage({ searchParams: Promise.resolve({}) });
+
+      expect(mocks.getSession).toHaveBeenCalledOnce();
+      expect(mocks.getSession).toHaveBeenCalledWith({
+        headers: mocks.requestHeaders,
+      });
+      expect(mocks.resolveSyntheticPassage).toHaveBeenLastCalledWith(
+        session,
+        'onboarding_chat'
+      );
     });
 
     it('falls back to the production widget when the passage check throws', async () => {

@@ -132,6 +132,31 @@ export const MixedScores: Story = {
   ],
 };
 
+export const RelationshipNotes: Story = {
+  decorators: [
+    Story => (
+      <SeededQuery
+        data={outboundFixtureQueue([
+          outboundFixtureRow({
+            name: 'Ada — Listen on YouTube, Spotify, Apple Music',
+            view: 'held',
+            flags: ['existing_relationship', 'possible_non_artist'],
+            relationshipHold:
+              'Existing relationship: flag to Tim, no cold outreach',
+            relationshipNotes: ['Relationship note retained from source'],
+            entityNote: 'Possible non-artist review required',
+            message: null,
+          }),
+        ])}
+      >
+        <div className='h-screen bg-base text-primary-token'>
+          <Story />
+        </div>
+      </SeededQuery>
+    ),
+  ],
+};
+
 /** Imported display names stay intact; the fixture never cleans canonical data. */
 export const LongImportedIdentity: Story = {
   decorators: [

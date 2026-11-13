@@ -38,3 +38,21 @@ export const Flagged: Story = {
     }),
   },
 };
+
+export const HeldForRelationship: Story = {
+  args: {
+    row: outboundFixtureRow({
+      view: 'held',
+      flags: ['existing_relationship'],
+      relationshipHold: 'Existing relationship: flag to Tim, no cold outreach',
+    }),
+  },
+};
+
+export const RelationshipNote: Story = {
+  args: {
+    row: outboundFixtureRow({
+      relationshipNotes: ["Relationship: Armada Music, Tim's vocalist deals"],
+    }),
+  },
+};

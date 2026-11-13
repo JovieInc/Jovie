@@ -2,6 +2,54 @@ import { expect, test } from '@playwright/test';
 
 // The queue fixture reads seeded data only; row actions open the inspector.
 test.describe('Outbound review geometry', () => {
+  test('keeps relationship holds explicit in a compact row with multiple source notes', async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto(
+      '/iframe.html?id=admin-outbound-workspace--relationship-notes&viewMode=story'
+    );
+    await page.getByRole('button', { name: /All Outbound views/ }).click();
+    await page.getByRole('menuitemradio', { name: 'Held 1' }).click();
+    const row = page.locator('[data-testid^="outbound-row-"]');
+    const hold = row.getByTestId('outbound-flag-existing-relationship');
+    await expect(hold).toHaveText('Existing relationship');
+    await expect(hold).toHaveAttribute(
+      'title',
+      'Existing relationship: flag to Tim, no cold outreach'
+    );
+    expect((await row.boundingBox())!.height).toBe(40);
+    const notes = hold.locator('..');
+    expect(
+      await hold.evaluate(element => {
+        const range = document.createRange();
+        range.selectNodeContents(element);
+        return (
+          range.getBoundingClientRect().right <=
+          element.parentElement!.getBoundingClientRect().right
+        );
+      })
+    ).toBe(true);
+    await expect(row.getByTestId('outbound-relationship-note')).toHaveAttribute(
+      'title',
+      'Relationship note retained from source'
+    );
+    await expect(row.getByTestId('outbound-flag-non-artist')).toHaveText(
+      'Possible non-artist'
+    );
+    await notes.hover();
+    await page.mouse.wheel(600, 0);
+    await expect
+      .poll(() => notes.evaluate(element => element.scrollLeft))
+      .toBeGreaterThan(0);
+    const action = row.getByRole('button', { name: /^Review / });
+    const box = await action.boundingBox();
+    expect(box!.x + box!.width).toBeLessThanOrEqual(390);
+    await action.focus();
+    await page.keyboard.press('Enter');
+    await expect(row).toHaveClass(/system-b-table-row-selected/);
+  });
+
   test('preserves a long imported identity while keeping its review action in view', async ({
     page,
   }) => {
