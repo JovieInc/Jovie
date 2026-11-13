@@ -1151,6 +1151,7 @@ export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/mesh-host-ack.test.mjs',
   'scripts/lib/__tests__/merge-queue-recovery.test.mjs',
   'scripts/lib/__tests__/capability-request.test.mjs',
+  'scripts/lib/__tests__/native-capability-adapter.test.mjs',
   'scripts/lib/__tests__/capability-recovery-integration.test.mjs',
   'scripts/lib/__tests__/job-capability-observation.test.mjs',
   'scripts/lib/__tests__/merge-queue-recovery-evidence.test.mjs',
