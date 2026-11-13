@@ -117,7 +117,6 @@ export const PlaybackDiscoverability: Story = {
   play: async ({ canvasElement, args }) => {
     const control = within(canvasElement).getByRole('button', {
       name: args.isPlaying ? 'Pause' : 'Play',
-      exact: true,
     });
     const wrapper = control.parentElement;
     if (!wrapper)
