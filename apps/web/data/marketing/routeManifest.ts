@@ -254,6 +254,14 @@ export interface RouteManifestEntry {
       readonly hiddenWhen: 'scripting-enabled';
     }[];
     readonly allowedFinalPaths?: readonly string[];
+    /**
+     * Set when the single redirect destination is an app route outside this
+     * manifest's static-marketing scope (e.g. the (dynamic)/start onboarding
+     * chat), so the destination cannot carry its own manifest recipe entry.
+     * Fail-closed without it: a redirect destination with no canonical
+     * manifest page drops the entry from the exact capture set.
+     */
+    readonly destinationIsAppRoute?: boolean;
     readonly allowsAuthShell?: boolean;
     readonly requiresSharedChrome?: boolean;
   };
@@ -1705,15 +1713,24 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
       source:
         'source binding audit 2026-09-01; JOV-5376 public waitlist front door',
       notes:
-        'Signed-out /waitlist is the AuthShell email capture. It does not mount a marketing hero. The stub recipe remains intentionally incomplete.',
+        'Signed-out /waitlist is the AuthShell email capture while public signup is closed (kill-switch state). One front door (Tim, 2026-11-09): with signup open it hands off into the /start onboarding chat; the signed-in pending receipt is untouched. The stub recipe remains intentionally incomplete.',
     },
     status: 'active',
     specVersion: '1.0.0',
     url: '/waitlist',
     healthCheck: {
       path: '/waitlist',
-      expected: 'page',
-      waitFor: '#auth-form',
+      expected: 'redirect',
+      allowedFinalPaths: ['/start'],
+      // One front door (Tim, 2026-11-09): /start is the (dynamic)/ onboarding
+      // chat — outside this manifest's static-marketing scope (the global page
+      // contract pins the manifest to the four static route roots), so the
+      // destination cannot carry its own manifest recipe entry. Declared
+      // explicitly here; the cert still follows the redirect and certifies
+      // the /start DOM, and /start's own journey stays covered by the
+      // auth/onboarding canaries and the claim checkout dogfood.
+      destinationIsAppRoute: true,
+      waitFor: '[data-testid="onboarding-chat"]',
       allowsAuthShell: true,
       requiresSharedChrome: false,
     },
@@ -2209,11 +2226,17 @@ export function getMarketingExactPublicRouteTargets(
       const canonical = manifest.find(
         candidate => candidate.url === destination
       );
+      // App-route destinations (e.g. /start) are declared explicitly and stay
+      // outside this manifest; everything else must resolve to a canonical
+      // active manifest page or the entry is dropped fail-closed.
+      const declaredAppRouteDestination =
+        entry.healthCheck?.destinationIsAppRoute === true;
       if (
-        !canonical ||
-        canonical.status !== 'active' ||
-        (canonical.healthCheck?.expected ?? 'page') !== 'page' ||
-        isRenderFixturePathname(destination)
+        !declaredAppRouteDestination &&
+        (!canonical ||
+          canonical.status !== 'active' ||
+          (canonical.healthCheck?.expected ?? 'page') !== 'page' ||
+          isRenderFixturePathname(destination))
       )
         return [];
       expectedPath = destination;

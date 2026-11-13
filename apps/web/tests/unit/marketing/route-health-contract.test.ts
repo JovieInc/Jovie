@@ -234,6 +234,14 @@ describe('marketing route health contract', () => {
         allowsAuthShell: false,
         requiresSharedChrome: false,
       },
+      {
+        glob: 'waitlist/page.tsx',
+        path: '/waitlist',
+        expected: 'redirect',
+        allowedFinalPaths: ['/start'],
+        allowsAuthShell: true,
+        requiresSharedChrome: false,
+      },
       ...['/demo/video', '/demovideo'].map(path => ({
         glob: `(marketing)${path}/page.tsx`,
         path,
@@ -250,7 +258,8 @@ describe('marketing route health contract', () => {
       )
     ).toMatchObject({
       path: '/waitlist',
-      expected: 'page',
+      expected: 'redirect',
+      allowedFinalPaths: ['/start'],
       allowsAuthShell: true,
       requiresSharedChrome: false,
     });
@@ -258,7 +267,6 @@ describe('marketing route health contract', () => {
     for (const [url, selector] of [
       ['/pay', '[data-testid="pay-hero"]'],
       ['/support', '[data-testid="marketing-section-hero"]'],
-      ['/waitlist', '#auth-form'],
     ] as const) {
       expect(
         MARKETING_EXACT_PUBLIC_ROUTE_TARGETS.find(target => target.url === url)
@@ -270,6 +278,20 @@ describe('marketing route health contract', () => {
         viewports: ['desktop', 'mobile'],
       });
     }
+    // One front door (Tim, 2026-11-09): anonymous /waitlist redirects into
+    // the /start onboarding chat when public signup is open, so the exact
+    // capture follows the redirect and certifies the destination DOM.
+    expect(
+      MARKETING_EXACT_PUBLIC_ROUTE_TARGETS.find(
+        target => target.url === '/waitlist'
+      )
+    ).toMatchObject({
+      fixturePath: '/waitlist',
+      expectedPath: '/start',
+      expectedRuntimeSelector: '[data-testid="onboarding-chat"]',
+      sourceSha: 'capture-time-git-sha',
+      viewports: ['desktop', 'mobile'],
+    });
 
     const waitlist = MARKETING_ROUTE_MANIFEST.find(
       entry => entry.url === '/waitlist'
