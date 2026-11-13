@@ -58,6 +58,33 @@ export function WaitlistSpotifySearch({
 
   const inputRef = useRef<HTMLInputElement | null>(null);
   const resultsListRef = useRef<HTMLDivElement>(null);
+  const hideResultsTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
+    null
+  );
+
+  // Clear the pending blur-hide timer on unmount so the deferred
+  // setShowResults can never fire after the DOM environment is gone
+  // (vitest teardown: unhandled `ReferenceError: window is not defined`).
+  useEffect(
+    () => () => {
+      if (hideResultsTimeoutRef.current !== null) {
+        clearTimeout(hideResultsTimeoutRef.current);
+        hideResultsTimeoutRef.current = null;
+      }
+    },
+    []
+  );
+
+  // Grace period after blur so a fast click on a result still lands.
+  const scheduleHideResults = useCallback(() => {
+    if (hideResultsTimeoutRef.current !== null) {
+      clearTimeout(hideResultsTimeoutRef.current);
+    }
+    hideResultsTimeoutRef.current = setTimeout(() => {
+      hideResultsTimeoutRef.current = null;
+      setShowResults(false);
+    }, 150);
+  }, []);
 
   const { results, state, search, clear } = useArtistSearchQuery({
     debounceMs: 300,
@@ -300,7 +327,7 @@ export function WaitlistSpotifySearch({
           onChange={handleSearchInputChange}
           onKeyDown={handleKeyDown}
           onFocus={() => searchQuery.length >= 1 && setShowResults(true)}
-          onBlur={() => setTimeout(() => setShowResults(false), 150)}
+          onBlur={scheduleHideResults}
           placeholder='Search artist name (optional)'
           disabled={isSubmitting}
           autoCapitalize='none'
