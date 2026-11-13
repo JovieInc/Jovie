@@ -124,4 +124,36 @@ describe('ChatMessage System B source contract', () => {
       );
     }
   });
+
+  it('routes transcript type literals through the shared scale tokens', () => {
+    const css = postcss.parse(
+      readFileSync(resolve(appRoot, designSystemPath), 'utf8')
+    );
+    const read = (selector: string, prop: string): string[] => {
+      const values: string[] = [];
+      css.walkRules(rule => {
+        if (rule.selector !== selector) return;
+        rule.walkDecls(prop, declaration => {
+          values.push(declaration.value);
+        });
+      });
+      return values;
+    };
+
+    for (const selector of [
+      ':where(.system-b-chat-markdown code)',
+      ':where(.system-b-chat-markdown pre code)',
+      ':where(.system-b-transcript-skill-chip)',
+    ]) {
+      expect(read(selector, 'font-size')).toEqual(['var(--text-app)']);
+    }
+    for (const selector of [
+      ':where(.system-b-chat-activity-title)',
+      ':where(.system-b-chat-markdown)',
+    ]) {
+      expect(read(selector, 'letter-spacing')).toEqual([
+        'var(--tracking-tight)',
+      ]);
+    }
+  });
 });
