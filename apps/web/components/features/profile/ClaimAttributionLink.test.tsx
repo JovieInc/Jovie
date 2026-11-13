@@ -3,7 +3,7 @@ import { afterEach, expect, it } from 'vitest';
 import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import { ClaimAttributionLink } from './ClaimAttributionLink';
 
-afterEach(() => globalThis.history.replaceState(null, '', '/'));
+afterEach(() => act(() => globalThis.history.replaceState(null, '', '/')));
 
 it('preserves the destination and follows safe campaign changes without cookies', async () => {
   const { container } = render(
