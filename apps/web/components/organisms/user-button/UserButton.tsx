@@ -654,12 +654,12 @@ export function UserButton({
           calm && 'h-8'
         )}
       >
-        <div className='h-6 w-6 shrink-0 rounded-full bg-sidebar-accent animate-pulse motion-reduce:animate-none' />
+        <div className='h-6 w-6 shrink-0 rounded-full bg-interactive-hover animate-pulse motion-reduce:animate-none' />
         <div
           data-user-button-loading-copy
           className={cn('flex-1', SHELL_RAIL_STAGE)}
         >
-          <div className='h-3 w-20 rounded-sm bg-sidebar-accent animate-pulse motion-reduce:animate-none' />
+          <div className='h-3 w-20 rounded-sm bg-interactive-hover animate-pulse motion-reduce:animate-none' />
         </div>
       </div>
     ) : (

@@ -229,6 +229,11 @@
     "apps/web/components/atoms/BrandLogo.tsx": {
       "permission-denied": "BrandLogo only draws the brand mark and has no permission input or gated action; the detector matched role='img' on the svg."
     },
+    "apps/web/components/atoms/CopyToggleIcon.tsx": {
+      "partial": "The only required prop is copied; Idle and Copied already render with every optional prop (className, size, strokeWidth) left out, and Large sets size. There is no data that could arrive incomplete.",
+      "long-content": "The atom draws one fixed-size icon and no text, so nothing can grow. The detector matched aria-label in the doc-comment example and the text- colour class.",
+      "rtl-overflow": "The atom draws one symmetric icon and no text, so direction changes nothing. The detector matched aria-label in the doc-comment example and the text- colour class."
+    },
     "apps/web/components/atoms/Divider.tsx": {
       "permission-denied": "A divider is a styled separator line with no action, data or account; nothing can be gated. The detector matched role='separator'."
     },
@@ -432,6 +437,9 @@
     },
     "apps/web/components/features/profile/ProfileAeoProofClaimCard.tsx": {
       "empty": "The proof claim card renders no collection: one heading, one note and one CTA, all required props; the detector matched the items-start class."
+    },
+    "apps/web/components/features/profile/ProfilePrimaryTabPanel.tsx": {
+      "offline": "The panel fetches nothing itself: releases, tour dates and the catalog result arrive as props from the server-rendered profile, and a failed catalog read arrives as catalogLoadFailed (ErrorCatalogLoadFailed, whose Try Again reloads the page). The detector matched the word skeleton in the visitorAssignmentResolved doc comment, which LoadingAlertsAssignment shows."
     },
     "apps/web/components/features/profile/ProfileViewTracker.tsx": {
       "error": "The tracker returns null; a refused beacon falls back to the tracking mutation and nothing is shown to the visitor, so there is no error state to render. ProfileViewTracker.certificate.test.tsx asserts the fallback and an axe-clean page.",
@@ -870,6 +878,9 @@
       "long-content": "The skeleton renders no visible text: only Skeleton blocks of fixed width and a fixed aria-label per variant, so there is no content to grow.",
       "offline": "The skeleton is a static Suspense fallback that fetches nothing; when the segment cannot load, the route's error boundary replaces it, not the skeleton.",
       "permission-denied": "The skeleton draws the same placeholders for everyone. The detector matched role='status' and the admin layout variant; access to the admin segment is decided by the route before the loaded surface, not by this fallback."
+    },
+    "apps/web/components/shell/DictationWaveform.tsx": {
+      "empty": "The strip draws a fixed count of decorative bars (32 unless bars is set) and takes no data, so it has no collection to empty. The detector matched the items-center class and the word list in the array-index-key comment."
     },
     "apps/web/components/shell/InstallBanner.tsx": {
       "empty": "The banner renders one card from scalar props (title, description, CTA) and owns no collection that could be empty; omitted copy falls back to defaults (PartialCustomTitle story). The detector matched the items-center class."
