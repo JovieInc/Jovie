@@ -381,12 +381,19 @@ class AdditiveStatementMergeTest(unittest.TestCase):
     def conflict(ours, theirs, base=""):
         return f"<<<<<<< HEAD\n{ours}||||||| base\n{base}=======\n{theirs}>>>>>>> main\n"
 
+    @staticmethod
+    def resolve(text):
+        def sh(args, **kwargs):
+            return subprocess.run(args, cwd=kwargs.get('cwd'), capture_output=True, text=True)
+        return statements.resolve_additive_statements_text(
+            text, validate_imports=lambda value: statements.unique_import_bindings(value, Path.cwd(), sh))
+
     def test_unions_named_import_additions_against_the_actual_base(self):
         base = "import { describe, expect, it, vi } from 'vitest';\n"
         ours = "import { afterEach, describe, expect, it, vi } from 'vitest';\n"
         extra = "import { HOME_MARKETING_HEADER_CTA } from '@/data/marketing/headerCta';\n"
         theirs = base + extra
-        self.assertEqual(statements.resolve_additive_statements_text(
+        self.assertEqual(self.resolve(
             self.conflict(ours, theirs, base)),
             "import { describe, expect, it, vi, afterEach } from 'vitest';\n" + extra)
 
@@ -405,9 +412,9 @@ class AdditiveStatementMergeTest(unittest.TestCase):
             ("import { describe, it, it } from 'vitest';\n", added),
         ):
             with self.subTest(ours=ours, theirs=theirs):
-                self.assertIsNone(statements.resolve_additive_statements_text(
+                self.assertIsNone(self.resolve(
                     self.conflict(ours, theirs, base)))
-        self.assertIsNone(statements.resolve_additive_statements_text(
+        self.assertIsNone(self.resolve(
             self.conflict(added, base, base) + self.conflict("changed\n", "other\n", "old\n")))
 
     def test_refuses_collisions_outside_the_hunk_and_existing_module_reorders(self):
@@ -420,16 +427,33 @@ class AdditiveStatementMergeTest(unittest.TestCase):
             "import afterEach from './helper';\n",
             "import { helper as afterEach } from './helper';\n",
             "const afterEach = () => {};\n",
+            "const { helper, afterEach } = makeHelpers();\n",
+            "const [helper, afterEach] = makeHelpers();\n",
+            "import { helper, afterEach } from './helper'\n",
+            "import { helper as afterEach } from './helper'\n",
+            "import * as afterEach from './helper';\n",
+            "const broken = ;\n",
             self.conflict("import { afterEach } from './helper';\n", ""),
         ):
             with self.subTest(context=context):
-                self.assertIsNone(statements.resolve_additive_statements_text(conflict + context))
+                self.assertIsNone(self.resolve(conflict + context))
         alpha = "import { alpha } from './alpha';\n"
         beta = "import { beta } from './beta';\n"
-        self.assertIsNone(statements.resolve_additive_statements_text(self.conflict(
+        self.assertIsNone(self.resolve(self.conflict(
             beta.replace('beta }', 'beta, headBeta }') + alpha.replace('alpha }', 'alpha, headAlpha }'),
             alpha.replace('alpha }', 'alpha, mainAlpha }') + beta.replace('beta }', 'beta, mainBeta }'),
             alpha + beta)))
+
+    def test_named_import_resolution_requires_the_full_file_validator(self):
+        base = "import { it } from 'vitest';\n"
+        conflict = self.conflict("import { it, expect } from 'vitest';\n", base, base)
+        self.assertIsNone(statements.resolve_additive_statements_text(conflict))
+        self.assertIsNone(statements.resolve_additive_statements_text(
+            conflict, validate_imports=lambda _: False))
+        self.assertFalse(statements.unique_import_bindings(base, Path.cwd(),
+                         lambda *args, **kwargs: SimpleNamespace(returncode=1)))
+        with patch.object(statements, 'atomic_write_text', side_effect=OSError('unavailable')):
+            self.assertFalse(statements.unique_import_bindings(base, Path.cwd(), None))
 
     def test_real_git_named_import_conflict_uses_the_existing_file_resolver(self):
         with tempfile.TemporaryDirectory() as scratch:
@@ -496,7 +520,7 @@ class AdditiveStatementMergeTest(unittest.TestCase):
             + "after\n"
             + self.conflict(expect_ours, expect_theirs)
         )
-        merged = statements.resolve_additive_statements_text(text)
+        merged = self.resolve(text)
         self.assertEqual(merged, "before\n" + theirs + ours + "middle\n" + mock_theirs + mock_ours + "after\n" + expect_theirs + expect_ours)
 
     def test_unions_an_import_and_accepts_route_group_paths(self):
@@ -507,7 +531,7 @@ class AdditiveStatementMergeTest(unittest.TestCase):
             "  resolveWinbackResumeToken: winbackMocks.resolveWinbackResumeToken,\n"
             "}));\n"
         )
-        merge = statements.resolve_additive_statements_text
+        merge = self.resolve
         self.assertEqual(merge(self.conflict(imported, mocks)), mocks + imported)
         self.assertEqual(merge(self.conflict(imported, imported)), imported)
         self.assertIsNone(merge(self.conflict(
@@ -541,7 +565,7 @@ class AdditiveStatementMergeTest(unittest.TestCase):
             "const clean = vi.fn();\n",
         ):
             with self.subTest(value=value):
-                self.assertIsNone(statements.resolve_additive_statements_text(value))
+                self.assertIsNone(self.resolve(value))
 
 
 class Size500StaleTest(unittest.TestCase):

@@ -8,7 +8,7 @@ import tempfile
 from pathlib import Path
 
 from atomic_state import atomic_write_text
-from fix_red_statement_merge import contained_by_main, contained_by_main_file, resolve_additive_statements_text
+from fix_red_statement_merge import contained_by_main, contained_by_main_file, resolve_additive_statements_text, unique_import_bindings
 
 LEGACY_CACHE_EXPORT = re.compile(
     r"^\s*export const (?:dynamic|fetchCache|revalidate)\s*=")
@@ -282,7 +282,8 @@ def resolve_additive_statement_file(worktree: Path, rel: str, sh) -> str | None:
     conflict = _diff3_conflict(worktree, rel, sh)
     if conflict is None:
         return None
-    return resolve_additive_statements_text(conflict)
+    return resolve_additive_statements_text(
+        conflict, validate_imports=lambda text: unique_import_bindings(text, worktree, sh))
 
 
 def _unique_json_object(pairs):
