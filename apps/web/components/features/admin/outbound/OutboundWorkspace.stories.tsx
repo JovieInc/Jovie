@@ -70,6 +70,11 @@ function SeededQuery({
   });
   client.setQueryData(queryKeys.admin.outbound(), data);
   client.setQueryData(queryKeys.admin.outboundReadiness(), readiness);
+  for (const row of data.rows) {
+    client.setQueryData(queryKeys.admin.outboundLead(row.leadId), {
+      certification: null,
+    });
+  }
   return (
     <QueryClientProvider client={client}>
       <RightPanelProvider>{children}</RightPanelProvider>
@@ -102,6 +107,33 @@ export const EmptyQueue: Story = {
   decorators: [
     Story => (
       <SeededQuery data={outboundFixtureQueue([])}>
+        <div className='h-screen bg-base text-primary-token'>
+          <Story />
+        </div>
+      </SeededQuery>
+    ),
+  ],
+};
+
+/** Imported display names stay intact; the fixture never cleans canonical data. */
+export const LongImportedIdentity: Story = {
+  decorators: [
+    Story => (
+      <SeededQuery
+        data={outboundFixtureQueue([
+          outboundFixtureRow({
+            name: 'Ada — Listen on YouTube, Spotify, Apple Music',
+            handle: 'ada-and-the-very-long-artist-handle',
+            whyNow: null,
+            fit: 'unknown',
+            fitBasis: 'presence_only',
+            view: 'needs_evidence',
+            nextAction: 'gather_evidence',
+            message: null,
+            missingEvidence: ['dsp', 'identity'],
+          }),
+        ])}
+      >
         <div className='h-screen bg-base text-primary-token'>
           <Story />
         </div>

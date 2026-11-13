@@ -4,7 +4,6 @@ import { Button, Checkbox } from '@jovie/ui';
 import { AlertTriangle, RefreshCw } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { toast } from '@/components/feedback';
-import { Avatar } from '@/components/molecules/Avatar';
 import { EmptyState } from '@/components/molecules/EmptyState';
 import { PageShell } from '@/components/organisms/PageShell';
 import {
@@ -23,7 +22,6 @@ import type {
   ContactEvidenceItem,
 } from '@/lib/contacts/certification';
 import {
-  OUTBOUND_FLAG_LABELS,
   OUTBOUND_NEXT_ACTION_LABELS,
   OUTBOUND_VIEW_LABELS,
   OUTBOUND_VIEWS,
@@ -45,6 +43,7 @@ import {
 import { type ColumnDef, createColumnHelper } from '@/lib/tanstack-table';
 import { cn } from '@/lib/utils';
 import { formatTimeAgo } from '@/lib/utils/date-formatting';
+import { OutboundNameCell } from './OutboundNameCell';
 import { OutboundRail } from './OutboundRail';
 import { OutboundReadinessPanel } from './OutboundReadinessPanel';
 import {
@@ -104,33 +103,10 @@ function bandColumn(
   return columnHelper.accessor(id, {
     header,
     cell: ({ row }) => <BandCell row={row.original} id={id} />,
-    size: id === 'fit' ? 84 : 60,
+    // Include cell padding so the label fits before this column is revealed.
+    size: id === 'fit' ? 112 : 96,
     meta: { priority },
   });
-}
-
-function NameCell({ row }: Readonly<{ row: OutboundRow }>) {
-  const nonArtist = row.flags.includes('possible_non_artist');
-  return (
-    <span className='flex min-w-0 items-center gap-2'>
-      <Avatar src={row.avatarUrl} alt='' name={row.name} size='md' />
-      <span className='max-w-44 truncate text-app font-medium text-primary-token'>
-        {row.name}
-      </span>
-      <span className='max-w-28 truncate text-xs text-tertiary-token'>
-        @{row.handle}
-      </span>
-      {nonArtist ? (
-        <span
-          className='shrink-0 rounded-sm border border-subtle px-1 text-2xs text-secondary-token'
-          title={row.entityNote ?? undefined}
-          data-testid='outbound-flag-non-artist'
-        >
-          {OUTBOUND_FLAG_LABELS.possible_non_artist}
-        </span>
-      ) : null}
-    </span>
-  );
 }
 
 // biome-ignore lint/suspicious/noExplicitAny: TanStack Table requires any for mixed-value-type column arrays
@@ -169,8 +145,8 @@ function buildColumns(
     }),
     columnHelper.accessor('name', {
       header: 'Artist',
-      cell: ({ row }) => <NameCell row={row.original} />,
-      size: 260,
+      cell: ({ row }) => <OutboundNameCell row={row.original} />,
+      size: 180,
       meta: { primary: true },
     }),
     columnHelper.accessor('whyNow', {
@@ -234,7 +210,7 @@ function buildColumns(
           </Button>
         );
       },
-      size: 132,
+      size: 144,
     }),
   ];
 }
@@ -645,7 +621,7 @@ export function OutboundWorkspace() {
                 { variant: 'text' },
                 { variant: 'person' },
               ]}
-              minWidth='440px'
+              minWidth='0'
               getRowId={row => row.leadId}
               getRowClassName={getRowClassName}
               getRowTestId={row => `outbound-row-${row.leadId}`}

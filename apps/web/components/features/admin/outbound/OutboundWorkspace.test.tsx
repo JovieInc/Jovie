@@ -208,4 +208,29 @@ describe('OutboundWorkspace', () => {
     expect(rail.props.row?.leadId).toBe(BEA.leadId);
     expect(screen.getAllByText('Not scored').length).toBeGreaterThan(0);
   });
+
+  it.each([
+    ['build_profile', 'Build Profile'],
+    ['gather_evidence', 'Gather Evidence'],
+  ] as const)(
+    'keeps %s as navigation with the full imported identity',
+    (nextAction, label) => {
+      const row = outboundFixtureRow({
+        name: 'Ada — Listen on YouTube, Spotify, Apple Music',
+        nextAction,
+      });
+      mockQueue(outboundFixtureQueue([row]));
+      renderWorkspace();
+      expect(screen.getByTitle(row.name)).toHaveTextContent(row.name);
+      fireEvent.click(screen.getByRole('button', { name: label }));
+      const rail = mocks.panels.at(-1) as ReactElement<{
+        row: { leadId: string; name: string } | null;
+      }>;
+      expect(rail.props.row).toMatchObject({
+        leadId: row.leadId,
+        name: row.name,
+      });
+      expect(mocks.decide).not.toHaveBeenCalled();
+    }
+  );
 });
