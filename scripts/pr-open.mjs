@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // api-budget: github-user-core 300/hr - on-demand, 10 updates/hr at <=30 REST calls including bounded fresh-run confirmation
-// api-budget: github-user-graphql 100/hr - on-demand, 10 updates/hr at <=10 points for PR metadata and body edits
+// api-budget: github-user-graphql 110/hr - on-demand, 10 updates/hr at <=11 points for capability probe, PR metadata and body edits
 // api-budget: linear-requests 10/hr - on-demand, one referenced-issue lookup per update at 10 updates/hr
 import { spawnSync } from 'node:child_process';
 import {

@@ -1,4 +1,6 @@
 /** Adapters for existing jobs; emitted requests use their existing journals/artifacts. */
+// api-budget: github-user-graphql 0/hr - pure evidence formatting; no network calls
+import { GITHUB_API } from '../../packages/api-client/github.ts';
 import {
   classifyCapabilityFailure,
   createCapabilityRequest,
@@ -33,7 +35,7 @@ export function publicationCapabilityRequest({
       : {}),
     capability: 'github-graphql',
     scope: 'JovieInc/Jovie:pull-request-create',
-    source: 'https://api.github.com/graphql',
+    source: `${GITHUB_API}/graphql`,
   });
   if (!observation) return null;
   return createCapabilityRequest(

@@ -1,4 +1,5 @@
 /** Source-bound access requests. This is a contract, not a scheduler or grant. */
+// api-budget: github-user-graphql 0/hr - pure ApiError classification; no network calls
 import { verify } from 'node:crypto';
 import { ApiError } from '../../packages/api-client/client.ts';
 import {
