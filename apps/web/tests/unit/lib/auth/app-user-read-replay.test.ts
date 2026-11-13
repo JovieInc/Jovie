@@ -23,7 +23,7 @@ const { outcomes, selectMock } = vi.hoisted(() => {
     onRejected?: (reason: unknown) => unknown
   ) => {
     let settled: Promise<unknown>;
-    const outcome = outcomes.shift() ?? (() => ({ rows: [] }));
+    const outcome: QueryOutcome = outcomes.shift() ?? (() => ({ rows: [] }));
     try {
       const result = outcome();
       if (result.error) {
