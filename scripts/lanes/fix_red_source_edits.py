@@ -9,6 +9,7 @@ from pathlib import Path
 
 from atomic_state import atomic_write_text
 from fix_red_statement_merge import contained_by_main, contained_by_main_file, resolve_additive_statements_text, unique_import_bindings
+from screen_debt_merge import resolve_subtractive_screen_debt
 
 LEGACY_CACHE_EXPORT = re.compile(
     r"^\s*export const (?:dynamic|fetchCache|revalidate)\s*=")
@@ -372,26 +373,6 @@ def resolve_additive_certificate_waivers(worktree: Path, rel: str, sh) -> str | 
             return None
         merged[key] = value
     theirs["waivers"] = dict(sorted(merged.items()))
-    return json.dumps(theirs, ensure_ascii=False, indent=2) + "\n"
-
-
-def resolve_subtractive_screen_debt(worktree: Path, rel: str, sh) -> str | None:
-    """Drop screen-debt rows either side removed, proven against Git's three stages.
-
-    Main's remaining order stays. An added row, a changed value, or any other
-    field edit stays unresolved. This is authored policy, not generated metadata.
-    """
-    if rel != "docs/design-system/cert-screens.json":
-        return None
-    loaded = _load_json_object_stages(worktree, rel, sh, "debt", _debt_rows)
-    if loaded is None:
-        return None
-    base, ours, theirs = loaded
-    for document in (ours, theirs):
-        if any(key not in base["debt"] or document["debt"][key] != base["debt"][key]
-               for key in document["debt"]):
-            return None
-    theirs["debt"] = {key: value for key, value in theirs["debt"].items() if key in ours["debt"]}
     return json.dumps(theirs, ensure_ascii=False, indent=2) + "\n"
 
 
