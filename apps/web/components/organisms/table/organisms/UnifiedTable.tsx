@@ -307,11 +307,8 @@ export interface UnifiedTableProps<TData extends RowData> {
    */
   readonly onColumnVisibilityChange?: OnChangeFn<VisibilityState>;
 
-  /**
-   * Layout-snap columns when they appear or disappear.
-   * Short, interruptible, and skipped when the user prefers reduced motion.
-   * Dense admin tables pass false.
-   * @default true
+  /** Snap viewport/schema-width changes, never selection/drawer allocation.
+   * Respects reduced motion; dense admin tables pass false. @default true
    */
   readonly columnSnap?: boolean;
 
@@ -1134,7 +1131,10 @@ export function UnifiedTable<TData extends RowData>(
   props: UnifiedTableProps<TData>
 ) {
   return (
-    <ColumnSnapMotion enabled={props.columnSnap ?? true}>
+    <ColumnSnapMotion
+      enabled={props.columnSnap ?? true}
+      columns={props.columns}
+    >
       <UnifiedTableContent {...props} />
     </ColumnSnapMotion>
   );

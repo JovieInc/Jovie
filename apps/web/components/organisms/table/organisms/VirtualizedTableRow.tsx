@@ -8,7 +8,10 @@ import { flexRender } from '@/lib/tanstack-table';
 import { cn } from '@/lib/utils';
 import '../table.types';
 import { TABLE_CELL_CONTENT_CLASSNAME } from '../atoms/TableCell';
-import { ColumnSnapReducedMotionContext } from '../ColumnSnapMotion';
+import {
+  ColumnSnapLayoutDependencyContext,
+  ColumnSnapReducedMotionContext,
+} from '../ColumnSnapMotion';
 import { usePrimaryColumnCompacts } from '../column-priority-context';
 import { columnSnapTransition } from '../column-snap';
 import { presets, rowState, tableAlignment } from '../table.styles';
@@ -104,6 +107,7 @@ function VirtualizedTableRowComponent<TData extends RowData>({
 }: VirtualizedTableRowProps<TData> &
   Omit<React.ComponentPropsWithoutRef<'tr'>, ManagedTrProps>) {
   const reducedMotion = useContext(ColumnSnapReducedMotionContext);
+  const layoutDependency = useContext(ColumnSnapLayoutDependencyContext);
   const rowData = row.original as TData;
   const isRowSelected = (row.getIsSelected?.() ?? false) || isSelected;
   const { primaryId, node: compactNode } = usePrimaryColumnCompacts(rowData);
@@ -233,6 +237,7 @@ function VirtualizedTableRowComponent<TData extends RowData>({
             <MotionTableCell
               key={cell.id}
               layout={!reducedMotion}
+              layoutDependency={layoutDependency}
               transition={
                 reducedMotion
                   ? undefined

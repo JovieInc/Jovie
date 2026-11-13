@@ -7,7 +7,10 @@ import type { Header, RowData } from '@/lib/tanstack-table';
 import { flexRender } from '@/lib/tanstack-table';
 import { cn } from '@/lib/utils';
 import '../table.types';
-import { ColumnSnapReducedMotionContext } from '../ColumnSnapMotion';
+import {
+  ColumnSnapLayoutDependencyContext,
+  ColumnSnapReducedMotionContext,
+} from '../ColumnSnapMotion';
 import { columnSnapTransition } from '../column-snap';
 import { iconColors, tableAlignment } from '../table.styles';
 
@@ -41,6 +44,7 @@ export function TableHeaderCell<TData extends RowData>({
   columnSnap = false,
 }: TableHeaderCellProps<TData>) {
   const reducedMotion = useContext(ColumnSnapReducedMotionContext);
+  const layoutDependency = useContext(ColumnSnapLayoutDependencyContext);
   // Determine aria-sort attribute without nested ternaries
   let ariaSort: 'ascending' | 'descending' | 'none' | undefined;
   if (!canSort || header.isPlaceholder) {
@@ -117,6 +121,7 @@ export function TableHeaderCell<TData extends RowData>({
       {...(columnSnap && !reducedMotion
         ? {
             layout: true,
+            layoutDependency,
             transition: columnSnapTransition(0),
             'data-column-snap': 'on',
           }

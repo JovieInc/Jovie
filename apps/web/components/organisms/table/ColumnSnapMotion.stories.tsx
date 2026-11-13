@@ -1,7 +1,7 @@
 import { Button } from '@jovie/ui';
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { td as MotionCell, th as MotionHeader } from 'motion/react-m';
-import { useState } from 'react';
+import { type ComponentProps, useState } from 'react';
 import { ColumnSnapMotion } from './ColumnSnapMotion';
 
 interface ExampleCopy {
@@ -30,10 +30,12 @@ function ColumnExample({
   enabled,
   copy = ENGLISH,
   dir,
+  columns,
 }: {
   readonly enabled: boolean;
   readonly copy?: ExampleCopy;
   readonly dir?: 'rtl';
+  readonly columns?: ComponentProps<typeof ColumnSnapMotion>['columns'];
 }) {
   const [showStreams, setShowStreams] = useState(false);
   const Header = enabled ? MotionHeader : 'th';
@@ -50,7 +52,7 @@ function ColumnExample({
       <Button onClick={() => setShowStreams(value => !value)}>
         {showStreams ? copy.hide : copy.show}
       </Button>
-      <ColumnSnapMotion enabled={enabled}>
+      <ColumnSnapMotion enabled={enabled} columns={columns}>
         <table className='w-full text-start text-sm'>
           <thead>
             <tr>
@@ -77,7 +79,9 @@ const meta = {
   component: ColumnSnapMotion,
   parameters: { layout: 'centered' },
   args: { enabled: true, children: null },
-  render: ({ enabled }) => <ColumnExample enabled={enabled} />,
+  render: ({ enabled, columns }) => (
+    <ColumnExample enabled={enabled} columns={columns} />
+  ),
 } satisfies Meta<typeof ColumnSnapMotion>;
 
 export default meta;
@@ -85,6 +89,10 @@ type Story = StoryObj<typeof meta>;
 
 export const Enabled: Story = {};
 export const Static: Story = { args: { enabled: false } };
+/** Only some schema widths are declared; unspecified widths remain automatic. */
+export const PartialColumnWidths: Story = {
+  args: { columns: [{ size: 200 }, {}] },
+};
 
 /**
  * When the layout feature chunk cannot load, ColumnSnapMotion logs a warning

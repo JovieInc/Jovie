@@ -6,10 +6,13 @@ import {
   waitFor,
 } from '@testing-library/react';
 import type { FeatureBundle } from 'motion/react';
-import type { ReactNode } from 'react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { type ReactNode, useContext } from 'react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { expectNoA11yViolations } from '@/tests/utils/a11y';
-import { ColumnSnapMotion } from './ColumnSnapMotion';
+import {
+  ColumnSnapLayoutDependencyContext,
+  ColumnSnapMotion,
+} from './ColumnSnapMotion';
 
 const state = vi.hoisted(() => ({
   reduced: false,
@@ -49,6 +52,7 @@ function table(enabled: boolean) {
 }
 
 describe('ColumnSnapMotion', () => {
+  afterEach(() => vi.unstubAllGlobals());
   beforeEach(() => {
     state.reduced = false;
     state.features = [];
@@ -57,6 +61,42 @@ describe('ColumnSnapMotion', () => {
     vi.doMock('./column-snap-features', async () => ({
       default: await state.imports(),
     }));
+  });
+
+  it('authorizes projection only for changed viewport dimensions or schema widths', () => {
+    vi.stubGlobal('innerWidth', 1440);
+    vi.stubGlobal('innerHeight', 900);
+    function Probe() {
+      const dependency = useContext(ColumnSnapLayoutDependencyContext);
+      return (
+        <button type='button' data-dependency={dependency}>
+          Select row
+        </button>
+      );
+    }
+    const fixture = (size: number) => (
+      <ColumnSnapMotion
+        enabled={false}
+        columns={[{ columns: [{ size, minSize: 120 }] }]}
+      >
+        <Probe />
+      </ColumnSnapMotion>
+    );
+    const { rerender } = render(fixture(200));
+    const button = screen.getByRole('button');
+    button.focus();
+    const before = button.dataset.dependency;
+    rerender(fixture(200));
+    fireEvent.resize(window);
+    expect(button.dataset.dependency).toBe(before);
+    vi.stubGlobal('innerWidth', 1100);
+    fireEvent.resize(window);
+    const resized = button.dataset.dependency;
+    expect(resized).not.toBe(before);
+    rerender(fixture(600));
+    expect(button.dataset.dependency).not.toBe(resized);
+    expect(screen.getByRole('button')).toBe(button);
+    expect(button).toHaveFocus();
   });
 
   it.each(['disabled', 'reduced'] as const)(
