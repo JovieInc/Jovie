@@ -61,6 +61,16 @@ vi.mock('@/lib/waitlist/settings', () => ({
   isWaitlistGateEnabled: mocks.isWaitlistGateEnabled,
 }));
 
+const winbackMocks = vi.hoisted(() => ({
+  resolveWinbackResumeToken: vi.fn().mockResolvedValue(null),
+  recordWinbackResumeClick: vi.fn().mockResolvedValue(undefined),
+}));
+
+vi.mock('@/lib/waitlist/winback-resume.server', () => ({
+  resolveWinbackResumeToken: winbackMocks.resolveWinbackResumeToken,
+  recordWinbackResumeClick: winbackMocks.recordWinbackResumeClick,
+}));
+
 import StartPage from './page';
 
 describe('StartPage', () => {
@@ -360,5 +370,46 @@ describe('StartPage', () => {
   // in the first HTML instead.
   it('has no loading.tsx, so the LCP heading is in the first HTML', () => {
     expect(existsSync(path.join(__dirname, 'loading.tsx'))).toBe(false);
+  });
+});
+
+describe('StartPage winback resume', () => {
+  afterEach(() => {
+    winbackMocks.resolveWinbackResumeToken.mockReset();
+    winbackMocks.recordWinbackResumeClick.mockClear();
+  });
+
+  it('lands a valid winback resume token in setup while public signup is closed', async () => {
+    vi.stubEnv('FEATURE_PUBLIC_SIGNUP_CLOSED', 'true');
+    winbackMocks.resolveWinbackResumeToken.mockResolvedValueOnce({
+      entryId: '11111111-1111-4111-8111-111111111111',
+      batchId: 'batch-a',
+      capabilityKey: 'public-profile-pages',
+    });
+
+    const result = await StartPage({
+      searchParams: Promise.resolve({
+        resume: 'winback',
+        w: 'valid-token',
+      }),
+    });
+
+    expect(result).toMatchObject({ props: { sessionLabel: 'pending' } });
+    expect(winbackMocks.recordWinbackResumeClick).toHaveBeenCalledOnce();
+  });
+
+  it('keeps the closed-signup redirect for an unknown winback token', async () => {
+    vi.stubEnv('FEATURE_PUBLIC_SIGNUP_CLOSED', 'true');
+    winbackMocks.resolveWinbackResumeToken.mockResolvedValueOnce(null);
+
+    await expect(
+      StartPage({
+        searchParams: Promise.resolve({
+          resume: 'winback',
+          w: 'invalid-token',
+        }),
+      })
+    ).rejects.toThrow('redirect:/waitlist');
+    expect(winbackMocks.recordWinbackResumeClick).not.toHaveBeenCalled();
   });
 });
