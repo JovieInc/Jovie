@@ -192,7 +192,7 @@ describe('marketing auth entry waits for intent', () => {
     render(<HomepageV2Route />);
     expectIntentOnly(
       screen.getByTestId('homepage-v2-hero-primary-cta'),
-      '/signup'
+      '/start'
     );
   });
 });
