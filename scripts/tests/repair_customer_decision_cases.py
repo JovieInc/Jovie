@@ -55,4 +55,3 @@ console.log(JSON.stringify(bodies.map(body => evaluateCustomerNoteContract({
                      '<!-- customer-changelog/v1 {"releaseWorthy":true}'):
             with self.subTest(note=note):
                 self.assertIsNone(classes.stamp_internal_changelog(body + note))
-
