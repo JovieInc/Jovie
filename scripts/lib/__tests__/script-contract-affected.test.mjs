@@ -320,10 +320,10 @@ test('waitlist producer mapping edits require the complete selector regression p
   assert.equal(buildAffectedTestPlan([...files, selector[1]]).mode, 'full');
 });
 
-for (const [jobs, expectedPeak] of [
-  ['1', 1],
-  ['2', 2],
-  [undefined, 3],
+for (const { jobs, expectedPeak } of [
+  { jobs: '1', expectedPeak: 1 },
+  { jobs: '2', expectedPeak: 2 },
+  { jobs: undefined, expectedPeak: 3 },
 ]) {
   test(`selected contract batches honor existing preflight jobs=${jobs ?? 'default'} without skipping failures`, async () => {
     let live = 0;
