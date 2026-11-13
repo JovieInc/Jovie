@@ -1,5 +1,5 @@
 import { act, fireEvent, render, screen } from '@testing-library/react';
-import { useEffect, useState } from 'react';
+import { type ReactNode, useEffect, useState } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { APP_ROUTES } from '@/constants/routes';
 
@@ -43,9 +43,11 @@ vi.mock(
   () => ({
     OpportunityInboxPageClient: ({
       connectedDSPs,
+      supplementaryContent,
       inbox,
       initialLinks,
     }: {
+      readonly supplementaryContent?: ReactNode;
       readonly connectedDSPs: readonly { readonly id: string }[];
       readonly inbox: {
         readonly cards: readonly { readonly id: string }[];
@@ -69,6 +71,7 @@ vi.mock(
           data-initial-link-count={initialLinks.length}
           data-pending-tour-date-count={inbox.tourDates?.pending.length ?? 0}
         >
+          {supplementaryContent}
           {cards.map(card => (
             <span key={card.id}>{card.id}</span>
           ))}
@@ -162,7 +165,9 @@ describe('OpportunityInboxRoute', () => {
     expect(screen.queryByTestId('pmf-survey-card')).not.toBeInTheDocument();
     mocks.shouldShowPmfSurvey.mockResolvedValue(true);
     view.rerender(await OpportunityInboxRoute());
-    expect(screen.getByTestId('pmf-survey-card')).toBeInTheDocument();
+    expect(screen.getByTestId('opportunity-inbox-client')).toContainElement(
+      screen.getByTestId('pmf-survey-card')
+    );
     expect(screen.getByTestId('opportunity-inbox-client')).toBeInTheDocument();
     expect(mocks.shouldShowPmfSurvey).toHaveBeenCalledWith({
       now: expect.any(Date),

@@ -1,7 +1,7 @@
 'use client';
 
 import { Button, RadioGroup, RadioGroupItem, Textarea } from '@jovie/ui';
-import { X } from 'lucide-react';
+import { ChevronDown, X } from 'lucide-react';
 import { type FormEvent, useId, useState } from 'react';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 
@@ -32,6 +32,7 @@ export interface PmfSurveyCardProps {
   readonly onDismiss: () => Promise<PmfSurveyCardResult>;
   /** Story and test seam for showing a state directly. */
   readonly initialState?: Exclude<CardState, 'closed'>;
+  readonly initialExpanded?: boolean;
 }
 
 /**
@@ -42,9 +43,12 @@ export function PmfSurveyCard({
   onSubmit,
   onDismiss,
   initialState = 'idle',
+  initialExpanded = initialState !== 'idle',
 }: PmfSurveyCardProps) {
   const questionId = useId();
   const benefitId = useId();
+  const formId = useId();
+  const [expanded, setExpanded] = useState(initialExpanded);
   const [state, setState] = useState<CardState>(initialState);
   const [choice, setChoice] = useState<PmfSurveyChoice | null>(null);
   const [benefit, setBenefit] = useState('');
@@ -84,23 +88,40 @@ export function PmfSurveyCard({
       data-state={state}
       role='region'
     >
-      <div className='p-4'>
+      <div className='p-3'>
         <div className='flex items-start gap-3'>
           <div className='min-w-0 flex-1'>
             <p
-              className='text-sm font-semibold text-primary-token'
+              className='text-sm font-medium text-primary-token'
               id={questionId}
             >
               {state === 'done'
                 ? 'Thanks for answering'
                 : 'How would you feel if you could no longer use Jovie?'}
             </p>
-            <p className='mt-1 text-sm text-tertiary-token'>
+            <p
+              hidden={!expanded && state !== 'done'}
+              className='mt-1 text-sm text-tertiary-token'
+            >
               {state === 'done'
                 ? 'Your answer helps decide what Jovie builds next.'
                 : 'One question, then it goes away.'}
             </p>
           </div>
+          {state !== 'done' ? (
+            <Button
+              aria-controls={formId}
+              aria-expanded={expanded}
+              disabled={pending}
+              onClick={() => setExpanded(current => !current)}
+              size='sm'
+              type='button'
+              variant='ghost'
+            >
+              {expanded ? 'Hide' : 'Answer'}
+              <ChevronDown aria-hidden='true' className='h-3 w-3' />
+            </Button>
+          ) : null}
           <Button
             aria-label='Dismiss'
             data-testid='pmf-survey-dismiss'
@@ -114,7 +135,12 @@ export function PmfSurveyCard({
         </div>
 
         {state === 'done' ? null : (
-          <form className='mt-4' onSubmit={submit}>
+          <form
+            className='mt-3'
+            hidden={!expanded}
+            id={formId}
+            onSubmit={submit}
+          >
             <RadioGroup
               aria-labelledby={questionId}
               disabled={pending}
@@ -159,13 +185,13 @@ export function PmfSurveyCard({
             />
 
             {state === 'missing' ? (
-              <p className='mt-3 text-sm text-error' role='alert'>
+              <p className='mt-3 text-sm text-error-text' role='alert'>
                 Pick an answer first.
               </p>
             ) : null}
 
             {state === 'error' ? (
-              <p className='mt-3 text-sm text-error' role='alert'>
+              <p className='mt-3 text-sm text-error-text' role='alert'>
                 Your answer was not saved. Try again.
               </p>
             ) : null}

@@ -25,7 +25,6 @@ import {
 } from '@/lib/connectors/opportunity-inbox-signal-type';
 import {
   EMPTY_OPPORTUNITY_INBOX_TOUR_DATES,
-  type OpportunityInboxData,
   type OpportunityInboxTourDateItem,
 } from '@/lib/connectors/opportunity-inbox-types';
 import type { AvailableDSP } from '@/lib/dsp';
@@ -36,11 +35,14 @@ import { getRovingFocusIndex } from '@/lib/utils/keyboard';
 import { InboxRuntimeNotification } from './InboxRuntimeNotification';
 import { OpportunityInboxEmptyState } from './OpportunityInboxEmptyState';
 import { OpportunityInboxFeed } from './OpportunityInboxFeed';
+import type { OpportunityInboxPageClientProps } from './OpportunityInboxPageClient.types';
 import { OpportunityInboxTourDateRow } from './OpportunityInboxTourDateRow';
 import {
   OpportunityInboxConfirmedTourDates,
   OpportunityInboxRejectedTourDates,
 } from './OpportunityInboxTourDateSections';
+
+export type { OpportunityInboxPageClientProps } from './OpportunityInboxPageClient.types';
 
 const PreviewDataHydrator = dynamic(
   () =>
@@ -63,14 +65,6 @@ function HomeRightPanelHost({
       initialLinks={[...initialLinks]}
     />
   );
-}
-
-export interface OpportunityInboxPageClientProps {
-  readonly inbox: OpportunityInboxData;
-  readonly profileId?: string | null;
-  readonly initialView?: 'needs' | 'done';
-  readonly connectedDSPs?: readonly AvailableDSP[];
-  readonly initialLinks?: readonly ProfileSocialLink[];
 }
 
 type SignalTypeFilter = OpportunitySignalType | 'all';
@@ -114,6 +108,7 @@ export function OpportunityInboxPageClient({
   initialView = 'needs',
   connectedDSPs = [],
   initialLinks = [],
+  supplementaryContent,
 }: OpportunityInboxPageClientProps) {
   const [inboxView, setInboxView] = useState(initialView);
   const [notes, setNotes] = useState('');
@@ -713,6 +708,7 @@ export function OpportunityInboxPageClient({
               </section>
             ) : null}
           </div>
+          {supplementaryContent}
         </div>
       </div>
     </PageShell>
