@@ -61,12 +61,14 @@ import {
   captureMerchGenerationFailureOutcome,
   classifyMerchGenerationFailure,
   type MerchGenerationFailureClass,
-  type MerchGenerationFailureSummary,
   type MerchGenerationStage,
 } from './generation-failures';
+import {
+  logMerchGenerationReceipt,
+  schedulePrintfulMockupEnrichment,
+} from './generation-receipts';
 import { generatePrintGraphic } from './graphic-engine';
 import { createGeneratedMerchArtwork } from './mockup-engine';
-import { scheduleMerchMockupEnrichment } from './mockup-enrichment';
 import {
   buildMerchPricingSnapshot,
   calculateRecommendedSalePriceCents,
@@ -379,61 +381,6 @@ export function resolveGenerationNextStep(
   return contentReviews.some(review => review.verdict === 'reject')
     ? MERCH_PERSON_CONTENT_PUBLISH_BLOCKER
     : MERCH_NO_DESIGNS_NEXT_STEP;
-}
-
-function logMerchGenerationReceipt(receipt: MerchGenerationReceipt): void {
-  logger.info('[merch-generation] production receipt', { ...receipt });
-}
-
-/**
- * Schedules durable, observable Printful mockup enrichment for the generated
- * designs (JOV-4743). Each option stays `pending_mockup` until the truthful
- * product mockup is attached (`mockup_ready`) or the retry budget/timeout is
- * exhausted (`mockup_failed`, which blocks publish). Replaces the previous
- * untracked fire-and-forget `Promise.allSettled` path.
- */
-function schedulePrintfulMockupEnrichment(params: {
-  readonly generationId: string;
-  readonly profileId: string;
-  readonly startedAt: number;
-  readonly requestedDesignCount: number;
-  readonly contentReviews: MerchGenerationReceipt['contentReviews'];
-  readonly failureSummary: MerchGenerationFailureSummary;
-  readonly designs: readonly {
-    readonly optionId: string;
-    readonly printFileUrl: string;
-  }[];
-}): void {
-  scheduleMerchMockupEnrichment(
-    params.designs.map(({ optionId, printFileUrl }) => ({
-      optionId,
-      request: {
-        printFileUrl,
-        catalogProductId: MERCH_DEFAULT_PRINTFUL_PRODUCT.catalogProductId,
-        catalogVariantIds: Object.values(
-          MERCH_DEFAULT_PRINTFUL_PRODUCT.variantMap
-        ),
-        placements: MERCH_DEFAULT_PRINTFUL_PRODUCT.placements,
-        technique: MERCH_DEFAULT_PRINTFUL_PRODUCT.technique,
-        productTypes: [MERCH_DEFAULT_PRINTFUL_PRODUCT.productType],
-      },
-    })),
-    outcomes => {
-      logMerchGenerationReceipt({
-        pipeline: MERCH_CANONICAL_PIPELINE_ID,
-        contractVersion: MERCH_GENERATION_CONTRACT_VERSION,
-        generationId: params.generationId,
-        profileId: params.profileId,
-        requestedDesignCount: params.requestedDesignCount,
-        readyDesignCount: params.designs.length,
-        mockups: outcomes,
-        contentReviews: params.contentReviews,
-        failureSummary: params.failureSummary,
-        disposition: 'ready',
-        durationMs: Date.now() - params.startedAt,
-      });
-    }
-  );
 }
 
 /** Concept line stored with a generated design. Source suffix stays a separate string. */
@@ -846,7 +793,20 @@ export async function generateMerchDesigns(params: {
 
   const enrichmentDesigns = attempts.flatMap(attempt =>
     attempt.preview && attempt.printFileUrl
-      ? [{ optionId: attempt.optionId, printFileUrl: attempt.printFileUrl }]
+      ? [
+          {
+            optionId: attempt.optionId,
+            printFileUrl: attempt.printFileUrl,
+            // Enrich with the option's OWN resolved catalog product — the
+            // default tee here is what produced tee mockups on hoodie/hat
+            // options.
+            catalogProductId: catalog.catalogProductId,
+            catalogVariantIds: catalog.catalogVariantIds,
+            placements: catalog.placements,
+            technique: catalog.technique,
+            productType: catalog.productType,
+          },
+        ]
       : []
   );
   if (enrichmentDesigns.length > 0) {

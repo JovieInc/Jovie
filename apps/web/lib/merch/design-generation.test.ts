@@ -3,11 +3,134 @@ import { reviewMerchContent } from './content-review';
 import {
   buildMerchImagePrompt,
   formatMerchDesignConcept,
+  generateMerchDesigns,
   MERCH_DESIGN_STRATEGIES,
   resolveMerchGenerationPrerequisites,
   selectionCountsToWeights,
   selectMerchDesignStrategies,
 } from './design-generation';
+import { scheduleMerchMockupEnrichment } from './mockup-enrichment';
+
+/**
+ * Queue-driven mock for the drizzle `db` client (same pattern as
+ * lib/merch/service.test.ts). Shift order for the generateMerchDesigns
+ * pre-claim reads: the artist-name select ends in `.limit()` (shifts
+ * synchronously), then the recent-strategy select ends in `.limit()`
+ * (synchronous), and the model-weights select ends in a bare awaited
+ * chain (shifts in a microtask).
+ */
+const merchMocks = vi.hoisted(() => ({
+  /** A resolved HOODIE catalog selection — deliberately distinct from the default tee (71). */
+  hoodieCatalogSelection: {
+    catalogProductId: 216,
+    productName: 'Unisex Heavy Blend Hoodie',
+    productType: 'hoodie',
+    colorway: 'black',
+    variantMap: { XL_black: 9519 },
+    catalogVariantIds: [9519],
+    sizes: ['S', 'M', 'L', 'XL'],
+    placements: ['front'],
+    technique: 'embroidery',
+    availabilityRegion: 'US',
+    shippingProfile: 'printful_standard_us',
+    pricing: {
+      currency: 'USD',
+      retailPriceCents: 5500,
+      estimatedPrintfulProductCostCents: 2200,
+      estimatedShippingCostCents: 500,
+      stripeFeeEstimateCents: 200,
+      refundReserveCents: 120,
+      artistRoyaltyRateBps: 5000,
+      artistPayoutPerUnitEstimateCents: 1500,
+      jovieMarginPerUnitEstimateCents: 980,
+      printfulCostSource: 'printful',
+      printfulCostUpdatedAt: new Date(Date.now() - 60_000).toISOString(),
+    },
+    providerWarnings: [],
+  },
+}));
+
+const dbHarness = vi.hoisted(() => {
+  const results: unknown[] = [];
+
+  function makeChain(): unknown {
+    const chain = new Proxy(
+      {},
+      {
+        get(_target, prop) {
+          if (prop === 'then') {
+            return (
+              resolve: (value: unknown) => unknown,
+              reject?: (reason: unknown) => unknown
+            ) => Promise.resolve(results.shift()).then(resolve, reject);
+          }
+          return (...args: unknown[]) => {
+            void args;
+            if (prop === 'limit' || prop === 'returning') {
+              return Promise.resolve(results.shift() ?? []);
+            }
+            return chain;
+          };
+        },
+      }
+    );
+    return chain;
+  }
+
+  const db = {
+    select: () => makeChain(),
+    insert: () => makeChain(),
+    update: () => makeChain(),
+    delete: () => makeChain(),
+  };
+
+  return {
+    db,
+    queue: (value: unknown) => {
+      results.push(value);
+    },
+  };
+});
+
+vi.mock('@/lib/db', () => ({ db: dbHarness.db }));
+
+vi.mock('./catalog', () => ({
+  resolveMerchCatalogSelection: vi.fn(
+    async () => merchMocks.hoodieCatalogSelection
+  ),
+  listMerchCatalogProductOptions: vi.fn(async () => []),
+  resolveLiveMerchCatalogProduct: vi.fn(),
+}));
+
+vi.mock('./graphic-engine', () => ({
+  generatePrintGraphic: vi.fn(
+    async (params: { prompt: string; content?: { prompt?: string } }) => {
+      const actual = await vi.importActual<{
+        reviewMerchContent: typeof import('./content-review').reviewMerchContent;
+      }>('./content-review');
+      return {
+        image: Buffer.from('print-png'),
+        modelKey: 'gpt-image-1.5',
+        modelId: 'test-model',
+        mediaType: 'image/png',
+        contentReview: actual.reviewMerchContent({
+          prompt: params.content?.prompt ?? params.prompt,
+        }),
+      };
+    }
+  ),
+}));
+
+vi.mock('./mockup-engine', () => ({
+  createGeneratedMerchArtwork: vi.fn(async () => ({
+    printFileUrl: 'https://files.example.com/print.png',
+    mockupUrl: 'https://files.example.com/mockup.png',
+  })),
+}));
+
+vi.mock('./mockup-enrichment', () => ({
+  scheduleMerchMockupEnrichment: vi.fn(),
+}));
 
 const source = {
   sourceType: 'song_title' as const,
@@ -156,5 +279,47 @@ describe('resolveGenerationNextStep', () => {
     );
     expect(MERCH_NO_DESIGNS_NEXT_STEP).not.toMatch(/pick one and/i);
     expect(resolveGenerationNextStep(3, [])).toMatch(/^Pick one/);
+  });
+});
+
+describe('generateMerchDesigns mockup enrichment', () => {
+  it('enriches a hoodie option with the hoodie catalog product, not the default tee', async () => {
+    // Pre-claim reads, in queue order: artist profile (sync .limit shift),
+    // recent strategy labels (sync .limit shift), model weights (bare-await
+    // microtask shift). Then batch insert, option insert, batch update.
+    dbHarness.queue([{ displayName: 'Tim White', username: 'timwhite' }]);
+    dbHarness.queue([]);
+    dbHarness.queue([]);
+    dbHarness.queue(undefined); // insert merchGenerationBatches
+    dbHarness.queue(undefined); // insert merchDesignOptions (the ready option)
+    dbHarness.queue(undefined); // update merchGenerationBatches -> ready
+
+    const result = await generateMerchDesigns({
+      profileId: '44444444-4444-4444-8444-444444444444',
+      clerkUserId: 'clerk_test_user',
+      prompt: 'stadium hoodie graphic',
+      count: 1,
+      source: {
+        sourceType: 'song_title',
+        sourceText: 'Static Bloom',
+        provenanceTitle: 'Static Bloom',
+        rightsStatus: 'owned',
+      },
+    });
+
+    expect(result.success).toBe(true);
+    expect(scheduleMerchMockupEnrichment).toHaveBeenCalledOnce();
+
+    const [items] = vi.mocked(scheduleMerchMockupEnrichment).mock.calls[0];
+    expect(items).toHaveLength(1);
+    // The option's OWN resolved catalog must drive the mockup request so a
+    // hoodie option gets hoodie mockups — not MERCH_DEFAULT_PRINTFUL_PRODUCT.
+    expect(items[0].request).toMatchObject({
+      catalogProductId: 216,
+      catalogVariantIds: [9519],
+      placements: ['front'],
+      technique: 'embroidery',
+      productTypes: ['hoodie'],
+    });
   });
 });
