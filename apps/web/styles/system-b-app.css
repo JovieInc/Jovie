@@ -3074,7 +3074,7 @@
   overflow-wrap: anywhere;
   color: var(--color-text-primary-token);
   font-size: var(--text-xs);
-  line-height: var(--line-height-relaxed);
+  line-height: var(--leading-relaxed);
 }
 
 :where(.system-b-chat-pitch-block-text[data-clamped="true"]) {
@@ -3153,7 +3153,7 @@
   display: block;
   color: var(--color-text-primary-token);
   font-size: var(--text-sm);
-  line-height: var(--line-height-normal);
+  line-height: var(--leading-normal);
 }
 
 :where(.system-b-chat-pitch-error-title) {
@@ -3185,14 +3185,14 @@
   margin: 0;
   color: var(--color-text-primary-token);
   font-size: var(--text-sm);
-  line-height: var(--line-height-normal);
+  line-height: var(--leading-normal);
 }
 
 :where(.system-b-chat-artifact-error) {
   display: block;
   color: var(--color-text-primary-token);
   font-size: var(--text-sm);
-  line-height: var(--line-height-normal);
+  line-height: var(--leading-normal);
 }
 
 :where(.system-b-chat-artifact-error-title) {

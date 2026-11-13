@@ -95,4 +95,33 @@ describe('ChatMessage System B source contract', () => {
     expect(styles).not.toMatch(/--system-b-chat-body-size:\s*[\d.]+rem/);
     expect(styles).not.toContain('var(--system-b-chat-user-bubble-text, #');
   });
+
+  it('binds chat line heights to defined leading tokens', () => {
+    const css = postcss.parse(
+      readFileSync(resolve(appRoot, designSystemPath), 'utf8')
+    );
+    const lineHeights = new Map<string, string>();
+    css.walkRules(rule => {
+      rule.walkDecls('line-height', declaration => {
+        lineHeights.set(rule.selector, declaration.value);
+      });
+    });
+
+    // `--line-height-*` is defined nowhere, so these rules used to inherit.
+    for (const value of lineHeights.values()) {
+      expect(value).not.toMatch(/var\(--line-height-/);
+    }
+    expect(lineHeights.get(':where(.system-b-chat-pitch-block-text)')).toBe(
+      'var(--leading-relaxed)'
+    );
+    for (const className of [
+      'system-b-chat-pitch-error',
+      'system-b-chat-step-limit-affordance-message',
+      'system-b-chat-artifact-error',
+    ]) {
+      expect(lineHeights.get(`:where(.${className})`)).toBe(
+        'var(--leading-normal)'
+      );
+    }
+  });
 });
