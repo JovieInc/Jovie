@@ -198,6 +198,11 @@ export default defineConfig({
       'next/dist/client/components/redirect-error',
       // Drag-and-drop
       '@dnd-kit/core',
+      // Locally-generated QR images (components/molecules/QRCode) — the
+      // generator is loaded through a dynamic import(); a cold, un-prebundled
+      // dynamic dep forces Vite to re-optimize mid-test, which stalls the
+      // browser iframe and the QR download stories never settle.
+      'qrcode',
       '@dnd-kit/sortable',
       '@dnd-kit/utilities',
       // UI extras

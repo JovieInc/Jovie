@@ -90,3 +90,32 @@ export const OtpSequence: Story = {
     </fieldset>
   ),
 };
+
+// Only the required props: no error, paste handler, autocomplete hint or
+// described-by id.
+export const PartialRequiredPropsOnly: Story = {
+  args: {
+    digit: '7',
+  },
+};
+
+// A pasted multi-character value before the parent trims it to one digit.
+export const LongContentPastedValue: Story = {
+  args: {
+    digit: '123456',
+  },
+};
+
+export const Rtl: Story = {
+  args: {
+    digit: '٤',
+    ariaLabel: 'الرقم ١ من ٦',
+  },
+  decorators: [
+    Story => (
+      <div dir='rtl' lang='ar'>
+        <Story />
+      </div>
+    ),
+  ],
+};

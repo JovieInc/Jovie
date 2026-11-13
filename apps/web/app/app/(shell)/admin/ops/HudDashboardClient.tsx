@@ -1088,7 +1088,7 @@ export function HudDashboardClient({
             </div>
           </div>
           <div className='flex flex-col items-start gap-1 sm:items-end'>
-            <div className='text-lg font-[620] tracking-[-0.03em] text-primary-token sm:text-xl'>
+            <div className='text-base font-[620] tracking-[-0.03em] text-primary-token sm:text-xl'>
               <HudClockClient />
             </div>
             <p className='text-xs text-secondary-token'>

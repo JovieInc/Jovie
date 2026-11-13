@@ -16,8 +16,12 @@
  * and owned-catalog matches are inherently preferred.
  */
 
-import { extractEntities } from '@/lib/chat/tokens';
+import { extractEntities, parseTokens } from '@/lib/chat/tokens';
 import type { ReleaseContext } from '@/lib/chat/types';
+import {
+  CHIP_ONLY_PROFILE_BRIEF,
+  formatOwnProfileReference,
+} from '@/prompts/system/profile-chat';
 
 /** Minimal artist identity needed to recognise self-references. */
 export interface HydrationArtistIdentity {
@@ -28,15 +32,21 @@ export interface HydrationArtistIdentity {
 
 export interface HydrateReferencedEntitiesInput {
   /**
-   * Recent user message texts (most-recent first is fine — order is preserved
-   * for de-duplication but does not affect output). Each is the raw wire string
-   * that may carry `@kind:id[label]` tokens.
+   * Recent user message texts, most recent first. Each is the raw wire string
+   * that may carry `@kind:id[label]` tokens. The first one is the latest turn:
+   * when it is only entity chips, the block adds a brief for the opening reply.
    */
   readonly userTexts: readonly string[];
   /** The artist's own catalog already loaded for this turn. */
   readonly ownedReleases: readonly ReleaseContext[];
   /** The artist's own identity, used to recognise `@artist` self-references. */
   readonly artist: HydrationArtistIdentity;
+  /**
+   * The signed-in creator profile id for this turn. `@profile` tokens resolve
+   * only when their id matches it; a client-supplied artist context without a
+   * resolved profile never hydrates a profile reference.
+   */
+  readonly ownProfileId?: string | null;
 }
 
 const RELEASE_TYPE_NOUN: Record<string, string> = {
@@ -117,6 +127,15 @@ export function buildReferencedEntitiesBlock(
     }
 
     if (
+      mention.kind === 'profile' &&
+      input.ownProfileId &&
+      mention.id === input.ownProfileId
+    ) {
+      lines.push(formatOwnProfileReference(mention.id, input.artist));
+      continue;
+    }
+
+    if (
       mention.kind === 'artist' &&
       ownArtistId !== undefined &&
       mention.id === ownArtistId
@@ -132,7 +151,31 @@ export function buildReferencedEntitiesBlock(
     );
   }
 
+  const latestUserText = input.userTexts[0];
+  const chipOnlyOwnProfile =
+    latestUserText !== undefined &&
+    isEntityOnlyText(latestUserText) &&
+    extractEntities(latestUserText).some(
+      mention =>
+        mention.kind === 'profile' &&
+        Boolean(input.ownProfileId) &&
+        mention.id === input.ownProfileId
+    );
+
   return `## Referenced Entities
-The user's latest message references the following entities. Use these resolved facts; do not contradict them or re-attribute owned assets to another artist.
-${lines.join('\n')}`;
+The user's latest message references the following entities. Use these resolved facts; do not contradict them or re-attribute owned assets to another artist. Refer to entities by name; never repeat their ids to the user.
+${lines.join('\n')}${chipOnlyOwnProfile ? `\n\n${CHIP_ONLY_PROFILE_BRIEF}` : ''}`;
+}
+
+/** True when the text holds entity tokens and nothing else a person wrote. */
+function isEntityOnlyText(text: string): boolean {
+  const tokens = parseTokens(text);
+  return (
+    tokens.some(token => token.type === 'entity') &&
+    tokens.every(
+      token =>
+        token.type === 'entity' ||
+        (token.type === 'text' && !token.value.trim())
+    )
+  );
 }

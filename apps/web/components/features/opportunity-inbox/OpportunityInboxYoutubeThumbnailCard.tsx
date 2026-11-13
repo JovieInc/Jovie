@@ -55,7 +55,7 @@ export function OpportunityInboxYoutubeThumbnailCard({
         </time>
       </header>
 
-      <h2 className='system-b-opportunity-inbox-card-title mt-2 text-lg font-semibold text-primary-token'>
+      <h2 className='text-balance system-b-opportunity-inbox-card-title mt-2 text-base font-semibold text-primary-token'>
         {card.title}
       </h2>
 

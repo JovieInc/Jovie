@@ -1,6 +1,9 @@
 import '@/styles/system-b-app.css';
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { expect, within } from 'storybook/test';
+import { ARTIST_VISIBILITY_OFFER, toCents } from '@/lib/config/plan-prices';
+import { queryKeys } from '@/lib/queries/keys';
 import { TOOL_STATE_PARTS } from './fixtures/tool-states';
 import { ToolPartsRenderer } from './tool-ui';
 
@@ -29,6 +32,41 @@ const meta = {
 
 export default meta;
 type Story = StoryObj<typeof meta>;
+
+/**
+ * The locked-tool upgrade prompt is the one UpgradeButton rendered without a
+ * priceId: it resolves its checkout price from the pricing-options query
+ * (#25284). The Storybook server has no /api/stripe/pricing-options, so
+ * without a seeded answer the button sits disabled at "Loading..." and its
+ * upgrade label never renders. Seed the current monthly offer so the prompt
+ * settles enabled, exactly as it does on a profile once pricing resolves —
+ * the same QueryClientProvider pattern UpgradeButton's own stories use.
+ */
+const seededPricingOptions: NonNullable<Story['decorators']> = [
+  function WithSeededPricingOptions(Story) {
+    const client = new QueryClient({
+      defaultOptions: {
+        queries: { retry: false, staleTime: Infinity },
+      },
+    });
+    client.setQueryData(queryKeys.billing.pricingOptions(), {
+      options: [
+        {
+          priceId: 'price_story_artist_presence_monthly',
+          amount: toCents(ARTIST_VISIBILITY_OFFER.pro.monthlyUsd),
+          currency: ARTIST_VISIBILITY_OFFER.pro.currency,
+          interval: ARTIST_VISIBILITY_OFFER.pro.interval,
+          description: 'Storybook artist presence monthly offer',
+        },
+      ],
+    });
+    return (
+      <QueryClientProvider client={client}>
+        <Story />
+      </QueryClientProvider>
+    );
+  },
+];
 
 /** Loading: a status tool still running while the stream is open. */
 export const LoadingStatusRow: Story = {
@@ -85,6 +123,7 @@ export const OfflineServiceUnreachable: Story = {
 /** Permission denied: a plan-locked tool shows a lock row and one upgrade. */
 export const PermissionDeniedLockedTool: Story = {
   args: { parts: TOOL_STATE_PARTS.permissionDenied, isStreaming: false },
+  decorators: seededPricingOptions,
   play: async ({ canvasElement }) => {
     await expect(
       within(canvasElement).getByRole('button', { name: 'Upgrade to Max' })
