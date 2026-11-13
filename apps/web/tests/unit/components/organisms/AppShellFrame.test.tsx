@@ -5,6 +5,9 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { AppShellFrame } from '@/components/organisms/AppShellFrame';
 import { AppShellSkeleton } from '@/components/organisms/AppShellSkeleton';
 
+// Load the real lazy subtree during suite setup, outside the DOM assertion wait.
+await import('@/components/organisms/DesktopTitlebar');
+
 afterEach(() => {
   document.documentElement.removeAttribute('data-desktop-runtime');
 });
@@ -41,17 +44,17 @@ describe('AppShellFrame', () => {
     }
   );
 
-  it('keeps the Electron-only flush rule out of browser shell layout', () => {
+  it('preserves the shared window gutter and rounded main perimeter in Electron', () => {
     const globalsSource = readFileSync(
       resolve(process.cwd(), 'app/globals.css'),
       'utf8'
     );
 
-    expect(globalsSource).toMatch(
-      /html\[data-desktop-runtime="electron"\][\s\S]*?\[data-app-shell-body="true"\]\[data-electron-top-gap-owner="titlebar"\][\s\S]*?padding-right:\s*0;[\s\S]*?padding-bottom:\s*0;/
+    expect(globalsSource).not.toMatch(
+      /\[data-app-shell-body="true"\]\[data-electron-top-gap-owner="titlebar"\]\s*\{[^}]*padding-(?:right|bottom):\s*0;/
     );
-    expect(globalsSource).toMatch(
-      /html\[data-desktop-runtime="electron"\][\s\S]*?\[data-app-shell-main-column="true"\][\s\S]*?> #main-content[\s\S]*?border-radius:\s*var\(--app-shell-radius\) 0 0 0;/
+    expect(globalsSource).not.toMatch(
+      /\[data-app-shell-main-column="true"\][\s\S]*?> #main-content\s*\{[^}]*border-radius:\s*var\(--app-shell-radius\) 0 0 0;/
     );
   });
 

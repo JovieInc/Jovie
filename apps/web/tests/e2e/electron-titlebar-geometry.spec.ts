@@ -329,7 +329,6 @@ test('Electron shell keeps one control contract across chat, calendar, tasks, li
       const settingsColumn = document.querySelector<HTMLElement>(
         '[data-settings-layout-column="true"]'
       );
-      const mainContent = document.querySelector<HTMLElement>('#main-content');
       if (!titlebar || !body || !sidebar || !mainPlane || !contentColumn)
         return null;
 
@@ -348,7 +347,6 @@ test('Electron shell keeps one control contract across chat, calendar, tasks, li
         : null;
       const settingsShellBox = settingsShell?.getBoundingClientRect();
       const settingsColumnBox = settingsColumn?.getBoundingClientRect();
-      const mainContentBox = mainContent?.getBoundingClientRect();
       return {
         bodyPaddingTop: Number.parseFloat(getComputedStyle(body).paddingTop),
         bodyPaddingLeft: Number.parseFloat(getComputedStyle(body).paddingLeft),
@@ -367,8 +365,8 @@ test('Electron shell keeps one control contract across chat, calendar, tasks, li
                   (contentColumnBox.left + headerPaddingLeft)
               )
             : null,
-        mainContentRight: mainContentBox?.right ?? null,
-        mainContentBottom: mainContentBox?.bottom ?? null,
+        mainPlaneRight: mainPlaneBox.right,
+        mainPlaneBottom: mainPlaneBox.bottom,
         viewportWidth: window.innerWidth,
         viewportHeight: window.innerHeight,
         settingsShellTop: settingsShellBox?.top ?? null,
@@ -416,21 +414,23 @@ test('Electron shell keeps one control contract across chat, calendar, tasks, li
         `${route} title aligns with the content column start`
       ).toBeLessThanOrEqual(1);
     }
-    // JOV-8941: the native window owns the right and bottom edges in
-    // Electron, so the main panel meets the window frame instead of reading
-    // as a floating card with a gutter on those edges. Fractional layout can
-    // round rects, so allow the same 1px tolerance the alignment checks use.
+    // The main panel keeps the shared shell gutter at the window perimeter.
+    // Reuse the same 1px fractional-layout tolerance as the titlebar checks.
     expect(
       Math.abs(
-        (geometry?.mainContentRight ?? 0) - (geometry?.viewportWidth ?? 0)
+        (geometry?.viewportWidth ?? 0) -
+          (geometry?.mainPlaneRight ?? 0) -
+          (geometry?.bodyPaddingLeft ?? 0)
       ),
-      `${route} main panel is flush with the window right edge (JOV-8941)`
+      `${route} main panel retains the shared right window gutter`
     ).toBeLessThanOrEqual(1);
     expect(
       Math.abs(
-        (geometry?.mainContentBottom ?? 0) - (geometry?.viewportHeight ?? 0)
+        (geometry?.viewportHeight ?? 0) -
+          (geometry?.mainPlaneBottom ?? 0) -
+          (geometry?.bodyPaddingTop ?? 0)
       ),
-      `${route} main panel is flush with the window bottom edge (JOV-8941)`
+      `${route} main panel retains the shared bottom window gutter`
     ).toBeLessThanOrEqual(1);
 
     if (route.startsWith(APP_ROUTES.SETTINGS)) {

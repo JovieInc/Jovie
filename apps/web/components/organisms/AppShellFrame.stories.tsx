@@ -214,3 +214,75 @@ export const PushInspector: Story = {
 export const PreviewOverlayInspector: Story = {
   render: () => <InspectorFixture withPreview />,
 };
+
+const WINDOW_INSET_CONTACTS = Array.from({ length: 40 }, (_, index) => ({
+  id: `example-contact-${index + 1}`,
+  label: `Example contact ${index + 1}`,
+}));
+
+/** Synthetic content on the production shell, header, sidebar and drawer. */
+function WindowInsetsFixture() {
+  const [open, setOpen] = useState(false);
+  return (
+    <SidebarProvider defaultOpen>
+      <AppShellFrame
+        containerClassName='h-dvh'
+        sidebar={<Sidebar collapsible='icon'>Navigation</Sidebar>}
+        header={
+          <DashboardHeader
+            breadcrumbs={[{ label: 'Contacts' }]}
+            action={
+              <RailToggleButton
+                side='right'
+                open={open}
+                openLabel='Collapse details'
+                closedLabel='Expand details'
+                controlsId='window-insets-inspector'
+                onToggle={() => setOpen(value => !value)}
+              />
+            }
+          />
+        }
+        main={
+          <div
+            data-testid='window-insets-scroll'
+            className='h-full overflow-auto'
+          >
+            {WINDOW_INSET_CONTACTS.map(contact => (
+              <div
+                key={contact.id}
+                data-testid='window-insets-row'
+                className='flex h-8 items-center justify-between gap-3 px-3 text-app'
+              >
+                <span>{contact.label}</span>
+                <Button size='sm' variant='ghost' onClick={() => setOpen(true)}>
+                  Details
+                </Button>
+              </div>
+            ))}
+          </div>
+        }
+        rightPanel={
+          <RightDrawer
+            id='window-insets-inspector'
+            isOpen={open}
+            width={360}
+            presentation='push'
+            ariaLabel='Example contact details'
+          >
+            <div className='p-3 text-app'>
+              Example contact
+              <Button size='sm' variant='ghost' onClick={() => setOpen(false)}>
+                Close details
+              </Button>
+            </div>
+          </RightDrawer>
+        }
+      />
+    </SidebarProvider>
+  );
+}
+
+export const WindowInsets: Story = {
+  render: () => <WindowInsetsFixture />,
+};
