@@ -751,18 +751,18 @@
       "evidence": "Proof-stat methodology page generated from the stat registry; source registration only, not rendered certification."
     },
     {
-      "source": "apps/web/app/[username]/tip/thank-you/page.tsx",
-      "from": null,
-      "to": "holdout",
-      "at": "2026-11-13T00:00:00Z",
-      "evidence": "JOV-12407 adds the missing tip checkout return page. Local missing/invalid session route checks and mocked payment-state tests passed; no production or real-payment certification."
-    },
-    {
       "source": "apps/web/app/[username]/profile-miss/page.tsx",
       "from": null,
       "to": "holdout",
       "at": "2026-11-12T20:38:19Z",
       "evidence": "PR #25184 introduces the profile-miss miss destination (JOV-12081): the dynamic route notFound() rewrites unknown handles into; source registration only, not rendered certification."
+    },
+    {
+      "source": "apps/web/app/[username]/tip/thank-you/page.tsx",
+      "from": null,
+      "to": "holdout",
+      "at": "2026-11-13T00:00:00Z",
+      "evidence": "JOV-12407 adds the missing tip checkout return page. Local missing/invalid session route checks and mocked payment-state tests passed; no production or real-payment certification."
     }
   ]
 }
