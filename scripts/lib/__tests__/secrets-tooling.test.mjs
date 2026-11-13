@@ -121,3 +121,20 @@ it('lintTokenAges flags missing expiry and old tokens', () => {
     'token-old:token:old',
   ]);
 });
+
+it('scrubPrText strips personal emails and phone numbers, keeps service addresses', async () => {
+  const { PERSONAL_MARK, scrubPrText } = await import(
+    '../../secrets/redact.mjs'
+  );
+  const person = ['jane.doe', 'gmail.com'].join('@');
+  const phone = ['555', '123', '4567'].join('-');
+  expect(scrubPrText(`ping ${person} or ${phone}`)).toBe(
+    `ping ${PERSONAL_MARK} or ${PERSONAL_MARK}`
+  );
+  expect(scrubPrText('+' + '1555' + '1234567')).toBe(PERSONAL_MARK);
+  const keep =
+    'Co-Authored-By: Claude <noreply@anthropic.com>\n' +
+    'git@github.com:JovieInc/Jovie 2026-11-12 4fd78e95 run 123-456 port 3000-3001 qa@jovie.test';
+  expect(scrubPrText(keep)).toBe(keep);
+  expect(scrubPrText('token ' + 'ghp_' + 'a'.repeat(36))).toBe(`token ${MARK}`);
+});
