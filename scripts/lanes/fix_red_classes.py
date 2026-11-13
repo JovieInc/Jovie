@@ -30,7 +30,7 @@ import migration_renumber
 import remediation
 from fix_red_mixed_repairs import first_route_reason, mixed_repairs  # noqa: F401
 from fix_red_screen_cert import SCREEN_CERT_TEXT, screen_cert_paths
-from fix_red_failure_routing import (ALIAS_ACTION, ALIAS_REVIEW_FAILURE, alias_owner_metadata,
+from fix_red_failure_routing import (ALIAS_ACTION, ALIAS_REVIEW_FAILURE, ROUTE_BUDGET_RATCHET, alias_owner_metadata,
                                      error_signature, fingerprint_key, owner_handoff_reason)
 from atomic_state import atomic_write_text
 from fix_red_source_edits import (  # noqa: F401
@@ -89,13 +89,6 @@ CENSUS_CERTIFICATION = re.compile(r"source changed; renew certification evidence
 DESIGN_SOURCE_CLI = re.compile(
     r"\bFAIL\b[^\n]*lib/__tests__/design-system-source-ratchet\.test\.mjs[^\n]*"
     r">[^\n]*exits zero from the CLI on the live tree")
-# The budget CLI checks the committed policy against current origin/main.
-# A stale head can retain ceilings main already lowered (#25125), including
-# inside disk-read CLI tests. Sync once through the existing owner; persistent
-# growth still needs a source repair, never a raised budget or an infra retry.
-ROUTE_BUDGET_RATCHET = re.compile(
-    r"(?:##\[error\]|::error::)(?:routes\./[^\s]+|firstLoad\.baselines\./[^\s]*|"
-    r"groups\.[A-Za-z]+\.baselineKb) grew \d+ -> \d+(?=\s|$)")
 # Armed spacing ratchet (spacing-scale-ratchet.test.ts). The count grew because a
 # PR added a 10px/14px utility. Snap those added utilities; do not raise the floor.
 SPACING_RATCHET_TEXT = re.compile(

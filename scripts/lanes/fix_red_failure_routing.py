@@ -1,4 +1,4 @@
-"""Bound shared evidence failures to their existing owner; never run a collector here."""
+"""Route source evidence failures to their existing repair owner."""
 from __future__ import annotations
 
 import hashlib
@@ -17,6 +17,14 @@ _HOLD = re.compile(r'class=deterministic-source;n=[1-9]\d*;run=([1-9]\d*);try=([
 _SHA = re.compile(r'[0-9a-f]{40}')
 _ROLLUPS = {'ci-fast', 'PR Ready', 'Product Lane Receipt'}
 _RED = {'FAILURE', 'ERROR', 'TIMED_OUT', 'CANCELLED', 'STARTUP_FAILURE'}
+
+# The budget CLI checks the committed policy against current origin/main.
+# A stale head can retain ceilings main already lowered (#25125), including
+# inside disk-read CLI tests. Sync once through the existing owner; persistent
+# growth still needs a source repair, never a raised budget or an infra retry.
+ROUTE_BUDGET_RATCHET = re.compile(
+    r"(?:##\[error\]|::error::)(?:routes\./[^\s]+|firstLoad\.baselines\./[^\s]*|"
+    r"groups\.[A-Za-z]+\.baselineKb) grew \d+ -> \d+(?=\s|$)")
 
 
 class SoleAliasReviewFailure:
