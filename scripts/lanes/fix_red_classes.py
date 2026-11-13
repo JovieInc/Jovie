@@ -30,7 +30,7 @@ import migration_renumber
 import remediation
 from fix_red_mixed_repairs import first_route_reason, mixed_repairs  # noqa: F401
 from fix_red_screen_cert import SCREEN_CERT_TEXT, screen_cert_paths
-from fix_red_failure_routing import (ALIAS_ACTION, ALIAS_REVIEW_FAILURE, alias_owner_metadata,
+from fix_red_failure_routing import (ALIAS_ACTION, ALIAS_REVIEW_FAILURE, ROUTE_BUDGET_GROWTH, alias_owner_metadata,
                                      error_signature, fingerprint_key, owner_handoff_reason)
 from atomic_state import atomic_write_text
 from fix_red_source_edits import (  # noqa: F401
@@ -159,7 +159,7 @@ SIGNATURES = (
     ("heading-balance", HEADING_BALANCE_TEXT, BALANCE_HEADINGS),
     ("census-certification", CENSUS_CERTIFICATION, SYNC_MAIN),
     ("design-source-cli", DESIGN_SOURCE_CLI, SYNC_MAIN),
-    # Inventory assertion outranks quota/infra noise echoed in the same log.
+    ("route-budget-growth", ROUTE_BUDGET_GROWTH, SYNC_MAIN),
     ("ci-fast-wiring", UNWIRED, WIRE_CI_FAST),
     # The license error is the job failure. A passing fixture can echo quota text.
     ("dependency-license", DEPENDENCY_LICENSE, AGENT),
