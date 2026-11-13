@@ -51,7 +51,12 @@ const payloadSchema = z
       .object({
         components: z.number().int().nonnegative().nullable(),
         certified: z.number().int().nonnegative().nullable(),
-        byCriterion: z.record(z.string().max(100), criterion),
+        byCriterion: z
+          .record(z.string().max(100), criterion)
+          .refine(
+            criteria => Object.keys(criteria).length <= 50,
+            'byCriterion must not exceed 50 criteria'
+          ),
       })
       .strict(),
     failingComponentsTotal: z.number().int().nonnegative(),
