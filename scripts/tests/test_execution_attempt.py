@@ -1411,6 +1411,22 @@ class CapabilityCheckpointTest(unittest.TestCase):
         self.assertEqual(len(json.loads(first)["capabilityRequests"]), 1)
         self.assertEqual(attempt._usage(attempt._rows(ledger), 102)["attempts"], 1)
 
+    def test_canceled_checkpoint_cannot_create_or_send_a_new_capability_request(self):
+        import capability_outbox
+        claimed = self.claim()
+        job = {"id": "run-1", "head": "a" * 40, "action": "issue-dispatch", "principal": "fixture",
+               "environment": "test", "owner": "worker-a", "linearIssueId": "cause"}
+        self.checkpoint(claimed, job=job)
+        attempt.finish(self.path, self.ident, claimed["fencingToken"], "canceled", {}, now=102, coordination=LOCAL)
+        state = Path(self.tmp.name) / "state"
+        ledger = state / "runs" / "execution-attempts.jsonl"
+        ledger.parent.mkdir(parents=True)
+        ledger.write_text(self.path.read_text())
+        with patch.object(capability_outbox, "transition") as bridge:
+            self.assertEqual(capability_outbox.flush(state, None, lambda _: True, now=103), [])
+            bridge.assert_not_called()
+        self.assertFalse((state / "linear" / "outbox.json").exists())
+
     def test_native_signed_resolution_reserves_same_fence_once_under_concurrent_callers(self):
         import capability_outbox
         import execution_capability

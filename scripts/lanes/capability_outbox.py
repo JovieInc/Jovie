@@ -18,7 +18,7 @@ def denied(error):
             or diagnostic.get("code") in {"FORBIDDEN", "UNAUTHENTICATED", "AUTHENTICATION_ERROR"})
 
 
-def reconcile(state, limit=10):
+def reconcile(state, limit=10, deadline=None):
     """Repair checkpoint -> outbox crashes from the existing verified execution mirror, never dispatch."""
     ledger = state / "runs" / "execution-attempts.jsonl"
     if ledger.exists() and ledger.stat().st_size > 8 * 1024 * 1024:
@@ -26,11 +26,25 @@ def reconcile(state, limit=10):
     rows = execution_attempt._rows(ledger)
     starts = {row["fencingToken"]: row for row in rows if row["event"] == "attempt_started"}
     latest = {row["fencingToken"]: row for row in rows if row.get("capability")}
+    finished = {row.get("fencingToken") for row in rows if row["event"] == "attempt_finished"}
+    ended = {row["identityDigest"] for row in rows if row.get("terminalState") in execution_attempt.TERMINAL
+             or row["event"] == "completion_fenced"}
     existing = sync._read(sync._outbox_path(state), sync.OUTBOX).get("capabilityRequests", {})
+    terminal_jobs = {row["capability"]["job"]["id"] for fence, row in latest.items()
+                     if fence in finished or row["identityDigest"] in ended}
+    if existing and terminal_jobs:
+        with sync._mutating(sync._outbox_path(state), sync.OUTBOX) as data:
+            for queued in data.get("capabilityRequests", {}).values():
+                if queued["record"]["job"]["id"] in terminal_jobs:
+                    for request in queued["record"]["capabilityRequests"]:
+                        if request["delivery"]["status"] == "pending" and request["delivery"]["attempts"] == 0:
+                            request["status"] = "superseded"
     restored = 0
     for fence, row in latest.items():
-        if restored >= limit:
+        if restored >= limit or deadline is not None and time.monotonic() >= deadline:
             break
+        if fence in finished or row["identityDigest"] in ended:
+            continue
         record, start = row["capability"], starts.get(fence)
         requests = record.get("capabilityRequests", [])
         if not requests or all(request["id"] in existing for request in requests):
@@ -38,14 +52,15 @@ def reconcile(state, limit=10):
         issue_id = record["job"].get("linearIssueId")
         if not start or not issue_id or issue_id != start.get("trigger", {}).get("causationId"):
             continue  # missing destination provenance never manufactures a recipient
-        messages = transition({"op": "render", "record": record})["messages"]
+        remaining = 10 if deadline is None else min(10, max(.001, deadline - time.monotonic()))
+        messages = transition({"op": "render", "record": record}, timeout=remaining)["messages"]
         enqueue(state, issue_id, record, messages)
         restored += 1
 
 
-def transition(payload):
+def transition(payload, timeout=10):
     result = subprocess.run(["node", str(BRIDGE)], input=json.dumps(payload), text=True,
-                            capture_output=True, timeout=10, check=True)
+                            capture_output=True, timeout=timeout, check=True)
     if len(result.stdout) > 262144:
         raise ValueError("capability-result-too-large")
     return json.loads(result.stdout)
@@ -108,10 +123,10 @@ def _update(state, key, op, now, **extra):
 def flush(state, linear, admit, *, limit=10, now=None, budget_s=45):
     """Unknown sends only read back; reservation precedes I/O, settlement is generation fenced."""
     now = time.time() if now is None else now
-    reconcile(state, limit=limit)
+    started = time.monotonic()
+    reconcile(state, limit=limit, deadline=started + budget_s)
     rows = sync._read(sync._outbox_path(state), sync.OUTBOX).get("capabilityRequests", {})
     results = []
-    started = time.monotonic()
     for key, row in rows.items():
         if len(results) >= limit or time.monotonic() - started >= budget_s:
             break

@@ -583,3 +583,14 @@ class CapabilityOutboxTest(Base):
         resumed = outbox._update(self.state, "c" * 64, "delivery-select", now)
         self.assertIn("request", resumed)
         self.assertFalse(resumed["readOnly"])
+
+
+    def test_reconstruction_consumes_same_flush_deadline_before_any_delivery(self):
+        outbox, now, result = self.seed()
+        clock = iter([10.0, 56.0])
+        with mock.patch.object(outbox, "reconcile") as reconcile, \
+                mock.patch.object(outbox.time, "monotonic", side_effect=lambda: next(clock)):
+            client = FakeLinear([])
+            self.assertEqual(outbox.flush(self.state, client, lambda _: True, now=now, budget_s=45), [])
+            self.assertEqual(reconcile.call_args.kwargs["deadline"], 55.0)
+            self.assertEqual(client.calls, [])
