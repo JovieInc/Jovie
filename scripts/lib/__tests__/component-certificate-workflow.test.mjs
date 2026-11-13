@@ -31,7 +31,7 @@ const steps = job.steps;
 function minimalReport() {
   return JSON.stringify({
     generatedAt: '2026-11-13T00:00:00.000Z',
-    headSha: 'fixture-sha',
+    headSha: 'ffffffffffffffffffffffffffffffffffffffff',
     totals: { byCriterion: {}, certified: 0, components: 0 },
     certificates: [],
   });
@@ -522,7 +522,7 @@ describe('Ovie delivery outcome from the real workflow shell', () => {
           )
         );
         expect(posted).toMatchObject({
-          headSha: 'fixture-sha',
+          headSha: 'ffffffffffffffffffffffffffffffffffffffff',
           schema: 'jovie.component-certificate-evidence/v1',
         });
       }
@@ -563,7 +563,7 @@ describe('Ovie delivery outcome from the real workflow shell', () => {
       reportPath,
       JSON.stringify({
         generatedAt: '2026-11-13T00:00:00.000Z',
-        headSha: 'fixture-sha',
+        headSha: 'ffffffffffffffffffffffffffffffffffffffff',
         totals: {
           byCriterion: { tests: { fail: 30000, na: 0, pass: 0, unknown: 0 } },
           certified: 0,
@@ -609,7 +609,7 @@ describe('Ovie delivery outcome from the real workflow shell', () => {
     expect(payloadSize).toBeLessThan(64 * 1024);
     const posted = JSON.parse(readFileSync(payloadPath, 'utf8'));
     expect(posted).toMatchObject({
-      headSha: 'fixture-sha',
+      headSha: 'ffffffffffffffffffffffffffffffffffffffff',
       reportBytes: expect.any(Number),
       schema: 'jovie.component-certificate-evidence/v1',
       totals: { certified: 0, components: 30000 },
@@ -654,6 +654,15 @@ describe('component-certificate delivery payload builder', () => {
   it('throws on a report without totals so delivery fails loudly', () => {
     expect(() => buildDeliveryPayload({})).toThrow();
     expect(() => buildDeliveryPayload(null)).toThrow();
+  });
+
+  it('throws on a report without a valid 40-hex headSha', () => {
+    expect(() =>
+      buildDeliveryPayload({
+        ...fullReport,
+        headSha: 'fixture-sha',
+      })
+    ).toThrow(/40-hex headSha/);
   });
 
   it('fails closed when the compact payload would outgrow the ingest cap', () => {
