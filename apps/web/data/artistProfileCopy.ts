@@ -397,9 +397,8 @@ export interface ArtistProfileLandingCopy {
 }
 
 /**
- * The animated audience visual is also used by the notifications landing page.
- * Keep its contract limited to the fields that visual actually renders so the
- * artist-profile narrative can evolve without forcing unrelated page copy.
+ * Shared with notifications; expose only fields the audience visual renders
+ * so artist-profile narrative edits do not require unrelated copy changes.
  */
 export type ArtistProfileCaptureVisualCopy = Omit<
   ArtistProfileLandingCopy['capture'],
