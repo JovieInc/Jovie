@@ -1,7 +1,10 @@
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import type { ContactEvidenceItem } from '@/lib/contacts/certification';
-import { OutboundRailFact } from './OutboundRailFact';
+import {
+  OutboundRailFact,
+  type OutboundRailFactProps,
+} from './OutboundRailFact';
 
 const item: ContactEvidenceItem = {
   key: 'canonical:display-name',
@@ -18,16 +21,21 @@ const item: ContactEvidenceItem = {
   decision: null,
 };
 
+function renderFact(overrides: Partial<OutboundRailFactProps> = {}) {
+  return render(
+    <OutboundRailFact
+      item={item}
+      active={false}
+      pending={false}
+      onDecision={vi.fn()}
+      {...overrides}
+    />
+  );
+}
+
 describe('OutboundRailFact', () => {
   it('keeps provenance, audit evidence and correction inline without disclosures', () => {
-    render(
-      <OutboundRailFact
-        item={item}
-        active={false}
-        pending={false}
-        onDecision={vi.fn()}
-      />
-    );
+    renderFact();
     expect(screen.getByText(/public link page/)).toBeVisible();
     expect(screen.getByText(item.rationale)).toBeVisible();
     expect(screen.getByText(/synthetic-revision/)).toBeVisible();
@@ -38,20 +46,9 @@ describe('OutboundRailFact', () => {
     ).not.toBeInTheDocument();
   });
   it('keeps unavailable provenance explicit without empty controls', () => {
-    render(
-      <OutboundRailFact
-        item={{
-          ...item,
-          source: '',
-          observedAt: null,
-          url: null,
-          rationale: '',
-        }}
-        active={false}
-        pending={false}
-        onDecision={vi.fn()}
-      />
-    );
+    renderFact({
+      item: { ...item, source: '', observedAt: null, url: null, rationale: '' },
+    });
     expect(
       screen.getByText('Source unknown · Observation date unknown')
     ).toBeVisible();
@@ -64,14 +61,7 @@ describe('OutboundRailFact', () => {
     'keeps missing or long recorded names truthful: %s',
     value => {
       const onDecision = vi.fn();
-      render(
-        <OutboundRailFact
-          item={{ ...item, value }}
-          active={false}
-          pending={false}
-          onDecision={onDecision}
-        />
-      );
+      renderFact({ item: { ...item, value }, onDecision });
       expect(screen.getByText(value || 'Not available')).toBeVisible();
       if (!value)
         expect(
@@ -82,28 +72,14 @@ describe('OutboundRailFact', () => {
   );
   it('does not turn a role-only import into an invented name', () => {
     const onDecision = vi.fn();
-    render(
-      <OutboundRailFact
-        item={{ ...item, value: 'Hip Hop Artist | NC' }}
-        active={false}
-        pending={false}
-        onDecision={onDecision}
-      />
-    );
+    renderFact({ item: { ...item, value: 'Hip Hop Artist | NC' }, onDecision });
     expect(screen.getByText('Hip Hop Artist | NC')).toBeVisible();
     expect(screen.queryByText(/Suggested display:/)).not.toBeInTheDocument();
     expect(onDecision).not.toHaveBeenCalled();
   });
   it('separates the recorded value from a suggestion without writing either', () => {
     const onDecision = vi.fn();
-    render(
-      <OutboundRailFact
-        item={item}
-        active
-        pending={false}
-        onDecision={onDecision}
-      />
-    );
+    renderFact({ active: true, onDecision });
     expect(screen.getByText(item.value)).toBeVisible();
     expect(screen.getByText('Suggested display: Ada')).toBeVisible();
     expect(screen.getByText('80% confidence')).toBeVisible();
@@ -119,14 +95,7 @@ describe('OutboundRailFact', () => {
     'preserves the %s decision and evidence identity',
     label => {
       const onDecision = vi.fn();
-      render(
-        <OutboundRailFact
-          item={item}
-          active={false}
-          pending={false}
-          onDecision={onDecision}
-        />
-      );
+      renderFact({ onDecision });
       fireEvent.click(
         within(
           screen.getByRole('group', { name: 'Review Display name' })
@@ -138,14 +107,7 @@ describe('OutboundRailFact', () => {
 
   it('requires explicit correction entry and save, retaining provenance and revision', () => {
     const onDecision = vi.fn();
-    render(
-      <OutboundRailFact
-        item={item}
-        active={false}
-        pending={false}
-        onDecision={onDecision}
-      />
-    );
+    renderFact({ onDecision });
     expect(screen.getByText(/synthetic-revision/)).toBeVisible();
     expect(screen.getByRole('link', { name: 'Open source' })).toHaveAttribute(
       'href',

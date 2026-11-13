@@ -43,12 +43,17 @@ function renderRail(overrides: Partial<OutboundRailProps> = {}) {
     onReject: vi.fn(),
     ...overrides,
   };
-  render(
+  const view = (updates: Partial<OutboundRailProps> = {}) => (
     <TooltipProvider>
-      <OutboundRail {...props} />
+      <OutboundRail {...props} {...updates} />
     </TooltipProvider>
   );
-  return props;
+  const rendered = render(view());
+  return {
+    ...props,
+    rerender: (updates: Partial<OutboundRailProps>) =>
+      rendered.rerender(view(updates)),
+  };
 }
 
 describe('OutboundRail', () => {
@@ -63,12 +68,63 @@ describe('OutboundRail', () => {
     expect(
       screen.queryByText('Message', { exact: true })
     ).not.toBeInTheDocument();
-    expect(
-      screen.getByRole('link', { name: 'Source', exact: true })
-    ).toBeVisible();
+    expect(screen.getByRole('link', { name: 'Source' })).toBeVisible();
     expect(screen.getByTestId('outbound-readiness')).toHaveTextContent(
       'Current certification is unknown.'
     );
+  });
+
+  it('preserves same-person draft and focus through loading, error, filled and unknown evidence', () => {
+    const props = renderRail({
+      certification: null,
+      certificationLoading: true,
+    });
+    const { rerender } = props;
+    const currentDraft = () => screen.getByLabelText('Message Body');
+    const draft = currentDraft();
+    fireEvent.change(draft, { target: { value: 'Keep this local draft' } });
+    draft.focus();
+    expect(screen.getByTestId('outbound-readiness')).toHaveTextContent(
+      'Current facts are loading.'
+    );
+    expect(
+      screen.queryByRole('button', { name: 'Certification details' })
+    ).not.toBeInTheDocument();
+    rerender({
+      certificationLoading: false,
+      error: 'Evidence unavailable; review the source.',
+    });
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      'Evidence unavailable; review the source.'
+    );
+    expect(currentDraft()).toHaveValue('Keep this local draft');
+    expect(currentDraft()).toHaveFocus();
+    rerender({
+      certificationLoading: false,
+      certification: certification('certified_for_outreach'),
+    });
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    const details = screen.getByRole('button', {
+      name: 'Certification details',
+    });
+    expect(details).toHaveAttribute('aria-expanded', 'false');
+    fireEvent.click(details);
+    expect(
+      screen.getByText('3 confirmed · 0 rejected · 0 unresolved · 0 stale')
+    ).toBeVisible();
+    expect(currentDraft()).toHaveValue('Keep this local draft');
+    rerender({ certificationLoading: false });
+    expect(screen.getByTestId('outbound-readiness')).toHaveTextContent(
+      'Current certification is unknown.'
+    );
+    expect(
+      screen.queryByRole('button', { name: 'Certification details' })
+    ).not.toBeInTheDocument();
+    expect(screen.getByTestId('outbound-rail')).toBeVisible();
+    expect(currentDraft()).toHaveValue('Keep this local draft');
+    expect(props.onClose).not.toHaveBeenCalled();
+    expect(props.onApprove).not.toHaveBeenCalled();
+    expect(props.onFact).not.toHaveBeenCalled();
   });
 
   it('focuses the current message for review without approving it', () => {
@@ -113,27 +169,7 @@ describe('OutboundRail', () => {
   });
 
   it('resets local edits, open details and rejection confirmation when the person changes', () => {
-    const props: OutboundRailProps = {
-      row: outboundFixtureRow(),
-      certification: certification('certified_for_outreach'),
-      certificationLoading: false,
-      activeFactKey: null,
-      pending: null,
-      error: null,
-      onClose: vi.fn(),
-      onFact: vi.fn(),
-      onCertify: vi.fn(),
-      onRefreshEvidence: vi.fn(),
-      onApprove: vi.fn(),
-      onSaveCopy: vi.fn(),
-      onHold: vi.fn(),
-      onReject: vi.fn(),
-    };
-    const { rerender } = render(
-      <TooltipProvider>
-        <OutboundRail {...props} />
-      </TooltipProvider>
-    );
+    const props = renderRail();
     fireEvent.change(screen.getByLabelText('Message Body'), {
       target: { value: 'Unsaved Ada edit' },
     });
@@ -152,11 +188,7 @@ describe('OutboundRail', () => {
         revision: null,
       },
     });
-    rerender(
-      <TooltipProvider>
-        <OutboundRail {...props} row={next} />
-      </TooltipProvider>
-    );
+    props.rerender({ row: next });
     expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
     expect(screen.getByLabelText('Message Body')).toHaveValue('Bea draft');
     expect(
