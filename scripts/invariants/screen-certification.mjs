@@ -229,21 +229,18 @@ export const PROTECTED_REVENUE_SCREEN_SOURCES = Object.freeze({
 });
 
 function parseRegistry(raw) {
-  return raw
-    .trim()
-    .split('\n')
-    .map(line => {
-      const [id, platform, owner, sources, viewports, flag, reason] =
-        line.split('|');
-      return Object.freeze({
-        id,
-        platform,
-        owner,
-        sources: sources.split(','),
-        viewports: viewports.split(','),
-        ...(flag === 'x' ? { excluded: true, reason } : {}),
-      });
+  return raw.split('\n').map(line => {
+    const [id, platform, owner, sources, viewports, flag, reason] =
+      line.split('|');
+    return Object.freeze({
+      id,
+      platform,
+      owner,
+      sources: sources.split(','),
+      viewports: viewports.split(','),
+      ...(flag === 'x' ? { excluded: true, reason } : {}),
     });
+  });
 }
 
 /** @type {readonly object[]} */
