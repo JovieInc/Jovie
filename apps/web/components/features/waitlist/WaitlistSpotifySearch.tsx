@@ -123,7 +123,7 @@ export function WaitlistSpotifySearch({
     setMode('url');
     // Focus the URL input after mode switch
     setTimeout(() => inputRef.current?.focus(), 0);
-  }, [clear]);
+  }, [clear, hideNow]);
 
   const handleBackToSearch = useCallback(() => {
     setMode('search');
@@ -178,6 +178,7 @@ export function WaitlistSpotifySearch({
       results,
       activeIndex,
       manualAddIndex,
+      hideNow,
       handleArtistSelect,
       handleManualAddClick,
     ]
