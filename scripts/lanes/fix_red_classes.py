@@ -28,6 +28,7 @@ from pathlib import Path
 import machine_gap
 import migration_renumber
 import remediation
+from fix_red_mixed_repairs import first_route_reason, mixed_repairs  # noqa: F401
 from fix_red_failure_routing import (ALIAS_ACTION, ALIAS_REVIEW_FAILURE, alias_owner_metadata,
                                      error_signature, fingerprint_key, owner_handoff_reason)
 from atomic_state import atomic_write_text
@@ -185,28 +186,9 @@ def stamp_internal_changelog(body) -> str | None:
     return body + INTERNAL_CHANGELOG_NOTE + "\n"
 
 
-def _mixed_repairs(pr: dict, per_check: list) -> list[str]:
-    """Body writes a mixed rollup can apply while the other classes stay on the model.
-
-    A single class returns nothing here so its primary route (changelog stamp, rerun, sync)
-    is not applied twice. Component-test evidence is never one of these repairs."""
-    if len({cls for cls, _ in per_check}) < 2:
-        return []
-    repairs: list[str] = []
-    if any(action == STAMP_CHANGELOG for _, action in per_check) and stamp_internal_changelog(pr.get("body")) is not None:
-        repairs.append(STAMP_CHANGELOG)
-    if any(cls == "pr-body" for cls, _ in per_check):
-        # Imported here: pr_events stamps via this module, and only from a function.
-        from pr_events import red_section_complete
-        if not red_section_complete(str(pr.get("body") or "")):
-            repairs.append("red-before-green")
-    return repairs
-
-
 def classify(pr: dict, logs: dict[str, str] | None = None) -> dict:
     """{cls, key, action, checks, signature, files, repairs}. `logs` maps a failing check name to its failed-job log;
-    a check with no log is `other`. A BEHIND branch with nothing deterministic to say is `stale-branch`.
-    `repairs` names body writes that still apply when the overall action stays `agent`."""
+    a check with no log is `other`. A BEHIND branch with nothing deterministic to say is `stale-branch`."""
     logs = logs or {}
     import detached_native_sync
     names = sorted({str(check.get("name")) for check in real_failures(pr)})
@@ -245,7 +227,7 @@ def classify(pr: dict, logs: dict[str, str] | None = None) -> dict:
         files = sorted(_domain_write_hits("\n".join(logs.get(name) or "" for name in names)))
     elif cls == "detached-native-consumer":
         files = detached_native_sync.paths("\n".join(logs.get(name) or "" for name in names))
-    repairs = _mixed_repairs(pr, per_check) if cls == "mixed" else []
+    repairs = mixed_repairs(pr, per_check) if cls == "mixed" else []
     return {"schema": SCHEMA, "cls": cls, "key": fingerprint_key(cls, names, signature), "action": action,
             "checks": names, "signature": signature, "files": files, "repairs": repairs,
             **({"evidenceOwner": owner} if owner else {})}

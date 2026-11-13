@@ -141,41 +141,6 @@ class ClassifyTest(unittest.TestCase):
         self.assertIsNone(classes.stamp_internal_changelog(once))
         self.assertEqual(classes.stamp_internal_changelog(""), classes.INTERNAL_CHANGELOG_NOTE + "\n")
 
-    def test_mixed_body_repairs_stay_on_the_model_for_the_remaining_class(self):
-        changelog = "Error: Customer outcome decision missing or invalid (missing-metadata)."
-        red = 'red-before-green: this repair PR has no "## Red-before-green" section'
-        touched = (
-            "::error file=apps/web/components/jovie/tool-ui.tsx::[test-not-touched] "
-            "Component changed but test apps/web/components/jovie/tool-ui.test.tsx "
-            "was not touched in this diff."
-        )
-        names = ("Affected Unit Tests (4/4)", "Fleet Rules Evidence", "Source Validation")
-        logs = {
-            "Affected Unit Tests (4/4)": touched,
-            "Fleet Rules Evidence": red,
-            "Source Validation": changelog,
-        }
-        bare = classes.classify({**pr(*names), "body": "## Summary\n"}, logs)
-        self.assertEqual((bare["cls"], bare["action"]), ("mixed", "agent"))
-        self.assertEqual(bare["repairs"], ["stamp-changelog", "red-before-green"])
-        self.assertNotIn(bare["action"], classes.DETERMINISTIC)
-        noted = classes.stamp_internal_changelog("## Summary\n")
-        complete = (
-            noted
-            + "\n## Red-before-green\n\n"
-            + "- Failing command: `node scripts/component-ship-gate.mjs`\n"
-            + "- Failing run (before fix): https://github.com/JovieInc/Jovie/actions/runs/42880446507\n\n"
-            + "```text\nFAIL component-ship-gate\n```\n"
-        )
-        done = classes.classify({**pr(*names), "body": complete}, logs)
-        self.assertEqual(done["repairs"], [])
-        self.assertEqual(done["action"], "agent")
-        single = classes.classify(pr("Source Validation"), {"Source Validation": changelog})
-        self.assertEqual(single["repairs"], [])
-        self.assertEqual(single["action"], "stamp-changelog")
-        noise = classes.classify(pr("A", "B"), {"A": "API rate limit exceeded", "B": "AssertionError"})
-        self.assertEqual(noise["repairs"], [])
-
     def test_key_ignores_volatile_numbers_but_separates_failures(self):
         a = classes.classify(pr("T"), {"T": "AssertionError: expected 12 to equal 3"})
         b = classes.classify(pr("T"), {"T": "AssertionError: expected 99 to equal 4"})
