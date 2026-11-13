@@ -34,7 +34,6 @@ import {
 } from '@/data/homepageV2Copy';
 import { MARKETING_PEN_CONTRACT_IDS } from '@/data/marketing/penContracts';
 import { ARTIST_PROFILE_SOCIAL_PROOF } from '@/data/socialProof';
-import { FEATURE_FLAGS } from '@/lib/flags/marketing-static';
 
 import './HomepageV2Route.css';
 
@@ -59,12 +58,8 @@ export function HomepageV2BelowHero() {
       <HomepageV2SystemOverview />
       <HomepageV2Spotlight />
       <HomepageV2CaptureReactivate />
-      {FEATURE_FLAGS.SHOW_HOMEPAGE_V2_POWER_GRID ? (
-        <HomepageV2PowerGrid />
-      ) : null}
-      {FEATURE_FLAGS.SHOW_HOMEPAGE_V2_SOCIAL_PROOF ? (
-        <HomepageV2SocialProof />
-      ) : null}
+      <HomepageV2PowerGrid />
+      <HomepageV2SocialProof />
       <HomepageV2Pricing />
       <HomepageV2FinalCta />
     </>

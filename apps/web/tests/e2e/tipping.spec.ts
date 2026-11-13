@@ -59,15 +59,6 @@ test.describe('Tipping MVP', () => {
         await page.addInitScript(mode => {
           localStorage.setItem('theme', mode);
         }, colorMode);
-
-        // Enable tipping feature flag
-        await page.addInitScript(() => {
-          Object.defineProperty(process.env, 'NEXT_PUBLIC_FEATURE_TIPS', {
-            value: 'true',
-            writable: true,
-            configurable: true,
-          });
-        });
       });
 
       test('shows tip button on profile with Venmo link', async ({ page }) => {

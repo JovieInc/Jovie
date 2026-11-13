@@ -28,21 +28,6 @@ vi.mock('@/lib/analytics', async importOriginal => {
   };
 });
 
-// Product default: SHOW_MARKETING_CENTER_NAV is false (clean homepage baseline).
-// Enable it here so header content assertions exercise center nav in isolation.
-vi.mock('@/lib/flags/marketing-static', async importOriginal => {
-  const actual =
-    await importOriginal<typeof import('@/lib/flags/marketing-static')>();
-  return {
-    ...actual,
-    FEATURE_FLAGS: {
-      ...actual.FEATURE_FLAGS,
-      SHOW_MARKETING_CENTER_NAV: true,
-      SHOW_HOMEPAGE_CENTER_NAV: true,
-    },
-  };
-});
-
 describe('MarketingHeader', () => {
   beforeEach(() => {
     mockTrack.mockClear();
