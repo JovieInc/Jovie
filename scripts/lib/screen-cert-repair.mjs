@@ -4,7 +4,7 @@
  * Safe edits only: waive error/offline when the only mutate token is `submit`
  * inside `chat-submit-prompt`, rename an existing empty-list story, and
  * generate Partial / Long / Rtl stories plus an axe test when the component's
- * exports make those states provable. A required state that is still missing
+ * exports make those states provable. A raw control or required state still missing
  * is a failure, so the lane falls through to a model.
  */
 import { existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
@@ -413,13 +413,19 @@ function repairOne(root, rel, waiverText) {
   const a11y = /** @type {{ status?: string } | undefined} */ (
     certificate.criteria.find(item => item.id === 'a11y')
   );
-  if (states?.status !== 'pass' || a11y?.status !== 'pass')
+  const owner = certificate.criteria.find(item => item.id === 'ds-owner');
+  if (
+    states?.status !== 'pass' ||
+    a11y?.status !== 'pass' ||
+    owner?.status !== 'pass'
+  )
     return {
       ok: false,
       missing: Object.entries(states?.states ?? {})
         .filter(([, row]) => row.status === 'fail')
         .map(([name]) => name)
-        .concat(a11y?.status === 'pass' ? [] : ['a11y']),
+        .concat(a11y?.status === 'pass' ? [] : ['a11y'])
+        .concat(owner?.status === 'pass' ? [] : ['ds-owner']),
     };
   const files = [];
   if (renamed !== storySource) files.push([storyPath, renamed]);

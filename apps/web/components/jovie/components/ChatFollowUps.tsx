@@ -1,5 +1,6 @@
 'use client';
 
+import { PlainButton } from '@jovie/ui/atoms/plain-button';
 import { useMemo } from 'react';
 import {
   type ChatFollowUp,
@@ -25,14 +26,14 @@ export function ChatFollowUps({
   return (
     <div className='flex flex-wrap gap-2 pt-1' data-testid='chat-follow-ups'>
       {items.map(item => (
-        <button
+        <PlainButton
           key={item.label}
           type='button'
-          className={getChatPromptPillClass('compact')}
+          className={`${getChatPromptPillClass('compact')} text-start wrap-anywhere`}
           onClick={() => onSelect(item.prompt)}
         >
           {item.label}
-        </button>
+        </PlainButton>
       ))}
     </div>
   );

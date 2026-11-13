@@ -1,5 +1,7 @@
 import { fireEvent, render, renderHook, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
+import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import { PROFILE_CHAT_FOLLOW_UPS } from '../profile-chat-follow-ups';
 import { ChatFollowUps, useProfileChatFollowUps } from './ChatFollowUps';
 
@@ -19,6 +21,59 @@ const thread = [
 ];
 
 describe('ChatFollowUps', () => {
+  it('sends the focused next move with Enter and Space', async () => {
+    const user = userEvent.setup();
+    const onSelect = vi.fn();
+    render(
+      <ChatFollowUps items={PROFILE_CHAT_FOLLOW_UPS} onSelect={onSelect} />
+    );
+    await user.tab();
+    expect(
+      screen.getByRole('button', { name: 'Plan My Next Release' })
+    ).toHaveFocus();
+    await user.keyboard('{Enter}');
+    await user.tab();
+    await user.keyboard(' ');
+    expect(onSelect.mock.calls).toEqual([
+      ['Plan my next release.'],
+      ['Tighten my bio.'],
+    ]);
+  });
+
+  it.each([
+    { state: 'default', items: PROFILE_CHAT_FOLLOW_UPS, dir: 'ltr' },
+    { state: 'empty', items: [], dir: 'ltr' },
+    {
+      state: 'long content',
+      items: [
+        {
+          label: 'Review my next release and the audience I want to reach',
+          prompt: 'Plan my next release.',
+        },
+      ],
+      dir: 'ltr',
+    },
+    {
+      state: 'right to left',
+      items: [{ label: 'خطط لإصداري القادم', prompt: 'Plan my next release.' }],
+      dir: 'rtl',
+    },
+  ])(
+    'has accessible next moves in the $state state',
+    async ({ items, dir }) => {
+      const { container } = render(
+        <div dir={dir}>
+          <ChatFollowUps items={items} onSelect={vi.fn()} />
+        </div>
+      );
+      expect(screen.queryAllByRole('button')).toHaveLength(items.length);
+      for (const item of items) {
+        expect(screen.getByRole('button', { name: item.label })).toBeVisible();
+      }
+      await expectNoA11yViolations(container);
+    }
+  );
+
   it('sends the prompt behind a tapped next move', () => {
     const onSelect = vi.fn();
     render(

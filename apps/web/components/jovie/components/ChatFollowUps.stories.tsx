@@ -29,3 +29,30 @@ export const ProfileNextMoves: Story = {};
 export const ProfileNextMovesLight: Story = {
   parameters: { themes: { themeOverride: 'light' } },
 };
+
+export const Empty: Story = { args: { items: [] } };
+
+export const LongContent: Story = {
+  args: {
+    items: PROFILE_CHAT_FOLLOW_UPS.map(item => ({
+      ...item,
+      label: `${item.label} with a detailed review of my releases and audience`,
+    })),
+  },
+};
+
+export const Rtl: Story = {
+  args: {
+    items: [
+      { label: 'خطط لإصداري القادم', prompt: 'Plan my next release.' },
+      { label: 'حسّن سيرتي الذاتية', prompt: 'Tighten my bio.' },
+    ],
+  },
+  decorators: [
+    Story => (
+      <div dir='rtl' lang='ar'>
+        <Story />
+      </div>
+    ),
+  ],
+};
