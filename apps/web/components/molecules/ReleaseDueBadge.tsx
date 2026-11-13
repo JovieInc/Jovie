@@ -1,5 +1,6 @@
 'use client';
 
+import { createContext, useContext } from 'react';
 import { DotBadge } from '@/components/atoms/DotBadge';
 
 interface ReleaseDueBadgeProps {
@@ -9,11 +10,18 @@ interface ReleaseDueBadgeProps {
   readonly onSetDate?: () => void;
 }
 
-function formatRelativeDue(dueDate: Date): {
+/** Fixed-date previews can share one clock without changing live task rows. */
+export const ReleaseDueClockContext = createContext<Date | undefined>(
+  undefined
+);
+
+function formatRelativeDue(
+  dueDate: Date,
+  now: Date
+): {
   label: string;
   variant: 'future' | 'soon' | 'overdue' | 'stale' | 'today';
 } {
-  const now = new Date();
   const diffMs = dueDate.getTime() - now.getTime();
   const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
 
@@ -62,6 +70,7 @@ export function ReleaseDueBadge({
   isCompleted,
   onSetDate,
 }: Readonly<ReleaseDueBadgeProps>) {
+  const now = useContext(ReleaseDueClockContext) ?? new Date();
   if (isCompleted) return null;
 
   if (!dueDate) {
@@ -79,7 +88,7 @@ export function ReleaseDueBadge({
     return null;
   }
 
-  const { label, variant } = formatRelativeDue(dueDate);
+  const { label, variant } = formatRelativeDue(dueDate, now);
 
   return (
     <DotBadge

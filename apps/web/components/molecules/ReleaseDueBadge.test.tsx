@@ -1,10 +1,24 @@
 import { render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { ReleaseDueBadge } from './ReleaseDueBadge';
+import { ReleaseDueBadge, ReleaseDueClockContext } from './ReleaseDueBadge';
 
 describe('ReleaseDueBadge', () => {
   afterEach(() => {
     vi.useRealTimers();
+  });
+
+  it('uses the supplied preview clock without changing live-clock behavior', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-11-13T12:00:00.000Z'));
+    const dueDate = new Date('2026-04-03T12:00:00.000Z');
+    const { rerender } = render(
+      <ReleaseDueClockContext value={new Date('2026-04-02T12:00:00.000Z')}>
+        <ReleaseDueBadge dueDate={dueDate} dueDaysOffset={1} />
+      </ReleaseDueClockContext>
+    );
+    expect(screen.getByText('1d')).toBeVisible();
+    rerender(<ReleaseDueBadge dueDate={dueDate} dueDaysOffset={1} />);
+    expect(screen.getByText('Overdue')).toBeVisible();
   });
 
   it('collapses overdue tasks to a simple overdue label', () => {

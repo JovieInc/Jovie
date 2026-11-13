@@ -169,7 +169,7 @@ const createSuccessStatusShowcaseState = (
 export const HOMEPAGE_PROFILE_PREVIEW_ARTIST: Artist = {
   id: 'homepage-preview-artist',
   owner_user_id: 'homepage-preview-owner',
-  handle: TIM_WHITE_PROFILE.handle,
+  handle: TIM_WHITE_PROFILE.publicProfileHandle,
   spotify_id: TIM_WHITE_PROFILE.spotifyArtistId,
   name: TIM_WHITE_PROFILE.name,
   image_url: TIM_WHITE_PROFILE.avatarSrc,

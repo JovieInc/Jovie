@@ -1,6 +1,7 @@
 import { render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { getConnectorDefinitions } from '@/lib/connectors/registry';
+import { applyRootTitleTemplate } from '@/lib/seo/document-title';
 
 const { configuration } = vi.hoisted(() => ({ configuration: vi.fn() }));
 const providerIds = getConnectorDefinitions().map(({ id }) => id);
@@ -12,7 +13,7 @@ vi.mock('@/lib/connectors/availability.server', () => ({
   getConnectorAvailability: configuration,
 }));
 
-import IntegrationsDirectoryPage from './page';
+import IntegrationsDirectoryPage, { metadata } from './page';
 
 const getHeading = (name: string) => screen.getByRole('heading', { name });
 const present = (pattern: RegExp) =>
@@ -21,6 +22,20 @@ const absent = (pattern: RegExp) =>
   expect(screen.queryByText(pattern)).not.toBeInTheDocument();
 describe('public integrations projection', () => {
   beforeEach(() => configuration.mockReturnValue(availability(true)));
+  it('names the page once and gives related links readable names', () => {
+    expect(applyRootTitleTemplate(metadata.title)).toBe('Integrations | Jovie');
+    render(<IntegrationsDirectoryPage />);
+    for (const [name, href] of [
+      ['Developers', '/developers'],
+      ['Command Line', '/cli'],
+      ['Pricing', '/pricing'],
+    ]) {
+      expect(screen.getByRole('link', { name })).toHaveAttribute('href', href);
+      expect(
+        screen.queryByRole('link', { name: href })
+      ).not.toBeInTheDocument();
+    }
+  });
   it('renders implemented available operations rather than provider promises', () => {
     render(<IntegrationsDirectoryPage />);
     expect(getHeading('YouTube')).toBeInTheDocument();
