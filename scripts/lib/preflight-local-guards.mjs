@@ -63,6 +63,14 @@ export const LOCAL_GUARDS = Object.freeze([
       p === 'scripts/capability-benchmark/capability-reconciliation.mjs',
   },
   {
+    id: 'dead-ends',
+    name: 'rendered dead-end copy, controls and links',
+    command: 'pnpm design:no-dead-ends:check',
+    when: p =>
+      /^(?:apps\/web|apps\/desktop\/src|packages\/ui)\/.+\.[jt]sx?$/.test(p) ||
+      /^packages\/copy\/(?:dead-ends|rules)/.test(p),
+  },
+  {
     id: 'design-noise',
     name: 'design-noise lint (apps/web/design-noise.baseline.json)',
     command: 'node apps/web/scripts/lint-design-noise.mjs',

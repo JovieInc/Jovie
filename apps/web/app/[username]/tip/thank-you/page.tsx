@@ -36,7 +36,7 @@ const STATUS_COPY = {
       'We could not verify a tip for this profile from this link. Check your payment status before making another payment.',
   },
   unavailable: {
-    title: 'Payment status unavailable',
+    title: 'Payment status temporarily unavailable',
     description:
       'We cannot check your payment right now. Wait a moment, then refresh this page. Do not pay again while the status is unknown.',
   },

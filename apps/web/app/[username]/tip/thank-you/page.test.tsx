@@ -58,6 +58,20 @@ describe('tip checkout return page', () => {
     expect(metadata.referrer).toBe('no-referrer');
   });
 
+  it('explains a temporary verification failure and how to recover', async () => {
+    mocks.resolve.mockResolvedValue('unavailable');
+    render(await Page(props));
+    expect(
+      screen.getByRole('heading', {
+        name: 'Payment status temporarily unavailable',
+      })
+    ).toBeVisible();
+    expect(screen.getByText(/then refresh this page/)).toBeVisible();
+    expect(
+      screen.getByRole('link', { name: 'Back to profile' })
+    ).toHaveAttribute('href', '/artist');
+  });
+
   it('reads request headers and rechecks payment status on each return', async () => {
     const firstHeaders = new Headers({ 'x-forwarded-for': '192.0.2.1' });
     const nextHeaders = new Headers({ 'x-forwarded-for': '192.0.2.2' });
