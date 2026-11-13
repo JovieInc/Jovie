@@ -139,8 +139,6 @@ jobs:
           ref: ${{ inputs.checkout-ref || github.sha }}
           persist-credentials: false
       - uses: ./.github/actions/setup-node-pnpm
-        with:
-          package_cache: 'false'
       # Reuse the lockfile-pinned Chromium system-dependency provisioner,
       # including Xvfb, without new apt commands or sandbox overrides.
       - uses: ./.github/actions/setup-playwright
