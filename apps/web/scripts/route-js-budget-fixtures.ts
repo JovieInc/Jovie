@@ -95,9 +95,9 @@ export function isolateBudgetAncestor(
     join(budgetDir, 'route-js-budgets.json'),
     JSON.stringify(budgets)
   );
-  const env: NodeJS.ProcessEnv = {};
-  for (const [key, value] of Object.entries(process.env)) {
-    if (value !== undefined && !key.startsWith('GIT_')) env[key] = value;
+  const env: NodeJS.ProcessEnv = { ...process.env };
+  for (const key of Object.keys(env)) {
+    if (key.startsWith('GIT_')) delete env[key];
   }
   const emptyConfig = join(workDir, 'empty.gitconfig');
   writeFileSync(emptyConfig, '');
