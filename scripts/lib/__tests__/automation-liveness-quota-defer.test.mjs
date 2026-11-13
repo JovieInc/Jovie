@@ -82,10 +82,15 @@ describe('a double 403 defers only while the shared budget is spent (JOV-10153)'
       token: 'actions-token',
       apiUrl: 'https://api.github.com',
     });
-    expect(read).toEqual({
+    expect(read).toMatchObject({
       ok: false,
       deferred: true,
       reason: 'quota-deferred',
+      capabilityBlocker: {
+        kind: 'quota',
+        source: RUNS_URL.split('?')[0],
+        resetAt: new Date(SPENT.resources.core.reset * 1000).toISOString(),
+      },
     });
   });
 
@@ -139,7 +144,7 @@ describe('the run-list observers defer instead of reporting unknown', () => {
       token: 'actions-token',
     });
     expect(observed).toMatchObject({ ok: false, reason: 'github-http-403' });
-    expect(observed.deferred).toBeFalsy();
+    expect('deferred' in observed && observed.deferred).toBeFalsy();
   });
 
   it('carries the deferred flag through the failure shape helper', () => {

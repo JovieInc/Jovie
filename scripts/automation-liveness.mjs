@@ -52,6 +52,7 @@ import {
   prepareQueueRecovery,
   QUEUE_FINGERPRINT,
 } from './lib/merge-queue-recovery.mjs';
+import { retainQueueCapabilityOutbox } from './lib/queue-capability-outbox.mjs';
 import * as redGate from './lib/red-monitor-owner-gate.mjs';
 
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -1017,6 +1018,18 @@ export async function main({
         process.stdout.write(
           `${JSON.stringify({ fingerprint: decision.fingerprint, dispatched })}\n`
         );
+      }
+      if (
+        decision.fingerprint === QUEUE_FINGERPRINT &&
+        recovery?.state?.capabilityRequests?.length
+      ) {
+        state[decision.fingerprint] = retainQueueCapabilityOutbox(
+          previous[decision.fingerprint],
+          recovery.state,
+          result,
+          decision.action
+        );
+        continue;
       }
       // Keep the prior state when filing failed so the next run retries.
       if (!result.ok || decision.action === 'hold')

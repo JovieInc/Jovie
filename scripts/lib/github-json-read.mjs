@@ -23,6 +23,8 @@
  * attribution is strict: a funded budget, no api base, or an unreadable
  * /rate_limit keeps the original failure so silence stays red.
  */
+import { classifyCapabilityFailure } from './capability-request.mjs';
+
 const TIMEOUT_MS = 10_000;
 
 /** Bounded JSON fetch: 200 is ok, any other status or transport is a reason. */
@@ -71,7 +73,9 @@ async function sharedBudgetSpent(fetchImpl, token, apiUrl) {
     githubHeaders(token)
   );
   const core = limit.ok ? limit.body?.resources?.core : null;
-  return typeof core?.remaining === 'number' && core.remaining <= 0;
+  return typeof core?.remaining === 'number' && core.remaining <= 0
+    ? core
+    : null;
 }
 
 /**
@@ -83,23 +87,43 @@ export async function readGithubJson(url, { fetchImpl, token, apiUrl = '' }) {
   const read = await readJson(fetchImpl, url, githubHeaders(token));
   if (read.ok || !token || read.reason !== 'http-403') return read;
   const recovery = await readJson(fetchImpl, url, {});
-  if (
-    !recovery.ok &&
-    recovery.reason === 'http-403' &&
-    (await sharedBudgetSpent(fetchImpl, token, apiUrl))
-  )
-    return { ok: false, deferred: true, reason: 'quota-deferred' };
+  if (!recovery.ok && recovery.reason === 'http-403') {
+    const budget = await sharedBudgetSpent(fetchImpl, token, apiUrl);
+    if (budget)
+      return {
+        ok: false,
+        deferred: true,
+        reason: 'quota-deferred',
+        capabilityBlocker: classifyCapabilityFailure({
+          kind: 'quota',
+          capability: 'github-core-read',
+          scope: 'github-actions-token',
+          code: 'shared-budget-exhausted',
+          source: url,
+          resetAt:
+            Number.isSafeInteger(budget.reset) &&
+            budget.reset >= 0 &&
+            budget.reset < 8640000000000
+              ? new Date(budget.reset * 1000).toISOString()
+              : null,
+        }),
+      };
+  }
   return recovery;
 }
 
 /**
  * Observation failure shape for the run-list observers: the `github-`
  * reason prefix with the deferred flag carried through (JOV-10153).
+ * @returns {{ok: false, deferred: boolean, reason: string, lastProofAt?: string, capabilityBlocker?: ReturnType<typeof classifyCapabilityFailure>}}
  */
 export function githubReadFailure(read) {
   return {
     ok: false,
     deferred: read.deferred === true,
     reason: `github-${read.reason}`,
+    ...(read.capabilityBlocker
+      ? { capabilityBlocker: read.capabilityBlocker }
+      : {}),
   };
 }

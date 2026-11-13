@@ -15,6 +15,13 @@ import { homedir, tmpdir } from 'node:os';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { shipIntent } from './lib/auto-ready-provenance.mjs';
+import {
+  persistPublicationCapabilityRequest,
+  publishQualifiedPr,
+} from './lib/pr-publication.mjs';
+
+export { persistPublicationCapabilityRequest } from './lib/pr-publication.mjs';
+
 import { proseOnly, scrubPrText } from './lib/pr-prose.mjs';
 import { wipGate } from './lib/pr-wip-gate.mjs';
 import { isRepairPr, lintPrBody } from './lib/preflight-changed.mjs';
@@ -613,6 +620,8 @@ export async function main(
     github = gh,
     execute = run,
     diagnose = console.error,
+    recordCapability = persistPublicationCapabilityRequest,
+    now = Date.now,
     pause = ms => new Promise(resolve => setTimeout(resolve, ms)),
   } = {}
 ) {
@@ -807,87 +816,20 @@ export async function main(
     });
     if (wip.refused) return 3;
     if (wip.override) labels.push('wip-override');
-    const dir = mkdtempSync(path.join(tmpdir(), 'pr-open-create-'));
-    try {
-      const bodyFile = path.join(dir, 'body.md');
-      writeFileSync(bodyFile, body);
-      const branchResult = git(['branch', '--show-current']);
-      const branch = branchResult.stdout.trim();
-      const local = git(['rev-parse', 'HEAD']);
-      const expectedHead = local.stdout.trim();
-      if (
-        branchResult.status !== 0 ||
-        !branch ||
-        local.status !== 0 ||
-        !/^[0-9a-f]{40}$/.test(expectedHead)
-      )
-        throw new Error(
-          'publication-head: cannot resolve the intended branch and commit'
-        );
-      if (!a.noPush) {
-        const push = git(['push', '-u', 'origin', 'HEAD'], {
-          stdio: 'inherit',
-        });
-        if (push.status !== 0) return push.status ?? 1;
-      }
-      // A narrow origin.fetch may not map this branch to @{upstream}: prove the
-      // remote head and name it; never re-push or bypass publication gates.
-      const remoteRef = `refs/heads/${branch}`;
-      const published = git(
-        ['ls-remote', '--exit-code', '--heads', 'origin', remoteRef],
-        { timeout: 30_000 }
-      );
-      if (published.status !== 0)
-        throw new Error(
-          `publication-head: remote head unavailable for ${branch}`
-        );
-      const refs = published.stdout
-        .trim()
-        .split(/\r?\n/)
-        .map(line => line.trim().split(/\s+/));
-      if (
-        refs.length !== 1 ||
-        refs[0][0] !== expectedHead ||
-        refs[0][1] !== remoteRef
-      )
-        throw new Error(
-          `publication-head: remote head does not match the intended commit for ${branch}`
-        );
-      const made = github(a.repo, [
-        'pr',
-        'create',
-        '--head',
-        branch,
-        '--repo',
-        REPOSITORY,
-        '--base',
-        a.base,
-        '--title',
-        title,
-        '--body-file',
-        bodyFile,
-        ...(a.draft ? ['--draft'] : []),
-        ...labels.flatMap(l => ['--label', l]),
-      ]);
-      log((made.stdout || made.stderr).trim());
-      const url = made.stdout.trim().split('\n').pop();
-      if (made.status === 0 && body.includes(PR_URL_PLACEHOLDER)) {
-        writeFileSync(bodyFile, body.replaceAll(PR_URL_PLACEHOLDER, url));
-        const edited = github(a.repo, [
-          'pr',
-          'edit',
-          url,
-          '--repo',
-          REPOSITORY,
-          '--body-file',
-          bodyFile,
-        ]);
-        if (edited.status !== 0) return edited.status ?? 1;
-      }
-      return made.status ?? 1;
-    } finally {
-      rmSync(dir, { recursive: true, force: true });
-    }
+    return await publishQualifiedPr({
+      a,
+      body,
+      title,
+      labels,
+      git,
+      github,
+      log,
+      diagnose,
+      recordCapability,
+      now,
+      repository: REPOSITORY,
+      placeholder: PR_URL_PLACEHOLDER,
+    });
   } catch (error) {
     log(`FAIL  ${error.message}`);
     return 1;

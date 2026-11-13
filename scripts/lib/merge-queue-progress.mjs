@@ -1,3 +1,4 @@
+import { classifyCapabilityFailure } from './capability-request.mjs';
 import { githubHeaders } from './github-json-read.mjs';
 import {
   QUEUE_CHECK_FIELDS,
@@ -17,7 +18,22 @@ export async function observeMergeQueueProgress(
   receipt,
   { fetchImpl, token, nowMs, apiUrl }
 ) {
-  if (!token) return { ok: false, reason: 'merge-queue-token-missing' };
+  const capabilityFailure = observation =>
+    classifyCapabilityFailure({
+      capability: 'github-queue-read',
+      scope: receipt.repo,
+      source: `${apiUrl}/graphql`,
+      ...observation,
+    });
+  if (!token)
+    return {
+      ok: false,
+      reason: 'merge-queue-token-missing',
+      capabilityBlocker: capabilityFailure({
+        kind: 'credential',
+        code: 'credential-unavailable',
+      }),
+    };
   const [owner, name] = String(receipt.repo).split('/');
   const branch = receipt.branch ?? 'main';
   const query = `query($owner:String!,$name:String!,$branch:String!){repository(owner:$owner,name:$name){mergeQueue(branch:$branch){entries(first:100){totalCount nodes{enqueuedAt headCommit { oid ${QUEUE_CHECK_FIELDS} }} pageInfo{hasNextPage}}} ${QUEUE_RECOVERY_FIELDS} pullRequests(baseRefName:$branch,states:MERGED,first:10,orderBy:{field:UPDATED_AT,direction:DESC}){nodes{${QUEUE_MERGED_FIELDS}}}}}`;
@@ -38,8 +54,21 @@ export async function observeMergeQueueProgress(
       }),
       signal: controller.signal,
     });
-    if (response.status !== 200)
-      return { ok: false, reason: `merge-queue-http-${response.status}` };
+    if (response.status !== 200) {
+      const reset = Number(response.headers?.get('x-ratelimit-reset'));
+      const capabilityBlocker = capabilityFailure({
+        status: response.status,
+        resetAt:
+          Number.isSafeInteger(reset) && reset > 0 && reset < 8640000000000
+            ? new Date(reset * 1000).toISOString()
+            : null,
+      });
+      return {
+        ok: false,
+        reason: `merge-queue-http-${response.status}`,
+        ...(capabilityBlocker ? { capabilityBlocker } : {}),
+      };
+    }
     body = await response.json();
   } catch (error) {
     return {

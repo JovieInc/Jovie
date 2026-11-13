@@ -6,6 +6,7 @@ import {
 } from './merge-queue-recovery-evidence.mjs';
 import { inspectOfficialLease } from './official-symphony-lease.mjs';
 import { FLEET_CLOSURE_LEASE_STALE_MS } from './ownerless-recovery-policy.mjs';
+import { queueCapabilityHold } from './queue-capability-outbox.mjs';
 
 export { queueSnapshot } from './merge-queue-recovery-evidence.mjs';
 
@@ -71,6 +72,7 @@ export function planQueueRecovery({
   previous = null,
   runtime,
   nowMs,
+  capabilityBlockers = [],
 }) {
   const durable = parseQueueRecovery(incident.issue?.description);
   const completed = previous?.recovery?.status === 'recovered';
@@ -117,8 +119,24 @@ export function planQueueRecovery({
     !snapshot?.known ||
     nowMs - stamp(snapshot.observedAt) >= FLEET_CLOSURE_LEASE_STALE_MS ||
     nowMs < stamp(snapshot.observedAt)
-  )
+  ) {
+    if (capabilityBlockers.length || prior?.capabilityRequests?.length) {
+      const hold = queueCapabilityHold({
+        state,
+        prior,
+        durable,
+        row,
+        issue: incident.issue,
+        blockers: capabilityBlockers,
+        localRequests: previous?.recovery?.capabilityRequests,
+        head: state.repair?.head,
+        nowMs,
+      });
+      const { status, nextAction, writable, ...detail } = hold;
+      return { ...finish(status, nextAction, detail), writable };
+    }
     return finish('unknown', 'refresh-telemetry');
+  }
   if (!open && row.status === 'fresh')
     return { state: null, dispatch: false, close: false };
   if (!prior && open) {
@@ -200,6 +218,30 @@ export function planQueueRecovery({
     staleAfterMs: FLEET_CLOSURE_LEASE_STALE_MS,
     requireHeartbeat: true,
   });
+  if (worker.accepted) {
+    state.owner = worker.owner;
+    state.lease = worker.lease;
+    state.leaseExpiresAt = worker.expiresAt;
+  }
+  if (
+    capabilityBlockers.length ||
+    prior?.capabilityRequests?.length ||
+    previous?.recovery?.capabilityRequests?.length
+  ) {
+    const hold = queueCapabilityHold({
+      state,
+      prior,
+      durable,
+      localRequests: previous?.recovery?.capabilityRequests,
+      row,
+      issue,
+      blockers: capabilityBlockers,
+      head: state.repair?.head ?? snapshot.main?.oid,
+      nowMs,
+    });
+    const { status, nextAction, writable, ...detail } = hold;
+    return { ...finish(status, nextAction, detail), writable };
+  }
   if (!worker.known)
     return finish(
       stamp(state.deadline) <= nowMs ? 'escalated' : 'unknown',
@@ -304,12 +346,37 @@ export async function prepareQueueRecovery({
     incident,
     previous: previous[QUEUE_FINGERPRINT],
     runtime,
+    capabilityBlockers: [
+      ...(observations.get(QUEUE_ID)?.capabilityBlocker
+        ? [observations.get(QUEUE_ID).capabilityBlocker]
+        : []),
+      ...(!readRuntime &&
+      incident.issue &&
+      (!env.SYMPHONY_STATE_URL || runtime?.error)
+        ? [
+            {
+              kind: 'custody-evidence',
+              capability: 'official-symphony-state',
+              scope: 'stalled-shipping-worker-lease',
+              code: env.SYMPHONY_STATE_URL
+                ? 'official-state-unavailable'
+                : 'endpoint-unconfigured',
+            },
+          ]
+        : []),
+    ],
     nowMs: stamp(report.observedAt),
   });
   if (plan.state) {
     row.recovery = plan.state;
     row.recoveryWritable = plan.writable !== false;
-    row.status = plan.close ? 'fresh' : 'stale';
+    row.status = plan.close
+      ? 'fresh'
+      : plan.state.status === 'capability-blocked'
+        ? 'unknown'
+        : 'stale';
+    if (plan.state.status === 'capability-blocked')
+      row.productVerdict = 'unknown';
     row.reason = `queue-recovery:${plan.state.status};next=${plan.state.nextAction};deadline=${plan.state.deadline}`;
     const red = report.results.filter(
       r => !['fresh', 'deferred'].includes(r.status)

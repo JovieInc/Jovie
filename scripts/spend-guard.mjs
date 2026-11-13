@@ -13,6 +13,8 @@ import { execFileSync } from 'node:child_process';
 import { appendFileSync, readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { renderCapabilityRequest } from './lib/capability-request.mjs';
+import { spendCredentialRequest } from './lib/job-capability-observation.mjs';
 import {
   buildAnomalies,
   dailySeries,
@@ -67,6 +69,16 @@ const cycleStart = (d, day) => {
   if (d.getUTCDate() < day) s.setUTCMonth(s.getUTCMonth() - 1);
   return s;
 };
+
+// Hosted reads require the existing named read-only credential before any CLI/network work.
+if (process.env.GITHUB_ACTIONS === 'true' && !process.env.VERCEL_TOKEN) {
+  const request = spendCredentialRequest(process.env, now.getTime());
+  process.stdout.write(
+    `${JSON.stringify({ status: 'capability-blocked', productVerdict: 'unknown', capabilityRequests: [request] })}\n`
+  );
+  process.stderr.write(`${renderCapabilityRequest(request)}\n`);
+  process.exit(75);
+}
 
 const budgets = vercel(['budgets', '--format', 'json']).budgets ?? [];
 const team = budgets.find(b => b.scope === 'team');

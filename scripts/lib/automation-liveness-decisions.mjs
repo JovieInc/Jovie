@@ -1,4 +1,5 @@
 import { REGISTRY_PATH } from './automation-registry.mjs';
+import { renderCapabilityRequest } from './capability-request.mjs';
 import { renderQueueRecovery } from './merge-queue-recovery.mjs';
 
 export function livenessFingerprint(id) {
@@ -54,6 +55,9 @@ export function livenessDecisions(report, previous = {}) {
         `Last heartbeat: ${row.lastProofAt ?? 'none'}; max silence ${row.budgetMinutes}m.`,
         `Escalation owner: ${row.escalationOwner}. Receipt: ${row.url ?? 'unknown'}.`,
         `Registry: ${REGISTRY_PATH}.`,
+        ...(row.recovery?.capabilityRequests ?? []).map(
+          renderCapabilityRequest
+        ),
         ...(row.recovery ? [renderQueueRecovery(row.recovery)] : []),
       ].join('\n'),
     });

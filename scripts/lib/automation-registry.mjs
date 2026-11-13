@@ -463,6 +463,9 @@ export function evaluateEntry(entry, observation, nowMs) {
       ...base,
       status: observation?.deferred ? 'deferred' : 'unknown',
       reason: observation?.reason ?? 'receipt-unreadable',
+      ...(observation?.capabilityBlocker
+        ? { capabilityBlocker: observation.capabilityBlocker }
+        : {}),
     };
   }
   const proofMs = Date.parse(observation.lastProofAt ?? '');
