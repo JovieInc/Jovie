@@ -1071,7 +1071,7 @@ export async function main({
       writeFileSync(args.previous, `${JSON.stringify(state, null, 2)}\n`);
   }
   process.stdout.write(
-    `${JSON.stringify({ status: report.status, red: report.results.filter(row => row.status !== 'fresh').map(row => row.id) })}\n`
+    `${JSON.stringify({ status: report.status, red: report.results.filter(row => !['fresh', 'deferred'].includes(row.status)).map(row => row.id) })}\n`
   );
   return full;
 }
