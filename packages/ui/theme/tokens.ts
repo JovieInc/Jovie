@@ -164,27 +164,27 @@ export const shadows = {
 } as const;
 
 // ============================================
-// BORDER RADIUS (expanded to match Linear's observed values)
+// BORDER RADIUS (values emitted from apps/web/design/tokens.json)
 // ============================================
 export const radii = {
-  none: 'var(--radius-none)',
-  xs: 'var(--radius-xs)', // 3px — tags, tiny elements
-  sm: 'var(--radius-sm)', // 4px — sidebar items, badges
-  md: 'var(--radius-md)', // 5px — inputs (Linear uses 5px not 6px)
-  default: 'var(--radius-default)', // 6px — buttons, dropdowns
-  lg: 'var(--radius-lg)', // 8px — cards, modals
-  xl: 'var(--radius-xl)', // 10px — large cards
-  '2xl': 'var(--radius-2xl)', // 12px — panels, sheets
-  '3xl': 'var(--radius-3xl)', // 14px — large modals
-  pill: 'var(--radius-pill)', // 48px — pill buttons
-  full: 'var(--radius-full)', // 9999px — circles
+  none: 'var(--radius-none)', // 0
+  xs: 'var(--radius-xs)', // 2px
+  sm: 'var(--radius-sm)', // 8px
+  md: 'var(--radius-md)', // 10px
+  default: 'var(--radius-default)', // 4px
+  lg: 'var(--radius-lg)', // 12px
+  xl: 'var(--radius-xl)', // 16px
+  '2xl': 'var(--radius-2xl)', // 20px
+  '3xl': 'var(--radius-3xl)', // 24px
+  pill: 'var(--radius-pill)', // CSS saturation; used arc depends on visible size
+  full: 'var(--radius-full)', // CSS saturation; not a measured 9999px arc
 } as const;
 
 /**
- * Semantic radius pairs for nested System B surfaces. The outer radius is
- * always the inner radius plus `inset`, keeping the two corner arcs
- * concentric. Use the outer alias for a shared surface and the matching inner
- * alias for a rounded child placed inside its inset.
+ * Semantic pairs for circular corners with a uniform border-box inset.
+ * Count border and padding once between outer and inner border edges.
+ * Adjacent surfaces and uncontained children are not concentric; use these
+ * aliases only when the shared owner establishes that geometry.
  */
 export const concentricRadii = {
   card: {

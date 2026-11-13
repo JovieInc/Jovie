@@ -3,6 +3,8 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { evaluateShrinkOnlyCount } from '@/lib/design/shrink-only-count-ratchet';
 import {
+  deriveSystemBInnerRadiusPx,
+  resolveSystemBRadiusPx,
   SYSTEM_B_CONCENTRIC_SURFACES,
   SYSTEM_B_RADIUS_PX,
   SYSTEM_B_SURFACE_INSET_PX,
@@ -16,6 +18,190 @@ import {
 const APP_ROOT = join(__dirname, '../../..');
 const REPO_ROOT = join(APP_ROOT, '../..');
 const RADIUS_BASELINE_PATH = join(__dirname, 'arbitrary-radius.baseline.json');
+
+const uniformInset = (value: number) => ({
+  top: value,
+  right: value,
+  bottom: value,
+  left: value,
+});
+
+describe('System B role geometry (shadow; no rendered consumer gate)', () => {
+  it('keeps the viewport frame square without squaring floating surfaces or controls', () => {
+    expect(resolveSystemBRadiusPx({ role: 'edge-attached-frame' })).toBe(0);
+    expect(
+      resolveSystemBRadiusPx({
+        role: 'rounded-surface',
+        surface: 'panel',
+        visibleSize: { width: 224, height: 600 },
+      })
+    ).toBe(24);
+    expect(
+      resolveSystemBRadiusPx({
+        role: 'capsule-control',
+        visibleSize: { width: 80, height: 28 },
+      })
+    ).toBe(14);
+  });
+
+  it('derives the existing semantic pairs from their actual border-box inset', () => {
+    for (const surface of ['card', 'overlay', 'panel'] as const) {
+      const pair = SYSTEM_B_CONCENTRIC_SURFACES[surface];
+      expect(
+        resolveSystemBRadiusPx({
+          role: 'inset-surface',
+          surface,
+          relationship: 'nested-parallel',
+          outerVisibleSize: { width: 100, height: 100 },
+          insetPx: uniformInset(SYSTEM_B_SURFACE_INSET_PX[pair.inset]),
+        })
+      ).toBe(SYSTEM_B_RADIUS_PX[pair.inner]);
+    }
+    // 1px outer border + 4px padding = 5px between the two border edges.
+    expect(
+      resolveSystemBRadiusPx({
+        role: 'inset-surface',
+        surface: 'card',
+        relationship: 'nested-parallel',
+        outerVisibleSize: { width: 100, height: 100 },
+        insetPx: uniformInset(5),
+      })
+    ).toBe(11);
+  });
+
+  it('clamps outer arcs to the visible box, and inner arcs to zero', () => {
+    expect(
+      resolveSystemBRadiusPx({
+        role: 'inset-surface',
+        surface: 'panel',
+        relationship: 'nested-parallel',
+        outerVisibleSize: { width: 100, height: 28 },
+        insetPx: uniformInset(4),
+      })
+    ).toBe(10);
+    expect(
+      resolveSystemBRadiusPx({
+        role: 'inset-surface',
+        surface: 'card',
+        relationship: 'nested-parallel',
+        outerVisibleSize: { width: 100, height: 100 },
+        insetPx: uniformInset(20),
+      })
+    ).toBe(0);
+  });
+
+  it('keeps a 28px visible pill at radius 14 inside a 44px hit target', () => {
+    for (const hitTargetHeight of [44, 48]) {
+      const control = {
+        visibleSize: { width: 80, height: 28 },
+        hitTargetHeight,
+      };
+      expect(
+        resolveSystemBRadiusPx({ role: 'capsule-control', ...control })
+      ).toBe(14);
+    }
+    expect(
+      resolveSystemBRadiusPx({
+        role: 'circle-control',
+        visibleSize: { width: 28, height: 28 },
+      })
+    ).toBe(14);
+    expect(
+      resolveSystemBRadiusPx({
+        role: 'capsule-control',
+        visibleSize: { width: 20, height: 80 },
+      })
+    ).toBe(10);
+  });
+
+  it.each(['adjacent', 'uncontained'] as const)(
+    'rejects false concentric %s relationships',
+    relationship => {
+      expect(() =>
+        resolveSystemBRadiusPx({
+          role: 'inset-surface',
+          surface: 'card',
+          relationship,
+          outerVisibleSize: { width: 100, height: 100 },
+          insetPx: uniformInset(4),
+        })
+      ).toThrow('Only nested parallel');
+    }
+  );
+
+  it('rejects unsupported elliptical corners and unequal insets', () => {
+    const geometry = {
+      relationship: 'nested-parallel' as const,
+      outerRadiusPx: { x: 16, y: 16 },
+      insetPx: uniformInset(4),
+    };
+    expect(() =>
+      deriveSystemBInnerRadiusPx({
+        ...geometry,
+        outerRadiusPx: { x: 16, y: 12 },
+      })
+    ).toThrow('Only circular corners');
+    expect(() =>
+      deriveSystemBInnerRadiusPx({
+        ...geometry,
+        insetPx: { ...uniformInset(4), left: 5 },
+      })
+    ).toThrow('Only circular corners');
+    expect(() =>
+      deriveSystemBInnerRadiusPx({
+        ...geometry,
+        outerRadiusPx: { x: 9999, y: 9999 },
+      })
+    ).toThrow('Resolve CSS saturation');
+  });
+
+  it.each([-1, NaN, Infinity])('rejects invalid measurements (%s)', invalid => {
+    expect(() =>
+      deriveSystemBInnerRadiusPx({
+        relationship: 'nested-parallel',
+        outerRadiusPx: { x: invalid, y: invalid },
+        insetPx: uniformInset(4),
+      })
+    ).toThrow('finite and nonnegative');
+    expect(() =>
+      deriveSystemBInnerRadiusPx({
+        relationship: 'nested-parallel',
+        outerRadiusPx: { x: 16, y: 16 },
+        insetPx: uniformInset(invalid),
+      })
+    ).toThrow('finite and nonnegative');
+    expect(() =>
+      resolveSystemBRadiusPx({
+        role: 'capsule-control',
+        visibleSize: { width: 80, height: invalid },
+      })
+    ).toThrow('finite and positive');
+  });
+
+  it('rejects collapsed surfaces and rectangular circles', () => {
+    expect(() =>
+      resolveSystemBRadiusPx({
+        role: 'inset-surface',
+        surface: 'card',
+        relationship: 'nested-parallel',
+        outerVisibleSize: { width: 32, height: 32 },
+        insetPx: uniformInset(16),
+      })
+    ).toThrow('finite and positive');
+    expect(() =>
+      resolveSystemBRadiusPx({
+        role: 'circle-control',
+        visibleSize: { width: 44, height: 28 },
+      })
+    ).toThrow('equal visible dimensions');
+    expect(() =>
+      resolveSystemBRadiusPx({
+        role: 'circle-control',
+        visibleSize: { width: 0, height: 0 },
+      })
+    ).toThrow('finite and positive');
+  });
+});
 
 describe('System B concentric radius contract', () => {
   it('keeps every outer radius equal to its inner radius plus its inset', () => {
