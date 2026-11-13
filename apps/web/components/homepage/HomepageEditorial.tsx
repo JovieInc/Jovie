@@ -10,10 +10,11 @@ import {
   HOMEPAGE_INVITE_ANCHOR,
 } from '@/data/homepageEditorialCopy';
 import { HOMEPAGE_LATEST_RELEASE } from '@/data/homepageProductUi';
+import { resolveHomepageHeroPrimaryAction } from '@/data/homepageStartCta';
 import { MARKETING_PEN_CONTRACT_IDS } from '@/data/marketing/penContracts';
 import { HOME_SPEC } from './v3/home-spec';
 import { Orbit } from './v3/Orbit';
-import { AppWindow, CatalogPlate, ReleaseInspector } from './v3/ProductUi';
+import { AppWindow, CatalogPlate } from './v3/ProductUi';
 import { Callout, ReleasePage } from './v3/Surfaces';
 import './v3/stage.css';
 import './v3/product-ui.css';
@@ -61,13 +62,15 @@ function ChapterRule({
 }
 
 /**
- * Hero: the locked line beside the lede and actions, then Jovie for Mac under
- * the one camera, its inspector lifted out of the window, lit by the Orbit.
+ * Hero: the locked line beside the lede and actions, then Jovie for Mac shot
+ * straight on, its release page lifted out of the window, standing in one
+ * key light from above. No rings or glow blobs: light, edge and shadow only.
  */
 export function HomepageStoryHero({
   copy = HOMEPAGE_EDITORIAL_COPY.hero,
   headingId = 'home-hero-heading',
 }: Readonly<{ copy?: HeroCopy; headingId?: string }>) {
+  const primary = resolveHomepageHeroPrimaryAction(copy);
   return (
     <section
       data-pen-section='hero'
@@ -78,12 +81,6 @@ export function HomepageStoryHero({
       aria-labelledby={headingId}
       className='hv3 hv3-hero marketing-hero-dock'
     >
-      <Orbit
-        id='hv3-orbit-hero'
-        rings={[1800, 1400, 1000]}
-        arc={[282, 34]}
-        arcRing={1}
-      />
       <div className='hv3-hero__copy'>
         <h1
           id={headingId}
@@ -95,13 +92,13 @@ export function HomepageStoryHero({
           <p className='hv3-lede marketing-hero-subtitle'>{copy.subhead}</p>
           <div className='hv3-ctas'>
             <Link
-              href={copy.primaryHref}
+              href={primary.href}
               prefetch={false}
               className='hv3-btn hv3-btn--primary'
               data-testid='homepage-primary-cta'
               data-primary-action='true'
             >
-              {copy.primaryAction}
+              {primary.label}
             </Link>
             <Link
               href={copy.secondaryHref}
@@ -113,7 +110,9 @@ export function HomepageStoryHero({
               <ArrowRight className='size-4' aria-hidden />
             </Link>
           </div>
-          <p className='hv3-mono hv3-hero__note'>{COPY.hero.note}</p>
+          {primary.showInviteNote ? (
+            <p className='hv3-mono hv3-hero__note'>{COPY.hero.note}</p>
+          ) : null}
         </div>
       </div>
       {/* Product mockups under the 3D camera: their boxes overlap by projection,
@@ -122,7 +121,10 @@ export function HomepageStoryHero({
         className='hv3-stage hv3-stage--hero'
         data-dom-certification='ignore'
       >
-        <div className='hv3-bounce' />
+        {/* The key light: one Ion wedge from above the frame, falling onto the
+            selected release. The window stands in it; it shows only as haze
+            above the window and as spill below it. */}
+        <div aria-hidden className='hv3-keylight' />
         <div
           className='hv3-rig hv3-rig--hero'
           role='img'
@@ -132,14 +134,18 @@ export function HomepageStoryHero({
             <AppWindow />
             <div className='hv3-sheen' />
           </div>
+          {/* What a listener gets from the selected row: its release page,
+              on the third column, down to its first listen rows. */}
           <div
-            className='hv3-lift hv3-lift--inspector hv3-edge'
+            aria-hidden
+            className='hv3-lift hv3-lift--page hv3-edge'
             data-hv3-parallax
           >
-            <ReleaseInspector anchor='upc' eager />
+            <div className='hv3-phone hv3-phone--hero'>
+              <ReleasePage titleAnchor='htitle' />
+            </div>
           </div>
         </div>
-        <Callout anchor='upc' label={COPY.hero.upcCallout} />
       </div>
       <nav className='hv3-index' aria-label={COPY.chaptersLabel}>
         {COPY.chapters.map((label, index) => (

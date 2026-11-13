@@ -20,6 +20,7 @@ import {
 } from './utils/profile-desktop-surface';
 import { certifyProfileModeHistory } from './utils/profile-mode-history';
 import { registerProfileNameAdmissionTests } from './utils/profile-name-admission';
+import { registerProfileOverviewColumnTests } from './utils/profile-overview-columns-admission';
 import { auditPublicProfileLayout } from './utils/public-profile-layout-invariant';
 import {
   installPublicRouteMocks,
@@ -911,6 +912,7 @@ test.describe('public profile browser admission', () => {
   });
 
   registerProfileNameAdmissionTests();
+  registerProfileOverviewColumnTests();
 
   test('deliberate red detects a desktop artist name escaping its cover', async ({
     page,

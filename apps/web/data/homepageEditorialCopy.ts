@@ -1,4 +1,8 @@
-import { HOMEPAGE_FEATURED_ARTIST } from '@/data/demoArtists';
+import {
+  featuredArtistPossessive,
+  featuredArtistPossessiveTitle,
+  HOMEPAGE_FEATURED_ARTIST,
+} from '@/data/demoArtists';
 import { HOMEPAGE_INVITE_ANCHOR } from '@/data/homepageInviteAnchor';
 import { TIM_WHITE_PROFILE } from '@/lib/tim-white';
 
@@ -39,8 +43,7 @@ export const HOMEPAGE_EDITORIAL_COPY = {
     secondaryAction: 'See a live profile',
     secondaryHref: TIM_WHITE_PROFILE.publicProfilePath,
     note: 'two fields · we email when your spot opens',
-    windowLabel: `Jovie for Mac: an example artist's Releases list with ${HOMEPAGE_FEATURED_ARTIST.inspected.title} open in the inspector`,
-    upcCallout: 'per release',
+    windowLabel: `Jovie for Mac: ${featuredArtistPossessive(HOMEPAGE_FEATURED_ARTIST)} Releases list, beside the ${HOMEPAGE_FEATURED_ARTIST.inspected.title} release page listeners open`,
   },
   /** Chapter index (mono, lowercase, as approved). */
   chapters: ['profile', 'releases', 'specs', 'invitation'],
@@ -53,7 +56,7 @@ export const HOMEPAGE_EDITORIAL_COPY = {
       { label: 'Every service', value: 'One link to wherever they listen' },
       { label: 'Stay close', value: 'Updates only for people who ask' },
     ],
-    alt: `An example artist’s Jovie profile, Listen mode, with ${HOMEPAGE_FEATURED_ARTIST.releases[0].title}.`,
+    alt: `${featuredArtistPossessiveTitle(HOMEPAGE_FEATURED_ARTIST)} Jovie profile, Listen mode, with ${HOMEPAGE_FEATURED_ARTIST.releases[0].title}.`,
     // The handle is printed on the phone beside it; the callout names the idea.
     handleCallout: 'one handle',
     updatesCallout: 'get updates · opt-in only',
@@ -66,7 +69,7 @@ export const HOMEPAGE_EDITORIAL_COPY = {
   releases: {
     headline: 'Every release, ready on day one.',
     body: 'Your catalog comes in once. Each release gets its own page with listen links for every service, and your profile always leads with the newest one.',
-    catalogLabel: 'An example artist’s release catalog in Jovie',
+    catalogLabel: `${featuredArtistPossessiveTitle(HOMEPAGE_FEATURED_ARTIST)} release catalog in Jovie`,
     releasePageLabel: `The ${HOMEPAGE_FEATURED_ARTIST.inspected.title} release page`,
     captions: {
       page: {

@@ -229,6 +229,11 @@
     "apps/web/components/atoms/BrandLogo.tsx": {
       "permission-denied": "BrandLogo only draws the brand mark and has no permission input or gated action; the detector matched role='img' on the svg."
     },
+    "apps/web/components/atoms/CopyToggleIcon.tsx": {
+      "partial": "The only required prop is copied; Idle and Copied already render with every optional prop (className, size, strokeWidth) left out, and Large sets size. There is no data that could arrive incomplete.",
+      "long-content": "The atom draws one fixed-size icon and no text, so nothing can grow. The detector matched aria-label in the doc-comment example and the text- colour class.",
+      "rtl-overflow": "The atom draws one symmetric icon and no text, so direction changes nothing. The detector matched aria-label in the doc-comment example and the text- colour class."
+    },
     "apps/web/components/atoms/Divider.tsx": {
       "permission-denied": "A divider is a styled separator line with no action, data or account; nothing can be gated. The detector matched role='separator'."
     },
@@ -433,6 +438,9 @@
     "apps/web/components/features/profile/ProfileAeoProofClaimCard.tsx": {
       "empty": "The proof claim card renders no collection: one heading, one note and one CTA, all required props; the detector matched the items-start class."
     },
+    "apps/web/components/features/profile/ProfilePrimaryTabPanel.tsx": {
+      "offline": "The panel fetches nothing itself: releases, tour dates and the catalog result arrive as props from the server-rendered profile, and a failed catalog read arrives as catalogLoadFailed (ErrorCatalogLoadFailed, whose Try Again reloads the page). The detector matched the word skeleton in the visitorAssignmentResolved doc comment, which LoadingAlertsAssignment shows."
+    },
     "apps/web/components/features/profile/ProfileViewTracker.tsx": {
       "error": "The tracker returns null; a refused beacon falls back to the tracking mutation and nothing is shown to the visitor, so there is no error state to render. ProfileViewTracker.certificate.test.tsx asserts the fallback and an axe-clean page.",
       "offline": "Offline the browser refuses the sendBeacon and the tracker hands the view to the tracking mutation without rendering anything; ProfileViewTracker.certificate.test.tsx covers that path, and the story shows the chrome-free mount."
@@ -577,6 +585,9 @@
     "apps/web/components/homepage/v3/Surfaces.tsx": {
       "empty": "ReleasePage lists the fixed RELEASE_PAGE_SERVICES and CommandPaletteCard lists the fixed palette rows from data/homepageProductUi.ts; neither list is data-driven, so neither can be empty.",
       "partial": "ReleasePage and CommandPaletteCard take no props; Callout's optional side and className are placement and styling flags with defaults, and both palette row shapes (with and without a shortcut) render in CommandPalette, so nothing can be partially present."
+    },
+    "apps/web/components/jovie/ChatHistorySwitcher.tsx": {
+      "offline": "ChatHistorySwitcher only reads the chat list through useChatConversationsQuery and never submits; lost connectivity reaches it as the failed load, which the ErrorLoadingHistory story shows with its Retry row."
     },
     "apps/web/components/jovie/components/AssistantMessageText.tsx": {
       "offline": "AssistantMessageText makes no request and has no connectivity input: it parses the reply string it is given. The only thing it loads is the markdown chunk, and while that is pending the Suspense fallback shows the same text as plain prose (LoadingMarkdownChunk); a reply that never arrives is the chat transport's state, not this component's."
@@ -868,6 +879,9 @@
       "offline": "The skeleton is a static Suspense fallback that fetches nothing; when the segment cannot load, the route's error boundary replaces it, not the skeleton.",
       "permission-denied": "The skeleton draws the same placeholders for everyone. The detector matched role='status' and the admin layout variant; access to the admin segment is decided by the route before the loaded surface, not by this fallback."
     },
+    "apps/web/components/shell/DictationWaveform.tsx": {
+      "empty": "The strip draws a fixed count of decorative bars (32 unless bars is set) and takes no data, so it has no collection to empty. The detector matched the items-center class and the word list in the array-index-key comment."
+    },
     "apps/web/components/shell/InstallBanner.tsx": {
       "empty": "The banner renders one card from scalar props (title, description, CTA) and owns no collection that could be empty; omitted copy falls back to defaults (PartialCustomTitle story). The detector matched the items-center class."
     },
@@ -948,8 +962,13 @@
       "offline": "The renderer never fetches or submits: it draws the search field and the rows its owner passes, and a submenu shows loading only when the caller sets isLoading (LoadingItems), so lost connectivity reaches it only as caller state.",
       "permission-denied": "The renderer has no permission input or gated action; the detector matched role='menuitem' on the loading and empty rows. A caller that withholds a submenu passes disabled, which Radix renders as an inert trigger."
     },
+    "packages/ui/atoms/common-dropdown-state-rows.tsx": {
+      "offline": "LoadingState and EmptyState never fetch or submit. They only draw the in-flight or empty row the menu owner asks for, and the detector marked them offline because the loading slot id contains the word loading. Lost connectivity stays the owner's state, shown by the Loading story.",
+      "permission-denied": "The rows have no permission input or gated action. The detector matched role='menuitem' and role='status'. A caller that must not offer an action omits that item instead of asking these rows to gate it."
+    },
     "packages/ui/atoms/common-dropdown.tsx": {
-      "offline": "CommonDropdown renders caller-supplied items and never fetches or submits; isLoading is a caller flag, so lost connectivity can only reach it as the existing LoadingState or EmptyState stories."
+      "offline": "CommonDropdown renders caller-supplied items and never fetches or submits; isLoading is a caller flag, so lost connectivity can only reach it as the existing LoadingState or EmptyState stories.",
+      "permission-denied": "CommonDropdown has no permission, entitlement, or account-role input. The detector matched role='menu' and role='group' on the content. Callers disable the whole control with the disabled prop (DisabledDropdown) or omit an item they must not offer."
     },
     "packages/ui/atoms/composite-field.tsx": {
       "offline": "CompositeField is a layout and focus-ring container that never submits or fetches (\"submit\" appears only in its doc comment); the form that owns its input and button reports offline."
@@ -1009,6 +1028,9 @@
     },
     "packages/ui/atoms/textarea.tsx": {
       "offline": "Textarea never fetches or submits; its only async signal is the pending validationState its owner passes in, so the owning form shows offline status."
+    },
+    "packages/ui/atoms/title-menu-trigger.tsx": {
+      "empty": "TitleMenuTrigger renders one title slot and a fixed chevron and takes no collection; the detector matched the items-center utility class. A blank title is the caller's to replace (ChatHistorySwitcher shows New Chat)."
     },
     "packages/ui/atoms/tooltip.tsx": {
       "empty": "TooltipContent only renders caller-supplied children and owns no data or collection; callers omit the Tooltip rather than open an empty one, and the detector matched the items-center utility class.",

@@ -5,6 +5,11 @@ export {
   OverflowMenuTrigger,
   type OverflowMenuTriggerProps,
 } from './atoms/overflow-menu-trigger';
+// Title Menu Trigger
+export {
+  TitleMenuTrigger,
+  type TitleMenuTriggerProps,
+} from './atoms/title-menu-trigger';
 export type {
   TabOverflowOption,
   UseTabOverflowOptions,
@@ -110,6 +115,10 @@ export {
   closeButtonStyles,
 } from './atoms/close-button';
 export { CommonDropdown } from './atoms/common-dropdown';
+export {
+  MENU_SCROLL_BODY,
+  MenuScrollBody,
+} from './atoms/common-dropdown-scroll-body';
 // Common Dropdown
 export type {
   CommonDropdownActionItem,
@@ -119,9 +128,11 @@ export type {
   CommonDropdownItem,
   CommonDropdownItemType,
   CommonDropdownLabel,
+  CommonDropdownMotion,
   CommonDropdownProps,
   CommonDropdownRadioGroup,
   CommonDropdownRadioItem,
+  CommonDropdownScrollBody,
   CommonDropdownSeparator,
   CommonDropdownSize,
   CommonDropdownSubmenu,
@@ -382,6 +393,7 @@ export {
   MENU_ITEM_COMPACT_DESTRUCTIVE,
   MENU_ITEM_DESTRUCTIVE,
   MENU_LABEL_BASE,
+  MENU_MOTION_ANCHORED,
   MENU_SEPARATOR_BASE,
   MENU_SHORTCUT_BASE,
   popoverContentClasses,
