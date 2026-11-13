@@ -27,6 +27,10 @@ function countFailing(report) {
 export function buildDeliveryPayload(report, meta = {}) {
   if (!report?.totals?.byCriterion)
     throw new Error('report has no totals.byCriterion');
+  // The ingest route only accepts a 40-hex headSha; a report without one
+  // must fail closed here with a clear error, not 400 at the route.
+  if (!/^[0-9a-f]{40}$/u.test(report.headSha ?? ''))
+    throw new Error('report has no valid 40-hex headSha');
   const totals = report.totals;
   const failing = (report.certificates ?? [])
     .filter(c => c?.certified === false && typeof c?.component === 'string')
@@ -39,7 +43,7 @@ export function buildDeliveryPayload(report, meta = {}) {
   const runUrl = meta.runUrl ?? null;
   return {
     schema: DELIVERY_SCHEMA,
-    headSha: report.headSha ?? 'unknown',
+    headSha: report.headSha,
     evaluatedAt: meta.evaluatedAt ?? report.generatedAt ?? null,
     reportBytes: meta.reportBytes ?? null,
     totals: {
