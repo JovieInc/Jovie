@@ -174,6 +174,28 @@ describe('homepage contract', { timeout: 60_000 }, () => {
     }
   });
 
+  it('leads the hero with what listeners open, not the back office', async () => {
+    const { container } = await renderHomePage();
+    const hero = container.querySelector('.hv3-hero');
+    // The lifted panel is the release page a listener opens; the metadata
+    // inspector stays in 03 specs.
+    expect(hero?.querySelector('.hv3-lift--page .hv3-rp')).not.toBeNull();
+    expect(hero?.querySelector('.hv3-insp')).toBeNull();
+    expect(container.querySelector('#specs .hv3-insp')).not.toBeNull();
+    // No callout here: any label beside the page crosses the release list
+    // or the box's frame guide, so the selected row and its page speak alone.
+    expect(hero?.querySelector('.hv3-callout')).toBeNull();
+    // The masked lift drops outer shadows, so the page keeps an inner edge.
+    expect(read('components/homepage/v3/chapters.css')).toMatch(
+      /\.hv3-phone\.hv3-phone--hero\s*\{[^}]*box-shadow: inset 0 0 0 1px var\(--hv3-b2\);/
+    );
+    // One anchor per id, so each connector finds its own phone.
+    const ids = [...container.querySelectorAll('[data-hv3-anchor]')].map(node =>
+      node.getAttribute('data-hv3-anchor')
+    );
+    expect(new Set(ids).size).toBe(ids.length);
+  });
+
   it('shows no prices on the page', async () => {
     const { container } = await renderHomePage();
     const main = [...container.querySelectorAll('section')]
@@ -185,7 +207,7 @@ describe('homepage contract', { timeout: 60_000 }, () => {
     }
   });
 
-  it('shows no real person: only the featured demo artist inside the product UI', async () => {
+  it('shows only the featured artist inside the product UI, and nobody else', async () => {
     const { HOMEPAGE_EDITORIAL_COPY: copy } = await loadCopy();
     const { HOMEPAGE_FEATURED_ARTIST: artist } = await import(
       '@/data/demoArtists'
@@ -194,24 +216,20 @@ describe('homepage contract', { timeout: 60_000 }, () => {
     const sources = [...container.querySelectorAll('section img')].map(image =>
       (image.getAttribute('src') ?? '').replace(/\?v=\w+$/, '')
     );
-    // Tim, 2026-11-08: the homepage does not feature him. Until a real artist
-    // opts in, the product UI is labeled Example artist (procedural art, no
-    // people, no verified badge). No real person renders on `/`.
+    // Tim, 2026-11-12: feature him with his own catalog for now, from the
+    // featured slot, so any opted-in artist can take it later. Only the slot's
+    // images render: no other person, no verified badge.
     const allowed = [
       artist.avatarSrc,
       ...artist.releases.map(release => release.src),
     ];
-    expect(artist.demo).toBe(true);
-    expect(artist.name).toBe('Example artist');
+    expect(artist.name).toBe('Tim White');
     expect(container.querySelector('.hv3-pp__badge, .hv3-insp__ok')).toBeNull();
     expect(sources.length).toBeGreaterThan(0);
     expect(sources.filter(src => !allowed.includes(src))).toEqual([]);
     expect([...new Set(sources)].sort()).toEqual([...new Set(allowed)].sort());
-    expect(sources.some(src => /tim-white|img\/releases\//.test(src))).toBe(
-      false
-    );
-    expect(container.textContent).not.toContain('Tim White');
-    expect(copy.profile.alt).toBeTruthy();
+    expect(container.textContent).not.toContain('Example artist');
+    expect(copy.profile.alt).toContain('Tim White’s Jovie profile');
   });
 
   it('keeps copy in data and free of em dashes and stock promotion', async () => {

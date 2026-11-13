@@ -95,11 +95,14 @@ test('homepage loads with hero heading, CTA, sections, and footer', async ({
     'Homepage did not render the expected main content shell'
   ).toBeVisible({ timeout: 60_000 });
 
-  // CTA must be present — the invite action is the homepage's one conversion
+  // CTA must be present — the invite action is the homepage's one conversion.
+  // The layout's hidden page-contract marker also links to /#request-invite
+  // and comes first in the DOM, so look only at CTAs a visitor can see.
   const cta = page
     .locator(
       '[data-testid="homepage-primary-cta"], a[href="#request-invite"], a[href="/#request-invite"]'
     )
+    .filter({ visible: true })
     .first();
   await expect(cta).toBeVisible({ timeout: 20_000 });
 
