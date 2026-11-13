@@ -353,23 +353,43 @@ def resolve_additive_certificate_waivers(worktree: Path, rel: str, sh) -> str | 
     return json.dumps(theirs, ensure_ascii=False, indent=2) + "\n"
 
 
-def resolve_subtractive_screen_debt(worktree: Path, rel: str, sh) -> str | None:
-    """Drop screen-debt rows either side removed, proven against Git's three stages.
+def _shrunk_criteria(base: str, ours: str, theirs: str) -> str | None:
+    """Criteria still open on both sides, in main's order. Additions and reorders stay unresolved."""
+    parsed = []
+    for side in (base, ours, theirs):
+        tokens = side.split(",")
+        if (not tokens or len(tokens) != len(set(tokens))
+                or any(re.fullmatch(r"[a-z][a-z0-9-]*", token) is None for token in tokens)):
+            return None
+        parsed.append(tokens)
+    base_tokens, ours_tokens, theirs_tokens = parsed
+    if any(token not in base_tokens for token in (*ours_tokens, *theirs_tokens)):
+        return None
+    if any(side != [token for token in base_tokens if token in side] for side in (ours_tokens, theirs_tokens)):
+        return None
+    return ",".join(token for token in theirs_tokens if token in ours_tokens)
 
-    Main's remaining order stays. An added row, a changed value, or any other
-    field edit stays unresolved. This is authored policy, not generated metadata.
-    """
+
+def resolve_subtractive_screen_debt(worktree: Path, rel: str, sh) -> str | None:
+    """Drop debt rows and criteria either side cleared, in main's order. Additions, reorders and other edits stay unresolved."""
     if rel != "docs/design-system/cert-screens.json":
         return None
     loaded = _load_json_object_stages(worktree, rel, sh, "debt", _debt_rows)
     if loaded is None:
         return None
     base, ours, theirs = loaded
-    for document in (ours, theirs):
-        if any(key not in base["debt"] or document["debt"][key] != base["debt"][key]
-               for key in document["debt"]):
+    if any(key not in base["debt"] for document in (ours, theirs) for key in document["debt"]):
+        return None
+    merged = {}
+    for key, theirs_value in theirs["debt"].items():
+        if key not in ours["debt"]:
+            continue
+        value = _shrunk_criteria(base["debt"][key], ours["debt"][key], theirs_value)
+        if value is None:
             return None
-    theirs["debt"] = {key: value for key, value in theirs["debt"].items() if key in ours["debt"]}
+        if value:
+            merged[key] = value
+    theirs["debt"] = merged
     return json.dumps(theirs, ensure_ascii=False, indent=2) + "\n"
 
 

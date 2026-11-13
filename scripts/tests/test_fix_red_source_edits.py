@@ -137,10 +137,25 @@ class SubtractiveScreenDebtTest(unittest.TestCase):
         self.assertEqual(result["debt"]["kept.tsx"], "a11y,states")
         self.assertEqual(result["schema"], self.base["schema"])
 
+    def test_unions_criterion_shrinks_and_drops_a_cleared_row(self):
+        self.base["debt"]["split.tsx"] = "a11y,states"
+        self.ours = json.loads(json.dumps(self.base))
+        self.theirs = json.loads(json.dumps(self.base))
+        del self.ours["debt"]["drop-head.tsx"]
+        del self.theirs["debt"]["drop-main.tsx"]
+        self.ours["debt"]["kept.tsx"] = "states"
+        self.theirs["debt"]["kept.tsx"] = "a11y"
+        self.theirs["debt"]["split.tsx"] = "a11y"
+        result = json.loads(self.resolve())
+        self.assertEqual(list(result["debt"]), ["also.tsx", "split.tsx"])
+        self.assertEqual(result["debt"]["split.tsx"], "a11y")
+        self.assertEqual(result["schema"], self.base["schema"])
+
     def test_refuses_additions_edits_and_other_paths(self):
         for mutate in (
             lambda: self.ours["debt"].update({"new.tsx": "states"}),
             lambda: self.ours["debt"].update({"kept.tsx": "changed"}),
+            lambda: self.ours["debt"].update({"kept.tsx": "states,a11y"}),
             lambda: self.theirs.update(schema="other"),
             lambda: self.ours["debt"].update({"kept.tsx": ""}),
             lambda: self.theirs["debt"].update({"added.tsx": "states"}),
