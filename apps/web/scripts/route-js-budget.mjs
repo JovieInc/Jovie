@@ -295,6 +295,44 @@ export function measureFirstLoadJs(nextDir) {
   return measureRouteJs(nextDir, collectFirstLoadFiles(nextDir));
 }
 
+/** @typedef {{file: string, gzipBytes: number}} ChunkContribution */
+/** @typedef {{route: string, gzipBytes: number, files: ChunkContribution[]}} RouteContribution */
+
+/**
+ * Explain the same emitted chunks measured by the gate, without rounding.
+ * @param {string} nextDir
+ * @param {Iterable<string>} routes
+ * @returns {RouteContribution[]}
+ */
+export function routeJsContributors(nextDir, routes) {
+  const wanted = new Set(routes);
+  if (!wanted.size) return [];
+  /** @type {Map<string, RouteContribution>} */
+  const byRoute = new Map();
+  for (const row of [
+    ...collectRouteFiles(nextDir),
+    ...collectFirstLoadFiles(nextDir).filter(
+      row => !isAuthedAppRoute(row.route)
+    ),
+  ]) {
+    if (!wanted.has(row.route)) continue;
+    const chunks = [...row.files]
+      .map(file => ({
+        file,
+        gzipBytes: gzipSync(budgetJsBytes(readFileSync(join(nextDir, file))), {
+          level: 9,
+        }).length,
+      }))
+      .sort(
+        (a, b) => b.gzipBytes - a.gzipBytes || a.file.localeCompare(b.file)
+      );
+    const gzipBytes = chunks.reduce((sum, chunk) => sum + chunk.gzipBytes, 0);
+    if (gzipBytes > (byRoute.get(row.route)?.gzipBytes ?? -1))
+      byRoute.set(row.route, { route: row.route, gzipBytes, files: chunks });
+  }
+  return [...byRoute.values()];
+}
+
 export function resolveFirstLoadTarget(route, firstLoad) {
   if (firstLoad.routes && Object.hasOwn(firstLoad.routes, route)) {
     return firstLoad.routes[route];
@@ -499,11 +537,29 @@ function main() {
     routeGroups,
     routeGroupsAncestor: routeBudgetsAncestor.ancestor?.routes ?? null,
   });
-  if (options.json) console.log(JSON.stringify(result, null, 2));
+  const contributors = routeJsContributors(
+    options.nextDir,
+    [
+      ...result.app.violations,
+      ...result.app.unlisted,
+      ...result.first.violations,
+      ...result.first.unlisted,
+      ...(result.groups?.violations ?? []),
+    ].map(row => row.route)
+  );
+  if (options.json)
+    console.log(JSON.stringify({ ...result, contributors }, null, 2));
   else {
     printRows(result.app.rows);
     printRows(result.first.rows);
     if (result.groups) printGroupRows(result.groups);
+    for (const row of contributors) {
+      console.log(
+        `\nLargest initial JS chunks for ${row.route} (${row.gzipBytes} bytes gzip):`
+      );
+      for (const chunk of row.files.slice(0, 8))
+        console.log(`  ${chunk.gzipBytes} bytes gzip  ${chunk.file}`);
+    }
   }
   for (const error of [...result.shape, ...result.growth])
     console.error(`::error::${error}`);

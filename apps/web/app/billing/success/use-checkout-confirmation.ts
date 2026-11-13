@@ -77,22 +77,22 @@ export function useCheckoutConfirmation(sessionId: string | null) {
   useEffect(() => {
     if (!sessionId) return;
     const controller = new AbortController();
+    let activeRequest: AbortController | undefined;
     let timer: ReturnType<typeof setTimeout> | undefined;
     let requestTimer: ReturnType<typeof setTimeout> | undefined;
     let reads = 0;
     const check = async () => {
       const request = new AbortController();
+      activeRequest = request;
       requestTimer = setTimeout(() => request.abort(), REQUEST_TIMEOUT_MS);
       let receipt = UNCONFIRMED;
       try {
-        receipt = await readReceipt(
-          sessionId,
-          AbortSignal.any([controller.signal, request.signal])
-        );
+        receipt = await readReceipt(sessionId, request.signal);
       } catch {
         // A failed read does not establish either payment or entitlement.
       } finally {
         clearTimeout(requestTimer);
+        activeRequest = undefined;
       }
       if (controller.signal.aborted) return;
       reads += 1;
@@ -104,6 +104,7 @@ export function useCheckoutConfirmation(sessionId: string | null) {
     void check();
     return () => {
       controller.abort();
+      activeRequest?.abort();
       clearTimeout(timer);
       clearTimeout(requestTimer);
     };

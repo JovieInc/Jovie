@@ -170,6 +170,37 @@ describe('checkout confirmation claims', () => {
 });
 
 describe('bounded recovery and interrupted navigation', () => {
+  it('aborts an in-flight confirmation when leaving the page', () => {
+    let signal: AbortSignal | undefined;
+    mocks.fetch.mockImplementation((_url, options: { signal: AbortSignal }) => {
+      signal = options.signal;
+      return new Promise(() => {});
+    });
+    const mounted = render(<CheckoutSuccessPage />);
+    expect(mocks.fetch).toHaveBeenCalledTimes(1);
+    expect(signal?.aborted).toBe(false);
+    mounted.unmount();
+    expect(signal?.aborted).toBe(true);
+  });
+
+  it('confirms checkout when AbortSignal.any is unavailable', async () => {
+    const descriptor = Object.getOwnPropertyDescriptor(AbortSignal, 'any');
+    Object.defineProperty(AbortSignal, 'any', {
+      value: undefined,
+      configurable: true,
+    });
+    try {
+      render(<CheckoutSuccessPage />);
+      await waitFor(() =>
+        expect(screen.getByTestId('checkout-success-paid')).toBeInTheDocument()
+      );
+      expect(mocks.fetch).toHaveBeenCalledTimes(1);
+    } finally {
+      if (descriptor) Object.defineProperty(AbortSignal, 'any', descriptor);
+      else Reflect.deleteProperty(AbortSignal, 'any');
+    }
+  });
+
   it('refreshes pending entitlement and stops after confirmation', async () => {
     vi.useFakeTimers();
     mocks.fetch.mockResolvedValueOnce(

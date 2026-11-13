@@ -206,8 +206,17 @@ describe('route-group policy reaches the existing evaluator and CLI', () => {
       expect(result.first.violations).toEqual([]);
       expect(result.app.violations).toEqual([]);
       expect(result.ok).toBe(status === 0);
+      expect(
+        result.contributors.map((row: { route: string }) => row.route)
+      ).toEqual(status === 0 ? [] : ['/', '/product', '/solutions/[audience]']);
       if (status === 1) {
         expect(run.stderr).toContain('marketing group baseline is 10 KB');
+        const [home] = result.contributors;
+        expect(Math.round(home.gzipBytes / 1024)).toBe(
+          result.first.rows.find((row: { route: string }) => row.route === '/')
+            .gzipKb
+        );
+        expect(home.files).toHaveLength(2);
       }
     }
   );
