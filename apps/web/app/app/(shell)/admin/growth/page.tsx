@@ -12,6 +12,7 @@ import {
 } from '@/components/features/admin/leads/GtmFunnel';
 import { getLeadFunnelCounts } from '@/components/features/admin/leads/LeadPipelineKpis';
 import { LeadTable } from '@/components/features/admin/leads/LeadTable';
+import { PmfMetricsPanel } from '@/components/features/admin/leads/PmfMetricsPanel';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { buildAdminGrowthHref } from '@/constants/admin-navigation';
 import { getArtistOfferFunnelReport } from '@/lib/acquisition/artist-offer-funnel.server';
@@ -22,6 +23,7 @@ import {
   isFounderFunnelDrilldownStage,
 } from '@/lib/admin/founder-funnel';
 import { requireCurrentAdminPageAccess } from '@/lib/admin/page-access';
+import { getPmfMetrics } from '@/lib/admin/pmf-metrics';
 import { adminGrowthSearchParams } from '@/lib/nuqs';
 import { GrowthFounderFunnel } from './GrowthFounderFunnel';
 
@@ -55,7 +57,7 @@ export default async function AdminGrowthPage({
   const drilldownStage = isFounderFunnelDrilldownStage(params.funnelStage)
     ? params.funnelStage
     : null;
-  const [counts, funnel, lifecycleMetrics, drilldown, goldenPath] =
+  const [counts, funnel, lifecycleMetrics, drilldown, goldenPath, pmf] =
     await Promise.all([
       getLeadFunnelCounts(),
       getFounderFunnelData(params.funnelRange),
@@ -67,6 +69,7 @@ export default async function AdminGrowthPage({
       getArtistOfferFunnelReport()
         .then(report => report.goldenPath ?? null)
         .catch(() => null),
+      getPmfMetrics(),
     ]);
 
   return (
@@ -87,6 +90,7 @@ export default async function AdminGrowthPage({
         />
       ) : null}
       <GoldenPathFunnelPanel report={goldenPath} />
+      <PmfMetricsPanel metrics={pmf} />
       <CanonicalLifecycleFunnel metrics={lifecycleMetrics} />
       <ContentSurfaceCard surface='details'>
         <div className='p-3'>

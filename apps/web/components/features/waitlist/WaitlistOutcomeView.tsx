@@ -130,7 +130,7 @@ function NextSteps({ email }: { readonly email?: string | null }) {
 
   return (
     <ol
-      className='mt-4 list-decimal space-y-1.5 pl-5 text-sm leading-6 text-white/62'
+      className='mt-4 list-decimal space-y-1.5 pl-5 text-sm leading-6 text-on-media/62'
       data-testid='waitlist-next-steps'
     >
       <li>{contactLine}</li>
@@ -139,7 +139,7 @@ function NextSteps({ email }: { readonly email?: string | null }) {
         Resume anytime at{' '}
         <Link
           href={APP_ROUTES.START}
-          className='font-medium text-white/86 underline-offset-2 hover:underline'
+          className='font-medium text-on-media/86 underline-offset-2 hover:underline'
         >
           /start
         </Link>{' '}
@@ -193,16 +193,16 @@ export function WaitlistOutcomeView({
   const showResumeCta = Boolean(copy.showNextSteps && !primaryHref);
 
   return (
-    <section className='w-full rounded-2xl border border-white/[0.08] bg-(--color-bg-surface-0) px-5 py-6 text-primary-token shadow-[0_24px_90px_rgba(0,0,0,0.38)] sm:px-6'>
+    <section className='w-full rounded-2xl border border-on-media/[0.08] bg-(--color-bg-surface-0) px-5 py-6 text-primary-token shadow-[0_24px_90px_rgba(0,0,0,0.38)] sm:px-6'>
       <div className='mb-5 flex items-center gap-3'>
-        <span className='inline-flex h-9 w-9 items-center justify-center rounded-full border border-white/10 bg-white/[0.04] text-white/74'>
+        <span className='inline-flex h-9 w-9 items-center justify-center rounded-full border border-on-media/10 bg-on-media/[0.04] text-on-media/74'>
           <Icon className='h-4 w-4' aria-hidden />
         </span>
         <h1 className='text-xl font-semibold leading-6 text-primary-token'>
           {title}
         </h1>
       </div>
-      <p className='text-sm leading-6 text-white/62'>{body}</p>
+      <p className='text-sm leading-6 text-on-media/62'>{body}</p>
       {copy.showNextSteps ? <NextSteps email={email} /> : null}
 
       <div className='mt-6 flex flex-col gap-2 sm:flex-row'>
@@ -231,7 +231,7 @@ export function WaitlistOutcomeView({
             variant='secondary'
             size='lg'
             className={cn(
-              'text-white/74 hover:text-white',
+              'text-on-media/74 hover:text-on-media',
               canRetry && 'sm:ml-auto'
             )}
           >

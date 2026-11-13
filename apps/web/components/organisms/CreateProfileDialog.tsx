@@ -12,7 +12,7 @@ import {
   Label,
 } from '@jovie/ui';
 import { useRouter } from 'next/navigation';
-import { type FormEvent, useState, useTransition } from 'react';
+import { type FormEvent, useRef, useState, useTransition } from 'react';
 import { toast } from '@/components/feedback';
 
 interface CreateIdentityResult {
@@ -35,6 +35,7 @@ export function CreateIdentityDialog({
   const [displayName, setDisplayName] = useState('');
   const [username, setUsername] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const displayNameRef = useRef<HTMLInputElement>(null);
 
   function handleClose() {
     onOpenChange(false);
@@ -86,7 +87,15 @@ export function CreateIdentityDialog({
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className='sm:max-w-100'>
+      <DialogContent
+        className='sm:max-w-100'
+        onOpenAutoFocus={event => {
+          // Open on the first field the dialog asks for, not its first
+          // tabbable control.
+          event.preventDefault();
+          displayNameRef.current?.focus();
+        }}
+      >
         <DialogHeader>
           <DialogTitle>Add Artist Identity</DialogTitle>
           <DialogDescription>
@@ -98,6 +107,7 @@ export function CreateIdentityDialog({
           <div className='space-y-2'>
             <Label htmlFor='create-profile-display-name'>Display Name</Label>
             <Input
+              ref={displayNameRef}
               id='create-profile-display-name'
               type='text'
               value={displayName}
@@ -106,7 +116,6 @@ export function CreateIdentityDialog({
                 setError(null);
               }}
               placeholder='Artist name'
-              autoFocus
               disabled={isPending}
             />
           </div>
@@ -129,7 +138,7 @@ export function CreateIdentityDialog({
           </div>
 
           {error && (
-            <p className='text-sm text-destructive' role='alert'>
+            <p className='text-sm text-error-text' role='alert'>
               {error}
             </p>
           )}

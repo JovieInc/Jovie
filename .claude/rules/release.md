@@ -238,8 +238,20 @@ feature/* ──► main (CI deploys to staging, then promotes to production)
 
 ### Bots to check
 
+- `sentry[bot]` (Sentry Seer, `<!-- BUG_PREDICTION -->` comments; retiring
+  into the local gate)
 - `coderabbitai[bot]` (CodeRabbit)
 - `greptile-apps[bot]` (Greptile)
+
+### Resolve bot threads yourself (founder rule, 2026-11-11)
+
+Resolve bot review comments yourself after you fix or answer them; leave
+human comments for their author. Fix a real finding on the same PR, or reply
+with the evidence that it is wrong, then resolve the thread
+(`resolveReviewThread`, or the GitHub MCP `resolve_review_thread` tool).
+Never resolve a thread a human started or replied in. A bot thread never
+holds a green PR: once PR Ready is green on the head, Auto-Ready Agent
+Drafts resolves the bot threads still open (`scripts/lib/bot-review-threads.mjs`).
 
 ### How to check
 
@@ -275,6 +287,7 @@ these states is a merge gate.
 
 ```
 BOT REVIEWS
+├─ Sentry:       N open (advisory)
 ├─ CodeRabbit:   N open (advisory)
 └─ Greptile:     N open (advisory)
 ```

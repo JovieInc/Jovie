@@ -5,8 +5,17 @@ import type { RouteDomFinding } from './route-dom-detector';
 export const BLANK_MEDIA_LUMA_STDDEV_MAX = 3;
 /** ...and at least this share of pixels sit within 6 levels of the mean. */
 export const BLANK_MEDIA_DOMINANT_SHARE_MIN = 0.985;
-/** Share of 16x16 grid cells that are flat (stddev < 2.5) above which the media is mostly empty. */
-export const BLANK_MEDIA_EMPTY_CELL_SHARE_MAX = 0.6;
+/**
+ * How far a 16x16 cell's mean luma must sit from the field's median cell to
+ * count as ink departing from an otherwise empty field.
+ */
+export const BLANK_MEDIA_INK_DEPARTURE_MIN = 16;
+/**
+ * Share of 16x16 grid cells that carry content — local luma or chroma
+ * variance, or a mean departing from the field — below which the media has
+ * no discernible content anywhere and reads as blank.
+ */
+export const BLANK_MEDIA_CONTENT_CELL_SHARE_MIN = 0.02;
 const BLANK_MEDIA_MAX_PROBES = 16;
 /**
  * How long to let a probed image finish loading and decoding before its pixels
@@ -20,10 +29,21 @@ export const BLANK_MEDIA_LOAD_WAIT_MS = 5000;
 
 /**
  * Blank-media: an img, video or canvas inside a designed section (a
- * [data-pen-section], else any top-level section) whose rendered pixels are
- * near-uniform. Pixels come from an element screenshot decoded in the page, so
- * what is judged is what a visitor sees (object-fit, poster, canvas draw),
- * not naturalWidth. Opt out with data-decorative or data-dom-certification.
+ * [data-pen-section], else any top-level section) whose rendered pixels show
+ * no discernible content. Pixels come from an element screenshot decoded in
+ * the page, so what is judged is what a visitor sees (object-fit, poster,
+ * canvas draw), not naturalWidth. Opt out with data-decorative or
+ * data-dom-certification.
+ *
+ * Blank requires near-uniform pixels, or a frame with no discernible content:
+ * fewer than BLANK_MEDIA_CONTENT_CELL_SHARE_MIN of its cells vary locally in
+ * luma or chroma, or depart from the field's median luma. The earlier
+ * local-flat-cell count (emptyShare >= 0.6) was measured on 2026-11-10 to
+ * flag loaded, content-bearing media: dark product screenshots (a Noir-Ion
+ * profile capture reads 62-79% locally-flat cells) and chromatic gradient
+ * artwork (100% luma-flat cells over a real chroma spread). Those measure
+ * 21-100% content cells and pass; a solid slot and a speck on a flat field
+ * (1.6%) still read as blank.
  */
 export async function inspectBlankMedia(
   page: Page
@@ -110,6 +130,14 @@ export async function inspectBlankMedia(
             .catch(() => undefined),
           new Promise(resolve => setTimeout(resolve, waitMs)),
         ]);
+        // The judged pixels come from an element screenshot, which copies the
+        // compositor's most recent frame — load and decode() alone do not
+        // guarantee that frame already carries the decoded bitmap (the same
+        // stale-frame class the contrast detector captures atomically). Let a
+        // frame that includes the decoded image commit before the capture.
+        await new Promise(resolve => {
+          requestAnimationFrame(() => requestAnimationFrame(resolve));
+        });
       }, BLANK_MEDIA_LOAD_WAIT_MS);
       png = await media.screenshot({ animations: 'disabled', timeout: 5000 });
     } catch {
@@ -128,12 +156,13 @@ export async function inspectBlankMedia(
       context.drawImage(bitmap, 0, 0, side, side);
       const { data } = context.getImageData(0, 0, side, side);
       const lumas: number[] = [];
+      const chromas: number[] = [];
       for (let index = 0; index < data.length; index += 4) {
-        lumas.push(
-          0.2126 * (data[index] ?? 0) +
-            0.7152 * (data[index + 1] ?? 0) +
-            0.0722 * (data[index + 2] ?? 0)
-        );
+        const red = data[index] ?? 0;
+        const green = data[index + 1] ?? 0;
+        const blue = data[index + 2] ?? 0;
+        lumas.push(0.2126 * red + 0.7152 * green + 0.0722 * blue);
+        chromas.push(Math.max(red, green, blue) - Math.min(red, green, blue));
       }
       const mean = lumas.reduce((sum, v) => sum + v, 0) / lumas.length;
       const variance =
@@ -142,39 +171,66 @@ export async function inspectBlankMedia(
         lumas.filter(v => Math.abs(v - mean) <= 6).length / lumas.length;
       const grid = 16;
       const cell = side / grid;
-      let flatCells = 0;
+      const cellMeans: number[] = [];
+      const cellLumaStddev: number[] = [];
+      const cellChromaStddev: number[] = [];
       for (let gy = 0; gy < grid; gy += 1) {
         for (let gx = 0; gx < grid; gx += 1) {
-          const values: number[] = [];
+          const lumaValues: number[] = [];
+          const chromaValues: number[] = [];
           for (let y = 0; y < cell; y += 1) {
             for (let x = 0; x < cell; x += 1) {
-              values.push(lumas[(gy * cell + y) * side + gx * cell + x] ?? 0);
+              const at = (gy * cell + y) * side + gx * cell + x;
+              lumaValues.push(lumas[at] ?? 0);
+              chromaValues.push(chromas[at] ?? 0);
             }
           }
-          const cellMean =
-            values.reduce((sum, v) => sum + v, 0) / values.length;
-          const cellStd = Math.sqrt(
-            values.reduce((sum, v) => sum + (v - cellMean) ** 2, 0) /
-              values.length
+          const lumaMean =
+            lumaValues.reduce((sum, v) => sum + v, 0) / lumaValues.length;
+          cellMeans.push(lumaMean);
+          cellLumaStddev.push(
+            Math.sqrt(
+              lumaValues.reduce((sum, v) => sum + (v - lumaMean) ** 2, 0) /
+                lumaValues.length
+            )
           );
-          if (cellStd < 2.5) flatCells += 1;
+          const chromaMean =
+            chromaValues.reduce((sum, v) => sum + v, 0) / chromaValues.length;
+          cellChromaStddev.push(
+            Math.sqrt(
+              chromaValues.reduce((sum, v) => sum + (v - chromaMean) ** 2, 0) /
+                chromaValues.length
+            )
+          );
         }
+      }
+      const sortedMeans = [...cellMeans].sort((a, b) => a - b);
+      const fieldMedian = sortedMeans[sortedMeans.length >> 1] ?? mean;
+      let contentCells = 0;
+      for (let index = 0; index < cellMeans.length; index += 1) {
+        const varies =
+          (cellLumaStddev[index] ?? 0) >= 2.5 ||
+          (cellChromaStddev[index] ?? 0) >= 2.5;
+        // BLANK_MEDIA_INK_DEPARTURE_MIN, inlined: this closure runs in the
+        // page, where module scope does not exist.
+        const ink = Math.abs((cellMeans[index] ?? 0) - fieldMedian) >= 16;
+        if (varies || ink) contentCells += 1;
       }
       return {
         stddev: Math.sqrt(variance),
         dominant,
         mean,
-        emptyShare: flatCells / (grid * grid),
+        contentShare: contentCells / (grid * grid),
       };
     }, png.toString('base64'));
     if (!stats) continue;
-    if (stats.emptyShare >= BLANK_MEDIA_EMPTY_CELL_SHARE_MAX) {
+    if (stats.contentShare < BLANK_MEDIA_CONTENT_CELL_SHARE_MIN) {
       findings.push({
         kind: 'blank-media',
-        message: `Media is mostly empty: ${Math.round(stats.emptyShare * 100)}% of its area is flat pixels.`,
+        message: `Media shows no discernible content: only ${Math.round(stats.contentShare * 100)}% of its cells vary from an empty field.`,
         elements: [probe.label],
         measurements: {
-          emptyShare: Math.round(stats.emptyShare * 1000) / 1000,
+          contentShare: Math.round(stats.contentShare * 1000) / 1000,
         },
       });
       continue;

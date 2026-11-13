@@ -155,27 +155,39 @@ describe('POST /api/profile/pac-event', () => {
     }
   );
 
-  it('joins identity in a consent-required region only with canonical analytics consent', async () => {
-    setCookieValues({
-      [AUDIENCE_ANON_COOKIE]: JV_AID,
-      [COOKIE_BANNER_REQUIRED_COOKIE]: '1',
-      [CONSENT_COOKIE_NAME]: JSON.stringify({
-        essential: true,
-        analytics: true,
-        marketing: false,
-      }),
-    });
+  it.each([undefined, 'rejected'])(
+    'joins identity with canonical analytics consent despite advertising consent %s',
+    async trackingConsent => {
+      setCookieValues({
+        [AUDIENCE_ANON_COOKIE]: JV_AID,
+        [COOKIE_BANNER_REQUIRED_COOKIE]: '1',
+        [CONSENT_COOKIE_NAME]: JSON.stringify({
+          essential: true,
+          analytics: true,
+          marketing: false,
+        }),
+        ...(trackingConsent
+          ? { [LEGACY_TRACKING_CONSENT_COOKIE]: trackingConsent }
+          : {}),
+      });
 
-    const response = await POST(
-      buildRequest(buildPayload({ consent: 'accepted' }))
-    );
+      const response = await POST(
+        buildRequest(buildPayload({ consent: 'accepted' }))
+      );
 
-    expect(response.status).toBe(204);
-    expect(mockTrackEvent).toHaveBeenCalledWith(
-      'pac_exposure',
-      expect.objectContaining({ jv_aid: JV_AID })
-    );
-  });
+      expect(response.status).toBe(204);
+      expect(mockTrackEvent).toHaveBeenCalledWith(
+        'pac_exposure',
+        expect.objectContaining({ jv_aid: JV_AID })
+      );
+      expect(mockLogStatsigEvent).toHaveBeenCalledWith(
+        JV_AID,
+        'pac_exposure',
+        expect.anything(),
+        expect.anything()
+      );
+    }
+  );
 
   it.each([
     {

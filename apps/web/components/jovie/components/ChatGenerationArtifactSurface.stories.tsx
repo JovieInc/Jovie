@@ -30,3 +30,34 @@ export const WithSubtitle: Story = {
     subtitle: 'This usually takes about 20 seconds.',
   },
 };
+
+/** Title only: the subtitle is optional and the header collapses to one line. */
+export const PartialTitleOnly: Story = {
+  args: {
+    title: 'Merch Options',
+    subtitle: null,
+  },
+};
+
+export const LongContent: Story = {
+  args: {
+    title:
+      'Generating cover art for The Extended Midnight Drive Sessions (Deluxe Anniversary Edition)',
+    subtitle:
+      'Three styles are rendering at full resolution. Large batches can take up to a minute; you can keep chatting while they finish.',
+  },
+};
+
+export const RtlContent: Story = {
+  args: {
+    title: 'جارٍ إنشاء غلاف الألبوم',
+    subtitle: 'يستغرق هذا عادةً حوالي 20 ثانية.',
+  },
+  decorators: [
+    Story => (
+      <div dir='rtl' lang='ar'>
+        <Story />
+      </div>
+    ),
+  ],
+};

@@ -5,7 +5,11 @@
  * filesystem or git access here; the CLI passes in file lists and a reader.
  */
 import { createHash } from 'node:crypto';
-import { evaluateCustomerNoteContract } from './daily-changelog-publication.mjs';
+import { customerNoteCopyProblems } from './changelog-filter-rules.mjs';
+import {
+  evaluateCustomerNoteContract,
+  readCustomerNote,
+} from './daily-changelog-publication.mjs';
 
 const CUSTOMER_MARKER =
   '<!-- customer-changelog/v1 {"releaseWorthy":false} -->';
@@ -95,6 +99,15 @@ export function lintPrBody({
       message: `changelog-marker: customer-facing code changed; the body needs ${CUSTOMER_MARKER} (internal work) or a releaseWorthy:true marker with availability (${verdict.reason}).`,
     });
   }
+  const copyProblems = customerNoteCopyProblems(
+    readCustomerNote(body).note,
+    createdAt
+  );
+  if (copyProblems.length)
+    errors.push({
+      id: 'changelog-copy',
+      message: `changelog-copy: rewrite the marker "text" (docs/CHANGELOG_PUBLICATION.md, "Headlines"): ${copyProblems.join(' ')}`,
+    });
   const template = [...missing].map(id => TEMPLATES[id](paths)).join('\n\n');
   return { errors, warnings, template };
 }
@@ -113,6 +126,58 @@ export function companionChecklist(files, read) {
   const items = [];
   const push = (trigger, item, done, hint) =>
     items.push({ trigger, item, done: Boolean(done), hint });
+
+  // Metadata assertions often live beside a route rather than its visible UI.
+  // Catch a missed companion before another source-CI round; this is diagnostic,
+  // and executing the test remains the proof that its expectations are current.
+  for (const { filename, status } of files) {
+    if (
+      status === 'removed' ||
+      !/^apps\/web\/app\/(?:.*\/)?(?:layout|page)\.tsx?$/.test(filename) ||
+      !/export\s+(?:const\s+metadata\b|(?:async\s+)?function\s+generateMetadata\b)/.test(
+        read(filename)
+      )
+    )
+      continue;
+    const companion = filename.replace(/\.(tsx?)$/, '.test.$1');
+    if (!read(companion)) continue;
+    push(
+      filename,
+      'route metadata test reviewed with its source',
+      has(companion),
+      `review ${companion} against the intended metadata and run \`pnpm --filter @jovie/web exec vitest run ${companion.replace('apps/web/', '')}\``
+    );
+  }
+
+  // Mirror the pinned company size ratchet for changed working-tree files,
+  // including untracked additions. CI remains the policy authority.
+  let sizeBaseline;
+  for (const { filename, status } of files) {
+    if (
+      status === 'removed' ||
+      !/\.(ts|tsx|js|jsx|mjs|cjs|py|swift|ex|exs|sh|rb|go|rs)$/.test(
+        filename
+      ) ||
+      /(^|\/)(node_modules|vendor|dist|build|\.next|Pods)\/|\.gen\.|\.generated\.|\.min\.|\.d\.ts$|lock/.test(
+        filename
+      )
+    )
+      continue;
+    const content = read(filename);
+    const lines = content.split('\n').length - (content.endsWith('\n') ? 1 : 0);
+    if (lines <= 500) continue;
+    sizeBaseline ??= JSON.parse(
+      read('scripts/company-guards/size-baseline.json') || '{}'
+    );
+    const budget = Math.max(500, sizeBaseline[filename] ?? 500);
+    if (lines > budget)
+      push(
+        filename,
+        'source file fits company size budget',
+        false,
+        `${lines} lines exceeds ${budget}; extract a cohesive module before pushing (scripts/company-guards/size-baseline.json).`
+      );
+  }
 
   const fixture = 'scripts/tests/test_disk_guard.py';
   if (has(fixture)) {
@@ -171,9 +236,12 @@ export function companionChecklist(files, read) {
     files,
     /^scripts\/(?:.+\/)?[^/]+\.test\.(?:mjs|ts|mts)$/
   )) {
-    const wired = ['scripts/ci-fast-lanes.mjs', 'package.json'].some(p =>
-      has(p)
-    );
+    // ci-fast-lanes.mjs also spreads in the planner contract list.
+    const wired =
+      ['scripts/ci-fast-lanes.mjs', 'package.json'].some(p => has(p)) ||
+      read('scripts/lib/test-planner-contract-tests.mjs').includes(
+        `'${file.filename}'`
+      );
     push(
       file.filename,
       'new scripts test wired into a CI lane',

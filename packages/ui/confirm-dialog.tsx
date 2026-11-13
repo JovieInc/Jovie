@@ -31,6 +31,7 @@ export interface ConfirmDialogProps {
   readonly variant?: 'default' | 'destructive';
   readonly onConfirm: () => void | Promise<void>;
   readonly onCancel?: () => void;
+  readonly onCloseAutoFocus?: (event: Event) => void;
   readonly onError?: (error: unknown) => void;
   readonly isLoading?: boolean;
   readonly confirmDisabled?: boolean;
@@ -48,6 +49,7 @@ export function ConfirmDialog({
   variant = 'default',
   onConfirm,
   onCancel,
+  onCloseAutoFocus,
   onError,
   isLoading = false,
   confirmDisabled = false,
@@ -97,6 +99,7 @@ export function ConfirmDialog({
           and Escape stay as Cancel, the safe choice, and pending blocks both. */}
       <DialogContent
         role='alertdialog'
+        onCloseAutoFocus={onCloseAutoFocus}
         hideClose
         overlayProps={{ onClick: closeAsCancel }}
         onEscapeKeyDown={event => {

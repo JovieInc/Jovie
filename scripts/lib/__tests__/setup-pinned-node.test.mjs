@@ -143,3 +143,95 @@ describe('jovie_setup_ensure_pinned_node', () => {
     ).toBeLessThan(sessionStartSh.indexOf('scripts/setup.sh"'));
   });
 });
+
+describe('jovie_setup_playwright_chromium', () => {
+  function makeRepo() {
+    const root = makeTempDir('jovie-pw-repo-');
+    const pkg = join(root, 'apps/web/node_modules/@playwright/test');
+    mkdirSync(pkg, { recursive: true });
+    writeFileSync(join(pkg, 'package.json'), '{"main":"index.js"}');
+    writeFileSync(
+      join(pkg, 'index.js'),
+      'module.exports={chromium:{executablePath:()=>process.env.FAKE_PW_EXE}};'
+    );
+    const exe = join(makeTempDir('jovie-pw-browsers-'), 'chrome');
+    const bin = makeTempDir('jovie-pw-bin-');
+    const log = join(bin, 'pnpm.log');
+    writeExecutable(
+      join(bin, 'pnpm'),
+      `#!/bin/sh\necho "$PWD $*" >> ${JSON.stringify(log)}\n[ "$FAKE_PW_INSTALL" = ok ] || exit 1\nprintf '#!/bin/sh\\n' > "$FAKE_PW_EXE" && chmod +x "$FAKE_PW_EXE"\n`
+    );
+    return { root, exe, bin, log };
+  }
+
+  function run(repo, env = {}) {
+    const result = runHelper(
+      `set -euo pipefail
+       . ${JSON.stringify(helperPath)}
+       jovie_setup_playwright_chromium ${JSON.stringify(repo.root)}`,
+      {
+        env: {
+          PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: '',
+          FAKE_PW_EXE: repo.exe,
+          ...env,
+        },
+        pathPrefix: repo.bin,
+      }
+    );
+    let calls = '';
+    try {
+      calls = readFileSync(repo.log, 'utf8');
+    } catch {}
+    return { result, calls };
+  }
+
+  it('skips the install when the pinned browser is already there', () => {
+    const repo = makeRepo();
+    writeExecutable(repo.exe, '#!/bin/sh\n');
+    const { result, calls } = run(repo);
+    expect(result.status, result.stderr).toBe(0);
+    expect(result.stdout).toContain('Playwright Chromium: ready');
+    expect(calls).toBe('');
+  });
+
+  it('installs a missing browser from apps/web with the repo Playwright', () => {
+    const repo = makeRepo();
+    const { result, calls } = run(repo, { FAKE_PW_INSTALL: 'ok' });
+    expect(result.status, result.stderr).toBe(0);
+    expect(calls).toBe(
+      `${join(repo.root, 'apps/web')} exec playwright install chromium\n`
+    );
+    expect(result.stdout).toContain('Playwright Chromium: ready');
+  });
+
+  it('names the cause and stays non-fatal when downloads are disabled', () => {
+    const repo = makeRepo();
+    const { result, calls } = run(repo, {
+      PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: '1',
+    });
+    expect(result.status, result.stderr).toBe(0);
+    expect(result.stdout).toContain('PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1');
+    expect(calls).toBe('');
+  });
+
+  it('stays non-fatal when the install fails', () => {
+    const repo = makeRepo();
+    const { result } = run(repo, { FAKE_PW_INSTALL: 'fail' });
+    expect(result.status, result.stderr).toBe(0);
+    expect(result.stdout).toContain(
+      'WARNING: Playwright Chromium install failed'
+    );
+  });
+
+  it('Claude SessionStart keeps going when setup.sh reports a missing tool', () => {
+    expect(sessionStartSh).toContain(
+      'if ! "$PROJECT_DIR/scripts/setup.sh"; then'
+    );
+  });
+
+  it('Claude SessionStart readies the browser in cloud sessions only', () => {
+    expect(sessionStartSh).toMatch(
+      /CLAUDE_CODE_REMOTE:-\}" = "true" \] && command -v jovie_setup_playwright_chromium[\s\S]*jovie_setup_playwright_chromium "\$PROJECT_DIR"/
+    );
+  });
+});

@@ -152,6 +152,26 @@ describe('library entity actions', () => {
     );
   });
 
+  it('offers a private studio take only Watch Take and Copy', () => {
+    const openUrl = vi.fn();
+    const actions = buildActions(
+      buildAsset({
+        id: 'take-take_1',
+        itemKind: 'video',
+        primaryActionLabel: 'Watch Take',
+        primaryActionHref: '/api/teleprompter/takes/take_1/media',
+        share: null,
+      }),
+      { openUrl }
+    );
+
+    expect(actions.map(action => action.id)).toEqual(['open-primary', 'copy']);
+    void actions[0]?.onExecute?.();
+    expect(openUrl).toHaveBeenCalledWith(
+      '/api/teleprompter/takes/take_1/media'
+    );
+  });
+
   it('keeps approval mutations disabled without profile-owner authority', () => {
     const actions = buildActions(buildAsset(), { profileId: null });
     const approval = actions.find(action => action.id === 'approval-status');
