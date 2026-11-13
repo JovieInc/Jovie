@@ -3,12 +3,15 @@ import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { getCachedAuth } from '@/lib/auth/cached';
 import { getExactProfileAccess } from '@/lib/auth/profile-access';
+import { getGrantedConnectorCapabilities } from '@/lib/connectors/capabilities';
 import { asConnectorStatusSql } from '@/lib/connectors/db-expressions';
 import { loadFreshGoogleAccessToken } from '@/lib/connectors/google-calendar/access-token';
-import { CONNECTOR_PROVIDERS } from '@/lib/connectors/registry';
+import {
+  CONNECTOR_PROVIDERS,
+  getConnectorDefinition,
+} from '@/lib/connectors/registry';
 import { RefreshLockBusyError } from '@/lib/connectors/token-vault';
 import { createYouTubeLibraryProvider } from '@/lib/connectors/youtube/provider';
-import { YOUTUBE_OAUTH_SCOPES } from '@/lib/connectors/youtube/scopes';
 import { syncYouTubeInboundComments } from '@/lib/connectors/youtube/sync-inbound-comments';
 import { db } from '@/lib/db';
 import { connectorAccounts } from '@/lib/db/schema/connectors';
@@ -84,8 +87,18 @@ export async function POST(request: Request) {
     );
   const accountId = account.id;
   const channelId = account.channelId;
-  const grantedScopes = account.scopes;
-  if (!YOUTUBE_OAUTH_SCOPES.every(scope => grantedScopes.includes(scope))) {
+  // Paged imports persist videos only; full sync also fetches analytics.
+  // OAuth consent for unrelated writes is not a prerequisite for either read.
+  const granted = getGrantedConnectorCapabilities(
+    getConnectorDefinition(CONNECTOR_PROVIDERS.youtube),
+    'connected',
+    account.scopes
+  );
+  const required =
+    parsed.data.mode === 'page'
+      ? ['channel_videos.read']
+      : ['channel_videos.read', 'channel_analytics.read'];
+  if (!required.every(id => granted.some(capability => capability.id === id))) {
     return NextResponse.json(
       { error: 'Reconnect YouTube to refresh access' },
       { status: 409 }

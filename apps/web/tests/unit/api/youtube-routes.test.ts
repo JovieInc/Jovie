@@ -415,6 +415,43 @@ describe('YouTube connector routes', () => {
     });
   });
 
+  it.each(['full', 'page'] as const)(
+    'syncs %s with its read capabilities without requesting write consent',
+    async mode => {
+      mocks.rows[0].scopes =
+        mode === 'page'
+          ? [YOUTUBE_OAUTH_SCOPES[0]]
+          : [YOUTUBE_OAUTH_SCOPES[0], YOUTUBE_OAUTH_SCOPES[2]];
+      const response = await sync(
+        postRequest(paths.sync, {
+          creatorProfileId: profileId,
+          mode,
+        })
+      );
+      expect(response.status).toBe(200);
+      expect(
+        mode === 'page' ? mocks.importPage : mocks.sync
+      ).toHaveBeenCalledTimes(1);
+    }
+  );
+
+  it.each(['full', 'page'] as const)(
+    'refuses %s with write-only consent before opening the vault',
+    async mode => {
+      mocks.rows[0].scopes = [YOUTUBE_OAUTH_SCOPES[1], YOUTUBE_OAUTH_SCOPES[3]];
+      expect(
+        await postStatus(sync, paths.sync, {
+          creatorProfileId: profileId,
+          mode,
+        })
+      ).toBe(409);
+      expect(mocks.loadToken).not.toHaveBeenCalled();
+      expect(mocks.sync).not.toHaveBeenCalled();
+      expect(mocks.importPage).not.toHaveBeenCalled();
+      expect(mocks.writes).toHaveLength(0);
+    }
+  );
+
   it('returns the paginated import snapshot without a full-channel sync', async () => {
     const status = await syncStatus(
       getRequest(paths.sync, { creatorProfileId: profileId })

@@ -1,6 +1,7 @@
 import 'server-only';
 import { and, desc, eq } from 'drizzle-orm';
 import { TIM_BRAND_DEAL_SOURCE_ACCOUNT } from '@/lib/connectors/brand-deal-opportunity';
+import { getGrantedConnectorCapabilities } from '@/lib/connectors/capabilities';
 import { runConnectorEnrichment } from '@/lib/connectors/enrichment';
 import {
   buildGmailOpportunityQuery,
@@ -9,8 +10,11 @@ import {
   getHeader,
   listGmailMessages,
 } from '@/lib/connectors/gmail/client';
-import { CONNECTOR_PROVIDERS } from '@/lib/connectors/registry';
-import { loadDecryptedToken } from '@/lib/connectors/token-vault';
+import { loadFreshGoogleAccessToken } from '@/lib/connectors/google-calendar/access-token';
+import {
+  CONNECTOR_PROVIDERS,
+  getConnectorDefinition,
+} from '@/lib/connectors/registry';
 import { db } from '@/lib/db';
 import { connectorAccounts, externalObjects } from '@/lib/db/schema/connectors';
 import { env } from '@/lib/env-server';
@@ -46,6 +50,7 @@ async function syncGmailExternalObjects(
     .select({
       id: connectorAccounts.id,
       providerAccountId: connectorAccounts.providerAccountId,
+      scopes: connectorAccounts.scopes,
     })
     .from(connectorAccounts)
     .where(
@@ -70,8 +75,19 @@ async function syncGmailExternalObjects(
     return null;
   }
 
-  const gmailTokens = await loadDecryptedToken(gmailAccount.id);
-  if (!gmailTokens) {
+  const capabilities = getGrantedConnectorCapabilities(
+    getConnectorDefinition(CONNECTOR_PROVIDERS.gmail),
+    'connected',
+    gmailAccount.scopes
+  );
+  if (
+    !capabilities.some(capability => capability.id === 'booking_emails.read')
+  ) {
+    return null;
+  }
+
+  const accessToken = await loadFreshGoogleAccessToken(gmailAccount.id);
+  if (!accessToken) {
     logger.error('[extract-and-propose] Token load failed', { userId });
     return null;
   }
@@ -81,11 +97,7 @@ async function syncGmailExternalObjects(
     DEFAULT_GMAIL_WINDOW_DAYS;
 
   const query = buildGmailOpportunityQuery(historyWindowDays);
-  const listResult = await listGmailMessages(
-    gmailTokens.accessToken,
-    query,
-    50
-  );
+  const listResult = await listGmailMessages(accessToken, query, 50);
   const messageStubs = listResult.messages ?? [];
 
   if (messageStubs.length === 0) {
@@ -96,9 +108,7 @@ async function syncGmailExternalObjects(
   }
 
   const messageDetails = await Promise.allSettled(
-    messageStubs
-      .slice(0, 20)
-      .map(stub => getGmailMessage(gmailTokens.accessToken, stub.id))
+    messageStubs.slice(0, 20).map(stub => getGmailMessage(accessToken, stub.id))
   );
 
   const messages = messageDetails
