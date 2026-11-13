@@ -334,10 +334,12 @@ function decodeMarketingProof(bytes, context, meta) {
       );
     }
     if (!sourceMatches(receipt?.sourcePath, context.sourcePaths)) continue;
+    // The capture may land on a declared redirect alternate (JOV-7973 seam:
+    // with public signup open, the /waitlist receipt's finalPath is /start).
     if (
       receipt.route !== context.marketingRoute ||
       receipt.fixturePath !== context.marketingRoute ||
-      receipt.finalPath !== context.marketingRoute
+      !validLocalFinalUrl(receipt.finalPath, context.marketingRoute)
     )
       return fail(
         'marketing receipt does not match the registered screen route'
