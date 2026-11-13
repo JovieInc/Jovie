@@ -225,6 +225,10 @@ Never dequeue to re-prioritize; label `compounding` and let green-enroll re-rout
 A queued `compounding` PR with a non-compounding entry ahead of it is dequeued and
 re-enqueued with `jump` by Merge Queue Green Enroll (receipt `relabel-jump`), under
 the same caps as a fresh enqueue: `MAX_JUMPED`, `JUMP_MAX_BUILD_S`, `JUMP_BATCH_S`.
+The build-age cap uses the current queue-head commit time, a conservative bound
+on build age, because original enqueue time survives group replacement. Missing,
+invalid, source-head or future group evidence defers the jump; enqueue time still
+controls the batching window.
 
 `drain-pr-queue.sh` remains a guarded manual maintenance tool. Its legacy
 source-admission and rebase path has no automatic caller. Hard-gate labels block

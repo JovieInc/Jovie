@@ -490,7 +490,7 @@ jobs:
               query($owner: String!, $repo: String!) {
                 repository(owner: $owner, name: $repo) {
                   mergeQueue(branch: "main") {
-                    entries(first: 50) { nodes { state position enqueuedAt pullRequest { number labels(first: 30) { nodes { name } } } } }
+                    entries(first: 50) { nodes { state position enqueuedAt headCommit { oid committedDate } pullRequest { number headRefOid labels(first: 30) { nodes { name } } } } }
                   }
                 }
               }`;
@@ -499,18 +499,25 @@ jobs:
             // One reset-safe jump policy for a fresh enqueue and for a relabel re-route. A jump
             // invalidates every merge group already building and restarts its CI (10-20 min;
             // the 04:00Z jump of #23554 reset three groups and nothing merged for 90 min). So jump only
-            // while no building group has had time to make progress: AWAITING_CHECKS entries enqueued
-            // under JUMP_MAX_BUILD_S ago (enqueuedAt bounds the build start from above), at most one jump per
+            // while no current group has had time to make progress: its queue-head commit age bounds
+            // the build age from above. Original enqueue age survives replacement groups. Keep one jump per
             // JUMP_BATCH_S, and at most MAX_JUMPED priority entries queued (compounding and marketing share the cap).
             const jumpPolicy = entries => {
               const ageS = e => (Date.now() - Date.parse(e.enqueuedAt)) / 1000;
               const jumped = entries.filter(isPriorityEntry).length;
               const building = entries.filter(e => e.state === 'AWAITING_CHECKS');
-              const stale = building.filter(e => !(ageS(e) < JUMP_MAX_BUILD_S));
+              const validOid = oid => /^[a-f0-9]{40}$/i.test(oid ?? '');
+              const stale = building.filter(e => {
+                const head = e.headCommit;
+                const source = e.pullRequest.headRefOid;
+                const age = (Date.now() - Date.parse(head?.committedDate)) / 1000;
+                // Unknown, source-head or future evidence cannot authorize a reset.
+                return !(validOid(head?.oid) && validOid(source) && head.oid.toLowerCase() !== source.toLowerCase() && age >= 0 && age < JUMP_MAX_BUILD_S);
+              });
               const recent = entries.filter(e => isPriorityEntry(e) && ageS(e) < JUMP_BATCH_S);
               let deferred = null;
               if (jumped >= MAX_JUMPED) deferred = `cap ${jumped}/${MAX_JUMPED}`;
-              else if (stale.length > 0) deferred = `building groups older than ${JUMP_MAX_BUILD_S}s: ${stale.map(e => '#' + e.pullRequest.number).join(',')}`;
+              else if (stale.length > 0) deferred = `building groups with unknown age or at least ${JUMP_MAX_BUILD_S}s old: ${stale.map(e => '#' + e.pullRequest.number).join(',')}`;
               else if (recent.length > 0) deferred = `batch window: ${recent.map(e => '#' + e.pullRequest.number).join(',')} jumped under ${JUMP_BATCH_S}s ago`;
               return { jumped, building, deferred };
             };
