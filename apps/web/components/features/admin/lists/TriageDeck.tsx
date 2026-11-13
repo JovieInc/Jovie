@@ -125,7 +125,7 @@ export function TriageDeck({
         verified={Boolean(creator?.isVerified)}
       />
       <div className='min-w-0'>
-        <h2 className='truncate text-lg font-medium text-primary-token'>
+        <h2 className='truncate text-base font-medium text-primary-token'>
           {name}
         </h2>
         <p className='truncate text-xs text-tertiary-token'>

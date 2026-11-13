@@ -27,7 +27,10 @@ vi.mock('@/lib/notifications/providers/resend', () => ({
 
 import { POST } from '@/app/api/admin/creator-invite/route';
 import { processSendClaimInviteJob } from '@/lib/email/jobs/send-claim-invite';
-import { isColdClaimInviteSendOpen } from '@/lib/outbound/cold-claim-invites';
+import {
+  coldClaimInviteRelationshipHold,
+  isColdClaimInviteSendOpen,
+} from '@/lib/outbound/cold-claim-invites';
 
 const PROFILE = '00000000-0000-4000-8000-000000000001';
 const INVITE = '00000000-0000-4000-8000-000000000002';
@@ -71,5 +74,38 @@ describe('cold claim invites stay closed until routed through Outbound approval'
     ).resolves.toMatchObject({ status: 'skipped', inviteId: INVITE });
     expect(mocks.db).not.toHaveBeenCalled();
     expect(mocks.send).not.toHaveBeenCalled();
+  });
+});
+
+describe('cold claim invites never go to an artist Tim already works with', () => {
+  const HOLD = 'Existing relationship: flag to Tim, no cold outreach';
+
+  it('holds Dannic by username, by name and by management domain', () => {
+    expect(
+      coldClaimInviteRelationshipHold({
+        username: 'djdannic',
+        displayName: null,
+      })
+    ).toBe(HOLD);
+    expect(
+      coldClaimInviteRelationshipHold({ username: 'x', displayName: 'Dannic' })
+    ).toBe(HOLD);
+    expect(
+      coldClaimInviteRelationshipHold({
+        username: 'x',
+        displayName: 'Nova Lane',
+        email: 'team@bigmgmt.com',
+      })
+    ).toBe(HOLD);
+  });
+
+  it('lets an unrelated profile through', () => {
+    expect(
+      coldClaimInviteRelationshipHold({
+        username: 'novalane',
+        displayName: 'Nova Lane',
+        email: 'artist@example.com',
+      })
+    ).toBeNull();
   });
 });

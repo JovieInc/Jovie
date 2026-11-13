@@ -4,6 +4,10 @@ import { and, eq } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import { type Lead, leads } from '@/lib/db/schema/leads';
 import { captureError } from '@/lib/error-tracking';
+import {
+  EXISTING_RELATIONSHIP_LABEL,
+  existingRelationshipHold,
+} from './existing-relationships';
 import { recordLeadFunnelEvent } from './funnel-events';
 import { ingestLeadAsCreator } from './ingest-lead';
 import { pipelineLog, pipelineWarn } from './pipeline-logger';
@@ -21,6 +25,8 @@ export interface ApproveLeadResult {
     route?: string;
     error?: string;
   } | null;
+  /** Set when an existing relationship held the lead; nothing was approved. */
+  relationshipHold?: { reason: string; label: string };
 }
 
 async function trySpotifyEnrichment(leadId: string): Promise<void> {
@@ -66,6 +72,41 @@ export async function approveLead(lead: Lead): Promise<ApproveLeadResult> {
   const leadId = lead.id;
 
   pipelineLog('approve', 'Starting approval pipeline', { leadId });
+
+  // Hard gate, before any state change: an artist Tim already works with is
+  // never approved, built or routed. The lead stays `qualified` under manual
+  // review with the reason on file, which also keeps it out of auto-approve.
+  const relationship = existingRelationshipHold({
+    handle: lead.linktreeHandle,
+    displayName: lead.displayName,
+    contactEmail: lead.contactEmail,
+    instagramHandle: lead.instagramHandle,
+    bio: lead.bio,
+  });
+  if (relationship) {
+    pipelineWarn('approve', 'Existing relationship: lead held, not approved', {
+      leadId,
+      matchedBy: relationship.matchedBy,
+    });
+    await db
+      .update(leads)
+      .set({
+        outreachRoute: 'manual_review',
+        hasRepresentation: true,
+        representationSignal: relationship.reason,
+        dmCopy: null,
+        updatedAt: new Date(),
+      })
+      .where(eq(leads.id, leadId));
+    return {
+      ingestion: null,
+      routing: null,
+      relationshipHold: {
+        reason: relationship.reason,
+        label: EXISTING_RELATIONSHIP_LABEL,
+      },
+    };
+  }
 
   // 1. Atomically update status to approved (guard against concurrent approval)
   const now = new Date();
