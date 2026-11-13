@@ -380,6 +380,59 @@ test('S5 titlebar import begins at module evaluation only in Electron, before re
   }
 });
 
+test('S5 rejected titlebar warmup leaves browser output and the desktop render loader intact', async () => {
+  const slot = await readFile(
+    new URL(
+      '../../web/components/organisms/DesktopTitlebarSlot.tsx',
+      import.meta.url
+    ),
+    'utf8'
+  );
+  for (const electron of [false, true]) {
+    let loads = 0;
+    let loadTitlebar;
+    const titlebar = () => null;
+    const lazyTitlebar = () => null;
+    const exports = {};
+    runInNewContext(compile(slot), {
+      exports,
+      require: id => {
+        if (id === 'next/dynamic')
+          return {
+            default: loader => {
+              loadTitlebar = loader;
+              return lazyTitlebar;
+            },
+          };
+        if (id === '@/lib/desktop/electron-runtime')
+          return {
+            isElectronRuntime: () => electron,
+            useIsElectronRuntime: () => electron,
+          };
+        if (id === '@/components/organisms/DesktopTitlebar') {
+          loads++;
+          if (loads === 1) throw new Error('titlebar warmup unavailable');
+          return { DesktopTitlebar: titlebar };
+        }
+        if (id === 'react/jsx-runtime') return { jsx: type => ({ type }) };
+        throw new Error(`unexpected import ${id}`);
+      },
+    });
+    // Flush the real import rejection, including any unhandled rejection.
+    await new Promise(resolve => setImmediate(resolve));
+    assert.equal(loads, electron ? 1 : 0);
+    const rendered = exports.DesktopTitlebarSlot();
+    if (electron) {
+      assert.equal(rendered.type, lazyTitlebar);
+      assert.equal(await loadTitlebar(), titlebar);
+      assert.equal(loads, 2);
+    } else {
+      assert.equal(rendered, null);
+      assert.equal(loads, 0);
+    }
+  }
+});
+
 test('S4 initial fullscreen snapshots apply without an event; failed or invalid reads retain live updates', async () => {
   const bundle = await build({
     entryPoints: [new URL('../src/preload.ts', import.meta.url).pathname],
