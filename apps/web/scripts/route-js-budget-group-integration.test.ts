@@ -7,6 +7,7 @@ import {
   buildFirstLoadFixture,
   cleanupFixtures,
   firstLoadBudgets,
+  isolateBudgetAncestor,
   NOW,
   validRaise,
   writeChunk,
@@ -133,9 +134,13 @@ describe('route-group policy reaches the existing evaluator and CLI', () => {
     'the actual CLI exits $status for a marketing group baseline of $baseline KB',
     ({ baseline, status }) => {
       const { nextDir, budgets, budgetPath } = cliFixture();
+      const ancestorEnv = isolateBudgetAncestor(
+        nextDir,
+        structuredClone(budgets)
+      );
       budgets.groups.marketing.baselineKb = baseline;
       writeFileSync(budgetPath, JSON.stringify(budgets));
-      const run = runCli(nextDir, budgetPath);
+      const run = runCli(nextDir, budgetPath, ancestorEnv);
       expect(run.status, run.stderr).toBe(status);
       const result = JSON.parse(run.stdout);
       expect(result.first.violations).toEqual([]);
