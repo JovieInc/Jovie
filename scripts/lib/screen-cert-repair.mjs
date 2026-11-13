@@ -406,8 +406,13 @@ function repairOne(root, rel, waiverText) {
     testSource: testJoined,
     waivers: appliedWaivers,
   });
-  const states = certificate.criteria.find(item => item.id === 'states');
-  const a11y = certificate.criteria.find(item => item.id === 'a11y');
+  const states =
+    /** @type {{ status?: string, states?: Record<string, { status?: string }> } | undefined} */ (
+      certificate.criteria.find(item => item.id === 'states')
+    );
+  const a11y = /** @type {{ status?: string } | undefined} */ (
+    certificate.criteria.find(item => item.id === 'a11y')
+  );
   if (states?.status !== 'pass' || a11y?.status !== 'pass')
     return {
       ok: false,

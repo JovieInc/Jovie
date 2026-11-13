@@ -73,7 +73,8 @@ export function runChecks(root, { base = previousRef(root) } = {}) {
  */
 export async function structuralCommands(root) {
   const lanes = await import('./ci-fast-lanes.mjs');
-  const here = (/** @type {string} */ test) => existsSync(join(root, test));
+  const here = (/** @type {string} */ test) =>
+    test.split(' ').every(part => existsSync(join(root, part)));
   const present = lanes.SCRIPT_CONTRACT_NODE_TESTS.filter(here);
   const { scriptContractNodeArgs } = lanes;
   // lib/__tests__ mixes node:test and Vitest files, so name the Vitest ones.
