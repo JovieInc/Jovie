@@ -1,4 +1,3 @@
-// @coverage-via apps/web/tests/unit/app/root-not-found-chrome-parity.test.tsx
 import '@/components/site/MarketingFooter.css';
 import Link from 'next/link';
 import { BrandLogo } from '@/components/atoms/BrandLogo';
