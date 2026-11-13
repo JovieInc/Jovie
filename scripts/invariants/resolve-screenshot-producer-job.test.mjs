@@ -18,6 +18,11 @@ const producer = (id, conclusion = 'success') => ({
   conclusion,
 });
 
+/** Narrow to the pending member so property reads stay inside the union. */
+const asPending = result => (result?.status === 'pending' ? result : null);
+/** Narrow to the resolved member so property reads stay inside the union. */
+const asResolved = result => (result?.status === 'resolved' ? result : null);
+
 test('selectProducerJobId accepts only Generate Screenshots', () => {
   assert.deepEqual(selectProducerJobId({ jobs: [producer(42)] }), {
     status: 'resolved',
@@ -32,22 +37,29 @@ test('selectProducerJobId accepts only Generate Screenshots', () => {
     'pending'
   );
   assert.equal(
-    selectProducerJobId({
-      jobs: [
-        { name: UNKNOWN_PRODUCER_JOB_NAME, id: 99, conclusion: 'success' },
-      ],
-    }).reason,
+    asPending(
+      selectProducerJobId({
+        jobs: [
+          { name: UNKNOWN_PRODUCER_JOB_NAME, id: 99, conclusion: 'success' },
+        ],
+      })
+    )?.reason,
     'unknown-job'
   );
-  assert.equal(selectProducerJobId({ jobs: [] }).reason, 'missing-producer');
+  assert.equal(
+    asPending(selectProducerJobId({ jobs: [] }))?.reason,
+    'missing-producer'
+  );
   assert.equal(
     selectProducerJobId({ jobs: [producer(1), producer(2)] }).status,
     'rejected'
   );
   assert.notEqual(
-    selectProducerJobId({
-      jobs: [{ name: UNKNOWN_PRODUCER_JOB_NAME, id: 99 }],
-    }).id,
+    asResolved(
+      selectProducerJobId({
+        jobs: [{ name: UNKNOWN_PRODUCER_JOB_NAME, id: 99 }],
+      })
+    )?.id,
     '99'
   );
 });

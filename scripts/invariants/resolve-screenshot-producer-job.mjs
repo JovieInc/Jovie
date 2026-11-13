@@ -46,6 +46,7 @@ const positiveJobId = value =>
  * Accept only the exact Generate Screenshots job. `unknown-job` and a missing
  * row stay pending so the caller can retry. Ambiguous or invalid ids reject.
  * @param {{ jobs?: Array<{ name?: string, id?: number, conclusion?: string | null }> } | null | undefined} payload
+ * @returns {{ status: 'resolved', id: string } | { status: 'rejected', reason: string } | { status: 'pending', reason: string }}
  */
 export function selectProducerJobId(payload) {
   const jobs = Array.isArray(payload?.jobs) ? payload.jobs : [];
@@ -137,7 +138,7 @@ export async function resolveProducerJobIdWithHold({
   now = Date.now,
   sleep = async ms => new Promise(resolve => setTimeout(resolve, ms)),
   lagSleep,
-} = {}) {
+}) {
   const holdDeadline = now() + holdBudgetMs;
   for (;;) {
     try {
