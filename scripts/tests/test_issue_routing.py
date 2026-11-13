@@ -232,7 +232,7 @@ class AvailabilityTest(unittest.TestCase):
         # The router reads the wall clock for pool expiry, and Hyperagent's allowance ends at UTC midnight.
         # Pin the clock to the last UTC noon so the 1 hour Claude window below never races midnight
         # (this test failed every night from 23:00 to 00:00 UTC).
-        now = (time.time() - 12 * 3600) // 86400 * 86400 + 12 * 3600
+        now = 1_794_484_800.0  # 2026-11-12T12:00:00Z
         with patch.object(lane.time, "time", return_value=now):
             self._router_end_to_end(now)
 

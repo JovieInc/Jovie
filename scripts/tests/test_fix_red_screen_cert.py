@@ -2,6 +2,7 @@ import sys
 import types
 import unittest
 from pathlib import Path
+from types import SimpleNamespace
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "lanes"))
 import fix_red_classes as classes  # noqa: E402
@@ -77,6 +78,21 @@ class ScreenCertRouteTest(unittest.TestCase):
             table["ui-feel"]("host", {"number": 1}, {"files": []}, "tree", "log", {}),
             "pushed")
         self.assertEqual(calls, [("sh", "logs", "host", {"number": 1}, "tree", "log", {})])
+
+    def test_dispatch_routes_heading_balance_through_the_rewrite(self):
+        calls = []
+
+        def sh(args, **_kwargs):
+            calls.append(args)
+            if args[:2] == ["git", "diff"]:
+                return SimpleNamespace(returncode=0, stdout="")
+            return SimpleNamespace(returncode=0, stdout="")
+
+        fixers = {name: object() for name in ("wire", "atomic", "renumber", "snap", "strip", "merge", "register")}
+        table = fix_red_screen_cert.dispatch(classes, sh, fixers)
+        balance = table[classes.BALANCE_HEADINGS]
+        self.assertIsNone(balance(None, {"headRefName": "claude/align"}, {}, Path("."), None, {}))
+        self.assertEqual(calls[0][:3], ["git", "diff", "-U0"])
 
 
 if __name__ == "__main__":

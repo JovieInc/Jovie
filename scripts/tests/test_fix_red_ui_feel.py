@@ -3,6 +3,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "lanes"))
 import fix_red_classes as classes  # noqa: E402
@@ -84,6 +85,19 @@ class UiFeelTest(unittest.TestCase):
             self.assertEqual(ui_feel.apply(root, escaped), [])
             self.assertEqual(ui_feel.hits("missingTabularNums without the marker"), [])
 
+    def test_failed_atomic_replace_preserves_source_and_cleans_staging(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            path = root / "apps/web/components/features/demo/DemoReleaseTasksSurface.tsx"
+            path.parent.mkdir(parents=True)
+            original = HEADING + "\n" + NUMERAL + "\n"
+            path.write_text(original, encoding="utf-8")
+            with patch("atomic_state.os.replace", side_effect=OSError("replace refused")):
+                with self.assertRaisesRegex(OSError, "replace refused"):
+                    ui_feel.apply(root, BLOCK)
+            self.assertEqual(path.read_text(encoding="utf-8"), original)
+            self.assertEqual(list(path.parent.iterdir()), [path])
+
     def test_publish_skips_commit_when_the_log_has_no_block(self):
         class Result:
             returncode = 0
@@ -95,6 +109,18 @@ class UiFeelTest(unittest.TestCase):
 
         self.assertIsNone(ui_feel.publish(
             sh, lambda *_args: {}, object(), {"number": 1, "headRefName": "fix/x"}, Path("."), None, {}))
+
+    def test_runner_dispatch_keeps_ui_feel_repair_after_compose_integration(self):
+        import lane_runner as lane
+        from fix_red_compose import deterministic_fixer
+
+        receipt = {}
+        pr_row = {"number": 25272}
+        with patch.object(classes, "publish_ui_feel", return_value="pushed") as publish:
+            fixer = deterministic_fixer(lane, classes.UI_FEEL)
+            self.assertIsNotNone(fixer)
+            self.assertEqual(fixer("host", pr_row, {}, Path("."), "log", receipt), "pushed")
+        publish.assert_called_once_with(lane.sh, lane.failed_logs, "host", pr_row, Path("."), "log", receipt)
 
 
 if __name__ == "__main__":

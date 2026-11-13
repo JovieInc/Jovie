@@ -66,10 +66,14 @@ describe('screen proof final paths (JOV-7973)', () => {
     );
   });
 
-  it('declares only the closed-signup handoff', () => {
-    assert.deepEqual(Object.keys(SCREEN_PROOF_FINAL_PATHS), ['/start']);
+  it('declares the closed-signup and open-signup handoffs', () => {
+    assert.deepEqual(Object.keys(SCREEN_PROOF_FINAL_PATHS), [
+      '/start',
+      '/waitlist',
+    ]);
     assert.ok(Object.isFrozen(SCREEN_PROOF_FINAL_PATHS));
     assert.ok(Object.isFrozen(SCREEN_PROOF_FINAL_PATHS['/start']));
+    assert.ok(Object.isFrozen(SCREEN_PROOF_FINAL_PATHS['/waitlist']));
   });
 
   it('resolves web.start proof that lands on the declared /waitlist handoff, and nothing else', () => {

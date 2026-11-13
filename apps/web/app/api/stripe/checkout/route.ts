@@ -3,6 +3,7 @@
  * Creates checkout sessions for subscription purchases
  */
 
+import { createHash } from 'node:crypto';
 import * as Sentry from '@sentry/nextjs';
 import { NextRequest, NextResponse } from 'next/server';
 import { APP_ROUTES } from '@/constants/routes';
@@ -13,6 +14,7 @@ import {
   openFirstTouchEnvelope,
 } from '@/lib/acquisition/first-touch-envelope';
 import { getCachedAuth } from '@/lib/auth/cached';
+import { normalizeUpgradeReturnTo } from '@/lib/billing/artist-presence-upgrade';
 import {
   CLAIM_FLOW_COOKIE,
   claimStateHref,
@@ -233,7 +235,9 @@ export async function POST(request: NextRequest) {
       throw error;
     }
     const checkoutSource =
-      rawSource === 'onboarding' || rawSource === 'youtube_thumbnails'
+      rawSource === 'onboarding' ||
+      rawSource === 'youtube_thumbnails' ||
+      rawSource === 'in_app'
         ? rawSource
         : undefined;
 
@@ -242,7 +246,9 @@ export async function POST(request: NextRequest) {
     }
 
     const referralCode = normalizeReferralCode(rawReferralCode);
-    const onboardingReturnTo = normalizeOnboardingReturnTo(rawReturnTo);
+    const onboardingReturnTo = normalizeOnboardingReturnTo(
+      checkoutSource === 'onboarding' ? rawReturnTo : undefined
+    );
 
     const priceError = await validatePriceId(priceId, userId);
     if (priceError) return priceError;
@@ -302,7 +308,17 @@ export async function POST(request: NextRequest) {
       checkoutSource === 'onboarding' &&
       request.cookies.get(CLAIM_FLOW_COOKIE)?.value === '1';
 
-    const sourceKey = isClaimFlow ? 'claim' : (checkoutSource ?? 'default');
+    const upgradeReturnTo = normalizeUpgradeReturnTo(rawReturnTo);
+    const returnKey = createHash('sha256')
+      .update(upgradeReturnTo)
+      .digest('hex')
+      .slice(0, 16);
+    const sourceKey =
+      checkoutSource === 'in_app'
+        ? `in_app:${returnKey}`
+        : isClaimFlow
+          ? 'claim'
+          : (checkoutSource ?? 'default');
     const correlationPart = checkoutCorrelationIdempotencyPart(correlation);
     const idempotencyKey = correlationPart
       ? `checkout:${userId}:${priceId}:${sourceKey}:${correlationPart}:${idempotencyBucket}`
@@ -320,6 +336,11 @@ export async function POST(request: NextRequest) {
     } else if (checkoutSource === 'onboarding') {
       successUrl = `${baseUrl}${onboardingReturnTo}&upgrade=success&session_id={CHECKOUT_SESSION_ID}${planIdSuffix}`;
       cancelUrl = `${baseUrl}${onboardingReturnTo}&upgrade=cancel`;
+    } else if (checkoutSource === 'in_app') {
+      // Navigation is not payment proof: the destination's existing entitlement
+      // checks remain authoritative, including while a webhook is pending.
+      successUrl = `${baseUrl}${upgradeReturnTo}`;
+      cancelUrl = `${baseUrl}${upgradeReturnTo}`;
     } else if (checkoutSource === 'youtube_thumbnails') {
       successUrl = `${baseUrl}/billing/youtube-thumbnails/success?session_id={CHECKOUT_SESSION_ID}`;
       cancelUrl = `${baseUrl}/billing/youtube-thumbnails?checkout=cancel`;

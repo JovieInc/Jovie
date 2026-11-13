@@ -188,6 +188,7 @@
   --system-b-entity-chip-artist-accent: var(--color-accent-purple);
   --system-b-entity-chip-track-accent: var(--color-accent-blue);
   --system-b-entity-chip-event-accent: var(--color-accent-orange);
+  --system-b-entity-chip-profile-accent: var(--color-accent-purple);
   --system-b-entity-chip-on-light-text: var(--system-b-chat-user-bubble-text);
   --system-b-chat-message-max-width: 78%;
   --system-b-chat-user-bubble-bg: var(--color-text-primary-token);
@@ -3864,6 +3865,7 @@ html[data-profile-flow-open="true"] .cookie-banner-card {
   --system-b-entity-chip-artist-accent: var(--color-accent-purple);
   --system-b-entity-chip-track-accent: var(--color-accent-blue);
   --system-b-entity-chip-event-accent: var(--color-accent-orange);
+  --system-b-entity-chip-profile-accent: var(--color-accent-purple);
   background-color: var(--color-bg-base);
   color: var(--color-text-primary-token);
   color-scheme: dark;
@@ -4033,6 +4035,7 @@ html:not(.dark) .teleprompter-studio {
   --system-b-entity-chip-artist-accent: var(--color-accent-purple);
   --system-b-entity-chip-track-accent: var(--color-accent-blue);
   --system-b-entity-chip-event-accent: var(--color-accent-orange);
+  --system-b-entity-chip-profile-accent: var(--color-accent-purple);
   --ds-marketing-eyebrow-color: #9da2ac;
   --public-shell-text: #f5f7fb;
 }

@@ -28,7 +28,7 @@ def bind_ui_feel(sh, failed_logs, classes):
 
 
 def dispatch(classes, sh, fixers: dict):
-    """Fixer table the lane used to inline. Screen-cert and ui-feel register here."""
+    """Route screen-cert, heading balance, and log-reported ui-feel repairs."""
     table = {
         classes.WIRE_CI_FAST: fixers["wire"],
         classes.ATOMIC_WRITE: fixers["atomic"],
@@ -45,7 +45,23 @@ def dispatch(classes, sh, fixers: dict):
     ui = fixers.get("ui")
     if ui is not None:
         table[classes.UI_FEEL] = ui
+    balance = getattr(classes, "BALANCE_HEADINGS", None)
+    if balance is not None:
+        table[balance] = (
+            lambda host, pr, route, worktree, log, receipt: balance_headings_fix(
+                sh, pr, worktree, log, receipt, classes)
+        )
     return table
+
+
+def balance_headings_fix(sh, pr, worktree, log, receipt, classes):
+    """Commit text-balance on headings this PR adds, then fast-forward the branch."""
+    import fix_red_rewrite
+    return fix_red_rewrite.rewrite_commit_push(
+        sh, pr, worktree, log, receipt, ("apps/web", "packages/ui"),
+        classes.balance_added_headings,
+        "fix(ui): balance headings this change wraps",
+        "balanced-headings", "balancedFiles")
 
 
 def repair_screen_cert_fix(sh, host, pr, route, worktree, log, receipt):

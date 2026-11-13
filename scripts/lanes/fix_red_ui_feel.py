@@ -10,6 +10,7 @@ import re
 from pathlib import Path
 
 import fix_red_rewrite
+from atomic_state import atomic_write_text
 
 MARKER = "[lint:ui-feel] new violations on lines this change adds:"
 END = "[lint:ui-feel] see eslint-rules"
@@ -135,7 +136,7 @@ def apply(root: Path, log: str) -> list[str]:
     for path, original, text in staged:
         if text == original:
             continue
-        path.write_text(text, encoding="utf-8")
+        atomic_write_text(path, text, encoding="utf-8")
         changed.append(path.relative_to(root).as_posix())
     return changed
 

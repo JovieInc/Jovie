@@ -5,6 +5,7 @@ const handlers = vi.hoisted(() => ({
   ingestion: vi.fn(),
   workflows: vi.fn(),
   merch: vi.fn(),
+  merchGenerationRecovery: vi.fn(),
 }));
 const cronAuth = vi.hoisted(() => vi.fn());
 
@@ -22,6 +23,9 @@ vi.mock('@/app/api/cron/process-workflow-runs/route', () => ({
 }));
 vi.mock('@/app/api/cron/process-merch-fulfillment/route', () => ({
   GET: handlers.merch,
+}));
+vi.mock('@/lib/merch/generation-recovery', () => ({
+  reconcileMerchGeneration: handlers.merchGenerationRecovery,
 }));
 
 import { GET } from '@/app/api/cron/queue-tick/route';
@@ -45,6 +49,7 @@ describe('queue tick', () => {
       'ingestion',
       'workflows',
       'merch',
+      'merch-generation-recovery',
     ]);
     expect(results.every(r => r.ok)).toBe(true);
   });
@@ -66,6 +71,7 @@ describe('queue tick', () => {
       ingestion: false,
       workflows: false,
       merch: true,
+      'merch-generation-recovery': true,
     });
   });
 
@@ -80,7 +86,7 @@ describe('queue tick', () => {
           status,
         }
       );
-      expect(results.filter(result => result.ok)).toHaveLength(3);
+      expect(results.filter(result => result.ok)).toHaveLength(4);
       const response = await GET(request);
       expect(response.status).toBe(500);
       expect((await response.json()).ok).toBe(false);

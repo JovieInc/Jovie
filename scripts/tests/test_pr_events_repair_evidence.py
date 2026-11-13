@@ -55,7 +55,10 @@ class Shell:
         return [call for call in self.calls if tuple(call[:len(prefix)]) == prefix]
 
 
-class RedBeforeGreenEvidenceTests(unittest.TestCase):
+from .repair_customer_decision_cases import CustomerDecisionCases
+
+
+class RedBeforeGreenEvidenceTests(CustomerDecisionCases, unittest.TestCase):
     PR = {"number": 7, "headRefOid": "a" * 40, "statusCheckRollup": [
         {"name": "Source Validation", "conclusion": "FAILURE",
          "detailsUrl": "https://github.com/JovieInc/Jovie/actions/runs/123/job/456"}]}
@@ -383,7 +386,7 @@ console.log(JSON.stringify(JSON.parse(readFileSync(0, 'utf8')).map(body =>
 
     def test_public_decision_round_trips_without_comment_injection(self):
         decision = {"releaseWorthy": True, "text": "Choose a link --> continue"}
-        updated = events.repair_evidence_body(self.PR, "Summary", customer_decision=decision)
+        updated = events.repair_evidence_body(self.PR, "Summary: customer-changelog/v1 is missing", customer_decision=decision)
         marker = updated.split("<!-- customer-changelog/v1 ", 1)[1].split(" -->", 1)[0]
         self.assertEqual(json.loads(marker), decision)
         self.assertNotIn("Choose a link -->", updated)
