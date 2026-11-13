@@ -8,6 +8,8 @@ import { motion, useReducedMotion } from 'motion/react';
 import { memo, useEffect, useRef, useState } from 'react';
 import { useClipboard } from '@/hooks/useClipboard';
 import { copyMarkdownToClipboard } from '@/lib/chat/copy-markdown';
+import { stripMachineContext } from '@/lib/chat/machine-context';
+import { parseTokens } from '@/lib/chat/tokens';
 import type { EnrichedFact } from '@/lib/profile-facts/enrichment';
 import { cn } from '@/lib/utils';
 import { SourceEvidenceProvider } from '../source-evidence-context';
@@ -20,6 +22,20 @@ import { ChatStepLimitAffordance } from './ChatStepLimitAffordance';
 import { FileAttachmentChip } from './FileAttachmentChip';
 import { ImageAttachmentChip } from './ImageAttachmentChip';
 import { TokenizedText } from './TokenizedText';
+
+/** Length as read on screen: entity tokens count as their chip label. */
+function visibleTokenLength(text: string): number {
+  return parseTokens(text).reduce(
+    (total, token) =>
+      total +
+      (token.type === 'text'
+        ? token.value.length
+        : token.type === 'entity'
+          ? token.label.length + 2
+          : token.id.length),
+    0
+  );
+}
 
 interface ChatMessageProps {
   readonly id: string;
@@ -106,7 +122,11 @@ export const ChatMessage = memo(function ChatMessage({
   const markdownCopyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
     null
   );
-  const messageText = getMessageText(parts);
+  const rawMessageText = getMessageText(parts);
+  // User bubbles show only what the person wrote: never machine context.
+  const messageText = isUser
+    ? stripMachineContext(rawMessageText)
+    : rawMessageText;
   const isCopySuccess = markdownCopied || fallbackCopySuccess;
 
   useEffect(() => {
@@ -178,7 +198,7 @@ export const ChatMessage = memo(function ChatMessage({
     isUser &&
     attachmentChips.length === 0 &&
     !messageText.includes('\n') &&
-    messageText.length <= 44;
+    visibleTokenLength(messageText) <= 44;
   const userAttachmentContent = attachmentChips.map(chip =>
     chip.isImage ? (
       <ImageAttachmentChip

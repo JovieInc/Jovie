@@ -8,7 +8,6 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "lanes"))
 import fix_red_classes as classes  # noqa: E402
 
-
 def pr(*names, merge="BLOCKED"):
     return {"mergeStateStatus": merge, "statusCheckRollup": [{"name": n, "conclusion": "FAILURE"} for n in names]
             + [{"name": "PR Ready", "conclusion": "FAILURE"}, {"name": "ok", "conclusion": "SUCCESS"}]}
@@ -21,6 +20,7 @@ class ClassifyTest(unittest.TestCase):
             "HttpError: API rate limit exceeded for installation": ("platform-infra", "rerun"),
             "Could not fetch gitleaks after 3 attempts (https://example.invalid/gitleaks.tar.gz).": ("platform-infra", "rerun"),
             "##[error]Dependency review detected incompatible licenses.": ("dependency-license", "agent"),
+            "screen certificate gate failed:\n  apps/web/components/jovie/merch-tool-artifacts.tsx [states missing empty]": ("screen-certificate", "repair-screen-cert"),
             "github-quota-deferred\n##[error]Dependency review detected incompatible licenses.": ("dependency-license", "agent"),
             "upstream returned HTTP 500 before the job started": ("platform-infra", "rerun"),
             "Unwired: scripts/a.test.mjs, scripts/b.test.mjs. Wire each file into a ci-fast lane": ("ci-fast-wiring", "wire-ci-fast"),
@@ -64,6 +64,25 @@ class ClassifyTest(unittest.TestCase):
         plain = classes.classify(pr("Source Validation"), {
             "Source Validation": "upstream returned HTTP 500 before the job started"})
         self.assertEqual((plain["cls"], plain["action"]), ("platform-infra", "rerun"))
+
+    def test_route_budget_ratchet_syncs_main_before_mocked_infra_noise(self):
+        # PR #25125: main tightened budgets while this head retained the old
+        # file. Both the build guard and the CLI integration test report growth.
+        errors = [
+            "2026-11-13T02:54:35.2625435Z ##[error]routes./app/chat/[id] grew 823 -> 1385",
+            "AssertionError: ::error::routes./app/chat grew 822 -> 1385",
+            "::error::firstLoad.baselines./start grew 804 -> 1247",
+            "::error::groups.dashboard.baselineKb grew 1199 -> 1385",
+        ]
+        for error in errors:
+            log = "passing fixture: API rate limit exceeded; github-quota-deferred\n" + error
+            got = classes.classify(pr("Exact-head Coverage", merge="BLOCKED"), {"Exact-head Coverage": log})
+            self.assertEqual((got["cls"], got["action"]), ("route-budget-ratchet", "sync-main"), error)
+        # Measurement overruns and passing test titles are not stale-policy proof.
+        for text in ["routes./app/chat grew 822 -> 1385", "✔ rejects routes./app/chat grew 822 -> 1385",
+                     "::error::/app/chat: 1400 KB exceeds 822 KB budget", "::error::routes./app/chat grew invalid"]:
+            got = classes.classify(pr("Exact-head Coverage"), {"Exact-head Coverage": text})
+            self.assertEqual((got["cls"], got["action"]), ("other", "agent"), text)
 
     def test_unwired_files_are_extracted_and_aggregates_ignored(self):
         got = classes.classify(pr("Source Validation"), {"Source Validation":

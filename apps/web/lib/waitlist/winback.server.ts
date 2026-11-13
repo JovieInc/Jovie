@@ -1,9 +1,10 @@
 import 'server-only';
 
 /**
- * DB half of the win-back matcher (founder dispatch 2026-11-09).
- * NOTHING SENDS from this module. Held-draft insertion belongs with the
- * send gate, which needs the `held_for_approval` ingestion status.
+ * DB half of the win-back matcher and held-draft insertion (founder dispatch
+ * 2026-11-09). Nothing here sends an email. Drafts land in `ingestion_jobs`
+ * with status `held_for_approval`. The send-time approval gate lives in
+ * `processWaitlistWinbackEmailJob`.
  *
  * Two seams, both fail-closed:
  * - `capability_wants` table: added by a parallel PR. Until it exists the
@@ -18,9 +19,18 @@ import 'server-only';
 import { sql as drizzleSql, eq } from 'drizzle-orm';
 import { unknownAcquisitionEligibility } from '@/lib/acquisition/eligibility';
 import type { DbOrTransaction } from '@/lib/db';
+import { ingestionJobs } from '@/lib/db/schema/ingestion';
+import { ovieOperatingKv } from '@/lib/db/schema/ovie';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { waitlistEntries } from '@/lib/db/schema/waitlist';
-import { WINBACK_MATCHABLE_STATUSES } from '@/lib/waitlist/winback';
+import { encryptPII } from '@/lib/utils/pii-encryption';
+import { generateWaitlistInviteTokenPair } from '@/lib/waitlist/tokens';
+import {
+  WINBACK_EMAIL_TEMPLATE_VERSION,
+  WINBACK_MATCHABLE_STATUSES,
+  winbackResumeKvKey,
+} from '@/lib/waitlist/winback';
+import { trackWinbackEvent } from '@/lib/waitlist/winback-analytics';
 
 export type WinbackQualificationVerdict = 'ELIGIBLE' | 'BLOCKED' | 'UNKNOWN';
 
@@ -168,4 +178,84 @@ export async function matchWinbackCandidates(
   }
 
   return { capabilityKey, seam: 'ready', seamDetail: null, candidates };
+}
+
+export interface WinbackDraftInput {
+  readonly entryId: string;
+  readonly capabilityKey: string;
+  readonly capabilityLabel: string;
+  readonly wants: readonly string[];
+  readonly handle: string;
+  readonly batchId: string;
+  readonly origin: string;
+  /** The person's waitlist cohort (queued/waitlisted/disqualified). */
+  readonly cohort: string;
+}
+
+/**
+ * Create a held draft (status `held_for_approval`) for one candidate. Never
+ * called automatically: the dry run reports candidates, an operator batches
+ * them, and only an approved batch can promote drafts to sendable.
+ */
+export async function enqueueWinbackDraftEmail(
+  tx: DbOrTransaction,
+  input: WinbackDraftInput,
+  options: { now?: Date } = {}
+): Promise<string> {
+  const now = options.now ?? new Date();
+  const tokenPair = generateWaitlistInviteTokenPair(now);
+  const encryptedToken = encryptPII(tokenPair.token);
+  if (!encryptedToken) {
+    throw new Error('Failed to encrypt winback resume token');
+  }
+
+  await tx
+    .insert(ovieOperatingKv)
+    .values({
+      key: winbackResumeKvKey(tokenPair.tokenHash),
+      value: {
+        entryId: input.entryId,
+        batchId: input.batchId,
+        capabilityKey: input.capabilityKey,
+      },
+      updatedAt: now,
+    })
+    .onConflictDoNothing();
+
+  const [job] = await tx
+    .insert(ingestionJobs)
+    .values({
+      jobType: 'send_waitlist_winback_email',
+      payload: {
+        entryId: input.entryId,
+        type: 'winback_capability_shipped',
+        capabilityKey: input.capabilityKey,
+        capabilityLabel: input.capabilityLabel,
+        wants: [...input.wants],
+        handle: input.handle,
+        batchId: input.batchId,
+        cohort: input.cohort,
+        origin: input.origin,
+        templateVersion: WINBACK_EMAIL_TEMPLATE_VERSION,
+        encryptedResumeToken: encryptedToken,
+      },
+      status: 'held_for_approval',
+      runAt: now,
+      maxAttempts: 3,
+      dedupKey: `winback_email:${input.entryId}:${input.capabilityKey}`,
+      createdAt: now,
+      updatedAt: now,
+    })
+    .onConflictDoNothing()
+    .returning({ id: ingestionJobs.id });
+
+  await trackWinbackEvent('winback_drafted', {
+    entry_id: input.entryId,
+    capability_key: input.capabilityKey,
+    batch_id: input.batchId,
+    template_version: WINBACK_EMAIL_TEMPLATE_VERSION,
+    winback_cohort: input.cohort,
+  });
+
+  return job?.id ?? `winback_email:${input.entryId}:${input.capabilityKey}`;
 }

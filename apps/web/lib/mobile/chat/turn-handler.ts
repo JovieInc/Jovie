@@ -25,6 +25,7 @@ import {
   reserveChatTurn,
   TURN_IN_PROGRESS_ERROR_CODE,
 } from '@/lib/chat/turns';
+import { wrapToolSetFailSoft } from '@/lib/chat/wrap-tool-execute';
 import {
   classifyIntent,
   isDeterministicIntent,
@@ -39,6 +40,7 @@ import {
   type ParsedMobileChatTurnRequest,
 } from '@/lib/mobile/chat/contract';
 import { getMobileConversationDetail } from '@/lib/mobile/chat/conversations';
+import { summarizeMobileMerchTurn as summarizeMerchTurn } from '@/lib/mobile/chat/merch-tool-events';
 import {
   embedMobileMerchArtifactsInContent,
   isMobileMerchArtifactEvent,
@@ -383,7 +385,7 @@ export async function handleMobileChatTurn(
     accountContext,
     forceLightModel: false,
     lastUserText: parsed.text,
-    tools: mobileMerchTools,
+    tools: wrapToolSetFailSoft(mobileMerchTools),
     signal,
     requestId,
     onStreamError: async error => {
@@ -428,6 +430,7 @@ export async function handleMobileChatTurn(
         const trimmed = sanitizeAssistantResponse(fullText.trim()).text;
         const toolResults = await streamResult.toolResults;
         const merchToolEvents = mobileMerchToolEventsFromResults(toolResults);
+        const merchTurn = summarizeMerchTurn(merchToolEvents, trimmed.length);
         const contentWithArtifacts = embedMobileMerchArtifactsInContent(
           trimmed,
           merchToolEvents
@@ -435,7 +438,8 @@ export async function handleMobileChatTurn(
         const finalText =
           contentWithArtifacts.length > 0
             ? contentWithArtifacts
-            : 'I could not produce a text reply for that request. Open the web chat to continue with richer actions.';
+            : (merchTurn.failureMessage ??
+              'I could not produce a text reply for that request. Open the web chat to continue with richer actions.');
 
         if (trimmed.length === 0 && merchToolEvents.length === 0) {
           enqueue({
@@ -450,16 +454,10 @@ export async function handleMobileChatTurn(
         const receipt = await persistTerminalAssistantMessageWithReceipt({
           conversationId: reservation.conversationId,
           turnId: reservation.turn.id,
-          status:
-            trimmed.length > 0 || merchToolEvents.length > 0
-              ? 'completed'
-              : 'failed_tool_unavailable',
+          status: merchTurn.completed ? 'completed' : 'failed_tool_unavailable',
           content: finalText,
           toolCalls: merchToolEvents.length > 0 ? merchToolEvents : null,
-          errorCode:
-            trimmed.length > 0 || merchToolEvents.length > 0
-              ? null
-              : 'WEB_HANDOFF_REQUIRED',
+          errorCode: merchTurn.completed ? null : 'WEB_HANDOFF_REQUIRED',
         });
 
         // Fail-soft persistence or an earlier terminal winner must not advertise
