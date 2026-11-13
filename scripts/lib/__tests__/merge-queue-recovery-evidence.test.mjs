@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest';
+import { alertStateFor } from '../../automation-liveness.mjs';
 import { livenessDecisions } from '../automation-registry.mjs';
 import {
   dispatchQueueRecovery,
   planQueueRecovery,
   prepareQueueRecovery,
+  QUEUE_FINGERPRINT,
   QUEUE_ID,
   renderQueueRecovery,
 } from '../merge-queue-recovery.mjs';
@@ -82,6 +84,62 @@ const mergedSnapshot = () =>
   });
 
 describe('exact recovery evidence and adversarial lifecycle', () => {
+  it('preserves recovery ownership and retry history through quota deferral', () => {
+    const recovery = plan().state;
+    const previous = { status: 'red', recovery };
+    expect(
+      alertStateFor('deferred', previous, { ...recovery, attempts: 99 })
+    ).toBe(previous);
+    for (const status of ['stale', 'unknown', 'fresh'])
+      expect(alertStateFor(status, previous, recovery)).toEqual({
+        status: status === 'fresh' ? 'green' : 'red',
+        recovery,
+      });
+    expect(
+      livenessDecisions(
+        {
+          results: [
+            { id: QUEUE_ID, critical: true, status: 'deferred', recovery },
+          ],
+        },
+        { [QUEUE_FINGERPRINT]: previous }
+      )
+    ).toEqual([]);
+  });
+
+  it('does not turn deferred unrelated monitors red after verified queue recovery', async () => {
+    const prior = plan().state;
+    const s = mergedSnapshot();
+    s.closure = { proven: true, repairSha: sha('d'), mainSha: sha('e') };
+    const report = {
+      observedAt: at(5),
+      status: 'critical',
+      results: [
+        { id: QUEUE_ID, critical: true, status: 'stale', budgetMinutes: 45 },
+        { id: 'lanes-clock:spend-guard', critical: true, status: 'deferred' },
+      ],
+    };
+    const result = await prepareQueueRecovery({
+      report,
+      observations: new Map([[QUEUE_ID, { recoverySnapshot: s }]]),
+      previous: {},
+      linear: null,
+      env: {},
+      fetchImpl: async () => {
+        throw new Error('network forbidden');
+      },
+      readIncident: async () => ({
+        known: true,
+        issue: { ...issue, description: renderQueueRecovery(prior) },
+      }),
+      readRuntime: async () => runtime(),
+      readClosure: async () => {},
+    });
+    expect(result.close).toBe(true);
+    expect(report.status).toBe('healthy');
+    expect(livenessDecisions(report).map(d => d.action)).toEqual(['green']);
+  });
+
   it('validates the same CI attempts through the existing queue-proof policy and main aggregate', async () => {
     const s = mergedSnapshot();
     const { client, paths } = proofClient();

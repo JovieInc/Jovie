@@ -6,10 +6,6 @@ export const PUBLIC_ACCESS_FLAG_CAPABILITIES = {
     nonMarketing: 'OAuth dynamic client registration kill switch',
   },
   SPOTIFY_OAUTH: { nonMarketing: 'account connection plumbing' },
-  HOMEPAGE_START_CTA: {
-    nonMarketing:
-      'homepage hero action enters /start; default off until the copy is approved',
-  },
   PUBLIC_SIGNUP_CLOSED: {
     nonMarketing: 'closed signup kill switch; default off',
   },

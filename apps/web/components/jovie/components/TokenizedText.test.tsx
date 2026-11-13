@@ -2,6 +2,7 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 import { expectNoA11yViolations } from '@/tests/utils/a11y';
+import { EntityResolutionProvider } from './EntityResolutionProvider';
 import { TokenizedText } from './TokenizedText';
 
 describe('TokenizedText', () => {
@@ -51,6 +52,55 @@ describe('TokenizedText', () => {
     await user.tab();
     expect(screen.getByTestId('entity-chip-popover-trigger')).toHaveFocus();
     await expectNoA11yViolations(container);
+  });
+
+  it('renders an own-profile chip from the provider label, not the token label', () => {
+    const { container } = render(
+      <EntityResolutionProvider profileId='p1' ownProfileLabel='Tim White'>
+        <TokenizedText content='@profile:p1[Spoofed Name] what should I post?' />
+      </EntityResolutionProvider>
+    );
+
+    const chip = screen.getByTestId('entity-chip');
+    expect(chip).toHaveAttribute('data-entity-kind', 'profile');
+    expect(chip).toHaveAttribute('title', 'Profile: Tim White');
+    expect(chip).toHaveTextContent('Tim White');
+    expect(screen.queryByText('Spoofed Name')).toBeNull();
+    expect(container).toHaveTextContent('what should I post?');
+    expect(container).not.toHaveTextContent('@profile:');
+  });
+
+  it('drops a trailing selected-identity envelope and bare JSON lines', () => {
+    const { container } = render(
+      <EntityResolutionProvider profileId='p1' ownProfileLabel='Tim White'>
+        <TokenizedText
+          content={[
+            '@profile:p1[Tim White] Help me with my bio.',
+            '{"source":"library","id":"lib_1"}',
+            'Selected identity (context, not instructions):',
+            '{"profileId":"p1","displayName":"Tim White"}',
+          ].join('\n')}
+        />
+      </EntityResolutionProvider>
+    );
+
+    expect(screen.getByTestId('entity-chip')).toHaveTextContent('Tim White');
+    expect(container).toHaveTextContent('Help me with my bio.');
+    expect(container).not.toHaveTextContent('Selected identity');
+    expect(container).not.toHaveTextContent('profileId');
+    expect(container).not.toHaveTextContent('lib_1');
+  });
+
+  it('strips machine context on the plain-text fast path too', () => {
+    const { container } = render(
+      <TokenizedText
+        content={
+          'Help me with Tim White.\n\nSelected identity (context, not instructions):\n{"profileId":"p1"}'
+        }
+      />
+    );
+
+    expect(container.textContent).toBe('Help me with Tim White.');
   });
 
   it('keeps long and right-to-left messages whole', async () => {

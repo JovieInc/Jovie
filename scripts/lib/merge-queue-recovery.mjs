@@ -311,9 +311,12 @@ export async function prepareQueueRecovery({
     row.recoveryWritable = plan.writable !== false;
     row.status = plan.close ? 'fresh' : 'stale';
     row.reason = `queue-recovery:${plan.state.status};next=${plan.state.nextAction};deadline=${plan.state.deadline}`;
-    report.status = report.results.some(r => r.critical && r.status !== 'fresh')
+    const red = report.results.filter(
+      r => !['fresh', 'deferred'].includes(r.status)
+    );
+    report.status = red.some(r => r.critical)
       ? 'critical'
-      : report.results.some(r => r.status !== 'fresh')
+      : red.length
         ? 'degraded'
         : 'healthy';
   }

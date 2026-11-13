@@ -487,7 +487,7 @@ export function SpotifyConnectDialog({
 
   return (
     <Dialog open={open} onClose={() => onOpenChange(false)} size='lg'>
-      <DialogTitle className='text-lg font-semibold text-primary-token'>
+      <DialogTitle className='text-base font-semibold text-primary-token'>
         Connect Spotify
       </DialogTitle>
       <DialogDescription className='text-app text-secondary-token'>

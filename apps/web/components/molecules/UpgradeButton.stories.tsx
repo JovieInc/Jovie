@@ -2,6 +2,7 @@ import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { type ReactNode, useLayoutEffect } from 'react';
 import { expect, userEvent, within } from 'storybook/test';
+import { ARTIST_VISIBILITY_OFFER, toCents } from '@/lib/config/plan-prices';
 import { AppFlagProvider } from '@/lib/flags/client';
 import { APP_FLAG_DEFAULTS } from '@/lib/flags/contracts';
 import { UpgradeButton } from './UpgradeButton';
@@ -58,6 +59,19 @@ function LocalCheckoutApi({
   useLayoutEffect(() => {
     const originalFetch = globalThis.fetch;
     globalThis.fetch = async input => {
+      if (String(input).includes('/api/stripe/pricing-options')) {
+        return Response.json({
+          options: [
+            {
+              priceId: STORY_PRICE_ID,
+              amount: toCents(ARTIST_VISIBILITY_OFFER.pro.monthlyUsd),
+              currency: ARTIST_VISIBILITY_OFFER.pro.currency,
+              interval: 'month',
+              description: ARTIST_VISIBILITY_OFFER.pro.displayName,
+            },
+          ],
+        });
+      }
       if (!String(input).includes('/api/stripe/checkout')) {
         throw new Error('Unexpected network request in UpgradeButton story.');
       }
@@ -89,7 +103,35 @@ function LocalCheckoutApi({
 
 const STORY_PRICE_ID = 'price_story_artist_presence';
 
-export const Default: Story = {};
+export const Default: Story = {
+  decorators: [
+    Story => (
+      <LocalCheckoutApi reply='server-error'>
+        <Story />
+      </LocalCheckoutApi>
+    ),
+  ],
+};
+
+export const DefaultPriceCheckout: Story = {
+  decorators: [
+    Story => (
+      <LocalCheckoutApi reply='pending'>
+        <Story />
+      </LocalCheckoutApi>
+    ),
+  ],
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const button = await canvas.findByRole('button', {
+      name: 'Upgrade to Artist Presence',
+    });
+    await userEvent.click(button);
+    await expect(
+      await canvas.findByRole('button', { name: 'Loading...' })
+    ).toBeDisabled();
+  },
+};
 
 export const Secondary: Story = {
   args: {

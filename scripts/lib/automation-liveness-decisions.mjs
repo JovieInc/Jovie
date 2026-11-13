@@ -17,7 +17,7 @@ export function livenessFingerprint(id) {
 export function livenessDecisions(report, previous = {}) {
   const decisions = [];
   for (const row of report.results) {
-    if (!row.critical) continue;
+    if (!row.critical || row.status === 'deferred') continue;
     const fingerprint = livenessFingerprint(row.id);
     if (row.recoveryWritable === false) {
       decisions.push({

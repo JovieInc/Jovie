@@ -101,7 +101,8 @@ planning authority; scoped rules, task packets and review project it.
    Electron), SimpleWebAuthn/platform contracts and supported endpoints/hooks.
 7. Routine adoption within existing security/license/budget authority proceeds
    autonomously. Paid commitments, data disclosure, credentials and external
-   authority retain applicable authorization. Missing network/package access
+   authority retain applicable authorization; routine PR and Linear text is not
+   data disclosure ([routine writes](FLEET.md#routine-writes)). Missing network/package access
    routes to bounded research or trusted dependency preparation; it never proves
    no SDK exists or authorizes a rewrite. Keep unrelated delivery moving.
 8. Verify the same behavior/failure/security contract for incumbent and candidate.

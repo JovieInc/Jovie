@@ -461,7 +461,7 @@ export function evaluateEntry(entry, observation, nowMs) {
   if (!observation || observation.ok !== true) {
     return {
       ...base,
-      status: 'unknown',
+      status: observation?.deferred ? 'deferred' : 'unknown',
       reason: observation?.reason ?? 'receipt-unreadable',
     };
   }
@@ -494,7 +494,7 @@ export function evaluateLiveness(registry, observations, nowMs) {
     if (!HOSTED_RECEIPT_KINDS.includes(entry.receipt?.kind)) continue;
     results.push(evaluateEntry(entry, observations.get(entry.id), nowMs));
   }
-  const red = results.filter(row => row.status !== 'fresh');
+  const red = results.filter(r => !['fresh', 'deferred'].includes(r.status));
   return {
     schema: LIVENESS_SCHEMA,
     observedAt: new Date(nowMs).toISOString(),

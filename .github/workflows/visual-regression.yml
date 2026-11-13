@@ -204,6 +204,29 @@ jobs:
             node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs" --run -- pnpm exec playwright test tests/e2e/admin-visual-regression.spec.ts \
             --config=playwright.config.ts --project=chromium --reporter=line $UPDATE_FLAG
 
+        env:
+          BASE_URL: http://localhost:3100
+          SMOKE_ONLY: '1'
+          CI: true
+          DATABASE_URL: ${{ env.DATABASE_URL }}
+          E2E_USE_TEST_AUTH_BYPASS: '1'
+          E2E_TEST_AUTH_PERSONA: admin
+          URL_ENCRYPTION_KEY: visual-regression-ci-url-encryption-key
+          AI_GATEWAY_API_KEY: visual-regression-ci
+
+      - name: Run Storybook visual specs
+        id: storybook
+        # Storybook iframe screenshots need no app server or database, so they
+        # run in their own step: a red app spec above must not stop component
+        # baselines from refreshing. Functional assertions still fail this step.
+        if: ${{ !cancelled() && steps.visual.outcome != 'skipped' }}
+        run: |
+          cd apps/web
+          UPDATE_FLAG=""
+          if [ "$REFRESH_MODE" = "true" ]; then
+            UPDATE_FLAG="--update-snapshots"
+          fi
+
           # Surface elevation matrix (JOV-2156) — Storybook iframe screenshots,
           # independent of the app server. Banned-combination baselines are the
           # intentional "should look BROKEN" sanity check; functional
@@ -232,17 +255,10 @@ jobs:
 
           kill "$STORYBOOK_PID" 2>/dev/null || true
         env:
-          BASE_URL: http://localhost:3100
-          SMOKE_ONLY: '1'
           CI: true
-          DATABASE_URL: ${{ env.DATABASE_URL }}
-          E2E_USE_TEST_AUTH_BYPASS: '1'
-          E2E_TEST_AUTH_PERSONA: admin
-          URL_ENCRYPTION_KEY: visual-regression-ci-url-encryption-key
-          AI_GATEWAY_API_KEY: visual-regression-ci
 
       - name: Upload Playwright results on failure
-        if: ${{ always() && steps.visual.outcome == 'failure' && hashFiles('apps/web/test-results/**') != '' }}
+        if: ${{ always() && (steps.visual.outcome == 'failure' || steps.storybook.outcome == 'failure') && hashFiles('apps/web/test-results/**') != '' }}
         uses: ./.github/actions/upload-safe-playwright-artifact
         with:
           name: visual-regression-report-${{ github.run_id }}-${{ github.run_attempt }}
@@ -255,8 +271,26 @@ jobs:
         id: diff
         # Only main may publish baselines: a dispatch on any other ref would
         # commit that ref's unreviewed source into the bot PR with auto-merge.
-        if: env.REFRESH_MODE == 'true' && steps.visual.outcome == 'success' && github.ref == 'refs/heads/main'
+        if: ${{ !cancelled() && env.REFRESH_MODE == 'true' && (steps.visual.outcome == 'success' || steps.storybook.outcome == 'success') && github.ref == 'refs/heads/main' }}
+        env:
+          APP_OUTCOME: ${{ steps.visual.outcome }}
+          STORYBOOK_OUTCOME: ${{ steps.storybook.outcome }}
         run: |
+          # Publish only the suites that passed. A red app suite still lets the
+          # Storybook baselines through, and the reverse, so one broken spec
+          # never blocks every other baseline from refreshing.
+          if [ "$APP_OUTCOME" != "success" ]; then
+            git ls-files -z -m -- "$SNAPSHOT_DIR" | grep -zv '/storybook-' \
+              | xargs -0 -r git checkout -q -- || true
+            git ls-files -z -o --exclude-standard -- "$SNAPSHOT_DIR" \
+              | grep -zv '/storybook-' | xargs -0 -r rm -f -- || true
+          fi
+          if [ "$STORYBOOK_OUTCOME" != "success" ]; then
+            git ls-files -z -m -- "$SNAPSHOT_DIR" | grep -z '/storybook-' \
+              | xargs -0 -r git checkout -q -- || true
+            git ls-files -z -o --exclude-standard -- "$SNAPSHOT_DIR" \
+              | grep -z '/storybook-' | xargs -0 -r rm -f -- || true
+          fi
           if [ -z "$(git status --porcelain "$SNAPSHOT_DIR")" ]; then
             echo "changed=false" >> "$GITHUB_OUTPUT"
             echo "No baseline changes detected."
@@ -268,14 +302,14 @@ jobs:
 
       - name: Generate Jovie Bot token (refresh only)
         id: app-token
-        if: env.REFRESH_MODE == 'true' && steps.diff.outputs.changed == 'true'
+        if: ${{ !cancelled() && env.REFRESH_MODE == 'true' && steps.diff.outputs.changed == 'true' }}
         uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
         with:
           app-id: ${{ vars.JOVIE_BOT_APP_ID }}
           private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}
 
       - name: Create or update baseline PR (refresh only)
-        if: env.REFRESH_MODE == 'true' && steps.diff.outputs.changed == 'true'
+        if: ${{ !cancelled() && env.REFRESH_MODE == 'true' && steps.diff.outputs.changed == 'true' }}
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
         run: |

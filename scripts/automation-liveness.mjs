@@ -41,6 +41,7 @@ import {
 } from './lib/automation-registry.mjs';
 import {
   githubHeaders,
+  githubReadFailure,
   readGithubJson,
   readJson,
 } from './lib/github-json-read.mjs';
@@ -75,8 +76,8 @@ export async function observeWorkflowFailureStreak(
     ? `&branch=${encodeURIComponent(receipt.branch)}`
     : '';
   const url = `${apiUrl}/repos/${receipt.repo}/actions/workflows/${encodeURIComponent(receipt.workflow)}/runs?status=completed&per_page=50${branch}`;
-  const read = await readGithubJson(url, { fetchImpl, token });
-  if (!read.ok) return { ok: false, reason: `github-${read.reason}` };
+  const read = await readGithubJson(url, { fetchImpl, token, apiUrl });
+  if (!read.ok) return githubReadFailure(read);
   if (!Array.isArray(read.body?.workflow_runs))
     return { ok: false, reason: 'github-runs-unreadable' };
   const conclusive = read.body.workflow_runs
@@ -133,8 +134,8 @@ export async function observeGithubWorkflow(
         : [query];
     });
     for (const url of urls) {
-      const read = await readGithubJson(url, { fetchImpl, token });
-      if (!read.ok) return { ok: false, reason: `github-${read.reason}` };
+      const read = await readGithubJson(url, { fetchImpl, token, apiUrl });
+      if (!read.ok) return githubReadFailure(read);
       if (!Array.isArray(read.body?.workflow_runs))
         return { ok: false, reason: 'github-runs-unreadable' };
       runs.push(...read.body.workflow_runs);
@@ -885,6 +886,18 @@ function summary(report) {
   ].join('\n');
 }
 
+/**
+ * Persisted alert state for one critical row: fresh resolves green, a decided
+ * red stays red, and a deferred row (unreadable receipts while the shared
+ * budget is spent, JOV-10153) keeps the prior state so it files and resolves
+ * nothing until a run can actually read the receipts.
+ */
+export function alertStateFor(status, previousState, recovery = null) {
+  if (status === 'deferred') return previousState ?? 'unknown';
+  const next = status === 'fresh' ? 'green' : 'red';
+  return recovery ? { status: next, recovery } : next;
+}
+
 export async function main({
   argv = process.argv.slice(2),
   env = process.env,
@@ -971,15 +984,13 @@ export async function main({
   if (args.file && env.REMEDIATION_INTAKE_DISABLED !== '1') {
     const state = { ...previous };
     for (const row of report.results) {
-      if (row.critical)
-        state[livenessFingerprint(row.id)] = row.recovery
-          ? {
-              status: row.status === 'fresh' ? 'green' : 'red',
-              recovery: row.recovery,
-            }
-          : row.status === 'fresh'
-            ? 'green'
-            : 'red';
+      if (!row.critical) continue;
+      const fingerprint = livenessFingerprint(row.id);
+      state[fingerprint] = alertStateFor(
+        row.status,
+        previous[fingerprint],
+        row.recovery
+      );
     }
     const { applyRemediationDecisionWithRetry } = await import(
       './lib/remediation-signal.mjs'
@@ -1016,7 +1027,7 @@ export async function main({
       writeFileSync(args.previous, `${JSON.stringify(state, null, 2)}\n`);
   }
   process.stdout.write(
-    `${JSON.stringify({ status: report.status, red: report.results.filter(row => row.status !== 'fresh').map(row => row.id) })}\n`
+    `${JSON.stringify({ status: report.status, red: report.results.filter(row => !['fresh', 'deferred'].includes(row.status)).map(row => row.id) })}\n`
   );
   return full;
 }

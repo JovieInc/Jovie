@@ -43,6 +43,8 @@ export const DESIGN_EXCEPTION_REGISTRIES = Object.freeze(
 {"id":"native-spacing-ios","path":"scripts/invariants/native-spacing-scale.baseline.json","kind":"count","pointer":["surfaces","ios"],"counts":["conservative"]},
 {"id":"native-spacing-desktop","path":"scripts/invariants/native-spacing-scale.baseline.json","kind":"count","pointer":["surfaces","desktop"],"counts":["conservative"]},
 {"id":"arbitrary-values","path":"apps/web/tests/unit/design-system/arbitrary-values.baseline.json","kind":"count","counts":["count"]},
+{"id":"source-identity","path":"apps/web/tests/unit/design-system/source-identity.baseline.json","kind":"set","pointer":["identities"],"growthCode":"set-growth"},
+{"id":"source-identity-allowlist","path":"apps/web/tests/unit/design-system/source-identity.allowlist.json","kind":"set","pointer":["identities"],"identityKeys":["file","rule","value"],"growthCode":"set-growth"},
 {"id":"linear-namespace","path":"apps/web/tests/unit/design-system/linear-namespace.baseline.json","kind":"count","counts":["count"]},
 {"id":"raw-button","path":"apps/web/tests/unit/design-system/raw-button.baseline.json","kind":"count","counts":["count"]},
 {"id":"server-imports","path":"apps/web/tests/unit/design-system/server-imports.baseline.json","kind":"count","counts":["count"]},
@@ -152,10 +154,13 @@ function compareSet(spec, candidateRecord, baseRecord) {
       fail(spec, ISSUE_CODES.INVALID_REGISTRY, 'set values must be arrays'),
     ];
   }
-  const baseItems = new Set(baseSet.map(item => String(item)));
-  const added = candidateSet
-    .map(item => String(item))
-    .filter(item => !baseItems.has(item));
+  // Object entries (the source-identity allowlist) compare by identityKeys.
+  const keyOf = item =>
+    isObject(item)
+      ? (spec.identityKeys ?? []).map(key => String(item[key] ?? '')).join('::')
+      : String(item);
+  const baseItems = new Set(baseSet.map(keyOf));
+  const added = candidateSet.map(keyOf).filter(item => !baseItems.has(item));
   if (added.length === 0) return [];
   return [
     fail(
