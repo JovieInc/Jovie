@@ -197,7 +197,6 @@ export const currencyCodeEnum = pgEnum('currency_code', [
   'DKK',
 ]);
 
-// Ingestion Enums
 export const ingestionStatusEnum = pgEnum('ingestion_status', [
   'idle',
   'pending',

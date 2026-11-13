@@ -104,7 +104,7 @@ function isReservedRecipientSkip(params: {
 export async function processWaitlistWinbackEmailJob(
   tx: DbOrTransaction,
   rawPayload: unknown,
-  options: { jobId?: string } = {}
+  options: { jobId?: string; now?: Date } = {}
 ): Promise<WaitlistWinbackEmailJobResult> {
   const parsed = winbackCapabilityShippedPayloadSchema.safeParse(rawPayload);
   if (!parsed.success) {
@@ -115,7 +115,7 @@ export async function processWaitlistWinbackEmailJob(
     );
   }
   const payload = parsed.data;
-  const now = new Date();
+  const now = options.now ?? new Date();
 
   // APPROVAL GATE — fail-closed. Without a valid approval record (approved
   // template version + admin-approved batch containing this entry) the send

@@ -509,9 +509,8 @@ export const selectSuggestedActionSchema = createSelectSchema(suggestedActions);
 
 /**
  * Durable workflow execution state, intentionally separate from `ingestionJobs`.
- * `ingestionJobStatusEnum` covers execution plus `held_for_approval` (win-back
- * drafts stay out of the pending scheduler until promotion); workflows need
- * `waiting_for_approval` to pause until a `suggested_actions` row
+ * `ingestionJobStatusEnum` includes `held_for_approval` for win-back drafts;
+ * workflows need `waiting_for_approval` to pause until a `suggested_actions` row
  * transitions to `approved`.
  *
  * `stepOutputs` is a JSON map of step name → output, enabling resume-from-step

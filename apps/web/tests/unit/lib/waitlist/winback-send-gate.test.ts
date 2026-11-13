@@ -19,6 +19,7 @@ vi.mock('@/lib/waitlist/winback-approval.server', () => ({
 }));
 
 const ENTRY_ID = '11111111-1111-4111-8111-111111111111';
+const FROZEN_NOW = new Date('2026-11-13T12:00:00.000Z');
 
 const APPROVAL_RECORD = {
   contract: 'jovie.winback-approval/v1',
@@ -117,10 +118,14 @@ describe('processWaitlistWinbackEmailJob winback_capability_shipped', () => {
 
   it('NEVER sends within the 14-day unanswered budget (JOV-6655)', async () => {
     mockGetApproval.mockResolvedValue(APPROVAL_RECORD);
-    mockGetLastUnanswered.mockResolvedValue(new Date());
+    mockGetLastUnanswered.mockResolvedValue(
+      new Date(FROZEN_NOW.getTime() - 24 * 60 * 60 * 1000)
+    );
     const { tx } = createEntryTxMock();
 
-    const result = await processWaitlistWinbackEmailJob(tx, winbackPayload());
+    const result = await processWaitlistWinbackEmailJob(tx, winbackPayload(), {
+      now: FROZEN_NOW,
+    });
 
     expect(result.status).toBe('skipped');
     expect(result.detail).toMatch(/JOV-6655/);
