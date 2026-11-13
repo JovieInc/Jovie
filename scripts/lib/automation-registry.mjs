@@ -451,6 +451,8 @@ export function evaluateEntry(entry, observation, nowMs) {
     critical: entry.critical === true,
     escalationOwner: entry.heartbeat?.escalationOwner ?? entry.owner,
     budgetMinutes: budget,
+    recovery: null,
+    recoveryWritable: true,
     lastProofAt: null,
     ageMinutes: null,
     reason: null,
@@ -516,43 +518,10 @@ export function evaluateLiveness(registry, observations, nowMs) {
   };
 }
 
-export function livenessFingerprint(id) {
-  return `automation-liveness-${String(id)
-    .replace(/[^a-z0-9]+/gi, '-')
-    .replace(/^-|-$/g, '')
-    .toLowerCase()}`;
-}
-
-/**
- * Alert decisions for the existing remediation-signal intake: one fingerprint
- * per critical loop, red while silent, green once its heartbeat returns.
- * `previous` maps fingerprint -> 'red'|'green' from the last run; a steady
- * green makes no Linear call.
- */
-export function livenessDecisions(report, previous = {}) {
-  const decisions = [];
-  for (const row of report.results) {
-    if (!row.critical) continue;
-    const fingerprint = livenessFingerprint(row.id);
-    if (row.status === 'fresh') {
-      if (previous[fingerprint] === 'red')
-        decisions.push({ action: 'green', fingerprint, id: row.id });
-      continue;
-    }
-    decisions.push({
-      action: 'red',
-      fingerprint,
-      id: row.id,
-      detail: [
-        `Automation \`${row.id}\` is ${row.status}: ${row.reason}.`,
-        `Last heartbeat: ${row.lastProofAt ?? 'none'}; max silence ${row.budgetMinutes}m.`,
-        `Escalation owner: ${row.escalationOwner}. Receipt: ${row.url ?? 'unknown'}.`,
-        `Registry: ${REGISTRY_PATH}.`,
-      ].join('\n'),
-    });
-  }
-  return decisions;
-}
+export {
+  livenessDecisions,
+  livenessFingerprint,
+} from './automation-liveness-decisions.mjs';
 
 // --- Run receipts (stage events) ------------------------------------------------
 

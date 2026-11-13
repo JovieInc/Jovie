@@ -8,21 +8,16 @@
  * LANE_GROUPS, and publishes an isolated lane artifact; the aggregate
  * `ci-fast` job also requires the dedicated profile browser admission job.
  *
- * Fail-fast: the first failed lane skips the expensive structural lane so
- * biome/typecheck red does not pay for structural Playwright. Cheap lanes
- * always run so one CI cycle reports every cheap failure instead of hiding
- * later lanes behind the first red one. Skipped lanes still emit a receipt.
+ * Fail-fast skips expensive structural work after cheap failures; cheap lanes
+ * still run and skipped lanes emit receipts.
  * CI_FAST_FAIL_FAST=false retains structural after failures; no selector runs all lanes.
- *
  * Usage:
  *   node scripts/ci-fast-lanes.mjs [with CI_FAST_LANE_GROUP=<group>]
- *
  * Env:
  *   GITHUB_EVENT_NAME, GITHUB_BASE_REF, GITHUB_REF, GITHUB_STEP_SUMMARY
  *   CI_FAST_LANE_GROUP — hosted group selector; omitted locally runs all lanes
  *   CI_FAST_LANES_OUT  — optional path for JSON lane results
  *   TURBO_SCM_BASE     — for typecheck --affected
- *   CI_FAST_SKIP_STRUCTURAL — "true" to skip the remaining group's structural lane
  *   CI_FAST_ONLY_STRUCTURAL — "true" to run only the structural lane
  *   CI_FAST_FAIL_FAST — "false" to run every selected lane even after a failure
  *   CI_FAST_STRUCTURAL_CONCURRENCY — structural commands run at once (default 3)
@@ -1125,6 +1120,8 @@ export const SCRIPT_CONTRACT_NODE_COMMAND = `${PR_OPEN_COVERAGE_COMMAND} && ${DE
 export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/merge-group-failure-hold.test.mjs',
   'scripts/lib/__tests__/mesh-host-ack.test.mjs',
+  'scripts/lib/__tests__/merge-queue-recovery.test.mjs',
+  'scripts/lib/__tests__/merge-queue-recovery-evidence.test.mjs',
   'scripts/lib/__tests__/merge-group-sibling-burn-contract.test.mjs',
   'scripts/lib/__tests__/gh-api-hold-retry.test.mjs',
   'scripts/lib/__tests__/prod-cert.test.mjs',

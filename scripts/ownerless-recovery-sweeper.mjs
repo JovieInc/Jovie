@@ -6,6 +6,7 @@ import { activeLinearCooldown } from './backlog-orchestrator/linear-client.mjs';
 import { TODO_STATE_ID } from './backlog-orchestrator/stale-lease-guard.mjs';
 import {
   buildPrFleetClosureAudit,
+  FLEET_CLOSURE_LEASE_STALE_MS,
   findOfficialSymphonyLease,
   hasFleetClosureRemediationLease,
   isRecoveryHoldLabel,
@@ -87,9 +88,7 @@ export async function recoveryIssueSnapshot(
   return fetchSnapshot();
 }
 
-async function linearClient() {
-  return import('./backlog-orchestrator/linear-client.mjs');
-}
+const linearClient = () => import('./backlog-orchestrator/linear-client.mjs');
 
 /**
  * @typedef {{name: string, payload?: {action?: string, label?: {name?: string}, pull_request?: {draft: boolean, state: string, base: {ref: string}, number?: number, created_at?: string, labels?: Array<{name: string}>, assignees?: Array<unknown>}}}} RecoveryEvent
@@ -366,6 +365,11 @@ export async function processFleetClosureRemediationIntents(
             receipt.pr === intent.pr &&
             receipt.head === intent.head &&
             receipt.issue === intent.issue &&
+            !(
+              intent.recovery &&
+              Date.parse(deps.nowImpl()) - Date.parse(receipt.observedAt) >=
+                FLEET_CLOSURE_LEASE_STALE_MS
+            ) &&
             (receipt.reason !== intent.reason ||
               receipt.action !== 'reattach-remediation-lane' ||
               receipt.consumer !== 'symphony-linear-writer')
@@ -424,10 +428,7 @@ export async function processFleetClosureRemediationIntents(
     if (lease.ok) {
       record('reattached', { readback: lease });
     } else if (lease.reason === 'symphony-lease-readback-missing') {
-      // Linear Todo plus the exact, read-back remediation receipt is the
-      // durable queue owned by official Symphony. A healthy runtime may be at
-      // capacity, so absence from its active/retrying projection is pending
-      // work rather than a failed dispatch.
+      // A read-back Todo intent is queued work, not an accepted worker.
       record('queued', { readback: lease });
     } else {
       fail(lease.reason, { readback: lease });
@@ -502,9 +503,7 @@ export async function run({
     process.exitCode = 1;
     return;
   }
-  // Native merge intent belongs to the PR writer and GitHub. The ownerless
-  // sweep still audits closure/remediation evidence above, but has no source
-  // admission dispatch or draft-promotion side effect.
+  // GitHub owns admission; this sweep only audits and reattaches repair.
   console.log('Ownerless recovery sweep: source admission is GitHub native');
 }
 

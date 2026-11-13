@@ -502,10 +502,9 @@ export async function resolveRemediationSignal({
   runUrl,
   apiKey,
   fetchImpl,
+  detail = '',
 }) {
-  // A member going green does not prove the shared incident is over, unless it
-  // measures the condition itself (production current vs main). Other members
-  // leave the owner's issue open; the canonical owner's green resolves it.
+  // Only a canonical resolver's proof may close a shared incident.
   const group = incidentFor(fingerprint);
   if (group && group.canonical !== fingerprint) {
     if (!group.resolvers?.includes(fingerprint)) {
@@ -515,7 +514,7 @@ export async function resolveRemediationSignal({
       fingerprint: group.canonical,
       source: group.canonicalSource,
       commentMarker: GREEN_MARKER,
-      comment: `${GREEN_MARKER}\n\`${fingerprint}\` (${source}) verified the condition is gone.\nRun: ${runUrl || '(run url unavailable)'}`,
+      comment: `${GREEN_MARKER}\n\`${fingerprint}\` (${source}) verified the condition is gone.\nRun: ${runUrl || '(run url unavailable)'}${detail ? `\n${detail}` : ''}`,
       apiKey,
       fetchImpl,
     });
@@ -525,7 +524,7 @@ export async function resolveRemediationSignal({
     fingerprint,
     source,
     commentMarker: GREEN_MARKER,
-    comment: `${GREEN_MARKER}\n${sourceLine} is green.\nRun: ${runUrl || '(run url unavailable)'}`,
+    comment: `${GREEN_MARKER}\n${sourceLine} is green.\nRun: ${runUrl || '(run url unavailable)'}${detail ? `\n${detail}` : ''}`,
     apiKey,
     fetchImpl,
   });
@@ -571,6 +570,7 @@ export async function applyRemediationDecision(decision = {}, context = {}) {
       runUrl,
       apiKey,
       fetchImpl,
+      detail: decision.detail ?? '',
     });
     results.push({ ...resolved, fingerprint: key });
     if (!resolved.ok) return { ok: false, action: 'green', results };

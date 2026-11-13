@@ -45,6 +45,12 @@ import {
   readJson,
 } from './lib/github-json-read.mjs';
 import { projectJsonHeartbeat } from './lib/json-heartbeat-receipt.mjs';
+import { observeMergeQueueProgress as observeQueue } from './lib/merge-queue-progress.mjs';
+import {
+  dispatchQueueRecovery,
+  prepareQueueRecovery,
+  QUEUE_FINGERPRINT,
+} from './lib/merge-queue-recovery.mjs';
 import * as redGate from './lib/red-monitor-owner-gate.mjs';
 
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -52,6 +58,8 @@ const TIMEOUT_MS = 10_000;
 const SHA_RE = /^[0-9a-f]{40}$/;
 // Overridable per observer for tests; one literal for the external-api guard.
 const GITHUB_API = 'https://api.github.com';
+export const observeMergeQueueProgress = (receipt, context) =>
+  observeQueue(receipt, { apiUrl: GITHUB_API, ...context });
 
 /**
  * Controller failure streak: healthy unless the newest `receipt.streak` (default 3) conclusive runs (success or
@@ -534,84 +542,6 @@ export async function observeProductionFreshness(receipt, context) {
 }
 
 /**
- * Merge-queue progress (2026-10-20: the queue stalled 39 min with no alarm,
- * JOV-8706). An empty queue is a fresh proof; otherwise the proof is the later
- * of the last merged PR and the oldest entry's enqueue time, so a
- * non-empty queue that stops merging goes silent. Unreadable is silence.
- */
-export async function observeMergeQueueProgress(
-  receipt,
-  { fetchImpl, token, nowMs, apiUrl = GITHUB_API }
-) {
-  if (!token) return { ok: false, reason: 'merge-queue-token-missing' };
-  const [owner, name] = String(receipt.repo).split('/');
-  const branch = receipt.branch ?? 'main';
-  // Merge time comes from PR mergedAt: a queue-merged commit keeps the
-  // timestamp of its merge group, not of the merge itself.
-  const query = `query($owner:String!,$name:String!,$branch:String!){repository(owner:$owner,name:$name){mergeQueue(branch:$branch){entries(first:100){totalCount nodes{enqueuedAt}}} pullRequests(baseRefName:$branch,states:MERGED,first:10,orderBy:{field:UPDATED_AT,direction:DESC}){nodes{mergedAt}}}}`;
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
-  let body;
-  try {
-    const response = await fetchImpl(`${apiUrl}/graphql`, {
-      method: 'POST',
-      headers: {
-        ...githubHeaders(token),
-        Accept: 'application/json',
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        query,
-        variables: { owner, name, branch },
-      }),
-      signal: controller.signal,
-    });
-    if (response.status !== 200)
-      return { ok: false, reason: `merge-queue-http-${response.status}` };
-    body = await response.json();
-  } catch (error) {
-    return {
-      ok: false,
-      reason:
-        error?.name === 'AbortError'
-          ? 'merge-queue-timeout'
-          : 'merge-queue-transport',
-    };
-  } finally {
-    clearTimeout(timer);
-  }
-  const repo = body?.data?.repository;
-  const entries = repo?.mergeQueue?.entries;
-  if (!repo || body?.errors?.length || !entries)
-    return { ok: false, reason: 'merge-queue-unreadable' };
-  if (Number(entries.totalCount) === 0)
-    return {
-      ok: true,
-      lastProofAt: new Date(nowMs).toISOString(),
-      reason: 'merge-queue-empty',
-    };
-  const merges = (repo.pullRequests?.nodes ?? [])
-    .map(node => Date.parse(node?.mergedAt ?? ''))
-    .filter(Number.isFinite);
-  const lastMerge = merges.length ? Math.max(...merges) : Number.NaN;
-  const enqueued = (entries.nodes ?? [])
-    .map(node => Date.parse(node?.enqueuedAt ?? ''))
-    .filter(Number.isFinite);
-  const waitingSince = enqueued.length ? Math.min(...enqueued) : Number.NaN;
-  const proof = Math.max(
-    Number.isFinite(lastMerge) ? lastMerge : -Infinity,
-    Number.isFinite(waitingSince) ? waitingSince : -Infinity
-  );
-  if (!Number.isFinite(proof))
-    return { ok: false, reason: 'merge-queue-times-unreadable' };
-  return {
-    ok: true,
-    lastProofAt: new Date(proof).toISOString(),
-    reason: `${entries.totalCount}-queued`,
-  };
-}
-
-/**
  * Triage dwell (Tim 2026-10-21: an issue that hits Triage is sorted right
  * away, not on a tick). The proof is an empty Triage, else the oldest Triage
  * entry time, so the age of the oldest unsorted issue is the staleness and
@@ -901,7 +831,7 @@ export async function runLiveness({
       })
     );
   }
-  return { report, events, startedAt };
+  return { report, events, startedAt, observations };
 }
 
 function parseArgs(argv) {
@@ -975,17 +905,18 @@ export async function main({
     );
     return { automations };
   }
-  const { report, events, startedAt } = await runLiveness({
+  const linear = env.LINEAR_API_KEY
+    ? createLinearClient({
+        identity: env.LINEAR_API_KEY,
+        authorization: () => env.LINEAR_API_KEY,
+        legacyStateRoot: null,
+      })
+    : null;
+  const { report, events, startedAt, observations } = await runLiveness({
     registry,
     fetchImpl,
     token: env.GH_TOKEN ?? env.GITHUB_TOKEN ?? '',
-    linear: env.LINEAR_API_KEY
-      ? createLinearClient({
-          identity: env.LINEAR_API_KEY,
-          authorization: () => env.LINEAR_API_KEY ?? '',
-          legacyStateRoot: null,
-        })
-      : null,
+    linear,
   });
   const endedAt = new Date().toISOString();
   const runUrl = env.GITHUB_RUN_ID
@@ -1004,6 +935,14 @@ export async function main({
     );
   }
   const previous = readPrevious(args.previous);
+  const recovery = await prepareQueueRecovery({
+    report,
+    observations,
+    previous,
+    linear,
+    env,
+    fetchImpl,
+  });
   const decisions = livenessDecisions(report, previous);
   const full = { ...report, startedAt, endedAt, runUrl, decisions };
   if (args.output)
@@ -1033,8 +972,14 @@ export async function main({
     const state = { ...previous };
     for (const row of report.results) {
       if (row.critical)
-        state[livenessFingerprint(row.id)] =
-          row.status === 'fresh' ? 'green' : 'red';
+        state[livenessFingerprint(row.id)] = row.recovery
+          ? {
+              status: row.status === 'fresh' ? 'green' : 'red',
+              recovery: row.recovery,
+            }
+          : row.status === 'fresh'
+            ? 'green'
+            : 'red';
     }
     const { applyRemediationDecisionWithRetry } = await import(
       './lib/remediation-signal.mjs'
@@ -1050,8 +995,20 @@ export async function main({
       process.stdout.write(
         `${JSON.stringify({ fingerprint: decision.fingerprint, action: decision.action, ok: result.ok, reason: 'reason' in result ? result.reason : null })}\n`
       );
+      if (
+        result.ok &&
+        decision.fingerprint === QUEUE_FINGERPRINT &&
+        recovery?.dispatch
+      ) {
+        const dispatched = await dispatchQueueRecovery(recovery, {
+          filed: result,
+        });
+        process.stdout.write(
+          `${JSON.stringify({ fingerprint: decision.fingerprint, dispatched })}\n`
+        );
+      }
       // Keep the prior state when filing failed so the next run retries.
-      if (!result.ok)
+      if (!result.ok || decision.action === 'hold')
         state[decision.fingerprint] =
           previous[decision.fingerprint] ?? 'unknown';
     }

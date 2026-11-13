@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto';
+import { inspectOfficialLease } from './official-symphony-lease.mjs';
 
 export const FLEET_CLOSURE_AUDIT_SCHEMA = 'jovie-pr-fleet-closure-audit/v1';
 export const FLEET_CLOSURE_AUDIT_MARKER =
@@ -278,13 +279,7 @@ const fleet = {
       .toUpperCase();
   },
   symphony(state, now, staleAfterMs) {
-    const raw = state ?? {
-      observedAt: now.toISOString(),
-      running: [],
-      retrying: [],
-      blocked: [],
-      source: 'unsupplied-symphony-state',
-    };
+    const raw = state;
     if (!raw || typeof raw !== 'object')
       return { healthy: false, reason: 'symphony-state-malformed' };
     // The official Symphony API uses snake_case while persisted policy
@@ -593,20 +588,11 @@ export function findOfficialSymphonyLease(
   identifier,
   { now = new Date(), staleAfterMs = FLEET_CLOSURE_LEASE_STALE_MS } = {}
 ) {
-  if (!state) return { ok: false, reason: 'symphony-state-missing' };
-  const symphony = fleet.symphony(state, now, staleAfterMs);
-  if (!symphony.healthy) return { ok: false, reason: symphony.reason };
-  const issue = String(identifier || '').toUpperCase();
-  const leaseState = ['running', 'retrying'].find(key =>
-    symphony[key].has(issue)
-  );
-  return {
-    ok: Boolean(leaseState),
-    state: leaseState,
-    reason: leaseState ? undefined : 'symphony-lease-readback-missing',
-    source: symphony.source,
-    observedAt: symphony.observedAt,
-  };
+  const lease = inspectOfficialLease(state, identifier, {
+    nowMs: now.getTime(),
+    staleAfterMs,
+  });
+  return { ...lease, ok: lease.accepted };
 }
 
 export function renderPrFleetClosureAudit(receipt) {
@@ -624,6 +610,7 @@ export function renderFleetClosureRemediationLease(intent) {
     action: 'reattach-remediation-lane',
     consumer: 'symphony-linear-writer',
     observedAt: intent.observedAt,
+    ...(intent.recovery ? { recovery: intent.recovery } : {}),
   });
   return `${FLEET_REMEDIATION_LEASE_MARKER}\n${JSON.stringify(normalized, null, 2)}\n<!-- /jovie-pr-fleet-remediation-lease -->`;
 }
@@ -656,7 +643,10 @@ export function hasFleetClosureRemediationLease(issue, intent) {
         receipt.pr === intent.pr &&
         receipt.head === intent.head &&
         receipt.issue === intent.issue &&
-        receipt.reason === intent.reason
+        receipt.reason === intent.reason &&
+        (!intent.recovery ||
+          (receipt.recovery?.openedAt === intent.recovery.openedAt &&
+            receipt.recovery?.attempt === intent.recovery.attempt))
     );
 }
 

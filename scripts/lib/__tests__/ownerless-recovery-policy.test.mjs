@@ -19,6 +19,12 @@ const head = 'a'.repeat(40);
 const main = 'b'.repeat(40);
 const now = '2026-08-15T02:00:00.000Z';
 const fresh = '2026-08-15T01:59:30.000Z';
+const freshState = () => ({
+  generated_at: fresh,
+  running: [],
+  retrying: [],
+  blocked: [],
+});
 const pull = (number, extra = {}) => ({
   number,
   title: extra.title ?? `Fix JOV-${number}`,
@@ -39,6 +45,7 @@ const audit = (pullRequests, linearIssues, extra = {}) =>
     pullRequests,
     linearIssues,
     now: new Date(now),
+    symphonyState: freshState(),
     snapshot: { complete: true, startedAt: fresh, completedAt: now },
     ...extra,
   });
@@ -46,12 +53,7 @@ const audit = (pullRequests, linearIssues, extra = {}) =>
 describe('ownerless recovery policy', () => {
   it('retries a transient official state read before failing closed', async () => {
     let calls = 0;
-    const state = {
-      generated_at: fresh,
-      running: [],
-      retrying: [],
-      blocked: [],
-    };
+    const state = freshState();
     const result = await fetchOfficialSymphonyState({
       fetchImpl: async () => {
         calls += 1;
@@ -257,12 +259,7 @@ describe('ownerless recovery policy', () => {
 
   it('keeps ownerless dispatch available unless the snapshot or Symphony is unsafe', () => {
     const ownerless = audit([pull(7, { title: 'Ownerless', body: '' })], [], {
-      symphonyState: {
-        observedAt: fresh,
-        running: [],
-        retrying: [],
-        blocked: [],
-      },
+      symphonyState: freshState(),
     });
     expect(ownerless.status).toBe('blocked');
     expect(shouldDispatchOwnerlessRecovery(ownerless)).toBe(true);

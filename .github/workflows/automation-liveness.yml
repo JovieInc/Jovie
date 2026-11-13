@@ -1,7 +1,7 @@
 name: Automation Liveness
 # controller-hop-exception: jovie-controller-hop/v1
 # accountable-writer: Gem
-# necessary-trust-boundary: A hosted dead-man reads every registered automation's run receipt (GitHub runs, the public lanes status gist, Summer and production health) outside the hosts that run those loops, so a silent host cannot hide its own silence; it only files or resolves fingerprinted Linear issues.
+# necessary-trust-boundary: A hosted dead-man reads every registered automation's run receipt (GitHub runs, the public lanes status gist, Summer and production health) outside the hosts that run those loops, so a silent host cannot hide its own silence; it files or resolves fingerprinted Linear incidents and reattaches their recovery intents through the existing Symphony dispatcher; native queue mutations remain outside this observer.
 # removal-trigger: Remove when the lanes doctor and an independent hosted deadman both read canon/automation-registry.jsonl and alert on silence for 30 consecutive days.
 
 # Dead-man check for canon/automation-registry.jsonl (Tim 2026-10-20: every
@@ -202,6 +202,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
           REMEDIATION_INTAKE_DISABLED: ${{ vars.REMEDIATION_INTAKE_DISABLED }}
+          SYMPHONY_STATE_URL: ${{ vars.SYMPHONY_STATE_URL }}
           FILE_ISSUES: ${{ (github.event_name != 'workflow_dispatch' || inputs.file) && 'true' || 'false' }}
         run: |
           args=(
