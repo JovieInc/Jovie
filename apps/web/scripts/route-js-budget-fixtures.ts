@@ -116,7 +116,7 @@ export function buildFirstLoadFixture() {
 export function writeAncestorGitRepo(
   nextDir: string,
   files: Record<string, string>
-): Record<string, string> {
+): NodeJS.ProcessEnv {
   for (const [relativePath, content] of Object.entries(files)) {
     const path = join(nextDir, relativePath);
     mkdirSync(dirname(path), { recursive: true });
@@ -124,9 +124,9 @@ export function writeAncestorGitRepo(
   }
   const emptyConfig = join(nextDir, 'empty.gitconfig');
   writeFileSync(emptyConfig, '');
-  const env: Record<string, string> = {};
-  for (const [key, value] of Object.entries(process.env)) {
-    if (typeof value === 'string' && !key.startsWith('GIT_')) env[key] = value;
+  const env: NodeJS.ProcessEnv = { ...process.env };
+  for (const key of Object.keys(env)) {
+    if (key.startsWith('GIT_')) delete env[key];
   }
   Object.assign(env, {
     GIT_NO_LAZY_FETCH: '1',
@@ -140,7 +140,7 @@ export function writeAncestorGitRepo(
   const git = (args: string[]): void => {
     const result = spawnSync('git', args, {
       cwd: nextDir,
-      env,
+      env: { ...process.env, ...env },
       encoding: 'utf8',
       timeout: 10000,
     });

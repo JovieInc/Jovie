@@ -218,7 +218,7 @@ describe('route-js-budget --write', () => {
   function cli(
     nextDir: string,
     budgetPath: string,
-    env: Record<string, string>,
+    env: NodeJS.ProcessEnv,
     ...flags: string[]
   ) {
     return spawnSync(
@@ -234,7 +234,7 @@ describe('route-js-budget --write', () => {
       {
         encoding: 'utf8',
         timeout: 20000,
-        env: { ...env },
+        env: { ...process.env, ...env },
       }
     );
   }
