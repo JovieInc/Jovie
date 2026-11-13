@@ -2,6 +2,13 @@
  * The shell receives this server-derived summary before the sidebar renders.
  * `unknown` deliberately fails open: a transient data failure must never hide
  * a destination a creator may still need.
+ *
+ * Total-versus-page contract: `pendingCount` is the uncapped source-eligible
+ * pending-row total (see `countPendingCreatorInboxActions`), not the number
+ * of cards the Inbox page renders — the feed caps its candidate page, so the
+ * badge can exceed the rendered card count. The count is source-eligible,
+ * not renderable-verified: payload-level validity is enforced at map time,
+ * and malformed-payload exclusion from this count remains outstanding work.
  */
 export interface InboxNavigationAvailability {
   readonly state: 'available' | 'empty' | 'unknown';
@@ -37,4 +44,11 @@ export function shouldShowInboxNavigation(
   availability: InboxNavigationAvailability | undefined
 ): boolean {
   return availability?.state !== 'empty';
+}
+
+/** Count-aware pending-work label — a lone item stays singular. */
+export function formatInboxPendingWorkLabel(pendingCount: number): string {
+  return pendingCount === 1
+    ? '1 Item Needs Attention'
+    : `${pendingCount} Items Need Attention`;
 }
