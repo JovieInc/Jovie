@@ -1,9 +1,12 @@
 import sys
 import unittest
 from pathlib import Path
+from types import SimpleNamespace
+from unittest.mock import patch, Mock
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "lanes"))
 import fix_red_classes as classes  # noqa: E402
+import lane_runner as lane  # noqa: E402
 
 
 def pr(*names, merge="BLOCKED"):
@@ -55,6 +58,75 @@ class ComposeRouteTest(unittest.TestCase):
         })
         self.assertEqual(paired["actions"], ["wire-ci-fast", "rerun"])
 
+
+class ComposeExecutionTest(unittest.TestCase):
+    def test_composed_route_stamps_the_body_before_wiring_and_does_not_call_the_model(self):
+        order = []
+        route = {"action": "compose", "cls": "composed",
+                 "actions": ["wire-ci-fast", "stamp-changelog"],
+                 "files": ["scripts/catalog-duplicate-report.test.mjs"]}
+
+        def stamp(pr, **kwargs):
+            order.append("stamp")
+            return True
+
+        def wire(host, pr, route, worktree, log, receipt):
+            order.append("wire")
+            receipt["wiredFiles"] = list(route["files"])
+            return SimpleNamespace(returncode=0)
+
+        receipt = {}
+        with patch.object(lane.pr_events, "ensure_red_before_green", side_effect=stamp), \
+                patch.object(lane, "wire_ci_fast_fix", side_effect=wire), \
+                patch.object(lane, "run_agent") as agent:
+            done = lane.compose_deterministic_fix(None, {"number": 24816, "body": "bare"}, route, Path("."), None, receipt)
+            self.assertIsNone(lane.deterministic_route_taken(None, {"body": "bare"}, route))
+        self.assertEqual(order, ["stamp", "wire"])
+        self.assertEqual(done.returncode, 0)
+        self.assertEqual(receipt["resolution"], "composed-deterministic")
+        self.assertEqual(receipt["composedActions"], ["stamp-changelog", "wire-ci-fast"])
+        self.assertEqual(receipt["wiredFiles"], ["scripts/catalog-duplicate-report.test.mjs"])
+        agent.assert_not_called()
+        order.clear()
+
+        def stamp_fails(pr, **kwargs):
+            order.append("stamp")
+            return False
+
+        with patch.object(lane.pr_events, "ensure_red_before_green", side_effect=stamp_fails), \
+                patch.object(lane, "wire_ci_fast_fix", side_effect=wire):
+            self.assertIsNone(lane.compose_deterministic_fix(
+                None, {"number": 24816, "body": "bare"}, route, Path("."), None, {}))
+        self.assertEqual(order, ["stamp"])
+
+    def test_composed_route_keeps_its_owner_after_another_loader_rebinds_lane_runner(self):
+        route = {"actions": ["stamp-changelog", "wire-ci-fast"], "files": []}
+        other = Mock()
+        receipt = {}
+        with patch.dict(sys.modules, {"lane_runner": other}), \
+                patch.object(lane.pr_events, "ensure_red_before_green", return_value=True) as stamp, \
+                patch.object(lane, "wire_ci_fast_fix", return_value=SimpleNamespace(returncode=0)) as wire:
+            done = lane.compose_deterministic_fix(None, {}, route, Path("."), None, receipt)
+        self.assertEqual(done.returncode, 0)
+        stamp.assert_called_once()
+        wire.assert_called_once()
+        self.assertEqual(receipt["composedActions"], ["stamp-changelog", "wire-ci-fast"])
+        self.assertEqual(other.mock_calls, [], "a new loader must not own an existing repair")
+
+    def test_composed_stamp_preserves_fresh_repair_evidence(self):
+        live = "## Red-before-green\n\n- Failing run: https://github.com/JovieInc/Jovie/actions/runs/42\n"
+        written = []
+        def gh(args, **kwargs):
+            if args[:2] == ["pr", "view"]:
+                return SimpleNamespace(returncode=0, stdout=live)
+            written.append(Path(args[args.index("--body-file") + 1]).read_text())
+            return SimpleNamespace(returncode=0)
+        with patch.object(lane, "gh_call", side_effect=gh), \
+                patch.object(lane, "wire_ci_fast_fix", return_value=SimpleNamespace(returncode=0)):
+            lane.compose_deterministic_fix(None,
+                {"number": 24816, "body": "stale"}, {"actions": ["stamp-changelog", "wire-ci-fast"]}, Path("."), None, {})
+        self.assertTrue(written[0].startswith(live))
+        self.assertEqual(written[0].count("customer-changelog/v1"), 1)
 
 if __name__ == "__main__":
     unittest.main()

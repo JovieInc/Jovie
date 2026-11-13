@@ -20,6 +20,7 @@ import argparse
 import copy
 from contextlib import contextmanager, nullcontext
 import fcntl
+from functools import partial
 import hashlib
 import importlib
 import math
@@ -109,6 +110,7 @@ import epics  # noqa: E402  (epic decomposition/closure and the expiring hold)
 # This module as imported: the event hooks take it as `lane`. Bound once, because other
 # loaders (the HUD) may later rebind sys.modules["lane_runner"] to a fresh copy.
 THIS = sys.modules[__name__]
+compose_deterministic_fix = partial(fix_red_compose.compose_deterministic_fix, THIS)
 REPO_SLUG = "JovieInc/Jovie"
 # Tim 2026-10-11: every JOV Todo issue is eligible; no label is required. `agent-ready` +
 # `dispatch-next` still designates bottleneck work, and a lane label (devin, codex, ...) is a
@@ -7185,10 +7187,6 @@ def stamp_changelog_decision(host: Host, pr: dict) -> bool:
     edited = gh_call(["pr", "edit", str(int(pr["number"])), "--repo", REPO_SLUG, "--body-file", str(path)],
                      priority="repair")
     return edited.returncode == 0
-
-
-def compose_deterministic_fix(host, pr, route, worktree, log, receipt):
-    return fix_red_compose.compose_deterministic_fix(THIS, host, pr, route, worktree, log, receipt)
 
 
 def deterministic_route_taken(host: Host, pr: dict, route: dict | None) -> str | None:

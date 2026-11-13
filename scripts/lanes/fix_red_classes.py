@@ -228,22 +228,8 @@ def classify(pr: dict, logs: dict[str, str] | None = None) -> dict:
         cls, action, signature = "mixed", AGENT, error_signature("\n".join(logs.get(name) or "" for name in names))
     if action != COMPOSE:
         actions = [action] if action in DETERMINISTIC else []
-    files = []
-    wanted = {item_cls for item_cls, _ in per_check}
-    if cls == "component-test-evidence":
-        files = sorted({test for name in names for test in COMPONENT_TEST_TEXT.findall(logs.get(name) or "")})
-    if "ci-fast-wiring" in wanted and action in {WIRE_CI_FAST, COMPOSE}:
-        for name in names:
-            found = UNWIRED.search(logs.get(name) or "")
-            files.extend(item.strip() for item in (found.group(1).split(",") if found else []) if item.strip())
-        files = sorted(set(files))
-    if "screen-certificate" in wanted and action in {REPAIR_SCREEN_CERT, COMPOSE}:
-        files = sorted(set(files) | set(screen_cert_paths("\n".join(logs.get(name) or "" for name in names))))
-    if "domain-write" in wanted and action in {REGISTER_DOMAIN, COMPOSE}:
-        files = sorted(set(files) | set(_domain_write_hits("\n".join(logs.get(name) or "" for name in names))))
-    if "detached-native-consumer" in wanted and (cls == "detached-native-consumer" or action == COMPOSE):
-        files = sorted(set(files) | set(detached_native_sync.paths(
-            "\n".join(logs.get(name) or "" for name in names))))
+    from fix_red_compose import repair_files
+    files = repair_files(cls, action, names, logs, per_check)
     repairs = mixed_repairs(pr, per_check) if cls == "mixed" else []
     return {"schema": SCHEMA, "cls": cls, "key": fingerprint_key(cls, names, signature), "action": action,
             "actions": actions, "checks": names, "signature": signature, "files": files, "repairs": repairs, **({"evidenceOwner": owner} if owner else {})}

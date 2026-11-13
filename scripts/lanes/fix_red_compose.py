@@ -76,3 +76,27 @@ def compose_deterministic_fix(lane, host, pr, route, worktree, log, receipt):
     receipt["composedActions"] = done
     receipt["resolution"] = "composed-deterministic"
     return agent or types.SimpleNamespace(returncode=0)
+
+
+def repair_files(cls, action, names, logs, per_check):
+    """Keep each deterministic class's input paths when composing its route."""
+    import fix_red_classes as classes
+    import detached_native_sync
+
+    files = []
+    wanted = {item_cls for item_cls, _ in per_check}
+    if cls == "component-test-evidence":
+        files = sorted({test for name in names for test in classes.COMPONENT_TEST_TEXT.findall(logs.get(name) or "")})
+    if "ci-fast-wiring" in wanted and action in {classes.WIRE_CI_FAST, classes.COMPOSE}:
+        for name in names:
+            found = classes.UNWIRED.search(logs.get(name) or "")
+            files.extend(item.strip() for item in (found.group(1).split(",") if found else []) if item.strip())
+        files = sorted(set(files))
+    if "screen-certificate" in wanted and action in {classes.REPAIR_SCREEN_CERT, classes.COMPOSE}:
+        files = sorted(set(files) | set(classes.screen_cert_paths("\n".join(logs.get(name) or "" for name in names))))
+    if "domain-write" in wanted and action in {classes.REGISTER_DOMAIN, classes.COMPOSE}:
+        files = sorted(set(files) | set(classes._domain_write_hits("\n".join(logs.get(name) or "" for name in names))))
+    if "detached-native-consumer" in wanted and (cls == "detached-native-consumer" or action == classes.COMPOSE):
+        files = sorted(set(files) | set(detached_native_sync.paths(
+            "\n".join(logs.get(name) or "" for name in names))))
+    return files
