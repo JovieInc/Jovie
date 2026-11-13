@@ -1,5 +1,8 @@
 import assert from 'node:assert/strict';
-import { readFile } from 'node:fs/promises';
+import { execFileSync } from 'node:child_process';
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
 import test from 'node:test';
 import {
   assertSizes,
@@ -43,6 +46,53 @@ test('gzip ratchet accepts shrinking artifacts and rejects growth or raised allo
 
 test('push and merge-group empty base refs resolve the same trusted main baseline', () => {
   assert.deepEqual(readBaseBaseline(''), readBaseBaseline('main'));
+});
+
+test('trusted baseline lookup from desktop cwd preserves shrink-only enforcement', async () => {
+  const root = await mkdtemp(path.join(tmpdir(), 'desktop-baseline-git-'));
+  const cwd = path.join(root, 'apps/desktop');
+  const file = path.join(cwd, 'scripts/bundle-size.json');
+  const baseline = { 'main.js': 200, 'preload.js': 100 };
+  const git = (...args) =>
+    execFileSync('git', args, { cwd: root, stdio: 'pipe' });
+  try {
+    await mkdir(path.dirname(file), { recursive: true });
+    git('init', '-q');
+    git(
+      '-c',
+      'user.name=Fixture',
+      '-c',
+      'user.email=fixture@example.invalid',
+      'commit',
+      '-q',
+      '--allow-empty',
+      '-m',
+      'empty base'
+    );
+    git('update-ref', 'refs/remotes/origin/main', 'HEAD');
+    assert.equal(readBaseBaseline('main', cwd), null);
+    await writeFile(file, JSON.stringify(baseline));
+    git('add', '.');
+    git(
+      '-c',
+      'user.name=Fixture',
+      '-c',
+      'user.email=fixture@example.invalid',
+      'commit',
+      '-q',
+      '-m',
+      'measured baseline'
+    );
+    git('update-ref', 'refs/remotes/origin/main', 'HEAD');
+    const raised = { ...baseline, 'main.js': 201 };
+    await writeFile(file, JSON.stringify(raised));
+    const trusted = readBaseBaseline('main', cwd);
+    assert.deepEqual(trusted, baseline);
+    assert.throws(() => assertSizes(raised, raised, trusted), /only shrink/);
+    assert.throws(() => readBaseBaseline('missing', cwd));
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
 });
 
 test('deterministic build ignores ambient release metadata and restores no shared files', async () => {

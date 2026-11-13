@@ -104,19 +104,22 @@ export async function measureBundles() {
   }
 }
 
-export function readBaseBaseline(base = process.env.GITHUB_BASE_REF || 'main') {
+export function readBaseBaseline(
+  base = process.env.GITHUB_BASE_REF || 'main',
+  cwd = desktopRoot
+) {
   const branch = base.trim() || 'main';
   const ref = branch.startsWith('origin/') ? branch : `origin/${branch}`;
   // Distinguish the initial introduction from an unreadable base/ref.
   const entries = execFileSync(
     'git',
-    ['ls-tree', '--name-only', ref, '--', BASELINE_FILE],
-    { cwd: desktopRoot, encoding: 'utf8' }
+    ['ls-tree', '--full-tree', '--name-only', ref, '--', BASELINE_FILE],
+    { cwd, encoding: 'utf8' }
   );
   if (!entries.trim()) return null;
   return JSON.parse(
     execFileSync('git', ['show', `${ref}:${BASELINE_FILE}`], {
-      cwd: desktopRoot,
+      cwd,
       encoding: 'utf8',
     })
   );
