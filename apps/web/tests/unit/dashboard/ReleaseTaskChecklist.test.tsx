@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render, screen } from '@testing-library/react';
 import type { ReactNode } from 'react';
@@ -170,5 +172,19 @@ describe('ReleaseTaskChecklist', () => {
       screen.queryByTestId('release-task-checklist-scroll-region')
     ).not.toBeInTheDocument();
     expect(screen.getByText('Submit to playlists')).toBeInTheDocument();
+  });
+
+  it('keeps the checklist on one px-3 seam with its group headers and rows', () => {
+    // The progress strip is a motion.div, which the shared test setup renders
+    // as a bare passthrough, so the seam is pinned at source level.
+    const source = readFileSync(
+      join(
+        process.cwd(),
+        'components/features/dashboard/release-tasks/ReleaseTaskChecklist.tsx'
+      ),
+      'utf8'
+    );
+    expect(source).toContain("'flex shrink-0 items-center gap-2 px-3 py-2'");
+    expect(source).not.toMatch(/\bpx-4\b/);
   });
 });
