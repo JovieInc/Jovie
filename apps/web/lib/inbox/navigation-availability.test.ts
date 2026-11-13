@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { suggestedActionStatusEnum } from '@/lib/db/schema/enums';
 import {
+  formatInboxPendingWorkLabel,
   PENDING_SUGGESTED_ACTION_STATUS,
   resolveInboxNavigationAvailability,
   shouldShowInboxNavigation,
@@ -42,5 +43,11 @@ describe('Inbox navigation availability', () => {
     expect(shouldShowInboxNavigation({ state: 'empty', pendingCount: 0 })).toBe(
       false
     );
+  });
+
+  it('keeps the pending-work label singular for a lone item', () => {
+    expect(formatInboxPendingWorkLabel(1)).toBe('1 Item Needs Attention');
+    expect(formatInboxPendingWorkLabel(2)).toBe('2 Items Need Attention');
+    expect(formatInboxPendingWorkLabel(0)).toBe('0 Items Need Attention');
   });
 });
