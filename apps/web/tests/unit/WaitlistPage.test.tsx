@@ -118,16 +118,19 @@ describe('WaitlistPage', () => {
     mockNotFound.mockClear();
     mockResolveUserState.mockClear();
 
-    const { WaitlistPublicLanding } = await import(
-      '@/components/features/waitlist/WaitlistPublicLanding'
-    );
+    // One front door (Tim, 2026-11-09): the DB-less smoke runtime resolves
+    // the visitor DB-free first and, with signup open, hands off to /start
+    // exactly like prod.
+    mockResolveUserState.mockResolvedValue({
+      state: CanonicalUserState.UNAUTHENTICATED,
+      context: {},
+    });
 
-    const result = await WaitlistPage();
-
-    expect(result.type.name).toBe('WaitlistRouteWithContract');
-    expect(result.props.children.type).toBe(WaitlistPublicLanding);
-    expect(mockResolveUserState).not.toHaveBeenCalled();
-    expect(mockRedirect).not.toHaveBeenCalled();
+    await expect(WaitlistPage()).rejects.toThrow('NEXT_REDIRECT');
+    expect(mockResolveUserState).toHaveBeenCalledWith({
+      createDbUserIfMissing: false,
+    });
+    expect(mockRedirect).toHaveBeenCalledWith('/start');
   });
 
   test('renders the waitlist receipt without reading waitlist when the gate is off (JOV-6449)', async () => {

@@ -1,14 +1,19 @@
-"""Union empty-base Vitest statement insertions.
+"""Union Vitest statement insertions and proven additive named imports.
 
 Main's statements stay first, then head-only statements. A changed existing
 line, control flow, an unbalanced side, or a repeated binding or import of the
-same module with a different body stays unresolved. The caller proves the
-diff3 base is empty.
+same module with a different body stays unresolved unless the actual diff3
+base proves an additive import change and a full-file binding check passes.
 """
 from __future__ import annotations
 
 import difflib
+import json
 import re
+import tempfile
+from pathlib import Path
+
+from atomic_state import atomic_write_text
 
 _HUNK = re.compile(
     r"^<<<<<<<[^\n]*\n(?P<ours>.*?)^\|{7}[^\n]*\n(?P<base>.*?)"
@@ -23,6 +28,111 @@ _CALL = re.compile(r"^[A-Za-z_$][\w$.]*\(")
 _FLOW = re.compile(
     r"^(?:return|throw|break|continue|yield|if|for|while|switch|try|else|catch|do)\b")
 _MARKERS = re.compile(r"(?m)^(?:<{7}|\|{7}|={7}|>{7})")
+_NAMED_IMPORT = re.compile(
+    r"import \{ (?P<names>[A-Za-z_$][\w$]*(?:, [A-Za-z_$][\w$]*)*) \} "
+    r"from (?P<quote>['\"])(?P<module>[^'\"\\\n]+)(?P=quote);\n")
+
+
+def _additive_named_imports(base: str, ours: str, theirs: str) -> str | None:
+    """Union only one-line named imports; every base binding must survive both sides."""
+    def parse(side):
+        imports, bindings, offset = {}, set(), 0
+        for match in _NAMED_IMPORT.finditer(side):
+            names = match['names'].split(', ')
+            module = match['module']
+            if (match.start() != offset or module in imports
+                    or len(names) != len(set(names)) or bindings.intersection(names)):
+                return None
+            imports[module] = (names, match['quote'])
+            bindings.update(names)
+            offset = match.end()
+        return imports if imports and offset == len(side) else None
+
+    original, head, main = parse(base), parse(ours), parse(theirs)
+    if original is None or head is None or main is None:
+        return None
+    for module, (names, _) in original.items():
+        if any(module not in side or not set(names).issubset(side[module][0])
+               for side in (head, main)):
+            return None
+    if any([module for module in side if module in original] != list(original)
+           for side in (head, main)):
+        return None
+    result, bindings = [], set()
+    for module in dict.fromkeys([*main, *head]):
+        names, quote = main.get(module, head.get(module))
+        merged = list(dict.fromkeys([*names, *head.get(module, ([], quote))[0]]))
+        if bindings.intersection(merged):
+            return None
+        bindings.update(merged)
+        result.append(f"import {{ {', '.join(merged)} }} from {quote}{module}{quote};\n")
+    return ''.join(result)
+
+
+# Reuse the installed TypeScript parser rather than approximating TSX bindings
+# with regex. This conservative check also refuses harmless local shadowing.
+_IMPORT_BINDINGS_CHECK = """
+const ts = require(process.argv[1]);
+const text = require('node:fs').readFileSync(process.argv[2], 'utf8');
+const source = ts.createSourceFile('merged.tsx', text, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+if (source.parseDiagnostics.length) process.exit(1);
+const spans = JSON.parse(process.argv[3]);
+const byteOffset = offset => Buffer.byteLength(text.slice(0, offset));
+const imports = source.statements.filter(ts.isImportDeclaration).map(statement => [
+  byteOffset(statement.getStart(source)), byteOffset(statement.end + (text[statement.end] === '\\n' ? 1 : 0)),
+]);
+for (const [start, end] of spans) {
+  let cursor = start;
+  for (const [from, to] of imports.filter(([from]) => from >= start && from < end)) {
+    if (from !== cursor || to > end) process.exit(1);
+    cursor = to;
+  }
+  if (cursor !== end) process.exit(1);
+}
+const imported = new Set();
+let valid = true;
+function names(name, visit) {
+  if (ts.isIdentifier(name)) visit(name.text);
+  else if (ts.isObjectBindingPattern(name) || ts.isArrayBindingPattern(name)) {
+    for (const element of name.elements) if (ts.isBindingElement(element)) names(element.name, visit);
+  }
+}
+for (const statement of source.statements) {
+  const add = name => { if (imported.has(name)) valid = false; imported.add(name); };
+  if (ts.isImportEqualsDeclaration(statement)) add(statement.name.text);
+  if (!ts.isImportDeclaration(statement) || !statement.importClause) continue;
+  const clause = statement.importClause;
+  if (clause.name) add(clause.name.text);
+  if (clause.namedBindings) {
+    if (ts.isNamespaceImport(clause.namedBindings)) add(clause.namedBindings.name.text);
+    else for (const element of clause.namedBindings.elements) add(element.name.text);
+  }
+}
+function declarations(node) {
+  if (node.name && (ts.isVariableDeclaration(node) || ts.isParameter(node)
+      || ts.isFunctionDeclaration(node) || ts.isClassDeclaration(node)
+      || ts.isEnumDeclaration(node) || ts.isTypeAliasDeclaration(node)
+      || ts.isInterfaceDeclaration(node) || ts.isModuleDeclaration(node))) {
+    names(node.name, name => { if (imported.has(name)) valid = false; });
+  }
+  ts.forEachChild(node, declarations);
+}
+declarations(source);
+process.exit(valid ? 0 : 1);
+"""
+
+
+def unique_import_bindings(text: str, worktree: Path, sh, spans=()) -> bool:
+    """Check the full resolved TSX file; missing installed parser leaves it manual."""
+    parser = Path(__file__).resolve().parents[2] / 'node_modules' / 'typescript'
+    try:
+        with tempfile.TemporaryDirectory() as scratch:
+            source = Path(scratch) / 'merged.tsx'
+            atomic_write_text(source, text)
+            return sh(['node', '-e', _IMPORT_BINDINGS_CHECK, str(parser), str(source), json.dumps(spans)],
+                      cwd=worktree).returncode == 0
+    except OSError:
+        return False
 
 
 def _statements(side: str) -> list[str] | None:
@@ -98,8 +208,8 @@ def _key(statement: str) -> str | None:
     return None
 
 
-def resolve_additive_statements_text(text: str) -> str | None:
-    """Union diff3 hunks whose base is empty and whose sides are statements.
+def resolve_additive_statements_text(text: str, *, validate_imports=None) -> str | None:
+    """Union empty-base statement hunks or additive named imports proven by diff3.
 
     None when any hunk has another shape, so the caller leaves that merge
     unresolved.
@@ -107,9 +217,21 @@ def resolve_additive_statements_text(text: str) -> str | None:
     matches = list(_HUNK.finditer(text))
     if not matches:
         return None
+    import_spans = []
+
+    def replace(match, replacement):
+        nonlocal text
+        delta = len(replacement) - (match.end() - match.start())
+        import_spans[:] = [(start + delta, end + delta) for start, end in import_spans]
+        text = text[:match.start()] + replacement + text[match.end():]
     for match in reversed(matches):
         if match["base"].strip():
-            return None
+            merged = _additive_named_imports(match['base'], match['ours'], match['theirs'])
+            if merged is None:
+                return None
+            replace(match, merged)
+            import_spans.append((match.start(), match.start() + len(merged)))
+            continue
         ours = _statements(match["ours"])
         theirs = _statements(match["theirs"])
         if ours is None or theirs is None:
@@ -126,9 +248,14 @@ def resolve_additive_statements_text(text: str) -> str | None:
             if prior is None:
                 seen[key] = statement.strip()
                 ordered.append(statement)
-        text = text[:match.start()] + "".join(ordered) + text[match.end():]
+        replace(match, "".join(ordered))
     if _MARKERS.search(text):
         return None
+    if import_spans:
+        # TypeScript reports UTF-16 positions; byte spans keep Unicode context exact.
+        spans = [(len(text[:start].encode()), len(text[:end].encode())) for start, end in import_spans]
+        if validate_imports is None or not validate_imports(text, spans):
+            return None
     return text
 
 

@@ -1,8 +1,10 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { getProfileMode } from '@/components/features/profile/registry';
 import {
   gateProfilePublicationAtEdge,
   getGatedProfileHandle,
+  getProfileModeQueryRewrite,
   type ProfilePublicationGateRequest,
 } from '@/lib/routing/profile-publication-edge';
 
@@ -68,7 +70,7 @@ describe('profile publication gate decisions', () => {
     // private destination — never a bare body and never the ISR-cached
     // profile body.
     expect(response?.headers.get('x-middleware-rewrite')).toBe(
-      'https://jov.ie/dualipa/profile-mode-render/__profile-miss/__profile-mode-alias'
+      'https://jov.ie/dualipa/profile-miss'
     );
     expect(response?.headers.get('cache-control')).toContain('no-store');
   });
@@ -103,12 +105,19 @@ describe('profile publication gate decisions', () => {
 });
 
 describe('branded miss destination', () => {
-  // The rewrite target 404s into app/[username]/not-found.tsx only while the
-  // miss sentinel resolves to no profile mode. If a mode with this segment
-  // name is ever registered, the destination would start rendering a profile
-  // body for gated handles instead — this pin makes that regression loud.
-  it('resolves the miss sentinel to no profile mode', () => {
-    expect(getProfileMode('__profile-miss')).toBe('profile');
+  // The rewrite target is the dedicated dynamic profile-miss route, which
+  // renders the branded boundary server-side. If it ever moved back onto
+  // the prerendered mode-render route, the miss would degrade into Next's
+  // flight-only __next_error__ shell again — this pin makes that loud.
+  it('rewrites the miss into the dynamic profile-miss route', () => {
+    const source = readFileSync(
+      resolve(
+        import.meta.dirname,
+        '../../../lib/routing/profile-publication-edge.ts'
+      ),
+      'utf8'
+    );
+    expect(source).toContain("PROFILE_MISS_REWRITE_SEGMENTS = 'profile-miss'");
   });
 });
 
@@ -137,7 +146,7 @@ describe('fixture handles', () => {
       );
       expect(readPublished).toHaveBeenCalledTimes(1);
       expect(res?.headers.get('x-middleware-rewrite')).toBe(
-        `${GATE_ORIGIN}${path}/profile-mode-render/__profile-miss/__profile-mode-alias`
+        `${GATE_ORIGIN}${path}/profile-miss`
       );
     }
   );
@@ -151,7 +160,79 @@ describe('fixture handles', () => {
       readPublished
     );
     expect(res?.headers.get('x-middleware-rewrite')).toBe(
-      `${GATE_ORIGIN}/unfazed/profile-mode-render/__profile-miss/__profile-mode-alias`
+      `${GATE_ORIGIN}/unfazed/profile-miss`
     );
+  });
+});
+
+describe('profile mode query rewrite (JOV-12081)', () => {
+  // The rewrite is bounded to the (handle, mode) pairs the mode-render route
+  // prerenders (aliasBudgetProfileModeParams): the route's ISR fallback render
+  // for a handle the build did not prerender serves a 404, not the profile
+  // (JOV-12481 — a freshly claimed, published, exempt profile 404'd for the
+  // full 180 s Golden Path poll on run 43433399178). Every other handle keeps
+  // the canonical render.
+  it.each(['listen', 'subscribe', 'releases', 'tour'])(
+    'rewrites the prerendered dualipa mode query %s to the guarded marker destination',
+    mode => {
+      const rewrite = getProfileModeQueryRewrite(
+        gateRequest(`/dualipa?mode=${mode}`)
+      );
+      expect(rewrite?.headers.get('x-middleware-rewrite')).toBe(
+        `${GATE_ORIGIN}/dualipa/profile-mode-render/${mode}/__profile-mode-alias`
+      );
+    }
+  );
+
+  it('rewrites the prerendered testartist pay alias', () => {
+    const rewrite = getProfileModeQueryRewrite(
+      gateRequest('/testartist?mode=pay')
+    );
+    expect(rewrite?.headers.get('x-middleware-rewrite')).toBe(
+      `${GATE_ORIGIN}/testartist/profile-mode-render/pay/__profile-mode-alias`
+    );
+  });
+
+  it.each(['pay', 'about', 'contact', 'tip'])(
+    'keeps dualipa %s on the canonical render: no mode document is prerendered for that pair',
+    mode => {
+      expect(
+        getProfileModeQueryRewrite(gateRequest(`/dualipa?mode=${mode}`))
+      ).toBeNull();
+    }
+  );
+
+  it('never sends a freshly claimed handle into the mode-render fallback (JOV-12481)', () => {
+    expect(
+      getProfileModeQueryRewrite(gateRequest('/tmwf0e76ofc781?mode=listen'))
+    ).toBeNull();
+  });
+
+  it('lowercases the handle and keeps the request a rewrite, not a redirect', () => {
+    const rewrite = getProfileModeQueryRewrite(
+      gateRequest('/DuaLipa?mode=listen')
+    );
+    expect(rewrite?.headers.get('x-middleware-rewrite')).toBe(
+      `${GATE_ORIGIN}/dualipa/profile-mode-render/listen/__profile-mode-alias`
+    );
+    expect(rewrite?.status).toBe(200);
+  });
+
+  it.each([
+    '/dualipa?mode=profile',
+    '/dualipa?mode=music',
+    '/dualipa?mode=listen%2F..%2F..%2Fapp',
+    '/pricing?mode=listen',
+    '/signin?mode=listen',
+    '/dualipa/listen?mode=pay',
+    '/dualipa?mode=',
+  ])('never rewrites %s', path => {
+    expect(getProfileModeQueryRewrite(gateRequest(path))).toBeNull();
+  });
+
+  it('never rewrites non-navigation methods', () => {
+    expect(
+      getProfileModeQueryRewrite(gateRequest('/dualipa?mode=listen', 'POST'))
+    ).toBeNull();
   });
 });

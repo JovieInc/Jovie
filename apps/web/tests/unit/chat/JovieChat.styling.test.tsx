@@ -127,6 +127,9 @@ vi.mock('@/app/app/(shell)/dashboard/DashboardDataContext', () => ({
 vi.mock('@/components/jovie/hooks', async importOriginal => {
   const actual =
     await importOriginal<typeof import('@/components/jovie/hooks')>();
+  const { idleChatFileAttachments } = await import(
+    './idle-chat-file-attachments'
+  );
   return {
     ...actual,
     useSuggestedProfiles: () => ({
@@ -171,31 +174,7 @@ vi.mock('@/components/jovie/hooks', async importOriginal => {
         serialized: '',
       },
     }),
-    useChatFileAttachments: () => ({
-      pendingFiles: [],
-      isDragOver: false,
-      isUploading: false,
-      hasReadyFiles: false,
-      addFiles: vi.fn(),
-      removeFile: vi.fn(),
-      clearFiles: vi.fn(),
-      toFileUIParts: () => [],
-      dropZoneRef: { current: null },
-      accept: 'image/*,audio/*,video/*',
-      aggregate: {
-        total: 0,
-        done: 0,
-        uploading: 0,
-        queued: 0,
-        errors: 0,
-        duplicates: 0,
-        totalBytes: 0,
-        uploadedBytes: 0,
-        overallPct: 0,
-        speed: '—',
-        eta: '—',
-      },
-    }),
+    useChatFileAttachments: idleChatFileAttachments,
   };
 });
 
@@ -651,6 +630,22 @@ describe('JovieChat styling regressions', () => {
 
     fireEvent.click(control as HTMLElement);
     expect(mockChatState.showCollapsedSummerFailures).toHaveBeenCalledTimes(1);
+  });
+
+  it('offers next moves under the first reply of a profile-chip chat', () => {
+    Object.assign(mockChatState, { isLoading: false, status: 'ready' });
+    mockChatState.messages = ['@profile:profile-1[Tim White]', 'Hi'].map(
+      (text, i) => ({
+        id: `m${i}`,
+        role: i ? 'assistant' : 'user',
+        parts: [{ type: 'text', text }],
+      })
+    );
+    const { container } = renderWithQueryClient(
+      <JovieChat profileId='profile-1' />
+    );
+    const chips = '[data-testid="chat-follow-ups"] button';
+    expect(container.querySelectorAll(chips)).toHaveLength(4);
   });
 
   it('keeps the collapsed unanswered-turns control hidden when there are none', () => {
