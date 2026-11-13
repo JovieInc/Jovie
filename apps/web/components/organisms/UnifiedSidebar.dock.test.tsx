@@ -24,7 +24,15 @@ describe('SidebarDock', () => {
             One
           </button>
         </nav>
-        <SidebarDock userId='one' update={{ state: 'ready', version: '2' }} />
+        <SidebarDock
+          userId='one'
+          updateControl={{
+            visible: true,
+            label: 'Restart to update',
+            urgent: false,
+            node: <button type='button'>Restart</button>,
+          }}
+        />
       </div>
     );
 

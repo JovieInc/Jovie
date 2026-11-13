@@ -46,3 +46,29 @@ export const NoDuration: Story = {
     duration: 0,
   },
 };
+
+// Stream metadata has not arrived: the position is known, the length is not.
+export const PartialUnknownDuration: Story = {
+  args: {
+    currentTime: 12,
+    duration: Number.NaN,
+  },
+};
+
+// A three-hour mix: the thumb still tracks the fraction played.
+export const LongTrack: Story = {
+  args: {
+    currentTime: 5400,
+    duration: 10800,
+  },
+};
+
+export const Rtl: Story = {
+  decorators: [
+    Story => (
+      <div dir='rtl' lang='ar'>
+        <Story />
+      </div>
+    ),
+  ],
+};

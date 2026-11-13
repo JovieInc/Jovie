@@ -10,6 +10,7 @@ import { parseJsonBody } from '@/lib/http/parse-json';
 import { withSystemIngestionSession } from '@/lib/ingestion/session';
 import {
   COLD_CLAIM_INVITE_CLOSED_MESSAGE,
+  coldClaimInviteRelationshipHold,
   isColdClaimInviteSendOpen,
 } from '@/lib/outbound/cold-claim-invites';
 import { requireOvieApiAccess } from '@/lib/ovie/privacy-lock/access';
@@ -90,6 +91,19 @@ export async function POST(request: Request) {
         { status: 400, headers: NO_STORE_HEADERS }
       );
     }
+
+    const relationshipHold = coldClaimInviteRelationshipHold({
+      username: profile.username,
+      displayName: profile.displayName,
+      email,
+    });
+    if (relationshipHold) {
+      return NextResponse.json(
+        { error: relationshipHold, code: 'EXISTING_RELATIONSHIP' },
+        { status: 409, headers: NO_STORE_HEADERS }
+      );
+    }
+
     // Create the invite record and optionally enqueue for sending
     const result = await withSystemIngestionSession(async tx => {
       // Create the invite record

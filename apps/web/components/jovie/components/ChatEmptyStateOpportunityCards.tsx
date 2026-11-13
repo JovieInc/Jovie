@@ -25,7 +25,7 @@ export function ChatEmptyStateOpportunityCards({
   return (
     <ul
       className={cn(
-        'mx-auto flex w-full max-w-[28rem] list-none flex-col gap-1 p-0',
+        'mx-auto flex w-full max-w-md list-none flex-col gap-1 p-0',
         className
       )}
       data-testid='chat-empty-state-opportunity-cards'

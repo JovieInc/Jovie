@@ -2,7 +2,7 @@
 'use client';
 
 import './HeaderNav.css';
-import { Button } from '@jovie/ui';
+import { Button, PlainButton } from '@jovie/ui';
 import { ArrowUpRight, ChevronDown } from 'lucide-react';
 import Link from 'next/link';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -550,7 +550,7 @@ export function HeaderNav({
 
             return (
               <div key={menu.id} className='marketing-glass-header__nav-item'>
-                <button
+                <PlainButton
                   type='button'
                   className={cn(
                     navLinkClass,
@@ -564,7 +564,7 @@ export function HeaderNav({
                 >
                   {menu.label}
                   <ChevronDown aria-hidden='true' size={13} strokeWidth={1.8} />
-                </button>
+                </PlainButton>
                 <MarketingGlassFlyout menu={menu} open={open} />
               </div>
             );

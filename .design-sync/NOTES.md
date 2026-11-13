@@ -119,7 +119,7 @@ To finish:
 - **playwright pin:** render check needs `playwright@1.60.0` (pins chromium 1223,
   the build cached at `/opt/pw-browsers`). A different cache build needs a matching
   playwright version.
-- **Feature-flag-gated sections:** `HomeBentoPairs`/`HomeLoopDiagramSection`/
-  `HomeStatQuoteSection` are gated by `SHOW_HOME_REFRESH_2026` (currently true). If
+- **Homepage refresh sections:** `HomeBentoPairs`/`HomeLoopDiagramSection`/
+  `HomeStatQuoteSection` are no longer flag-gated. If
   the homepage composition changes, re-confirm the scoped component list matches
   what `page.tsx` actually renders.

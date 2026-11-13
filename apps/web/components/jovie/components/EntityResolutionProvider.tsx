@@ -38,6 +38,12 @@ const EMPTY_ENTITY_CACHE_SNAPSHOT = '';
 
 interface EntityResolutionProviderProps {
   readonly profileId: string | null | undefined;
+  /**
+   * The signed-in creator's own profile, from server-rendered chat props.
+   * Resolves `@profile:<profileId>` chips without trusting the token label.
+   */
+  readonly ownProfileLabel?: string | null;
+  readonly ownProfileAvatarUrl?: string | null;
   readonly children: ReactNode;
 }
 
@@ -69,8 +75,12 @@ function areQueryKeysEqual(
  */
 export function EntityResolutionProvider({
   profileId,
+  ownProfileLabel: rawOwnProfileLabel,
+  ownProfileAvatarUrl,
   children,
 }: EntityResolutionProviderProps) {
+  const ownProfileLabel = rawOwnProfileLabel?.trim() || null;
+  const ownProfileAvatar = ownProfileAvatarUrl ?? null;
   // Read the QueryClient via its context directly so we degrade cleanly when
   // no QueryClientProvider is mounted above us (e.g. lightweight unit tests
   // of JovieChat, or hypothetical SSR-only consumers). `useQueryClient()`
@@ -151,10 +161,27 @@ export function EntityResolutionProvider({
   const resolver = useMemo<ResolverFn>(() => {
     // cacheSnapshot is intentionally part of the closure so memoization
     // re-fires when caches change. Reads are deferred until each chip calls.
+    const ownProfileResolution: EntityResolution =
+      profileId && ownProfileLabel
+        ? {
+            ref: {
+              kind: 'profile',
+              id: profileId,
+              label: ownProfileLabel,
+              ...(ownProfileAvatar ? { thumbnail: ownProfileAvatar } : {}),
+            },
+            isLoading: false,
+          }
+        : NULL_RESOLUTION;
+    // Only the signed-in creator's own profile resolves; never another id.
+    const resolveProfile = (id: string) =>
+      profileId && id === profileId ? ownProfileResolution : NULL_RESOLUTION;
     if (!profileId || !queryClient) {
-      return () => NULL_RESOLUTION;
+      return (kind, id) =>
+        kind === 'profile' ? resolveProfile(id) : NULL_RESOLUTION;
     }
     return (kind, id) => {
+      if (kind === 'profile') return resolveProfile(id);
       try {
         const key =
           kind === 'release'
@@ -203,7 +230,15 @@ export function EntityResolutionProvider({
     // cacheSnapshot participates so consumers re-derive on cache change.
     // queryClient is stable from React Query's provider.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [profileId, queryClient, cacheSnapshot, releaseMatrixKey, eventsListKey]);
+  }, [
+    profileId,
+    queryClient,
+    cacheSnapshot,
+    releaseMatrixKey,
+    eventsListKey,
+    ownProfileLabel,
+    ownProfileAvatar,
+  ]);
 
   return (
     <EntityResolutionContext.Provider value={resolver}>
