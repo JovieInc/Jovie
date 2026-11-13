@@ -15,7 +15,6 @@ import { logger } from '@/lib/utils/logger';
  */
 
 export const runtime = 'nodejs';
-export const dynamic = 'force-dynamic';
 
 const ROUTE = '/api/internal/ovie/component-certificate-evidence';
 // Mirrors the sibling evidence routes' bounded bodies (64KB). This cap is a
