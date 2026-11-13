@@ -12,6 +12,7 @@ const mocks = vi.hoisted(() => ({
   dehydrated: vi.fn(),
   essential: vi.fn(),
   captureError: vi.fn(),
+  banStatus: vi.fn(),
   banned: false,
   boundaryMounts: 0,
 }));
@@ -45,7 +46,7 @@ vi.mock('@/features/workspace-lock/WorkspaceLockScreen', () => ({
   WorkspaceLockScreen: () => <div>Unlock Ovie</div>,
 }));
 vi.mock('@/lib/auth/ban-check', () => ({
-  getUserBanStatus: async () => ({ isBanned: mocks.banned }),
+  getUserBanStatus: mocks.banStatus,
 }));
 vi.mock('@/lib/auth/cached', () => ({ getFreshAuth: mocks.getFreshAuth }));
 vi.mock('@/lib/error-tracking', () => ({ captureError: mocks.captureError }));
@@ -182,6 +183,9 @@ describe('DashboardShellContent privacy decision', () => {
   beforeEach(() => {
     mocks.boundaryMounts = 0;
     mocks.banned = false;
+    mocks.banStatus
+      .mockReset()
+      .mockImplementation(async () => ({ isBanned: mocks.banned }));
     mocks.shellDashboard.mockReset().mockResolvedValue(dashboardData);
     mocks.dashboard.mockReset().mockResolvedValue(dashboardData);
     mocks.flags.mockResolvedValue({});
@@ -340,8 +344,107 @@ describe('DashboardShellContent privacy decision', () => {
       screen.getByRole('heading', { name: 'Unavailable' })
     ).toBeInTheDocument();
     expect(screen.queryByText('Private route child')).not.toBeInTheDocument();
-    expect(mocks.shellDashboard).not.toHaveBeenCalled();
+    expect(mocks.banStatus).toHaveBeenCalledWith('user-1');
+    expect(mocks.dehydrated).not.toHaveBeenCalled();
     await expectNoA11yViolations(container);
+  });
+
+  it('starts the workspace read while the ban check is still pending', async () => {
+    let resolveBan: (status: { isBanned: boolean }) => void = () => {};
+    mocks.banStatus.mockReturnValue(
+      new Promise<{ isBanned: boolean }>(resolve => {
+        resolveBan = resolve;
+      })
+    );
+    let tree: React.ReactNode;
+    const pending = shell('customer', <div>Jovie dashboard</div>).then(
+      result => {
+        tree = result;
+      }
+    );
+
+    await vi.waitFor(() => {
+      expect(mocks.shellDashboard).toHaveBeenCalledOnce();
+      expect(mocks.flags).toHaveBeenCalledOnce();
+    });
+    // Workspace data has resolved, but nothing renders without a ban verdict.
+    await Promise.resolve();
+    expect(tree).toBeUndefined();
+
+    resolveBan({ isBanned: false });
+    await pending;
+    render(tree);
+    expect(screen.getByText('Jovie dashboard')).toBeInTheDocument();
+  });
+
+  it('blocks a banned account even when workspace data resolved first', async () => {
+    let resolveBan: (status: { isBanned: boolean }) => void = () => {};
+    mocks.banStatus.mockReturnValue(
+      new Promise<{ isBanned: boolean }>(resolve => {
+        resolveBan = resolve;
+      })
+    );
+    const pending = shell('customer', <div>Private route child</div>);
+    await vi.waitFor(() => expect(mocks.shellDashboard).toHaveBeenCalledOnce());
+    await mocks.shellDashboard.mock.results[0]?.value;
+
+    resolveBan({ isBanned: true });
+    render(await pending);
+
+    expect(
+      screen.getByRole('heading', { name: 'Unavailable' })
+    ).toBeInTheDocument();
+    expect(screen.queryByText('Private route child')).not.toBeInTheDocument();
+    expect(mocks.dehydrated).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    [
+      'redirects',
+      Object.assign(new Error('redirect'), {
+        digest: 'NEXT_REDIRECT;replace;/start;307;',
+      }),
+    ],
+    ['fails', new Error('DAL unavailable')],
+  ])(
+    'keeps a banned account on the unavailable page when the workspace read %s',
+    async (_label, failure) => {
+      mocks.banned = true;
+      mocks.shellDashboard.mockRejectedValue(failure);
+
+      render(await shell('customer', <div>Private route child</div>));
+
+      expect(
+        screen.getByRole('heading', { name: 'Unavailable' })
+      ).toBeInTheDocument();
+      expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+      expect(mocks.captureError).not.toHaveBeenCalled();
+    }
+  );
+
+  it('renders nothing when the ban check itself fails', async () => {
+    const failure = new Error('ban check unavailable');
+    mocks.banStatus.mockRejectedValue(failure);
+
+    await expect(
+      shell('customer', <div>Private route child</div>)
+    ).rejects.toBe(failure);
+    expect(mocks.dehydrated).not.toHaveBeenCalled();
+  });
+
+  it('blocks a banned Ovie account without rendering the workspace', async () => {
+    mocks.banned = true;
+    mocks.essential.mockReturnValue(false);
+    ovieState(false, false);
+
+    render(await shell('ov', <div>Private Ovie dashboard</div>));
+
+    expect(
+      screen.getByRole('heading', { name: 'Unavailable' })
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText('Private Ovie dashboard')
+    ).not.toBeInTheDocument();
   });
 
   it.each([

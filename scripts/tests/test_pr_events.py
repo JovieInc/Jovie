@@ -100,7 +100,9 @@ def red_episode_route(reply, login="github-actions[bot]", created="2026-01-01T00
     `gh api graphql`; the Shell routes by prefix, so one callable dispatches on the query."""
     def route(args):
         if "LABELED_EVENT" in " ".join(args):
-            actor = {"__typename": "Bot" if login.endswith("[bot]") else "User", "login": login}
+            # Real GraphQL: a Bot's login has no "[bot]" suffix (REST adds it).
+            bot = login.endswith("[bot]")
+            actor = {"__typename": "Bot" if bot else "User", "login": login.removesuffix("[bot]")}
             nodes = [] if absent else [{"createdAt": created, "label": {"name": "lane-fix-red"},
                                         "actor": actor}]
             return {"data": {"repository": {"pullRequest": {"timelineItems": {"nodes": nodes}}}}}
@@ -484,8 +486,14 @@ class RelayTest(unittest.TestCase):
         disabled = {"claude", "hyperagent"}
         self.assertTrue(events.in_scope(pr(draft=True), "red", disabled))
         self.assertTrue(events.in_scope(pr(branch="tim/fix"), "red", disabled))
-        self.assertFalse(events.in_scope(pr(branch="claude/focused-davinci-x", draft=True), "red", disabled),
-                         "a human session's draft is not the lanes' work")
+        # Tim 2026-11-12: a red required check on any same-repo draft to main is repair scope;
+        # whether its writer still holds it is the active-worker gate's call (red_label_justified).
+        session = pr(branch="claude/focused-davinci-x", draft=True)
+        self.assertTrue(events.in_scope(session, "red", disabled))
+        self.assertFalse(events.in_scope(session, "conflict", disabled), "only red repair widened")
+        self.assertFalse(events.in_scope({**session, "baseRefName": "claude/parent"}, "red", disabled),
+                         "a stacked draft stays with its stack")
+        self.assertFalse(events.in_scope({**session, "isCrossRepository": True}, "red", disabled))
         self.assertFalse(events.in_scope(pr(isCrossRepository=True), "red", disabled))
         self.assertFalse(events.in_scope(pr(labels=["hold"]), "red", disabled))
         self.assertFalse(events.in_scope(pr(state="MERGED"), "red", disabled))
@@ -645,7 +653,7 @@ class RelayTest(unittest.TestCase):
         run = {"event": "pull_request", "conclusion": "success", "head_sha": "h1",
                "pull_requests": [{"number": 5}]}
         view = pr(branch="cursor/fix", sha="h1", merge="CLEAN", labels=["lane-fix-red"], state="OPEN")
-        for login, cleared in (("github-actions[bot]", True), ("jovie-bot[bot]", False), ("tim", False)):
+        for login, cleared in (("github-actions[bot]", True), ("github-actions", False), ("jovie-bot[bot]", False), ("tim", False)):
             shell = Shell({("gh", "pr", "view"): view,
                            ("gh", "api", "graphql"): red_episode_route(lambda args: None, login=login)})
             result = events.relay("workflow_run", {"workflow_run": run}, shell, set())
@@ -711,10 +719,70 @@ class RelayTest(unittest.TestCase):
         ]
         shell = Shell({("gh", "pr", "list"): rows,
                        ("gh", "api", "graphql"): red_episode_route(lambda args: None)})
-        self.assertEqual(events.relay("push", {}, shell, set()), [(5, "cleared-red")])
+        self.assertEqual(events.relay("push", {}, shell, set()), [(5, "cleared-red"), (5, "enroll-wake")])
         self.assertEqual(shell.made("gh", "api", "-X", "DELETE"),
                          [["gh", "api", "-X", "DELETE",
                            f"repos/{events.REPO}/issues/5/labels/lane-fix-red"]])
+        self.assertEqual(shell.made("gh", "workflow", "run"),
+                         [["gh", "workflow", "run", events.GREEN_ENROLL_WORKFLOW,
+                           "--repo", events.REPO, "--ref", "main", "-f", "pr_number=5"]])
+
+    def test_a_push_sweep_clears_a_stale_relay_red_on_a_settled_head_and_wakes_enroll(self):
+        # #25157: required-green since 21:04Z, lane-fix-red from an older head (relay, 14:28Z),
+        # merge state lagging after the main push, and 14 skipped jobs in the rollup. No check
+        # completion comes for an unchanged green head, so the push sweep is the exit.
+        def node(name, conclusion, **extra):
+            return {"__typename": "CheckRun", "name": name, "conclusion": conclusion,
+                    "completedAt": "2026-11-12T21:04:00Z", **extra}
+
+        def rollup(*nodes):
+            return {"data": {"repository": {"pullRequest": {"commits": {"nodes": [{"commit": {
+                "statusCheckRollup": {"contexts": {"nodes": list(nodes)}}}}]}}}}}
+
+        def sweep(nodes, merge="UNKNOWN", login="github-actions[bot]", **extra):
+            row = pr(number=5, branch="tim/fix", merge=merge, labels=["lane-fix-red"], state="OPEN",
+                     mergeable="MERGEABLE", **extra)
+            shell = Shell({("gh", "pr", "list"): [row],
+                           ("gh", "api", "graphql"): red_episode_route(rollup(*nodes), login=login)})
+            return events.relay("push", {}, shell, set()), shell
+
+        green = [node("Source Validation", "SUCCESS"), node("CodeRabbit", "SKIPPED"),
+                 node("Advisory", "NEUTRAL"), node("Tently", "FAILURE")]
+        for merge in ("UNKNOWN", "BLOCKED"):
+            result, shell = sweep(green, merge)
+            self.assertEqual(result, [(5, "cleared-red"), (5, "enroll-wake")], merge)
+            self.assertEqual(len(shell.made("gh", "api", "-X", "DELETE")), 1, merge)
+            self.assertEqual(len(shell.made("gh", "workflow", "run")), 1, merge)
+        result, shell = sweep(green, draft=True)
+        self.assertEqual(result, [(5, "cleared-red")], "auto-ready promotes a draft, not enroll")
+        self.assertEqual(shell.made("gh", "workflow", "run"), [])
+
+        pending = node("Source Validation", None, completedAt=None, startedAt="2026-11-12T21:27:00Z")
+        for why, nodes in (("red", [node("Source Validation", "FAILURE"), node("CodeRabbit", "SKIPPED")]),
+                           ("pending", [node("CI", "SUCCESS"), pending]),
+                           ("cancelled", [node("Source Validation", "CANCELLED"), node("CI", "SUCCESS")]),
+                           ("nothing succeeded", [node("CodeRabbit", "SKIPPED")])):
+            result, shell = sweep(nodes)
+            self.assertEqual(result, [], why)
+            self.assertEqual(shell.made("gh", "api", "-X", "DELETE"), [], why)
+            self.assertEqual(shell.made("gh", "workflow", "run"), [], why)
+
+        for login in ("jovie-bot[bot]", "tim"):
+            for merge in ("CLEAN", "UNKNOWN"):
+                result, shell = sweep(green, merge, login=login)
+                self.assertEqual(result, [], (login, merge))
+                self.assertEqual(shell.made("gh", "api", "-X", "DELETE"), [], (login, merge))
+                self.assertEqual(shell.made("gh", "workflow", "run"), [], (login, merge))
+
+    def test_a_push_sweep_bounds_its_enroll_wakes(self):
+        rows = [pr(number=n, branch=f"tim/fix-{n}", merge="CLEAN", labels=["lane-fix-red"], state="OPEN")
+                for n in range(1, events.SWEEP_ENROLL_WAKES + 3)]
+        shell = Shell({("gh", "pr", "list"): rows,
+                       ("gh", "api", "graphql"): red_episode_route(lambda args: None)})
+        result = events.relay("push", {}, shell, set())
+        self.assertEqual(len([row for row in result if row[1] == "cleared-red"]), events.SWEEP_ENROLL_WAKES,
+                         "past the cap the label stays for the next landing: no clear without its wake")
+        self.assertEqual(len(shell.made("gh", "workflow", "run")), events.SWEEP_ENROLL_WAKES)
 
     def test_a_failure_hold_dequeue_is_relayed_and_a_plain_hand_dequeue_is_not(self):
         view = {"state": "OPEN", "isDraft": False, "headRefName": "codex/jov-6577-20261012t075744",
@@ -1957,7 +2025,9 @@ class GapTest(unittest.TestCase):
 
     def test_stalled_agent_drafts_are_repaired_or_held_on_a_live_dependency(self):
         """JOV-7079 canary: an old non-lane agent draft cannot sit forever. Past the 3d SLO
-        and stalled it enters repair unless a dependency it names is still open."""
+        and stalled it is reclaimed unless a dependency it names is still open; that age rule
+        is the close / reclaim-to-close authority only. A red required check is repaired within
+        the hour whatever the draft's age (Tim 2026-11-12), and never closes anything."""
         now = events.iso_ts("2033-05-18T03:00:00Z")
         old, recent = "2033-05-15T00:00:00Z", "2033-05-18T00:00:00Z"
         ancient = "2033-05-01T00:00:00Z"
@@ -2000,6 +2070,17 @@ class GapTest(unittest.TestCase):
         self.assertEqual(landed["close"], [])
         self.assertEqual(next(row for row in landed["dispositions"] if row["pr"] == 22)["state"], "advancing")
         self.assertIn((22, "stale"), landed["label"])
+        # New rule: red repair no longer waits for the 3d floor. The young draft (23) goes red
+        # with no commit for 2h: repaired now. A red draft committed 10 minutes ago keeps its
+        # writer. Neither red draft is closed, and the dependency hold is unchanged.
+        red = [{**prs[3], "rollup": "FAILURE", "lastCommitAt": "2033-05-18T01:00:00Z"},
+               self.node(25, isDraft=True, headRefName="claude/live-session", rollup="FAILURE",
+                         createdAt="2033-05-18T02:00:00Z", lastCommitAt="2033-05-18T02:50:00Z")]
+        repaired = events.reconcile_plan(prs[:3] + red, {}, set(), 2, now, deps={22: [9]})
+        self.assertIn((23, "red"), repaired["label"])
+        self.assertNotIn(25, [number for number, _ in repaired["label"]], "a commit inside the hour holds the head")
+        self.assertEqual(repaired["close"], [])
+        self.assertEqual(repaired["depHolds"], [(22, [9])])
 
     def test_reclaimed_abandoned_drafts_are_in_scope_for_repair_and_promotion(self):
         now = events.iso_ts("2033-05-18T03:00:00Z")
@@ -2009,7 +2090,10 @@ class GapTest(unittest.TestCase):
         self.assertTrue(events.in_scope(abandoned, "green", set(), now), "a reclaimed draft is readied when CLEAN")
         self.assertFalse(events.in_scope(abandoned, "orphan", set(), now))
         moving = pr(31, branch="codex/homepage-material", draft=True, merge="BLOCKED", createdAt=ancient, updatedAt=recent)
-        self.assertFalse(events.in_scope(moving, "red", set(), now), "a draft still being pushed stays with its writer")
+        self.assertFalse(events.in_scope(moving, "conflict", set(), now), "a draft still being pushed stays with its writer")
+        # Red repair is no longer gated on age (Tim 2026-11-12): any red draft to main is in
+        # scope, and the active-worker gate (claim or commit inside the hour) keeps live writers.
+        self.assertTrue(events.in_scope(moving, "red", set(), now))
         held = pr(32, branch="codex/held", draft=True, merge="BLOCKED", createdAt=ancient, updatedAt=old, labels=["hold"])
         self.assertFalse(events.in_scope(held, "red", set(), now))
         writer = pr(33, branch="feature/mine", draft=True, merge="DIRTY", createdAt=ancient, updatedAt=old)
@@ -2574,7 +2658,10 @@ class NativeQueueClaimTest(unittest.TestCase):
         for entrypoint in ("event", "poll"):
             with self.subTest(entrypoint=entrypoint), tempfile.TemporaryDirectory() as tmp:
                 host = runner.Host(state=Path(tmp));target = pr(branch="human/work", kinds=["red"], checks=[RED_CHECK])
-                shell = Shell();module = fake_lane(shell);live = {**target, "state": "OPEN", "isDraft": True}
+                # A head restacked onto another branch left red-repair scope (a red draft to main is
+                # in scope since 2026-11-12; a stacked one stays with its stack).
+                shell = Shell();module = fake_lane(shell)
+                live = {**target, "state": "OPEN", "isDraft": True, "baseRefName": "human/parent"}
                 module.reconcile_fix_target = lambda _: live
                 with patch.object(runner, "sh", shell), patch.object(runner, "reconcile_fix_target", return_value=live), \
                         patch.object(runner, "claimed_elsewhere", return_value=False), \
@@ -2611,8 +2698,11 @@ class NativeQueueClaimTest(unittest.TestCase):
                 self.assertEqual(path.exists(), allowed)
                 if allowed:self.assertEqual(json.loads(path.read_text())["5"]["count"], 1)
                 self.assertEqual(shell.calls, [])
-        self.assertFalse(events.in_scope(pr(branch=digest, draft=True), "red", {"hyperagent"}),
+        self.assertFalse(events.in_scope(pr(branch=digest, draft=True), "conflict", {"hyperagent"}),
                          "polling integration does not expand event ownership")
+        # Tim 2026-11-12: a red draft to main is red-repair scope whatever its prefix; the
+        # relay's active-worker gate (fresh claim or commit inside the hour) keeps live writers.
+        self.assertTrue(events.in_scope(pr(branch=digest, draft=True), "red", {"hyperagent"}))
 
     def test_cleanup_production_list_rotates_refused_row_and_preserves_current_ownership(self):
         for first in ("queued", "unreadable", "owner"):

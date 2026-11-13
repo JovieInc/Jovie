@@ -1,0 +1,100 @@
+{
+  "schema": "customer-changelog-editorial/v1",
+  "entries": {
+    "customer-update:profile-qr-local-generation": {
+      "headline": "QR codes, drawn on your device",
+      "lead": "Your profile QR code is now made right on the visitor's device, so your page loads with no outside requests."
+    },
+    "customer-update:public-signup-reopens": {
+      "headline": "Public sign-up is open",
+      "lead": "Create your Jovie account and claim your name."
+    },
+    "customer-update:profile-footer-events-overlap": {
+      "headline": "Profile footer no longer overlaps events"
+    },
+    "customer-update:homepage-music-forward-invite": {
+      "hide": true,
+      "reason": "Says an invitation is required; public sign-up reopened on 2026-11-09."
+    },
+    "customer-update:branded-release-share-cards": {
+      "headline": "Release links unfurl with a branded card"
+    },
+    "customer-update:post-checkout-fan-list-start": {
+      "headline": "Start collecting fans right after you upgrade"
+    },
+    "customer-update:onboarding-real-catalog-preview": {
+      "headline": "See your music before you pay"
+    },
+    "customer-update:pricing-comparison-mobile-readability": {
+      "headline": "Pricing comparisons read cleanly on phones"
+    },
+    "customer-update:composer-enlarged-text-actions": {
+      "headline": "Send stays visible with larger text"
+    },
+    "customer-update:onboarding-confirmed-handle-prompt": {
+      "headline": "Onboarding preview stays in sync with your handle"
+    },
+    "customer-update:onboarding-preview-reachable-details": {
+      "headline": "Scroll the full onboarding preview in any window"
+    },
+    "customer-update:mac-shell-even-window-gutters": {
+      "headline": "Even spacing around the Mac app window"
+    },
+    "customer-update:profile-jovie-branding": {
+      "headline": "A small Jovie mark on public profiles"
+    },
+    "customer-update:google-connection-return-recovery": {
+      "headline": "Your place is kept when Google sign-in is canceled"
+    },
+    "customer-update:public-agent-api-discovery": {
+      "headline": "AI agents can discover Jovie's public tools",
+      "lead": "AI agents can now find creator lookup, profile creation and feedback reporting in Jovie's public tool list."
+    },
+    "customer-update:available-account-integrations": {
+      "hide": true,
+      "reason": "Reads as internal setup; nothing a customer can act on."
+    },
+    "customer-update:artist-presence-plan-name": {
+      "headline": "The paid plan is now Artist Presence"
+    },
+    "customer-update:onboarding-saved-conversation-resume": {
+      "headline": "Pick up onboarding where you left off"
+    },
+    "customer-update:creator-lookup-real-data": {
+      "hide": true,
+      "reason": "Developer-facing and unflattering: it describes stand-in data in a creator lookup."
+    },
+    "customer-update:profile-release-preview-playback": {
+      "headline": "Play release previews right on a profile"
+    },
+    "customer-update:homepage-faq": {
+      "hide": true,
+      "reason": "Describes the earlier homepage, replaced on 2026-11-07."
+    },
+    "customer-update:generic-creator-smart-links-copy": {
+      "hide": true,
+      "reason": "A marketing wording change, not a product change."
+    },
+    "customer-update:profile-link-preview-avif": {
+      "hide": true,
+      "reason": "Unflattering: it describes previews that showed an error."
+    },
+    "customer-update:public-artist-profile-discovery-fields": {
+      "headline": "Artist profiles share more with agent tools"
+    },
+    "customer-update:identity-reach-line": {
+      "hide": true,
+      "reason": "A homepage wording change on the earlier homepage, replaced on 2026-11-07."
+    },
+    "customer-update:profile-link-claim": {
+      "hide": true,
+      "reason": "Describes the name field on the earlier homepage, replaced on 2026-11-07."
+    },
+    "customer-update:fan-updates": {
+      "headline": "Get updates from an artist"
+    },
+    "customer-update:help-center": {
+      "headline": "Help is easier to find"
+    }
+  }
+}

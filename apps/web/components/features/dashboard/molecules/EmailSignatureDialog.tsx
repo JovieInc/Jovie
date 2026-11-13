@@ -79,7 +79,7 @@ export function EmailSignatureDialog({
               title='Email Signature preview'
               sandbox=''
               srcDoc={previewSrcDoc}
-              className='block h-48 w-full border-0 bg-white dark:bg-surface-1'
+              className='block h-48 w-full border-0 bg-on-media dark:bg-surface-1'
             />
           ) : (
             <p className='p-4 text-xs text-tertiary-token'>
