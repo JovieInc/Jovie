@@ -28,6 +28,8 @@ from pathlib import Path
 import machine_gap
 import migration_renumber
 import remediation
+from fix_red_mixed_repairs import first_route_reason, mixed_repairs  # noqa: F401
+from fix_red_screen_cert import SCREEN_CERT_TEXT, screen_cert_paths
 from fix_red_failure_routing import (ALIAS_ACTION, ALIAS_REVIEW_FAILURE, alias_owner_metadata,
                                      error_signature, fingerprint_key, owner_handoff_reason)
 from atomic_state import atomic_write_text
@@ -39,12 +41,12 @@ from fix_red_ui_feel import apply as apply_ui_feel, publish as publish_ui_feel  
 
 SCHEMA = "jovie-fix-red-class/v1"
 # Actions a class can route to. `agent` is the default (a model run); the others spend no model.
-RERUN, SYNC_MAIN, WIRE_CI_FAST, RENUMBER, STAMP_CHANGELOG, SNAP_SPACING, STRIP_CACHE, MERGE_NARROWED, REGISTER_DOMAIN, ATOMIC_WRITE, UI_FEEL, AGENT = (
+RERUN, SYNC_MAIN, WIRE_CI_FAST, RENUMBER, STAMP_CHANGELOG, SNAP_SPACING, STRIP_CACHE, MERGE_NARROWED, REGISTER_DOMAIN, ATOMIC_WRITE, UI_FEEL, REPAIR_SCREEN_CERT, AGENT = (
     "rerun", "sync-main", "wire-ci-fast", "renumber-migrations", "stamp-changelog", "snap-spacing",
-    "strip-cache-exports", "merge-narrowed-preflight", "register-domain-writes", "atomic-write", "ui-feel", "agent")
+    "strip-cache-exports", "merge-narrowed-preflight", "register-domain-writes", "atomic-write", "ui-feel", "repair-screen-cert", "agent")
 DETERMINISTIC = frozenset({
     RERUN, SYNC_MAIN, WIRE_CI_FAST, RENUMBER, STAMP_CHANGELOG, SNAP_SPACING, STRIP_CACHE, MERGE_NARROWED,
-    REGISTER_DOMAIN, ATOMIC_WRITE, UI_FEEL, ALIAS_ACTION})
+    REGISTER_DOMAIN, ATOMIC_WRITE, UI_FEEL, REPAIR_SCREEN_CERT, ALIAS_ACTION})
 
 # remediation.INFRA_TEXT (runner loss, OOM, 5xx) plus the platform failures seen in 52 agent-declined
 # fix runs. Kept out of INFRA_TEXT: the exhausted-PR classifier deliberately routes a rate-limited
@@ -58,7 +60,6 @@ PLATFORM_TEXT = re.compile(
 # scripts/security/dual-license-elections.json. Never drop a deny-licenses id.
 DEPENDENCY_LICENSE = re.compile(r"Dependency review detected incompatible licenses")
 QUOTA_TEXT = re.compile(r"github-quota-deferred|Fleet rule evidence is (?:missing|deferred)", re.IGNORECASE)
-# Before quota: a Source Validation log echoes github-quota-deferred beside the ui-feel block that failed the job.
 UI_FEEL_TEXT = re.compile(r"\[lint:ui-feel\] new violations on lines this change adds:")
 UNWIRED = re.compile(r"Unwired: (.+?)\. Wire each file into a ci-fast lane")
 ATOMIC_TEXT = re.compile(r"use atomic_state\.atomic_write_text for whole-file state")
@@ -162,6 +163,8 @@ SIGNATURES = (
     # The license error is the job failure. A passing fixture can echo quota text.
     ("dependency-license", DEPENDENCY_LICENSE, AGENT),
     ("ui-feel", UI_FEEL_TEXT, UI_FEEL),
+    # Before quota/platform: a Source Validation log echoes passing-test rate-limit lines beside the gate that failed the job.
+    ("screen-certificate", SCREEN_CERT_TEXT, REPAIR_SCREEN_CERT),
     ("quota-deferred", QUOTA_TEXT, RERUN),
     ("platform-infra", PLATFORM_TEXT, RERUN),
     ("migration-number", migration_renumber.LOG_TEXT, RENUMBER),
@@ -190,7 +193,7 @@ def stamp_internal_changelog(body) -> str | None:
 
 
 def classify(pr: dict, logs: dict[str, str] | None = None) -> dict:
-    """{cls, key, action, checks, signature, files}. `logs` maps a failing check name to its failed-job log;
+    """{cls, key, action, checks, signature, files, repairs}. `logs` maps a failing check name to its failed-job log;
     a check with no log is `other`. A BEHIND branch with nothing deterministic to say is `stale-branch`."""
     logs = logs or {}
     import detached_native_sync
@@ -226,12 +229,16 @@ def classify(pr: dict, logs: dict[str, str] | None = None) -> dict:
             found = UNWIRED.search(logs.get(name) or "")
             files.extend(item.strip() for item in (found.group(1).split(",") if found else []) if item.strip())
         files = sorted(set(files))
+    elif cls == "screen-certificate":
+        files = screen_cert_paths("\n".join(logs.get(name) or "" for name in names))
     elif cls == "domain-write":
         files = sorted(_domain_write_hits("\n".join(logs.get(name) or "" for name in names)))
     elif cls == "detached-native-consumer":
         files = detached_native_sync.paths("\n".join(logs.get(name) or "" for name in names))
+    repairs = mixed_repairs(pr, per_check) if cls == "mixed" else []
     return {"schema": SCHEMA, "cls": cls, "key": fingerprint_key(cls, names, signature), "action": action,
-            "checks": names, "signature": signature, "files": files, **({"evidenceOwner": owner} if owner else {})}
+            "checks": names, "signature": signature, "files": files, "repairs": repairs,
+            **({"evidenceOwner": owner} if owner else {})}
 
 
 def _split_shell_and(command: str) -> list[str] | None:
@@ -983,7 +990,7 @@ def wire_ci_fast(root: Path, files: list[str]) -> list[str]:
     added = []
     for rel in files:
         if not re.fullmatch(r"scripts/[\w./-]+\.test\.(?:mjs|mts|js|ts)", rel) or ".." in rel \
-                or not (Path(root) / rel).is_file() or f"'{rel}'" in text:
+                or not (Path(root) / rel).is_file() or f"'{rel}'" in text or f"'{rel} " in text:
             continue
         source = (Path(root) / rel).read_text(errors="replace")
         name = "SCRIPT_CONTRACT_VITEST_TESTS" if re.search(r"""from ['"]vitest['"]""", source) else "SCRIPT_CONTRACT_NODE_TESTS"

@@ -87,7 +87,8 @@ describe('WaitlistPage', () => {
     }
   );
 
-  test('renders the public waitlist entry for signed-out visitors', async () => {
+  test('renders the public waitlist entry for signed-out visitors when signup is closed', async () => {
+    vi.stubEnv('FEATURE_PUBLIC_SIGNUP_CLOSED', 'true');
     mockRedirect.mockClear();
     mockNotFound.mockClear();
     mockResolveUserState.mockResolvedValue({

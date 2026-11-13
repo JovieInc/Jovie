@@ -258,7 +258,7 @@ export function PaySelector({
           <button
             type='button'
             onClick={handleCustomToggle}
-            className='relative inline-flex h-10 w-full items-center justify-center gap-1.5 rounded-full border border-white/10 bg-white/[0.02] px-4 text-app font-medium tracking-[-0.015em] text-secondary-token transition-[border-color,background-color,color] duration-subtle hover:border-white/16 hover:bg-white/[0.05] hover:text-primary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))] focus-visible:ring-offset-2 focus-visible:ring-offset-transparent'
+            className='relative inline-flex h-10 w-full items-center justify-center gap-1.5 rounded-full border border-white/10 bg-white/[0.02] px-4 text-app font-medium tracking-[-0.015em] text-secondary-token transition-[border-color,background-color,color] duration-subtle hover:border-white/16 hover:bg-white/[0.05] hover:text-primary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:ring-offset-transparent'
             aria-pressed={customMode}
             aria-controls='pay-selector-heading'
           >
@@ -271,7 +271,7 @@ export function PaySelector({
               <button
                 type='button'
                 onClick={() => setShowOtherOptions(open => !open)}
-                className='relative flex h-auto min-h-7 w-full rounded-full items-center gap-3.5 text-app font-medium tracking-[-0.015em] text-tertiary-token transition-colors duration-subtle hover:bg-transparent hover:text-primary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))] focus-visible:ring-offset-2 focus-visible:ring-offset-transparent'
+                className='relative flex h-auto min-h-7 w-full rounded-full items-center gap-3.5 text-app font-medium tracking-[-0.015em] text-tertiary-token transition-colors duration-subtle hover:bg-transparent hover:text-primary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:ring-offset-transparent'
                 aria-expanded={showOtherOptions}
               >
                 <span className='h-px flex-1 bg-white/8' />
