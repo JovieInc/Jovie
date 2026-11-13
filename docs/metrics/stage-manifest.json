@@ -815,6 +815,27 @@
           "owner": "lanes worker"
         }
       ]
+    },
+    "desktop-startup": {
+      "entityId": "source SHA:receipt start:launch index",
+      "description": "Synthetic Ubuntu local HTTP stub; not installed-native first-paint or a speedup measurement.",
+      "stages": [
+        {
+          "id": "launch",
+          "meaning": "bounded launch, sampling and cleanup duration",
+          "producer": "apps/desktop/scripts/startup-budget.mjs",
+          "status": "pushed",
+          "source": "desktop-startup-receipts"
+        },
+        {
+          "id": "finished",
+          "meaning": "measurement ended with captured or unavailable evidence",
+          "producer": "apps/desktop/scripts/startup-budget.mjs",
+          "status": "pushed",
+          "source": "desktop-startup-receipts"
+        }
+      ],
+      "endToEnd": [["launch", "finished"]]
     }
   },
   "sources": {
@@ -906,6 +927,13 @@
       "kind": "events",
       "url": null,
       "owner": "scripts/design/design-loop-ledger.mjs (docs/metrics/design-loop-ledger.ndjson)"
+    },
+    "desktop-startup-receipts": {
+      "kind": "events",
+      "url": null,
+      "artifact": "desktop-startup-receipts/stage-events.ndjson",
+      "workflow": "ci.yml",
+      "owner": "desktop startup (JOV-12388)"
     }
   },
   "producers": {

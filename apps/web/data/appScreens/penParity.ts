@@ -398,24 +398,6 @@ export const APP_SCREEN_PEN_PENDING_DECISIONS: readonly PenPendingDecision[] = [
     summary: 'A3fqK 10px side inset vs edge-to-edge tables.',
   },
   {
-    decisionId: 'D3',
-    checkId: 'page-toolbar.height',
-    recordedOn: '2026-09-27',
-    penValue: 40,
-    sourceValue: 42,
-    summary:
-      'ftsrB is 40; a PageToolbar holding a 30px tab button (h-7.5) plus py-1.5 renders at 42 despite min-h-10.',
-  },
-  {
-    decisionId: 'D3',
-    checkId: 'page-toolbar.table-shell-height',
-    recordedOn: '2026-09-27',
-    penValue: 40,
-    sourceValue: 44,
-    summary:
-      'ftsrB is 40; TABLE_TOOLBAR_SHELL_CLASS is h-11. PR #19084 converges code on 40.',
-  },
-  {
     decisionId: 'D9',
     checkId: 'page-toolbar.padding-x',
     recordedOn: '2026-09-27',

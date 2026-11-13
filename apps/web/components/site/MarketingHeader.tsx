@@ -28,7 +28,6 @@ import {
   type MarketingNavLink,
 } from '@/data/marketingNavigation';
 import { track } from '@/lib/analytics';
-import { FEATURE_FLAGS } from '@/lib/flags/marketing-static';
 
 export interface MarketingHeaderChromeNav {
   readonly primary: readonly MarketingNavLink[];
@@ -224,8 +223,7 @@ export function MarketingHeader({
   }, [presentation]);
 
   const centerNavEnabled =
-    FEATURE_FLAGS.SHOW_MARKETING_CENTER_NAV &&
-    (!usesHomepageChrome || (isHomepage && showHomepageCenterNav));
+    !usesHomepageChrome || (isHomepage && showHomepageCenterNav);
   const useCanonicalSimpleNav = isHomepage || navLinks !== undefined;
   const hasSimpleNav = isMinimal || (centerNavEnabled && useCanonicalSimpleNav);
   const centerNavDisabled = !centerNavEnabled;

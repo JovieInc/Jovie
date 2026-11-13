@@ -86,7 +86,12 @@ export function registerProfileOverviewColumnTests() {
     await installPublicRouteMocks(page);
     await page.setViewportSize({ width: 1440, height: 900 });
     await page.goto(FIXTURE_ROUTE);
-    await waitForSettledProfileLayout(page, 'desktop');
+    const layout = expectedPublicProfileLayout(1440);
+    expect(
+      layout,
+      'The sabotage only proves anything on the desktop shell'
+    ).toBe('desktop');
+    await waitForSettledProfileLayout(page, layout);
     expect((await auditPublicProfileLayout(page)).violations).toEqual([]);
     // Recreate the shipped bug: an intrinsically sized track lets the nowrap
     // titles widen the center cards past their column, under the rail.
