@@ -18,8 +18,10 @@ export function useResultsVisibility() {
   const hideTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const cancelPendingHide = useCallback(() => {
-    clearTimeout(hideTimeoutRef.current);
-    hideTimeoutRef.current = null;
+    if (hideTimeoutRef.current !== null) {
+      clearTimeout(hideTimeoutRef.current);
+      hideTimeoutRef.current = null;
+    }
   }, []);
 
   useEffect(
