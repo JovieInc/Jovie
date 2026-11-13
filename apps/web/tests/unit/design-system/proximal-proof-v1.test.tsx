@@ -5,11 +5,12 @@
 //
 // The shipped homepage is invite-only: its one action ("Request an Invite")
 // scrolls to the waitlist form that closes the same page, and its proof is the
-// real template profile and releases workspace captures. It shows no real
-// person: Tim, 2026-10-26, "no real person's face on /". The
-// homepage-no-person-images guard owns that rule; this receipt asserts the
-// action stays bound to the on-page form (no signup link while signup is
-// closed) without borrowing a person's capture.
+// real template profile and releases workspace captures. Since Tim
+// (2026-11-12, "use me for now") the product UI shows his own catalog from
+// the featured-artist slot; the homepage-no-person-images guard owns which
+// person images may render. This receipt asserts the action stays bound to
+// the on-page form (no signup link while signup is closed) and that the hero
+// shows the product, not a person's capture.
 import { render, screen, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import {
@@ -68,7 +69,12 @@ describe('JOV-INV-038 proximal-proof evaluator (homepage hero)', () => {
     render(<HomepageStoryHero />);
     const hero = screen.getByTestId('marketing-section-hero');
 
-    expect(within(hero).queryByRole('img', { name: /Tim White/i })).toBeNull();
+    // The only labelled image naming the artist is the product mockup.
+    for (const image of within(hero).queryAllByRole('img', {
+      name: /Tim White/i,
+    })) {
+      expect(image).toHaveAccessibleName(/^Jovie for Mac:/);
+    }
     expect(
       hero.querySelector('a[href="/start"], a[href="/signup"]')
     ).toBeNull();

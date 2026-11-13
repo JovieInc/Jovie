@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
   getCachedAuth: vi.fn(),
@@ -17,22 +17,21 @@ import { resolvePmfSurveyUserId, shouldShowPmfSurvey } from './prompt.server';
 
 const NOW = new Date('2026-11-11T12:00:00.000Z');
 
-describe('PMF prompt gate', () => {
+describe('PMF prompt eligibility', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.stubEnv('FEATURE_PMF_SURVEY_PROMPT', 'true');
     mocks.getCachedAuth.mockResolvedValue({ userId: 'user-1' });
     mocks.isPmfSurveyEligibleForUser.mockResolvedValue(true);
   });
 
-  afterEach(() => {
-    vi.unstubAllEnvs();
+  it('shows by default with no flag or env override', async () => {
+    await expect(shouldShowPmfSurvey({ now: NOW })).resolves.toBe(true);
   });
 
-  it('stays hidden while the flag is at its default off', async () => {
-    vi.unstubAllEnvs();
+  it('stays hidden when nobody is signed in', async () => {
+    mocks.getCachedAuth.mockResolvedValue({ userId: null });
     await expect(shouldShowPmfSurvey({ now: NOW })).resolves.toBe(false);
-    expect(mocks.getCachedAuth).not.toHaveBeenCalled();
+    expect(mocks.isPmfSurveyEligibleForUser).not.toHaveBeenCalled();
   });
 
   it('shows for the signed-in user when the prompt is due', async () => {

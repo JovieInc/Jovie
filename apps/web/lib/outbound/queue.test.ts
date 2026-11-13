@@ -76,6 +76,7 @@ function row(lead: OutboundLeadFacts, ledger = []) {
     dedupeKey: `email:${lead.contactEmail}`,
     ledger,
     now: NOW,
+    dogfoodGate: null,
   });
 }
 
@@ -304,6 +305,25 @@ describe('outbound queue display', () => {
       needs_evidence: 1,
       certified: 1,
       approved: 0,
+    });
+  });
+});
+
+describe('draft gate defaults', () => {
+  it('fails closed when the caller omits gate evidence', () => {
+    const lead = facts();
+    expect(
+      buildOutboundRow({
+        facts: lead,
+        target: target(lead),
+        dedupeKey: null,
+        ledger: [],
+        now: NOW,
+      })
+    ).toMatchObject({
+      view: 'needs_judge',
+      nextAction: 'await_judge',
+      message: null,
     });
   });
 });

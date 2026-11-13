@@ -17,6 +17,10 @@ import {
   isPublicSignupClosed,
   PUBLIC_SIGNUP_CLOSED_REDIRECT,
 } from '@/lib/waitlist/public-signup-gate';
+import {
+  recordWinbackResumeClick,
+  resolveWinbackResumeToken,
+} from '@/lib/waitlist/winback-resume.server';
 
 /**
  * Canonical onboarding chat entry point.
@@ -88,6 +92,20 @@ export default async function StartPage(
     typeof params.intent_id === 'string' ? params.intent_id : undefined;
   const starterHandoff = resolveStartEntryHandoff(params);
 
+  // Win-back resume link (founder dispatch 2026-11-09):
+  // /start?resume=winback&w=<signed token> lands in setup even while public
+  // signup is closed — the token is a high-entropy value minted with the
+  // held win-back draft and verified against the operating ledger here.
+  // Best-effort: a failed lookup never blocks the page, it only keeps the
+  // closed-signup redirect in force.
+  const winbackResume =
+    params.resume === 'winback' && typeof params.w === 'string'
+      ? await resolveWinbackResumeToken(params.w)
+      : null;
+  if (winbackResume) {
+    await recordWinbackResumeClick(winbackResume);
+  }
+
   // JOV-7753: a handle-only entry (outreach, claim redirect) shows the
   // visitor's real page first. Explicit prompts and intents keep their flow.
   // A taken handle is the exception: it must say so even when a starter prompt
@@ -112,7 +130,12 @@ export default async function StartPage(
   // join the waitlist. Signed-in users (including redeemed invitees) keep the
   // golden path, and the production certification canary (verified passage
   // token) still exercises anonymous /start.
-  if (!isSignedIn && !turnstileTestMode && isPublicSignupClosed()) {
+  if (
+    !isSignedIn &&
+    !turnstileTestMode &&
+    !winbackResume &&
+    isPublicSignupClosed()
+  ) {
     redirect(PUBLIC_SIGNUP_CLOSED_REDIRECT);
   }
   // No account and no onboarding cookie: there is nothing to restore, so the
