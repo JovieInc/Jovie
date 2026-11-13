@@ -9,7 +9,6 @@ import {
   type TipCheckoutReturnState,
 } from '@/lib/services/tips/checkout-return.server';
 
-export const dynamic = 'force-dynamic';
 export const metadata: Metadata = {
   title: 'Payment status | Jovie',
   robots: NOINDEX_ROBOTS,
@@ -76,7 +75,7 @@ export default async function TipThankYouPage({
       >
         <h1
           id='payment-status-title'
-          className='text-xl font-semibold text-primary-token'
+          className='text-balance text-xl font-semibold text-primary-token'
         >
           {copy.title}
         </h1>

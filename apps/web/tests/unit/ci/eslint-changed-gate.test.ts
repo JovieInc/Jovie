@@ -94,6 +94,29 @@ describe('run', () => {
     );
   });
 
+  it('includes worktree and untracked files in local preflight', () => {
+    const spawn = vi
+      .fn()
+      .mockReturnValueOnce(okDiff('apps/web/app/page.tsx\n'))
+      .mockReturnValueOnce(okDiff('apps/web/app/new-page.tsx\n'))
+      .mockReturnValueOnce({ status: 0 })
+      .mockReturnValueOnce({ status: 0 });
+    expect(
+      run({ worktree: true, spawn, exists: () => true, log: () => {} })
+    ).toBe(0);
+    expect(spawn.mock.calls[0][1]).toContain('--merge-base');
+    expect(spawn.mock.calls[1][1]).toEqual([
+      'ls-files',
+      '--others',
+      '--exclude-standard',
+      '--',
+      'apps/web',
+    ]);
+    expect(spawn.mock.calls[2][1]).toEqual(
+      expect.arrayContaining(['app/page.tsx', 'app/new-page.tsx'])
+    );
+  });
+
   it('propagates an ESLint failure status', () => {
     const spawn = vi
       .fn()

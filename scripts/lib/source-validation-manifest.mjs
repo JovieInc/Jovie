@@ -290,11 +290,9 @@ export const coveredBy = atom =>
  */
 export function selectManifestGuards(paths, base = 'main') {
   return [
-    ...SOURCE_VALIDATION_GUARDS.filter(g =>
-      paths.some(p => g.when.test(p))
-    ).map(g => ({ ...g, command: g.command.replaceAll('{base}', base) })),
+    ...SOURCE_VALIDATION_GUARDS.filter(g => paths.some(p => g.when.test(p))),
     ...selectLocalGuards(paths),
-  ];
+  ].map(g => ({ ...g, command: g.command.replaceAll('{base}', base) }));
 }
 
 export function readRunScripts(workflowText, deriveSteps) {

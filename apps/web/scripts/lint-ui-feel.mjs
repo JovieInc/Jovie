@@ -35,7 +35,8 @@
  *
  * Usage:
  *   node scripts/lint-ui-feel.mjs            # check only
- *   node scripts/lint-ui-feel.mjs --changed origin/main  # added lines only
+ *   node scripts/lint-ui-feel.mjs --changed origin/main  # committed added lines
+ *   LINT_CHANGED_WORKTREE=1 node scripts/lint-ui-feel.mjs --changed origin/main
  *   node scripts/lint-ui-feel.mjs --list     # print file:line locations
  *   node scripts/lint-ui-feel.mjs --update   # lower the baseline
  *
@@ -199,6 +200,7 @@ export function violationsOnAddedLines(violations, added) {
 
 export async function checkChanged({
   baseRef,
+  worktree = process.env.LINT_CHANGED_WORKTREE === '1',
   rule,
   collect = collectViolations,
   spawn = spawnSync,
@@ -212,7 +214,7 @@ export async function checkChanged({
       'diff',
       '-U0',
       '--diff-filter=ACMR',
-      `${baseRef}...HEAD`,
+      ...(worktree ? ['--merge-base', baseRef] : [`${baseRef}...HEAD`]),
       '--',
       'apps/web',
     ],
@@ -227,6 +229,24 @@ export async function checkChanged({
     return 1;
   }
   const added = addedLines(diff.stdout);
+  if (worktree) {
+    const untracked = spawn(
+      'git',
+      ['ls-files', '--others', '--exclude-standard', '--', 'apps/web'],
+      { cwd: join(webRoot, '..', '..'), encoding: 'utf8' }
+    );
+    if (untracked.status !== 0) {
+      error('[lint:ui-feel] could not list untracked web files');
+      return 1;
+    }
+    for (const path of untracked.stdout.split('\n')) {
+      if (!path.startsWith('apps/web/')) continue;
+      const file = path.slice(9);
+      if (!SCANNED_FILE.test(file)) continue;
+      const lines = readFileSync(join(webRoot, file), 'utf8').split('\n');
+      added.set(file, new Set(lines.map((_, index) => index + 1)));
+    }
+  }
   const files = [...added.keys()].filter(file =>
     existsSync(join(webRoot, file))
   );
