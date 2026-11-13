@@ -1,4 +1,5 @@
 /** GitHub transport and data-branch policies for the CI timing collector. */
+// api-budget: github-actions-token 0/hr - no scheduled caller; activation and its event-rate budget remain owned by JOV-8933.
 
 /** @type {{ maxJobPages: number, jobsPerPage: number, maxQueueRunsPages: number, maxRowsPerRunEvent: number, maxBackfillRuns: number, backfillWindowMinutes: number, retentionDays: number, maxPruneDeletes: number, turboCacheSampleModulo: number, maxTurboLogJobsPerRun: number, dataBranch: string, dataDir: string }} */
 export const CAPS = {

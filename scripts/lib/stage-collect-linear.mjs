@@ -1,3 +1,5 @@
+// api-budget: linear-requests 30/hr - daily report burst: 10 batches with at most 3 admissions each, report priority.
+// api-budget: linear-complexity 15000/hr - daily report burst: 30 conservative admissions at 500 points, report priority.
 import {
   createLinearClient,
   LINEAR_API_URL,
