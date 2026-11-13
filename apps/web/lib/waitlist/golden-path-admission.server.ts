@@ -23,6 +23,8 @@ import {
   type GoldenPathVerdict,
 } from '@/lib/waitlist/golden-path-admission';
 import { getWaitlistSettings } from '@/lib/waitlist/settings';
+import { countOpenBugReports } from '@/lib/waitlist/support-load.server';
+import { decideSupportLoadCapacity } from '@/lib/waitlist/support-load-capacity';
 
 const THROTTLE_CACHE_MS = 60_000;
 let throttleCache: { open: boolean; expiresAt: number } | null = null;
@@ -63,11 +65,20 @@ export function resetGoldenPathAdmissionCaches(): void {
 
 async function readCapacityHold(): Promise<GoldenPathAdmissionReason | null> {
   try {
-    const settings = await getWaitlistSettings();
+    const [settings, openBugReports] = await Promise.all([
+      getWaitlistSettings(),
+      countOpenBugReports(),
+    ]);
     if (!settings.autoAcceptEnabled || settings.autoAcceptDailyLimit <= 0) {
       return 'hold_auto_accept_disabled';
     }
-    return settings.autoAcceptedToday >= settings.autoAcceptDailyLimit
+    // Gate harder while open bug reports pile up (Tim, 2026-11-09).
+    const capacity = decideSupportLoadCapacity({
+      baseDailyLimit: settings.autoAcceptDailyLimit,
+      openBugReports,
+    });
+    if (capacity.band === 'hold') return 'hold_support_load';
+    return settings.autoAcceptedToday >= capacity.dailyLimit
       ? 'hold_capacity_full'
       : null;
   } catch (error) {

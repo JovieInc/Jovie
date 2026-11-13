@@ -1,5 +1,3 @@
-import { RELATED_CREATORS_LABEL } from '@/lib/creator/vocabulary';
-
 export type ToolUiRenderer = 'artifact' | 'status';
 export type ToolUiHint = 'artifact' | 'status';
 
@@ -45,6 +43,22 @@ export const TOOL_UI_REGISTRY = {
     successTitle: 'Feedback sent',
     errorTitle: "Couldn't send your feedback",
   },
+  useSkill: {
+    label: 'Skill',
+    uiHint: 'status',
+    renderer: 'status',
+    loadingTitle: 'Opening the playbook…',
+    successTitle: 'Playbook ready',
+    errorTitle: "Couldn't open that playbook",
+  },
+  requestCapability: {
+    label: 'Request',
+    uiHint: 'status',
+    renderer: 'status',
+    loadingTitle: 'Filing the request…',
+    successTitle: 'Request filed',
+    errorTitle: "Couldn't file the request",
+  },
   showTopInsights: {
     label: 'Insights',
     uiHint: 'artifact',
@@ -85,16 +99,6 @@ export const TOOL_UI_REGISTRY = {
     successTitle: 'Canvas checked',
     errorTitle: "Couldn't check Canvas",
   },
-  suggestRelatedArtists: {
-    // Source-neutral chrome (JOV-7635): music-specific framing lives in the
-    // tool result, which carries artist language only for music sources.
-    label: RELATED_CREATORS_LABEL,
-    uiHint: 'status',
-    renderer: 'status',
-    loadingTitle: 'Finding related creators…',
-    successTitle: 'Found related creators',
-    errorTitle: "Couldn't find related creators",
-  },
   writeWorldClassBio: {
     label: 'Bio',
     uiHint: 'status',
@@ -102,14 +106,6 @@ export const TOOL_UI_REGISTRY = {
     loadingTitle: 'Writing your bio…',
     successTitle: 'Bio ready',
     errorTitle: "Couldn't write your bio",
-  },
-  generateCanvasPlan: {
-    label: 'Canvas plan',
-    uiHint: 'status',
-    renderer: 'status',
-    loadingTitle: 'Planning your Canvas video…',
-    successTitle: 'Canvas plan ready',
-    errorTitle: "Couldn't plan your Canvas",
   },
   generateAlbumArt: {
     label: 'Album art',
@@ -254,14 +250,6 @@ export const TOOL_UI_REGISTRY = {
     loadingTitle: 'Opening billing…',
     successTitle: 'Billing ready',
     errorTitle: "Couldn't open billing",
-  },
-  createPromoStrategy: {
-    label: 'Promo strategy',
-    uiHint: 'status',
-    renderer: 'status',
-    loadingTitle: 'Building your promo plan…',
-    successTitle: 'Promo plan ready',
-    errorTitle: "Couldn't build your promo plan",
   },
   markCanvasUploaded: {
     label: 'Canvas',

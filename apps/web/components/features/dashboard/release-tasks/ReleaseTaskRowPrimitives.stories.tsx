@@ -1,7 +1,10 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { fn } from 'storybook/test';
 import type { ReleaseTaskView } from '@/lib/release-tasks/types';
-import { ReleaseTaskCheckbox } from './ReleaseTaskRowPrimitives';
+import {
+  ReleaseTaskCheckbox,
+  ReleaseTaskTitleText,
+} from './ReleaseTaskRowPrimitives';
 
 const task: ReleaseTaskView = {
   id: 'task-story',
@@ -35,10 +38,12 @@ const meta = {
     layout: 'centered',
   },
   decorators: [
-    Story => (
+    (Story, context) => (
       <div className='flex items-center gap-3 rounded-md border border-subtle bg-surface-1 p-4'>
         <Story />
-        <span className='text-app text-secondary-token'>{task.title}</span>
+        <span className='text-app text-secondary-token'>
+          {context.args.task?.title ?? task.title}
+        </span>
       </div>
     ),
   ],
@@ -72,4 +77,36 @@ export const Automated: Story = {
       assigneeType: 'ai_workflow',
     },
   },
+};
+
+/** A long title in the truncating title primitive beside the checkbox. */
+export const LongContentTitle: Story = {
+  args: {
+    task: {
+      ...task,
+      title:
+        'Pitch the deluxe edition to every editorial playlist curator who featured the lead single',
+    },
+  },
+  render: args => (
+    <div className='flex w-56 min-w-0 items-center gap-2'>
+      <ReleaseTaskCheckbox {...args} />
+      <ReleaseTaskTitleText className='min-w-0 flex-1' isDone={args.isDone}>
+        {args.task.title}
+      </ReleaseTaskTitleText>
+    </div>
+  ),
+};
+
+export const RtlTitle: Story = {
+  args: {
+    task: { ...task, title: 'التواصل مع محرري قوائم التشغيل' },
+  },
+  decorators: [
+    Story => (
+      <div dir='rtl' lang='ar'>
+        <Story />
+      </div>
+    ),
+  ],
 };

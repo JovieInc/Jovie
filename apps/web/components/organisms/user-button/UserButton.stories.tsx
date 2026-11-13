@@ -1,5 +1,8 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
+import { withSignedInSession } from '@/.storybook/signed-in-session';
 import { APP_ROUTES } from '@/constants/routes';
+import { JovieAuthValuesProvider } from '@/hooks/useJovieAuth';
+import type { Artist } from '@/types/db';
 import { UserButton } from './UserButton';
 
 const meta: Meta<typeof UserButton> = {
@@ -36,4 +39,82 @@ export const CollapsedDockStatus: Story = {
       badges: <span aria-hidden='true'>↑ ·</span>,
     },
   },
+};
+
+const signedIn: NonNullable<Story['decorators']> = [
+  withSignedInSession,
+  Story => (
+    <JovieAuthValuesProvider>
+      <Story />
+    </JovieAuthValuesProvider>
+  ),
+];
+
+const LONG_NAME_ARTIST: Artist = {
+  id: 'story-artist',
+  owner_user_id: 'story-user',
+  handle: 'timwhite',
+  spotify_id: 'story-spotify',
+  name: 'Tim White And The Extremely Long Touring Band Name',
+  image_url: '',
+  tagline: '',
+  published: true,
+  is_verified: false,
+  is_featured: false,
+  marketing_opt_out: false,
+  created_at: '2026-01-01T00:00:00Z',
+  settings: {},
+};
+
+/** No session yet: the row holds its skeleton until the session resolves. */
+export const LoadingRow: Story = {};
+
+const onSidebarRail: NonNullable<Story['decorators']> = [
+  Story => (
+    <div className='w-56 bg-sidebar p-2'>
+      <Story />
+    </div>
+  ),
+];
+
+/** Loading row on the light rail: the skeleton reads against the surface. */
+export const LoadingRowLight: Story = {
+  parameters: { themes: { themeOverride: 'light' } },
+  decorators: onSidebarRail,
+};
+
+/** Loading row on the dark rail. */
+export const LoadingRowDark: Story = {
+  parameters: { themes: { themeOverride: 'dark' } },
+  decorators: onSidebarRail,
+};
+
+/** Signed in without a photo: the avatar falls back to initials. */
+export const PartialWithoutAvatar: Story = {
+  decorators: signedIn,
+};
+
+/** A long account name truncates inside the row. */
+export const LongContent: Story = {
+  args: { artist: LONG_NAME_ARTIST },
+  decorators: [
+    ...signedIn,
+    Story => (
+      <div className='w-56'>
+        <Story />
+      </div>
+    ),
+  ],
+};
+
+/** The signed-in row inside a right-to-left page. */
+export const Rtl: Story = {
+  decorators: [
+    ...signedIn,
+    Story => (
+      <div dir='rtl' lang='ar' className='w-56'>
+        <Story />
+      </div>
+    ),
+  ],
 };

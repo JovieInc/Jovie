@@ -827,7 +827,7 @@ export function buildStructuredCollaboratorParagraph(
         segments.push({ type: 'text', text: ' and ' });
       }
       segments.push(
-        { type: 'text', text: '"' },
+        { type: 'text', text: '\u201c' },
         {
           type: 'release',
           text: release.title,
@@ -836,7 +836,7 @@ export function buildStructuredCollaboratorParagraph(
             `/${encodeURIComponent(release.slug)}`
           ),
         },
-        { type: 'text', text: '"' }
+        { type: 'text', text: '\u201d' }
       );
     });
   });

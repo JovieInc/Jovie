@@ -7,19 +7,10 @@
 
 import { NextResponse } from 'next/server';
 
-import { getOvieOperatorEntitlements } from '@/lib/ovie/privacy-lock/access';
+import { operatorAccess } from '@/lib/api/route-access';
+import { defineRoute } from '@/lib/api/route-pipeline';
 
-export async function POST() {
-  const entitlements = await getOvieOperatorEntitlements({ session: 'fresh' });
-
-  if (!entitlements.isAuthenticated) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
-
-  if (!entitlements.isAdmin) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-  }
-
+async function postHandler() {
   return NextResponse.json(
     {
       error:
@@ -28,3 +19,12 @@ export async function POST() {
     { status: 410 }
   );
 }
+
+export const POST = defineRoute(
+  {
+    route: '/api/admin/test-user/set-plan',
+    access: operatorAccess({ session: 'fresh' }),
+    legacy: { cache: 'none', unhandledErrors: 'rethrow' },
+  },
+  postHandler
+);

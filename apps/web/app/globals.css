@@ -22,6 +22,7 @@
    (styles/system-b-app.css) can reference the same foundation without
    re-emitting it. Imported normally here so it is emitted once, globally. */
 @import "../styles/tailwind-foundation.css";
+@import "../styles/electron-chrome.css";
 
 /* Scan @jovie/ui package so Tailwind v4 detects its class usage */
 
@@ -110,34 +111,9 @@ body {
   --jovie-shell-overlay-z-index: 180;
 }
 
-html[data-desktop-runtime="electron"] {
-  --electron-titlebar-height: 40px;
-  --electron-controls-width: 200px;
-  --electron-traffic-light-x: 20px;
-  /* JOV-8974: the titlebar band sits one shell gap below the window top, so
-     the native lights ride down with it (MACOS_TRAFFIC_LIGHT_Y + gap). */
-  --electron-traffic-light-y: 25px;
-  --electron-traffic-light-control-size: 14px;
-  --electron-traffic-light-clearance: 8px;
-  /* Content origin is the shell gap (titlebar padding-left). The reserve
-     places the first control at the native lights' trailing clearance.
-     20 - 8 + 42 + 16 + 8 - 8 = 70. Toggle window x = 8 + 70 + 8 = 86. */
-  --electron-traffic-light-safe-width: calc(
-    var(--electron-traffic-light-x) -
-    var(--app-shell-gap) +
-    (3 * var(--electron-traffic-light-control-size)) +
-    (2 * var(--electron-traffic-light-clearance)) +
-    var(--electron-traffic-light-clearance) -
-    var(--app-shell-sidebar-icon-gap)
-  );
-  --electron-sidebar-width: var(--app-shell-sidebar-width);
-  --electron-sidebar-collapsed-width: 52px;
-}
-
 html[data-desktop-runtime="electron"] body {
   background: rgb(var(--sidebar-background));
-  font-family:
-    -apple-system, BlinkMacSystemFont, var(--font-inter), "Inter", sans-serif;
+  font-family: var(--font-sans);
 }
 
 [data-electron-titlebar="true"] {
@@ -2186,9 +2162,6 @@ body {
   body {
     background-color: var(--color-bg-base);
     color: var(--color-text-primary-token);
-    font-feature-settings:
-      "rlig" 1,
-      "calt" 1;
   }
   h1,
   h2,
