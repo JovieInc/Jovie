@@ -16,6 +16,9 @@ name: Auto-Merge Base Guard
 on:
   pull_request_target:
     types: [auto_merge_enabled]
+    # The guard only acts on a non-main base, so a main-based PR never starts a
+    # run (283 always-skipped runs/week before this filter, 2026-11-11).
+    branches-ignore: [main]
 
 permissions:
   contents: read

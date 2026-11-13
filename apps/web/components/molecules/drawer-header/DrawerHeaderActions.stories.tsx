@@ -60,3 +60,82 @@ export const CopiedStateWithLink: Story = {
     onClose: () => undefined,
   },
 };
+
+/** No primary or overflow actions: only the small-screen Close remains. */
+export const EmptyActions: Story = {
+  args: {
+    primaryActions: [],
+    onClose: () => undefined,
+  },
+};
+
+/** One primary action without an active icon, no overflow and no Close. */
+export const PartialSingleAction: Story = {
+  args: {
+    primaryActions: [
+      {
+        id: 'copy',
+        label: 'Copy link',
+        icon: Copy,
+        onClick: () => undefined,
+      },
+    ],
+  },
+};
+
+export const LongContent: Story = {
+  args: {
+    primaryActions: [
+      {
+        id: 'open',
+        label: 'Open Midnight Drive (Extended Club Mix) in a new tab',
+        icon: ExternalLink,
+        onClick: () => undefined,
+      },
+    ],
+    overflowActions: [
+      {
+        id: 'copy-smart-link',
+        label: 'Copy the smart link for every streaming service',
+        icon: Copy,
+        onClick: () => undefined,
+      },
+      {
+        id: 'copy-isrc',
+        label: 'Copy ISRC and UPC codes for distributor support',
+        icon: Copy,
+        onClick: () => undefined,
+      },
+    ],
+    onClose: () => undefined,
+  },
+};
+
+export const Rtl: Story = {
+  args: {
+    primaryActions: [
+      {
+        id: 'open',
+        label: 'فتح العنصر',
+        icon: ExternalLink,
+        onClick: () => undefined,
+      },
+    ],
+    overflowActions: [
+      {
+        id: 'copy',
+        label: 'نسخ العنوان',
+        icon: Copy,
+        onClick: () => undefined,
+      },
+    ],
+    onClose: () => undefined,
+  },
+  decorators: [
+    Story => (
+      <div dir='rtl' lang='ar'>
+        <Story />
+      </div>
+    ),
+  ],
+};

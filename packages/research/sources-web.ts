@@ -112,6 +112,12 @@ export async function exaSearch(
 
 // ---- Firecrawl search (plan credits, tier 1) ------------------------------
 
+interface FirecrawlWebResult {
+  url: string;
+  title?: string;
+  description?: string;
+}
+
 const TBS: Partial<Record<Freshness, string>> = {
   live: 'qdr:d',
   day: 'qdr:d',
@@ -126,22 +132,24 @@ export async function firecrawlSearch(
   limit = 5
 ): Promise<SourceOutput> {
   const tbs = TBS[freshness];
+  // v2 API: v0/v1 are retired on 2026-12-10. v2 groups results by source,
+  // so web results arrive under data.web rather than as a bare data array.
   const response = await client.request({
-    url: providerUrl('firecrawl', '/v1/search'),
+    url: providerUrl('firecrawl', '/v2/search'),
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: { query, limit, ...(tbs ? { tbs } : {}) },
+    body: { query, limit, sources: ['web'], ...(tbs ? { tbs } : {}) },
     timeoutMs: 30_000,
     ...READ,
   });
   if (response.status >= 400)
     throw new Error(`firecrawl HTTP ${response.status}`);
   const body = response.json<{
-    data?: { url: string; title?: string; description?: string }[];
+    data?: { web?: FirecrawlWebResult[] };
   }>();
   return {
     usd: 0,
-    hits: (body.data ?? []).map(r => ({
+    hits: (body.data?.web ?? []).map(r => ({
       source: 'firecrawl',
       title: clip(r.title, 200) || r.url,
       url: r.url,

@@ -218,6 +218,7 @@ export const ingestionJobStatusEnum = pgEnum('ingestion_job_status', [
   'failed',
   'held_for_approval',
 ]);
+
 export const scraperStrategyEnum = pgEnum('scraper_strategy', [
   'http',
   'browser',

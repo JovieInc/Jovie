@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import { getSeamSideOffset, SEAM_GAP, Tooltip } from './Tooltip';
@@ -95,6 +95,23 @@ describe('getSeamSideOffset', () => {
 });
 
 describe('Tooltip (shell)', () => {
+  it('reads no layout when right-side tooltips mount in a seam container', () => {
+    const spy = vi.spyOn(Element.prototype, 'getBoundingClientRect');
+    render(
+      <nav data-sidebar='sidebar'>
+        <Tooltip label='Single child' side='right'>
+          <button type='button'>Row</button>
+        </Tooltip>
+        <Tooltip label='Wrapped children' side='right'>
+          <span>Icon</span>
+          <span>Text</span>
+        </Tooltip>
+      </nav>
+    );
+    expect(spy).not.toHaveBeenCalled();
+    spy.mockRestore();
+  });
+
   it('preserves the full label without a line clamp', () => {
     render(
       <Tooltip
@@ -238,5 +255,30 @@ describe('Tooltip (shell) accessibility', () => {
     fireEvent.focus(screen.getByRole('button', { name: 'Audience' }));
     expect(screen.queryByTestId('tooltip-content')).not.toBeInTheDocument();
     await expectNoA11yViolations(container);
+  });
+});
+
+describe('Tooltip forced closed', () => {
+  // The collapsing-sidebar orphan: intent gathered while `open={false}` must
+  // not survive to the moment the owner releases the tooltip.
+  it('needs fresh intent after the owner stops forcing it closed', async () => {
+    const view = (open: false | undefined) => (
+      <Tooltip label='Status' open={open}>
+        <button type='button'>Account</button>
+      </Tooltip>
+    );
+    const { rerender } = render(view(false));
+    const trigger = screen.getByRole('button', { name: 'Account' });
+    fireEvent.focus(trigger);
+    await act(async () => {});
+    expect(screen.queryByRole('tooltip')).not.toBeInTheDocument();
+
+    rerender(view(undefined));
+    await act(async () => {});
+    expect(screen.queryByRole('tooltip')).not.toBeInTheDocument();
+
+    fireEvent.blur(trigger);
+    fireEvent.focus(trigger);
+    expect(await screen.findByRole('tooltip')).toHaveTextContent('Status');
   });
 });

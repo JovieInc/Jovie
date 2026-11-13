@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { LISTEN_COOKIE } from '@/constants/app';
 import type { AvailableDSP } from '@/lib/dsp';
 import { toGenericPlatformLink } from '@/lib/platform-links';
+import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import type { Artist } from '@/types/db';
 import { StaticListenInterface } from './StaticListenInterface';
 
@@ -110,8 +111,8 @@ describe('StaticListenInterface', () => {
     }
   });
 
-  it('exposes DSP destinations as links in the accessibility tree', () => {
-    render(
+  it('exposes DSP destinations as links in the accessibility tree', async () => {
+    const { container } = render(
       <StaticListenInterface artist={artist} handle='tim' dspsOverride={dsps} />
     );
 
@@ -139,10 +140,88 @@ describe('StaticListenInterface', () => {
     expect(
       screen.queryByRole('button', { name: /spotify|apple music/i })
     ).not.toBeInTheDocument();
+    expect(
+      screen.getByText('Your preferred app opens first next time.')
+    ).toBeInTheDocument();
+    await expectNoA11yViolations(container);
   });
 
-  it('keeps preview DSP rows out of the link tree', () => {
+  it('explains when the profile has no streaming links', async () => {
+    const { container } = render(
+      <StaticListenInterface artist={artist} handle='tim' dspsOverride={[]} />
+    );
+
+    expect(
+      screen.getByText("Streaming links aren't available for this profile yet.")
+    ).toBeInTheDocument();
+    expect(screen.queryByRole('link')).not.toBeInTheDocument();
+    await expectNoA11yViolations(container);
+  });
+
+  it('hides the help text when asked', () => {
     render(
+      <StaticListenInterface
+        artist={artist}
+        handle='tim'
+        dspsOverride={dsps}
+        hideHelpText
+      />
+    );
+
+    expect(
+      screen.queryByText('Your preferred app opens first next time.')
+    ).not.toBeInTheDocument();
+  });
+
+  it('shows the opening provider and locks the row until it resets', async () => {
+    const open = vi.spyOn(globalThis, 'open').mockReturnValue(null);
+
+    try {
+      const { container } = render(
+        <StaticListenInterface
+          artist={artist}
+          handle='tim'
+          dspsOverride={dsps}
+        />
+      );
+
+      fireEvent.click(screen.getByRole('link', { name: 'Listen on Spotify' }));
+
+      expect(await screen.findByText('Opening Spotify...')).toBeInTheDocument();
+      // label-content-name-mismatch: while the row shows the opening label,
+      // the accessible name renames to match the visible text.
+      expect(
+        screen.getByRole('link', { name: 'Opening Spotify...' })
+      ).toBeInTheDocument();
+      await waitFor(() =>
+        expect(open).toHaveBeenCalledWith(
+          'https://open.spotify.com/artist/4u',
+          '_blank',
+          'noopener,noreferrer'
+        )
+      );
+      await expectNoA11yViolations(container);
+
+      // A second press while opening is ignored.
+      fireEvent.click(
+        screen.getByRole('link', { name: 'Listen on Apple Music' })
+      );
+      expect(open).toHaveBeenCalledTimes(1);
+
+      await waitFor(
+        () => expect(screen.queryByText('Opening Spotify...')).toBeNull(),
+        { timeout: 2000 }
+      );
+    } finally {
+      open.mockRestore();
+      localStorage.removeItem(LISTEN_COOKIE);
+      document.cookie = `${LISTEN_COOKIE}=; path=/; max-age=0`;
+    }
+  });
+
+  it('keeps preview DSP rows out of the link tree', async () => {
+    const open = vi.spyOn(globalThis, 'open').mockReturnValue(null);
+    const { container } = render(
       <StaticListenInterface
         artist={artist}
         handle='tim'
@@ -152,8 +231,13 @@ describe('StaticListenInterface', () => {
     );
 
     expect(screen.queryByRole('link')).not.toBeInTheDocument();
-    expect(
-      screen.getByRole('button', { name: 'Listen on Spotify' })
-    ).toBeVisible();
+    const previewRow = screen.getByRole('button', {
+      name: 'Listen on Spotify',
+    });
+    expect(previewRow).toBeVisible();
+    fireEvent.click(previewRow);
+    expect(open).not.toHaveBeenCalled();
+    open.mockRestore();
+    await expectNoA11yViolations(container);
   });
 });

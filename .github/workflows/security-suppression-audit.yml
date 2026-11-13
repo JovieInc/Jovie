@@ -1,8 +1,14 @@
 name: Security Suppression Audit
 
 on:
+  # Submitted reviews arrive through Lane Fix Relay, which already wakes on
+  # every submitted review and calls this workflow for main-based PRs; a
+  # trigger of its own here started ~600 runs a week that skipped because
+  # the reviewer was not a bot (2026-11-11 audit). The github context is the
+  # relay's pull_request_review event.
+  workflow_call:
   pull_request_review:
-    types: [submitted, edited, dismissed]
+    types: [edited, dismissed]
   # Each bot review is audited on its own pull_request_review event, so there
   # is no clock: re-reading every open PR's reviews daily repeated that work
   # and spent one REST call per open PR. Dispatch keeps the full-roster audit.
@@ -12,8 +18,10 @@ permissions:
   contents: read
 
 concurrency:
-  group: security-suppression-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
+  # github.workflow is the caller's name when Lane Fix Relay calls this; only
+  # this workflow's own runs cancel each other, never a relay run.
+  group: security-suppression-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.workflow == 'Security Suppression Audit' }}
 
 jobs:
   review-audit:

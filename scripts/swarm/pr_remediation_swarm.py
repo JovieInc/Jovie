@@ -26,13 +26,13 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "lanes"))
-import fix_red_classes as classes  # noqa: E402
+import fix_red_classes as classes, model_pool_calls  # noqa: E401,E402  (model_pool_calls: no Anthropic model on the gateway)
 from apiclient.gh import run_gh  # noqa: E402
 
 SCHEMA = "jovie-remediation-swarm/v1"
 HOST = "gha-swarm"
 REPO = os.environ.get("GITHUB_REPOSITORY", "JovieInc/Jovie")
-CLAIM_TTL_S = 2 * 3600
+CLAIM_TTL_S = 60 * 60  # same TTL as scripts/lanes/pr_events.py CLAIM_TTL_S
 RECENT_PUSH_S = 20 * 60
 LABEL = "lane-fix-red"
 CONFLICT_LABEL = "lane-fix-conflict"
@@ -432,7 +432,7 @@ def prepare_red(a, plan: dict, pr: dict) -> int:
     plan["logDiag"] = LOG_DIAG[:4]
     regen = next((cmd for name, pat, cmd in REGEN if pat.search(joined)), None)
     action = plan["action"]
-    skip = None
+    skip = classes.owner_handoff_reason(cls) if action == cls["action"] else None
     if regen and action == classes.AGENT:
         plan.update(action="regen", regen=regen, cls="regen")
         action = "regen"
@@ -695,9 +695,9 @@ def pick_model(base: str, key: str, candidates: list[str]) -> tuple[str, float, 
     with urllib.request.urlopen(req, timeout=30) as resp:
         data = {m["id"]: m for m in json.load(resp)["data"]}
     for c in candidates:
-        if c in data:
+        if c in data and not model_pool_calls.request_refusal(base, {"model": c}, site="pr-remediation-swarm", strict=True):
             pricing = data[c].get("pricing") or {}
-            # A relay lists no prices: fall back to list price per token so the cost stop still trips.
+            # A relay lists no prices: list price per token keeps the cost stop.
             p_in = float(pricing.get("input") or 0) or float(os.environ.get("SWARM_PRICE_IN_PER_M", "0.15")) / 1e6
             p_out = float(pricing.get("output") or 0) or float(os.environ.get("SWARM_PRICE_OUT_PER_M", "0.50")) / 1e6
             return c, p_in, p_out

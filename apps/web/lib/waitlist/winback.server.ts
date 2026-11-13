@@ -1,24 +1,24 @@
 import 'server-only';
 
 /**
- * DB half of the win-back loop plumbing. Nothing here sends an email:
- * drafts land in `ingestion_jobs` with status `held_for_approval`, and the
- * send-time approval gate lives in the win-back email processor
- * (`processWaitlistEmailJob`, type `winback_capability_shipped`).
+ * DB half of the win-back matcher and held-draft insertion (founder dispatch
+ * 2026-11-09). Nothing here sends an email. Drafts land in `ingestion_jobs`
+ * with status `held_for_approval`. The send-time approval gate lives in
+ * `processWaitlistWinbackEmailJob`.
  *
- * Two seams, both fail-closed (founder dispatch 2026-11-09):
+ * Two seams, both fail-closed:
  * - `capability_wants` table: added by a parallel PR. Until it exists the
  *   matcher returns zero candidates with a `capability_wants_pending` seam
  *   marker instead of guessing.
  * - Shared qualification re-check: composed through
- *   `evaluateAcquisitionEligibility` (lib/acquisition/eligibility.ts). The
- *   default composer reports UNKNOWN (fail-closed) until the parallel PR's
- *   evidence composition is merged; callers may inject a real composer.
+ *   `evaluateAcquisitionEligibility`. The default composer reports UNKNOWN
+ *   until the parallel evidence composition is merged; callers may inject a
+ *   real composer.
  */
 
 import { sql as drizzleSql, eq } from 'drizzle-orm';
 import { unknownAcquisitionEligibility } from '@/lib/acquisition/eligibility';
-import { type DbOrTransaction } from '@/lib/db';
+import type { DbOrTransaction } from '@/lib/db';
 import { ingestionJobs } from '@/lib/db/schema/ingestion';
 import { ovieOperatingKv } from '@/lib/db/schema/ovie';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
@@ -31,10 +31,6 @@ import {
   winbackResumeKvKey,
 } from '@/lib/waitlist/winback';
 import { trackWinbackEvent } from '@/lib/waitlist/winback-analytics';
-
-// ---------------------------------------------------------------------------
-// Shared qualification re-check (seam).
-// ---------------------------------------------------------------------------
 
 export type WinbackQualificationVerdict = 'ELIGIBLE' | 'BLOCKED' | 'UNKNOWN';
 
@@ -50,11 +46,9 @@ export type WinbackQualificationDecider = (input: {
 }) => Promise<WinbackQualificationDecision>;
 
 /**
- * Default re-check: runs the SHARED qualification decision
- * (`evaluateAcquisitionEligibility`) over an explicit unknown-evidence
- * composer, which fails closed to UNKNOWN — an unknown verdict never gets a
- * draft. Wiring the real cone-evidence composer here is the seam for the
- * parallel qualification PR.
+ * Default re-check: runs the shared qualification decision over an explicit
+ * unknown-evidence composer, which fails closed to UNKNOWN. An unknown
+ * verdict never gets a draft.
  */
 export const defaultWinbackQualificationDecider: WinbackQualificationDecider =
   async ({ capabilityKey, now }) => {
@@ -67,10 +61,6 @@ export const defaultWinbackQualificationDecider: WinbackQualificationDecider =
       detail: eligibility.policy.instruction,
     };
   };
-
-// ---------------------------------------------------------------------------
-// Matcher.
-// ---------------------------------------------------------------------------
 
 export interface WinbackCandidate {
   readonly entryId: string;
@@ -97,12 +87,11 @@ async function loadCapabilityWantRows(
   const table = await tx.execute<{ regclass: string | null }>(
     drizzleSql`SELECT to_regclass('public.capability_wants')::text AS "regclass"`
   );
-  if (!table.rows[0]?.regclass) {
+  const regclass = table.rows[0]?.regclass;
+  if (!regclass) {
     return { seam: 'capability_wants_pending', rows: [] };
   }
 
-  // capability_wants (parallel PR): kind want|objection|current_tool, text
-  // in the person's own words, capability_key, waitlist_entry_id.
   const rows = await tx.execute<{
     waitlist_entry_id: string;
     kind: string;
@@ -156,7 +145,7 @@ export async function matchWinbackCandidates(
     };
   }
 
-  const statuses = await loadMatchableStatuses(tx);
+  const statuses = new Set(await loadMatchableStatuses(tx));
   const wantsByEntry = new Map<string, { kind: string; text: string }[]>();
   for (const row of wantLoad.rows) {
     const list = wantsByEntry.get(row.entryId) ?? [];
@@ -171,7 +160,7 @@ export async function matchWinbackCandidates(
       .from(waitlistEntries)
       .where(eq(waitlistEntries.id, entryId))
       .limit(1);
-    if (!entry || !statuses.includes(entry.status)) continue;
+    if (!entry || !statuses.has(entry.status)) continue;
 
     const [profile] = await tx
       .select({ handle: creatorProfiles.username })
@@ -190,10 +179,6 @@ export async function matchWinbackCandidates(
 
   return { capabilityKey, seam: 'ready', seamDetail: null, candidates };
 }
-
-// ---------------------------------------------------------------------------
-// Held drafts.
-// ---------------------------------------------------------------------------
 
 export interface WinbackDraftInput {
   readonly entryId: string;

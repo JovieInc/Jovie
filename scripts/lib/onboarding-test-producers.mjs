@@ -1,3 +1,5 @@
+import { PRODUCT_SHOT_TEST_PRODUCERS } from './product-shot-test-producers.mjs';
+
 /** Exact onboarding/waitlist producers; flags and unknown neighbors remain global. */
 /** @type {Array<[string, string[]]>} */
 export const ONBOARDING_TEST_PRODUCERS = [
@@ -25,4 +27,12 @@ export const ONBOARDING_TEST_PRODUCERS = [
       'apps/web/tests/unit/onboarding/OnboardingChat.empty-intro.test.tsx',
     ],
   ],
+];
+
+// The affected-test planner is at its company size budget. Product-shot
+// bindings join through this module, which sparse CI checkouts already carry.
+/** @type {Array<[string, string[]]>} */
+export const KNOWN_VITEST_FIXTURE_PRODUCERS = [
+  ...ONBOARDING_TEST_PRODUCERS,
+  ...PRODUCT_SHOT_TEST_PRODUCERS,
 ];

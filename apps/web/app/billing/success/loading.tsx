@@ -9,7 +9,7 @@ import { StandaloneProductPage } from '@/components/organisms/StandaloneProductP
  */
 export default function BillingSuccessLoading() {
   return (
-    <StandaloneProductPage width='lg' centered>
+    <StandaloneProductPage width='lg'>
       <ContentSurfaceCard surface='details' className='overflow-hidden'>
         <ContentSectionHeaderSkeleton
           titleWidth='w-56'

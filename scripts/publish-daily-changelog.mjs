@@ -4,6 +4,7 @@ import { execFileSync } from 'node:child_process';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { collectCustomerCandidates } from './lib/daily-changelog-collector.mjs';
+import { lintDailyDigestStories } from './lib/daily-changelog-copy-gate.mjs';
 import {
   checkPublicationBinding,
   isTrustedControllerRun,
@@ -189,6 +190,23 @@ const plan = planDailyPublication({
   observedAt,
   catchUp: process.argv.includes('--catch-up'),
 });
+// Customer digest copy must pass @jovie/copy at the jovie-marketing register
+// before the release PR opens: /changelog is certified by seo:certify
+// (copy:copy-lint), and an em dash here used to eject the release PR from
+// the merge queue a day later (PR #25178, 2026-11-12). Fail the writer's
+// output here instead; reword the copy, never waive the gate.
+const copyFindings = lintDailyDigestStories(plan.result?.stories);
+if (copyFindings.length > 0) {
+  writeFileSync(
+    resolve(output, 'copy-lint-failures.json'),
+    `${JSON.stringify(copyFindings, null, 2)}\n`
+  );
+  for (const finding of copyFindings)
+    console.error(`[copy-gate] ${finding.message}`);
+  throw new Error(
+    `Daily digest copy fails @jovie/copy (${copyFindings.length} blocking); reword the story copy at the source note.`
+  );
+}
 writeFileSync(
   resolve(output, 'plan.json'),
   `${JSON.stringify({ ...plan, content: undefined }, null, 2)}\n`
