@@ -33,6 +33,7 @@ import { hashCredential } from '../packages/api-client/store.ts';
 import { ADMISSION_BLOCKING_LABELS } from './lib/admission-hold-labels.mjs';
 import {
   evaluateLiveness,
+  isQuotaDeferredRow,
   livenessDecisions,
   livenessFingerprint,
   loadRegistry,
@@ -41,9 +42,14 @@ import {
 } from './lib/automation-registry.mjs';
 import {
   githubHeaders,
+  quotaKindOf,
   readGithubJson,
   readJson,
 } from './lib/github-json-read.mjs';
+import {
+  EX_TEMPFAIL,
+  QUOTA_DEFERRED_MARKER,
+} from './lib/github-rate-limit.mjs';
 import { projectJsonHeartbeat } from './lib/json-heartbeat-receipt.mjs';
 import * as redGate from './lib/red-monitor-owner-gate.mjs';
 
@@ -689,7 +695,17 @@ async function requiredGreenAt(
     `${apiUrl}/repos/${repo}/commits/${sha}/status?per_page=100`,
     { fetchImpl, token }
   );
-  if (!runs.ok || !statuses.ok) return { ok: false };
+  if (!runs.ok || !statuses.ok)
+    return {
+      ok: false,
+      // A quota-deferred leg (JOV-9993) is not unreadable evidence; the
+      // caller keeps the deferral so the row is not filed red.
+      reason: [runs, statuses].some(
+        read => !read.ok && read.reason === 'quota-deferred'
+      )
+        ? 'github-quota-deferred'
+        : null,
+    };
   let greenAt = -Infinity;
   for (const check of checks) {
     const times = [
@@ -753,8 +769,24 @@ export async function observeGreenToEnqueue(
       body: JSON.stringify({ query, variables: { owner, name } }),
       signal: controller.signal,
     });
-    if (response.status !== 200)
+    if (response.status !== 200) {
+      // A GraphQL denial carrying GitHub's own rate-limit evidence is a
+      // quota failure, not unreadable evidence (JOV-9993): defer like the
+      // REST observers instead of filing a false red.
+      let bodyText = '';
+      try {
+        bodyText = (await response.text()).slice(0, 512);
+      } catch {
+        // The status stays the only evidence when the body will not read.
+      }
+      const quotaKind = quotaKindOf({
+        status: response.status,
+        headers: response.headers,
+        bodyText,
+      });
+      if (quotaKind) return { ok: false, reason: 'github-quota-deferred' };
       return { ok: false, reason: `green-enqueue-http-${response.status}` };
+    }
     body = await response.json();
   } catch (error) {
     return {
@@ -805,7 +837,10 @@ export async function observeGreenToEnqueue(
       apiUrl,
     });
     if (!timing.ok)
-      return { ok: false, reason: 'green-enqueue-checks-unreadable' };
+      return {
+        ok: false,
+        reason: timing.reason ?? 'green-enqueue-checks-unreadable',
+      };
     if (timing.greenAt === null) continue;
     if (DEFECT_HOLD_CLASSES.has(timing.holdClass ?? '')) held.push(pr.number);
     else waiting.push({ number: pr.number, greenAt: timing.greenAt });
@@ -1005,7 +1040,20 @@ export async function main({
   }
   const previous = readPrevious(args.previous);
   const decisions = livenessDecisions(report, previous);
-  const full = { ...report, startedAt, endedAt, runUrl, decisions };
+  // JOV-9993: reads the quota classifier deferred (github-http-403 with
+  // GitHub's own rate-limit evidence on both legs). Reported and warned
+  // below, never filed red: the next 20-minute bucket re-reads them.
+  const quotaDeferred = report.results
+    .filter(isQuotaDeferredRow)
+    .map(row => row.id);
+  const full = {
+    ...report,
+    startedAt,
+    endedAt,
+    runUrl,
+    decisions,
+    quotaDeferred,
+  };
   if (args.output)
     writeFileSync(args.output, `${JSON.stringify(full, null, 2)}\n`);
   if (args.events)
@@ -1032,7 +1080,10 @@ export async function main({
   if (args.file && env.REMEDIATION_INTAKE_DISABLED !== '1') {
     const state = { ...previous };
     for (const row of report.results) {
-      if (row.critical)
+      // A quota-deferred row files no decision, so it must not flip the
+      // persisted color either (JOV-9993): the next readable run files the
+      // true transition.
+      if (row.critical && !isQuotaDeferredRow(row))
         state[livenessFingerprint(row.id)] =
           row.status === 'fresh' ? 'green' : 'red';
     }
@@ -1058,8 +1109,14 @@ export async function main({
     if (args.previous)
       writeFileSync(args.previous, `${JSON.stringify(state, null, 2)}\n`);
   }
+  if (quotaDeferred.length)
+    process.stdout.write(
+      `::warning::${QUOTA_DEFERRED_MARKER}: GitHub quota denied the read of ` +
+        `${quotaDeferred.length} automation(s) (${quotaDeferred.join(', ')}); ` +
+        'not a silence verdict. The next 20-minute bucket re-reads them.\n'
+    );
   process.stdout.write(
-    `${JSON.stringify({ status: report.status, red: report.results.filter(row => row.status !== 'fresh').map(row => row.id) })}\n`
+    `${JSON.stringify({ status: report.status, red: report.results.filter(row => row.status !== 'fresh').map(row => row.id), quotaDeferred })}\n`
   );
   return full;
 }
@@ -1067,7 +1124,13 @@ export async function main({
 if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
   main()
     .then(full => {
-      if (redGate.enforcedRed(full)) process.exitCode = 1; // enforcing gate
+      if (redGate.enforcedRed(full))
+        process.exitCode = 1; // enforcing gate
+      // A quota-deferred run is infrastructure, not a verdict (JOV-9993):
+      // exit 75 like every other github-quota-deferred lane, so a blind
+      // bucket stays visible instead of silently green.
+      else if ('quotaDeferred' in full && full.quotaDeferred?.length)
+        process.exitCode = EX_TEMPFAIL;
     })
     .catch(error => {
       process.stderr.write(

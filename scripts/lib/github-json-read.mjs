@@ -13,8 +13,24 @@
  * scripts/automation-liveness.mjs already uses — so a denied or exhausted
  * credential cannot hide a readable run list. Any other failure, or a public
  * read that also fails, keeps the original failure so silence stays red.
+ *
+ * When a denial carries GitHub's own rate-limit evidence — the body text or
+ * the x-ratelimit/retry-after headers, read by the one repo-wide classifier
+ * (classifyGitHubFailure in scripts/lib/github-rate-limit.mjs) — the read is
+ * QUOTA, not silence: automation-liveness run 43413778385 answered `API rate
+ * limit exceeded for installation` (HTTP 403) on both legs while every
+ * workflow was green, and the dead-man filed red for 28 critical loops
+ * (JOV-9993). A quota denial returns `quota-deferred` (observers surface it
+ * as `github-quota-deferred`): the run reports it, warns with the
+ * github-quota-deferred marker, exits 75, and the next 20-minute bucket
+ * re-reads — inside every critical loop's silence budget. A quota failure is
+ * never a silence verdict, the same doctrine github-rate-limit.mjs already
+ * applies to every other GITHUB_TOKEN consumer.
  */
+import { classifyGitHubFailure } from './github-rate-limit.mjs';
+
 const TIMEOUT_MS = 10_000;
+const BODY_SNIPPET_CHARS = 512;
 
 /** Bounded JSON fetch: 200 is ok, any other status or transport is a reason. */
 export async function readJson(fetchImpl, url, headers = {}) {
@@ -29,8 +45,23 @@ export async function readJson(fetchImpl, url, headers = {}) {
       },
       signal: controller.signal,
     });
-    if (response.status !== 200)
-      return { ok: false, reason: `http-${response.status}` };
+    if (response.status !== 200) {
+      // A status alone cannot tell a quota denial from a permission one:
+      // keep the classifier's evidence (body snippet + headers) on the read.
+      let bodyText = '';
+      try {
+        bodyText = (await response.text()).slice(0, BODY_SNIPPET_CHARS);
+      } catch {
+        // The status stays the only evidence when the body will not read.
+      }
+      return {
+        ok: false,
+        reason: `http-${response.status}`,
+        status: response.status,
+        headers: response.headers ?? null,
+        bodyText,
+      };
+    }
     return { ok: true, body: await response.json() };
   } catch (error) {
     return {
@@ -49,11 +80,46 @@ export function githubHeaders(token) {
 }
 
 /**
+ * The rate-limit kind GitHub attached to a denied read, or null when the
+ * denial carries no quota evidence (a permission answer). Reuses the one
+ * repo-wide classifier so liveness defers exactly the failures every other
+ * GITHUB_TOKEN consumer already defers.
+ * @param {{ ok?: boolean, status?: number, headers?: any, bodyText?: string } | null | undefined} read
+ * @returns {string | null}
+ */
+export function quotaKindOf(read) {
+  if (!read || read.ok || (read.status !== 403 && read.status !== 429))
+    return null;
+  const classification = classifyGitHubFailure({
+    status: read.status,
+    message: read.bodyText ?? '',
+    headers: read.headers ?? null,
+  });
+  return classification.retryable ? classification.kind : null;
+}
+
+/**
  * Run-list read for the workflow observers; see the module header. The
  * unauthenticated retry runs only when a token was used and only on a 403.
  */
 export async function readGithubJson(url, { fetchImpl, token }) {
   const read = await readJson(fetchImpl, url, githubHeaders(token));
-  if (read.ok || !token || read.reason !== 'http-403') return read;
-  return readJson(fetchImpl, url, {});
+  if (read.ok) return read;
+  if (token && read.reason === 'http-403') {
+    const fallback = await readJson(fetchImpl, url, {});
+    if (fallback.ok) return fallback;
+    const recoveryQuotaKind = quotaKindOf(read) ?? quotaKindOf(fallback);
+    if (recoveryQuotaKind)
+      return {
+        ok: false,
+        reason: 'quota-deferred',
+        quotaKind: recoveryQuotaKind,
+      };
+    return fallback;
+  }
+  // A 429, or a tokenless quota denial, defers too: a quota failure is never
+  // a silence verdict, with or without a recovery read.
+  const quotaKind = quotaKindOf(read);
+  if (quotaKind) return { ok: false, reason: 'quota-deferred', quotaKind };
+  return read;
 }

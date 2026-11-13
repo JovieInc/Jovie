@@ -1,4 +1,6 @@
-import { dirname, resolve } from 'node:path';
+import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
@@ -7,8 +9,10 @@ import {
 } from '../../../packages/api-client/client.ts';
 import { MemoryLedgerStore } from '../../../packages/api-client/store.ts';
 import {
+  observeGreenToEnqueue,
   observeWorkflowFailureStreak,
   runLiveness as runLivenessImpl,
+  main as runMain,
 } from '../../automation-liveness.mjs';
 import { selectSourceGuards } from '../../ci-fast-lanes.mjs';
 import {
@@ -16,8 +20,14 @@ import {
   livenessFingerprint,
   loadRegistry,
 } from '../automation-registry.mjs';
-
 import { mapTestReferences } from '../ci-script-test-inventory.mjs';
+import { applyRemediationDecisionWithRetry } from '../remediation-signal.mjs';
+
+// The filing branch's intake is mocked so the deferred-read tests never
+// reach Linear (same isolation as automation-liveness.test.mjs, JOV-8843).
+vi.mock('../remediation-signal.mjs', () => ({
+  applyRemediationDecisionWithRetry: vi.fn(async () => ({ ok: true })),
+}));
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
 const registry = loadRegistry(repoRoot);
@@ -334,4 +344,153 @@ describe('main-ref quota recovery (JOV-7973)', () => {
       ).toEqual(age ? ['red'] : []);
     }
   );
+});
+
+describe('quota-exhausted reads defer instead of filing a false P0 (JOV-9993)', () => {
+  // Run 43413778385 (2026-11-13T11:02Z): the shared installation REST budget
+  // answered `API rate limit exceeded for installation` (HTTP 403) on both
+  // the token read and the public read while every workflow was green, and
+  // the dead-man filed red for 28 critical loops. GitHub attaches its own
+  // rate-limit evidence to those denials, so a read that fails on both legs
+  // is deferred — never a silence verdict — and the next 20-minute bucket
+  // re-reads it, inside every critical loop's silence budget.
+  const QUOTA_BODY = JSON.stringify({
+    message:
+      "API rate limit exceeded for installation. (But here's the good news: Authenticated requests get a higher rate limit...)",
+    documentation_url:
+      'https://docs.github.com/en/rest/using-the-rest-api/rate-limits-for-the-rest-api',
+  });
+  const quotaDenied = () =>
+    new Response(QUOTA_BODY, {
+      status: 403,
+      headers: {
+        'x-ratelimit-limit': '5000',
+        'x-ratelimit-remaining': '0',
+        'x-ratelimit-reset': String(Math.floor(NOW / 1000) + 1800),
+      },
+    });
+
+  it('defers a run-list read denied by quota on both legs', async () => {
+    const fetchImpl = vi.fn(async () => quotaDenied());
+    const { report } = await runLiveness({
+      registry: only('github:jovie:security-advisory-loop'),
+      nowMs: NOW,
+      fetchImpl,
+      token: 'actions-token',
+    });
+    expect(rowFor(report, 'github:jovie:security-advisory-loop')).toMatchObject(
+      {
+        status: 'unknown',
+        reason: 'github-quota-deferred',
+      }
+    );
+    // The token read, then the public recovery read: both denied.
+    expect(fetchImpl).toHaveBeenCalledTimes(2);
+    // Not a silence verdict: no red is filed while the read is deferred.
+    expect(livenessDecisions(report)).toEqual([]);
+  });
+
+  it('keeps a persisted red alert open across a deferred read', async () => {
+    const fingerprint = livenessFingerprint(
+      'github:jovie:security-advisory-loop'
+    );
+    const { report } = await runLiveness({
+      registry: only('github:jovie:security-advisory-loop'),
+      nowMs: NOW,
+      fetchImpl: async () => quotaDenied(),
+      token: 'actions-token',
+    });
+    // Neither a green (no heartbeat was read) nor a new red: a genuinely
+    // silent loop keeps its open alert until a readable run files the
+    // true transition.
+    expect(livenessDecisions(report, { [fingerprint]: 'red' })).toEqual([]);
+  });
+
+  it('defers a secondary-rate-limited read without a public retry', async () => {
+    const fetchImpl = vi.fn(
+      async () =>
+        new Response(
+          JSON.stringify({
+            message:
+              'You have exceeded a secondary rate limit and must wait before you try again.',
+          }),
+          { status: 429, headers: { 'Retry-After': '60' } }
+        )
+    );
+    const observed = await observeWorkflowFailureStreak(
+      {
+        repo: 'JovieInc/Jovie',
+        workflow: 'production-controller.yml',
+        streak: 3,
+      },
+      { fetchImpl, token: 'actions-token', nowMs: NOW }
+    );
+    expect(observed).toMatchObject({
+      ok: false,
+      reason: 'github-quota-deferred',
+    });
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+  });
+
+  it('defers a quota-denied green-to-enqueue graphql read', async () => {
+    const observed = await observeGreenToEnqueue(
+      {
+        repo: 'JovieInc/Jovie',
+        requiredChecks: ['PR Ready'],
+      },
+      {
+        fetchImpl: async () => quotaDenied(),
+        token: 'actions-token',
+        nowMs: NOW,
+      }
+    );
+    expect(observed).toMatchObject({
+      ok: false,
+      reason: 'github-quota-deferred',
+    });
+  });
+
+  it('preserves alert state and files nothing for a deferred loop', async () => {
+    const id = 'github:jovie:security-advisory-loop';
+    const fingerprint = livenessFingerprint(id);
+    const dir = mkdtempSync(join(tmpdir(), 'automation-liveness-quota-'));
+    const statePath = join(dir, 'state.json');
+    writeFileSync(
+      statePath,
+      `${JSON.stringify({ [fingerprint]: 'red' }, null, 2)}\n`
+    );
+    const stdout = vi
+      .spyOn(process.stdout, 'write')
+      .mockImplementation(() => true);
+    try {
+      const result = await runMain({
+        argv: ['--file', '--previous', statePath],
+        env: { GH_TOKEN: 'actions-token' },
+        fetchImpl: async () => quotaDenied(),
+      });
+      // main() also returns the export-automations payload, which has no
+      // decisions; this run is a liveness report.
+      if (!('decisions' in result))
+        throw new Error('expected a liveness report with decisions');
+      expect(rowFor(result, id)).toMatchObject({
+        status: 'unknown',
+        reason: 'github-quota-deferred',
+      });
+      expect(result.quotaDeferred).toContain(id);
+      expect(
+        vi
+          .mocked(applyRemediationDecisionWithRetry)
+          .mock.calls.map(([decision]) => decision.fingerprint)
+      ).not.toContain(fingerprint);
+      // The persisted red keeps its color: no false resolution either.
+      expect(JSON.parse(readFileSync(statePath, 'utf8'))[fingerprint]).toBe(
+        'red'
+      );
+      expect(stdout.mock.calls.map(call => String(call[0])).join('')).toContain(
+        'github-quota-deferred'
+      );
+    } finally {
+      stdout.mockRestore();
+    }
+  });
 });

@@ -524,6 +524,18 @@ export function livenessFingerprint(id) {
 }
 
 /**
+ * A read the GitHub quota classifier deferred (lib/github-json-read.mjs):
+ * the shared REST budget denied both the token read and the public read of
+ * a workflow whose runs exist. It is not a silence verdict — the run warns
+ * and exits 75, and the dead-man re-reads in the next 20-minute bucket,
+ * inside every critical loop's silence budget — so it files no red and
+ * flips no alert state (JOV-9993, run 43413778385).
+ */
+export function isQuotaDeferredRow(row) {
+  return row?.status === 'unknown' && row?.reason === 'github-quota-deferred';
+}
+
+/**
  * Alert decisions for the existing remediation-signal intake: one fingerprint
  * per critical loop, red while silent, green once its heartbeat returns.
  * `previous` maps fingerprint -> 'red'|'green' from the last run; a steady
@@ -539,6 +551,10 @@ export function livenessDecisions(report, previous = {}) {
         decisions.push({ action: 'green', fingerprint, id: row.id });
       continue;
     }
+    // A quota-deferred read is not a silence verdict: no red filing, and the
+    // persisted alert state keeps its prior color until a readable run files
+    // the true transition (JOV-9993).
+    if (isQuotaDeferredRow(row)) continue;
     decisions.push({
       action: 'red',
       fingerprint,
