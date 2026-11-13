@@ -36,7 +36,7 @@ it('starts the shared checkout from the lock popover without activating its row'
   fireEvent.click(
     screen.getByRole('button', { name: 'Monitoring Restricted' })
   );
-  fireEvent.click(screen.getByRole('button', { name: 'Upgrade', exact: true }));
+  fireEvent.click(screen.getByRole('button', { name: 'Upgrade' }));
   expect(checkout).toHaveBeenCalledWith(
     expect.objectContaining({ priceId: 'price_presence', source: 'in_app' }),
     expect.any(Object)
