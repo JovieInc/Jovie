@@ -163,12 +163,36 @@ export const AccountMenuMobileLight: Story = {
 export const LoadingRowLight: Story = {
   decorators: [
     Story => (
-      <div className='w-56 bg-sidebar px-3 py-2'>
+      <div
+        className='w-56 px-3 py-2'
+        style={{ backgroundColor: 'var(--app-shell-sidebar-background)' }}
+      >
         <Story />
       </div>
     ),
   ],
   parameters: light,
+};
+
+export const LoadingRowDark: Story = {
+  ...LoadingRowLight,
+  parameters: dark,
+};
+
+/** The same session placeholder on the page surface, outside the sidebar. */
+export const LoadingRowPageLight: Story = {
+  decorators: [
+    Story => (
+      <div className='w-56 bg-surface-0 px-3 py-2'>
+        <Story />
+      </div>
+    ),
+  ],
+  parameters: light,
+};
+export const LoadingRowPageDark: Story = {
+  ...LoadingRowPageLight,
+  parameters: dark,
 };
 
 /** Deterministic Mac menu data; the production UserButton owns every row. */

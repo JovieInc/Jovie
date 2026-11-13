@@ -10,10 +10,9 @@ import { ACCOUNT_LOADING_FILL } from './account-loading-fill';
  * The account button's placeholders and trigger avatar.
  *
  * Every placeholder uses ACCOUNT_LOADING_FILL, so the loading state stays
- * visible on the light and the dark sidebar.
+ * visible on the light and the dark sidebar. Keep it steady: the pulse's
+ * 50% opacity falls below 3:1 contrast.
  */
-
-const PULSE = 'animate-pulse motion-reduce:animate-none';
 
 /** Billing row in the open menu while the plan is still loading. */
 export function BillingLoadingRow() {
@@ -23,9 +22,9 @@ export function BillingLoadingRow() {
       data-testid='billing-loading'
     >
       <span className={INSET_PANEL_ICON_COLUMN}>
-        <span className={cn('size-4 rounded', PULSE, ACCOUNT_LOADING_FILL)} />
+        <span className={cn('size-4 rounded', ACCOUNT_LOADING_FILL)} />
       </span>
-      <span className={cn('h-3 w-20 rounded', PULSE, ACCOUNT_LOADING_FILL)} />
+      <span className={cn('h-3 w-20 rounded', ACCOUNT_LOADING_FILL)} />
     </div>
   );
 }
@@ -47,11 +46,7 @@ export function UserButtonLoadingPlaceholder({
       <div
         data-testid='user-button-loading'
         data-user-button-loading-fill
-        className={cn(
-          'h-10 w-10 shrink-0 rounded-full',
-          PULSE,
-          ACCOUNT_LOADING_FILL
-        )}
+        className={cn('h-10 w-10 shrink-0 rounded-full', ACCOUNT_LOADING_FILL)}
       />
     );
   }
@@ -66,11 +61,7 @@ export function UserButtonLoadingPlaceholder({
     >
       <div
         data-user-button-loading-fill
-        className={cn(
-          'h-6 w-6 shrink-0 rounded-full',
-          PULSE,
-          ACCOUNT_LOADING_FILL
-        )}
+        className={cn('h-6 w-6 shrink-0 rounded-full', ACCOUNT_LOADING_FILL)}
       />
       <div
         data-user-button-loading-copy
@@ -78,7 +69,7 @@ export function UserButtonLoadingPlaceholder({
       >
         <div
           data-user-button-loading-fill
-          className={cn('h-3 w-20 rounded-sm', PULSE, ACCOUNT_LOADING_FILL)}
+          className={cn('h-3 w-20 rounded-sm', ACCOUNT_LOADING_FILL)}
         />
       </div>
     </div>
