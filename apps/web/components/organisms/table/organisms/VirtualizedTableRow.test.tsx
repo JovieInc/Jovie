@@ -9,6 +9,7 @@ import {
   useReactTable,
 } from '@/lib/tanstack-table';
 import { expectNoA11yViolations } from '@/tests/utils/a11y';
+import { ColumnSnapLayoutDependencyContext } from '../ColumnSnapMotion';
 import { VirtualizedTableRow } from './VirtualizedTableRow';
 
 type Release = {
@@ -70,6 +71,35 @@ const RELEASE: Release = {
 };
 
 describe('VirtualizedTableRow (colocated)', () => {
+  it('retains the selected row, cell identity and keyboard focus across resize causes', () => {
+    const onKeyDown = vi.fn();
+    const fixture = (dependency: string, selected: boolean) => (
+      <ColumnSnapLayoutDependencyContext.Provider value={dependency}>
+        <ReleaseRow
+          release={RELEASE}
+          columnSnap
+          isSelected={selected}
+          onKeyDown={onKeyDown}
+        />
+      </ColumnSnapLayoutDependencyContext.Provider>
+    );
+    const { rerender } = render(fixture('1440:900', false));
+    const row = screen.getByRole('row');
+    const cell = screen.getAllByRole('cell')[0];
+    row.focus();
+    rerender(fixture('1440:900', true));
+    expect(row).toHaveAttribute('aria-selected', 'true');
+    rerender(fixture('1100:900', true));
+    expect(screen.getAllByRole('cell')[0]).toBe(cell);
+    expect(row).toHaveFocus();
+    fireEvent.keyDown(row, { key: 'Enter' });
+    expect(onKeyDown).toHaveBeenCalledWith(
+      expect.objectContaining({ key: 'Enter' }),
+      3,
+      RELEASE
+    );
+  });
+
   it('opens the row on click and ranges on shift-click', async () => {
     const user = userEvent.setup();
     const onRowClick = vi.fn();

@@ -42,6 +42,38 @@ function table(data: CatalogRow[], emptyState?: ReactNode) {
 }
 
 describe('UnifiedTable states', () => {
+  it('preserves selection and keyboard activation when column definitions and widths change', async () => {
+    const user = userEvent.setup();
+    const onRowClick = vi.fn();
+    const fixture = (width: number, selected: string | null) => (
+      <UnifiedTable
+        data={RELEASES}
+        columns={columns.map((column, index) => ({
+          ...column,
+          size: index === 0 ? width : 120,
+        }))}
+        columnSizing='schema'
+        enableVirtualization={false}
+        getRowId={row => row.id}
+        isRowSelected={row => row.id === selected}
+        onRowClick={onRowClick}
+      />
+    );
+    const { rerender } = render(fixture(200, null));
+    const row = screen.getAllByRole('row')[1];
+    const cell = screen.getByRole('cell', { name: 'Never Say A Word' });
+    row.focus();
+    rerender(fixture(200, 'one'));
+    expect(row).toHaveAttribute('aria-selected', 'true');
+    rerender(fixture(360, 'one'));
+    expect(screen.getByRole('cell', { name: 'Never Say A Word' })).toBe(cell);
+    expect(cell).toHaveStyle({ width: '360px' });
+    expect(row).toHaveFocus();
+    await user.keyboard('{Enter}');
+    expect(onRowClick).toHaveBeenCalledWith(RELEASES[0]);
+    expect(onRowClick).toHaveBeenCalledTimes(1);
+  });
+
   it('opens a row with missing values on click', async () => {
     const user = userEvent.setup();
     const onRowClick = vi.fn();

@@ -1,6 +1,7 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import type { Header } from '@/lib/tanstack-table';
+import { ColumnSnapLayoutDependencyContext } from '../ColumnSnapMotion';
 import { TableHeaderCell } from './TableHeaderCell';
 
 type Row = { title: string };
@@ -56,6 +57,39 @@ function renderCell(
 }
 
 describe('TableHeaderCell (molecule)', () => {
+  it('keeps the focused sort control usable across semantic and resize updates', () => {
+    const onToggleSort = vi.fn();
+    const fixture = (dependency: string, direction: false | 'asc') => (
+      <ColumnSnapLayoutDependencyContext.Provider value={dependency}>
+        <table>
+          <thead>
+            <tr>
+              <TableHeaderCell
+                header={mockHeader('Title')}
+                canSort
+                sortDirection={direction}
+                stickyHeaderClass=''
+                tableHeaderClass=''
+                onToggleSort={onToggleSort}
+                columnSnap
+              />
+            </tr>
+          </thead>
+        </table>
+      </ColumnSnapLayoutDependencyContext.Provider>
+    );
+    const { rerender } = render(fixture('1440:900', false));
+    const button = screen.getByRole('button');
+    button.focus();
+    rerender(fixture('1440:900', 'asc'));
+    expect(button).toHaveAccessibleName('Title: sorted ascending');
+    rerender(fixture('1100:900', 'asc'));
+    expect(screen.getByRole('button')).toBe(button);
+    expect(button).toHaveFocus();
+    fireEvent.click(button);
+    expect(onToggleSort).toHaveBeenCalledTimes(1);
+  });
+
   it('snaps the header cell only when the table asks for it', () => {
     const { rerender } = renderCell();
     expect(screen.getByRole('columnheader')).not.toHaveAttribute(
