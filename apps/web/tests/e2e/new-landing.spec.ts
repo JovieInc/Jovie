@@ -3,6 +3,7 @@ import {
   HOMEPAGE_EDITORIAL_COPY as COPY,
   HOMEPAGE_INVITE_ANCHOR,
 } from '@/data/homepageEditorialCopy';
+import { getClaimProfileIntent } from '@/data/marketingCtaIntents';
 import { expect, test } from './setup';
 
 test.use({ storageState: { cookies: [], origins: [] } });
@@ -56,13 +57,14 @@ test.describe('/new landing page', () => {
     await expect(page.locator('body')).not.toContainText('Page not found');
   });
 
-  test('uses the invite action as the primary action', async ({ page }) => {
+  test('uses the claim action as the primary action', async ({ page }) => {
     await gotoLegacyNewLanding(page);
 
+    const claim = getClaimProfileIntent();
     const cta = page.getByTestId('homepage-primary-cta');
     await expect(cta).toBeVisible();
-    await expect(cta).toHaveText(COPY.hero.primaryAction);
-    await expect(cta).toHaveAttribute('href', `#${HOMEPAGE_INVITE_ANCHOR}`);
+    await expect(cta).toHaveText(claim.label);
+    await expect(cta).toHaveAttribute('href', claim.href);
   });
 
   test('mounts the homepage sections after the redirect', async ({ page }) => {
@@ -75,7 +77,7 @@ test.describe('/new landing page', () => {
     await expect(
       page
         .locator(`#${HOMEPAGE_INVITE_ANCHOR}`)
-        .getByTestId('waitlist-role-form')
+        .getByTestId('homepage-close-cta')
     ).toBeAttached();
   });
 
@@ -94,7 +96,7 @@ test.describe('/new landing page', () => {
     await expect(page.getByTestId('homepage-v2-hero')).toHaveCount(0);
   });
 
-  test('keeps the hero and invite action visible on mobile', async ({
+  test('keeps the hero and claim action visible on mobile', async ({
     page,
   }) => {
     await page.setViewportSize({ width: 375, height: 812 });
