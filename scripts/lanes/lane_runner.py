@@ -203,14 +203,7 @@ RELEASE_EXTRAS = ["scripts/shipping_origin.py", "scripts/hostops/install-lane-ho
                   "scripts/lib/merge-group-ahead-attribution.mjs",
                   "scripts/lib/merge-group-admission.mjs",
                   "scripts/lib/source-admission-policy.mjs", "scripts/pr-fleet-rules.mjs", "scripts/lib/wins-ledger.mjs",
-                  # Repair-evidence case mixin (imported by LANE_TESTS test_pr_events_repair_evidence.py)
-                  # plus the canonical customer-note policy its node driver imports: a release stages
-                  # scripts/lanes plus RELEASE_EXTRAS only, so an unshipped import dies as an opaque
-                  # "release tests failed" in the staged self-test and ejects every merge group.
-                  "scripts/tests/repair_customer_decision_cases.py",
-                  "scripts/lib/daily-changelog-publication.mjs", "scripts/lib/daily-changelog.mjs",
-                  "scripts/lib/changelog-filter-rules.mjs",
-                  "scripts/lib/merge-group-member-policy.mjs",
+                  "scripts/tests/repair_customer_decision_cases.py", "scripts/lib/daily-changelog-publication.mjs", "scripts/lib/daily-changelog.mjs", "scripts/lib/changelog-filter-rules.mjs", "scripts/lib/merge-group-member-policy.mjs",
                   "scripts/lib/pr-size-exclusions.mjs",
                   "scripts/lib/product-lane-classifier.mjs",
                   "scripts/lib/pr-size-guard-policy.mjs", "scripts/lib/repo-hygiene-limits.mjs",
