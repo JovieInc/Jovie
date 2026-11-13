@@ -6,6 +6,7 @@ export const ENTITY_KIND_ACCENT_VAR: Record<EntityKind, string> = {
   artist: '--system-b-entity-chip-artist-accent',
   track: '--system-b-entity-chip-track-accent',
   event: '--system-b-entity-chip-event-accent',
+  profile: '--system-b-entity-chip-profile-accent',
 };
 
 export function entityAccentCssVar(kind: EntityKind): string {

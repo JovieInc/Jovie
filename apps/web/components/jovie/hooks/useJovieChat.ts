@@ -40,6 +40,7 @@ import {
 } from '@/lib/chat/open-chat-with-prompt';
 import { trimMessagesForChatRequest } from '@/lib/chat/request-validation';
 import { buildChatThreadRoute } from '@/lib/chat/sync-chat-thread-url';
+import { splitLeadingEntityMentions } from '@/lib/chat/tokens';
 import { isRecoverableToolErrorCode } from '@/lib/chat/tool-errors';
 import { CHAT_TRANSCRIPT_WINDOW_VARIANT_IDENTITY } from '@/lib/chat/transcript-window';
 import { recordUxLatency } from '@/lib/monitoring/interaction-latency';
@@ -307,6 +308,7 @@ export function useJovieChatController({
     readComposerDraftScope(conversationId ?? null)
   );
   const chipTray = useChipTray();
+  const addEntityChip = chipTray.addEntity;
   const [chatError, setChatErrorState] = useState<ChatError | null>(() =>
     readRecoveryError(recoveryContext)
   );
@@ -962,12 +964,15 @@ export function useJovieChatController({
     },
   });
 
+  const clearChips = chipTray.clear;
   const clearScopedDraft = useCallback(() => {
+    // Chips reference the previous creator's entities; never carry them over.
+    clearChips();
     if (!inputDraftScopeRef.current) return;
     draft.set('');
     // Keep ownership until this instance finishes cleanup, so a late save can
     // never relabel the previous creator's text with the new current scope.
-  }, [draft]);
+  }, [clearChips, draft]);
   const previousProfileIdRef = useRef(profileId);
   useEffect(() => {
     if (previousProfileIdRef.current !== profileId) {
@@ -1615,10 +1620,15 @@ export function useJovieChatController({
       if (chatMode !== 'ov' && !conversationId) {
         const pendingDraft = consumePendingChatDraft(profileId);
         if (pendingDraft) {
+          // Entity context rides as composer chips, never as raw text.
+          const { mentions, text } = splitLeadingEntityMentions(pendingDraft);
+          for (const { kind, id, label } of mentions) {
+            addEntityChip({ kind, id, label });
+          }
           inputDraftScopeRef.current = currentComposerDraftScope();
-          setInput(previous =>
-            previous ? `${previous}\n\n${pendingDraft}` : pendingDraft
-          );
+          if (text) {
+            setInput(previous => (previous ? `${previous}\n\n${text}` : text));
+          }
           inputRef.current?.focus();
           return;
         }
@@ -1629,7 +1639,7 @@ export function useJovieChatController({
     return () => {
       canceled = true;
     };
-  }, [chatMode, conversationId, doSubmit, profileId, setInput]);
+  }, [addEntityChip, chatMode, conversationId, doSubmit, profileId, setInput]);
 
   useEffect(() => {
     const handlePromptEvent = (event: Event) => {

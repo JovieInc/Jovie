@@ -1,5 +1,11 @@
 import assert from 'node:assert/strict';
-import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -19,7 +25,66 @@ function readRepo(rel) {
   return readFileSync(join(repoRoot, rel), 'utf8');
 }
 
+function repairFixture() {
+  const root = mkdtempSync(join(tmpdir(), 'screen-cert-repair-'));
+  for (const rel of [
+    COMPONENT,
+    COMPONENT.replace('.tsx', '.stories.tsx'),
+    COMPONENT.replace('.tsx', '.test.tsx'),
+    'docs/design-system/component-certification.json',
+    'apps/web/tests/unit/design-system/plain-button-scope.json',
+  ]) {
+    const dest = join(root, rel);
+    mkdirSync(dirname(dest), { recursive: true });
+    writeFileSync(dest, readRepo(rel));
+  }
+  return root;
+}
+
 describe('screen certificate repair', () => {
+  it('accepts a headless control only when the existing scope approves its file', () => {
+    const root = repairFixture();
+    writeFileSync(
+      join(root, COMPONENT),
+      `${readRepo(COMPONENT)}\nexport function ApprovedAction() { return <PlainButton type='button'>Continue</PlainButton>; }\n`
+    );
+    writeFileSync(
+      join(root, 'apps/web/tests/unit/design-system/plain-button-scope.json'),
+      JSON.stringify({ files: [COMPONENT.replace('apps/web/', '')] })
+    );
+    const result = applyRepair(root, [COMPONENT], { write: true });
+    assert.equal(result.ok, true, JSON.stringify(result));
+  });
+
+  it.each(['button', 'PlainButton'])(
+    'refuses an unapproved %s and writes no companions',
+    control => {
+      const root = repairFixture();
+      writeFileSync(
+        join(root, COMPONENT),
+        `${readRepo(COMPONENT)}\nexport function RawAction() { return <${control} type='button'>Continue</${control}>; }\n`
+      );
+      const story = COMPONENT.replace('.tsx', '.stories.tsx');
+      const before = readFileSync(join(root, story), 'utf8');
+      const result = applyRepair(root, [COMPONENT], { write: true });
+      assert.equal(result.ok, false);
+      assert.ok(result.missing.includes('ds-owner'));
+      assert.equal(readFileSync(join(root, story), 'utf8'), before);
+      assert.equal(
+        existsSync(
+          join(root, COMPONENT.replace('.tsx', '.states.stories.tsx'))
+        ),
+        false
+      );
+      assert.equal(
+        existsSync(
+          join(root, COMPONENT.replace('.tsx', '.certificate.test.tsx'))
+        ),
+        false
+      );
+    }
+  );
+
   it('treats a chat submit event as the only mutate signal', () => {
     const source = readRepo(COMPONENT);
     assert.equal(submitEventOnly(source), true);
