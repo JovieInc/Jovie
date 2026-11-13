@@ -93,15 +93,8 @@ function resolveFooterVariant(
   pathname: string | null
 ): ResolvedVariant {
   const isMinimalPath = pathname ? MINIMAL_FOOTER_PATHS.has(pathname) : false;
-  const autoVariant: ResolvedVariant =
-    FEATURE_FLAGS.SHOW_MARKETING_FULL_FOOTER && !isMinimalPath
-      ? 'expanded'
-      : 'minimal';
-  const requested = variant === 'auto' ? autoVariant : variant;
-  if (requested === 'expanded' && !FEATURE_FLAGS.SHOW_MARKETING_FULL_FOOTER) {
-    return 'minimal';
-  }
-  return requested;
+  const autoVariant: ResolvedVariant = isMinimalPath ? 'minimal' : 'expanded';
+  return variant === 'auto' ? autoVariant : variant;
 }
 
 const markLinkClassName =

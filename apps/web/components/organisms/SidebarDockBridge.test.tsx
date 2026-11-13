@@ -6,14 +6,15 @@ import {
   waitFor,
 } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { DesktopUpdateViewState } from '@/lib/desktop/desktop-updates';
+import {
+  installDesktopUpdateBridge,
+  uninstallDesktopUpdateBridge,
+} from '@/lib/desktop/desktop-updates.test-utils';
 import { WHATS_NEW_PATH } from '@/lib/whats-new';
 import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import { SidebarDockBridge } from './SidebarDockBridge';
 
 const mocks = vi.hoisted(() => ({
-  update: { state: 'unsupported' } as DesktopUpdateViewState,
-  openModal: vi.fn(),
   stop: vi.fn(),
   toggleTrack: vi.fn(async () => {}),
   track: {
@@ -23,12 +24,6 @@ const mocks = vi.hoisted(() => ({
     artworkUrl: null,
     isPlaying: true,
   },
-}));
-vi.mock('./desktop-update/DesktopUpdateProvider', () => ({
-  useDesktopUpdateContext: () => ({
-    state: mocks.update,
-    openModal: mocks.openModal,
-  }),
 }));
 vi.mock('./release-sidebar/useTrackAudioPlayer', () => ({
   useTrackAudioPlayer: () => ({
@@ -72,24 +67,31 @@ const props = {
 beforeEach(() => {
   localStorage.clear();
   vi.clearAllMocks();
-  mocks.update = { state: 'unsupported' };
+  uninstallDesktopUpdateBridge();
   mocks.track.activeTrackId = null;
   mocks.track.trackTitle = null;
 });
 
 it('queues the newest release behind the updater while preserving audio actions', async () => {
-  mocks.update = { state: 'ready', version: '2' };
+  const { bridge, emit } = installDesktopUpdateBridge({
+    state: 'available',
+    version: '2',
+    releaseDate: null,
+    notesUrl: '/changelog',
+  });
   mocks.track.activeTrackId = 'track';
   mocks.track.trackTitle = 'Never Say A Word';
-  const { rerender } = render(<SidebarDockBridge {...props} />);
+  render(<SidebarDockBridge {...props} />);
   await waitFor(() => expect(fetchFeed).toHaveBeenCalledOnce());
   expect(screen.queryByRole('link')).toBeNull();
   expect(fetchFeed).toHaveBeenCalledWith(
     WHATS_NEW_PATH,
     expect.objectContaining({ signal: expect.any(AbortSignal) })
   );
-  fireEvent.click(screen.getByRole('button', { name: 'Restart to update' }));
-  expect(mocks.openModal).toHaveBeenCalledOnce();
+  expect(
+    await screen.findByRole('button', { name: 'Download update' })
+  ).toBeVisible();
+  expect(bridge.download).not.toHaveBeenCalled();
   fireEvent.click(screen.getByRole('button', { name: 'Pause' }));
   expect(mocks.toggleTrack).toHaveBeenCalledWith({
     id: 'track',
@@ -97,12 +99,9 @@ it('queues the newest release behind the updater while preserving audio actions'
   });
   fireEvent.click(screen.getByRole('button', { name: 'Dismiss Player' }));
   expect(mocks.stop).toHaveBeenCalledOnce();
-  mocks.update = { state: 'unsupported' };
-  rerender(<SidebarDockBridge {...props} />);
+  act(() => emit({ state: 'not-available' }));
   expect(await screen.findByRole('link')).toHaveAttribute('href', '/changelog');
-  expect(
-    screen.queryByRole('button', { name: 'Restart to update' })
-  ).toBeNull();
+  expect(screen.queryByRole('button', { name: 'Download update' })).toBeNull();
 });
 
 it.each([null, { version: 2 }])(

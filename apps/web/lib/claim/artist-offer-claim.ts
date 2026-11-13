@@ -95,13 +95,18 @@ export interface ClaimArtist {
   } | null;
 }
 
-function signupHref(params: Record<string, string>): string {
+/**
+ * Anonymous claim entries start the /start onboarding chat with the artist
+ * context attached (Tim, 2026-11-09: one front door — no anonymous door
+ * lands on /signup). Pro-monthly intent already rides the plan-intent
+ * cookies set by /claim/start, so the URL carries only the chat handoff.
+ */
+function startClaimHref(params: Record<string, string>): string {
   const search = new URLSearchParams({
-    plan: 'pro',
-    interval: 'month',
+    starter_prompt: 'I want to claim my profile.',
     ...params,
   });
-  return `${APP_ROUTES.SIGNUP}?${search.toString()}`;
+  return `${APP_ROUTES.START}?${search.toString()}`;
 }
 
 /**
@@ -120,7 +125,7 @@ export function resolveClaimRedirect(input: {
   if (viewer.hasClaimedProfile) return CLAIM_CHECKOUT_HREF;
 
   if (!artist) {
-    return viewer.signedIn ? APP_ROUTES.START : signupHref({});
+    return viewer.signedIn ? APP_ROUTES.START : startClaimHref({});
   }
 
   if (artist.profile?.isClaimed) return claimStateHref('already_claimed');
@@ -134,7 +139,7 @@ export function resolveClaimRedirect(input: {
 
   const spotifyUrl = `https://open.spotify.com/artist/${artist.spotifyId}`;
   if (viewer.signedIn) return APP_ROUTES.START;
-  return signupHref({
+  return startClaimHref({
     spotify_url: spotifyUrl,
     ...(artist.name ? { artist_name: artist.name } : {}),
   });
