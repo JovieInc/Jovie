@@ -197,8 +197,7 @@
     { "path": "apps/web/lib/canaries/public-profile.ts", "rules": { "unresolved-prompt": ["cf0456aad793801c"] }, "reason": "Exact diagnostic tag, redaction marker, schema path or security literal; not an authoring prompt." },
     { "path": "apps/web/lib/canonical-surfaces.ts", "rules": { "unresolved-prompt": ["d020f5126c55de7b", "e4eca94d7154f16e"] }, "reason": "Exact source route template in the engineering inventory; not displayed page copy." },
     { "path": "apps/web/lib/changelog-parser.ts", "rules": { "markdown": ["983987033f0e1170"] }, "reason": "Intentional Markdown serialization, parser delimiter, plain-text signature/list, or security mask; not stray formatting in visible copy." },
-    { "path": "apps/web/lib/chat/entity-hydration.ts", "rules": { "markdown": ["475e6c9d34ab1ff5", "521c522d76d265f2", "57efb92b7bbd527e", "748776274edc6aab"] }, "reason": "Intentional Markdown serialization, parser delimiter, plain-text signature/list, or security mask; not stray formatting in visible copy." },
-    { "path": "apps/web/lib/chat/entity-hydration.ts", "rules": { "instruction": ["4b548e41785761f7"] }, "reason": "Exact model-only prompt or tool description; not a rendered response." },
+    { "path": "apps/web/lib/chat/entity-hydration.ts", "rules": { "markdown": ["521c522d76d265f2", "57efb92b7bbd527e", "748776274edc6aab"] }, "reason": "Intentional Markdown serialization, parser delimiter, plain-text signature/list, or security mask; not stray formatting in visible copy." },
     {
       "path": "apps/web/lib/chat/pinned-opportunity.ts",
       "rules": { "markdown": ["3dfa3b0cd8ed40ac", "645c5d10b3af0514", "6eeddf087267c1ef", "79e7497d6fa3e21c", "91447bf28c09c933", "cd5602bf65a87d20"] },

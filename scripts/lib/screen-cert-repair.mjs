@@ -1,11 +1,9 @@
 /**
  * Deterministic screen-certificate repair.
  *
- * Safe edits only: waive error/offline when the only mutate token is `submit`
- * inside `chat-submit-prompt`, rename an existing empty-list story, and
- * generate Partial / Long / Rtl stories plus an axe test when the component's
- * exports make those states provable. A raw control or required state still missing
- * is a failure, so the lane falls through to a model.
+ * Safe edits only: waive submit-event false positives, rename empty-list
+ * stories, and generate provable state stories and axe tests. Missing states
+ * or unapproved controls fall through to the model without writing files.
  */
 import { existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, relative } from 'node:path';
@@ -414,18 +412,25 @@ function repairOne(root, rel, waiverText) {
     certificate.criteria.find(item => item.id === 'a11y')
   );
   const owner = certificate.criteria.find(item => item.id === 'ds-owner');
-  if (
-    states?.status !== 'pass' ||
-    a11y?.status !== 'pass' ||
-    owner?.status !== 'pass'
-  )
+  const scope = join(
+    root,
+    'apps/web/tests/unit/design-system/plain-button-scope.json'
+  );
+  const ownerPassed =
+    owner?.status === 'pass' &&
+    (!/\bPlainButton\b/.test(source) ||
+      (existsSync(scope) &&
+        JSON.parse(readFileSync(scope, 'utf8')).files.includes(
+          rel.replace(/^apps\/web\//, '')
+        )));
+  if (states?.status !== 'pass' || a11y?.status !== 'pass' || !ownerPassed)
     return {
       ok: false,
       missing: Object.entries(states?.states ?? {})
         .filter(([, row]) => row.status === 'fail')
         .map(([name]) => name)
         .concat(a11y?.status === 'pass' ? [] : ['a11y'])
-        .concat(owner?.status === 'pass' ? [] : ['ds-owner']),
+        .concat(ownerPassed ? [] : ['ds-owner']),
     };
   const files = [];
   if (renamed !== storySource) files.push([storyPath, renamed]);

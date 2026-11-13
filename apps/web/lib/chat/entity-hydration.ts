@@ -18,6 +18,10 @@
 
 import { extractEntities, parseTokens } from '@/lib/chat/tokens';
 import type { ReleaseContext } from '@/lib/chat/types';
+import {
+  CHIP_ONLY_PROFILE_BRIEF,
+  formatOwnProfileReference,
+} from '@/prompts/system/profile-chat';
 
 /** Minimal artist identity needed to recognise self-references. */
 export interface HydrationArtistIdentity {
@@ -44,11 +48,6 @@ export interface HydrateReferencedEntitiesInput {
    */
   readonly ownProfileId?: string | null;
 }
-
-const CHIP_ONLY_PROFILE_BRIEF = `The user opened this chat from their own profile and has not asked a question yet. Do not reply with a generic menu or ask what they want to work on. Instead:
-1. Open with one specific observation about this profile that uses one or two real numbers from About This Artist, Streaming Stats, Profile Analytics, Discography Context or Tipping & Monetization above. Never invent a number; when a number is zero or missing, say what that means for them.
-2. Name the single most valuable next move for this profile and why, then offer to do it.
-No list and no menu: the app shows tappable next moves under your reply. Keep it under 70 words.`;
 
 const RELEASE_TYPE_NOUN: Record<string, string> = {
   single: 'single',
@@ -132,9 +131,7 @@ export function buildReferencedEntitiesBlock(
       input.ownProfileId &&
       mention.id === input.ownProfileId
     ) {
-      lines.push(
-        `- profile:${mention.id} "${input.artist.displayName}" (@${input.artist.username}) — the user's own Jovie profile. The artist facts above describe it.`
-      );
+      lines.push(formatOwnProfileReference(mention.id, input.artist));
       continue;
     }
 

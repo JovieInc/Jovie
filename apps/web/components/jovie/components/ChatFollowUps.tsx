@@ -1,13 +1,12 @@
 'use client';
 
-import { PlainButton } from '@jovie/ui/atoms/plain-button';
+import { Button } from '@jovie/ui/atoms/button';
 import { useMemo } from 'react';
 import {
   type ChatFollowUp,
   PROFILE_CHAT_FOLLOW_UPS,
   profileFollowUpAnchorId,
 } from '../profile-chat-follow-ups';
-import { getChatPromptPillClass } from './chat-prompt-styles';
 
 export interface ChatFollowUpsConfig {
   readonly afterMessageId: string;
@@ -26,14 +25,16 @@ export function ChatFollowUps({
   return (
     <div className='flex flex-wrap gap-2 pt-1' data-testid='chat-follow-ups'>
       {items.map(item => (
-        <PlainButton
+        <Button
           key={item.label}
           type='button'
-          className={`${getChatPromptPillClass('compact')} text-start wrap-anywhere`}
+          variant='secondary'
+          size='sm'
+          className='max-w-full whitespace-normal wrap-anywhere'
           onClick={() => onSelect(item.prompt)}
         >
           {item.label}
-        </PlainButton>
+        </Button>
       ))}
     </div>
   );
