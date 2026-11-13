@@ -41,9 +41,11 @@ describe('CmdKMainPlaneSearchInput', () => {
     rerender(<CmdKMainPlaneSearchInput {...props} open={false} />);
     expect(input).toHaveValue('Release plan');
     expect(input).not.toHaveFocus();
+    expect(input).toHaveAttribute('aria-expanded', 'false');
     rerender(<CmdKMainPlaneSearchInput {...props} open />);
     expect(input).toHaveValue('Release plan');
     expect(input).toHaveFocus();
+    expect(input).toHaveAttribute('aria-expanded', 'true');
   });
 
   it.each([

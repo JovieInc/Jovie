@@ -1,4 +1,5 @@
 import { fireEvent, render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import { SidebarBottomNowPlaying } from './SidebarBottomNowPlaying';
@@ -10,6 +11,47 @@ const fullTrack = {
 };
 
 describe('SidebarBottomNowPlaying', () => {
+  it.each([
+    { trackTitle: fullTrack.trackTitle, hint: fullTrack.trackTitle },
+    { trackTitle: null, hint: 'Now playing' },
+  ])(
+    'identifies the collapsed player on keyboard focus with $hint',
+    async ({ trackTitle, hint }) => {
+      const user = userEvent.setup();
+      const onPlay = vi.fn();
+      render(
+        <SidebarBottomNowPlaying
+          track={{ ...fullTrack, trackTitle }}
+          isPlaying={false}
+          onPlay={onPlay}
+          collapsed
+        />
+      );
+
+      await user.tab();
+
+      expect(screen.getByRole('button')).toHaveFocus();
+      expect(await screen.findByRole('tooltip')).toHaveTextContent(hint);
+      await user.keyboard('{Enter}');
+      expect(onPlay).toHaveBeenCalledOnce();
+    }
+  );
+
+  it('shows the supplied title without inventing an absent artist or artwork', () => {
+    const { container } = render(
+      <SidebarBottomNowPlaying
+        track={{ ...fullTrack, artistName: null, artworkUrl: null }}
+        isPlaying={false}
+        onPlay={vi.fn()}
+      />
+    );
+
+    expect(container).toHaveTextContent(fullTrack.trackTitle);
+    expect(container.textContent).toBe(fullTrack.trackTitle);
+    expect(container.querySelector('img')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Play' })).toBeEnabled();
+  });
+
   it.each([
     { state: 'paused', track: fullTrack, isPlaying: false },
     { state: 'playing', track: fullTrack, isPlaying: true },

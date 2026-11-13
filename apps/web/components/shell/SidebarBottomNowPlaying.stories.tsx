@@ -53,6 +53,17 @@ export const CollapsedSidebar: Story = {
   args: { collapsed: true, isPlaying: true },
 };
 
+export const CollapsedArtworkOnly: Story = {
+  args: {
+    collapsed: true,
+    track: {
+      trackTitle: null,
+      artistName: null,
+      artworkUrl: meta.args.track.artworkUrl,
+    },
+  },
+};
+
 export const LightAndDark: Story = {
   render: args => (
     <div className='grid grid-cols-2 gap-6 bg-base p-6'>
