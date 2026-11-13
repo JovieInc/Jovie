@@ -156,7 +156,7 @@ unless linked below.
 | `@jovie/no-hardcoded-theme-colors` | `error` | L | Yes | None (no grandfathered count) |
 | `@jovie/ui-feel` | `off` | L | No | None (enforced by the UI-feel ratchet below) |
 | `arbitrary-radius` | `error` | S + G | Yes | 14 occurrences; 8 files |
-| `arbitrary-values` | `error` | G + I | Yes | 1688 |
+| `arbitrary-values` | `error` | G + I | Yes | 1673 |
 | `component-family` | `error` | G | Yes | button=37; emptyState=6; entityHeader=1; palette=4; shell=21; status=9 |
 | `contrast (computed pairs)` | `error` | S + G | Yes | No count baseline; 4.5:1 normal text, 3:1 large text/UI |
 | `contrast (raw colors)` | `error` | S | Yes | arbitraryHex=0; bareBgBlack=0; bareBgWhite=0; bareTextBlack=0; bareTextWhite=0 |
@@ -164,7 +164,7 @@ unless linked below.
 | `linear-namespace` | `error` | G + I | Yes | 687 |
 | `shadcn/no-restyle` | `error` | L + G | Yes | 212 files; 2991 messages (grandfathered) |
 | `off-scale-step` | `error` | G + I | Yes | None; vs base |
-| `source-identity` | `error` | I | Yes | 1918 |
+| `source-identity` | `error` | I | Yes | 1906 |
 | `spacing-scale (conservative)` | `error` | S + G | Yes | 589; armed=true; marketing=46; packages/ui=11; web-other=289; web-shell=243 |
 | `spacing-scale (strict)` | `warn` | S + G | No | 2190; armed=false; marketing=143; packages/ui=60; web-other=1126; web-shell=837 |
 | `touch-target` | `error` | D | Yes | 153 |
