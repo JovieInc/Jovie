@@ -186,6 +186,23 @@ describe('onboarding readiness', () => {
     expect(readiness.ready).toBe(7);
   });
 
+  it('shows how many artists the relationship registry holds', () => {
+    const queue = BLOCKED.queue;
+    if (!queue) throw new Error('fixture has a queue');
+    expect(
+      byId(
+        buildOutboundReadiness({
+          ...BLOCKED,
+          queue: { ...queue, relationshipHeld: 2 },
+        }),
+        'certifications'
+      )?.detail
+    ).toContain('2 held: Existing relationship: flag to Tim, no cold outreach');
+    expect(
+      byId(buildOutboundReadiness(BLOCKED), 'certifications')?.detail
+    ).not.toContain('Existing relationship');
+  });
+
   it('states the transactional versus cold boundary', () => {
     expect(byId(buildOutboundReadiness(BLOCKED), 'boundary')).toMatchObject({
       status: 'info',

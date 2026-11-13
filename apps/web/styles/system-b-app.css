@@ -2145,8 +2145,8 @@
   cursor: default;
   user-select: none;
   align-items: center;
-  gap: var(--space-2-5);
-  border-radius: var(--radius-md);
+  gap: var(--space-2);
+  border-radius: var(--system-b-radius-overlay-inner);
   padding-inline: var(--space-2);
   color: var(--color-text-secondary-token);
   font-family: var(--font-caption);

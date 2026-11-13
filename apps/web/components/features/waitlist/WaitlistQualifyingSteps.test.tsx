@@ -118,8 +118,8 @@ describe('WaitlistRoleForm request-access questions', () => {
     );
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(screen.getByTestId('waitlist-role-form-joined')).toHaveTextContent(
-      "You're on the list" +
-        "We'll email maya@example.com when your invite is ready." +
+      "You're on the waitlist." +
+        "We'll email maya@example.com when your spot opens." +
         'Your request is for Maya Vale.'
     );
     expect(sentBody()).toMatchObject({

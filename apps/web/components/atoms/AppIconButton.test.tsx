@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { TooltipProvider } from '@jovie/ui';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -107,5 +109,13 @@ describe('AppIconButton', () => {
     expect(ref.current).toBe(
       screen.getByRole('button', { name: 'Open details' })
     );
+  });
+
+  it('pads app controls on the same 10px inset as Button (px-2.5)', () => {
+    const css = readFileSync(
+      resolve(__dirname, '../../styles/design-system.css'),
+      'utf8'
+    );
+    expect(css).toContain('--app-shell-control-padding-x: 10px;');
   });
 });
