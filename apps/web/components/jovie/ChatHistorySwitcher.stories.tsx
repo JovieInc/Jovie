@@ -66,7 +66,11 @@ async function openMenu(canvasElement: HTMLElement) {
   await userEvent.click(
     within(canvasElement).getByTestId('chat-history-trigger')
   );
-  return within(document.body).findByRole('menu');
+  // A searchable menu presents its content as a group — a text input is not
+  // an allowed child of role="menu" (axe aria-required-children) — with the
+  // item rows in an inner menu. Scope to the group so the pinned search
+  // field is inside the queried container.
+  return within(document.body).findByRole('group');
 }
 
 const meta = {

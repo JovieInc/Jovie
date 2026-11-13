@@ -28,17 +28,20 @@ interface TourModePanelProps {
   readonly tourDates: TourDateViewModel[];
 }
 
+// The media-stage contrast floor for muted text is on-media/52 (~5.6:1 on
+// the dark stage, WCAG 2.2 AA — axe color-contrast). on-media/38 measures
+// ~3.4:1 there and fails the Storybook a11y lane.
 function getTicketStatusClassName(
   ticketStatus: TourDateViewModel['ticketStatus'],
   canBuyTickets: boolean
 ): string {
   if (ticketStatus === 'sold_out') {
-    return 'border-on-media/8 bg-transparent text-on-media/38';
+    return 'border-on-media/8 bg-transparent text-on-media/52';
   }
 
   return canBuyTickets
     ? 'border-on-media/14 bg-on-media/[0.02] text-on-media dark:text-on-media'
-    : 'border-on-media/8 bg-transparent text-on-media/38';
+    : 'border-on-media/8 bg-transparent text-on-media/52';
 }
 
 function getTicketStatusLabel(
@@ -166,7 +169,7 @@ function TourDateRow({
       ) : (
         // No ticket target: plain muted meta text — a non-interactive span
         // must never wear button chrome.
-        <span className='shrink-0 text-xs font-medium text-on-media/38'>
+        <span className='shrink-0 text-xs font-medium text-on-media/52'>
           {getTicketStatusLabel(item.date.ticketStatus, canBuyTickets)}
         </span>
       )}

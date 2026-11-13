@@ -1,35 +1,28 @@
 #!/usr/bin/env tsx
 /**
- * Chunk Comparison Script
- *
- * Compares Next.js build output against a baseline to detect bundle size regressions.
- * Follows the same guard pattern as test-performance-guard.ts.
+ * Chunk report: per-surface route budgets and the telemetry contribution of
+ * a finished build.
  *
  * Usage:
- *   pnpm --filter @jovie/web compare-chunks          # Compare against baseline
- *   pnpm --filter @jovie/web compare-chunks:snapshot  # Capture new baseline
+ *   pnpm --filter @jovie/web compare-chunks
  *
  * JOV-6585: also enforces explicit telemetry-contribution budgets (compressed
  * and uncompressed) for the chunks that ship browser telemetry onto public
  * routes. Limits live in docs/performance/telemetry-budgets.json with a
  * documented Jovie-measured baseline; a missing build manifest fails closed.
  *
- * JOV-8555: the initial-JS growth ratchet is fail-closed. A missing, malformed,
- * or placeholder (never-captured) bundle baseline fails the run instead of
- * silently skipping growth detection.
+ * JOV-8555: initial-JS growth detection does not live here. This script's
+ * growth ratchet keyed a snapshot by chunk filename, and Turbopack's hashed
+ * filenames change with any content change, so it was never wired and is
+ * removed. The blocking per-route ratchet is scripts/route-js-budget.mjs.
  */
 
-import { execSync } from 'node:child_process';
-import { existsSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, realpathSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { gzipSync } from 'node:zlib';
 
 const WEB_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
-const BASELINE_PATH = join(
-  WEB_ROOT,
-  '../../docs/performance/bundle-baseline.json'
-);
 const BUILD_MANIFEST_PATH = join(WEB_ROOT, '.next/build-manifest.json');
 // Reserved for future app-router manifest comparison
 // const APP_BUILD_MANIFEST_PATH = join(WEB_ROOT, '.next/app-build-manifest.json');
@@ -41,8 +34,6 @@ const TELEMETRY_BUDGETS_PATH = join(
   WEB_ROOT,
   '../../docs/performance/telemetry-budgets.json'
 );
-
-const GROWTH_THRESHOLD_PERCENT = 10;
 
 /**
  * Telemetry chunk classification (JOV-6585). A chunk counts as telemetry
@@ -95,55 +86,6 @@ interface TelemetryBudgets {
     measured_raw_bytes: number;
   };
   rationale: string;
-}
-
-interface Baseline {
-  capturedAt: string | null;
-  commit: string | null;
-  totalInitialJS_bytes: number;
-  chunks: Record<string, number>;
-}
-
-/**
- * JOV-8555: load the committed bundle baseline, fail-closed. A missing,
- * malformed, or placeholder (never-captured) baseline means the initial-JS
- * growth ratchet cannot run — that state is a failure, never a skip.
- */
-export function loadBaseline(baselinePath: string = BASELINE_PATH): Baseline {
-  if (!existsSync(baselinePath)) {
-    throw new TypeError(
-      `Bundle baseline file is missing: ${baselinePath}. The initial-JS growth ratchet is fail-closed — run \`pnpm --filter @jovie/web compare-chunks:snapshot\` after a clean build and commit docs/performance/bundle-baseline.json instead of skipping the check.`
-    );
-  }
-
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(readFileSync(baselinePath, 'utf-8'));
-  } catch (error) {
-    const reason = error instanceof Error ? error.message : String(error);
-    throw new TypeError(
-      `Bundle baseline file is malformed: ${baselinePath} (${reason}).`
-    );
-  }
-
-  const candidate = parsed as Partial<Baseline> | null;
-  if (
-    !candidate ||
-    typeof candidate.totalInitialJS_bytes !== 'number' ||
-    candidate.totalInitialJS_bytes <= 0 ||
-    typeof candidate.capturedAt !== 'string' ||
-    candidate.capturedAt === '' ||
-    typeof candidate.commit !== 'string' ||
-    candidate.commit === '' ||
-    typeof candidate.chunks !== 'object' ||
-    candidate.chunks === null
-  ) {
-    throw new TypeError(
-      `Bundle baseline is unwired: ${baselinePath} carries no captured measurements (capturedAt, commit, totalInitialJS_bytes, chunks). Run \`pnpm --filter @jovie/web compare-chunks:snapshot\` after a clean build and commit the captured baseline.`
-    );
-  }
-
-  return candidate as Baseline;
 }
 
 export interface BuildManifest {
@@ -553,41 +495,6 @@ function formatBytes(bytes: number): string {
   return `${(kb / 1024).toFixed(2)}MB`;
 }
 
-function captureSnapshot(): void {
-  if (!existsSync(BUILD_MANIFEST_PATH)) {
-    console.error('❌ No build output found. Run `pnpm build` first.');
-    process.exit(1);
-  }
-
-  const manifest: BuildManifest = JSON.parse(
-    readFileSync(BUILD_MANIFEST_PATH, 'utf-8')
-  );
-  const chunks = collectChunkSizes(manifest);
-  const totalBytes = Object.values(chunks).reduce((sum, size) => sum + size, 0);
-
-  let commit: string | null = null;
-  try {
-    commit = execSync('git rev-parse --short HEAD', {
-      encoding: 'utf-8',
-    }).trim();
-  } catch {
-    // Not in a git repo
-  }
-
-  const baseline: Baseline = {
-    capturedAt: new Date().toISOString(),
-    commit,
-    totalInitialJS_bytes: totalBytes,
-    chunks,
-  };
-
-  writeFileSync(BASELINE_PATH, `${JSON.stringify(baseline, null, 2)}\n`);
-  console.log(
-    `✅ Baseline captured: ${formatBytes(totalBytes)} total JS (${Object.keys(chunks).length} chunks)`
-  );
-  console.log(`   Saved to: ${BASELINE_PATH}`);
-}
-
 function compare(): void {
   if (!existsSync(BUILD_MANIFEST_PATH)) {
     console.error('❌ No build output found. Run `pnpm build` first.');
@@ -602,18 +509,6 @@ function compare(): void {
     (sum, size) => sum + size,
     0
   );
-
-  // Load baseline — fail closed (JOV-8555): an unwired baseline must red the
-  // run instead of silently skipping growth detection. The failure reason is
-  // reported after the report table so the rest of the diagnostics still print.
-  let baseline: Baseline | null = null;
-  let baselineError: string | null = null;
-  try {
-    baseline = loadBaseline();
-  } catch (error) {
-    baseline = null;
-    baselineError = error instanceof Error ? error.message : String(error);
-  }
 
   let hasFailure = false;
 
@@ -636,89 +531,6 @@ function compare(): void {
   console.log(
     `| Budget | per-route initialJS_gzip_kb (docs/performance/route-budgets.json) |`
   );
-
-  if (baseline && baseline.totalInitialJS_bytes > 0) {
-    const delta = currentTotal - baseline.totalInitialJS_bytes;
-    const deltaPercent = (
-      (delta / baseline.totalInitialJS_bytes) *
-      100
-    ).toFixed(1);
-    const sign = delta >= 0 ? '+' : '';
-    console.log(
-      `| vs Baseline | ${sign}${formatBytes(delta)} (${sign}${deltaPercent}%) |`
-    );
-    console.log(`| Baseline commit | ${baseline.commit ?? 'unknown'} |`);
-
-    // Find new, removed, and grown chunks
-    const newChunks: string[] = [];
-    const removedChunks: string[] = [];
-    const grownChunks: Array<{
-      file: string;
-      before: number;
-      after: number;
-      percent: number;
-    }> = [];
-
-    for (const [file, size] of Object.entries(currentChunks)) {
-      if (!(file in baseline.chunks)) {
-        newChunks.push(file);
-      } else {
-        const before = baseline.chunks[file];
-        const growthPercent = ((size - before) / before) * 100;
-        if (growthPercent > GROWTH_THRESHOLD_PERCENT) {
-          grownChunks.push({
-            file,
-            before,
-            after: size,
-            percent: growthPercent,
-          });
-        }
-      }
-    }
-
-    for (const file of Object.keys(baseline.chunks)) {
-      if (!(file in currentChunks)) {
-        removedChunks.push(file);
-      }
-    }
-
-    if (newChunks.length > 0) {
-      console.log(`\n### New chunks (${newChunks.length})`);
-      for (const file of newChunks.slice(0, 10)) {
-        console.log(`- \`${file}\` (${formatBytes(currentChunks[file])})`);
-      }
-      if (newChunks.length > 10)
-        console.log(`- ... and ${newChunks.length - 10} more`);
-    }
-
-    if (removedChunks.length > 0) {
-      console.log(`\n### Removed chunks (${removedChunks.length})`);
-      for (const file of removedChunks.slice(0, 10)) {
-        console.log(`- \`${file}\``);
-      }
-    }
-
-    if (grownChunks.length > 0) {
-      console.log(`\n### Chunks grown >${GROWTH_THRESHOLD_PERCENT}%`);
-      console.log('| Chunk | Before | After | Growth |');
-      console.log('|-------|--------|-------|--------|');
-      for (const { file, before, after, percent } of grownChunks
-        .sort((a, b) => b.percent - a.percent)
-        .slice(0, 10)) {
-        console.log(
-          `| \`${file.split('/').pop()}\` | ${formatBytes(before)} | ${formatBytes(after)} | +${percent.toFixed(1)}% |`
-        );
-      }
-    }
-  } else {
-    console.log(`| vs Baseline | No baseline captured yet |`);
-    // JOV-8555: fail closed — an unwired growth ratchet must red the run and
-    // point at the capture command instead of skipping growth detection.
-    console.log(
-      `\n❌ BUNDLE BASELINE UNWIRED: ${baselineError ?? 'docs/performance/bundle-baseline.json is missing, malformed, or still the empty placeholder'}, so initial-JS growth detection cannot run. Capture it with \`pnpm --filter @jovie/web compare-chunks:snapshot\` after a clean build and commit the result.`
-    );
-    hasFailure = true;
-  }
 
   // Per-route initial-JS budget check (JOV-8561). Sizes are uncompressed;
   // budgets are gzip, estimated at ≈ 30% of uncompressed (the same convention
@@ -790,9 +602,5 @@ if (
   existsSync(invokedPath) &&
   realpathSync(invokedPath) === realpathSync(fileURLToPath(import.meta.url))
 ) {
-  if (process.argv.includes('--snapshot')) {
-    captureSnapshot();
-  } else {
-    compare();
-  }
+  compare();
 }

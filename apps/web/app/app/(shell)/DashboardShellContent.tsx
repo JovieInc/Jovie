@@ -46,8 +46,10 @@ import {
  * so the browser receives a streaming skeleton immediately while this
  * component resolves data from the database.
  *
- * Ban check runs in parallel with the dashboard data fetch — banned users
- * are rare enough that blocking every page load for them isn't worth it.
+ * The ban check is started first and overlaps the dashboard data fetch, so an
+ * ordinary load does not wait on it serially. Its verdict is still read before
+ * anything from the dashboard read is used: a banned account gets only the
+ * unavailable page.
  *
  * Runtime app flags are snapshotted server-side for dynamic shell routes so
  * client consumers see the same values on first paint.
@@ -68,15 +70,11 @@ export async function DashboardShellContent({
   const useEssentialShell = shouldUseEssentialShellData(pathname);
   const cookieStorePromise = cookies();
 
-  // Run ban check in parallel with dashboard data fetch
-  const [banStatus, cookieStore] = await Promise.all([
-    getUserBanStatus(userId),
-    cookieStorePromise,
-  ]);
-
-  if (banStatus.isBanned) {
-    return <UnavailablePage />;
-  }
+  // Start the ban check now; it is awaited below, after the workspace read has
+  // been started. The no-op handler only keeps a rejection from being reported
+  // as unhandled while the Ovie privacy read is in flight; the await rethrows.
+  const banStatusPromise = getUserBanStatus(userId);
+  banStatusPromise.catch(() => {});
 
   // Ovie role access has already been checked by the shell layout. Read its
   // opt-in privacy state before any dashboard DAL call; Jovie never queries it.
@@ -102,13 +100,11 @@ export async function DashboardShellContent({
       initiallyLocked = true;
     }
   }
-  let dashboardData: DashboardData | null = null;
-  let initialFlags: Awaited<ReturnType<typeof getAppFlagsSnapshot>> = {};
-  if (!initiallyLocked) {
-    try {
-      // The parent shell must settle too: a page's error is hidden while this
-      // outer Suspense boundary is still waiting on its own dashboard read.
-      [dashboardData, initialFlags] = await withTimeout(
+  // The parent shell must settle too: a page's error is hidden while this
+  // outer Suspense boundary is still waiting on its own dashboard read.
+  const workspacePromise = initiallyLocked
+    ? null
+    : withTimeout(
         Promise.all([
           useEssentialShell
             ? getDashboardShellData(userId)
@@ -120,6 +116,26 @@ export async function DashboardShellContent({
         ]),
         { timeoutMs: 10_000, context: 'App shell workspace data' }
       );
+  // A banned account returns before this is awaited; its outcome (including a
+  // redirect) must then be dropped, not surface as an unhandled rejection.
+  workspacePromise?.catch(() => {});
+
+  // Ban verdict first: nothing from the workspace read is used, and none of
+  // its errors or redirects are acted on, until the account is known good.
+  const [banStatus, cookieStore] = await Promise.all([
+    banStatusPromise,
+    cookieStorePromise,
+  ]);
+
+  if (banStatus.isBanned) {
+    return <UnavailablePage />;
+  }
+
+  let dashboardData: DashboardData | null = null;
+  let initialFlags: Awaited<ReturnType<typeof getAppFlagsSnapshot>> = {};
+  if (workspacePromise) {
+    try {
+      [dashboardData, initialFlags] = await workspacePromise;
     } catch (error) {
       throwIfRedirect(error);
       void captureError('App shell workspace load failed', error, { pathname });
