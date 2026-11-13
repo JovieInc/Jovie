@@ -101,6 +101,9 @@ export const publicEnv = {
   get NEXT_PUBLIC_SHOW_OPERATOR_BANNER() {
     return process.env.NEXT_PUBLIC_SHOW_OPERATOR_BANNER || undefined;
   },
+  get NEXT_PUBLIC_FEATURE_VOICE_INPUT() {
+    return process.env.NEXT_PUBLIC_FEATURE_VOICE_INPUT ?? 'true';
+  },
   /**
    * Default OFF: Max is not for sale (offer-truth: contact sales), so the
    * in-app "Request Early Access" Max card was a dead end (JOV-INV-046).

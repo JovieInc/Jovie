@@ -726,6 +726,8 @@ describe('canonical marketing component registry', () => {
     expect(centrallyReadSources.HomepageV2Route).toContain(
       'homepage-v2-hero__demo-scale'
     );
+    // Every below-hero section ships unconditionally: no static flag gates.
+    expect(centrallyReadSources.HomepageV2Route).not.toContain('FEATURE_FLAGS');
   });
 
   it('keeps terminal CTA actions on the canonical Button atom', () => {
