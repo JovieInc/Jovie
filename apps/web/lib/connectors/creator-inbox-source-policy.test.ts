@@ -8,6 +8,7 @@ describe('creator inbox source provenance', () => {
     'ops.healthcheck',
     'ovie.queue',
     'workflow_capture.request',
+    'WORKFLOW_CAPTURE.REQUEST',
   ])(
     'keeps explicit operator source %s outside the creator projection',
     kind => {
