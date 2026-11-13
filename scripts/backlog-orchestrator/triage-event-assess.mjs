@@ -4,6 +4,10 @@
 import { createHash } from 'node:crypto';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
+import {
+  censusUnavailableReceipt,
+  discoverCensusWithRetry,
+} from './backlog-census-retry.mjs';
 import { fetchBacklogSweepCandidates } from './backlog-current-linear.mjs';
 import { admitBacklogEvent } from './backlog-event-admission.mjs';
 import { worldObservationSummary } from './backlog-observation-summary.mjs';
@@ -465,33 +469,29 @@ export async function assessBacklogSweep(
     now = Date.now,
     discover = fetchBacklogSweepCandidates,
     assess = assessTriageEvent,
+    sleepImpl = undefined,
   } = {}
 ) {
   const started = now(),
     results = [];
   let all;
   try {
-    all = await discover(client, BACKLOG_READ_OPTIONS);
-  } catch {
-    return {
-      schema: 'linear-backlog-catch-up/v1',
-      observedAt: new Date(now()).toISOString(),
-      issueCount: 0,
-      inventoryUnknown: true,
-      assessed: 0,
-      deferred: 0,
-      failed: 1,
-      wakeSymphony: false,
-      results: [
-        {
-          disposition: 'assessment-failed',
-          reason: 'backlog-catch-up-census-unavailable',
-          owner: 'JOV-8022 Fleet admission owner',
-          mutations: 0,
-          wakeSymphony: false,
-        },
-      ],
-    };
+    all = await discoverCensusWithRetry(
+      discover,
+      client,
+      BACKLOG_READ_OPTIONS,
+      {
+        started,
+        timeBudgetMs,
+        now,
+        sleepImpl,
+      }
+    );
+  } catch (error) {
+    // Transient misses retry inside this sweep's own budget
+    // (backlog-census-retry.mjs); a persistent miss still fails, and its row
+    // now names the sanitized cause instead of an anonymous unavailable.
+    return censusUnavailableReceipt(error, now());
   }
   const issues = all.filter(
     row =>
