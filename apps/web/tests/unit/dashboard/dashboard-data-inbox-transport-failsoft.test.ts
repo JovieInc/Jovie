@@ -393,7 +393,8 @@ describe('Inbox navigation transport fail-soft (JOV-12477)', () => {
 
     const result = await getDashboardData();
 
-    expect(result.inboxNavigation.state).not.toBe('unknown');
+    expect(result.inboxNavigation).toBeDefined();
+    expect(result.inboxNavigation?.state).not.toBe('unknown');
     expect(withDbSessionTxMock).toHaveBeenCalledTimes(5);
     expect(captureExceptionMock).not.toHaveBeenCalled();
   });
