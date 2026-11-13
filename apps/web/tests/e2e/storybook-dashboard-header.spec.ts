@@ -72,8 +72,20 @@ for (const width of [390, 1440, 1512]) {
       await expect(rail).toHaveAttribute('aria-pressed', 'true');
       await page.keyboard.press('Tab');
       await expect(action).toBeFocused();
+      const focusedSurface = await action.evaluate(element => {
+        const style = getComputedStyle(element);
+        return Object.fromEntries(
+          ['background-color', 'border-color', 'box-shadow'].map(property => [
+            property,
+            style.getPropertyValue(property),
+          ])
+        );
+      });
       await page.keyboard.press('Enter');
       await expect(action).toHaveAttribute('aria-pressed', 'true');
+      for (const [property, value] of Object.entries(focusedSurface)) {
+        await expect(action).toHaveCSS(property, value);
+      }
       expect(await header.boundingBox()).toEqual(before);
       expect(await rail.boundingBox()).toEqual(railBox);
 
