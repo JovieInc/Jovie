@@ -14,6 +14,7 @@ import {
   useRightPanel,
 } from '@/contexts/RightPanelContext';
 import { useRegisterRightPanel } from '@/hooks/useRegisterRightPanel';
+import { PROVIDER_CONFIG } from '@/lib/discography/config';
 import type { ReleaseViewModel } from '@/lib/discography/types';
 import { UnifiedTable } from './UnifiedTable';
 
@@ -127,7 +128,7 @@ function SelectedRowDrawer({
             ) : (
               <ReleaseTable
                 releases={releases}
-                providerConfig={{}}
+                providerConfig={PROVIDER_CONFIG}
                 artistName='Artist'
                 onCopy={async () => 'copied'}
                 onEdit={release => select(release.id)}
@@ -145,6 +146,7 @@ function SelectedRowDrawer({
 const meta = {
   title: 'Organisms/Table/MotionCauses',
   component: SelectedRowDrawer,
+  args: { surface: 'presence' },
   parameters: { layout: 'padded' },
   decorators: [
     Story => (
