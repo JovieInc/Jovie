@@ -12,7 +12,10 @@ import { connectOnboardingSpotifyArtist } from '@/app/onboarding/actions/connect
 import { enrichProfileFromDsp } from '@/app/onboarding/actions/enrich-profile';
 import { OnboardingCheckoutClient } from '@/app/onboarding/checkout/OnboardingCheckoutClient';
 import { OnboardingV2Form } from '@/components/features/dashboard/organisms/onboarding-v2/OnboardingV2Form';
+import { MARKETING_PRICING_PLANS } from '@/data/marketingPricingPlans';
+import { ARTIST_VISIBILITY_OFFER, toCents } from '@/lib/config/plan-prices';
 import type { ArtistSearchState } from '@/lib/queries/useArtistSearchQuery';
+import { formatAmount } from '@/lib/utils/format-number';
 
 const mockPush = vi.fn();
 const mockReplace = vi.fn();
@@ -802,5 +805,67 @@ describe('Onboarding screen performance budgets', () => {
         vi.useRealTimers();
       }
     });
+  });
+});
+
+describe('Paid offer consistency', () => {
+  it('shows the pricing feature list and monthly price on Plan and checkout', async () => {
+    const offer = ARTIST_VISIBILITY_OFFER.pro;
+    const features = MARKETING_PRICING_PLANS.find(
+      plan => plan.id === 'pro'
+    )!.features;
+    render(
+      <OnboardingV2Form
+        initialDisplayName='Test Artist'
+        initialHandle='test-artist'
+        initialProfileId='profile-performance'
+        initialResumeStep='upgrade'
+        isHydrated
+        userEmail='artist@example.com'
+        userId='user-performance'
+      />
+    );
+    await screen.findByRole('heading', {
+      name: 'Want the full profile from day one?',
+    });
+    expect(
+      within(screen.getByRole('list', { name: offer.displayName }))
+        .getAllByRole('listitem')
+        .map(item => item.textContent)
+    ).toEqual(features);
+    expect(
+      screen.getByText(`${formatAmount(toCents(offer.monthlyUsd))}/mo`)
+    ).toBeInTheDocument();
+    expect(screen.getAllByText(/Your import is ready/)).toHaveLength(1);
+    expect(
+      screen.queryByText(/album art, pitch tools, and advanced AI/)
+    ).not.toBeInTheDocument();
+    cleanup();
+    render(
+      <OnboardingCheckoutClient
+        plan='pro'
+        profileId={null}
+        monthlyPriceId='price_test_monthly'
+        annualPriceId={null}
+        monthlyAmount={toCents(offer.monthlyUsd)}
+        annualAmount={null}
+        displayName='Test Artist'
+        username='test-artist'
+        avatarUrl={null}
+        spotifyFollowers={null}
+        isDefaultUpsell
+      />
+    );
+    expect(
+      within(screen.getByRole('list', { name: offer.displayName }))
+        .getAllByRole('listitem')
+        .map(item => item.textContent)
+    ).toEqual(features);
+    expect(
+      screen.getByText(formatAmount(toCents(offer.monthlyUsd)))
+    ).toBeInTheDocument();
+    expect(screen.getByText('/mo')).toBeInTheDocument();
+    expect(screen.queryByText('Verified Badge')).not.toBeInTheDocument();
+    expect(screen.queryByText(/day Analytics/)).not.toBeInTheDocument();
   });
 });
