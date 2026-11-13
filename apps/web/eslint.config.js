@@ -356,7 +356,6 @@ module.exports = [
       'components/atoms/TableErrorFallback.tsx',
       'components/atoms/AvatarUploadOverlay.tsx',
       'components/atoms/ReleaseArtworkThumb.tsx',
-      'components/atoms/SettingsPlanGateLabel.tsx',
     ],
     rules: {
       'no-restricted-syntax': [

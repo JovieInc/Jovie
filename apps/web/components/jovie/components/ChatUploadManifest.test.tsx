@@ -1,12 +1,36 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { ComponentProps, ReactNode } from 'react';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import type { PendingFile } from '../hooks/useChatFileAttachments';
 import { ChatUploadManifest } from './ChatUploadManifest';
+
+const checkout = await vi.hoisted(async () => {
+  const { createUpgradeCheckoutFixture } = await import(
+    '@/tests/fixtures/upgrade-checkout'
+  );
+  return createUpgradeCheckoutFixture();
+});
+vi.mock('@/lib/analytics', () => ({
+  track: checkout.track,
+  useFeatureFlag: () => true,
+}));
+vi.mock('next/navigation', () => ({
+  useRouter: () => ({ push: checkout.push }),
+}));
+vi.mock('@/lib/queries', () => ({
+  useCheckoutMutation: () => ({
+    mutate: checkout.mutate,
+    reset: checkout.reset,
+    isPending: false,
+    error: null,
+  }),
+  usePricingOptionsQuery: () => checkout.pricing,
+}));
+beforeEach(() => vi.clearAllMocks());
 
 vi.mock('motion/react', () => ({
   AnimatePresence: ({ children }: { readonly children: ReactNode }) => (
@@ -135,8 +159,16 @@ describe('ChatUploadManifest', () => {
       screen.getByText('Upgrade to Artist Presence for unlimited file uploads')
     ).toBeInTheDocument();
     expect(
-      screen.getByRole('link', { name: 'Upgrade to Artist Presence' })
-    ).toHaveAttribute('href', '/pricing');
+      screen.getByRole('button', { name: 'Upgrade to Artist Presence' })
+    ).toBeEnabled();
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Upgrade to Artist Presence' })
+    );
+    expect(checkout.mutate).toHaveBeenCalledWith(
+      { priceId: 'price_presence', source: 'in_app', returnTo: '/app' },
+      expect.any(Object)
+    );
+    expect(checkout.push).not.toHaveBeenCalled();
   });
 
   it('retires bespoke manifest bar fills in favor of ProgressBar ownership', () => {
@@ -252,5 +284,12 @@ describe('ChatUploadManifest', () => {
     const thumb = screen.getByRole('img', { name: 'cover-art.png' });
     expect(thumb).toHaveAttribute('width', '30');
     expect(thumb).toHaveAttribute('height', '30');
+  });
+  it('does not offer another subscription for paid users with locked files', () => {
+    renderManifest({ lockedCount: 2, isPro: true });
+    expect(
+      screen.queryByRole('button', { name: 'Upgrade to Artist Presence' })
+    ).not.toBeInTheDocument();
+    expect(checkout.mutate).not.toHaveBeenCalled();
   });
 });

@@ -1,5 +1,9 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import type { CSSProperties } from 'react';
+import {
+  LocalCheckoutApi,
+  UpgradeQueryProvider,
+} from '@/tests/fixtures/upgrade-checkout-story';
 import type { PendingFile } from '../hooks/useChatFileAttachments';
 import { ChatUploadManifest } from './ChatUploadManifest';
 
@@ -74,9 +78,17 @@ const meta = {
   title: 'Jovie/Components/ChatUploadManifest',
   component: ChatUploadManifest,
   parameters: {
+    nextjs: { appDirectory: true, navigation: { pathname: '/app' } },
     layout: 'centered',
   },
   decorators: [
+    Story => (
+      <UpgradeQueryProvider>
+        <LocalCheckoutApi reply='server-error'>
+          <Story />
+        </LocalCheckoutApi>
+      </UpgradeQueryProvider>
+    ),
     Story => (
       <div style={shellStyle}>
         <Story />
