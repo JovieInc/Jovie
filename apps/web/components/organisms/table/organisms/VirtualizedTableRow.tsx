@@ -117,6 +117,9 @@ function VirtualizedTableRowComponent<TData extends RowData>({
 
   const handleClick = useCallback(
     (e: React.MouseEvent) => {
+      // React portal events bubble through their owning row even though
+      // the menu is outside its DOM. An action must not also select the row.
+      if (!e.currentTarget.contains(e.target as Node)) return;
       if (e.shiftKey && onRowShiftClick) {
         e.preventDefault();
         onRowShiftClick(rowIndex, rowData);

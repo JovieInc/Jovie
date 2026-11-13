@@ -1,6 +1,7 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { ComponentProps } from 'react';
+import { createPortal } from 'react-dom';
 import { describe, expect, it, vi } from 'vitest';
 import {
   type ColumnDef,
@@ -34,11 +35,16 @@ type RowProps = Partial<
 function ReleaseRow({
   release,
   dir,
+  testColumns = columns,
   ...props
-}: RowProps & { readonly release: Release; readonly dir?: 'rtl' }) {
+}: RowProps & {
+  readonly release: Release;
+  readonly dir?: 'rtl';
+  readonly testColumns?: typeof columns;
+}) {
   const table = useReactTable({
     data: [release],
-    columns,
+    columns: testColumns,
     getRowId: row => row.id,
     getCoreRowModel: getCoreRowModel(),
   });
@@ -69,7 +75,35 @@ const RELEASE: Release = {
   artist: 'Midnight Orchestra',
 };
 
+function PortalActionCell() {
+  return createPortal(
+    <button type='button'>Portal action</button>,
+    document.body
+  );
+}
+const portalColumns = [
+  column.display({ id: 'actions', cell: PortalActionCell }),
+];
+
 describe('VirtualizedTableRow (colocated)', () => {
+  it('does not select or range-select from a portalled action', () => {
+    const onRowClick = vi.fn();
+    const onRowShiftClick = vi.fn();
+    render(
+      <ReleaseRow
+        release={RELEASE}
+        testColumns={portalColumns}
+        onRowClick={onRowClick}
+        onRowShiftClick={onRowShiftClick}
+      />
+    );
+    const action = screen.getByRole('button', { name: 'Portal action' });
+    fireEvent.click(action);
+    fireEvent.click(action, { shiftKey: true });
+    expect(onRowClick).not.toHaveBeenCalled();
+    expect(onRowShiftClick).not.toHaveBeenCalled();
+  });
+
   it('opens the row on click and ranges on shift-click', async () => {
     const user = userEvent.setup();
     const onRowClick = vi.fn();
