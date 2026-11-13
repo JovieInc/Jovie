@@ -54,6 +54,8 @@ export async function recordComponentCertificateDelivery(
 ): Promise<ComponentCertificateDeliveryRecord> {
   const backend = postgresRecordBackend();
   await backend.set(LATEST_KEY, packet);
+  // Evidence-grade last-write-wins: a concurrent delivery can drop a history
+  // row; the artifact and `latest` remain the authoritative records.
   const current = await backend.get(HISTORY_KEY);
   const history = Array.isArray(current) ? current : [];
   const next = [summaryOf(packet), ...history].slice(0, HISTORY_CAP);
