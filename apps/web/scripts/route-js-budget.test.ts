@@ -173,19 +173,6 @@ describe('route-js-budget', () => {
     );
   });
 
-  it('explains public first-load manifests with the same measurement as the gate', () => {
-    const nextDir = buildFirstLoadFixture();
-    const [row] = routeJsContributors(nextDir, ['/', '/']);
-    expect(row.files.map(chunk => chunk.file).sort()).toEqual([
-      'static/chunks/home.js',
-      'static/chunks/main.js',
-    ]);
-    expect(Math.round(row.gzipBytes / 1024)).toBe(
-      measureFirstLoadJs(nextDir).find(route => route.route === '/')?.gzipKb
-    );
-    expect(routeJsContributors(nextDir, [])).toEqual([]);
-  });
-
   it('explains the worst parallel app entry instead of unioning separate entries', () => {
     const nextDir = buildFixture();
     writeManifest(nextDir, '@dialog/settings', '/app/@dialog/settings/page', {

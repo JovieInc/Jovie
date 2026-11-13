@@ -2,7 +2,11 @@ import { spawnSync } from 'node:child_process';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { evaluateBudgets } from './route-js-budget.mjs';
+import {
+  evaluateBudgets,
+  measureFirstLoadJs,
+  routeJsContributors,
+} from './route-js-budget.mjs';
 import {
   buildFirstLoadFixture,
   cleanupFixtures,
@@ -96,6 +100,19 @@ function runCli(nextDir: string, budgetPath: string, env = process.env) {
 }
 
 describe('route-group policy reaches the existing evaluator and CLI', () => {
+  it('explains public first-load manifests with the same measurement as the gate', () => {
+    const nextDir = buildFirstLoadFixture();
+    const [row] = routeJsContributors(nextDir, ['/', '/']);
+    expect(row.files.map(chunk => chunk.file).sort()).toEqual([
+      'static/chunks/home.js',
+      'static/chunks/main.js',
+    ]);
+    expect(Math.round(row.gzipBytes / 1024)).toBe(
+      measureFirstLoadJs(nextDir).find(route => route.route === '/')?.gzipKb
+    );
+    expect(routeJsContributors(nextDir, [])).toEqual([]);
+  });
+
   it('isolates fixture Git commands from an inherited parent repository', () => {
     const parentDir = buildFirstLoadFixture();
     const parentEnv = writeAncestorGitRepo(parentDir, {
