@@ -1,9 +1,6 @@
-import { PLAN_PRICES } from '@/lib/config/plan-prices';
 import type { PricingOption } from '@/lib/queries';
 
 const MONTHLY_INTERVALS = new Set(['month', 'monthly']);
-
-export const FALLBACK_VERIFIED_PRICE_LABEL = `$${PLAN_PRICES.pro.monthly}/mo`;
 
 export function getPreferredVerifiedPrice(
   options: PricingOption[]
@@ -14,14 +11,13 @@ export function getPreferredVerifiedPrice(
   return monthPrice ?? options[0];
 }
 
+/** Label of the price the person is charged; no list-price fallback. */
 export function formatVerifiedPriceLabel(
   option: PricingOption | undefined
-): string {
-  if (!option) return FALLBACK_VERIFIED_PRICE_LABEL;
+): string | null {
+  if (!option || !Number.isFinite(option.amount)) return null;
 
-  const amount = Number.isFinite(option.amount)
-    ? option.amount / 100
-    : PLAN_PRICES.pro.monthly;
+  const amount = option.amount / 100;
   const currency = option.currency?.toUpperCase() || 'USD';
 
   const formatted = new Intl.NumberFormat('en-US', {
@@ -31,4 +27,12 @@ export function formatVerifiedPriceLabel(
   }).format(amount);
 
   return `${formatted}/mo`;
+}
+
+/** "Get Verified — <price>", or "Get Verified" until the price is known. */
+export function formatVerifiedUpgradeLabel(
+  option: PricingOption | undefined
+): string {
+  const price = formatVerifiedPriceLabel(option);
+  return price ? `Get Verified — ${price}` : 'Get Verified';
 }

@@ -16,6 +16,12 @@ const {
 
 vi.mock('server-only', () => ({}));
 
+// The signup price lock has its own suite; keep this unit off the database.
+const mockEnsurePriceLockForUserSafely = vi.hoisted(() => vi.fn());
+vi.mock('@/lib/billing/price-lock.server', () => ({
+  ensurePriceLockForUserSafely: mockEnsurePriceLockForUserSafely,
+}));
+
 vi.mock('@/lib/db', () => ({
   db: {
     select: () => ({
@@ -105,6 +111,10 @@ describe('provisionAppUser waitlist gate (JOV-6449)', () => {
     expect(mockIsWaitlistGateEnabled).toHaveBeenCalledOnce();
     expect(mockGetWaitlistAccess).not.toHaveBeenCalled();
     expect(mockInsertReturning).toHaveBeenCalledOnce();
+    expect(mockEnsurePriceLockForUserSafely).toHaveBeenCalledWith(
+      'user-new',
+      'signup'
+    );
   });
 
   it('reads waitlist only after the launch gate is on', async () => {

@@ -3,6 +3,7 @@ import 'server-only';
 import { sql as drizzleSql, eq } from 'drizzle-orm';
 import { readCachedAcquisitionEligibility } from '@/lib/acquisition/eligibility.server';
 import { invalidateProxyUserStateCache } from '@/lib/auth/proxy-state';
+import { ensurePriceLockForUserSafely } from '@/lib/billing/price-lock.server';
 import {
   buildProductionWaitlistCanaryMarker,
   hasProductionWaitlistCanaryNamespace,
@@ -729,9 +730,6 @@ export async function submitWaitlistAccessRequest(
     // may still be holding a stale waitlist_pending entry from a prior
     // /waitlist visit. Mirror the normal-approval invalidation so middleware
     // doesn't keep redirecting the user back to /waitlist.
-    //
-    // Only bust the cache when the userStatus row actually changed; otherwise
-    // we'd thrash the cache on every idempotent re-assert.
     await invalidateProxyUserStateCache(input.appUserId).catch(error => {
       logger.warn(
         '[waitlist] Failed to invalidate proxy state on already_accepted',
@@ -768,6 +766,8 @@ export async function submitWaitlistAccessRequest(
   }
 
   if (!suppressCanaryCommunications) {
+    if (input.appUserId)
+      await ensurePriceLockForUserSafely(input.appUserId, 'waitlist');
     await recordWaitlistJoin({
       entryId: result.entryId,
       acquisitionId: input.acquisitionId,

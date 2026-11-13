@@ -215,7 +215,7 @@
     "refund_guarantee_claim": 2
   },
   "apps/web/lib/billing/verified-upgrade.ts": {
-    "billing_claim": 2
+    "billing_claim": 1
   },
   "apps/web/lib/canaries/m2-revenue-path.ts": {
     "billing_claim": 2

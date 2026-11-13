@@ -143,7 +143,9 @@ describe('GET /api/stripe/pricing-options', () => {
     const data = await response.json();
 
     expect(response.status).toBe(200);
-    expect(data.options).toEqual([{ priceId: 'price_live', amount: 1200 }]);
+    expect(data.options).toEqual([
+      { priceId: 'price_live', amount: 1200, plan: 'pro' },
+    ]);
     const context = {
       event: 'stripe_pricing_option_skipped',
       priceId: 'price_missing',
@@ -200,7 +202,7 @@ describe('GET /api/stripe/pricing-options', () => {
     );
     expect(mockRetrieve).toHaveBeenCalledExactlyOnceWith('price_live');
     expect((await response.json()).options).toEqual([
-      { priceId: 'price_live', amount: 1200 },
+      { priceId: 'price_live', amount: 1200, plan: 'pro' },
     ]);
   });
 
@@ -234,7 +236,9 @@ describe('GET /api/stripe/pricing-options', () => {
     const data = await response.json();
 
     expect(response.status).toBe(200);
-    expect(data.options).toEqual([{ priceId: 'price_live', amount: 1200 }]);
+    expect(data.options).toEqual([
+      { priceId: 'price_live', amount: 1200, plan: 'pro' },
+    ]);
     expect(data.pricingOptions).toEqual(data.options);
     expect(mockCaptureError).not.toHaveBeenCalled();
   });

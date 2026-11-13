@@ -3,6 +3,7 @@ import { readRequestAccountClassHeader } from '@/lib/accounts/request-account-cl
 import 'server-only';
 
 import { and, sql as drizzleSql, eq, isNull } from 'drizzle-orm';
+import { ensurePriceLockForUserSafely } from '@/lib/billing/price-lock.server';
 import { db } from '@/lib/db';
 import { users } from '@/lib/db/schema/auth';
 import { captureError } from '@/lib/error-tracking';
@@ -141,6 +142,8 @@ export async function provisionAppUser(
       if (userStatus === 'waitlist_pending') {
         await ensureSignupWaitlistEntry(normalizedEmail || email);
       }
+      // Price lock: the price they sign up at is recorded now.
+      await ensurePriceLockForUserSafely(inserted.id, 'signup');
       return inserted.id;
     }
 

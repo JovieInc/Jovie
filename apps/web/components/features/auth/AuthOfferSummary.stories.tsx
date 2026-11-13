@@ -1,10 +1,13 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
+import { expect, within } from 'storybook/test';
+import { clearPlanIntent } from '@/lib/auth/plan-intent';
 
 import { AuthOfferSummary } from './AuthOfferSummary';
 
 const meta = {
   title: 'Auth/AuthOfferSummary',
   component: AuthOfferSummary,
+  beforeEach: () => clearPlanIntent(),
   args: {
     enabled: true,
   },
@@ -22,6 +25,20 @@ const meta = {
 
 export default meta;
 type Story = StoryObj<typeof meta>;
+
+export const EmptyNoOffer: Story = {
+  args: { mode: 'sign-up' },
+  parameters: {
+    nextjs: {
+      navigation: { query: { plan: '', interval: '' } },
+    },
+  },
+  play: async ({ canvasElement }) => {
+    await expect(
+      within(canvasElement).queryByTestId('auth-offer-summary')
+    ).not.toBeInTheDocument();
+  },
+};
 
 export const SignUpProTrial: Story = {
   args: {

@@ -17,6 +17,7 @@
 import 'server-only';
 import type Stripe from 'stripe';
 
+import type { LockedCheckoutExpectation } from '@/lib/billing/price-lock-checkout';
 import { captureError } from '@/lib/error-tracking';
 import { logger } from '@/lib/utils/logger';
 
@@ -28,6 +29,8 @@ import {
   type PlanType,
 } from './config';
 import { assertCheckoutPriceContract } from './price-contract';
+
+const retrievePrice = (id: string) => stripe.prices.retrieve(id);
 
 /**
  * Plan hierarchy for determining upgrade vs downgrade
@@ -81,6 +84,7 @@ export interface PreviewPlanChangeOptions {
   customerId: string;
   /** Target price ID for the new plan */
   newPriceId: string;
+  lockedPrice?: LockedCheckoutExpectation;
 }
 
 /**
@@ -91,6 +95,7 @@ export interface ExecutePlanChangeOptions {
   subscriptionId: string;
   /** Target price ID for the new plan */
   newPriceId: string;
+  lockedPrice?: LockedCheckoutExpectation;
   /** Whether to prorate (default: true for upgrades, false for downgrades) */
   prorate?: boolean;
 }
@@ -204,19 +209,16 @@ export function isIntervalChange(
 export async function previewPlanChange(
   options: PreviewPlanChangeOptions
 ): Promise<ProrationPreview | null> {
-  const { customerId, newPriceId } = options;
+  const { customerId, newPriceId, lockedPrice } = options;
 
   try {
-    // Validate new price ID
     const activePriceIds = getActivePriceIds();
-    if (!activePriceIds.includes(newPriceId)) {
+    if (!lockedPrice && !activePriceIds.includes(newPriceId)) {
       logger.warn('Invalid price ID for plan change preview', { newPriceId });
       return null;
     }
 
-    await assertCheckoutPriceContract(newPriceId, id =>
-      stripe.prices.retrieve(id)
-    );
+    await assertCheckoutPriceContract(newPriceId, retrievePrice, lockedPrice);
 
     // Get current subscription
     const subscription = await getActiveSubscription(customerId);
@@ -325,12 +327,12 @@ export async function previewPlanChange(
 export async function executePlanChange(
   options: ExecutePlanChangeOptions
 ): Promise<PlanChangeResult> {
-  const { subscriptionId, newPriceId, prorate } = options;
+  const { subscriptionId, newPriceId, prorate, lockedPrice } = options;
 
   try {
     // Validate new price ID
     const activePriceIds = getActivePriceIds();
-    if (!activePriceIds.includes(newPriceId)) {
+    if (!lockedPrice && !activePriceIds.includes(newPriceId)) {
       return {
         success: false,
         error: 'Invalid price ID',
@@ -339,9 +341,7 @@ export async function executePlanChange(
       };
     }
 
-    await assertCheckoutPriceContract(newPriceId, id =>
-      stripe.prices.retrieve(id)
-    );
+    await assertCheckoutPriceContract(newPriceId, retrievePrice, lockedPrice);
 
     // Get current subscription with expanded price data
     const subscriptionRaw = await stripe.subscriptions.retrieve(

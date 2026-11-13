@@ -11,6 +11,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getCachedAuth } from '@/lib/auth/cached';
+import { resolveCheckoutPriceForUser } from '@/lib/billing/price-lock.server';
 import { captureCriticalError } from '@/lib/error-tracking';
 import { parseJsonBody } from '@/lib/http/parse-json';
 import { isMaxPlanEnabled, isMaxPriceId } from '@/lib/stripe/config';
@@ -63,10 +64,16 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const { decision } = await resolveCheckoutPriceForUser(userId, priceId);
+
     // Get proration preview
     const preview = await previewPlanChange({
       customerId: customerResult.customerId,
-      newPriceId: priceId,
+      // Price lock: the preview quotes the locked price, same as the change.
+      newPriceId: decision.priceId,
+      ...(decision.kind === 'locked'
+        ? { lockedPrice: decision.expectation }
+        : {}),
     });
 
     if (!preview) {

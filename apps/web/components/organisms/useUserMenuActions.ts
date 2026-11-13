@@ -5,7 +5,7 @@ import { useMemo, useState } from 'react';
 import type { JovieSignOutOptions } from '@/hooks/useJovieAuth';
 import { track } from '@/lib/analytics';
 import {
-  formatVerifiedPriceLabel,
+  formatVerifiedUpgradeLabel,
   getPreferredVerifiedPrice,
 } from '@/lib/billing/verified-upgrade';
 import { env } from '@/lib/env-client';
@@ -78,7 +78,7 @@ export function useUserMenuActions({
   );
 
   const upgradeLabel = useMemo(
-    () => `Get Verified — ${formatVerifiedPriceLabel(selectedPrice)}`,
+    () => formatVerifiedUpgradeLabel(selectedPrice),
     [selectedPrice]
   );
 

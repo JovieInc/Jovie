@@ -83,6 +83,7 @@ export async function GET() {
         currency: option.currency,
         interval: option.interval,
         description: option.description,
+        plan: option.plan,
       }));
 
     return NextResponse.json({

@@ -162,6 +162,36 @@ describe('BillingDashboard', () => {
     vi.clearAllMocks();
   });
 
+  it('shows the locked price and the disclosure, never the list price, to a person with a price lock', async () => {
+    mockFetchResponses({
+      '/api/billing/status': BILLING_STATUS_PRO,
+      '/api/stripe/pricing-options': {
+        options: [{ ...PRICING_OPTIONS.options[0], plan: 'pro' }],
+      },
+      '/api/billing/price-lock': {
+        priceLock: {
+          locked: true,
+          priceVersionId: 'pro-2026-10-20-m12',
+          lockedAt: '2026-10-29T00:00:00.000Z',
+          month: {
+            amountCents: 1200,
+            currency: 'usd',
+            interval: 'month',
+            priceId: 'price_locked_12',
+          },
+          year: null,
+        },
+      },
+      '/api/billing/history': EMPTY_HISTORY,
+    });
+
+    renderBillingDashboard();
+
+    expect(await screen.findByTestId('price-lock-note')).toHaveTextContent(
+      'Your price is locked at $12/mo.'
+    );
+  });
+
   it('renders loading skeleton while queries are pending', () => {
     // Never resolve fetch — keeps queries in loading state
     (global.fetch as ReturnType<typeof vi.fn>).mockImplementation(

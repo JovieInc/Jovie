@@ -37,6 +37,11 @@ const {
 
 vi.mock('server-only', () => ({}));
 
+// Price lock recording is covered by price-lock.server.test.ts.
+vi.mock('@/lib/billing/price-lock.server', () => ({
+  ensurePriceLockForUserSafely: vi.fn().mockResolvedValue(undefined),
+}));
+
 vi.mock('next/headers', () => ({
   headers: vi.fn(async () => new Headers()),
 }));

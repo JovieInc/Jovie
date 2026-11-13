@@ -19,6 +19,29 @@ const runs = deriveSteps(read(WORKFLOW_PATH))
 const commands = workflowCommands(runs, pkg.scripts, coveredBy);
 
 describe('Source Validation manifest parity', () => {
+  it('checks offer prose when a new billing helper has no direct guard import', () => {
+    const guard = selectManifestGuards([
+      'apps/web/lib/billing/price-versions.ts',
+    ]).find(g => g.id === 'duplicate-literals');
+    expect(guard?.command).toContain(
+      'node scripts/invariants/offer-claims/check.mjs'
+    );
+    expect(guard?.command).toContain('node scripts/invariants/validate.mjs');
+  });
+
+  it.each([
+    'apps/web/components/features/auth/AuthOfferSummary.tsx',
+    'apps/web/components/features/auth/AuthOfferSummary.stories.tsx',
+    'packages/ui/atoms/card.stories.ts',
+    'packages/ui/atoms/card.states.stories.tsx',
+  ])('runs the unchanged certificate gate for %s', path => {
+    const guard = selectManifestGuards([path]).find(
+      g => g.id === 'component-certificate'
+    );
+    expect(guard?.command).toBe('pnpm component-certificate:gate');
+    expect(guard?.covers).toContain('pnpm component-certificate:gate');
+  });
+
   it('every command Source Validation runs is a manifest guard or has a NOT_LOCAL reason', () => {
     const missing = commands.filter(c => !coveredBy(c));
     expect(
