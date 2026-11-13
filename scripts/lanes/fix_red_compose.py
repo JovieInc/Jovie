@@ -16,7 +16,7 @@ def compose_actions(actions: list[str]) -> list[str]:
     order = (
         classes.SYNC_MAIN, classes.STAMP_CHANGELOG, classes.WIRE_CI_FAST, classes.RENUMBER,
         classes.SNAP_SPACING, classes.STRIP_CACHE, classes.MERGE_NARROWED, classes.REGISTER_DOMAIN,
-        classes.ATOMIC_WRITE, classes.REPAIR_SCREEN_CERT, classes.BALANCE_HEADINGS, classes.RERUN)
+        classes.ATOMIC_WRITE, classes.REPAIR_SCREEN_CERT, classes.BALANCE_HEADINGS, classes.UI_FEEL, classes.RERUN)
     rank = {name: index for index, name in enumerate(order)}
     chosen: list[str] = []
     for action in actions:
@@ -47,6 +47,7 @@ def deterministic_fixer(lane, action: str):
         "renumber": lane.renumber_migrations_fix, "snap": lane.snap_spacing_fix,
         "strip": lane.strip_cache_exports_fix, "merge": lane.merge_narrowed_preflight_fix,
         "register": lane.register_domain_writes_fix,
+        "ui": lane.fix_red_screen_cert.bind_ui_feel(lane.sh, lane.failed_logs, classes),
     }).get(action)
 
 

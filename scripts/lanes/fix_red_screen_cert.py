@@ -19,8 +19,16 @@ def screen_cert_paths(log: str) -> list[str]:
     return sorted(set(SCREEN_CERT_FILE.findall(log or "")))
 
 
+def bind_ui_feel(sh, failed_logs, classes):
+    """Adapt the ui-feel publisher to the fixer call the lane already uses."""
+    def fix(host, pr, route, worktree, log, receipt):
+        del route
+        return classes.publish_ui_feel(sh, failed_logs, host, pr, worktree, log, receipt)
+    return fix
+
+
 def dispatch(classes, sh, fixers: dict):
-    """Fixer table the lane used to inline. Screen-cert and heading balance are routed here."""
+    """Route screen-cert, heading balance, and log-reported ui-feel repairs."""
     table = {
         classes.WIRE_CI_FAST: fixers["wire"],
         classes.ATOMIC_WRITE: fixers["atomic"],
@@ -34,6 +42,9 @@ def dispatch(classes, sh, fixers: dict):
                 sh, host, pr, route, worktree, log, receipt)
         ),
     }
+    ui = fixers.get("ui")
+    if ui is not None:
+        table[classes.UI_FEEL] = ui
     balance = getattr(classes, "BALANCE_HEADINGS", None)
     if balance is not None:
         table[balance] = (
