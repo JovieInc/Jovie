@@ -24,7 +24,6 @@ for (const { route, cta } of [
   });
 }
 
-
 test('/waitlist serves the one front door in both signup modes', async ({
   page,
 }, testInfo) => {
