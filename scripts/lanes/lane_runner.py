@@ -7205,6 +7205,48 @@ def deterministic_route_taken(host: Host, pr: dict, route: dict | None) -> str |
     return f"infra-rerun:{route['cls']}" if pr_events.sync_main(host, THIS, pr, time.time(), terminal_ok=True) == "synced" else None
 
 
+def _deterministic_fixer(action: str):
+    """Leaf no-model fixers. `compose` is not one of them; it runs these in order."""
+    return {fix_red_classes.WIRE_CI_FAST: wire_ci_fast_fix,
+            fix_red_classes.ATOMIC_WRITE: atomic_state_fix,
+            fix_red_classes.RENUMBER: renumber_migrations_fix,
+            fix_red_classes.SNAP_SPACING: snap_spacing_fix,
+            fix_red_classes.STRIP_CACHE: strip_cache_exports_fix,
+            fix_red_classes.MERGE_NARROWED: merge_narrowed_preflight_fix,
+            fix_red_classes.REGISTER_DOMAIN: register_domain_writes_fix}.get(action)
+
+
+def compose_deterministic_fix(host: Host, pr: dict, route: dict, worktree: Path, log, receipt: dict):
+    """Run every deterministic action on one red head. Stamp the body before a fixer push.
+    None when any action does not apply; the caller then sends the head to the model."""
+    actions = fix_red_classes.compose_actions(route.get("actions") or [])
+    if len(actions) < 2 or any(action not in fix_red_classes.DETERMINISTIC for action in actions):
+        return None
+    agent = None
+    done = []
+    for action in actions:
+        if action == fix_red_classes.STAMP_CHANGELOG:
+            if not stamp_changelog_decision(host, pr):
+                return None
+        elif action == fix_red_classes.RERUN:
+            if not _rerun_failed(pr):
+                return None
+        elif action == fix_red_classes.SYNC_MAIN:
+            if pr_events.sync_main(host, THIS, pr, time.time(), terminal_ok=True) != "synced":
+                return None
+        else:
+            fixer = _deterministic_fixer(action)
+            if fixer is None:
+                return None
+            agent = fixer(host, pr, route, worktree, log, receipt)
+            if agent is None:
+                return None
+        done.append(action)
+    receipt["composedActions"] = done
+    receipt["resolution"] = "composed-deterministic"
+    return agent or types.SimpleNamespace(returncode=0)
+
+
 # Per-PR circuit breaker across heads. Gem ledger, 762 fix runs: after 3 consecutive unproductive
 # runs on a PR inside 24 h the next run pushed 7% of the time (13 of 192), against 27% for a first
 # run; 52% of all runs went to PRs the lane never pushed. A new head does not reset the streak.
@@ -8171,14 +8213,12 @@ def _fix_red_pr(host: Host, name: str, spec: dict, pr: dict, *, branch_held=True
                 boundary("before-agent")
                 execution_attempt.boundary(runs / "execution-attempts.jsonl", ident, claimed["fencingToken"],
                                            {"spend": 1, "mutations": 1}, coordination=coordination, boundary_id="repair-dispatch")
-                fixer = {fix_red_classes.WIRE_CI_FAST: wire_ci_fast_fix,
-                         fix_red_classes.ATOMIC_WRITE: atomic_state_fix,
-                         fix_red_classes.RENUMBER: renumber_migrations_fix,
-                         fix_red_classes.SNAP_SPACING: snap_spacing_fix,
-                         fix_red_classes.STRIP_CACHE: strip_cache_exports_fix,
-                         fix_red_classes.MERGE_NARROWED: merge_narrowed_preflight_fix,
-                         fix_red_classes.REGISTER_DOMAIN: register_domain_writes_fix}.get((route or {}).get("action"))
-                agent = fixer(host, pr, route, worktree, log, receipt) if fixer else None
+                action = (route or {}).get("action")
+                if action == fix_red_classes.COMPOSE:
+                    agent = compose_deterministic_fix(host, pr, route, worktree, log, receipt)
+                else:
+                    fixer = _deterministic_fixer(action)
+                    agent = fixer(host, pr, route, worktree, log, receipt) if fixer else None
                 agent = agent or run_agent(template(spec["cmd"], {"prompt": prompt, "prompt_file": str(prompt_file),
                                                          "cwd": str(worktree),
                                                          "provider_receipt": str(provider_evidence),

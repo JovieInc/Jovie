@@ -7872,6 +7872,45 @@ class FixRedTest(unittest.TestCase):
                     {"name": "ci-fast (remaining)", "status": "COMPLETED", "conclusion": "FAILURE",
                      "detailsUrl": "https://github.com/x/actions/runs/1/job/42"}]}
 
+    def test_composed_route_stamps_the_body_before_wiring_and_does_not_call_the_model(self):
+        order = []
+        route = {"action": "compose", "cls": "composed",
+                 "actions": ["wire-ci-fast", "stamp-changelog"],
+                 "files": ["scripts/catalog-duplicate-report.test.mjs"]}
+
+        def stamp(host, pr):
+            order.append("stamp")
+            return True
+
+        def wire(host, pr, route, worktree, log, receipt):
+            order.append("wire")
+            receipt["wiredFiles"] = list(route["files"])
+            return SimpleNamespace(returncode=0)
+
+        receipt = {}
+        with patch.object(lane, "stamp_changelog_decision", side_effect=stamp), \
+                patch.object(lane, "wire_ci_fast_fix", side_effect=wire), \
+                patch.object(lane, "run_agent") as agent:
+            done = lane.compose_deterministic_fix(None, {"number": 24816, "body": "bare"}, route, Path("."), None, receipt)
+            self.assertIsNone(lane.deterministic_route_taken(None, {"body": "bare"}, route))
+        self.assertEqual(order, ["stamp", "wire"])
+        self.assertEqual(done.returncode, 0)
+        self.assertEqual(receipt["resolution"], "composed-deterministic")
+        self.assertEqual(receipt["composedActions"], ["stamp-changelog", "wire-ci-fast"])
+        self.assertEqual(receipt["wiredFiles"], ["scripts/catalog-duplicate-report.test.mjs"])
+        agent.assert_not_called()
+        order.clear()
+
+        def stamp_fails(host, pr):
+            order.append("stamp")
+            return False
+
+        with patch.object(lane, "stamp_changelog_decision", side_effect=stamp_fails), \
+                patch.object(lane, "wire_ci_fast_fix", side_effect=wire):
+            self.assertIsNone(lane.compose_deterministic_fix(
+                None, {"number": 24816, "body": "bare"}, route, Path("."), None, {}))
+        self.assertEqual(order, ["stamp"])
+
     def test_unreadable_or_partial_open_state_is_not_treated_as_an_authorized_target(self):
         for payload in ("not json", "[]", '{"state":"OPEN"}', '{"state":"OPEN","headRefOid":"h1","headRefName":""}'):
             with self.subTest(payload=payload), patch.object(lane, "sh", return_value=SimpleNamespace(returncode=0, stdout=payload)):
