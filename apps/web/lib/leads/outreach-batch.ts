@@ -37,6 +37,7 @@ import {
 } from '@/lib/outbound/audience-effect-policy';
 import { getOutboundClaimUrl } from '@/lib/outbound/claim-url';
 import {
+  type OutboundLeadIdentity,
   outboundTargetFromLead,
   readOutboundLedger,
 } from '@/lib/outbound/ledger.server';
@@ -155,17 +156,12 @@ function isPermanentOutreachError(error: unknown): boolean {
   return status !== null && status >= 400 && status < 500 && status !== 429;
 }
 
-interface ClaimedLead {
-  id: string;
-  linktreeHandle: string;
-  displayName: string | null;
-  contactEmail: string | null;
-  instagramHandle: string | null;
-  creatorProfileId: string | null;
-  /** Read by the existing-relationship hold in evaluateOutboundSend. */
-  bio: string | null;
-  /** Derived in memory from the stored hash inputs; never persisted. */
-  claimToken: string | null;
+/**
+ * A claimed lead: the identity the outbound target binds (its bio is read by
+ * the existing-relationship hold in evaluateOutboundSend) plus claim state.
+ * `claimToken` is derived in memory from the hash inputs; never persisted.
+ */
+interface ClaimedLead extends OutboundLeadIdentity {
   claimTokenHash: string | null;
   priorityScore: number | null;
   claimedAt: Date;

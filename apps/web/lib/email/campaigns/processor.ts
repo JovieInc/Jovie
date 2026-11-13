@@ -28,10 +28,7 @@ import { emailSuppressions } from '@/lib/db/schema/suppression';
 import { enqueueBulkClaimInviteJobs } from '@/lib/email/jobs/enqueue';
 import type { SuppressionReason } from '@/lib/notifications/suppression';
 import { hashEmail } from '@/lib/notifications/suppression';
-import {
-  coldClaimInviteRelationshipHold,
-  isColdClaimInviteSendOpen,
-} from '@/lib/outbound/cold-claim-invites';
+import { isColdClaimInviteSendOpen } from '@/lib/outbound/cold-claim-invites';
 import { logger } from '@/lib/utils/logger';
 
 /**
@@ -528,19 +525,6 @@ async function processEnrollment(
         subjectId: enrollment.subjectId,
       });
       result.errors++;
-      return;
-    }
-
-    // An artist Tim already works with gets no follow-up either.
-    if (
-      coldClaimInviteRelationshipHold({
-        username: inviteData.profile.username,
-        displayName: inviteData.profile.displayName,
-        email: inviteData.invite.email,
-      })
-    ) {
-      await stopEnrollment(enrollment.id, 'existing_relationship', now);
-      result.stopped++;
       return;
     }
 

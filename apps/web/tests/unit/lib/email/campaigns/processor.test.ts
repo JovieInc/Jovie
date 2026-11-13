@@ -45,11 +45,7 @@ const {
 const coldGate = vi.hoisted(() => ({ open: true }));
 // Exercise the underlying send logic as if the path were open; the closed
 // default is proven separately below (JOV-7858).
-vi.mock('@/lib/outbound/cold-claim-invites', async importOriginal => ({
-  // Keep the real existing-relationship hold; only the open switch is faked.
-  ...(await importOriginal<
-    typeof import('@/lib/outbound/cold-claim-invites')
-  >()),
+vi.mock('@/lib/outbound/cold-claim-invites', () => ({
   isColdClaimInviteSendOpen: () => coldGate.open,
   COLD_CLAIM_INVITE_CLOSED_MESSAGE: 'closed',
 }));
@@ -789,41 +785,6 @@ describe('email/campaigns/processor.ts', () => {
 
       expect(result.skipped).toBe(1);
       expect(result.sent).toBe(0);
-    });
-  });
-
-  describe('existing-relationship hold', () => {
-    it('stops the follow-up for an artist Tim already works with', async () => {
-      setupProcessingMocks({
-        claimInviteRows: [
-          {
-            inviteId: 'invite-1',
-            email: 'artist@example.com',
-            creatorProfileId: 'subject-1',
-            sentAt: new Date('2026-01-01T00:00:00Z'),
-            profileId: 'subject-1',
-            username: 'djdannic',
-            displayName: 'Dannic',
-            avatarUrl: null,
-            meta: null,
-          },
-        ],
-      });
-
-      const { processCampaigns } = await import(
-        '@/lib/email/campaigns/processor'
-      );
-      const result = await processCampaigns();
-
-      expect(result.stopped).toBe(1);
-      expect(result.sent).toBe(0);
-      expect(mockEnqueueBulkClaimInviteJobs).not.toHaveBeenCalled();
-      const { setSpy } = getUpdateSpies();
-      expect(setSpy).toHaveBeenCalledWith({
-        status: 'stopped',
-        stopReason: 'existing_relationship',
-        updatedAt: expect.any(Date),
-      });
     });
   });
 
