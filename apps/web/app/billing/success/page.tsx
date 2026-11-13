@@ -205,11 +205,9 @@ function CheckoutSuccessContent() {
   } else if (isOnboardingUpgrade && proofPending) {
     successTitle = 'Your plan is active';
   } else if (isOnboardingUpgrade) {
-    successTitle = shareUrl
-      ? 'Your profile is live and upgraded'
-      : 'Your plan is active';
+    successTitle = shareUrl ? 'Your profile is live' : 'Your plan is active';
   } else if (paidDisplayName) {
-    successTitle = `Welcome to ${paidDisplayName}!`;
+    successTitle = `${paidDisplayName} plan confirmed`;
   } else {
     successTitle = CHECKOUT_RECOVERY_COPY.title;
   }
@@ -224,11 +222,11 @@ function CheckoutSuccessContent() {
   } else if (isOnboardingUpgrade) {
     successSubtitle = isArtistVisibilitySuccess
       ? `You're all set. ${ARTIST_VISIBILITY_ACTIVATION_COPY.status}.`
-      : "You're all set. Here's what you just unlocked.";
+      : "Here's what's included with your plan.";
   } else if (isArtistVisibilitySuccess) {
     successSubtitle = ARTIST_VISIBILITY_ACTIVATION_COPY.next;
   } else {
-    successSubtitle = "Your plan is active. Here's what you just unlocked.";
+    successSubtitle = "Your plan is active. Here's what's included.";
   }
 
   // The page settles in place: no confetti, no entrance slide and no vertical

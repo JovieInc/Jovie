@@ -150,6 +150,9 @@ describe('checkout confirmation claims', () => {
     first.unmount();
     render(<CheckoutSuccessPage />);
     await screen.findByTestId('checkout-success-paid');
+    expect(
+      screen.queryByText(/welcome to|just unlocked|live and upgraded/i)
+    ).not.toBeInTheDocument();
     expect(mocks.page).toHaveBeenCalledTimes(2);
     expect(mocks.page).toHaveBeenCalledWith(
       'checkout_success',
@@ -297,7 +300,7 @@ describe('profile claims and activation', () => {
     render(<CheckoutSuccessPage />);
     await screen.findByTestId('paid-share-prompt');
     expect(screen.getByRole('heading')).toHaveTextContent(
-      'Your profile is live and upgraded'
+      'Your profile is live'
     );
     expect(
       screen.getByRole('link', { name: /explore your dashboard/i })
