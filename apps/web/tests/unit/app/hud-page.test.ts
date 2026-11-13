@@ -2,8 +2,11 @@ vi.mock('@/lib/ovie/privacy-lock/server', () => ({
   assertOviePrivacyUnlocked: vi.fn().mockResolvedValue(undefined),
 }));
 
+import QRCodeLib from 'qrcode';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import HudPage from '@/app/hud/page';
+import { BASE_URL } from '@/constants/domains';
+import { APP_ROUTES } from '@/constants/routes';
 import { AGENT_OS_ADMIN_FIXTURE_ARTIFACTS } from '@/lib/agent-os/fixtures';
 import { env } from '@/lib/env-server';
 
@@ -134,6 +137,42 @@ describe('/hud page auth', () => {
     expect(dashboardElement?.props?.density).toBe('kiosk');
     expect(dashboardElement?.props?.presentationMode).toBe('token');
     expect(getFounderFunnelDataMock).not.toHaveBeenCalled();
+  });
+
+  it('gives the kiosk QR panel the absolute kiosk link to encode', async () => {
+    authorizeHudMock.mockResolvedValue({ ok: true, mode: 'kiosk' });
+    getHudMetricsMock.mockResolvedValue({ accessMode: 'kiosk' });
+
+    const result = await HudPage({
+      searchParams: Promise.resolve({ kiosk: 'tv token/1' }),
+    });
+
+    const hudUrl = findElementByName(result, 'HudDashboardClient')?.props
+      ?.hudUrl as string | undefined;
+    expect(hudUrl).toBeTruthy();
+    const parsed = new URL(hudUrl as string);
+    expect(parsed.origin).toBe(new URL(BASE_URL).origin);
+    expect(parsed.pathname).toBe(APP_ROUTES.HUD);
+    // The token round-trips intact, so the scanned link authorizes.
+    expect(parsed.searchParams.get('kiosk')).toBe('tv token/1');
+
+    // The value is a scannable payload: it encodes to a real QR matrix.
+    const qr = QRCodeLib.create(hudUrl as string);
+    expect(qr.modules.size).toBeGreaterThan(20);
+  });
+
+  it('passes no QR link outside the token presentation', async () => {
+    getCurrentAdminPageAccessMock.mockResolvedValue({
+      isAuthenticated: true,
+      hasAdminRole: true,
+      userId: 'admin_1',
+    });
+
+    const result = await HudPage({ searchParams: Promise.resolve({}) });
+
+    expect(
+      findElementByName(result, 'HudDashboardClient')?.props?.hudUrl
+    ).toBeUndefined();
   });
 
   it('calls unauthorized for signed-out users', async () => {
