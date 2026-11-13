@@ -46,6 +46,7 @@ const BRAND_WORDS = new Set([
   'Music',
   'SoundCloud',
   'Spotify',
+  'Stripe',
   'TikTok',
   'Venmo',
   'YouTube',
@@ -293,6 +294,62 @@ function isSentenceCase(value) {
 }
 
 /**
+ * Suggestion for sentence-case copy. Mid-sentence capitals that are not
+ * abbreviations or brand words are lowercased; brand words such as Stripe
+ * stay. The first character is capitalized unless the copy starts with a
+ * brand. Callers still decide validity with `isSentenceCase`.
+ *
+ * @param {string} value
+ */
+function toCanonicalSentenceCase(value) {
+  const trimmed = normalizeText(value);
+  if (!trimmed) return trimmed;
+
+  const rawWords = trimmed.split(' ');
+  let prevEndsSentence = true;
+  const rewritten = [];
+  for (const raw of rawWords) {
+    const leading = raw.match(/^[^A-Za-z0-9]*/)?.[0] ?? '';
+    const trailing = raw.match(/[^A-Za-z0-9]*$/)?.[0] ?? '';
+    const core = raw.slice(leading.length, raw.length - trailing.length);
+    const endsSentence = /[.!?:][)"'\]]*$/.test(raw);
+    if (!core) {
+      rewritten.push(raw);
+      if (endsSentence) prevEndsSentence = true;
+      continue;
+    }
+    let nextCore = core;
+    if (
+      !prevEndsSentence &&
+      !isAbbreviation(core) &&
+      !isBrandWord(core) &&
+      /^[A-Z][a-z]/.test(core)
+    ) {
+      nextCore = `${core.charAt(0).toLowerCase()}${core.slice(1).toLowerCase()}`;
+    }
+    rewritten.push(`${leading}${nextCore}${trailing}`);
+    prevEndsSentence = endsSentence;
+  }
+
+  let result = rewritten.join(' ');
+  const firstWord = stripEdgePunctuation(result.split(' ')[0] ?? '');
+  const startsWithBrandWord =
+    isBrandWord(firstWord) ||
+    (firstWord.length > 1 &&
+      firstWord.startsWith('i') &&
+      /[A-Z]/.test(firstWord[1]));
+  if (
+    result &&
+    !startsWithBrandWord &&
+    /[A-Za-z]/.test(result.charAt(0)) &&
+    result.charAt(0) !== result.charAt(0).toUpperCase()
+  ) {
+    result = `${result.charAt(0).toUpperCase()}${result.slice(1)}`;
+  }
+  return result;
+}
+
+/**
  * @param {string} filename
  */
 function isUiScopedFile(filename) {
@@ -427,6 +484,7 @@ module.exports = {
   hasAllowlistComment,
   isSentenceCase,
   isTitleCase,
+  toCanonicalSentenceCase,
   isToastCall,
   isUiScopedFile,
   shouldSkipLiteral,
