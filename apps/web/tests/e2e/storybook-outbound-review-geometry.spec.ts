@@ -18,7 +18,12 @@ test.describe('Outbound review geometry', () => {
       'title',
       'Existing relationship: flag to Tim, no cold outreach'
     );
-    expect((await row.boundingBox())!.height).toBe(40);
+    const rowBox = (await row.boundingBox())!;
+    const holdBox = (await hold.boundingBox())!;
+    expect(rowBox.height).toBe(40);
+    expect(holdBox.y + holdBox.height).toBeLessThanOrEqual(
+      rowBox.y + rowBox.height
+    );
     const notes = hold.locator('..');
     expect(
       await hold.evaluate(element => {

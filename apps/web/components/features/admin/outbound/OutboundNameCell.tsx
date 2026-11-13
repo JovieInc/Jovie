@@ -32,7 +32,7 @@ export function OutboundNameCell({ row }: Readonly<{ row: OutboundRow }>) {
           <span className='flex min-w-0 items-center gap-1 overflow-x-auto scrollbar-hide'>
             {row.relationshipHold ? (
               <span
-                className='shrink-0 whitespace-nowrap rounded-sm border border-subtle px-1 text-2xs text-secondary-token'
+                className='shrink-0 whitespace-nowrap rounded-sm border border-subtle px-1 text-2xs leading-none text-secondary-token'
                 title={row.relationshipHold}
                 data-testid='outbound-flag-existing-relationship'
               >
@@ -41,7 +41,7 @@ export function OutboundNameCell({ row }: Readonly<{ row: OutboundRow }>) {
             ) : null}
             {nonArtist ? (
               <span
-                className='shrink-0 whitespace-nowrap rounded-sm border border-subtle px-1 text-2xs text-secondary-token'
+                className='shrink-0 whitespace-nowrap rounded-sm border border-subtle px-1 text-2xs leading-none text-secondary-token'
                 title={row.entityNote ?? undefined}
                 data-testid='outbound-flag-non-artist'
               >
@@ -51,7 +51,7 @@ export function OutboundNameCell({ row }: Readonly<{ row: OutboundRow }>) {
             {row.relationshipNotes.map(note => (
               <span
                 key={note}
-                className='max-w-56 shrink-0 truncate rounded-sm border border-subtle px-1 text-2xs text-secondary-token'
+                className='max-w-56 shrink-0 truncate rounded-sm border border-subtle px-1 text-2xs leading-none text-secondary-token'
                 title={note}
                 data-testid='outbound-relationship-note'
               >
