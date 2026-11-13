@@ -52,6 +52,138 @@ function renderRail(overrides: Partial<OutboundRailProps> = {}) {
 }
 
 describe('OutboundRail', () => {
+  it('focuses the current message for review without approving it', () => {
+    const props = renderRail();
+    fireEvent.click(screen.getByRole('button', { name: 'Review Message' }));
+    expect(screen.getByLabelText('Message Body')).toHaveFocus();
+    expect(props.onApprove).not.toHaveBeenCalled();
+  });
+  it('focuses the active fact rather than an earlier fact when review is requested', () => {
+    const facts = ['First', 'Active'].map((label, index) => ({
+      key: `fact-${index}`,
+      revision: 'synthetic',
+      category: 'identity' as const,
+      label,
+      value: label,
+      url: null,
+      source: 'fixture',
+      observedAt: null,
+      confidence: null,
+      rationale: 'Synthetic evidence',
+      freshness: 'unknown' as const,
+      decision: null,
+    }));
+    renderRail({
+      certification: {
+        ...certification('needs_review'),
+        items: facts,
+        coverage: {
+          ...certification('needs_review').coverage,
+          missingSourceClasses: [],
+        },
+      },
+      activeFactKey: 'fact-1',
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Review Facts' }));
+    expect(
+      within(screen.getByRole('group', { name: 'Review Active' })).getByRole(
+        'button',
+        { name: 'Yes' }
+      )
+    ).toHaveFocus();
+  });
+
+  it('resets local edits, open details and rejection confirmation when the person changes', () => {
+    const props: OutboundRailProps = {
+      row: outboundFixtureRow(),
+      certification: certification('certified_for_outreach'),
+      certificationLoading: false,
+      activeFactKey: null,
+      pending: null,
+      error: null,
+      onClose: vi.fn(),
+      onFact: vi.fn(),
+      onCertify: vi.fn(),
+      onRefreshEvidence: vi.fn(),
+      onApprove: vi.fn(),
+      onSaveCopy: vi.fn(),
+      onHold: vi.fn(),
+      onReject: vi.fn(),
+    };
+    const { rerender } = render(
+      <TooltipProvider>
+        <OutboundRail {...props} />
+      </TooltipProvider>
+    );
+    fireEvent.change(screen.getByLabelText('Message Body'), {
+      target: { value: 'Unsaved Ada edit' },
+    });
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Certification details' })
+    );
+    act(() => sendOutboundRailCommand('reject'));
+    expect(screen.getByRole('alertdialog')).toBeVisible();
+    const next = outboundFixtureRow({
+      leadId: 'synthetic-next-person',
+      name: 'Bea',
+      message: {
+        channel: 'email',
+        subject: 'Bea subject',
+        body: 'Bea draft',
+        revision: null,
+      },
+    });
+    rerender(
+      <TooltipProvider>
+        <OutboundRail {...props} row={next} />
+      </TooltipProvider>
+    );
+    expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
+    expect(screen.getByLabelText('Message Body')).toHaveValue('Bea draft');
+    expect(
+      screen.getByRole('button', { name: 'Certification details' })
+    ).toHaveAttribute('aria-expanded', 'false');
+    act(() => sendOutboundRailCommand('approve'));
+    expect(props.onApprove).toHaveBeenLastCalledWith({
+      channel: 'email',
+      subject: 'Bea subject',
+      body: 'Bea draft',
+    });
+  });
+
+  it('keeps readiness blockers and a truthful next action above closed details', () => {
+    renderRail({ certification: certification('needs_review') });
+    const summary = screen.getByTestId('outbound-readiness');
+    expect(summary).toHaveTextContent('2 unresolved facts');
+    expect(summary).toHaveTextContent('dsp');
+    expect(summary).toHaveTextContent('Sending remains closed');
+    expect(
+      within(summary).getByRole('button', { name: 'Refresh Evidence' })
+    ).toBeEnabled();
+    expect(
+      screen.getByRole('button', { name: 'Certification details' })
+    ).toHaveAttribute('aria-expanded', 'false');
+  });
+
+  it('shows judge and reachability blockers together without inventing a dispatch action', () => {
+    renderRail({
+      row: outboundFixtureRow({
+        view: 'needs_judge',
+        channel: null,
+        message: null,
+      }),
+    });
+    const summary = screen.getByTestId('outbound-readiness');
+    expect(summary).toHaveTextContent('dogfood judge');
+    expect(summary).toHaveTextContent('No reachable channel');
+    expect(
+      within(summary).getByRole('link', { name: 'Review Source' })
+    ).toHaveAttribute('href', 'https://linktr.ee/ada');
+    expect(
+      screen.queryByRole('button', { name: /Build|Gather/ })
+    ).not.toBeInTheDocument();
+  });
+
   it('explains unavailable cold draft facts or compliance without offering message actions', () => {
     renderRail({
       row: outboundFixtureRow({

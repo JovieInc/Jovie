@@ -11,11 +11,8 @@ import {
   Textarea,
 } from '@jovie/ui';
 import { ExternalLink } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import {
-  EvidenceItemCard,
-  humanize,
-} from '@/components/features/admin/contacts-table/AdminContactsTable';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { humanize } from '@/components/features/admin/contacts-table/AdminContactsTable';
 import {
   DrawerSection,
   EntityHeader,
@@ -28,14 +25,14 @@ import type {
   ContactEvidenceItem,
 } from '@/lib/contacts/certification';
 import {
-  OUTBOUND_FLAG_LABELS,
   OUTBOUND_REJECT_REASON_LABELS,
   OUTBOUND_REJECT_REASONS,
-  OUTBOUND_VIEW_LABELS,
   type OutboundCopy,
   type OutboundRejectReason,
   type OutboundRow,
 } from '@/lib/outbound/types';
+import { OutboundRailFact } from './OutboundRailFact';
+import { OutboundRailReadiness } from './OutboundRailReadiness';
 import {
   OUTBOUND_RAIL_COMMAND_EVENT,
   type OutboundRailCommand,
@@ -92,7 +89,7 @@ function approvalLine(row: OutboundRow): string {
   if (row.approval.copy === 'stale')
     return 'Message changed since approval. Approve again.';
   if (row.approval.copy === 'approved' && row.approval.target === 'approved')
-    return 'Approved for send';
+    return 'Draft approved; sending remains closed';
   if (row.approval.copy === 'draft' && row.message?.revision)
     return 'Edited draft, not approved';
   return 'Not approved';
@@ -152,7 +149,7 @@ function MessageSection({
             : row.flags.includes('cold_draft_unavailable')
               ? 'Draft hidden until certified page facts and email compliance checks are available.'
               : row.channel
-                ? 'No claim link yet. Build the profile to draft a message.'
+                ? 'No draft is available for this profile yet.'
                 : 'No reachable channel: no email address or Instagram handle on file.'}
         </p>
       </DrawerSection>
@@ -216,7 +213,7 @@ function MessageSection({
   );
 }
 
-export function OutboundRail({
+function OutboundRailContent({
   row,
   certification,
   certificationLoading,
@@ -232,6 +229,7 @@ export function OutboundRail({
   onHold,
   onReject,
 }: OutboundRailProps) {
+  const contentRef = useRef<HTMLDivElement>(null);
   const [reason, setReason] = useState<OutboundRejectReason>('not_a_fit');
   const [confirmReject, setConfirmReject] = useState(false);
   const reject = useCallback(() => setConfirmReject(true), []);
@@ -273,16 +271,7 @@ export function OutboundRail({
                 />
               }
               title={row.name}
-              subtitle={`@${row.handle} · ${OUTBOUND_VIEW_LABELS[row.view]}`}
-              meta={
-                <span className='text-xs text-secondary-token'>
-                  {certification
-                    ? humanize(certification.status)
-                    : certificationLoading
-                      ? 'Loading facts…'
-                      : 'No canonical contact yet'}
-                </span>
-              }
+              subtitle={`@${row.handle}`}
             />
           </div>
         ) : undefined
@@ -340,19 +329,36 @@ export function OutboundRail({
                 onReject(reason);
               }}
             />
-            <p
-              role='status'
-              aria-live='polite'
-              className='min-h-4 text-2xs leading-4 text-error'
-            >
-              {error}
-            </p>
           </div>
         ) : undefined
       }
     >
       {row ? (
-        <>
+        <div ref={contentRef} className='space-y-2.5'>
+          <OutboundRailReadiness
+            row={row}
+            certification={certification}
+            loading={certificationLoading}
+            pending={pending}
+            error={error}
+            onRefreshEvidence={onRefreshEvidence}
+            onCertify={onCertify}
+            onReviewFacts={() => {
+              const root = contentRef.current;
+              const active = root?.querySelector<HTMLButtonElement>(
+                '[aria-current="true"] fieldset button'
+              );
+              (
+                active ??
+                root?.querySelector<HTMLButtonElement>('fieldset button')
+              )?.focus();
+            }}
+            onReviewMessage={() =>
+              contentRef.current
+                ?.querySelector<HTMLTextAreaElement>('textarea')
+                ?.focus()
+            }
+          />
           <MessageSection
             key={row.leadId}
             row={row}
@@ -372,25 +378,7 @@ export function OutboundRail({
             onApprove={onApprove}
             onSaveCopy={onSaveCopy}
           />
-          {row.entityNote || row.missingEvidence.length ? (
-            <DrawerSection title='Eligibility' collapsible={false}>
-              <ul
-                className='space-y-1 px-1 pb-2 text-xs text-secondary-token'
-                data-testid='outbound-eligibility'
-              >
-                {row.entityNote ? (
-                  <li>
-                    {OUTBOUND_FLAG_LABELS.possible_non_artist}: {row.entityNote}
-                    . Reject it as not an artist, or keep it if it is one.
-                  </li>
-                ) : null}
-                {row.missingEvidence.length ? (
-                  <li>Needs evidence: {row.missingEvidence.join(', ')}.</li>
-                ) : null}
-              </ul>
-            </DrawerSection>
-          ) : null}
-          <DrawerSection title='Profile' collapsible={false}>
+          <DrawerSection title='Profile & source' defaultOpen={false}>
             <div className='flex items-center gap-2 px-1 pb-2 text-xs'>
               {row.profilePath ? (
                 <a
@@ -418,7 +406,7 @@ export function OutboundRail({
               </a>
             </div>
           </DrawerSection>
-          <DrawerSection title='Certification' collapsible={false}>
+          <DrawerSection title='Certification details' defaultOpen={false}>
             {certification ? (
               <div className='space-y-2 px-1 pb-2'>
                 <p className='text-xs tabular-nums text-secondary-token'>
@@ -433,31 +421,9 @@ export function OutboundRail({
                     Certification waits for the resolver to find it.
                   </p>
                 ) : null}
-                {row.profilePath &&
-                certification.coverage.missingSourceClasses.length ? (
-                  <Button
-                    size='sm'
-                    variant='ghost'
-                    className='w-full'
-                    disabled={pending !== null}
-                    loading={pending === 'refresh_evidence'}
-                    onClick={onRefreshEvidence}
-                  >
-                    Refresh Evidence
-                  </Button>
-                ) : null}
-                <Button
-                  size='sm'
-                  variant='secondary'
-                  className='w-full'
-                  disabled={
-                    !certification.canCertify || certified || pending !== null
-                  }
-                  loading={pending === 'certify'}
-                  onClick={onCertify}
-                >
-                  {certified ? 'Certified' : 'Certify Current Facts'}
-                </Button>
+                <p className='break-all text-2xs text-tertiary-token'>
+                  Evidence revision: {certification.evidenceRevision}
+                </p>
               </div>
             ) : (
               <p className='min-h-12 px-1 pb-2 text-xs text-secondary-token'>
@@ -468,10 +434,14 @@ export function OutboundRail({
             )}
           </DrawerSection>
           {[...grouped].map(([category, items]) => (
-            <DrawerSection key={category} title={humanize(category)}>
+            <DrawerSection
+              key={category}
+              title={humanize(category)}
+              collapsible={false}
+            >
               {items.map(item => (
-                <EvidenceItemCard
-                  key={item.key}
+                <OutboundRailFact
+                  key={`${item.key}:${item.revision}`}
                   item={item}
                   active={item.key === activeFactKey}
                   pending={pending === item.key}
@@ -480,8 +450,13 @@ export function OutboundRail({
               ))}
             </DrawerSection>
           ))}
-        </>
+        </div>
       ) : null}
     </AdminDetailRail>
   );
+}
+
+/** Person navigation resets draft edits, corrections, disclosures and rejection confirmation. */
+export function OutboundRail(props: OutboundRailProps) {
+  return <OutboundRailContent key={props.row?.leadId ?? 'empty'} {...props} />;
 }
