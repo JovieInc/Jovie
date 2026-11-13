@@ -1,7 +1,9 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+import * as linearApi from '../../../packages/api-client/linear.ts';
 import {
   canonicalLinearIdentifier,
   collectLinearIssues,
+  collectStageRaw,
   linearAdmit,
   sliceLinearIdentifiers,
 } from '../stage-collect.mjs';
@@ -332,5 +334,72 @@ describe('collectLinearIssues', () => {
     expect(result.issues).toEqual({});
     expect(result.counts).toMatchObject({ fetched: 0, failed: 1 });
     expect(result.error).toContain('shed');
+  });
+});
+
+describe('Linear transport failures', () => {
+  it('records a rate-limited Linear read without spending retry budget', async () => {
+    const fetchImpl = vi.fn(async () => new Response('', { status: 429 }));
+    await expect(
+      collectLinearIssues({
+        fetchImpl,
+        apiKey: 'stage-collector-test',
+        identifiers: ['JOV-1'],
+      })
+    ).resolves.toMatchObject({
+      issues: {},
+      counts: { requested: 1, fetched: 0, failed: 1, admittedBatches: 0 },
+      error: expect.stringContaining('secondary'),
+    });
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('stage collector retry clock', () => {
+  it('uses elapsed time for admission even when the report window is fixed', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(T0);
+    const client = linearApi.createLinearClient({
+      identity: 'clock-test',
+      authorization: () => 'clock-test',
+      legacyStateRoot: null,
+    });
+    let calls = 0;
+    vi.spyOn(client.client, 'request').mockImplementation(async () => {
+      calls += 1;
+      if (calls < 3) throw { kind: 'shed', retryAt: T0 + calls * 30_000 };
+      throw new Error('admissions finished');
+    });
+    vi.spyOn(linearApi, 'createLinearClient').mockReturnValue(client);
+    let completed = false;
+    try {
+      const result = collectStageRaw({
+        gh: args =>
+          args[1] === 'graphql'
+            ? JSON.stringify({
+                data: { search: { nodes: [{ number: 1, title: 'JOV-1' }] } },
+              })
+            : '[]',
+        env: { LINEAR_API_KEY: 'clock-test' },
+        manifest: { sources: {} },
+        now: T0 - 1,
+        days: 1,
+      }).then(value => {
+        completed = true;
+        return value;
+      });
+      await vi.advanceTimersByTimeAsync(75_000);
+      expect(completed).toBe(true);
+      expect(calls).toBe(3);
+      expect((await result).sources['linear-history']).toMatchObject({
+        ok: false,
+        partial: true,
+        counts: { failed: 1 },
+      });
+    } finally {
+      vi.clearAllTimers();
+      vi.useRealTimers();
+      vi.restoreAllMocks();
+    }
   });
 });
