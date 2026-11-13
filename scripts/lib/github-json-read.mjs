@@ -26,11 +26,29 @@
  * re-reads — inside every critical loop's silence budget. A quota failure is
  * never a silence verdict, the same doctrine github-rate-limit.mjs already
  * applies to every other GITHUB_TOKEN consumer.
+ *
+ * landedOnMainAt moved here from scripts/automation-liveness.mjs (also its
+ * size-500 budget): it is the same readJson/githubHeaders consumer.
  */
 import { classifyGitHubFailure } from './github-rate-limit.mjs';
 
 const TIMEOUT_MS = 10_000;
 const BODY_SNIPPET_CHARS = 512;
+
+/** The classifier's evidence from a denied response: status, headers, body. */
+async function deniedEvidence(response) {
+  let bodyText = '';
+  try {
+    bodyText = (await response.text()).slice(0, BODY_SNIPPET_CHARS);
+  } catch {
+    // The status stays the only evidence when the body will not read.
+  }
+  return {
+    status: response.status,
+    headers: response.headers ?? null,
+    bodyText,
+  };
+}
 
 /** Bounded JSON fetch: 200 is ok, any other status or transport is a reason. */
 export async function readJson(fetchImpl, url, headers = {}) {
@@ -48,18 +66,10 @@ export async function readJson(fetchImpl, url, headers = {}) {
     if (response.status !== 200) {
       // A status alone cannot tell a quota denial from a permission one:
       // keep the classifier's evidence (body snippet + headers) on the read.
-      let bodyText = '';
-      try {
-        bodyText = (await response.text()).slice(0, BODY_SNIPPET_CHARS);
-      } catch {
-        // The status stays the only evidence when the body will not read.
-      }
       return {
         ok: false,
         reason: `http-${response.status}`,
-        status: response.status,
-        headers: response.headers ?? null,
-        bodyText,
+        ...(await deniedEvidence(response)),
       };
     }
     return { ok: true, body: await response.json() };
@@ -99,6 +109,16 @@ export function quotaKindOf(read) {
 }
 
 /**
+ * The rate-limit kind attached to a denied non-GET response (the GraphQL
+ * observer's POST), or null without quota evidence; see quotaKindOf.
+ * @param {Response} response
+ * @returns {Promise<string | null>}
+ */
+export async function classifyDeniedResponse(response) {
+  return quotaKindOf(await deniedEvidence(response));
+}
+
+/**
  * Run-list read for the workflow observers; see the module header. The
  * unauthenticated retry runs only when a token was used and only on a 403.
  */
@@ -122,4 +142,53 @@ export async function readGithubJson(url, { fetchImpl, token }) {
   const quotaKind = quotaKindOf(read);
   if (quotaKind) return { ok: false, reason: 'quota-deferred', quotaKind };
   return read;
+}
+
+const PUSH_RUNS_PAGE = 100;
+const LANDING_SKEW_MS = 2 * 60_000;
+
+/**
+ * When a merge-queue squash commit reached main.
+ *
+ * Its committer date is the queue time, which can precede the fast-forward
+ * onto main by hours. The earliest push-event run at or after that date is
+ * the landing time. An unreadable or incomplete run list keeps the committer
+ * date, so a real stall still alerts.
+ */
+export async function landedOnMainAt(
+  repo,
+  sha,
+  committerDate,
+  { fetchImpl, token, apiUrl }
+) {
+  const committerMs = Date.parse(committerDate ?? '');
+  const base = `${apiUrl}/repos/${repo}/actions/runs?head_sha=${encodeURIComponent(sha)}&event=push&per_page=${PUSH_RUNS_PAGE}`;
+  const headers = githubHeaders(token);
+  const first = await readJson(fetchImpl, base, headers);
+  if (!first.ok || !Array.isArray(first.body?.workflow_runs))
+    return committerDate;
+  let runs = first.body.workflow_runs;
+  const total = Number(first.body.total_count);
+  if (Number.isFinite(total) && total > runs.length) {
+    const lastPage = Math.ceil(total / PUSH_RUNS_PAGE);
+    const older = await readJson(
+      fetchImpl,
+      `${base}&page=${lastPage}`,
+      headers
+    );
+    if (!older.ok || !Array.isArray(older.body?.workflow_runs))
+      return committerDate;
+    runs = older.body.workflow_runs;
+  }
+  const landedMs = runs
+    .map(run => Date.parse(run?.created_at ?? ''))
+    .filter(
+      ms =>
+        Number.isFinite(ms) &&
+        (!Number.isFinite(committerMs) || ms + LANDING_SKEW_MS >= committerMs)
+    )
+    .reduce((min, ms) => Math.min(min, ms), Number.POSITIVE_INFINITY);
+  return Number.isFinite(landedMs)
+    ? new Date(landedMs).toISOString()
+    : committerDate;
 }

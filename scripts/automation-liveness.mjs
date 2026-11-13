@@ -41,8 +41,9 @@ import {
   validateRegistry,
 } from './lib/automation-registry.mjs';
 import {
+  classifyDeniedResponse,
   githubHeaders,
-  quotaKindOf,
+  landedOnMainAt,
   readGithubJson,
   readJson,
 } from './lib/github-json-read.mjs';
@@ -166,55 +167,6 @@ export async function observeGithubWorkflow(
 /** A timestamp inside a JSON document (status feeds, health routes). */
 export async function observeJsonTimestamp(receipt, { fetchImpl }) {
   return projectJsonHeartbeat(receipt, await readJson(fetchImpl, receipt.url));
-}
-
-const PUSH_RUNS_PAGE = 100;
-const LANDING_SKEW_MS = 2 * 60_000;
-
-/**
- * When a merge-queue squash commit reached main.
- *
- * Its committer date is the queue time, which can precede the fast-forward
- * onto main by hours. The earliest push-event run at or after that date is
- * the landing time. An unreadable or incomplete run list keeps the committer
- * date, so a real stall still alerts.
- */
-async function landedOnMainAt(
-  repo,
-  sha,
-  committerDate,
-  { fetchImpl, token, apiUrl }
-) {
-  const committerMs = Date.parse(committerDate ?? '');
-  const base = `${apiUrl}/repos/${repo}/actions/runs?head_sha=${encodeURIComponent(sha)}&event=push&per_page=${PUSH_RUNS_PAGE}`;
-  const headers = githubHeaders(token);
-  const first = await readJson(fetchImpl, base, headers);
-  if (!first.ok || !Array.isArray(first.body?.workflow_runs))
-    return committerDate;
-  let runs = first.body.workflow_runs;
-  const total = Number(first.body.total_count);
-  if (Number.isFinite(total) && total > runs.length) {
-    const lastPage = Math.ceil(total / PUSH_RUNS_PAGE);
-    const older = await readJson(
-      fetchImpl,
-      `${base}&page=${lastPage}`,
-      headers
-    );
-    if (!older.ok || !Array.isArray(older.body?.workflow_runs))
-      return committerDate;
-    runs = older.body.workflow_runs;
-  }
-  const landedMs = runs
-    .map(run => Date.parse(run?.created_at ?? ''))
-    .filter(
-      ms =>
-        Number.isFinite(ms) &&
-        (!Number.isFinite(committerMs) || ms + LANDING_SKEW_MS >= committerMs)
-    )
-    .reduce((min, ms) => Math.min(min, ms), Number.POSITIVE_INFINITY);
-  return Number.isFinite(landedMs)
-    ? new Date(landedMs).toISOString()
-    : committerDate;
 }
 
 function shaFromMainRef(head) {
@@ -698,8 +650,7 @@ async function requiredGreenAt(
   if (!runs.ok || !statuses.ok)
     return {
       ok: false,
-      // A quota-deferred leg (JOV-9993) is not unreadable evidence; the
-      // caller keeps the deferral so the row is not filed red.
+      // A quota-deferred leg (JOV-9993) is not unreadable evidence.
       reason: [runs, statuses].some(
         read => !read.ok && read.reason === 'quota-deferred'
       )
@@ -770,20 +721,9 @@ export async function observeGreenToEnqueue(
       signal: controller.signal,
     });
     if (response.status !== 200) {
-      // A GraphQL denial carrying GitHub's own rate-limit evidence is a
-      // quota failure, not unreadable evidence (JOV-9993): defer like the
-      // REST observers instead of filing a false red.
-      let bodyText = '';
-      try {
-        bodyText = (await response.text()).slice(0, 512);
-      } catch {
-        // The status stays the only evidence when the body will not read.
-      }
-      const quotaKind = quotaKindOf({
-        status: response.status,
-        headers: response.headers,
-        bodyText,
-      });
+      // A GraphQL denial with GitHub's own rate-limit evidence is quota, not
+      // unreadable evidence (JOV-9993): defer like the REST observers.
+      const quotaKind = await classifyDeniedResponse(response);
       if (quotaKind) return { ok: false, reason: 'github-quota-deferred' };
       return { ok: false, reason: `green-enqueue-http-${response.status}` };
     }
@@ -1040,9 +980,8 @@ export async function main({
   }
   const previous = readPrevious(args.previous);
   const decisions = livenessDecisions(report, previous);
-  // JOV-9993: reads the quota classifier deferred (github-http-403 with
-  // GitHub's own rate-limit evidence on both legs). Reported and warned
-  // below, never filed red: the next 20-minute bucket re-reads them.
+  // JOV-9993: reads the quota classifier deferred. Warned below, never
+  // filed red: the next 20-minute bucket re-reads them.
   const quotaDeferred = report.results
     .filter(isQuotaDeferredRow)
     .map(row => row.id);
@@ -1081,8 +1020,7 @@ export async function main({
     const state = { ...previous };
     for (const row of report.results) {
       // A quota-deferred row files no decision, so it must not flip the
-      // persisted color either (JOV-9993): the next readable run files the
-      // true transition.
+      // persisted color either (JOV-9993).
       if (row.critical && !isQuotaDeferredRow(row))
         state[livenessFingerprint(row.id)] =
           row.status === 'fresh' ? 'green' : 'red';
