@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import * as linearApi from '../../../packages/api-client/linear.ts';
 import {
   canonicalLinearIdentifier,
@@ -9,6 +9,8 @@ import {
 } from '../stage-collect.mjs';
 
 const T0 = Date.parse('2026-11-10T00:00:00Z');
+beforeEach(() => vi.stubEnv('JOVIE_API_STATE', 'memory'));
+afterEach(() => vi.unstubAllEnvs());
 
 /** Fake clock: `advance` moves it forward (used by injected sleeps). */
 function fakeClock(start = T0) {
