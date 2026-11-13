@@ -5,6 +5,7 @@ import { HudFullscreenControl } from '@/components/features/admin/hud/HudFullscr
 import { HudNoiseDisclosure } from '@/components/features/admin/hud/HudNoiseDisclosure';
 import { AdminPage } from '@/components/features/admin/layout/AdminPage';
 import { OperationalControlPanel } from '@/components/features/admin/OperationalControlPanel';
+import { BASE_URL } from '@/constants/domains';
 import { APP_ROUTES } from '@/constants/routes';
 import { getFounderFunnelData } from '@/lib/admin/founder-funnel';
 import { getCurrentAdminPageAccess } from '@/lib/admin/page-access';
@@ -12,7 +13,10 @@ import { AGENT_OS_ADMIN_FIXTURE_ARTIFACTS } from '@/lib/agent-os/fixtures';
 import { authorizeHud } from '@/lib/auth/hud';
 import { env } from '@/lib/env-server';
 import { getHudMetrics } from '@/lib/hud/metrics';
-import { OVIE_OPS_PRODUCT_NAME } from '@/lib/ovie/ops-entrypoint';
+import {
+  OVIE_OPS_PRODUCT_NAME,
+  ovieOpsKioskHref,
+} from '@/lib/ovie/ops-entrypoint';
 import { assertOviePrivacyUnlocked } from '@/lib/ovie/privacy-lock/server';
 import { NOINDEX_ROBOTS } from '@/lib/seo/noindex-metadata';
 
@@ -67,6 +71,13 @@ export default async function HudPage({
       density={tokenOk ? 'kiosk' : 'shell'}
       presentationMode={tokenOk ? 'token' : 'shell'}
       kioskToken={tokenOk ? kioskToken : null}
+      // The token view's "Scan to view" QR encodes this absolute kiosk link.
+      // Without it the panel has nothing to encode (JOV-12383).
+      hudUrl={
+        tokenOk && kioskToken
+          ? `${BASE_URL}${ovieOpsKioskHref(kioskToken)}`
+          : undefined
+      }
       initialFixtureAgentRuns={
         env.HUD_AGENT_RUNS_FIXTURES === '1'
           ? AGENT_OS_ADMIN_FIXTURE_ARTIFACTS

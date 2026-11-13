@@ -21,3 +21,18 @@ export const LongEmail: Story = {
     artistName: 'The Midnight Orchestra of Lower Manhattan',
   },
 };
+
+/** The artist question was skipped, so only the email line shows. */
+export const PartialBlankArtist: Story = { args: { artistName: '   ' } };
+
+export const RtlLayout: Story = {
+  args: {
+    email: 'maya@example.com',
+    artistName: 'مايا فيل',
+  },
+  render: args => (
+    <div dir='rtl' className='w-80'>
+      <WaitlistJoinedConfirmation {...args} />
+    </div>
+  ),
+};

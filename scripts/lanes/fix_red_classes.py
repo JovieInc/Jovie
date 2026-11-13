@@ -17,7 +17,6 @@ from __future__ import annotations
 
 import argparse
 import ast
-import hashlib
 import json
 import re
 import sys
@@ -26,12 +25,15 @@ from collections import defaultdict
 from datetime import datetime, timezone
 from pathlib import Path
 
+import machine_gap
 import migration_renumber
 import remediation
+from fix_red_failure_routing import (ALIAS_ACTION, ALIAS_REVIEW_FAILURE, alias_owner_metadata,
+                                     error_signature, fingerprint_key, owner_handoff_reason)
 from atomic_state import atomic_write_text
 from fix_red_source_edits import (  # noqa: F401
     snap_added_conservative_spacing, strip_added_legacy_cache_exports,
-    resolve_additive_node_tests_text, resolve_additive_node_test_file, resolve_additive_list_conflict,
+    resolve_additive_node_tests_text, resolve_additive_node_test_file, resolve_additive_list_conflict, size_500_stale_hit,
 )
 
 SCHEMA = "jovie-fix-red-class/v1"
@@ -42,9 +44,11 @@ RERUN, SYNC_MAIN, WIRE_CI_FAST, RENUMBER, STAMP_CHANGELOG, SNAP_SPACING, STRIP_C
     "compose")
 DETERMINISTIC = frozenset({
     RERUN, SYNC_MAIN, WIRE_CI_FAST, RENUMBER, STAMP_CHANGELOG, SNAP_SPACING, STRIP_CACHE, MERGE_NARROWED,
-    REGISTER_DOMAIN, ATOMIC_WRITE})
+    REGISTER_DOMAIN, ATOMIC_WRITE, ALIAS_ACTION})
 # Sync the branch, stamp the body, then file fixers, then rerun. The stamp has to land before a
 # fixer push so the synchronize event carries the note. `compose` is the route, not a leaf action.
+# Alias graduation stays a single-action route: it is deterministic, and compose drops a head that
+# pairs it with another class rather than running half of the pair.
 _COMPOSE_ORDER = (
     SYNC_MAIN, STAMP_CHANGELOG, WIRE_CI_FAST, RENUMBER, SNAP_SPACING, STRIP_CACHE, MERGE_NARROWED,
     REGISTER_DOMAIN, ATOMIC_WRITE, RERUN)
@@ -148,6 +152,7 @@ _JSON_KEY = re.compile(r'^\s*"([^"\n]+)"\s*:')
 
 # (class, pattern, action). First match wins per check; order is most specific first.
 SIGNATURES = (
+    ("alias-review-deadline", ALIAS_REVIEW_FAILURE, ALIAS_ACTION),
     ("component-test-evidence", COMPONENT_TEST_TEXT, AGENT),
     ("narrowed-preflight", NARROWED_CONFLICT, MERGE_NARROWED),
     # Before platform-infra: a Source Validation log can carry passing-test rate-limit lines beside the guard error that actually failed the job.
@@ -174,28 +179,8 @@ LLM_VERDICTS = frozenset({"fix-pushed", "fix-no-change", "cancelled", "failed"})
 DEFAULT_BREAKER_N, MAX_BREAKER_N, MIN_CELL_RUNS = 2, 3, 10
 
 
-def error_signature(text: str) -> str:
-    """Prefer the failed-test summary to setup/mock output; normalize volatile tokens."""
-    text = re.sub(r"\x1b\[[0-9;]*m", "", str(text or ""))
-    text = re.split(r"(?m)^.*?\bFailed (?:Tests|Suites) [1-9]\d*\s*[⎯─-]*\s*$", text)[-1]
-    for line in text.splitlines():
-        if re.search(r"\b(error|fail(?:ed|ure)?|assert|expected|unwired|violation)\b", line, re.IGNORECASE):
-            line = re.sub(r"^\S*\d{4}-\d\d-\d\dT[\d:.]+Z\s*", "", line.strip())
-            line = re.sub(r"\b[0-9a-f]{7,40}\b|\d+", "#", line)
-            return re.sub(r"\s+", " ", line)[:120]
-    return ""
-
-
 def real_failures(pr: dict) -> list[dict]:
-    return [check for check in pr.get("statusCheckRollup") or []
-            if str(check.get("conclusion") or "").upper() in RED and str(check.get("name") or "").lower() not in AGGREGATE]
-
-
-def fingerprint_key(cls: str, names: list[str], signature: str = "") -> str:
-    parts = [cls, *sorted({re.sub(r"\s+", " ", str(name)).strip().lower() for name in names})]
-    if cls in {"other", "mixed"}:
-        parts.append(signature)
-    return hashlib.sha256("|".join(parts).encode()).hexdigest()[:12]
+    return machine_gap.red_checks(pr.get("statusCheckRollup") or [], RED, AGGREGATE)
 
 
 def stamp_internal_changelog(body) -> str | None:
@@ -224,19 +209,25 @@ def classify(pr: dict, logs: dict[str, str] | None = None) -> dict:
     is `stale-branch`. Two or more deterministic classes compose (stamp, then wire, no model). One
     non-deterministic class keeps the head on the model."""
     logs = logs or {}
+    import detached_native_sync
     names = sorted({str(check.get("name")) for check in real_failures(pr)})
     per_check = []
     for name in names:
         text = logs.get(name) or ""
         hit = next(((cls, action) for cls, pattern, action in SIGNATURES if pattern.search(text)), None)
-        per_check.append(hit or ("other", AGENT))
+        per_check.append(detached_native_sync.hit(text) or hit or size_500_stale_hit(text) or ("other", AGENT))
     classes = {cls for cls, _ in per_check}
     actions: list[str] = []
     if len(classes) == 1:
         cls, action = per_check[0]
     elif classes and all(item_action in DETERMINISTIC for _, item_action in per_check):
-        actions = compose_actions([item_action for _, item_action in per_check])
-        if len(actions) > 1:
+        raw = [item_action for _, item_action in per_check]
+        actions = compose_actions(raw)
+        # compose_actions drops anything outside _COMPOSE_ORDER. A dropped action (alias
+        # graduation) must not run as a partial compose.
+        if len(actions) != len(dict.fromkeys(raw)):
+            cls, action, actions = "mixed", AGENT, []
+        elif len(actions) > 1:
             cls, action = "composed", COMPOSE
         elif len(actions) == 1:
             # Two classes, one leaf (census + design both sync). The existing single-action route runs it.
@@ -255,6 +246,10 @@ def classify(pr: dict, logs: dict[str, str] | None = None) -> dict:
     if cls == "quota-deferred" and CHANGELOG_QUOTA_READ.search("\n".join(logs.get(name) or "" for name in names)) \
             and stamp_internal_changelog(pr.get("body")) is not None:
         cls, action, signature = "changelog-metadata", STAMP_CHANGELOG, ""
+    owner = alias_owner_metadata(names, logs) if cls == "alias-review-deadline" else None
+    if cls == "alias-review-deadline" and owner is None:
+        cls, action, signature = "mixed", AGENT, error_signature("\n".join(logs.get(name) or "" for name in names))
+        actions = []
     if action != COMPOSE:
         actions = [action] if action in DETERMINISTIC else []
     files = []
@@ -269,8 +264,12 @@ def classify(pr: dict, logs: dict[str, str] | None = None) -> dict:
         files = sorted(set(files) | set(found_files))
     if "domain-write" in wanted and action in {REGISTER_DOMAIN, COMPOSE}:
         files = sorted(set(files) | set(_domain_write_hits("\n".join(logs.get(name) or "" for name in names))))
+    if "detached-native-consumer" in wanted and (cls == "detached-native-consumer" or action == COMPOSE):
+        files = sorted(set(files) | set(detached_native_sync.paths(
+            "\n".join(logs.get(name) or "" for name in names))))
     return {"schema": SCHEMA, "cls": cls, "key": fingerprint_key(cls, names, signature), "action": action,
-            "actions": actions, "checks": names, "signature": signature, "files": files}
+            "actions": actions, "checks": names, "signature": signature, "files": files,
+            **({"evidenceOwner": owner} if owner else {})}
 
 
 def _split_shell_and(command: str) -> list[str] | None:
@@ -1092,8 +1091,8 @@ def _epoch(row: dict) -> float | None:
 def historic_key(row: dict) -> str:
     """Ledger rows keep the failing check names, not the log: coarser than the live fingerprint, stable."""
     source = row.get("requestSource") or {}
-    names = [name for name, verdict in source.get("checks") or []
-             if str(verdict).upper() in RED and str(name).lower() not in AGGREGATE]
+    names = [str(check.get("name")) for check in real_failures({"statusCheckRollup": [
+        {"name": name, "conclusion": verdict} for name, verdict in source.get("checks") or []]})]
     kinds = ",".join(source.get("eventKinds") or [])
     return fingerprint_key("history", names or [f"event:{kinds}"])
 

@@ -34,6 +34,11 @@ export {
   DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from './dropdown-menu';
+export type {
+  HostDrawnInputProps,
+  HostDrawnSelectProps,
+} from './host-drawn-field';
+export { HostDrawnInput, HostDrawnSelect } from './host-drawn-field';
 export type { IconButtonName, IconButtonProps } from './icon-button';
 export { IconButton, iconButtonVariants } from './icon-button';
 export {

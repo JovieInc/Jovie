@@ -123,15 +123,15 @@ jobs:
           echo "path=$out" >> "$GITHUB_OUTPUT"
           wc -l < "$out"
 
-      - name: Install Playwright Chromium for Storybook render proof
-        working-directory: apps/web
-        run: pnpm exec playwright install --with-deps chromium
+      # Certified captures need Chromium's system fonts, so system_deps keeps
+      # them; the shared action caches the browser by Playwright version.
+      - name: Setup Playwright Chromium for Storybook render proof
+        uses: ./.github/actions/setup-playwright
+        with:
+          system_deps: 'true'
 
       - name: Install Doppler CLI
-        run: |
-          curl -sLf --retry 3 --tlsv1.2 --proto "=https" 'https://packages.doppler.com/public/cli/gpg.DE2A7741A397C129.key' | sudo gpg --dearmor -o /usr/share/keyrings/doppler-archive-keyring.gpg
-          echo "deb [signed-by=/usr/share/keyrings/doppler-archive-keyring.gpg] https://packages.doppler.com/public/cli/deb/debian any-version main" | sudo tee /etc/apt/sources.list.d/doppler-cli.list
-          sudo apt-get update && sudo apt-get install -y doppler
+        uses: ./.github/actions/setup-doppler
 
       - name: Produce and post evidence
         env:

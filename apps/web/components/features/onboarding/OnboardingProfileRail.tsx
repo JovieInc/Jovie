@@ -250,14 +250,14 @@ function DspMatchStrip({
 
   return (
     <fieldset
-      className='flex items-center gap-1.5 rounded-full border border-white/15 bg-black/28 px-2 py-1.5 text-white shadow-[0_14px_30px_rgba(0,0,0,0.22)] backdrop-blur-xl dark:text-white'
+      className='flex items-center gap-1.5 rounded-full border border-on-media/15 bg-ink-on-media/28 px-2 py-1.5 text-on-media shadow-[0_14px_30px_rgba(0,0,0,0.22)] backdrop-blur-xl dark:text-on-media'
       data-testid='onboarding-dsp-match-strip'
       aria-label='Matched Music Services'
     >
       {visible.map(match => (
         <span
           key={match.id}
-          className='inline-flex h-7 w-7 items-center justify-center rounded-full bg-white text-black shadow-[0_6px_16px_rgba(0,0,0,0.18)] dark:bg-white dark:text-black'
+          className='inline-flex h-7 w-7 items-center justify-center rounded-full bg-on-media text-ink-on-media shadow-[0_6px_16px_rgba(0,0,0,0.18)] dark:bg-on-media dark:text-ink-on-media'
           title={match.label}
         >
           <SocialIcon
@@ -269,7 +269,7 @@ function DspMatchStrip({
         </span>
       ))}
       {overflow > 0 ? (
-        <span className='inline-flex h-7 items-center rounded-full bg-white px-2 text-2xs font-semibold text-black dark:bg-white dark:text-black'>
+        <span className='inline-flex h-7 items-center rounded-full bg-on-media px-2 text-2xs font-semibold text-ink-on-media dark:bg-on-media dark:text-ink-on-media'>
           +{overflow} others
         </span>
       ) : null}
@@ -458,7 +458,7 @@ export function OnboardingProfileRail({
             }
             topRight={
               <span
-                className='inline-flex h-6 items-center rounded-full border border-white/12 bg-black/60 px-2.5 text-2xs font-medium text-white backdrop-blur-md dark:text-white'
+                className='inline-flex h-6 items-center rounded-full border border-on-media/12 bg-ink-on-media/60 px-2.5 text-2xs font-medium text-on-media backdrop-blur-md dark:text-on-media'
                 data-testid='onboarding-profile-preview-badge'
               >
                 Preview

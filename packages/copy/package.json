@@ -6,6 +6,8 @@
   "types": "./index.ts",
   "exports": {
     ".": "./index.ts",
+    "./tooltip-copy": "./tooltip-copy.ts",
+    "./tooltip-copy-audit": "./tooltip-copy-audit.ts",
     "./transport": "./transport.ts",
     "./writing-quality": "./writing-quality.ts"
   },

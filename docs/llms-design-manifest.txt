@@ -62,7 +62,7 @@
 - `border-subtle`, `border-default`, `border-strong`
 - `focus-ring-themed` or `focus-visible:*` on interactive elements
 
-## Design Tokens (293 contract tokens; 576 total in CSS)
+## Design Tokens (294 contract tokens; 580 total in CSS)
 
 Contract tokens below are the semantic surface for AI edits. DSP brand colors and extended accent palettes live in `apps/web/styles/design-system.css` only.
 
@@ -360,6 +360,7 @@ Contract tokens below are the semantic surface for AI edits. DSP brand colors an
 - `--shadow-divider`: oklch(86% 0 283) 0px -0.5px 0px 0px inset
 - `--shadow-lg`: 0 4px 40px #00000014, 0 3px 20px #0000001a, 0 2px 6px #00000014, 0 1px 1px #0000000f
 - `--shadow-md`: 0 3px 8px #0000001a, 0 2px 5px #0000001a, 0 1px 1px #0000001a
+- `--shadow-mobile-nav-sheet`: 0 -8px 40px oklch(0% 0 0 / 0.25), 0 -2px 12px oklch(0% 0 0 / 0.15)
 - `--shadow-popover`: 0 8px 24px rgba(0, 0, 0, 0.08)
 - `--shadow-sm`: 0px 4px 4px -1px #0000000a, 0px 1px 1px 0px #00000014
 - `--shadow-xl`: 0 5px 50px #00000033, 0 4px 30px #00000033, 0 3px 10px #0000001a
