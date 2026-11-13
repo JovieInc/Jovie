@@ -1,8 +1,15 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { type ReactNode, useEffect } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { useSetHeaderActions } from '@/contexts/HeaderActionsContext';
+import { SIDEBAR_PERSIST_DEBOUNCE_MS } from '@/hooks/useSidebarPreferencePersist';
 import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import { AuthShellWrapper, usePendingShell } from './AuthShellWrapper';
 
@@ -104,6 +111,23 @@ function RegisterThrowingAction() {
   return <p>Route content</p>;
 }
 
+/** Press the collapse control, then let the debounced persist fire. */
+async function collapseSidebarAndSettle(presses = 1) {
+  vi.useFakeTimers();
+  try {
+    const collapse = screen.getByRole('button', { name: 'Collapse sidebar' });
+    for (let press = 0; press < presses; press += 1) fireEvent.click(collapse);
+    // The write is debounced: nothing is sent while the burst is in flight.
+    await act(() =>
+      vi.advanceTimersByTimeAsync(SIDEBAR_PERSIST_DEBOUNCE_MS - 1)
+    );
+    expect(vi.getTimerCount()).toBe(1);
+    await act(() => vi.advanceTimersByTimeAsync(1));
+  } finally {
+    vi.useRealTimers();
+  }
+}
+
 beforeEach(() => {
   routeConfig.section = 'dashboard';
   routeConfig.breadcrumbs = [];
@@ -112,7 +136,6 @@ beforeEach(() => {
 
 describe('AuthShellWrapper accessibility', () => {
   it('persists a collapsed sidebar and survives an offline save', async () => {
-    const user = userEvent.setup();
     const persist = vi.fn(async () => {
       throw new TypeError('Failed to fetch');
     });
@@ -122,11 +145,25 @@ describe('AuthShellWrapper accessibility', () => {
       </AuthShellWrapper>
     );
 
-    await user.click(screen.getByRole('button', { name: 'Collapse sidebar' }));
+    await collapseSidebarAndSettle();
 
-    await waitFor(() => expect(persist).toHaveBeenCalledWith(true));
+    expect(persist).toHaveBeenCalledWith(true);
     expect(screen.getByText('Route content')).toBeInTheDocument();
     await expectNoA11yViolations(container);
+  });
+
+  it('coalesces a burst of sidebar toggles into one persist', async () => {
+    const persist = vi.fn(async () => {});
+    render(
+      <AuthShellWrapper persistSidebarCollapsed={persist}>
+        <p>Route content</p>
+      </AuthShellWrapper>
+    );
+
+    await collapseSidebarAndSettle(5);
+
+    expect(persist).toHaveBeenCalledTimes(1);
+    expect(persist).toHaveBeenCalledWith(true);
   });
 
   it('announces the pending Releases shell without axe violations', async () => {

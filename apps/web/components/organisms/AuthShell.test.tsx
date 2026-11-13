@@ -8,6 +8,11 @@ import type { AppShellSection } from '@/types/app-shell';
 import type { DashboardBreadcrumbItem } from '@/types/dashboard';
 import { AuthShell } from './AuthShell';
 
+const mocks = vi.hoisted(() => ({
+  headerRenders: 0,
+  togglePreviewPanel: () => {},
+}));
+
 vi.mock('@/hooks/useBreakpoint', () => ({
   useBreakpointDown: () => false,
 }));
@@ -49,19 +54,22 @@ vi.mock('@/features/dashboard/organisms/DashboardHeader', () => ({
   }: {
     breadcrumbs: DashboardBreadcrumbItem[];
     sidebarTrigger?: ReactNode;
-  }) => (
-    <header>
-      {sidebarTrigger}
-      <nav aria-label='Breadcrumb'>
-        {breadcrumbs.map(crumb => (
-          <span key={crumb.label}>{crumb.label}</span>
-        ))}
-      </nav>
-    </header>
-  ),
+  }) => {
+    mocks.headerRenders += 1;
+    return (
+      <header>
+        {sidebarTrigger}
+        <nav aria-label='Breadcrumb'>
+          {breadcrumbs.map(crumb => (
+            <span key={crumb.label}>{crumb.label}</span>
+          ))}
+        </nav>
+      </header>
+    );
+  },
 }));
 vi.mock('@/app/app/(shell)/dashboard/PreviewPanelContext', () => ({
-  usePreviewPanelState: () => ({ toggle: vi.fn() }),
+  usePreviewPanelState: () => ({ toggle: mocks.togglePreviewPanel }),
 }));
 vi.mock('@/components/features/chat/Composer', () => ({
   useComposerFocus: () => ({ isComposerFocused: false }),
@@ -133,6 +141,27 @@ describe('AuthShell', () => {
     // Once pinned, the rail owns its toggle and the header trigger leaves.
     expect(toggle).not.toBeInTheDocument();
     await expectNoA11yViolations(container);
+  });
+
+  it('reuses the header when only the route content re-renders', () => {
+    const breadcrumbs = [{ label: 'Releases' }];
+    const { rerender } = render(
+      <Shell breadcrumbs={breadcrumbs}>
+        <p>First render</p>
+      </Shell>
+    );
+    const rendersAfterMount = mocks.headerRenders;
+
+    // A route render (or a sidebar hover peek) re-renders the shell; a
+    // rebuilt header element would re-render the whole header each time.
+    rerender(
+      <Shell breadcrumbs={breadcrumbs}>
+        <p>Second render</p>
+      </Shell>
+    );
+
+    expect(screen.getByText('Second render')).toBeInTheDocument();
+    expect(mocks.headerRenders).toBe(rendersAfterMount);
   });
 
   it('renders the customer header, content and mobile tabs', async () => {

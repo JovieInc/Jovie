@@ -1,3 +1,4 @@
+import { spawnSync } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -77,6 +78,59 @@ export function judge(
 
 export function growth(next: object, previous: object) {
   return grownBudgetNumbers(next, previous, NOW).join('\n');
+}
+
+/**
+ * The budget CLI always reads `origin/main` from the process git dir. Pin that
+ * ref to `budgets` inside `workDir` so a later shrink of the real ratchet is
+ * not growth against this fixture.
+ */
+export function isolateBudgetAncestor(
+  workDir: string,
+  budgets: object
+): NodeJS.ProcessEnv {
+  const budgetDir = join(workDir, 'apps/web/scripts');
+  mkdirSync(budgetDir, { recursive: true });
+  writeFileSync(
+    join(budgetDir, 'route-js-budgets.json'),
+    JSON.stringify(budgets)
+  );
+  const env: NodeJS.ProcessEnv = { ...process.env };
+  for (const key of Object.keys(env)) {
+    if (key.startsWith('GIT_')) delete env[key];
+  }
+  const emptyConfig = join(workDir, 'empty.gitconfig');
+  writeFileSync(emptyConfig, '');
+  Object.assign(env, {
+    GIT_CONFIG_GLOBAL: emptyConfig,
+    GIT_CONFIG_NOSYSTEM: '1',
+    GIT_AUTHOR_NAME: 'Budget fixture',
+    GIT_COMMITTER_NAME: 'Budget fixture',
+    GIT_AUTHOR_EMAIL: 'fixture@example.invalid',
+    GIT_COMMITTER_EMAIL: 'fixture@example.invalid',
+  });
+  const git = (args: string[]) => {
+    const result = spawnSync('git', args, {
+      cwd: workDir,
+      env,
+      encoding: 'utf8',
+      timeout: 10000,
+    });
+    if (result.status !== 0) {
+      throw new Error(
+        `git ${args.join(' ')} failed: ${result.stderr || result.stdout}`
+      );
+    }
+  };
+  git(['init', '--initial-branch=main']);
+  git(['add', 'apps/web/scripts/route-js-budgets.json']);
+  git(['commit', '-m', 'Fixture ancestor budgets']);
+  git(['update-ref', 'refs/remotes/origin/main', 'HEAD']);
+  return {
+    ...env,
+    GIT_DIR: join(workDir, '.git'),
+    GIT_WORK_TREE: workDir,
+  };
 }
 
 export function buildFirstLoadFixture() {

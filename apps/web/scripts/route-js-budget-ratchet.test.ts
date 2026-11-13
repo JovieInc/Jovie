@@ -14,6 +14,7 @@ import {
   buildFirstLoadFixture,
   cleanupFixtures,
   firstLoadBudgets,
+  isolateBudgetAncestor,
   judge,
   NOW,
   validRaise,
@@ -214,7 +215,12 @@ describe('per-route initial JS ratchet (JOV-8555)', () => {
 });
 
 describe('route-js-budget --write', () => {
-  function cli(nextDir: string, budgetPath: string, ...flags: string[]) {
+  function cli(
+    nextDir: string,
+    budgetPath: string,
+    env: NodeJS.ProcessEnv,
+    ...flags: string[]
+  ) {
     return spawnSync(
       process.execPath,
       [
@@ -228,7 +234,7 @@ describe('route-js-budget --write', () => {
       {
         encoding: 'utf8',
         timeout: 20000,
-        env: { ...process.env, GIT_NO_LAZY_FETCH: '1' },
+        env: { ...env, GIT_NO_LAZY_FETCH: '1' },
       }
     );
   }
@@ -250,15 +256,16 @@ describe('route-js-budget --write', () => {
     budgets.firstLoad.baselines = {};
     budgets.routes = {};
     writeFileSync(budgetPath, JSON.stringify(budgets));
+    const env = isolateBudgetAncestor(nextDir, budgets);
 
-    const closed = cli(nextDir, budgetPath);
+    const closed = cli(nextDir, budgetPath, env);
     expect(closed.status).toBe(1);
     expect(closed.stderr).toContain(
       '/about ships 48 KB gzip initial JS and has no baseline (new routes fail closed). Add "/about": 48 under firstLoad.baselines'
     );
     expect(closed.stderr).toContain('--write');
 
-    const written = cli(nextDir, budgetPath, '--write');
+    const written = cli(nextDir, budgetPath, env, '--write');
     expect(written.status, written.stderr).toBe(0);
     const recorded = JSON.parse(readFileSync(budgetPath, 'utf8'));
     expect(recorded.firstLoad.baselines).toEqual({
@@ -274,10 +281,10 @@ describe('route-js-budget --write', () => {
       marketing: { baselineKb: 16 },
       public: { baselineKb: 48 },
     });
-    expect(cli(nextDir, budgetPath).status).toBe(0);
+    expect(cli(nextDir, budgetPath, env).status).toBe(0);
 
     writeChunk(nextDir, 'about.js', 48 * 1024);
-    const grown = cli(nextDir, budgetPath, '--write');
+    const grown = cli(nextDir, budgetPath, env, '--write');
     expect(grown.status).toBe(1);
     expect(grown.stderr).toContain(
       '/about ships 56 KB gzip initial JS; its baseline is 48 KB (+8 KB)'

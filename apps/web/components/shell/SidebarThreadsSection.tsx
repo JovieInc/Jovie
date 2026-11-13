@@ -24,6 +24,7 @@ import {
   SIDEBAR_ENTRY_ICON_SLOT_CLASS,
   SIDEBAR_ENTRY_LABEL_INSET_CLASS,
 } from './sidebar-optical';
+import { observeSidebarThreadTitle } from './sidebar-thread-title-observer';
 import { SEAM_BOUNDARY_SELECTOR, Tooltip } from './Tooltip';
 
 // Chat list types — co-located so consumers import from one place. Production
@@ -225,23 +226,12 @@ const SidebarThreadRow = React.memo(function SidebarThreadRow({
 
   // The same string can change width when unread/active typography changes.
   // Font loading and container resizing can also change clipping without a render.
+  // One shared observer serves every row (see sidebar-thread-title-observer).
   useLayoutEffect(() => {
     measureTitle();
-    const observer = new ResizeObserver(measureTitle);
-    if (titleRef.current) observer.observe(titleRef.current);
-    globalThis.addEventListener('resize', measureTitle);
-    const fonts = document.fonts;
-    let mounted = true;
-    void fonts?.ready.then(() => {
-      if (mounted) measureTitle();
-    });
-    fonts?.addEventListener('loadingdone', measureTitle);
-    return () => {
-      mounted = false;
-      observer.disconnect();
-      globalThis.removeEventListener('resize', measureTitle);
-      fonts?.removeEventListener('loadingdone', measureTitle);
-    };
+    const title = titleRef.current;
+    if (!title) return;
+    return observeSidebarThreadTitle(title, measureTitle);
   }, [measureTitle, thread.title, unread, active, calm, tight]);
 
   const rowClasses = cn(

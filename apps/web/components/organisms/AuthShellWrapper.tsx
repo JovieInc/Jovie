@@ -12,7 +12,6 @@ import {
   useMemo,
   useRef,
   useState,
-  useTransition,
 } from 'react';
 import { PreviewPanelProvider } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
 import { ComposerFocusProvider } from '@/components/features/chat/Composer';
@@ -40,6 +39,7 @@ import { RightRailKeyboardHandler } from '@/hooks/RightRailKeyboardHandler';
 import { useAuthRouteConfig } from '@/hooks/useAuthRouteConfig';
 import { useDashboardShortcuts } from '@/hooks/useDashboardShortcuts';
 import { useGlobalShortcutActions } from '@/hooks/useGlobalShortcutActions';
+import { useSidebarPreferencePersist } from '@/hooks/useSidebarPreferencePersist';
 import { OPERATOR_SEQUENCE_SHORTCUTS } from '@/lib/ovie/operator-commands';
 import type { AppShellMode } from '@/types/app-shell';
 import { AuthShell } from './AuthShell';
@@ -103,7 +103,6 @@ function AuthShellWrapperInner({
   const config = useAuthRouteConfig(mode);
   const pathname = usePathname();
   const headerActions = useHeaderActions();
-  const [, startTransition] = useTransition();
   const [pendingShellRoute, setPendingShellRoute] =
     useState<PendingShellRoute>(null);
   const pendingShellTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
@@ -145,29 +144,38 @@ function AuthShellWrapperInner({
   // rendered once by UnifiedSidebar's notification region.
   // Wrap page-injected header elements in ErrorBoundary so a throwing badge/action
   // degrades gracefully (renders nothing + toast) instead of crashing the shell.
+  // Memoized so an unrelated wrapper render keeps the header props stable
+  // and the memoized header element in AuthShell is reused.
   const rawHeaderAction = headerActions.headerActions ?? null;
-  const headerAction = rawHeaderAction ? (
-    <ErrorBoundary fallback={null}>{rawHeaderAction}</ErrorBoundary>
-  ) : null;
+  const headerAction = useMemo(
+    () =>
+      rawHeaderAction ? (
+        <ErrorBoundary fallback={null}>{rawHeaderAction}</ErrorBoundary>
+      ) : null,
+    [rawHeaderAction]
+  );
 
   // Header badge from context (shown after breadcrumb on left side)
   const rawHeaderBadge = headerActions.headerBadge ?? null;
-  const headerBadge = rawHeaderBadge ? (
-    <ErrorBoundary fallback={null}>{rawHeaderBadge}</ErrorBoundary>
-  ) : null;
+  const headerBadge = useMemo(
+    () =>
+      rawHeaderBadge ? (
+        <ErrorBoundary fallback={null}>{rawHeaderBadge}</ErrorBoundary>
+      ) : null,
+    [rawHeaderBadge]
+  );
 
-  // Memoize the sidebar open change handler to prevent context value changes
-  // that would cause infinite re-render loops in sidebar consumers.
-  // Only create a callback when persistSidebarCollapsed is defined, otherwise
-  // useSidebarCookieState needs undefined to manage internal state.
-  const handleSidebarOpenChange = useCallback(
-    (open: boolean) => {
-      startTransition(() => {
-        // Fire-and-forget: persist sidebar preference in background
-        persistSidebarCollapsed?.(!open)?.catch?.(() => {});
-      });
-    },
-    [persistSidebarCollapsed, startTransition]
+  const railToggle = useMemo(
+    () => (showArtistProfileRailToggle ? <ArtistProfileRailToggle /> : null),
+    [showArtistProfileRailToggle]
+  );
+
+  // Stable handler (or undefined, so useSidebarCookieState manages internal
+  // state). The cookie is written synchronously on toggle; the database write
+  // is debounced so a burst of toggles costs one server action, after the
+  // rail has settled.
+  const handleSidebarOpenChange = useSidebarPreferencePersist(
+    persistSidebarCollapsed
   );
 
   const clearPendingShell = useCallback((route?: PendingShellRoute) => {
@@ -286,19 +294,13 @@ function AuthShellWrapperInner({
                 breadcrumbs={config.breadcrumbs}
                 headerBadge={headerBadge}
                 headerAction={headerAction}
-                railToggle={
-                  showArtistProfileRailToggle ? (
-                    <ArtistProfileRailToggle />
-                  ) : null
-                }
+                railToggle={railToggle}
                 commandPaletteHeader={headerActions.commandPaletteHeader}
                 showMobileTabs={config.showMobileTabs}
                 isTableRoute={config.isTableRoute}
                 isLyricsRoute={config.isLyricsRoute}
                 isChatRoute={config.isChatRoute}
-                onSidebarOpenChange={
-                  persistSidebarCollapsed ? handleSidebarOpenChange : undefined
-                }
+                onSidebarOpenChange={handleSidebarOpenChange}
                 sidebarDefaultOpen={sidebarDefaultOpen}
               >
                 {shellChildren}
