@@ -120,6 +120,15 @@ function sleepMs(ms) {
  * the hold budget. Returns the resolved id, or throws the honest outcome —
  * ProducerJobDeferredError when the budget is still shed at the deadline,
  * Error for a real failure. Never turns a deferral into a green verdict.
+ * @param {{
+ *   fetchJobs: () => Promise<{ jobs?: Array<{ name?: string, id?: number, conclusion?: string | null }> }>,
+ *   holdBudgetMs?: number,
+ *   intervalMs?: number,
+ *   now?: () => number,
+ *   sleep?: (ms: number) => Promise<void>,
+ *   lagSleep?: (ms: number) => Promise<void>,
+ * }} options
+ * @returns {Promise<{ status: 'resolved', id: string }>}
  */
 export async function resolveProducerJobIdWithHold({
   fetchJobs,

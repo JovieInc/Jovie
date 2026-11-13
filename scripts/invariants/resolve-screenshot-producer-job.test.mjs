@@ -62,7 +62,6 @@ test('resolveProducerJobId waits through unknown-job then accepts the real name'
     delays: [0, 0],
     fetchJobs: async () => payloads[reads++] ?? payloads.at(-1),
     sleep: async () => undefined,
-    lagSleep: async () => undefined,
   });
   assert.deepEqual(result, { status: 'resolved', id: '88' });
   assert.equal(reads, 2);
@@ -81,7 +80,6 @@ test('resolveProducerJobId does not accept a permanent unknown-job', async () =>
       };
     },
     sleep: async () => undefined,
-    lagSleep: async () => undefined,
   });
   assert.deepEqual(result, { status: 'pending', reason: 'unknown-job' });
   assert.equal(reads, 3);
