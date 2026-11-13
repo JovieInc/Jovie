@@ -572,7 +572,7 @@
       "evidence": {
         "kind": "source-audit",
         "at": "2026-11-13T00:00:00Z",
-        "ref": "JOV-12407: app/[username]/tip/thank-you/page.test.tsx, lib/services/tips/checkout-return.server.test.ts, and local Chromium desktop/mobile route checks"
+        "ref": "JOV-12407 / 3237f6189a: 72 focused tests and local Chromium desktop/mobile missing/invalid-session route checks"
       },
       "sources": ["apps/web/app/[username]/tip/thank-you/page.tsx"]
     },

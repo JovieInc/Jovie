@@ -318,6 +318,7 @@ web.public-profile-about|web|public-profile|apps/web/app/[username]/about/page.t
 web.public-profile-alerts|web|public-profile|apps/web/app/[username]/alerts/page.tsx|desktop,mobile
 web.public-profile-notifications|web|public-profile|apps/web/app/[username]/notifications/page.tsx|desktop,mobile
 web.public-profile-shop|web|public-profile|apps/web/app/[username]/shop/page.tsx|desktop,mobile
+web.tip-checkout-return|web|tip-checkout-return|apps/web/app/[username]/tip/thank-you/page.tsx|desktop,mobile
 web.auth|web|browser-input-assurance|apps/web/app/(auth)/,apps/web/app/@auth/,apps/web/app/auth-return/,apps/web/app/desktop-auth/,apps/web/app/mobile-auth-return/,apps/web/components/features/auth/|desktop,mobile
 web.artist-pay|web|artist-pay|apps/web/app/[username]/pay/page.tsx|desktop,mobile
 web.artist-alerts|web|artist-alerts|apps/web/app/[username]/alerts/page.tsx|desktop,mobile
