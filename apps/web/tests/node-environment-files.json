@@ -1359,7 +1359,6 @@
   "tests/unit/ovie/shipping-state.test.ts",
   "tests/unit/ovie/summer-kanban.test.ts",
   "tests/unit/ovie/summer-session.test.ts",
-  "tests/unit/performance/bundle-baseline-gate.test.ts",
   "tests/unit/performance/route-budget-gate.test.ts",
   "tests/unit/performance/telemetry-budget-gate.test.ts",
   "tests/unit/pricing/pricing-source-of-truth.test.ts",
