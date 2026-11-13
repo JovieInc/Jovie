@@ -6,7 +6,7 @@ import {
   type ArtistProfileFeatureTile,
 } from '@/data/artistProfileFeatures';
 
-const FOOTER_CTA_LABEL = 'Start free trial';
+const FOOTER_CTA_LABEL = 'Get started';
 
 function requireTile<T extends { readonly id: string }>(
   tiles: readonly T[],

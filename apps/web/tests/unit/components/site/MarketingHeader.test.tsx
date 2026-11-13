@@ -280,8 +280,8 @@ describe('MarketingHeader', () => {
       'marketing-glass'
     );
     expect(
-      screen.getByRole('link', { name: 'Claim your profile' })
-    ).toHaveAttribute('href', '/signup');
+      screen.getByRole('link', { name: 'Claim your free profile' })
+    ).toHaveAttribute('href', '/start');
     expect(screen.queryByRole('link', { name: 'Get started' })).toBeNull();
   });
 
