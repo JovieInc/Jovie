@@ -3,9 +3,9 @@
 // @coverage-via apps/web/tests/unit/dashboard/SettingsToggleRow.test.tsx
 import { Switch } from '@jovie/ui';
 import * as React from 'react';
-import { SettingsPlanGateLabel } from '@/components/atoms/SettingsPlanGateLabel';
 import { PRO_PLAN_DISPLAY_NAME } from '@/lib/config/plan-prices';
 import { cn } from '@/lib/utils';
+import { SettingsPlanGateLabel } from './SettingsPlanGateLabel';
 import {
   getSettingsRowDataState,
   getSettingsRowDescriptionClassName,
