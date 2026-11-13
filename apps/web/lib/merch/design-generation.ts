@@ -53,6 +53,7 @@ import {
 import {
   MERCH_CANONICAL_PIPELINE_ID,
   MERCH_GENERATION_CONTRACT_VERSION,
+  type MerchGenerationReceipt,
 } from './generation-contract';
 import {
   buildMerchGenerationFailureSummary,
