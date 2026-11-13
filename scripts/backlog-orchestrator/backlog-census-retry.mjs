@@ -116,6 +116,58 @@ export function censusUnavailableReceipt(error, nowMs = Date.now()) {
 }
 
 /**
+ * An active shared-credential cooldown defers the census exactly like the
+ * Triage catch-up defers on the same condition (triageSweepReceiptForError):
+ * a truthful deferred receipt with the published reset, failed: 0, so the
+ * next fleet-gate-refresh tick retries it. This is the typed, named path —
+ * not a hidden miss: every other census failure still fails visibly via
+ * censusUnavailableReceipt (JOV-12500).
+ * @param {{ resetAt: number, retryAt: string }} cooldown
+ * @param {number} [nowMs]
+ */
+export function censusDeferredReceipt(cooldown, nowMs = Date.now()) {
+  return {
+    schema: 'linear-backlog-catch-up/v1',
+    observedAt: new Date(nowMs).toISOString(),
+    issueCount: 0,
+    inventoryUnknown: true,
+    assessed: 0,
+    deferred: 0,
+    failed: 0,
+    wakeSymphony: false,
+    census: {
+      status: 'deferred',
+      reason: 'RATE_LIMITED',
+      resetAt: cooldown.resetAt,
+      retryAt: cooldown.retryAt,
+    },
+    results: [
+      {
+        disposition: 'census-deferred',
+        reason: 'backlog-catch-up-census-deferred',
+        owner: 'JOV-8022 Fleet admission owner',
+        mutations: 0,
+        wakeSymphony: false,
+        resetAt: cooldown.resetAt,
+        retryAt: cooldown.retryAt,
+      },
+    ],
+  };
+}
+
+/**
+ * Classify a failed census read into its receipt: an active published
+ * cooldown defers; every other persistent miss fails with its cause named.
+ * @param {unknown} error
+ * @param {number} [nowMs]
+ */
+export function censusFailureReceipt(error, nowMs = Date.now()) {
+  const cooldown = activeLinearCooldown(error, nowMs);
+  if (cooldown) return censusDeferredReceipt(cooldown, nowMs);
+  return censusUnavailableReceipt(error, nowMs);
+}
+
+/**
  * Run the census discovery with the bounded retry above.
  * @param {(client: any, options: any) => Promise<any>} discover
  * @param {any} client
