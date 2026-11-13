@@ -6,7 +6,13 @@ export const PUBLIC_ACCESS_FLAG_CAPABILITIES = {
     nonMarketing: 'OAuth dynamic client registration kill switch',
   },
   SPOTIFY_OAUTH: { nonMarketing: 'account connection plumbing' },
-  PUBLIC_SIGNUP_CLOSED: { nonMarketing: 'closed signup gate; default on' },
+  HOMEPAGE_START_CTA: {
+    nonMarketing:
+      'homepage hero action enters /start; default off until the copy is approved',
+  },
+  PUBLIC_SIGNUP_CLOSED: {
+    nonMarketing: 'closed signup kill switch; default off',
+  },
 } as const satisfies Readonly<
   Partial<Record<ProductFlagKey, { readonly nonMarketing: string }>>
 >;

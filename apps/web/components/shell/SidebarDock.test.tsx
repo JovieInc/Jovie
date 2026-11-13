@@ -9,6 +9,7 @@ import { type ComponentPropsWithoutRef, forwardRef } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { BannerViewport } from '@/components/feedback/BannerViewport';
 import { banner } from '@/components/feedback/banner-store';
+import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import {
   SidebarDock,
   type SidebarDockProps,
@@ -65,7 +66,7 @@ beforeEach(() => {
 describe('SidebarDock', () => {
   it.each(Array.from({ length: 8 }, (_, mask) => mask))(
     'keeps fixed order for combination %i',
-    mask => {
+    async mask => {
       const { container } = render(
         <SidebarDock
           userId='one'
@@ -81,10 +82,11 @@ describe('SidebarDock', () => {
           mask & 1 ? 'now-playing' : null,
         ].filter(Boolean)
       );
+      await expectNoA11yViolations(container);
     }
   );
 
-  it('puts install last and routes all actions', () => {
+  it('puts install last and routes all actions', async () => {
     const onUpdate = vi.fn();
     const { container } = render(
       <SidebarDock
@@ -97,6 +99,7 @@ describe('SidebarDock', () => {
       />
     );
     expect(cards(container)).toEqual(['update', 'now-playing']);
+    await expectNoA11yViolations(container);
     fireEvent.click(screen.getByRole('button', { name: 'Update available' }));
     expect(onUpdate).toHaveBeenCalledOnce();
     fireEvent.click(screen.getByRole('button', { name: 'Dismiss update' }));
@@ -107,6 +110,7 @@ describe('SidebarDock', () => {
     expect(audio.onDismiss).toHaveBeenCalledOnce();
     fireEvent.click(screen.getByRole('button', { name: 'Install' }));
     expect(install.onInstall).toHaveBeenCalledOnce();
+    await expectNoA11yViolations(container);
     fireEvent.click(screen.getByRole('button', { name: 'Dismiss Prompt' }));
     expect(install.onDismiss).toHaveBeenCalledOnce();
   });
@@ -224,9 +228,9 @@ describe('SidebarDock', () => {
     }
   );
 
-  it('keeps update recovery reachable', () => {
+  it('keeps update recovery reachable', async () => {
     const onUpdate = vi.fn();
-    render(
+    const { container } = render(
       <SidebarDock
         userId='one'
         onUpdate={onUpdate}
@@ -236,6 +240,76 @@ describe('SidebarDock', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Update failed' }));
     expect(onUpdate).toHaveBeenCalledOnce();
     expect(screen.getByText('Open update details to try again.')).toBeVisible();
+    await expectNoA11yViolations(container);
+  });
+
+  it('shows audio with only a track title', async () => {
+    const onPlay = vi.fn();
+    const { container } = render(
+      <SidebarDock
+        userId='one'
+        audio={{
+          ...audio,
+          onPlay,
+          track: {
+            trackTitle: 'Untitled demo',
+            artistName: null,
+            artworkUrl: null,
+          },
+        }}
+      />
+    );
+    expect(cards(container)).toEqual(['now-playing']);
+    expect(screen.getByText('Untitled demo')).toBeVisible();
+    fireEvent.click(screen.getByRole('button', { name: 'Pause' }));
+    expect(onPlay).toHaveBeenCalledOnce();
+    await expectNoA11yViolations(container);
+  });
+
+  it('keeps long release and track titles reachable', async () => {
+    const title =
+      'Release pages now show every streaming service, presave countdowns and per-territory analytics';
+    const trackTitle =
+      'Midnight Drive Through the Neon City (Extended Club Mix featuring the Late Night Strings)';
+    const { container } = render(
+      <SidebarDock
+        userId='one'
+        release={{ ...release, title }}
+        audio={{
+          ...audio,
+          track: { ...audio.track, trackTitle },
+        }}
+      />
+    );
+    expect(cards(container)).toEqual(['whats-new', 'now-playing']);
+    expect(screen.getByText(title)).toHaveClass('truncate');
+    expect(screen.getByText(trackTitle)).toBeInTheDocument();
+    await expectNoA11yViolations(container);
+  });
+
+  it('routes update actions in a right-to-left sidebar', async () => {
+    const onUpdate = vi.fn();
+    const { container } = render(
+      <div dir='rtl' lang='ar'>
+        <SidebarDock
+          userId='one'
+          update={update}
+          onUpdate={onUpdate}
+          audio={{
+            ...audio,
+            track: {
+              trackTitle: 'ليالي المدينة الطويلة',
+              artistName: 'فرقة الشرق',
+              artworkUrl: null,
+            },
+          }}
+        />
+      </div>
+    );
+    expect(screen.getByText('ليالي المدينة الطويلة')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Update available' }));
+    expect(onUpdate).toHaveBeenCalledOnce();
+    await expectNoA11yViolations(container);
   });
 
   it('collapses cards to named user-button badges', () => {
@@ -315,5 +389,18 @@ describe('SidebarDock', () => {
     expect(screen.queryByRole('link')).toBeNull();
     get.mockRestore();
     set.mockRestore();
+  });
+  it('measures card positions only when the card stack changes', () => {
+    const measure = vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect');
+    const { rerender } = render(<SidebarDock userId='one' audio={audio} />);
+    const mounted = measure.mock.calls.length;
+    expect(mounted).toBeGreaterThan(0);
+    rerender(
+      <SidebarDock userId='one' audio={{ ...audio, isPlaying: false }} />
+    );
+    expect(measure.mock.calls.length).toBe(mounted);
+    rerender(<SidebarDock userId='one' audio={audio} update={update} />);
+    expect(measure.mock.calls.length).toBeGreaterThan(mounted);
+    measure.mockRestore();
   });
 });

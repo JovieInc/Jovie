@@ -110,5 +110,47 @@ describe('component certificate companion files', () => {
     const missing = run();
     assert.equal(missing.status, 1);
     assert.match(missing.stdout, /matches no component/);
+
+    // Waivers out of path order fail the gate until --sort puts them in place.
+    const registry = join(
+      root,
+      'docs/design-system/component-certification.json'
+    );
+    writeFileSync(
+      registry,
+      JSON.stringify({
+        gates: { [source]: ['tests', 'a11y'] },
+        waivers: {
+          'packages/ui/b.tsx': { rtl: 'No text', empty: 'No list' },
+          'packages/ui/a.tsx': { offline: 'No network' },
+        },
+      })
+    );
+    const unsorted = run();
+    assert.equal(unsorted.status, 1, unsorted.stdout);
+    assert.match(unsorted.stdout, /waivers is not sorted by component path/);
+    assert.match(
+      unsorted.stdout,
+      /run node scripts\/component-certificate\.mjs --sort/
+    );
+    const sort = spawnSync(
+      process.execPath,
+      [cli, '--repo-root', root, '--sort'],
+      {
+        encoding: 'utf8',
+      }
+    );
+    assert.equal(sort.status, 0, sort.stderr);
+    const { waivers } = JSON.parse(readFileSync(registry, 'utf8'));
+    assert.deepEqual(Object.keys(waivers), [
+      'packages/ui/a.tsx',
+      'packages/ui/b.tsx',
+    ]);
+    // State order inside an entry stays as written.
+    assert.deepEqual(Object.keys(waivers['packages/ui/b.tsx']), [
+      'rtl',
+      'empty',
+    ]);
+    assert.equal(run().status, 0);
   });
 });

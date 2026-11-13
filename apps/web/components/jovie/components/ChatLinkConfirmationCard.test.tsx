@@ -1,7 +1,8 @@
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { FetchHttpError } from '@/lib/queries/fetch';
+import { FetchHttpError, FetchNetworkError } from '@/lib/queries/fetch';
+import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import { ChatLinkConfirmationCard } from './ChatLinkConfirmationCard';
 
 const { confirmMutate, previewState } = vi.hoisted(() => ({
@@ -143,7 +144,7 @@ describe('ChatLinkConfirmationCard', () => {
 
     const error = screen.getByRole('status', { name: 'Link Confirmation' });
     expect(error).toHaveTextContent('Unable to add link. Try again.');
-    expect(error).toHaveClass('text-error');
+    expect(error).toHaveClass('text-error-text');
     expect(error).not.toHaveClass('text-danger-token');
   });
 });
@@ -322,5 +323,158 @@ describe('confirmation acknowledgement', () => {
     expect(
       screen.getByRole('status', { name: 'Link Confirmation' })
     ).not.toHaveTextContent('Spotify link added.');
+  });
+});
+
+describe('ChatLinkConfirmationCard certificate states', () => {
+  const linkStatus = () =>
+    screen.getByRole('status', { name: 'Link Confirmation' });
+
+  function pressAddThen(
+    settle: (options: {
+      onSuccess: (data: unknown) => void;
+      onError: (error: unknown) => void;
+    }) => void
+  ) {
+    fireEvent.click(screen.getByRole('button', { name: 'Add' }));
+    const options = confirmMutate.mock.calls.at(-1)?.[1];
+    act(() => settle(options));
+  }
+
+  beforeEach(() => confirmMutate.mockReset());
+
+  it('has no axe violations in the draft state', async () => {
+    const { container } = render(<ChatLinkConfirmationCard {...props} />);
+    await expectNoA11yViolations(container);
+  });
+
+  it('has no axe violations while the save is in flight', async () => {
+    const { container } = render(<ChatLinkConfirmationCard {...props} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Add' }));
+    expect(linkStatus()).toHaveTextContent('Saving your link…');
+    await expectNoA11yViolations(container);
+  });
+
+  it('shows a rejected save as an error and stays axe-clean', async () => {
+    const { container } = render(<ChatLinkConfirmationCard {...props} />);
+    pressAddThen(o => o.onError(new FetchHttpError('rejected', 422)));
+    expect(linkStatus()).toHaveTextContent('Unable to add link. Try again.');
+    expect(linkStatus()).toHaveClass('text-error-text');
+    await expectNoA11yViolations(container);
+  });
+
+  it('treats an offline request as unconfirmed, never as failed, and stays axe-clean', async () => {
+    const { container } = render(<ChatLinkConfirmationCard {...props} />);
+    pressAddThen(o =>
+      o.onError(new FetchNetworkError('Failed to fetch', new TypeError()))
+    );
+    expect(linkStatus()).toHaveTextContent('Save unconfirmed. Use Check save.');
+    expect(linkStatus()).not.toHaveClass('text-error');
+    expect(screen.getByRole('button', { name: 'Check save' })).toBeVisible();
+    await expectNoA11yViolations(container);
+  });
+
+  it('has no axe violations once the save is acknowledged', async () => {
+    const { container } = render(<ChatLinkConfirmationCard {...props} />);
+    pressAddThen(o => o.onSuccess(acknowledged));
+    expect(linkStatus()).toHaveTextContent('Spotify link added.');
+    await expectNoA11yViolations(container);
+  });
+
+  it('has no axe violations once dismissed', async () => {
+    const { container } = render(
+      <ChatLinkConfirmationCard {...props} toolCallId='tool-dismiss-a11y' />
+    );
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Dismiss Spotify link' })
+    );
+    expect(linkStatus()).toHaveTextContent('Cancelled');
+    await expectNoA11yViolations(container);
+  });
+
+  it('falls back to the generic link glyph for an unknown platform without a tool call id', async () => {
+    const { container } = render(
+      <ChatLinkConfirmationCard
+        profileId='profile-1'
+        platform={{
+          id: 'linktree',
+          name: 'Linktree',
+          icon: 'Linktree',
+          color: 'brand-linktree',
+        }}
+        normalizedUrl='https://linktr.ee/example'
+        originalUrl='linktr.ee/example'
+        preview
+      />
+    );
+    expect(screen.getByTestId('social-icon-link')).toBeInTheDocument();
+    expect(linkStatus()).toHaveTextContent(
+      'Preview only. Nothing will be saved.'
+    );
+    await expectNoA11yViolations(container);
+  });
+
+  it('keeps a long URL in one truncated line with its full value as the title', async () => {
+    const longUrl =
+      'https://music.youtube.com/channel/UCabcdefghijklmnopqrstuvwxyz0123456789?si=extended-share-token';
+    const { container } = render(
+      <ChatLinkConfirmationCard
+        {...props}
+        platform={{
+          id: 'youtubemusic',
+          name: 'YouTube Music (Official Artist Channel)',
+          icon: 'youtubemusic',
+          color: 'brand-youtube',
+        }}
+        normalizedUrl={longUrl}
+        originalUrl={longUrl}
+      />
+    );
+    const url = screen.getByText(longUrl);
+    expect(url).toHaveClass('truncate');
+    expect(url).toHaveAttribute('title', longUrl);
+    expect(
+      screen.getByRole('button', {
+        name: 'Dismiss YouTube Music (Official Artist Channel) link',
+      })
+    ).toBeInTheDocument();
+    await expectNoA11yViolations(container);
+  });
+
+  it('renders inside a right-to-left transcript and stays axe-clean', async () => {
+    const { container } = render(
+      <div dir='rtl' lang='ar'>
+        <ChatLinkConfirmationCard {...props} toolCallId='tool-rtl' />
+      </div>
+    );
+    expect(screen.getByRole('button', { name: 'Add' })).toBeInTheDocument();
+    await expectNoA11yViolations(container);
+  });
+
+  it('keeps text typed in the composer beside it through every save outcome', async () => {
+    const user = userEvent.setup();
+    render(
+      <>
+        <ChatLinkConfirmationCard {...props} toolCallId='tool-retain' />
+        <textarea aria-label='Unsent notes' />
+      </>
+    );
+    const notes = screen.getByRole('textbox', { name: 'Unsent notes' });
+    await user.type(notes, 'Keep this draft');
+    pressAddThen(o =>
+      o.onError(new FetchNetworkError('Failed to fetch', new TypeError()))
+    );
+    await user.click(notes);
+    await user.type(notes, ' safe');
+    fireEvent.click(screen.getByRole('button', { name: 'Check save' }));
+    act(() =>
+      confirmMutate.mock.calls.at(-1)?.[1].onSuccess({
+        ...acknowledged,
+        receipt: { ...acknowledged.receipt, requestId: 'link:tool-retain' },
+      })
+    );
+    expect(linkStatus()).toHaveTextContent('Spotify link added.');
+    expect(notes).toHaveValue('Keep this draft safe');
+    expect(notes).toHaveFocus();
   });
 });

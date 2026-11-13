@@ -70,18 +70,6 @@
     padding-top: 7.5rem;
   }
 
-  .hv3-hero > .hv3-orbit {
-    top: 5rem;
-    left: -45.3125rem;
-    transform: rotate(47deg);
-  }
-
-  .hv3-hero
-    > .hv3-orbit
-    :is(.hv3-orbit__arc, .hv3-orbit__bloom, .hv3-orbit__sweep) {
-    display: none;
-  }
-
   .hv3-hero__copy {
     grid-template-columns: 1fr;
     row-gap: 1.25rem;
@@ -117,11 +105,18 @@
     visibility: hidden;
   }
 
-  .hv3-stage--hero .hv3-bounce {
-    top: 20rem;
-    left: 0;
-    width: 37.5rem;
-    height: 7.5rem;
+  /* The 390 crop shows the sidebar edge into the list: the beam lands there. */
+  .hv3-keylight {
+    top: -12rem;
+    left: 2rem;
+    width: 20rem;
+    height: 40rem;
+  }
+
+  /* The lifted release page lands past the stage's right edge at this crop,
+     where overflow clips it: take it out, so its cover is never fetched. */
+  .hv3-rig--hero .hv3-lift--page {
+    display: none;
   }
 
   .hv3-stage--hero .hv3-callout {

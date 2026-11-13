@@ -257,6 +257,18 @@ describe('EmailCodeAuthForm', () => {
     expect(locationAssign).not.toHaveBeenCalled();
   });
 
+  it('explains the invite requirement after a verified code', async () => {
+    renderForm();
+    await reachCodeStep();
+    signInEmailOtp.mockResolvedValueOnce({
+      data: null,
+      error: { code: 'SIGNUP_INVITE_REQUIRED', status: 403 },
+    });
+    await submitCode('111111');
+    await screen.findByText(/no jovie account uses this email/i);
+    expect(locationAssign).not.toHaveBeenCalled();
+  });
+
   it('locks the flow when verify reports too many attempts', async () => {
     renderForm();
     await reachCodeStep();
@@ -345,6 +357,7 @@ describe('EmailCodeAuthForm', () => {
       const resend = screen.getByRole('button', {
         name: 'Resend Verification Code',
       });
+      expect(resend).toHaveTextContent('Resend Code');
       await act(async () => {
         fireEvent.click(resend);
       });

@@ -58,6 +58,15 @@ import {
   MERCH_GENERATION_CONTRACT_VERSION,
   type MerchGenerationReceipt,
 } from './generation-contract';
+import {
+  buildMerchGenerationFailureSummary,
+  captureMerchCatalogFallback,
+  captureMerchGenerationFailureOutcome,
+  classifyMerchGenerationFailure,
+  type MerchGenerationFailureClass,
+  type MerchGenerationFailureSummary,
+  type MerchGenerationStage,
+} from './generation-failures';
 import { generatePrintGraphic } from './graphic-engine';
 import { createGeneratedMerchArtwork } from './mockup-engine';
 import { scheduleMerchMockupEnrichment } from './mockup-enrichment';
@@ -223,7 +232,10 @@ async function resolveGenerationPricing(prompt: string) {
       placements: catalog.placements,
       technique: catalog.technique,
     };
-  } catch {
+  } catch (error) {
+    // Draft-only fallback: record it at warning level with a sanitized reason
+    // class so a dead Printful catalog is production-visible.
+    await captureMerchCatalogFallback({ error });
     return {
       pricing: fallbackPricing(),
       productionWarnings: [] as string[],
@@ -389,6 +401,7 @@ function schedulePrintfulMockupEnrichment(params: {
   readonly startedAt: number;
   readonly requestedDesignCount: number;
   readonly contentReviews: MerchGenerationReceipt['contentReviews'];
+  readonly failureSummary: MerchGenerationFailureSummary;
   readonly designs: readonly {
     readonly optionId: string;
     readonly printFileUrl: string;
@@ -432,6 +445,7 @@ function schedulePrintfulMockupEnrichment(params: {
         readyDesignCount: params.designs.length,
         mockups: outcomes,
         contentReviews: params.contentReviews,
+        failureSummary: params.failureSummary,
         disposition: 'ready',
         durationMs: Date.now() - params.startedAt,
       });
@@ -586,6 +600,17 @@ export async function generateMerchDesigns(params: {
       review: promptReview,
     });
     const contentReviews = [toContentReviewReceipt(optionId, promptReview)];
+    // Whole-prompt content rejection: a product gate, not a provider incident,
+    // so the outcome capture deliberately no-ops for a pure content_reject.
+    const failureSummary = buildMerchGenerationFailureSummary({
+      requested: count,
+      ready: 0,
+      failureClasses: ['content_reject'],
+    });
+    await captureMerchGenerationFailureOutcome({
+      generationId,
+      failureSummary,
+    });
     logMerchGenerationReceipt({
       pipeline: MERCH_CANONICAL_PIPELINE_ID,
       contractVersion: MERCH_GENERATION_CONTRACT_VERSION,
@@ -595,6 +620,7 @@ export async function generateMerchDesigns(params: {
       readyDesignCount: 0,
       mockups: [],
       contentReviews,
+      failureSummary,
       disposition: 'failed',
       durationMs: Date.now() - startedAt,
     });
@@ -619,6 +645,7 @@ export async function generateMerchDesigns(params: {
         confidence: review.confidence,
         reviewed_at: review.reviewedAt,
       })),
+      failureSummary,
       nextStep: MERCH_PERSON_CONTENT_PUBLISH_BLOCKER,
       designs: [],
     };
@@ -634,6 +661,7 @@ export async function generateMerchDesigns(params: {
         readonly preview: MerchDesignPreview | null;
         readonly review: MerchContentReview | null;
         readonly printFileUrl?: string;
+        readonly failureClass?: MerchGenerationFailureClass;
       }> => {
         const optionId = randomUUID();
         const sourceLabel = params.source
@@ -647,6 +675,10 @@ export async function generateMerchDesigns(params: {
           params.prompt,
           sourceLabel
         );
+        // Track the pipeline stage so a per-design failure can be classified
+        // (image vs artwork upload vs persist) without leaking raw provider
+        // messages anywhere user-facing.
+        let stage: MerchGenerationStage = 'graphic';
         try {
           const graphic = await generatePrintGraphic({
             prompt: buildMerchImagePrompt(
@@ -659,6 +691,7 @@ export async function generateMerchDesigns(params: {
             selection: { weights: modelWeights },
             content: { prompt: params.prompt, concept },
           });
+          stage = 'artwork';
           const artwork = await createGeneratedMerchArtwork({
             profileId: params.profileId,
             generationId,
@@ -666,6 +699,7 @@ export async function generateMerchDesigns(params: {
             printFile: graphic.image,
             productType: catalog.productType,
           });
+          stage = 'persist';
 
           await db.insert(merchDesignOptions).values({
             id: optionId,
@@ -766,6 +800,10 @@ export async function generateMerchDesigns(params: {
             },
           };
         } catch (error) {
+          const failureClass = classifyMerchGenerationFailure({
+            stage,
+            error,
+          });
           if (error instanceof MerchPersonContentRejectedError) {
             await persistRejectedOption({
               optionId,
@@ -778,13 +816,19 @@ export async function generateMerchDesigns(params: {
               optionId,
               failureCodes: error.review.failureCodes,
             });
-            return { optionId, preview: null, review: error.review };
+            return {
+              optionId,
+              preview: null,
+              review: error.review,
+              failureClass,
+            };
           }
           logger.warn('[merch-designs] generation failed for one design', {
             optionId,
+            failureClass,
             err: error instanceof Error ? error.message : String(error),
           });
-          return { optionId, preview: null, review: null };
+          return { optionId, preview: null, review: null, failureClass };
         }
       }
     )
@@ -798,6 +842,16 @@ export async function generateMerchDesigns(params: {
       ? [toContentReviewReceipt(attempt.optionId, attempt.review)]
       : []
   );
+  const failureSummary = buildMerchGenerationFailureSummary({
+    requested: count,
+    ready: ready.length,
+    failureClasses: attempts.flatMap(attempt =>
+      attempt.failureClass ? [attempt.failureClass] : []
+    ),
+  });
+  // Production-visible outcome: one incident when nothing rendered for a
+  // non-content reason, one warning for a partial batch (no-op otherwise).
+  await captureMerchGenerationFailureOutcome({ generationId, failureSummary });
 
   logger.info('[merch-designs] generation response ready', {
     ms: Date.now() - startedAt,
@@ -832,6 +886,7 @@ export async function generateMerchDesigns(params: {
       startedAt,
       requestedDesignCount: count,
       contentReviews,
+      failureSummary,
       designs: enrichmentDesigns,
     });
   } else {
@@ -844,6 +899,7 @@ export async function generateMerchDesigns(params: {
       readyDesignCount: 0,
       mockups: [],
       contentReviews,
+      failureSummary,
       disposition: 'failed',
       durationMs: Date.now() - startedAt,
     });
@@ -872,6 +928,7 @@ export async function generateMerchDesigns(params: {
       reviewed_at: review.reviewedAt,
     })),
     nextStep: resolveGenerationNextStep(ready.length, contentReviews),
+    failureSummary,
     designs: ready,
   };
 }

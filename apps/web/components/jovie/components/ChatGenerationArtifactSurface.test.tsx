@@ -3,6 +3,7 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
+import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import { ChatGenerationArtifactSurface } from './ChatGenerationArtifactSurface';
 import { ChatPitchCard } from './ChatPitchCard';
 
@@ -125,5 +126,62 @@ describe('ChatGenerationArtifactSurface', () => {
     for (const fragment of bannedUtilityFragments) {
       expect(`${artifactSource}\n${pitchSource}`).not.toContain(fragment);
     }
+  });
+});
+
+describe('ChatGenerationArtifactSurface certificate states', () => {
+  const longTitle =
+    'Generating cover art for The Extended Midnight Drive Sessions (Deluxe Anniversary Edition)';
+  const longSubtitle =
+    'Three styles are rendering at full resolution. Large batches can take up to a minute; you can keep chatting while they finish.';
+
+  it.each([
+    ['title and subtitle', 'Generating cover art', 'Takes about 20 seconds.'],
+    ['title only (partial)', 'Merch Options', null],
+    ['long title and subtitle', longTitle, longSubtitle],
+  ] as const)('has no axe violations: %s', async (_state, title, subtitle) => {
+    const { container } = render(
+      <ChatGenerationArtifactSurface title={title} subtitle={subtitle}>
+        <div>Option grid</div>
+      </ChatGenerationArtifactSurface>
+    );
+    await expectNoA11yViolations(container);
+  });
+
+  it('drops the subtitle line when the subtitle is missing', () => {
+    render(
+      <ChatGenerationArtifactSurface title='Merch Options' subtitle={null}>
+        <div>Option grid</div>
+      </ChatGenerationArtifactSurface>
+    );
+    expect(
+      document.querySelector('.system-b-chat-generation-artifact-subtitle')
+    ).toBeNull();
+    expect(screen.getByText('Merch Options')).toBeInTheDocument();
+  });
+
+  it('keeps long copy whole rather than truncating it', () => {
+    render(
+      <ChatGenerationArtifactSurface title={longTitle} subtitle={longSubtitle}>
+        <div>Option grid</div>
+      </ChatGenerationArtifactSurface>
+    );
+    expect(screen.getByText(longTitle)).toBeInTheDocument();
+    expect(screen.getByText(longSubtitle)).toBeInTheDocument();
+  });
+
+  it('renders right-to-left copy and stays axe-clean', async () => {
+    const { container } = render(
+      <div dir='rtl' lang='ar'>
+        <ChatGenerationArtifactSurface
+          title='جارٍ إنشاء غلاف الألبوم'
+          subtitle='يستغرق هذا عادةً حوالي 20 ثانية.'
+        >
+          <div>شبكة الخيارات</div>
+        </ChatGenerationArtifactSurface>
+      </div>
+    );
+    expect(screen.getByText('جارٍ إنشاء غلاف الألبوم')).toBeInTheDocument();
+    await expectNoA11yViolations(container);
   });
 });
