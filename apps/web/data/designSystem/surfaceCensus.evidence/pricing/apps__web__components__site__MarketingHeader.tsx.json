@@ -1,6 +1,6 @@
 {
   "file": "apps/web/components/site/MarketingHeader.tsx",
-  "sha256": "f9d37f2ede2085a23e002a7653ff93f88af408dd9d022111ee5c82cbcd935ebb",
-  "at": "2026-11-09T03:00:11.997Z",
-  "ref": "Carried over unchanged from the single pricing row digest 8e1f02b52a25 certified at 2026-11-09T03:00:11.997Z; that certification is described in the row's evidence.ref in surfaceCensus.json."
+  "sha256": "2af32a1f33f610d7dd11a5eef33a1280cedbada2b911cd0e3e5243bbbd1aa524",
+  "at": "2026-11-13T01:07:08.478Z",
+  "ref": "WAITLIST_ENABLED removed: the default marketing header CTA is now 'Claim your free profile' -> /start (was 'Claim your profile' -> /signup). Verified with the MarketingHeader and HeaderNav jsdom render suites, not a browser capture."
 }

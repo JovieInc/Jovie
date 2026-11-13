@@ -88,6 +88,14 @@ describe('HeaderNav states', () => {
     await expectNoA11yViolations(container);
   });
 
+  it('sends the default public CTA into the one /start flow', () => {
+    render(<HeaderNav authMode='public-static' hideNav={false} />);
+
+    expect(
+      screen.getByRole('link', { name: 'Claim your free profile' })
+    ).toHaveAttribute('href', APP_ROUTES.START);
+  });
+
   it('drops the desktop nav group and its divider when there are no nav links', async () => {
     const { container } = render(
       <HeaderNav authMode='public-static' navLinks={[]} />
