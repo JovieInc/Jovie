@@ -12,6 +12,10 @@ import fix_red_classes as classes  # noqa: E402
 import lane_runner as lane  # noqa: E402
 import fix_red_source_edits as edits  # noqa: E402
 import fix_red_statement_merge as statements  # noqa: E402
+# Release self-test runs this listed file only, so the split class has to load here.
+from scripts.tests.test_duplicate_clock_pin import DuplicateClockPinTest  # noqa: E402
+
+assert issubclass(DuplicateClockPinTest, unittest.TestCase)
 
 
 def pr(*names, merge="BLOCKED"):
