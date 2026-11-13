@@ -1,6 +1,29 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
-import { expect, userEvent, within } from 'storybook/test';
+import {
+  clearAllMocks,
+  expect,
+  fn,
+  sb,
+  userEvent,
+  waitFor,
+  within,
+} from 'storybook/test';
+import { toast } from '@/components/feedback';
 import { useProfileHeaderParts } from './ProfileSidebarHeader';
+
+// The Storybook navigation mock pins pathname '/test', which isProfileRoute
+// treats as a profile route — and FeedbackProvider mounts no Toaster on
+// profile routes — so the failure toast can never render in this lane.
+// Following the ShareableLinkRow convention (the surface reports the failure
+// to its owner), these stories assert the error report — the toast call —
+// instead of the toast DOM.
+sb.mock(import('@/components/feedback'), async importOriginal => {
+  const actual = await importOriginal<typeof import('@/components/feedback')>();
+  return {
+    ...actual,
+    toast: { ...actual.toast, error: fn(), success: fn() },
+  };
+});
 
 /**
  * Download QR Code fetches the QR image; these stories answer that request
@@ -33,11 +56,11 @@ async function openMenu({
 
 /**
  * Opens the overflow menu, triggers the QR download, and waits for the
- * failure toast. Clicking the item closes the menu, so the a11y audit
- * runs on the settled toast state: a held-open modal menu aria-hides the
- * page behind it, which axe reports as aria-hidden-focus.
+ * failure report. Clicking the item closes the menu, so the a11y audit
+ * runs on the settled state: a held-open modal menu aria-hides the page
+ * behind it, which axe reports as aria-hidden-focus.
  */
-async function downloadQrAndAwaitToast({
+async function downloadQrAndExpectErrorReport({
   canvasElement,
 }: {
   readonly canvasElement: HTMLElement;
@@ -48,9 +71,9 @@ async function downloadQrAndAwaitToast({
       name: 'Download QR Code',
     })
   );
-  await expect(
-    await within(document.body).findByText('Unable to download QR code')
-  ).toBeVisible();
+  await waitFor(() =>
+    expect(toast.error).toHaveBeenCalledWith('Unable to download QR code')
+  );
 }
 
 function ProfileSidebarHeaderDemo({
@@ -115,20 +138,24 @@ export const EmptyIdentity: Story = {
   },
 };
 
-/** The QR service answers with an error: the menu reports it in a toast. */
+/** The QR image read fails: the menu reports it as an error toast. */
 export const ErrorQrDownload: Story = {
-  beforeEach: () =>
-    stubQrFetch(async () => new Response(null, { status: 500 })),
-  play: downloadQrAndAwaitToast,
+  beforeEach: () => {
+    clearAllMocks();
+    return stubQrFetch(async () => new Response(null, { status: 500 }));
+  },
+  play: downloadQrAndExpectErrorReport,
 };
 
-/** Offline: the QR request never reaches the service. */
+/** Offline: the QR image read never completes. */
 export const OfflineQrDownload: Story = {
-  beforeEach: () =>
-    stubQrFetch(async () => {
+  beforeEach: () => {
+    clearAllMocks();
+    return stubQrFetch(async () => {
       throw new TypeError('Failed to fetch');
-    }),
-  play: downloadQrAndAwaitToast,
+    });
+  },
+  play: downloadQrAndExpectErrorReport,
 };
 
 export const LongContentName: Story = {
