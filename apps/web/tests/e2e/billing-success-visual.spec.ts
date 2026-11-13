@@ -28,6 +28,8 @@ for (const viewport of [
       await checkoutReady;
       await route.fulfill({
         json: {
+          status: 'confirmed',
+          paymentStatus: 'paid',
           plan: 'pro',
           needsProfile: false,
           proofPending: false,
