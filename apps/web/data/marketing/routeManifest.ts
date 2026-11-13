@@ -254,13 +254,7 @@ export interface RouteManifestEntry {
       readonly hiddenWhen: 'scripting-enabled';
     }[];
     readonly allowedFinalPaths?: readonly string[];
-    /**
-     * Set when the single redirect destination is an app route outside this
-     * manifest's static-marketing scope (e.g. the (dynamic)/start onboarding
-     * chat), so the destination cannot carry its own manifest recipe entry.
-     * Fail-closed without it: a redirect destination with no canonical
-     * manifest page drops the entry from the exact capture set.
-     */
+    /** Redirect destination is an app route outside this manifest (e.g. /start, the (dynamic)/ onboarding chat); fail-closed without it when no canonical manifest page exists. */
     readonly destinationIsAppRoute?: boolean;
     readonly allowsAuthShell?: boolean;
     readonly requiresSharedChrome?: boolean;
@@ -1722,13 +1716,9 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
       path: '/waitlist',
       expected: 'redirect',
       allowedFinalPaths: ['/start'],
-      // One front door (Tim, 2026-11-09): /start is the (dynamic)/ onboarding
-      // chat — outside this manifest's static-marketing scope (the global page
-      // contract pins the manifest to the four static route roots), so the
-      // destination cannot carry its own manifest recipe entry. Declared
-      // explicitly here; the cert still follows the redirect and certifies
-      // the /start DOM, and /start's own journey stays covered by the
-      // auth/onboarding canaries and the claim checkout dogfood.
+      // One front door (Tim, 2026-11-09): /start is the (dynamic)/ onboarding chat —
+      // outside this manifest (global page contract pins the static roots); the cert
+      // follows the redirect and certifies the /start DOM. Canaries cover /start itself.
       destinationIsAppRoute: true,
       waitFor: '[data-testid="onboarding-chat"]',
       allowsAuthShell: true,
@@ -2226,17 +2216,14 @@ export function getMarketingExactPublicRouteTargets(
       const canonical = manifest.find(
         candidate => candidate.url === destination
       );
-      // App-route destinations (e.g. /start) are declared explicitly and stay
-      // outside this manifest; everything else must resolve to a canonical
-      // active manifest page or the entry is dropped fail-closed.
-      const declaredAppRouteDestination =
-        entry.healthCheck?.destinationIsAppRoute === true;
+      if (isRenderFixturePathname(destination)) return [];
+      // App-route destinations (e.g. /start) are declared explicitly; anything
+      // else must resolve to a canonical active manifest page, fail-closed.
       if (
-        !declaredAppRouteDestination &&
+        !entry.healthCheck?.destinationIsAppRoute &&
         (!canonical ||
           canonical.status !== 'active' ||
-          (canonical.healthCheck?.expected ?? 'page') !== 'page' ||
-          isRenderFixturePathname(destination))
+          (canonical.healthCheck?.expected ?? 'page') !== 'page')
       )
         return [];
       expectedPath = destination;
