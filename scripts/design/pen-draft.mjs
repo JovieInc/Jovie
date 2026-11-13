@@ -14,6 +14,8 @@
  *   node scripts/design/pen-draft.mjs --out DIR [--only claim,homepage]
  *   node scripts/design/pen-draft.mjs --plan [--changed FILE] [--only ...]
  *
+ * The Pen agent runs on Fable 5.2; PEN_DRAFT_MODEL names another model.
+ *
  * With PEN_DRAFT_TRIM=1 a draft starts from a cut-down copy of the canonical
  * file (components, related screens, variables) and the new frame is spliced
  * back into the full file. It is off by default: it did not stop the Pen
@@ -34,7 +36,13 @@ import {
 import { basename, dirname, join, resolve } from 'node:path';
 import { parseArgs } from 'node:util';
 
-export const PEN_CLI_VERSION = '0.3.14';
+// 0.3.16 is the first Pen CLI that lists claude-fable-5-2; older ones reject
+// it as an unknown model.
+export const PEN_CLI_VERSION = '0.3.16';
+// The CLI's own default is claude-opus-5-5, whose weekly limit on the
+// subscription was spent on Nov 12: every frame of run 43305192409 ended
+// "Agent failed: rate_limit". Fable 5.2 has its own limit (Tim, 2026-11-12).
+export const PEN_DRAFT_MODEL = 'claude-fable-5-2';
 export const PEN_MAX_FAILED_CALLS = 30;
 export const BRIEFS_DIR = 'docs/design-system/pen-briefs';
 export const MANIFEST = 'docs/pen-stills/golden-path/manifest.json';
@@ -127,7 +135,10 @@ export function planFrames({ briefs, changed = null, only = null }) {
 }
 
 /** The pen arguments for one brief, drafting into its own output file. */
-export function penArgs(brief, { input, outDir, trim = false }) {
+export function penArgs(
+  brief,
+  { input, outDir, trim = false, model = PEN_DRAFT_MODEL }
+) {
   return [
     '-y',
     `@pen.dev/cli@${PEN_CLI_VERSION}`,
@@ -136,8 +147,12 @@ export function penArgs(brief, { input, outDir, trim = false }) {
     join(outDir, `${brief.frame}.pen`),
     '--prompt',
     `Add a new top-level frame named "${brief.frame}" (route ${brief.route ?? 'n/a'}). Leave every existing frame untouched.${trim ? " This file holds the design system's components and the screens this frame builds on, not every screen." : ''}\n\n${LOAD_NOTE}\n\n${brief.prompt}`,
+    // Used only if --model is ever dropped; the CLI infers the agent from
+    // the model id.
     '--agent',
     'claude',
+    '--model',
+    model,
     '--export',
     join(outDir, `${brief.frame}.png`),
     '--usage',
@@ -149,6 +164,11 @@ export function penArgs(brief, { input, outDir, trim = false }) {
     '--max-failed-calls',
     String(PEN_MAX_FAILED_CALLS),
   ];
+}
+
+/** The model the Pen agent runs on: PEN_DRAFT_MODEL, else Fable 5.2. */
+export function penModel(env) {
+  return env.PEN_DRAFT_MODEL?.trim() || PEN_DRAFT_MODEL;
 }
 
 /** The cut-down input is opt-in, with PEN_DRAFT_TRIM=1. */
@@ -421,6 +441,8 @@ async function main() {
   // Off by default: on Nov 8, 0 of 13 drafts from the cut-down copy drew a
   // frame, against 5 of 18 from the whole file, so the copy is opt-in.
   const trim = useTrimmedInput(process.env);
+  const model = penModel(process.env);
+  console.log(`pen-draft: the Pen agent runs on ${model}`);
 
   for (const brief of briefs) {
     const startedAt = Date.now();
@@ -456,13 +478,17 @@ async function main() {
       row.attempts = attempt;
       delete row.error;
       try {
-        execFileSync('npx', penArgs(brief, { input: from, outDir, trim }), {
-          stdio: ['ignore', 'inherit', 'inherit'],
-          timeout,
-          // Workspace fonts and images resolve relative to the .pen file.
-          cwd: dirname(input),
-          env: { ...process.env, NODE_OPTIONS: PEN_NODE_OPTIONS },
-        });
+        execFileSync(
+          'npx',
+          penArgs(brief, { input: from, outDir, trim, model }),
+          {
+            stdio: ['ignore', 'inherit', 'inherit'],
+            timeout,
+            // Workspace fonts and images resolve relative to the .pen file.
+            cwd: dirname(input),
+            env: { ...process.env, NODE_OPTIONS: PEN_NODE_OPTIONS },
+          }
+        );
         const missing = missingOutputs(brief, outDir);
         const problem = missing.length
           ? `pen wrote no ${missing.join(' or ')}`

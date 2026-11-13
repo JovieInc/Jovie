@@ -12,8 +12,11 @@ import {
   loadBriefs,
   missingOutputs,
   missingSecrets,
+  PEN_CLI_VERSION,
+  PEN_DRAFT_MODEL,
   parseBrief,
   penArgs,
+  penModel,
   planFrames,
   spliceDraft,
   trimCanonical,
@@ -58,7 +61,7 @@ test('pen draws into its own file from the canonical input and keeps other frame
   );
   assert.deepEqual(args.slice(0, 6), [
     '-y',
-    '@pen.dev/cli@0.3.14',
+    `@pen.dev/cli@${PEN_CLI_VERSION}`,
     '--in',
     'c.pen',
     '--out',
@@ -69,6 +72,24 @@ test('pen draws into its own file from the canonical input and keeps other frame
     /Leave every existing frame untouched/
   );
   assert.equal(args[args.indexOf('--export') + 1], 'o/claim.png');
+});
+
+test('the Pen agent drafts on Fable 5.2 unless PEN_DRAFT_MODEL names another model', () => {
+  // Run 43305192409: the CLI's default model, claude-opus-5-5, had spent the
+  // subscription's weekly limit, so every frame ended "Agent failed: rate_limit".
+  assert.equal(PEN_DRAFT_MODEL, 'claude-fable-5-2');
+  assert.equal(penModel({}), 'claude-fable-5-2');
+  assert.equal(penModel({ PEN_DRAFT_MODEL: ' ' }), 'claude-fable-5-2');
+  assert.equal(penModel({ PEN_DRAFT_MODEL: 'gpt-5.5' }), 'gpt-5.5');
+  const brief = { frame: 'claim', prompt: 'P' };
+  const opts = { input: 'i.pen', outDir: 'o' };
+  const args = penArgs(brief, opts);
+  assert.equal(args[args.indexOf('--model') + 1], 'claude-fable-5-2');
+  const other = penArgs(brief, { ...opts, model: 'gpt-5.5' });
+  assert.equal(other[other.indexOf('--model') + 1], 'gpt-5.5');
+  // Pen CLI 0.3.14 doesn't list claude-fable-5-2 and rejects unknown models.
+  const [major, minor, patch] = PEN_CLI_VERSION.split('.').map(Number);
+  assert.ok(major > 0 || minor > 3 || (minor === 3 && patch >= 16));
 });
 
 test('the Pen agent sees why a tool call failed and has room to recover', () => {
