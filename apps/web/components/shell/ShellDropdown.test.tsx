@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { ShellDropdown } from './ShellDropdown';
@@ -48,5 +50,21 @@ describe('ShellDropdown', () => {
     fireEvent.change(filter, { target: { value: 'spot' } });
     fireEvent.click(screen.getByRole('button', { name: 'Clear Filter' }));
     expect(filter).toHaveValue('');
+  });
+
+  it('shares the DS menu row geometry: concentric radius and 8px icon gap', () => {
+    // Surface is --radius-xl with a --space-1 inset, so rows take the
+    // matching inner radius, like OVERLAY_ITEM_RADIUS in packages/ui.
+    const css = readFileSync(
+      resolve(__dirname, '../../styles/system-b-app.css'),
+      'utf8'
+    );
+    const row = /:where\(\.system-b-shell-dropdown-row\) \{[^}]*\}/.exec(
+      css
+    )?.[0];
+    expect(row).toContain(
+      'border-radius: var(--system-b-radius-overlay-inner);'
+    );
+    expect(row).toContain('gap: var(--space-2);');
   });
 });

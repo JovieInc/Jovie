@@ -22,6 +22,7 @@ import { musicFetchEnrichmentPayloadSchema } from '@/lib/dsp-enrichment/jobs/mus
 import { processReleaseEnrichmentJob } from '@/lib/dsp-enrichment/jobs/release-enrichment';
 import { processSendClaimInviteJob } from '@/lib/email/jobs/send-claim-invite';
 import { processWaitlistEmailJob } from '@/lib/waitlist/email-jobs';
+import { processWaitlistWinbackEmailJob } from '@/lib/waitlist/winback-email-job';
 import { processBeaconsJob } from './jobs/beacons';
 import { processLayloJob } from './jobs/laylo';
 import { processTikTokJob } from './jobs/tiktok';
@@ -117,6 +118,10 @@ export async function processJob(
       return processSendClaimInviteJob(conn, job.payload);
     case 'send_waitlist_email':
       return processWaitlistEmailJob(conn, job.payload, { jobId: job.id });
+    case 'send_waitlist_winback_email':
+      return processWaitlistWinbackEmailJob(conn, job.payload, {
+        jobId: job.id,
+      });
     case 'dsp_artist_discovery':
       return processDspArtistDiscoveryJob(conn, job.payload);
     case 'dsp_track_enrichment': {

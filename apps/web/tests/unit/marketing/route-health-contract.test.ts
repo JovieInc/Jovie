@@ -234,6 +234,14 @@ describe('marketing route health contract', () => {
         allowsAuthShell: false,
         requiresSharedChrome: false,
       },
+      {
+        glob: 'waitlist/page.tsx',
+        path: '/waitlist',
+        expected: 'redirect',
+        allowedFinalPaths: ['/start'],
+        allowsAuthShell: true,
+        requiresSharedChrome: false,
+      },
       ...['/demo/video', '/demovideo'].map(path => ({
         glob: `(marketing)${path}/page.tsx`,
         path,
@@ -250,21 +258,23 @@ describe('marketing route health contract', () => {
       )
     ).toMatchObject({
       path: '/waitlist',
-      expected: 'page',
+      expected: 'redirect',
+      allowedFinalPaths: ['/start'],
       allowsAuthShell: true,
       requiresSharedChrome: false,
     });
 
-    for (const [url, selector] of [
-      ['/pay', '[data-testid="pay-hero"]'],
-      ['/support', '[data-testid="marketing-section-hero"]'],
-      ['/waitlist', '#auth-form'],
+    for (const [url, selector, finalPath] of [
+      ['/pay', '[data-testid="pay-hero"]', '/pay'],
+      ['/support', '[data-testid="marketing-section-hero"]', '/support'],
+      // One front door: /waitlist capture follows the redirect to /start.
+      ['/waitlist', '[data-testid="onboarding-chat"]', '/start'],
     ] as const) {
       expect(
         MARKETING_EXACT_PUBLIC_ROUTE_TARGETS.find(target => target.url === url)
       ).toMatchObject({
         fixturePath: url,
-        expectedPath: url,
+        expectedPath: finalPath,
         expectedRuntimeSelector: selector,
         sourceSha: 'capture-time-git-sha',
         viewports: ['desktop', 'mobile'],
@@ -343,6 +353,15 @@ describe('marketing route health contract', () => {
       if (entry.status === 'active' && target.expected === 'redirect') {
         expect(target.allowedFinalPaths.length).toBeGreaterThan(0);
         for (const path of target.allowedFinalPaths) {
+          // One front door (Tim, 2026-11-09): a redirect may declare an
+          // app-route destination outside this manifest
+          // (healthCheck.destinationIsAppRoute, e.g. /start — certified by
+          // the canaries + claim dogfood). Undeclared destinations must
+          // still be canonical active pages.
+          if (entry.healthCheck?.destinationIsAppRoute === true) {
+            expect(path.startsWith('/'), path).toBe(true);
+            continue;
+          }
           const destination = MARKETING_ROUTE_MANIFEST.find(
             entry => entry.url === path
           );
@@ -372,7 +391,9 @@ describe('marketing route health contract', () => {
     const expectedGlobs = MARKETING_ROUTE_MANIFEST.filter(
       entry =>
         entry.status === 'active' &&
-        (entry.healthCheck?.expected ?? 'page') === 'page' &&
+        ((entry.healthCheck?.expected ?? 'page') === 'page' ||
+          // Declared app-route recoveries (/waitlist -> /start) are captured.
+          entry.healthCheck?.destinationIsAppRoute === true) &&
         !entry.url.includes('*') &&
         entry.url !== '/renders' &&
         !entry.url.startsWith('/renders/')

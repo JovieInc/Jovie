@@ -154,7 +154,7 @@
   --app-shell-content-padding-y: 8px;
   --app-shell-content-surface: var(--linear-bg-surface-0);
   --app-shell-control-height-sm: 28px;
-  --app-shell-control-padding-x: 11px;
+  --app-shell-control-padding-x: 10px;
   --app-shell-control-radius: 9999px;
   --app-shell-toolbar-gap: 4px;
   --app-shell-audio-bar-max-height: 120px;

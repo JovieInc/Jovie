@@ -71,8 +71,10 @@ describe('self-serve artist claim routing', () => {
         }),
         'https://jov.ie'
       );
-      expect(anon.pathname).toBe('/signup');
-      expect(anon.searchParams.get('plan')).toBe('pro');
+      expect(anon.pathname).toBe('/start');
+      expect(anon.searchParams.get('starter_prompt')).toBe(
+        'I want to claim my profile.'
+      );
       expect(
         resolveClaimRedirect({
           viewer: signedIn,
@@ -97,18 +99,16 @@ describe('self-serve artist claim routing', () => {
   it('creates a new profile with Pro monthly intent for a new artist', () => {
     const href = resolveClaimRedirect({ viewer: anonymous, artist: artist() });
     const url = new URL(href, 'https://jov.ie');
-    expect(url.pathname).toBe('/signup');
-    expect(url.searchParams.get('plan')).toBe('pro');
-    expect(url.searchParams.get('interval')).toBe('month');
+    expect(url.pathname).toBe('/start');
     expect(url.searchParams.get('spotify_url')).toBe(
       'https://open.spotify.com/artist/4Z8W4fKeB5YxbusRsdQVPb'
     );
     expect(url.searchParams.get('artist_name')).toBe('Indie Artist');
   });
 
-  it('routes create-without-Spotify to signup or onboarding', () => {
+  it('routes create-without-Spotify to the /start onboarding chat', () => {
     expect(resolveClaimRedirect({ viewer: anonymous, artist: null })).toBe(
-      '/signup?plan=pro&interval=month'
+      `/start?${new URLSearchParams({ starter_prompt: 'I want to claim my profile.' })}`
     );
     expect(resolveClaimRedirect({ viewer: signedIn, artist: null })).toBe(
       '/start'
