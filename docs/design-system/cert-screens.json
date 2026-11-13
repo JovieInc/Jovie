@@ -106,7 +106,6 @@
     "apps/web/components/features/profile/DesktopQrOverlay.tsx": "a11y,ds-owner,states,tests,tokens",
     "apps/web/components/features/profile/ProfileAboutShare.tsx": "a11y,ds-owner,states,tests",
     "apps/web/components/features/profile/ProfileDrawerShell.tsx": "a11y,ds-owner,states,tests,tokens",
-    "apps/web/components/features/profile/ProfileIdentityHeader.tsx": "ds-owner",
     "apps/web/components/features/profile/ProfileUnifiedDrawer.tsx": "a11y,ds-owner,states,tests",
     "apps/web/components/features/profile/artist-notifications-cta/ProfileInlineNotificationsCTA.tsx": "a11y,ds-owner,states,tests,tokens",
     "apps/web/components/features/profile/artist-notifications-cta/ProfileMobileNotificationsFlow.tsx": "a11y,ds-owner,frontend-rules,states,tests,tokens",
@@ -148,7 +147,6 @@
     "apps/web/components/molecules/GenrePicker.tsx": "a11y,ds-owner,frontend-rules,states,tests",
     "apps/web/components/molecules/LocationPicker.tsx": "a11y,ds-owner,forced-caps,frontend-rules,states,tests",
     "apps/web/components/molecules/MerchPricingPresetPicker.tsx": "a11y,ds-owner,frontend-rules,states,tests",
-    "apps/web/components/molecules/MobileNav.tsx": "ds-owner",
     "apps/web/components/molecules/ReleaseDueBadge.tsx": "a11y,ds-owner,states,tests,tokens",
     "apps/web/components/molecules/WorkspaceSelector.tsx": "a11y,ds-owner,states,tests",
     "apps/web/components/molecules/drawer/CollapsibleSectionHeading.tsx": "a11y,ds-owner,states",
@@ -161,7 +159,6 @@
     "apps/web/components/organisms/CmdKMainPlaneSearchInput.tsx": "ds-owner,states",
     "apps/web/components/organisms/CmdKPalette.tsx": "a11y,ds-owner,frontend-rules,states",
     "apps/web/components/organisms/DesktopTitlebar.tsx": "a11y,ds-owner,states,tests,tokens",
-    "apps/web/components/organisms/HeaderNav.tsx": "ds-owner",
     "apps/web/components/organisms/OperatorListsNav.tsx": "a11y,ds-owner,frontend-rules,states",
     "apps/web/components/organisms/PaySection.tsx": "a11y,ds-owner,frontend-rules,states,tests",
     "apps/web/components/organisms/PersistentAudioBar.tsx": "a11y,ds-owner,states,tests",
@@ -172,7 +169,6 @@
     "apps/web/components/organisms/entity-card/EntityCard.tsx": "a11y,ds-owner,forced-caps,states",
     "apps/web/components/organisms/table/atoms/ShellListRowFrame.tsx": "a11y,ds-owner,states,tests",
     "apps/web/components/organisms/table/molecules/TableHeaderCell.tsx": "a11y,ds-owner,states",
-    "apps/web/components/organisms/user-button/UserButton.tsx": "ds-owner",
     "apps/web/components/providers/ErrorBoundary.tsx": "a11y,ds-owner,states,tests",
     "apps/web/components/shell/ContextMenuOverlay.tsx": "a11y,ds-owner,forced-caps,states",
     "apps/web/components/shell/DictationWaveform.tsx": "tokens",
@@ -180,7 +176,6 @@
     "apps/web/components/shell/IconBtn.tsx": "a11y,ds-owner,states",
     "apps/web/components/shell/ScrubGradient.tsx": "a11y,ds-owner,frontend-rules,states,tests,tokens",
     "apps/web/components/shell/SidebarNavItem.tsx": "a11y,ds-owner,states",
-    "apps/web/components/shell/SidebarThreadsSection.tsx": "a11y,states,tokens",
-    "apps/web/components/site/theme-toggle/ThemeToggleSegmented.tsx": "ds-owner"
+    "apps/web/components/shell/SidebarThreadsSection.tsx": "a11y,states,tokens"
   }
 }
