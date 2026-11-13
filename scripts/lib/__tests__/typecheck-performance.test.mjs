@@ -75,16 +75,51 @@ describe('typecheck performance', () => {
           scenarios: { ci: { baselineP95Ms: 1, targetP95Ms: 1 } },
         })
       );
-      // /bin/sh + sleep keeps per-sample spawn cost at ~5 ms regardless of
-      // runner load; a node-based shim boots the interpreter per sample and
-      // that boot is load-sensitive enough (three round-one samples plus a
-      // confirmation round sharing one budget) to consume the whole deadline
-      // inside round one, leaving confirmations empty on loaded merge-queue
-      // runners (2026-11-13). Three round-one samples take ~3.1 s of the
-      // 3.5 s shared budget and the remaining ~0.4 s can never fit another
-      // 1 s sample, so the deadline deterministically interrupts the
-      // confirmation round while round one still completes with ~0.4 s slack.
-      writeFileSync(join(directory, 'corepack'), '#!/bin/sh\nsleep 1\n');
+      // Deterministic clock/runner fixtures (JOV-12511) replace the old
+      // wall-clock choreography (three 1 s sleeps inside one shared 3.5 s
+      // budget). That choreography kept ~0.4 s of cumulative slack for round
+      // one, which vanished on loaded merge-queue runners and left the
+      // confirmation round unattempted (confirmations=[]). Here the shared
+      // deadline runs on a VIRTUAL clock that advances only when the runner
+      // consumes workload: each round-one sample advances it 1000 ms and
+      // exits, so after three samples 3000 < 3500 and the confirmation round
+      // always starts; its sample no longer fits the remaining virtual
+      // budget, so the runner stalls and the REAL 500 ms per-sample timeout
+      // kills it. Load can stretch no cumulative budget — the deadline is
+      // virtual and every real-time margin is per-sample (~1500 ms budget vs
+      // a ~5 ms workload, then a 500 ms kill against a 30 s stall).
+      writeFileSync(
+        join(directory, 'virtual-clock.mjs'),
+        [
+          "import { readFileSync } from 'node:fs';",
+          '',
+          'const state = ' +
+            JSON.stringify(join(directory, 'clock-state')) +
+            ';',
+          '',
+          "export const now = () => Number(readFileSync(state, 'utf8'));",
+          '',
+        ].join('\n')
+      );
+      writeFileSync(join(directory, 'clock-state'), '0');
+      writeFileSync(
+        join(directory, 'corepack'),
+        [
+          '#!/bin/sh',
+          '# Virtual workload: consume 1000 ms of the shared virtual clock, exit',
+          '# when the workload still fits the deadline, and stall (until the real',
+          '# per-sample timeout kills us) once it no longer does — mirroring a',
+          '# real measurement that overruns the shared deadline.',
+          `state=${JSON.stringify(join(directory, 'clock-state'))}`,
+          'clock=$(( $(cat "$state") + 1000 ))',
+          'printf \'%s\\n\' "$clock" > "$state"',
+          'if [ "$clock" -le 3500 ]; then',
+          '  exit 0',
+          'fi',
+          'exec sleep 30',
+          '',
+        ].join('\n')
+      );
       chmodSync(join(directory, 'corepack'), 0o755);
       const output = join(directory, 'report.json');
       const result = spawnSync(
@@ -103,9 +138,13 @@ describe('typecheck performance', () => {
         ],
         {
           encoding: 'utf8',
-          env: { ...process.env, PATH: `${directory}:${process.env.PATH}` },
-          // Harness slack only: the 3.5 s shared budget plus boot fits well
-          // inside 30 s even on loaded runners; the assertions are unchanged.
+          env: {
+            ...process.env,
+            PATH: `${directory}:${process.env.PATH}`,
+            TYPECHECK_PERFORMANCE_CLOCK: join(directory, 'virtual-clock.mjs'),
+          },
+          // Harness slack only: the fixture completes in about a second even
+          // on loaded runners; the assertions are unchanged.
           timeout: 30000,
         }
       );
