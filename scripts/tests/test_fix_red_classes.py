@@ -15,6 +15,16 @@ def pr(*names, merge="BLOCKED"):
 
 
 class ClassifyTest(unittest.TestCase):
+    def test_internal_stamp_accepts_schema_mentions_but_preserves_existing_notes(self):
+        body = "Repair the customer-changelog/v1 decision.\n"
+        self.assertEqual(classes.stamp_internal_changelog(body), body + classes.INTERNAL_CHANGELOG_NOTE + "\n")
+        for note in ('<!-- customer-changelog/v1 {"releaseWorthy":true} -->',
+                     '<!-- customer-changelog/v1 malformed -->',
+                     '<!--\ncustomer-changelog/v1 {"releaseWorthy":false}\n-->',
+                     '<!-- customer-changelog/v1 {"releaseWorthy":true}'):
+            with self.subTest(note=note):
+                self.assertIsNone(classes.stamp_internal_changelog(body + note))
+
     def test_signatures_map_to_classes_and_actions(self):
         cases = {
             "github-quota-deferred; fleet evidence retry": ("quota-deferred", "rerun"),

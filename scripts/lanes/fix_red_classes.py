@@ -178,7 +178,7 @@ def real_failures(pr: dict) -> list[dict]:
 def stamp_internal_changelog(body) -> str | None:
     """Append the internal customer-changelog note. None when `body` is not a string or already
     contains a note (a second note is an ambiguous contract, not a stamp)."""
-    if not isinstance(body, str) or "customer-changelog/v1" in body:
+    if not isinstance(body, str) or re.search(r"<!--\s*customer-changelog/v1\b", body):
         return None
     if body and not body.endswith("\n"):
         body += "\n"
