@@ -432,6 +432,37 @@ class AdditiveStatementMergeTest(unittest.TestCase):
         merged = statements.resolve_additive_statements_text(text)
         self.assertEqual(merged, "before\n" + theirs + ours + "middle\n" + mock_theirs + mock_ours + "after\n" + expect_theirs + expect_ours)
 
+    def test_unions_an_import_and_accepts_route_group_paths(self):
+        imported = "import { getRequestSession } from '@/lib/auth/request-session';\n"
+        mocks = (
+            "const winbackMocks = vi.hoisted(() => ({ resolveWinbackResumeToken: vi.fn() }));\n"
+            "vi.mock('@/lib/waitlist/winback-resume.server', () => ({\n"
+            "  resolveWinbackResumeToken: winbackMocks.resolveWinbackResumeToken,\n"
+            "}));\n"
+        )
+        merge = statements.resolve_additive_statements_text
+        self.assertEqual(merge(self.conflict(imported, mocks)), mocks + imported)
+        self.assertEqual(merge(self.conflict(imported, imported)), imported)
+        self.assertIsNone(merge(self.conflict(
+            imported, "import { other } from '@/lib/auth/request-session';\n")))
+        self.assertIsNone(merge(self.conflict(
+            "import {\n  getRequestSession,\n} from '@/lib/auth/request-session';\n", mocks)))
+        calls = []
+
+        def sh(args, **_kwargs):
+            calls.append(args)
+            return SimpleNamespace(returncode=1, stdout="")
+
+        for rel in (
+            "apps/web/app/(dynamic)/start/page.test.ts",
+            "apps/web/app/[username]/page.test.tsx",
+            "apps/web/app/(.)photo/page.test.ts",
+            "README.md",
+        ):
+            calls.clear()
+            self.assertIsNone(edits.resolve_additive_statement_file(Path("."), rel, sh))
+            self.assertEqual(bool(calls), rel != "README.md")
+
     def test_edits_control_flow_and_unknown_shapes_stay_unresolved(self):
         added = "const head = vi.fn();\n"
         for value in (

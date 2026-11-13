@@ -3,9 +3,9 @@ import { headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { OnboardingSessionBoundary } from '@/components/features/onboarding/OnboardingSessionBoundary';
 import { getStartRouteRedirect } from '@/lib/auth/access-route-redirect';
-import { auth } from '@/lib/auth/better-auth';
 import { CanonicalUserState } from '@/lib/auth/canonical-user-state';
 import { resolveUserState } from '@/lib/auth/gate';
+import { getRequestSession } from '@/lib/auth/request-session';
 import { captureWarning } from '@/lib/error-tracking';
 import { getCurrentOnboardingSessionId } from '@/lib/onboarding/session';
 import { resolveStartEntryHandoff } from '@/lib/onboarding/start-entry-handoff';
@@ -58,8 +58,8 @@ async function resolveSyntheticTurnstileTestMode(
   isSignedIn: boolean
 ): Promise<boolean> {
   try {
-    const requestHeaders = await headers();
     if (!isSignedIn) {
+      const requestHeaders = await headers();
       // Production certification canary token (JOV-9625). Verify-only here;
       // /api/chat consumes it before accepting a test-mode token.
       return (
@@ -68,7 +68,9 @@ async function resolveSyntheticTurnstileTestMode(
         })) !== null
       );
     }
-    const session = await auth.api.getSession({ headers: requestHeaders });
+    // Same cookie-mode read the auth gate already made for this request, so
+    // this reuses its result instead of asking Better Auth a second time.
+    const session = await getRequestSession('cookie');
     return (await resolveSyntheticPassage(session, 'onboarding_chat')) !== null;
   } catch (error) {
     await captureWarning(

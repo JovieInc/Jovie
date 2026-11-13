@@ -1,15 +1,8 @@
 'use client';
 
 import { shortTooltipTitle } from '@jovie/copy/tooltip-copy';
-import { Button, IconButton } from '@jovie/ui';
-import {
-  ArrowUp,
-  AudioLines,
-  ChevronDown,
-  ChevronUp,
-  Download,
-  X,
-} from 'lucide-react';
+import { IconButton } from '@jovie/ui';
+import { ArrowUp, AudioLines, Download, X } from 'lucide-react';
 import Link from 'next/link';
 import {
   type ReactNode,
@@ -21,7 +14,6 @@ import {
 } from 'react';
 import { banner } from '@/components/feedback/banner-store';
 import { APP_ROUTES } from '@/constants/routes';
-import type { DesktopUpdateViewState } from '@/lib/desktop/desktop-updates';
 import { useReducedMotion } from '@/lib/hooks/useReducedMotion';
 import type { WhatsNewEntry } from '@/lib/whats-new';
 import { InstallBanner } from './InstallBanner';
@@ -35,8 +27,8 @@ export interface SidebarDockStatus {
 export interface SidebarDockProps {
   readonly userId: string;
   readonly collapsed?: boolean;
-  readonly update?: DesktopUpdateViewState;
-  readonly onUpdate?: () => void;
+  /** The desktop app's one update control; absent in web builds. */
+  readonly updateControl?: SidebarDockUpdateControl;
   readonly release?: WhatsNewEntry | null;
   readonly audio?: React.ComponentProps<typeof SidebarBottomNowPlaying> & {
     readonly reserved?: boolean;
@@ -49,6 +41,16 @@ export interface SidebarDockProps {
   readonly children?: (status: SidebarDockStatus | undefined) => ReactNode;
 }
 
+export interface SidebarDockUpdateControl {
+  /** False while the updater has nothing to show. */
+  readonly visible: boolean;
+  /** Status for the notice bus and the collapsed rail's badge label. */
+  readonly label: string | null;
+  /** A failure outranks the other sidebar notices. */
+  readonly urgent: boolean;
+  readonly node: ReactNode;
+}
+
 export function sidebarDockSeenKey(userId: string): string {
   return `jovie.sidebarDock.${encodeURIComponent(userId)}.seenRelease`;
 }
@@ -57,8 +59,7 @@ export function sidebarDockSeenKey(userId: string): string {
 export function SidebarDock({
   userId,
   collapsed = false,
-  update,
-  onUpdate,
+  updateControl,
   release,
   audio,
   install,
@@ -71,8 +72,6 @@ export function SidebarDock({
   const [seen, setSeen] = useState<{ key: string; id: string | null } | null>(
     null
   );
-  const [compactUpdate, setCompactUpdate] = useState(false);
-  const [dismissedUpdate, setDismissedUpdate] = useState<string | null>(null);
   const key = sidebarDockSeenKey(userId);
 
   useEffect(() => {
@@ -86,21 +85,9 @@ export function SidebarDock({
   const showRelease = Boolean(
     userId && release && seen?.key === key && seen.id !== release.id
   );
-  const updateLabel =
-    update?.state === 'available'
-      ? 'Update available'
-      : update?.state === 'downloading'
-        ? `Downloading ${Math.round(update.percent)}%`
-        : update?.state === 'ready'
-          ? 'Restart to update'
-          : update?.state === 'error'
-            ? 'Update failed'
-            : null;
-  const updateId =
-    update?.state === 'available' ? `${userId}:${update.version}` : null;
-  const showUpdate = Boolean(
-    updateLabel && (!updateId || dismissedUpdate !== updateId)
-  );
+  const updateLabel = updateControl?.visible ? updateControl.label : null;
+  const updateUrgent = updateControl?.urgent ?? false;
+  const showUpdate = Boolean(updateLabel);
   const activeNotice = useSyncExternalStore(
     banner.subscribe,
     banner.getActiveBanner,
@@ -113,11 +100,11 @@ export function SidebarDock({
       banner.show({
         id,
         title: updateLabel,
-        priority: update?.state === 'error' ? 1000 : 300,
+        priority: updateUrgent ? 1000 : 300,
         placement: 'sidebar',
       });
     return () => banner.dismiss(id);
-  }, [noticePrefix, showUpdate, collapsed, updateLabel, update?.state]);
+  }, [noticePrefix, showUpdate, collapsed, updateLabel, updateUrgent]);
   useEffect(() => {
     const id = `${noticePrefix}release`;
     if (showRelease && !collapsed)
@@ -162,10 +149,10 @@ export function SidebarDock({
   useLayoutEffect(() => {
     const region = regionRef.current;
     if (!region) return;
-    const stack = `${compactUpdate}|${Array.from(
+    const stack = Array.from(
       region.querySelectorAll<HTMLElement>('[data-dock-card]'),
       card => card.dataset.dockCard
-    ).join()}`;
+    ).join();
     if (stack === measuredStack.current) return;
     measuredStack.current = stack;
     const style = getComputedStyle(region);
@@ -267,49 +254,10 @@ export function SidebarDock({
           <section
             data-dock-card='update'
             aria-label='App Update'
-            className='rounded-md border border-subtle bg-sidebar p-2'
+            // min-h-9 holds the control's fixed row while its chunk loads.
+            className='min-h-9 rounded-md border border-subtle bg-sidebar px-2'
           >
-            <div className='flex min-w-0 items-center gap-1'>
-              <Button
-                size='sm'
-                variant='ghost'
-                onClick={onUpdate}
-                className='min-w-0 flex-1 justify-start'
-              >
-                <span className='tabular-nums'>{updateLabel}</span>
-              </Button>
-              <IconButton
-                size='sm'
-                ariaLabel={compactUpdate ? 'Expand update' : 'Collapse update'}
-                aria-expanded={!compactUpdate}
-                onClick={() => setCompactUpdate(value => !value)}
-              >
-                {compactUpdate ? (
-                  <ChevronUp className='size-3' />
-                ) : (
-                  <ChevronDown className='size-3' />
-                )}
-              </IconButton>
-              {update?.state === 'available' ? (
-                <IconButton
-                  size='sm'
-                  ariaLabel='Dismiss update'
-                  onClick={() => {
-                    returnFocus();
-                    setDismissedUpdate(updateId);
-                  }}
-                >
-                  <X className='size-3' />
-                </IconButton>
-              ) : null}
-            </div>
-            {!compactUpdate ? (
-              <p className='text-2xs text-secondary-token'>
-                {update?.state === 'error'
-                  ? 'Open update details to try again.'
-                  : 'Open update details.'}
-              </p>
-            ) : null}
+            {updateControl?.node}
           </section>
         ) : null}
         {!collapsed && showRelease && release && selected('release') ? (

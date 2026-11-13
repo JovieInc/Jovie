@@ -998,6 +998,14 @@
       "classification": "C"
     },
     {
+      "source": "apps/web/app/[username]/profile-miss/page.tsx",
+      "kind": "page",
+      "route": "/[username]/profile-miss",
+      "methods": [],
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
       "source": "apps/web/app/[username]/profile-mode-render/[profileMode]/[marker]/page.tsx",
       "kind": "page",
       "route": "/[username]/profile-mode-render/[profileMode]/[marker]",

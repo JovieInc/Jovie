@@ -1458,8 +1458,8 @@
 }
 
 :where(.system-b-library-action--icon) {
-  width: calc(var(--space-6) + var(--space-1));
-  height: calc(var(--space-6) + var(--space-1));
+  width: var(--app-shell-control-height-sm);
+  height: var(--app-shell-control-height-sm);
   padding-inline: 0;
 }
 
@@ -2145,8 +2145,8 @@
   cursor: default;
   user-select: none;
   align-items: center;
-  gap: var(--space-2-5);
-  border-radius: var(--radius-md);
+  gap: var(--space-2);
+  border-radius: var(--system-b-radius-overlay-inner);
   padding-inline: var(--space-2);
   color: var(--color-text-secondary-token);
   font-family: var(--font-caption);
@@ -3074,7 +3074,7 @@
   overflow-wrap: anywhere;
   color: var(--color-text-primary-token);
   font-size: var(--text-xs);
-  line-height: var(--line-height-relaxed);
+  line-height: var(--leading-relaxed);
 }
 
 :where(.system-b-chat-pitch-block-text[data-clamped="true"]) {
@@ -3153,7 +3153,7 @@
   display: block;
   color: var(--color-text-primary-token);
   font-size: var(--text-sm);
-  line-height: var(--line-height-normal);
+  line-height: var(--leading-normal);
 }
 
 :where(.system-b-chat-pitch-error-title) {
@@ -3185,14 +3185,14 @@
   margin: 0;
   color: var(--color-text-primary-token);
   font-size: var(--text-sm);
-  line-height: var(--line-height-normal);
+  line-height: var(--leading-normal);
 }
 
 :where(.system-b-chat-artifact-error) {
   display: block;
   color: var(--color-text-primary-token);
   font-size: var(--text-sm);
-  line-height: var(--line-height-normal);
+  line-height: var(--leading-normal);
 }
 
 :where(.system-b-chat-artifact-error-title) {
@@ -4345,7 +4345,7 @@
   font-size: var(--system-b-chat-activity-size);
   font-weight: var(--system-b-chat-activity-weight);
   line-height: var(--system-b-chat-activity-line-height);
-  letter-spacing: -0.01em;
+  letter-spacing: var(--tracking-tight);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -4389,7 +4389,7 @@
   color: inherit;
   font-size: inherit;
   line-height: inherit;
-  letter-spacing: -0.01em;
+  letter-spacing: var(--tracking-tight);
   -webkit-font-smoothing: antialiased;
   overflow-wrap: anywhere;
   word-break: break-word;
@@ -4485,7 +4485,7 @@
   background: var(--color-bg-surface-2);
   padding: 0.125rem 0.375rem;
   font-family: var(--font-mono);
-  font-size: 0.75rem;
+  font-size: var(--text-app);
   color: var(--color-text-primary-token);
 }
 
@@ -4505,7 +4505,7 @@
   border: 0;
   background: transparent;
   padding: 0;
-  font-size: 0.75rem;
+  font-size: var(--text-app);
   line-height: 1.5rem;
 }
 
@@ -4567,7 +4567,7 @@
   border: 1px solid transparent;
   border-radius: var(--radius-lg);
   box-shadow: none;
-  font-size: 12px;
+  font-size: var(--text-app);
   font-weight: var(--font-weight-medium);
   line-height: 1;
   padding-inline: var(--space-2);
@@ -5257,9 +5257,19 @@
   line-height: 1.25rem;
 }
 
+/* The user bubble inverts with the theme (light bubble in dark mode, dark
+   bubble in light mode), so mix against the bubble itself, not white. */
 .system-b-entity-chip[data-entity-variant="transcript"][data-entity-tone="onLight"] {
-  border-color: color-mix(in srgb, var(--jovie-entity-accent) 30%, white);
-  background: color-mix(in srgb, var(--jovie-entity-accent) 8%, white);
+  border-color: color-mix(
+    in srgb,
+    var(--jovie-entity-accent) 30%,
+    var(--system-b-chat-user-bubble-bg, white)
+  );
+  background: color-mix(
+    in srgb,
+    var(--jovie-entity-accent) 10%,
+    var(--system-b-chat-user-bubble-bg, white)
+  );
   color: var(
     --system-b-entity-chip-on-light-text,
     var(--color-text-primary-token)
