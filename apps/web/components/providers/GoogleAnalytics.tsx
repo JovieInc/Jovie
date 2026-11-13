@@ -6,12 +6,14 @@ import type { Consent } from '@/lib/cookies/consent';
 import { isDemoRecordingClient } from '@/lib/demo-recording';
 import { env } from '@/lib/env-client';
 import { publicEnv } from '@/lib/env-public';
+import { usePublicPathname } from '@/lib/navigation/use-public-pathname';
 import {
   applyGoogleConsentMode,
   consentToGoogleConsentMode,
   isCookieBannerRequiredFromClient,
   isValidGaMeasurementId,
 } from '@/lib/tracking/google-consent-mode';
+import { isTipCheckoutReturn } from '@/lib/tracking/is-tip-checkout-return';
 
 function isConsentPayload(value: unknown): value is Consent {
   if (!value || typeof value !== 'object') return false;
@@ -29,10 +31,15 @@ type AnalyticsWindow = Window & {
 };
 
 export function GoogleAnalytics() {
+  const pathname = usePublicPathname();
   const measurementId = publicEnv.NEXT_PUBLIC_GA_MEASUREMENT_ID;
   const isPassive = env.IS_TEST || env.IS_E2E;
   const isDemo = isDemoRecordingClient();
-  const skip = !isValidGaMeasurementId(measurementId) || isPassive || isDemo;
+  const skip =
+    !isValidGaMeasurementId(measurementId) ||
+    isPassive ||
+    isDemo ||
+    isTipCheckoutReturn(pathname);
 
   useEffect(() => {
     if (skip) return;
