@@ -177,7 +177,7 @@ describe('ArtistNotificationsCTA SMS manage flow', () => {
   it('removes the retired inline phone composer from the auto-open flow', async () => {
     await renderCTA();
 
-    expect(await screen.findByText('Get New Music')).toBeInTheDocument();
+    expect(await screen.findByText('Get updates')).toBeInTheDocument();
     expect(screen.queryByTestId('country-selector')).not.toBeInTheDocument();
     expect(screen.queryByText('Stay in the Loop')).not.toBeInTheDocument();
   });

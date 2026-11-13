@@ -60,7 +60,7 @@ export function SegmentedDigitBox({
         boxSizeClassName,
         'border-(--profile-pearl-border) bg-[color:color-mix(in_srgb,var(--profile-pearl-bg)_94%,transparent)] text-primary-token shadow-[0_10px_24px_rgba(15,17,24,0.08)] backdrop-blur-2xl',
         isFocused
-          ? 'border-(--profile-pearl-border) bg-(--profile-pearl-bg-hover) ring-2 ring-[rgb(var(--focus-ring))]/18 shadow-[0_14px_30px_rgba(15,17,24,0.12)]'
+          ? 'border-(--profile-pearl-border) bg-(--profile-pearl-bg-hover) ring-2 ring-focus/18 shadow-[0_14px_30px_rgba(15,17,24,0.12)]'
           : 'hover:bg-(--profile-pearl-bg-hover)',
         error &&
           'border-error/55 bg-[color:color-mix(in_srgb,var(--profile-pearl-bg)_90%,rgba(127,29,29,0.12))] ring-2 ring-error/14',

@@ -11,10 +11,13 @@ name: Auto-Ready Agent Drafts
 #    jovie-writer-pr-proof/v1 receipt does. The owning writer's successful path
 #    is scripts/writer-owned-pr-promote.sh. This job never waits for green.
 #
-# 2. Green-source undraft (event-driven). When a draft on JovieInc/Jovie has
-#    persisted exact-author/head proof, PR Ready + required checks SUCCESS and
-#    mergeable CLEAN, undraft it so Merge Queue Green Enroll can pick it up. This job never enables auto-merge
-#    and never enrolls the merge queue.
+# 2. Green-source undraft (event-driven). When a draft on JovieInc/Jovie is
+#    shippable (a trusted writer in ON_GREEN_WRITERS ships on green by default,
+#    any other author needs persisted exact-author/head proof), has PR Ready +
+#    required checks SUCCESS and mergeable CLEAN, undraft it so Merge Queue
+#    Green Enroll can pick it up. This job never enables auto-merge and never
+#    enrolls the merge queue. Tim, Nov 11 2026: "all prs must merge
+#    automatically on green" (scripts/lib/auto-ready-provenance.mjs).
 #
 # Green-source never mutates HOLD #17156. Tim-hold / machine hold labels
 # (GREEN_SOURCE_HOLD_LABELS) cover other open holds; merged PR numbers are
@@ -22,8 +25,10 @@ name: Auto-Ready Agent Drafts
 #
 # Manual dispatch without pr_number remains writer-proof recovery. Dispatch
 # with pr_number + head_sha is a targeted green-source undraft. Opt out
-# per-PR with machine/security/hold labels or controlled-proof/canary markers.
-# Missing proof is always ineligible; the author need not opt out while working.
+# per-PR with `<!-- jovie-auto-ready: park -->` in the body, machine/security/
+# hold labels, converting back to draft after the last push, or
+# controlled-proof/canary markers. An untrusted author without proof is always
+# ineligible.
 
 # Wake only on the workflows that publish the required source contexts
 # (Source Validation: PR Ready + Migration Guard; Fork PR Gate; PR Size Guard).
@@ -182,3 +187,32 @@ jobs:
           MISSED_COHORT: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.name == 'Source Validation' && '1' || '0' }}
           RUN_OFFSET: ${{ github.run_number }}
         run: bash scripts/auto-ready-green-drafts.sh
+
+      # Founder rule 2026-11-11: bot review comments never hold a green PR.
+      # Once PR Ready is green on this exact head, resolve the threads review
+      # bots (sentry[bot], coderabbitai[bot], ...) opened. Human threads and
+      # bot threads a human replied in are never touched. Best effort: a
+      # thread that will not resolve is a warning, and this runs after the
+      # undraft so it never delays it.
+      - name: Prime Node toolcache
+        if: ${{ !cancelled() && github.event_name == 'workflow_run' }}
+        uses: ./.github/actions/prime-node-toolcache
+      - name: Setup Node.js for bot thread resolution
+        if: ${{ !cancelled() && github.event_name == 'workflow_run' }}
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v4.4.0
+        with:
+          node-version-file: .nvmrc
+
+      - name: Resolve bot review threads on the green head
+        if: ${{ !cancelled() && github.event_name == 'workflow_run' }}
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          REPO: ${{ github.repository }}
+          TARGET_PR: ${{ github.event.workflow_run.pull_requests[0].number || '' }}
+          TARGET_HEAD: ${{ github.event.workflow_run.head_sha || '' }}
+        run: |
+          if [ -z "$TARGET_PR" ] || [ -z "$TARGET_HEAD" ]; then
+            echo "no PR association on this wake; nothing to resolve"
+            exit 0
+          fi
+          node scripts/lib/bot-review-threads.mjs --repo "$REPO" --pr "$TARGET_PR" --head "$TARGET_HEAD"
