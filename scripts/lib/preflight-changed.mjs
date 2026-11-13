@@ -5,7 +5,11 @@
  * filesystem or git access here; the CLI passes in file lists and a reader.
  */
 import { createHash } from 'node:crypto';
-import { evaluateCustomerNoteContract } from './daily-changelog-publication.mjs';
+import { customerNoteCopyProblems } from './changelog-filter-rules.mjs';
+import {
+  evaluateCustomerNoteContract,
+  readCustomerNote,
+} from './daily-changelog-publication.mjs';
 
 const CUSTOMER_MARKER =
   '<!-- customer-changelog/v1 {"releaseWorthy":false} -->';
@@ -95,6 +99,15 @@ export function lintPrBody({
       message: `changelog-marker: customer-facing code changed; the body needs ${CUSTOMER_MARKER} (internal work) or a releaseWorthy:true marker with availability (${verdict.reason}).`,
     });
   }
+  const copyProblems = customerNoteCopyProblems(
+    readCustomerNote(body).note,
+    createdAt
+  );
+  if (copyProblems.length)
+    errors.push({
+      id: 'changelog-copy',
+      message: `changelog-copy: rewrite the marker "text" (docs/CHANGELOG_PUBLICATION.md, "Headlines"): ${copyProblems.join(' ')}`,
+    });
   const template = [...missing].map(id => TEMPLATES[id](paths)).join('\n\n');
   return { errors, warnings, template };
 }
