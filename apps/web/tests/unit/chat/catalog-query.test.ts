@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type { ReleaseContext } from '@/lib/chat/types';
 import { linkRow, makeChain, releaseRow, sqlTokens } from './sql-tokens';
 
 const selectMock = vi.fn();
@@ -222,9 +223,16 @@ describe('resolveChatRelease precedence', () => {
     });
   });
 
-  const sliceRow = (title: string): ReleaseRowShape => ({
-    ...releaseRow,
+  const sliceRow = (title: string): ReleaseContext => ({
+    id: releaseRow.id,
     title,
+    releaseType: releaseRow.releaseType,
+    releaseDate: '2026-01-01T00:00:00.000Z',
+    artworkUrl: null,
+    spotifyPopularity: releaseRow.spotifyPopularity,
+    totalTracks: releaseRow.totalTracks,
+    canvasStatus: 'not_set',
+    metadata: {},
   });
 
   it('a full-catalog exact match beats a loaded partial (remix) match', async () => {
@@ -352,9 +360,9 @@ describe('resolveNamedOwnedReleasesForPrompt', () => {
       artworkUrl: null,
       spotifyPopularity: 12,
       totalTracks: 1,
-      canvasStatus: 'missing' as const,
+      canvasStatus: 'not_set',
       metadata: {},
-    };
+    } satisfies ReleaseContext;
 
     await expect(
       resolveNamedOwnedReleasesForPrompt(
@@ -366,7 +374,7 @@ describe('resolveNamedOwnedReleasesForPrompt', () => {
   });
 
   it('uses a loaded row past the shown cap without a database hit when there is no profile', async () => {
-    const loaded = Array.from({ length: 26 }, (_, index) => ({
+    const loaded: ReleaseContext[] = Array.from({ length: 26 }, (_, index) => ({
       id: `id-${index}`,
       title: index === 25 ? 'Never Say A Word' : `Track ${index + 1}`,
       releaseType: 'single',
@@ -374,7 +382,7 @@ describe('resolveNamedOwnedReleasesForPrompt', () => {
       artworkUrl: null,
       spotifyPopularity: null,
       totalTracks: 1,
-      canvasStatus: 'missing' as const,
+      canvasStatus: 'not_set',
       metadata: {},
     }));
     const { resolveNamedOwnedReleasesForPrompt } = await import(

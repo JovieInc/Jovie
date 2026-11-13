@@ -229,9 +229,7 @@ describe('resolveOwnedReleaseTokensForHydration', () => {
   });
 
   it('skips tokens already in the loaded slice and deduplicates ids', async () => {
-    const releases = [
-      { ...releaseRow, title: 'Loaded Title', id: 'release-1' },
-    ];
+    const releases = [sliceRowCompat('Loaded Title')];
     const text =
       '@release:release-9[Other] and @release:11111111-2222-3333-4444-555555555555[Never Say A Word]';
     // Same beyond-slice id twice across texts: one query.
@@ -251,7 +249,7 @@ describe('resolveOwnedReleaseTokensForHydration', () => {
   });
 
   it('bounds hydration queries and skips non-release or malformed tokens', async () => {
-    const releases: ReleaseRowShape[] = [];
+    const releases = [] as const;
     const beyond = Array.from({ length: 10 }, (_, i) => ({
       id: `1111111${i}-2222-3333-4444-555555555555`,
     }));

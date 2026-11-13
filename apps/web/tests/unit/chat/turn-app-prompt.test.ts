@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type { AssembleAppPromptInput } from '@/lib/chat/turn-app-prompt';
 
 const selectMock = vi.fn();
 
@@ -59,9 +60,15 @@ const baseInput = {
   artistContext,
   releases: [
     {
-      ...releaseRow,
+      id: releaseRow.id,
+      title: releaseRow.title,
+      releaseType: releaseRow.releaseType,
       releaseDate: '2026-01-01T00:00:00.000Z',
-      canvasStatus: 'missing' as const,
+      artworkUrl: null,
+      spotifyPopularity: releaseRow.spotifyPopularity,
+      totalTracks: releaseRow.totalTracks,
+      canvasStatus: 'not_set',
+      metadata: {},
     },
   ],
   profileId: 'profile-1',
@@ -70,7 +77,7 @@ const baseInput = {
   aiWeeklyMessageLimit: 10,
   insightsEnabled: false,
   knowledgeContext: '',
-};
+} satisfies AssembleAppPromptInput;
 
 describe('assembleAppModeSystemPrompt catalog threading', () => {
   beforeEach(() => {

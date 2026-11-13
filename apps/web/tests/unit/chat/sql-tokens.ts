@@ -1,4 +1,5 @@
 import { vi } from 'vitest';
+import type { ReleaseContext } from '@/lib/chat/types';
 
 const TABLE_NAME = Symbol.for('drizzle:Name');
 
@@ -49,17 +50,6 @@ export function sqlTokens(node: unknown): string {
   return parts.join(' ').replace(/\s+/g, ' ').trim();
 }
 
-type ReleaseRowShape = {
-  id: string;
-  title: string;
-  releaseType: string;
-  releaseDate: Date | string | null;
-  artworkUrl: string | null;
-  spotifyPopularity: number | null;
-  totalTracks: number;
-  metadata: Record<string, unknown> | null;
-};
-
 export const releaseRow = {
   id: 'release-1',
   title: 'Midnight',
@@ -80,8 +70,19 @@ export const linkRow = {
   isPrimary: true,
 };
 
-export function sliceRowCompat(title = 'Loaded Title'): ReleaseRowShape {
-  return { ...releaseRow, title };
+/** A loaded prompt row. Dates are ISO strings and canvas status is the real union. */
+export function sliceRowCompat(title = 'Loaded Title'): ReleaseContext {
+  return {
+    id: releaseRow.id,
+    title,
+    releaseType: releaseRow.releaseType,
+    releaseDate: '2026-01-01T00:00:00.000Z',
+    artworkUrl: releaseRow.artworkUrl,
+    spotifyPopularity: releaseRow.spotifyPopularity,
+    totalTracks: releaseRow.totalTracks,
+    canvasStatus: 'not_set',
+    metadata: {},
+  };
 }
 
 export function makeChain(rows: unknown[]) {
