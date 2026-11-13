@@ -9,26 +9,12 @@
 import { readdirSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { render, screen, within } from '@testing-library/react';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { MARKETING_ROUTE_MANIFEST } from '@/data/marketing';
 import { getMarketingRecipe } from '@/data/marketing/recipes';
 import { getPublicPriceClaim } from '@/lib/billing/offer-truth';
 import { getEndUserPerfRouteById } from '@/scripts/performance-route-manifest';
 
-const gate = vi.hoisted(() => ({ WAITLIST_ENABLED: true }));
-vi.mock('@/lib/flags/marketing-static', async importOriginal => {
-  const actual =
-    await importOriginal<typeof import('@/lib/flags/marketing-static')>();
-  return {
-    ...actual,
-    FEATURE_FLAGS: new Proxy(actual.FEATURE_FLAGS, {
-      get: (target, key) =>
-        key === 'WAITLIST_ENABLED'
-          ? gate.WAITLIST_ENABLED
-          : target[key as keyof typeof target],
-    }),
-  };
-});
 vi.mock('@/lib/analytics', () => ({ track: vi.fn(), page: vi.fn() }));
 vi.mock('@/lib/content-records/store.server', async () => {
   const { MARKETING_PAGE_KIND } = await import(
@@ -93,9 +79,6 @@ const HOMEPAGE_STYLES = [
 const PRICE_TEXT = /\$\s?\d|\d+\s?\/\s?mo\b|\bper month\b|\b\d+-day\b/i;
 
 describe('homepage contract', { timeout: 60_000 }, () => {
-  beforeEach(() => {
-    gate.WAITLIST_ENABLED = true;
-  });
   afterEach(() => {
     vi.resetModules();
   });
@@ -153,38 +136,34 @@ describe('homepage contract', { timeout: 60_000 }, () => {
     ]);
   });
 
-  it.each([true, false])(
-    'ends in the one role waitlist form and links nowhere near signup, waitlist=%s',
-    async waitlist => {
-      gate.WAITLIST_ENABLED = waitlist;
-      const { HOMEPAGE_EDITORIAL_COPY: copy, HOMEPAGE_INVITE_ANCHOR } =
-        await loadCopy();
-      const { container } = await renderHomePage();
+  it('ends in the one role waitlist form and links nowhere near signup', async () => {
+    const { HOMEPAGE_EDITORIAL_COPY: copy, HOMEPAGE_INVITE_ANCHOR } =
+      await loadCopy();
+    const { container } = await renderHomePage();
 
-      // One conversion: the role waitlist form inside the closing section.
-      const forms = [...container.querySelectorAll('form')];
-      expect(forms).toHaveLength(1);
-      expect(forms[0]).toHaveAttribute('data-testid', 'waitlist-role-form');
-      const close = container.querySelector(`#${HOMEPAGE_INVITE_ANCHOR}`);
-      expect(close).toHaveAttribute('data-testid', 'marketing-section-cta');
-      expect(close?.contains(forms[0] ?? null)).toBe(true);
-      expect(within(forms[0]!).getAllByRole('radio')).toHaveLength(6);
+    // One conversion: the role waitlist form inside the closing section.
+    const forms = [...container.querySelectorAll('form')];
+    expect(forms).toHaveLength(1);
+    expect(forms[0]).toHaveAttribute('data-testid', 'waitlist-role-form');
+    const close = container.querySelector(`#${HOMEPAGE_INVITE_ANCHOR}`);
+    expect(close).toHaveAttribute('data-testid', 'marketing-section-cta');
+    expect(close?.contains(forms[0] ?? null)).toBe(true);
+    expect(within(forms[0]!).getAllByRole('radio')).toHaveLength(6);
 
-      // The hero's primary action scrolls to that form; no public signup.
-      const primary = screen.getByTestId('homepage-primary-cta');
-      expect(primary).toHaveAttribute('href', `#${HOMEPAGE_INVITE_ANCHOR}`);
-      expect(primary).toHaveTextContent(copy.hero.primaryAction);
-      expect(
-        container.querySelectorAll('[data-primary-action="true"]')
-      ).toHaveLength(1);
-      const hrefs = [...container.querySelectorAll('a[href]')].map(
-        link => link.getAttribute('href') ?? ''
-      );
-      expect(
-        hrefs.filter(href => /^\/(signup|sign-up|start|claim)\b/.test(href))
-      ).toEqual([]);
-    }
-  );
+    // The hero's primary action scrolls to that form; no public signup.
+    const primary = screen.getByTestId('homepage-primary-cta');
+    expect(primary).toHaveAttribute('href', `#${HOMEPAGE_INVITE_ANCHOR}`);
+    expect(primary).toHaveTextContent(copy.hero.primaryAction);
+    expect(
+      container.querySelectorAll('[data-primary-action="true"]')
+    ).toHaveLength(1);
+    const hrefs = [...container.querySelectorAll('a[href]')].map(
+      link => link.getAttribute('href') ?? ''
+    );
+    expect(
+      hrefs.filter(href => /^\/(signup|sign-up|start|claim)\b/.test(href))
+    ).toEqual([]);
+  });
 
   it('binds performance readiness to the rendered hero and its action', async () => {
     const { container } = await renderHomePage();

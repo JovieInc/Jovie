@@ -12,7 +12,7 @@ describe('HomepageV2FinalCta', () => {
     ).toHaveTextContent('Keep your work moving.');
     expect(
       screen.getByTestId('homepage-v2-final-cta-primary')
-    ).toHaveTextContent('Get started');
+    ).toHaveTextContent('Start free trial');
     expect(screen.getByTestId('homepage-v2-final-cta-primary')).toHaveAttribute(
       'data-size',
       'md'

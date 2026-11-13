@@ -14,7 +14,6 @@ describe('marketing static flags', () => {
     expect(FEATURE_FLAGS.SHOW_MARKETING_CENTER_NAV).toBe(true);
     expect(FEATURE_FLAGS.SHOW_HOMEPAGE_CENTER_NAV).toBe(true);
     expect(FEATURE_FLAGS.SHOW_MARKETING_FULL_FOOTER).toBe(true);
-    expect(FEATURE_FLAGS.WAITLIST_ENABLED).toBe(true);
   });
 
   it('keeps V1 design flags false (inverted semantics still off — V2 ships)', () => {

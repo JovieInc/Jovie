@@ -226,7 +226,6 @@ The source defaults below are preserved in this slice.
 | `SHOW_PUBLIC_PROFILE_V1_DESIGN` | `false` | Remove inverted gate AND obsolete V1 branch; keep supported current public profile, never flip true. |
 | `SHOW_REPLACES_SECTION` | `true` | Remove presentation gate in favor of the supported enabled behavior. |
 | `SHOW_SEE_IT_IN_ACTION` | `true` | Remove presentation gate in favor of the supported enabled behavior. |
-| `WAITLIST_ENABLED` | `true` | Keep acquisition/admission policy; not part of product rollout retirement. |
 
 ### Override cleanup and rollback
 

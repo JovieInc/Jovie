@@ -6,7 +6,7 @@ import { MARKETING_PAGE_CONTRACTS } from '@/data/marketing/pageContracts';
 
 /**
  * JOV-6860: the marketing header's primary CTA label must come from the one
- * waitlist-mode front-door source on every route. Per-route divergence (the
+ * front-door source on every route. Per-route divergence (the
  * artist-profiles "Get started" drift) fails here. The homepage claim
  * → /start lock (JOV-5085) is the only sanctioned override.
  */
@@ -15,44 +15,40 @@ const HEADER_MANIFEST_ROUTES = Object.values(MARKETING_PAGE_CONTRACTS)
   .filter(url => !url.endsWith('/*'));
 
 describe('marketing header CTA consistency', () => {
-  for (const waitlistEnabled of [true, false]) {
-    it(`resolves one shared primary CTA across the route manifest (waitlist=${waitlistEnabled})`, () => {
-      const shared = getHomepageFrontDoorCtaContract(waitlistEnabled).primary;
-      const divergent = HEADER_MANIFEST_ROUTES.filter(
-        url => url !== APP_ROUTES.HOME
-      ).filter(
-        url =>
-          resolveMarketingHeaderPrimaryCta(url, waitlistEnabled).label !==
-          shared.label
-      );
+  it('resolves one shared primary CTA across the route manifest', () => {
+    const shared = getHomepageFrontDoorCtaContract().primary;
+    const divergent = HEADER_MANIFEST_ROUTES.filter(
+      url => url !== APP_ROUTES.HOME
+    ).filter(
+      url => resolveMarketingHeaderPrimaryCta(url).label !== shared.label
+    );
 
-      expect(divergent).toEqual([]);
-      for (const url of HEADER_MANIFEST_ROUTES) {
-        if (url === APP_ROUTES.HOME) continue;
-        expect(
-          resolveMarketingHeaderPrimaryCta(url, waitlistEnabled),
-          `${url} header CTA`
-        ).toEqual(shared);
-      }
-    });
-  }
-
-  it('keeps the homepage header on the on-page invitation form in both modes', () => {
-    // Signup is invite-only (PUBLIC_SIGNUP_CLOSED): the homepage header
-    // scrolls to the homepage's own role waitlist form, like the hero.
-    for (const waitlistEnabled of [true, false]) {
+    expect(divergent).toEqual([]);
+    for (const url of HEADER_MANIFEST_ROUTES) {
+      if (url === APP_ROUTES.HOME) continue;
       expect(
-        resolveMarketingHeaderPrimaryCta(APP_ROUTES.HOME, waitlistEnabled)
-      ).toEqual({ label: 'Request an Invite', href: '/#request-invite' });
+        resolveMarketingHeaderPrimaryCta(url),
+        `${url} header CTA`
+      ).toEqual(shared);
     }
   });
 
-  it('keeps artist-profiles on the shared waitlist CTA', () => {
+  it('keeps the homepage header on the on-page invitation form', () => {
+    // The homepage header scrolls to the homepage's own role form, like the
+    // hero.
+    expect(resolveMarketingHeaderPrimaryCta(APP_ROUTES.HOME)).toEqual({
+      label: 'Request an Invite',
+      href: '/#request-invite',
+    });
+  });
+
+  it('keeps artist-profiles on the shared open-signup CTA', () => {
+    const open = { label: 'Claim your free profile', href: APP_ROUTES.START };
     expect(
-      resolveMarketingHeaderPrimaryCta(APP_ROUTES.ARTIST_PROFILES, true)
-    ).toEqual({ label: 'Claim your profile', href: APP_ROUTES.SIGNUP });
+      resolveMarketingHeaderPrimaryCta(APP_ROUTES.ARTIST_PROFILES)
+    ).toEqual(open);
     expect(
-      resolveMarketingHeaderPrimaryCta(APP_ROUTES.ARTIST_PROFILE_LEGACY, true)
-    ).toEqual({ label: 'Claim your profile', href: APP_ROUTES.SIGNUP });
+      resolveMarketingHeaderPrimaryCta(APP_ROUTES.ARTIST_PROFILE_LEGACY)
+    ).toEqual(open);
   });
 });

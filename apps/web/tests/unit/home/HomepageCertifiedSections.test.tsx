@@ -1,17 +1,11 @@
 // @coverage-via apps/web/tests/unit/home/HomepageCertifiedSections.test.tsx
 import { render, screen, within } from '@testing-library/react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
   HomepageCertifiedSections,
   HomepageEditorialFeatureSection,
 } from '@/components/homepage/HomepageCertifiedSections';
 import { HOMEPAGE_MEDIA_MAP } from '@/data/homepageMediaMap';
-
-const gate = vi.hoisted(() => ({ WAITLIST_ENABLED: false }));
-vi.mock('@/lib/flags/marketing-static', () => ({ FEATURE_FLAGS: gate }));
-beforeEach(() => {
-  gate.WAITLIST_ENABLED = false;
-});
 
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: vi.fn() }),

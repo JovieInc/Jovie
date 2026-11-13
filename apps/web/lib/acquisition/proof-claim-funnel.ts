@@ -15,7 +15,6 @@
 
 import { APP_ROUTES } from '@/constants/routes';
 import { ARTIST_VISIBILITY_OFFER } from '@/lib/config/plan-prices';
-import { FEATURE_FLAGS } from '@/lib/flags/marketing-static';
 import { TIM_WHITE_PROFILE } from '@/lib/tim-white';
 
 /** Artist Presence monthly offer, derived from the canonical plan price. */
@@ -129,21 +128,8 @@ export function buildProofClaimHref(): string {
   return withProofClaimParams(`${APP_ROUTES.START}?${params.toString()}`);
 }
 
-export function resolveProofClaimCta(
-  waitlistEnabled: boolean = FEATURE_FLAGS.WAITLIST_ENABLED
-): ProofClaimCta {
+export function resolveProofClaimCta(): ProofClaimCta {
   const offer = getProofClaimOffer();
-  if (waitlistEnabled) {
-    return {
-      label: 'Claim yours',
-      href: buildProofClaimHref(),
-      note: 'Limited · Reserve your name',
-      support: 'Limited access. Reserve your name now.',
-      limited: true,
-      offer,
-    };
-  }
-
   return {
     label: 'Get yours',
     href: buildProofClaimHref(),

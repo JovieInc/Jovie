@@ -17,7 +17,6 @@ import { getHomepageFrontDoorCtaContract } from '@/data/homepageFrontDoorCta';
 import { resolveMarketingAuthPrefetch } from '@/data/marketing/authEntryPrefetch';
 import type { MarketingPenContractId } from '@/data/marketing/penContracts';
 import type { BrandMarkSize } from '@/lib/brand/tokens';
-import { FEATURE_FLAGS } from '@/lib/flags/marketing-static';
 import { cn } from '@/lib/utils';
 import {
   getNavGroupVariantClass,
@@ -124,9 +123,8 @@ export interface HeaderFlyoutMenu {
 }
 
 // One front-door CTA for headers rendered without an explicit publicCta.
-const DEFAULT_PUBLIC_CTA: HeaderNavCta = getHomepageFrontDoorCtaContract(
-  FEATURE_FLAGS.WAITLIST_ENABLED
-).primary;
+const DEFAULT_PUBLIC_CTA: HeaderNavCta =
+  getHomepageFrontDoorCtaContract().primary;
 
 type PublicAuthActionsProps = Readonly<{
   readonly minimal?: boolean;
