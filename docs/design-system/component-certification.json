@@ -774,6 +774,9 @@
       "empty": "The dialog maps over the fixed COOKIE_CATEGORIES constant (Essential, Analytics, Marketing), which is never empty, so there is no empty-data state.",
       "long-content": "Every category label, description and button in the dialog is fixed copy from module constants with no props or user text, so its content cannot grow."
     },
+    "apps/web/components/organisms/DesktopTitlebarSlot.tsx": {
+      "error": "The module-level catch only absorbs a failed speculative titlebar import; it never sets render state or draws an error. The existing next/dynamic loader still owns the render import. desktop-startup-contract.cases.mjs executes the rejected warmup and verifies that the desktop render loader remains usable and browser output stays null; DesktopTitlebarSlot.test.tsx covers the mounted titlebar."
+    },
     "apps/web/components/organisms/MarketingSignInLink.tsx": {
       "partial": "The link renders one label and one fixed sign-in route; variant and label are presentation choices with defaults, so there is no data to be partially present.",
       "long-content": "The label prop is typed as the two fixed strings 'Sign in' and 'Log in', so no caller can pass longer copy."
