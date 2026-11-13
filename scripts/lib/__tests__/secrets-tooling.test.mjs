@@ -1,4 +1,5 @@
 import { expect, it } from 'vitest';
+import { parse, prepare } from '../../pr-comment.mjs';
 import { MARK, redact } from '../../secrets/redact.mjs';
 import {
   formatPresence,
@@ -137,4 +138,19 @@ it('scrubPrText strips personal emails and phone numbers, keeps service addresse
     'git@github.com:JovieInc/Jovie 2026-11-12 4fd78e95 run 123-456 port 3000-3001 qa@jovie.test';
   expect(scrubPrText(keep)).toBe(keep);
   expect(scrubPrText('token ' + 'ghp_' + 'a'.repeat(36))).toBe(`token ${MARK}`);
+});
+
+it('pr:comment parses its arguments and scrubs before posting', () => {
+  expect(parse(['24820', '--body-file', 'x.md'])).toEqual({
+    number: '24820',
+    bodyFile: 'x.md',
+    dryRun: false,
+  });
+  expect(() => parse(['--body-file', 'x.md'])).toThrow(/usage/);
+  const person = ['jane', 'gmail.com'].join('@');
+  const out = prepare(`CI green; contact ${person}\n`);
+  expect(out.body).toBe('CI green; contact [REDACTED-PERSONAL]');
+  expect(out.scrubbed).toBe(true);
+  expect(prepare('All 52 checks passed.').scrubbed).toBe(false);
+  expect(() => prepare('   ')).toThrow(/empty/);
 });
