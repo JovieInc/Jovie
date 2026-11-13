@@ -229,6 +229,9 @@ describe('Ovie delivery outcome from the real workflow shell', () => {
           GITHUB_STEP_SUMMARY: summary,
           GITHUB_OUTPUT: output,
           CERT_SHA: 'fixture-sha',
+          GITHUB_SERVER_URL: 'https://github.com',
+          GITHUB_REPOSITORY: 'JovieInc/Jovie',
+          GITHUB_RUN_ID: '123',
           POST_REQUESTED: 'true',
           CRON_SECRET: 'fixture-secret-value',
           OVIE_BASE_URL: 'https://ovie.invalid',
@@ -247,6 +250,8 @@ describe('Ovie delivery outcome from the real workflow shell', () => {
     expect(posted).toMatchObject({
       headSha: 'ffffffffffffffffffffffffffffffffffffffff',
       reportBytes: expect.any(Number),
+      runUrl: 'https://github.com/JovieInc/Jovie/actions/runs/123',
+      artifactName: 'component-certificate-123',
       schema: 'jovie.component-certificate-evidence/v1',
       totals: { certified: 0, components: 30000 },
     });

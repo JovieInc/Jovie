@@ -1,10 +1,8 @@
-import type { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { recordComponentCertificateDelivery } from '@/lib/agent-os/component-certificate-ingest';
-import {
-  handleCronEvidencePost,
-  jsonResponse,
-} from '@/lib/cron/evidence-route';
+import { type AccessPolicy, defineRoute } from '@/lib/api/route-pipeline';
+import { verifyCronRequest } from '@/lib/cron/auth';
+import { jsonResponse } from '@/lib/cron/evidence-route';
 import { logger } from '@/lib/utils/logger';
 
 /**
@@ -66,33 +64,45 @@ const payloadSchema = z
   })
   .strict();
 
-const bodySchema = payloadSchema;
+const cronAccess: AccessPolicy<null> = {
+  name: 'cron-secret',
+  async authorize(request) {
+    const denied = verifyCronRequest(request, { route: ROUTE });
+    return denied
+      ? { ok: false, status: denied.status, body: await denied.json() }
+      : { ok: true, auth: null };
+  },
+};
 
-export async function POST(request: Request): Promise<NextResponse> {
-  return handleCronEvidencePost(request, {
+export const POST = defineRoute(
+  {
     route: ROUTE,
-    maxBytes: MAX_BODY_BYTES,
-    schema: bodySchema,
-    invalidLabel: 'invalid_packet',
-    handle: async data => {
-      try {
-        const stored = await recordComponentCertificateDelivery(
-          data as Record<string, unknown> & { headSha: string }
-        );
-        return jsonResponse(
-          {
-            historyCount: stored.historyCount,
-            ok: true,
-            storedHeadSha: data.headSha,
-          },
-          200
-        );
-      } catch (error) {
-        logger.error('[component-certificate-evidence] ingest failed', {
-          error: error instanceof Error ? error.message : String(error),
-        });
-        return jsonResponse({ error: 'ingest_failed' }, 503);
-      }
+    access: cronAccess,
+    body: {
+      schema: payloadSchema,
+      maxBodySize: MAX_BODY_BYTES,
+      invalidBody: error => ({
+        error: 'invalid_packet',
+        issues: error.issues.slice(0, 10),
+      }),
     },
-  });
-}
+  },
+  async ({ body: data }) => {
+    try {
+      const stored = await recordComponentCertificateDelivery(data);
+      return jsonResponse(
+        {
+          historyCount: stored.historyCount,
+          ok: true,
+          storedHeadSha: data.headSha,
+        },
+        200
+      );
+    } catch (error) {
+      logger.error('[component-certificate-evidence] ingest failed', {
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return jsonResponse({ error: 'ingest_failed' }, 503);
+    }
+  }
+);

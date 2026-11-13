@@ -86,8 +86,11 @@ function main() {
   const report = JSON.parse(readFileSync(reportPath, 'utf8'));
   const serverUrl = process.env.GITHUB_SERVER_URL;
   const runId = process.env.GITHUB_RUN_ID;
+  const repository = process.env.GITHUB_REPOSITORY;
   const runUrl =
-    serverUrl && runId ? `${serverUrl}/actions/runs/${runId}` : null;
+    serverUrl && repository && runId
+      ? `${serverUrl}/${repository}/actions/runs/${runId}`
+      : null;
   const payload = buildDeliveryPayload(report, {
     reportBytes: statSync(reportPath).size,
     runUrl,

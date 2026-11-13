@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const { recordMock, verifyCronRequestMock } = vi.hoisted(() => ({
@@ -12,7 +12,10 @@ vi.mock('@/lib/cron/auth', () => ({
 vi.mock('@/lib/agent-os/component-certificate-ingest', () => ({
   recordComponentCertificateDelivery: recordMock,
 }));
-vi.mock('@/lib/utils/logger', () => ({ logger: { error: vi.fn() } }));
+vi.mock('@/lib/utils/logger', () => ({
+  logger: { error: vi.fn(), warn: vi.fn() },
+}));
+vi.mock('@/lib/error-tracking', () => ({ captureError: vi.fn() }));
 
 import { POST } from './route';
 
@@ -45,7 +48,7 @@ function packet(overrides: Record<string, unknown> = {}) {
 
 function post(body: unknown) {
   return POST(
-    new Request(
+    new NextRequest(
       'https://jov.ie/api/internal/ovie/component-certificate-evidence',
       {
         method: 'POST',
@@ -73,6 +76,7 @@ describe('POST /api/internal/ovie/component-certificate-evidence', () => {
     );
     const response = await post(packet());
     expect(response.status).toBe(401);
+    expect(response.headers.get('Cache-Control')).toBe('no-store');
     expect(recordMock).not.toHaveBeenCalled();
   });
 
@@ -86,8 +90,30 @@ describe('POST /api/internal/ovie/component-certificate-evidence', () => {
     const response = await post(oversized);
     expect(response.status).toBe(413);
     await expect(response.json()).resolves.toMatchObject({
-      error: 'payload_too_large',
+      error: 'Request body too large',
     });
+    expect(recordMock).not.toHaveBeenCalled();
+  });
+
+  it('cancels an oversized stream before reading the whole request', async () => {
+    const cancel = vi.fn();
+    let pulls = 0;
+    const body = new ReadableStream({
+      pull(controller) {
+        pulls += 1;
+        controller.enqueue(new Uint8Array(32 * 1024));
+        if (pulls === 10) controller.close();
+      },
+      cancel,
+    });
+    const request = new NextRequest(
+      'https://jov.ie/api/internal/ovie/component-certificate-evidence',
+      { method: 'POST', body, duplex: 'half' }
+    );
+    const response = await POST(request);
+    expect(response.status).toBe(413);
+    expect(cancel).toHaveBeenCalledTimes(1);
+    expect(pulls).toBeLessThan(10);
     expect(recordMock).not.toHaveBeenCalled();
   });
 
@@ -106,7 +132,7 @@ describe('POST /api/internal/ovie/component-certificate-evidence', () => {
     const response = await post('{not-json');
     expect(response.status).toBe(400);
     await expect(response.json()).resolves.toMatchObject({
-      error: 'invalid_json',
+      error: 'Invalid JSON in request body',
     });
   });
 

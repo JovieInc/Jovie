@@ -3369,6 +3369,14 @@
       "classification": "C"
     },
     {
+      "source": "apps/web/app/api/internal/ovie/component-certificate-evidence/route.ts",
+      "kind": "handler",
+      "route": "/api/internal/ovie/component-certificate-evidence",
+      "methods": ["POST"],
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
       "source": "apps/web/app/api/internal/ovie/customer-voice/[id]/reply/route.ts",
       "kind": "handler",
       "route": "/api/internal/ovie/customer-voice/[id]/reply",

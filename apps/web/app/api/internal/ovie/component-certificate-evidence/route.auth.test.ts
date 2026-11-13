@@ -5,6 +5,7 @@
  * through the real POST handler, so a wiring regression that route.test.ts's
  * mock would mask still fails here.
  */
+import { NextRequest } from 'next/server';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 const { recordMock } = vi.hoisted(() => ({ recordMock: vi.fn() }));
@@ -15,6 +16,8 @@ vi.mock('@/lib/agent-os/component-certificate-ingest', () => ({
 vi.mock('@/lib/utils/logger', () => ({
   logger: { error: vi.fn(), warn: vi.fn() },
 }));
+
+vi.mock('@/lib/error-tracking', () => ({ captureError: vi.fn() }));
 
 const HEAD_SHA = 'a'.repeat(40);
 
@@ -39,7 +42,7 @@ function packet() {
 async function post(authorization: string | undefined) {
   const { POST } = await import('./route');
   return POST(
-    new Request(
+    new NextRequest(
       'https://jov.ie/api/internal/ovie/component-certificate-evidence',
       {
         method: 'POST',
