@@ -1,6 +1,6 @@
 {
   "file": "apps/web/components/site/PublicPageShell.tsx",
-  "sha256": "9ac44e2e5bfaf2d1922f6446248a7f8a84d139e4b37d37f2ba70faf92230dbc5",
-  "at": "2026-11-09T03:00:11.997Z",
-  "ref": "Carried over unchanged from the single pricing row digest 8e1f02b52a25 certified at 2026-11-09T03:00:11.997Z; that certification is described in the row's evidence.ref in surfaceCensus.json."
+  "sha256": "1d05063a90568570bcb874357beeafef119772e842ee7c92cd609bebf3394531",
+  "at": "2026-11-13T00:37:42.207Z",
+  "ref": "Header and footer chrome CSS imports moved from the root layout into the (marketing) layout and PublicPageShell; no markup change. Verified against a production build served with next start: /pricing answers 200, renders one header-nav and one marketing-footer, and its linked stylesheets carry every class of HeaderNav.css (27) and MarketingFooter.css (13). No browser screenshot was taken; CI surface recertification captures the pixels."
 }
