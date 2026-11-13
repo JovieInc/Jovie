@@ -7922,7 +7922,7 @@ class FixRedTest(unittest.TestCase):
                  "actions": ["wire-ci-fast", "stamp-changelog"],
                  "files": ["scripts/catalog-duplicate-report.test.mjs"]}
 
-        def stamp(host, pr):
+        def stamp(pr, **kwargs):
             order.append("stamp")
             return True
 
@@ -7932,7 +7932,7 @@ class FixRedTest(unittest.TestCase):
             return SimpleNamespace(returncode=0)
 
         receipt = {}
-        with patch.object(lane, "stamp_changelog_decision", side_effect=stamp), \
+        with patch.object(lane.pr_events, "ensure_red_before_green", side_effect=stamp), \
                 patch.object(lane, "wire_ci_fast_fix", side_effect=wire), \
                 patch.object(lane, "run_agent") as agent:
             done = lane.compose_deterministic_fix(None, {"number": 24816, "body": "bare"}, route, Path("."), None, receipt)
@@ -7945,11 +7945,11 @@ class FixRedTest(unittest.TestCase):
         agent.assert_not_called()
         order.clear()
 
-        def stamp_fails(host, pr):
+        def stamp_fails(pr, **kwargs):
             order.append("stamp")
             return False
 
-        with patch.object(lane, "stamp_changelog_decision", side_effect=stamp_fails), \
+        with patch.object(lane.pr_events, "ensure_red_before_green", side_effect=stamp_fails), \
                 patch.object(lane, "wire_ci_fast_fix", side_effect=wire):
             self.assertIsNone(lane.compose_deterministic_fix(
                 None, {"number": 24816, "body": "bare"}, route, Path("."), None, {}))
@@ -7960,14 +7960,29 @@ class FixRedTest(unittest.TestCase):
         other = Mock()
         receipt = {}
         with patch.dict(sys.modules, {"lane_runner": other}), \
-                patch.object(lane, "stamp_changelog_decision", return_value=True) as stamp, \
+                patch.object(lane.pr_events, "ensure_red_before_green", return_value=True) as stamp, \
                 patch.object(lane, "wire_ci_fast_fix", return_value=SimpleNamespace(returncode=0)) as wire:
             done = lane.compose_deterministic_fix(None, {}, route, Path("."), None, receipt)
         self.assertEqual(done.returncode, 0)
-        stamp.assert_called_once_with(None, {})
+        stamp.assert_called_once()
         wire.assert_called_once()
         self.assertEqual(receipt["composedActions"], ["stamp-changelog", "wire-ci-fast"])
         self.assertEqual(other.mock_calls, [], "a new loader must not own an existing repair")
+
+    def test_composed_stamp_preserves_fresh_repair_evidence(self):
+        live = "## Red-before-green\n\n- Failing run: https://github.com/JovieInc/Jovie/actions/runs/42\n"
+        written = []
+        def gh(args, **kwargs):
+            if args[:2] == ["pr", "view"]:
+                return SimpleNamespace(returncode=0, stdout=live)
+            written.append(Path(args[args.index("--body-file") + 1]).read_text())
+            return SimpleNamespace(returncode=0)
+        with patch.object(lane, "gh_call", side_effect=gh), \
+                patch.object(lane, "wire_ci_fast_fix", return_value=SimpleNamespace(returncode=0)):
+            lane.compose_deterministic_fix(None,
+                {"number": 24816, "body": "stale"}, {"actions": ["stamp-changelog", "wire-ci-fast"]}, Path("."), None, {})
+        self.assertTrue(written[0].startswith(live))
+        self.assertEqual(written[0].count("customer-changelog/v1"), 1)
 
     def test_unreadable_or_partial_open_state_is_not_treated_as_an_authorized_target(self):
         for payload in ("not json", "[]", '{"state":"OPEN"}', '{"state":"OPEN","headRefOid":"h1","headRefName":""}'):

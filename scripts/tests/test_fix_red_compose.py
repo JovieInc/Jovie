@@ -19,6 +19,12 @@ class ComposeRouteTest(unittest.TestCase):
         self.assertEqual(set(compose_actions(sorted(leaves))), leaves)
         self.assertEqual(compose_actions([classes.ALIAS_ACTION]), [])
 
+    def test_remote_sync_cannot_compose_with_checkout_repairs(self):
+        from fix_red_compose import composed_route
+
+        self.assertEqual(composed_route([classes.SYNC_MAIN, classes.WIRE_CI_FAST], classes.COMPOSE, classes.AGENT),
+                         ("mixed", classes.AGENT, []))
+
     def test_a_mixed_agent_head_has_no_leaf_actions(self):
         mixed = classes.classify(pr("A", "B"), {"A": "API rate limit exceeded", "B": "AssertionError"})
         self.assertEqual((mixed["cls"], mixed["action"]), ("mixed", "agent"))

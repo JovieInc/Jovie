@@ -28,7 +28,7 @@ def compose_actions(actions: list[str]) -> list[str]:
 def composed_route(raw: list[str], compose: str, agent: str) -> tuple[str, str, list[str]]:
     """(cls, action, actions). A dropped leaf becomes mixed/agent and runs nothing here."""
     actions = compose_actions(raw)
-    if len(actions) != len(dict.fromkeys(raw)):
+    if len(actions) != len(dict.fromkeys(raw)) or (len(actions) > 1 and "sync-main" in actions):
         return "mixed", agent, []
     if len(actions) > 1:
         return "composed", compose, actions
@@ -55,19 +55,18 @@ def compose_deterministic_fix(lane, host, pr, route, worktree, log, receipt):
     import fix_red_classes as classes
 
     actions = compose_actions(route.get("actions") or [])
-    if len(actions) < 2 or any(action not in classes.DETERMINISTIC for action in actions):
+    if len(actions) < 2 or classes.SYNC_MAIN in actions or any(action not in classes.DETERMINISTIC for action in actions):
         return None
     agent = None
     done = []
     for action in actions:
         if action == classes.STAMP_CHANGELOG:
-            if not lane.stamp_changelog_decision(host, pr):
+            if not lane.pr_events.ensure_red_before_green(
+                    pr, customer_decision={"releaseWorthy": False},
+                    sh=lambda args: lane.gh_call(args, priority="repair")):
                 return None
         elif action == classes.RERUN:
             if not lane._rerun_failed(pr):
-                return None
-        elif action == classes.SYNC_MAIN:
-            if lane.pr_events.sync_main(host, lane.THIS, pr, lane.time.time(), terminal_ok=True) != "synced":
                 return None
         else:
             fixer = deterministic_fixer(lane, action)

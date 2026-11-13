@@ -168,7 +168,9 @@ export function providerAlbumId(
   providerKey: string,
   url: string
 ): string | null {
-  const route = ALBUM_ROUTES[providerKey];
+  const route = Object.hasOwn(ALBUM_ROUTES, providerKey)
+    ? ALBUM_ROUTES[providerKey]
+    : null;
   if (!route) return null;
   let parsed: URL;
   try {
@@ -240,7 +242,7 @@ function sumDependents(
   summaries: DuplicateReportReleaseSummary[]
 ): Record<string, number> | null {
   let allExported = true;
-  const totals: Record<string, number> = {};
+  const totals: Record<string, number> = Object.create(null);
   for (const summary of summaries) {
     if (!summary.dependents) {
       allExported = false;

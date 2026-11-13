@@ -28,6 +28,12 @@ function spotifyAlbum(urlId: string): DuplicateReportRelease['providers'] {
 }
 
 describe('providerAlbumId', () => {
+  it('treats inherited object names as unknown providers', () => {
+    for (const key of ['constructor', '__proto__', 'toString']) {
+      expect(providerAlbumId(key, 'https://example.com/no-album')).toBeNull();
+    }
+  });
+
   it('extracts the id from valid album routes, tolerating query/hash/trailing slash', () => {
     expect(
       providerAlbumId('spotify', 'https://open.spotify.com/album/1a2b3c?si=x')
@@ -241,6 +247,19 @@ describe('buildDuplicateReport', () => {
       totalProviderLinks: 2,
       byResource: { smart_links: 3 },
     });
+  });
+
+  it('sums all exported dependent names without inherited dictionary entries', () => {
+    const dependents = JSON.parse('{"constructor":2,"__proto__":3}');
+    const report = buildDuplicateReport({
+      releases: [
+        release({ id: 'a', upc: '123', dependents }),
+        release({ id: 'b', upc: '123', dependents }),
+      ],
+    });
+    expect(JSON.stringify(report.groups[0].dependentInventory.byResource)).toBe(
+      '{"constructor":4,"__proto__":6}'
+    );
   });
 
   it('reports an exact UPC collision even when provider ids differ', () => {
