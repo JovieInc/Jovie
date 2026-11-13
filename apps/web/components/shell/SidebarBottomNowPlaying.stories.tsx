@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
+import { expect, fn, userEvent, waitFor, within } from 'storybook/test';
 import { SidebarBottomNowPlaying } from './SidebarBottomNowPlaying';
 
 const meta = {
@@ -102,4 +103,44 @@ export const RtlOverflow: Story = {
       </div>
     ),
   ],
+};
+
+export const PlaybackDiscoverability: Story = {
+  args: {
+    onPlay: fn(),
+    track: {
+      trackTitle: 'Never Say A Word',
+      artistName: null,
+      artworkUrl: null,
+    },
+  },
+  play: async ({ canvasElement, args }) => {
+    const control = within(canvasElement).getByRole('button', {
+      name: args.isPlaying ? 'Pause' : 'Play',
+      exact: true,
+    });
+    const wrapper = control.parentElement;
+    if (!wrapper)
+      throw new Error('Playback control must have a visibility wrapper');
+    const idleOpacity = matchMedia('(hover: none)').matches ? '1' : '0';
+    await waitFor(() =>
+      expect(getComputedStyle(wrapper).opacity).toBe(idleOpacity)
+    );
+    const bounds = control.getBoundingClientRect().toJSON();
+    await userEvent.tab();
+    await expect(control).toHaveFocus();
+    await waitFor(() => expect(getComputedStyle(wrapper).opacity).toBe('1'));
+    await userEvent.keyboard('{Enter}');
+    await expect(args.onPlay).toHaveBeenCalledOnce();
+    await expect(control.getBoundingClientRect().toJSON()).toEqual(bounds);
+    control.blur();
+    await waitFor(() =>
+      expect(getComputedStyle(wrapper).opacity).toBe(idleOpacity)
+    );
+  },
+};
+
+export const PauseDiscoverability: Story = {
+  ...PlaybackDiscoverability,
+  args: { ...PlaybackDiscoverability.args, isPlaying: true, onPlay: fn() },
 };

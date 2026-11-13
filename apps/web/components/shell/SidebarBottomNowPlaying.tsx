@@ -112,7 +112,7 @@ export const SidebarBottomNowPlaying = React.memo(
               />
             ) : null}
           </ArtworkFrame>
-          <div className='absolute left-1/2 top-1/2 size-7 -translate-x-1/2 -translate-y-1/2 opacity-0 transition-opacity duration-subtle ease-subtle focus-within:opacity-100 group-hover/now-playing:opacity-100'>
+          <div className='absolute left-1/2 top-1/2 size-7 -translate-x-1/2 -translate-y-1/2 opacity-0 transition-opacity duration-subtle ease-subtle focus-within:opacity-100 group-hover/now-playing:opacity-100 [@media(hover:none)]:opacity-100'>
             <Button
               type='button'
               variant='ghost'
