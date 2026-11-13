@@ -1,10 +1,28 @@
 """Markdown-preserving helpers for the existing PR repair evidence writer."""
 from __future__ import annotations
 
+import json
 import re
 
 RED_HEADING = re.compile(r"^#{1,6}\s*red-before-green\s*$", re.I)
 ANY_HEADING = re.compile(r"^#{1,6}\s")
+
+
+def repair_customer_decision(updated: str, decisions: list[str], customer_decision: dict | None) -> str:
+    """Preserve original comments through section replacement before selecting a missing note."""
+    for decision in decisions:
+        if decision not in updated:
+            updated = updated.rstrip("\n") + "\n" + decision + "\n"
+    if customer_decision is not None and not re.search(r"<!--\s*customer-changelog/v1\b", updated):
+        if not isinstance(customer_decision, dict) or type(customer_decision.get("releaseWorthy")) is not bool:
+            raise ValueError("customer decision requires an explicit releaseWorthy boolean")
+        if customer_decision["releaseWorthy"] is False:
+            from fix_red_classes import stamp_internal_changelog
+            updated = stamp_internal_changelog(updated)
+        else:
+            note = json.dumps(customer_decision, separators=(",", ":")).replace("<", "\\u003c").replace(">", "\\u003e")
+            updated = updated.rstrip("\n") + "\n<!-- customer-changelog/v1 " + note + " -->\n"
+    return updated
 
 
 def red_section_bounds(lines: list[str], heading=RED_HEADING) -> tuple[int, int] | None:
