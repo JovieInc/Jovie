@@ -6,7 +6,8 @@ same module with a different body stays unresolved unless the actual diff3
 base proves an additive import change and a full-file binding check passes.
 
 A duplicate UTC-noon test clock pin keeps main's patch target and the head's
-fixed instant. Any other overlap stays unresolved.
+fixed instant. A two-way `it()` pair that shares one trailing `});` is the
+same insertion, with main's test first. Any other overlap stays unresolved.
 """
 from __future__ import annotations
 
