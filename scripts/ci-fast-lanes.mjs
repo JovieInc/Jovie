@@ -1312,7 +1312,7 @@ export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/api-budget.test.mjs',
   'scripts/lib/__tests__/domain-write-guard.test.mjs',
   'scripts/lib/__tests__/screen-audit-receipts.test.mjs',
-  'scripts/lib/__tests__/component-certificate.test.mjs',
+  'scripts/lib/__tests__/component-certificate.test.mjs scripts/lib/__tests__/screen-cert-repair.test.mjs',
   'scripts/lib/__tests__/verify-patched-dependencies.test.mjs',
   'scripts/lib/__tests__/incident-dedupe.test.mjs',
   'scripts/lib/__tests__/ci-capacity.test.mjs',
@@ -1332,15 +1332,13 @@ export const MESH_CURRENT_WIRE_COVERAGE_COMMAND =
   'pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/mesh-current-wire.test.mjs --coverage.enabled --coverage.provider=v8 --coverage.include=lanes/mesh-current-wire.mjs --coverage.reportsDirectory="${RUNNER_TEMP:-/tmp}/jovie-mesh-current-wire-coverage" --coverage.reporter=text --coverage.reporter=json --coverage.reporter=json-summary --coverage.thresholds.perFile=true --coverage.thresholds.lines=90 --coverage.thresholds.statements=90 --coverage.thresholds.branches=85 --coverage.thresholds.functions=100';
 export const VALIDATION_LIFECYCLE_COVERAGE_COMMAND =
   'pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/validation-lifecycle.test.mjs lib/__tests__/validation-sync.test.mjs lib/__tests__/linear-sync-on-merge.test.mjs lib/__tests__/founder-taste-order.test.mjs --maxWorkers=1 --coverage --coverage.include="lib/{validation-lifecycle,validation-sync,linear-sync-on-merge,founder-taste-order}.mjs" --coverage.reporter=text --coverage.reporter=json-summary --coverage.reportsDirectory="${RUNNER_TEMP:-/tmp}/jovie-validation-lifecycle-coverage" --coverage.thresholds.perFile --coverage.thresholds.lines=90 --coverage.thresholds.statements=90 --coverage.thresholds.branches=75 --coverage.thresholds.functions=85';
-// Keep scanner-heavy script contracts outside V8 instrumentation; cover the
-// document helpers with the same behavior test in a small separate process.
-// Release-lineage contracts. Main Health's idle probe (scripts/main-health.mjs --structural) runs the same
-// files: production-release-supersession held the date that expired on 2026-11-10 and failed every group for 8 h.
+// Scanner-heavy script contracts stay outside V8; document helpers run in a small process.
+// Release-lineage contracts also run from Main Health's idle probe (the 2026-11-10 supersession date held groups for 8 h).
 export const RELEASE_LINEAGE_CONTRACT_COMMAND =
   'pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/recheck-main-lineage-auth.test.mjs lib/__tests__/recheck-main-lineage-advancing.test.mjs lib/__tests__/production-release-supersession.test.mjs lib/__tests__/staging-controller-supersession.test.mjs lib/__tests__/staging-receipt-fetch-real-gh.test.mjs lib/__tests__/staging-generation-lineage.test.mjs lib/__tests__/release-lineage-gate.test.mjs lib/__tests__/release-risk-policy.test.mjs lib/__tests__/release-range-risk.test.mjs lib/__tests__/vitest-retry-reporter.test.mjs';
 
 export const SCRIPT_CONTRACT_VITEST_COMMAND = `pnpm exec vitest --root scripts --config vitest.config.mts run ${SCRIPT_CONTRACT_VITEST_TESTS.map(
-  test => test.replace(/^scripts\//u, '')
+  test => test.replace(/(^| )scripts\//gu, '$1')
 ).join(
   ' '
 )} && pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/doc-freshness.test.mjs --coverage --coverage.include=lib/doc-review.mjs --coverage.include=lib/doc-freshness.mjs --coverage.reporter=text --coverage.reporter=json --coverage.reportsDirectory="\${RUNNER_TEMP:-/tmp}/jovie-document-review-coverage" --coverage.thresholds.perFile=true --coverage.thresholds.lines=90 --coverage.thresholds.branches=80 --coverage.thresholds.functions=90 && pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/daily-changelog.test.mjs lib/__tests__/daily-changelog-publication.test.mjs --coverage --coverage.include=lib/daily-changelog.mjs --coverage.include=lib/daily-changelog-publication.mjs --coverage.include=lib/daily-changelog-collector.mjs --coverage.reporter=text --coverage.reporter=json --coverage.reportsDirectory="\${RUNNER_TEMP:-/tmp}/jovie-changelog-coverage" --coverage.thresholds.perFile=true --coverage.thresholds.lines=85 --coverage.thresholds.branches=75 --coverage.thresholds.functions=82`;

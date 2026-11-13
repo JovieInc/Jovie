@@ -103,7 +103,9 @@ export async function structuralCommands(root) {
         '--config',
         'vitest.config.mts',
         'run',
-        ...vitest.map(test => test.replace(/^scripts\//u, '')),
+        ...vitest.flatMap(test =>
+          test.split(' ').map(part => part.replace(/^scripts\//u, ''))
+        ),
       ],
     },
   ];

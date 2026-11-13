@@ -8,7 +8,6 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "lanes"))
 import fix_red_classes as classes  # noqa: E402
 
-
 def pr(*names, merge="BLOCKED"):
     return {"mergeStateStatus": merge, "statusCheckRollup": [{"name": n, "conclusion": "FAILURE"} for n in names]
             + [{"name": "PR Ready", "conclusion": "FAILURE"}, {"name": "ok", "conclusion": "SUCCESS"}]}
@@ -21,6 +20,7 @@ class ClassifyTest(unittest.TestCase):
             "HttpError: API rate limit exceeded for installation": ("platform-infra", "rerun"),
             "Could not fetch gitleaks after 3 attempts (https://example.invalid/gitleaks.tar.gz).": ("platform-infra", "rerun"),
             "##[error]Dependency review detected incompatible licenses.": ("dependency-license", "agent"),
+            "screen certificate gate failed:\n  apps/web/components/jovie/merch-tool-artifacts.tsx [states missing empty]": ("screen-certificate", "repair-screen-cert"),
             "github-quota-deferred\n##[error]Dependency review detected incompatible licenses.": ("dependency-license", "agent"),
             "upstream returned HTTP 500 before the job started": ("platform-infra", "rerun"),
             "Unwired: scripts/a.test.mjs, scripts/b.test.mjs. Wire each file into a ci-fast lane": ("ci-fast-wiring", "wire-ci-fast"),

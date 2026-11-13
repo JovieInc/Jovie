@@ -29,6 +29,7 @@ import machine_gap
 import migration_renumber
 import remediation
 from fix_red_mixed_repairs import first_route_reason, mixed_repairs  # noqa: F401
+from fix_red_screen_cert import SCREEN_CERT_TEXT, screen_cert_paths
 from fix_red_failure_routing import (ALIAS_ACTION, ALIAS_REVIEW_FAILURE, alias_owner_metadata,
                                      error_signature, fingerprint_key, owner_handoff_reason)
 from atomic_state import atomic_write_text
@@ -39,12 +40,12 @@ from fix_red_source_edits import (  # noqa: F401
 
 SCHEMA = "jovie-fix-red-class/v1"
 # Actions a class can route to. `agent` is the default (a model run); the others spend no model.
-RERUN, SYNC_MAIN, WIRE_CI_FAST, RENUMBER, STAMP_CHANGELOG, SNAP_SPACING, STRIP_CACHE, MERGE_NARROWED, REGISTER_DOMAIN, ATOMIC_WRITE, AGENT = (
+RERUN, SYNC_MAIN, WIRE_CI_FAST, RENUMBER, STAMP_CHANGELOG, SNAP_SPACING, STRIP_CACHE, MERGE_NARROWED, REGISTER_DOMAIN, ATOMIC_WRITE, REPAIR_SCREEN_CERT, AGENT = (
     "rerun", "sync-main", "wire-ci-fast", "renumber-migrations", "stamp-changelog", "snap-spacing",
-    "strip-cache-exports", "merge-narrowed-preflight", "register-domain-writes", "atomic-write", "agent")
+    "strip-cache-exports", "merge-narrowed-preflight", "register-domain-writes", "atomic-write", "repair-screen-cert", "agent")
 DETERMINISTIC = frozenset({
     RERUN, SYNC_MAIN, WIRE_CI_FAST, RENUMBER, STAMP_CHANGELOG, SNAP_SPACING, STRIP_CACHE, MERGE_NARROWED,
-    REGISTER_DOMAIN, ATOMIC_WRITE, ALIAS_ACTION})
+    REGISTER_DOMAIN, ATOMIC_WRITE, REPAIR_SCREEN_CERT, ALIAS_ACTION})
 
 # remediation.INFRA_TEXT (runner loss, OOM, 5xx) plus the platform failures seen in 52 agent-declined
 # fix runs. Kept out of INFRA_TEXT: the exhausted-PR classifier deliberately routes a rate-limited
@@ -159,6 +160,8 @@ SIGNATURES = (
     ("ci-fast-wiring", UNWIRED, WIRE_CI_FAST),
     # The license error is the job failure. A passing fixture can echo quota text.
     ("dependency-license", DEPENDENCY_LICENSE, AGENT),
+    # Before quota/platform: a Source Validation log echoes passing-test rate-limit lines beside the gate that failed the job.
+    ("screen-certificate", SCREEN_CERT_TEXT, REPAIR_SCREEN_CERT),
     ("quota-deferred", QUOTA_TEXT, RERUN),
     ("platform-infra", PLATFORM_TEXT, RERUN),
     ("migration-number", migration_renumber.LOG_TEXT, RENUMBER),
@@ -223,6 +226,8 @@ def classify(pr: dict, logs: dict[str, str] | None = None) -> dict:
             found = UNWIRED.search(logs.get(name) or "")
             files.extend(item.strip() for item in (found.group(1).split(",") if found else []) if item.strip())
         files = sorted(set(files))
+    elif cls == "screen-certificate":
+        files = screen_cert_paths("\n".join(logs.get(name) or "" for name in names))
     elif cls == "domain-write":
         files = sorted(_domain_write_hits("\n".join(logs.get(name) or "" for name in names)))
     elif cls == "detached-native-consumer":
@@ -982,7 +987,7 @@ def wire_ci_fast(root: Path, files: list[str]) -> list[str]:
     added = []
     for rel in files:
         if not re.fullmatch(r"scripts/[\w./-]+\.test\.(?:mjs|mts|js|ts)", rel) or ".." in rel \
-                or not (Path(root) / rel).is_file() or f"'{rel}'" in text:
+                or not (Path(root) / rel).is_file() or f"'{rel}'" in text or f"'{rel} " in text:
             continue
         source = (Path(root) / rel).read_text(errors="replace")
         name = "SCRIPT_CONTRACT_VITEST_TESTS" if re.search(r"""from ['"]vitest['"]""", source) else "SCRIPT_CONTRACT_NODE_TESTS"

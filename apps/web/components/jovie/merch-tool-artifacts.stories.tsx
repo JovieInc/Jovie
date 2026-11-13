@@ -28,7 +28,7 @@ export const WithCatalogCandidates: StoryObj<typeof meta> = {
   },
 };
 
-export const WithoutCandidates: StoryObj<typeof meta> = {
+export const EmptyCandidates: StoryObj<typeof meta> = {
   args: {
     message:
       'Jovie could not find a confirmed catalog title. Add a title or provide a phrase you own before generating artwork.',
