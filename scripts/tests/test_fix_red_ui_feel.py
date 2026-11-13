@@ -98,6 +98,20 @@ class UiFeelTest(unittest.TestCase):
             self.assertEqual(path.read_text(encoding="utf-8"), original)
             self.assertEqual(list(path.parent.iterdir()), [path])
 
+    def test_reported_dynamic_route_and_main_heading_forms_are_repaired(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            path = root / "apps/web/app/[username]/page.tsx"
+            path.parent.mkdir(parents=True)
+            path.write_text("<h2>Account setup</h2>\n<h3 className={`title`}>Profile</h3>\n", encoding="utf-8")
+            log = BLOCK.replace("components/features/demo/DemoReleaseTasksSurface.tsx", "app/[username]/page.tsx").replace("missingTabularNums", "headingNeedsBalance")
+            self.assertEqual(ui_feel.apply(root, log), ["apps/web/app/[username]/page.tsx"])
+            self.assertEqual(path.read_text(encoding="utf-8"), '<h2 className="text-balance">Account setup</h2>\n<h3 className={`text-balance title`}>Profile</h3>\n')
+            self.assertEqual(ui_feel.apply(root, log), [])
+
+    def test_heading_without_class_keeps_main_repair_behavior(self):
+        self.assertEqual(ui_feel.insert_token("<h2>Account setup</h2>", "headingNeedsBalance"), '<h2 className="text-balance">Account setup</h2>')
+
     def test_publish_skips_commit_when_the_log_has_no_block(self):
         class Result:
             returncode = 0

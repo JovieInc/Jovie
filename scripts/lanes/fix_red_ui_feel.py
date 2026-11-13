@@ -11,19 +11,16 @@ from pathlib import Path
 
 import fix_red_rewrite
 from atomic_state import atomic_write_text
+from fix_red_source_edits import balance_heading_line
 
 MARKER = "[lint:ui-feel] new violations on lines this change adds:"
 END = "[lint:ui-feel] see eslint-rules"
 _HIT = re.compile(
-    r"(?P<path>(?:apps/web/)?[\w./()@+-]+\.(?:tsx|jsx|ts|js)):(?P<line>\d+)[ \t]+"
+    r"(?P<path>(?:apps/web/)?[\w./()\[\]@+-]+\.(?:tsx|jsx|ts|js)):(?P<line>\d+)[ \t]+"
     r"(?P<kind>missingTabularNums|headingNeedsBalance)\b")
 _CLASS = re.compile(r"""className=(['"])(.*?)\1""")
 _TOKENS = {
     "missingTabularNums": ("tabular-nums", ("tabular-nums", "font-variant-numeric")),
-    "headingNeedsBalance": (
-        "text-balance",
-        ("text-balance", "text-pretty", "text-wrap", "text-nowrap", "truncate",
-         "sr-only", "whitespace-nowrap", "line-clamp-")),
 }
 
 
@@ -75,6 +72,8 @@ def _has(parts: list[str], token: str) -> bool:
 
 def insert_token(line: str, kind: str) -> str | None:
     """Return the line with the kind's token, the same line when already exempt, or None."""
+    if kind == "headingNeedsBalance":
+        return balance_heading_line(line)
     spec = _TOKENS.get(kind)
     if spec is None or "className={" in line:
         return None
@@ -107,7 +106,7 @@ def _safe(root: Path, rel: str) -> Path | None:
 
 
 def apply(root: Path, log: str) -> list[str]:
-    """Write every reported token, or nothing. Paths are repo-relative."""
+    """Validate every edit before replacing files atomically, one file at a time."""
     rows = hits(log)
     if not rows:
         return []
