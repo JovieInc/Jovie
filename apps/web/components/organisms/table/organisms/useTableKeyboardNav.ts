@@ -114,6 +114,14 @@ export function useTableKeyboardNav<TData>({
   const handleKeyDown = useCallback(
     (event: React.KeyboardEvent, rowIndex: number, rowData: TData) => {
       if (!enabled || rowCount === 0) return;
+      // Row shortcuts belong to the focused row, never a nested button or
+      // a portalled menu whose events bubble back through the React tree.
+      if (
+        event.defaultPrevented ||
+        (event.currentTarget && event.target !== event.currentTarget)
+      ) {
+        return;
+      }
 
       // Shifted letter selection belongs to these rows. Other consumers of
       // the shared mapper retain their ordinary j/k bindings.

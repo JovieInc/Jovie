@@ -14,11 +14,15 @@ function isSeparatorItem(id: string): boolean {
 const DEFAULT_TRIGGER_CLASS_NAME = [
   'ml-auto',
   'inline-flex h-7 w-7 items-center justify-center',
+  // A row owns its content budget. Dense rows have less room than the
+  // default trigger: constrain both axes so the face stays square, centered,
+  // and unclipped instead of overflowing the cell's stable-height wrapper.
+  'max-h-(--table-cell-content-height) max-w-(--table-cell-content-height)',
   'rounded-full border border-transparent bg-transparent',
   'text-tertiary-token transition-colors duration-fast ease-interactive',
   'hover:bg-surface-1 hover:text-primary-token',
   'focus-visible:outline-none focus-visible:bg-surface-1',
-  'focus-visible:ring-1 focus-visible:ring-focus/50',
+  'focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-focus/50',
 ].join(' ');
 
 /**

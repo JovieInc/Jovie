@@ -28,6 +28,38 @@ function renderNav(onRowToggle?: (row: string) => void) {
 }
 
 describe('useTableKeyboardNav', () => {
+  it.each(['Enter', ' ', 'ArrowDown', 'ArrowUp', 'Home', 'End', 'x'])(
+    'leaves %s to the focused child control',
+    key => {
+      const { handleKeyDown, onRowClick } = renderNav();
+      const row = document.createElement('tr');
+      const button = document.createElement('button');
+      row.append(button);
+      const event = {
+        ...keyEvent(key),
+        target: button,
+        currentTarget: row,
+      } as unknown as KeyboardEvent;
+      handleKeyDown(event, 0, 'row-a');
+      expect(onRowClick).not.toHaveBeenCalled();
+      expect(event.preventDefault).not.toHaveBeenCalled();
+    }
+  );
+
+  it('does not reactivate an already handled key', () => {
+    const { handleKeyDown, onRowClick } = renderNav();
+    const row = document.createElement('tr');
+    const event = {
+      ...keyEvent('Enter'),
+      target: row,
+      currentTarget: row,
+      defaultPrevented: true,
+    } as unknown as KeyboardEvent;
+    handleKeyDown(event, 0, 'row-a');
+    expect(onRowClick).not.toHaveBeenCalled();
+    expect(event.preventDefault).not.toHaveBeenCalled();
+  });
+
   it('opens the row on Space when no toggle is given', () => {
     const { handleKeyDown, onRowClick } = renderNav();
     handleKeyDown(keyEvent(' '), 0, 'row-a');

@@ -6,6 +6,35 @@ import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import { TableActionMenu } from './TableActionMenu';
 
 describe('TableActionMenu', () => {
+  it('restores keyboard focus after Escape without activating a row', async () => {
+    const user = userEvent.setup();
+    const onRowClick = vi.fn();
+    const onAction = vi.fn();
+    render(
+      <table>
+        <tbody>
+          <tr onClick={onRowClick}>
+            <td>
+              <TableActionMenu
+                items={[{ id: 'copy', label: 'Copy', onClick: onAction }]}
+              />
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    );
+    const trigger = screen.getByRole('button', { name: 'More actions' });
+    await user.tab();
+    expect(trigger).toHaveFocus();
+    await user.keyboard('{Enter}');
+    expect(screen.getByRole('menu')).toBeInTheDocument();
+    await user.keyboard('{Escape}');
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument();
+    expect(trigger).toHaveFocus();
+    expect(onRowClick).not.toHaveBeenCalled();
+    expect(onAction).not.toHaveBeenCalled();
+  });
+
   it('opens from its trigger and runs the chosen action', async () => {
     const user = userEvent.setup();
     const onCopy = vi.fn();
