@@ -228,7 +228,7 @@ function DesktopSurfaceCard({
   return (
     <section
       className={cn(
-        'rounded-2xl border border-white/6 bg-white/[0.025] p-5',
+        'min-w-0 rounded-2xl border border-white/6 bg-white/[0.025] p-5',
         className
       )}
       data-testid={testId}
@@ -490,7 +490,7 @@ export function ProfileDesktopSurface({
       data-side-rail-enabled={canGetUpdates ? 'true' : 'false'}
     >
       <div
-        className='grid min-h-0 min-w-0 gap-3.5 [@media(min-width:1180px)]:contents'
+        className='grid min-h-0 min-w-0 grid-cols-1 gap-3.5 [@media(min-width:1180px)]:contents'
         data-testid='profile-desktop-main-content'
       >
         {/* Composition rule (#11899): the desktop cover is a fixed standard
@@ -597,7 +597,7 @@ export function ProfileDesktopSurface({
         </section>
 
         <div
-          className='grid min-h-0 min-w-0 content-start gap-3.5 [@media(min-width:1180px)]:col-start-2 [@media(min-width:1180px)]:row-start-1'
+          className='grid min-h-0 min-w-0 grid-cols-1 content-start gap-3.5 [@media(min-width:1180px)]:col-start-2 [@media(min-width:1180px)]:row-start-1'
           data-testid='profile-desktop-secondary-grid'
         >
           <DesktopSurfaceCard
@@ -707,7 +707,7 @@ export function ProfileDesktopSurface({
 
       <div
         className={cn(
-          'min-h-0 min-w-0 gap-3.5',
+          'min-h-0 min-w-0 grid-cols-1 gap-3.5',
           canGetUpdates
             ? 'grid [@media(min-width:1180px)]:col-start-3 [@media(min-width:1180px)]:row-start-1'
             : 'hidden'
