@@ -4,7 +4,9 @@ import { dirname, join } from 'node:path';
 import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 import {
+  ProducerJobDeferredError,
   resolveProducerJobId,
+  resolveProducerJobIdWithHold,
   selectProducerJobId,
   UNKNOWN_PRODUCER_JOB_NAME,
 } from './resolve-screenshot-producer-job.mjs';
@@ -60,6 +62,7 @@ test('resolveProducerJobId waits through unknown-job then accepts the real name'
     delays: [0, 0],
     fetchJobs: async () => payloads[reads++] ?? payloads.at(-1),
     sleep: async () => undefined,
+    lagSleep: async () => undefined,
   });
   assert.deepEqual(result, { status: 'resolved', id: '88' });
   assert.equal(reads, 2);
@@ -78,6 +81,7 @@ test('resolveProducerJobId does not accept a permanent unknown-job', async () =>
       };
     },
     sleep: async () => undefined,
+    lagSleep: async () => undefined,
   });
   assert.deepEqual(result, { status: 'pending', reason: 'unknown-job' });
   assert.equal(reads, 3);
@@ -97,4 +101,60 @@ test('screenshot workflow resolves the producer job through the retry helper', (
   );
   assert.equal(workflow.includes('resolve-screenshot-producer-job.mjs'), true);
   assert.equal(workflow.includes(UNKNOWN_PRODUCER_JOB_NAME), false);
+});
+
+test('the hold runner retries a quota deferral and resolves when the budget recovers', async () => {
+  let reads = 0;
+  let clock = 0;
+  const id = await resolveProducerJobIdWithHold({
+    fetchJobs: async () => {
+      reads += 1;
+      if (reads < 3) throw new ProducerJobDeferredError();
+      return { jobs: [producer(42)] };
+    },
+    holdBudgetMs: 10 * 60_000,
+    intervalMs: 30_000,
+    now: () => {
+      clock += 35_000;
+      return clock;
+    },
+    sleep: async () => undefined,
+    lagSleep: async () => undefined,
+  });
+  assert.equal(id.id, '42');
+  assert.equal(reads, 3);
+});
+
+test('the hold runner still exits deferred when the budget cannot recover (no green-wash)', async () => {
+  let clock = 0;
+  await assert.rejects(
+    resolveProducerJobIdWithHold({
+      fetchJobs: async () => {
+        throw new ProducerJobDeferredError();
+      },
+      holdBudgetMs: 8 * 60_000,
+      intervalMs: 30_000,
+      now: () => {
+        clock += 31_000;
+        return clock;
+      },
+      sleep: async () => undefined,
+      lagSleep: async () => undefined,
+    }),
+    error => error instanceof ProducerJobDeferredError
+  );
+});
+
+test('the hold runner keeps real resolution failures loud (not deferred)', async () => {
+  await assert.rejects(
+    resolveProducerJobIdWithHold({
+      fetchJobs: async () => ({ jobs: [] }),
+      holdBudgetMs: 60_000,
+      intervalMs: 1_000,
+      now: () => Date.now(),
+      sleep: async () => undefined,
+      lagSleep: async () => undefined,
+    }),
+    /Could not resolve the current producer job ID/
+  );
 });
