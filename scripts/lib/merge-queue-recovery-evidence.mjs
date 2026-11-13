@@ -1,3 +1,4 @@
+// api-budget: github-actions-token 15/hr - existing 20-minute liveness gate, at most one linked-PR query plus four closure-proof reads per run
 import { hasExactSuccessfulMergeGroupProof } from '../../.github/scripts/verify-main-release-readiness.mjs';
 import { createGitHubClient } from '../../packages/api-client/github.ts';
 import { ADMISSION_BLOCKING_LABELS } from './admission-hold-labels.mjs';
