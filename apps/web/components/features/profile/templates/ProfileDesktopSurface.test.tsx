@@ -1154,7 +1154,6 @@ describe('ProfileDesktopSurface', () => {
       'data-mode',
       'profile'
     );
-
     const overview = screen.getByTestId('profile-desktop-home-overview');
     expect(overview).toHaveClass(
       '[@media(min-width:1180px)]:grid-cols-[minmax(420px,520px)_minmax(0,1fr)_320px]'
@@ -1164,6 +1163,7 @@ describe('ProfileDesktopSurface', () => {
     );
 
     const secondary = screen.getByTestId('profile-desktop-secondary-grid');
+    expect(secondary).toHaveClass('grid-cols-1', 'min-w-0'); // 1440px overlap
     const selectedWork = within(secondary).getByText('Selected work');
     const events = within(secondary).getByText('Events');
     expect(

@@ -50,6 +50,10 @@ vi.mock('@/lib/synthetic/passage-token.server', () => ({
 vi.mock('@/lib/onboarding/start-entry-profile.server', () => ({
   resolveStartEntryProfile: vi.fn().mockResolvedValue(null),
 }));
+vi.mock('@/lib/waitlist/winback-resume.server', () => ({
+  resolveWinbackResumeToken: vi.fn().mockResolvedValue(null),
+  recordWinbackResumeClick: vi.fn().mockResolvedValue(undefined),
+}));
 vi.mock('@/lib/onboarding/session', () => ({
   getCurrentOnboardingSessionId: vi.fn().mockResolvedValue(null),
 }));
