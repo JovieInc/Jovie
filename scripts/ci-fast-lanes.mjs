@@ -14,9 +14,6 @@
  * later lanes behind the first red one. Skipped lanes still emit a receipt.
  * CI_FAST_FAIL_FAST=false retains structural after failures; no selector runs all lanes.
  *
- * Usage:
- *   node scripts/ci-fast-lanes.mjs [with CI_FAST_LANE_GROUP=<group>]
- *
  * Env:
  *   GITHUB_EVENT_NAME, GITHUB_BASE_REF, GITHUB_REF, GITHUB_STEP_SUMMARY
  *   CI_FAST_LANE_GROUP — hosted group selector; omitted locally runs all lanes
@@ -1116,6 +1113,7 @@ export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
   'scripts/lib/__tests__/wake-fanout-contract.test.mjs',
   'scripts/design-system-source-ratchet.test.mjs',
   'scripts/review-escapes.test.mjs',
+  'scripts/catalog-duplicate-report.test.mjs',
 ]);
 export const DEPRECATION_COVERAGE_COMMAND =
   'node --test --experimental-test-coverage --test-coverage-include=scripts/deprecation-clearance.mjs --test-coverage-include=scripts/lib/deprecation-observation.mjs --test-coverage-lines=90 --test-coverage-branches=80 --test-coverage-functions=90 scripts/deprecation-clearance.test.mjs';
