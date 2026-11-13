@@ -68,3 +68,40 @@ def before_local_dispatch(runner, host, name, spec, issue, receipt, ident, claim
                    endedAt=runner.now_iso(), result={"verdict": "capability-blocked", "pr": None, "commit": None})
     runner.append_json_object(host.state / "runs" / "ledger.jsonl", receipt)
     return receipt
+
+
+def finish_admission(runner, host, name, spec, issue, linear, receipt, ident, coordination):
+    """Finish the existing claim/cloud gate before the local capability preflight."""
+    runs = host.state / "runs"
+    claimed = receipt.get("execution")
+    if not receipt.get("verdict") and not claimed["admitted"]:
+        receipt.update(verdict="duplicate-active" if claimed["reason"] == "duplicate_active" else "quarantined",
+                       reasons=[claimed["reason"]])
+    if receipt.get("verdict"):
+        verdict = receipt["verdict"]
+        receipt.update(endedAt=runner.now_iso(),
+                       result={"verdict": verdict, "commit": None, "pr": None, "prUrl": None})
+        runner.append_json_object(runs / "ledger.jsonl", receipt)
+        return receipt
+    cloud = runner.cloud_lane_dispatch.execution_gate(runner, host, issue, linear, name, claimed)
+    if cloud is not None:
+        return runner.cloud_lane_dispatch.record_receipt(runner, runs, receipt, cloud)
+    try:
+        capability_hold = before_local_dispatch(
+            runner, host, name, spec, issue, receipt, ident, claimed, coordination)
+    except (OSError, ValueError, subprocess.SubprocessError, RuntimeError) as error:
+        # Unknown adapter/transport state is not a product failure or permission to dispatch.
+        receipt.update(verdict="capability-blocked", reasons=[f"capability-adapter-unavailable:{type(error).__name__}"],
+                       endedAt=runner.now_iso(), result={"verdict": "capability-blocked", "pr": None, "commit": None})
+        runner.append_json_object(runs / "ledger.jsonl", receipt)
+        capability_hold = receipt
+    if capability_hold is not None:
+        return capability_hold
+
+
+def release_blocked(slot, verdict):
+    """Retain the original run/fence/request without spending issue or provider retries."""
+    if verdict != "capability-blocked":
+        return False
+    slot.release()
+    return True

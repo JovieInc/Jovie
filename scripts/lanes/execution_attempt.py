@@ -7,6 +7,7 @@ from pathlib import Path
 import sys
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import lifecycle  # noqa: E402
+from execution_mirror import mirror_capability_chain, mirror_rows as _mirror_rows  # noqa: E402
 SCHEMA, GITHUB_LEDGER_ANCHOR = "jovie-execution-attempt/v1", "cd29469b1fa2c433135f23bbfca273e674934676"
 TERMINAL = frozenset({"succeeded", "no_op_stale", "canceled", "failed_known", "failed_unknown", "budget_exhausted", "quarantined", "superseded", "dead_lettered"})
 RETRYABLE = frozenset({"provider_outage", "flaky_infra", "repair_incomplete", "target_state_unavailable"})
@@ -14,16 +15,6 @@ def digest(value) -> str: return hashlib.sha256(json.dumps(value, sort_keys=True
 def identity(domain: str, work: dict, generation) -> dict:
     work_key, generation = f"{domain}:{digest(work)}", digest(generation)
     return {"workKey": work_key, "executionGeneration": generation, "identityDigest": digest({"workKey": work_key, "generation": generation})}
-def _mirror_rows(text: str) -> list[dict]:
-    """A crash or full disk can tear the last append. The local file mirrors the GitHub ledger,
-    so a torn final line (no newline) is dropped, never fatal: one torn line failed every
-    fix-red claim on Gem from 2026-10-26 07:30Z. Interior corruption still raises."""
-    lines = text.split("\n")
-    if lines[-1] == "": lines.pop()
-    else:
-        try: json.loads(lines[-1])
-        except json.JSONDecodeError: lines.pop()
-    return [json.loads(line) for line in lines if line]
 def _ends_open(path: Path) -> bool:
     if not path.exists() or not path.stat().st_size: return False
     with open(path, "rb") as handle:
@@ -320,14 +311,17 @@ def _locked(path: Path, ident: dict, coordination: dict | None, fn, *, now=None)
             # is unknown. Do not turn this invocation into another authorization.
             if recovered["event"] == "boundary_admitted": raise RuntimeError("execution-coordinator-recovered-boundary")
         result, additions = fn(rows)
-        if not additions: return result
+        if not additions:
+            mirror_capability_chain(_for, _file_locked, path, ident, rows)
+            return result
         if len(additions) != 1: raise RuntimeError("execution-coordinator-non-atomic-append")
         event_id = _github_append(coordination, ident, additions[0], head)
         if event_id is None: continue
         canonical, canonical_head = _github_rows(coordination, ident)
         winner = next((row for row in canonical if row.get("_remote", {}).get("eventId") == event_id), None)
         if winner:
-            _file_locked(path, lambda _rows: (None, [winner]))
+            if not mirror_capability_chain(_for, _file_locked, path, ident, canonical):
+                _file_locked(path, lambda _rows: (None, [winner]))
             if isinstance(result, dict) and result.get("admitted"):
                 if (canonical[-1] is not winner or any(row.get("terminalState") in TERMINAL or row.get("event") == "completion_fenced"
                     or (row.get("event") == "attempt_finished" and row.get("fencingToken") == winner.get("fencingToken")) for row in canonical)

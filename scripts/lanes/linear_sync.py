@@ -18,6 +18,7 @@ from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
 
+from linear_state import read_state, write_state as _write
 from atomic_state import atomic_write_text
 
 TEAMS = ("JOV", "LYB")
@@ -73,32 +74,7 @@ COMMENTS_QUERY = 'query($id:String!){issue(id:$id){comments(first:20){nodes{body
 
 
 def _read(path: Path, schema: str) -> dict:
-    try:
-        data = json.loads(path.read_text())
-    except FileNotFoundError:
-        return {"schema": schema}
-    except (OSError, ValueError):
-        if schema == OUTBOX:
-            raise ValueError("linear-outbox-unreadable-preserve-delivery-history") from None
-        return {"schema": schema}
-    if schema == OUTBOX and (not isinstance(data, dict) or data.get("schema") != schema):
-        raise ValueError("linear-outbox-schema-invalid-preserve-delivery-history")
-    return data if isinstance(data, dict) and data.get("schema") == schema else {"schema": schema}
-
-
-def _write(path: Path, data: dict) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    tmp = path.with_name(f".{path.name}.{os.getpid()}.tmp")
-    with open(tmp, "w") as handle:
-        handle.write(json.dumps(data, separators=(",", ":")))
-        handle.flush()
-        os.fsync(handle.fileno())
-    os.replace(tmp, path)
-    directory = os.open(path.parent, os.O_RDONLY)
-    try:
-        os.fsync(directory)
-    finally:
-        os.close(directory)
+    return read_state(path, schema, strict=schema == OUTBOX)
 
 
 @contextmanager
@@ -504,10 +480,7 @@ def flush(state: Path, linear, admit, transient=(), limit: int = FLUSH_LIMIT, bu
     # Same scheduler and budget; capability uncertainty never enters generic comment retries.
     import capability_outbox
     started = time.monotonic()
-    try:
-        capability_delivery = capability_outbox.flush(state, linear, admit, limit=min(limit, 10), budget_s=budget_s)
-    except Exception as error:
-        capability_delivery = [{"delivered": False, "reason": f"capability-adapter:{type(error).__name__}"}]
+    capability_delivery = capability_outbox.safe_flush(state, linear, admit, limit=min(limit, 10), budget_s=budget_s)
     entries = list(_read(_outbox_path(state), OUTBOX).get("entries") or [])
     delivered, outcome = [], "drained"
     for entry in entries[:limit]:

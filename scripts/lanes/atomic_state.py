@@ -10,13 +10,23 @@ import stat
 from pathlib import Path
 
 
-def atomic_write_text(path, text: str, encoding: str = "utf-8") -> None:
+def atomic_write_text(path, text: str, encoding: str = "utf-8", *, durable: bool = False) -> None:
     # A symlinked state file must keep pointing at its target: replace the target, never the link.
     path = Path(os.path.realpath(path))
     staged = path.with_name(f".{path.name}.{os.getpid()}.{uuid.uuid4().hex[:8]}.tmp")
     try:
-        staged.write_text(text, encoding=encoding)
+        with staged.open("w", encoding=encoding) as handle:
+            handle.write(text)
+            if durable:
+                handle.flush()
+                os.fsync(handle.fileno())
         os.replace(staged, path)
+        if durable:
+            directory = os.open(path.parent, os.O_RDONLY)
+            try:
+                os.fsync(directory)
+            finally:
+                os.close(directory)
     finally:
         staged.unlink(missing_ok=True)
 

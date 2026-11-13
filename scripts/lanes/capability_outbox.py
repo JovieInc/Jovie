@@ -164,3 +164,11 @@ def flush(state, linear, admit, *, limit=10, now=None, budget_s=45):
         result = _update(state, key, "delivery-settle", now, selected=selected, sent=sent, receipt=receipt)
         results.append({"key": key, **result})
     return results
+
+
+def safe_flush(state, linear, admit, **options):
+    """A broken capability adapter must not stop unrelated outbox work."""
+    try:
+        return flush(state, linear, admit, **options)
+    except Exception as error:
+        return [{"delivered": False, "reason": f"capability-adapter:{type(error).__name__}"}]

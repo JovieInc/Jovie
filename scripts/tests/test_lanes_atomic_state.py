@@ -13,6 +13,7 @@ import ast
 import sys
 import tempfile
 import unittest
+from unittest.mock import patch
 from pathlib import Path
 
 LANES = Path(__file__).resolve().parents[1] / "lanes"
@@ -80,6 +81,28 @@ class AtomicStateGuardTest(unittest.TestCase):
             missing = Path(tmp) / "absent" / "state.json"
             with self.assertRaises(OSError):
                 atomic_write_text(missing, "x")
+
+
+    def test_durable_replacement_syncs_before_and_after_rename_and_preserves_old_on_failure(self):
+        import atomic_state
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp) / "state.json"
+            target.write_text("old")
+            events = []
+            real_replace = atomic_state.os.replace
+            def replace(source, destination):
+                events.append("replace")
+                real_replace(source, destination)
+            with patch.object(atomic_state.os, "fsync", side_effect=lambda _: events.append("sync")), \
+                    patch.object(atomic_state.os, "replace", side_effect=replace):
+                atomic_write_text(target, "new", durable=True)
+            self.assertEqual(events, ["sync", "replace", "sync"])
+            self.assertEqual(target.read_text(), "new")
+            with patch.object(atomic_state.os, "fsync", side_effect=OSError("disk unavailable")):
+                with self.assertRaises(OSError):
+                    atomic_write_text(target, "unsafe", durable=True)
+            self.assertEqual(target.read_text(), "new")
+            self.assertEqual([p.name for p in Path(tmp).iterdir()], ["state.json"])
 
 
     def test_a_symlinked_state_file_keeps_its_link_and_the_target_is_replaced(self):
