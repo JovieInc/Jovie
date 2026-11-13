@@ -2,7 +2,7 @@ import { render } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { HeaderNav } from '@/components/organisms/HeaderNav';
-import { UserButton } from '@/components/organisms/user-button';
+import { LazyUserButton } from '@/components/organisms/user-button/user-button.lazy';
 import { APP_ROUTES } from '@/constants/routes';
 
 // Clerk hooks are pulled transitively by UserButton/AuthActions; the signed-out
@@ -43,7 +43,7 @@ describe('HeaderNav authenticated mobile user slot', () => {
     }>;
     // JOV-5349: production must render the design-system showUserInfo variant,
     // not the bare compact avatar default.
-    expect(slot.type).toBe(UserButton);
+    expect(slot.type).toBe(LazyUserButton);
     expect(slot.props.showUserInfo).toBe(true);
     expect(slot.props.settingsHref).toBe(APP_ROUTES.SETTINGS);
   });

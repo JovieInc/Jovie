@@ -31,6 +31,16 @@
  *     non-zero stops starting structural commands (fail-fast)
  */
 
+import {
+  escapeAnnotationMessage,
+  escapeAnnotationProperty,
+} from './lib/ci-fast-annotations.mjs';
+
+export {
+  escapeAnnotationMessage,
+  escapeAnnotationProperty,
+} from './lib/ci-fast-annotations.mjs';
+
 import { spawn, spawnSync } from 'node:child_process';
 import {
   appendFileSync,
@@ -1122,6 +1132,22 @@ export const SCRIPT_CONTRACT_NODE_COMMAND = `${PR_OPEN_COVERAGE_COMMAND} && ${DE
 )
   .map(args => `node ${args.join(' ')}`)
   .join(' && ')}`;
+export const MESH_HOST_ACK_COVERAGE_COMMAND =
+  'pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/mesh-host-ack.test.mjs --coverage.enabled --coverage.provider=v8 --coverage.include=lanes/mesh-host-ack.mjs --coverage.reportsDirectory="${RUNNER_TEMP:-/tmp}/jovie-mesh-host-ack-coverage" --coverage.reporter=text --coverage.reporter=json --coverage.reporter=json-summary --coverage.thresholds.perFile=true --coverage.thresholds.lines=99 --coverage.thresholds.statements=99 --coverage.thresholds.branches=90 --coverage.thresholds.functions=100';
+export const MESH_NATIVE_TERMINAL_COVERAGE_COMMAND =
+  'pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/mesh-native-terminal.test.mjs --coverage.enabled --coverage.provider=v8 --coverage.include=lanes/mesh-native-terminal.mjs --coverage.reportsDirectory="${RUNNER_TEMP:-/tmp}/jovie-mesh-native-terminal-coverage" --coverage.reporter=text --coverage.reporter=json --coverage.reporter=json-summary --coverage.thresholds.perFile=true --coverage.thresholds.lines=90 --coverage.thresholds.statements=90 --coverage.thresholds.branches=85 --coverage.thresholds.functions=90';
+export const MESH_RUNTIME_BUNDLE_COVERAGE_COMMAND =
+  'pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/mesh-runtime-bundle.test.mjs --coverage.enabled --coverage.provider=v8 --coverage.include=lanes/mesh-runtime-bundle.mjs --coverage.reportsDirectory="${RUNNER_TEMP:-/tmp}/jovie-mesh-runtime-bundle-coverage" --coverage.reporter=text --coverage.reporter=json --coverage.reporter=json-summary --coverage.thresholds.perFile=true --coverage.thresholds.lines=90 --coverage.thresholds.statements=90 --coverage.thresholds.branches=85 --coverage.thresholds.functions=100';
+export const MESH_CURRENT_WIRE_COVERAGE_COMMAND =
+  'pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/mesh-current-wire.test.mjs --coverage.enabled --coverage.provider=v8 --coverage.include=lanes/mesh-current-wire.mjs --coverage.reportsDirectory="${RUNNER_TEMP:-/tmp}/jovie-mesh-current-wire-coverage" --coverage.reporter=text --coverage.reporter=json --coverage.reporter=json-summary --coverage.thresholds.perFile=true --coverage.thresholds.lines=90 --coverage.thresholds.statements=90 --coverage.thresholds.branches=85 --coverage.thresholds.functions=100';
+export const VALIDATION_LIFECYCLE_COVERAGE_COMMAND =
+  'pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/validation-lifecycle.test.mjs lib/__tests__/validation-sync.test.mjs lib/__tests__/linear-sync-on-merge.test.mjs lib/__tests__/founder-taste-order.test.mjs --maxWorkers=1 --coverage --coverage.include="lib/{validation-lifecycle,validation-sync,linear-sync-on-merge,founder-taste-order}.mjs" --coverage.reporter=text --coverage.reporter=json-summary --coverage.reportsDirectory="${RUNNER_TEMP:-/tmp}/jovie-validation-lifecycle-coverage" --coverage.thresholds.perFile --coverage.thresholds.lines=90 --coverage.thresholds.statements=90 --coverage.thresholds.branches=75 --coverage.thresholds.functions=85';
+// Keep scanner-heavy script contracts outside V8 instrumentation; cover the
+// document helpers with the same behavior test in a small separate process.
+// Release-lineage contracts. Main Health's idle probe (scripts/main-health.mjs --structural) runs the same
+// files: production-release-supersession held the date that expired on 2026-11-10 and failed every group for 8 h.
+export const RELEASE_LINEAGE_CONTRACT_COMMAND =
+  'pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/recheck-main-lineage-auth.test.mjs lib/__tests__/recheck-main-lineage-advancing.test.mjs lib/__tests__/production-release-supersession.test.mjs lib/__tests__/staging-controller-supersession.test.mjs lib/__tests__/staging-receipt-fetch-real-gh.test.mjs lib/__tests__/staging-generation-lineage.test.mjs lib/__tests__/release-lineage-gate.test.mjs lib/__tests__/release-risk-policy.test.mjs lib/__tests__/release-range-risk.test.mjs lib/__tests__/vitest-retry-reporter.test.mjs';
 export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/merge-group-failure-hold.test.mjs',
   'scripts/lib/__tests__/mesh-host-ack.test.mjs',
@@ -1133,6 +1159,7 @@ export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/cert-bottleneck.test.mjs',
   'scripts/lib/__tests__/self-hosted-workspace-reset-contract.test.mjs',
   'scripts/lib/__tests__/ci-timing-collector.test.mjs',
+  'scripts/lib/__tests__/ci-timing-github.test.mjs',
   'scripts/lib/__tests__/turbo-cache-stats.test.mjs',
   'scripts/lib/__tests__/mesh-native-terminal.test.mjs',
   'scripts/lib/__tests__/mesh-runtime-bundle.test.mjs',
@@ -1269,6 +1296,8 @@ export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/sparse-checkout-import-closure.test.mjs',
   'scripts/lib/__tests__/shipping-slo-collector.test.mjs',
   'scripts/lib/__tests__/shipping-slo.test.mjs',
+  'scripts/lib/__tests__/shipping-slo-history.test.mjs',
+  'scripts/lib/__tests__/stage-collect-linear.test.mjs',
   'scripts/lib/__tests__/stage-derive.test.mjs',
   'scripts/lib/__tests__/stage-events.test.mjs',
   'scripts/lib/__tests__/stale-pr-base-sha.test.mjs',
@@ -1322,23 +1351,6 @@ export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/workers-inventory.test.mjs',
   'scripts/lib/__tests__/setup-pinned-node.test.mjs',
 ]);
-export const MESH_HOST_ACK_COVERAGE_COMMAND =
-  'pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/mesh-host-ack.test.mjs --coverage.enabled --coverage.provider=v8 --coverage.include=lanes/mesh-host-ack.mjs --coverage.reportsDirectory="${RUNNER_TEMP:-/tmp}/jovie-mesh-host-ack-coverage" --coverage.reporter=text --coverage.reporter=json --coverage.reporter=json-summary --coverage.thresholds.perFile=true --coverage.thresholds.lines=99 --coverage.thresholds.statements=99 --coverage.thresholds.branches=90 --coverage.thresholds.functions=100';
-export const MESH_NATIVE_TERMINAL_COVERAGE_COMMAND =
-  'pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/mesh-native-terminal.test.mjs --coverage.enabled --coverage.provider=v8 --coverage.include=lanes/mesh-native-terminal.mjs --coverage.reportsDirectory="${RUNNER_TEMP:-/tmp}/jovie-mesh-native-terminal-coverage" --coverage.reporter=text --coverage.reporter=json --coverage.reporter=json-summary --coverage.thresholds.perFile=true --coverage.thresholds.lines=90 --coverage.thresholds.statements=90 --coverage.thresholds.branches=85 --coverage.thresholds.functions=90';
-export const MESH_RUNTIME_BUNDLE_COVERAGE_COMMAND =
-  'pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/mesh-runtime-bundle.test.mjs --coverage.enabled --coverage.provider=v8 --coverage.include=lanes/mesh-runtime-bundle.mjs --coverage.reportsDirectory="${RUNNER_TEMP:-/tmp}/jovie-mesh-runtime-bundle-coverage" --coverage.reporter=text --coverage.reporter=json --coverage.reporter=json-summary --coverage.thresholds.perFile=true --coverage.thresholds.lines=90 --coverage.thresholds.statements=90 --coverage.thresholds.branches=85 --coverage.thresholds.functions=100';
-export const MESH_CURRENT_WIRE_COVERAGE_COMMAND =
-  'pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/mesh-current-wire.test.mjs --coverage.enabled --coverage.provider=v8 --coverage.include=lanes/mesh-current-wire.mjs --coverage.reportsDirectory="${RUNNER_TEMP:-/tmp}/jovie-mesh-current-wire-coverage" --coverage.reporter=text --coverage.reporter=json --coverage.reporter=json-summary --coverage.thresholds.perFile=true --coverage.thresholds.lines=90 --coverage.thresholds.statements=90 --coverage.thresholds.branches=85 --coverage.thresholds.functions=100';
-export const VALIDATION_LIFECYCLE_COVERAGE_COMMAND =
-  'pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/validation-lifecycle.test.mjs lib/__tests__/validation-sync.test.mjs lib/__tests__/linear-sync-on-merge.test.mjs lib/__tests__/founder-taste-order.test.mjs --maxWorkers=1 --coverage --coverage.include="lib/{validation-lifecycle,validation-sync,linear-sync-on-merge,founder-taste-order}.mjs" --coverage.reporter=text --coverage.reporter=json-summary --coverage.reportsDirectory="${RUNNER_TEMP:-/tmp}/jovie-validation-lifecycle-coverage" --coverage.thresholds.perFile --coverage.thresholds.lines=90 --coverage.thresholds.statements=90 --coverage.thresholds.branches=75 --coverage.thresholds.functions=85';
-// Keep scanner-heavy script contracts outside V8 instrumentation; cover the
-// document helpers with the same behavior test in a small separate process.
-// Release-lineage contracts. Main Health's idle probe (scripts/main-health.mjs --structural) runs the same
-// files: production-release-supersession held the date that expired on 2026-11-10 and failed every group for 8 h.
-export const RELEASE_LINEAGE_CONTRACT_COMMAND =
-  'pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/recheck-main-lineage-auth.test.mjs lib/__tests__/recheck-main-lineage-advancing.test.mjs lib/__tests__/production-release-supersession.test.mjs lib/__tests__/staging-controller-supersession.test.mjs lib/__tests__/staging-receipt-fetch-real-gh.test.mjs lib/__tests__/staging-generation-lineage.test.mjs lib/__tests__/release-lineage-gate.test.mjs lib/__tests__/release-risk-policy.test.mjs lib/__tests__/release-range-risk.test.mjs lib/__tests__/vitest-retry-reporter.test.mjs';
-
 export const SCRIPT_CONTRACT_VITEST_COMMAND = `pnpm exec vitest --root scripts --config vitest.config.mts run ${SCRIPT_CONTRACT_VITEST_TESTS.map(
   test => test.replace(/^scripts\//u, '')
 ).join(
@@ -2063,21 +2075,6 @@ function capLines(lines, max) {
   return kept;
 }
 
-/** Escape a workflow-command message per GitHub Actions rules. */
-export function escapeAnnotationMessage(text) {
-  return String(text ?? '')
-    .replaceAll('%', '%25')
-    .replaceAll('\r', '%0D')
-    .replaceAll('\n', '%0A');
-}
-
-/** Escape a workflow-command property value (e.g. `title=`). */
-export function escapeAnnotationProperty(text) {
-  return escapeAnnotationMessage(text)
-    .replaceAll(':', '%3A')
-    .replaceAll(',', '%2C');
-}
-
 function commandLabel(command, max = 80) {
   const flat = String(command ?? '')
     .replace(/\s+/gu, ' ')
@@ -2198,7 +2195,6 @@ function structuralFailureExcerpt(command, output, index, count, code) {
   ].join('\n');
   return `${header}\n\n${excerpt(output, 1200 - header.length - 3)}`;
 }
-
 /**
  * Files whose change can alter Biome's verdict on untouched files (config or
  * the pinned Biome version). Linting only the changed files would let a
@@ -2295,8 +2291,11 @@ export function runEslintServerBoundaries(cwd = REPO_ROOT) {
   return shell('pnpm --filter=@jovie/web run lint:server-boundaries');
 }
 
-function runTypecheck() {
-  // --force is mandatory (JOV-3499). Gate guard scans this file + ci.yml.
+/**
+ * Shared PR preselection: a 'false' run_jovie_typecheck receipt (written by
+ * ci-path-changes) means no typecheck graph inputs changed on this PR.
+ */
+function typecheckReceiptSkip() {
   const event = process.env.GITHUB_EVENT_NAME || '';
   if (
     event === 'pull_request' &&
@@ -2309,6 +2308,14 @@ function runTypecheck() {
       skipped: true,
     };
   }
+  return null;
+}
+
+function runTypecheck() {
+  // --force is mandatory (JOV-3499). Gate guard scans this file + ci.yml.
+  const event = process.env.GITHUB_EVENT_NAME || '';
+  const receiptSkip = typecheckReceiptSkip();
+  if (receiptSkip) return receiptSkip;
   if (event !== 'workflow_dispatch' && !repoLanes().runJovieProduct) {
     return {
       code: 0,
@@ -2338,17 +2345,8 @@ function runWebTestsTypecheck() {
   // (run_jovie_typecheck) already counts its JS and baseline inputs via
   // affectsWebTestTypecheck, so a 'false' receipt means none changed.
   const event = process.env.GITHUB_EVENT_NAME || '';
-  if (
-    event === 'pull_request' &&
-    process.env.CI_FAST_RUN_JOVIE_TYPECHECK === 'false'
-  ) {
-    return {
-      code: 0,
-      output:
-        'No TypeScript graph files changed (ci-path-changes preselection)\n',
-      skipped: true,
-    };
-  }
+  const receiptSkip = typecheckReceiptSkip();
+  if (receiptSkip) return receiptSkip;
   if (event !== 'workflow_dispatch' && !repoLanes().runJovieProduct) {
     return {
       code: 0,
@@ -2380,17 +2378,8 @@ function runWebStoriesTypecheck() {
   // web-tests-typecheck, since any .stories.tsx or component-source .tsx
   // change already satisfies affectsWebTestTypecheck.
   const event = process.env.GITHUB_EVENT_NAME || '';
-  if (
-    event === 'pull_request' &&
-    process.env.CI_FAST_RUN_JOVIE_TYPECHECK === 'false'
-  ) {
-    return {
-      code: 0,
-      output:
-        'No TypeScript graph files changed (ci-path-changes preselection)\n',
-      skipped: true,
-    };
-  }
+  const receiptSkip = typecheckReceiptSkip();
+  if (receiptSkip) return receiptSkip;
   if (event !== 'workflow_dispatch' && !repoLanes().runJovieProduct) {
     return {
       code: 0,

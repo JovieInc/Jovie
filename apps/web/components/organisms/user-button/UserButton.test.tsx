@@ -111,6 +111,9 @@ describe('UserButton browser chunk diet (JOV-12023)', () => {
       /from '@\/components\/organisms\/DesktopTitlebar'/
     );
     expect(source).not.toMatch(/from '@\/lib\/desktop\/electron-bridge'/);
+    expect(source).not.toMatch(
+      /from '@\/lib\/workspace-lock\/unlock-with-passkey'/
+    );
     expect(source).toMatch(/from '@\/lib\/desktop\/electron-runtime'/);
     expect(source).toMatch(/from '\.\/desktop-release-identity\.lazy'/);
     expect(lazySource).toMatch(
@@ -344,6 +347,26 @@ describe('UserButton states', () => {
     }
   );
 
+  it('draws the loading row with the theme-safe interactive-hover token', () => {
+    mockUseUserSafe.mockReturnValue({
+      isLoaded: false,
+      isSignedIn: false,
+      user: null,
+    } as any);
+    render(<UserButton showUserInfo />);
+
+    const loading = screen.getByTestId('user-button-loading');
+    const indicators = [...loading.querySelectorAll('.animate-pulse')];
+    // Avatar disc and name line.
+    expect(indicators).toHaveLength(2);
+    for (const indicator of indicators) {
+      // Same 168 176 195 / 6% as before in dark; 6% ink on the light rail.
+      expect(indicator).toHaveClass('bg-interactive-hover');
+      // bg-sidebar-accent is ~1.04:1 on the light rail: invisible (JOV-12383).
+      expect(indicator).not.toHaveClass('bg-sidebar-accent');
+    }
+  });
+
   it('opens the menu from the keyboard, shows the billing skeleton while billing loads, and Escape returns focus', async () => {
     mockUseBillingStatusQuery.mockReturnValue({
       data: undefined,
@@ -355,6 +378,9 @@ describe('UserButton states', () => {
 
     const trigger = screen.getByRole('button', { name: /Adele Adkins/i });
     expect(trigger).toHaveAttribute('type', 'button');
+    // The PlainButton trigger keeps its own sidebar focus ring, not the default one.
+    expect(trigger).toHaveClass('focus-visible:ring-sidebar-ring');
+    expect(trigger).not.toHaveClass('focus-visible:ring-focus');
     await expectNoA11yViolations(container);
 
     trigger.focus();
