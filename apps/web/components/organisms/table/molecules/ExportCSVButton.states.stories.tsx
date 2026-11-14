@@ -25,7 +25,7 @@ const meta = {
     layout: 'centered',
   },
   args: {
-    getData: () => rows,
+    getData: (): ExportRow[] | Promise<ExportRow[]> => rows,
     filename: 'audience-export',
   },
 } satisfies Meta<typeof ExportCSVButton<ExportRow>>;
