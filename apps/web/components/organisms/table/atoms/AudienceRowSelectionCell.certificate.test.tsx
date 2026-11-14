@@ -1,40 +1,25 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import type { ReactNode } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import { AudienceRowSelectionCell } from './AudienceRowSelectionCell';
-
-/** A table row stand-in that records clicks and keys bubbling out of the cell. */
-function RowStandIn({
-  onActivate,
-  children,
-}: {
-  readonly onActivate: () => void;
-  readonly children: ReactNode;
-}) {
-  return (
-    // biome-ignore lint/a11y/noStaticElementInteractions: test-only row stand-in that observes bubbling, like the table row that owns the cell.
-    <div onClick={onActivate} onKeyDown={onActivate}>
-      {children}
-    </div>
-  );
-}
 
 describe('AudienceRowSelectionCell certificate', () => {
   it('toggles by keyboard without the click reaching the row', async () => {
     const user = userEvent.setup();
     const onToggle = vi.fn();
+    // Stands in for the table row that owns the cell: clicks and keys that
+    // bubble out of the render root would reach it.
     const onRowClick = vi.fn();
+    document.body.addEventListener('click', onRowClick);
+    document.body.addEventListener('keydown', onRowClick);
     const { container } = render(
-      <RowStandIn onActivate={onRowClick}>
-        <AudienceRowSelectionCell
-          rowNumber={4}
-          isChecked={false}
-          displayName='Ada'
-          onToggle={onToggle}
-        />
-      </RowStandIn>
+      <AudienceRowSelectionCell
+        rowNumber={4}
+        isChecked={false}
+        displayName='Ada'
+        onToggle={onToggle}
+      />
     );
 
     const checkbox = screen.getByRole('checkbox', { name: 'Select Ada' });
@@ -44,6 +29,8 @@ describe('AudienceRowSelectionCell certificate', () => {
     expect(onToggle).toHaveBeenCalledTimes(1);
     fireEvent.click(checkbox);
     expect(onToggle).toHaveBeenCalledTimes(2);
+    document.body.removeEventListener('click', onRowClick);
+    document.body.removeEventListener('keydown', onRowClick);
     expect(onRowClick).not.toHaveBeenCalled();
     expect(screen.getByText('4')).toHaveAttribute('aria-hidden', 'true');
     await expectNoA11yViolations(container);
