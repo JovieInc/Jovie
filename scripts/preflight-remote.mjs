@@ -23,6 +23,7 @@ import {
   EVIDENCE_MARKER,
   evidenceMatches,
   parseEvidence,
+  SLOTS_BUSY_EXIT,
 } from './lib/prepush-offload.mjs';
 
 export const DEFAULT_HOST = 'gem';
@@ -41,6 +42,10 @@ export function parseRemoteArgs(argv, env = {}) {
     slots:
       Number.parseInt(env.JOVIE_REMOTE_PREFLIGHT_SLOTS ?? '', 10) ||
       DEFAULT_SLOTS,
+    // 0 = wait for a slot indefinitely (manual runs). The pre-push hook passes a
+    // limit so a full Gem hands off to free hosted runners instead of queuing.
+    queueMaxSec:
+      Number.parseInt(env.JOVIE_REMOTE_PREFLIGHT_QUEUE_MAX_SEC ?? '', 10) || 0,
     push: true,
     bundle: false,
     backend: 'gem',
@@ -53,6 +58,8 @@ export function parseRemoteArgs(argv, env = {}) {
     const f = argv[i];
     if (f === '--host') a.host = argv[++i];
     else if (f === '--backend') a.backend = argv[++i];
+    else if (f === '--queue-max-sec')
+      a.queueMaxSec = Number.parseInt(argv[++i], 10) || 0;
     else if (f === '--no-push') a.push = false;
     // ship HEAD as a git bundle (no push, so no recursion into pre-push) and
     // require passing evidence bound to the exact sha + tree
@@ -81,6 +88,7 @@ export function buildRemoteScript({
   forward,
   bodyB64,
   bundle = false,
+  queueMaxSec = 0,
 }) {
   const fwd = forward.map(q).join(' ');
   return `set -euo pipefail
@@ -121,6 +129,7 @@ fi
 # 3. host-wide concurrency gate: flock slots, queue instead of fail
 slot=""
 announced=0
+tq=$(date +%s)
 while [ -z "$slot" ]; do
   for i in $(seq 0 $((${slots} - 1))); do
     exec 9>"$HOME/.cache/gem-remote-preflight-slots/slot-$i.lock"
@@ -128,6 +137,10 @@ while [ -z "$slot" ]; do
   done
   if [ -z "$slot" ]; then
     [ $announced = 1 ] || { echo "[preflight:remote] all ${slots} remote slots busy; queued." >&2; announced=1; }
+    if [ ${queueMaxSec} -gt 0 ] && [ $(( $(date +%s) - tq )) -ge ${queueMaxSec} ]; then
+      echo "[preflight:remote] all ${slots} remote slots still busy after ${queueMaxSec}s; handing off (exit ${SLOTS_BUSY_EXIT})." >&2
+      exit ${SLOTS_BUSY_EXIT}
+    fi
     sleep 2
   fi
 done
@@ -193,6 +206,7 @@ export async function main({
     forward: a.forward,
     bodyB64,
     bundle: a.bundle,
+    queueMaxSec: a.queueMaxSec,
   });
   if (a.dryRun) {
     console.log(script);

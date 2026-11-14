@@ -17,6 +17,8 @@ import { defaultLockDir, slotsBusy } from '../lib/preflight-lock.mjs';
 import {
   chooseBackend,
   chooseMode,
+  gemQueueMaxSec,
+  isBackendUnavailable,
   isInfraTimeout,
 } from '../lib/prepush-offload.mjs';
 
@@ -63,10 +65,17 @@ function gemLoad() {
 }
 
 const ARGV = {
-  gem: ['scripts/preflight-remote.mjs', '--bundle', '--fast'],
+  // A full Gem queue hands off to free hosted runners after a bounded wait.
+  gem: [
+    'scripts/preflight-remote.mjs',
+    '--bundle',
+    '--queue-max-sec',
+    String(gemQueueMaxSec(env)),
+    '--fast',
+  ],
   actions: ['scripts/preflight-remote.mjs', '--backend', 'actions'],
 };
-const unavailable = code => code === 127 || code === 255;
+const unavailable = isBackendUnavailable;
 
 export async function main() {
   const t0 = Date.now();
