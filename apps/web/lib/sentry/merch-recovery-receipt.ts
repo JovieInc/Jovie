@@ -46,6 +46,7 @@ interface MerchRecoverySentryEventLike {
   readonly extra?: Record<string, unknown> | null;
   readonly exception?: {
     readonly values?: ReadonlyArray<{
+      readonly type?: string | null;
       readonly value?: string | null;
     } | null> | null;
   } | null;
