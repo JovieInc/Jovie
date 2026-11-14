@@ -10,6 +10,7 @@ import {
 import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
+import { runInNewContext } from 'node:vm';
 import { afterEach, describe, expect, it } from 'vitest';
 
 const REPO_ROOT = resolve(import.meta.dirname, '..', '..', '..');
@@ -216,6 +217,99 @@ describe('diff mutation capacity admission', () => {
 });
 
 describe('portable mutation evidence', () => {
+  it.each([true, false])(
+    'snapshots the failed sweep outside the workspace with optional files present=%s',
+    optional => {
+      const sweep = load(workflow).jobs.sweep.steps;
+      const save = sweep.find(step => step.name === 'Save sweep state');
+      const snapshot = sweep.find(step => step.id === 'snapshot');
+      const upload = sweep.find(
+        step => step.name === 'Upload sweep state and survivor tasks'
+      );
+      expect(snapshot).toBeDefined();
+      expect(sweep.indexOf(save)).toBeLessThan(sweep.indexOf(snapshot));
+      expect(sweep.indexOf(snapshot)).toBeLessThan(sweep.indexOf(upload));
+      expect(upload.if).toContain("steps.snapshot.outcome == 'success'");
+      expect(upload.if).not.toContain('hashFiles');
+      const condition = snapshot.if
+        .replace(/^\$\{\{\s*|\s*\}\}$/g, '')
+        .replace(/steps\.([\w-]+)/g, 'steps["$1"]');
+      const allowed = (capacity, portable, hasState) =>
+        runInNewContext(condition, {
+          always: () => true,
+          hashFiles: () => (hasState ? 'digest' : ''),
+          steps: {
+            capacity: { outputs: { run: capacity } },
+            portable_state: { outcome: portable },
+            score: { outcome: 'failure' },
+          },
+        });
+      expect(allowed('true', 'success', true)).toBe(true);
+      expect(allowed('false', 'success', true)).toBe(false);
+      expect(allowed('true', 'failure', true)).toBe(false);
+      expect(allowed('true', 'success', false)).toBe(false);
+
+      const root = mkdtempSync(resolve(tmpdir(), 'mutation-snapshot-'));
+      fixtureRoots.push(root);
+      const workspace = resolve(root, 'workspace');
+      const runnerTemp = resolve(root, 'runner-temp');
+      const cache = resolve(workspace, '.cache/jovie-mutation');
+      mkdirSync(resolve(cache, 'survivor-tasks'), { recursive: true });
+      mkdirSync(runnerTemp);
+      const files = {
+        'sweep-state.json': '{"score":42}\n',
+        ...(optional
+          ? {
+              'sweep-state.json.runs.jsonl': '{"run":1}\n',
+              'survivor-tasks/task.json': '{"survivor":true}\n',
+            }
+          : {}),
+      };
+      for (const [name, content] of Object.entries(files))
+        writeFileSync(resolve(cache, name), content);
+      if (optional) {
+        writeFileSync(
+          resolve(runnerTemp, 'test-quality-latest.json'),
+          '{"metric":1}\n'
+        );
+        writeFileSync(
+          resolve(runnerTemp, 'baseline-proposal.json'),
+          '{"baseline":1}\n'
+        );
+      }
+      const score = spawnSync('bash', ['-c', 'exit 7']);
+      expect(score.status).toBe(7);
+      const result = spawnSync(
+        'bash',
+        ['-e', '-o', 'pipefail', '-c', snapshot.run],
+        {
+          cwd: workspace,
+          encoding: 'utf8',
+          env: { ...process.env, RUNNER_TEMP: runnerTemp },
+        }
+      );
+      expect(result.status, result.stderr).toBe(0);
+      for (const [name, content] of Object.entries(files)) {
+        expect(readFileSync(resolve(cache, name), 'utf8')).toBe(content);
+        expect(
+          readFileSync(resolve(runnerTemp, 'sweep-out', name), 'utf8')
+        ).toBe(content);
+      }
+      for (const name of [
+        'test-quality-latest.json',
+        'baseline-proposal.json',
+      ]) {
+        expect(existsSync(resolve(runnerTemp, 'sweep-out', name))).toBe(
+          optional
+        );
+        if (optional)
+          expect(readFileSync(resolve(runnerTemp, 'sweep-out', name))).toEqual(
+            readFileSync(resolve(runnerTemp, name))
+          );
+      }
+    }
+  );
+
   it('archives relative to the checkout and restores identical scores across runner homes', () => {
     const root = mkdtempSync(resolve(tmpdir(), 'certificate-cache-'));
     fixtureRoots.push(root);

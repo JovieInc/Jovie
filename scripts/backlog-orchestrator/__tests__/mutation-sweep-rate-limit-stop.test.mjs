@@ -53,13 +53,13 @@ test('filing stops at the first rate-limited upsert and leaves the rest unfiled'
     // The first module fails rate-limited; b and c are never attempted.
     assert.equal(calls.length, 1);
     assert.equal(filed, 0);
-    assert.equal(unfiled, 2);
+    assert.equal(unfiled, 3);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
 });
 
-test('filing continues over ordinary results and counts only non-rate-limited upserts', async () => {
+test('filing continues over ordinary failures but counts only successful upserts', async () => {
   const dir = tasksDir();
   try {
     let calls = 0;
@@ -80,8 +80,8 @@ test('filing continues over ordinary results and counts only non-rate-limited up
       ),
     });
     assert.equal(calls, 3);
-    assert.equal(filed, 3);
-    assert.equal(unfiled, 0);
+    assert.equal(filed, 2);
+    assert.equal(unfiled, 1);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
