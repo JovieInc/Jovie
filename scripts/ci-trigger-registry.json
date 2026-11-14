@@ -29,7 +29,7 @@
     "codeowners-drift.yml": {"runsPerMergedPr":4.4,"triggers":["pull_request","push"]},
     "codeql.yml": {"runsPerMergedPr":0.9,"triggers":["push","workflow_dispatch"]},
     "company-guards.yml": {"runsPerMergedPr":6.2,"triggers":["merge_group:checks_requested","pull_request","push"]},
-    "component-certificate.yml": {"runsPerMergedPr":2.5,"triggers":["workflow_dispatch","workflow_run:CI","workflow_run:Mutation Diff","workflow_run:Visual & A11y Tests"]},
+    "component-certificate.yml": {"runsPerMergedPr":2.827,"triggers":["workflow_dispatch","workflow_run:CI","workflow_run:Mutation Diff","workflow_run:Visual & A11y Tests"]},
     "controller-quota-replay.yml": {"runsPerMergedPr":1.7,"triggers":["workflow_run:Production Controller","workflow_run:Staging Controller"]},
     "cost-anomaly-gate.yml": {"runsPerMergedPr":0.8,"triggers":["repository_dispatch:clock_cost_anomaly_gate","schedule","workflow_dispatch"]},
     "deepsec-native.yml": {"runsPerMergedPr":0,"triggers":["schedule","workflow_dispatch"]},

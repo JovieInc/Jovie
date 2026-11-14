@@ -189,7 +189,6 @@ The source defaults below are preserved in this slice.
 |---|---|---|
 | `SHOW_PRODUCT_DEMO_VIDEO` | `false` | Keep founder gate until approved master, playback certification and founder acceptance (JOV-7208). |
 | `SHOW_PUBLIC_ABOUT_FOOTER_REFRESH` | `false` | Remove presentation fork in favor of supported About/footer content; no blanket enable. |
-| `WAITLIST_ENABLED` | `true` | Keep acquisition/admission policy; not part of product rollout retirement. |
 
 ### Override cleanup and rollback
 

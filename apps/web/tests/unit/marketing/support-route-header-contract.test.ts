@@ -34,16 +34,12 @@ describe('support route header contract', () => {
       'penContractId={MARKETING_PEN_CONTRACT_IDS.shell.header}'
     );
     expect(headerSource).toContain('getHomepageFrontDoorCtaContract');
-    expect(headerSource).toContain(
-      'getHomepageFrontDoorCtaContract(FEATURE_FLAGS.WAITLIST_ENABLED).primary'
-    );
-    // JOV-6860: every marketing-header route shares the waitlist-mode
+    expect(headerSource).toContain('getHomepageFrontDoorCtaContract().primary');
+    // JOV-6860: every marketing-header route shares the one
     // front-door CTA via the single resolver; no per-route CTA overrides
     // other than the locked homepage entry.
     expect(headerSource).toContain('resolveMarketingHeaderPrimaryCta');
-    expect(headerSource).toContain(
-      'getHomepageFrontDoorCtaContract(waitlistEnabled).primary'
-    );
+    expect(headerSource).not.toContain('waitlistEnabled');
     expect(headerSource).not.toContain('MARKETING_CTA_INTENTS');
     expect(headerSource).not.toContain('APP_ROUTES.ARTIST_PROFILES]:');
     // Homepage claim action (Tim, 2026-11-12: "Switch it"): / sends its
