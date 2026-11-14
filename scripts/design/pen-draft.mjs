@@ -91,14 +91,16 @@ export function loadBriefs(dir = BRIEFS_DIR, only = null) {
 // A build call ran past ten minutes once the agent set out to draw four rail
 // states (run 43339513257), and pen only saves when the agent finishes.
 export const LOAD_NOTE =
-  'The document is large and the editor can take a few minutes to load it. Work in the open editor (leave the file path empty), and when a canvas call times out, wait and retry it rather than giving up. Build in small steps, one screen or state per call: a call that builds several at once can run for many minutes on this file. Saving takes two minutes and the run is stopped at 23, so anything not finished within 20 minutes saves nothing: finish as soon as the frame matches the brief.';
+  'The document is large and the editor can take a few minutes to load it. Work in the open editor (leave the file path empty), and when a canvas call times out, wait and retry it rather than giving up. Build in small steps, one screen or state per call: a call that builds several at once can run for many minutes on this file, and a call that times out wrote nothing — do not read the image it was going to write, just redraw that piece in a smaller call. Saving takes two minutes and the run is stopped at 55, so anything not finished within 50 minutes saves nothing: finish as soon as the frame matches the brief.';
 /** Attempts per brief: a draft that failed early gets one more try. */
 export const ATTEMPTS = 2;
-// Each matrix job has 25 minutes. Setup and upload took 20 seconds in run
-// 43339513257, so two minutes are reserved, not the five that left a first
-// attempt 14 minutes and its restart 6: the largest brief was still building
-// when each was stopped. Finished drafts have taken 7 to 13 minutes.
-export const BUDGET_MS = 23 * 60_000;
+// Each matrix job has 60 minutes. Setup and upload took 20 seconds in run
+// 43339513257, so five minutes are reserved. Finished drafts of the small
+// briefs have taken 7 to 13 minutes, but run 43568417528 stopped the insights
+// and page-skeletons briefs (4 and 12 frames to draw) with most of their
+// frames still to build at 23 minutes: the budget has to fit the largest
+// brief, not the typical one.
+export const BUDGET_MS = 55 * 60_000;
 // A retry starts from the canonical file again, so less than this is no use.
 const MIN_ATTEMPT_MS = 10 * 60_000;
 
