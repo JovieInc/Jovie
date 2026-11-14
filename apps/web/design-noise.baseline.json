@@ -151,9 +151,6 @@
     "apps/web/components/features/dashboard/organisms/shopify/ShopifyStoreCard.tsx": {
       "icon-tile": 1
     },
-    "apps/web/components/features/dashboard/organisms/tour-dates/TourDatesEmptyState.tsx": {
-      "icon-tile": 2
-    },
     "apps/web/components/features/dashboard/organisms/tour-dates/TourDatesManager.tsx": {
       "icon-tile": 1
     },

@@ -4,6 +4,7 @@ import { Button, Input } from '@jovie/ui';
 import { useCallback, useState } from 'react';
 import { Icon } from '@/components/atoms/Icon';
 import { toast } from '@/components/feedback';
+import { EmptyState } from '@/components/molecules/EmptyState';
 import {
   useConnectBandsintownMutation,
   useSaveBandsintownApiKeyMutation,
@@ -73,47 +74,22 @@ export function TourDatesEmptyState({
     }
   }, [artistName, connectMutation, onConnected]);
 
-  // Step 1: API Key Setup
+  // Step 1: API key setup. Only reached when no server key is configured.
   if (!hasApiKey) {
     return (
-      <div className='flex flex-col items-center justify-center px-4 py-16 text-center'>
-        <div className='flex h-16 w-16 items-center justify-center rounded-lg bg-surface-2'>
-          <Icon
-            name='Key'
-            className='h-8 w-8 text-tertiary-token'
-            aria-hidden='true'
-          />
-        </div>
-        <h3 className='mt-4 text-app font-caption text-secondary-token'>
-          Set Up Bandsintown Integration
-        </h3>
-        <p className='mt-1 max-w-md text-app text-secondary-token'>
-          To sync your tour dates, you&apos;ll need a free Bandsintown API key.
-        </p>
-
-        <div className='mt-6 w-full max-w-md text-left'>
-          <ol className='mb-6 list-decimal space-y-2 pl-5 text-app text-secondary-token'>
-            <li>
-              Visit{' '}
-              <a
-                href='https://artists.bandsintown.com'
-                target='_blank'
-                rel='noopener noreferrer'
-                className='text-primary-token underline hover:no-underline'
-              >
-                artists.bandsintown.com
-              </a>
-            </li>
-            <li>Sign in or create an account</li>
-            <li>Go to Settings &rarr; API &rarr; Generate Key</li>
-            <li>Copy your API key and paste it below</li>
-          </ol>
-
-          <div className='flex flex-col gap-3'>
+      <EmptyState
+        presentation='workspace'
+        icon={<Icon name='Key' className='h-5 w-5' aria-hidden='true' />}
+        heading='Set Up Bandsintown Integration'
+        description='Generate a free API key in Bandsintown under Settings, then API, and paste it here.' // ui-casing-allow: product name
+        testId='tour-dates-empty-state-api-key'
+        actionSlot={
+          <div className='flex w-full flex-col gap-3'>
             <Input
               type='password'
               inputSize='lg'
               placeholder='Your Bandsintown API key' // ui-casing-allow: product name
+              aria-label='Bandsintown API Key'
               value={apiKey}
               onChange={e => setApiKey(e.target.value)}
               disabled={saveApiKeyMutation.isPending}
@@ -133,55 +109,48 @@ export function TourDatesEmptyState({
                 <>
                   <Icon
                     name='Loader2'
-                    className='mr-2 h-4 w-4 animate-spin'
+                    className='mr-2 h-4 w-4 animate-spin motion-reduce:animate-none'
                     aria-hidden='true'
                   />
                   Saving...
                 </>
               ) : (
-                <>
-                  <Icon
-                    name='Key'
-                    className='mr-2 h-4 w-4'
-                    aria-hidden='true'
-                  />
-                  Save API Key
-                </>
+                'Save API Key'
               )}
             </Button>
+            <p className='text-2xs text-tertiary-token'>
+              Get a key at{' '}
+              <a
+                href='https://artists.bandsintown.com'
+                target='_blank'
+                rel='noopener noreferrer'
+                className='text-secondary-token underline underline-offset-2 hover:no-underline'
+              >
+                artists.bandsintown.com
+              </a>
+              . Your API key is encrypted and stored securely.
+            </p>
           </div>
-
-          <p className='mt-4 text-center text-2xs text-tertiary-token'>
-            Your API key is encrypted and stored securely.
-          </p>
-        </div>
-      </div>
+        }
+      />
     );
   }
 
-  // Step 2: Artist Connection
+  // Step 2: artist connection
   return (
-    <div className='flex flex-col items-center justify-center px-4 py-16 text-center'>
-      <div className='flex h-16 w-16 items-center justify-center rounded-lg bg-surface-2'>
-        <Icon
-          name='CalendarDays'
-          className='h-8 w-8 text-tertiary-token'
-          aria-hidden='true'
-        />
-      </div>
-      <h3 className='mt-4 text-app font-caption text-secondary-token'>
-        Connect Your Tour Dates
-      </h3>
-      <p className='mt-1 max-w-sm text-app text-secondary-token'>
-        Enter your Bandsintown artist name to sync your upcoming shows.
-      </p>
-
-      <div className='mt-6 w-full max-w-md'>
-        <div className='flex flex-col gap-3'>
+    <EmptyState
+      presentation='workspace'
+      icon={<Icon name='CalendarDays' className='h-5 w-5' aria-hidden='true' />}
+      heading='Connect Your Tour Dates'
+      description='Enter your Bandsintown artist name to sync your upcoming shows.' // ui-casing-allow: product name
+      testId='tour-dates-empty-state-connect'
+      actionSlot={
+        <div className='flex w-full flex-col gap-3'>
           <Input
             type='text'
             inputSize='lg'
             placeholder='Your artist name on Bandsintown' // ui-casing-allow: product name
+            aria-label='Bandsintown Artist Name'
             value={artistName}
             onChange={e => setArtistName(e.target.value)}
             disabled={connectMutation.isPending}
@@ -201,25 +170,17 @@ export function TourDatesEmptyState({
               <>
                 <Icon
                   name='Loader2'
-                  className='mr-2 h-4 w-4 animate-spin'
+                  className='mr-2 h-4 w-4 animate-spin motion-reduce:animate-none'
                   aria-hidden='true'
                 />
                 Connecting...
               </>
             ) : (
-              <>
-                <Icon name='Link' className='mr-2 h-4 w-4' aria-hidden='true' />
-                Connect Bandsintown
-              </>
+              'Connect Bandsintown'
             )}
           </Button>
         </div>
-
-        <p className='mt-4 text-2xs text-tertiary-token'>
-          Your tour dates will sync from Bandsintown and appear here. You can
-          also add shows manually.
-        </p>
-      </div>
-    </div>
+      }
+    />
   );
 }
