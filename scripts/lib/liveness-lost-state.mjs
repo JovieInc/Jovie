@@ -5,7 +5,7 @@ import { livenessFingerprint } from './automation-registry.mjs';
  * Decision-time previous alert state, reconciling a lost restore (JOV-9641).
  *
  * The liveness workflow restores the previous alert state from an Actions
- * artifact, and the restore step swallows `gh api` failures (`|| true`), so an
+ * artifact, and the restore step swallows GitHub API failures (`|| true`), so an
  * installation-budget 403 can leave a filing run with no persisted state at
  * all. That run must not mark every fingerprint green: a critical row with no
  * recorded state reads as red (an alert may be open and unproven), so a
