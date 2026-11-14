@@ -151,7 +151,47 @@ jobs:
           if [[ "$code" -gt 1 ]]; then
             exit "$code"
           fi
+      - name: Prime Node toolcache (no GitHub API manifest call)
+        if: ${{ hashFiles('.github/actions/prime-node-toolcache/action.yml') != '' }}
+        uses: ./.github/actions/prime-node-toolcache
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+      - name: Check the installation quota before uploading osv SARIF
+        # JOV-11801: the pinned upload action answers "API rate limit exceeded
+        # for installation" whenever the shared Actions token bucket is empty,
+        # reddening main with no verdict on the code (episodes 1-12). The gate
+        # reads the bucket first and defers the upload, visibly, only while it
+        # cannot carry the upload's own calls; every other upload failure still
+        # fails the job, and the scan step above is unchanged and fail-closed.
+        id: osv_upload_gate
+        env:
+          GH_TOKEN: ${{ github.token }}
+          # The osv job times out at 20 minutes. A rate-limit hold must finish
+          # inside that window (gh-api-hold.sh otherwise waits up to 3900s).
+          # GET /rate_limit does not spend the bucket it reports.
+          GH_API_HOLD_BUDGET_SECONDS: 90
+          GH_API_HOLD_TOKEN_CAP_SECONDS: 90
+        run: |
+          set -euo pipefail
+          hold_script=".github/scripts/gh-api-hold.sh"
+          if [[ ! -f "$hold_script" ]]; then
+            echo "::error::Missing ${hold_script} - cannot gate the osv SARIF upload"
+            exit 1
+          fi
+          # GET /rate_limit never spends the bucket it reports, so the read
+          # answers even while the bucket is empty. A read failure does not
+          # defer: the upload is then attempted and stays fail-closed.
+          if ! quota="$(bash "$hold_script" api rate_limit --jq '{remaining: .resources.core.remaining, reset: .resources.core.reset, limit: .resources.core.limit}')"; then
+            echo "::warning::github-quota-deferred gate could not read the rate limit; attempting the osv SARIF upload"
+            echo "defer=false" >>"${GITHUB_OUTPUT:-/dev/null}"
+            exit 0
+          fi
+          printf '%s' "$quota" | node scripts/security/sarif-upload-gate.mjs --label osv
       - name: Upload osv SARIF
+        # success() stays explicit: a custom if replaces the default status
+        # check, and a failed scan must not upload.
+        if: steps.osv_upload_gate.outputs.defer != 'true' && success()
         uses: github/codeql-action/upload-sarif@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4.39.1
         with:
           sarif_file: osv.sarif

@@ -6,6 +6,7 @@ import { leadPipelineSettings, leads } from '@/lib/db/schema/leads';
 import { getOutboundClaimUrl } from '@/lib/outbound/claim-url';
 import { DEFAULT_DM_TEMPLATE } from './constants';
 import { filterEmail } from './email-filter';
+import { existingRelationshipHold } from './existing-relationships';
 import {
   ensureLeadClaimToken,
   persistLeadClaimToken,
@@ -45,7 +46,17 @@ export async function routeLead(leadId: string): Promise<RouteLeadResult> {
   // 5. Determine route
   let route: 'email' | 'dm' | 'both' | 'manual_review' | 'skipped';
 
-  if (isHighProfile || repResult.hasRepresentation) {
+  // Hard gate: an existing relationship never routes to email or DM, and
+  // records why in the representation signal Tim already reads.
+  const relationship = existingRelationshipHold({
+    handle: lead.linktreeHandle,
+    displayName: lead.displayName,
+    contactEmail: lead.contactEmail,
+    instagramHandle: lead.instagramHandle,
+    bio: lead.bio,
+  });
+
+  if (relationship || isHighProfile || repResult.hasRepresentation) {
     route = 'manual_review';
   } else if (!emailResult.invalid && lead.hasInstagram) {
     route = 'both';
@@ -62,6 +73,7 @@ export async function routeLead(leadId: string): Promise<RouteLeadResult> {
     route,
     isHighProfile,
     hasRepresentation: repResult.hasRepresentation,
+    existingRelationship: Boolean(relationship),
     emailInvalid: emailResult.invalid,
     hasInstagram: lead.hasInstagram,
   });
@@ -101,8 +113,8 @@ export async function routeLead(leadId: string): Promise<RouteLeadResult> {
       emailInvalid: emailResult.invalid,
       emailSuspicious: emailResult.suspicious,
       emailInvalidReason: emailResult.reason,
-      hasRepresentation: repResult.hasRepresentation,
-      representationSignal: repResult.signal,
+      hasRepresentation: relationship ? true : repResult.hasRepresentation,
+      representationSignal: relationship?.reason ?? repResult.signal,
       dmCopy,
       updatedAt: new Date(),
     })

@@ -719,13 +719,12 @@ describe('canonical marketing component registry', () => {
       ),
     });
 
-    expect(centrallyReadSources.HomepageV2Route).toContain(
-      "aria-hidden='true'"
-    );
-    expect(centrallyReadSources.HomepageV2Route).toContain('inert');
-    expect(centrallyReadSources.HomepageV2Route).toContain(
-      'homepage-v2-hero__demo-scale'
-    );
+    const routeSource = centrallyReadSources.HomepageV2Route;
+    expect(routeSource).toContain("aria-hidden='true'");
+    expect(routeSource).toContain('inert');
+    expect(routeSource).toContain('homepage-v2-hero__demo-scale');
+    // Every below-hero section ships unconditionally: no static flag gates.
+    expect(routeSource).not.toContain('FEATURE_FLAGS');
   });
 
   it('keeps terminal CTA actions on the canonical Button atom', () => {
@@ -1769,7 +1768,7 @@ vi.mock('next/link', async () => {
 it('preserves the mounted homepage front-door auth boundary and public secondary navigation', () => {
   const { container } = render(createElement(HomepageV2Route));
   const auth = screen.getByTestId('homepage-v2-hero-primary-cta');
-  expect(auth).toHaveAttribute('href', '/signup');
+  expect(auth).toHaveAttribute('href', '/start');
   expect(auth).toHaveAttribute('data-test-prefetch', 'false');
   const publicLink = container.querySelector('a.public-action-secondary');
   expect(publicLink).toHaveAttribute('href', '/artist-profiles');

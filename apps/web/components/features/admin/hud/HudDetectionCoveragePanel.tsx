@@ -42,7 +42,7 @@ function Metric({
   return (
     <div className='min-w-0 border-t border-subtle pt-2'>
       <p className='text-2xs font-medium text-tertiary-token'>{label}</p>
-      <p className='mt-1 text-lg font-semibold tabular-nums text-primary-token'>
+      <p className='mt-1 text-base font-semibold tabular-nums text-primary-token'>
         {value}
       </p>
       <p className='mt-0.5 text-2xs leading-4 text-tertiary-token'>{detail}</p>

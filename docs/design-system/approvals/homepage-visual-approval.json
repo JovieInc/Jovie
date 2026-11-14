@@ -1,0 +1,17 @@
+{
+  "schema": "jovie-homepage-baseline-approval/v1",
+  "approvedBy": "tim",
+  "approvedAt": "2026-11-12T23:46:02Z",
+  "approvalMessage": "cmsg_01AgKv1abQyxVAdD8PvqKyxs7H5YN1iqEKb3SsMTcFF4VN",
+  "question": "Switch the homepage to 'Claim your profile'?",
+  "answer": "Switch it",
+  "evidence": [
+    "Builds on the hero Tim approved for #24671 (cmsg_01AgKv1abQyxVAdD8PvqKyxsHxTuqWjp3UXVdEKhZovXiA, \"Ship it\", reviewed d526b34fff)",
+    "Production before: design pass screenshot 2026-11-12T23:33Z (homepage asking for an invite)",
+    "Change: hero, header and close say Claim your profile and enter /start; the invite copy is gone",
+    "After screenshot goes to Tim once the change is live"
+  ],
+  "pr": 25255,
+  "reviewedCommit": "e1cd237489f9237ad58ff2057afd6a64d9f9ccfb",
+  "sourcesDigest": "4d9724a7e5322e454c0a5ba05cd13cd3036fa17f414e74f0c3046dd8e6d61abb"
+}

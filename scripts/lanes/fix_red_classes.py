@@ -28,22 +28,27 @@ from pathlib import Path
 import machine_gap
 import migration_renumber
 import remediation
-from fix_red_failure_routing import (ALIAS_ACTION, ALIAS_REVIEW_FAILURE, alias_owner_metadata,
-                                     error_signature, fingerprint_key, owner_handoff_reason)
+from reviewable_split import measured_changes, reviewable_split
+from fix_red_mixed_repairs import first_route_reason, mixed_repairs  # noqa: F401
+from fix_red_screen_cert import SCREEN_CERT_TEXT, screen_cert_paths
+from fix_red_failure_routing import (ALIAS_ACTION, ALIAS_REVIEW_FAILURE, ROUTE_BUDGET_GROWTH, alias_owner_metadata,
+                                     error_signature, fingerprint_key, owner_handoff_reason, LOCAL_MODULE_PREREQUISITE)
 from atomic_state import atomic_write_text
 from fix_red_source_edits import (  # noqa: F401
-    snap_added_conservative_spacing, strip_added_legacy_cache_exports,
+    balance_added_headings, snap_added_conservative_spacing, strip_added_legacy_cache_exports,
     resolve_additive_node_tests_text, resolve_additive_node_test_file, resolve_additive_list_conflict, size_500_stale_hit,
 )
+from fix_red_ui_feel import apply as apply_ui_feel, publish as publish_ui_feel  # noqa: F401
+from fix_red_render_modes import ACTION as ADMIT_RENDER_MODE, hit as render_mode_hit  # noqa: F401
 
 SCHEMA = "jovie-fix-red-class/v1"
 # Actions a class can route to. `agent` is the default (a model run); the others spend no model.
-RERUN, SYNC_MAIN, WIRE_CI_FAST, RENUMBER, STAMP_CHANGELOG, SNAP_SPACING, STRIP_CACHE, MERGE_NARROWED, REGISTER_DOMAIN, ATOMIC_WRITE, AGENT = (
+RERUN, SYNC_MAIN, WIRE_CI_FAST, RENUMBER, STAMP_CHANGELOG, SNAP_SPACING, STRIP_CACHE, MERGE_NARROWED, REGISTER_DOMAIN, ATOMIC_WRITE, REPAIR_SCREEN_CERT, BALANCE_HEADINGS, UI_FEEL, AGENT, COMPOSE = (
     "rerun", "sync-main", "wire-ci-fast", "renumber-migrations", "stamp-changelog", "snap-spacing",
-    "strip-cache-exports", "merge-narrowed-preflight", "register-domain-writes", "atomic-write", "agent")
+    "strip-cache-exports", "merge-narrowed-preflight", "register-domain-writes", "atomic-write", "repair-screen-cert", "balance-headings", "ui-feel", "agent", "compose")
 DETERMINISTIC = frozenset({
     RERUN, SYNC_MAIN, WIRE_CI_FAST, RENUMBER, STAMP_CHANGELOG, SNAP_SPACING, STRIP_CACHE, MERGE_NARROWED,
-    REGISTER_DOMAIN, ATOMIC_WRITE, ALIAS_ACTION})
+    REGISTER_DOMAIN, ATOMIC_WRITE, REPAIR_SCREEN_CERT, BALANCE_HEADINGS, UI_FEEL, ADMIT_RENDER_MODE, ALIAS_ACTION})
 
 # remediation.INFRA_TEXT (runner loss, OOM, 5xx) plus the platform failures seen in 52 agent-declined
 # fix runs. Kept out of INFRA_TEXT: the exhausted-PR classifier deliberately routes a rate-limited
@@ -57,6 +62,7 @@ PLATFORM_TEXT = re.compile(
 # scripts/security/dual-license-elections.json. Never drop a deny-licenses id.
 DEPENDENCY_LICENSE = re.compile(r"Dependency review detected incompatible licenses")
 QUOTA_TEXT = re.compile(r"github-quota-deferred|Fleet rule evidence is (?:missing|deferred)", re.IGNORECASE)
+UI_FEEL_TEXT = re.compile(r"\[lint:ui-feel\] new violations on lines this change adds:")
 UNWIRED = re.compile(r"Unwired: (.+?)\. Wire each file into a ci-fast lane")
 ATOMIC_TEXT = re.compile(r"use atomic_state\.atomic_write_text for whole-file state")
 BODY_TEXT = re.compile(r"red-before-green:|PR body is missing|missing (?:a )?`?## ?(?:Red-before-green|Blast radius)",
@@ -91,6 +97,8 @@ DESIGN_SOURCE_CLI = re.compile(
 # PR added a 10px/14px utility. Snap those added utilities; do not raise the floor.
 SPACING_RATCHET_TEXT = re.compile(
     r"off-grid 10px/14px spacing steps \(\*-2\.5, \*-3\.5\) grew")
+# Changed-line ui-feel. Before platform text: Source Validation echoes rate-limit lines.
+HEADING_BALANCE_TEXT = re.compile(r"[\w./()-]+\.tsx:\d+\s+headingNeedsBalance")
 # Cache Components ratchet (assertStackPatternRatchet). Growth is a newly added
 # `export const dynamic|fetchCache|revalidate`. Delete that added line. Never
 # raise the ceiling. Checked before platform text: the count can look like HTTP 5xx.
@@ -131,7 +139,7 @@ _NARROWED_HUNK = re.compile(
 _NARROWED_SIDE = re.compile(
     r"\A(?P<prefix>(?:[ \t]*command:\n)?)(?P<cindent>[ \t]*)'(?P<command>[^'\n]+)',\n"
     r"(?P<nindent>[ \t]*)note: '(?P<note>[^'\n]+)',\n?\Z")
-_QUOTED_LIST_ENTRY = re.compile(r"^[ \t]*'[^'\n]+',[ \t]*$")
+_QUOTED_LIST_ENTRY = re.compile(r"""^[ \t]*(?:'[^'\n]+'|"[^"\n]+"),[ \t]*$""")
 _IDENT_TOKEN = re.compile(r"[A-Za-z][A-Za-z0-9-]*")
 _AND_CHAIN_LINE = re.compile(
     r"""^(?P<indent>[ \t]*)(?P<prefix>(?:"[^"\n]+"\s*:\s*)?)(?P<q>['"])(?P<command>[^'"\n]*&&[^'"\n]*)(?P=q)(?P<suffix>,?)\s*$""")
@@ -146,18 +154,23 @@ _JSON_KEY = re.compile(r'^\s*"([^"\n]+)"\s*:')
 SIGNATURES = (
     ("alias-review-deadline", ALIAS_REVIEW_FAILURE, ALIAS_ACTION),
     ("component-test-evidence", COMPONENT_TEST_TEXT, AGENT),
+    ("local-module-prerequisite", LOCAL_MODULE_PREREQUISITE, SYNC_MAIN),
     ("narrowed-preflight", NARROWED_CONFLICT, MERGE_NARROWED),
     # Before platform-infra: a Source Validation log can carry passing-test rate-limit lines beside the guard error that actually failed the job.
     ("domain-write", DOMAIN_WRITE, REGISTER_DOMAIN),
     ("changelog-metadata", CHANGELOG_MISSING, STAMP_CHANGELOG),
     ("cache-surface", CACHE_SURFACE_TEXT, STRIP_CACHE),
     ("spacing-scale", SPACING_RATCHET_TEXT, SNAP_SPACING),
+    ("ui-feel", UI_FEEL_TEXT, UI_FEEL),
+    ("heading-balance", HEADING_BALANCE_TEXT, BALANCE_HEADINGS),
     ("census-certification", CENSUS_CERTIFICATION, SYNC_MAIN),
     ("design-source-cli", DESIGN_SOURCE_CLI, SYNC_MAIN),
-    # Inventory assertion outranks quota/infra noise echoed in the same log.
+    ("route-budget-growth", ROUTE_BUDGET_GROWTH, SYNC_MAIN),
     ("ci-fast-wiring", UNWIRED, WIRE_CI_FAST),
     # The license error is the job failure. A passing fixture can echo quota text.
     ("dependency-license", DEPENDENCY_LICENSE, AGENT),
+    # Before quota/platform: a Source Validation log echoes passing-test rate-limit lines beside the gate that failed the job.
+    ("screen-certificate", SCREEN_CERT_TEXT, REPAIR_SCREEN_CERT),
     ("quota-deferred", QUOTA_TEXT, RERUN),
     ("platform-infra", PLATFORM_TEXT, RERUN),
     ("migration-number", migration_renumber.LOG_TEXT, RENUMBER),
@@ -178,7 +191,7 @@ def real_failures(pr: dict) -> list[dict]:
 def stamp_internal_changelog(body) -> str | None:
     """Append the internal customer-changelog note. None when `body` is not a string or already
     contains a note (a second note is an ambiguous contract, not a stamp)."""
-    if not isinstance(body, str) or "customer-changelog/v1" in body:
+    if not isinstance(body, str) or re.search(r"<!--\s*customer-changelog/v1\b", body):
         return None
     if body and not body.endswith("\n"):
         body += "\n"
@@ -186,7 +199,7 @@ def stamp_internal_changelog(body) -> str | None:
 
 
 def classify(pr: dict, logs: dict[str, str] | None = None) -> dict:
-    """{cls, key, action, checks, signature, files}. `logs` maps a failing check name to its failed-job log;
+    """{cls, key, action, actions, checks, signature, files, repairs}. `logs` maps a failing check name to its failed-job log;
     a check with no log is `other`. A BEHIND branch with nothing deterministic to say is `stale-branch`."""
     logs = logs or {}
     import detached_native_sync
@@ -195,10 +208,15 @@ def classify(pr: dict, logs: dict[str, str] | None = None) -> dict:
     for name in names:
         text = logs.get(name) or ""
         hit = next(((cls, action) for cls, pattern, action in SIGNATURES if pattern.search(text)), None)
-        per_check.append(detached_native_sync.hit(text) or hit or size_500_stale_hit(text) or ("other", AGENT))
+        per_check.append(detached_native_sync.hit(text) or render_mode_hit(text) or hit or size_500_stale_hit(text) or ("other", AGENT))
     classes = {cls for cls, _ in per_check}
+    actions: list[str] = []
     if len(classes) == 1:
         cls, action = per_check[0]
+    elif classes and all(item_action in DETERMINISTIC for _, item_action in per_check):
+        import fix_red_compose
+        cls, action, actions = fix_red_compose.composed_route(
+            [item_action for _, item_action in per_check], COMPOSE, AGENT)
     elif classes:
         cls, action = "mixed", AGENT
     else:
@@ -214,20 +232,13 @@ def classify(pr: dict, logs: dict[str, str] | None = None) -> dict:
     owner = alias_owner_metadata(names, logs) if cls == "alias-review-deadline" else None
     if cls == "alias-review-deadline" and owner is None:
         cls, action, signature = "mixed", AGENT, error_signature("\n".join(logs.get(name) or "" for name in names))
-    files = []
-    if cls == "component-test-evidence":
-        files = sorted({test for name in names for test in COMPONENT_TEST_TEXT.findall(logs.get(name) or "")})
-    if cls == "ci-fast-wiring":
-        for name in names:
-            found = UNWIRED.search(logs.get(name) or "")
-            files.extend(item.strip() for item in (found.group(1).split(",") if found else []) if item.strip())
-        files = sorted(set(files))
-    elif cls == "domain-write":
-        files = sorted(_domain_write_hits("\n".join(logs.get(name) or "" for name in names)))
-    elif cls == "detached-native-consumer":
-        files = detached_native_sync.paths("\n".join(logs.get(name) or "" for name in names))
+    if action != COMPOSE:
+        actions = [action] if action in DETERMINISTIC else []
+    from fix_red_compose import repair_files
+    files = repair_files(cls, action, names, logs, per_check)
+    repairs = mixed_repairs(pr, per_check) if cls == "mixed" else []
     return {"schema": SCHEMA, "cls": cls, "key": fingerprint_key(cls, names, signature), "action": action,
-            "checks": names, "signature": signature, "files": files, **({"evidenceOwner": owner} if owner else {})}
+            "actions": actions, "checks": names, "signature": signature, "files": files, "repairs": repairs, **({"evidenceOwner": owner} if owner else {})}
 
 
 def _split_shell_and(command: str) -> list[str] | None:
@@ -575,10 +586,7 @@ def resolve_preflight_narrowed_text(text: str) -> str | None:
 
 
 def merge_additive_quoted_entries(ours: str, theirs: str) -> str | None:
-    """Union two conflict sides that only add quoted list entries.
-
-    Main's order stays, then head-only lines. A blank side, a non-entry line, or a
-    repeated path with different text returns None."""
+    """Union quoted list entries. Single quotes keep main order; double quotes sort. A non-entry returns None."""
 
     def rows(side: str) -> list[str] | None:
         if not str(side or "").endswith("\n"):
@@ -596,6 +604,10 @@ def merge_additive_quoted_entries(ours: str, theirs: str) -> str | None:
     for line in theirs_rows + ours_rows:
         if line not in seen:
             seen.append(line)
+    # Double-quoted rows are JSON path registries. Those files must stay sorted.
+    if seen and all(line.strip().startswith('"') for line in seen):
+        pad = seen[0][:len(seen[0]) - len(seen[0].lstrip(" \t"))]
+        seen = [f'{pad}"{line.strip()[1:-2]}",' for line in sorted(seen, key=lambda line: line.strip())]
     return "\n".join(seen) + "\n"
 
 
@@ -979,7 +991,7 @@ def wire_ci_fast(root: Path, files: list[str]) -> list[str]:
     added = []
     for rel in files:
         if not re.fullmatch(r"scripts/[\w./-]+\.test\.(?:mjs|mts|js|ts)", rel) or ".." in rel \
-                or not (Path(root) / rel).is_file() or f"'{rel}'" in text:
+                or not (Path(root) / rel).is_file() or f"'{rel}'" in text or f"'{rel} " in text:
             continue
         source = (Path(root) / rel).read_text(errors="replace")
         name = "SCRIPT_CONTRACT_VITEST_TESTS" if re.search(r"""from ['"]vitest['"]""", source) else "SCRIPT_CONTRACT_NODE_TESTS"
@@ -1138,37 +1150,13 @@ def costs_from_metrics(state: Path) -> dict:
     return out
 
 
-def reviewable_split(changes: dict[str, int], layers: list[list[str]], cap: int = 1500) -> list[int]:
-    """Validate an exhaustive split, counting tests. Caller measures generated paths as zero.
-
-    This plans file-level layers only; each layer still owes dependency/build/test proof.
-    No Git mutation or policy exception is authorized by a passing plan.
-    """
-    if type(cap) is not int or cap < 1 or not changes or not layers:
-        raise ValueError("nonempty measurements/layers and a positive integer cap required")
-    if any(type(count) is not int or count < 0 for count in changes.values()):
-        raise ValueError("unknown, binary or negative line count")
-    seen, totals = set(), []
-    for layer in layers:
-        if not isinstance(layer, list) or not layer:
-            raise ValueError("empty or invalid layer")
-        for path in layer:
-            if path not in changes or path in seen:
-                raise ValueError(f"unknown or duplicate path: {path}")
-            seen.add(path)
-        total = sum(changes[path] for path in layer)
-        if total > cap:
-            raise ValueError(f"layer {len(totals) + 1} exceeds cap: {total}/{cap}")
-        totals.append(total)
-    if seen != set(changes):
-        raise ValueError(f"unassigned paths: {sorted(set(changes) - seen)}")
-    return totals
-
-
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("command", choices=["measure", "split-plan"])
     parser.add_argument("--plan", type=Path, help="JSON {changes: {path: measured lines}, layers: [[path]]}")
+    parser.add_argument("--numstat", type=Path, help="Verify plan counts against git diff --numstat; counts all rows")
+    parser.add_argument("--layer-numstat", type=Path, action="append", default=[],
+                        help="Ordered adjacent base/head numstats; measures paths repeated across PR layers")
     parser.add_argument("--state", default=str(Path.home() / ".local/state/jovie-lanes"))
     parser.add_argument("--days", type=int, default=5)
     parser.add_argument("--now", type=float, default=None)
@@ -1178,7 +1166,18 @@ def main(argv=None) -> int:
             parser.error("split-plan requires --plan")
         plan = json.loads(args.plan.read_text())
         try:
-            totals = reviewable_split(plan["changes"], plan["layers"])
+            if args.layer_numstat:
+                if args.numstat is not None:
+                    raise ValueError("choose whole-diff or adjacent-layer measurements")
+                snapshots = [measured_changes(path.read_text()) for path in args.layer_numstat]
+                if plan.get("layerChanges") != snapshots or len(plan["layers"]) != len(snapshots):
+                    raise ValueError("layer measurements differ from Git numstat; regenerate each adjacent base/head")
+                totals = [reviewable_split(changes, [layer])[0]
+                          for changes, layer in zip(snapshots, plan["layers"])]
+            else:
+                if args.numstat is not None and plan["changes"] != measured_changes(args.numstat.read_text()):
+                    raise ValueError("plan measurements differ from Git numstat; regenerate for the current base/head")
+                totals = reviewable_split(plan["changes"], plan["layers"])
         except ValueError as error:
             parser.error(str(error))
         print(json.dumps({"reviewableLines": totals, "cap": 1500, "testsIncluded": True}))

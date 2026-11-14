@@ -197,7 +197,7 @@ nodes:
       - push
       - workflow_dispatch
     terminalReceipt: job:main-release-ready
-    jobCount: 68
+    jobCount: 71
   - name: Claim Checkout Dogfood
     path: .github/workflows/claim-checkout-dogfood.yml
     active: true
@@ -725,8 +725,8 @@ nodes:
       - Mac Lane Route
     triggeringStateTransition:
       - workflow_call
-    terminalReceipt: job:build
-    jobCount: 2
+    terminalReceipt: job:startup-budget
+    jobCount: 3
   - name: Main Health
     path: .github/workflows/main-health.yml
     active: true
@@ -811,7 +811,8 @@ nodes:
     category: source-validation
     authoritativeProducer: Source Validation
     authoritativeFor: []
-    allowedConsumers: []
+    allowedConsumers:
+      - Component Certificate
     triggeringStateTransition:
       - push
       - workflow_dispatch
@@ -1130,7 +1131,6 @@ nodes:
     authoritativeFor: []
     allowedConsumers: []
     triggeringStateTransition:
-      - pull_request
       - workflow_dispatch
     terminalReceipt: job:crawl
     jobCount: 1
@@ -1239,6 +1239,7 @@ nodes:
       - push
       - repository_dispatch
       - workflow_dispatch
+      - workflow_run
     terminalReceipt: job:find
     jobCount: 1
   - name: Remediation Sweep
@@ -1548,6 +1549,7 @@ nodes:
     authoritativeProducer: Source Validation
     authoritativeFor: []
     allowedConsumers:
+      - Quality Gap Finder
       - SonarCloud
     triggeringStateTransition:
       - repository_dispatch
@@ -1620,7 +1622,8 @@ nodes:
     category: source-validation
     authoritativeProducer: Source Validation
     authoritativeFor: []
-    allowedConsumers: []
+    allowedConsumers:
+      - Component Certificate
     triggeringStateTransition:
       - push
       - workflow_dispatch
@@ -1637,7 +1640,7 @@ nodes:
       - schedule
       - workflow_dispatch
     terminalReceipt: job:report-scheduled-failure
-    jobCount: 2
+    jobCount: 3
   - name: VOC Mine
     path: .github/workflows/voc-mine.yml
     active: true
@@ -1694,6 +1697,12 @@ edges:
     to: Mac Lane Route
     type: workflow_call
   - from: CI
+    to: Component Certificate
+    type: workflow_run
+  - from: Visual & A11y Tests
+    to: Component Certificate
+    type: workflow_run
+  - from: Mutation Diff
     to: Component Certificate
     type: workflow_run
   - from: Staging Controller
@@ -1819,6 +1828,9 @@ edges:
   - from: Production Release
     to: Canary Health Gate
     type: workflow_call
+  - from: Test Coverage Audit
+    to: Quality Gap Finder
+    type: workflow_run
   - from: Eve Pilot
     to: Safe PR Remediation
     type: workflow_run

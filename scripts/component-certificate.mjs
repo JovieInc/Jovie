@@ -13,8 +13,10 @@ import { basename, dirname, join } from 'node:path';
 import { parseArgs } from 'node:util';
 import {
   COVERAGE_ROOTS,
+  coverageRootForPath,
   listComponentsInRoot,
   REPO_ROOT,
+  shouldWalkRootRecursively,
 } from './component-ship-policy.mjs';
 import { applyBenchmarkReview } from './lib/component-benchmark-review.mjs';
 import {
@@ -29,7 +31,7 @@ import {
   mutationStateKey,
   mutationTestsFor,
 } from './lib/component-certificate-mutation.mjs';
-import { acceptStoryReceipts } from './lib/component-evidence.mjs';
+import { loadStoryReceipts } from './lib/component-story-receipts.mjs';
 
 const { values } = parseArgs({
   options: {
@@ -138,20 +140,7 @@ const registry = readJson(values.registry, { policy: {}, waivers: {} });
 const policy = { ...DEFAULT_POLICY, ...(registry.policy ?? {}) };
 const mutation =
   readJson(values['mutation-state'], { modules: {} }).modules ?? {};
-// Story-capture receipts count only when every story was captured in light
-// and dark; partial passes are dropped (and listed) rather than trusted.
-const receipts = kind => {
-  const { components, rejected } = acceptStoryReceipts(
-    readJson(values[kind], { components: {} }).components
-  );
-  for (const r of rejected)
-    console.error(
-      `[component-certificate] ignored ${kind} receipt for ${r.path}: ${r.problem}`
-    );
-  return components;
-};
-const a11y = receipts('a11y');
-const visual = receipts('visual');
+const { a11y, visual, renderInputs } = loadStoryReceipts(root, values);
 const journeyMap = readJson(values.journeys, { components: {}, journeys: {} });
 const benchmarks =
   readJson(values.benchmarks, { components: {} }).components ?? {};
@@ -166,13 +155,29 @@ const mutationInventory = Object.keys(mutation).length
 
 /** @type {any[]} */
 let list = [];
-if (values.all || values.gate)
-  for (const r of [...new Set(COVERAGE_ROOTS)])
-    list.push(...listComponentsInRoot(r, root));
-const seen = new Set();
-list = list.filter(c =>
-  seen.has(c.sourceRel) ? false : seen.add(c.sourceRel)
-);
+if (values.all || values.gate) {
+  const roots = [...new Set(COVERAGE_ROOTS)];
+  // Discover a recursive parent once, retaining the canonical per-root order.
+  // packages/ui is non-recursive, so its separate atoms root still runs.
+  const discoveryRoots = roots.filter(
+    rootRel =>
+      !roots.some(
+        parent =>
+          parent !== rootRel &&
+          shouldWalkRootRecursively(parent) &&
+          rootRel.startsWith(`${parent}/`)
+      )
+  );
+  const rootOrder = new Map(roots.map((rootRel, index) => [rootRel, index]));
+  list = discoveryRoots.flatMap(rootRel => listComponentsInRoot(rootRel, root));
+  list.sort(
+    (a, b) =>
+      rootOrder.get(coverageRootForPath(a.sourceRel)) -
+        rootOrder.get(coverageRootForPath(b.sourceRel)) ||
+      a.sourceRel.localeCompare(b.sourceRel)
+  );
+}
+const seen = new Set(list.map(c => c.sourceRel));
 // A gate key naming one .tsx file outside the coverage roots (an app-route
 // component such as app/[username]/_components/X.tsx) is certified as if
 // passed with --component; a missing file still fails "matches no component".
@@ -203,13 +208,28 @@ const prefixGateScope = new Set([
   ...(values.component ?? []),
   ...gatedFiles,
 ]);
-for (const rel of [...(values.component ?? []), ...gatedFiles, ...screenFiles])
-  if (!seen.has(rel) && seen.add(rel))
-    list.push({
+const scopedDirectories = new Map();
+for (const rel of [
+  ...(values.component ?? []),
+  ...gatedFiles,
+  ...screenFiles,
+]) {
+  if (seen.has(rel)) continue;
+  seen.add(rel);
+  const dir = dirname(rel);
+  if (!scopedDirectories.has(dir))
+    scopedDirectories.set(
+      dir,
+      new Map(listComponentsInRoot(dir, root, false).map(c => [c.sourceRel, c]))
+    );
+  list.push(
+    scopedDirectories.get(dir).get(rel) ?? {
       sourceRel: rel,
       testRel: rel.replace(/\.tsx$/, '.test.tsx'),
       storyRel: rel.replace(/\.tsx$/, '.stories.tsx'),
-    });
+    }
+  );
+}
 if (!values.all && values.component)
   list = list.filter(c => values.component.includes(c.sourceRel));
 
@@ -243,6 +263,7 @@ const certificates = list.map(c => {
     policy,
     packagesUi: c.sourceRel.startsWith('packages/ui/'),
     evidence: {
+      renderInputs,
       mutation: mutation[mutationStateKey(c.sourceRel)],
       a11y: a11y[c.sourceRel],
       visual: visual[c.sourceRel],

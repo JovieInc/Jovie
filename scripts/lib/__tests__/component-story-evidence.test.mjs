@@ -41,7 +41,20 @@ const both = (storyId, extra = {}) => [
   clean(storyId, 'dark', extra.dark),
 ];
 const one = (path, storyIds) =>
-  new Map([[path, { sourceHash: hashA, storyIds }]]);
+  new Map([
+    [
+      path,
+      {
+        sourceHash: hashA,
+        storyIds,
+        renderInputs: {
+          schema: 'jovie.component-render-inputs/v1',
+          digest: hashA,
+          mode: 'storybook-full',
+        },
+      },
+    ],
+  ]);
 
 describe('runner guard: Storybook never runs on gem', () => {
   it('allows GitHub-hosted runners', () => {
@@ -243,6 +256,7 @@ describe('receipt assembly', () => {
       const receipt = file.components[path];
       assert.equal(receipt.schema, STORY_EVIDENCE_SCHEMA);
       assert.equal(receipt.sourceHash, hashA);
+      assert.equal(receipt.renderInputs.digest, hashA);
       assert.equal(receipt.status, 'pass');
       assert.equal(receipt.captured, 2);
       assert.equal(receipt.detail, undefined);
@@ -350,4 +364,31 @@ describe('shard merge', () => {
       { components: { 'packages/ui/a.tsx': pass, 'packages/ui/b.tsx': fail } }
     );
   });
+});
+
+it('rejects shards with conflicting render provenance for the same component', () => {
+  const path = 'packages/ui/atoms/button.tsx';
+  const receipt = {
+    status: 'pass',
+    renderInputs: {
+      schema: 'jovie.component-render-inputs/v1',
+      mode: 'storybook-full',
+      digest: hashA,
+    },
+  };
+  assert.throws(
+    () =>
+      mergeEvidence([
+        { components: { [path]: receipt } },
+        {
+          components: {
+            [path]: {
+              ...receipt,
+              renderInputs: { ...receipt.renderInputs, digest: 'b'.repeat(64) },
+            },
+          },
+        },
+      ]),
+    /conflicting render inputs/
+  );
 });

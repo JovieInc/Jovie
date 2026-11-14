@@ -30,9 +30,9 @@ const badgeVariants = cva(BADGE_SHARED_GEOMETRY_CLASS, {
     size: BADGE_SIZE_GEOMETRY,
     tone: {
       neutral: 'border-subtle bg-surface-1 text-tertiary-token',
-      info: 'border-info/20 bg-surface-1 text-info',
+      info: 'border-info/20 bg-surface-1 text-(--color-accent-blue-text) dark:text-info',
       success: 'border-success/20 bg-surface-1 text-success-text',
-      accent: 'border-accent/20 bg-surface-1 text-accent',
+      accent: 'border-accent/20 bg-surface-1 text-accent-text',
       warning: 'border-warning/20 bg-surface-1 text-warning-text',
       error: 'border-error/20 bg-surface-1 text-error-text',
     },

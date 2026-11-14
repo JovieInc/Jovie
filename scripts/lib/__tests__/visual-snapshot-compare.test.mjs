@@ -123,7 +123,8 @@ describe('visual snapshot compare (JOV-5459)', () => {
       resolve(REPO_ROOT, '.github/workflows/visual-regression.yml'),
       'utf8'
     );
-    const compareJob = [
+    // Minimal split-lane fixtures: one shared build job plus three suite jobs.
+    const buildJob = [
       '  ci-visual-snapshot-compare:',
       '    name: Visual Snapshot Compare',
       '    needs: [ci-path-changes]',
@@ -131,7 +132,39 @@ describe('visual snapshot compare (JOV-5459)', () => {
       '    steps:',
       '      - run: node scripts/visual-snapshot-compare.mjs compare',
     ].join('\n');
-    const mergeReady = [
+    const homepageSuiteJob = [
+      '  ci-visual-snapshot-homepage:',
+      '    name: Visual Snapshot Compare (homepage)',
+      '    needs: [ci-path-changes, ci-visual-snapshot-compare]',
+      "    if: needs.ci-path-changes.outputs.run_homepage_visual == 'true'",
+      '    steps:',
+      '      - uses: actions/download-artifact@v8',
+      '        with:',
+      '          name: visual-compare-build-${{ github.run_id }}',
+    ].join('\n');
+    const marketingDomSuiteJob = [
+      '  ci-visual-marketing-dom:',
+      '    name: Visual Snapshot Compare (marketing DOM)',
+      '    needs: [ci-path-changes, ci-visual-snapshot-compare]',
+      "    if: needs.ci-path-changes.outputs.run_marketing_dom == 'true'",
+      '    steps:',
+      '      - uses: actions/download-artifact@v8',
+      '        with:',
+      '          name: visual-compare-build-${{ github.run_id }}',
+      '      - run: node .github/scripts/guard-playwright-artifacts.mjs --run -- pnpm exec playwright test tests/product-screenshots/route-dom-certification.spec.ts --workers=1',
+    ].join('\n');
+    const marketingRoutesSuiteJob = [
+      '  ci-visual-marketing-routes:',
+      '    name: Visual Snapshot Compare (marketing routes)',
+      '    needs: [ci-path-changes, ci-visual-snapshot-compare]',
+      "    if: needs.ci-path-changes.outputs.run_marketing_dom == 'true'",
+      '    steps:',
+      '      - uses: actions/download-artifact@v8',
+      '        with:',
+      '          name: visual-compare-build-${{ github.run_id }}',
+      '      - run: node .github/scripts/guard-playwright-artifacts.mjs --run -- pnpm exec playwright test tests/product-screenshots/marketing-routes.spec.ts --workers=4',
+    ].join('\n');
+    const partialMergeReady = [
       '  ci-merge-group-ready:',
       '    needs: [ci-visual-snapshot-compare]',
     ].join('\n');
@@ -143,10 +176,26 @@ describe('visual snapshot compare (JOV-5459)', () => {
     ].join('\n');
     const issues = assertVisualCompareWorkflowContract({
       visualRegressionYaml,
-      ciYaml: [compareJob, mergeReady, fastSourceReady].join('\n'),
+      ciYaml: [
+        buildJob,
+        homepageSuiteJob,
+        marketingDomSuiteJob,
+        marketingRoutesSuiteJob,
+        partialMergeReady,
+        fastSourceReady,
+      ].join('\n'),
     });
     expect(issues).toContain(
       'compare job must run on homepage pull_request paths (run_homepage_visual)'
+    );
+    expect(issues).toContain(
+      'compare job must build once and publish the shared visual compare build artifact'
+    );
+    expect(issues).toContain(
+      'homepage visual compare must render and compare the Playwright homepage snapshots'
+    );
+    expect(issues).toContain(
+      'merge-group PR Ready must require visual snapshot compare'
     );
     expect(issues).toContain(
       'source PR Ready must require visual snapshot compare on homepage paths'
@@ -154,11 +203,8 @@ describe('visual snapshot compare (JOV-5459)', () => {
     expect(issues).toContain(
       'source PR Ready must fail closed when a homepage PR skips visual snapshot compare'
     );
-    expect(issues).toContain(
-      'homepage visual compare must render and compare the Playwright homepage snapshots'
-    );
 
-    const gatedCompareJob = compareJob.replace(
+    const gatedBuildJob = buildJob.replace(
       "    if: github.event_name == 'merge_group'",
       [
         '    if: >-',
@@ -166,31 +212,163 @@ describe('visual snapshot compare (JOV-5459)', () => {
         "      needs.ci-path-changes.outputs.run_homepage_visual == 'true'",
       ].join('\n')
     );
-    const renderedCompareJob = gatedCompareJob.replace(
+    const renderedBuildJob = gatedBuildJob.replace(
       '      - run: node scripts/visual-snapshot-compare.mjs compare',
       [
         '      - run: node scripts/visual-snapshot-compare.mjs compare',
         '      - uses: ./.github/actions/setup-node-pnpm',
-        '      - uses: ./.github/actions/setup-playwright',
         '      - run: pnpm turbo build --filter=@jovie/web',
-        '      - run: node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs" --run -- pnpm exec playwright test tests/e2e/visual-regression.spec.ts --project=chromium --grep homepage',
+        '      - run: tar -cf "${{ runner.temp }}/visual-compare-build.tar" --exclude=\'.next/cache\' -C apps/web .next',
+        '      - uses: actions/upload-artifact@v7',
+        '        with:',
+        '          name: visual-compare-build-${{ github.run_id }}',
       ].join('\n')
     );
+    const renderedHomepageSuiteJob = homepageSuiteJob
+      .replace(
+        '      - uses: actions/download-artifact@v8',
+        [
+          '      - uses: ./.github/actions/setup-node-pnpm',
+          '      - uses: ./.github/actions/setup-playwright',
+          '      - uses: actions/download-artifact@v8',
+        ].join('\n')
+      )
+      .replace(
+        '          name: visual-compare-build-${{ github.run_id }}',
+        [
+          '          name: visual-compare-build-${{ github.run_id }}',
+          '      - run: node .github/scripts/guard-playwright-artifacts.mjs --run -- pnpm exec playwright test tests/e2e/visual-regression.spec.ts --project=chromium --grep homepage',
+        ].join('\n')
+      );
+    const fullyWiredMergeReady = [
+      '  ci-merge-group-ready:',
+      '    needs: [ci-visual-snapshot-compare, ci-visual-snapshot-homepage, ci-visual-marketing-dom, ci-visual-marketing-routes]',
+      '    steps:',
+      '      - run: |',
+      '          VISUAL_HOMEPAGE_RESULT="${{ needs.ci-visual-snapshot-homepage.result }}"',
+      '          VISUAL_MARKETING_DOM_RESULT="${{ needs.ci-visual-marketing-dom.result }}"',
+      '          VISUAL_MARKETING_ROUTES_RESULT="${{ needs.ci-visual-marketing-routes.result }}"',
+      '          RUN_HOMEPAGE_VISUAL="${{ needs.ci-path-changes.outputs.run_homepage_visual }}"',
+      '          RUN_MARKETING_DOM="${{ needs.ci-path-changes.outputs.run_marketing_dom }}"',
+      '          for selected_gate in \\',
+      '            "Homepage Visual Compare:$RUN_HOMEPAGE_VISUAL:$VISUAL_HOMEPAGE_RESULT" \\',
+      '            "Marketing DOM Certification:$RUN_MARKETING_DOM:$VISUAL_MARKETING_DOM_RESULT" \\',
+      '            "Marketing Route Capture:$RUN_MARKETING_DOM:$VISUAL_MARKETING_ROUTES_RESULT"; do',
+      '            if [[ "$selected" == "true" && "$result" != "success" ]]; then exit 1; fi',
+      '            if [[ "$selected" != "true" && "$result" != "skipped" ]]; then exit 1; fi',
+      '          done',
+    ].join('\n');
     const gatedSourceReady = [
       '  ci-pr-ready:',
-      '    needs: [ci-path-changes, ci-fast, ci-visual-snapshot-compare]',
+      '    needs: [ci-path-changes, ci-fast, ci-visual-snapshot-compare, ci-visual-snapshot-homepage, ci-visual-marketing-dom, ci-visual-marketing-routes]',
       '    steps:',
       '      - run: |',
       '          RUN_HOMEPAGE_VISUAL="${{ needs.ci-path-changes.outputs.run_homepage_visual }}"',
+      '          RUN_MARKETING_DOM="${{ needs.ci-path-changes.outputs.run_marketing_dom }}"',
       '          VISUAL_COMPARE_RESULT="${{ needs.ci-visual-snapshot-compare.result }}"',
+      '          VISUAL_HOMEPAGE_RESULT="${{ needs.ci-visual-snapshot-homepage.result }}"',
+      '          VISUAL_MARKETING_DOM_RESULT="${{ needs.ci-visual-marketing-dom.result }}"',
+      '          VISUAL_MARKETING_ROUTES_RESULT="${{ needs.ci-visual-marketing-routes.result }}"',
       '          if [[ "$RUN_HOMEPAGE_VISUAL" == "true" && "$VISUAL_COMPARE_RESULT" != "success" ]]; then exit 1; fi',
+      '          if [[ "$RUN_HOMEPAGE_VISUAL" == "true" && "$VISUAL_HOMEPAGE_RESULT" != "success" ]]; then exit 1; fi',
+      '          if [[ "$RUN_MARKETING_DOM" == "true" && "$VISUAL_MARKETING_DOM_RESULT" != "success" ]]; then exit 1; fi',
+      '          if [[ "$RUN_MARKETING_DOM" == "true" && "$VISUAL_MARKETING_ROUTES_RESULT" != "success" ]]; then exit 1; fi',
     ].join('\n');
     expect(
       assertVisualCompareWorkflowContract({
         visualRegressionYaml,
-        ciYaml: [renderedCompareJob, mergeReady, gatedSourceReady].join('\n'),
+        ciYaml: [
+          renderedBuildJob,
+          renderedHomepageSuiteJob,
+          marketingDomSuiteJob,
+          marketingRoutesSuiteJob,
+          fullyWiredMergeReady,
+          gatedSourceReady,
+        ].join('\n'),
       })
     ).toEqual([]);
+
+    // Review item: an aggregate that wires all four needs but keeps only the
+    // legacy build-result check must still be rejected — every selected suite
+    // needs its own fail-closed result check.
+    const uncheckedSourceReady = gatedSourceReady
+      .replace(
+        /\n *if \[\[ "\$RUN_HOMEPAGE_VISUAL" == "true" && "\$VISUAL_HOMEPAGE_RESULT" != "success" \]\]; then exit 1; fi/,
+        ''
+      )
+      .replace(
+        /\n *if \[\[ "\$RUN_MARKETING_DOM" == "true" && "\$VISUAL_MARKETING_DOM_RESULT" != "success" \]\]; then exit 1; fi/,
+        ''
+      )
+      .replace(
+        /\n *if \[\[ "\$RUN_MARKETING_DOM" == "true" && "\$VISUAL_MARKETING_ROUTES_RESULT" != "success" \]\]; then exit 1; fi/,
+        ''
+      );
+    // Merge-group side: assignments and needs alone must not satisfy the
+    // validator — each suite's selected-gate entry must survive, and the
+    // enforcing loop must exist. Per-suite negatives keep the assignments and
+    // drop only that suite's gate entry; a final one drops the whole loop.
+    const dropLine = needle => fullyWiredMergeReady.replace(needle, '');
+    const dropLoop = () =>
+      fullyWiredMergeReady.replace(
+        /\n *for selected_gate in [\s\S]*?\n *done/,
+        '\n'
+      );
+    const mergeReadyNegatives = [
+      [
+        'homepage gate entry',
+        dropLine(
+          '            "Homepage Visual Compare:$RUN_HOMEPAGE_VISUAL:$VISUAL_HOMEPAGE_RESULT" \\\n'
+        ),
+      ],
+      [
+        'marketing DOM gate entry',
+        dropLine(
+          '            "Marketing DOM Certification:$RUN_MARKETING_DOM:$VISUAL_MARKETING_DOM_RESULT" \\\n'
+        ),
+      ],
+      [
+        'marketing routes gate entry',
+        dropLine(
+          '            "Marketing Route Capture:$RUN_MARKETING_DOM:$VISUAL_MARKETING_ROUTES_RESULT"; do\n'
+        ),
+      ],
+      ['entire enforcing loop', dropLoop()],
+    ];
+    for (const [label, crippledMergeReady] of mergeReadyNegatives) {
+      expect(crippledMergeReady, label).not.toBe(fullyWiredMergeReady);
+      expect(
+        assertVisualCompareWorkflowContract({
+          visualRegressionYaml,
+          ciYaml: [
+            renderedBuildJob,
+            renderedHomepageSuiteJob,
+            marketingDomSuiteJob,
+            marketingRoutesSuiteJob,
+            crippledMergeReady,
+            gatedSourceReady,
+          ].join('\n'),
+        })
+      ).toContain(
+        'merge-group PR Ready must validate every selected visual suite result'
+      );
+    }
+    expect(uncheckedSourceReady).not.toBe(gatedSourceReady);
+    expect(
+      assertVisualCompareWorkflowContract({
+        visualRegressionYaml,
+        ciYaml: [
+          renderedBuildJob,
+          renderedHomepageSuiteJob,
+          marketingDomSuiteJob,
+          marketingRoutesSuiteJob,
+          fullyWiredMergeReady,
+          uncheckedSourceReady,
+        ].join('\n'),
+      })
+    ).toContain(
+      'source PR Ready must fail closed when a homepage PR skips visual snapshot compare'
+    );
   });
 
   it('passes the committed snapshot inventory and workflow contract', () => {

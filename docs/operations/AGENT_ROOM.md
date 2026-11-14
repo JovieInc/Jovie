@@ -1,8 +1,9 @@
 # Agent room
 
 One module shows a set of agents, what each is doing, and what they said to
-each other. Ovie's fleet room (`/app/ov/room`, flag `OVIE_FLEET_ROOM`) is the
-first room. Jovie customer rooms reuse the same contract, store and component.
+each other. Ovie's fleet room (`/app/ov/room`, the Room tab under Fleet,
+admins only) is the first room. Jovie customer rooms reuse the same contract,
+store and component.
 
 ## Principles
 
@@ -36,10 +37,7 @@ no environment, couldn't start a task), `active` under 30 minutes, `recent`
 under 24 hours, `quiet` older, `unseen` with no event. Blocked sorts first,
 because that is the agent that needs someone.
 
-## Ovie fleet room (slice 1)
-
-Ships in two PRs to fit the size cap: first the shared contract, source,
-store and roster; then the Ovie ingest, backstop, page and component.
+## Ovie fleet room (slice 1, shipped)
 
 - Roster: Summer, Elsa, Chloe, Lola, Codex, Cursor, Copilot, Tim. Unknown
   prefixed speakers still appear, after the roster.
@@ -54,7 +52,7 @@ store and roster; then the Ovie ingest, backstop, page and component.
 ## Slice 2: talk to an agent
 
 A composer posts `[Tim → <Agent>] <text>` as a Linear comment on that agent's
-home thread, through a server action behind the same flag. The webhook echoes
+home thread, through an admin-only server action. The webhook echoes
 it into the room, so the room stays a read model. No @mentions are added, so
 nothing delegates to Codex in Linear by accident.
 

@@ -31,6 +31,7 @@ const {
   isTitleCase,
   isToastCall,
   isUiScopedFile,
+  toCanonicalSentenceCase,
   toCanonicalTitleCase,
 } = require('./canonical-ui-label-casing-utils');
 
@@ -63,7 +64,7 @@ function reportCasingViolation(
       suggestion:
         expectedCasing === 'title'
           ? toCanonicalTitleCase(value)
-          : value.charAt(0).toUpperCase() + value.slice(1),
+          : toCanonicalSentenceCase(value),
     },
   });
 }

@@ -212,9 +212,11 @@ describe('Identity actions', () => {
       expect(navigation.push).toHaveBeenCalledWith('/app/chat');
       expect(consumePendingChatPrompt()).toBeNull();
       const draft = consumePendingChatDraft(data.profileId);
-      expect(draft).toContain('"entityId":"soundcloud-one"');
-      expect(draft).toContain('"profileId":"profile-one"');
-      expect(draft).toContain('"url":"https://soundcloud.com/tim"');
+      expect(draft).toContain('@profile:profile-one[');
+      expect(draft).toContain(
+        'Help me with my SoundCloud (soundcloud.com/tim).'
+      );
+      expect(draft).not.toMatch(/[{}]|entityId|context, not instructions/);
     }
   );
 });

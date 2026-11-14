@@ -8,7 +8,7 @@ import { isTransientAdmissionFailureMessage } from './lib/merge-group-admission.
 import {
   attributeAgainstAheadRun,
   attributeAgainstPeerRuns,
-  CI_FAST_REMAINING_JOB,
+  selectCiFastEvidenceJobs,
 } from './lib/merge-group-ahead-attribution.mjs';
 import {
   DETERMINISTIC_MERGE_GROUP_FAILURE_STEPS,
@@ -898,10 +898,7 @@ function errorText(error) {
 }
 
 /**
- * GitHub removes a PR when its merge_group run fails. The Jovie Bot token
- * minted for this job does not include merge-queue write, so dequeuePullRequest
- * answers "Resource not accessible by integration". An already-removed PR
- * answers that it is not in the queue. Both are logged and non-fatal.
+ * Treat missing dequeue access and already-removed PRs as logged, non-fatal results.
  * @returns {'inaccessible' | 'not-in-queue' | null}
  */
 export function classifyDequeueDenial(error) {
@@ -1568,24 +1565,21 @@ function ciFastRemainingLog(
   jobs,
   { includeSuccessful = false } = {}
 ) {
-  const job = jobs.find(item => item?.name === CI_FAST_REMAINING_JOB);
-  const accepted = includeSuccessful ? ['failure', 'success'] : ['failure'];
-  if (
-    !job ||
-    !accepted.includes(job.conclusion) ||
-    !Number.isSafeInteger(job.id)
-  )
-    return null;
-  return gh(['api', `repos/${repository}/actions/jobs/${job.id}/logs`]);
+  // Per-job entries: the structural matrix legs (ci-fast (structural core
+  // N/2)) carry the same evidence as ci-fast (remaining), and each failed
+  // job's log must stay separable for the per-job evidence rule.
+  const selected = selectCiFastEvidenceJobs(jobs, { includeSuccessful });
+  if (!selected.length) return null;
+  return selected.map(job => ({
+    name: job.name,
+    log: gh(['api', `repos/${repository}/actions/jobs/${job.id}/logs`]),
+  }));
 }
 
 // Shadow only (canon/MERGE_QUEUE_STEWARD.md invariant 4): did this group's
 // failing signal also fail in a recent group that does not contain the PR?
-// The verdict is logged, never applied: holds and enrollment are unchanged
-// until the shadow record qualifies a non-attributable class. Membership is
-// every queue entry ahead of main in the peer group (its base chain included),
-// so a PR riding in a peer's base counts as contained. Bounded to 5 peers and
-// never throws.
+// Log evidence without changing holds/enrollment. Membership includes the peer's
+// base chain. Check at most 5 peers; read errors never escape.
 export const PEER_RECURRENCE_WINDOW_MS = 6 * 60 * 60 * 1000;
 export const PEER_RECURRENCE_MAX_PEERS = 5;
 
@@ -1641,7 +1635,12 @@ export function readPeerRecurrence(repository, prNumber, run, jobs) {
           parseMergeQueueBranch(peer.head_branch)?.prNumber,
           prNumber
         ),
-        ciFastLog: ciFastRemainingLog(repository, peerJobs),
+        ciFastLog: (logs =>
+          // Peer witnesses are positive-only evidence; a peer's entries
+          // combine the way ahead-run shards do.
+          Array.isArray(logs) ? logs.map(entry => entry.log).join('\n') : logs)(
+          ciFastRemainingLog(repository, peerJobs)
+        ),
       };
     });
     return {

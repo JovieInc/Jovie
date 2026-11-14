@@ -1,9 +1,10 @@
 /**
  * The opt-in featured slot on marketing surfaces.
  *
- * Tim (2026-11-08): the homepage does not feature him. Until a real artist
- * opts in, the slot shows the labeled example artist in `demoArtists.ts`,
- * then the top opted-in artists whose content is certified.
+ * Tim (2026-11-12): feature him, with his own catalog, for now, and keep the
+ * slot ready for any artist's data so it can rotate by what converts. The
+ * slot shows the best-ranked opted-in artist whose content is certified, and
+ * the labeled example artist in `demoArtists.ts` when none is.
  *
  * A real artist reaches the homepage only through a record in
  * `FEATURED_ARTIST_OPT_INS` that passes `featuredArtistCertificationFailures`.
@@ -14,13 +15,15 @@
  * - A rights entry for every image the slot shows (avatar, every release, the
  *   inspected release): who holds it and on what basis we may show it.
  * - Every real person visible in those images, by their id in
- *   `scripts/invariants/art-direction/approved-people.json`. The art-direction
- *   rule keeps every real person off `/` (Tim, 2026-10-26), so on the homepage
- *   this list must be empty: cover art and artwork, no photos of people. Only
- *   Tim can change that rule.
+ *   `scripts/invariants/art-direction/approved-people.json`. The only person
+ *   a slot may show is the artist themselves (`artistPersonId`), and only
+ *   images the registry admits on `/` with their own approval. Anyone else in
+ *   an image keeps the slot off the homepage.
  * - A confirmation that the slot shows no testimonials, follower counts,
  *   revenue or other performance claims the artist did not approve.
  */
+
+import { TIM_WHITE_PROFILE } from '@/lib/tim-white';
 
 export interface FeaturedArtistRelease {
   readonly title: string;
@@ -64,7 +67,7 @@ export interface FeaturedArtistCertification {
   readonly certifiedAt: string;
   readonly imageRights: readonly FeaturedArtistImageRights[];
   /** approved-people ids for every real person visible in the images.
-   * Must be empty while `/` admits no real person. */
+   * Only the artist themselves (`artistPersonId`) may appear. */
   readonly peopleInImages: readonly string[];
   readonly noUnapprovedClaims: true;
 }
@@ -80,15 +83,116 @@ export interface FeaturedArtistOptIn {
   };
   /** Lower ranks are featured first. */
   readonly rank: number;
+  /**
+   * The artist's own id in approved-people.json, when their photos may show
+   * in the slot. Nobody else may appear in the images.
+   */
+  readonly artistPersonId?: string;
   /** Null until the content is certified. */
   readonly certification: FeaturedArtistCertification | null;
 }
 
+const TIM_RELEASES = '/img/releases';
+
 /**
- * Real artists who opted in to be featured. Empty until the first one does;
- * every entry must pass `featuredArtistCertificationFailures`.
+ * Tim White, Jovie's founder, featured with his own catalog until other
+ * artists opt in. Tim (2026-11-12): use him for now, and keep the slot ready
+ * for other artists' data so the featured artist can rotate by what converts.
  */
-export const FEATURED_ARTIST_OPT_INS: readonly FeaturedArtistOptIn[] = [];
+export const FEATURED_ARTIST_TIM_WHITE: FeaturedArtistOptIn = {
+  rank: 0,
+  artistPersonId: 'tim-white',
+  artist: {
+    demo: false,
+    slug: 'tim-white',
+    name: TIM_WHITE_PROFILE.name,
+    handle: TIM_WHITE_PROFILE.publicProfileHandle,
+    profileDisplay: TIM_WHITE_PROFILE.publicProfileDisplay,
+    avatarSrc: TIM_WHITE_PROFILE.avatarSrc,
+    releases: [
+      {
+        title: 'Never Say A Word',
+        byline: 'Tim White',
+        year: '2024',
+        src: `${TIM_RELEASES}/never-say-a-word.jpg`,
+      },
+      {
+        title: 'Take Me Over',
+        byline: 'Austin Leeds Remix · Tim White',
+        year: '2024',
+        src: `${TIM_RELEASES}/take-me-over-remix.webp`,
+      },
+      {
+        title: 'Doge (To Mars)',
+        byline: 'Tim White',
+        year: '2021',
+        src: `${TIM_RELEASES}/doge-to-mars.webp`,
+      },
+      {
+        title: 'Tomorrow Sounds',
+        byline: 'Tim White',
+        year: '2020',
+        src: `${TIM_RELEASES}/tomorrow-sounds.jpg`,
+      },
+      {
+        title: 'Supernova Girl',
+        byline: 'Tim White',
+        year: '2020',
+        src: `${TIM_RELEASES}/supernova-girl.webp`,
+      },
+      {
+        title: 'This Is Love',
+        byline: 'Tim White',
+        year: '2020',
+        src: `${TIM_RELEASES}/this-is-love.webp`,
+      },
+    ],
+    inspected: {
+      title: 'Supernova Girl',
+      src: `${TIM_RELEASES}/supernova-girl.webp`,
+      date: 'Mar 6',
+      type: 'Single',
+      tracks: '1',
+      duration: '2:34',
+      genres: ['Melodic Techno', 'Trance'],
+      label: 'The Bubblegum Factory',
+      upc: '5054526843813',
+    },
+  },
+  optIn: {
+    at: '2026-11-12T19:58:13Z',
+    inArtistsWords:
+      'approve new hero. use me for now. but the system should be ready to handle other data too. so we can start rotating demo artists based on what converts later.',
+    source: 'Tim, in the Jovie project chat with Claude',
+  },
+  certification: {
+    certifiedAt: '2026-11-12T20:10:00Z',
+    imageRights: [
+      TIM_WHITE_PROFILE.avatarSrc,
+      `${TIM_RELEASES}/never-say-a-word.jpg`,
+      `${TIM_RELEASES}/take-me-over-remix.webp`,
+      `${TIM_RELEASES}/doge-to-mars.webp`,
+      `${TIM_RELEASES}/tomorrow-sounds.jpg`,
+      `${TIM_RELEASES}/supernova-girl.webp`,
+      `${TIM_RELEASES}/this-is-love.webp`,
+    ].map(src => ({
+      src,
+      holder: 'Tim White',
+      basis: 'artist-owned' as const,
+    })),
+    // His avatar and the Never Say A Word cover are photos of him.
+    peopleInImages: ['tim-white'],
+    noUnapprovedClaims: true,
+  },
+};
+
+/**
+ * Real artists who opted in to be featured, best first. Every entry must pass
+ * `featuredArtistCertificationFailures`; the lowest certified rank shows.
+ */
+export const FEATURED_ARTIST_OPT_INS: readonly FeaturedArtistOptIn[] = [
+  FEATURED_ARTIST_TIM_WHITE,
+];
 
 const LOCAL_IMAGE = /^\/[\w\-./]+\.(webp|png|jpe?g|avif)$/;
 
@@ -140,9 +244,12 @@ export function featuredArtistCertificationFailures(
     failures.push('unapproved claims are not ruled out');
   }
 
-  if (certification.peopleInImages.length > 0) {
+  const others = certification.peopleInImages.filter(
+    person => person !== record.artistPersonId
+  );
+  if (others.length > 0) {
     failures.push(
-      'images show a real person, and `/` admits no real person (Tim, 2026-10-26)'
+      `images show someone other than the artist (${others.join(', ')}); \`/\` admits only the featured artist`
     );
   }
 

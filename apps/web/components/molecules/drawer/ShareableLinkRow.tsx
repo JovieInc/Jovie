@@ -45,7 +45,7 @@ const DENSITY_CLASSES = {
     container: 'h-8 gap-1.5 rounded-full px-3',
     icon: 'h-3.5 w-3.5',
     value: 'text-2xs',
-    button: 'h-5.5 w-5.5 rounded-full',
+    button: 'h-6 w-6 rounded-full',
     glyph: 'h-3.5 w-3.5',
   },
 } as const;

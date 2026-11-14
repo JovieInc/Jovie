@@ -230,8 +230,6 @@ const BLOBLESS_BASE_FETCH_JOBS = new Set([
   'ci-fast-remaining',
 ]);
 
-// Jobs whose full base fetch runs in the background during dependency
-// install; "Fetch base-branch history" then awaits it before any consumer.
 const BACKGROUND_BASE_FETCH_JOBS = new Set(['ci-fast-remaining']);
 
 describe('merge_group workflow contract', () => {
@@ -311,7 +309,7 @@ describe('merge_group workflow contract', () => {
     );
 
     const consumers =
-      'ci-fast-typecheck ci-fast-remaining ci-profile-admission-browser ci-fast-structural-python ci-fast-structural-web ci-fast-structural-lanes ci-promptfoo-evals ci-golden-eval-set ci-build-layout ci-build-ovie ci-typecheck-ovie ci-storybook-surfaces ci-cross-product-integration ci-unit-tests ci-exact-head-coverage-shard ci-golden-path-lock ci-visual-snapshot-compare drizzle-migration-guard';
+      'ci-fast-typecheck ci-fast-remaining ci-profile-admission-browser ci-fast-structural-python ci-fast-structural-web ci-fast-structural-lanes ci-promptfoo-evals ci-golden-eval-set ci-build-layout ci-build-ovie ci-typecheck-ovie ci-storybook-surfaces ci-cross-product-integration ci-unit-tests ci-exact-head-coverage-shard ci-golden-path-lock ci-visual-snapshot-compare ci-visual-snapshot-homepage ci-visual-marketing-dom ci-visual-marketing-routes drizzle-migration-guard';
     for (const jobId of consumers.split(' ')) {
       const job = getJobBlock(CI_WORKFLOW, jobId);
       expect(job, jobId).toContain('ci-merge-group-workspace');
@@ -3477,6 +3475,9 @@ ${selectedGateScript}`,
       'ci-secret-scan',
       'ci-golden-path-lock',
       'ci-visual-snapshot-compare',
+      'ci-visual-snapshot-homepage',
+      'ci-visual-marketing-dom',
+      'ci-visual-marketing-routes',
       'drizzle-migration-guard',
       'ci-unit-tests',
       'ci-merge-group-ready',
@@ -4518,8 +4519,7 @@ describe('resolveMergeGroupPathDiff coalesced heads (JOV-4905)', () => {
   });
 });
 
-// Each case builds a 40+ commit fixture repo with real git subprocesses;
-// the default 5s timeout flaked under load and ejected merge-queue groups.
+// Real 40+ commit fixtures need more than 5s under load.
 describe('Storybook Surface Matrix shallow diff-base history', {
   timeout: 30_000,
 }, () => {

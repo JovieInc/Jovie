@@ -257,8 +257,12 @@ export function CommonDropdown(props: CommonDropdownProps) {
         aria-busy={isLoading || undefined}
         /* A text input is not an allowed child of role="menu" (axe
            aria-required-children), so a searchable menu presents its
-           surface as a group and keeps the item rows in an inner menu. */
+           surface as a group and keeps the item rows in an inner menu.
+           Radix hardcodes aria-orientation on the content; orientation is
+           not an allowed aria-* attribute on role="group" (axe
+           aria-allowed-attr), so strip it in the group form. */
         role={searchable ? 'group' : 'menu'}
+        aria-orientation={searchable ? undefined : 'vertical'}
         data-scroll-body={scrollBody ? 'true' : undefined}
         data-motion={motion?.name ?? 'fade'}
         className={cn(
@@ -333,8 +337,11 @@ export function CommonDropdown(props: CommonDropdownProps) {
         data-menu-surface='toolbar'
         data-slot='common-dropdown-content'
         aria-busy={isLoading || undefined}
-        /* Same searchable group/menu split as the dropdown content above. */
+        /* Same searchable group/menu split as the dropdown content above.
+           Radix hardcodes aria-orientation; it is not allowed on
+           role="group" (axe aria-allowed-attr). */
         role={searchable ? 'group' : 'menu'}
+        aria-orientation={searchable ? undefined : 'vertical'}
         className={cn(contextContentBase, contentClassName)}
         style={getContentStyle(minWidth, maxHeight, 'context')}
         onEscapeKeyDown={event => {

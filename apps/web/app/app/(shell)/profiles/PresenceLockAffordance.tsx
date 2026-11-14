@@ -2,9 +2,8 @@
 
 import { Popover, PopoverContent, PopoverTrigger } from '@jovie/ui';
 import { LockKeyhole } from 'lucide-react';
-import Link from 'next/link';
 import { useRef, useState } from 'react';
-import { APP_ROUTES } from '@/constants/routes';
+import { UpgradeButton } from '@/components/molecules/UpgradeButton';
 import { cn } from '@/lib/utils';
 
 interface PresenceLockAffordanceProps {
@@ -69,13 +68,9 @@ export function PresenceLockAffordance({
           Monitoring Restricted
         </p>
         <p className='mt-1 text-xs text-secondary-token'>{explanation}</p>
-        <Link
-          href={APP_ROUTES.SETTINGS_BILLING}
-          className='mt-2 inline-flex text-xs font-medium text-primary-token underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-focus/50'
-          onClick={event => event.stopPropagation()}
-        >
+        <UpgradeButton variant='ghost' size='sm' className='mt-2'>
           Upgrade
-        </Link>
+        </UpgradeButton>
       </PopoverContent>
     </Popover>
   );

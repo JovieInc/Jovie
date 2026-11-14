@@ -5,16 +5,22 @@ import 'server-only';
  *
  * Replaces the untracked fire-and-forget `Promise.allSettled` mockup attach.
  * Guarantees:
- * - Survives the response: scheduled with Next.js `after()` so serverless
- *   teardown cannot silently drop the work (falls back to inline execution
- *   outside a request scope, e.g. tests/scripts).
+ * - Survives the response: the scheduled task RETURNS its promise so
+ *   Next.js `after()` can await the enrichment to settlement instead of
+ *   serverless teardown cutting it off mid-write (falls back to inline
+ *   execution outside a request scope, e.g. tests/scripts).
  * - Retry budget + timeout: each option gets up to MAX_MOCKUP_ATTEMPTS
- *   attempts, each bounded by MOCKUP_ATTEMPT_TIMEOUT_MS.
+ *   attempts; per-attempt timeouts are derived from the remaining
+ *   MOCKUP_ENRICHMENT_BUDGET_MS so the worker settles inside the hosting
+ *   route's function budget. A timed-out attempt is never retried — its
+ *   provider work may still be in flight and a retry would overlap it.
  * - Idempotency: an option that already has a truthful Printful mockup is
  *   skipped; URL attachment itself dedupes by URL set membership.
  * - Terminal receipt: every option reaches a terminal state persisted on its
  *   qualityReview evidence (`mockup_ready` | `mockup_failed`) and returned to
- *   the caller for the batch-level production receipt.
+ *   the caller for the batch-level production receipt. The queue-tick
+ *   reconciler (./generation-recovery) is the fail-safe that fails anything
+ *   still pending past the stale window.
  */
 
 import { sql as drizzleSql, eq } from 'drizzle-orm';
@@ -34,6 +40,16 @@ import {
 export const MAX_MOCKUP_ATTEMPTS = 2;
 /** Hard ceiling per attempt; the Printful poll loop alone can run ~48s. */
 export const MOCKUP_ATTEMPT_TIMEOUT_MS = 90_000;
+/**
+ * Total enrichment budget per scheduled batch. Anchored to the hosting
+ * route's 60s function budget (app/api/chat/route.ts maxDuration) minus
+ * headroom, so the worker settles before the host can cut it off and leave
+ * options stranded in `pending_mockup`. Per-attempt timeouts are derived
+ * from the remaining budget, never the flat ceiling alone.
+ */
+export const MOCKUP_ENRICHMENT_BUDGET_MS = 45_000;
+/** Below this remaining budget an attempt cannot meaningfully start. */
+const MIN_ATTEMPT_BUDGET_MS = 5_000;
 
 export interface MerchMockupEnrichmentItem {
   readonly optionId: string;
@@ -51,6 +67,9 @@ function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
+/** Marks a withTimeout rejection so retries never overlap in-flight work. */
+class MockupAttemptTimeoutError extends Error {}
+
 function withTimeout<T>(
   promise: Promise<T>,
   ms: number,
@@ -58,7 +77,10 @@ function withTimeout<T>(
 ): Promise<T> {
   return new Promise<T>((resolve, reject) => {
     const timer = setTimeout(
-      () => reject(new Error(`${label} timed out after ${ms}ms`)),
+      () =>
+        reject(
+          new MockupAttemptTimeoutError(`${label} timed out after ${ms}ms`)
+        ),
       ms
     );
     promise.then(
@@ -108,7 +130,8 @@ async function persistOptionMockupStatus(
 }
 
 async function enrichOptionMockup(
-  item: MerchMockupEnrichmentItem
+  item: MerchMockupEnrichmentItem,
+  deadlineAt: number
 ): Promise<MerchMockupEnrichmentOutcome> {
   // Idempotency: never regenerate a truthful mockup that already exists.
   try {
@@ -128,11 +151,23 @@ async function enrichOptionMockup(
   }
 
   let lastError = 'Printful mockup generation returned no mockups.';
-  for (let attempt = 1; attempt <= MAX_MOCKUP_ATTEMPTS; attempt += 1) {
+  let attempt = 0;
+  while (attempt < MAX_MOCKUP_ATTEMPTS) {
+    const remainingMs = deadlineAt - Date.now();
+    if (remainingMs < MIN_ATTEMPT_BUDGET_MS) {
+      lastError = `Enrichment budget exhausted before attempt ${attempt + 1} could start.`;
+      logger.warn('[merch-mockups] skipping attempt; budget exhausted', {
+        optionId: item.optionId,
+        attempt: attempt + 1,
+        remainingMs,
+      });
+      break;
+    }
+    attempt += 1;
     try {
       const { results, errors } = await withTimeout(
         generateProductMockups(item.request),
-        MOCKUP_ATTEMPT_TIMEOUT_MS,
+        Math.min(MOCKUP_ATTEMPT_TIMEOUT_MS, remainingMs),
         `Printful mockup generation (option ${item.optionId}, attempt ${attempt})`
       );
       const mockupUrls = results.flatMap(result => result.mockupUrls);
@@ -154,37 +189,52 @@ async function enrichOptionMockup(
         errors.length > 0
           ? errors.join('; ')
           : 'Printful mockup generation returned no mockups.';
+      logger.warn('[merch-mockups] mockup attempt failed', {
+        optionId: item.optionId,
+        attempt,
+        maxAttempts: MAX_MOCKUP_ATTEMPTS,
+        err: lastError,
+      });
     } catch (error) {
       lastError = errorMessage(error);
+      logger.warn('[merch-mockups] mockup attempt failed', {
+        optionId: item.optionId,
+        attempt,
+        maxAttempts: MAX_MOCKUP_ATTEMPTS,
+        err: lastError,
+      });
+      if (error instanceof MockupAttemptTimeoutError) {
+        // A timed-out attempt leaves provider work in flight; retrying would
+        // overlap it. Persist the terminal failure below and let the
+        // reconciler backstop anything else.
+        break;
+      }
     }
-    logger.warn('[merch-mockups] mockup attempt failed', {
-      optionId: item.optionId,
-      attempt,
-      maxAttempts: MAX_MOCKUP_ATTEMPTS,
-      err: lastError,
-    });
   }
 
   // Terminal failure: user-visible state that blocks publish (JOV-4743).
   await persistOptionMockupStatus(item.optionId, 'mockup_failed', lastError);
   logger.error('[merch-mockups] mockup enrichment reached terminal failure', {
     optionId: item.optionId,
-    attempts: MAX_MOCKUP_ATTEMPTS,
+    attempts: attempt,
     err: lastError,
   });
   return {
     optionId: item.optionId,
     status: 'mockup_failed',
-    attempts: MAX_MOCKUP_ATTEMPTS,
+    attempts: attempt,
     error: lastError,
   };
 }
 
 /** Runs enrichment for all items; never throws — every item gets a terminal outcome. */
 export async function runMerchMockupEnrichment(
-  items: readonly MerchMockupEnrichmentItem[]
+  items: readonly MerchMockupEnrichmentItem[],
+  options?: { readonly budgetMs?: number }
 ): Promise<readonly MerchMockupEnrichmentOutcome[]> {
-  return Promise.all(items.map(enrichOptionMockup));
+  const deadlineAt =
+    Date.now() + (options?.budgetMs ?? MOCKUP_ENRICHMENT_BUDGET_MS);
+  return Promise.all(items.map(item => enrichOptionMockup(item, deadlineAt)));
 }
 
 /**
@@ -203,12 +253,13 @@ export function scheduleMerchMockupEnrichment(
     const outcomes = await runMerchMockupEnrichment(items);
     await onSettled?.(outcomes);
   };
-  const guarded = () => {
+  // Return the promise so `after()` (and the inline fallback) can await the
+  // enrichment to settlement instead of dropping it at teardown.
+  const guarded = () =>
     run().catch(error => {
       logger.error('[merch-mockups] enrichment worker crashed', {
         err: errorMessage(error),
       });
     });
-  };
   scheduleAfter(guarded, { fallback: 'inline' });
 }

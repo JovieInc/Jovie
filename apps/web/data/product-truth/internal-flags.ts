@@ -18,10 +18,6 @@ export const INTERNAL_FLAG_CAPABILITIES = {
   MUSIC_RESOLVER_RELEASE_FACTS: {
     nonMarketing: 'JOV-7323 release-facts resolver family cutover',
   },
-  PMF_SURVEY_PROMPT: {
-    nonMarketing:
-      'in-app PMF survey card for activated creators; default off; internal measurement only',
-  },
 } as const satisfies Readonly<
   Partial<Record<ProductFlagKey, { readonly nonMarketing: string }>>
 >;

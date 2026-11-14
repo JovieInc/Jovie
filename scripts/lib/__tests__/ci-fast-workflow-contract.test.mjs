@@ -449,7 +449,7 @@ describe('ci-fast bounded parallel workflow', () => {
     expect([...whole, ...keyed[0].files].sort()).toEqual(
       [...LANES_PYTEST_FILES].sort()
     );
-    expect(LANES_PYTEST_FILES).toHaveLength(47);
+    expect(LANES_PYTEST_FILES).toHaveLength(48);
     expect(whole).toContain('scripts/tests/test_pr_events_repair_evidence.py');
     expect(whole).toContain('scripts/tests/test_pr_events_red_repair.py');
     expect(whole).toContain('scripts/tests/test_pr_body_markup.py');
@@ -734,7 +734,7 @@ describe('ci-fast bounded parallel workflow', () => {
     ]);
   });
 
-  it('selects the desktop updater geometry proof for modal changes', () => {
+  it('selects the desktop updater geometry proofs for modal and control changes', () => {
     const remaining = jobBlock(
       'ci-fast-remaining',
       'ci-profile-admission-browser'
@@ -747,6 +747,10 @@ describe('ci-fast bounded parallel workflow', () => {
       'apps/web/components/organisms/desktop-update/DesktopUpdateModal.tsx',
       'apps/web/components/organisms/desktop-update/DesktopUpdateModal.stories.tsx',
       'apps/web/tests/e2e/storybook-desktop-update-modal.spec.ts',
+      'apps/web/components/organisms/desktop-update/DesktopUpdateControl.tsx',
+      'apps/web/components/organisms/desktop-update/DesktopUpdateControl.stories.tsx',
+      'apps/web/lib/desktop/desktop-update-control-state.ts',
+      'apps/web/tests/e2e/storybook-desktop-update-control.spec.ts',
     ]) {
       expect(
         spawnSync('grep', ['-qE', pattern ?? 'a^'], {
@@ -768,9 +772,71 @@ describe('ci-fast bounded parallel workflow', () => {
     expect(remaining).toContain(
       'specs+=(tests/e2e/storybook-desktop-update-modal.spec.ts)'
     );
-    expect(
-      jobBlock('ci-storybook-surfaces', 'ci-cross-product-integration')
-    ).toContain('tests/e2e/storybook-desktop-update-modal.spec.ts');
+    expect(remaining).toContain(
+      'specs+=(tests/e2e/storybook-desktop-update-control.spec.ts)'
+    );
+    const surfaces = jobBlock(
+      'ci-storybook-surfaces',
+      'ci-cross-product-integration'
+    );
+    expect(surfaces).toContain(
+      'tests/e2e/storybook-desktop-update-modal.spec.ts'
+    );
+    expect(surfaces).toContain(
+      'tests/e2e/storybook-desktop-update-control.spec.ts'
+    );
+  });
+
+  it('selects the account surface captures for the menu, banner and footer', () => {
+    const remaining = jobBlock(
+      'ci-fast-remaining',
+      'ci-profile-admission-browser'
+    );
+    const pattern = remaining.match(
+      /ACCOUNT_SURFACE_STORYBOOK_PATTERN='([^']+)'/
+    )?.[1];
+    expect(pattern).toBeTruthy();
+    for (const path of [
+      'packages/ui/atoms/inset-panel.tsx',
+      'packages/ui/atoms/inset-panel.stories.tsx',
+      'packages/ui/lib/inset-panel-styles.ts',
+      'apps/web/components/organisms/user-button/UserButton.tsx',
+      'apps/web/components/organisms/user-button/UserButton.stories.tsx',
+      'apps/web/components/organisms/user-button/UsageMenuItem.tsx',
+      'apps/web/components/organisms/user-button/account-loading-fill.ts',
+      'apps/web/components/organisms/sidebar-identity-group/SidebarIdentityGroup.tsx',
+      'apps/web/components/shell/SidebarDock.tsx',
+      'apps/web/components/shell/SidebarDock.stories.tsx',
+      'apps/web/components/shell/SidebarDockCards.tsx',
+      'apps/web/tests/e2e/storybook-account-surface.spec.ts',
+    ]) {
+      expect(
+        spawnSync('grep', ['-qE', pattern ?? 'a^'], {
+          input: `${path}\n`,
+          encoding: 'utf8',
+        }).status,
+        path
+      ).toBe(0);
+    }
+    for (const path of [
+      'apps/web/components/organisms/Other.tsx',
+      'apps/web/components/shell/SidebarDockBridge.tsx',
+      'packages/ui/atoms/kbd.tsx',
+    ]) {
+      expect(
+        spawnSync('grep', ['-qE', pattern ?? 'a^'], {
+          input: `${path}\n`,
+          encoding: 'utf8',
+        }).status,
+        path
+      ).not.toBe(0);
+    }
+    expect(remaining).toContain(
+      'RUN_ACCOUNT_SURFACE: ${{ steps.storybook-browser.outputs.account_surface }}'
+    );
+    expect(remaining).toContain(
+      'specs+=(tests/e2e/storybook-account-surface.spec.ts)'
+    );
   });
 
   it('selects DSP details only for its real consumers and runs the maintained browser proof', () => {

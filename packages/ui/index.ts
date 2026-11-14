@@ -233,7 +233,6 @@ export type {
   HostDrawnSelectProps,
 } from './atoms/host-drawn-field';
 export { HostDrawnInput, HostDrawnSelect } from './atoms/host-drawn-field';
-// IconButton
 export type { IconButtonName, IconButtonProps } from './atoms/icon-button';
 export { IconButton, iconButtonVariants } from './atoms/icon-button';
 export {
@@ -254,10 +253,25 @@ export { InlineSubscribe } from './atoms/inline-subscribe';
 // Input
 export type { InputProps } from './atoms/input';
 export { Input, inputVariants } from './atoms/input';
-
 // InputGroup
 export type { InputGroupProps } from './atoms/input-group';
 export { InputGroup } from './atoms/input-group';
+// Inset panel
+export type {
+  InsetPanelHeaderProps,
+  InsetPanelProgressProps,
+  InsetPanelProps,
+  InsetPanelRowProps,
+  InsetPanelTone,
+} from './atoms/inset-panel';
+export {
+  InsetPanel,
+  InsetPanelHeader,
+  InsetPanelProgress,
+  InsetPanelRow,
+  InsetPanelSectionLabel,
+  InsetPanelSeparator,
+} from './atoms/inset-panel';
 // Keyboard (Kbd)
 export type { KbdProps } from './atoms/kbd';
 export { Kbd } from './atoms/kbd';
@@ -273,6 +287,9 @@ export type {
   NativeSelectProps,
 } from './atoms/native-select';
 export { NativeSelect } from './atoms/native-select';
+// IconButton
+export type { PlainButtonProps } from './atoms/plain-button';
+export { PlainButton, plainButtonFocusClassName } from './atoms/plain-button';
 // Popover
 export {
   Popover,
@@ -400,6 +417,22 @@ export {
   selectContentClasses,
   subMenuContentClasses,
 } from './lib/dropdown-styles';
+export {
+  INSET_PANEL_GRADIENT,
+  INSET_PANEL_GUTTER,
+  INSET_PANEL_HEADER,
+  INSET_PANEL_ICON_COLUMN,
+  INSET_PANEL_LABEL,
+  INSET_PANEL_META,
+  INSET_PANEL_PROGRESS,
+  INSET_PANEL_ROW_INTERACTIVE,
+  INSET_PANEL_ROW_LAYOUT,
+  INSET_PANEL_SECTION_LABEL,
+  INSET_PANEL_SEPARATOR,
+  INSET_PANEL_SURFACE,
+  INSET_PANEL_TITLE,
+  INSET_PANEL_TRAILING,
+} from './lib/inset-panel-styles';
 export type { LinearPillSize, LinearPillTone } from './lib/linear-pill';
 export {
   getLinearPillClassName,

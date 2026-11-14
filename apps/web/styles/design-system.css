@@ -154,7 +154,7 @@
   --app-shell-content-padding-y: 8px;
   --app-shell-content-surface: var(--linear-bg-surface-0);
   --app-shell-control-height-sm: 28px;
-  --app-shell-control-padding-x: 11px;
+  --app-shell-control-padding-x: 10px;
   --app-shell-control-radius: 9999px;
   --app-shell-toolbar-gap: 4px;
   --app-shell-audio-bar-max-height: 120px;
@@ -188,6 +188,7 @@
   --system-b-entity-chip-artist-accent: var(--color-accent-purple);
   --system-b-entity-chip-track-accent: var(--color-accent-blue);
   --system-b-entity-chip-event-accent: var(--color-accent-orange);
+  --system-b-entity-chip-profile-accent: var(--color-accent-purple);
   --system-b-entity-chip-on-light-text: var(--system-b-chat-user-bubble-text);
   --system-b-chat-message-max-width: 78%;
   --system-b-chat-user-bubble-bg: var(--color-text-primary-token);
@@ -1747,6 +1748,7 @@ html[data-profile-flow-open="true"] .cookie-banner-card {
    - surface-3: Pressed/active
 */
 
+[data-proof-theme],
 :root {
   /* Noir Ion ziawi lock (2026-09-09–10, re-locked 2026-09-25: raised = lighter) —
      light 5-step ladder + 6 accents. */
@@ -2099,7 +2101,7 @@ html[data-profile-flow-open="true"] .cookie-banner-card {
   );
   --state-offline-fg: var(--color-warning);
   --state-permission-bg: var(--color-warning-subtle);
-  --state-permission-fg: var(--color-warning);
+  --state-permission-fg: var(--color-warning-text);
   --state-permission-border: color-mix(
     in oklab,
     var(--color-warning) 20%,
@@ -2120,6 +2122,7 @@ html[data-profile-flow-open="true"] .cookie-banner-card {
 
 /* Dark mode — Jovie Noir Ion ziawi lock (2026-09-09–10).
    Exactly 5 surfaces. Focus = ion. Aqua/gold/flare alias mint/orange/red. */
+[data-proof-theme="dark"],
 :root.dark {
   --noir-ion-canvas: #030406;
   --noir-ion-shell: #07080a;
@@ -2440,7 +2443,7 @@ html[data-profile-flow-open="true"] .cookie-banner-card {
   );
   --state-offline-fg: var(--color-warning);
   --state-permission-bg: var(--color-warning-subtle);
-  --state-permission-fg: var(--color-warning);
+  --state-permission-fg: var(--color-warning-text);
   --state-permission-border: color-mix(
     in oklab,
     var(--color-warning) 20%,
@@ -3289,6 +3292,7 @@ html[data-profile-flow-open="true"] .cookie-banner-card {
 /* ============================================
    SEMANTIC STATUS COLORS (OKLCH)
    ============================================ */
+[data-proof-theme],
 :root {
   /* Success */
   --color-success: var(--color-accent-green);
@@ -3313,6 +3317,7 @@ html[data-profile-flow-open="true"] .cookie-banner-card {
   --color-info-foreground: oklch(100% 0 0);
 }
 
+[data-proof-theme="dark"],
 :root.dark {
   /* Success — Mint */
   --color-success: var(--color-accent-green);
@@ -3337,6 +3342,7 @@ html[data-profile-flow-open="true"] .cookie-banner-card {
    orange, red) that stay locked to the Noir Ion palette; these derived tokens
    keep status copy at WCAG AA (4.5:1) on white (light) and on the error-tinted
    and elevated dark surfaces, without redefining the palette. */
+[data-proof-theme],
 :root {
   --color-success-text: color-mix(in srgb, var(--color-success) 42%, black);
   --color-warning-text: color-mix(in srgb, var(--color-warning) 60%, black);
@@ -3344,11 +3350,27 @@ html[data-profile-flow-open="true"] .cookie-banner-card {
   --color-accent-text: color-mix(in srgb, var(--color-accent) 65%, black);
 }
 
+[data-proof-theme="dark"],
 :root.dark {
   --color-success-text: var(--color-success);
   --color-warning-text: var(--color-warning);
   --color-error-text: color-mix(in srgb, var(--color-error) 75%, white);
   --color-accent-text: var(--color-accent);
+}
+
+/* Fixed-theme Storybook semantic-token proofs reuse the palettes above.
+   These two non-inline Tailwind aliases must resolve on the proof subtree.
+   This does not isolate ancestor-based dark: variants. */
+[data-proof-theme] {
+  --color-surface-0: var(--color-bg-surface-0);
+  --color-focus: var(--color-border-focus);
+}
+
+/* Partial cards dim their subtree. Strengthen default description copy while
+   preserving custom semantic foregrounds, which replace the secondary class. */
+:where([data-content-state="partial"])
+[data-slot="card-description"].text-secondary-token {
+  color: var(--color-text-primary-token);
 }
 
 /* ============================================
@@ -3864,6 +3886,7 @@ html[data-profile-flow-open="true"] .cookie-banner-card {
   --system-b-entity-chip-artist-accent: var(--color-accent-purple);
   --system-b-entity-chip-track-accent: var(--color-accent-blue);
   --system-b-entity-chip-event-accent: var(--color-accent-orange);
+  --system-b-entity-chip-profile-accent: var(--color-accent-purple);
   background-color: var(--color-bg-base);
   color: var(--color-text-primary-token);
   color-scheme: dark;
@@ -4033,6 +4056,7 @@ html:not(.dark) .teleprompter-studio {
   --system-b-entity-chip-artist-accent: var(--color-accent-purple);
   --system-b-entity-chip-track-accent: var(--color-accent-blue);
   --system-b-entity-chip-event-accent: var(--color-accent-orange);
+  --system-b-entity-chip-profile-accent: var(--color-accent-purple);
   --ds-marketing-eyebrow-color: #9da2ac;
   --public-shell-text: #f5f7fb;
 }
@@ -4127,6 +4151,15 @@ html:not(.dark) .smart-link-powered-by {
     transition:
       box-shadow 150ms cubic-bezier(0.32, 0.72, 0, 1),
       border-color 150ms cubic-bezier(0.32, 0.72, 0, 1);
+  }
+}
+
+/* Icons never squash. A Lucide glyph beside truncating text keeps its drawn
+   size, so the text gives way instead. :where() keeps specificity at 0 and
+   the base layer sits under utilities, so an explicit shrink class still wins. */
+@layer base {
+  :where(svg.lucide) {
+    flex-shrink: 0;
   }
 }
 

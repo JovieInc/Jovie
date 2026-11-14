@@ -6,6 +6,7 @@ import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { test } from 'node:test';
 import { resolveLinearIssueByFingerprint } from './lib/linear-issue-intake.mjs';
+import { logFailedLinearAction, withLinearRetry } from './lib/linear-retry.mjs';
 import {
   CLOSE_SCAN_MAX_PAGES,
   listSecadvIssueCandidates,
@@ -295,4 +296,76 @@ test('runAdvisoryCloses fails closed on a non-rate-limit close failure', async (
     close: async () => ({ ok: false, reason: 'linear_close_unsuccessful' }),
   });
   assert.equal(r.ok, false);
+});
+
+test('withLinearRetry retries a transient failure and returns the recovered result', async () => {
+  let attempts = 0;
+  const waits = [];
+  const result = await withLinearRetry(
+    async () => {
+      attempts += 1;
+      if (attempts < 3) return { ok: false, reason: 'linear_search_transport' };
+      return { ok: true, action: 'resolved' };
+    },
+    {
+      fingerprint: 'secadv-x',
+      op: 'upsert',
+      delays: [1, 1],
+      sleep: async ms => {
+        waits.push(ms);
+      },
+    }
+  );
+  assert.equal(result.ok, true);
+  assert.deepEqual(waits, [1, 1]);
+});
+
+test('withLinearRetry fails closed after exhausting retries on a transient failure', async () => {
+  let attempts = 0;
+  const result = await withLinearRetry(
+    async () => {
+      attempts += 1;
+      return { ok: false, reason: 'linear_rate_limited' };
+    },
+    {
+      fingerprint: 'secadv-x',
+      op: 'upsert',
+      delays: [1, 1],
+      sleep: async () => {},
+    }
+  );
+  assert.equal(result.ok, false);
+  assert.equal(result.reason, 'linear_rate_limited');
+  assert.equal(attempts, 3);
+});
+
+test('withLinearRetry returns a deterministic failure without retrying', async () => {
+  let attempts = 0;
+  const result = await withLinearRetry(
+    async () => {
+      attempts += 1;
+      return { ok: false, reason: 'linear_search_401' };
+    },
+    {
+      fingerprint: 'secadv-x',
+      op: 'upsert',
+      delays: [1, 1, 1],
+      sleep: async () => {},
+    }
+  );
+  assert.equal(result.ok, false);
+  assert.equal(attempts, 1, 'auth failures must not be retried');
+});
+
+test('logFailedLinearAction names the failing op, fingerprint and reason', () => {
+  const lines = [];
+  logFailedLinearAction(
+    { fingerprint: 'secadv-ghsa-x', op: 'upsert', reason: 'linear_search_502' },
+    { log: line => lines.push(line) }
+  );
+  assert.equal(lines.length, 1);
+  assert.match(
+    lines[0],
+    /upsert for secadv-ghsa-x failed \(linear_search_502\)/
+  );
 });

@@ -1,6 +1,6 @@
 {
   "name": "@jovie/web",
-  "version": "26.11.2",
+  "version": "26.11.3",
   "private": true,
   "sideEffects": false,
   "engines": {
@@ -35,7 +35,6 @@
     "build:strict": "pnpm run typecheck && NODE_OPTIONS=--max-old-space-size=8192 next build --turbopack",
     "analyze": "NODE_OPTIONS=--max-old-space-size=8192 ANALYZE=true NEXT_IGNORE_TYPECHECK=1 next build --webpack",
     "compare-chunks": "tsx scripts/compare-chunks.ts",
-    "compare-chunks:snapshot": "tsx scripts/compare-chunks.ts --snapshot",
     "build:validate": "pnpm run validate-env && pnpm run build",
     "start": "next start",
     "lint": "biome lint .",
@@ -226,6 +225,7 @@
     "test:visual-a11y": "pnpm run e2e:visual && pnpm run test:a11y",
     "perf:auth": "tsx scripts/performance-auth.ts",
     "perf:route-js": "node scripts/route-js-budget.mjs",
+    "perf:render-modes": "node scripts/route-render-modes.mjs",
     "perf:interactions": "tsx scripts/performance-interaction-audit.ts",
     "perf:interactions:measure": "tsx scripts/run-interaction-latency-audit.ts",
     "product-surface-counts": "tsx scripts/generate-product-surface-counts.ts",

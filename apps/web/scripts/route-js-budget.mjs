@@ -10,15 +10,12 @@
  * the Lighthouse treemap can open the sibling map (JOV-12023), and Vercel
  * production builds do not. The map file itself is not JS.
  *
- * Per-route ceilings in route-js-budgets.json only shrink; raises require an
- * unexpired design-exception-registry override for the exact key. Public
- * first-load manifests (with client-reference fallback) keep tighter marketing
- * ceilings and measured baselines for existing over-target routes.
+ * Every measured route is held to its own baseline in route-js-budgets.json
+ * and a route with none fails closed; `--write` only tightens (JOV-8555, see
+ * route-js-ratchet.mjs). Route-group ceilings and the one-way rules for hand
+ * edits live in route-js-budget-policy.mjs.
  *
- * Route-group targets and downward-only ceilings are enforced alongside
- * existing per-route budgets; shared policy lives in route-js-budget-policy.mjs.
- *
- * Usage: node scripts/route-js-budget.mjs [--next-dir .next] [--budgets file] [--json]
+ * Usage: node scripts/route-js-budget.mjs [--next-dir .next] [--budgets file] [--json] [--write]
  */
 import { spawnSync } from 'node:child_process';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
@@ -39,6 +36,12 @@ import {
   validateBudgetShape,
   validateGroupBudgetShape,
 } from './route-js-budget-policy.mjs';
+import {
+  findBaselineSlack,
+  isInterceptedManifestKey,
+  reportRouteRatchet,
+  writeBaselines,
+} from './route-js-ratchet.mjs';
 
 export {
   BASELINE_HEADROOM_RATIO,
@@ -55,6 +58,12 @@ export {
   validateBudgetShape,
   validateGroupBudgetShape,
 } from './route-js-budget-policy.mjs';
+export {
+  baselineWithHeadroom,
+  findBaselineSlack,
+  isInterceptedManifestKey,
+  tightenBudgets,
+} from './route-js-ratchet.mjs';
 
 /** @typedef {import('./route-js-budget-policy.mjs').RouteGroups} RouteGroups */
 
@@ -102,7 +111,8 @@ function readClientManifest(path) {
  */
 function collectRouteFiles(
   nextDir,
-  root = join(nextDir, 'server', 'app', 'app')
+  root = join(nextDir, 'server', 'app', 'app'),
+  { intercepted = false } = {}
 ) {
   const buildManifest = JSON.parse(
     readFileSync(join(nextDir, 'build-manifest.json'), 'utf8')
@@ -111,13 +121,14 @@ function collectRouteFiles(
     ...(buildManifest.rootMainFiles ?? []),
     ...(buildManifest.polyfillFiles ?? []),
   ];
-  return findManifests(root).map(path => {
+  return findManifests(root).flatMap(path => {
     const [key, manifest] = readClientManifest(path);
+    if (!intercepted && isInterceptedManifestKey(key)) return [];
     const files = new Set(rootFiles);
     for (const chunks of Object.values(manifest.entryJSFiles ?? {})) {
       for (const chunk of chunks) files.add(chunk);
     }
-    return { route: routeFromManifestKey(key), files };
+    return [{ route: routeFromManifestKey(key), files }];
   });
 }
 
@@ -187,7 +198,10 @@ export function findForbiddenClientCode(
   rules = FORBIDDEN_CLIENT_CODE
 ) {
   const routesByFile = new Map();
-  for (const { route, files } of collectRouteFiles(nextDir)) {
+  // Intercepted modals still ship to the client, so the scan keeps them.
+  for (const { route, files } of collectRouteFiles(nextDir, undefined, {
+    intercepted: true,
+  })) {
     for (const file of files) {
       if (!routesByFile.has(file)) routesByFile.set(file, []);
       routesByFile.get(file).push(route);
@@ -206,13 +220,23 @@ export function findForbiddenClientCode(
 }
 
 /**
+ * Each measured route is held to its own recorded baseline. A route with no
+ * baseline is `unlisted` and fails closed: there is no default to fall back
+ * to, so a new route cannot ship at an unmeasured size.
  * @param {RouteJsMeasurement[]} measurements
- * @param {{ defaultMaxGzipKb: number, routes?: Record<string, number> }} budgets
+ * @param {{ routes?: Record<string, number> }} budgets
  */
 export function checkBudgets(measurements, budgets) {
   const violations = [];
+  const unlisted = [];
   const rows = measurements.map(row => {
-    const budgetKb = budgets.routes?.[row.route] ?? budgets.defaultMaxGzipKb;
+    const budgetKb = isKb(budgets.routes?.[row.route])
+      ? budgets.routes[row.route]
+      : null;
+    if (budgetKb === null) {
+      unlisted.push(row);
+      return { ...row, budgetKb, ok: false };
+    }
     const ok = row.gzipKb <= budgetKb;
     if (!ok) violations.push({ ...row, budgetKb });
     return { ...row, budgetKb, ok };
@@ -221,7 +245,7 @@ export function checkBudgets(measurements, budgets) {
   const staleBudgets = Object.keys(budgets.routes ?? {}).filter(
     route => !measured.has(route)
   );
-  return { rows, violations, staleBudgets };
+  return { rows, violations, unlisted, staleBudgets };
 }
 
 function rememberRoute(routes, route, files) {
@@ -253,6 +277,7 @@ export function collectFirstLoadFiles(nextDir) {
       if (!Array.isArray(files)) {
         throw new Error(`app-build-manifest pages[${key}] is not a file list`);
       }
+      if (isInterceptedManifestKey(key)) continue;
       rememberRoute(routes, routeFromManifestKey(key), [...shared, ...files]);
     }
   } else {
@@ -281,15 +306,7 @@ export function resolveFirstLoadTarget(route, firstLoad) {
 }
 
 export function checkFirstLoadBudgets(measurements, firstLoad) {
-  const routes = Object.fromEntries(
-    measurements.map(({ route }) => [
-      route,
-      isKb(firstLoad.baselines?.[route])
-        ? firstLoad.baselines[route]
-        : resolveFirstLoadTarget(route, firstLoad),
-    ])
-  );
-  const result = checkBudgets(measurements, { routes });
+  const result = checkBudgets(measurements, { routes: firstLoad.baselines });
   const withTarget = row => ({
     ...row,
     targetKb: resolveFirstLoadTarget(row.route, firstLoad),
@@ -297,6 +314,7 @@ export function checkFirstLoadBudgets(measurements, firstLoad) {
   return {
     rows: result.rows.map(withTarget),
     violations: result.violations.map(withTarget),
+    unlisted: result.unlisted.map(withTarget),
     staleBudgets: missingExplicitRoutes(measurements, {
       routes: firstLoad.routes,
     }),
@@ -360,15 +378,21 @@ export function evaluateBudgets({
         marketingPatterns: budgets.firstLoad?.marketingRoutes ?? [],
       })
     : null;
+  const slack = [
+    ...findBaselineSlack(appRows, budgets.routes),
+    ...findBaselineSlack(publicRows, budgets.firstLoad?.baselines),
+  ];
   const ok = [
     shape,
     growth,
     app.violations,
+    app.unlisted,
     first.violations,
+    first.unlisted,
     missing,
     groups?.violations ?? [],
   ].every(errors => errors.length === 0);
-  return { shape, growth, app, first, groups, missing, ok };
+  return { shape, growth, app, first, groups, missing, slack, ok };
 }
 
 function git(repoRoot, args) {
@@ -413,12 +437,14 @@ function parseArgs(argv) {
     nextDir: resolve(SCRIPT_DIR, '..', '.next'),
     budgetsPath: join(SCRIPT_DIR, 'route-js-budgets.json'),
     json: false,
+    write: false,
   };
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index];
     if (arg === '--next-dir') options.nextDir = resolve(argv[++index]);
     else if (arg === '--budgets') options.budgetsPath = resolve(argv[++index]);
     else if (arg === '--json') options.json = true;
+    else if (arg === '--write') options.write = true;
     else throw new Error(`Unknown argument: ${arg}`);
   }
   return options;
@@ -426,9 +452,9 @@ function parseArgs(argv) {
 
 function printRows(rows) {
   for (const row of rows) {
-    const mark = row.ok ? 'ok  ' : 'OVER';
+    const mark = row.ok ? 'ok  ' : row.budgetKb === null ? 'NEW ' : 'OVER';
     console.log(
-      `${mark} ${String(row.gzipKb).padStart(5)} / ${String(row.budgetKb).padStart(5)} KB gz  ${row.route}`
+      `${mark} ${String(row.gzipKb).padStart(5)} / ${String(row.budgetKb ?? '-').padStart(5)} KB gz  ${row.route}`
     );
   }
 }
@@ -450,7 +476,7 @@ function printGroupRows(groups) {
 
 function main() {
   const options = parseArgs(process.argv.slice(2));
-  const budgets = JSON.parse(readFileSync(options.budgetsPath, 'utf8'));
+  let budgets = JSON.parse(readFileSync(options.budgetsPath, 'utf8'));
   const ancestor = readBudgetAncestor(REPO_ROOT);
   if (!ancestor.ok) throw new Error(ancestor.error);
   const routeGroups = loadRouteGroups();
@@ -462,9 +488,12 @@ function main() {
   const appRows = measureRouteJs(options.nextDir);
   if (!appRows.length)
     throw new Error(`No /app client manifests under ${options.nextDir}`);
+  const firstRows = measureFirstLoadJs(options.nextDir);
+  if (options.write)
+    budgets = writeBaselines(options.budgetsPath, budgets, appRows, firstRows);
   const result = evaluateBudgets({
     appRows,
-    firstRows: measureFirstLoadJs(options.nextDir),
+    firstRows,
     budgets,
     ancestor: ancestor.ancestor,
     routeGroups,
@@ -482,20 +511,7 @@ function main() {
     console.error(
       `::error::${route} has a first-load budget but was not in the build manifest`
     );
-  for (const route of result.app.staleBudgets)
-    console.log(
-      `::warning::route-js-budgets.json has no matching /app route: ${route}`
-    );
-  for (const row of [...result.app.violations, ...result.first.violations]) {
-    console.error(
-      `::error::${row.route} ships ${row.gzipKb} KB gzip first-load JS; budget is ${row.budgetKb} KB. Split heavy client code; do not raise budgets or baselines.`
-    );
-  }
-  for (const row of result.groups?.violations ?? []) {
-    console.error(
-      `::error::${row.route} (${row.group} group) ships ${row.gzipKb} KB gzip initial JS; the ${row.group} group baseline is ${row.baselineKb} KB (target ${row.targetKb} KB from docs/performance/route-budgets.json). Split heavy client code; do not raise budgets or baselines.`
-    );
-  }
+  reportRouteRatchet(result);
   const forbidden = findForbiddenClientCode(options.nextDir);
   for (const hit of forbidden) {
     console.error(

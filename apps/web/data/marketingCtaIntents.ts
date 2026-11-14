@@ -1,5 +1,4 @@
 import { APP_ROUTES } from '@/constants/routes';
-import { FEATURE_FLAGS } from '@/lib/flags/marketing-static';
 import { TIM_WHITE_PROFILE } from '@/lib/tim-white';
 
 /**
@@ -25,14 +24,6 @@ export interface MarketingCtaIntent {
 
 // Every claim enters the /start qualify chat (Tim 2026-09-28, JOV-3379): the
 // chat admits or reserves, so no front door routes to /signup or /waitlist.
-const CLAIM_PROFILE_WAITLIST_INTENT = {
-  id: 'claim-profile',
-  label: 'Claim your profile',
-  href: APP_ROUTES.START,
-  eventName: 'landing_cta_claim_profile',
-  support: 'Free to start. Reserve your name now.',
-} as const satisfies MarketingCtaIntent;
-
 const CLAIM_PROFILE_OPEN_SIGNUP_INTENT = {
   id: 'claim-profile',
   label: 'Claim your profile',
@@ -52,9 +43,7 @@ export const MARKETING_CTA_INTENTS = {
   },
 } as const satisfies Record<string, MarketingCtaIntent>;
 
-export type ClaimProfileCtaIntent =
-  | typeof CLAIM_PROFILE_WAITLIST_INTENT
-  | typeof CLAIM_PROFILE_OPEN_SIGNUP_INTENT;
+export type ClaimProfileCtaIntent = typeof CLAIM_PROFILE_OPEN_SIGNUP_INTENT;
 
 function buildOpenClaimProfileStartHref(trimmedHandle: string): string {
   if (!trimmedHandle) return APP_ROUTES.START;
@@ -70,10 +59,6 @@ export function buildClaimProfileStartHref(handle?: string): string {
   return buildOpenClaimProfileStartHref(handle?.trim().replace(/^@/, '') ?? '');
 }
 
-export function getClaimProfileIntent(
-  waitlistEnabled: boolean = FEATURE_FLAGS.WAITLIST_ENABLED
-): ClaimProfileCtaIntent {
-  return waitlistEnabled
-    ? CLAIM_PROFILE_WAITLIST_INTENT
-    : CLAIM_PROFILE_OPEN_SIGNUP_INTENT;
+export function getClaimProfileIntent(): ClaimProfileCtaIntent {
+  return CLAIM_PROFILE_OPEN_SIGNUP_INTENT;
 }

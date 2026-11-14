@@ -72,6 +72,25 @@ describe('MarketingHeader states', () => {
     ).toHaveFocus();
   });
 
+  it('always draws the center nav links on a landing route', () => {
+    render(<MarketingHeader />);
+
+    const banner = screen.getByRole('banner');
+    expect(
+      within(banner).getAllByRole('link', { name: 'Pricing' }).length
+    ).toBeGreaterThan(0);
+  });
+
+  it('sends the default landing CTA into the one /start flow', () => {
+    render(<MarketingHeader />);
+
+    expect(
+      within(screen.getByRole('banner')).getByRole('link', {
+        name: 'Claim your free profile',
+      })
+    ).toHaveAttribute('href', APP_ROUTES.START);
+  });
+
   it('draws no empty nav row or menu when there are no links', async () => {
     const { container } = render(<MarketingHeader navLinks={[]} />);
 

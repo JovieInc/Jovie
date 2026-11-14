@@ -17,7 +17,7 @@ describe('InlineOfflineNotice', () => {
     expect(notice.className).toContain('text-app');
     expect(notice.className).toContain('border-warning/30');
     expect(notice.className).toContain('bg-warning-subtle');
-    expect(notice.className).toContain('text-warning');
+    expect(notice).toHaveClass('text-warning-text');
   });
 
   it('does not bypass semantic warning tokens with arbitrary state variables', () => {

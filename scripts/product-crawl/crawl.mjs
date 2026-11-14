@@ -11,7 +11,9 @@
 // longest main-thread stall, load time, console errors, failed same-origin
 // requests, placeholder text and sideways scroll. The public profile is also
 // crawled on an unclaimed test profile, where the claim banner must show.
-// The crawl only loads pages: it never clicks, submits or pays.
+// The crawl only loads pages: it never clicks, submits or pays. Its last
+// pass (overlay-walk.mjs) hovers, resizes, presses Escape and follows one
+// link on a few pages, looking for overlays left up without their anchor.
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
@@ -19,6 +21,7 @@ import { parseArgs } from 'node:util';
 import { chromium } from 'playwright';
 import { skipSignedIn, uncoveredEntry } from './accepted-uncovered.mjs';
 import { MEASURE, OBSERVE } from './observe.mjs';
+import { overlayWalkSummary, runOverlayWalks } from './overlay-walk.mjs';
 import {
   CLAIM_BANNER,
   causeOf,
@@ -99,14 +102,13 @@ const pages = [];
 const uncovered = [];
 const host = new URL(args.origin).host;
 
-async function visit({ route, target, viewport, identity, fixture, collect }) {
+async function openContext({ viewport, identity }) {
   const ctx = await browser.newContext({
     viewport: VIEWPORTS[viewport],
     ...(identity === 'signed-in'
       ? { storageState: args['storage-state'] }
       : {}),
   });
-  await ctx.addInitScript(OBSERVE);
   if (BYPASS)
     await ctx.route(
       u => u.host === host,
@@ -118,6 +120,12 @@ async function visit({ route, target, viewport, identity, fixture, collect }) {
           },
         })
     );
+  return ctx;
+}
+
+async function visit({ route, target, viewport, identity, fixture, collect }) {
+  const ctx = await openContext({ viewport, identity });
+  await ctx.addInitScript(OBSERVE);
   const page = await ctx.newPage();
   const consoleErrors = [];
   const failedRequests = [];
@@ -192,6 +200,7 @@ async function visit({ route, target, viewport, identity, fixture, collect }) {
     if (m.frame) row.frame = m.frame;
     row.placeholder = m.text.match(PLACEHOLDER)?.[0] ?? null;
     row.horizontalOverflow = m.overflow;
+    row.overlaySurface = m.overlaySurface;
     if (row.expectClaimBanner) row.claimBanner = CLAIM_BANNER.test(m.text);
     row.consoleErrors = [...new Set(consoleErrors)];
     row.thirdPartyConsole = thirdPartyConsole;
@@ -381,6 +390,15 @@ if (throttleRechecksLeft)
   console.warn(
     `[crawl] ${throttleRechecksLeft} rate-limited pages judged without a quiet reload`
   );
+// Interaction walks on the pages that have a sidebar or hover triggers.
+const overlayWalks = await runOverlayWalks({
+  pages,
+  origin: args.origin,
+  out: args.out,
+  openContext,
+  pastDeadline,
+  skip: skipSignedIn,
+});
 await browser.close();
 
 const receipt = {
@@ -394,6 +412,7 @@ const receipt = {
   uncovered,
   closedInProduction,
   outOfTime: loadsLeft || resamplesLeft ? { loadsLeft, resamplesLeft } : null,
+  overlayWalks,
   pages,
 };
 const verdict = productReady(receipt);
@@ -413,6 +432,8 @@ const lines = [
   `## Product crawl: ${verdict.ready ? 'ready' : 'not ready'}`,
   '',
   `${routes.length} page routes; ${pages.filter(p => p.identity === 'stranger').length} page loads as a stranger, ${pages.filter(p => p.identity === 'signed-in').length} signed in; ${uncovered.filter(u => !u.accepted).length} routes uncovered, ${uncovered.filter(u => u.accepted).length} reviewed exceptions; ${pages.filter(p => p.authGated).length} loads hit the sign-in wall.`,
+  '',
+  overlayWalkSummary(overlayWalks, signedIn),
   '',
   `Not ready because: ${verdict.reasons.join('; ') || 'nothing'}`,
   '',
@@ -447,5 +468,9 @@ for (const f of rankFindings(verdict.findings))
 for (const p of pages.filter(x => !x.error && !x.authGated))
   console.log(
     `crawl-page ${JSON.stringify({ route: p.route, url: p.url, identity: p.identity, viewport: p.viewport, status: p.status, cls: p.cls, lcpMs: p.lcpMs, longestTaskMs: p.longestTaskMs, loadMs: p.loadMs })}`
+  );
+for (const w of overlayWalks.walks)
+  console.log(
+    `crawl-walk ${JSON.stringify({ route: w.route, url: w.url, identity: w.identity, rail: w.rail, opened: w.opened, steps: w.steps?.length, orphaned: w.steps?.filter(s => s.orphans).length, error: w.error })}`
   );
 // The crawl reports; ready-gate.mjs decides. Exit 0 so the receipt uploads.

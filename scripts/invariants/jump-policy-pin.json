@@ -1,0 +1,29 @@
+{
+  "schema": "jovie-jump-policy-pin/v1",
+  "COMPOUNDING_LABEL": "compounding",
+  "MARKETING_LABEL": "priority:marketing",
+  "MAX_JUMPED": 2,
+  "JUMP_MAX_BUILD_S": 300,
+  "JUMP_BATCH_S": 1800,
+  "COMPOUNDING_PATHS": [
+    {
+      "source": "^\\.github\\/(workflows|actions|ci-harness|scripts|runner-host|runner-image)\\/",
+      "flags": ""
+    },
+    {
+      "source": "^scripts\\/(lanes|swarm|hermes)\\/",
+      "flags": ""
+    },
+    {
+      "source": "^scripts\\/(ci-|merge-|pr-|fleet-|quota-)[^/]*$",
+      "flags": ""
+    },
+    {
+      "source": "^scripts\\/tests\\/test_[a-z_]*(lane|autoscale|sentinel|execution|codex|stage)[a-z_]*\\.py$",
+      "flags": ""
+    }
+  ],
+  "jumpPolicySha256": "b251eec36bbe16f53eef61d8a6548ee354f66d4cf0c33fb1af01a37e06ac9765",
+  "isPriorityLabelSha256": "58e13f20b22714cbcb6a5605948ca19c1907d6d4b3ca03ab03b54d3ccc210a7c",
+  "jumpTrueSites": 2
+}

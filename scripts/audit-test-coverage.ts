@@ -10,9 +10,9 @@
  *   apps/web/tests/quarantine/flaky-tests.json       — flake report from test:flaky (optional)
  *
  * Writes:
- *   docs/TEST_COVERAGE_HEATMAP.md                    — committed, idempotent (only writes on change)
- *   apps/web/reports/test-coverage-snapshot.json     — committed by the nightly cron;
- *                                                       canonical baseline that --check-pr compares against
+ *   docs/TEST_COVERAGE_HEATMAP.md                    — runtime report, idempotent (only writes on change)
+ *   apps/web/reports/test-coverage-snapshot.json     — published to the runtime store;
+ *                                                       restored before nightly --check-pr drift checks
  *
  * Modes:
  *   (default)    — regenerate heatmap + snapshot
@@ -33,8 +33,8 @@ import { listSurfaceFiles } from './lib/coverage-surface-files.mjs';
 const REPO_ROOT = resolve(fileURLToPath(import.meta.url), '..', '..');
 const REGISTER_PATH = resolve(REPO_ROOT, 'docs/TEST_RISK_REGISTER.md');
 const HEATMAP_PATH = resolve(REPO_ROOT, 'docs/TEST_COVERAGE_HEATMAP.md');
-// Committed baseline — written by the nightly cron, consumed by --check-pr
-// in any PR context. Lives next to Stryker's incremental file by convention.
+// Runtime baseline restored by the nightly audit before --check-pr. The
+// committed snapshot is the initial seed and local/offline fallback.
 const SNAPSHOT_PATH = resolve(
   REPO_ROOT,
   'apps/web/reports/test-coverage-snapshot.json'
@@ -821,7 +821,7 @@ async function main() {
     flakyReport
   );
 
-  // PR-check mode: compare current to snapshot in main, exit 1 on RED degradation.
+  // Compare current coverage to the restored snapshot, exit 1 on RED degradation.
   if (checkPr) {
     if (!previousSnapshot) {
       console.log('No previous snapshot found — skipping check.');

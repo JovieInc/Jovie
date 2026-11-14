@@ -15,9 +15,9 @@ export interface HomepageCatalogRelease {
   readonly selected?: boolean;
 }
 
-/** The featured artist (Tim, 2026-11-08: not Tim; a demo artist until real
- * artists opt in). Their catalog, newest first; the inspected release is
- * the selected row. */
+/** The featured artist (`data/featuredArtists.ts`; Tim, 2026-11-12: Tim
+ * for now, any opted-in artist later). Their catalog, newest first; the
+ * inspected release is the selected row. */
 const ARTIST = HOMEPAGE_FEATURED_ARTIST;
 const INSPECTED = ARTIST.inspected;
 

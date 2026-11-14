@@ -16,6 +16,14 @@ vi.mock('@clerk/nextjs', () => ({
   SignedOut: ({ children }: { children: React.ReactNode }) => children,
 }));
 
+// Records whether the account menu module was evaluated. The marketing header
+// must reach it only through the code-split wrapper, never a static import.
+const accountMenu = vi.hoisted(() => ({ evaluated: false }));
+vi.mock('@/components/organisms/user-button/UserButton', () => {
+  accountMenu.evaluated = true;
+  return { UserButton: () => null };
+});
+
 import { type HeaderFlyoutMenu, HeaderNav } from './HeaderNav';
 
 const FLYOUTS: readonly HeaderFlyoutMenu[] = [
@@ -88,6 +96,29 @@ describe('HeaderNav states', () => {
     await expectNoA11yViolations(container);
   });
 
+  it('does not load the account menu for a signed-out visitor', () => {
+    render(
+      <HeaderNav
+        authMode='public-static'
+        navLinks={[{ href: APP_ROUTES.PRICING, label: 'Pricing' }]}
+        publicCta={{ href: APP_ROUTES.SIGNUP, label: 'Get Started' }}
+      />
+    );
+
+    expect(
+      within(primaryNav()).getByRole('link', { name: 'Log in' })
+    ).toBeInTheDocument();
+    expect(accountMenu.evaluated).toBe(false);
+  });
+
+  it('sends the default public CTA into the one /start flow', () => {
+    render(<HeaderNav authMode='public-static' hideNav={false} />);
+
+    expect(
+      screen.getByRole('link', { name: 'Claim your free profile' })
+    ).toHaveAttribute('href', APP_ROUTES.START);
+  });
+
   it('drops the desktop nav group and its divider when there are no nav links', async () => {
     const { container } = render(
       <HeaderNav authMode='public-static' navLinks={[]} />
@@ -111,6 +142,7 @@ describe('HeaderNav states', () => {
 
     const trigger = screen.getByRole('button', { name: 'Product' });
     expect(trigger).toHaveAttribute('aria-expanded', 'false');
+    expect(trigger).toHaveAttribute('data-slot', 'plain-button');
     await expectNoA11yViolations(container);
 
     await user.hover(trigger);

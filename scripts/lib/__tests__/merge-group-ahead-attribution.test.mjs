@@ -245,7 +245,7 @@ describe('attributeAgainstAheadRun', () => {
         currentJobs: failedCiFastJobs,
         currentCiFastLog: 'no lane output',
       }).reason
-    ).toBe('ci-fast-failure-unparsed');
+    ).toBe('ci-fast-failure-unparsed:ci-fast (remaining)');
     expect(
       attributeAgainstAheadRun({
         ...base,

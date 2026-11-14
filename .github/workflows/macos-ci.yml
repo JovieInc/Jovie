@@ -60,6 +60,8 @@ jobs:
         with:
           ref: ${{ inputs.checkout-ref || github.sha }}
           persist-credentials: false
+          # The gzip ratchet compares the committed ceiling with the base ref.
+          fetch-depth: 0
       - uses: ./.github/actions/setup-node-pnpm
         # A cold macOS pnpm cache save can outlive all product evidence and
         # consume the merge-queue deadline. Keep the exact fetch/install path,
@@ -124,3 +126,34 @@ jobs:
           if-no-files-found: error
           compression-level: 0
           retention-days: 7
+
+  # Synthetic local-stub measurement, separate from the loaded test runner.
+  # Report-only targets: unavailable samples are artifacts, never fake zeros.
+  # Setup and artifact failures remain CI failures.
+  startup-budget:
+    name: Desktop startup receipt (report-only)
+    if: ${{ !inputs.mac-child }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.checkout-ref || github.sha }}
+          persist-credentials: false
+      - uses: ./.github/actions/setup-node-pnpm
+      # Reuse the lockfile-pinned Chromium system-dependency provisioner,
+      # including Xvfb, without new apt commands or sandbox overrides.
+      - uses: ./.github/actions/setup-playwright
+        with:
+          system_deps: 'true'
+          cache: 'restore'
+      - name: Record five local-stub launches
+        run: xvfb-run -a pnpm --filter @jovie/desktop run startup:budget
+      - name: Upload desktop startup receipt
+        if: ${{ always() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: desktop-startup-receipts
+          path: artifacts/desktop-test-results/startup-budget
+          if-no-files-found: error
+          retention-days: 30
