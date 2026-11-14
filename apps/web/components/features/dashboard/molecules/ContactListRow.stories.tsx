@@ -54,7 +54,7 @@ export const PartialRoleOnly: Story = {
   args: {
     contact: {
       ...contact,
-      role: 'press',
+      role: 'press_pr',
       personName: null,
       email: null,
       territories: [],
