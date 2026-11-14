@@ -1064,12 +1064,11 @@ describe('product lane classifier', () => {
     expect(() => classifyProductLanes(['new-product/main.ts'])).toThrow(
       ProductLaneClassificationError
     );
-    const tracked = execFileSync('git', ['ls-files', '-z'], {
+    const listed = execFileSync('git', ['ls-files', '-z'], {
       encoding: 'utf8',
       maxBuffer: 1 << 28,
-    })
-      .split('\0')
-      .filter(Boolean);
+    });
+    const tracked = listed.split('\0').filter(Boolean);
     expect(() => classifyProductLanes(tracked)).not.toThrow();
   });
 
