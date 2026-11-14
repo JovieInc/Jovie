@@ -159,3 +159,128 @@ test.describe('Input atom Storybook conformance', () => {
     await attachScreenshot(testInfo, 'input-keyboard-focus-200-zoom.png', root);
   });
 });
+
+test.describe('Shared error copy contrast', () => {
+  const errorStories = [
+    'ui-atoms-field--error',
+    'ui-atoms-form--error-state',
+    'ui-atoms-input--error',
+    'ui-atoms-label--error-state',
+    'ui-atoms-nativeselect--error',
+    'ui-atoms-textarea--error',
+  ] as const;
+
+  for (const theme of ['light', 'dark'] as const) {
+    for (const story of errorStories) {
+      test(`error copy meets WCAG AA [${theme} ${story}] @a11y`, async ({
+        page,
+      }, testInfo) => {
+        await page.addInitScript(
+          value => localStorage.setItem('jovie-theme-storybook', value),
+          theme
+        );
+        const root = await openStory(page, story);
+        await expect(page.locator('html')).toHaveClass(new RegExp(theme));
+        await page.evaluate(() => document.fonts.ready);
+        await expect(root.locator('.text-destructive').first()).toBeVisible();
+
+        const result = await new AxeBuilder({ page })
+          .include('#storybook-root')
+          .options(wcag22AaAxeOptions())
+          .analyze();
+        const measured = result.passes
+          .filter(rule => rule.id === 'color-contrast')
+          .flatMap(rule => rule.nodes)
+          .filter(node => node.html.includes('text-destructive'))
+          .flatMap(node => node.any)
+          .filter(check => check.id === 'color-contrast');
+        const evidencePath = testInfo.outputPath('error-copy-contrast.json');
+        await writeFile(
+          evidencePath,
+          JSON.stringify({ story, theme, result }, null, 2)
+        );
+        await testInfo.attach('error-copy-contrast.json', {
+          path: evidencePath,
+          contentType: 'application/json',
+        });
+        const screenshotPath = testInfo.outputPath('error-copy.png');
+        await root.screenshot({ path: screenshotPath, animations: 'disabled' });
+        await testInfo.attach('error-copy.png', {
+          path: screenshotPath,
+          contentType: 'image/png',
+        });
+        expect(result.violations).toEqual([]);
+        expect(
+          result.incomplete.filter(rule => rule.id === 'color-contrast')
+        ).toEqual([]);
+        expect(measured.length).toBeGreaterThan(0);
+        for (const check of measured)
+          expect(check.data.contrastRatio).toBeGreaterThanOrEqual(4.5);
+      });
+    }
+  }
+});
+
+test.describe('Composite field and switch error-copy contrast', () => {
+  const fixtures = [
+    {
+      story: 'ui-atoms-compositefield--error-state',
+      message: 'composite-field-error-message',
+      role: 'textbox',
+      name: 'Choose your handle',
+    },
+    {
+      story: 'ui-atoms-switch--error-state',
+      message: 'sw-error-message',
+      role: 'switch',
+      name: 'Accept the distribution terms',
+    },
+  ] as const;
+
+  for (const theme of ['light', 'dark'] as const) {
+    for (const fixture of fixtures) {
+      test(`error copy meets WCAG AA [${theme} ${fixture.story}] @a11y`, async ({
+        page,
+      }, testInfo) => {
+        await page.addInitScript(
+          value => localStorage.setItem('jovie-theme-storybook', value),
+          theme
+        );
+        const root = await openStory(page, fixture.story);
+        await expect(page.locator('html')).toHaveClass(new RegExp(theme));
+        await expect(
+          root.getByRole(fixture.role, { name: fixture.name })
+        ).toBeVisible();
+        await expect(root.locator(`#${fixture.message}`)).toBeVisible();
+        await page.evaluate(() => document.fonts.ready);
+        const result = await new AxeBuilder({ page })
+          .include('#storybook-root')
+          .options(wcag22AaAxeOptions())
+          .analyze();
+        const evidencePath = testInfo.outputPath('error-copy-contrast.json');
+        await writeFile(
+          evidencePath,
+          JSON.stringify({ story: fixture.story, theme, result }, null, 2)
+        );
+        await testInfo.attach('error-copy-contrast.json', {
+          path: evidencePath,
+          contentType: 'application/json',
+        });
+        await attachScreenshot(testInfo, `${fixture.story}-${theme}.png`, root);
+        expect(result.violations).toEqual([]);
+        expect(
+          result.incomplete.filter(rule => rule.id === 'color-contrast')
+        ).toEqual([]);
+        const measured = result.passes
+          .filter(rule => rule.id === 'color-contrast')
+          .flatMap(rule => rule.nodes)
+          .filter(node => node.html.includes(fixture.message))
+          .flatMap(node => node.any)
+          .filter(check => check.id === 'color-contrast');
+        expect(measured.length).toBeGreaterThan(0);
+        for (const check of measured)
+          expect(check.data.contrastRatio).toBeGreaterThanOrEqual(4.5);
+      });
+    }
+  }
+});

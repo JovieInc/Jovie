@@ -12,6 +12,24 @@
       "a11y",
       "frontend-rules"
     ],
+    "apps/web/components/atoms/AppSegmentControl.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/atoms/LogoIcon.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
     "apps/web/components/features/auth/AuthOfferSummary.tsx": [
       "ds-owner",
       "tokens",
@@ -645,8 +663,20 @@
     "apps/web/components/jovie/components/ChatToolSurface.tsx": {
       "partial": "ChatToolSurface is a slot wrapper: it renders whatever children its card passes and its optional props are only tone, className and a test id, so there is no data that can be partly present. Partial states belong to the cards that fill it, such as ChatLinkConfirmationCard."
     },
+    "apps/web/components/jovie/components/ChatVideoRecordingProposalCard.tsx": {
+      "empty": "The card renders one title, one script and two fixed actions from a required payload; it lists no collection (payload.questions is handed to the recorder, never drawn). The detector matched the items-center class on the uploaded row.",
+      "permission-denied": "The card has no role, plan or gated branch: anyone who is shown the proposal can upload or record. The detector matched role='alert' on the failed-upload line, which ErrorUploadFailed shows."
+    },
     "apps/web/components/jovie/components/ErrorDisplay.tsx": {
       "empty": "ErrorDisplay renders exactly one required ChatError and never a collection; the only .filter is over the two parts of the support reference, and the detector matched the items-start and items-center classes."
+    },
+    "apps/web/components/jovie/components/SlashCommandMenu.tsx": {
+      "error": "The menu has no error branch and submits nothing: a commit calls the composer's onSelectSkill, onSelectEntity or onSelectPrompt. The detector matched the word submit in the IME-composition comment of its key handler.",
+      "permission-denied": "The menu draws no denied face: a skill the account cannot use (album art without the capability) is left out of the list, so there is nothing locked to show. The detector matched role='combobox' on the filter field."
+    },
+    "apps/web/components/jovie/merch-tool-artifacts.tsx": {
+      "error": "It never draws its own failure. The only submit signal is the jovie-chat-submit-prompt event it dispatches, and the chat that receives it owns the request and its errors. A failed tool event returns null so the shared failure card draws it. The detector matched submit in that event name.",
+      "offline": "It never fetches. The only submit signal is the jovie-chat-submit-prompt event it dispatches, and the chat composer owns the request and its network error. The detector matched submit in that event name."
     },
     "apps/web/components/jovie/source-evidence-context.tsx": {
       "loading": "The provider is pending only while the code-split source-facts module resolves, a microtask after mount; a static story cannot hold a resolved dynamic import, so source-evidence-context.test.tsx asserts data-source-evidence='pending' before 'ready'. Its children render unchanged either way.",
@@ -774,6 +804,9 @@
       "empty": "The dialog maps over the fixed COOKIE_CATEGORIES constant (Essential, Analytics, Marketing), which is never empty, so there is no empty-data state.",
       "long-content": "Every category label, description and button in the dialog is fixed copy from module constants with no props or user text, so its content cannot grow."
     },
+    "apps/web/components/organisms/DesktopTitlebarSlot.tsx": {
+      "error": "The module-level catch only absorbs a failed speculative titlebar import; it never sets render state or draws an error. The existing next/dynamic loader still owns the render import. desktop-startup-contract.cases.mjs executes the rejected warmup and verifies that the desktop render loader remains usable and browser output stays null; DesktopTitlebarSlot.test.tsx covers the mounted titlebar."
+    },
     "apps/web/components/organisms/MarketingSignInLink.tsx": {
       "partial": "The link renders one label and one fixed sign-in route; variant and label are presentation choices with defaults, so there is no data to be partially present.",
       "long-content": "The label prop is typed as the two fixed strings 'Sign in' and 'Log in', so no caller can pass longer copy."
@@ -794,6 +827,9 @@
     "apps/web/components/organisms/StandaloneProductPage.tsx": {
       "empty": "StandaloneProductPage is a layout shell that renders its required children in a main landmark; it owns no collection, and the detector matched the items-center class.",
       "partial": "Its optional props (className, contentClassName, width, centered) are layout options, not content fields, so there is no partially filled state; Centered and NarrowWidth show them."
+    },
+    "apps/web/components/organisms/desktop-update/DesktopUpdateControl.tsx": {
+      "permission-denied": "Every desktop user may download, restart or retry an update; the control has no account, role or gated action. The detector matched role='status' on the polite announcement."
     },
     "apps/web/components/organisms/public-surface/PublicSurfaceStage.tsx": {
       "empty": "The stage holds no data: children is required and is the profile card itself. The detector matched the items-stretch and items-center layout classes.",
@@ -992,6 +1028,11 @@
     },
     "packages/ui/atoms/link.tsx": {
       "partial": "Link renders one label slot; its optional props (variant, active, visited, disabled, touchTarget, reserveLabel) are presentation flags with defaults, and the not-yet-arrived label case is shown by the EmptyStreamedLabel story."
+    },
+    "packages/ui/atoms/plain-button.tsx": {
+      "empty": "PlainButton renders the children its caller passes and owns no collection or data, so it has no empty state of its own.",
+      "error": "PlainButton makes no request and validates nothing; an error belongs to the action its caller wires to onClick.",
+      "offline": "PlainButton makes no network request, so it behaves the same offline; connectivity belongs to the caller's action."
     },
     "packages/ui/atoms/progress.tsx": {
       "permission-denied": "ProgressBar only reports completion of an upload or import and has no gated action or permission input; the detector matched role='progressbar'."

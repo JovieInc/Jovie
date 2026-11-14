@@ -14,9 +14,6 @@
  * later lanes behind the first red one. Skipped lanes still emit a receipt.
  * CI_FAST_FAIL_FAST=false retains structural after failures; no selector runs all lanes.
  *
- * Usage:
- *   node scripts/ci-fast-lanes.mjs [with CI_FAST_LANE_GROUP=<group>]
- *
  * Env:
  *   GITHUB_EVENT_NAME, GITHUB_BASE_REF, GITHUB_REF, GITHUB_STEP_SUMMARY
  *   CI_FAST_LANE_GROUP — hosted group selector; omitted locally runs all lanes
@@ -30,6 +27,16 @@
  *   CI_FAST_STRUCTURAL_ABORT_STATUS_FILE — background cheap-lane exit status;
  *     non-zero stops starting structural commands (fail-fast)
  */
+
+import {
+  escapeAnnotationMessage,
+  escapeAnnotationProperty,
+} from './lib/ci-fast-annotations.mjs';
+
+export {
+  escapeAnnotationMessage,
+  escapeAnnotationProperty,
+} from './lib/ci-fast-annotations.mjs';
 
 import { spawn, spawnSync } from 'node:child_process';
 import {
@@ -782,7 +789,7 @@ export const STRUCTURAL_WEB_JOB_PREFIXES = Object.freeze([
 
 /** Files of the lanes coverage suite (one coverage map, sharded below). */
 export const LANES_PYTEST_FILES = Object.freeze(
-  'scripts/tests/test_factory_signals.py scripts/tests/test_factory_intake.py scripts/tests/test_backlog_admission.py scripts/tests/test_backlog_writer_guard.py scripts/tests/test_board_intake.py scripts/tests/test_capacity_limit.py scripts/tests/test_claude_lane.py scripts/tests/test_cloud_lane.py scripts/tests/test_codex_lane.py scripts/tests/test_conftest_host_isolation.py scripts/tests/test_continuity_clock.py scripts/tests/test_design_gate.py scripts/tests/test_devin_free_policy.py scripts/tests/test_disk_guard.py scripts/tests/test_doctor.py scripts/tests/test_public_feed.py scripts/tests/test_health_checks.py scripts/tests/test_main_health.py scripts/tests/test_epics.py scripts/tests/test_execution_attempt.py scripts/tests/test_gh_app_token.py scripts/tests/test_hud.py scripts/tests/test_hyperagent_cli.py scripts/tests/test_hyperagent_lane.py scripts/tests/test_issue_routing.py scripts/tests/test_lane_runner.py scripts/tests/test_model_families.py scripts/tests/test_model_pools.py scripts/tests/test_model_pool_guard.py scripts/tests/test_model_pool_calls.py scripts/tests/test_model_radar.py scripts/tests/test_pr_events.py scripts/tests/test_pr_events_repair_evidence.py scripts/tests/test_pr_events_red_repair.py scripts/tests/test_pr_body_markup.py scripts/tests/test_priority_admission.py scripts/tests/test_qualification_guard.py scripts/tests/test_reason_lane.py scripts/tests/test_remediation.py scripts/tests/test_repair_order.py scripts/tests/test_repair_win.py scripts/tests/test_service_census.py scripts/tests/test_shipping_attribution.py scripts/tests/test_shipping_origin.py scripts/tests/test_telegram_archive.py scripts/tests/test_worktree_pool.py scripts/tests/test_worktree_sweep.py'.split(
+  'scripts/tests/test_factory_signals.py scripts/tests/test_factory_intake.py scripts/tests/test_backlog_admission.py scripts/tests/test_backlog_writer_guard.py scripts/tests/test_board_intake.py scripts/tests/test_capacity_limit.py scripts/tests/test_claude_lane.py scripts/tests/test_cloud_lane.py scripts/tests/test_codex_lane.py scripts/tests/test_conftest_host_isolation.py scripts/tests/test_continuity_clock.py scripts/tests/test_design_gate.py scripts/tests/test_devin_free_policy.py scripts/tests/test_disk_guard.py scripts/tests/test_doctor.py scripts/tests/test_public_feed.py scripts/tests/test_health_checks.py scripts/tests/test_main_health.py scripts/tests/test_epics.py scripts/tests/test_fix_red_statement_merge.py scripts/tests/test_execution_attempt.py scripts/tests/test_gh_app_token.py scripts/tests/test_hud.py scripts/tests/test_hyperagent_cli.py scripts/tests/test_hyperagent_lane.py scripts/tests/test_issue_routing.py scripts/tests/test_lane_runner.py scripts/tests/test_model_families.py scripts/tests/test_model_pools.py scripts/tests/test_model_pool_guard.py scripts/tests/test_model_pool_calls.py scripts/tests/test_model_radar.py scripts/tests/test_pr_events.py scripts/tests/test_pr_events_repair_evidence.py scripts/tests/test_pr_events_red_repair.py scripts/tests/test_pr_body_markup.py scripts/tests/test_priority_admission.py scripts/tests/test_qualification_guard.py scripts/tests/test_reason_lane.py scripts/tests/test_remediation.py scripts/tests/test_repair_order.py scripts/tests/test_repair_win.py scripts/tests/test_service_census.py scripts/tests/test_shipping_attribution.py scripts/tests/test_shipping_origin.py scripts/tests/test_telegram_archive.py scripts/tests/test_worktree_pool.py scripts/tests/test_worktree_sweep.py'.split(
     ' '
   )
 );
@@ -918,6 +925,8 @@ export const STRUCTURAL_PYTHON_REGRESSION_COMMANDS = Object.freeze([
 ]);
 
 export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
+  'scripts/ios-certification-config.test.mjs',
+  'scripts/resolve-main-sha.test.mjs', // JOV-12497 SIGPIPE regression.
   'scripts/hostops/pen-golden-path-sync.test.mjs',
   'scripts/design/pen-inspect.test.mjs',
   'scripts/hostops/pen-files-worker/src/index.test.mjs',
@@ -935,6 +944,7 @@ export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
   'scripts/lib/__tests__/source-drift.test.mjs',
   'scripts/lib/__tests__/typecheck-slot.test.mjs',
   'scripts/preflight.test.mjs',
+  'scripts/preflight-step-control.test.mjs',
   'scripts/installation-budget-sentinel.test.mjs',
   'scripts/layout-guard-pen-contracts.test.mjs',
   'scripts/invariants/shell-ia.test.mjs', // JOV-INV-047 shell+IA registry.
@@ -965,6 +975,8 @@ export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
   'scripts/artist-profile-conformance.test.mjs',
   'scripts/backlog-orchestrator/__tests__/admission-disposition.test.mjs',
   'scripts/backlog-orchestrator/__tests__/admission-receipt.test.mjs',
+  'scripts/backlog-orchestrator/__tests__/backlog-census-retry.test.mjs',
+  'scripts/backlog-orchestrator/__tests__/mutation-sweep-rate-limit-stop.test.mjs',
   'scripts/backlog-orchestrator/__tests__/backlog-hygiene.test.mjs',
   'scripts/backlog-orchestrator/__tests__/backlog-remediation.test.mjs',
   'scripts/backlog-orchestrator/__tests__/conversation-intake.test.mjs',
@@ -1106,6 +1118,7 @@ export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
   'scripts/lib/__tests__/wake-fanout-contract.test.mjs',
   'scripts/design-system-source-ratchet.test.mjs',
   'scripts/review-escapes.test.mjs',
+  'scripts/catalog-duplicate-report.test.mjs',
 ]);
 export const DEPRECATION_COVERAGE_COMMAND =
   'node --test --experimental-test-coverage --test-coverage-include=scripts/deprecation-clearance.mjs --test-coverage-include=scripts/lib/deprecation-observation.mjs --test-coverage-lines=90 --test-coverage-branches=80 --test-coverage-functions=90 scripts/deprecation-clearance.test.mjs';
@@ -1122,9 +1135,26 @@ export const SCRIPT_CONTRACT_NODE_COMMAND = `${PR_OPEN_COVERAGE_COMMAND} && ${DE
 )
   .map(args => `node ${args.join(' ')}`)
   .join(' && ')}`;
+export const MESH_HOST_ACK_COVERAGE_COMMAND =
+  'pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/mesh-host-ack.test.mjs --coverage.enabled --coverage.provider=v8 --coverage.include=lanes/mesh-host-ack.mjs --coverage.reportsDirectory="${RUNNER_TEMP:-/tmp}/jovie-mesh-host-ack-coverage" --coverage.reporter=text --coverage.reporter=json --coverage.reporter=json-summary --coverage.thresholds.perFile=true --coverage.thresholds.lines=99 --coverage.thresholds.statements=99 --coverage.thresholds.branches=90 --coverage.thresholds.functions=100';
+export const MESH_NATIVE_TERMINAL_COVERAGE_COMMAND =
+  'pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/mesh-native-terminal.test.mjs --coverage.enabled --coverage.provider=v8 --coverage.include=lanes/mesh-native-terminal.mjs --coverage.reportsDirectory="${RUNNER_TEMP:-/tmp}/jovie-mesh-native-terminal-coverage" --coverage.reporter=text --coverage.reporter=json --coverage.reporter=json-summary --coverage.thresholds.perFile=true --coverage.thresholds.lines=90 --coverage.thresholds.statements=90 --coverage.thresholds.branches=85 --coverage.thresholds.functions=90';
+export const MESH_RUNTIME_BUNDLE_COVERAGE_COMMAND =
+  'pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/mesh-runtime-bundle.test.mjs --coverage.enabled --coverage.provider=v8 --coverage.include=lanes/mesh-runtime-bundle.mjs --coverage.reportsDirectory="${RUNNER_TEMP:-/tmp}/jovie-mesh-runtime-bundle-coverage" --coverage.reporter=text --coverage.reporter=json --coverage.reporter=json-summary --coverage.thresholds.perFile=true --coverage.thresholds.lines=90 --coverage.thresholds.statements=90 --coverage.thresholds.branches=85 --coverage.thresholds.functions=100';
+export const MESH_CURRENT_WIRE_COVERAGE_COMMAND =
+  'pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/mesh-current-wire.test.mjs --coverage.enabled --coverage.provider=v8 --coverage.include=lanes/mesh-current-wire.mjs --coverage.reportsDirectory="${RUNNER_TEMP:-/tmp}/jovie-mesh-current-wire-coverage" --coverage.reporter=text --coverage.reporter=json --coverage.reporter=json-summary --coverage.thresholds.perFile=true --coverage.thresholds.lines=90 --coverage.thresholds.statements=90 --coverage.thresholds.branches=85 --coverage.thresholds.functions=100';
+export const VALIDATION_LIFECYCLE_COVERAGE_COMMAND =
+  'pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/validation-lifecycle.test.mjs lib/__tests__/validation-sync.test.mjs lib/__tests__/linear-sync-on-merge.test.mjs lib/__tests__/founder-taste-order.test.mjs --maxWorkers=1 --coverage --coverage.include="lib/{validation-lifecycle,validation-sync,linear-sync-on-merge,founder-taste-order}.mjs" --coverage.reporter=text --coverage.reporter=json-summary --coverage.reportsDirectory="${RUNNER_TEMP:-/tmp}/jovie-validation-lifecycle-coverage" --coverage.thresholds.perFile --coverage.thresholds.lines=90 --coverage.thresholds.statements=90 --coverage.thresholds.branches=75 --coverage.thresholds.functions=85';
+// Keep scanner-heavy script contracts outside V8 instrumentation; cover the
+// document helpers with the same behavior test in a small separate process.
+// Release-lineage contracts. Main Health's idle probe (scripts/main-health.mjs --structural) runs the same
+// files: production-release-supersession held the date that expired on 2026-11-10 and failed every group for 8 h.
+export const RELEASE_LINEAGE_CONTRACT_COMMAND =
+  'pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/recheck-main-lineage-auth.test.mjs lib/__tests__/recheck-main-lineage-advancing.test.mjs lib/__tests__/production-release-supersession.test.mjs lib/__tests__/staging-controller-supersession.test.mjs lib/__tests__/staging-receipt-fetch-real-gh.test.mjs lib/__tests__/staging-generation-lineage.test.mjs lib/__tests__/release-lineage-gate.test.mjs lib/__tests__/release-risk-policy.test.mjs lib/__tests__/release-range-risk.test.mjs lib/__tests__/vitest-retry-reporter.test.mjs';
 export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/merge-group-failure-hold.test.mjs',
   'scripts/lib/__tests__/mesh-host-ack.test.mjs',
+  'scripts/lib/__tests__/canonical-profile-json-handoff.test.mjs',
   'scripts/lib/__tests__/merge-group-sibling-burn-contract.test.mjs',
   'scripts/lib/__tests__/gh-api-hold-retry.test.mjs',
   'scripts/lib/__tests__/prod-cert.test.mjs',
@@ -1133,6 +1163,7 @@ export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/cert-bottleneck.test.mjs',
   'scripts/lib/__tests__/self-hosted-workspace-reset-contract.test.mjs',
   'scripts/lib/__tests__/ci-timing-collector.test.mjs',
+  'scripts/lib/__tests__/ci-timing-github.test.mjs',
   'scripts/lib/__tests__/turbo-cache-stats.test.mjs',
   'scripts/lib/__tests__/mesh-native-terminal.test.mjs',
   'scripts/lib/__tests__/mesh-runtime-bundle.test.mjs',
@@ -1150,8 +1181,11 @@ export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/mutation-floor-intake.test.mjs',
   'scripts/lib/__tests__/mutation-diff-workflow.test.mjs',
   'scripts/lib/__tests__/component-certificate-workflow.test.mjs',
+  'scripts/lib/__tests__/component-certificate-delivery.test.mjs',
+  'scripts/lib/__tests__/component-certificate-producer.test.mjs',
   'scripts/lib/__tests__/storybook-certification-matrix.test.mjs',
   'scripts/lib/__tests__/mutation-sweep.test.mjs',
+  'scripts/lib/__tests__/mutation-lifecycle.test.mjs',
   'scripts/lib/__tests__/mutation-sweep-file-issues.test.mjs',
   'scripts/lib/__tests__/test-quality-rank.test.mjs',
   'scripts/lib/__tests__/knip-web-tooling.test.mjs',
@@ -1269,6 +1303,8 @@ export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/sparse-checkout-import-closure.test.mjs',
   'scripts/lib/__tests__/shipping-slo-collector.test.mjs',
   'scripts/lib/__tests__/shipping-slo.test.mjs',
+  'scripts/lib/__tests__/shipping-slo-history.test.mjs',
+  'scripts/lib/__tests__/stage-collect-linear.test.mjs',
   'scripts/lib/__tests__/stage-derive.test.mjs',
   'scripts/lib/__tests__/stage-events.test.mjs',
   'scripts/lib/__tests__/stale-pr-base-sha.test.mjs',
@@ -1312,7 +1348,7 @@ export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/api-budget.test.mjs',
   'scripts/lib/__tests__/domain-write-guard.test.mjs',
   'scripts/lib/__tests__/screen-audit-receipts.test.mjs',
-  'scripts/lib/__tests__/component-certificate.test.mjs',
+  'scripts/lib/__tests__/component-certificate.test.mjs scripts/lib/__tests__/component-certificate-discovery.test.mjs scripts/lib/__tests__/component-story-workers.test.mjs scripts/lib/__tests__/component-story-inventory.test.mjs scripts/lib/__tests__/screen-cert-repair.test.mjs scripts/lib/__tests__/component-render-inputs.test.mjs scripts/lib/__tests__/component-render-receipts.test.mjs',
   'scripts/lib/__tests__/verify-patched-dependencies.test.mjs',
   'scripts/lib/__tests__/incident-dedupe.test.mjs',
   'scripts/lib/__tests__/ci-capacity.test.mjs',
@@ -1322,25 +1358,8 @@ export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/workers-inventory.test.mjs',
   'scripts/lib/__tests__/setup-pinned-node.test.mjs',
 ]);
-export const MESH_HOST_ACK_COVERAGE_COMMAND =
-  'pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/mesh-host-ack.test.mjs --coverage.enabled --coverage.provider=v8 --coverage.include=lanes/mesh-host-ack.mjs --coverage.reportsDirectory="${RUNNER_TEMP:-/tmp}/jovie-mesh-host-ack-coverage" --coverage.reporter=text --coverage.reporter=json --coverage.reporter=json-summary --coverage.thresholds.perFile=true --coverage.thresholds.lines=99 --coverage.thresholds.statements=99 --coverage.thresholds.branches=90 --coverage.thresholds.functions=100';
-export const MESH_NATIVE_TERMINAL_COVERAGE_COMMAND =
-  'pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/mesh-native-terminal.test.mjs --coverage.enabled --coverage.provider=v8 --coverage.include=lanes/mesh-native-terminal.mjs --coverage.reportsDirectory="${RUNNER_TEMP:-/tmp}/jovie-mesh-native-terminal-coverage" --coverage.reporter=text --coverage.reporter=json --coverage.reporter=json-summary --coverage.thresholds.perFile=true --coverage.thresholds.lines=90 --coverage.thresholds.statements=90 --coverage.thresholds.branches=85 --coverage.thresholds.functions=90';
-export const MESH_RUNTIME_BUNDLE_COVERAGE_COMMAND =
-  'pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/mesh-runtime-bundle.test.mjs --coverage.enabled --coverage.provider=v8 --coverage.include=lanes/mesh-runtime-bundle.mjs --coverage.reportsDirectory="${RUNNER_TEMP:-/tmp}/jovie-mesh-runtime-bundle-coverage" --coverage.reporter=text --coverage.reporter=json --coverage.reporter=json-summary --coverage.thresholds.perFile=true --coverage.thresholds.lines=90 --coverage.thresholds.statements=90 --coverage.thresholds.branches=85 --coverage.thresholds.functions=100';
-export const MESH_CURRENT_WIRE_COVERAGE_COMMAND =
-  'pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/mesh-current-wire.test.mjs --coverage.enabled --coverage.provider=v8 --coverage.include=lanes/mesh-current-wire.mjs --coverage.reportsDirectory="${RUNNER_TEMP:-/tmp}/jovie-mesh-current-wire-coverage" --coverage.reporter=text --coverage.reporter=json --coverage.reporter=json-summary --coverage.thresholds.perFile=true --coverage.thresholds.lines=90 --coverage.thresholds.statements=90 --coverage.thresholds.branches=85 --coverage.thresholds.functions=100';
-export const VALIDATION_LIFECYCLE_COVERAGE_COMMAND =
-  'pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/validation-lifecycle.test.mjs lib/__tests__/validation-sync.test.mjs lib/__tests__/linear-sync-on-merge.test.mjs lib/__tests__/founder-taste-order.test.mjs --maxWorkers=1 --coverage --coverage.include="lib/{validation-lifecycle,validation-sync,linear-sync-on-merge,founder-taste-order}.mjs" --coverage.reporter=text --coverage.reporter=json-summary --coverage.reportsDirectory="${RUNNER_TEMP:-/tmp}/jovie-validation-lifecycle-coverage" --coverage.thresholds.perFile --coverage.thresholds.lines=90 --coverage.thresholds.statements=90 --coverage.thresholds.branches=75 --coverage.thresholds.functions=85';
-// Keep scanner-heavy script contracts outside V8 instrumentation; cover the
-// document helpers with the same behavior test in a small separate process.
-// Release-lineage contracts. Main Health's idle probe (scripts/main-health.mjs --structural) runs the same
-// files: production-release-supersession held the date that expired on 2026-11-10 and failed every group for 8 h.
-export const RELEASE_LINEAGE_CONTRACT_COMMAND =
-  'pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/recheck-main-lineage-auth.test.mjs lib/__tests__/recheck-main-lineage-advancing.test.mjs lib/__tests__/production-release-supersession.test.mjs lib/__tests__/staging-controller-supersession.test.mjs lib/__tests__/staging-receipt-fetch-real-gh.test.mjs lib/__tests__/staging-generation-lineage.test.mjs lib/__tests__/release-lineage-gate.test.mjs lib/__tests__/release-risk-policy.test.mjs lib/__tests__/release-range-risk.test.mjs lib/__tests__/vitest-retry-reporter.test.mjs';
-
 export const SCRIPT_CONTRACT_VITEST_COMMAND = `pnpm exec vitest --root scripts --config vitest.config.mts run ${SCRIPT_CONTRACT_VITEST_TESTS.map(
-  test => test.replace(/^scripts\//u, '')
+  test => test.replace(/(^| )scripts\//gu, '$1')
 ).join(
   ' '
 )} && pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/doc-freshness.test.mjs --coverage --coverage.include=lib/doc-review.mjs --coverage.include=lib/doc-freshness.mjs --coverage.reporter=text --coverage.reporter=json --coverage.reportsDirectory="\${RUNNER_TEMP:-/tmp}/jovie-document-review-coverage" --coverage.thresholds.perFile=true --coverage.thresholds.lines=90 --coverage.thresholds.branches=80 --coverage.thresholds.functions=90 && pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/daily-changelog.test.mjs lib/__tests__/daily-changelog-publication.test.mjs --coverage --coverage.include=lib/daily-changelog.mjs --coverage.include=lib/daily-changelog-publication.mjs --coverage.include=lib/daily-changelog-collector.mjs --coverage.reporter=text --coverage.reporter=json --coverage.reportsDirectory="\${RUNNER_TEMP:-/tmp}/jovie-changelog-coverage" --coverage.thresholds.perFile=true --coverage.thresholds.lines=85 --coverage.thresholds.branches=75 --coverage.thresholds.functions=82`;
@@ -2063,21 +2082,6 @@ function capLines(lines, max) {
   return kept;
 }
 
-/** Escape a workflow-command message per GitHub Actions rules. */
-export function escapeAnnotationMessage(text) {
-  return String(text ?? '')
-    .replaceAll('%', '%25')
-    .replaceAll('\r', '%0D')
-    .replaceAll('\n', '%0A');
-}
-
-/** Escape a workflow-command property value (e.g. `title=`). */
-export function escapeAnnotationProperty(text) {
-  return escapeAnnotationMessage(text)
-    .replaceAll(':', '%3A')
-    .replaceAll(',', '%2C');
-}
-
 function commandLabel(command, max = 80) {
   const flat = String(command ?? '')
     .replace(/\s+/gu, ' ')
@@ -2198,7 +2202,6 @@ function structuralFailureExcerpt(command, output, index, count, code) {
   ].join('\n');
   return `${header}\n\n${excerpt(output, 1200 - header.length - 3)}`;
 }
-
 /**
  * Files whose change can alter Biome's verdict on untouched files (config or
  * the pinned Biome version). Linting only the changed files would let a
@@ -2295,8 +2298,11 @@ export function runEslintServerBoundaries(cwd = REPO_ROOT) {
   return shell('pnpm --filter=@jovie/web run lint:server-boundaries');
 }
 
-function runTypecheck() {
-  // --force is mandatory (JOV-3499). Gate guard scans this file + ci.yml.
+/**
+ * Shared PR preselection: a 'false' run_jovie_typecheck receipt (written by
+ * ci-path-changes) means no typecheck graph inputs changed on this PR.
+ */
+function typecheckReceiptSkip() {
   const event = process.env.GITHUB_EVENT_NAME || '';
   if (
     event === 'pull_request' &&
@@ -2309,6 +2315,14 @@ function runTypecheck() {
       skipped: true,
     };
   }
+  return null;
+}
+
+function runTypecheck() {
+  // --force is mandatory (JOV-3499). Gate guard scans this file + ci.yml.
+  const event = process.env.GITHUB_EVENT_NAME || '';
+  const receiptSkip = typecheckReceiptSkip();
+  if (receiptSkip) return receiptSkip;
   if (event !== 'workflow_dispatch' && !repoLanes().runJovieProduct) {
     return {
       code: 0,
@@ -2338,17 +2352,8 @@ function runWebTestsTypecheck() {
   // (run_jovie_typecheck) already counts its JS and baseline inputs via
   // affectsWebTestTypecheck, so a 'false' receipt means none changed.
   const event = process.env.GITHUB_EVENT_NAME || '';
-  if (
-    event === 'pull_request' &&
-    process.env.CI_FAST_RUN_JOVIE_TYPECHECK === 'false'
-  ) {
-    return {
-      code: 0,
-      output:
-        'No TypeScript graph files changed (ci-path-changes preselection)\n',
-      skipped: true,
-    };
-  }
+  const receiptSkip = typecheckReceiptSkip();
+  if (receiptSkip) return receiptSkip;
   if (event !== 'workflow_dispatch' && !repoLanes().runJovieProduct) {
     return {
       code: 0,
@@ -2380,17 +2385,8 @@ function runWebStoriesTypecheck() {
   // web-tests-typecheck, since any .stories.tsx or component-source .tsx
   // change already satisfies affectsWebTestTypecheck.
   const event = process.env.GITHUB_EVENT_NAME || '';
-  if (
-    event === 'pull_request' &&
-    process.env.CI_FAST_RUN_JOVIE_TYPECHECK === 'false'
-  ) {
-    return {
-      code: 0,
-      output:
-        'No TypeScript graph files changed (ci-path-changes preselection)\n',
-      skipped: true,
-    };
-  }
+  const receiptSkip = typecheckReceiptSkip();
+  if (receiptSkip) return receiptSkip;
   if (event !== 'workflow_dispatch' && !repoLanes().runJovieProduct) {
     return {
       code: 0,
@@ -3147,9 +3143,9 @@ export async function runStructural(opts = {}) {
     // Revision-bound acquisition decisions and unchanged marketing CAS behavior.
     ACQUISITION_CERTIFICATION_COMMAND,
     // JOV-4421: hard ship gate — tests + matching stories for shippable UI.
-    'pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/component-ship-gate.test.mjs lib/__tests__/component-certificate-gate.test.mjs lib/__tests__/component-cert-screens.test.mjs lib/__tests__/forced-caps.test.mjs lib/__tests__/component-certificate-companions.test.mjs lib/__tests__/component-evidence.test.mjs lib/__tests__/component-story-evidence.test.mjs lib/__tests__/component-certificate-mutation.test.mjs lib/__tests__/mutation-sweep-root.test.mjs lib/__tests__/component-benchmark-review.test.mjs',
+    'pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/component-ship-gate.test.mjs lib/__tests__/component-certificate-gate.test.mjs lib/__tests__/component-cert-screens.test.mjs lib/__tests__/forced-caps.test.mjs lib/__tests__/component-certificate-companions.test.mjs lib/__tests__/component-evidence.test.mjs lib/__tests__/component-render-inputs.test.mjs lib/__tests__/component-render-receipts.test.mjs lib/__tests__/component-story-evidence.test.mjs lib/__tests__/component-certificate-mutation.test.mjs lib/__tests__/mutation-sweep-root.test.mjs lib/__tests__/component-benchmark-review.test.mjs',
     // JOV-5454: live Storybook certification evaluator + lifecycle.
-    'pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/component-live-storybook-certification.test.mjs',
+    'pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/component-live-storybook-certification.test.mjs lib/__tests__/component-story-workers.test.mjs lib/__tests__/component-story-inventory.test.mjs',
     'pnpm component-ship-gate',
     'pnpm screen-registration-gate',
     'pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/design-exception-registry.test.mjs --coverage --coverage.include=design-exception-registry.mjs --coverage.thresholds.lines=75 --coverage.thresholds.branches=70 --coverage.thresholds.functions=60',

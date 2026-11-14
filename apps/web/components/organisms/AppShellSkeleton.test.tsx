@@ -62,6 +62,24 @@ describe('AppShellSkeleton', () => {
     ).toBeNull();
   });
 
+  it('insets the skeleton headers with the same tokens as the loaded shell', () => {
+    const { container } = render(<AppShellSkeleton />);
+
+    // Loaded header: px-(--app-shell-header-padding-x). Loaded sidebar
+    // header: px-(--app-shell-sidebar-inset). A literal inset here shifts
+    // the row sideways when the fallback is replaced.
+    const header = container.querySelector('header');
+    expect(header).toHaveClass('px-app-header');
+    for (const node of container.querySelectorAll(
+      '.h-\\(--app-shell-header-height\\)'
+    )) {
+      expect(node).not.toHaveClass('px-2.5');
+    }
+    expect(
+      container.querySelector('.px-\\(--app-shell-sidebar-inset\\)')
+    ).not.toBeNull();
+  });
+
   it('renders an explicit null sidebar override without the default nav skeleton', () => {
     const { container } = render(<AppShellSkeleton sidebar={null} />);
 

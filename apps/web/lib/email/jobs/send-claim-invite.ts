@@ -19,6 +19,7 @@ import { GatewayEmailProvider } from '@/lib/notifications/providers/gateway';
 import { isEmailSuppressed } from '@/lib/notifications/suppression';
 import {
   COLD_CLAIM_INVITE_CLOSED_MESSAGE,
+  coldClaimInviteRelationshipHold,
   isColdClaimInviteSendOpen,
 } from '@/lib/outbound/cold-claim-invites';
 import { generateClaimTokenPair } from '@/lib/security/claim-token';
@@ -157,6 +158,22 @@ export async function processSendClaimInviteJob(
       .where(eq(creatorClaimInvites.id, invite.id));
 
     throw new Error(`Profile not found: ${payload.creatorProfileId}`);
+  }
+
+  // Hard gate: an artist Tim already works with never gets a cold invite,
+  // even one queued before the hold was registered. Nothing is retried.
+  const relationshipHold = coldClaimInviteRelationshipHold({
+    username: profile.username,
+    displayName: profile.displayName,
+    email: invite.email,
+  });
+  if (relationshipHold) {
+    return {
+      inviteId: invite.id,
+      email: invite.email,
+      status: 'skipped',
+      detail: relationshipHold,
+    };
   }
 
   // Profile already claimed - mark as skipped (not an error, just no longer needed)

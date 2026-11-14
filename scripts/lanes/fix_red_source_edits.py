@@ -8,7 +8,8 @@ import tempfile
 from pathlib import Path
 
 from atomic_state import atomic_write_text
-from fix_red_statement_merge import contained_by_main, contained_by_main_file, resolve_additive_statements_text
+from fix_red_statement_merge import contained_by_main, contained_by_main_file, resolve_additive_statements_text, unique_import_bindings
+from screen_debt_merge import resolve_subtractive_screen_debt
 
 LEGACY_CACHE_EXPORT = re.compile(
     r"^\s*export const (?:dynamic|fetchCache|revalidate)\s*=")
@@ -46,17 +47,14 @@ def _spacing_product_path(path: str) -> bool:
     return rel.startswith(SPACING_SCAN_PREFIXES)
 
 
-def _added_spacing_edits(diff: str) -> dict[str, dict[int, tuple[str, str]]]:
-    """Map eligible file -> {new 1-based line: (added text, snapped text)} for utilities the diff adds."""
-    edits: dict[str, dict[int, tuple[str, str]]] = {}
+def iter_added_lines(diff: str):
+    """Yield (path, new 1-based line, added text) for each added unified-diff line."""
     rel = ""
-    eligible = False
     new_line = 0
     in_hunk = False
     for raw in str(diff or "").splitlines():
         if raw.startswith("+++ b/"):
             rel = raw[6:]
-            eligible = _spacing_product_path(rel)
             in_hunk = False
             continue
         if raw.startswith("--- ") or raw.startswith("diff --git "):
@@ -66,34 +64,30 @@ def _added_spacing_edits(diff: str) -> dict[str, dict[int, tuple[str, str]]]:
             new_line = int(header.group(1))
             in_hunk = True
             continue
-        if not in_hunk:
+        if not in_hunk or raw.startswith("\\"):
             continue
-        if raw.startswith("\\"):
-            continue  # "\ No newline at end of file" is not a source line
         if raw.startswith("+"):
-            added = raw[1:]
-            snapped = _snap_spacing_line(added)
-            if eligible and snapped != added:
-                edits.setdefault(rel, {})[new_line] = (added, snapped)
+            yield rel, new_line, raw[1:]
             new_line += 1
-        elif raw.startswith("-"):
-            continue
-        else:
-            # A context line (rare with -U0) still occupies a new-file line.
+        elif not raw.startswith("-"):
             new_line += 1
+
+
+def _added_spacing_edits(diff: str) -> dict[str, dict[int, tuple[str, str]]]:
+    """Map eligible file -> {new 1-based line: (added text, snapped text)} for utilities the diff adds."""
+    edits: dict[str, dict[int, tuple[str, str]]] = {}
+    for rel, new_line, added in iter_added_lines(diff):
+        snapped = _snap_spacing_line(added)
+        if _spacing_product_path(rel) and snapped != added:
+            edits.setdefault(rel, {})[new_line] = (added, snapped)
     return edits
 
 
-def snap_added_conservative_spacing(root: Path, diff: str) -> list[str]:
-    """Snap conservative spacing utilities on lines this diff adds. Returns the files written.
-
-    Grandfathered lines are left alone, including an identical `gap-2.5` elsewhere in the
-    file. A line that no longer matches the diff is left alone so a stale patch cannot
-    rewrite a neighbor. 2.5 -> 2 (10px -> 8px) and 3.5 -> 3 (14px -> 12px).
-    """
+def _rewrite_added_lines(root: Path, edits: dict[str, dict[int, tuple[str, str]]]) -> list[str]:
+    """Replace added lines that still match. A stale line is left alone."""
     changed = []
     root = Path(root)
-    for rel, lines in _added_spacing_edits(diff).items():
+    for rel, lines in edits.items():
         path = root / rel
         try:
             original = path.read_text()
@@ -101,7 +95,7 @@ def snap_added_conservative_spacing(root: Path, diff: str) -> list[str]:
             continue
         file_lines = original.splitlines(keepends=True)
         dirty = False
-        for lineno, (added, snapped) in lines.items():
+        for lineno, (added, rewritten) in lines.items():
             index = lineno - 1
             if index < 0 or index >= len(file_lines):
                 continue
@@ -109,7 +103,7 @@ def snap_added_conservative_spacing(root: Path, diff: str) -> list[str]:
             current = file_lines[index][: len(file_lines[index]) - len(ending)]
             if current != added:
                 continue
-            file_lines[index] = snapped + ending
+            file_lines[index] = rewritten + ending
             dirty = True
         if not dirty:
             continue
@@ -119,6 +113,11 @@ def snap_added_conservative_spacing(root: Path, diff: str) -> list[str]:
             continue
         changed.append(rel)
     return sorted(changed)
+
+
+def snap_added_conservative_spacing(root: Path, diff: str) -> list[str]:
+    """Snap added 2.5/3.5 utilities to 2/3. Grandfathered and stale lines stay."""
+    return _rewrite_added_lines(root, _added_spacing_edits(diff))
 
 
 def _legacy_cache_path(path: str) -> bool:
@@ -134,46 +133,70 @@ def _legacy_cache_path(path: str) -> bool:
 def _added_legacy_cache_exports(diff: str) -> dict[str, dict[int, str]]:
     """Map eligible file -> {new 1-based line: added text} for cache exports the diff adds."""
     edits: dict[str, dict[int, str]] = {}
-    rel = ""
-    eligible = False
-    new_line = 0
-    in_hunk = False
-    for raw in str(diff or "").splitlines():
-        if raw.startswith("+++ b/"):
-            rel = raw[6:]
-            eligible = _legacy_cache_path(rel)
-            in_hunk = False
-            continue
-        if raw.startswith("--- ") or raw.startswith("diff --git "):
-            continue
-        header = re.match(r"^@@ -\d+(?:,\d+)? \+(\d+)(?:,\d+)? @@", raw)
-        if header:
-            new_line = int(header.group(1))
-            in_hunk = True
-            continue
-        if not in_hunk:
-            continue
-        if raw.startswith("\\"):
-            continue
-        if raw.startswith("+"):
-            added = raw[1:]
-            if eligible and LEGACY_CACHE_EXPORT.match(added):
-                edits.setdefault(rel, {})[new_line] = added
-            new_line += 1
-        elif raw.startswith("-"):
-            continue
-        else:
-            new_line += 1
+    for rel, new_line, added in iter_added_lines(diff):
+        if _legacy_cache_path(rel) and LEGACY_CACHE_EXPORT.match(added):
+            edits.setdefault(rel, {})[new_line] = added
     return edits
 
 
-def strip_added_legacy_cache_exports(root: Path, diff: str) -> list[str]:
-    """Delete route-segment cache exports on lines this diff adds. Returns the files written.
+_HEADING_TAG = re.compile(r"<h[1-6]\b[^>]*>", re.I)
+_BALANCE_EXEMPT = re.compile(
+    r"\b(?:text-balance|text-pretty|text-wrap|text-nowrap|truncate|sr-only|line-clamp-)\w*|\bwhitespace-nowrap\b")
+_QUOTED_CLASS = re.compile(r"""className=(['"])(.*?)\1""")
+_TEMPLATE_CLASS = re.compile(r"className=\{`([^`]*)`\}")
 
-    Grandfathered exports stay, including an identical line elsewhere in the file.
-    A line that no longer matches the diff stays, so a stale patch cannot delete a
-    neighbor. `export const runtime` is not a legacy surface and is left alone.
-    """
+
+def _heading_product_path(path: str) -> bool:
+    rel = str(path or "").replace("\\", "/")
+    if not rel.endswith(".tsx") or rel.startswith("/") or ".." in Path(rel).parts:
+        return False
+    if re.search(r"\.(?:test|spec|stories)\.tsx$", rel):
+        return False
+    return rel.startswith(("apps/web/", "packages/ui/"))
+
+
+def _balance_tag(tag: str) -> str:
+    if "textWrap" in tag:
+        return tag
+    quoted = _QUOTED_CLASS.search(tag)
+    if quoted:
+        body = quoted.group(2)
+        if _BALANCE_EXEMPT.search(body):
+            return tag
+        quote = quoted.group(1)
+        insert = "text-balance" if body == "" else f"text-balance {body}"
+        return f"{tag[:quoted.start()]}className={quote}{insert}{quote}{tag[quoted.end():]}"
+    template = _TEMPLATE_CLASS.search(tag)
+    if template:
+        body = template.group(1)
+        if "${" in body or _BALANCE_EXEMPT.search(body):
+            return tag
+        insert = "text-balance" if body == "" else f"text-balance {body}"
+        return f"{tag[:template.start()]}className={{`{insert}`}}{tag[template.end():]}"
+    if "className=" in tag:
+        return tag
+    if tag.endswith("/>"):
+        return tag[:-2] + ' className="text-balance" />'
+    return tag[:-1] + ' className="text-balance">'
+
+
+def balance_heading_line(line: str) -> str:
+    """Balance static heading tags using the shared exemption and class rules."""
+    return _HEADING_TAG.sub(lambda match: _balance_tag(match.group(0)), line)
+
+
+def balance_added_headings(root: Path, diff: str) -> list[str]:
+    """Add text-balance on added heading tags. Dynamic and stale lines stay."""
+    edits: dict[str, dict[int, tuple[str, str]]] = {}
+    for rel, new_line, added in iter_added_lines(diff):
+        balanced = balance_heading_line(added)
+        if _heading_product_path(rel) and balanced != added:
+            edits.setdefault(rel, {})[new_line] = (added, balanced)
+    return _rewrite_added_lines(root, edits)
+
+
+def strip_added_legacy_cache_exports(root: Path, diff: str) -> list[str]:
+    """Delete added dynamic/fetchCache/revalidate exports. Stale and runtime lines stay."""
     changed = []
     root = Path(root)
     for rel, lines in _added_legacy_cache_exports(diff).items():
@@ -261,9 +284,13 @@ def _diff3_conflict(worktree: Path, rel: str, sh) -> str | None:
         return probe.stdout
 
 
+# Next.js route groups, dynamic segments, parallel routes and intercepts.
+_TEST_PATH = r"[\w./()[\]@+-]+"
+
+
 def resolve_additive_node_test_file(worktree: Path, rel: str, sh) -> str | None:
     """Use Git's actual three stages to prove test conflicts are insertions only."""
-    if not re.fullmatch(r"[\w./-]+\.(?:test|spec)\.mjs", rel):
+    if not re.fullmatch(_TEST_PATH + r"\.(?:test|spec)\.mjs", rel):
         return None
     conflict = _diff3_conflict(worktree, rel, sh)
     if conflict is None:
@@ -273,12 +300,13 @@ def resolve_additive_node_test_file(worktree: Path, rel: str, sh) -> str | None:
 
 def resolve_additive_statement_file(worktree: Path, rel: str, sh) -> str | None:
     """Union empty-base statement insertions in a Vitest file, proven from Git's three stages."""
-    if not re.fullmatch(r"[\w./-]+\.(?:test|spec)\.tsx?", rel):
+    if not re.fullmatch(_TEST_PATH + r"\.(?:test|spec)\.tsx?", rel):
         return None
     conflict = _diff3_conflict(worktree, rel, sh)
     if conflict is None:
         return None
-    return resolve_additive_statements_text(conflict)
+    return resolve_additive_statements_text(
+        conflict, validate_imports=lambda text, spans: unique_import_bindings(text, worktree, sh, spans))
 
 
 def _unique_json_object(pairs):
@@ -350,26 +378,6 @@ def resolve_additive_certificate_waivers(worktree: Path, rel: str, sh) -> str | 
             return None
         merged[key] = value
     theirs["waivers"] = dict(sorted(merged.items()))
-    return json.dumps(theirs, ensure_ascii=False, indent=2) + "\n"
-
-
-def resolve_subtractive_screen_debt(worktree: Path, rel: str, sh) -> str | None:
-    """Drop screen-debt rows either side removed, proven against Git's three stages.
-
-    Main's remaining order stays. An added row, a changed value, or any other
-    field edit stays unresolved. This is authored policy, not generated metadata.
-    """
-    if rel != "docs/design-system/cert-screens.json":
-        return None
-    loaded = _load_json_object_stages(worktree, rel, sh, "debt", _debt_rows)
-    if loaded is None:
-        return None
-    base, ours, theirs = loaded
-    for document in (ours, theirs):
-        if any(key not in base["debt"] or document["debt"][key] != base["debt"][key]
-               for key in document["debt"]):
-            return None
-    theirs["debt"] = {key: value for key, value in theirs["debt"].items() if key in ours["debt"]}
     return json.dumps(theirs, ensure_ascii=False, indent=2) + "\n"
 
 

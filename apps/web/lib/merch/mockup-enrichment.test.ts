@@ -12,6 +12,7 @@ const hoisted = vi.hoisted(() => ({
   selectLimit: vi.fn(),
   updateSet: vi.fn(),
   updateWhere: vi.fn(),
+  scheduleAfter: vi.fn(),
 }));
 
 vi.mock('@/lib/db', () => ({
@@ -38,9 +39,14 @@ vi.mock('@/lib/merch/mockups', () => ({
   attachMockupsToDesignOption: hoisted.attachMockupsToDesignOption,
 }));
 
+vi.mock('@/lib/next/schedule-after', () => ({
+  scheduleAfter: hoisted.scheduleAfter,
+}));
+
 import {
   MAX_MOCKUP_ATTEMPTS,
   runMerchMockupEnrichment,
+  scheduleMerchMockupEnrichment,
 } from './mockup-enrichment';
 
 const ITEM = {
@@ -132,5 +138,67 @@ describe('runMerchMockupEnrichment (JOV-4743)', () => {
     expect(hoisted.generateProductMockups).toHaveBeenCalledTimes(
       MAX_MOCKUP_ATTEMPTS
     );
+  });
+});
+
+describe('scheduleMerchMockupEnrichment durability (PR-4)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    hoisted.selectLimit.mockResolvedValue([{ mockupUrls: [] }]);
+    hoisted.updateSet.mockReturnValue({ where: hoisted.updateWhere });
+    hoisted.updateWhere.mockResolvedValue(undefined);
+    hoisted.attachMockupsToDesignOption.mockResolvedValue(undefined);
+    hoisted.scheduleAfter.mockReset();
+  });
+
+  it('hands scheduleAfter a task whose returned promise settles only after enrichment completes', async () => {
+    let capturedTask: (() => unknown) | undefined;
+    hoisted.scheduleAfter.mockImplementation((task: () => unknown) => {
+      capturedTask = task;
+      return true;
+    });
+    let resolveProvider!: (value: {
+      results: { mockupUrls: string[] }[];
+      errors: string[];
+    }) => void;
+    hoisted.generateProductMockups.mockImplementation(
+      () =>
+        new Promise(resolve => {
+          resolveProvider = resolve;
+        })
+    );
+    const onSettled = vi.fn();
+
+    scheduleMerchMockupEnrichment([ITEM], onSettled);
+
+    expect(capturedTask).toBeDefined();
+    const taskPromise = capturedTask?.() as Promise<unknown> | undefined;
+    // Next.js after() awaits the task's return value — it must be a promise
+    // that stays pending while the provider work is still in flight,
+    // otherwise serverless teardown can cut the enrichment off mid-write.
+    expect(taskPromise).toBeInstanceOf(Promise);
+
+    let settled = false;
+    void taskPromise?.then(() => {
+      settled = true;
+    });
+    await new Promise(resolve => setTimeout(resolve, 20));
+    expect(settled).toBe(false);
+    expect(onSettled).not.toHaveBeenCalled();
+
+    resolveProvider({
+      results: [{ mockupUrls: [PRINTFUL_URL] }],
+      errors: [],
+    });
+    await taskPromise;
+
+    expect(settled).toBe(true);
+    expect(onSettled).toHaveBeenCalledTimes(1);
+    expect(onSettled).toHaveBeenCalledWith([
+      expect.objectContaining({
+        optionId: 'option-1',
+        status: 'mockup_ready',
+      }),
+    ]);
   });
 });

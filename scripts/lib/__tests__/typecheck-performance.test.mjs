@@ -75,11 +75,50 @@ describe('typecheck performance', () => {
           scenarios: { ci: { baselineP95Ms: 1, targetP95Ms: 1 } },
         })
       );
-      // Six complete samples take at least 1.2s; the same 1s budget covers
-      // both rounds, retaining the full first round and a partial confirmation.
+      // Deterministic clock/runner fixtures (JOV-12511) replace the old
+      // wall-clock choreography (three 1 s sleeps inside one shared 3.5 s
+      // budget). That choreography kept ~0.4 s of cumulative slack for round
+      // one, which vanished on loaded merge-queue runners and left the
+      // confirmation round unattempted (confirmations=[]). Here the shared
+      // deadline runs on a VIRTUAL clock that advances only when the runner
+      // consumes workload: each round-one sample advances it 1000 ms and
+      // exits, so after three samples 3000 < 3500 and the confirmation round
+      // always starts; its sample no longer fits the remaining virtual
+      // budget, so the runner stalls and the REAL 500 ms per-sample timeout
+      // kills it. Load can stretch no cumulative budget — the deadline is
+      // virtual and every real-time margin is per-sample (~1500 ms budget vs
+      // a ~5 ms workload, then a 500 ms kill against a 30 s stall).
+      writeFileSync(
+        join(directory, 'virtual-clock.mjs'),
+        [
+          "import { readFileSync } from 'node:fs';",
+          '',
+          'const state = ' +
+            JSON.stringify(join(directory, 'clock-state')) +
+            ';',
+          '',
+          "export const now = () => Number(readFileSync(state, 'utf8'));",
+          '',
+        ].join('\n')
+      );
+      writeFileSync(join(directory, 'clock-state'), '0');
       writeFileSync(
         join(directory, 'corepack'),
-        `#!${process.execPath}\nsetTimeout(() => {}, 200);\n`
+        [
+          '#!/bin/sh',
+          '# Virtual workload: consume 1000 ms of the shared virtual clock, exit',
+          '# when the workload still fits the deadline, and stall (until the real',
+          '# per-sample timeout kills us) once it no longer does — mirroring a',
+          '# real measurement that overruns the shared deadline.',
+          `state=${JSON.stringify(join(directory, 'clock-state'))}`,
+          'clock=$(( $(cat "$state") + 1000 ))',
+          'printf \'%s\\n\' "$clock" > "$state"',
+          'if [ "$clock" -le 3500 ]; then',
+          '  exit 0',
+          'fi',
+          'exec sleep 30',
+          '',
+        ].join('\n')
       );
       chmodSync(join(directory, 'corepack'), 0o755);
       const output = join(directory, 'report.json');
@@ -93,14 +132,20 @@ describe('typecheck performance', () => {
           '3',
           '--enforce',
           '--max-duration-ms',
-          '1000',
+          '3500',
           '--output',
           output,
         ],
         {
           encoding: 'utf8',
-          env: { ...process.env, PATH: `${directory}:${process.env.PATH}` },
-          timeout: 10000,
+          env: {
+            ...process.env,
+            PATH: `${directory}:${process.env.PATH}`,
+            TYPECHECK_PERFORMANCE_CLOCK: join(directory, 'virtual-clock.mjs'),
+          },
+          // Harness slack only: the fixture completes in about a second even
+          // on loaded runners; the assertions are unchanged.
+          timeout: 30000,
         }
       );
       expect(result.status, result.stderr).toBe(1);
@@ -111,7 +156,7 @@ describe('typecheck performance', () => {
         report.confirmations[0].samples.some(sample => sample.timedOut)
       ).toBe(true);
       expect(report.ratchet.ci.status).toBe('fail');
-      expect(report.maxDurationMs).toBe(1000);
+      expect(report.maxDurationMs).toBe(3500);
     } finally {
       rmSync(directory, { recursive: true, force: true });
     }

@@ -725,8 +725,8 @@ nodes:
       - Mac Lane Route
     triggeringStateTransition:
       - workflow_call
-    terminalReceipt: job:build
-    jobCount: 2
+    terminalReceipt: job:startup-budget
+    jobCount: 3
   - name: Main Health
     path: .github/workflows/main-health.yml
     active: true
@@ -811,7 +811,8 @@ nodes:
     category: source-validation
     authoritativeProducer: Source Validation
     authoritativeFor: []
-    allowedConsumers: []
+    allowedConsumers:
+      - Component Certificate
     triggeringStateTransition:
       - push
       - workflow_dispatch
@@ -1130,7 +1131,6 @@ nodes:
     authoritativeFor: []
     allowedConsumers: []
     triggeringStateTransition:
-      - pull_request
       - workflow_dispatch
     terminalReceipt: job:crawl
     jobCount: 1
@@ -1620,7 +1620,8 @@ nodes:
     category: source-validation
     authoritativeProducer: Source Validation
     authoritativeFor: []
-    allowedConsumers: []
+    allowedConsumers:
+      - Component Certificate
     triggeringStateTransition:
       - push
       - workflow_dispatch
@@ -1694,6 +1695,12 @@ edges:
     to: Mac Lane Route
     type: workflow_call
   - from: CI
+    to: Component Certificate
+    type: workflow_run
+  - from: Visual & A11y Tests
+    to: Component Certificate
+    type: workflow_run
+  - from: Mutation Diff
     to: Component Certificate
     type: workflow_run
   - from: Staging Controller

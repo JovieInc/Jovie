@@ -254,6 +254,8 @@ export interface RouteManifestEntry {
       readonly hiddenWhen: 'scripting-enabled';
     }[];
     readonly allowedFinalPaths?: readonly string[];
+    /** Redirect destination is an app route outside this manifest (e.g. /start, the (dynamic)/ onboarding chat); fail-closed without it when no canonical manifest page exists. */
+    readonly destinationIsAppRoute?: boolean;
     readonly allowsAuthShell?: boolean;
     readonly requiresSharedChrome?: boolean;
   };
@@ -1705,15 +1707,20 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
       source:
         'source binding audit 2026-09-01; JOV-5376 public waitlist front door',
       notes:
-        'Signed-out /waitlist is the AuthShell email capture. It does not mount a marketing hero. The stub recipe remains intentionally incomplete.',
+        'Signed-out /waitlist is the AuthShell email capture while public signup is closed (kill-switch state). One front door (Tim, 2026-11-09): with signup open it hands off into the /start onboarding chat; the signed-in pending receipt is untouched. The stub recipe remains intentionally incomplete.',
     },
     status: 'active',
     specVersion: '1.0.0',
     url: '/waitlist',
     healthCheck: {
       path: '/waitlist',
-      expected: 'page',
-      waitFor: '#auth-form',
+      expected: 'redirect',
+      allowedFinalPaths: ['/start'],
+      // One front door (Tim, 2026-11-09): /start is the (dynamic)/ onboarding chat —
+      // outside this manifest (global page contract pins the static roots); the cert
+      // follows the redirect and certifies the /start DOM. Canaries cover /start itself.
+      destinationIsAppRoute: true,
+      waitFor: '[data-testid="onboarding-chat"]',
       allowsAuthShell: true,
       requiresSharedChrome: false,
     },
@@ -2209,11 +2216,14 @@ export function getMarketingExactPublicRouteTargets(
       const canonical = manifest.find(
         candidate => candidate.url === destination
       );
+      if (isRenderFixturePathname(destination)) return [];
+      // App-route destinations (e.g. /start) are declared explicitly; anything
+      // else must resolve to a canonical active manifest page, fail-closed.
       if (
-        !canonical ||
-        canonical.status !== 'active' ||
-        (canonical.healthCheck?.expected ?? 'page') !== 'page' ||
-        isRenderFixturePathname(destination)
+        !entry.healthCheck?.destinationIsAppRoute &&
+        (!canonical ||
+          canonical.status !== 'active' ||
+          (canonical.healthCheck?.expected ?? 'page') !== 'page')
       )
         return [];
       expectedPath = destination;
