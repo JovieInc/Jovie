@@ -1,7 +1,7 @@
 # Agent room
 
 One module shows a set of agents, what each is doing, and what they said to
-each other. Ovie's fleet room (`/app/ov/room`, flag `OVIE_FLEET_ROOM`) is the
+each other. Ovie's fleet room (`/app/ov/room`, admins only) is the
 first room. Jovie customer rooms reuse the same contract, store and component.
 
 ## Principles
@@ -51,7 +51,7 @@ because that is the agent that needs someone.
 ## Slice 2: talk to an agent
 
 A composer posts `[Tim → <Agent>] <text>` as a Linear comment on that agent's
-home thread, through a server action behind the same flag. The webhook echoes
+home thread, through an admin-only server action. The webhook echoes
 it into the room, so the room stays a read model. No @mentions are added, so
 nothing delegates to Codex in Linear by accident.
 

@@ -4,15 +4,10 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
   requireAccess: vi.fn().mockResolvedValue('user_admin'),
-  flag: vi.fn(),
   read: vi.fn(),
   canSend: vi.fn().mockReturnValue(false),
-  notFound: vi.fn(() => {
-    throw new Error('NEXT_NOT_FOUND');
-  }),
 }));
 
-vi.mock('next/navigation', () => ({ notFound: mocks.notFound }));
 vi.mock('@/components/features/admin/layout/AdminPage', () => ({
   AdminPage: ({
     children,
@@ -51,7 +46,6 @@ vi.mock('@/app/app/(shell)/admin/room/actions', () => ({
 vi.mock('@/lib/admin/page-access', () => ({
   requireCurrentAdminPageAccess: mocks.requireAccess,
 }));
-vi.mock('@/lib/flags/server', () => ({ getAppFlagValue: mocks.flag }));
 vi.mock('@/lib/ovie/fleet-room.server', () => ({
   readOvieFleetRoom: mocks.read,
 }));
@@ -69,17 +63,13 @@ describe('AdminRoomPage', () => {
     mocks.canSend.mockReturnValue(false);
   });
 
-  it('is not found when OVIE_FLEET_ROOM is off', async () => {
-    mocks.flag.mockResolvedValueOnce(false);
+  it('checks admin access before reading the room', async () => {
+    mocks.requireAccess.mockRejectedValueOnce(new Error('NEXT_NOT_FOUND'));
     await expect(AdminRoomPage()).rejects.toThrow('NEXT_NOT_FOUND');
-    expect(mocks.flag).toHaveBeenCalledWith('OVIE_FLEET_ROOM', {
-      userId: 'user_admin',
-    });
     expect(mocks.read).not.toHaveBeenCalled();
   });
 
   it('renders the room, and says so only when a read failed', async () => {
-    mocks.flag.mockResolvedValue(true);
     mocks.read.mockResolvedValueOnce({ status: 'ok', view: {} });
     const { unmount } = render(await AdminRoomPage());
     expect(screen.getByTestId('room-probe')).toHaveTextContent('ok');
@@ -105,7 +95,6 @@ describe('AdminRoomPage', () => {
   });
 
   it('shows the composer only where Linear is configured', async () => {
-    mocks.flag.mockResolvedValue(true);
     mocks.read.mockResolvedValue({ status: 'ok', view: {} });
     const { unmount } = render(await AdminRoomPage());
     expect(screen.queryByTestId('composer-probe')).toBeNull();
