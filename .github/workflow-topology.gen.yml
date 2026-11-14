@@ -1131,7 +1131,6 @@ nodes:
     authoritativeFor: []
     allowedConsumers: []
     triggeringStateTransition:
-      - pull_request
       - workflow_dispatch
     terminalReceipt: job:crawl
     jobCount: 1

@@ -258,6 +258,11 @@ jobs:
               ;;
           esac
 
+      - name: Record full-crawl containment
+        if: ${{ always() && (github.event_name != 'workflow_dispatch' || github.ref != 'refs/heads/main') }}
+        run: |
+          echo "Full product crawl skipped for cost containment; no production readiness score produced. Existing health and authentication probes retain their policy." >> "$GITHUB_STEP_SUMMARY"
+
       - name: Resolve exact canonical production deployment
         id: target
         if: ${{ steps.trigger.outputs.should_probe == 'true' || steps.trigger.outputs.should_certify == 'true' }}
@@ -614,10 +619,12 @@ jobs:
   # with scripts/product-crawl/ready-gate.mjs. Report only: it never fails
   # the release, and it only loads pages (no clicks, submits or payments).
   # Runs after auth-smoke so the two sign-ins never overlap.
+  # Cost containment: full crawls require explicit manual-main dispatch. Existing
+  # smoke, authentication, Lighthouse and golden-path certification stay automatic.
   product-crawl:
     name: Product Crawl (Landed Production)
     needs: [resolve-target, auth-smoke]
-    if: ${{ always() && needs.resolve-target.result == 'success' && needs.resolve-target.outputs.should_certify == 'true' }}
+    if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && needs.resolve-target.result == 'success' && needs.resolve-target.outputs.should_certify == 'true' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 40
     permissions:

@@ -97,7 +97,7 @@
     "pr-visual-review.yml": {"runsPerMergedPr":2.1,"triggers":["pull_request:opened","pull_request:reopened","pull_request:synchronize"]},
     "preflight-remote.yml": {"runsPerMergedPr":0.1,"triggers":["workflow_dispatch"]},
     "private-data-guard.yml": {"runsPerMergedPr":6.9,"triggers":["merge_group","pull_request","push"]},
-    "product-crawl.yml": {"runsPerMergedPr":0,"triggers":["pull_request","workflow_dispatch"]},
+    "product-crawl.yml": {"runsPerMergedPr":0,"triggers":["workflow_dispatch"]},
     "production-continuity.yml": {"runsPerMergedPr":2.3,"triggers":["repository_dispatch:clock_production_continuity","schedule","workflow_dispatch"]},
     "production-controller-health.yml": {"runsPerMergedPr":0,"triggers":["schedule","workflow_dispatch"]},
     "production-controller.yml": {"runsPerMergedPr":0.9,"triggers":["workflow_run:Staging Controller"]},
