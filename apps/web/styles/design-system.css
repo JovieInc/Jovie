@@ -4140,6 +4140,15 @@ html:not(.dark) .smart-link-powered-by {
   }
 }
 
+/* Icons never squash. A Lucide glyph beside truncating text keeps its drawn
+   size, so the text gives way instead. :where() keeps specificity at 0 and
+   the base layer sits under utilities, so an explicit shrink class still wins. */
+@layer base {
+  :where(svg.lucide) {
+    flex-shrink: 0;
+  }
+}
+
 /* FAQ REDUCED MOTION START
    Disclosure geometry resolves directly. This scoped override follows the
    global focus transition so keyboard focus stays visible without interpolation. */
