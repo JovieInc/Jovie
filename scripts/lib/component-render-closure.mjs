@@ -32,6 +32,7 @@ import {
 import { posix } from 'node:path';
 import {
   isRenderInput,
+  PRODUCER_INPUTS,
   RENDER_INPUT_SCHEMA,
   RENDER_INPUT_SCHEMA_V2,
   STORYBOOK_PROFILE,
@@ -365,12 +366,20 @@ export function componentRenderBindings(
       profile.JOVIE_LIVE_STORYBOOK_CERT === '1'
         ? 'storybook-live'
         : 'storybook-full';
+    // The capture code (producer scripts, the workflow) is hashed as-is, not
+    // traced: a change to how receipts are made re-proves every component.
+    const sharedFiles = [
+      ...new Set([
+        ...shared.files,
+        ...[...graph.inputs].filter(path => PRODUCER_INPUTS.has(path)),
+      ]),
+    ].sort();
     const sharedDigest = graph.digestOf(
       `${RENDER_INPUT_SCHEMA_V2}\0shared\0${JSON.stringify(profile)}\0`,
-      shared.files
+      sharedFiles
     );
-    const sharedSet = new Set(shared.files);
-    stats.shared = shared.files.length;
+    const sharedSet = new Set(sharedFiles);
+    stats.shared = sharedFiles.length;
     const stories = storyFilesByComponent(graph.all, paths);
     let global = null;
     for (const path of paths) {
