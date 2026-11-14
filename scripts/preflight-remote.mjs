@@ -153,7 +153,11 @@ exit $rc
 }
 
 function git(cwd, args) {
-  const r = spawnSync('git', args, { cwd, encoding: 'utf8' });
+  const r = spawnSync('git', args, {
+    maxBuffer: 256 * 1024 * 1024,
+    cwd,
+    encoding: 'utf8',
+  });
   return { ok: r.status === 0, out: (r.stdout || '').trim(), err: r.stderr };
 }
 

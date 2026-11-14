@@ -29,7 +29,11 @@ let checkout, head, eventPath, localPr, localPrPath;
 beforeAll(() => {
   checkout = mkdtempSync(join(tmpdir(), 'changelog-guard-'));
   const git = (...args) =>
-    execFileSync('git', args, { cwd: checkout, encoding: 'utf8' }).trim();
+    execFileSync('git', args, {
+      maxBuffer: 256 * 1024 * 1024,
+      cwd: checkout,
+      encoding: 'utf8',
+    }).trim();
   git('init', '-q');
   git('config', 'user.name', 'Guard test');
   git('config', 'user.email', 'guard@example.invalid');

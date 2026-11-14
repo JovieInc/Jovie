@@ -156,7 +156,12 @@ async function qualification(t, guard) {
   const cwd = path.join(root, 'source');
   mkdirSync(cwd);
   const git = (...args) => {
-    const result = spawnSync('git', args, { cwd, env, encoding: 'utf8' });
+    const result = spawnSync('git', args, {
+      maxBuffer: 256 * 1024 * 1024,
+      cwd,
+      env,
+      encoding: 'utf8',
+    });
     assert.equal(result.status, 0, result.stderr);
   };
   git('init', '-q', '--bare', path.join(root, 'origin.git'));

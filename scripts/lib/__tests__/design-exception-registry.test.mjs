@@ -388,7 +388,11 @@ describe('design exception-registry native ci-fast gate (JOV-5447)', () => {
   it('propagates a validator failure as a nonzero native gate result', () => {
     const fixture = mkdtempSync(join(tmpdir(), 'design-exception-registry-'));
     const git = args =>
-      spawnSync('git', args, { cwd: fixture, encoding: 'utf8' });
+      spawnSync('git', args, {
+        maxBuffer: 256 * 1024 * 1024,
+        cwd: fixture,
+        encoding: 'utf8',
+      });
     try {
       git(['init', '-b', 'main']);
       git(['config', 'user.email', 'jovie-agent@example.com']);
