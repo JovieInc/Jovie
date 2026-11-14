@@ -66,7 +66,7 @@ const PHONE =
 export function redactPersonal(text) {
   return String(text)
     .replace(EMAIL, m =>
-      SAFE_EMAIL.test(m) || FILE_LIKE.test(m) ? m : PERSONAL_MARK,
+      SAFE_EMAIL.test(m) || FILE_LIKE.test(m) ? m : PERSONAL_MARK
     )
     .replace(PHONE, PERSONAL_MARK);
 }
