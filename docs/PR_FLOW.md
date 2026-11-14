@@ -164,8 +164,8 @@ before you open the PR (source: `.github/ci-harness/manifest.json` `riskRules`):
   every admitted environment is recorded with the
   `jovie-preview-env-admission/v1` contract and torn down with a
   `jovie-preview-env-cleanup/v1` receipt (PR close →
-  `neon-ephemeral-branch-cleanup.yml` + `vercel-preview-cleanup.yml`; Neon
-  branch TTLs and on-limit cleanup cover missed events). External Vercel
+  `vercel-preview-cleanup.yml`; Neon branches expire on their own TTL and
+  branch creation cleans up when the project nears its limit). External Vercel
   preview status remains informational — see
   [`release.md`](../.claude/rules/release.md).
 

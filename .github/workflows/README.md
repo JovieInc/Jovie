@@ -142,7 +142,7 @@ in-flight/legacy daily run (bounded to 11 reads per pass).
 ## Neon Database
 
 - **Ephemeral branches** - Created only by manual dispatch or scheduled evidence lanes (never automatically per PR) as explicit, expiring exceptions carrying the `jovie-preview-env-admission/v1` contract (JOV-5941; registry: `.github/preview-env-registry.json`)
-- **Cleanup** - `neon-ephemeral-branch-cleanup.yml` deletes branches when PRs close and emits a `jovie-preview-env-cleanup/v1` receipt; the daily `neon-scheduled-cleanup.yml` heartbeat reconciles missed cleanup events
+- **Cleanup** - every created branch carries a Neon-enforced TTL (`expires_in_hours`), branch creation runs `.github/actions/neon-branch-cleanup` when the project nears its branch limit, and the manual `neon-scheduled-cleanup.yml` reconciliation pass emits a `jovie-preview-env-cleanup/v1` receipt
 - **Protected branch** - `main` is the production database branch
 
 ## Hosted Previews

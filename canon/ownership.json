@@ -76,7 +76,6 @@
     {"id": "workflow:merge-queue-green-enroll", "kind": "workflow", "owner": "summer", "status": "active", "ref": ".github/workflows/merge-queue-green-enroll.yml"},
     {"id": "workflow:merge-queue-ruleset-verify", "kind": "workflow", "owner": "gem-ci-repair", "status": "active", "ref": ".github/workflows/merge-queue-ruleset-verify.yml"},
     {"id": "workflow:mutation-diff", "kind": "workflow", "owner": "gem-ci-repair", "status": "active", "ref": ".github/workflows/mutation-diff.yml"},
-    {"id": "workflow:neon-ephemeral-branch-cleanup", "kind": "workflow", "owner": "symphony-release", "status": "active", "ref": ".github/workflows/neon-ephemeral-branch-cleanup.yml"},
     {"id": "workflow:neon-scheduled-cleanup", "kind": "workflow", "owner": "symphony-release", "status": "active", "ref": ".github/workflows/neon-scheduled-cleanup.yml"},
     {"id": "workflow:next-build-cache-warm", "kind": "workflow", "owner": "gem-hostops", "status": "active", "ref": ".github/workflows/next-build-cache-warm.yml"},
     {"id": "workflow:nightly-testing-agent", "kind": "workflow", "owner": "gem-ci-repair", "status": "active", "ref": ".github/workflows/nightly-testing-agent.yml"},
