@@ -6,6 +6,7 @@ import {
   remediationTriggersEnabled,
   upsertLinearIssueByTitleFingerprint,
 } from './lib/linear-issue-intake.mjs';
+import { withLinearRateLimitRetry } from './lib/linear-rate-limit-retry.mjs';
 
 export const BILLING_SYNC_STALE_KEY = 'billing-sync-stale';
 const STALE_MS = 36 * 60 * 60 * 1000;
@@ -90,8 +91,16 @@ export async function applyBillingSyncPlan(plan, { runId, fetchImpl } = {}) {
   });
 }
 
-async function main() {
-  const raw = process.env.BILLING_HEALTH_JSON || '{}';
+/**
+ * Linear rate limits defer the signal (visible warning + job summary) instead
+ * of failing the probe verdict; every other failure still throws.
+ * @param {{ env?: typeof process.env, fetchImpl?: typeof fetch }} [options]
+ */
+export async function runBillingSyncIntake({
+  env = process.env,
+  fetchImpl,
+} = {}) {
+  const raw = env.BILLING_HEALTH_JSON || '{}';
   const health = JSON.parse(raw);
   const metrics = health.metrics ?? health;
   const plan = planBillingSyncIntake({
@@ -100,13 +109,22 @@ async function main() {
     oldestUnprocessedAt: metrics.oldestUnprocessedWebhookAt ?? null,
     unprocessedWebhooks: metrics.unprocessedWebhookCount ?? 0,
   });
-  const result = await applyBillingSyncPlan(plan, {
-    runId: process.env.GITHUB_RUN_ID,
-  });
+  const result = await withLinearRateLimitRetry(
+    () =>
+      applyBillingSyncPlan(plan, {
+        runId: env.GITHUB_RUN_ID,
+        fetchImpl,
+      }),
+    { label: 'billing sync stale probe' }
+  );
   if (!result.ok) {
     throw new Error(`Billing sync intake failed: ${result.reason}`);
   }
-  console.log(JSON.stringify(result));
+  return result;
+}
+
+async function main() {
+  console.log(JSON.stringify(await runBillingSyncIntake()));
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {

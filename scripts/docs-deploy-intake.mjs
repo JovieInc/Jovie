@@ -10,6 +10,7 @@ import {
   remediationTriggersEnabled,
   upsertLinearIssueByTitleFingerprint,
 } from './lib/linear-issue-intake.mjs';
+import { withLinearRateLimitRetry } from './lib/linear-rate-limit-retry.mjs';
 
 export const DOCS_DEPLOY_KEY = 'vercel-deploy-failed-jovie-docs';
 export const DOCS_ENVIRONMENT = 'Production – jovie-docs';
@@ -178,14 +179,21 @@ export async function intakeDocsDeploy({
   const statusRows = statusResult.kind === 'ok' ? await statuses.json() : [];
   const status = Array.isArray(statusRows) ? statusRows[0]?.state : null;
   const plan = planDocsDeploy({ status, onMain });
-  const result = await apply(plan, {
-    runId,
-    deploymentUrl: docsDeploymentUrl(
-      deployment,
-      Array.isArray(statusRows) ? statusRows[0] : null
-    ),
-    fetchImpl,
-  });
+  // Linear rate limits are a bookkeeping delay, not a production failure:
+  // retry with bounded backoff, then defer visibly instead of failing the
+  // probe verdict. Every other failure still throws below.
+  const result = await withLinearRateLimitRetry(
+    () =>
+      apply(plan, {
+        runId,
+        deploymentUrl: docsDeploymentUrl(
+          deployment,
+          Array.isArray(statusRows) ? statusRows[0] : null
+        ),
+        fetchImpl,
+      }),
+    { label: signal }
+  );
   if (!result.ok) {
     throw new Error(`docs deploy intake failed: ${result.reason}`);
   }

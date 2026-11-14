@@ -7,6 +7,10 @@ import {
   remediationTriggersEnabled,
   upsertLinearIssueByTitleFingerprint,
 } from './lib/linear-issue-intake.mjs';
+import {
+  isLinearRateLimited,
+  withLinearRateLimitRetry,
+} from './lib/linear-rate-limit-retry.mjs';
 
 export const SYNTHETIC_REMEDIATION_KEY = 'synthetic-monitoring';
 
@@ -104,18 +108,26 @@ ${runUrl ? `\nRun: ${runUrl}` : ''}`;
   });
 }
 
-async function main() {
-  const testStatus = process.env.TEST_STATUS || 'error';
-  const flakyCount = Number.parseInt(process.env.FLAKY_TESTS || '0', 10);
-  const failedTests = process.env.FAILED_TESTS || '';
+/**
+ * Linear rate limits defer the signal (visible warning + job summary) instead
+ * of failing the probe verdict; every other failure still throws.
+ * @param {{ env?: typeof process.env, fetchImpl?: typeof fetch }} [options]
+ */
+export async function runSyntheticMonitoringIntake({
+  env = process.env,
+  fetchImpl,
+} = {}) {
+  const testStatus = env.TEST_STATUS || 'error';
+  const flakyCount = Number.parseInt(env.FLAKY_TESTS || '0', 10);
+  const failedTests = env.FAILED_TESTS || '';
   const failedRetry = testStatus === 'failed' && failedTests.trim().length > 0;
-  const previousConclusion = process.env.PREVIOUS_CONCLUSION || null;
+  const previousConclusion = env.PREVIOUS_CONCLUSION || null;
   const plan = planSyntheticMonitoringAction({
     testStatus,
     flakyCount,
     failedRetry,
     previousConclusion,
-    runAttempt: Number.parseInt(process.env.GITHUB_RUN_ATTEMPT || '1', 10),
+    runAttempt: Number.parseInt(env.GITHUB_RUN_ATTEMPT || '1', 10),
   });
   const enabled = remediationTriggersEnabled();
   if (!enabled) {
@@ -126,46 +138,70 @@ async function main() {
       reason: plan.reason,
     });
     console.log(JSON.stringify(dry));
-    return;
+    return dry;
   }
   if (plan.action === 'flake') {
     console.log(
       `::notice::synthetic flake (${plan.reason}); not filed. Flake count feeds remediation:flaky-test-filing through the ratchet.`
     );
     console.log(JSON.stringify({ ok: true, action: 'flake', ...plan }));
-    return;
+    return { ok: true, action: 'flake', ...plan };
   }
   if (plan.action === 'hold') {
     console.log(JSON.stringify({ ok: true, action: 'hold', ...plan }));
-    return;
+    return { ok: true, action: 'hold', ...plan };
   }
   if (plan.action === 'resolve') {
-    const result = await closeLinearIssueByFingerprint({
-      fingerprint: SYNTHETIC_REMEDIATION_KEY,
-      labelKey: SYNTHETIC_REMEDIATION_KEY,
-      comment: 'Synthetic monitoring recovered on two consecutive green runs.',
-      runId: process.env.GITHUB_RUN_ID,
-    });
+    const result = await withLinearRateLimitRetry(
+      () =>
+        closeLinearIssueByFingerprint({
+          fingerprint: SYNTHETIC_REMEDIATION_KEY,
+          labelKey: SYNTHETIC_REMEDIATION_KEY,
+          comment:
+            'Synthetic monitoring recovered on two consecutive green runs.',
+          runId: env.GITHUB_RUN_ID,
+          fetchImpl,
+        }),
+      { label: 'synthetic monitoring resolve' }
+    );
     if (!result.ok) {
       throw new Error(`Synthetic Linear resolve failed: ${result.reason}`);
     }
-    console.log(JSON.stringify(result));
-    return;
+    return result;
   }
-  const result = await fileSyntheticMonitoringLinearIssue({
-    failedTests,
-    runUrl: process.env.RUN_URL,
-  });
+  // Filing and the failed-test evidence comment are one idempotent unit: the
+  // upsert dedupes by fingerprint, so a rate-limited comment retries the
+  // whole unit instead of red on a bookkeeping delay. A real comment
+  // failure after a successful filing stays best-effort (the issue exists);
+  // only a rate-limited comment propagates so it can retry or defer.
+  const result = await withLinearRateLimitRetry(
+    async () => {
+      const filed = await fileSyntheticMonitoringLinearIssue({
+        failedTests,
+        runUrl: env.RUN_URL,
+        fetchImpl,
+      });
+      if (!filed.ok) return filed;
+      if (filed.id) {
+        const commented = await addLinearIssueComment({
+          issueId: filed.id,
+          body: `Failed tests (${env.GITHUB_RUN_ID ?? 'unknown'}):\n\n\`\`\`\n${failedTests || 'unknown'}\n\`\`\`\n${env.RUN_URL ?? ''}`,
+          fetchImpl,
+        });
+        if (!commented.ok && isLinearRateLimited(commented)) return commented;
+      }
+      return filed;
+    },
+    { label: 'synthetic monitoring intake' }
+  );
   if (!result.ok) {
     throw new Error(`Synthetic Linear intake failed: ${result.reason}`);
   }
-  if (result.id) {
-    await addLinearIssueComment({
-      issueId: result.id,
-      body: `Failed tests (${process.env.GITHUB_RUN_ID ?? 'unknown'}):\n\n\`\`\`\n${failedTests || 'unknown'}\n\`\`\`\n${process.env.RUN_URL ?? ''}`,
-    });
-  }
-  console.log(JSON.stringify(result));
+  return result;
+}
+
+async function main() {
+  console.log(JSON.stringify(await runSyntheticMonitoringIntake()));
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {
