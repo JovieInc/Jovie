@@ -30,6 +30,249 @@
       "frontend-rules",
       "forced-caps"
     ],
+    "apps/web/components/features/admin/ActivityTableUnified.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/admin/AdminPeopleRightPanelProvider.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/admin/AdminReadUnavailable.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/admin/AdminStepUp.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/admin/AdminVerificationRequired.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/admin/BulkDeleteCreatorDialog.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/admin/CapabilityEvidenceMatrix.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/admin/CreatorProfileSocialLinks.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/admin/CreatorProfileTableRow.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/admin/DeleteCreatorDialog.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/admin/FunnelMetricsStrip.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/admin/KpiItem.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/admin/MetricsChart.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/admin/MetricsChartClient.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/admin/OperationalControlPanel.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/admin/ReliabilityCard.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/admin/SentryMetricsCard.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/admin/ShippingVelocityCanvas.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/admin/ShippingVelocityChart.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/admin/SpotifyAccountIdentity.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/admin/TimActionRequiredSection.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/admin/WaitlistGateFunnel.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/admin/WaitlistMetrics.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/admin/WeeklyTrendChart.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/admin/WhatShipped.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/admin/admin-assets-table/AdminAssetsPageWrapper.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/admin/admin-creator-profiles/AdminCreatorProfilesUnified.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
     "apps/web/components/features/profile/ClaimBanner.tsx": [
       "ds-owner",
       "tokens",
@@ -313,11 +556,60 @@
       "partial": "VerifiedBadge takes no data; its only optional props are size and className, both styling with defaults, and its glyph and accessible name are fixed, so nothing can be partially present.",
       "permission-denied": "VerifiedBadge is a static verification mark with no gated action or permission input; the detector matched role='img' on its wrapper."
     },
+    "apps/web/components/features/admin/ActivityTableUnified.tsx": {
+      "error": "It renders the events it is handed and has no failure path of its own; the detector matched the 'error' activity status, whose rows LongContentFiftyEvents shows. A failed activity read is handled by the admin activity page that loads the items.",
+      "offline": "It never fetches: the items stream in from the server page, and its isLoading flag only drives the static ActivityTableSkeleton (the Loading story)."
+    },
+    "apps/web/components/features/admin/AdminReadUnavailable.tsx": {
+      "loading": "The 'Reading current data…' copy shows only while the Retry transition's router.refresh() is in flight; it has no prop, so no static story can hold it. Retry is driven in AdminReadUnavailable.test.tsx and AdminReadUnavailable.certificate.test.tsx.",
+      "offline": "It never fetches: Retry only calls router.refresh(), and a read that failed for lack of connectivity reaches it as the caller's message, which ErrorReadFailed shows.",
+      "permission-denied": "It has no gated action or permission input; the detector matched role='status'. A read blocked by a missing admin step-up renders AdminVerificationRequired instead (its PermissionDeniedStepUpRequired story)."
+    },
+    "apps/web/components/features/admin/AdminVerificationRequired.tsx": {
+      "empty": "It holds no collection: a fixed or caller message, the unlock action and an optional step-up error. The detector matched the items-center class.",
+      "error": "The step-up error comes only from useAdminStepUp after a real passkey ceremony fails, which a story cannot trigger without a WebAuthn prompt; AdminStepUp's Error story shows the retry button and AdminVerificationRequired.certificate.test.tsx asserts the alert text and axe-clean markup."
+    },
+    "apps/web/components/features/admin/BulkDeleteCreatorDialog.tsx": {
+      "empty": "It holds no collection: the title and button copy only pluralise on count, and the dialog opens only from a non-empty table selection. The detector matched the items-center class."
+    },
+    "apps/web/components/features/admin/CreatorProfileTableRow.tsx": {
+      "offline": "The row never fetches; its verify, feature, marketing, refresh and delete actions are parent callbacks, and a request that failed for lack of connectivity reaches it as status 'error', which ErrorActionsFailed shows."
+    },
+    "apps/web/components/features/admin/DeleteCreatorDialog.tsx": {
+      "empty": "The deleted-data list is a fixed constant (three rows unclaimed, five claimed), never empty; with no profile the dialog renders nothing, which DeleteCreatorDialog.test.tsx asserts."
+    },
+    "apps/web/components/features/admin/MetricsChart.tsx": {
+      "loading": "Its only loading state is next/dynamic's skeleton while the bundled recharts chunk downloads, which takes no prop and lasts only until the chunk resolves, so no static story can hold it. MetricsChart.test.tsx and MetricsChart.certificate.test.tsx render it through a mocked next/dynamic and check its height and axe.",
+      "offline": "It never fetches: the points arrive as props from the server page, and the only network step is the bundled recharts chunk. Connectivity changes nothing it draws once the page has loaded."
+    },
+    "apps/web/components/features/admin/MetricsChartClient.tsx": {
+      "loading": "Its loading state is next/dynamic's placeholder while the MetricsChart chunk downloads; it takes no prop and ends when the chunk resolves, so no static story can hold it. MetricsChartClient.test.tsx renders it through a mocked next/dynamic with an axe check.",
+      "offline": "It never fetches: it forwards the server page's points to the lazily loaded MetricsChart, and the only network step is that bundled chunk."
+    },
+    "apps/web/components/features/admin/OperationalControlPanel.tsx": {
+      "long-content": "It takes no props: every heading, description and toggle label is fixed copy in the source, so no caller or data text can overflow it."
+    },
     "apps/web/components/features/admin/OperatorBanner.tsx": {
       "permission-denied": "The banner has no permission check of its own: the admin and environment gate lives in OperatorBannerWrapper, which returns null for non-admins (its PermissionDeniedNonAdmin story and OperatorBannerWrapper.test.tsx). The detector matched role='alert'."
     },
     "apps/web/components/features/admin/OvieRouteUsageBeacon.tsx": {
       "error": "The beacon renders null in every state and is fire-and-forget: a failed POST is swallowed by its .catch, so there is no failure to draw. OvieRouteUsageBeacon.test.tsx rejects the fetch and asserts the page is unchanged and axe-clean."
+    },
+    "apps/web/components/features/admin/ShippingVelocityCanvas.tsx": {
+      "permission-denied": "It draws the rows it is handed and has no gated action or permission input; the detector matched role='img' on the canvas."
+    },
+    "apps/web/components/features/admin/WaitlistGateFunnel.tsx": {
+      "permission-denied": "It renders counts only and has no gated action or permission input; the detector matched the waitlist role (artist, manager, label) each count is grouped by."
+    },
+    "apps/web/components/features/admin/WaitlistMetrics.tsx": {
+      "error": "It renders four already-loaded counts and has no failure path; the detector matched tone='error', the icon colour of the Email Failures count. A failed waitlist read is handled by the page that loads the metrics."
+    },
+    "apps/web/components/features/admin/WeeklyTrendChart.tsx": {
+      "loading": "Its loading state is next/dynamic's pulse block while the bundled recharts chunk downloads; it takes no prop and ends when the chunk resolves, so no static story can hold it. WeeklyTrendChart.test.tsx renders it through a mocked next/dynamic with an axe check.",
+      "offline": "It never fetches: the weekly rows arrive as props, and the only network step is the bundled recharts chunk."
+    },
+    "apps/web/components/features/admin/admin-creator-profiles/AdminCreatorProfilesUnified.tsx": {
+      "offline": "Rows arrive as server props; its only client requests are row actions, whose network failure raises the same failure toast ErrorVerifyFailed shows, and load-more, whose failure is swallowed (fetchNextPage().catch), so there is no separate offline UI."
     },
     "apps/web/components/features/alerts/UnpublishedEntityAlerts.tsx": {
       "offline": "The copy and its fallback never fetch; the alert sign-up it hosts, AlertGrowthLanding, owns the subscribe request and its network error. The detector matched the loading test id on the Suspense fallback (Loading).",
