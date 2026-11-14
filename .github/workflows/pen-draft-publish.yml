@@ -1,0 +1,80 @@
+# controller-hop-exception: jovie-controller-hop/v1
+# accountable-writer: Summer
+# necessary-trust-boundary: Pen drafts are private Actions artifacts and Tim approves a design only from a picture he can see; this job reads one run's artifacts and writes the pictures to Linear approval issues, nothing in the repo.
+# removal-trigger: Remove when Pen drafts run inside the design loop that already holds the Pen key and posts its own pictures for approval.
+
+name: Pen draft pictures to Linear
+
+# After a Pen draft run on main (JOV-12577): put each drafted frame's picture
+# inline on the Linear issue `Pen draft for approval: <frame>`, labelled
+# `quality-gap:needs-tim` so Summer turns it into an Ovie inbox card. One issue
+# per frame: a new draft updates it. It never moves an issue, edits the
+# canonical Pen file or approves anything in pen-bindings.json.
+# A failed draft run still publishes the frames that drew a picture.
+
+on:
+  workflow_run:
+    workflows: [Pen draft missing frames]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      run_id:
+        description: 'Pen draft run id whose pictures to publish'
+        required: true
+        type: string
+
+permissions: {}
+
+# One at a time, none dropped: two runs for one frame must not both create
+# its issue.
+concurrency:
+  group: pen-draft-publish
+  cancel-in-progress: false
+  queue: max
+
+jobs:
+  publish:
+    name: Publish Pen draft pictures
+    # PR drafts stay on the PR; a fork branch named main gets nothing.
+    if: ${{ github.event_name == 'workflow_dispatch' || (github.event.workflow_run.event != 'pull_request' && github.event.workflow_run.head_repository.full_name == github.repository) }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      actions: read
+      contents: read
+    env:
+      RUN_ID: ${{ inputs.run_id || github.event.workflow_run.id }}
+    steps:
+      - name: Check the run id
+        run: |
+          set -euo pipefail
+          case "$RUN_ID" in
+            ''|*[!0-9]*) echo "run_id must be a number" >&2; exit 1 ;;
+          esac
+
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Prime Node toolcache (no GitHub API manifest call)
+        if: ${{ hashFiles('.github/actions/prime-node-toolcache/action.yml') != '' }}
+        uses: ./.github/actions/prime-node-toolcache
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: '.nvmrc'
+
+      # github-token-budget: 16 calls/run - list one run's artifacts, download each pen-draft frame
+      - name: Download Pen drafts
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: pen-draft-*
+          path: ${{ runner.temp }}/pen-drafts
+          run-id: ${{ env.RUN_ID }}
+          github-token: ${{ github.token }}
+
+      - name: Publish pictures to Linear
+        env:
+          LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
+        run: node scripts/design/pen-draft-publish.mjs --dir "$RUNNER_TEMP/pen-drafts" --run-id "$RUN_ID"

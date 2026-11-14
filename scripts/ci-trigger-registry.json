@@ -82,6 +82,7 @@
     "npm-publish.yml": {"runsPerMergedPr":0,"triggers":["push","workflow_dispatch"]},
     "observability-issue.yml": {"runsPerMergedPr":0,"triggers":["repository_dispatch:observability-report"]},
     "ovie-summer-canary.yml": {"runsPerMergedPr":0.2,"triggers":["repository_dispatch:clock_summer_canary","workflow_dispatch"]},
+    "pen-draft-publish.yml": {"runsPerMergedPr":0.1,"triggers":["workflow_dispatch","workflow_run:Pen draft missing frames"]},
     "pen-draft.yml": {"runsPerMergedPr":0.1,"triggers":["pull_request:opened","pull_request:reopened","pull_request:synchronize","push","workflow_dispatch"]},
     "pen-inspect.yml": {"runsPerMergedPr":0,"triggers":["pull_request:opened","pull_request:reopened","pull_request:synchronize","workflow_dispatch"]},
     "pen-still-diff.yml": {"runsPerMergedPr":0.3,"triggers":["pull_request:opened","pull_request:reopened","pull_request:synchronize","workflow_dispatch"]},
