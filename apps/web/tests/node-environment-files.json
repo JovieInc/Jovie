@@ -763,6 +763,7 @@
   "tests/unit/ci/vercel-config.test.ts",
   "tests/unit/ci/vercelignore-chat-runtime.test.ts",
   "tests/unit/ci/visual-a11y-story-evidence-workflow.test.ts",
+  "tests/unit/ci/sync-standalone-assets.test.ts",
   "tests/unit/ci/visual-a11y-workflow.test.ts",
   "tests/unit/ci/vitest-coverage-thresholds.test.ts",
   "tests/unit/ci/vitest-local-workers.test.ts",

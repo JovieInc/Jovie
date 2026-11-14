@@ -40,6 +40,7 @@ import {
   MAX_PLAYWRIGHT_PNG_WIDTH,
   validPlaywrightPng,
 } from '../../../../../scripts/lib/playwright-png.mjs';
+import { allowanceEnabled } from './artifact-allowance';
 import productionSmokeProducers from './fixtures/production-smoke-producers.json';
 
 const webRoot = resolve(import.meta.dirname, '../../..');
@@ -131,17 +132,11 @@ const producerStageRequired = [
   'synthetic-monitoring.yml:synthetic-test',
   'visual-regression.yml:visual-regression',
 ];
-// Reviewed image/Markdown allowances; any flag except explicit false can opt in.
-const allowanceEnabled = (value: unknown) =>
-  value !== undefined &&
-  value !== false &&
-  !['', 'false'].includes(String(value));
 const imageAllowedJobs = new Set([
   'ci.yml:ci-fast-remaining',
   'ci.yml:ci-golden-path',
   'ci.yml:ci-lighthouse-pr',
   'ci.yml:ci-storybook-surfaces',
-  'ci.yml:ci-visual-snapshot-compare',
   'ci.yml:ci-visual-snapshot-homepage',
   'ci.yml:ci-visual-marketing-dom',
   'ci.yml:ci-visual-marketing-routes',
@@ -162,7 +157,6 @@ const markdownAllowedJobs = new Set([
   'ci.yml:ci-golden-path',
   'ci.yml:ci-smoke-required',
   'ci.yml:ci-storybook-surfaces',
-  'ci.yml:ci-visual-snapshot-compare',
   'ci.yml:ci-visual-snapshot-homepage',
   'ci.yml:ci-visual-marketing-dom',
   'ci.yml:ci-visual-marketing-routes',
