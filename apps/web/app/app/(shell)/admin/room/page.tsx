@@ -1,10 +1,8 @@
 import type { Metadata } from 'next';
-import { notFound } from 'next/navigation';
 import { AdminPage } from '@/components/features/admin/layout/AdminPage';
 import { AgentRoom } from '@/components/features/agent-room/AgentRoom';
 import { AgentRoomComposer } from '@/components/features/agent-room/AgentRoomComposer';
 import { requireCurrentAdminPageAccess } from '@/lib/admin/page-access';
-import { getAppFlagValue } from '@/lib/flags/server';
 import { OVIE_FLEET_ROSTER } from '@/lib/ovie/fleet-room';
 import { readOvieFleetRoom } from '@/lib/ovie/fleet-room.server';
 import {
@@ -38,9 +36,7 @@ const READ_FAILED_COPY =
  * store only (docs/operations/AGENT_ROOM.md); rendering calls no provider.
  */
 export default async function AdminRoomPage() {
-  const actorId = await requireCurrentAdminPageAccess();
-  const enabled = await getAppFlagValue('OVIE_FLEET_ROOM', { userId: actorId });
-  if (!enabled) notFound();
+  await requireCurrentAdminPageAccess();
 
   const room = await readOvieFleetRoom();
   return (

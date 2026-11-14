@@ -129,8 +129,18 @@ describe('render input refresh eligibility', () => {
   it.each([
     ['apps/web/components/Widget.tsx', 'apps/web/lib/Widget.tsx', true],
     ['apps/web/lib/palette.ts', 'apps/web/tests/palette.ts', false],
+    [
+      'apps/web/tests/fixtures/upgrade-checkout-story.tsx',
+      'apps/web/tests/fixtures/upgrade-checkout-story.tsx',
+      false,
+    ],
+    [
+      'apps/web/lib/docs/parseMarkdownFrontmatter.ts',
+      'apps/web/lib/docs/parseMarkdownFrontmatter.ts',
+      false,
+    ],
   ])(
-    'actual workflow preserves the source of a rename from %s to %s',
+    'actual workflow preserves render inputs through an edit or rename from %s to %s',
     (from, to, visual) => {
       const dir = mkdtempSync(join(tmpdir(), 'render-refresh-rename-'));
       const env = Object.fromEntries(
@@ -168,7 +178,8 @@ describe('render input refresh eligibility', () => {
         git(['commit', '-qm', 'before rename']);
         const base = git(['rev-parse', 'HEAD']);
         mkdirSync(dirname(join(dir, to)), { recursive: true });
-        renameSync(join(dir, from), join(dir, to));
+        if (from === to) put(to, 'export const color = "blue";');
+        else renameSync(join(dir, from), join(dir, to));
         put('packages/copy/docs/notes.md', '# Workflow admission');
         git(['add', '-A']);
         git(['commit', '-qm', 'rename render input']);
@@ -228,6 +239,10 @@ describe('render input refresh eligibility', () => {
       'apps/web/public/new.png',
       'packages/copy/src/index.ts',
       'scripts/lib/component-render-inputs.mjs',
+      'apps/web/tests/fixtures/upgrade-checkout-story.tsx',
+      'apps/web/tests/fixtures/hud-cockpit.ts',
+      'apps/web/tests/fixtures/audio/tone.wav',
+      'apps/web/lib/docs/parseMarkdownFrontmatter.ts',
     ]) {
       assert.ok(eligible(path), path);
       assert.deepEqual(storyEvidenceEligibility([path]), {
@@ -248,5 +263,24 @@ describe('render input refresh eligibility', () => {
       /has_render_changes/
     );
     assert.match(workflow.jobs['storybook-a11y'].if, /has_visual_changes/);
+  });
+
+  it('retains unit and markdown exclusions after runtime fixture admission', () => {
+    for (const path of [
+      'apps/web/tests/unit/status.test.ts',
+      'apps/web/tests/fixtures/helper.test.ts',
+      'apps/web/tests/fixtures/helper.spec.tsx',
+      'apps/web/tests/fixtures/__tests__/helper.ts',
+      'apps/web/tests/fixtures/README.md',
+      'apps/web/lib/docs/parser.spec.ts',
+      'apps/web/docs/guide.md',
+    ]) {
+      assert.equal(isRenderInput(path), false, path);
+      assert.equal(eligible(path), false, path);
+      assert.deepEqual(storyEvidenceEligibility([path]), {
+        render: false,
+        visual: false,
+      });
+    }
   });
 });

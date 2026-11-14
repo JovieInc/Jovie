@@ -46,6 +46,7 @@ import {
   readJson,
 } from './lib/github-json-read.mjs';
 import { projectJsonHeartbeat } from './lib/json-heartbeat-receipt.mjs';
+import { lostStatePrevious } from './lib/liveness-lost-state.mjs';
 import * as redGate from './lib/red-monitor-owner-gate.mjs';
 
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -1016,7 +1017,11 @@ export async function main({
     );
   }
   const previous = readPrevious(args.previous);
-  const decisions = livenessDecisions(report, previous);
+  // JOV-9641: a missing state file means the restore step lost the persisted
+  // alert state (its gh api failures are swallowed); stateless critical rows
+  // read as red so a recovered loop resolves its open alert, not green.
+  const decisionPrevious = lostStatePrevious(args, report, previous);
+  const decisions = livenessDecisions(report, decisionPrevious);
   const full = { ...report, startedAt, endedAt, runUrl, decisions };
   if (args.output)
     writeFileSync(args.output, `${JSON.stringify(full, null, 2)}\n`);
@@ -1065,7 +1070,7 @@ export async function main({
       // Keep the prior state when filing failed so the next run retries.
       if (!result.ok)
         state[decision.fingerprint] =
-          previous[decision.fingerprint] ?? 'unknown';
+          decisionPrevious[decision.fingerprint] ?? 'unknown';
     }
     if (args.previous)
       writeFileSync(args.previous, `${JSON.stringify(state, null, 2)}\n`);
