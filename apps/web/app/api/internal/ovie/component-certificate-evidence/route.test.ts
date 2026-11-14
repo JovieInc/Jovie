@@ -17,7 +17,7 @@ vi.mock('@/lib/utils/logger', () => ({
 }));
 vi.mock('@/lib/error-tracking', () => ({ captureError: vi.fn() }));
 
-import { POST } from './route';
+import { OPTIONS, POST } from './route';
 
 const HEAD_SHA = 'a'.repeat(40);
 
@@ -64,9 +64,11 @@ describe('POST /api/internal/ovie/component-certificate-evidence', () => {
     vi.clearAllMocks();
     verifyCronRequestMock.mockReturnValue(null);
     recordMock.mockResolvedValue({
+      accepted: true,
+      reason: 'stored',
       historyCount: 1,
       key: 'component-certificate:latest',
-      packet: {},
+      packet: { headSha: HEAD_SHA },
     });
   });
 
@@ -74,7 +76,7 @@ describe('POST /api/internal/ovie/component-certificate-evidence', () => {
     verifyCronRequestMock.mockReturnValue(
       NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     );
-    const response = await post(packet());
+    const response = await post('{invalid-json');
     expect(response.status).toBe(401);
     expect(response.headers.get('Cache-Control')).toBe('no-store');
     expect(recordMock).not.toHaveBeenCalled();
@@ -149,6 +151,78 @@ describe('POST /api/internal/ovie/component-certificate-evidence', () => {
       headSha: HEAD_SHA,
       schema: 'jovie.component-certificate-evidence/v1',
     });
+  });
+
+  const order = {
+    schema: 'jovie.source-order/v1',
+    sourceOrdinal: 100,
+    runNumber: 20,
+    runAttempt: 1,
+  };
+  it('acknowledges the stored order and never echoes a rejected incoming head', async () => {
+    const storedHeadSha = 'b'.repeat(40);
+    recordMock.mockResolvedValue({
+      accepted: false,
+      reason: 'stale',
+      historyCount: null,
+      packet: { headSha: storedHeadSha, deliveryOrder: order },
+    });
+    const response = await post(packet({ deliveryOrder: order }));
+    expect(response.status).toBe(409);
+    await expect(response.json()).resolves.toMatchObject({
+      ok: false,
+      accepted: false,
+      reason: 'stale',
+      storedHeadSha,
+      deliveryOrder: order,
+    });
+  });
+  it.each([
+    { ...order, sourceOrdinal: 0 },
+    { ...order, runNumber: Number.MAX_SAFE_INTEGER + 1 },
+    { ...order, runAttempt: -1 },
+    { ...order, runNumber: '20' },
+    { ...order, unexpected: true },
+    { ...order, schema: 'unsupported' },
+    null,
+  ])(
+    'rejects malformed ordering before persistence: %j',
+    async deliveryOrder => {
+      expect((await post(packet({ deliveryOrder }))).status).toBe(400);
+      expect(recordMock).not.toHaveBeenCalled();
+    }
+  );
+  it('advertises ordering through authenticated OPTIONS without body or store access', async () => {
+    const request = new NextRequest(
+      'https://jov.ie/api/internal/ovie/component-certificate-evidence',
+      {
+        method: 'OPTIONS',
+        headers: { authorization: 'Bearer secret' },
+        body: '{invalid-json',
+      }
+    );
+    const response = await OPTIONS(request);
+    expect(response.status).toBe(200);
+    expect(response.headers.get('Cache-Control')).toBe('no-store');
+    await expect(response.json()).resolves.toEqual({
+      ok: true,
+      deliveryOrderSchema: 'jovie.source-order/v1',
+    });
+    expect(recordMock).not.toHaveBeenCalled();
+    expect(request.bodyUsed).toBe(false);
+  });
+  it('authenticates capability requests before advertising support', async () => {
+    verifyCronRequestMock.mockReturnValue(
+      NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    );
+    const response = await OPTIONS(
+      new NextRequest(
+        'https://jov.ie/api/internal/ovie/component-certificate-evidence',
+        { method: 'OPTIONS' }
+      )
+    );
+    expect(response.status).toBe(401);
+    expect(recordMock).not.toHaveBeenCalled();
   });
 
   it('reports a store failure as 503, not a crash', async () => {

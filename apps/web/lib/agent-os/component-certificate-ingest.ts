@@ -1,4 +1,9 @@
 import { postgresRecordBackend } from '@/lib/ovie/mcp/postgres-backend';
+import { logger } from '@/lib/utils/logger';
+import {
+  type OrderedEvidenceResult,
+  storeOrderedEvidence,
+} from './source-ordered-evidence';
 
 /**
  * Persistence for the component-certificate Ovie evidence route
@@ -21,8 +26,8 @@ export type ComponentCertificateDeliverySummary = {
   readonly runUrl: string | null;
 };
 
-export type ComponentCertificateDeliveryRecord = {
-  readonly historyCount: number;
+export type ComponentCertificateDeliveryRecord = OrderedEvidenceResult & {
+  readonly historyCount: number | null;
   readonly key: string;
   readonly packet: Record<string, unknown>;
 };
@@ -53,14 +58,31 @@ export async function recordComponentCertificateDelivery(
   }
 ): Promise<ComponentCertificateDeliveryRecord> {
   const backend = postgresRecordBackend();
-  await backend.set(LATEST_KEY, packet);
-  // Evidence-grade last-write-wins: a concurrent delivery can drop a history
-  // row; the artifact and `latest` remain the authoritative records.
-  const current = await backend.get(HISTORY_KEY);
-  const history = Array.isArray(current) ? current : [];
-  const next = [summaryOf(packet), ...history].slice(0, HISTORY_CAP);
-  await backend.set(HISTORY_KEY, next);
-  return { historyCount: next.length, key: LATEST_KEY, packet };
+  const result = await storeOrderedEvidence({
+    backend,
+    key: LATEST_KEY,
+    packet,
+  });
+  let historyCount: number | null = null;
+  // History is non-authoritative and best effort, independently of the atomic
+  // latest write. A lost history row cannot change the accepted generation.
+  if (result.reason === 'stored') {
+    try {
+      const current = await backend.get(HISTORY_KEY);
+      const history = Array.isArray(current) ? current : [];
+      const next = [summaryOf(packet), ...history].slice(0, HISTORY_CAP);
+      await backend.set(HISTORY_KEY, next);
+      historyCount = next.length;
+    } catch (error) {
+      logger.warn(
+        '[component-certificate-evidence] optional history unavailable',
+        {
+          error: error instanceof Error ? error.message : String(error),
+        }
+      );
+    }
+  }
+  return { ...result, historyCount, key: LATEST_KEY };
 }
 
 export async function readLatestComponentCertificateDelivery(): Promise<unknown> {

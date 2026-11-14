@@ -39,18 +39,18 @@ function packet() {
   };
 }
 
-async function post(authorization: string | undefined) {
-  const { POST } = await import('./route');
-  return POST(
+async function post(authorization: string | undefined, method = 'POST') {
+  const { POST, OPTIONS } = await import('./route');
+  return (method === 'OPTIONS' ? OPTIONS : POST)(
     new NextRequest(
       'https://jov.ie/api/internal/ovie/component-certificate-evidence',
       {
-        method: 'POST',
+        method,
         headers: {
           'content-type': 'application/json',
           ...(authorization ? { authorization } : {}),
         },
-        body: JSON.stringify(packet()),
+        ...(method === 'POST' ? { body: JSON.stringify(packet()) } : {}),
       }
     )
   );
@@ -86,13 +86,33 @@ describe('POST /api/internal/ovie/component-certificate-evidence: real auth', ()
 
   it('the real secret is accepted and reaches the store', async () => {
     recordMock.mockResolvedValue({
+      accepted: true,
+      reason: 'stored',
       historyCount: 1,
       key: 'component-certificate:latest',
-      packet: {},
+      packet: { headSha: HEAD_SHA },
     });
     vi.stubEnv('CRON_SECRET', 'the-real-secret');
     const response = await post('Bearer the-real-secret');
     expect(response.status).toBe(200);
     expect(recordMock).toHaveBeenCalledTimes(1);
+  });
+  it.each([undefined, 'Bearer wrong-secret'])(
+    'capability rejects %s through real cron auth',
+    async authorization => {
+      vi.stubEnv('CRON_SECRET', 'the-real-secret');
+      expect((await post(authorization, 'OPTIONS')).status).toBe(401);
+      expect(recordMock).not.toHaveBeenCalled();
+    }
+  );
+  it('capability accepts the real secret without a store write', async () => {
+    vi.stubEnv('CRON_SECRET', 'the-real-secret');
+    const response = await post('Bearer the-real-secret', 'OPTIONS');
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({
+      ok: true,
+      deliveryOrderSchema: 'jovie.source-order/v1',
+    });
+    expect(recordMock).not.toHaveBeenCalled();
   });
 });
