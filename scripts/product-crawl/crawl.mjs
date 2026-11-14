@@ -4,6 +4,7 @@
 //   node scripts/product-crawl/crawl.mjs --origin https://jov.ie --out <dir>
 //     [--storage-state <signed-in Playwright state>] [--unclaimed-handle testartist]
 //     [--deadline-epoch-ms <ms>]  (or CRAWL_DEADLINE_EPOCH_MS)
+//     [--shard 2/4]  (or CRAWL_SHARD; loads only this shard's routes, shard.mjs)
 // Past the deadline it starts no new page loads and still writes the
 // receipt, which then names how many loads were left (never ready). A crawl
 // that ran into the job timeout used to leave no receipt at all.
@@ -21,7 +22,7 @@ import { parseArgs } from 'node:util';
 import { chromium } from 'playwright';
 import { skipSignedIn, uncoveredEntry } from './accepted-uncovered.mjs';
 import { MEASURE, OBSERVE } from './observe.mjs';
-import { overlayWalkSummary, runOverlayWalks } from './overlay-walk.mjs';
+import { MAX_WALKS_PER_IDENTITY, runOverlayWalks } from './overlay-walk.mjs';
 import {
   CLAIM_BANNER,
   causeOf,
@@ -43,6 +44,7 @@ import {
   sitemapPaths,
   strangerDiscovery,
 } from './sample-params.mjs';
+import { inShard, parseShard, summaryLines } from './shard.mjs';
 import { judgeOnQuietReload, wasThrottled } from './throttle.mjs';
 
 const { values: args } = parseArgs({
@@ -57,8 +59,10 @@ const { values: args } = parseArgs({
       type: 'string',
       default: process.env.CRAWL_DEADLINE_EPOCH_MS || '',
     },
+    shard: { type: 'string', default: process.env.CRAWL_SHARD || '' },
   },
 });
+const shard = parseShard(args.shard);
 
 const DEADLINE = Number(args['deadline-epoch-ms']) || Infinity;
 const started = Date.now();
@@ -282,6 +286,7 @@ const samples = sample();
 
 const todo = [];
 for (const route of routes) {
+  if (!inShard(route, shard)) continue;
   let target = concrete(route);
   if (!target) {
     const cover = coverRoute(route, samples, { signedIn, sitemapProblem });
@@ -398,6 +403,8 @@ const overlayWalks = await runOverlayWalks({
   openContext,
   pastDeadline,
   skip: skipSignedIn,
+  // Each shard walks its own pages; together they walk about one crawl's worth.
+  max: Math.max(1, Math.ceil(MAX_WALKS_PER_IDENTITY / shard.count)),
 });
 await browser.close();
 
@@ -406,7 +413,10 @@ const receipt = {
   origin: args.origin,
   sha: args.sha || null,
   at: new Date().toISOString(),
-  routes,
+  shard,
+  signedIn,
+  // A shard owns only its routes; merge-receipts.mjs unions them back.
+  routes: routes.filter(r => inShard(r, shard)),
   samples: Object.fromEntries(samples),
   sitemapProblem,
   uncovered,
@@ -426,40 +436,7 @@ await writeFile(
   JSON.stringify(verdict, null, 1)
 );
 
-const byKind = {};
-for (const f of verdict.findings) byKind[f.kind] = (byKind[f.kind] ?? 0) + 1;
-const lines = [
-  `## Product crawl: ${verdict.ready ? 'ready' : 'not ready'}`,
-  '',
-  `${routes.length} page routes; ${pages.filter(p => p.identity === 'stranger').length} page loads as a stranger, ${pages.filter(p => p.identity === 'signed-in').length} signed in; ${uncovered.filter(u => !u.accepted).length} routes uncovered, ${uncovered.filter(u => u.accepted).length} reviewed exceptions; ${pages.filter(p => p.authGated).length} loads hit the sign-in wall.`,
-  '',
-  overlayWalkSummary(overlayWalks, signedIn),
-  '',
-  `Not ready because: ${verdict.reasons.join('; ') || 'nothing'}`,
-  '',
-  `Findings by kind: ${
-    Object.entries(byKind)
-      .map(([k, n]) => `${k} ${n}`)
-      .join(', ') || 'none'
-  }`,
-  '',
-  ...Object.keys(byKind).flatMap(kind => {
-    const rows = rankFindings(verdict.findings).filter(f => f.kind === kind);
-    return [
-      '',
-      `### ${kind} (${rows.length})`,
-      '',
-      '| route | viewport | detail |',
-      '| --- | --- | --- |',
-      ...rows
-        .slice(0, 25)
-        .map(
-          f =>
-            `| ${f.route} | ${f.viewport} | ${f.detail.replaceAll('|', '/').replaceAll('\n', ' ')} |`
-        ),
-    ];
-  }),
-];
+const lines = summaryLines(receipt, verdict);
 await writeFile(join(args.out, 'summary.md'), lines.join('\n'));
 console.log(lines.join('\n'));
 // Every finding, one JSON line each, so the full list survives in the job log.
