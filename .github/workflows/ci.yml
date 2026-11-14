@@ -4141,6 +4141,7 @@ jobs:
                   tests/e2e/storybook-marketing-h1.spec.ts \
                   tests/e2e/storybook-skeleton.spec.ts \
                   tests/e2e/storybook-separator.spec.ts \
+                  tests/e2e/storybook-scoped-theme.spec.ts \
                   tests/e2e/storybook-sheet.spec.ts \
                   tests/e2e/storybook-overlay-collisions.spec.ts \
                   tests/e2e/storybook-profile-claim-name.spec.ts \

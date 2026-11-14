@@ -551,24 +551,14 @@ export const SOURCE_GUARDS = Object.freeze([
     prOnly: true,
   }),
   Object.freeze({
-    // Semantic conflicts: a PR that is green alone but red once merged with
-    // main (2026-10-25: the locked footer's nine unbound nav labels, found only
-    // by invariants:check in the merge group, stalled the queue). Run the
-    // invariants on the PR merged with the current base in a
-    // throwaway worktree. A textual merge conflict is left to its own gates.
+    // Merged-with-base invariants. Textual merge conflicts stay on their gates.
     id: 'merged-with-base-invariants',
     command: `bash -c ${shellQuote('set -euo pipefail; t="$(mktemp -d)"; root="$PWD"; git worktree add -q --detach "$t" HEAD; for nm in node_modules apps/*/node_modules packages/*/node_modules workers/*/node_modules; do [ -d "$root/$nm" ] && mkdir -p "$t/$(dirname "$nm")" && ln -s "$root/$nm" "$t/$nm"; done; trap \'git worktree remove --force "$t"\' EXIT; cd "$t"; git fetch -q --no-tags origin "${GITHUB_BASE_REF:-main}" || true; git -c user.name=ci -c user.email=ci@invalid merge -q --no-edit "origin/${GITHUB_BASE_REF:-main}" >/dev/null 2>&1 || { echo "merge with base conflicts; skipped"; exit 0; }; [ -f canon/invariants.jsonl ] || { echo "no invariant registry in this checkout; skipped"; exit 0; }; node scripts/invariants/design-surfaces.mjs; if [ -f scripts/invariants/stack-pattern-ratchet.mjs ]; then node scripts/invariants/stack-pattern-ratchet.mjs; fi; ' + PR_CHEAP_SCAN_COMMANDS.join('; ') + '; pnpm invariants:check')}`,
     inputs: /./u,
     prOnly: true,
   }),
   Object.freeze({
-    // The lanes release self-test (lane_runner prove-staging, lifecycle) runs
-    // LANE_TESTS with unittest, LANES_SELFTEST=1, a scratch LANES_STATE and HOME,
-    // which changes behaviour (credentials_spend.tick() returns
-    // selftest-skipped). A new lanes test passed at PR time and failed in the
-    // merge group (#23137, 2026-10-25). Run only the changed or added lanes
-    // tests, plus the test named after a changed scripts/lanes module, with that
-    // env on the PR merged with base. The full 336s pytest stays merge-group.
+    // Changed lanes tests against the merged base. Full pytest stays merge-group.
     id: 'lanes-selftest-changed-tests',
     command: `bash -c ${shellQuote(LANES_SELFTEST_CHANGED_TESTS_SCRIPT)}`,
     // Candidate roots only; the command intersects changed paths with RELEASE_EXTRAS.
@@ -591,6 +581,13 @@ export const SOURCE_GUARDS = Object.freeze([
     command: `node ${shellQuote(fileURLToPath(new URL('./invariants/copy-leak/check.mjs', import.meta.url)))} && node --test --test-isolation=none --experimental-test-coverage ${shellQuote(`--test-coverage-include=${fileURLToPath(new URL('./invariants/copy-leak/check.mjs', import.meta.url))}`)} --test-coverage-lines=95 --test-coverage-branches=85 --test-coverage-functions=85 ${shellQuote(fileURLToPath(new URL('./invariants/copy-leak/copy-leak.test.mjs', import.meta.url)))}`,
     inputs:
       /^(?:apps\/web\/|scripts\/invariants\/copy-leak\/|scripts\/ci-fast-lanes\.mjs$)/u,
+    prOnly: false,
+  }),
+  Object.freeze({
+    id: 'jump-policy-pin',
+    command: 'cd scripts && node --test invariants/jump-policy-pin.test.mjs',
+    inputs:
+      /(?:^\.github\/workflows\/merge-queue-green-enroll\.yml$|^scripts\/invariants\/jump-policy-pin\.(?:json|test\.mjs)$|^scripts\/lib\/main-red-eject\.mjs$|^scripts\/lib\/wins-ledger\.mjs$|^scripts\/lanes\/bindings\.py$|^scripts\/lanes\/priority_admission\.py$|^\.github\/MERGE_QUEUE\.md$)/u,
     prOnly: false,
   }),
   Object.freeze({
@@ -881,6 +878,7 @@ export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
   'scripts/pr-open-win.test.mjs',
   'scripts/lib/__tests__/sources-of-truth.test.mjs',
   'scripts/invariants/duplicate-literals.test.mjs',
+  'scripts/invariants/jump-policy-pin.test.mjs',
   'scripts/lib/__tests__/source-drift.test.mjs',
   'scripts/lib/__tests__/typecheck-slot.test.mjs',
   'scripts/preflight.test.mjs',
@@ -1017,6 +1015,7 @@ export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
   'scripts/lib/__tests__/source-guard-dependency-generation.test.mjs',
   'scripts/retire-coverage-reports.test.mjs',
   'scripts/publish-coverage-report.test.mjs',
+  'scripts/coverage-artifact-baseline.test.mjs',
   'scripts/lib/__tests__/canonical-artist-site-intake.test.mjs',
   'scripts/lib/__tests__/canonical-json.test.mjs',
   'scripts/lib/__tests__/format-biome-json.test.mjs',
@@ -1038,6 +1037,7 @@ export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
   'scripts/screenshot-loop/screenshot-bug-loop.test.mjs',
   'scripts/security/audit-workflow-execution.test.mjs',
   'scripts/security/findings.test.mjs',
+  'scripts/security/sarif-upload-gate.test.mjs',
   'scripts/summer-commissioning/canonical-registry.test.mjs',
   'scripts/summer-commissioning/commissioning.test.mjs',
   'scripts/summer-commissioning/company-registry.test.mjs',

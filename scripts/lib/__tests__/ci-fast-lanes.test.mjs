@@ -2463,7 +2463,7 @@ describe('source-read guard selection', () => {
   it('fails closed onto guards for manual, local, and unreadable diffs', () => {
     const all = SOURCE_GUARDS.map(guard => guard.id);
     // Manual dispatch runs web Unit Tests and structural, which carry the rest.
-    expect(selected('workflow_dispatch', ['README.md'])).toEqual([
+    const failClosed = [
       'capacity-forecast',
       'native-design-system',
       'artist-launch-contract',
@@ -2481,29 +2481,13 @@ describe('source-read guard selection', () => {
       'external-api-guard',
       'domain-write-guard',
       'copy-leak',
-    ]);
+      'jump-policy-pin',
+    ];
+    expect(selected('workflow_dispatch', ['README.md'])).toEqual(failClosed);
     expect(selected('', ['README.md'])).toEqual(all);
     expect(selected('pull_request', null)).toEqual(all);
     expect(selected('pull_request', [])).toEqual(all);
-    expect(selected('merge_group', null)).toEqual([
-      'capacity-forecast',
-      'native-design-system',
-      'artist-launch-contract',
-      'privacy-input-route-trackers',
-      'privacy-compliance',
-      'artist-profile-conformance',
-      'ci-schedule-inventory',
-      'automation-registry',
-      'growth-registry',
-      'outcome-verifier',
-      'synthetic-canary-liveness',
-      'playbook-authoring',
-      'icp-language',
-      'anti-slop',
-      'external-api-guard',
-      'domain-write-guard',
-      'copy-leak',
-    ]);
+    expect(selected('merge_group', null)).toEqual(failClosed);
   });
 
   it('points every guard at a test file that exists', () => {

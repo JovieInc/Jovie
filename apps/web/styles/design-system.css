@@ -1748,6 +1748,7 @@ html[data-profile-flow-open="true"] .cookie-banner-card {
    - surface-3: Pressed/active
 */
 
+[data-proof-theme],
 :root {
   /* Noir Ion ziawi lock (2026-09-09–10, re-locked 2026-09-25: raised = lighter) —
      light 5-step ladder + 6 accents. */
@@ -2121,6 +2122,7 @@ html[data-profile-flow-open="true"] .cookie-banner-card {
 
 /* Dark mode — Jovie Noir Ion ziawi lock (2026-09-09–10).
    Exactly 5 surfaces. Focus = ion. Aqua/gold/flare alias mint/orange/red. */
+[data-proof-theme="dark"],
 :root.dark {
   --noir-ion-canvas: #030406;
   --noir-ion-shell: #07080a;
@@ -3290,6 +3292,7 @@ html[data-profile-flow-open="true"] .cookie-banner-card {
 /* ============================================
    SEMANTIC STATUS COLORS (OKLCH)
    ============================================ */
+[data-proof-theme],
 :root {
   /* Success */
   --color-success: var(--color-accent-green);
@@ -3314,6 +3317,7 @@ html[data-profile-flow-open="true"] .cookie-banner-card {
   --color-info-foreground: oklch(100% 0 0);
 }
 
+[data-proof-theme="dark"],
 :root.dark {
   /* Success — Mint */
   --color-success: var(--color-accent-green);
@@ -3338,6 +3342,7 @@ html[data-profile-flow-open="true"] .cookie-banner-card {
    orange, red) that stay locked to the Noir Ion palette; these derived tokens
    keep status copy at WCAG AA (4.5:1) on white (light) and on the error-tinted
    and elevated dark surfaces, without redefining the palette. */
+[data-proof-theme],
 :root {
   --color-success-text: color-mix(in srgb, var(--color-success) 42%, black);
   --color-warning-text: color-mix(in srgb, var(--color-warning) 60%, black);
@@ -3345,11 +3350,20 @@ html[data-profile-flow-open="true"] .cookie-banner-card {
   --color-accent-text: color-mix(in srgb, var(--color-accent) 65%, black);
 }
 
+[data-proof-theme="dark"],
 :root.dark {
   --color-success-text: var(--color-success);
   --color-warning-text: var(--color-warning);
   --color-error-text: color-mix(in srgb, var(--color-error) 75%, white);
   --color-accent-text: var(--color-accent);
+}
+
+/* Fixed-theme Storybook semantic-token proofs reuse the palettes above.
+   These two non-inline Tailwind aliases must resolve on the proof subtree.
+   This does not isolate ancestor-based dark: variants. */
+[data-proof-theme] {
+  --color-surface-0: var(--color-bg-surface-0);
+  --color-focus: var(--color-border-focus);
 }
 
 /* Partial cards dim their subtree. Strengthen default description copy while
