@@ -11,6 +11,10 @@
  */
 
 @custom-variant dark (&:is(.dark *));
+/* Link's declared preview state leaves hover/press and native history intact. */
+@custom-variant link-visited (
+  &[data-variant="link"][data-state="visited"]:not(:hover):not(:active)
+);
 
 @theme {
   /* Consolidated type scale (Tim 2026-09-27, Pen text-* steps): UI text sits

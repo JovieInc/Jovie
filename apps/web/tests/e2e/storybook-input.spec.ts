@@ -20,6 +20,13 @@ const VIEWPORTS = [
   { id: 'compact', width: 390, height: 844 },
 ] as const;
 
+async function setStoryTheme(page: Page, theme: 'light' | 'dark') {
+  await page.addInitScript(
+    value => localStorage.setItem('jovie-theme-storybook', value),
+    theme
+  );
+}
+
 async function openStory(page: Page, storyId: string) {
   await page.goto(`/iframe.html?id=${storyId}&viewMode=story`, {
     waitUntil: 'domcontentloaded',
@@ -175,10 +182,7 @@ test.describe('Shared error copy contrast', () => {
       test(`error copy meets WCAG AA [${theme} ${story}] @a11y`, async ({
         page,
       }, testInfo) => {
-        await page.addInitScript(
-          value => localStorage.setItem('jovie-theme-storybook', value),
-          theme
-        );
+        await setStoryTheme(page, theme);
         const root = await openStory(page, story);
         await expect(page.locator('html')).toHaveClass(new RegExp(theme));
         await page.evaluate(() => document.fonts.ready);
@@ -242,10 +246,7 @@ test.describe('Composite field and switch error-copy contrast', () => {
       test(`error copy meets WCAG AA [${theme} ${fixture.story}] @a11y`, async ({
         page,
       }, testInfo) => {
-        await page.addInitScript(
-          value => localStorage.setItem('jovie-theme-storybook', value),
-          theme
-        );
+        await setStoryTheme(page, theme);
         const root = await openStory(page, fixture.story);
         await expect(page.locator('html')).toHaveClass(new RegExp(theme));
         await expect(
@@ -282,5 +283,116 @@ test.describe('Composite field and switch error-copy contrast', () => {
           expect(check.data.contrastRatio).toBeGreaterThanOrEqual(4.5);
       });
     }
+  }
+});
+
+test.describe('Link and danger-tooltip text contrast', () => {
+  const stories = [
+    'shadcn-link--default',
+    'shadcn-link--active',
+    'shadcn-link--visited',
+    'shadcn-link--as-child',
+    'shadcn-link--long-content',
+    'shadcn-link--state-matrix',
+    'ui-atoms-tooltip--danger',
+  ] as const;
+
+  for (const theme of ['light', 'dark'] as const) {
+    for (const story of stories) {
+      test(`semantic text meets WCAG AA [${theme} ${story}] @a11y`, async ({
+        page,
+      }, testInfo) => {
+        await setStoryTheme(page, theme);
+        await openStory(page, story);
+        await expect(page.locator('html')).toHaveClass(new RegExp(theme));
+        const selector =
+          story === 'ui-atoms-tooltip--danger'
+            ? '[data-testid="tooltip-content"]'
+            : '#storybook-root [data-variant="link"]:not([aria-disabled="true"])';
+        await expect(page.locator(selector).first()).toBeVisible();
+        await page.evaluate(() => document.fonts.ready);
+        const result = await new AxeBuilder({ page })
+          .include(selector)
+          .options(wcag22AaAxeOptions())
+          .analyze();
+        const measured = [...result.passes, ...result.violations]
+          .filter(rule => rule.id === 'color-contrast')
+          .flatMap(rule => rule.nodes)
+          .flatMap(node => node.any)
+          .filter(check => check.id === 'color-contrast');
+        const evidence = JSON.stringify({ story, theme, result }, null, 2);
+        await testInfo.attach('semantic-text-contrast.json', {
+          body: evidence,
+          contentType: 'application/json',
+        });
+        await attachScreenshot(
+          testInfo,
+          `semantic-text-${theme}-${story}.png`,
+          page.locator('body')
+        );
+        await writeFile(
+          join(EVIDENCE_DIR, `semantic-text-${theme}-${story}.json`),
+          evidence
+        );
+        expect(result.violations).toEqual([]);
+        expect(
+          result.incomplete.filter(rule => rule.id === 'color-contrast')
+        ).toEqual([]);
+        expect(measured.length).toBeGreaterThan(0);
+        for (const check of measured)
+          expect(check.data.contrastRatio).toBeGreaterThanOrEqual(4.5);
+      });
+    }
+    test(`visited preview preserves interactive color precedence [${theme}]`, async ({
+      page,
+    }, testInfo) => {
+      await setStoryTheme(page, theme);
+      await openStory(page, 'shadcn-link--visited');
+      const link = page.locator('#storybook-root [data-variant="link"]');
+      const tokens = await link.evaluate(element => {
+        const probe = document.createElement('span');
+        element.append(probe);
+        const colors: Record<string, string> = {};
+        for (const state of ['visited', 'hover']) {
+          probe.style.color = `var(--color-link-${state})`;
+          colors[state] = getComputedStyle(probe).color;
+        }
+        probe.remove();
+        return colors;
+      });
+      const color = () =>
+        link.evaluate(element => getComputedStyle(element).color);
+      await page.mouse.move(0, 0);
+      const observed: Record<string, string> = { idle: await color() };
+      await page.keyboard.press('Tab');
+      await expect(link).toBeFocused();
+      expect(
+        await link.evaluate(element => element.matches(':focus-visible'))
+      ).toBe(true);
+      observed.focus = await color();
+      await link.hover();
+      observed.hover = await color();
+      await page.mouse.down();
+      observed.active = await color();
+      await page.mouse.up();
+      await page.mouse.move(0, 0);
+      observed.restored = await color();
+      const evidencePath = testInfo.outputPath('visited-preview-colors.json');
+      await writeFile(
+        evidencePath,
+        JSON.stringify({ theme, tokens, observed })
+      );
+      await testInfo.attach('visited-preview-colors.json', {
+        path: evidencePath,
+        contentType: 'application/json',
+      });
+      expect(observed).toEqual({
+        idle: tokens.visited,
+        focus: tokens.visited,
+        hover: tokens.hover,
+        active: tokens.hover,
+        restored: tokens.visited,
+      });
+    });
   }
 });
