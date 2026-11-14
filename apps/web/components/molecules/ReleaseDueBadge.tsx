@@ -1,5 +1,6 @@
 'use client';
 
+import { PlainButton } from '@jovie/ui';
 import { createContext, useContext } from 'react';
 import { DotBadge } from '@/components/atoms/DotBadge';
 
@@ -47,20 +48,20 @@ const VARIANT_STYLES = {
     dotClassName: 'bg-transparent',
   },
   soon: {
-    className: 'border-amber-500/20 bg-amber-500/5',
-    dotClassName: 'bg-amber-500',
+    className: 'border-warning/20 bg-warning/5',
+    dotClassName: 'bg-warning',
   },
   overdue: {
     className: 'border-error/20 bg-error/5',
     dotClassName: 'bg-error',
   },
   stale: {
-    className: 'border-zinc-400/20 bg-zinc-400/5',
-    dotClassName: 'bg-zinc-400',
+    className: 'border-accent-gray/20 bg-accent-gray/5',
+    dotClassName: 'bg-accent-gray',
   },
   today: {
-    className: 'border-amber-500/20 bg-amber-500/5',
-    dotClassName: 'bg-amber-500',
+    className: 'border-warning/20 bg-warning/5',
+    dotClassName: 'bg-warning',
   },
 } as const;
 
@@ -76,13 +77,13 @@ export function ReleaseDueBadge({
   if (!dueDate) {
     if (dueDaysOffset !== null) {
       return (
-        <button
+        <PlainButton
           type='button'
           onClick={onSetDate}
-          className='text-3xs text-amber-500 hover:underline'
+          className='text-3xs text-warning hover:underline'
         >
           Set date
-        </button>
+        </PlainButton>
       );
     }
     return null;

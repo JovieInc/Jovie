@@ -86,6 +86,114 @@
       "a11y",
       "frontend-rules"
     ],
+    "apps/web/components/molecules/DocToolbar.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/molecules/FooterBranding.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/molecules/FrostedContainer.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/molecules/LegalSupportBlock.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/molecules/ReleaseDueBadge.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/molecules/Section.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/molecules/UsageLimitUpgradePrompt.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/molecules/WorkspaceSelector.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/molecules/drawer/CollapsibleSectionHeading.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/molecules/drawer/DrawerEditableTextField.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/molecules/filters/FilterChip.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/molecules/tab-bar/TabBar.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
     "apps/web/components/organisms/StandaloneProductPage.tsx": [
       "ds-owner",
       "tokens",
@@ -765,6 +873,9 @@
     "apps/web/components/molecules/drawer/ShareableLinkRow.tsx": {
       "empty": "ShareableLinkRow always renders one required URL with its copy (and optional open) action and never a collection; the detector matched the items-center class.",
       "partial": "It renders one required url: displayValue falls back to that url and the other optional props are density, surface, visibility, labels and callbacks with defaults, so nothing can be partially present (NoOpenButton shows the copy-only row)."
+    },
+    "apps/web/components/molecules/tab-bar/TabBar.tsx": {
+      "permission-denied": "TabBar has no account, role or gated tab; the detector matched the ARIA attributes `role='tablist'` and `role='tab'`. A disabled tab is shown as PartialDisabledTab."
     },
     "apps/web/components/organisms/AppShellFrame.tsx": {
       "offline": "AppShellFrame is a presentational frame that never fetches or submits; the detector matched 'loading' and 'Suspense' in its doc comments. Connectivity reaches the shell only through the routes and rails it slots, which own their offline states."
