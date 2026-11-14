@@ -71,14 +71,17 @@ describe('runtime updates in the shell corner pill', () => {
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 
-  it('announces an update in the shell corner pill beside the navigation', () => {
+  it('announces an update in the corner pill, not on the shell Inbox bell', () => {
     state.available = true;
     state.downloaded = true;
-    renderDashboardNav({
+    const { queryByRole } = renderDashboardNav({
       renderFn: ui =>
         render(<RuntimeUpdateProvider>{ui}</RuntimeUpdateProvider>),
       overrides: { inboxNavigation: { state: 'empty', pendingCount: 0 } },
     });
+    expect(
+      queryByRole('link', { name: /App Update Available/i })
+    ).not.toBeInTheDocument();
     expect(
       screen.getByRole('button', { name: 'Restart Jovie to update' })
     ).toBeEnabled();

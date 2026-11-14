@@ -1,12 +1,15 @@
-import { expect, type Page, test } from '@playwright/test';
+import { expect, test } from '@playwright/test';
 import {
   SHELL_RAIL_PREVIEW_GRACE_MS,
   SHELL_RAIL_PREVIEW_INTENT_MS,
 } from '@/components/shell/rail-motion';
+import { findClippedFocusRings } from './utils/focus-ring-clipping';
 import {
-  detectReversibleControl,
-  type ReversibleActivation,
-} from '../utils/reversible-control-detector';
+  certify,
+  expectAtMostOneSelectedNavRow,
+  homeFocusAnchor,
+  openDraftAnchor,
+} from './utils/shell-control-quality-helpers';
 import { inspectShellMaterial } from './utils/shell-material-detector';
 import { controls, expectRailPushesRoute } from './utils/shell-rail-controls';
 import {
@@ -19,69 +22,6 @@ test.use({
   viewport: { width: 1440, height: 900 },
 });
 
-// Reuse the existing detector with ten COMPLETE cycles, mixing activation
-// methods. Hidden staged controls are mounted but never logical actions.
-const sequence: ReversibleActivation[] = Array.from(
-  { length: 20 },
-  (_, index) => (index % 3 === 0 ? 'keyboard' : 'pointer')
-);
-
-async function certify(page: Page, side: 'left' | 'right') {
-  const toggle = controls(page, side);
-  const count = await toggle.count();
-  if (count !== 1)
-    throw new Error(`expected one logical ${side} rail action, found ${count}`);
-  const initial =
-    (await toggle.getAttribute('aria-expanded')) === 'true' ? 'open' : 'closed';
-  return detectReversibleControl({
-    name: `real composed ${side} rail`,
-    states: initial === 'open' ? ['open', 'closed'] : ['closed', 'open'],
-    activationSequence: sequence,
-    observe: async () => ({
-      pinned:
-        side === 'left'
-          ? await page
-              .locator('#shell-left-rail')
-              .getAttribute('data-rail-pinned')
-          : null,
-      preview: await page
-        .locator(`[data-rail-preview-region="${side}"]`)
-        .getAttribute('data-rail-preview'),
-      state:
-        (await controls(page, side).getAttribute('aria-expanded')) === 'true'
-          ? 'open'
-          : 'closed',
-    }),
-    activate: async via => {
-      if (via === 'pointer') await controls(page, side).click();
-      else await controls(page, side).press(side === 'left' ? '[' : ']');
-      const movingRail = page
-        .locator(
-          side === 'left'
-            ? '[data-state][data-rail-phase]'
-            : '[data-testid="app-shell-right-rail"] [data-rail-phase]'
-        )
-        .first();
-      await expect(movingRail).toHaveAttribute(
-        'data-rail-phase',
-        /^(open|closed)$/
-      );
-    },
-    assertContinuity: async () => {
-      const count = await controls(page, side).count();
-      if (count !== 1)
-        throw new Error(
-          `expected one logical ${side} rail action, found ${count}`
-        );
-      await expect(controls(page, side)).toBeEnabled();
-      await expect(page.locator('[data-app-shell-frame]')).toHaveAttribute(
-        'data-quality-probe',
-        'mounted'
-      );
-    },
-  });
-}
-
 test.beforeEach(async ({ page }) => {
   await page.goto(
     '/api/dev/test-auth/enter?persona=creator-ready&redirect=/app',
@@ -89,24 +29,37 @@ test.beforeEach(async ({ page }) => {
   );
   await expect(page.locator('[data-app-shell-frame]')).toBeVisible();
   await waitForHydration(page);
-  // JOV-8973 (#23006) discloses the inbox Notes on demand, so open the
-  // disclosure first: the Notes box stays this spec's settle/draft anchor.
-  await page.getByRole('button', { name: 'Add Notes' }).click();
-  await expect(
-    page.getByRole('textbox', { name: 'Notes', exact: true })
-  ).toBeVisible();
+  // Home's Notes only render beside a real queue item and this persona's
+  // queue can be empty, so the Needs You tab is the settle/focus anchor.
+  await expect(homeFocusAnchor(page)).toBeVisible();
   await expect(controls(page, 'left')).toHaveCount(1);
   await page
     .locator('[data-app-shell-frame]')
     .evaluate(element => element.setAttribute('data-quality-probe', 'mounted'));
 });
 
+test('keyboard focus rings on the app shell are never clipped by an overflow ancestor', async ({
+  page,
+}, testInfo) => {
+  const report = await findClippedFocusRings(page);
+  await testInfo.attach('focus-ring-clipping', {
+    body: JSON.stringify(report, null, 2),
+    contentType: 'application/json',
+  });
+  expect(report.visited).toBeGreaterThan(0);
+  // The sidebar header (bell, search, rail toggle) must be in the tab walk.
+  await expect(
+    page.locator('[data-sidebar-header-actions] [data-inbox-attention]')
+  ).toBeVisible();
+  expect(report.findings).toEqual([]);
+});
+
 test('composed browser rails survive ten complete mixed-input cycles, preserve drafts, and reject duplicate actions', async ({
   page,
 }, testInfo) => {
+  const notes = await openDraftAnchor(page);
   await certify(page, 'left');
   await certify(page, 'right');
-  const notes = page.getByRole('textbox', { name: 'Notes', exact: true });
   await notes.fill('Shell regression draft [ ]');
   const before = await controls(page, 'left').getAttribute('aria-expanded');
   await notes.press('ControlOrMeta+b');
@@ -216,7 +169,7 @@ for (const side of ['right'] as const) {
           requestAnimationFrame(() => requestAnimationFrame(resolve))
         )
     );
-    const notes = page.getByRole('textbox', { name: 'Notes', exact: true });
+    const notes = homeFocusAnchor(page);
     await notes.focus();
     await page.mouse.move(700, 450);
     const plane = page.locator('main#main-content');
@@ -374,17 +327,27 @@ test('route navigation keeps the shell attached and inspects rendered materials 
         document.documentElement.classList.toggle('dark', value === 'dark'),
       theme
     );
-    // [sidebar link, page heading, pathname]. The root link is `Inbox` since
-    // #20840 (header still titles `/app` as Home via breadcrumb-labels), and
-    // the Identity destination is titled `Profiles` since #20953.
-    for (const [linkName, heading, pathname] of [
+    // [sidebar entry, page heading, pathname]. The Identity destination is
+    // titled `Profiles` since #20953. `/app` has no rail row any more: the
+    // header bell (named Inbox) is its entry, and header + tab title say
+    // Inbox to match (Tim 2026-11-14).
+    for (const [entry, heading, pathname] of [
       ['New Chat', 'New Chat', '/app/chat'],
       ['Identity', 'Profiles', '/app/presence'],
       ['Work', 'Work', '/app/library'],
-      ['Inbox', 'Home', '/app'],
+      ['bell', 'Inbox', '/app'],
     ] as const) {
-      await page.getByRole('link', { name: linkName, exact: true }).click();
+      await (entry === 'bell'
+        ? page.locator('[data-sidebar-header-actions] [data-inbox-attention]')
+        : page.getByRole('link', { name: entry, exact: true })
+      ).click();
+      // While the destination resolves, at most one row may look selected.
+      await expectAtMostOneSelectedNavRow(page, `${pathname} (loading)`);
       await page.waitForURL(url => url.pathname === pathname);
+      await expectAtMostOneSelectedNavRow(page, pathname);
+      if (pathname === '/app') {
+        await expect(page).toHaveTitle(/^Inbox \| /);
+      }
       await expect(
         page.getByRole('heading', { name: heading, exact: true }).first()
       ).toBeVisible();
@@ -460,7 +423,7 @@ test('chat profile stays mounted through closed, opening and interrupted exits',
 test('resizing through narrow drawers clears stale locks and preserves the desktop pin', async ({
   page,
 }, testInfo) => {
-  const notes = page.getByRole('textbox', { name: 'Notes', exact: true });
+  const notes = homeFocusAnchor(page);
   await expect(controls(page, 'left')).toHaveAttribute('aria-pressed', 'true');
   const savedPin = (await page.context().cookies()).filter(
     cookie => cookie.name === 'sidebar:state'
