@@ -1,6 +1,9 @@
 import '@/app/globals.css';
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
-import { AgentRoomComposer } from './AgentRoomComposer';
+import {
+  AgentRoomComposer,
+  type AgentRoomComposerState,
+} from './AgentRoomComposer';
 
 const meta = {
   title: 'Features/AgentRoom/AgentRoomComposer',
@@ -13,8 +16,8 @@ const meta = {
       { id: 'chloe', name: 'Chloe' },
       { id: 'lola', name: 'Lola' },
     ],
-    action: async () => ({
-      status: 'sent' as const,
+    action: async (): Promise<AgentRoomComposerState> => ({
+      status: 'sent',
       message: 'Posted in JOV-12296.',
     }),
   },
@@ -28,8 +31,8 @@ export const Composer: Story = {};
 /** A failed send: the error shows and the typed message stays for a retry. */
 export const FailedSend: Story = {
   args: {
-    action: async () => ({
-      status: 'error' as const,
+    action: async (): Promise<AgentRoomComposerState> => ({
+      status: 'error',
       message: 'Linear did not take the message. Try again.',
     }),
   },
