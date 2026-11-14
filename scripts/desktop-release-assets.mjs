@@ -1397,15 +1397,13 @@ export async function prepare({
 
   if (!release) {
     release = await client.createDraft({ environment, releaseSha, version });
-  } else if (
-    environment === 'staging' &&
-    release.target_commitish !== releaseSha
-  ) {
+  } else if (release.target_commitish !== releaseSha) {
     invariant(
       release.draft === true &&
+        release.published_at === null &&
         Array.isArray(release.assets) &&
         release.assets.length === 0,
-      'A non-empty or public release cannot be retargeted.'
+      'A non-empty or public release cannot be retargeted (JOV-12609).'
     );
     release = await client.retargetEmptyDraft(release.id, releaseSha);
   }
