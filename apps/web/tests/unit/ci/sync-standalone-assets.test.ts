@@ -88,7 +88,10 @@ it('boots the relocated standalone tree without borrowing React peers from the b
     const boot = spawnSync(
       process.execPath,
       [resolve(relocated, 'apps/web/server.js')],
-      { encoding: 'utf8', env: { PATH: process.env.PATH ?? '' } }
+      {
+        encoding: 'utf8',
+        env: { PATH: process.env.PATH ?? '', NODE_ENV: 'test' },
+      }
     );
     expect(boot.status, boot.stderr).toBe(0);
     expect(boot.stdout.trim()).toBe('1.0.0 1.0.0:1.0.0');
