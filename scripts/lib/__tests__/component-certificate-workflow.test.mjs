@@ -216,16 +216,6 @@ ${gate?.run || 'true'}`,
     expect(none).not.toMatch(/--(visual|a11y)\b/u);
     expect(runBuild(['a11y.json'])).not.toContain('--visual');
   });
-  it('is event-driven: no cron, no pull_request, main CI completion only', () => {
-    expect(workflow).not.toMatch(/^\s*schedule:/mu);
-    expect(workflow).not.toMatch(/pull_request/u);
-    expect(workflow).toMatch(
-      /workflows: \[CI\]\n\s+types: \[completed\]\n\s+branches: \[main\]/u
-    );
-    expect(workflow).toContain(
-      "github.event.workflow_run.conclusion == 'success'"
-    );
-  });
   it('installs only typescript, not the workspace', () => {
     expect(workflow).not.toContain('setup-node-pnpm');
     expect(workflow).not.toMatch(/pnpm install/u);

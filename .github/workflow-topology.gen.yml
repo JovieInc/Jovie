@@ -811,7 +811,8 @@ nodes:
     category: source-validation
     authoritativeProducer: Source Validation
     authoritativeFor: []
-    allowedConsumers: []
+    allowedConsumers:
+      - Component Certificate
     triggeringStateTransition:
       - push
       - workflow_dispatch
@@ -1620,7 +1621,8 @@ nodes:
     category: source-validation
     authoritativeProducer: Source Validation
     authoritativeFor: []
-    allowedConsumers: []
+    allowedConsumers:
+      - Component Certificate
     triggeringStateTransition:
       - push
       - workflow_dispatch
@@ -1694,6 +1696,12 @@ edges:
     to: Mac Lane Route
     type: workflow_call
   - from: CI
+    to: Component Certificate
+    type: workflow_run
+  - from: Visual & A11y Tests
+    to: Component Certificate
+    type: workflow_run
+  - from: Mutation Diff
     to: Component Certificate
     type: workflow_run
   - from: Staging Controller

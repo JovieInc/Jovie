@@ -7,7 +7,9 @@ name: Component Certificate
 
 on:
   workflow_run:
-    workflows: [CI]
+    # CI can finish before the independently cached render/mutation producers.
+    # Their completions refresh the same source-bound report after evidence lands.
+    workflows: [CI, 'Visual & A11y Tests', Mutation Diff]
     types: [completed]
     branches: [main]
   workflow_dispatch:
@@ -27,13 +29,18 @@ jobs:
     if: >-
       github.ref == 'refs/heads/main' && (
         github.event_name == 'workflow_dispatch' ||
-        github.event.workflow_run.conclusion == 'success')
+        (github.event.workflow_run.conclusion == 'success' &&
+         github.event.workflow_run.head_branch == 'main' &&
+         github.event.workflow_run.head_repository.full_name == github.repository &&
+         github.event.workflow_run.head_sha == github.sha &&
+         contains(fromJSON('["push","workflow_dispatch","workflow_run"]'), github.event.workflow_run.event)))
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
       contents: read
     concurrency:
-      group: component-certificate
+      # Late completions for an older main must not cancel a newer report.
+      group: component-certificate-${{ inputs.sha || github.event.workflow_run.head_sha || github.sha }}
       cancel-in-progress: true
     env:
       CERT_SHA: ${{ inputs.sha || github.event.workflow_run.head_sha || github.sha }}
