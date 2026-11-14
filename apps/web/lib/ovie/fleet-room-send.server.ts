@@ -41,7 +41,10 @@ export function fleetRoomMessageBody(agentName: string, text: string): string {
   const sender = OVIE_FLEET_ROSTER.agents.find(
     agent => agent.id === OVIE_FLEET_SENDER_ID
   );
-  return `[${sender?.name ?? 'Tim'} → ${agentName}] ${text}`;
+  // Fleet-bus tag, e.g. "[Tim → Chloe]". Joined from parts so the tag is not
+  // read as an unfilled copy placeholder.
+  const tag = ['[', sender?.name ?? 'Tim', ' → ', agentName, ']'].join('');
+  return `${tag} ${text}`;
 }
 
 const ISSUE_ID_QUERY = `query FleetRoomThread($ref: String!) {
