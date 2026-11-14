@@ -45,6 +45,11 @@ import {
   readGithubJson,
   readJson,
 } from './lib/github-json-read.mjs';
+import {
+  DEFECT_HOLD_CLASSES,
+  queueRemovalHold,
+  requiredGreenAt,
+} from './lib/green-enqueue-admission.mjs';
 import { projectJsonHeartbeat } from './lib/json-heartbeat-receipt.mjs';
 import { lostStatePrevious } from './lib/liveness-lost-state.mjs';
 import * as redGate from './lib/red-monitor-owner-gate.mjs';
@@ -663,62 +668,6 @@ export async function observeLinearTriageDwell(receipt, { linear, nowMs }) {
 const MERGEABLE_GREEN = new Set(['CLEAN', 'UNSTABLE', 'HAS_HOOKS']);
 const ADMISSION_BLOCKING = new Set(ADMISSION_BLOCKING_LABELS);
 const GREEN_TIMING_MAX_PRS = 10;
-const FAILURE_HOLD_CONTEXT = 'jovie-queue-failure-hold/v1';
-const DEFECT_HOLD_CLASSES = new Set(['deterministic-source', 'unclassified']);
-
-/**
- * When the exact head turned required-green: the latest success among each
- * required name's check runs (completed_at) and commit statuses (created_at).
- * Null when any required name has no success yet.
- *
- * JOV-8788: run 43163802915 reported green-enqueue-checks-unreadable while
- * its own budget sampler showed the shared-github-token REST budget at
- * 0/5000. A denied or exhausted Actions token must not flip the observation
- * unknown, so these reads retry once unauthenticated, like the run-list
- * observers (JOV-11677); a public read that also fails keeps it red.
- */
-async function requiredGreenAt(
-  repo,
-  sha,
-  checks,
-  { fetchImpl, token, apiUrl }
-) {
-  const runs = await readGithubJson(
-    `${apiUrl}/repos/${repo}/commits/${sha}/check-runs?filter=latest&per_page=100`,
-    { fetchImpl, token }
-  );
-  const statuses = await readGithubJson(
-    `${apiUrl}/repos/${repo}/commits/${sha}/status?per_page=100`,
-    { fetchImpl, token }
-  );
-  if (!runs.ok || !statuses.ok) return { ok: false };
-  let greenAt = -Infinity;
-  for (const check of checks) {
-    const times = [
-      ...(runs.body?.check_runs ?? [])
-        .filter(run => run?.name === check && run?.conclusion === 'success')
-        .map(run => Date.parse(run.completed_at ?? '')),
-      ...(statuses.body?.statuses ?? [])
-        .filter(row => row?.context === check && row?.state === 'success')
-        .map(row => Date.parse(row.created_at ?? '')),
-    ].filter(Number.isFinite);
-    if (!times.length) return { ok: true, greenAt: null, holdClass: null };
-    greenAt = Math.max(greenAt, Math.max(...times));
-  }
-  // The merge-queue failure hold is a commit status on the head (ci-plan):
-  // description `class=<class>;n=..;run=..`. A real-defect hold needs a new
-  // head from its owner; it is reported, not counted as promotion latency.
-  const hold = (statuses.body?.statuses ?? []).find(
-    row => row?.context === FAILURE_HOLD_CONTEXT
-  );
-  const holdClass =
-    /(?:^|;)class=([a-z-]+)/.exec(String(hold?.description ?? ''))?.[1] ?? null;
-  return {
-    ok: true,
-    greenAt: Number.isFinite(greenAt) ? greenAt : null,
-    holdClass,
-  };
-}
 
 /**
  * Green -> enqueued dwell (Tim 2026-10-21: a PR whose exact head is
@@ -729,6 +678,10 @@ async function requiredGreenAt(
  * per-head timing read. Proof is "no ready, mergeable, required-green PR sits
  * outside the merge queue", else the earliest such green time. Admission
  * label holds are reported separately, using the writer's shared policy.
+ * A head that spent the controller's bounded queue-removal re-admission
+ * budget, or was dequeued by a person, is reported as removal-held for the
+ * same reason (JOV-8788): it waits for a new head from its owner, not for
+ * this automation.
  * Green drafts are counted in the reason; draft promotion is the writer's
  * (JOV-INV-022).
  */
@@ -740,7 +693,7 @@ export async function observeGreenToEnqueue(
   const [owner, name] = String(receipt.repo).split('/');
   const checks = receipt.requiredChecks ?? [];
   if (!checks.length) return { ok: false, reason: 'required-checks-missing' };
-  const query = `query($owner:String!,$name:String!){repository(owner:$owner,name:$name){pullRequests(states:OPEN,first:40,orderBy:{field:UPDATED_AT,direction:DESC}){nodes{number isDraft isInMergeQueue mergeStateStatus baseRefName headRefOid labels(first:100){nodes{name} pageInfo{hasNextPage}}}}}}`;
+  const query = `query($owner:String!,$name:String!){repository(owner:$owner,name:$name){pullRequests(states:OPEN,first:40,orderBy:{field:UPDATED_AT,direction:DESC}){nodes{number isDraft isInMergeQueue mergeStateStatus baseRefName headRefOid labels(first:100){nodes{name} pageInfo{hasNextPage}} commits(last:1){nodes{commit{committedDate}}} timelineItems(last:100,itemTypes:[REMOVED_FROM_MERGE_QUEUE_EVENT]){nodes{... on RemovedFromMergeQueueEvent{createdAt actor{__typename login}}}}}}}}`;
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
   let body;
@@ -784,6 +737,7 @@ export async function observeGreenToEnqueue(
   const waiting = [];
   const held = [];
   const labelHeld = [];
+  const removalHeld = [];
   const ready = [];
   for (const pr of green.filter(row => !row.isDraft)) {
     if (
@@ -798,6 +752,7 @@ export async function observeGreenToEnqueue(
       )
     )
       labelHeld.push(pr.number);
+    else if (queueRemovalHold(pr)) removalHeld.push(pr.number);
     else ready.push(pr);
   }
   for (const pr of ready.slice(0, GREEN_TIMING_MAX_PRS)) {
@@ -822,7 +777,7 @@ export async function observeGreenToEnqueue(
     .map(n => `#${n}`)
     .join(
       ','
-    )}];defect-held=${held.length}[${held.map(n => `#${n}`).join(',')}];label-held=${labelHeld.length}[${labelHeld.map(n => `#${n}`).join(',')}]`;
+    )}];defect-held=${held.length}[${held.map(n => `#${n}`).join(',')}];label-held=${labelHeld.length}[${labelHeld.map(n => `#${n}`).join(',')}];removal-held=${removalHeld.length}[${removalHeld.map(n => `#${n}`).join(',')}]`;
   if (!waiting.length)
     return { ok: true, lastProofAt: new Date(nowMs).toISOString(), reason };
   return {
