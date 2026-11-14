@@ -171,7 +171,6 @@ The source defaults below are preserved in this slice.
 | `AUTH_OFFER_SUMMARY` | `false` | Remove copy/layout gate after selecting the supported offer recap; no pricing, auth or entitlement change. |
 | `CLAIM_LEGACY_PROOF_SWEEP` | `false` | Keep rollout stop for the grandfathered-claim sweep that takes 50k+ pages private after the 30-day nudge; remove once the first flip is observed. |
 | `CHATGPT_APP_DIRECTORY_MCP` | `false` | Keep public API exposure security control; no dynamic client registration grant. |
-| `HOMEPAGE_START_CTA` | `false` | Keep copy-approval gate for the homepage hero action entering `/start`; remove in favor of the enabled behavior once the copy is approved. |
 | `INVESTOR_PORTAL_YC_DECK` | `false` | Remove narrative/layout gate in favor of the supported private brief; preserve financial privacy and sourced claims. |
 | `IN_HOUSE_RESOLVER` | `false` | Keep resolver rollback compatibility control (JOV-7323). |
 | `MARKETING_GENERIC_CREATOR_NAV` | `true` | Remove presentation switch in favor of supported creator wording; no new capability claim. |
@@ -189,38 +188,8 @@ The source defaults below are preserved in this slice.
 
 | Flag | Source default | Disposition |
 |---|---|---|
-| `SHOW_ARTIST_PROFILE_PAY_FLOW_VIDEO` | `true` | Remove presentation gate in favor of the supported enabled behavior. |
-| `SHOW_EXAMPLE_PROFILES_CAROUSEL` | `true` | Remove presentation gate in favor of the supported enabled behavior. |
-| `SHOW_FEATURE_SHOWCASE` | `true` | Remove presentation gate in favor of the supported enabled behavior. |
-| `SHOW_FINAL_CTA` | `true` | Remove presentation gate in favor of the supported enabled behavior. |
-| `SHOW_FORGEUI_MARKETING_UPDATES` | `true` | Remove presentation gate in favor of the supported enabled behavior. |
-| `SHOW_HOMEPAGE_AI_COMPOSER_SECTION` | `true` | Remove presentation gate in favor of the supported enabled behavior. |
-| `SHOW_HOMEPAGE_CENTER_NAV` | `true` | Remove presentation gate in favor of the supported enabled behavior. |
-| `SHOW_HOMEPAGE_FAQ` | `true` | Remove presentation gate in favor of the supported enabled behavior. |
-| `SHOW_HOMEPAGE_FRIDAY_RHYTHM` | `true` | Remove presentation gate in favor of the supported enabled behavior. |
-| `SHOW_HOMEPAGE_GO_LIVE_SECTION` | `true` | Remove presentation gate in favor of the supported enabled behavior. |
-| `SHOW_HOMEPAGE_SECTIONS` | `true` | Remove presentation gate in favor of the supported enabled behavior. |
-| `SHOW_HOMEPAGE_UNLOCKED_SECTIONS` | `true` | Remove presentation gate in favor of the supported enabled behavior. |
-| `SHOW_HOMEPAGE_V2_CAPTURE_REACTIVATE` | `true` | Remove presentation gate in favor of the supported enabled behavior. |
-| `SHOW_HOMEPAGE_V2_FINAL_CTA` | `true` | Remove presentation gate in favor of the supported enabled behavior. |
-| `SHOW_HOMEPAGE_V2_FOOTER_LINKS` | `true` | Remove presentation gate in favor of the supported enabled behavior. |
-| `SHOW_HOMEPAGE_V2_POWER_GRID` | `true` | Remove presentation gate in favor of the supported enabled behavior. |
-| `SHOW_HOMEPAGE_V2_PRICING` | `true` | Remove presentation gate in favor of the supported enabled behavior. |
-| `SHOW_HOMEPAGE_V2_SOCIAL_PROOF` | `true` | Remove presentation gate in favor of the supported enabled behavior. |
-| `SHOW_HOMEPAGE_V2_SPOTLIGHT` | `true` | Remove presentation gate in favor of the supported enabled behavior. |
-| `SHOW_HOMEPAGE_V2_SYSTEM_OVERVIEW` | `true` | Remove presentation gate in favor of the supported enabled behavior. |
-| `SHOW_HOMEPAGE_V2_TRUST` | `true` | Remove presentation gate in favor of the supported enabled behavior. |
-| `SHOW_HOME_REFRESH_2026` | `true` | Remove presentation gate in favor of the supported enabled behavior. |
-| `SHOW_HOME_V1_DESIGN` | `false` | Remove inverted gate AND obsolete V1 branch; keep supported V2 homepage, never flip true. |
-| `SHOW_LOGO_BAR` | `true` | Remove presentation gate in favor of the supported enabled behavior. |
-| `SHOW_MARKETING_CENTER_NAV` | `true` | Remove presentation gate in favor of the supported enabled behavior. |
-| `SHOW_MARKETING_FULL_FOOTER` | `true` | Remove presentation gate in favor of the supported enabled behavior. |
-| `SHOW_PHONE_TOUR` | `true` | Remove presentation gate in favor of the supported enabled behavior. |
 | `SHOW_PRODUCT_DEMO_VIDEO` | `false` | Keep founder gate until approved master, playback certification and founder acceptance (JOV-7208). |
 | `SHOW_PUBLIC_ABOUT_FOOTER_REFRESH` | `false` | Remove presentation fork in favor of supported About/footer content; no blanket enable. |
-| `SHOW_PUBLIC_PROFILE_V1_DESIGN` | `false` | Remove inverted gate AND obsolete V1 branch; keep supported current public profile, never flip true. |
-| `SHOW_REPLACES_SECTION` | `true` | Remove presentation gate in favor of the supported enabled behavior. |
-| `SHOW_SEE_IT_IN_ACTION` | `true` | Remove presentation gate in favor of the supported enabled behavior. |
 | `WAITLIST_ENABLED` | `true` | Keep acquisition/admission policy; not part of product rollout retirement. |
 
 ### Override cleanup and rollback

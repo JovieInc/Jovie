@@ -249,7 +249,7 @@ describe('scripts test inventory guard', () => {
     for (const file of [
       ...SCRIPT_CONTRACT_NODE_TESTS,
       ...SCRIPT_CONTRACT_VITEST_TESTS,
-    ]) {
+    ].flatMap(entry => entry.split(' '))) {
       expect(existsSync(resolve(REPO_ROOT, file)), file).toBe(true);
     }
   });

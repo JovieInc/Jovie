@@ -216,7 +216,7 @@ describe('route-group budgets (JOV-8561)', () => {
     expect(grownRouteBudgetNumbers(raised, null, {}, NOW)).toEqual([]);
   });
 
-  it('ships group baselines that cover every route-budgets.json group and dominate their committed operative budgets', () => {
+  it('ships group baselines that cover every route-budgets.json group and equal their worst route baseline', () => {
     const budgets = JSON.parse(
       readFileSync(join(__dirname, 'route-js-budgets.json'), 'utf8')
     );
@@ -229,31 +229,29 @@ describe('route-group budgets (JOV-8561)', () => {
     const groupCeiling = (route: string) =>
       budgets.groups[routeGroupFor(route, budgets.firstLoad.marketingRoutes)]
         .baselineKb;
-    // /app routes: explicit entries and the default.
+    // Every operative per-route baseline fits its group. The defaults and
+    // firstLoad.routes are targets, not operative ceilings (JOV-8555), so a
+    // group baseline may sit below them.
     for (const [route, kb] of Object.entries(budgets.routes)) {
-      expect(kb).toBeLessThanOrEqual(groupCeiling(route));
-    }
-    expect(budgets.defaultMaxGzipKb).toBeLessThanOrEqual(
-      groupCeiling('/app/chat')
-    );
-    expect(budgets.defaultMaxGzipKb).toBeLessThanOrEqual(
-      groupCeiling('/app/admin')
-    );
-    // First-load routes: explicit ceilings, baselines, and the defaults.
-    for (const [route, kb] of Object.entries(budgets.firstLoad.routes ?? {})) {
-      expect(kb).toBeLessThanOrEqual(groupCeiling(route));
+      expect(kb, route).toBeLessThanOrEqual(groupCeiling(route));
     }
     for (const [route, kb] of Object.entries(
       budgets.firstLoad.baselines ?? {}
     )) {
-      expect(kb).toBeLessThanOrEqual(groupCeiling(route));
+      expect(kb, route).toBeLessThanOrEqual(groupCeiling(route));
     }
-    expect(budgets.firstLoad.marketingMaxGzipKb).toBeLessThanOrEqual(
-      groupCeiling('/')
-    );
-    expect(budgets.firstLoad.defaultMaxGzipKb).toBeLessThanOrEqual(
-      groupCeiling('/about')
-    );
+    // Each group baseline is exactly its worst route baseline.
+    const worst: Record<string, number> = {};
+    for (const [route, kb] of [
+      ...Object.entries<number>(budgets.routes),
+      ...Object.entries<number>(budgets.firstLoad.baselines),
+    ]) {
+      const group = routeGroupFor(route, budgets.firstLoad.marketingRoutes);
+      worst[group] = Math.max(worst[group] ?? 0, kb);
+    }
+    for (const group of Object.keys(groups)) {
+      expect(budgets.groups[group].baselineKb, group).toBe(worst[group]);
+    }
     // Group targets stay the route-budgets.json numbers.
     for (const [group, definition] of Object.entries(groups)) {
       expect(budgets.groups[group]?.baselineKb).toBeGreaterThan(

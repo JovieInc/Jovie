@@ -26,7 +26,7 @@ describe('WaitlistOutcomeView states', () => {
     );
 
     expect(
-      screen.getByRole('heading', { level: 1, name: "You're on the list" })
+      screen.getByRole('heading', { level: 1, name: "You're on the waitlist." })
     ).toBeInTheDocument();
     expect(screen.getByTestId('waitlist-next-steps')).toHaveTextContent(
       'Watch artist@example.com for the access email.'

@@ -69,6 +69,26 @@ const LONG_NAME_ARTIST: Artist = {
 /** No session yet: the row holds its skeleton until the session resolves. */
 export const LoadingRow: Story = {};
 
+const onSidebarRail: NonNullable<Story['decorators']> = [
+  Story => (
+    <div className='w-56 bg-sidebar p-2'>
+      <Story />
+    </div>
+  ),
+];
+
+/** Loading row on the light rail: the skeleton reads against the surface. */
+export const LoadingRowLight: Story = {
+  parameters: { themes: { themeOverride: 'light' } },
+  decorators: onSidebarRail,
+};
+
+/** Loading row on the dark rail. */
+export const LoadingRowDark: Story = {
+  parameters: { themes: { themeOverride: 'dark' } },
+  decorators: onSidebarRail,
+};
+
 /** Signed in without a photo: the avatar falls back to initials. */
 export const PartialWithoutAvatar: Story = {
   decorators: signedIn,

@@ -7,7 +7,9 @@ name: Component Certificate
 
 on:
   workflow_run:
-    workflows: [CI]
+    # CI can finish before the independently cached render/mutation producers.
+    # Their completions refresh the same source-bound report after evidence lands.
+    workflows: [CI, 'Visual & A11y Tests', Mutation Diff]
     types: [completed]
     branches: [main]
   workflow_dispatch:
@@ -27,13 +29,18 @@ jobs:
     if: >-
       github.ref == 'refs/heads/main' && (
         github.event_name == 'workflow_dispatch' ||
-        github.event.workflow_run.conclusion == 'success')
+        (github.event.workflow_run.conclusion == 'success' &&
+         github.event.workflow_run.head_branch == 'main' &&
+         github.event.workflow_run.head_repository.full_name == github.repository &&
+         github.event.workflow_run.head_sha == github.sha &&
+         contains(fromJSON('["push","workflow_dispatch","workflow_run"]'), github.event.workflow_run.event)))
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
       contents: read
     concurrency:
-      group: component-certificate
+      # Late completions for an older main must not cancel a newer report.
+      group: component-certificate-${{ inputs.sha || github.event.workflow_run.head_sha || github.sha }}
       cancel-in-progress: true
     env:
       CERT_SHA: ${{ inputs.sha || github.event.workflow_run.head_sha || github.sha }}
@@ -53,9 +60,9 @@ jobs:
       - name: Restore mutation evidence
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
-          path: ~/.local/state/jovie-mutation
-          key: mutation-sweep-state-${{ github.run_id }}-${{ github.run_attempt }}
-          restore-keys: mutation-sweep-state-
+          path: .cache/jovie-mutation
+          key: mutation-sweep-portable-v2-${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: mutation-sweep-portable-v2-
       # Story-capture receipts from visual-a11y.yml (component-story-evidence,
       # hosted runners only). Receipts bind to source hashes, so an older
       # capture only counts for components that have not changed since.
@@ -77,7 +84,7 @@ jobs:
         run: |
           set -euo pipefail
           evidence_args=()
-          state="$HOME/.local/state/jovie-mutation/sweep-state.json"
+          state=".cache/jovie-mutation/sweep-state.json"
           if [ -f "$state" ]; then evidence_args+=(--mutation-state "$state"); fi
           stories="$HOME/.local/state/jovie-story-evidence"
           for kind in visual a11y; do
@@ -105,6 +112,9 @@ jobs:
           path: ${{ runner.temp }}/component-certificate/report.json
           if-no-files-found: error
           retention-days: 30
+      - name: Install Doppler CLI
+        if: ${{ github.event_name != 'workflow_dispatch' || inputs.post }}
+        uses: ./.github/actions/setup-doppler
       - name: Resolve CRON_SECRET
         if: ${{ github.event_name != 'workflow_dispatch' || inputs.post }}
         env:
@@ -112,29 +122,69 @@ jobs:
           DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN_PRD }}
         run: node .github/scripts/resolve-synthetic-secrets.mjs --name CRON_SECRET
       - name: Post to Ovie
-        if: ${{ github.event_name != 'workflow_dispatch' || inputs.post }}
+        id: delivery
+        if: ${{ !cancelled() }}
         env:
           OVIE_BASE_URL: ${{ vars.OVIE_BASE_URL || 'https://jov.ie' }}
+          POST_REQUESTED: ${{ github.event_name != 'workflow_dispatch' || inputs.post }}
         run: |
-          set -uo pipefail
+          set -euo pipefail
           report="$RUNNER_TEMP/component-certificate/report.json"
-          if [ -z "${CRON_SECRET:-}" ]; then
-            echo "Ovie post skipped: CRON_SECRET not available." | tee -a "$GITHUB_STEP_SUMMARY"
+          mkdir -p "$RUNNER_TEMP/component-certificate"
+          record_delivery() {
+            node - "$RUNNER_TEMP/component-certificate/delivery.json" "$1" "$2" "$3" <<'NODE'
+          const fs = require('node:fs');
+          const [file, outcome, reason, httpStatus] = process.argv.slice(2);
+          fs.writeFileSync(file, JSON.stringify({
+            schema: 'jovie.component-certificate-delivery/v1',
+            headSha: process.env.CERT_SHA,
+            requested: process.env.POST_REQUESTED === 'true',
+            outcome, reason, httpStatus,
+            // HTTP acceptance is transport evidence, not persisted readback.
+            ingestion: 'unverified',
+          }, null, 2) + '\n');
+          NODE
+            printf 'Ovie delivery: %s (%s; HTTP %s). Ingestion unverified.\n' "$1" "$2" "$3" >> "$GITHUB_STEP_SUMMARY"
+            printf 'outcome=%s\n' "$1" >> "$GITHUB_OUTPUT"
+          }
+          if [ "$POST_REQUESTED" != true ]; then
+            record_delivery skipped post-disabled none
             exit 0
           fi
+          if [ ! -s "$report" ]; then
+            record_delivery failed report-unavailable none
+            echo "::error::Ovie delivery failed: certificate report unavailable."
+            exit 1
+          fi
+          if [ -z "${CRON_SECRET:-}" ]; then
+            record_delivery failed credential-unavailable none
+            echo "::error::Ovie delivery failed: CRON_SECRET unresolved; see secret resolution."
+            exit 1
+          fi
+          # The full report stays in the artifact; only the bounded packet is posted.
+          payload="$RUNNER_TEMP/component-certificate/delivery-payload.json"
+          node scripts/lib/component-certificate-delivery.mjs "$report" --out "$payload"
           code="$(curl -sS -o "$RUNNER_TEMP/ovie-response.txt" -w '%{http_code}' \
             --retry 2 --max-time 60 --tlsv1.2 --proto '=https' \
             -X POST "$OVIE_BASE_URL/api/internal/ovie/component-certificate-evidence" \
             -H "authorization: Bearer ${CRON_SECRET}" \
             -H 'content-type: application/json' \
-            --data-binary "@${report}")" || code="000"
+            --data-binary "@${payload}")" || code="000"
           case "$code" in
-            2*) echo "Posted component certificate to Ovie (HTTP $code)." | tee -a "$GITHUB_STEP_SUMMARY" ;;
-            404|405) echo "Ovie post skipped: ingest route not deployed (HTTP $code)." | tee -a "$GITHUB_STEP_SUMMARY" ;;
-            *) echo "::warning::Ovie post failed (HTTP $code); report is still in the artifact."
-               echo "Ovie post failed (HTTP $code)." >> "$GITHUB_STEP_SUMMARY" ;;
+            2[0-9][0-9]) record_delivery http-accepted readback-required "$code" ;;
+            *) record_delivery failed http-or-transport-error "$code"
+               echo "::error::Ovie delivery failed (HTTP $code); report retained in the artifact."
+               exit 1 ;;
           esac
-          exit 0
+
+      - name: Upload delivery receipt
+        if: ${{ always() && steps.delivery.outputs.outcome != '' }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: component-certificate-delivery-${{ github.run_id }}
+          path: ${{ runner.temp }}/component-certificate/delivery.json
+          if-no-files-found: error
+          retention-days: 30
 
       - name: Clean scratch
         if: always()

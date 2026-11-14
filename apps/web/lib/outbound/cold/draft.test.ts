@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   type ColdArtifactFacts,
   composeColdSequence,
+  ExistingRelationshipDraftError,
   isRecentRelease,
 } from './draft';
 
@@ -111,5 +112,17 @@ describe('isRecentRelease', () => {
       false
     );
     expect(isRecentRelease(null, NOW)).toBe(false);
+  });
+});
+
+describe('existing-relationship hold on cold drafts', () => {
+  it('refuses to draft for Dannic by name or handle', () => {
+    expect(() =>
+      composeColdSequence(facts({ artistName: 'Dannic' }), NOW)
+    ).toThrow(ExistingRelationshipDraftError);
+    expect(() =>
+      composeColdSequence(facts({ handle: '@djdannic' }), NOW)
+    ).toThrow('Existing relationship: flag to Tim, no cold outreach');
+    expect(() => composeColdSequence(facts(), NOW)).not.toThrow();
   });
 });

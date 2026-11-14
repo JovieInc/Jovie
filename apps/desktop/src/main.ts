@@ -20,7 +20,8 @@ import {
   shell,
   type WebContents,
 } from 'electron';
-import { autoUpdater } from 'electron-updater';
+import type { AppUpdater } from 'electron-updater';
+import { bindDesktopAutoUpdaterEvents } from './desktop-auto-update-events';
 import {
   bindWindowFullScreenState,
   MACOS_TRAFFIC_LIGHT_POSITION,
@@ -2779,11 +2780,18 @@ function checkForUpdatesFromMenu(): void {
   runDesktopUpdateCheck('notify');
 }
 
+let autoUpdater: AppUpdater;
+
 function configureDesktopAutoUpdater(): void {
-  if (!desktopUpdatesSupported()) {
+  if (!desktopUpdatesSupported() || autoUpdater) {
     return;
   }
 
+  // Load the updater only when updates are supported and requested.
+  autoUpdater = (
+    require('electron-updater') as typeof import('electron-updater')
+  ).autoUpdater;
+  bindDesktopAutoUpdaterEvents(autoUpdater, handleDesktopUpdateEvent);
   if (APP_ENV === 'staging') {
     autoUpdater.allowPrerelease = true;
   }
@@ -2816,6 +2824,8 @@ function runDesktopUpdateCheck(mode: 'silent' | 'notify'): void {
   if (!desktopUpdatesSupported()) {
     return;
   }
+
+  configureDesktopAutoUpdater();
 
   // An explicit check before startup settles also fulfills queued auto work.
   startupMaintenance?.cancelPending('update-check');
@@ -3130,63 +3140,27 @@ function updateErrorEvent(error: unknown): DesktopUpdateEvent {
   };
 }
 
-// Wire auto-updater events to renderer IPC so the web UI can show the update
-// pill (legacy boolean channels) and the typed update surfaces (JOV-6683).
-autoUpdater.on('checking-for-update', () => {
-  pushUpdateEvent({ type: 'checking-for-update' });
-});
-
-autoUpdater.on('update-available', info => {
-  updateReadyToInstall = false;
-  pendingManualUpdateCheck = false;
-  refreshApplicationMenu();
-  sendToAppWindows(UPDATE_AVAILABLE_CHANNEL);
-  pushUpdateEvent({
-    type: 'update-available',
-    version: info.version,
-    releaseDate: info.releaseDate ?? null,
-  });
-});
-
-autoUpdater.on('download-progress', progress => {
-  pushUpdateEvent({
-    type: 'download-progress',
-    percent: progress.percent,
-    transferredBytes: progress.transferred,
-    totalBytes: progress.total,
-    bytesPerSecond: progress.bytesPerSecond,
-  });
-});
-
-autoUpdater.on('update-downloaded', info => {
-  updateReadyToInstall = true;
-  pendingManualUpdateCheck = false;
-  refreshApplicationMenu();
-  sendToAppWindows(UPDATE_DOWNLOADED_CHANNEL);
-  pushUpdateEvent({ type: 'update-downloaded', version: info.version });
-
-  if (nightlyUpdateLaunch) {
-    void installNightlyDownloadedUpdate();
-    return;
+// Preserve native menu feedback and both legacy and typed renderer events.
+function handleDesktopUpdateEvent(event: DesktopUpdateEvent): void {
+  if (event.type === 'update-available' || event.type === 'update-downloaded') {
+    updateReadyToInstall = event.type === 'update-downloaded';
+    pendingManualUpdateCheck = false;
+    refreshApplicationMenu();
+    sendToAppWindows(
+      updateReadyToInstall ? UPDATE_DOWNLOADED_CHANNEL : UPDATE_AVAILABLE_CHANNEL
+    );
   }
-  void installDownloadedUpdateIfIdle();
-});
-
-autoUpdater.on('update-not-available', () => {
-  pushUpdateEvent({ type: 'update-not-available' });
-  showManualUpdateCheckFeedback('not-available');
-  if (nightlyUpdateLaunch) {
-    app.quit();
+  pushUpdateEvent(event);
+  if (event.type === 'update-downloaded') {
+    if (nightlyUpdateLaunch) void installNightlyDownloadedUpdate();
+    else void installDownloadedUpdateIfIdle();
+  } else if (event.type === 'update-not-available' || event.type === 'error') {
+    showManualUpdateCheckFeedback(
+      event.type === 'error' ? 'error' : 'not-available'
+    );
+    if (nightlyUpdateLaunch) app.quit();
   }
-});
-
-autoUpdater.on('error', error => {
-  pushUpdateEvent(updateErrorEvent(error));
-  showManualUpdateCheckFeedback('error');
-  if (nightlyUpdateLaunch) {
-    app.quit();
-  }
-});
+}
 
 // Native visibility stays truthful when backgroundThrottling disables Page Visibility.
 ipcMain.handle(GET_VISUAL_ACTIVITY_CHANNEL, (event, ...args: unknown[]) => {
@@ -3704,6 +3678,13 @@ if (gotSingleInstanceLock) {
 }
 
 app.whenReady().then(async () => {
+  if (
+    !nightlyUpdateLaunch &&
+    gotSingleInstanceLock &&
+    !printBuildIdentityOnStart
+  ) {
+    session.defaultSession.preconnect({ url: APP_ORIGIN, numSockets: 2 });
+  }
   if (!gotSingleInstanceLock && !printBuildIdentityOnStart) return;
 
   void persistDesktopBuildIdentityEvidence();
@@ -3725,7 +3706,16 @@ app.whenReady().then(async () => {
     return;
   }
 
-  await configureDesktopWebAuthn();
+  // Keep liveness detection active throughout window-state hydration.
+  if (!nightlyUpdateLaunch) startMainLivenessMonitor();
+
+  const bootSplashWordmarkReady = nightlyUpdateLaunch
+    ? Promise.resolve()
+    : preloadDesktopBootSplashWordmark();
+  await Promise.all([
+    configureDesktopWebAuthn(),
+    nightlyUpdateLaunch ? Promise.resolve() : hydrateWindowState(),
+  ]);
 
   const appIconPath = getAppIconPath();
   if (process.platform === 'darwin' && appIconPath && app.dock) {
@@ -3768,21 +3758,9 @@ app.whenReady().then(async () => {
     return;
   }
 
-  // Detection lives on the probe worker's own timers, so this stays correct
-  // even while the main loop is blocked — start before any window work.
-  startMainLivenessMonitor();
-
-  // The first window paints the boot splash, so the cached wordmark must be
-  // resolved before createWindow runs. Start it alongside window-state
-  // hydration; the preload never rejects (it falls back to the mark).
-  const bootSplashWordmarkReady = preloadDesktopBootSplashWordmark();
-  await hydrateWindowState();
+  // The splash asset starts alongside native initialization and falls back
+  // to the mark on failure; it must settle before the first window paints.
   await bootSplashWordmarkReady;
-
-  // macOS menu bar extra (NSStatusItem via Electron Tray)
-  if (process.platform === 'darwin') {
-    menuBarTray = new MenuBarTray(handleTrayAction);
-  }
 
   startupMaintenance = createStartupMaintenanceGate();
   createWindow(
@@ -3792,6 +3770,11 @@ app.whenReady().then(async () => {
         ? new URL(pendingLegacyAuthReturnRoute, APP_URL).toString()
         : APP_ENTRY_URL
   );
+  // macOS menu bar extra (NSStatusItem via Electron Tray)
+  if (process.platform === 'darwin') {
+    menuBarTray = new MenuBarTray(handleTrayAction);
+  }
+
   const directProfileUrl = process.argv.find((arg: string) =>
     canonicalPublicProfileUrl(arg)
   );

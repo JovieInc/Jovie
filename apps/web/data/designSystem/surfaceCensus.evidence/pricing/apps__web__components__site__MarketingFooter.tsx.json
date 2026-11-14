@@ -1,6 +1,6 @@
 {
   "file": "apps/web/components/site/MarketingFooter.tsx",
-  "sha256": "c73e7dc690907215b50e727ee73bb7b35eae95b70cc74e8d5353dc65936695d1",
-  "at": "2026-11-12T11:51:09.479Z",
-  "ref": "MarketingFooter adds the existing Your Privacy Choices legal link. Pricing page and other pricing owners are unchanged versus main. Verified by the MarketingFooter unit test; source digest only, no layout change."
+  "sha256": "fd33db06d8e3c3dea1b5bea5212f72752924cb5769dbedfd29c5167f6d6e3ebf",
+  "at": "2026-11-13T00:39:55.773Z",
+  "ref": "Removed constant-true SHOW_MARKETING_CENTER_NAV / SHOW_MARKETING_FULL_FOOTER style gates from MarketingHeader and MarketingFooter; rendered output is unchanged. Verified with the MarketingHeader and MarketingFooter vitest render suites (jsdom, incl. axe), not a browser capture."
 }

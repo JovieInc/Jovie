@@ -5,6 +5,17 @@ import {
   ConnectorCard,
   type ConnectorStatus,
 } from '@/components/features/connectors/ConnectorCard';
+import { getConnectorAvailability } from '@/lib/connectors/availability.server';
+
+const { availabilityCredentials } = vi.hoisted(() => ({
+  availabilityCredentials: {
+    GOOGLE_OAUTH_CLIENT_ID: '',
+    GOOGLE_OAUTH_CLIENT_SECRET: '',
+    SPOTIFY_CLIENT_ID: '',
+    SPOTIFY_CLIENT_SECRET: '',
+  },
+}));
+vi.mock('@/lib/env-server', () => ({ env: availabilityCredentials }));
 
 const STATUS_CASES = [
   {
@@ -289,5 +300,72 @@ describe('ConnectorCard', () => {
     expect(container.firstElementChild).toHaveAttribute('aria-busy', 'true');
     fireEvent.click(screen.getByRole('button', { name: /^Disconnect/ }));
     expect(onDisconnect).toHaveBeenCalledOnce();
+  });
+});
+
+describe('ConnectorCard against real connector availability', () => {
+  it('renders the setup-unavailable reason without a retry promise or leaked credentials', () => {
+    availabilityCredentials.SPOTIFY_CLIENT_ID = 'sp-id-fixture';
+    availabilityCredentials.SPOTIFY_CLIENT_SECRET = 'sp-secret-fixture';
+    const availability = getConnectorAvailability();
+    render(
+      <ConnectorCard
+        provider='gmail'
+        status='not_connected'
+        available={availability.gmail.available}
+        unavailableReason={availability.gmail.reason}
+        onConnect={vi.fn()}
+      />
+    );
+    const detail = screen.getByTestId('connector-detail-gmail');
+    expect(detail).toHaveTextContent(
+      'Connection setup is unavailable. This connector cannot be connected yet.'
+    );
+    // Absent setup is not transient, so the card must not promise a retry.
+    expect(detail.textContent).not.toMatch(/try again later/i);
+    // Credentials never cross the server boundary, even as context.
+    const text = document.body.textContent ?? '';
+    expect(text).not.toContain('sp-id-fixture');
+    expect(text).not.toContain('sp-secret-fixture');
+  });
+
+  it('preserves disconnect for an existing connection when setup is unavailable', () => {
+    const onDisconnect = vi.fn();
+    const availability = getConnectorAvailability();
+    render(
+      <ConnectorCard
+        provider='gmail'
+        status='connected'
+        available={false}
+        unavailableReason={availability.gmail.reason}
+        accountLabel='artist@example.com'
+        onDisconnect={onDisconnect}
+      />
+    );
+    expect(
+      screen.getByRole('status', { name: 'Gmail status: Unavailable' })
+    ).toBeInTheDocument();
+    const detail = screen.getByTestId('connector-detail-gmail');
+    expect(detail).toHaveTextContent(
+      'Connection setup is unavailable. This connector cannot be connected yet.'
+    );
+    expect(detail.textContent).not.toMatch(/try again later/i);
+    const disconnect = screen.getByRole('button', { name: 'Disconnect Gmail' });
+    expect(disconnect).toBeEnabled();
+    fireEvent.click(disconnect);
+    expect(onDisconnect).toHaveBeenCalledOnce();
+  });
+
+  it('keeps the transient read-failure fallback wording when a read fails without a reason', () => {
+    render(
+      <ConnectorCard
+        provider='gmail'
+        status='unavailable'
+        onConnect={vi.fn()}
+      />
+    );
+    expect(screen.getByTestId('connector-detail-gmail')).toHaveTextContent(
+      'Connection is unavailable. Try again later.'
+    );
   });
 });
