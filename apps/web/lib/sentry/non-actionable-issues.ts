@@ -550,3 +550,64 @@ export function isNonActionableLoopbackBetterAuthHostEvent(
     value => typeof value === 'string' && isLoopbackBetterAuthHostText(value)
   );
 }
+
+/**
+ * Merch generation recovery receipt (JOV-12581 / Sentry 7847611605): the
+ * queue-tick reconciler (apps/web/lib/merch/generation-recovery.ts) is the
+ * DESIGNED fail-safe that fails merch generation work stranded by request
+ * cutoffs (function budget, deploy, crash) — e.g. the 2026-11-13
+ * DEPLOYMENT_PAUSED window. A successful reconciliation is the fail-safe
+ * working, not an application error, but `captureWarning` files a
+ * `captureException(new Error(...))` whose Sentry/Linear title reads
+ * `Error: [merch-generation-recovery] reconciled stale merch generation
+ * work`, filing a prod-errors issue per reconciliation pass. Keep the
+ * captureWarning receipt (console + analytics); drop only the Sentry
+ * filing. A real DB failure inside the reconciler still throws into the
+ * queue-tick error path and keeps its own capture classes, and chronically
+ * non-zero reconciliation counts remain visible in the console/analytics
+ * record — they are a worker-health signal, not per-event paging.
+ */
+export const MERCH_GENERATION_RECOVERY_RECEIPT_PATTERN =
+  /\[merch-generation-recovery\] reconciled stale merch generation work/;
+
+/** Drop the designed-path receipt in server/edge `ignoreErrors`. */
+export const MERCH_GENERATION_RECOVERY_IGNORE_ERRORS: ReadonlyArray<RegExp> = [
+  MERCH_GENERATION_RECOVERY_RECEIPT_PATTERN,
+];
+
+/**
+ * True when a capture is the successful merch generation reconciliation
+ * receipt, not a reconciler failure.
+ */
+export function isMerchGenerationRecoveryReceiptCapture(
+  value: unknown
+): boolean {
+  if (typeof value === 'string') {
+    return MERCH_GENERATION_RECOVERY_RECEIPT_PATTERN.test(value);
+  }
+  if (value instanceof Error) {
+    return MERCH_GENERATION_RECOVERY_RECEIPT_PATTERN.test(value.message);
+  }
+  return false;
+}
+
+/** True when a Sentry/Linear title is the merch recovery receipt. */
+export function isNonActionableMerchGenerationRecoveryIssue(
+  issue: SentryIssueSummary
+): boolean {
+  return (
+    MERCH_GENERATION_RECOVERY_RECEIPT_PATTERN.test(issue.title ?? '') ||
+    MERCH_GENERATION_RECOVERY_RECEIPT_PATTERN.test(issue.culprit ?? '')
+  );
+}
+
+/** True when a Sentry event is the merch recovery receipt. */
+export function isNonActionableMerchGenerationRecoveryEvent(
+  event: SentryExceptionLike
+): boolean {
+  return collectSentryEventCaptureValues(event).some(
+    value =>
+      typeof value === 'string' &&
+      MERCH_GENERATION_RECOVERY_RECEIPT_PATTERN.test(value)
+  );
+}

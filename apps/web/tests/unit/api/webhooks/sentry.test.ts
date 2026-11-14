@@ -547,6 +547,44 @@ describe('POST /api/webhooks/sentry', () => {
     expect(mockServerFetch).not.toHaveBeenCalled();
   });
 
+  it('skips autofix for the merch generation recovery receipt (JOV-12581)', async () => {
+    mockAcquireRecentDispatch.mockResolvedValue({
+      acquired: true,
+      reason: 'acquired',
+    });
+
+    const { POST } = await import('@/app/api/webhooks/sentry/route');
+    const payload = {
+      data: {
+        issue: {
+          id: '7847611605',
+          title:
+            'Error: [merch-generation-recovery] reconciled stale merch generation work',
+          culprit: 'captureWarning',
+        },
+      },
+    };
+    const body = JSON.stringify(payload);
+    const request = new Request('https://example.com/api/webhooks/sentry', {
+      method: 'POST',
+      headers: {
+        'sentry-hook-signature': sign(body),
+      },
+      body,
+    });
+
+    const response = await POST(request as never);
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(data).toEqual({
+      received: true,
+      skipped: true,
+      reason: 'merch-generation-recovery-receipt',
+    });
+    expect(mockServerFetch).not.toHaveBeenCalled();
+  });
+
   it('returns deduplicated response when a recent dispatch exists', async () => {
     mockAcquireRecentDispatch.mockResolvedValue({
       acquired: false,

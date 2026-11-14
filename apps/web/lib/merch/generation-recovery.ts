@@ -12,8 +12,11 @@ import 'server-only';
  * - Batches stuck in `generating` past the same window are marked `failed`.
  * - Both repairs are single bounded statements (LIMIT inside the id
  *   subselect) and idempotent: a second run matches zero rows.
- * - Repairs emit a warning-level Sentry event with counts; the production
- *   logger is a no-op, so the capture helper is the observable record.
+ * - Repairs emit a warning-level receipt with counts through the capture
+ *   helper (console + analytics; the production logger is a no-op, so the
+ *   capture helper is the observable record). The Sentry filing for this
+ *   designed-path receipt is intentionally dropped (JOV-12581): a
+ *   successful reconciliation is the fail-safe working, not an error.
  */
 
 import { and, sql as drizzleSql } from 'drizzle-orm';
