@@ -38,7 +38,6 @@ import {
 import {
   attestationMatchesControllerRepair,
   renderControllerRepairAttestation,
-  selectSeerControllerRepairReview,
 } from '../controller-repair-attestation.mjs';
 
 const REPOSITORY = 'JovieInc/Jovie';
@@ -647,56 +646,10 @@ describe('queue workflow mutation safety', () => {
     ).toBe(false);
   });
 
-  it('binds controller repair authority to one successful exact-head Seer check', () => {
-    const checkSuite = {
-      app: { id: 12637, slug: 'sentry' },
-      head_sha: HEAD,
-      id: 92271699412,
-    };
-    const checkRun = {
-      app: { id: 12637, slug: 'sentry' },
-      check_suite: { id: checkSuite.id },
-      conclusion: 'success',
-      head_sha: HEAD,
-      id: 101553168181,
-      name: 'Seer Code Review',
-      status: 'completed',
-    };
-
-    expect(
-      selectSeerControllerRepairReview(
-        { checkRuns: [checkRun], checkSuite },
-        { expectedHead: HEAD }
-      )
-    ).toEqual({
-      checkRunId: checkRun.id,
-      checkSuiteId: checkSuite.id,
-      reviewId: `seer-check-${checkRun.id}`,
-      reviewedHead: HEAD,
-    });
-
-    for (const evidence of [
-      { checkRuns: [{ ...checkRun, head_sha: OTHER_HEAD }], checkSuite },
-      { checkRuns: [{ ...checkRun, conclusion: 'failure' }], checkSuite },
-      {
-        checkRuns: [checkRun, { ...checkRun, id: checkRun.id + 1 }],
-        checkSuite,
-      },
-      {
-        checkRuns: [{ ...checkRun, app: { id: 999, slug: 'attacker-review' } }],
-        checkSuite,
-      },
-      {
-        checkRuns: [checkRun],
-        checkSuite: { ...checkSuite, head_sha: OTHER_HEAD },
-      },
-    ]) {
-      expect(() =>
-        selectSeerControllerRepairReview(evidence, { expectedHead: HEAD })
-      ).toThrow();
-    }
+  it('takes controller repair authority from a GitHub review, never the retired Seer check', async () => {
+    const attestation = await import('../controller-repair-attestation.mjs');
+    expect(Object.keys(attestation).filter(name => /seer/i.test(name))).toEqual([]);
   });
-
 });
 
 describe('native live preflight', () => {
