@@ -7,7 +7,7 @@ import { livenessFingerprint } from './automation-registry.mjs';
  * restore step — `unzip -p liveness/prior.zip state.json > liveness/state.json
  * 2>/dev/null || true` — created a 0-byte file when the artifact listing hit an
  * installation-budget 403 behind `|| true` (observed 2026-11-14T13:00:28Z on
- * run 43597514138: `gh api` printed the 403 body into `$id`, the zip download
+ * run 43597514138: the GitHub CLI printed the 403 body into `$id`, the zip download
  * failed, and the bare `>` redirect still truncated the target into existence).
  * An empty file parses as no state at all, so it must reconcile like a missing
  * one, not count as a successful restore.
