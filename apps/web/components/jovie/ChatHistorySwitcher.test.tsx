@@ -119,9 +119,9 @@ describe('ChatHistorySwitcher', () => {
     );
     const rows = within(menu).getAllByTestId('chat-history-row');
     expect(rows.map(row => row.textContent)).toEqual([
-      'Release Plan For Spring5m',
-      'Tour Budget3d',
-      'Merch Drop Ideas1mo',
+      'Release Plan For Spring 5m',
+      'Tour Budget 3d',
+      'Merch Drop Ideas 1mo',
     ]);
     expect(
       within(menu).getByRole('menuitem', { name: 'Tour Budget 3d' })
