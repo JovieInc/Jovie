@@ -12,6 +12,11 @@ from pathlib import Path
 
 from atomic_state import atomic_write_text
 
+HEADER_ZINDEX = "rewrite-header-zindex"
+# Header chrome copies zIndex:100 into a new file. Route it before quota noise in the same shard log.
+OVERLAY_HEADER_Z = re.compile(
+    r"overlay-raw-z-index: apps/web/components/organisms/(?:HeaderNav|RootNotFoundHeader)\.tsx: zIndex:100 x\d+ \(baseline \d+\)")
+
 HEADER_FILES = (
     "apps/web/components/organisms/HeaderNav.tsx",
     "apps/web/components/organisms/RootNotFoundHeader.tsx",

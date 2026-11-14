@@ -33,7 +33,7 @@ from fix_red_screen_cert import SCREEN_CERT_TEXT, screen_cert_paths
 from fix_red_failure_routing import (ALIAS_ACTION, ALIAS_REVIEW_FAILURE, ROUTE_BUDGET_GROWTH, alias_owner_metadata,
                                      error_signature, fingerprint_key, owner_handoff_reason, LOCAL_MODULE_PREREQUISITE)
 from atomic_state import atomic_write_text
-from fix_red_header_zindex import rewrite_header_site_zindex  # noqa: F401
+from fix_red_header_zindex import HEADER_ZINDEX, OVERLAY_HEADER_Z, rewrite_header_site_zindex  # noqa: F401
 from fix_red_source_edits import (  # noqa: F401
     balance_added_headings, snap_added_conservative_spacing, strip_added_legacy_cache_exports,
     resolve_additive_node_tests_text, resolve_additive_node_test_file, resolve_additive_list_conflict, size_500_stale_hit,
@@ -45,7 +45,6 @@ SCHEMA = "jovie-fix-red-class/v1"
 RERUN, SYNC_MAIN, WIRE_CI_FAST, RENUMBER, STAMP_CHANGELOG, SNAP_SPACING, STRIP_CACHE, MERGE_NARROWED, REGISTER_DOMAIN, ATOMIC_WRITE, REPAIR_SCREEN_CERT, BALANCE_HEADINGS, UI_FEEL, AGENT, COMPOSE = (
     "rerun", "sync-main", "wire-ci-fast", "renumber-migrations", "stamp-changelog", "snap-spacing",
     "strip-cache-exports", "merge-narrowed-preflight", "register-domain-writes", "atomic-write", "repair-screen-cert", "balance-headings", "ui-feel", "agent", "compose")
-HEADER_ZINDEX = "rewrite-header-zindex"
 DETERMINISTIC = frozenset({
     RERUN, SYNC_MAIN, WIRE_CI_FAST, RENUMBER, STAMP_CHANGELOG, SNAP_SPACING, STRIP_CACHE, MERGE_NARROWED,
     REGISTER_DOMAIN, ATOMIC_WRITE, REPAIR_SCREEN_CERT, BALANCE_HEADINGS, UI_FEEL, HEADER_ZINDEX, ALIAS_ACTION})
@@ -150,9 +149,6 @@ _YAML_AND_CHAIN_LINE = re.compile(
     r"(?P<command>[\w./@=:\t -]+(?:&&[\w./@=:\t -]+)+)(?P<suffix>)$")
 _JSON_KEY = re.compile(r'^\s*"([^"\n]+)"\s*:')
 
-# Header chrome copies zIndex:100 into a new file. Route it before quota noise in the same shard log.
-OVERLAY_HEADER_Z = re.compile(
-    r"overlay-raw-z-index: apps/web/components/organisms/(?:HeaderNav|RootNotFoundHeader)\.tsx: zIndex:100 x\d+ \(baseline \d+\)")
 # (class, pattern, action). First match wins per check; order is most specific first.
 SIGNATURES = (
     ("alias-review-deadline", ALIAS_REVIEW_FAILURE, ALIAS_ACTION),
