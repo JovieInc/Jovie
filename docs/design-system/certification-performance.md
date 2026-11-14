@@ -115,5 +115,7 @@ each, v2 about 205 on average. Keep it that way:
   components), never one PR per component. Each merge then costs one
   incremental run, not one per component.
 - Watch the plan line in the run summary. If `reused` stays low after a quiet
-  merge, a file has crept into the shared set: trace it with
-  `componentRenderBindings(root, paths).stats.shared`.
+  merge, a file has crept into the shared set. `stats.shared` from
+  `componentRenderBindings` gives its size (81 files at `5bf11983`), and
+  `buildRenderGraph(root).closure(['apps/web/.storybook/preview.tsx']).files`
+  lists what the preview reaches.
