@@ -9,7 +9,7 @@ import {
 
 /**
  * The editorial homepage (Tim, 2026-11-03): the locked line, the jov.ie/you
- * profile, the releases workspace, then the role waitlist form.
+ * profile, the releases workspace, then the claim-your-profile close.
  */
 const meta = {
   title: 'Marketing/HomepageEditorial',
@@ -19,7 +19,7 @@ const meta = {
     docs: {
       description: {
         component:
-          'Invite-only homepage chapters. The hero action scrolls to the on-page role waitlist form; product imagery comes from the screenshot registry.',
+          'Homepage chapters. The hero, header and close enter /start to claim a profile (the invitation form returns only while public signup is closed); product imagery comes from the screenshot registry.',
       },
     },
   },

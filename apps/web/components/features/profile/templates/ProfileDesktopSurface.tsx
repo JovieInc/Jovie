@@ -529,7 +529,7 @@ export function ProfileDesktopSurface({
                 <Link
                   href={profileHref}
                   data-testid='profile-header'
-                  className='inline-flex min-w-0 max-w-full items-start gap-2 rounded-md text-[clamp(2.5rem,16cqi,5.75rem)] font-semibold leading-[0.92] tracking-[-0.06em] text-white dark:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))] focus-visible:ring-offset-2 focus-visible:ring-offset-transparent'
+                  className='inline-flex min-w-0 max-w-full items-start gap-2 rounded-md text-[clamp(2.5rem,16cqi,5.75rem)] font-semibold leading-[0.92] tracking-[-0.06em] text-white dark:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:ring-offset-transparent'
                 >
                   <span className='min-w-0 line-clamp-2 wrap-anywhere'>
                     {artist.name}

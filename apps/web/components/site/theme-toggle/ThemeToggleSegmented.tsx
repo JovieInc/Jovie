@@ -1,5 +1,6 @@
 'use client';
 
+import { PlainButton } from '@jovie/ui';
 /**
  * ThemeToggleSegmented Component
  *
@@ -96,7 +97,7 @@ export function ThemeToggleSegmented({
           }}
         />
 
-        <button
+        <PlainButton
           type='button'
           aria-label='System Theme'
           aria-pressed={currentTheme === 'system'}
@@ -110,10 +111,10 @@ export function ThemeToggleSegmented({
         >
           <span aria-hidden='true' className={`absolute ${hitTargetClass}`} />
           <SmallSystemIcon />
-        </button>
+        </PlainButton>
 
         {wrapButton(
-          <button
+          <PlainButton
             type='button'
             aria-label='Light Theme'
             aria-pressed={currentTheme === 'light'}
@@ -130,11 +131,11 @@ export function ThemeToggleSegmented({
           >
             <span aria-hidden='true' className={`absolute ${hitTargetClass}`} />
             <SmallSunIcon />
-          </button>
+          </PlainButton>
         )}
 
         {wrapButton(
-          <button
+          <PlainButton
             type='button'
             aria-label='Dark Theme'
             aria-pressed={currentTheme === 'dark'}
@@ -151,7 +152,7 @@ export function ThemeToggleSegmented({
           >
             <span aria-hidden='true' className={`absolute ${hitTargetClass}`} />
             <SmallMoonIcon />
-          </button>
+          </PlainButton>
         )}
       </div>
       {shortcutDescription ? (

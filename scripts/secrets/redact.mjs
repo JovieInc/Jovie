@@ -4,6 +4,12 @@
  *
  *   some-command 2>&1 | node scripts/secrets/redact.mjs
  *   node scripts/secrets/redact.mjs --check file   # exit 1 if it would redact
+ *   node scripts/secrets/redact.mjs --pr-text      # also strip personal data
+ *
+ * `scrubPrText` is the automatic guardrail on routine PR text (Tim White,
+ * 2026-11-12: routine GitHub writes never wait on him; canon/FLEET.md#routine-writes).
+ * It strips secrets plus personal email addresses and phone numbers, so a
+ * public PR body or comment never needs a human to check it first.
  *
  * Pattern-based only. It never holds secret values or hashes of them, so it is
  * safe to run anywhere. It is a net, not a guarantee: the rule stays "never
@@ -41,19 +47,42 @@ export function redact(text) {
   return out;
 }
 
+export const PERSONAL_MARK = '[REDACTED-PERSONAL]';
+
+// Addresses that identify a service or a placeholder, not a person.
+const SAFE_EMAIL =
+  /(?:^(?:no-?reply|notifications|support|git)@)|@(?:[a-z0-9-]+\.)*(?:noreply\.github\.com|github\.com|anthropic\.com|example\.(?:com|org|net)|[a-z0-9-]+\.(?:test|invalid|example|localhost))$/i;
+const EMAIL = /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b/g;
+// Grouped NANP numbers (555-123-4567, (555) 123-4567, +1 555 123 4567) and
+// bare E.164 (+15551234567). Dates, SHAs and IDs have other shapes.
+const PHONE =
+  /(?<![\w-])(?:\+?1[\s.-])?(?:\(\d{3}\)\s?|\d{3}[\s.-])\d{3}[\s.-]\d{4}(?![\w-])|(?<![\w+])\+\d{10,15}\b/g;
+
+export function redactPersonal(text) {
+  return String(text)
+    .replace(EMAIL, m => (SAFE_EMAIL.test(m) ? m : PERSONAL_MARK))
+    .replace(PHONE, PERSONAL_MARK);
+}
+
+/** Secrets and personal data out of PR titles, bodies and comments. */
+export function scrubPrText(text) {
+  return redactPersonal(redact(text));
+}
+
 if (
   process.argv[1] &&
   import.meta.url === new URL(`file://${process.argv[1]}`).href
 ) {
+  const scrub = process.argv.includes('--pr-text') ? scrubPrText : redact;
   const checkIdx = process.argv.indexOf('--check');
   if (checkIdx > -1) {
     const text = readFileSync(process.argv[checkIdx + 1], 'utf8');
-    process.exit(redact(text) === text ? 0 : 1);
+    process.exit(scrub(text) === text ? 0 : 1);
   }
   let buf = '';
   process.stdin.setEncoding('utf8');
   process.stdin.on('data', c => {
     buf += c;
   });
-  process.stdin.on('end', () => process.stdout.write(redact(buf)));
+  process.stdin.on('end', () => process.stdout.write(scrub(buf)));
 }

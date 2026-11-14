@@ -11,7 +11,7 @@ export interface WaitlistJoinedConfirmationProps {
   readonly confirmationRef?: RefObject<HTMLDivElement | null>;
 }
 
-/** The calm confirmation the request-access card shows once a request lands. */
+/** The calm confirmation the card shows once a request lands. */
 export function WaitlistJoinedConfirmation({
   email,
   artistName,
@@ -30,14 +30,14 @@ export function WaitlistJoinedConfirmation({
       className={cn('flex w-full flex-col gap-2', className)}
     >
       <Heading className='text-balance text-xl font-medium tracking-tight text-primary-token'>
-        You&apos;re on the list
+        You&apos;re on the waitlist.
       </Heading>
       <p className='text-pretty text-sm text-secondary-token'>
         We&apos;ll email{' '}
         <span className='break-all font-medium text-primary-token'>
           {email}
         </span>{' '}
-        when your invite is ready.
+        when your spot opens.
       </p>
       {artist ? (
         <p

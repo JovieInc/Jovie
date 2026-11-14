@@ -60,3 +60,30 @@ export const TrackSurface: Story = {
     surfaceVariant: 'track',
   },
 };
+
+export const EmptyUrl: Story = {
+  args: { url: '' },
+};
+
+export const Partial: Story = {
+  args: { icon: null, badge: 'Custom' },
+};
+
+export const LongContent: Story = {
+  args: {
+    label: 'Official website with every release and all upcoming tour dates',
+  },
+};
+
+export const RtlOverflow: Story = {
+  decorators: [
+    Story => (
+      <div dir='rtl'>
+        <Story />
+      </div>
+    ),
+  ],
+  args: {
+    label: 'الموقع الرسمي وجميع تواريخ الجولة القادمة',
+  },
+};

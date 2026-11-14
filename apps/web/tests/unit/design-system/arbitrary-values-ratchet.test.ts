@@ -12,6 +12,12 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it, vi } from 'vitest';
+import {
+  evaluateBaseDesignRatchet,
+  OFF_SCALE_HINT,
+  ON_SCALE_STEPS,
+} from '../../../../../scripts/design-system-base-ratchet.mjs';
+import { CANONICAL_SPACING_STEPS } from '../../../scripts/optical-grid-scanners';
 
 /**
  * Design-system drift ratchet.
@@ -184,6 +190,19 @@ describe('design-system arbitrary-value ratchet', () => {
         'Use design-system tokens instead of arbitrary values, or — if this is intentional — justify it in review.'
     ).toBeLessThanOrEqual(baseline.count);
   }, 30_000);
+});
+
+describe('off-scale numeric step ratchet', () => {
+  // Tailwind v4 takes any number as a step, so `h-7.25` (29px) is an
+  // arbitrary value with no `-[` for the count above to see.
+  it('adds no off-scale numeric steps beyond trusted base source', () => {
+    for (const step of CANONICAL_SPACING_STEPS)
+      if (step !== 'px') expect(ON_SCALE_STEPS.has(step), step).toBe(true);
+    const added = evaluateBaseDesignRatchet().newIdentities.filter(key =>
+      key.includes('\toff-scale-step\t')
+    );
+    expect(added, `${OFF_SCALE_HINT}\n${added.join('\n')}`).toEqual([]);
+  });
 });
 
 describe('arbitrary-value source prefilter', () => {

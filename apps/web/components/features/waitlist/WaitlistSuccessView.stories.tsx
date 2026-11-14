@@ -39,7 +39,7 @@ export const Web214AuthenticatedPending: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     await expect(
-      canvas.getByRole('heading', { name: "You're on the list" })
+      canvas.getByRole('heading', { name: "You're on the waitlist." })
     ).toBeVisible();
     await expect(
       canvas.queryByTestId('waitlist-start-pro-checkout')

@@ -370,7 +370,7 @@ export const ContactDetailSidebar = memo(function ContactDetailSidebar({
             }
             actions={headerActions}
             className='px-2 py-2'
-            titleClassName='text-base leading-5 tracking-[-0.02em]'
+            titleClassName='text-base leading-5 tracking-tighter'
             data-testid='contact-detail-entity-header'
           />
         ) : undefined

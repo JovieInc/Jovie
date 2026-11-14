@@ -102,6 +102,15 @@ ruleTester.run('canonical-ui-label-casing', rule, {
       filename: '/project/apps/web/components/example/Example.stories.tsx',
       code: `<Button>open profile</Button>`,
     },
+    {
+      // Payment brands keep their casing inside sentence-case descriptions.
+      filename,
+      code: `<SettingsActionRow description="Checking your Stripe connection and payout status." />`,
+    },
+    {
+      filename,
+      code: `<SettingsActionRow description="Connect Stripe to receive fan payments directly through Jovie. Stripe handles payment processing, payouts, and tax reporting." />`,
+    },
   ],
 
   invalid: [
@@ -123,7 +132,31 @@ ruleTester.run('canonical-ui-label-casing', rule, {
     {
       filename,
       code: `<CardDescription>Share Your Profile Link On Social Media.</CardDescription>`,
-      errors: [{ messageId: 'useSentenceCase' }],
+      errors: [
+        {
+          messageId: 'useSentenceCase',
+          data: {
+            contextLabel: '<CardDescription>',
+            value: 'Share Your Profile Link On Social Media.',
+            suggestion: 'Share your profile link on social media.',
+          },
+        },
+      ],
+    },
+    {
+      // A brand stays capitalized. The other mid-sentence capital is the fix.
+      filename,
+      code: `<SettingsActionRow description="Checking your Stripe Connection and payout status." />`,
+      errors: [
+        {
+          messageId: 'useSentenceCase',
+          data: {
+            contextLabel: 'description prop',
+            value: 'Checking your Stripe Connection and payout status.',
+            suggestion: 'Checking your Stripe connection and payout status.',
+          },
+        },
+      ],
     },
     {
       filename,
@@ -143,12 +176,30 @@ ruleTester.run('canonical-ui-label-casing', rule, {
     {
       filename,
       code: `toast.error('Member Removed');`,
-      errors: [{ messageId: 'useSentenceCase' }],
+      errors: [
+        {
+          messageId: 'useSentenceCase',
+          data: {
+            contextLabel: 'toast message',
+            value: 'Member Removed',
+            suggestion: 'Member removed',
+          },
+        },
+      ],
     },
     {
       filename,
       code: `<TooltipContent>High Intent</TooltipContent>`,
-      errors: [{ messageId: 'useSentenceCase' }],
+      errors: [
+        {
+          messageId: 'useSentenceCase',
+          data: {
+            contextLabel: '<TooltipContent>',
+            value: 'High Intent',
+            suggestion: 'High intent',
+          },
+        },
+      ],
     },
   ],
 });

@@ -2,16 +2,13 @@ import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ChatUsageData } from '@/lib/queries/useChatUsageQuery';
+import { idleBillingQueries } from '@/tests/fixtures/idle-billing-queries';
 import { SettingsUsageStatsSection } from '../../../components/features/dashboard/organisms/SettingsUsageStatsSection';
 
 const mockUseChatUsageQuery = vi.fn();
 const refetch = vi.fn();
 vi.mock('@/lib/queries', () => ({
-  useCheckoutMutation: () => ({
-    error: null,
-    isPending: false,
-    mutate: vi.fn(),
-  }),
+  ...idleBillingQueries,
   useChatUsageQuery: () => mockUseChatUsageQuery(),
 }));
 const baseUsage: ChatUsageData = {

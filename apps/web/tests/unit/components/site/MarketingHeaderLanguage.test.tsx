@@ -31,18 +31,6 @@ vi.mock('@/data/marketingNavigation', async importOriginal => {
   return { ...actual, MARKETING_NAV_LINKS: renamedLinks };
 });
 
-vi.mock('@/lib/flags/marketing-static', async importOriginal => {
-  const actual =
-    await importOriginal<typeof import('@/lib/flags/marketing-static')>();
-  return {
-    ...actual,
-    FEATURE_FLAGS: {
-      ...actual.FEATURE_FLAGS,
-      SHOW_MARKETING_CENTER_NAV: true,
-    },
-  };
-});
-
 describe('marketing header language independence', () => {
   beforeEach(() => renderHeaderNav.mockClear());
   afterEach(cleanup);

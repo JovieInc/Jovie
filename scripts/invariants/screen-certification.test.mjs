@@ -4219,15 +4219,15 @@ if (p.endsWith('/zip')) {
 
   it('registers the profile-mode render route for changed-surface certification', () => {
     const source = 'apps/web/app/[username]/profile-mode-render/';
+    const missSource = 'apps/web/app/[username]/profile-miss/page.tsx';
     const screen = SCREEN_REGISTRY.find(
       entry => entry.id === 'web.profile-mode-render'
     );
-
     assert.deepEqual(screen, {
       id: 'web.profile-mode-render',
       platform: 'web',
       owner: 'profile-mode-render',
-      sources: [source],
+      sources: [source, missSource],
       viewports: ['desktop', 'mobile'],
     });
 
