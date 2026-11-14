@@ -291,8 +291,11 @@ def rank_pass(lane, host, binding, linear, now: float | None = None, force: bool
         ready = [row for row in rows if skip_reason(row, open_ids, frozenset(label.lower() for label in binding.excluded)) is None]
         top = backlog_rank.order(ready, now)[:RANK_TOP]
         top_ids = {row["id"] for row in top}
-        others = [value for key, value in current.items() if key not in top_ids]
-        pending = backlog_rank.plan_sort_orders(top, current, min(others) if others else 0.0)
+        # Only rows that could be promoted compete with the ranked list; unready or held rows may sit
+        # anywhere. Otherwise every new issue (Linear lists it first) forced a rewrite of all
+        # RANK_TOP rows, and each write is a webhook to every subscriber (JOV-12550).
+        others = {row["id"]: current[row["id"]] for row in ready if row["id"] not in top_ids}
+        pending = backlog_rank.plan_sort_orders(top, current, min(others.values()) if others else float("inf"), others=others)
         receipt.update(readAt=now, backlog=len(rows), top=len(top))
     outbox = lane.linear_sync.Outboxed(state, linear)
     for issue_id in list(pending)[:RANK_WRITES_PER_TICK]:

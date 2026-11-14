@@ -257,11 +257,8 @@ export function sourceHasJsx(source, fileName = 'source.tsx') {
   );
 }
 
-// listComponentsInRoot re-scans a root on every call (multiple coverage
-// roots overlap, and callers like discoverAtomMoleculeInventory() call it
-// repeatedly within one process). Parsing every .tsx file's AST is real
-// work; cache by (path, mtime, size) so a repeat call over an unchanged
-// file is a Map lookup instead of a re-parse.
+// Repeated discovery calls share source classification by (path, mtime, size),
+// so unchanged components do not require another AST parse.
 const sourceHasJsxCache = new Map();
 
 function sourceHasJsxCached(absPath) {
@@ -345,13 +342,17 @@ function walkFiles(absDir, recursive, out = []) {
 }
 
 /**
+ * @param {boolean} [recursive] Scoped discovery can inspect direct siblings only.
  * @returns {{ component: string, sourceRel: string, sourceAbs: string, dirRel: string, storyRel: string | null, testRel: string | null, covered: boolean, tested: boolean }[]}
  */
-export function listComponentsInRoot(rootRel, repoRoot = REPO_ROOT) {
+export function listComponentsInRoot(
+  rootRel,
+  repoRoot = REPO_ROOT,
+  recursive = shouldWalkRootRecursively(rootRel)
+) {
   const absRoot = join(repoRoot, rootRel);
   if (!existsSync(absRoot)) return [];
 
-  const recursive = shouldWalkRootRecursively(rootRel);
   const files = walkFiles(absRoot, recursive);
   const byDir = new Map(); // dirAbs -> { stories: Map, tests: Map, sources: [] }
 
@@ -375,7 +376,6 @@ export function listComponentsInRoot(rootRel, repoRoot = REPO_ROOT) {
     if (!SOURCE_TSX_RE.test(name)) continue;
     const base = name.replace(/\.tsx$/i, '');
     if (isExcludedBasename(base)) continue;
-    // packages/ui non-recursive root: only direct children already handled
     bucket.sources.push({ base, abs, name });
   }
 

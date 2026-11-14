@@ -7,6 +7,7 @@ import type {
   AgentRoomView,
 } from '@jovie/agent-transport-contracts/agent-room';
 import { UserAvatar } from '@jovie/ui';
+import type { ReactNode } from 'react';
 import { HudStatusPill } from '@/app/app/(shell)/admin/ops/HudStatusPill';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 
@@ -164,11 +165,14 @@ export interface AgentRoomProps {
   readonly view: AgentRoomView;
   /** Shown when the store could not be read; the roster still renders. */
   readonly unavailableReason?: string | null;
+  /** Optional composer under the feed; the room itself never sends. */
+  readonly composer?: ReactNode;
 }
 
 export function AgentRoom({
   view,
   unavailableReason,
+  composer,
 }: Readonly<AgentRoomProps>) {
   const now = view.generatedAt;
   return (
@@ -230,6 +234,7 @@ export function AgentRoom({
             ))}
           </ol>
         )}
+        {composer}
       </ContentSurfaceCard>
     </div>
   );

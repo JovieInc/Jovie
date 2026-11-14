@@ -208,13 +208,28 @@ const prefixGateScope = new Set([
   ...(values.component ?? []),
   ...gatedFiles,
 ]);
-for (const rel of [...(values.component ?? []), ...gatedFiles, ...screenFiles])
-  if (!seen.has(rel) && seen.add(rel))
-    list.push({
+const scopedDirectories = new Map();
+for (const rel of [
+  ...(values.component ?? []),
+  ...gatedFiles,
+  ...screenFiles,
+]) {
+  if (seen.has(rel)) continue;
+  seen.add(rel);
+  const dir = dirname(rel);
+  if (!scopedDirectories.has(dir))
+    scopedDirectories.set(
+      dir,
+      new Map(listComponentsInRoot(dir, root, false).map(c => [c.sourceRel, c]))
+    );
+  list.push(
+    scopedDirectories.get(dir).get(rel) ?? {
       sourceRel: rel,
       testRel: rel.replace(/\.tsx$/, '.test.tsx'),
       storyRel: rel.replace(/\.tsx$/, '.stories.tsx'),
-    });
+    }
+  );
+}
 if (!values.all && values.component)
   list = list.filter(c => values.component.includes(c.sourceRel));
 

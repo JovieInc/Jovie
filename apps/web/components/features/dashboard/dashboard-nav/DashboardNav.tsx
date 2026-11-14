@@ -463,10 +463,10 @@ export function DashboardNav({
     <div
       data-sidebar-search-slot='true'
       className={cn(
-        'mx-1 flex h-9 shrink-0 items-center gap-(--space-2-5) pr-1.5 lg:overflow-hidden',
+        'flex h-9 shrink-0 items-center gap-(--space-2-5) pr-1.5 lg:overflow-hidden',
         // The command slot keeps its vertical allocation while the
         // surrounding rail narrows; navigation below never moves.
-        'group-data-[collapsible=icon]:mx-0 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:gap-0 group-data-[collapsible=icon]:border-transparent group-data-[collapsible=icon]:bg-transparent group-data-[collapsible=icon]:pr-0'
+        'group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:gap-0 group-data-[collapsible=icon]:border-transparent group-data-[collapsible=icon]:bg-transparent group-data-[collapsible=icon]:pr-0'
       )}
     >
       <RailStagedContent

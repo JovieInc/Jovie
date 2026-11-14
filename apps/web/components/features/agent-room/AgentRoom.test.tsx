@@ -52,4 +52,14 @@ describe('AgentRoom', () => {
     expect(roomTimeAgo('2026-11-08T20:00:00.000Z', now)).toBe('3d ago');
     expect(roomTimeAgo(null, now)).toBe('never');
   });
+
+  it('renders a composer slot under the feed when given one', () => {
+    render(
+      <AgentRoom
+        view={fleetRoomFixtureView([])}
+        composer={<form data-testid='slot-composer' />}
+      />
+    );
+    expect(screen.getByTestId('slot-composer')).toBeInTheDocument();
+  });
 });
