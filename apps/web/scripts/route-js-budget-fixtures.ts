@@ -139,6 +139,7 @@ export function writeAncestorGitRepo(
   });
   const git = (args: string[]): void => {
     const result = spawnSync('git', args, {
+      maxBuffer: 256 * 1024 * 1024,
       cwd: nextDir,
       env,
       encoding: 'utf8',

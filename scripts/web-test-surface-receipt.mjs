@@ -27,6 +27,7 @@ export const REPO_ROOT = resolve(fileURLToPath(new URL('..', import.meta.url)));
 function git(args, fallback = '') {
   try {
     return execFileSync('git', args, {
+      maxBuffer: 256 * 1024 * 1024,
       cwd: REPO_ROOT,
       encoding: 'utf8',
     }).trim();
