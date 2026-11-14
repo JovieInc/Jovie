@@ -23,7 +23,7 @@
    dark regions stay in the content-safe lower-left block. Three washes at
    <= 0.16 peak opacity — never a flat uniform glow. */
 .marketing-editorial-background[data-variant="soft"]
-.marketing-editorial-background__washes {
+  .marketing-editorial-background__washes {
   background:
     radial-gradient(
       62% 48% at 72% 28%,
@@ -48,7 +48,7 @@
    never cross; washes stay under 0.14 peak so the sweep reads as light,
    not object. */
 .marketing-editorial-background[data-variant="flow"]
-.marketing-editorial-background__washes {
+  .marketing-editorial-background__washes {
   background:
     radial-gradient(
       58% 44% at 78% 30%,

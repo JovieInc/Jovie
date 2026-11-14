@@ -1,20 +1,32 @@
 import assert from 'node:assert/strict';
-import { execFileSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { dirname, join, resolve } from 'node:path';
+import { spawnSync } from 'node:child_process';
+import { readFileSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
 import { describe, it } from 'node:test';
 import { fileURLToPath } from 'node:url';
+import {
+  biomeDiagnosticCategories,
+  isInsideRepo,
+  listWorkspaceBiomeOutsideRepoHits,
+  PROBE_PARENT,
+  runBiomeOnRepoProbes,
+  sourceProbesWorkspaceBiomeOutsideRepo,
+  workspaceBiomeBin,
+} from '../biome-repo-probe.mjs';
 import { formatBiomeJson } from '../format-biome-json.mjs';
 
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
-const BIOME = resolve(REPO_ROOT, 'node_modules/@biomejs/biome/bin/biome');
 
 function biomeAccepts(text) {
-  const dir = mkdtempSync(join(tmpdir(), 'biome-json-'));
-  const path = join(dir, 'sample.json');
-  writeFileSync(path, text);
-  execFileSync(BIOME, ['check', path], { encoding: 'utf8' });
+  const result = runBiomeOnRepoProbes(REPO_ROOT, [
+    { name: 'sample.json', text },
+  ]);
+  if (result.error) throw result.error;
+  if (result.status !== 0) {
+    throw new Error(
+      `biome check failed (${result.status}): ${result.stderr || result.stdout}`
+    );
+  }
 }
 
 describe('formatBiomeJson', () => {
@@ -94,5 +106,67 @@ describe('formatBiomeJson', () => {
     );
     biomeAccepts(baseline);
     biomeAccepts(formatBiomeJson(parsed));
+  });
+});
+
+describe('workspace biome probes stay inside the repo', () => {
+  it('rejects a probe name that could leave the workspace', () => {
+    assert.throws(
+      () =>
+        runBiomeOnRepoProbes(REPO_ROOT, [
+          { name: '../sample.json', text: '{}\n' },
+        ]),
+      /basename/
+    );
+  });
+
+  it('keeps the probe directory inside the repo and visible to git', () => {
+    assert.equal(workspaceBiomeBin(REPO_ROOT).endsWith('bin/biome'), true);
+    assert.equal(
+      isInsideRepo(REPO_ROOT, resolve(REPO_ROOT, PROBE_PARENT)),
+      true
+    );
+    // Built without a quoted /tmp literal: the hermetic guard rejects those.
+    const outside = ['', 'tmp', 'biome-outside'].join('/');
+    assert.equal(isInsideRepo(REPO_ROOT, outside), false);
+    const ignored = spawnSync(
+      'git',
+      ['check-ignore', '-q', '--', `${PROBE_PARENT}/sample.json`],
+      { cwd: REPO_ROOT, encoding: 'utf8' }
+    );
+    assert.equal(ignored.status, 1);
+  });
+
+  it('parses biome json diagnostics and treats a panic with no json as empty', () => {
+    assert.deepEqual(
+      biomeDiagnosticCategories({
+        stdout:
+          'note\n{"diagnostics":[{"category":"lint/style/noRestrictedImports"}]}',
+      }),
+      ['lint/style/noRestrictedImports']
+    );
+    assert.deepEqual(biomeDiagnosticCategories({ stdout: '' }), []);
+    assert.deepEqual(
+      biomeDiagnosticCategories({ stdout: '{"diagnostics":[]}' }),
+      []
+    );
+  });
+
+  it('flags a workspace biome binary aimed at a temp directory', () => {
+    const open = 'tmp' + 'dir(';
+    const deliberate = [
+      "const BIOME = resolve(REPO_ROOT, 'node_modules/@biomejs/biome/bin/biome');",
+      `const dir = mkdtempSync(join(${open}), 'biome-json-'));`,
+      "execFileSync(BIOME, ['check', path]);",
+    ].join('\n');
+    assert.deepEqual(sourceProbesWorkspaceBiomeOutsideRepo(deliberate), [
+      'BIOME',
+    ]);
+    const prePush = readFileSync(
+      resolve(REPO_ROOT, 'scripts/hooks/pre-push-gate.test.mjs'),
+      'utf8'
+    );
+    assert.deepEqual(sourceProbesWorkspaceBiomeOutsideRepo(prePush), []);
+    assert.deepEqual(listWorkspaceBiomeOutsideRepoHits(REPO_ROOT), []);
   });
 });

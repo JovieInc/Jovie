@@ -980,8 +980,9 @@ html[data-profile-flow-open="true"] .cookie-banner-card {
      dock then covered the last ~42px). Cap the column itself. Mobile overflow
      mode stays in the max-width block above and is unchanged. */
   [data-testid="profile-compact-surface"]:not([data-render-mode="preview"]):has(
-    > .profile-floating-tab-bar
-  ) > .profile-content-column {
+      > .profile-floating-tab-bar
+    )
+    > .profile-content-column {
     flex: 1 1 auto;
     height: calc(100% - var(--profile-bottom-nav-height));
     max-height: calc(100% - var(--profile-bottom-nav-height));
@@ -1162,8 +1163,9 @@ html[data-profile-flow-open="true"] .cookie-banner-card {
      'menu sheet spans the phone column' (2px tolerance, first red run
      41005969193). Validated live: sheet/shell bottom delta 8px -> 0. */
   .profile-viewport:not(.profile-viewport--embedded):not(
-    .profile-viewport--desktop-surface
-  ) .profile-compact-surface-slot {
+      .profile-viewport--desktop-surface
+    )
+    .profile-compact-surface-slot {
     display: flex;
     flex-direction: column;
   }
@@ -1189,7 +1191,7 @@ html[data-profile-flow-open="true"] .cookie-banner-card {
      the compact shell keeps its base 430px phone-column width, centered on
      the profile stage like the md card. */
   .profile-viewport--desktop-surface:not(.profile-viewport--embedded)
-  .public-profile-layout-frame {
+    .public-profile-layout-frame {
     max-width: min(100%, var(--ds-public-content-max));
     padding-left: max(var(--page-pad), env(safe-area-inset-left));
     padding-right: max(var(--page-pad), env(safe-area-inset-right));
@@ -1223,7 +1225,7 @@ html[data-profile-flow-open="true"] .cookie-banner-card {
 
   /* JOV-11623: top-align the desktop stage across mode switches. */
   .profile-viewport--desktop-surface:not(.profile-viewport--embedded)
-  .public-profile-layout-frame--desktop {
+    .public-profile-layout-frame--desktop {
     align-items: flex-start;
   }
 }
@@ -1253,16 +1255,18 @@ html[data-profile-flow-open="true"] .cookie-banner-card {
      Home grid inside the shell. The 32px start padding keeps the canvas
      inside the visual-audit shell bounds (y >= 24 at 1280x900). */
   .profile-viewport:not(.profile-viewport--embedded):not(
-    .profile-viewport--desktop-surface
-  ) .public-profile-layout-frame--compact {
+      .profile-viewport--desktop-surface
+    )
+    .public-profile-layout-frame--compact {
     align-items: flex-start;
     padding-block-start: 32px;
   }
 
   /* Drop the phone chrome: the page is the canvas. */
   .profile-viewport:not(.profile-viewport--embedded):not(
-    .profile-viewport--desktop-surface
-  ) .public-profile-compact-shell {
+      .profile-viewport--desktop-surface
+    )
+    .public-profile-compact-shell {
     max-width: min(100%, var(--profile-desktop-max-width));
     /* Canvas height follows content with the designed minimum. Forcing
        max(--profile-desktop-min-height, 100dvh) stretched the shell to

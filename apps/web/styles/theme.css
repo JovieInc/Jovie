@@ -329,7 +329,7 @@
 /* Reserve balanced space only when the badge exists so Apple/Google labels
    remain centered and never run under Clerk's inline "Last used" badge. */
 :is(.cl-signIn-root, .cl-signUp-root)
-.cl-socialButtonsBlockButton:has(.cl-lastAuthenticationStrategyBadge) {
+  .cl-socialButtonsBlockButton:has(.cl-lastAuthenticationStrategyBadge) {
   padding-inline: 4.5rem;
 }
 

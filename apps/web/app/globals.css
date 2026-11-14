@@ -135,7 +135,7 @@ html[data-desktop-runtime="electron"] [data-app-shell-frame="true"] {
    equals the sides (--app-shell-gap), so the titlebar band and the shared
    header row start one shell gap below the window top. */
 html[data-desktop-runtime="electron"]
-[data-app-shell-body="true"][data-electron-top-gap-owner="titlebar"] {
+  [data-app-shell-body="true"][data-electron-top-gap-owner="titlebar"] {
   padding-top: var(--app-shell-gap);
   transition-property: gap, padding-right, padding-bottom, padding-left;
 }
@@ -252,9 +252,9 @@ html[data-desktop-runtime="electron"]
 
 /* Settings now supplies the shared desktop header inside its route panel. */
 html[data-desktop-runtime="electron"]
-[data-app-shell-content-inset="true"]:has(
-  [data-testid="settings-shell-content"]
-) {
+  [data-app-shell-content-inset="true"]:has(
+    [data-testid="settings-shell-content"]
+  ) {
   padding-top: 0;
 }
 

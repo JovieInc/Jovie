@@ -109,7 +109,7 @@
    The trailing HTML marker releases paint without waiting for hydration;
    the heading stays visible and the original controls keep their identity. */
 .system-b-onboarding-chat[data-starter-handoff="true"]
-[data-dock="bottom"]:not(:has([data-onboarding-composer-complete])) {
+  [data-dock="bottom"]:not(:has([data-onboarding-composer-complete])) {
   visibility: hidden;
 }
 
@@ -6444,7 +6444,7 @@
 /* An open composer palette/status owns the space above the dock. Keep the
    suggestion geometry reserved while removing overlapping content and focus. */
 [data-empty-chat-region="true"]:has([data-chat-composer-overlay="true"])
-[data-empty-chat-suggestions="true"] {
+  [data-empty-chat-suggestions="true"] {
   visibility: hidden;
 }
 
