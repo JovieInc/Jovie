@@ -58,7 +58,6 @@ HOSTED_DEEP_EVIDENCE_JOBS = (
 
 HOSTED_POST_MERGE_JOBS = (
     ("linear-sync-on-merge.yml", "sync_done"),
-    ("neon-ephemeral-branch-cleanup.yml", "delete-neon-branch"),
 )
 
 def _writer_proof_body(
