@@ -35,6 +35,62 @@ describe('InlineSubscribe', () => {
     ).not.toBeDisabled();
   });
 
+  it('offers an email-format hint and leaves idle ARIA state clear', () => {
+    render(<Harness />);
+    const field = screen.getByRole('textbox', { name: 'Email address' });
+
+    expect(field).toHaveAttribute(
+      'placeholder',
+      expect.stringMatching(/^[^\s@]+@[^\s@]+\.[^\s@]+$/)
+    );
+    expect(field).not.toHaveAttribute('aria-invalid', 'true');
+    expect(field).not.toHaveAttribute('aria-busy', 'true');
+  });
+
+  it('keeps pending email frozen and focused, then resumes editing when settled', async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+    function Request({ pending }: { readonly pending: boolean }) {
+      const [value, setValue] = useState('');
+      return (
+        <InlineSubscribe
+          ariaLabel='Email address'
+          buttonLabel='Subscribe'
+          value={value}
+          onValueChange={next => {
+            onChange(next);
+            setValue(next);
+          }}
+          pending={pending}
+        />
+      );
+    }
+    const { rerender } = render(<Request pending={false} />);
+    const field = screen.getByRole('textbox', { name: 'Email address' });
+    await user.type(field, 'fan@example.com');
+    expect(field).toHaveValue('fan@example.com');
+    expect(field).toHaveFocus();
+
+    rerender(<Request pending />);
+    expect(field).toHaveFocus();
+    expect(field).toHaveAttribute('readonly');
+    expect(field).toHaveAttribute('aria-busy', 'true');
+    onChange.mockClear();
+    await user.type(field, 'blocked');
+    expect(field).toHaveValue('fan@example.com');
+    expect(onChange).not.toHaveBeenCalled();
+
+    rerender(<Request pending={false} />);
+    expect(screen.getByRole('textbox', { name: 'Email address' })).toBe(field);
+    expect(field).toHaveFocus();
+    expect(field).toHaveValue('fan@example.com');
+    expect(field).not.toHaveAttribute('readonly');
+    expect(field).not.toHaveAttribute('aria-busy', 'true');
+    await user.type(field, '.au');
+    expect(field).toHaveValue('fan@example.com.au');
+    expect(onChange).toHaveBeenLastCalledWith('fan@example.com.au');
+  });
+
   it('submits an empty field so the parent can validate', () => {
     const onSubmit = vi.fn();
     render(<Harness onSubmit={onSubmit} />);
