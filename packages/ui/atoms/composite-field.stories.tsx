@@ -73,7 +73,7 @@ export const ErrorState: Story = {
           aria-label='Choose your handle'
           aria-invalid='true'
           aria-describedby='composite-field-error-message'
-          className='min-w-0 flex-1 bg-transparent text-error'
+          className='min-w-0 flex-1 bg-transparent text-error-text'
           defaultValue='taken'
         />
         <Button size='sm' type='button'>
@@ -82,7 +82,7 @@ export const ErrorState: Story = {
       </CompositeField>
       <p
         id='composite-field-error-message'
-        className='px-1 text-xs text-error'
+        className='px-1 text-xs text-error-text'
         role='alert'
       >
         That handle is already taken. Try another.
