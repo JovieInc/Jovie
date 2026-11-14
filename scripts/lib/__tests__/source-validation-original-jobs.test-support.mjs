@@ -9,6 +9,7 @@ const SETUP_NODE = 'Setup Node.js and pnpm';
 const MQ_PARITY_TOOLS = 'Resolve MQ parity tools for older source heads';
 const MQ_PARITY_SCOPE = 'Select MQ parity scope';
 const TYPECHECK_TWIN = 'Run typecheck lane parity';
+const UNIT_FLAKY_UPLOAD = 'Preserve retried-then-passed unit tests';
 
 /** Serial → pooled disk-read step is an owned migration (same guards, first
  * failure wins). Normalize both sides so the deepEqual still pins everything
@@ -84,6 +85,7 @@ export function assertOriginalJobsRetained(current, baseline) {
     MQ_PARITY_TOOLS,
     MQ_PARITY_SCOPE,
     TYPECHECK_TWIN,
+    UNIT_FLAKY_UPLOAD,
   ]);
   const strip = job => ({
     ...job,
@@ -110,7 +112,8 @@ export function assertOriginalJobsRetained(current, baseline) {
           (id === 'unit' &&
             (name === MQ_PARITY_TOOLS ||
               name === MQ_PARITY_SCOPE ||
-              name === TYPECHECK_TWIN))) &&
+              name === TYPECHECK_TWIN ||
+              name === UNIT_FLAKY_UPLOAD))) &&
         !kept.length &&
         added.length === 1;
       assert.ok(kept.length === added.length || firstLanding, `${id}: ${name}`);
@@ -135,6 +138,17 @@ export function assertOriginalJobsRetained(current, baseline) {
     /steps\.mq-parity\.outputs\.typecheck == 'true'/
   );
   assert.match(String(twin?.if), /matrix\.shard == '2\/4'/);
+  // Observability-only artifact upload (JOV-12621): never blocks, never
+  // uploads more than the retry sidecar, never fails on a missing file.
+  const flaky = unitSteps.find(step => step.name === UNIT_FLAKY_UPLOAD);
+  if (flaky) {
+    assert.match(String(flaky.uses), /^actions\/upload-artifact@[a-f0-9]{40}/);
+    assert.equal(flaky.with?.path, 'apps/web/test-report.*.flaky.json');
+    assert.equal(flaky.with?.['if-no-files-found'], 'ignore');
+    assert.match(String(flaky.with?.name), /^unit-flaky-/);
+    assert.equal(flaky['continue-on-error'], undefined);
+    assert.match(String(flaky.if), /steps\.reuse\.outputs\.reuse != 'true'/);
+  }
 
   const steps = current.jobs.deterministic.steps;
   const linearStep = steps.find(step => step.name === linear);

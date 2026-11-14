@@ -2957,7 +2957,7 @@ export async function runStructural(opts = {}) {
     "node --experimental-test-coverage --test --test-coverage-include='scripts/verification/*.mjs' --test-coverage-exclude='scripts/verification/*.test.mjs' --test-coverage-lines=100 --test-coverage-functions=100 --test-coverage-branches=98 scripts/verification/*.test.mjs",
     'pnpm ci:harness:check',
     'pnpm ci:incident-contract:validate',
-    'node --test scripts/ci-release-trigger-contract.test.mjs .github/scripts/analyze-test-flakiness.test.js',
+    'node --test scripts/ci-release-trigger-contract.test.mjs .github/scripts/analyze-test-flakiness.test.js .github/scripts/flakiness-retry-evidence.test.js',
     'node --test .github/scripts/collect-quarantine-evidence.test.mjs',
     'node --test scripts/file-quarantine-clusters.test.mjs scripts/propose-quarantine-ledger.test.mjs',
     'node --test .github/scripts/marketing-dom-workflow.test.mjs',
