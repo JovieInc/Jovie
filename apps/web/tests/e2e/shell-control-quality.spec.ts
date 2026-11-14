@@ -54,6 +54,34 @@ test('keyboard focus rings on the app shell are never clipped by an overflow anc
   expect(report.findings).toEqual([]);
 });
 
+test('the sidebar logo row and the page title share one center line', async ({
+  page,
+}) => {
+  // Tim, Nov 14: on web the logo row sat 12px below "Home". Every header
+  // row across the sidebar and the content must center on the same line.
+  const centers = await page.evaluate(() => {
+    const center = (selector: string) => {
+      const element = document.querySelector(selector);
+      if (!(element instanceof HTMLElement)) return null;
+      const box = element.getBoundingClientRect();
+      return box.height > 0 ? box.top + box.height / 2 : null;
+    };
+    return {
+      sidebarHeader: center('[data-sidebar="header"]'),
+      sidebarActions: center('[data-sidebar-header-actions]'),
+      contentHeader: center('[data-testid="dashboard-header"]'),
+      contentTitle: center('[data-testid="dashboard-header-title-slot"]'),
+    };
+  });
+  for (const [name, value] of Object.entries(centers)) {
+    expect(value, `${name} is not rendered`).not.toBeNull();
+  }
+  const line = centers.contentTitle ?? 0;
+  for (const [name, value] of Object.entries(centers)) {
+    expect(Math.abs((value ?? 0) - line), name).toBeLessThanOrEqual(1);
+  }
+});
+
 test('composed browser rails survive ten complete mixed-input cycles, preserve drafts, and reject duplicate actions', async ({
   page,
 }, testInfo) => {

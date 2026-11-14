@@ -251,6 +251,22 @@ describe('sidebar header actions row', () => {
     expect(logoRow).toHaveClass('h-7');
   });
 
+  it('sizes the sidebar header like the content header so their rows share a center line', () => {
+    renderHeader();
+    const { header } = headerControls();
+    // The content header is h-(--app-shell-header-height) and centers its
+    // title; the sidebar header must match it with symmetric padding, or the
+    // logo row drops below the page title (Tim, Nov 14).
+    const active = activeTokens(header);
+    expect(active).toContain('h-(--app-shell-header-height)');
+    expect(active).toContain('justify-center');
+    const vertical = active.filter(token => /^(?:pt|pb|py|mt|h)-/.test(token));
+    expect(vertical.sort()).toEqual([
+      'h-(--app-shell-header-height)',
+      'py-0.5',
+    ]);
+  });
+
   it('never clips a focus ring between a header control and the sidebar header', () => {
     renderHeader();
     const { header, controls } = headerControls();

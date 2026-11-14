@@ -470,11 +470,14 @@ export function UnifiedSidebar({
     >
       <SidebarHeader
         data-electron-drag-region='true'
+        // Same height as the content header, so the logo row and the page
+        // title share one center line (Tim, Nov 14: the 64px header sat the
+        // brand row 12px below "Home").
+        // Every sidebar (customer, route and operator) uses the one unified
+        // header-height token (founder lock 2026-09-25).
         className={cn(
           'relative justify-center gap-0 px-(--app-shell-sidebar-inset) group-data-[collapsible=icon]:px-0',
-          isRouteSidebar || isOperatorSection
-            ? 'h-(--app-shell-header-height) py-0.5'
-            : 'h-16 pt-5 pb-4'
+          'h-(--app-shell-header-height) py-0.5'
         )}
       >
         <SidebarHeaderNav
