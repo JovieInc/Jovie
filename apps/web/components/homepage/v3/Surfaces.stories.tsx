@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import type { ReactNode } from 'react';
-import { CommandPaletteCard, ReleasePage } from './Surfaces';
+import { Callout, CommandPaletteCard, ReleasePage } from './Surfaces';
 import './stage.css';
 import './product-ui.css';
 import './phone.css';
@@ -38,4 +38,28 @@ export const FeaturedRelease: Story = {
 
 export const CommandPalette: Story = {
   render: () => <CommandPaletteCard />,
+};
+
+/**
+ * Long content: a long callout label. The motion layer shortens the leader
+ * before the label crosses a frame guide; unplaced, it sits at rest.
+ */
+export const LongContentCallout: Story = {
+  render: () => (
+    <div style={{ position: 'relative', width: 480, height: 120 }}>
+      <Callout
+        anchor='story-long'
+        label='per release, per territory, per service, refreshed every night'
+      />
+    </div>
+  ),
+};
+
+/** Right-to-left: the release page inside an RTL document. */
+export const RtlReleasePage: Story = {
+  render: () => (
+    <div dir='rtl' className='hv3-phone' style={{ width: 390, height: 860 }}>
+      <ReleasePage />
+    </div>
+  ),
 };

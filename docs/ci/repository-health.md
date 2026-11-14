@@ -76,6 +76,7 @@ File count, checkout/history size, dependency/build complexity, and organization
 | Canonical visual baselines | 100 files / 12 MiB |
 | Forbidden tracked outputs | Zero new violations |
 | New repository-root entries | Only names in `scripts/repo-root-allowlist.json` |
+| Orphan review images | Zero images under `docs/screenshots/` or `docs/pen-stills/` that nothing outside their folder references |
 
 The 10,000-file failure is retired, not raised. `scripts/repo-health-baseline.json` records the 10,014 exact-main total, 9,945 old compatibility count, and legacy findings by rule/area. Receipts show the current total and delta. Existing PR-size, generated-placement, payload, binary, and visual gates still fail normally; there is no `continue-on-error`.
 
@@ -178,6 +179,10 @@ Pruned under this rule (JOV-6671): historical `apps/web/drizzle/migrations/meta/
 
 2026-10-26 hygiene pass: main was 198.00 MiB of 198 MiB and the drizzle cap test failing (12 snapshots, cap 8) after #23277 and neighbours. Pruned 0137-0140 (4 files, ~4.6 MiB) per the JOV-6671 rule; 0141-0148 remain. Tracked bytes 198.00 -> 193.54 MiB (4.46 MiB headroom). The vendored actions (JOV-8754, #22504, already merged) stay vendored: they exist to avoid GITHUB_TOKEN REST calls and are hash-verified against upstream, so deduping the two actions-cache bundles would need a custom build; budget unchanged.
 
+### Review images: PR evidence stays on the PR
+
+One-off PR evidence (before/after captures, QA stills, review screenshots) belongs on the PR as an attachment or an uploaded CI artifact, not in the tree. Committed copies outlive the review, nothing points at them, and they spend the shrink-only tracked-bytes budget; 2026-11 removed 55 such files (#25003). `scripts/lib/orphan-screenshot-guard.mjs`, run by `scripts/repo-hygiene-guard.mjs` (pre-commit and PR Size Guard), fails any `png`/`jpg`/`jpeg`/`webp`/`gif` under `docs/screenshots/` or `docs/pen-stills/` that no tracked file outside the image's own folder references by path or file name. An evidence bundle still counts as referenced: an image listed by a sibling file (README, `capture.json`, `holdout.json`) is live when a tracked file outside the folder names the folder (surface-census evidence, a test that reads the folder). A README inside the folder alone is not a reference. To fix a failure, delete the image and attach it to the PR, or link it from the doc, census entry or test that actually needs it. Tests: `scripts/lib/__tests__/orphan-screenshot-guard.test.mjs`.
+
 ### Repository-root allowlist
 
 Stale audit, status, and one-off script files accumulated at the root (`*_AUDIT.md`, `.agent-status.json`, `run-checks.sh`, `test-homepage.*`). The 2026-10-20 pass deleted the dead ones and moved the JOV-2712 hardening bundle to `docs/hardening/`. To stop regrowth, `scripts/repo-root-allowlist.json` lists every tracked top-level file and directory; `scripts/repo-hygiene-guard.mjs` fails any added path whose first segment is not listed, and a guard test keeps the list equal to the tracked root. Put docs under `docs/` or `canon/`, scripts under `scripts/`, and run evidence outside git. Adding a root entry is a reviewed edit to the allowlist; retiring one removes it.
@@ -205,6 +210,20 @@ All must hold for two consecutive 30-day windows:
 6. **Operations:** access, secrets, releases, dependency updates, observability, rollback, and cross-repo changes have lower total operator cost.
 
 Otherwise keep the monorepo and address the measured payload, build, or ownership problem directly.
+
+## CI event fan-out budget
+
+One event should start a known, small number of runs. Workflow chains (`workflow_run`) and pull-request metadata triggers (`edited`, `labeled`, `unlabeled`) multiply runs, and every run, even a skipped one, spends the shared GitHub event pipeline and run list; cancelled and successful bookkeeping runs also take the hosted job slots (about 60) and the shared `GITHUB_TOKEN` bucket that merge-gate jobs need.
+
+Measured 2026-11-04 to 2026-11-10: 111,600 workflow runs for 415 merged PRs, 269 runs per merged PR; 32,213 runs (29%) skipped every job. Four workflows were over 95% skipped (Cheap Fixer, Legacy Human Hold Scrub, Security Suppression Audit, Auto-Merge Base Guard); their filters moved to the trigger in #25018, which took the declared total from 269.3 to 256.3.
+
+Budget: **60 runs per merged PR** across all workflows. The registry ceiling starts at 300, about 10% above the measured 269 to 277 (the week moves with merge volume), so a nightly measurement is not red from its first run. It only goes down toward the target.
+
+- Registry: `scripts/ci-trigger-registry.json` lists every workflow file, the exact triggers that may start it (`event`, `event:type`, or `workflow_run:<upstream>`) and its expected `runsPerMergedPr`. `budget.runsPerMergedPr` is the target; `budget.ceiling` caps the declared total.
+- Gate: `scripts/ci-workflow-topology.test.mjs` fails when a workflow or trigger is not registered (fan-out triggers are named in the error), when a registered trigger no longer exists, when `runsPerMergedPr` is missing, or when the declared total passes the ceiling.
+- Adding a trigger: run `node scripts/ci-trigger-registry.mjs --write`, which syncs triggers and leaves a new workflow's `runsPerMergedPr` null, then fill in the measured or estimated number. A new `workflow_run`, `edited` or `labeled` trigger needs a reason in the PR body. Prefer an event filter (`types`, `branches`, `paths`) or a reusable call from a workflow that already wakes on the event over a job-level `if:` that skips.
+- Nightly measurement: the `fan-out-budget` job in CI Duration Ratchet (its existing 06:25 UTC schedule, so no new clock) runs `scripts/ci-trigger-budget.mjs` with the job's own read-only `GITHUB_TOKEN` through the shared client at `report` priority, about 200 calls. It fails when the measured 7-day runs per merged PR pass `budget.ceiling`, or when a workflow with 5+ skipped runs in a 6-hour sample skipped every job in more than 95% of its runs over both that sample and 7 days. It is not a PR check.
+- Lowering the ceiling: after a fan-out cut lands, re-measure and lower `budget.ceiling` and the affected `runsPerMergedPr` in the same PR.
 
 ## Safe cleanup playbook
 

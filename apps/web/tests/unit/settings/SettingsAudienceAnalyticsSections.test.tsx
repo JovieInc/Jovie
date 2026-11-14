@@ -1,5 +1,5 @@
 import { TooltipProvider } from '@jovie/ui';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { SettingsAnalyticsSection } from '@/features/dashboard/organisms/SettingsAnalyticsSection';
 import type { Artist } from '@/types/db';
@@ -30,8 +30,28 @@ vi.mock('@/features/dashboard/hooks/useOptimisticToggle', () => ({
   },
 }));
 
+const checkout = await vi.hoisted(async () => {
+  const { createUpgradeCheckoutFixture } = await import(
+    '@/tests/fixtures/upgrade-checkout'
+  );
+  return createUpgradeCheckoutFixture();
+});
+vi.mock('@/lib/analytics', () => ({
+  track: checkout.track,
+  useFeatureFlag: () => true,
+}));
+vi.mock('next/navigation', () => ({
+  useRouter: () => ({ push: checkout.push }),
+}));
 vi.mock('@/lib/queries', () => ({
   useAnalyticsFilterMutation: () => ({ updateAnalyticsFilterAsync }),
+  useCheckoutMutation: () => ({
+    mutate: checkout.mutate,
+    reset: checkout.reset,
+    isPending: false,
+    error: null,
+  }),
+  usePricingOptionsQuery: () => checkout.pricing,
 }));
 
 const artist = {
@@ -41,6 +61,7 @@ const artist = {
 
 describe('analytics settings anatomy', () => {
   beforeEach(() => {
+    vi.clearAllMocks();
     toggleConfigs.length = 0;
     updateAnalyticsFilterAsync.mockReset();
   });
@@ -59,6 +80,18 @@ describe('analytics settings anatomy', () => {
 
     expect(screen.queryByRole('switch')).not.toBeInTheDocument();
     expect(screen.getByText('Traffic Quality Filtering')).toBeInTheDocument();
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Upgrade to Artist Presence' })
+    );
+    expect(checkout.mutate).toHaveBeenCalledExactlyOnceWith(
+      {
+        priceId: checkout.pricing.data.options[0].priceId,
+        source: 'in_app',
+        returnTo: '/app',
+      },
+      expect.any(Object)
+    );
+    expect(checkout.push).not.toHaveBeenCalled();
 
     rerender(
       <TooltipProvider>

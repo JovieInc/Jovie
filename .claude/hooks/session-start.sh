@@ -60,7 +60,12 @@ if [ -x "$PROJECT_DIR/scripts/setup.sh" ]; then
   # fingerprint matches and Node/pnpm pins are ok). Cold/stale worktrees
   # still run the full bootstrap.
   echo "Running ./scripts/setup.sh to normalize this worktree..."
-  "$PROJECT_DIR/scripts/setup.sh"
+  # A cloud session cannot install every laptop tool (Doppler, for one), and
+  # setup.sh exits 1 on any missing one. Keep going, so dependencies and the
+  # Playwright browser below still get set up.
+  if ! "$PROJECT_DIR/scripts/setup.sh"; then
+    echo "WARNING: scripts/setup.sh reported missing tools (listed above); continuing."
+  fi
 fi
 
 # 0.5. Verify GitHub CLI availability
@@ -89,6 +94,12 @@ if [ ! -d "node_modules" ] || [ -z "$(ls -A node_modules 2>/dev/null)" ]; then
   echo "Dependencies installed."
 else
   echo "Dependencies already installed."
+fi
+
+# 1.5. Playwright Chromium (cloud sessions): ready it for screenshots and e2e,
+# or say why it cannot be, before work that needs it starts.
+if [ "${CLAUDE_CODE_REMOTE:-}" = "true" ] && command -v jovie_setup_playwright_chromium >/dev/null 2>&1; then
+  jovie_setup_playwright_chromium "$PROJECT_DIR"
 fi
 
 # 2. Make hook scripts executable

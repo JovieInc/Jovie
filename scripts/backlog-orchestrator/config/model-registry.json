@@ -26,6 +26,14 @@
         "approved_by": "Tim White",
         "approved_at": "2026-09-29",
         "ref": "JOV-7248"
+      },
+      {
+        "rule": "no_claude",
+        "scope": "lane_model_pools",
+        "reason": "Lanes may route Anthropic models to the Claude subscription or Hyperagent only, never the Gateway or a metered key, and balance the two by what expires first (scripts/lanes/model-pools.json). This registry's models and route_chains keep no_claude.",
+        "approved_by": "Tim White",
+        "approved_at": "2026-11-11",
+        "ref": "JovieInc/Jovie#24849"
       }
     ],
     "api_burn_fraction_of_sub": 0.15,

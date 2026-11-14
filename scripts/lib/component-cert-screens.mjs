@@ -45,6 +45,37 @@ export function debtEntry(criteria) {
   return [...new Set(criteria)].sort().join(',');
 }
 
+/**
+ * Registry maps keyed by component path (screen debt, state waivers, gates)
+ * are kept sorted by path, in plain code-unit order (the same as Python's
+ * sorted()), so a new entry lands at its own place instead of where every PR
+ * appends, and two PRs collide only when their components are neighbours.
+ */
+export const SORT_COMMAND = 'node scripts/component-certificate.mjs --sort';
+
+export function comparePaths(a, b) {
+  return a < b ? -1 : a > b ? 1 : 0;
+}
+
+export function sortByPath(map = {}) {
+  return Object.fromEntries(
+    Object.entries(map).sort(([a], [b]) => comparePaths(a, b))
+  );
+}
+
+/** One error when `map` is not sorted by path, naming the first key out of place. */
+export function unsortedPathErrors(label, map = {}) {
+  const keys = Object.keys(map);
+  const at = keys.findIndex(
+    (key, i) => i && comparePaths(keys[i - 1], key) > 0
+  );
+  return at < 0
+    ? []
+    : [
+        `${label} is not sorted by component path (${keys[at]} comes after ${keys[at - 1]}); run ${SORT_COMMAND}`,
+      ];
+}
+
 /** Roots whose .tsx files the certificate can judge as components. */
 export const SCREEN_COMPONENT_ROOTS = Object.freeze([
   'apps/web/components/',
@@ -158,6 +189,15 @@ export function failingCriteria(cert, criteria) {
   });
 }
 
+/** State names whose certificate row failed. Empty when states is not recorded. */
+export function failedStateNames(cert) {
+  const states = cert?.criteria?.find(entry => entry.id === 'states')?.states;
+  if (!states || typeof states !== 'object') return [];
+  return Object.entries(states)
+    .filter(([, row]) => row?.status === 'fail')
+    .map(([name]) => name);
+}
+
 /**
  * @param {{certificates: any[]}} report
  * @param {any} screens registry
@@ -172,6 +212,7 @@ export function evaluateScreenGates(report, screens, byScreen, base = null) {
   if (screens.schema !== SCREENS_SCHEMA)
     errors.push(`cert-screens: schema must be ${SCREENS_SCHEMA}`);
   if (!criteria.length) errors.push('cert-screens: needs a criteria list');
+  errors.push(...unsortedPathErrors('cert-screens: debt', screens.debt));
   const certs = new Map(report.certificates.map(c => [c.component, c]));
   const debt = screens.debt ?? {};
   const rendered = new Map(); // component -> screens
@@ -191,8 +232,14 @@ export function evaluateScreenGates(report, screens, byScreen, base = null) {
     const failing = failingCriteria(certs.get(component), criteria);
     const allowed = new Set(owedCriteria(debt[component]));
     const fresh = failing.filter(id => !allowed.has(id));
-    if (fresh.length)
-      failures.push({ component, screens: ids, criteria: fresh });
+    if (fresh.length) {
+      const failure = { component, screens: ids, criteria: fresh };
+      if (fresh.includes('states')) {
+        const missingStates = failedStateNames(certs.get(component));
+        if (missingStates.length) failure.missingStates = missingStates;
+      }
+      failures.push(failure);
+    }
   }
   for (const [component, entry] of Object.entries(debt)) {
     const owed = owedCriteria(entry);
@@ -256,6 +303,12 @@ export function evaluateScreenGates(report, screens, byScreen, base = null) {
   };
 }
 
+function formatCriterion(failure, id) {
+  if (id === 'states' && failure.missingStates?.length)
+    return `states missing ${failure.missingStates.join(', ')}`;
+  return id;
+}
+
 export function formatScreenGate(result) {
   const lines = result.perScreen.map(
     s =>
@@ -267,7 +320,7 @@ export function formatScreenGate(result) {
     ...result.errors.map(e => `  config: ${e}`),
     ...result.failures.map(
       f =>
-        `  ${f.component} [${f.criteria.join(', ')}] on ${f.screens.join(', ')}`
+        `  ${f.component} [${f.criteria.map(id => formatCriterion(f, id)).join(', ')}] on ${f.screens.join(', ')}`
     ),
     ...result.stale.map(
       s =>
@@ -300,10 +353,7 @@ export function screenIssues(report, screens, byScreen) {
             const crit = certs.get(component)?.criteria.find(x => x.id === k);
             const states =
               k === 'states'
-                ? Object.entries(crit?.states ?? {})
-                    .filter(([, v]) => v.status === 'fail')
-                    .map(([s]) => s)
-                    .join(', ')
+                ? failedStateNames(certs.get(component)).join(', ')
                 : null;
             return [k, states || crit?.detail || crit?.status || 'unknown'];
           })
@@ -326,7 +376,5 @@ export function currentDebt(report, screens, byScreen) {
   const debt = {};
   for (const row of screenIssues(report, screens, byScreen))
     debt[row.component] = debtEntry(row.criteria);
-  return Object.fromEntries(
-    Object.entries(debt).sort(([a], [b]) => a.localeCompare(b))
-  );
+  return sortByPath(debt);
 }

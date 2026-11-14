@@ -34,3 +34,13 @@ export const Pill: Story = {
     label: 'Sign in',
   },
 };
+
+/** Both variants inside a right-to-left header. */
+export const Rtl: Story = {
+  render: () => (
+    <div dir='rtl' lang='ar' className='flex items-center gap-4'>
+      <MarketingSignInLink variant='ghost' label='Log in' />
+      <MarketingSignInLink variant='pill' label='Sign in' />
+    </div>
+  ),
+};

@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { render, screen, within } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -122,5 +124,26 @@ describe('DashboardPay', () => {
       screen.getByText(/artist-handle\/pay\?source=link/)
     ).toBeInTheDocument();
     expect(screen.getByTestId('earnings-tab')).toBeInTheDocument();
+  });
+});
+
+describe('DashboardPay scale tokens', () => {
+  it('uses the 16px text-base step instead of the text-lg alias', () => {
+    const source = readFileSync(
+      resolve(__dirname, './DashboardPay.tsx'),
+      'utf8'
+    );
+
+    expect(source).not.toMatch(/(?<![\w-])text-lg\b/);
+  });
+});
+
+describe('DashboardPay icon geometry', () => {
+  it('keeps glyphs on the 4px grid (16px, never the 18px half step)', () => {
+    const source = readFileSync(
+      resolve(__dirname, './DashboardPay.tsx'),
+      'utf8'
+    );
+    expect(source).not.toMatch(/\b[hw]-4\.5\b|\bsize-4\.5\b/);
   });
 });

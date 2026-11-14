@@ -21,3 +21,13 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {};
+
+/**
+ * The release time has passed but the page has not refreshed yet: the
+ * countdown renders nothing inside its pill while the router refreshes.
+ */
+export const EmptyCountdownElapsed: Story = {
+  args: {
+    releaseDate: new Date(Date.now() - 60_000),
+  },
+};

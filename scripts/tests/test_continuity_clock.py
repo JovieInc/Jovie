@@ -396,12 +396,47 @@ class CredentialsSpendTickTest(unittest.TestCase):
         self.assertEqual(args[:3], ["node", str(self.release / credentials_spend.SCRIPT), "--live"])
         self.assertIn(str(credentials_spend.receipt_path(self.home)), args)
         self.assertNotIn("--file-linear", args)
-        self.assertEqual(sorted(kwargs["env"]), ["HOME", "PATH"], "no host credential reaches the check")
+        self.assertEqual(sorted(kwargs["env"]), ["HOME", "LANES_LINEAR_APP_STATUS", "PATH"], "only redacted metadata reaches the check")
         state = json.loads((self.state / credentials_spend.STATE_FILE).read_text())
         self.assertEqual(state["nextAttemptAt"], NOW + credentials_spend.INTERVAL_S)
         self.assertEqual(credentials_spend.tick(self.state, self.release, run=self.run_check(), now=NOW + 3600,
                                                 home=self.home, linear_token=lambda _state: None)["status"], "current")
         self.assertEqual(len(self.calls), 1)
+
+    def test_redacted_token_metadata_is_observed_after_the_existing_filing_token_read(self):
+        import linear_app_token
+        def access(_state):
+            (self.state / linear_app_token.CACHE_NAME).write_text(json.dumps({
+                "schema": linear_app_token.SCHEMA, "scope": linear_app_token.SCOPE,
+                "accessToken": "must-not-escape", "client": "private-client-tag",
+                "expiresAt": NOW + 29 * 86400,
+            }))
+            return "app-access"
+        credentials_spend.tick(self.state, self.release, run=self.run_check(), now=NOW,
+                               home=self.home, linear_token=access)
+        env = self.calls[0][1]["env"]
+        raw = env["LANES_LINEAR_APP_STATUS"]
+        self.assertNotIn("must-not-escape", raw)
+        self.assertNotIn("private-client-tag", raw)
+        self.assertEqual(json.loads(raw), {
+            "schema": "jovie.linear-app-status/v1", "observedAt": credentials_spend._iso(NOW),
+            "available": True, "scopeMatches": True, "expiresInS": 29 * 86400,
+            "mintFailed": False,
+        })
+
+    def test_missing_and_failed_cache_metadata_stays_visible_without_minting(self):
+        import linear_app_token
+        with patch.object(linear_app_token, "mint", side_effect=AssertionError("no mint")):
+            missing = credentials_spend.app_token_status(self.state, NOW, False)
+            self.assertFalse(missing["available"])
+            self.assertIsNone(missing["expiresInS"])
+            (self.state / linear_app_token.CACHE_NAME).write_text(json.dumps({
+                "schema": linear_app_token.SCHEMA, "scope": linear_app_token.SCOPE,
+                "mintFailedAt": NOW, "mintError": "never-echo-this",
+            }))
+            failed = credentials_spend.app_token_status(self.state, NOW, False)
+            self.assertTrue(failed["mintFailed"])
+            self.assertNotIn("never-echo-this", json.dumps(failed))
 
     def test_findings_are_filed_as_the_linear_app_never_a_personal_key(self):
         result = credentials_spend.tick(self.state, self.release, run=self.run_check(), now=NOW, home=self.home,

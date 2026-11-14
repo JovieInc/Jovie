@@ -5,6 +5,7 @@ import {
   SHELL_RAIL_PREVIEW_GRACE_MS,
   SHELL_RAIL_PREVIEW_INTENT_MS,
 } from '@/components/shell/rail-motion';
+import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import { SidebarProvider, useSidebar } from './context';
 
 const viewport = vi.hoisted(() => ({ mobile: true }));
@@ -191,12 +192,13 @@ describe('explicit sidebar activation', () => {
   it('opens and closes with Enter, Space, and the sidebar shortcut', async () => {
     viewport.mobile = false;
     const user = userEvent.setup();
-    render(
+    const { container } = render(
       <SidebarProvider defaultOpen={false}>
         <Controls />
       </SidebarProvider>
     );
     const control = screen.getByRole('button');
+    await expectNoA11yViolations(container);
     await user.tab();
     expect(control).toHaveFocus();
     // Keyboard focus on the rail is equivalent access: it peeks, unpinned.

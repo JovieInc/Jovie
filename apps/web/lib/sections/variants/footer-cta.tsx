@@ -40,7 +40,7 @@ export const FOOTER_CTA_VARIANTS: readonly SectionVariant[] = [
     description:
       'Generic CTA used by PayPromo. Delete both together when the Tips feature is officially shelved.',
     componentPath: 'components/organisms/CTASection.tsx',
-    usedIn: ['PayPromo (dormant, feature-flagged)'],
+    usedIn: ['PayPromo (dormant, not mounted on a route)'],
     status: 'consolidate',
     mergeInto: 'marketing-final-cta-default',
     render: () => <MarketingFinalCTA />,

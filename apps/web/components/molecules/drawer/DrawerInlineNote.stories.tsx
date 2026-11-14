@@ -30,3 +30,31 @@ export const ErrorTone: Story = {
     message: 'Failed to load links.',
   },
 };
+
+/** The one-line note a drawer section shows when its list is empty. */
+export const EmptyListNote: Story = {
+  args: {
+    message: 'No contacts added yet.',
+    inset: 'flush',
+  },
+};
+
+export const LongContent: Story = {
+  args: {
+    message:
+      'Links from Spotify, Apple Music, YouTube Music, Tidal, Deezer, Amazon Music and SoundCloud will show here once the catalog sync finishes for this release.',
+  },
+};
+
+export const Rtl: Story = {
+  args: {
+    message: 'لم تتم إضافة أي روابط بعد.',
+  },
+  decorators: [
+    Story => (
+      <div dir='rtl' lang='ar'>
+        <Story />
+      </div>
+    ),
+  ],
+};

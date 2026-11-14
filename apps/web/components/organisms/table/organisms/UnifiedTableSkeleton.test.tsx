@@ -1,6 +1,7 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import type { ColumnDef } from '@/lib/tanstack-table';
+import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import { UnifiedTableSkeleton } from './UnifiedTableSkeleton';
 
 type Row = { id: string; title: string; count: number };
@@ -105,4 +106,30 @@ describe('UnifiedTableSkeleton', () => {
       firstCell?.querySelector('.system-b-table-skeleton-person-name')
     ).not.toBeNull();
   });
+
+  it.each([
+    ['loading', COLUMNS, undefined],
+    [
+      'rtl',
+      [
+        { accessorKey: 'title', id: 'title', header: 'العنوان' },
+        { accessorKey: 'count', id: 'count', header: 'العدد' },
+      ] satisfies ColumnDef<Row, unknown>[],
+      'rtl',
+    ],
+  ] as const)(
+    'has no accessibility violations when %s',
+    async (_name, columns, dir) => {
+      const { container } = render(
+        <div dir={dir} lang={dir === 'rtl' ? 'ar' : 'en'}>
+          <UnifiedTableSkeleton
+            columns={[...columns]}
+            skeletonRows={3}
+            skeletonColumnConfig={[{ variant: 'person' }, { variant: 'text' }]}
+          />
+        </div>
+      );
+      await expectNoA11yViolations(container);
+    }
+  );
 });

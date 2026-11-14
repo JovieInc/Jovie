@@ -29,19 +29,25 @@ export default async function StartLayout({
   // client 'anonymous' -> invalid-restore) and wedges the nightly auth.setup
   // (JOV-7653). The read is catch-guarded so DB-less visual capture, where
   // the session lookup cannot resolve, still gets its forced defaults.
-  const hasLiveSession =
-    env.E2E_TEST_MODE === '1' ||
-    (await getRequestSession('cookie')
-      .then(session => Boolean(session?.user?.id))
-      .catch(() => false));
-  const forceSignedOutDefaults =
+  //
+  // Only a non-secure smoke/E2E host can force signed-out defaults, so the
+  // session is read only there. Production and preview never ask for it here.
+  const mayForceSignedOutDefaults =
     !isSecureEnv() &&
-    !hasLiveSession &&
+    env.E2E_TEST_MODE !== '1' &&
     (env.PUBLIC_NOAUTH_SMOKE === '1' ||
       process.env.NEXT_PUBLIC_E2E_MODE === '1');
-  const initialFlags = await getAppFlagsSnapshot({
-    flagNames: resolveStartRouteFlagNames(),
-  });
+  const [hasLiveSession, initialFlags] = await Promise.all([
+    mayForceSignedOutDefaults
+      ? getRequestSession('cookie')
+          .then(session => Boolean(session?.user?.id))
+          .catch(() => false)
+      : false,
+    getAppFlagsSnapshot({
+      flagNames: resolveStartRouteFlagNames(),
+    }),
+  ]);
+  const forceSignedOutDefaults = mayForceSignedOutDefaults && !hasLiveSession;
 
   return (
     <ResolvedClientProviders

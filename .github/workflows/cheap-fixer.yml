@@ -6,13 +6,13 @@ name: Cheap Fixer
 # Dormant source foundation. Default off; no paid-model route or repair activation.
 # Explicit shadow mode emits terminal metadata only until fx/Workers AI commissioning.
 
+# Lane Fix Relay already wakes on every Source Validation, CI and
+# Changed-Evidence Test Suites completion; it calls this workflow only for a
+# failed pull_request run while CHEAP_FIXER_MODE is shadow. Its own
+# workflow_run trigger started 2,500+ runs a week that all skipped
+# (2026-11-11 audit). The github context is the relay's workflow_run event.
 on:
-  workflow_run:
-    workflows:
-      - Source Validation
-      - CI
-      - Changed-Evidence Test Suites
-    types: [completed]
+  workflow_call:
 
 permissions: {}
 

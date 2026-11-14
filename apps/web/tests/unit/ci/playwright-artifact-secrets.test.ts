@@ -150,6 +150,8 @@ const imageAllowedJobs = new Set([
   'screenshots.yml:generate',
   'synthetic-monitoring.yml:synthetic-test',
   'visual-regression.yml:visual-regression',
+  // Founder-approved homepage-*.png only, same render as the compare job.
+  'visual-regression.yml:approved-homepage-baselines',
 ]);
 const markdownAllowedJobs = new Set([
   'ci.yml:ci-build-layout',

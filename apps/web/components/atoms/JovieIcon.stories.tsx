@@ -42,3 +42,13 @@ export const ExplicitThemeContrast: Story = {
     </div>
   ),
 };
+
+/** The mark is symmetric in meaning, so a right-to-left page leaves it as is. */
+export const Rtl: Story = {
+  render: args => (
+    <div dir='rtl' lang='ar' className='flex items-center gap-2'>
+      <JovieIcon {...args} />
+      <span className='text-sm text-primary-token'>جوفي</span>
+    </div>
+  ),
+};

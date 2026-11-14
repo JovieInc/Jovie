@@ -6,7 +6,9 @@ import { db } from '@/lib/db';
 import { contactEvidenceReviews } from '@/lib/db/schema/contacts';
 import { leadFunnelEvents, leads } from '@/lib/db/schema/leads';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
+import { getAppFlagValue } from '@/lib/flags/server';
 import { resolveLeadClaimToken } from '@/lib/leads/lead-claim-token';
+import { readDogfoodGates } from './cold/dogfood-gate.server';
 import { outboundTargetFromLead, readOutboundLedger } from './ledger.server';
 import {
   buildOutboundRow,
@@ -148,32 +150,38 @@ export async function getOutboundQueue(
         .filter((id): id is string => id !== null)
     ),
   ];
-  const [ledger, certifications, replies, evidence] = await Promise.all([
-    readOutboundLedger(leadIds),
-    keys.length
-      ? db
-          .select({ dedupeKey: contactEvidenceReviews.dedupeKey })
-          .from(contactEvidenceReviews)
-          .where(
-            and(
-              inArray(contactEvidenceReviews.dedupeKey, keys),
-              eq(contactEvidenceReviews.evidenceKey, 'profile:certification')
+  // An unreadable flag must not expose drafts. Explicit off preserves rollout behavior.
+  const gateEnabled = await getAppFlagValue('OUTBOUND_DOGFOOD_GATE').catch(
+    () => true
+  );
+  const [ledger, certifications, replies, evidence, dogfood] =
+    await Promise.all([
+      readOutboundLedger(leadIds),
+      keys.length
+        ? db
+            .select({ dedupeKey: contactEvidenceReviews.dedupeKey })
+            .from(contactEvidenceReviews)
+            .where(
+              and(
+                inArray(contactEvidenceReviews.dedupeKey, keys),
+                eq(contactEvidenceReviews.evidenceKey, 'profile:certification')
+              )
             )
-          )
-      : Promise.resolve([]),
-    leadIds.length
-      ? db
-          .select({ leadId: leadFunnelEvents.leadId })
-          .from(leadFunnelEvents)
-          .where(
-            and(
-              inArray(leadFunnelEvents.leadId, leadIds),
-              inArray(leadFunnelEvents.eventType, REPLY_EVENT_TYPES)
+        : Promise.resolve([]),
+      leadIds.length
+        ? db
+            .select({ leadId: leadFunnelEvents.leadId })
+            .from(leadFunnelEvents)
+            .where(
+              and(
+                inArray(leadFunnelEvents.leadId, leadIds),
+                inArray(leadFunnelEvents.eventType, REPLY_EVENT_TYPES)
+              )
             )
-          )
-      : Promise.resolve([]),
-    readEvidenceClasses(profileIds),
-  ]);
+        : Promise.resolve([]),
+      readEvidenceClasses(profileIds),
+      gateEnabled && leadRows.length ? readDogfoodGates(profileIds, now) : null,
+    ]);
   const certified = new Set(certifications.map(row => row.dedupeKey));
   const replied = new Set(replies.map(row => row.leadId));
 
@@ -193,6 +201,11 @@ export async function getOutboundQueue(
       dedupeKey,
       ledger: ledger.get(row.id) ?? [],
       now,
+      dogfoodGate: gateEnabled
+        ? row.creatorProfileId
+          ? dogfood?.byProfile.get(row.creatorProfileId)
+          : undefined
+        : null,
     });
   });
   const rows = rankOutboundRows(

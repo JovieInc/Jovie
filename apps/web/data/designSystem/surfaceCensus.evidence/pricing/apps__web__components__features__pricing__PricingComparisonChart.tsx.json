@@ -1,0 +1,6 @@
+{
+  "file": "apps/web/components/features/pricing/PricingComparisonChart.tsx",
+  "sha256": "79f753628d75793859418f55cdd3888e75ec65e7b596776a9b6a68c11c08f791",
+  "at": "2026-11-11T18:29:20.962Z",
+  "ref": "PR #25053: plan picker select moved to @jovie/ui HostDrawnSelect; its CSS rule now selects .system-b-pricing-mobile-selector > select instead of a class. Rendered DOM identical across Pro and Free states apart from the removed class attribute; computed styles under the full stylesheet match on every property jsdom computes."
+}

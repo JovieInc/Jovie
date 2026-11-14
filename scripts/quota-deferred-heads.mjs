@@ -3,7 +3,9 @@
 // github-quota-deferred marker and has stayed red past the age limit. A
 // quota-deferred result is infrastructure, never a verdict, and the lane relay
 // must have re-run it (lane-fix-relay.yml subscribes to PR Fleet Rules). Any
-// head older than 1h means that re-run path is broken.
+// head older than 1h means that re-run path is broken. A PR Ready lookup
+// deferral is not this check: quota_rerun.quota_rerun_decision reruns that
+// job once after the log's advertised reset.
 //
 // CLI: node scripts/quota-deferred-heads.mjs [--max-age-minutes 60]
 //      node scripts/quota-deferred-heads.mjs --share [N]  (quota share of the last N PR Fleet Rules runs)

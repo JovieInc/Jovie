@@ -12,6 +12,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ChatEntityPanelProvider } from '@/app/app/(shell)/chat/ChatEntityPanelContext';
 import { ChatEntityRightPanelHost } from '@/app/app/(shell)/chat/ChatEntityRightPanelHost';
+import { JovieChat } from '@/app/app/(shell)/chat/DeferredJovieChat';
 import type { DashboardData } from '@/app/app/(shell)/dashboard/actions/dashboard-data';
 import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
 import {
@@ -21,8 +22,8 @@ import {
 } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
 import { AppIconButton } from '@/components/atoms/AppIconButton';
 import { NavigationDestinationReady } from '@/components/features/dashboard/NavigationDestinationReady';
+import { ChatHistorySwitcher } from '@/components/jovie/ChatHistorySwitcher';
 import { ChatWorkspaceSurface } from '@/components/jovie/ChatWorkspaceSurface';
-import { JovieChat } from '@/components/jovie/JovieChat';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { EmptyState } from '@/components/molecules/EmptyState';
 import { ErrorBoundary } from '@/components/providers/ErrorBoundary';
@@ -120,18 +121,6 @@ function WelcomeChatBootstrapAnnouncer({
     >
       {message}
     </div>
-  );
-}
-
-/**
- * Header badge that displays the conversation title as the breadcrumb suffix.
- * Rendered inside the DashboardHeader via HeaderActionsContext.
- */
-function ChatTitleBadge({ title }: { readonly title: string }) {
-  return (
-    <span className='block max-w-full truncate' title={title}>
-      {title}
-    </span>
   );
 }
 
@@ -501,14 +490,19 @@ export function ChatPageClient({
   );
 
   useEffect(() => {
+    // The breadcrumb is the chat switcher: current title (or "New Chat")
+    // that opens chat history. Rendered inside DashboardHeader's title slot.
     setHeaderBadge(
-      currentThreadTitle ? <ChatTitleBadge title={currentThreadTitle} /> : null
+      <ChatHistorySwitcher
+        title={currentThreadTitle}
+        activeConversationId={conversationId ?? null}
+      />
     );
 
     return () => {
       setHeaderBadge(null);
     };
-  }, [currentThreadTitle, setHeaderBadge]);
+  }, [conversationId, currentThreadTitle, setHeaderBadge]);
 
   useEffect(() => {
     setHeaderActions(headerActions);

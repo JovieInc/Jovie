@@ -1,6 +1,6 @@
 'use client';
 
-import { uploadPresigned } from '@vercel/blob/client';
+import { uploadPresignedLazy as uploadPresigned } from '@/lib/blob/upload-presigned-lazy';
 import {
   buildFileBlobPath,
   resolveChatFileUploadMime,

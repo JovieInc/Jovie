@@ -110,6 +110,15 @@ const INTERNAL_ACCOUNT_EMAIL_DOMAINS = [
 ] as const;
 
 /**
+ * The founder's own domain (the entry above). Its catch-all mailbox is the
+ * founder's, so only he can receive a sign-in code sent to an address on it.
+ */
+export const FOUNDER_EMAIL_DOMAIN = INTERNAL_ACCOUNT_EMAIL_DOMAINS[1];
+
+/** The founder's base local part; dogfood mailboxes are `<this>+dogfood…`. */
+export const FOUNDER_EMAIL_LOCAL_PART = 't' as const;
+
+/**
  * Dogfood/QA mailbox domains (JOV-7362). Accounts on these domains are created
  * exclusively for internal dogfooding and QA (e.g. `*@test.jovie.com` E2E and
  * auth-surface QA accounts) and must never count as customers in cohort,
@@ -127,11 +136,12 @@ const CLERK_TEST_TAG_PATTERN = /\+clerk_test(\+|$)/;
  * address should use one of these; one that cannot sends the
  * `x-jovie-account-class` header (see `lib/accounts/internal-account.ts`).
  */
+export const DOGFOOD_ACCOUNT_EMAIL_TAG = 'dogfood' as const;
 export const INTERNAL_ACCOUNT_EMAIL_TAGS = [
   'canary',
   'e2e',
   'prodcert',
-  'dogfood',
+  DOGFOOD_ACCOUNT_EMAIL_TAG,
 ] as const;
 const INTERNAL_TAG_ALTERNATION = INTERNAL_ACCOUNT_EMAIL_TAGS.join('|');
 const INTERNAL_TAG_PATTERN = new RegExp(

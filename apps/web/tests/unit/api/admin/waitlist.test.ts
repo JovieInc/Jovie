@@ -1,3 +1,4 @@
+import { NextRequest } from 'next/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mockGetCurrentUserEntitlements = vi.hoisted(() => vi.fn());
@@ -28,7 +29,7 @@ describe('GET /api/admin/waitlist', () => {
     });
 
     const { GET } = await import('@/app/api/admin/waitlist/route');
-    const request = new Request('http://localhost/api/admin/waitlist');
+    const request = new NextRequest('http://localhost/api/admin/waitlist');
     const response = await GET(request);
     const data = await response.json();
 
@@ -49,7 +50,7 @@ describe('GET /api/admin/waitlist', () => {
     });
 
     const { GET } = await import('@/app/api/admin/waitlist/route');
-    const request = new Request('http://localhost/api/admin/waitlist');
+    const request = new NextRequest('http://localhost/api/admin/waitlist');
     const response = await GET(request);
     const data = await response.json();
 
@@ -97,7 +98,7 @@ describe('GET /api/admin/waitlist', () => {
     });
 
     const { GET } = await import('@/app/api/admin/waitlist/route');
-    const request = new Request(
+    const request = new NextRequest(
       'http://localhost/api/admin/waitlist?page=2&pageSize=10'
     );
     const response = await GET(request);

@@ -33,10 +33,12 @@ describe('SearchableContent', () => {
     );
 
     const clearButton = screen.getByRole('button', { name: 'Clear search' });
+    // The visible control is a 24px box (axe target-size); the before
+    // pseudo still extends the pointer target to 44px.
     expect(clearButton).toHaveClass(
       'absolute',
-      'h-4',
-      'w-4',
+      'h-6',
+      'w-6',
       'before:h-11',
       'before:w-11',
       'before:content-[""]'

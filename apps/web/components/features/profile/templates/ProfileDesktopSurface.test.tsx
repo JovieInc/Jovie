@@ -217,14 +217,14 @@ describe('ProfileDesktopSurface', () => {
     ]);
   });
 
-  it('hides the desktop back control on the public profile root for logged-out visitors', () => {
-    mockUseIsAuthenticated.mockReturnValue(false);
-    renderDesktopSurface({ onBack: vi.fn() });
-
-    expect(
-      screen.queryByRole('button', { name: 'Back' })
-    ).not.toBeInTheDocument();
-  });
+  it.each(['profile', 'listen', 'tour', 'about'] as const)(
+    'hides the desktop back control on the %s tab for logged-out visitors',
+    activeMode => {
+      mockUseIsAuthenticated.mockReturnValue(false);
+      renderDesktopSurface({ activeMode, onBack: vi.fn() });
+      expect(screen.queryByRole('button', { name: 'Back' })).toBeNull();
+    }
+  );
 
   it('bounds the public-profile Pen capture to the desktop surface (JOV-11623)', () => {
     const { container } = renderDesktopSurface(
@@ -351,9 +351,9 @@ describe('ProfileDesktopSurface', () => {
       'before:min-h-11',
       'before:min-w-11'
     );
-    expect(listenCta.className).toContain('before:min-w-11');
     const profileHeader = screen.getByTestId('profile-header');
     expect(profileHeader).toHaveClass('min-w-0', 'max-w-full');
+    expect(profileHeader).toHaveClass('focus-visible:ring-focus');
     expect(within(profileHeader).getByText('Tim White')).toHaveClass(
       'min-w-0',
       'line-clamp-2 wrap-anywhere'
@@ -1154,7 +1154,6 @@ describe('ProfileDesktopSurface', () => {
       'data-mode',
       'profile'
     );
-
     const overview = screen.getByTestId('profile-desktop-home-overview');
     expect(overview).toHaveClass(
       '[@media(min-width:1180px)]:grid-cols-[minmax(420px,520px)_minmax(0,1fr)_320px]'
@@ -1164,6 +1163,7 @@ describe('ProfileDesktopSurface', () => {
     );
 
     const secondary = screen.getByTestId('profile-desktop-secondary-grid');
+    expect(secondary).toHaveClass('grid-cols-1', 'min-w-0'); // 1440px overlap
     const selectedWork = within(secondary).getByText('Selected work');
     const events = within(secondary).getByText('Events');
     expect(

@@ -128,23 +128,35 @@ export function listComponentsMissingAdjacentStories(root) {
 }
 
 /**
- * The committed allowlist is the measured baseline. It can only shrink: a new
- * uncovered component is absent from the list and fails the audit, and a story
- * landing without removing its entry fails this check.
+ * The committed allowlist is a shrink-only baseline. A component that lacks an
+ * adjacent story and is not listed fails: that is new debt. A listed component
+ * that now has a story, or was deleted, is stale headroom and passes, so the
+ * PR that adds a story never has to edit this shared file (two such PRs used
+ * to conflict on it). `--tighten` drops stale entries in one sweep.
  */
 export function assertBaselineAllowlist(root, policy) {
   validateUiStoryCoveragePolicy(policy);
   const measured = listComponentsMissingAdjacentStories(root);
-  const listed = (policy.allowlist ?? []).map(entry => entry.path);
-  if (
-    measured.length !== listed.length ||
-    measured.some((path, index) => path !== listed[index])
-  ) {
+  const listed = new Set((policy.allowlist ?? []).map(entry => entry.path));
+  const unlisted = measured.filter(path => !listed.has(path));
+  if (unlisted.length > 0) {
     throw new Error(
-      'UI story coverage allowlist does not match components that lack an adjacent story'
+      `UI story coverage allowlist is missing components that lack an adjacent story: ${unlisted.join(', ')}`
     );
   }
   return measured;
+}
+
+/** The policy with stale allowlist entries dropped. Never adds an entry. */
+export function tightenAllowlist(root, policy) {
+  const measured = new Set(assertBaselineAllowlist(root, policy));
+  const allowlist = (policy.allowlist ?? []).filter(entry =>
+    measured.has(entry.path)
+  );
+  return {
+    policy: { ...policy, allowlist },
+    dropped: (policy.allowlist?.length ?? 0) - allowlist.length,
+  };
 }
 
 function adjacentStoryExists(root, sourcePath) {
@@ -204,12 +216,14 @@ function harnessIssues(root) {
  * @param {{
  *   root: string,
  *   changedFiles: string[],
+ *   deletedFiles?: string[],
  *   allowlist?: { path: string, linearIssue: string }[],
  * }} input
  */
 export function auditUiStoryCoverage({
   root,
   changedFiles,
+  deletedFiles = [],
   allowlist = /** @type {{ path: string, linearIssue: string }[]} */ ([]),
 }) {
   const classified = changedFiles
@@ -238,8 +252,28 @@ export function auditUiStoryCoverage({
     }
   }
 
+  // The allowlist only shrinks, so an entry can outlive its component's story.
+  // Deleting the story of a component that still exists is new debt, whether
+  // or not a stale entry still names the component.
+  const removedStories = [];
+  for (const story of deletedFiles.filter(path => STORY_RE.test(path))) {
+    const component = story.replace(STORY_RE, '.tsx');
+    if (
+      classifyUiPath(component) === 'component' &&
+      existsSync(resolve(root, component)) &&
+      !adjacentStoryExists(root, component)
+    ) {
+      removedStories.push(component);
+      issues.push({
+        path: component,
+        reason:
+          'this change deletes the adjacent Storybook story of a component that still exists',
+      });
+    }
+  }
+
   return {
-    applicable: classified.length > 0,
+    applicable: classified.length > 0 || removedStories.length > 0,
     changedUiPaths: classified,
     issues,
     clean: issues.length === 0,
@@ -278,10 +312,10 @@ function parseArgs(argv) {
   );
 }
 
-function changedFilesFromGit(root, diffBase) {
+function changedFilesFromGit(root, diffBase, filter = ['--diff-filter=ACMR']) {
   const result = spawnSync(
     'git',
-    ['diff', '--name-only', '--diff-filter=ACMR', `${diffBase}...HEAD`],
+    ['diff', '--name-only', ...filter, `${diffBase}...HEAD`],
     { cwd: root, encoding: 'utf8' }
   );
   if (result.status !== 0) {
@@ -294,20 +328,30 @@ function changedFilesFromGit(root, diffBase) {
 }
 
 function main(argv = process.argv.slice(2)) {
-  const args = parseArgs(argv);
+  const tighten = argv.includes('--tighten');
+  const args = parseArgs(argv.filter(argument => argument !== '--tighten'));
   const root = resolve(args.root ?? DEFAULT_ROOT);
   const policyPath = resolve(root, args.policy ?? DEFAULT_POLICY);
   const policy = validateUiStoryCoveragePolicy(
     JSON.parse(readFileSync(policyPath, 'utf8'))
   );
+  if (tighten) {
+    const next = tightenAllowlist(root, policy);
+    writeFileSync(policyPath, `${JSON.stringify(next.policy, null, 2)}\n`);
+    console.log(`[ui-story-coverage] dropped ${next.dropped} stale entries`);
+    return 0;
+  }
+  const diffBase =
+    args['diff-base'] ??
+    process.env.UI_STORY_COVERAGE_DIFF_BASE ??
+    'origin/main';
   const changedFiles = args.files
     ? readFileSync(resolve(args.files), 'utf8').split(/\r?\n/).filter(Boolean)
-    : changedFilesFromGit(
-        root,
-        args['diff-base'] ??
-          process.env.UI_STORY_COVERAGE_DIFF_BASE ??
-          'origin/main'
-      );
+    : changedFilesFromGit(root, diffBase);
+  // A story renamed away counts as deleted; one renamed in place still exists.
+  const deletedFiles = args.files
+    ? []
+    : changedFilesFromGit(root, diffBase, ['--no-renames', '--diff-filter=D']);
   const mode = resolveUiStoryCoverageMode({
     policy,
     pullRequestNumber: args['pr-number'],
@@ -316,6 +360,7 @@ function main(argv = process.argv.slice(2)) {
   const audit = auditUiStoryCoverage({
     root,
     changedFiles,
+    deletedFiles,
     allowlist: policy.allowlist ?? [],
   });
   const report = {

@@ -19,8 +19,8 @@ describe('copy-markdown', () => {
   it('writes markdown and html clipboard payloads when supported', async () => {
     const write = vi.fn().mockResolvedValue(undefined);
     class MockClipboardItem {
-      readonly items: Record<string, Blob>;
-      constructor(items: Record<string, Blob>) {
+      readonly items: Record<string, Blob | Promise<Blob>>;
+      constructor(items: Record<string, Blob | Promise<Blob>>) {
         this.items = items;
       }
     }
@@ -35,10 +35,42 @@ describe('copy-markdown', () => {
     expect(success).toBe(true);
     expect(write).toHaveBeenCalledTimes(1);
     const clipboardItem = write.mock.calls[0]?.[0]?.[0] as MockClipboardItem;
-    expect(clipboardItem.items['text/plain']).toBeInstanceOf(Blob);
-    expect(clipboardItem.items['text/html']).toBeInstanceOf(Blob);
-    expect(clipboardItem.items['text/plain'].type).toBe('text/plain');
-    expect(clipboardItem.items['text/html'].type).toBe('text/html');
+    const plain = await clipboardItem.items['text/plain'];
+    const html = await clipboardItem.items['text/html'];
+    expect(plain).toBeInstanceOf(Blob);
+    expect(html).toBeInstanceOf(Blob);
+    expect(plain?.type).toBe('text/plain');
+    expect(html?.type).toBe('text/html');
+    expect(await html?.text()).toContain('<h2>Heading</h2>');
+  });
+
+  it('hands write() the html as a promise so the click keeps clipboard access', async () => {
+    let htmlPayload: unknown;
+    const write = vi.fn().mockImplementation(async items => {
+      htmlPayload = items[0].items['text/html'];
+    });
+    class MockClipboardItem {
+      constructor(readonly items: Record<string, Blob | Promise<Blob>>) {}
+    }
+    vi.stubGlobal('ClipboardItem', MockClipboardItem);
+    vi.stubGlobal('navigator', { clipboard: { write, writeText: vi.fn() } });
+
+    const pending = copyMarkdownToClipboard('Paragraph');
+    // write() is called before the markdown renderer has finished loading.
+    await Promise.resolve();
+    expect(write).toHaveBeenCalledTimes(1);
+    expect(htmlPayload).toBeInstanceOf(Promise);
+    await expect(pending).resolves.toBe(true);
+  });
+
+  it('keeps remark out of the chat bundle until the first copy', async () => {
+    const { readFileSync } = await import('node:fs');
+    const { join } = await import('node:path');
+    const source = readFileSync(
+      join(__dirname, '../../../lib/chat/copy-markdown.ts'),
+      'utf8'
+    );
+    expect(source).not.toMatch(/^import (?!type)[^;]*from 'remark/m);
   });
 
   it('falls back to plain text copy when rich clipboard write is unavailable', async () => {

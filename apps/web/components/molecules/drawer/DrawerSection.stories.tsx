@@ -63,3 +63,57 @@ export const WithActions: Story = {
     ),
   },
 };
+
+/** A titled section whose owner has nothing to list yet. */
+export const EmptySection: Story = {
+  args: {
+    title: 'Links',
+    children: (
+      <p className='text-xs text-tertiary-token'>No links added yet.</p>
+    ),
+  },
+};
+
+/** No title: no heading, no collapse toggle, content only. */
+export const PartialUntitled: Story = {
+  args: {
+    title: undefined,
+    surface: 'card',
+  },
+};
+
+export const LongContent: Story = {
+  args: {
+    title:
+      'Streaming links, presave destinations and territory-specific store pages',
+    actions: (
+      <DrawerButton tone='ghost' size='sm'>
+        Edit
+      </DrawerButton>
+    ),
+    children: (
+      <p className='text-sm text-secondary-token'>
+        Spotify, Apple Music, YouTube Music, Tidal, Deezer, Amazon Music,
+        SoundCloud, Beatport, Bandcamp and Audiomack links appear here once the
+        catalog sync finishes for every territory this release is distributed
+        to.
+      </p>
+    ),
+  },
+};
+
+export const Rtl: Story = {
+  args: {
+    title: 'البيانات الوصفية',
+    children: (
+      <p className='text-sm text-secondary-token'>يظهر محتوى القسم هنا.</p>
+    ),
+  },
+  decorators: [
+    Story => (
+      <div dir='rtl' lang='ar'>
+        <Story />
+      </div>
+    ),
+  ],
+};

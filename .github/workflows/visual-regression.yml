@@ -23,6 +23,15 @@ on:
     # Daily catch-up so baselines never drift more than a day behind main.
     - cron: '0 10 * * *'
   workflow_dispatch:
+    inputs:
+      approved_homepage_baselines:
+        description: >-
+          Render only the homepage baselines on the dispatched branch and commit
+          them there. Needs a founder approval receipt
+          (docs/design-system/approvals/homepage-visual-approval.json) whose sources
+          digest matches the branch. Never runs on main.
+        type: boolean
+        default: false
 
 permissions: {}
 
@@ -33,6 +42,7 @@ concurrency:
 jobs:
   visual-regression:
     name: Visual Regression (baseline refresh)
+    if: ${{ !inputs.approved_homepage_baselines }}
     environment: Preview – jovie
     runs-on: ubuntu-24.04
     timeout-minutes: 35
@@ -194,6 +204,29 @@ jobs:
             node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs" --run -- pnpm exec playwright test tests/e2e/admin-visual-regression.spec.ts \
             --config=playwright.config.ts --project=chromium --reporter=line $UPDATE_FLAG
 
+        env:
+          BASE_URL: http://localhost:3100
+          SMOKE_ONLY: '1'
+          CI: true
+          DATABASE_URL: ${{ env.DATABASE_URL }}
+          E2E_USE_TEST_AUTH_BYPASS: '1'
+          E2E_TEST_AUTH_PERSONA: admin
+          URL_ENCRYPTION_KEY: visual-regression-ci-url-encryption-key
+          AI_GATEWAY_API_KEY: visual-regression-ci
+
+      - name: Run Storybook visual specs
+        id: storybook
+        # Storybook iframe screenshots need no app server or database, so they
+        # run in their own step: a red app spec above must not stop component
+        # baselines from refreshing. Functional assertions still fail this step.
+        if: ${{ !cancelled() && steps.visual.outcome != 'skipped' }}
+        run: |
+          cd apps/web
+          UPDATE_FLAG=""
+          if [ "$REFRESH_MODE" = "true" ]; then
+            UPDATE_FLAG="--update-snapshots"
+          fi
+
           # Surface elevation matrix (JOV-2156) — Storybook iframe screenshots,
           # independent of the app server. Banned-combination baselines are the
           # intentional "should look BROKEN" sanity check; functional
@@ -217,21 +250,15 @@ jobs:
 
           STORYBOOK_BASE_URL=http://localhost:6006 \
             node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs" --run -- pnpm exec playwright test tests/e2e/storybook-elevation.spec.ts \
+            tests/e2e/storybook-chat-history-switcher.spec.ts \
             --config=playwright.config.storybook.ts --project=chromium --reporter=line $UPDATE_FLAG
 
           kill "$STORYBOOK_PID" 2>/dev/null || true
         env:
-          BASE_URL: http://localhost:3100
-          SMOKE_ONLY: '1'
           CI: true
-          DATABASE_URL: ${{ env.DATABASE_URL }}
-          E2E_USE_TEST_AUTH_BYPASS: '1'
-          E2E_TEST_AUTH_PERSONA: admin
-          URL_ENCRYPTION_KEY: visual-regression-ci-url-encryption-key
-          AI_GATEWAY_API_KEY: visual-regression-ci
 
       - name: Upload Playwright results on failure
-        if: ${{ always() && steps.visual.outcome == 'failure' && hashFiles('apps/web/test-results/**') != '' }}
+        if: ${{ always() && (steps.visual.outcome == 'failure' || steps.storybook.outcome == 'failure') && hashFiles('apps/web/test-results/**') != '' }}
         uses: ./.github/actions/upload-safe-playwright-artifact
         with:
           name: visual-regression-report-${{ github.run_id }}-${{ github.run_attempt }}
@@ -244,8 +271,26 @@ jobs:
         id: diff
         # Only main may publish baselines: a dispatch on any other ref would
         # commit that ref's unreviewed source into the bot PR with auto-merge.
-        if: env.REFRESH_MODE == 'true' && steps.visual.outcome == 'success' && github.ref == 'refs/heads/main'
+        if: ${{ !cancelled() && env.REFRESH_MODE == 'true' && (steps.visual.outcome == 'success' || steps.storybook.outcome == 'success') && github.ref == 'refs/heads/main' }}
+        env:
+          APP_OUTCOME: ${{ steps.visual.outcome }}
+          STORYBOOK_OUTCOME: ${{ steps.storybook.outcome }}
         run: |
+          # Publish only the suites that passed. A red app suite still lets the
+          # Storybook baselines through, and the reverse, so one broken spec
+          # never blocks every other baseline from refreshing.
+          if [ "$APP_OUTCOME" != "success" ]; then
+            git ls-files -z -m -- "$SNAPSHOT_DIR" | grep -zv '/storybook-' \
+              | xargs -0 -r git checkout -q -- || true
+            git ls-files -z -o --exclude-standard -- "$SNAPSHOT_DIR" \
+              | grep -zv '/storybook-' | xargs -0 -r rm -f -- || true
+          fi
+          if [ "$STORYBOOK_OUTCOME" != "success" ]; then
+            git ls-files -z -m -- "$SNAPSHOT_DIR" | grep -z '/storybook-' \
+              | xargs -0 -r git checkout -q -- || true
+            git ls-files -z -o --exclude-standard -- "$SNAPSHOT_DIR" \
+              | grep -z '/storybook-' | xargs -0 -r rm -f -- || true
+          fi
           if [ -z "$(git status --porcelain "$SNAPSHOT_DIR")" ]; then
             echo "changed=false" >> "$GITHUB_OUTPUT"
             echo "No baseline changes detected."
@@ -257,14 +302,14 @@ jobs:
 
       - name: Generate Jovie Bot token (refresh only)
         id: app-token
-        if: env.REFRESH_MODE == 'true' && steps.diff.outputs.changed == 'true'
+        if: ${{ !cancelled() && env.REFRESH_MODE == 'true' && steps.diff.outputs.changed == 'true' }}
         uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
         with:
           app-id: ${{ vars.JOVIE_BOT_APP_ID }}
           private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}
 
       - name: Create or update baseline PR (refresh only)
-        if: env.REFRESH_MODE == 'true' && steps.diff.outputs.changed == 'true'
+        if: ${{ !cancelled() && env.REFRESH_MODE == 'true' && steps.diff.outputs.changed == 'true' }}
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
         run: |
@@ -345,6 +390,159 @@ jobs:
           pnpm dlx neonctl branches delete "$BRANCH_NAME" --project-id "$NEON_PROJECT_ID" || {
             echo "Branch '$BRANCH_NAME' not found or already deleted; ignoring." >&2
           }
+
+  approved-homepage-baselines:
+    # The homepage is bound to Pen stills, so a new homepage design cannot be
+    # adopted from a local render (scripts/visual-baseline-adopt.mjs refuses
+    # homepage-*). When the founder approves a new homepage from screenshots,
+    # the receipt pins that approval to the homepage sources that were reviewed. This job
+    # renders exactly what ci.yml `ci-visual-snapshot-compare` renders, with
+    # the same build env, and commits only homepage-*.png to the dispatched
+    # branch. It refuses main and refuses a receipt that no longer matches.
+    name: Approved homepage baselines (branch)
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.approved_homepage_baselines && github.ref != 'refs/heads/main' }}
+    environment: Preview – jovie
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    permissions:
+      contents: read
+    env:
+      REFRESH_MODE: 'true'
+      SNAPSHOT_DIR: apps/web/tests/e2e/__snapshots__/visual-regression.spec.ts
+      PLAYWRIGHT_ARTIFACT_REQUIRE_PRODUCER_STAGE: 'true'
+      PLAYWRIGHT_ARTIFACT_ALLOW_IMAGES: 'true'
+      PLAYWRIGHT_ARTIFACT_ALLOW_PUBLIC_IMAGES: 'true'
+      PLAYWRIGHT_ARTIFACT_ALLOW_MARKDOWN: 'true'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+
+      - uses: ./.github/actions/setup-node-pnpm
+
+      - name: Verify founder approval receipt matches the branch
+        run: node scripts/homepage-baseline-approval.mjs verify
+
+      - name: Setup Playwright (Chromium)
+        uses: ./.github/actions/setup-playwright
+
+      - name: Build homepage (same env as Visual Snapshot Compare)
+        run: pnpm turbo build --filter=@jovie/web
+        env:
+          NEXT_PUBLIC_APP_URL: http://localhost:3230
+          NEXT_PUBLIC_BETTER_AUTH_URL: http://localhost:3230
+          NEXT_PUBLIC_AUTH_MOCK: '1'
+          NEXT_PUBLIC_AUTH_PROXY_DISABLED: '1'
+          NEXT_PUBLIC_E2E_MODE: '1'
+          NEXT_IGNORE_ESLINT: '1'
+          NEXT_IGNORE_TYPECHECK: '1'
+          NEXT_PRIVATE_SKIP_SIZE_CHECK: 'true'
+          NEXT_DISABLE_TOOLBAR: '1'
+          E2E_USE_TEST_AUTH_BYPASS: '1'
+          E2E_VISUAL_CAPTURE_SYNTHETIC_AUTH: '1'
+          E2E_TEST_AUTH_PERSONA: creator-ready
+          E2E_CLERK_USER_ID: user_test
+
+      - name: Render approved homepage baselines
+        run: |
+          set -euo pipefail
+          cd apps/web
+          mkdir -p tests/.auth
+          echo '{"cookies":[],"origins":[]}' > tests/.auth/user.json
+
+          cleanup() {
+            kill "$SERVER_PID" 2>/dev/null || true
+            wait "$SERVER_PID" 2>/dev/null || true
+          }
+          trap cleanup EXIT
+
+          export HOSTNAME=localhost
+          PORT=3230 node .next/standalone/apps/web/server.js > "$RUNNER_TEMP/homepage-baseline-server.log" 2>&1 &
+          SERVER_PID=$!
+          SERVER_READY=false
+          for _attempt in $(seq 1 30); do
+            if curl -sf http://localhost:3230 > /dev/null 2>&1; then
+              SERVER_READY=true
+              break
+            fi
+            sleep 1
+          done
+          if [ "$SERVER_READY" = "false" ]; then
+            cat "$RUNNER_TEMP/homepage-baseline-server.log"
+            exit 1
+          fi
+
+          UPDATE_FLAG=""
+          if [ "$REFRESH_MODE" = "true" ]; then
+            UPDATE_FLAG="--update-snapshots"
+          fi
+          node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs" --run -- \
+            pnpm exec playwright test tests/e2e/visual-regression.spec.ts \
+            --config=playwright.config.ts --project=chromium --reporter=line --grep homepage \
+            $UPDATE_FLAG
+        env:
+          BASE_URL: http://localhost:3230
+          CI: 'true'
+          E2E_SKIP_WEB_SERVER: '1'
+          DATABASE_URL: postgresql://localhost/noop
+          NEXT_PUBLIC_APP_URL: http://localhost:3230
+          NEXT_PUBLIC_BETTER_AUTH_URL: http://localhost:3230
+          NEXT_DISABLE_TOOLBAR: '1'
+          NEXT_PUBLIC_AUTH_PROXY_DISABLED: '1'
+          NEXT_PUBLIC_AUTH_MOCK: '1'
+          NEXT_PUBLIC_E2E_MODE: '1'
+          E2E_USE_TEST_AUTH_BYPASS: '1'
+          E2E_VISUAL_CAPTURE_SYNTHETIC_AUTH: '1'
+          E2E_TEST_AUTH_PERSONA: creator-ready
+          E2E_CLERK_USER_ID: user_test
+
+      - name: Keep only homepage baselines
+        id: diff
+        run: |
+          set -euo pipefail
+          CHANGED=$(git status --porcelain --untracked-files=all -- "$SNAPSHOT_DIR" | awk '{print $2}')
+          echo "$CHANGED"
+          if echo "$CHANGED" | grep -v -E '/homepage-[a-z0-9]+\.png$' | grep -q .; then
+            echo "::error::The approved refresh touched snapshots other than homepage-*.png."
+            exit 1
+          fi
+          if git status --porcelain --untracked-files=all | grep -v -F "$SNAPSHOT_DIR/homepage-" | grep -q .; then
+            echo "::error::The approved refresh changed files outside the homepage baselines."
+            git status --porcelain --untracked-files=all
+            exit 1
+          fi
+          if [ -n "$CHANGED" ]; then
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Generate Jovie Bot token (approved homepage baselines)
+        id: app-token
+        if: steps.diff.outputs.changed == 'true'
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        with:
+          app-id: ${{ vars.JOVIE_BOT_APP_ID }}
+          private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}
+
+      - name: Commit approved homepage baselines to the branch
+        if: steps.diff.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          RECEIPT_MESSAGE=$(node -e "console.log(require('./docs/design-system/approvals/homepage-visual-approval.json').approvalMessage)")
+          git add "$SNAPSHOT_DIR"/homepage-*.png
+          git commit -m "chore(visual): adopt founder-approved homepage baselines [auto]
+
+          Rendered by run ${GITHUB_RUN_ID} from ${GITHUB_SHA::8}.
+          Approval: ${RECEIPT_MESSAGE}"
+          AUTH_HEADER="AUTHORIZATION: basic $(printf 'x-access-token:%s' "$GH_TOKEN" | base64 | tr -d '\n')"
+          # Plain fast-forward push: never force, so a newer branch commit wins.
+          git -c "http.https://github.com/.extraheader=$AUTH_HEADER" push origin "HEAD:refs/heads/${GITHUB_REF_NAME}"
 
   report-scheduled-failure:
     # Nothing fails silently (docs/design-system/GOVERNANCE.md): a red scheduled

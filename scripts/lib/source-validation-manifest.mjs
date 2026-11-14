@@ -13,6 +13,7 @@
  * scoped) or NOT_LOCAL (heavy, CI-only or covered elsewhere, with the reason).
  */
 import { readFileSync } from 'node:fs';
+import { selectLocalGuards } from './preflight-local-guards.mjs';
 
 const WORKFLOWS = /^\.github\/(?:workflows|actions)\//;
 
@@ -147,6 +148,13 @@ export const SOURCE_VALIDATION_GUARDS = Object.freeze([
     covers: ['pnpm screen-registration-gate'],
   },
   {
+    id: 'component-certificate',
+    name: 'component and screen certificate gate',
+    command: 'pnpm component-certificate:gate',
+    when: /^(?:apps\/web\/(?:app|components)\/|packages\/ui\/|docs\/design-system\/(?:component-certification|cert-screens)\.json$|scripts\/(?:lib\/)?component-(?:certificate|cert-screens))/,
+    covers: ['pnpm component-certificate:gate'],
+  },
+  {
     id: 'layout-guard-pen',
     name: 'layout-guard pen contracts still rendered',
     command: 'node scripts/layout-guard-pen-contracts.mjs',
@@ -225,10 +233,6 @@ export const NOT_LOCAL = Object.freeze([
   { match: 'lint:motion-css', reason: 'covered by the web lint pass in CI' },
   { match: 'component-ship-gate', reason: 'preflight:changed ship-gate check' },
   {
-    match: 'component-certificate:gate',
-    reason: 'pre-push runs it right after component-ship-gate',
-  },
-  {
     match: 'mac-header-two-lines-v1',
     reason: 'preflight:changed merge-group-unit-guards (narrowed)',
   },
@@ -280,10 +284,17 @@ export const coveredBy = atom =>
   NOT_LOCAL.some(n => atom.includes(n.match));
 
 /** Guards whose trigger matches the changed paths, `{base}` expanded. */
+/**
+ * Guards for these changed paths: Source Validation's, then the pre-push-only
+ * guards for checks PR CI leaves to the merge group (preflight-local-guards).
+ */
 export function selectManifestGuards(paths, base = 'main') {
-  return SOURCE_VALIDATION_GUARDS.filter(g =>
-    paths.some(p => g.when.test(p))
-  ).map(g => ({ ...g, command: g.command.replaceAll('{base}', base) }));
+  return [
+    ...SOURCE_VALIDATION_GUARDS.filter(g =>
+      paths.some(p => g.when.test(p))
+    ).map(g => ({ ...g, command: g.command.replaceAll('{base}', base) })),
+    ...selectLocalGuards(paths),
+  ];
 }
 
 export function readRunScripts(workflowText, deriveSteps) {

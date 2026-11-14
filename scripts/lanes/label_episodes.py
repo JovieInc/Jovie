@@ -59,7 +59,15 @@ def label_episode_applier(number: int, label: str, sh, budgeted=None) -> str | N
         episodes = [node for node in nodes
                     if str((node.get("label") or {}).get("name") or "").lower() == label]
         latest = max(episodes, key=lambda node: str(node.get("createdAt") or ""))
-        login = (latest.get("actor") or {}).get("login")
+        actor = latest.get("actor") or {}
+        login = actor.get("login")
     except (ValueError, KeyError, IndexError, TypeError, AttributeError):
         return None
-    return str(login).lower() if login else None
+    if not login:
+        return None
+    login = str(login).lower()
+    # GraphQL names a Bot without REST's "[bot]" suffix ("github-actions"), so without this the
+    # provenance gate never matched RELAY_RED_LABELLER and no stale lane-fix-red ever cleared (#25157).
+    if actor.get("__typename") == "Bot" and not login.endswith("[bot]"):
+        login += "[bot]"
+    return login

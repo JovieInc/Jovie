@@ -137,4 +137,58 @@ describeCompactDesktop('desktop artist profile layout', () => {
       expect(g.docOverflow).toBeLessThanOrEqual(0);
     });
   }
+
+  // Walk 2026-11-09 (jov.ie/tim): Home -> Music/Events/About re-centred the
+  // header into one narrow column, grew a Back arrow between sibling tabs and
+  // spread Get updates + socials across the row. The identity column must sit
+  // still while the tabs change.
+  test('1440px keeps the identity header still across sibling tabs', async ({
+    page,
+  }) => {
+    await openFixture(page, 1440, 900);
+    const readIdentity = () =>
+      page.evaluate(() => {
+        const portrait = document.querySelector<HTMLElement>(
+          '[data-testid="profile-identity-portrait"]'
+        );
+        const actions = document.querySelector<HTMLElement>(
+          '[data-testid="profile-identity-actions"]'
+        );
+        if (!portrait || !actions) throw new Error('identity missing');
+        return {
+          portrait: portrait.getBoundingClientRect().toJSON() as DOMRect,
+          actions: actions.getBoundingClientRect().toJSON() as DOMRect,
+        };
+      });
+    const home = await readIdentity();
+    const homeArtLeft = await page
+      .getByTestId('profile-pac-featured-art')
+      .evaluate(el => el.getBoundingClientRect().left);
+    const nav = page.getByTestId('profile-bottom-nav');
+    for (const label of ['Music', 'Events', 'About']) {
+      await nav.getByRole('button', { name: label }).click();
+      await expect(
+        page.getByTestId('profile-compact-surface')
+      ).not.toHaveAttribute('data-mode', 'profile');
+      const tab = await readIdentity();
+      if (label === 'Music') {
+        // The Music panel's mobile bleed must not pull it left of column 2.
+        const panelLeft = await page
+          .locator(
+            '[data-testid="profile-primary-tab-releases"], [data-testid="profile-primary-tab-listen"]'
+          )
+          .first()
+          .evaluate(el => el.getBoundingClientRect().left);
+        expect(Math.abs(panelLeft - homeArtLeft), label).toBeLessThanOrEqual(1);
+      }
+      expect(Math.abs(tab.portrait.left - home.portrait.left), label).toBe(0);
+      expect(Math.abs(tab.portrait.top - home.portrait.top), label).toBe(0);
+      expect(tab.portrait.width, label).toBeCloseTo(home.portrait.width, 0);
+      expect(tab.actions.width, label).toBeCloseTo(home.actions.width, 0);
+      await expect(
+        page.getByRole('button', { name: 'Back' }),
+        label
+      ).toHaveCount(0);
+    }
+  });
 });

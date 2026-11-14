@@ -63,7 +63,7 @@
   justify-content: center;
   gap: 8px;
   padding: 0 16px;
-  border: 1px solid var(--color-border-subtle);
+  border: 1px solid var(--color-border-default); /* no fill carries the edge */
   border-radius: 9999px;
   font-size: 0.875rem;
   font-weight: 510;

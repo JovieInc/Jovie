@@ -3,9 +3,15 @@ import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { useState } from 'react';
 import { fn } from 'storybook/test';
 import { withSignedInSession } from '@/.storybook/signed-in-session';
+import { DesktopUpdateControl } from '@/components/organisms/desktop-update/DesktopUpdateControl';
 import { SidebarIdentityGroup } from '@/components/organisms/sidebar-identity-group';
 import { JovieAuthValuesProvider } from '@/hooks/useJovieAuth';
-import { SidebarDock, type SidebarDockProps } from './SidebarDock';
+import type { DesktopUpdateControlState } from '@/lib/desktop/desktop-update-control-state';
+import {
+  SidebarDock,
+  type SidebarDockProps,
+  type SidebarDockUpdateControl,
+} from './SidebarDock';
 
 const release = {
   id: 'dock-story-release',
@@ -16,12 +22,31 @@ const release = {
   highlights: [],
   dogfood: [],
 };
-const update = {
-  state: 'available',
-  version: '2',
-  releaseDate: null,
-  notesUrl: '/changelog',
-} as const;
+/** The dock's update slot, filled the way SidebarDockBridge fills it. */
+const updateControl = (
+  state: DesktopUpdateControlState,
+  label: string
+): SidebarDockUpdateControl => ({
+  visible: true,
+  label,
+  urgent: state.kind === 'failed',
+  node: (
+    <DesktopUpdateControl
+      state={state}
+      onDownload={fn()}
+      onRestart={fn()}
+      onRetry={fn()}
+    />
+  ),
+});
+const update = updateControl(
+  { kind: 'available', version: '2' },
+  'Update available'
+);
+const failedUpdate = updateControl(
+  { kind: 'failed', retry: 'check', version: '2' },
+  'Update failed'
+);
 const audio = {
   track: {
     trackTitle: 'Never Say A Word',
@@ -94,7 +119,7 @@ const meta = {
       </JovieAuthValuesProvider>
     ),
   ],
-  args: { userId: 'dock-story', onUpdate: fn() },
+  args: { userId: 'dock-story' },
   render: DockPreview,
 } satisfies Meta<typeof SidebarDock>;
 export default meta;
@@ -104,43 +129,114 @@ export const Empty: Story = {};
 export const AudioOnly: Story = { args: { audio } };
 export const WhatsNewOnly: Story = { args: { release } };
 export const WhatsNewAndAudio: Story = { args: { release, audio } };
-export const UpdateOnly: Story = { args: { update } };
-export const UpdateAndAudio: Story = { args: { update, audio } };
-export const UpdateAndWhatsNew: Story = { args: { update, release } };
-export const AllThree: Story = { args: { update, release, audio } };
+export const UpdateOnly: Story = { args: { updateControl: update } };
+export const UpdateAndAudio: Story = { args: { updateControl: update, audio } };
+export const UpdateAndWhatsNew: Story = {
+  args: { updateControl: update, release },
+};
+export const AllThree: Story = {
+  args: {
+    updateControl: update,
+    release,
+    audio,
+  },
+};
 export const WithInstall: Story = {
   args: {
-    update,
     release,
     audio,
     install: { onInstall: fn(), onDismiss: fn() },
   },
 };
 export const Collapsed: Story = {
-  args: { update, release, audio, collapsed: true },
+  args: { updateControl: update, release, audio, collapsed: true },
 };
 export const CollapsedEmpty: Story = { args: { collapsed: true } };
 export const Downloading: Story = {
   args: {
-    update: {
-      state: 'downloading',
-      percent: 42,
-      transferredBytes: 42,
-      totalBytes: 100,
-      bytesPerSecond: 1,
-    },
+    updateControl: updateControl(
+      { kind: 'downloading', version: '2', percent: 42 },
+      'Downloading update'
+    ),
     release,
     audio,
   },
 };
 export const Ready: Story = {
-  args: { update: { state: 'ready', version: '2' }, release, audio },
+  args: {
+    updateControl: updateControl(
+      { kind: 'ready', version: '2' },
+      'Restart to update'
+    ),
+    release,
+    audio,
+  },
 };
 export const UpdateError: Story = {
-  args: { update: { state: 'error', message: 'Offline', retryable: true } },
+  args: { updateControl: failedUpdate },
 };
 export const IOSInstall: Story = {
   args: { install: { isIOS: true, onInstall: fn(), onDismiss: fn() } },
+};
+
+export const ErrorUpdateFailed: Story = {
+  args: {
+    updateControl: failedUpdate,
+    audio,
+  },
+};
+/** Audio with only a track title: no artist and no artwork. */
+export const PartialAudio: Story = {
+  args: {
+    release,
+    audio: {
+      ...audio,
+      track: {
+        trackTitle: 'Untitled demo',
+        artistName: null,
+        artworkUrl: null,
+      },
+    },
+  },
+};
+export const LongContent: Story = {
+  args: {
+    release: {
+      ...release,
+      title:
+        'Release pages now show every streaming service, presave countdowns and per-territory analytics',
+    },
+    audio: {
+      ...audio,
+      track: {
+        trackTitle:
+          'Midnight Drive Through the Neon City (Extended Club Mix featuring the Late Night Strings)',
+        artistName:
+          'The Long Weekend Collective, Avery Stone and the Northern Lights',
+        artworkUrl: null,
+      },
+    },
+  },
+};
+export const Rtl: Story = {
+  args: {
+    updateControl: update,
+    audio: {
+      ...audio,
+      track: {
+        trackTitle: 'ليالي المدينة الطويلة',
+        artistName: 'فرقة الشرق',
+        artworkUrl: null,
+      },
+    },
+  },
+  decorators: [
+    Story => (
+      <div dir='rtl' lang='ar'>
+        <Story />
+      </div>
+    ),
+  ],
 };
 
 const light = { themes: { themeOverride: 'light' } };

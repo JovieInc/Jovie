@@ -51,3 +51,26 @@ export const CompactDensity: Story = {
     density: 'compact',
   },
 };
+
+export const LongContent: Story = {
+  args: {
+    label:
+      'Show this release on your public profile and in every smart link that references it',
+    ariaLabel: 'Show this release on your public profile',
+    checked: true,
+  },
+};
+
+export const Rtl: Story = {
+  args: {
+    label: 'إظهار في الملف الشخصي',
+    ariaLabel: 'إظهار في الملف الشخصي',
+  },
+  decorators: [
+    Story => (
+      <div dir='rtl' lang='ar'>
+        <Story />
+      </div>
+    ),
+  ],
+};

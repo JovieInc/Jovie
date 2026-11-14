@@ -3,8 +3,9 @@ import { inspectBlankMedia } from './route-dom-blank-media';
 import { inspectMarketingOutcomeDom } from './route-dom-outcome-dom';
 
 export {
+  BLANK_MEDIA_CONTENT_CELL_SHARE_MIN,
   BLANK_MEDIA_DOMINANT_SHARE_MIN,
-  BLANK_MEDIA_EMPTY_CELL_SHARE_MAX,
+  BLANK_MEDIA_INK_DEPARTURE_MIN,
   BLANK_MEDIA_LUMA_STDDEV_MAX,
   inspectBlankMedia,
 } from './route-dom-blank-media';

@@ -226,3 +226,28 @@ describe('ContactDetailSidebar', () => {
     ).toHaveLength(0);
   });
 });
+
+describe('ContactDetailSidebar scale tokens', () => {
+  it('keeps type and size utilities on scale tokens instead of arbitrary values', async () => {
+    const { readFileSync } = await import('node:fs');
+    const { join } = await import('node:path');
+    const source = readFileSync(
+      join(
+        import.meta.dirname,
+        '..',
+        '..',
+        '..',
+        'components',
+        'features',
+        'dashboard',
+        'organisms',
+        'contacts-table',
+        'ContactDetailSidebar.tsx'
+      ),
+      'utf8'
+    );
+
+    expect(source).not.toMatch(/tracking-\[-0\.02em\]/);
+    expect(source).toContain('tracking-tighter');
+  });
+});

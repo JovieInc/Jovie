@@ -2,7 +2,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { CanonicalUserState } from '@/lib/auth/canonical-user-state';
 
 /**
- * Closed public signup (canon/PRODUCT.md, 2026-11-02): one test per path.
+ * Public signup kill switch (FEATURE_PUBLIC_SIGNUP_CLOSED, canon/PRODUCT.md
+ * 2026-11-09): public signup is open by default; setting the env override to
+ * true re-closes it. One test per path while the switch is on:
  *  1. /signup (and anonymous /start) go to the waitlist.
  *  2. Sign-in still works for existing users.
  *  3. An invite link creates the account and enters the golden path.
@@ -48,6 +50,10 @@ vi.mock('@/lib/synthetic/passage-token.server', () => ({
 vi.mock('@/lib/onboarding/start-entry-profile.server', () => ({
   resolveStartEntryProfile: vi.fn().mockResolvedValue(null),
 }));
+vi.mock('@/lib/waitlist/winback-resume.server', () => ({
+  resolveWinbackResumeToken: vi.fn().mockResolvedValue(null),
+  recordWinbackResumeClick: vi.fn().mockResolvedValue(undefined),
+}));
 vi.mock('@/lib/onboarding/session', () => ({
   getCurrentOnboardingSessionId: vi.fn().mockResolvedValue(null),
 }));
@@ -77,7 +83,7 @@ vi.mock('@/app/(auth)/signin/SignInPageClient', () => ({
 
 const anonymous = { state: CanonicalUserState.UNAUTHENTICATED };
 
-describe('closed public signup (PUBLIC_SIGNUP_CLOSED)', () => {
+describe('public signup kill switch (FEATURE_PUBLIC_SIGNUP_CLOSED)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     process.env.FEATURE_PUBLIC_SIGNUP_CLOSED = 'true';
@@ -89,21 +95,23 @@ describe('closed public signup (PUBLIC_SIGNUP_CLOSED)', () => {
     delete process.env.FEATURE_PUBLIC_SIGNUP_CLOSED;
   });
 
-  it('keeps public signup closed by default while preserving an explicit reopen switch', async () => {
+  it('opens public signup by default while keeping the closed kill switch', async () => {
     delete process.env.FEATURE_PUBLIC_SIGNUP_CLOSED;
     const { CODE_FLAGS } = await import('@/lib/flags/code-flags');
-    expect(CODE_FLAGS.PUBLIC_SIGNUP_CLOSED).toBe(true);
+    expect(CODE_FLAGS.PUBLIC_SIGNUP_CLOSED).toBe(false);
 
     const { default: SignUpPage } = await import('@/app/(auth)/signup/page');
     await expect(
       SignUpPage({ searchParams: Promise.resolve({}) })
-    ).rejects.toThrow('NEXT_REDIRECT:/waitlist');
-    mocks.redirect.mockClear();
-    process.env.FEATURE_PUBLIC_SIGNUP_CLOSED = 'false';
-    await expect(
-      SignUpPage({ searchParams: Promise.resolve({}) })
     ).resolves.toBeTruthy();
     expect(mocks.redirect).not.toHaveBeenCalled();
+
+    // Kill switch: FEATURE_PUBLIC_SIGNUP_CLOSED=true sends visitors back to
+    // the waitlist (canon/PRODUCT.md, 2026-11-09).
+    process.env.FEATURE_PUBLIC_SIGNUP_CLOSED = 'true';
+    await expect(
+      SignUpPage({ searchParams: Promise.resolve({}) })
+    ).rejects.toThrow('NEXT_REDIRECT:/waitlist');
   });
 
   it('path 1: sends /signup, the signup modal and anonymous /start to the waitlist', async () => {

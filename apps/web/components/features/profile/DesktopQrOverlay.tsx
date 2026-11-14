@@ -2,9 +2,9 @@
 // @coverage-via apps/web/tests/unit/DesktopQrOverlay.test.tsx
 
 import { Smartphone, X } from 'lucide-react';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { CircleIconButton } from '@/components/atoms/CircleIconButton';
-import { getQrCodeUrl, QRCode } from '@/components/molecules/QRCode';
+import { getQrCodeDataUrl, QRCode } from '@/components/molecules/QRCode';
 import { PROFILE_Z } from '@/lib/profile/z-index-constants';
 
 interface DesktopQrOverlayProps {
@@ -33,17 +33,29 @@ export function DesktopQrOverlay({ handle }: Readonly<DesktopQrOverlayProps>) {
   const [mode, setMode] = useState<'hidden' | 'icon' | 'open'>('hidden');
   const [url, setUrl] = useState('');
   const openCardRef = useRef<HTMLDivElement>(null);
-  const qrUrl = useMemo(() => {
-    if (!url) return '';
-    return getQrCodeUrl(url, 120);
-  }, [url]);
+
+  // Warm the QR cache after the window load event so the open card renders
+  // instantly. Generation is local CPU work (no network), so it can no longer
+  // hold the load event; the gate stays because the generation effect and the
+  // card's own render both belong after load on a cold visit.
+  const [pageLoaded, setPageLoaded] = useState(false);
 
   useEffect(() => {
-    if (!qrUrl || typeof globalThis.Image !== 'function') return;
+    if (globalThis.document?.readyState === 'complete') {
+      setPageLoaded(true);
+      return;
+    }
+    const onLoad = () => setPageLoaded(true);
+    globalThis.addEventListener('load', onLoad, { once: true });
+    return () => globalThis.removeEventListener('load', onLoad);
+  }, []);
 
-    const preloadImage = new globalThis.Image();
-    preloadImage.src = qrUrl;
-  }, [qrUrl]);
+  useEffect(() => {
+    if (!pageLoaded || !url) {
+      return;
+    }
+    void getQrCodeDataUrl(url, 120).catch(() => null);
+  }, [pageLoaded, url]);
 
   useEffect(() => {
     if (typeof globalThis.matchMedia !== 'function') return;
@@ -157,13 +169,20 @@ export function DesktopQrOverlay({ handle }: Readonly<DesktopQrOverlayProps>) {
               <X className='h-4 w-4' aria-hidden='true' />
             </button>
           </div>
-          {url && (
+          {url && pageLoaded ? (
             <QRCode
               data={url}
               size={120}
               label='Scan To Open This Profile On Your Phone'
             />
-          )}
+          ) : url ? (
+            <div
+              aria-hidden='true'
+              data-testid='desktop-qr-placeholder'
+              className='rounded-lg bg-surface-2 animate-pulse motion-reduce:animate-none'
+              style={{ width: 120, height: 120 }}
+            />
+          ) : null}
         </div>
       )}
 

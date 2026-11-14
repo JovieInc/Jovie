@@ -7,7 +7,7 @@ import { EmptyState } from '@/components/molecules/EmptyState';
 import { AboutSection } from '@/features/profile/AboutSection';
 import { AlertsSettingsView } from '@/features/profile/AlertsSettingsView';
 import { ArtistNotificationsCTA } from '@/features/profile/artist-notifications-cta/ArtistNotificationsCTA';
-import { SubscriptionFormSkeleton } from '@/features/profile/artist-notifications-cta/shared';
+import { InlineNotificationsFlowSkeleton } from '@/features/profile/artist-notifications-cta/InlineNotificationsFlowSkeleton';
 import { TwoStepNotificationsCTA } from '@/features/profile/artist-notifications-cta/TwoStepNotificationsCTA';
 import type { NotificationSourceContext } from '@/features/profile/artist-notifications-cta/types';
 import type {
@@ -96,17 +96,16 @@ const DEFAULT_MODE_CARD_ACCENTS = resolveProfileModeCardAccents();
 function SectionIntro({
   title,
   body,
-}: Readonly<{
-  title: string;
-  body?: string;
-}>) {
+}: Readonly<{ title: string; body?: string }>) {
   return (
     <div className={cn('space-y-1', body ? 'mb-4' : 'mb-3')}>
-      <p className='text-app font-semibold tracking-[-0.015em] text-white/56'>
+      <p className='text-app font-semibold tracking-[-0.015em] text-on-media/56'>
         {title}
       </p>
       {body ? (
-        <p className='max-w-[28ch] text-sm leading-6 text-white/68'>{body}</p>
+        <p className='max-w-[28ch] text-sm leading-6 text-on-media/68'>
+          {body}
+        </p>
       ) : null}
     </div>
   );
@@ -146,18 +145,18 @@ function PreviewAlertsPanel({
         </div>
 
         <div className='space-y-1.5'>
-          <p className='text-xl font-semibold tracking-[-0.014em] text-white dark:text-white'>
+          <p className='text-xl font-semibold tracking-[-0.014em] text-on-media dark:text-on-media'>
             {resolvedTitle}
           </p>
           {resolvedBody ? (
-            <p className='max-w-[28ch] text-app leading-5 text-white/58'>
+            <p className='max-w-[28ch] text-app leading-5 text-on-media/58'>
               {resolvedBody}
             </p>
           ) : null}
         </div>
 
         {state.kind === 'button' ? (
-          <div className='inline-flex items-center gap-2 rounded-full border border-white/14 bg-white/[0.08] px-4 py-3 text-sm font-semibold text-white dark:text-white'>
+          <div className='inline-flex items-center gap-2 rounded-full border border-on-media/14 bg-on-media/[0.08] px-4 py-3 text-sm font-semibold text-on-media dark:text-on-media'>
             <Bell className='h-4 w-4' />
             <span>{isSubscribed ? 'Manage alerts' : 'Get Alerts'}</span>
           </div>
@@ -167,10 +166,10 @@ function PreviewAlertsPanel({
         state.kind === 'name' ||
         state.kind === 'birthday' ? (
           <div className='space-y-3'>
-            <div className='rounded-3xl border border-white/12 bg-white/[0.06] px-4 py-3 text-sm text-white/72'>
+            <div className='rounded-3xl border border-on-media/12 bg-on-media/[0.06] px-4 py-3 text-sm text-on-media/72'>
               {state.value || state.label}
             </div>
-            <div className='inline-flex items-center justify-center rounded-full bg-white dark:bg-surface-1 px-4 py-2 text-sm font-semibold text-black dark:text-white'>
+            <div className='inline-flex items-center justify-center rounded-full bg-on-media dark:bg-surface-1 px-4 py-2 text-sm font-semibold text-ink-on-media dark:text-on-media'>
               {state.actionLabel || 'Continue'}
             </div>
           </div>
@@ -182,13 +181,13 @@ function PreviewAlertsPanel({
               {OTP_SLOT_KEYS.map((slotKey, index) => (
                 <div
                   key={`otp-${slotKey}`}
-                  className='flex h-11 items-center justify-center rounded-2xl border border-white/12 bg-white/[0.06] text-sm font-semibold text-white/78'
+                  className='flex h-11 items-center justify-center rounded-2xl border border-on-media/12 bg-on-media/[0.06] text-sm font-semibold text-on-media/78'
                 >
                   {state.value?.[index] ?? ''}
                 </div>
               ))}
             </div>
-            <div className='inline-flex items-center justify-center rounded-full bg-white dark:bg-surface-1 px-4 py-2 text-sm font-semibold text-black dark:text-white'>
+            <div className='inline-flex items-center justify-center rounded-full bg-on-media dark:bg-surface-1 px-4 py-2 text-sm font-semibold text-ink-on-media dark:text-on-media'>
               {state.actionLabel || 'Verify'}
             </div>
           </div>
@@ -255,7 +254,7 @@ function SubscribePanel({
       <ProfileStayCloseCard accent={accent}>
         <div className='-mx-4 -mb-4'>
           {!visitorAssignmentResolved ? (
-            <SubscriptionFormSkeleton />
+            <InlineNotificationsFlowSkeleton />
           ) : subscribeTwoStep ? (
             <TwoStepNotificationsCTA
               artist={artist}
@@ -458,7 +457,7 @@ export function ProfilePrimaryTabPanel({
         >
           <div>
             <div className='px-4 pb-2 pt-3'>
-              <h2 className='text-xl font-semibold leading-none tracking-[-0.014em] text-white dark:text-white'>
+              <h2 className='text-balance text-xl font-semibold leading-none tracking-[-0.014em] text-on-media dark:text-on-media'>
                 Music
               </h2>
             </div>
@@ -482,7 +481,7 @@ export function ProfilePrimaryTabPanel({
         data-testid='profile-primary-tab-listen'
       >
         <div className='px-4 pb-2 pt-3'>
-          <h2 className='text-xl font-semibold leading-none tracking-[-0.014em] text-white dark:text-white'>
+          <h2 className='text-balance text-xl font-semibold leading-none tracking-[-0.014em] text-on-media dark:text-on-media'>
             Music
           </h2>
         </div>
@@ -569,7 +568,7 @@ export function ProfilePrimaryTabPanel({
         <SectionIntro title='About' />
         <div
           className={cn(
-            'text-white/80',
+            'text-on-media/80',
             renderMode === 'preview' && 'pointer-events-none'
           )}
         >

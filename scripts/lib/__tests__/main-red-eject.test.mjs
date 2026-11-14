@@ -156,23 +156,36 @@ describe('decideEject', () => {
         .action
     ).toBe('revert');
   });
-  it('caps attempts per change and gives a live repair its grace', () => {
+  it('caps attempts per change', () => {
     expect(decideEject({ ...base, priorAttempts: 2 }).reason).toBe(
       'attempt-cap'
     );
+  });
+  it('reverts even while a forward fix is open (it wins only by landing first)', () => {
+    // Revert first (canon/MERGE_QUEUE_STEWARD.md): 2026-10-31 the forward fix sat
+    // at queue position 18 behind the stall it was fixing.
     const repair = {
       number: 23712,
-      createdAt: '2026-10-29T19:50:00Z',
-      queued: false,
+      createdAt: '2026-10-29T19:55:00Z',
+      queued: true,
     };
-    expect(decideEject({ ...base, repairs: [repair] }).reason).toBe(
-      'repair-in-flight:#23712'
-    );
+    // decideEject takes no repair list at all now; an extra field is ignored.
     expect(
-      decideEject({
-        ...base,
-        repairs: [{ ...repair, createdAt: '2026-10-29T18:00:00Z' }],
-      }).action
+      decideEject(/** @type {any} */ ({ ...base, repairs: [repair] }))
+    ).toEqual({
+      action: 'revert',
+      reason: 'culprit-attributed',
+    });
+  });
+  it('allows one revert in flight per culprit, whoever opened it', () => {
+    const mainHealth = { number: 9, check: 'Main health', culprit: 'c' };
+    expect(decideEject({ ...base, openReverts: [mainHealth] })).toEqual({
+      action: 'skip',
+      reason: 'revert-in-flight-for-culprit',
+    });
+    expect(
+      decideEject({ ...base, openReverts: [{ ...mainHealth, culprit: 'd' }] })
+        .action
     ).toBe('revert');
   });
   it('builds conventional titles within 100 chars', () => {
