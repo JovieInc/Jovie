@@ -57,6 +57,11 @@ export const InsetPanel = React.forwardRef<HTMLElement, InsetPanelProps>(
 );
 InsetPanel.displayName = 'InsetPanel';
 
+/** Optional slots keep numeric zero counts while preserving empty values. */
+function hasInsetPanelContent(value: React.ReactNode): boolean {
+  return value === 0 || Boolean(value);
+}
+
 export interface InsetPanelHeaderProps
   extends Omit<React.HTMLAttributes<HTMLDivElement>, 'title'> {
   readonly title: React.ReactNode;
@@ -77,17 +82,21 @@ export function InsetPanelHeader({
     <div
       {...props}
       data-slot='inset-panel-header'
-      className={cn(INSET_PANEL_HEADER, trailing && 'pe-0.5', className)}
+      className={cn(
+        INSET_PANEL_HEADER,
+        hasInsetPanelContent(trailing) && 'pe-0.5',
+        className
+      )}
     >
       <span data-slot='inset-panel-title' className={INSET_PANEL_TITLE}>
         {title}
       </span>
-      {meta ? (
+      {hasInsetPanelContent(meta) ? (
         <span data-slot='inset-panel-meta' className={INSET_PANEL_META}>
           {meta}
         </span>
       ) : null}
-      {trailing ? (
+      {hasInsetPanelContent(trailing) ? (
         <span
           data-slot='inset-panel-header-trailing'
           className='flex shrink-0 items-center'
@@ -157,7 +166,7 @@ export function InsetPanelRow({
       <span data-slot='inset-panel-label' className={INSET_PANEL_LABEL}>
         {label}
       </span>
-      {trailing ? (
+      {hasInsetPanelContent(trailing) ? (
         <span data-slot='inset-panel-trailing' className={INSET_PANEL_TRAILING}>
           {trailing}
         </span>
