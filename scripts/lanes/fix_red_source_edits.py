@@ -22,6 +22,7 @@ from fix_red_conflict_resolvers import (  # noqa: F401
     resolve_additive_certificate_waivers, resolve_additive_node_test_file,
     resolve_additive_node_tests_text, resolve_additive_statement_file,
 )
+from fix_red_liveness_quota import resolve_liveness_quota_text  # noqa: F401
 from screen_debt_merge import resolve_subtractive_screen_debt  # noqa: F401
 
 # Same argv as lane_runner.WORKTREE_INSTALL. A fresh repair worktree has no
@@ -87,6 +88,8 @@ def resolve_additive_list_conflict(worktree: Path, branch: str, log, *, sh, merg
                     text = resolve_additive_certificate_waivers(worktree, path, sh)
                 if text is None and not stage_choice:
                     text = resolve_subtractive_screen_debt(worktree, path, sh)
+                if text is None and not stage_choice:
+                    text = resolve_liveness_quota_text(path, target.read_text())
             except OSError:
                 text = None
             if text is None:

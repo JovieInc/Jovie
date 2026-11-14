@@ -16,9 +16,10 @@
  * - evaluateLiveness: compares each entry's last-run receipt to its max
  *   staleness. Silence is an alert: a missing or unreadable receipt is red,
  *   never green (dead-man semantics).
- * - runStageEvents: run receipts in the jovie-stage-event/v1 shape (one
- *   started -> finished pair per run), so every run's start and end land in
- *   the stage-timing pipeline.
+ * - runStageEvents (re-exported from ./liveness-stage-events.mjs, split for
+ *   the shrink-only size-500 budget): run receipts in the jovie-stage-event/v1
+ *   shape (one started -> finished pair per run), so every run's start and end
+ *   land in the stage-timing pipeline.
  *
  * Network reads live in the hosted liveness job (scripts/automation-liveness.mjs).
  */
@@ -33,13 +34,11 @@ export function hasCronSchedule(source = '') {
   return CRON_RE.test(String(source));
 }
 
+export { runStageEvents } from './liveness-stage-events.mjs';
+
 export const REGISTRY_SCHEMA = 'jovie-automation-registry/v1';
 export const REGISTRY_PATH = 'canon/automation-registry.jsonl';
 export const LIVENESS_SCHEMA = 'jovie-automation-liveness/v1';
-// Shared with the stage-instrumentation contract (scripts/lib/stage-events.mjs,
-// docs/metrics/stage-manifest.json entity `automation-run`).
-export const STAGE_EVENT_SCHEMA = 'jovie-stage-event/v1';
-export const RUN_ENTITY_TYPE = 'automation-run';
 
 export const STATUSES = Object.freeze(['live', 'retired']);
 export const TRIGGER_KINDS = Object.freeze([
@@ -523,6 +522,12 @@ export function livenessFingerprint(id) {
     .toLowerCase()}`;
 }
 
+/** A quota-deferred read (lib/github-json-read.mjs, JOV-9993): not a
+ * silence verdict, so it files no red and flips no alert state. */
+export function isQuotaDeferredRow(row) {
+  return row?.status === 'unknown' && row?.reason === 'github-quota-deferred';
+}
+
 /**
  * Alert decisions for the existing remediation-signal intake: one fingerprint
  * per critical loop, red while silent, green once its heartbeat returns.
@@ -539,6 +544,10 @@ export function livenessDecisions(report, previous = {}) {
         decisions.push({ action: 'green', fingerprint, id: row.id });
       continue;
     }
+    // A quota-deferred read is not a silence verdict: no red filing, and the
+    // persisted alert state keeps its prior color until a readable run files
+    // the true transition (JOV-9993).
+    if (isQuotaDeferredRow(row)) continue;
     decisions.push({
       action: 'red',
       fingerprint,
@@ -552,58 +561,6 @@ export function livenessDecisions(report, previous = {}) {
     });
   }
   return decisions;
-}
-
-// --- Run receipts (stage events) ------------------------------------------------
-
-/**
- * jovie-stage-event/v1 rows for one run: `started` (entered at start, exited
- * at end) and the terminal `finished`. A run without a start or end time
- * yields no rows; timestamps are never invented.
- */
-export function runStageEvents({
-  automationId,
-  runRef,
-  startedAt,
-  endedAt,
-  outcome,
-  sourceReceipt,
-  actor = null,
-}) {
-  const start = Date.parse(startedAt ?? '');
-  const end = Date.parse(endedAt ?? '');
-  if (
-    !Number.isFinite(start) ||
-    !Number.isFinite(end) ||
-    !nonEmpty(sourceReceipt)
-  )
-    return [];
-  const entityId = `${automationId}@${runRef}`;
-  const exit = new Date(Math.max(start, end)).toISOString();
-  return [
-    {
-      schema: STAGE_EVENT_SCHEMA,
-      entityType: RUN_ENTITY_TYPE,
-      entityId,
-      stage: 'started',
-      enteredAt: new Date(start).toISOString(),
-      exitedAt: exit,
-      actor,
-      outcome: 'advanced',
-      sourceReceipt,
-    },
-    {
-      schema: STAGE_EVENT_SCHEMA,
-      entityType: RUN_ENTITY_TYPE,
-      entityId,
-      stage: 'finished',
-      enteredAt: exit,
-      exitedAt: exit,
-      actor,
-      outcome: outcome === 'failed' ? 'failed' : 'completed',
-      sourceReceipt,
-    },
-  ];
 }
 
 /** Read a dotted path (`a.b.c`) from parsed JSON. */
