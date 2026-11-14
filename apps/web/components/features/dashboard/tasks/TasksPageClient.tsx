@@ -1774,6 +1774,7 @@ export function TasksPageClient() {
   const handleGenerateTaskPitch = useCallback(
     (task: TaskView) => {
       if (!task.releaseId || !task.releaseTitle) {
+        toast.error('Link a release to this task to generate its pitch.');
         return;
       }
 
