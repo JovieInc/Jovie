@@ -7,7 +7,9 @@ name: Component Certificate
 
 on:
   workflow_run:
-    workflows: [CI]
+    # CI can finish before the independently cached render/mutation producers.
+    # Late trusted completions refresh current main; evidence bindings decide reuse.
+    workflows: [CI, 'Visual & A11y Tests', Mutation Diff]
     types: [completed]
     branches: [main]
   workflow_dispatch:
@@ -27,16 +29,23 @@ jobs:
     if: >-
       github.ref == 'refs/heads/main' && (
         github.event_name == 'workflow_dispatch' ||
-        github.event.workflow_run.conclusion == 'success')
+        (github.event_name == 'workflow_run' &&
+         github.event.workflow_run.conclusion == 'success' &&
+         github.event.workflow_run.head_branch == 'main' &&
+         github.event.workflow_run.head_repository.full_name == github.repository &&
+         contains(fromJSON('["push","workflow_dispatch","workflow_run"]'), github.event.workflow_run.event)))
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
       contents: read
     concurrency:
-      group: component-certificate
+      # Cancellation follows the immutable target, never the producer's older SHA.
+      group: component-certificate-${{ inputs.sha || github.sha }}
       cancel-in-progress: true
     env:
-      CERT_SHA: ${{ inputs.sha || github.event.workflow_run.head_sha || github.sha }}
+      CERT_SHA: ${{ inputs.sha || github.sha }}
+      CERT_EVENT_NAME: ${{ github.event_name }}
+      CERT_TRIGGER_SHA: ${{ github.event.workflow_run.head_sha }}
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -45,7 +54,16 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
       - name: Require main ancestry
-        run: git merge-base --is-ancestor HEAD origin/main
+        run: |
+          set -euo pipefail
+          [[ "$CERT_SHA" =~ ^[0-9a-f]{40}$ ]]
+          test "$(git rev-parse HEAD)" = "$CERT_SHA"
+          git merge-base --is-ancestor HEAD origin/main
+          if [ "$CERT_EVENT_NAME" = workflow_run ]; then
+            [[ "$CERT_TRIGGER_SHA" =~ ^[0-9a-f]{40}$ ]]
+            git cat-file -e "$CERT_TRIGGER_SHA^{commit}"
+            git merge-base --is-ancestor "$CERT_TRIGGER_SHA" HEAD
+          fi
       - uses: ./.github/actions/prime-node-toolcache
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v6.4.0
         with:
@@ -57,8 +75,8 @@ jobs:
           key: mutation-sweep-portable-v2-${{ github.run_id }}-${{ github.run_attempt }}
           restore-keys: mutation-sweep-portable-v2-
       # Story-capture receipts from visual-a11y.yml (component-story-evidence,
-      # hosted runners only). Receipts bind to source hashes, so an older
-      # capture only counts for components that have not changed since.
+      # hosted runners only). Component AND shared input bindings are required;
+      # stale/legacy passes and failures both become unknown after restore.
       - name: Restore story evidence
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
@@ -118,6 +136,7 @@ jobs:
         id: delivery
         if: ${{ !cancelled() }}
         env:
+          GH_TOKEN: ${{ github.token }}
           OVIE_BASE_URL: ${{ vars.OVIE_BASE_URL || 'https://jov.ie' }}
           POST_REQUESTED: ${{ github.event_name != 'workflow_dispatch' || inputs.post }}
         run: |
@@ -154,12 +173,26 @@ jobs:
             echo "::error::Ovie delivery failed: CRON_SECRET unresolved; see secret resolution."
             exit 1
           fi
+          # The full report stays in the artifact; only the bounded packet is posted.
+          payload="$RUNNER_TEMP/component-certificate/delivery-payload.json"
+          node scripts/lib/component-certificate-delivery.mjs "$report" --out "$payload"
+          # Best-effort supersession boundary, not atomic with Ovie's write.
+          # Use the existing Git-protocol resolver to avoid installation REST quota.
+          if ! current_main="$(RESOLVE_MAIN_BUDGET_SECONDS=0 timeout 30s bash .github/scripts/resolve-main-sha.sh "$GITHUB_REPOSITORY")"; then
+            record_delivery failed main-ref-unavailable none
+            echo "::error::Current main unavailable; report retained without delivery."
+            exit 1
+          fi
+          if [ "$current_main" != "$CERT_SHA" ]; then
+            record_delivery skipped superseded-main none
+            exit 0
+          fi
           code="$(curl -sS -o "$RUNNER_TEMP/ovie-response.txt" -w '%{http_code}' \
             --retry 2 --max-time 60 --tlsv1.2 --proto '=https' \
             -X POST "$OVIE_BASE_URL/api/internal/ovie/component-certificate-evidence" \
             -H "authorization: Bearer ${CRON_SECRET}" \
             -H 'content-type: application/json' \
-            --data-binary "@${report}")" || code="000"
+            --data-binary "@${payload}")" || code="000"
           case "$code" in
             2[0-9][0-9]) record_delivery http-accepted readback-required "$code" ;;
             *) record_delivery failed http-or-transport-error "$code"

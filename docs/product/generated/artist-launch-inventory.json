@@ -998,6 +998,14 @@
       "classification": "C"
     },
     {
+      "source": "apps/web/app/[username]/profile-miss/page.tsx",
+      "kind": "page",
+      "route": "/[username]/profile-miss",
+      "methods": [],
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
       "source": "apps/web/app/[username]/profile-mode-render/[profileMode]/[marker]/page.tsx",
       "kind": "page",
       "route": "/[username]/profile-mode-render/[profileMode]/[marker]",
@@ -3356,6 +3364,14 @@
       "source": "apps/web/app/api/internal/ovie/certification-evidence/route.ts",
       "kind": "handler",
       "route": "/api/internal/ovie/certification-evidence",
+      "methods": ["POST"],
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
+      "source": "apps/web/app/api/internal/ovie/component-certificate-evidence/route.ts",
+      "kind": "handler",
+      "route": "/api/internal/ovie/component-certificate-evidence",
       "methods": ["POST"],
       "surface": "deferred",
       "classification": "C"
@@ -5724,6 +5740,14 @@
       "source": "apps/web/app/app/(shell)/admin/revenue-lift/page.tsx",
       "kind": "page",
       "route": "/app/admin/revenue-lift",
+      "methods": [],
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
+      "source": "apps/web/app/app/(shell)/admin/room/page.tsx",
+      "kind": "page",
+      "route": "/app/admin/room",
       "methods": [],
       "surface": "deferred",
       "classification": "C"

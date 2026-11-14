@@ -5,10 +5,10 @@ export const HOMEPAGE_REQUEST_ACCESS_STARTER_PROMPT =
   'Hey, I want to get access to Jovie.';
 
 /**
- * Canonical public acquisition destination for waitlist-on marketing CTAs.
- * Lands on `/signup` (working AuthShell, same-origin) rather than `/waitlist`,
- * which 404s for several authenticated and half-provisioned states (JOV-6436).
- * Durable waitlist receipts stay on `APP_ROUTES.WAITLIST`.
+ * Same-origin sign-up entry (working AuthShell) used by flows that must not
+ * land on `/waitlist`, which 404s for several authenticated and
+ * half-provisioned states (JOV-6436). Durable waitlist receipts stay on
+ * `APP_ROUTES.WAITLIST`.
  */
 export const PUBLIC_WAITLIST_URL = APP_ROUTES.SIGNUP;
 
@@ -45,22 +45,11 @@ export interface HomepageFrontDoorCtaContract {
   readonly fallbackSupport: string;
 }
 
-export function getHomepageFrontDoorCtaContract(
-  waitlistEnabled: boolean
-): HomepageFrontDoorCtaContract {
-  if (waitlistEnabled) {
-    return {
-      // Claim, not a request: the paid profile is self-serve
-      // (EVENT: Tim, 2026-10-20). Signup still runs the post-auth waitlist gate.
-      primary: {
-        label: 'Claim your profile',
-        href: PUBLIC_WAITLIST_URL,
-      },
-      secondary: null,
-      fallbackSupport: 'Free to start. Reserve your name now.',
-    };
-  }
-
+/**
+ * The one public front-door CTA. Signup is open and there is one flow: every
+ * claim enters the /start chat, which owns post-auth routing.
+ */
+export function getHomepageFrontDoorCtaContract(): HomepageFrontDoorCtaContract {
   return {
     primary: {
       label: 'Claim your free profile',

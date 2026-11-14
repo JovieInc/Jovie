@@ -34,6 +34,99 @@ def red(*names):
             'statusCheckRollup': [{'name': n, 'conclusion': 'FAILURE'} for n in names]}
 
 
+class LocalModulePrerequisiteTest(unittest.TestCase):
+    def test_missing_local_prerequisite_syncs_main_before_fixture_infra(self):
+        diagnostic = ("lib/waitlist/winback-approval.server.ts(23,8): error TS2307: "
+                      "Cannot find module '@/lib/waitlist/winback' or its corresponding type declarations.")
+        for state in ("BLOCKED", "BEHIND"):
+            diagnostics = [diagnostic.replace("lib/waitlist/winback-approval.server.ts", source)
+                           for source in ("lib/waitlist/winback-approval.server.ts", "hooks/useWinback.ts",
+                                          "types/winback.ts", "constants/winback.ts", "infrastructure/winback.ts")]
+            for log in diagnostics + ["passing fixture: API rate limit exceeded\n##[error]" + item for item in diagnostics]:
+                got = classes.classify({**red("Source Validation"), "mergeStateStatus": state}, {"Source Validation": log})
+                self.assertEqual((got["cls"], got["action"]), ("local-module-prerequisite", "sync-main"))
+
+    def test_infrastructure_shortcut_preserves_the_local_prerequisite_route(self):
+        pr = {**red("Source Validation"), "queueFailure": None, "eventKinds": []}
+        log = ("passing fixture: API rate limit exceeded\n##[error]"
+               "lib/waitlist/winback-approval.server.ts(23,8): error TS2307: "
+               "Cannot find module '@/lib/waitlist/winback' or its corresponding type declarations.")
+        with patch.object(lane, "failed_logs", return_value={"Source Validation": log}):
+            self.assertIsNone(lane.infra_only_red(None, pr))
+            self.assertEqual(lane.route_fix_red(None, pr)["action"], "sync-main")
+
+    def test_infrastructure_shortcut_preserves_composed_prerequisite_sync(self):
+        pr = {**red("Source Validation", "Design Conformance"), "queueFailure": None, "eventKinds": []}
+        logs = {
+            "Source Validation": ("passing fixture: API rate limit exceeded\n"
+                                  "lib/waitlist/winback-approval.server.ts(23,8): error TS2307: "
+                                  "Cannot find module '@/lib/waitlist/winback'"),
+            "Design Conformance": "passing fixture: API rate limit exceeded\nsource changed; renew certification evidence",
+        }
+        with patch.object(lane, "failed_logs", return_value=logs):
+            route = lane.route_fix_red(None, pr)
+            self.assertEqual((route["cls"], route["action"]), ("composed", "sync-main"))
+            self.assertIsNone(lane.infra_only_red(None, pr))
+
+    def test_mixed_prerequisite_and_product_failure_stays_with_agent(self):
+        pr = {**red("Source Validation", "Exact-head Coverage"), "queueFailure": None, "eventKinds": []}
+        logs = {
+            "Source Validation": ("passing fixture: API rate limit exceeded\n"
+                                  "lib/waitlist/winback-approval.server.ts(23,8): error TS2307: "
+                                  "Cannot find module '@/lib/waitlist/winback'"),
+            "Exact-head Coverage": "passing fixture: API rate limit exceeded\nUnwired: scripts/a.test.mjs. Wire each file into a ci-fast lane",
+        }
+        with patch.object(lane, "failed_logs", return_value=logs):
+            route = lane.route_fix_red(None, pr)
+            self.assertEqual((route["cls"], route["action"]), ("mixed", "agent"))
+            self.assertIsNone(lane.infra_only_red(None, pr))
+
+    def test_missing_package_or_fixture_text_does_not_request_prerequisite_sync(self):
+        for log in (
+            "lib/a.ts(1,1): error TS2307: Cannot find module 'external-package' or its corresponding type declarations.",
+            "passing test: Cannot find module '@/lib/waitlist/winback'",
+            "lib/a.ts(1,1): error TS2305: Module '@/lib/a' has no exported member 'missing'.",
+        ):
+            got = classes.classify(red("Source Validation"), {"Source Validation": log})
+            self.assertEqual((got["cls"], got["action"]), ("other", "agent"))
+
+
+class RouteBudgetGrowthTest(unittest.TestCase):
+    def test_annotated_budget_growth_syncs_main_before_fixture_infra(self):
+        growth = ('2026-11-13T03:11:53.2279082Z ##[error]routes./app/chat/[id] grew 823 -> 1385\n'
+                  '##[error]firstLoad.baselines./start grew 804 -> 1247\n'
+                  '##[error]groups.dashboard.baselineKb grew 1199 -> 1385\n')
+        for log in (growth, '\x1b[31m' + growth + '\x1b[0m',
+                    'passing fixture: API rate limit exceeded; HTTP 503\n' + growth):
+            route = classes.classify(red('Exact-head Coverage'), {'Exact-head Coverage': log})
+            self.assertEqual((route['cls'], route['action']), ('route-budget-growth', 'sync-main'))
+
+    def test_runtime_budget_failures_and_passing_fixtures_stay_with_agent(self):
+        growth = '##[error]routes./app/chat grew 822 -> 1385\n'
+        for log in ('routes./app/chat grew 822 -> 1385\n',
+                    'echo "' + growth.strip() + '"\n',
+                    '##[error]routes./app/chat grew 1385 -> 822\n',
+                    '##[error]routes./app/chat grew 822 -> 822\n',
+                    growth + '##[error]/app grew beyond its measured JS budget\n',
+                    growth + 'FAIL home.test.tsx > shows setup\nAssertionError: hidden setup\n',
+                    growth + 'Error: the build failed\n',
+                    'FAIL /app/chat: 1400 / 822 KB gz\n'):
+            route = classes.classify(red('Exact-head Coverage'), {'Exact-head Coverage': log})
+            self.assertEqual(route['action'], 'agent', log)
+
+    def test_log_failed_job_prefix_still_syncs_main(self):
+        prefixed = (
+            'Exact-head Coverage\tUNKNOWN STEP\t2026-11-13T19:16:13.5084741Z ##[error]routes./app/admin/hud grew 738 -> 975\n'
+            'Exact-head Coverage\tUNKNOWN STEP\t2026-11-13T19:16:13.5103474Z ##[error]firstLoad.baselines./ grew 578 -> 663\n'
+            'Exact-head Coverage\tUNKNOWN STEP\t2026-11-13T19:16:13.6219908Z ##[error]Process completed with exit code 1.\n')
+        route = classes.classify(red('Exact-head Coverage'), {'Exact-head Coverage': prefixed})
+        self.assertEqual((route['cls'], route['action']), ('route-budget-growth', 'sync-main'))
+        poisoned = prefixed + (
+            'Exact-head Coverage\tUNKNOWN STEP\t2026-11-13T19:16:14.0000000Z ##[error]AssertionError: expected 1 to be +0\n')
+        stay = classes.classify(red('Exact-head Coverage'), {'Exact-head Coverage': poisoned})
+        self.assertEqual(stay['action'], 'agent')
+
+
 class AliasClassificationTest(unittest.TestCase):
     def test_real_annotation_and_complete_failure_have_owned_no_model_route(self):
         for log in (ANNOTATION, LOG, '\x1b[31m' + LOG + '\x1b[0m',
@@ -199,6 +292,27 @@ class QueueEvidenceTest(unittest.TestCase):
         self.assertNotIn('attemptRefunded', receipt)
         for operation in (install, agent, rerun, claim):
             operation.assert_not_called()
+
+
+class RouteBudgetRoutingTest(unittest.TestCase):
+    def test_route_budget_ratchet_syncs_main_before_mocked_infra_noise(self):
+        # PR #25125: main tightened budgets while this head retained the old
+        # file. Both the build guard and the CLI integration test report growth.
+        errors = [
+            "2026-11-13T02:54:35.2625435Z ##[error]routes./app/chat/[id] grew 823 -> 1385",
+            "AssertionError: ::error::routes./app/chat grew 822 -> 1385",
+            "::error::firstLoad.baselines./start grew 804 -> 1247",
+            "::error::groups.dashboard.baselineKb grew 1199 -> 1385",
+        ]
+        for error in errors:
+            log = "passing fixture: API rate limit exceeded; github-quota-deferred\n" + error
+            got = classes.classify(red("Exact-head Coverage"), {"Exact-head Coverage": log})
+            self.assertEqual((got["cls"], got["action"]), ("route-budget-growth", "sync-main"), error)
+        # Measurement overruns and passing test titles are not stale-policy proof.
+        for text in ["routes./app/chat grew 822 -> 1385", "✔ rejects routes./app/chat grew 822 -> 1385",
+                     "::error::/app/chat: 1400 KB exceeds 822 KB budget", "::error::routes./app/chat grew invalid"]:
+            got = classes.classify(red("Exact-head Coverage"), {"Exact-head Coverage": text})
+            self.assertEqual((got["cls"], got["action"]), ("other", "agent"), text)
 
 
 if __name__ == '__main__':

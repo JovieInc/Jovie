@@ -1,5 +1,6 @@
 import { spawnSync } from 'node:child_process';
 import {
+  existsSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
@@ -85,6 +86,133 @@ const fixtureRoots = [];
 afterEach(() => {
   for (const root of fixtureRoots.splice(0))
     rmSync(root, { recursive: true, force: true });
+});
+
+describe('diff mutation capacity admission', () => {
+  it.each([
+    [0, 0, 0, true, true, 0],
+    [75, 0, 0, false, false, 0],
+    [23, 0, 23, false, false, 0],
+    [0, 75, 0, true, false, 0],
+    [0, 23, 23, true, false, 0],
+    [0, 0, 1, true, true, 1],
+    [0, 0, 0, false, false, 0, false],
+  ])(
+    'preflight %i then %i: exits %i, setup=%s, score=%s',
+    (earlyStatus, lateStatus, expectedStatus, setupExpected, scoreExpected, mutationStatus, hasFiles = true) => {
+      const diff = load(workflow).jobs.mutate.steps;
+      const capacity = diff.find(step => step.id === 'capacity');
+      const setup = diff.find(step => step.name === 'Setup Node.js and pnpm');
+      const mutation = diff.find(step => step.id === 'mutation');
+      const upload = diff.find(step => step.name === 'Upload mutation reports');
+      expect(
+        capacity,
+        'capacity must be checked before dependency setup'
+      ).toBeDefined();
+      expect(diff.indexOf(capacity)).toBeLessThan(diff.indexOf(setup));
+      expect(capacity.if).toBe("steps.files.outputs.files != ''");
+      expect(capacity.env.MUTATION_MAX_LOAD).toBe('8');
+      expect(mutation.env.MUTATION_MAX_LOAD).toBe('8');
+      expect(upload.if).toContain("steps.mutation.outputs.started == 'true'");
+      expect(upload.if).toContain('always()');
+
+      const root = mkdtempSync(resolve(tmpdir(), 'mutation-capacity-'));
+      fixtureRoots.push(root);
+      mkdirSync(resolve(root, 'scripts'));
+      const reportPath = resolve(
+        root,
+        'apps/web/reports/mutation/diff/report.json'
+      );
+      mkdirSync(resolve(root, 'apps/web/reports/mutation/diff'), {
+        recursive: true,
+      });
+      writeFileSync(reportPath, '{"stale":true}');
+      writeFileSync(
+        resolve(root, 'scripts/mutation-sweep-preflight.mjs'),
+        'process.exit(Number(process.env.PREFLIGHT_STATUS));\n'
+      );
+      writeFileSync(
+        resolve(root, 'scripts/mutation-diff.mjs'),
+        "import { writeFileSync, appendFileSync } from 'node:fs'; writeFileSync('scored', 'yes'); writeFileSync('apps/web/reports/mutation/diff/report.json', '{\"fresh\":true}'); appendFileSync(process.env.GITHUB_STEP_SUMMARY, 'score: measured\\n'); process.exit(Number(process.env.MUTATION_STATUS));\n"
+      );
+      const summary = resolve(root, 'summary');
+      const output = resolve(root, 'output');
+      writeFileSync(summary, '');
+      writeFileSync(output, '');
+      const outputs = {
+        files: { files: hasFiles ? 'apps/web/lib/auth/example.ts' : '' },
+      };
+      const admitted = step =>
+        step.if
+          .replace(/^\$\{\{\s*(.*?)\s*\}\}$/u, '$1')
+          .split(' && ')
+          .every(condition => {
+            switch (condition) {
+              case 'always()':
+                return true;
+              case "hashFiles('apps/web/reports/mutation/diff/*.json') != ''":
+                return existsSync(reportPath);
+              case "steps.files.outputs.files != ''":
+                return outputs.files.files !== '';
+              case "steps.capacity.outputs.run == 'true'":
+                return outputs.capacity?.run === 'true';
+              case "steps.mutation.outputs.started == 'true'":
+                return outputs.mutation?.started === 'true';
+              default:
+                throw new Error(`unsupported step condition: ${condition}`);
+            }
+          });
+      const run = (step, status) =>
+        spawnSync('bash', ['-e', '-o', 'pipefail', '-c', step.run], {
+          cwd: root,
+          encoding: 'utf8',
+          env: {
+            ...process.env,
+            ...step.env,
+            PREFLIGHT_STATUS: String(status),
+            MUTATION_STATUS: String(mutationStatus),
+            GITHUB_OUTPUT: output,
+            GITHUB_STEP_SUMMARY: summary,
+          },
+        });
+      expect(admitted(capacity)).toBe(hasFiles);
+      let status = admitted(capacity) ? run(capacity, earlyStatus).status : 0;
+      outputs.capacity = Object.fromEntries(
+        readFileSync(output, 'utf8')
+          .trim()
+          .split('\n')
+          .filter(Boolean)
+          .map(row => row.split('='))
+      );
+      const setupRan = status === 0 && admitted(setup);
+      if (setupRan) writeFileSync(resolve(root, 'setup'), 'yes');
+      if (status === 0 && admitted(mutation))
+        status = run(mutation, lateStatus).status;
+      expect(status).toBe(expectedStatus);
+      expect(existsSync(resolve(root, 'setup'))).toBe(setupExpected);
+      expect(existsSync(resolve(root, 'scored'))).toBe(scoreExpected);
+      const receipt = readFileSync(output, 'utf8');
+      outputs.mutation = Object.fromEntries(
+        receipt
+          .trim()
+          .split('\n')
+          .filter(Boolean)
+          .map(row => row.split('='))
+      );
+      // A pre-existing report is insufficient. A failing harness may upload its
+      // fresh report because the upload step uses always() and the start receipt.
+      expect(admitted(upload)).toBe(scoreExpected);
+      expect(JSON.parse(readFileSync(reportPath, 'utf8'))).toEqual(
+        scoreExpected ? { fresh: true } : { stale: true }
+      );
+      const report = readFileSync(summary, 'utf8');
+      expect(receipt.includes('started=true')).toBe(scoreExpected);
+      expect(report.includes('score: measured')).toBe(scoreExpected);
+      if (earlyStatus === 75 || lateStatus === 75)
+        expect(report).toContain('no mutation score produced');
+      if (expectedStatus !== 0) expect(report).not.toContain('Skipped');
+    }
+  );
 });
 
 describe('portable mutation evidence', () => {

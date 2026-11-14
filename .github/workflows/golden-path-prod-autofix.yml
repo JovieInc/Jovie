@@ -7,7 +7,13 @@ name: Golden Path Prod Autofix
 # controller-hop-exception: jovie-controller-hop/v1
 # accountable-writer: Gem
 # necessary-trust-boundary: Manual trusted-main dispatch observes deployed runtime; only this bounded job receives Linear/Cursor mutation credentials and it never deploys or merges.
-# compatibility-expiry: 2026-10-31; delete after the probe is owned in-band by Production Controller.
+# compatibility-expiry: 2026-12-15; delete after the probe is owned in-band by Production Controller.
+# Decision 2026-11-14 (JOV-12536) - Keep as the manual fallback for now. The
+# 2026-10-31 expiry passed with no decision. Scheduled production coverage has
+# moved to postdeploy-probes.yml (JOV-9625, JOV-9822: certification after every
+# promotion and on the 12 h lanes clock), so this workflow stays manual and
+# gets no clock of its own. By 2026-12-15: delete it with the prod-probe and
+# autofix modes, or record a new dated decision here.
 # Does not read signup-account secrets. Missing CURSOR_API_KEY fails closed.
 
 on:

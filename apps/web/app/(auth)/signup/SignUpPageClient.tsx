@@ -6,12 +6,7 @@ import { useSearchParams } from 'next/navigation';
 import { type ReactNode, useEffect, useMemo, useState } from 'react';
 import { AuthenticatedAuthEntryGuard } from '@/components/features/auth/AuthenticatedAuthEntryGuard';
 import { APP_ROUTES } from '@/constants/routes';
-import {
-  AuthLayout,
-  AuthOfferSummary,
-  AuthRoutePrefetch,
-  AuthShell,
-} from '@/features/auth';
+import { AuthLayout, AuthRoutePrefetch, AuthShell } from '@/features/auth';
 import { track } from '@/lib/analytics';
 import { buildAuthRouteUrl } from '@/lib/auth/build-auth-route-url';
 import { getCentralAuthCallbackPath } from '@/lib/auth/central-auth-routing';
@@ -326,11 +321,7 @@ function getFallbackRedirectUrl(
  * buttons are gated by `lib/auth/oauth-providers.ts` - Apple stays hidden
  * until its env flag is set (JOV-2062).
  */
-export function SignUpPageClient({
-  showOfferSummary = false,
-}: Readonly<{
-  readonly showOfferSummary?: boolean;
-}> = {}) {
+export function SignUpPageClient() {
   const searchParams = useSearchParams();
   const desktopReturnRoute = sanitizeDesktopReturnRoute(
     searchParams.get('desktop_return')
@@ -363,7 +354,6 @@ export function SignUpPageClient({
         <AuthRoutePrefetch href={signInUrl} />
         <SignUpOauthErrorBanner signInUrl={signInUrl} />
         <SignUpClaimDataPersistence />
-        {showOfferSummary ? <AuthOfferSummary mode='sign-up' enabled /> : null}
         <AuthShell
           mode='sign-up'
           forceOppositeModeHardNavigation

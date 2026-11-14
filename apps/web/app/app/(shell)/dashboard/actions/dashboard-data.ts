@@ -536,6 +536,20 @@ async function loadInboxNavigationAvailability(
       );
       return UNKNOWN_INBOX_NAVIGATION_AVAILABILITY;
     }
+    // Transient Neon transport failures (dropped connections, postmaster
+    // exits, commit-wired transport kills) are infrastructure conditions on
+    // a fail-soft read — the same class the avatar/social-links boundaries
+    // degrade log-only (JOV-8864/JOV-8900). The count runs on the shared
+    // session transaction, so a killed transport cannot be replayed on the
+    // same tx; degrade log-only instead of paging Sentry (JOV-12477,
+    // Sentry 7846577230: `Failed query: select count(*) from
+    // "suggested_actions"` on a Neon suspend kill).
+    if (isDashboardReadRecoveryAdmitted(error)) {
+      logger.warn(
+        '[inbox-navigation] inbox count read hit a transient transport failure; degrading to unknown availability'
+      );
+      return UNKNOWN_INBOX_NAVIGATION_AVAILABILITY;
+    }
     Sentry.captureException(error, {
       level: 'warning',
       tags: { context: 'inbox_navigation_availability' },

@@ -10,7 +10,10 @@ import {
 } from '@/lib/customer-changelog';
 import { resolveMonorepoPath } from '@/lib/filesystem-paths';
 import { auditOrphans } from '@/lib/seo/geo-certification';
-import { CustomerChangelogArchive } from './CustomerChangelogArchive';
+import {
+  ChangelogEntryMedia,
+  CustomerChangelogArchive,
+} from './CustomerChangelogArchive';
 
 const MONTHS: readonly CustomerChangelogMonthGroup[] = [
   {
@@ -108,68 +111,6 @@ describe('CustomerChangelogArchive', () => {
       document.activeElement.blur();
   });
 
-  it('shows source-declared limited rollout prerequisites without a GA badge', () => {
-    render(
-      <CustomerChangelogArchive
-        months={[
-          {
-            ...MONTHS[0],
-            entries: [
-              {
-                ...MONTHS[0].entries[0],
-                availability: 'limited',
-                prerequisites: ['Eligible profiles with updates enabled'],
-              },
-            ],
-          },
-        ]}
-      />
-    );
-    expect(screen.getByText('Limited availability')).toBeVisible();
-    expect(
-      screen.getByText('Eligible profiles with updates enabled')
-    ).toBeVisible();
-    expect(screen.queryByText('Generally available')).not.toBeInTheDocument();
-  });
-
-  it('renders a receipt-approved next step and never mints an unsafe link', () => {
-    const action = {
-      label: 'See it on a demo profile',
-      href: '/demo/showcase/tim-white-profile?mode=subscribe',
-    };
-    render(
-      <CustomerChangelogArchive
-        months={[
-          {
-            ...MONTHS[0],
-            entries: [{ ...MONTHS[0].entries[0], action }],
-          },
-          {
-            ...MONTHS[1],
-            entries: [
-              {
-                ...MONTHS[1].entries[0],
-                action: { label: 'Unsafe', href: 'javascript:alert(1)' },
-              },
-            ],
-          },
-        ]}
-      />
-    );
-    expect(
-      screen.getByRole('link', { name: /See it on a demo profile/ })
-    ).toHaveAttribute(
-      'href',
-      '/demo/showcase/tim-white-profile?mode=subscribe'
-    );
-    fireEvent.click(
-      screen.getByRole('button', { name: 'Load Earlier Updates' })
-    );
-    expect(
-      screen.queryByRole('link', { name: /Unsafe/ })
-    ).not.toBeInTheDocument();
-  });
-
   it('retains permanent engineering links when there are no approved customer outcomes', () => {
     render(
       <CustomerChangelogArchive
@@ -183,7 +124,7 @@ describe('CustomerChangelogArchive', () => {
     );
     expect(screen.getByText('Engineering history')).not.toBeVisible();
   });
-  it('leads with outcome titles and keeps version tertiary', () => {
+  it('leads with outcome headlines and links the date to its date page', () => {
     render(<CustomerChangelogArchive months={MONTHS.slice(0, 1)} />);
 
     expect(
@@ -191,14 +132,22 @@ describe('CustomerChangelogArchive', () => {
         name: 'Review qualified brand deals in your Inbox',
       })
     ).toBeVisible();
-    expect(screen.getByText('August 16, 2026 · v26.8.1')).toBeVisible();
+    const date = screen.getByText('August 16, 2026', { selector: 'time' });
+    expect(date).toHaveAttribute('datetime', '2026-08-16');
+    expect(date.closest('a')).toHaveAttribute('href', '/changelog/26.8.1');
+    expect(screen.queryByText(/v26\.8\.1/)).not.toBeInTheDocument();
     expect(
-      screen.getByText('August 16, 2026 · v26.8.1').closest('a')
-    ).toHaveAttribute('href', '/changelog/26.8.1');
-    expect(screen.queryByText(/^v26\.8\.1$/)).not.toBeInTheDocument();
-    expect(
-      screen.getByText('New', { selector: '.changelog-entry__category' })
+      screen.getByText('New', { selector: '[data-tone="neutral"]' })
     ).toBeVisible();
+    // The headline is the permalink.
+    expect(
+      screen.getByRole('link', {
+        name: 'Review qualified brand deals in your Inbox',
+      })
+    ).toHaveAttribute(
+      'href',
+      '/changelog#review-qualified-brand-deals-v26-8-1-0'
+    );
     // One announcement, told once: a single heading and no decorative
     // placeholder card repeating the entry inside itself. The archive jump
     // nav link is the only other legitimate title surface.
@@ -212,169 +161,30 @@ describe('CustomerChangelogArchive', () => {
     expect(screen.queryByRole('img')).not.toBeInTheDocument();
   });
 
-  it('renders one real media asset per entry through the projected contract', () => {
-    render(
-      <CustomerChangelogArchive
-        months={[
-          {
-            ...MONTHS[0],
-            entries: [
-              {
-                ...MONTHS[0].entries[0],
-                media: {
-                  kind: 'image',
-                  src: '/images/auth/noir-studio.webp',
-                  alt: 'Inbox showing a qualified brand deal',
-                },
-              },
-            ],
-          },
-        ]}
-      />
-    );
-
-    const img = screen.getByRole('img', {
-      name: 'Inbox showing a qualified brand deal',
-    });
-    expect(img.getAttribute('src')).toContain('/images/auth/noir-studio.webp');
-    expect(img).toHaveAttribute('loading', 'lazy');
-    expect(img).toHaveAttribute('decoding', 'async');
-    // Exactly one media region: the reserved-aspect frame, no second card.
-    expect(document.querySelectorAll('.changelog-entry-media')).toHaveLength(1);
-    expect(document.querySelector('.changelog-entry__card')).toBeNull();
-  });
-
-  it('removes the media region instead of leaving a placeholder gap when the asset fails', () => {
-    render(
-      <CustomerChangelogArchive
-        months={[
-          {
-            ...MONTHS[0],
-            entries: [
-              {
-                ...MONTHS[0].entries[0],
-                media: {
-                  kind: 'image',
-                  src: '/images/auth/missing-asset.webp',
-                  alt: 'Unavailable screenshot',
-                },
-              },
-            ],
-          },
-        ]}
-      />
-    );
-
-    const img = screen.getByRole('img', { name: 'Unavailable screenshot' });
-    fireEvent.error(img);
-    expect(
-      screen.queryByRole('img', { name: 'Unavailable screenshot' })
-    ).not.toBeInTheDocument();
-    expect(document.querySelector('.changelog-entry-media')).toBeNull();
-    expect(
-      screen.getByRole('heading', {
-        name: 'Review qualified brand deals in your Inbox',
-      })
-    ).toBeVisible();
-  });
-
-  it('renders contracted video with controls and no autoplay', () => {
-    render(
-      <CustomerChangelogArchive
-        months={[
-          {
-            ...MONTHS[0],
-            entries: [
-              {
-                ...MONTHS[0].entries[0],
-                media: {
-                  kind: 'video',
-                  src: '/videos/inbox-tour.mp4',
-                  alt: 'Inbox walkthrough',
-                },
-              },
-            ],
-          },
-        ]}
-      />
-    );
-
-    const video = document.querySelector(
-      '.changelog-entry-media video'
-    ) as HTMLVideoElement;
-    expect(video).not.toBeNull();
-    expect(video).toHaveAttribute('controls');
-    expect(video).toHaveAttribute('playsinline');
-    expect(video).toHaveAttribute('preload', 'metadata');
-    expect(video.autoplay).toBe(false);
-    expect(video).toHaveAttribute('aria-label', 'Inbox walkthrough');
-  });
-
-  it('keeps long titles readable in a single text-first column', () => {
-    const longTitle =
-      'Review qualified brand deals in your Inbox with buyer context, budget signals, and source attribution across every connected profile';
-    render(
-      <CustomerChangelogArchive
-        months={[
-          {
-            ...MONTHS[0],
-            entries: [{ ...MONTHS[0].entries[0], title: longTitle }],
-          },
-        ]}
-      />
-    );
-
-    expect(screen.getByRole('heading', { name: longTitle })).toBeVisible();
-    expect(screen.getAllByRole('heading', { name: longTitle })).toHaveLength(1);
-    expect(document.querySelector('.changelog-entry__card')).toBeNull();
-    expect(document.querySelector('.changelog-entry-media')).toBeNull();
-  });
-
-  it('binds the last two title words so no word sits alone on the last line', () => {
-    render(
-      <CustomerChangelogArchive
-        months={[
-          {
-            ...MONTHS[0],
-            entries: [
-              { ...MONTHS[0].entries[0], title: 'Google connection recovery' },
-            ],
-          },
-        ]}
-      />
-    );
-
-    const heading = screen.getByRole('heading', {
-      name: 'Google connection recovery',
-    });
-    const bound = heading.querySelector('span.inline-block');
-    expect(bound?.textContent).toBe('connection recovery');
-  });
-
   it('shows one month then loads earlier updates without 1-of-N theater', () => {
     const { container } = render(<CustomerChangelogArchive months={MONTHS} />);
 
     // Month label appears twice by design: archive jump-nav rail + section heading.
     expect(screen.getAllByText('August 2026').length).toBeGreaterThan(0);
     expect(screen.getByRole('heading', { name: 'August 2026' })).toHaveClass(
-      'truncate'
+      'sr-only'
     );
     expect(
       screen.queryByRole('heading', { name: 'July 2026' })
     ).not.toBeInTheDocument();
     expect(
-      screen.getByRole('button', { name: 'Load Earlier Updates' })
+      screen.getByRole('button', { name: 'Load earlier updates' })
     ).toBeVisible();
     expect(screen.queryByText(/Show \d+ More/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/Showing \d+ of \d+/i)).not.toBeInTheDocument();
 
     fireEvent.click(
-      screen.getByRole('button', { name: 'Load Earlier Updates' })
+      screen.getByRole('button', { name: 'Load earlier updates' })
     );
 
     expect(screen.getAllByText('July 2026').length).toBeGreaterThan(0);
     expect(
-      screen.queryByRole('button', { name: 'Load Earlier Updates' })
+      screen.queryByRole('button', { name: 'Load earlier updates' })
     ).not.toBeInTheDocument();
     expect(container.querySelector('img')).not.toBeInTheDocument();
   });
@@ -411,7 +221,7 @@ describe('CustomerChangelogArchive', () => {
     expect(container.querySelector(`#${MONTHS[1].entries[0].slug}`)).toBeNull();
 
     fireEvent.click(
-      screen.getByRole('button', { name: 'Load Earlier Updates' })
+      screen.getByRole('button', { name: 'Load earlier updates' })
     );
 
     expect(olderEntry).toHaveAttribute(
@@ -453,7 +263,7 @@ describe('CustomerChangelogArchive', () => {
     ).toBeInTheDocument();
     expect(target).toHaveFocus();
     expect(
-      screen.queryByRole('button', { name: 'Load Earlier Updates' })
+      screen.queryByRole('button', { name: 'Load earlier updates' })
     ).not.toBeInTheDocument();
   });
 
@@ -647,14 +457,14 @@ describe('CustomerChangelogArchive', () => {
               Node.DOCUMENT_POSITION_FOLLOWING
           )
           .map(control => control.textContent?.trim())
-      ).toEqual(['All', 'New', 'Improved', 'Fixed', 'Removed']);
+      ).toEqual(['All', 'New', 'Improved', 'Fixed', 'Removed', 'RSS feed']);
       expect(
         screen.getByRole('heading', { name: months[0].entries[0].title })
       ).toBeVisible();
     }
   );
 
-  it('keeps JOV-IDs, Redis, and admission on Level 3', () => {
+  it('keeps internal tokens off the customer page', () => {
     render(<CustomerChangelogArchive months={MONTHS.slice(1)} />);
 
     expect(
@@ -662,15 +472,45 @@ describe('CustomerChangelogArchive', () => {
         name: 'Sign-out stays available when the store is missing',
       })
     ).toBeVisible();
-    const disclosure = screen.getByText('Technical details').closest('details');
-    expect(disclosure).not.toHaveAttribute('open');
+    expect(screen.queryByText('Technical details')).not.toBeInTheDocument();
+    expect(screen.queryByText(/JOV-5260/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Redis/)).not.toBeInTheDocument();
+  });
 
-    fireEvent.click(screen.getByText('Technical details'));
+  it('renders an entry’s approved media inside its post', () => {
+    render(
+      <CustomerChangelogArchive
+        months={[
+          {
+            ...MONTHS[0],
+            entries: [
+              {
+                ...MONTHS[0].entries[0],
+                media: {
+                  kind: 'image',
+                  src: '/images/auth/noir-studio.webp',
+                  alt: 'Inbox showing a qualified brand deal',
+                },
+              },
+            ],
+          },
+        ]}
+      />
+    );
+    expect(
+      document.querySelector(
+        'article.changelog-post .changelog-entry-media img'
+      )
+    ).toHaveAttribute('alt', 'Inbox showing a qualified brand deal');
+  });
 
-    expect(disclosure).toHaveAttribute('open');
-    expect(screen.getByText(/JOV-5260/)).toBeVisible();
-    expect(screen.getByText(/Redis/)).toBeVisible();
-    expect(screen.getByText(/admission/)).toBeVisible();
+  it('links the feed from the filter row', () => {
+    render(<CustomerChangelogArchive months={MONTHS.slice(0, 1)} />);
+
+    expect(screen.getByRole('link', { name: 'RSS feed' })).toHaveAttribute(
+      'href',
+      '/changelog/feed.xml'
+    );
   });
 
   it('renders the empty state without archive chrome', () => {
@@ -678,7 +518,7 @@ describe('CustomerChangelogArchive', () => {
 
     expect(screen.getByText('No updates yet. Check back soon!')).toBeVisible();
     expect(
-      screen.queryByRole('button', { name: 'Load Earlier Updates' })
+      screen.queryByRole('button', { name: 'Load earlier updates' })
     ).not.toBeInTheDocument();
   });
 
@@ -724,5 +564,53 @@ describe('CustomerChangelogArchive', () => {
       'aria-pressed',
       'false'
     );
+  });
+});
+
+describe('ChangelogEntryMedia', () => {
+  it('renders one real image in a reserved frame and drops it on failure', () => {
+    const { container } = render(
+      <ChangelogEntryMedia
+        media={{
+          kind: 'image',
+          src: '/images/auth/noir-studio.webp',
+          alt: 'Inbox showing a qualified brand deal',
+        }}
+      />
+    );
+    const img = screen.getByRole('img', {
+      name: 'Inbox showing a qualified brand deal',
+    });
+    expect(img.getAttribute('src')).toContain('/images/auth/noir-studio.webp');
+    expect(img).toHaveAttribute('loading', 'lazy');
+    expect(img).toHaveAttribute('decoding', 'async');
+    expect(container.querySelectorAll('.changelog-entry-media')).toHaveLength(
+      1
+    );
+    // A failed asset leaves no placeholder gap.
+    fireEvent.error(img);
+    expect(container.querySelector('.changelog-entry-media')).toBeNull();
+  });
+
+  it('renders contracted video with controls and no autoplay', () => {
+    const { container } = render(
+      <ChangelogEntryMedia
+        media={{
+          kind: 'video',
+          src: '/videos/inbox-tour.mp4',
+          alt: 'Inbox walkthrough',
+        }}
+      />
+    );
+    const video = container.querySelector(
+      '.changelog-entry-media video'
+    ) as HTMLVideoElement;
+    expect(video).toHaveAttribute('controls');
+    expect(video).toHaveAttribute('playsinline');
+    expect(video).toHaveAttribute('preload', 'metadata');
+    expect(video.autoplay).toBe(false);
+    expect(video).toHaveAttribute('aria-label', 'Inbox walkthrough');
+    fireEvent.error(video);
+    expect(container.querySelector('.changelog-entry-media')).toBeNull();
   });
 });

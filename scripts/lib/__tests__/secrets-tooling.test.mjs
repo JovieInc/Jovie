@@ -137,6 +137,8 @@ it('scrubPrText strips personal emails and phone numbers, keeps service addresse
     'Co-Authored-By: Claude <noreply@anthropic.com>\n' +
     'git@github.com:JovieInc/Jovie 2026-11-12 4fd78e95 run 123-456 port 3000-3001 qa@jovie.test';
   expect(scrubPrText(keep)).toBe(keep);
+  const files = 'assets icon@2x.png, logo@1.5x.webp and foo@next.js stay';
+  expect(scrubPrText(files)).toBe(files);
   expect(scrubPrText('token ' + 'ghp_' + 'a'.repeat(36))).toBe(`token ${MARK}`);
 });
 

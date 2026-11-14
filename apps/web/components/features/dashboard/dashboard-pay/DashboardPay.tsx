@@ -387,7 +387,7 @@ export function DashboardPay() {
                   >
                     <Wallet className='h-5 w-5 text-accent-token' />
                   </div>
-                  <h2 className='text-base font-semibold tracking-[-0.011em] text-primary-token sm:text-lg'>
+                  <h2 className='text-balance text-base font-semibold tracking-[-0.011em] text-primary-token'>
                     Connect Venmo To Unlock Earnings
                   </h2>
                   <p className='mt-2 text-app leading-5 text-secondary-token sm:text-sm'>

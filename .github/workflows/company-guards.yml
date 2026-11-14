@@ -1,8 +1,10 @@
 # Shared company guard suite from JovieInc/ci (canon/COMPANY.md).
 # Pin is bumped by a bot PR; a pin more than 72h behind the newest canon/guard
 # commit fails this check. The bot rewrites these two lines only:
-# company-guards.yml@9891c0ec01d1a19bc441977f2fa58c24d2611e4e
-# ci-ref: 9891c0ec01d1a19bc441977f2fa58c24d2611e4e
+# company-guards.yml@da878c8965355cd5a08db7bd0cee0d5527cf7dcb
+# ci-ref: da878c8965355cd5a08db7bd0cee0d5527cf7dcb
+# Latest canon/guard revision: daf34326 changes only the certification kit and
+# is absent from drift's path-filtered history. Certification keeps that tip.
 # Source Validation classifies with the trusted base, which has no
 # .company-guards/ rule. The baseline is committed under scripts/company-guards/
 # and this job copies it to the path guards/size.mjs reads.

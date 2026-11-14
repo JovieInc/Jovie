@@ -29,6 +29,15 @@
  *
  * landedOnMainAt moved here from scripts/automation-liveness.mjs (also its
  * size-500 budget): it is the same readJson/githubHeaders consumer.
+ * JOV-10153: when the public retry also 403s (automation-liveness runs
+ * 43404659161 / 43406130330 — the runner IP is throttled exactly while the
+ * fleet has spent the shared token, 0/5000), the free GET /rate_limit
+ * attributes the double 403 to the spent budget: the read is `deferred`
+ * (the installation-budget sentinel's convention — gates that read on it
+ * defer instead of deciding until it resets), not `unknown`, so a live
+ * automation files no false P0 while its receipts are unreadable. The
+ * attribution is strict: a funded budget, no api base, or an unreadable
+ * /rate_limit keeps the original failure so silence stays red.
  */
 import { classifyGitHubFailure } from './github-rate-limit.mjs';
 
@@ -119,29 +128,46 @@ export async function classifyDeniedResponse(response) {
 }
 
 /**
- * Run-list read for the workflow observers; see the module header. The
- * unauthenticated retry runs only when a token was used and only on a 403.
+ * True when the shared installation REST budget is provably spent
+ * (resources.core.remaining <= 0). GET /rate_limit is exempt from the REST
+ * quota and still answers once the budget is spent, so it can attribute a
+ * double 403 to the budget instead of a silent automation.
  */
-export async function readGithubJson(url, { fetchImpl, token }) {
+async function sharedBudgetSpent(fetchImpl, token, apiUrl) {
+  if (!apiUrl) return false;
+  const limit = await readJson(
+    fetchImpl,
+    `${apiUrl}/rate_limit`,
+    githubHeaders(token)
+  );
+  const core = limit.ok ? limit.body?.resources?.core : null;
+  return typeof core?.remaining === 'number' && core.remaining <= 0;
+}
+
+/**
+ * Run-list read for the workflow observers; see the module header. The
+ * unauthenticated retry runs only when a token was used and only on a 403;
+ * a retry that also 403s defers only while the shared budget is spent.
+ */
+export async function readGithubJson(url, { fetchImpl, token, apiUrl = '' }) {
   const read = await readJson(fetchImpl, url, githubHeaders(token));
   if (read.ok) return read;
   if (token && read.reason === 'http-403') {
-    const fallback = await readJson(fetchImpl, url, {});
-    if (fallback.ok) return fallback;
-    const recoveryQuotaKind = quotaKindOf(read) ?? quotaKindOf(fallback);
-    if (recoveryQuotaKind)
-      return {
-        ok: false,
-        reason: 'quota-deferred',
-        quotaKind: recoveryQuotaKind,
-      };
-    return fallback;
+    const recovery = await readJson(fetchImpl, url, {});
+    if (recovery.ok) return recovery;
+    const recoveryKind = quotaKindOf(read) ?? quotaKindOf(recovery);
+    if (recoveryKind)
+      return { ok: false, reason: 'quota-deferred', quotaKind: recoveryKind };
+    if (
+      recovery.reason === 'http-403' &&
+      (await sharedBudgetSpent(fetchImpl, token, apiUrl))
+    )
+      return { ok: false, deferred: true, reason: 'quota-deferred' };
+    return { ok: false, reason: recovery.reason };
   }
-  // A 429, or a tokenless quota denial, defers too: a quota failure is never
-  // a silence verdict, with or without a recovery read.
   const quotaKind = quotaKindOf(read);
   if (quotaKind) return { ok: false, reason: 'quota-deferred', quotaKind };
-  return read;
+  return { ok: false, reason: read.reason };
 }
 
 const PUSH_RUNS_PAGE = 100;
@@ -191,4 +217,16 @@ export async function landedOnMainAt(
   return Number.isFinite(landedMs)
     ? new Date(landedMs).toISOString()
     : committerDate;
+}
+
+/**
+ * Observation failure shape for the run-list observers: the `github-`
+ * reason prefix with the deferred flag carried through (JOV-10153).
+ */
+export function githubReadFailure(read) {
+  return {
+    ok: false,
+    deferred: read.deferred === true,
+    reason: `github-${read.reason}`,
+  };
 }

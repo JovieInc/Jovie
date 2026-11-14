@@ -116,24 +116,52 @@ jobs:
           INPUT_FILES: ${{ inputs.files }}
         run: node scripts/lib/github-installation-quota.mjs soft-fail -- bash .github/scripts/mutation-diff-resolve-files.sh
 
-      - name: Setup Node.js and pnpm
+      - name: Check the runner has spare capacity
+        id: capacity
         if: steps.files.outputs.files != ''
+        env:
+          MUTATION_MAX_LOAD: '8'
+        run: |
+          set +e
+          node scripts/mutation-sweep-preflight.mjs
+          code=$?
+          set -e
+          if [ "$code" -eq 75 ]; then
+            echo "run=false" >> "$GITHUB_OUTPUT"
+            echo "Skipped: Gem busy; no mutation score produced." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          [ "$code" -eq 0 ] || exit "$code"
+          echo "run=true" >> "$GITHUB_OUTPUT"
+
+      - name: Setup Node.js and pnpm
+        if: steps.files.outputs.files != '' && steps.capacity.outputs.run == 'true'
         uses: ./.github/actions/setup-node-pnpm
 
       - name: Run Stryker on changed high-risk files
-        if: steps.files.outputs.files != ''
+        id: mutation
+        if: steps.files.outputs.files != '' && steps.capacity.outputs.run == 'true'
         env:
           CI: 'true'
           FILES: ${{ steps.files.outputs.files }}
           STRYKER_CONCURRENCY: '1'
           MUTATION_MAX_LOAD: '8'
         run: |
-          # Off-peak only: skip (not fail) while Gem's 5-minute load is 8 or more.
-          if ! node scripts/mutation-sweep-preflight.mjs; then echo "Gem busy; diff mutation skipped."; exit 0; fi
+          # Capacity can change during setup. Only exit 75 means a busy host.
+          set +e
+          node scripts/mutation-sweep-preflight.mjs
+          code=$?
+          set -e
+          if [ "$code" -eq 75 ]; then
+            echo "Skipped: Gem busy after setup; no mutation score produced." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          [ "$code" -eq 0 ] || exit "$code"
+          echo "started=true" >> "$GITHUB_OUTPUT"
           node scripts/mutation-diff.mjs --files "$FILES" --summary "$GITHUB_STEP_SUMMARY"
 
       - name: Upload mutation reports
-        if: ${{ always() && hashFiles('apps/web/reports/mutation/diff/*.json') != '' }}
+        if: ${{ always() && steps.mutation.outputs.started == 'true' && hashFiles('apps/web/reports/mutation/diff/*.json') != '' }}
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: mutation-diff-${{ github.run_id }}

@@ -25,7 +25,7 @@ export function getConnectorAvailability(): Record<
         available: configured[definition.oauthBundle],
         reason: configured[definition.oauthBundle]
           ? undefined
-          : 'Connection setup is unavailable. Try again later.',
+          : 'Connection setup is unavailable. This connector cannot be connected yet.',
       },
     ])
   ) as Record<ConnectorProviderId, ConnectorAvailability>;

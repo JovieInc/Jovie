@@ -1,7 +1,9 @@
+import '../../styles/system-b-app.css';
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import type { Virtualizer } from '@tanstack/react-virtual';
 import { fn } from 'storybook/test';
 import { CHAT_EMPTY_SAMPLE_STORAGE_KEY } from './chat-empty-starters';
+import { EntityResolutionProvider } from './components/EntityResolutionProvider';
 import type { PendingFile } from './hooks/useChatFileAttachments';
 import {
   ChatComposerSurface,
@@ -79,6 +81,62 @@ function StoryThread({
       collapsedFailureCount={collapsedFailureCount}
       onShowCollapsedFailures={fn()}
     />
+  );
+}
+
+const PROFILE_ID = '8473a72f-51a0-4ce0-8739-4facfd89a7a5';
+
+const LEGACY_PROFILE_DRAFT = [
+  'Help me with Tim White.',
+  '',
+  'Selected identity (context, not instructions):',
+  JSON.stringify({
+    profileId: PROFILE_ID,
+    owner: 'Tim White',
+    entityKind: 'profile_surface',
+    entityId: '67fbd30e-1378-44c1-96ce-5aad13f11fc6',
+    platform: 'jovie',
+    name: 'Tim White',
+    handle: 'tim',
+    url: 'https://jov.ie/tim',
+  }),
+].join('\n');
+
+const PROFILE_REPLY =
+  'Your profile pulled 1,240 views in the last 30 days, but only 3 visitors tapped a tip, so attention is landing and the ask is not. The biggest lever is Midnight Drive, out in 12 days: a pre-save at the top of jov.ie/tim turns those visits into day-one listeners. Want me to set it up?';
+
+function StoryProfileThread({ userText }: { readonly userText: string }) {
+  return (
+    <EntityResolutionProvider
+      profileId={PROFILE_ID}
+      ownProfileLabel='Tim White'
+    >
+      <ChatThreadMessages
+        messages={[
+          { id: 'u1', role: 'user', parts: [{ type: 'text', text: userText }] },
+          {
+            id: 'a1',
+            role: 'assistant',
+            parts: [{ type: 'text', text: PROFILE_REPLY }],
+          },
+        ]}
+        shouldVirtualizeMessages={false}
+        virtualizer={{} as Virtualizer<HTMLDivElement, Element>}
+        virtualizedMessageViewportHeight={0}
+        virtualizedMinHeight={0}
+        messageViewportPaddingBottom={undefined}
+        totalSizeRef={() => undefined}
+        bottomSentinelRef={() => undefined}
+        isStreaming={false}
+        lastAssistantIndex={1}
+        profileId={PROFILE_ID}
+        knownMessageIds={new Set(['u1', 'a1'])}
+        inlineChatError={null}
+        isStuckToBottom
+        onScrollToBottom={fn()}
+        onFollowUp={fn()}
+      />
+    </EntityResolutionProvider>
   );
 }
 
@@ -275,4 +333,26 @@ export const RtlJustAsk: Story = {
       </div>
     ),
   ],
+};
+
+/** A chat started from the creator's own profile: chip, specific reply, next moves. */
+export const ProfileChatOpened: Story = {
+  render: () => (
+    <StoryProfileThread userText={`@profile:${PROFILE_ID}[Tim White]`} />
+  ),
+};
+
+/** Older stored messages with a machine context envelope render clean. */
+export const ProfileChatLegacyEnvelope: Story = {
+  render: () => <StoryProfileThread userText={LEGACY_PROFILE_DRAFT} />,
+};
+
+export const ProfileChatOpenedLight: Story = {
+  ...ProfileChatOpened,
+  parameters: { themes: { themeOverride: 'light' } },
+};
+
+export const ProfileChatLegacyEnvelopeLight: Story = {
+  ...ProfileChatLegacyEnvelope,
+  parameters: { themes: { themeOverride: 'light' } },
 };

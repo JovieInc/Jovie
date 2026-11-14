@@ -188,6 +188,7 @@
   --system-b-entity-chip-artist-accent: var(--color-accent-purple);
   --system-b-entity-chip-track-accent: var(--color-accent-blue);
   --system-b-entity-chip-event-accent: var(--color-accent-orange);
+  --system-b-entity-chip-profile-accent: var(--color-accent-purple);
   --system-b-entity-chip-on-light-text: var(--system-b-chat-user-bubble-text);
   --system-b-chat-message-max-width: 78%;
   --system-b-chat-user-bubble-bg: var(--color-text-primary-token);
@@ -2099,7 +2100,7 @@ html[data-profile-flow-open="true"] .cookie-banner-card {
   );
   --state-offline-fg: var(--color-warning);
   --state-permission-bg: var(--color-warning-subtle);
-  --state-permission-fg: var(--color-warning);
+  --state-permission-fg: var(--color-warning-text);
   --state-permission-border: color-mix(
     in oklab,
     var(--color-warning) 20%,
@@ -2440,7 +2441,7 @@ html[data-profile-flow-open="true"] .cookie-banner-card {
   );
   --state-offline-fg: var(--color-warning);
   --state-permission-bg: var(--color-warning-subtle);
-  --state-permission-fg: var(--color-warning);
+  --state-permission-fg: var(--color-warning-text);
   --state-permission-border: color-mix(
     in oklab,
     var(--color-warning) 20%,
@@ -3351,6 +3352,13 @@ html[data-profile-flow-open="true"] .cookie-banner-card {
   --color-accent-text: var(--color-accent);
 }
 
+/* Partial cards dim their subtree. Strengthen default description copy while
+   preserving custom semantic foregrounds, which replace the secondary class. */
+:where([data-content-state="partial"])
+[data-slot="card-description"].text-secondary-token {
+  color: var(--color-text-primary-token);
+}
+
 /* ============================================
    FEATURE ACCENT COLORS (OKLCH)
    ============================================
@@ -3864,6 +3872,7 @@ html[data-profile-flow-open="true"] .cookie-banner-card {
   --system-b-entity-chip-artist-accent: var(--color-accent-purple);
   --system-b-entity-chip-track-accent: var(--color-accent-blue);
   --system-b-entity-chip-event-accent: var(--color-accent-orange);
+  --system-b-entity-chip-profile-accent: var(--color-accent-purple);
   background-color: var(--color-bg-base);
   color: var(--color-text-primary-token);
   color-scheme: dark;
@@ -4033,6 +4042,7 @@ html:not(.dark) .teleprompter-studio {
   --system-b-entity-chip-artist-accent: var(--color-accent-purple);
   --system-b-entity-chip-track-accent: var(--color-accent-blue);
   --system-b-entity-chip-event-accent: var(--color-accent-orange);
+  --system-b-entity-chip-profile-accent: var(--color-accent-purple);
   --ds-marketing-eyebrow-color: #9da2ac;
   --public-shell-text: #f5f7fb;
 }
@@ -4127,6 +4137,15 @@ html:not(.dark) .smart-link-powered-by {
     transition:
       box-shadow 150ms cubic-bezier(0.32, 0.72, 0, 1),
       border-color 150ms cubic-bezier(0.32, 0.72, 0, 1);
+  }
+}
+
+/* Icons never squash. A Lucide glyph beside truncating text keeps its drawn
+   size, so the text gives way instead. :where() keeps specificity at 0 and
+   the base layer sits under utilities, so an explicit shrink class still wins. */
+@layer base {
+  :where(svg.lucide) {
+    flex-shrink: 0;
   }
 }
 

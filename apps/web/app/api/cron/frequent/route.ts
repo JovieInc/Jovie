@@ -62,8 +62,9 @@ import { processLeadBatch } from '@/lib/leads/process-batch';
 import { cleanupExpiredSuppressions } from '@/lib/notifications/suppression';
 import { companyHistoryCronJob } from '@/lib/ovie/company-history/configured.server';
 import { refreshCompanyStateCache } from '@/lib/ovie/company-state.server';
+import { fleetRoomCronJob } from '@/lib/ovie/fleet-room.server';
 import { applySummerCardDefaults } from '@/lib/ovie/summer-cards.server';
-import { refreshProofStats } from '@/lib/proof-stats/publish.server';
+import { proofStatsCronJob } from '@/lib/proof-stats/cron.server';
 import {
   probeRedisOperability,
   RedisOperabilityError,
@@ -198,16 +199,7 @@ export async function GET(request: Request) {
         })
       : { success: true, skipped: true };
 
-  // Proof stats: hourly slot, four indexed counts plus one content-record
-  // version when a value or a publishable state changed. A stat that went
-  // stale is withdrawn here, which expires the cache tag so cached pages drop
-  // the number. No new schedule.
-  results.proofStats =
-    minute < 15
-      ? await runSubJob('proofStats', async () => ({
-          ...(await refreshProofStats(new Date())),
-        }))
-      : { success: true, skipped: true };
+  results.proofStats = await proofStatsCronJob(minute, runSubJob);
 
   // JOV-7880: product truth every run; shipping and Linear hourly. Reads use the snapshot.
   results.companyState = await runSubJob('companyState', async () => {
@@ -221,7 +213,9 @@ export async function GET(request: Request) {
     };
   });
 
+  // Hourly Ovie backstops: company history and the fleet room (webhook-first).
   results.companyHistory = await companyHistoryCronJob(minute, runSubJob);
+  results.fleetRoom = await fleetRoomCronJob(minute, runSubJob);
 
   // Default-plus-deadline contract: an overdue founder ask records its
   // declared default (approve or reject) so nothing waits on Tim forever.

@@ -62,7 +62,7 @@
 - `border-subtle`, `border-default`, `border-strong`
 - `focus-ring-themed` or `focus-visible:*` on interactive elements
 
-## Design Tokens (294 contract tokens; 597 total in CSS)
+## Design Tokens (295 contract tokens; 598 total in CSS)
 
 Contract tokens below are the semantic surface for AI edits. DSP brand colors and extended accent palettes live in `apps/web/styles/design-system.css` only.
 
@@ -192,6 +192,7 @@ Contract tokens below are the semantic surface for AI edits. DSP brand colors an
 - `--system-b-entity-chip-artist-accent`: var(--color-accent-purple)
 - `--system-b-entity-chip-event-accent`: var(--color-accent-orange)
 - `--system-b-entity-chip-on-light-text`: var(--system-b-chat-user-bubble-text)
+- `--system-b-entity-chip-profile-accent`: var(--color-accent-purple)
 - `--system-b-entity-chip-release-accent`: var(--color-accent)
 - `--system-b-entity-chip-track-accent`: var(--color-accent-blue)
 - `--system-b-header-height`: var(--linear-header-height)
@@ -406,7 +407,7 @@ Contract tokens below are the semantic surface for AI edits. DSP brand colors an
 - `--ease-subtle`: var(--ds-motion-subtle-easing)
 - `--page-pad`: clamp(16px, 4vw, 32px)
 
-## Shared UI Components (44 atom primitives)
+## Shared UI Components (45 atom primitives)
 
 Import from `@jovie/ui` — do not recreate local atom copies.
 
@@ -436,6 +437,7 @@ Import from `@jovie/ui` — do not recreate local atom copies.
 - **Link** — `packages/ui/atoms/link.tsx`
 - **NativeSelect** — `packages/ui/atoms/native-select.tsx`
 - **OverflowMenuTrigger** — `packages/ui/atoms/overflow-menu-trigger.tsx`
+- **PlainButton** — `packages/ui/atoms/plain-button.tsx`
 - **Popover** — `packages/ui/atoms/popover.tsx`
 - **Progress** — `packages/ui/atoms/progress.tsx`
 - **RadioGroup** — `packages/ui/atoms/radio-group.tsx`

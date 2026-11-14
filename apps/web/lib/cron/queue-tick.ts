@@ -2,10 +2,12 @@ import 'server-only';
 
 /**
  * One tick for the queue-polling crons. Compounding (Tim 2026-10-31): N jobs
- * polling on the same schedule become one job running N tasks. Each handler is
- * the existing cron route's GET, unchanged, so auth, limits and behavior stay
- * with the route; this only fans out. Enqueue sites kick a single queue
- * through `kickQueue` (event-driven); the 30-minute cron is the fail-safe.
+ * polling on the same schedule become one job running N tasks. Most handlers
+ * fan out to the existing cron route's GET, unchanged, so auth, limits and
+ * behavior stay with the route; `merch-generation-recovery` is a lib
+ * reconciler with no route of its own and runs directly. Enqueue sites kick a
+ * single queue through `kickQueue` (event-driven); the 30-minute cron is the
+ * fail-safe.
  */
 export const QUEUE_HANDLERS = [
   {
@@ -23,6 +25,13 @@ export const QUEUE_HANDLERS = [
   {
     name: 'merch',
     load: () => import('@/app/api/cron/process-merch-fulfillment/route'),
+  },
+  {
+    name: 'merch-generation-recovery',
+    run: () =>
+      import('@/lib/merch/generation-recovery').then(module =>
+        module.reconcileMerchGeneration()
+      ),
   },
 ] as const;
 
@@ -52,6 +61,15 @@ export async function runQueueTick(
   const settled = await Promise.allSettled(
     handlers.map(async handler => {
       const startedAt = now();
+      if ('run' in handler) {
+        await handler.run();
+        return {
+          name: handler.name,
+          ok: true,
+          status: 200,
+          durationMs: now() - startedAt,
+        } satisfies QueueResult;
+      }
       const route = await handler.load();
       const response = await route.GET(request);
       return {
