@@ -6,6 +6,18 @@ import json
 import re
 import subprocess
 
+# A local TS2307 can mean a prerequisite has landed on main while the PR is
+# BLOCKED rather than BEHIND. Use the existing one-sync-per-head route before
+# asking a model to recreate modules. Unresolved errors still fall back to it.
+LOCAL_MODULE_PREREQUISITE = re.compile(
+    r"\b[\w./-]+\.[cm]?[jt]sx?\(\d+,\d+\): error TS2307: "
+    r"Cannot find module ['\"]@/[\w./-]+['\"]")
+
+def has_local_prerequisite_failure(route, logs):
+    """A compiler failure stays out of infrastructure retries even in a mixed route."""
+    return any(LOCAL_MODULE_PREREQUISITE.search(logs.get(name) or "") for name in route["checks"])
+
+
 ALIAS_ACTION = 'alias-graduation-owner'
 COLLECTOR = 'scripts/lib/public-profile-alias-graduation.mjs'
 _ALIAS_ERROR = re.compile(
