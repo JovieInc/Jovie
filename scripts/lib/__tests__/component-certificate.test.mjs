@@ -390,16 +390,13 @@ describe('component certificate CLI evidence freshness', () => {
       'scripts/lib/component-benchmark-review.mjs',
       'scripts/lib/component-certificate-mutation.mjs',
       'scripts/lib/component-evidence.mjs',
-      'scripts/lib/component-render-inputs.mjs',
-      'scripts/lib/component-story-receipts.mjs',
-      'scripts/lib/component-render-closure.mjs',
-      'scripts/lib/component-story-evidence-lib.mjs',
       'scripts/lib/design-rules/forced-caps.mjs',
       'scripts/lib/design-rules/raw-colors.mjs',
-      'scripts/lib/mutation-sweep.mjs',
-      'scripts/lib/mutation-sweep-root.mjs',
-      'scripts/lib/mutation-diff.mjs',
-      'scripts/lib/mutation-source.mjs',
+      ...`component-render-inputs component-render-closure component-story-receipts
+        component-story-evidence-lib mutation-sweep mutation-sweep-root mutation-diff
+        mutation-source`
+        .split(/\s+/)
+        .map(name => `scripts/lib/${name}.mjs`),
     ]) {
       mkdirSync(dirname(join(f.root, path)), { recursive: true });
       cpSync(join(dirname(dirname(cli)), path), join(f.root, path));
