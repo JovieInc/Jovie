@@ -221,6 +221,123 @@ describe('WaitlistSpotifySearch', () => {
     ).not.toBeInTheDocument();
   });
 
+  it.each(['artist', 'manual'] as const)(
+    'keeps composition Enter from choosing the highlighted %s option',
+    async option => {
+      Element.prototype.scrollIntoView = vi.fn();
+      mockHookReturn.results = ARTISTS;
+      mockHookReturn.state = 'success';
+      const onUrlChange = vi.fn();
+      const onArtistNameChange = vi.fn();
+      const user = userEvent.setup();
+      renderSearch({ onUrlChange, onArtistNameChange });
+
+      const combobox = screen.getByRole('combobox');
+      await user.type(combobox, 'neon');
+      await user.keyboard(
+        option === 'artist'
+          ? '{ArrowDown}'
+          : '{ArrowDown}{ArrowDown}{ArrowDown}'
+      );
+      const activeOption =
+        option === 'artist' ? 'spotify-result-0' : 'spotify-result-2';
+      expect(combobox).toHaveAttribute('aria-activedescendant', activeOption);
+
+      const composingEnter = new KeyboardEvent('keydown', {
+        key: 'Enter',
+        isComposing: true,
+        bubbles: true,
+        cancelable: true,
+      });
+      expect(composingEnter.isComposing).toBe(true);
+      fireEvent(combobox, composingEnter);
+
+      expect(onUrlChange).not.toHaveBeenCalled();
+      expect(onArtistNameChange).not.toHaveBeenCalled();
+      expect(mockClear).not.toHaveBeenCalled();
+      expect(screen.getByRole('combobox')).toBe(combobox);
+      expect(combobox).toHaveValue('neon');
+      expect(combobox).toHaveFocus();
+      expect(combobox).toHaveAttribute('aria-expanded', 'true');
+      expect(combobox).toHaveAttribute('aria-activedescendant', activeOption);
+      expect(composingEnter.defaultPrevented).toBe(false);
+
+      await user.keyboard('{Enter}');
+      expect(mockClear).toHaveBeenCalledTimes(1);
+      if (option === 'artist') {
+        expect(onUrlChange).toHaveBeenCalledExactlyOnceWith(ARTISTS[0].url);
+        expect(onArtistNameChange).toHaveBeenCalledExactlyOnceWith(
+          ARTISTS[0].name
+        );
+        expect(screen.getByText(ARTISTS[0].name)).toBeVisible();
+        expect(screen.getByRole('button', { name: 'Change' })).toBeVisible();
+      } else {
+        expect(screen.getByLabelText('Spotify link')).toBeVisible();
+        expect(onUrlChange).not.toHaveBeenCalled();
+        expect(onArtistNameChange).not.toHaveBeenCalled();
+      }
+    }
+  );
+
+  it.each(['ArrowDown', 'ArrowUp', 'Escape', 'Tab'] as const)(
+    'leaves composition %s to native editing instead of navigating the results',
+    async key => {
+      Element.prototype.scrollIntoView = vi.fn();
+      mockHookReturn.results = ARTISTS;
+      mockHookReturn.state = 'success';
+      const user = userEvent.setup();
+      renderSearch();
+      const combobox = screen.getByRole('combobox');
+      await user.type(combobox, 'neon');
+      await user.keyboard('{ArrowDown}{ArrowDown}');
+
+      const composingKey = new KeyboardEvent('keydown', {
+        key,
+        isComposing: true,
+        bubbles: true,
+        cancelable: true,
+      });
+      expect(composingKey.isComposing).toBe(true);
+      fireEvent(combobox, composingKey);
+
+      expect(combobox).toHaveAttribute('aria-expanded', 'true');
+      expect(combobox).toHaveAttribute(
+        'aria-activedescendant',
+        'spotify-result-1'
+      );
+      expect(combobox).toHaveValue('neon');
+      expect(combobox).toHaveFocus();
+      expect(composingKey.defaultPrevented).toBe(false);
+
+      await user.keyboard(`{${key}}`);
+      if (key === 'ArrowDown' || key === 'ArrowUp') {
+        expect(combobox).toHaveAttribute(
+          'aria-activedescendant',
+          key === 'ArrowDown' ? 'spotify-result-2' : 'spotify-result-0'
+        );
+      } else {
+        expect(combobox).toHaveAttribute('aria-expanded', 'false');
+        expect(combobox).not.toHaveAttribute('aria-activedescendant');
+      }
+    }
+  );
+
+  it('does not consume composition Escape when the results are closed', () => {
+    renderSearch();
+    const combobox = screen.getByRole('combobox');
+    const composingEscape = new KeyboardEvent('keydown', {
+      key: 'Escape',
+      isComposing: true,
+      bubbles: true,
+      cancelable: true,
+    });
+    fireEvent(combobox, composingEscape);
+
+    expect(composingEscape.defaultPrevented).toBe(false);
+    expect(combobox).toHaveAttribute('aria-expanded', 'false');
+    expect(combobox).toHaveValue('');
+  });
+
   it('closes the results on Escape and keeps the typed query', async () => {
     mockHookReturn.state = 'empty';
     const user = userEvent.setup();
