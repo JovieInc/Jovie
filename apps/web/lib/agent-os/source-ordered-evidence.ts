@@ -1,6 +1,10 @@
 import { z } from 'zod';
 import { canonicalJson } from '@/lib/agent-distribution/hash';
 import type { RecordBackend } from '@/lib/ovie/mcp/store';
+import {
+  CERTIFICATION_CAS_ATTEMPTS,
+  CERTIFICATION_PERSISTENCE_TTL_SECONDS,
+} from './certification-cas';
 
 export const SOURCE_ORDER_SCHEMA = 'jovie.source-order/v1';
 const positiveInteger = z
@@ -32,9 +36,6 @@ export type OrderedEvidenceResult = {
     | 'legacy-after-ordered';
   packet: OrderedEvidencePacket;
 };
-const ATTEMPTS = 5;
-// The Postgres backend is durable and ignores TTL; matches certification custody.
-const TTL_SECONDS = 315_576_000;
 
 function packetValue(value: unknown): OrderedEvidencePacket {
   if (
@@ -89,10 +90,16 @@ export async function storeOrderedEvidence(input: {
   packet: Record<string, unknown> & { headSha: string };
 }): Promise<OrderedEvidenceResult> {
   const next = packetValue(input.packet);
-  for (let attempt = 0; attempt < ATTEMPTS; attempt++) {
+  for (let attempt = 0; attempt < CERTIFICATION_CAS_ATTEMPTS; attempt++) {
     const raw = await input.backend.get(input.key);
     if (raw === null || raw === undefined) {
-      if (await input.backend.setIfAbsent(input.key, next, TTL_SECONDS))
+      if (
+        await input.backend.setIfAbsent(
+          input.key,
+          next,
+          CERTIFICATION_PERSISTENCE_TTL_SECONDS
+        )
+      )
         return { accepted: true, reason: 'stored', packet: next };
       continue;
     }
@@ -100,7 +107,14 @@ export async function storeOrderedEvidence(input: {
     const reason = decision(current, next);
     if (reason !== 'stored')
       return { accepted: reason === 'duplicate', reason, packet: current };
-    if (await input.backend.compareAndSet(input.key, raw, next, TTL_SECONDS))
+    if (
+      await input.backend.compareAndSet(
+        input.key,
+        raw,
+        next,
+        CERTIFICATION_PERSISTENCE_TTL_SECONDS
+      )
+    )
       return { accepted: true, reason, packet: next };
   }
   throw new Error('Source-ordered evidence lost compare-and-set repeatedly');

@@ -89,10 +89,34 @@ refreshes the event's immutable current-main SHA, even when the producer ran
 on an older ancestor. The trigger must be an ancestor of the target, which must
 belong to main. Cancellation is scoped to that target. Cache reuse still requires
 matching current input bindings; a late completion never refreshes old hashes.
-Immediately before posting, the workflow rechecks current main and keeps a
+Before negotiation and immediately before posting, the workflow rechecks main and keeps a
 superseded report only as an immutable artifact (including explicit historical
 dispatch targets). An unreadable main fails delivery closed. This check is not
-atomic with Ovie ingestion and does not provide monotonic storage ordering.
+atomic with Ovie ingestion; accepted-generation ordering is enforced separately
+by the receiver's existing Postgres JSONB compare-and-set path.
+
+Delivery carries optional `deliveryOrder` metadata with schema
+`jovie.source-order/v1`, a positive safe-integer `sourceOrdinal` from
+`git rev-list --count` on the full-history target, and this workflow's
+`runNumber`/`runAttempt`. The target must match the report SHA. The receiver
+trusts the authorized producer's main/ancestry proof; it does not fetch Git.
+Source ordinal wins first, then run/attempt for the same SHA. Stale generations,
+equal-height different SHAs, inconsistent same-SHA ordinals, and conflicting
+equal-order content are rejected with 409 and the actually stored SHA. Exact
+duplicates are idempotent. Legacy packets work only before ordered state exists.
+All receiver writes, including legacy requests, use the same bounded CAS path;
+storage failure or exhausted contention returns 503. The capped 50-row history
+is explicitly best effort and cannot change latest acceptance.
+
+The sender first requires authenticated OPTIONS on the existing route to return
+`{ok:true,deliveryOrderSchema:"jovie.source-order/v1"}`; negotiation does no DB
+work. Old/unavailable receivers fail delivery with the full artifact retained,
+never a legacy fallback. POST success also requires an acknowledgement of the
+exact stored SHA and order. The existing 64KiB route/60KiB compact-packet bounds
+and full-report artifacts remain intact. HTTP acknowledgement is not an
+independent readback of current persisted state; the delivery receipt retains
+`ingestion: "unverified"` and records the attempted order.
+
 Locally: start `storybook dev` in `apps/web`, then run
 `node scripts/component-story-evidence.mjs --local --component packages/ui/atoms/button.tsx`.
 
