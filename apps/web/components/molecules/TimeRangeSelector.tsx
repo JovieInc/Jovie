@@ -159,6 +159,7 @@ export function TimeRangeSelector<T extends AnalyticsRange>({
 
   return (
     <AppSegmentControl
+      semantics='radio'
       value={value}
       onValueChange={onValueChange}
       options={ranges.map(range => ({
