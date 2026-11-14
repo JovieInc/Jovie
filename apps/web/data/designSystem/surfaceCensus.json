@@ -554,6 +554,30 @@
       ]
     },
     {
+      "id": "tip-checkout-return",
+      "area": "customer-utility",
+      "importance": {
+        "acquisition": 1,
+        "revenue": 3,
+        "usage": 1
+      },
+      "status": "holdout",
+      "owner": "@itstimwhite",
+      "issue": "JOV-12407",
+      "expectedOwners": [
+        "apps/web/components/site/PublicPageShell.tsx",
+        "apps/web/lib/services/tips/checkout-return.server.ts"
+      ],
+      "divergence": "New checkout return replaces a missing route; production payment verification remains outstanding.",
+      "remainingScope": "Local desktop/mobile missing and invalid session states verified; paid/pending states covered with mocked Stripe only. No real transaction or deployed certification.",
+      "evidence": {
+        "kind": "source-audit",
+        "at": "2026-11-13T00:00:00Z",
+        "ref": "JOV-12407 / 3237f6189a: 72 focused tests and local Chromium desktop/mobile missing/invalid-session route checks"
+      },
+      "sources": ["apps/web/app/[username]/tip/thank-you/page.tsx"]
+    },
+    {
       "id": "utility",
       "area": "customer-utility",
       "importance": {
@@ -732,6 +756,13 @@
       "to": "holdout",
       "at": "2026-11-12T20:38:19Z",
       "evidence": "PR #25184 introduces the profile-miss miss destination (JOV-12081): the dynamic route notFound() rewrites unknown handles into; source registration only, not rendered certification."
+    },
+    {
+      "source": "apps/web/app/[username]/tip/thank-you/page.tsx",
+      "from": null,
+      "to": "holdout",
+      "at": "2026-11-13T00:00:00Z",
+      "evidence": "JOV-12407 adds the missing tip checkout return page. Local missing/invalid session route checks and mocked payment-state tests passed; no production or real-payment certification."
     }
   ]
 }

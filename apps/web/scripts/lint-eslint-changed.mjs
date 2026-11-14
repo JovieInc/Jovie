@@ -8,7 +8,8 @@
 // leaving it clean. The exception is @jovie/ui-feel, which carries ratcheted
 // legacy debt: it is off in the shared config and checked here on added
 // lines only (scripts/lint-ui-feel.mjs --changed), because the repo-wide
-// ratchet runs only in the merge group.
+// ratchet runs only in the merge group. Local preflight opts into
+// LINT_CHANGED_WORKTREE=1 to also inspect staged, unstaged and untracked files.
 import { spawnSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { relative, resolve } from 'node:path';
@@ -29,6 +30,7 @@ export function changedWebFiles(diffStdout, { exists = existsSync } = {}) {
 
 export function run({
   baseRef = process.env.ESLINT_CHANGED_BASE ?? 'origin/main',
+  worktree = process.env.LINT_CHANGED_WORKTREE === '1',
   spawn = spawnSync,
   exists = existsSync,
   log = console.log,
@@ -36,7 +38,12 @@ export function run({
 } = {}) {
   const diff = spawn(
     'git',
-    ['diff', '--name-only', '--diff-filter=ACMR', `${baseRef}...HEAD`],
+    [
+      'diff',
+      '--name-only',
+      '--diff-filter=ACMR',
+      ...(worktree ? ['--merge-base', baseRef] : [`${baseRef}...HEAD`]),
+    ],
     { cwd: repoRoot, encoding: 'utf8' }
   );
   if (diff.status !== 0) {
@@ -45,7 +52,23 @@ export function run({
     return 1;
   }
 
-  const files = changedWebFiles(diff.stdout, { exists });
+  const untracked = worktree
+    ? spawn(
+        'git',
+        ['ls-files', '--others', '--exclude-standard', '--', 'apps/web'],
+        {
+          cwd: repoRoot,
+          encoding: 'utf8',
+        }
+      )
+    : { status: 0, stdout: '' };
+  if (untracked.status !== 0) {
+    error('[lint:eslint:changed] could not list untracked web files');
+    return 1;
+  }
+  const files = changedWebFiles(`${diff.stdout}\n${untracked.stdout}`, {
+    exists,
+  });
 
   if (files.length === 0) {
     log('[lint:eslint:changed] no changed web TypeScript files');

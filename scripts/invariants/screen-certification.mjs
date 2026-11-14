@@ -229,21 +229,18 @@ export const PROTECTED_REVENUE_SCREEN_SOURCES = Object.freeze({
 });
 
 function parseRegistry(raw) {
-  return raw
-    .trim()
-    .split('\n')
-    .map(line => {
-      const [id, platform, owner, sources, viewports, flag, reason] =
-        line.split('|');
-      return Object.freeze({
-        id,
-        platform,
-        owner,
-        sources: sources.split(','),
-        viewports: viewports.split(','),
-        ...(flag === 'x' ? { excluded: true, reason } : {}),
-      });
+  return raw.split('\n').map(line => {
+    const [id, platform, owner, sources, viewports, flag, reason] =
+      line.split('|');
+    return Object.freeze({
+      id,
+      platform,
+      owner,
+      sources: sources.split(','),
+      viewports: viewports.split(','),
+      ...(flag === 'x' ? { excluded: true, reason } : {}),
     });
+  });
 }
 
 /** @type {readonly object[]} */
@@ -318,6 +315,7 @@ web.public-profile-about|web|public-profile|apps/web/app/[username]/about/page.t
 web.public-profile-alerts|web|public-profile|apps/web/app/[username]/alerts/page.tsx|desktop,mobile
 web.public-profile-notifications|web|public-profile|apps/web/app/[username]/notifications/page.tsx|desktop,mobile
 web.public-profile-shop|web|public-profile|apps/web/app/[username]/shop/page.tsx|desktop,mobile
+web.tip-checkout-return|web|tip-checkout-return|apps/web/app/[username]/tip/thank-you/page.tsx|desktop,mobile
 web.auth|web|browser-input-assurance|apps/web/app/(auth)/,apps/web/app/@auth/,apps/web/app/auth-return/,apps/web/app/desktop-auth/,apps/web/app/mobile-auth-return/,apps/web/components/features/auth/|desktop,mobile
 web.artist-pay|web|artist-pay|apps/web/app/[username]/pay/page.tsx|desktop,mobile
 web.artist-alerts|web|artist-alerts|apps/web/app/[username]/alerts/page.tsx|desktop,mobile

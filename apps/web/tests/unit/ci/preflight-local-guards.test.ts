@@ -35,6 +35,54 @@ describe('preflight:changed local guards', () => {
     expect(ids(['README.md', 'scripts/ci-fast-lanes.mjs'])).toEqual([]);
   });
 
+  it('runs changed ESLint and the cache ratchet before pushing web source', () => {
+    const route = 'apps/web/app/[username]/tip/thank-you/page.tsx';
+    expect(ids([route])).toEqual(
+      expect.arrayContaining([
+        'web-eslint',
+        'stack-pattern-ratchet',
+        'dead-ends',
+      ])
+    );
+    expect(guard('web-eslint').command).toBe(
+      'LINT_CHANGED_WORKTREE=1 ESLINT_CHANGED_BASE=origin/{base} pnpm --filter @jovie/web run lint:eslint:changed'
+    );
+    expect(guard('stack-pattern-ratchet').command).toBe(
+      'node scripts/invariants/stack-pattern-ratchet.mjs'
+    );
+    for (const id of ['web-eslint', 'stack-pattern-ratchet']) {
+      expect(guard(id).heavy).toBeUndefined();
+    }
+    expect(ids(['README.md', 'apps/web/app/route.stories.tsx'])).not.toContain(
+      'stack-pattern-ratchet'
+    );
+    expect(ids(['apps/web/eslint.config.js'])).toContain('web-eslint');
+    expect(
+      ids(['apps/web/lib/services/tips/checkout-return.server.ts'])
+    ).toEqual(
+      expect.arrayContaining([
+        'web-eslint',
+        'stack-pattern-ratchet',
+        'dead-ends',
+      ])
+    );
+    expect(selectManifestGuards([route]).map(g => g.id)).toEqual(
+      expect.arrayContaining([
+        'web-eslint',
+        'stack-pattern-ratchet',
+        'dead-ends',
+      ])
+    );
+    for (const base of ['main', 'release/test']) {
+      expect(
+        selectManifestGuards([route], base).find(g => g.id === 'web-eslint')
+          ?.command
+      ).toBe(
+        `LINT_CHANGED_WORKTREE=1 ESLINT_CHANGED_BASE=origin/${base} pnpm --filter @jovie/web run lint:eslint:changed`
+      );
+    }
+  });
+
   it('runs the route JS budgets when shipped web code changes, as a heavy guard', () => {
     for (const path of [
       'apps/web/app/(marketing)/page.tsx',

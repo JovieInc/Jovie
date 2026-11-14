@@ -10,10 +10,12 @@ import {
   isAnalyticsAllowed,
   rememberAcquisitionId,
 } from '@/lib/tracking/consent';
+import { isTipCheckoutReturn } from '@/lib/tracking/is-tip-checkout-return';
 
 const FIRST_TOUCH_KEY = 'jovie_acquisition_first_touch_v1';
 
 function captureAcquisition(): void {
+  if (isTipCheckoutReturn(globalThis.location.pathname)) return;
   if (!isAnalyticsAllowed()) return;
   const acquisitionId = getOrCreateAcquisitionId();
   if (!acquisitionId) return;

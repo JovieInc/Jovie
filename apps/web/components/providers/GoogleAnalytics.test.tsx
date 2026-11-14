@@ -10,6 +10,10 @@ type AnalyticsWindow = Window & {
 const mockPublicEnv = vi.hoisted(() => ({
   NEXT_PUBLIC_GA_MEASUREMENT_ID: 'G-TMY7Z8HK47' as string | undefined,
 }));
+const navigation = vi.hoisted(() => ({ pathname: '/' }));
+vi.mock('next/navigation', () => ({
+  usePathname: () => navigation.pathname,
+}));
 
 vi.mock('next/script', () => ({
   default: ({
@@ -44,9 +48,21 @@ vi.mock('@/lib/demo-recording', () => ({
 
 describe('GoogleAnalytics', () => {
   beforeEach(() => {
+    navigation.pathname = '/';
     mockPublicEnv.NEXT_PUBLIC_GA_MEASUREMENT_ID = 'G-TMY7Z8HK47';
     (window as AnalyticsWindow).dataLayer = undefined;
     (window as AnalyticsWindow).gtag = vi.fn();
+  });
+
+  it('never loads or configures GA on a tip checkout return', () => {
+    navigation.pathname = '/artist/tip/thank-you';
+    const { queryByTestId, rerender } = render(<GoogleAnalytics />);
+    expect(queryByTestId('ga-gtag-loader')).not.toBeInTheDocument();
+    expect((window as AnalyticsWindow).gtag).not.toHaveBeenCalled();
+
+    navigation.pathname = '/artist';
+    rerender(<GoogleAnalytics />);
+    expect(queryByTestId('ga-gtag-loader')).toBeInTheDocument();
   });
 
   it('configures GA from the client bundle instead of rendering inline script children', () => {

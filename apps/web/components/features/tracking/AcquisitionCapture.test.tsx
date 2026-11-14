@@ -68,6 +68,21 @@ describe('AcquisitionCapture', () => {
     expect(consent.onChange).not.toHaveBeenCalled();
   });
 
+  it('does not persist or send a checkout return URL, even after consent changes', () => {
+    runtime.pathname = '/artist/tip/thank-you';
+    globalThis.history.replaceState(
+      {},
+      '',
+      `${runtime.pathname}?session_id=cs_test_private`
+    );
+    render(<AcquisitionCapture />);
+    const reconcileConsent = consent.onChange.mock.calls[0][0];
+    act(() => reconcileConsent());
+    expect(fetch).not.toHaveBeenCalled();
+    expect(consent.getOrCreateAcquisitionId).not.toHaveBeenCalled();
+    expect(globalThis.localStorage.length).toBe(0);
+  });
+
   afterEach(() => {
     globalThis.JVConsent = undefined;
     vi.unstubAllGlobals();

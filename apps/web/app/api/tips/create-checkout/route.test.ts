@@ -1,3 +1,5 @@
+import { existsSync } from 'node:fs';
+import path from 'node:path';
 import { NextRequest } from 'next/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -212,6 +214,28 @@ describe('/api/tips/create-checkout', () => {
     );
     expect(response.status).toBe(409);
     expect(mocks.create).not.toHaveBeenCalled();
+  });
+
+  it('returns to an implemented confirmation route and preserves the cancellation alias', async () => {
+    const response = await POST(
+      request('POST', { profileId, handle: 'artist', amountCents: 1000 })
+    );
+    expect(response.status).toBe(200);
+    const params = mocks.create.mock.calls[0][0];
+    const success = new URL(params.success_url);
+    expect(success.pathname).toBe('/artist/tip/thank-you');
+    expect(success.searchParams.get('session_id')).toBe(
+      '{CHECKOUT_SESSION_ID}'
+    );
+    expect(
+      existsSync(path.resolve('app/[username]/tip/thank-you/page.tsx'))
+    ).toBe(true);
+    expect(params.cancel_url).toBe('https://jov.ie/artist/tip');
+    expect(params.metadata).toMatchObject({
+      profile_id: profileId,
+      handle: 'artist',
+      source: 'tip_checkout',
+    });
   });
 
   it('rate limits before reading the request body', async () => {

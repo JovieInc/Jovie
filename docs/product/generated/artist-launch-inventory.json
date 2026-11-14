@@ -1030,6 +1030,14 @@
       "classification": "C"
     },
     {
+      "source": "apps/web/app/[username]/tip/thank-you/page.tsx",
+      "kind": "page",
+      "route": "/[username]/tip/thank-you",
+      "methods": [],
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
       "source": "apps/web/app/@auth/(.)signin/page.tsx",
       "kind": "page",
       "route": "/signin",

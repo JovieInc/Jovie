@@ -6,6 +6,7 @@
  * before JOV-8196 lands on main the guard intentionally skips, matching the
  * script's own graceful skip.
  */
+import { execFileSync } from 'node:child_process';
 import {
   existsSync,
   mkdirSync,
@@ -414,4 +415,59 @@ describe('ui-feel added-lines gate (PR time)', () => {
       }
     }
   );
+});
+
+describe('ui-feel local preflight worktree mode', () => {
+  it('catches unstaged and untracked violations before they are committed', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'ui-feel-worktree-'));
+    const webRoot = join(root, 'apps', 'web');
+    const card = join(webRoot, 'components', 'Card.tsx');
+    const added = join(webRoot, 'components', 'NewCard.tsx');
+    const git = args =>
+      execFileSync('git', ['-C', root, ...args], { stdio: 'pipe' });
+    const check = worktree =>
+      checkChanged({
+        baseRef: 'origin/main',
+        worktree,
+        webRoot,
+        rule: loadUiFeelRule(),
+        log: () => {},
+        error: () => {},
+      });
+    try {
+      mkdirSync(join(webRoot, 'components'), { recursive: true });
+      writeFileSync(
+        card,
+        'export default () => <h1 className="text-balance">Ready</h1>;'
+      );
+      git(['init', '-q']);
+      git(['add', '.']);
+      git([
+        '-c',
+        'user.name=Fixture',
+        '-c',
+        'user.email=fixture@example.com',
+        'commit',
+        '-qm',
+        'baseline',
+      ]);
+      git(['update-ref', 'refs/remotes/origin/main', 'HEAD']);
+      writeFileSync(card, 'export default () => <h1>Needs balance</h1>;');
+      expect(await check(false)).toBe(0);
+      expect(await check(true)).toBe(1);
+      writeFileSync(
+        card,
+        'export default () => <h1 className="text-balance">Ready</h1>;'
+      );
+      writeFileSync(added, 'export default () => <h2>New heading</h2>;');
+      expect(await check(true)).toBe(1);
+      writeFileSync(
+        added,
+        'export default () => <h2 className="text-balance">New heading</h2>;'
+      );
+      expect(await check(true)).toBe(0);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
 });
