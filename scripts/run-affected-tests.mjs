@@ -2780,10 +2780,7 @@ function changedFiles(base) {
   return execFileSync(
     'git',
     ['diff', '--diff-filter=ACDMR', '--name-only', `${base}...HEAD`],
-    {
-      cwd: REPO_ROOT,
-      encoding: 'utf8',
-    }
+    { maxBuffer: 256 * 1024 * 1024, cwd: REPO_ROOT, encoding: 'utf8' }
   )
     .trim()
     .split('\n')

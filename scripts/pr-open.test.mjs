@@ -490,7 +490,12 @@ function fakeDiffRunner(command, args) {
 }
 function localRepo() {
   const repo = mkdtempSync(path.join(tmpdir(), 'pr-open-repo-'));
-  const git = args => execFileSync('git', args, { cwd: repo, stdio: 'ignore' });
+  const git = args =>
+    execFileSync('git', args, {
+      maxBuffer: 256 * 1024 * 1024,
+      cwd: repo,
+      stdio: 'ignore',
+    });
   git(['init']);
   git(['config', 'user.email', 'test@example.com']);
   git(['config', 'user.name', 'Test']);
@@ -512,7 +517,11 @@ test('new PR checks use remote main when local main is stale', async () => {
   const bodyDir = mkdtempSync(path.join(tmpdir(), 'pr-open-remote-base-'));
   const bodyFile = path.join(bodyDir, 'body.md');
   const git = args =>
-    execFileSync('git', args, { cwd: repo, encoding: 'utf8' });
+    execFileSync('git', args, {
+      maxBuffer: 256 * 1024 * 1024,
+      cwd: repo,
+      encoding: 'utf8',
+    });
   try {
     git(['checkout', '-b', 'feature']);
     git(['branch', '-f', 'main', 'origin/main']);
@@ -664,7 +673,12 @@ test('draft resolves the current branch explicitly for gh --repo', async () => {
 
 test('draft uses the remote base when local main is stale without borrowing upstream locked changes', async () => {
   const { repo, cleanup } = localRepo();
-  const git = args => execFileSync('git', args, { cwd: repo, stdio: 'ignore' });
+  const git = args =>
+    execFileSync('git', args, {
+      maxBuffer: 256 * 1024 * 1024,
+      cwd: repo,
+      stdio: 'ignore',
+    });
   try {
     git(['checkout', '-b', 'fixture/marketing-source']);
     git(['branch', '-f', 'main', 'HEAD']);
@@ -736,6 +750,7 @@ function publicationFixture(mode = 'normal') {
     if (key.startsWith('GIT_')) delete env[key];
   const git = args =>
     execFileSync('git', args, {
+      maxBuffer: 256 * 1024 * 1024,
       cwd: repo,
       env,
       encoding: 'utf8',

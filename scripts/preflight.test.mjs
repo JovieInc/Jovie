@@ -62,7 +62,12 @@ function hookGitFixture({ behind = true, conflict = false, during = '' } = {}) {
     PREFLIGHT_FIXTURE_BASE: baseWriter,
   };
   const gitAt = (dir, ...args) => {
-    const r = spawnSync('git', args, { cwd: dir, env, encoding: 'utf8' });
+    const r = spawnSync('git', args, {
+      maxBuffer: 256 * 1024 * 1024,
+      cwd: dir,
+      env,
+      encoding: 'utf8',
+    });
     assert.equal(r.status, 0, r.stderr);
     return r.stdout.trim();
   };
@@ -509,7 +514,12 @@ async function lintRepairDiff(
   const cwd = mkdtempSync(path.join(tmpdir(), 'pf-body-'));
   const env = buildPreflightEnv();
   const git = (...args) => {
-    const result = spawnSync('git', args, { cwd, env, encoding: 'utf8' });
+    const result = spawnSync('git', args, {
+      maxBuffer: 256 * 1024 * 1024,
+      cwd,
+      env,
+      encoding: 'utf8',
+    });
     assert.equal(result.status, 0, result.stderr);
   };
   try {
@@ -853,6 +863,7 @@ test('pre-push Git environment cannot redirect fixture writes into its linked wo
   const fixtures = path.join(root, 'fixtures');
   const git = (cwd, ...args) => {
     const result = spawnSync('git', args, {
+      maxBuffer: 256 * 1024 * 1024,
       cwd,
       env: fixtureEnv,
       encoding: 'utf8',

@@ -354,7 +354,11 @@ test('actual routing stages current non-Web main after exact merge-group Web adm
   const root = mkdtempSync(join(tmpdir(), 'stage-carryover-success-'));
   try {
     const git = (...args) =>
-      execFileSync('git', args, { cwd: root, encoding: 'utf8' }).trim();
+      execFileSync('git', args, {
+        maxBuffer: 256 * 1024 * 1024,
+        cwd: root,
+        encoding: 'utf8',
+      }).trim();
     git('init', '--quiet');
     git('config', 'user.name', 'Release test');
     git('config', 'user.email', 'release-test@example.invalid');

@@ -62,7 +62,11 @@ describe('ci-harness manifest', () => {
     const webRoot = resolve(root, 'apps/web');
     const migrations = resolve(webRoot, 'drizzle/migrations');
     const runGit = (...args) =>
-      spawnSync('git', args, { cwd: root, encoding: 'utf8' });
+      spawnSync('git', args, {
+        maxBuffer: 256 * 1024 * 1024,
+        cwd: root,
+        encoding: 'utf8',
+      });
 
     try {
       mkdirSync(migrations, { recursive: true });

@@ -95,7 +95,12 @@ for (const linkedWorktree of [false, true]) {
     env.GIT_CONFIG_NOSYSTEM = '1';
 
     const git = (cwd, ...args) => {
-      const result = spawnSync('git', args, { cwd, env, encoding: 'utf8' });
+      const result = spawnSync('git', args, {
+        maxBuffer: 256 * 1024 * 1024,
+        cwd,
+        env,
+        encoding: 'utf8',
+      });
       assert.equal(result.status, 0, result.stderr);
       return result.stdout.trim();
     };

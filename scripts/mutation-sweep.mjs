@@ -111,7 +111,12 @@ if (!values.state && !values['list-only'])
   throw new Error('--state <path> is required');
 
 const git = (/** @type {string[]} */ args, input) =>
-  spawnSync('git', args, { cwd: repoRoot, encoding: 'utf8', input });
+  spawnSync('git', args, {
+    maxBuffer: 256 * 1024 * 1024,
+    cwd: repoRoot,
+    encoding: 'utf8',
+    input,
+  });
 const headSha = values.sha ?? git(['rev-parse', 'HEAD']).stdout.trim();
 
 const baseline = loadMutationScoreBaseline(

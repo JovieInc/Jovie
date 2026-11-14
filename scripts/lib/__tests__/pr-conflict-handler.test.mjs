@@ -94,7 +94,11 @@ function workflowRunScript(name) {
 }
 
 function runGit(cwd, args) {
-  const result = spawnSync('git', args, { cwd, encoding: 'utf8' });
+  const result = spawnSync('git', args, {
+    maxBuffer: 256 * 1024 * 1024,
+    cwd,
+    encoding: 'utf8',
+  });
   expect(result.status, result.stderr).toBe(0);
   return result.stdout.trim();
 }

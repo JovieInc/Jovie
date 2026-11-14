@@ -482,6 +482,7 @@ function listUntrackedFiles() {
 
 function runGit(args) {
   const result = spawnSync('git', args, {
+    maxBuffer: 256 * 1024 * 1024,
     cwd: repoRoot,
     encoding: 'buffer',
     stdio: ['ignore', 'pipe', 'ignore'],

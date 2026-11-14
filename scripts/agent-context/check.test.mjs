@@ -78,7 +78,11 @@ test('staged integrity check cannot be masked by an unstaged policy or missing r
     JSON.stringify(collectRuleScopes([file], () => old))
   );
   const git = args => {
-    const r = spawnSync('git', args, { cwd: dir, encoding: 'utf8' });
+    const r = spawnSync('git', args, {
+      maxBuffer: 256 * 1024 * 1024,
+      cwd: dir,
+      encoding: 'utf8',
+    });
     assert.equal(r.status, 0, r.stderr);
   };
   git(['init', '-q']);

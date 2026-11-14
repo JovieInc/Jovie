@@ -392,6 +392,7 @@ function validateHostedChanges(changes) {
 
 function gitOutput(repository, args) {
   return execFileSync('git', args, {
+    maxBuffer: 256 * 1024 * 1024,
     cwd: repository,
     encoding: 'utf8',
   }).trim();
@@ -401,7 +402,7 @@ function gitTreeInventory(repository, revision, paths) {
   const output = execFileSync(
     'git',
     ['ls-tree', '-r', '-z', revision, '--', ...paths],
-    { cwd: repository }
+    { maxBuffer: 256 * 1024 * 1024, cwd: repository }
   ).toString('utf8');
   return new Map(
     output
@@ -1970,7 +1971,7 @@ function hostedStageCommand(args) {
   const rawStatus = execFileSync(
     'git',
     ['status', '--porcelain=v1', '-z', '--untracked-files=all'],
-    { cwd: repository }
+    { maxBuffer: 256 * 1024 * 1024, cwd: repository }
   ).toString('utf8');
   const records = rawStatus.split('\0').filter(Boolean);
   const paths = records.map(record => {

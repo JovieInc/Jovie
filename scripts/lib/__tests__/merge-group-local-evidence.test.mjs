@@ -19,7 +19,11 @@ import {
 } from '../merge-group-local-evidence.mjs';
 
 function git(cwd, args) {
-  return execFileSync('git', args, { cwd, encoding: 'utf8' });
+  return execFileSync('git', args, {
+    maxBuffer: 256 * 1024 * 1024,
+    cwd,
+    encoding: 'utf8',
+  });
 }
 
 describe('local merge-group size evidence', () => {
@@ -279,6 +283,7 @@ describe('local merge-group size evidence', () => {
       let groupPresent = true;
       try {
         execFileSync('git', ['cat-file', '-e', `${head}^{commit}`], {
+          maxBuffer: 256 * 1024 * 1024,
           cwd: clone,
           stdio: 'ignore',
           env: { ...process.env, GIT_NO_LAZY_FETCH: '1' },

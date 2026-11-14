@@ -34,7 +34,11 @@ function stepRunScript(name) {
 
 /** @param {string} cwd @param {string[]} args */
 function git(cwd, args) {
-  return execFileSync('git', args, { cwd, encoding: 'utf8' }).trim();
+  return execFileSync('git', args, {
+    maxBuffer: 256 * 1024 * 1024,
+    cwd,
+    encoding: 'utf8',
+  }).trim();
 }
 
 /** @param {string} cwd @param {string} message */
@@ -248,6 +252,7 @@ describe('targeted complete ancestry for PR Size Guard', () => {
     expect(git(f.clone, ['show-ref'])).not.toContain('unrelated');
     expect(
       spawnSync('git', ['cat-file', '-e', f.unrelated], {
+        maxBuffer: 256 * 1024 * 1024,
         cwd: f.clone,
         env: { ...process.env, GIT_NO_LAZY_FETCH: '1' },
       }).status
@@ -282,6 +287,7 @@ describe('targeted complete ancestry for PR Size Guard', () => {
     ).toBe(git(f.source, ['diff', '--numstat', f.rootSha, f.head]));
     expect(
       spawnSync('git', ['--no-lazy-fetch', 'cat-file', '-e', f.historicBlob], {
+        maxBuffer: 256 * 1024 * 1024,
         cwd: f.clone,
       }).status
     ).not.toBe(0);

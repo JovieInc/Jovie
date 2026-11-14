@@ -208,6 +208,7 @@ function stripDependencyFields(manifest) {
 
 function readJsonAtRef(ref, file) {
   const contents = execFileSync('git', ['show', `${ref}:${file}`], {
+    maxBuffer: 256 * 1024 * 1024,
     encoding: 'utf8',
     stdio: ['ignore', 'pipe', 'ignore'],
   });

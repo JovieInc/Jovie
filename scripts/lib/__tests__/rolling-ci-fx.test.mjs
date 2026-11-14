@@ -554,7 +554,11 @@ describe('hosted rolling CI repair policy', () => {
   it('binds the trusted test selector and coverage plan to the exact PR and patch tree', () => {
     const repository = mkdtempSync(join(tmpdir(), 'jovie-hosted-test-plan-'));
     const git = (...args) =>
-      execFileSync('git', args, { cwd: repository, encoding: 'utf8' }).trim();
+      execFileSync('git', args, {
+        maxBuffer: 256 * 1024 * 1024,
+        cwd: repository,
+        encoding: 'utf8',
+      }).trim();
     try {
       git('init', '-q');
       const sourcePath = 'apps/web/components/foo/Hello.tsx';

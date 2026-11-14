@@ -321,6 +321,7 @@ test('the selected source gate goes red on wrong native paint/token bypass and g
       copyFile(path);
     const git = args => {
       const result = spawnSync('git', args, {
+        maxBuffer: 256 * 1024 * 1024,
         cwd: root,
         encoding: 'utf8',
         timeout: 10000,
@@ -463,6 +464,7 @@ test('trusted paint ceiling measures an immutable base without a paint-debt file
   const root = mkdtempSync(join(tmpdir(), 'jovie-native-ceiling-'));
   const git = args => {
     const result = spawnSync('git', args, {
+      maxBuffer: 256 * 1024 * 1024,
       cwd: root,
       encoding: 'utf8',
       timeout: 10000,

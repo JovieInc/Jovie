@@ -335,7 +335,11 @@ export function sh(cmd, { cwd, env, timeoutMs = 600_000 }) {
 }
 
 const git = (cwd, args) => {
-  const r = spawnSync('git', args, { cwd, encoding: 'utf8' });
+  const r = spawnSync('git', args, {
+    maxBuffer: 256 * 1024 * 1024,
+    cwd,
+    encoding: 'utf8',
+  });
   return r.status === 0 ? r.stdout.trim() : '';
 };
 

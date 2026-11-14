@@ -655,6 +655,7 @@ it.each([
     writeFileSync(env.GARDENING_ROSTER, JSON.stringify(scenario.pages));
     const git = (...args) =>
       execFileSync('git', args, {
+        maxBuffer: 256 * 1024 * 1024,
         cwd: root,
         env,
         encoding: 'utf8',
@@ -704,7 +705,12 @@ it.each([
         execFileSync(
           'git',
           ['--git-dir', remote, 'for-each-ref', '--format=%(refname)'],
-          { env, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }
+          {
+            maxBuffer: 256 * 1024 * 1024,
+            env,
+            encoding: 'utf8',
+            stdio: ['ignore', 'pipe', 'pipe'],
+          }
         ).trim(),
         ''
       );

@@ -204,7 +204,11 @@ describe('changed test coverage', () => {
   it('merges every --coverage shard report in the ratchet check', () => {
     const repo = mkdtempSync(join(tmpdir(), 'changed-coverage-cli-'));
     const git = (...args) =>
-      execFileSync('git', args, { cwd: repo, encoding: 'utf8' }).trim();
+      execFileSync('git', args, {
+        maxBuffer: 256 * 1024 * 1024,
+        cwd: repo,
+        encoding: 'utf8',
+      }).trim();
     git('init', '-q');
     git('config', 'user.email', 'ci@example.com');
     git('config', 'user.name', 'CI');

@@ -447,6 +447,7 @@ export function evaluateSkillGovernance({ root = process.cwd() } = {}) {
     if (resolverRoot !== '.agents/skills') return entries;
 
     const tracked = spawnSync('git', ['ls-files', '--', `${resolverRoot}/`], {
+      maxBuffer: 256 * 1024 * 1024,
       cwd: root,
       encoding: 'utf8',
     });
@@ -607,6 +608,7 @@ function evaluateStagedSkillGovernance() {
   // Materializing the index copies the whole repo (~13k files); skip it when
   // nothing governed is staged.
   const staged = spawnSync('git', ['diff', '--cached', '--name-only', '-z'], {
+    maxBuffer: 256 * 1024 * 1024,
     cwd: process.cwd(),
     encoding: 'utf8',
   });

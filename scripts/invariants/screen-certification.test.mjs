@@ -3610,7 +3610,11 @@ if (p.endsWith('/zip')) {
     // HEAD^1, so the gate follows it.
     const repo = mkdtempSync(join(tmpdir(), 'screen-cert-diff-base-'));
     const runGit = args =>
-      spawnSync('git', args, { cwd: repo, encoding: 'utf8' });
+      spawnSync('git', args, {
+        maxBuffer: 256 * 1024 * 1024,
+        cwd: repo,
+        encoding: 'utf8',
+      });
     const savedEnv = {
       SCREEN_CERT_DIFF_BASE: process.env.SCREEN_CERT_DIFF_BASE,
       COMPONENT_SHIP_DIFF_BASE: process.env.COMPONENT_SHIP_DIFF_BASE,

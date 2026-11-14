@@ -133,6 +133,7 @@ export function resolveTrustedBaseEnrollment(repoRoot = REPO_ROOT) {
           'git',
           ['show', `${candidate}:${REGISTRY_SOURCE_PATH}`],
           {
+            maxBuffer: 256 * 1024 * 1024,
             cwd: repoRoot,
             encoding: 'utf8',
             stdio: ['ignore', 'pipe', 'pipe'],

@@ -400,6 +400,7 @@ export function labelFor(statement) {
 
 function git(args, { cwd = ROOT, env = process.env } = {}) {
   const r = spawnSync('git', args, {
+    maxBuffer: 256 * 1024 * 1024,
     cwd,
     env: buildPreflightEnv(env, cwd),
     encoding: 'utf8',
@@ -444,7 +445,7 @@ export async function lintBody({
           from,
           ...(to ? [to] : []),
         ],
-        { cwd, env, encoding: 'utf8' }
+        { maxBuffer: 256 * 1024 * 1024, cwd, env, encoding: 'utf8' }
       );
       if (diff.status !== 0)
         throw new Error(`Cannot read PR body diff for ${to ?? from}`);

@@ -35,6 +35,7 @@ afterEach(() => {
 
 function git(cwd, ...args) {
   return execFileSync('git', args, {
+    maxBuffer: 256 * 1024 * 1024,
     cwd,
     encoding: 'utf8',
     env: {

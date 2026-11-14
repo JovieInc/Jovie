@@ -396,7 +396,11 @@ export function evaluateBudgets({
 }
 
 function git(repoRoot, args) {
-  return spawnSync('git', args, { cwd: repoRoot, encoding: 'utf8' });
+  return spawnSync('git', args, {
+    maxBuffer: 256 * 1024 * 1024,
+    cwd: repoRoot,
+    encoding: 'utf8',
+  });
 }
 
 export function readBudgetAncestor(repoRoot = REPO_ROOT, options = {}) {

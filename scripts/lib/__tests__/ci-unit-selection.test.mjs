@@ -152,6 +152,7 @@ describe('selected web unit lane', () => {
       write('runtime-input.txt', 'valid');
       const git = (...args) =>
         execFileSync('git', args, {
+          maxBuffer: 256 * 1024 * 1024,
           cwd: dir,
           encoding: 'utf8',
           stdio: ['ignore', 'pipe', 'pipe'],

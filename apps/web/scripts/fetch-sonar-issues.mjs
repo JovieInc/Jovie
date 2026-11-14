@@ -452,6 +452,7 @@ async function fetchMeasures(ctx) {
 function gitOut(args, cwd) {
   try {
     return execFileSync('git', args, {
+      maxBuffer: 256 * 1024 * 1024,
       cwd,
       encoding: 'utf8',
       stdio: ['ignore', 'pipe', 'ignore'],

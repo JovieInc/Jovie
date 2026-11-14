@@ -27,7 +27,11 @@ const roots = [];
 afterAll(() => roots.forEach(r => rmSync(r, { recursive: true, force: true })));
 
 const git = (cwd, ...args) =>
-  execFileSync('git', args, { cwd, encoding: 'utf8' }).trim();
+  execFileSync('git', args, {
+    maxBuffer: 256 * 1024 * 1024,
+    cwd,
+    encoding: 'utf8',
+  }).trim();
 
 /** Reproduces the 2026-10-21 wave: 63b63b2 tip was low, range was not. */
 function buildWave() {
