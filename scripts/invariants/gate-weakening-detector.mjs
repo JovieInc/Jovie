@@ -39,7 +39,9 @@ export function loadConfig(url = CONFIG_URL) {
 export function evaluateGateWeakening(files, config = loadConfig()) {
   const findings = [];
   for (const file of files ?? []) {
-    if (!file?.path || excluded(file.path, config) || isGeneratedReport(file.path, config)) continue;
+    if (!file?.path) continue;
+    if ((config.jumpPolicyPin?.paths ?? []).includes(file.previousPath)) findings.push(finding('jump-policy-changed', file.path, `${file.previousPath} renamed out of the watched paths`));
+    if (excluded(file.path, config) || isGeneratedReport(file.path, config)) continue;
     findings.push(...inspectInvariantTest(file));
     if (isSelf(file.path, config)) {
       findings.push(...inspectSelf(file));
@@ -144,6 +146,7 @@ export function loadDiffFiles(cwd, baseRef) {
     const renamed = flag.startsWith('R') || flag.startsWith('C');
     files.push({
       path,
+      previousPath: renamed ? parts[1] : null,
       before: flag.startsWith('A') ? null : showFile(cwd, mergeBase, renamed ? parts[1] : path),
       after: flag.startsWith('D') ? null : showFile(cwd, 'HEAD', path),
     });
@@ -156,9 +159,7 @@ function inspectGateFile(file, config) {
   const added = addedLines(file.before, file.after);
   if (isRuleset(file.path)) findings.push(...rulesetFindings(file));
   if (file.path === config.prReadyPath) {
-    for (const name of removedNeeds(file, config.prReadyJob)) {
-      add('pr-ready-check-removed', name);
-    }
+    for (const name of removedNeeds(file, config.prReadyJob)) add('pr-ready-check-removed', name);
   }
   if (file.path === config.sourceValidationPath) {
     for (const name of removedNames(stepNames(file.before), stepNames(file.after))) {
@@ -166,10 +167,11 @@ function inspectGateFile(file, config) {
     }
   }
   if (file.path === config.sourceGuardPath) {
-    for (const name of removedNames(guardIds(file.before), guardIds(file.after))) {
-      add('source-guard-removed', name);
-    }
+    const removed = removedNames(guardIds(file.before), guardIds(file.after));
+    for (const name of removed) add('source-guard-removed', name);
+    if (removed.includes(config.jumpPolicyPin?.guardId)) add('jump-policy-changed', `${config.jumpPolicyPin.guardId} guard removed`);
   }
+  if ((config.jumpPolicyPin?.paths ?? []).includes(file.path) && file.before != null && file.after !== file.before) add('jump-policy-changed', 'jump policy pin changed');
   if (isCiYaml(file.path)) {
     for (const line of added) {
       if (/^\s*#/.test(line)) continue;
@@ -184,9 +186,7 @@ function inspectGateFile(file, config) {
   }
   // A brand-new ledger (no prior version) introduces a ratchet; it is not a
   // loosening. Growth of an existing ledger still trips this.
-  if (isShrinkOnly(file.path) && file.before != null && file.after != null && grew(file.before, file.after)) {
-    add('shrink-only-growth', 'count increased');
-  }
+  if (isShrinkOnly(file.path) && file.before != null && file.after != null && grew(file.before, file.after)) add('shrink-only-growth', 'count increased');
   if (isThresholdPath(file.path) && file.before != null && file.after != null) {
     findings.push(...thresholdFindings(file, config));
   }
@@ -229,12 +229,11 @@ function inspectSelf(file) {
   }
   const findings = [];
   const add = (kind, detail) => findings.push(finding(kind, file.path, detail));
-  if (before.schema !== after.schema || before.invariantId !== after.invariantId) {
-    add('detector-rule-removed', 'identity');
-  }
+  if (before.schema !== after.schema || before.invariantId !== after.invariantId) add('detector-rule-removed', 'identity');
   for (const kind of before.requiredKinds ?? []) if (!(after.requiredKinds ?? []).includes(kind)) add('detector-rule-removed', kind);
   for (const entry of new Set([...(before.selfPaths ?? []), ...(after.selfPaths ?? [])]))
     if ((before.selfPaths ?? []).includes(entry) !== (after.selfPaths ?? []).includes(entry)) add('detector-selfpaths-changed', entry);
+  if (before.jumpPolicyPin != null && (JSON.stringify(before.jumpPolicyPin.paths ?? []) !== JSON.stringify(after.jumpPolicyPin?.paths ?? []) || before.jumpPolicyPin.guardId !== after.jumpPolicyPin?.guardId)) add('jump-policy-changed', 'jumpPolicyPin watch changed');
   for (const exclusion of after.scanExclusions ?? []) {
     if (!(before.scanExclusions ?? []).includes(exclusion)) {
       add('scan-exclusion-grew', exclusion);
