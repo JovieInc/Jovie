@@ -58,7 +58,7 @@ export const RtlArabicSplit: Story = {
   },
   decorators: [
     Story => (
-      <div dir='rtl' lang='ar' className='w-[38rem]'>
+      <div dir='rtl' lang='ar' className='w-full max-w-xl'>
         <Story />
       </div>
     ),
