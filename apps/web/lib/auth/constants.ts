@@ -63,7 +63,7 @@ export const AUTH_SURFACE = {
 export const AUTH_CLASSES = {
   /** Error message styling with fade-in animation */
   fieldError:
-    'text-xs font-[450] text-error text-left animate-in fade-in-0 slide-in-from-top-1 duration-subtle',
+    'text-xs font-[450] text-error-text text-left animate-in fade-in-0 slide-in-from-top-1 duration-subtle',
   /** Step transition animation for multi-step forms */
   stepTransition:
     'animate-in fade-in-0 slide-in-from-bottom-2 duration-cinematic ease-out',

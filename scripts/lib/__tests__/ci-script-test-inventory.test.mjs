@@ -1,3 +1,4 @@
+import { spawnSync } from 'node:child_process';
 import {
   existsSync,
   mkdirSync,
@@ -16,6 +17,7 @@ import {
   runStructural,
   SCRIPT_CONTRACT_NODE_TESTS,
   SCRIPT_CONTRACT_VITEST_TESTS,
+  selectSourceGuards,
 } from '../../ci-fast-lanes.mjs';
 import { buildControlTestCommands } from '../../run-affected-tests.mjs';
 import {
@@ -33,6 +35,59 @@ const REPO_ROOT = resolve(import.meta.dirname, '..', '..', '..');
 const EXCEPTIONS = { ...RUNNER_ONLY_EXCEPTIONS, ...KNOWN_RED_ORPHANS };
 
 describe('scripts test inventory guard', () => {
+  it('selects and expands future automation-liveness splits in the existing lane', () => {
+    const future =
+      'scripts/lib/__tests__/automation-liveness-future-split.test.mjs';
+    const existing = 'scripts/lib/__tests__/automation-liveness.test.mjs';
+    for (const event of ['pull_request', 'merge_group', 'push']) {
+      expect(
+        selectSourceGuards(event, [future]).some(
+          guard => guard.id === 'automation-registry'
+        )
+      ).toBe(true);
+    }
+    const guard = selectSourceGuards('pull_request', [future]).find(
+      item => item.id === 'automation-registry'
+    );
+    const root = mkdtempSync(join(tmpdir(), 'liveness-lane-'));
+    try {
+      mkdirSync(join(root, 'scripts/lib/__tests__'), { recursive: true });
+      mkdirSync(join(root, 'bin'));
+      for (const file of [existing, future])
+        writeFileSync(join(root, file), '');
+      // Record real shell expansion without running the unrelated coverage stage.
+      writeFileSync(join(root, 'bin/node'), '#!/bin/sh\nexit 0\n', {
+        mode: 0o755,
+      });
+      writeFileSync(
+        join(root, 'bin/pnpm'),
+        '#!/bin/sh\nprintf "%s\\n" "$@"\n',
+        {
+          mode: 0o755,
+        }
+      );
+      const result = spawnSync('bash', ['-c', guard.command], {
+        cwd: root,
+        env: {
+          ...process.env,
+          PATH: `${join(root, 'bin')}:${process.env.PATH}`,
+        },
+        encoding: 'utf8',
+      });
+      expect(result.status, result.stderr).toBe(0);
+      const args = result.stdout.trim().split('\n');
+      expect(args).toContain(existing);
+      expect(args).toContain(future);
+      const refs = mapTestReferences(
+        [{ source: 'automation-registry', text: guard.command }],
+        [existing, future]
+      );
+      expect([...refs.values()].every(sources => sources.size > 0)).toBe(true);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
   it('runs the inventory in source validation control commands before queue admission', () => {
     const commands = buildControlTestCommands().map(([command, args]) =>
       [command, ...args].join(' ')
@@ -194,7 +249,7 @@ describe('scripts test inventory guard', () => {
     for (const file of [
       ...SCRIPT_CONTRACT_NODE_TESTS,
       ...SCRIPT_CONTRACT_VITEST_TESTS,
-    ]) {
+    ].flatMap(entry => entry.split(' '))) {
       expect(existsSync(resolve(REPO_ROOT, file)), file).toBe(true);
     }
   });

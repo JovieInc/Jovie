@@ -12,6 +12,7 @@ import {
   getSortedRowModel,
   useReactTable,
 } from '@/lib/tanstack-table';
+import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import { TableHeaderCell } from '../molecules/TableHeaderCell';
 import { presets } from '../table.styles';
 import type { UnifiedTableHeader as HeaderComponent } from './UnifiedTableHeader';
@@ -180,6 +181,28 @@ describe('UnifiedTableHeader', () => {
       </table>
     );
     expect(container.querySelector('thead')).toBeNull();
+  });
+
+  it('stays axe-clean unsorted', async () => {
+    const { container } = render(<Harness />);
+    expect(screen.getAllByRole('columnheader')).toHaveLength(3);
+    await expectNoA11yViolations(container);
+  });
+
+  it('stays axe-clean sorted descending', async () => {
+    const { container } = render(
+      <Harness initialSort={[{ id: 'title', desc: true }]} />
+    );
+    expect(
+      screen.getByRole('button', { name: 'Title: sorted descending' })
+    ).toBeInTheDocument();
+    await expectNoA11yViolations(container);
+  });
+
+  it('stays axe-clean with a visually hidden header', async () => {
+    const { container } = render(<Harness semanticOnlyActions />);
+    expect(screen.getByText('Actions')).toHaveClass('sr-only');
+    await expectNoA11yViolations(container);
   });
 });
 

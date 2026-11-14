@@ -84,3 +84,41 @@ export const WorkspaceReadTimeout: Story = {
     onRetry: fn(),
   },
 };
+
+export const ErrorWithDiagnostics: Story = {
+  args: {
+    title: 'Unable to Load Dashboard',
+    message: 'Try again in a moment.',
+    error: Object.assign(new Error('Request timed out after 30 seconds.'), {
+      digest: 'dashboard-timeout',
+    }),
+    onRetry: fn(),
+  },
+};
+
+/** Only the required message: default title, default action, no error object. */
+export const PartialMessageOnly: Story = {
+  args: {
+    message: 'Failed to load your workspace. Please refresh the page.',
+    onRetry: fn(),
+  },
+};
+
+export const RtlArabicCopy: Story = {
+  args: {
+    title: 'تعذر تحميل لوحة التحكم',
+    message: 'حاول مرة أخرى بعد قليل.',
+    actionLabel: 'إعادة المحاولة',
+    error: Object.assign(new Error('انتهت مهلة الطلب بعد ثلاثين ثانية.'), {
+      digest: 'dashboard-timeout',
+    }),
+    onRetry: fn(),
+  },
+  decorators: [
+    Story => (
+      <div dir='rtl' lang='ar' className='flex min-h-screen'>
+        <Story />
+      </div>
+    ),
+  ],
+};

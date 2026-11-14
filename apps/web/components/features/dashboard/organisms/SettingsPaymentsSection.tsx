@@ -181,7 +181,7 @@ export function SettingsPaymentsSection() {
       <SettingsActionRow
         icon={<CreditCard className='h-4 w-4' aria-hidden />}
         title='Loading payments'
-        description='Checking your stripe connection and payout status.'
+        description='Checking your Stripe connection and payout status.'
       />
     );
   }
@@ -221,7 +221,7 @@ export function SettingsPaymentsSection() {
       <SettingsActionRow
         icon={<CreditCard className='h-4 w-4' aria-hidden />}
         title='Stripe not connected'
-        description='Connect stripe to receive fan payments directly through jovie. Stripe handles payment processing, payouts, and tax reporting.'
+        description='Connect Stripe to receive fan payments directly through Jovie. Stripe handles payment processing, payouts, and tax reporting.'
         action={renderConnectAction('Connect Stripe')}
       />,
       paymentErrorNotice(error)

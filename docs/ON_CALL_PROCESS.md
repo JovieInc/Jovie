@@ -105,6 +105,54 @@ Before closing the incident:
 - Document root cause, mitigation, and permanent fix
 - Add follow-up tasks for structural prevention
 
+## Red monitors need an owner
+
+A monitor that stays red is an incident or it is deleted. A check that is red
+run after run with no owner teaches everyone to ignore it, and then it cannot
+tell us when something real breaks.
+
+**Rule.** For every scheduled or post-deploy workflow in
+`canon/automation-registry.jsonl` (trigger `github-cron`, `lanes-clock` or
+`github-event`), a red streak needs an open incident with a live owner lease
+when either is true:
+
+- more than 3 consecutive failed runs, or
+- red for more than 24 hours, counted from the streak's first failed run (not
+  from the last green run, which for a daily or weekly monitor is a cadence
+  ago).
+
+A monitor whose newest run is green is never red, however long ago it last
+ran. Skipped and cancelled runs carry no verdict.
+
+**Owner lease.** Add one line to `canon/monitor-incidents.jsonl`:
+`{"workflow": "<file>.yml", "incident": "<Linear key or URL>", "owner": "<who>",
+"openedAt": "<ISO>", "until": "<ISO>", "reason": "<why it is red>"}`. It has
+the `jovie-hold/v1` shape: the lease is live until `until`, and never longer
+than 7 days from `openedAt`. When it lapses, renew it with a new line, fix the
+monitor, or retire it from the registry. There is no fourth option.
+
+**Gate.** `scripts/automation-liveness.mjs` reads the same runs page it already
+fetches for each monitor and runs `scripts/lib/red-monitor-owner-gate.mjs`. The
+result is in the liveness report (`redMonitors`), the step summary and one
+annotation per offender.
+
+- Report-only until **2026-11-25**: offenders are warnings.
+- From **2026-11-25T00:00Z** (`ENFORCE_FROM`): the liveness check fails while any
+  offender has no live lease.
+
+Offenders on 2026-11-11, when the gate landed: `cost-anomaly-gate.yml`,
+`claim-checkout-dogfood.yml`, `visual-regression.yml`, `e2e-full-matrix.yml`,
+`vs-linktree-claims.yml`, `postdeploy-probes.yml` and `spend-guard.yml` (needs
+the `VERCEL_READONLY_TOKEN` secret from the founder).
+
+**One spec asserts one class.** A functional journey spec may not contain a
+performance or layout budget. A budget lives in its own spec and reports as its
+own check, so a layout regression never turns a revenue canary red and a real
+checkout break never hides behind a known layout red. Example:
+`apps/web/tests/e2e/claim-checkout.spec.ts` (journey) and
+`claim-checkout-layout.perf.spec.ts` (layout budget, check
+`Claim checkout layout budget (perf)`).
+
 ## Escalation Triggers
 
 Escalate from P1 to P0 immediately if any of the following occur:

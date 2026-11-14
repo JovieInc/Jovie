@@ -716,7 +716,7 @@ describe('baked runner prerequisite contract', () => {
       readonly devDependencies: Readonly<Record<string, string>>;
     };
     expect(requirements.nodeMajor).toBe(24);
-    expect(requirements.nodeMinimum).toBe('24.22.2');
+    expect(requirements.nodeMinimum).toBe('24.22.3');
     expect(requirements.nodeMinimum).toBe(
       readFileSync(resolve(repoRoot, '.nvmrc'), 'utf8').trim()
     );
@@ -738,7 +738,7 @@ describe('baked runner prerequisite contract', () => {
       'sha256:f546db5932b903c81cf269a712dad679fdf139dc08b7676c08f391a11258de5e'
     );
     expect(runnerDockerfile).toContain(
-      '48cc0e21e048790e54c0cf5749c2725005313d652651c40b7a21feb9697aaf75'
+      '4f2b175a6d53a5c617a80dba2676238a0688cef28c6da4eba35c7d844e66fcfb'
     );
     expect(runnerDockerfile).toContain('sha256sum --check --strict');
     expect(runnerDockerfile).not.toMatch(/curl[\s\S]*?\|\s*tar/);
@@ -748,7 +748,7 @@ describe('baked runner prerequisite contract', () => {
     expect(runnerDockerfile).toContain('COREPACK_HOME=/opt/corepack');
     expect(runnerDockerfile).toContain('su -s /bin/bash runner -c');
     expect(runnerDockerfile).toContain(
-      '/opt/hostedtoolcache/node/24.22.2/x64/bin/pnpm --version'
+      '/opt/hostedtoolcache/node/24.22.3/x64/bin/pnpm --version'
     );
     expect(
       runnerDockerfile.indexOf('FROM runner-base\n\n# Corepack')
@@ -1427,9 +1427,9 @@ describe('baked runner prerequisite contract', () => {
     expect(playwrightAction).toContain(
       'node .github/runner-image/verify-prerequisites.mjs --component playwright'
     );
-    // Version resolve, cache restore and browser download all skip on a warm image.
+    // Version resolve, cache restore/save, download and save notice skip on warm.
     expect(playwrightAction.match(/playwright_warm != 'true'/g)).toHaveLength(
-      3
+      5
     );
     expect(playwrightAction).toContain('PLAYWRIGHT_BROWSERS_PATH=');
   });

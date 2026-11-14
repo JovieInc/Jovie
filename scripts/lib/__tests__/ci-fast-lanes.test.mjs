@@ -746,7 +746,7 @@ describe('runStructural screenshot contract discovery', () => {
     expect(new Set(all).size).toBe(all.length);
     expect(web).toContain('pnpm component-ship-gate');
     expect(web).toContain(
-      'pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/component-live-storybook-certification.test.mjs'
+      'pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/component-live-storybook-certification.test.mjs lib/__tests__/component-story-workers.test.mjs lib/__tests__/component-story-inventory.test.mjs'
     );
     // Merge-group-only guards gate PRs in their own web lane (component-family
     // ratchet is inside tests/unit/design-system), not a structural command.
@@ -1426,8 +1426,8 @@ describe('structural command pool', () => {
     expect(started).toEqual([LANES_COVERAGE_COMMAND]);
     // Every per-module coverage floor still runs, after the shards combine.
     expect(LANES_COVERAGE_COMMAND).toContain('coverage combine');
-    expect(LANES_COVERAGE_COMMAND.match(/--fail-under=/g)?.length).toBe(23);
-    expect(LANES_COVERAGE_COMMAND).toContain('cloud_lane.py" --fail-under=90');
+    expect(LANES_COVERAGE_COMMAND.match(/--fail-under=/g)?.length).toBe(26);
+    expect(LANES_COVERAGE_COMMAND).toContain('cloud_lane*.py" --fail-under=90');
     expect(LANES_COVERAGE_COMMAND).toContain(
       'priority_admission.py" --fail-under=80'
     );

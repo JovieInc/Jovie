@@ -1,5 +1,6 @@
 import { render } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import { ScrollRevealInit } from './ScrollRevealInit';
 
 describe('ScrollRevealInit', () => {
@@ -32,20 +33,38 @@ describe('ScrollRevealInit', () => {
     document.body.innerHTML = '';
   });
 
-  it('leaves the reveal to CSS when scroll-driven animations are supported', () => {
+  it('leaves the reveal to CSS when scroll-driven animations are supported', async () => {
     supportsViewTimeline = true;
-    render(<ScrollRevealInit />);
+    const { container } = render(<ScrollRevealInit />);
 
     expect(document.documentElement.classList.contains('reveal-js')).toBe(
       false
     );
     expect(observe).not.toHaveBeenCalled();
+    expect(container).toBeEmptyDOMElement();
+    await expectNoA11yViolations(container);
   });
 
-  it('falls back to an observer that reveals elements once they intersect', () => {
+  it('registers no observer when the page has nothing to reveal', async () => {
+    supportsViewTimeline = false;
+    document.body.innerHTML = '';
+    const { container, unmount } = render(<ScrollRevealInit />);
+
+    expect(document.documentElement.classList.contains('reveal-js')).toBe(true);
+    expect(IntersectionObserver).not.toHaveBeenCalled();
+    expect(observe).not.toHaveBeenCalled();
+    await expectNoA11yViolations(container);
+
+    unmount();
+    expect(document.documentElement.classList.contains('reveal-js')).toBe(
+      false
+    );
+  });
+
+  it('falls back to an observer that reveals elements once they intersect', async () => {
     supportsViewTimeline = false;
     const target = document.querySelector('.reveal-on-scroll') as HTMLElement;
-    const { unmount } = render(<ScrollRevealInit />);
+    const { container, unmount } = render(<ScrollRevealInit />);
 
     expect(document.documentElement.classList.contains('reveal-js')).toBe(true);
     expect(observe).toHaveBeenCalledWith(target);
@@ -60,6 +79,7 @@ describe('ScrollRevealInit', () => {
       {} as IntersectionObserver
     );
     expect(target.classList.contains('revealed')).toBe(true);
+    await expectNoA11yViolations(container);
 
     unmount();
     expect(document.documentElement.classList.contains('reveal-js')).toBe(

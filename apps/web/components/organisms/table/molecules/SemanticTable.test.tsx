@@ -1,7 +1,8 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
+import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import { TableCell } from '../atoms/TableCell';
-import { TableBody, TableRoot, TableRow } from './SemanticTable';
+import { TableBody, TableHead, TableRoot, TableRow } from './SemanticTable';
 
 describe('SemanticTable row geometry', () => {
   it('forwards the selected row mode to the semantic table containing investor cells', () => {
@@ -44,5 +45,52 @@ describe('SemanticTable row geometry', () => {
     expect(
       screen.getByRole('table').style.getPropertyValue('--table-row-height')
     ).toBe('');
+  });
+
+  it('composes an axe-clean table with a header row', async () => {
+    const { container } = render(
+      <TableRoot className='w-96' rowMode='two-line'>
+        <TableHead className='text-secondary-token'>
+          <TableRow>
+            <th>Name</th>
+            <th>Status</th>
+          </TableRow>
+        </TableHead>
+        <TableBody>
+          <TableRow className='text-primary-token'>
+            <td>Midnight EP</td>
+            <td>Published</td>
+          </TableRow>
+        </TableBody>
+      </TableRoot>
+    );
+
+    expect(screen.getAllByRole('columnheader')).toHaveLength(2);
+    expect(screen.getAllByRole('row')[1]).toHaveClass('text-primary-token');
+    await expectNoA11yViolations(container);
+  });
+
+  it('stays axe-clean with long copy in a right-to-left table', async () => {
+    const { container } = render(
+      <div dir='rtl' lang='ar'>
+        <TableRoot>
+          <TableHead>
+            <TableRow>
+              <th>الاسم</th>
+            </TableRow>
+          </TableHead>
+          <TableBody>
+            <TableRow>
+              <TableCell>
+                عنوان إصدار طويل جدا يجب ألا يوسع صف الجدول مهما طال
+              </TableCell>
+            </TableRow>
+          </TableBody>
+        </TableRoot>
+      </div>
+    );
+
+    expect(screen.getByRole('columnheader')).toHaveTextContent('الاسم');
+    await expectNoA11yViolations(container);
   });
 });

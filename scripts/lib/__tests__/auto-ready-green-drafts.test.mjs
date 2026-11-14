@@ -38,6 +38,7 @@ const workflow = readFileSync(
 
 const head = 'a'.repeat(40);
 const other = 'b'.repeat(40);
+const S = 'outside-contributor';
 
 function writerBody(
   prNumber = 18001,
@@ -90,37 +91,36 @@ function draft(overrides = {}) {
 
 describe('green-source draft classifier', () => {
   it.each([
-    [
-      'writer-proof-proof-missing',
-      { body: 'Final qualification pending; author still working.' },
-    ],
-    ['writer-proof-head-mismatch', { body: writerBody(18001, other) }],
+    // Trusted writers ship on green by default; any other author needs proof.
+    ['writer-proof-proof-missing', { body: 'Author still working.' }],
+    ['writer-proof-head-mismatch', { body: writerBody(18001, other, S) }],
     [
       'writer-proof-writer-mismatch',
       { body: writerBody(18001, head, 'another-writer') },
     ],
-    ['writer-proof-pr-number-mismatch', { body: writerBody(18002) }],
+    ['writer-proof-pr-number-mismatch', { body: writerBody(18002, head, S) }],
     ['author-unavailable', { authorLogin: undefined }],
   ])('never treats green checks as writer intent: %s', (reason, overrides) => {
-    expect(classifyGreenSourceDraft(draft(overrides))).toEqual({
+    const pr = draft({ authorLogin: S, ...overrides });
+    expect(classifyGreenSourceDraft(pr)).toEqual({
       eligible: false,
       reason,
     });
   });
 
-  it('promotes a trusted writer that opted in to ship on green, with no receipt', () => {
-    const body = 'Ships when green.\n\n<!-- jovie-auto-ready: on-green -->';
-    expect(classifyGreenSourceDraft(draft({ body }))).toEqual({
-      eligible: true,
-      reason: 'green-source-clean',
-    });
-    expect(
-      classifyGreenSourceDraft(draft({ body, authorLogin: 'jovie-bot[bot]' }))
-    ).toEqual({ eligible: true, reason: 'green-source-clean' });
+  it.each([
+    ['without the marker (REST-opened)', 'Ships when green.'],
+    ['with the marker', 'Ships.\n\n<!-- jovie-auto-ready: on-green -->'],
+  ])('ships a trusted writer draft on green %s, no receipt', (_n, body) => {
+    const verdict = b => classifyGreenSourceDraft(draft({ body: b })).reason;
+    expect(verdict(body)).toBe('green-source-clean');
+    expect(verdict(`${body}\n<!-- jovie-auto-ready: park -->`)).toBe(
+      'writer-parked'
+    );
   });
 
-  it('keeps every other gate when a draft opts in to ship on green', () => {
-    const body = '<!-- jovie-auto-ready: on-green -->';
+  it('keeps every other gate when a draft ships on green by default', () => {
+    const body = 'Opened through the REST API.';
     const refused = (overrides, reason) =>
       expect(classifyGreenSourceDraft(draft({ body, ...overrides }))).toEqual({
         eligible: false,
@@ -468,19 +468,17 @@ describe('green-source shell controller (fake gh)', () => {
     MISSED_COHORT: '0',
     DRY_RUN: '0',
   };
-  it('an active author without proof stays draft despite successful checks', () => {
-    const result = runController(
-      [listed({ body: 'Final qualification pending' })],
-      ready
-    );
+  it('a parked draft stays draft despite successful checks', () => {
+    const body = 'Still working.\n<!-- jovie-auto-ready: park -->';
+    const result = runController([listed({ body })], ready);
     expect(result.status).toBe(0);
-    expect(result.stdout).toContain('writer-proof-proof-missing');
+    expect(result.stdout).toContain('writer-parked');
     expect(result.calls.some(call => call.startsWith('pr ready'))).toBe(false);
   });
 
   it.each([
     ['a newer head', { headRefOid: other, body: writerBody(20874, other) }],
-    ['withdrawn proof', { body: '' }],
+    ['a new park marker', { body: '<!-- jovie-auto-ready: park -->' }],
     ['a different author', { author: { login: 'another-writer' } }],
   ])('revalidates %s immediately before readiness', (_name, patch) => {
     const result = runController([listed()], {
@@ -609,13 +607,13 @@ describe('green-source shell controller (fake gh)', () => {
     expect(result.calls.some(call => call.startsWith('pr ready'))).toBe(false);
   });
 
-  it.each(['', writerBody(20874, other, 'jovie-bot[bot]')])(
-    'keeps strict Bot writer proof required',
+  it.each(['', writerBody(20874, other, 'renovate[bot]')])(
+    'keeps strict proof required for an untrusted Bot',
     body => {
       const result = runController(
         [
           listed({
-            rawAuthor: { __typename: 'Bot', login: 'jovie-bot' },
+            rawAuthor: { __typename: 'Bot', login: 'renovate' },
             body,
           }),
         ],

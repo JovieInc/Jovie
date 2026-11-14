@@ -36,6 +36,10 @@ import {
   selectHighRiskSources,
 } from './lib/mutation-diff.mjs';
 import { buildWorkflowRunUrl } from './lib/mutation-floor-intake.mjs';
+import {
+  mutationRunSucceeded,
+  runMutationHarness,
+} from './lib/mutation-lifecycle.mjs';
 import { loadMutationScoreBaseline } from './lib/mutation-score-floor.mjs';
 import {
   buildSurvivorIssue,
@@ -57,6 +61,7 @@ import {
   rootRelative,
   stateKey,
 } from './lib/mutation-sweep-root.mjs';
+import { preflight as checkCapacity } from './mutation-sweep-preflight.mjs';
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -82,37 +87,7 @@ const { values } = parseArgs({
 });
 
 /** Spare-compute gate: refuse to start when gem is busy. Exit 75 = skip. */
-function preflight() {
-  const minMemGb = Number(process.env.MUTATION_MIN_MEM_GB ?? 8);
-  const maxLoad = Number(process.env.MUTATION_MAX_LOAD ?? 8);
-  const minDiskGb = Number(process.env.MUTATION_MIN_DISK_GB ?? 15);
-  const problems = [];
-  if (existsSync('/proc/meminfo')) {
-    const kb = Number(
-      /MemAvailable:\s+(\d+)/u.exec(
-        readFileSync('/proc/meminfo', 'utf8')
-      )?.[1] ?? 0
-    );
-    if (kb / 1048576 < minMemGb)
-      problems.push(
-        `MemAvailable ${(kb / 1048576).toFixed(1)}GB < ${minMemGb}GB`
-      );
-  }
-  if (existsSync('/proc/loadavg')) {
-    const load = Number(readFileSync('/proc/loadavg', 'utf8').split(' ')[1]);
-    if (load > maxLoad) problems.push(`5-min load ${load} > ${maxLoad}`);
-  }
-  const df = spawnSync('df', ['-Pk', repoRoot], { encoding: 'utf8' });
-  const avail = Number(
-    df.stdout?.split('\n')[1]?.split(/\s+/u)[3] ?? Number.NaN
-  );
-  if (Number.isFinite(avail) && avail / 1048576 < minDiskGb) {
-    problems.push(
-      `disk ${(avail / 1048576).toFixed(0)}GB free < ${minDiskGb}GB`
-    );
-  }
-  return problems;
-}
+const preflight = () => checkCapacity(repoRoot);
 
 if (values.preflight) {
   const problems = preflight();
@@ -315,6 +290,9 @@ mkdirSync(tasksDir, { recursive: true });
 /** @type {string[]} */ const summaryRows = [];
 /** @type {{ file: string, reason: string }[]} */ const regressions = [];
 let issuesFiled = 0;
+let linearFilingStopped = false;
+let unfiledBatches = 0;
+let scoredNow = 0;
 
 for (const file of batch) {
   // Off-peak only: re-check the 5-minute load before every module, not just at start.
@@ -333,14 +311,14 @@ for (const file of batch) {
   const reportFile = join(reportDir, reportName(rel(file)));
   rmSync(reportFile, { force: true });
   console.log(`\n=== sweep ${file}`);
-  const run = spawnSync(
+  const run = await runMutationHarness(
     process.execPath,
     [join(repoRoot, target.harness), ...harnessArgs(target, rel(file))],
     {
       cwd: repoRoot,
-      stdio: 'inherit',
-      timeout: num('file-timeout-minutes') * 60_000,
-      killSignal: 'SIGKILL',
+      rootDir,
+      sourcePath: join(rootDir, rel(file)),
+      timeoutMs: num('file-timeout-minutes') * 60_000,
       env: {
         ...process.env,
         CI: 'true',
@@ -351,9 +329,10 @@ for (const file of batch) {
   const durationMs = Date.now() - started;
   const at = new Date().toISOString();
   const previous = state.modules[file];
-  const mutants = existsSync(reportFile)
-    ? readReportMutants(reportFile, rel(file))
-    : null;
+  const mutants =
+    mutationRunSucceeded(run) && existsSync(reportFile)
+      ? readReportMutants(reportFile, rel(file))
+      : null;
   let entry;
   if (!mutants || mutants.length === 0) {
     entry = recordRun(state, file, {
@@ -395,7 +374,7 @@ for (const file of batch) {
       join(tasksDir, `${file.replace(/[^\w.-]+/gu, '_')}.json`),
       `${JSON.stringify({ file, sha: headSha, score: entry.score, valid: entry.valid, tests, survivors: real }, null, 1)}\n`
     );
-    if (values['file-issues'] && real.length > 0) {
+    if (values['file-issues'] && real.length > 0 && !linearFilingStopped) {
       const {
         remediationTriggersEnabled,
         upsertLinearIssueByTitleFingerprint,
@@ -420,7 +399,13 @@ for (const file of batch) {
         console.log(
           `Linear survivors issue (${file}): ${res.action ?? 'failed'} ${res.url ?? res.reason ?? ''}`
         );
-        issuesFiled += 1;
+        if (res.reason === 'linear_rate_limited') {
+          // The shared Linear credential is spent. Stop spending: filing more
+          // survivors cannot succeed, and every retry starves the Fleet Gate
+          // / Triage consumers of the same credential for longer (JOV-12500).
+          linearFilingStopped = true;
+          unfiledBatches += 1;
+        } else issuesFiled += 1;
       } else
         logRemediationDryRun({
           action: 'upsert',
@@ -430,6 +415,8 @@ for (const file of batch) {
     }
   }
   const verdict = ratchetVerdict(file, entry, previous, baseline);
+  if (entry.status === 'scored') scoredNow++;
+  if (!mutationRunSucceeded(run)) process.exitCode = 1;
   if (!verdict.ok) regressions.push({ file, reason: verdict.reason });
   appendFileSync(
     runsLog,
@@ -440,21 +427,24 @@ for (const file of batch) {
   );
   // Atomic persist after every module so a killed run loses at most one.
   persist();
+  if (!run.cleanupProved) {
+    console.error(
+      `${file}: cleanup unproved; recovery files retained at ${run.tempDir}`
+    );
+    break;
+  }
   rmSync(reportFile, { force: true });
   rmSync(`${reportFile}.tests.json`, { force: true });
   rmSync(`${reportFile}.coverage`, { recursive: true, force: true });
-  rmSync(join(rootDir, '.stryker-tmp'), { recursive: true, force: true });
-  // The timeout's SIGKILL reaches only the harness; its Stryker child can keep
-  // mutating sources in place (inPlace: true), so a timed-out module ends the batch.
-  if (run.signal === 'SIGKILL') {
+  if (run.timedOut || run.interrupted) {
     console.log(
-      `${file} timed out; stopping so its Stryker run cannot overlap the next module.`
+      `${file} ${run.interrupted ? 'interrupted' : 'timed out'}; owned mutation run stopped.`
     );
     break;
   }
 }
 
-writeOutputs(batch.length);
+writeOutputs(scoredNow);
 const scored = Object.values(state.modules).filter(m => m.status === 'scored');
 const summary = [
   `## Mutation sweep (${target.root})`,
@@ -466,6 +456,9 @@ const summary = [
   ...summaryRows,
   '',
   issuesFiled ? `${issuesFiled} survivor work item(s) filed.\n` : '',
+  linearFilingStopped
+    ? `Survivor filing stopped early: the shared Linear credential was rate-limited; ${unfiledBatches} module(s) with survivors left unfiled and the next sweep retries them.\n`
+    : '',
 ].join('\n');
 console.log(`\n${summary}`);
 if (values.summary) appendFileSync(values.summary, summary);

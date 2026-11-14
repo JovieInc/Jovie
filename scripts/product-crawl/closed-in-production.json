@@ -23,6 +23,10 @@
       "reason": "internal demo page, noindex"
     },
     {
+      "prefix": "/demo/showcase",
+      "reason": "screenshot fixtures; production 404s them except for the screenshot workflow (lib/security/production-blocked-routes.ts)"
+    },
+    {
       "prefix": "/ui",
       "reason": "component gallery for development"
     },

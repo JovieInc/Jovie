@@ -5,16 +5,32 @@ import {
   readConfiguredSearchCounts,
 } from '@/lib/ovie/shipping-state/configured.server';
 import { getRedis } from '@/lib/redis';
+import { syncCompanyMetrics } from './daily-metrics.server';
+import { configuredMetricSources } from './metric-sources.server';
 import { syncCompanyHistory } from './store.server';
 
-/** The hourly fill, with the configured HUD GitHub token and the shared Redis. */
-export function syncConfiguredCompanyHistory(now = new Date()) {
-  return syncCompanyHistory(now, {
-    redis: getRedis(),
-    owner: configuredGithubOwner(),
-    searchCounts: readConfiguredSearchCounts,
-  });
+/**
+ * The hourly fill: merged PRs through the configured HUD GitHub token, and
+ * the daily metrics (funnel, AI spend, CI, Linear) beside it, into the
+ * shared Redis. A failing source never blocks the others.
+ */
+export async function syncConfiguredCompanyHistory(now = new Date()) {
+  const redis = getRedis();
+  const [history, metrics] = await Promise.all([
+    syncCompanyHistory(now, {
+      redis,
+      owner: configuredGithubOwner(),
+      searchCounts: readConfiguredSearchCounts,
+    }),
+    syncCompanyMetrics(now, { redis, sources: configuredMetricSources() }),
+  ]);
+  return { ...history, metrics };
 }
+
+const UNCONFIGURED_REASONS = new Set([
+  'redis-unavailable',
+  'github-owner-unconfigured',
+]);
 
 type SubJobRunner<T> = (
   name: string,
@@ -32,5 +48,19 @@ export async function companyHistoryCronJob<T>(
   sync: (now: Date) => Promise<object> = syncConfiguredCompanyHistory
 ): Promise<T | { success: true; skipped: true }> {
   if (minute >= 15) return { success: true, skipped: true };
-  return run('companyHistory', async () => ({ ...(await sync(new Date())) }));
+  return run('companyHistory', async () => {
+    const result: Record<string, unknown> = { ...(await sync(new Date())) };
+    // The sync reports failures as receipts; a merged-PR sync that wrote
+    // nothing must still reach the sub-job's error capture. No Redis or no
+    // GitHub owner is an environment without the integration, not an alert.
+    if (
+      result.status === 'unavailable' &&
+      !UNCONFIGURED_REASONS.has(String(result.reason))
+    ) {
+      throw new Error(
+        `company history sync unavailable: ${String(result.reason ?? 'unknown')}`
+      );
+    }
+    return result;
+  });
 }

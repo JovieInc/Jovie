@@ -92,3 +92,58 @@ export const Operator: Story = {
     ),
   },
 };
+
+/** Settings drops the top header: sidebar and content only. */
+export const PartialWithoutHeader: Story = {
+  args: {
+    section: 'settings',
+    children: (
+      <div className='p-6'>
+        <p className='text-sm text-secondary-token'>Settings content.</p>
+      </div>
+    ),
+  },
+};
+
+export const LongContentBreadcrumbs: Story = {
+  args: {
+    breadcrumbs: [
+      { label: 'Releases', href: '/app/releases' },
+      {
+        label:
+          'The Extraordinarily Long Album Title That Keeps Going Well Past Any Reasonable Line Length (Deluxe Anniversary Remastered Edition)',
+      },
+    ],
+    children: (
+      <div className='space-y-3 p-6'>
+        {Array.from({ length: 20 }, (_, index) => index + 1).map(track => (
+          <p
+            key={`track-${track}`}
+            className='text-sm text-secondary-token break-words'
+          >
+            Track {track}: An Unusually Long Track Title That Wraps Inside The
+            Content Panel
+          </p>
+        ))}
+      </div>
+    ),
+  },
+};
+
+export const RtlShell: Story = {
+  args: {
+    breadcrumbs: [{ label: 'الإصدارات' }],
+    children: (
+      <div className='p-6'>
+        <p className='text-sm text-secondary-token'>محتوى لوحة العميل.</p>
+      </div>
+    ),
+  },
+  decorators: [
+    Story => (
+      <div dir='rtl' lang='ar'>
+        <Story />
+      </div>
+    ),
+  ],
+};

@@ -141,12 +141,15 @@
         "Input",
         "Label",
         "Field",
-        "Textarea"
+        "Textarea",
+        "HostDrawnInput",
+        "HostDrawnSelect"
       ],
       "ownerFiles": [
         "packages/ui/atoms/index.ts",
         "packages/ui/atoms/button.tsx",
-        "packages/ui/atoms/icon-button.tsx"
+        "packages/ui/atoms/icon-button.tsx",
+        "packages/ui/atoms/host-drawn-field.tsx"
       ]
     },
     "dialogs-and-drawers": {

@@ -63,3 +63,17 @@ export const AllProviders: Story = {
     </div>
   ),
 };
+
+export const RtlWithLabel: Story = {
+  args: {
+    provider: 'apple_music',
+    showLabel: true,
+  },
+  decorators: [
+    Story => (
+      <div dir='rtl' lang='ar'>
+        <Story />
+      </div>
+    ),
+  ],
+};

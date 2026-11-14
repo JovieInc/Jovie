@@ -1,12 +1,15 @@
 /**
  * Promo Download Confirm
  *
- * Called after client-side Blob upload completes. Records the uploaded
+ * POST: called after client-side Blob upload completes. Records the uploaded
  * file in the promoDownloads table. The blob pathname (NOT the public URL)
  * is stored so download URLs are generated server-side with expiry.
+ *
+ * GET ?releaseId=…&list=true: the signed-in creator's files for one release,
+ * for the release Downloads page. Never returns the blob pathname.
  */
 
-import { and, sql as drizzleSql, eq } from 'drizzle-orm';
+import { and, asc, sql as drizzleSql, eq } from 'drizzle-orm';
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import {
@@ -70,6 +73,68 @@ function slugify(title: string): string {
   }
 
   return slug;
+}
+
+const listQuerySchema = z.object({
+  releaseId: z.string().uuid(),
+  list: z.literal('true'),
+});
+
+export async function GET(request: NextRequest) {
+  const { userId: clerkUserId, error } = await requireAuth();
+  if (error) return error;
+
+  const parsed = listQuerySchema.safeParse(
+    Object.fromEntries(new URL(request.url).searchParams)
+  );
+  if (!parsed.success) {
+    return NextResponse.json(
+      { error: 'Invalid request' },
+      { status: 400, headers: NO_STORE_HEADERS }
+    );
+  }
+
+  try {
+    const { profile } = await getSessionContext({
+      clerkUserId,
+      requireUser: true,
+      requireProfile: false,
+    });
+    if (!profile) {
+      return NextResponse.json(
+        { error: 'Creator profile not found' },
+        { status: 403, headers: NO_STORE_HEADERS }
+      );
+    }
+
+    // Scoped to the caller's profile, so another creator's release lists empty.
+    const files = await db
+      .select({
+        id: promoDownloads.id,
+        title: promoDownloads.title,
+        fileName: promoDownloads.fileName,
+        fileMimeType: promoDownloads.fileMimeType,
+        fileSizeBytes: promoDownloads.fileSizeBytes,
+        isActive: promoDownloads.isActive,
+        position: promoDownloads.position,
+      })
+      .from(promoDownloads)
+      .where(
+        and(
+          eq(promoDownloads.releaseId, parsed.data.releaseId),
+          eq(promoDownloads.creatorProfileId, profile.id)
+        )
+      )
+      .orderBy(asc(promoDownloads.position));
+
+    return NextResponse.json({ files }, { headers: NO_STORE_HEADERS });
+  } catch (err) {
+    captureError('Promo download list error', err);
+    return NextResponse.json(
+      { error: 'Failed to load promo downloads' },
+      { status: 500, headers: NO_STORE_HEADERS }
+    );
+  }
 }
 
 export async function POST(request: NextRequest) {

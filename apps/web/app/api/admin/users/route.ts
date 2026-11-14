@@ -1,29 +1,17 @@
 import { NextResponse } from 'next/server';
 
 import { type AdminUsersSort, getAdminUsers } from '@/lib/admin/users';
-import { getOvieOperatorEntitlements } from '@/lib/ovie/privacy-lock/access';
+import {
+  type OperatorRouteInput,
+  operatorAccess,
+} from '@/lib/api/route-access';
+import { defineRoute } from '@/lib/api/route-pipeline';
 
 export const runtime = 'nodejs';
 
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 
-export async function GET(request: Request) {
-  const entitlements = await getOvieOperatorEntitlements({ purpose: 'read' });
-
-  if (!entitlements.isAuthenticated) {
-    return NextResponse.json(
-      { error: 'Unauthorized' },
-      { status: 401, headers: NO_STORE_HEADERS }
-    );
-  }
-
-  if (!entitlements.isAdmin) {
-    return NextResponse.json(
-      { error: 'Forbidden' },
-      { status: 403, headers: NO_STORE_HEADERS }
-    );
-  }
-
+async function getHandler({ request }: OperatorRouteInput) {
   const { searchParams } = new URL(request.url);
   const page = Math.min(
     10000,
@@ -59,3 +47,12 @@ export async function GET(request: Request) {
     { headers: NO_STORE_HEADERS }
   );
 }
+
+export const GET = defineRoute(
+  {
+    route: '/api/admin/users',
+    access: operatorAccess({ purpose: 'read' }),
+    legacy: { cache: 'pipeline-responses-only', unhandledErrors: 'rethrow' },
+  },
+  getHandler
+);

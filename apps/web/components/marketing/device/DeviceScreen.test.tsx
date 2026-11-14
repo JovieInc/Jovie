@@ -2,6 +2,7 @@ import { render, screen } from '@testing-library/react';
 import Link from 'next/link';
 import { describe, expect, it } from 'vitest';
 import { HomePhoneFrame } from '@/components/features/home/HomePhoneFrame';
+import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import { MobileWebScreen, OfficialIPhoneFrame } from './DeviceScreen';
 import { OFFICIAL_IPHONE_BEZEL } from './deviceBezels';
 
@@ -101,5 +102,75 @@ describe('device screen content and accessibility', () => {
     ).toBeInTheDocument();
 
     expect(screen.queryByRole('img', { hidden: true })).toBeNull();
+  });
+});
+
+// Axe coverage for each state the mobile web screen and the official bezel render.
+describe('device screen states', () => {
+  const nativeCapture = {
+    platform: 'ios-native',
+    src: '/native-capture.png',
+    alt: 'Jovie iOS release editor',
+    width: 402,
+    height: 874,
+  } as const;
+
+  it('keeps a sparse page inside the full-size screen', async () => {
+    const { container } = render(
+      <MobileWebScreen testId='sparse-preview'>
+        <p>One link so far</p>
+      </MobileWebScreen>
+    );
+
+    const screenFrame = screen.getByTestId('sparse-preview');
+    expect(screenFrame).toHaveClass('mobile-web-screen');
+    expect(screenFrame).toHaveAttribute('data-device', 'mobile-web');
+    expect(screen.getByText('One link so far')).toBeInTheDocument();
+    await expectNoA11yViolations(container);
+  });
+
+  it('renders a page taller than the screen without dropping rows', async () => {
+    const { container } = render(
+      <MobileWebScreen>
+        <ul>
+          {Array.from({ length: 30 }, (_, i) => `Release ${i + 1}`).map(
+            label => (
+              <li key={label}>{label}</li>
+            )
+          )}
+        </ul>
+      </MobileWebScreen>
+    );
+
+    expect(screen.getAllByRole('listitem')).toHaveLength(30);
+    await expectNoA11yViolations(container);
+  });
+
+  it('keeps the screen and bezel accessible inside a right-to-left page', async () => {
+    const { container } = render(
+      <div dir='rtl' lang='ar'>
+        <MobileWebScreen>
+          <Link href='/smart-links'>Open smart link</Link>
+        </MobileWebScreen>
+        <OfficialIPhoneFrame screenshot={nativeCapture} sizes='402px' />
+      </div>
+    );
+
+    expect(
+      screen.getByRole('link', { name: 'Open smart link' })
+    ).toBeInTheDocument();
+    expect(screen.getAllByRole('img')).toHaveLength(1);
+    await expectNoA11yViolations(container);
+  });
+
+  it('exposes only the native capture inside the official bezel', async () => {
+    const { container } = render(
+      <OfficialIPhoneFrame screenshot={nativeCapture} sizes='402px' priority />
+    );
+
+    expect(screen.getByRole('figure').getAttribute('data-device-model')).toBe(
+      OFFICIAL_IPHONE_BEZEL.model
+    );
+    await expectNoA11yViolations(container);
   });
 });

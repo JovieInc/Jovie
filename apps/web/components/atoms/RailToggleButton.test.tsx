@@ -1,6 +1,7 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
+import { expectNoA11yViolations } from '@/tests/utils/a11y';
 
 vi.mock('@jovie/ui', async importOriginal => ({
   ...(await importOriginal<typeof import('@jovie/ui')>()),
@@ -27,10 +28,17 @@ describe('RailToggleButton', () => {
       closedLabel: 'Show profile',
       onToggle,
     };
-    const { rerender } = render(<RailToggleButton {...props} open={false} />);
+    // Fixture only: the app always renders the rail that aria-controls names.
+    const { container, rerender } = render(
+      <>
+        <RailToggleButton {...props} open={false} />
+        <aside id='profile-rail' aria-label='Profile' />
+      </>
+    );
     const button = screen.getByRole('button', { name: 'Show profile' });
     expect(button).toHaveAttribute('data-rail-preview-trigger', 'false');
     expect(button).toHaveAttribute('aria-controls', 'profile-rail');
+    await expectNoA11yViolations(container);
     await user.tab();
     await user.hover(button);
     expect(button).toHaveFocus();
@@ -38,11 +46,17 @@ describe('RailToggleButton', () => {
     expect(onToggle).not.toHaveBeenCalled();
     await user.keyboard(' ');
     expect(onToggle).toHaveBeenCalledOnce();
-    rerender(<RailToggleButton {...props} open pinned />);
+    rerender(
+      <>
+        <RailToggleButton {...props} open pinned />
+        <aside id='profile-rail' aria-label='Profile' />
+      </>
+    );
     expect(button).toHaveFocus();
     expect(button).toHaveAccessibleName('Hide profile');
     expect(button).toHaveAttribute('aria-expanded', 'true');
     expect(button).toHaveAttribute('aria-pressed', 'true');
+    await expectNoA11yViolations(container);
   });
 
   it('uses one static chrome contract for a left rail', async () => {

@@ -11,6 +11,7 @@ import {
 import { extname, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { validateControllerHopChanges } from './invariants/controller-hop-contract.mjs';
+import { findOrphanReviewImages } from './lib/orphan-screenshot-guard.mjs';
 import {
   GEN_JSON_SIZE_ALLOWLIST,
   HYGIENE_LIMITS,
@@ -620,6 +621,7 @@ export function evaluateRepoHygiene({
   const errors = [
     ...validateRepoHealthBaseline(baseline),
     ...validateRepoHealthRollout(rollout),
+    ...findOrphanReviewImages({ root, trackedPaths }),
   ];
   const candidateFindings = [];
   const added = [...new Set(addedPaths.map(normalizePath))];
@@ -950,11 +952,7 @@ export function collectGitPaths(args) {
     // conflict resolutions). Drop paths identical to MERGE_HEAD.
     let mergeHeadOids = null;
     try {
-      const mergeHead = execFileSync(
-        'git',
-        ['rev-parse', '--verify', '-q', 'MERGE_HEAD'],
-        { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }
-      ).trim();
+      const mergeHead = gitPathsRevParse('MERGE_HEAD');
       if (mergeHead) {
         mergeHeadOids = new Map();
         for (const record of gitPaths(['ls-tree', '-r', '-z', mergeHead])) {

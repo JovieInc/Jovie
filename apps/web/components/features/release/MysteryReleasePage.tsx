@@ -82,7 +82,7 @@ export function MysteryReleasePage({
         )}
 
         {minimal && (
-          <div className='mt-5 rounded-2xl bg-white/10 p-4 text-center ring-1 ring-inset ring-white/[0.08]'>
+          <div className='mt-5 rounded-2xl bg-on-media/10 p-4 text-center ring-1 ring-inset ring-on-media/[0.08]'>
             <p className='text-muted-foreground text-sm font-medium'>
               Something new coming soon
             </p>

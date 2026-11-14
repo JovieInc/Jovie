@@ -1,6 +1,8 @@
 import { fireEvent, render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { createRef } from 'react';
 import { describe, expect, it } from 'vitest';
+import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import { AuthTextInput } from './AuthTextInput';
 
 describe('AuthTextInput', () => {
@@ -61,5 +63,66 @@ describe('AuthTextInput', () => {
     expect(
       screen.getByRole('textbox', { name: 'Artist name' }).className
     ).toContain('data-[test=auth]');
+  });
+
+  it('keeps typed input and focus through a parent rerender, Escape and blur', async () => {
+    const user = userEvent.setup();
+    const { rerender } = render(
+      <AuthTextInput aria-label='Email address' placeholder='you@example.com' />
+    );
+    const input = screen.getByRole('textbox', { name: 'Email address' });
+
+    await user.type(input, 'artist@jov.ie');
+    rerender(
+      <AuthTextInput
+        aria-label='Email address'
+        placeholder='you@example.com'
+        aria-invalid
+      />
+    );
+
+    expect(screen.getByRole('textbox', { name: 'Email address' })).toBe(input);
+    expect(input).toHaveValue('artist@jov.ie');
+    expect(input).toHaveFocus();
+
+    await user.keyboard('{Escape}');
+    expect(input).toHaveValue('artist@jov.ie');
+    expect(input).toHaveFocus();
+
+    await user.tab();
+    expect(input).not.toHaveFocus();
+    expect(input).toHaveValue('artist@jov.ie');
+  });
+
+  it('has no axe violations for the default, otp, disabled and invalid fields', async () => {
+    const { container } = render(
+      <form>
+        <AuthTextInput aria-label='Email address' type='email' />
+        <AuthTextInput aria-label='One-time code' variant='otp' />
+        <AuthTextInput aria-label='Name' defaultValue='Tim' disabled />
+        <AuthTextInput aria-label='Handle' aria-invalid defaultValue='@@' />
+      </form>
+    );
+
+    expect(screen.getByRole('textbox', { name: 'Name' })).toBeDisabled();
+    await expectNoA11yViolations(container);
+  });
+
+  it('has no axe violations for long right-to-left content', async () => {
+    const { container } = render(
+      <div dir='rtl'>
+        <AuthTextInput
+          aria-label='البريد الإلكتروني'
+          defaultValue='booking.and.management.team.for.the.collective@example-records-group.com'
+        />
+      </div>
+    );
+
+    expect(
+      screen.getByRole('textbox', { name: 'البريد الإلكتروني' })
+    ).toHaveValue(
+      'booking.and.management.team.for.the.collective@example-records-group.com'
+    );
+    await expectNoA11yViolations(container);
   });
 });

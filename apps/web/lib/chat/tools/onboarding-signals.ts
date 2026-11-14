@@ -13,6 +13,11 @@
  */
 
 import { z } from 'zod';
+import {
+  type CapabilityDefinition,
+  PRODUCT_CAPABILITIES,
+  type ProductCapabilityId,
+} from '@/data/product-truth/registry';
 import { chatToolSchema } from '@/lib/chat/strict-schema';
 
 /** Release stage the artist self-reports. */
@@ -61,6 +66,40 @@ export const objectionSchema = chatToolSchema({
   text: z.string().min(1).max(500),
 });
 
+/** Marks a visitor want that no capability serves today (a build request). */
+export const WANT_NOT_AVAILABLE = 'not_available' as const;
+
+/**
+ * Capabilities a visitor can actually get today, derived from product truth:
+ * built past `proposed`, announced publicly, and usable (open or enrolled).
+ */
+export const VISITOR_AVAILABLE_CAPABILITY_IDS = (
+  Object.entries(PRODUCT_CAPABILITIES) as ReadonlyArray<
+    [ProductCapabilityId, CapabilityDefinition]
+  >
+)
+  .filter(
+    ([, capability]) =>
+      capability.maturity !== 'proposed' &&
+      capability.publication === 'public' &&
+      (capability.access === 'open' || capability.access === 'enrolled')
+  )
+  .map(([id]) => id);
+
+export const wantCapabilitySchema = z.enum([
+  WANT_NOT_AVAILABLE,
+  ...VISITOR_AVAILABLE_CAPABILITY_IDS,
+]);
+
+/** What the visitor says they want Jovie to do, matched to a capability. */
+export const wantSchema = chatToolSchema({
+  /** The want in the visitor's words, paraphrased — 1-2 sentences max. */
+  text: z.string().min(1).max(500),
+  /** Matching available capability id, or `not_available`. */
+  capability: wantCapabilitySchema,
+});
+export type OnboardingWant = z.infer<typeof wantSchema>;
+
 /**
  * Recorded signal payload. The LLM writes one of these per relevant turn.
  * The tool can pass only the fields it has signal on — every field is
@@ -71,6 +110,7 @@ export const interviewSignalSchema = chatToolSchema({
   audienceBand: audienceBandSchema.optional(),
   currentTool: currentToolSchema.optional(),
   objection: objectionSchema.optional(),
+  want: wantSchema.optional(),
   /** Free-form note for anything that doesn't fit the typed schema yet. */
   freeNote: z.string().max(2000).optional(),
 }).refine(
@@ -80,6 +120,7 @@ export const interviewSignalSchema = chatToolSchema({
         v.audienceBand ||
         v.currentTool ||
         v.objection ||
+        v.want ||
         v.freeNote
     ),
   { message: 'At least one signal field must be present' }
@@ -91,7 +132,7 @@ export type InterviewSignal = z.infer<typeof interviewSignalSchema>;
  * Append-only: each tool call appends one entry. Read-time consumers should
  * use the most recent occurrence of a given field as the canonical value.
  */
-export const interviewSignalsMetadataSchema = z.object({
+export const interviewSignalsMetadataSchema = chatToolSchema({
   metadataVersion: z.literal(1),
   signals: z
     .array(
@@ -113,6 +154,7 @@ export function collapseInterviewSignals(
     if (s.audienceBand) result.audienceBand = s.audienceBand;
     if (s.currentTool) result.currentTool = s.currentTool;
     if (s.objection) result.objection = s.objection;
+    if (s.want) result.want = s.want;
     if (s.freeNote) result.freeNote = s.freeNote;
   }
   return result;

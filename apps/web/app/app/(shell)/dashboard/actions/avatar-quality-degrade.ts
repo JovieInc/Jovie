@@ -33,7 +33,7 @@ export function isIdleTransactionTermination(error: unknown): boolean {
  */
 export function isCommitTransportFailure(error: unknown): boolean {
   if (!(error instanceof Error)) return false;
-  if (/^Failed query: commit$/i.test(error.message)) return true;
+  if (/^Failed query: commit\b/i.test(error.message)) return true;
   return error.cause instanceof Error && isCommitTransportFailure(error.cause);
 }
 

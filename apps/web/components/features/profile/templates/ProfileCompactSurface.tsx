@@ -35,12 +35,12 @@ import {
   getPublicProfileHistoryServerSnapshot,
   getPublicProfileHistorySnapshot,
   resolveProfileSurfaceState,
-  shouldShowPublicProfileBackChevron,
   subscribeToPublicProfileHistory,
 } from '@/features/profile/profile-surface-state';
 import { getProfileModeDefinition } from '@/features/profile/registry';
 import type { PublicRelease } from '@/features/profile/releases/types';
 import { SubscriptionConfirmedBanner } from '@/features/profile/SubscriptionConfirmedBanner';
+import { shouldShowTabBackChevron } from '@/features/profile/sibling-tabs';
 import { useIsAuthenticated } from '@/hooks/useIsAuthenticated';
 import type { UserLocation } from '@/hooks/useUserLocation';
 import { track } from '@/lib/analytics';
@@ -493,8 +493,8 @@ export function ProfileCompactSurface({
     getPublicProfileHistorySnapshot,
     getPublicProfileHistoryServerSnapshot
   );
-  const showBackChevron = shouldShowPublicProfileBackChevron({
-    isProfileRoot: activeMode === 'profile',
+  const showBackChevron = shouldShowTabBackChevron({
+    mode: activeMode,
     hasHistoryDestination,
     isSignedIn,
     forceHidden: hideBackButton || isNotificationsFlowOpen,
@@ -662,7 +662,7 @@ export function ProfileCompactSurface({
           shouldUseOverflowScroll ? 'scroll' : undefined
         }
       >
-        <div className='pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.025),transparent_34%)]' />
+        <div className='pointer-events-none absolute inset-0 bg-(image:--profile-compact-sheen)' />
 
         {/* Top chrome floats over the identity header (Pen y1PaMa): back or
             spacer on the left, the overflow menu on the right. */}
@@ -788,7 +788,7 @@ export function ProfileCompactSurface({
               // above this region; authorized destinations stay visible.
               CONTENT_SAFE_AREA_BOTTOM_PADDING,
               !isHomeMode &&
-                'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70'
+                'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-on-media/70'
             )}
             data-testid='profile-content-scroll'
             tabIndex={isHomeMode ? undefined : 0}
@@ -911,10 +911,10 @@ export function ProfileCompactSurface({
                     label={proofClaimCta.label}
                     ariaLabel={`jov.ie/you ${proofClaimCta.label}`}
                     testId='profile-proof-claim-bar-cta'
-                    className='flex h-11 w-full items-center justify-between rounded-full border border-(--profile-dock-border) bg-(--profile-dock-solid-bg) px-4 text-sm font-medium text-white/88 transition-colors duration-subtle hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70'
+                    className='flex h-11 w-full items-center justify-between rounded-full border border-(--profile-dock-border) bg-(--profile-dock-solid-bg) px-4 text-sm font-medium text-on-media/88 transition-colors duration-subtle hover:text-on-media focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-on-media/70'
                   >
                     <span>
-                      <span className='text-white/55'>jov.ie/</span>you
+                      <span className='text-on-media/55'>jov.ie/</span>you
                     </span>{' '}
                     <span className='inline-flex items-center gap-1.5'>
                       {proofClaimCta.label}

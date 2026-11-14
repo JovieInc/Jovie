@@ -3,12 +3,12 @@
 
 import { Button } from '@jovie/ui';
 import Link from 'next/link';
-import { APP_ROUTES } from '@/constants/routes';
+import { APP_ROUTES, PUBLIC_ENTRY_HREF } from '@/constants/routes';
 import { useIsAuthenticated } from '@/hooks/useIsAuthenticated';
 
 export function AuthActions() {
   const isAuthed = useIsAuthenticated();
-  const primaryHref = isAuthed ? APP_ROUTES.DASHBOARD : APP_ROUTES.SIGNUP;
+  const primaryHref = isAuthed ? APP_ROUTES.DASHBOARD : PUBLIC_ENTRY_HREF;
   const primaryLabel = isAuthed ? 'Open App' : 'Sign up';
 
   return (

@@ -43,3 +43,24 @@ export const Disabled: Story = {
     disabled: true,
   },
 };
+
+/** A long address scrolls inside the field rather than widening it. */
+export const LongContent: Story = {
+  args: {
+    defaultValue:
+      'booking.and.management.team.for.the.collective@example-records-group.com',
+  },
+};
+
+/** The field inside a right-to-left page; typed text follows the page direction. */
+export const Rtl: Story = {
+  args: {
+    placeholder: 'البريد الإلكتروني',
+    'aria-label': 'البريد الإلكتروني',
+  },
+  render: args => (
+    <div dir='rtl' className='w-72'>
+      <AuthTextInput {...args} />
+    </div>
+  ),
+};

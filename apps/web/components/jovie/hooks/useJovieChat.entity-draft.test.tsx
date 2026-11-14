@@ -124,6 +124,41 @@ describe('Entity draft handoff and ownership', () => {
     expect(h.send).not.toHaveBeenCalled();
   });
 
+  it('turns a leading profile token into a composer chip, not text', async () => {
+    applyCacheScope({ profileId: 'profile-a' });
+    expect(
+      openChatWithDraft('@profile:profile-a[Tim White]', { push: vi.fn() })
+    ).toBe(true);
+    const view = renderHook(() => useJovieChat({ profileId: 'profile-a' }));
+    await act(async () => {});
+    expect(view.result.current.input).toBe('');
+    expect(view.result.current.chipTray.chips).toEqual([
+      expect.objectContaining({
+        type: 'entity',
+        kind: 'profile',
+        id: 'profile-a',
+        label: 'Tim White',
+      }),
+    ]);
+    expect(h.send).not.toHaveBeenCalled();
+    act(() => applyCacheScope({ profileId: 'profile-b' }));
+    expect(view.result.current.chipTray.chips).toEqual([]);
+  });
+
+  it('keeps the readable ask as text beside the profile chip', async () => {
+    applyCacheScope({ profileId: 'profile-a' });
+    openChatWithDraft(
+      '@profile:profile-a[Tim White] Help me with my Instagram (instagram.com/tim).',
+      { push: vi.fn() }
+    );
+    const view = renderHook(() => useJovieChat({ profileId: 'profile-a' }));
+    await act(async () => {});
+    expect(view.result.current.input).toBe(
+      'Help me with my Instagram (instagram.com/tim).'
+    );
+    expect(view.result.current.chipTray.chips).toHaveLength(1);
+  });
+
   it.each([
     { profileId: 'profile-b' },
     { userId: 'another-user' },

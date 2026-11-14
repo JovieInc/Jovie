@@ -8,7 +8,12 @@ import {
   ilike,
   or,
 } from 'drizzle-orm';
-import { type NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
+import {
+  type OperatorRouteInput,
+  operatorAccess,
+} from '@/lib/api/route-access';
+import { defineRoute } from '@/lib/api/route-pipeline';
 import { db } from '@/lib/db';
 import { getDeepErrorMessage } from '@/lib/db/errors';
 import { leads } from '@/lib/db/schema/leads';
@@ -21,7 +26,6 @@ import {
 import { parseJsonBody } from '@/lib/http/parse-json';
 import { processLeadBatch } from '@/lib/leads/process-batch';
 import { seedLeadFromUrl } from '@/lib/leads/url-intake';
-import { getOvieOperatorEntitlements } from '@/lib/ovie/privacy-lock/access';
 import { mapConcurrent } from '@/lib/utils/map-concurrent';
 import {
   leadListQuerySchema,
@@ -109,23 +113,7 @@ async function insertLeadWithLegacyFallback(seed: {
 /**
  * GET /api/admin/leads — List leads with filtering, search, sort, pagination.
  */
-export async function GET(request: NextRequest) {
-  // Claim tokens require privileged proof; authorization must never be cached
-  // across explicit relock or session revocation.
-  const entitlements = await getOvieOperatorEntitlements();
-  if (!entitlements.isAuthenticated) {
-    return NextResponse.json(
-      { error: 'Unauthorized' },
-      { status: 401, headers: NO_STORE_HEADERS }
-    );
-  }
-  if (!entitlements.isAdmin) {
-    return NextResponse.json(
-      { error: 'Forbidden' },
-      { status: 403, headers: NO_STORE_HEADERS }
-    );
-  }
-
+async function getHandler({ request }: OperatorRouteInput) {
   try {
     const params = Object.fromEntries(request.nextUrl.searchParams);
     const query = leadListQuerySchema.parse(params);
@@ -254,6 +242,17 @@ export async function GET(request: NextRequest) {
   }
 }
 
+export const GET = defineRoute(
+  {
+    route: '/api/admin/leads',
+    // Claim tokens require privileged proof; authorization must never be cached
+    // across explicit relock or session revocation.
+    access: operatorAccess(),
+    legacy: { cache: 'pipeline-responses-only', unhandledErrors: 'rethrow' },
+  },
+  getHandler
+);
+
 type LeadProcessResult = {
   url: string;
   status: 'created' | 'duplicate' | 'invalid';
@@ -322,21 +321,7 @@ async function processLeadUrl(
  * POST /api/admin/leads — Manual URL submission (single or batch).
  * Inserts new leads as 'discovered', then triggers qualification.
  */
-export async function POST(request: NextRequest) {
-  const entitlements = await getOvieOperatorEntitlements({ session: 'fresh' });
-  if (!entitlements.isAuthenticated) {
-    return NextResponse.json(
-      { error: 'Unauthorized' },
-      { status: 401, headers: NO_STORE_HEADERS }
-    );
-  }
-  if (!entitlements.isAdmin) {
-    return NextResponse.json(
-      { error: 'Forbidden' },
-      { status: 403, headers: NO_STORE_HEADERS }
-    );
-  }
-
+async function postHandler({ request }: OperatorRouteInput) {
   try {
     const parsed = await parseJsonBody(request, {
       route: '/api/admin/leads',
@@ -393,3 +378,12 @@ export async function POST(request: NextRequest) {
     );
   }
 }
+
+export const POST = defineRoute(
+  {
+    route: '/api/admin/leads',
+    access: operatorAccess({ session: 'fresh' }),
+    legacy: { cache: 'pipeline-responses-only', unhandledErrors: 'rethrow' },
+  },
+  postHandler
+);

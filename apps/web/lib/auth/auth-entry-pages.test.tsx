@@ -37,7 +37,9 @@ describe.each([SignUpPage, SignInPage, SignupModalPage, SigninModalPage])(
     afterEach(() => vi.unstubAllEnvs());
 
     beforeEach(() => {
-      // This canonical-entry table exercises explicit reopening; default closure is covered separately.
+      // This canonical-entry table exercises the open default (Tim,
+      // 2026-11-09); the closed kill switch is covered in
+      // public-signup-closed.test.tsx.
       vi.stubEnv('FEATURE_PUBLIC_SIGNUP_CLOSED', 'false');
       resolveUserState.mockReset();
     });

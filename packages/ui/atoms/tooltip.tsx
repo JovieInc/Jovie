@@ -47,16 +47,167 @@ const TooltipProvider = ({
 };
 TooltipProvider.displayName = TooltipPrimitive.Provider.displayName;
 
+interface TooltipAnchorScopeValue {
+  /** Lets the root observe the element its content is anchored to. */
+  readonly setAnchor: (node: HTMLElement | null) => void;
+  /** Pointer or focus left the trigger while no content was showing. */
+  readonly endIntent: () => void;
+}
+
+const TooltipAnchorScope = React.createContext<TooltipAnchorScopeValue | null>(
+  null
+);
+
+const HIDDEN_ANCESTOR = '[inert], [hidden]';
+
 /**
- * Tooltip root component with SSR-safe defaults.
+ * False when the anchor cannot be seen or reached: unmounted, `display:none`,
+ * `visibility:hidden`, or under an inert / hidden / aria-hidden ancestor.
+ * Style reads only; geometry comes from the observers so no layout is forced.
+ */
+function isAnchorRendered(anchor: HTMLElement): boolean {
+  if (!anchor.isConnected) return false;
+  if (anchor.closest(HIDDEN_ANCESTOR)) return false;
+  if (anchor.parentElement?.closest('[aria-hidden="true"]')) return false;
+  if (typeof anchor.checkVisibility === 'function') {
+    return anchor.checkVisibility({ visibilityProperty: true });
+  }
+  for (let node: HTMLElement | null = anchor; node; node = node.parentElement) {
+    if (getComputedStyle(node).display === 'none') return false;
+  }
+  return getComputedStyle(anchor).visibility !== 'hidden';
+}
+
+/**
+ * Anchor invariant: tooltip content never outlives its trigger. While a
+ * tooltip is requested open this reports `true` as soon as the trigger
+ * unmounts, is hidden, collapses to zero size, or leaves the viewport or its
+ * clipping container (a collapsing sidebar), and `false` again if it returns.
+ * Observers exist only while a tooltip is open, so idle triggers cost nothing.
+ */
+function useAnchorDetached(
+  requested: boolean,
+  anchor: HTMLElement | null,
+  hadAnchor: boolean
+): boolean {
+  const [detached, setDetached] = React.useState(false);
+
+  React.useEffect(() => {
+    if (!requested) return;
+    if (!anchor) {
+      // An anchor that was mounted and is now gone is an unmounted trigger.
+      setDetached(hadAnchor);
+      return () => setDetached(false);
+    }
+    let outOfView = false;
+    let zeroSize = false;
+    const evaluate = () =>
+      setDetached(outOfView || zeroSize || !isAnchorRendered(anchor));
+    evaluate();
+
+    const intersection =
+      typeof IntersectionObserver === 'function'
+        ? new IntersectionObserver(entries => {
+            const entry = entries.at(-1);
+            if (!entry) return;
+            outOfView = !entry.isIntersecting;
+            evaluate();
+          })
+        : null;
+    intersection?.observe(anchor);
+
+    const resize =
+      typeof ResizeObserver === 'function'
+        ? new ResizeObserver(() => {
+            // Layout is clean inside the callback, so this read is free. The
+            // rect (not the entry) keeps inline triggers measurable.
+            const rect = anchor.getBoundingClientRect();
+            zeroSize = rect.width === 0 && rect.height === 0;
+            evaluate();
+          })
+        : null;
+    resize?.observe(anchor);
+
+    const mutation =
+      typeof MutationObserver === 'function'
+        ? new MutationObserver(evaluate)
+        : null;
+    mutation?.observe(anchor.ownerDocument.documentElement, {
+      subtree: true,
+      childList: true,
+      attributes: true,
+      attributeFilter: ['class', 'style', 'hidden', 'inert', 'aria-hidden'],
+    });
+
+    return () => {
+      intersection?.disconnect();
+      resize?.disconnect();
+      mutation?.disconnect();
+      setDetached(false);
+    };
+  }, [requested, anchor, hadAnchor]);
+
+  return detached;
+}
+
+/**
+ * Tooltip root component with SSR-safe defaults. Owns the anchor invariant:
+ * content closes when its trigger unmounts, hides, or leaves view.
  */
 const Tooltip = ({
   open,
   defaultOpen,
+  onOpenChange,
   ...props
-}: React.ComponentPropsWithoutRef<typeof TooltipPrimitive.Root>) => (
-  <TooltipPrimitive.Root open={open} defaultOpen={defaultOpen} {...props} />
-);
+}: React.ComponentPropsWithoutRef<typeof TooltipPrimitive.Root>) => {
+  const [uncontrolledOpen, setUncontrolledOpen] = React.useState(
+    defaultOpen ?? false
+  );
+  const requested = open ?? uncontrolledOpen;
+  const [anchor, setAnchor] = React.useState<HTMLElement | null>(null);
+  const hadAnchor = React.useRef(false);
+  if (anchor) hadAnchor.current = true;
+  const detached = useAnchorDetached(requested, anchor, hadAnchor.current);
+
+  const shown = requested && !detached;
+  const shownRef = React.useRef(shown);
+  shownRef.current = shown;
+  const onOpenChangeRef = React.useRef(onOpenChange);
+  onOpenChangeRef.current = onOpenChange;
+  const reportedOpen = React.useRef(requested);
+  const handleOpenChange = React.useCallback((next: boolean) => {
+    reportedOpen.current = next;
+    setUncontrolledOpen(next);
+    onOpenChangeRef.current?.(next);
+  }, []);
+  // Report the forced close once so controlled owners drop stale open state.
+  React.useEffect(() => {
+    if (detached) handleOpenChange(false);
+  }, [detached, handleOpenChange]);
+
+  const scope = React.useMemo<TooltipAnchorScopeValue>(
+    () => ({
+      setAnchor,
+      // Radix only reports a close for content it is showing. An owner that
+      // was told "open" while forcing the tooltip closed would otherwise keep
+      // that intent forever and pop the tooltip later with no pointer on it.
+      endIntent: () => {
+        if (!shownRef.current && reportedOpen.current) handleOpenChange(false);
+      },
+    }),
+    [handleOpenChange]
+  );
+
+  return (
+    <TooltipAnchorScope.Provider value={scope}>
+      <TooltipPrimitive.Root
+        open={shown}
+        onOpenChange={handleOpenChange}
+        {...props}
+      />
+    </TooltipAnchorScope.Provider>
+  );
+};
 Tooltip.displayName = TooltipPrimitive.Root.displayName;
 
 /**
@@ -65,9 +216,33 @@ Tooltip.displayName = TooltipPrimitive.Root.displayName;
 const TooltipTrigger = React.forwardRef<
   React.ComponentRef<typeof TooltipPrimitive.Trigger>,
   React.ComponentPropsWithoutRef<typeof TooltipPrimitive.Trigger>
->(({ asChild = true, ...props }, ref) => (
-  <TooltipPrimitive.Trigger ref={ref} asChild={asChild} {...props} />
-));
+>(({ asChild = true, onPointerLeave, onBlur, ...props }, ref) => {
+  const scope = React.useContext(TooltipAnchorScope);
+  const setAnchor = scope?.setAnchor;
+  const composedRef = React.useCallback(
+    (node: HTMLButtonElement | null) => {
+      setAnchor?.(node);
+      if (typeof ref === 'function') ref(node);
+      else if (ref) ref.current = node;
+    },
+    [ref, setAnchor]
+  );
+  return (
+    <TooltipPrimitive.Trigger
+      ref={composedRef}
+      asChild={asChild}
+      {...props}
+      onPointerLeave={event => {
+        onPointerLeave?.(event);
+        scope?.endIntent();
+      }}
+      onBlur={event => {
+        onBlur?.(event);
+        scope?.endIntent();
+      }}
+    />
+  );
+});
 TooltipTrigger.displayName = TooltipPrimitive.Trigger.displayName;
 
 interface TooltipContentProps

@@ -312,7 +312,7 @@ describe('public CTA guard', () => {
     // design-system showUserInfo variant, not the bare compact avatar.
     // Match structure, not indentation: formatter reflow must not break it.
     expect(headerNav).toMatch(
-      /authenticatedUserSlot=\{\s*<UserButton\s+showUserInfo\s+settingsHref=\{APP_ROUTES\.SETTINGS\}\s*\/>\s*\}/
+      /authenticatedUserSlot=\{\s*<LazyUserButton\s+showUserInfo\s+settingsHref=\{APP_ROUTES\.SETTINGS\}\s*\/>\s*\}/
     );
   });
 

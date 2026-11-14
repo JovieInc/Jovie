@@ -58,3 +58,21 @@ export const PublicPricing: Story = {
 export const PublicText: Story = {
   args: { href: '/support', label: 'Talk to the team', variant: 'text' },
 };
+
+/** Long content: a long label on the large primary action. */
+export const LongContentLabel: Story = {
+  args: {
+    href: '/signup',
+    label: 'Claim your free artist profile and start capturing fans today',
+  },
+};
+
+/** Right-to-left: an Arabic label in an RTL document. */
+export const RtlArabicLabel: Story = {
+  args: { href: '/signup', label: 'ابدأ مجاناً' },
+  render: args => (
+    <div dir='rtl' lang='ar'>
+      <LandingCTAButton {...args} />
+    </div>
+  ),
+};

@@ -122,7 +122,9 @@ class Replay(unittest.TestCase):
             for first, gate in ((1, "production:production-release"), (3, "production:authorize-exact-main-ci-evidence"),
                                 (5, "production:lighthouse-ci-production"), (7, "production:authorize-fleet-deployment-state")):
                 on_first, on_second = seen[first], seen[first + 1]
-                self.assertEqual(len(new_keys(on_first)), len(rg.blocker_reasons(TIMELINE[first][2])), f"first run {first}")
+                # One failing gate is one blocker: every error line in its log folds into the same alert key.
+                self.assertEqual(len(new_keys(on_first)), 1, f"first run {first}")
+                self.assertTrue(all(k.startswith("production-deploy:release-gate-new-blocker:") for k in new_keys(on_first)))
                 self.assertFalse(red_keys(on_first) & {f"production-deploy:release-gate-red:{gate}"}, "one red run is quiet")
                 text = on_second[f"production-deploy:release-gate-red:{gate}"]
                 self.assertIn(f"{(f'{first:x}') * 12}", text)  # first bad SHA
@@ -162,6 +164,99 @@ class Replay(unittest.TestCase):
             first = self.tick(tmp, 2, 4_000_000.0)
             second = self.tick(tmp, 3, 4_000_400.0)
             self.assertEqual(new_keys(first), new_keys(second))
+
+
+MIGRATION_JOB, VERIFY_JOB = "Migrate production database", "Production Verified"
+# The 2026-11-10 storm: the migration job logged 30+ distinct error lines (one per failed step, each with
+# attempt numbers, elapsed times and ANSI codes) that each hashed into its own Urgent issue.
+MIGRATION_LOG = "".join(
+    f"2026-11-10T06:5{i:02d}Z ##[error]Require predecessor verdict PASS before migration: verdict {i} not reached (attempt {i}, elapsed {i} ms)\x1b[0m\n"
+    for i in range(30))
+VERIFY_LOG = "2026-11-10T06:55:00Z ##[error]Production Verified: post-deploy probe did not pass.\x1b[0m\n"
+
+
+class StormGitHub:
+    """Newest controller run fails the given gate jobs (name -> log); the previous run was green."""
+
+    def __init__(self, failing: dict[str, str]):
+        self.failing = list(failing.items())
+        self.run_id = 3000
+        self.log_reads = 0
+
+    def runs(self):
+        return [
+            {"id": self.run_id, "status": "completed", "conclusion": "failure", "head_sha": "d" * 40,
+             "created_at": "2026-11-10T06:50:00Z", "html_url": f"https://github.com/run/{self.run_id}"},
+            {"id": 3001, "status": "completed", "conclusion": "success", "head_sha": "e" * 40,
+             "created_at": "2026-11-10T06:20:00Z", "html_url": "https://github.com/run/3001"},
+        ]
+
+    def __call__(self, args, **_):
+        path = args[1]
+        if "workflows/production-controller.yml/runs" in path:
+            body = {"workflow_runs": self.runs()}
+        elif "workflows/staging-controller.yml/runs" in path:
+            body = {"workflow_runs": []}
+        elif "/jobs?" in path:
+            run_id = int(path.split("/runs/")[1].split("/")[0])
+            body = {"jobs": [{"name": name, "id": run_id * 100 + k, "html_url": f"https://github.com/job/{run_id * 100 + k}", "conclusion": "failure"}
+                             for k, (name, _) in enumerate(self.failing)]}
+        elif path.endswith("/logs"):
+            self.log_reads += 1
+            job_id = int(path.split("/jobs/")[1].split("/")[0])
+            run_id = job_id // 100
+            log = self.failing[job_id - run_id * 100][1] if 0 <= job_id - run_id * 100 < len(self.failing) else ""
+            return SimpleNamespace(returncode=0, stdout=log, stderr="")
+        elif "/commits?sha=main" in path:
+            body = [{"sha": f"c{i}", "commit": {"committer": {"date": "2026-11-10T06:00:00Z"}}} for i in range(6)]
+        elif "/check-runs?" in path:
+            body = {"check_runs": []}
+        else:
+            raise AssertionError(path)
+        return SimpleNamespace(returncode=0, stdout=json.dumps(body), stderr="")
+
+
+class StormFanout(unittest.TestCase):
+    """2026-11-10 regression: one blocker on one run files exactly one issue."""
+
+    def tick(self, tmp, now, gh):
+        got, err = rg.sample(Path(tmp), now, run=gh)
+        self.assertIsNone(err)
+        return rg.judge(got, now)
+
+    def test_many_error_lines_file_one_issue_per_blocker(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            alerts = self.tick(tmp, 7_000_000.0, StormGitHub({MIGRATION_JOB: MIGRATION_LOG, VERIFY_JOB: VERIFY_LOG}))
+            storm = new_keys(alerts)
+            self.assertEqual(len(storm), 2)  # one per failing gate, not per error line
+            self.assertTrue(any("migrate-production-database" in k for k in storm), storm)
+            self.assertTrue(any("production-verified" in k for k in storm), storm)
+            text = "\n".join(alerts[k] for k in storm)
+            self.assertIn("run 3000", text)  # the run identity lives in the body, not the key
+
+    def test_the_key_is_stable_across_ticks_and_cosmetic_log_changes(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            first = self.tick(tmp, 7_000_000.0, StormGitHub({MIGRATION_JOB: MIGRATION_LOG, VERIFY_JOB: VERIFY_LOG}))
+            varied = StormGitHub({MIGRATION_JOB: MIGRATION_LOG.replace("not reached", "STILL not reached"),
+                                  VERIFY_JOB: VERIFY_LOG.replace("did not pass.", "did not pass again.")})
+            second = self.tick(tmp, 7_000_400.0, varied)
+            self.assertEqual(new_keys(first), new_keys(second))
+
+    def test_a_new_run_failing_the_same_gate_reuses_the_key(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            first = self.tick(tmp, 7_000_000.0, StormGitHub({MIGRATION_JOB: MIGRATION_LOG, VERIFY_JOB: VERIFY_LOG}))
+            gh = StormGitHub({MIGRATION_JOB: MIGRATION_LOG.replace("not reached", "still not reached"),
+                              VERIFY_JOB: VERIFY_LOG.replace("did not pass.", "failed again.")})
+            gh.run_id = 3002  # a NEW controller run, same two failing gates, different log lines
+            second = self.tick(tmp, 7_000_400.0, gh)
+            self.assertEqual(new_keys(first), new_keys(second))
+
+    def test_per_run_cap_bounds_the_fanout(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            failing = {f"Gate {i}": f"2026-11-10T06:50:00Z ##[error]Gate {i} failed in a brand new way.\x1b[0m\n"
+                       for i in range(rg.NEW_BLOCKER_ALERT_CAP + 2)}
+            alerts = self.tick(tmp, 7_000_000.0, StormGitHub(failing))
+            self.assertEqual(len(new_keys(alerts)), rg.NEW_BLOCKER_ALERT_CAP)
 
 
 class MainChecks(unittest.TestCase):

@@ -11,6 +11,11 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "lanes"))
 import fix_red_classes as classes  # noqa: E402
 import lane_runner as lane  # noqa: E402
 import fix_red_source_edits as edits  # noqa: E402
+import fix_red_statement_merge as statements  # noqa: E402
+# Release self-test runs this listed file only, so the split class has to load here.
+from scripts.tests.test_duplicate_clock_pin import DuplicateClockPinTest  # noqa: E402
+
+assert issubclass(DuplicateClockPinTest, unittest.TestCase)
 
 
 def pr(*names, merge="BLOCKED"):
@@ -35,9 +40,9 @@ class AdditiveCertificateWaiversTest(unittest.TestCase):
             return SimpleNamespace(returncode=0, stdout=values[int(args[-1][1]) - 1])
         return edits.resolve_additive_certificate_waivers(Path("."), rel or self.REL, sh)
 
-    def test_preserves_main_order_then_head_only_waivers(self):
+    def test_writes_the_union_sorted_by_component_path(self):
         result = json.loads(self.resolve())
-        self.assertEqual(list(result["waivers"]), ["existing.tsx", "main.tsx", "head.tsx"])
+        self.assertEqual(list(result["waivers"]), ["existing.tsx", "head.tsx", "main.tsx"])
         self.assertEqual(result["waivers"]["head.tsx"], self.ours["waivers"]["head.tsx"])
         self.assertEqual(result["policy"], self.base["policy"])
 
@@ -57,6 +62,17 @@ class AdditiveCertificateWaiversTest(unittest.TestCase):
         self.assertIsNone(self.resolve(blobs=["not JSON"] * 3))
 
     def test_real_git_append_conflict_is_repaired_through_existing_machine(self):
+        debt_rel = "docs/design-system/cert-screens.json"
+        debt_base = {"schema": "jovie.cert-screens/v1", "debt": {
+            "kept.tsx": "a11y,states",
+            "drop-head.tsx": "states",
+            "also.tsx": "tests",
+            "drop-main.tsx": "a11y",
+        }}
+        debt_ours = json.loads(json.dumps(debt_base))
+        debt_theirs = json.loads(json.dumps(debt_base))
+        del debt_ours["debt"]["drop-head.tsx"]
+        del debt_theirs["debt"]["drop-main.tsx"]
         with tempfile.TemporaryDirectory() as scratch:
             work = Path(scratch)
             def sh(args, **kwargs):
@@ -71,17 +87,19 @@ class AdditiveCertificateWaiversTest(unittest.TestCase):
             git("config", "commit.gpgsign", "false")
             git("config", "core.hooksPath", str(work / "hooks"))
             target = work / self.REL
+            debt_target = work / debt_rel
             target.parent.mkdir(parents=True)
-            def save(value):
-                target.write_text(json.dumps(value, indent=2) + "\n")
-                git("add", self.REL)
+            def save(waiver, debt):
+                target.write_text(json.dumps(waiver, indent=2) + "\n")
+                debt_target.write_text(json.dumps(debt, indent=2) + "\n")
+                git("add", self.REL, debt_rel)
                 git("commit", "-qm", "fixture")
-            save(self.base)
+            save(self.base, debt_base)
             git("branch", "feature")
-            save(self.theirs)
+            save(self.theirs, debt_theirs)
             git("update-ref", "refs/remotes/origin/main", git("rev-parse", "HEAD"))
             git("checkout", "-q", "feature")
-            save(self.ours)
+            save(self.ours, debt_ours)
             def machine_sh(args, **kwargs):
                 # Leave mutation/verification/push ownership with the caller.
                 if args[:2] == ["git", "push"]:
@@ -90,6 +108,9 @@ class AdditiveCertificateWaiversTest(unittest.TestCase):
             self.assertTrue(edits.resolve_additive_list_conflict(
                 work, "feature", None, sh=machine_sh, merge_entries=lambda _: None))
             self.assertEqual(json.loads(target.read_text()), json.loads(self.resolve()))
+            debt = json.loads(debt_target.read_text())
+            self.assertEqual(list(debt["debt"]), ["kept.tsx", "also.tsx"])
+            self.assertEqual(debt["schema"], debt_base["schema"])
             self.assertEqual(git("diff", "--name-only", "--diff-filter=U"), "")
 
 
@@ -314,6 +335,125 @@ class AdditiveNodeTestFileTest(unittest.TestCase):
             with self.subTest(code=code), patch.object(lane, "sh", side_effect=replies):
                 actual = classes.resolve_additive_node_test_file(Path("."), "draft.test.mjs", lane.sh)
                 self.assertEqual(actual, block("main") + block("head") if code == 127 else None)
+
+
+class AdditiveStatementMergeTest(unittest.TestCase):
+    @staticmethod
+    def conflict(ours, theirs, base=""):
+        return f"<<<<<<< HEAD\n{ours}||||||| base\n{base}=======\n{theirs}>>>>>>> main\n"
+
+    def test_unions_empty_base_statements_in_main_order(self):
+        ours = (
+            "const mockSweepLegacySlugs = vi.hoisted(() =>\n"
+            "  vi.fn(async () => ({ renamed: 1 }))\n"
+            ");\n"
+        )
+        theirs = "const mockSweepAppleMusicCatalog = vi.hoisted(() => vi.fn());\n"
+        mock_ours = (
+            "vi.mock('@/lib/discography/slug-migration', () => ({\n"
+            "  sweepLegacySlugsForCron: mockSweepLegacySlugs,\n"
+            "}));\n"
+        )
+        mock_theirs = (
+            "vi.mock('@/lib/discography/apple-music-import', () => ({\n"
+            "  sweepAppleMusicCatalogCompletenessForCron: mockSweepAppleMusicCatalog,\n"
+            "}));\n"
+        )
+        expect_ours = "    expect(data.results.legacySlugMigration.data).toEqual({ renamed: 1 });\n"
+        expect_theirs = (
+            "    expect(data.results.appleMusicCatalogImport.data).toEqual({\n"
+            "      profilesChecked: 2,\n"
+            "      releasesImported: 3,\n"
+            "      failed: 0,\n"
+            "    });\n"
+        )
+        text = (
+            "before\n"
+            + self.conflict(ours, theirs)
+            + "middle\n"
+            + self.conflict(mock_ours, mock_theirs)
+            + "after\n"
+            + self.conflict(expect_ours, expect_theirs)
+        )
+        merged = statements.resolve_additive_statements_text(text)
+        self.assertEqual(merged, "before\n" + theirs + ours + "middle\n" + mock_theirs + mock_ours + "after\n" + expect_theirs + expect_ours)
+
+    def test_unions_an_import_and_accepts_route_group_paths(self):
+        imported = "import { getRequestSession } from '@/lib/auth/request-session';\n"
+        mocks = (
+            "const winbackMocks = vi.hoisted(() => ({ resolveWinbackResumeToken: vi.fn() }));\n"
+            "vi.mock('@/lib/waitlist/winback-resume.server', () => ({\n"
+            "  resolveWinbackResumeToken: winbackMocks.resolveWinbackResumeToken,\n"
+            "}));\n"
+        )
+        merge = statements.resolve_additive_statements_text
+        self.assertEqual(merge(self.conflict(imported, mocks)), mocks + imported)
+        self.assertEqual(merge(self.conflict(imported, imported)), imported)
+        self.assertIsNone(merge(self.conflict(
+            imported, "import { other } from '@/lib/auth/request-session';\n")))
+        self.assertIsNone(merge(self.conflict(
+            "import {\n  getRequestSession,\n} from '@/lib/auth/request-session';\n", mocks)))
+        calls = []
+
+        def sh(args, **_kwargs):
+            calls.append(args)
+            return SimpleNamespace(returncode=1, stdout="")
+
+        for rel in (
+            "apps/web/app/(dynamic)/start/page.test.ts",
+            "apps/web/app/[username]/page.test.tsx",
+            "apps/web/app/(.)photo/page.test.ts",
+            "README.md",
+        ):
+            calls.clear()
+            self.assertIsNone(edits.resolve_additive_statement_file(Path("."), rel, sh))
+            self.assertEqual(bool(calls), rel != "README.md")
+
+    def test_edits_control_flow_and_unknown_shapes_stay_unresolved(self):
+        added = "const head = vi.fn();\n"
+        for value in (
+            self.conflict(added, "const main = vi.fn();\n", "const old = vi.fn();\n"),
+            self.conflict("  return 1;\n", "  return 2;\n"),
+            self.conflict("const head = vi.fn();\n", "const head = vi.fn(async () => 1);\n"),
+            self.conflict("vi.mock('@/a', () => ({\n", "vi.mock('@/b', () => ({\n"),
+            self.conflict(added, "const main = vi.fn();\n").replace("||||||| base\n", ""),
+            "const clean = vi.fn();\n",
+        ):
+            with self.subTest(value=value):
+                self.assertIsNone(statements.resolve_additive_statements_text(value))
+
+
+class Size500StaleTest(unittest.TestCase):
+    LOG = "\n".join([
+        "##[warning]vacuous-verdict: apps/web/lib/finance/metrics/engine.ts: 1 vacuous verdict site(s)",
+        "##[error]size-500: apps/web/lib/agent-os/certification.ts: grew 1220 -> 1265",
+        "##[error]size-500: scripts/lanes/lane_runner.py: grew 11721 -> 11736",
+        "##[error]Process completed with exit code 1.",
+        "company-guards: FAIL (2)",
+    ])
+
+    def test_blocked_size_growth_syncs_main(self):
+        got = classes.classify(pr("Company guards", merge="BLOCKED"), {"Company guards": self.LOG})
+        self.assertEqual((got["cls"], got["action"]), ("size-500-stale", "sync-main"))
+        self.assertIsNone(edits.size_500_stale_hit(None))
+        self.assertIsNone(edits.size_500_stale_hit("##[error]Process completed with exit code 1."))
+
+    def test_another_annotated_error_stays_with_the_model(self):
+        log = self.LOG + "\n##[error]AssertionError: expected 1"
+        got = classes.classify(pr("Company guards", merge="BLOCKED"), {"Company guards": log})
+        self.assertEqual((got["cls"], got["action"]), ("other", "agent"))
+
+    def test_a_known_signature_outranks_size_growth_in_the_same_log(self):
+        log = "API rate limit exceeded\n" + self.LOG
+        got = classes.classify(pr("Company guards"), {"Company guards": log})
+        self.assertEqual(got["action"], "rerun")
+
+    def test_size_growth_beside_another_failing_check_stays_mixed(self):
+        got = classes.classify(pr("Company guards", "Unit Tests"), {
+            "Company guards": self.LOG,
+            "Unit Tests": "AssertionError: expected 1",
+        })
+        self.assertEqual((got["cls"], got["action"]), ("mixed", "agent"))
 
 
 if __name__ == "__main__":

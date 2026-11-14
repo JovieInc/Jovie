@@ -1,3 +1,4 @@
+import { checkTooltipCopy } from '@jovie/copy/tooltip-copy';
 import {
   act,
   fireEvent,
@@ -9,11 +10,13 @@ import { type ComponentPropsWithoutRef, forwardRef } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { BannerViewport } from '@/components/feedback/BannerViewport';
 import { banner } from '@/components/feedback/banner-store';
+import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import {
   SidebarDock,
   type SidebarDockProps,
   sidebarDockSeenKey,
 } from './SidebarDock';
+import { Tooltip } from './Tooltip';
 
 // Expose the Next Link contract without starting a router in jsdom.
 vi.mock('next/link', () => ({
@@ -34,12 +37,16 @@ const release = {
   highlights: [],
   dogfood: [],
 };
-const update = {
-  state: 'available',
-  version: '2',
-  releaseDate: null,
-  notesUrl: '/changelog',
-} as const;
+const control = (
+  overrides: Partial<NonNullable<SidebarDockProps['updateControl']>> = {}
+): NonNullable<SidebarDockProps['updateControl']> => ({
+  visible: true,
+  label: 'Update available',
+  urgent: false,
+  node: <button type='button'>Slotted control</button>,
+  ...overrides,
+});
+const update = control();
 const audio = {
   track: {
     trackTitle: 'Never Say A Word',
@@ -65,11 +72,11 @@ beforeEach(() => {
 describe('SidebarDock', () => {
   it.each(Array.from({ length: 8 }, (_, mask) => mask))(
     'keeps fixed order for combination %i',
-    mask => {
+    async mask => {
       const { container } = render(
         <SidebarDock
           userId='one'
-          update={mask & 4 ? update : undefined}
+          updateControl={mask & 4 ? update : undefined}
           release={mask & 2 ? release : null}
           audio={mask & 1 ? audio : undefined}
         />
@@ -81,25 +88,32 @@ describe('SidebarDock', () => {
           mask & 1 ? 'now-playing' : null,
         ].filter(Boolean)
       );
+      await expectNoA11yViolations(container);
     }
   );
 
-  it('puts install last and routes all actions', () => {
-    const onUpdate = vi.fn();
-    const { container } = render(
+  it('puts install last and routes all actions', async () => {
+    const { container, rerender } = render(
       <SidebarDock
         userId='one'
-        update={update}
-        onUpdate={onUpdate}
+        updateControl={update}
         release={release}
         audio={audio}
         install={install}
       />
     );
     expect(cards(container)).toEqual(['update', 'now-playing']);
-    fireEvent.click(screen.getByRole('button', { name: 'Update available' }));
-    expect(onUpdate).toHaveBeenCalledOnce();
-    fireEvent.click(screen.getByRole('button', { name: 'Dismiss update' }));
+    await expectNoA11yViolations(container);
+    // The update has no dismiss: it leaves only when the updater is done.
+    rerender(
+      <SidebarDock
+        userId='one'
+        updateControl={control({ visible: false, label: null, node: null })}
+        release={release}
+        audio={audio}
+        install={install}
+      />
+    );
     expect(cards(container)).toEqual(['whats-new', 'now-playing']);
     fireEvent.click(screen.getByRole('button', { name: "Dismiss what's new" }));
     expect(cards(container)).toEqual(['now-playing', 'install']);
@@ -107,6 +121,7 @@ describe('SidebarDock', () => {
     expect(audio.onDismiss).toHaveBeenCalledOnce();
     fireEvent.click(screen.getByRole('button', { name: 'Install' }));
     expect(install.onInstall).toHaveBeenCalledOnce();
+    await expectNoA11yViolations(container);
     fireEvent.click(screen.getByRole('button', { name: 'Dismiss Prompt' }));
     expect(install.onDismiss).toHaveBeenCalledOnce();
   });
@@ -117,7 +132,7 @@ describe('SidebarDock', () => {
         <BannerViewport />
         <SidebarDock
           userId='one'
-          update={update}
+          updateControl={update}
           release={release}
           install={install}
         />
@@ -161,81 +176,148 @@ describe('SidebarDock', () => {
     expect(localStorage.getItem(sidebarDockSeenKey('one'))).toBe('newer');
   });
 
-  it.each<NonNullable<SidebarDockProps['update']>>([
-    {
-      state: 'downloading',
-      percent: 42,
-      transferredBytes: 42,
-      totalBytes: 100,
-      bytesPerSecond: 1,
-    },
-    { state: 'ready', version: '2' },
-  ])(
-    'keeps $state undismissable, including in the one-line row',
-    updateState => {
-      render(<SidebarDock userId='one' update={updateState} />);
-      expect(
-        screen.queryByRole('button', { name: 'Dismiss update' })
-      ).toBeNull();
-      expect(
-        screen.getByText(
-          updateState.state === 'ready'
-            ? 'Restart to update'
-            : 'Downloading 42%'
-        )
-      ).toBeVisible();
-      fireEvent.click(screen.getByRole('button', { name: 'Collapse update' }));
-      expect(
-        screen.getByRole('button', { name: 'Expand update' })
-      ).toHaveAttribute('aria-expanded', 'false');
-      expect(screen.queryByText('Open update details.')).toBeNull();
-      expect(
-        screen.queryByRole('button', { name: 'Dismiss update' })
-      ).toBeNull();
-    }
-  );
+  describe('update control slot', () => {
+    it('gives the control a fixed row and no chrome of its own', async () => {
+      const { container } = render(
+        <SidebarDock userId='one' updateControl={control()} />
+      );
+      expect(cards(container)).toEqual(['update']);
+      const card = container.querySelector('[data-dock-card="update"]');
+      expect(card?.className).toMatch(/\bmin-h-9\b/);
+      // The control is the card's only button: no collapse, no dismiss.
+      expect(screen.getAllByRole('button')).toEqual([
+        screen.getByRole('button', { name: 'Slotted control' }),
+      ]);
+      await expectNoA11yViolations(container);
+    });
 
-  it('allows available-version dismissal without hiding a downloading update', () => {
-    const { rerender } = render(<SidebarDock userId='one' update={update} />);
-    fireEvent.click(screen.getByRole('button', { name: 'Dismiss update' }));
-    expect(screen.queryByText('Update available')).toBeNull();
-    rerender(
+    it('has no card while the control is hidden or absent', () => {
+      const { container, rerender } = render(
+        <SidebarDock
+          userId='one'
+          updateControl={control({ visible: false, label: null, node: null })}
+        />
+      );
+      expect(cards(container)).toEqual([]);
+      rerender(<SidebarDock userId='one' />);
+      expect(cards(container)).toEqual([]);
+    });
+
+    it('keeps the card mounted while the control changes state', () => {
+      const { container, rerender } = render(
+        <SidebarDock userId='one' updateControl={control()} />
+      );
+      const card = container.querySelector('[data-dock-card="update"]');
+      rerender(
+        <SidebarDock
+          userId='one'
+          updateControl={control({ label: 'Update failed', urgent: true })}
+        />
+      );
+      expect(container.querySelector('[data-dock-card="update"]')).toBe(card);
+    });
+
+    it('lets a failed update outrank a permission notice', () => {
+      banner.show({ id: 'permission', title: 'Permission', priority: 900 });
+      const { container, rerender } = render(
+        <SidebarDock userId='one' updateControl={control()} />
+      );
+      expect(cards(container)).toEqual([]);
+      rerender(
+        <SidebarDock
+          userId='one'
+          updateControl={control({ label: 'Update failed', urgent: true })}
+        />
+      );
+      expect(cards(container)).toEqual(['update']);
+    });
+
+    it('names the collapsed rail badge from the control', () => {
+      render(
+        <SidebarDock
+          userId='one'
+          collapsed
+          updateControl={control({ label: 'Restart to update' })}
+        >
+          {status => (
+            <button type='button' aria-label={status?.label}>
+              {status?.badges}
+            </button>
+          )}
+        </SidebarDock>
+      );
+      expect(screen.getByRole('button')).toHaveAccessibleName(
+        'Restart to update'
+      );
+    });
+  });
+
+  it('shows audio with only a track title', async () => {
+    const onPlay = vi.fn();
+    const { container } = render(
       <SidebarDock
         userId='one'
-        update={{
-          state: 'downloading',
-          percent: 42,
-          transferredBytes: 42,
-          totalBytes: 100,
-          bytesPerSecond: 1,
+        audio={{
+          ...audio,
+          onPlay,
+          track: {
+            trackTitle: 'Untitled demo',
+            artistName: null,
+            artworkUrl: null,
+          },
         }}
       />
     );
-    expect(screen.getByText('Downloading 42%')).toBeVisible();
+    expect(cards(container)).toEqual(['now-playing']);
+    expect(screen.getByText('Untitled demo')).toBeVisible();
+    fireEvent.click(screen.getByRole('button', { name: 'Pause' }));
+    expect(onPlay).toHaveBeenCalledOnce();
+    await expectNoA11yViolations(container);
   });
 
-  it.each(['unsupported', 'idle', 'checking', 'not-available'] as const)(
-    'has no card for updater %s',
-    state => {
-      const { container } = render(
-        <SidebarDock userId='one' update={{ state }} />
-      );
-      expect(cards(container)).toEqual([]);
-    }
-  );
-
-  it('keeps update recovery reachable', () => {
-    const onUpdate = vi.fn();
-    render(
+  it('keeps long release and track titles reachable', async () => {
+    const title =
+      'Release pages now show every streaming service, presave countdowns and per-territory analytics';
+    const trackTitle =
+      'Midnight Drive Through the Neon City (Extended Club Mix featuring the Late Night Strings)';
+    const { container } = render(
       <SidebarDock
         userId='one'
-        onUpdate={onUpdate}
-        update={{ state: 'error', message: 'Offline', retryable: true }}
+        release={{ ...release, title }}
+        audio={{
+          ...audio,
+          track: { ...audio.track, trackTitle },
+        }}
       />
     );
-    fireEvent.click(screen.getByRole('button', { name: 'Update failed' }));
-    expect(onUpdate).toHaveBeenCalledOnce();
-    expect(screen.getByText('Open update details to try again.')).toBeVisible();
+    expect(cards(container)).toEqual(['whats-new', 'now-playing']);
+    expect(screen.getByText(title)).toHaveClass('truncate');
+    expect(screen.getByText(trackTitle)).toBeInTheDocument();
+    await expectNoA11yViolations(container);
+  });
+
+  it('keeps the update control reachable in a right-to-left sidebar', async () => {
+    const { container } = render(
+      <div dir='rtl' lang='ar'>
+        <SidebarDock
+          userId='one'
+          updateControl={update}
+          audio={{
+            ...audio,
+            track: {
+              trackTitle: 'ليالي المدينة الطويلة',
+              artistName: 'فرقة الشرق',
+              artworkUrl: null,
+            },
+          }}
+        />
+      </div>
+    );
+    expect(screen.getByText('ليالي المدينة الطويلة')).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Slotted control' })
+    ).toBeVisible();
+    await expectNoA11yViolations(container);
   });
 
   it('collapses cards to named user-button badges', () => {
@@ -243,7 +325,7 @@ describe('SidebarDock', () => {
       <SidebarDock
         userId='one'
         collapsed
-        update={update}
+        updateControl={update}
         release={release}
         audio={audio}
         install={install}
@@ -270,6 +352,76 @@ describe('SidebarDock', () => {
       </SidebarDock>
     );
     expect(container.querySelector('[data-dock-badges]')).toBeNull();
+  });
+
+  // Founder report: the sidebar opened, the status tooltip armed, the sidebar
+  // collapsed, and the tooltip stayed up with no pointer on it. UserButton
+  // wires the dock status exactly like this harness.
+  describe('status tooltip across collapse', () => {
+    const qrNote =
+      'Profile QR codes are now drawn right on your device. Visiting a profile no longer reaches an outside service to render them, so pages load with zero third-party requests, keeping the promise we publish on our comparison page.';
+    const Dock = ({ collapsed }: { readonly collapsed: boolean }) => (
+      <SidebarDock
+        userId='one'
+        collapsed={collapsed}
+        release={{ ...release, title: qrNote }}
+      >
+        {status => (
+          <Tooltip
+            label={status?.label ?? 'Open user menu'}
+            side='right'
+            open={status ? undefined : false}
+          >
+            <button type='button'>Account</button>
+          </Tooltip>
+        )}
+      </SidebarDock>
+    );
+    const tooltip = () => screen.queryByRole('tooltip');
+    const settle = () => act(async () => {});
+
+    it('never leaves the tooltip up after the sidebar collapses', async () => {
+      const { rerender } = render(<Dock collapsed={false} />);
+      const trigger = screen.getByRole('button', { name: 'Account' });
+
+      // Sidebar open: hover arms the tooltip, then the pointer leaves.
+      fireEvent.focus(trigger);
+      await settle();
+      expect(tooltip()).not.toBeInTheDocument();
+      fireEvent.blur(trigger);
+      await settle();
+
+      rerender(<Dock collapsed />);
+      await settle();
+      expect(tooltip()).not.toBeInTheDocument();
+    });
+
+    it('closes when collapsed flips, even with focus still on the trigger', async () => {
+      const { rerender } = render(<Dock collapsed />);
+      const trigger = screen.getByRole('button', { name: 'Account' });
+      fireEvent.focus(trigger);
+      expect(await screen.findByRole('tooltip')).toBeInTheDocument();
+
+      rerender(<Dock collapsed={false} />);
+      await settle();
+      expect(tooltip()).not.toBeInTheDocument();
+      rerender(<Dock collapsed />);
+      await settle();
+      expect(tooltip()).not.toBeInTheDocument();
+
+      // Fresh intent still works.
+      fireEvent.blur(trigger);
+      fireEvent.focus(trigger);
+      expect(await screen.findByRole('tooltip')).toBeInTheDocument();
+    });
+
+    it('shows a short title, not the changelog paragraph', async () => {
+      render(<Dock collapsed />);
+      fireEvent.focus(screen.getByRole('button', { name: 'Account' }));
+      const label = "What's new: Profile QR codes are now drawn…";
+      expect(await screen.findByRole('tooltip')).toHaveTextContent(label);
+      expect(checkTooltipCopy(label)).toEqual([]);
+    });
   });
 
   it('reserves the audio slot without a duplicate transport while the full player is visible', () => {
@@ -315,5 +467,18 @@ describe('SidebarDock', () => {
     expect(screen.queryByRole('link')).toBeNull();
     get.mockRestore();
     set.mockRestore();
+  });
+  it('measures card positions only when the card stack changes', () => {
+    const measure = vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect');
+    const { rerender } = render(<SidebarDock userId='one' audio={audio} />);
+    const mounted = measure.mock.calls.length;
+    expect(mounted).toBeGreaterThan(0);
+    rerender(
+      <SidebarDock userId='one' audio={{ ...audio, isPlaying: false }} />
+    );
+    expect(measure.mock.calls.length).toBe(mounted);
+    rerender(<SidebarDock userId='one' audio={audio} updateControl={update} />);
+    expect(measure.mock.calls.length).toBeGreaterThan(mounted);
+    measure.mockRestore();
   });
 });

@@ -70,3 +70,32 @@ export const Compact: Story = {
     />
   ),
 };
+
+/** A long title truncates; the due, assignee and priority columns hold. */
+export const LongContentTitle: Story = {
+  args: {
+    task: {
+      ...task,
+      title:
+        'Pitch the deluxe edition to every editorial playlist curator who featured the lead single, with the new artwork, the press release and the live session clips attached',
+      priority: 'urgent',
+    },
+  },
+};
+
+export const RtlTask: Story = {
+  args: {
+    task: {
+      ...task,
+      title: 'التواصل مع محرري قوائم التشغيل',
+      assigneeType: 'ai_workflow',
+    },
+  },
+  decorators: [
+    Story => (
+      <div dir='rtl' lang='ar'>
+        <Story />
+      </div>
+    ),
+  ],
+};

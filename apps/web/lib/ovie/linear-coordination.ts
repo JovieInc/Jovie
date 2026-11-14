@@ -20,6 +20,8 @@ export type LinearCoordinationRequest = {
   readonly founderIntentRef: string;
   readonly sourceRefs: readonly string[];
   readonly author: string;
+  /** Linear priority on create: 1 urgent, 2 high, 3 medium, 4 low. */
+  readonly priority?: 1 | 2 | 3 | 4;
 };
 
 export type LinearCoordinationReceipt = {
@@ -54,6 +56,11 @@ export type LinearCoordinationResult =
       readonly status: 'failed';
       readonly code: 'provider-error' | 'readback-missing';
       readonly message: string;
+      /**
+       * readback-missing only: what the mutation itself returned. The issue
+       * exists, so callers must not file it again.
+       */
+      readonly mutated?: LinearIssueSnapshot;
     };
 
 export class LinearCoordinationDeniedError extends Error {
@@ -81,6 +88,7 @@ export type LinearCoordinationDeps = {
     readonly title: string;
     readonly description: string;
     readonly teamId: string;
+    readonly priority?: 1 | 2 | 3 | 4;
   }) => Promise<LinearIssueSnapshot>;
   readonly updateIssue: (input: {
     readonly issueId: string;
@@ -148,6 +156,7 @@ export async function coordinateLinearWork(
         title: input.title.trim(),
         description: input.body.trim(),
         teamId: input.teamId.trim(),
+        ...(input.priority ? { priority: input.priority } : {}),
       });
     } else {
       mutated = await deps.updateIssue({
@@ -164,12 +173,25 @@ export async function coordinateLinearWork(
     };
   }
 
-  const readBack = await deps.readIssue(mutated.id);
+  let readBack: LinearIssueSnapshot | null;
+  try {
+    readBack = await deps.readIssue(mutated.id);
+  } catch (error) {
+    return {
+      status: 'failed',
+      code: 'readback-missing',
+      message: `Linear mutation succeeded but readback failed: ${
+        error instanceof Error ? error.message : 'unknown error'
+      }`,
+      mutated,
+    };
+  }
   if (!readBack) {
     return {
       status: 'failed',
       code: 'readback-missing',
       message: 'Linear mutation succeeded but readback returned no issue',
+      mutated,
     };
   }
   if (

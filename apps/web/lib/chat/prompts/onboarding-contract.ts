@@ -66,7 +66,9 @@ export function checkOnboardingPromptContract(prompt: string) {
     recordsSignalsSilently: includesAll(
       'Record known interview evidence silently with `recordInterviewSignal`',
       'Do not invent a signal or ask the same answered question again',
-      'Record each stated objection through `recordInterviewSignal`'
+      'Record each stated objection through `recordInterviewSignal`',
+      'When the visitor says what they want Jovie to do, record it as a `want`',
+      'with the matching available capability, or not_available'
     ),
     redirectsGeneralSupportIntoIntake: includesAll(
       'For general support, redirect to the intake',

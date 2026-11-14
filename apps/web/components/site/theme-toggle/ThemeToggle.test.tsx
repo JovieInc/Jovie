@@ -1,6 +1,7 @@
 import { TooltipProvider } from '@jovie/ui';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import { ThemeToggle } from './ThemeToggle';
 
 const themeState = vi.hoisted(() => ({
@@ -25,8 +26,8 @@ describe('ThemeToggle', () => {
     themeState.setTheme.mockReset();
   });
 
-  it('renders an accessible icon control and cycles to the next theme', () => {
-    render(<ThemeToggle shortcutKey='t' />);
+  it('renders an accessible icon control and cycles to the next theme', async () => {
+    const { container } = render(<ThemeToggle shortcutKey='t' />);
 
     expect(vi.mocked(TooltipProvider)).toHaveBeenCalled();
     for (const [props] of vi.mocked(TooltipProvider).mock.calls) {
@@ -39,14 +40,17 @@ describe('ThemeToggle', () => {
       expect.stringContaining('switch to system')
     );
     expect(button).toHaveAttribute('aria-describedby');
+    await expectNoA11yViolations(container);
 
     fireEvent.click(button);
 
     expect(themeState.setTheme).toHaveBeenCalledWith('system');
   });
 
-  it('renders the segmented appearance and routes a selected theme', () => {
-    render(<ThemeToggle appearance='segmented' shortcutKey='T' />);
+  it('renders the segmented appearance and routes a selected theme', async () => {
+    const { container } = render(
+      <ThemeToggle appearance='segmented' shortcutKey='T' />
+    );
 
     expect(screen.getByRole('toolbar', { name: 'Theme' })).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Light Theme' }));
@@ -55,10 +59,13 @@ describe('ThemeToggle', () => {
     expect(
       screen.getByText('Press T to toggle between light and dark themes.')
     ).toHaveClass('sr-only');
+    await expectNoA11yViolations(container);
   });
 
-  it('keeps the footer root target while preserving the 28px visible segments', () => {
-    render(<ThemeToggle appearance='segmented' size='footer' />);
+  it('keeps the footer root target while preserving the 28px visible segments', async () => {
+    const { container } = render(
+      <ThemeToggle appearance='segmented' size='footer' />
+    );
 
     const toolbar = screen.getByRole('toolbar', { name: 'Theme' });
     expect(toolbar).toHaveClass('h-11', 'px-0', 'py-2');
@@ -67,15 +74,28 @@ describe('ThemeToggle', () => {
       'w-11',
       'px-3'
     );
+    await expectNoA11yViolations(container);
   });
 
-  it('uses the linear token treatment for icon appearance', () => {
-    render(<ThemeToggle variant='linear' />);
+  it('keeps the segmented control accessible in a right-to-left document', async () => {
+    const { container } = render(
+      <div dir='rtl'>
+        <ThemeToggle appearance='segmented' />
+      </div>
+    );
+
+    expect(screen.getByRole('toolbar', { name: 'Theme' })).toBeInTheDocument();
+    await expectNoA11yViolations(container);
+  });
+
+  it('uses the linear token treatment for icon appearance', async () => {
+    const { container } = render(<ThemeToggle variant='linear' />);
 
     // Assert the specified token: jsdom 30 resolves an undefined var() to the
     // computed initial value, so toHaveStyle cannot see the token.
     expect(
       screen.getByRole('button', { name: /Toggle theme/ }).style.border
     ).toBe('1px solid var(--linear-border-subtle)');
+    await expectNoA11yViolations(container);
   });
 });

@@ -5,6 +5,7 @@ import {
   GET as getLlmsFull,
   LLMS_FULL_TXT_CLAIM_IDS,
 } from '@/app/llms-full.txt/route';
+import { calendarDeadlineClock } from '@/tests/utils/calendar-deadline-clock';
 import { getAlternative, getAlternativeSlugs } from './alternatives';
 import { getComparison, getComparisonSlugs } from './comparisons';
 import {
@@ -82,9 +83,22 @@ describe('scoped published claim evidence', () => {
   it('binds every material content item to a current publish-safe receipt', () => {
     const groups = allBoundClaimGroups();
     expect(groups.length).toBeGreaterThan(0);
+    // Every receipt is current as of the newest verification. The review
+    // deadlines themselves are read against the real clock only by the daily
+    // time-bomb scan, which files an issue a week ahead; a lapsed competitor
+    // review must not fail every unrelated merge group.
+    const asOf = calendarDeadlineClock(
+      new Date(
+        Math.max(
+          ...Object.values(PUBLISHED_CLAIM_RECEIPTS).map(receipt =>
+            Date.parse(`${receipt.verifiedAt}T00:00:00Z`)
+          )
+        )
+      )
+    );
     for (const claimIds of groups) {
       expect(claimIds.length).toBeGreaterThan(0);
-      expect(validatePublishedClaimReceipts(claimIds, new Date())).toEqual([]);
+      expect(validatePublishedClaimReceipts(claimIds, asOf)).toEqual([]);
     }
   });
 

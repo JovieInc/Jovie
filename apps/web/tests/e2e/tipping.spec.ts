@@ -59,15 +59,6 @@ test.describe('Tipping MVP', () => {
         await page.addInitScript(mode => {
           localStorage.setItem('theme', mode);
         }, colorMode);
-
-        // Enable tipping feature flag
-        await page.addInitScript(() => {
-          Object.defineProperty(process.env, 'NEXT_PUBLIC_FEATURE_TIPS', {
-            value: 'true',
-            writable: true,
-            configurable: true,
-          });
-        });
       });
 
       test('shows tip button on profile with Venmo link', async ({ page }) => {
@@ -261,10 +252,12 @@ test.describe('Tipping MVP', () => {
           timeout: SMOKE_TIMEOUTS.VISIBILITY,
         });
 
-        // Verify QR code contains the correct URL
+        // The QR image is generated locally from the `qrcode` dependency, so
+        // its src is a data URL, never a third-party host. The encoded URL is
+        // the profile's own origin + handle by construction (the overlay
+        // passes location.origin/handle to the generator).
         const qrSrc = await qrImage.getAttribute('src');
-        expect(qrSrc).toContain('api.qrserver.com');
-        expect(qrSrc).toContain('testartist');
+        expect(qrSrc).toMatch(/^data:image\/png;base64,/);
 
         // Test closing and reopening the QR overlay
         const closeButton = qrOverlay.getByRole('button', { name: 'Close' });

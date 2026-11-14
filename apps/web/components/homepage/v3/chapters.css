@@ -62,11 +62,6 @@
   padding-top: 10.5rem;
 }
 
-.hv3-hero > .hv3-orbit {
-  top: -6.25rem;
-  left: calc(var(--hv3-edge) - 12.5rem);
-}
-
 /* JOV-INV-038: the headline dominates and the support line recedes, both in
    semantic ink tokens. The approved v3 display scale (Tim, receipt
    home-canonical-v3) is larger than the shared marketing title ramp. */
@@ -117,31 +112,82 @@
   height: 47.5rem;
 }
 
-.hv3-stage--hero::before {
+/*
+ * Key light (Tim, 2026-11-12: "less ai slop more premium artdirected
+ * lighting"). One source, one hue, asymmetric: an Ion wedge from above the
+ * frame, right of the headline so the headline's zone stays black. Its apex
+ * stays out of sight: the beam only comes up out of the dark under the
+ * actions and opens onto the window's top edge, so it reads as light falling
+ * on the product, not as a shape behind the copy. The window stands in front
+ * of it; below the window it is spill. Everything else falls to black.
+ * The wedge is clipped on ::before and blurred here, so its edges are soft
+ * (a filter on the clipped element itself would leave them hard).
+ * Replaces the hero's rings, arc and glow blobs.
+ */
+.hv3-keylight {
   position: absolute;
-  top: 10rem;
-  right: 0;
-  left: 0;
-  height: 40rem;
-  background: radial-gradient(
-    60% 50% at 55% 75%,
-    color-mix(in srgb, var(--hv3-t2) 7%, transparent),
-    transparent 70%
-  );
-  content: "";
+  top: -26rem;
+  left: 46%;
+  /* container-width-allow: light geometry in the approved 1440 frame, not a page column */
+  width: 34rem;
+  height: 78rem;
+  filter: blur(1.75rem);
   pointer-events: none;
 }
 
-.hv3-stage--hero .hv3-bounce {
-  top: 37.5rem;
-  left: 1.5rem;
-  width: calc(var(--hv3-box) - 3rem);
-  height: 15rem;
-  background: radial-gradient(
-    closest-side,
-    color-mix(in srgb, var(--hv3-ion) 22%, transparent),
-    color-mix(in srgb, var(--hv3-t2) 6%, transparent) 60%,
+.hv3-keylight::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    180deg,
+    transparent 15%,
+    color-mix(in srgb, var(--hv3-ion) 4%, transparent) 20%,
+    color-mix(in srgb, var(--hv3-ion) 11%, transparent) 27%,
+    color-mix(in srgb, var(--hv3-ion) 7%, transparent) 55%,
+    transparent 80%
+  );
+  clip-path: polygon(44% 0, 56% 0, 100% 100%, 0 100%);
+}
+
+/* Where the beam meets the window's top edge: a hard 1px rim, brightest
+   under the beam's centre, gone at both ends. */
+.hv3-rig--hero .hv3-window::before {
+  left: 30%;
+  width: 60%;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    color-mix(in srgb, var(--hv3-ion) 80%, transparent) 55%,
     transparent
+  );
+}
+
+/* The window's own corner glow answered the old arc; under a top key it
+   would be a second source. */
+.hv3-rig--hero .hv3-app::after {
+  content: none;
+}
+
+/* Top light on the window's surface, falling off down the list. */
+.hv3-rig--hero .hv3-sheen {
+  inset: 0;
+  width: auto;
+  background: radial-gradient(
+    45% 55% at 64% 0,
+    color-mix(in srgb, var(--hv3-light) 6%, transparent),
+    transparent 70%
+  );
+}
+
+/* The release page is lit from above, not from the corner: bright top edge,
+   dark flanks. */
+.hv3-rig--hero .hv3-lift--page.hv3-edge::after {
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--hv3-light) 30%, transparent),
+    color-mix(in srgb, var(--hv3-light) 5%, transparent) 18%,
+    color-mix(in srgb, var(--hv3-light) 2%, transparent)
   );
 }
 
@@ -154,15 +200,30 @@
   transform-origin: 0 0;
 }
 
-/* The inspector sits on the third column of the box, its right edge on the
-   window's, lifted by shadow alone. Its height ends below the UPC row. */
-.hv3-lift--inspector {
-  top: 2.5rem;
+/* The release page sits on the third column of the box, its right edge on
+   the window's, lifted by shadow alone. It is the 390 phone scaled to the
+   column and runs past the window's foot far enough to show the first listen
+   rows under the title, fading out the way a page keeps going below the
+   fold. */
+.hv3-lift--page {
+  top: 1.75rem;
   left: calc(var(--hv3-col2) + 1.5rem);
   width: var(--hv3-col1);
-  height: 29rem;
-  border-radius: var(--radius-md);
+  height: 44rem;
+  border-radius: calc(var(--radius-3xl) + var(--radius-sm));
+  mask-image: linear-gradient(var(--hv3-shade) 78%, transparent);
   transform: translateY(var(--hv3-par, 0px));
+}
+
+.hv3-phone.hv3-phone--hero {
+  inset: 0 auto auto 0;
+  width: 24.375rem;
+  height: 53.75rem;
+  /* The lift's mask clips anything outside its box, so the page's edge is an
+     inner hairline that fades out with it. */
+  box-shadow: inset 0 0 0 1px var(--hv3-b2);
+  transform: scale(1.0256);
+  transform-origin: 0 0;
 }
 
 .hv3-index {

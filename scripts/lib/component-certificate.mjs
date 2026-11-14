@@ -94,8 +94,12 @@ function stringLiterals(sf) {
 }
 
 export function findRawColors(source, fileName) {
+  return rawColorsFromSourceFile(parseSource(source, fileName));
+}
+
+function rawColorsFromSourceFile(sf) {
   const hits = [];
-  for (const text of stringLiterals(parseSource(source, fileName))) {
+  for (const text of stringLiterals(sf)) {
     if (/^(use client|use server)$/.test(text) || /^[./@]/.test(text)) continue;
     for (const [re, kind] of RAW_COLOR_PATTERNS) {
       for (const m of text.matchAll(re)) hits.push({ kind, value: m[0] });
@@ -107,7 +111,10 @@ export function findRawColors(source, fileName) {
 const RAW_ELEMENTS = ['button', 'input', 'select', 'textarea', 'dialog'];
 
 export function findRawElements(source, fileName) {
-  const sf = parseSource(source, fileName);
+  return rawElementsFromSourceFile(parseSource(source, fileName));
+}
+
+function rawElementsFromSourceFile(sf) {
   const hits = [];
   const visit = n => {
     if (
@@ -124,7 +131,10 @@ export function findRawElements(source, fileName) {
 
 /** Deterministic subset of the frontend-skill jank rules (layout shift, focus loss, input lag). */
 export function findJank(source, fileName) {
-  const sf = parseSource(source, fileName);
+  return jankFromSourceFile(parseSource(source, fileName));
+}
+
+function jankFromSourceFile(sf) {
   const findings = [];
   const add = (rule, node, detail) =>
     findings.push({
@@ -301,9 +311,7 @@ export function findJank(source, fileName) {
 }
 
 /** Which states can this component reach? Derived from its source; waivers override. */
-export function applicableStates(source, fileName) {
-  const sf = parseSource(source, fileName);
-  const text = source;
+export function applicableStates(text, _fileName = 'x.tsx') {
   const hasInput = /<(input|textarea|select)\b|<(Input|Textarea|Select)\b/.test(
     text
   );
@@ -327,7 +335,6 @@ export function applicableStates(source, fileName) {
       text
     );
   const optionalProps = (text.match(/\w+\?:/g) ?? []).length;
-  void sf;
   const out = {};
   out.loading = loading;
   out.empty = dataList;
@@ -385,8 +392,9 @@ export function certifyComponent({
   policy = DEFAULT_POLICY,
   packagesUi = false,
 }) {
-  // Receipt metadata cannot choose the bytes this certificate binds to.
+  // Bind to current bytes; share one fresh tree between the source guards.
   const sourceHash = sha(source);
+  const sourceFile = parseSource(source, path);
   const sourceBound = receipt => receipt?.sourceHash === sourceHash;
   const mutationTests =
     mutationTestSources === undefined
@@ -407,7 +415,7 @@ export function certifyComponent({
   const raw =
     packagesUi && /packages\/ui\/atoms\//.test(path)
       ? []
-      : findRawElements(source, path);
+      : rawElementsFromSourceFile(sourceFile);
   if (raw.length) {
     criteria.push(
       crit('ds-owner', 'fail', {
@@ -422,7 +430,7 @@ export function certifyComponent({
   } else criteria.push(crit('ds-owner', 'pass'));
 
   // tokens
-  const colors = findRawColors(source, path);
+  const colors = rawColorsFromSourceFile(sourceFile);
   if (colors.length) {
     criteria.push(
       crit('tokens', 'fail', {
@@ -438,7 +446,7 @@ export function certifyComponent({
   } else criteria.push(crit('tokens', 'pass'));
 
   // states
-  const applicable = applicableStates(source, path);
+  const applicable = applicableStates(source);
   const covered = statesCovered(storySource);
   const stateRows = {};
   const stateMissing = [];
@@ -541,10 +549,9 @@ export function certifyComponent({
   }
 
   // frontend-rules
-  const jank = findJank(source, path);
-  const needsRetention = hasInputs;
+  const jank = jankFromSourceFile(sourceFile);
   const retentionOk =
-    !needsRetention ||
+    !hasInputs ||
     (!!testSource &&
       /(userEvent|user)\.type\(/.test(testSource) &&
       /toHaveValue|\.value\)/.test(testSource));
