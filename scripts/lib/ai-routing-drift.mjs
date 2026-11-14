@@ -350,6 +350,7 @@ export function evaluateRouting({
 
   return {
     schema: ROUTING_CHECK_SCHEMA,
+    budgetExhausted: false,
     days,
     gatewayUsdPerDay: round(Object.values(keyUsd).reduce((a, b) => a + b, 0)),
     workersAiUsdByDay: workersAiByDay
@@ -373,5 +374,33 @@ export function evaluateRouting({
     unreferencedCeilings: [...knownKeys].filter(key => !(key in keyUsd)),
     runwayDays: round(runway, 1),
     findings,
+  };
+}
+
+/**
+ * The Gateway answered budget_exhausted (HTTP 402 or the local spend cap), so
+ * its spend report is unreadable and drift cannot be measured. That is a known
+ * runway fact, reported as a gateway-runway finding, never a crash.
+ */
+export function budgetExhaustedResult({ days, reason }) {
+  return {
+    schema: ROUTING_CHECK_SCHEMA,
+    budgetExhausted: true,
+    days,
+    gatewayUsdPerDay: null,
+    workersAiUsdByDay: null,
+    workersAiUsdPerDay: null,
+    byKey: {},
+    unreferencedCeilings: [],
+    runwayDays: 0,
+    findings: [
+      finding(
+        'critical',
+        'gateway-runway',
+        'vercel-ai-gateway-budget',
+        `AI Gateway budget exhausted (${reason}); spend report unreadable, routing drift not evaluated this run. Traffic fails over to Workers AI where a twin exists.`,
+        { runwayDays: 0 }
+      ),
+    ],
   };
 }

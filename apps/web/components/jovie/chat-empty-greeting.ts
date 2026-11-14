@@ -1,10 +1,4 @@
-import {
-  appliesToSegment,
-  INSIGHT_ACTIONS,
-} from '@/lib/creator/segment-registry';
-import type { ResolvedSegment } from '@/lib/creator/segments';
 import { resolveSafeFirstName } from '@/lib/email/templates/personalization';
-import type { InsightResponse, InsightType } from '@/types/insights';
 
 /** Home welcomes the person and offers one real next step (JOV-7150). */
 
@@ -37,87 +31,95 @@ export function getChatEmptyStateGreetingText(
   return firstName ? `${timeOfDay}, ${firstName}.` : `${timeOfDay}.`;
 }
 
-export interface ChatEmptyStateAction {
-  readonly insightId: string;
-  readonly suggestion: string;
-  readonly prompt: string;
-  readonly expiresAt: number;
+/**
+ * The only thing New Chat may show under the greeting: work Jovie has already
+ * finished from the artist's real data, attached to the item it is about.
+ * A draft waiting for approval, or a finding with its evidence. Never a chore
+ * for the artist ("Review your tip flow"), never a canned suggestion without a
+ * result behind it. With nothing real, New Chat shows the greeting and the
+ * composer and nothing else (Tim, Nov 14 2026: "why are we asking a user again
+ * to do something that is our job?").
+ */
+export interface ChatEmptyStateResult {
+  readonly id: string;
+  /** The release, channel, fan or profile the result is about. */
+  readonly item: {
+    readonly kind: 'release' | 'channel' | 'profile' | 'fan' | 'task';
+    readonly id: string;
+    readonly label: string;
+  };
+  /** What Jovie finished. */
+  readonly result: {
+    readonly kind: 'draft' | 'finding';
+    /** One sentence, past tense, naming the item: "Drafted a pitch for Wheels Up." */
+    readonly summary: string;
+    /** Where the finished draft or finding opens. */
+    readonly href: string;
+  };
 }
 
-// Existing chat can draft or analyze these concrete tasks. Model prose is
-// context, never customer-facing proof that a result has already occurred.
-const ACTION_BY_TYPE: Record<InsightType, string> = {
-  release_momentum: 'Draft a release update',
-  subscriber_surge: 'Draft a fan update',
-  subscriber_churn: 'Draft a fan update',
-  tip_hotspot: 'Review your tip flow with Jovie',
-  capture_rate_change: 'Review your signup flow with Jovie',
-  city_growth: 'Plan your next show',
-  new_market: 'Plan your next show',
-  declining_market: 'Plan your next show',
-  tour_gap: 'Plan your next show',
-  tour_timing: 'Plan your next show',
-  platform_preference: 'Review your traffic sources',
-  referrer_surge: 'Review your traffic sources',
-  engagement_quality: 'Plan your next fan update',
-  peak_activity: 'Plan when to share your next update',
-  device_shift: 'Review your audience experience',
+const RESULT_ACTION_LABEL: Record<
+  ChatEmptyStateResult['result']['kind'],
+  string
+> = {
+  draft: 'Review Draft',
+  finding: 'Open Finding',
 };
 
-/**
- * Summary order is owned by the server. Model-written titles/confidence do not
- * certify a win. Only offer a current actionable entry, as a contextual draft;
- * activating it does not claim execution or mark the Insight acted on.
- */
-export function resolveChatEmptyStateInsight(
-  insights: readonly InsightResponse[],
-  now = Date.now(),
-  segment?: ResolvedSegment
-): ChatEmptyStateAction | null {
-  for (const insight of insights) {
-    // Segment gate (JOV-9679): a comedian never gets "Draft a release update".
-    // `segment` omitted keeps legacy behavior for callers without a profile.
-    if (
-      segment !== undefined &&
-      !INSIGHT_ACTIONS.some(
-        item =>
-          item.insightType === insight.insightType &&
-          appliesToSegment(item.segments, segment)
-      )
-    ) {
-      continue;
-    }
-    const suggestion = insight.actionSuggestion?.trim();
-    const supportedAction = ACTION_BY_TYPE[insight.insightType];
-    const expiresAt = Date.parse(insight.expiresAt);
-    if (
-      insight.status !== 'active' ||
-      !Number.isFinite(expiresAt) ||
-      expiresAt <= now ||
-      !insight.id?.trim() ||
-      !insight.title?.trim() ||
-      !suggestion ||
-      !supportedAction ||
-      suggestion.length > 240
-    ) {
-      continue;
-    }
+export function chatEmptyStateResultActionLabel(
+  result: ChatEmptyStateResult
+): string {
+  return RESULT_ACTION_LABEL[result.result.kind];
+}
 
-    // Conversion is Jovie's work. Do not turn its shortfall into artist homework.
-    const conversionFlow =
-      insight.insightType === 'tip_hotspot'
-        ? 'tip'
-        : insight.insightType === 'capture_rate_change'
-          ? 'signup'
-          : null;
-    return {
-      insightId: insight.id,
-      expiresAt,
-      suggestion: supportedAction,
-      prompt: conversionFlow
-        ? `Review my ${conversionFlow} flow and identify a concrete improvement Jovie can make.\n\nInsight ${insight.id}: ${insight.title}`
-        : `Help me with this next step: ${supportedAction}. Ask for any missing facts; do not invent results.\n\nInsight ${insight.id}: ${insight.title}\nSuggested context: ${suggestion}`,
-    };
+/**
+ * Wording that hands the artist a chore or promises nothing concrete. A
+ * suggestion that matches is rejected, in the app and in the nightly action
+ * walk (JOV-12633), which reads every New Chat suggestion with this list.
+ */
+const CHORE_WORDING: readonly RegExp[] = [
+  /^\s*(review|check|plan|improve|optimi[sz]e|update|consider|try|explore|think about|look at|work on)\b/i,
+  /\bwith jovie\b/i,
+  /\byour (tip|signup|sign-up|conversion|traffic|audience|fan) (flow|sources|experience)\b/i,
+  /\bnext step\b/i,
+  /\bdraft this\b/i,
+];
+
+export function findChoreWording(text: string): string | null {
+  for (const pattern of CHORE_WORDING) {
+    const match = pattern.exec(text);
+    if (match) return match[0].trim();
   }
   return null;
+}
+
+/**
+ * Why a result can't be shown, or null when it can. A result needs a backing
+ * item, a finished draft or finding with somewhere to open it, and a summary
+ * that reports work done rather than assigning work.
+ */
+export function chatEmptyStateResultProblem(
+  result: ChatEmptyStateResult
+): string | null {
+  if (!result.id.trim()) return 'missing id';
+  if (!result.item.id.trim() || !result.item.label.trim())
+    return 'no backing item';
+  const summary = result.result.summary.trim();
+  if (!summary) return 'no finished result';
+  const href = result.result.href;
+  if (!href.startsWith('/') || href.startsWith('//'))
+    return 'result does not open';
+  if (!summary.includes(result.item.label.trim()))
+    return 'summary does not name its item';
+  const chore = findChoreWording(summary);
+  if (chore) return `chore wording: "${chore}"`;
+  return null;
+}
+
+export function selectChatEmptyStateResult(
+  results: readonly ChatEmptyStateResult[] | null | undefined
+): ChatEmptyStateResult | null {
+  return (
+    (results ?? []).find(r => chatEmptyStateResultProblem(r) === null) ?? null
+  );
 }
