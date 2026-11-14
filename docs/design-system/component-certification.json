@@ -30,6 +30,267 @@
       "frontend-rules",
       "forced-caps"
     ],
+    "apps/web/components/features/dashboard/AudienceRowActionsMenu.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/dashboard/atoms/AnalyticsCard.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/dashboard/atoms/AudienceIntentBadge.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/dashboard/atoms/DashboardCard.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/dashboard/atoms/DashboardHeaderActionGroup.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/dashboard/atoms/DrawerToggleButton.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/dashboard/atoms/MatchStatusBadge.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/dashboard/audience/table/molecules/AudienceTableHeader.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/dashboard/insights/InsightActions.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/dashboard/insights/InsightCard.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/dashboard/insights/InsightCategoryIcon.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/dashboard/insights/InsightsPanel.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/dashboard/molecules/ContactDeleteConfirmDialog.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/dashboard/molecules/ContactListRow.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/dashboard/molecules/CopyToClipboardButton.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/dashboard/molecules/DashboardRefreshButton.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/dashboard/molecules/ProfilePreview.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/dashboard/molecules/SettingsErrorState.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/dashboard/molecules/SettingsStatusPill.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/dashboard/molecules/SettingsToggleRow.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/dashboard/organisms/AnalyticsRankedList.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/dashboard/organisms/AnalyticsSidebar.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/dashboard/organisms/AudiencePanelContext.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/dashboard/organisms/GroupedLinksManager.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/dashboard/organisms/OnboardingFormWrapper.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/dashboard/organisms/OnboardingHandleOnlyForm.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/dashboard/organisms/PreviewDataHydrator.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/dashboard/organisms/SettingsAnalyticsSection.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/dashboard/organisms/SettingsAppearanceSection.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
     "apps/web/components/features/profile/ClaimBanner.tsx": [
       "ds-owner",
       "tokens",
@@ -362,18 +623,68 @@
     "apps/web/components/features/dashboard/NavigationDestinationReady.tsx": {
       "offline": "It never fetches or mutates: it renders null and only reports readiness once the caller's ready flag flips (LoadingDestinationData shows it held). The detector matched the word loading in its doc comment; the destination that owns the data owns any network failure."
     },
+    "apps/web/components/features/dashboard/atoms/AudienceIntentBadge.tsx": {
+      "long-content": "The badge text is the fixed High, Medium or Low label from AUDIENCE_INTENT_BADGE_STYLES; no caller text reaches it, and DotBadge keeps the pill on one line. The detector matched the label field."
+    },
     "apps/web/components/features/dashboard/atoms/ConfidenceBadge.tsx": {
       "partial": "Its one required score is its only data; size, showLabel and className are presentation switches shown in the Small and WithLabel stories, so nothing can be partially present.",
       "long-content": "Its text is a whole percentage of a 0 to 1 score and one of three fixed level labels, so the longest it can read is '100% Medium', and DotBadge keeps it on one line (AllLevels shows every label)."
+    },
+    "apps/web/components/features/dashboard/atoms/DashboardCard.tsx": {
+      "partial": "DashboardCard is a layout surface whose only data is children; variant, padding, hover and the ARIA passthroughs are presentation options with defaults, so nothing can be partially present.",
+      "permission-denied": "The card gates nothing: the detector matched its role ARIA passthrough prop. Any locked content is the caller's children, which certify their own permission states."
     },
     "apps/web/components/features/dashboard/atoms/DspProviderIcon.tsx": {
       "empty": "It draws one provider's icon and owns no collection that could be empty. The detector matched the items-center class.",
       "partial": "Its one required provider is its only data and every DSP_PROVIDER_IDS entry has a registry name and colour (DspProviderIcon.test.tsx checks this); a provider without a dedicated logo falls back to SocialIcon, the NonStreamingProvider story.",
       "long-content": "Its only text is the provider's fixed registry name, never caller text; AllProviders shows every name, the longest included."
     },
+    "apps/web/components/features/dashboard/atoms/MatchStatusBadge.tsx": {
+      "partial": "status is the only data; size and className are presentation options with defaults, so the badge is drawn whole or not at all. Small and AllStatuses already render with optional props left out.",
+      "long-content": "The badge text is one of four fixed labels from MATCH_STATUS_BADGE_STYLES (longest Auto-confirmed, shown in AllStatuses); no caller text reaches it. The detector matched the label field."
+    },
     "apps/web/components/features/dashboard/dashboard-nav/InboxAttentionLink.tsx": {
       "offline": "InboxAttentionLink never fetches or mutates; it renders the pending count its owner passes, and with no connection that count stays unloaded, which the Partial story shows.",
       "permission-denied": "InboxAttentionLink links to the signed-in Inbox that every account can open and has no gated action; a viewer who cannot reach the dashboard never sees the app rail."
+    },
+    "apps/web/components/features/dashboard/insights/InsightActions.tsx": {
+      "empty": "InsightActions always renders the same Dismiss and Done pair for one insight id and owns no collection; the detector matched the items-center class.",
+      "long-content": "Both labels are fixed copy (Dismiss, Done) and the only prop is the insight id, so no caller text reaches the buttons; the detector matched text- size classes."
+    },
+    "apps/web/components/features/dashboard/insights/InsightCard.tsx": {
+      "empty": "InsightCard renders exactly one insight record and owns no collection; the detector matched the items-start and items-center classes. The empty insight list is InsightsPanel's Empty and EmptyCategory stories."
+    },
+    "apps/web/components/features/dashboard/insights/InsightCategoryIcon.tsx": {
+      "long-content": "The chip draws one fixed aria-hidden glyph per category and lays out no text, so nothing can grow; the detector matched its text- colour class."
+    },
+    "apps/web/components/features/dashboard/molecules/ContactDeleteConfirmDialog.tsx": {
+      "permission-denied": "Anyone who can open the contacts editor can delete a contact; the dialog gates nothing. The detector matched the contact's role field, which only names the contact in the description."
+    },
+    "apps/web/components/features/dashboard/molecules/ContactListRow.tsx": {
+      "empty": "ContactListRow renders exactly one contact and owns no collection; the detector matched the items-center class. A contact with no person, email or territory is PartialRoleOnly.",
+      "permission-denied": "The row is a plain select button with no gated action; the detector matched the contact's role field, which is only its label."
+    },
+    "apps/web/components/features/dashboard/molecules/CopyToClipboardButton.tsx": {
+      "partial": "relativePath is the only data; the labels, icon and callbacks are presentation options with defaults, so the button is drawn whole or not at all. Default renders with every optional label at its default.",
+      "offline": "Copying writes to the local clipboard with no network request, so it behaves the same offline; the detector matched the loading-style isCopying flag. A refused clipboard is ErrorClipboardRefused."
+    },
+    "apps/web/components/features/dashboard/molecules/DashboardRefreshButton.tsx": {
+      "error": "The button has no failure state of its own: it runs the caller's onRefresh (router.refresh in DashboardAnalytics) inside startTransition, and a failed refresh surfaces through that route's error boundary. The detector matched startTransition.",
+      "offline": "No request belongs to the button; an offline refresh fails in the caller's route refresh and its error boundary, not here. LoadingRefreshPending shows the only state the button draws while a refresh is in flight."
+    },
+    "apps/web/components/features/dashboard/molecules/SettingsErrorState.tsx": {
+      "empty": "The card shows one fixed error message for a section and owns no collection; the detector matched the items-center class."
+    },
+    "apps/web/components/features/dashboard/molecules/SettingsStatusPill.tsx": {
+      "partial": "state and status are two ways to pass one of three save states, plus className; a status record with no flag set renders the reserved invisible idle container, which SettingsStatusPill.test.tsx asserts, so no data can be partially shown."
+    },
+    "apps/web/components/features/dashboard/organisms/AnalyticsRankedList.tsx": {
+      "error": "The list makes no request and has no failure state: rows arrive from AnalyticsSidebar, which owns the failed-fetch state (ErrorSevenDayFetch, DidNotLoad). The detector matched the catch in formatRankedLabel, which keeps an undecodable label as written (asserted in AnalyticsRankedList.certificate.test.tsx).",
+      "offline": "The list never fetches; its loading flag comes from AnalyticsSidebar, whose OfflinePausedFirstLoad story shows a paused offline load as this list's skeleton."
+    },
+    "apps/web/components/features/dashboard/organisms/AudiencePanelContext.tsx": {
+      "long-content": "The module is a context provider and hook that render no UI of their own; children pass through untouched, and the detector matched the children prop. The panels and controls that consume it certify their own long-content states.",
+      "rtl-overflow": "The providers draw nothing: they only hold which audience panel is open, so there is no layout to mirror. The detector matched the children prop."
     },
     "apps/web/components/features/dashboard/organisms/DashboardHeader.tsx": {
       "empty": "Every caller passes at least one breadcrumb: useAuthRouteConfig always builds one from the pathname and SettingsSection passes its title, so the header never renders without a title. It owns no collection; the detector matched the items-center class."
@@ -382,11 +693,27 @@
       "empty": "The tab bar is built from fixed navigation config (primaryNavigation, artistNavigation and the settings item), so it always has destinations; only the optional Public Profile row depends on data, and DashboardMobileTabs.test.tsx covers its absence. The detector matched the .map calls over that config.",
       "long-content": "Every label it shows is fixed navigation copy, never caller text; the profile link carries only an href under the fixed Public Profile label. The Default story already renders at the 320px mobile1 viewport."
     },
+    "apps/web/components/features/dashboard/organisms/OnboardingFormWrapper.tsx": {
+      "permission-denied": "Detector false positive: SIDEBAR_STEP_KEYS lists 'plan' as a loading-shell step key; the wrapper has no plan or permission gate."
+    },
+    "apps/web/components/features/dashboard/organisms/OnboardingHandleOnlyForm.tsx": {
+      "permission-denied": "Detector false positive: the sidebar step list has { id: 'upgrade', label: 'Plan' }; the handle step has no plan or permission gate."
+    },
+    "apps/web/components/features/dashboard/organisms/PreviewDataHydrator.tsx": {
+      "long-content": "The hydrator returns null and lays out no text; link titles and the display name it hands to PreviewPanelContext are drawn by the profile rail, which certifies its own long-content states. The detector matched title and displayName fields.",
+      "rtl-overflow": "It renders nothing (PreviewDataHydrator.certificate.test.tsx asserts an empty container), so there is no layout to mirror; the profile rail it registers owns direction."
+    },
     "apps/web/components/features/dashboard/organisms/ReleaseTablePendingShell.tsx": {
       "empty": "The shell is the releases route's loading surface: it always draws a fixed SKELETON_ROW_COUNT.TABLE of skeleton rows and owns no data collection that could be empty. The detector matched the skeletonRows prop and the rows of its column config.",
       "partial": "It takes no data. Its only optional props are showHeader, whose headerless variant is the NoHeader story, and a test id, so nothing can be partially present.",
       "long-content": "It renders no caller text: the column headers are fixed product copy and every cell is a skeleton bar. The detector matched its aria-label.",
       "offline": "The shell does no network work; it is what the route shows while its data loads, so going offline cannot change what it draws (the route's own error boundary owns failed loads)."
+    },
+    "apps/web/components/features/dashboard/organisms/SettingsAnalyticsSection.tsx": {
+      "long-content": "Copy is fixed: \"Traffic Quality Filtering\" with \"High quality only\" / \"All traffic\"; no user-supplied text renders."
+    },
+    "apps/web/components/features/dashboard/organisms/SettingsAppearanceSection.tsx": {
+      "long-content": "Copy is fixed: THEME_OPTIONS labels and descriptions plus \"High Contrast\"; no user-supplied text renders."
     },
     "apps/web/components/features/dashboard/release-tasks/ReleaseTaskEmptyState.tsx": {
       "offline": "The empty state makes no request: generating the plan is the parent checklist's onSetUp, which owns the network call and its failure. The detector matched the isLoading prop, shown in LoadingGeneratingPlan.",
