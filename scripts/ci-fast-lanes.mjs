@@ -944,6 +944,7 @@ export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
   'scripts/lib/__tests__/source-drift.test.mjs',
   'scripts/lib/__tests__/typecheck-slot.test.mjs',
   'scripts/preflight.test.mjs',
+  'scripts/preflight-step-control.test.mjs',
   'scripts/installation-budget-sentinel.test.mjs',
   'scripts/layout-guard-pen-contracts.test.mjs',
   'scripts/invariants/shell-ia.test.mjs', // JOV-INV-047 shell+IA registry.
