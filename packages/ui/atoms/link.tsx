@@ -17,18 +17,18 @@ const linkVariants = cva(
       variant: {
         default: [
           'text-(--color-link-default) hover:text-(--color-link-hover) hover:underline',
-          'visited:text-(--color-link-visited)',
-          'active:text-(--color-accent) data-[state=active]:text-(--color-accent)',
+          'visited:text-(--color-link-visited) data-[state=visited]:not-hover:not-active:text-(--color-link-visited)',
+          'active:text-(--color-link-hover) data-[state=active]:text-(--color-link-hover)',
         ],
         subtle: [
           'text-(--linear-text-secondary) hover:text-(--color-link-hover) hover:underline',
-          'visited:text-(--color-link-visited)',
-          'active:text-(--color-accent) data-[state=active]:text-(--color-accent)',
+          'visited:text-(--color-link-visited) data-[state=visited]:not-hover:not-active:text-(--color-link-visited)',
+          'active:text-(--color-link-hover) data-[state=active]:text-(--color-link-hover)',
         ],
         inline: [
           'text-primary-token underline decoration-(--linear-border-default) hover:decoration-(--color-link-hover)',
-          'visited:text-(--color-link-visited) visited:decoration-(--color-link-visited)',
-          'active:text-(--color-accent) active:decoration-(--color-accent) data-[state=active]:text-(--color-accent) data-[state=active]:decoration-(--color-accent)',
+          'visited:text-(--color-link-visited) visited:decoration-(--color-link-visited) data-[state=visited]:not-hover:not-active:text-(--color-link-visited) data-[state=visited]:not-hover:not-active:decoration-(--color-link-visited)',
+          'active:text-(--color-link-hover) active:decoration-(--color-link-hover) data-[state=active]:text-(--color-link-hover) data-[state=active]:decoration-(--color-link-hover)',
         ],
         compact: '',
       },
