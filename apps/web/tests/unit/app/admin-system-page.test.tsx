@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -87,9 +87,8 @@ describe('AdminSystemPage', () => {
       'roster'
     );
     expect(screen.getByTestId('agent-roster')).toBeVisible();
-    expect(
-      screen.getAllByTestId('agent-room-agent').map(row => row.textContent)
-    ).toContain('Summer');
+    const rosterRows = screen.getAllByTestId('agent-room-agent');
+    expect(within(rosterRows[0]).getByText('Summer')).toBeInTheDocument();
     expect(mockAdminSystemMap).not.toHaveBeenCalled();
     expect(
       screen.queryByRole('heading', { name: 'Agents' })

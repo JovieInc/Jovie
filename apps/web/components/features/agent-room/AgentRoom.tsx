@@ -120,7 +120,7 @@ export function AgentRoom({
         surface='details'
         as='section'
         aria-label='Agents'
-        className='flex min-h-0 min-w-0 flex-col'
+        className='flex min-w-0 flex-col overflow-hidden'
       >
         <div className='flex shrink-0 items-center justify-between gap-2 px-3 pt-3'>
           <h2 className='text-2xs font-semibold text-balance text-tertiary-token'>
@@ -141,7 +141,7 @@ export function AgentRoom({
         surface='details'
         as='section'
         aria-label='Activity'
-        className='flex min-h-0 min-w-0 flex-col lg:col-span-2'
+        className='flex min-w-0 flex-col overflow-hidden lg:col-span-2'
       >
         <div className='flex shrink-0 items-center justify-between gap-2 px-3 pt-3'>
           <h2 className='text-2xs font-semibold text-balance text-tertiary-token'>
