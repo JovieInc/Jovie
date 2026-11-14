@@ -961,6 +961,7 @@ export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
   'scripts/product-crawl/overlay-walk.test.mjs',
   'scripts/product-crawl/ready-gate.test.mjs',
   'scripts/product-crawl/sample-params.test.mjs',
+  'scripts/product-crawl/shard.test.mjs',
   'scripts/product-crawl/throttle.test.mjs',
   'scripts/positioning/positioning.test.mjs',
   'scripts/funnel-judge/preview-gate.test.mjs',
