@@ -1,9 +1,7 @@
 'use client';
 
 import { shortTooltipTitle } from '@jovie/copy/tooltip-copy';
-import { IconButton } from '@jovie/ui';
-import { ArrowUp, AudioLines, Download, X } from 'lucide-react';
-import Link from 'next/link';
+import { ArrowUp, AudioLines, Download } from 'lucide-react';
 import {
   type ReactNode,
   useEffect,
@@ -13,11 +11,11 @@ import {
   useSyncExternalStore,
 } from 'react';
 import { banner } from '@/components/feedback/banner-store';
-import { APP_ROUTES } from '@/constants/routes';
 import { useReducedMotion } from '@/lib/hooks/useReducedMotion';
 import type { WhatsNewEntry } from '@/lib/whats-new';
 import { InstallBanner } from './InstallBanner';
 import { SidebarBottomNowPlaying } from './SidebarBottomNowPlaying';
+import { DockUpdateCard, DockWhatsNewCard } from './SidebarDockCards';
 
 export interface SidebarDockStatus {
   readonly badges: ReactNode;
@@ -248,46 +246,20 @@ export function SidebarDock({
         ref={regionRef}
         data-sidebar-dock='true'
         aria-label='Sidebar Dock'
-        className='flex shrink-0 flex-col gap-1 overflow-visible px-2'
+        className='flex shrink-0 flex-col gap-1 overflow-visible px-3 pb-(--space-2-5) empty:pb-0'
       >
         {!collapsed && showUpdate && selected('update') ? (
-          <section
-            data-dock-card='update'
-            aria-label='App Update'
-            // min-h-9 holds the control's fixed row while its chunk loads.
-            className='min-h-9 rounded-md border border-subtle bg-sidebar px-2'
-          >
-            {updateControl?.node}
-          </section>
+          <DockUpdateCard>{updateControl?.node}</DockUpdateCard>
         ) : null}
         {!collapsed && showRelease && release && selected('release') ? (
-          <section
-            data-dock-card='whats-new'
-            aria-label="What's New"
-            className='flex items-center gap-1 rounded-md border border-subtle bg-sidebar p-2'
-          >
-            <Link
-              href={APP_ROUTES.CHANGELOG}
-              prefetch={false}
-              onClick={markSeen}
-              className='min-w-0 flex-1 rounded-sm text-xs text-primary-token focus-ring-themed'
-            >
-              <span className='block font-medium'>What&apos;s new</span>
-              <span className='block truncate text-2xs text-secondary-token'>
-                {release.title}
-              </span>
-            </Link>
-            <IconButton
-              size='sm'
-              ariaLabel="Dismiss what's new"
-              onClick={() => {
-                returnFocus();
-                markSeen();
-              }}
-            >
-              <X className='size-3' />
-            </IconButton>
-          </section>
+          <DockWhatsNewCard
+            title={release.title}
+            onOpen={markSeen}
+            onDismiss={() => {
+              returnFocus();
+              markSeen();
+            }}
+          />
         ) : null}
         {!collapsed && showAudio && audio ? (
           <div

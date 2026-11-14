@@ -1,7 +1,12 @@
 'use client';
 
 // @coverage-via apps/web/tests/unit/user-button/UsageMenuItem.test.tsx
-import { Button } from '@jovie/ui';
+import {
+  Button,
+  INSET_PANEL_ICON_COLUMN,
+  INSET_PANEL_ROW_INTERACTIVE,
+  INSET_PANEL_ROW_LAYOUT,
+} from '@jovie/ui';
 import { ChevronDown, ChevronRight, ExternalLink, Gauge } from 'lucide-react';
 import Link from 'next/link';
 import { type ReactNode, useEffect, useId, useRef, useState } from 'react';
@@ -17,6 +22,7 @@ import { env } from '@/lib/env-client';
 import { useChatUsageQuery } from '@/lib/queries';
 import type { ChatUsageData } from '@/lib/queries/useChatUsageQuery';
 import { cn } from '@/lib/utils';
+import { ACCOUNT_LOADING_FILL } from './account-loading-fill';
 
 interface UsageMenuItemProps {
   readonly usageStatsUrl: string;
@@ -154,16 +160,23 @@ export function UsageMenuItem({
         onClick={toggleExpanded}
         aria-expanded={expanded}
         aria-controls={detailsId}
-        className='min-h-8 w-full justify-start gap-2 rounded-none px-2.5 py-1.5 text-left text-app font-normal text-secondary-token hover:text-secondary-token focus-visible:bg-interactive-hover'
+        className={cn(
+          INSET_PANEL_ROW_LAYOUT,
+          INSET_PANEL_ROW_INTERACTIVE,
+          'w-full justify-start text-left font-normal'
+        )}
       >
-        <span className='flex h-4 w-4 shrink-0 items-center justify-center text-tertiary-token'>
+        <span className={INSET_PANEL_ICON_COLUMN}>
           <Gauge className='h-4 w-4' aria-hidden />
         </span>
         <span className='min-w-0 flex-1'>Usage remaining</span>
         <span className='shrink-0 tabular-nums text-tertiary-token'>
           {isLoading ? (
             <span
-              className='inline-block h-3 w-8 animate-pulse rounded bg-surface-2 motion-reduce:animate-none'
+              className={cn(
+                'inline-block h-3 w-8 animate-pulse rounded motion-reduce:animate-none',
+                ACCOUNT_LOADING_FILL
+              )}
               aria-hidden
             />
           ) : (
