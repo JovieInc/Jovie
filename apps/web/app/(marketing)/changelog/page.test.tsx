@@ -106,14 +106,19 @@ vi.mock('@/components/marketing/changelog/ChangelogSubscribeColumn', () => ({
   ChangelogSubscribeColumn: () => <div data-testid='changelog-subscribe' />,
 }));
 
+const footerCtaProps: object[] = [];
 vi.mock('@/components/site/MarketingFooterCta', () => ({
-  MarketingFooterCta: () => <div data-testid='marketing-footer-cta' />,
+  MarketingFooterCta: (props: object) => {
+    footerCtaProps.push(props);
+    return <div data-testid='marketing-footer-cta' />;
+  },
 }));
 
 import ChangelogPage, { metadata } from './page';
 
 describe('public changelog page', () => {
   beforeEach(() => {
+    footerCtaProps.length = 0;
     currentSnapshot = reviewedSnapshot(SNAPSHOT);
   });
   it('does not describe older empty slots as newer than a published daily update', async () => {
@@ -132,36 +137,60 @@ describe('public changelog page', () => {
     expect(screen.queryByRole('status')).not.toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'October 2026' })).toBeVisible();
   });
-  it.each(['empty', 'undated'] as const)(
-    'reports %s publication without inventing a date or update',
-    async kind => {
-      currentSnapshot = {
-        ...SNAPSHOT,
-        releases:
-          kind === 'empty' ? [] : [{ ...SNAPSHOT.releases[0], date: '' }],
-      };
-      render(await ChangelogPage());
-      expect(screen.getByRole('status')).toHaveTextContent(
-        kind === 'empty'
-          ? 'No customer updates have been published yet.'
-          : 'The latest published update is listed below.'
-      );
-    }
-  );
-  it('keeps one customer-facing heading and discloses unpublished source slots', async () => {
+  it('renders the empty state without inventing a date or update', async () => {
+    currentSnapshot = { ...SNAPSHOT, releases: [] };
+    render(await ChangelogPage());
+    expect(screen.getByText('No updates yet. Check back soon!')).toBeVisible();
+    expect(screen.queryByRole('article')).not.toBeInTheDocument();
+  });
+
+  it('keeps one plain page heading and no pipeline vocabulary', async () => {
+    const { container } = render(await ChangelogPage());
+
+    expect(
+      screen.getAllByRole('heading', { level: 1, name: 'Changelog' })
+    ).toHaveLength(1);
+    expect(
+      screen.getByText('New features, improvements and fixes in Jovie.')
+    ).toBeVisible();
+    expect(screen.getByTestId('changelog-subscribe')).toBeInTheDocument();
+    expect(container).not.toHaveTextContent(/source-backed|release slots/i);
+    expect(screen.queryByText('Product update')).not.toBeInTheDocument();
+  });
+
+  it('never promotes a bare area label to a headline', async () => {
     render(await ChangelogPage());
 
     expect(
-      screen.getAllByRole('heading', { level: 1, name: "What's new in Jovie" })
-    ).toHaveLength(1);
-    expect(screen.getByText('Changelog')).toBeVisible();
-    expect(screen.getByRole('status')).toHaveTextContent(
-      'The latest published update is August 31, 2026.'
-    );
-    expect(
-      screen.getByLabelText('Subscribe To Changelog Updates')
+      screen.getByRole('heading', {
+        level: 3,
+        name: 'Library filters: one catalog for every stage.',
+      })
     ).toBeVisible();
-    expect(screen.queryByText('Product update')).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('heading', { name: 'Library filters' })
+    ).not.toBeInTheDocument();
+  });
+
+  it('describes each rendered post to answer engines as structured data', async () => {
+    const { container } = render(await ChangelogPage());
+
+    const schema = JSON.parse(
+      container.querySelector('script[type="application/ld+json"]')
+        ?.textContent ?? '{}'
+    );
+    expect(schema['@type']).toBe('Blog');
+    expect(schema.url).toMatch(/\/changelog$/);
+    const headings = screen
+      .getAllByRole('heading', { level: 3 })
+      .map(heading => heading.textContent);
+    expect(schema.blogPost.length).toBeGreaterThan(0);
+    for (const post of schema.blogPost) {
+      expect(post['@type']).toBe('BlogPosting');
+      expect(headings).toContain(post.headline);
+      expect(post.datePublished).toMatch(/^\d{4}-\d{2}-\d{2}/);
+      expect(post.url).toMatch(/\/changelog#.+/);
+    }
   });
 
   it('uses a descriptive product-update title for search and sharing', () => {
@@ -170,17 +199,10 @@ describe('public changelog page', () => {
     );
   });
 
-  it('renders a matte hero and exactly one footer CTA', async () => {
+  it('renders exactly one footer CTA on the shared claim-profile intent', async () => {
     render(await ChangelogPage());
 
-    expect(
-      screen.queryByTestId('changelog-hero-photo')
-    ).not.toBeInTheDocument();
-    expect(
-      screen.getByRole('heading', { level: 1, name: "What's new in Jovie" })
-    ).toBeVisible();
-    // Route owns its final CTA (MarketingFooterCta) instead of stacking
-    // the generic footer request-access banner on top of it (spec rule 2).
     expect(screen.getAllByTestId('marketing-footer-cta')).toHaveLength(1);
+    expect(footerCtaProps).toEqual([{}]);
   });
 });

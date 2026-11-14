@@ -284,6 +284,7 @@ describe('homepage contract', { timeout: 60_000 }, () => {
     // root with an anchor, so the fragment must name an id the homepage
     // actually renders. A renamed target (e.g. the old claim input)
     // otherwise silently dead-ends every dependent CTA at the top of `/`.
+    const HOMEPAGE_FRAGMENT_HREF = /['"`]\/#([A-Za-z0-9][A-Za-z0-9_-]*)['"`]/g;
     const anchors = new Set<string>();
     const collectAnchors = (dir: string): void => {
       for (const entry of readdirSync(dir, { withFileTypes: true })) {
@@ -297,9 +298,7 @@ describe('homepage contract', { timeout: 60_000 }, () => {
           /\.(ts|tsx)$/.test(entry.name) &&
           !/(\.test\.|\.spec\.|\.stories\.)/.test(entry.name)
         ) {
-          for (const match of read(path).matchAll(
-            /['"`]\/#([A-Za-z0-9][A-Za-z0-9_-]*)['"`]/g
-          )) {
+          for (const match of read(path).matchAll(HOMEPAGE_FRAGMENT_HREF)) {
             anchors.add(match[1]);
           }
         }
@@ -308,12 +307,16 @@ describe('homepage contract', { timeout: 60_000 }, () => {
     collectAnchors('app');
     collectAnchors('components');
 
+    // The changelog footer was the last `/#fragment` link; it now uses the
+    // shared claim CTA, so an empty set is valid. The pattern is proven on a
+    // fixture instead, so the scan cannot go stale silently.
     expect(
-      anchors.size,
-      `no homepage fragment anchors found — the guard scan went stale: ${[
-        ...anchors,
-      ].join(', ')}`
-    ).toBeGreaterThan(0);
+      [
+        ...`href='/#claim-name' "/#faq" '/pricing#plans'`.matchAll(
+          HOMEPAGE_FRAGMENT_HREF
+        ),
+      ].map(match => match[1])
+    ).toEqual(['claim-name', 'faq']);
     const missing = [...anchors].filter(id => !renderedIds.has(id));
     expect(missing).toEqual([]);
   });
