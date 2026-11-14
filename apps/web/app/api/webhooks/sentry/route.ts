@@ -20,7 +20,6 @@ import { ServerFetchTimeoutError, serverFetch } from '@/lib/http/server-fetch';
 import {
   isNonActionableDestinationStreamIssue,
   isNonActionableLoopbackBetterAuthHostIssue,
-  isNonActionableMerchGenerationRecoveryIssue,
   isNonActionableOwnerIdentityVerifiedMergeGuardIssue,
   isNonActionableSpotifyReleaseCreditBoundIssue,
   isNonActionableUpstashErrorBag,
@@ -340,21 +339,6 @@ export async function POST(request: NextRequest) {
           received: true,
           skipped: true,
           reason: 'owner-verified-merge-guard',
-        },
-        { headers: NO_STORE_HEADERS }
-      );
-    }
-
-    if (isNonActionableMerchGenerationRecoveryIssue({ title, culprit })) {
-      logger.info(
-        '[Sentry Webhook] Skipping autofix for merch generation recovery receipt',
-        { issueId, title, culprit }
-      );
-      return NextResponse.json(
-        {
-          received: true,
-          skipped: true,
-          reason: 'merch-generation-recovery-receipt',
         },
         { headers: NO_STORE_HEADERS }
       );

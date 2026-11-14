@@ -31,7 +31,6 @@ import {
   type SentryMode,
 } from '@/lib/sentry/init';
 import {
-  isMerchGenerationRecoveryReceiptCapture,
   isMusicfetchCutoverCapture,
   isOpaqueUpstashErrorJsonBag,
   isOwnerIdentityVerifiedMergeGuardCapture,
@@ -323,20 +322,13 @@ export async function captureError(
   const ownerMergeGuard =
     isOwnerIdentityVerifiedMergeGuardCapture(message) ||
     isOwnerIdentityVerifiedMergeGuardCapture(resolvedError);
-  // Merch generation recovery receipt (JOV-12581 / Sentry 7847611605): the
-  // queue-tick reconciler succeeding is the designed fail-safe, not an
-  // error. Keep console + analytics; never file a Sentry exception.
-  const merchRecoveryReceipt =
-    isMerchGenerationRecoveryReceiptCapture(message) ||
-    isMerchGenerationRecoveryReceiptCapture(resolvedError);
 
   if (
     !opaqueBag &&
     !quotaNoise &&
     !boundedCreditReceipt &&
     !musicfetchCutover &&
-    !ownerMergeGuard &&
-    !merchRecoveryReceipt
+    !ownerMergeGuard
   ) {
     sendToSentry({
       error: resolvedError ?? message,

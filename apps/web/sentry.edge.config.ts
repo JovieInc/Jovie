@@ -11,16 +11,18 @@ import {
 } from '@/lib/sentry/config';
 import { LOW_VALUE_SPAN_FILTERS } from '@/lib/sentry/low-value-spans';
 import {
+  isNonActionableMerchGenerationRecoveryEvent,
+  MERCH_GENERATION_RECOVERY_IGNORE_ERRORS,
+} from '@/lib/sentry/merch-recovery-receipt';
+import {
   DESTINATION_STREAM_CLOSED_IGNORE_ERRORS,
   isNonActionableDestinationStreamEvent,
   isNonActionableLoopbackBetterAuthHostEvent,
-  isNonActionableMerchGenerationRecoveryEvent,
   isNonActionableOwnerIdentityVerifiedMergeGuardEvent,
   isNonActionableVercelIpcEvent,
   isTransientInfraHttpTransaction,
   isUpstashQuotaSentryEvent,
   LOOPBACK_BETTER_AUTH_HOST_IGNORE_ERRORS,
-  MERCH_GENERATION_RECOVERY_IGNORE_ERRORS,
   MUSICFETCH_CUTOVER_IGNORE_ERRORS,
   OWNER_IDENTITY_VERIFIED_MERGE_GUARD_IGNORE_ERRORS,
   SPOTIFY_RELEASE_CREDIT_BOUND_IGNORE_ERRORS,

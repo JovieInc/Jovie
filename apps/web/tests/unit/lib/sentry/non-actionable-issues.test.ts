@@ -2,14 +2,11 @@ import { describe, expect, it } from 'vitest';
 
 import {
   DESTINATION_STREAM_CLOSED_IGNORE_ERRORS,
-  isMerchGenerationRecoveryReceiptCapture,
   isMusicfetchCutoverCapture,
   isNonActionableDestinationStreamEvent,
   isNonActionableDestinationStreamIssue,
   isNonActionableLoopbackBetterAuthHostEvent,
   isNonActionableLoopbackBetterAuthHostIssue,
-  isNonActionableMerchGenerationRecoveryEvent,
-  isNonActionableMerchGenerationRecoveryIssue,
   isNonActionableOwnerIdentityVerifiedMergeGuardEvent,
   isNonActionableOwnerIdentityVerifiedMergeGuardIssue,
   isNonActionableSpotifyReleaseCreditBoundEvent,
@@ -27,7 +24,6 @@ import {
   isUpstashQuotaNoise,
   isUpstashQuotaSentryEvent,
   LOOPBACK_BETTER_AUTH_HOST_IGNORE_ERRORS,
-  MERCH_GENERATION_RECOVERY_IGNORE_ERRORS,
   MUSICFETCH_CUTOVER_IGNORE_ERRORS,
   MUSICFETCH_REMEDIATION_ISSUE,
   OWNER_IDENTITY_VERIFIED_MERGE_GUARD_IGNORE_ERRORS,
@@ -687,68 +683,6 @@ describe('non-actionable Sentry issues', () => {
       ).toBe(false);
       expect(
         isNonActionableOwnerIdentityVerifiedMergeGuardEvent({
-          exception: { values: [{ value: 'Unauthorized' }] },
-        })
-      ).toBe(false);
-    });
-  });
-
-  describe('merch generation recovery receipt (JOV-12581 / Sentry 7847611605)', () => {
-    const receiptTitle =
-      'Error: [merch-generation-recovery] reconciled stale merch generation work';
-
-    it('matches the Sentry/Linear title', () => {
-      expect(
-        isNonActionableMerchGenerationRecoveryIssue({ title: receiptTitle })
-      ).toBe(true);
-      expect(
-        MERCH_GENERATION_RECOVERY_IGNORE_ERRORS.some(pattern =>
-          pattern.test(receiptTitle)
-        )
-      ).toBe(true);
-    });
-
-    it('matches the capture message string and Error form', () => {
-      expect(
-        isMerchGenerationRecoveryReceiptCapture(
-          '[merch-generation-recovery] reconciled stale merch generation work'
-        )
-      ).toBe(true);
-      expect(
-        isMerchGenerationRecoveryReceiptCapture(new Error(receiptTitle))
-      ).toBe(true);
-      expect(isMerchGenerationRecoveryReceiptCapture(undefined)).toBe(false);
-    });
-
-    it('matches a Sentry exception event', () => {
-      expect(
-        isNonActionableMerchGenerationRecoveryEvent({
-          exception: {
-            values: [
-              {
-                type: 'Error',
-                value:
-                  '[merch-generation-recovery] reconciled stale merch generation work',
-              },
-            ],
-          },
-        })
-      ).toBe(true);
-    });
-
-    it('does not match reconciler failures or unrelated captures', () => {
-      expect(
-        isNonActionableMerchGenerationRecoveryIssue({
-          title: 'Error: Failed query: select from merch_generation_batches',
-        })
-      ).toBe(false);
-      expect(
-        isMerchGenerationRecoveryReceiptCapture(
-          '[merch-generation-recovery] reconciliation failed'
-        )
-      ).toBe(false);
-      expect(
-        isNonActionableMerchGenerationRecoveryEvent({
           exception: { values: [{ value: 'Unauthorized' }] },
         })
       ).toBe(false);

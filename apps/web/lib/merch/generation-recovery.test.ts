@@ -8,9 +8,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
  * was cut off. Options stuck in `pending_mockup` are failed with reason
  * `enrichment_timeout` via a conditional update that never clobbers a late
  * success; batches stuck in `generating` are failed. Bounded, idempotent,
- * and reported at warning level through the capture helper (console +
- * analytics; the production logger is a no-op, and the Sentry filing for
- * this designed-path receipt is intentionally dropped per JOV-12581).
+ * and reported to Sentry at warning level (the production logger is a
+ * no-op).
  */
 
 const hoisted = vi.hoisted(() => ({
