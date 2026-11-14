@@ -443,9 +443,7 @@ function loadBody(args, cwd) {
 
 /** Run the shared Private Data Guard from the pinned JovieInc/ci workflow. */
 export async function privateDataCheck(cwd, env, mergeBase) {
-  // Loaded here, not at the top, so a checkout without node_modules reaches
-  // checkPrerequisites and prints the install fix instead of crashing.
-  const { load: yamlLoad } = await import('js-yaml');
+  const { load: yamlLoad } = await import('js-yaml'); // lazy: missing deps reach checkPrerequisites
   const wfPath = path.join(cwd, '.github/workflows/private-data-guard.yml');
   if (!existsSync(wfPath)) return { skip: 'no private-data-guard workflow' };
   const wf = /** @type {any} */ (yamlLoad(readFileSync(wfPath, 'utf8')));
