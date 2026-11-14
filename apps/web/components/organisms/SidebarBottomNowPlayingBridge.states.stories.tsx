@@ -18,11 +18,14 @@ function withCapturedTrack(track: AudioTrackSource): Decorator {
     useEffect(() => captureTrackPlayback(track, 214, 48), []);
     return <>{children}</>;
   }
-  return Story => (
-    <CapturedTrack>
-      <Story />
-    </CapturedTrack>
-  );
+  function WithCapturedTrack(Story: Parameters<Decorator>[0]) {
+    return (
+      <CapturedTrack>
+        <Story />
+      </CapturedTrack>
+    );
+  }
+  return WithCapturedTrack;
 }
 
 const meta = {
