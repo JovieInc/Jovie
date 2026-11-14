@@ -1,4 +1,4 @@
-import { render, waitFor } from '@testing-library/react';
+import { act, render, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ElectronAPI } from '@/lib/desktop/electron-bridge';
 import { expectNoA11yViolations } from '@/tests/utils/a11y';
@@ -63,6 +63,9 @@ describe('DesktopTitlebarSlot', () => {
       } satisfies ElectronAPI,
     });
     const { container } = render(<DesktopTitlebarSlot />);
+    await act(async () => {
+      await vi.dynamicImportSettled();
+    });
     await waitFor(() => {
       expect(
         document.querySelector('[data-testid="electron-titlebar-row"]')

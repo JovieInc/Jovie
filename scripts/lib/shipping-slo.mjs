@@ -19,56 +19,25 @@
  *     bottleneck investigation even without an absolute regression
  */
 
+import {
+  DEFAULT_THRESHOLDS,
+  defFor,
+  METRIC_DEFS,
+} from './shipping-slo-baseline.mjs';
+
+export {
+  appendDailyHistory,
+  DEFAULT_THRESHOLDS,
+  HISTORY_DAYS,
+  METRIC_DEFS,
+  ratchetBaseline,
+  SHIPPING_SLO_SCHEMA_VERSION,
+  stageHistorySummary,
+  validateBaseline,
+  WINDOW_DAYS,
+} from './shipping-slo-baseline.mjs';
+
 import { computePercentile } from './ci-duration-ratchet.mjs';
-
-export const SHIPPING_SLO_SCHEMA_VERSION = 1;
-export const WINDOW_DAYS = 7;
-export const HISTORY_DAYS = 42;
-
-export const DEFAULT_THRESHOLDS = Object.freeze({
-  improvementFraction: 0.1,
-  improvementHoldDays: 3,
-  regressionFraction: 0.2,
-  throughputDropFraction: 0.2,
-  wowGrowthTarget: 0.08,
-  flatGrowthWeeks: 2,
-});
-
-/** Declared SLO metrics. direction: which way is "better". */
-export const METRIC_DEFS = Object.freeze([
-  { key: 'ci_walltime.pull_request.p95', unit: 'seconds', direction: 'lower' },
-  { key: 'ci_walltime.merge_group.p95', unit: 'seconds', direction: 'lower' },
-  { key: 'merge_queue.wait.p95', unit: 'seconds', direction: 'lower' },
-  { key: 'merge_queue.ejection_rate', unit: 'ratio', direction: 'lower' },
-  { key: 'lead_time.devin.p95', unit: 'seconds', direction: 'lower' },
-  { key: 'lead_time.codex.p95', unit: 'seconds', direction: 'lower' },
-  { key: 'lead_time.other.p95', unit: 'seconds', direction: 'lower' },
-  {
-    key: 'remediation.pr_red_to_green.p95',
-    unit: 'seconds',
-    direction: 'lower',
-  },
-  {
-    key: 'remediation.main_red_to_green.p95',
-    unit: 'seconds',
-    direction: 'lower',
-  },
-  {
-    key: 'remediation.production_promote_hold.p95',
-    unit: 'seconds',
-    direction: 'lower',
-    // No collector feeds promote-hold intervals yet (JOV-8082); the evaluator
-    // skips unsupported metrics and validateBaseline rejects baselining them.
-    unsupported: true,
-  },
-  {
-    key: 'production_lag.merged_to_verified.p95',
-    unit: 'seconds',
-    direction: 'lower',
-  },
-  { key: 'throughput.merges_per_day', unit: 'per_day', direction: 'higher' },
-  { key: 'throughput.verified_per_day', unit: 'per_day', direction: 'higher' },
-]);
 
 const DAY_MS = 86_400_000;
 const secondsBetween = (from, to) => {
@@ -89,6 +58,27 @@ export function prLane(pr) {
   if (['devin', 'codex', 'claude', 'devin-ai-integration'].includes(first))
     return first === 'devin-ai-integration' ? 'devin' : first;
   if (/^devin\//.test(ref)) return 'devin';
+  return 'other';
+}
+
+/**
+ * Provider classifier from the branch prefix alone (no extra API calls) —
+ * prefix evidence sampled on JovieInc/Jovie, 2026-11-10:
+ *   - `hyperagent/*`: 48 branch heads, 8 merged PRs (all authored
+ *     itstimwhite via the GitHub App, like every agent lane — the prefix is
+ *     the only discriminator) → 'hyperagent'.
+ *   - `glm/*`: 95 branch heads, 21 merged PRs → 'glm' (GLM coding agents).
+ *   - `gem/*`: zero branch heads in the repo, so Gem stays in 'other' until a
+ *     branch prefix or label actually appears (no invented mapping).
+ * The ratchet keys `prLane`/`lead_time.devin|codex|other` are unchanged; this
+ * finer split feeds the daily history row and gistSlo.leadTimeByProvider only.
+ */
+const PROVIDER_PREFIXES = new Set(['devin', 'codex', 'hyperagent', 'glm']);
+export function prProvider(pr) {
+  const ref = String(pr?.headRefName ?? pr?.head_ref ?? '').toLowerCase();
+  const first = ref.split('/')[0] || '';
+  if (first === 'devin' || first === 'devin-ai-integration') return 'devin';
+  if (PROVIDER_PREFIXES.has(first)) return first;
   return 'other';
 }
 
@@ -174,6 +164,23 @@ export function leadTimeByLane(prs, sinceMs, nowMs) {
   const out = {};
   for (const [lane, values] of Object.entries(byLane))
     out[lane] = percentiles(values);
+  return out;
+}
+
+/** PR lead time (createdAt → mergedAt) percentiles grouped by provider. */
+export function leadTimeByProvider(prs, sinceMs, nowMs) {
+  const byProvider = {};
+  for (const pr of prs ?? []) {
+    if (!pr?.mergedAt || !pr?.createdAt) continue;
+    const mergedAt = Date.parse(pr.mergedAt);
+    if (mergedAt < sinceMs || mergedAt > nowMs) continue;
+    const seconds = secondsBetween(pr.createdAt, pr.mergedAt);
+    if (!seconds) continue;
+    (byProvider[prProvider(pr)] ||= []).push(seconds);
+  }
+  const out = {};
+  for (const [provider, values] of Object.entries(byProvider))
+    out[provider] = percentiles(values);
   return out;
 }
 
@@ -405,8 +412,6 @@ export function flattenMetrics(metrics) {
   return flat;
 }
 
-const defFor = key => METRIC_DEFS.find(d => d.key === key);
-
 function isImproved(key, observed, base, fraction) {
   const def = defFor(key);
   if (!def || observed === null || !Number.isFinite(base)) return false;
@@ -516,50 +521,6 @@ export function evaluateShippingSlo(flat, baseline, { today = null } = {}) {
   return { regressions, tightenCandidates, flatStall, thresholds };
 }
 
-/**
- * Produce the next baseline document: tightened values for held improvements,
- * today's snapshot appended to rolling history. Never worsens a baseline.
- */
-export function ratchetBaseline(baseline, flat, evaluation, { now }) {
-  const iso = new Date(now).toISOString();
-  const date = iso.slice(0, 10);
-  const next = JSON.parse(JSON.stringify(baseline));
-  next.schemaVersion = SHIPPING_SLO_SCHEMA_VERSION;
-  next.updatedAt = iso;
-  next.metrics ||= {};
-  const tightened = [];
-  for (const cand of evaluation?.tightenCandidates ?? []) {
-    const def = defFor(cand.key);
-    const cur = Number(next.metrics[cand.key]?.value ?? next.metrics[cand.key]);
-    if (!def || !Number.isFinite(cur)) continue;
-    const better =
-      def.direction === 'lower' ? cand.observed < cur : cand.observed > cur;
-    if (!better) continue;
-    next.metrics[cand.key] = {
-      value: Math.round(cand.observed * 1000) / 1000,
-      unit: def.unit,
-      direction: def.direction,
-      ratchetedAt: iso,
-    };
-    tightened.push(cand.key);
-  }
-  const values = {};
-  for (const [key, value] of Object.entries(flat))
-    if (Number.isFinite(value)) values[key] = value;
-  next.history = [
-    ...(next.history ?? []),
-    {
-      date,
-      values,
-      throughput: {
-        wowGrowth: flat.throughput_wow_growth ?? null,
-        growthTrend: flat.throughput_growth_trend ?? null,
-      },
-    },
-  ].slice(-HISTORY_DAYS);
-  return { next, tightened };
-}
-
 /** Compact `slo` block for the Symphony lanes status gist. */
 export function buildGistSloBlock(flat, evaluation, { now }) {
   const pick = key => flat[key] ?? null;
@@ -594,25 +555,3 @@ export function buildGistSloBlock(flat, evaluation, { now }) {
 }
 
 /** Structural validation of the committed baseline document. */
-export function validateBaseline(baseline) {
-  const errors = [];
-  if (!baseline || typeof baseline !== 'object')
-    return { ok: false, errors: ['baseline must be an object'] };
-  if (baseline.schemaVersion !== SHIPPING_SLO_SCHEMA_VERSION)
-    errors.push(`schemaVersion must be ${SHIPPING_SLO_SCHEMA_VERSION}`);
-  if (!baseline.metrics || typeof baseline.metrics !== 'object')
-    errors.push('metrics must be an object');
-  else
-    for (const [key, entry] of Object.entries(baseline.metrics)) {
-      const def = defFor(key);
-      if (!def) errors.push(`unknown metric key: ${key}`);
-      else if (def.unsupported)
-        errors.push(`${key}: metric is unsupported and must not be baselined`);
-      const value = Number(entry?.value ?? entry);
-      if (!Number.isFinite(value) || value < 0)
-        errors.push(`${key}: value must be a non-negative number`);
-    }
-  if (baseline.history !== undefined && !Array.isArray(baseline.history))
-    errors.push('history must be an array');
-  return { ok: errors.length === 0, errors };
-}

@@ -385,6 +385,7 @@ describe('EntityCard', () => {
 describe('EntityCard source contract', () => {
   it('uses inline helper anatomy for meta and profit details', () => {
     const source = readFileSync(resolve(__dirname, './EntityCard.tsx'), 'utf8');
+    expect(source).not.toMatch(/font-\[(?:590|680)\]/);
 
     expect(source).toContain(
       "'block min-w-0 truncate text-xs text-tertiary-token'"

@@ -1,11 +1,15 @@
 'use client';
 
+import dynamic from 'next/dynamic';
 import { type ReactNode, useEffect, useState } from 'react';
 import {
   SidebarDock,
   type SidebarDockStatus,
+  type SidebarDockUpdateControl,
 } from '@/components/shell/SidebarDock';
 import { usePWAInstall } from '@/hooks/usePWAInstall';
+import type { DesktopUpdateControlState } from '@/lib/desktop/desktop-update-control-state';
+import { useDesktopUpdateState } from '@/lib/desktop/useDesktopUpdateState';
 import {
   isWhatsNewActionComplete,
   parseWhatsNewFeed,
@@ -17,8 +21,30 @@ import {
   requestFullAudioPlayer,
   useAudioChromeSnapshot,
 } from './audio-chrome-state';
-import { useDesktopUpdateContext } from './desktop-update/DesktopUpdateProvider';
 import { useTrackAudioPlayer } from './release-sidebar/useTrackAudioPlayer';
+
+// Desktop-only: keep the control (and the morph button it
+// pulls in) out of every browser tab's shell chunk. The dock card reserves
+// the row, so the late chunk cannot shift the footer.
+const DesktopUpdateControl = dynamic(() =>
+  import('./desktop-update/DesktopUpdateControl').then(mod => ({
+    default: mod.DesktopUpdateControl,
+  }))
+);
+
+/** Status the dock needs before the control's chunk is in. */
+const UPDATE_CONTROL_NOTICE: Record<
+  Exclude<DesktopUpdateControlState['kind'], 'hidden'>,
+  string
+> = {
+  checking: 'Checking for updates',
+  available: 'Update available',
+  downloading: 'Downloading update',
+  ready: 'Restart to update',
+  restarting: 'Restarting to update',
+  failed: 'Update failed',
+  offline: 'Update paused, no connection',
+};
 
 /** Adapt the existing updater, changelog projection, audio player and PWA hook. */
 export function SidebarDockBridge({
@@ -34,7 +60,24 @@ export function SidebarDockBridge({
   readonly collapsed: boolean;
   readonly children: (status: SidebarDockStatus | undefined) => ReactNode;
 }) {
-  const update = useDesktopUpdateContext();
+  const updateControl = useDesktopUpdateState();
+  const updateControlKind = updateControl.state.kind;
+  const dockUpdateControl: SidebarDockUpdateControl =
+    updateControlKind === 'hidden'
+      ? { visible: false, label: null, urgent: false, node: null }
+      : {
+          visible: true,
+          label: UPDATE_CONTROL_NOTICE[updateControlKind],
+          urgent: updateControlKind === 'failed',
+          node: (
+            <DesktopUpdateControl
+              state={updateControl.state}
+              onDownload={updateControl.download}
+              onRestart={updateControl.restart}
+              onRetry={updateControl.retry}
+            />
+          ),
+        };
   const pwa = usePWAInstall();
   const audioChrome = useAudioChromeSnapshot();
   const { playbackState, stop, toggleTrack } = useTrackAudioPlayer();
@@ -61,8 +104,7 @@ export function SidebarDockBridge({
     <SidebarDock
       userId={userId}
       collapsed={collapsed}
-      update={update?.state}
-      onUpdate={update?.openModal}
+      updateControl={dockUpdateControl}
       release={
         release && userState && isWhatsNewActionComplete(release, userState)
           ? null

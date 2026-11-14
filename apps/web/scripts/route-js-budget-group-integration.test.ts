@@ -1,7 +1,7 @@
 import { spawnSync } from 'node:child_process';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { evaluateBudgets } from './route-js-budget.mjs';
 import {
   buildFirstLoadFixture,
@@ -9,18 +9,33 @@ import {
   firstLoadBudgets,
   NOW,
   validRaise,
+  writeAncestorGitRepo,
   writeChunk,
 } from './route-js-budget-fixtures';
 
-afterEach(cleanupFixtures);
+afterEach(() => {
+  vi.unstubAllEnvs();
+  cleanupFixtures();
+});
+
+// The CLI compares this fixture with origin/main's route-js-budgets.json.
+// Group and route ceilings that the cases do not intentionally move must stay
+// at the committed ratchet, or a later --write looks like growth.
+const committedBudgets = JSON.parse(
+  readFileSync(join(__dirname, 'route-js-budgets.json'), 'utf8')
+) as {
+  routes: { '/app/chat': number };
+  groups: { admin: { baselineKb: number }; dashboard: { baselineKb: number } };
+};
 
 function control() {
   const budgets = firstLoadBudgets({
-    admin: { baselineKb: 1345 },
-    dashboard: { baselineKb: 1385 },
+    admin: { baselineKb: committedBudgets.groups.admin.baselineKb },
+    dashboard: { baselineKb: committedBudgets.groups.dashboard.baselineKb },
     marketing: { baselineKb: 50 },
     public: { baselineKb: 80 },
   });
+  budgets.routes['/app/chat'] = committedBudgets.routes['/app/chat'];
   const routeGroups = {
     admin: { budgets: { initialJS_gzip_kb: 300 } },
     dashboard: { budgets: { initialJS_gzip_kb: 250 } },
@@ -32,6 +47,8 @@ function control() {
     firstRows: [
       { route: '/', gzipKb: 20, chunks: 1 },
       { route: '/product', gzipKb: 20, chunks: 1 },
+      { route: '/solutions/[audience]', gzipKb: 20, chunks: 1 },
+      { route: '/about', gzipKb: 60, chunks: 1 },
     ],
     budgets,
     ancestor: structuredClone(budgets),
@@ -79,6 +96,43 @@ function runCli(nextDir: string, budgetPath: string, env = process.env) {
 }
 
 describe('route-group policy reaches the existing evaluator and CLI', () => {
+  it('isolates fixture Git commands from an inherited parent repository', () => {
+    const parentDir = buildFirstLoadFixture();
+    const parentEnv = writeAncestorGitRepo(parentDir, {
+      'parent.txt': 'parent',
+    });
+    const parentIndex = join(parentDir, '.git', 'index');
+    const indexBefore = readFileSync(parentIndex);
+    const git = (dir: string, env: NodeJS.ProcessEnv, args: string[]) => {
+      const run = spawnSync('git', args, {
+        cwd: dir,
+        env,
+        encoding: 'utf8',
+        timeout: 10000,
+      });
+      expect(run.status, run.stderr).toBe(0);
+      return run.stdout.trim();
+    };
+    const parentHead = git(parentDir, parentEnv, ['rev-parse', 'HEAD']);
+    vi.stubEnv('GIT_DIR', join(parentDir, '.git'));
+    vi.stubEnv('GIT_WORK_TREE', parentDir);
+    vi.stubEnv('GIT_COMMON_DIR', join(parentDir, '.git'));
+    vi.stubEnv('GIT_INDEX_FILE', parentIndex);
+
+    const fixtureDir = buildFirstLoadFixture();
+    const env = writeAncestorGitRepo(fixtureDir, { 'budget.json': '{}' });
+    expect(env.GIT_INDEX_FILE).toBeUndefined();
+    expect(env.GIT_COMMON_DIR).toBeUndefined();
+    expect(git(fixtureDir, env, ['rev-parse', '--show-toplevel'])).toBe(
+      fixtureDir
+    );
+    expect(git(fixtureDir, env, ['show', 'origin/main:budget.json'])).toBe(
+      '{}'
+    );
+    expect(git(parentDir, parentEnv, ['rev-parse', 'HEAD'])).toBe(parentHead);
+    expect(readFileSync(parentIndex)).toEqual(indexBefore);
+  });
+
   it.each(['2024-1-5', '2024/01/05', '2099-99-99', '2099-02-30'])(
     'rejects group baseline and target raises with malformed expiry %s',
     expiresOn => {
@@ -133,7 +187,20 @@ describe('route-group policy reaches the existing evaluator and CLI', () => {
       const { nextDir, budgets, budgetPath } = cliFixture();
       budgets.groups.marketing.baselineKb = baseline;
       writeFileSync(budgetPath, JSON.stringify(budgets));
-      const run = runCli(nextDir, budgetPath);
+      // Hermetic ancestor: the CLI compares the budgets file with origin/main
+      // through git, so point git at a fixture repo holding these fixture
+      // budgets instead of the real repository's baselines.
+      const env = writeAncestorGitRepo(nextDir, {
+        'apps/web/scripts/route-js-budgets.json': readFileSync(
+          budgetPath,
+          'utf8'
+        ),
+        'docs/performance/route-budgets.json': readFileSync(
+          join(__dirname, '../../../docs/performance/route-budgets.json'),
+          'utf8'
+        ),
+      });
+      const run = runCli(nextDir, budgetPath, env);
       expect(run.status, run.stderr).toBe(status);
       const result = JSON.parse(run.stdout);
       expect(result.first.violations).toEqual([]);

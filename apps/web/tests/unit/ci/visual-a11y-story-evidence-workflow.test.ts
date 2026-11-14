@@ -114,9 +114,10 @@ describe('component story evidence producer lane (visual-a11y.yml)', () => {
       /self-hosted|jovie-fixed|CI_FAST_RUNNER|CI_UNIT_RUNNER|secrets\./
     );
     expect(evidence.needs).toEqual(['ci-visual-path-changes']);
-    expect(evidence.if).toContain('has_visual_changes');
+    expect(evidence.if).toContain('has_render_changes');
     expect(evidence['timeout-minutes']).toBe(30);
     const a11y = visualA11y.jobs['storybook-a11y'] as Job;
+    expect(a11y.if).toContain('has_visual_changes');
     expect(a11y['timeout-minutes']).toBe(10);
     expect(Object.keys(visualA11y.on).sort()).toEqual([
       'push',

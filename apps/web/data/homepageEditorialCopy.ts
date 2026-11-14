@@ -10,10 +10,11 @@ import { TIM_WHITE_PROFILE } from '@/lib/tim-white';
  * Homepage copy for `/` (Tim, 2026-11-03: "Music line wins" for the root
  * route only; gbrain decisions/homepage-music-line-scope-2026-11-03-0420).
  *
- * Invite-only go-to-market (decisions/close-public-signup-waitlist-2026-11-02):
- * the page is an editorial story that ends in the role waitlist form. While
- * `PUBLIC_SIGNUP_CLOSED` is on, nothing here links to public signup; the one
- * primary action scrolls to the on-page form.
+ * Open signup (2026-11-09; Tim, 2026-11-12 23:46Z: "Switch it"): the page is
+ * an editorial story whose actions all enter `/start` with the shared
+ * claim-profile intent, ending in the `claim` close. While the
+ * `PUBLIC_SIGNUP_CLOSED` kill switch is on, the hero action scrolls to the
+ * on-page role waitlist form instead and the close is `invite`.
  *
  * These are the code defaults. The published `marketing-page/home` content
  * record fills the open slots (`lib/content-records/marketing-page.ts`); the
@@ -87,6 +88,33 @@ export const HOMEPAGE_EDITORIAL_COPY = {
       },
     },
   },
+  /**
+   * 04 claim: the close while public signup is open (Tim, 2026-11-12 23:46Z:
+   * "Switch it"). Code-owned: the `cta` record slots were written for the
+   * invitation form, so they apply only to `invite` below. The action label
+   * and destination come from the shared claim-profile CTA intent.
+   */
+  claim: {
+    chapter: 'claim',
+    headline: 'Claim your name on Jovie.',
+    subhead:
+      'Find yourself on Spotify and your catalog comes in once. Your profile and a page for every release are ready when you finish.',
+    steps: [
+      {
+        title: 'Find yourself',
+        body: 'Your artist name or a Spotify link.',
+      },
+      {
+        title: 'Claim your name',
+        body: 'The handle people type to find you.',
+      },
+      {
+        title: 'Go live',
+        body: 'Your profile and release pages, built from your catalog.',
+      },
+    ],
+  },
+  /** 04 invitation: the close only while `PUBLIC_SIGNUP_CLOSED` is on. */
   invite: {
     headline: 'Jovie opens by invitation.',
     subhead:
@@ -123,4 +151,5 @@ export const HOMEPAGE_HEADLINE_BREAKS: Readonly<
     'ready on day one.',
   ],
   [HOMEPAGE_EDITORIAL_COPY.invite.headline]: ['Jovie opens', 'by invitation.'],
+  [HOMEPAGE_EDITORIAL_COPY.claim.headline]: ['Claim your name', 'on Jovie.'],
 };

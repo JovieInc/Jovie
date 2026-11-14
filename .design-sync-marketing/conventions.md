@@ -68,8 +68,6 @@ composition (layout, spacing, type) is what the agent designs, not the images.
 | `FULL_PAGE` | `lib/featureFlags.ts:ARTIST_PROFILE_FLAGS` | `true` |
 | `SOCIAL_PROOF` | `lib/featureFlags.ts:ARTIST_PROFILE_FLAGS` | `true` |
 | `FAQ` | `lib/featureFlags.ts:ARTIST_PROFILE_FLAGS` | `true` |
-| `SHOW_ARTIST_PROFILE_PAY_FLOW_VIDEO` | `lib/flags/marketing-static.ts:FEATURE_FLAGS` | `true` |
-| `SHOW_FORGEUI_MARKETING_UPDATES` | `lib/flags/marketing-static.ts:FEATURE_FLAGS` | `true` |
 
 All flags are build-time booleans (no runtime API calls). Safe to read in the
 design-sync preview sandbox.

@@ -415,12 +415,10 @@ function loadBody(args, cwd) {
       title: args.title ?? '',
       labels: [],
     };
-  if (
-    process.env.JOVIE_PR_BODY_FILE &&
-    existsSync(process.env.JOVIE_PR_BODY_FILE)
-  )
+  const envBody = process.env.JOVIE_PR_BODY_FILE;
+  if (envBody && existsSync(envBody))
     return {
-      body: readFileSync(process.env.JOVIE_PR_BODY_FILE, 'utf8'),
+      body: readFileSync(envBody, 'utf8'),
       title: args.title ?? '',
       labels: [],
     };

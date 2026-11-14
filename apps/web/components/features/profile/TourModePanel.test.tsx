@@ -187,6 +187,29 @@ describe('TourModePanel tickets and states', () => {
 
     expect(screen.queryAllByRole('link')).toHaveLength(0);
     expect(screen.getAllByText('The Novo')).toHaveLength(3);
+
+    // The plain-text status labels hold the AA contrast floor on the media
+    // stage: on-media/52 (~5.6:1 on the dark stage), not the old /38 (~3.4:1).
+    for (const label of [
+      screen.getByText('Sold Out'),
+      ...screen.getAllByText('No Tickets'),
+    ]) {
+      expect(label).toHaveClass('text-on-media/52');
+    }
+
+    // A cancelled row mutes its date and venue with the same on-media/52
+    // token instead of a container opacity-50: halved alpha compounds with
+    // the muted tokens to ~2.2:1 and fails WCAG 2.2 AA (axe color-contrast).
+    const cancelledRow = screen
+      .getAllByText('No Tickets')
+      .at(-1)
+      ?.closest('div.grid');
+    expect(cancelledRow).toBeDefined();
+    expect(cancelledRow?.className).not.toContain('opacity-50');
+    const cancelledVenue = cancelledRow?.querySelector('p');
+    expect(cancelledVenue).toHaveClass('text-on-media/52');
+    const cancelledDay = cancelledRow?.querySelector('span.tabular-nums');
+    expect(cancelledDay).toHaveClass('text-on-media/52');
   });
 
   it('draws row text and dividers with on-media tokens, not raw white', () => {

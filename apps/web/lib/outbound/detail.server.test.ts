@@ -181,4 +181,21 @@ describe('outbound decisions', () => {
       expect.objectContaining({ decision: 'no', reason: 'too_big' }),
     ]);
   });
+
+  it('refuses to approve an artist Tim already works with, before any write', async () => {
+    for (const held of [
+      { linktreeHandle: 'djdannic' },
+      { displayName: 'Dannic' },
+      { contactEmail: 'team@sortedmanagement.com' },
+      { bio: 'Mgmt: Big MGMT' },
+    ]) {
+      mocks.lead = { ...LEAD, ...held };
+      await expect(approveOutbound(INPUT)).resolves.toEqual({
+        ok: false,
+        reason: 'existing_relationship',
+      });
+    }
+    expect(mocks.record).not.toHaveBeenCalled();
+    expect(mocks.inspection).not.toHaveBeenCalled();
+  });
 });

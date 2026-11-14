@@ -21,6 +21,7 @@ import {
   HOMEPAGE_EDITORIAL_COPY,
   HOMEPAGE_INVITE_ANCHOR,
 } from '@/data/homepageEditorialCopy';
+import { getClaimProfileIntent } from '@/data/marketingCtaIntents';
 
 vi.mock('@/lib/analytics', () => ({ track: vi.fn(), page: vi.fn() }));
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn() }) }));
@@ -43,7 +44,7 @@ vi.mock('next/image', () => ({
 }));
 
 describe('JOV-INV-038 proximal-proof evaluator (homepage hero)', () => {
-  it('keeps the promise in the hero and its action bound to the on-page form', () => {
+  it('keeps the promise in the hero and its action bound to the claim at the close', () => {
     const { container } = render(
       <>
         <HomepageStoryHero />
@@ -56,16 +57,17 @@ describe('JOV-INV-038 proximal-proof evaluator (homepage hero)', () => {
     expect(hero.contains(claim)).toBe(true);
     expect(claim).toHaveTextContent(HOMEPAGE_EDITORIAL_COPY.hero.headline);
 
+    const intent = getClaimProfileIntent();
     const action = within(hero).getByTestId('homepage-primary-cta');
-    expect(action).toHaveAttribute('href', `#${HOMEPAGE_INVITE_ANCHOR}`);
+    expect(action).toHaveAttribute('href', intent.href);
     const target = container.querySelector(`#${HOMEPAGE_INVITE_ANCHOR}`);
     expect(target).not.toBeNull();
     expect(
-      within(target as HTMLElement).getByTestId('waitlist-role-form')
-    ).toBeInTheDocument();
+      within(target as HTMLElement).getByTestId('homepage-close-cta')
+    ).toHaveAttribute('href', intent.href);
   });
 
-  it('offers no signup link and shows no person capture or unlabeled proof', () => {
+  it('offers one claim link and shows no person capture or unlabeled proof', () => {
     render(<HomepageStoryHero />);
     const hero = screen.getByTestId('marketing-section-hero');
 
@@ -75,9 +77,8 @@ describe('JOV-INV-038 proximal-proof evaluator (homepage hero)', () => {
     })) {
       expect(image).toHaveAccessibleName(/^Jovie for Mac:/);
     }
-    expect(
-      hero.querySelector('a[href="/start"], a[href="/signup"]')
-    ).toBeNull();
+    expect(hero.querySelectorAll('a[href="/start"]')).toHaveLength(1);
+    expect(hero.querySelector('a[href="/signup"]')).toBeNull();
     expect(
       screen.queryByText(/Claimed|Verified customer|Illustrative/i)
     ).toBeNull();

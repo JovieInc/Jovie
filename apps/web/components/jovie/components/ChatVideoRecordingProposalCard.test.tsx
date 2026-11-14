@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { startTeleprompterRecording } from '@/lib/teleprompter/recorder';
 import type { VideoRecordingProposalPayload } from '@/lib/teleprompter/types';
 import { uploadRecordableVideo } from '@/lib/teleprompter/upload-video';
+import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import { fastRender } from '@/tests/utils/fast-render';
 import { ChatVideoRecordingProposalCard } from './ChatVideoRecordingProposalCard';
 
@@ -101,5 +102,59 @@ describe('ChatVideoRecordingProposalCard', () => {
     expect(startTeleprompterRecording).toHaveBeenCalledWith(
       expect.objectContaining({ questions: ['Where did you write it?'] })
     );
+  });
+
+  it('shows why an upload failed and lets the artist try again', async () => {
+    vi.mocked(uploadRecordableVideo).mockRejectedValue(
+      new Error('Video is larger than 500 MB.')
+    );
+    const { container } = renderCard();
+
+    const fileInput = container.querySelector(
+      'input[type="file"]'
+    ) as HTMLInputElement;
+    fireEvent.change(fileInput, {
+      target: {
+        files: [new File(['video'], 'promo.mp4', { type: 'video/mp4' })],
+      },
+    });
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Video is larger than 500 MB.'
+    );
+    expect(
+      screen.getByTestId('chat-video-recording-upload')
+    ).not.toBeDisabled();
+    await expectNoA11yViolations(container);
+  });
+
+  it('keeps the file input out of the tab order and limited to video', () => {
+    const { container } = renderCard();
+
+    const fileInput = container.querySelector(
+      'input[type="file"]'
+    ) as HTMLInputElement;
+    expect(fileInput).toHaveClass('hidden');
+    expect(fileInput.tabIndex).toBe(-1);
+    expect(fileInput.accept).toBe('video/mp4,video/quicktime');
+  });
+
+  it('has no accessibility violations in the proposal and uploaded states', async () => {
+    vi.mocked(uploadRecordableVideo).mockResolvedValue({
+      blobUrl: 'blob:video',
+    });
+    const { container } = renderCard();
+    await expectNoA11yViolations(container);
+
+    fireEvent.change(
+      container.querySelector('input[type="file"]') as HTMLInputElement,
+      {
+        target: {
+          files: [new File(['video'], 'promo.mp4', { type: 'video/mp4' })],
+        },
+      }
+    );
+    await screen.findByTestId('chat-video-recording-upload-success');
+    await expectNoA11yViolations(container);
   });
 });

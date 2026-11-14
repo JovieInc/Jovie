@@ -53,6 +53,8 @@ export type { KbdProps } from './kbd';
 export { Kbd } from './kbd';
 export type { NativeSelectOption, NativeSelectProps } from './native-select';
 export { NativeSelect } from './native-select';
+export type { PlainButtonProps } from './plain-button';
+export { PlainButton, plainButtonFocusClassName } from './plain-button';
 export {
   Popover,
   PopoverAnchor,
