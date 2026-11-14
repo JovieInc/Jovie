@@ -1,6 +1,6 @@
 import '@/app/globals.css';
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
-import { AdminPage, type AdminPageProps } from './AdminPage';
+import { AdminPage } from './AdminPage';
 
 const meta = {
   title: 'Features/Admin/Layout/AdminPage States',
@@ -48,7 +48,9 @@ export const LongContentScrollingDocument: Story = {
   },
 };
 
-function RtlPage(args: AdminPageProps) {
+type PageArgs = Parameters<NonNullable<Story['render']>>[0];
+
+function RtlPage(args: PageArgs) {
   return (
     <div dir='rtl' lang='ar'>
       <AdminPage {...args} />
