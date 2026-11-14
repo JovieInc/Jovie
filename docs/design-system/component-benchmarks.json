@@ -429,6 +429,91 @@
         }
       ]
     },
+    "packages/ui/atoms/inset-panel.tsx": {
+      "libraryVersion": 1,
+      "sourceHash": "8b35f797aad0c02aa1c7edb71161c8b04815b2a7929b57ab9a9ca8e05b2c7bc1",
+      "reference": "React conditional rendering; WAI-ARIA APG structural roles and Button/Link; Radix Slot; shadcn/ui Card (structural comparison, not a menu widget)",
+      "checked": "Compared root HTML props/ref/Slot composition, header ReactNode count/control slots, static row versus native button/child-owned link semantics, native disabled behavior/type, decorative icon and accessible text, native hr and named progress, caller-owned structure and no internal selection state. Retained all nine original stories and inspected current ten-story light/dark capture receipts. Actual new count matrix covers numeric0/nonzero7/null/undefined/false/empty strings, three painted count slots, equal32px header/row rhythm, matching trailing edges/inset, containment/overflow, full axe and contrast. Inspected both new Chromium PNGs; this is not complete API parity or OS/AT verification.",
+      "gaps": [
+        {
+          "item": "Numeric zero is valid ReactNode count content but was omitted from header metadata/header trailing/row trailing, while the header gutter also treated zero as absent",
+          "decision": "adapt",
+          "status": "done",
+          "reference": "React conditional rendering: numeric0 renders as content",
+          "resolution": "One shared content-presence predicate admits numeric0 and preserves prior truthiness. Actual old-source12pass/4fail tofixed16/16 plus22consumer tests; current light/dark native browser2/2 and existing canonical20/20 observations; zero/nonzero share geometry and empty values omit all three wrappers."
+        },
+        {
+          "item": "APG Menu roles, arrow-key roving focus and menu selection state",
+          "decision": "skip",
+          "reason": "InsetPanel is documented as a static in-flow panel; interactive rows compose native links/buttons. Adding menu-widget behavior would change its existing semantics and keyboard model.",
+          "reference": "WAI-ARIA APG structural roles; Button/Link patterns"
+        },
+        {
+          "item": "shadcn Card optional CardAction/size/spacing API and general per-part HTML prop/ref parity",
+          "decision": "skip",
+          "reason": "The current compact panel exposes its documented surface/header/row/progress API and shared menu geometry; it does not claim shadcn Card API parity. Root HTML/ref/Slot composition is retained, and child controls own their own link/button props.",
+          "reference": "shadcn/ui Card at e62c9435fff729a175f38983dee73b2cb4f6a069"
+        }
+      ],
+      "judge": "OpenAI Codex (source and actual browser evidence review)",
+      "date": "2026-11-14",
+      "reviewMethod": "Primary-reference/source comparison and actual local Chromium evidence inspection; no external model, live System One/Pen, production or assistive-device invocation.",
+      "reviewSource": "43719ac8dbc5e166d602d2cfa9571e6b9dc98f99",
+      "references": [
+        "https://react.dev/learn/conditional-rendering",
+        "https://www.w3.org/WAI/ARIA/apg/practices/structural-roles/",
+        "https://www.w3.org/WAI/ARIA/apg/patterns/button/",
+        "https://www.w3.org/WAI/ARIA/apg/patterns/link/",
+        "https://github.com/shadcn-ui/ui/blob/e62c9435fff729a175f38983dee73b2cb4f6a069/apps/v4/registry/bases/radix/ui/card.tsx"
+      ],
+      "evidence": [
+        "packages/ui/atoms/inset-panel.test.tsx",
+        "packages/ui/atoms/inset-panel.stories.tsx",
+        "apps/web/tests/e2e/storybook-inset-panel.spec.ts"
+      ],
+      "localEvidence": {
+        "sourceSha": "43719ac8dbc5e166d602d2cfa9571e6b9dc98f99",
+        "artifactDirectory": "/workspace/ds-certification-tracker/inset-panel-zero-count",
+        "canonicalStories": 10,
+        "canonicalThemeObservations": 20,
+        "nativeBrowserCases": 2,
+        "contrastRatioMinimum": {
+          "light": 5.61,
+          "dark": 6.72
+        },
+        "violations": 0,
+        "incompleteContrast": 0,
+        "scope": "Full canonical preview/CSS, bounded story selection and explicitly hashed temporary PlainButton fixture. Canonical collector retained PNG hashes; two new CountSlots actual PNGs inspected. Local evidence is not imported as hosted evidence.",
+        "renderInputs": {
+          "schema": "jovie.component-render-inputs/v1",
+          "digest": "7669ea274404f0e1601c55b5e4d98e79f9041c9c0f6e4706ad830d84a3b2b1c0",
+          "mode": "storybook-full"
+        },
+        "captureSourceContext": "43719ac8; explicit temporary selection preserved; later dependency/source contexts require separate validation"
+      },
+      "reviewedDependencies": [
+        {
+          "path": "packages/ui/lib/inset-panel-styles.ts",
+          "sha256": "2a137ace8afd859da7f2d607e44feb4ad013dbbaf3e7851f81439925eb4a4327"
+        },
+        {
+          "path": "packages/ui/lib/dropdown-styles.ts",
+          "sha256": "edc676c620a8c953f0d01a41a3ea7e3f5f2272afb86287dd3eddf9e0b58c7252"
+        },
+        {
+          "path": "apps/web/styles/design-system.css",
+          "sha256": "96e20e900f2603c6b3244d983757aa76da3a5ddd7453d0db2a925d7a1dd8d23d"
+        },
+        {
+          "path": "apps/web/styles/theme.css",
+          "sha256": "edcc4f85d579b1740dcbc85a471bc47fb494524b1055108dff9cbdde81015992"
+        },
+        {
+          "path": "apps/web/app/globals.css",
+          "sha256": "1e176bc26ef46c3852b459dd0822c1c9c83b14ac8c0546621562d5a63a81ed54"
+        }
+      ]
+    },
     "packages/ui/atoms/kbd.tsx": {
       "libraryVersion": 1,
       "sourceHash": "bbbb6936333a7687dfed078070f77806e1682ab1880a4abfd386198ceede644f",
