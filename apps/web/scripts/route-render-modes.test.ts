@@ -290,7 +290,7 @@ describe('dynamic render-mode admission', () => {
         to: 'dynamic',
       },
     ]);
-    expect(Object.keys(result.snapshot.routes)).toEqual([
+    expect(Object.keys(result.snapshot.routes ?? {})).toEqual([
       '/app/admin/releases',
       '/app/admin/room',
       '/app/admin/screenshots',
@@ -304,7 +304,7 @@ describe('dynamic render-mode admission', () => {
     ]);
     expect(outside.refused).toEqual(['/about']);
     expect(outside.changes).toEqual([]);
-    expect(outside.snapshot.routes['/about']).toBeUndefined();
+    expect(outside.snapshot.routes?.['/about']).toBeUndefined();
 
     const current = snapshot({ '/app/admin/room': 'dynamic' });
     const existing = admitDynamicRoutes(current, [
