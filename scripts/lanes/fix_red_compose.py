@@ -81,6 +81,7 @@ def compose_deterministic_fix(lane, host, pr, route, worktree, log, receipt):
 
 def repair_files(cls, action, names, logs, per_check):
     """Keep each deterministic class's input paths when composing its route."""
+    import cert_stub_sync
     import fix_red_classes as classes
     import detached_native_sync
 
@@ -99,5 +100,8 @@ def repair_files(cls, action, names, logs, per_check):
         files = sorted(set(files) | set(classes._domain_write_hits("\n".join(logs.get(name) or "" for name in names))))
     if "detached-native-consumer" in wanted and (cls == "detached-native-consumer" or action == classes.COMPOSE):
         files = sorted(set(files) | set(detached_native_sync.paths(
+            "\n".join(logs.get(name) or "" for name in names))))
+    if "cert-todo-stub" in wanted and (cls == "cert-todo-stub" or action == classes.COMPOSE):
+        files = sorted(set(files) | set(cert_stub_sync.config_paths(
             "\n".join(logs.get(name) or "" for name in names))))
     return files
