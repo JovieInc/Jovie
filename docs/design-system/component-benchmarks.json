@@ -460,16 +460,51 @@
     },
     "packages/ui/atoms/link.tsx": {
       "libraryVersion": 1,
-      "sourceHash": "1c2fc40c2af23f21c48d9c705e38ee900c7a273eb2d41e0a34baf1f26fc8ae53",
+      "sourceHash": "05b144bd33b20564e61dc7ace8591c51a78df9aa0b35beb2a486bfd608b02b75",
       "reference": "WAI-ARIA APG Link; Radix Slot (asChild); shadcn/ui Button link variant",
-      "checked": "anchor semantics, asChild Slot, aria-disabled blocks activation, aria-current via active, 44px target, forwardRef",
+      "checked": "Compared native anchor semantics with APG Link and current shadcn link/Slot composition; reviewed forwarded DOM props/ref and caller-provided aria-current, data-state precedence, disabled activation, target/RTL/reserved-label and reduced-motion contracts. Twelve Chromium story/theme observations cover six Link states, and two computed-color sequences check visited idle, keyboard focus, hover, press and restoration. Native :visited selectors remain; no history inspection was added.",
       "gaps": [
         {
           "item": "disabled links stay in the tab order",
           "decision": "skip",
           "reason": "aria-disabled with activation blocked is the APG-accepted form for a disabled link",
           "reference": "APG Link"
+        },
+        {
+          "item": "Readable default, active, visited, composed-child, long-content and state-matrix text in both themes",
+          "decision": "adapt",
+          "status": "done",
+          "reference": "WCAG 2.2 1.4.3 Contrast (Minimum)",
+          "evidence": "Real Chromium/axe light ratios: default/composed/long 4.97, active 6.89, visited 7.10. Dark controls: default 8.39, active 10.24, visited 4.68. All 12 observations have zero violations or incomplete contrast checks. Existing semantic text tokens are reused; fills and borders are unchanged."
+        },
+        {
+          "item": "Declared visited preview follows its semantic token without overriding hover or native press",
+          "decision": "adopt",
+          "status": "done",
+          "reference": "APG Link; existing Link visited prop and native :visited contract",
+          "evidence": "Two Chromium computed-color regressions fail before and pass after: idle/focus use visited, hover/press use the interactive token, leaving the target restores visited. Native history selectors, disabled activation and the existing tab-order skip are unchanged."
         }
+      ],
+      "judge": "OpenAI Codex (source/reference/browser review)",
+      "date": "2026-11-14",
+      "reviewMethod": "Fetched APG and current shadcn source; read the current implementation and executed focused unit and Chromium regressions. The combined unit batch passed 148 tests with one inherited jsdom mouse-leave skip; color proof comes from the browser. No external model invocation.",
+      "reviewSource": "b88966ecd1e440a307e5e326a5c89e6a45bc5e33",
+      "references": [
+        "https://www.w3.org/WAI/ARIA/apg/patterns/link/",
+        "https://github.com/shadcn-ui/ui/blob/main/apps/v4/registry/bases/radix/ui/button.tsx",
+        "https://www.w3.org/WAI/WCAG22/Understanding/contrast-minimum.html"
+      ],
+      "referenceBlobs": {
+        "shadcn-ui/ui/apps/v4/registry/bases/radix/ui/button.tsx": "e6266ffa1f7d2a694f2abad0d51c215c8248c245"
+      },
+      "reviewedDependencies": {
+        "apps/web/styles/design-system.css": "a9b845db84790c1a5750fd1d274530abeddb2c10f33248b4582fb5b34f5e817e",
+        "packages/ui/lib/dropdown-styles.ts": "edc676c620a8c953f0d01a41a3ea7e3f5f2272afb86287dd3eddf9e0b58c7252"
+      },
+      "evidence": [
+        "packages/ui/atoms/link.test.tsx",
+        "apps/web/tests/e2e/storybook-input.spec.ts",
+        "https://github.com/JovieInc/Jovie/commit/b88966ecd1e440a307e5e326a5c89e6a45bc5e33"
       ]
     },
     "packages/ui/atoms/native-select.tsx": {
@@ -746,10 +781,43 @@
     },
     "packages/ui/atoms/tooltip.tsx": {
       "libraryVersion": 1,
-      "sourceHash": "6320ebfaa71e85e6e14daacc5067c11e2c19a8ba927796ac069ab964247cea70",
+      "sourceHash": "852f275c1f7853a26bd58637e47d255928c547d9d11253c8f159c4b9809ccb0a",
       "reference": "WAI-ARIA APG Tooltip; Radix Tooltip; shadcn/ui Tooltip",
-      "checked": "Radix hover/focus open, Escape, provider delays, collision padding, reduced motion",
-      "gaps": []
+      "checked": "Compared APG Tooltip and current Radix/shadcn provider, trigger and portalled-content APIs; reviewed inherited delays, controlled/uncontrolled open/change forwarding, Radix Escape delegation, anchor-detachment/collision safety, refs, RTL and reduced-motion contracts. Focused units retain existing behavior; Chromium measures actual Danger foreground/background in both themes. This shared-style consumer was re-reviewed although this patch does not change its component bytes.",
+      "gaps": [
+        {
+          "item": "Readable Danger text on the existing semantic error surface in both themes",
+          "decision": "adapt",
+          "status": "done",
+          "reference": "WCAG 2.2 1.4.3 Contrast (Minimum); APG Tooltip",
+          "evidence": "Real Chromium/axe improves light Danger from 3.29 to 4.99 and dark from 4.82 to 6.20. Both observations have zero violations or incomplete contrast checks. Existing error-text replaces fill-color text; error-subtle background, border, geometry and behavior are unchanged."
+        }
+      ],
+      "reviewReason": "The previous source judgment was already stale; the current component and changed shared surface received a fresh reference/source/behavior review.",
+      "judge": "OpenAI Codex (source/reference/browser review)",
+      "date": "2026-11-14",
+      "reviewMethod": "Fetched APG and current shadcn source; read current Tooltip and shared style behavior, ran focused unit regressions and two strict Danger Chromium observations. The inherited jsdom mouse-leave skip remains disclosed and unchanged. No external model invocation.",
+      "reviewSource": "b88966ecd1e440a307e5e326a5c89e6a45bc5e33",
+      "references": [
+        "https://www.w3.org/WAI/ARIA/apg/patterns/tooltip/",
+        "https://github.com/shadcn-ui/ui/blob/main/apps/v4/registry/bases/radix/ui/tooltip.tsx",
+        "https://www.w3.org/WAI/WCAG22/Understanding/contrast-minimum.html"
+      ],
+      "referenceBlobs": {
+        "shadcn-ui/ui/apps/v4/registry/bases/radix/ui/tooltip.tsx": "2b6c4e049259e7318d52e85e93e8079304fb67b5"
+      },
+      "reviewedDependencies": {
+        "apps/web/styles/design-system.css": "a9b845db84790c1a5750fd1d274530abeddb2c10f33248b4582fb5b34f5e817e",
+        "packages/ui/lib/dropdown-styles.ts": "edc676c620a8c953f0d01a41a3ea7e3f5f2272afb86287dd3eddf9e0b58c7252"
+      },
+      "evidence": [
+        "packages/ui/atoms/tooltip.test.tsx",
+        "packages/ui/atoms/tooltip-anchor.test.tsx",
+        "packages/ui/atoms/tooltip-collision.test.tsx",
+        "packages/ui/atoms/tooltip-shortcut.test.tsx",
+        "apps/web/tests/e2e/storybook-input.spec.ts",
+        "https://github.com/JovieInc/Jovie/commit/b88966ecd1e440a307e5e326a5c89e6a45bc5e33"
+      ]
     },
     "packages/ui/atoms/tooltip-shortcut.tsx": {
       "libraryVersion": 1,
