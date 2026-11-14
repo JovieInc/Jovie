@@ -43,12 +43,12 @@ from fix_red_render_modes import ACTION as ADMIT_RENDER_MODE, hit as render_mode
 
 SCHEMA = "jovie-fix-red-class/v1"
 # Actions a class can route to. `agent` is the default (a model run); the others spend no model.
-RERUN, SYNC_MAIN, WIRE_CI_FAST, RENUMBER, STAMP_CHANGELOG, SNAP_SPACING, STRIP_CACHE, MERGE_NARROWED, REGISTER_DOMAIN, ATOMIC_WRITE, REPAIR_SCREEN_CERT, BALANCE_HEADINGS, UI_FEEL, AGENT, COMPOSE = (
+RERUN, SYNC_MAIN, WIRE_CI_FAST, RENUMBER, STAMP_CHANGELOG, SNAP_SPACING, STRIP_CACHE, MERGE_NARROWED, REGISTER_DOMAIN, ATOMIC_WRITE, REPAIR_SCREEN_CERT, BALANCE_HEADINGS, UI_FEEL, AGENT, COMPOSE, REPAIR_WIN = (
     "rerun", "sync-main", "wire-ci-fast", "renumber-migrations", "stamp-changelog", "snap-spacing",
-    "strip-cache-exports", "merge-narrowed-preflight", "register-domain-writes", "atomic-write", "repair-screen-cert", "balance-headings", "ui-feel", "agent", "compose")
+    "strip-cache-exports", "merge-narrowed-preflight", "register-domain-writes", "atomic-write", "repair-screen-cert", "balance-headings", "ui-feel", "agent", "compose", "repair-win")
 DETERMINISTIC = frozenset({
     RERUN, SYNC_MAIN, WIRE_CI_FAST, RENUMBER, STAMP_CHANGELOG, SNAP_SPACING, STRIP_CACHE, MERGE_NARROWED,
-    REGISTER_DOMAIN, ATOMIC_WRITE, REPAIR_SCREEN_CERT, BALANCE_HEADINGS, UI_FEEL, ADMIT_RENDER_MODE, ALIAS_ACTION})
+    REGISTER_DOMAIN, ATOMIC_WRITE, REPAIR_SCREEN_CERT, BALANCE_HEADINGS, UI_FEEL, ADMIT_RENDER_MODE, ALIAS_ACTION, REPAIR_WIN})
 
 # remediation.INFRA_TEXT (runner loss, OOM, 5xx) plus the platform failures seen in 52 agent-declined
 # fix runs. Kept out of INFRA_TEXT: the exhausted-PR classifier deliberately routes a rate-limited
@@ -175,6 +175,7 @@ SIGNATURES = (
     ("platform-infra", PLATFORM_TEXT, RERUN),
     ("migration-number", migration_renumber.LOG_TEXT, RENUMBER),
     ("atomic-write", ATOMIC_TEXT, ATOMIC_WRITE),
+    ("measured-win", re.compile(r"needs a measured win \(metric, before, after, method, evidence\)"), REPAIR_WIN),
     ("pr-body", BODY_TEXT, AGENT),
 )
 BEHIND_CLASS = "stale-branch"
