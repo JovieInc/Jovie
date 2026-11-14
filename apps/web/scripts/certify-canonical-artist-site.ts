@@ -24,6 +24,14 @@ export interface CanonicalArtistSiteCliOptions {
   readonly outputPath: string;
   /** Newest-first SHAs from the certified revision. Empty means equality only. */
   readonly sourceHistory?: readonly string[];
+  /**
+   * True when `--source-history` was passed and its file parsed to zero
+   * entries. The Golden Path shell pre-creates the history file and clears it
+   * only when a history page failed (e.g. a GitHub installation-quota 403),
+   * so empty lineage evidence is a transport failure — never proof that the
+   * deployed revision is unrelated to the certified one.
+   */
+  readonly lineageFileEmpty?: boolean;
 }
 
 interface M2Receipt {
@@ -104,16 +112,39 @@ function optional(argv: readonly string[], name: string): string | undefined {
   return value;
 }
 
-function loadSourceHistory(path: string | undefined): readonly string[] {
-  if (!path) return [];
+function loadSourceHistory(path: string | undefined): {
+  entries: readonly string[];
+  fileWritten: boolean;
+} {
+  if (!path) return { entries: [], fileWritten: false };
   try {
-    return parseSourceHistory(readFileSync(resolve(path), 'utf8'));
+    const entries = parseSourceHistory(readFileSync(resolve(path), 'utf8'));
+    return { entries, fileWritten: true };
   } catch {
-    return [];
+    return { entries: [], fileWritten: false };
+  }
+}
+
+/**
+ * A lineage read that promised evidence and delivered none (the flag was
+ * passed but the file is missing or empty) is a transport failure, not
+ * drift. The Golden Path shell always creates the file, so empty content
+ * means every history page failed.
+ */
+export class LineageEvidenceUnavailableError extends Error {
+  readonly deployedRevision: string | null;
+  constructor(deployedRevision: string | null) {
+    super(
+      'github-quota-deferred: canonical artist-site certification could not bind the deployed revision to the certified source: the commits history read came back empty (GitHub installation quota or transport failure). No certificate was issued; this is not a pass and not a product verdict. Re-run after the quota resets.'
+    );
+    this.name = 'LineageEvidenceUnavailableError';
+    this.deployedRevision = deployedRevision;
   }
 }
 
 function parseOptions(argv: readonly string[]): CanonicalArtistSiteCliOptions {
+  const historyFlag = optional(argv, '--source-history');
+  const history = loadSourceHistory(historyFlag);
   return {
     candidateId: required(argv, '--candidate-id'),
     runId: required(argv, '--run-id'),
@@ -128,7 +159,8 @@ function parseOptions(argv: readonly string[]): CanonicalArtistSiteCliOptions {
     navigationStatus: required(argv, '--navigation-status'),
     profileResultPath: required(argv, '--profile-result'),
     outputPath: required(argv, '--output'),
-    sourceHistory: loadSourceHistory(optional(argv, '--source-history')),
+    sourceHistory: history.entries,
+    lineageFileEmpty: historyFlag !== undefined && history.entries.length === 0,
   };
 }
 
@@ -166,6 +198,21 @@ export function certifyCanonicalArtistSite(
   );
   const revisionBound =
     revisionRelation === 'same' || revisionRelation === 'ancestor';
+  // A history file the workflow pre-created but left empty means every
+  // commits-history page failed (GitHub installation-quota 403 or transport):
+  // the deployed revision cannot be bound, which is missing evidence, not
+  // drift. Fail honestly as quota-deferred instead of issuing a false RED
+  // product verdict; the journey results themselves still stand and a re-run
+  // after the quota reset re-reads the history. Real failures keep their RED:
+  // an unhealthy profile or a history that shows a genuinely unrelated
+  // revision never reaches this branch.
+  if (
+    options.lineageFileEmpty === true &&
+    revisionRelation === 'unrelated' &&
+    profileHealthy
+  ) {
+    throw new LineageEvidenceUnavailableError(deployedRevision);
+  }
   const profilePassed = profileHealthy && revisionBound;
   const exposedDeferred = profile?.exposedDeferredSurfaces;
   const boundDefect = (passesIgnoringRevision: boolean) =>
@@ -384,7 +431,15 @@ if (process.argv[1]?.endsWith('certify-canonical-artist-site.ts')) {
     }
     if (!certificate.safeToSend) process.exitCode = 1;
   } catch (error) {
-    console.error(error instanceof Error ? error.message : String(error));
-    process.exitCode = 1;
+    if (error instanceof LineageEvidenceUnavailableError) {
+      // The repository's quota-deferral convention (runWithGitHubRetry): exit
+      // 75 with a github-quota-deferred warning is a transport state, never a
+      // verdict on the change. Re-running after the reset re-reads history.
+      console.error(`::warning title=github-quota-deferred::${error.message}`);
+      process.exitCode = 75;
+    } else {
+      console.error(error instanceof Error ? error.message : String(error));
+      process.exitCode = 1;
+    }
   }
 }

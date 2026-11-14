@@ -1,25 +1,19 @@
 import { readFile } from 'node:fs/promises';
-import { type NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { resolveScreenshotPath } from '@/lib/admin/screenshots';
+import {
+  type OperatorRouteInput,
+  operatorAccess,
+} from '@/lib/api/route-access';
+import { defineRoute } from '@/lib/api/route-pipeline';
 import { captureError } from '@/lib/error-tracking';
-import { getOvieOperatorEntitlements } from '@/lib/ovie/privacy-lock/access';
 
 export const runtime = 'nodejs';
 
-export async function GET(
-  _request: NextRequest,
+async function getHandler(
+  _input: OperatorRouteInput,
   { params }: { params: Promise<{ filename: string }> }
 ) {
-  const entitlements = await getOvieOperatorEntitlements({ purpose: 'read' });
-
-  if (!entitlements.isAuthenticated) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
-
-  if (!entitlements.isAdmin) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-  }
-
   const { filename } = await params;
   const filePath = resolveScreenshotPath(decodeURIComponent(filename));
 
@@ -52,3 +46,12 @@ export async function GET(
     );
   }
 }
+
+export const GET = defineRoute(
+  {
+    route: '/api/admin/screenshots/[filename]',
+    access: operatorAccess({ purpose: 'read' }),
+    legacy: { cache: 'none', unhandledErrors: 'rethrow' },
+  },
+  getHandler
+);

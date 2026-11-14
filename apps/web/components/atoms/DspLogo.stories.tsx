@@ -66,3 +66,46 @@ export const UnmappedProvider: Story = {
     provider: 'amazon',
   },
 };
+
+const LONGEST_PROVIDERS = [
+  'netease',
+  'youtube_music',
+  'amazon_music',
+  'iheartradio',
+] as const satisfies ReadonlyArray<ProviderKey>;
+
+/**
+ * Long content: the longest platform names at a tall size in a narrow cell.
+ * The label never wraps, so the caller has to give the logo its full width.
+ */
+export const LongContentNarrowSlot: Story = {
+  render: () => (
+    <ul className='flex flex-col gap-3'>
+      {LONGEST_PROVIDERS.map(provider => (
+        <li className='w-36 border-l border-subtle pl-2' key={provider}>
+          <DspLogo height={24} provider={provider} />
+        </li>
+      ))}
+    </ul>
+  ),
+};
+
+/** Right-to-left: platform logos beside Arabic listen-on labels. */
+export const RtlListenOn: Story = {
+  render: () => (
+    <ul dir='rtl' className='flex flex-col gap-3 text-sm text-secondary-token'>
+      {(
+        [
+          ['anghami', 'استمع على'],
+          ['spotify', 'استمع على'],
+          ['deezer', 'متوفر الآن على'],
+        ] as const
+      ).map(([provider, label]) => (
+        <li className='flex items-center gap-2' key={provider}>
+          <span>{label}</span>
+          <DspLogo height={20} provider={provider} />
+        </li>
+      ))}
+    </ul>
+  ),
+};

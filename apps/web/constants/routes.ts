@@ -120,6 +120,7 @@ export const APP_ROUTES = {
   ADMIN_CREATORS_TOGGLE_VERIFY: '/app/ov/creators/toggle-verify',
   ADMIN_USERS: '/app/ov/users',
   ADMIN_ACTIVITY: '/app/ov/activity',
+  ADMIN_ROOM: '/app/ov/room',
   ADMIN_CAMPAIGNS: '/app/ov/campaigns',
   ADMIN_GROWTH_YC_METRICS: '/app/ov/growth/yc-metrics',
   ADMIN_INVESTORS: '/app/ov/investors',
@@ -280,6 +281,12 @@ export const APP_ROUTES = {
 } as const;
 
 export type AppRoute = (typeof APP_ROUTES)[keyof typeof APP_ROUTES];
+
+/**
+ * Where public CTAs send a new, anonymous visitor. There is one flow, not a
+ * separate waitlist and onboarding: the /start chat admits or holds them.
+ */
+export const PUBLIC_ENTRY_HREF = APP_ROUTES.START;
 
 const SPOTIFY_CATALOG_CONNECTION_PARAM = 'connect';
 const SPOTIFY_CATALOG_CONNECTION_VALUE = 'spotify';

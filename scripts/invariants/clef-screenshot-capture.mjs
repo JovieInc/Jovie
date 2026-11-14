@@ -21,14 +21,21 @@ export async function withCaptureBrowser(run) { const { chromium } = await impor
 const browser = await chromium.launch(); try { return await run(browser); } finally { await browser.close(); } }
 /**
 * @param {import('playwright').Browser} browser
-* @param {{url: string, viewport?: string | number, mode?: string, selector?: string, mockupSelector?: string, click?: string, wait?: number}} options
+* @param {{url: string, viewport?: string | number, mode?: string, selector?: string, mockupSelector?: string, click?: string, wait?: number, expectedPath?: string}} options
 */
 export async function captureSurfacePng(browser, options) {
-const { url, viewport = 'desktop', mode, selector, mockupSelector, click, wait = 1500 } = options;
+const { url, viewport = 'desktop', mode, selector, mockupSelector, click, wait = 1500, expectedPath } = options;
 const target = resolveCaptureViewport(viewport); const page = await browser.newPage({
 viewport: { width: target.width, height: target.height }, deviceScaleFactor: target.deviceScaleFactor,
 isMobile: target.isMobile, colorScheme: resolveCaptureColorScheme(mode), }); try {
 await page.goto(url, { waitUntil: 'networkidle', timeout: 60_000 });
+// A capture that landed on a different route (auth redirect, closed-signup
+// handoff) is not this frame's surface: report it instead of screenshotting
+// whatever page answered (JOV-11623).
+const finalUrl = page.url();
+if (expectedPath && new URL(finalUrl).pathname !== expectedPath) {
+return { png: null, geometry: null, viewport: target.width,
+mode: resolveCaptureColorScheme(mode), finalUrl, redirected: true }; }
 if (click) await page.click(click, { timeout: 5_000 }).catch(() => {}); await page.waitForTimeout(wait);
 const png = selector ? await page.locator(selector).first().screenshot()
 : await page.screenshot({ fullPage: true });
@@ -41,5 +48,6 @@ return { x: r.x - rect.x, y: r.y - rect.y, width: r.width, height: r.height }; }
 section: { width: rect.width, height: rect.height }, mockup: box(mockupEl),
 textBlocks: [...root.querySelectorAll('h1, h2, h3, p')].map(box).filter(r => r && r.width > 0 && r.height > 0),
 }; }, { sectionSelector: selector ?? null, mockup: mockupSelector ?? null });
-return { png, geometry, viewport: target.width, mode: resolveCaptureColorScheme(mode) }; } finally {
+return { png, geometry, viewport: target.width, mode: resolveCaptureColorScheme(mode),
+finalUrl }; } finally {
 await page.close(); } }

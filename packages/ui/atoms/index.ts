@@ -34,6 +34,11 @@ export {
   DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from './dropdown-menu';
+export type {
+  HostDrawnInputProps,
+  HostDrawnSelectProps,
+} from './host-drawn-field';
+export { HostDrawnInput, HostDrawnSelect } from './host-drawn-field';
 export type { IconButtonName, IconButtonProps } from './icon-button';
 export { IconButton, iconButtonVariants } from './icon-button';
 export {
@@ -48,6 +53,8 @@ export type { KbdProps } from './kbd';
 export { Kbd } from './kbd';
 export type { NativeSelectOption, NativeSelectProps } from './native-select';
 export { NativeSelect } from './native-select';
+export type { PlainButtonProps } from './plain-button';
+export { PlainButton, plainButtonFocusClassName } from './plain-button';
 export {
   Popover,
   PopoverAnchor,

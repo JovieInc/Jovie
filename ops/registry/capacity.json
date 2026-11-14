@@ -30,7 +30,7 @@
       "rule": "Real cash or prepaid credit: cheapest model that clears the capability floor; honour the caps in the spend registry."
     },
     "preserve-frontier": {
-      "rule": "Subscription capacity for frontier work only (money and auth critical); cheaper lanes take the rest."
+      "rule": "Subscription capacity, paid for either way. Anthropic models run here or on Hyperagent, never the Vercel AI Gateway or a metered key. Within a capability class the pool whose allowance expires first takes the run (Tim, 2026-11-11; scripts/lanes/model-pools.json)."
     },
     "unavailable": {
       "rule": "Not routable: lane disabled, plan lapsed or unverified. Do not route work here."
@@ -575,7 +575,7 @@
       },
       "policy": {
         "id": "preserve-frontier",
-        "delegation": "Opus only for money and auth critical work; Sonnet and Haiku for the rest."
+        "delegation": "Opus for frontier work; Sonnet and Haiku for the rest. Balance against Hyperagent by what expires first."
       },
       "limits": { "softRuns": 12, "windowS": 18000 },
       "accounts": [

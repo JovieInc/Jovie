@@ -82,6 +82,12 @@ describe('marketing model roles (model-registry.json projection)', () => {
         scope: 'marketing_roles',
         approved_at: '2026-09-29',
       }),
+      // Lanes: Claude subscription or Hyperagent only, balanced by expiry (scripts/lanes/model-pools.json).
+      expect.objectContaining({
+        rule: 'no_claude',
+        scope: 'lane_model_pools',
+        approved_at: '2026-11-11',
+      }),
     ]);
     for (const model of registry.models) {
       expect(`${model.provider} ${model.family} ${model.model}`).not.toMatch(

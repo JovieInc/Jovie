@@ -1,0 +1,39 @@
+/** Exact product-shot producers; unknown paths and missing tests stay full-suite. */
+/** @type {Array<[string, string[]]>} */
+export const PRODUCT_SHOT_TEST_PRODUCERS = [
+  [
+    'apps/web/lib/screenshots/product-shots.ts',
+    [
+      'apps/web/lib/screenshots/product-shots.test.ts',
+      'apps/web/lib/screenshots/product-shots.manifest.test.ts',
+    ],
+  ],
+  [
+    'apps/web/lib/screenshots/product-shots.manifest.json',
+    [
+      'apps/web/lib/screenshots/product-shots.manifest.test.ts',
+      'apps/web/lib/screenshots/product-shots.test.ts',
+    ],
+  ],
+  [
+    'apps/web/scripts/product-shots/plan.ts',
+    [
+      'apps/web/scripts/product-shots/plan.test.ts',
+      'apps/web/lib/screenshots/product-shots.manifest.test.ts',
+      'apps/web/scripts/product-shots/render.test.ts',
+    ],
+  ],
+  [
+    'apps/web/scripts/product-shots/render.ts',
+    ['apps/web/scripts/product-shots/render.test.ts'],
+  ],
+  [
+    'apps/web/scripts/product-shots/source-hash.mjs',
+    [
+      'apps/web/scripts/product-shots/source-hash.test.ts',
+      'apps/web/scripts/product-shots/plan.test.ts',
+      'apps/web/lib/screenshots/product-shots.manifest.test.ts',
+      'apps/web/scripts/product-shots/render.test.ts',
+    ],
+  ],
+];

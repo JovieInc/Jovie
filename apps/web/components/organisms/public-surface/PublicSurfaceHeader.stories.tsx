@@ -44,3 +44,44 @@ export const WithCenterContent: Story = {
     ),
   },
 };
+
+/** Only a back control: the right slot stays as an empty spacer. */
+export const PartialLeftSlotOnly: Story = {
+  args: {
+    leftSlot: (
+      <Button type='button' variant='ghost' size='sm'>
+        Back
+      </Button>
+    ),
+  },
+};
+
+/** A long release title between both controls truncates inside its slot. */
+export const LongContentCenterTitle: Story = {
+  args: {
+    ...WithSlots.args,
+    children: (
+      <p className='truncate text-center text-sm text-primary-token'>
+        Never Say A Word (Extended Club Mix) feat. The Los Angeles After Hours
+        Orchestra
+      </p>
+    ),
+  },
+};
+
+/** Slots mirror inside a right-to-left page. */
+export const Rtl: Story = {
+  args: {
+    ...WithSlots.args,
+    children: (
+      <p className='text-center text-sm text-primary-token'>منتصف الليل</p>
+    ),
+  },
+  decorators: [
+    Story => (
+      <div dir='rtl' lang='ar'>
+        <Story />
+      </div>
+    ),
+  ],
+};

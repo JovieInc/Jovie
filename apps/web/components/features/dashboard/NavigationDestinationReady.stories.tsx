@@ -43,3 +43,18 @@ export const NotYetReady: Story = {
     </div>
   ),
 };
+
+/** The destination's data is still loading: the signal holds until ready. */
+export const LoadingDestinationData: Story = {
+  args: {
+    destination: 'calendar',
+    ready: false,
+  },
+  render: args => (
+    <div className='text-sm text-tertiary-token' aria-busy='true'>
+      Loading &quot;{args.destination}&quot;. Renders nothing and holds the
+      readiness signal until the data arrives.
+      <NavigationDestinationReady {...args} />
+    </div>
+  ),
+};

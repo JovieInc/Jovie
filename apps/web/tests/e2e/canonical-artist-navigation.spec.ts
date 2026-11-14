@@ -21,6 +21,7 @@ test.describe('canonical artist navigation', () => {
       let expectedRevision: string | undefined;
       if (resultPath) {
         const result = JSON.parse(readFileSync(resultPath, 'utf8'));
+        expect(result.failed).toBe(false);
         expectedRevision = JSON.parse(readFileSync(result.reportPath, 'utf8'))
           .snapshot.releaseSha;
         expect(expectedRevision).toMatch(/^[a-f0-9]{40}$/);

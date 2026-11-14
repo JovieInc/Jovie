@@ -116,3 +116,43 @@ export const Waitlist: Story = {
     ),
   },
 };
+
+/** A caller that hides the visible title and the footer prompt: only the form slot renders. */
+export const PartialFormOnly: Story = {
+  args: {
+    formTitle: 'Continue to Jovie',
+    showFormTitle: false,
+    showFooterPrompt: false,
+    children: <SampleForm />,
+  },
+};
+
+/** A long title and footer prompt wrap inside the form column. */
+export const LongContent: Story = {
+  args: {
+    formTitle:
+      'Continue to Jovie with the email address your label already uses',
+    showFooterPrompt: true,
+    footerPrompt: 'Booking for a roster of artists and need a team account?',
+    footerLinkText: 'Create your account',
+    footerLinkHref: '/signup',
+    children: <SampleForm />,
+  },
+};
+
+/** The split chrome inside a right-to-left page. */
+export const Rtl: Story = {
+  args: {
+    formTitle: 'Log in to Jovie',
+    layoutVariant: 'split',
+    showFooterPrompt: true,
+    children: <SampleForm />,
+  },
+  decorators: [
+    Story => (
+      <div dir='rtl' lang='ar'>
+        <Story />
+      </div>
+    ),
+  ],
+};

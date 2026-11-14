@@ -1,5 +1,6 @@
 name: CI Duration Ratchet
 # clock-class: skip-if-unchanged
+# github-token-budget: 201 calls/run - one p95 sample read, plus at most ~200 total_count and skipped-run reads by the fan-out budget job (scripts/ci-trigger-budget.mjs) once a night
 
 # Nightly p95 gate-duration measurement + SLO guard.
 # Measures the rolling p95 wall-clock of recent PR merge-gate CI runs and
@@ -251,3 +252,42 @@ jobs:
             -H 'Content-type: application/json' \
             --data "$PAYLOAD" \
             "$SLACK_WEBHOOK_URL"
+
+  # Audit finding 4: runs per merged PR and always-skipped workflows, measured
+  # on the same nightly cron (no new clock). Read-only; never a PR check.
+  # Fails when the 7-day runs per merged PR pass the ceiling in
+  # scripts/ci-trigger-registry.json, or a busy workflow skips >95% of its runs.
+  fan-out-budget:
+    name: CI fan-out budget
+    if: github.event_name != 'push'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      actions: read
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          sparse-checkout: |
+            .nvmrc
+            .github/actions/prime-node-toolcache
+            packages/api-client
+            scripts/ci-trigger-budget.mjs
+            scripts/ci-trigger-registry.json
+          sparse-checkout-cone-mode: false
+
+      - name: Prime Node toolcache (no GitHub API manifest call)
+        uses: ./.github/actions/prime-node-toolcache
+
+      - name: Set up Node
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+
+      - name: Measure runs per merged PR and skipped share
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        run: node scripts/ci-trigger-budget.mjs

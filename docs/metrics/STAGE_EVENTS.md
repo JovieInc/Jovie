@@ -13,7 +13,7 @@ One row per entity per stage. Stage dwell time is `exitedAt - enteredAt`.
 | Field | Type | Meaning |
 | --- | --- | --- |
 | `schema` | `"jovie-stage-event/v1"` | Contract version. Breaking changes bump it. |
-| `entityType` | manifest key | `shipping`, `remediation`, `release`, `release-replay`, `ios-release`, `revenue-funnel`, `summer-turn`, `linear-intake`, `detector-issue`, `automation-run`, `incident`, `board-task`, `design-loop` |
+| `entityType` | manifest key | `shipping`, `remediation`, `remediation-repair`, `remediation-writer`, `release`, `release-replay`, `ios-release`, `revenue-funnel`, `summer-turn`, `linear-intake`, `detector-issue`, `automation-run`, `incident`, `board-task`, `design-loop` |
 | `entityId` | string | Stable id; the format is declared per entity in the manifest. |
 | `stage` | manifest stage id | Must be registered for the entity type. Unregistered stages are rejected. |
 | `enteredAt` | ISO-8601 | When the entity entered the stage. |
@@ -116,6 +116,8 @@ PATCH as `lanes-status.json`). Keep 28 days, drop older rows, cap at 8 MB.
 | `shipping:gate` | `shipping` / `JovieInc/Jovie#<pr>` | `startedAt + gateWaitS` | receipt `endedAt` (`advanced` landing/verified, `failed` held/timeout) | `runs/ledger.jsonl` (`kind` adopt) |
 | `shipping:outcome-receipt` | `shipping` / `JOV-<n>` | lifecycle comment that owes `outcome` | outcome lane records the receipt (`advanced` pass, `failed` fail, `abandoned` no receipt) | `runs/ledger.jsonl` (`kind` outcome-verify) |
 | `remediation:repair-start` | `remediation` / `JovieInc/Jovie#<pr>@<first 12 chars of the red head sha>` | fix-red receipt `startedAt` | receipt `endedAt` | `runs/ledger.jsonl` (`kind` fix-red) |
+
+Red-to-green dwell per red head SHA is also split by who greened it (red-repair admission, 2026-11-12): `remediation-repair` when a `lane-fix-<kind>` label landed between red and green, `remediation-writer` when none did. Both are derived from the same `github-pr` receipts as `remediation` (stages `red`, `green`); a truncated timeline stays unsplit.
 
 | `incident:undetected` | `incident` / `<host>:<condition key>#<generation>` | last proof of life: the probe's last pass (`probe-red:*`) or the receipt's mtime (`automation-silent:*`) | doctor raised the condition | `runs/incidents.jsonl` `detected` |
 | `incident:unfiled` | same | condition raised | Linear issue filed or reopened (first tick doctor.json `issues[key]` holds an open id) | `runs/incidents.jsonl` `filed` |

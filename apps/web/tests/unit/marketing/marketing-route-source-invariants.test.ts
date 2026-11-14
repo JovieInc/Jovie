@@ -7,6 +7,11 @@ import {
 } from '@/data/marketing/factory/pageRecord';
 import { getPageRecordContracts } from '@/data/marketing/factory/pageRecordContract';
 import { MARKETING_ROUTE_MANIFEST } from '@/data/marketing/routeManifest';
+import {
+  announceShrink,
+  compareToBaseline,
+  tightenBaseline,
+} from '../../../../../scripts/lib/shrink-only-baseline.mjs';
 
 /**
  * Manifest-driven marketing source invariants.
@@ -23,8 +28,11 @@ import { MARKETING_ROUTE_MANIFEST } from '@/data/marketing/routeManifest';
  * Rendered-layout invariants (nested surfaces, stranded text, heading
  * hierarchy, clipping) live in the route DOM detector instead.
  *
- * Existing violations are a decrease-only baseline. To shrink it after a
- * fix, run with UPDATE_MARKETING_SOURCE_BASELINE=1.
+ * Existing violations are a decrease-only baseline: growth fails, a fix
+ * passes without touching the baseline file, and TIGHTEN_BASELINES=1 (run by
+ * scripts/baselines-tighten.mjs) lowers the entries afterwards.
+ * UPDATE_MARKETING_SOURCE_BASELINE=1 rewrites the baseline to current counts,
+ * growth included; that is a floor raise and needs review.
  */
 
 const WEB_ROOT = process.cwd();
@@ -322,23 +330,26 @@ describe('marketing route source invariants (manifest-driven)', () => {
     }
 
     const baseline = readBaseline();
-    const regressions = Object.entries(current)
-      .filter(([key, count]) => count > (baseline[key] ?? 0))
-      .map(
-        ([key, count]) =>
-          `${key}: ${count} (baseline ${baseline[key] ?? 0}) — ${
-            MARKETING_SOURCE_RULES.find(rule => key.startsWith(`${rule.id}::`))
-              ?.invariant
-          }`
-      );
-    const stale = Object.entries(baseline)
-      .filter(([key, count]) => (current[key] ?? 0) < count)
-      .map(([key, count]) => `${key}: ${current[key] ?? 0} < ${count}`);
+    const { growth, shrink } = compareToBaseline(current, baseline);
+    if (process.env.TIGHTEN_BASELINES === '1') {
+      // Lowers or removes entries only; growth below still fails.
+      const next = tightenBaseline(current, baseline).baseline;
+      if (shrink.length > 0) {
+        writeFileSync(BASELINE_PATH, `${JSON.stringify(next, null, 2)}\n`);
+      }
+    }
+    const regressions = growth.map(
+      ({ path: [key], count, baseline: allowed }) =>
+        `${key}: ${count} (baseline ${allowed}) — ${
+          MARKETING_SOURCE_RULES.find(rule => key.startsWith(`${rule.id}::`))
+            ?.invariant
+        }`
+    );
 
     expect(regressions, 'New marketing invariant violations').toEqual([]);
-    expect(
-      stale,
-      'Baseline is stale — rerun with UPDATE_MARKETING_SOURCE_BASELINE=1 to lock in the fix'
-    ).toEqual([]);
+    // A fixed violation leaves stale headroom. That passes: failing here made
+    // the PR that removed debt rewrite this shared file, and two green PRs
+    // then went red together in a merge group.
+    announceShrink('marketing-route-source-invariants', shrink);
   });
 });

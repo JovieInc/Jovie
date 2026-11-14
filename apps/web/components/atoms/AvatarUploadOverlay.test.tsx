@@ -1,5 +1,6 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
+import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import { AvatarUploadOverlay } from './AvatarUploadOverlay';
 
 describe('AvatarUploadOverlay', () => {
@@ -30,4 +31,25 @@ describe('AvatarUploadOverlay', () => {
     expect(overlay).toHaveClass('rounded-lg');
     expect(overlay).not.toHaveClass('rounded-full');
   });
+});
+
+describe('AvatarUploadOverlay accessibility', () => {
+  it.each([
+    ['hover', {}],
+    ['drag over', { isDragOver: true }],
+    ['artwork drag over', { isDragOver: true, shapeClassName: 'rounded-lg' }],
+  ])(
+    'stays out of the accessibility tree in the %s state',
+    async (_label, props) => {
+      const { container } = render(
+        <button type='button' aria-label='Upload photo' className='relative'>
+          <AvatarUploadOverlay iconSize={20} {...props} />
+        </button>
+      );
+      expect(
+        screen.getByRole('button', { name: 'Upload photo' })
+      ).toBeVisible();
+      await expectNoA11yViolations(container);
+    }
+  );
 });

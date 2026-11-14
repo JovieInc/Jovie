@@ -1,0 +1,135 @@
+{
+  "schema": "jovie.queue-drift-guards/v1",
+  "purpose": "Every checked-in baseline and what happens to it when two green PRs combine. scripts/lib/__tests__/queue-drift-guards.test.mjs fails when a tracked baseline is missing here.",
+  "guards": [
+    {
+      "id": "design-noise",
+      "baseline": "apps/web/design-noise.baseline.json",
+      "semantic": "shrink-only",
+      "check": "node apps/web/scripts/lint-design-noise.mjs",
+      "tighten": "node apps/web/scripts/lint-design-noise.mjs --tighten"
+    },
+    {
+      "id": "marketing-route-source-invariants",
+      "baseline": "apps/web/tests/unit/marketing/marketing-route-source-invariants.baseline.json",
+      "semantic": "shrink-only",
+      "check": "pnpm --filter @jovie/web exec vitest run --config vitest.config.fast.mts tests/unit/marketing/marketing-route-source-invariants.test.ts",
+      "tighten": "TIGHTEN_BASELINES=1 pnpm --filter @jovie/web exec vitest run --config vitest.config.fast.mts tests/unit/marketing/marketing-route-source-invariants.test.ts"
+    },
+    {
+      "id": "offer-claims",
+      "baseline": "scripts/invariants/offer-claims/baseline.json",
+      "semantic": "shrink-only",
+      "check": "node scripts/invariants/offer-claims/check.mjs",
+      "tighten": "node scripts/invariants/offer-claims/check.mjs --tighten"
+    },
+    {
+      "id": "stat-claims",
+      "baseline": "scripts/invariants/stat-claims/baseline.json",
+      "semantic": "shrink-only",
+      "check": "node scripts/invariants/stat-claims/check.mjs",
+      "tighten": "node scripts/invariants/stat-claims/check.mjs --tighten"
+    },
+    {
+      "id": "size-500",
+      "baseline": "scripts/company-guards/size-baseline.json",
+      "semantic": "shrink-only",
+      "check": "node scripts/company-guards/size-ratchet.mjs --no-raise origin/main",
+      "tighten": "node scripts/company-guards/size-ratchet.mjs --tighten"
+    }
+  ],
+  "combineSafe": {
+    "reason": "Read on 2026-11-11: the checker fails growth and reports a shrink without failing, or keeps one entry per file. Each has its own update command; none is wired into scripts/baselines-tighten.mjs yet.",
+    "baselines": [
+      "apps/web/composite-field.baseline.json",
+      "apps/web/contrast-ratchet.baseline.json",
+      "apps/web/tests/unit/design-system/arbitrary-radius.baseline.json",
+      "apps/web/tests/unit/design-system/canonical-nav-metric.baseline.json",
+      "apps/web/tests/unit/design-system/destructive-red-drift.baseline/",
+      "apps/web/tests/unit/design-system/linear-namespace.baseline.json",
+      "apps/web/tests/unit/design-system/no-uppercase.baseline.json",
+      "apps/web/tests/unit/design-system/sidebar-optical-alignment.baseline.json",
+      "apps/web/tests/unit/design-system/spacing-scale.baseline.json",
+      "apps/web/touch-target-ratchet.baseline.json",
+      "apps/web/ui-feel-ratchet.baseline.json",
+      "packages/copy/dead-ends.baseline.json",
+      "scripts/invariants/duplicate-literals.baseline.json",
+      "scripts/invariants/native-spacing-scale.baseline.json",
+      "scripts/invariants/shell-ia.baseline.json",
+      "scripts/shared-ui-visual-arbitrary.baseline.json"
+    ]
+  },
+  "exactMatch": [
+    {
+      "reason": "Not migrated: table-system-ratchet.test.ts fails on a stale entry (staleBaseline must be empty). Can fail a combined head.",
+      "baselines": [
+        "apps/web/tests/unit/design-system/table-system.baseline.json"
+      ]
+    },
+    {
+      "reason": "Not migrated: id-set ratchet (art-direction/ratchet.mjs); resolved ids must be deleted in the same tree. Can fail a combined head.",
+      "baselines": [
+        "scripts/invariants/art-direction/accent.baseline.json",
+        "scripts/invariants/art-direction/hero-scroll.baseline.json",
+        "scripts/invariants/art-direction/hue.baseline.json",
+        "scripts/invariants/art-direction/imagery-provenance.baseline.json",
+        "scripts/invariants/art-direction/images.baseline.json",
+        "scripts/invariants/art-direction/surface-media.baseline.json"
+      ]
+    },
+    {
+      "reason": "Not migrated: id-set ratchet; resolved ids must be deleted in the same tree. Can fail a combined head.",
+      "baselines": ["scripts/invariants/icp-language/baseline.json"]
+    },
+    {
+      "reason": "Not migrated: no-wall-clock-assertions.test.mjs fails on stale entries. Can fail a combined head.",
+      "baselines": ["scripts/lib/wall-clock-assertion-baseline.json"]
+    },
+    {
+      "reason": "Not migrated: typecheck-scripts.mjs fails on entries for errors that no longer exist. Can fail a combined head.",
+      "baselines": ["scripts/typecheck-baseline.json"]
+    }
+  ],
+  "unreviewed": {
+    "reason": "Not audited for combine safety in the 2026-11-11 pass. Move each to guards with its semantic when it is checked.",
+    "baselines": [
+      "apps/web/contrast-computed.baseline.json",
+      "apps/web/data/product-truth/claim-coverage-baseline.json",
+      "apps/web/data/product-truth/golden-path-proof-baseline.json",
+      "apps/web/lib/seo/ratchet-baseline.json",
+      "apps/web/lib/seo/seo-certify-baseline.json",
+      "apps/web/seo-ratchet.baseline.json",
+      "apps/web/test-performance-baseline.json",
+      "apps/web/tests/fixtures/seo-ratchet-baseline.json",
+      "apps/web/tests/product-screenshots/route-dom-marketing-baseline.json",
+      "apps/web/tests/product-screenshots/shell-material-baseline.json",
+      "apps/web/tests/seo/seo-baseline.json",
+      "apps/web/tests/unit/design-system/arbitrary-values.baseline.json",
+      "apps/web/tests/unit/design-system/component-family.baseline.json",
+      "apps/web/tests/unit/design-system/deprecated-button-alias.baseline.json",
+      "apps/web/tests/unit/design-system/raw-button.baseline.json",
+      "apps/web/tests/unit/design-system/server-imports.baseline.json",
+      "apps/web/tests/unit/design-system/shadcn-no-restyle.baseline.json",
+      "apps/web/tests/unit/design-system/sidebar-nav-row.baseline.json",
+      "apps/web/tests/unit/design-system/source-identity.baseline.json",
+      "apps/web/tests/unit/design-system/tab-canon.baseline.json",
+      "apps/web/tests/unit/marketing/banned-phrase.baseline.json",
+      "apps/web/tests/unit/marketing/marketing-eyebrow-caps.baseline.json",
+      "apps/web/tests/unit/marketing/raw-jsx-copy.baseline.json",
+      "apps/web/tests/unit/metrics-layer.baseline.json",
+      "apps/web/tests/unit/routes/shell-redirect-stubs.baseline.json",
+      "apps/web/typecheck-stories-baseline.json",
+      "apps/web/typecheck-tests-baseline.json",
+      "config/slop-guard/baseline.json",
+      "docs/metrics/shipping-slo-baseline.json",
+      "docs/pen-stills/pen-variable-baseline.json",
+      "ops/registry/secrets-lint-baseline.json",
+      "scripts/design-authority-interactive-baseline.json",
+      "scripts/invariants/overlay-layer-contract.baseline.json",
+      "scripts/mutation-score-baseline.json",
+      "scripts/repo-health-baseline.json",
+      "scripts/story-coverage-baseline.json",
+      "scripts/swift-arch/baseline.json"
+    ]
+  }
+}

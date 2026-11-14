@@ -226,14 +226,16 @@ const measureJank = () =>
     loadWorstMs: number;
     inputWorstMs: number;
     frames: boolean;
+    worstPhases: string;
     worstScripts: string[];
   }>(resolve => {
     const types = PerformanceObserver.supportedEntryTypes ?? [];
     let cls = 0;
     let firstInputAt = Number.POSITIVE_INFINITY;
     const frames: { startTime: number; duration: number }[] = [];
-    let worst: { duration: number; scripts: string[] } = {
+    let worst: { duration: number; phases: string; scripts: string[] } = {
       duration: 0,
+      phases: '',
       scripts: [],
     };
     let pending = 3;
@@ -256,6 +258,7 @@ const measureJank = () =>
         loadWorstMs,
         inputWorstMs,
         frames: types.includes('long-animation-frame'),
+        worstPhases: worst.phases,
         worstScripts: worst.scripts,
       });
     };
@@ -297,8 +300,19 @@ const measureJank = () =>
             }[];
           }
         ).scripts ?? [];
+      // Where the frame's time went: tasks before rendering, then rendering
+      // (rAF callbacks, style and layout, paint). A frame with no script
+      // attribution is usually style, layout or paint.
+      const timing = entry as PerformanceEntry & {
+        renderStart?: number;
+        styleAndLayoutStart?: number;
+      };
+      const end = entry.startTime + entry.duration;
+      const renderStart = timing.renderStart || end;
+      const styleStart = timing.styleAndLayoutStart || end;
       worst = {
         duration: entry.duration,
+        phases: `tasks ${Math.round(renderStart - entry.startTime)}ms, render ${Math.round(end - renderStart)}ms (style+layout+paint ${Math.round(end - styleStart)}ms)`,
         scripts: [...scripts]
           .sort((a, b) => b.duration - a.duration)
           .slice(0, 3)
@@ -397,7 +411,7 @@ async function recordJank(currentPage: Page, surface: string): Promise<void> {
       // Receipts upload as artifacts; the run log is where a fixer reads
       // which scripts held the longest frame.
       process.stdout.write(
-        `[prod-cert:jank] ${surface} longest frame ${Math.round(jank.worstFrameMs)}ms; loads ${samples.map(Math.round).join('/')}ms; scripts: ${jank.worstScripts.join(' | ') || 'none attributed'}\n`
+        `[prod-cert:jank] ${surface} longest frame ${Math.round(jank.worstFrameMs)}ms; loads ${samples.map(Math.round).join('/')}ms; ${jank.worstPhases}; scripts: ${jank.worstScripts.join(' | ') || 'none attributed'}\n`
       );
     }
     recordCertObservation({

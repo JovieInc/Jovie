@@ -4,6 +4,7 @@ import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { useState } from 'react';
 import type { ColumnDef, RowSelectionState } from '@/lib/tanstack-table';
 import { PersonCell } from '../atoms/PersonCell';
+import { TableEmptyState } from '../atoms/TableEmptyState';
 import { UnifiedTable } from './UnifiedTable';
 
 type RowData = { id: string; title: string; artist: string };
@@ -200,5 +201,168 @@ export const DensePeopleLoading: Story = {
         { width: '32px', variant: 'text' },
       ]}
     />
+  ),
+};
+
+type CatalogRow = {
+  readonly id: string;
+  readonly title: string;
+  readonly artist?: string;
+  readonly status?: string;
+};
+
+const catalogColumns: ColumnDef<CatalogRow, unknown>[] = [
+  { accessorKey: 'title', header: 'Title', size: 280 },
+  {
+    accessorKey: 'artist',
+    header: 'Artist',
+    size: 200,
+    cell: ({ getValue }) => (getValue() as string | undefined) ?? null,
+  },
+  {
+    accessorKey: 'status',
+    header: 'Status',
+    size: 140,
+    cell: ({ getValue }) => (getValue() as string | undefined) ?? null,
+  },
+];
+
+const NO_CATALOG_ROWS: CatalogRow[] = [];
+
+export const EmptyCatalog: Story = {
+  render: () => (
+    <UnifiedTable
+      data={NO_CATALOG_ROWS}
+      columns={catalogColumns}
+      enableVirtualization={false}
+      caption='Releases'
+      emptyState={
+        <TableEmptyState
+          heading='No releases yet'
+          description='Add your first release to start building your smart links.'
+          action={{ label: 'Add Release', onClick: () => undefined }}
+        />
+      }
+    />
+  ),
+};
+
+export const PartialMissingValues: Story = {
+  render: () => (
+    <UnifiedTable
+      data={[
+        {
+          id: 'one',
+          title: 'Never Say A Word',
+          artist: 'Tim White',
+          status: 'Released',
+        },
+        { id: 'two', title: 'Seaside Heights', status: 'Draft' },
+        { id: 'three', title: 'Untitled Demo' },
+      ]}
+      columns={catalogColumns}
+      enableVirtualization={false}
+      getRowId={row => row.id}
+      caption='Releases'
+    />
+  ),
+};
+
+export const LongCellContent: Story = {
+  render: () => (
+    <div className='max-w-2xl'>
+      <UnifiedTable
+        data={[
+          {
+            id: 'one',
+            title:
+              'First Light (Extended Anniversary Remaster featuring The Midnight Orchestra and Friends)',
+            artist:
+              'The Extraordinarily Long Named Midnight Orchestra Collective',
+            status: 'Scheduled For Worldwide Release',
+          },
+          {
+            id: 'two',
+            title: 'Seaside Heights',
+            artist: 'Tim White',
+            status: 'Released',
+          },
+        ]}
+        columns={catalogColumns}
+        enableVirtualization={false}
+        getRowId={row => row.id}
+        caption='Releases'
+      />
+    </div>
+  ),
+};
+
+export const OfflineEmptyState: Story = {
+  render: () => (
+    <UnifiedTable
+      data={NO_CATALOG_ROWS}
+      columns={catalogColumns}
+      enableVirtualization={false}
+      caption='Releases'
+      emptyState={
+        <TableEmptyState
+          variant='error'
+          heading='You are offline'
+          description='Reconnect to the internet to load your releases.'
+          action={{ label: 'Try Again', onClick: () => undefined }}
+        />
+      }
+    />
+  ),
+};
+
+export const PermissionDeniedEmptyState: Story = {
+  render: () => (
+    <UnifiedTable
+      data={NO_CATALOG_ROWS}
+      columns={catalogColumns}
+      enableVirtualization={false}
+      caption='Team releases'
+      emptyState={
+        <TableEmptyState
+          variant='permission'
+          heading='You do not have access to these releases'
+          description='Ask a workspace owner to share the catalog with you.'
+        />
+      }
+    />
+  ),
+};
+
+const arabicColumns: ColumnDef<CatalogRow, unknown>[] = [
+  { accessorKey: 'title', header: 'العنوان', size: 240 },
+  { accessorKey: 'artist', header: 'الفنان', size: 200 },
+  { accessorKey: 'status', header: 'الحالة', size: 120 },
+];
+
+export const RtlCatalog: Story = {
+  render: () => (
+    <div dir='rtl' lang='ar'>
+      <UnifiedTable
+        data={[
+          {
+            id: 'one',
+            title: 'أول ضوء',
+            artist: 'فرقة منتصف الليل',
+            status: 'صدر',
+          },
+          {
+            id: 'two',
+            title: 'مرتفعات الشاطئ',
+            artist: 'ليلى حداد',
+            status: 'مسودة',
+          },
+        ]}
+        columns={arabicColumns}
+        enableVirtualization={false}
+        getRowId={row => row.id}
+        caption='الإصدارات'
+      />
+    </div>
   ),
 };

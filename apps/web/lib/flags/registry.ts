@@ -58,6 +58,7 @@ export const APP_FLAG_REGISTRY = {
     'RELEASE_TO_REVENUE_AUTOPILOT'
   ),
   AI_CONNECTORS_BETA: buildBooleanFlag('AI_CONNECTORS_BETA'),
+  OVIE_FLEET_ROOM: buildBooleanFlag('OVIE_FLEET_ROOM'),
   MERCH_MVP: buildBooleanFlag('MERCH_MVP'),
   BULK_PRESS_PHOTO_IMPORT: buildBooleanFlag('BULK_PRESS_PHOTO_IMPORT'),
   TELEPROMPTER_RECORDING: buildBooleanFlag('TELEPROMPTER_RECORDING'),
@@ -67,6 +68,7 @@ export const APP_FLAG_REGISTRY = {
   AGENT_PROFILE_CREATE: buildBooleanFlag('AGENT_PROFILE_CREATE'),
   CREATOR_FINANCE: buildBooleanFlag('CREATOR_FINANCE'),
   VISIBILITY_AUDIT_OFFER: buildBooleanFlag('VISIBILITY_AUDIT_OFFER'),
+  OUTBOUND_DOGFOOD_GATE: buildBooleanFlag('OUTBOUND_DOGFOOD_GATE'),
 } as const satisfies Record<AppFlagName, Flag<boolean>>;
 
 export const SUBSCRIBE_CTA_VARIANT_FLAG = flag<

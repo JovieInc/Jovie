@@ -13,7 +13,11 @@ function argument(name) {
 }
 
 function trackedFiles() {
-  return execFileSync('git', ['ls-files', '-z'], { encoding: 'utf8' })
+  // The tracked-path list is over Node's 1 MiB default buffer (ENOBUFS).
+  return execFileSync('git', ['ls-files', '-z'], {
+    encoding: 'utf8',
+    maxBuffer: 64 * 1024 * 1024,
+  })
     .split('\0')
     .filter(Boolean);
 }

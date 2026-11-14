@@ -77,14 +77,20 @@ function fixture(t, behavior = '') {
   writeFileSync(join(root, 'pnpm-lock.yaml'), 'preserve lock');
   writeFileSync(join(root, '.env.local'), 'preserve environment');
   writeFileSync(
+    join(root, 'bin/gh'),
+    '#!/bin/bash\n[[ "$*" == "api --help" ]] || exit 99\nprintf "FLAGS\\n  --slurp Aggregate paginated JSON\\n"\n',
+    { mode: 0o755 }
+  );
+  writeFileSync(
     join(root, 'bin/pnpm'),
     `#!/bin/bash
 set -eu
 if [[ "$*" == '--version' ]]; then
+  printf '%s' "\${CI-unset}" > "$PWD/version-ci"
   ${behavior || "echo '9.15.9'"}
   exit 0
 fi
-printf '%s\\n' "$PWD" "$*" "$PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD" "$ONNXRUNTIME_NODE_INSTALL" > "$PWD/install-receipt"
+printf '%s\\n' "$PWD" "$*" "$PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD" "$ONNXRUNTIME_NODE_INSTALL" "\${CI-unset}" > "$PWD/install-receipt"
 exit "\${INSTALL_STATUS:-0}"
 `,
     { mode: 0o755 }
@@ -97,7 +103,7 @@ test('installs frozen dependencies in the repository without touching environmen
   bootstrap(root, env);
   assert.equal(
     readFileSync(join(root, 'install-receipt'), 'utf8'),
-    `${root}\ninstall --frozen-lockfile --prefer-offline\n1\nskip\n`
+    `${root}\ninstall --frozen-lockfile --prefer-offline\n1\nskip\ntrue\n`
   );
   assert.equal(
     readFileSync(join(root, '.env.local'), 'utf8'),
@@ -107,6 +113,25 @@ test('installs frozen dependencies in the repository without touching environmen
     readFileSync(join(root, 'pnpm-lock.yaml'), 'utf8'),
     'preserve lock'
   );
+});
+
+test('forces noninteractive installation without changing the caller or version probe environment', t => {
+  for (const ci of [undefined, 'false']) {
+    const { root, env } = fixture(t);
+    if (ci !== undefined) env.CI = ci;
+    if (process.env.NODE_V8_COVERAGE)
+      env.NODE_V8_COVERAGE = process.env.NODE_V8_COVERAGE;
+    const before = { ...env };
+    const processCi = process.env.CI;
+    bootstrap(root, env);
+    assert.equal(readFileSync(join(root, 'version-ci'), 'utf8'), ci ?? 'unset');
+    assert.equal(
+      readFileSync(join(root, 'install-receipt'), 'utf8').split('\n')[4],
+      'true'
+    );
+    assert.deepEqual(env, before);
+    assert.equal(process.env.CI, processCi);
+  }
 });
 
 test('rejects a runtime mismatch before running the installer', t => {
@@ -157,6 +182,117 @@ test('reports executable disappearance between probe and install', t => {
   assert.throws(() => bootstrap(root, env), /ENOENT/);
 });
 
+function copyBootstrapScripts(root) {
+  mkdirSync(join(root, 'scripts/lib'), { recursive: true });
+  mkdirSync(join(root, 'scripts/hooks'), { recursive: true });
+  writeFileSync(
+    join(root, 'scripts/hooks/configure-git-hooks.sh'),
+    '#!/bin/bash\nprintf configured > hook-configured\n'
+  );
+  for (const name of [
+    'setup.sh',
+    'codex-setup.sh',
+    'codex-cloud-setup.mjs',
+    'lib/setup-worktree-health.sh',
+  ])
+    copyFileSync(resolve('scripts', name), join(root, 'scripts', name));
+}
+
+test('warns offline about an incompatible installed gh without blocking setup or SessionStart', t => {
+  for (const behavior of [
+    "printf 'FLAGS\\n  --paginate Paginate\\n'",
+    "printf 'FLAGS\\n  --slurp Slurp\\n'; exit 7",
+    "printf 'EXAMPLES\\n  gh api --slurp\\nFLAGS\\n  --slurped Other\\n'",
+  ]) {
+    for (const args of [
+      ['scripts/codex-setup.sh'],
+      ['scripts/codex-setup.sh', '--codex-hook'],
+      ['scripts/setup.sh'],
+    ]) {
+      const { root, env } = fixture(t);
+      copyBootstrapScripts(root);
+      if (args[0] === 'scripts/setup.sh') {
+        for (const gitArgs of [
+          ['init'],
+          ['add', '.nvmrc', 'package.json', 'pnpm-lock.yaml'],
+        ]) {
+          assert.equal(spawnSync('git', gitArgs, { cwd: root }).status, 0);
+        }
+        mkdirSync(join(root, 'node_modules/.cache/jovie-setup'), {
+          recursive: true,
+        });
+        writeFileSync(join(root, 'node_modules/.modules.yaml'), '');
+        const hash = spawnSync(
+          'bash',
+          [
+            '-c',
+            'source "$1"; jovie_setup_hash_dependency_inputs "$2"',
+            'fixture',
+            resolve('scripts/lib/setup-worktree-health.sh'),
+            root,
+          ],
+          { encoding: 'utf8' }
+        );
+        assert.equal(hash.status, 0, hash.stderr);
+        writeFileSync(
+          join(root, 'node_modules/.cache/jovie-setup/deps.sha256'),
+          hash.stdout
+        );
+      }
+      writeFileSync(
+        join(root, 'bin/gh'),
+        `#!/bin/bash
+printf '%s\\n' "$*" >> "$PWD/gh-receipt"
+[[ "$*" == 'api --help' ]] || exit 99
+${behavior}
+`,
+        { mode: 0o755 }
+      );
+      const result = spawnSync('bash', args, {
+        cwd: root,
+        encoding: 'utf8',
+        env: { ...env, HOME: root, JOVIE_CODEX_SECRET_FREE: '1' },
+      });
+      assert.equal(result.status, 0, result.stdout + result.stderr);
+      assert.match(result.stderr, /WARNING:.*must support --slurp/);
+      assert.ok(result.stderr.includes(join(root, 'bin/gh')));
+      assert.match(result.stderr, /existing installation/);
+      assert.equal(
+        readFileSync(join(root, 'gh-receipt'), 'utf8'),
+        'api --help\n'
+      );
+      if (args[0] === 'scripts/setup.sh')
+        assert.match(result.stdout, /Worktree already healthy/);
+      else
+        assert.match(
+          readFileSync(join(root, 'install-receipt'), 'utf8'),
+          /install --frozen-lockfile/
+        );
+      assert.equal(
+        readFileSync(join(root, 'hook-configured'), 'utf8'),
+        'configured'
+      );
+    }
+  }
+});
+
+test('keeps a missing gh optional without auth or network calls', t => {
+  const { root } = fixture(t);
+  rmSync(join(root, 'bin/gh'));
+  const result = spawnSync(
+    '/bin/bash',
+    [
+      '-c',
+      'source "$1"; jovie_setup_gh_api_slurp_ok',
+      'fixture',
+      resolve('scripts/lib/setup-worktree-health.sh'),
+    ],
+    { encoding: 'utf8', env: { PATH: join(root, 'bin') } }
+  );
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(result.stdout + result.stderr, '');
+});
+
 test('secret-free SessionStart uses the dependency lane and emits valid hook JSON from any cwd', t => {
   const { root, env } = fixture(t);
   mkdirSync(join(root, 'scripts'));
@@ -166,8 +302,7 @@ test('secret-free SessionStart uses the dependency lane and emits valid hook JSO
     join(root, 'scripts/hooks/configure-git-hooks.sh'),
     '#!/bin/bash\nprintf configured > hook-configured\n'
   );
-  for (const name of ['codex-setup.sh', 'codex-cloud-setup.mjs'])
-    copyFileSync(resolve('scripts', name), join(root, 'scripts', name));
+  copyBootstrapScripts(root);
   writeFileSync(join(root, 'scripts/setup.sh'), '#!/bin/bash\nexit 99\n');
   writeFileSync(
     join(root, 'scripts/codex-gbrain-sync.sh'),

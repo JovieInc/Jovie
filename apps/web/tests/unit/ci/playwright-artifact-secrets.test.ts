@@ -147,9 +147,12 @@ const imageAllowedJobs = new Set([
   'ci.yml:ci-visual-marketing-routes',
   // Manual public-profile CTA identity captures only (dispatch-gated flag).
   'e2e-full-matrix.yml:e2e-full-matrix',
+  'product-crawl.yml:crawl',
   'screenshots.yml:generate',
   'synthetic-monitoring.yml:synthetic-test',
   'visual-regression.yml:visual-regression',
+  // Founder-approved homepage-*.png only, same render as the compare job.
+  'visual-regression.yml:approved-homepage-baselines',
 ]);
 const markdownAllowedJobs = new Set([
   'ci.yml:ci-build-layout',

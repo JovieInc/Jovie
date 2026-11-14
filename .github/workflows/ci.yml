@@ -174,7 +174,7 @@ jobs:
             --volume "$PWD:/repo:ro" \
             "$IMAGE_TAG" -lc '
               set -euo pipefail
-              test "$(node --version)" = v24.22.2
+              test "$(node --version)" = v24.22.3
               test "$(cd / && COREPACK_ENABLE_NETWORK=0 pnpm --version)" = 9.15.9
 
               dependency_status=$(JOVIE_RUNNER_REPO_ROOT=/repo \
@@ -315,7 +315,7 @@ jobs:
           assert_line 'pnpm store path' 'pnpm_store_path=/opt/jovie-pnpm-store' "$dependency_status"
           assert_line 'Playwright warm status' 'playwright_warm=true' "$playwright_status"
           assert_line 'Playwright browser path' 'playwright_browsers_path=/opt/ms-playwright' "$playwright_status"
-          assert_equal 'Node version' v24.22.2 "$(node --version)"
+          assert_equal 'Node version' v24.22.3 "$(node --version)"
           assert_equal 'pnpm version' 9.15.9 "$(pnpm --version)"
           assert_equal 'PLAYWRIGHT_BROWSERS_PATH' /opt/ms-playwright "$PLAYWRIGHT_BROWSERS_PATH"
           assert_executable 'Chromium' /opt/ms-playwright/chromium-1223/chrome-linux64/chrome
@@ -940,7 +940,7 @@ jobs:
             echo "run_public_lighthouse=false" >> "$GITHUB_OUTPUT"
           fi
 
-          DASHBOARD_LIGHTHOUSE_PATTERN='^(\.github/workflows/ci\.yml|apps/web/(\.lighthouserc\.(dashboard|chat|onboarding)\.pr\.json|scripts/lighthouse-dashboard-auth\.cjs)|scripts/ci/wait-background-build\.sh)$'
+          DASHBOARD_LIGHTHOUSE_PATTERN='^(\.github/(workflows/ci\.yml|scripts/lighthouse-.*)|apps/web/(\.lighthouserc\.(dashboard|chat|onboarding)\.pr\.json|scripts/lighthouse-.*)|scripts/ci/wait-background-build\.sh)$'
           dash_lh=false
           if [[ "$RUN_BUILD" == "true" || "$RUN_TEST" == "true" ]] || echo "$CHANGED_FILES" | grep -q -E "$DASHBOARD_LIGHTHOUSE_PATTERN"; then dash_lh=true; fi
           echo "run_dashboard_lighthouse=$dash_lh" >> "$GITHUB_OUTPUT"
@@ -2452,6 +2452,18 @@ jobs:
             mv "$BASE_FETCH_DIR/status.tmp" "$BASE_FETCH_DIR/status"
           ) < /dev/null > "$BASE_FETCH_DIR/fetch.log" 2>&1 &
           echo "Base-branch history fetch started in the background (pid $!)."
+      # Pinned actionlint downloads (source, patch, shellcheck, pyflakes) from the
+      # cache main writes in tsc-cache-warm.yml. Warm: none of them is fetched, so
+      # a GitHub release outage cannot fail this step (29 merge groups on
+      # 2026-11-08 and 2026-11-10). Read-only here; every entry is re-verified
+      # against its sha256 pin before use, so an older key is safe to restore.
+      - name: Restore pinned actionlint downloads
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: /tmp/jovie-pinned-downloads
+          key: pinned-downloads-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('.github/scripts/run-actionlint.sh') }}
+          restore-keys: |
+            pinned-downloads-${{ runner.os }}-${{ runner.arch }}-
       - uses: ./.github/actions/setup-node-pnpm
         with:
           reuse_merge_group_workspace: 'true'
@@ -2471,6 +2483,7 @@ jobs:
         env:
           # Read-only token for the release-download fallback.
           RELEASE_DOWNLOAD_TOKEN: ${{ github.token }}
+          PINNED_DOWNLOAD_CACHE_DIR: /tmp/jovie-pinned-downloads
         run: bash .github/scripts/run-actionlint.sh
       - name: Fetch base-branch history
         # Await the background fetch. Fails closed on a non-zero fetch exit,
@@ -2642,7 +2655,7 @@ jobs:
           KBD_STORYBOOK_PATTERN='^(packages/ui/atoms/kbd(\.stories)?\.tsx|apps/web/\.storybook/(motion-fixtures\.ts|preview\.tsx|preview-head\.html|main\.ts)|apps/web/tests/e2e/storybook-kbd-motion\.spec\.ts)$'
           CRAWLER_STORYBOOK_PATTERN='^apps/web/(components/features/dashboard/organisms/ai-crawler/AiCrawler(DetailPanel|IntelligenceCard)(\.stories)?\.tsx|tests/e2e/storybook-ai-crawler\.spec\.ts)$'
           TASKS_STORYBOOK_PATTERN='^apps/web/(components/features/dashboard/tasks/(Task(DataTable|ListRow)(\.stories)?\.tsx|TasksPageClient\.tsx)|components/organisms/table/(atoms/TableCell\.tsx|table\.types\.ts|organisms/VirtualizedTableRow\.tsx|molecules/TaskProjectionListRow\.tsx)|tests/e2e/storybook-task-row-geometry\.spec\.ts)$'
-          DESKTOP_UPDATE_STORYBOOK_PATTERN='^apps/web/(components/organisms/desktop-update/DesktopUpdateModal(\.stories)?\.tsx|tests/e2e/storybook-desktop-update-modal\.spec\.ts)$'
+          DESKTOP_UPDATE_STORYBOOK_PATTERN='^apps/web/(components/organisms/desktop-update/DesktopUpdate(Modal|Control)(\.stories)?\.tsx|lib/desktop/desktop-update-control-state\.ts|tests/e2e/storybook-desktop-update-(modal|control)\.spec\.ts)$'
           DSP_STORYBOOK_PATTERN='^apps/web/(components/shell/DspAvatarStack(\.mobile-drawer)?(\.stories|\.test)?\.tsx|components/features/dashboard/organisms/release-provider-matrix/shell-releases/ShellReleaseRow(\.stories)?\.tsx|components/organisms/release-sidebar/ReleaseSidebarSections\.tsx|components/molecules/drawer/RightDrawer\.tsx|lib/a11y/modal-focus-boundary\.ts|tests/e2e/storybook-dsp-details\.spec\.ts)$'
           SMART_LINK_STORYBOOK_PATTERN='^apps/web/(components/features/release/(SmartLinkShell|MusicServiceDial|ActionDial)(\.stories|\.test)?\.tsx|components/organisms/public-surface/PublicSurface(Shell|Stage)(\.stories|\.test)?\.tsx|components/organisms/ReleaseLandingPage\.stories\.tsx|app/r/\[slug\]/ReleaseLandingPage\.tsx|app/globals\.css|styles/design-system\.css|tests/e2e/storybook-smart-link-reachability\.spec\.ts)$'
           # Overlay primitives, their layer tokens, and the
@@ -2814,6 +2827,7 @@ jobs:
           fi
           if [[ "$RUN_DESKTOP_UPDATE" == 'true' ]]; then
             specs+=(tests/e2e/storybook-desktop-update-modal.spec.ts)
+            specs+=(tests/e2e/storybook-desktop-update-control.spec.ts)
           fi
           if [[ "$RUN_DSP" == 'true' ]]; then
             specs+=(tests/e2e/storybook-dsp-details.spec.ts)
@@ -4115,6 +4129,7 @@ jobs:
                   tests/e2e/storybook-onboarding-recovery.spec.ts \
                   tests/e2e/storybook-task-row-geometry.spec.ts \
                   tests/e2e/storybook-desktop-update-modal.spec.ts \
+                  tests/e2e/storybook-desktop-update-control.spec.ts \
                   tests/e2e/storybook-dsp-details.spec.ts \
                   tests/e2e/storybook-smart-link-reachability.spec.ts \
                   --config=playwright.config.storybook.ts --project=chromium --reporter=line \
@@ -5139,40 +5154,21 @@ jobs:
       - uses: ./.github/actions/setup-node-pnpm
         if: steps.check_changes.outputs.run_full_ci == 'true'
 
-      # Move 1 (merge-time): decide artifact availability BEFORE any build.
-      # ci-build-public is dispatch-only, so on merge_group this download
-      # always fails and the background fallback build below always runs;
-      # on dispatch the shared artifact, when present, wins and no build
-      # runs at all. Extraction and the background build write the same
-      # apps/web/.next tree, so their conditions are mutually exclusive.
-      - name: Download build artifact
-        if: steps.check_changes.outputs.run_full_ci == 'true'
-        id: download-build
-        continue-on-error: true
-        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
-        with:
-          name: nextjs-build-${{ github.run_id }}
-          path: ${{ runner.temp }}/nextjs-build-download
-
-      - name: Extract build artifact
-        if: steps.check_changes.outputs.run_full_ci == 'true' && steps.download-build.outcome == 'success'
-        run: tar -xf "$RUNNER_TEMP/nextjs-build-download/nextjs-build.tar" -C apps/web
-
-      # Same read-only Turbopack cache restore as "Build + Layout
-      # (combined)": the writer is next-build-cache-warm.yml (trusted main
-      # only), the path is compiler state only, and Turbopack revalidates
-      # every entry against this job's own inputs and env, so the fallback
-      # build's output is unchanged. This job never saves the cache. The
-      # fallback build omits the NEXT_PUBLIC_* mock values the cache is
-      # warmed with, so modules that inline those recompile; the rest of
-      # the compile starts warm. Only the no-artifact path builds, so
-      # artifact runs skip the restore entirely.
-      - name: Resolve Next build cache hour
+      # Relative budgets compile the merge-group base in this workspace, then
+      # head. Restore the read-only Turbopack cache first so both compiles
+      # start warm (writer: next-build-cache-warm.yml; this job never saves).
+      # Head's compile starts only after the workspace is back on the exact
+      # head, in the background, so it overlaps Playwright, the Neon branch
+      # and migrations. Those steps do not read or write apps/web/.next.
+      # A built baseline never uses the prebuilt artifact. An artifact hit
+      # never starts a second build. The two writers of apps/web/.next stay
+      # mutually exclusive.
+      - name: Resolve Next build cache hour (Lighthouse)
         id: next-build-cache-hour
-        if: steps.check_changes.outputs.run_full_ci == 'true' && steps.download-build.outcome != 'success'
+        if: steps.check_changes.outputs.run_full_ci == 'true'
         run: echo "hour=$(date -u +%Y%m%d%H)" >> "$GITHUB_OUTPUT"
-      - name: Restore Next build cache (read-only)
-        if: steps.check_changes.outputs.run_full_ci == 'true' && steps.download-build.outcome != 'success'
+      - name: Restore Next build cache for Lighthouse (read-only)
+        if: steps.check_changes.outputs.run_full_ci == 'true'
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: apps/web/.next/cache/turbopack
@@ -5181,18 +5177,54 @@ jobs:
             ${{ runner.os }}-next-build-web-v1-${{ hashFiles('pnpm-lock.yaml', 'apps/web/package.json', 'apps/web/next.config.js') }}-
             ${{ runner.os }}-next-build-web-v1-
 
-      # No shared artifact: build here, but in the background so it overlaps
-      # Playwright/Chromium setup, the Neon branch and migrations — none of
-      # which read or write apps/web/.next, and the build needs no database.
-      # The standalone server only starts after the wait step below and the
-      # migrations have both completed. setsid puts the build in its own
-      # process group so the wait step and the job-end cleanup can kill the
-      # whole pnpm/next tree, not just this wrapper. The status file is
-      # written atomically (tmp + mv) and the wait step fails closed on a
-      # nonzero status, a process that died without one, or a timeout.
+      # Timing budgets are judged against the commit this change lands on,
+      # built and measured in this job on this runner, so a busy runner slows
+      # both sides instead of failing the change. No baseline (no base commit,
+      # changed dependencies, failed base build) is not a failure: the script
+      # exits 0 with built=false and the gate then enforces every configured
+      # budget as it is.
+      - name: Build base commit for relative Lighthouse budgets
+        id: lighthouse-baseline
+        if: steps.check_changes.outputs.run_full_ci == 'true'
+        run: bash .github/scripts/lighthouse-build-baseline.sh build
+        env:
+          BASE_SHA: ${{ github.event.merge_group.base_sha }}
+          BASELINE_DIR: ${{ runner.temp }}/lighthouse-baseline
+          NEXT_IGNORE_ESLINT: '1'
+          NEXT_IGNORE_TYPECHECK: '1'
+          NEXT_PRIVATE_SKIP_SIZE_CHECK: 'true'
+          SKIP_SKILLS_CATALOG_SYNC: '1'
+
+      # Blocking: everything after this must run on the exact head tree. The
+      # build step left a copy of the script in RUNNER_TEMP, because the
+      # workspace may be on a base commit that does not have it.
+      - name: Restore workspace to the exact head
+        if: steps.check_changes.outputs.run_full_ci == 'true'
+        run: bash "$RUNNER_TEMP/lighthouse-build-baseline.sh" restore
+
+      # With a baseline head is built below, so the artifact is not fetched.
+      - name: Download build artifact
+        if: steps.check_changes.outputs.run_full_ci == 'true' && steps.lighthouse-baseline.outputs.built != 'true'
+        id: download-build
+        continue-on-error: true
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: nextjs-build-${{ github.run_id }}
+          path: ${{ runner.temp }}/nextjs-build-download
+
+      - name: Extract build artifact
+        if: steps.check_changes.outputs.run_full_ci == 'true' && steps.download-build.outcome == 'success' && steps.lighthouse-baseline.outputs.built != 'true'
+        run: tar -xf "$RUNNER_TEMP/nextjs-build-download/nextjs-build.tar" -C apps/web
+
+      # Same command and env as the base build, so the two differ only by the
+      # change. setsid puts the build in its own process group so the wait
+      # step and the job-end cleanup can kill the whole pnpm/next tree. The
+      # status file is written atomically (tmp + mv) and the wait step fails
+      # closed on a nonzero status, a process that died without one, or a
+      # timeout.
       - name: Start fallback build in background
         id: background-build-start
-        if: steps.check_changes.outputs.run_full_ci == 'true' && steps.download-build.outcome != 'success'
+        if: steps.check_changes.outputs.run_full_ci == 'true' && (steps.download-build.outcome != 'success' || steps.lighthouse-baseline.outputs.built == 'true')
         shell: bash
         env:
           NEXT_IGNORE_ESLINT: '1'
@@ -5215,17 +5247,12 @@ jobs:
           echo "started=true" >> "$GITHUB_OUTPUT"
           echo "Background fallback build started (pid $(cat "$pid_file")); log: $log"
 
-      # Helper-only coverage gap (Astra re-review): a change limited to
-      # scripts/ci/wait-background-build.sh selects this job through
-      # DASHBOARD_LIGHTHOUSE_PATTERN, but the product-lane classifier routes
-      # scripts/** to operations lanes and the unit shards require run_web,
-      # so the helper's executable contract tests would never run. Run them
-      # here, targeted, on the no-artifact path every helper-only change
-      # takes — while the background build compiles, before the wait, so no
-      # critical path is added and no new web lane or required context is
-      # introduced (same shape as the blog publication contracts step).
+      # A change limited to scripts/ci/wait-background-build.sh selects this
+      # job, but unit shards require run_web and scripts/** routes to
+      # operations lanes. Run the helper contracts here, on the path that
+      # launches the build, while that build compiles.
       - name: Run background-build helper contract tests
-        if: steps.check_changes.outputs.run_full_ci == 'true' && steps.download-build.outcome != 'success'
+        if: steps.check_changes.outputs.run_full_ci == 'true' && (steps.download-build.outcome != 'success' || steps.lighthouse-baseline.outputs.built == 'true')
         shell: bash
         run: >-
           pnpm --filter @jovie/web exec vitest run
@@ -5270,10 +5297,8 @@ jobs:
           GIT_BRANCH: pr-${{ github.event.pull_request.number }}
           ALLOW_PROD_MIGRATIONS: 'true'
 
-      # Runs whenever the background build was launched (the started output
-      # above), after migrations. The wait protocol itself lives in
-      # scripts/ci/wait-background-build.sh and is executable-tested in
-      # apps/web/tests/unit/ci/lighthouse-background-build.test.ts.
+      # Runs whenever the background build was launched, after migrations.
+      # The wait protocol lives in scripts/ci/wait-background-build.sh.
       - name: Wait for background fallback build
         if: steps.check_changes.outputs.run_full_ci == 'true' && steps.background-build-start.outputs.started == 'true'
         shell: bash
@@ -5284,7 +5309,7 @@ jobs:
             "$RUNNER_TEMP/next-build-fallback.exit" \
             "$RUNNER_TEMP/next-build-fallback.log"
 
-      - name: Run signed-in shell navigation and dashboard Lighthouse
+      - name: Run signed-in shell navigation
         if: steps.check_changes.outputs.run_full_ci == 'true'
         run: |
           cd apps/web
@@ -5325,25 +5350,17 @@ jobs:
           # fails on console errors, uncaught exceptions and error boundaries.
           # releases-first-paint-visual fails if the release list moves after
           # it first paints.
+          # chat-history-switcher fails if opening the chat history menu
+          # shifts layout, drops frames, or breaks search and keyboard select.
           # Blocking, and run first so a nav break fails fast.
           node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs" --run -- \
             pnpm exec playwright test tests/e2e/dashboard-click-navigation.spec.ts \
             tests/e2e/shell-nav-click-through.spec.ts \
             tests/e2e/shell-route-health.spec.ts \
             tests/e2e/releases-first-paint-visual.spec.ts \
+            tests/e2e/chat-history-switcher.spec.ts \
             --config=playwright.config.noauth.ts --project=chromium --reporter=line
 
-          # Chat and onboarding Lighthouse reuse this signed-in server. Their
-          # own jobs need an identity secret and skip green without it, so
-          # these runs are what hold the pages to their budgets. Onboarding
-          # needs the creator persona, which has not finished onboarding.
-          # Every page runs so one miss still prints the others; any miss
-          # fails the step.
-          lh_failed=0
-          pnpm run test:lighthouse:dashboard:pr || lh_failed=1
-          pnpm run test:lighthouse:chat:pr || lh_failed=1
-          LIGHTHOUSE_TEST_PERSONA=creator pnpm run test:lighthouse:onboarding:pr || lh_failed=1
-          exit "$lh_failed"
         env:
           CI: true
           BASE_URL: http://localhost:3000
@@ -5356,6 +5373,36 @@ jobs:
           FLAGS_SECRET: ${{ secrets.FLAGS_SECRET }}
           E2E_SKIP_SEED: '1'
           E2E_SKIP_WARMUP: '1'
+
+      # Its own step, so a budget miss is not reported as a navigation
+      # failure or the other way round. Dashboard, chat and onboarding are
+      # measured here: chat's and onboarding's own jobs need an identity
+      # secret and skip green without it. The gate starts the head server,
+      # measures every page, then measures the base build on the same port
+      # and database. Timing audits fail on a regression against base beyond
+      # runner noise or past a ceiling derived from the configured budget;
+      # accessibility, best practices and layout shift keep their configured
+      # budgets. Rules: apps/web/scripts/lighthouse-relative-budget.mjs.
+      # Every page runs so one miss still prints the others.
+      - name: Run signed-in Lighthouse budgets
+        if: steps.check_changes.outputs.run_full_ci == 'true'
+        run: |
+          export E2E_USE_TEST_AUTH_BYPASS=1
+          export NEXT_PUBLIC_AUTH_MOCK=1
+          export NEXT_PUBLIC_AUTH_PROXY_DISABLED=1
+
+          node apps/web/scripts/lighthouse-relative-gate.mjs
+        env:
+          CI: true
+          BASE_URL: http://localhost:3000
+          DATABASE_URL: ${{ env.DATABASE_URL }}
+          URL_ENCRYPTION_KEY: lighthouse-dashboard-ci-url-encryption-key
+          AI_GATEWAY_API_KEY: lighthouse-dashboard-ci
+          FLAGS_SECRET: ${{ secrets.FLAGS_SECRET }}
+          E2E_SKIP_SEED: '1'
+          E2E_SKIP_WARMUP: '1'
+          LIGHTHOUSE_BASELINE_SERVER: ${{ steps.lighthouse-baseline.outputs.server }}
+          LIGHTHOUSE_BASELINE_SHA: ${{ steps.lighthouse-baseline.outputs.sha }}
 
       - name: Upload shell navigation failure evidence
         if: ${{ failure() && steps.check_changes.outputs.run_full_ci == 'true' && hashFiles('apps/web/test-results/**') != '' }}
@@ -5385,6 +5432,7 @@ jobs:
             apps/web/.lighthouseci/dashboard-pr/
             apps/web/.lighthouseci/chat-pr/
             apps/web/.lighthouseci/onboarding-pr/
+            apps/web/.lighthouseci/relative/
           if-no-files-found: ignore
           retention-days: 3
 
@@ -7465,7 +7513,7 @@ jobs:
         env:
           PROFILE_CERT_DIR: ${{ runner.temp }}/canonical-artist-site/profile
           PROFILE_RESULT: ${{ runner.temp }}/canonical-artist-site/profile-result.json
-        run: mkdir -p "$(dirname "$PROFILE_RESULT")" && pnpm --filter=@jovie/web exec tsx scripts/certify-artist-profile.ts --output "$PROFILE_CERT_DIR" > "$PROFILE_RESULT" && cat "$PROFILE_RESULT"
+        run: mkdir -p "$(dirname "$PROFILE_RESULT")" && pnpm --filter=@jovie/web exec sh -c 'exec tsx scripts/certify-artist-profile.ts --output "$PROFILE_CERT_DIR" > "$PROFILE_RESULT"' && cat "$PROFILE_RESULT"
 
       - name: Verify live canonical profile navigation
         id: canonical_navigation

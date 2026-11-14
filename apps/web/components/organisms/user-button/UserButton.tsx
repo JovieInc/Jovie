@@ -3,7 +3,7 @@
 // @coverage-via apps/web/tests/components/user-button.test.tsx
 
 import type { CommonDropdownItem, CommonDropdownSubmenu } from '@jovie/ui';
-import { Badge, Button, CommonDropdown } from '@jovie/ui';
+import { Badge, Button, CommonDropdown, PlainButton } from '@jovie/ui';
 import {
   ArrowDownToLine,
   CircleAlert,
@@ -39,7 +39,6 @@ import { useIsElectronRuntime } from '@/lib/desktop/electron-runtime';
 import { GLYPH_CMD, GLYPH_OPT, GLYPH_SHIFT } from '@/lib/keyboard-shortcuts';
 import { useFeedbackMutation } from '@/lib/queries';
 import { cn } from '@/lib/utils';
-import { ensurePrivacyLockCanBeEnabled } from '@/lib/workspace-lock/unlock-with-passkey';
 import {
   isMoneyHidden,
   setMoneyHidden,
@@ -49,6 +48,7 @@ import { Avatar } from '../../molecules/Avatar/Avatar';
 import { useDesktopUpdateContext } from '../desktop-update/DesktopUpdateProvider';
 import { DesktopReleaseIdentity } from './desktop-release-identity.lazy';
 import { OviePrivacyLockControl } from './OviePrivacyLockControl';
+import { ensurePrivacyLockCanBeEnabled } from './privacy-lock-readiness.lazy';
 import type { UserButtonProps } from './types';
 import { UsageMenuItem } from './UsageMenuItem';
 import { useUserButton } from './useUserButton';
@@ -386,8 +386,8 @@ function buildDropdownItems({
       render: () => (
         <div className='cursor-default px-2.5 py-2 text-app h-9'>
           <div className='flex w-full items-center gap-2.5'>
-            <div className='h-4 w-4 animate-pulse motion-reduce:animate-none rounded bg-white/10' />
-            <div className='h-3 w-20 animate-pulse motion-reduce:animate-none rounded bg-white/10' />
+            <div className='h-4 w-4 animate-pulse motion-reduce:animate-none rounded bg-on-media/10' />
+            <div className='h-3 w-20 animate-pulse motion-reduce:animate-none rounded bg-on-media/10' />
           </div>
         </div>
       ),
@@ -654,12 +654,12 @@ export function UserButton({
           calm && 'h-8'
         )}
       >
-        <div className='h-6 w-6 shrink-0 rounded-full bg-sidebar-accent animate-pulse motion-reduce:animate-none' />
+        <div className='h-6 w-6 shrink-0 rounded-full bg-interactive-hover animate-pulse motion-reduce:animate-none' />
         <div
           data-user-button-loading-copy
           className={cn('flex-1', SHELL_RAIL_STAGE)}
         >
-          <div className='h-3 w-20 rounded-sm bg-sidebar-accent animate-pulse motion-reduce:animate-none' />
+          <div className='h-3 w-20 rounded-sm bg-interactive-hover animate-pulse motion-reduce:animate-none' />
         </div>
       </div>
     ) : (
@@ -698,7 +698,7 @@ export function UserButton({
   const triggerElement =
     trigger ??
     (showUserInfo ? (
-      <button
+      <PlainButton
         type='button'
         className={cn(
           'relative group/user-button flex w-full min-w-0 items-center gap-2 rounded-md px-2 py-1 text-left transition-colors hover:bg-sidebar-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring group-data-[collapsible=icon]:mx-auto group-data-[collapsible=icon]:size-7 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:gap-0 group-data-[collapsible=icon]:p-0',
@@ -748,7 +748,7 @@ export function UserButton({
           )}
           aria-hidden='true'
         />
-      </button>
+      </PlainButton>
     ) : (
       <Button
         variant='ghost'

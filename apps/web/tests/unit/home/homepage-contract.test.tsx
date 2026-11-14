@@ -1,5 +1,7 @@
 // Homepage page contract (Tim, 2026-11-03: "Jovie helps you move your music
-// forward." on `/`; invite-only, the story ends in the role waitlist form).
+// forward." on `/`; Tim, 2026-11-12: "Switch it", so the story ends in the
+// claim-your-profile action into `/start`, or in the role waitlist form only
+// while the PUBLIC_SIGNUP_CLOSED kill switch is on).
 // One table-driven contract: it renders the real `/` page module and checks
 // the route manifest, copy truth sources, the one primary action, product
 // imagery, and tokenized styles. Changing the page means changing its typed
@@ -149,31 +151,35 @@ describe('homepage contract', { timeout: 60_000 }, () => {
       copy.profile.headline,
       copy.releases.headline,
       specs.headline,
-      copy.invite.headline,
+      copy.claim.headline,
     ]);
   });
 
   it.each([true, false])(
-    'ends in the one role waitlist form and links nowhere near signup, waitlist=%s',
+    'ends in the one claim action into /start, waitlist=%s',
     async waitlist => {
       gate.WAITLIST_ENABLED = waitlist;
-      const { HOMEPAGE_EDITORIAL_COPY: copy, HOMEPAGE_INVITE_ANCHOR } =
-        await loadCopy();
+      const { HOMEPAGE_INVITE_ANCHOR } = await loadCopy();
+      const { getClaimProfileIntent } = await import(
+        '@/data/marketingCtaIntents'
+      );
+      const claim = getClaimProfileIntent();
       const { container } = await renderHomePage();
 
-      // One conversion: the role waitlist form inside the closing section.
-      const forms = [...container.querySelectorAll('form')];
-      expect(forms).toHaveLength(1);
-      expect(forms[0]).toHaveAttribute('data-testid', 'waitlist-role-form');
+      // No on-page form: the closing section hands off to /start.
+      expect(container.querySelectorAll('form')).toHaveLength(0);
       const close = container.querySelector(`#${HOMEPAGE_INVITE_ANCHOR}`);
       expect(close).toHaveAttribute('data-testid', 'marketing-section-cta');
-      expect(close?.contains(forms[0] ?? null)).toBe(true);
-      expect(within(forms[0]!).getAllByRole('radio')).toHaveLength(6);
+      const closeCta = within(close as HTMLElement).getByTestId(
+        'homepage-close-cta'
+      );
+      expect(closeCta).toHaveAttribute('href', claim.href);
+      expect(closeCta).toHaveTextContent(claim.label);
 
-      // The hero's primary action scrolls to that form; no public signup.
+      // The hero's primary action is the same claim; one primary action.
       const primary = screen.getByTestId('homepage-primary-cta');
-      expect(primary).toHaveAttribute('href', `#${HOMEPAGE_INVITE_ANCHOR}`);
-      expect(primary).toHaveTextContent(copy.hero.primaryAction);
+      expect(primary).toHaveAttribute('href', claim.href);
+      expect(primary).toHaveTextContent(claim.label);
       expect(
         container.querySelectorAll('[data-primary-action="true"]')
       ).toHaveLength(1);
@@ -181,8 +187,11 @@ describe('homepage contract', { timeout: 60_000 }, () => {
         link => link.getAttribute('href') ?? ''
       );
       expect(
-        hrefs.filter(href => /^\/(signup|sign-up|start|claim)\b/.test(href))
+        hrefs.filter(href => /^\/(signup|sign-up|claim)\b/.test(href))
       ).toEqual([]);
+      expect(new Set(hrefs.filter(href => /^\/start\b/.test(href)))).toEqual(
+        new Set(['/start'])
+      );
     }
   );
 
@@ -193,6 +202,28 @@ describe('homepage contract', { timeout: 60_000 }, () => {
     for (const selector of selectors ?? []) {
       expect(container.querySelector(selector), selector).not.toBeNull();
     }
+  });
+
+  it('leads the hero with what listeners open, not the back office', async () => {
+    const { container } = await renderHomePage();
+    const hero = container.querySelector('.hv3-hero');
+    // The lifted panel is the release page a listener opens; the metadata
+    // inspector stays in 03 specs.
+    expect(hero?.querySelector('.hv3-lift--page .hv3-rp')).not.toBeNull();
+    expect(hero?.querySelector('.hv3-insp')).toBeNull();
+    expect(container.querySelector('#specs .hv3-insp')).not.toBeNull();
+    // No callout here: any label beside the page crosses the release list
+    // or the box's frame guide, so the selected row and its page speak alone.
+    expect(hero?.querySelector('.hv3-callout')).toBeNull();
+    // The masked lift drops outer shadows, so the page keeps an inner edge.
+    expect(read('components/homepage/v3/chapters.css')).toMatch(
+      /\.hv3-phone\.hv3-phone--hero\s*\{[^}]*box-shadow: inset 0 0 0 1px var\(--hv3-b2\);/
+    );
+    // One anchor per id, so each connector finds its own phone.
+    const ids = [...container.querySelectorAll('[data-hv3-anchor]')].map(node =>
+      node.getAttribute('data-hv3-anchor')
+    );
+    expect(new Set(ids).size).toBe(ids.length);
   });
 
   it('shows no prices on the page', async () => {
@@ -206,7 +237,7 @@ describe('homepage contract', { timeout: 60_000 }, () => {
     }
   });
 
-  it('shows no real person: only the featured demo artist inside the product UI', async () => {
+  it('shows only the featured artist inside the product UI, and nobody else', async () => {
     const { HOMEPAGE_EDITORIAL_COPY: copy } = await loadCopy();
     const { HOMEPAGE_FEATURED_ARTIST: artist } = await import(
       '@/data/demoArtists'
@@ -215,24 +246,20 @@ describe('homepage contract', { timeout: 60_000 }, () => {
     const sources = [...container.querySelectorAll('section img')].map(image =>
       (image.getAttribute('src') ?? '').replace(/\?v=\w+$/, '')
     );
-    // Tim, 2026-11-08: the homepage does not feature him. Until a real artist
-    // opts in, the product UI is labeled Example artist (procedural art, no
-    // people, no verified badge). No real person renders on `/`.
+    // Tim, 2026-11-12: feature him with his own catalog for now, from the
+    // featured slot, so any opted-in artist can take it later. Only the slot's
+    // images render: no other person, no verified badge.
     const allowed = [
       artist.avatarSrc,
       ...artist.releases.map(release => release.src),
     ];
-    expect(artist.demo).toBe(true);
-    expect(artist.name).toBe('Example artist');
+    expect(artist.name).toBe('Tim White');
     expect(container.querySelector('.hv3-pp__badge, .hv3-insp__ok')).toBeNull();
     expect(sources.length).toBeGreaterThan(0);
     expect(sources.filter(src => !allowed.includes(src))).toEqual([]);
     expect([...new Set(sources)].sort()).toEqual([...new Set(allowed)].sort());
-    expect(sources.some(src => /tim-white|img\/releases\//.test(src))).toBe(
-      false
-    );
-    expect(container.textContent).not.toContain('Tim White');
-    expect(copy.profile.alt).toBeTruthy();
+    expect(container.textContent).not.toContain('Example artist');
+    expect(copy.profile.alt).toContain('Tim White’s Jovie profile');
   });
 
   it('keeps copy in data and free of em dashes and stock promotion', async () => {
@@ -257,6 +284,7 @@ describe('homepage contract', { timeout: 60_000 }, () => {
     // root with an anchor, so the fragment must name an id the homepage
     // actually renders. A renamed target (e.g. the old claim input)
     // otherwise silently dead-ends every dependent CTA at the top of `/`.
+    const HOMEPAGE_FRAGMENT_HREF = /['"`]\/#([A-Za-z0-9][A-Za-z0-9_-]*)['"`]/g;
     const anchors = new Set<string>();
     const collectAnchors = (dir: string): void => {
       for (const entry of readdirSync(dir, { withFileTypes: true })) {
@@ -270,9 +298,7 @@ describe('homepage contract', { timeout: 60_000 }, () => {
           /\.(ts|tsx)$/.test(entry.name) &&
           !/(\.test\.|\.spec\.|\.stories\.)/.test(entry.name)
         ) {
-          for (const match of read(path).matchAll(
-            /['"`]\/#([A-Za-z0-9][A-Za-z0-9_-]*)['"`]/g
-          )) {
+          for (const match of read(path).matchAll(HOMEPAGE_FRAGMENT_HREF)) {
             anchors.add(match[1]);
           }
         }
@@ -281,12 +307,16 @@ describe('homepage contract', { timeout: 60_000 }, () => {
     collectAnchors('app');
     collectAnchors('components');
 
+    // The changelog footer was the last `/#fragment` link; it now uses the
+    // shared claim CTA, so an empty set is valid. The pattern is proven on a
+    // fixture instead, so the scan cannot go stale silently.
     expect(
-      anchors.size,
-      `no homepage fragment anchors found — the guard scan went stale: ${[
-        ...anchors,
-      ].join(', ')}`
-    ).toBeGreaterThan(0);
+      [
+        ...`href='/#claim-name' "/#faq" '/pricing#plans'`.matchAll(
+          HOMEPAGE_FRAGMENT_HREF
+        ),
+      ].map(match => match[1])
+    ).toEqual(['claim-name', 'faq']);
     const missing = [...anchors].filter(id => !renderedIds.has(id));
     expect(missing).toEqual([]);
   });

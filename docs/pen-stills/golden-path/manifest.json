@@ -3,7 +3,7 @@
   "surface": "golden-path",
   "primaryMode": "dark",
   "penFile": {
-    "name": "Jovie Design Studio — canonical.lib.pen",
+    "name": "Jovie Design Studio \u2014 canonical.lib.pen",
     "sha256": null,
     "note": "Design first (Tim, 2026-11-08): every Golden Path screen needs a Pen frame before it can certify. penNodeId 'pending-no-design' means no Pen frame exists yet. Node ids come from scripts/pen-review/export-refs.mjs CANONICAL_SURFACES (PR #24239) ; the homepage is pending because frame UfvR8 is in no saved .pen file and homepage v3 is an HTML build awaiting Tim's approval (2026-11-08). A frame may set penFile to export from another .pen in the archive; scripts/agent/pen-golden-path-export.mjs fails loudly on an id the file does not have. Stills are written by that exporter on the Pen machine, never by hand."
   },
@@ -23,6 +23,7 @@
       "penNodeId": "oaz9c",
       "fileHash": null,
       "stillPath": "docs/pen-stills/golden-path/signup-signin.signin.dark.1440.png",
+      "sectionSelector": "[data-auth-shell]",
       "viewport": 1440,
       "mode": "dark",
       "status": "active",
@@ -73,6 +74,7 @@
       "penNodeId": "D9kdx",
       "fileHash": null,
       "stillPath": "docs/pen-stills/golden-path/public-profile.profile.dark.1440.png",
+      "sectionSelector": "[data-pen-section='public-profile/profile']",
       "viewport": 1440,
       "mode": "dark",
       "status": "active",
@@ -92,6 +94,7 @@
       "penNodeId": "hLRZB",
       "fileHash": null,
       "stillPath": "docs/pen-stills/golden-path/checkout.pricing.dark.1440.png",
+      "sectionSelector": ".system-b-pricing-page",
       "viewport": 1440,
       "mode": "dark",
       "status": "active",

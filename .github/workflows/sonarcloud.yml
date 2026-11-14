@@ -117,7 +117,7 @@ jobs:
 
       - name: SonarQube Scan
         if: ${{ env.SONAR_SCAN_ENABLED == 'true' }}
-        uses: SonarSource/sonarqube-scan-action@4d1dc0c91ee400dcf8a6dddf2f705ac36542e304 # v8.2.1 trufflehog:ignore (pinned action SHA is a git commit, not a credential)
+        uses: SonarSource/sonarqube-scan-action@e805d875275f728fac1885b413934be6d7c63f65 # v8.2.1 trufflehog:ignore (pinned action SHA is a git commit, not a credential)
         with:
           # workflow_run's GITHUB_SHA belongs to this wrapper, not the analyzed checkout.
           args: -Dsonar.scm.revision=${{ github.event.workflow_run.head_sha || github.sha }}

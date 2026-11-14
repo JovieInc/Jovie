@@ -449,8 +449,10 @@ describe('ci-fast bounded parallel workflow', () => {
     expect([...whole, ...keyed[0].files].sort()).toEqual(
       [...LANES_PYTEST_FILES].sort()
     );
-    expect(LANES_PYTEST_FILES).toHaveLength(41);
+    expect(LANES_PYTEST_FILES).toHaveLength(48);
     expect(whole).toContain('scripts/tests/test_pr_events_repair_evidence.py');
+    expect(whole).toContain('scripts/tests/test_pr_events_red_repair.py');
+    expect(whole).toContain('scripts/tests/test_pr_body_markup.py');
     expect(whole).toContain('scripts/tests/test_board_intake.py');
     expect(whole).toContain('scripts/tests/test_priority_admission.py');
     expect(STRUCTURAL_PYTHON_REGRESSION_COMMANDS.join(' ')).toContain(
@@ -460,7 +462,7 @@ describe('ci-fast bounded parallel workflow', () => {
     expect(whole).toContain('scripts/tests/test_factory_intake.py');
     expect(whole).toContain('scripts/tests/test_cloud_lane.py');
     expect(command).toContain(
-      'coverage report --include="*/scripts/lanes/cloud_lane.py" --fail-under=90'
+      'coverage report --include="*/scripts/lanes/cloud_lane*.py" --fail-under=90'
     );
     expect(whole).toContain('scripts/tests/test_hyperagent_cli.py');
     expect(whole).toContain('scripts/tests/test_model_radar.py');
@@ -732,7 +734,7 @@ describe('ci-fast bounded parallel workflow', () => {
     ]);
   });
 
-  it('selects the desktop updater geometry proof for modal changes', () => {
+  it('selects the desktop updater geometry proofs for modal and control changes', () => {
     const remaining = jobBlock(
       'ci-fast-remaining',
       'ci-profile-admission-browser'
@@ -745,6 +747,10 @@ describe('ci-fast bounded parallel workflow', () => {
       'apps/web/components/organisms/desktop-update/DesktopUpdateModal.tsx',
       'apps/web/components/organisms/desktop-update/DesktopUpdateModal.stories.tsx',
       'apps/web/tests/e2e/storybook-desktop-update-modal.spec.ts',
+      'apps/web/components/organisms/desktop-update/DesktopUpdateControl.tsx',
+      'apps/web/components/organisms/desktop-update/DesktopUpdateControl.stories.tsx',
+      'apps/web/lib/desktop/desktop-update-control-state.ts',
+      'apps/web/tests/e2e/storybook-desktop-update-control.spec.ts',
     ]) {
       expect(
         spawnSync('grep', ['-qE', pattern ?? 'a^'], {
@@ -766,9 +772,19 @@ describe('ci-fast bounded parallel workflow', () => {
     expect(remaining).toContain(
       'specs+=(tests/e2e/storybook-desktop-update-modal.spec.ts)'
     );
-    expect(
-      jobBlock('ci-storybook-surfaces', 'ci-cross-product-integration')
-    ).toContain('tests/e2e/storybook-desktop-update-modal.spec.ts');
+    expect(remaining).toContain(
+      'specs+=(tests/e2e/storybook-desktop-update-control.spec.ts)'
+    );
+    const surfaces = jobBlock(
+      'ci-storybook-surfaces',
+      'ci-cross-product-integration'
+    );
+    expect(surfaces).toContain(
+      'tests/e2e/storybook-desktop-update-modal.spec.ts'
+    );
+    expect(surfaces).toContain(
+      'tests/e2e/storybook-desktop-update-control.spec.ts'
+    );
   });
 
   it('selects DSP details only for its real consumers and runs the maintained browser proof', () => {
@@ -2132,7 +2148,7 @@ describe('ci-fast bounded parallel workflow', () => {
 
   it('keeps workflow contracts in the bounded CI control suite', () => {
     expect(PACKAGE_JSON.scripts['ci:control:test']).toBe(
-      'node scripts/run-affected-tests.mjs --control && node --test scripts/ci-workflow-topology.test.mjs scripts/workflow-runner-pin-check.test.mjs && node scripts/ci-workflow-topology.mjs && pnpm ownership:check && node scripts/sources-of-truth.mjs && node scripts/invariants/duplicate-literals.mjs'
+      'node scripts/run-affected-tests.mjs --control && node --test scripts/ci-workflow-topology.test.mjs scripts/workflow-runner-pin-check.test.mjs scripts/ci-trigger-budget.test.mjs && node scripts/ci-workflow-topology.mjs && pnpm ownership:check && node scripts/sources-of-truth.mjs && node scripts/invariants/duplicate-literals.mjs'
     );
     expect(PACKAGE_JSON.scripts['ownership:check']).toBe(
       'node --test scripts/ownership-registry.test.mjs && node scripts/ownership-registry.mjs --report'
@@ -2507,7 +2523,23 @@ describe('ci-fast bounded parallel workflow', () => {
         new RegExp(`^readonly ${name}='[0-9a-f]{64}'$`, 'm')
       );
     }
-    expect(script.match(/sha256sum --check --status/g)?.length).toBe(2);
+    // One verifier (sha_ok) checks every download, the extracted shellcheck
+    // binary and every cache entry before use.
+    expect(script.match(/sha256sum --check --status/g)?.length).toBe(1);
+    expect(script).toContain(
+      'sha_ok "$out" "$sha" || fail "sha256 mismatch: $url"'
+    );
+    expect(script).toContain(
+      'sha_ok "$tool_dir/shellcheck.tar.xz" "$shellcheck_tarball_sha256"'
+    );
+    expect(script).toContain(
+      'sha_ok "$tool_dir/shellcheck" "$shellcheck_binary_sha256"'
+    );
+    expect(script).toContain('if sha_ok "$cache_dir/$1" "$1"; then');
+    // The image fallback is pinned by digest, never by tag.
+    expect(script).toMatch(
+      /^readonly SHELLCHECK_IMAGE='koalaman\/shellcheck@sha256:[0-9a-f]{64}'$/m
+    );
     expect(script).toContain('--fail');
     expect(script).toContain('-shellcheck="$tool_dir/shellcheck"');
     expect(script).toContain('-pyflakes="$tool_dir/pyflakes"');
@@ -2537,6 +2569,8 @@ describe('ci-fast bounded parallel workflow', () => {
       'actionlint.yml:actionlint',
       'ci.yml:ci-fast-remaining',
       'source-validation.yml:deterministic',
+      // Fills the main-scoped download cache the three callers above restore.
+      'tsc-cache-warm.yml:warm',
     ]);
   });
 
@@ -2581,9 +2615,11 @@ describe('ci-fast bounded parallel workflow', () => {
     // actionlint reads only checked-out workflows, so it runs unconditionally
     // in the idle wait for the background base-branch fetch.
     expect(remaining).toMatch(
-      /- uses: \.\/\.github\/actions\/setup-node-pnpm\n\s+with:\n\s+reuse_merge_group_workspace: 'true'\n(?:\s+#.*\n)+\s+- name: Set up Go for source-pinned actionlint\n\s+uses: actions\/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7\.0\.0\n\s+with:\n\s+go-version: '1\.26\.10'\n\s+cache: false\n\s+- name: Run actionlint\n\s+env:\n(?:\s+#.*\n)+\s+RELEASE_DOWNLOAD_TOKEN: \$\{\{ github\.token \}\}\n\s+run: bash \.github\/scripts\/run-actionlint\.sh\n\s+- name: Fetch base-branch history\n/
+      /- uses: \.\/\.github\/actions\/setup-node-pnpm\n\s+with:\n\s+reuse_merge_group_workspace: 'true'\n(?:\s+#.*\n)+\s+- name: Set up Go for source-pinned actionlint\n\s+uses: actions\/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7\.0\.0\n\s+with:\n\s+go-version: '1\.26\.10'\n\s+cache: false\n\s+- name: Run actionlint\n\s+env:\n(?:\s+#.*\n)+\s+RELEASE_DOWNLOAD_TOKEN: \$\{\{ github\.token \}\}\n\s+PINNED_DOWNLOAD_CACHE_DIR: \/tmp\/jovie-pinned-downloads\n\s+run: bash \.github\/scripts\/run-actionlint\.sh\n\s+- name: Fetch base-branch history\n/
     );
-    expect(remaining.match(/run-actionlint\.sh/g)).toHaveLength(1);
+    expect(
+      remaining.match(/bash \.github\/scripts\/run-actionlint\.sh/g)
+    ).toHaveLength(1);
     expect(remaining).toMatch(/actions\/setup-python/);
     expect(remaining).toMatch(/python -m pip install/);
     expect(typecheck).not.toContain('ci-fast-remaining');

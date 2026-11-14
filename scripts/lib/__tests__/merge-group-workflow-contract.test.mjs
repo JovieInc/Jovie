@@ -3564,7 +3564,6 @@ ${selectedGateScript}`,
     expect(mergeGroupWorkflows).toEqual([
       'ci.yml',
       'company-guards.yml',
-      'pr-fleet-rules.yml',
       'pr-size-guard.yml',
       'pr-targets-main.yml',
       'private-data-guard.yml',

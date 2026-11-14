@@ -65,7 +65,8 @@ import {
 
 export { baseRefCandidates, resolveBaseRef };
 
-import { checkInstallMatchesLockfile } from './lib/preflight-install.mjs';
+import { dateChecks } from './lib/preflight-date-checks.mjs';
+import { checkPrerequisites } from './lib/preflight-prerequisites.mjs';
 import { remoteHint } from './lib/remote-hint.mjs';
 
 const SELF = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -414,12 +415,10 @@ function loadBody(args, cwd) {
       title: args.title ?? '',
       labels: [],
     };
-  if (
-    process.env.JOVIE_PR_BODY_FILE &&
-    existsSync(process.env.JOVIE_PR_BODY_FILE)
-  )
+  const envBody = process.env.JOVIE_PR_BODY_FILE;
+  if (envBody && existsSync(envBody))
     return {
-      body: readFileSync(process.env.JOVIE_PR_BODY_FILE, 'utf8'),
+      body: readFileSync(envBody, 'utf8'),
       title: args.title ?? '',
       labels: [],
     };
@@ -511,6 +510,17 @@ function biomeTargets(files) {
     .map(f => f.filename);
 }
 
+/** Format the same branch changes that the later Biome check validates. */
+export function formatChangedFiles(cwd, base, env) {
+  const touched = biomeTargets(changedFiles(cwd, base).files);
+  if (!touched.length) return Promise.resolve({ code: 0, out: '', ms: 0 });
+  const targets = touched.map(f => `'${f.replaceAll("'", "'\\''")}'`).join(' ');
+  return sh(
+    `pnpm exec biome check --write --no-errors-on-unmatched -- ${targets}`,
+    { cwd, env }
+  );
+}
+
 /** Workspace packages whose typecheck the diff touches. */
 export function typecheckTargets(files, cwd) {
   const out = new Set();
@@ -584,8 +594,8 @@ export async function main({
   const cwd = args.repo;
   const hint = remoteHint({ env });
   if (hint) log(hint);
-  // Fail fast before any check runs against an install this worktree did not make.
-  const install = checkInstallMatchesLockfile({ repo: cwd });
+  // Fail fast on install provenance and incompatible installed tools.
+  const install = checkPrerequisites({ repo: cwd, env, list: args.list });
   if (!install.ok) {
     log(`[preflight:changed] ${install.message}`);
     return 1;
@@ -710,8 +720,9 @@ export async function main({
       deferred.push(g.id);
       continue;
     }
-    cmd(g.id, g.name, g.command, g.phase ?? 1);
+    cmd(g.id, g.name, g.command, g.phase ?? 1, g.timeoutMs);
   }
+  for (const c of dateChecks(paths, baseRef)) cmd(c.id, c.name, c.command);
 
   const bio = biomeTargets(files);
   if (bio.length)
@@ -891,19 +902,9 @@ export async function main({
       }
     };
     await Promise.all(Array.from({ length: CONCURRENCY }, worker));
-    if (phase === 0 && args.write && results.length) {
-      // Commit hooks (lint-staged) format staged files; match that so the
-      // generated output is committable as written.
-      const touched = git(cwd, ['diff', '--name-only'])
-        .split('\n')
-        .filter(f => /\.(?:[cm]?[jt]sx?|json)$/.test(f));
-      if (touched.length)
-        await sh(
-          `pnpm exec biome check --write --no-errors-on-unmatched ${touched.map(f => JSON.stringify(f)).join(' ')}`,
-          { cwd, env: childEnv }
-        );
-    }
     if (phase === 0 && args.write) {
+      // Recompute after generators so newly written outputs are included too.
+      await formatChangedFiles(cwd, baseRef, childEnv);
       const changedByGen = git(cwd, ['status', '--porcelain'])
         .split('\n')
         .filter(l => /workflow-topology|ci-harness|design-tokens|llms/.test(l));

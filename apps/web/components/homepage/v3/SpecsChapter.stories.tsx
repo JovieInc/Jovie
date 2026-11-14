@@ -22,3 +22,12 @@ export const Desktop: Story = {};
 export const Mobile: Story = {
   parameters: { viewport: { defaultViewport: 'mobile1' } },
 };
+
+/** Right-to-left: the specs sheet and moments inside an RTL document. */
+export const RtlDocument: Story = {
+  render: () => (
+    <div dir='rtl'>
+      <SpecsChapter />
+    </div>
+  ),
+};

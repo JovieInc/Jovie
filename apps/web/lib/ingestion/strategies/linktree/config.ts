@@ -90,7 +90,7 @@ export const LINKTREE_VERIFICATION_PATTERNS = [
  * Last checked: 2026-03-27
  * Checked profiles: linktr.ee/linktree, /TikTok, /selenagomez, /Billieeilish,
  *   /shopify, /therock — all had null facebookPixelId/googleAnalyticsId/tiktokPixelId.
- * Linktree only injects fbq('init'), ttq.load(), gtag('config') with creator-
+ * Linktree only initializes Meta, TikTok and Google tracking with creator-
  * configured IDs. Platform-owned tracking uses separate systems (Datadog,
  * ingress endpoint, Google Ad Manager). No platform-owned pixel IDs were found;
  * Linktree's fb:app_id and GAM network code are not pixel IDs and are not

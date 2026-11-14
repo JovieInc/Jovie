@@ -7,5 +7,12 @@
     "typography": "{{component}} owns typography. Use an approved variant ({{variants|none defined}}) instead of font/text restyles.",
     "shape": "{{component}} owns radius/shape. Use an approved variant ({{variants|none defined}}) instead of rounded-* overrides.",
     "default": "Do not restyle {{component}}. Use approved @jovie/ui variants ({{variants|none defined}}) and sizes ({{sizes|none defined}}). Layout/placement classes are allowed. See DESIGN.md."
-  }
+  },
+  "contracts": [
+    {
+      "pattern": "^PlainButton$",
+      "allow": ["*"],
+      "deny": []
+    }
+  ]
 }

@@ -11,6 +11,7 @@ import {
   creatorContacts,
   creatorProfiles,
 } from '@/lib/db/schema/profiles';
+import { coldClaimInviteRelationshipHold } from '@/lib/outbound/cold-claim-invites';
 
 export interface EligibleProfile {
   id: string;
@@ -20,6 +21,20 @@ export interface EligibleProfile {
   contactEmail: string | null;
 }
 
+/** Artists Tim already works with are never eligible for a cold invite. */
+function withoutRelationshipHolds(
+  profiles: EligibleProfile[]
+): EligibleProfile[] {
+  return profiles.filter(
+    profile =>
+      coldClaimInviteRelationshipHold({
+        username: profile.username,
+        displayName: profile.displayName,
+        email: profile.contactEmail,
+      }) === null
+  );
+}
+
 /**
  * Fetch specific profiles by ID for bulk invite.
  */
@@ -27,7 +42,7 @@ export async function fetchProfilesById(
   profileIds: string[],
   limit: number
 ): Promise<EligibleProfile[]> {
-  return db
+  const rows = await db
     .select({
       id: creatorProfiles.id,
       username: creatorProfiles.username,
@@ -50,6 +65,7 @@ export async function fetchProfilesById(
       )
     )
     .limit(limit);
+  return withoutRelationshipHolds(rows);
 }
 
 /**
@@ -60,7 +76,7 @@ export async function fetchProfilesByFitScore(
   fitScoreThreshold: number,
   limit: number
 ): Promise<EligibleProfile[]> {
-  return db
+  const rows = await db
     .select({
       id: creatorProfiles.id,
       username: creatorProfiles.username,
@@ -89,6 +105,7 @@ export async function fetchProfilesByFitScore(
     )
     .orderBy(drizzleSql`${creatorProfiles.fitScore} DESC`)
     .limit(limit);
+  return withoutRelationshipHolds(rows);
 }
 
 /**

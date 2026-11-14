@@ -67,3 +67,38 @@ export const Truncated: Story = {
 export const Loading: Story = {
   render: () => <PersonCellSkeleton width='240px' />,
 };
+
+export const PartialNoPhotoOrDetail: Story = {
+  args: {
+    name: 'Jordan Reyes',
+    secondary: null,
+    avatarUrl: null,
+  },
+};
+
+export const LongNameAndEmail: Story = {
+  args: {
+    name: 'Alexandria Constantinople-Whitfield of The Midnight Orchestra',
+    secondary: 'alexandria.constantinople-whitfield@example-records-group.com',
+    trailing: (
+      <span
+        title='Subscribed'
+        className='block h-1.5 w-1.5 rounded-full bg-accent'
+      />
+    ),
+  },
+};
+
+export const RtlArabicName: Story = {
+  args: {
+    name: 'ليلى حداد',
+    secondary: 'layla@example.com',
+  },
+  decorators: [
+    Story => (
+      <div dir='rtl' lang='ar'>
+        <Story />
+      </div>
+    ),
+  ],
+};

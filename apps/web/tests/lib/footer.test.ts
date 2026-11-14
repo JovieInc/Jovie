@@ -25,7 +25,7 @@ describe('generateFooterHTML', () => {
 
     expect(html).toContain('<footer');
     expect(html).toContain('Jovie');
-    expect(html).toContain('Join the waitlist');
+    expect(html).toContain('Claim your profile');
     expect(html).toContain('Privacy');
     expect(html).toContain(`utm_artist=${mockArtist.handle}`);
   });
@@ -51,11 +51,10 @@ describe('generateFooterHTML', () => {
     expect(html).toContain('Jovie');
   });
 
-  it('includes waitlist link when feature flag is enabled', async () => {
-    // We can't easily mock the feature flag here, but we can test that the link structure is correct
+  it('links new visitors into the /start flow with UTM params', async () => {
     const html = await generateFooterHTML({ artist: mockArtist });
 
-    expect(html).toContain('/sign-up?utm_source=listen&utm_artist=test-artist');
+    expect(html).toContain('/start?utm_source=listen&utm_artist=test-artist');
   });
 
   it('includes logo SVG', async () => {

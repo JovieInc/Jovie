@@ -2,12 +2,21 @@
 // dashboard gate runs signed-in shell navigation without an identity secret;
 // the onboarding gate still admits on E2E_CLERK_USER_ID.
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import {
+  chmodSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { runInNewContext } from 'node:vm';
 import { load } from 'js-yaml';
 import { describe, expect, it } from 'vitest';
+import { SUITES } from '../../../scripts/lighthouse-relative-gate.mjs';
 
 interface LighthouseStep {
   id?: string;
@@ -16,7 +25,6 @@ interface LighthouseStep {
   if?: string;
   run: string;
   env: Record<string, string>;
-  with?: Record<string, unknown>;
   'continue-on-error'?: unknown;
 }
 interface LighthouseJob {
@@ -29,6 +37,7 @@ interface SelectOptions {
   relevant?: boolean;
   failed?: boolean;
   branch?: string;
+  baseline?: boolean;
   started?: string;
 }
 
@@ -53,13 +62,14 @@ describe('Lighthouse identity admission', () => {
       relevant = true,
       failed = false,
       branch = 'fixture-branch',
+      baseline = false,
       started = 'true',
     }: SelectOptions = {}
   ): boolean => {
     const expression = (step?.if ?? 'success()')
       .replace(/\$\{\{|\}\}/g, '')
       .replace(
-        /\.(lighthouse-identity|download-build|neon-branch|ci-path-changes|neon-db|background-build-start)\b/g,
+        /\.(lighthouse-identity|lighthouse-baseline|background-build-start|download-build|neon-branch|ci-path-changes|neon-db)\b/g,
         "['$1']"
       );
     // Actions implicitly applies success() unless the expression explicitly
@@ -71,10 +81,11 @@ describe('Lighthouse identity admission', () => {
       always: () => true,
       steps: {
         'lighthouse-identity': { outputs: { available } },
+        'lighthouse-baseline': { outputs: { built: String(baseline) } },
+        'background-build-start': { outputs: { started } },
         check_changes: { outputs: { run_full_ci: String(relevant) } },
         'download-build': { outcome: download },
         'neon-branch': { outputs: { branch_id: branch } },
-        'background-build-start': { outputs: { started } },
       },
       needs: {
         'ci-path-changes': { outputs: { run_neon: String(ephemeral) } },
@@ -84,7 +95,7 @@ describe('Lighthouse identity admission', () => {
   };
 
   const PROBE_NAMES = {
-    dashboard: 'Run signed-in shell navigation and dashboard Lighthouse',
+    dashboard: 'Run signed-in shell navigation',
     onboarding: 'Run authenticated onboarding Lighthouse',
   } as const;
 
@@ -106,120 +117,223 @@ describe('Lighthouse identity admission', () => {
     expect(probe.run).toContain(
       'tests/e2e/releases-first-paint-visual.spec.ts'
     );
-    const lighthouse = probe.run.indexOf(
-      'pnpm run test:lighthouse:dashboard:pr'
-    );
     const serverReady = probe.run.indexOf('SERVER_READY" = "false"');
     expect(nav).toBeGreaterThan(serverReady);
-    expect(lighthouse).toBeGreaterThan(nav);
-    // Chat and onboarding have no identity-free job of their own, so the
-    // dashboard gate holds them to their budgets on the same server.
-    const chat = probe.run.indexOf('pnpm run test:lighthouse:chat:pr');
-    const onboarding = probe.run.indexOf(
-      'LIGHTHOUSE_TEST_PERSONA=creator pnpm run test:lighthouse:onboarding:pr'
-    );
-    expect(chat).toBeGreaterThan(lighthouse);
-    expect(onboarding).toBeGreaterThan(lighthouse);
-    expect(probe.run).not.toMatch(/test:lighthouse:[a-z]+:pr[^\n]*\|\|\s*true/);
     expect(probe.run).not.toMatch(
       /click-(?:navigation|through)[^\n]*\|\|\s*true/
     );
+    // Lighthouse is its own step after navigation, so a budget miss and a
+    // navigation failure are reported under their own names.
+    expect(probe.run).not.toContain('test:lighthouse');
+    const budgets = stepNamed(job, 'Run signed-in Lighthouse budgets');
+    expect(job.steps.indexOf(budgets)).toBeGreaterThan(
+      job.steps.indexOf(probe)
+    );
+    expect(selected(budgets, 'false')).toBe(true);
+    expect(selected(budgets, 'false', { failed: true })).toBe(false);
+    expect(selected(budgets, 'false', { relevant: false })).toBe(false);
+    expect(budgets.run).toContain(
+      'node apps/web/scripts/lighthouse-relative-gate.mjs'
+    );
+    expect(budgets.run).not.toMatch(/\|\|/);
+    expect(budgets['continue-on-error']).toBeUndefined();
+    expect(budgets.env.BASE_URL).toBe('http://localhost:3000');
+    expect(budgets.env.LIGHTHOUSE_BASELINE_SERVER).toBe(
+      '${{ steps.lighthouse-baseline.outputs.server }}'
+    );
+    // Chat and onboarding have no identity-free job of their own, so the
+    // dashboard gate holds them to their budgets on the same server.
+    expect(SUITES).toEqual([
+      { name: 'dashboard', script: 'test:lighthouse:dashboard:pr' },
+      { name: 'chat', script: 'test:lighthouse:chat:pr' },
+      {
+        name: 'onboarding',
+        script: 'test:lighthouse:onboarding:pr',
+        env: { LIGHTHOUSE_TEST_PERSONA: 'creator' },
+      },
+    ]);
     expect(probe['continue-on-error']).toBeUndefined();
     expect(job['continue-on-error']).toBeUndefined();
   });
 
-  it('dashboard: decides the shared artifact before building; extraction and the background build stay mutually exclusive', () => {
+  it('dashboard: a missing baseline cannot fail the job, and nothing runs off the head tree', () => {
     const job = workflow.jobs['ci-lighthouse-dashboard-pr'];
-    const byName = (name: string) => stepNamed(job, name);
-    const download = byName('Download build artifact');
-    const extract = byName('Extract build artifact');
-    const start = byName('Start fallback build in background');
-    const wait = byName('Wait for background fallback build');
-    const probe = byName(PROBE_NAMES.dashboard);
-    // Wiring and order: the artifact decision precedes every build path
-    // (Move 1, merge-time), the background build launches only when the
-    // artifact is missing, and the wait runs after migrations, exactly
-    // when a build was launched, before the probes.
-    const indexOf = (name: string) =>
-      job.steps.findIndex(step => step.name === name);
-    expect(indexOf('Download build artifact')).toBeLessThan(
-      indexOf('Extract build artifact')
+    const names = job.steps.map(step => step.name);
+    const baseline = stepNamed(
+      job,
+      'Build base commit for relative Lighthouse budgets'
     );
-    expect(indexOf('Extract build artifact')).toBeLessThan(
-      indexOf('Start fallback build in background')
+    const restore = stepNamed(job, 'Restore workspace to the exact head');
+    // The script, not continue-on-error, makes a missing baseline harmless.
+    expect(baseline['continue-on-error']).toBeUndefined();
+    const dir = mkdtempSync(join(tmpdir(), 'lighthouse-baseline-'));
+    try {
+      // Not a git checkout: the build cannot even start.
+      const output = join(dir, 'output');
+      const result = spawnSync(
+        'bash',
+        [
+          join(REPO_ROOT, '.github/scripts/lighthouse-build-baseline.sh'),
+          'build',
+        ],
+        {
+          cwd: dir,
+          env: {
+            ...process.env,
+            GIT_CEILING_DIRECTORIES: dir,
+            RUNNER_TEMP: dir,
+            GITHUB_OUTPUT: output,
+            BASELINE_DIR: join(dir, 'baseline'),
+            BASE_SHA: '',
+          },
+          encoding: 'utf8',
+        }
+      );
+      expect(result.status, result.stderr).toBe(0);
+      expect(readFileSync(output, 'utf8')).toBe('built=false\n');
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+    expect(baseline.run).toBe(
+      'bash .github/scripts/lighthouse-build-baseline.sh build'
     );
-    expect(indexOf('Start fallback build in background')).toBeLessThan(
-      indexOf('Run migrations (ephemeral Neon)')
+    expect(baseline.env.BASE_SHA).toBe(
+      '${{ github.event.merge_group.base_sha }}'
     );
-    expect(indexOf('Run migrations (ephemeral Neon)')).toBeLessThan(
-      indexOf('Wait for background fallback build')
+    // The restore is blocking and runs whether or not the base build worked.
+    expect(restore['continue-on-error']).toBeUndefined();
+    // Not the workspace path: after the base checkout that file is the base
+    // commit's, or missing (dispatch run 42967736732 failed there).
+    expect(restore.run).toBe(
+      'bash "$RUNNER_TEMP/lighthouse-build-baseline.sh" restore'
     );
-    expect(indexOf('Wait for background fallback build')).toBeLessThan(
-      indexOf(PROBE_NAMES.dashboard)
-    );
-    expect(start.run).toContain('started=true" >> "$GITHUB_OUTPUT');
-    expect(start.if).toContain("steps.download-build.outcome != 'success'");
-    expect(wait.if).toContain(
-      "steps.background-build-start.outputs.started == 'true'"
-    );
-    // Artifact hit: extraction is the only build path; no background build,
-    // no wait, no cache restore.
-    expect(selected(download, 'true')).toBe(true);
-    expect(selected(download, 'true', { relevant: false })).toBe(false);
-    expect(selected(extract, 'true', { download: 'success' })).toBe(true);
-    expect(selected(extract, 'true')).toBe(false);
-    expect(selected(start, 'true')).toBe(true);
-    expect(selected(start, 'true', { download: 'success' })).toBe(false);
-    expect(selected(start, 'true', { relevant: false })).toBe(false);
-    // Artifact miss: the background build and its wait run, gated on the
-    // started output, and neither can absorb a failure.
-    expect(selected(wait, 'true')).toBe(true);
-    expect(selected(wait, 'true', { started: 'false' })).toBe(false);
-    expect(selected(wait, 'true', { relevant: false })).toBe(false);
-    expect(wait['continue-on-error']).toBeUndefined();
-    expect(start['continue-on-error']).toBeUndefined();
-    expect(wait.run).toContain('scripts/ci/wait-background-build.sh');
-    // Failed extraction: the extract step is fail-closed (no
-    // continue-on-error), and because the background build requires the
-    // download to have failed, it never launched on the artifact path — a
-    // failed extraction reds the job instead of racing a second build.
-    expect(extract['continue-on-error']).toBeUndefined();
-    expect(selected(start, 'true', { download: 'success' })).toBe(false);
-    expect(selected(wait, 'true', { failed: true })).toBe(false);
-    expect(selected(probe, 'true', { failed: true })).toBe(false);
-    // Same read-only Turbopack cache restore as Build + Layout: pinned
-    // restore-only action, compiler-state path, hour-suffixed key written
-    // only by trusted main (next-build-cache-warm), never saved here — and
-    // skipped entirely on the artifact path.
-    const cacheHour = byName('Resolve Next build cache hour');
-    const cacheRestore = byName('Restore Next build cache (read-only)');
-    expect(selected(cacheHour, 'true')).toBe(true);
-    expect(selected(cacheHour, 'true', { download: 'success' })).toBe(false);
-    expect(selected(cacheRestore, 'true')).toBe(true);
-    expect(selected(cacheRestore, 'true', { download: 'success' })).toBe(false);
-    expect(selected(cacheRestore, 'true', { relevant: false })).toBe(false);
-    expect(cacheRestore.uses).toBe(
-      'actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9'
-    );
-    expect(cacheRestore.with?.path).toBe('apps/web/.next/cache/turbopack');
-    // Job-end backstop: a best-effort always() kill of the build process
-    // group, only when a build was launched, that cannot fail the job.
-    const groupKill = byName(
-      'Kill background build process group (if still alive)'
-    );
-    expect(groupKill.if).toContain('always()');
-    expect(groupKill.if).toContain(
-      "steps.background-build-start.outputs.started == 'true'"
-    );
-    expect(groupKill.run).toContain('next-build-fallback.pid');
-    expect(groupKill.run).toContain('"$pid" -ge 1');
-    const source = readFileSync(
-      resolve(REPO_ROOT, '.github/workflows/ci.yml'),
+    expect(restore.if).toBe(baseline.if);
+    expect(names.indexOf(restore.name)).toBe(names.indexOf(baseline.name) + 1);
+    for (const later of [
+      'Extract build artifact',
+      'Start fallback build in background',
+      'Run signed-in shell navigation',
+      'Run signed-in Lighthouse budgets',
+    ]) {
+      expect(names.indexOf(later), later).toBeGreaterThan(
+        names.indexOf(restore.name)
+      );
+    }
+    // Base and head are built by the same command with the same env, so the
+    // prebuilt artifact (other env) is not used once a baseline exists.
+    const fallback = stepNamed(job, 'Start fallback build in background');
+    expect(fallback.run).toContain('pnpm --filter=@jovie/web run build');
+    for (const key of Object.keys(fallback.env)) {
+      expect(baseline.env[key], key).toBe(fallback.env[key]);
+    }
+    expect(
+      selected(fallback, 'true', { download: 'success', baseline: true })
+    ).toBe(true);
+    expect(
+      selected(stepNamed(job, 'Extract build artifact'), 'true', {
+        download: 'success',
+        baseline: true,
+      })
+    ).toBe(false);
+    // ...and not fetched either: it is about 1.5 GB and nothing would read it.
+    const download = stepNamed(job, 'Download build artifact');
+    expect(selected(download, 'true', { baseline: true })).toBe(false);
+    expect(selected(download, 'true', { baseline: false })).toBe(true);
+    expect(
+      selected(fallback, 'true', { download: 'skipped', baseline: true })
+    ).toBe(true);
+    const script = readFileSync(
+      join(REPO_ROOT, '.github/scripts/lighthouse-build-baseline.sh'),
       'utf8'
     );
-    expect(source).toContain(
-      "key: ${{ runner.os }}-next-build-web-v1-${{ hashFiles('pnpm-lock.yaml', 'apps/web/package.json', 'apps/web/next.config.js') }}-${{ steps.next-build-cache-hour.outputs.hour }}"
+    expect(script).toContain('pnpm --filter=@jovie/web run build');
+  });
+
+  it('dashboard: the baseline builds from a checkout with nothing untracked, then restores head', () => {
+    // A clean checkout lists no untracked files outside node_modules. The
+    // listing must treat that as empty, not as a failed pipeline.
+    const dir = mkdtempSync(join(tmpdir(), 'lighthouse-baseline-clean-'));
+    const script = join(
+      REPO_ROOT,
+      '.github/scripts/lighthouse-build-baseline.sh'
     );
+    const git = (cwd: string, ...args: string[]) => {
+      const result = spawnSync(
+        'git',
+        ['-c', 'user.email=ci@example.com', '-c', 'user.name=ci', ...args],
+        { cwd, encoding: 'utf8' }
+      );
+      expect(result.status, `git ${args.join(' ')}: ${result.stderr}`).toBe(0);
+      return result.stdout.trim();
+    };
+    try {
+      const origin = join(dir, 'origin');
+      const bin = join(dir, 'bin');
+      const temp = join(dir, 'temp');
+      for (const path of [join(origin, 'apps/web'), bin, temp]) {
+        mkdirSync(path, { recursive: true });
+      }
+      git(origin, 'init', '-q', '-b', 'main');
+      git(origin, 'config', 'uploadpack.allowAnySHA1InWant', 'true');
+      writeFileSync(join(origin, '.gitignore'), '.next/\nnode_modules/\n');
+      writeFileSync(join(origin, 'apps/web/page.txt'), 'base\n');
+      git(origin, 'add', '-A');
+      git(origin, 'commit', '-q', '-m', 'base');
+      const baseSha = git(origin, 'rev-parse', 'HEAD');
+      writeFileSync(join(origin, 'apps/web/page.txt'), 'head\n');
+      git(origin, 'commit', '-q', '-am', 'head');
+      const headSha = git(origin, 'rev-parse', 'HEAD');
+      // Stands in for `pnpm --filter=@jovie/web run build`: the "server" is
+      // the page of whatever commit is checked out.
+      writeFileSync(
+        join(bin, 'pnpm'),
+        '#!/usr/bin/env bash\nset -e\nmkdir -p apps/web/.next/standalone/apps/web node_modules/dep\ncp apps/web/page.txt apps/web/.next/standalone/apps/web/server.js\n'
+      );
+      chmodSync(join(bin, 'pnpm'), 0o755);
+      const work = join(dir, 'work');
+      git(dir, 'clone', '-q', '--depth=1', `file://${origin}`, work);
+      expect(
+        git(work, 'ls-files', '--others', '--ignored', '--exclude-standard')
+      ).toBe('');
+
+      const output = join(dir, 'output');
+      const env = {
+        ...process.env,
+        PATH: `${bin}:${process.env.PATH}`,
+        RUNNER_TEMP: temp,
+        GITHUB_OUTPUT: output,
+        BASELINE_DIR: join(temp, 'baseline'),
+        BASE_SHA: baseSha,
+      };
+      const run = (mode: string) =>
+        spawnSync(
+          'bash',
+          [
+            mode === 'restore'
+              ? join(temp, 'lighthouse-build-baseline.sh')
+              : script,
+            mode,
+          ],
+          { cwd: work, env, encoding: 'utf8' }
+        );
+
+      const build = run('build');
+      expect(build.status, build.stdout + build.stderr).toBe(0);
+      expect(readFileSync(output, 'utf8')).toContain('built=true\n');
+      expect(
+        readFileSync(join(temp, 'baseline/apps/web/server.js'), 'utf8')
+      ).toBe('base\n');
+
+      const restore = run('restore');
+      expect(restore.status, restore.stdout + restore.stderr).toBe(0);
+      expect(git(work, 'rev-parse', 'HEAD')).toBe(headSha);
+      expect(readFileSync(join(work, 'apps/web/page.txt'), 'utf8')).toBe(
+        'head\n'
+      );
+      expect(existsSync(join(work, 'apps/web/.next/standalone'))).toBe(false);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 
   it('dashboard: a change to any Lighthouse config it runs turns its measuring steps on', () => {
@@ -237,64 +351,15 @@ describe('Lighthouse identity admission', () => {
       'apps/web/.lighthouserc.chat.pr.json',
       'apps/web/.lighthouserc.onboarding.pr.json',
       'apps/web/scripts/lighthouse-dashboard-auth.cjs',
-      // Helper-only change regression: the wait script the job invokes must
-      // select this gate on its own, without any app-side change.
+      'apps/web/scripts/lighthouse-relative-budget.mjs',
+      'apps/web/scripts/lighthouse-relative-gate.mjs',
+      '.github/scripts/lighthouse-build-baseline.sh',
+      '.github/scripts/lighthouse-install-scope.mjs',
       'scripts/ci/wait-background-build.sh',
     ]) {
       expect(pattern.test(path), path).toBe(true);
     }
     expect(pattern.test('apps/web/.lighthouserc.admin.pr.json')).toBe(false);
-  });
-
-  it('launch gate: a helper-only change keeps selecting the golden-path launch gate', () => {
-    const source = readFileSync(
-      join(REPO_ROOT, '.github/workflows/ci.yml'),
-      'utf8'
-    );
-    const match = source.match(/LAUNCH_GATE_PATTERN='([^']+)'/);
-    expect(match).not.toBeNull();
-    const pattern = new RegExp(match?.[1] ?? '$^');
-    expect(pattern.test('scripts/ci/wait-background-build.sh')).toBe(true);
-    // Established selectors must keep selecting alongside the helper.
-    expect(pattern.test('apps/web/tests/e2e/shell-route-health.spec.ts')).toBe(
-      true
-    );
-    expect(pattern.test('docs/launch/LAUNCH_GATES.md')).toBe(true);
-    expect(pattern.test('docs/unrelated.md')).toBe(false);
-  });
-
-  it('dashboard: a helper-only change still reaches the helper contract tests', () => {
-    const job = workflow.jobs['ci-lighthouse-dashboard-pr'];
-    const byName = (name: string) => stepNamed(job, name);
-    const helperTests = byName('Run background-build helper contract tests');
-    // The unit shards require run_web and the product-lane classifier
-    // routes scripts/** to operations lanes, so a change limited to
-    // scripts/ci/wait-background-build.sh would otherwise never execute
-    // its tests. The targeted step runs them on the no-artifact path such
-    // a change always takes — selected with the job, between the build
-    // launch and the wait, and fail-closed like every other step.
-    expect(helperTests.run).toContain(
-      'pnpm --filter @jovie/web exec vitest run'
-    );
-    expect(helperTests.run).toContain(
-      'tests/unit/ci/lighthouse-launch-gates.test.ts'
-    );
-    expect(helperTests.run).toContain(
-      'tests/unit/ci/lighthouse-background-build.test.ts'
-    );
-    expect(selected(helperTests, 'true')).toBe(true);
-    expect(selected(helperTests, 'true', { download: 'success' })).toBe(false);
-    expect(selected(helperTests, 'true', { relevant: false })).toBe(false);
-    expect(selected(helperTests, 'true', { failed: true })).toBe(false);
-    expect(helperTests['continue-on-error']).toBeUndefined();
-    const indexOf = (name: string) =>
-      job.steps.findIndex(step => step.name === name);
-    expect(indexOf('Start fallback build in background')).toBeLessThan(
-      indexOf('Run background-build helper contract tests')
-    );
-    expect(indexOf('Run background-build helper contract tests')).toBeLessThan(
-      indexOf('Wait for background fallback build')
-    );
   });
 
   for (const surface of ['onboarding'] as const) {
@@ -353,21 +418,14 @@ describe('Lighthouse identity admission', () => {
     const job = workflow.jobs[`ci-lighthouse-${surface}-pr`];
     it(`${surface}: present identity preserves artifact fallback, real probes and failure cleanup`, () => {
       const byName = (name: string) => stepNamed(job, name);
-      // The dashboard job no longer has a synchronous fallback step: the
-      // background-build protocol that replaced it is asserted in the
-      // artifact-decision test above and executable-tested below.
-      if (surface === 'onboarding') {
-        const fallback = byName(`Build app fallback for ${surface} Lighthouse`);
-        expect(selected(fallback, 'true')).toBe(true);
-        expect(selected(fallback, 'true', { failed: true })).toBe(false);
-        expect(selected(fallback, 'true', { download: 'success' })).toBe(false);
-      } else {
-        expect(
-          job.steps.some(
-            step => step.name === 'Build app fallback for dashboard Lighthouse'
-          )
-        ).toBe(false);
-      }
+      const fallback = byName(
+        surface === 'dashboard'
+          ? 'Start fallback build in background'
+          : `Build app fallback for ${surface} Lighthouse`
+      );
+      expect(selected(fallback, 'true')).toBe(true);
+      expect(selected(fallback, 'true', { failed: true })).toBe(false);
+      expect(selected(fallback, 'true', { download: 'success' })).toBe(false);
       expect(
         selected(byName('Extract build artifact'), 'true', {
           download: 'success',
@@ -376,7 +434,9 @@ describe('Lighthouse identity admission', () => {
       const probe = byName(PROBE_NAMES[surface]);
       expect(selected(probe, 'true')).toBe(true);
       expect(selected(probe, 'true', { failed: true })).toBe(false);
-      expect(probe.run).toContain(`pnpm run test:lighthouse:${surface}:pr`);
+      if (surface !== 'dashboard') {
+        expect(probe.run).toContain(`pnpm run test:lighthouse:${surface}:pr`);
+      }
       expect(probe.run).toContain('Standalone server');
       expect(probe.run).toContain(
         "trap 'kill $SERVER_PID 2>/dev/null || true' EXIT"
