@@ -11,8 +11,8 @@ import {
 import { productReady } from '../../product-crawl/ready-gate.mjs';
 import { selectScriptContracts } from '../script-contract-affected.mjs';
 
-/** @typedef {{ name?: string, if?: string, run?: string, uses?: string, with?: { path?: string } }} WorkflowStep */
-/** @typedef {{ if?: string, needs?: string[], env?: Record<string, string>, steps: WorkflowStep[] }} WorkflowJob */
+/** @typedef {{ name?: string, if?: string, run?: string, uses?: string, env?: Record<string, string>, with?: { path?: string, name?: string, pattern?: string } }} WorkflowStep */
+/** @typedef {{ if?: string, needs?: string[], env?: Record<string, string>, strategy?: { 'fail-fast'?: boolean, matrix?: Record<string, unknown> }, steps: WorkflowStep[] }} WorkflowJob */
 /** @typedef {{ event: string, ref: string, resolveResult?: string, shouldCertify?: string }} CrawlEvent */
 
 const REPO_ROOT = resolve(import.meta.dirname, '../../..');
