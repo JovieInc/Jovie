@@ -647,6 +647,7 @@ export function evaluateRepoHygiene({
         if (!baseRef) return '';
         try {
           return execFileSync('git', ['show', `${baseRef}:${path}`], {
+            maxBuffer: 256 * 1024 * 1024,
             cwd: root,
             encoding: 'utf8',
             stdio: ['ignore', 'pipe', 'ignore'],
@@ -1011,6 +1012,7 @@ function previousBaseline(args) {
   try {
     return JSON.parse(
       execFileSync('git', ['show', `${ref}:${REPO_HEALTH_BASELINE_PATH}`], {
+        maxBuffer: 256 * 1024 * 1024,
         encoding: 'utf8',
         stdio: ['ignore', 'pipe', 'ignore'],
       })

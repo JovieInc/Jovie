@@ -150,7 +150,11 @@ function fixture(t) {
   const repoRoot = mkdtempSync(join(tmpdir(), 'design-base-ratchet-'));
   t.after(() => rmSync(repoRoot, { recursive: true, force: true }));
   const git = (...args) =>
-    execFileSync('git', args, { cwd: repoRoot, encoding: 'utf8' }).trim();
+    execFileSync('git', args, {
+      maxBuffer: 256 * 1024 * 1024,
+      cwd: repoRoot,
+      encoding: 'utf8',
+    }).trim();
   const write = (path, source) => {
     mkdirSync(dirname(join(repoRoot, path)), { recursive: true });
     writeFileSync(join(repoRoot, path), source);

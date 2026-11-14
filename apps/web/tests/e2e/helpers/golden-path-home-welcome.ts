@@ -1,4 +1,4 @@
-import { expect, type Page } from '@playwright/test';
+import { type BoundingBox, expect, type Page } from '@playwright/test';
 import { APP_ROUTES } from '@/constants/routes';
 
 /** Open Home and capture the greeting and composer box once both have mounted. */
@@ -16,6 +16,22 @@ export async function openHomeWelcome(page: Page) {
     .getByRole('textbox', { name: 'Chat message input', exact: false })
     .first();
   await expect(input).toBeVisible();
-  const before = await input.boundingBox();
+  // The deferred chat chunk (JOV-10150) swaps the server-rendered welcome for
+  // the loading body and back while the chunk loads, and that swap can land
+  // between the visibility check and a single boundingBox() read, which does
+  // not retry: the box came back null on main pushes 3e772d62c and 875bd2e98
+  // (runs 43645152882 and 43647984362, 2026-11-14). Read the box through a
+  // retrying poll so it is captured from the mounted composer; every
+  // downstream assertion keeps its full strength.
+  let before: BoundingBox | null = null;
+  await expect
+    .poll(
+      async () => {
+        before = await input.boundingBox();
+        return before;
+      },
+      { timeout: 15_000, message: 'mounted composer box' }
+    )
+    .not.toBeNull();
   return { initialGreeting, before };
 }
