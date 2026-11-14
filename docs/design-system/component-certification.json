@@ -30,14 +30,6 @@
       "frontend-rules",
       "forced-caps"
     ],
-    "apps/web/components/features/auth/AuthOfferSummary.tsx": [
-      "ds-owner",
-      "tokens",
-      "states",
-      "tests",
-      "a11y",
-      "frontend-rules"
-    ],
     "apps/web/components/features/profile/ClaimBanner.tsx": [
       "ds-owner",
       "tokens",
