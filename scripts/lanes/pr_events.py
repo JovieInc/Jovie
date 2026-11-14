@@ -1103,6 +1103,19 @@ def repair_evidence_body(pr: dict, body: str, excerpt: str = "", *, customer_dec
         if previous_win_section is not None:
             if not bounds or "\n".join(lines[bounds[0]:bounds[1]]).rstrip("\n") != previous_win_section.rstrip("\n"):
                 raise ValueError("Win section changed; re-read the evidence before replacement")
+        if previous_win_section is not None or bounds is None:
+            # Reuse Fleet's policy before publishing caller-supplied measurements.
+            # A heading alone previously let incomplete evidence restart red CI.
+            validated = subprocess.run(["node", "--input-type=module", "-e", """
+import { readFileSync } from 'node:fs';
+import { requiredWinErrors, winSectionErrors } from './scripts/lib/wins-ledger.mjs';
+const body = readFileSync(0, 'utf8');
+const errors = [...requiredWinErrors({title: 'ci: repair evidence', body}), ...winSectionErrors(body)];
+if (errors.length) { console.error(errors.join('\\n')); process.exitCode = 1; }
+"""], cwd=HERE.parent.parent, input=win_section, text=True, capture_output=True, timeout=10)
+            if validated.returncode:
+                raise ValueError("measured win failed canonical Win validation: " + validated.stderr.strip())
+        if previous_win_section is not None:
             start, end = bounds
             updated = "\n".join(lines[:start] + win_section.rstrip("\n").split("\n") + [""] + lines[end:])
         elif bounds is None:
