@@ -415,6 +415,7 @@ test.describe('Waitlist Spotify native composition events', () => {
         const events: ComposingKeyObservation[] = [];
 
         const root = page.locator('#storybook-root');
+        const view = page.locator('body');
         const name = `waitlist-composition-${theme}-${option}`;
         let failure: unknown;
         let screenshotFailure: unknown;
@@ -455,7 +456,7 @@ test.describe('Waitlist Spotify native composition events', () => {
               activeOption
             );
           }
-          await attachScreenshot(testInfo, `${name}-editing.png`, root);
+          await attachScreenshot(testInfo, `${name}-editing.png`, view);
           await attachA11yResult(page, testInfo, `${name}-editing-a11y.json`);
 
           await page.keyboard.press('Enter');
@@ -475,7 +476,7 @@ test.describe('Waitlist Spotify native composition events', () => {
           failure = error;
         } finally {
           try {
-            await attachScreenshot(testInfo, `${name}-final.png`, root);
+            await attachScreenshot(testInfo, `${name}-final.png`, view);
           } catch (error) {
             screenshotFailure = error;
           }
