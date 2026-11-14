@@ -5,7 +5,7 @@ import { createHash } from 'node:crypto';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import {
-  censusUnavailableReceipt,
+  censusFailureReceipt,
   discoverCensusWithRetry,
 } from './backlog-census-retry.mjs';
 import { fetchBacklogSweepCandidates } from './backlog-current-linear.mjs';
@@ -474,24 +474,19 @@ export async function assessBacklogSweep(
 ) {
   const started = now(),
     results = [];
+  const censusBudget = { started, timeBudgetMs, now, sleepImpl };
   let all;
   try {
     all = await discoverCensusWithRetry(
       discover,
       client,
       BACKLOG_READ_OPTIONS,
-      {
-        started,
-        timeBudgetMs,
-        now,
-        sleepImpl,
-      }
+      censusBudget
     );
   } catch (error) {
-    // Transient misses retry inside this sweep's own budget
-    // (backlog-census-retry.mjs); a persistent miss still fails, and its row
-    // now names the sanitized cause instead of an anonymous unavailable.
-    return censusUnavailableReceipt(error, now());
+    // An active cooldown defers like the Triage catch-up; any other
+    // persistent miss still fails with its cause named (JOV-12500).
+    return censusFailureReceipt(error, now());
   }
   const issues = all.filter(
     row =>
@@ -954,6 +949,10 @@ export async function runCli() {
   if (triageDeferred)
     console.error(
       `::warning title=Triage catch-up deferred::Linear credential cooldown is active; the next fleet-gate-refresh tick retries at or after ${receipt.triageSweep?.retryAt}.`
+    );
+  if (isSweep && receipt.backlog?.census?.status === 'deferred')
+    console.error(
+      `::warning title=Backlog census deferred::Linear credential cooldown is active; the next fleet-gate-refresh tick retries the census at or after ${receipt.backlog?.census?.retryAt}.`
     );
   if (triageSucceeded && sweepCacheFile) {
     const cache = readSweepCache(sweepCacheFile);

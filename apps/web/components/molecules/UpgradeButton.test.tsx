@@ -1,3 +1,4 @@
+import { Button } from '@jovie/ui';
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { expectNoA11yViolations } from '@/tests/utils/a11y';
@@ -243,5 +244,43 @@ describe('UpgradeButton', () => {
     expect(mocks.mutation.current.reset).toHaveBeenCalledTimes(1);
     fireEvent.click(screen.getByRole('button'));
     expect(mocks.mutation.current.mutate).toHaveBeenCalledTimes(2);
+  });
+  it('composes a named button, preserves its click signal, and locks only during checkout', () => {
+    mocks.directUpgrade.current = true;
+    const onClick = vi.fn();
+    const control = (
+      <UpgradeButton asChild>
+        <Button type='button' disabled={false} onClick={onClick}>
+          Artist Presence
+        </Button>
+      </UpgradeButton>
+    );
+    const { rerender } = render(control);
+    const button = screen.getByRole('button', { name: 'Artist Presence' });
+    fireEvent.click(button);
+    fireEvent.click(button);
+    expect(onClick).toHaveBeenCalledTimes(1);
+    expect(mocks.mutation.current.mutate).toHaveBeenCalledTimes(1);
+    expect(button).toBeDisabled();
+    expect(button).toHaveAttribute('aria-busy', 'true');
+    act(() =>
+      mocks.mutation.current.mutate.mock.calls[0][1].onError(
+        new Error('Offline')
+      )
+    );
+    expect(button).toBeEnabled();
+    expect(button).not.toHaveAttribute('aria-busy');
+    mocks.pricing.current.data.options = [];
+    rerender(control);
+    // Force a props render after replacing the query result.
+    rerender(
+      <UpgradeButton asChild>
+        <Button type='button'>Artist Presence</Button>
+      </UpgradeButton>
+    );
+    expect(button).toBeDisabled();
+    expect(screen.getByRole('status')).toHaveTextContent(
+      'Checkout is unavailable'
+    );
   });
 });
