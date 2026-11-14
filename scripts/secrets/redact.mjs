@@ -54,10 +54,11 @@ const SAFE_EMAIL =
   /(?:^(?:no-?reply|notifications|support|git)@)|@(?:[a-z0-9-]+\.)*(?:noreply\.github\.com|github\.com|anthropic\.com|example\.(?:com|org|net)|[a-z0-9-]+\.(?:test|invalid|example|localhost))$/i;
 const EMAIL = /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b/g;
 // Email-shaped tokens that are really file names or package refs: retina
-// assets (icon@2x.png) and code-file "domains" (foo@next.js). None of these
-// extensions is a TLD a person's address would use.
+// assets (icon@2x.png) and code-file "domains" (foo@next.js). Matched by the
+// final extension only, so a real address like a@2x.co is still redacted; none
+// of these extensions is a TLD a person's address would use.
 const FILE_LIKE =
-  /@\d+(?:\.\d+)?x\.|\.(?:png|jpe?g|gif|svg|webp|avif|ico|bmp|js|mjs|cjs|jsx|ts|mts|cts|tsx|json|css|scss|map|lock|ya?ml|toml|wasm)$/i;
+  /\.(?:png|jpe?g|gif|svg|webp|avif|ico|bmp|js|mjs|cjs|jsx|ts|mts|cts|tsx|json|css|scss|map|lock|ya?ml|toml|wasm)$/i;
 // Grouped NANP numbers (555-123-4567, (555) 123-4567, +1 555 123 4567) and
 // bare E.164 (+15551234567). Dates, SHAs and IDs have other shapes.
 const PHONE =
