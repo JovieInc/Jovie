@@ -396,3 +396,152 @@ test.describe('Link and danger-tooltip text contrast', () => {
     });
   }
 });
+
+test.describe('Waitlist Spotify native composition events', () => {
+  for (const theme of ['light', 'dark'] as const) {
+    for (const option of ['artist', 'manual'] as const) {
+      test(`composition preserves editing before ordinary ${option} activation [${theme}]`, async ({
+        page,
+      }, testInfo) => {
+        const pageErrors: string[] = [];
+        const resourceErrors: string[] = [];
+        const events: Array<{
+          key: string;
+          isComposing: boolean;
+          defaultPrevented: boolean;
+        }> = [];
+        page.on('pageerror', error => pageErrors.push(error.message));
+        page.on('console', message => {
+          if (message.type() === 'error') pageErrors.push(message.text());
+        });
+        page.on('requestfailed', request =>
+          resourceErrors.push(
+            `${request.url()}: ${request.failure()?.errorText}`
+          )
+        );
+        page.on('response', response => {
+          if (response.status() >= 400)
+            resourceErrors.push(`${response.status()} ${response.url()}`);
+        });
+
+        const root = page.locator('#storybook-root');
+        const name = `waitlist-composition-${theme}-${option}`;
+        let failure: unknown;
+        let screenshotFailure: unknown;
+        try {
+          await setStoryTheme(page, theme);
+          await openStory(
+            page,
+            'features-waitlist-waitlistspotifysearch--results'
+          );
+          await expect(page.locator('html')).toHaveClass(new RegExp(theme));
+          const search = root.getByRole('combobox', {
+            name: 'Search Spotify artists',
+          });
+          await expect(search).toHaveValue('Neon');
+          await expect(
+            root.getByRole('button', { name: /Neon Harbour/ })
+          ).toBeVisible();
+          await search.focus();
+          await page.keyboard.press('ArrowDown');
+          if (option === 'manual') {
+            await page.keyboard.press('ArrowDown');
+            await page.keyboard.press('ArrowDown');
+          }
+          const activeOption =
+            option === 'artist' ? 'spotify-result-0' : 'spotify-result-2';
+          await expect(search).toHaveAttribute(
+            'aria-activedescendant',
+            activeOption
+          );
+
+          // These are native DOM event flags, not an OS input-method replay.
+          for (const key of [
+            'Enter',
+            'ArrowDown',
+            'ArrowUp',
+            'Escape',
+            'Tab',
+          ]) {
+            const event = await search.evaluate((element, composingKey) => {
+              const keydown = new KeyboardEvent('keydown', {
+                key: composingKey,
+                isComposing: true,
+                bubbles: true,
+                cancelable: true,
+              });
+              element.dispatchEvent(keydown);
+              return {
+                key: composingKey,
+                isComposing: keydown.isComposing,
+                defaultPrevented: keydown.defaultPrevented,
+              };
+            }, key);
+            events.push(event);
+            expect(event.isComposing).toBe(true);
+            expect(event.defaultPrevented).toBe(false);
+            await expect(search).toBeVisible();
+            await expect(search).toBeFocused();
+            await expect(search).toHaveValue('Neon');
+            await expect(search).toHaveAttribute('aria-expanded', 'true');
+            await expect(search).toHaveAttribute(
+              'aria-activedescendant',
+              activeOption
+            );
+          }
+          await attachScreenshot(testInfo, `${name}-editing.png`, root);
+          await attachA11yResult(page, testInfo, `${name}-editing-a11y.json`);
+
+          await page.keyboard.press('Enter');
+          if (option === 'artist') {
+            await expect(
+              root.getByRole('button', { name: 'Change', exact: true })
+            ).toBeVisible();
+            await expect(
+              root.getByText('Neon Harbor', { exact: true })
+            ).toBeVisible();
+          } else {
+            await expect(root.getByLabel('Spotify link')).toBeVisible();
+          }
+          await expect(search).toHaveCount(0);
+          await assertNoHorizontalOverflow(page, name);
+        } catch (error) {
+          failure = error;
+        } finally {
+          try {
+            await attachScreenshot(testInfo, `${name}-final.png`, root);
+          } catch (error) {
+            screenshotFailure = error;
+          }
+          const evidence = JSON.stringify(
+            {
+              theme,
+              option,
+              events,
+              pageErrors,
+              resourceErrors,
+              failure: failure === undefined ? null : String(failure),
+              screenshotFailure:
+                screenshotFailure === undefined
+                  ? null
+                  : String(screenshotFailure),
+            },
+            null,
+            2
+          );
+          await testInfo.attach(`${name}.json`, {
+            body: evidence,
+            contentType: 'application/json',
+          });
+          await mkdir(EVIDENCE_DIR, { recursive: true });
+          await writeFile(join(EVIDENCE_DIR, `${name}.json`), evidence);
+        }
+        if (failure !== undefined) throw failure;
+        if (screenshotFailure !== undefined) throw screenshotFailure;
+        await attachA11yResult(page, testInfo, `${name}-a11y.json`);
+        expect(pageErrors).toEqual([]);
+        expect(resourceErrors).toEqual([]);
+      });
+    }
+  }
+});
