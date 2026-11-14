@@ -70,7 +70,7 @@ function readBlob(repo, base, file) {
   const row = execFileSync(
     'git',
     [...args, 'ls-tree', '-z', base, '--', file],
-    { cwd: repo, encoding: 'utf8' }
+    { maxBuffer: 256 * 1024 * 1024, cwd: repo, encoding: 'utf8' }
   );
   const match = row.match(/^(\d+) blob ([a-f0-9]+)\t([^\0]+)\0$/u);
   if (!match || match[3] !== file || !['100644', '100755'].includes(match[1])) {
@@ -79,6 +79,7 @@ function readBlob(repo, base, file) {
     );
   }
   return execFileSync('git', [...args, 'cat-file', 'blob', match[2]], {
+    maxBuffer: 256 * 1024 * 1024,
     cwd: repo,
   });
 }
@@ -116,7 +117,7 @@ export function snapshotTrustedTestPlanner({ repo, base, out }) {
           '--',
           'LESSONS.guards.json',
         ],
-        { cwd: repo }
+        { maxBuffer: 256 * 1024 * 1024, cwd: repo }
       );
       if (!optionalInput.length)
         throw new Error(
