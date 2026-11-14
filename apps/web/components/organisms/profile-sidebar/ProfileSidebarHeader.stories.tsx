@@ -1,17 +1,16 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
-import { expect, spyOn, userEvent, waitFor, within } from 'storybook/test';
-import { toast } from '@/components/feedback';
+import { expect, fn, userEvent, waitFor, within } from 'storybook/test';
 import { useProfileHeaderParts } from './ProfileSidebarHeader';
 
 // The Storybook navigation mock pins pathname '/test', which isProfileRoute
 // treats as a profile route — and FeedbackProvider mounts no Toaster on
 // profile routes — so the failure toast can never render in this lane.
-// Following the ShareableLinkRow convention (the surface reports the failure
-// to its owner), these stories assert the error report — the toast.error
-// call — instead of the toast DOM. (sb.mock's factory form is unsupported
-// here: storybook's mock transform only understands { spy: true }; spying
-// the toast object's method directly needs no module machinery.)
-const toastErrorSpy = spyOn(toast, 'error');
+// The stories also run in a different module realm from the harness, so a
+// module-scope spy on the shared `toast` object can never observe the
+// component's call. Following the ShareableLinkRow convention (the surface
+// reports the failure to its owner), the stories pass an fn() reporter —
+// channel-forwarded, so the assertion can see it — and assert the exact
+// report message through it.
 
 /**
  * Download QR Code fetches the QR image; these stories answer that request
@@ -48,11 +47,10 @@ async function openMenu({
  * runs on the settled state: a held-open modal menu aria-hides the page
  * behind it, which axe reports as aria-hidden-focus.
  */
-async function downloadQrAndExpectErrorReport({
-  canvasElement,
-}: {
-  readonly canvasElement: HTMLElement;
-}) {
+async function downloadQrAndExpectErrorReport(
+  canvasElement: HTMLElement,
+  onQrDownloadError: unknown
+) {
   await openMenu({ canvasElement });
   await userEvent.click(
     within(document.body).getByRole('menuitem', {
@@ -60,7 +58,7 @@ async function downloadQrAndExpectErrorReport({
     })
   );
   await waitFor(() =>
-    expect(toastErrorSpy).toHaveBeenCalledWith('Unable to download QR code')
+    expect(onQrDownloadError).toHaveBeenCalledWith('Unable to download QR code')
   );
 }
 
@@ -68,15 +66,18 @@ function ProfileSidebarHeaderDemo({
   username,
   displayName,
   profilePath,
+  onQrDownloadError,
 }: {
   readonly username: string;
   readonly displayName: string;
   readonly profilePath: string;
+  readonly onQrDownloadError?: (message: string) => void;
 }) {
   const { title, actions } = useProfileHeaderParts({
     username,
     displayName,
     profilePath,
+    onQrDownloadError,
   });
   return (
     <div className='flex items-center justify-between gap-2 rounded-lg border border-subtle bg-surface-0 px-3 py-2'>
@@ -128,22 +129,26 @@ export const EmptyIdentity: Story = {
 
 /** The QR image read fails: the menu reports it as an error toast. */
 export const ErrorQrDownload: Story = {
-  beforeEach: () => {
-    toastErrorSpy.mockClear();
-    return stubQrFetch(async () => new Response(null, { status: 500 }));
+  args: {
+    onQrDownloadError: fn(),
   },
-  play: downloadQrAndExpectErrorReport,
+  beforeEach: () =>
+    stubQrFetch(async () => new Response(null, { status: 500 })),
+  play: ({ canvasElement, args }) =>
+    downloadQrAndExpectErrorReport(canvasElement, args.onQrDownloadError),
 };
 
 /** Offline: the QR image read never completes. */
 export const OfflineQrDownload: Story = {
-  beforeEach: () => {
-    toastErrorSpy.mockClear();
-    return stubQrFetch(async () => {
-      throw new TypeError('Failed to fetch');
-    });
+  args: {
+    onQrDownloadError: fn(),
   },
-  play: downloadQrAndExpectErrorReport,
+  beforeEach: () =>
+    stubQrFetch(async () => {
+      throw new TypeError('Failed to fetch');
+    }),
+  play: ({ canvasElement, args }) =>
+    downloadQrAndExpectErrorReport(canvasElement, args.onQrDownloadError),
 };
 
 export const LongContentName: Story = {

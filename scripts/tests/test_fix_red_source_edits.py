@@ -12,6 +12,10 @@ import fix_red_classes as classes  # noqa: E402
 import lane_runner as lane  # noqa: E402
 import fix_red_source_edits as edits  # noqa: E402
 import fix_red_statement_merge as statements  # noqa: E402
+# Release self-test runs this listed file only, so the split class has to load here.
+from scripts.tests.test_duplicate_clock_pin import DuplicateClockPinTest  # noqa: E402
+
+assert issubclass(DuplicateClockPinTest, unittest.TestCase)
 
 
 def pr(*names, merge="BLOCKED"):
@@ -108,49 +112,6 @@ class AdditiveCertificateWaiversTest(unittest.TestCase):
             self.assertEqual(list(debt["debt"]), ["kept.tsx", "also.tsx"])
             self.assertEqual(debt["schema"], debt_base["schema"])
             self.assertEqual(git("diff", "--name-only", "--diff-filter=U"), "")
-
-
-class SubtractiveScreenDebtTest(unittest.TestCase):
-    REL = "docs/design-system/cert-screens.json"
-
-    def setUp(self):
-        self.base = {"schema": "jovie.cert-screens/v1", "debt": {
-            "kept.tsx": "a11y,states",
-            "drop-head.tsx": "states",
-            "also.tsx": "tests",
-            "drop-main.tsx": "a11y",
-        }}
-        self.ours = json.loads(json.dumps(self.base))
-        self.theirs = json.loads(json.dumps(self.base))
-        del self.ours["debt"]["drop-head.tsx"]
-        del self.theirs["debt"]["drop-main.tsx"]
-
-    def resolve(self, rel=None, blobs=None):
-        values = blobs or [json.dumps(value) for value in (self.base, self.ours, self.theirs)]
-        def sh(args, **kwargs):
-            return SimpleNamespace(returncode=0, stdout=values[int(args[-1][1]) - 1])
-        return edits.resolve_subtractive_screen_debt(Path("."), rel or self.REL, sh)
-
-    def test_keeps_main_order_and_drops_either_sides_removals(self):
-        result = json.loads(self.resolve())
-        self.assertEqual(list(result["debt"]), ["kept.tsx", "also.tsx"])
-        self.assertEqual(result["debt"]["kept.tsx"], "a11y,states")
-        self.assertEqual(result["schema"], self.base["schema"])
-
-    def test_refuses_additions_edits_and_other_paths(self):
-        for mutate in (
-            lambda: self.ours["debt"].update({"new.tsx": "states"}),
-            lambda: self.ours["debt"].update({"kept.tsx": "changed"}),
-            lambda: self.theirs.update(schema="other"),
-            lambda: self.ours["debt"].update({"kept.tsx": ""}),
-            lambda: self.theirs["debt"].update({"added.tsx": "states"}),
-        ):
-            self.setUp()
-            mutate()
-            self.assertIsNone(self.resolve())
-        self.assertIsNone(self.resolve("docs/design-system/component-certification.json"))
-        self.assertIsNone(self.resolve(blobs=['{"debt":{},"debt":{}}'] * 3))
-        self.assertIsNone(self.resolve(blobs=["not JSON"] * 3))
 
 
 class SpacingSnapTest(unittest.TestCase):

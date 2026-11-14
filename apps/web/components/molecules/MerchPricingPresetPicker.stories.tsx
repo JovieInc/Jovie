@@ -44,3 +44,55 @@ export const SafeSelected: Story = {
     value: 'safe',
   },
 };
+
+// No priced option yet (the product has no cost data): the group stays
+// labelled and takes no space for options it cannot offer.
+export const EmptyNoOptions: Story = {
+  args: {
+    options: [],
+  },
+};
+
+const longOptions: MerchPricingPresetOption[] = [
+  {
+    preset: 'safe',
+    label: 'Safe margin for a first small-batch run',
+    salePrice: '$24',
+    profit: '$6',
+  },
+  {
+    preset: 'standard',
+    label: 'Standard margin most independent artists choose',
+    salePrice: '$28',
+    profit: '$10',
+  },
+  {
+    preset: 'aggressive',
+    label: 'Aggressive margin for limited collector editions',
+    salePrice: '$32',
+    profit: '$14',
+  },
+];
+
+export const LongLabels: Story = {
+  args: {
+    options: longOptions,
+  },
+  decorators: [
+    Story => (
+      <div className='w-72'>
+        <Story />
+      </div>
+    ),
+  ],
+};
+
+export const Rtl: Story = {
+  decorators: [
+    Story => (
+      <div dir='rtl' lang='ar'>
+        <Story />
+      </div>
+    ),
+  ],
+};
