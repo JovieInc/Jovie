@@ -59,7 +59,7 @@ function StoryShell({
   if (seed) client.setQueryData(['ops', 'what-shipped', null], seed);
   return (
     <QueryClientProvider client={client}>
-      <div className='w-[34rem] bg-base p-4 text-primary-token'>{children}</div>
+      <div className='w-full max-w-lg bg-base p-4 text-primary-token'>{children}</div>
     </QueryClientProvider>
   );
 }

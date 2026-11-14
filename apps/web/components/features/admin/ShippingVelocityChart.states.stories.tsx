@@ -41,7 +41,7 @@ const meta = {
   parameters: { layout: 'centered' },
   decorators: [
     Story => (
-      <div className='w-[min(52rem,calc(100vw-2rem))] rounded-xl border border-subtle bg-surface-1'>
+      <div className='w-full max-w-3xl rounded-xl border border-subtle bg-surface-1'>
         <Story />
       </div>
     ),
