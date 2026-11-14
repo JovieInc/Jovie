@@ -29,6 +29,21 @@ function classes(element: Element | null): string[] {
   return (element?.getAttribute('class') ?? '').split(/\s+/).filter(Boolean);
 }
 
+const COUNT_SLOTS = [
+  'inset-panel-meta',
+  'inset-panel-header-trailing',
+  'inset-panel-trailing',
+] as const;
+
+function CountSlots({ value }: { value: React.ReactNode }) {
+  return (
+    <>
+      <InsetPanelHeader title='Queue' meta={value} trailing={value} />
+      <InsetPanelRow trailing={value}>Pending changes</InsetPanelRow>
+    </>
+  );
+}
+
 describe('InsetPanel', () => {
   it('renders an evenly inset surface and forwards its ref', () => {
     const ref = React.createRef<HTMLElement>();
@@ -191,6 +206,33 @@ describe('InsetPanel', () => {
       expect.arrayContaining(['text-tertiary-token', 'tabular-nums'])
     );
     expect(screen.getByRole('button', { name: 'Dismiss' })).toBeVisible();
+  });
+
+  it.each(COUNT_SLOTS)('shows numeric zero in %s', slot => {
+    const { container } = render(<CountSlots value={0} />);
+    expect(container.querySelector(`[data-slot="${slot}"]`)).toHaveTextContent(
+      '0'
+    );
+  });
+
+  it('keeps counts visible as values become zero and omits empty slots', () => {
+    const { container, rerender } = render(<CountSlots value={7} />);
+    const assertSlots = (text: string | null) => {
+      for (const slot of COUNT_SLOTS) {
+        const element = container.querySelector(`[data-slot="${slot}"]`);
+        if (text === null) expect(element).toBeNull();
+        else expect(element).toHaveTextContent(text);
+      }
+    };
+    assertSlots('7');
+    for (const value of [null, undefined, false, '']) {
+      rerender(<CountSlots value={value} />);
+      assertSlots(null);
+    }
+    rerender(<CountSlots value={0} />);
+    assertSlots('0');
+    rerender(<CountSlots value={7} />);
+    assertSlots('7');
   });
 
   it('renders a muted section label, a separator and a named progress bar', () => {

@@ -141,6 +141,33 @@ export const EmptyNoRows: Story = {
   ),
 };
 
+/** Zero is visible count content; optional empty values reserve no slot. */
+export const CountSlots: Story = {
+  render: args => (
+    <div className='flex flex-col gap-2'>
+      {[
+        { label: 'Zero', value: 0 },
+        { label: 'Nonzero', value: 7 },
+        { label: 'Null', value: null },
+        { label: 'Undefined', value: undefined },
+        { label: 'False', value: false },
+        { label: 'Empty', value: '' },
+      ].map(({ label, value }) => (
+        <InsetPanel {...args} asChild key={label}>
+          <section aria-label={`${label} count`}>
+            <InsetPanelHeader
+              title={`${label} count`}
+              meta={value}
+              trailing={value}
+            />
+            <InsetPanelRow trailing={value}>Pending changes</InsetPanelRow>
+          </section>
+        </InsetPanel>
+      ))}
+    </div>
+  ),
+};
+
 /** Rows without an icon or trailing content keep the shared label edge. */
 export const PartialRows: Story = {
   render: args => (
