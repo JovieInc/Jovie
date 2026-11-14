@@ -30,6 +30,24 @@
       "frontend-rules",
       "forced-caps"
     ],
+    "apps/web/components/features/profile/AboutSection.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/profile/AlertsSettingsView.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
     "apps/web/components/features/profile/ClaimBanner.tsx": [
       "ds-owner",
       "tokens",
@@ -37,6 +55,15 @@
       "tests",
       "a11y",
       "frontend-rules"
+    ],
+    "apps/web/components/features/profile/ProfileAboutShare.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
     ],
     "apps/web/components/features/profile/ProfileAeoProofClaimCard.tsx": [
       "ds-owner",
@@ -54,6 +81,24 @@
       "a11y",
       "frontend-rules"
     ],
+    "apps/web/components/features/profile/ProfilePaymentsCard.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/profile/ProfileUnifiedDrawer.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
     "apps/web/components/features/profile/SubscriptionConfirmedBanner.tsx": [
       "ds-owner",
       "tokens",
@@ -61,6 +106,42 @@
       "tests",
       "a11y",
       "frontend-rules"
+    ],
+    "apps/web/components/features/profile/UtmBuilderDialog.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/profile/nav/BottomTabBar.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/profile/views/MenuView.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/profile/views/ProfileIntentPage.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
     ],
     "apps/web/components/molecules/ContentSectionHeader.tsx": [
       "ds-owner",
@@ -430,6 +511,11 @@
       "empty": "The chart takes no props and always renders the fixed public comparison registry (PUBLIC_PRICING_COMPARISON), which is never empty; PricingComparisonChart.test.tsx asserts it has rows. The detector matched the .map calls over that registry.",
       "permission-denied": "The comparison is public marketing copy with no gated action or permission input; the detector matched the word plan in the plan picker and price claims."
     },
+    "apps/web/components/features/profile/AboutSection.tsx": {
+      "loading": "No loading state: the detector matched the image attribute loading={index < 2 ? 'eager' : 'lazy'} on the press photo grid.",
+      "error": "No error UI exists: when a press photo download fails, the catch block falls back to globalThis.open(photo.blobUrl, '_blank', 'noopener,noreferrer'), which AboutSection.certificate.test.tsx covers.",
+      "offline": "No offline UI exists: the only request is the press photo fetch(, and an offline failure takes the same catch fallback that opens the original photo in a new tab."
+    },
     "apps/web/components/features/profile/AliasCollisionRecovery.tsx": {
       "error": "Recovery returns null in every state; a failed, non-OK or malformed alias decision only leaves the visitor on the mode page, which has no pixels of its own to show. AliasCollisionRecovery.certificate.test.tsx asserts no navigation or history change and an axe-clean page for each failure."
     },
@@ -442,11 +528,23 @@
     "apps/web/components/features/profile/DesktopQrOverlayClient.tsx": {
       "loading": "The wrapper renders null on the server and on first paint by design (JOV-2273, no CSR bailout), then shows the icon once matchMedia resolves in an effect, so there is no loading chrome to capture; DesktopQrOverlayClient.test.tsx asserts the empty server render."
     },
+    "apps/web/components/features/profile/ProfileAboutShare.tsx": {
+      "empty": "The share button renders no collection; the detector matched the items-center class in its className.",
+      "error": "No error UI exists: share and clipboard failures end in the catch marked '// Silent failure — matches the hero share control.', which ProfileAboutShare.test.tsx covers."
+    },
     "apps/web/components/features/profile/ProfileAeoProofClaimCard.tsx": {
       "empty": "The proof claim card renders no collection: one heading, one note and one CTA, all required props; the detector matched the items-start class."
     },
+    "apps/web/components/features/profile/ProfilePrimaryCTA.tsx": {
+      "long-content": "Labels are fixed copy ('Listen now', 'Find tickets', 'Shop merch', 'Open in Spotify'); no caller text reaches the buttons.",
+      "offline": "The CTA makes no request; the detector matched loading in the comment about shipping the animated skeleton from `loading.tsx`."
+    },
     "apps/web/components/features/profile/ProfilePrimaryTabPanel.tsx": {
       "offline": "The panel fetches nothing itself: releases, tour dates and the catalog result arrive as props from the server-rendered profile, and a failed catalog read arrives as catalogLoadFailed (ErrorCatalogLoadFailed, whose Try Again reloads the page). The detector matched the word skeleton in the visitorAssignmentResolved doc comment, which LoadingAlertsAssignment shows."
+    },
+    "apps/web/components/features/profile/ProfileUnifiedDrawer.tsx": {
+      "offline": "The drawer makes no request; the detector matched the comment '// Intentionally do NOT mutate `view` when capability flips false.'",
+      "permission-denied": "The drawer has no permission branch; the detector matched the comment that rows must not claim `role=\"menuitem\"` (axe aria-required-parent)."
     },
     "apps/web/components/features/profile/ProfileViewTracker.tsx": {
       "error": "The tracker returns null; a refused beacon falls back to the tracking mutation and nothing is shown to the visitor, so there is no error state to render. ProfileViewTracker.certificate.test.tsx asserts the fallback and an axe-clean page.",
@@ -476,6 +574,9 @@
       "long-content": "The skeleton renders no caller text: its title and body are fixed non-breaking spaces and the consent line is invisible, so there is no content that can run long.",
       "offline": "The skeleton never fetches; it stands in while the visitor's assignment resolves, and the live form that replaces it reports connectivity."
     },
+    "apps/web/components/features/profile/nav/BottomTabBar.tsx": {
+      "empty": "The tab set cannot be empty: const visibleTabs = getPermittedPublicProfileNavigation(); returns the fixed public profile destinations."
+    },
     "apps/web/components/features/profile/templates/ProfileCompactSurface.tsx": {
       "offline": "The surface makes no request: 'loading' is the lazy overlay import option and 'pending' a comment. The alert sign-up it hosts owns its submit; LoadingVisitorAssignment shows the held skeleton, and ProfileCompactTemplate's OfflineAlertForm story and test cover the offline assignment fallback.",
       "permission-denied": "A public profile with no gated action or permission input; the detector matched 'locked' and 'upgrade' in code comments. hideJovieBranding only drops the footer mark (ProfileCompactSurface.test.tsx)."
@@ -483,6 +584,13 @@
     "apps/web/components/features/profile/templates/PublicProfileLayoutShell.tsx": {
       "empty": "The shell holds no collection: compactSurface is required, and PartialCompactOnly shows it alone with no desktop surface or claim footer. The detector matched the items-center and items-stretch layout classes.",
       "offline": "The shell never fetches; the compact and desktop surfaces it hosts own their requests (ProfileCompactTemplate's OfflineAlertForm covers the offline fallback). The detector matched the desktop Loading profile placeholder, shown in LoadingEmbeddedPreview."
+    },
+    "apps/web/components/features/profile/views/MenuView.tsx": {
+      "long-content": "Entry labels are fixed registry titles ('Share Profile', 'Pay', 'Contact') plus the constant 'Release credits'; no caller text reaches the menu.",
+      "permission-denied": "The menu has no permission branch; the detector matched the ARIA attributes role='menu' and role='menuitem'."
+    },
+    "apps/web/components/features/profile/views/ProfileIntentPage.tsx": {
+      "permission-denied": "The page has no permission branch; the detector matched the word plan in the doc comment '(plan spec for SEO internal linking on mobile'."
     },
     "apps/web/components/features/release/ActionDial.tsx": {
       "error": "ActionDial never fetches or mutates; its only catch blocks guard localStorage for the first-use hint, and blocked storage still shows the hint, which ActionDial.test.tsx covers ('survives blocked storage').",

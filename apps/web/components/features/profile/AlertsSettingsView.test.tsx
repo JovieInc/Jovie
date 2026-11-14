@@ -78,4 +78,23 @@ describe('AlertsSettingsView', () => {
       );
     }
   });
+
+  it('draws the turn-off control as a non-submitting button on the media token', () => {
+    const onUnsubscribe = vi.fn();
+    render(
+      <AlertsSettingsView
+        {...viewProps}
+        isSubscribed
+        onTogglePref={vi.fn()}
+        onUnsubscribe={onUnsubscribe}
+      />
+    );
+
+    const turnOff = screen.getByRole('button', { name: 'Turn off alerts' });
+    expect(turnOff).toHaveAttribute('type', 'button');
+    expect(turnOff).toHaveClass('text-on-media/72');
+    expect(turnOff.className).not.toContain('text-white');
+    turnOff.click();
+    expect(onUnsubscribe).toHaveBeenCalledTimes(1);
+  });
 });
