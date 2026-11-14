@@ -44,12 +44,17 @@ export const MissingSource: Story = {
 export const LoadingBelowFold: Story = {
   decorators: [
     Story => (
-      <div style={{ height: 320, width: 480, overflowY: 'auto' }}>
+      <section
+        aria-label='Desktop cover loading frame'
+        // biome-ignore lint/a11y/noNoninteractiveTabindex: keyboard entry point for the scrollable region (axe scrollable-region-focusable)
+        tabIndex={0}
+        style={{ height: 320, width: 480, overflowY: 'auto' }}
+      >
         <div style={{ height: 1600 }} />
         <div style={{ position: 'relative', height: 320, width: 480 }}>
           <Story />
         </div>
-      </div>
+      </section>
     ),
   ],
 };
