@@ -37,6 +37,9 @@ export function buildSurvivorTaskIssue(task, { runUrl = null } = {}) {
  * The filing loop. Stops at the first `linear_rate_limited` result: filing
  * more survivors cannot succeed, and every retry starves the Fleet Gate /
  * Triage consumers of the same shared credential for longer (JOV-12500).
+ * `filed` counts confirmed successful upserts. `unfiled` counts unsuccessful
+ * or dry-run task files plus the raw unattempted filename tail after quota;
+ * neither the task directory nor these counters prove missing Linear issues.
  * @param {{ tasksDir: string, runUrl?: string | null, upsert?: typeof upsertLinearIssueByTitleFingerprint, enabled?: boolean }} options
  * @returns {Promise<{ filed: number, unfiled: number }>}
  */
@@ -66,6 +69,7 @@ export async function fileSurvivorIssues(options) {
         key: 'mutation-survivors',
         fingerprint: issue.fingerprint,
       });
+      unfiled += 1;
       continue;
     }
     const res = await upsert({
@@ -80,16 +84,18 @@ export async function fileSurvivorIssues(options) {
       `Linear survivors issue (${task.file}): ${res.action ?? 'failed'} ${res.url ?? res.reason ?? ''}`
     );
     if (res.reason === 'linear_rate_limited') {
-      unfiled = names.length - index - 1;
+      const remainingFiles = names.length - index;
+      unfiled += remainingFiles;
       console.log(
-        `Linear shared credential is rate-limited; stopping filing so the Fleet/Triage consumers keep their budget (${unfiled} task file(s) left unfiled, resets at ${res.resetAt ?? 'an unknown time'}).`
+        `Linear shared credential is rate-limited; stopping filing so the Fleet/Triage consumers keep their budget (${remainingFiles} task filename(s), including the current rate-limited file and unattempted tail; resets at ${res.resetAt ?? 'an unknown time'}).`
       );
       break;
     }
-    filed += 1;
+    if (res.ok === true) filed += 1;
+    else unfiled += 1;
   }
   console.log(
-    `${filed} survivor issue(s) filed from ${names.length} task file(s).`
+    `${filed} survivor issue upsert(s) confirmed from ${names.length} task JSON filename(s); ${unfiled} task filename(s) not completed this pass (not a missing Linear issue count).`
   );
   return { filed, unfiled };
 }

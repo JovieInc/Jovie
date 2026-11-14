@@ -302,11 +302,6 @@ jobs:
           node scripts/test-quality-loop.mjs report --state "$state_dir/sweep-state.json" \
             --out "$RUNNER_TEMP/test-quality-latest.json" || true
           node scripts/test-quality-loop.mjs ratchet --state "$state_dir/sweep-state.json" || true
-          mkdir -p "$RUNNER_TEMP/sweep-out"
-          cp "$RUNNER_TEMP/test-quality-latest.json" "$RUNNER_TEMP/sweep-out/" 2>/dev/null || true
-          cp "$state_dir/sweep-state.json" "$state_dir/sweep-state.json.runs.jsonl" "$RUNNER_TEMP/sweep-out/" 2>/dev/null || true
-          cp -r "$state_dir/survivor-tasks" "$RUNNER_TEMP/sweep-out/" 2>/dev/null || true
-          cp "$RUNNER_TEMP/baseline-proposal.json" "$RUNNER_TEMP/sweep-out/" 2>/dev/null || true
           [ "$ui_status" -eq 0 ] || { echo "::error::packages/ui mutation sweep exited $ui_status"; exit "$ui_status"; }
 
       # The only step that sees a secret. It reads the task JSON the sweep wrote
@@ -337,13 +332,33 @@ jobs:
           path: .cache/jovie-mutation
           key: mutation-sweep-portable-v2-${{ github.run_id }}-${{ github.run_attempt }}
 
+      # Snapshot even a failed score/filing attempt. The cache remains the
+      # state owner; copying evidence must not rewrite or clear its history.
+      - name: Snapshot sweep state and survivor tasks
+        id: snapshot
+        if: ${{ always() && steps.capacity.outputs.run == 'true' && steps.portable_state.outcome == 'success' && hashFiles('.cache/jovie-mutation/sweep-state.json') != '' }}
+        run: |
+          set -euo pipefail
+          state_dir=".cache/jovie-mutation"
+          out_dir="$RUNNER_TEMP/sweep-out"
+          mkdir -p "$out_dir"
+          cp "$state_dir/sweep-state.json" "$out_dir/"
+          for file in "$state_dir/sweep-state.json.runs.jsonl" \
+            "$RUNNER_TEMP/test-quality-latest.json" "$RUNNER_TEMP/baseline-proposal.json"; do
+            if [ -f "$file" ]; then cp "$file" "$out_dir/"; fi
+          done
+          if [ -d "$state_dir/survivor-tasks" ]; then
+            cp -R "$state_dir/survivor-tasks" "$out_dir/"
+          fi
+
       - name: Upload sweep state and survivor tasks
-        if: ${{ always() && hashFiles('**/sweep-out/*') != '' }}
+        if: ${{ always() && steps.snapshot.outcome == 'success' }}
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: mutation-sweep-${{ github.run_id }}
           path: ${{ runner.temp }}/sweep-out/
           retention-days: 30
+          if-no-files-found: error
 
       # The persistent workspace keeps node_modules for the next run; the
       # Stryker sandbox, reports and per-module coverage must not accumulate.

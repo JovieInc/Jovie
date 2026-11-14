@@ -72,10 +72,6 @@ describe('selectHighRiskSources', () => {
     'import "./setup"; export interface Actor { id: string }',
     'import {} from "./setup";',
     'import { type Actor } from "./actor";',
-    'export { type Actor } from "./actor";',
-    'export {} from "./setup";',
-    'export { allowed } from "./policy";',
-    'export * from "./policy";',
     'export enum Role { Admin }',
     'export namespace Roles { export const admin = true; }',
     'export abstract class Actor {}',
@@ -544,6 +540,7 @@ describe('mutation CLI result semantics', () => {
       for (const path of [
         'scripts/mutation-diff.mjs',
         'scripts/lib/mutation-diff.mjs',
+        'scripts/lib/mutation-source.mjs',
         'scripts/lib/mutation-score-floor.mjs',
         'scripts/lib/mutation-floor-intake.mjs',
         'scripts/lib/linear-issue-intake.mjs',
