@@ -1,4 +1,3 @@
-// @vitest-environment node
 import { spawnSync } from 'node:child_process';
 import {
   cpSync,
@@ -12,7 +11,7 @@ import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
 import { expect, it, vi } from 'vitest';
 
-it('boots the relocated standalone tree without borrowing react peers from the build checkout', async () => {
+it('boots the relocated standalone tree without borrowing React peers from the build checkout', async () => {
   const root = mkdtempSync(resolve(tmpdir(), 'visual-standalone-'));
   const app = resolve(root, 'build/apps/web');
   const write = (name: string, content: string) => {

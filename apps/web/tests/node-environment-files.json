@@ -756,7 +756,6 @@
   "tests/unit/ci/storybook-a11y-runner.test.ts",
   "tests/unit/ci/summer-eve-pin-workflow.test.ts",
   "tests/unit/ci/supply-chain-provenance.test.ts",
-  "tests/unit/ci/sync-standalone-assets.test.ts",
   "tests/unit/ci/synthetic-monitoring-workflow.test.ts",
   "tests/unit/ci/test-coverage-audit-workflow.test.ts",
   "tests/unit/ci/test-truth-guard.test.ts",
