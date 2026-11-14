@@ -56,8 +56,19 @@ jobs:
           set -euo pipefail
           # A guard that cannot read usage must fail red, not pass green: it ran
           # blind from 2026-10-31 to the 2026-11-08 budget pause without one alert.
-          test -n "$VERCEL_TOKEN" || { echo "::error::VERCEL_READONLY_TOKEN is unavailable; spend guard cannot read usage, so no 50/75/90 percent alert can fire before Vercel pauses the team."; exit 1; }
-          node scripts/spend-guard.mjs > spend-report.json
+          fail_spend() {
+            local message="$1"
+            jq -n --arg message "$message" '{schema:"jovie.spend-guard/v1",readStatus:"unavailable",spentUsd:null,alert:true,message:$message}' > spend-report.json
+            echo "read_status=unavailable" >> "$GITHUB_OUTPUT"
+            echo "alert=true" >> "$GITHUB_OUTPUT"
+            echo "message=$message" >> "$GITHUB_OUTPUT"
+            echo "::error::$message"
+            exit 1
+          }
+          test -n "$VERCEL_TOKEN" || fail_spend "VERCEL_READONLY_TOKEN is unavailable; spend protection is blind. Usage and forecast are unknown."
+          node scripts/spend-guard.mjs > spend-report.json || fail_spend "Vercel usage read or evaluation failed; spend protection is blind. Usage and forecast are unknown."
+          jq -e '(.alert | type == "boolean") and (.message | type == "string" and length > 0)' spend-report.json >/dev/null || fail_spend "Vercel spend report is malformed; spend protection is blind. Usage and forecast are unknown."
+          echo "read_status=success" >> "$GITHUB_OUTPUT"
           echo "alert=$(jq -r .alert spend-report.json)" >> "$GITHUB_OUTPUT"
           echo "message=$(jq -r .message spend-report.json)" >> "$GITHUB_OUTPUT"
           jq -r .message spend-report.json
@@ -80,18 +91,24 @@ jobs:
           key: spend-guard-log-state-${{ github.run_id }}
 
       - name: Notify Slack on a spend alert
-        if: ${{ steps.spend.outputs.alert == 'true' }}
+        id: notify
+        if: ${{ !cancelled() && steps.spend.outputs.alert == 'true' }}
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
           MESSAGE: ${{ steps.spend.outputs.message }}
         run: |
           set -euo pipefail
-          test -n "$SLACK_WEBHOOK_URL" || { echo "::warning::Slack webhook unavailable"; exit 0; }
-          curl --silent --show-error --max-time 20 -X POST "$SLACK_WEBHOOK_URL" -H 'Content-Type: application/json' \
-            -d "$(jq -n --arg m "$MESSAGE" '{text: ("Spend guard: " + $m)}')"
+          echo "delivery_status=failed" >> "$GITHUB_OUTPUT"
+          test -n "$SLACK_WEBHOOK_URL" || { echo "::error::Slack webhook unavailable; spend alert was not delivered."; exit 1; }
+          response="$(mktemp)"
+          trap 'rm -f "$response"' EXIT
+          curl --fail --silent --show-error --max-time 20 -X POST "$SLACK_WEBHOOK_URL" -H 'Content-Type: application/json' \
+            -d "$(jq -n --arg m "$MESSAGE" '{text: ("Spend guard: " + $m)}')" --output "$response"
+          test "$(cat "$response")" = ok || { echo "::error::Slack did not accept the spend alert."; exit 1; }
+          echo "delivery_status=accepted" >> "$GITHUB_OUTPUT"
 
       - name: File or resolve spend remediation
-        if: ${{ steps.spend.outputs.alert != '' }}
+        if: ${{ !cancelled() && steps.spend.outputs.alert != '' }}
         env:
           GH_TOKEN: ${{ github.token }}
           LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
@@ -104,6 +121,19 @@ jobs:
           REMEDIATION_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           REMEDIATION_FAIL_OPEN: '1'
         run: node scripts/remediation-signal-intake.mjs
+
+      - name: Summarize protection evidence
+        if: always()
+        env:
+          READ_STATUS: ${{ steps.spend.outputs.read_status || 'not-run' }}
+          DELIVERY_STATUS: ${{ steps.notify.outputs.delivery_status || 'not-requested' }}
+        run: |
+          {
+            echo "## Spend protection evidence"
+            echo "Clock: this run started; independent of protection health."
+            echo "Provider read/evaluation: $READ_STATUS"
+            echo "Slack transport: $DELIVERY_STATUS (acceptance is not founder acknowledgement)"
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: File new or rising runtime error signatures
         if: ${{ steps.logs.outputs.items != '' && steps.logs.outputs.items != '0' }}

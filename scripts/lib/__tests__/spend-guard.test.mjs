@@ -1,4 +1,14 @@
 import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
+import {
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { test } from 'node:test';
 import {
   cluster,
@@ -19,8 +29,10 @@ import {
   planRemediations,
   project,
   projectAnomalies,
+  projectTotals,
   serviceCost,
   thresholdsCrossed,
+  totalCost,
 } from '../spend-guard.mjs';
 
 const usage = {
@@ -51,6 +63,205 @@ test('series ignores the Pro seat and accepts both CLI cost keys', () => {
   );
   assert.equal(serviceCost({ effectiveCost: 3 }), 3);
   assert.equal(serviceCost({ name: 'Pro', cost: 20 }), 0);
+});
+
+test('unavailable and malformed costs never become zero usage', () => {
+  for (const cost of [
+    undefined,
+    null,
+    '',
+    ' ',
+    'unavailable',
+    NaN,
+    Infinity,
+    false,
+  ])
+    assert.throws(
+      () => serviceCost({ name: 'CDN Requests', cost }),
+      /invalid cost/
+    );
+  assert.equal(serviceCost({ cost: '0' }), 0);
+  assert.equal(serviceCost({ cost: '-1.5' }), -1.5);
+  assert.equal(totalCost([]), 0);
+  assert.deepEqual(projectTotals({ groupBy: { data: [] } }), {});
+  assert.throws(() => totalCost(undefined), /unavailable/);
+  assert.throws(() => dailySeries({}), /unavailable/);
+  assert.throws(() => projectTotals({}), /unavailable/);
+  assert.throws(
+    () =>
+      dailySeries({
+        breakdown: {
+          data: [
+            { periodKey: '2026-11-12', services: [{ cost: 'unavailable' }] },
+          ],
+        },
+      }),
+    /invalid cost/
+  );
+});
+
+test('an expired or invalid billing cycle cannot produce a healthy projection', () => {
+  for (const periodEnd of ['2026-11-14', 'invalid'])
+    assert.throws(
+      () =>
+        project({
+          series: [],
+          spentUsd: 80,
+          budgetUsd: 100,
+          periodEnd,
+          now: new Date('2026-11-15T12:00:00Z'),
+        }),
+      /billing period/
+    );
+});
+
+const workflow = readFileSync(
+  new URL('../../../.github/workflows/spend-guard.yml', import.meta.url),
+  'utf8'
+);
+function stepSource(name) {
+  const section = workflow
+    .split(`      - name: ${name}\n`)[1]
+    ?.split('\n      - name:')[0];
+  assert.ok(section, `missing workflow step ${name}`);
+  return section;
+}
+function runStep(name, env = {}) {
+  const dir = mkdtempSync(join(tmpdir(), 'spend-guard-test-'));
+  try {
+    mkdirSync(join(dir, 'bin'));
+    // Execute the real workflow shell. Only its external provider and Slack
+    // transports are fixtures; no production request or real webhook is used.
+    writeFileSync(
+      join(dir, 'bin/node'),
+      '#!/bin/bash\n[ "$FIXTURE_READ" != error ] || exit 42\nprintf "%s" "$FIXTURE_REPORT"\n',
+      { mode: 0o755 }
+    );
+    writeFileSync(
+      join(dir, 'bin/curl'),
+      '#!/bin/bash\nset -eu\nfail=false\nout=""\nwhile [ "$#" -gt 0 ]; do\ncase "$1" in --fail) fail=true;; --output) shift; out="$1";; esac\nshift\ndone\n[ "$fail" = true ] || exit 91\n[ "$FIXTURE_HTTP" != error ] || exit 22\nprintf "%s" "$FIXTURE_BODY" > "$out"\n',
+      { mode: 0o755 }
+    );
+    const script = stepSource(name)
+      .split('        run: |\n')[1]
+      .split('\n')
+      .map(line => line.replace(/^          /, ''))
+      .join('\n');
+    const output = join(dir, 'output');
+    writeFileSync(output, '');
+    const result = spawnSync('bash', ['-c', script], {
+      cwd: dir,
+      encoding: 'utf8',
+      timeout: 5000,
+      env: {
+        ...process.env,
+        PATH: `${join(dir, 'bin')}:${process.env.PATH}`,
+        GITHUB_OUTPUT: output,
+        VERCEL_TOKEN: 'fixture-only',
+        SLACK_WEBHOOK_URL: 'https://invalid.example/fixture',
+        MESSAGE: 'fixture alert',
+        FIXTURE_REPORT: '{"alert":false,"message":"healthy fixture"}',
+        FIXTURE_BODY: 'ok',
+        FIXTURE_HTTP: 'ok',
+        ...env,
+      },
+    });
+    return {
+      ...result,
+      output: readFileSync(output, 'utf8'),
+      report: (() => {
+        try {
+          return JSON.parse(
+            readFileSync(join(dir, 'spend-report.json'), 'utf8')
+          );
+        } catch {
+          return null;
+        }
+      })(),
+    };
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+}
+
+test('missing token, failed provider and malformed report produce a red actionable alert', () => {
+  for (const env of [
+    { VERCEL_TOKEN: '' },
+    { FIXTURE_READ: 'error' },
+    { FIXTURE_REPORT: '{"alert":"false"}' },
+  ]) {
+    const r = runStep('Evaluate spend', env);
+    assert.equal(r.status, 1, r.stderr);
+    assert.match(r.output, /read_status=unavailable/);
+    assert.match(r.output, /alert=true/);
+    assert.equal(r.report.spentUsd, null);
+    assert.equal(r.report.readStatus, 'unavailable');
+    assert.match(r.report.message, /unknown/);
+  }
+  const healthy = runStep('Evaluate spend');
+  assert.equal(healthy.status, 0, healthy.stderr);
+  assert.match(healthy.output, /read_status=success/);
+  assert.match(healthy.output, /alert=false/);
+});
+
+test('Slack requires an available webhook, successful HTTP and the acceptance body', () => {
+  for (const env of [
+    { SLACK_WEBHOOK_URL: '' },
+    { FIXTURE_HTTP: 'error' },
+    { FIXTURE_BODY: 'invalid_payload' },
+  ]) {
+    const r = runStep('Notify Slack on a spend alert', env);
+    assert.notEqual(r.status, 0);
+    assert.match(r.output, /delivery_status=failed/);
+    assert.doesNotMatch(r.output, /delivery_status=accepted/);
+  }
+  const accepted = runStep('Notify Slack on a spend alert');
+  assert.equal(accepted.status, 0, accepted.stderr);
+  assert.match(accepted.output, /delivery_status=accepted/);
+});
+
+test('protection failures still reach existing notification and remediation steps', () => {
+  assert.match(
+    stepSource('Notify Slack on a spend alert'),
+    /if: \$\{\{ !cancelled\(\) && steps.spend.outputs.alert == 'true' \}\}/
+  );
+  assert.match(
+    stepSource('File or resolve spend remediation'),
+    /if: \$\{\{ !cancelled\(\) && steps.spend.outputs.alert != '' \}\}/
+  );
+});
+
+test('a failed current-day project read cannot produce a successful CLI report', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'spend-provider-test-'));
+  try {
+    const provider = join(dir, 'vercel-fixture');
+    writeFileSync(
+      provider,
+      `#!${process.execPath}\nconst args = process.argv.slice(2);\nif (args[0] === 'budgets') console.log(JSON.stringify({budgets:[{scope:'team',amount:100}]}));\nelse if (args.includes('--breakdown')) console.log(JSON.stringify({breakdown:{data:[{periodKey:'2026-11-11',services:[{cost:1}]}]}}));\nelse if (args.includes('--group-by')) {\nif (args.includes('2026-11-12')) process.exit(42);\nconsole.log(JSON.stringify({groupBy:{data:[]}}));\n} else console.log(JSON.stringify({services:[{cost:1}],projects:[],deployments:[]}));\n`,
+      { mode: 0o755 }
+    );
+    const result = spawnSync(
+      process.execPath,
+      [
+        new URL('../../spend-guard.mjs', import.meta.url).pathname,
+        '--now',
+        '2026-11-12T20:00:00Z',
+      ],
+      {
+        encoding: 'utf8',
+        timeout: 5000,
+        env: {
+          ...process.env,
+          VERCEL_BIN: provider,
+          VERCEL_TOKEN: 'fixture-only',
+        },
+      }
+    );
+    assert.notEqual(result.status, 0);
+    assert.equal(result.stdout, '');
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
 });
 test('thresholds alert at 50/75/90', () => {
   assert.deepEqual(thresholdsCrossed(20, 100), []);
