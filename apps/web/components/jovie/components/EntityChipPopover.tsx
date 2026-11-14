@@ -29,7 +29,7 @@ import {
   EntityCard,
 } from '@/components/organisms/entity-card';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
-import type { EntityKind } from '@/lib/chat/tokens';
+import { ENTITY_KIND_LABEL, type EntityKind } from '@/lib/chat/tokens';
 import type { EntityRef } from '@/lib/commands/entities';
 import type { EnrichedFact } from '@/lib/profile-facts/enrichment';
 import { cn } from '@/lib/utils';
@@ -41,13 +41,6 @@ const HOVER_OPEN_DELAY_MS = 200;
 const HOVER_CLOSE_DELAY_MS = 120;
 let activeInspection: { owner: object; close: () => void } | null = null;
 let lastInspectionAt = 0;
-
-const KIND_PREFIX: Record<EntityKind, string> = {
-  release: 'Release',
-  artist: 'Artist',
-  track: 'Track',
-  event: 'Event',
-};
 
 interface EntityChipPopoverProps {
   readonly kind: EntityKind;
@@ -94,7 +87,7 @@ export function EntityChipPopover({
     : (entity?.label ?? 'Unavailable reference');
   const srOnlyName = sourceFact
     ? `Inspect source: ${sourceFact.subject.displayName ?? 'Reference'} — `
-    : `${KIND_PREFIX[kind]}: ${label} — `;
+    : `${ENTITY_KIND_LABEL[kind]}: ${label} — `;
   const mobile = useMediaQuery('(max-width: 639px)');
   const [open, setOpen] = useState(false);
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -405,10 +398,12 @@ function toMentionInput(
 ): ChatEntityMentionInput {
   const meta = entity?.meta;
   const base: ChatEntityMentionInput = {
-    kind,
+    // The creator's own profile reads as them, the artist.
+    kind: kind === 'profile' ? 'artist' : kind,
     id,
     label: entity?.label ?? label,
     thumbnail: entity?.thumbnail ?? null,
+    isYou: kind === 'profile' || undefined,
   };
 
   if (!meta) return base;
@@ -469,7 +464,7 @@ function EntityChipPopoverBody({
         }
       : canOpen
         ? {
-            label: `Open ${KIND_PREFIX[kind]}`,
+            label: `Open ${ENTITY_KIND_LABEL[kind]}`,
             onClick: onOpenEntity,
           }
         : null;

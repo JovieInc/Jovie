@@ -1,0 +1,261 @@
+/* One day of the changelog feed: a sticky date rail beside the reading
+   column, the day's posts, and its small fixes as one quiet list.
+
+   Token discipline: existing semantic tokens only, no raw colour values.
+   Sticky pin: the fixed marketing header owns --public-shell-header-offset,
+   so the date rail pins at header offset + 24px. */
+
+.changelog-day {
+  display: grid;
+  gap: var(--space-4);
+  padding-block: var(--space-10);
+  border-top: 1px solid var(--color-border-subtle);
+}
+
+@media (min-width: 1024px) {
+  .changelog-day {
+    /* Date rail, then the 720px reading column centred in the container:
+       the rail and the right gutter share what is left. */
+    grid-template-columns: minmax(10.5rem, 1fr) minmax(0, 45rem) minmax(0, 1fr);
+    column-gap: var(--space-12);
+    padding-block: var(--space-16);
+  }
+}
+
+.changelog-day__rail {
+  min-width: 0;
+}
+
+@media (min-width: 1024px) {
+  .changelog-day__rail {
+    position: sticky;
+    top: calc(var(--public-shell-header-offset) + var(--space-6));
+    align-self: start;
+  }
+}
+
+.changelog-day__date {
+  display: inline-flex;
+  align-items: center;
+  font-size: var(--text-app); /* 13px */
+  line-height: var(--leading-normal);
+  color: var(--color-text-tertiary-token);
+  border-radius: var(--radius-xs);
+  transition: color var(--duration-subtle) var(--ease-subtle);
+}
+
+.changelog-day__date:hover {
+  color: var(--color-text-primary-token);
+}
+
+.changelog-day__body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-12);
+  min-width: 0;
+}
+
+/* ---------------------------------------------------------- */
+/* Post                                                        */
+/* ---------------------------------------------------------- */
+
+.changelog-post {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  min-width: 0;
+  /* Anchor jumps clear the fixed marketing header. */
+  scroll-margin-top: calc(var(--public-shell-header-offset) + var(--space-6));
+}
+
+.changelog-post:focus {
+  outline: none;
+}
+
+.changelog-post__meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.changelog-post__heading {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+}
+
+.changelog-post__title {
+  min-width: 0;
+  color: var(--color-text-primary-token);
+}
+
+.changelog-post__title a {
+  border-radius: var(--radius-xs);
+}
+
+/* Copy-link control: revealed on hover or keyboard focus. */
+.changelog-post__copy {
+  flex: none;
+  /* Centre the 28px control on the headline's first line. */
+  margin-top: var(--space-1);
+}
+
+@media (max-width: 1023px) {
+  /* Narrow screens give the headline the full measure; it is the permalink. */
+  .changelog-post__copy {
+    display: none;
+  }
+}
+
+@media (hover: hover) {
+  .changelog-post__copy {
+    opacity: 0;
+    transition: opacity var(--duration-subtle) var(--ease-subtle);
+  }
+
+  .changelog-post:hover .changelog-post__copy,
+  .changelog-polish__item:hover .changelog-post__copy,
+  .changelog-post__copy:focus-within {
+    opacity: 1;
+  }
+}
+
+.changelog-post__lead {
+  font-size: var(--text-lg); /* 18px */
+  line-height: var(--leading-relaxed);
+  color: var(--color-text-secondary-token);
+  text-wrap: pretty;
+}
+
+.changelog-post__list {
+  display: grid;
+  gap: var(--space-2);
+  margin: 0;
+  padding-left: var(--space-5);
+  list-style: disc;
+  font-size: var(--text-base);
+  line-height: var(--leading-relaxed);
+  color: var(--color-text-secondary-token);
+}
+
+.changelog-post__list li::marker {
+  color: var(--color-text-quaternary-token);
+}
+
+.changelog-post__note {
+  font-size: var(--text-sm);
+  line-height: var(--leading-normal);
+  color: var(--color-text-tertiary-token);
+}
+
+.changelog-post__action {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: fit-content;
+  min-height: var(--space-11); /* 44px hit target */
+  font-size: var(--text-sm);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text-primary-token);
+  border-radius: var(--radius-xs);
+  transition: color var(--duration-subtle) var(--ease-subtle);
+}
+
+.changelog-post__action:hover {
+  color: var(--color-text-secondary-token);
+}
+
+/* ---------------------------------------------------------- */
+/* Fixes and polish: the day's small items as one quiet list   */
+/* ---------------------------------------------------------- */
+
+.changelog-polish {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.changelog-polish__title {
+  font-size: var(--text-sm);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text-primary-token);
+}
+
+.changelog-polish__list {
+  display: grid;
+  gap: var(--space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.changelog-polish__item {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  padding-left: var(--space-5);
+  font-size: var(--text-base);
+  line-height: var(--leading-relaxed);
+  color: var(--color-text-secondary-token);
+  scroll-margin-top: calc(var(--public-shell-header-offset) + var(--space-6));
+}
+
+.changelog-polish__item:focus {
+  outline: none;
+}
+
+.changelog-polish__item::before {
+  content: "";
+  position: absolute;
+  left: var(--space-1);
+  top: 0.7em;
+  width: var(--space-1);
+  height: var(--space-1);
+  border-radius: var(--radius-pill);
+  background-color: var(--color-text-quaternary-token);
+}
+
+.changelog-polish__text {
+  display: grid;
+  gap: var(--space-0-5);
+  min-width: 0;
+}
+
+.changelog-polish__detail {
+  text-wrap: pretty;
+}
+
+/* Its own line, balanced: a headline never strands one word. */
+.changelog-polish__headline {
+  width: fit-content;
+  text-wrap: balance;
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text-primary-token);
+  border-radius: var(--radius-xs);
+}
+
+/* A deep link lands on its post: mark it without moving anything. */
+.changelog-post:target .changelog-post__title,
+.changelog-polish__item:target .changelog-polish__headline {
+  text-decoration: underline;
+  text-decoration-color: var(--color-border-strong);
+  text-underline-offset: 0.2em;
+}
+
+.changelog-load-earlier {
+  border-top: 1px solid var(--color-border-subtle);
+  padding-top: var(--space-6);
+}
+
+.changelog-archive {
+  margin-top: var(--space-6);
+}
+
+@media (max-width: 1023px) {
+  .changelog-day {
+    padding-block: var(--space-8);
+  }
+}

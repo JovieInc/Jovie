@@ -27,6 +27,7 @@ import {
   listComponentsInRoot,
   REPO_ROOT,
 } from './component-ship-policy.mjs';
+import { storyComponentInputs } from './lib/component-render-inputs.mjs';
 import {
   assembleEvidence,
   mergeEvidence,
@@ -166,18 +167,7 @@ if (values.list) {
   process.exit(0);
 }
 
-const components = new Map(
-  [...selected].map(([path, storyIds]) => [
-    path,
-    {
-      storyIds,
-      // Bind to the exact bytes the certificate will hash.
-      sourceHash: createHash('sha256')
-        .update(readFileSync(join(root, path)))
-        .digest('hex'),
-    },
-  ])
-);
+const components = storyComponentInputs(root, selected, process.env);
 const jobs = [];
 for (const { storyIds } of components.values())
   for (const storyId of storyIds)
@@ -185,8 +175,7 @@ for (const { storyIds } of components.values())
 log(
   `capturing ${jobs.length} story × theme renders for ${components.size} components`
 );
-// No jobs writes nothing, so the certificate keeps its prior evidence. An
-// unfiltered index that maps no @jovie/ui story is broken, so that goes red.
+// No jobs writes nothing; an entirely unmapped index is broken.
 if (!jobs.length) process.exit(selection.components.size ? 0 : 1);
 
 const webRequire = createRequire(join(root, 'apps/web/package.json'));

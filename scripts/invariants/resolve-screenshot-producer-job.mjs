@@ -1,5 +1,6 @@
 import { spawnSync } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
+import { EX_TEMPFAIL } from '../../packages/api-client/client.ts';
 import { runGh } from '../../packages/api-client/gh.ts';
 import { PRODUCER, PRODUCER_LAG_DELAYS_MS } from './screen-proof-resolver.mjs';
 
@@ -15,6 +16,29 @@ export const PRODUCER_JOB_RESOLVE_DELAYS_MS = Object.freeze([
   ...PRODUCER_LAG_DELAYS_MS,
 ]);
 
+/**
+ * The producer step's retry budget for JOV-10153 quota deferrals (the shared
+ * installation REST budget is spent and gh shed the read). Bounded well under
+ * the 10-minute step timeout; a deferral that outlasts it still exits 75 —
+ * honestly deferred, never a green verdict.
+ */
+export function producerJobHoldBudgetMs() {
+  return positiveIntegerEnv('PRODUCER_JOB_HOLD_BUDGET_MS') ?? 8 * 60_000;
+}
+export const PRODUCER_JOB_QUOTA_RETRY_INTERVAL_MS = 30_000;
+
+function positiveIntegerEnv(name) {
+  const value = Number(process.env[name]);
+  return Number.isSafeInteger(value) && value > 0 ? value : null;
+}
+
+export class ProducerJobDeferredError extends Error {
+  constructor() {
+    super('github quota deferred the producer job read (exit 75)');
+    this.name = 'ProducerJobDeferredError';
+  }
+}
+
 const positiveJobId = value =>
   typeof value === 'number' && Number.isSafeInteger(value) && value > 0;
 
@@ -22,6 +46,7 @@ const positiveJobId = value =>
  * Accept only the exact Generate Screenshots job. `unknown-job` and a missing
  * row stay pending so the caller can retry. Ambiguous or invalid ids reject.
  * @param {{ jobs?: Array<{ name?: string, id?: number, conclusion?: string | null }> } | null | undefined} payload
+ * @returns {{ status: 'resolved', id: string } | { status: 'rejected', reason: string } | { status: 'pending', reason: string }}
  */
 export function selectProducerJobId(payload) {
   const jobs = Array.isArray(payload?.jobs) ? payload.jobs : [];
@@ -70,6 +95,13 @@ async function readJobsPayload() {
     ],
     { priority: 'deploy' }
   );
+  if (result.code === EX_TEMPFAIL) {
+    // JOV-10153: the shared installation budget is spent and gh shed the
+    // read without a verdict. Retryable within the step's hold budget —
+    // one deferral must not hard-fail the producer step and wedge the
+    // deploy gate until the next push.
+    throw new ProducerJobDeferredError();
+  }
   if (result.code !== 0) {
     console.error('::error::Could not resolve the current producer job ID.');
     process.exit(result.code);
@@ -84,20 +116,80 @@ function sleepMs(ms) {
   }
 }
 
+/**
+ * The direct-run loop: lag-budget resolution with deferral retries inside
+ * the hold budget. Returns the resolved id, or throws the honest outcome —
+ * ProducerJobDeferredError when the budget is still shed at the deadline,
+ * Error for a real failure. Never turns a deferral into a green verdict.
+ * @param {{
+ *   fetchJobs: () => Promise<{ jobs?: Array<{ name?: string, id?: number, conclusion?: string | null }> }>,
+ *   holdBudgetMs?: number,
+ *   intervalMs?: number,
+ *   now?: () => number,
+ *   sleep?: (ms: number) => Promise<void>,
+ *   lagSleep?: (ms: number) => Promise<void>,
+ * }} options
+ * @returns {Promise<{ status: 'resolved', id: string }>}
+ */
+export async function resolveProducerJobIdWithHold({
+  fetchJobs,
+  holdBudgetMs = producerJobHoldBudgetMs(),
+  intervalMs = PRODUCER_JOB_QUOTA_RETRY_INTERVAL_MS,
+  now = Date.now,
+  sleep = async ms => new Promise(resolve => setTimeout(resolve, ms)),
+  lagSleep,
+}) {
+  const holdDeadline = now() + holdBudgetMs;
+  for (;;) {
+    try {
+      const result = await resolveProducerJobId({
+        fetchJobs,
+        sleep: lagSleep ?? sleep,
+      });
+      if (result.status === 'resolved') return result;
+      const { reason, status } = result;
+      if (reason === 'unknown-job') {
+        throw new Error(
+          'Could not resolve the current producer job ID (unknown-job).'
+        );
+      }
+      if (status === 'rejected') {
+        throw new Error(
+          `Could not resolve the current producer job ID (${reason}).`
+        );
+      }
+      // pending: exhausted the lag budget without the job name appearing.
+      throw new Error('Could not resolve the current producer job ID.');
+    } catch (error) {
+      if (!(error instanceof ProducerJobDeferredError)) throw error;
+      if (now() + intervalMs >= holdDeadline) throw error;
+      await sleep(intervalMs);
+    }
+  }
+}
+
 const isDirectRun =
   process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href;
 
 if (isDirectRun) {
-  const result = await resolveProducerJobId({
-    fetchJobs: async () => readJobsPayload(),
-    sleep: async ms => sleepMs(ms),
-  });
-  if (result.status !== 'resolved') {
-    const detail = result.reason === 'unknown-job' ? ' (unknown-job)' : '';
+  try {
+    const result = await resolveProducerJobIdWithHold({
+      fetchJobs: async () => readJobsPayload(),
+      sleep: async ms => sleepMs(ms),
+    });
+    process.stdout.write(`${result.id}\n`);
+  } catch (error) {
+    if (error instanceof ProducerJobDeferredError) {
+      // Honest deferral: exit 75 keeps the quota-deferred semantics for the
+      // workflow; the gate re-runs when the shared budget recovers.
+      console.error(
+        '::error::Could not resolve the current producer job ID (github quota still deferred within the hold budget).'
+      );
+      process.exit(EX_TEMPFAIL);
+    }
     console.error(
-      `::error::Could not resolve the current producer job ID${detail}.`
+      `::error::${error instanceof Error ? error.message : 'Could not resolve the current producer job ID.'}`
     );
     process.exit(1);
   }
-  process.stdout.write(`${result.id}\n`);
 }

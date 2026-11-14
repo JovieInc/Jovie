@@ -152,6 +152,55 @@ describe('Button pill state choreography', () => {
     );
   });
 
+  it('keeps link actions named and activatable without retry announcements', () => {
+    const action = vi.fn();
+    render(
+      <Button
+        variant='link'
+        pendingPresentation='morph'
+        actionState='error'
+        onClick={action}
+      >
+        Read details
+      </Button>
+    );
+
+    const button = screen.getByRole('button', { name: 'Read details' });
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+    fireEvent.click(button);
+    expect(action).toHaveBeenCalledOnce();
+  });
+
+  it.each([
+    'icon',
+    'icon-xs',
+    'icon-sm',
+    'icon-md',
+    'icon-lg',
+    'icon-xl',
+  ] as const)(
+    'keeps %s actions quiet and activatable when morph is requested',
+    size => {
+      const action = vi.fn();
+      render(
+        <Button
+          size={size}
+          pendingPresentation='morph'
+          actionState='error'
+          aria-label='Open filters'
+          onClick={action}
+        >
+          <span aria-hidden='true'>F</span>
+        </Button>
+      );
+
+      const button = screen.getByRole('button', { name: 'Open filters' });
+      expect(screen.queryByRole('status')).not.toBeInTheDocument();
+      fireEvent.click(button);
+      expect(action).toHaveBeenCalledOnce();
+    }
+  );
+
   it('retains destructive foreground contrast on a pending primary action', () => {
     render(
       <Button pendingPresentation='morph' destructive loading>

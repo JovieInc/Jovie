@@ -1,5 +1,8 @@
-// The opt-in featured slot (Tim, 2026-11-08): demo artists until real artists
-// opt in to be featured, then the top opted-in artists with certified content.
+// The opt-in featured slot: the top opted-in artist with certified content,
+// the demo artist when none is. Tim (2026-11-12): Tim, with his own catalog,
+// for now, rotating to other artists by what converts later.
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
   DEMO_ARTIST_IVO_LINDQVIST,
@@ -8,6 +11,7 @@ import {
 } from '@/data/demoArtists';
 import {
   FEATURED_ARTIST_OPT_INS,
+  FEATURED_ARTIST_TIM_WHITE,
   type FeaturedArtistOptIn,
   featuredArtistCertificationFailures,
   featuredArtistImages,
@@ -59,12 +63,22 @@ function optIn(
 }
 
 describe('featured artist slot', () => {
-  it('shows the demo artist while no real artist is certified', () => {
-    expect(FEATURED_ARTIST_OPT_INS.every(isCertified)).toBe(true);
-    if (FEATURED_ARTIST_OPT_INS.length === 0) {
-      expect(HOMEPAGE_FEATURED_ARTIST).toBe(DEMO_ARTIST_IVO_LINDQVIST);
-      expect(isDemoArtist(HOMEPAGE_FEATURED_ARTIST)).toBe(true);
+  it('certifies every opt-in and features Tim with his own catalog for now', () => {
+    for (const record of FEATURED_ARTIST_OPT_INS) {
+      expect(
+        featuredArtistCertificationFailures(record),
+        record.artist.slug
+      ).toEqual([]);
     }
+    expect(HOMEPAGE_FEATURED_ARTIST).toBe(FEATURED_ARTIST_TIM_WHITE.artist);
+    expect(isDemoArtist(HOMEPAGE_FEATURED_ARTIST)).toBe(false);
+    expect(HOMEPAGE_FEATURED_ARTIST.inspected.title).toBe('Supernova Girl');
+  });
+
+  it('falls back to the demo artist when no opt-in is certified', () => {
+    expect(selectFeaturedArtist([], DEMO_ARTIST_IVO_LINDQVIST)).toBe(
+      DEMO_ARTIST_IVO_LINDQVIST
+    );
   });
 
   it('features the best-ranked certified opt-in', () => {
@@ -111,15 +125,20 @@ describe('featured artist slot', () => {
     );
   });
 
-  it('keeps every real person off the homepage', () => {
-    const record = optIn('portrait', 1);
+  it('admits only the artist themselves in the images', () => {
+    const record = optIn('portrait', 1, { artistPersonId: 'portrait' });
     const certification = record.certification;
     if (!certification) throw new Error('fixture is certified');
+    const self = featuredArtistCertificationFailures({
+      ...record,
+      certification: { ...certification, peopleInImages: ['portrait'] },
+    });
+    expect(self).toEqual([]);
     const failures = featuredArtistCertificationFailures({
       ...record,
       certification: { ...certification, peopleInImages: ['someone'] },
     });
-    expect(failures.join(' ')).toMatch(/admits no real person/);
+    expect(failures.join(' ')).toMatch(/someone other than the artist/);
   });
 
   it('refuses certification dated before the opt-in', () => {
@@ -143,8 +162,50 @@ describe('featured artist slot', () => {
       expect(copy).not.toMatch(/example artist/i);
     }
   });
-});
 
-function isCertified(record: FeaturedArtistOptIn): boolean {
-  return featuredArtistCertificationFailures(record).length === 0;
-}
+  it('backs every opt-in with the approved-people registry', () => {
+    // The record's people are declarations; the registry is the evidence.
+    const registry = JSON.parse(
+      readFileSync(
+        resolve(
+          process.cwd(),
+          '../../scripts/invariants/art-direction/approved-people.json'
+        ),
+        'utf8'
+      )
+    ) as {
+      people: { id: string }[];
+      images: {
+        path: string;
+        person: string;
+        routes: string[];
+        homepage?: { at?: string; inTheirWords?: string };
+      }[];
+    };
+    const approved = new Set(registry.people.map(person => person.id));
+    for (const record of FEATURED_ARTIST_OPT_INS) {
+      const declared = record.certification?.peopleInImages ?? [];
+      for (const person of declared) {
+        expect(approved.has(person), `${record.artist.slug}: ${person}`).toBe(
+          true
+        );
+      }
+      const shown = new Set<string>();
+      for (const src of featuredArtistImages(record.artist)) {
+        const image = registry.images.find(
+          entry => entry.path === `apps/web/public${src}`
+        );
+        if (!image) continue;
+        shown.add(image.person);
+        expect(declared, src).toContain(image.person);
+        expect(image.routes, src).toContain('/');
+        expect(image.homepage?.inTheirWords?.trim(), src).toBeTruthy();
+        expect(Date.parse(image.homepage?.at ?? ''), src).not.toBeNaN();
+      }
+      // A declared person with no registered slot image is a stale claim.
+      expect([...shown].sort(), record.artist.slug).toEqual(
+        [...declared].sort()
+      );
+    }
+  });
+});

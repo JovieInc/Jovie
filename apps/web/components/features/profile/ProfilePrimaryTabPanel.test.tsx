@@ -261,4 +261,18 @@ describe('ProfilePrimaryTabPanel', () => {
       screen.queryByTestId('mock-two-step-notifications-cta')
     ).not.toBeInTheDocument();
   });
+
+  it('draws the Music heading and About copy with on-media tokens, not raw white', () => {
+    const { unmount } = renderPanel();
+    expect(screen.getByRole('heading', { name: 'Music' })).toHaveClass(
+      'text-on-media'
+    );
+    unmount();
+
+    const about = renderPanel({ mode: 'about' });
+    expect(about.container.innerHTML).toContain('text-on-media/80');
+    expect(about.container.innerHTML).not.toMatch(
+      /\b(?:bg|text|border)-white\b/
+    );
+  });
 });

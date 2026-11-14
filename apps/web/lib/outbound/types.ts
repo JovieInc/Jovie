@@ -115,13 +115,18 @@ export const OUTBOUND_NEXT_ACTION_LABELS: Record<OutboundNextAction, string> = {
   none: '—',
 };
 
-/** Warn-only flags. They label a row and keep it out of "ready"; they never reject. */
+/**
+ * Flags label a row and keep it out of "ready". All are warn-only except
+ * `existing_relationship`, which is a hard hold: no approval, draft or send.
+ */
 export type OutboundFlag =
+  | 'existing_relationship'
   | 'possible_non_artist'
   | 'unscored'
   | 'presence_only_fit';
 
 export const OUTBOUND_FLAG_LABELS: Record<OutboundFlag, string> = {
+  existing_relationship: 'Existing relationship',
   possible_non_artist: 'Possible non-artist',
   unscored: 'Unscored',
   presence_only_fit: 'Presence-only fit',
@@ -147,6 +152,16 @@ export interface OutboundRow {
   readonly flags: readonly OutboundFlag[];
   /** Why the row is flagged as a possible non-artist, in Tim's words. */
   readonly entityNote: string | null;
+  /**
+   * Why this artist is held out of cold outreach (Tim already works with them
+   * or their team); null when no existing relationship is registered.
+   */
+  readonly relationshipHold: string | null;
+  /**
+   * Relationship tags on an artist who stays eligible ("Relationship: Armada
+   * Music, ..."). Shown on the row and beside the draft and approval.
+   */
+  readonly relationshipNotes: readonly string[];
   /** Required evidence classes not yet on file; empty when complete. */
   readonly missingEvidence: readonly string[];
   /** JOV-6650 owns ability and intent; unknown until it ships. */
@@ -198,5 +213,6 @@ export const OUTBOUND_REFUSAL_MESSAGES = {
     'The dogfood judge has not passed the outreach review cards, so nothing is sendable.',
   no_channel: 'No email or Instagram on file to reach them.',
   invalid: 'The message must be non-empty and keep the claim link.',
+  existing_relationship: 'Existing relationship: flag to Tim, no cold outreach',
 } as const;
 export type OutboundRefusal = keyof typeof OUTBOUND_REFUSAL_MESSAGES;

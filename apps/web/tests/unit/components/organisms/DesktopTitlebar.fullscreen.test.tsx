@@ -66,8 +66,27 @@ beforeEach(() => {
   electronRuntimeMock.isElectronRuntime = true;
   Reflect.deleteProperty(window, 'electronAPI');
   document.documentElement.removeAttribute('data-electron-fullscreen');
+  document.documentElement.removeAttribute('data-electron-fullscreen-managed');
 });
 describe('DesktopTitlebar native fullscreen', () => {
+  it('preserves preload-owned fullscreen through the pre-hydration runtime state', () => {
+    electronRuntimeMock.isElectronRuntime = false;
+    document.documentElement.dataset.electronFullscreenManaged = 'preload';
+    document.documentElement.dataset.electronFullscreen = 'true';
+    const getFullScreenState = vi.fn().mockResolvedValue(false);
+    const onFullScreenChanged = vi.fn();
+    Object.defineProperty(window, 'electronAPI', {
+      configurable: true,
+      value: { getFullScreenState, onFullScreenChanged },
+    });
+
+    renderTitlebar();
+
+    expect(document.documentElement.dataset.electronFullscreen).toBe('true');
+    expect(getFullScreenState).not.toHaveBeenCalled();
+    expect(onFullScreenChanged).not.toHaveBeenCalled();
+  });
+
   it('mirrors native full-screen transitions onto the document root', async () => {
     const fullScreenCallbacks: Array<(isFullScreen: boolean) => void> = [];
     Object.defineProperty(window, 'electronAPI', {

@@ -16,7 +16,10 @@ import {
   resolveTestBypassUserId,
 } from '@/lib/auth/test-mode';
 import { resolveDesktopMarketingRedirect } from '@/lib/desktop/desktop-marketing-guard';
-import { gateProfilePublicationAtEdge } from '@/lib/routing/profile-publication-edge';
+import {
+  gateProfilePublicationAtEdge,
+  getProfileModeQueryRewrite,
+} from '@/lib/routing/profile-publication-edge';
 import { analyzeHost } from '@/lib/routing/proxy-routing';
 import {
   createFastNotFoundResponse,
@@ -217,6 +220,12 @@ export default async function middleware(
   if (req.method !== 'OPTIONS') {
     const profilePublicationResponse = await gateProfilePublicationAtEdge(req);
     if (profilePublicationResponse) return profilePublicationResponse;
+    // JOV-12081: a published profile's ?mode= view renders through the
+    // guarded mode-render marker destination. The next.config afterFiles
+    // rewrite that used to own this never applies to the prerendered
+    // profile route, so the proxy rewrites it here, per request.
+    const profileModeRewrite = getProfileModeQueryRewrite(req);
+    if (profileModeRewrite) return profileModeRewrite;
   }
 
   // ========================================================================

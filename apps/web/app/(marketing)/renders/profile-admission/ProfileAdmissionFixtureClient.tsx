@@ -84,7 +84,9 @@ export function ProfileAdmissionFixtureClient({
             displayName={
               searchParams.get('name') === 'unmarked' ? 'UNMARKED' : undefined
             }
+            fanCapture={searchParams.get('rail') === 'on'}
             longName={searchParams.get('name') === 'long'}
+            longTitles={searchParams.get('titles') === 'long'}
             preview={searchParams.get('layout') === 'preview'}
             state={searchParams.get('state')}
             tourDates={searchParams.get('events') === 'empty' ? [] : undefined}

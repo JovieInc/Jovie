@@ -53,15 +53,14 @@ vi.mock('@/app/app/(shell)/dashboard/PreviewPanelContext', () => ({
 
 vi.mock('@/lib/queries', async importOriginal => {
   const actual = await importOriginal<typeof import('@/lib/queries')>();
+  const { idleBillingQueries } = await import(
+    '@/tests/fixtures/idle-billing-queries'
+  );
 
   return {
     ...actual,
     usePlanGate: mockUsePlanGate,
-    useCheckoutMutation: () => ({
-      mutate: vi.fn(),
-      isPending: false,
-      error: null,
-    }),
+    ...idleBillingQueries,
   };
 });
 

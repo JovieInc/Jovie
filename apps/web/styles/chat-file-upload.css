@@ -177,8 +177,8 @@
 }
 
 :where(.system-b-chat-file-chip-icon) {
-  width: 24px;
-  height: 24px;
+  width: var(--space-6);
+  height: var(--space-6);
   flex-shrink: 0;
   border-radius: var(--radius-md);
   overflow: hidden;

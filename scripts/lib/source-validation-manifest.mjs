@@ -148,6 +148,13 @@ export const SOURCE_VALIDATION_GUARDS = Object.freeze([
     covers: ['pnpm screen-registration-gate'],
   },
   {
+    id: 'component-certificate',
+    name: 'component and screen certificate gate',
+    command: 'pnpm component-certificate:gate',
+    when: /^(?:apps\/web\/(?:app|components)\/|packages\/ui\/|docs\/design-system\/(?:component-certification|cert-screens)\.json$|scripts\/(?:lib\/)?component-(?:certificate|cert-screens))/,
+    covers: ['pnpm component-certificate:gate'],
+  },
+  {
     id: 'layout-guard-pen',
     name: 'layout-guard pen contracts still rendered',
     command: 'node scripts/layout-guard-pen-contracts.mjs',
@@ -225,10 +232,6 @@ export const NOT_LOCAL = Object.freeze([
   },
   { match: 'lint:motion-css', reason: 'covered by the web lint pass in CI' },
   { match: 'component-ship-gate', reason: 'preflight:changed ship-gate check' },
-  {
-    match: 'component-certificate:gate',
-    reason: 'pre-push runs it right after component-ship-gate',
-  },
   {
     match: 'mac-header-two-lines-v1',
     reason: 'preflight:changed merge-group-unit-guards (narrowed)',

@@ -137,7 +137,7 @@ export function LyricsView({
                 strokeWidth={2.25}
               />
             </div>
-            <h2 className='text-lg font-display text-primary-token line-clamp-2'>
+            <h2 className='text-base font-display text-primary-token line-clamp-2'>
               No Lyrics Yet
             </h2>
             <p className='mt-2 text-app leading-[1.55] text-tertiary-token'>

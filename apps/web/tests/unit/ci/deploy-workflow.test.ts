@@ -12,6 +12,7 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { load as parseYaml, dump as stringifyYaml } from 'js-yaml';
 import { afterAll, describe, expect, it } from 'vitest';
+import { storyEvidenceEligibility } from '../../../../../scripts/lib/component-render-inputs.mjs';
 import {
   cronGapMinutes,
   filterList,
@@ -523,16 +524,9 @@ describe('CI Storybook accessibility path gate', () => {
       visualPathJob,
       'Detect visual-relevant changes'
     );
-    expect(visualDetectStep).toContain(
-      '[ "${{ github.event_name }}" == "workflow_dispatch" ] || [ "${{ github.event_name }}" == "push" ]'
-    );
-    expect(visualDetectStep).toContain(
-      'echo "has_visual_changes=true" >> "$GITHUB_OUTPUT"'
-    );
-    const visualPattern = visualDetectStep.match(
-      /VISUAL_PATTERNS='([^']+)'/
-    )?.[1];
-    expect(visualPattern).toBeTruthy();
+    expect(visualDetectStep).toContain("EVENT_NAME === 'workflow_dispatch'");
+    expect(visualDetectStep).toContain('{ visual: true, render: true }');
+    expect(visualDetectStep).toContain('storyEvidenceEligibility(paths)');
     for (const input of [
       'apps/web/.storybook/preview.tsx',
       'apps/web/app/globals.css',
@@ -545,16 +539,11 @@ describe('CI Storybook accessibility path gate', () => {
       'pnpm-lock.yaml',
       '.github/workflows/visual-a11y.yml',
     ]) {
-      expect(
-        spawnSync('grep', ['-q', '-E', visualPattern!], { input }).status,
-        input
-      ).toBe(0);
+      expect(storyEvidenceEligibility([input]).visual, input).toBe(true);
     }
-    expect(
-      spawnSync('grep', ['-q', '-E', visualPattern!], {
-        input: 'apps/web/styles.css',
-      }).status
-    ).toBe(1);
+    expect(storyEvidenceEligibility(['apps/web/styles.css']).visual).toBe(
+      false
+    );
     expect(visualWorkflow).toMatch(/- 'apps\/web\/styles\/\*\*'/);
   });
 });
