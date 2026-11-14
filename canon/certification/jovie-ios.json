@@ -10,46 +10,47 @@
         "id": "entry",
         "kind": "entry",
         "surface": "web",
-        "oracle": "TODO: what a first-time visitor must understand on the first screen"
+        "oracle": "The iOS app's first screen (Splash into Auth) tells a first-time visitor what Jovie does for them and offers one working next step; no error, quota or placeholder surface."
       },
       {
         "id": "signup",
         "kind": "signup",
         "surface": "web",
-        "oracle": "TODO: a canary account is created and signed in as itself"
+        "oracle": "The canary signs in through the app's browser auth (MobileAuthCoordinator opens jov.ie/auth/start with client=ios and PKCE S256) and lands signed in as itself in the app; no waitlist wall, invite error or blank restoring screen."
       },
       {
         "id": "onboarding",
         "kind": "onboarding",
         "surface": "web",
-        "oracle": "TODO: onboarding completes with the canary's own inputs reflected back"
+        "oracle": "Onboarding (Features/NeedsOnboarding) completes with the canary's own inputs reflected back, and the handle/context chosen in onboarding is the one the app keeps."
       },
       {
         "id": "first-value",
         "kind": "first-value",
         "surface": "web",
-        "oracle": "TODO: the canary sees the product's core value with its own data"
+        "oracle": "The canary sees the app's core value with its own data: the dashboard shows their releases and chat replies answer the question asked (no error body or quota wall)."
       },
       {
         "id": "paid-conversion",
         "kind": "paid-conversion",
         "surface": "web",
-        "oracle": "TODO: the paywall shows the live price and a test purchase unlocks the paid plan"
+        "oracle": "The canary's account upgrades to Artist Presence at the live price through Jovie's web billing (Stripe test-mode checkout; the app shares web billing and has no separate in-app purchase), and the paid capabilities are live for that account in the iOS app."
       }
     ],
     "flows": { "web": "canon/certification/flows/jovie-ios.mjs" },
     "accounts": {
       "policy": "canary-only",
-      "source": "TODO: doppler:<project>/<config> keys for canary accounts (never in git)"
+      "source": "prodcert canary identities (apps/web/lib/synthetic/prodcert-identities.ts), the same identities used to sign in on iOS; OTP read for that address only"
     }
   },
   "paidOutcome": {
-    "plan": "TODO",
-    "price": 0,
+    "plan": "Artist Presence",
+    "price": 12,
     "currency": "USD",
     "interval": "month",
-    "priceSource": "TODO: path of the file holding the live price",
-    "freeAlternative": "TODO: what the buyer does instead of paying"
+    "priceSource": "apps/web/lib/config/plan-prices.ts",
+    "pricePattern": "monthlyUsd:\\s*([0-9.]+)",
+    "freeAlternative": "Jovie Free on the same account (profile, smart links, release pages, fan capture) or a free link-in-bio"
   },
   "buyer": {
     "personas": "canon/certification/jovie-ios-personas.json",
@@ -59,8 +60,12 @@
   "privacy": {
     "profile": "standard",
     "registry": "canon/certification/jovie-ios-tracker-registry.json",
-    "crawl": [{ "url": "TODO: https://<prod>/", "input": false }],
-    "policyUrl": "TODO: https://<prod>/privacy",
+    "crawl": [
+      { "url": "https://jov.ie/", "input": false },
+      { "url": "https://jov.ie/auth/start", "input": true },
+      { "url": "https://jov.ie/legal/privacy", "input": false }
+    ],
+    "policyUrl": "https://jov.ie/legal/privacy",
     "counselSignoff": null
   },
   "customerVoice": {
@@ -68,12 +73,12 @@
       {
         "id": "support-email",
         "kind": "email",
-        "route": "TODO: handler that captures inbound support email"
+        "route": "apps/web/app/api/webhooks/resend-inbound (support@jov.ie per SUPPORT_EMAIL in apps/web/constants/domains.ts) -> lib/customer-voice -> Summer"
       }
     ],
     "approval": "tim",
     "sink": "SUMMER_CUSTOMER_VOICE_URL"
   },
-  "waste": { "appId": "TODO: id in the waste registry" },
-  "capacity": { "appId": "TODO: id in the capacity collector" }
+  "waste": { "appId": "jovie" },
+  "capacity": { "appId": "jovie" }
 }
