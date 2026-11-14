@@ -6,7 +6,6 @@ import {
   INSET_PANEL_ICON_COLUMN,
   INSET_PANEL_ROW_INTERACTIVE,
   INSET_PANEL_ROW_LAYOUT,
-  PlainButton,
 } from '@jovie/ui';
 import { ChevronDown, ChevronRight, ExternalLink, Gauge } from 'lucide-react';
 import Link from 'next/link';
@@ -154,7 +153,9 @@ export function UsageMenuItem({
 
   return (
     <div data-testid='usage-menu-item'>
-      <PlainButton
+      <Button
+        type='button'
+        variant='ghost'
         ref={toggleRef}
         onClick={toggleExpanded}
         aria-expanded={expanded}
@@ -162,7 +163,7 @@ export function UsageMenuItem({
         className={cn(
           INSET_PANEL_ROW_LAYOUT,
           INSET_PANEL_ROW_INTERACTIVE,
-          'justify-start font-normal'
+          'w-full justify-start text-left font-normal'
         )}
       >
         <span className={INSET_PANEL_ICON_COLUMN}>
@@ -187,7 +188,7 @@ export function UsageMenuItem({
         ) : (
           <ChevronRight className='h-3.5 w-3.5 shrink-0 text-tertiary-token' />
         )}
-      </PlainButton>
+      </Button>
 
       {expanded ? (
         <div id={detailsId} className='pb-2'>
