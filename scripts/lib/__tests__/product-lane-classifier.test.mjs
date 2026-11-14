@@ -1066,6 +1066,7 @@ describe('product lane classifier', () => {
     );
     const tracked = execFileSync('git', ['ls-files', '-z'], {
       encoding: 'utf8',
+      maxBuffer: 1 << 28,
     })
       .split('\0')
       .filter(Boolean);

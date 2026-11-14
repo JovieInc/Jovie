@@ -143,7 +143,11 @@ function readSerifExceptions(repoRoot) {
 }
 
 function trackedFiles(repoRoot) {
-  return execFileSync('git', ['ls-files'], { cwd: repoRoot, encoding: 'utf8' })
+  return execFileSync('git', ['ls-files'], {
+    cwd: repoRoot,
+    encoding: 'utf8',
+    maxBuffer: 1 << 28,
+  })
     .split('\n')
     .filter(Boolean);
 }

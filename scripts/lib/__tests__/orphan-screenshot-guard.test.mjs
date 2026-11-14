@@ -244,6 +244,7 @@ describe('git-backed scan', () => {
     const trackedPaths = execFileSync('git', ['ls-files'], {
       cwd: root,
       encoding: 'utf8',
+      maxBuffer: 1 << 28,
     })
       .split('\n')
       .filter(Boolean);
