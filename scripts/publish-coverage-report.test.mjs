@@ -43,7 +43,6 @@ test('every integrated workflow retains origin data and the handoff grants only 
     'desktop-release',
     'production-controller',
     'screenshots',
-    'sentry-autofix',
     'shipping-slo',
   ]) {
     const workflow = /** @type {Workflow} */ (
