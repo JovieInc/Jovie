@@ -1,10 +1,35 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { TitleMenuTrigger } from '@jovie/ui';
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { DashboardHeader } from './DashboardHeader';
 
 describe('DashboardHeader', () => {
+  it('keeps the focused title control mounted when a live chat title changes', () => {
+    const { rerender } = render(
+      <DashboardHeader
+        breadcrumbs={[{ label: 'New Chat' }]}
+        breadcrumbSuffix={<TitleMenuTrigger label='New Chat' />}
+      />
+    );
+    const trigger = screen.getByRole('button', { name: 'New Chat' });
+    trigger.focus();
+    const title = 'Plan The Full European Summer Festival Run';
+    rerender(
+      <DashboardHeader
+        breadcrumbs={[{ label: title }]}
+        breadcrumbSuffix={<TitleMenuTrigger label={title} />}
+      />
+    );
+    expect(screen.getByRole('button', { name: title })).toBe(trigger);
+    expect(trigger).toHaveFocus();
+    expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1);
+    expect(screen.getByRole('heading', { level: 1 })).toHaveAccessibleName(
+      title
+    );
+  });
+
   it('hides the web toggle and divider before Electron hydration without hiding route actions', () => {
     // Load the real prepaint rule: this behavior must work before any effect.
     const css = readFileSync(

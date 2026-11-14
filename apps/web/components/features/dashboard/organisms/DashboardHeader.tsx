@@ -62,7 +62,9 @@ function HeaderTitle({
         className={cn(
           'min-w-0 truncate font-semibold text-primary-token',
           'text-base leading-tight tracking-[-0.018em]',
-          'sm:text-xs sm:leading-normal sm:tracking-tight'
+          // Compact desktop titles share the controls' medium weight without
+          // squeezing the letter spacing or changing the mobile type scale.
+          'sm:text-xs sm:font-medium sm:leading-normal sm:tracking-normal'
         )}
       >
         {breadcrumbSuffix ?? currentLabel}

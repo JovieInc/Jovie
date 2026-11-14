@@ -1,4 +1,5 @@
 import { fireEvent, render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import {
@@ -21,7 +22,7 @@ describe('DashboardHeaderActionButton', () => {
     );
   });
 
-  it('renders a labelled action that forwards clicks and pressed state', async () => {
+  it('keeps a labelled action keyboard-operable with its pressed state', async () => {
     const onClick = vi.fn();
     const { container } = render(
       <DashboardHeaderActionButton
@@ -36,8 +37,11 @@ describe('DashboardHeaderActionButton', () => {
     const button = screen.getByRole('button', { name: 'Refresh' });
     expect(button).toHaveAttribute('aria-pressed', 'true');
     expect(button.className).toContain('h-8');
-    fireEvent.click(button);
+    await userEvent.tab();
+    expect(button).toHaveFocus();
+    await userEvent.keyboard('{Enter}');
     expect(onClick).toHaveBeenCalledOnce();
+    expect(button).toHaveFocus();
     await expectNoA11yViolations(container);
   });
 
