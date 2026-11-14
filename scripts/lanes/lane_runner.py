@@ -166,7 +166,7 @@ LANE_TESTS = ["scripts/tests/test_factory_signals.py", "scripts/tests/test_facto
               "scripts/tests/test_worktree_pool.py",
               "scripts/tests/test_design_gate.py",
               "scripts/tests/test_file_overlap.py",
-              "scripts/tests/test_remediation.py", "scripts/tests/test_repair_order.py", "scripts/tests/test_autoscale.py", "scripts/tests/test_pr_wip.py",
+              "scripts/tests/test_remediation.py", "scripts/tests/test_revert_first.py", "scripts/tests/test_repair_order.py", "scripts/tests/test_autoscale.py", "scripts/tests/test_pr_wip.py",
               "scripts/tests/test_capacity_limit.py", "scripts/tests/test_capacity_registry.py", "scripts/tests/test_fleet_gate_emitter.py",
               "scripts/tests/test_claude_lane.py", "scripts/tests/test_issue_routing.py", "scripts/tests/test_pool_feed.py", "scripts/tests/test_release_fixtures.py",
               "scripts/tests/test_epics.py",
