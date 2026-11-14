@@ -10,6 +10,7 @@
  */
 import { createHash } from 'node:crypto';
 import ts from 'typescript';
+import { storyCriterion } from './component-story-receipts.mjs';
 import { forcedCapsCriterion } from './design-rules/forced-caps.mjs';
 import { RAW_COLOR_PATTERNS } from './design-rules/raw-colors.mjs';
 import { moduleKey } from './mutation-sweep.mjs';
@@ -94,8 +95,12 @@ function stringLiterals(sf) {
 }
 
 export function findRawColors(source, fileName) {
+  return rawColorsFromSourceFile(parseSource(source, fileName));
+}
+
+function rawColorsFromSourceFile(sf) {
   const hits = [];
-  for (const text of stringLiterals(parseSource(source, fileName))) {
+  for (const text of stringLiterals(sf)) {
     if (/^(use client|use server)$/.test(text) || /^[./@]/.test(text)) continue;
     for (const [re, kind] of RAW_COLOR_PATTERNS) {
       for (const m of text.matchAll(re)) hits.push({ kind, value: m[0] });
@@ -107,7 +112,10 @@ export function findRawColors(source, fileName) {
 const RAW_ELEMENTS = ['button', 'input', 'select', 'textarea', 'dialog'];
 
 export function findRawElements(source, fileName) {
-  const sf = parseSource(source, fileName);
+  return rawElementsFromSourceFile(parseSource(source, fileName));
+}
+
+function rawElementsFromSourceFile(sf) {
   const hits = [];
   const visit = n => {
     if (
@@ -124,7 +132,10 @@ export function findRawElements(source, fileName) {
 
 /** Deterministic subset of the frontend-skill jank rules (layout shift, focus loss, input lag). */
 export function findJank(source, fileName) {
-  const sf = parseSource(source, fileName);
+  return jankFromSourceFile(parseSource(source, fileName));
+}
+
+function jankFromSourceFile(sf) {
   const findings = [];
   const add = (rule, node, detail) =>
     findings.push({
@@ -301,9 +312,7 @@ export function findJank(source, fileName) {
 }
 
 /** Which states can this component reach? Derived from its source; waivers override. */
-export function applicableStates(source, fileName) {
-  const sf = parseSource(source, fileName);
-  const text = source;
+export function applicableStates(text, _fileName = 'x.tsx') {
   const hasInput = /<(input|textarea|select)\b|<(Input|Textarea|Select)\b/.test(
     text
   );
@@ -327,7 +336,6 @@ export function applicableStates(source, fileName) {
       text
     );
   const optionalProps = (text.match(/\w+\?:/g) ?? []).length;
-  void sf;
   const out = {};
   out.loading = loading;
   out.empty = dataList;
@@ -385,8 +393,8 @@ export function certifyComponent({
   policy = DEFAULT_POLICY,
   packagesUi = false,
 }) {
-  // Receipt metadata cannot choose the bytes this certificate binds to.
   const sourceHash = sha(source);
+  const sourceFile = parseSource(source, path);
   const sourceBound = receipt => receipt?.sourceHash === sourceHash;
   const mutationTests =
     mutationTestSources === undefined
@@ -407,7 +415,7 @@ export function certifyComponent({
   const raw =
     packagesUi && /packages\/ui\/atoms\//.test(path)
       ? []
-      : findRawElements(source, path);
+      : rawElementsFromSourceFile(sourceFile);
   if (raw.length) {
     criteria.push(
       crit('ds-owner', 'fail', {
@@ -422,7 +430,7 @@ export function certifyComponent({
   } else criteria.push(crit('ds-owner', 'pass'));
 
   // tokens
-  const colors = findRawColors(source, path);
+  const colors = rawColorsFromSourceFile(sourceFile);
   if (colors.length) {
     criteria.push(
       crit('tokens', 'fail', {
@@ -438,7 +446,7 @@ export function certifyComponent({
   } else criteria.push(crit('tokens', 'pass'));
 
   // states
-  const applicable = applicableStates(source, path);
+  const applicable = applicableStates(source);
   const covered = statesCovered(storySource);
   const stateRows = {};
   const stateMissing = [];
@@ -503,48 +511,19 @@ export function certifyComponent({
     } else criteria.push(crit('tests', 'pass'));
   }
 
-  // a11y
-  const axeInTest =
-    !!testSource &&
-    /expectNoA11yViolations|\baxe\(|vitest-axe|toHaveNoViolations/.test(
-      testSource
-    );
-  const a11yEv = evidence.a11y;
-  const a11yCurrent = sourceBound(a11yEv);
-  if (a11yCurrent && a11yEv.status === 'pass')
-    criteria.push(crit('a11y', 'pass', { source: 'storybook-a11y' }));
-  else if (a11yCurrent && a11yEv.status === 'fail') {
-    criteria.push(crit('a11y', 'fail', { detail: a11yEv.detail }));
-    miss(
-      'a11y',
-      `axe violations: ${a11yEv.detail ?? 'see report'}`,
-      'Fix violations; keep stories axe-clean'
-    );
-  } else if (axeInTest)
-    criteria.push(crit('a11y', 'pass', { source: 'unit-axe' }));
-  else {
-    criteria.push(
-      crit('a11y', 'unknown', {
-        detail:
-          a11yEv && !a11yCurrent
-            ? 'CI a11y evidence is stale or missing a source hash'
-            : 'no axe assertion in unit test and no CI a11y evidence',
-      })
-    );
-    miss(
-      'a11y',
-      a11yEv && !a11yCurrent
-        ? 'no current source-bound axe evidence'
-        : 'no axe evidence',
-      'Call expectNoA11yViolations(container) from apps/web/tests/utils/a11y.ts in the unit test for each rendered state'
-    );
-  }
+  const a11yCriterion = storyCriterion(
+    'a11y',
+    evidence,
+    sourceHash,
+    testSource
+  );
+  criteria.push(a11yCriterion.criterion);
+  if (a11yCriterion.missing) missing.push(a11yCriterion.missing);
 
   // frontend-rules
-  const jank = findJank(source, path);
-  const needsRetention = hasInputs;
+  const jank = jankFromSourceFile(sourceFile);
   const retentionOk =
-    !needsRetention ||
+    !hasInputs ||
     (!!testSource &&
       /(userEvent|user)\.type\(/.test(testSource) &&
       /toHaveValue|\.value\)/.test(testSource));
@@ -636,31 +615,14 @@ export function certifyComponent({
     );
   }
 
-  // visual
-  const v = evidence.visual;
-  const visualCurrent = sourceBound(v);
-  if (visualCurrent && v.status === 'pass')
-    criteria.push(crit('visual', 'pass', { captured: v.captured }));
-  else if (visualCurrent && v.status === 'fail') {
-    criteria.push(crit('visual', 'fail', { detail: v.detail }));
-    miss('visual', v.detail ?? 'visual diff', 'Review the CI capture diff');
-  } else {
-    criteria.push(
-      crit('visual', 'unknown', {
-        detail:
-          v && !visualCurrent
-            ? 'CI capture is stale or missing a source hash'
-            : 'no CI capture',
-      })
-    );
-    miss(
-      'visual',
-      v && !visualCurrent
-        ? 'no current source-bound CI capture'
-        : 'no CI-captured baseline for the state stories',
-      'Land state stories; the component-certificate workflow captures them in CI (never a Storybook build on gem)'
-    );
-  }
+  const visualCriterion = storyCriterion(
+    'visual',
+    evidence,
+    sourceHash,
+    testSource
+  );
+  criteria.push(visualCriterion.criterion);
+  if (visualCriterion.missing) missing.push(visualCriterion.missing);
 
   // journeys
   const j = evidence.journeys;

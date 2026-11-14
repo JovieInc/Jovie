@@ -31,7 +31,7 @@ import remediation
 from fix_red_mixed_repairs import first_route_reason, mixed_repairs  # noqa: F401
 from fix_red_screen_cert import SCREEN_CERT_TEXT, screen_cert_paths
 from fix_red_failure_routing import (ALIAS_ACTION, ALIAS_REVIEW_FAILURE, ROUTE_BUDGET_GROWTH, alias_owner_metadata,
-                                     error_signature, fingerprint_key, owner_handoff_reason)
+                                     error_signature, fingerprint_key, owner_handoff_reason, LOCAL_MODULE_PREREQUISITE)
 from atomic_state import atomic_write_text
 from fix_red_source_edits import (  # noqa: F401
     balance_added_headings, snap_added_conservative_spacing, strip_added_legacy_cache_exports,
@@ -152,6 +152,7 @@ _JSON_KEY = re.compile(r'^\s*"([^"\n]+)"\s*:')
 SIGNATURES = (
     ("alias-review-deadline", ALIAS_REVIEW_FAILURE, ALIAS_ACTION),
     ("component-test-evidence", COMPONENT_TEST_TEXT, AGENT),
+    ("local-module-prerequisite", LOCAL_MODULE_PREREQUISITE, SYNC_MAIN),
     ("narrowed-preflight", NARROWED_CONFLICT, MERGE_NARROWED),
     # Before platform-infra: a Source Validation log can carry passing-test rate-limit lines beside the guard error that actually failed the job.
     ("domain-write", DOMAIN_WRITE, REGISTER_DOMAIN),
