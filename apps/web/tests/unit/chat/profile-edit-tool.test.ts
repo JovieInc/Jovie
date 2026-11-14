@@ -6,6 +6,7 @@ import {
   FIELD_DESCRIPTIONS,
   type ProfileEditContext,
 } from '@/lib/ai/tools/profile-edit';
+import { buildSystemPrompt } from '@/lib/chat/system-prompt';
 
 interface ProfileEditInputSchema {
   safeParse(input: unknown): { success: boolean };
@@ -178,5 +179,57 @@ describe('EDITABLE_FIELDS', () => {
   it('blocked contains username and genres', () => {
     expect(EDITABLE_FIELDS.blocked).toContain('username');
     expect(EDITABLE_FIELDS.blocked).toContain('genres');
+  });
+});
+
+describe('proposeProfileEdit destination clarity (regression)', () => {
+  function descriptionOf(context: ProfileEditContext): string {
+    const { description } = createProfileEditTool(context);
+    if (typeof description === 'function') {
+      return description({ context: {} as never });
+    }
+    return description ?? '';
+  }
+
+  it('names the Jovie profile as the apply destination in the tool description', () => {
+    expect(descriptionOf(testContext)).toContain("artist's Jovie profile");
+  });
+
+  it('distinguishes drafting for Spotify from updating Jovie', () => {
+    const description = descriptionOf(testContext).toLowerCase();
+    expect(description).toContain('spotify');
+    expect(description).toContain('draft');
+    expect(description).toContain('cannot write to spotify');
+  });
+
+  it('carries the destination instruction into the generated system prompt', () => {
+    const prompt = buildSystemPrompt(
+      {
+        displayName: 'Test Artist',
+        username: 'testartist',
+        bio: 'A cool bio about this artist.',
+        genres: ['ambient'],
+        spotifyFollowers: 100,
+        spotifyPopularity: 10,
+        profileViews: 5,
+        hasSocialLinks: true,
+        hasMusicLinks: true,
+        tippingStats: {
+          tipClicks: 0,
+          tipsSubmitted: 0,
+          totalReceivedCents: 0,
+          monthReceivedCents: 0,
+        },
+      },
+      []
+    );
+    // Generated-prompt contract (not a model-behavior proof): the Profile
+    // Editing section must tell the model that applying updates the Jovie
+    // profile only and that other-platform bio asks are drafted in-reply.
+    expect(prompt).toContain(
+      "Applying a proposed edit updates the artist's Jovie profile only"
+    );
+    expect(prompt).toContain('draft the text in your reply');
+    expect(prompt).toContain('not Spotify');
   });
 });

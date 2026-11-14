@@ -115,6 +115,10 @@ export function ProfileEditPreviewCard({
     onCancel?.();
   }, [onCancel]);
 
+  // Name the destination for bio edits: applying updates the Jovie bio, never
+  // the platform the artist may have been discussing (e.g. Spotify).
+  const applyLabel = preview.field === 'bio' ? 'Apply to Jovie Bio' : 'Apply';
+
   // Show completed state
   if (applied) {
     return (
@@ -229,7 +233,7 @@ export function ProfileEditPreviewCard({
           ) : (
             <>
               <Check className='h-3.5 w-3.5' />
-              Apply
+              {applyLabel}
             </>
           )}
         </DrawerButton>
