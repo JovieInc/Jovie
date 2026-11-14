@@ -147,11 +147,14 @@ jobs:
             node - "$RUNNER_TEMP/component-certificate/delivery.json" "$1" "$2" "$3" <<'NODE'
           const fs = require('node:fs');
           const [file, outcome, reason, httpStatus] = process.argv.slice(2);
+          let deliveryOrder = null;
+          try { deliveryOrder = JSON.parse(fs.readFileSync(`${process.env.RUNNER_TEMP}/component-certificate/delivery-payload.json`, 'utf8')).deliveryOrder ?? null; } catch { /* No valid packet exists for early failures. */ }
           fs.writeFileSync(file, JSON.stringify({
             schema: 'jovie.component-certificate-delivery/v1',
             headSha: process.env.CERT_SHA,
             requested: process.env.POST_REQUESTED === 'true',
             outcome, reason, httpStatus,
+            deliveryOrder,
             // HTTP acceptance is transport evidence, not persisted readback.
             ingestion: 'unverified',
           }, null, 2) + '\n');
@@ -173,20 +176,44 @@ jobs:
             echo "::error::Ovie delivery failed: CRON_SECRET unresolved; see secret resolution."
             exit 1
           fi
-          # The full report stays in the artifact; only the bounded packet is posted.
-          payload="$RUNNER_TEMP/component-certificate/delivery-payload.json"
-          node scripts/lib/component-certificate-delivery.mjs "$report" --out "$payload"
-          # Best-effort supersession boundary, not atomic with Ovie's write.
+          # Best-effort current-main boundary; receiver CAS fences accepted generations.
           # Use the existing Git-protocol resolver to avoid installation REST quota.
-          if ! current_main="$(RESOLVE_MAIN_BUDGET_SECONDS=0 timeout 30s bash .github/scripts/resolve-main-sha.sh "$GITHUB_REPOSITORY")"; then
-            record_delivery failed main-ref-unavailable none
-            echo "::error::Current main unavailable; report retained without delivery."
+          require_current_main() {
+            if ! current_main="$(RESOLVE_MAIN_BUDGET_SECONDS=0 timeout 30s bash .github/scripts/resolve-main-sha.sh "$GITHUB_REPOSITORY")"; then
+              record_delivery failed main-ref-unavailable none
+              echo "::error::Current main unavailable; report retained without delivery."
+              exit 1
+            fi
+            if [ "$current_main" != "$CERT_SHA" ]; then
+              record_delivery skipped superseded-main none
+              exit 0
+            fi
+          }
+          require_current_main
+          # Full history is required for a strictly increasing ancestor count.
+          # The report must name the exact target whose ordinal is attached.
+          payload="$RUNNER_TEMP/component-certificate/delivery-payload.json"
+          if [ "$(git rev-parse --is-shallow-repository)" != false ] || \
+            ! source_ordinal="$(git rev-list --count "$CERT_SHA")" || \
+            ! node scripts/lib/component-certificate-delivery.mjs "$report" --out "$payload" \
+              --source-sha "$CERT_SHA" --source-ordinal "$source_ordinal"; then
+            record_delivery failed invalid-order-metadata none
+            echo "::error::Ordered generation unavailable; report retained without delivery."
             exit 1
           fi
-          if [ "$current_main" != "$CERT_SHA" ]; then
-            record_delivery skipped superseded-main none
-            exit 0
+          capability="$RUNNER_TEMP/ovie-capability.json"
+          code="$(curl -sS -o "$capability" -w '%{http_code}' \
+            --retry 2 --max-time 30 --max-filesize 65536 --tlsv1.2 --proto '=https' \
+            -X OPTIONS "$OVIE_BASE_URL/api/internal/ovie/component-certificate-evidence" \
+            -H "authorization: Bearer ${CRON_SECRET}")" || code="000"
+          if [ "$code" != 200 ] || \
+            ! node scripts/lib/component-certificate-delivery.mjs --verify-capability "$capability"; then
+            record_delivery failed receiver-ordering-unavailable "$code"
+            echo "::error::Receiver ordering unavailable; artifact retained, no legacy fallback."
+            exit 1
           fi
+          # Capability negotiation can take time; recheck immediately before POST.
+          require_current_main
           code="$(curl -sS -o "$RUNNER_TEMP/ovie-response.txt" -w '%{http_code}' \
             --retry 2 --max-time 60 --tlsv1.2 --proto '=https' \
             -X POST "$OVIE_BASE_URL/api/internal/ovie/component-certificate-evidence" \
@@ -194,7 +221,14 @@ jobs:
             -H 'content-type: application/json' \
             --data-binary "@${payload}")" || code="000"
           case "$code" in
-            2[0-9][0-9]) record_delivery http-accepted readback-required "$code" ;;
+            2[0-9][0-9])
+              if ! node scripts/lib/component-certificate-delivery.mjs --verify-ack \
+                "$RUNNER_TEMP/ovie-response.txt" "$payload"; then
+                record_delivery failed invalid-order-acknowledgement "$code"
+                echo "::error::Receiver did not acknowledge this generation; artifact retained."
+                exit 1
+              fi
+              record_delivery http-accepted readback-required "$code" ;;
             *) record_delivery failed http-or-transport-error "$code"
                echo "::error::Ovie delivery failed (HTTP $code); report retained in the artifact."
                exit 1 ;;
@@ -211,4 +245,4 @@ jobs:
 
       - name: Clean scratch
         if: always()
-        run: rm -rf node_modules/typescript "$RUNNER_TEMP/ts" "$RUNNER_TEMP/component-certificate" "$RUNNER_TEMP/ovie-response.txt"
+        run: rm -rf node_modules/typescript "$RUNNER_TEMP/ts" "$RUNNER_TEMP/component-certificate" "$RUNNER_TEMP/ovie-response.txt" "$RUNNER_TEMP/ovie-capability.json"
