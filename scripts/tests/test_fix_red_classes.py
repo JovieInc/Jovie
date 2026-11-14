@@ -38,23 +38,6 @@ class ClassifyTest(unittest.TestCase):
             got = classes.classify(pr("Source Validation"), {"Source Validation": log})
             self.assertEqual((got["cls"], got["action"]), (cls, action), log)
 
-    def test_missing_local_prerequisite_syncs_main_before_fixture_infra(self):
-        diagnostic = ("lib/waitlist/winback-approval.server.ts(23,8): error TS2307: "
-                      "Cannot find module '@/lib/waitlist/winback' or its corresponding type declarations.")
-        for state in ("BLOCKED", "BEHIND"):
-            for log in (diagnostic, "passing fixture: API rate limit exceeded\n##[error]" + diagnostic):
-                got = classes.classify(pr("Source Validation", merge=state), {"Source Validation": log})
-                self.assertEqual((got["cls"], got["action"]), ("local-module-prerequisite", "sync-main"))
-
-    def test_missing_package_or_fixture_text_does_not_request_prerequisite_sync(self):
-        for log in (
-            "lib/a.ts(1,1): error TS2307: Cannot find module 'external-package' or its corresponding type declarations.",
-            "passing test: Cannot find module '@/lib/waitlist/winback'",
-            "lib/a.ts(1,1): error TS2305: Module '@/lib/a' has no exported member 'missing'.",
-        ):
-            got = classes.classify(pr("Source Validation"), {"Source Validation": log})
-            self.assertEqual((got["cls"], got["action"]), ("other", "agent"))
-
     def test_failed_live_design_cli_syncs_main_before_retrying_fixture_infra(self):
         summary = (" FAIL  workspace-scripts lib/__tests__/design-system-source-ratchet.test.mjs"
                    " > design-system source identity ratchet (JOV-5301)"

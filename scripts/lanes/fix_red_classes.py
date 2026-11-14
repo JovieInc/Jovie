@@ -31,7 +31,7 @@ import remediation
 from fix_red_mixed_repairs import first_route_reason, mixed_repairs  # noqa: F401
 from fix_red_screen_cert import SCREEN_CERT_TEXT, screen_cert_paths
 from fix_red_failure_routing import (ALIAS_ACTION, ALIAS_REVIEW_FAILURE, ROUTE_BUDGET_GROWTH, alias_owner_metadata,
-                                     error_signature, fingerprint_key, owner_handoff_reason)
+                                     error_signature, fingerprint_key, owner_handoff_reason, LOCAL_MODULE_PREREQUISITE)
 from atomic_state import atomic_write_text
 from fix_red_source_edits import (  # noqa: F401
     balance_added_headings, snap_added_conservative_spacing, strip_added_legacy_cache_exports,
@@ -70,12 +70,6 @@ BODY_TEXT = re.compile(r"red-before-green:|PR body is missing|missing (?:a )?`?#
 COMPONENT_TEST_TEXT = re.compile(
     r"::error file=[^\s:]+::\[test-not-touched\] Component changed but test "
     r"((?:apps/web|packages/ui)/[\w./-]+\.(?:test|spec)\.[jt]sx?) was not touched in this diff\.")
-# A local TS2307 can mean a prerequisite has landed on main while the PR is
-# BLOCKED rather than BEHIND. Use the existing one-sync-per-head route before
-# asking a model to recreate modules. Unresolved errors still fall back to it.
-LOCAL_MODULE_PREREQUISITE = re.compile(
-    r"\b(?:app|components|lib)/[\w./-]+\.[cm]?[jt]sx?\(\d+,\d+\): error TS2307: "
-    r"Cannot find module ['\"]@/[\w./-]+['\"]")
 # The internal customer-changelog decision. A second note is `ambiguous`, so a body that already
 # contains one is never stamped again. The quota form is the attempt>1 mask of the same defect:
 # the guard could not re-read the body, so the log no longer says missing-metadata.
