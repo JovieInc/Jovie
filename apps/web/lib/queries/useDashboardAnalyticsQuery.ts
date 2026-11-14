@@ -1,6 +1,6 @@
 'use client';
 
-import { keepPreviousData, useQuery } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import type {
   AnalyticsRange,
   DashboardAnalyticsResponse,
@@ -74,7 +74,8 @@ export function useDashboardAnalyticsQuery({
     queryFn: ({ signal }) =>
       fetchDashboardAnalytics(cacheRange, requestView, signal),
     staleTime,
-    placeholderData: keepPreviousData,
+    // A different range is a different observation. Keep the pending state
+    // until that window loads; same-key refreshes still retain cached data.
     refetchOnWindowFocus: false,
     refetchOnReconnect: false,
     refetchOnMount: false,
