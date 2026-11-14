@@ -1,15 +1,13 @@
 name: Product crawl
 
+# Manual-main production crawl. Existing source CI qualifies crawler changes
+# through the registered pure fixtures; fixture passes are not production readiness.
 # Crawls every page route of production as a stranger and judges the receipt
 # with scripts/product-crawl/ready-gate.mjs (Tim, 2026-11-08: crawl the whole
 # product and declare it ready; jank found means fix and repeat). Reports
 # only: the receipt and summary upload; nothing is written to production.
 on:
   workflow_dispatch:
-  pull_request:
-    paths:
-      - 'scripts/product-crawl/**'
-      - '.github/workflows/product-crawl.yml'
 
 permissions:
   contents: read
@@ -21,6 +19,7 @@ concurrency:
 jobs:
   crawl:
     name: Product crawl
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
