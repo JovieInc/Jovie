@@ -950,7 +950,7 @@ nodes:
       - workflow_dispatch
       - workflow_run
     terminalReceipt: job:publish
-    jobCount: 1
+    jobCount: 3
   - name: Pen draft missing frames
     path: .github/workflows/pen-draft.yml
     active: true

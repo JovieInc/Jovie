@@ -14,15 +14,15 @@
  * frame, never a second one. It never changes an issue's state: moving the
  * issue is Tim's answer. Any failed upload or issue write exits 1.
  */
-import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
-import { join, resolve } from 'node:path';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { parseArgs } from 'node:util';
 import { linearRequest } from '../lib/linear-cooldown.mjs';
 import { JOVIE_TEAM_ID } from '../lib/linear-issue-intake.mjs';
 import { withLinearRetry } from '../lib/linear-retry.mjs';
+import { collectFrames, pictureFor } from './pen-draft-frames.mjs';
 
-export const ARTIFACT_PREFIX = 'pen-draft-';
 export const TITLE_PREFIX = 'Pen draft for approval: ';
 // A label of its own for design approvals. `quality-gap:needs-tim` is a gate
 // in scripts/lanes/fleet_ledger.py that accepts on silence, and it counts
@@ -30,8 +30,6 @@ export const TITLE_PREFIX = 'Pen draft for approval: ';
 export const APPROVAL_LABEL = 'pen-draft:needs-tim';
 export const APPROVAL_LINE = 'Move to Todo to accept, cancel to reject.';
 export const CREATE_STATE_NAME = 'Backlog';
-// Linear rejects larger uploads; a frame preview is a few hundred KB.
-export const MAX_PNG_BYTES = 25 * 1024 * 1024;
 
 /**
  * @typedef {{ok: false, reason: string, detail?: string}} Failure
@@ -55,16 +53,7 @@ export const MAX_PNG_BYTES = 25 * 1024 * 1024;
  */
 const failed = result => !result.ok;
 
-const FRAME_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const TERMINAL_STATES = new Set(['completed', 'canceled']);
-
-/** `pen-draft-<frame>` -> `<frame>`; null for any other artifact name. */
-export function frameFromArtifactName(name) {
-  if (typeof name !== 'string' || !name.startsWith(ARTIFACT_PREFIX))
-    return null;
-  const frame = name.slice(ARTIFACT_PREFIX.length);
-  return FRAME_RE.test(frame) ? frame : null;
-}
 
 export function approvalTitle(frame) {
   return `${TITLE_PREFIX}${frame}`;
@@ -105,24 +94,6 @@ export function runUrlFor(runId, env = process.env) {
   const server = env.GITHUB_SERVER_URL || 'https://github.com';
   const repo = env.GITHUB_REPOSITORY || 'JovieInc/Jovie';
   return `${server}/${repo}/actions/runs/${runId}`;
-}
-
-/** One entry per `pen-draft-<frame>` folder; `png` is null when it drew none. */
-export function collectFrames(dir) {
-  if (!existsSync(dir)) return [];
-  return readdirSync(dir, { withFileTypes: true })
-    .filter(entry => entry.isDirectory())
-    .map(entry => ({
-      artifact: entry.name,
-      frame: frameFromArtifactName(entry.name),
-    }))
-    .filter(entry => entry.frame)
-    .sort((a, b) => a.frame.localeCompare(b.frame))
-    .map(entry => {
-      const png = join(dir, entry.artifact, `${entry.frame}.png`);
-      const drawn = existsSync(png) && statSync(png).isFile();
-      return { ...entry, png: drawn ? png : null };
-    });
 }
 
 /**
@@ -371,26 +342,37 @@ export async function publishDrafts({
 }) {
   const ctx = { apiKey, fetchImpl, env, sleep, log };
   const frames = collectFrames(dir);
-  const withPng = frames.filter(entry => entry.png);
   /** @type {FrameRow[]} */
-  const rows = frames
-    .filter(entry => !entry.png)
-    .map(entry => ({
-      frame: entry.frame,
-      ok: /** @type {const} */ (true),
-      action: 'skipped-no-png',
-    }));
-  if (withPng.length === 0) return { ok: true, frames: rows };
-  if (!apiKey)
-    return { ok: false, reason: 'missing_linear_api_key', frames: rows };
-  const refs = await resolveTeamRefs(ctx);
-  if (failed(refs)) return { ok: false, reason: refs.reason, frames: rows };
-  for (const { frame, png } of withPng) {
-    const bytes = readFile(png);
-    if (bytes.length === 0 || bytes.length > MAX_PNG_BYTES) {
-      rows.push({ frame, ok: false, reason: 'pen_upload_bad_size' });
+  const rows = [];
+  /** @type {{frame: string, bytes: Buffer}[]} */
+  const pictures = [];
+  // Every picture is checked before Linear is asked for anything.
+  for (const entry of frames) {
+    const { frame } = entry;
+    if (!entry.png && !entry.sidecar) {
+      rows.push({ frame, ok: true, action: 'skipped-no-png' });
       continue;
     }
+    const picture = pictureFor(entry, readFile);
+    if (failed(picture))
+      rows.push({
+        frame,
+        ok: false,
+        reason: picture.reason,
+        ...(picture.detail ? { detail: picture.detail } : {}),
+      });
+    else pictures.push({ frame, bytes: picture.bytes });
+  }
+  const done = () => ({
+    ok: rows.every(row => row.ok),
+    frames: rows.sort((a, b) => a.frame.localeCompare(b.frame)),
+  });
+  if (pictures.length === 0) return done();
+  if (!apiKey)
+    return { ...done(), ok: false, reason: 'missing_linear_api_key' };
+  const refs = await resolveTeamRefs(ctx);
+  if (failed(refs)) return { ...done(), ok: false, reason: refs.reason };
+  for (const { frame, bytes } of pictures) {
     const upload = await retried(ctx, frame, 'pen_upload', () =>
       uploadPng(ctx, { frame, bytes })
     );
@@ -418,7 +400,7 @@ export async function publishDrafts({
           }
     );
   }
-  return { ok: rows.every(row => row.ok), frames: rows };
+  return done();
 }
 
 async function main() {

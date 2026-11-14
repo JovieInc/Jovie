@@ -1,12 +1,13 @@
 # controller-hop-exception: jovie-controller-hop/v1
 # accountable-writer: Summer
-# necessary-trust-boundary: Pen drafts are private Actions artifacts and Tim approves a design only from a picture he can see; this job reads one run's artifacts and writes the pictures to Linear approval issues, nothing in the repo.
+# necessary-trust-boundary: Pen drafts are private Actions artifacts and Tim approves a design only from a picture he can see; one job per frame reads the run's draft and renders the drafted frame with the Pen CLI key and the private canonical Pen file URL, another writes the pictures to Linear approval issues, and none writes to the repo.
 # removal-trigger: Remove when Pen drafts run inside the design loop that already holds the Pen key and posts its own pictures for approval.
 
 name: Pen draft pictures to Linear
 
-# After a Pen draft run on main (JOV-12577): put each drafted frame's picture
-# inline on the Linear issue `Pen draft for approval: <frame>`, labelled
+# After a Pen draft run on main (JOV-12577): render each drafted frame alone
+# from its <frame>.pen (the draft's own png is the whole canvas, too small to
+# read), and put that picture inline on the Linear issue `Pen draft for approval: <frame>`, labelled
 # `pen-draft:needs-tim`, a label with no default on silence. One issue
 # per frame: a new draft updates it. It never moves an issue, edits the
 # canonical Pen file or approves anything in pen-bindings.json.
@@ -33,18 +34,21 @@ concurrency:
   cancel-in-progress: false
   queue: max
 
+env:
+  RUN_ID: ${{ inputs.run_id || github.event.workflow_run.id }}
+
 jobs:
-  publish:
-    name: Publish Pen draft pictures
+  plan:
+    name: Plan Pen frame pictures
     # PR drafts stay on the PR; a fork branch named main gets nothing.
     if: ${{ github.event_name == 'workflow_dispatch' || (github.event.workflow_run.event != 'pull_request' && github.event.workflow_run.head_repository.full_name == github.repository) }}
     runs-on: ubuntu-24.04
-    timeout-minutes: 10
+    timeout-minutes: 5
     permissions:
       actions: read
       contents: read
-    env:
-      RUN_ID: ${{ inputs.run_id || github.event.workflow_run.id }}
+    outputs:
+      frames: ${{ steps.pick.outputs.frames }}
     steps:
       - name: Check the run id
         run: |
@@ -73,6 +77,105 @@ jobs:
           path: ${{ runner.temp }}/pen-drafts
           run-id: ${{ env.RUN_ID }}
           github-token: ${{ github.token }}
+
+      - name: Pick the frames that drew a .pen
+        id: pick
+        run: |
+          set -euo pipefail
+          frames=$(node scripts/design/pen-draft-picture.mjs --plan --dir "$RUNNER_TEMP/pen-drafts")
+          echo "frames=$frames" >> "$GITHUB_OUTPUT"
+          echo "Pen frames to render: $frames"
+
+  render:
+    name: Render drafted Pen frame
+    needs: plan
+    if: ${{ needs.plan.outputs.frames != '[]' }}
+    runs-on: ubuntu-24.04
+    # One headless session of up to 5 minutes; setup takes under a minute.
+    timeout-minutes: 10
+    # The Pen editor behind one PEN_CLI_KEY serves one document, so rendering
+    # takes the same lease as the draft jobs in pen-draft.yml.
+    concurrency:
+      group: pen-draft-canonical-editor
+      cancel-in-progress: false
+      queue: max
+    permissions:
+      actions: read
+      contents: read
+    strategy:
+      # One frame that will not render costs only itself.
+      fail-fast: false
+      max-parallel: 1
+      matrix:
+        frame: ${{ fromJSON(needs.plan.outputs.frames) }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Prime Node toolcache (no GitHub API manifest call)
+        if: ${{ hashFiles('.github/actions/prime-node-toolcache/action.yml') != '' }}
+        uses: ./.github/actions/prime-node-toolcache
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: '.nvmrc'
+
+      # github-token-budget: 3 calls/run - download this frame's draft from the drafting run
+      - name: Download the frame's draft
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: pen-draft-${{ matrix.frame }}
+          path: ${{ runner.temp }}/pen-drafts/pen-draft-${{ matrix.frame }}
+          run-id: ${{ env.RUN_ID }}
+          github-token: ${{ github.token }}
+
+      - name: Render the drafted frame
+        env:
+          PEN_CLI_KEY: ${{ secrets.PEN_CLI_KEY }}
+          PEN_GOLDEN_PATH_FILE_URL: ${{ secrets.PEN_GOLDEN_PATH_FILE_URL }}
+        run: node scripts/design/pen-draft-picture.mjs --dir "$RUNNER_TEMP/pen-drafts"
+
+      # The frame's folder, as downloaded, without its 25 MB .pen file.
+      - name: Upload the picture
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: pen-draft-picture-${{ matrix.frame }}
+          path: |
+            ${{ runner.temp }}/pen-drafts
+            !${{ runner.temp }}/pen-drafts/**/*.pen
+          if-no-files-found: warn
+          retention-days: 14
+
+  publish:
+    name: Publish Pen draft pictures
+    needs: [plan, render]
+    # A frame whose render job failed has no picture; the others still publish.
+    if: ${{ !cancelled() && needs.plan.result == 'success' && needs.plan.outputs.frames != '[]' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      actions: read
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Prime Node toolcache (no GitHub API manifest call)
+        if: ${{ hashFiles('.github/actions/prime-node-toolcache/action.yml') != '' }}
+        uses: ./.github/actions/prime-node-toolcache
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: '.nvmrc'
+
+      - name: Download the pictures
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: pen-draft-picture-*
+          merge-multiple: true
+          path: ${{ runner.temp }}/pen-drafts
 
       - name: Publish pictures to Linear
         env:
