@@ -22,6 +22,7 @@ import {
   type LegacyNudge,
   legacyNudgeForDashboard,
 } from '@/lib/claim/legacy-verification';
+import { countPendingCreatorInboxActions } from '@/lib/connectors/opportunity-inbox-data';
 import { isMissingConnectorSchemaError } from '@/lib/connectors/schema-errors';
 import type { DbOrTransaction } from '@/lib/db';
 import { DB_CONFIG, isRetryableError } from '@/lib/db/client/retry';
@@ -35,7 +36,6 @@ import {
 } from '@/lib/db/query-timeout';
 import { clickEvents, tips } from '@/lib/db/schema/analytics';
 import { userSettings, users } from '@/lib/db/schema/auth';
-import { suggestedActions } from '@/lib/db/schema/connectors';
 import { socialLinks } from '@/lib/db/schema/links';
 import {
   type CreatorProfile,
@@ -63,7 +63,6 @@ import {
 import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 import {
   type InboxNavigationAvailability,
-  PENDING_SUGGESTED_ACTION_STATUS,
   resolveInboxNavigationAvailability,
   UNKNOWN_INBOX_NAVIGATION_AVAILABILITY,
 } from '@/lib/inbox/navigation-availability';
@@ -483,17 +482,12 @@ async function loadInboxNavigationAvailability(
   if (!profileId) return UNKNOWN_INBOX_NAVIGATION_AVAILABILITY;
 
   try {
-    const pendingSuggestedActions = await dashboardQuery(
-      () =>
-        tx
-          .select({ count: drizzleSql<number>`count(*)` })
-          .from(suggestedActions)
-          .where(
-            and(
-              eq(suggestedActions.userId, userId),
-              eq(suggestedActions.status, PENDING_SUGGESTED_ACTION_STATUS)
-            )
-          ),
+    // Shared creator-review eligibility (countPendingCreatorInboxActions):
+    // operator-only pending rows (Ovie captures, founder/ops/ovie sources)
+    // never raise the badge, and the count is the uncapped total — never
+    // derived from the feed's capped candidate page.
+    const pendingSuggestedActionCount = await dashboardQuery(
+      () => countPendingCreatorInboxActions(userId, tx),
       'Inbox navigation suggested actions count query',
       { db: tx, timeoutMs: QUERY_TIMEOUTS.api }
     );
@@ -515,7 +509,7 @@ async function loadInboxNavigationAvailability(
     );
 
     return resolveInboxNavigationAvailability(
-      Number(pendingSuggestedActions[0]?.count ?? 0),
+      pendingSuggestedActionCount,
       Number(pendingTourDates[0]?.count ?? 0)
     );
   } catch (error) {
@@ -539,6 +533,20 @@ async function loadInboxNavigationAvailability(
     if (isQueryTimeoutError(error) || isPostgresTimeoutError(error)) {
       logger.warn(
         '[inbox-navigation] inbox count read timed out; degrading to unknown availability'
+      );
+      return UNKNOWN_INBOX_NAVIGATION_AVAILABILITY;
+    }
+    // Transient Neon transport failures (dropped connections, postmaster
+    // exits, commit-wired transport kills) are infrastructure conditions on
+    // a fail-soft read — the same class the avatar/social-links boundaries
+    // degrade log-only (JOV-8864/JOV-8900). The count runs on the shared
+    // session transaction, so a killed transport cannot be replayed on the
+    // same tx; degrade log-only instead of paging Sentry (JOV-12477,
+    // Sentry 7846577230: `Failed query: select count(*) from
+    // "suggested_actions"` on a Neon suspend kill).
+    if (isDashboardReadRecoveryAdmitted(error)) {
+      logger.warn(
+        '[inbox-navigation] inbox count read hit a transient transport failure; degrading to unknown availability'
       );
       return UNKNOWN_INBOX_NAVIGATION_AVAILABILITY;
     }

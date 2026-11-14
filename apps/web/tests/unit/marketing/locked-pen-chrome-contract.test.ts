@@ -58,7 +58,9 @@ describe('locked Pen marketing chrome (JOV-6179)', () => {
       /\.marketing-glass-header__cta\s*\{([^}]*)\}/
     )?.[1];
 
-    expect(headerNav).toContain("import { Button } from '@jovie/ui'");
+    expect(headerNav).toMatch(
+      /import \{[^}]*\bButton\b[^}]*\} from '@jovie\/ui'/
+    );
     expect(primaryAuthLink).toContain("size = 'marketing'");
     expect(primaryAuthLink).toMatch(
       /<Button\s+asChild\s+size=\{size\}\s+variant='primary'/

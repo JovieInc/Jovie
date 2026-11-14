@@ -4,6 +4,10 @@
 import { createHash } from 'node:crypto';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
+import {
+  censusFailureReceipt,
+  discoverCensusWithRetry,
+} from './backlog-census-retry.mjs';
 import { fetchBacklogSweepCandidates } from './backlog-current-linear.mjs';
 import { admitBacklogEvent } from './backlog-event-admission.mjs';
 import { worldObservationSummary } from './backlog-observation-summary.mjs';
@@ -465,33 +469,24 @@ export async function assessBacklogSweep(
     now = Date.now,
     discover = fetchBacklogSweepCandidates,
     assess = assessTriageEvent,
+    sleepImpl = undefined,
   } = {}
 ) {
   const started = now(),
     results = [];
+  const censusBudget = { started, timeBudgetMs, now, sleepImpl };
   let all;
   try {
-    all = await discover(client, BACKLOG_READ_OPTIONS);
-  } catch {
-    return {
-      schema: 'linear-backlog-catch-up/v1',
-      observedAt: new Date(now()).toISOString(),
-      issueCount: 0,
-      inventoryUnknown: true,
-      assessed: 0,
-      deferred: 0,
-      failed: 1,
-      wakeSymphony: false,
-      results: [
-        {
-          disposition: 'assessment-failed',
-          reason: 'backlog-catch-up-census-unavailable',
-          owner: 'JOV-8022 Fleet admission owner',
-          mutations: 0,
-          wakeSymphony: false,
-        },
-      ],
-    };
+    all = await discoverCensusWithRetry(
+      discover,
+      client,
+      BACKLOG_READ_OPTIONS,
+      censusBudget
+    );
+  } catch (error) {
+    // An active cooldown defers like the Triage catch-up; any other
+    // persistent miss still fails with its cause named (JOV-12500).
+    return censusFailureReceipt(error, now());
   }
   const issues = all.filter(
     row =>
@@ -954,6 +949,10 @@ export async function runCli() {
   if (triageDeferred)
     console.error(
       `::warning title=Triage catch-up deferred::Linear credential cooldown is active; the next fleet-gate-refresh tick retries at or after ${receipt.triageSweep?.retryAt}.`
+    );
+  if (isSweep && receipt.backlog?.census?.status === 'deferred')
+    console.error(
+      `::warning title=Backlog census deferred::Linear credential cooldown is active; the next fleet-gate-refresh tick retries the census at or after ${receipt.backlog?.census?.retryAt}.`
     );
   if (triageSucceeded && sweepCacheFile) {
     const cache = readSweepCache(sweepCacheFile);

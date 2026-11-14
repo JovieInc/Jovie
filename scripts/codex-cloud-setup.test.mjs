@@ -81,10 +81,11 @@ function fixture(t, behavior = '') {
     `#!/bin/bash
 set -eu
 if [[ "$*" == '--version' ]]; then
+  printf '%s' "\${CI-unset}" > "$PWD/version-ci"
   ${behavior || "echo '9.15.9'"}
   exit 0
 fi
-printf '%s\\n' "$PWD" "$*" "$PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD" "$ONNXRUNTIME_NODE_INSTALL" > "$PWD/install-receipt"
+printf '%s\\n' "$PWD" "$*" "$PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD" "$ONNXRUNTIME_NODE_INSTALL" "\${CI-unset}" > "$PWD/install-receipt"
 exit "\${INSTALL_STATUS:-0}"
 `,
     { mode: 0o755 }
@@ -97,7 +98,7 @@ test('installs frozen dependencies in the repository without touching environmen
   bootstrap(root, env);
   assert.equal(
     readFileSync(join(root, 'install-receipt'), 'utf8'),
-    `${root}\ninstall --frozen-lockfile --prefer-offline\n1\nskip\n`
+    `${root}\ninstall --frozen-lockfile --prefer-offline\n1\nskip\ntrue\n`
   );
   assert.equal(
     readFileSync(join(root, '.env.local'), 'utf8'),
@@ -107,6 +108,25 @@ test('installs frozen dependencies in the repository without touching environmen
     readFileSync(join(root, 'pnpm-lock.yaml'), 'utf8'),
     'preserve lock'
   );
+});
+
+test('forces noninteractive installation without changing the caller or version probe environment', t => {
+  for (const ci of [undefined, 'false']) {
+    const { root, env } = fixture(t);
+    if (ci !== undefined) env.CI = ci;
+    if (process.env.NODE_V8_COVERAGE)
+      env.NODE_V8_COVERAGE = process.env.NODE_V8_COVERAGE;
+    const before = { ...env };
+    const processCi = process.env.CI;
+    bootstrap(root, env);
+    assert.equal(readFileSync(join(root, 'version-ci'), 'utf8'), ci ?? 'unset');
+    assert.equal(
+      readFileSync(join(root, 'install-receipt'), 'utf8').split('\n')[4],
+      'true'
+    );
+    assert.deepEqual(env, before);
+    assert.equal(process.env.CI, processCi);
+  }
 });
 
 test('rejects a runtime mismatch before running the installer', t => {

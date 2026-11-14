@@ -12,6 +12,24 @@
       "a11y",
       "frontend-rules"
     ],
+    "apps/web/components/atoms/AppSegmentControl.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/atoms/LogoIcon.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
     "apps/web/components/features/auth/AuthOfferSummary.tsx": [
       "ds-owner",
       "tokens",
@@ -229,6 +247,11 @@
     "apps/web/components/atoms/BrandLogo.tsx": {
       "permission-denied": "BrandLogo only draws the brand mark and has no permission input or gated action; the detector matched role='img' on the svg."
     },
+    "apps/web/components/atoms/CopyToggleIcon.tsx": {
+      "partial": "The only required prop is copied; Idle and Copied already render with every optional prop (className, size, strokeWidth) left out, and Large sets size. There is no data that could arrive incomplete.",
+      "long-content": "The atom draws one fixed-size icon and no text, so nothing can grow. The detector matched aria-label in the doc-comment example and the text- colour class.",
+      "rtl-overflow": "The atom draws one symmetric icon and no text, so direction changes nothing. The detector matched aria-label in the doc-comment example and the text- colour class."
+    },
     "apps/web/components/atoms/Divider.tsx": {
       "permission-denied": "A divider is a styled separator line with no action, data or account; nothing can be gated. The detector matched role='separator'."
     },
@@ -432,6 +455,9 @@
     },
     "apps/web/components/features/profile/ProfileAeoProofClaimCard.tsx": {
       "empty": "The proof claim card renders no collection: one heading, one note and one CTA, all required props; the detector matched the items-start class."
+    },
+    "apps/web/components/features/profile/ProfilePrimaryTabPanel.tsx": {
+      "offline": "The panel fetches nothing itself: releases, tour dates and the catalog result arrive as props from the server-rendered profile, and a failed catalog read arrives as catalogLoadFailed (ErrorCatalogLoadFailed, whose Try Again reloads the page). The detector matched the word skeleton in the visitorAssignmentResolved doc comment, which LoadingAlertsAssignment shows."
     },
     "apps/web/components/features/profile/ProfileViewTracker.tsx": {
       "error": "The tracker returns null; a refused beacon falls back to the tracking mutation and nothing is shown to the visitor, so there is no error state to render. ProfileViewTracker.certificate.test.tsx asserts the fallback and an axe-clean page.",
@@ -637,8 +663,20 @@
     "apps/web/components/jovie/components/ChatToolSurface.tsx": {
       "partial": "ChatToolSurface is a slot wrapper: it renders whatever children its card passes and its optional props are only tone, className and a test id, so there is no data that can be partly present. Partial states belong to the cards that fill it, such as ChatLinkConfirmationCard."
     },
+    "apps/web/components/jovie/components/ChatVideoRecordingProposalCard.tsx": {
+      "empty": "The card renders one title, one script and two fixed actions from a required payload; it lists no collection (payload.questions is handed to the recorder, never drawn). The detector matched the items-center class on the uploaded row.",
+      "permission-denied": "The card has no role, plan or gated branch: anyone who is shown the proposal can upload or record. The detector matched role='alert' on the failed-upload line, which ErrorUploadFailed shows."
+    },
     "apps/web/components/jovie/components/ErrorDisplay.tsx": {
       "empty": "ErrorDisplay renders exactly one required ChatError and never a collection; the only .filter is over the two parts of the support reference, and the detector matched the items-start and items-center classes."
+    },
+    "apps/web/components/jovie/components/SlashCommandMenu.tsx": {
+      "error": "The menu has no error branch and submits nothing: a commit calls the composer's onSelectSkill, onSelectEntity or onSelectPrompt. The detector matched the word submit in the IME-composition comment of its key handler.",
+      "permission-denied": "The menu draws no denied face: a skill the account cannot use (album art without the capability) is left out of the list, so there is nothing locked to show. The detector matched role='combobox' on the filter field."
+    },
+    "apps/web/components/jovie/merch-tool-artifacts.tsx": {
+      "error": "It never draws its own failure. The only submit signal is the jovie-chat-submit-prompt event it dispatches, and the chat that receives it owns the request and its errors. A failed tool event returns null so the shared failure card draws it. The detector matched submit in that event name.",
+      "offline": "It never fetches. The only submit signal is the jovie-chat-submit-prompt event it dispatches, and the chat composer owns the request and its network error. The detector matched submit in that event name."
     },
     "apps/web/components/jovie/source-evidence-context.tsx": {
       "loading": "The provider is pending only while the code-split source-facts module resolves, a microtask after mount; a static story cannot hold a resolved dynamic import, so source-evidence-context.test.tsx asserts data-source-evidence='pending' before 'ready'. Its children render unchanged either way.",
@@ -766,6 +804,9 @@
       "empty": "The dialog maps over the fixed COOKIE_CATEGORIES constant (Essential, Analytics, Marketing), which is never empty, so there is no empty-data state.",
       "long-content": "Every category label, description and button in the dialog is fixed copy from module constants with no props or user text, so its content cannot grow."
     },
+    "apps/web/components/organisms/DesktopTitlebarSlot.tsx": {
+      "error": "The module-level catch only absorbs a failed speculative titlebar import; it never sets render state or draws an error. The existing next/dynamic loader still owns the render import. desktop-startup-contract.cases.mjs executes the rejected warmup and verifies that the desktop render loader remains usable and browser output stays null; DesktopTitlebarSlot.test.tsx covers the mounted titlebar."
+    },
     "apps/web/components/organisms/MarketingSignInLink.tsx": {
       "partial": "The link renders one label and one fixed sign-in route; variant and label are presentation choices with defaults, so there is no data to be partially present.",
       "long-content": "The label prop is typed as the two fixed strings 'Sign in' and 'Log in', so no caller can pass longer copy."
@@ -786,6 +827,9 @@
     "apps/web/components/organisms/StandaloneProductPage.tsx": {
       "empty": "StandaloneProductPage is a layout shell that renders its required children in a main landmark; it owns no collection, and the detector matched the items-center class.",
       "partial": "Its optional props (className, contentClassName, width, centered) are layout options, not content fields, so there is no partially filled state; Centered and NarrowWidth show them."
+    },
+    "apps/web/components/organisms/desktop-update/DesktopUpdateControl.tsx": {
+      "permission-denied": "Every desktop user may download, restart or retry an update; the control has no account, role or gated action. The detector matched role='status' on the polite announcement."
     },
     "apps/web/components/organisms/public-surface/PublicSurfaceStage.tsx": {
       "empty": "The stage holds no data: children is required and is the profile card itself. The detector matched the items-stretch and items-center layout classes.",
@@ -870,6 +914,9 @@
       "long-content": "The skeleton renders no visible text: only Skeleton blocks of fixed width and a fixed aria-label per variant, so there is no content to grow.",
       "offline": "The skeleton is a static Suspense fallback that fetches nothing; when the segment cannot load, the route's error boundary replaces it, not the skeleton.",
       "permission-denied": "The skeleton draws the same placeholders for everyone. The detector matched role='status' and the admin layout variant; access to the admin segment is decided by the route before the loaded surface, not by this fallback."
+    },
+    "apps/web/components/shell/DictationWaveform.tsx": {
+      "empty": "The strip draws a fixed count of decorative bars (32 unless bars is set) and takes no data, so it has no collection to empty. The detector matched the items-center class and the word list in the array-index-key comment."
     },
     "apps/web/components/shell/InstallBanner.tsx": {
       "empty": "The banner renders one card from scalar props (title, description, CTA) and owns no collection that could be empty; omitted copy falls back to defaults (PartialCustomTitle story). The detector matched the items-center class."
@@ -981,6 +1028,11 @@
     },
     "packages/ui/atoms/link.tsx": {
       "partial": "Link renders one label slot; its optional props (variant, active, visited, disabled, touchTarget, reserveLabel) are presentation flags with defaults, and the not-yet-arrived label case is shown by the EmptyStreamedLabel story."
+    },
+    "packages/ui/atoms/plain-button.tsx": {
+      "empty": "PlainButton renders the children its caller passes and owns no collection or data, so it has no empty state of its own.",
+      "error": "PlainButton makes no request and validates nothing; an error belongs to the action its caller wires to onClick.",
+      "offline": "PlainButton makes no network request, so it behaves the same offline; connectivity belongs to the caller's action."
     },
     "packages/ui/atoms/progress.tsx": {
       "permission-denied": "ProgressBar only reports completion of an upload or import and has no gated action or permission input; the detector matched role='progressbar'."

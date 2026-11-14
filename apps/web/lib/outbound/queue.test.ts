@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  type OutboundLedgerRow,
   type OutboundTarget,
   outboundCopyEvidenceKey,
   outboundCopyRevision,
@@ -66,10 +67,12 @@ function target(lead: OutboundLeadFacts): OutboundTarget {
     claimUrl: lead.claimToken
       ? `https://jov.ie/claim/${lead.claimToken}`
       : null,
+    handle: lead.linktreeHandle,
+    bio: lead.bio,
   };
 }
 
-function row(lead: OutboundLeadFacts, ledger = []) {
+function row(lead: OutboundLeadFacts, ledger: OutboundLedgerRow[] = []) {
   return buildOutboundRow({
     facts: lead,
     target: target(lead),
@@ -305,6 +308,131 @@ describe('outbound queue display', () => {
       needs_evidence: 1,
       certified: 1,
       approved: 0,
+    });
+  });
+});
+
+describe('existing-relationship hold in the outbound queue', () => {
+  const dannic = (overrides: Partial<OutboundLeadFacts> = {}) =>
+    facts({
+      id: 'lead-dannic',
+      linktreeHandle: 'djdannic',
+      displayName: 'Dannic',
+      contactEmail: 'hello@example.com',
+      profileUsername: 'djdannic',
+      ...overrides,
+    });
+
+  function approvedLedger(lead: OutboundLeadFacts): OutboundLedgerRow[] {
+    const t = target(lead);
+    const targetRevision = outboundTargetRevision(t);
+    const copy = {
+      channel: 'email' as const,
+      subject: 'Your Jovie page is ready',
+      body: `Hey, ${t.claimUrl}`,
+    };
+    return [
+      {
+        evidenceKey: outboundTargetEvidenceKey(lead.id),
+        evidenceRevision: targetRevision,
+        decision: 'yes',
+        snapshot: {},
+        actorUserId: 'tim',
+        createdAt: new Date('2026-10-03T00:00:00Z'),
+      },
+      {
+        evidenceKey: outboundCopyEvidenceKey(lead.id),
+        evidenceRevision: outboundCopyRevision(targetRevision, copy),
+        decision: 'yes',
+        snapshot: { targetRevision, ...copy },
+        actorUserId: 'tim',
+        createdAt: new Date('2026-10-03T00:01:00Z'),
+      },
+    ];
+  }
+
+  it('holds a Dannic lead that would otherwise be ready, with the reason and no draft', () => {
+    // The same facts under another name are ready to certify.
+    expect(row(facts()).view).toBe('ready');
+    const held = row(dannic());
+    expect(held.view).toBe('held');
+    expect(held.nextAction).toBe('none');
+    expect(held.flags).toContain('existing_relationship');
+    expect(held.relationshipHold).toBe(
+      'Existing relationship: flag to Tim, no cold outreach'
+    );
+    expect(held.approval.target).toBe('held');
+    expect(held.message).toBeNull();
+  });
+
+  it('never shows Dannic as certified or approved, even with yes rows on file', () => {
+    const lead = dannic({ certified: true });
+    // Sanity: the same ledger approves an unrelated artist.
+    const other = facts({ certified: true });
+    expect(row(other, approvedLedger(other)).view).toBe('approved');
+
+    const held = row(lead, approvedLedger(lead));
+    expect(held.view).toBe('held');
+    expect(held.approval.approvedAt).toBeNull();
+    expect(held.message).toBeNull();
+    expect(row(dannic({ certified: true })).view).toBe('held');
+  });
+
+  it('holds by organization domain, bio and second handle too', () => {
+    for (const lead of [
+      facts({ contactEmail: 'bookings@sortedmanagement.com' }),
+      facts({ bio: 'Management: Big MGMT' }),
+      facts({ instagramHandle: 'djdannic', hasInstagram: true }),
+    ])
+      expect(row(lead)).toMatchObject({
+        view: 'held',
+        message: null,
+        relationshipHold:
+          'Existing relationship: flag to Tim, no cold outreach',
+      });
+  });
+
+  it('keeps held rows out of every outreach count', () => {
+    const rows = rankOutboundRows([row(dannic()), row(facts())], new Map());
+    const counts = countOutboundViews(rows);
+    expect(counts).toMatchObject({ held: 1, ready: 1, approved: 0 });
+    expect(rows.at(-1)?.handle).toBe('djdannic');
+  });
+
+  it('keeps an Armada artist eligible and carries the relationship tag', () => {
+    const tag = "Relationship: Armada Music, Tim's vocalist deals";
+    const armada = facts({ bio: 'New EP out now on Armada Music' });
+    const ready = row(armada);
+    expect(ready.view).toBe('ready');
+    expect(ready.relationshipHold).toBeNull();
+    expect(ready.flags).not.toContain('existing_relationship');
+    expect(ready.relationshipNotes).toEqual([tag]);
+    expect(ready.message?.body).toContain('https://jov.ie/claim/tok');
+
+    const certified = facts({
+      bio: 'New EP out now on Armada Music',
+      certified: true,
+    });
+    const approved = row(certified, approvedLedger(certified));
+    expect(approved.view).toBe('approved');
+    expect(approved.relationshipNotes).toEqual([tag]);
+    expect(row(facts()).relationshipNotes).toEqual([]);
+  });
+
+  it('shows a held artist as held, not awaiting the judge, when the gate is closed', () => {
+    const lead = dannic();
+    const held = buildOutboundRow({
+      facts: lead,
+      target: target(lead),
+      dedupeKey: null,
+      ledger: [],
+      now: NOW,
+    });
+    expect(held).toMatchObject({
+      view: 'held',
+      nextAction: 'none',
+      message: null,
+      relationshipHold: 'Existing relationship: flag to Tim, no cold outreach',
     });
   });
 });

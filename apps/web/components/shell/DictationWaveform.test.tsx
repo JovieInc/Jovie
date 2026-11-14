@@ -1,5 +1,6 @@
 import { render } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
+import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import { DictationWaveform } from './DictationWaveform';
 
 describe('DictationWaveform', () => {
@@ -44,5 +45,14 @@ describe('DictationWaveform', () => {
     expect(source).toContain(
       "className='dictation-waveform-bar block w-1 rounded-full bg-cyan-300/85'"
     );
+  });
+
+  it('is hidden from assistive technology and axe-clean, listening or idle', async () => {
+    const { container, rerender } = render(<DictationWaveform active />);
+    expect(container.firstElementChild).toHaveAttribute('aria-hidden', 'true');
+    await expectNoA11yViolations(container);
+
+    rerender(<DictationWaveform active={false} />);
+    await expectNoA11yViolations(container);
   });
 });

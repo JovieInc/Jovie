@@ -7,6 +7,8 @@
  * re-exports the public names.
  */
 
+import { escapeAnnotationMessage } from './ci-fast-annotations.mjs';
+
 const GIT_FETCH_NOISE_LINE =
   /^\s*(?:\* \[new (?:branch|tag)\]|[0-9a-f]+\.\.[0-9a-f]+\s)/u;
 // Lowercase `error` catches TypeScript's `file.ts(1,2): error TS2532: …` while
@@ -184,21 +186,6 @@ function capLines(lines, max) {
     used += line.length + 1;
   }
   return kept;
-}
-
-/** Escape a workflow-command message per GitHub Actions rules. */
-export function escapeAnnotationMessage(text) {
-  return String(text ?? '')
-    .replaceAll('%', '%25')
-    .replaceAll('\r', '%0D')
-    .replaceAll('\n', '%0A');
-}
-
-/** Escape a workflow-command property value (e.g. `title=`). */
-export function escapeAnnotationProperty(text) {
-  return escapeAnnotationMessage(text)
-    .replaceAll(':', '%3A')
-    .replaceAll(',', '%2C');
 }
 
 export function commandLabel(command, max = 80) {

@@ -1,6 +1,6 @@
 {
   "file": "apps/web/components/site/MarketingHeader.tsx",
-  "sha256": "f9d37f2ede2085a23e002a7653ff93f88af408dd9d022111ee5c82cbcd935ebb",
-  "at": "2026-11-09T03:00:11.997Z",
-  "ref": "Carried over unchanged from the single pricing row digest 8e1f02b52a25 certified at 2026-11-09T03:00:11.997Z; that certification is described in the row's evidence.ref in surfaceCensus.json."
+  "sha256": "0f5b97eba826cfc00f4b1f1177907ca0c709a977da32318b6ff370dfe68e7c97",
+  "at": "2026-11-13T00:39:55.773Z",
+  "ref": "Removed constant-true SHOW_MARKETING_CENTER_NAV / SHOW_MARKETING_FULL_FOOTER style gates from MarketingHeader and MarketingFooter; rendered output is unchanged. Verified with the MarketingHeader and MarketingFooter vitest render suites (jsdom, incl. axe), not a browser capture."
 }

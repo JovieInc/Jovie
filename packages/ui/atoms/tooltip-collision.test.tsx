@@ -28,9 +28,10 @@ vi.mock('@radix-ui/react-tooltip', async importOriginal => {
   });
   RecordingContent.displayName = 'RecordingTooltipContent';
   // Force tooltips open so Content mounts without hover (unreliable in jsdom).
+  // The shared root always controls Radix, so `open` is never undefined here.
   const ForcedOpenRoot = (
     props: React.ComponentPropsWithoutRef<typeof actual.Root>
-  ) => <actual.Root {...props} open={props.open ?? true} />;
+  ) => <actual.Root {...props} open />;
   return { ...actual, Content: RecordingContent, Root: ForcedOpenRoot };
 });
 

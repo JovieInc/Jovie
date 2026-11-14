@@ -72,6 +72,15 @@ describe('MarketingHeader states', () => {
     ).toHaveFocus();
   });
 
+  it('always draws the center nav links on a landing route', () => {
+    render(<MarketingHeader />);
+
+    const banner = screen.getByRole('banner');
+    expect(
+      within(banner).getAllByRole('link', { name: 'Pricing' }).length
+    ).toBeGreaterThan(0);
+  });
+
   it('draws no empty nav row or menu when there are no links', async () => {
     const { container } = render(<MarketingHeader navLinks={[]} />);
 
