@@ -1,5 +1,5 @@
 {
-  "$comment": "Render mode and prerendered HTML bytes per route, from the CI mock-env build's prerender-manifest.json. Enforced by scripts/route-render-modes.mjs after the build in source-validation.yml (Exact-head Coverage) and ci.yml (Build + Layout). Entry: static | isr:<seconds> | param-prerender[:<seconds>] | dynamic, then html=<bytes> for a static or ISR page. A route may not lose cacheability, its HTML may not grow past recorded bytes plus max(5%, 4096 B), and a route with no entry fails closed. Written only by `node apps/web/scripts/route-render-modes.mjs --next-dir apps/web/.next --write`, which adds, removes and tightens and never records a loss; an intended loss is a hand edit plus an unexpired overrides[route] entry (owner, reason, issue, removalCondition, evidence, expiresOn). First snapshot 2026-11-12 from main 0b82835e: 93 static, 2 isr, 19 param-prerender, 169 dynamic. The build must set CI=true like the workflows do: the /renders fixture routes are admitted only then, and they 404 as small static pages otherwise.",
+  "$comment": "Render mode and prerendered HTML bytes per route, from the CI mock-env build's prerender-manifest.json. Enforced by scripts/route-render-modes.mjs after the build in source-validation.yml (Exact-head Coverage) and ci.yml (Build + Layout). Entry: static | isr:<seconds> | param-prerender[:<seconds>] | dynamic, then html=<bytes> for a static or ISR page. A route may not lose cacheability, its HTML may not grow past recorded bytes plus max(5%, 4096 B), and a route with no entry fails closed. Written by `node apps/web/scripts/route-render-modes.mjs --next-dir apps/web/.next --write`, which adds, removes and tightens and never records a loss, or by `--admit-dynamic` / `--admit-from-log`, which inserts only a missing dynamic entry the check already named on an allowed prefix; an intended loss is a hand edit plus an unexpired overrides[route] entry (owner, reason, issue, removalCondition, evidence, expiresOn). First snapshot 2026-11-12 from main 0b82835e: 93 static, 2 isr, 19 param-prerender, 169 dynamic. The build must set CI=true like the workflows do: the /renders fixture routes are admitted only then, and they 404 as small static pages otherwise.",
   "schema": "jovie.route-render-modes/v1",
   "overrides": {},
   "routes": {
@@ -81,6 +81,7 @@
     "/app/admin/product": "dynamic",
     "/app/admin/releases": "dynamic",
     "/app/admin/revenue-lift": "dynamic",
+    "/app/admin/room": "dynamic",
     "/app/admin/screenshots": "dynamic",
     "/app/admin/share-studio": "dynamic",
     "/app/admin/shipping": "dynamic",

@@ -1,7 +1,8 @@
 /**
  * Render-mode ratchet policy: classification of a build's routes, the
  * cacheability order, comparison with the committed snapshot, and the
- * snapshot's only writer. The CLI and its messages are in
+ * snapshot's build writer. Dynamic admission lives in
+ * route-render-modes-admit.mjs. The CLI and its messages are in
  * route-render-modes.mjs.
  */
 import { gateWeakeningOverrideApplies } from './route-js-budget-policy.mjs';

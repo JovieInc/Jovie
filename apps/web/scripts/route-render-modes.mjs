@@ -24,6 +24,8 @@
  * origin/main.
  *
  * Usage: node scripts/route-render-modes.mjs [--next-dir .next] [--snapshot file] [--write] [--init] [--json]
+ *        node scripts/route-render-modes.mjs [--snapshot file] --admit-dynamic <route>
+ *        node scripts/route-render-modes.mjs [--snapshot file] --admit-from-log <file>
  */
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
@@ -31,6 +33,10 @@ import { fileURLToPath } from 'node:url';
 
 import { readBudgetAncestor } from './route-js-budget.mjs';
 import { gateWeakeningOverrideApplies } from './route-js-budget-policy.mjs';
+import {
+  admitDynamicRoutes,
+  planDynamicAdmissions,
+} from './route-render-modes-admit.mjs';
 import {
   classifyRoutes,
   compareRenderModes,
@@ -48,6 +54,10 @@ import {
   weakenedEntries,
 } from './route-render-modes-policy.mjs';
 
+export {
+  admitDynamicRoutes,
+  planDynamicAdmissions,
+} from './route-render-modes-admit.mjs';
 export {
   cacheabilityLoss,
   classifyRoutes,
@@ -171,22 +181,89 @@ function parseArgs(argv) {
     json: false,
     write: false,
     init: false,
+    /** @type {string[]} */
+    admitDynamic: [],
+    /** @type {string | null} */
+    admitFromLog: null,
   };
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index];
-    if (arg === '--next-dir') options.nextDir = resolve(argv[++index]);
-    else if (arg === '--snapshot')
-      options.snapshotPath = resolve(argv[++index]);
+    const next = () => {
+      const value = argv[++index];
+      if (!value || value.startsWith('--'))
+        throw new Error(`${arg} needs a value`);
+      return value;
+    };
+    if (arg === '--next-dir') options.nextDir = resolve(next());
+    else if (arg === '--snapshot') options.snapshotPath = resolve(next());
     else if (arg === '--json') options.json = true;
     else if (arg === '--write') options.write = true;
     else if (arg === '--init') options.init = true;
-    else throw new Error(`Unknown argument: ${arg}`);
+    else if (arg === '--admit-dynamic') options.admitDynamic.push(next());
+    else if (arg === '--admit-from-log') {
+      if (options.admitFromLog)
+        throw new Error('--admit-from-log accepts one log');
+      options.admitFromLog = resolve(next());
+    } else throw new Error(`Unknown argument: ${arg}`);
+  }
+  const admitting =
+    options.admitDynamic.length > 0 || options.admitFromLog !== null;
+  if (admitting && (options.write || options.init)) {
+    throw new Error(
+      '--admit-dynamic and --admit-from-log do not combine with --write or --init'
+    );
+  }
+  if (options.admitDynamic.length > 0 && options.admitFromLog) {
+    throw new Error(
+      '--admit-dynamic and --admit-from-log are mutually exclusive'
+    );
   }
   return options;
 }
 
+/** @param {ReturnType<typeof parseArgs>} options */
+function admitSnapshot(options) {
+  if (!existsSync(options.snapshotPath)) {
+    throw new Error(`${options.snapshotPath} is missing`);
+  }
+  const snapshot = JSON.parse(readFileSync(options.snapshotPath, 'utf8'));
+  const plan = options.admitFromLog
+    ? planDynamicAdmissions(readFileSync(options.admitFromLog, 'utf8'))
+    : {
+        ok: true,
+        admissions: options.admitDynamic.map(route => ({
+          route,
+          entry: /** @type {const} */ ('dynamic'),
+        })),
+        reason: '',
+      };
+  if (!plan.ok) {
+    console.error(`::error::${plan.reason}`);
+    process.exit(1);
+  }
+  const result = admitDynamicRoutes(snapshot, plan.admissions);
+  if (result.refused.length > 0 || result.changes.length === 0) {
+    console.error(`::error::${result.reason || 'no dynamic route admitted'}`);
+    process.exit(1);
+  }
+  writeFileSync(
+    options.snapshotPath,
+    `${JSON.stringify(result.snapshot, null, 2)}\n`
+  );
+  console.log(
+    JSON.stringify({
+      changed: result.changes.map(change => change.route),
+      routes: result.changes,
+    })
+  );
+}
+
 function main() {
   const options = parseArgs(process.argv.slice(2));
+  if (options.admitDynamic.length > 0 || options.admitFromLog) {
+    admitSnapshot(options);
+    return;
+  }
   const build = readBuild(options.nextDir);
   if (Object.keys(build.routes).length === 0)
     throw new Error(`No routes found in the build at ${options.nextDir}`);

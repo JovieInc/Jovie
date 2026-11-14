@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
+  admitDynamicRoutes,
   cacheabilityLoss,
   classifyRoutes,
   formatEntry,
@@ -10,6 +11,7 @@ import {
   htmlAllowance,
   isDynamicAllowed,
   parseEntry,
+  planDynamicAdmissions,
   SNAPSHOT_SCHEMA,
   validateSnapshotShape,
 } from './route-render-modes.mjs';
@@ -257,5 +259,69 @@ describe('render-mode ratchet', () => {
       '/start',
     ]);
     expect(result.notices[0]).toContain('3 route(s) are cheaper than recorded');
+  });
+});
+
+const ROOM_MISS =
+  '/app/admin/room (dynamic) has no entry in apps/web/scripts/route-render-modes.json (new routes fail closed). Add "/app/admin/room": "dynamic", or run `node apps/web/scripts/route-render-modes.mjs --next-dir apps/web/.next --write` on the CI mock-env build, and commit it.';
+
+describe('dynamic render-mode admission', () => {
+  it('admits only the dynamic route a CI log already named', () => {
+    const log = [
+      `2026-11-14T07:21:01.1705375Z ##[error]${ROOM_MISS}`,
+      'Exact-head Coverage\tRender modes\t2026-11-14T07:21:01.1741144Z ##[error]Process completed with exit code 1.',
+    ].join('\n');
+    const plan = planDynamicAdmissions(log);
+    expect(plan.ok).toBe(true);
+    expect(plan.admissions).toEqual([
+      { route: '/app/admin/room', entry: 'dynamic' },
+    ]);
+    const before = snapshot({
+      '/app/admin/releases': 'dynamic',
+      '/app/admin/screenshots': 'dynamic',
+    });
+    const result = admitDynamicRoutes(before, plan.admissions);
+    expect(result.refused).toEqual([]);
+    expect(result.changes).toEqual([
+      {
+        kind: 'added',
+        route: '/app/admin/room',
+        from: null,
+        to: 'dynamic',
+      },
+    ]);
+    expect(Object.keys(result.snapshot.routes)).toEqual([
+      '/app/admin/releases',
+      '/app/admin/room',
+      '/app/admin/screenshots',
+    ]);
+    expect(before.routes['/app/admin/room']).toBeUndefined();
+  });
+
+  it('refuses a route outside the dynamic prefixes and an existing key', () => {
+    const outside = admitDynamicRoutes(snapshot({}), [
+      { route: '/about', entry: 'dynamic' },
+    ]);
+    expect(outside.refused).toEqual(['/about']);
+    expect(outside.changes).toEqual([]);
+    expect(outside.snapshot.routes['/about']).toBeUndefined();
+
+    const current = snapshot({ '/app/admin/room': 'dynamic' });
+    const existing = admitDynamicRoutes(current, [
+      { route: '/app/admin/room', entry: 'dynamic' },
+    ]);
+    expect(existing.refused).toEqual(['/app/admin/room']);
+    expect(existing.snapshot).toBe(current);
+  });
+
+  it('refuses a log that also names another error or a non-dynamic miss', () => {
+    expect(
+      planDynamicAdmissions(`::error::${ROOM_MISS}\n::error::cacheability lost`)
+        .ok
+    ).toBe(false);
+    const staticMiss =
+      '/about (static html=30000) has no entry in apps/web/scripts/route-render-modes.json (new routes fail closed). Add "/about": "static html=30000"';
+    expect(planDynamicAdmissions(`##[error]${staticMiss}`).ok).toBe(false);
+    expect(planDynamicAdmissions('').reason).toBe('no dynamic route admitted');
   });
 });

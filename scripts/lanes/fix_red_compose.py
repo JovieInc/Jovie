@@ -12,11 +12,13 @@ import types
 def compose_actions(actions: list[str]) -> list[str]:
     """Stable order for leaf actions. Drops anything outside the order, including `compose`."""
     import fix_red_classes as classes
+    import fix_red_render_modes
 
     order = (
         classes.SYNC_MAIN, classes.STAMP_CHANGELOG, classes.WIRE_CI_FAST, classes.RENUMBER,
         classes.SNAP_SPACING, classes.STRIP_CACHE, classes.MERGE_NARROWED, classes.REGISTER_DOMAIN,
-        classes.ATOMIC_WRITE, classes.REPAIR_SCREEN_CERT, classes.BALANCE_HEADINGS, classes.UI_FEEL, classes.RERUN)
+        classes.ATOMIC_WRITE, classes.REPAIR_SCREEN_CERT, classes.BALANCE_HEADINGS, classes.UI_FEEL,
+        fix_red_render_modes.ACTION, classes.RERUN)
     rank = {name: index for index, name in enumerate(order)}
     chosen: list[str] = []
     for action in actions:
@@ -42,13 +44,17 @@ def deterministic_fixer(lane, action: str):
     """Resolve leaf fixers on the owning runner, including after a loader rebind."""
     import fix_red_classes as classes
 
-    return lane.fix_red_screen_cert.dispatch(classes, lane.sh, {
+    import fix_red_render_modes
+
+    table = lane.fix_red_screen_cert.dispatch(classes, lane.sh, {
         "wire": lane.wire_ci_fast_fix, "atomic": lane.atomic_state_fix,
         "renumber": lane.renumber_migrations_fix, "snap": lane.snap_spacing_fix,
         "strip": lane.strip_cache_exports_fix, "merge": lane.merge_narrowed_preflight_fix,
         "register": lane.register_domain_writes_fix,
         "ui": lane.fix_red_screen_cert.bind_ui_feel(lane.sh, lane.failed_logs, classes),
-    }).get(action)
+    })
+    table[fix_red_render_modes.ACTION] = fix_red_render_modes.bind(lane.sh, lane.failed_logs)
+    return table.get(action)
 
 
 def compose_deterministic_fix(lane, host, pr, route, worktree, log, receipt):
@@ -99,5 +105,9 @@ def repair_files(cls, action, names, logs, per_check):
         files = sorted(set(files) | set(classes._domain_write_hits("\n".join(logs.get(name) or "" for name in names))))
     if "detached-native-consumer" in wanted and (cls == "detached-native-consumer" or action == classes.COMPOSE):
         files = sorted(set(files) | set(detached_native_sync.paths(
+            "\n".join(logs.get(name) or "" for name in names))))
+    if "render-mode-admission" in wanted and action in {"admit-render-mode", classes.COMPOSE}:
+        import fix_red_render_modes
+        files = sorted(set(files) | set(fix_red_render_modes.routes_in(
             "\n".join(logs.get(name) or "" for name in names))))
     return files
