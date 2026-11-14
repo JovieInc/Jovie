@@ -21,6 +21,7 @@ import {
   resolveLinearIssueByFingerprint,
   upsertLinearIssueByTitleFingerprint,
 } from './lib/linear-issue-intake.mjs';
+import { logFailedLinearAction, withLinearRetry } from './lib/linear-retry.mjs';
 import {
   issueDescription,
   issueTitle,
@@ -374,29 +375,47 @@ async function main() {
     const devin = await resolveLabelId('devin', process.env.LINEAR_API_KEY);
     if (!devin) throw new Error('Linear label "devin" not found');
     for (const g of plan.upserts.slice(0, MAX_UPSERTS_PER_RUN)) {
-      const r = await upsertLinearIssueByTitleFingerprint({
-        fingerprint: g.fingerprint,
-        title: issueTitle(g),
-        description: issueDescription(g),
-        priority: LINEAR_PRIORITY[g.severity],
-        createStateName: 'Todo',
-        reopenTerminal: true,
-        createLabelIds: [devin],
-      });
-      receipt.actions.push({
+      const r = await withLinearRetry(
+        () =>
+          upsertLinearIssueByTitleFingerprint({
+            fingerprint: g.fingerprint,
+            title: issueTitle(g),
+            description: issueDescription(g),
+            priority: LINEAR_PRIORITY[g.severity],
+            createStateName: 'Todo',
+            reopenTerminal: true,
+            createLabelIds: [devin],
+          }),
+        { fingerprint: g.fingerprint, op: 'upsert' }
+      );
+      const action = {
         fingerprint: g.fingerprint,
         op: 'upsert',
         ok: r.ok,
         action: r.action,
         id: r.identifier,
-      });
-      if (!r.ok) process.exitCode = 1;
+      };
+      if (!r.ok) action.reason = r.reason;
+      receipt.actions.push(action);
+      if (!r.ok) {
+        logFailedLinearAction(action);
+        process.exitCode = 1;
+      }
     }
     if (plan.closes.length > 0) {
-      const scan = await listSecadvIssueCandidates({
-        apiKey: process.env.LINEAR_API_KEY,
-      });
+      const scan = await withLinearRetry(
+        () =>
+          listSecadvIssueCandidates({
+            apiKey: process.env.LINEAR_API_KEY,
+          }),
+        { fingerprint: 'secadv-close-scan', op: 'scan' }
+      );
       if (!scan.ok) {
+        logFailedLinearAction({
+          fingerprint: 'secadv-close-scan',
+          op: 'scan',
+          reason: scan.reason,
+        });
         receipt.actions.push({
           fingerprint: 'secadv-close-scan',
           op: 'scan',
@@ -417,6 +436,8 @@ async function main() {
             `Fixed on main at ${g.fixedAt} and deployed: Production deployment at ${g.deployedAt} postdates the fix.`,
         });
         receipt.actions.push(...closeResult.actions);
+        for (const a of closeResult.actions)
+          if (!a.ok) logFailedLinearAction(a);
         if (!closeResult.ok) process.exitCode = 1;
       }
     }

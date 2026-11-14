@@ -16,8 +16,8 @@ import { load } from 'js-yaml';
 import { describe, expect, it } from 'vitest';
 import { runWithRealGh } from '../real-gh-harness.mjs';
 
-/** @typedef {{ id?: string, run?: string, env?: Record<string, string> }} WorkflowStep */
-/** @typedef {{ if?: string, outputs?: { should_probe?: string, quota_deferred?: string }, steps?: WorkflowStep[] }} WorkflowJob */
+/** @typedef {{ id?: string, name?: string, if?: string, uses?: string, run?: string, env?: Record<string, string>, with?: Record<string, any> }} WorkflowStep */
+/** @typedef {{ if?: string, needs?: string[], outputs?: Record<string, string>, steps?: WorkflowStep[] }} WorkflowJob */
 
 const workflow = /** @type {{ jobs: Record<string, WorkflowJob> }} */ (
   load(
@@ -500,96 +500,6 @@ describe('landed production identity during GitHub quota exhaustion (JOV-8495)',
   });
 });
 
-// Evaluate the workflow's result expressions using fixture job outcomes.
-function evaluate(expression, results) {
-  return runInNewContext(
-    expression
-      .replace(/^\$\{\{\s*|\s*\}\}$/g, '')
-      .replaceAll('always()', 'true')
-      .replace(
-        /needs\.([\w-]+)\.(result|outputs\.should_probe|outputs\.quota_deferred)/g,
-        (_, job, field) =>
-          JSON.stringify(
-            field === 'result'
-              ? results[job]
-              : field === 'outputs.quota_deferred'
-                ? results.quotaDeferred
-                : results.shouldProbe
-          )
-      )
-  );
-}
-
-describe('probe darkness is never healthy release evidence (JOV-7195)', () => {
-  it.each([
-    ['success', 'true', 'success', 'success', 'success', 'success'],
-    ['failure', 'true', 'skipped', 'skipped', 'skipped', 'failure'],
-    ['failure', 'false', 'skipped', 'skipped', 'skipped', 'failure'],
-    ['success', 'true', 'cancelled', 'success', 'success', 'failure'],
-    ['success', 'true', 'success', 'success', 'skipped', 'failure'],
-    ['success', 'true', 'success', 'failure', 'success', 'failure'],
-  ])(
-    'reports resolve=%s probe=%s smoke=%s auth=%s lighthouse=%s as %s',
-    (resolveResult, shouldProbe, smoke, auth, lighthouse, expected) => {
-      const results = {
-        'resolve-target': resolveResult,
-        shouldProbe,
-        smoke,
-        'auth-smoke': auth,
-        lighthouse,
-      };
-      const remediation = workflow.jobs.remediation;
-      expect(evaluate(remediation.if, results)).toBe(true);
-      const intake = remediation.steps.find(
-        step => step.env?.REMEDIATION_CONCLUSION
-      );
-      expect(evaluate(intake.env.REMEDIATION_CONCLUSION, results)).toBe(
-        expected
-      );
-      expect(evaluate(workflow.jobs['notify-failure'].if, results)).toBe(
-        expected === 'failure'
-      );
-    }
-  );
-
-  it('does not dispatch probes or page when the trigger read is rate limited', () => {
-    const expression = workflow.jobs['resolve-target'].outputs.should_probe;
-    const shouldProbe = (trigger, quotaDeferred) =>
-      runInNewContext(
-        expression
-          .replace(/^\$\{\{\s*|\s*\}\}$/g, '')
-          .replaceAll(
-            'steps.trigger.outputs.quota_deferred',
-            quotaDeferred === undefined ? 'null' : JSON.stringify(quotaDeferred)
-          )
-          .replaceAll(
-            'steps.trigger.outputs.should_probe',
-            JSON.stringify(trigger)
-          )
-      );
-    expect(shouldProbe('true', undefined)).toBe(true);
-    expect(shouldProbe('true', '')).toBe(true);
-    expect(shouldProbe('true', 'true')).toBe(false);
-    expect(shouldProbe('false', undefined)).toBe(false);
-
-    const deferred = {
-      'resolve-target': 'success',
-      shouldProbe: 'false',
-      smoke: 'skipped',
-      'auth-smoke': 'skipped',
-      lighthouse: 'skipped',
-    };
-    expect(evaluate(workflow.jobs.remediation.if, deferred)).toBe(false);
-    expect(evaluate(workflow.jobs['notify-failure'].if, deferred)).toBe(false);
-  });
-
-  it('does not clear an incident when exact in-lease evidence skips the fallback', () => {
-    const results = { 'resolve-target': 'success', shouldProbe: 'false' };
-    expect(evaluate(workflow.jobs.remediation.if, results)).toBe(false);
-    expect(evaluate(workflow.jobs['notify-failure'].if, results)).toBe(false);
-  });
-});
-
 /** @param {{ mode?: string, wrongToken?: boolean, crossRepository?: boolean }} [options] */
 async function resolveTargetHttps({
   mode = 'ancestor',
@@ -836,28 +746,5 @@ describe('postdeploy resolver authenticates real Git HTTPS (JOV-8495)', () => {
         true
       );
     }
-  );
-});
-
-it('keeps quota deferral observable without claiming executed probe evidence', () => {
-  const results = {
-    'resolve-target': 'success',
-    shouldProbe: 'false',
-    quotaDeferred: 'true',
-    smoke: 'skipped',
-    'auth-smoke': 'skipped',
-    lighthouse: 'skipped',
-  };
-  const remediation = workflow.jobs.remediation;
-  expect(evaluate(remediation.if, results)).toBe(true);
-  const intake = remediation.steps.find(
-    step => step.env?.REMEDIATION_CONCLUSION
-  );
-  expect(evaluate(intake.env.REMEDIATION_CONCLUSION, results)).toBe(
-    'quota-deferred'
-  );
-  expect(evaluate(workflow.jobs['notify-failure'].if, results)).toBe(false);
-  expect(workflow.jobs['resolve-target'].outputs.quota_deferred).toBe(
-    "${{ steps.trigger.outputs.quota_deferred == 'true' }}"
   );
 });

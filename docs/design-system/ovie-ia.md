@@ -12,8 +12,8 @@ the screen inventory it covers is `APP_SCREEN_SOURCES` in the same folder.
    Pages pass `title` to `AdminPage` and never render an `h1`.
 2. **Sub-navigation.** One primitive family, owned by `AdminPage`:
    - `views=` for separate routes behind one sidebar row (Shipping:
-     Pipeline, Product, Timeline; Fleet: Health, Agents). It renders the
-     canonical `RouteSegmentControl` in the page toolbar, the same control
+     Pipeline, Product, Timeline; Fleet: Health, Agents, Room). It renders
+     the canonical `RouteSegmentControl` in the page toolbar, the same control
      Jovie's Audience uses. The view label equals the page title.
    - `tabs=` for views of the same data inside one destination (People,
      Platform Connections, Playlists, Agents). It renders

@@ -16,21 +16,14 @@ export const REQUIRED_MERGE_STATUSES = [
 /** Canonical native merge-queue operating policy (controller + repo guardrails). */
 export const MERGE_QUEUE_POLICY = Object.freeze({
   enqueueLabel: null,
-  // 12→16 on 2026-07-09 per JOV-3833 decision trigger (ready→merged p95 718m
-  // vs 15m target after one week live; queue-depth deferral was a binding
-  // constraint during merge waves). Re-evaluate if runner-pool saturation
-  // (per-job queue wait >3m) returns.
+  // JOV-3833: depth 12→16 after p95 718m vs 15m target; revisit at >3m runner waits.
   maxQueueDepth: 16,
   perAgentEnqueueLimitPerHour: 6,
   queueTimeoutMinutes: 60,
   rulesetId: '10512119',
 });
 
-/**
- * Typed immutable native group policy (JOV-8112). Singleton groups start
- * immediately and keep each PR's synthetic head and path-selected product
- * lanes independent from slow or starved siblings.
- */
+/** JOV-8112: immediate singleton groups isolate each PR's head and product lanes. */
 export const NATIVE_QUEUE_COHORT_POLICY = Object.freeze({
   schema: 'jovie-native-queue-cohort/v1',
   minEntriesToMerge: 1,
@@ -537,6 +530,12 @@ export const FORBIDDEN_PINNED_JOB_CONTEXTS = Object.freeze([
   'Golden Path Lock',
   'CI / Visual Snapshot Compare',
   'Visual Snapshot Compare',
+  'CI / Visual Snapshot Compare (homepage)',
+  'Visual Snapshot Compare (homepage)',
+  'CI / Visual Snapshot Compare (marketing DOM)',
+  'Visual Snapshot Compare (marketing DOM)',
+  'CI / Visual Snapshot Compare (marketing routes)',
+  'Visual Snapshot Compare (marketing routes)',
   'CI / Layout Guard',
   'Layout Guard',
   'CI / Build + Layout (combined)',

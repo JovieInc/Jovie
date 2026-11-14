@@ -131,25 +131,47 @@ describe('ci-pr-ready source lane', () => {
   });
 
   it('treats a skipped visual compare as red on homepage and marketing PRs (JOV-5960)', () => {
-    for (const flag of ['run_homepage_visual', 'run_marketing_dom']) {
+    // Move 2 split: each flag selects the shared build plus its own suites.
+    const flagSuites = {
+      run_homepage_visual: ['ci-visual-snapshot-homepage'],
+      run_marketing_dom: [
+        'ci-visual-marketing-dom',
+        'ci-visual-marketing-routes',
+      ],
+    } as const;
+    for (const [flag, suites] of Object.entries(flagSuites)) {
       const outputs = {
         'ci-path-changes.run_homepage_visual': 'false',
         'ci-path-changes.run_marketing_dom': 'false',
         [`ci-path-changes.${flag}`]: 'true',
       };
-      const skipped = runReady('ci-pr-ready', {
+      const skippedBuild = runReady('ci-pr-ready', {
         outputs,
         results: { 'ci-visual-snapshot-compare': 'skipped' },
       });
-      expect(skipped.status, flag).toBe(1);
-      expect(skipped.stdout).toContain('skipped is not green');
+      expect(skippedBuild.status, flag).toBe(1);
+      expect(skippedBuild.stdout).toContain('skipped is not green');
+      // A skipped selected suite is red even when the shared build passed.
+      for (const suite of suites) {
+        const skippedSuite = runReady('ci-pr-ready', {
+          outputs,
+          results: { [suite]: 'skipped' },
+        });
+        expect(skippedSuite.status, `${flag}:${suite}`).toBe(1);
+        expect(skippedSuite.stdout).toContain('skipped is not green');
+      }
     }
     const unrelated = runReady('ci-pr-ready', {
       outputs: {
         'ci-path-changes.run_homepage_visual': 'false',
         'ci-path-changes.run_marketing_dom': 'false',
       },
-      results: { 'ci-visual-snapshot-compare': 'skipped' },
+      results: {
+        'ci-visual-snapshot-compare': 'skipped',
+        'ci-visual-snapshot-homepage': 'skipped',
+        'ci-visual-marketing-dom': 'skipped',
+        'ci-visual-marketing-routes': 'skipped',
+      },
     });
     expect(unrelated.status, unrelated.stdout).toBe(0);
   });
@@ -170,6 +192,9 @@ describe('ci-merge-group-ready combined head', () => {
     ['ci-golden-eval-set', 'run_golden_eval_set'],
     ['ci-lighthouse-dashboard-pr', 'run_golden_path'],
     ['ci-lighthouse-onboarding-pr', 'run_golden_path'],
+    ['ci-visual-snapshot-homepage', 'run_homepage_visual'],
+    ['ci-visual-marketing-dom', 'run_marketing_dom'],
+    ['ci-visual-marketing-routes', 'run_marketing_dom'],
   ];
 
   it('accepts skipped lanes only when their paths were not selected', () => {

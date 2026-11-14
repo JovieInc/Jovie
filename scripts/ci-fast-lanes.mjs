@@ -23,10 +23,34 @@
  *   CI_FAST_ONLY_STRUCTURAL — "true" to run only the structural lane
  *   CI_FAST_FAIL_FAST — "false" to run every selected lane even after a failure
  *   CI_FAST_STRUCTURAL_CONCURRENCY — structural commands run at once (default 3)
- *   CI_FAST_STRUCTURAL_LANES — only|skip the lanes coverage pytest (its own job)
+ *   CI_FAST_STRUCTURAL_LANES — only|skip the lanes coverage pytest (its own
+ *     matrix job), or only:<group> for one matrix leg (see
+ *     LANES_COVERAGE_GROUP_COMMANDS)
+ *   CI_FAST_STRUCTURAL_SHARD — "k/n" (1-based) runs only shard k of the
+ *     structural command pool (ci-fast (structural core) matrix); unset runs
+ *     the whole pool. Invalid values fail closed.
  *   CI_FAST_STRUCTURAL_ABORT_STATUS_FILE — background cheap-lane exit status;
  *     non-zero stops starting structural commands (fail-fast)
  */
+
+import {
+  LANES_COVERAGE_FLOORS,
+  LANES_PYTEST_SHARDS,
+  lanesCoverageGroupCommands,
+  lanesCoverageRun,
+  selectStructuralShard,
+} from './lib/ci-structural-shards.mjs';
+
+export {
+  LANES_COVERAGE_FLOORS,
+  LANES_COVERAGE_GROUP_SHARDS,
+  LANES_PYTEST_FILES,
+  LANES_PYTEST_SHARD_EXPRESSION,
+  LANES_PYTEST_SHARDS,
+  LANES_RETRY_FUNCTION,
+  lanesReceiptRanSuite,
+  selectStructuralShard,
+} from './lib/ci-structural-shards.mjs';
 
 import {
   escapeAnnotationMessage,
@@ -801,93 +825,12 @@ export const STRUCTURAL_WEB_JOB_PREFIXES = Object.freeze([
   'pnpm --dir apps/web exec ',
 ]);
 
-/** Files of the lanes coverage suite (one coverage map, sharded below). */
-export const LANES_PYTEST_FILES = Object.freeze(
-  'scripts/tests/test_factory_signals.py scripts/tests/test_factory_intake.py scripts/tests/test_backlog_admission.py scripts/tests/test_backlog_writer_guard.py scripts/tests/test_board_intake.py scripts/tests/test_capacity_limit.py scripts/tests/test_claude_lane.py scripts/tests/test_cloud_lane.py scripts/tests/test_codex_lane.py scripts/tests/test_conftest_host_isolation.py scripts/tests/test_continuity_clock.py scripts/tests/test_design_gate.py scripts/tests/test_devin_free_policy.py scripts/tests/test_disk_guard.py scripts/tests/test_doctor.py scripts/tests/test_public_feed.py scripts/tests/test_health_checks.py scripts/tests/test_main_health.py scripts/tests/test_epics.py scripts/tests/test_fix_red_statement_merge.py scripts/tests/test_execution_attempt.py scripts/tests/test_gh_app_token.py scripts/tests/test_hud.py scripts/tests/test_hyperagent_cli.py scripts/tests/test_hyperagent_lane.py scripts/tests/test_issue_routing.py scripts/tests/test_lane_runner.py scripts/tests/test_model_families.py scripts/tests/test_model_pools.py scripts/tests/test_model_pool_guard.py scripts/tests/test_model_pool_calls.py scripts/tests/test_model_radar.py scripts/tests/test_pr_events.py scripts/tests/test_pr_events_repair_evidence.py scripts/tests/test_pr_events_red_repair.py scripts/tests/test_pr_body_markup.py scripts/tests/test_priority_admission.py scripts/tests/test_qualification_guard.py scripts/tests/test_reason_lane.py scripts/tests/test_remediation.py scripts/tests/test_repair_order.py scripts/tests/test_repair_win.py scripts/tests/test_service_census.py scripts/tests/test_shipping_attribution.py scripts/tests/test_shipping_origin.py scripts/tests/test_telegram_archive.py scripts/tests/test_worktree_pool.py scripts/tests/test_worktree_sweep.py'.split(
-    ' '
-  )
+const LANES_COVERAGE_RUN = lanesCoverageRun(LANES_PYTEST_SHARDS, 'jovie-lanes');
+export const LANES_COVERAGE_GROUP_COMMANDS = lanesCoverageGroupCommands(
+  LANES_PYTEST_SHARDS,
+  lanesCoverageRun,
+  structuralPythonRegression
 );
-
-/**
- * The lanes coverage pytest is ci-fast (remaining)'s long pole: 308.5s of
- * the job's 5.2 min in merge group 39479966697 (2026-10-20). The old split
- * (`-k UpdateTest` vs the rest) had drifted to ~5% / ~95% of the suite as it
- * grew, so the second shard ran almost serially. Four concurrent shards on
- * the 4 vCPU runner, balanced on a serial --durations run (378s local):
- *  - a / b: test_lane_runner.py (138s) with `-k EXPR` and `-k "not (EXPR)"`
- *    over that one file, so each of its tests runs exactly once. EXPR names
- *    its four slowest classes (~83s); a rename that empties shard a fails it
- *    (pytest exit 5).
- *  - c / d: every other file exactly once. Measured concurrently (4 shards,
- *    2026-10-20): a 111s, b 88s, c 140s, d 179s before test_worktree_pool.py
- *    moved to c; serial was 405s.
- * `coverage combine` merges the four branch-coverage maps before the
- * unchanged per-module thresholds read them.
- */
-export const LANES_PYTEST_SHARD_EXPRESSION =
-  'DependencyOnlyGateTest or RunAgentTest or PreservedRecoveryTest or UpdateTest';
-
-const LANES_RUNNER_FILE = 'scripts/tests/test_lane_runner.py';
-const LANES_SHARD_C_FILES = Object.freeze([
-  'scripts/tests/test_remediation.py',
-  'scripts/tests/test_execution_attempt.py',
-  'scripts/tests/test_codex_lane.py',
-  'scripts/tests/test_worktree_sweep.py',
-  'scripts/tests/test_worktree_pool.py',
-]);
-
-/** @type {ReadonlyArray<{ id: string, files: readonly string[], keyword?: string }>} */
-export const LANES_PYTEST_SHARDS = Object.freeze([
-  {
-    id: 'a',
-    files: [LANES_RUNNER_FILE],
-    keyword: LANES_PYTEST_SHARD_EXPRESSION,
-  },
-  {
-    id: 'b',
-    files: [LANES_RUNNER_FILE],
-    keyword: `not (${LANES_PYTEST_SHARD_EXPRESSION})`,
-  },
-  { id: 'c', files: LANES_SHARD_C_FILES },
-  {
-    id: 'd',
-    files: LANES_PYTEST_FILES.filter(
-      file => file !== LANES_RUNNER_FILE && !LANES_SHARD_C_FILES.includes(file)
-    ),
-  },
-]);
-
-/**
- * Retry a lanes pytest shard's failed nodes once, only when one to three
- * nodes failed (a wider failure is a real regression, never retried).
- * Merge-group ejections of unrelated product PRs came from timing-sensitive
- * lanes tests: test_update_installs_tested_release_and_only_moves_the_symlink
- * ejected 7 distinct PRs in 17h, each discarding the groups queued behind it.
- * A deterministic failure fails twice and still fails the shard; a pass on the
- * retry is surfaced as a ::warning naming the node so the flake stays visible.
- * POSIX sh: the shard output goes through a log file because sh has no
- * pipefail. Coverage from the retry appends to the shard's data file.
- */
-export const LANES_RETRY_FUNCTION =
-  'lanes_retry() { lr_id="$1"; lr_rc="$2"; lr_log="$3"; ' +
-  'if [ "$lr_rc" -eq 0 ] || [ "$lr_rc" -eq 5 ]; then return "$lr_rc"; fi; ' +
-  'lr_nodes="$(sed -n \'s/^FAILED \\(scripts\\/[^ ]*\\).*/\\1/p\' "$lr_log" | sort -u)"; ' +
-  'lr_n="$(printf \'%s\\n\' "$lr_nodes" | grep -c .)"; ' +
-  'if [ "$lr_n" -lt 1 ] || [ "$lr_n" -gt 3 ]; then return "$lr_rc"; fi; ' +
-  'echo "::warning title=lanes pytest retry::shard $lr_id retried $lr_n failed node(s) once: $(printf \'%s \' $lr_nodes)"; ' +
-  'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-lanes-$lr_id.coverage" python3 -m coverage run -a --branch -m pytest $lr_nodes -q -p no:cacheprovider --basetemp="${RUNNER_TEMP:-/tmp}/jovie-lanes-pytest-$lr_id-retry"; }; ';
-
-/** @param {{ id: string, files: readonly string[], keyword?: string }} shard */
-const lanesCoverageShard = ({ id, files, keyword }) =>
-  `{ lanes_log="\${RUNNER_TEMP:-/tmp}/jovie-lanes-${id}.log"; PYTEST_ADDOPTS=-rf COVERAGE_FILE="\${RUNNER_TEMP:-/tmp}/jovie-lanes-${id}.coverage" python3 -m coverage run --branch -m pytest ${files.join(' ')} -q -p no:cacheprovider --basetemp="\${RUNNER_TEMP:-/tmp}/jovie-lanes-pytest-${id}"${keyword ? ` -k "${keyword}"` : ''} > "$lanes_log" 2>&1; lanes_rc=$?; cat "$lanes_log"; lanes_retry ${id} "$lanes_rc" "$lanes_log"; }`;
-
-const [LANES_LAST_SHARD] = LANES_PYTEST_SHARDS.slice(-1);
-const LANES_BACKGROUND_SHARDS = LANES_PYTEST_SHARDS.slice(0, -1);
-// Every background shard is waited on (no short-circuit), so none outlives
-// the command. The first non-zero shard status is the command's status (the
-// qualifiers in automation-verify read pytest/coverage exit codes), and it
-// fails the command before coverage is combined.
-const LANES_COVERAGE_RUN = `{ ${LANES_RETRY_FUNCTION}${LANES_BACKGROUND_SHARDS.map(shard => `${lanesCoverageShard(shard)} & lanes_${shard.id}=$!;`).join(' ')} ${lanesCoverageShard(LANES_LAST_SHARD)}; lanes_status=$?; ${LANES_BACKGROUND_SHARDS.map(shard => `wait "$lanes_${shard.id}"; lanes_shard=$?; [ "$lanes_status" -ne 0 ] || lanes_status=$lanes_shard;`).join(' ')} (exit "$lanes_status"); } && COVERAGE_FILE="\${RUNNER_TEMP:-/tmp}/jovie-lanes.coverage" python3 -m coverage combine ${LANES_PYTEST_SHARDS.map(shard => `"\${RUNNER_TEMP:-/tmp}/jovie-lanes-${shard.id}.coverage"`).join(' ')}`;
 
 /**
  * Structural Python regressions, split so the pool can overlap them. Each
@@ -903,34 +846,17 @@ export const API_CLIENT_PY_COMMAND = structuralPythonRegression(
   'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-apiclient.coverage" python3 -m coverage run --branch --include="*/scripts/apiclient/*" -m pytest scripts/tests/test_apiclient.py scripts/tests/test_apiclient_adapters.py scripts/tests/test_apiclient_conformance.py scripts/tests/test_apiclient_pricing.py -q -p no:cacheprovider --basetemp="${RUNNER_TEMP:-/tmp}/jovie-apiclient-pytest" && COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-apiclient.coverage" python3 -m coverage report --fail-under=85'
 );
 
+const LANES_COVERAGE_REPORT_COMMANDS = LANES_COVERAGE_FLOORS.map(
+  ({ include, floor }) =>
+    'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-lanes.coverage" python3 -m coverage report --include="' +
+    include +
+    '" --fail-under=' +
+    floor
+);
+
 // Run the CPU-heavy coverage shards alone; keep every main-branch floor.
 export const LANES_COVERAGE_COMMAND = structuralPythonRegression(
-  [
-    LANES_COVERAGE_RUN,
-    'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-lanes.coverage" python3 -m coverage report --include="*/scripts/lanes/backlog_admission.py" --fail-under=90',
-    'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-lanes.coverage" python3 -m coverage report --include="*/scripts/lanes/priority_admission.py" --fail-under=80',
-    'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-lanes.coverage" python3 -m coverage report --include="*/scripts/lanes/backlog_writer_guard.py" --fail-under=90',
-    'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-lanes.coverage" python3 -m coverage report --include="*/scripts/lanes/board_intake.py" --fail-under=85',
-    'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-lanes.coverage" python3 -m coverage report --include="*/scripts/lanes/hud.py" --fail-under=80',
-    'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-lanes.coverage" python3 -m coverage report --include="*/scripts/lanes/capacity_limit.py" --fail-under=90',
-    'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-lanes.coverage" python3 -m coverage report --include="*/scripts/lanes/qualification_guard.py" --fail-under=85',
-    'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-lanes.coverage" python3 -m coverage report --include="*/scripts/lanes/lane_runner.py,*/scripts/lanes/pr_events.py,*/scripts/lanes/reason_lane.py,*/scripts/lanes/gbrain_catalog.py,*/scripts/lanes/design_gate.py,*/scripts/lanes/doctor.py,*/scripts/lanes/public_feed.py,*/scripts/lanes/disk_guard.py,*/scripts/lanes/continuity_clock.py" --fail-under=85',
-    'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-lanes.coverage" python3 -m coverage report --include="*/scripts/hyperagent/*.py" --fail-under=90',
-    'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-lanes.coverage" python3 -m coverage report --include="*/scripts/lanes/hyperagent_lane.py" --fail-under=95',
-    'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-lanes.coverage" python3 -m coverage report --include="*/scripts/lanes/devin_free_policy.py" --fail-under=85',
-    'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-lanes.coverage" python3 -m coverage report --include="*/scripts/lanes/claude_lane.py" --fail-under=95',
-    'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-lanes.coverage" python3 -m coverage report --include="*/scripts/lanes/codex_lane.py" --fail-under=85',
-    'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-lanes.coverage" python3 -m coverage report --include="*/scripts/lanes/cloud_lane*.py" --fail-under=90',
-    'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-lanes.coverage" python3 -m coverage report --include="*/scripts/lanes/worktree_sweep.py" --fail-under=85',
-    'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-lanes.coverage" python3 -m coverage report --include="*/scripts/lanes/service_census.py" --fail-under=85',
-    'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-lanes.coverage" python3 -m coverage report --include="*/scripts/lanes/epics.py" --fail-under=90',
-    'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-lanes.coverage" python3 -m coverage report --include="*/scripts/lanes/execution_attempt.py" --fail-under=85',
-    'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-lanes.coverage" python3 -m coverage report --include="*/scripts/lanes/merge_evidence.py" --fail-under=85',
-    'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-lanes.coverage" python3 -m coverage report --include="*/scripts/lanes/worktree_pool.py" --fail-under=85',
-    'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-lanes.coverage" python3 -m coverage report --include="*/scripts/lanes/dependency_diff.py" --fail-under=95',
-    'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-lanes.coverage" python3 -m coverage report --include="*/scripts/lanes/remediation.py" --fail-under=85',
-    'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-lanes.coverage" python3 -m coverage report --include="*/scripts/lanes/model_radar.py" --fail-under=90 && COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-lanes.coverage" python3 -m coverage report --include="*/scripts/lanes/model_pools.py" --fail-under=95 && COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-lanes.coverage" python3 -m coverage report --include="*/scripts/lanes/model_pool_guard.py" --fail-under=95 && COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-lanes.coverage" python3 -m coverage report --include="*/scripts/lanes/model_pool_calls.py" --fail-under=95',
-  ].join(' && ')
+  [LANES_COVERAGE_RUN, ...LANES_COVERAGE_REPORT_COMMANDS].join(' && ')
 );
 
 export const STRUCTURAL_PYTHON_REGRESSION_COMMANDS = Object.freeze([
@@ -1171,7 +1097,10 @@ export const RELEASE_LINEAGE_CONTRACT_COMMAND =
 export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/merge-group-failure-hold.test.mjs',
   'scripts/lib/__tests__/mesh-host-ack.test.mjs',
+  'scripts/lib/__tests__/automation-liveness-lost-state-recovery.test.mjs',
   'scripts/lib/__tests__/canonical-profile-json-handoff.test.mjs',
+  'scripts/lib/__tests__/merge-group-shard-failure-hold.test.mjs',
+  'scripts/lib/__tests__/ci-structural-shards.test.mjs',
   'scripts/lib/__tests__/merge-group-sibling-burn-contract.test.mjs',
   'scripts/lib/__tests__/gh-api-hold-retry.test.mjs',
   'scripts/lib/__tests__/prod-cert.test.mjs',
@@ -1187,6 +1116,7 @@ export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/mesh-current-wire.test.mjs',
   'scripts/lib/__tests__/summer-improvement-loop-config.test.mjs',
   'scripts/lib/__tests__/merge-group-ahead-attribution.test.mjs',
+  'scripts/lib/__tests__/merge-group-shard-attribution.test.mjs',
   'scripts/lib/__tests__/blog-content-ci.test.mjs',
   'scripts/lib/__tests__/vendored-actions.test.mjs',
   'scripts/lib/__tests__/api-quota-report.test.mjs',
@@ -1199,6 +1129,7 @@ export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/mutation-diff-workflow.test.mjs',
   'scripts/lib/__tests__/component-certificate-workflow.test.mjs',
   'scripts/lib/__tests__/component-certificate-delivery.test.mjs',
+  'scripts/lib/__tests__/component-certificate-ordering.test.mjs',
   'scripts/lib/__tests__/component-certificate-producer.test.mjs',
   'scripts/lib/__tests__/storybook-certification-matrix.test.mjs',
   'scripts/lib/__tests__/mutation-sweep.test.mjs',
@@ -1272,6 +1203,9 @@ export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/pr-comment-analysis.test.mjs',
   'scripts/lib/__tests__/pr-liveness.test.mjs',
   'scripts/lib/__tests__/postdeploy-probes-workflow.test.mjs',
+  'scripts/lib/__tests__/postdeploy-probe-admission.test.mjs',
+  'scripts/lib/__tests__/postdeploy-probe-transport.test.mjs',
+  'scripts/lib/__tests__/postdeploy-probe-workflow-admission.test.mjs',
   'scripts/lib/__tests__/postdeploy-crawl-receipt.test.mjs',
   'scripts/lib/__tests__/postdeploy-cert-after-pen.test.mjs',
   'scripts/lib/__tests__/pr-preparation-safety.test.mjs',
@@ -2944,12 +2878,58 @@ export async function runStructural(opts = {}) {
       STRUCTURAL_WEB_JOB_PREFIXES.some(prefix => part.startsWith(prefix))
     ),
   ]);
-  const parts = allParts.filter(
+  if (
+    lanesMode &&
+    lanesMode !== 'skip' &&
+    lanesMode !== 'only' &&
+    !(
+      lanesMode.startsWith('only:') &&
+      LANES_COVERAGE_GROUP_COMMANDS[lanesMode.slice('only:'.length)]
+    )
+  ) {
+    throw new Error(
+      `CI_FAST_STRUCTURAL_LANES must be skip, only, or only:<${Object.keys(LANES_COVERAGE_GROUP_COMMANDS).join('|')}>; got ${JSON.stringify(lanesMode)}`
+    );
+  }
+  // The lanes coverage family: the legacy whole-suite command (local runs and
+  // a plain "only") plus one command per matrix leg. An unknown family member
+  // can never survive a mode it was not built for.
+  const lanesFamily = new Set([
+    LANES_COVERAGE_COMMAND,
+    ...Object.values(LANES_COVERAGE_GROUP_COMMANDS),
+  ]);
+  const lanesModeKeeps = part => {
+    if (!lanesFamily.has(part)) {
+      return lanesMode !== 'only' && !lanesMode?.startsWith('only:');
+    }
+    if (lanesMode === 'skip') return false;
+    // Group modes keep the whole-suite command's slot; it is swapped for the
+    // leg's command after the filter so ordering and locks follow the legacy
+    // position. Plain "only"/unset keep the legacy combined command.
+    return part === LANES_COVERAGE_COMMAND;
+  };
+  const selectedParts = allParts.filter(
     part =>
       mode !== (STRUCTURAL_PYTHON_JOB_PARTS.has(part) ? 'skip' : 'only') &&
       webMode !== (webJobParts.has(part) ? 'skip' : 'only') &&
-      lanesMode !== (part === LANES_COVERAGE_COMMAND ? 'skip' : 'only')
+      lanesModeKeeps(part)
   );
+  const lanesGroupParts = lanesMode?.startsWith('only:')
+    ? selectedParts.map(part =>
+        part === LANES_COVERAGE_COMMAND
+          ? LANES_COVERAGE_GROUP_COMMANDS[lanesMode.slice('only:'.length)]
+          : part
+      )
+    : selectedParts;
+  // ci-fast (structural core) matrix legs each run one deterministic shard of
+  // the pool; the union of shards is exactly the unsharded pool (pinned by
+  // the runner's contract suite). Consumed like the split modes so a nested
+  // contract run never inherits the filter.
+  const shardSpec = process.env.CI_FAST_STRUCTURAL_SHARD;
+  delete process.env.CI_FAST_STRUCTURAL_SHARD;
+  const parts = shardSpec
+    ? selectStructuralShard(lanesGroupParts, shardSpec)
+    : lanesGroupParts;
   if (parts.length === 0) {
     return {
       code: 0,

@@ -3372,7 +3372,7 @@
       "source": "apps/web/app/api/internal/ovie/component-certificate-evidence/route.ts",
       "kind": "handler",
       "route": "/api/internal/ovie/component-certificate-evidence",
-      "methods": ["POST"],
+      "methods": ["OPTIONS", "POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -5741,6 +5741,13 @@
       "kind": "page",
       "route": "/app/admin/revenue-lift",
       "methods": [],
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
+      "source": "apps/web/app/app/(shell)/admin/room/actions.ts",
+      "kind": "action",
+      "export": "sendFleetRoomMessageAction",
       "surface": "deferred",
       "classification": "C"
     },

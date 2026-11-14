@@ -1,5 +1,9 @@
 import { z } from 'zod';
 import { recordComponentCertificateDelivery } from '@/lib/agent-os/component-certificate-ingest';
+import {
+  deliveryOrderSchema,
+  SOURCE_ORDER_SCHEMA,
+} from '@/lib/agent-os/source-ordered-evidence';
 import { type AccessPolicy, defineRoute } from '@/lib/api/route-pipeline';
 import { verifyCronRequest } from '@/lib/cron/auth';
 import { jsonResponse } from '@/lib/cron/evidence-route';
@@ -42,6 +46,7 @@ const payloadSchema = z
   .object({
     schema: z.literal('jovie.component-certificate-evidence/v1'),
     headSha: sha,
+    deliveryOrder: deliveryOrderSchema.optional(),
     evaluatedAt: z.string().datetime({ offset: true }).nullable(),
     reportBytes: z.number().int().nonnegative().nullable(),
     totals: z
@@ -73,6 +78,11 @@ const cronAccess: AccessPolicy<null> = {
   },
 };
 
+// Same authorization as POST; negotiation never reads a body or touches storage.
+export const OPTIONS = defineRoute({ route: ROUTE, access: cronAccess }, () =>
+  jsonResponse({ ok: true, deliveryOrderSchema: SOURCE_ORDER_SCHEMA }, 200)
+);
+
 export const POST = defineRoute(
   {
     route: ROUTE,
@@ -92,10 +102,13 @@ export const POST = defineRoute(
       return jsonResponse(
         {
           historyCount: stored.historyCount,
-          ok: true,
-          storedHeadSha: data.headSha,
+          ok: stored.accepted,
+          accepted: stored.accepted,
+          reason: stored.reason,
+          storedHeadSha: stored.packet.headSha,
+          deliveryOrder: stored.packet.deliveryOrder ?? null,
         },
-        200
+        stored.accepted ? 200 : 409
       );
     } catch (error) {
       logger.error('[component-certificate-evidence] ingest failed', {

@@ -48,17 +48,39 @@
     },
     "packages/ui/atoms/badge.tsx": {
       "libraryVersion": 1,
-      "sourceHash": "9bb70aca71858d8bb1cf7bc81fbf2fff38b3c6a8a6de2271641cb201a7bd921a",
+      "sourceHash": "cc4d9293f33f5532e7479471bc00a09d7a24b496fe1faeda89a37b42deddbb57",
       "reference": "shadcn/ui Badge (static text; no APG widget pattern)",
-      "checked": "static span, variants, forwardRef, no interactive role",
+      "checked": "Compared current shadcn Radix Badge span/optional asChild API, HTML props and refs, static role/keyboard contract, variant/state text, RTL/long labels and externally supplied props (no controlled state); retained non-interactive composition decision. Existing Chromium/axe evidence measures permission, info and accent text in both themes.",
       "gaps": [
         {
           "item": "asChild polymorphism (shadcn Badge)",
           "decision": "skip",
           "reason": "Badge is non-interactive here; interactive chips compose Link or Button",
           "reference": "shadcn/ui Badge"
+        },
+        {
+          "item": "Readable permission-restricted, info and accent status text in both themes",
+          "decision": "adapt",
+          "status": "done",
+          "reference": "WCAG 2.2 1.4.3 Contrast (Minimum)",
+          "evidence": "Existing Chromium/axe exact-node ratios: permission 5.69/6.88, info 4.97/13.38, accent 5.28/7.54 (light/dark); no violations or incomplete contrast checks."
         }
-      ]
+      ],
+      "judge": "OpenAI Codex (source and evidence review)",
+      "date": "2026-11-14",
+      "reviewMethod": "Primary-reference/source comparison and inspection of existing local execution evidence; no external model invocation.",
+      "reviewSource": "f13971f7301cc8d37c00b71576848fbded59913f",
+      "references": [
+        "https://github.com/shadcn-ui/ui/blob/e62c9435fff729a175f38983dee73b2cb4f6a069/apps/v4/registry/bases/radix/ui/badge.tsx",
+        "https://www.w3.org/WAI/ARIA/apg/practices/structural-roles/",
+        "https://www.w3.org/WAI/WCAG22/Understanding/contrast-minimum.html"
+      ],
+      "evidence": [
+        "packages/ui/atoms/badge.test.tsx",
+        "apps/web/tests/e2e/storybook-status-copy.spec.ts",
+        "https://github.com/JovieInc/Jovie/pull/25479"
+      ],
+      "landedSource": "3a5a74d31fa394b41c1aca80005a086d9756293f"
     },
     "packages/ui/atoms/button.tsx": {
       "libraryVersion": 1,
@@ -76,23 +98,52 @@
     },
     "packages/ui/atoms/card.tsx": {
       "libraryVersion": 1,
-      "sourceHash": "3b9e96ff809a39685518c01c88da54a39d3077303f767addab66df36d4d7c917",
+      "sourceHash": "c84a4c25697387019edfef7255534953e67a69b60052d23bccae5bc5140a3f5e",
       "reference": "shadcn/ui Card (structural container; no APG widget pattern)",
-      "checked": "asChild on every part, aria-busy for partial, focus ring on hoverable, forwardRef",
+      "checked": "Compared current shadcn Radix Card generic div parts (no current upstream asChild)/optional layout APIs, native HTML/Slot semantics and refs on all Jovie parts, caller-owned Link/Button keyboard behavior, external contentState and aria-busy override, native heading choice, long/RTL content, background-color exclusion from transitions, and light/dark partial-description/nested-status text. No internal controlled/uncontrolled state.",
       "gaps": [
         {
           "item": "hoverable variant is not operable by itself",
           "decision": "skip",
-          "reason": "interaction comes from asChild onto Link or Button, as with shadcn; Card adds no role",
-          "reference": "shadcn/ui Card"
+          "reason": "Interaction comes from Jovie's asChild composition onto native Link or Button; Card adds no role. Current pinned shadcn Card is structural and does not expose asChild.",
+          "reference": "shadcn/ui Card",
+          "priorReason": "interaction comes from asChild onto Link or Button, as with shadcn; Card adds no role"
         },
         {
           "item": "CardTitle fixed to h3",
           "decision": "skip",
           "reason": "asChild lets callers pick the heading level",
           "reference": "shadcn/ui Card"
+        },
+        {
+          "item": "Current shadcn CardAction, size=sm and card-spacing layout APIs",
+          "decision": "skip",
+          "reason": "These optional layout conveniences do not add widget behavior; Jovie retains its System B spacing and existing Header/Content/Footer plus className/Slot composition. No API parity is claimed.",
+          "reference": "shadcn/ui Radix Card at e62c9435fff729a175f38983dee73b2cb4f6a069"
+        },
+        {
+          "item": "Readable partial description and nested offline status in both themes",
+          "decision": "adapt",
+          "status": "done",
+          "reference": "WCAG 2.2 1.4.3 Contrast (Minimum)",
+          "evidence": "Existing Chromium/axe ratios (light/dark): partial description 9.16/11.06 at actual 0.8 partial opacity; nested offline status 5.69/5.93. Background color is excluded from Card transitions."
         }
-      ]
+      ],
+      "judge": "OpenAI Codex (source and evidence review)",
+      "date": "2026-11-14",
+      "reviewMethod": "Primary-reference/source comparison and inspection of existing local execution evidence; no external model invocation.",
+      "reviewSource": "f13971f7301cc8d37c00b71576848fbded59913f",
+      "references": [
+        "https://github.com/shadcn-ui/ui/blob/e62c9435fff729a175f38983dee73b2cb4f6a069/apps/v4/registry/bases/radix/ui/card.tsx",
+        "https://www.w3.org/WAI/ARIA/apg/practices/structural-roles/",
+        "https://www.w3.org/WAI/WCAG22/Understanding/contrast-minimum.html"
+      ],
+      "evidence": [
+        "packages/ui/atoms/card.test.tsx",
+        "apps/web/tests/e2e/storybook-status-copy.spec.ts",
+        "https://github.com/JovieInc/Jovie/pull/25479"
+      ],
+      "landedSource": "3a5a74d31fa394b41c1aca80005a086d9756293f"
     },
     "packages/ui/atoms/checkbox.tsx": {
       "libraryVersion": 1,
@@ -284,17 +335,43 @@
     },
     "packages/ui/atoms/inline-offline.tsx": {
       "libraryVersion": 1,
-      "sourceHash": "12e8ddf0765f448feda2ef8202ca1162bc429464d35a8cf4eaf6038c2112f499",
+      "sourceHash": "947a16192f78ccc80c32efdd9a4da19ef5f0806319d626ac1c8242a23b11a776",
       "reference": "library offline-degraded; WAI-ARIA status live region",
-      "checked": "role=status polite atomic, retry button, logical text-start",
+      "checked": "Compared benchmark-library v1 offline-degraded, its current Linear/Things offline documentation, and WAI-ARIA status semantics: polite/atomic advisory region without focus management; optional native type=button retry with canonical Button, caller-owned callback/message, no local controlled state, logical RTL/wrapping, with/without-action states and light/dark text. No ref/asChild API or queue implementation is claimed.",
       "gaps": [
         {
           "item": "writes queued or clearly blocked (offline-degraded)",
           "decision": "skip",
           "reason": "the notice reports state; queuing belongs to the data owner",
           "reference": "library offline-degraded"
+        },
+        {
+          "item": "Readable offline status text with and without retry in both themes",
+          "decision": "adapt",
+          "status": "done",
+          "reference": "WCAG 2.2 1.4.3 Contrast (Minimum)",
+          "evidence": "Existing Chromium/axe exact-node ratios 5.69 light / 6.88 dark for both action states; no violations or incomplete contrast checks."
         }
-      ]
+      ],
+      "judge": "OpenAI Codex (source and evidence review)",
+      "date": "2026-11-14",
+      "reviewMethod": "Primary-reference/source comparison and inspection of existing local execution evidence; no external model invocation.",
+      "reviewSource": "f13971f7301cc8d37c00b71576848fbded59913f",
+      "references": [
+        "docs/design-system/benchmark-library.json#offline-degraded",
+        "https://www.w3.org/TR/wai-aria-1.2/#status",
+        "https://www.w3.org/WAI/WCAG22/Understanding/status-messages.html",
+        "https://www.w3.org/WAI/ARIA/apg/patterns/button/",
+        "https://www.w3.org/WAI/WCAG22/Understanding/contrast-minimum.html",
+        "https://linear.app/docs/get-the-app",
+        "https://culturedcode.com/things/cloud/"
+      ],
+      "evidence": [
+        "packages/ui/atoms/inline-offline.test.tsx",
+        "apps/web/tests/e2e/storybook-status-copy.spec.ts",
+        "https://github.com/JovieInc/Jovie/pull/25479"
+      ],
+      "landedSource": "3a5a74d31fa394b41c1aca80005a086d9756293f"
     },
     "packages/ui/atoms/inline-subscribe.tsx": {
       "libraryVersion": 1,

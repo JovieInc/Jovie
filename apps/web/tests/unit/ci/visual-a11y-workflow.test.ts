@@ -299,9 +299,22 @@ describe('CI accessibility and visual gate contracts (JOV-4060)', () => {
   });
 
   it('serves the compare build where its public URLs point', () => {
-    const compare = job('ci-visual-snapshot-compare');
-    const build = step(compare, 'Build homepage for rendered snapshot compare');
-    const render = step(compare, 'Render and compare homepage snapshots');
+    // Move 2 split: the build is produced by ci-visual-snapshot-compare and
+    // the homepage render suite (ci-visual-snapshot-homepage) downloads that
+    // exact build, so the served origin must still match the baked one.
+    const buildLane = job('ci-visual-snapshot-compare');
+    const homepageLane = job('ci-visual-snapshot-homepage');
+    const build = step(
+      buildLane,
+      'Build homepage for rendered snapshot compare'
+    );
+    const render = step(homepageLane, 'Render and compare homepage snapshots');
+    const download = homepageLane.steps.find(entry =>
+      entry.uses?.includes('actions/download-artifact@')
+    );
+    expect(download?.with?.name).toBe(
+      'visual-compare-build-${{ github.run_id }}'
+    );
     const origin = 'http://localhost:3230';
     for (const entry of [build.step, render.step])
       expect(entry.env).toMatchObject({

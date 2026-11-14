@@ -433,7 +433,7 @@ Generated from `.github/ci-harness/manifest.json`. Do not hand-edit this block; 
 
 | Tier | Purpose | Merge-gate jobs |
 | --- | --- | --- |
-| Source Fast Gate | Cheap deterministic checks required on each source PR and repeated on the synthetic combined head. | `Path Changes` (both), `ci-fast` (both), `Secret Scan (gitleaks + trufflehog)` (both), `Golden Path Lock` (both), `Visual Snapshot Compare` (merge-group), `Migration Guard` (both), `Unit Tests` (merge-group) |
+| Source Fast Gate | Cheap deterministic checks required on each source PR and repeated on the synthetic combined head. | `Path Changes` (both), `ci-fast` (both), `Secret Scan (gitleaks + trufflehog)` (both), `Golden Path Lock` (both), `Visual Snapshot Compare` (merge-group), `Visual Snapshot Compare (homepage)` (merge-group), `Visual Snapshot Compare (marketing DOM)` (merge-group), `Visual Snapshot Compare (marketing routes)` (merge-group), `Migration Guard` (both), `Unit Tests` (merge-group) |
 | Structural Contract | Mechanical architecture, workflow, docs, and repo-rule checks. | `CI Risk Classifier` (both) |
 | Exact-Head Coverage | Meaningful V8 coverage and a 60% changed-line ratchet on exact source and synthetic combined heads, with no untrusted-code secrets; nightly retains the global risk-surface debt check. | `Exact-head Coverage` (both) |
 | Explicit Deep Evidence | Manual, scheduled, or event-driven deep evidence that never starts from or delays ordinary PR Ready. | none |
@@ -456,6 +456,9 @@ Source `PR Ready` may require only `source-pr`/`both` jobs below. Merge-group `P
 | `Secret Scan (gitleaks + trufflehog)` | both | fast-gate | `./scripts/security/scan-secrets.sh ci-pr origin/main` |
 | `Golden Path Lock` | both | fast-gate | `node scripts/golden-path-lock.mjs merge-gate` |
 | `Visual Snapshot Compare` | merge-group | fast-gate | `node scripts/visual-snapshot-compare.mjs compare` |
+| `Visual Snapshot Compare (homepage)` | merge-group | fast-gate | `node scripts/visual-snapshot-compare.mjs compare` |
+| `Visual Snapshot Compare (marketing DOM)` | merge-group | fast-gate | `cd apps/web && pnpm exec playwright test tests/product-screenshots/route-dom-certification.spec.ts --config=playwright.config.screenshots.ts --project=screenshots --workers=1 --retries=0 -g 'deliberate-red|certifies every marketing route'` |
+| `Visual Snapshot Compare (marketing routes)` | merge-group | fast-gate | `cd apps/web && pnpm exec playwright test tests/product-screenshots/marketing-routes.spec.ts --config=playwright.config.screenshots.ts --project=screenshots --workers=4 --retries=0` |
 | `Migration Guard` | both | fast-gate | `cd apps/web && ./scripts/check-migrations.sh && ./scripts/validate-migrations.sh` |
 | `Unit Tests` | merge-group | fast-gate | `pnpm --filter=@jovie/web run test:fast` |
 | `Exact-head Coverage` | both | exact-head-coverage | `pnpm --filter @jovie/web test:coverage && node scripts/check-changed-test-coverage.mjs --base <base-sha> --head <head-sha>` |
