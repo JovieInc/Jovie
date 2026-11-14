@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import {
   existsSync,
@@ -15,7 +16,6 @@ import {
   planChangedLineCoverage,
   runChangedLineCoverageCheck,
 } from './changed-test-coverage.mjs';
-import { execFileSync } from './child-process.mjs';
 import { validateFxExecutorIdentity } from './fx-remediation-lane.mjs';
 import {
   parseRollingCiState,
