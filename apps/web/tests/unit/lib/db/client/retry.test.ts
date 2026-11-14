@@ -53,6 +53,44 @@ describe('isRetryableError', () => {
     expect(isRetryableError(error)).toBe(false);
   });
 
+  it('returns true for the Neon postmaster-exit kill text (JOV-12320)', () => {
+    const error = new Error('Failed query: select "id" from "user_settings"', {
+      cause: new Error(
+        'terminating connection due to unexpected postmaster exit'
+      ),
+    });
+
+    expect(isRetryableError(error)).toBe(true);
+  });
+
+  it('returns true for an idle-session kill with no statement in flight', () => {
+    expect(
+      isRetryableError(
+        new Error('terminating connection due to idle-session timeout')
+      )
+    ).toBe(true);
+  });
+
+  it('returns true when the kill text names connection before terminate', () => {
+    expect(
+      isRetryableError(new Error('server terminated the connection'))
+    ).toBe(true);
+  });
+
+  it('never replays the statement-timeout family (JOV-5754 doctrine)', () => {
+    expect(
+      isRetryableError(
+        new Error('canceling statement due to statement timeout')
+      )
+    ).toBe(false);
+    const wrapped = new Error('Failed query: select 1', {
+      cause: new Error(
+        'terminating connection due to idle-in-transaction timeout'
+      ),
+    });
+    expect(isRetryableError(wrapped)).toBe(false);
+  });
+
   it('returns false for non-Error values', () => {
     expect(isRetryableError('string error')).toBe(false);
     expect(isRetryableError(null)).toBe(false);

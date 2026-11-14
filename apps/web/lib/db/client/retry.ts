@@ -36,6 +36,14 @@ const RETRYABLE_ERROR_PATTERNS: readonly RegExp[] = [
   /connection pool exhausted/i,
   /client has encountered a connection error/i,
   /terminating connection due to administrator command/i,
+  // Neon compute kills name the server side explicitly; the generic
+  // connection.*terminated ordering misses reversed word order and the
+  // postmaster/idle-session kill texts (JOV-12320 — a SELECT killed by a
+  // Neon suspend matched no pattern, so the read was never replayed and
+  // the raw drizzle wrapper paged Sentry).
+  /terminating connection due to unexpected postmaster exit/i,
+  /terminating connection due to idle-session timeout/i,
+  /terminated the connection/i,
 ] as const;
 
 const RETRYABLE_PG_CODES = new Set(['53300', '57P01', '57P03']);
