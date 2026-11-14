@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
   cacheabilityLoss,
@@ -18,6 +20,29 @@ import {
   SNAPSHOT_ROUTES,
   snapshot,
 } from './route-render-modes-fixtures';
+
+describe('committed render-mode baseline', () => {
+  it('records the existing dynamic publication-gate miss destination', () => {
+    const committed = JSON.parse(
+      readFileSync(join(__dirname, 'route-render-modes.json'), 'utf8')
+    );
+    const route = '/[username]/profile-miss';
+    const baseline = snapshot({ ...SNAPSHOT_ROUTES });
+    if (committed.routes[route])
+      baseline.routes[route] = committed.routes[route];
+
+    const result = judge(
+      build => {
+        build.appPathRoutes[`${route}/page`] = route;
+      },
+      baseline,
+      null
+    );
+
+    expect(result.errors).toEqual([]);
+    expect(result.ok).toBe(true);
+  });
+});
 
 describe('render-mode classification', () => {
   it('classifies pages and prerendered handlers from build manifests only', () => {

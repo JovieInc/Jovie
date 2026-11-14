@@ -24,6 +24,7 @@
     "/[username]/merch/[cardId]": "dynamic",
     "/[username]/notifications": "dynamic",
     "/[username]/pay": "dynamic",
+    "/[username]/profile-miss": "dynamic",
     "/[username]/profile-mode-render/[profileMode]/[marker]": "param-prerender",
     "/[username]/shop": "dynamic",
     "/a/[handle]/[slug]": "dynamic",
