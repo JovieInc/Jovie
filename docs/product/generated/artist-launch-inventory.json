@@ -5745,6 +5745,13 @@
       "classification": "C"
     },
     {
+      "source": "apps/web/app/app/(shell)/admin/room/actions.ts",
+      "kind": "action",
+      "export": "sendFleetRoomMessageAction",
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
       "source": "apps/web/app/app/(shell)/admin/room/page.tsx",
       "kind": "page",
       "route": "/app/admin/room",

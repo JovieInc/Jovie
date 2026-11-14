@@ -8,6 +8,9 @@ import type { AgentRoomRoster } from '@jovie/agent-transport-contracts/agent-roo
  */
 export const OVIE_FLEET_ROOM_ID = 'ovie:fleet';
 
+/** Who the room's composer posts as: the founder's Linear account. */
+export const OVIE_FLEET_SENDER_ID = 'tim';
+
 const FLEET_THREAD = {
   ref: 'JOV-12296',
   url: 'https://linear.app/jovie/issue/JOV-12296',
