@@ -65,6 +65,19 @@ class LocalModulePrerequisiteTest(unittest.TestCase):
             self.assertEqual((route["cls"], route["action"]), ("composed", "sync-main"))
             self.assertIsNone(lane.infra_only_red(None, pr))
 
+    def test_mixed_prerequisite_and_product_failure_stays_with_agent(self):
+        pr = {**red("Source Validation", "Exact-head Coverage"), "queueFailure": None, "eventKinds": []}
+        logs = {
+            "Source Validation": ("passing fixture: API rate limit exceeded\n"
+                                  "lib/waitlist/winback-approval.server.ts(23,8): error TS2307: "
+                                  "Cannot find module '@/lib/waitlist/winback'"),
+            "Exact-head Coverage": "passing fixture: API rate limit exceeded\nUnwired: scripts/a.test.mjs. Wire each file into a ci-fast lane",
+        }
+        with patch.object(lane, "failed_logs", return_value=logs):
+            route = lane.route_fix_red(None, pr)
+            self.assertEqual((route["cls"], route["action"]), ("mixed", "agent"))
+            self.assertIsNone(lane.infra_only_red(None, pr))
+
     def test_missing_package_or_fixture_text_does_not_request_prerequisite_sync(self):
         for log in (
             "lib/a.ts(1,1): error TS2307: Cannot find module 'external-package' or its corresponding type declarations.",
