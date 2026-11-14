@@ -1,14 +1,4 @@
-import { spawnSync } from 'node:child_process';
-import {
-  cpSync,
-  existsSync,
-  mkdirSync,
-  mkdtempSync,
-  readFileSync,
-  rmSync,
-  writeFileSync,
-} from 'node:fs';
-import { tmpdir } from 'node:os';
+import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
@@ -412,83 +402,4 @@ describe('visual snapshot compare (JOV-5459)', () => {
       })
     ).toMatchObject({ ok: true, reason: 'matched' });
   });
-});
-
-it('boots the relocated standalone tree without borrowing React peers from the build checkout', () => {
-  const root = mkdtempSync(resolve(tmpdir(), 'visual-standalone-'));
-  const app = resolve(root, 'build/apps/web');
-  const write = (name, content) => {
-    const file = resolve(app, name);
-    mkdirSync(resolve(file, '..'), { recursive: true });
-    writeFileSync(file, content);
-  };
-  try {
-    for (const file of [
-      'sync-standalone-assets.mjs',
-      'resolve-package-json.mjs',
-    ]) {
-      write(
-        `scripts/${file}`,
-        readFileSync(resolve(REPO_ROOT, 'apps/web/scripts', file), 'utf8')
-      );
-    }
-    for (const name of [
-      'next',
-      '@next/env',
-      '@swc/helpers',
-      '@statsig/statsig-node-core',
-      'require-in-the-middle',
-      'react',
-      'react-dom',
-      'scheduler',
-    ]) {
-      write(
-        `node_modules/${name}/package.json`,
-        JSON.stringify({
-          name,
-          version: '1.0.0',
-          main: 'index.js',
-          ...(name === 'react-dom'
-            ? {
-                dependencies: { scheduler: '1.0.0' },
-                peerDependencies: { react: '*' },
-              }
-            : {}),
-        })
-      );
-      write(
-        `node_modules/${name}/index.js`,
-        name === 'react-dom'
-          ? "module.exports = require('react').version + ':' + require('scheduler').version;"
-          : "module.exports = { version: '1.0.0' };"
-      );
-    }
-    write('public/fixture.txt', 'public asset');
-    write('.next/static/fixture.txt', 'static asset');
-    write(
-      '.next/standalone/apps/web/server.js',
-      "console.log(require('react').version, require('react-dom'));"
-    );
-    const sync = spawnSync(
-      process.execPath,
-      [resolve(app, 'scripts/sync-standalone-assets.mjs')],
-      { encoding: 'utf8', env: { PATH: process.env.PATH } }
-    );
-    expect(sync.status, sync.stderr).toBe(0);
-    const relocated = resolve(root, 'runtime');
-    cpSync(resolve(app, '.next/standalone'), relocated, { recursive: true });
-    rmSync(resolve(root, 'build'), { recursive: true, force: true });
-    const boot = spawnSync(
-      process.execPath,
-      [resolve(relocated, 'apps/web/server.js')],
-      { encoding: 'utf8', env: { PATH: process.env.PATH } }
-    );
-    expect(boot.status, boot.stderr).toBe(0);
-    expect(boot.stdout.trim()).toBe('1.0.0 1.0.0:1.0.0');
-    expect(
-      readFileSync(resolve(relocated, 'apps/web/public/fixture.txt'), 'utf8')
-    ).toBe('public asset');
-  } finally {
-    rmSync(root, { recursive: true, force: true });
-  }
 });

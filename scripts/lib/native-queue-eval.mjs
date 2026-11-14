@@ -243,18 +243,14 @@ export function evaluate(bundle, now = Date.now()) {
     v.job?.run_id === v.run.id &&
     v.job?.run_attempt === v.run.run_attempt &&
     v.job?.head_sha === bundle.evaluatorSha &&
-    // The evaluator tests + coverage run via pnpm ci:control:test, which the
-    // ci-fast split assigns to the structural python job's run step (updated
-    // from 'ci-fast (remaining)'/'Run structural ci-fast lane' in Move 3,
-    // 2026-11-10, when the structural lane sharded into matrix jobs).
-    v.job?.name === 'ci-fast (structural python)' &&
+    v.job?.name === 'ci-fast (remaining)' &&
     v.job?.status === 'completed' &&
     v.job?.conclusion === 'success' &&
     time(v.job?.completed_at) &&
     Date.parse(v.job.completed_at) <= now &&
     v.job.steps?.some(
       step =>
-        step.name === 'Run structural pytest shards' &&
+        step.name === 'Run structural ci-fast lane' &&
         step.status === 'completed' &&
         step.conclusion === 'success'
     ) &&

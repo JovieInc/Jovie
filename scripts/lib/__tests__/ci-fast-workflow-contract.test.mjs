@@ -360,7 +360,7 @@ describe('ci-fast bounded parallel workflow', () => {
       );
     }
     expect(
-      jobBlock('ci-fast-structural-core', 'ci-fast-structural-python')
+      jobBlock('ci-fast-remaining', 'ci-profile-admission-browser')
     ).toContain(
       'python -m pip install --quiet --require-hashes -r .github/requirements/pytest.txt'
     );
@@ -626,11 +626,13 @@ describe('ci-fast bounded parallel workflow', () => {
       DESKTOP_RELEASE_COVERAGE_COMMAND
     );
 
-    const core = jobBlock(
-      'ci-fast-structural-core',
-      'ci-fast-structural-python'
+    const remaining = jobBlock(
+      'ci-fast-remaining',
+      'ci-profile-admission-browser'
     );
-    const pattern = core.match(/STRUCTURAL_DESKTOP_PATTERN='([^']+)'/)?.[1];
+    const pattern = remaining.match(
+      /STRUCTURAL_DESKTOP_PATTERN='([^']+)'/
+    )?.[1];
     expect(pattern).toBeTruthy();
     for (const path of [
       'scripts/desktop-release-assets.mjs',
@@ -1091,11 +1093,11 @@ describe('ci-fast bounded parallel workflow', () => {
     expect(webParts).not.toContain('--passWithNoTests');
     expect(webParts).toContain('CERTIFICATION_KERNEL_COMMAND');
     expect(LANE_COMMANDS.structural).toContain(CERTIFICATION_KERNEL_COMMAND);
-    const core = jobBlock(
-      'ci-fast-structural-core',
-      'ci-fast-structural-python'
+    const remaining = jobBlock(
+      'ci-fast-remaining',
+      'ci-profile-admission-browser'
     );
-    const pattern = core.match(/STRUCTURAL_UI_PATTERN='([^']+)'/)?.[1];
+    const pattern = remaining.match(/STRUCTURAL_UI_PATTERN='([^']+)'/)?.[1];
     expect(pattern).toBeDefined();
     expect(
       spawnSync('grep', ['-qE', pattern], {
@@ -1821,13 +1823,13 @@ describe('ci-fast bounded parallel workflow', () => {
   });
 
   it('keeps the iOS design gate independent from Ubuntu operations', () => {
-    const core = jobBlock(
-      'ci-fast-structural-core',
-      'ci-fast-structural-python'
+    const remaining = jobBlock(
+      'ci-fast-remaining',
+      'ci-profile-admission-browser'
     );
-    const structuralDecision = core.slice(
-      core.indexOf('- name: Decide structural lane'),
-      core.indexOf('- name: Set up Python (structural regression tests)')
+    const structuralDecision = remaining.slice(
+      remaining.indexOf('- name: Decide structural lane'),
+      remaining.indexOf('- name: Select Storybook browser proof')
     );
 
     expect(LANE_GROUPS.web).toContain('design-conformance');
@@ -2003,17 +2005,13 @@ describe('ci-fast bounded parallel workflow', () => {
   }, 120_000);
 
   it('fails closed onto structural UI gates for every web UI source and guard', () => {
-    const core = jobBlock(
-      'ci-fast-structural-core',
-      'ci-fast-structural-python'
-    );
     const remaining = jobBlock(
       'ci-fast-remaining',
       'ci-profile-admission-browser'
     );
-    const structuralDecision = core.slice(
-      core.indexOf('- name: Decide structural lane'),
-      core.indexOf('- name: Set up Python (structural regression tests)')
+    const structuralDecision = remaining.slice(
+      remaining.indexOf('- name: Decide structural lane'),
+      remaining.indexOf('- name: Select Storybook browser proof')
     );
 
     for (const requiredPath of [
@@ -2322,10 +2320,6 @@ describe('ci-fast bounded parallel workflow', () => {
       'ci-fast-remaining',
       'ci-profile-admission-browser'
     );
-    const core = jobBlock(
-      'ci-fast-structural-core',
-      'ci-fast-structural-python'
-    );
     const at = marker => remaining.indexOf(marker);
     // A failing background lane run fails the await step, with its log.
     const dir = mkdtempSync(join(tmpdir(), 'ci-fast-bg-'));
@@ -2358,6 +2352,14 @@ describe('ci-fast bounded parallel workflow', () => {
     expect(at('Setup Playwright (Chromium)')).toBeGreaterThan(
       at('- name: Start ci-fast lanes')
     );
+    expect(at('- name: Run structural ci-fast lane')).toBeGreaterThan(
+      at('- name: Install pytest (structural regression tests)')
+    );
+    // Structural runs while the cheap lanes finish; the await follows it and
+    // runs even after a structural failure, so both results gate the job.
+    expect(at('- name: Await ci-fast lanes')).toBeGreaterThan(
+      at('- name: Run structural ci-fast lane')
+    );
     expect(at('- name: Run selected Storybook browser proof')).toBeGreaterThan(
       at('- name: Await ci-fast lanes')
     );
@@ -2366,29 +2368,18 @@ describe('ci-fast bounded parallel workflow', () => {
     expect(stepBody('Await ci-fast lanes')).toContain(
       "if: ${{ !cancelled() && steps.lanes-start.outcome == 'success' }}"
     );
+    // Fail-fast: a red cheap-lane status stops new structural commands.
+    expect(stepBody('Run structural ci-fast lane')).toContain(
+      'CI_FAST_STRUCTURAL_ABORT_STATUS_FILE: ${{ runner.temp }}/ci-fast-lanes-bg/status'
+    );
     expect(stepBody('Start ci-fast lanes')).toContain(
       'LANES_DIR: ${{ runner.temp }}/ci-fast-lanes-bg\n'
     );
     expect(remaining).toContain("CI_FAST_SKIP_STRUCTURAL: 'true'");
-    // The structural pool itself moved to the sharded core job (Move 3).
-    expect(remaining).not.toContain('CI_FAST_ONLY_STRUCTURAL');
-    expect(remaining).not.toContain('- name: Run structural ci-fast lane');
-    const coreAt = marker => core.indexOf(marker);
-    expect(coreAt('- name: Run structural ci-fast lane')).toBeGreaterThan(
-      coreAt('- name: Install pytest (structural regression tests)')
-    );
-    const coreStepBody = name =>
-      core.split(`- name: ${name}\n`)[1].split('\n      - ')[0];
-    expect(coreStepBody('Run structural ci-fast lane')).toContain(
-      'CI_FAST_STRUCTURAL_ABORT_STATUS_FILE: ${{ runner.temp }}/ci-fast-lanes-bg/status'
-    );
-    expect(core).toContain("CI_FAST_ONLY_STRUCTURAL: 'true'");
-    expect(core).toContain(
+    expect(remaining).toContain("CI_FAST_ONLY_STRUCTURAL: 'true'");
+    expect(remaining).toContain(
       "if: ${{ success() && steps.structural.outputs.skip != 'true' }}"
     );
-    expect(core).toContain('CI_FAST_STRUCTURAL_SHARD: ${{ matrix.shard }}/2');
-    expect(core).toContain("shard: ['1', '2']");
-    expect(core).toContain('fail-fast: false');
   });
 
   it('retains successful structural evidence beyond the short artifact excerpt', () => {
@@ -2576,7 +2567,7 @@ describe('ci-fast bounded parallel workflow', () => {
     }
     expect(callers.sort()).toEqual([
       'actionlint.yml:actionlint',
-      'ci.yml:ci-actionlint',
+      'ci.yml:ci-fast-remaining',
       'source-validation.yml:deterministic',
       // Fills the main-scoped download cache the three callers above restore.
       'tsc-cache-warm.yml:warm',
@@ -2592,7 +2583,7 @@ describe('ci-fast bounded parallel workflow', () => {
     'different condition',
   ])('rejects an actionlint compiler prerequisite with %s', fault => {
     const workflow = /** @type {ActionlintWorkflow} */ (loadYaml(WORKFLOW));
-    const steps = structuredClone(workflow.jobs['ci-actionlint'].steps);
+    const steps = structuredClone(workflow.jobs['ci-fast-remaining'].steps);
     const setupIndex = steps.findIndex(step =>
       step.uses?.startsWith('actions/setup-go@')
     );
@@ -2621,30 +2612,21 @@ describe('ci-fast bounded parallel workflow', () => {
     expect(typecheck).not.toMatch(
       /run-actionlint\.sh|rhysd\/actionlint|actions\/setup-python|python -m pip install/
     );
-    // actionlint reads only checked-out .github/ sources, so it is its own
-    // path-gated job, off remaining's serial step chain (Move 3, 2026-11-10).
-    const actionlint = jobBlock('ci-actionlint', 'ci-fast-structural-core');
-    const core = jobBlock(
-      'ci-fast-structural-core',
-      'ci-fast-structural-python'
-    );
-    expect(remaining).not.toContain('run-actionlint.sh');
-    expect(actionlint).toMatch(
-      /- name: Set up Go for source-pinned actionlint\n\s+uses: actions\/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7\.0\.0\n\s+with:\n\s+go-version: '1\.26\.10'\n\s+cache: false\n\s+- name: Run actionlint\n\s+env:\n(?:\s+#.*\n)+\s+RELEASE_DOWNLOAD_TOKEN: \$\{\{ github\.token \}\}\n\s+PINNED_DOWNLOAD_CACHE_DIR: \/tmp\/jovie-pinned-downloads\n\s+run: bash \.github\/scripts\/run-actionlint\.sh\n/
+    // actionlint reads only checked-out workflows, so it runs unconditionally
+    // in the idle wait for the background base-branch fetch.
+    expect(remaining).toMatch(
+      /- uses: \.\/\.github\/actions\/setup-node-pnpm\n\s+with:\n\s+reuse_merge_group_workspace: 'true'\n(?:\s+#.*\n)+\s+- name: Set up Go for source-pinned actionlint\n\s+uses: actions\/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7\.0\.0\n\s+with:\n\s+go-version: '1\.26\.10'\n\s+cache: false\n\s+- name: Run actionlint\n\s+env:\n(?:\s+#.*\n)+\s+RELEASE_DOWNLOAD_TOKEN: \$\{\{ github\.token \}\}\n\s+PINNED_DOWNLOAD_CACHE_DIR: \/tmp\/jovie-pinned-downloads\n\s+run: bash \.github\/scripts\/run-actionlint\.sh\n\s+- name: Fetch base-branch history\n/
     );
     expect(
-      actionlint.match(/run: bash \.github\/scripts\/run-actionlint\.sh/g)
+      remaining.match(/bash \.github\/scripts\/run-actionlint\.sh/g)
     ).toHaveLength(1);
-    expect(actionlint).toContain(
-      "needs.ci-path-changes.outputs.run_actionlint == 'true'"
-    );
-    expect(core).toMatch(/actions\/setup-python/);
-    expect(core).toMatch(/python -m pip install/);
+    expect(remaining).toMatch(/actions\/setup-python/);
+    expect(remaining).toMatch(/python -m pip install/);
     expect(typecheck).not.toContain('ci-fast-remaining');
     expect(remaining).not.toContain('ci-fast-typecheck');
 
     expect(aggregate).toMatch(
-      /needs:\s*\[\s*ci-path-changes,\s*ci-merge-group-admission,\s*ci-fast-typecheck,\s*ci-fast-remaining,\s*ci-profile-admission-browser,\s*ci-fast-structural-python,\s*ci-fast-structural-web,\s*ci-fast-structural-lanes,\s*ci-fast-structural-lanes-coverage,\s*ci-fast-structural-core,\s*ci-actionlint,\s*\]/s
+      /needs:\s*\[\s*ci-path-changes,\s*ci-merge-group-admission,\s*ci-fast-typecheck,\s*ci-fast-remaining,\s*ci-profile-admission-browser,\s*ci-fast-structural-python,\s*ci-fast-structural-web,\s*ci-fast-structural-lanes,\s*\]/s
     );
     expect(aggregate).toMatch(/^  ci-fast:\n    name: ci-fast$/m);
     expect(aggregate).toMatch(/if: >-\s+always\(\)/);
@@ -2663,23 +2645,10 @@ describe('ci-fast bounded parallel workflow', () => {
       /PROFILE_BROWSER_RESULT: \$\{\{ needs\.ci-profile-admission-browser\.result \}\}/
     );
     expect(aggregate).toMatch(
-      /\[\[ "\$TYPECHECK_RESULT" != "success" \|\| "\$REMAINING_RESULT" != "success" \|\| "\$PROFILE_BROWSER_RESULT" != "success" \|\| "\$STRUCTURAL_PYTHON_RESULT" != "success" \|\| "\$STRUCTURAL_WEB_RESULT" != "success" \|\| "\$STRUCTURAL_LANES_RESULT" != "success" \|\| "\$STRUCTURAL_LANES_COVERAGE_RESULT" != "success" \|\| "\$STRUCTURAL_CORE_RESULT" != "success" \]\]/
-    );
-    // The path-gated actionlint job may report skipped; anything else fails.
-    expect(aggregate).toMatch(
-      /\[\[ "\$ACTIONLINT_RESULT" != "success" && "\$ACTIONLINT_RESULT" != "skipped" \]\]/
+      /\[\[ "\$TYPECHECK_RESULT" != "success" \|\| "\$REMAINING_RESULT" != "success" \|\| "\$PROFILE_BROWSER_RESULT" != "success" \|\| "\$STRUCTURAL_PYTHON_RESULT" != "success" \|\| "\$STRUCTURAL_WEB_RESULT" != "success" \|\| "\$STRUCTURAL_LANES_RESULT" != "success" \]\]/
     );
     expect(aggregate).toMatch(
       /STRUCTURAL_WEB_RESULT: \$\{\{ needs\.ci-fast-structural-web\.result \}\}/
-    );
-    expect(aggregate).toMatch(
-      /STRUCTURAL_CORE_RESULT: \$\{\{ needs\.ci-fast-structural-core\.result \}\}/
-    );
-    expect(aggregate).toMatch(
-      /STRUCTURAL_LANES_COVERAGE_RESULT: \$\{\{ needs\.ci-fast-structural-lanes-coverage\.result \}\}/
-    );
-    expect(aggregate).toMatch(
-      /ACTIONLINT_RESULT: \$\{\{ needs\.ci-actionlint\.result \}\}/
     );
     expect(aggregate).not.toContain('GROUP_RESULT');
     expect(aggregate).toMatch(/exit 1/);
@@ -2690,95 +2659,35 @@ describe('ci-fast bounded parallel workflow', () => {
       'ci-fast-remaining',
       'ci-profile-admission-browser'
     );
-    const core = jobBlock(
-      'ci-fast-structural-core',
-      'ci-fast-structural-python'
-    );
     const python = jobBlock(
       'ci-fast-structural-python',
       'ci-fast-structural-web'
     );
     const aliases = python.match(/(?<= \*)[\w-]+/g);
     expect(aliases).toHaveLength(10);
-    // Anchor definitions live in ci-fast-remaining (gate/checkout/fetch) and
-    // ci-fast-structural-core (structural lane), both earlier in the file.
-    const anchorHomes = `${remaining}\n${core}`;
-    for (const name of aliases) expect(anchorHomes).toContain(`&${name}`);
-    expect(core).toContain('CI_FAST_STRUCTURAL_PYTEST: skip');
-    expect(core).not.toContain('continue-on-error: true');
+    for (const name of aliases) expect(remaining).toContain(`&${name}`);
+    expect(remaining).toContain('CI_FAST_STRUCTURAL_PYTEST: skip');
     expect(python).toContain('CI_FAST_STRUCTURAL_PYTEST: only');
     expect(python).not.toContain('CI_FAST_STRUCTURAL_WEB');
   });
 
-  it('runs the lanes coverage pytest as two matrix legs plus a combine job', () => {
+  it('runs the lanes coverage pytest alone in an aliased ci-fast job', () => {
     const remaining = jobBlock(
       'ci-fast-remaining',
       'ci-profile-admission-browser'
     );
-    const core = jobBlock(
-      'ci-fast-structural-core',
-      'ci-fast-structural-python'
-    );
-    const lanes = jobBlock(
-      'ci-fast-structural-lanes',
-      'ci-fast-structural-lanes-coverage'
-    );
+    const lanes = jobBlock('ci-fast-structural-lanes', 'ci-knip');
     expect(lanes).toMatch(
-      /^ {2}ci-fast-structural-lanes:\n {4}name: ci-fast \(structural lanes \$\{\{ matrix\.group \}\}\)$/m
+      /^ {2}ci-fast-structural-lanes:\n {4}name: ci-fast \(structural lanes\)$/m
     );
-    expect(lanes).toContain('group: [ab, cd]');
-    expect(lanes).toContain('fail-fast: false');
     const aliases = lanes.match(/(?<= \*)[\w-]+/g);
     expect(aliases).toHaveLength(10);
-    const anchorHomes = `${remaining}\n${core}`;
-    for (const name of aliases) expect(anchorHomes).toContain(`&${name}`);
-    expect(core).toContain('CI_FAST_STRUCTURAL_LANES: skip');
-    expect(lanes).toContain(
-      'CI_FAST_STRUCTURAL_LANES: only:${{ matrix.group }}'
-    );
+    for (const name of aliases) expect(remaining).toContain(`&${name}`);
+    expect(remaining).toContain('CI_FAST_STRUCTURAL_LANES: skip');
+    expect(lanes).toContain('CI_FAST_STRUCTURAL_LANES: only');
     expect(lanes).not.toContain('CI_FAST_STRUCTURAL_PYTEST');
     expect(lanes).not.toContain('CI_FAST_STRUCTURAL_WEB');
     expect(lanes).toContain('runs-on: ubuntu-24.04');
-    // Each leg uploads its pair's combined branch map for the report job.
-    expect(lanes).toContain('- name: Upload lanes coverage data');
-    expect(lanes).toContain(
-      'name: lanes-coverage-${{ matrix.group }}-${{ github.run_id }}-${{ github.run_attempt }}'
-    );
-    expect(lanes).toContain('if-no-files-found: error');
-    // The runner's own receipt gates the artifact (Move 3 review): a clean
-    // skip records a not-applicable marker; success without data fails here.
-    expect(lanes).toContain('- name: Stage lanes coverage evidence');
-    expect(lanes).toContain('id: lanes-run');
-    expect(lanes.indexOf('- name: Stage lanes coverage evidence')).toBeLessThan(
-      lanes.indexOf('- name: Upload lanes coverage data')
-    );
-    expect(lanes).toContain('lanesReceiptRanSuite');
-    expect(lanes).toContain('not-applicable');
-    expect(lanes).toContain(
-      "if: ${{ steps.lanes-coverage.outputs.artifact != '' }}"
-    );
-
-    const coverage = jobBlock('ci-fast-structural-lanes-coverage', 'ci-knip');
-    expect(coverage).toMatch(
-      /^ {2}ci-fast-structural-lanes-coverage:\n {4}name: ci-fast \(structural lanes coverage\)$/m
-    );
-    // The report runs only after both legs succeeded, and combines the full
-    // suite's maps before any per-module floor is enforced.
-    expect(coverage).toContain('needs.ci-fast-structural-lanes.result');
-    const reportAt = coverage.indexOf('- name: Run lanes coverage report');
-    expect(
-      coverage.indexOf('- name: Download lanes coverage data')
-    ).toBeLessThan(reportAt);
-    expect(coverage.indexOf('coverage combine')).toBeGreaterThan(reportAt);
-    expect(coverage).toContain('jovie-lanes-ab.coverage');
-    expect(coverage).toContain('jovie-lanes-cd.coverage');
-    expect(coverage).toContain('.github/ci-harness/lanes-coverage-floors.txt');
-    expect(coverage).not.toContain('setup-node-pnpm');
-    // Both legs' evidence is required whenever the suite applied; a mix of
-    // data files and not-applicable markers fails closed.
-    expect(coverage).toContain('jovie-lanes-*.not-applicable');
-    expect(coverage).toContain('missing lanes coverage data for leg $group');
-    expect(coverage).toContain('inconsistent lanes coverage evidence');
   });
 
   it('runs the structural web commands in an aliased ci-fast job', () => {
@@ -2786,19 +2695,14 @@ describe('ci-fast bounded parallel workflow', () => {
       'ci-fast-remaining',
       'ci-profile-admission-browser'
     );
-    const core = jobBlock(
-      'ci-fast-structural-core',
-      'ci-fast-structural-python'
-    );
     const web = jobBlock('ci-fast-structural-web', 'ci-fast-structural-lanes');
     expect(web).toMatch(
       /^ {2}ci-fast-structural-web:\n {4}name: ci-fast \(structural web\)$/m
     );
     const aliases = web.match(/(?<= \*)[\w-]+/g);
     expect(aliases).toHaveLength(11);
-    const anchorHomes = `${remaining}\n${core}`;
-    for (const name of aliases) expect(anchorHomes).toContain(`&${name}`);
-    expect(core).toContain('CI_FAST_STRUCTURAL_WEB: skip');
+    for (const name of aliases) expect(remaining).toContain(`&${name}`);
+    expect(remaining).toContain('CI_FAST_STRUCTURAL_WEB: skip');
     expect(web).toContain('CI_FAST_STRUCTURAL_WEB: only');
     expect(web).not.toContain('CI_FAST_STRUCTURAL_PYTEST');
     // tests/unit/ci runs a real Chromium Playwright capture.
@@ -2970,13 +2874,13 @@ describe('ci-fast bounded parallel workflow', () => {
   });
 
   it('path-selects both workflow contracts and excludes unrelated tests', () => {
-    const core = jobBlock(
-      'ci-fast-structural-core',
-      'ci-fast-structural-python'
+    const remaining = jobBlock(
+      'ci-fast-remaining',
+      'ci-profile-admission-browser'
     );
     const controlPattern = structuralControlPattern();
     const controlPatternAdditions = [];
-    const uiPattern = core.match(/STRUCTURAL_UI_PATTERN='([^']+)'/)?.[1];
+    const uiPattern = remaining.match(/STRUCTURAL_UI_PATTERN='([^']+)'/)?.[1];
     expect(controlPattern).toBeDefined();
     expect(uiPattern).toBeDefined();
 
@@ -3132,20 +3036,16 @@ describe('ci-fast bounded parallel workflow', () => {
   });
 
   it('runs hosted structural CI for Storybook and token-guard inputs', () => {
-    const core = jobBlock(
-      'ci-fast-structural-core',
-      'ci-fast-structural-python'
-    );
     const remaining = jobBlock(
       'ci-fast-remaining',
       'ci-profile-admission-browser'
     );
-    const structuralDecision = core.slice(
-      core.indexOf('- name: Decide structural lane'),
-      core.indexOf('- name: Set up Python (structural regression tests)')
+    const structuralDecision = remaining.slice(
+      remaining.indexOf('- name: Decide structural lane'),
+      remaining.indexOf('- name: Select Storybook browser proof')
     );
     const controlPattern = structuralControlPattern();
-    const uiPattern = core.match(/STRUCTURAL_UI_PATTERN='([^']+)'/)?.[1];
+    const uiPattern = remaining.match(/STRUCTURAL_UI_PATTERN='([^']+)'/)?.[1];
     expect(controlPattern).toBeDefined();
     expect(uiPattern).toBeDefined();
     const selectsStructural = new RegExp(`${controlPattern}|${uiPattern}`);
@@ -3327,13 +3227,9 @@ describe('invariant-scanned PR structural selection', () => {
   it('selects structural for every invariant-scanned path on source PRs', () => {
     const addition =
       'STRUCTURAL_CONTROL_PATTERN+="|$(node scripts/invariants/scanned-paths.mjs --ere)"';
-    const decisionStart = WORKFLOW.indexOf('- name: Decide structural lane');
     const decision = WORKFLOW.slice(
-      decisionStart,
-      WORKFLOW.indexOf(
-        '- name: Set up Python (structural regression tests)',
-        decisionStart
-      )
+      WORKFLOW.indexOf('- name: Decide structural lane'),
+      WORKFLOW.indexOf('- name: Select Storybook browser proof')
     );
     expect(decision).toContain(addition);
     expect(decision.indexOf(addition)).toBeLessThan(
@@ -3368,13 +3264,9 @@ describe('new scripts test PR structural selection', () => {
   // #18714 added an unwired scripts test; only the merge queue ran the
   // inventory guard, so the PR passed and the queue group was ejected.
   it('selects structural when a PR adds or renames a scripts test', () => {
-    const decisionStart = WORKFLOW.indexOf('- name: Decide structural lane');
     const decision = WORKFLOW.slice(
-      decisionStart,
-      WORKFLOW.indexOf(
-        '- name: Set up Python (structural regression tests)',
-        decisionStart
-      )
+      WORKFLOW.indexOf('- name: Decide structural lane'),
+      WORKFLOW.indexOf('- name: Select Storybook browser proof')
     );
     const line = decision
       .split('\n')
@@ -3688,13 +3580,9 @@ it('selects hosted structural coverage for doctor census fixture-only edits', ()
 });
 
 it('reads structural control paths from data, one alternative per line (JOV-6837)', () => {
-  const decisionStart = WORKFLOW.indexOf('- name: Decide structural lane');
   const decision = WORKFLOW.slice(
-    decisionStart,
-    WORKFLOW.indexOf(
-      '- name: Set up Python (structural regression tests)',
-      decisionStart
-    )
+    WORKFLOW.indexOf('- name: Decide structural lane'),
+    WORKFLOW.indexOf('- name: Select Storybook browser proof')
   );
   expect(decision).toContain(
     `STRUCTURAL_CONTROL_PATTERN="$(grep -vE '^[[:space:]]*(#|$)' .github/ci-harness/structural-control-paths.ere | paste -sd'|' -)"`

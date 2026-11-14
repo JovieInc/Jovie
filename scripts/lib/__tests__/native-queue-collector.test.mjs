@@ -34,7 +34,7 @@ else if(query.includes('/statuses?')) result=[[{context:'Fork PR Gate',id:2,stat
 else if(query.includes('/pulls/123/files?')) result=[[{filename:'CHANGELOG.md'}]];
 else if(query.includes('/pulls/123')) result={merged:true,head:{sha:head},merge_commit_sha:head};
 else if(query.includes('ci.yml/runs?')) result={workflow_runs:[{id:123,run_attempt:1,head_sha:head,repository:{full_name:repo},path:'.github/workflows/ci.yml',status:'completed',conclusion:'success'}]};
-else if(query.includes('/jobs?')) result=[{jobs:process.env.COLLECTOR_CASE==='merged-no-job'?[]:[{id:321,run_id:123,run_attempt:1,head_sha:head,name:'PR Ready',status:'completed',conclusion:'success'},{id:322,run_id:123,run_attempt:1,head_sha:head,name:'ci-fast (structural python)',status:'completed',conclusion:'success'}]}];
+else if(query.includes('/jobs?')) result=[{jobs:process.env.COLLECTOR_CASE==='merged-no-job'?[]:[{id:321,run_id:123,run_attempt:1,head_sha:head,name:'PR Ready',status:'completed',conclusion:'success'},{id:322,run_id:123,run_attempt:1,head_sha:head,name:'ci-fast (remaining)',status:'completed',conclusion:'success'}]}];
 else if(query.includes('/artifacts?')) result=[{artifacts:[{name:'product-lane-final-'+head+'-1',expired:process.env.COLLECTOR_CASE==='merged-expired',workflow_run:{id:123,head_sha:head}}]}];
 else if(query.includes('/compare/')) result={status:'identical',base_commit:{sha:head},merge_base_commit:{sha:head}};
 else throw Error('unhandled fixture request: '+query);
@@ -174,7 +174,7 @@ describe('read-only native queue collector CLI', () => {
     const { bundle } = collect('validation');
     expect(bundle.evaluatorSha).toBe('a'.repeat(40));
     expect(bundle.validation.run.id).toBe(123);
-    expect(bundle.validation.job.name).toBe('ci-fast (structural python)');
+    expect(bundle.validation.job.name).toBe('ci-fast (remaining)');
     expect(bundle.validation.log).toBe('fixture exact job log');
   });
   it('records pending validation without fetching an unavailable job log', () => {

@@ -300,7 +300,7 @@ export function main(
                 `actions/runs/${run.id}/attempts/${run.run_attempt}/jobs?per_page=100`
               )
                 .flatMap(page => page.jobs)
-                .find(job => job.name === 'ci-fast (structural python)')
+                .find(job => job.name === 'ci-fast (remaining)')
             : null;
         const log =
           job?.status === 'completed'

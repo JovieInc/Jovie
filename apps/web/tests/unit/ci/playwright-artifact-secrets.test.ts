@@ -96,7 +96,8 @@ const safeUploadUses = './.github/actions/upload-safe-playwright-artifact';
 // browser-derived files the guard scans before any upload can read them.
 const playwrightProducer =
   /(?:playwright test|run qa:routes| e2e:|run test:e2e|test:nightly-agent:(?:normalize|publish-status))/;
-// Reviewed unguarded producers: `file:job` to step name, or '*' for every step.
+// Reviewed producers that run without guard-playwright-artifacts.mjs, keyed
+// `file:job` to one step name or '*' for the whole job.
 const unguardedProducerSteps = new Map([
   // Captures publish through the catalog integrity/budget verifier instead.
   ['screenshots.yml:generate', '*'],
@@ -136,7 +137,6 @@ const imageAllowedJobs = new Set([
   'ci.yml:ci-golden-path',
   'ci.yml:ci-lighthouse-pr',
   'ci.yml:ci-storybook-surfaces',
-  'ci.yml:ci-visual-snapshot-compare',
   'ci.yml:ci-visual-snapshot-homepage',
   'ci.yml:ci-visual-marketing-dom',
   'ci.yml:ci-visual-marketing-routes',
@@ -157,7 +157,6 @@ const markdownAllowedJobs = new Set([
   'ci.yml:ci-golden-path',
   'ci.yml:ci-smoke-required',
   'ci.yml:ci-storybook-surfaces',
-  'ci.yml:ci-visual-snapshot-compare',
   'ci.yml:ci-visual-snapshot-homepage',
   'ci.yml:ci-visual-marketing-dom',
   'ci.yml:ci-visual-marketing-routes',
@@ -274,8 +273,7 @@ const jobBlock = (source: string, job: string) =>
   '';
 const stepBlock = (source: string, name: string) =>
   source
-    // Step boundaries include aliased step references (`- &anchor` / `- *anchor`).
-    .split(/(?=^      - (?:name:|[&*]))/m)
+    .split(/(?=^      - name:)/m)
     .find(block => block.startsWith(`      - name: ${name}\n`)) ?? '';
 const yamlPropertyBlock = (source: string, key: string, indent: number) => {
   const lines = source.split('\n');
@@ -947,7 +945,7 @@ describe('Playwright artifact secret boundary', () => {
     'keeps Storybook base-fetch auth scoped and propagates exit %i',
     fetchExit => {
       const workflow = readFileSync(join(workflowsRoot, 'ci.yml'), 'utf8');
-      const job = jobBlock(workflow, 'ci-fast-structural-core');
+      const job = jobBlock(workflow, 'ci-fast-remaining');
       const step = stepBlock(job, 'Decide structural lane');
       expect(step).toContain('GH_TOKEN: ${{ github.token }}');
       const command = step

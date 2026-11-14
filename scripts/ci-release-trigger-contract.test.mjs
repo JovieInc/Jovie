@@ -22,7 +22,6 @@ function jobBlock(jobId) {
 }
 
 const ciFastTypecheckBlock = jobBlock('ci-fast-typecheck');
-const ciFastStructuralCoreBlock = jobBlock('ci-fast-structural-core');
 const ciFastRemainingBlock = jobBlock('ci-fast-remaining');
 const ciFastAggregateBlock = jobBlock('ci-fast');
 
@@ -53,15 +52,13 @@ test('CI prevention verifier runs for every source PR and exact merge-group head
     /run: node scripts\/ci-release-incident-contract\.mjs/
   );
   assert.match(ciFastRemainingBlock, /run: pnpm ci:incident-contract:validate/);
-  // The decide step moved with the structural lane to the sharded
-  // ci-fast-structural-core job (Move 3, 2026-11-10).
   assert.match(
-    ciFastStructuralCoreBlock,
+    ciFastRemainingBlock,
     /if \[\[ "\$\{\{ github\.event_name \}\}" != "pull_request" \]\]; then\n            echo "skip=false"/
   );
   assert.match(
     ciFastAggregateBlock,
-    /needs:\s*\[\s*ci-path-changes,\s*ci-merge-group-admission,\s*ci-fast-typecheck,\s*ci-fast-remaining,\s*ci-profile-admission-browser,\s*ci-fast-structural-python,\s*ci-fast-structural-web,\s*ci-fast-structural-lanes,\s*ci-fast-structural-lanes-coverage,\s*ci-fast-structural-core,\s*ci-actionlint,\s*\]/s
+    /needs:\s*\[\s*ci-path-changes,\s*ci-merge-group-admission,\s*ci-fast-typecheck,\s*ci-fast-remaining,\s*ci-profile-admission-browser,\s*ci-fast-structural-python,\s*ci-fast-structural-web,\s*ci-fast-structural-lanes,\s*\]/s
   );
   assert.match(
     ciFastAggregateBlock,
@@ -77,7 +74,7 @@ test('CI prevention verifier runs for every source PR and exact merge-group head
   );
   assert.match(
     ciFastAggregateBlock,
-    /\[\[ "\$TYPECHECK_RESULT" != "success" \|\| "\$REMAINING_RESULT" != "success" \|\| "\$PROFILE_BROWSER_RESULT" != "success" \|\| "\$STRUCTURAL_PYTHON_RESULT" != "success" \|\| "\$STRUCTURAL_WEB_RESULT" != "success" \|\| "\$STRUCTURAL_LANES_RESULT" != "success" \|\| "\$STRUCTURAL_LANES_COVERAGE_RESULT" != "success" \|\| "\$STRUCTURAL_CORE_RESULT" != "success" \]\]/
+    /\[\[ "\$TYPECHECK_RESULT" != "success" \|\| "\$REMAINING_RESULT" != "success" \|\| "\$PROFILE_BROWSER_RESULT" != "success" \|\| "\$STRUCTURAL_PYTHON_RESULT" != "success" \|\| "\$STRUCTURAL_WEB_RESULT" != "success" \|\| "\$STRUCTURAL_LANES_RESULT" != "success" \]\]/
   );
   assert.match(ciFastAggregateBlock, /exit 1/);
   assert.doesNotMatch(

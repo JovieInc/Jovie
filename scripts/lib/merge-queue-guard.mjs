@@ -99,7 +99,9 @@ export const PRODUCTION_CONTROLLER_GENERATION_READBACK_SCHEMA =
   'jovie-production-controller-generation-readback/v1';
 
 /**
- * Native cohort decision contract; GitHub owns the live wait clock.
+ * Decide whether a native cohort should merge now. GitHub owns the live
+ * wait clock; this is the typed source contract for tests and readback.
+ *
  * @param {{ queuedCount?: unknown, waitedMinutes?: unknown }} [input]
  */
 export function evaluateNativeCohortMergeDecision({
@@ -2005,9 +2007,6 @@ export const MERGE_GROUP_FAILURE_CONCLUSIONS = new Set([
 // retry policy below.
 export const DETERMINISTIC_MERGE_GROUP_FAILURE_STEPS = new Set([
   'Run lanes coverage pytest',
-  // Combined floors report of the lanes coverage matrix legs (Move 3
-  // 2026-11-10); a shortfall on the unchanged head fails identically on retry.
-  'Run lanes coverage report',
   'Run deterministic brand safety scan',
   'Run deterministic Promptfoo evals',
   'Run golden eval-set CI gate',

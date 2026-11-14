@@ -212,12 +212,12 @@ function parseExactCiFastFailureOperands(script) {
     .map(
       clause =>
         clause.match(
-          /^"\$(TYPECHECK_RESULT|REMAINING_RESULT|PROFILE_BROWSER_RESULT|STRUCTURAL_PYTHON_RESULT|STRUCTURAL_WEB_RESULT|STRUCTURAL_LANES_RESULT|STRUCTURAL_LANES_COVERAGE_RESULT|STRUCTURAL_CORE_RESULT)"\s+!=\s+"success"$/
+          /^"\$(TYPECHECK_RESULT|REMAINING_RESULT|PROFILE_BROWSER_RESULT|STRUCTURAL_PYTHON_RESULT|STRUCTURAL_WEB_RESULT|STRUCTURAL_LANES_RESULT)"\s+!=\s+"success"$/
         )?.[1]
     );
   if (
     operands.sort().join() !==
-    'PROFILE_BROWSER_RESULT,REMAINING_RESULT,STRUCTURAL_CORE_RESULT,STRUCTURAL_LANES_COVERAGE_RESULT,STRUCTURAL_LANES_RESULT,STRUCTURAL_PYTHON_RESULT,STRUCTURAL_WEB_RESULT,TYPECHECK_RESULT'
+    'PROFILE_BROWSER_RESULT,REMAINING_RESULT,STRUCTURAL_LANES_RESULT,STRUCTURAL_PYTHON_RESULT,STRUCTURAL_WEB_RESULT,TYPECHECK_RESULT'
   )
     throw new Error('Invalid ci-fast fail-closed result set');
   return operands;
@@ -278,9 +278,9 @@ describe('merge_group workflow contract', () => {
   it('accepts reordered exact ci-fast failure operands', () => {
     expect(
       parseExactCiFastFailureOperands(
-        'if [[ "$PROFILE_BROWSER_RESULT" != "success" || "$STRUCTURAL_CORE_RESULT" != "success" || "$STRUCTURAL_LANES_COVERAGE_RESULT" != "success" || "$STRUCTURAL_LANES_RESULT" != "success" || "$STRUCTURAL_WEB_RESULT" != "success" || "$STRUCTURAL_PYTHON_RESULT" != "success" || "$TYPECHECK_RESULT" != "success" || "$REMAINING_RESULT" != "success" ]]; then'
+        'if [[ "$PROFILE_BROWSER_RESULT" != "success" || "$STRUCTURAL_LANES_RESULT" != "success" || "$STRUCTURAL_WEB_RESULT" != "success" || "$STRUCTURAL_PYTHON_RESULT" != "success" || "$TYPECHECK_RESULT" != "success" || "$REMAINING_RESULT" != "success" ]]; then'
       )
-    ).toHaveLength(8);
+    ).toHaveLength(6);
   });
 
   it('rejects a ci-fast failure condition missing a required operand', () => {
@@ -309,7 +309,7 @@ describe('merge_group workflow contract', () => {
     );
 
     const consumers =
-      'ci-fast-typecheck ci-fast-remaining ci-profile-admission-browser ci-fast-structural-python ci-fast-structural-web ci-fast-structural-lanes ci-fast-structural-core ci-promptfoo-evals ci-golden-eval-set ci-build-layout ci-build-ovie ci-typecheck-ovie ci-storybook-surfaces ci-cross-product-integration ci-unit-tests ci-exact-head-coverage-shard ci-golden-path-lock ci-visual-snapshot-compare ci-visual-snapshot-homepage ci-visual-marketing-dom ci-visual-marketing-routes drizzle-migration-guard';
+      'ci-fast-typecheck ci-fast-remaining ci-profile-admission-browser ci-fast-structural-python ci-fast-structural-web ci-fast-structural-lanes ci-promptfoo-evals ci-golden-eval-set ci-build-layout ci-build-ovie ci-typecheck-ovie ci-storybook-surfaces ci-cross-product-integration ci-unit-tests ci-exact-head-coverage-shard ci-golden-path-lock ci-visual-snapshot-compare ci-visual-snapshot-homepage ci-visual-marketing-dom ci-visual-marketing-routes drizzle-migration-guard';
     for (const jobId of consumers.split(' ')) {
       const job = getJobBlock(CI_WORKFLOW, jobId);
       expect(job, jobId).toContain('ci-merge-group-workspace');
@@ -359,7 +359,8 @@ describe('merge_group workflow contract', () => {
   it('revalidates size after contract edits without draft-state or label churn', () => {
     const sourceRevisionTrigger = 'types: [opened, synchronize, reopened]';
 
-    // Draft transitions preserve the source SHA and its checks.
+    // Draft state does not change the source SHA. The original source checks
+    // remain authoritative when the owner pairs ready with native auto-merge.
     expect(SIZE_GUARD_WORKFLOW).toContain(
       'types: [opened, synchronize, reopened, edited]'
     );
@@ -389,7 +390,9 @@ describe('merge_group workflow contract', () => {
         return workflowDeclaresReadyForReviewType(source);
       });
 
-    // Only green-enroll consumes ready transitions; it preserves checks and skips drafts.
+    // A ready transition must never earn an unchanged head a second CI
+    // flight. merge-queue-green-enroll.yml is the sole subscriber: it admits
+    // the already-green head and still skips drafts.
     expect(offenders).toEqual([]);
     expect(existsSync(resolve(workflowDir, 'auto-merge-default.yml'))).toBe(
       false
@@ -491,7 +494,9 @@ describe('merge_group workflow contract', () => {
       "policy='scripts/lib/merge-group-admission.mjs'"
     );
     expect(admission).toContain('node "$policy"');
-    // JOV-8754: admission uses a read-only Bot token, falling back to GITHUB_TOKEN.
+    // JOV-8754: the only secret admission may touch is the Jovie Bot key for a
+    // read-only installation token (the ci-merge-group-supersede pattern),
+    // with GITHUB_TOKEN as the fail-closed fallback.
     expect(admission.match(/secrets\.[A-Z_]+/g)).toEqual([
       'secrets.JOVIE_BOT_PRIVATE_KEY',
     ]);
@@ -585,20 +590,16 @@ describe('merge_group workflow contract', () => {
     }
 
     const remaining = getJobBlock(CI_WORKFLOW, 'ci-fast-remaining');
-    const structuralCore = getJobBlock(CI_WORKFLOW, 'ci-fast-structural-core');
     expect(remaining).toContain("CI_FAST_SKIP_STRUCTURAL: 'true'");
-    // The structural lane and its decide step moved to the sharded
-    // ci-fast-structural-core matrix job (Move 3, 2026-11-10).
-    expect(remaining).not.toContain("CI_FAST_ONLY_STRUCTURAL: 'true'");
-    expect(structuralCore).toContain("CI_FAST_ONLY_STRUCTURAL: 'true'");
-    expect(structuralCore).toContain('github.event_name }}" != "pull_request"');
-    expect(structuralCore).toContain('echo "skip=false"');
-    expect(structuralCore).toContain('apps/web/\\.storybook/');
-    expect(structuralCore).toContain('apps/web/package\\.json$');
-    expect(structuralCore).toContain('apps/web/scripts/');
-    expect(structuralCore).not.toContain('chromatic\\.config\\.json$');
-    expect(structuralCore).toContain('package\\.json$');
-    expect(structuralCore).toContain('shared-ui-visual-arbitrary');
+    expect(remaining).toContain("CI_FAST_ONLY_STRUCTURAL: 'true'");
+    expect(remaining).toContain('github.event_name }}" != "pull_request"');
+    expect(remaining).toContain('echo "skip=false"');
+    expect(remaining).toContain('apps/web/\\.storybook/');
+    expect(remaining).toContain('apps/web/package\\.json$');
+    expect(remaining).toContain('apps/web/scripts/');
+    expect(remaining).not.toContain('chromatic\\.config\\.json$');
+    expect(remaining).toContain('package\\.json$');
+    expect(remaining).toContain('shared-ui-visual-arbitrary');
     // Control-lane paths moved to data (JOV-6837).
     expect(
       readFileSync(
@@ -648,7 +649,7 @@ describe('merge_group workflow contract', () => {
     expect(ciFast).toContain('TYPECHECK_RESULT');
     expect(ciFast).toContain('REMAINING_RESULT');
     expect(ciFast).toContain('PROFILE_BROWSER_RESULT');
-    expect(parseExactCiFastFailureOperands(ciFast)).toHaveLength(8);
+    expect(parseExactCiFastFailureOperands(ciFast)).toHaveLength(6);
     expect(ciFast).toContain('exit 1');
     const units = getJobBlock(CI_WORKFLOW, 'ci-unit-tests');
     expect(units).not.toContain('ci-unit-runner-route');
