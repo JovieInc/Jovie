@@ -28,7 +28,7 @@ import type { ReleaseViewModel } from '@/lib/discography/types';
 
 const { mockUseDspMatchesQuery, mockUsePlanGate, navigationState, testState } =
   vi.hoisted(() => ({
-    testState: { realActionMenu: false },
+    testState: { realActionMenu: false, albumArtFlag: false },
     mockUseDspMatchesQuery: vi.fn(() => ({ data: [], isLoading: false })),
     mockUsePlanGate: vi.fn(() => ({
       isLoading: false,
@@ -67,7 +67,8 @@ vi.mock('@/contexts/TableMetaContext', () => ({
 }));
 
 vi.mock('@/lib/flags/client', () => ({
-  useAppFlag: () => false,
+  useAppFlag: (flag: string) =>
+    flag === 'ALBUM_ART_GENERATION' && testState.albumArtFlag,
 }));
 
 vi.mock('@/app/app/(shell)/dashboard/releases/actions', () => ({
@@ -433,6 +434,7 @@ function renderShell(
 
 beforeEach(() => {
   testState.realActionMenu = false;
+  testState.albumArtFlag = false;
   navigationState.searchParams = new URLSearchParams();
   mockUseDspMatchesQuery.mockReturnValue({ data: [], isLoading: false });
   mockUsePlanGate.mockReturnValue({
@@ -754,6 +756,45 @@ describe('ShellReleasesView', () => {
         expect.stringContaining('/lost-in-the-light')
       );
     });
+  });
+
+  it('opens chat with the release chip from the Generate Album Art row action', async () => {
+    const { openChatWithPrompt } = await import(
+      '@/lib/chat/open-chat-with-prompt'
+    );
+    vi.mocked(openChatWithPrompt).mockClear();
+    testState.albumArtFlag = true;
+    mockUsePlanGate.mockReturnValue({
+      isLoading: false,
+      isError: false,
+      smartLinksLimit: null,
+      isPro: true,
+      canCreateManualReleases: true,
+      canGenerateAlbumArt: true,
+      canGenerateReleasePlans: true,
+      canEditSmartLinks: true,
+      canAccessFutureReleases: true,
+    });
+
+    renderShell([
+      fakeRelease({ id: 'r1', title: 'Lost in the Light' }),
+      fakeRelease({ id: 'r2', title: 'Sunshine Recorder' }),
+    ]);
+
+    fireEvent.click(
+      screen.getByRole('button', {
+        name: 'Release actions for Sunshine Recorder',
+      })
+    );
+    const row = screen.getByRole('listitem', { name: /Sunshine Recorder/ });
+    fireEvent.click(
+      within(row).getByRole('button', { name: 'Generate Album Art' })
+    );
+
+    expect(openChatWithPrompt).toHaveBeenCalledTimes(1);
+    const [prompt] = vi.mocked(openChatWithPrompt).mock.calls[0];
+    expect(prompt).toContain('@release:r2[Sunshine Recorder]');
+    expect(prompt).not.toContain('{');
   });
 
   it('keeps the global search trigger inside the header actions probe', async () => {

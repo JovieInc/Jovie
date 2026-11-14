@@ -16,6 +16,8 @@ const {
   mockUseTaskBoardQuery,
   mockUseTasksQuery,
   mockEntitySidebarShell,
+  mockOpenChatWithPrompt,
+  mockToastError,
   editorTestState,
 } = vi.hoisted(() => ({
   mockRouterPush: vi.fn(),
@@ -25,12 +27,32 @@ const {
   mockUseTaskBoardQuery: vi.fn(),
   mockUseTasksQuery: vi.fn(),
   mockEntitySidebarShell: vi.fn(),
+  mockOpenChatWithPrompt: vi.fn(),
+  mockToastError: vi.fn(),
   editorTestState: { real: false },
 }));
 
 vi.mock('next/navigation', () => ({
   useRouter: () => ({
     push: mockRouterPush,
+  }),
+}));
+
+vi.mock('@/lib/chat/open-chat-with-prompt', () => ({
+  openChatWithPrompt: mockOpenChatWithPrompt,
+}));
+
+vi.mock('sonner', () => ({
+  toast: Object.assign(vi.fn(), {
+    success: vi.fn(),
+    error: mockToastError,
+    info: vi.fn(),
+    warning: vi.fn(),
+    message: vi.fn(),
+    loading: vi.fn(),
+    promise: vi.fn(),
+    custom: vi.fn(),
+    dismiss: vi.fn(),
   }),
 }));
 
@@ -275,6 +297,15 @@ const mockJovieTask = {
   releaseId: null,
   releaseTitle: null,
 } as const;
+
+const mockPitchTask = {
+  ...mockTask,
+  id: 'task-pitch',
+  taskNumber: 4,
+  title: 'Pitch to Spotify editorial playlists',
+  status: 'todo',
+  agentStatus: 'queued',
+} as const satisfies TaskView;
 
 const mockTaskDescriptionHelper = {
   title: 'Press Release',
@@ -823,6 +854,8 @@ describe('TasksPageClient', () => {
     mockSetViewMode.mockClear();
     mockRegisterRightPanel.mockReset();
     mockRouterPush.mockReset();
+    mockOpenChatWithPrompt.mockReset();
+    mockToastError.mockReset();
     mockUseReleaseEntityQuery.mockClear();
     mockEntitySidebarShell.mockClear();
     mockUseTaskBoardQuery.mockClear();
@@ -2011,6 +2044,57 @@ describe('TasksPageClient', () => {
       label: 'Delete Task',
       destructive: true,
     });
+  });
+
+  it('opens chat with the task named in words when Generate Pitch is chosen', () => {
+    mockTasksData = [mockTask, mockPitchTask];
+    renderPage();
+
+    const pitchItem = getLatestTableProps()
+      ?.getContextMenuItems?.(mockPitchTask)
+      ?.find(item => item.id === 'generate-pitch');
+    expect(pitchItem).toMatchObject({ label: 'Generate Pitch' });
+
+    act(() => {
+      pitchItem?.onClick?.();
+    });
+
+    expect(mockToastError).not.toHaveBeenCalled();
+    expect(mockOpenChatWithPrompt).toHaveBeenCalledTimes(1);
+    const [prompt] = mockOpenChatWithPrompt.mock.calls[0];
+    expect(prompt).toContain('my task "Pitch to Spotify editorial playlists"');
+    expect(prompt).toContain('@release:release-1[QA Release]');
+  });
+
+  it('tells the artist to link a release instead of opening chat when Generate Pitch has no release', () => {
+    // The menu only offers Generate Pitch while the task has a release, so
+    // the release is unlinked after the menu was built for this task.
+    const pitchTask: { -readonly [K in keyof TaskView]: TaskView[K] } = {
+      ...mockPitchTask,
+    };
+    mockTasksData = [mockTask, pitchTask];
+    renderPage();
+
+    const pitchItem = getLatestTableProps()
+      ?.getContextMenuItems?.(pitchTask)
+      ?.find(item => item.id === 'generate-pitch');
+    expect(pitchItem).toBeDefined();
+
+    pitchTask.releaseId = null;
+    pitchTask.releaseTitle = null;
+    act(() => {
+      pitchItem?.onClick?.();
+    });
+
+    expect(mockToastError).toHaveBeenCalledWith(
+      'Link a release to generate its pitch.'
+    );
+    expect(mockOpenChatWithPrompt).not.toHaveBeenCalled();
+    expect(
+      getLatestTableProps()
+        ?.getContextMenuItems?.(pitchTask)
+        ?.some(item => item.id === 'generate-pitch')
+    ).toBe(false);
   });
 
   it('opens a confirmation dialog before deleting a task from the context menu', () => {

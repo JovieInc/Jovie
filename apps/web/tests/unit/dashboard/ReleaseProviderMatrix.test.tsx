@@ -29,6 +29,7 @@ import {
 
 const mockRouterPush = vi.fn();
 const mockRouterRefresh = vi.fn();
+const mockOpenChatWithPrompt = vi.fn();
 const mockInstantiateReleaseTasks = vi.fn().mockResolvedValue(undefined);
 const mockInstantiateReleaseTasksFromCatalog = vi
   .fn()
@@ -83,6 +84,10 @@ vi.mock('sonner', () => ({
 
 vi.mock('@/lib/error-tracking', () => ({
   captureError: vi.fn(),
+}));
+
+vi.mock('@/lib/chat/open-chat-with-prompt', () => ({
+  openChatWithPrompt: mockOpenChatWithPrompt,
 }));
 
 vi.mock('@/hooks/useClipboard', () => ({
@@ -224,21 +229,35 @@ vi.mock(
     ReleaseTable: ({
       releases,
       onEdit,
+      canGenerateAlbumArt,
+      onGenerateAlbumArt,
     }: {
       releases: Array<{ id: string; title?: string }>;
       onEdit?: (release: { id: string; title?: string }) => void;
+      canGenerateAlbumArt?: boolean;
+      onGenerateAlbumArt?: (release: { id: string; title?: string }) => void;
     }) => (
       <div data-testid='release-table'>
         ids:{releases.map(release => release.id).join(',')}
         {releases.map(release => (
-          <button
-            key={release.id}
-            type='button'
-            data-testid={`edit-release-${release.id}`}
-            onClick={() => onEdit?.(release)}
-          >
-            edit-{release.id}
-          </button>
+          <React.Fragment key={release.id}>
+            <button
+              type='button'
+              data-testid={`edit-release-${release.id}`}
+              onClick={() => onEdit?.(release)}
+            >
+              edit-{release.id}
+            </button>
+            {canGenerateAlbumArt && onGenerateAlbumArt ? (
+              <button
+                type='button'
+                aria-label={`Generate Album Art For ${release.title}`}
+                onClick={() => onGenerateAlbumArt(release)}
+              >
+                Generate Album Art
+              </button>
+            ) : null}
+          </React.Fragment>
         ))}
       </div>
     ),
@@ -766,6 +785,41 @@ describe('ReleaseProviderMatrix', () => {
       );
       expect(banner).toHaveAttribute('aria-hidden', 'false');
       expect(banner).toHaveStyle({ visibility: 'visible', opacity: '1' });
+    });
+  });
+
+  describe('release row actions', () => {
+    it('opens chat with the release chip when Generate Album Art is clicked', () => {
+      mockUsePlanGate.mockReturnValue({
+        smartLinksLimit: null,
+        isPro: true,
+        canCreateManualReleases: true,
+        canGenerateReleasePlans: false,
+        canEditSmartLinks: true,
+        canAccessFutureReleases: true,
+        canGenerateAlbumArt: true,
+      } as ReturnType<typeof mockUsePlanGate>);
+
+      renderWithProviders(
+        <ReleaseProviderMatrix
+          releases={[makeRelease('r1'), makeRelease('r2')]}
+          providerConfig={providerConfig}
+          primaryProviders={primaryProviders}
+          spotifyConnected={true}
+        />
+      );
+
+      fireEvent.click(
+        screen.getByRole('button', {
+          name: 'Generate Album Art For Test Release r2',
+        })
+      );
+
+      expect(mockOpenChatWithPrompt).toHaveBeenCalledTimes(1);
+      const [prompt, router] = mockOpenChatWithPrompt.mock.calls[0];
+      expect(prompt).toContain('@release:r2[Test Release r2]');
+      expect(prompt).not.toContain('{');
+      expect(router).toMatchObject({ push: mockRouterPush });
     });
   });
 
