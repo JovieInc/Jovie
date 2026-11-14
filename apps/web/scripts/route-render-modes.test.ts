@@ -2,6 +2,13 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
+  judge,
+  manifests,
+  page,
+  SNAPSHOT_ROUTES,
+  snapshot,
+} from './fixtures/route-render-modes-fixtures';
+import {
   admitDynamicRoutes,
   cacheabilityLoss,
   classifyRoutes,
@@ -15,13 +22,6 @@ import {
   SNAPSHOT_SCHEMA,
   validateSnapshotShape,
 } from './route-render-modes.mjs';
-import {
-  judge,
-  manifests,
-  page,
-  SNAPSHOT_ROUTES,
-  snapshot,
-} from './route-render-modes-fixtures';
 
 describe('committed render-mode baseline', () => {
   it('records the existing dynamic publication-gate miss destination', () => {

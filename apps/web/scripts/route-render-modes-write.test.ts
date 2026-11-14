@@ -4,13 +4,6 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import {
-  classifyRoutes,
-  evaluateRenderModes,
-  SNAPSHOT_SCHEMA,
-  tightenSnapshot,
-  weakenedEntries,
-} from './route-render-modes.mjs';
-import {
   cleanupRoots,
   judge,
   manifests,
@@ -20,7 +13,14 @@ import {
   roots,
   SNAPSHOT_ROUTES,
   snapshot,
-} from './route-render-modes-fixtures';
+} from './fixtures/route-render-modes-fixtures';
+import {
+  classifyRoutes,
+  evaluateRenderModes,
+  SNAPSHOT_SCHEMA,
+  tightenSnapshot,
+  weakenedEntries,
+} from './route-render-modes.mjs';
 
 afterEach(cleanupRoots);
 

@@ -3,7 +3,7 @@ import {
   classifyRoutes,
   evaluateRenderModes,
   SNAPSHOT_SCHEMA,
-} from './route-render-modes.mjs';
+} from '../route-render-modes.mjs';
 
 export const NOW = new Date('2026-10-22T00:00:00.000Z');
 export const roots: string[] = [];

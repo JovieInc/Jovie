@@ -1,31 +1,14 @@
 #!/usr/bin/env node
 /**
  * Render-mode and HTML-weight ratchet for a finished `next build`.
+ * Reads prerender and app-path manifests only. A less cacheable route,
+ * HTML past its allowance, or a missing entry fails closed. `--write`
+ * only tightens. `--admit-dynamic` and `--admit-from-log` insert a
+ * missing allowed `dynamic` row the check already named.
  *
- * Reads only build output (.next/prerender-manifest.json and
- * .next/app-path-routes-manifest.json): no server, no network, no secrets.
- * Every page, and every prerendered route handler, is classified by how
- * cacheable it is:
- *
- *   static            prerendered once at build, never revalidated
- *   isr:<seconds>     prerendered, revalidated on that window
- *   param-prerender   parameterised route prerendered or cached on demand
- *                     (`:<seconds>` when the build prerendered a path with a
- *                     revalidate window)
- *   dynamic           rendered on every request
- *
- * The committed snapshot (route-render-modes.json) is the baseline. The check
- * fails when a route loses cacheability (static -> isr -> dynamic, or a
- * shorter revalidate window), when a prerendered page's HTML grows past the
- * allowance, or when a route has no entry (new routes fail closed). A route
- * that got cheaper passes; `--write` locks the win in. `--write` only
- * tightens: it never records a loss. A loss that is intended is a hand edit
- * of the entry plus an unexpired `overrides` entry, judged against
- * origin/main.
- *
- * Usage: node scripts/route-render-modes.mjs [--next-dir .next] [--snapshot file] [--write] [--init] [--json]
- *        node scripts/route-render-modes.mjs [--snapshot file] --admit-dynamic <route>
- *        node scripts/route-render-modes.mjs [--snapshot file] --admit-from-log <file>
+ * Usage: node apps/web/scripts/route-render-modes.mjs [--next-dir .next] [--snapshot file] [--write] [--init] [--json]
+ *        node apps/web/scripts/route-render-modes.mjs [--snapshot file] --admit-dynamic <route>
+ *        node apps/web/scripts/route-render-modes.mjs [--snapshot file] --admit-from-log <file>
  */
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
