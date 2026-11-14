@@ -154,7 +154,9 @@ describe('InsightsPanel certificate', () => {
       generateFailure: { status: 403 },
     });
 
-    expect(screen.getByRole('link', { name: /plan|upgrade|billing/i })).toBeVisible();
+    expect(
+      screen.getByRole('link', { name: /plan|upgrade|billing/i })
+    ).toBeVisible();
     await expectNoA11yViolations(container);
   });
 

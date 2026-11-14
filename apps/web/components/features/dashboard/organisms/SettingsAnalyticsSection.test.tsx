@@ -84,7 +84,9 @@ describe('SettingsAnalyticsSection', () => {
     expect(updateAnalyticsFilterAsync).toHaveBeenCalledWith(true);
     expect(onArtistUpdate).toHaveBeenCalledWith(
       expect.objectContaining({
-        settings: expect.objectContaining({ exclude_self_from_analytics: true }),
+        settings: expect.objectContaining({
+          exclude_self_from_analytics: true,
+        }),
       })
     );
     await waitFor(() => expect(screen.getByText('Saved')).toBeInTheDocument());

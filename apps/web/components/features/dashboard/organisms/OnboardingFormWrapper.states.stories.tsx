@@ -117,7 +117,9 @@ export const OfflineHandleCheck: Story = {
     }),
   play: async ({ canvasElement }) => {
     const canvas = await typeHandle(canvasElement, 'offlinename');
-    await expect(canvas.getByRole('button', { name: 'Continue' })).toBeDisabled();
+    await expect(
+      canvas.getByRole('button', { name: 'Continue' })
+    ).toBeDisabled();
   },
 };
 

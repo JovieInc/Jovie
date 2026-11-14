@@ -146,14 +146,12 @@ describe('AudienceRowActionsMenu certificate', () => {
       />
     );
 
-    expect(screen.getByRole('menuitem', { name: 'Copy email' })).toHaveAttribute(
-      'aria-disabled',
-      'true'
-    );
-    expect(screen.getByRole('menuitem', { name: 'Copy phone' })).toHaveAttribute(
-      'aria-disabled',
-      'true'
-    );
+    expect(
+      screen.getByRole('menuitem', { name: 'Copy email' })
+    ).toHaveAttribute('aria-disabled', 'true');
+    expect(
+      screen.getByRole('menuitem', { name: 'Copy phone' })
+    ).toHaveAttribute('aria-disabled', 'true');
     expect(writeText).not.toHaveBeenCalled();
     await expectNoA11yViolations(container);
     await expectNoA11yViolations(screen.getByRole('menu'));

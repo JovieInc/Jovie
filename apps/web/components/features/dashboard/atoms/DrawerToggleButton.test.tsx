@@ -4,7 +4,7 @@ import userEvent from '@testing-library/user-event';
 import type { ReactNode } from 'react';
 import { useMemo, useState } from 'react';
 import { describe, expect, it, vi } from 'vitest';
-import { TableMetaContext, type TableMeta } from '@/contexts/TableMetaContext';
+import { type TableMeta, TableMetaContext } from '@/contexts/TableMetaContext';
 import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import { DrawerToggleButton } from './DrawerToggleButton';
 
@@ -37,7 +37,9 @@ function DrawerMeta({
   );
   return (
     <TooltipProvider>
-      <TableMetaContext.Provider value={value}>{children}</TableMetaContext.Provider>
+      <TableMetaContext.Provider value={value}>
+        {children}
+      </TableMetaContext.Provider>
     </TooltipProvider>
   );
 }

@@ -94,7 +94,11 @@ export const LongContentLinks: Story = {
           url: 'https://music.apple.com/us/album/the-midnight-harbour-sessions',
           clicks: 88210,
         },
-        { id: 'c', url: 'https://youtube.com/watch?v=dQw4w9WgXcQ', clicks: 7402 },
+        {
+          id: 'c',
+          url: 'https://youtube.com/watch?v=dQw4w9WgXcQ',
+          clicks: 7402,
+        },
       ],
     },
   },

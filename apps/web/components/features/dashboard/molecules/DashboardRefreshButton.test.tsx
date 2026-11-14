@@ -5,9 +5,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import { DashboardRefreshButton } from './DashboardRefreshButton';
 
-function SlowRefreshFrame({
-  pending,
-}: Readonly<{ pending: Promise<void> }>) {
+function SlowRefreshFrame({ pending }: Readonly<{ pending: Promise<void> }>) {
   const [version, setVersion] = useState(0);
   return (
     <>
@@ -69,6 +67,5 @@ describe('DashboardRefreshButton', () => {
     expect(container.querySelector('svg')).toHaveClass('animate-spin');
     expect(screen.getByText('Data v0')).toBeInTheDocument();
     await expectNoA11yViolations(container);
-
   });
 });

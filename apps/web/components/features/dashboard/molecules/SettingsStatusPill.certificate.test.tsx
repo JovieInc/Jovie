@@ -21,7 +21,11 @@ describe('SettingsStatusPill certificate', () => {
   it('shows the server error and colours it as destructive', async () => {
     const { container } = render(
       <SettingsStatusPill
-        status={{ saving: false, success: null, error: 'Handle is already taken' }}
+        status={{
+          saving: false,
+          success: null,
+          error: 'Handle is already taken',
+        }}
       />
     );
 

@@ -25,9 +25,7 @@ describe('AnalyticsCard certificate', () => {
   });
 
   it('renders partial data with only a title and value', async () => {
-    const { container } = render(
-      <AnalyticsCard title='Clicks' value={0} />
-    );
+    const { container } = render(<AnalyticsCard title='Clicks' value={0} />);
 
     const region = screen.getByRole('region', { name: 'Clicks metric' });
     expect(region).toHaveTextContent('Clicks');

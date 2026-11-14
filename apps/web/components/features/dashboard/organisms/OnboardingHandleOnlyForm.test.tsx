@@ -145,8 +145,13 @@ describe('OnboardingHandleOnlyForm', () => {
     await user.type(handleInput(), 'takenname');
 
     expect(
-      (await screen.findAllByText('Handle already taken', {}, { timeout: 3000 }))
-        .length
+      (
+        await screen.findAllByText(
+          'Handle already taken',
+          {},
+          { timeout: 3000 }
+        )
+      ).length
     ).toBeGreaterThan(0);
     expect(continueButton()).toBeDisabled();
     await expectNoA11yViolations(container);

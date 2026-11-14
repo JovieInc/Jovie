@@ -48,7 +48,9 @@ type Story = StoryObj<typeof meta>;
 export const EmptyHandle: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    await expect(canvas.getByRole('button', { name: 'Continue' })).toBeDisabled();
+    await expect(
+      canvas.getByRole('button', { name: 'Continue' })
+    ).toBeDisabled();
   },
 };
 
@@ -91,7 +93,9 @@ export const OfflineHandleCheck: Story = {
     }),
   play: async ({ canvasElement }) => {
     const canvas = await typeHandle(canvasElement, 'offlinename');
-    await expect(canvas.getByRole('button', { name: 'Continue' })).toBeDisabled();
+    await expect(
+      canvas.getByRole('button', { name: 'Continue' })
+    ).toBeDisabled();
   },
 };
 

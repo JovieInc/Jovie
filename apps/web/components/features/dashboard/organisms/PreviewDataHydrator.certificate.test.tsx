@@ -115,7 +115,11 @@ describe('PreviewDataHydrator certificate', () => {
 
     const data = lastHydration();
     expect(data.links).toEqual([
-      expect.objectContaining({ id: 'ig', title: 'Instagram', isVisible: false }),
+      expect.objectContaining({
+        id: 'ig',
+        title: 'Instagram',
+        isVisible: false,
+      }),
       expect.objectContaining({ id: 'odd', platformType: undefined }),
     ]);
     expect(data.dspConnections.spotify).toEqual({

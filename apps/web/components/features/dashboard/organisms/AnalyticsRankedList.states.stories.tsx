@@ -54,8 +54,16 @@ export const LongContentLabels: Story = {
         label: 'https://music.apple.com/us/album/the-midnight-harbour-sessions',
         value: '904,117',
       },
-      { key: 'c', label: 'https://youtube.com/watch?v=dQw4w9WgXcQ', value: '88,210' },
-      { key: 'd', label: 'https://tidal.com/browse/album/123456789', value: '7,402' },
+      {
+        key: 'c',
+        label: 'https://youtube.com/watch?v=dQw4w9WgXcQ',
+        value: '88,210',
+      },
+      {
+        key: 'd',
+        label: 'https://tidal.com/browse/album/123456789',
+        value: '7,402',
+      },
       { key: 'e', label: '100%25%20pure%20remix', value: '12' },
     ],
   },

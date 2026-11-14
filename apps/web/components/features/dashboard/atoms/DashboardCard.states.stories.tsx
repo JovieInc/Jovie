@@ -27,9 +27,9 @@ export const LongContentWrapping: Story = {
           Release-day checklist for every connected streaming platform
         </h3>
         <p className='text-sm text-secondary-token'>
-          This deliberately long card body runs to several lines so the card
-          can be checked for clean wrapping without clipping or horizontal
-          overflow at narrow widths. Supercalifragilisticexpialidocious.
+          This deliberately long card body runs to several lines so the card can
+          be checked for clean wrapping without clipping or horizontal overflow
+          at narrow widths. Supercalifragilisticexpialidocious.
         </p>
       </div>
     ),
@@ -44,8 +44,8 @@ export const LongContentInteractive: Story = {
     onClick: () => {},
     children: (
       <span>
-        Open the full analytics breakdown for this release across every
-        platform and region
+        Open the full analytics breakdown for this release across every platform
+        and region
       </span>
     ),
   },

@@ -62,7 +62,9 @@ describe('DashboardCard certificate', () => {
     );
 
     expect(screen.getByRole('heading', { name: long })).toBeInTheDocument();
-    expect(screen.getByText('هذه بطاقة لوحة تحكم افتراضية.')).toBeInTheDocument();
+    expect(
+      screen.getByText('هذه بطاقة لوحة تحكم افتراضية.')
+    ).toBeInTheDocument();
     await expectNoA11yViolations(container);
   });
 });

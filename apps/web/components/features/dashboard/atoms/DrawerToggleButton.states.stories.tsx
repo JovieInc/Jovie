@@ -1,7 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import type { ReactNode } from 'react';
 import { useMemo, useState } from 'react';
-import { TableMetaContext, type TableMeta } from '@/contexts/TableMetaContext';
+import { type TableMeta, TableMetaContext } from '@/contexts/TableMetaContext';
 import { DrawerToggleButton } from './DrawerToggleButton';
 
 function DrawerMeta({
@@ -22,7 +22,9 @@ function DrawerMeta({
     [open, registered, tableMeta]
   );
   return (
-    <TableMetaContext.Provider value={value}>{children}</TableMetaContext.Provider>
+    <TableMetaContext.Provider value={value}>
+      {children}
+    </TableMetaContext.Provider>
   );
 }
 

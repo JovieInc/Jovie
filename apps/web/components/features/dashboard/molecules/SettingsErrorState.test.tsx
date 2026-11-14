@@ -9,7 +9,9 @@ describe('SettingsErrorState', () => {
     const { container } = render(<SettingsErrorState />);
 
     expect(screen.getByText('Something went wrong')).toBeInTheDocument();
-    expect(screen.getByText('Failed to load this section.')).toBeInTheDocument();
+    expect(
+      screen.getByText('Failed to load this section.')
+    ).toBeInTheDocument();
     expect(screen.queryByRole('button')).not.toBeInTheDocument();
     await expectNoA11yViolations(container);
   });
@@ -25,7 +27,9 @@ describe('SettingsErrorState', () => {
       />
     );
 
-    expect(screen.getByText('Could not load notifications')).toBeInTheDocument();
+    expect(
+      screen.getByText('Could not load notifications')
+    ).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Try Again' }));
     expect(onRetry).toHaveBeenCalledTimes(1);
     await expectNoA11yViolations(container);
