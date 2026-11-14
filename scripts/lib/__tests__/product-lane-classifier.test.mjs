@@ -1,4 +1,3 @@
-import { execFileSync } from 'node:child_process';
 import {
   existsSync,
   mkdirSync,
@@ -10,6 +9,7 @@ import {
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
+import { execFileSync } from '../child-process.mjs';
 import {
   classifyLockfileChange,
   classifyProductLanes,
@@ -1064,11 +1064,11 @@ describe('product lane classifier', () => {
     expect(() => classifyProductLanes(['new-product/main.ts'])).toThrow(
       ProductLaneClassificationError
     );
-    const listed = execFileSync('git', ['ls-files', '-z'], {
+    const tracked = execFileSync('git', ['ls-files', '-z'], {
       encoding: 'utf8',
-      maxBuffer: 1 << 28,
-    });
-    const tracked = listed.split('\0').filter(Boolean);
+    })
+      .split('\0')
+      .filter(Boolean);
     expect(() => classifyProductLanes(tracked)).not.toThrow();
   });
 

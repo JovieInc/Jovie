@@ -249,6 +249,7 @@ export const TITLE_CASE_HEADING =
   /\btitle=['"][^'"\n]*\s(?:Settings|Panel|Player|Tasks|Dock|Update|Timeline|Search|Results|View|Bottom|Chat|Links|Stats|Rules|Accounts|Tools|Tracking|Privacy)\b/u;
 export function findTitleCaseHeadings(root = REPO_ROOT) {
   const files = execFileSync('git', ['ls-files', '--', 'apps/web'], {
+    maxBuffer: 256 * 1024 * 1024,
     cwd: root,
     encoding: 'utf8',
   })

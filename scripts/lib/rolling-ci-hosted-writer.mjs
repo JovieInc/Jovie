@@ -404,7 +404,7 @@ function assertHostedCandidateState({
   const records = execFileSync(
     'git',
     ['status', '--porcelain=v1', '-z', '--untracked-files=all'],
-    { cwd: repository, env: environment }
+    { maxBuffer: 256 * 1024 * 1024, cwd: repository, env: environment }
   )
     .toString('utf8')
     .split('\0')
@@ -504,7 +504,7 @@ export function stageHostedRepairArtifact({
   const records = execFileSync(
     'git',
     ['status', '--porcelain=v1', '-z', '--untracked-files=all'],
-    { cwd: repository, env: cleanEnvironment }
+    { maxBuffer: 256 * 1024 * 1024, cwd: repository, env: cleanEnvironment }
   )
     .toString('utf8')
     .split('\0')

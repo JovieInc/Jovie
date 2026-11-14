@@ -1386,7 +1386,11 @@ describe('ci-fast bounded parallel workflow', () => {
     const outPath = join(repo, 'ci-fast-lanes.json');
     const changedPath = join(repo, relativePath);
     const runGit = args =>
-      spawnSync('git', args, { cwd: repo, encoding: 'utf8' });
+      spawnSync('git', args, {
+        maxBuffer: 256 * 1024 * 1024,
+        cwd: repo,
+        encoding: 'utf8',
+      });
     try {
       mkdirSync(binDir, { recursive: true });
       mkdirSync(dirname(changedPath), { recursive: true });
@@ -1491,7 +1495,11 @@ describe('ci-fast bounded parallel workflow', () => {
     const repo = mkdtempSync(join(tmpdir(), 'ci-fast-selector-mismatch-'));
     const outPath = join(repo, 'ci-fast-lanes.json');
     const runGit = args =>
-      spawnSync('git', args, { cwd: repo, encoding: 'utf8' });
+      spawnSync('git', args, {
+        maxBuffer: 256 * 1024 * 1024,
+        cwd: repo,
+        encoding: 'utf8',
+      });
     try {
       expect(runGit(['init', '--initial-branch=main']).status).toBe(0);
       expect(
@@ -3339,7 +3347,11 @@ describe('CI diff selection on a divergent PR', () => {
   it('ignores main-only changes for PRs while preserving exact combined-head and push diffs', () => {
     const repository = mkdtempSync(join(tmpdir(), 'ci-pr-diff-'));
     const git = (...args) =>
-      execFileSync('git', args, { cwd: repository, encoding: 'utf8' }).trim();
+      execFileSync('git', args, {
+        maxBuffer: 256 * 1024 * 1024,
+        cwd: repository,
+        encoding: 'utf8',
+      }).trim();
     const select = (event, base = '') => {
       vi.stubEnv('GITHUB_EVENT_NAME', event);
       vi.stubEnv('GITHUB_BASE_REF', 'main');
@@ -3426,7 +3438,11 @@ describe('CI filename argv boundary (JOV-7573)', () => {
   function makeRepo(files) {
     const repository = mkdtempSync(join(tmpdir(), 'ci-argv-boundary-'));
     const git = (...args) =>
-      execFileSync('git', args, { cwd: repository, encoding: 'utf8' });
+      execFileSync('git', args, {
+        maxBuffer: 256 * 1024 * 1024,
+        cwd: repository,
+        encoding: 'utf8',
+      });
     git('init', '-b', 'main');
     git('config', 'user.name', 'CI test');
     git('config', 'user.email', 'ci-test@example.invalid');
@@ -3649,9 +3665,9 @@ it('reads structural control paths from data, one alternative per line (JOV-6837
     expect(() => new RegExp(line), line).not.toThrow();
   }
   const selected = execFileSync('git', ['ls-files'], {
+    maxBuffer: 256 * 1024 * 1024,
     cwd: REPO_ROOT,
     encoding: 'utf8',
-    maxBuffer: 1 << 28,
   })
     .split('\n')
     .filter(path => new RegExp(structuralControlPattern()).test(path));

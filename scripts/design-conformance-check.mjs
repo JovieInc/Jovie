@@ -73,8 +73,8 @@ function safeRepoPath(value) {
 function trackedFiles(repoRoot) {
   return new Set(
     execFileSync('git', ['ls-files', '-z'], {
+      maxBuffer: 256 * 1024 * 1024,
       cwd: repoRoot,
-      maxBuffer: 1 << 28,
     })
       .toString('utf8')
       .split('\0')
@@ -430,7 +430,7 @@ function changedFiles(repoRoot) {
   return execFileSync(
     'git',
     ['diff', '--diff-filter=ACDMRT', '--name-only', `${base}...HEAD`],
-    { cwd: repoRoot, encoding: 'utf8' }
+    { maxBuffer: 256 * 1024 * 1024, cwd: repoRoot, encoding: 'utf8' }
   )
     .split('\n')
     .map(line => line.trim())

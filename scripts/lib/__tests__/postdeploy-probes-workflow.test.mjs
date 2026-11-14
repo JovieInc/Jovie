@@ -346,6 +346,7 @@ async function resolveTarget({ deployed = 'ancestor', metadata = '' } = {}) {
   };
   const git = (...args) =>
     execFileSync('git', args, {
+      maxBuffer: 256 * 1024 * 1024,
       cwd: remote,
       env: gitEnv,
       encoding: 'utf8',
@@ -527,7 +528,11 @@ async function resolveTargetHttps({
   };
   /** @param {...string} args */
   const git = (...args) =>
-    execFileSync('git', args, { env: gitEnv, encoding: 'utf8' }).trim();
+    execFileSync('git', args, {
+      maxBuffer: 256 * 1024 * 1024,
+      env: gitEnv,
+      encoding: 'utf8',
+    }).trim();
   /** @type {{ path: string, authorized: boolean }[]} */
   const gitRequests = [];
   /** @type {import('node:https').Server | undefined} */
