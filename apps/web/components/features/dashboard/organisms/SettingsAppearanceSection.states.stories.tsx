@@ -28,15 +28,18 @@ function stubFetch(next: typeof globalThis.fetch) {
 }
 
 function withData(withProfile: boolean, dir?: 'rtl') {
-  return (Story: () => React.JSX.Element) => (
-    <DashboardDataProvider value={buildDashboardData(withProfile)}>
-      <TooltipProvider>
-        <div className='max-w-3xl' dir={dir}>
-          <Story />
-        </div>
-      </TooltipProvider>
-    </DashboardDataProvider>
-  );
+  function WithDashboardData(Story: () => React.JSX.Element) {
+    return (
+      <DashboardDataProvider value={buildDashboardData(withProfile)}>
+        <TooltipProvider>
+          <div className='max-w-3xl' dir={dir}>
+            <Story />
+          </div>
+        </TooltipProvider>
+      </DashboardDataProvider>
+    );
+  }
+  return WithDashboardData;
 }
 
 async function pickDarkTheme(canvasElement: HTMLElement) {
