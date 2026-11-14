@@ -30,6 +30,267 @@
       "frontend-rules",
       "forced-caps"
     ],
+    "apps/web/components/features/dashboard/organisms/links/ChatStyleLinkList.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/dashboard/organisms/links/QuickAddSuggestions.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/dashboard/organisms/onboarding/OnboardingCompleteStep.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/dashboard/organisms/release-provider-matrix/AppleMusicSyncBanner.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/dashboard/organisms/release-provider-matrix/ImportProgressBanner.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/dashboard/organisms/release-provider-matrix/NewReleaseHeaderAction.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/dashboard/organisms/release-provider-matrix/ReleaseProviderMatrixNotices.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/dashboard/organisms/release-provider-matrix/ReleaseStateBanners.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/dashboard/organisms/release-provider-matrix/ReleaseTable.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/dashboard/organisms/release-provider-matrix/ReleaseTableExportButton.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/dashboard/organisms/release-provider-matrix/ReleaseTableSubheader.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/dashboard/organisms/release-provider-matrix/ReleaseTableWithTracks.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/dashboard/organisms/release-provider-matrix/ReleaseWorkflowOverlays.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/dashboard/organisms/release-provider-matrix/ReleasesEmptyState.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/dashboard/organisms/release-provider-matrix/ReleasesExperience.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/dashboard/organisms/release-provider-matrix/SmartLinkGateBanner.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/dashboard/organisms/release-provider-matrix/components/ExpandButton.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/dashboard/organisms/releases/cells/PopularityCell.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/dashboard/organisms/releases/cells/ProviderCell.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/dashboard/organisms/releases/cells/SmartLinkCell.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/dashboard/organisms/releases/components/NotFoundCopyButton.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/dashboard/organisms/releases/components/ProviderCopyButton.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/dashboard/organisms/releases/components/ProviderStatusDot.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/dashboard/organisms/releases/release-actions.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/dashboard/organisms/settings-artist-profile-section/SettingsArtistProfileSection.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/dashboard/organisms/table/TableToolbar.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/dashboard/organisms/tour-dates/TourDatesManager.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/dashboard/release-tasks/ReleaseTaskPage.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/dashboard/tasks/TaskDataTable.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
     "apps/web/components/features/profile/ClaimBanner.tsx": [
       "ds-owner",
       "tokens",
@@ -388,9 +649,57 @@
       "long-content": "It renders no caller text: the column headers are fixed product copy and every cell is a skeleton bar. The detector matched its aria-label.",
       "offline": "The shell does no network work; it is what the route shows while its data loads, so going offline cannot change what it draws (the route's own error boundary owns failed loads)."
     },
+    "apps/web/components/features/dashboard/organisms/links/ChatStyleLinkList.tsx": {
+      "offline": "The list never fetches or mutates: links, the pending add and every handler arrive as props. The detector matched the 'loading' row type that draws the adding-link skeleton (LoadingAddingLink)."
+    },
+    "apps/web/components/features/dashboard/organisms/release-provider-matrix/AppleMusicSyncBanner.tsx": {
+      "error": "No error branch exists: a failed confirm or reject only records a breadcrumb in the mutation hook's onError and re-enables the buttons, and a failed match query leaves the banner hidden (LoadingEligibilityHidden).",
+      "offline": "Offline has no face of its own: with no match data the banner state is 'hidden' and it renders nothing, the same output as LoadingEligibilityHidden."
+    },
+    "apps/web/components/features/dashboard/organisms/release-provider-matrix/NewReleaseHeaderAction.tsx": {
+      "long-content": "Every label is fixed copy ('New Release' and the menu items). The detector matched the label prop passed to DashboardHeaderActionButton."
+    },
+    "apps/web/components/features/dashboard/organisms/release-provider-matrix/ReleaseProviderMatrixNotices.tsx": {
+      "error": "None of the five notices draws an error: they forward onSubmit to the lazy ReleasePlanWizard, which owns its failure UI. The detector matched the onSubmit prop.",
+      "offline": "The notices fetch nothing themselves; Suspense here only wraps lazy chunks with a reserved-height or null fallback. The one query belongs to AppleMusicSyncBanner, covered by its own state stories."
+    },
+    "apps/web/components/features/dashboard/organisms/release-provider-matrix/ReleaseStateBanners.tsx": {
+      "offline": "It only composes banners from props and never fetches. The detector matched the isLoading prop it forwards to AppleMusicSyncBanner."
+    },
+    "apps/web/components/features/dashboard/organisms/release-provider-matrix/ReleaseTableExportButton.tsx": {
+      "long-content": "The trigger is an icon-only button with the fixed label='Export'; no caller text is drawn. The detector matched that label prop."
+    },
+    "apps/web/components/features/dashboard/organisms/release-provider-matrix/ReleaseTableSubheader.tsx": {
+      "loading": "The only loading UI is the Suspense fallback shown while the lazy filter and export chunks download; no prop or mock can hold it in a story. ReleaseTableSubheader.certificate.test.tsx asserts the disabled 'Loading Filters' placeholder.",
+      "offline": "It fetches nothing: filter counts derive from the allReleases prop. The detector matched Suspense, which only wraps the lazy filter and export chunks."
+    },
+    "apps/web/components/features/dashboard/organisms/release-provider-matrix/ReleasesEmptyState.tsx": {
+      "long-content": "The heading and description are fixed copy chosen by the variant; no caller text is drawn. The detector matched the description prop of the shared empty state."
+    },
+    "apps/web/components/features/dashboard/organisms/release-provider-matrix/SmartLinkGateBanner.tsx": {
+      "empty": "It takes two counts, not a collection, and its parent mounts it only when releasedCount exceeds the soft cap or unreleasedCount is above zero. The detector matched the word releases in its copy."
+    },
+    "apps/web/components/features/dashboard/organisms/release-provider-matrix/components/ExpandButton.tsx": {
+      "long-content": "It renders only a chevron or spinner icon with a fixed aria-label. The detector matched name='Loader2' on the icon.",
+      "offline": "It never fetches; isLoading is passed in by the owning row, and the Loading story covers the spinner."
+    },
+    "apps/web/components/features/dashboard/organisms/releases/cells/PopularityCell.tsx": {
+      "long-content": "It draws a fixed-width 0 to 100 bar with no caller text. The detector matched the aria-label."
+    },
+    "apps/web/components/features/dashboard/organisms/releases/cells/SmartLinkCell.tsx": {
+      "empty": "It shows one release's single smart link, not a collection. The detector matched the items-center class."
+    },
+    "apps/web/components/features/dashboard/organisms/releases/components/ProviderStatusDot.tsx": {
+      "long-content": "It is a fixed 16px badge whose three labels come from PROVIDER_STATUS_LABELS; no caller text is drawn. The detector matched the label lookup.",
+      "permission-denied": "It has no permission input: status and accent are its only props. The detector matched role='img'."
+    },
     "apps/web/components/features/dashboard/release-tasks/ReleaseTaskEmptyState.tsx": {
       "offline": "The empty state makes no request: generating the plan is the parent checklist's onSetUp, which owns the network call and its failure. The detector matched the isLoading prop, shown in LoadingGeneratingPlan.",
       "permission-denied": "It has no gated action or role check; the parent only renders it for someone who can set up the release. The detector matched the word plan in its fixed action label."
+    },
+    "apps/web/components/features/dashboard/release-tasks/ReleaseTaskPage.tsx": {
+      "error": "The page has no error branch: it reads only data from useReleaseTasksQuery, so a failed load renders the same empty playbook as EmptyNoTasks, and a failed toggle is rolled back inside the mutation hook. The detector matched toggle.mutate.",
+      "offline": "Offline has no face of its own: without task data the page renders the empty playbook covered by EmptyNoTasks, and the toggle mutation queues inside its hook. The detector matched toggle.mutate."
     },
     "apps/web/components/features/dashboard/release-tasks/ReleaseTaskProgressBar.tsx": {
       "error": "The bar draws counts its parent already has and makes no request, so it has no failure of its own. The detector matched the text-error class on the overdue count, which the WithOverdue story shows.",
