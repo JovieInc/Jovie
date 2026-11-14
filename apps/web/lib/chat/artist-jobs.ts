@@ -86,8 +86,7 @@ export const ARTIST_JOBS: readonly ArtistJob[] = [
     opensChat: true,
     carries: 'entity',
     screenAlreadyHad: RELEASE_FACTS,
-    status: 'drops-context',
-    issue: 'JOV-12423',
+    status: 'works',
   },
   {
     id: 'release.ask',
@@ -109,8 +108,7 @@ export const ARTIST_JOBS: readonly ArtistJob[] = [
     opensChat: true,
     carries: 'entity',
     screenAlreadyHad: RELEASE_FACTS,
-    status: 'drops-context',
-    issue: 'JOV-12423',
+    status: 'works',
   },
   {
     id: 'release.share',
@@ -171,12 +169,13 @@ export const ARTIST_JOBS: readonly ArtistJob[] = [
     id: 'profile.review',
     object: 'profile',
     job: 'Get my profile ready to share',
-    where: 'New chat > Review Your Profile',
+    where:
+      'No one-click action yet (the canned New chat button was removed Nov 14)',
     action: null,
     opensChat: true,
     carries: 'entity',
     screenAlreadyHad: ['my handle', 'my profile link'],
-    status: 'works',
+    status: 'missing',
   },
   {
     id: 'fan.top',
