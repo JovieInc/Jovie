@@ -1,5 +1,4 @@
 import assert from 'node:assert/strict';
-import { execFileSync, spawnSync } from 'node:child_process';
 import {
   closeSync,
   existsSync,
@@ -18,6 +17,7 @@ import {
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import test from 'node:test';
+import { execFileSync, spawnSync } from './lib/child-process.mjs';
 import {
   GEN_JSON_SIZE_ALLOWLIST,
   MAX_GEN_JSON_BYTES,

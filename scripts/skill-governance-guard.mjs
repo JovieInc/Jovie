@@ -1,6 +1,5 @@
 #!/usr/bin/env node
 
-import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import {
   existsSync,
@@ -12,6 +11,7 @@ import {
 import { tmpdir } from 'node:os';
 import { relative, resolve, sep } from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { spawnSync } from './lib/child-process.mjs';
 
 /** Path segments that host adapters dump duplicate SKILL.md into. */
 export const ADAPTER_SKILL_SEGMENTS = Object.freeze([

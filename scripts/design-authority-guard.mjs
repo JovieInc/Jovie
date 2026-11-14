@@ -144,10 +144,9 @@ function readSerifExceptions(repoRoot) {
 
 function trackedFiles(repoRoot) {
   return execFileSync('git', ['ls-files'], {
+    maxBuffer: 256 * 1024 * 1024,
     cwd: repoRoot,
     encoding: 'utf8',
-    // The tracked-file list outgrew Node's 1MB default spawn buffer.
-    maxBuffer: 8 * 1024 * 1024,
   })
     .split('\n')
     .filter(Boolean);

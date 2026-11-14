@@ -900,7 +900,7 @@ function changedFilesFromGit(diffBase, repoRoot = REPO_ROOT) {
   const result = spawnSync(
     'git',
     ['diff', '--diff-filter=ACDMR', '--name-status', `${diffBase}...HEAD`],
-    { cwd: repoRoot, encoding: 'utf8' }
+    { maxBuffer: 256 * 1024 * 1024, cwd: repoRoot, encoding: 'utf8' }
   );
   if (result.status !== 0) {
     throw new Error(

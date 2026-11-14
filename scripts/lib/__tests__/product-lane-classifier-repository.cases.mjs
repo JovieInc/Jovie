@@ -1,5 +1,5 @@
-import { execFileSync } from 'node:child_process';
 import { expect, it } from 'vitest';
+import { execFileSync } from '../child-process.mjs';
 import {
   classifyProductLanes,
   ProductLaneClassificationError,
@@ -12,7 +12,6 @@ export function defineRepositoryClassificationTests() {
     );
     const tracked = execFileSync('git', ['ls-files', '-z'], {
       encoding: 'utf8',
-      maxBuffer: 8 * 1024 * 1024,
     })
       .split('\0')
       .filter(Boolean);

@@ -1,5 +1,4 @@
 import assert from 'node:assert/strict';
-import { execFileSync, spawnSync } from 'node:child_process';
 import {
   chmodSync,
   cpSync,
@@ -13,6 +12,7 @@ import {
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
+import { execFileSync, spawnSync } from './lib/child-process.mjs';
 import { evaluateFleetRules } from './pr-fleet-rules.mjs';
 import {
   CUSTOMER_MARKER,
