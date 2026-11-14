@@ -1,7 +1,7 @@
 'use client';
 
 import { Button, NativeSelect, Textarea } from '@jovie/ui';
-import { useActionState } from 'react';
+import { startTransition, useActionState, useState } from 'react';
 
 export type AgentRoomComposerState =
   | { readonly status: 'idle' }
@@ -28,10 +28,26 @@ export function AgentRoomComposer({
   action,
   maxChars = 2_000,
 }: Readonly<AgentRoomComposerProps>) {
-  const [state, formAction, pending] = useActionState(action, IDLE);
+  // Submit through onSubmit, not the form's action prop: a form action resets
+  // the form when it settles, so a failed send would wipe the unsent message.
+  // The fields are controlled, and the message clears only once it is sent.
+  const [agentId, setAgentId] = useState('');
+  const [text, setText] = useState('');
+  const [state, formAction, pending] = useActionState(
+    async (previous: AgentRoomComposerState, formData: FormData) => {
+      const next = await action(previous, formData);
+      if (next.status === 'sent') setText('');
+      return next;
+    },
+    IDLE
+  );
   return (
     <form
-      action={formAction}
+      onSubmit={event => {
+        event.preventDefault();
+        const formData = new FormData(event.currentTarget);
+        startTransition(() => formAction(formData));
+      }}
       className='flex flex-col gap-2 border-t border-subtle px-3 py-3'
       data-testid='agent-room-composer'
     >
@@ -45,7 +61,8 @@ export function AgentRoomComposer({
             label: agent.name,
           }))}
           placeholder='Choose an agent'
-          defaultValue=''
+          value={agentId}
+          onChange={event => setAgentId(event.target.value)}
         />
       </div>
       <Textarea
@@ -55,6 +72,8 @@ export function AgentRoomComposer({
         required
         maxLength={maxChars}
         rows={3}
+        value={text}
+        onChange={event => setText(event.target.value)}
       />
       <div className='flex items-center justify-between gap-2'>
         <p

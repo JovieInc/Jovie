@@ -55,7 +55,7 @@ const INTENTIONAL_INTERNAL_ROUTES: Record<string, string> = {
   [APP_ROUTES.ADMIN_FEATURES]:
     'Operational incident controls retained for direct admin access; founder reviews use Certifications',
   [APP_ROUTES.ADMIN_ROOM]:
-    'Fleet room behind OVIE_FLEET_ROOM, reached by direct link until the founder approves a Fleet view door',
+    'Admin-only fleet room, reached by direct link until the founder approves a Fleet view door',
   '/app/ov/hud':
     'Operator HUD workspace reached from the default /hud rewrite into the OV app shell',
   '/app/ov/inbox':
