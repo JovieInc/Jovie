@@ -154,12 +154,15 @@ jobs:
             echo "::error::Ovie delivery failed: CRON_SECRET unresolved; see secret resolution."
             exit 1
           fi
+          # The full report stays in the artifact; only the bounded packet is posted.
+          payload="$RUNNER_TEMP/component-certificate/delivery-payload.json"
+          node scripts/lib/component-certificate-delivery.mjs "$report" --out "$payload"
           code="$(curl -sS -o "$RUNNER_TEMP/ovie-response.txt" -w '%{http_code}' \
             --retry 2 --max-time 60 --tlsv1.2 --proto '=https' \
             -X POST "$OVIE_BASE_URL/api/internal/ovie/component-certificate-evidence" \
             -H "authorization: Bearer ${CRON_SECRET}" \
             -H 'content-type: application/json' \
-            --data-binary "@${report}")" || code="000"
+            --data-binary "@${payload}")" || code="000"
           case "$code" in
             2[0-9][0-9]) record_delivery http-accepted readback-required "$code" ;;
             *) record_delivery failed http-or-transport-error "$code"

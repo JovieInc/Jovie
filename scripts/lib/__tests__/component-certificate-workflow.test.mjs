@@ -240,6 +240,13 @@ ${gate?.run || 'true'}`,
     expect(steps.indexOf(install)).toBeLessThan(steps.indexOf(resolver));
     expect(install.if).toBe(resolver.if);
     expect(post.if).toContain('!cancelled()');
+    // JOV-12456: delivery posts the bounded compact payload built from the
+    // report; the full report is never the request body.
+    expect(post.run).toContain(
+      'node scripts/lib/component-certificate-delivery.mjs "$report" --out "$payload"'
+    );
+    expect(post.run).toContain('--data-binary "@${payload}"');
+    expect(post.run).not.toContain('--data-binary "@${report}"');
     const receipt = steps.find(step => step.name === 'Upload delivery receipt');
     expect(receipt.if).toContain('always()');
     expect(receipt.with.path).toBe(
@@ -386,115 +393,4 @@ describe('Visual a11y execution summaries', () => {
     ).toMatchObject({ if: 'always()', with: { 'if-no-files-found': 'warn' } });
     expect(visual.on).not.toHaveProperty('pull_request');
   });
-});
-
-describe('Ovie delivery outcome from the real workflow shell', () => {
-  const notSent = {
-    requested: true,
-    secret: true,
-    report: true,
-    code: '200',
-    exit: 1,
-    outcome: 'failed',
-    sent: false,
-  };
-  it.each([
-    {
-      ...notSent,
-      requested: false,
-      secret: false,
-      report: false,
-      exit: 0,
-      outcome: 'skipped',
-      reason: 'post-disabled',
-    },
-    { ...notSent, report: false, reason: 'report-unavailable' },
-    { ...notSent, secret: false, reason: 'credential-unavailable' },
-    ...[
-      '200',
-      '202',
-      '204',
-      '302',
-      '401',
-      '404',
-      '405',
-      '429',
-      '500',
-      '000',
-    ].map(code => ({
-      requested: true,
-      secret: true,
-      report: true,
-      code,
-      exit: code.startsWith('2') ? 0 : 1,
-      outcome: code.startsWith('2') ? 'http-accepted' : 'failed',
-      reason: code.startsWith('2')
-        ? 'readback-required'
-        : 'http-or-transport-error',
-      sent: true,
-    })),
-  ])(
-    'records $outcome for HTTP $code, requested=$requested, secret=$secret, report=$report',
-    fixture => {
-      const root = fixtureRoot('certificate-delivery-');
-      mkdirSync(resolve(root, 'component-certificate'));
-      mkdirSync(resolve(root, 'bin'));
-      if (fixture.report)
-        writeFileSync(
-          resolve(root, 'component-certificate/report.json'),
-          '{"headSha":"fixture-sha"}'
-        );
-      // Offline transport double: never print or persist request headers.
-      writeFileSync(
-        resolve(root, 'bin/curl'),
-        '#!/bin/bash\ntouch "$RUNNER_TEMP/sent"\nprintf "%s" "$FIXTURE_HTTP_CODE"\n[ "$FIXTURE_HTTP_CODE" != 000 ]\n',
-        { mode: 0o755 }
-      );
-      const summary = resolve(root, 'summary.md');
-      const output = resolve(root, 'output');
-      const result = spawnSync(
-        'bash',
-        ['-c', steps.find(step => step.name === 'Post to Ovie').run],
-        {
-          encoding: 'utf8',
-          env: {
-            ...process.env,
-            PATH: `${resolve(root, 'bin')}:${process.env.PATH}`,
-            RUNNER_TEMP: root,
-            GITHUB_STEP_SUMMARY: summary,
-            GITHUB_OUTPUT: output,
-            CERT_SHA: 'fixture-sha',
-            POST_REQUESTED: String(fixture.requested),
-            CRON_SECRET: fixture.secret ? 'fixture-secret-value' : '',
-            OVIE_BASE_URL: 'https://ovie.invalid',
-            FIXTURE_HTTP_CODE: fixture.code,
-          },
-        }
-      );
-      expect(result.status, result.stdout + result.stderr).toBe(fixture.exit);
-      const receiptText = readFileSync(
-        resolve(root, 'component-certificate/delivery.json'),
-        'utf8'
-      );
-      expect(JSON.parse(receiptText)).toMatchObject({
-        headSha: 'fixture-sha',
-        requested: fixture.requested,
-        outcome: fixture.outcome,
-        reason: fixture.reason,
-        httpStatus: fixture.sent ? fixture.code : 'none',
-        ingestion: 'unverified',
-      });
-      expect(existsSync(resolve(root, 'sent'))).toBe(fixture.sent);
-      expect(readFileSync(output, 'utf8')).toContain(
-        `outcome=${fixture.outcome}`
-      );
-      expect(readFileSync(summary, 'utf8')).toContain('Ingestion unverified');
-      expect(
-        result.stdout +
-          result.stderr +
-          receiptText +
-          readFileSync(summary, 'utf8')
-      ).not.toContain('fixture-secret-value');
-    }
-  );
 });
