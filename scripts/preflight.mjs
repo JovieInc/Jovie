@@ -1,18 +1,4 @@
 #!/usr/bin/env node
-import {
-  appendFileSync,
-  closeSync,
-  existsSync,
-  mkdirSync,
-  mkdtempSync,
-  openSync,
-  readFileSync,
-  realpathSync,
-} from 'node:fs';
-import { cpus, freemem, homedir, loadavg, tmpdir } from 'node:os';
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
-import { load as yamlLoad } from 'js-yaml';
 /**
  * `pnpm preflight`: run, locally and in one pass, the changed-file steps the
  * Source Validation workflow runs, and list EVERY failure instead of stopping
@@ -44,7 +30,21 @@ import { load as yamlLoad } from 'js-yaml';
  * ~/.local/state/jovie-lanes/preflight.jsonl; JOVIE_PREFLIGHT_LEDGER=off
  * disables it. That ledger is the measurement for CI rounds avoided.
  */
-import { spawnSync } from './lib/child-process.mjs';
+import { spawnSync } from 'node:child_process';
+import {
+  appendFileSync,
+  closeSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  openSync,
+  readFileSync,
+  realpathSync,
+} from 'node:fs';
+import { cpus, freemem, homedir, loadavg, tmpdir } from 'node:os';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { load as yamlLoad } from 'js-yaml';
 import { guardNested, withPreflightDepth } from './lib/preflight-depth.mjs';
 import {
   failureTrap,
