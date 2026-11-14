@@ -86,6 +86,294 @@
       "a11y",
       "frontend-rules"
     ],
+    "apps/web/components/molecules/DropdownEmptyRow.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/molecules/FeatureCard.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/molecules/FooterNavigation.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/molecules/FormStatus.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/molecules/LegalHero.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/molecules/LegalSidebar.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/molecules/MeasuredValue.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/molecules/ProfileNavButton.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/molecules/QRCodeCard.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/molecules/RouteSegmentControl.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/molecules/SettingsLoadingSkeleton.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/molecules/SocialLink.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/molecules/StatusPipeline.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/molecules/StepCard.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/molecules/drawer/DrawerBackButton.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/molecules/drawer/DrawerCardActionBar.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/molecules/drawer/DrawerEntityAvatar.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/molecules/drawer/DrawerFormField.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/molecules/drawer/DrawerFormGridRow.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/molecules/drawer/DrawerInspectorCard.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/molecules/drawer/DrawerInspectorGrid.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/molecules/drawer/DrawerInspectorStack.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/molecules/drawer/DrawerLoadingSkeleton.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/molecules/drawer/DrawerPropertyRow.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/molecules/drawer/DrawerSplitButton.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/molecules/drawer/DrawerStatGrid.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/molecules/drawer/EntityRail.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/molecules/drawer/EntityTabbedRail.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/molecules/drawer/StatRow.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/molecules/drawer/StatTile.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/molecules/filters/ActiveFilterPill.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/molecules/inspector/DisclosureRow.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
     "apps/web/components/organisms/StandaloneProductPage.tsx": [
       "ds-owner",
       "tokens",
@@ -707,6 +995,12 @@
       "partial": "Its three handlers are required and its optional props (className, disabled, compact) are presentation flags with defaults, so there is no partially present data; Compact, Standard and Disabled show them.",
       "long-content": "The three button labels are fixed consent copy with no props or caller text, so the content cannot grow; the detector matched text in the --linear-text-primary token and a layout comment."
     },
+    "apps/web/components/molecules/FeatureCard.tsx": {
+      "empty": "FeatureCard renders one card from scalar title, description and metric props and owns no collection; the detector matched the items-center class on the metric badge."
+    },
+    "apps/web/components/molecules/FormStatus.tsx": {
+      "permission-denied": "FormStatus shows the loading, error and success lines its owning form passes and gates nothing; the detector matched role='alert' on the error line."
+    },
     "apps/web/components/molecules/InfoBox.tsx": {
       "permission-denied": "InfoBox shows caller copy in a variant tone and has no account, role or gated action of its own. The detector matched role='alert' on the error variant (Error story)."
     },
@@ -716,9 +1010,29 @@
       "offline": "LoadingSkeleton never fetches; its owner decides what replaces it when a request cannot be made, and the detector matched the word skeleton.",
       "permission-denied": "LoadingSkeleton has no gated action or permission input; the detector matched role='status' on its loading regions."
     },
+    "apps/web/components/molecules/MeasuredValue.tsx": {
+      "empty": "MeasuredValue renders one reading and owns no collection; a missing reading is its unknown state (the Unknown and NeverSeen stories). The detector matched the items-center class on the unknown branch."
+    },
+    "apps/web/components/molecules/ProfileNavButton.tsx": {
+      "error": "The button has no error UI: its only catch blocks swallow a failed clipboard write or event dispatch by design (`// clipboard access may fail in certain contexts`), which ProfileNavButton.test.tsx asserts leaves the trigger usable.",
+      "partial": "Its only optional props are className and loading, and each variant (logo menu, back link) always renders whole; the menu items that depend on sign-in and viewport width are asserted in ProfileNavButton.test.tsx.",
+      "long-content": "The button shows an icon only and the menu copy is fixed; the artist handle goes into hrefs and never into visible text, so no prop can lengthen what it draws.",
+      "offline": "It never fetches or mutates: every item is a link, a clipboard write or a window event, so lost connectivity only reaches it as the browser's own navigation error. The detector matched the loading prop, shown in LoadingProfile."
+    },
     "apps/web/components/molecules/QRCode.tsx": {
       "loading": "The skeleton shows only while local generation is in flight, and a static story cannot hold that promise open; QRCode.test.tsx renders the skeleton before the encoder resolves and asserts it clears.",
       "offline": "QRCode generates locally and never fetches. A data URL that fails to decode uses the same same-size unavailable fallback as a generation error, which FailedGeneration names and QRCode.test.tsx asserts."
+    },
+    "apps/web/components/molecules/SettingsLoadingSkeleton.tsx": {
+      "empty": "The skeletons are the loading frame and take no data; the only .map draws three fixed placeholder cards (`[1, 2, 3].map`), and the detector matched the word list in the Contacts comment and the items-center class.",
+      "offline": "The skeletons paint while a settings route loads and never fetch or submit, so connectivity cannot reach them; the detector matched the loading and skeleton wording."
+    },
+    "apps/web/components/molecules/SocialLink.tsx": {
+      "loading": "The icon link has no pending phase: the link data arrives as a prop and a press opens the URL at once; the detector matched the comment `// Optional: could add loading state here`.",
+      "offline": "The click tracking is fire-and-forget (`trackSocialClick.mutate`) and the press opens the platform URL in a new tab, so lost connectivity only reaches it as the browser's own page for that tab; nothing the link draws changes."
+    },
+    "apps/web/components/molecules/StatusPipeline.tsx": {
+      "offline": "StatusPipeline only draws the stages its owner passes and never fetches; the detector matched the 'pending' stage state, shown in PendingAllStages."
     },
     "apps/web/components/molecules/UpgradeButton.tsx": {
       "empty": "UpgradeButton renders one button and an optional error line and takes no collection; the detector matched the items-center class.",
@@ -737,11 +1051,21 @@
     "apps/web/components/molecules/drawer/DrawerButton.tsx": {
       "partial": "DrawerButton holds no data: it forwards its children label and native button props to the shared Button and only maps tone and size (both defaulted) to classes, so nothing can be partially present."
     },
+    "apps/web/components/molecules/drawer/DrawerFormGridRow.tsx": {
+      "empty": "The row lays out one label beside one control and owns no collection; the detector matched the items-center class in `'grid items-center gap-2'`."
+    },
     "apps/web/components/molecules/drawer/DrawerInlineNote.tsx": {
       "partial": "The note holds one required message string; tone, inset, className and testId are presentation options shown by Default, ErrorTone and EmptyListNote, so there is no second piece of data that can be missing."
     },
+    "apps/web/components/molecules/drawer/DrawerLoadingSkeleton.tsx": {
+      "empty": "The skeleton is the drawer's loading frame and takes no data; its .map calls draw a fixed four-tab row and contentRows placeholder rows (`contentRowIds.map`), so there is no collection that could be empty.",
+      "offline": "The skeleton paints while a drawer's details load and never fetches or submits, so connectivity cannot reach it; the detector matched the Skeleton atom and the Loading details label."
+    },
     "apps/web/components/molecules/drawer/DrawerMediaThumb.tsx": {
       "permission-denied": "DrawerMediaThumb only renders an image or its fallback and has no gated action or permission input; the detector matched role='img' on the thumb."
+    },
+    "apps/web/components/molecules/drawer/DrawerPropertyRow.tsx": {
+      "empty": "The row renders one label and one value and owns no collection; a missing value is the caller's copy (PartialMissingValue). The detector matched the items-center class in `align === 'start' ? 'items-start' : 'items-center'`."
     },
     "apps/web/components/molecules/drawer/DrawerSectionHeading.tsx": {
       "partial": "The heading holds one required label (children); as and className only choose the element and extra classes, so nothing can be partially present. Default and SemanticHeading show both element choices."
@@ -759,12 +1083,21 @@
     "apps/web/components/molecules/drawer/EntityHeader.tsx": {
       "permission-denied": "EntityHeader has no gated action or permission input; callers choose what goes in the actions slot, and the detector matched role='img' on the thumbnail and status glyph."
     },
+    "apps/web/components/molecules/drawer/EntityRail.tsx": {
+      "error": "The rail renders the entity its owner passes and fetches nothing; its only catch swallows a failed property copy (`// Copy failures are non-critical; useClipboard reports the error.`), so there is no error frame of its own."
+    },
     "apps/web/components/molecules/drawer/RightDrawer.tsx": {
       "permission-denied": "RightDrawer is the shell's rail container: it has no account, role or gated action of its own, and a read-only or locked inspector is drawn by the content passed in as children. The detector matched role='dialog' on the mobile sheet."
     },
     "apps/web/components/molecules/drawer/ShareableLinkRow.tsx": {
       "empty": "ShareableLinkRow always renders one required URL with its copy (and optional open) action and never a collection; the detector matched the items-center class.",
       "partial": "It renders one required url: displayValue falls back to that url and the other optional props are density, surface, visibility, labels and callbacks with defaults, so nothing can be partially present (NoOpenButton shows the copy-only row)."
+    },
+    "apps/web/components/molecules/drawer/StatTile.tsx": {
+      "offline": "StatTile only draws the value or state its owner passes and never fetches; a source that cannot answer is shown as the not-measured state (NotMeasured). The detector matched the 'loading' state prop."
+    },
+    "apps/web/components/molecules/inspector/DisclosureRow.tsx": {
+      "empty": "The row toggles one block of children and owns no collection; the detector matched the items-center class on its toggle button."
     },
     "apps/web/components/organisms/AppShellFrame.tsx": {
       "offline": "AppShellFrame is a presentational frame that never fetches or submits; the detector matched 'loading' and 'Suspense' in its doc comments. Connectivity reaches the shell only through the routes and rails it slots, which own their offline states."
