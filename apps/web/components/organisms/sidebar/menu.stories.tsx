@@ -1,6 +1,13 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
+import { Inbox } from 'lucide-react';
 import { SidebarProvider } from './context';
-import { SidebarMenu, SidebarMenuButton, SidebarMenuItem } from './menu';
+import {
+  SidebarMenu,
+  SidebarMenuBadge,
+  SidebarMenuButton,
+  SidebarMenuItem,
+  SidebarMenuSkeleton,
+} from './menu';
 
 const meta = {
   title: 'Organisms/Sidebar/menu',
@@ -44,4 +51,61 @@ export const Disabled: Story = {
     children: 'Earnings',
     disabled: true,
   },
+};
+
+/** Rows still resolving render the menu skeleton in place of buttons. */
+export const LoadingRows: Story = {
+  render: () => (
+    <>
+      <SidebarMenuSkeleton showIcon />
+      <SidebarMenuSkeleton showIcon />
+      <SidebarMenuSkeleton />
+    </>
+  ),
+};
+
+/** A row with an icon and count badge but no tooltip or row actions. */
+export const PartialIconAndBadge: Story = {
+  render: () => (
+    <>
+      <SidebarMenuButton>
+        <Inbox aria-hidden='true' />
+        <span>Inbox</span>
+      </SidebarMenuButton>
+      <SidebarMenuBadge>12</SidebarMenuBadge>
+    </>
+  ),
+};
+
+/** A long label truncates inside the rail instead of widening it. */
+export const LongContentLabel: Story = {
+  args: {
+    children: (
+      <>
+        <Inbox aria-hidden='true' />
+        <span>
+          Release Planning for The Extraordinarily Long Album Title (Deluxe
+          Anniversary Remastered Edition)
+        </span>
+      </>
+    ),
+  },
+};
+
+export const RtlLabel: Story = {
+  args: {
+    children: (
+      <>
+        <Inbox aria-hidden='true' />
+        <span>صندوق الوارد</span>
+      </>
+    ),
+  },
+  decorators: [
+    Story => (
+      <div dir='rtl' lang='ar'>
+        <Story />
+      </div>
+    ),
+  ],
 };

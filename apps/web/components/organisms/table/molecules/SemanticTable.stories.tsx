@@ -35,3 +35,48 @@ export const Default: Story = {
     </TableRoot>
   ),
 };
+
+/** Long values wrap inside the composed table without widening it. */
+export const LongContent: Story = {
+  args: { children: null },
+  render: () => (
+    <TableRoot className='w-72 text-sm text-primary-token'>
+      <TableHead>
+        <TableRow>
+          <th className='px-3 py-2 text-left'>Name</th>
+          <th className='px-3 py-2 text-left'>Status</th>
+        </TableRow>
+      </TableHead>
+      <TableBody>
+        <TableRow>
+          <td className='px-3 py-2'>
+            Never Say A Word (Extended Club Mix) feat. a long guest list
+          </td>
+          <td className='px-3 py-2'>Awaiting distributor approval</td>
+        </TableRow>
+      </TableBody>
+    </TableRoot>
+  ),
+};
+
+export const Rtl: Story = {
+  args: { children: null },
+  render: () => (
+    <div dir='rtl' lang='ar'>
+      <TableRoot className='w-72 text-sm text-primary-token'>
+        <TableHead>
+          <TableRow>
+            <th className='px-3 py-2 text-start'>الاسم</th>
+            <th className='px-3 py-2 text-start'>الحالة</th>
+          </TableRow>
+        </TableHead>
+        <TableBody>
+          <TableRow>
+            <td className='px-3 py-2'>منتصف الليل</td>
+            <td className='px-3 py-2'>منشور</td>
+          </TableRow>
+        </TableBody>
+      </TableRoot>
+    </div>
+  ),
+};

@@ -825,36 +825,35 @@ export const HOMEPAGE_PROFILE_SHOWCASE_STATES: Readonly<
     label: 'Notifications On',
     helper: 'The done state keeps the exact same footprint.',
   }),
-  tour: createShowcaseState({
+  tour: createQuietButtonShowcaseState({
     id: 'tour',
     latestReleaseKey: 'none',
-    kind: 'button',
-    tone: 'quiet',
     label: 'Next Date Live',
     helper: 'Lead with the next date and open the full run from there.',
     drawerView: 'tour',
-    showSubscriptionConfirmedBanner: false,
   }),
-  'events-empty': createShowcaseState({
+  'events-empty': createQuietButtonShowcaseState({
     id: 'events-empty',
     latestReleaseKey: 'none',
-    kind: 'button',
-    tone: 'quiet',
     label: 'Events Empty',
     helper: 'The empty Events tab should still offer alerts.',
     drawerView: 'tour',
-    showSubscriptionConfirmedBanner: false,
   }),
-  'more-menu': createShowcaseState({
+  'more-menu': createQuietButtonShowcaseState({
     id: 'more-menu',
     latestReleaseKey: 'live',
-    kind: 'button',
-    tone: 'quiet',
     label: 'More Menu',
     helper: 'The compact profile menu should fit above the bottom nav.',
     drawerView: 'menu',
     releaseActionLabel: 'Listen',
-    showSubscriptionConfirmedBanner: false,
+  }),
+  share: createQuietButtonShowcaseState({
+    id: 'share',
+    latestReleaseKey: 'live',
+    label: 'Share Profile',
+    helper: 'One link to copy or post anywhere.',
+    drawerView: 'share',
+    releaseActionLabel: 'Listen',
   }),
   'tips-open': createQuietButtonShowcaseState({
     id: 'tips-open',

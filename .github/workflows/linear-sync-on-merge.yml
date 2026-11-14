@@ -209,10 +209,13 @@ jobs:
       # flags `quota_deferred`. That used to end as a green run that did nothing
       # (2026-10-24: 22:43Z and 23:01Z). Hold until the quota resets (bounded to
       # 5 minutes; a later reset fails this step and the job visibly), then run
-      # the same evaluation once more; a second deferral fails the job.
+      # the same evaluation once more; a second GitHub deferral fails the job.
+      # A Linear 429 sets deferral_kind=linear and skips this hold: the listing
+      # already retried, the cursor resumes on the next sweep, and exiting 1
+      # here was filed as unknown-job (run 43041615689).
       - name: Hold for the GitHub quota reset
         id: quota_hold
-        if: ${{ steps.evaluate.outputs.quota_deferred == 'true' }}
+        if: ${{ steps.evaluate.outputs.quota_deferred == 'true' && steps.evaluate.outputs.deferral_kind != 'linear' }}
         env:
           GH_TOKEN: ${{ github.token }}
           GH_API_HOLD_BUDGET_SECONDS: '300'

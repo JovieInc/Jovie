@@ -1,11 +1,15 @@
 import { eq } from 'drizzle-orm';
-import { type NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { z } from 'zod';
+import {
+  type OperatorRouteInput,
+  operatorAccess,
+} from '@/lib/api/route-access';
+import { defineRoute } from '@/lib/api/route-pipeline';
 import { db } from '@/lib/db';
 import { discoveryKeywords } from '@/lib/db/schema/leads';
 import { captureError, getSafeErrorMessage } from '@/lib/error-tracking';
 import { parseJsonBody } from '@/lib/http/parse-json';
-import { getOvieOperatorEntitlements } from '@/lib/ovie/privacy-lock/access';
 
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 
@@ -24,21 +28,7 @@ const keywordToggleSchema = z.object({
   enabled: z.boolean(),
 });
 
-export async function GET() {
-  const entitlements = await getOvieOperatorEntitlements({ purpose: 'read' });
-  if (!entitlements.isAuthenticated) {
-    return NextResponse.json(
-      { error: 'Unauthorized' },
-      { status: 401, headers: NO_STORE_HEADERS }
-    );
-  }
-  if (!entitlements.isAdmin) {
-    return NextResponse.json(
-      { error: 'Forbidden' },
-      { status: 403, headers: NO_STORE_HEADERS }
-    );
-  }
-
+async function getHandler() {
   try {
     const keywords = await db.select().from(discoveryKeywords);
     return NextResponse.json(
@@ -56,21 +46,16 @@ export async function GET() {
   }
 }
 
-export async function POST(request: NextRequest) {
-  const entitlements = await getOvieOperatorEntitlements({ session: 'fresh' });
-  if (!entitlements.isAuthenticated) {
-    return NextResponse.json(
-      { error: 'Unauthorized' },
-      { status: 401, headers: NO_STORE_HEADERS }
-    );
-  }
-  if (!entitlements.isAdmin) {
-    return NextResponse.json(
-      { error: 'Forbidden' },
-      { status: 403, headers: NO_STORE_HEADERS }
-    );
-  }
+export const GET = defineRoute(
+  {
+    route: '/api/admin/leads/keywords',
+    access: operatorAccess({ purpose: 'read' }),
+    legacy: { cache: 'pipeline-responses-only', unhandledErrors: 'rethrow' },
+  },
+  getHandler
+);
 
+async function postHandler({ request }: OperatorRouteInput) {
   try {
     const parsed = await parseJsonBody(request, {
       route: '/api/admin/leads/keywords',
@@ -106,21 +91,16 @@ export async function POST(request: NextRequest) {
   }
 }
 
-export async function PATCH(request: NextRequest) {
-  const entitlements = await getOvieOperatorEntitlements({ session: 'fresh' });
-  if (!entitlements.isAuthenticated) {
-    return NextResponse.json(
-      { error: 'Unauthorized' },
-      { status: 401, headers: NO_STORE_HEADERS }
-    );
-  }
-  if (!entitlements.isAdmin) {
-    return NextResponse.json(
-      { error: 'Forbidden' },
-      { status: 403, headers: NO_STORE_HEADERS }
-    );
-  }
+export const POST = defineRoute(
+  {
+    route: '/api/admin/leads/keywords',
+    access: operatorAccess({ session: 'fresh' }),
+    legacy: { cache: 'pipeline-responses-only', unhandledErrors: 'rethrow' },
+  },
+  postHandler
+);
 
+async function patchHandler({ request }: OperatorRouteInput) {
   try {
     const parsed = await parseJsonBody(request, {
       route: '/api/admin/leads/keywords',
@@ -163,21 +143,16 @@ export async function PATCH(request: NextRequest) {
   }
 }
 
-export async function DELETE(request: NextRequest) {
-  const entitlements = await getOvieOperatorEntitlements({ session: 'fresh' });
-  if (!entitlements.isAuthenticated) {
-    return NextResponse.json(
-      { error: 'Unauthorized' },
-      { status: 401, headers: NO_STORE_HEADERS }
-    );
-  }
-  if (!entitlements.isAdmin) {
-    return NextResponse.json(
-      { error: 'Forbidden' },
-      { status: 403, headers: NO_STORE_HEADERS }
-    );
-  }
+export const PATCH = defineRoute(
+  {
+    route: '/api/admin/leads/keywords',
+    access: operatorAccess({ session: 'fresh' }),
+    legacy: { cache: 'pipeline-responses-only', unhandledErrors: 'rethrow' },
+  },
+  patchHandler
+);
 
+async function deleteHandler({ request }: OperatorRouteInput) {
   try {
     const parsed = await parseJsonBody(request, {
       route: '/api/admin/leads/keywords',
@@ -218,3 +193,12 @@ export async function DELETE(request: NextRequest) {
     );
   }
 }
+
+export const DELETE = defineRoute(
+  {
+    route: '/api/admin/leads/keywords',
+    access: operatorAccess({ session: 'fresh' }),
+    legacy: { cache: 'pipeline-responses-only', unhandledErrors: 'rethrow' },
+  },
+  deleteHandler
+);

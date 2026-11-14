@@ -35,7 +35,9 @@ import {
   resolveIdentityPhoto,
 } from '@/lib/profile-surfaces/presence-identity';
 import { reconcileProfileSurfaces } from '@/lib/profile-surfaces/reconciliation';
+import { resolvePresenceRemovalTarget } from '@/lib/profile-surfaces/removal-target';
 import { resolveSocialShortcutPlatforms } from '@/lib/social/shortcut-platforms';
+import { loadPresenceRemovalLinks } from './removal-data';
 
 export type {
   PresenceSignal,
@@ -267,6 +269,7 @@ export async function loadProfilesWorkspaceData(input: {
           .select({
             surfaceId: profileSurfaceSources.surfaceId,
             sourceType: profileSurfaceSources.sourceType,
+            sourceRefId: profileSurfaceSources.sourceRefId,
           })
           .from(profileSurfaceSources)
           .where(
@@ -275,6 +278,10 @@ export async function loadProfilesWorkspaceData(input: {
               eq(profileSurfaceSources.isLive, true)
             )
           );
+  const removalLinks = await loadPresenceRemovalLinks(
+    input.profileId,
+    input.clerkUserId
+  );
   const sourceTypesBySurface = new Map<string, Set<string>>();
   for (const source of sourceRows) {
     const sourceTypes = sourceTypesBySurface.get(source.surfaceId) ?? new Set();
@@ -354,6 +361,12 @@ export async function loadProfilesWorkspaceData(input: {
       handle: surface.handle === surface.displayName ? null : surface.handle,
       url: surface.url,
       trackedUrl,
+      removalTarget: resolvePresenceRemovalTarget(
+        surface,
+        input.profileId,
+        sourceRows,
+        removalLinks
+      ),
       qualificationStatus,
       isOfficial: surface.isOfficial,
       monitoringState,

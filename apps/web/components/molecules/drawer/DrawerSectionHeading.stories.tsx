@@ -23,3 +23,32 @@ export const SemanticHeading: Story = {
     children: 'Role',
   },
 };
+
+/** A long caller label wraps inside a narrow drawer column. */
+export const LongContent: Story = {
+  args: {
+    as: 'h3',
+    children: 'Booking, management and publishing contacts for every territory',
+  },
+  decorators: [
+    StoryComponent => (
+      <div className='w-48'>
+        <StoryComponent />
+      </div>
+    ),
+  ],
+};
+
+export const Rtl: Story = {
+  args: {
+    as: 'h3',
+    children: 'معلومات الاتصال',
+  },
+  decorators: [
+    StoryComponent => (
+      <div dir='rtl' lang='ar' className='w-48'>
+        <StoryComponent />
+      </div>
+    ),
+  ],
+};

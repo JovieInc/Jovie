@@ -1,6 +1,7 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
+import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import { inspectRecoveryActions } from '@/tests/utils/recovery-actions';
 import { PageErrorState } from './PageErrorState';
 
@@ -101,5 +102,59 @@ describe('PageErrorState', () => {
 
     const details = screen.getByText('Error details').closest('details');
     expect(details).toHaveTextContent('Request timed out after 30 seconds.');
+  });
+
+  it.each([
+    [
+      'error with diagnostics',
+      {
+        title: 'Unable to Load Dashboard',
+        message: 'Try again in a moment.',
+        error: Object.assign(new Error('Request timed out after 30 seconds.'), {
+          digest: 'dashboard-timeout',
+        }),
+      },
+    ],
+    [
+      'message only',
+      { message: 'Failed to load your workspace. Please refresh the page.' },
+    ],
+    [
+      'long diagnostics',
+      {
+        message: 'Try again in a moment.',
+        error: new Error(
+          'The dashboard request exceeded its timeout while loading profile, audience, release, and analytics data. Please retry after checking your connection.'
+        ),
+      },
+    ],
+  ])('is axe-clean for the %s state', async (_label, props) => {
+    const { container } = render(<PageErrorState {...props} />);
+
+    expect(screen.getByRole('alert')).toHaveTextContent(props.message);
+    expect(screen.getAllByRole('button')).not.toHaveLength(0);
+    await expectNoA11yViolations(container);
+  });
+
+  it('keeps the recovery action and details right-to-left and axe-clean', async () => {
+    const user = userEvent.setup();
+    const onRetry = vi.fn();
+    const { container } = render(
+      <div dir='rtl' lang='ar'>
+        <PageErrorState
+          title='تعذر تحميل لوحة التحكم'
+          message='حاول مرة أخرى بعد قليل.'
+          actionLabel='إعادة المحاولة'
+          onRetry={onRetry}
+        />
+      </div>
+    );
+
+    await user.click(screen.getByRole('button', { name: 'إعادة المحاولة' }));
+    expect(onRetry).toHaveBeenCalledOnce();
+    expect(
+      screen.getByRole('heading', { name: 'تعذر تحميل لوحة التحكم' })
+    ).toBeInTheDocument();
+    await expectNoA11yViolations(container);
   });
 });

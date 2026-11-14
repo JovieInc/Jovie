@@ -96,3 +96,17 @@ describe('FleetAuditPanel', () => {
     expect(called).toContain('target=Jovie%23123');
   });
 });
+
+describe('FleetAuditPanel scale tokens', () => {
+  it('uses the 16px text-base step instead of the text-lg alias', async () => {
+    const { readFileSync } = await import('node:fs');
+    const { join } = await import('node:path');
+    const source = readFileSync(
+      join(import.meta.dirname, 'FleetAuditPanel.tsx'),
+      'utf8'
+    );
+
+    expect(source).not.toMatch(/(?<![\w-])text-lg\b/);
+    expect(source).toContain('text-base');
+  });
+});

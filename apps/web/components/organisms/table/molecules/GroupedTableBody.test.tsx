@@ -1,5 +1,6 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
+import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import { GroupHeader } from '../atoms/GroupHeader';
 import { GroupedTableBody } from './GroupedTableBody';
 
@@ -91,4 +92,43 @@ describe('shared grouped table rendering', () => {
     );
     expect(row.style.top).toBe('');
   });
+
+  it.each([
+    ['ltr', groups, undefined],
+    [
+      'rtl',
+      [
+        {
+          key: 'new',
+          label: 'جديد',
+          count: 1,
+          rows: [{ id: 'l', name: 'ليلى حداد' }],
+        },
+      ],
+      'rtl',
+    ],
+  ] as const)(
+    'has no accessibility violations in %s',
+    async (_name, groupedData, dir) => {
+      const { container } = render(
+        <table dir={dir} lang={dir === 'rtl' ? 'ar' : 'en'}>
+          <caption>Grouped fans</caption>
+          <GroupedTableBody
+            groupedData={groupedData.map(group => ({
+              ...group,
+              rows: [...group.rows],
+            }))}
+            columns={1}
+            observeGroupHeader={vi.fn()}
+            renderRow={row => (
+              <tr key={row.id}>
+                <td>{row.name}</td>
+              </tr>
+            )}
+          />
+        </table>
+      );
+      await expectNoA11yViolations(container);
+    }
+  );
 });

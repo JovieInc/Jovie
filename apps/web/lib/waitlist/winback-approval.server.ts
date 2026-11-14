@@ -80,7 +80,7 @@ export async function promoteApprovedWinbackBatch(
     .from(ingestionJobs)
     .where(
       and(
-        eq(ingestionJobs.jobType, 'send_waitlist_email'),
+        eq(ingestionJobs.jobType, 'send_waitlist_winback_email'),
         eq(ingestionJobs.status, 'held_for_approval'),
         drizzleSql`${ingestionJobs.payload}->>'batchId' = ${batchId}`
       )

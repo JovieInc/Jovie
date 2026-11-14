@@ -5,16 +5,18 @@ import { act } from 'react';
 import { hydrateRoot } from 'react-dom/client';
 import { renderToString } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
+import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import { AnimatedIconSwap } from './AnimatedIconSwap';
 
 describe('AnimatedIconSwap', () => {
-  it('renders the active child on first render', () => {
-    const { getByTestId } = render(
+  it('renders the active child on first render', async () => {
+    const { container, getByTestId } = render(
       <AnimatedIconSwap activeKey='copy'>
         <svg data-testid='copy-icon' />
       </AnimatedIconSwap>
     );
     expect(getByTestId('copy-icon')).not.toBeNull();
+    await expectNoA11yViolations(container);
   });
 
   it('renders the initial icon without hidden motion state on the server', () => {

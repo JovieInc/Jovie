@@ -13,10 +13,22 @@ import { isCustomerCopy } from './changelog-filter-rules';
 import {
   type ChangelogRelease,
   type ChangelogSection,
-  changelogInlineText,
   changelogVersionLabel,
   isDailyChangelogKey,
 } from './changelog-parser';
+import {
+  type CustomerChangelogProjectionOptions,
+  publicationQueueKey,
+  resolveEntryCopy,
+  SECTION_ORDER,
+} from './customer-changelog-copy';
+import { resolveCustomerChangelogEditorial } from './customer-changelog-editorial';
+
+export {
+  applyCustomerChangelogEditorialToRelease,
+  type CustomerChangelogProjectionOptions,
+  splitCustomerChangelogOutcome,
+} from './customer-changelog-copy';
 
 export const CUSTOMER_CHANGELOG_CATEGORIES = [
   'new',
@@ -117,6 +129,17 @@ export type CustomerChangelogProjection = {
   readonly tombstones: readonly CustomerChangelogTombstone[];
 };
 
+/**
+ * One day of the public feed: its posts, then the day's small fixes as one
+ * quiet list. A day with nothing but fixes promotes the first to a post so
+ * the day still has a headline.
+ */
+export type CustomerChangelogDayGroup = {
+  readonly date: string;
+  readonly posts: readonly CustomerChangelogEntry[];
+  readonly polish: readonly CustomerChangelogEntry[];
+};
+
 export type CustomerChangelogMonthGroup = {
   readonly monthKey: string;
   readonly label: string;
@@ -144,14 +167,6 @@ const SECTION_PROMINENCE: Record<
   fixed: 'small',
   removed: 'small',
 };
-
-const SECTION_ORDER = [
-  'featured',
-  'added',
-  'changed',
-  'fixed',
-  'removed',
-] as const satisfies readonly (keyof ChangelogSection)[];
 
 const LEVEL3_TOKEN_RE =
   /\bJOV-\d+\b|\bRedis\b|\badmission\b|\bsynthetic identit(?:y|ies)\b|#\d{4,}/gi;
@@ -202,22 +217,6 @@ export function extractCustomerChangelogTechnical(text: string): {
     .replaceAll(/\s{2,}/g, ' ')
     .trim();
   return { clean: clean || text.trim(), technical };
-}
-
-export function splitCustomerChangelogOutcome(entry: string): {
-  readonly title: string;
-  readonly explanation: string;
-} {
-  const text = changelogInlineText(entry).trim();
-  const colon = /^(.+?):\s+(.+)$/s.exec(text);
-  if (colon?.[1] && colon[2] && colon[1].length <= 140) {
-    return { title: colon[1].trim(), explanation: colon[2].trim() };
-  }
-  const dash = /^(.+?)\s+[—–]\s+(.+)$/s.exec(text);
-  if (dash?.[1] && dash[2] && dash[1].length <= 140) {
-    return { title: dash[1].trim(), explanation: dash[2].trim() };
-  }
-  return { title: text, explanation: '' };
 }
 
 function inferCapabilities(text: string): string[] {
@@ -273,13 +272,10 @@ export function formatCustomerChangelogTertiary(
 }
 
 export function projectCustomerChangelog(
-  releases: readonly ChangelogRelease[]
+  releases: readonly ChangelogRelease[],
+  options: CustomerChangelogProjectionOptions = {}
 ): CustomerChangelogEntry[] {
-  return [...projectCustomerChangelogArchive(releases).entries];
-}
-
-function publicationQueueKey(section: keyof ChangelogSection, summary: string) {
-  return `${section}\u0000${summary}`;
+  return [...projectCustomerChangelogArchive(releases, options).entries];
 }
 
 function assertUniqueCustomerPermalinks(
@@ -307,8 +303,10 @@ function assertUniqueCustomerPermalinks(
 }
 
 export function projectCustomerChangelogArchive(
-  releases: readonly ChangelogRelease[]
+  releases: readonly ChangelogRelease[],
+  options: CustomerChangelogProjectionOptions = {}
 ): CustomerChangelogProjection {
+  const editorial = options.editorial ?? resolveCustomerChangelogEditorial();
   const entries: CustomerChangelogEntry[] = [];
   const tombstones: CustomerChangelogTombstone[] = [];
 
@@ -335,9 +333,12 @@ export function projectCustomerChangelogArchive(
         if (!publication || !isCustomerCopy(bullet)) {
           continue;
         }
+        const edit = editorial[publication.entryId];
+        // Withdrawn: left unprojected so its fragments become a tombstone.
+        if (edit?.hide) continue;
         projected.add(publication.entryId);
         const { title: rawTitle, explanation: rawExplanation } =
-          splitCustomerChangelogOutcome(bullet);
+          resolveEntryCopy(bullet, edit);
         const titleParts = extractCustomerChangelogTechnical(rawTitle);
         const explanationParts =
           extractCustomerChangelogTechnical(rawExplanation);
@@ -365,7 +366,7 @@ export function projectCustomerChangelogArchive(
             availability: publication.availability,
             prerequisites: publication.prerequisites,
             action: publication.action ?? null,
-            media: null,
+            media: edit?.media ?? null,
             technicalVersion: release.version,
             explanation,
             supporting: publication.supporting ?? [],
@@ -462,4 +463,21 @@ export function groupCustomerChangelogByMonth(
       label: formatMonthLabel(monthKey),
       entries: monthEntries,
     }));
+}
+
+/** Group entries (already newest first) into day posts for the public feed. */
+export function groupCustomerChangelogByDay(
+  entries: readonly CustomerChangelogEntry[]
+): CustomerChangelogDayGroup[] {
+  const days = new Map<string, CustomerChangelogEntry[]>();
+  for (const entry of entries) {
+    days.set(entry.date, [...(days.get(entry.date) ?? []), entry]);
+  }
+  return [...days.entries()].map(([date, dayEntries]) => {
+    const posts = dayEntries.filter(entry => entry.category !== 'fixed');
+    const fixes = dayEntries.filter(entry => entry.category === 'fixed');
+    return posts.length > 0
+      ? { date, posts, polish: fixes }
+      : { date, posts: fixes.slice(0, 1), polish: fixes.slice(1) };
+  });
 }

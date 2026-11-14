@@ -1,15 +1,25 @@
 import { getTableName } from 'drizzle-orm';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { selectMock, matchRows, surfaceRows, reconcileMock } = vi.hoisted(
-  () => ({
-    selectMock: vi.fn(),
-    matchRows: [] as Record<string, unknown>[],
-    surfaceRows: [] as Record<string, unknown>[],
-    reconcileMock: vi.fn(),
-  })
-);
+const {
+  selectMock,
+  matchRows,
+  surfaceRows,
+  sourceRows,
+  removalLinksMock,
+  reconcileMock,
+} = vi.hoisted(() => ({
+  selectMock: vi.fn(),
+  matchRows: [] as Record<string, unknown>[],
+  surfaceRows: [] as Record<string, unknown>[],
+  sourceRows: [] as Record<string, unknown>[],
+  removalLinksMock: vi.fn(),
+  reconcileMock: vi.fn(),
+}));
 
+vi.mock('./removal-data', () => ({
+  loadPresenceRemovalLinks: removalLinksMock,
+}));
 vi.mock('server-only', () => ({}));
 vi.mock('@/lib/db', () => ({ db: { select: selectMock } }));
 vi.mock('@/lib/entitlements/server', () => ({
@@ -51,6 +61,8 @@ describe('profile workspace DSP portrait provenance', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     matchRows.splice(0, matchRows.length);
+    sourceRows.splice(0, sourceRows.length);
+    removalLinksMock.mockResolvedValue([]);
     surfaceRows.splice(0, surfaceRows.length, surface);
     reconcileMock.mockResolvedValue(undefined);
     selectMock.mockImplementation((fields?: Record<string, unknown>) => ({
@@ -72,7 +84,9 @@ describe('profile workspace DSP portrait provenance', () => {
               ? surfaceRows
               : name === 'dsp_artist_matches'
                 ? matchRows
-                : [];
+                : name === 'profile_surface_sources'
+                  ? sourceRows
+                  : [];
         // Return only selected columns, so missing provenance in SELECT fails.
         const projected = fields
           ? rows.map(row =>
@@ -204,4 +218,36 @@ describe('profile workspace DSP portrait provenance', () => {
       expect(row?.url).toBe(artistUrl);
     }
   );
+  it('projects only the authenticated saved-link target through selected source provenance', async () => {
+    sourceRows.push({
+      surfaceId: surface.id,
+      sourceType: 'social_link',
+      sourceRefId: 'saved-link',
+    });
+    sourceRows.push({
+      surfaceId: surface.id,
+      sourceType: 'identity_link',
+      sourceRefId: 'retained-evidence',
+    });
+    removalLinksMock.mockResolvedValue([
+      {
+        id: 'saved-link',
+        creatorProfileId: 'profile-1',
+        url: artistUrl,
+        version: 7,
+        isActive: true,
+        state: 'active',
+      },
+    ]);
+    const data = await loadProfilesWorkspaceData({
+      clerkUserId: 'owner',
+      databaseUserId: 'db-owner',
+      profileId: 'profile-1',
+    });
+    expect(removalLinksMock).toHaveBeenCalledWith('profile-1', 'owner');
+    expect(data.rows.find(row => row.id === surface.id)).toMatchObject({
+      url: artistUrl,
+      removalTarget: { linkId: 'saved-link', url: artistUrl, version: 7 },
+    });
+  });
 });

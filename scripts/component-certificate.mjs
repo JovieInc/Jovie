@@ -4,6 +4,7 @@
  *   node scripts/component-certificate.mjs --all [--out report.json] [--summary]
  *   node scripts/component-certificate.mjs --component apps/web/components/x/Y.tsx [--spec]
  *   node scripts/component-certificate.mjs --gate   (fail on any gated criterion in component-certification.json)
+ *   node scripts/component-certificate.mjs --sort   (sort gates, waivers and screen debt by component path)
  * Optional evidence inputs (absent evidence = `unknown`, which counts as missing):
  *   --mutation-state sweep-state.json  --a11y a11y.json  --visual visual.json  --journeys journeys.json
  */
@@ -56,6 +57,7 @@ const { values } = parseArgs({
     sha: { type: 'string', default: 'unknown' },
     guards: { type: 'boolean', default: false },
     gate: { type: 'boolean', default: false },
+    sort: { type: 'boolean', default: false },
     screens: {
       type: 'string',
       default: 'docs/design-system/cert-screens.json',
@@ -103,6 +105,26 @@ const readWithCompanions = (rel, suffix) => {
     .filter(text => typeof text === 'string');
   return parts.length ? parts.join('\n') : null;
 };
+
+// gates, waivers and screen debt stay sorted by component path (the gate
+// checks it), so a new entry lands at its own place rather than where every
+// PR appends.
+if (values.sort) {
+  const { sortByPath } = await import('./lib/component-cert-screens.mjs');
+  /** @type {{rel: string, keys: string[]}[]} */
+  const files = [
+    { rel: values.registry, keys: ['gates', 'waivers'] },
+    { rel: values.screens, keys: ['debt'] },
+  ];
+  for (const { rel, keys } of files) {
+    const abs = rel.startsWith('/') ? rel : join(root, rel);
+    if (!existsSync(abs)) continue;
+    const doc = JSON.parse(readFileSync(abs, 'utf8'));
+    for (const key of keys) if (doc[key]) doc[key] = sortByPath(doc[key]);
+    writeFileSync(abs, `${JSON.stringify(doc, null, 2)}\n`);
+  }
+  process.exit(0);
+}
 
 if (values.guards) {
   const s = summarizeGuards(
@@ -247,6 +269,16 @@ if (values.gate) {
     },
     registry.gates ?? {}
   );
+  const { unsortedPathErrors } = await import(
+    './lib/component-cert-screens.mjs'
+  );
+  const orderErrors = ['gates', 'waivers'].flatMap(key =>
+    unsortedPathErrors(`${values.registry}: ${key}`, registry[key])
+  );
+  if (orderErrors.length) {
+    result.errors.push(...orderErrors);
+    result.ok = false;
+  }
   console.log(formatGateResult(result));
   let screensOk = true;
   if (screenRegistry) {

@@ -114,6 +114,12 @@
       "rule": "arbitrary-value",
       "value": "grid-cols-[minmax(420px,520px)_minmax(0,1fr)_320px]",
       "reason": "JOV-11623: canonical Pen frame D9kdx (\"Public profile / Desktop >=1180 - CANONICAL\", docs/pen-stills/golden-path/manifest.json) home grid - 4:5 cover left, Selected-work/Events column center, 320px Get-updates/Payments side rail right. Frame is the locked design; no token expresses the three-column template."
+    },
+    {
+      "file": "apps/web/components/features/profile/templates/ProfileDesktopSurface.tsx",
+      "rule": "arbitrary-value",
+      "value": "text-[clamp(2.5rem,16cqi,5.75rem)]",
+      "reason": "JOV-11623: desktop artist-name sizing follows the height-bounded cover content width rather than viewport width. Retains the existing 5.75rem ceiling; 2.5rem is the existing 40px type step. 16cqi preserves single-line UNMARKED across verified short/tall desktop cases; wrap-anywhere handles longer or enlarged names. Scoped containment repair; no Pen approval claimed. No existing token expresses this content-width formula."
     }
   ],
   "notes": "Documented escapes only. Each identity is file<TAB>rule<TAB>value (or {file, rule, value}). Prefer deleting the debt over adding an escape. The JOV-[1-9] entry is a zod issue-key validation regex in that route (identifier: /^JOV-[1-9][0-9]*$/u), not a style token; no canonical design token applies."

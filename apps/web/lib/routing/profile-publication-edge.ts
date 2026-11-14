@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { readProfilePublished } from '@/lib/profile/publication-read';
+import { aliasBudgetProfileModeParams } from '@/lib/routing/alias-budget-static-params';
 import {
   isReservedUsername,
   USERNAME_MAX_LENGTH,
@@ -80,17 +81,16 @@ function unavailableResponse(): NextResponse {
 }
 
 /**
- * Private rewrite destination for gated handles. The
- * `profile-mode-render/[profileMode]/[marker]` page renders `notFound()` for
- * any profileMode that resolves to no mode, so the miss sentinel falls
- * through to the canonical `app/[username]/not-found.tsx` boundary — the
- * branded profile 404 with a real 404 status (JOV-10267). The marker segment
- * must stay `__profile-mode-alias` (matching PRIVATE_PROFILE_ALIAS_MARKER in
- * proxy.ts, which drops direct requests carrying it), so only this
- * server-side rewrite can reach the destination.
+ * Rewrite destination for gated handles: the dedicated DYNAMIC
+ * `app/[username]/profile-miss/page.tsx` route, whose notFound() renders the
+ * branded `app/[username]/not-found.tsx` boundary server-side with a real
+ * 404 status and Next's automatic NonIndex noindex meta (JOV-10267). The
+ * destination must stay a non-prerendered route: notFound() thrown during a
+ * prerendered ISR route's fallback render serves Next's flight-only
+ * `__next_error__` shell instead — no branded body, no robots meta
+ * (observed on production and the daily ci.yml dispatch, 2026-11-12).
  */
-const PROFILE_MISS_REWRITE_SEGMENTS =
-  'profile-mode-render/__profile-miss/__profile-mode-alias';
+const PROFILE_MISS_REWRITE_SEGMENTS = 'profile-miss';
 
 function notPublishedResponse(
   handle: string,
@@ -119,6 +119,62 @@ function notPublishedResponse(
 export interface ProfilePublicationGateRequest {
   readonly method: string;
   readonly nextUrl: URL;
+}
+
+// Mirrors next.config.js's profileQueryModePattern; the shape pins in
+// public-profile-page.test.ts keep the two in sync.
+const PROFILE_QUERY_MODES = new Set([
+  'listen',
+  'pay',
+  'subscribe',
+  'about',
+  'contact',
+  'tour',
+  'releases',
+  'tip',
+]);
+
+/**
+ * JOV-12081: a published profile's `?mode=` view must render through the
+ * guarded mode-render marker destination, but the next.config afterFiles
+ * rewrite that owns this never applies to the prerendered profile route
+ * (`?mode=listen` silently rendered the home document), and beforeFiles
+ * rewrites are contractually reserved for the /hud interceptors — a
+ * `/:username`-sourced beforeFiles rewrite would hijack concrete
+ * single-segment pages that carry a mode query. The proxy runs per request
+ * ahead of the ISR cache, so the rewrite happens here, URL unchanged.
+ * The rewrite is bounded to the (handle, mode) pairs the mode-render route
+ * actually prerenders (`aliasBudgetProfileModeParams`, the same constant its
+ * generateStaticParams consumes). The route's ISR fallback render for a
+ * handle the build did not prerender serves a 404, not the profile: the
+ * production-faithful Golden Path polled a freshly claimed, published,
+ * exempt profile at `/{handle}?mode=listen` for 180 s on run 43433399178 and
+ * every response was 404 (JOV-12481, regressed by the unbounded rewrite),
+ * while the canonical `/[username]` render of the same handle works. Any
+ * other handle keeps the canonical render — the pre-JOV-12081 behavior,
+ * which is what production serves today — until the fallback-render defect
+ * is fixed with deployment-level evidence.
+ */
+const PRERENDERED_PROFILE_MODE_PARAMS: ReadonlySet<string> = new Set(
+  aliasBudgetProfileModeParams().map(
+    param => `${param.username}:${param.profileMode}`
+  )
+);
+
+export function getProfileModeQueryRewrite(
+  request: ProfilePublicationGateRequest
+): NextResponse | null {
+  if (request.method !== 'GET' && request.method !== 'HEAD') return null;
+  const handle = getGatedProfileHandle(request.nextUrl.pathname);
+  if (!handle) return null;
+  const mode = request.nextUrl.searchParams.get('mode');
+  if (!mode || !PROFILE_QUERY_MODES.has(mode)) return null;
+  if (!PRERENDERED_PROFILE_MODE_PARAMS.has(`${handle}:${mode}`)) return null;
+  const rewriteUrl = new URL(
+    `/${encodeURIComponent(handle)}/profile-mode-render/${mode}/__profile-mode-alias`,
+    request.nextUrl.origin
+  );
+  return NextResponse.rewrite(rewriteUrl);
 }
 
 /**

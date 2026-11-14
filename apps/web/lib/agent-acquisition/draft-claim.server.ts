@@ -39,6 +39,7 @@ import {
   reserveAgentDraft,
 } from './draft-reservation.server';
 import type { AgentDraftRow } from './draft-store';
+import { goldenPathHandleFromPreview } from './golden-path';
 
 /**
  * Person-side completion of an agent-created draft (JOV-9760).
@@ -214,8 +215,17 @@ function attribution(row: AgentDraftRow, now: Date) {
 async function chooseHandle(
   tx: DbOrTransaction,
   artistName: string,
-  draftId: string
+  draftId: string,
+  requested: string | null = null
 ): Promise<string> {
+  // A golden-path handle request was availability-checked for this draft at
+  // claim_handle time; honor it exactly when it is still free. A suffixed
+  // variant would be a silent swap, so it falls through to the derived
+  // handle instead.
+  if (requested && validateUsername(requested).isValid) {
+    const handle = await findAvailableHandle(tx, requested);
+    if (handle === requested) return handle;
+  }
   const base = normalizeArtistNameToHandleBase(artistName).replaceAll('-', '');
   const fallback = `artist${draftId.replaceAll('-', '').slice(0, 8)}`;
   for (const candidateBase of [base, fallback]) {
@@ -268,7 +278,12 @@ async function claimInTransaction(
 
   const now = new Date();
   const artist = row.preview;
-  const handle = await chooseHandle(tx, artist.display_name, row.id);
+  const handle = await chooseHandle(
+    tx,
+    artist.display_name,
+    row.id,
+    goldenPathHandleFromPreview(row.preview)
+  );
   const [created] = await tx
     .insert(creatorProfiles)
     .values({

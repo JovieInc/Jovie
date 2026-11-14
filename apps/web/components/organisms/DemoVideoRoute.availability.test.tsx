@@ -50,7 +50,7 @@ describe.each(routes)('%s feature availability', (_path, Page) => {
     expect(screen.getByRole('link', { name: 'Download demo' })).toBeVisible();
     expect(screen.getByRole('link', { name: 'Try it free' })).toHaveAttribute(
       'href',
-      APP_ROUTES.SIGNUP
+      APP_ROUTES.START
     );
   });
 });

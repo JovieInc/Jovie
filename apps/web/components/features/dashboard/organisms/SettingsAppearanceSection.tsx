@@ -49,15 +49,25 @@ function getServerSnapshot(): boolean {
 export function SettingsAppearanceSection() {
   const { selectedProfile } = useDashboardData();
   const selectedProfileId = selectedProfile?.id;
-  const { theme, resolvedTheme, setTheme } = useTheme();
+  const { theme, setTheme, forcedTheme, systemTheme } = useTheme();
   const { updateTheme, isPending: isThemePending } =
     useThemeMutation(selectedProfileId);
   const { isHighContrast, setHighContrast } = useHighContrast();
   const { setHighContrast: saveHighContrast, isPending: isContrastPending } =
     useHighContrastMutation(selectedProfileId);
 
+  // When the theme policy forces a theme (CoreProviders passes forcedTheme
+  // while theme switching is off), the UI is pinned to that theme regardless
+  // of the stored preference. Reflect the enforced theme and refuse writes so
+  // the stored preference survives policy re-enable.
+  const forcedValue =
+    forcedTheme === 'light' || forcedTheme === 'dark'
+      ? (forcedTheme as ThemeValue)
+      : null;
+  const isThemeForced = forcedValue !== null;
+
   const handleThemeChange = (newTheme: string) => {
-    if (!selectedProfileId) return;
+    if (!selectedProfileId || isThemeForced) return;
 
     const validTheme = newTheme as ThemeValue;
     setTheme(validTheme);
@@ -81,12 +91,18 @@ export function SettingsAppearanceSection() {
     getHydratedSnapshot,
     getServerSnapshot
   );
-  const selectedTheme = hasHydrated
-    ? ((theme ?? 'system') as ThemeValue)
-    : null;
-  let resolvedThemeLabel = '';
-  if (hasHydrated && resolvedTheme === 'light') resolvedThemeLabel = 'Light';
-  else if (hasHydrated && resolvedTheme === 'dark') resolvedThemeLabel = 'Dark';
+  const selectedTheme = isThemeForced
+    ? forcedValue
+    : hasHydrated
+      ? ((theme ?? 'system') as ThemeValue)
+      : null;
+  // systemTheme is the device-level resolution (independent of the stored
+  // preference), so the System option reports what the device would pick.
+  // systemTheme is client-derived — gate it on hydration like the stored
+  // preference so the server HTML and the first client render agree.
+  let systemThemeLabel = '';
+  if (hasHydrated && systemTheme === 'light') systemThemeLabel = 'Light';
+  else if (hasHydrated && systemTheme === 'dark') systemThemeLabel = 'Dark';
 
   return (
     <SettingsPanel
@@ -105,7 +121,11 @@ export function SettingsAppearanceSection() {
               type='button'
               variant='ghost'
               onClick={() => handleThemeChange(option.value)}
-              disabled={isThemePending || !selectedProfileId}
+              disabled={
+                isThemePending ||
+                !selectedProfileId ||
+                (isThemeForced && option.value !== forcedValue)
+              }
               className={cn(
                 'h-auto justify-start rounded-lg border px-3 py-2.5 text-left',
                 'focus-visible:ring-2 focus-visible:ring-accent/50 focus-visible:ring-offset-0',
@@ -123,17 +143,17 @@ export function SettingsAppearanceSection() {
                 <span className='min-w-0 flex-1'>
                   <span className='flex items-center gap-1 text-app font-caption text-primary-token'>
                     {option.label}
-                    {option.value === 'system' && resolvedThemeLabel ? (
+                    {option.value === 'system' && systemThemeLabel ? (
                       <Tooltip>
                         <TooltipTrigger asChild>
                           <span className='inline-flex cursor-help rounded text-2xs text-tertiary-token underline decoration-dotted underline-offset-2'>
-                            {resolvedThemeLabel}
+                            {systemThemeLabel}
                           </span>
                         </TooltipTrigger>
                         <TooltipContent side='top'>
                           {/* ui-casing-allow: System is a theme option label */}
                           Your device currently resolves System to{' '}
-                          {resolvedThemeLabel}.
+                          {systemThemeLabel}.
                         </TooltipContent>
                       </Tooltip>
                     ) : null}

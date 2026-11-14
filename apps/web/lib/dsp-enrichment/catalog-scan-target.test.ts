@@ -70,4 +70,17 @@ describe('Spotify catalog scan binding', () => {
     expect(await getBoundSpotifyArtistId(db.tx, profileId)).toBeNull();
     expect(db.select).toHaveBeenCalledTimes(1);
   });
+
+  it('never grants scan authority from the user-editable spotify_url alone', async () => {
+    const url = `https://open.spotify.com/artist/${canonical}`;
+    const unconfirmed = database({ spotifyId: null, spotifyUrl: url } as never);
+    expect(await getBoundSpotifyArtistId(unconfirmed.tx, profileId)).toBeNull();
+    const confirmed = database({ spotifyId: null, spotifyUrl: url } as never, {
+      status: 'confirmed',
+      externalArtistId: canonical,
+    });
+    expect(await getBoundSpotifyArtistId(confirmed.tx, profileId)).toBe(
+      canonical
+    );
+  });
 });

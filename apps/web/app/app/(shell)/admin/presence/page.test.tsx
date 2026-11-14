@@ -7,6 +7,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const mocks = vi.hoisted(() => ({
   access: vi.fn(),
   auth: vi.fn(),
+  session: vi.fn(),
   shell: vi.fn(),
   flag: vi.fn(),
   load: vi.fn(),
@@ -14,6 +15,9 @@ const mocks = vi.hoisted(() => ({
 vi.mock('server-only', () => ({}));
 vi.mock('@/lib/admin/page-access', () => ({
   requireCurrentAdminPageAccess: mocks.access,
+}));
+vi.mock('@/lib/auth/request-session', () => ({
+  getRequestSession: mocks.session,
 }));
 vi.mock('@/lib/auth/cached', () => ({ getCachedAuth: mocks.auth }));
 vi.mock('@/lib/flags/server', () => ({ getAppFlagValue: mocks.flag }));
@@ -76,6 +80,10 @@ describe('Ovie Presence consumes canonical Presence', () => {
     vi.clearAllMocks();
     mocks.access.mockResolvedValue('actor');
     mocks.auth.mockResolvedValue({ userId: 'actor' });
+    mocks.session.mockResolvedValue({
+      user: { id: 'ba-actor' },
+      session: { id: 'session', userId: 'ba-actor' },
+    });
     mocks.flag.mockResolvedValue(true);
   });
   it.each(['customer-identity', 'company-identity'])(
@@ -104,6 +112,12 @@ describe('Ovie Presence consumes canonical Presence', () => {
       expect(operator.props).toEqual({
         data,
         scope: { actorId: 'actor', workspaceId: identityId, target: 'creator' },
+        removalPrincipal: {
+          appActorId: 'actor',
+          authUserId: 'ba-actor',
+          sessionId: 'session',
+          impersonationSubject: null,
+        },
       });
     }
   );

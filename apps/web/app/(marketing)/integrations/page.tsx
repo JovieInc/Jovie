@@ -18,7 +18,11 @@ export const metadata: Metadata = {
   alternates: { canonical: PAGE_URL },
 };
 const SCHEMA = buildBreadcrumbSchema([{ name: 'Integrations', url: PAGE_URL }]);
-const RELATED = [APP_ROUTES.DEVELOPERS, APP_ROUTES.CLI, APP_ROUTES.PRICING];
+const RELATED = [
+  { href: APP_ROUTES.DEVELOPERS, label: 'Developers' },
+  { href: APP_ROUTES.CLI, label: 'Command Line' },
+  { href: APP_ROUTES.PRICING, label: 'Pricing' },
+];
 
 // Public capabilities reflect deployment configuration. Rebuild this static
 // reference when provider configuration changes; Settings checks live availability.
@@ -79,9 +83,9 @@ export default function IntegrationsDirectoryPage() {
       </div>
       <p className='pt-6 text-sm text-secondary'>
         Related pages:{' '}
-        {RELATED.map(href => (
+        {RELATED.map(({ href, label }) => (
           <Link key={href} href={href} className='mr-3 underline'>
-            {href}
+            {label}
           </Link>
         ))}
       </p>

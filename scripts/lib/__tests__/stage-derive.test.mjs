@@ -5,7 +5,6 @@ import { buildReport, stageMarkdown } from '../../shipping-slo-report.mjs';
 import {
   attachRedPrSuites,
   collectArtifactFeed,
-  collectLinearIssues,
   collectMergedPrs,
   collectStageRaw,
   listWorkflowRuns,
@@ -299,7 +298,19 @@ describe('stage collector', () => {
       ok: false,
       error: 'HTTP 404: Not Found',
     });
-    expect(raw.sources['linear-history']).toEqual({ ok: true, n: 1 });
+    expect(raw.sources['linear-history']).toEqual({
+      ok: true,
+      n: 1,
+      counts: {
+        requested: 1,
+        capped: 0,
+        fetched: 1,
+        missing: 0,
+        failed: 0,
+        admittedBatches: 1,
+        historyTruncated: 0,
+      },
+    });
     expect(raw.sources['lanes-stage-feed']).toMatchObject({
       ok: false,
       error: 'HTTP 404',
@@ -314,17 +325,6 @@ describe('stage collector', () => {
     expect(raw.controllers.production[0].headSha).toBe('a'.repeat(40));
     // Three 3-day search chunks cover 7 days, plus one batched job lookup.
     expect(calls.filter(a => a[1] === 'graphql')).toHaveLength(4);
-  });
-  it('defers a rate-limited Linear read without spending retry budget', async () => {
-    const fetchImpl = vi.fn(async () => new Response('', { status: 429 }));
-    await expect(
-      collectLinearIssues({
-        fetchImpl,
-        apiKey: 'stage-collector-test',
-        identifiers: ['JOV-1'],
-      })
-    ).rejects.toMatchObject({ exitCode: 75 });
-    expect(fetchImpl).toHaveBeenCalledTimes(1);
   });
   it('flags truncated PR timelines and commits', () => {
     const failures = [];

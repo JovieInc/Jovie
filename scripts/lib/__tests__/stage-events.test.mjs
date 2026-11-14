@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { checkStageManifest } from '../../stage-manifest-check.mjs';
+import { deriveStageEvents } from '../stage-derive.mjs';
 import {
   buildStageSummary,
   chainStages,
@@ -330,5 +331,69 @@ describe('stage timings', () => {
       p50: null,
       p95: null,
     });
+  });
+});
+
+const splitSuite = (conclusion, minutes) => ({
+  conclusion,
+  createdAt: ago(minutes),
+  updatedAt: ago(minutes),
+  event: 'pull_request',
+});
+const redThenGreen = timeline => ({
+  prs: [
+    {
+      repository: 'JovieInc/Jovie',
+      number: 9,
+      headRefName: 'feature/agent-wip',
+      timeline,
+      commits: [
+        {
+          oid: 'aaaaaaaaaaaaaaaa',
+          committedDate: ago(200),
+          rollup: 'FAILURE',
+          suites: [splitSuite('FAILURE', 180)],
+        },
+        {
+          oid: 'bbbb',
+          committedDate: ago(160),
+          rollup: 'SUCCESS',
+          suites: [splitSuite('SUCCESS', 130)],
+        },
+      ],
+    },
+  ],
+});
+const split = (raw, type) =>
+  deriveStageEvents(raw, MANIFEST)
+    .filter(e => e.entityType === type)
+    .map(e => [e.entityId, e.stage, e.enteredAt, e.exitedAt]);
+const DWELL = [
+  ['JovieInc/Jovie#9@aaaaaaaaaaaa', 'red', ago(180), ago(130)],
+  ['JovieInc/Jovie#9@aaaaaaaaaaaa', 'green', ago(130), ago(130)],
+];
+
+describe('red-to-green dwell per red head, split writer vs repair', () => {
+  it('counts an episode with a lane-fix label inside it as a repair', () => {
+    const raw = redThenGreen([
+      { type: 'labeled', at: ago(170), label: 'lane-fix-red' },
+    ]);
+    expect(split(raw, 'remediation-repair')).toEqual(DWELL);
+    expect(split(raw, 'remediation-writer')).toEqual([]);
+  });
+
+  it('counts an episode its writer greened with no repair label as the writer', () => {
+    const raw = redThenGreen([
+      { type: 'labeled', at: ago(300), label: 'lane-fix-red' },
+    ]);
+    expect(split(raw, 'remediation-writer')).toEqual(DWELL);
+    expect(split(raw, 'remediation-repair')).toEqual([]);
+  });
+
+  it('leaves a truncated timeline unsplit: it cannot prove no repair label', () => {
+    const raw = redThenGreen([]);
+    raw.prs[0].timelineTruncated = true;
+    expect(split(raw, 'remediation-writer')).toEqual([]);
+    expect(split(raw, 'remediation-repair')).toEqual([]);
   });
 });

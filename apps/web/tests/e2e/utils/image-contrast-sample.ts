@@ -244,3 +244,151 @@ export async function captureContrastScreenshot(
     }
   }
 }
+
+// Diagnostic (JOV-11623): a failing verdict means the sampled background
+// behind the glyphs is brighter than the painted surface — either a real
+// bright background or leftover ink the hide never covered. The pixel grid
+// and stacks name sample points, not painters. This census walks the
+// hit-test stack (pointer-events forced, like the candidate scan) at the
+// brightest sampled pixels and records every element that can paint there
+// with the computed styles and pseudo-element ink that decide which one
+// did. It runs only for failing candidates, after the hide style is
+// removed, so recorded colors are the real rendered ones.
+export async function sampleRegionPainters(
+  screenshot: Buffer,
+  page: Page,
+  box: ContrastBox,
+  scale: number,
+  hideAttribute: string
+): Promise<Record<string, unknown>> {
+  const left = Math.max(0, Math.floor(box.x * scale));
+  const top = Math.max(0, Math.floor(box.y * scale));
+  const width = Math.max(1, Math.round(box.width * scale));
+  const height = Math.max(1, Math.round(box.height * scale));
+  const { data, info } = await sharp(screenshot)
+    .extract({ left, top, width, height })
+    .raw()
+    .toBuffer({ resolveWithObject: true });
+  const channels = info.channels;
+  const hexAt = (pixel: number): string => {
+    const offset = pixel * channels;
+    const hex = (value: number) => value.toString(16).padStart(2, '0');
+    return `#${hex(data[offset])}${hex(data[offset + 1])}${hex(data[offset + 2])}`;
+  };
+  const bright: Array<{
+    cssX: number;
+    cssY: number;
+    lum: number;
+    hex: string;
+  }> = [];
+  for (let y = 0; y < height; y += 1) {
+    for (let x = 0; x < width; x += 1) {
+      const pixel = y * width + x;
+      const offset = pixel * channels;
+      const lum = relativeLuminance(
+        data[offset],
+        data[offset + 1],
+        data[offset + 2]
+      );
+      if (lum < 0.08) continue;
+      bright.push({
+        cssX: box.x + x / scale,
+        cssY: box.y + y / scale,
+        lum: Math.round(lum * 1000) / 1000,
+        hex: hexAt(pixel),
+      });
+    }
+  }
+  bright.sort((a, b) => b.lum - a.lum);
+  // Spread the census points so a single glyph cannot monopolize them.
+  const points: typeof bright = [];
+  for (const candidate of bright) {
+    if (
+      points.length >= 10 ||
+      points.every(
+        point =>
+          Math.hypot(point.cssX - candidate.cssX, point.cssY - candidate.cssY) >
+          4
+      )
+    ) {
+      if (points.length < 10) points.push(candidate);
+      if (points.length >= 10) break;
+    }
+  }
+  const censusPoints = points.map(point => ({
+    x: Math.round(point.cssX),
+    y: Math.round(point.cssY),
+    hex: point.hex,
+    lum: point.lum,
+  }));
+  const summary = {
+    brightPixelCount: bright.length,
+    brightestHexes: [...new Set(bright.map(pixel => pixel.hex))].slice(0, 12),
+    sampledPoints: censusPoints,
+    stacks: await page.evaluate(
+      ({ points: censusPoints, hideAttribute: attribute }) => {
+        const override = document.createElement('style');
+        override.textContent = '*{pointer-events:auto!important}';
+        document.head.appendChild(override);
+        try {
+          return censusPoints.map(point => {
+            const stack = document
+              .elementsFromPoint(point.x, point.y)
+              .slice(0, 8);
+            return {
+              at: `${Math.round(point.x)},${Math.round(point.y)} ${point.hex}`,
+              painters: stack.map(element => {
+                const style = getComputedStyle(element);
+                const rect = element.getBoundingClientRect();
+                const pseudo = (name: string): string | null => {
+                  const cs = getComputedStyle(element, name);
+                  const content = cs.content;
+                  if (!content || content === 'none' || content === 'normal')
+                    return null;
+                  return `${name} content=${String(content).slice(0, 40)} color=${cs.color} bg=${cs.backgroundColor} bgImg=${cs.backgroundImage === 'none' ? 'none' : cs.backgroundImage.slice(0, 80)}`;
+                };
+                let hideTagged = false;
+                for (
+                  let node: Element | null = element;
+                  node;
+                  node = node.parentElement
+                ) {
+                  if (node.hasAttribute(attribute)) {
+                    hideTagged = true;
+                    break;
+                  }
+                }
+                const testId = element.getAttribute('data-testid');
+                return {
+                  tag: testId
+                    ? `${element.tagName.toLowerCase()}#${testId}`
+                    : element.tagName.toLowerCase(),
+                  cls: (element.getAttribute('class') ?? '').slice(0, 120),
+                  rect: `${Math.round(rect.x)},${Math.round(rect.y)} ${Math.round(rect.width)}x${Math.round(rect.height)}`,
+                  color: style.color,
+                  bg: style.backgroundColor,
+                  bgImg:
+                    style.backgroundImage === 'none'
+                      ? 'none'
+                      : style.backgroundImage.slice(0, 80),
+                  opacity: style.opacity,
+                  zIndex: style.zIndex,
+                  position: style.position,
+                  hideTagged,
+                  text: (element.textContent ?? '').trim().slice(0, 40),
+                  pseudos: [pseudo('::before'), pseudo('::after')].filter(
+                    (value): value is string => value !== null
+                  ),
+                };
+              }),
+            };
+          });
+        } finally {
+          override.remove();
+        }
+      },
+      { points: censusPoints, hideAttribute }
+    ),
+  };
+  return summary;
+}

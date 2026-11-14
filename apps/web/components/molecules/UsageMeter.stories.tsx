@@ -68,3 +68,58 @@ export const Exhausted: Story = {
     },
   },
 };
+
+export const ZeroAllowance: Story = {
+  args: {
+    model: {
+      used: 0,
+      limit: 0,
+      remaining: 0,
+      remainingPercent: 0,
+      state: 'exhausted',
+      resetAt: '2026-08-24T18:00:00.000Z',
+      warningRemainingPercent: 20,
+    },
+  },
+};
+
+/** Stale snapshot: the owner hides the live status and labels it last known. */
+export const PartialLastKnownUsage: Story = {
+  args: {
+    label: 'Last Known Weekly Messages',
+    showStatus: false,
+    resetLabel: 'Reset timing unavailable',
+  },
+};
+
+export const LongContentLabels: Story = {
+  args: {
+    label: 'Weekly AI messages across every connected workspace and artist',
+    description:
+      'Counts chat replies, release drafts, and profile suggestions generated for every artist you manage this week.',
+    resetLabel:
+      'Resets Monday, August 24, 2026 at 11:00 AM Pacific Daylight Time',
+    model: {
+      used: 1_250_000,
+      limit: 9_999_999,
+      remaining: 8_749_999,
+      remainingPercent: 88,
+      state: 'healthy',
+      resetAt: '2026-08-24T18:00:00.000Z',
+      warningRemainingPercent: 20,
+    },
+  },
+};
+
+export const RtlLayout: Story = {
+  args: {
+    label: 'الرسائل الأسبوعية',
+    description: 'تشمل الردود والمسودات لكل فنان تديره.',
+    resetLabel: 'يُعاد التعيين في 24 أغسطس',
+  },
+  render: args => (
+    <div dir='rtl'>
+      <UsageMeter {...args} />
+    </div>
+  ),
+};

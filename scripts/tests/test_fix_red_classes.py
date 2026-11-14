@@ -8,7 +8,6 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "lanes"))
 import fix_red_classes as classes  # noqa: E402
 
-
 def pr(*names, merge="BLOCKED"):
     return {"mergeStateStatus": merge, "statusCheckRollup": [{"name": n, "conclusion": "FAILURE"} for n in names]
             + [{"name": "PR Ready", "conclusion": "FAILURE"}, {"name": "ok", "conclusion": "SUCCESS"}]}
@@ -17,10 +16,12 @@ def pr(*names, merge="BLOCKED"):
 class ClassifyTest(unittest.TestCase):
     def test_signatures_map_to_classes_and_actions(self):
         cases = {
+            "[lint:ui-feel] new violations on lines this change adds:\n  a.tsx:1  missingTabularNums\ngithub-quota-deferred": ("ui-feel", "ui-feel"),
             "github-quota-deferred; fleet evidence retry": ("quota-deferred", "rerun"),
             "HttpError: API rate limit exceeded for installation": ("platform-infra", "rerun"),
             "Could not fetch gitleaks after 3 attempts (https://example.invalid/gitleaks.tar.gz).": ("platform-infra", "rerun"),
             "##[error]Dependency review detected incompatible licenses.": ("dependency-license", "agent"),
+            "screen certificate gate failed:\n  apps/web/components/jovie/merch-tool-artifacts.tsx [states missing empty]": ("screen-certificate", "repair-screen-cert"),
             "github-quota-deferred\n##[error]Dependency review detected incompatible licenses.": ("dependency-license", "agent"),
             "upstream returned HTTP 500 before the job started": ("platform-infra", "rerun"),
             "Unwired: scripts/a.test.mjs, scripts/b.test.mjs. Wire each file into a ci-fast lane": ("ci-fast-wiring", "wire-ci-fast"),
@@ -36,6 +37,23 @@ class ClassifyTest(unittest.TestCase):
         for log, (cls, action) in cases.items():
             got = classes.classify(pr("Source Validation"), {"Source Validation": log})
             self.assertEqual((got["cls"], got["action"]), (cls, action), log)
+
+    def test_missing_local_prerequisite_syncs_main_before_fixture_infra(self):
+        diagnostic = ("lib/waitlist/winback-approval.server.ts(23,8): error TS2307: "
+                      "Cannot find module '@/lib/waitlist/winback' or its corresponding type declarations.")
+        for state in ("BLOCKED", "BEHIND"):
+            for log in (diagnostic, "passing fixture: API rate limit exceeded\n##[error]" + diagnostic):
+                got = classes.classify(pr("Source Validation", merge=state), {"Source Validation": log})
+                self.assertEqual((got["cls"], got["action"]), ("local-module-prerequisite", "sync-main"))
+
+    def test_missing_package_or_fixture_text_does_not_request_prerequisite_sync(self):
+        for log in (
+            "lib/a.ts(1,1): error TS2307: Cannot find module 'external-package' or its corresponding type declarations.",
+            "passing test: Cannot find module '@/lib/waitlist/winback'",
+            "lib/a.ts(1,1): error TS2305: Module '@/lib/a' has no exported member 'missing'.",
+        ):
+            got = classes.classify(pr("Source Validation"), {"Source Validation": log})
+            self.assertEqual((got["cls"], got["action"]), ("other", "agent"))
 
     def test_failed_live_design_cli_syncs_main_before_retrying_fixture_infra(self):
         summary = (" FAIL  workspace-scripts lib/__tests__/design-system-source-ratchet.test.mjs"
@@ -607,7 +625,6 @@ class T(unittest.TestCase):
         path = Path(__file__).resolve().parents[1] / "tests" / "test_lane_runner.py"
         text = path.read_text()
         self.assertEqual(classes.complete_release_identity_stubs(text), text)
-
 
 if __name__ == "__main__":
     unittest.main()

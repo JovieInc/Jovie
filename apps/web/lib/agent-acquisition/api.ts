@@ -25,11 +25,129 @@ import {
   prepareReleaseLaunchSchema,
 } from './draft-contract';
 import { createAgentDraft, readAgentDraft } from './draft-store';
+import {
+  answerQuestionSchema,
+  claimHandleSchema,
+  draftRefSchema,
+  GOLDEN_PATH_TOOL_NAMES,
+  type GoldenPathToolName,
+  publishProfileSchema,
+  shareProfileSchema,
+} from './golden-path';
+import {
+  answerOnboardingQuestion,
+  buildProfile,
+  claimHandle,
+  getQualification,
+  publishProfile,
+  shareProfile,
+  startUpgrade,
+} from './golden-path.server';
 import { prepareReleaseLaunch } from './release-launch';
 
 const searchInput = agentArtistInputSchema.extend({
   acquisition: agentAcquisitionSchema,
 });
+
+/** Golden-path step tools; capability-scoped like every other write tool. */
+const GOLDEN_PATH_DRAFT_TOOLS = [
+  {
+    name: 'claim_handle' as const,
+    title: 'Claim a handle',
+    description:
+      'Check and reserve the draft artist\u2019s jov.ie handle (the profile URL). Returns availability with numbered suggested alternatives when taken. High-reach artists are routed to the existing verification path. The reservation completes when the artist signs in through claim_url; nothing is public until they publish.',
+    inputSchema: z.toJSONSchema(claimHandleSchema),
+    annotations: {
+      title: 'Claim a handle',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: true,
+    },
+  },
+  {
+    name: 'answer_onboarding_question' as const,
+    title: 'Record a Mom Test answer',
+    description:
+      "Record one onboarding Mom Test answer on the draft: lastGrowthAttempt (the artist's most recent growth attempt and how it went) or promoSpend (what they pay each month to promote their music, one of none, under_50, 50_plus). The exact question wording ships in the Jovie skill. Ask in your own voice; never lead or ask willingness-to-pay.",
+    inputSchema: z.toJSONSchema(answerQuestionSchema),
+    annotations: {
+      title: 'Record a Mom Test answer',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: true,
+    },
+  },
+  {
+    name: 'get_qualification' as const,
+    title: 'Get qualification',
+    description:
+      'Run the shared onboarding qualification for the draft artist. Returns qualified or queued with a reason; queued carries the locked line "Your handle is reserved. You\'re on the waitlist."',
+    inputSchema: z.toJSONSchema(draftRefSchema),
+    annotations: {
+      title: 'Get qualification',
+      readOnlyHint: true,
+      destructiveHint: false,
+      openWorldHint: true,
+    },
+  },
+  {
+    name: 'build_profile' as const,
+    title: 'Build profile preview',
+    description:
+      "Build the draft profile from the artist's public data, including the real catalog preview when available. Read-only preview for the artist; nothing is published.",
+    inputSchema: z.toJSONSchema(draftRefSchema),
+    annotations: {
+      title: 'Build profile preview',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: true,
+    },
+  },
+  {
+    name: 'publish_profile' as const,
+    title: 'Publish profile',
+    description:
+      'Publish step. Agents never publish: show claim_url so the artist signs in on Jovie and publishes from their dashboard. Returns claim_required until the draft is claimed.',
+    inputSchema: z.toJSONSchema(publishProfileSchema),
+    annotations: {
+      title: 'Publish profile',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: true,
+    },
+  },
+  {
+    name: 'share_profile' as const,
+    title: 'Share a profile',
+    description:
+      'Return the public jov.ie profile URL plus a factual share line for an already-public profile. Never shares a private or unpublished profile.',
+    inputSchema: z.toJSONSchema(shareProfileSchema),
+    annotations: {
+      title: 'Share a profile',
+      readOnlyHint: true,
+      destructiveHint: false,
+      openWorldHint: true,
+    },
+  },
+  {
+    name: 'start_upgrade' as const,
+    title: 'Start upgrade',
+    description:
+      'Return the existing Jovie checkout entry for the draft artist (claim/start). Plans and prices are shown on Jovie from offer truth; never state a price yourself.',
+    inputSchema: z.toJSONSchema(draftRefSchema),
+    annotations: {
+      title: 'Start upgrade',
+      readOnlyHint: true,
+      destructiveHint: false,
+      openWorldHint: true,
+    },
+  },
+];
+
 export const AGENT_DRAFT_TOOLS = [
   {
     name: 'artist.search_or_import',
@@ -72,6 +190,7 @@ export const AGENT_DRAFT_TOOLS = [
       openWorldHint: true,
     },
   },
+  ...GOLDEN_PATH_DRAFT_TOOLS,
 ];
 const callSchema = z
   .object({
@@ -79,6 +198,7 @@ const callSchema = z
       'artist.search_or_import',
       'workspace.create_draft',
       'release.prepare_launch',
+      ...GOLDEN_PATH_TOOL_NAMES,
     ]),
     arguments: z.unknown(),
   })
@@ -161,6 +281,24 @@ export async function guardAgentRequest(
 export async function executeAgentDraftTool(tool: string, args: unknown) {
   if (tool === 'workspace.create_draft') return createAgentDraft(args);
   if (tool === 'release.prepare_launch') return prepareReleaseLaunch(args);
+  if (GOLDEN_PATH_TOOL_NAMES.includes(tool as GoldenPathToolName)) {
+    switch (tool as GoldenPathToolName) {
+      case 'claim_handle':
+        return claimHandle(args);
+      case 'answer_onboarding_question':
+        return answerOnboardingQuestion(args);
+      case 'get_qualification':
+        return getQualification(args);
+      case 'build_profile':
+        return buildProfile(args);
+      case 'publish_profile':
+        return publishProfile(args);
+      case 'share_profile':
+        return shareProfile(args);
+      case 'start_upgrade':
+        return startUpgrade(args);
+    }
+  }
   const parsed = searchInput.safeParse(args);
   if (tool !== 'artist.search_or_import')
     return {

@@ -198,9 +198,25 @@ test('a playlist page names its genres, and its moods sit between in keywords', 
     genres: ['synthwave'],
     moods: ['nocturnal'],
   });
-  assert.deepEqual(playlistTags({ keywords: 'x,curated playlist' }), {
+  assert.deepEqual(
+    playlistTags({ url: '/playlists/x', keywords: 'x,curated playlist' }),
+    { genres: [], moods: [] }
+  );
+});
+
+test("only a playlist's own page names tags, not the index's default keywords", () => {
+  const keywords =
+    'Jovie,public profile,personal website,control your presence';
+  const none = { genres: [], moods: [] };
+  assert.deepEqual(playlistTags({ url: '/playlists', keywords }), none);
+  assert.deepEqual(
+    playlistTags({ url: '/playlists/mood/chill', keywords }),
+    none
+  );
+  assert.deepEqual(playlistTags({ url: '/tim', keywords }), none);
+  assert.deepEqual(playlistTags({ url: '/playlists/late-night', keywords }), {
     genres: [],
-    moods: [],
+    moods: ['public profile'],
   });
 });
 

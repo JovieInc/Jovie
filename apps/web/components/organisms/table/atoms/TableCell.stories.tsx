@@ -122,3 +122,46 @@ export const CreatorIdentityLight: Story = {
   ...CreatorIdentity,
   parameters: { themes: { themeOverride: 'light' } },
 };
+
+/** Long copy clips with an ellipsis inside the fixed row height. */
+export const LongContent: Story = {
+  args: { children: null },
+  render: () => (
+    <table style={{ width: 280, tableLayout: 'fixed' }}>
+      <tbody>
+        <tr>
+          <TableCell>
+            Never Say A Word (Extended Club Mix) feat. a very long guest list
+          </TableCell>
+          <TableCell align='right' width='w-16'>
+            1,284,019
+          </TableCell>
+        </tr>
+        <tr>
+          <TableCell multiline>
+            Two-line rows may wrap a long title within their height budget
+          </TableCell>
+          <TableCell align='right' width='w-16'>
+            42
+          </TableCell>
+        </tr>
+      </tbody>
+    </table>
+  ),
+};
+
+export const Rtl: Story = {
+  args: { children: null },
+  render: () => (
+    <table dir='rtl' lang='ar' style={{ width: 280, tableLayout: 'fixed' }}>
+      <tbody>
+        <tr>
+          <TableCell>عنوان الإصدار</TableCell>
+          <TableCell align='right' width='w-16'>
+            ٤٢
+          </TableCell>
+        </tr>
+      </tbody>
+    </table>
+  ),
+};

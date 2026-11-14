@@ -7,6 +7,9 @@ type PublicProfileLayoutViolationCode =
   | 'claim_cta_overflow'
   | 'claim_cta_wrap'
   | 'desktop_bottom_nav'
+  | 'desktop_card_outside_column'
+  | 'desktop_column_gutter'
+  | 'desktop_column_overlap'
   | 'desktop_compact_shell'
   | 'desktop_empty_side_rail'
   | 'desktop_geometry_token'
@@ -154,6 +157,88 @@ export async function auditPublicProfileLayout(page: Page) {
       });
     }
 
+    // Home overview columns (cover | Selected work + Events | Get updates +
+    // Payments) must never paint over each other. The cards are translucent,
+    // so an overlap shows both columns at once (jov.ie/tim at 1440px, where
+    // nowrap release titles widened the center cards past their track).
+    if (ownsDesktop && homeOverview) {
+      const columns = [
+        'profile-desktop-cover',
+        'profile-desktop-secondary-grid',
+        'profile-desktop-side-rail',
+      ].flatMap(testId => {
+        const column = visible(`[data-testid="${testId}"]`)[0];
+        if (!column) return [];
+        const cards =
+          testId === 'profile-desktop-cover'
+            ? [column]
+            : Array.from(column.children).filter(isVisible);
+        return [{ testId, column, cards }];
+      });
+      const describe = (rect: DOMRect) =>
+        `${rect.left.toFixed(1)}..${rect.right.toFixed(1)} x ${rect.top.toFixed(1)}..${rect.bottom.toFixed(1)}`;
+      const overviewBox = homeOverview.getBoundingClientRect();
+      for (const { testId, column, cards } of columns) {
+        const columnBox = column.getBoundingClientRect();
+        for (const card of cards) {
+          const cardBox = card.getBoundingClientRect();
+          if (
+            cardBox.left < columnBox.left - 1 ||
+            cardBox.right > columnBox.right + 1 ||
+            cardBox.left < overviewBox.left - 1 ||
+            cardBox.right > overviewBox.right + 1
+          ) {
+            violations.push({
+              code: 'desktop_card_outside_column',
+              detail: `${testId} card ${describe(cardBox)} escapes column ${describe(columnBox)} / overview ${describe(overviewBox)}`,
+            });
+          }
+        }
+      }
+      for (let left = 0; left < columns.length; left += 1) {
+        for (let right = left + 1; right < columns.length; right += 1) {
+          for (const leftCard of columns[left].cards) {
+            for (const rightCard of columns[right].cards) {
+              const a = leftCard.getBoundingClientRect();
+              const b = rightCard.getBoundingClientRect();
+              const overlapX =
+                Math.min(a.right, b.right) - Math.max(a.left, b.left);
+              const overlapY =
+                Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top);
+              if (overlapX > 1 && overlapY > 1) {
+                violations.push({
+                  code: 'desktop_column_overlap',
+                  detail: `${columns[left].testId} card ${describe(a)} overlaps ${columns[right].testId} card ${describe(b)} by ${overlapX.toFixed(1)}x${overlapY.toFixed(1)}px`,
+                });
+              }
+            }
+          }
+        }
+      }
+      // The cover is narrower than its track (4:5, height-driven), so only
+      // the center/rail gutter is the grid's own column gap.
+      const center = columns.find(
+        column => column.testId === 'profile-desktop-secondary-grid'
+      );
+      const rail = columns.find(
+        column => column.testId === 'profile-desktop-side-rail'
+      );
+      const columnGap = Number.parseFloat(
+        getComputedStyle(homeOverview).columnGap
+      );
+      if (center && rail && Number.isFinite(columnGap)) {
+        const gutter =
+          rail.column.getBoundingClientRect().left -
+          center.column.getBoundingClientRect().right;
+        if (Math.abs(gutter - columnGap) > 1) {
+          violations.push({
+            code: 'desktop_column_gutter',
+            detail: `center/rail gutter is ${gutter.toFixed(1)}px; the overview column gap is ${columnGap}px`,
+          });
+        }
+      }
+    }
+
     const desktopCover = visible('[data-testid="profile-desktop-cover"]')[0];
     const artistName = desktopCover?.querySelector<HTMLElement>(
       '[data-testid="profile-header"]'
@@ -161,13 +246,29 @@ export async function auditPublicProfileLayout(page: Page) {
     if (ownsDesktop && desktopCover && isVisible(artistName ?? null)) {
       const coverBox = desktopCover.getBoundingClientRect();
       const nameBox = artistName.getBoundingClientRect();
+      // The header can fit while a no-break name is clipped inside its
+      // line-clamped span. Observe the text fragments, not just the flex box.
+      const nameText = artistName.querySelector('span');
+      const textBox = nameText?.getBoundingClientRect();
+      const range = document.createRange();
+      if (nameText) range.selectNodeContents(nameText);
+      const textEscapes = textBox
+        ? Array.from(range.getClientRects()).some(
+            rect =>
+              rect.left <
+                Math.max(textBox.left, nameBox.left, coverBox.left) - 1 ||
+              rect.right >
+                Math.min(textBox.right, nameBox.right, coverBox.right) + 1
+          )
+        : false;
       if (
         nameBox.left < coverBox.left - 1 ||
-        nameBox.right > coverBox.right + 1
+        nameBox.right > coverBox.right + 1 ||
+        textEscapes
       ) {
         violations.push({
           code: 'artist_name_clipped',
-          detail: `artist name bounds ${nameBox.left.toFixed(1)}..${nameBox.right.toFixed(1)} escape cover ${coverBox.left.toFixed(1)}..${coverBox.right.toFixed(1)}`,
+          detail: `artist name bounds ${nameBox.left.toFixed(1)}..${nameBox.right.toFixed(1)}, cover ${coverBox.left.toFixed(1)}..${coverBox.right.toFixed(1)}, clipped text=${textEscapes}`,
         });
       }
     }

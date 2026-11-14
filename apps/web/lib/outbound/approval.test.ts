@@ -332,3 +332,79 @@ describe('draftOutboundCopy', () => {
     });
   });
 });
+
+describe('existing-relationship hold on approval and send', () => {
+  const DANNIC: OutboundTarget = {
+    ...TARGET,
+    leadId: 'lead-dannic',
+    displayName: 'Dannic',
+    handle: 'djdannic',
+  };
+  const rows = () => [targetRow('yes', DANNIC), copyRow('yes', COPY, DANNIC)];
+
+  it('resolves a fully approved Dannic target as held with nothing sendable', () => {
+    const state = resolveOutboundApproval(DANNIC, rows());
+    expect(state.target).toBe('held');
+    expect(state.sendableCopy).toBeNull();
+    expect(state.approvedAt).toBeNull();
+    expect(state.relationshipHold).toMatch(/^Existing relationship/);
+    // The same rows approve an unrelated artist.
+    const other = { ...DANNIC, displayName: 'Nova Lane', handle: 'novalane' };
+    expect(
+      resolveOutboundApproval(other, [
+        targetRow('yes', other),
+        copyRow('yes', COPY, other),
+      ])
+    ).toMatchObject({ target: 'approved', relationshipHold: null });
+  });
+
+  it('holds by handle alone, by name alone and by management domain', () => {
+    for (const target of [
+      { ...TARGET, handle: 'djdannic' },
+      { ...TARGET, displayName: 'DANNIC' },
+      { ...TARGET, contactEmail: 'team@cloud9music.nl' },
+      { ...TARGET, bio: 'Mgmt: Sorted Management' },
+    ])
+      expect(resolveOutboundApproval(target, [])).toMatchObject({
+        target: 'held',
+        sendableCopy: null,
+      });
+  });
+
+  it('refuses the send and the manual history record for the relationship', () => {
+    expect(
+      evaluateOutboundSend({ target: DANNIC, channel: 'email', rows: rows() })
+    ).toEqual({ allowed: false, reason: 'existing_relationship' });
+    expect(
+      evaluateOutboundHistoryRecord({
+        target: DANNIC,
+        channel: 'email',
+        rows: rows(),
+      })
+    ).toEqual({
+      historyRecordAllowed: false,
+      dispatchAllowed: false,
+      reason: 'existing_relationship',
+    });
+  });
+
+  it('leaves the target revision unchanged by handle and bio', () => {
+    expect(outboundTargetRevision({ ...TARGET, handle: 'x', bio: 'y' })).toBe(
+      outboundTargetRevision(TARGET)
+    );
+  });
+
+  it('carries the Armada tag on an approved target without holding it', () => {
+    const armada = { ...TARGET, contactEmail: 'artist@armadamusic.com' };
+    const state = resolveOutboundApproval(armada, [
+      targetRow('yes', armada),
+      copyRow('yes', COPY, armada),
+    ]);
+    expect(state.target).toBe('approved');
+    expect(state.sendableCopy).not.toBeNull();
+    expect(state.relationshipHold).toBeNull();
+    expect(state.relationshipNotes).toEqual([
+      "Relationship: Armada Music, Tim's vocalist deals",
+    ]);
+  });
+});

@@ -14,7 +14,6 @@ import {
   verifyTurnstileToken,
 } from '@/lib/turnstile/verify';
 import { logger } from '@/lib/utils/logger';
-import { isPublicSignupClosed } from '@/lib/waitlist/public-signup-gate';
 import { joinWaitlistWithRole } from '@/lib/waitlist/role-entry';
 import {
   momTestAnswersSchema,
@@ -28,11 +27,11 @@ import { WAITLIST_ROLE_VALUES } from '@/lib/waitlist/roles';
 // does not download zod.
 const waitlistRoleSchema = z.enum(WAITLIST_ROLE_VALUES);
 /**
- * Anonymous closed-signup waitlist join (canon/PRODUCT.md, 2026-11-02).
- *
- * Bot protection matches the public changelog form: a durable per-IP limiter
- * (1 per 10 s, Redis, denies on outage) and Cloudflare Turnstile. The route
- * is inert (404) unless `PUBLIC_SIGNUP_CLOSED` is on. A known email gets the
+ * Anonymous waitlist join. Bot protection matches the public changelog form:
+ * a durable per-IP limiter (1 per 10 s, Redis, denies on outage) and
+ * Cloudflare Turnstile. The route stays live whether the signup kill switch
+ * (`FEATURE_PUBLIC_SIGNUP_CLOSED`) is on or off — the homepage waitlist role
+ * form posts here in both modes (Tim, 2026-11-09). A known email gets the
  * same response as a new one, so the form never reveals who is waitlisted.
  */
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
@@ -107,10 +106,6 @@ async function verifyTurnstile(
 }
 
 export async function POST(request: NextRequest) {
-  if (!isPublicSignupClosed()) {
-    return json({ error: 'Not found' }, 404);
-  }
-
   const ip = getClientIP(request);
   const rateLimitResult = await waitlistJoinLimiter.limit(ip);
   if (!rateLimitResult.success) {

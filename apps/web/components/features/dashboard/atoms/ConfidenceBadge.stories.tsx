@@ -53,3 +53,14 @@ export const AllLevels: Story = {
     </div>
   ),
 };
+
+export const RtlWithLabel: Story = {
+  args: { score: 0.65, showLabel: true },
+  decorators: [
+    Story => (
+      <div dir='rtl' lang='ar'>
+        <Story />
+      </div>
+    ),
+  ],
+};

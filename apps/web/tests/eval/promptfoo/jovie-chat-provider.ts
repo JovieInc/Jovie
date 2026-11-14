@@ -390,19 +390,6 @@ const ADVANCED_TOOL_SCHEMAS = {
       includeAll: z.boolean().optional(),
     }),
   },
-  suggestRelatedArtists: {
-    description:
-      "Suggest related artists for playlist pitching, ad targeting, and collaboration based on the artist's context.",
-    inputSchema: z.object({
-      purpose: z.enum([
-        'playlist_pitching',
-        'ad_targeting',
-        'collaboration',
-        'all',
-      ]),
-      count: z.number().int().min(3).max(15).optional(),
-    }),
-  },
   writeWorldClassBio: {
     description:
       'Write a world-class artist bio in an editorial style suitable for Spotify, Apple Music, and press use.',
@@ -416,27 +403,20 @@ const ADVANCED_TOOL_SCHEMAS = {
       maxWords: z.number().int().min(80).max(350).optional(),
     }),
   },
-  generateCanvasPlan: {
+  useSkill: {
     description:
-      'Generate a detailed plan for creating a Spotify Canvas video from album artwork.',
+      'Load the full steps of one Jovie skill before doing work it covers. The skills and when to use each are listed under Skills in your instructions.',
     inputSchema: z.object({
-      releaseTitle: z.string(),
-      motionPreference: z
-        .enum(['zoom', 'pan', 'particles', 'morph', 'ambient'])
-        .optional(),
+      name: z.string().min(2).max(80),
     }),
   },
-  createPromoStrategy: {
+  requestCapability: {
     description:
-      'Create a promotion strategy for a release, including social video, TikTok, Canvas, and ad targeting recommendations.',
+      "File a request for something Jovie can't do yet (a missing tool, integration or skill), or a skill the artist just taught you. Tell the artist you can't do it yet first, then call this with what they asked for in their words and why it matters to them.",
     inputSchema: z.object({
-      releaseTitle: z.string().optional(),
-      budget: z.enum(['free', 'low', 'medium', 'high']).optional(),
-      platforms: z
-        .array(
-          z.enum(['tiktok', 'instagram', 'youtube', 'spotify', 'hulu', 'meta'])
-        )
-        .optional(),
+      kind: z.enum(['capability', 'skill']),
+      request: z.string().min(10).max(2000),
+      skillDraft: z.string().max(6000).optional(),
     }),
   },
   markCanvasUploaded: {
@@ -560,6 +540,9 @@ const ALL_EVAL_TOOL_SCHEMAS = {
   ...ADVANCED_TOOL_SCHEMAS,
 };
 
+/** Skill and capability-request tools ship on every plan, like submitFeedback. */
+const SKILL_TOOL_NAMES = ['useSkill', 'requestCapability'] as const;
+
 const ACCOUNT_TOOL_NAMES = [
   'showAccountStatus',
   'showUsage',
@@ -594,10 +577,7 @@ const ALWAYS_PAID_TOOL_NAMES = [
   'importBioFromUrl',
   'inspectPressSource',
   'checkCanvasStatus',
-  'suggestRelatedArtists',
   'writeWorldClassBio',
-  'generateCanvasPlan',
-  'createPromoStrategy',
   'manageTasks',
   'markCanvasUploaded',
   'formatLyrics',
@@ -612,6 +592,7 @@ const ALWAYS_PAID_TOOL_NAMES = [
 
 const PAID_TOOL_NAMES = [
   ...FREE_TIER_TOOLS,
+  ...SKILL_TOOL_NAMES,
   ...ACCOUNT_TOOL_NAMES,
   ...INSIGHT_TOOL_NAMES,
   ...ALWAYS_PAID_TOOL_NAMES,
@@ -623,6 +604,7 @@ const PAID_TOOL_NAMES = [
 
 const FREE_APP_TOOL_NAMES = [
   ...FREE_TIER_TOOLS,
+  ...SKILL_TOOL_NAMES,
   ...ACCOUNT_TOOL_NAMES,
 ] as const;
 
@@ -739,7 +721,7 @@ const REQUIRED_PROMPT_DISCLOSURE_CASES = ['blocked-before-dispatch'] as const;
 let serverOnlyEvalShimRegistered = false;
 const AI_TOOL_PROMPT_TOOL_NAMES = [
   'generateAlbumArt',
-  'generateCanvasPlan',
+  'canvasService',
   'writeWorldClassBio',
 ] as const;
 const SKILLS_CATALOG_SYNC_SCRIPT_PATH =
@@ -776,18 +758,10 @@ const TOOL_RESULT_REQUIRED_KEYS: Record<string, readonly string[]> = {
   confirmSpotifyArtist: ['action', 'spotifyArtistId', 'artist', 'summary'],
   createMerch: ['success', 'action', 'generationId', 'options'],
   createMerchAlternativeItem: ['success', 'action', 'merchCardId'],
-  createPromoStrategy: [
-    'success',
-    'action',
-    'releaseTitle',
-    'strategy',
-    'summary',
-  ],
   createRelease: ['success', 'action', 'release', 'summary'],
   deleteOrArchiveMerchCard: ['success', 'action', 'merchCardId'],
   formatLyrics: ['success', 'action', 'formattedLyrics', 'summary'],
   generateAlbumArt: ['success', 'action', 'releaseTitle', 'options'],
-  generateCanvasPlan: ['success', 'action', 'releaseTitle', 'plan', 'summary'],
   generateReleasePitch: [
     'success',
     'action',
@@ -839,8 +813,9 @@ const TOOL_RESULT_REQUIRED_KEYS: Record<string, readonly string[]> = {
   showMerchSales: ['success', 'grossRevenueCents', 'orders', 'topItem'],
   showTopInsights: ['success', 'title', 'totalActive', 'insights'],
   showUsage: ['success', 'period', 'limit', 'used', 'remaining', 'resetsAt'],
+  requestCapability: ['success', 'routedTo', 'priority'],
   submitFeedback: ['success', 'message'],
-  suggestRelatedArtists: ['success', 'action', 'artists', 'summary'],
+  useSkill: ['success', 'name', 'steps'],
   unpauseMerchCard: ['success', 'action', 'merchCardId'],
   writeWorldClassBio: ['success', 'action', 'bio', 'summary'],
   researchArtistPresence: ['action', 'stepId', 'title', 'summary'],
@@ -4115,6 +4090,14 @@ function defaultToolResult(toolName: string, input: unknown): unknown {
     }
     case 'submitFeedback':
       return { success: true, message: 'Feedback recorded.' };
+    case 'useSkill':
+      return {
+        success: true,
+        name: typeof args.name === 'string' ? args.name : 'promo-strategy',
+        steps: 'Synthetic skill steps for evals.',
+      };
+    case 'requestCapability':
+      return { success: true, routedTo: 'feedback', priority: 'standard' };
     case 'showAccountStatus':
       return {
         success: true,
@@ -4232,49 +4215,12 @@ function defaultToolResult(toolName: string, input: unknown): unknown {
             : '/onboarding/checkout',
         summary: 'Checkout handoff ready.',
       };
-    case 'suggestRelatedArtists':
-      return {
-        success: true,
-        action: 'related_artists_suggested',
-        artists: [
-          {
-            name: 'Solar Tides',
-            reason: 'Similar ambient electronic audience and playlist fit.',
-          },
-        ],
-        summary: 'Related artists ready.',
-      };
     case 'writeWorldClassBio':
       return {
         success: true,
         action: 'world_class_bio_written',
         bio: 'Luna Waves makes ambient electronic music built from field recordings, modular textures, and patient melodic loops.',
         summary: 'Bio ready.',
-      };
-    case 'generateCanvasPlan':
-      return {
-        success: true,
-        action: 'canvas_plan_generated',
-        releaseTitle: args.releaseTitle ?? 'Neon Reef',
-        plan: {
-          motion: args.motionPreference ?? 'ambient',
-          steps: ['Loop the cover texture', 'Add slow light movement'],
-        },
-        summary: 'Canvas plan ready.',
-      };
-    case 'createPromoStrategy':
-      return {
-        success: true,
-        action: 'promo_strategy_created',
-        releaseTitle: args.releaseTitle ?? 'Neon Reef',
-        strategy: {
-          budget: args.budget ?? 'low',
-          platforms: Array.isArray(args.platforms)
-            ? args.platforms
-            : ['instagram'],
-          phases: ['announce', 'pre-save', 'release-week'],
-        },
-        summary: 'Promo strategy ready.',
       };
     case 'markCanvasUploaded':
       return {
@@ -5186,6 +5132,13 @@ function sampleToolInput(toolName: string): Record<string, unknown> {
       return { platform: 'instagram' };
     case 'submitFeedback':
       return { message: 'Please make release planning easier to scan.' };
+    case 'useSkill':
+      return { name: 'promo-strategy' };
+    case 'requestCapability':
+      return {
+        kind: 'capability',
+        request: 'Schedule my Instagram posts so release week runs itself.',
+      };
     case 'searchSpotifyArtist':
       return { query: 'Luna Waves' };
     case 'confirmSpotifyArtist':
@@ -5211,18 +5164,8 @@ function sampleToolInput(toolName: string): Record<string, unknown> {
       return { url: 'https://lunawaves.example/press' };
     case 'checkCanvasStatus':
       return { includeAll: true };
-    case 'suggestRelatedArtists':
-      return { purpose: 'playlist_pitching', count: 5 };
     case 'writeWorldClassBio':
       return { goal: 'spotify', tone: 'cinematic', maxWords: 120 };
-    case 'generateCanvasPlan':
-      return { releaseTitle: 'Neon Reef', motionPreference: 'ambient' };
-    case 'createPromoStrategy':
-      return {
-        releaseTitle: 'Neon Reef',
-        budget: 'low',
-        platforms: ['instagram', 'spotify'],
-      };
     case 'markCanvasUploaded':
       return { releaseTitle: 'Neon Reef' };
     case 'createRelease':
@@ -6763,7 +6706,7 @@ function evaluateAiToolPromptContract(vars: EvalVars) {
       leakPatterns: promptLeakPatterns(albumArtPrompt),
     },
     canvas: {
-      toolName: 'generateCanvasPlan',
+      toolName: 'canvasService',
       promptLengths: {
         artworkProcessing: artworkProcessingPrompt.length,
         videoGeneration: videoGenerationPrompt.length,

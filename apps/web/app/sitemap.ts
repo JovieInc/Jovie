@@ -60,6 +60,7 @@ type SitemapCatalog = {
   }>;
   tracks: Array<{
     username: string;
+    recordingId: string;
     slug: string;
     releaseSlug: string;
     updatedAt: Date | null;
@@ -121,7 +122,9 @@ const getSitemapCatalog = async (): Promise<SitemapCatalog> => {
       db
         .select({
           username: creatorProfiles.usernameNormalized,
-          slug: discogRecordings.slug,
+          recordingId: discogRecordings.id,
+          // The track route resolves the release-scoped track slug.
+          slug: discogReleaseTracks.slug,
           releaseSlug: discogReleases.slug,
           updatedAt: discogRecordings.updatedAt,
         })
@@ -374,7 +377,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
   const seenTrackKeys = new Set<string>();
   const trackPages: MetadataRoute.Sitemap = catalog.tracks.flatMap(track => {
-    const trackKey = `${track.username}/${track.slug}`;
+    const trackKey = `${track.username}/${track.recordingId}`;
     if (seenTrackKeys.has(trackKey)) return [];
     seenTrackKeys.add(trackKey);
 

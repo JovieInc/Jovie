@@ -1,10 +1,36 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import type { ComponentProps, ReactNode } from 'react';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import type { PendingFile } from '../hooks/useChatFileAttachments';
 import { ChatUploadManifest } from './ChatUploadManifest';
+
+const checkout = await vi.hoisted(async () => {
+  const { createUpgradeCheckoutFixture } = await import(
+    '@/tests/fixtures/upgrade-checkout'
+  );
+  return createUpgradeCheckoutFixture();
+});
+vi.mock('@/lib/analytics', () => ({
+  track: checkout.track,
+  useFeatureFlag: () => true,
+}));
+vi.mock('next/navigation', () => ({
+  useRouter: () => ({ push: checkout.push }),
+}));
+vi.mock('@/lib/queries', () => ({
+  useCheckoutMutation: () => ({
+    mutate: checkout.mutate,
+    reset: checkout.reset,
+    isPending: false,
+    error: null,
+  }),
+  usePricingOptionsQuery: () => checkout.pricing,
+}));
+beforeEach(() => vi.clearAllMocks());
 
 vi.mock('motion/react', () => ({
   AnimatePresence: ({ children }: { readonly children: ReactNode }) => (
@@ -133,8 +159,16 @@ describe('ChatUploadManifest', () => {
       screen.getByText('Upgrade to Artist Presence for unlimited file uploads')
     ).toBeInTheDocument();
     expect(
-      screen.getByRole('link', { name: 'Upgrade to Artist Presence' })
-    ).toHaveAttribute('href', '/pricing');
+      screen.getByRole('button', { name: 'Upgrade to Artist Presence' })
+    ).toBeEnabled();
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Upgrade to Artist Presence' })
+    );
+    expect(checkout.mutate).toHaveBeenCalledWith(
+      { priceId: 'price_presence', source: 'in_app', returnTo: '/app' },
+      expect.any(Object)
+    );
+    expect(checkout.push).not.toHaveBeenCalled();
   });
 
   it('retires bespoke manifest bar fills in favor of ProgressBar ownership', () => {
@@ -191,5 +225,71 @@ describe('ChatUploadManifest', () => {
     expect(manifestSource).toContain("return 'text-success-text';");
     expect(manifestSource).not.toContain("return 'text-error';");
     expect(manifestSource).not.toContain("return 'text-warning';");
+  });
+
+  it('collapses the expanded manifest from its header control', async () => {
+    const onCollapse = vi.fn();
+    const user = userEvent.setup();
+    const { container } = renderManifest({ onCollapse });
+
+    await user.click(
+      screen.getByRole('button', { name: 'Collapse Upload Manifest' })
+    );
+
+    expect(onCollapse).toHaveBeenCalledTimes(1);
+    await expectNoA11yViolations(container);
+  });
+
+  it('expands the collapsed summary when it is pressed', async () => {
+    const onExpand = vi.fn();
+    const user = userEvent.setup();
+    const { container } = renderManifest({ collapsed: true, onExpand });
+
+    await user.click(
+      screen.getByRole('button', { name: /Uploading 2 attachments/ })
+    );
+
+    expect(onExpand).toHaveBeenCalledTimes(1);
+    await expectNoA11yViolations(container);
+  });
+
+  it('renders nothing without files', async () => {
+    const { container } = renderManifest({
+      files: [],
+      aggregate: { total: 0, done: 0, overallPct: 0, speed: '0 B/s', eta: '—' },
+    });
+
+    expect(container).toBeEmptyDOMElement();
+    await expectNoA11yViolations(container);
+  });
+
+  it('keeps the locked-files and duplicate states accessible', async () => {
+    const { container } = renderManifest({
+      files: [readyFile, { ...uploadingFile, id: 'dup', status: 'duplicate' }],
+      lockedCount: 1,
+      isPro: false,
+      isUploading: false,
+    });
+
+    expect(screen.getByText('1 duplicate skipped')).toBeInTheDocument();
+    expect(screen.getByText('1 file locked')).toBeInTheDocument();
+    await expectNoA11yViolations(container);
+  });
+
+  it('reserves the thumbnail box with explicit image dimensions', () => {
+    renderManifest({
+      files: [{ ...readyFile, previewUrl: 'blob:cover-art' }],
+    });
+
+    const thumb = screen.getByRole('img', { name: 'cover-art.png' });
+    expect(thumb).toHaveAttribute('width', '30');
+    expect(thumb).toHaveAttribute('height', '30');
+  });
+  it('does not offer another subscription for paid users with locked files', () => {
+    renderManifest({ lockedCount: 2, isPro: true });
+    expect(
+      screen.queryByRole('button', { name: 'Upgrade to Artist Presence' })
+    ).not.toBeInTheDocument();
+    expect(checkout.mutate).not.toHaveBeenCalled();
   });
 });

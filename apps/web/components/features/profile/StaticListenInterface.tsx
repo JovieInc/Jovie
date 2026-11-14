@@ -201,7 +201,14 @@ export const StaticListenInterface = React.memo(function StaticListenInterface({
                   void handleDSPClick(dsp, event);
                 }}
                 label={isSelected ? `Opening ${dsp.name}...` : dsp.name}
-                ariaLabel={`Listen on ${dsp.name}`}
+                /* label-content-name-mismatch: the accessible name must
+                   contain the visible label, so the opening state renames
+                   the link instead of keeping the resting label. */
+                ariaLabel={
+                  isSelected
+                    ? `Opening ${dsp.name}...`
+                    : `Listen on ${dsp.name}`
+                }
                 providerKey={
                   provider?.showOnListenPage ? provider.key : undefined
                 }

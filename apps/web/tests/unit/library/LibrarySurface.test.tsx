@@ -20,6 +20,7 @@ import {
 import type { LibraryReleaseAsset } from '@/app/app/(shell)/library/library-data';
 import { LIBRARY_VIEW_MODE_STORAGE_KEY } from '@/app/app/(shell)/library/library-grid-preferences';
 import { LIBRARY_SAVED_VIEW_STORAGE_KEY } from '@/app/app/(shell)/library/library-saved-views';
+import { buildLibraryTakeAssets } from '@/app/app/(shell)/library/library-take-assets';
 import { HeaderSearchSurfaceFromContext } from '@/components/shell/HeaderSearchSurfaceFromContext';
 import { APP_ROUTES } from '@/constants/routes';
 import { HeaderActionsProvider } from '@/contexts/HeaderActionsContext';
@@ -1393,6 +1394,37 @@ describe('LibrarySurface', () => {
     fireEvent.click(drawer.getByRole('tab', { name: 'Overview' }));
     expect(drawer.queryByText('Source')).toBeNull();
     expect(drawer.queryByText(/internal-card-123/)).toBeNull();
+  });
+
+  it('gives a studio take only Watch Take and no files in the drawer', () => {
+    const mediaUrl = '/api/teleprompter/takes/take-1/media';
+    const [take] = buildLibraryTakeAssets(
+      [
+        {
+          takeId: 'take-1',
+          takeNumber: 3,
+          title: 'Release day',
+          kind: 'promo',
+          source: 'script',
+          durationMs: 42_000,
+          kept: true,
+          createdAt: '2026-11-11T12:00:00.000Z',
+          mediaUrl,
+        },
+      ],
+      'Tim White'
+    );
+    renderLibrary([take]);
+    clickGridView();
+    fireEvent.click(screen.getByRole('button', { name: /View Release day/u }));
+    const drawer = within(screen.getByTestId('library-asset-drawer'));
+    const watch = drawer.getByRole('link', { name: 'Watch Take' });
+    expect(watch).toHaveAttribute('href', mediaUrl);
+    expect(drawer.queryByTestId('work-action-share-privately')).toBeNull();
+    expect(drawer.queryByText('Review Status')).toBeNull();
+    fireEvent.click(drawer.getByRole('tab', { name: 'Files' }));
+    expect(drawer.getByText('No files for this take.')).toBeInTheDocument();
+    expect(drawer.queryByRole('button', { name: /Attach File/u })).toBeNull();
   });
 
   it('renders the library right rail with the shared compact entity anatomy', () => {

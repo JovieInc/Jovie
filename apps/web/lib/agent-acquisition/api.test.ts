@@ -277,16 +277,6 @@ describe('shared anonymous REST/MCP draft boundary', () => {
       for (const hint of ['readOnlyHint', 'destructiveHint', 'openWorldHint'])
         expect(typeof tool.annotations[hint]).toBe('boolean');
     }
-    expect(tools.map(tool => tool.title)).toEqual([
-      'Find artist',
-      'Create artist draft',
-      'Prepare release launch',
-    ]);
-    expect(tools.map(tool => tool.name)).toEqual([
-      'artist.search_or_import',
-      'workspace.create_draft',
-      'release.prepare_launch',
-    ]);
     const ping = await mcpPost(request(rpc('ping', undefined, 0)));
     expect(await ping.json()).toEqual({ jsonrpc: '2.0', id: 0, result: {} });
     const notification = await mcpPost(

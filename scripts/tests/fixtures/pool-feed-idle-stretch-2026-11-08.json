@@ -1,0 +1,45 @@
+{
+  "about": "A recorded idle stretch on the Gem lanes host, replayed by PoolFeedReplayTest. `recorded` is copied from the Symphony doctor's own reports (Linear issue ids given). The doctor did not record which lane each issue was routed to at the worker's moment, so `replay` states the routing view the test assumes; it is labelled as an assumption, not as a recording.",
+  "recorded": [
+    {
+      "at": "2026-11-07T21:11:43Z",
+      "issue": "JOV-11428",
+      "text": "stage claim (hyperagent): 204 eligible issues but 3 idle exits in the last hour, none for lack of demand: none-eligible x3"
+    },
+    {
+      "at": "2026-11-08T05:01:10Z",
+      "issue": "JOV-11612",
+      "text": "hyperagent has 251 compatible issue(s), but 0/4 workers after dispatch retried for 5m"
+    },
+    {
+      "at": "2026-11-08T06:16:55Z",
+      "issue": "JOV-11620",
+      "text": "stage claim (hyperagent): 253 eligible issues but 5 idle exits in the last hour, none for lack of demand: none-eligible x5"
+    },
+    {
+      "at": "2026-11-08T07:07:25Z",
+      "issue": "JOV-11627",
+      "text": "stage claim: 5/6 worker idle exits in the last hour were 'none-eligible' (83%) while work is waiting; all reasons: none-eligible x5, wip-cap x1"
+    },
+    {
+      "at": "2026-11-09T04:40:22Z",
+      "issue": "JOV-11933",
+      "text": "grok has 266 compatible issue(s), but 0/1 workers after dispatch retried for 5m"
+    },
+    {
+      "at": "2026-11-09T07:27:18Z",
+      "issue": "JOV-11998",
+      "text": "hyperagent has 263 compatible issue(s), but 3/4 workers after dispatch retried for 5m"
+    }
+  ],
+  "replay": {
+    "at": "2026-11-08T05:01:10Z",
+    "backlog": 251,
+    "worker": "hyperagent",
+    "seats": { "hyperagent": 4, "grok": 1, "claude": 2, "codex": 3 },
+    "freeSeats": { "hyperagent": 4, "grok": 1, "claude": 2, "codex": 3 },
+    "assumption": "Grok's one seat is free and Grok is behind pace on its weekly use-or-lose quota (registry policy use-full-quota, pace discount -0.9), so the router's cheapest available route for standard work is grok. Devin is off (registry: unavailable).",
+    "down": ["devin", "kimi"],
+    "paceAdjust": { "grok": -0.9 }
+  }
+}

@@ -66,7 +66,15 @@ export async function generateMetadata({
     // here and let the page's own notFound() below render the branded
     // app/[username]/not-found.tsx boundary with its data-testid="not-found"
     // sentinel and a real 404 status.
-    return { title: 'Not Found', robots: RENDER_FIXTURE_METADATA.robots };
+    //
+    // No robots on the miss metadata: the 404 render already gets Next's
+    // automatic <meta name="robots" content="noindex"> for every status > 400
+    // render (app-render NonIndex), so an explicit robots here emitted a
+    // SECOND robots meta and failed the synthetic smoke's noindex-count-1
+    // assertion (JOV-12153). Same title-only shape as the [slug] miss
+    // pattern; the X-Robots-Tag: noindex, nofollow header from next.config
+    // still covers this destination.
+    return { title: 'Not Found' };
   }
 
   const profileMetadata = await generatePublicProfileMetadata({

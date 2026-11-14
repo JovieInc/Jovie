@@ -998,6 +998,14 @@
       "classification": "C"
     },
     {
+      "source": "apps/web/app/[username]/profile-miss/page.tsx",
+      "kind": "page",
+      "route": "/[username]/profile-miss",
+      "methods": [],
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
       "source": "apps/web/app/[username]/profile-mode-render/[profileMode]/[marker]/page.tsx",
       "kind": "page",
       "route": "/[username]/profile-mode-render/[profileMode]/[marker]",
@@ -2345,6 +2353,14 @@
       "classification": "C"
     },
     {
+      "source": "apps/web/app/api/cron/cleanup-dogfood-accounts/route.ts",
+      "kind": "handler",
+      "route": "/api/cron/cleanup-dogfood-accounts",
+      "methods": ["GET"],
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
       "source": "apps/web/app/api/cron/cleanup-idempotency-keys/route.ts",
       "kind": "handler",
       "route": "/api/cron/cleanup-idempotency-keys",
@@ -3385,6 +3401,14 @@
       "classification": "C"
     },
     {
+      "source": "apps/web/app/api/internal/ovie/founder-welcome/route.ts",
+      "kind": "handler",
+      "route": "/api/internal/ovie/founder-welcome",
+      "methods": ["POST"],
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
       "source": "apps/web/app/api/internal/ovie/golden-path-evidence/route.ts",
       "kind": "handler",
       "route": "/api/internal/ovie/golden-path-evidence",
@@ -3481,6 +3505,14 @@
       "classification": "C"
     },
     {
+      "source": "apps/web/app/api/internal/ovie/summer-company/charts/metric/route.ts",
+      "kind": "handler",
+      "route": "/api/internal/ovie/summer-company/charts/metric",
+      "methods": ["GET"],
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
       "source": "apps/web/app/api/internal/ovie/summer-company/charts/shipping/route.ts",
       "kind": "handler",
       "route": "/api/internal/ovie/summer-company/charts/shipping",
@@ -3548,6 +3580,14 @@
       "source": "apps/web/app/api/internal/ovie/summer-company/history/route.ts",
       "kind": "handler",
       "route": "/api/internal/ovie/summer-company/history",
+      "methods": ["GET"],
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
+      "source": "apps/web/app/api/internal/ovie/summer-company/metrics/route.ts",
+      "kind": "handler",
+      "route": "/api/internal/ovie/summer-company/metrics",
       "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
@@ -4444,7 +4484,7 @@
       "source": "apps/web/app/api/promo-downloads/confirm/route.ts",
       "kind": "handler",
       "route": "/api/promo-downloads/confirm",
-      "methods": ["POST"],
+      "methods": ["GET", "POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -4772,6 +4812,38 @@
       "source": "apps/web/app/api/summer/control/route.ts",
       "kind": "handler",
       "route": "/api/summer/control",
+      "methods": ["POST"],
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
+      "source": "apps/web/app/api/teleprompter/takes/[takeId]/media/route.ts",
+      "kind": "handler",
+      "route": "/api/teleprompter/takes/[takeId]/media",
+      "methods": ["GET"],
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
+      "source": "apps/web/app/api/teleprompter/takes/[takeId]/route.ts",
+      "kind": "handler",
+      "route": "/api/teleprompter/takes/[takeId]",
+      "methods": ["DELETE", "PATCH"],
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
+      "source": "apps/web/app/api/teleprompter/takes/route.ts",
+      "kind": "handler",
+      "route": "/api/teleprompter/takes",
+      "methods": ["GET", "POST"],
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
+      "source": "apps/web/app/api/teleprompter/takes/upload-token/route.ts",
+      "kind": "handler",
+      "route": "/api/teleprompter/takes/upload-token",
       "methods": ["POST"],
       "surface": "deferred",
       "classification": "C"
@@ -6765,6 +6837,20 @@
       "methods": [],
       "surface": "owner-home",
       "classification": "B"
+    },
+    {
+      "source": "apps/web/app/app/(shell)/pmf-survey-actions.ts",
+      "kind": "action",
+      "export": "dismissPmfSurvey",
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
+      "source": "apps/web/app/app/(shell)/pmf-survey-actions.ts",
+      "kind": "action",
+      "export": "submitPmfSurveyAnswer",
+      "surface": "deferred",
+      "classification": "C"
     },
     {
       "source": "apps/web/app/app/(shell)/presence/page.tsx",

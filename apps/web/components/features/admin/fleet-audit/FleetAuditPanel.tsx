@@ -190,13 +190,13 @@ export function FleetAuditPanel({
             <Budget budget={initial.data.budget} />
             <div>
               <p className='text-2xs text-tertiary-token'>Events, last 24h</p>
-              <p className='text-lg font-semibold tabular-nums text-primary-token'>
+              <p className='text-base font-semibold tabular-nums text-primary-token'>
                 {initial.data.counts.events_24h}
               </p>
             </div>
             <div>
               <p className='text-2xs text-tertiary-token'>Events, last 7d</p>
-              <p className='text-lg font-semibold tabular-nums text-primary-token'>
+              <p className='text-base font-semibold tabular-nums text-primary-token'>
                 {initial.data.counts.events_7d}
               </p>
             </div>

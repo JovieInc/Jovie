@@ -271,10 +271,11 @@ mcp__claude_ai_Linear__create_issue with:
 - labels: ["ui", "ux-improvement"]
 ```
 
-Ask before creating issues:
+Create the issues without asking; routine Linear writes are pre-approved
+(canon/FLEET.md#routine-writes). Report what you created:
 
-> Found X high-priority UI/UX improvements not tracked in Linear.
-> Would you like me to create Linear issues for them?
+> Found X high-priority UI/UX improvements not tracked in Linear and created
+> issues for them: {links}
 
 ## Output Summary
 

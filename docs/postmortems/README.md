@@ -81,7 +81,8 @@ session ended, Summer assigns the write-up.
 
 Copy [TEMPLATE.md](TEMPLATE.md). Required sections: summary, impact (time to
 detect, time to own, time to repair, what was blocked), timeline, root cause,
-contributing causes, **failure classes and invariants violated**, why
+contributing causes, **revert first** (when the culprit's revert PR opened, or why no
+culprit existed; required in frontmatter from 2026-11-12), **failure classes and invariants violated**, why
 detection failed, the instance fix, **systemic controls** applied to every
 similar surface, action items as Linear issues, and open questions. Mark every
 claim you could not verify from source as `unverified`.
@@ -96,6 +97,7 @@ status: draft | reviewed | controls-verified | closed
 severity: sev1 | sev2 | sev3
 detected: 2026-09-23T21:37Z
 repaired: 2026-09-26T22:45Z
+revert_opened: 2026-09-23T21:52Z | none: <why no culprit commit existed>
 failure_classes: [silent-production-staleness]
 detectable_before_human: false
 detection_gaps: [missing-signal, missing-invariant]

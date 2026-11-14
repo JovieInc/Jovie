@@ -26,6 +26,16 @@ if (process.cwd() !== appRoot) {
   process.chdir(appRoot);
 }
 
+// Merge-time pilot: true when Vitest's RESOLVED isolation setting is off
+// (vitest.config.fast.mts injects VITEST_ISOLATION_OFF into test.env). The
+// default — unset, or any other value — keeps per-file isolation and the
+// original cleanup hook below.
+const isolationOff = process.env.VITEST_ISOLATION_OFF === 'true';
+
+// Captured from the dynamic Testing Library import below when a DOM exists;
+// used by the isolate-off unwind so it can order RTL cleanup first.
+let domCleanup: (() => void) | null = null;
+
 if (typeof window !== 'undefined') {
   const [matchers, { cleanup }] = await Promise.all([
     import('@testing-library/jest-dom/matchers'),
@@ -37,11 +47,72 @@ if (typeof window !== 'undefined') {
   const { default: _commonJsDefault, ...jestDomMatchers } = matchers;
   expect.extend(jestDomMatchers);
 
+  // Captured for the isolate-off unwind below; stays null in
+  // node-environment files (no DOM, no Testing Library).
+  domCleanup = cleanup;
+
   // Ensure the DOM is cleaned up between tests to avoid cross-test interference
+  if (!isolationOff) {
+    afterEach(() => {
+      cleanup();
+      // Run after Testing Library unmounts, while jsdom's `window` still exists.
+      releaseIdleAuthClient();
+    });
+  }
+}
+
+// Merge-time pilot (isolation off, one opt-in shard): the unwind is gated on
+// the RESOLVED isolation setting — vitest.config.fast.mts computes it (CLI
+// --isolate/--no-isolate wins over the VITEST_ISOLATE string) and injects it
+// here as VITEST_ISOLATION_OFF, so the raw env string can never desync from
+// what Vitest actually does. Isolate:true runs register no extra cleanup.
+//
+// Vitest runs after-hooks in REVERSE registration order, so the pilot does NOT
+// register separate unwinds (they would run backwards). One controlled hook
+// owns everything in a fixed order: RTL cleanup -> auth disposal ->
+// mock/global/env/timer restore -> residual DOM/storage clear. Beyond this
+// baseline, a test file must still unwind anything custom it mutates (module
+// singletons, listeners on window/document, servers/connections).
+// Runs each unwind step in order; a throwing step never skips the later
+// ones — the first error is rethrown only after every step has run.
+// Exported for the unwind regression tests.
+export function runUnwindSteps(steps: Array<() => void>): void {
+  const errors: unknown[] = [];
+  for (const runStep of steps) {
+    try {
+      runStep();
+    } catch (error) {
+      errors.push(error);
+    }
+  }
+  if (errors.length > 0) throw errors[0];
+}
+
+if (isolationOff) {
   afterEach(() => {
-    cleanup();
-    // Run after Testing Library unmounts, while jsdom's `window` still exists.
-    releaseIdleAuthClient();
+    runUnwindSteps([
+      // 1-2. Testing Library unmounts, then the auth client is disposed while
+      // jsdom's `window` still exists.
+      () => {
+        if (domCleanup) domCleanup();
+        if (typeof window !== 'undefined') releaseIdleAuthClient();
+      },
+      // 3. Restore what Vitest primitives own.
+      () => vi.restoreAllMocks(),
+      () => vi.unstubAllEnvs(),
+      () => vi.unstubAllGlobals(),
+      // A file that calls vi.useFakeTimers() at MODULE scope is incompatible
+      // with pilot mode — move fake timers into beforeEach (leak-fix follow-up).
+      () => vi.useRealTimers(),
+      // 4. Residual DOM/storage from the previous test's leftovers.
+      () => {
+        if (typeof window !== 'undefined') {
+          document.body.innerHTML = '';
+          window.localStorage.clear();
+          window.sessionStorage.clear();
+        }
+      },
+    ]);
   });
 }
 

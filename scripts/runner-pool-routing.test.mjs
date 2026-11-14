@@ -5,7 +5,7 @@ import { runInNewContext } from 'node:vm';
 import { load } from 'js-yaml';
 
 const workflow = name =>
-  /** @type {{ jobs: Record<string, { 'runs-on': string, steps?: Array<{ run?: string }> }> }} */ (
+  /** @type {{ on: Record<string, unknown>, jobs: Record<string, { 'runs-on': string, steps?: Array<{ run?: string }> }> }} */ (
     load(
       readFileSync(
         new URL(`../.github/workflows/${name}.yml`, import.meta.url),
@@ -74,10 +74,7 @@ test('PR Ready has an independent override and retains the hosted default', () =
   );
 });
 
-for (const [file, id] of [
-  ['pr-fleet-rules', 'fleet'],
-  ['pr-targets-main', 'pr-targets-main'],
-]) {
+for (const [file, id] of [['pr-targets-main', 'pr-targets-main']]) {
   test(`${file}: fixed merge-group routing retains precedence over the control-plane override`, () => {
     const expression = workflow(file).jobs[id]['runs-on'];
     assert.equal(select(expression), 'ubuntu-latest');
@@ -95,6 +92,20 @@ for (const [file, id] of [
     );
   });
 }
+
+// PR Fleet Rules reads only the source PR, so it no longer runs on merge_group
+// (.github/MERGE_QUEUE.md "Queue parity") and has no merge-gate pool route.
+test('pr-fleet-rules: routes through the control-plane override and never runs on merge_group', () => {
+  const fleet = workflow('pr-fleet-rules');
+  assert.equal(Object.hasOwn(fleet.on, 'merge_group'), false);
+  const expression = fleet.jobs.fleet['runs-on'];
+  assert.equal(select(expression), 'ubuntu-latest');
+  assert.equal(
+    select(expression, { RUNNER_CONTROL_PLANE: '"ubuntu-24.04"' }),
+    'ubuntu-24.04'
+  );
+  assert.doesNotMatch(expression, /MERGE_GATE_POOL/);
+});
 
 test('Fleet Rules never executes fork checkout code on the persistent pool', () => {
   assert.equal(

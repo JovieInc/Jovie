@@ -42,25 +42,38 @@ async function removeSocialLink(
   );
 }
 
-export function useRemoveSocialLinkMutation() {
+export function useRemoveSocialLinkMutation(options?: {
+  readonly isCurrent?: () => boolean;
+  readonly onError?: (error: unknown) => void;
+}) {
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: removeSocialLink,
+    retry: false,
     onSuccess: (_data, variables) => {
+      if (options?.isCurrent && !options.isCurrent()) return;
       // Invalidate social links queries to refetch fresh data
       queryClient.invalidateQueries({
         queryKey: queryKeys.dashboard.socialLinks(variables.profileId),
+        exact: true,
+        refetchType: 'all',
       });
       queryClient.invalidateQueries({
         queryKey: queryKeys.dashboard.socialLinks(),
+        exact: true,
+        refetchType: 'all',
       });
       queryClient.invalidateQueries({
         queryKey: queryKeys.user.profile(),
+        exact: true,
+        refetchType: 'all',
       });
     },
     onError: error => {
-      handleMutationError(error, 'Failed to remove link');
+      if (options?.isCurrent && !options.isCurrent()) return;
+      if (options?.onError) options.onError(error);
+      else handleMutationError(error, 'Failed to remove link');
     },
   });
 }

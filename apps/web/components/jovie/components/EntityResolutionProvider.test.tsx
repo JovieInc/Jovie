@@ -279,6 +279,74 @@ describe('EntityResolutionProvider', () => {
     expect(result.current.ref).toBeUndefined();
   });
 
+  it('resolves the own profile from server props, with or without a QueryClient', () => {
+    const withClient = renderHook(() => useEntityResolution('profile', 'p1'), {
+      wrapper: ({ children }) => (
+        <QueryClientProvider client={new QueryClient()}>
+          <EntityResolutionProvider
+            profileId='p1'
+            ownProfileLabel='  Tim White  '
+            ownProfileAvatarUrl='https://example.com/tim.jpg'
+          >
+            {children}
+          </EntityResolutionProvider>
+        </QueryClientProvider>
+      ),
+    });
+    expect(withClient.result.current).toEqual({
+      ref: {
+        kind: 'profile',
+        id: 'p1',
+        label: 'Tim White',
+        thumbnail: 'https://example.com/tim.jpg',
+      },
+      isLoading: false,
+    });
+
+    const withoutClient = renderHook(
+      () => useEntityResolution('profile', 'p1'),
+      {
+        wrapper: ({ children }) => (
+          <EntityResolutionProvider profileId='p1' ownProfileLabel='Tim White'>
+            {children}
+          </EntityResolutionProvider>
+        ),
+      }
+    );
+    expect(withoutClient.result.current.ref).toEqual({
+      kind: 'profile',
+      id: 'p1',
+      label: 'Tim White',
+    });
+  });
+
+  it.each([
+    ['another profile id', 'p1', 'Tim White', 'p2'],
+    ['a blank own label', 'p1', '   ', 'p1'],
+    ['a missing own label', 'p1', undefined, 'p1'],
+    ['no signed-in profile', null, 'Tim White', 'p1'],
+  ] as const)(
+    'never resolves a profile chip for %s',
+    (_case, profileId, ownProfileLabel, tokenId) => {
+      const { result } = renderHook(
+        () => useEntityResolution('profile', tokenId),
+        {
+          wrapper: ({ children }) => (
+            <QueryClientProvider client={new QueryClient()}>
+              <EntityResolutionProvider
+                profileId={profileId}
+                ownProfileLabel={ownProfileLabel}
+              >
+                {children}
+              </EntityResolutionProvider>
+            </QueryClientProvider>
+          ),
+        }
+      );
+      expect(result.current).toEqual(NULL_ENTITY_RESOLUTION);
+    }
+  );
+
   it('returns undefined for track (no query hook yet)', () => {
     const client = new QueryClient();
     const { result } = renderHook(() => useEntityResolution('track', 'trk_1'), {

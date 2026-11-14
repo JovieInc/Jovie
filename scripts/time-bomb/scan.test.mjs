@@ -46,6 +46,8 @@ test('the clock shim moves new Date, Date() and Date.now but not explicit dates'
     }).NODE_OPTIONS,
     `--max-old-space-size=3072 --import=${fileURLToPath(new URL('./shift-clock.mjs', import.meta.url))}`
   );
+  // Deliberate calendar deadlines read the real clock only inside the scan.
+  assert.equal(shiftedEnv(0, {}).CALENDAR_DEADLINE_SCAN, '1');
 });
 
 test('reads failing files and tests from a Vitest JSON report', () => {

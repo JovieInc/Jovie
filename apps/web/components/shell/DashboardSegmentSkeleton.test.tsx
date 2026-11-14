@@ -1,5 +1,6 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
+import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import {
   DashboardSegmentSkeleton,
   type DashboardSegmentSkeletonVariant,
@@ -29,19 +30,22 @@ function geometrySignature(container: HTMLElement): string[] {
 }
 
 describe('DashboardSegmentSkeleton route variants', () => {
-  it('uses the dashboard label for the default fallback', () => {
-    render(<DashboardSegmentSkeleton />);
+  it('uses the dashboard label for the default fallback', async () => {
+    const { container } = render(<DashboardSegmentSkeleton />);
 
     expect(screen.getByTestId('dashboard-segment-skeleton')).toHaveAttribute(
       'aria-label',
       'Loading dashboard'
     );
+    await expectNoA11yViolations(container);
   });
 
   it.each(ROUTE_VARIANTS)(
     'exposes an accessible busy state for the %s route',
-    variant => {
-      render(<DashboardSegmentSkeleton variant={variant} />);
+    async variant => {
+      const { container } = render(
+        <DashboardSegmentSkeleton variant={variant} />
+      );
 
       const skeleton = screen.getByTestId('dashboard-segment-skeleton');
       expect(skeleton).toHaveAttribute('role', 'status');
@@ -53,8 +57,25 @@ describe('DashboardSegmentSkeleton route variants', () => {
       );
       expect(skeleton).toHaveAttribute('data-skeleton-variant', variant);
       expect(skeleton).toHaveClass('min-h-full', 'w-full');
+      await expectNoA11yViolations(container);
     }
   );
+
+  it('keeps the same placeholder structure in a right-to-left layout', async () => {
+    const { container } = render(
+      <div dir='rtl' lang='ar'>
+        <DashboardSegmentSkeleton variant='profile' />
+      </div>
+    );
+
+    expect(
+      screen.getByRole('status', { name: 'Loading artist profiles' })
+    ).toBeInTheDocument();
+    expect(
+      container.querySelectorAll('[data-skeleton-slot="profile-table"] > .h-14')
+    ).toHaveLength(6);
+    await expectNoA11yViolations(container);
+  });
 
   it('reserves the admin health dashboard geometry (JOV-2098)', () => {
     const { container } = render(<DashboardSegmentSkeleton variant='admin' />);

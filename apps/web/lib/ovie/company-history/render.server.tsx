@@ -2,6 +2,8 @@ import 'server-only';
 
 import { readFile } from 'node:fs/promises';
 import { ImageResponse } from 'next/og';
+import type { ReactElement } from 'react';
+import { MetricChart, type MetricChartInput } from './metric-chart';
 import {
   SHIPPING_CHART_SIZE,
   ShippingChart,
@@ -26,16 +28,15 @@ let fonts: Promise<[Buffer, Buffer]> | null = null;
 const loadFonts = () =>
   (fonts ??= Promise.all([readFile(INTER_REGULAR), readFile(INTER_SEMIBOLD)]));
 
-/** PNG response for one shipping window. Deterministic for a given input. */
-export async function renderShippingChart(
-  input: ShippingChartInput,
-  headers: Record<string, string> = {}
+async function renderPng(
+  element: ReactElement,
+  headers: Record<string, string>
 ): Promise<ImageResponse> {
   const [regular, semibold] = await loadFonts().catch(error => {
     fonts = null;
     throw error;
   });
-  return new ImageResponse(<ShippingChart {...input} />, {
+  return new ImageResponse(element, {
     ...SHIPPING_CHART_SIZE,
     headers,
     fonts: [
@@ -43,4 +44,20 @@ export async function renderShippingChart(
       { name: 'Inter', data: semibold, weight: 600, style: 'normal' },
     ],
   });
+}
+
+/** PNG response for one shipping window. Deterministic for a given input. */
+export function renderShippingChart(
+  input: ShippingChartInput,
+  headers: Record<string, string> = {}
+): Promise<ImageResponse> {
+  return renderPng(<ShippingChart {...input} />, headers);
+}
+
+/** PNG response for one daily metric window, in the shipping chart's layout. */
+export function renderMetricChart(
+  input: MetricChartInput,
+  headers: Record<string, string> = {}
+): Promise<ImageResponse> {
+  return renderPng(<MetricChart {...input} />, headers);
 }

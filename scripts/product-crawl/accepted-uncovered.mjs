@@ -30,6 +30,12 @@ export const ACCEPTED_UNCOVERED = Object.freeze({
   '/hud/wiki/[...slug]': `rewritten to /app/ov/wiki (next.config.js beforeFiles), so it is the admin wiki; ${ADMIN}`,
   '/engineering/[slug]':
     'no engineering story is published yet (content/engineering holds drafts only) and dynamicParams is false, so the route has no page; crawled once /sitemap.xml lists one',
+  '/playlists/[slug]':
+    'no playlist is published yet (/playlists says coming soon and /sitemap.xml lists none); crawled once /sitemap.xml lists one',
+  '/playlists/genre/[genre]':
+    'a genre hub 404s unless a published playlist carries the genre, and none is published yet; crawled from the playlist page once one is',
+  '/playlists/mood/[mood]':
+    'a mood hub 404s unless a published playlist carries the mood, and none is published yet; crawled from the playlist page once one is',
   '/billing/cancel':
     'loading it signed in records a checkout_cancelled analytics event for the test account, and strangers are sent to sign in',
 });

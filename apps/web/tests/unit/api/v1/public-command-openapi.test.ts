@@ -11,6 +11,20 @@ import { handleMcpMessage } from '../../../../../../packages/jovie-cli/src/mcp';
 const publicCommands = COMMANDS.filter(
   command => !command.internal && !command.operator
 );
+
+/** Golden-path commands need the private draft capability pair to run. */
+const GOLDEN_PATH_TOOLS = new Set([
+  'claim_handle',
+  'answer_onboarding_question',
+  'get_qualification',
+  'build_profile',
+  'publish_profile',
+  'start_upgrade',
+]);
+const GOLDEN_PATH_DRAFT_FLAGS = {
+  'draft-id': '9efebd98-39b7-4a77-8965-04b5aafad9ad',
+  'draft-token': 'g'.repeat(120),
+};
 const schemas = ARTIST_OPENAPI_DOCUMENT.components.schemas;
 
 function operationFor(pathname: string, method: string) {
@@ -60,7 +74,16 @@ describe('published public CLI/MCP contract', () => {
               : command.tool === 'lookup_creator'
                 ? 'https://www.youtube.com/@creator'
                 : 'public-handle',
-          flags: { title: 'Example report', details: 'Example details' },
+          flags: {
+            title: 'Example report',
+            details: 'Example details',
+            ...(GOLDEN_PATH_TOOLS.has(command.tool)
+              ? GOLDEN_PATH_DRAFT_FLAGS
+              : {}),
+            ...(command.tool === 'answer_onboarding_question'
+              ? { question: 'promoSpend', answer: 'under_50' }
+              : {}),
+          },
         },
         {
           fetchImpl: async (input, init) => {
@@ -89,6 +112,13 @@ describe('published public CLI/MCP contract', () => {
               for (const key of resolve(schema!).required ?? []) {
                 expect(payload).toHaveProperty(key);
               }
+            }
+            if (url.pathname === '/api/mcp') {
+              return Response.json({
+                jsonrpc: '2.0',
+                id: 'jovie-golden-path',
+                result: { structuredContent: { status: 'ok' } },
+              });
             }
             if (url.pathname === '/api/music/mcp') {
               return Response.json({

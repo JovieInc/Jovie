@@ -1,12 +1,16 @@
 import 'server-only';
 
 import { readFile } from 'node:fs/promises';
-import { type NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { resolveVisualQaRunRelativePath } from '@/lib/agent-os/visual-qa/paths';
 import { getVisualQaReviewRun } from '@/lib/agent-os/visual-qa/review';
+import {
+  type OperatorRouteInput,
+  operatorAccess,
+} from '@/lib/api/route-access';
+import { defineRoute } from '@/lib/api/route-pipeline';
 import { captureError } from '@/lib/error-tracking';
-import { getOvieOperatorEntitlements } from '@/lib/ovie/privacy-lock/access';
 
 export const runtime = 'nodejs';
 
@@ -37,26 +41,12 @@ function imagePathForKind(
   return surface.overlayPath;
 }
 
-export async function GET(
-  _request: NextRequest,
+async function getHandler(
+  _input: OperatorRouteInput,
   context: {
     params: Promise<{ runId: string; surfaceId: string; kind: string }>;
   }
-): Promise<Response> {
-  const entitlements = await getOvieOperatorEntitlements({ purpose: 'read' });
-  if (!entitlements.isAuthenticated) {
-    return NextResponse.json(
-      { error: 'Unauthorized' },
-      { status: 401, headers: NO_STORE_HEADERS }
-    );
-  }
-  if (!entitlements.isAdmin) {
-    return NextResponse.json(
-      { error: 'Forbidden' },
-      { status: 403, headers: NO_STORE_HEADERS }
-    );
-  }
-
+) {
   const parsedParams = ParamsSchema.safeParse(await context.params);
   if (!parsedParams.success) {
     return NextResponse.json(
@@ -116,3 +106,12 @@ export async function GET(
     );
   }
 }
+
+export const GET = defineRoute(
+  {
+    route: '/api/admin/hud/visual-qa/[runId]/[surfaceId]/[kind]',
+    access: operatorAccess({ purpose: 'read' }),
+    legacy: { cache: 'pipeline-responses-only', unhandledErrors: 'rethrow' },
+  },
+  getHandler
+);

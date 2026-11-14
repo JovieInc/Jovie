@@ -1,14 +1,15 @@
 #!/usr/bin/env bash
 # Firecrawl full-site crawl + dedupe registry (JOV-4880).
-# /v1/map -> diff vs url->{lastCrawledAt,contentHash} -> /v1/batch/scrape the
+# /v2/map -> diff vs url->{lastCrawledAt,contentHash} -> /v2/batch/scrape the
 # delta -> update registry, so repeat runs only fetch new/stale URLs.
+# Firecrawl retires v0/v1 on 2026-12-10; keep every call on /v2.
 # Needs FIRECRAWL_API_KEY; it is never printed. Requires curl + jq.
 set -euo pipefail
 
 API=https://api.firecrawl.dev
-REGISTRY_DIR="$(cd "$(dirname "$0")" && pwd)/.cache/firecrawl-registry" # gitignored .cache/
+REGISTRY_DIR="${FIRECRAWL_REGISTRY_DIR:-$(cd "$(dirname "$0")" && pwd)/.cache/firecrawl-registry}" # gitignored .cache/
 LIMIT=100; MAX_AGE_DAYS=7; SITEMAP=include; IGNORE_QP=false; CONCURRENCY=4
-POLL_S=5; TIMEOUT_S=1800
+POLL_S=${FIRECRAWL_POLL_S:-5}; TIMEOUT_S=1800
 
 usage() { sed -n '2,5p' "$0"; echo "Usage: $0 map|crawl <url> [--limit n] [--max-age-days n] [--sitemap include|only|skip] [--ignore-query-params] [--max-concurrency n] [--dry-run]"; }
 die() { echo "firecrawl-crawl: $*" >&2; exit 1; }
@@ -74,8 +75,10 @@ esac
 mkdir -p "$REGISTRY_DIR"
 [ -f "$reg" ] || echo '{"version":1,"pages":{}}' > "$reg"
 
-links=$(fc POST /v1/map "$(jq -nc --arg u "$url" --arg s "$SITEMAP" --argjson q "$IGNORE_QP" \
-  '{url:$u, sitemap:$s} + (if $q then {ignoreQueryParameters:true} else {} end)')" | jq -r '.links[]? | if type=="string" then . else .url end')
+# v2 defaults ignoreQueryParameters to true, so send it either way to keep
+# distinct ?query URLs unless --ignore-query-params is passed.
+links=$(fc POST /v2/map "$(jq -nc --arg u "$url" --arg s "$SITEMAP" --argjson q "$IGNORE_QP" \
+  '{url:$u, sitemap:$s, ignoreQueryParameters:$q}')" | jq -r '.links[]? | if type=="string" then . else .url end')
 delta=$(echo "$links" | diff_urls)
 due=$(echo "$delta" | jq -r '.due[]')
 due_n=$(echo "$delta" | jq '.due | length')
@@ -86,8 +89,10 @@ jq -n --arg s "$site" --arg r "$reg" --argjson m "$(echo "$links" | grep -c . ||
 [ "$cmd" = map ] && { echo "$due"; exit 0; }
 [ "${DRY_RUN:-}" = 1 ] || [ "$due_n" -eq 0 ] && exit 0
 
-job=$(fc POST /v1/batch/scrape "$(jq -nc --argjson u "$(echo "$due" | jq -Rn '[inputs]')" \
-  --argjson c "$CONCURRENCY" '{urls:$u, formats:["markdown"], maxConcurrency:$c}')")
+# maxAge:0 asks for a live fetch: v2 otherwise serves cached pages up to two
+# days old, which would stamp lastCrawledAt on content we did not fetch.
+job=$(fc POST /v2/batch/scrape "$(jq -nc --argjson u "$(echo "$due" | jq -Rn '[inputs]')" \
+  --argjson c "$CONCURRENCY" '{urls:$u, formats:["markdown"], maxConcurrency:$c, maxAge:0}')")
 job_id=$(echo "$job" | jq -r '.id // .jobId')
 [ -n "$job_id" ] && [ "$job_id" != null ] || die "no job id returned"
 echo "batch scrape job: $job_id ($due_n pages)"
@@ -95,11 +100,21 @@ echo "batch scrape job: $job_id ($due_n pages)"
 deadline=$((now + TIMEOUT_S))
 while :; do
   sleep "$POLL_S"
-  st=$(fc GET "/v1/batch/scrape/$job_id")
+  st=$(fc GET "/v2/batch/scrape/$job_id")
   s=$(echo "$st" | jq -r '.status')
   [ "$s" = completed ] && break
   [ "$s" = failed ] || [ "$s" = cancelled ] && die "job $job_id $s"
   [ "$(date -u +%s)" -lt "$deadline" ] || die "job $job_id timed out ($s)"
+done
+
+# Large results come back in pages; follow .next until it runs out.
+rows=$(echo "$st" | jq -c '.data[]?')
+next=$(echo "$st" | jq -r '.next // empty')
+while [ -n "$next" ]; do
+  case "$next" in "$API"/*) ;; *) die "unexpected next page URL";; esac
+  page=$(fc GET "${next#"$API"}")
+  rows=$(printf '%s\n%s' "$rows" "$(echo "$page" | jq -c '.data[]?')")
+  next=$(echo "$page" | jq -r '.next // empty')
 done
 
 ts=$(date -u +%Y-%m-%dT%H:%M:%SZ)
@@ -109,7 +124,7 @@ while IFS= read -r row; do
   [ -n "$u" ] && [ -n "$md" ] || continue
   h=$(printf %s "$md" | sha256sum | cut -d' ' -f1)
   entries=$(echo "$entries" | jq --arg u "$u" --arg h "$h" '.[$u]=$h')
-done < <(echo "$st" | jq -c '.data[] | {url:(.metadata.sourceURL // .url), markdown}')
+done < <(echo "$rows" | jq -c 'select(.) | {url:(.metadata.sourceURL // .metadata.url // .url), markdown}')
 jq --arg ts "$ts" --argjson e "$entries" \
   '.updatedAt = $ts | .pages = (.pages + ($e | with_entries(.value = {lastCrawledAt:$ts, contentHash:.value})))' \
   "$reg" > "$reg.tmp" && mv "$reg.tmp" "$reg"

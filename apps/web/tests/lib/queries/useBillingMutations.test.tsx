@@ -107,6 +107,31 @@ describe('useBillingMutations', () => {
       });
     });
 
+    it('preserves the initiating app screen in the checkout request', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve(mockCheckoutResponse),
+      });
+      const { result } = renderHook(() => useCheckoutMutation(), { wrapper });
+      result.current.mutate({
+        priceId: 'price_presence',
+        source: 'in_app',
+        returnTo: '/app/releases?release=123',
+      });
+      await waitFor(() => expect(result.current.isSuccess).toBe(true));
+      expect(mockFetch).toHaveBeenCalledWith(
+        '/api/stripe/checkout',
+        expect.objectContaining({
+          body: JSON.stringify({
+            priceId: 'price_presence',
+            source: 'in_app',
+            returnTo: '/app/releases?release=123',
+            humanConfirmed: true,
+          }),
+        })
+      );
+    });
+
     it('does NOT automatically redirect (allows analytics tracking)', async () => {
       mockFetch.mockResolvedValueOnce({
         ok: true,

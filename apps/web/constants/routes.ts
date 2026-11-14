@@ -281,6 +281,12 @@ export const APP_ROUTES = {
 
 export type AppRoute = (typeof APP_ROUTES)[keyof typeof APP_ROUTES];
 
+/**
+ * Where public CTAs send a new, anonymous visitor. There is one flow, not a
+ * separate waitlist and onboarding: the /start chat admits or holds them.
+ */
+export const PUBLIC_ENTRY_HREF = APP_ROUTES.START;
+
 const SPOTIFY_CATALOG_CONNECTION_PARAM = 'connect';
 const SPOTIFY_CATALOG_CONNECTION_VALUE = 'spotify';
 

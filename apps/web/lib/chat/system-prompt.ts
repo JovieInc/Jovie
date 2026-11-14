@@ -4,6 +4,7 @@ import {
   type EnforcedArtistRule,
 } from '@/lib/artist-rules/gate';
 import { buildPromptSecuritySection } from '@/lib/chat/prompt-disclosure-guard';
+import { buildSkillsPromptSection } from '@/lib/chat/skills/registry';
 import { spotifyConnectionLine } from '@/lib/chat/spotify-connection-line';
 import { buildSegmentPromptSection } from '@/lib/creator/segment-registry';
 import { inferSegment, type ResolvedSegment } from '@/lib/creator/segments';
@@ -192,7 +193,7 @@ export function buildSystemPromptParts(
       platforms: context.hasMusicLinks ? ['spotify'] : [],
     }).segment;
   const stable = `You are Jovie, an AI music career assistant. You help independent artists understand their data and make smart career decisions.
-${buildPromptSecuritySection()}${buildArtistRulesPromptSection(context.artistRules)}
+${buildPromptSecuritySection()}${buildArtistRulesPromptSection(context.artistRules)}${buildSkillsPromptSection()}
 ## About This Artist
 - **Today:** ${formatPromptDate(now)}
 - **Name:** ${context.displayName} (@${context.username})
@@ -227,7 +228,7 @@ ${buildSegmentPromptSection(segment)}
 ## Entity & Skill Tokens
 Messages may contain structured tokens the UI attached before sending:
 - \`@release:<id>[<title>]\`: reference to a specific release. Use the id directly (e.g. pass as releaseId to generateAlbumArt). Treat the [title] as display only.
-- \`@artist:<id>[<name>]\` and \`@track:<id>[<title>]\`: same pattern for artists/tracks.
+- \`@artist:<id>[<name>]\` and \`@track:<id>[<title>]\`: same pattern for artists/tracks. \`@profile:<id>[<name>]\` is the user's own Jovie profile, attached when they start a chat from it; treat it as a request for help with that profile.
 - \`/skill:<toolId>\`: the user picked this skill explicitly. Call the matching tool immediately **only if that tool is available to this artist on their current plan** (anything not in the tools list you were given is gated). If the tool is gated, do not attempt to call it or describe its output; say briefly that the skill is a Pro-plan feature. If the tool is available but required entity slots aren't filled (no matching @entity token), ask for the missing entity before calling.
 Do not echo tokens in your responses. When referring to the entity in your reply, use its display name ("Midnight Drive"), not the token.
 
@@ -333,7 +334,7 @@ Merch quality standard:
 - The MVP uses Jovie checkout and a manual artist payout ledger. Never say artist payouts are automatic.
 
 ## Feedback
-When the artist wants to share feedback, report a bug, or request a feature, ask them to describe it. Once they provide their feedback, call the submitFeedback tool with their message. Thank them briefly after submission.${buildLockedToolsSection(options?.lockedTools)}${buildPlanLimitationsSection(options)}`;
+When the artist wants to share feedback or report a bug, ask them to describe it. Once they provide their feedback, call the submitFeedback tool with their message. Thank them briefly after submission. A request for something Jovie can't do yet goes to requestCapability instead.${buildLockedToolsSection(options?.lockedTools)}${buildPlanLimitationsSection(options)}`;
 
   // Per-turn context (retrieved knowledge, live usage counters, referenced
   // entities, pinned card) goes last so the stable prefix stays byte-identical

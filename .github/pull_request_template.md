@@ -1,5 +1,9 @@
 ## Summary
 
+Before:
+
+After:
+
 Refs JOV-
 
 ## Verification
@@ -20,3 +24,6 @@ Required for PRs labeled `compounding` and for ci/perf/throughput changes (Fleet
 After-value measured once live: use `?` for after and add `- Pending: yes`. Add `- Per-merge: yes` when every merge pays the saving.
 -->
 n/a
+
+<!-- Ships on green. Delete the next line only to park a work-in-progress draft. -->
+<!-- jovie-auto-ready: on-green -->

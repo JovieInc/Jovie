@@ -1,5 +1,6 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { expectNoA11yViolations } from '@/tests/utils/a11y';
 
 const { getState, updateState, lock, ensureReady } = vi.hoisted(() => ({
   getState: vi.fn(),
@@ -122,7 +123,7 @@ describe('OviePrivacyLockControl', () => {
     });
     lock.mockResolvedValue(undefined);
 
-    render(
+    const { container } = render(
       <OviePrivacyLockControl ensurePrivacyLockCanBeEnabled={ensureReady} />
     );
     expect(
@@ -134,5 +135,6 @@ describe('OviePrivacyLockControl', () => {
     expect(
       screen.getByRole('button', { name: 'Lock Ovie Now' })
     ).toBeInTheDocument();
+    await expectNoA11yViolations(container);
   });
 });

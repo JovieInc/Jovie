@@ -3435,7 +3435,7 @@ describe('CI E2E smoke workflow', () => {
       readFileSync(resolve(repoRoot, 'apps/web/package.json'), 'utf8')
     ) as { scripts: Record<string, string> };
     expect(packageJson.scripts['seed:test-data']).toContain(
-      'tests/seed-test-data.ts'
+      'tests/seed-e2e-entry.ts'
     );
     expect(smokeJob).not.toContain('Export DATABASE_URL (main');
   });

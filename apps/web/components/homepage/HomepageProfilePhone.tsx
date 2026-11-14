@@ -17,8 +17,8 @@ const PHONE_COPY = HOMEPAGE_EDITORIAL_COPY.profile.phone;
 const ARTIST = HOMEPAGE_FEATURED_ARTIST;
 
 /**
- * The featured artist's profile, Listen mode (Pen WyQJb). Until a real artist
- * opts in, this is the example artist (Tim, 2026-11-08): name and handle, no
+ * The featured artist's profile, Listen mode (Pen WyQJb), drawn from the
+ * featured slot (Tim for now, Tim 2026-11-12): name and handle, no
  * verified badge, Get Updates, Instagram and TikTok, the latest release as
  * the one thing the profile leads with, and the profile tabs.
  * Static, no data fetch: the page stays fully static. The anchors are where

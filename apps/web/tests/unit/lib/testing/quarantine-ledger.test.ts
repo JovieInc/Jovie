@@ -7,18 +7,35 @@ import {
   isQuarantineLedgerValid,
   parseQuarantineLedger,
 } from '@/lib/testing/quarantine-ledger';
+import { calendarDeadlineClock } from '@/tests/utils/calendar-deadline-clock';
+
+// Fixture ledgers are read on a fixed clock so their expiry dates never lapse.
+const FIXTURE_NOW = new Date(Date.UTC(2026, 5, 13));
+
+/**
+ * The committed ledger is read as of its newest entry in required lanes; only
+ * the daily time-bomb scan reads its expiry dates against the real clock.
+ */
+function committedLedgerClock(raw: {
+  entries?: readonly { firstSeenAt?: string }[];
+}): Date {
+  const seen = (raw.entries ?? [])
+    .map(entry => Date.parse(`${entry.firstSeenAt}T00:00:00Z`))
+    .filter(Number.isFinite);
+  return calendarDeadlineClock(new Date(Math.max(0, ...seen)));
+}
 
 describe('quarantine ledger', () => {
   it('parses the committed ledger file with required metadata', () => {
     const ledgerPath = resolve(process.cwd(), 'tests/quarantine.json');
-    const parsed = parseQuarantineLedger(
-      JSON.parse(readFileSync(ledgerPath, 'utf8'))
-    );
+    const raw = JSON.parse(readFileSync(ledgerPath, 'utf8'));
+    const now = committedLedgerClock(raw);
+    const parsed = parseQuarantineLedger(raw, now);
 
     expect(isQuarantineLedgerValid(parsed)).toBe(true);
 
     const isActive = (entry: { expiresAt: string }) =>
-      Date.parse(entry.expiresAt) >= Date.now();
+      Date.parse(entry.expiresAt) >= now.getTime();
     // Count entries dynamically so the test tolerates additions/removals in
     // tests/quarantine.json — only the structural guarantees matter here.
     const expectedUnitCount = parsed.ledger.entries.filter(
@@ -47,40 +64,43 @@ describe('quarantine ledger', () => {
 
   it('has no expired quarantine entries (expired entries are inert, so fix or remove them)', () => {
     const ledgerPath = resolve(process.cwd(), 'tests/quarantine.json');
-    const parsed = parseQuarantineLedger(
-      JSON.parse(readFileSync(ledgerPath, 'utf8'))
-    );
+    const raw = JSON.parse(readFileSync(ledgerPath, 'utf8'));
+    const now = committedLedgerClock(raw);
+    const parsed = parseQuarantineLedger(raw, now);
     const expired = parsed.ledger.entries
-      .filter(entry => Date.parse(entry.expiresAt) < Date.now())
+      .filter(entry => Date.parse(entry.expiresAt) < now.getTime())
       .map(entry => `${entry.id} (expired ${entry.expiresAt})`);
 
     expect(expired).toEqual([]);
   });
 
   it('flags missing required entry metadata', () => {
-    const parsed = parseQuarantineLedger({
-      schemaVersion: 1,
-      retryBudget: {
-        unitDefaultRetries: 1,
-        quarantineUnitRetries: 2,
-        e2eDefaultRetries: 0,
-        quarantineE2eRetries: 2,
-        maxRetryAttemptsPerCiRun: 10,
-        unitShardCount: 6,
-      },
-      entries: [
-        {
-          id: 'broken-entry',
-          kind: 'unit',
-          path: 'tests/foo.test.ts',
-          owner: '',
-          firstSeenAt: '2026-02-01',
-          reproductionCommand: 'pnpm test',
-          fixIssueUrl: 'https://linear.app/jovie/issue/JOV-1',
-          expiresAt: '2026-12-31',
+    const parsed = parseQuarantineLedger(
+      {
+        schemaVersion: 1,
+        retryBudget: {
+          unitDefaultRetries: 1,
+          quarantineUnitRetries: 2,
+          e2eDefaultRetries: 0,
+          quarantineE2eRetries: 2,
+          maxRetryAttemptsPerCiRun: 10,
+          unitShardCount: 6,
         },
-      ],
-    });
+        entries: [
+          {
+            id: 'broken-entry',
+            kind: 'unit',
+            path: 'tests/foo.test.ts',
+            owner: '',
+            firstSeenAt: '2026-02-01',
+            reproductionCommand: 'pnpm test',
+            fixIssueUrl: 'https://linear.app/jovie/issue/JOV-1',
+            expiresAt: '2026-12-31',
+          },
+        ],
+      },
+      FIXTURE_NOW
+    );
 
     expect(isQuarantineLedgerValid(parsed)).toBe(false);
     expect(parsed.issues.some(issue => issue.path.includes('owner'))).toBe(
@@ -89,27 +109,30 @@ describe('quarantine ledger', () => {
   });
 
   it('enforces retry budget caps', () => {
-    const parsed = parseQuarantineLedger({
-      schemaVersion: 1,
-      retryBudget: {
-        unitDefaultRetries: 1,
-        quarantineUnitRetries: 5,
-        e2eDefaultRetries: 0,
-        quarantineE2eRetries: 5,
-        maxRetryAttemptsPerCiRun: 10,
-        unitShardCount: 6,
+    const parsed = parseQuarantineLedger(
+      {
+        schemaVersion: 1,
+        retryBudget: {
+          unitDefaultRetries: 1,
+          quarantineUnitRetries: 5,
+          e2eDefaultRetries: 0,
+          quarantineE2eRetries: 5,
+          maxRetryAttemptsPerCiRun: 10,
+          unitShardCount: 6,
+        },
+        entries: Array.from({ length: 4 }, (_, index) => ({
+          id: `unit-${index}`,
+          kind: 'unit',
+          path: `tests/foo-${index}.test.ts`,
+          owner: 'platform',
+          firstSeenAt: '2026-02-01',
+          reproductionCommand: 'pnpm test',
+          fixIssueUrl: 'https://linear.app/jovie/issue/JOV-1',
+          expiresAt: '2026-12-31',
+        })),
       },
-      entries: Array.from({ length: 4 }, (_, index) => ({
-        id: `unit-${index}`,
-        kind: 'unit',
-        path: `tests/foo-${index}.test.ts`,
-        owner: 'platform',
-        firstSeenAt: '2026-02-01',
-        reproductionCommand: 'pnpm test',
-        fixIssueUrl: 'https://linear.app/jovie/issue/JOV-1',
-        expiresAt: '2026-12-31',
-      })),
-    });
+      FIXTURE_NOW
+    );
 
     expect(parsed.summary.withinRetryBudget).toBe(false);
     expect(

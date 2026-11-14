@@ -628,7 +628,12 @@ export async function generateMetadata({
   const opaqueDecision =
     await resolveOpaqueInternalProfileUsername(normalizedUsername);
   if (opaqueDecision.action === 'not_found') {
-    return { title: 'Not Found', robots: { index: false, follow: false } };
+    // The page renders notFound() for this state, and Next automatically
+    // injects <meta name="robots" content="noindex"> into every status > 400
+    // render; an explicit robots meta here emitted a SECOND robots tag (the
+    // JOV-12153 duplicate-robots class). Title-only, like the other miss
+    // branches in this file.
+    return { title: 'Not Found' };
   }
   if (opaqueDecision.action === 'redirect') {
     permanentRedirect(opaqueInternalProfileRedirectPath(opaqueDecision, slug));
