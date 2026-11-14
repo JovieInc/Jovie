@@ -336,7 +336,7 @@ export function storyFilesByComponent(files, componentPaths) {
  * back to the v1 global digest under the v2 schema (`scope: 'global'`).
  * @param {string} root @param {Iterable<string>} componentPaths
  * @param {Record<string,string>} [profile]
- * @returns {{ bindings: Map<string, {schema: string, digest: string, mode: string, scope: string}>, problem: string|null, stats: {components: number, closure: number, shared: number, global: number} }}
+ * @returns {{ bindings: Map<string, {schema: string, digest: string, mode: string, scope: string}>, problem: string|null, stats: {components: number, closure: number, shared: number, global: number, unresolved: string[]} }}
  */
 export function componentRenderBindings(
   root,
