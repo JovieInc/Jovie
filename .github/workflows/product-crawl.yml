@@ -40,3 +40,13 @@ jobs:
           name: product-crawl-receipt
           path: product-crawl-receipt/*.json
           if-no-files-found: error
+      # Taken only when an interaction walk leaves an overlay up without its
+      # anchor (scripts/product-crawl/overlay-walk.mjs). This lane crawls
+      # public pages as a stranger, so the captures hold nothing private.
+      - name: Upload orphaned-overlay screenshots
+        if: ${{ always() && hashFiles('product-crawl-receipt/overlay-walk/*.png') != '' }}
+        uses: ./.github/actions/upload-safe-playwright-artifact
+        with:
+          name: product-crawl-overlay-walk
+          path: product-crawl-receipt/overlay-walk/*.png
+          allow-images: 'true'

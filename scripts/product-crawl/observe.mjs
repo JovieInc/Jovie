@@ -1,5 +1,6 @@
 // What the crawler measures inside each page it loads: layout shifts and
 // what moved, inserts, paint, long tasks and the longest animation frame.
+import { SURFACE } from './overlay-walk.mjs';
 import { verticalMove } from './ready-gate.mjs';
 
 // Runs in the page, so it is a string: these scripts type-check as Node.
@@ -69,4 +70,5 @@ export const OBSERVE = `
 `;
 export const MEASURE = `({ ...window.__crawl, added: undefined,
   text: document.body?.innerText ?? '',
+  overlaySurface: ${SURFACE},
   overflow: document.documentElement.scrollWidth > window.innerWidth + 1 })`;
