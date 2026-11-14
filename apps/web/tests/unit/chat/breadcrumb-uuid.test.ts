@@ -17,8 +17,8 @@ describe('getBreadcrumbLabel', () => {
     expect(getBreadcrumbLabel('library')).toBe('Work');
   });
 
-  it('returns "Inbox" for the app root segment', () => {
-    expect(getBreadcrumbLabel('app')).toBe('Inbox');
+  it('returns "Home" for the app root segment', () => {
+    expect(getBreadcrumbLabel('app')).toBe('Home');
   });
 
   it('returns the explicit title for the visibility audit', () => {

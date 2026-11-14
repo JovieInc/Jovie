@@ -1,11 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { type ReactNode, useState } from 'react';
 import { SidebarContext } from '@/components/shell/SidebarContext';
-import {
-  SIDEBAR_HEADER_ICON_BUTTON_CLASS,
-  SIDEBAR_HEADER_ICON_CLASS,
-} from '@/components/shell/sidebar-header-icon-button';
-import { cn } from '@/lib/utils';
 import { SidebarCollapseButton } from '.';
 
 /** Story-local sidebar state so this molecule story never imports organisms. */
@@ -75,15 +70,4 @@ export const OnContentSurface: Story = {
       </SidebarProvider>
     ),
   ],
-};
-
-/** Sidebar header row: same 28px box and 16px glyph as the bell and search. */
-export const InSidebarHeader: Story = {
-  args: {
-    className: cn(
-      SIDEBAR_HEADER_ICON_BUTTON_CLASS,
-      'aria-pressed:text-sidebar-item-foreground [&_svg]:size-(--app-shell-sidebar-icon-size)'
-    ),
-    iconClassName: SIDEBAR_HEADER_ICON_CLASS,
-  },
 };

@@ -95,12 +95,11 @@ describe('dashboard metadata generation', () => {
     mockLimit.mockResolvedValue([]);
   });
 
-  it('titles the app root Inbox, matching the header bell and breadcrumb', async () => {
+  it('uses the static dashboard title for the app root', async () => {
     const { generateMetadata } = await import('@/app/app/(shell)/page');
     const metadata = await generateMetadata();
 
-    // Rendered tab title is "Inbox | Jovie" via the root title template.
-    expect(metadata.title).toBe('Inbox');
+    expect(metadata.title).toBe('Home');
   });
 
   it('uses the visible New Chat title for the chat home route', async () => {

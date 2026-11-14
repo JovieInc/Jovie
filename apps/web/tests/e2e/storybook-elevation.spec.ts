@@ -591,13 +591,9 @@ test.describe('central runtime notifications', () => {
     await expect(
       page.getByRole('button', { name: 'Downloading Jovie Update…' })
     ).toBeDisabled();
-    // The update is announced by the shell pill, never on the Inbox bell.
     await expect(
-      page.getByRole('link', { name: 'Inbox', exact: true })
+      page.getByRole('link', { name: 'Inbox — App Update Available' })
     ).toHaveAttribute('href', '/app');
-    await expect(
-      page.getByRole('link', { name: /App Update Available/ })
-    ).toHaveCount(0);
     await fireDesktopUpdate(page, 'downloaded');
     await expect(
       page.getByRole('button', { name: 'Restart Jovie To Update' })
@@ -753,28 +749,13 @@ test.describe('sidebar attention and Settings header', () => {
       const searchBox = (await search.boundingBox())!;
       expect(Math.abs(bellBox.y - searchBox.y)).toBeLessThanOrEqual(1);
       expect(searchBox.x).toBeGreaterThan(bellBox.x);
-      // Bell, search and rail toggle: one 28px box, one rhythm (Tim
-      // 2026-11-14 alignment pass).
-      const toggleBox = (await page
-        .locator('[data-sidebar-brand-row] [data-testid="sidebar-rail-toggle"]')
-        .boundingBox())!;
-      for (const box of [bellBox, searchBox, toggleBox]) {
-        expect(box.width).toBeCloseTo(28, 0);
-        expect(box.height).toBeCloseTo(28, 0);
-        expect(
-          Math.abs(box.y + box.height / 2 - (bellBox.y + bellBox.height / 2))
-        ).toBeLessThanOrEqual(0.5);
-      }
-      const firstGap = searchBox.x - (bellBox.x + bellBox.width);
-      const secondGap = toggleBox.x - (searchBox.x + searchBox.width);
-      expect(Math.abs(firstGap - secondGap)).toBeLessThanOrEqual(0.5);
-      // The bell is the only `/app` entry: the rail's Inbox row is gone.
       await expect(
         page.getByRole('link', { name: 'Inbox', exact: true })
-      ).toHaveCount(0);
+      ).toHaveCount(1);
       // Current navigation groups Calendar within Work. Preserve every
       // canonical destination exposed by this default-flags story.
       for (const [name, href] of [
+        ['Inbox', '/app'],
         ['Work', '/app/library'],
         ['Audience', '/app/contacts?tab=audience'],
         // JOV-7733 retired the Identity rollout gate, so it is part of the

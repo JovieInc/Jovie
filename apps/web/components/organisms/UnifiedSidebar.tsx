@@ -11,6 +11,7 @@ import { useMemo } from 'react';
 import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
 import { AskJovieMark } from '@/components/ask-jovie/AskJovie';
 import { BrandLogo } from '@/components/atoms/BrandLogo';
+import { SidebarCollapseButton } from '@/components/molecules/sidebar-collapse-button';
 import { WorkspaceSelector } from '@/components/molecules/WorkspaceSelector';
 import {
   Sidebar,
@@ -24,11 +25,12 @@ import {
 } from '@/components/organisms/sidebar';
 import { SidebarIdentityGroup } from '@/components/organisms/sidebar-identity-group';
 import { HeaderSearchSurfaceFromContext } from '@/components/shell/HeaderSearchSurfaceFromContext';
+import { RailStagedContent } from '@/components/shell/RailStagedContent';
 import {
   SHELL_RAIL_ALLOCATION,
   SHELL_RAIL_LABEL,
 } from '@/components/shell/rail-motion';
-import { SidebarHeaderActions } from '@/components/shell/SidebarHeaderActions';
+import { SidebarInboxLink } from '@/components/shell/SidebarInboxLink';
 import { SIDEBAR_ENTRY_LABEL_INSET_CLASS } from '@/components/shell/sidebar-optical';
 import { APP_ROUTES, isDemoRoutePath } from '@/constants/routes';
 import { useShellSidebarOverride } from '@/contexts/ShellSidebarOverrideContext';
@@ -44,6 +46,7 @@ import { ProfileCompletionCard } from '@/features/dashboard/molecules/ProfileCom
 import { useProfileData } from '@/hooks/useProfileData';
 import { APP_SHELL_WORKSPACES } from '@/lib/app-shell/workspaces';
 import { BRAND_WORDMARKS, type BrandVariant } from '@/lib/brand/tokens';
+import { useIsElectronRuntime } from '@/lib/desktop/electron-bridge';
 import { useAppFlag } from '@/lib/flags/client';
 import { useDashboardProfileQuery } from '@/lib/queries/useDashboardProfileQuery';
 import { cn } from '@/lib/utils';
@@ -309,6 +312,9 @@ function SidebarHeaderNav({
   routeBackHref?: string;
   routeBackLabel?: string;
 }>) {
+  const isDesktop = useIsElectronRuntime();
+  const { state, isMobile, isPreview, open: pinned } = useSidebar();
+  const chromeHidden = state === 'closed' && !isMobile;
   const { inboxNavigation, selectedProfile } = useDashboardData();
 
   return (
@@ -406,11 +412,28 @@ function SidebarHeaderNav({
           );
         })()}
       </div>
-      <SidebarHeaderActions
-        showActions={!isRouteSidebar && !isOperatorSection && !isDemoRoute}
-        headerOwnsCollapsedToggle={headerOwnsCollapsedToggle}
-        inboxNavigation={inboxNavigation}
-      />
+      {!isRouteSidebar && !isOperatorSection && !isDemoRoute ? (
+        <RailStagedContent
+          hidden={chromeHidden}
+          className='flex items-center'
+          data-sidebar-header-actions='true'
+        >
+          <SidebarInboxLink availability={inboxNavigation} />
+          <HeaderSearchSurfaceFromContext compact />
+        </RailStagedContent>
+      ) : null}
+
+      {!isDesktop ? (
+        <RailStagedContent
+          hidden={
+            !pinned && !isPreview && !isMobile && headerOwnsCollapsedToggle
+          }
+          stage={headerOwnsCollapsedToggle}
+          className='ml-auto shrink-0 group-data-[collapsible=icon]:order-first group-data-[collapsible=icon]:mx-auto'
+        >
+          <SidebarCollapseButton />
+        </RailStagedContent>
+      ) : null}
     </div>
   );
 }

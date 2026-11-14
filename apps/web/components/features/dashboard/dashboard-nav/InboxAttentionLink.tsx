@@ -7,11 +7,12 @@ import { APP_ROUTES } from '@/constants/routes';
 import { cn } from '@/lib/utils';
 
 export interface InboxAttentionLinkProps {
-  /** Accessible name. App updates live in the shell's update pill. */
+  /** Accessible name, including any update notice. */
   readonly label: string;
   readonly itemId: string;
   readonly attention: string;
   readonly pendingCount?: number;
+  readonly runtimeUpdate?: boolean;
   readonly navigationPending?: boolean;
   readonly onClick?: (event: MouseEvent<HTMLAnchorElement>) => void;
 }
@@ -22,6 +23,7 @@ export function InboxAttentionLink({
   itemId,
   attention,
   pendingCount = 0,
+  runtimeUpdate = false,
   navigationPending = false,
   onClick,
 }: InboxAttentionLinkProps) {
@@ -52,6 +54,12 @@ export function InboxAttentionLink({
         >
           {Math.min(pendingCount, 99)}
         </span>
+      ) : runtimeUpdate ? (
+        <span
+          aria-hidden='true'
+          data-inbox-runtime-update
+          className='absolute right-0 top-0 size-1.5 rounded-full bg-accent'
+        />
       ) : null}
     </Link>
   );

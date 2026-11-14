@@ -9,10 +9,6 @@ import {
   getSidebarNavIconClassName,
   getSidebarNavRowClassName,
 } from './SidebarNavItem';
-import {
-  SIDEBAR_HEADER_ICON_BUTTON_CLASS,
-  SIDEBAR_HEADER_ICON_CLASS,
-} from './sidebar-header-icon-button';
 import { Tooltip } from './Tooltip';
 
 /**
@@ -64,7 +60,7 @@ export function HeaderSearchSurfaceFromContext({
       onClick={isCommandPaletteOpen ? closeCommandPalette : openCommandPalette}
       className={cn(
         compact
-          ? SIDEBAR_HEADER_ICON_BUTTON_CLASS
+          ? 'focus-ring-themed inline-flex size-7 shrink-0 items-center justify-center rounded-md text-sidebar-item-foreground hover:bg-sidebar-accent focus-visible:bg-sidebar-accent'
           : cn(
               getSidebarNavRowClassName({}),
               'text-left',
@@ -77,11 +73,9 @@ export function HeaderSearchSurfaceFromContext({
     >
       <Icon
         name='Search'
-        className={
-          compact ? SIDEBAR_HEADER_ICON_CLASS : getSidebarNavIconClassName({})
-        }
+        className={getSidebarNavIconClassName({})}
         aria-hidden='true'
-        strokeWidth={compact ? 2 : 2.25}
+        strokeWidth={2.25}
       />
       {compact ? null : (
         <>

@@ -59,14 +59,4 @@ describe('staged rail chrome', () => {
     expect(available).toHaveFocus();
     available.remove();
   });
-
-  it('keeps expanded controls unclipped so their focus rings paint in full', () => {
-    render(<Fixture hidden={false} />);
-    const chrome = screen.getByTestId('chrome');
-    const always = (chrome.getAttribute('class') ?? '')
-      .split(/\s+/)
-      .filter(token => token && !token.includes(':'));
-    expect(always).not.toContain('overflow-hidden');
-    expect(chrome).toHaveClass('group-data-[collapsible=icon]:overflow-hidden');
-  });
 });

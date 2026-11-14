@@ -7,11 +7,7 @@ import {
   linksNavItem,
   presenceNavItem,
 } from './config';
-import {
-  getRailNavigation,
-  isNavigationItemActive,
-  isNavigationItemHighlighted,
-} from './navigation-state';
+import { isNavigationItemActive } from './navigation-state';
 
 describe('isNavigationItemActive', () => {
   it('keeps Home scoped to the shell root', () => {
@@ -94,33 +90,5 @@ describe('isNavigationItemActive', () => {
         )
       ).toBe(true);
     }
-  });
-});
-
-describe('getRailNavigation', () => {
-  const items = [homeNavItem, presenceNavItem, libraryNavItem];
-
-  it('drops only the Inbox row when the header bell owns the inbox', () => {
-    expect(getRailNavigation(items, true)).toEqual([
-      presenceNavItem,
-      libraryNavItem,
-    ]);
-    expect(getRailNavigation(items, false)).toEqual(items);
-  });
-});
-
-describe('isNavigationItemHighlighted', () => {
-  it('paints the current page when nothing is pending', () => {
-    expect(isNavigationItemHighlighted('home', true, undefined)).toBe(true);
-    expect(isNavigationItemHighlighted('audience', false, undefined)).toBe(
-      false
-    );
-  });
-
-  it('moves the paint to the pending destination so one row is selected', () => {
-    expect(isNavigationItemHighlighted('home', true, 'audience')).toBe(false);
-    expect(isNavigationItemHighlighted('audience', false, 'audience')).toBe(
-      true
-    );
   });
 });

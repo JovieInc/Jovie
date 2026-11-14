@@ -34,12 +34,28 @@ describe('InboxAttentionLink', () => {
     ).toHaveTextContent('99');
   });
 
-  it('carries no app-update dot: the shell update pill announces updates', () => {
-    render(
-      <InboxAttentionLink label='Inbox' itemId='home' attention='empty' />
+  it('shows the update dot only when nothing is pending', () => {
+    const { rerender } = render(
+      <InboxAttentionLink
+        label='Inbox'
+        itemId='home'
+        attention='available'
+        runtimeUpdate
+      />
+    );
+    expect(
+      document.querySelector('[data-inbox-runtime-update]')
+    ).toBeInTheDocument();
+    rerender(
+      <InboxAttentionLink
+        label='Inbox'
+        itemId='home'
+        attention='available'
+        runtimeUpdate
+        pendingCount={2}
+      />
     );
     expect(document.querySelector('[data-inbox-runtime-update]')).toBeNull();
-    expect(screen.queryByRole('status')).toBeNull();
   });
 
   it('acknowledges a pending navigation and forwards clicks', () => {
@@ -65,6 +81,7 @@ describe('InboxAttentionLink', () => {
     ['partial', { attention: 'unknown' }],
     ['pending', { attention: 'available', pendingCount: 3 }],
     ['long content', { attention: 'available', pendingCount: 140 }],
+    ['update available', { attention: 'available', runtimeUpdate: true }],
     ['navigation pending', { attention: 'empty', navigationPending: true }],
   ] as const)('has no accessibility violations when %s', async (_, props) => {
     const { container } = render(

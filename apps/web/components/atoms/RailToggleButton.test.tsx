@@ -189,30 +189,4 @@ describe('RailToggleButton', () => {
       'lucide-pin'
     );
   });
-
-  it('keeps the 14px rail glyph by default and accepts a caller glyph size', () => {
-    const props = {
-      side: 'left' as const,
-      open: true,
-      openLabel: 'Collapse sidebar',
-      closedLabel: 'Expand sidebar',
-      onToggle: vi.fn(),
-    };
-    const { unmount } = render(
-      <RailToggleButton {...props} iconTestId='default-icon' />
-    );
-    expect(screen.getByTestId('default-icon')).toHaveClass('size-3.5');
-    unmount();
-    render(
-      <RailToggleButton
-        {...props}
-        iconTestId='sized-icon'
-        iconClassName='size-(--app-shell-sidebar-icon-size)'
-      />
-    );
-    expect(screen.getByTestId('sized-icon')).toHaveClass(
-      'size-(--app-shell-sidebar-icon-size)'
-    );
-    expect(screen.getByTestId('sized-icon')).not.toHaveClass('size-3.5');
-  });
 });

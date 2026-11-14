@@ -1,4 +1,3 @@
-import { TooltipProvider } from '@jovie/ui';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
@@ -7,7 +6,6 @@ import {
   useHeaderActions,
 } from '@/contexts/HeaderActionsContext';
 import { HeaderSearchSurfaceFromContext } from './HeaderSearchSurfaceFromContext';
-import { SIDEBAR_HEADER_ICON_BUTTON_CLASS } from './sidebar-header-icon-button';
 
 function renderSurface(calm = false) {
   return render(
@@ -88,23 +86,5 @@ describe('HeaderSearchSurfaceFromContext', () => {
       screen.getByRole('button', { name: 'Other destination' })
     );
     expect(screen.getByRole('status')).toHaveTextContent('Closed');
-  });
-
-  it('renders the compact rail trigger on the shared header icon-button box', () => {
-    render(
-      <HeaderActionsProvider>
-        <TooltipProvider>
-          <HeaderSearchSurfaceFromContext compact />
-        </TooltipProvider>
-      </HeaderActionsProvider>
-    );
-    const trigger = screen.getByRole('button', { name: 'Search Jovie' });
-    for (const token of SIDEBAR_HEADER_ICON_BUTTON_CLASS.split(' ')) {
-      expect(trigger).toHaveClass(token);
-    }
-    const glyph = trigger.querySelector('svg');
-    expect(glyph).toHaveClass('size-(--app-shell-sidebar-icon-size)');
-    // The compact glyph no longer takes the nav row's muted icon color.
-    expect(glyph?.getAttribute('class') ?? '').not.toContain('sidebar-muted');
   });
 });

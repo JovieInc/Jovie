@@ -88,12 +88,7 @@ describe('DashboardNav route warming', () => {
       headerOwnsInbox: true,
     });
     expect(document.querySelector('[data-inbox-attention]')).toBeNull();
-    // The header bell is the Inbox entry, so the rail's Inbox row goes too;
-    // every other destination is retained.
-    expect(destinations()).toEqual(
-      retained.filter(destination => destination.href !== APP_ROUTES.DASHBOARD)
-    );
-    expect(screen.queryByRole('link', { name: label })).not.toBeInTheDocument();
+    expect(destinations()).toEqual(retained);
     expect(document.querySelector('[data-sidebar-search-divider]')).toBeNull();
   });
 
@@ -249,9 +244,7 @@ describe('DashboardNav route warming', () => {
     expect(link).not.toHaveAttribute('aria-busy');
   });
 
-  it('keeps opportunity counts on the Inbox bell and leaves app updates to the shell pill', () => {
-    // The update now lives in the shell's corner pill; the Inbox page shows
-    // no update, so the bell must not point there for one.
+  it('shows runtime update attention on the existing Inbox bell while preserving opportunity counts', () => {
     runtimeUpdateState.available = true;
     const pending = renderDashboardNav({
       renderFn: render,
@@ -259,12 +252,9 @@ describe('DashboardNav route warming', () => {
         inboxNavigation: { state: 'available', pendingCount: 3 },
       },
     });
-    const pendingLink = pending.container.querySelector(
-      '[data-navigation-item-id="inbox"]'
-    );
-    expect(pendingLink).toHaveAccessibleName('Inbox');
-    expect(pendingLink).toHaveAttribute('href', APP_ROUTES.DASHBOARD);
-    expect(pendingLink).toHaveAttribute('data-inbox-attention', 'available');
+    expect(
+      pending.getByRole('link', { name: 'Inbox — App Update Available' })
+    ).toHaveAttribute('href', APP_ROUTES.DASHBOARD);
     expect(
       pending.getByRole('status', { name: '3 pending items' })
     ).toHaveTextContent('3');
@@ -281,16 +271,29 @@ describe('DashboardNav route warming', () => {
         inboxNavigation: { state: 'empty', pendingCount: 0 },
       },
     });
+    const updateLink = updateOnly.getByRole('link', {
+      name: 'Inbox — App Update Available',
+    });
+    expect(updateLink).toHaveAttribute('data-inbox-attention', 'available');
     expect(
-      updateOnly.queryByRole('link', { name: /App Update Available/ })
-    ).toBeNull();
-    const link = updateOnly.container.querySelector(
+      updateLink.querySelector('[data-inbox-runtime-update]')
+    ).not.toBeNull();
+    updateOnly.unmount();
+
+    runtimeUpdateState.available = false;
+    const caughtUp = renderDashboardNav({
+      renderFn: render,
+      overrides: {
+        inboxNavigation: { state: 'empty', pendingCount: 0 },
+      },
+    });
+    const link = caughtUp.container.querySelector(
       '[data-navigation-item-id="inbox"]'
     );
     expect(link).toHaveAccessibleName('Inbox');
+    if (!(link instanceof HTMLElement)) return;
     expect(link).toHaveAttribute('data-inbox-attention', 'empty');
-    expect(link?.querySelector('[data-inbox-runtime-update]')).toBeNull();
-    runtimeUpdateState.available = false;
+    expect(link.querySelector('[data-inbox-runtime-update]')).toBeNull();
   });
 
   it('labels the header bell Inbox without a rollout override', () => {

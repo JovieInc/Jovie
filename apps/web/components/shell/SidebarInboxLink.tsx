@@ -7,10 +7,6 @@ import {
   formatInboxPendingWorkLabel,
   type InboxNavigationAvailability,
 } from '@/lib/inbox/navigation-availability';
-import {
-  SIDEBAR_HEADER_ICON_BUTTON_CLASS,
-  SIDEBAR_HEADER_ICON_CLASS,
-} from './sidebar-header-icon-button';
 import { Tooltip } from './Tooltip';
 
 /**
@@ -37,9 +33,12 @@ export function SidebarInboxLink({
         data-inbox-attention={
           pending ? 'available' : (availability?.state ?? 'unknown')
         }
-        className={SIDEBAR_HEADER_ICON_BUTTON_CLASS}
+        className='focus-ring-themed relative inline-flex size-7 shrink-0 items-center justify-center rounded-md text-sidebar-item-foreground hover:bg-sidebar-accent focus-visible:bg-sidebar-accent'
       >
-        <Bell className={SIDEBAR_HEADER_ICON_CLASS} aria-hidden='true' />
+        <Bell
+          className='size-(--app-shell-sidebar-icon-size)'
+          aria-hidden='true'
+        />
         {pending ? (
           <span
             data-inbox-unread='true'

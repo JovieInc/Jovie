@@ -23,8 +23,6 @@ interface RailToggleButtonProps {
   readonly controlsId?: string;
   readonly shortcut?: string;
   readonly className?: string;
-  /** Glyph size override; the sidebar header aligns it to its 16px row. */
-  readonly iconClassName?: string;
   readonly dataTestId?: string;
   readonly iconTestId?: string;
 }
@@ -47,7 +45,6 @@ export function RailToggleButton({
   controlsId,
   shortcut,
   className,
-  iconClassName,
   dataTestId,
   iconTestId,
 }: RailToggleButtonProps) {
@@ -73,7 +70,7 @@ export function RailToggleButton({
     >
       <Icon
         name={iconName}
-        className={iconClassName ?? 'size-3.5'}
+        className='size-3.5'
         strokeWidth={2}
         aria-hidden='true'
         data-testid={iconTestId}
