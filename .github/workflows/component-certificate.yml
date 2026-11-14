@@ -3,6 +3,7 @@
 # capability-gap: The per-component certificate needs a whole-repo static pass after main settles, which no existing workflow owns; folding it into CI would add a step to every PR and merge group.
 # revisit-trigger: Fold into the Production Controller evidence packets once they carry design-system certification, or retire when Ovie computes certificates itself.
 # necessary-trust-boundary: Runs on trusted main only, read-only token. The one secret (CRON_SECRET) is used by a single curl step after the certificate script has finished; it posts evidence to the Ovie ingest route and never writes to GitHub.
+# github-token-budget: 1 calls/run - exact-attempt canonical child proof for failed Visual & A11y notifications only
 name: Component Certificate
 
 on:
@@ -24,13 +25,79 @@ on:
         type: boolean
 permissions: {}
 jobs:
+  failed_capture:
+    name: Admit failed workflow's canonical capture
+    if: >-
+      github.ref == 'refs/heads/main' && github.event_name == 'workflow_run' &&
+      github.event.workflow_run.name == 'Visual & A11y Tests' &&
+      github.event.workflow_run.conclusion == 'failure' &&
+      github.event.workflow_run.head_branch == 'main' &&
+      github.event.workflow_run.head_repository.full_name == github.repository &&
+      contains(fromJSON('["push","workflow_dispatch","workflow_run"]'), github.event.workflow_run.event)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    outputs:
+      cache-key: ${{ steps.canonical.outputs.cache-key }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Require trusted main ancestry
+        env:
+          CERT_SHA: ${{ github.sha }}
+          CERT_TRIGGER_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          set -euo pipefail
+          [[ "$CERT_SHA" =~ ^[0-9a-f]{40}$ ]]
+          test "$(git rev-parse HEAD)" = "$CERT_SHA"
+          git merge-base --is-ancestor HEAD origin/main
+          [[ "$CERT_TRIGGER_SHA" =~ ^[0-9a-f]{40}$ ]]
+          git cat-file -e "$CERT_TRIGGER_SHA^{commit}"
+          git merge-base --is-ancestor "$CERT_TRIGGER_SHA" HEAD
+      - uses: ./.github/actions/prime-node-toolcache
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v6.4.0
+        with:
+          node-version-file: .nvmrc
+      # Public Actions metadata is readable with this existing token scope.
+      # Any denial or incomplete proof fails closed; no alternate credential.
+      - name: Verify exact canonical child
+        id: canonical
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node scripts/lib/component-story-completion.mjs
+      - name: Restore exact triggering capture cache
+        id: cache
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.local/state/jovie-story-evidence
+          key: ${{ steps.canonical.outputs.cache-key }}
+          fail-on-cache-miss: true
+      - name: Require exact capture cache admission
+        env:
+          EXPECTED_KEY: ${{ steps.canonical.outputs.cache-key }}
+          MATCHED_KEY: ${{ steps.cache.outputs.cache-matched-key }}
+          CACHE_HIT: ${{ steps.cache.outputs.cache-hit }}
+        run: |
+          set -euo pipefail
+          test "$CACHE_HIT" = true
+          test "$MATCHED_KEY" = "$EXPECTED_KEY"
+      - name: Require current capture bindings
+        run: STORY_CACHE_DIR="$HOME/.local/state/jovie-story-evidence" node scripts/lib/component-story-completion.mjs --require-current-cache
   certify:
     name: Certify components
+    needs: failed_capture
     if: >-
-      github.ref == 'refs/heads/main' && (
+      !cancelled() && github.ref == 'refs/heads/main' && (
         github.event_name == 'workflow_dispatch' ||
         (github.event_name == 'workflow_run' &&
-         github.event.workflow_run.conclusion == 'success' &&
+         (github.event.workflow_run.conclusion == 'success' ||
+          (github.event.workflow_run.name == 'Visual & A11y Tests' &&
+           github.event.workflow_run.conclusion == 'failure' &&
+           needs.failed_capture.result == 'success')) &&
          github.event.workflow_run.head_branch == 'main' &&
          github.event.workflow_run.head_repository.full_name == github.repository &&
          contains(fromJSON('["push","workflow_dispatch","workflow_run"]'), github.event.workflow_run.event)))
@@ -78,11 +145,30 @@ jobs:
       # hosted runners only). Component AND shared input bindings are required;
       # stale/legacy passes and failures both become unknown after restore.
       - name: Restore story evidence
+        if: ${{ github.event.workflow_run.conclusion != 'failure' }}
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ~/.local/state/jovie-story-evidence
           key: component-story-evidence-${{ github.run_id }}-${{ github.run_attempt }}
           restore-keys: component-story-evidence-
+      - name: Restore admitted triggering capture
+        id: admitted_capture
+        if: ${{ needs.failed_capture.result == 'success' }}
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.local/state/jovie-story-evidence
+          key: ${{ needs.failed_capture.outputs.cache-key }}
+          fail-on-cache-miss: true
+      - name: Require exact restored capture
+        if: ${{ needs.failed_capture.result == 'success' }}
+        env:
+          EXPECTED_KEY: ${{ needs.failed_capture.outputs.cache-key }}
+          MATCHED_KEY: ${{ steps.admitted_capture.outputs.cache-matched-key }}
+          CACHE_HIT: ${{ steps.admitted_capture.outputs.cache-hit }}
+        run: |
+          set -euo pipefail
+          test "$CACHE_HIT" = true
+          test "$MATCHED_KEY" = "$EXPECTED_KEY"
       - name: Install typescript only
         run: |
           set -euo pipefail
