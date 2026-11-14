@@ -1,7 +1,7 @@
+import { execFileSync } from 'node:child_process';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 import { isDeepStrictEqual } from 'node:util';
-import { execFileSync } from './child-process.mjs';
 
 export const PRODUCT_LANES = ['ios', 'mac', 'web'];
 

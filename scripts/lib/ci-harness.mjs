@@ -1,7 +1,7 @@
+import { execFileSync } from 'node:child_process';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { execFileSync } from './child-process.mjs';
 
 export const HARNESS_SCHEMA_VERSION = 1;
 export const DEFAULT_MANIFEST_PATH = '.github/ci-harness/manifest.json';
