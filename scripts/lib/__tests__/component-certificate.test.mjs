@@ -397,6 +397,7 @@ describe('component certificate CLI evidence freshness', () => {
       'scripts/lib/mutation-sweep.mjs',
       'scripts/lib/mutation-sweep-root.mjs',
       'scripts/lib/mutation-diff.mjs',
+      'scripts/lib/mutation-source.mjs',
     ]) {
       mkdirSync(dirname(join(f.root, path)), { recursive: true });
       cpSync(join(dirname(dirname(cli)), path), join(f.root, path));
