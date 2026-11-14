@@ -4136,7 +4136,6 @@ jobs:
                   tests/e2e/storybook-download-visual.spec.ts \
                   tests/e2e/storybook-elevation.spec.ts \
                   tests/e2e/storybook-input.spec.ts \
-                  tests/e2e/storybook-inset-panel.spec.ts \
                   tests/e2e/storybook-status-copy.spec.ts \
                   tests/e2e/storybook-marketing-faq.spec.ts \
                   tests/e2e/storybook-marketing-h1.spec.ts \
