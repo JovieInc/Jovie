@@ -62,6 +62,204 @@
       "a11y",
       "frontend-rules"
     ],
+    "apps/web/components/marketing/artist-profile/ArtistProfileOutcomesCarousel.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/marketing/artist-profile/ArtistProfilePhoneFrame.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/marketing/artist-profile/ArtistProfileReactivationSection.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/marketing/artist-profile/ArtistProfileSectionShell.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/marketing/artist-profile/ArtistProfileSocialProof.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/marketing/artist-profile/ArtistProfileSpecWall.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/marketing/artist-profile/CompactGlassCaptureDemo.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/marketing/artist-profile/CompactGlassModule.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/marketing/artist-profile/captureShared.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/marketing/changelog/ChangelogDayRow.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/marketing/changelog/ChangelogSubscribeColumn.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/marketing/changelog/ChangelogTimeline.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/marketing/changelog/CustomerChangelogArchive.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/marketing/homepage-v2/HomepageV2Ctas.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/marketing/homepage-v2/HomepageV2Route.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/marketing/proof/ProofMethodology.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/marketing/proof/ProofMetricGrid.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/marketing/proof/ProofRankedBarChart.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/marketing/proof/ProofStatBanner.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/marketing/storybook/StoryBlogCard.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/media/NormalizedLogoAsset.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/media/NormalizedTrustLogo.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
     "apps/web/components/molecules/ContentSectionHeader.tsx": [
       "ds-owner",
       "tokens",
@@ -101,6 +299,42 @@
       "tests",
       "a11y",
       "frontend-rules"
+    ],
+    "apps/web/components/site/Container.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/site/MarketingFinalCTA.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/site/NotFoundPageContent.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/ui/zoom-parallax.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
     ],
     "packages/ui/": [
       "ds-owner",
@@ -687,6 +921,35 @@
       "offline": "It never fetches or mutates; lost connectivity reaches it only as a capture that fails to load, which the ErrorPreviewUnavailable story shows.",
       "permission-denied": "It only frames a product capture and has no gated action or permission input; the detector matched role='img' on the fallback and 'locked' in the founder-locked recipe comment."
     },
+    "apps/web/components/marketing/artist-profile/ArtistProfileSocialProof.tsx": {
+      "permission-denied": "The section is public marketing copy with no account, role or gated action. The detector matched {quote.role}, the quoted person's job title; a closed real-quote gate renders nothing (EmptyGateClosed)."
+    },
+    "apps/web/components/marketing/artist-profile/ArtistProfileSpecWall.tsx": {
+      "permission-denied": "The spec wall is public marketing copy with no account, role or gated action. The detector matched role='img' on its decorative preview visuals."
+    },
+    "apps/web/components/marketing/changelog/ChangelogSubscribeColumn.tsx": {
+      "long-content": "The column takes no props and renders ChangelogEmailSignup's fixed copy, so there is no content to lengthen. The detector matched 'page title' in its doc comment; the signup's own states belong to ChangelogEmailSignup."
+    },
+    "apps/web/components/marketing/changelog/ChangelogTimeline.tsx": {
+      "error": "A pure presentation body: the route parses CHANGELOG.md and passes releases in, so it has no request or failure to show. The detector matched the catch in formatDate, which falls back to the raw date string, and the removed section's 'bg-error-subtle' tag class.",
+      "permission-denied": "The public changelog has no account, role or gated content. The detector matched 'founder-locked pen copy' in a casing comment."
+    },
+    "apps/web/components/marketing/changelog/CustomerChangelogArchive.tsx": {
+      "loading": "Months arrive as props from the route, so the feed never waits on data. The detector matched 'lazy loading' in the media comment; pendingTargetId is a scroll-and-focus hand-off, not a load.",
+      "offline": "The feed makes no network request: months, tombstones and technical releases are props, and filters and Load earlier run locally. The detector inferred offline only from the 'lazy loading' comment.",
+      "permission-denied": "The public changelog has no account, role or gated content. The detector matched role='status' on withdrawn-link notices and role='toolbar' on the category filter."
+    },
+    "apps/web/components/marketing/homepage-v2/HomepageV2Route.tsx": {
+      "empty": "The route takes no props and renders fixed module copy (HOMEPAGE_V2_COPY, HOMEPAGE_V2_POWER_TILES), so no collection can be empty. The detector matched 'items' and one .map over those constants.",
+      "long-content": "The route takes no props and renders fixed module copy, so there is no content to lengthen per story; each section's own long-content state lives with that section (for example HomepageV2Ctas, ArtistProfileSpecWall)."
+    },
+    "apps/web/components/media/NormalizedLogoAsset.tsx": {
+      "partial": "A presentational logo frame: its optional props are className and fit, both styling with defaults, so there is no optional content to omit. Natural and Contained stories cover both fits.",
+      "long-content": "children is one SVG logo scaled into a normalized frame, not text, so there is no content to lengthen. The detector matched 'children'."
+    },
+    "apps/web/components/media/NormalizedTrustLogo.tsx": {
+      "long-content": "Renders one registered trust logo by id; the label is the logo's aria-label, not visible text, so there is no content to lengthen. The detector matched 'label'."
+    },
     "apps/web/components/molecules/AuthActions.tsx": {
       "empty": "AuthActions always renders its fixed links (Log in and Sign up when signed out, Open App when signed in) and never a collection; the detector matched the items-center class."
     },
@@ -953,6 +1216,9 @@
     "apps/web/components/site/MarketingPageContractMarkers.tsx": {
       "long-content": "The marker is a hidden, aria-hidden metadata node read only by route-contract tests; it is never painted, so no label length can lay out or overflow.",
       "rtl-overflow": "The marker is hidden and aria-hidden and never painted, so text direction cannot affect any layout; the detector matched the CTA label attribute."
+    },
+    "apps/web/components/site/NotFoundPageContent.tsx": {
+      "long-content": "Title and description come from getNotFoundCopy(variant), a fixed two-variant table, so no story can lengthen them; the title already clamps with line-clamp-2. The detector matched 'title' and 'description'."
     },
     "apps/web/components/site/theme-toggle/ThemeToggle.tsx": {
       "empty": "ThemeToggle always offers the same three themes (system, light, dark) and renders no data collection; the detector matched the items-center class.",
