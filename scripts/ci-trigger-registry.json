@@ -118,7 +118,6 @@
     "security-suppression-audit.yml": {"runsPerMergedPr":0,"triggers":["pull_request_review:dismissed","pull_request_review:edited","workflow_call","workflow_dispatch"]},
     "security.yml": {"runsPerMergedPr":0.9,"triggers":["push","schedule","workflow_dispatch"]},
     "sentry-autofix-recurrence.yml": {"runsPerMergedPr":0.2,"triggers":["repository_dispatch:clock_sentry_autofix_recurrence","schedule","workflow_dispatch"]},
-    "sentry-autofix.yml": {"runsPerMergedPr":0,"triggers":["repository_dispatch:sentry-issue"]},
     "shipping-origin.yml": {"runsPerMergedPr":0.1,"triggers":["workflow_dispatch"]},
     "shipping-slo.yml": {"runsPerMergedPr":0,"triggers":["schedule","workflow_dispatch"]},
     "sonarcloud.yml": {"runsPerMergedPr":0.1,"triggers":["workflow_dispatch","workflow_run:Test Coverage Audit"]},

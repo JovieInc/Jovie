@@ -1,30 +1,8 @@
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it, vi } from 'vitest';
-import {
-  alreadyRecorded,
-  correlateIncident,
-  decideRecurrence,
-  fetchWithRetry,
-  isProductionEnvironment,
-  isRetryableStatus,
-  MAX_ATTEMPTS,
-  MAX_PRS_PER_RUN,
-  parseAutofixIncident,
-  parseSentryIssueId,
-  recurrenceComment,
-  retryDelayMs,
-  runSentryAutofixRecurrence,
-} from '../../sentry-autofix-recurrence.mjs';
+import { runSentryRecurrenceObservations } from '../../sentry-autofix-recurrence.mjs';
 
-const MAIN_SHA = 'a'.repeat(40);
-const MERGE_SHA = 'b'.repeat(40);
-const AUTOFIX_BODY = `## Summary
-- **Issue ID:** 1234567890
-- **Root-cause fingerprint:** fp-chat-timeout
-- **Environment:** vercel-production
-- **Release:** ${MAIN_SHA}
-- **Route:** /api/chat
-`;
+const LINEAR_API = 'https://api.linear.app/graphql';
 
 function jsonResponse(status, body) {
   return new Response(JSON.stringify(body), {
@@ -33,238 +11,68 @@ function jsonResponse(status, body) {
   });
 }
 
-describe('sentry autofix recurrence', () => {
-  it('parses incident identity from the autofix PR body', () => {
-    expect(parseAutofixIncident(AUTOFIX_BODY)).toEqual({
-      issueId: '1234567890',
-      shortId: null,
-      linearIdentifier: null,
-      fingerprint: 'fp-chat-timeout',
-      environment: 'vercel-production',
-      release: MAIN_SHA,
-      route: '/api/chat',
-    });
-    expect(parseSentryIssueId('no id here')).toBeNull();
-  });
-
-  it('waits for soak then resolves quiet issues and reopens firing ones', () => {
-    const mergedAt = '2026-08-19T00:00:00.000Z';
-    const now = new Date('2026-08-19T01:00:00.000Z');
-    expect(
-      decideRecurrence({
-        mergedAt,
-        lastSeen: '2026-08-18T23:00:00.000Z',
-        now,
-      })
-    ).toEqual({ action: 'resolve', reason: 'quiet_after_deploy' });
-    expect(
-      decideRecurrence({
-        mergedAt,
-        lastSeen: '2026-08-19T00:30:00.000Z',
-        now,
-      })
-    ).toEqual({ action: 'reopen', reason: 'still_firing' });
-    expect(
-      decideRecurrence({
-        mergedAt,
-        lastSeen: '2026-08-19T00:30:00.000Z',
-        now: new Date('2026-08-19T00:10:00.000Z'),
-      })
-    ).toEqual({ action: 'skip', reason: 'soak_pending' });
-  });
-
-  it('does not treat missing lastSeen as a green resolve', () => {
-    const mergedAt = '2026-08-19T00:00:00.000Z';
-    const now = new Date('2026-08-19T01:00:00.000Z');
-    expect(decideRecurrence({ mergedAt, lastSeen: null, now })).toEqual({
-      action: 'skip',
-      reason: 'missing_last_seen',
-    });
-    expect(decideRecurrence({ mergedAt, lastSeen: 'not-a-date', now })).toEqual(
-      { action: 'skip', reason: 'missing_last_seen' }
-    );
-  });
-
-  it('does not double-comment the same lastSeen decision', () => {
-    const comment = recurrenceComment({
-      action: 'resolve',
-      lastSeen: '2026-08-18T23:00:00.000Z',
-      issueId: '1',
-      sentryUrl: 'https://sentry.io/issues/1/',
-      currentMainSha: MAIN_SHA,
-      reason: 'quiet_after_deploy',
-    });
-    expect(comment).toContain(
-      '<!-- sentry-recurrence:resolved:2026-08-18T23:00:00.000Z -->'
-    );
-    expect(comment).toContain(MAIN_SHA);
-    expect(
-      alreadyRecorded([comment], 'resolved', '2026-08-18T23:00:00.000Z')
-    ).toBe(true);
-    expect(
-      alreadyRecorded([comment], 'reopened', '2026-08-18T23:00:00.000Z')
-    ).toBe(false);
-  });
-});
-
-describe('sentry autofix recurrence incident correlation', () => {
-  const incident = parseAutofixIncident(AUTOFIX_BODY);
-
-  it('requires production environment and current-main ancestry', () => {
-    expect(
-      correlateIncident({
-        incident: { ...incident, environment: null },
-        currentMainSha: MAIN_SHA,
-        compare: { behind_by: 0 },
-      })
-    ).toEqual({ action: 'skip', reason: 'missing_environment' });
-    expect(
-      correlateIncident({
-        incident: { ...incident, environment: 'preview' },
-        currentMainSha: MAIN_SHA,
-        compare: { behind_by: 0 },
-      })
-    ).toEqual({ action: 'skip', reason: 'non_production_environment' });
-    expect(
-      correlateIncident({
-        incident,
-        currentMainSha: MAIN_SHA,
-        compare: { behind_by: 2 },
-      })
-    ).toEqual({ action: 'skip', reason: 'not_on_current_main' });
-    expect(
-      correlateIncident({
-        incident,
-        currentMainSha: MAIN_SHA,
-        compare: { behind_by: 0 },
-      })
-    ).toEqual({ action: 'continue', reason: 'correlated' });
-  });
-
-  it('rejects fingerprint and environment mismatches from Sentry', () => {
-    expect(isProductionEnvironment('vercel-production')).toBe(true);
-    expect(
-      correlateIncident({
-        incident,
-        sentryIssue: {
-          tags: [{ key: 'environment', value: 'preview' }],
-        },
-        currentMainSha: MAIN_SHA,
-        compare: { behind_by: 0 },
-      })
-    ).toEqual({ action: 'skip', reason: 'environment_mismatch' });
-    expect(
-      correlateIncident({
-        incident,
-        sentryIssue: { metadata: { fingerprint: 'other-fp' } },
-        currentMainSha: MAIN_SHA,
-        compare: { behind_by: 0 },
-      })
-    ).toEqual({ action: 'skip', reason: 'fingerprint_mismatch' });
-  });
-});
-
-describe('sentry autofix recurrence retry bounds', () => {
-  it('retries only transient statuses up to MAX_ATTEMPTS', async () => {
-    expect(isRetryableStatus(429)).toBe(true);
-    expect(isRetryableStatus(404)).toBe(false);
-    expect(retryDelayMs(1)).toBe(1000);
-    expect(MAX_ATTEMPTS).toBe(3);
-    expect(MAX_PRS_PER_RUN).toBe(20);
-
-    const fetchImpl = vi
-      .fn()
-      .mockResolvedValueOnce(new Response('', { status: 500 }))
-      .mockResolvedValueOnce(new Response('', { status: 429 }))
-      .mockResolvedValueOnce(new Response('ok', { status: 200 }));
-    const sleepImpl = vi.fn(async () => {});
-    const response = await fetchWithRetry(
-      'https://example.test',
-      {},
-      { fetchImpl, sleepImpl }
-    );
-    expect(response.status).toBe(200);
-    expect(fetchImpl).toHaveBeenCalledTimes(3);
-    expect(sleepImpl).toHaveBeenCalledTimes(2);
-  });
-
-  it('does not retry a fourth time after the bound', async () => {
-    const fetchImpl = vi.fn(async () => new Response('', { status: 503 }));
-    const sleepImpl = vi.fn(async () => {});
-    const response = await fetchWithRetry(
-      'https://example.test',
-      {},
-      { fetchImpl, sleepImpl, maxAttempts: MAX_ATTEMPTS }
-    );
-    expect(response.status).toBe(503);
-    expect(fetchImpl).toHaveBeenCalledTimes(MAX_ATTEMPTS);
-    expect(sleepImpl).toHaveBeenCalledTimes(MAX_ATTEMPTS - 1);
-  });
-});
-
-describe('sentry autofix recurrence runner', () => {
-  it('observer-only dispatch never enters legacy PR search or unrelated Sentry status writes', async () => {
+describe('sentry recurrence observations runner', () => {
+  it('only scans observation registrations and never touches GitHub or Sentry status', async () => {
     const fetchImpl = vi.fn(async url => {
-      if (String(url) !== 'https://api.linear.app/graphql')
-        throw new Error('legacy path reached');
+      if (String(url) !== LINEAR_API) throw new Error('legacy path reached');
       return jsonResponse(200, {
         data: { issues: { nodes: [], pageInfo: { hasNextPage: false } } },
       });
     });
     expect(
-      await runSentryAutofixRecurrence({
+      await runSentryRecurrenceObservations({
         githubToken: 'gh',
         sentryToken: 'sentry',
         linearApiKey: 'linear',
-        observationsOnly: true,
         fetchImpl,
       })
-    ).toMatchObject({
-      ok: true,
-      results: [],
-      observations: { ok: true, results: [] },
-    });
+    ).toEqual({ ok: true, observations: { ok: true, results: [] } });
     expect(fetchImpl).toHaveBeenCalledTimes(1);
-    fetchImpl.mockClear();
-    expect(
-      await runSentryAutofixRecurrence({
+  });
+
+  it('fails closed without tokens or a Linear key', async () => {
+    const fetchImpl = vi.fn();
+    await expect(
+      runSentryRecurrenceObservations({ githubToken: '', fetchImpl })
+    ).resolves.toEqual({ ok: false, reason: 'missing_github_token' });
+    await expect(
+      runSentryRecurrenceObservations({
+        githubToken: 'gh',
+        sentryToken: '',
+        fetchImpl,
+      })
+    ).resolves.toEqual({ ok: false, reason: 'missing_sentry_auth_token' });
+    await expect(
+      runSentryRecurrenceObservations({
         githubToken: 'gh',
         sentryToken: 'sentry',
         linearApiKey: '',
-        observationsOnly: true,
         fetchImpl,
       })
-    ).toMatchObject({
+    ).resolves.toMatchObject({
       ok: false,
       reason: 'missing_linear_api_key',
     });
     expect(fetchImpl).not.toHaveBeenCalled();
   });
 
-  it('runs registered observations on the existing clock and surfaces an unreadable registration scan', async () => {
-    for (const readable of [true, false]) {
-      const fetchImpl = vi.fn(async url => {
-        if (String(url).includes('api.linear.app')) {
-          return jsonResponse(readable ? 200 : 401, {
-            data: { issues: { nodes: [], pageInfo: { hasNextPage: false } } },
-          });
-        }
-        if (String(url).includes('/commits/main'))
-          return jsonResponse(200, { sha: MAIN_SHA });
-        if (String(url).includes('/search/issues'))
-          return jsonResponse(200, { items: [] });
-        return jsonResponse(404, {});
-      });
-      const result = await runSentryAutofixRecurrence({
-        githubToken: 'github-fixture',
-        sentryToken: 'sentry-fixture',
-        linearApiKey: 'linear-fixture',
-        fetchImpl,
-      });
-      expect(result.ok).toBe(readable);
-      expect(result.observations).toMatchObject({ ok: readable, results: [] });
-      if (!readable) expect(result.reason).toBe('linear_http_401');
-    }
+  it('surfaces an unreadable registration scan as red', async () => {
+    const fetchImpl = vi.fn(async () =>
+      jsonResponse(401, {
+        data: { issues: { nodes: [], pageInfo: { hasNextPage: false } } },
+      })
+    );
+    const result = await runSentryRecurrenceObservations({
+      githubToken: 'github-fixture',
+      sentryToken: 'sentry-fixture',
+      linearApiKey: 'linear-fixture',
+      fetchImpl,
+    });
+    expect(result).toMatchObject({
+      ok: false,
+      reason: 'linear_http_401',
+      observations: { ok: false, results: [] },
+    });
   });
 
   it('propagates a pending-artifact deferral as a non-failing deferred run', async () => {
@@ -282,259 +90,51 @@ describe('sentry autofix recurrence runner', () => {
       })),
     }));
     try {
-      const { runSentryAutofixRecurrence } = await import(
+      const { runSentryRecurrenceObservations: run } = await import(
         '../../sentry-autofix-recurrence.mjs'
       );
-      const fetchImpl = vi.fn(async url => {
-        if (String(url).includes('/commits/main'))
-          return jsonResponse(200, { sha: MAIN_SHA });
-        if (String(url).includes('/search/issues'))
-          return jsonResponse(200, { items: [] });
-        return jsonResponse(404, {});
-      });
       expect(
-        await runSentryAutofixRecurrence({
+        await run({
           githubToken: 'gh',
           sentryToken: 'sentry',
           linearApiKey: 'linear',
-          observationsOnly: true,
-          fetchImpl,
+          fetchImpl: vi.fn(),
         })
-      ).toMatchObject({ ok: true, results: [], deferred });
-      expect(
-        await runSentryAutofixRecurrence({
-          githubToken: 'gh',
-          sentryToken: 'sentry',
-          linearApiKey: 'linear',
-          fetchImpl,
-        })
-      ).toMatchObject({ ok: true, currentMainSha: MAIN_SHA, deferred });
+      ).toMatchObject({ ok: true, deferred });
     } finally {
       vi.doUnmock('../../lib/sentry-validation-observation.mjs');
       vi.resetModules();
     }
   });
-
-  it('fails closed without tokens and on a malformed search payload', async () => {
-    await expect(
-      runSentryAutofixRecurrence({ githubToken: '' })
-    ).resolves.toEqual({ ok: false, reason: 'missing_github_token' });
-    await expect(
-      runSentryAutofixRecurrence({
-        githubToken: 'gh',
-        sentryToken: '',
-      })
-    ).resolves.toEqual({ ok: false, reason: 'missing_sentry_auth_token' });
-
-    const fetchImpl = vi.fn(async url => {
-      const path = String(url);
-      if (path.includes('/commits/main')) {
-        return jsonResponse(200, { sha: MAIN_SHA });
-      }
-      if (path.includes('/search/issues')) {
-        return jsonResponse(200, { items: null });
-      }
-      return jsonResponse(500, {});
-    });
-    await expect(
-      runSentryAutofixRecurrence({
-        githubToken: 'gh',
-        sentryToken: 'sentry',
-        fetchImpl,
-        sleepImpl: async () => {},
-      })
-    ).resolves.toEqual({ ok: false, reason: 'github_search_malformed' });
-  });
-
-  it('resolves a quiet current-main incident and skips false-green holes', async () => {
-    const fetchImpl = vi.fn(async (url, init) => {
-      const path = String(url);
-      const method = String(init?.method ?? 'GET');
-      if (path.includes('/commits/main')) {
-        return jsonResponse(200, { sha: MAIN_SHA });
-      }
-      if (path.includes('/search/issues')) {
-        return jsonResponse(200, {
-          items: [
-            {
-              number: 11,
-              html_url: 'https://github.com/JovieInc/Jovie/pull/11',
-            },
-            {
-              number: 12,
-              html_url: 'https://github.com/JovieInc/Jovie/pull/12',
-            },
-          ],
-        });
-      }
-      if (path.endsWith('/pulls/11')) {
-        return jsonResponse(200, {
-          body: AUTOFIX_BODY,
-          merged_at: '2026-08-19T00:00:00.000Z',
-          merge_commit_sha: MERGE_SHA,
-        });
-      }
-      if (path.endsWith('/pulls/12')) {
-        return jsonResponse(200, {
-          body: AUTOFIX_BODY.replace('1234567890', '999'),
-          merged_at: '2026-08-19T00:00:00.000Z',
-          merge_commit_sha: MERGE_SHA,
-        });
-      }
-      if (path.includes('/compare/')) {
-        return jsonResponse(200, { behind_by: 0, status: 'ahead' });
-      }
-      if (path.endsWith('/issues/1234567890/') && method === 'GET') {
-        return jsonResponse(200, {
-          status: 'unresolved',
-          lastSeen: '2026-08-18T23:00:00.000Z',
-          permalink: 'https://sentry.io/issues/1234567890/',
-          tags: [{ key: 'environment', value: 'vercel-production' }],
-          metadata: { fingerprint: 'fp-chat-timeout' },
-        });
-      }
-      if (path.endsWith('/issues/999/') && method === 'GET') {
-        return jsonResponse(200, {
-          status: 'unresolved',
-          lastSeen: null,
-          permalink: 'https://sentry.io/issues/999/',
-          tags: [{ key: 'environment', value: 'vercel-production' }],
-        });
-      }
-      if (path.includes('/issues/11/comments') && method === 'GET') {
-        return jsonResponse(200, []);
-      }
-      if (path.endsWith('/issues/1234567890/') && method === 'PUT') {
-        return jsonResponse(200, { status: 'resolved' });
-      }
-      if (path.includes('/issues/11/comments') && method === 'POST') {
-        return jsonResponse(201, { id: 1 });
-      }
-      return jsonResponse(404, {});
-    });
-
-    const result = await runSentryAutofixRecurrence({
-      githubToken: 'gh',
-      sentryToken: 'sentry',
-      now: new Date('2026-08-19T01:00:00.000Z'),
-      fetchImpl,
-      sleepImpl: async () => {},
-    });
-
-    expect(result.ok).toBe(true);
-    expect(result.currentMainSha).toBe(MAIN_SHA);
-    expect(result.results).toEqual([
-      {
-        pr: 11,
-        issueId: '1234567890',
-        action: 'resolve',
-        reason: 'quiet_after_deploy',
-      },
-      {
-        pr: 12,
-        issueId: '999',
-        action: 'skip',
-        reason: 'missing_last_seen',
-      },
-    ]);
-    const put = fetchImpl.mock.calls.find(
-      ([url, init]) =>
-        String(url).endsWith('/issues/1234567890/') &&
-        String(init?.method) === 'PUT'
-    );
-    expect(JSON.parse(String(put[1].body))).toEqual({ status: 'resolved' });
-  });
 });
 
 describe('sentry recurrence CLI artifacts', () => {
-  it.each([
-    ['', '', false, 'missing_github_token'],
-    ['github-fixture', '', false, 'missing_sentry_auth_token'],
-    ['github-fixture', 'sentry-fixture', true, 'missing_linear_api_key'],
-  ])(
-    'preserves a red JSON result for %s / %s / %s',
-    async (github, sentry, observationsOnly, reason) => {
-      const previousEntry = process.argv[1];
-      const previousExitCode = process.exitCode;
-      const log = vi.spyOn(console, 'log').mockImplementation(() => {});
-      const error = vi.spyOn(console, 'error').mockImplementation(() => {});
-      const exit = vi.spyOn(process, 'exit').mockImplementation(() => {
-        throw new Error('Immediate exit would truncate the CLI artifact');
-      });
-      try {
-        vi.stubEnv('GH_TOKEN', github);
-        vi.stubEnv('SENTRY_AUTH_TOKEN', sentry);
-        vi.stubEnv('LINEAR_API_KEY', '');
-        vi.stubEnv(
-          'SENTRY_RECURRENCE_OBSERVATIONS_ONLY',
-          observationsOnly ? '1' : ''
-        );
-        process.argv[1] = fileURLToPath(
-          new URL('../../sentry-autofix-recurrence.mjs', import.meta.url)
-        );
-        vi.resetModules();
-        await import('../../sentry-autofix-recurrence.mjs');
-        await vi.waitFor(() => expect(error).toHaveBeenCalledWith(reason));
-        expect(log).toHaveBeenCalledTimes(1);
-        const result = JSON.parse(log.mock.calls[0][0]);
-        expect(result).toMatchObject({ ok: false, reason });
-        if (observationsOnly) {
-          expect(result.observations).toEqual({
-            ok: false,
-            results: [],
-            reason,
-          });
-        }
-        expect(process.exitCode).toBe(1);
-        expect(exit).not.toHaveBeenCalled();
-      } finally {
-        process.argv[1] = previousEntry;
-        process.exitCode = previousExitCode;
-        vi.unstubAllEnvs();
-        log.mockRestore();
-        error.mockRestore();
-        exit.mockRestore();
-        vi.resetModules();
-      }
-    }
-  );
-
-  it('keeps the successful CLI result machine-readable without a failure exit', async () => {
+  async function runCli(env, fetchImpl) {
     const previousEntry = process.argv[1];
     const previousExitCode = process.exitCode;
     const log = vi.spyOn(console, 'log').mockImplementation(() => {});
     const error = vi.spyOn(console, 'error').mockImplementation(() => {});
     const exit = vi.spyOn(process, 'exit').mockImplementation(() => {
-      throw new Error('Successful CLI must not exit immediately');
-    });
-    const fetchImpl = vi.fn(async url => {
-      if (String(url).includes('/commits/main'))
-        return jsonResponse(200, { sha: MAIN_SHA });
-      if (String(url).includes('/search/issues'))
-        return jsonResponse(200, { items: [] });
-      throw new Error('Unexpected CLI request');
+      throw new Error('Immediate exit would truncate the CLI artifact');
     });
     try {
-      vi.stubEnv('GH_TOKEN', 'github-fixture');
-      vi.stubEnv('SENTRY_AUTH_TOKEN', 'sentry-fixture');
-      vi.stubEnv('LINEAR_API_KEY', undefined);
-      vi.stubEnv('SENTRY_RECURRENCE_OBSERVATIONS_ONLY', '');
-      vi.stubGlobal('fetch', fetchImpl);
+      for (const [key, value] of Object.entries(env)) vi.stubEnv(key, value);
+      if (fetchImpl) vi.stubGlobal('fetch', fetchImpl);
       process.argv[1] = fileURLToPath(
         new URL('../../sentry-autofix-recurrence.mjs', import.meta.url)
       );
       vi.resetModules();
       await import('../../sentry-autofix-recurrence.mjs');
       await vi.waitFor(() => expect(log).toHaveBeenCalledTimes(1));
-      expect(JSON.parse(log.mock.calls[0][0])).toEqual({
-        ok: true,
-        currentMainSha: MAIN_SHA,
-        results: [],
-      });
-      expect(error).not.toHaveBeenCalled();
-      expect(exit).not.toHaveBeenCalled();
-      expect(process.exitCode).toBe(previousExitCode);
-      expect(fetchImpl).toHaveBeenCalledTimes(2);
+      // main() reports a red result on the next tick, after the JSON line.
+      await new Promise(resolve => setTimeout(resolve, 0));
+      return {
+        result: JSON.parse(log.mock.calls[0][0]),
+        errors: [...error.mock.calls],
+        exitCode: process.exitCode,
+        previousExitCode,
+        exited: exit.mock.calls.length > 0,
+      };
     } finally {
       process.argv[1] = previousEntry;
       process.exitCode = previousExitCode;
@@ -545,5 +145,49 @@ describe('sentry recurrence CLI artifacts', () => {
       exit.mockRestore();
       vi.resetModules();
     }
+  }
+
+  it.each([
+    ['', '', 'missing_github_token'],
+    ['github-fixture', '', 'missing_sentry_auth_token'],
+    ['github-fixture', 'sentry-fixture', 'missing_linear_api_key'],
+  ])(
+    'preserves a red JSON result for %s / %s',
+    async (github, sentry, reason) => {
+      const run = await runCli({
+        GH_TOKEN: github,
+        SENTRY_AUTH_TOKEN: sentry,
+        LINEAR_API_KEY: '',
+      });
+      expect(run.result).toMatchObject({ ok: false, reason });
+      expect(run.errors).toEqual([[reason]]);
+      expect(run.exitCode).toBe(1);
+      expect(run.exited).toBe(false);
+    }
+  );
+
+  it('keeps the successful CLI result machine-readable without a failure exit', async () => {
+    const fetchImpl = vi.fn(async url => {
+      if (String(url) !== LINEAR_API) throw new Error('Unexpected CLI request');
+      return jsonResponse(200, {
+        data: { issues: { nodes: [], pageInfo: { hasNextPage: false } } },
+      });
+    });
+    const run = await runCli(
+      {
+        GH_TOKEN: 'github-fixture',
+        SENTRY_AUTH_TOKEN: 'sentry-fixture',
+        LINEAR_API_KEY: 'linear-fixture',
+      },
+      fetchImpl
+    );
+    expect(run.result).toEqual({
+      ok: true,
+      observations: { ok: true, results: [] },
+    });
+    expect(run.errors).toEqual([]);
+    expect(run.exitCode).toBe(run.previousExitCode);
+    expect(run.exited).toBe(false);
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
   });
 });

@@ -199,7 +199,18 @@ async function verifyHomeWelcome(page: Page) {
       });
       const { initialGreeting, before } = await openHomeWelcome(page);
       await expect(heading).toHaveText(initialGreeting!);
-      const after = await input.boundingBox();
+      // Same chunk-swap race as the helper's `before` read: re-read the box
+      // until the mounted composer yields a real one, never a single sample.
+      let after: import('@playwright/test').BoundingBox | null = null;
+      await expect
+        .poll(
+          async () => {
+            after = await input.boundingBox();
+            return after;
+          },
+          { timeout: 15_000, message: 'mounted composer box' }
+        )
+        .not.toBeNull();
       expect(before).not.toBeNull();
       expect(after).not.toBeNull();
       if (before && after) {

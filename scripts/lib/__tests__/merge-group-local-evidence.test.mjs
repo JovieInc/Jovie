@@ -1,4 +1,3 @@
-import { execFileSync } from 'node:child_process';
 import {
   chmodSync,
   mkdirSync,
@@ -11,6 +10,7 @@ import { tmpdir } from 'node:os';
 import { delimiter, join, resolve } from 'node:path';
 import { load } from 'js-yaml';
 import { describe, expect, it } from 'vitest';
+import { execFileSync } from '../child-process.mjs';
 import {
   parseLsTreeLong,
   parseNumstatZ,

@@ -71,7 +71,11 @@ export function censusFindings(
       JSON.parse(readFileSync(join(root, census.CENSUS_PATH), 'utf8')),
     readPrevious = () => {
       const git = args =>
-        execFileSync('git', args, { cwd: root, encoding: 'utf8' });
+        execFileSync('git', args, {
+          maxBuffer: 256 * 1024 * 1024,
+          cwd: root,
+          encoding: 'utf8',
+        });
       // An absent file on the base is the initial census.
       return git([
         'ls-tree',
