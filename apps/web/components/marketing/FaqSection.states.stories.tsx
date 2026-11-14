@@ -9,7 +9,7 @@ const meta: Meta<typeof FaqSection> = {
   parameters: { layout: 'fullscreen' },
   decorators: [
     Story => (
-      <div className='mx-auto w-[min(42rem,calc(100vw-2rem))] bg-base p-6 text-primary-token'>
+      <div className='mx-auto w-full max-w-2xl bg-base p-6 text-primary-token'>
         <Story />
       </div>
     ),

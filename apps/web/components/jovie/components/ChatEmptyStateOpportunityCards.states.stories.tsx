@@ -27,7 +27,7 @@ const meta = {
   args: { cards: [], onSelect: fn() },
   decorators: [
     Story => (
-      <div className='w-[28rem] max-w-full p-4'>
+      <div className='w-full max-w-md max-w-full p-4'>
         <Story />
       </div>
     ),

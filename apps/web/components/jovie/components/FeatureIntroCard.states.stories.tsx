@@ -10,7 +10,7 @@ const meta = {
   parameters: { layout: 'centered', nextjs: { appDirectory: true } },
   decorators: [
     Story => (
-      <div className='w-[360px] max-w-full p-4'>
+      <div className='w-90 max-w-full p-4'>
         <Story />
       </div>
     ),
