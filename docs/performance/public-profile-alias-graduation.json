@@ -1,12 +1,12 @@
 {
   "schema": "jovie-public-profile-alias-graduation/v2",
   "repository": "JovieInc/Jovie",
-  "measuredAt": "2026-10-31T06:00:00Z",
+  "measuredAt": "2026-11-10T06:00:00Z",
   "selection": {
     "workflowPath": ".github/workflows/production-controller.yml",
-    "since": "2026-10-27T06:00:00Z",
-    "cutoff": "2026-10-31T06:00:00Z",
-    "enumeratedControllers": 246,
+    "since": "2026-11-06T06:00:00Z",
+    "cutoff": "2026-11-10T06:00:00Z",
+    "enumeratedControllers": 248,
     "windowSize": 14,
     "eligibility": "completed controllers and completed measurement steps by cutoff, regardless of controller conclusion; partial measurements consume a nonqualifying slot",
     "order": "measurement job completedAt descending, controllerRunId descending"
@@ -17,43 +17,43 @@
     "p95Estimator": "nearest-rank",
     "thresholdMs": 1500,
     "requiredConsecutiveRuns": 14,
-    "nextReviewAt": "2026-11-07T06:00:00Z",
+    "nextReviewAt": "2026-11-17T06:00:00Z",
     "trackingIssue": "JOV-8737"
   },
   "evidence": {
     "inventory": "generated/public-profile-alias-controller-inventory.jsonl",
-    "inventorySha256": "297a8c4d6c2eba1388d670fd309edd968373f593f1e093dc81f683541dc1cfd7",
+    "inventorySha256": "88b12ea9c8f6e3c5ca4f907b57b93dc6a37f6f26fd9a894bd8b435fac24690ad",
     "measurements": "generated/public-profile-alias-measurements.jsonl",
-    "measurementsSha256": "6527e35e8d17f4ca2901808e1515afadb9fd584835cef6623d181114d3ce706f"
+    "measurementsSha256": "1347fffeae310306f93a9d43b5e123d51c299564a2a89fb3bd2ff6312934059c"
   },
   "windows": {
     "production": {
       "surface": "production-canonical-alias",
-      "job": "Production Release / Production public-profile alias usable-result gate",
+      "job": "Production public-profile alias usable-result gate",
       "step": "Gate canonical public-profile aliases on usable results",
       "selectedJobIds": [
-        124441088711, 124435712092, 124428732384, 124422006319, 124405991691,
-        124397752926, 124386959341, 124376821256, 124297883322, 124281270957,
-        124266641702, 124233559202, 124214309172, 124183449382
+        129653717257, 129641711864, 129634592041, 129627469776, 129610704808,
+        129602564752, 129586313367, 129573766438, 129564633034, 129551801647,
+        129537719907, 129523285759, 129513884807, 129498095812
       ],
-      "qualifyingRunsInWindow": 14,
-      "consecutiveQualifyingRuns": 14,
-      "graduated": true,
-      "decision": "block"
+      "qualifyingRunsInWindow": 0,
+      "consecutiveQualifyingRuns": 0,
+      "graduated": false,
+      "decision": "warn"
     },
     "staging": {
       "surface": "staging-exact-build",
       "job": "Production Release / Promote to Production",
       "step": "Prove canonical navigation budgets on exact staged build",
       "selectedJobIds": [
-        124432228621, 124425163168, 124402028788, 124393150007, 124382912242,
-        124371862405, 124364879243, 124357617142, 124350903624, 124342955112,
-        124333982929, 124325177217, 124288207842, 124274291981
+        129645543467, 129614222499, 129594592797, 129577347161, 129556752420,
+        129542568927, 129529000721, 129503688545, 129487762254, 129438560380,
+        129318284294, 129295421543, 129230094244, 129209691032
       ],
-      "qualifyingRunsInWindow": 14,
-      "consecutiveQualifyingRuns": 14,
-      "graduated": true,
-      "decision": "block"
+      "qualifyingRunsInWindow": 5,
+      "consecutiveQualifyingRuns": 0,
+      "graduated": false,
+      "decision": "warn"
     }
   }
 }

@@ -35,6 +35,7 @@ import {
   runWithRealGh,
   storedZip,
 } from '../real-gh-harness.mjs';
+import { assertAliasWriter } from './alias-writer-fixture.mjs';
 
 vi.mock('node:child_process', async importOriginal => {
   const actual = /** @type {typeof import('node:child_process')} */ (
@@ -69,6 +70,10 @@ const DEPLOYMENT_URL = 'https://jovie-exact-generation-jovie.vercel.app';
 const tempRoots = [];
 
 describe('public-profile alias graduation policy', () => {
+  it(
+    'writes formatter-clean receipts and preserves evidence',
+    assertAliasWriter
+  );
   it('reproduces each independent window from the complete controller inventory', () => {
     const receipt = PUBLIC_PROFILE_ALIAS_GRADUATION;
     const { policy, selection, evidence, windows } = receipt;
@@ -328,7 +333,7 @@ describe('public-profile alias graduation policy', () => {
           jobs: [
             {
               id: id * 10,
-              name: 'Production Release / Production public-profile alias usable-result gate',
+              name: 'Production public-profile alias usable-result gate',
               status: 'completed',
               conclusion: 'success',
               completed_at: at,
