@@ -140,7 +140,10 @@ const registry = readJson(values.registry, { policy: {}, waivers: {} });
 const policy = { ...DEFAULT_POLICY, ...(registry.policy ?? {}) };
 const mutation =
   readJson(values['mutation-state'], { modules: {} }).modules ?? {};
-const { a11y, visual, renderInputs } = loadStoryReceipts(root, values);
+const { a11y, visual, renderInputs, renderInputsFor } = loadStoryReceipts(
+  root,
+  values
+);
 const journeyMap = readJson(values.journeys, { components: {}, journeys: {} });
 const benchmarks =
   readJson(values.benchmarks, { components: {} }).components ?? {};
@@ -264,6 +267,7 @@ const certificates = list.map(c => {
     packagesUi: c.sourceRel.startsWith('packages/ui/'),
     evidence: {
       renderInputs,
+      componentRenderInputs: renderInputsFor(c.sourceRel),
       mutation: mutation[mutationStateKey(c.sourceRel)],
       a11y: a11y[c.sourceRel],
       visual: visual[c.sourceRel],

@@ -81,3 +81,39 @@ console.log(JSON.stringify({ revision, components: reference.totals.components,
 console.log(`Temporary evidence: ${temp}`);
 JS
 ```
+
+## Story evidence: keeping it fast
+
+Story evidence (the `visual` and `a11y` criteria) used to bind every receipt to
+one digest over all render inputs, so any merge to main staled every receipt
+and the next run recaptured everything. Receipts now bind to each component's
+own render closure (`jovie.component-render-inputs/v2`,
+`scripts/lib/component-render-closure.mjs`): the component file, its story
+files, everything they import, Storybook alias mocks, and a small shared set
+(the Storybook preview and its imports, global CSS, configs, package manifests
+and the lockfile). An import the graph cannot resolve, or a dynamic import,
+falls back to the old global digest for that component only, so it fails
+closed.
+
+`visual-a11y.yml` runs it in three steps. **Plan** restores the last evidence,
+builds a static story index, keeps every receipt whose source and closure are
+unchanged, and sizes up to 20 capture shards for the rest at about 400 renders
+each. **Capture** runs those shards in parallel. **Merge** joins the shards
+with the reused receipts, saves the cache the certificate restores, and
+reports the run against its budget: a cold run within 15 minutes, an
+incremental one within 6. Over budget warns; it never fails.
+
+Measured on main at `5bf11983` (Nov 14): 1,376 components, 1,279 with stories,
+9,472 renders. Binding takes about 1.5 s and planning 3 s. Over the last 60
+main commits, 27 touched render inputs: v1 recaptured all 1,376 components on
+each, v2 about 205 on average. Keep it that way:
+
+- Keep the shared set small. Files the preview imports reach every receipt, so
+  import from a module's own file (`@jovie/ui/atoms/button`), never a barrel,
+  in anything `.storybook/preview.tsx` reaches.
+- Ship certification fixes as batch PRs by area (one PR for dozens of
+  components), never one PR per component. Each merge then costs one
+  incremental run, not one per component.
+- Watch the plan line in the run summary. If `reused` stays low after a quiet
+  merge, a file has crept into the shared set: trace it with
+  `componentRenderBindings(root, paths).stats.shared`.

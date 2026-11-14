@@ -734,7 +734,7 @@ export function renderAgentSpec(
   return [
     `# Certify ${cert.component}`,
     '',
-    'Goal: make every criterion below pass so the component certificate reports certified. One small PR; UI fast lane if the diff stays visual-only (labels ui + fast and a Fast-track UI eligibility section with Why eligible, Before, After, Checks run).',
+    'Goal: make every criterion below pass so the component certificate reports certified. Batch it: ship this with the other components of its area in one PR, not a PR per component; UI fast lane if the diff stays visual-only (labels ui + fast and a Fast-track UI eligibility section with Why eligible, Before, After, Checks run).',
     '',
     '## Missing criteria',
     ...cert.missing.map(m => `- [${m.criterion}] ${m.reason}. Do: ${m.how}`),

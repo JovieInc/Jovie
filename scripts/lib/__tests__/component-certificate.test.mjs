@@ -392,6 +392,8 @@ describe('component certificate CLI evidence freshness', () => {
       'scripts/lib/component-evidence.mjs',
       'scripts/lib/component-render-inputs.mjs',
       'scripts/lib/component-story-receipts.mjs',
+      'scripts/lib/component-render-closure.mjs',
+      'scripts/lib/component-story-evidence-lib.mjs',
       'scripts/lib/design-rules/forced-caps.mjs',
       'scripts/lib/design-rules/raw-colors.mjs',
       'scripts/lib/mutation-sweep.mjs',
