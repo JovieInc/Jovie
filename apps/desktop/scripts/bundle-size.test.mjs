@@ -54,7 +54,11 @@ test('trusted baseline lookup from desktop cwd preserves shrink-only enforcement
   const file = path.join(cwd, 'scripts/bundle-size.json');
   const baseline = { 'main.js': 200, 'preload.js': 100 };
   const git = (...args) =>
-    execFileSync('git', args, { cwd: root, stdio: 'pipe' });
+    execFileSync('git', args, {
+      maxBuffer: 256 * 1024 * 1024,
+      cwd: root,
+      stdio: 'pipe',
+    });
   try {
     await mkdir(path.dirname(file), { recursive: true });
     git('init', '-q');
