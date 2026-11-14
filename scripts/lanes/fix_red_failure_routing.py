@@ -6,6 +6,18 @@ import json
 import re
 import subprocess
 
+# A local TS2307 can mean a prerequisite has landed on main while the PR is
+# BLOCKED rather than BEHIND. Use the existing one-sync-per-head route before
+# asking a model to recreate modules. Unresolved errors still fall back to it.
+LOCAL_MODULE_PREREQUISITE = re.compile(
+    r"\b[\w./-]+\.[cm]?[jt]sx?\(\d+,\d+\): error TS2307: "
+    r"Cannot find module ['\"]@/[\w./-]+['\"]")
+
+def has_local_prerequisite_failure(route, logs):
+    """A compiler failure stays out of infrastructure retries even in a mixed route."""
+    return any(LOCAL_MODULE_PREREQUISITE.search(logs.get(name) or "") for name in route["checks"])
+
+
 ALIAS_ACTION = 'alias-graduation-owner'
 COLLECTOR = 'scripts/lib/public-profile-alias-graduation.mjs'
 _ALIAS_ERROR = re.compile(
@@ -13,6 +25,8 @@ _ALIAS_ERROR = re.compile(
     r'\d{4}-\d\d-\d\dT[\d:.]+Z \((?P<issue>JOV-[1-9]\d*)\) '
     r'and its \d+h grace ended \d{4}-\d\d-\d\dT[\d:.]+Z; re-review and refresh it\.')
 _ANSI = re.compile(r'\x1b\[[0-9;]*m')
+# `gh run view --log-failed` prefixes each line `job \t step \t` before the timestamp.
+_LOG_FAILED_PREFIX = re.compile(r'^[^\t]+\t[^\t]+\t(?=\d{4}-\d\d-\d\dT|##\[error\])')
 _HOLD = re.compile(r'class=deterministic-source;n=[1-9]\d*;run=([1-9]\d*);try=([1-9]\d*)')
 _SHA = re.compile(r'[0-9a-f]{40}')
 _ROLLUPS = {'ci-fast', 'PR Ready', 'Product Lane Receipt'}
@@ -47,6 +61,7 @@ class RouteBudgetGrowth:
         clean = _ANSI.sub('', str(text or ''))
         matches = []
         for line in clean.splitlines():
+            line = _LOG_FAILED_PREFIX.sub('', line, count=1)
             match = _BUDGET_GROWTH_LINE.fullmatch(line)
             if match:
                 if float(match[2]) <= float(match[1]):

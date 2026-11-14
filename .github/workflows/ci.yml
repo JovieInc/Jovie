@@ -7223,7 +7223,7 @@ jobs:
         env:
           PROFILE_CERT_DIR: ${{ runner.temp }}/canonical-artist-site/profile
           PROFILE_RESULT: ${{ runner.temp }}/canonical-artist-site/profile-result.json
-        run: mkdir -p "$(dirname "$PROFILE_RESULT")" && pnpm --filter=@jovie/web exec tsx scripts/certify-artist-profile.ts --output "$PROFILE_CERT_DIR" > "$PROFILE_RESULT" && cat "$PROFILE_RESULT"
+        run: mkdir -p "$(dirname "$PROFILE_RESULT")" && pnpm --filter=@jovie/web exec sh -c 'exec tsx scripts/certify-artist-profile.ts --output "$PROFILE_CERT_DIR" > "$PROFILE_RESULT"' && cat "$PROFILE_RESULT"
 
       - name: Verify live canonical profile navigation
         id: canonical_navigation
