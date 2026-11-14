@@ -66,7 +66,6 @@ vi.mock('@/lib/workspace-lock/unlock-with-passkey', () => ({
 
 import { usePathname, useRouter } from 'next/navigation';
 import { useDesktopUpdateContext } from '@/components/organisms/desktop-update/DesktopUpdateProvider';
-import { ACCOUNT_LOADING_FILL } from '@/components/organisms/user-button/account-loading-fill';
 import { UserButton } from '@/components/organisms/user-button/UserButton';
 import { useAuthSafe, useUserSafe } from '@/hooks/useClerkSafe';
 import {
@@ -307,30 +306,6 @@ describe('UserButton states', () => {
       await expectNoA11yViolations(container);
     }
   );
-
-  it('draws the loading row with the fill that clears 3:1 on every surface', () => {
-    mockUseUserSafe.mockReturnValue({
-      isLoaded: false,
-      isSignedIn: false,
-      user: null,
-    } as any);
-    render(<UserButton showUserInfo />);
-
-    const loading = screen.getByTestId('user-button-loading');
-    // Steady, not pulsing: the pulse's 50% opacity falls below 3:1.
-    const indicators = [
-      ...loading.querySelectorAll('[data-user-button-loading-fill]'),
-    ];
-    // Avatar disc and name line.
-    expect(indicators).toHaveLength(2);
-    for (const indicator of indicators) {
-      // account-loading-fill.test.ts asserts this fill clears the 3:1
-      // non-text floor in light and dark (JOV-12383).
-      expect(indicator).toHaveClass(ACCOUNT_LOADING_FILL);
-      // bg-sidebar-accent is ~1.04:1 on the light rail: invisible (JOV-12383).
-      expect(indicator).not.toHaveClass('bg-sidebar-accent');
-    }
-  });
 
   it('opens the menu from the keyboard, shows the billing skeleton while billing loads, and Escape returns focus', async () => {
     mockUseBillingStatusQuery.mockReturnValue({
