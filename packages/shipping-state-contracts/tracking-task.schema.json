@@ -1,0 +1,146 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "tracking-task.schema.json",
+  "title": "TrackingTask",
+  "description": "Shared tracking row for ovie.shipping-state.v1 consumers (Jovie web, Ovie, Mac). Linear is canonical; identity is linear:JOV-*. Missing data is unknown — never zero, done, or queued.",
+  "type": "object",
+  "$defs": {
+    "TrackingStatus": {
+      "type": "string",
+      "enum": [
+        "queued",
+        "running",
+        "in-review",
+        "blocked",
+        "done",
+        "failed",
+        "cancelled"
+      ]
+    },
+    "TrackingExecutorKind": {
+      "type": "string",
+      "enum": [
+        "codex-cloud",
+        "hyperagent",
+        "local",
+        "github-actions",
+        "unknown"
+      ]
+    },
+    "TrackingContainer": {
+      "type": "object",
+      "description": "Where the work is actually executing. Null on the task means unknown — never invent 'local'.",
+      "properties": {
+        "kind": { "$ref": "#/$defs/TrackingExecutorKind" },
+        "id": { "type": ["string", "null"] },
+        "label": { "type": ["string", "null"] },
+        "url": { "type": ["string", "null"], "format": "uri" }
+      },
+      "required": ["kind", "id", "label", "url"],
+      "additionalProperties": false
+    },
+    "ChecksRollup": {
+      "type": "string",
+      "enum": ["success", "failure", "pending", "unknown"]
+    },
+    "TrackingPullRequest": {
+      "type": "object",
+      "properties": {
+        "number": { "type": "integer", "minimum": 1 },
+        "url": { "type": ["string", "null"], "format": "uri" },
+        "checksRollup": { "$ref": "#/$defs/ChecksRollup" }
+      },
+      "required": ["number", "url", "checksRollup"],
+      "additionalProperties": false
+    },
+    "LaneAgent": {
+      "type": "string",
+      "enum": [
+        "codex",
+        "devin",
+        "glm",
+        "grok",
+        "opus",
+        "cursor",
+        "sonnet",
+        "fable"
+      ]
+    },
+    "OperationalTaskPriority": {
+      "type": "string",
+      "enum": ["urgent", "high", "medium", "low", "none"]
+    },
+    "OperationalTaskWorkflowState": {
+      "type": "string",
+      "enum": [
+        "queued",
+        "running",
+        "retrying",
+        "blocked",
+        "in-review",
+        "merge-queued",
+        "merged",
+        "production-verified"
+      ]
+    }
+  },
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^linear:.+$",
+      "description": "Stable cross-presentation identity. Linear remains the canonical owner."
+    },
+    "linearIdentifier": { "type": "string", "examples": ["JOV-5248"] },
+    "linearUrl": { "type": ["string", "null"], "format": "uri" },
+    "title": { "type": "string" },
+    "status": { "$ref": "#/$defs/TrackingStatus" },
+    "statusDetail": {
+      "type": ["string", "null"],
+      "description": "Presentation qualifier, e.g. 'Retrying', 'Merge queued', 'Production verified'."
+    },
+    "workflowState": {
+      "oneOf": [
+        { "$ref": "#/$defs/OperationalTaskWorkflowState" },
+        { "type": "null" }
+      ]
+    },
+    "container": {
+      "oneOf": [{ "$ref": "#/$defs/TrackingContainer" }, { "type": "null" }]
+    },
+    "showCodexMark": {
+      "type": "boolean",
+      "description": "True iff container.kind === 'codex-cloud'. A codex/ branch prefix alone never sets it."
+    },
+    "agent": {
+      "oneOf": [
+        { "$ref": "#/$defs/LaneAgent" },
+        { "type": "string" },
+        { "type": "null" }
+      ]
+    },
+    "pullRequest": {
+      "oneOf": [{ "$ref": "#/$defs/TrackingPullRequest" }, { "type": "null" }]
+    },
+    "updatedAt": {
+      "type": ["string", "null"],
+      "format": "date-time"
+    },
+    "priority": { "$ref": "#/$defs/OperationalTaskPriority" }
+  },
+  "required": [
+    "id",
+    "linearIdentifier",
+    "linearUrl",
+    "title",
+    "status",
+    "statusDetail",
+    "workflowState",
+    "container",
+    "showCodexMark",
+    "agent",
+    "pullRequest",
+    "updatedAt",
+    "priority"
+  ],
+  "additionalProperties": false
+}
