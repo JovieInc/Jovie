@@ -39,3 +39,47 @@ export const FallbackOnly: Story = {
     fallback: 'Solo Artist',
   },
 };
+
+/** Every entry is blank, so normalization leaves only the fallback. */
+export const EmptyBlankNames: Story = {
+  args: {
+    names: ['', '  '],
+    fallback: 'Tim White',
+  },
+};
+
+/** Blank entries and an exact duplicate drop out of an otherwise full line. */
+export const PartialBlankAndDuplicate: Story = {
+  args: {
+    names: ['Vigel', '', ' Vigel ', 'Tim White'],
+  },
+};
+
+/** Many long credits wrap inside a narrow byline. */
+export const LongContentManyCredits: Story = {
+  args: {
+    names: [
+      'The Los Angeles After Hours Orchestra',
+      'Cosmic Gate',
+      'Vigel',
+      'Tim White',
+      'Sunrise Set Collective',
+      'Midnight Radio',
+    ],
+    className: 'block max-w-64 text-sm text-primary-token',
+  },
+};
+
+/** Hebrew credits inside a right-to-left page. */
+export const Rtl: Story = {
+  args: {
+    names: ['עופר לב', 'שלמה ארצי', 'Tim White'],
+  },
+  decorators: [
+    Story => (
+      <div dir='rtl' lang='he'>
+        <Story />
+      </div>
+    ),
+  ],
+};

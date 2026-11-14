@@ -7,7 +7,7 @@
 
 export const SCHEMA = 'jovie-cheap-fixer-receipt/v1';
 export const CLAIM_HOST = 'cheap-fixer';
-export const CLAIM_TTL_S = 2 * 3600; // same TTL as scripts/lanes/pr_events.py CLAIM_TTL_S
+export const CLAIM_TTL_S = 60 * 60; // same TTL as scripts/lanes/pr_events.py CLAIM_TTL_S
 export const LIMITS = Object.freeze({
   maxFiles: 3,
   maxChangedLines: 60,

@@ -48,7 +48,7 @@ export function ProofClaimCtaLink({
 
 export function proofClaimFooterClassName(className?: string): string {
   return cn(
-    'inline-flex min-h-6 items-center gap-2 text-sm font-medium tracking-normal text-white/88 transition-colors duration-subtle hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 focus-visible:ring-offset-2 focus-visible:ring-offset-transparent',
+    'inline-flex min-h-6 items-center gap-2 text-sm font-medium tracking-normal text-on-media/88 transition-colors duration-subtle hover:text-on-media focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-on-media/70 focus-visible:ring-offset-2 focus-visible:ring-offset-transparent',
     className
   );
 }

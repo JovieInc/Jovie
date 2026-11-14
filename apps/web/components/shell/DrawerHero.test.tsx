@@ -153,3 +153,17 @@ describe('DrawerHero', () => {
     );
   });
 });
+
+describe('DrawerHero scale tokens', () => {
+  it('keeps type and size utilities on scale tokens instead of arbitrary values', async () => {
+    const { readFileSync } = await import('node:fs');
+    const { join } = await import('node:path');
+    const source = readFileSync(
+      join(import.meta.dirname, 'DrawerHero.tsx'),
+      'utf8'
+    );
+
+    expect(source).not.toMatch(/leading-\[16px\]/);
+    expect(source).toContain('leading-4');
+  });
+});

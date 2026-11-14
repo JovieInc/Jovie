@@ -19,7 +19,8 @@ export const Count: Story = {
   },
 };
 
-export const CountOverflow: Story = {
+/** A count past two digits collapses to 99+ and keeps the badge compact. */
+export const OverflowCount: Story = {
   args: {
     variant: 'count',
     count: '99+',
@@ -36,4 +37,35 @@ export const New: Story = {
   args: {
     variant: 'new',
   },
+};
+
+/** Callers pass zero when nothing is waiting; the badge still keeps its size. */
+export const EmptyZeroCount: Story = {
+  args: {
+    variant: 'count',
+    count: 0,
+  },
+};
+
+/** A long, unabbreviated count stays on one compact line. */
+export const LongContentCount: Story = {
+  args: {
+    variant: 'count',
+    count: '1,284',
+  },
+};
+
+export const RtlCount: Story = {
+  args: {
+    variant: 'count',
+    count: '٣',
+  },
+  decorators: [
+    Story => (
+      <div dir='rtl' lang='ar' className='flex items-center gap-2 text-sm'>
+        المحادثات
+        <Story />
+      </div>
+    ),
+  ],
 };

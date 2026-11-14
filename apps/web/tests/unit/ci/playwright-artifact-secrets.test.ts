@@ -40,6 +40,7 @@ import {
   MAX_PLAYWRIGHT_PNG_WIDTH,
   validPlaywrightPng,
 } from '../../../../../scripts/lib/playwright-png.mjs';
+import { allowanceEnabled } from './artifact-allowance';
 import productionSmokeProducers from './fixtures/production-smoke-producers.json';
 
 const webRoot = resolve(import.meta.dirname, '../../..');
@@ -130,11 +131,6 @@ const producerStageRequired = [
   'synthetic-monitoring.yml:synthetic-test',
   'visual-regression.yml:visual-regression',
 ];
-// Reviewed image/Markdown allowances; any flag except explicit false can opt in.
-const allowanceEnabled = (value: unknown) =>
-  value !== undefined &&
-  value !== false &&
-  !['', 'false'].includes(String(value));
 const imageAllowedJobs = new Set([
   'ci.yml:ci-fast-remaining',
   'ci.yml:ci-golden-path',
@@ -146,9 +142,12 @@ const imageAllowedJobs = new Set([
   'ci.yml:ci-visual-marketing-routes',
   // Manual public-profile CTA identity captures only (dispatch-gated flag).
   'e2e-full-matrix.yml:e2e-full-matrix',
+  'product-crawl.yml:crawl',
   'screenshots.yml:generate',
   'synthetic-monitoring.yml:synthetic-test',
   'visual-regression.yml:visual-regression',
+  // Founder-approved homepage-*.png only, same render as the compare job.
+  'visual-regression.yml:approved-homepage-baselines',
 ]);
 const markdownAllowedJobs = new Set([
   'ci.yml:ci-build-layout',

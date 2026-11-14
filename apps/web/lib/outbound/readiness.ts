@@ -6,6 +6,8 @@
  * to clear", so every item reports a count or a state that can shrink.
  */
 
+import { EXISTING_RELATIONSHIP_LABEL } from '@/lib/leads/existing-relationships';
+
 export type ReadinessStatus = 'green' | 'red' | 'unknown' | 'info';
 
 export interface ReadinessItem {
@@ -61,6 +63,8 @@ export interface ReadinessInputs {
     readonly certified: number;
     readonly approved: number;
     readonly needsProfile: number;
+    /** Held out of cold outreach by the existing-relationship registry. */
+    readonly relationshipHeld?: number;
   } | null;
   readonly evidence: {
     readonly built: number;
@@ -193,7 +197,11 @@ export function buildOutboundReadiness(
         : 'red',
     detail: !queue
       ? 'Outbound queue could not be read.'
-      : `${queue.ready} ready to certify · ${queue.needsEvidence} need evidence (${queue.needsProfile} waiting on a profile build) · ${queue.flagged} flagged · ${queue.certified} certified · ${queue.approved} approved`,
+      : `${queue.ready} ready to certify · ${queue.needsEvidence} need evidence (${queue.needsProfile} waiting on a profile build) · ${queue.flagged} flagged · ${queue.certified} certified · ${queue.approved} approved${
+          queue.relationshipHeld
+            ? ` · ${queue.relationshipHeld} held: ${EXISTING_RELATIONSHIP_LABEL}`
+            : ''
+        }`,
     owner: 'Tim',
     href: '/app/ov/outbound',
   });

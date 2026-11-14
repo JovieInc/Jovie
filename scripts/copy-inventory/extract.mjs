@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 // Copy inventory: every visible copy line on the public marketing routes as a
 // row {id, route, section, role, text, source}. IDs are short and speakable
-// ("HOME-3") and stable: they are assigned once, keyed on the source (file +
-// text, or a content-record field), and committed in ids.gen.json. Re-running
-// never renumbers; new lines get the next free number for their prefix.
+// ("HOME-3") and stable, keyed on the source (file + text, or a content-record
+// field). ids.gen.json pins the IDs that predate hashing and is read-only; new
+// lines get a number from a hash of their key (ids.mjs), so PRs never edit it.
 //
 //   node scripts/copy-inventory/extract.mjs          # write inventory + ids
 //   node scripts/copy-inventory/extract.mjs --check  # exit 1 if stale
@@ -12,6 +12,7 @@ import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { isDeepStrictEqual } from 'node:util';
 import ts from 'typescript';
+import { createAssigner } from './ids.mjs';
 import { ROUTES, SITE_CHROME } from './routes.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -390,18 +391,7 @@ function recordSlots() {
 
 export function buildInventory(registry = { ids: {} }) {
   const recordMap = recordSlots();
-  const ids = { ...registry.ids }; // key -> ID
-  const counters = {};
-  for (const id of Object.values(ids)) {
-    const [, p, n] = /^(.+)-(\d+)$/.exec(id) ?? [];
-    if (p) counters[p] = Math.max(counters[p] ?? 0, Number(n));
-  }
-  const assign = (prefix, key) => {
-    if (!ids[key])
-      ids[key] =
-        `${prefix}-${(counters[prefix] = (counters[prefix] ?? 0) + 1)}`;
-    return ids[key];
-  };
+  const { assign, ids } = createAssigner(registry.ids); // key -> ID
 
   const claimed = new Set();
   const rows = [];
@@ -474,18 +464,14 @@ function main() {
   const registry = existsSync(IDS_PATH)
     ? JSON.parse(read(IDS_PATH))
     : { ids: {} };
-  const { rows, registry: next } = buildInventory(registry);
-  const sortedIds = Object.fromEntries(
-    Object.entries(next.ids).sort(([a], [b]) => a.localeCompare(b))
-  );
-  const idsOut = stable({ ids: sortedIds });
+  const { rows } = buildInventory(registry);
   const outJson = stable({ schema: 1, count: rows.length, rows });
   if (check) {
+    // inventory.gen.json is untracked (repo byte budget); verify only if present.
+    // ids.gen.json is read-only pins, so it is never stale.
     const stale =
-      // inventory.gen.json is untracked (repo byte budget); verify only if present.
-      (existsSync(OUT_PATH) &&
-        !isDeepStrictEqual(JSON.parse(read(OUT_PATH)), JSON.parse(outJson))) ||
-      !isDeepStrictEqual(JSON.parse(read(IDS_PATH)), JSON.parse(idsOut));
+      existsSync(OUT_PATH) &&
+      !isDeepStrictEqual(JSON.parse(read(OUT_PATH)), JSON.parse(outJson));
     if (stale) {
       console.error(
         'copy inventory is stale: run node scripts/copy-inventory/extract.mjs'
@@ -494,7 +480,6 @@ function main() {
     }
     return;
   }
-  writeFileSync(IDS_PATH, idsOut);
   writeFileSync(OUT_PATH, outJson);
   const per = {};
   for (const r of rows) per[r.route] = (per[r.route] ?? 0) + 1;

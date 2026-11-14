@@ -118,13 +118,13 @@ describe('lanes coverage matrix legs', () => {
   });
 
   it('keeps the floors file as the single source for the combined report', () => {
-    expect(LANES_COVERAGE_FLOORS).toHaveLength(23);
+    expect(LANES_COVERAGE_FLOORS).toHaveLength(26);
     for (const { include, floor } of LANES_COVERAGE_FLOORS) {
       expect(LANES_COVERAGE_COMMAND).toContain(
         `--include="${include}" --fail-under=${floor}`
       );
     }
-    expect(LANES_COVERAGE_COMMAND.match(/--fail-under=/g)?.length).toBe(23);
+    expect(LANES_COVERAGE_COMMAND.match(/--fail-under=/g)?.length).toBe(26);
   });
 
   it('runs no leg command and reports a clean skip on a web-only head', async () => {

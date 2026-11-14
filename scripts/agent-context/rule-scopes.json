@@ -40,7 +40,7 @@
       "scripts/setup*",
       ".codex/**"
     ],
-    "bodySha256": "e9c46b96f7549ccf1a2c9a380c6cae1497bda7c6e10c9ae8e957ae7944e62d7e"
+    "bodySha256": "62b91cddba6fb6b74cb0e43f37691238fc0c88eb0e13cb30d092ca2d7369ff54"
   },
   {
     "file": ".claude/rules/event-driven.md",
@@ -78,6 +78,21 @@
     "file": ".claude/rules/hermes-air.md",
     "paths": ["docs/HERMES_AIR.md"],
     "bodySha256": "8f3fe75a0a77dd812481cbea13e7e2fabf83b95d48af9f5646b2fc9a2fc725f0"
+  },
+  {
+    "file": ".claude/rules/hermetic-ci.md",
+    "paths": [
+      "**/*.test.*",
+      "**/*.spec.*",
+      "**/tests/**",
+      "**/test_*.py",
+      "**/vitest.config.*",
+      "**/playwright.config.*",
+      ".github/workflows/**",
+      ".github/actions/**",
+      ".github/scripts/**"
+    ],
+    "bodySha256": "ab6e1ef736a3788ac1fba123dd562ca3a26007affe6331fe2badd74b5ddb55f1"
   },
   {
     "file": ".claude/rules/infra.md",
@@ -166,7 +181,7 @@
       "docs/PR_FLOW.md",
       "RELEASE_CHECKLIST.md"
     ],
-    "bodySha256": "27411ea8a3d2c412e00e5c29831ad6bb4d99a5632381e533840dbc5731b6f0dd"
+    "bodySha256": "f566f0df3d70659a7146b7388695f74745fef4fd459484e86dd9707d5b2c76e4"
   },
   {
     "file": ".claude/rules/security.md",
@@ -214,7 +229,7 @@
       "**/vitest.config.*",
       "**/playwright.config.*"
     ],
-    "bodySha256": "b435ddb3d1618cd410c0dd3200197fec57c537bf4bfa91dc72abbfb8c1e05ce7"
+    "bodySha256": "44e87934ad88433f125cae3c7666c7eece49b4043e2d459ebffb60a91e0c6383"
   },
   {
     "file": ".claude/rules/ui.md",

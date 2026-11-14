@@ -8,6 +8,7 @@ const mocks = vi.hoisted(() => ({
   getFounderFunnelData: vi.fn(),
   getFounderFunnelStageRows: vi.fn(),
   getLeadFunnelCounts: vi.fn(),
+  getPmfMetrics: vi.fn(),
   requireAccess: vi.fn(),
 }));
 
@@ -71,6 +72,14 @@ vi.mock('@/lib/admin/founder-funnel', () => ({
       'paid',
     ].includes(value as string),
 }));
+vi.mock('@/lib/admin/pmf-metrics', () => ({
+  getPmfMetrics: mocks.getPmfMetrics,
+}));
+vi.mock('@/components/features/admin/leads/PmfMetricsPanel', () => ({
+  PmfMetricsPanel: ({ metrics }: { metrics: unknown }) => (
+    <div>{metrics ? 'PMF metric ready' : 'PMF metric unavailable'}</div>
+  ),
+}));
 vi.mock('@/lib/admin/page-access', () => ({
   requireCurrentAdminPageAccess: mocks.requireAccess,
 }));
@@ -85,6 +94,20 @@ describe('AdminGrowthPage', () => {
     }));
     mocks.getCanonicalContactMetrics.mockResolvedValue({});
     mocks.getArtistOfferFunnelReport.mockResolvedValue({ goldenPath: {} });
+    mocks.getPmfMetrics.mockResolvedValue({ surveyResponses: 0 });
+  });
+
+  it('shows the PMF metric, and an honest error when it cannot be read', async () => {
+    const { default: AdminGrowthPage } = await import('./page');
+    const ok = render(
+      await AdminGrowthPage({ searchParams: Promise.resolve({}) })
+    );
+    expect(screen.getByText('PMF metric ready')).toBeInTheDocument();
+    ok.unmount();
+
+    mocks.getPmfMetrics.mockResolvedValue(null);
+    render(await AdminGrowthPage({ searchParams: Promise.resolve({}) }));
+    expect(screen.getByText('PMF metric unavailable')).toBeInTheDocument();
   });
 
   it('shows the golden path funnel, and an honest error when it cannot be read', async () => {

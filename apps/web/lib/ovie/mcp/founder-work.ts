@@ -206,6 +206,70 @@ export function createFounderWorkReader(deps: FounderWorkDeps) {
         .filter((issue): issue is NonNullable<typeof issue> => issue !== null);
     },
 
+    /**
+     * JOV issues per window, one aliased request (company history). A window
+     * at `first` or more comes back null: the count is not known.
+     */
+    async countLinearIssuesInWindows(
+      field: 'createdAt' | 'completedAt',
+      windows: readonly { gte: string; lt: string }[],
+      first = 250
+    ): Promise<(number | null)[]> {
+      if (windows.length === 0) return [];
+      const fields = windows
+        .map(
+          (_, i) => `w${i}: issues(first: $first, includeArchived: true,
+            filter: { team: { key: { eq: "JOV" } }, ${field}: { gte: $g${i}, lt: $l${i} } }
+          ) { nodes { id } pageInfo { hasNextPage } }`
+        )
+        .join('\n');
+      const params = windows
+        .map(
+          (_, i) => `$g${i}: DateTimeOrDuration!, $l${i}: DateTimeOrDuration!`
+        )
+        .join(', ');
+      const variables: Record<string, unknown> = { first };
+      windows.forEach((w, i) => {
+        variables[`g${i}`] = w.gte;
+        variables[`l${i}`] = w.lt;
+      });
+      type Page = { nodes?: unknown[]; pageInfo?: { hasNextPage?: boolean } };
+      const data = await linearGraphql<Record<string, Page | undefined>>(
+        `query OvieJovieIssueCounts($first: Int!, ${params}) { ${fields} }`,
+        variables
+      );
+      return windows.map((_, i) => {
+        const page = data[`w${i}`];
+        if (!page || !Array.isArray(page.nodes)) return null;
+        return page.pageInfo?.hasNextPage ? null : page.nodes.length;
+      });
+    },
+
+    /** GitHub Actions runs on JovieInc/Jovie matching a REST filter; total_count only. */
+    async countGithubWorkflowRuns(filter: {
+      readonly created: string;
+      readonly status?: 'failure' | 'success';
+    }): Promise<number> {
+      const query = new URLSearchParams({
+        created: filter.created,
+        per_page: '1',
+        ...(filter.status ? { status: filter.status } : {}),
+      });
+      const payload = asRecord(
+        await githubJson(
+          `/repos/JovieInc/Jovie/actions/runs?${query.toString()}`
+        )
+      );
+      const total = payload?.total_count;
+      if (
+        typeof total !== 'number' ||
+        !Number.isSafeInteger(total) ||
+        total < 0
+      )
+        throw new Error('GitHub workflow run count was not a number');
+      return total;
+    },
+
     async listGithubPullRequests(state: OvieWorkListState, limit: number) {
       const query = new URLSearchParams({
         state,

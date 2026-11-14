@@ -1,6 +1,7 @@
 import { and, sql as drizzleSql, eq } from 'drizzle-orm';
 import type { Metadata } from 'next';
 import Link from 'next/link';
+import { notFound } from 'next/navigation';
 import { BASE_URL } from '@/constants/app';
 import { db } from '@/lib/db';
 import { joviePlaylists } from '@/lib/db/schema/playlists';
@@ -52,6 +53,9 @@ export default async function MoodHubPage({
   const { mood } = await params;
   const decoded = safeDecodeURIPathComponent(mood);
   const playlists = await getPlaylistsByMood(mood);
+  // No published playlist carries this mood: a hub for any typed word would
+  // be an empty, indexable page titled with that word.
+  if (playlists.length === 0) notFound();
 
   return (
     <div className='mx-auto max-w-6xl px-4 py-16'>

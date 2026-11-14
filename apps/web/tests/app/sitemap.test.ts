@@ -77,6 +77,7 @@ vi.mock('@/lib/db/schema/content', () => ({
   discogReleaseTracks: {
     releaseId: 'releaseId',
     recordingId: 'recordingId',
+    slug: 'releaseTrackSlug',
   },
   providerLinks: {
     ownerType: 'ownerType',
@@ -187,18 +188,21 @@ describe('sitemap', () => {
       .mockResolvedValueOnce([
         {
           username: 'tim',
+          recordingId: 'recording-album',
           slug: 'album',
           releaseSlug: 'album',
           updatedAt: new Date('2026-01-03'),
         },
         {
           username: 'tim',
+          recordingId: 'recording-album',
           slug: 'album',
           releaseSlug: 'best-of',
           updatedAt: new Date('2026-01-03'),
         },
         {
           username: 'tim',
+          recordingId: 'recording-single',
           slug: 'single',
           releaseSlug: 'single-release',
           updatedAt: new Date('2026-01-04'),
@@ -209,8 +213,9 @@ describe('sitemap', () => {
 
     const { default: sitemap } = await import('../../app/sitemap');
     const entries = await sitemap();
+    const urls = entries.map(entry => entry.url);
 
-    expect(entries.map(entry => entry.url)).toEqual(
+    expect(urls).toEqual(
       expect.arrayContaining([
         'https://jov.ie',
         'https://jov.ie/blog',
@@ -237,16 +242,9 @@ describe('sitemap', () => {
       ])
     );
 
-    const albumMatches = entries.filter(
-      entry => entry.url === 'https://jov.ie/tim/album'
-    );
-    expect(albumMatches).toHaveLength(1);
-    expect(entries.map(entry => entry.url)).not.toContain(
-      'https://jov.ie/tim/best-of/album'
-    );
-    expect(entries.map(entry => entry.url)).not.toContain(
-      'https://jov.ie/tim/single'
-    );
+    expect(urls.filter(u => u === 'https://jov.ie/tim/album')).toHaveLength(1);
+    expect(urls).not.toContain('https://jov.ie/tim/best-of/album');
+    expect(urls).not.toContain('https://jov.ie/tim/single');
 
     for (const blockedUrl of [
       'https://jov.ie/demo',

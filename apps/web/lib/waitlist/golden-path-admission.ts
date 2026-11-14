@@ -25,7 +25,8 @@ export type GoldenPathAdmissionReason =
   | 'hold_capacity_full'
   | 'hold_auto_accept_disabled'
   | 'hold_outranked'
-  | 'hold_open_learnings';
+  | 'hold_open_learnings'
+  | 'hold_support_load';
 
 export interface GoldenPathAdmissionInput {
   /** Server-confirmed Spotify artist id (confirmSpotifyArtist output). */

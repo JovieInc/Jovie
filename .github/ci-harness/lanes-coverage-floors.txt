@@ -17,7 +17,7 @@
 */scripts/lanes/devin_free_policy.py	85
 */scripts/lanes/claude_lane.py	95
 */scripts/lanes/codex_lane.py	85
-*/scripts/lanes/cloud_lane.py	90
+*/scripts/lanes/cloud_lane*.py	90
 */scripts/lanes/worktree_sweep.py	85
 */scripts/lanes/service_census.py	85
 */scripts/lanes/epics.py	90
@@ -27,3 +27,6 @@
 */scripts/lanes/dependency_diff.py	95
 */scripts/lanes/remediation.py	85
 */scripts/lanes/model_radar.py	90
+*/scripts/lanes/model_pools.py	95
+*/scripts/lanes/model_pool_guard.py	95
+*/scripts/lanes/model_pool_calls.py	95

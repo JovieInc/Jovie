@@ -193,3 +193,41 @@ export const Geometry: Story = {
     </div>
   ),
 };
+
+/** No value yet: the placeholder carries the prompt. */
+export const EmptyHandle: Story = {
+  args: {
+    density: 'compact',
+    label: 'Edit Proposed Handle',
+  },
+  play: async ({ canvasElement }) => {
+    const input = canvasElement.querySelector<HTMLInputElement>(
+      'input[aria-label="Edit Proposed Handle"]'
+    );
+    await expect(input).toHaveValue('');
+    await expect(input).toHaveAttribute('placeholder', 'Edit Proposed Handle');
+  },
+};
+
+/** A long pasted URL scrolls inside the field; the owner keeps its width. */
+export const LongContentUrl: Story = {
+  args: {
+    density: 'compact',
+    label: 'Social Profile URL',
+    defaultValue:
+      'https://www.instagram.com/an.unusually.long.artist.handle.with.many.parts/?utm_source=linktree&utm_medium=social',
+  },
+};
+
+export const RtlPicker: Story = {
+  args: {
+    density: 'picker',
+    label: 'Search Spotify artists',
+    defaultValue: 'فيروز',
+  },
+  render: args => (
+    <div dir='rtl'>
+      <FieldPreview {...args} />
+    </div>
+  ),
+};

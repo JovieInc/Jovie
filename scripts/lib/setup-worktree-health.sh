@@ -92,6 +92,23 @@ jovie_setup_pnpm_pin_ok() {
   [[ "$(pnpm --version 2>/dev/null || true)" == "9.15.9" ]]
 }
 
+# Workflows already depend on paginated JSON aggregation. Probe help locally so
+# an installed but incompatible CLI is diagnosed before expensive checks.
+# Keep gh optional when absent, as in setup.sh's existing auth guidance.
+jovie_setup_gh_api_slurp_ok() {
+  local gh_path api_help
+  gh_path="$(command -v gh)" || return 0
+  if api_help="$("$gh_path" api --help 2>/dev/null)" &&
+    grep -Eq '^[[:space:]]*--slurp([[:space:]]|$)' <<<"$api_help"; then
+    return 0
+  fi
+  printf '%s\n' \
+    "${1:-ERROR}: GitHub CLI at $gh_path must support --slurp for its api command." \
+    'Upgrade this existing installation with its package manager (brew upgrade gh or winget upgrade GitHub.cli), or put a supported gh first on PATH.' \
+    "Verify offline with: \"$gh_path\" api --help (must list --slurp)." >&2
+  return 1
+}
+
 jovie_setup_worktree_healthy() {
   local repo_root="${1:-${REPO_ROOT:?REPO_ROOT is required}}"
   local fingerprint previous fingerprint_file
@@ -141,4 +158,35 @@ jovie_setup_ensure_pinned_node() {
   export PATH="$dir/bin:$PATH"
   [[ -z "${CLAUDE_ENV_FILE:-}" ]] || printf 'export PATH=%q:"$PATH"\n' "$dir/bin" >>"$CLAUDE_ENV_FILE"
   jovie_setup_node_pin_ok "$repo_root"
+}
+
+# Make the Chromium build that the repo's pinned Playwright drives ready for
+# screenshots and e2e, or say in one line why it cannot be. Never fails the
+# caller: a missing browser must not block a session that does not render.
+# Cheap when the browser is already there (one node resolve, no download).
+jovie_setup_playwright_chromium() {
+  local repo_root="${1:-${REPO_ROOT:-.}}" web exe
+  web="$repo_root/apps/web"
+  exe="$(cd "$web" 2>/dev/null && node -e "process.stdout.write(require('@playwright/test').chromium.executablePath())" 2>/dev/null)" || exe=""
+  if [[ -z "$exe" ]]; then
+    echo "Playwright Chromium: not checked (@playwright/test does not resolve; install dependencies first)."
+    return 0
+  fi
+  if [[ -x "$exe" ]]; then
+    echo "Playwright Chromium: ready ($exe)."
+    return 0
+  fi
+  # The environment says not to fetch browsers (often with a dead
+  # PLAYWRIGHT_DOWNLOAD_HOST); respect it rather than reach for another source.
+  if [[ "${PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD:-}" == 1 ]]; then
+    echo "WARNING: Playwright Chromium is missing at $exe and this environment disables browser downloads (PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1). Screenshots and e2e cannot render here; capture them in CI (pr-visual-review, screenshots workflows)."
+    return 0
+  fi
+  echo "Installing Playwright Chromium for screenshots and e2e..."
+  if (cd "$web" && pnpm exec playwright install chromium) && [[ -x "$exe" ]]; then
+    echo "Playwright Chromium: ready ($exe)."
+  else
+    echo "WARNING: Playwright Chromium install failed; screenshots and e2e cannot render in this session."
+  fi
+  return 0
 }

@@ -1,22 +1,53 @@
 #!/usr/bin/env node
 import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
-import { evaluateCustomerNoteContract } from './lib/daily-changelog-publication.mjs';
+import { parseArgs } from 'node:util';
+import { customerNoteCopyProblems } from './lib/changelog-filter-rules.mjs';
+import {
+  evaluateCustomerNoteContract,
+  readCustomerNote,
+} from './lib/daily-changelog-publication.mjs';
 import {
   QUOTA_DEFERRED_MARKER,
   runWithGitHubRetry,
 } from './lib/github-rate-limit.mjs';
 
-const event = process.env.GITHUB_EVENT_PATH
-  ? JSON.parse(readFileSync(process.env.GITHUB_EVENT_PATH, 'utf8'))
-  : {};
-const pr = event.pull_request;
-if (pr) {
+// Local preflight reuses the hosted contract without GitHub calls or writes.
+// Supply a REST PR snapshot and optionally the body proposed for --body-file.
+const { values } = parseArgs({
+  options: {
+    'pr-file': { type: 'string' },
+    'body-file': { type: 'string' },
+  },
+});
+const local = values['pr-file'] !== undefined;
+if ((local || values['body-file']) && process.env.GITHUB_ACTIONS === 'true')
+  throw new Error(
+    'Local preflight arguments are unavailable in GitHub Actions'
+  );
+if (values['body-file'] && !local)
+  throw new Error('--body-file requires --pr-file');
+const event =
+  !local && process.env.GITHUB_EVENT_PATH
+    ? JSON.parse(readFileSync(process.env.GITHUB_EVENT_PATH, 'utf8'))
+    : {};
+const pr = local
+  ? JSON.parse(readFileSync(values['pr-file'], 'utf8'))
+  : event.pull_request;
+if (local || pr) {
   if (
-    !/^[a-f0-9]{40}$/.test(pr.base?.sha ?? '') ||
-    !/^[a-f0-9]{40}$/.test(pr.head?.sha ?? '')
+    !/^[a-f0-9]{40}$/.test(pr?.base?.sha ?? '') ||
+    !/^[a-f0-9]{40}$/.test(pr?.head?.sha ?? '')
   )
     throw new Error('Missing exact PR revision evidence');
+  if (
+    local &&
+    execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim() !==
+      pr.head.sha
+  )
+    throw new Error(
+      'Local HEAD differs from PR snapshot; refresh exact-head evidence'
+    );
   const files = execFileSync(
     'git',
     ['diff', '--name-only', `${pr.base.sha}...${pr.head.sha}`],
@@ -31,7 +62,9 @@ if (pr) {
   // reported as github-quota-deferred at once (no runner held waiting for the
   // reset); Lane Fix Relay re-runs it instead of queueing repair.
   let current = { head: pr.head, body: pr.body };
-  if (process.env.GITHUB_RUN_ATTEMPT !== '1') {
+  if (local && values['body-file'])
+    current.body = readFileSync(values['body-file'], 'utf8');
+  if (!local && process.env.GITHUB_RUN_ATTEMPT !== '1') {
     const read = await runWithGitHubRetry(
       [
         'gh',
@@ -63,6 +96,16 @@ if (pr) {
   if (!verdict.passed)
     throw new Error(
       `Customer outcome decision missing or invalid (${verdict.reason}). This PR changes customer-facing code (apps/web/{app,components/features,lib}, apps/ios Swift, apps/desktop/src), so its body needs one marker. Internal work: add the line <!-- customer-changelog/v1 {"releaseWorthy":false} --> to the PR body (the PR template already has it). Customer-visible work: see docs/CHANGELOG_PUBLICATION.md for the releaseWorthy:true form with availability.`
+    );
+  // Headline and wording rules for release-worthy markers in PRs created
+  // after the lint landed; older PRs keep the contract they were admitted under.
+  const copyProblems = customerNoteCopyProblems(
+    readCustomerNote(current.body).note,
+    pr.created_at
+  );
+  if (copyProblems.length)
+    throw new Error(
+      `Customer changelog copy needs a rewrite. Fix the "text" of the customer-changelog/v1 marker in the PR body, then re-run Source Validation:\n${copyProblems.map(problem => `  - ${problem}`).join('\n')}\nRule and examples: docs/CHANGELOG_PUBLICATION.md ("Headlines").`
     );
   process.stdout.write(`${JSON.stringify(verdict)}\n`);
 }

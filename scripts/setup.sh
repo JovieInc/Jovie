@@ -268,6 +268,8 @@ fi
 # shellcheck source=lib/setup-worktree-health.sh
 . "$REPO_ROOT/scripts/lib/setup-worktree-health.sh"
 
+jovie_setup_gh_api_slurp_ok WARNING || true
+
 # Repair the linked-worktree-local setting before the first ordinary Git
 # command. A primary checkout with core.bare=true otherwise makes even
 # `git rev-parse` fail inside every linked worktree.
@@ -288,12 +290,9 @@ hash_dependency_inputs() {
   jovie_setup_hash_dependency_inputs "$REPO_ROOT"
 }
 
-# Warm SessionStart skip. Claude and Codex both call this script on every
-# session. When the worktree is already healthy (deps fingerprint matches,
-# Node 24.21.0+, pnpm 9.15.9), do not rerun Doppler/gh/Clerk/migration/lsof.
-# Cold or stale worktrees fall through to the full body. Codex gbrain sync
-# is not part of this script and still runs after we return.
-# Force the full body with JOVIE_SETUP_FORCE=1.
+# Warm SessionStart skips auth/migration/cache work when dependencies and
+# Node/pnpm pins match. Codex gbrain sync still runs after setup returns.
+# Cold/stale worktrees and JOVIE_SETUP_FORCE=1 run the full body.
 if jovie_setup_worktree_healthy "$REPO_ROOT"; then
   SETUP_DURATION_SECONDS=$(( $(date +%s) - SETUP_START_SECONDS ))
   success "Worktree already healthy — skipped setup body (${SETUP_DURATION_SECONDS}s)"

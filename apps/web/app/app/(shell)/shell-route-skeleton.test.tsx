@@ -2,9 +2,10 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { cleanup, render, screen, within } from '@testing-library/react';
 import { isValidElement, type ReactElement } from 'react';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { APP_ROUTES } from '@/constants/routes';
 import { RightPanelProvider } from '@/contexts/RightPanelContext';
+import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import { CalendarRouteSkeleton } from './calendar/CalendarRouteSkeleton';
 import { LibraryLoadingState } from './library/LibraryLoadingState';
 import { LinksPageClient } from './links/LinksPageClient';
@@ -18,6 +19,10 @@ import {
 } from './profiles/ProfilesRouteSkeleton';
 import { SettingsRouteSkeleton } from './settings/SettingsRouteSkeleton';
 import { resolveShellRouteSkeleton } from './shell-route-skeleton';
+import {
+  LibraryLoadingStateLazy,
+  ProfilesRouteSkeletonLazy,
+} from './shell-route-table-skeletons';
 import { TourDatesRouteSkeleton } from './tour-dates/TourDatesRouteSkeleton';
 
 const shellDirectory = __dirname;
@@ -34,15 +39,46 @@ describe('resolveShellRouteSkeleton', () => {
     [APP_ROUTES.CALENDAR, CalendarRouteSkeleton],
     [APP_ROUTES.LINKS, LinksRouteSkeleton],
     [APP_ROUTES.DASHBOARD_LINKS, LinksRouteSkeleton],
-    [APP_ROUTES.PRESENCE, ProfilesRouteSkeleton],
-    [APP_ROUTES.PROFILES, ProfilesRouteSkeleton],
+    [APP_ROUTES.PRESENCE, ProfilesRouteSkeletonLazy],
+    [APP_ROUTES.PROFILES, ProfilesRouteSkeletonLazy],
     [APP_ROUTES.TOUR_DATES, TourDatesRouteSkeleton],
     [APP_ROUTES.SETTINGS_ACCOUNT, SettingsRouteSkeleton],
     [APP_ROUTES.SETTINGS_PROFILE, SettingsRouteSkeleton],
     [APP_ROUTES.EARNINGS, SettingsRouteSkeleton],
-    [APP_ROUTES.LIBRARY, LibraryLoadingState],
+    [APP_ROUTES.LIBRARY, LibraryLoadingStateLazy],
   ])('gives %s its own route-shaped skeleton', (pathname, expected) => {
     expect(skeletonType(pathname)).toBe(expected);
+  });
+
+  it('keeps the full table out of the shell boot bundle', () => {
+    // The shell layout imports this module for every shell route, so a
+    // static import of a skeleton that renders UnifiedTable ships TanStack
+    // Table and the virtualizer to chat and every other route.
+    const source = readFileSync(
+      join(shellDirectory, 'shell-route-skeleton.tsx'),
+      'utf8'
+    );
+    expect(source).not.toMatch(/from '\.\/library\/LibraryLoadingState'/);
+    expect(source).not.toMatch(/from '\.\/profiles\/ProfilesRouteSkeleton'/);
+    expect(source).not.toMatch(/from '\.\/dashboard\/releases\/loading'/);
+    expect(source).not.toMatch(/organisms\/table/);
+  });
+
+  it.each([['Loading Profiles', <ProfilesRouteSkeletonLazy key='profiles' />]])(
+    'renders the lazy %s skeleton once its chunk loads',
+    async (label, element) => {
+      render(element);
+      const region = await screen.findByLabelText(label);
+      expect(region).toHaveAttribute('aria-busy', 'true');
+    }
+  );
+
+  it('renders the lazy library skeleton with the same markup as the eager one', async () => {
+    const { container: eager } = render(<LibraryLoadingState />);
+    const eagerHtml = eager.innerHTML;
+    cleanup();
+    const { container } = render(<LibraryLoadingStateLazy />);
+    await vi.waitFor(() => expect(container.innerHTML).toBe(eagerHtml));
   });
 
   it('keeps the generic shell main when the destination is unknown', () => {
@@ -138,5 +174,35 @@ describe('route skeletons', () => {
     expect(
       skeleton.closest('[data-testid="settings-shell-content"]')
     ).not.toBeNull();
+  });
+});
+
+describe('resolved shell skeletons are accessible loading states', () => {
+  it.each([
+    APP_ROUTES.CHAT,
+    APP_ROUTES.RELEASES,
+    APP_ROUTES.LIBRARY,
+    APP_ROUTES.LYRICS,
+    APP_ROUTES.TASKS,
+    APP_ROUTES.CALENDAR,
+    APP_ROUTES.LINKS,
+    APP_ROUTES.PRESENCE,
+    APP_ROUTES.TOUR_DATES,
+    APP_ROUTES.SETTINGS_ACCOUNT,
+    APP_ROUTES.EARNINGS,
+  ])('renders an axe-clean skeleton for %s', async pathname => {
+    const node = resolveShellRouteSkeleton(pathname);
+    expect(isValidElement(node)).toBe(true);
+    const { container } = render(
+      <RightPanelProvider>
+        <main>{node}</main>
+      </RightPanelProvider>
+    );
+
+    // Table skeletons load through next/dynamic, so wait for the lazy chunk.
+    await vi.waitFor(() =>
+      expect(container.querySelector('main')?.childElementCount).toBe(1)
+    );
+    await expectNoA11yViolations(container);
   });
 });

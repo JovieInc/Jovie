@@ -59,3 +59,60 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const EightTurns: Story = {};
+
+function thread(
+  turns: number,
+  userText: (turn: number) => string,
+  assistantText: (turn: number) => string
+): ChatNavMessage[] {
+  return Array.from({ length: turns * 2 }, (_, i) => {
+    const turn = Math.floor(i / 2) + 1;
+    const role = i % 2 === 0 ? 'user' : 'assistant';
+    return {
+      id: `msg-${i}`,
+      role,
+      parts: [
+        {
+          type: 'text',
+          text: role === 'user' ? userText(turn) : assistantText(turn),
+        },
+      ],
+    };
+  });
+}
+
+/** A short thread (below 13 messages) has nothing to navigate: no rail. */
+export const EmptyShortThread: Story = {
+  args: {
+    messages: MESSAGES.slice(0, 6),
+  },
+};
+
+/** Twenty turns of long questions: markers stay evenly spaced, previews truncate. */
+export const LongContentManyTurns: Story = {
+  args: {
+    messages: thread(
+      20,
+      turn =>
+        `Turn ${turn}: can you compare every release in the catalog against last quarter, split by platform, country and playlist placement, and tell me which ones need a new pitch before the summer festival run?`,
+      turn => `Turn ${turn}: here is the full breakdown you asked for.`
+    ),
+  },
+};
+
+export const RtlTurns: Story = {
+  args: {
+    messages: thread(
+      8,
+      turn => `الجولة ${turn}: كيف يؤدي أحدث إصدار لي هذا الأسبوع؟`,
+      turn => `الجولة ${turn}: ارتفعت مرات الاستماع وبيعت تذاكر حفلتين.`
+    ),
+  },
+  decorators: [
+    Story => (
+      <div dir='rtl' lang='ar'>
+        <Story />
+      </div>
+    ),
+  ],
+};

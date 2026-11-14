@@ -4,6 +4,7 @@ import { and, desc, sql as drizzleSql, eq } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import { waitlistEntries } from '@/lib/db/schema/waitlist';
 import { getWaitlistSettings } from '@/lib/waitlist/settings';
+import { readSupportLoadCapacity } from '@/lib/waitlist/support-load.server';
 import {
   compareRankedRows,
   type RankedQueue,
@@ -64,11 +65,13 @@ export async function getRankedWaitlistQueue(): Promise<RankedQueue> {
     };
   });
   mapped.sort(compareRankedRows);
+  // Show the budget the gate actually spends, after the support-load knob.
+  const effective = await readSupportLoadCapacity(settings);
 
   return {
     rows: mapped,
     capacity: {
-      dailyLimit: settings.autoAcceptDailyLimit,
+      dailyLimit: effective.dailyLimit,
       usedToday: settings.autoAcceptedToday,
       autoAcceptEnabled: settings.autoAcceptEnabled,
     },

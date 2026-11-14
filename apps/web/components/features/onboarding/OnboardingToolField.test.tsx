@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
+import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import {
   ONBOARDING_TOOL_FIELD_RAW_FOCUS_FIXTURE_TEST_ID,
   OnboardingToolFieldRawFocusFixture,
@@ -32,19 +33,29 @@ function FieldExample({
   density,
   label,
   disabled = false,
+  defaultValue,
+  className,
 }: {
   readonly density: 'picker' | 'compact';
   readonly label: string;
   readonly disabled?: boolean;
+  readonly defaultValue?: string;
+  readonly className?: string;
 }) {
   const fieldId = fieldIdFor(label);
   return (
-    <OnboardingToolField density={density} htmlFor={fieldId}>
+    <OnboardingToolField
+      density={density}
+      htmlFor={fieldId}
+      className={className}
+    >
       <span className='sr-only'>{label}</span>
       <input
         id={fieldId}
         aria-label={label}
         disabled={disabled}
+        defaultValue={defaultValue}
+        placeholder={label}
         className='min-w-0 flex-1 bg-transparent focus:outline-none'
       />
     </OnboardingToolField>
@@ -146,6 +157,104 @@ describe('OnboardingToolField', () => {
     expect(screen.getByLabelText('Edit Proposed Handle')).toBeDisabled();
     expect(owner).toHaveClass('border-subtle', 'bg-surface-0');
     expect(owner?.className).not.toContain('rgba(255,255,255,0.035)');
+  });
+});
+
+describe('OnboardingToolField states', () => {
+  it('keeps typed text through a re-render that changes density and class', async () => {
+    const user = userEvent.setup();
+    const { rerender } = render(
+      <FieldExample density='compact' label='Edit Proposed Handle' />
+    );
+    const input = screen.getByLabelText('Edit Proposed Handle');
+    await user.type(input, 'newartist');
+    expect(input).toHaveValue('newartist');
+
+    rerender(
+      <FieldExample
+        density='picker'
+        label='Edit Proposed Handle'
+        className='mt-4'
+      />
+    );
+
+    const after = screen.getByLabelText('Edit Proposed Handle');
+    expect(after).toBe(input);
+    expect(after).toHaveValue('newartist');
+    expect(after.closest('[data-slot="onboarding-tool-field"]')).toHaveClass(
+      'mt-4'
+    );
+  });
+
+  it('focuses the inner input when the owner label is clicked', async () => {
+    const user = userEvent.setup();
+    render(<FieldExample density='picker' label='Search Spotify artists' />);
+    const owner = screen
+      .getByLabelText('Search Spotify artists')
+      .closest('[data-slot="onboarding-tool-field"]') as HTMLElement;
+    await user.click(owner);
+    expect(screen.getByLabelText('Search Spotify artists')).toHaveFocus();
+  });
+
+  it('is axe-clean empty, with its placeholder as the prompt', async () => {
+    const { container } = render(
+      <FieldExample density='compact' label='Edit Proposed Handle' />
+    );
+    const input = screen.getByLabelText('Edit Proposed Handle');
+    expect(input).toHaveValue('');
+    expect(input).toHaveAttribute('placeholder', 'Edit Proposed Handle');
+    await expectNoA11yViolations(container);
+  });
+
+  it('is axe-clean with a value, in both densities and disabled', async () => {
+    const { container } = render(
+      <>
+        <FieldExample
+          density='picker'
+          label='Search Spotify artists'
+          defaultValue='Test Artist'
+        />
+        <FieldExample
+          density='compact'
+          label='Edit Proposed Handle'
+          defaultValue='validartist'
+          disabled
+        />
+      </>
+    );
+    expect(screen.getByLabelText('Search Spotify artists')).toHaveValue(
+      'Test Artist'
+    );
+    await expectNoA11yViolations(container);
+  });
+
+  it('keeps a long value whole inside the owner', async () => {
+    const url =
+      'https://www.instagram.com/an.unusually.long.artist.handle.with.many.parts/?utm_source=linktree';
+    const { container } = render(
+      <FieldExample
+        density='compact'
+        label='Social Profile URL'
+        defaultValue={url}
+      />
+    );
+    const input = screen.getByLabelText('Social Profile URL');
+    expect(input).toHaveValue(url);
+    expect(input).toHaveClass('min-w-0', 'flex-1');
+    await expectNoA11yViolations(container);
+  });
+
+  it('is axe-clean right to left and keeps typed text', async () => {
+    const user = userEvent.setup();
+    const { container } = render(
+      <div dir='rtl'>
+        <FieldExample density='picker' label='Search Spotify artists' />
+      </div>
+    );
+    const input = screen.getByLabelText('Search Spotify artists');
+    await user.type(input, 'فيروز');
+    expect(input).toHaveValue('فيروز');
+    await expectNoA11yViolations(container);
   });
 });
 

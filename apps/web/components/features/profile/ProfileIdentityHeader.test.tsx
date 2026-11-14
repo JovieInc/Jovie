@@ -1,5 +1,7 @@
 import { fireEvent, render, screen, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
+import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import type { LegacySocialLink } from '@/types/db';
 import { ProfileIdentityHeader } from './ProfileIdentityHeader';
 
@@ -135,6 +137,7 @@ describe('ProfileIdentityHeader', () => {
       renderHeader({ onGetUpdatesClick });
 
       const primary = screen.getByRole('button', { name: 'Get Updates' });
+      expect(primary).toHaveAttribute('data-slot', 'plain-button');
       expect(primary.parentElement).toHaveClass('h-11', 'flex-1');
       const pillFace = primary.parentElement?.querySelector(
         '.profile-glass-pill'
@@ -243,5 +246,84 @@ describe('ProfileIdentityHeader', () => {
 
     expect(screen.queryByTestId('profile-identity-social-row')).toBeNull();
     expect(screen.queryByRole('heading')).toBeNull();
+  });
+});
+
+describe('ProfileIdentityHeader states', () => {
+  const instagram = social('instagram', 'https://instagram.com/timwhite');
+
+  it('opens the subscribe flow from the Get Updates pill', async () => {
+    const user = userEvent.setup();
+    const onGetUpdatesClick = vi.fn();
+    const { container } = renderHeader({
+      onGetUpdatesClick,
+      socialLinks: [instagram],
+    });
+
+    await user.click(screen.getByRole('button', { name: 'Get Updates' }));
+    expect(onGetUpdatesClick).toHaveBeenCalledTimes(1);
+    await expectNoA11yViolations(container);
+  });
+
+  it('gives the Listen pill the whole row with no social links', async () => {
+    const { container } = renderHeader({ socialLinks: [] });
+
+    expect(screen.getByTestId('profile-identity-listen')).toBeInTheDocument();
+    expect(screen.queryByTestId('profile-identity-social-row')).toBeNull();
+    await expectNoA11yViolations(container);
+  });
+
+  it('shows only name and handle with no portrait, badge or destination', async () => {
+    const { container } = renderHeader({
+      imageUrl: null,
+      isVerified: false,
+      hasListenDestination: false,
+    });
+
+    expect(screen.queryByTestId('profile-identity-listen')).toBeNull();
+    expect(screen.queryByRole('button')).toBeNull();
+    expect(screen.getByTestId('profile-identity-handle')).toHaveTextContent(
+      'jov.ie/tim'
+    );
+    await expectNoA11yViolations(container);
+  });
+
+  it('truncates a long name and handle inside the column', async () => {
+    const name = 'Tim White and the Los Angeles After Hours Orchestra';
+    const { container } = renderHeader({
+      name,
+      handle: 'timwhiteandthelosangelesafterhoursorchestra',
+      onGetUpdatesClick: vi.fn(),
+    });
+
+    expect(screen.getByText(name)).toHaveClass('truncate');
+    expect(screen.getByTestId('profile-identity-handle')).toHaveClass(
+      'truncate'
+    );
+    await expectNoA11yViolations(container);
+  });
+
+  it('keeps the action row in reading order right to left', async () => {
+    const { container } = render(
+      <div dir='rtl' lang='ar'>
+        <ProfileIdentityHeader
+          name='تيم وايت'
+          handle='tim'
+          imageUrl='https://example.com/tim.jpg'
+          profileHref='/tim'
+          listenHref='/tim/listen'
+          onGetUpdatesClick={vi.fn()}
+          socialLinks={[instagram]}
+        />
+      </div>
+    );
+
+    expect(
+      screen.getByRole('heading', { level: 1, name: 'تيم وايت' })
+    ).toBeInTheDocument();
+    const row = screen.getByTestId('profile-identity-actions');
+    expect(within(row).getAllByRole('button')).toHaveLength(1);
+    expect(within(row).getAllByRole('link')).toHaveLength(1);
+    await expectNoA11yViolations(container);
   });
 });

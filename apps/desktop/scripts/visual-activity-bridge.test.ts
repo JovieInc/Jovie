@@ -26,6 +26,7 @@ vi.mock('electron', () => ({
 beforeEach(() => {
   vi.resetModules();
   vi.clearAllMocks();
+  ipc.invoke.mockResolvedValue(false);
   exposed.clear();
   listeners.clear();
   ipc.on.mockImplementation((channel, listener) =>
@@ -37,11 +38,11 @@ describe('visual activity bridge', () => {
   it('reads without payload and subscribes to booleans through the actual preload', async () => {
     await import('../src/preload');
     const api = exposed.get('electronAPI')!;
-    ipc.invoke.mockResolvedValue(false);
     expect(await api.getVisualActivity()).toBe(false);
-    expect(ipc.invoke).toHaveBeenCalledExactlyOnceWith(
-      'desktop-get-visual-activity'
-    );
+    expect(ipc.invoke.mock.calls).toEqual([
+      ['desktop-get-full-screen-state'],
+      ['desktop-get-visual-activity'],
+    ]);
     const callback = vi.fn();
     const dispose = api.onVisualActivity(callback);
     const listener = listeners.get('desktop-visual-activity')!;

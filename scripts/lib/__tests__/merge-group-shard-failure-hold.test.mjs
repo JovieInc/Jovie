@@ -145,7 +145,7 @@ process.stdout.write(JSON.stringify(result));
         },
       }
     );
-    expect(execution.status, execution.stderr).toBe(0);
+    expect(execution.status, execution.stderr + execution.stdout).toBe(0);
     const receipt = JSON.parse(execution.stdout);
     expect(receipt.aheadAttribution).toEqual({
       attributable: false,

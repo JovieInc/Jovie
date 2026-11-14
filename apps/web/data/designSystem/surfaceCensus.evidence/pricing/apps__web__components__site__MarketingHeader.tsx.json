@@ -1,0 +1,6 @@
+{
+  "file": "apps/web/components/site/MarketingHeader.tsx",
+  "sha256": "e7525674584370918d4a804b019db5ec5888e9d5e384dfbc07e3d70e1756ff73",
+  "at": "2026-11-13T14:57:14.310Z",
+  "ref": "WAITLIST_ENABLED removed and constant-true SHOW_MARKETING_CENTER_NAV / SHOW_MARKETING_FULL_FOOTER gates removed. Default marketing header CTA is Claim your free profile -> /start; homepage header stays Claim your profile -> /start. Verified with MarketingHeader and HeaderNav vitest render suites (jsdom), not a browser capture."
+}

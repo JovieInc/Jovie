@@ -2,10 +2,12 @@
 /**
  * Fail-closed golden-path lock (JOV-5085): the certified homepage front
  * door → logged-out first message sends → waitlist write only after
- * verified auth. The certified homepage has exactly two states
+ * verified auth. The homepage front door is certified in these states
  * (JOV-5864 / JOV-6794):
- * - open (WAITLIST_ENABLED=false): name search
- *   ("Search your name" → "Find me") with a /start handoff
+ * - open claim (public signup reopened 2026-11-09): one "Claim your profile"
+ *   link into /start, or the jov.ie/you link claim form submitting to /start
+ * - legacy open: name search ("Search your name" → "Find me") with a /start
+ *   handoff
  * - waitlist-gated (WAITLIST_ENABLED=true, prelaunch): "Claim your profile"
  *   primary CTA → /signup. Waitlist gating is the only allowed gate.
  * Missing secrets fail closed. Merge gate never reads E2E_PROD.
@@ -154,6 +156,21 @@ export function evaluateHomepageHtml(html) {
       reason: `found link claim "${GOLDEN_PATH_HERO_CLAIM_DOMAIN}" → "${GOLDEN_PATH_HERO_CLAIM_ACTION}" submitting to ${GOLDEN_PATH_START_PATH}`,
     };
   }
+  // Open claim front door: the shared claim-profile intent renders the hero,
+  // header and closing actions as one link into /start. The label must sit
+  // inside the link that goes to /start; a /start link elsewhere on the page
+  // does not count.
+  const claimLinkPattern = new RegExp(
+    `<a\\b[^>]*\\bhref\\s*=\\s*["'][^"']*\\/start(?:[?"']|\\/)[^>]*>(?:(?!<\\/a>)[\\s\\S]){0,400}?${GOLDEN_PATH_GATED_CTA_LABEL}`,
+    'i'
+  );
+  if (claimLinkPattern.test(html)) {
+    return {
+      id: 'homepage-cta',
+      ok: true,
+      reason: `found claim CTA "${GOLDEN_PATH_GATED_CTA_LABEL}" linking to ${GOLDEN_PATH_START_PATH}`,
+    };
+  }
   // Legacy name search, accepted until production carries the link claim.
   if (hasPlaceholder && hasAction && hasStartHandoff) {
     return {
@@ -182,7 +199,7 @@ export function evaluateHomepageHtml(html) {
   return {
     id: 'homepage-cta',
     ok: false,
-    reason: `homepage conversion must be the link claim ("${GOLDEN_PATH_HERO_CLAIM_DOMAIN}" → "${GOLDEN_PATH_HERO_CLAIM_ACTION}" → ${GOLDEN_PATH_START_PATH}), the name search ("${GOLDEN_PATH_HERO_SEARCH_PLACEHOLDER}" → "${GOLDEN_PATH_HERO_SEARCH_ACTION}") with a ${GOLDEN_PATH_START_PATH} handoff, or the certified waitlist gate "${GOLDEN_PATH_GATED_CTA_LABEL}" → ${GOLDEN_PATH_GATED_CTA_HREF}`,
+    reason: `homepage conversion must be the claim CTA ("${GOLDEN_PATH_GATED_CTA_LABEL}" linking to ${GOLDEN_PATH_START_PATH}), the link claim ("${GOLDEN_PATH_HERO_CLAIM_DOMAIN}" → "${GOLDEN_PATH_HERO_CLAIM_ACTION}" → ${GOLDEN_PATH_START_PATH}), the name search ("${GOLDEN_PATH_HERO_SEARCH_PLACEHOLDER}" → "${GOLDEN_PATH_HERO_SEARCH_ACTION}") with a ${GOLDEN_PATH_START_PATH} handoff, or the certified waitlist gate "${GOLDEN_PATH_GATED_CTA_LABEL}" → ${GOLDEN_PATH_GATED_CTA_HREF}`,
   };
 }
 

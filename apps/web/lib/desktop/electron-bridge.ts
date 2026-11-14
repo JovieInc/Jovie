@@ -49,6 +49,11 @@ export interface ElectronAPI {
   readonly onVisualActivity?: (
     callback: (active: boolean) => void
   ) => () => void;
+  /** Native full-screen state; optional on older shells and browsers. */
+  readonly getFullScreenState?: () => Promise<boolean>;
+  readonly onFullScreenChanged?: (
+    callback: (isFullScreen: boolean) => void
+  ) => () => void;
   /** Register a callback that fires when electron-updater detects a new version. */
   readonly onUpdateAvailable: (cb: () => void) => void | (() => void);
   /** Register a callback that fires when the update download is complete. */
@@ -284,47 +289,10 @@ export function onDesktopNavigate(cb: (path: string) => void): () => void {
   return subscribe(cb);
 }
 
-/** Old binaries and browsers keep their existing visual behavior. */
-export function observeDesktopVisualActivity(
-  callback: (active: boolean) => void
-): () => void {
-  const api = getRawElectronAPI();
-  if (
-    typeof api?.getVisualActivity !== 'function' ||
-    typeof api.onVisualActivity !== 'function'
-  ) {
-    return () => undefined;
-  }
-  let disposed = false;
-  let revision = 0;
-  let unsubscribe: (() => void) | undefined;
-  try {
-    unsubscribe = api.onVisualActivity(active => {
-      if (disposed || typeof active !== 'boolean') return;
-      revision += 1;
-      callback(active);
-    });
-    const requestedRevision = revision;
-    void api
-      .getVisualActivity()
-      .then(active => {
-        // A live event wins over an older asynchronous snapshot.
-        if (
-          !disposed &&
-          revision === requestedRevision &&
-          typeof active === 'boolean'
-        )
-          callback(active);
-      })
-      .catch(() => undefined);
-  } catch {
-    // Optional stale bridge methods cannot break the transcript.
-  }
-  return () => {
-    disposed = true;
-    if (typeof unsubscribe === 'function') unsubscribe();
-  };
-}
+export {
+  observeDesktopFullScreen,
+  observeDesktopVisualActivity,
+} from './electron-native-state';
 
 /**
  * Read package provenance from the context-isolated preload bridge.

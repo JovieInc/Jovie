@@ -178,13 +178,13 @@ describe('ShellReleaseRow audio affordance', () => {
       />
     );
 
-    expect(screen.getByText('Lost in the Light').className).toContain(
-      'font-caption'
-    );
-    expect(screen.getByText('Lost in the Light').className).toContain(
-      'leading-[1.2]'
-    );
-    expect(screen.getByText('Bahamas').className).toContain('text-2xs');
+    // text-overflow needs a block box: the ellipsis lives on the inner span,
+    // never on the inline-flex link, and the artist line gives way first.
+    const title = screen.getByText('Lost in the Light');
+    expect(title).toHaveClass('truncate', 'min-w-0');
+    expect(title).not.toHaveClass('inline-flex');
+    expect(title.parentElement).toHaveClass('font-caption', 'leading-[1.2]');
+    expect(screen.getByText('Bahamas')).toHaveClass('text-2xs', 'shrink-9999');
   });
 
   it('keeps the title target at the 24px WCAG 2.5.8 floor in the dense row', () => {
@@ -202,7 +202,7 @@ describe('ShellReleaseRow audio affordance', () => {
 
     // The h-8 dense row renders the title as the EntityHoverLink button;
     // axe target-size (WCAG 2.2 AA, not allowlistable) measures its box.
-    expect(screen.getByText('Lost in the Light').className).toContain(
+    expect(screen.getByText('Lost in the Light').parentElement).toHaveClass(
       'min-h-6'
     );
   });

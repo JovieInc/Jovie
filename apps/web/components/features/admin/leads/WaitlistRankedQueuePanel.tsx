@@ -6,6 +6,7 @@ const HOLD_LABELS: Record<string, string> = {
   hold_outranked: 'Outranked today',
   hold_golden_path_not_green: 'Golden path not green',
   hold_open_learnings: 'Learning throttle closed',
+  hold_support_load: 'Paused for open bug reports',
   hold_auto_accept_disabled: 'Auto-accept off',
   hold_high_profile_needs_verification: 'Needs verification',
   hold_identity_unresolved: 'Identity unresolved',

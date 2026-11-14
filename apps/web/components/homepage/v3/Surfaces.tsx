@@ -17,8 +17,15 @@ import { Anchor, Cover, DspGlyph } from './ProductUi';
 const PAGE = HOMEPAGE_PRODUCT_UI.releasePage;
 const PALETTE = HOMEPAGE_PRODUCT_UI.palette;
 
-/** The release page (VrRlg) for the inspected release; "+N more" follows the registry. */
-export function ReleasePage() {
+/**
+ * The release page (VrRlg) for the inspected release; "+N more" follows the
+ * registry. The hero shows the same page beside the app, so its title anchor
+ * takes another id and the 02 connector still finds the chapter's phone.
+ */
+export function ReleasePage({
+  titleAnchor = 'title',
+  eager = false,
+}: Readonly<{ titleAnchor?: string; eager?: boolean }> = {}) {
   const more = HOME_SPEC.listen - RELEASE_PAGE_SERVICES.length;
   return (
     <div className='hv3-rp'>
@@ -27,12 +34,13 @@ export function ReleasePage() {
         <span>•••</span>
       </div>
       <span className='hv3-rp__art'>
-        <Cover src={PAGE.src} size={300} />
+        <Cover src={PAGE.src} size={300} eager={eager} />
       </span>
-      <h4 className='hv3-rp__title text-balance'>
-        <Anchor id='title' className='hv3-anchor--before' />
+      {/* h3: the page sits under its chapter's h2 (axe heading-order). */}
+      <h3 className='hv3-rp__title text-balance'>
+        <Anchor id={titleAnchor} className='hv3-anchor--before' />
         {PAGE.title}
-      </h4>
+      </h3>
       <p className='hv3-rp__artist'>{PAGE.artist}</p>
       <ul className='hv3-rp__list'>
         {RELEASE_PAGE_SERVICES.map(glyph => (

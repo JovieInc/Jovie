@@ -1,6 +1,11 @@
 import { eq } from 'drizzle-orm';
-import { type NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { z } from 'zod';
+import {
+  type OperatorRouteInput,
+  operatorAccess,
+} from '@/lib/api/route-access';
+import { defineRoute } from '@/lib/api/route-pipeline';
 import { db } from '@/lib/db';
 import { getDeepErrorMessage } from '@/lib/db/errors';
 import { leadPipelineSettings } from '@/lib/db/schema/leads';
@@ -10,7 +15,6 @@ import {
   getSafeErrorMessage,
 } from '@/lib/error-tracking';
 import { parseJsonBody } from '@/lib/http/parse-json';
-import { getOvieOperatorEntitlements } from '@/lib/ovie/privacy-lock/access';
 
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 
@@ -104,21 +108,7 @@ function isMissingLeadPipelineSettingsSchemaError(error: unknown): boolean {
 /**
  * GET /api/admin/leads/settings — Return pipeline settings.
  */
-export async function GET() {
-  const entitlements = await getOvieOperatorEntitlements();
-  if (!entitlements.isAuthenticated) {
-    return NextResponse.json(
-      { error: 'Unauthorized' },
-      { status: 401, headers: NO_STORE_HEADERS }
-    );
-  }
-  if (!entitlements.isAdmin) {
-    return NextResponse.json(
-      { error: 'Forbidden' },
-      { status: 403, headers: NO_STORE_HEADERS }
-    );
-  }
-
+async function getHandler() {
   try {
     let [settings] = await db
       .select()
@@ -160,24 +150,19 @@ export async function GET() {
   }
 }
 
+export const GET = defineRoute(
+  {
+    route: '/api/admin/leads/settings',
+    access: operatorAccess(),
+    legacy: { cache: 'pipeline-responses-only', unhandledErrors: 'rethrow' },
+  },
+  getHandler
+);
+
 /**
  * PATCH /api/admin/leads/settings — Update pipeline settings.
  */
-export async function PATCH(request: NextRequest) {
-  const entitlements = await getOvieOperatorEntitlements({ session: 'fresh' });
-  if (!entitlements.isAuthenticated) {
-    return NextResponse.json(
-      { error: 'Unauthorized' },
-      { status: 401, headers: NO_STORE_HEADERS }
-    );
-  }
-  if (!entitlements.isAdmin) {
-    return NextResponse.json(
-      { error: 'Forbidden' },
-      { status: 403, headers: NO_STORE_HEADERS }
-    );
-  }
-
+async function patchHandler({ request }: OperatorRouteInput) {
   try {
     const parsed = await parseJsonBody(request, {
       route: '/api/admin/leads/settings',
@@ -224,3 +209,12 @@ export async function PATCH(request: NextRequest) {
     );
   }
 }
+
+export const PATCH = defineRoute(
+  {
+    route: '/api/admin/leads/settings',
+    access: operatorAccess({ session: 'fresh' }),
+    legacy: { cache: 'pipeline-responses-only', unhandledErrors: 'rethrow' },
+  },
+  patchHandler
+);

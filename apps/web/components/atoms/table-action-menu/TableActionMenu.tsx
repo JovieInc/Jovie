@@ -43,6 +43,7 @@ export function TableActionMenu({
   align = 'end',
   open,
   onOpenChange,
+  modal,
   searchable = false,
   searchPlaceholder,
   searchMode = 'root',
@@ -92,6 +93,7 @@ export function TableActionMenu({
         variant='context'
         size='compact'
         items={dropdownItems}
+        modal={modal}
         searchable={searchable}
         searchPlaceholder={searchPlaceholder}
         searchMode={searchMode}
@@ -112,6 +114,7 @@ export function TableActionMenu({
         align={align}
         open={open}
         onOpenChange={onOpenChange}
+        modal={modal}
         searchable={searchable}
         searchPlaceholder={searchPlaceholder}
         searchMode={searchMode}
@@ -128,6 +131,7 @@ export function TableActionMenu({
       triggerIcon={TriggerIcon}
       align={align}
       open={open}
+      modal={modal}
       onOpenChange={onOpenChange}
       searchable={searchable}
       searchPlaceholder={searchPlaceholder}

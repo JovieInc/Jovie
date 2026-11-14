@@ -154,7 +154,7 @@
   --app-shell-content-padding-y: 8px;
   --app-shell-content-surface: var(--linear-bg-surface-0);
   --app-shell-control-height-sm: 28px;
-  --app-shell-control-padding-x: 11px;
+  --app-shell-control-padding-x: 10px;
   --app-shell-control-radius: 9999px;
   --app-shell-toolbar-gap: 4px;
   --app-shell-audio-bar-max-height: 120px;
@@ -188,6 +188,7 @@
   --system-b-entity-chip-artist-accent: var(--color-accent-purple);
   --system-b-entity-chip-track-accent: var(--color-accent-blue);
   --system-b-entity-chip-event-accent: var(--color-accent-orange);
+  --system-b-entity-chip-profile-accent: var(--color-accent-purple);
   --system-b-entity-chip-on-light-text: var(--system-b-chat-user-bubble-text);
   --system-b-chat-message-max-width: 78%;
   --system-b-chat-user-bubble-bg: var(--color-text-primary-token);
@@ -314,6 +315,22 @@
     );
   --profile-stage-glow-a: rgba(255, 255, 255, 0.1);
   --profile-stage-glow-b: rgba(38, 42, 54, 0.42);
+  /* Layout shell stage layers (PublicProfileLayoutShell). Declared here, on
+     the shell's own element, so --profile-stage-glow-a resolves against the
+     artist accent the shell sets inline. */
+  --profile-stage-ambient-glow: radial-gradient(
+    circle at 50% 30%,
+    var(--profile-stage-glow-a, rgba(255, 255, 255, 0.18)),
+    transparent 60%
+  );
+  --profile-stage-scrim:
+    radial-gradient(circle at top, rgba(255, 255, 255, 0.06), transparent 26%),
+    linear-gradient(
+      180deg,
+      rgba(6, 8, 13, 0.34) 0%,
+      rgba(7, 8, 10, 0.82) 42%,
+      rgba(8, 9, 10, 0.98) 100%
+    );
   --profile-content-bg: linear-gradient(
     180deg,
     rgba(14, 16, 20, 0.96),
@@ -826,7 +843,7 @@ html[data-profile-flow-open="true"] .cookie-banner-card {
   .cookie-banner-card--above-public-profile-dock {
     top: auto;
     bottom: var(--profile-bottom-nav-height);
-    left: min(50vw, calc(var(--profile-shell-max-width) / 2));
+    left: 50%;
     right: auto !important;
     /* Same edges as the claim bar and dock below it. */
     width: min(358px, calc(100vw - 32px)) !important;
@@ -1392,31 +1409,62 @@ html[data-profile-flow-open="true"] .cookie-banner-card {
     text-underline-offset: 8px;
   }
 
-  /* Home: two top-aligned columns centered in the viewport (1fr / auto / 1fr
-     rows put the pair on the optical middle). */
+  /* Every tab: two top-aligned columns, identity left, the tab's content
+     right. The identity column sits at the same place on Home, Music, Events
+     and About, so switching tabs never reflows the header (walk 2026-11-09:
+     the non-Home tabs re-centred it into one narrow column). Rows start at
+     the top instead of optically centring the pair, because a centred row
+     moves the header whenever the right column changes height. */
   .profile-viewport:not(.profile-viewport--embedded):not(
       .profile-viewport--desktop-surface
     )
-    [data-profile-home-mode="true"]
-    .profile-home-content-scroll {
+    .public-profile-compact-shell
+    .profile-content-scroll-region {
     display: grid;
     grid-template-columns: 320px 400px;
-    grid-template-rows: 1fr auto 1fr;
+    grid-template-rows: auto 1fr;
     column-gap: 96px;
     justify-content: center;
     align-items: start;
     padding-inline: 48px;
-    overflow: visible;
+    padding-block-start: 40px;
   }
 
   .profile-viewport:not(.profile-viewport--embedded):not(
       .profile-viewport--desktop-surface
     )
     [data-profile-home-mode="true"]
-    .profile-home-content-scroll
+    .profile-home-content-scroll {
+    overflow: visible;
+  }
+
+  /* The tab's content (Home rail, Music, Events, About) is the right column.
+     The grid owns the inline padding here, so the Music panel's mobile bleed
+     (-mx-(--page-pad), which cancels the phone scrollport padding) would
+     shift it left of the column by --page-pad; reset it. */
+  .profile-viewport:not(.profile-viewport--embedded):not(
+      .profile-viewport--desktop-surface
+    )
+    .public-profile-compact-shell
+    .profile-content-scroll-region
+    > :not([data-testid="profile-identity-header"]):not(
+      [data-testid="profile-jovie-branding"]
+    ) {
+    grid-column: 2;
+    grid-row: 1;
+    min-width: 0;
+    width: 100%;
+    margin-inline: 0;
+  }
+
+  .profile-viewport:not(.profile-viewport--embedded):not(
+      .profile-viewport--desktop-surface
+    )
+    .public-profile-compact-shell
+    .profile-content-scroll-region
     > [data-testid="profile-identity-header"] {
     grid-column: 1;
-    grid-row: 2;
+    grid-row: 1;
     align-items: flex-start;
     text-align: left;
     padding: 0;
@@ -1425,8 +1473,8 @@ html[data-profile-flow-open="true"] .cookie-banner-card {
   .profile-viewport:not(.profile-viewport--embedded):not(
       .profile-viewport--desktop-surface
     )
-    [data-profile-home-mode="true"]
-    .profile-home-content-scroll
+    .public-profile-compact-shell
+    .profile-content-scroll-region
     [data-testid="profile-identity-portrait"] {
     width: 160px !important;
     height: 160px !important;
@@ -1435,8 +1483,8 @@ html[data-profile-flow-open="true"] .cookie-banner-card {
   .profile-viewport:not(.profile-viewport--embedded):not(
       .profile-viewport--desktop-surface
     )
-    [data-profile-home-mode="true"]
-    .profile-home-content-scroll
+    .public-profile-compact-shell
+    .profile-content-scroll-region
     [data-testid="profile-identity-portrait"]
     > div:first-child {
     width: 100% !important;
@@ -1446,8 +1494,8 @@ html[data-profile-flow-open="true"] .cookie-banner-card {
   .profile-viewport:not(.profile-viewport--embedded):not(
       .profile-viewport--desktop-surface
     )
-    [data-profile-home-mode="true"]
-    .profile-home-content-scroll
+    .public-profile-compact-shell
+    .profile-content-scroll-region
     [data-testid="profile-header"] {
     margin-top: 16px;
   }
@@ -1455,8 +1503,8 @@ html[data-profile-flow-open="true"] .cookie-banner-card {
   .profile-viewport:not(.profile-viewport--embedded):not(
       .profile-viewport--desktop-surface
     )
-    [data-profile-home-mode="true"]
-    .profile-home-content-scroll
+    .public-profile-compact-shell
+    .profile-content-scroll-region
     [data-testid="profile-identity-link"] {
     justify-content: flex-start;
     font-size: 40px;
@@ -1468,8 +1516,8 @@ html[data-profile-flow-open="true"] .cookie-banner-card {
   .profile-viewport:not(.profile-viewport--embedded):not(
       .profile-viewport--desktop-surface
     )
-    [data-profile-home-mode="true"]
-    .profile-home-content-scroll
+    .public-profile-compact-shell
+    .profile-content-scroll-region
     [data-testid="profile-identity-link"]
     > span {
     overflow: visible;
@@ -1482,8 +1530,8 @@ html[data-profile-flow-open="true"] .cookie-banner-card {
   .profile-viewport:not(.profile-viewport--embedded):not(
       .profile-viewport--desktop-surface
     )
-    [data-profile-home-mode="true"]
-    .profile-home-content-scroll
+    .public-profile-compact-shell
+    .profile-content-scroll-region
     [data-testid="profile-identity-handle"] {
     font-size: 16px;
     line-height: 24px;
@@ -1494,8 +1542,8 @@ html[data-profile-flow-open="true"] .cookie-banner-card {
   .profile-viewport:not(.profile-viewport--embedded):not(
       .profile-viewport--desktop-surface
     )
-    [data-profile-home-mode="true"]
-    .profile-home-content-scroll
+    .public-profile-compact-shell
+    .profile-content-scroll-region
     [data-testid="profile-identity-actions"] {
     flex-direction: column;
     align-items: stretch;
@@ -1506,15 +1554,15 @@ html[data-profile-flow-open="true"] .cookie-banner-card {
   .profile-viewport:not(.profile-viewport--embedded):not(
       .profile-viewport--desktop-surface
     )
-    [data-profile-home-mode="true"]
-    .profile-home-content-scroll
+    .public-profile-compact-shell
+    .profile-content-scroll-region
     [data-testid="profile-identity-actions"]
     > a,
   .profile-viewport:not(.profile-viewport--embedded):not(
       .profile-viewport--desktop-surface
     )
-    [data-profile-home-mode="true"]
-    .profile-home-content-scroll
+    .public-profile-compact-shell
+    .profile-content-scroll-region
     [data-testid="profile-identity-actions"]
     > div:first-child:not([data-testid]) {
     flex: none;
@@ -1524,8 +1572,8 @@ html[data-profile-flow-open="true"] .cookie-banner-card {
   .profile-viewport:not(.profile-viewport--embedded):not(
       .profile-viewport--desktop-surface
     )
-    [data-profile-home-mode="true"]
-    .profile-home-content-scroll
+    .public-profile-compact-shell
+    .profile-content-scroll-region
     [data-testid="profile-identity-actions"]
     .profile-glass-pill {
     height: 44px;
@@ -1535,8 +1583,8 @@ html[data-profile-flow-open="true"] .cookie-banner-card {
   .profile-viewport:not(.profile-viewport--embedded):not(
       .profile-viewport--desktop-surface
     )
-    [data-profile-home-mode="true"]
-    .profile-home-content-scroll
+    .public-profile-compact-shell
+    .profile-content-scroll-region
     [data-testid="profile-identity-social-row"] {
     flex: none;
     justify-content: flex-start;
@@ -1551,7 +1599,7 @@ html[data-profile-flow-open="true"] .cookie-banner-card {
     .profile-home-content-scroll
     > [data-testid="profile-home-rail"] {
     grid-column: 2;
-    grid-row: 2;
+    grid-row: 1;
     flex: none;
     width: 400px;
     height: auto;
@@ -1651,8 +1699,8 @@ html[data-profile-flow-open="true"] .cookie-banner-card {
   .profile-viewport:not(.profile-viewport--embedded):not(
       .profile-viewport--desktop-surface
     )
-    [data-profile-home-mode="true"]
-    .profile-home-content-scroll
+    .public-profile-compact-shell
+    .profile-content-scroll-region
     [data-testid="profile-identity-listen"] {
     display: none;
   }
@@ -1673,26 +1721,13 @@ html[data-profile-flow-open="true"] .cookie-banner-card {
   .profile-viewport:not(.profile-viewport--embedded):not(
       .profile-viewport--desktop-surface
     )
-    [data-profile-home-mode="true"]
-    .profile-home-content-scroll
+    .public-profile-compact-shell
+    .profile-content-scroll-region
     > [data-testid="profile-jovie-branding"] {
     grid-column: 1 / -1;
-    grid-row: 3;
+    grid-row: 2;
     align-self: end;
     opacity: 0.4;
-  }
-
-  /* Non-Home tabs keep one readable column inside the wider page. */
-  .profile-viewport:not(.profile-viewport--embedded):not(
-      .profile-viewport--desktop-surface
-    )
-    .public-profile-compact-shell
-    [data-testid="profile-compact-surface"]:not([data-mode="profile"])
-    .profile-content-scroll-region
-    > * {
-    margin-inline: auto;
-    max-width: 560px;
-    width: 100%;
   }
 }
 
@@ -1725,7 +1760,37 @@ html[data-profile-flow-open="true"] .cookie-banner-card {
      on brand fills, photos and fixed-dark media. */
   --color-verified: #0084d1;
   --color-on-media: #ffffff;
+  /* The black that stays black on an on-media white fill (a white pill's
+     label), in light and dark alike. */
+  --color-ink-on-media: #000000;
   --color-verified-backing: var(--color-on-media);
+  /* Quiet header text link (marketing Sign in / Log in) and its hover. The
+     dark values live in the .dark block below so scoped dark wrappers match. */
+  --color-header-text-link: oklch(37.1% 0 none);
+  --color-header-text-link-hover: oklch(14.5% 0 none);
+  /* Mobile nav sheet: the scrim behind it and its upward shadow, the same in
+     light and dark. */
+  --mobile-nav-scrim: oklch(0% 0 0 / 0.6);
+  --shadow-mobile-nav-sheet:
+    0 -8px 40px oklch(0% 0 0 / 0.25), 0 -2px 12px oklch(0% 0 0 / 0.15);
+  /* Fallback cover art sleeve (ArtworkFallbackTile): the same light-on-dark
+     bevel over the seeded surface in light and dark. */
+  --artwork-fallback-sleeve: linear-gradient(
+    135deg,
+    rgba(255, 255, 255, 0.09),
+    rgba(255, 255, 255, 0.012) 52%,
+    rgba(0, 0, 0, 0.13)
+  );
+  --artwork-fallback-sleeve-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    inset 0 -24px 48px rgba(0, 0, 0, 0.14);
+  /* Top sheen over the compact profile surface (ProfileCompactSurface),
+     the same in light and dark. */
+  --profile-compact-sheen: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.025),
+    transparent 34%
+  );
   /* Glass (2026-10-26): one semantic material for frosted panels. Shell
      mixed 3% toward ion in OKLab (same recipe as JOV-8927 ds-glass), alpha per
      theme so secondary text clears 4.5:1 over black, white and every accent
@@ -1762,6 +1827,22 @@ html[data-profile-flow-open="true"] .cookie-banner-card {
   --noir-ion-selected: rgba(17, 175, 255, 0.1);
   --noir-ion-selected-strong: rgba(17, 175, 255, 0.16);
   --noir-ion-focus-ring: rgba(17, 175, 255, 0.72);
+  /* Profile preview bento (ProfilePreviewBento): the default hero, an accent
+     purple glow over a dark vertical gradient, and the fade into its base,
+     the same in light and dark. */
+  --profile-preview-bento-hero:
+    radial-gradient(
+      120% 90% at 50% -10%,
+      rgba(123, 108, 255, 0.42) 0%,
+      rgba(70, 58, 170, 0.14) 38%,
+      rgba(12, 12, 20, 0) 66%
+    ),
+    linear-gradient(180deg, #14131f 0%, #0c0c12 100%);
+  --profile-preview-bento-fade: linear-gradient(
+    to bottom,
+    transparent,
+    #0c0c12
+  );
   /* Light aliases keep shared marketing chrome on the same Noir Ion token
      family as the dark surface while the footer theme control is active. */
   --noir-ion-text-strong: var(--color-text-primary-token);
@@ -1830,6 +1911,10 @@ html[data-profile-flow-open="true"] .cookie-banner-card {
   --color-accent-purple-text: #6d28d9;
   --color-accent-pink: #f52bb5;
   --color-accent-pink-subtle: rgba(245, 43, 181, 0.12);
+  /* Accent TEXT variants (light): raw Ion accents clear 4.5:1 only on dark
+     surfaces. On light paper they need darkened text mixes (WCAG 2.2 AA). */
+  --color-accent-blue-text: #0072c6;
+  --color-accent-pink-text: #c4187f;
   --color-accent-red: #f72a36;
   --color-accent-red-subtle: rgba(247, 42, 54, 0.12);
   --color-accent-orange: #ff7800;
@@ -2015,7 +2100,7 @@ html[data-profile-flow-open="true"] .cookie-banner-card {
   );
   --state-offline-fg: var(--color-warning);
   --state-permission-bg: var(--color-warning-subtle);
-  --state-permission-fg: var(--color-warning);
+  --state-permission-fg: var(--color-warning-text);
   --state-permission-border: color-mix(
     in oklab,
     var(--color-warning) 20%,
@@ -2047,6 +2132,7 @@ html[data-profile-flow-open="true"] .cookie-banner-card {
   --noir-ion-floating: #232427;
   --color-verified: #00bcff;
   --color-on-media: #ffffff;
+  --color-ink-on-media: #000000;
   --color-verified-backing: var(--color-bg-base);
   --noir-ion-text-strong: #ffffff;
   --noir-ion-text-primary: #f5f7fb;
@@ -2173,6 +2259,10 @@ html[data-profile-flow-open="true"] .cookie-banner-card {
   --color-accent-purple-text: #a47bff;
   --color-accent-pink: #f52bb5;
   --color-accent-pink-subtle: rgba(245, 43, 181, 0.12);
+  /* Accent TEXT variants (dark): the raw accents clear 4.5:1 on dark
+     surfaces, so the text variants rebind to them. */
+  --color-accent-blue-text: var(--color-accent-blue);
+  --color-accent-pink-text: var(--color-accent-pink);
   --color-accent-red: #f72a36;
   --color-accent-red-subtle: rgba(247, 42, 54, 0.12);
   --color-accent-orange: #ff7800;
@@ -2351,7 +2441,7 @@ html[data-profile-flow-open="true"] .cookie-banner-card {
   );
   --state-offline-fg: var(--color-warning);
   --state-permission-bg: var(--color-warning-subtle);
-  --state-permission-fg: var(--color-warning);
+  --state-permission-fg: var(--color-warning-text);
   --state-permission-border: color-mix(
     in oklab,
     var(--color-warning) 20%,
@@ -2367,6 +2457,9 @@ html[data-profile-flow-open="true"] .cookie-banner-card {
 .dark {
   --color-verified: #00bcff;
   --color-verified-backing: var(--color-bg-base);
+  /* The quiet header text link reads the same wrapper (dark: variant parity). */
+  --color-header-text-link: color-mix(in oklab, #fff 60%, transparent);
+  --color-header-text-link-hover: color-mix(in oklab, #fff 90%, transparent);
 }
 
 /* Public-profile navigation is one distinct functional glass layer. It floats
@@ -2537,6 +2630,18 @@ html[data-profile-flow-open="true"] .cookie-banner-card {
   -webkit-backdrop-filter: blur(var(--space-4));
 }
 
+/* One brand footer per profile (walk 2026-11-09): from md up, where the
+   "Jovie · Claim yours" footer renders under the card, it already carries the
+   Jovie mark, so the in-card "Made with Jovie" line steps aside instead of
+   stacking a second brand footer above it. Phones keep "Made with Jovie"
+   (the claim footer is md+ only). */
+@media (min-width: 768px) {
+  .profile-viewport:has([data-testid="profile-claim-footer"])
+    [data-testid="profile-jovie-branding"] {
+    display: none;
+  }
+}
+
 /* Public-profile mode cards (Pen D14lo6 / NdEbB / GTSIc / QZvG7). One accent
    per card, set by lib/profile/mode-card-accent.ts through data-accent. The
    gradient centers on the exact accent token; the only contrast lever is
@@ -2652,6 +2757,24 @@ html[data-profile-flow-open="true"] .cookie-banner-card {
       var(--profile-mode-card-accent-shade) 0%,
       transparent 100%
     );
+}
+
+/* Compact mode card (empty states): no reserved height, so a short message
+   never sits under a large blank gradient. One accent glow at the top right
+   only, and a hairline rim, so the corner glow cannot read as a smear past an
+   edge the dark card would otherwise not show (walk 2026-11-09, Events). */
+.profile-mode-card.profile-mode-card--compact {
+  --profile-mode-card-min-height: 0;
+  box-shadow: inset 0 0 0 var(--space-px) var(--profile-mode-card-hairline);
+}
+
+.profile-mode-card.profile-mode-card--compact::before {
+  background: radial-gradient(
+    80% 60% at 100% 0%,
+    var(--profile-mode-card-accent-center) 0%,
+    var(--profile-mode-card-accent-shade) 42%,
+    transparent 100%
+  );
 }
 
 .profile-mode-card[data-accent="ultra"] {
@@ -3216,9 +3339,9 @@ html[data-profile-flow-open="true"] .cookie-banner-card {
    keep status copy at WCAG AA (4.5:1) on white (light) and on the error-tinted
    and elevated dark surfaces, without redefining the palette. */
 :root {
-  --color-success-text: color-mix(in srgb, var(--color-success) 48%, black);
-  --color-warning-text: color-mix(in srgb, var(--color-warning) 70%, black);
-  --color-error-text: color-mix(in srgb, var(--color-error) 85%, black);
+  --color-success-text: color-mix(in srgb, var(--color-success) 42%, black);
+  --color-warning-text: color-mix(in srgb, var(--color-warning) 60%, black);
+  --color-error-text: color-mix(in srgb, var(--color-error) 78%, black);
   --color-accent-text: color-mix(in srgb, var(--color-accent) 65%, black);
 }
 
@@ -3227,6 +3350,13 @@ html[data-profile-flow-open="true"] .cookie-banner-card {
   --color-warning-text: var(--color-warning);
   --color-error-text: color-mix(in srgb, var(--color-error) 75%, white);
   --color-accent-text: var(--color-accent);
+}
+
+/* Partial cards dim their subtree. Strengthen default description copy while
+   preserving custom semantic foregrounds, which replace the secondary class. */
+:where([data-content-state="partial"])
+[data-slot="card-description"].text-secondary-token {
+  color: var(--color-text-primary-token);
 }
 
 /* ============================================
@@ -3500,6 +3630,44 @@ html[data-profile-flow-open="true"] .cookie-banner-card {
 }
 
 /* ============================================
+   PUBLIC SURFACE + SMART LINK TOKENS (2026-11-11)
+   ============================================
+   Theme-constant on purpose: each token carries the exact literal its
+   component drew before it existed (component certification, tokens), so
+   light and dark compute what they did. The pattern pairs keep their own
+   light and dark members because the components pick one with dark:. */
+:root {
+  /* SmartLinkPoweredByFooter light brand line and link hover; dark: keeps
+     muted-foreground. Same values as Tailwind neutral-700 and neutral-950. */
+  --color-smart-link-footer-text: oklch(37.1% 0 none);
+  --color-smart-link-footer-text-hover: oklch(14.5% 0 none);
+  /* PublicSurfaceShell scrim over blurred ambient artwork. */
+  --public-surface-ambient-scrim:
+    radial-gradient(circle at top, rgba(255, 255, 255, 0.06), transparent 26%),
+    linear-gradient(
+      180deg,
+      rgba(6, 8, 13, 0.34) 0%,
+      rgba(7, 8, 10, 0.82) 42%,
+      rgba(8, 9, 10, 0.98) 100%
+    );
+  /* BackgroundPattern grid lines and dots. */
+  --background-pattern-grid:
+    linear-gradient(rgba(0, 0, 0, 0.02) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0, 0, 0, 0.02) 1px, transparent 1px);
+  --background-pattern-grid-dark:
+    linear-gradient(rgba(255, 255, 255, 0.02) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
+  --background-pattern-dots: radial-gradient(
+    rgba(0, 0, 0, 0.1) 1px,
+    transparent 1px
+  );
+  --background-pattern-dots-dark: radial-gradient(
+    rgba(255, 255, 255, 0.1) 1px,
+    transparent 1px
+  );
+}
+
+/* ============================================
    MENU/DROPDOWN TOKENS
    ============================================ */
 :root {
@@ -3667,6 +3835,13 @@ html[data-profile-flow-open="true"] .cookie-banner-card {
   --color-accent-purple-subtle: rgba(169, 130, 255, 0.12);
   --color-accent-pink: #ff48d2;
   --color-accent-pink-subtle: rgba(255, 72, 210, 0.12);
+  /* Night-page palette paints dark surfaces, so the accent TEXT variants
+     must rebind to the dark-surface values: the light :root text variants
+     are tuned for white paper and fail 4.5:1 on the dark tiles (axe
+     color-contrast). */
+  --color-accent-blue-text: var(--color-accent-blue);
+  --color-accent-pink-text: var(--color-accent-pink);
+  --color-accent-purple-text: var(--color-accent-purple);
   --color-accent-red: #ff677d;
   --color-accent-red-subtle: rgba(255, 103, 125, 0.12);
   --color-accent-orange: #ffc857;
@@ -3697,6 +3872,7 @@ html[data-profile-flow-open="true"] .cookie-banner-card {
   --system-b-entity-chip-artist-accent: var(--color-accent-purple);
   --system-b-entity-chip-track-accent: var(--color-accent-blue);
   --system-b-entity-chip-event-accent: var(--color-accent-orange);
+  --system-b-entity-chip-profile-accent: var(--color-accent-purple);
   background-color: var(--color-bg-base);
   color: var(--color-text-primary-token);
   color-scheme: dark;
@@ -3704,8 +3880,8 @@ html[data-profile-flow-open="true"] .cookie-banner-card {
 
 /* JOV-8780 — certified light mode for the marketing night stages.
 
-   home, pricing, launch, artist-profiles and artist-notifications are
-   art-directed night pages: they paint fixed cinematic-black surfaces
+   home, pricing, launch, artist-profiles, artist-notifications and the
+   teleprompter studio's camera are art-directed night pages: they paint fixed cinematic-black surfaces
    (.home-viewport, .system-b-pricing-page, .system-b-launch-page,
    .frame-skin, bg-black stages) in BOTH themes. In the light theme their
    text/badge/button tokens flipped to light-ink values over those dark
@@ -3728,7 +3904,8 @@ html:not(.dark) .home-viewport,
 html:not(.dark) .system-b-marketing:has(.system-b-pricing-page),
 html:not(.dark) .system-b-marketing:has(.system-b-launch-page),
 html:not(.dark) .system-b-marketing:has(.artist-profiles-home-system),
-html:not(.dark) .system-b-marketing:has(.artist-notifications-landing) {
+html:not(.dark) .system-b-marketing:has(.artist-notifications-landing),
+html:not(.dark) .teleprompter-studio {
   color-scheme: dark;
   --color-bg-base: #030406;
   --color-bg-surface-0: #07080a;
@@ -3772,6 +3949,13 @@ html:not(.dark) .system-b-marketing:has(.artist-notifications-landing) {
   --color-accent-purple-subtle: rgba(169, 130, 255, 0.12);
   --color-accent-pink: #ff48d2;
   --color-accent-pink-subtle: rgba(255, 72, 210, 0.12);
+  /* Night-page palette paints dark surfaces, so the accent TEXT variants
+     must rebind to the dark-surface values: the light :root text variants
+     are tuned for white paper and fail 4.5:1 on the dark tiles (axe
+     color-contrast). */
+  --color-accent-blue-text: var(--color-accent-blue);
+  --color-accent-pink-text: var(--color-accent-pink);
+  --color-accent-purple-text: var(--color-accent-purple);
   --color-accent-red: #ff677d;
   --color-accent-red-subtle: rgba(255, 103, 125, 0.12);
   --color-accent-orange: #ffc857;
@@ -3858,6 +4042,7 @@ html:not(.dark) .system-b-marketing:has(.artist-notifications-landing) {
   --system-b-entity-chip-artist-accent: var(--color-accent-purple);
   --system-b-entity-chip-track-accent: var(--color-accent-blue);
   --system-b-entity-chip-event-accent: var(--color-accent-orange);
+  --system-b-entity-chip-profile-accent: var(--color-accent-purple);
   --ds-marketing-eyebrow-color: #9da2ac;
   --public-shell-text: #f5f7fb;
 }
@@ -3952,6 +4137,15 @@ html:not(.dark) .smart-link-powered-by {
     transition:
       box-shadow 150ms cubic-bezier(0.32, 0.72, 0, 1),
       border-color 150ms cubic-bezier(0.32, 0.72, 0, 1);
+  }
+}
+
+/* Icons never squash. A Lucide glyph beside truncating text keeps its drawn
+   size, so the text gives way instead. :where() keeps specificity at 0 and
+   the base layer sits under utilities, so an explicit shrink class still wins. */
+@layer base {
+  :where(svg.lucide) {
+    flex-shrink: 0;
   }
 }
 
@@ -4278,6 +4472,27 @@ html:not(.dark) .smart-link-powered-by {
   outline: 2px solid var(--jovie-entity-accent);
   outline-offset: 2px;
   border-radius: var(--radius-sm);
+}
+
+/* About credits read as prose, not as accent links: the mention takes the
+   card's primary text color with a quiet underline that firms up on hover,
+   like the profile's AEO prose (walk 2026-11-09: bright blue underlines). */
+.profile-about-credits .profile-entity-mention {
+  color: var(--color-text-tooltip);
+  text-decoration-color: color-mix(
+    in oklab,
+    var(--color-text-tooltip) 32%,
+    transparent
+  );
+}
+
+.profile-about-credits .profile-entity-mention:hover,
+.profile-about-credits .profile-entity-mention:focus-visible {
+  text-decoration-color: var(--color-text-tooltip);
+}
+
+.profile-about-credits .profile-entity-mention:focus-visible {
+  outline-color: var(--color-text-tooltip);
 }
 
 /* ============================================

@@ -198,4 +198,48 @@ describe('dashboard Lighthouse background build wait protocol', () => {
     expect(result.stderr).toContain('pid must be an integer');
     rmSync(dir, { recursive: true, force: true });
   });
+
+  it('dashboard job overlaps the fallback compile with setup and waits before probes', () => {
+    const source = readFileSync(
+      resolve(REPO_ROOT, '.github/workflows/ci.yml'),
+      'utf8'
+    );
+    const start = source.indexOf('  ci-lighthouse-dashboard-pr:');
+    const end = source.indexOf('\n  ci-lighthouse-onboarding-pr:');
+    expect(start).toBeGreaterThan(-1);
+    expect(end).toBeGreaterThan(start);
+    const job = source.slice(start, end);
+    const at = (label: string) => {
+      const index = job.indexOf(label);
+      expect(index, label).toBeGreaterThan(-1);
+      return index;
+    };
+    const order = [
+      'uses: ./.github/actions/setup-node-pnpm',
+      'Restore Next build cache for Lighthouse (read-only)',
+      'Build base commit for relative Lighthouse budgets',
+      'Restore workspace to the exact head',
+      'Start fallback build in background',
+      'Run background-build helper contract tests',
+      'Setup Playwright (Chromium)',
+      'Create ephemeral Neon database branch (with retry)',
+      'Run migrations (ephemeral Neon)',
+      'Wait for background fallback build',
+      'Run signed-in shell navigation',
+      'tests/e2e/chat-history-switcher.spec.ts',
+      'Run signed-in Lighthouse budgets',
+      'Kill background build process group (if still alive)',
+      'Cleanup ephemeral Neon branch',
+    ];
+    let previous = -1;
+    for (const label of order) {
+      const index = at(label);
+      expect(index, label).toBeGreaterThan(previous);
+      previous = index;
+    }
+    expect(job).toContain('bash scripts/ci/wait-background-build.sh');
+    expect(job).not.toContain('Build app fallback for dashboard Lighthouse');
+    expect(job).toContain('actions/cache/restore@');
+    expect(job).not.toContain('actions/cache/save@');
+  });
 });

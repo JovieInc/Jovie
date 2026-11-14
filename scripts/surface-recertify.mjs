@@ -3,14 +3,17 @@
 //   node scripts/surface-recertify.mjs list                      stale canonical groups as JSON (exit 0)
 //   node scripts/surface-recertify.mjs capture --base-url U --out DIR
 //   node scripts/surface-recertify.mjs apply --evidence DIR --run-url URL --artifact NAME --sha SHA
-// `capture` needs Playwright; `list` and `apply` are node-only.
+//   node scripts/surface-recertify.mjs renew --ref "what changed and how it was verified"
+// `capture` needs Playwright; `list`, `apply` and `renew` are node-only.
+// `renew` is for the PR that changes certified source: it writes one evidence
+// entry per file that PR made stale, so the PR carries its own renewal.
 import { createHash } from 'node:crypto';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { parseArgs } from 'node:util';
-import { CENSUS_PATH } from './design-surface-census.mjs';
 import {
+  evidenceEntries,
   REQUIRED_WIDTHS,
   readCensus,
   renewGroup,
@@ -28,6 +31,7 @@ const { positionals, values } = parseArgs({
     'run-url': { type: 'string' },
     artifact: { type: 'string' },
     sha: { type: 'string' },
+    ref: { type: 'string' },
   },
 });
 const root = values.root;
@@ -122,9 +126,16 @@ async function capture() {
   }
 }
 
+function writeEntries(entries) {
+  for (const { path, entry } of entries) {
+    mkdirSync(dirname(join(root, path)), { recursive: true });
+    writeFileSync(join(root, path), `${JSON.stringify(entry, null, 2)}\n`);
+  }
+}
+
 function apply() {
   const sha = values.sha ?? '';
-  let census = readCensus(root);
+  const census = readCensus(root);
   const renewed = [];
   const failed = [];
   // Not recertifiable by design (dynamic route, multi-source); not a failure.
@@ -138,26 +149,34 @@ function apply() {
       const capture = JSON.parse(
         readFileSync(join(values.evidence, group.id, 'capture.json'), 'utf8')
       );
-      census = renewGroup(census, group, {
-        capture,
-        at: new Date().toISOString(),
-        runUrl: values['run-url'],
-        artifactName: values.artifact,
-        sha,
-      });
+      writeEntries(
+        renewGroup(group, {
+          capture,
+          at: new Date().toISOString(),
+          runUrl: values['run-url'],
+          artifactName: values.artifact,
+          sha,
+        })
+      );
       renewed.push(group.id);
     } catch (error) {
       failed.push(String(error.message));
     }
   }
-  if (renewed.length)
-    writeFileSync(
-      join(root, CENSUS_PATH),
-      `${JSON.stringify(census, null, 2)}\n`
-    );
   console.log(JSON.stringify({ renewed, failed, skipped }, null, 2));
   // Renewals still land; the workflow fails its last step on any rejection.
   if (failed.length && !renewed.length) process.exitCode = 1;
+}
+
+function renew() {
+  const at = new Date().toISOString();
+  const written = [];
+  for (const group of staleGroups(root)) {
+    const entries = evidenceEntries(group, { at, ref: values.ref });
+    writeEntries(entries);
+    written.push(...entries.map(item => item.path));
+  }
+  console.log(JSON.stringify({ renewed: written }, null, 2));
 }
 
 if (command === 'list') {
@@ -166,6 +185,8 @@ if (command === 'list') {
   await capture();
 } else if (command === 'apply') {
   apply();
+} else if (command === 'renew') {
+  renew();
 } else {
   console.error(`unknown command ${command}`);
   process.exitCode = 2;

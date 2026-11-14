@@ -56,6 +56,7 @@ import stage_events  # noqa: E402  (jovie-stage-event/v1 rows for the stage coll
 import ledger_archive  # noqa: E402  (bounded runs/ledger.jsonl)
 import throughput_sentinel  # noqa: E402
 import health_checks  # noqa: E402  (source certification and release health providers)
+import credentials_spend  # noqa: E402  (shared redacted Linear app metadata)
 import integration_probes  # noqa: E402  (synthetic probes of the Gem integrations fleet work depends on)
 
 COOL_OFF_S = 6 * 3600
@@ -646,6 +647,8 @@ def observe(host, lane, codex, now: float | None = None) -> dict:
         "publicFeed": read_json(state / "public-feed-sizes.json", {}),
         "installLag": {key: read_json(state / "update.json", {}).get(key) for key in ("behindS", "behindCommit", "error", "at")},
         "linearAppCredential": _linear_app_credential(lane),
+        # Local status only: this remains observable when Linear itself cannot file an issue.
+        "linearAppToken": credentials_spend.app_token_status(state, now, True),
         "strandedClaims": stranded_claims,
         "ownership": {key: value for key, value in read_json(state / "ownership.json", {}).items()
                       if key not in ("ownerlessSince", "evidenceNoted", "moved", "claimsReleased")},
@@ -1217,6 +1220,15 @@ def judge(obs: dict, previous: dict | None = None) -> dict[str, str]:
         alerts["linear-app-credential-missing"] = (
             "no Jovie Lanes Linear app credential (~/.config/jovie-lanes/linear-app.env); lanes Linear "
             "access fails closed (no personal-key fallback) until the lanes host owner reinstalls it")
+    app_status = obs.get("linearAppToken") or {}
+    expiry = app_status.get("expiresInS")
+    if obs.get("linearAppCredential") is True and (
+            app_status.get("mintFailed") or app_status.get("scopeMatches") is not True or
+            type(expiry) not in (int, float) or expiry <= 0):
+        alerts["linear-app-token-unavailable"] = (
+            "Jovie Lanes app token metadata is missing, expired, scope-mismatched, or reports a failed mint; "
+            "owner gem-lanes: inspect redacted token status. This condition remains in the independent "
+            "GitHub status feed when Linear filing is unavailable; credential changes need separate authority")
     probed = obs.get("integrationProbes")
     # A red probe of the same component is the more specific incident: one issue, not two.
     same_incident = integration_probes.suppressed_silence(probed)

@@ -28,7 +28,12 @@ describe('WaitlistOutcomeView pending receipt', () => {
     expect(
       screen.getByText(/jov\.ie\/coolartist is yours/i)
     ).toBeInTheDocument();
-    expect(screen.getByText(/reserved/i)).toBeInTheDocument();
+    // The locked post-claim copy (Tim, 2026-11-09), verbatim.
+    expect(
+      screen.getByRole('heading', {
+        name: 'Your handle is reserved. You’re on the waitlist.',
+      })
+    ).toBeInTheDocument();
   });
 
   it('falls back to generic saved copy when no handle was reserved', () => {

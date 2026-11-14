@@ -31,3 +31,60 @@ export const PlainText: Story = {
     segments: [{ type: 'text', text: 'No entity mentions in this bio.' }],
   },
 };
+
+/** A bio with no text yet renders nothing, so the paragraph collapses. */
+export const EmptySegments: Story = {
+  args: {
+    segments: [],
+  },
+  render: args => (
+    <p className='w-80 min-h-6 text-mid text-secondary-token'>
+      <EntityMentionText {...args} />
+    </p>
+  ),
+};
+
+export const LongContentWrapping: Story = {
+  args: {
+    segments: [
+      { type: 'text', text: 'Featured on ' },
+      {
+        type: 'release',
+        text: 'Never Say A Word (Extended Club Mix featuring the Los Angeles Philharmonic Strings)',
+        href: '/tim/never-say-a-word-extended',
+      },
+      { type: 'text', text: ' alongside ' },
+      {
+        type: 'artist',
+        text: 'Cosmic Gate and the Unusually Long Collective Name Ensemble',
+        href: '/cosmicgate',
+      },
+      {
+        type: 'text',
+        text: ', a run of collaborations that took the record from late-night sets to festival main stages across three continents.',
+      },
+    ],
+  },
+  render: args => (
+    <p className='w-72 text-mid leading-6 text-secondary-token'>
+      <EntityMentionText {...args} />
+    </p>
+  ),
+};
+
+export const RtlMixedDirection: Story = {
+  args: {
+    segments: [
+      { type: 'text', text: 'أغنية جديدة ' },
+      { type: 'release', text: 'The Deep End', href: '/tim/the-deep-end' },
+      { type: 'text', text: ' متاحة الآن، من إنتاج ' },
+      { type: 'artist', text: 'Cosmic Gate', href: '/cosmicgate' },
+      { type: 'text', text: '.' },
+    ],
+  },
+  render: args => (
+    <p dir='rtl' className='w-72 text-mid leading-6 text-secondary-token'>
+      <EntityMentionText {...args} />
+    </p>
+  ),
+};

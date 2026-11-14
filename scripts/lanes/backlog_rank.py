@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import re
 from datetime import datetime
+from itertools import pairwise
 
 import workstreams
 
@@ -116,18 +117,84 @@ def order(rows: list[dict], now: float) -> list[dict]:
                                          row.get("identifier") or ""))
 
 
-def plan_sort_orders(ranked: list[dict], current: dict[str, float], others_min: float, step: float = 1.0) -> dict[str, float]:
+def _kept(values: list[float], limit: float) -> set[int]:
+    """Positions of one longest strictly increasing run (not necessarily contiguous) of `values`,
+    using only values below `limit`. Those rows are already in place and need no write."""
+    best: list[list[int]] = []
+    for n, value in enumerate(values):
+        chain: list[int] = []
+        if value < limit:
+            for m in range(n):
+                if best[m] and values[m] < value and len(best[m]) > len(chain):
+                    chain = best[m]
+            chain = [*chain, n]
+        best.append(chain)
+    return set(max(best, key=len, default=[]))
+
+
+def _fill(values: list[float], kept: set[int], limit: float, step: float) -> list[float] | None:
+    """`values` with every position outside `kept` moved between its kept neighbours (or just above
+    the first / below `limit` at the ends). None when there is no room left between two neighbours."""
+    out = list(values)
+    n, count = 0, len(values)
+    while n < count:
+        if n in kept:
+            n += 1
+            continue
+        end = n
+        while end < count and end not in kept:
+            end += 1
+        run = end - n
+        lo = out[n - 1] if n else None
+        hi = values[end] if end < count else (limit if limit != float("inf") else None)
+        for j in range(run):
+            if lo is None and hi is None:
+                return None
+            if lo is None:
+                out[n + j] = hi - step * (run - j)
+            elif hi is None:
+                out[n + j] = lo + step * (j + 1)
+            else:
+                if (hi - lo) / (run + 1) < 1e-4:
+                    return None
+                out[n + j] = lo + (hi - lo) * (j + 1) / (run + 1)
+        n = end
+    # Round only the values this pass moved: Linear's own sortOrder values carry more decimals, and
+    # rounding a kept value would turn it into a spurious write (or collide two close neighbours).
+    out = [value if n in kept else round(value, 6) for n, value in enumerate(out)]
+    if any(b <= a for a, b in pairwise(out)) or (limit != float("inf") and out[-1] >= limit):
+        return None
+    return out
+
+
+def plan_sort_orders(ranked: list[dict], current: dict[str, float], others_min: float, step: float = 1.0,
+                     others: dict[str, float] | None = None) -> dict[str, float]:
     """New Linear sortOrder values (lower = higher in the list) that put `ranked` in score order
-    above every other Backlog row. Empty when the list is already in that shape, so a settled
-    Backlog costs no writes and the values never drift downward."""
+    above `others_min`, writing as few rows as possible: rows already in order keep their value and
+    only the rest move between their neighbours. A settled list writes nothing.
+
+    With `others` (the competing rows below the list and their sortOrder), a newcomer that Linear
+    listed above the ranked rows is moved below them instead, when that takes fewer writes than
+    moving the whole list above it (JOV-12550: one new issue used to rewrite all 40 rows)."""
     ids = [row["id"] for row in ranked]
     if not ids or any(i not in current for i in ids):
         return {}
     values = [current[i] for i in ids]
-    if values == sorted(values) and len(set(values)) == len(values) and values[-1] < others_min:
-        return {}
-    count = len(ids)
-    return {i: round(others_min - (count - n) * step, 6) for n, i in enumerate(ids)}
+    filled = _fill(values, _kept(values, others_min), others_min, step)
+    if filled is None:  # no room between neighbours: lay the list out again, once
+        base = others_min if others_min != float("inf") else min(values)
+        filled = [round(base - (len(ids) - n) * step, 6) for n in range(len(ids))]
+    plan = {i: v for i, v, old in zip(ids, filled, values) if v != old}
+    if others:
+        loose = _fill(values, _kept(values, float("inf")), float("inf"), step)
+        if loose is not None:
+            top = loose[-1]
+            intruders = sorted((value, key) for key, value in others.items() if key not in set(ids) and value <= top)
+            demote = {i: v for i, v, old in zip(ids, loose, values) if v != old}
+            demote.update({key: round(top + step * (n + 1), 6) for n, (_, key) in enumerate(intruders)})
+            if len(demote) < len(plan):
+                return demote
+    return plan
 
 
 def with_factory_floor(ordered: list[dict], take: int, factory_share: float | None, floor: float) -> list[dict]:

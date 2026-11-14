@@ -1,8 +1,8 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { HOMEPAGE_INVITE_ANCHOR } from '@/data/homepageEditorialCopy';
 import { HOME_MARKETING_HEADER_CTA } from '@/data/marketing/headerCta';
+import { getClaimProfileIntent } from '@/data/marketingCtaIntents';
 
 function readWebSource(path: string): string {
   return readFileSync(resolve(process.cwd(), path), 'utf8');
@@ -34,27 +34,23 @@ describe('support route header contract', () => {
       'penContractId={MARKETING_PEN_CONTRACT_IDS.shell.header}'
     );
     expect(headerSource).toContain('getHomepageFrontDoorCtaContract');
-    expect(headerSource).toContain(
-      'getHomepageFrontDoorCtaContract(FEATURE_FLAGS.WAITLIST_ENABLED).primary'
-    );
-    // JOV-6860: every marketing-header route shares the waitlist-mode
+    expect(headerSource).toContain('getHomepageFrontDoorCtaContract().primary');
+    // JOV-6860: every marketing-header route shares the one
     // front-door CTA via the single resolver; no per-route CTA overrides
     // other than the locked homepage entry.
     expect(headerSource).toContain('resolveMarketingHeaderPrimaryCta');
-    expect(headerSource).toContain(
-      'getHomepageFrontDoorCtaContract(waitlistEnabled).primary'
-    );
+    expect(headerSource).not.toContain('waitlistEnabled');
     expect(headerSource).not.toContain('MARKETING_CTA_INTENTS');
     expect(headerSource).not.toContain('APP_ROUTES.ARTIST_PROFILES]:');
-    // Homepage conversion lock (JOV-5085, label EVENT 2026-11-03): / is
-    // invite-only, so its header action scrolls to the on-page invitation
-    // form; other routes keep the front-door CTA.
+    // Homepage claim action (Tim, 2026-11-12: "Switch it"): / sends its
+    // header action into /start with the shared claim-profile intent; other
+    // routes keep the front-door CTA.
     expect(headerSource).toContain(
       '[APP_ROUTES.HOME]: HOME_MARKETING_HEADER_CTA'
     );
     expect(HOME_MARKETING_HEADER_CTA).toEqual({
-      label: 'Request an Invite',
-      href: `/#${HOMEPAGE_INVITE_ANCHOR}`,
+      label: getClaimProfileIntent().label,
+      href: getClaimProfileIntent().href,
     });
     expect(headerSource).toContain("treatment: 'wordmark'");
     expect(headerSource).toContain('MARKETING_NAV_LINKS.map');

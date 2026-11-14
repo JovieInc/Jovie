@@ -5,7 +5,6 @@ export { AuthBranding } from './AuthBranding';
 export { AuthFormContainer } from './AuthFormContainer';
 // Organisms
 export { AuthLayout } from './AuthLayout';
-export { AuthOfferSummary } from './AuthOfferSummary';
 export { AuthPageSkeleton } from './AuthPageSkeleton';
 export {
   AuthProviderButtonSlot,

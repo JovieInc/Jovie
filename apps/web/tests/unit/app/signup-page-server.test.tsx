@@ -27,7 +27,8 @@ describe('/signup page server redirect', () => {
   afterEach(() => vi.unstubAllEnvs());
 
   beforeEach(() => {
-    // These fixtures exercise the explicit-reopen path; closed defaults are covered separately.
+    // These fixtures exercise the open default (Tim, 2026-11-09); the closed
+    // kill switch is covered in public-signup-closed.test.tsx.
     vi.stubEnv('FEATURE_PUBLIC_SIGNUP_CLOSED', 'false');
     vi.resetModules();
     resolveUserStateMock.mockReset();

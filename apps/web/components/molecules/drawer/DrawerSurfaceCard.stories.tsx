@@ -51,3 +51,25 @@ export const BusySemanticSection: Story = {
     children: 'Loading analytics…',
   },
 };
+
+export const LongContent: Story = {
+  args: {
+    variant: 'card',
+    children:
+      'Spotify, Apple Music, YouTube Music, Tidal, Deezer, Amazon Music, SoundCloud, Beatport, Bandcamp and Audiomack links appear in this drawer card once the catalog sync finishes for every territory this release is distributed to.',
+  },
+};
+
+export const Rtl: Story = {
+  args: {
+    variant: 'card',
+    children: 'سطح الدرج',
+  },
+  decorators: [
+    Story => (
+      <div dir='rtl' lang='ar' className='w-80 bg-surface-0 p-3'>
+        <Story />
+      </div>
+    ),
+  ],
+};

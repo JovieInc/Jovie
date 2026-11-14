@@ -15,6 +15,7 @@ import {
   CHECK_COMMAND,
   DESIGN_EXCEPTION_REGISTRIES,
   evaluateDesignExceptionRegistries,
+  exceptionMetadataIssues,
   ISSUE_CODES,
 } from '../../design-exception-registry.mjs';
 
@@ -78,6 +79,48 @@ function evaluatePair(candidateOverrides = {}, drop = {}) {
 }
 
 describe('design exception-registry contract (JOV-5447)', () => {
+  it.each(
+    [
+      '2024-1-5',
+      '2024/01/05',
+      '2026-99-99',
+      '2026-02-30',
+      '2027-02-29',
+      20270101,
+      null,
+      [],
+      {},
+    ].map(expiresOn => ({ expiresOn }))
+  )(
+    'rejects invalid expiry $expiresOn even with a removal condition',
+    ({ expiresOn }) => {
+      const entry = exception({
+        expiresOn,
+        removalCondition: 'Remove after the canonical component migration',
+      });
+      expect(exceptionMetadataIssues(entry, 'exception')).toContain(
+        'exception: expiresOn must be a valid date (YYYY-MM-DD)'
+      );
+      expect(
+        evaluatePair({ [SERIF]: { serif: [entry] } }).issues.map(
+          item => item.code
+        )
+      ).toContain(ISSUE_CODES.MISSING_EXCEPTION_METADATA);
+    }
+  );
+
+  it.each([undefined, '', '2027-01-01', '2028-02-29'])(
+    'accepts optional or valid expiry %j with a removal condition',
+    expiresOn => {
+      expect(
+        exceptionMetadataIssues(
+          exception({ expiresOn, removalCondition: 'Remove after migration' }),
+          'exception'
+        )
+      ).toEqual([]);
+    }
+  );
+
   it('fails closed for every required rejection', () => {
     expect(LANE_GROUPS.remaining).toContain('design-exception-registry');
     expect(CHECK_COMMAND).not.toMatch(/vitest|playwright|e2e/i);
@@ -230,6 +273,42 @@ describe('design exception-registry contract (JOV-5447)', () => {
       ).toContain(ISSUE_CODES.SELF_SEEDED_REGISTRY);
     }
   );
+
+  it('locks the source-identity baseline and allowlist against unguarded growth', () => {
+    const baselinePath = `${DS}/source-identity.baseline.json`;
+    const allowlistPath = `${DS}/source-identity.allowlist.json`;
+    const baseline = readJson(baselinePath);
+    const allowlist = readJson(allowlistPath);
+    const grown = evaluatePair({
+      [baselinePath]: {
+        ...baseline,
+        identities: [...baseline.identities, 'a.tsx\tarbitrary-value\tw-[1px]'],
+      },
+      [allowlistPath]: {
+        ...allowlist,
+        identities: [
+          ...allowlist.identities,
+          { file: 'a.tsx', rule: 'arbitrary-value', value: 'w-[1px]' },
+        ],
+      },
+    });
+    for (const registry of ['source-identity', 'source-identity-allowlist'])
+      expect(grown.issues).toContainEqual(
+        expect.objectContaining({ registry, code: ISSUE_CODES.SET_GROWTH })
+      );
+    // Pruning, and rewording an existing allowlist reason, are not growth.
+    expect(
+      evaluatePair({
+        [baselinePath]: { ...baseline, identities: [] },
+        [allowlistPath]: {
+          ...allowlist,
+          identities: allowlist.identities
+            .slice(1)
+            .map(entry => ({ ...entry, reason: 'reworded reason' })),
+        },
+      }).ok
+    ).toBe(true);
+  });
 
   it('passes shrink, unchanged, and complete documented exceptions', () => {
     expect(evaluatePair().ok).toBe(true);

@@ -98,7 +98,7 @@ function focusSiblingMenuItem(
   input: HTMLInputElement | null,
   placement: 'first' | 'last'
 ): HTMLElement | undefined {
-  const menu = input?.closest('[role="menu"]');
+  const menu = input?.closest('[role="menu"], [role="group"]');
   if (!menu) return undefined;
 
   const menuItems = Array.from(

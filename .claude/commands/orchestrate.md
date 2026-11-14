@@ -62,7 +62,7 @@ Classify each PR into one of these states:
 - **CONFLICT**: Has merge conflicts that need resolution
 - **FAILING_CHECKS**: CI failures (lint, typecheck, tests)
 - **REVIEW_BLOCKED**: Has requested changes or blocking reviews
-- **COMMENT_PENDING**: Has unaddressed review comments (AI or human)
+- **COMMENT_PENDING**: Has unaddressed human review comments (resolve bot comments yourself)
 - **DUPLICATE**: Overlaps with another PR addressing the same concern
 - **STUCK**: No progress possible without human intervention
 
@@ -73,7 +73,8 @@ This phase runs FIRST because it resolves the most PRs with the least effort.
 For EVERY open PR (unless it has conflicts or is a duplicate):
 
 ### 1a. Convert drafts that are ready
-If a draft PR has all checks passing and no unresolved comments:
+If a draft PR has all checks passing and no unresolved human comments (bot
+threads never hold a green PR: fix or answer them, then resolve them yourself):
 ```bash
 gh pr ready <NUMBER>
 ```

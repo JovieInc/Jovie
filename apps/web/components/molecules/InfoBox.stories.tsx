@@ -54,7 +54,7 @@ export const Error: Story = {
   },
 };
 
-export const WithoutTitle: Story = {
+export const PartialWithoutTitle: Story = {
   args: {
     variant: 'info',
     children: 'This info box has no title, just content.',
@@ -95,4 +95,31 @@ export const InlineNotices: Story = {
       </InfoBox>
     </div>
   ),
+};
+
+export const LongContent: Story = {
+  args: {
+    title:
+      'Your distributor has not confirmed the release date for every territory yet',
+    variant: 'warning',
+    children:
+      'Spotify, Apple Music and YouTube Music confirmed Friday, but Tidal, Deezer, Amazon Music and Beatport are still processing the delivery. Smart links show the stores that are live and add the rest automatically as each one confirms the release.',
+    className: 'w-96',
+  },
+};
+
+export const Rtl: Story = {
+  args: {
+    title: 'معلومات',
+    variant: 'info',
+    children: 'هذه رسالة إعلامية لمساعدة المستخدم.',
+    className: 'w-96',
+  },
+  decorators: [
+    Story => (
+      <div dir='rtl' lang='ar'>
+        <Story />
+      </div>
+    ),
+  ],
 };

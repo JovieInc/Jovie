@@ -1,5 +1,6 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
+import { idleBillingQueries } from '@/tests/fixtures/idle-billing-queries';
 import {
   CompactReleasePlanUpgradeCard,
   ReleasePlanUpgradeInterstitial,
@@ -14,9 +15,7 @@ vi.mock('@/lib/analytics', () => ({
   useFeatureFlag: () => false,
 }));
 
-vi.mock('@/lib/queries', () => ({
-  useCheckoutMutation: () => ({ mutate: vi.fn(), isPending: false }),
-}));
+vi.mock('@/lib/queries', () => idleBillingQueries);
 
 describe('TasksUpgradeInterstitial', () => {
   it('names the canonical Artist Presence plan on the compact upgrade CTA', () => {
@@ -39,5 +38,19 @@ describe('TasksUpgradeInterstitial', () => {
     expect(
       screen.getByRole('button', { name: 'Upgrade to Artist Presence' })
     ).toBeInTheDocument();
+  });
+});
+
+describe('TasksUpgradeInterstitial scale tokens', () => {
+  it('uses the 16px text-base step instead of the text-lg alias', async () => {
+    const { readFileSync } = await import('node:fs');
+    const { join } = await import('node:path');
+    const source = readFileSync(
+      join(import.meta.dirname, 'TasksUpgradeInterstitial.tsx'),
+      'utf8'
+    );
+
+    expect(source).not.toMatch(/(?<![\w-])text-lg\b/);
+    expect(source).toContain('text-base');
   });
 });

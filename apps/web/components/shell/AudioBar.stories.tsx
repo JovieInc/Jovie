@@ -73,3 +73,69 @@ export const ExpandedWithFacts: Story = {
 export const ExpandedWithoutFacts: Story = {
   args: { waveformOn: true },
 };
+
+/** Waveform open on a track with no cue markers yet. */
+export const EmptyCues: Story = {
+  args: { waveformOn: true, cues: [] },
+};
+
+/** Only the required transport: no shuffle, previous, next or loop
+ *  handlers, and a track without lyrics or analyzed facts. */
+export const PartialTransport: Story = {
+  args: {
+    onShuffle: undefined,
+    onPrevious: undefined,
+    onNext: undefined,
+    onCycleLoop: undefined,
+    track: {
+      id: 'untitled-demo',
+      title: 'Untitled demo',
+      artist: 'Bahamas',
+    },
+  },
+};
+
+export const LongContent: Story = {
+  args: {
+    waveformOn: true,
+    cues: [
+      { at: 12, label: 'Intro with the extended a cappella vocal and pads' },
+      {
+        at: 48,
+        label: 'Second chorus into the long instrumental breakdown section',
+      },
+      { at: 86, label: 'Outro with the reprise of the opening synth line' },
+    ],
+    track: {
+      id: 'midnight-drive',
+      title:
+        'Midnight Drive Through the Neon City (Extended Club Mix featuring the Late Night Strings)',
+      artist: 'The Long Weekend Collective',
+      hasLyrics: true,
+      bpm: 174,
+      musicalKey: 'F♯ minor (11A)',
+    },
+  },
+};
+
+export const Rtl: Story = {
+  args: {
+    waveformOn: true,
+    cues: [{ at: 40, label: 'المقطع الثاني' }],
+    track: {
+      id: 'layali',
+      title: 'ليالي المدينة الطويلة',
+      artist: 'فرقة الشرق',
+      hasLyrics: true,
+      bpm: 96,
+      musicalKey: '4A',
+    },
+  },
+  decorators: [
+    Story => (
+      <div dir='rtl' lang='ar'>
+        <Story />
+      </div>
+    ),
+  ],
+};

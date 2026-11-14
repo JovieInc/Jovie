@@ -3915,8 +3915,8 @@ function assertAiToolPromptContractCovered(output) {
   }
 
   const canvas = payload.canvas ?? {};
-  if (canvas.toolName !== 'generateCanvasPlan') {
-    return fail('canvas payload is not tied to generateCanvasPlan');
+  if (canvas.toolName !== 'canvasService') {
+    return fail('canvas payload is not tied to canvasService');
   }
   const canvasPromptLengths = canvas.promptLengths ?? {};
   for (const field of ['artworkProcessing', 'videoGeneration']) {

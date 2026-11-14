@@ -22,11 +22,14 @@ const columns: ColumnDef<RowData, any>[] = [
 
 // The body renders row.getVisibleCells(), so rows must come from a real
 // table model, not hand-built objects.
-function TableBodyWithModel(
-  props: Omit<ComponentProps<typeof VirtualizedTableBody<RowData>>, 'rows'>
-) {
+function TableBodyWithModel({
+  rowsData = data,
+  ...props
+}: Omit<ComponentProps<typeof VirtualizedTableBody<RowData>>, 'rows'> & {
+  readonly rowsData?: RowData[];
+}) {
   const table = useReactTable({
-    data,
+    data: rowsData,
     columns,
     getRowId: row => row.id,
     getCoreRowModel: getCoreRowModel(),
@@ -69,5 +72,22 @@ export const SearchableContextActions: Story = {
         onClick: () => undefined,
       },
     ],
+  },
+};
+
+const NO_ROWS: RowData[] = [];
+
+export const EmptyNoRows: Story = {
+  render: args => (
+    <table className='w-full text-primary-token'>
+      <caption className='text-start text-xs text-secondary-token'>
+        No releases match this view
+      </caption>
+      <TableBodyWithModel {...args} rowsData={NO_ROWS} />
+    </table>
+  ),
+  args: {
+    ...SearchableContextActions.args,
+    getContextMenuItems: undefined,
   },
 };
