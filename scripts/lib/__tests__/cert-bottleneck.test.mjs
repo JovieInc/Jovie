@@ -92,6 +92,7 @@ describe('the topmost Golden Path bottleneck', () => {
       {
         surface: 'landing',
         check: check('stranger-homepage-signup-entry', 'failed', 'invite only'),
+        alongside: [],
         behind: ['claim'],
       },
       { servedSha: SHA, runUrl: 'https://github.com/run/1' }

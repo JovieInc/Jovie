@@ -109,7 +109,7 @@ export const splitLine = split =>
 
 /**
  * @param {NonNullable<ReturnType<typeof topBottleneck>>} bottleneck
- * @param {{ servedSha: string, runUrl?: string | null }} context
+ * @param {{ servedSha: string, runUrl?: string | null, split?: ReturnType<typeof verdictSplit> | null }} context
  */
 export function bottleneckIssue(
   bottleneck,
