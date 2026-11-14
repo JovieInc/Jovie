@@ -24,7 +24,7 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 /** Nothing finished yet: the greeting alone, so the composer is the focus. */
-export const GreetingOnly: Story = {};
+export const Empty: Story = {};
 
 /** A finished draft for a real release, with one link that opens it. */
 export const WithFinishedDraft: Story = {
@@ -39,4 +39,48 @@ export const WithFinishedDraft: Story = {
       },
     },
   },
+};
+
+/** A long artist name and a long summary wrap without pushing the link off. */
+export const LongContent: Story = {
+  args: {
+    firstName: 'Wolfgang Amadeus Maximilian Featherstonehaugh-Cholmondeley',
+    result: {
+      id: 'draft-long',
+      item: {
+        kind: 'release',
+        id: 'release-long',
+        label: 'The Night We Drove Down Every Coastal Highway Until Sunrise',
+      },
+      result: {
+        kind: 'draft',
+        summary:
+          'Your playlist pitch for The Night We Drove Down Every Coastal Highway Until Sunrise is ready, with three curator matches.',
+        href: '/app/chat',
+      },
+    },
+  },
+};
+
+/** Right-to-left text keeps the greeting and link aligned to the start edge. */
+export const Rtl: Story = {
+  args: {
+    firstName: 'ليلى',
+    result: {
+      id: 'finding-rtl',
+      item: { kind: 'release', id: 'release-rtl', label: 'قمر' },
+      result: {
+        kind: 'finding',
+        summary: 'وجد جوفي ثلاث قوائم تشغيل جديدة لأغنية قمر.',
+        href: '/app/chat',
+      },
+    },
+  },
+  decorators: [
+    Story => (
+      <div dir='rtl'>
+        <Story />
+      </div>
+    ),
+  ],
 };

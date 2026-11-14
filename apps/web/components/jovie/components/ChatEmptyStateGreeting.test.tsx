@@ -1,4 +1,5 @@
 import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import type { ChatEmptyStateResult } from '../chat-empty-greeting';
@@ -45,6 +46,15 @@ describe('ChatEmptyStateGreeting', () => {
     );
     const link = screen.getByRole('link', { name: 'Review Draft' });
     expect(link).toHaveAttribute('href', '/app/chat/thread-1');
+  });
+
+  it('reaches the result link from the keyboard', async () => {
+    vi.useRealTimers();
+    const user = userEvent.setup();
+    render(<ChatEmptyStateGreeting firstName='Tim' result={draft} />);
+
+    await user.tab();
+    expect(screen.getByRole('link', { name: 'Review Draft' })).toHaveFocus();
   });
 
   it('never shows the Nov 14 chore suggestion or its Draft This With Jovie button', () => {
