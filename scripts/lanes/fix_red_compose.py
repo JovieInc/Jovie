@@ -1,7 +1,10 @@
 """Compose every deterministic fix-red class on one head, then run them with no model.
 
 Split from fix_red_classes and lane_runner so those files stay inside the company
-size ceiling. Stamp the body before a fixer push. An action outside the leaf order
+size ceiling. Stamp the body before a fixer push. Stamp the changelog before
+repair-win: that publisher also stamps a missing note, so running it first makes
+the later stamp a no-op and fails the compose. A repair-win publish that does
+not change the body fails the compose. An action outside the leaf order
 (alias graduation) is not run as a partial compose.
 """
 from __future__ import annotations
@@ -15,7 +18,7 @@ def compose_actions(actions: list[str]) -> list[str]:
     import fix_red_render_modes
 
     order = (
-        classes.SYNC_MAIN, classes.STAMP_CHANGELOG, classes.WIRE_CI_FAST, classes.RENUMBER,
+        classes.SYNC_MAIN, classes.STAMP_CHANGELOG, classes.REPAIR_WIN, classes.WIRE_CI_FAST, classes.RENUMBER,
         classes.SNAP_SPACING, classes.STRIP_CACHE, classes.MERGE_NARROWED, classes.REGISTER_DOMAIN,
         classes.ATOMIC_WRITE, classes.REPAIR_SCREEN_CERT, classes.BALANCE_HEADINGS, classes.UI_FEEL,
         fix_red_render_modes.ACTION, classes.RERUN)
@@ -74,6 +77,10 @@ def compose_deterministic_fix(lane, host, pr, route, worktree, log, receipt):
                 return None
         elif action == classes.RERUN:
             if not lane._rerun_failed(pr):
+                return None
+        elif action == classes.REPAIR_WIN:
+            import fix_red_measured_win
+            if not fix_red_measured_win.publish(pr, lambda args: lane.gh_call(args, priority="repair")):
                 return None
         else:
             fixer = deterministic_fixer(lane, action)
