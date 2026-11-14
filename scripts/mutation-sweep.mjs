@@ -416,14 +416,31 @@ for (const file of batch) {
   }
   const verdict = ratchetVerdict(file, entry, previous, baseline);
   if (entry.status === 'scored') scoredNow++;
-  if (!mutationRunSucceeded(run)) process.exitCode = 1;
+  // A timed-out or interrupted module is infrastructure (host load rose past
+  // the off-peak gate mid-run, or the batch was cancelled), not evidence about
+  // the module: it is recorded unscored above and retried by a later batch
+  // (pickBatch ranks error entries for retry). It must not fail the sweep —
+  // only a crashed/nonzero harness, unproved cleanup, or a ratchet regression
+  // does. Failing the sweep on any failed run turned one load-driven timeout
+  // into a red main.
+  const stoppedCleanly =
+    (run.timedOut || run.interrupted) && run.cleanupProved === true;
+  if (!mutationRunSucceeded(run) && !stoppedCleanly) process.exitCode = 1;
   if (!verdict.ok) regressions.push({ file, reason: verdict.reason });
   appendFileSync(
     runsLog,
     `${JSON.stringify({ at, file, sha: headSha, mode: values.mode, durationMs, status: entry.status, score: entry.score, valid: entry.valid, survived: entry.survived, ratchet: verdict.ok ? 'ok' : verdict.reason, runUrl })}\n`
   );
+  const scoreCell =
+    entry.status === 'scored'
+      ? `${entry.score}%`
+      : run.timedOut
+        ? 'timeout (unscored)'
+        : run.interrupted
+          ? 'interrupted (unscored)'
+          : 'error';
   summaryRows.push(
-    `| \`${file}\` | ${entry.status === 'scored' ? `${entry.score}%` : 'error'} | ${entry.valid} | ${entry.survived} | ${Math.round(durationMs / 1000)}s | ${verdict.ok ? verdict.reason : `REGRESSED: ${verdict.reason}`} |`
+    `| \`${file}\` | ${scoreCell} | ${entry.valid} | ${entry.survived} | ${Math.round(durationMs / 1000)}s | ${verdict.ok ? verdict.reason : `REGRESSED: ${verdict.reason}`} |`
   );
   // Atomic persist after every module so a killed run loses at most one.
   persist();
@@ -438,7 +455,7 @@ for (const file of batch) {
   rmSync(`${reportFile}.coverage`, { recursive: true, force: true });
   if (run.timedOut || run.interrupted) {
     console.log(
-      `${file} ${run.interrupted ? 'interrupted' : 'timed out'}; owned mutation run stopped.`
+      `${file} ${run.interrupted ? 'interrupted' : 'timed out'}; owned mutation run stopped. Recorded unscored; a later batch retries it.`
     );
     break;
   }
