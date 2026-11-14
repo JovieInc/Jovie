@@ -24,9 +24,10 @@ import { withLinearRetry } from '../lib/linear-retry.mjs';
 
 export const ARTIFACT_PREFIX = 'pen-draft-';
 export const TITLE_PREFIX = 'Pen draft for approval: ';
-// The label Summer turns into Ovie inbox cards (scripts/quality-gap-finder.mjs
-// LABEL_LOW). The repo has no label of its own for design approvals.
-export const APPROVAL_LABEL = 'quality-gap:needs-tim';
+// A label of its own for design approvals. `quality-gap:needs-tim` is a gate
+// in scripts/lanes/fleet_ledger.py that accepts on silence, and it counts
+// toward the quality-gap finder's daily cap; this one does neither.
+export const APPROVAL_LABEL = 'pen-draft:needs-tim';
 export const APPROVAL_LINE = 'Move to Todo to accept, cancel to reject.';
 export const CREATE_STATE_NAME = 'Backlog';
 // Linear rejects larger uploads; a frame preview is a few hundred KB.

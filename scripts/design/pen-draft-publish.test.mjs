@@ -228,7 +228,28 @@ test('the description holds the picture inline, the run link and the ask', () =>
     ].join('\n')
   );
   assert.equal(APPROVAL_LINE, 'Move to Todo to accept, cancel to reject.');
-  assert.equal(APPROVAL_LABEL, 'quality-gap:needs-tim');
+  assert.equal(APPROVAL_LABEL, 'pen-draft:needs-tim');
+});
+
+test('the approval label has no default on silence and no shared cap', () => {
+  // fleet_ledger.py accepts a gate label's default at its deadline, and the
+  // quality-gap finder caps issues with its own label. Both match labels by
+  // exact name, so the Pen draft label must not be named in either.
+  for (const file of [
+    'scripts/lanes/fleet_ledger.py',
+    'scripts/lanes/workstreams.py',
+    'scripts/quality-gap-finder.mjs',
+  ])
+    assert.equal(
+      readFileSync(file, 'utf8').includes(APPROVAL_LABEL),
+      false,
+      file
+    );
+  const ledger = readFileSync('scripts/lanes/fleet_ledger.py', 'utf8');
+  const gates = ledger.match(/GATE_LABELS = frozenset\(\{([^}]*)\}\)/)[1];
+  assert.match(gates, /"quality-gap:needs-tim"/);
+  // Exact set membership, not a pattern a new needs-tim label could match.
+  assert.match(ledger, /labels & GATE_LABELS/);
 });
 
 test('the run link takes a numeric run id only', () => {

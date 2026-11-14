@@ -7,7 +7,7 @@ name: Pen draft pictures to Linear
 
 # After a Pen draft run on main (JOV-12577): put each drafted frame's picture
 # inline on the Linear issue `Pen draft for approval: <frame>`, labelled
-# `quality-gap:needs-tim` so Summer turns it into an Ovie inbox card. One issue
+# `pen-draft:needs-tim`, a label with no default on silence. One issue
 # per frame: a new draft updates it. It never moves an issue, edits the
 # canonical Pen file or approves anything in pen-bindings.json.
 # A failed draft run still publishes the frames that drew a picture.
