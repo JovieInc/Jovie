@@ -31,7 +31,7 @@ import remediation
 from fix_red_mixed_repairs import first_route_reason, mixed_repairs  # noqa: F401
 from fix_red_screen_cert import SCREEN_CERT_TEXT, screen_cert_paths
 from fix_red_failure_routing import (ALIAS_ACTION, ALIAS_REVIEW_FAILURE, ROUTE_BUDGET_GROWTH, alias_owner_metadata,
-                                     error_signature, fingerprint_key, owner_handoff_reason)
+                                     error_signature, fingerprint_key, owner_handoff_reason, LOCAL_MODULE_PREREQUISITE)
 from atomic_state import atomic_write_text
 from fix_red_source_edits import (  # noqa: F401
     balance_added_headings, snap_added_conservative_spacing, strip_added_legacy_cache_exports,
@@ -152,6 +152,7 @@ _JSON_KEY = re.compile(r'^\s*"([^"\n]+)"\s*:')
 SIGNATURES = (
     ("alias-review-deadline", ALIAS_REVIEW_FAILURE, ALIAS_ACTION),
     ("component-test-evidence", COMPONENT_TEST_TEXT, AGENT),
+    ("local-module-prerequisite", LOCAL_MODULE_PREREQUISITE, SYNC_MAIN),
     ("narrowed-preflight", NARROWED_CONFLICT, MERGE_NARROWED),
     # Before platform-infra: a Source Validation log can carry passing-test rate-limit lines beside the guard error that actually failed the job.
     ("domain-write", DOMAIN_WRITE, REGISTER_DOMAIN),
@@ -199,13 +200,13 @@ def classify(pr: dict, logs: dict[str, str] | None = None) -> dict:
     """{cls, key, action, actions, checks, signature, files, repairs}. `logs` maps a failing check name to its failed-job log;
     a check with no log is `other`. A BEHIND branch with nothing deterministic to say is `stale-branch`."""
     logs = logs or {}
-    import detached_native_sync
+    import cert_stub_sync, detached_native_sync
     names = sorted({str(check.get("name")) for check in real_failures(pr)})
     per_check = []
     for name in names:
         text = logs.get(name) or ""
         hit = next(((cls, action) for cls, pattern, action in SIGNATURES if pattern.search(text)), None)
-        per_check.append(detached_native_sync.hit(text) or hit or size_500_stale_hit(text) or ("other", AGENT))
+        per_check.append(detached_native_sync.hit(text) or cert_stub_sync.hit(text) or hit or size_500_stale_hit(text) or ("other", AGENT))
     classes = {cls for cls, _ in per_check}
     actions: list[str] = []
     if len(classes) == 1:
