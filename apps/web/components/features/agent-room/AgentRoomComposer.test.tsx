@@ -35,6 +35,30 @@ describe('AgentRoomComposer', () => {
       )
     );
     expect(action).toHaveBeenCalledTimes(1);
+    expect(screen.getByLabelText('Message')).toHaveValue('');
+  });
+
+  it('keeps the unsent message and agent when the send fails', async () => {
+    const action = vi.fn(
+      async (): Promise<AgentRoomComposerState> => ({
+        status: 'error',
+        message: 'Linear did not take the message. Try again.',
+      })
+    );
+    render(<AgentRoomComposer agents={AGENTS} action={action} />);
+    const agent = screen.getByRole('combobox', { name: /^To/ });
+    fireEvent.change(agent, { target: { value: 'chloe' } });
+    fireEvent.change(screen.getByLabelText('Message'), {
+      target: { value: 'status?' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Send' }));
+    await waitFor(() =>
+      expect(screen.getByRole('status')).toHaveTextContent(
+        'Linear did not take the message.'
+      )
+    );
+    expect(screen.getByLabelText('Message')).toHaveValue('status?');
+    expect(agent).toHaveValue('chloe');
   });
 
   it('lists only the agents it is given', () => {
