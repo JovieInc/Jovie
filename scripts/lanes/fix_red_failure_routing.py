@@ -13,6 +13,11 @@ LOCAL_MODULE_PREREQUISITE = re.compile(
     r"\b(?:app|components|lib)/[\w./-]+\.[cm]?[jt]sx?\(\d+,\d+\): error TS2307: "
     r"Cannot find module ['\"]@/[\w./-]+['\"]")
 
+def has_local_prerequisite_failure(route, logs):
+    """A compiler failure stays out of infrastructure retries even in a mixed route."""
+    return any(LOCAL_MODULE_PREREQUISITE.search(logs.get(name) or "") for name in route["checks"])
+
+
 ALIAS_ACTION = 'alias-graduation-owner'
 COLLECTOR = 'scripts/lib/public-profile-alias-graduation.mjs'
 _ALIAS_ERROR = re.compile(
