@@ -96,18 +96,34 @@ async function ingestUrlEntry(entry: string): Promise<BatchIngestResult> {
     }
 
     const payload = (await response.json()) as {
+      ok?: boolean;
       profile?: { id?: string; username?: string; usernameNormalized?: string };
+      warning?: string;
       error?: string;
       details?: string;
     };
 
     if (response.ok) {
+      const profileId = payload.profile?.id;
+      const username =
+        payload.profile?.username ?? payload.profile?.usernameNormalized;
+      // Ingestion can persist a profile but fail its link extraction (207 or
+      // 200 + warning). Preserve that evidence instead of reporting full success.
+      const reason =
+        payload.warning ||
+        payload.details ||
+        payload.error ||
+        (response.status === 207 || payload.ok !== true
+          ? 'Profile ingestion did not complete.'
+          : typeof profileId !== 'string' || !profileId.trim()
+            ? 'Ingestion did not return a profile receipt.'
+            : undefined);
       return {
         input: normalizedInput,
-        status: 'success',
-        profileId: payload.profile?.id,
-        username:
-          payload.profile?.username ?? payload.profile?.usernameNormalized,
+        status: reason ? 'error' : 'success',
+        reason,
+        profileId,
+        username,
       };
     }
 
