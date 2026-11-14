@@ -116,6 +116,7 @@ function main() {
       out: { type: 'string' },
       'artifact-name': { type: 'string' },
       'source-ordinal': { type: 'string' },
+      'source-sha': { type: 'string' },
       'verify-capability': { type: 'boolean' },
       'verify-ack': { type: 'boolean' },
     },
@@ -139,6 +140,12 @@ function main() {
     process.exit(2);
   }
   const report = JSON.parse(readFileSync(reportPath, 'utf8'));
+  if (
+    values['source-ordinal'] !== undefined &&
+    (!/^[0-9a-f]{40}$/.test(values['source-sha'] ?? '') ||
+      report.headSha !== values['source-sha'])
+  )
+    throw new Error('ordered delivery must match the checked source SHA');
   const serverUrl = process.env.GITHUB_SERVER_URL;
   const runId = process.env.GITHUB_RUN_ID;
   const repository = process.env.GITHUB_REPOSITORY;

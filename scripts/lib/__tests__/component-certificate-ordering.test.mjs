@@ -93,10 +93,19 @@ describe('ordered delivery protocol', () => {
         import.meta.dirname,
         '../component-certificate-delivery.mjs'
       );
-      const run = values =>
+      const run = (values, sourceSha = report.headSha) =>
         spawnSync(
           process.execPath,
-          [entry, input, '--out', output, '--source-ordinal', '15'],
+          [
+            entry,
+            input,
+            '--out',
+            output,
+            '--source-ordinal',
+            '15',
+            '--source-sha',
+            sourceSha,
+          ],
           {
             encoding: 'utf8',
             env: {
@@ -114,6 +123,11 @@ describe('ordered delivery protocol', () => {
       expect(JSON.parse(readFileSync(output, 'utf8')).deliveryOrder).toEqual(
         order
       );
+      for (const sourceSha of ['', 'b'.repeat(40)])
+        expect(
+          run({ GITHUB_RUN_NUMBER: '20', GITHUB_RUN_ATTEMPT: '2' }, sourceSha)
+            .status
+        ).not.toBe(0);
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
