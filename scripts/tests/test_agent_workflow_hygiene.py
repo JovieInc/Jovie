@@ -422,6 +422,18 @@ def test_event_complete_workflows_do_not_retain_fallback_clocks() -> None:
     assert "schedule:" in ruleset_triggers
 
 
+def test_agent_landing_does_not_treat_risk_classifier_as_human_merge_gate() -> None:
+    """Autonomous shipping uses machine gates and never creates a human hold."""
+    for path in sorted(WORKFLOWS.glob("*.yml")):
+        content = path.read_text(encoding="utf-8")
+        assert "blocksUnattendedAutoMerge == true" not in content, path.name
+        assert not re.search(
+            r"--add-label(?:=|\s+)[\"']?(?:needs-human|no-auto)", content
+        ), path.name
+        assert "Has needs-human label. Skipping" not in content, path.name
+        assert "requires human review; skipping" not in content, path.name
+
+
 def test_retired_human_hold_labels_are_removed_at_the_pr_boundary() -> None:
     """A stale workflow or manual label action cannot create a durable hold."""
     scrub = (WORKFLOWS / "legacy-human-hold-scrub.yml").read_text(
