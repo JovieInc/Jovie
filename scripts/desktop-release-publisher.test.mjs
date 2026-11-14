@@ -745,7 +745,44 @@ test('production recovery requires strict same-ID exact-tag private empty readba
   }
 });
 
-test('production prepare preserves exact-tag drafts from older sources and skips recovery for exact matches', async () => {
+test('production prepare retargets exact-tag drafts from older sources and skips recovery for exact matches', async () => {
+  const { input } = productionRecoveryFixture();
+  const client = fakeClient({
+    mainSha: input.releaseSha,
+    release: releaseFixture('production', input.version, OLD_SHA),
+  });
+  client.recoverableProductionDraft = async () =>
+    assert.fail('tag already exists');
+  await prepare({ ...input, client });
+  assert.equal(client.release.target_commitish, input.releaseSha);
+  assert.equal(client.release.draft, true);
+  assert.deepEqual(client.release.assets, []);
+  assert.equal(client.metadataUpdateCalls, 0);
+  assert.deepEqual(client.events, []);
+  await prepare({ ...input, client });
+  assert.equal(client.metadataUpdateCalls, 0);
+  assert.deepEqual(client.events, []);
+});
+
+test('production prepare still refuses a published release targeting an older commit', async () => {
+  const { input } = productionRecoveryFixture();
+  const client = fakeClient({
+    mainSha: input.releaseSha,
+    release: releaseFixture('production', input.version, OLD_SHA, false),
+  });
+  client.recoverableProductionDraft = async () =>
+    assert.fail('tag already exists');
+  client.retargetEmptyDraft = async () =>
+    assert.fail('must not retarget a published release');
+  const before = structuredClone(client.release);
+  await assert.rejects(
+    prepare({ ...input, client }),
+    /cannot be retargeted|not the authorized commit/
+  );
+  assert.deepEqual(client.release, before);
+});
+
+test('production prepare still refuses a stale exact-tag draft that holds assets', async () => {
   const { input } = productionRecoveryFixture();
   const client = fakeClient({
     mainSha: input.releaseSha,
@@ -754,17 +791,14 @@ test('production prepare preserves exact-tag drafts from older sources and skips
   client.recoverableProductionDraft = async () =>
     assert.fail('tag already exists');
   client.retargetEmptyDraft = async () =>
-    assert.fail('must not retarget older source');
+    assert.fail('must not retarget a non-empty draft');
+  client.seedStarter(expectedDesktopAssetNames(input.version)[0]);
   const before = structuredClone(client.release);
   await assert.rejects(
     prepare({ ...input, client }),
-    /not the authorized commit/
+    /cannot be retargeted|not the authorized commit/
   );
   assert.deepEqual(client.release, before);
-  client.release.target_commitish = input.releaseSha;
-  await prepare({ ...input, client });
-  assert.equal(client.metadataUpdateCalls, 0);
-  assert.deepEqual(client.events, []);
 });
 
 test('production keeps immutable version tags and never uses rolling mutations', async t => {
