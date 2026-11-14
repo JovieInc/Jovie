@@ -114,6 +114,18 @@ class RouteBudgetGrowthTest(unittest.TestCase):
             route = classes.classify(red('Exact-head Coverage'), {'Exact-head Coverage': log})
             self.assertEqual(route['action'], 'agent', log)
 
+    def test_log_failed_job_prefix_still_syncs_main(self):
+        prefixed = (
+            'Exact-head Coverage\tUNKNOWN STEP\t2026-11-13T19:16:13.5084741Z ##[error]routes./app/admin/hud grew 738 -> 975\n'
+            'Exact-head Coverage\tUNKNOWN STEP\t2026-11-13T19:16:13.5103474Z ##[error]firstLoad.baselines./ grew 578 -> 663\n'
+            'Exact-head Coverage\tUNKNOWN STEP\t2026-11-13T19:16:13.6219908Z ##[error]Process completed with exit code 1.\n')
+        route = classes.classify(red('Exact-head Coverage'), {'Exact-head Coverage': prefixed})
+        self.assertEqual((route['cls'], route['action']), ('route-budget-growth', 'sync-main'))
+        poisoned = prefixed + (
+            'Exact-head Coverage\tUNKNOWN STEP\t2026-11-13T19:16:14.0000000Z ##[error]AssertionError: expected 1 to be +0\n')
+        stay = classes.classify(red('Exact-head Coverage'), {'Exact-head Coverage': poisoned})
+        self.assertEqual(stay['action'], 'agent')
+
 
 class AliasClassificationTest(unittest.TestCase):
     def test_real_annotation_and_complete_failure_have_owned_no_model_route(self):

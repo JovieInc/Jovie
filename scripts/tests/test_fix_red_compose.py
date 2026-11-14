@@ -52,6 +52,21 @@ class ComposeRouteTest(unittest.TestCase):
         })
         self.assertEqual((shared["cls"], shared["action"]), ("composed", "sync-main"))
         self.assertEqual(shared["actions"], ["sync-main"])
+        design = ("Source Validation\tUNKNOWN STEP\t2026-11-13T19:17:13.8426377Z "
+                  " FAIL  workspace-scripts lib/__tests__/design-system-source-ratchet.test.mjs"
+                  " > design-system source identity ratchet (JOV-5301)"
+                  " > exits zero from the CLI on the live tree\n")
+        budget = (
+            "Exact-head Coverage\tUNKNOWN STEP\t2026-11-13T19:16:13.5084741Z ##[error]routes./app/admin/hud grew 738 -> 975\n"
+            "Exact-head Coverage\tUNKNOWN STEP\t2026-11-13T19:16:13.5103474Z ##[error]firstLoad.baselines./ grew 578 -> 663\n")
+        inherited = classes.classify(pr("Source Validation", "Exact-head Coverage", merge="BLOCKED"), {
+            "Source Validation": design, "Exact-head Coverage": budget})
+        self.assertEqual((inherited["cls"], inherited["action"]), ("composed", "sync-main"))
+        self.assertEqual(inherited["actions"], ["sync-main"])
+        owned = classes.classify(pr("Source Validation", "Exact-head Coverage", merge="BLOCKED"), {
+            "Source Validation": design,
+            "Exact-head Coverage": budget + "AssertionError: expected 1\n"})
+        self.assertEqual((owned["cls"], owned["action"]), ("mixed", "agent"))
         paired = classes.classify(pr("A", "B"), {
             "A": "API rate limit exceeded",
             "B": "Unwired: scripts/a.test.mjs. Wire each file into a ci-fast lane",

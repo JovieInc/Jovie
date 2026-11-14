@@ -25,6 +25,8 @@ _ALIAS_ERROR = re.compile(
     r'\d{4}-\d\d-\d\dT[\d:.]+Z \((?P<issue>JOV-[1-9]\d*)\) '
     r'and its \d+h grace ended \d{4}-\d\d-\d\dT[\d:.]+Z; re-review and refresh it\.')
 _ANSI = re.compile(r'\x1b\[[0-9;]*m')
+# `gh run view --log-failed` prefixes each line `job \t step \t` before the timestamp.
+_LOG_FAILED_PREFIX = re.compile(r'^[^\t]+\t[^\t]+\t(?=\d{4}-\d\d-\d\dT|##\[error\])')
 _HOLD = re.compile(r'class=deterministic-source;n=[1-9]\d*;run=([1-9]\d*);try=([1-9]\d*)')
 _SHA = re.compile(r'[0-9a-f]{40}')
 _ROLLUPS = {'ci-fast', 'PR Ready', 'Product Lane Receipt'}
@@ -42,6 +44,7 @@ class RouteBudgetGrowth:
             r' grew (\d+(?:\.\d+)?) -> (\d+(?:\.\d+)?)\s*$')
         matches = []
         for line in clean.splitlines():
+            line = _LOG_FAILED_PREFIX.sub('', line, count=1)
             match = growth.fullmatch(line)
             if match:
                 if float(match[2]) <= float(match[1]):
