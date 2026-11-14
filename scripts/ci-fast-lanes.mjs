@@ -925,6 +925,7 @@ export const STRUCTURAL_PYTHON_REGRESSION_COMMANDS = Object.freeze([
 ]);
 
 export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
+  'scripts/ios-certification-config.test.mjs',
   'scripts/resolve-main-sha.test.mjs', // JOV-12497 SIGPIPE regression.
   'scripts/hostops/pen-golden-path-sync.test.mjs',
   'scripts/design/pen-inspect.test.mjs',
@@ -1178,8 +1179,11 @@ export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/mutation-floor-intake.test.mjs',
   'scripts/lib/__tests__/mutation-diff-workflow.test.mjs',
   'scripts/lib/__tests__/component-certificate-workflow.test.mjs',
+  'scripts/lib/__tests__/component-certificate-delivery.test.mjs',
+  'scripts/lib/__tests__/component-certificate-producer.test.mjs',
   'scripts/lib/__tests__/storybook-certification-matrix.test.mjs',
   'scripts/lib/__tests__/mutation-sweep.test.mjs',
+  'scripts/lib/__tests__/mutation-lifecycle.test.mjs',
   'scripts/lib/__tests__/mutation-sweep-file-issues.test.mjs',
   'scripts/lib/__tests__/test-quality-rank.test.mjs',
   'scripts/lib/__tests__/knip-web-tooling.test.mjs',
@@ -1342,7 +1346,7 @@ export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/api-budget.test.mjs',
   'scripts/lib/__tests__/domain-write-guard.test.mjs',
   'scripts/lib/__tests__/screen-audit-receipts.test.mjs',
-  'scripts/lib/__tests__/component-certificate.test.mjs scripts/lib/__tests__/screen-cert-repair.test.mjs',
+  'scripts/lib/__tests__/component-certificate.test.mjs scripts/lib/__tests__/component-certificate-discovery.test.mjs scripts/lib/__tests__/component-story-workers.test.mjs scripts/lib/__tests__/component-story-inventory.test.mjs scripts/lib/__tests__/screen-cert-repair.test.mjs',
   'scripts/lib/__tests__/verify-patched-dependencies.test.mjs',
   'scripts/lib/__tests__/incident-dedupe.test.mjs',
   'scripts/lib/__tests__/ci-capacity.test.mjs',
@@ -3139,7 +3143,7 @@ export async function runStructural(opts = {}) {
     // JOV-4421: hard ship gate — tests + matching stories for shippable UI.
     'pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/component-ship-gate.test.mjs lib/__tests__/component-certificate-gate.test.mjs lib/__tests__/component-cert-screens.test.mjs lib/__tests__/forced-caps.test.mjs lib/__tests__/component-certificate-companions.test.mjs lib/__tests__/component-evidence.test.mjs lib/__tests__/component-story-evidence.test.mjs lib/__tests__/component-certificate-mutation.test.mjs lib/__tests__/mutation-sweep-root.test.mjs lib/__tests__/component-benchmark-review.test.mjs',
     // JOV-5454: live Storybook certification evaluator + lifecycle.
-    'pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/component-live-storybook-certification.test.mjs',
+    'pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/component-live-storybook-certification.test.mjs lib/__tests__/component-story-workers.test.mjs lib/__tests__/component-story-inventory.test.mjs',
     'pnpm component-ship-gate',
     'pnpm screen-registration-gate',
     'pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/design-exception-registry.test.mjs --coverage --coverage.include=design-exception-registry.mjs --coverage.thresholds.lines=75 --coverage.thresholds.branches=70 --coverage.thresholds.functions=60',
