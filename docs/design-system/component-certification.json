@@ -54,6 +54,33 @@
       "a11y",
       "frontend-rules"
     ],
+    "apps/web/components/features/profile/ProfilePhotoContextMenu.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/profile/ProfileQuickActions.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/profile/ProfileRedirectSurface.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
     "apps/web/components/features/profile/SubscriptionConfirmedBanner.tsx": [
       "ds-owner",
       "tokens",
@@ -61,6 +88,123 @@
       "tests",
       "a11y",
       "frontend-rules"
+    ],
+    "apps/web/components/features/profile/artist-contacts-button/ArtistContactsButton.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/profile/artist-contacts-button/ContactDrawer.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/profile/subscribe/SubscribeForm.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/profile/views/AboutView.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/profile/views/ContactView.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/profile/views/ListenView.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/release/ReleaseNotificationsProvider.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/release/ReleaseScheduleFields.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/tracking/EditorialRetargeting.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/tracking/JoviePixel.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/tracking/MetaPixel.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/visibility-audit/VisibilityAuditReportView.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/waitlist/WaitlistInviteMessage.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
     ],
     "apps/web/components/molecules/ContentSectionHeader.tsx": [
       "ds-owner",
@@ -101,6 +245,132 @@
       "tests",
       "a11y",
       "frontend-rules"
+    ],
+    "apps/web/components/providers/Analytics.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/providers/AuthClientProviders.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/providers/ClientProviders.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/providers/CoreProviders.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/providers/GoogleAnalytics.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/providers/InstantlyPixel.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/providers/JovieAnalytics.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/providers/LazyProviders.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/providers/NuqsProvider.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/providers/PublicPageErrorFallback.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/providers/QueryProvider.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/providers/ResolvedClientProviders.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/providers/SystemBErrorFallback.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/providers/ToastProvider.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
     ],
     "packages/ui/": [
       "ds-owner",
@@ -445,8 +715,20 @@
     "apps/web/components/features/profile/ProfileAeoProofClaimCard.tsx": {
       "empty": "The proof claim card renders no collection: one heading, one note and one CTA, all required props; the detector matched the items-start class."
     },
+    "apps/web/components/features/profile/ProfilePhotoContextMenu.tsx": {
+      "error": "The menu has no error UI: a failed download is sent to captureException and falls back to opening the image in a new tab (ProfilePhotoContextMenu.test.tsx covers this). The detector matched that catch block.",
+      "offline": "Offline is the same failed fetch: it is reported and the image opens in a new tab, with nothing drawn in the menu. The detector matched fetch( in the download handler."
+    },
     "apps/web/components/features/profile/ProfilePrimaryTabPanel.tsx": {
       "offline": "The panel fetches nothing itself: releases, tour dates and the catalog result arrive as props from the server-rendered profile, and a failed catalog read arrives as catalogLoadFailed (ErrorCatalogLoadFailed, whose Try Again reloads the page). The detector matched the word skeleton in the visitorAssignmentResolved doc comment, which LoadingAlertsAssignment shows."
+    },
+    "apps/web/components/features/profile/ProfileQuickActions.tsx": {
+      "empty": "The bar maps the fixed QUICK_ACTIONS constant of five actions and takes no list from its caller, so it can never be empty. The detector matched QUICK_ACTIONS.map(.",
+      "partial": "Every action is drawn from the fixed QUICK_ACTIONS constant, so no action can be partly present; the detector counted the icon type's className?: and bookingDisabled?:, and booking-disabled is the BookingDisabled story.",
+      "long-content": "The bar shows icons only; each fixed label (Profile, Events, Book, Pay, About) is an aria-label, so there is no visible text that could run long."
+    },
+    "apps/web/components/features/profile/ProfileRedirectSurface.tsx": {
+      "empty": "The surface renders one title, description and spinner and owns no collection that could be empty. The detector matched the items-center class."
     },
     "apps/web/components/features/profile/ProfileViewTracker.tsx": {
       "error": "The tracker returns null; a refused beacon falls back to the tracking mutation and nothing is shown to the visitor, so there is no error state to render. ProfileViewTracker.certificate.test.tsx asserts the fallback and an axe-clean page.",
@@ -468,6 +750,9 @@
     "apps/web/components/features/profile/SubscriptionConfirmedBanner.tsx": {
       "long-content": "The banner's title and description are fixed copy with no props or user text, so its content cannot grow; the detector matched the Banner title and description props."
     },
+    "apps/web/components/features/profile/artist-contacts-button/ArtistContactsButton.tsx": {
+      "long-content": "The trigger is an icon-only button whose only label is the fixed aria-label 'Contacts'; artistName reaches only ContactDrawer's title, whose LongContentContacts story covers a long name."
+    },
     "apps/web/components/features/profile/artist-notifications-cta/BirthdayInput.tsx": {
       "long-content": "BirthdayInput always renders exactly eight single-digit boxes (MM/DD/YYYY) under fixed Month, Day and Year labels; it takes no caller text, and useSegmentedInput strips non-digits and drops anything past the eighth digit, which BirthdayInput.test.tsx covers, so nothing can grow.",
       "offline": "BirthdayInput never fetches or submits; onSubmit is a callback fired on Enter and the notifications flow that owns it saves the birthday and reports connectivity. The detector matched onSubmit."
@@ -475,6 +760,11 @@
     "apps/web/components/features/profile/artist-notifications-cta/InlineNotificationsFlowSkeleton.tsx": {
       "long-content": "The skeleton renders no caller text: its title and body are fixed non-breaking spaces and the consent line is invisible, so there is no content that can run long.",
       "offline": "The skeleton never fetches; it stands in while the visitor's assignment resolves, and the live form that replaces it reports connectivity."
+    },
+    "apps/web/components/features/profile/subscribe/SubscribeForm.tsx": {
+      "error": "SubscribeForm only routes to ArtistNotificationsCTA or TwoStepNotificationsCTA; the inline submit error lives in useSubscriptionForm and is certified there (subscription-form-states.test.tsx). The detector matched 'error' in the doc comment.",
+      "offline": "A failed or offline submit is handled inside useSubscriptionForm, not by this router, which draws no network state of its own. The detector matched 'submit' in the doc comment.",
+      "permission-denied": "The form has no permission state: the two-step choice is made by the caller, as the doc comment's 'Gated by Pro entitlement at the call-site' says, which is what the detector matched."
     },
     "apps/web/components/features/profile/templates/ProfileCompactSurface.tsx": {
       "offline": "The surface makes no request: 'loading' is the lazy overlay import option and 'pending' a comment. The alert sign-up it hosts owns its submit; LoadingVisitorAssignment shows the held skeleton, and ProfileCompactTemplate's OfflineAlertForm story and test cover the offline assignment fallback.",
@@ -494,6 +784,12 @@
     },
     "apps/web/components/features/release/MusicServiceDial.tsx": {
       "error": "The dial has no failure UI: its only catch skips the localStorage copy of the choice when storage is unavailable, and the cookie still remembers it. MusicServiceDial.test.tsx streams and checks the cookie with storage throwing, with axe."
+    },
+    "apps/web/components/features/release/ReleaseNotificationsProvider.tsx": {
+      "error": "The provider renders no markup of its own; subscription errors go to useNotifications().error, a toast owned by the feedback system. The detector matched that onError wiring."
+    },
+    "apps/web/components/features/release/ReleaseScheduleFields.tsx": {
+      "long-content": "Both labels and the help line are fixed RELEASE_SCHEDULING_COPY strings and the values are formatted dates, so no caller text can run long."
     },
     "apps/web/components/features/release/SmartLinkLoadingState.tsx": {
       "empty": "The skeleton draws a fixed five provider rows from a constant key list and takes no props, so there is no collection that can be empty; the detector matched that .map(.",
@@ -528,6 +824,13 @@
     },
     "apps/web/components/features/tracking/AcquisitionCapture.tsx": {
       "error": "AcquisitionCapture renders no markup; a failed acquisition request or blocked storage is swallowed by design and shows nothing, which AcquisitionCapture.test.tsx covers."
+    },
+    "apps/web/components/features/tracking/JoviePixel.tsx": {
+      "error": "JoviePixel renders no markup; a failed beacon or mutation is fire-and-forget by design and shows nothing. The detector matched the @ts-expect-error comments.",
+      "offline": "Offline sends fail silently through sendBeacon or the tracking mutation and show nothing; the component always returns null. The detector matched mutate and submit."
+    },
+    "apps/web/components/features/tracking/MetaPixel.tsx": {
+      "permission-denied": "MetaPixel renders no markup; denied marketing consent renders null, which MetaPixel.certificate.test.tsx covers. The detector matched 'gated on marketing consent' in the doc comment."
     },
     "apps/web/components/features/tracking/SignupFunnelBeacon.tsx": {
       "error": "SignupFunnelBeacon renders no markup; trackFunnelStep and postJsonBeacon swallow a failed send by design (JOV-6585 fail-open), and the detector matched the catch in isSignupEntryHref, which returns false for an unparseable href as SignupFunnelBeacon.test.tsx covers."
@@ -894,6 +1197,34 @@
     "apps/web/components/organisms/user-button/UserButtonLoading.tsx": {
       "offline": "These are the placeholders shown while the session or the plan is still loading, and the trigger avatar. They take no connectivity input and fetch nothing; an offline account button stays on the same placeholder, which the Loading stories show.",
       "permission-denied": "The placeholders and the avatar carry no action and no account, role or plan check, so nothing in them can be denied. The detector matched the billing identifier in BillingLoadingRow."
+    },
+    "apps/web/components/providers/Analytics.tsx": {
+      "error": "Analytics renders only the invisible Vercel beacon; a failed page() call is caught and logged, which Analytics.certificate.test.tsx covers. The detector matched that catch."
+    },
+    "apps/web/components/providers/CoreProviders.tsx": {
+      "empty": "The provider owns no collection that could be empty. The detector matched the word entries in the PacerProvider batcher comment.",
+      "error": "CoreProviders draws no error UI: failed monitoring imports are caught and logged, and chunk errors go to useChunkErrorHandler. The detector matched those catch blocks."
+    },
+    "apps/web/components/providers/InstantlyPixel.tsx": {
+      "empty": "InstantlyPixel always renders null and owns no collection; the detector matched 'ALLOW-list' and 'DENY-list' in its comments."
+    },
+    "apps/web/components/providers/LazyProviders.tsx": {
+      "loading": "The lazy Analytics chunk's loading placeholder is null by design and children render at once, so there is no loading UI to show. The detector matched loading: () => null.",
+      "offline": "Nothing here fetches for display: the deferred analytics beacon only reports, and children render the same offline. The detector matched the loading option."
+    },
+    "apps/web/components/providers/PublicPageErrorFallback.tsx": {
+      "permission-denied": "A render-error fallback has no permission state. The detector matched role='alert'."
+    },
+    "apps/web/components/providers/QueryProvider.tsx": {
+      "partial": "QueryProvider takes only children; the detector counted optional fields on a global Window declaration and fenceBrowserQueryClient's generation parameter.",
+      "offline": "QueryProvider draws no offline UI; offline handling is TanStack's paused fetch plus refetch on reconnect in the client defaults, shown by each query's own consumer.",
+      "permission-denied": "The provider has no permission state. The detector matched 'Gated' in the comment on the E2E-only invalidation hook."
+    },
+    "apps/web/components/providers/ResolvedClientProviders.tsx": {
+      "partial": "It forwards three optional flags unchanged and its bootstrap comes from the server-only getClientAuthBootstrap; a partial bootstrap is ClientProviders' PartialBootstrapWithoutUsername story."
+    },
+    "apps/web/components/providers/SystemBErrorFallback.tsx": {
+      "permission-denied": "An error fallback has no permission state. The detector matched the role prop, which only sets role='alert'."
     },
     "apps/web/components/shell/AppShellRightRail.tsx": {
       "partial": "AppShellRightRail is a layout slot. Its only optional props are className and the belowHeader placement flag, and it renders whatever drawer it is given, so the rail itself has no partially loaded state; each drawer owns its own."
