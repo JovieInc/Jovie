@@ -925,6 +925,7 @@ export const STRUCTURAL_PYTHON_REGRESSION_COMMANDS = Object.freeze([
 ]);
 
 export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
+  'scripts/ios-certification-config.test.mjs',
   'scripts/resolve-main-sha.test.mjs', // JOV-12497 SIGPIPE regression.
   'scripts/hostops/pen-golden-path-sync.test.mjs',
   'scripts/design/pen-inspect.test.mjs',
