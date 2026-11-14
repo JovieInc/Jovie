@@ -14,6 +14,8 @@ import {
 import { join, relative, resolve } from 'node:path';
 
 export const RENDER_INPUT_SCHEMA = 'jovie.component-render-inputs/v1';
+/** Per-component closure binding (scripts/lib/component-render-closure.mjs). */
+export const RENDER_INPUT_SCHEMA_V2 = 'jovie.component-render-inputs/v2';
 export const STORYBOOK_PROFILE = Object.freeze({
   JOVIE_LIVE_STORYBOOK_CERT: '',
   JOVIE_STORYBOOK_MANUAL_AXE: '1',
@@ -34,6 +36,7 @@ const PRODUCER_INPUTS = new Set([
   'scripts/lib/component-evidence.mjs',
   'scripts/lib/component-story-receipts.mjs',
   'scripts/lib/component-render-inputs.mjs',
+  'scripts/lib/component-render-closure.mjs',
   '.github/workflows/visual-a11y.yml',
 ]);
 // These support directories contain imported Storybook/runtime code and assets.
@@ -169,7 +172,9 @@ export function storyComponentInputs(root, selected, env) {
 }
 
 export function renderBindingProblem(binding) {
-  return binding?.schema !== RENDER_INPUT_SCHEMA ||
+  return ![RENDER_INPUT_SCHEMA, RENDER_INPUT_SCHEMA_V2].includes(
+    binding?.schema
+  ) ||
     binding?.mode !== 'storybook-full' ||
     !/^[0-9a-f]{64}$/.test(binding?.digest ?? '')
     ? 'missing or invalid render input binding'
@@ -183,6 +188,7 @@ export function renderReceiptCurrent(receipt, sourceHash, expected) {
     receipt.sourceHash === sourceHash &&
     !renderBindingProblem(expected) &&
     !renderBindingProblem(receipt.renderInputs) &&
+    receipt.renderInputs.schema === expected.schema &&
     receipt.renderInputs.digest === expected.digest
   );
 }

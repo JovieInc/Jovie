@@ -47,11 +47,11 @@ describe('render evidence freshness at the certificate boundary', () => {
     const dir = mkdtempSync(join(tmpdir(), 'no-story-receipts-'));
     const errors = vi.spyOn(console, 'error').mockImplementation(() => {});
     try {
-      assert.deepEqual(loadStoryReceipts(dir, { visual: 'missing.json' }), {
-        renderInputs: null,
-        visual: {},
-        a11y: {},
+      const { renderInputsFor, ...loaded } = loadStoryReceipts(dir, {
+        visual: 'missing.json',
       });
+      assert.deepEqual(loaded, { renderInputs: null, visual: {}, a11y: {} });
+      assert.equal(renderInputsFor('packages/ui/atoms/button.tsx'), null);
       assert.equal(errors.mock.calls.length, 0);
     } finally {
       errors.mockRestore();
@@ -258,10 +258,7 @@ describe('render input refresh eligibility', () => {
       storyEvidenceEligibility(['packages/ui/atoms/button.test.tsx']),
       { render: true, visual: true }
     );
-    assert.match(
-      workflow.jobs['component-story-evidence'].if,
-      /has_render_changes/
-    );
+    assert.match(workflow.jobs['story-evidence-plan'].if, /has_render_changes/);
     assert.match(workflow.jobs['storybook-a11y'].if, /has_visual_changes/);
   });
 

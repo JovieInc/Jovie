@@ -9,10 +9,13 @@ import {
   acceptStoryReceipts,
   STORY_EVIDENCE_SCHEMA,
 } from './component-evidence.mjs';
+import { componentRenderBindings } from './component-render-closure.mjs';
 import {
+  RENDER_INPUT_SCHEMA_V2,
   renderReceiptCurrent,
   snapshotRenderInputs,
 } from './component-render-inputs.mjs';
+import { allComponentPaths } from './component-story-receipts.mjs';
 
 const WORKFLOW = '.github/workflows/visual-a11y.yml';
 const WORKFLOW_NAME = 'Visual & A11y Tests';
@@ -84,11 +87,26 @@ export async function verifiedStoryCacheKey(
 /** Reject a stale notification before it can replace a current certificate. */
 export function requireCurrentStoryCache(root, directory) {
   const checkout = realpathSync(root);
-  const snapshot = snapshotRenderInputs(root);
-  requireProof(
-    !snapshot.problem && snapshot.binding,
-    'current render inputs unavailable'
-  );
+  /** @type {any} */
+  let snapshot = null;
+  /** @type {Map<string, any> | null} */
+  let closures = null;
+  const expectedFor = (path, receipt) => {
+    if (receipt?.renderInputs?.schema === RENDER_INPUT_SCHEMA_V2) {
+      if (!closures) {
+        const result = componentRenderBindings(root, allComponentPaths(root));
+        requireProof(!result.problem, 'current render closure unavailable');
+        closures = result.bindings;
+      }
+      return closures.get(path) ?? null;
+    }
+    snapshot ??= snapshotRenderInputs(root);
+    requireProof(
+      !snapshot.problem && snapshot.binding,
+      'current render inputs unavailable'
+    );
+    return snapshot.binding;
+  };
   let cohort;
   for (const kind of ['visual', 'a11y']) {
     const records = JSON.parse(
@@ -124,7 +142,7 @@ export function requireCurrentStoryCache(root, directory) {
         .digest('hex');
       requireProof(
         receipt.schema === STORY_EVIDENCE_SCHEMA &&
-          renderReceiptCurrent(receipt, sourceHash, snapshot.binding),
+          renderReceiptCurrent(receipt, sourceHash, expectedFor(path, receipt)),
         'stale or invalid capture source/render binding'
       );
     }
