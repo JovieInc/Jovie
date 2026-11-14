@@ -669,6 +669,7 @@
   "tests/unit/chat/ai-model-identifiers.test.ts",
   "tests/unit/chat/ai-operations.test.ts",
   "tests/unit/chat/album-art-capability.test.ts",
+  "tests/unit/chat/catalog-query.test.ts",
   "tests/unit/chat/chat-attachments-style-guard.test.ts",
   "tests/unit/chat/chat-composer-system-b-style-guard.test.ts",
   "tests/unit/chat/chat-context.test.ts",

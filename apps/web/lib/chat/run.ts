@@ -30,7 +30,6 @@ import {
   validateChatMessageParts,
 } from '@/lib/chat/attachment-policy';
 import { copyFloorRepairTransform } from '@/lib/chat/copy-floor-repair';
-import { buildReferencedEntitiesBlock } from '@/lib/chat/entity-hydration';
 import {
   buildGroundingFacts,
   wrapStreamResultWithGroundingGuard,
@@ -39,10 +38,7 @@ import { resolveImportBioRestrictedTools } from '@/lib/chat/import-bio-turn-guar
 import { retrieveKnowledgeContext } from '@/lib/chat/knowledge/retrieval';
 import { selectKnowledgeContext } from '@/lib/chat/knowledge/router';
 import { extractLastUserText } from '@/lib/chat/message-text';
-import {
-  buildPinnedOpportunityBlock,
-  type PinnedOpportunityContext,
-} from '@/lib/chat/pinned-opportunity';
+import type { PinnedOpportunityContext } from '@/lib/chat/pinned-opportunity';
 import {
   createStaticTextLanguageModel,
   detectSystemPromptLeak,
@@ -53,7 +49,6 @@ import {
 import { ONBOARDING_SYSTEM_PROMPT } from '@/lib/chat/prompts/onboarding';
 import { resolveChatPromptRegistryEntry } from '@/lib/chat/prompts/registry';
 import {
-  buildSystemPromptParts,
   joinSystemPromptParts,
   type SystemPromptParts,
 } from '@/lib/chat/system-prompt';
@@ -61,9 +56,11 @@ import {
   isChatToolStepCapExhausted,
   resolveChatToolStepLimit,
 } from '@/lib/chat/tool-step-limit';
+import { assembleAppModeSystemPrompt } from '@/lib/chat/turn-app-prompt';
 import type {
   ArtistContext,
   ChatTelemetry,
+  ReleaseCatalogMeta,
   ReleaseContext,
 } from '@/lib/chat/types';
 import {
@@ -80,10 +77,7 @@ import {
 } from '@/lib/constants/ai-models';
 import type { getEntitlements as GetEntitlements } from '@/lib/entitlements/registry';
 import { startChatTurnLangfuseTrace } from '@/lib/observability/langfuse';
-import {
-  applyEveIdentityToSystemPrompt,
-  type EveIdentityId,
-} from '@/lib/ovie/identity';
+import type { EveIdentityId } from '@/lib/ovie/identity';
 import { OvieProgramError } from '@/lib/ovie/program';
 
 type EntitlementsForPlan = ReturnType<typeof GetEntitlements>;
@@ -229,6 +223,8 @@ export interface ExecuteChatTurnInput {
    */
   artistContext: ArtistContext | null;
   releases: ReleaseContext[];
+  /** Catalog read health + total; omitted = loaded slice is the whole catalog. */
+  releaseCatalog?: ReleaseCatalogMeta;
   /** Recording titles for the grounding guard; null/undefined = unknown (title rule skipped). */
   catalogTrackTitles?: readonly string[] | null;
   /** Internal creator-profile UUID. Null when anonymous (`mode='onboarding'`). */
@@ -411,40 +407,27 @@ export async function executeChatTurn(
     if (!artistContext) {
       throw new Error('artistContext is required when mode is "app"');
     }
-    // Resolve `@kind:id[label]` tokens from recent user turns against the
-    // artist's own catalog and profile so the model recognises owned assets
-    // instead of mis-attributing them to another artist (JOV-3537).
-    const referencedEntities = buildReferencedEntitiesBlock({
-      userTexts: recentUserTexts(uiMessages),
-      ownedReleases: releases,
-      artist: {
-        displayName: artistContext.displayName,
-        username: artistContext.username,
-        spotifyUrl: artistContext.spotifyUrl,
-      },
-      ownProfileId: resolvedProfileId,
-    });
-    const pinnedOpportunityBlock =
-      buildPinnedOpportunityBlock(pinnedOpportunity);
+    const userTexts = recentUserTexts(uiMessages);
     const knowledgeContext = blockedForDisclosure
       ? ''
-      : await knowledgeRetriever(recentUserTexts(uiMessages).join(' '), signal);
-    const parts = buildSystemPromptParts(artistContext, releases, {
+      : await knowledgeRetriever(userTexts.join(' '), signal);
+    // App-mode assembly (entity hydration incl. beyond-slice release tokens,
+    // catalog meta threading) lives in turn-app-prompt.ts.
+    systemPromptParts = await assembleAppModeSystemPrompt({
+      artistContext,
+      releases,
+      releaseCatalog: input.releaseCatalog,
+      profileId: resolvedProfileId,
+      userTexts,
       aiCanUseTools: planLimits.booleans.aiCanUseTools,
       aiWeeklyMessageLimit: planLimits.limits.aiWeeklyMessageLimit,
       insightsEnabled,
-      knowledgeContext: knowledgeContext || undefined,
-      accountContext,
-      referencedEntities,
-      pinnedOpportunity: pinnedOpportunityBlock,
+      knowledgeContext,
+      pinnedOpportunity,
+      identity,
       lockedTools,
+      accountContext,
     });
-    systemPromptParts = identity
-      ? {
-          stable: applyEveIdentityToSystemPrompt(parts.stable, identity),
-          dynamic: parts.dynamic,
-        }
-      : parts;
   }
   if (writingPilot) {
     systemPromptParts = { ...systemPromptParts, dynamic: writingPilot.prompt };

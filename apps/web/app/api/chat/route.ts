@@ -69,6 +69,7 @@ import {
   resolveAlbumArtCapability,
 } from '@/lib/chat/album-art-capability';
 import { fetchArtistContext } from '@/lib/chat/artist-context.server';
+import { resolveChatRelease } from '@/lib/chat/catalog-query';
 import { fetchCatalogTrackTitlesForChat } from '@/lib/chat/catalog-titles';
 import { assertChatToolsRegistered } from '@/lib/chat/chat-tool-inventory';
 import {
@@ -86,7 +87,7 @@ import {
   updateOwnedReleaseGeneratedPitches,
   updateOwnedReleaseMetadata,
 } from '@/lib/chat/release-writes';
-import { fetchReleasesForChat } from '@/lib/chat/releases';
+import { fetchReleaseCatalogForChat } from '@/lib/chat/releases';
 import {
   extractUIMessageText,
   parseChatRequestBody,
@@ -114,6 +115,7 @@ import {
   preparePersistedToolEventsForTurnFinish,
   resolvePersistedToolEventsForDisplay,
 } from '@/lib/chat/tool-events';
+import { createCheckCanvasStatusTool } from '@/lib/chat/tools/canvas-status';
 import { proposeMerchAction } from '@/lib/chat/tools/merch-propose';
 import {
   createMerchAlternativeTool,
@@ -138,6 +140,8 @@ import {
   type ArtistContext,
   artistContextSchema,
   type ChatTelemetry,
+  type ReleaseCatalogMeta,
+  type ReleaseCatalogSnapshot,
   type ReleaseContext,
 } from '@/lib/chat/types';
 import { gateAssistantReply } from '@/lib/chat/voice-lint';
@@ -212,10 +216,7 @@ import type {
   AlbumArtStyleId,
   SuggestedReleaseTarget,
 } from '@/lib/services/album-art/types';
-import {
-  buildCanvasMetadata,
-  summarizeCanvasStatus,
-} from '@/lib/services/canvas/service';
+import { buildCanvasMetadata } from '@/lib/services/canvas/service';
 import { getInsightsSummary } from '@/lib/services/insights/lifecycle';
 import {
   buildPitchInput,
@@ -254,22 +255,6 @@ const CHAT_KILL_SWITCH_GATES = {
   FORCE_LIGHT: 'ai_chat_force_light',
 } as const;
 
-/**
- * Find a release by title (exact match first, then partial).
- * Returns null if no match found.
- */
-function findReleaseByTitle(
-  releases: ReleaseContext[],
-  title: string
-): ReleaseContext | null {
-  const lower = title.toLowerCase();
-  return (
-    releases.find(r => r.title.toLowerCase() === lower) ??
-    releases.find(r => r.title.toLowerCase().includes(lower)) ??
-    null
-  );
-}
-
 function normalizeReleaseTitle(value: string): string {
   return value
     .trim()
@@ -290,18 +275,20 @@ function toSuggestedReleaseTarget(
   };
 }
 
-function resolveAlbumArtReleaseTarget(
+async function resolveAlbumArtReleaseTarget(
+  profileId: string | null,
   releases: ReleaseContext[],
   input: { releaseId?: string; releaseTitle?: string }
-):
+): Promise<
   | { status: 'resolved'; release: ReleaseContext }
   | {
       status: 'needs_target';
       suggestedReleases: readonly SuggestedReleaseTarget[];
-    } {
+    }
+> {
   if (input.releaseId) {
-    const release = releases.find(item => item.id === input.releaseId);
-    if (release) return { status: 'resolved', release };
+    const resolved = await resolveChatRelease(profileId, releases, input);
+    if (resolved) return { status: 'resolved', release: resolved };
   }
 
   if (!input.releaseTitle?.trim()) {
@@ -311,12 +298,15 @@ function resolveAlbumArtReleaseTarget(
     };
   }
 
-  const normalized = normalizeReleaseTitle(input.releaseTitle);
-  const exact = releases.find(
-    release => normalizeReleaseTitle(release.title) === normalized
-  );
+  // Exact tiers first: local exact, then the owned catalog beyond the slice.
+  // A local fuzzy match must not suppress a full-catalog exact match.
+  const exact = await resolveChatRelease(profileId, releases, {
+    releaseTitle: input.releaseTitle,
+    match: 'exact',
+  });
   if (exact) return { status: 'resolved', release: exact };
 
+  const normalized = normalizeReleaseTitle(input.releaseTitle);
   const fuzzy = releases.filter(release => {
     const title = normalizeReleaseTitle(release.title);
     return title.includes(normalized) || normalized.includes(title);
@@ -731,79 +721,6 @@ function createSocialLinkRemovalTool(profileId: string | null) {
   });
 }
 
-/**
- * Creates the checkCanvasStatus tool for querying release canvas status.
- * Fetches release data and reports which releases need canvas videos.
- */
-function createCheckCanvasStatusTool(
-  profileId: string | null,
-  releases: ReleaseContext[]
-) {
-  return tool({
-    description:
-      "Check which of the artist's releases have Spotify Canvas videos set and which are missing them. Use this when the artist asks about canvas videos or wants to generate them.",
-    inputSchema: chatToolSchema({
-      includeAll: z
-        .boolean()
-        .optional()
-        .describe(
-          'If true, include all releases. If false (default), only show releases missing canvas.'
-        ),
-    }),
-    execute: async ({ includeAll }) => {
-      if (!profileId) {
-        return {
-          success: false,
-          error: 'Profile ID required for release data',
-        };
-      }
-
-      if (releases.length === 0) {
-        return {
-          success: true,
-          summary: {
-            total: 0,
-            message:
-              'No releases found. Connect your Spotify account and sync your releases first.',
-          },
-        };
-      }
-
-      const summary = summarizeCanvasStatus(
-        releases.map(r => ({
-          id: r.id,
-          title: r.title,
-          metadata: r.metadata,
-          artworkUrl: r.artworkUrl,
-        }))
-      );
-
-      const releaseList = includeAll
-        ? releases.map(r => ({
-            title: r.title,
-            releaseType: r.releaseType,
-            canvasStatus: r.canvasStatus,
-            hasArtwork: Boolean(r.artworkUrl),
-            spotifyPopularity: r.spotifyPopularity,
-          }))
-        : summary.releasesNeedingCanvas.map(r => ({
-            title: r.title,
-            hasArtwork: r.hasArtwork,
-          }));
-
-      return {
-        success: true,
-        summary: {
-          total: summary.total,
-          withCanvas: summary.withCanvas,
-          withoutCanvas: summary.withoutCanvas,
-        },
-        releases: releaseList,
-      };
-    },
-  });
-}
-
 function createGenerateAlbumArtTool(params: {
   readonly profileId: string | null;
   readonly clerkUserId: string;
@@ -881,10 +798,14 @@ function createGenerateAlbumArtTool(params: {
         };
       }
 
-      const target = resolveAlbumArtReleaseTarget(params.releases, {
-        releaseId,
-        releaseTitle,
-      });
+      const target = await resolveAlbumArtReleaseTarget(
+        params.profileId,
+        params.releases,
+        {
+          releaseId,
+          releaseTitle,
+        }
+      );
 
       if (target.status === 'needs_target' && !createRelease) {
         return {
@@ -1232,7 +1153,9 @@ function createMarkCanvasUploadedTool(
         return { success: false, error: 'Profile ID required' };
       }
 
-      const release = findReleaseByTitle(releases, releaseTitle);
+      const release = await resolveChatRelease(profileId, releases, {
+        releaseTitle,
+      });
 
       if (!release) {
         return {
@@ -1277,7 +1200,8 @@ function createMarkCanvasUploadedTool(
 function createWorldClassBioTool(
   context: ArtistContext,
   profileId: string | null,
-  releases: ReleaseContext[]
+  releases: ReleaseContext[],
+  releaseCatalog?: ReleaseCatalogMeta
 ) {
   return tool({
     description:
@@ -1300,6 +1224,14 @@ function createWorldClassBioTool(
         .describe('Maximum words for the returned draft (default 180)'),
     }),
     execute: async ({ goal, tone, maxWords }) => {
+      // A failed catalog read must not become "0 releases" in bio facts.
+      if (releaseCatalog?.status === 'unavailable') {
+        return {
+          success: false,
+          error:
+            'The release catalog is temporarily unavailable, so the bio draft would risk wrong release facts. Try again in a moment.',
+        };
+      }
       const wordLimit = maxWords ?? 180;
       const draftPackage = buildArtistBioDraft({
         artistName: context.displayName,
@@ -1310,7 +1242,9 @@ function createWorldClassBioTool(
         spotifyUrl: context.spotifyUrl ?? null,
         appleMusicUrl: context.appleMusicUrl ?? null,
         profileViews: context.profileViews,
-        releaseCount: releases.length,
+        // Whole-catalog count, not just the loaded slice (dogfood 2026-11-10):
+        // bios for catalogs larger than the per-turn slice understated the count.
+        releaseCount: releaseCatalog?.total ?? releases.length,
         notableReleases: releases.slice(0, 3).map(release => release.title),
       });
 
@@ -1421,7 +1355,8 @@ function createGenerateReleasePitchTool(
   resolvedProfileId: string,
   identity: { clerkUserId: string; conversationId: string | null },
   releases: ReleaseContext[],
-  artistRules?: ArtistContext['artistRules']
+  artistRules?: ArtistContext['artistRules'],
+  releaseCatalog?: ReleaseCatalogMeta
 ) {
   return tool({
     description: `Generate one copy-paste-ready release pitch for a specific destination. Use for playlist, radio, Sirius XM, install, playback/music supervisor, editorial post, record label, or collaborator pitching. Ask the artist where they want to pitch it before calling this tool unless a task or user message clearly maps to one of these destinations: ${PITCH_TARGET_OPTIONS_TEXT}. Ask which release they want to pitch if unclear. If the artist provides custom guidance, pass it via instructions. ${PITCH_GRILL_PROCEDURE}`,
@@ -1475,18 +1410,25 @@ function createGenerateReleasePitchTool(
     }) => {
       try {
         if (releases.length === 0) {
+          // A failed catalog read must not masquerade as "no releases" (dogfood
+          // 2026-11-10): tell the model the catalog is unreadable instead.
+          if (releaseCatalog?.status === 'unavailable') {
+            return {
+              success: false as const,
+              error:
+                'The release catalog is temporarily unavailable. Try the pitch again in a moment.',
+            };
+          }
           return {
             success: false as const,
             error: "You don't have any releases yet. Add a release first.",
           };
         }
 
-        const release =
-          releaseId !== undefined
-            ? releases.find(candidate => candidate.id === releaseId)
-            : releaseTitle !== undefined
-              ? findReleaseByTitle(releases, releaseTitle)
-              : null;
+        const release = await resolveChatRelease(resolvedProfileId, releases, {
+          releaseId,
+          releaseTitle,
+        });
 
         if (!release) {
           return {
@@ -1621,7 +1563,8 @@ function buildChatTools(
     readonly sourceImageUrl: string | null;
     readonly conversationId: string | null;
   },
-  lastUserText = ''
+  lastUserText = '',
+  releaseCatalog?: ReleaseCatalogMeta
 ) {
   return {
     ...(insightsEnabled
@@ -1635,11 +1578,16 @@ function buildChatTools(
     proposeProfileEdit: createProfileEditTool(artistContext),
     importBioFromUrl: createImportBioFromUrlTool({ userId: clerkUserId }),
     inspectPressSource: createInspectPressSourceTool({ userId: clerkUserId }),
-    checkCanvasStatus: createCheckCanvasStatusTool(resolvedProfileId, releases),
+    checkCanvasStatus: createCheckCanvasStatusTool(
+      resolvedProfileId,
+      releases,
+      releaseCatalog
+    ),
     writeWorldClassBio: createWorldClassBioTool(
       artistContext,
       resolvedProfileId,
-      releases
+      releases,
+      releaseCatalog
     ),
     ...(albumArtEnabled && canGenerateAlbumArt
       ? {
@@ -1687,7 +1635,8 @@ function buildChatTools(
               conversationId: reservedTurn?.conversationId ?? null,
             },
             releases,
-            artistContext.artistRules
+            artistContext.artistRules,
+            releaseCatalog
           ),
         }
       : {}),
@@ -1802,16 +1751,15 @@ function toNullableString(value: unknown): string | null {
 
 async function fetchOptionalReleases(
   profileId: string | null
-): Promise<ReleaseContext[]> {
+): Promise<ReleaseCatalogSnapshot> {
   if (!profileId) {
-    return [];
+    return { status: 'ok', total: 0, releases: [] };
   }
 
-  try {
-    return await fetchReleasesForChat(profileId);
-  } catch {
-    return [];
-  }
+  // Never throws: a failed read returns `status: 'unavailable'` so the
+  // prompt and tools can say the catalog is unreadable instead of asserting
+  // the artist has no releases (dogfood 2026-11-10).
+  return fetchReleaseCatalogForChat(profileId);
 }
 
 /**
@@ -2585,7 +2533,8 @@ export async function POST(req: Request) {
   }
   const artistContext = contextResult.context;
 
-  const releases = await fetchOptionalReleases(resolvedProfileId);
+  const releaseCatalog = await fetchOptionalReleases(resolvedProfileId);
+  const releases = [...releaseCatalog.releases];
   const catalogTrackTitles = resolvedProfileId
     ? await fetchCatalogTrackTitlesForChat(resolvedProfileId)
     : null;
@@ -2621,7 +2570,8 @@ export async function POST(req: Request) {
             conversationId:
               reservedTurn?.conversationId ?? resolvedConversationId,
           },
-          userText
+          userText,
+          releaseCatalog
         )
       : {};
     // Plan-locked stubs stay VISIBLE to the model so free users who ask for
@@ -2758,6 +2708,7 @@ export async function POST(req: Request) {
       uiMessages,
       artistContext,
       releases,
+      releaseCatalog,
       catalogTrackTitles,
       resolvedProfileId,
       resolvedConversationId: dispatchConversationId,
