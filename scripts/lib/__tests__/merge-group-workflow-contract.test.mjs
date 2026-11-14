@@ -1,4 +1,3 @@
-import { spawnSync } from 'node:child_process';
 import {
   chmodSync,
   existsSync,
@@ -26,6 +25,7 @@ import {
   EXACT_HEAD_COVERAGE_JOB_TIMEOUT_MINUTES,
   EXACT_HEAD_COVERAGE_STEP_TIMEOUT,
 } from '../changed-test-coverage.mjs';
+import { spawnSync } from '../child-process.mjs';
 import {
   MERGE_GROUP_ADMISSION_QUOTA_RECOVERY_MS,
   MERGE_GROUP_ADMISSION_WAIT_MS,
@@ -3833,11 +3833,7 @@ describe('PR Size Guard merge-base comparison', () => {
   });
 
   function git(cwd, args) {
-    const result = spawnSync('git', args, {
-      maxBuffer: 256 * 1024 * 1024,
-      cwd,
-      encoding: 'utf8',
-    });
+    const result = spawnSync('git', args, { cwd, encoding: 'utf8' });
     expect(result.status, result.stderr || result.stdout).toBe(0);
     return result.stdout.trim();
   }
@@ -4277,11 +4273,7 @@ describe('resolveMergeGroupPathDiff coalesced heads (JOV-4905)', () => {
   });
 
   function git(cwd, args) {
-    const result = spawnSync('git', args, {
-      maxBuffer: 256 * 1024 * 1024,
-      cwd,
-      encoding: 'utf8',
-    });
+    const result = spawnSync('git', args, { cwd, encoding: 'utf8' });
     if (result.status !== 0) {
       throw new Error(
         `git ${args.join(' ')} failed: ${result.stderr || result.stdout}`
@@ -4545,11 +4537,7 @@ describe('Storybook Surface Matrix shallow diff-base history', {
   });
 
   function git(cwd, args) {
-    const result = spawnSync('git', args, {
-      maxBuffer: 256 * 1024 * 1024,
-      cwd,
-      encoding: 'utf8',
-    });
+    const result = spawnSync('git', args, { cwd, encoding: 'utf8' });
     expect(result.status, result.stderr || result.stdout).toBe(0);
     return result.stdout.trim();
   }
@@ -4697,7 +4685,6 @@ describe('Storybook Surface Matrix shallow diff-base history', {
     // Other branches are never fetched.
     expect(
       spawnSync('git', ['cat-file', '-e', `${sibling}^{commit}`], {
-        maxBuffer: 256 * 1024 * 1024,
         cwd: work,
       }).status
     ).not.toBe(0);

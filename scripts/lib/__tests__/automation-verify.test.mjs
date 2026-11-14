@@ -1,4 +1,3 @@
-import { spawn, spawnSync } from 'node:child_process';
 import {
   chmodSync,
   cpSync,
@@ -32,6 +31,7 @@ import {
   runControlTestCommands,
 } from '../../run-affected-tests.mjs';
 import { classifyBlogContentChanges } from '../blog-content-ci.mjs';
+import { spawn, spawnSync } from '../child-process.mjs';
 import { resolveBaseRef } from '../git-base-ref.mjs';
 
 const SERVICE_CENSUS_QUALIFICATION_INPUTS = [
@@ -2265,7 +2265,6 @@ describe('automation-verify affected scope', () => {
       const repo = mkdtempSync(resolve(tmpdir(), 'scripts-typecheck-select-'));
       const git = args => {
         const result = spawnSync('git', args, {
-          maxBuffer: 256 * 1024 * 1024,
           cwd: repo,
           encoding: 'utf8',
         });
@@ -4638,11 +4637,7 @@ function consumerBaseFixture() {
     writeFileSync(resolve(repo, file), text);
   };
   const git = (...args) => {
-    const result = spawnSync('git', args, {
-      maxBuffer: 256 * 1024 * 1024,
-      cwd: repo,
-      encoding: 'utf8',
-    });
+    const result = spawnSync('git', args, { cwd: repo, encoding: 'utf8' });
     expect(result.status, result.stdout + result.stderr).toBe(0);
     return result.stdout.trim();
   };

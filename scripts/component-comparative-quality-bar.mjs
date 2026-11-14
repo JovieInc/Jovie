@@ -5,11 +5,11 @@
  * and consumes rendered/behavioral observations, never third-party source.
  */
 
-import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { REPO_ROOT } from './component-ship-policy.mjs';
+import { execFileSync } from './lib/child-process.mjs';
 import {
   COMPARATIVE_DELIBERATE_RED_FIXTURES,
   COMPARATIVE_QUALIFICATION_CONTROLS,
@@ -133,7 +133,6 @@ export function resolveTrustedBaseEnrollment(repoRoot = REPO_ROOT) {
           'git',
           ['show', `${candidate}:${REGISTRY_SOURCE_PATH}`],
           {
-            maxBuffer: 256 * 1024 * 1024,
             cwd: repoRoot,
             encoding: 'utf8',
             stdio: ['ignore', 'pipe', 'pipe'],

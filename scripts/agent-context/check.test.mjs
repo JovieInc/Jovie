@@ -1,5 +1,4 @@
 import assert from 'node:assert/strict';
-import { execFileSync, spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import {
   mkdirSync,
@@ -16,6 +15,7 @@ import { dirname, matchesGlob, resolve } from 'node:path';
 import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { generateVoiceDirective } from '../../.agents/skills/gstack/scripts/resolvers/voice.mjs';
+import { execFileSync, spawnSync } from '../lib/child-process.mjs';
 import { emitBudgetErrors, evaluate, references } from './check.mjs';
 import { grade } from './grade.mjs';
 import {
@@ -78,11 +78,7 @@ test('staged integrity check cannot be masked by an unstaged policy or missing r
     JSON.stringify(collectRuleScopes([file], () => old))
   );
   const git = args => {
-    const r = spawnSync('git', args, {
-      maxBuffer: 256 * 1024 * 1024,
-      cwd: dir,
-      encoding: 'utf8',
-    });
+    const r = spawnSync('git', args, { cwd: dir, encoding: 'utf8' });
     assert.equal(r.status, 0, r.stderr);
   };
   git(['init', '-q']);

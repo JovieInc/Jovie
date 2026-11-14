@@ -1,4 +1,3 @@
-import { execFileSync } from 'node:child_process';
 import {
   chmodSync,
   mkdirSync,
@@ -11,6 +10,7 @@ import { tmpdir } from 'node:os';
 import { delimiter, join, resolve } from 'node:path';
 import { load } from 'js-yaml';
 import { describe, expect, it } from 'vitest';
+import { execFileSync } from '../child-process.mjs';
 import {
   parseLsTreeLong,
   parseNumstatZ,
@@ -19,11 +19,7 @@ import {
 } from '../merge-group-local-evidence.mjs';
 
 function git(cwd, args) {
-  return execFileSync('git', args, {
-    maxBuffer: 256 * 1024 * 1024,
-    cwd,
-    encoding: 'utf8',
-  });
+  return execFileSync('git', args, { cwd, encoding: 'utf8' });
 }
 
 describe('local merge-group size evidence', () => {
@@ -283,7 +279,6 @@ describe('local merge-group size evidence', () => {
       let groupPresent = true;
       try {
         execFileSync('git', ['cat-file', '-e', `${head}^{commit}`], {
-          maxBuffer: 256 * 1024 * 1024,
           cwd: clone,
           stdio: 'ignore',
           env: { ...process.env, GIT_NO_LAZY_FETCH: '1' },

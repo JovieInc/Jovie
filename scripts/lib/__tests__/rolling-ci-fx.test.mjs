@@ -1,4 +1,3 @@
-import { execFileSync, spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import {
   mkdirSync,
@@ -11,6 +10,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 import { MIN_CHANGED_LINE_COVERAGE } from '../changed-test-coverage.mjs';
+import { execFileSync, spawnSync } from '../child-process.mjs';
 import { FX_EXECUTOR_POLICY } from '../fx-remediation-lane.mjs';
 import {
   normalizeFailureEvents,
@@ -554,11 +554,7 @@ describe('hosted rolling CI repair policy', () => {
   it('binds the trusted test selector and coverage plan to the exact PR and patch tree', () => {
     const repository = mkdtempSync(join(tmpdir(), 'jovie-hosted-test-plan-'));
     const git = (...args) =>
-      execFileSync('git', args, {
-        maxBuffer: 256 * 1024 * 1024,
-        cwd: repository,
-        encoding: 'utf8',
-      }).trim();
+      execFileSync('git', args, { cwd: repository, encoding: 'utf8' }).trim();
     try {
       git('init', '-q');
       const sourcePath = 'apps/web/components/foo/Hello.tsx';

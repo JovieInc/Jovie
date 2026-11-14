@@ -1,4 +1,3 @@
-import { execFileSync } from 'node:child_process';
 import {
   existsSync,
   mkdirSync,
@@ -10,6 +9,7 @@ import {
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
+import { execFileSync } from '../child-process.mjs';
 import {
   classifyLockfileChange,
   classifyProductLanes,
@@ -718,11 +718,7 @@ describe('product lane classifier', () => {
     const files = join(root, 'files.txt');
     const receipt = join(root, 'receipt.json');
     const git = args =>
-      execFileSync('git', args, {
-        maxBuffer: 256 * 1024 * 1024,
-        cwd: root,
-        encoding: 'utf8',
-      }).trim();
+      execFileSync('git', args, { cwd: root, encoding: 'utf8' }).trim();
     try {
       git(['init', '-q']);
       git(['config', 'user.name', 'Product Lane Test']);
@@ -781,11 +777,7 @@ describe('product lane classifier', () => {
     const files = join(root, 'files.txt');
     const receipt = join(root, 'receipt.json');
     const git = args =>
-      execFileSync('git', args, {
-        maxBuffer: 256 * 1024 * 1024,
-        cwd: root,
-        encoding: 'utf8',
-      }).trim();
+      execFileSync('git', args, { cwd: root, encoding: 'utf8' }).trim();
     const writeRoot = command =>
       writeFileSync(
         join(root, 'package.json'),
@@ -1073,7 +1065,6 @@ describe('product lane classifier', () => {
       ProductLaneClassificationError
     );
     const tracked = execFileSync('git', ['ls-files', '-z'], {
-      maxBuffer: 256 * 1024 * 1024,
       encoding: 'utf8',
     })
       .split('\0')

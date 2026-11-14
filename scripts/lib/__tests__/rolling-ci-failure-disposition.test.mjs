@@ -1,4 +1,3 @@
-import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import {
   mkdirSync,
@@ -10,6 +9,7 @@ import {
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { spawnSync } from '../child-process.mjs';
 import { normalizeFailureEvents } from '../rolling-ci-dispatch.mjs';
 import {
   planOfflineFailureDispositions,
@@ -460,11 +460,7 @@ it('reproduces a synthetic defect, stages one bounded repair, and checks the exa
   const repo = join(dir, 'repo');
   mkdirSync(repo);
   const git = args => {
-    const result = spawnSync('git', args, {
-      maxBuffer: 256 * 1024 * 1024,
-      cwd: repo,
-      encoding: 'utf8',
-    });
+    const result = spawnSync('git', args, { cwd: repo, encoding: 'utf8' });
     expect(result.status, result.stderr).toBe(0);
     return result.stdout.trim();
   };

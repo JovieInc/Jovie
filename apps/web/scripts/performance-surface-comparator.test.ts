@@ -153,7 +153,6 @@ function fixture(
   directories.push(root);
   const git = (...args: string[]) =>
     execFileSync('git', args, {
-      maxBuffer: 256 * 1024 * 1024,
       cwd: root,
       encoding: 'utf8',
       stdio: ['ignore', 'pipe', 'pipe'],

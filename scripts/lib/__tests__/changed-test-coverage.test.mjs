@@ -1,4 +1,3 @@
-import { execFileSync, spawnSync } from 'node:child_process';
 import {
   chmodSync,
   existsSync,
@@ -28,6 +27,7 @@ import {
   SOURCE_SCANNER_TESTS,
   toWebCoverageIncludePaths,
 } from '../changed-test-coverage.mjs';
+import { execFileSync, spawnSync } from '../child-process.mjs';
 import { NATIVE_QUEUE_POLICY } from '../merge-queue-guard.mjs';
 
 const path = 'apps/web/lib/example.ts';
@@ -204,11 +204,7 @@ describe('changed test coverage', () => {
   it('merges every --coverage shard report in the ratchet check', () => {
     const repo = mkdtempSync(join(tmpdir(), 'changed-coverage-cli-'));
     const git = (...args) =>
-      execFileSync('git', args, {
-        maxBuffer: 256 * 1024 * 1024,
-        cwd: repo,
-        encoding: 'utf8',
-      }).trim();
+      execFileSync('git', args, { cwd: repo, encoding: 'utf8' }).trim();
     git('init', '-q');
     git('config', 'user.email', 'ci@example.com');
     git('config', 'user.name', 'CI');

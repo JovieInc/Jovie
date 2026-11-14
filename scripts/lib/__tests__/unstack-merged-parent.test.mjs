@@ -1,4 +1,3 @@
-import { execFileSync, spawnSync } from 'node:child_process';
 import {
   chmodSync,
   mkdtempSync,
@@ -9,6 +8,7 @@ import {
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
+import { execFileSync, spawnSync } from '../child-process.mjs';
 
 const repoRoot = resolve(import.meta.dirname, '../../..');
 const script = resolve(repoRoot, 'scripts/unstack-merged-parent.sh');
@@ -35,7 +35,6 @@ afterEach(() => {
 
 function git(cwd, ...args) {
   return execFileSync('git', args, {
-    maxBuffer: 256 * 1024 * 1024,
     cwd,
     encoding: 'utf8',
     env: {

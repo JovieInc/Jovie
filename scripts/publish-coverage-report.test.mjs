@@ -1,5 +1,4 @@
 import assert from 'node:assert/strict';
-import { execFileSync } from 'node:child_process';
 import {
   mkdirSync,
   mkdtempSync,
@@ -12,6 +11,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
 import { load } from 'js-yaml';
+import { execFileSync } from './lib/child-process.mjs';
 // Trusted-base source contracts invoke this entry directly. Keep the artifact
 // behaviors in that suite even before the runner inventory update has landed.
 import './coverage-artifact-baseline.test.mjs';
@@ -94,11 +94,7 @@ function fixture(t, nightly = true) {
   const remote = join(root, 'origin.git');
   mkdirSync(cwd);
   const git = (...args) =>
-    execFileSync('git', args, {
-      maxBuffer: 256 * 1024 * 1024,
-      cwd,
-      encoding: 'utf8',
-    }).trim();
+    execFileSync('git', args, { cwd, encoding: 'utf8' }).trim();
   git('init', '--quiet', '--initial-branch=main');
   git('config', 'user.name', 'Coverage Test');
   git('config', 'user.email', 'coverage@example.invalid');

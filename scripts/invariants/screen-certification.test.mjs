@@ -1,5 +1,4 @@
 import assert from 'node:assert/strict';
-import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import {
   chmodSync,
@@ -14,6 +13,7 @@ import { dirname, join, resolve } from 'node:path';
 import { describe, it } from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { crc32 } from 'node:zlib';
+import { spawnSync } from '../lib/child-process.mjs';
 import {
   readProductReferenceOwner,
   screenNeedsProductReferences,
@@ -3610,11 +3610,7 @@ if (p.endsWith('/zip')) {
     // HEAD^1, so the gate follows it.
     const repo = mkdtempSync(join(tmpdir(), 'screen-cert-diff-base-'));
     const runGit = args =>
-      spawnSync('git', args, {
-        maxBuffer: 256 * 1024 * 1024,
-        cwd: repo,
-        encoding: 'utf8',
-      });
+      spawnSync('git', args, { cwd: repo, encoding: 'utf8' });
     const savedEnv = {
       SCREEN_CERT_DIFF_BASE: process.env.SCREEN_CERT_DIFF_BASE,
       COMPONENT_SHIP_DIFF_BASE: process.env.COMPONENT_SHIP_DIFF_BASE,

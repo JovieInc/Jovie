@@ -1,5 +1,4 @@
 import assert from 'node:assert/strict';
-import { execFileSync, spawnSync } from 'node:child_process';
 import {
   chmodSync,
   copyFileSync,
@@ -16,6 +15,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { execFileSync, spawnSync } from '../child-process.mjs';
 
 // Lets a test make one directory vanish mid-walk, the way parallel CI
 // commands delete apps/web/coverage while doc:freshness:check runs.
@@ -655,7 +655,6 @@ it.each([
     writeFileSync(env.GARDENING_ROSTER, JSON.stringify(scenario.pages));
     const git = (...args) =>
       execFileSync('git', args, {
-        maxBuffer: 256 * 1024 * 1024,
         cwd: root,
         env,
         encoding: 'utf8',
@@ -705,12 +704,7 @@ it.each([
         execFileSync(
           'git',
           ['--git-dir', remote, 'for-each-ref', '--format=%(refname)'],
-          {
-            maxBuffer: 256 * 1024 * 1024,
-            env,
-            encoding: 'utf8',
-            stdio: ['ignore', 'pipe', 'pipe'],
-          }
+          { env, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }
         ).trim(),
         ''
       );

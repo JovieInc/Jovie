@@ -1,4 +1,3 @@
-import { spawnSync } from 'node:child_process';
 import {
   mkdirSync,
   mkdtempSync,
@@ -9,6 +8,7 @@ import {
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { spawnSync } from '../child-process.mjs';
 import {
   bindOpenPrsToLiveBaseRefs,
   buildConflictCohortLiveHeadQuery,
@@ -94,11 +94,7 @@ function workflowRunScript(name) {
 }
 
 function runGit(cwd, args) {
-  const result = spawnSync('git', args, {
-    maxBuffer: 256 * 1024 * 1024,
-    cwd,
-    encoding: 'utf8',
-  });
+  const result = spawnSync('git', args, { cwd, encoding: 'utf8' });
   expect(result.status, result.stderr).toBe(0);
   return result.stdout.trim();
 }

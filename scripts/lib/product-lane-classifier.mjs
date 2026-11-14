@@ -1,7 +1,7 @@
-import { execFileSync } from 'node:child_process';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 import { isDeepStrictEqual } from 'node:util';
+import { execFileSync } from './child-process.mjs';
 
 export const PRODUCT_LANES = ['ios', 'mac', 'web'];
 
@@ -952,7 +952,6 @@ function readPackageJsonAtRef(ref, cwd) {
 function gitSucceeds(args, cwd) {
   try {
     execFileSync('git', args, {
-      maxBuffer: 256 * 1024 * 1024,
       cwd,
       stdio: ['ignore', 'pipe', 'pipe'],
     });
@@ -971,7 +970,6 @@ function readOptionalFileAtRef(ref, path, cwd) {
   let type;
   try {
     type = execFileSync('git', ['cat-file', '-t', `${ref}:${path}`], {
-      maxBuffer: 256 * 1024 * 1024,
       cwd,
       encoding: 'utf8',
       stdio: ['ignore', 'pipe', 'pipe'],

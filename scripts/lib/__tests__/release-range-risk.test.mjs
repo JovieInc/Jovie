@@ -1,4 +1,3 @@
-import { execFileSync, spawnSync } from 'node:child_process';
 import {
   mkdirSync,
   mkdtempSync,
@@ -10,6 +9,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterAll, describe, expect, it } from 'vitest';
+import { execFileSync, spawnSync } from '../child-process.mjs';
 import { classifyCiRisk, loadCiHarnessManifest } from '../ci-harness.mjs';
 import { planProductionLaneRange } from '../production-lane-range.mjs';
 import {
@@ -27,11 +27,7 @@ const roots = [];
 afterAll(() => roots.forEach(r => rmSync(r, { recursive: true, force: true })));
 
 const git = (cwd, ...args) =>
-  execFileSync('git', args, {
-    maxBuffer: 256 * 1024 * 1024,
-    cwd,
-    encoding: 'utf8',
-  }).trim();
+  execFileSync('git', args, { cwd, encoding: 'utf8' }).trim();
 
 /** Reproduces the 2026-10-21 wave: 63b63b2 tip was low, range was not. */
 function buildWave() {

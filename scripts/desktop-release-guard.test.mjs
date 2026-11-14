@@ -1,5 +1,4 @@
 import assert from 'node:assert/strict';
-import { execFileSync, spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import {
@@ -34,6 +33,7 @@ import {
   formatReleaseStampFailureDetails,
   readGitObjectContent,
 } from './desktop-release-guard.mjs';
+import { execFileSync, spawnSync } from './lib/child-process.mjs';
 import { discoverVersionedManifests, planStamp } from './version-stamp.mjs';
 
 const desktopRequire = createRequire(
@@ -1836,11 +1836,7 @@ test('desktop selection finds an intervening JOV-5996 change from the durable ba
   const root = await mkdtemp(join(tmpdir(), 'jovie-desktop-select-'));
   t.after(() => rm(root, { force: true, recursive: true }));
   const git = (...args) =>
-    execFileSync('git', args, {
-      maxBuffer: 256 * 1024 * 1024,
-      cwd: root,
-      encoding: 'utf8',
-    }).trim();
+    execFileSync('git', args, { cwd: root, encoding: 'utf8' }).trim();
 
   git('init', '-q');
   git('config', 'user.email', 'desktop-release-test@jov.ie');
@@ -2684,11 +2680,7 @@ test('production desktop release is forward-only when main outruns the controlle
   const root = await mkdtemp(join(tmpdir(), 'jovie-desktop-forward-only-'));
   t.after(() => rm(root, { force: true, recursive: true }));
   const git = (...args) =>
-    execFileSync('git', args, {
-      maxBuffer: 256 * 1024 * 1024,
-      cwd: root,
-      encoding: 'utf8',
-    }).trim();
+    execFileSync('git', args, { cwd: root, encoding: 'utf8' }).trim();
   git('init', '-q');
   git('config', 'user.email', 'desktop-release-test@jov.ie');
   git('config', 'user.name', 'Desktop Release Test');
@@ -2876,11 +2868,7 @@ test('desktop release CLI uses the exact merge-group base without weakening stam
     );
     t.after(() => rm(root, { force: true, recursive: true }));
     const git = (...args) =>
-      execFileSync('git', args, {
-        maxBuffer: 256 * 1024 * 1024,
-        cwd: root,
-        encoding: 'utf8',
-      }).trim();
+      execFileSync('git', args, { cwd: root, encoding: 'utf8' }).trim();
     const write = async (path, content) => {
       const destination = join(root, path);
       await mkdir(join(destination, '..'), { recursive: true });

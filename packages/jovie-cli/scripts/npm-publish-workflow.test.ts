@@ -548,7 +548,6 @@ describe('canonical source validation discovers CLI publication changes', () => 
     try {
       const git = (...args: string[]) => {
         const result = spawnSync('git', args, {
-          maxBuffer: 256 * 1024 * 1024,
           cwd: dir,
           encoding: 'utf8',
           env: {

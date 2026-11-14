@@ -116,11 +116,7 @@ function fixture(t) {
   mkdirSync(root);
   t.after(() => rmSync(base, { recursive: true, force: true }));
   const git = (...args) =>
-    execFileSync('git', args, {
-      maxBuffer: 256 * 1024 * 1024,
-      cwd: root,
-      encoding: 'utf8',
-    }).trim();
+    execFileSync('git', args, { cwd: root, encoding: 'utf8' }).trim();
   git('init', '-q');
   git('config', 'user.email', 'test@example.invalid');
   git('config', 'user.name', 'Fixture');
