@@ -43,6 +43,15 @@ class LocalModulePrerequisiteTest(unittest.TestCase):
                 got = classes.classify({**red("Source Validation"), "mergeStateStatus": state}, {"Source Validation": log})
                 self.assertEqual((got["cls"], got["action"]), ("local-module-prerequisite", "sync-main"))
 
+    def test_infrastructure_shortcut_preserves_the_local_prerequisite_route(self):
+        pr = {**red("Source Validation"), "queueFailure": None, "eventKinds": []}
+        log = ("passing fixture: API rate limit exceeded\n##[error]"
+               "lib/waitlist/winback-approval.server.ts(23,8): error TS2307: "
+               "Cannot find module '@/lib/waitlist/winback' or its corresponding type declarations.")
+        with patch.object(lane, "failed_logs", return_value={"Source Validation": log}):
+            self.assertIsNone(lane.infra_only_red(None, pr))
+            self.assertEqual(lane.route_fix_red(None, pr)["action"], "sync-main")
+
     def test_missing_package_or_fixture_text_does_not_request_prerequisite_sync(self):
         for log in (
             "lib/a.ts(1,1): error TS2307: Cannot find module 'external-package' or its corresponding type declarations.",
