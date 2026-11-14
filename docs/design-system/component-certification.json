@@ -30,6 +30,222 @@
       "frontend-rules",
       "forced-caps"
     ],
+    "apps/web/components/features/admin/lists/OvieListsIndex.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/admin/lists/OvieSmartViewWorkspace.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/admin/lists/StarRating.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/admin/lists/TriageDeck.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/admin/outbound/OutboundNameCell.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/admin/outbound/OutboundReadinessPanel.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/admin/outbound/OutboundWorkspace.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/admin/outreach/DmQueuePanel.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/admin/outreach/OutreachKpis.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/admin/outreach/OutreachOverviewPanel.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/admin/outreach/OutreachStatusBadge.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/admin/outreach/ReviewQueuePanel.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/admin/system-map/AdminSystemMap.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/admin/system-map/AdminSystemMapSkillsTab.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/admin/system-map/SkillDocCard.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/admin/table/AdminCreatorsTableHeader.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/admin/table/AdminDataTable.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/admin/table/AdminTableHeader.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/admin/table/AdminTablePagination.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/admin/table/AdminTableShell.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/admin/table/organisms/KanbanBoard.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/admin/waitlist-table/AdminWaitlistTableUnified.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/admin/waitlist-table/WaitlistKanbanCard.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/admin/wiki/WikiPageArticle.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
     "apps/web/components/features/profile/ClaimBanner.tsx": [
       "ds-owner",
       "tokens",
@@ -318,6 +534,43 @@
     },
     "apps/web/components/features/admin/OvieRouteUsageBeacon.tsx": {
       "error": "The beacon renders null in every state and is fire-and-forget: a failed POST is swallowed by its .catch, so there is no failure to draw. OvieRouteUsageBeacon.test.tsx rejects the fetch and asserts the page is unchanged and axe-clean."
+    },
+    "apps/web/components/features/admin/lists/OvieListsIndex.tsx": {
+      "permission-denied": "The index sits on an admin-only route that the server layout gates before it renders, and it takes no role or permission input. The detector matched role='status' on the loading placeholder."
+    },
+    "apps/web/components/features/admin/lists/OvieSmartViewWorkspace.tsx": {
+      "permission-denied": "The workspace sits on an admin-only route that the server layout gates before it renders, and it takes no role or permission input. The detector matched role='status' on the loading placeholder."
+    },
+    "apps/web/components/features/admin/lists/StarRating.tsx": {
+      "long-content": "The control draws five fixed icon buttons and no visible text; the label prop is only the fieldset's aria-label, so no caller text can overflow. The detector matched the label prop."
+    },
+    "apps/web/components/features/admin/outbound/OutboundReadinessPanel.tsx": {
+      "offline": "The panel never fetches: it takes resolved readiness plus isLoading and isError flags, so an offline request reaches it as isError (ErrorCouldNotLoad). The detector matched the isLoading prop."
+    },
+    "apps/web/components/features/admin/outbound/OutboundWorkspace.tsx": {
+      "permission-denied": "The workspace sits on an admin-only route that the server layout gates before it renders, and it takes no role or permission input. The detector matched role='toolbar' on the view tabs."
+    },
+    "apps/web/components/features/admin/outreach/DmQueuePanel.tsx": {
+      "long-content": "The panel's own copy is fixed (title='DM queue', a fixed subtitle and a numeric count); lead names and DM copy are drawn by DmQueueCard, which owns their overflow. The detector matched the title and subtitle props it passes to ContentSectionHeader."
+    },
+    "apps/web/components/features/admin/system-map/AdminSystemMap.tsx": {
+      "empty": "The only prop is activeTab; lists come from the checked-in connector and skill registries, which a story cannot empty. AdminSystemMap.test.tsx renders the 'No tools registered.' branch with a mocked registry.",
+      "long-content": "The only prop is activeTab; every label and description comes from the checked-in connector and skill registries, so no caller text can grow. The detector matched c.label, t.name and t.description."
+    },
+    "apps/web/components/features/admin/system-map/AdminSystemMapSkillsTab.tsx": {
+      "empty": "The tab takes no props and lists the checked-in SKILL_REGISTRY, which a story cannot empty. AdminSystemMapSkillsTab.certificate.test.tsx renders the zero-skill count line with a mocked registry.",
+      "long-content": "The tab takes no props; its one line of copy is fixed and each skill's text is drawn by SkillDocCard (LongContentSkill). The detector matched the name and description props it passes down."
+    },
+    "apps/web/components/features/admin/table/AdminCreatorsTableHeader.tsx": {
+      "empty": "The header holds no rows or collection: it draws five fixed column headings. The detector matched the items-center layout classes.",
+      "long-content": "Every heading is fixed copy ('Creator', 'Social', 'Actions' and the Created sort label) and each cell is whitespace-nowrap, so no caller text can grow. The detector matched the label prop on SortableHeaderButton."
+    },
+    "apps/web/components/features/admin/waitlist-table/AdminWaitlistTableUnified.tsx": {
+      "error": "The table takes its rows as props and never fetches, so it has no failed face to draw; a failed copy or approval is a toast. AdminWaitlistTableUnified.test.tsx asserts the 'Failed to copy name' toast. The detector matched toast.error.",
+      "offline": "The table takes its rows as props and never fetches; isFetchingNextPage is passed through to the shared table (LoadingNextPage) and an offline approval fails as a toast from useApproveEntry. The detector matched isLoading={false} and isFetchingNextPage."
+    },
+    "apps/web/components/features/admin/waitlist-table/WaitlistKanbanCard.tsx": {
+      "empty": "The card draws exactly one entry and holds no collection. The detector matched the items-start and items-center layout classes; missing optional fields are shown by PartialEntry."
     },
     "apps/web/components/features/alerts/UnpublishedEntityAlerts.tsx": {
       "offline": "The copy and its fallback never fetch; the alert sign-up it hosts, AlertGrowthLanding, owns the subscribe request and its network error. The detector matched the loading test id on the Suspense fallback (Loading).",
