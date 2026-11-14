@@ -274,6 +274,61 @@ export type FleetRoomSyncReceipt =
       readonly reason: 'redis-unavailable' | 'linear-unconfigured';
     };
 
+type SyncIssues = {
+  readonly fleet: readonly SyncIssueNode[];
+  readonly homes: readonly (SyncIssueNode | null | undefined)[];
+};
+
+type SyncResponse = { fleet?: { nodes?: SyncIssueNode[] } } & Record<
+  string,
+  SyncIssueNode | { nodes?: SyncIssueNode[] } | null | undefined
+>;
+
+/**
+ * One request on the happy path. Linear fails the whole request when any
+ * aliased home thread errors (deleted or out of reach), so on failure re-read
+ * the fleet list alone (its error propagates) and each home thread on its own,
+ * skipping the ones that still fail.
+ */
+async function readSyncIssues(
+  linear: LinearGraphql,
+  since: string
+): Promise<SyncIssues> {
+  const variables: Record<string, unknown> = { since };
+  OVIE_FLEET_HOME_THREADS.forEach((ref, index) => {
+    variables[`home${index}`] = ref;
+  });
+  try {
+    const data = await linear<SyncResponse>(
+      fleetRoomSyncQuery(OVIE_FLEET_HOME_THREADS),
+      variables
+    );
+    return {
+      fleet: data.fleet?.nodes ?? [],
+      homes: OVIE_FLEET_HOME_THREADS.map(
+        (_, index) => data[`home${index}`] as SyncIssueNode | null | undefined
+      ),
+    };
+  } catch (error) {
+    if (OVIE_FLEET_HOME_THREADS.length === 0) throw error;
+  }
+  const fleet = await linear<SyncResponse>(fleetRoomSyncQuery([]), { since });
+  const homes = await Promise.all(
+    OVIE_FLEET_HOME_THREADS.map(async ref => {
+      try {
+        const data = await linear<SyncResponse>(fleetRoomSyncQuery([ref]), {
+          since,
+          home0: ref,
+        });
+        return data.home0 as SyncIssueNode | null | undefined;
+      } catch {
+        return null;
+      }
+    })
+  );
+  return { fleet: fleet.fleet?.nodes ?? [], homes };
+}
+
 export async function syncOvieFleetRoom(
   now = new Date(),
   deps: FleetRoomDeps = configuredFleetRoomDeps()
@@ -285,16 +340,7 @@ export async function syncOvieFleetRoom(
   const since = new Date(
     now.getTime() - SYNC_WINDOW_DAYS * 24 * 60 * 60_000
   ).toISOString();
-  const variables: Record<string, unknown> = { since };
-  OVIE_FLEET_HOME_THREADS.forEach((ref, index) => {
-    variables[`home${index}`] = ref;
-  });
-  const data = await deps.linear<
-    { fleet?: { nodes?: SyncIssueNode[] } } & Record<
-      string,
-      SyncIssueNode | { nodes?: SyncIssueNode[] } | null | undefined
-    >
-  >(fleetRoomSyncQuery(OVIE_FLEET_HOME_THREADS), variables);
+  const data = await readSyncIssues(deps.linear, since);
 
   // A home thread can also carry the `fleet` label; merge its comments.
   const issues = new Map<string, SyncIssueNode>();
@@ -312,10 +358,8 @@ export async function syncOvieFleetRoom(
       },
     });
   };
-  for (const node of data.fleet?.nodes ?? []) add(node);
-  OVIE_FLEET_HOME_THREADS.forEach((_, index) => {
-    add(data[`home${index}`] as SyncIssueNode | null | undefined);
-  });
+  for (const node of data.fleet) add(node);
+  for (const node of data.homes) add(node);
 
   let comments = 0;
   const events = [];

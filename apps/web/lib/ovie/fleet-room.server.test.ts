@@ -147,6 +147,48 @@ describe('syncOvieFleetRoom', () => {
     });
   });
 
+  it('skips a home thread that fails instead of dropping the whole sync', async () => {
+    const redis = memoryRoomRedis();
+    const comment = {
+      id: 'd',
+      body: "Codex couldn't start a task for this request: usage limits",
+      createdAt: '2026-11-11T19:02:00.000Z',
+      user: { id: 'c802cb9b-dcdd-4081-afa9-376e905b73ab' },
+    };
+    const bad = OVIE_FLEET_HOME_THREADS[0];
+    const linear = vi.fn(
+      async (_query: string, variables: Record<string, unknown>) => {
+        if (Object.values(variables).includes(bad)) {
+          throw new Error('Entity not found');
+        }
+        if (variables.home0) {
+          return {
+            home0: {
+              identifier: String(variables.home0),
+              title: null,
+              url: null,
+              comments: { nodes: [comment] },
+            },
+          };
+        }
+        return { fleet: { nodes: [] } };
+      }
+    );
+    const receipt = await syncOvieFleetRoom(NOW, { redis, linear });
+    expect(receipt).toMatchObject({ status: 'ok' });
+    expect(linear).toHaveBeenCalledTimes(2 + OVIE_FLEET_HOME_THREADS.length);
+    if (OVIE_FLEET_HOME_THREADS.length > 1) {
+      expect(receipt).toMatchObject({ written: 1 });
+    }
+  });
+
+  it('still fails when the fleet list itself cannot be read', async () => {
+    const linear = vi.fn().mockRejectedValue(new Error('Linear down'));
+    await expect(
+      syncOvieFleetRoom(NOW, { redis: memoryRoomRedis(), linear })
+    ).rejects.toThrow('Linear down');
+  });
+
   it('reports unconfigured sources instead of throwing', async () => {
     expect(await syncOvieFleetRoom(NOW, { redis: null, linear: null })).toEqual(
       {
