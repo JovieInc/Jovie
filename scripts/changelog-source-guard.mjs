@@ -51,7 +51,7 @@ if (local || pr) {
   const files = execFileSync(
     'git',
     ['diff', '--name-only', `${pr.base.sha}...${pr.head.sha}`],
-    { encoding: 'utf8' }
+    { maxBuffer: 256 * 1024 * 1024, encoding: 'utf8' }
   )
     .trim()
     .split('\n');

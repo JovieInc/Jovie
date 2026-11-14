@@ -133,11 +133,10 @@ origin fails without changing existing bytes. New heads require new receipts;
 neither repair nor review/finalizer receipts rewrite origin history.
 
 The Dependabot metadata-certified producer and atomic pin-sync writer emit after
-their final heads are known. Sentry Autofix, Shipping SLO (snapshot and ratchet),
+their final heads are known. Shipping SLO (snapshot and ratchet),
 Screenshots (new and updated PR), Production Controller customer notes, Desktop
 Release stamps, and both coverage/nightly report publishers use the same
-`shipping_origin.py emit-automation` boundary after publication. Sentry records
-the evidenced Claude provider, without inventing a model from its routing tier.
+`shipping_origin.py emit-automation` boundary after publication.
 
 Hosted producers retain a data-only `shipping-origin-v1` Actions artifact for 30
 days. The existing lanes dispatch tick reads artifacts from both reporting
