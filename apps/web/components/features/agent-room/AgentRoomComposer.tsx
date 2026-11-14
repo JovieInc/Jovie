@@ -35,8 +35,12 @@ export function AgentRoomComposer({
   const [text, setText] = useState('');
   const [state, formAction, pending] = useActionState(
     async (previous: AgentRoomComposerState, formData: FormData) => {
+      const sent = String(formData.get('text') ?? '');
       const next = await action(previous, formData);
-      if (next.status === 'sent') setText('');
+      // Clear only what was sent: text typed while the send ran stays.
+      if (next.status === 'sent') {
+        setText(current => (current === sent ? '' : current));
+      }
       return next;
     },
     IDLE
