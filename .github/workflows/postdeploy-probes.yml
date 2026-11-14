@@ -1000,11 +1000,23 @@ jobs:
           else
             echo '[]' > "$steps_json"
           fi
+          status=0
           node scripts/prod-cert.mjs \
             --origin https://jov.ie \
             --steps "$steps_json" \
             --out "${RUNNER_TEMP}/prod-cert-receipts.json" \
-            --post --file-issues
+            --post --file-issues || status=$?
+          # JOV-12620: a not-certified verdict (exit 1) is already posted to the
+          # ledger, filed in Linear and uploaded below: its own receipt, not a
+          # probe failure. Only smoke, auth and Lighthouse turn this run red; a
+          # crash that records no verdict (exit 2) still fails.
+          if [ "$status" -eq 1 ]; then
+            echo "::warning title=Golden path not certified::Receipts recorded; see the job summary and the prod-cert-receipts artifact."
+            { echo "### Golden path not certified (receipt, non-blocking)"; echo "| Surface | Status | Failing |"; echo "|---|---|---|"
+              jq -r '.receipts[] | select(.status != "passed") | "| \(.surface) | \(.status) | \(.blocker // ([.checks[]? | select(.status == "failed") | .id] | join(", "))) |"' "${RUNNER_TEMP}/prod-cert-receipts.json"; } >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          exit "$status"
 
       - name: Upload certification receipts
         if: ${{ always() }}

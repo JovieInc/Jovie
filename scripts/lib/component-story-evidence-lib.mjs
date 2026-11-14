@@ -194,6 +194,8 @@ export function captureProblems(result, theme, kind) {
   return problems;
 }
 
+const DETERMINISTIC_PROBLEM = /^(?:axe |rendered )/;
+
 const shorten = text => String(text).replace(/\s+/g, ' ').trim().slice(0, 160);
 
 /** The theme a story pins through its own globals, if any (either capture says). */
@@ -212,6 +214,7 @@ function receiptFor(
 ) {
   const stories = [];
   const failures = [];
+  let transient = false;
   for (const id of storyIds) {
     // A story that pins one theme (e.g. OperationsDark) can't prove both, so
     // it is checked in its own theme only and left out of the light+dark list.
@@ -221,6 +224,10 @@ function receiptFor(
     for (const theme of pinned ? [pinned] : STORY_THEMES) {
       const result = results.get(`${id}\u0000${theme}`);
       const problems = captureProblems(result, theme, kind);
+      // Axe findings and a wrong theme repeat on the same inputs; anything
+      // else (no capture, no render, errors, no screenshot) may be a flake.
+      if (problems.some(problem => !DETERMINISTIC_PROBLEM.test(problem)))
+        transient = true;
       if (problems.length)
         failures.push(`${id} [${theme}]: ${shorten(problems.join('; '))}`);
       else {
@@ -241,6 +248,8 @@ function receiptFor(
     captured: stories.length,
     stories,
   };
+  if (receipt.status === 'fail' && (transient || !stories.length))
+    receipt.retry = true;
   if (!stories.length) receipt.detail = 'no stories captured';
   else if (failures.length) {
     const more = failures.length - DETAIL_LIMIT;
@@ -278,8 +287,9 @@ export const selectStories = selectUiStories;
 
 /**
  * Prior receipts still valid for the current tree: both kinds present, same
- * source bytes and the same v2 closure binding. Failures count too: they are
- * real observations of these exact inputs, so recapturing them is waste.
+ * source bytes and the same v2 closure binding. Deterministic failures (axe
+ * findings, a wrong theme) count too: recapturing them is waste. A failure
+ * marked `retry` (no capture, no render, errors) is captured again.
  * @param {{ visual?: Record<string, any>, a11y?: Record<string, any> }} prior
  * @param {Map<string, { sourceHash: string, renderInputs: any }>} components
  * @returns {Map<string, { visual: any, a11y: any }>}
@@ -292,7 +302,8 @@ export function reusableReceipts(prior, components) {
     const same = receipt =>
       receipt?.schema === STORY_EVIDENCE_SCHEMA &&
       receipt.sourceHash === sourceHash &&
-      ['pass', 'fail'].includes(receipt.status) &&
+      (receipt.status === 'pass' ||
+        (receipt.status === 'fail' && !receipt.retry)) &&
       JSON.stringify(receipt.renderInputs) === JSON.stringify(renderInputs);
     if (renderInputs?.digest && same(visual) && same(a11y))
       reuse.set(path, { visual, a11y });

@@ -124,6 +124,13 @@ describe('per-component render closure (jovie.component-render-inputs/v2)', () =
     const shared = digests(f.bind());
     for (const path of [BUTTON, CARD, ROW])
       assert.notEqual(shared[path], after[path]);
+
+    // So does the capture code: a new producer re-proves every receipt.
+    f.put('.github/workflows/visual-a11y.yml', 'name: Visual');
+    execFileSync('git', ['add', '.'], { cwd: f.root, env: gitEnv });
+    const producer = digests(f.bind());
+    for (const path of [BUTTON, CARD, ROW])
+      assert.notEqual(producer[path], shared[path]);
   });
 
   it('falls back to the global digest when an import cannot be resolved', () => {
@@ -202,6 +209,15 @@ describe('story evidence reuse and sharding', () => {
     );
     assert.deepEqual([...reused.keys()], [BUTTON]);
     assert.equal(reused.get(BUTTON).a11y.status, 'fail');
+    // A failure that may be a flake (no render, errors) is captured again.
+    const flaky = { ...receipt('a', 'd1', 'fail'), retry: true };
+    assert.equal(
+      reusableReceipts(
+        { visual: { [BUTTON]: receipt('a', 'd1') }, a11y: { [BUTTON]: flaky } },
+        inputs
+      ).size,
+      0
+    );
     // A half pair is recaptured.
     assert.equal(
       reusableReceipts(

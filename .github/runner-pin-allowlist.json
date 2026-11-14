@@ -180,7 +180,6 @@
     "security.yml#commit-signature-check",
     "security.yml#workflow-execution-posture",
     "sentry-autofix-recurrence.yml#recurrence",
-    "sentry-autofix.yml#autofix",
     "shipping-origin.yml#receipt",
     "shipping-slo.yml#measure",
     "sonarcloud.yml#sonarcloud",

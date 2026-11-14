@@ -1,5 +1,4 @@
 import assert from 'node:assert/strict';
-import { execFileSync, spawnSync } from 'node:child_process';
 import {
   chmodSync,
   copyFileSync,
@@ -16,6 +15,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { execFileSync, spawnSync } from '../child-process.mjs';
 
 // Lets a test make one directory vanish mid-walk, the way parallel CI
 // commands delete apps/web/coverage while doc:freshness:check runs.

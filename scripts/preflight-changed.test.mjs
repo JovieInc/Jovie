@@ -387,7 +387,11 @@ test('heavy checks run through the host typecheck slot and keep their quoting', 
 });
 
 const gitIn = (cwd, args) => {
-  const r = spawnSync('git', args, { cwd, encoding: 'utf8' });
+  const r = spawnSync('git', args, {
+    maxBuffer: 256 * 1024 * 1024,
+    cwd,
+    encoding: 'utf8',
+  });
   assert.equal(r.status, 0, r.stdout + r.stderr);
 };
 

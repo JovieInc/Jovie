@@ -75,7 +75,7 @@ test('the old homepage manifest is gone and nothing in the pipeline reads it', (
       ':!scripts/design/*.test.mjs',
       'docs',
     ],
-    { cwd: REPO_ROOT, encoding: 'utf8' }
+    { maxBuffer: 256 * 1024 * 1024, cwd: REPO_ROOT, encoding: 'utf8' }
   );
   assert.equal(run.stdout.trim(), '');
 });
