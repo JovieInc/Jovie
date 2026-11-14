@@ -1,167 +1,26 @@
 import assert from 'node:assert/strict';
-import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { test } from 'node:test';
 import { load as yamlLoad } from 'js-yaml';
 import { JOVIE_TEAM_ID } from '../lib/linear-issue-intake.mjs';
 import {
+  artifacts,
+  assetUrl,
+  fakeNetwork,
+  fakePng,
+  publish,
+  RUN_URL,
+  UPLOAD_URL,
+} from './pen-draft-publish.fixtures.mjs';
+import {
   APPROVAL_LABEL,
   APPROVAL_LINE,
   approvalDescription,
   approvalTitle,
-  collectFrames,
-  frameFromArtifactName,
   pickApprovalIssue,
-  publishDrafts,
   runUrlFor,
 } from './pen-draft-publish.mjs';
-
-const RUN_URL = 'https://github.com/JovieInc/Jovie/actions/runs/123';
-const UPLOAD_URL = 'https://uploads.example.test/signed/put';
-const assetUrl = frame => `https://uploads.linear.app/asset/${frame}.png`;
-
-/** A download-artifact folder: one `pen-draft-<frame>` dir per artifact. */
-function artifacts(frames) {
-  const dir = mkdtempSync(join(tmpdir(), 'pen-draft-publish-'));
-  for (const [artifact, files] of Object.entries(frames)) {
-    mkdirSync(join(dir, artifact), { recursive: true });
-    for (const file of files)
-      writeFileSync(join(dir, artifact, file), `bytes of ${file}`);
-  }
-  return dir;
-}
-
-/** Fake Linear plus its upload host. Records every request it sees. */
-function fakeNetwork({ issues = [], failPutFor = [] } = {}) {
-  const calls = [];
-  const created = [];
-  const json = body => ({
-    ok: true,
-    status: 200,
-    headers: new Headers(),
-    text: async () => JSON.stringify(body),
-  });
-  let pendingFrame = null;
-  const fetchImpl = async (url, init) => {
-    if (init.method === 'PUT') {
-      calls.push({ op: 'PUT', url, headers: init.headers, body: init.body });
-      const failed = failPutFor.includes(pendingFrame);
-      return { ok: !failed, status: failed ? 403 : 200 };
-    }
-    const { query, variables } = JSON.parse(init.body);
-    const op = query.match(/(?:query|mutation)\s+(\w+)/)[1];
-    calls.push({ op, variables, authorization: init.headers.Authorization });
-    if (op === 'PenDraftPublishRefs')
-      return json({
-        data: {
-          team: {
-            states: { nodes: [{ id: 'state-backlog', name: 'Backlog' }] },
-          },
-          issueLabels: {
-            nodes: [
-              { id: 'label-workspace', name: APPROVAL_LABEL, team: null },
-              {
-                id: 'label-team',
-                name: APPROVAL_LABEL,
-                team: { id: JOVIE_TEAM_ID },
-              },
-            ],
-          },
-        },
-      });
-    if (op === 'PenDraftFileUpload') {
-      pendingFrame = variables.filename.replace(/\.png$/, '');
-      return json({
-        data: {
-          fileUpload: {
-            success: true,
-            uploadFile: {
-              uploadUrl: UPLOAD_URL,
-              assetUrl: assetUrl(pendingFrame),
-              headers: [{ key: 'x-amz-acl', value: 'private' }],
-            },
-          },
-        },
-      });
-    }
-    if (op === 'PenDraftApprovalIssue')
-      return json({ data: { issues: { nodes: [...issues, ...created] } } });
-    if (op === 'PenDraftApprovalCreate') {
-      const issue = {
-        id: `new-${created.length}`,
-        identifier: `JOV-90${created.length}`,
-        title: variables.input.title,
-        state: { type: 'backlog' },
-        labels: { nodes: variables.input.labelIds.map(id => ({ id })) },
-      };
-      created.push(issue);
-      return json({ data: { issueCreate: { success: true, issue } } });
-    }
-    if (op === 'PenDraftApprovalUpdate')
-      return json({
-        data: { issueUpdate: { success: true, issue: { id: variables.id } } },
-      });
-    throw new Error(`unexpected Linear operation ${op}`);
-  };
-  return { fetchImpl, calls, ops: () => calls.map(call => call.op) };
-}
-
-const publish = (dir, network, extra = {}) =>
-  publishDrafts({
-    dir,
-    runUrl: RUN_URL,
-    apiKey: 'lin_api_test',
-    fetchImpl: network.fetchImpl,
-    env: {
-      LINEAR_COOLDOWN_STATE_DIR: mkdtempSync(join(tmpdir(), 'pen-cooldown-')),
-    },
-    sleep: async () => {},
-    log: () => {},
-    ...extra,
-  });
-
-test('frame names come from pen-draft-<frame> artifact names only', () => {
-  assert.equal(frameFromArtifactName('pen-draft-homepage'), 'homepage');
-  assert.equal(
-    frameFromArtifactName('pen-draft-page-skeletons-2'),
-    'page-skeletons-2'
-  );
-  for (const name of [
-    'pen-draft-',
-    'pen-draft',
-    'pen-drafts-homepage',
-    'quality-gaps-123',
-    'pen-draft-Bad Name',
-    'pen-draft-../etc',
-    'pen-draft-a--b',
-    'xpen-draft-homepage',
-    undefined,
-  ])
-    assert.equal(frameFromArtifactName(name), null, String(name));
-});
-
-test('only pen-draft folders count, and a frame without a png has none', () => {
-  const dir = artifacts({
-    'pen-draft-homepage': ['homepage.pen', 'homepage.png', 'homepage.json'],
-    'pen-draft-claim': ['claim.pen', 'receipt.json'],
-    // Another frame's picture in the wrong artifact is not this frame's.
-    'pen-draft-insights': ['homepage.png'],
-    'coverage-report': ['coverage.png'],
-  });
-  assert.deepEqual(
-    collectFrames(dir).map(entry => [
-      entry.frame,
-      entry.png?.slice(dir.length + 1) ?? null,
-    ]),
-    [
-      ['claim', null],
-      ['homepage', 'pen-draft-homepage/homepage.png'],
-      ['insights', null],
-    ]
-  );
-  assert.deepEqual(collectFrames(join(dir, 'missing')), []);
-});
 
 test('the approval issue is matched on its exact title', () => {
   assert.equal(approvalTitle('homepage'), 'Pen draft for approval: homepage');
@@ -293,7 +152,7 @@ test('a new frame uploads its png and gets one labelled Backlog issue', async ()
   assert.equal(put.url, UPLOAD_URL);
   assert.equal(put.headers['Content-Type'], 'image/png');
   assert.equal(put.headers['x-amz-acl'], 'private');
-  assert.equal(String(put.body), 'bytes of homepage.png');
+  assert.deepEqual(put.body, fakePng(1440, 900));
   assert.deepEqual(find.variables, {
     teamId: JOVIE_TEAM_ID,
     title: 'Pen draft for approval: homepage',
@@ -384,9 +243,9 @@ test('a failed upload fails the run, writes no issue, and other frames still pub
   const result = await publish(dir, network);
   assert.equal(result.ok, false);
   assert.deepEqual(result.frames, [
-    { frame: 'insights', ok: true, action: 'skipped-no-png' },
     { frame: 'claim', ok: false, reason: 'pen_upload_put_403' },
     { frame: 'homepage', ok: true, action: 'created', identifier: 'JOV-900' },
+    { frame: 'insights', ok: true, action: 'skipped-no-png' },
   ]);
   const titles = network.calls
     .filter(call => call.op === 'PenDraftApprovalIssue')
@@ -429,20 +288,69 @@ test('the workflow publishes the run that drafted, with read-only tokens', () =>
   });
   assert.equal(workflow.on.workflow_dispatch.inputs.run_id.required, true);
   assert.deepEqual(workflow.permissions, {});
-  const job = workflow.jobs.publish;
-  assert.deepEqual(job.permissions, { actions: 'read', contents: 'read' });
-  const download = job.steps.find(step =>
-    String(step.uses ?? '').startsWith('actions/download-artifact@')
+  assert.match(workflow.env.RUN_ID, /inputs\.run_id/);
+  assert.match(workflow.env.RUN_ID, /github\.event\.workflow_run\.id/);
+  const { plan, render, publish: job } = workflow.jobs;
+  const uses = (steps, action) =>
+    steps.find(step => String(step.uses ?? '').startsWith(`${action}@`));
+  const runs = (steps, script) =>
+    steps.find(step => String(step.run ?? '').includes(script));
+  const readOnly = { actions: 'read', contents: 'read' };
+
+  // Plan lists the frames of the drafting run that left a .pen.
+  assert.deepEqual(plan.permissions, readOnly);
+  const all = uses(plan.steps, 'actions/download-artifact');
+  assert.match(all.uses, /^actions\/download-artifact@[0-9a-f]{40}$/);
+  assert.equal(all.with.pattern, 'pen-draft-*');
+  assert.match(all.with['run-id'], /RUN_ID/);
+  assert.ok(all.with['github-token']);
+  assert.match(runs(plan.steps, 'pen-draft-picture.mjs').run, /--plan/);
+
+  // One render job per frame, one at a time, under the draft jobs' editor
+  // lease: the Pen editor behind one key serves one document.
+  assert.equal(render.needs, 'plan');
+  assert.deepEqual(render.permissions, readOnly);
+  assert.deepEqual(render.concurrency, draft.jobs.draft.concurrency);
+  assert.equal(render.strategy['max-parallel'], 1);
+  assert.equal(render.strategy['fail-fast'], false);
+  assert.match(render.strategy.matrix.frame, /needs\.plan\.outputs\.frames/);
+  const download = uses(render.steps, 'actions/download-artifact');
+  assert.equal(download.with.name, 'pen-draft-${{ matrix.frame }}');
+  // A named artifact unpacks flat, so its path restores the frame's folder.
+  assert.match(
+    download.with.path,
+    /pen-drafts\/pen-draft-\$\{\{ matrix\.frame \}\}$/
   );
-  assert.match(download.uses, /^actions\/download-artifact@[0-9a-f]{40}$/);
-  assert.equal(download.with.pattern, 'pen-draft-*');
-  assert.match(download.with['run-id'], /RUN_ID|run_id/);
-  assert.ok(download.with['github-token']);
-  const publishStep = job.steps.find(step =>
-    String(step.run ?? '').includes('scripts/design/pen-draft-publish.mjs')
-  );
-  // The step that holds the Linear key holds nothing else.
+  assert.match(download.with['run-id'], /RUN_ID/);
+  const renderStep = runs(render.steps, 'scripts/design/pen-draft-picture.mjs');
+  assert.deepEqual(Object.keys(renderStep.env), [
+    'PEN_CLI_KEY',
+    'PEN_GOLDEN_PATH_FILE_URL',
+  ]);
+  const upload = uses(render.steps, 'actions/upload-artifact');
+  assert.ok(render.steps.indexOf(download) < render.steps.indexOf(renderStep));
+  assert.ok(render.steps.indexOf(renderStep) < render.steps.indexOf(upload));
+  assert.equal(upload.with.name, 'pen-draft-picture-${{ matrix.frame }}');
+  // The 25 MB .pen files stay behind; the per-frame folder is kept.
+  assert.match(upload.with.path, /pen-drafts\n!.*\*\*\/\*\.pen/);
+
+  // Publish gets only the pictures, holds only the Linear key, and still
+  // runs when one frame's render job failed.
+  assert.deepEqual(job.needs, ['plan', 'render']);
+  assert.match(job.if, /!cancelled\(\)/);
+  assert.deepEqual(job.permissions, readOnly);
+  const pictures = uses(job.steps, 'actions/download-artifact');
+  assert.equal(pictures.with.pattern, 'pen-draft-picture-*');
+  assert.equal(pictures.with['merge-multiple'], true);
+  assert.equal(pictures.with['run-id'], undefined);
+  const publishStep = runs(job.steps, 'scripts/design/pen-draft-publish.mjs');
   assert.deepEqual(Object.keys(publishStep.env), ['LINEAR_API_KEY']);
-  assert.match(job.env.RUN_ID, /inputs\.run_id/);
-  assert.match(job.env.RUN_ID, /github\.event\.workflow_run\.id/);
+  assert.equal(JSON.stringify(job).includes('PEN_'), false);
+  assert.equal(
+    JSON.stringify([plan, render]).includes('LINEAR_API_KEY'),
+    false
+  );
+  // No job outlasts the 10 minutes the publish job always had.
+  for (const each of [plan, render, job])
+    assert.ok(each['timeout-minutes'] <= 10);
 });
