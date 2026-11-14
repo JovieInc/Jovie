@@ -117,7 +117,7 @@ describe('lanes coverage matrix legs', () => {
     );
   });
 
-  it('keeps the floors file as the single source for the combined report', () => {
+  it('keeps the shared export as the single source for the combined report', () => {
     expect(LANES_COVERAGE_FLOORS).toHaveLength(26);
     for (const { include, floor } of LANES_COVERAGE_FLOORS) {
       expect(LANES_COVERAGE_COMMAND).toContain(

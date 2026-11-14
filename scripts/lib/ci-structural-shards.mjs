@@ -1,6 +1,3 @@
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
-
 /**
  * ci-fast (structural lanes) runs as two matrix legs on separate runners: leg
  * ab runs shards a+b, leg cd runs c+d, and each combines its pair into
@@ -53,34 +50,118 @@ export function lanesReceiptRanSuite(receipt) {
 }
 
 /**
- * Per-module lanes coverage floors, one `<include>\t<floor>` row per line in
- * .github/ci-harness/lanes-coverage-floors.txt. The file is the single source
- * for both this command list and the lanes-coverage report job's bash step
- * (the structural-control-paths.ere data-file pattern, JOV-6837), so the two
- * cannot drift. Malformed rows fail closed at module load.
+ * One coverage-floor authority for both the full-suite command and hosted
+ * combined report. Keep it in the existing script dependency closure so
+ * trusted archives and sparse checkouts need no extra runtime data file.
  */
 export const LANES_COVERAGE_FLOORS = Object.freeze(
-  readFileSync(
-    resolve(
-      import.meta.dirname,
-      '..',
-      '..',
-      '.github/ci-harness/lanes-coverage-floors.txt'
-    ),
-    'utf8'
-  )
-    .split('\n')
-    .map(line => line.trim())
-    .filter(line => line && !line.startsWith('#'))
-    .map(line => {
-      const [include, floor, ...rest] = line.split('\t');
-      if (!include || !/^\d+$/.test(floor ?? '') || rest.length > 0) {
-        throw new Error(
-          `lanes-coverage-floors.txt: malformed row ${JSON.stringify(line)}`
-        );
-      }
-      return { include, floor: Number(floor) };
-    })
+  [
+    {
+      include: '*/scripts/lanes/backlog_admission.py',
+      floor: 90,
+    },
+    {
+      include: '*/scripts/lanes/priority_admission.py',
+      floor: 80,
+    },
+    {
+      include: '*/scripts/lanes/backlog_writer_guard.py',
+      floor: 90,
+    },
+    {
+      include: '*/scripts/lanes/board_intake.py',
+      floor: 85,
+    },
+    {
+      include: '*/scripts/lanes/hud.py',
+      floor: 80,
+    },
+    {
+      include: '*/scripts/lanes/capacity_limit.py',
+      floor: 90,
+    },
+    {
+      include: '*/scripts/lanes/qualification_guard.py',
+      floor: 85,
+    },
+    {
+      include:
+        '*/scripts/lanes/lane_runner.py,*/scripts/lanes/pr_events.py,*/scripts/lanes/reason_lane.py,*/scripts/lanes/gbrain_catalog.py,*/scripts/lanes/design_gate.py,*/scripts/lanes/doctor.py,*/scripts/lanes/public_feed.py,*/scripts/lanes/disk_guard.py,*/scripts/lanes/continuity_clock.py',
+      floor: 85,
+    },
+    {
+      include: '*/scripts/hyperagent/*.py',
+      floor: 90,
+    },
+    {
+      include: '*/scripts/lanes/hyperagent_lane.py',
+      floor: 95,
+    },
+    {
+      include: '*/scripts/lanes/devin_free_policy.py',
+      floor: 85,
+    },
+    {
+      include: '*/scripts/lanes/claude_lane.py',
+      floor: 95,
+    },
+    {
+      include: '*/scripts/lanes/codex_lane.py',
+      floor: 85,
+    },
+    {
+      include: '*/scripts/lanes/cloud_lane*.py',
+      floor: 90,
+    },
+    {
+      include: '*/scripts/lanes/worktree_sweep.py',
+      floor: 85,
+    },
+    {
+      include: '*/scripts/lanes/service_census.py',
+      floor: 85,
+    },
+    {
+      include: '*/scripts/lanes/epics.py',
+      floor: 90,
+    },
+    {
+      include: '*/scripts/lanes/execution_attempt.py',
+      floor: 85,
+    },
+    {
+      include: '*/scripts/lanes/merge_evidence.py',
+      floor: 85,
+    },
+    {
+      include: '*/scripts/lanes/worktree_pool.py',
+      floor: 85,
+    },
+    {
+      include: '*/scripts/lanes/dependency_diff.py',
+      floor: 95,
+    },
+    {
+      include: '*/scripts/lanes/remediation.py',
+      floor: 85,
+    },
+    {
+      include: '*/scripts/lanes/model_radar.py',
+      floor: 90,
+    },
+    {
+      include: '*/scripts/lanes/model_pools.py',
+      floor: 95,
+    },
+    {
+      include: '*/scripts/lanes/model_pool_guard.py',
+      floor: 95,
+    },
+    {
+      include: '*/scripts/lanes/model_pool_calls.py',
+      floor: 95,
+    },
+  ].map(row => Object.freeze(row))
 );
 
 /**

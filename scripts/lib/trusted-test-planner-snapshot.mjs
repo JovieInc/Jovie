@@ -11,10 +11,6 @@ export const MODULE_INIT_FILES = {
   'scripts/invariants/scanned-paths.mjs': [
     'scripts/invariants/latency-sensitive-execution-allowlist.json',
   ],
-  // Read at ci-fast-lanes.mjs module load (lanes coverage floors, Move 3).
-  'scripts/lib/ci-structural-shards.mjs': [
-    '.github/ci-harness/lanes-coverage-floors.txt',
-  ],
 };
 
 const SHA = /^[a-f0-9]{40}(?:[a-f0-9]{24})?$/u;
@@ -130,11 +126,6 @@ export function snapshotTrustedTestPlanner({ repo, base, out }) {
     }
     if (file.endsWith('.json')) {
       JSON.parse(source);
-      continue;
-    }
-    // Module-initialization data files (e.g. the lanes coverage floors table)
-    // are carried as opaque bytes: included in the closure, never parsed.
-    if (file.endsWith('.txt')) {
       continue;
     }
     if (!file.endsWith('.mjs'))

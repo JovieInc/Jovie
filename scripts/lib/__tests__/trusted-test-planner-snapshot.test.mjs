@@ -29,10 +29,7 @@ import {
 
 const ROOT = join(import.meta.dirname, '../../..');
 
-test('the isolated lane-runner snapshot carries the floors file read at module load', async t => {
-  // Move 3 review: ci-fast-lanes.mjs reads
-  // .github/ci-harness/lanes-coverage-floors.txt at module load, so a
-  // scripts-only snapshot without it dies with ENOENT in trusted tooling.
+test('the isolated lane-runner snapshot loads the shared coverage-floor export', async t => {
   const head = spawnSync('git', ['rev-parse', 'HEAD'], {
     cwd: ROOT,
     encoding: 'utf8',
@@ -45,9 +42,9 @@ test('the isolated lane-runner snapshot carries the floors file read at module l
   const manifest = snapshotTrustedTestPlanner({ repo: ROOT, base, out });
   assert.ok(
     manifest.files.some(
-      file => file.path === '.github/ci-harness/lanes-coverage-floors.txt'
+      file => file.path === 'scripts/lib/ci-structural-shards.mjs'
     ),
-    'the module-initialization closure must include the floors file'
+    'the import closure must include the coverage-floor authority'
   );
   const mod = await import(
     `${pathToFileURL(join(out, 'files', 'scripts/ci-fast-lanes.mjs')).href}?isolated=${base}`

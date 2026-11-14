@@ -903,13 +903,6 @@ jobs:
           # source and dependencies in its unconditional workflow cleanup steps.
           trap '[ "$merging" != true ] || git reset --hard --quiet "$EXPECTED_HEAD"; rm -rf "$guard_root"' EXIT
           git archive "$trusted_ref" scripts | tar -x -C "$guard_root"
-          # The lanes coverage floors file is read at ci-fast-lanes.mjs module
-          # load. A trusted ref from before the file landed pairs with a lane
-          # script that never reads it, so extract only when present; once the
-          # pairing landed, a missing file here fails closed at import.
-          if git cat-file -e "$trusted_ref:.github/ci-harness/lanes-coverage-floors.txt" 2>/dev/null; then
-            git archive "$trusted_ref" .github/ci-harness/lanes-coverage-floors.txt | tar -x -C "$guard_root"
-          fi
           # Guard code and the guard list come from the trusted base (above); the
           # files they read must be the ones this PR would land: base plus head.
           # Run against the head alone, a PR behind the base fails every guard
