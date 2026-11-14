@@ -311,7 +311,9 @@ test('withLinearRetry retries a transient failure and returns the recovered resu
       fingerprint: 'secadv-x',
       op: 'upsert',
       delays: [1, 1],
-      sleep: async ms => waits.push(ms),
+      sleep: async ms => {
+        waits.push(ms);
+      },
     }
   );
   assert.equal(result.ok, true);

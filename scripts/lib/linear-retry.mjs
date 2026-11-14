@@ -27,8 +27,10 @@ const defaultSleep = ms => new Promise(resolve => setTimeout(resolve, ms));
  * the last result; exhausted retries keep ok:false so the caller still exits 1
  * (fail-closed — a deferral is honest, a false green is not).
  *
- * @param {() => Promise<{ok: boolean, reason?: string, rateLimited?: boolean, resetAt?: number}>} run
- * @param {{fingerprint?: string, op?: string, delays?: number[], sleep?: (ms: number) => Promise<void>, log?: (line: string) => void}} options
+ * @template {{ok: boolean, reason?: string}} T
+ * @param {() => Promise<T>} run
+ * @param {{fingerprint?: string, op?: string, delays?: number[], sleep?: (ms: number) => Promise<void>, log?: (line: string) => void}} [options]
+ * @returns {Promise<T>}
  */
 export async function withLinearRetry(
   run,
