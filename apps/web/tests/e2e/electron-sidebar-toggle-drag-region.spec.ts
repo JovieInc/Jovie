@@ -101,11 +101,8 @@ test('collapsed sidebar toggle stays clickable on headed routes (Home) and Setti
 test('no duplicate sidebar dock button and titlebar toggle on the same page', async ({
   page,
 }) => {
-  // Skip outside the explicit dev-auth E2E lane; duplicate-control checks need a bypassed Clerk session.
-  test.skip(
-    process.env.E2E_USE_TEST_AUTH_BYPASS !== '1',
-    'Requires E2E_USE_TEST_AUTH_BYPASS=1'
-  );
+  // Duplicate-control checks need a bypassed Clerk session; this spec runs in the dev-auth lane.
+  expect(process.env.E2E_USE_TEST_AUTH_BYPASS).toBe('1');
   test.setTimeout(180_000);
 
   await installElectronRuntime(page);
