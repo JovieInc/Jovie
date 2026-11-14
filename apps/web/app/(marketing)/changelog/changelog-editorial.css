@@ -115,6 +115,9 @@
     position: absolute;
     width: 1px;
     height: 1px;
+    /* The marketing heading rule adds descender padding, which would keep
+       the border box taller than 1px and leave clipped ink behind. */
+    padding: 0;
     overflow: hidden;
     clip-path: inset(50%);
     white-space: nowrap;
