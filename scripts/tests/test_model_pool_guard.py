@@ -47,10 +47,9 @@ class GuardTest(unittest.TestCase):
             self.assertEqual(pools.main(["check", "--root", str(ROOT)]), 0)
         self.assertIn("every Anthropic route is on an allowed pool", out.getvalue())
 
-    def test_the_exception_list_is_exactly_the_known_three(self):
+    def test_the_exception_list_is_exactly_the_known_two(self):
         # Adding an exception is a decision for Tim, not a way to get green: change this list with it.
         self.assertEqual(sorted((row["path"], row["rule"]) for row in TABLE["exceptions"]), [
-            (".github/workflows/pen-draft.yml", "metered-anthropic-credential"),
             ("ops/agents/summer-improvement-loop/claude-lock.json", "metered-anthropic-host"),
             ("ops/models/task-registry.json", "anthropic-on-forbidden-pool")])
 
@@ -125,7 +124,8 @@ class GuardTest(unittest.TestCase):
     def test_exceptions_only_shrink(self):
         table = copy.deepcopy(TABLE)
         workflow = {".github/workflows/pen-draft.yml": "env:\n  ANTHROPIC_API_KEY: x\n", "_keep": ("exceptions",)}
-        table["exceptions"] = [row for row in TABLE["exceptions"] if row["path"].endswith("pen-draft.yml")]
+        table["exceptions"] = [{"path": ".github/workflows/pen-draft.yml", "rule": "metered-anthropic-credential",
+                                "reason": "fixture", "owner": "fixture", "removeWhen": "fixture"}]
         with tempfile.TemporaryDirectory() as tmp:
             self.assertEqual(guard.scan(repo(Path(tmp), table, **dict(workflow))), [])
         with tempfile.TemporaryDirectory() as tmp:  # the offender is gone: the exception must go too
