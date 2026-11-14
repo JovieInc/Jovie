@@ -88,6 +88,8 @@ const json = (body: unknown, status = 200) =>
 
 describe('TimActionRequiredSection certificate', () => {
   beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-09-28T12:00:00.000Z'));
     fetchMock.mockReset();
     toast.success.mockReset();
     toast.error.mockReset();
@@ -96,6 +98,7 @@ describe('TimActionRequiredSection certificate', () => {
 
   afterEach(() => {
     vi.unstubAllGlobals();
+    vi.useRealTimers();
   });
 
   it('marks a decision done in Linear and refreshes the list', async () => {

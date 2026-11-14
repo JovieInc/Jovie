@@ -40,12 +40,15 @@ const ok = (body: unknown) =>
 
 describe('ShippingVelocityChart certificate', () => {
   beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-08-25T12:00:00.000Z'));
     fetchMock.mockReset();
     vi.stubGlobal('fetch', fetchMock);
   });
 
   afterEach(() => {
     vi.unstubAllGlobals();
+    vi.useRealTimers();
   });
 
   it('spotlights a series from the legend and clears it from the chart', async () => {
