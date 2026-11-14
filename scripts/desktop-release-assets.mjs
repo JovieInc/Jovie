@@ -1141,14 +1141,6 @@ export class GitHubClient {
     });
   }
 
-  async retargetEmptyDraft(releaseId, releaseSha) {
-    return this.request(`/repos/${this.repository}/releases/${releaseId}`, {
-      method: 'PATCH',
-      body: JSON.stringify({ target_commitish: releaseSha }),
-      headers: { 'Content-Type': 'application/json' },
-    });
-  }
-
   async updateTagCommit(tag, releaseSha) {
     return this.request(
       `/repos/${this.repository}/git/refs/tags/${encodeURIComponent(tag)}`,
@@ -1405,7 +1397,17 @@ export async function prepare({
         release.assets.length === 0,
       'A non-empty or public release cannot be retargeted (JOV-12609).'
     );
-    release = await client.retargetEmptyDraft(release.id, releaseSha);
+    // Only the target may differ; a malformed draft still fails closed.
+    validateReleaseEnvelope({
+      environment,
+      release: { ...release, target_commitish: releaseSha },
+      releaseSha,
+      version,
+      draft: true,
+    });
+    // A target-only PATCH turns a ref-less draft tag into untagged-* (JOV-12659).
+    await updateRelease(client, release, environment, releaseSha, version);
+    release = await client.releaseById(release.id);
   }
   validateReleaseEnvelope({
     environment,

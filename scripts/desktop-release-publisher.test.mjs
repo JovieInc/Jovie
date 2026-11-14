@@ -757,11 +757,12 @@ test('production prepare retargets exact-tag drafts from older sources and skips
   assert.equal(client.release.target_commitish, input.releaseSha);
   assert.equal(client.release.draft, true);
   assert.deepEqual(client.release.assets, []);
-  assert.equal(client.metadataUpdateCalls, 0);
-  assert.deepEqual(client.events, []);
+  assert.equal(client.metadataUpdateCalls, 1);
+  const retarget = [`retarget:${input.version}:${input.releaseSha}`];
+  assert.deepEqual(client.events, retarget);
   await prepare({ ...input, client });
-  assert.equal(client.metadataUpdateCalls, 0);
-  assert.deepEqual(client.events, []);
+  assert.equal(client.metadataUpdateCalls, 1);
+  assert.deepEqual(client.events, retarget);
 });
 
 test('production keeps immutable version tags and never uses rolling mutations', async t => {

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { prepare } from './desktop-release-assets.mjs';
+import { prepare, releaseMetadataUpdate } from './desktop-release-assets.mjs';
 
 // JOV-12609: a production Desktop release run rejected by Apple notarization
 // left a private, never-published, asset-less draft release whose
@@ -9,6 +9,10 @@ import { prepare } from './desktop-release-assets.mjs';
 // path, unlike staging, never retargeted an existing exact-tag draft. These
 // cases live apart from desktop-release-publisher.test.mjs to honor its
 // size-500 budget (scripts/company-guards/size-baseline.json).
+//
+// JOV-12659: the fake mirrors GitHub for a draft whose tag has no ref yet.
+// A PATCH that sends only target_commitish renames the tag to untagged-*;
+// a PATCH with the whole envelope keeps the exact tag.
 //
 // Refusal cases assert a rejection under EITHER guard wording: the pre-fix
 // envelope invariant ('Release target is not the authorized commit') and the
@@ -38,19 +42,23 @@ function draftClient(overrides = {}) {
   Object.assign(client.release, overrides);
   client.releaseOrDraftByTag = async () => client.release;
   client.retargetEmptyDraft = async (_id, releaseSha) => {
-    client.retargets += 1;
     assert.equal(_id, client.release.id);
     client.release.target_commitish = releaseSha;
+    client.release.tag_name = 'untagged-03e293ca43c9202132ea';
     return client.release;
   };
   client.createDraft = async () => {
     throw new Error('prepare must not create a draft for an existing tag');
   };
-  client.updateReleaseMetadata = async () => {
-    throw new Error('prepare must not rewrite release metadata here');
+  client.updateReleaseMetadata = async input => {
+    client.retargets += 1;
+    assert.equal(input.releaseId, client.release.id);
+    Object.assign(client.release, releaseMetadataUpdate(input));
+    return client.release;
   };
-  client.releaseById = async () => {
-    throw new Error('prepare must not re-read the release here');
+  client.releaseById = async id => {
+    assert.equal(id, client.release.id);
+    return client.release;
   };
   return client;
 }
@@ -70,6 +78,7 @@ test('production prepare retargets a stale asset-less unpublished exact-tag draf
   await prepare(prepareInput(client));
   assert.equal(client.retargets, 1);
   assert.equal(client.release.target_commitish, AUTHORIZED);
+  assert.equal(client.release.tag_name, `v${VERSION}`);
   assert.equal(client.release.draft, true);
   assert.equal(client.release.published_at, null);
   assert.deepEqual(client.release.assets, []);
