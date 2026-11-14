@@ -472,6 +472,9 @@ test.describe('Waitlist Spotify native composition events', () => {
           }
           await expect(search).toHaveCount(0);
           await assertNoHorizontalOverflow(page, name);
+          await attachA11yResult(page, testInfo, `${name}-a11y.json`);
+          expect(pageErrors).toEqual([]);
+          expect(resourceErrors).toEqual([]);
         } catch (error) {
           failure = error;
         } finally {
@@ -490,9 +493,6 @@ test.describe('Waitlist Spotify native composition events', () => {
             screenshotFailure,
           });
         }
-        await attachA11yResult(page, testInfo, `${name}-a11y.json`);
-        expect(pageErrors).toEqual([]);
-        expect(resourceErrors).toEqual([]);
       });
     }
   }
