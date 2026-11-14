@@ -37,7 +37,6 @@ import {
 import { homedir, tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { load as yamlLoad } from 'js-yaml';
 import { baseRefCandidates, resolveBaseRef } from './lib/git-base-ref.mjs';
 import {
   companionChecklist,
@@ -444,6 +443,9 @@ function loadBody(args, cwd) {
 
 /** Run the shared Private Data Guard from the pinned JovieInc/ci workflow. */
 export async function privateDataCheck(cwd, env, mergeBase) {
+  // Loaded here, not at the top, so a checkout without node_modules reaches
+  // checkPrerequisites and prints the install fix instead of crashing.
+  const { load: yamlLoad } = await import('js-yaml');
   const wfPath = path.join(cwd, '.github/workflows/private-data-guard.yml');
   if (!existsSync(wfPath)) return { skip: 'no private-data-guard workflow' };
   const wf = /** @type {any} */ (yamlLoad(readFileSync(wfPath, 'utf8')));
