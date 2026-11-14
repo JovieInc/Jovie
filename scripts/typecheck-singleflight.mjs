@@ -1,6 +1,5 @@
 #!/usr/bin/env node
 
-import { spawn, spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import {
   closeSync,
@@ -15,6 +14,7 @@ import {
 } from 'node:fs';
 import { relative, resolve } from 'node:path';
 import { setTimeout as sleep } from 'node:timers/promises';
+import { spawn, spawnSync } from './lib/child-process.mjs';
 import {
   collectOwnerDiagnostics,
   collectWaitDiagnostics,

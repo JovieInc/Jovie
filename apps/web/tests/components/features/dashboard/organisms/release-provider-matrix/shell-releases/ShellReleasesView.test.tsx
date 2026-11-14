@@ -28,7 +28,7 @@ import type { ReleaseViewModel } from '@/lib/discography/types';
 
 const { mockUseDspMatchesQuery, mockUsePlanGate, navigationState, testState } =
   vi.hoisted(() => ({
-    testState: { realActionMenu: false },
+    testState: { realActionMenu: false, albumArtFlag: false },
     mockUseDspMatchesQuery: vi.fn(() => ({ data: [], isLoading: false })),
     mockUsePlanGate: vi.fn(() => ({
       isLoading: false,
@@ -67,7 +67,8 @@ vi.mock('@/contexts/TableMetaContext', () => ({
 }));
 
 vi.mock('@/lib/flags/client', () => ({
-  useAppFlag: () => false,
+  useAppFlag: (flag: string) =>
+    flag === 'ALBUM_ART_GENERATION' && testState.albumArtFlag,
 }));
 
 vi.mock('@/app/app/(shell)/dashboard/releases/actions', () => ({
@@ -433,6 +434,7 @@ function renderShell(
 
 beforeEach(() => {
   testState.realActionMenu = false;
+  testState.albumArtFlag = false;
   navigationState.searchParams = new URLSearchParams();
   mockUseDspMatchesQuery.mockReturnValue({ data: [], isLoading: false });
   mockUsePlanGate.mockReturnValue({
@@ -756,6 +758,45 @@ describe('ShellReleasesView', () => {
     });
   });
 
+  it('opens chat with the release chip from the Generate Album Art row action', async () => {
+    const { openChatWithPrompt } = await import(
+      '@/lib/chat/open-chat-with-prompt'
+    );
+    vi.mocked(openChatWithPrompt).mockClear();
+    testState.albumArtFlag = true;
+    mockUsePlanGate.mockReturnValue({
+      isLoading: false,
+      isError: false,
+      smartLinksLimit: null,
+      isPro: true,
+      canCreateManualReleases: true,
+      canGenerateAlbumArt: true,
+      canGenerateReleasePlans: true,
+      canEditSmartLinks: true,
+      canAccessFutureReleases: true,
+    });
+
+    renderShell([
+      fakeRelease({ id: 'r1', title: 'Lost in the Light' }),
+      fakeRelease({ id: 'r2', title: 'Sunshine Recorder' }),
+    ]);
+
+    fireEvent.click(
+      screen.getByRole('button', {
+        name: 'Release actions for Sunshine Recorder',
+      })
+    );
+    const row = screen.getByRole('listitem', { name: /Sunshine Recorder/ });
+    fireEvent.click(
+      within(row).getByRole('button', { name: 'Generate Album Art' })
+    );
+
+    expect(openChatWithPrompt).toHaveBeenCalledTimes(1);
+    const [prompt] = vi.mocked(openChatWithPrompt).mock.calls[0];
+    expect(prompt).toContain('@release:r2[Sunshine Recorder]');
+    expect(prompt).not.toContain('{');
+  });
+
   it('keeps the global search trigger inside the header actions probe', async () => {
     renderShell([
       fakeRelease({ id: '1', title: 'Alpha' }),
@@ -796,153 +837,6 @@ describe('ShellReleasesView', () => {
     expect(
       screen.queryByRole('combobox', { name: 'Filter releases' })
     ).not.toBeInTheDocument();
-  });
-
-  describe('entitlement gating', () => {
-    it('shows open smart-link affordance for fully entitled users', () => {
-      renderShell([
-        fakeRelease({
-          id: 'r1',
-          title: 'Open Track',
-          releaseDate: '2024-01-01',
-        }),
-      ]);
-
-      expect(
-        screen.getByLabelText('Open smart link for Open Track')
-      ).toBeInTheDocument();
-      expect(
-        screen.queryByLabelText(/Smart link locked \(Pro\)/)
-      ).not.toBeInTheDocument();
-    });
-
-    it('locks scheduled releases for free users without canAccessFutureReleases', async () => {
-      mockUsePlanGate.mockReturnValue({
-        isLoading: false,
-        isError: false,
-        smartLinksLimit: null,
-        isPro: false,
-        canCreateManualReleases: true,
-        canGenerateAlbumArt: false,
-        canGenerateReleasePlans: false,
-        canEditSmartLinks: true,
-        canAccessFutureReleases: false,
-      });
-
-      const future = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
-        .toISOString()
-        .slice(0, 10);
-
-      renderShell([
-        fakeRelease({
-          id: 'future-1',
-          title: 'Upcoming Drop',
-          releaseDate: future,
-        }),
-      ]);
-
-      expect(
-        screen.getByLabelText('Scheduled smart link (Pro) for Upcoming Drop')
-      ).toBeInTheDocument();
-      expect(
-        screen.queryByLabelText('Open smart link for Upcoming Drop')
-      ).not.toBeInTheDocument();
-      expect(
-        await screen.findByTestId('smart-link-gate-banner-unreleased')
-      ).toBeInTheDocument();
-    });
-
-    it('locks releases beyond smartLinksLimit with cap reason', () => {
-      mockUsePlanGate.mockReturnValue({
-        isLoading: false,
-        isError: false,
-        smartLinksLimit: 1,
-        isPro: false,
-        canCreateManualReleases: true,
-        canGenerateAlbumArt: false,
-        canGenerateReleasePlans: false,
-        canEditSmartLinks: true,
-        canAccessFutureReleases: true,
-      });
-
-      renderShell([
-        fakeRelease({
-          id: 'old',
-          title: 'Older Release',
-          releaseDate: '2020-01-01',
-        }),
-        fakeRelease({
-          id: 'new',
-          title: 'Newer Release',
-          releaseDate: '2024-01-01',
-        }),
-      ]);
-
-      // Cap allows oldest first up to limit — newer release is locked.
-      expect(
-        screen.getByLabelText('Smart link locked (Pro) for Newer Release')
-      ).toBeInTheDocument();
-      expect(
-        screen.getByLabelText('Open smart link for Older Release')
-      ).toBeInTheDocument();
-    });
-
-    it('gates the row action menu copy item when the smart link is locked', () => {
-      mockUsePlanGate.mockReturnValue({
-        isLoading: false,
-        isError: false,
-        smartLinksLimit: null,
-        isPro: false,
-        canCreateManualReleases: true,
-        canGenerateAlbumArt: false,
-        canGenerateReleasePlans: false,
-        canEditSmartLinks: true,
-        canAccessFutureReleases: false,
-      });
-
-      const future = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
-        .toISOString()
-        .slice(0, 10);
-
-      renderShell([
-        fakeRelease({
-          id: 'future-1',
-          title: 'Upcoming Drop',
-          releaseDate: future,
-        }),
-      ]);
-
-      // Row menu should expose the scheduled-lock label, not "Copy smart link".
-      expect(
-        screen.getAllByRole('button', { name: 'Scheduled smart link (Pro)' })[0]
-      ).toBeInTheDocument();
-      expect(
-        screen.queryByRole('button', { name: 'Copy Smart Link' })
-      ).not.toBeInTheDocument();
-    });
-
-    it('hides the manual create affordance when canCreateManualReleases is false', () => {
-      mockUsePlanGate.mockReturnValue({
-        isLoading: false,
-        isError: false,
-        smartLinksLimit: null,
-        isPro: false,
-        canCreateManualReleases: false,
-        canGenerateAlbumArt: false,
-        canGenerateReleasePlans: false,
-        canEditSmartLinks: true,
-        canAccessFutureReleases: true,
-      });
-
-      renderShell([], { spotifyConnected: true });
-
-      expect(
-        screen.queryByTestId('create-manual-action')
-      ).not.toBeInTheDocument();
-      expect(
-        screen.queryByTestId('shell-releases-create-connected-empty')
-      ).not.toBeInTheDocument();
-    });
   });
 
   describe('entitlement gating', () => {

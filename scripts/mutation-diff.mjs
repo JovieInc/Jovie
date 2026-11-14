@@ -64,7 +64,7 @@ function changedPaths() {
   const diff = spawnSync(
     'git',
     ['diff', '--name-only', '--diff-filter=AMR', values.base, values.head],
-    { cwd: repoRoot, encoding: 'utf8' }
+    { maxBuffer: 256 * 1024 * 1024, cwd: repoRoot, encoding: 'utf8' }
   );
   if (diff.status !== 0) throw new Error(`git diff failed: ${diff.stderr}`);
   return diff.stdout.split('\n').filter(Boolean);

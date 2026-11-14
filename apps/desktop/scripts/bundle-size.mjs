@@ -114,11 +114,12 @@ export function readBaseBaseline(
   const entries = execFileSync(
     'git',
     ['ls-tree', '--full-tree', '--name-only', ref, '--', BASELINE_FILE],
-    { cwd, encoding: 'utf8' }
+    { maxBuffer: 256 * 1024 * 1024, cwd, encoding: 'utf8' }
   );
   if (!entries.trim()) return null;
   return JSON.parse(
     execFileSync('git', ['show', `${ref}:${BASELINE_FILE}`], {
+      maxBuffer: 256 * 1024 * 1024,
       cwd,
       encoding: 'utf8',
     })
