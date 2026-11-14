@@ -91,3 +91,26 @@ export const RetentionDisabled: Story = {
     </div>
   ),
 };
+
+function SegmentChoiceDemo() {
+  const [value, setValue] = useState<(typeof analyticsRanges)[number]>('7d');
+  return (
+    <TimeRangeSelector
+      variant='segment'
+      value={value}
+      onValueChange={setValue}
+      ranges={analyticsRanges}
+      maxRetentionDays={30}
+    />
+  );
+}
+
+export const SegmentChoice: Story = {
+  args: {
+    variant: 'segment',
+    tabsBaseId: undefined,
+    panelId: undefined,
+    maxRetentionDays: 30,
+  },
+  render: () => <SegmentChoiceDemo />,
+};
