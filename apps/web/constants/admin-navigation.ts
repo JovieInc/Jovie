@@ -270,9 +270,8 @@ export interface AdminWorkspaceTab {
 }
 
 /**
- * Views behind one sidebar row. Product and Timeline are Shipping views, and
- * Agents (the skill and system map) is a Fleet view; they keep their routes so
- * deep links and drilldowns stay valid, but have no sidebar row of their own.
+ * Views behind one sidebar row. Product and Timeline are Shipping views; Agents
+ * and Room are Fleet views. Each keeps its route, so deep links stay valid.
  */
 export const ADMIN_WORKSPACE_TABS = {
   shipping: [
@@ -283,6 +282,7 @@ export const ADMIN_WORKSPACE_TABS = {
   operations: [
     { label: 'Health', href: APP_ROUTES.ADMIN_OPERATIONS },
     { label: 'Agents', href: APP_ROUTES.ADMIN_SYSTEM },
+    { label: 'Room', href: APP_ROUTES.ADMIN_ROOM },
   ],
 } as const satisfies Record<string, readonly AdminWorkspaceTab[]>;
 

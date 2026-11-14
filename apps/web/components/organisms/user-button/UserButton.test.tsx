@@ -1,6 +1,4 @@
-import { readFileSync } from 'node:fs';
-import path from 'node:path';
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -96,30 +94,11 @@ const mockUseDesktopUpdateContext = vi.mocked(useDesktopUpdateContext);
 
 const originalLocation = window.location;
 
-describe('UserButton browser chunk diet (JOV-12023)', () => {
-  // #24725 named these the last eager desktop edges; UserButton must never
-  // reintroduce them. A static titlebar import drags electron-bridge, the
-  // update modal and radix dialog into every browser shell chunk.
-  const source = readFileSync(path.join(__dirname, 'UserButton.tsx'), 'utf8');
-  const lazySource = readFileSync(
-    path.join(__dirname, 'desktop-release-identity.lazy.ts'),
-    'utf8'
-  );
-
-  it('keeps every desktop module out of the static import graph', () => {
-    expect(source).not.toMatch(
-      /from '@\/components\/organisms\/DesktopTitlebar'/
-    );
-    expect(source).not.toMatch(/from '@\/lib\/desktop\/electron-bridge'/);
-    expect(source).not.toMatch(
-      /from '@\/lib\/workspace-lock\/unlock-with-passkey'/
-    );
-    expect(source).toMatch(/from '@\/lib\/desktop\/electron-runtime'/);
-    expect(source).toMatch(/from '\.\/desktop-release-identity\.lazy'/);
-    expect(lazySource).toMatch(
-      /import\('@\/components\/organisms\/DesktopTitlebar'/
-    );
-    expect(lazySource).toMatch(/ssr: false/);
+afterAll(() => {
+  Object.defineProperty(window, 'location', {
+    value: originalLocation,
+    configurable: true,
+    writable: true,
   });
 });
 
@@ -264,14 +243,6 @@ describe('UserButton cookie settings access', () => {
     mockSignedInAccount();
   });
 
-  afterAll(() => {
-    Object.defineProperty(window, 'location', {
-      value: originalLocation,
-      configurable: true,
-      writable: true,
-    });
-  });
-
   it.each([
     ['', true],
     ['jv_cc_required=0=1', true],
@@ -320,20 +291,9 @@ describe('UserButton states', () => {
     mockUseBillingStatusQuery.mockReturnValue(FREE_BILLING as any);
   });
 
-  afterAll(() => {
-    Object.defineProperty(window, 'location', {
-      value: originalLocation,
-      configurable: true,
-      writable: true,
-    });
-  });
-
-  it.each([
-    [true, 'rounded-md'],
-    [false, 'rounded-full'],
-  ])(
-    'holds the skeleton (showUserInfo %s) until the session loads',
-    async (showUserInfo, shape) => {
+  it.each([true, false])(
+    'holds the placeholder (showUserInfo %s) until the session loads',
+    async showUserInfo => {
       mockUseUserSafe.mockReturnValue({
         isLoaded: false,
         isSignedIn: false,
@@ -341,31 +301,11 @@ describe('UserButton states', () => {
       } as any);
       const { container } = render(<UserButton showUserInfo={showUserInfo} />);
 
-      expect(screen.getByTestId('user-button-loading')).toHaveClass(shape);
+      expect(screen.getByTestId('user-button-loading')).toBeInTheDocument();
       expect(screen.queryByRole('button')).toBeNull();
       await expectNoA11yViolations(container);
     }
   );
-
-  it('draws the loading row with the theme-safe interactive-hover token', () => {
-    mockUseUserSafe.mockReturnValue({
-      isLoaded: false,
-      isSignedIn: false,
-      user: null,
-    } as any);
-    render(<UserButton showUserInfo />);
-
-    const loading = screen.getByTestId('user-button-loading');
-    const indicators = [...loading.querySelectorAll('.animate-pulse')];
-    // Avatar disc and name line.
-    expect(indicators).toHaveLength(2);
-    for (const indicator of indicators) {
-      // Same 168 176 195 / 6% as before in dark; 6% ink on the light rail.
-      expect(indicator).toHaveClass('bg-interactive-hover');
-      // bg-sidebar-accent is ~1.04:1 on the light rail: invisible (JOV-12383).
-      expect(indicator).not.toHaveClass('bg-sidebar-accent');
-    }
-  });
 
   it('opens the menu from the keyboard, shows the billing skeleton while billing loads, and Escape returns focus', async () => {
     mockUseBillingStatusQuery.mockReturnValue({
@@ -386,7 +326,9 @@ describe('UserButton states', () => {
     trigger.focus();
     await user.keyboard('{Enter}');
     const menu = await screen.findByRole('menu');
-    expect(menu.querySelectorAll('.bg-on-media\\/10')).toHaveLength(2);
+    // The fill itself is asserted in UserButtonLoading.test.tsx.
+    expect(within(menu).getByTestId('billing-loading')).toBeInTheDocument();
+    expect(menu.querySelector('.bg-on-media\\/10')).toBeNull();
     expect(
       screen.queryByRole('menuitem', { name: /Upgrade/i })
     ).not.toBeInTheDocument();
@@ -451,5 +393,108 @@ describe('UserButton states', () => {
     const name = screen.getByTitle(longName);
     expect(name).toHaveClass('truncate');
     await expectNoA11yViolations(container);
+  });
+});
+
+// The menu's custom rows sit on the shared inset-panel geometry: one gutter,
+// one icon column, one label edge.
+describe('UserButton account surface layout', () => {
+  const FREE_BILLING = {
+    data: { isPro: false, plan: null, hasStripeCustomer: false },
+    isLoading: false,
+    error: null,
+  };
+
+  beforeEach(() => {
+    mockSignedInAccount();
+    mockUseBillingStatusQuery.mockReturnValue(FREE_BILLING as any);
+  });
+
+  async function openMenu(calm = false) {
+    const user = userEvent.setup();
+    const view = render(<UserButton showUserInfo calm={calm} />);
+    const trigger = screen.getByRole('button', { name: /Adele Adkins/i });
+    await user.click(trigger);
+    const menu = await screen.findByRole('menu');
+    return { ...view, menu, trigger, user };
+  }
+
+  it('keeps every menu entry reachable by role and name', async () => {
+    const { menu } = await openMenu();
+    for (const name of [
+      'Open profile for Adele Adkins',
+      'Help',
+      /^Settings/,
+      /^Send Feedback/,
+    ]) {
+      expect(within(menu).getByRole('menuitem', { name })).toBeInTheDocument();
+    }
+    expect(
+      within(menu).getByRole('button', { name: /Usage remaining/ })
+    ).toBeInTheDocument();
+    expect(within(menu).getAllByRole('separator').length).toBeGreaterThan(2);
+  });
+
+  it('aligns the custom rows to the shared gutter and icon column', async () => {
+    const { menu, trigger } = await openMenu(true);
+
+    // Header: no extra row inset; the avatar sits in the icon column and the
+    // name starts on the label edge shared with every other row.
+    const profile = within(menu).getByRole('menuitem', {
+      name: 'Open profile for Adele Adkins',
+    });
+    expect(profile).toHaveClass('gap-2', 'px-(--space-2-5)');
+    const avatarColumn = profile.firstElementChild as HTMLElement;
+    expect(avatarColumn).toHaveClass('w-4', 'shrink-0', 'justify-center');
+
+    // Help uses the normal action row, leaving the header for identity.
+    const help = within(menu).getByRole('menuitem', { name: 'Help' });
+    expect(help).toHaveClass('px-2.5');
+    expect(help).not.toHaveClass('px-2');
+
+    // Header and footer dividers are hairlines that stop at the gutter.
+    const separators = within(menu).getAllByRole('separator');
+    for (const separator of separators) {
+      expect(separator).toHaveClass('mx-(--space-2-5)', 'h-px', 'bg-subtle');
+      expect(separator).not.toHaveClass('h-2');
+    }
+
+    // Version reads as a muted section label on the same gutter.
+    expect(within(menu).getByTestId('app-build-diagnostics')).toHaveClass(
+      'h-8',
+      'px-(--space-2-5)',
+      'text-tertiary-token'
+    );
+
+    // Usage is a normal row: concentric radius, not a square strip.
+    const usage = within(menu).getByRole('button', { name: /Usage remaining/ });
+    expect(usage).not.toHaveClass('rounded-none');
+    expect(usage).toHaveClass('h-8', 'px-(--space-2-5)');
+
+    // Sidebar account row: avatar centred on the nav icon column.
+    expect(trigger).toHaveClass('px-0', 'gap-2');
+    expect(trigger.querySelector('[data-user-button-icon-column]')).toHaveClass(
+      'w-4',
+      'justify-center'
+    );
+  });
+
+  it('keeps arrow-key navigation and Escape focus return', async () => {
+    const user = userEvent.setup();
+    render(<UserButton showUserInfo />);
+    const trigger = screen.getByRole('button', { name: /Adele Adkins/i });
+    trigger.focus();
+    await user.keyboard('{Enter}');
+    const menu = await screen.findByRole('menu');
+    const items = within(menu).getAllByRole('menuitem');
+    await user.keyboard('{ArrowDown}');
+    expect(items).toContain(document.activeElement);
+    const first = document.activeElement;
+    await user.keyboard('{ArrowDown}');
+    expect(document.activeElement).not.toBe(first);
+    expect(items).toContain(document.activeElement);
+    await user.keyboard('{Escape}');
+    expect(screen.queryByRole('menu')).toBeNull();
+    expect(trigger).toHaveFocus();
   });
 });

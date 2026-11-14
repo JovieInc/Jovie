@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url';
 
 const ENTRY = 'scripts/run-affected-tests.mjs';
 // Existing sparse-checkout closure names this module-initialization JSON input.
-const MODULE_INIT_FILES = {
+export const MODULE_INIT_FILES = {
   'scripts/invariants/scanned-paths.mjs': [
     'scripts/invariants/latency-sensitive-execution-allowlist.json',
   ],

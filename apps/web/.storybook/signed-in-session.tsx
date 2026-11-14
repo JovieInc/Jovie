@@ -47,13 +47,13 @@ const SIGNED_IN_SESSIONS_LIST = [
   },
 ];
 
-export function createSignedInApiMock(): NonNullable<
-  ApiMockWindow['__jovieApiMock']
-> {
+export function createSignedInApiMock(
+  user: Partial<typeof SIGNED_IN_USER> = {}
+): NonNullable<ApiMockWindow['__jovieApiMock']> {
   return ({ url }) => {
     if (url.pathname.endsWith('/get-session')) {
       return Response.json({
-        user: SIGNED_IN_USER,
+        user: { ...SIGNED_IN_USER, ...user },
         session: SIGNED_IN_SESSION,
       });
     }

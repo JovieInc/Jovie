@@ -267,3 +267,8 @@ export const DownloadingLight: Story = { ...Downloading, parameters: light };
 export const ReadyLight: Story = { ...Ready, parameters: light };
 export const UpdateErrorLight: Story = { ...UpdateError, parameters: light };
 export const IOSInstallLight: Story = { ...IOSInstall, parameters: light };
+export const ErrorUpdateFailedLight: Story = {
+  ...ErrorUpdateFailed,
+  parameters: light,
+};
+export const LongContentLight: Story = { ...LongContent, parameters: light };

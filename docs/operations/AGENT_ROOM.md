@@ -1,8 +1,9 @@
 # Agent room
 
 One module shows a set of agents, what each is doing, and what they said to
-each other. Ovie's fleet room (`/app/ov/room`, admins only) is the
-first room. Jovie customer rooms reuse the same contract, store and component.
+each other. Ovie's fleet room (`/app/ov/room`, the Room tab under Fleet,
+admins only) is the first room. Jovie customer rooms reuse the same contract,
+store and component.
 
 ## Principles
 

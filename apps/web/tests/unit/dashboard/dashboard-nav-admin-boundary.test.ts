@@ -132,6 +132,7 @@ describe('exclusive customer vs OV navigation', () => {
     expect(ADMIN_WORKSPACE_TABS.operations.map(tab => tab.label)).toEqual([
       'Health',
       'Agents',
+      'Room',
     ]);
     expect(
       ADMIN_NAV_REGISTRY.filter(item =>

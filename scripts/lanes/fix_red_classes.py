@@ -39,6 +39,7 @@ from fix_red_source_edits import (  # noqa: F401
     resolve_additive_node_tests_text, resolve_additive_node_test_file, resolve_additive_list_conflict, size_500_stale_hit,
 )
 from fix_red_ui_feel import apply as apply_ui_feel, publish as publish_ui_feel  # noqa: F401
+from fix_red_render_modes import ACTION as ADMIT_RENDER_MODE, hit as render_mode_hit  # noqa: F401
 
 SCHEMA = "jovie-fix-red-class/v1"
 # Actions a class can route to. `agent` is the default (a model run); the others spend no model.
@@ -47,7 +48,7 @@ RERUN, SYNC_MAIN, WIRE_CI_FAST, RENUMBER, STAMP_CHANGELOG, SNAP_SPACING, STRIP_C
     "strip-cache-exports", "merge-narrowed-preflight", "register-domain-writes", "atomic-write", "repair-screen-cert", "balance-headings", "ui-feel", "agent", "compose")
 DETERMINISTIC = frozenset({
     RERUN, SYNC_MAIN, WIRE_CI_FAST, RENUMBER, STAMP_CHANGELOG, SNAP_SPACING, STRIP_CACHE, MERGE_NARROWED,
-    REGISTER_DOMAIN, ATOMIC_WRITE, REPAIR_SCREEN_CERT, BALANCE_HEADINGS, UI_FEEL, ALIAS_ACTION})
+    REGISTER_DOMAIN, ATOMIC_WRITE, REPAIR_SCREEN_CERT, BALANCE_HEADINGS, UI_FEEL, ADMIT_RENDER_MODE, ALIAS_ACTION})
 
 # remediation.INFRA_TEXT (runner loss, OOM, 5xx) plus the platform failures seen in 52 agent-declined
 # fix runs. Kept out of INFRA_TEXT: the exhausted-PR classifier deliberately routes a rate-limited
@@ -207,7 +208,7 @@ def classify(pr: dict, logs: dict[str, str] | None = None) -> dict:
     for name in names:
         text = logs.get(name) or ""
         hit = next(((cls, action) for cls, pattern, action in SIGNATURES if pattern.search(text)), None)
-        per_check.append(detached_native_sync.hit(text) or hit or size_500_stale_hit(text) or ("other", AGENT))
+        per_check.append(detached_native_sync.hit(text) or render_mode_hit(text) or hit or size_500_stale_hit(text) or ("other", AGENT))
     classes = {cls for cls, _ in per_check}
     actions: list[str] = []
     if len(classes) == 1:
@@ -1154,6 +1155,8 @@ def main(argv=None) -> int:
     parser.add_argument("command", choices=["measure", "split-plan"])
     parser.add_argument("--plan", type=Path, help="JSON {changes: {path: measured lines}, layers: [[path]]}")
     parser.add_argument("--numstat", type=Path, help="Verify plan counts against git diff --numstat; counts all rows")
+    parser.add_argument("--layer-numstat", type=Path, action="append", default=[],
+                        help="Ordered adjacent base/head numstats; measures paths repeated across PR layers")
     parser.add_argument("--state", default=str(Path.home() / ".local/state/jovie-lanes"))
     parser.add_argument("--days", type=int, default=5)
     parser.add_argument("--now", type=float, default=None)
@@ -1163,9 +1166,18 @@ def main(argv=None) -> int:
             parser.error("split-plan requires --plan")
         plan = json.loads(args.plan.read_text())
         try:
-            if args.numstat is not None and plan["changes"] != measured_changes(args.numstat.read_text()):
-                raise ValueError("plan measurements differ from Git numstat; regenerate for the current base/head")
-            totals = reviewable_split(plan["changes"], plan["layers"])
+            if args.layer_numstat:
+                if args.numstat is not None:
+                    raise ValueError("choose whole-diff or adjacent-layer measurements")
+                snapshots = [measured_changes(path.read_text()) for path in args.layer_numstat]
+                if plan.get("layerChanges") != snapshots or len(plan["layers"]) != len(snapshots):
+                    raise ValueError("layer measurements differ from Git numstat; regenerate each adjacent base/head")
+                totals = [reviewable_split(changes, [layer])[0]
+                          for changes, layer in zip(snapshots, plan["layers"])]
+            else:
+                if args.numstat is not None and plan["changes"] != measured_changes(args.numstat.read_text()):
+                    raise ValueError("plan measurements differ from Git numstat; regenerate for the current base/head")
+                totals = reviewable_split(plan["changes"], plan["layers"])
         except ValueError as error:
             parser.error(str(error))
         print(json.dumps({"reviewableLines": totals, "cap": 1500, "testsIncluded": True}))

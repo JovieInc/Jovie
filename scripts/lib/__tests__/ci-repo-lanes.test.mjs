@@ -207,6 +207,24 @@ describe('JOV-5288 CI repo lanes', () => {
     ]);
     expect(plan.runJovieProduct).toBe(true);
     expect(plan.runSymphonyControl).toBe(true);
+    expect(plan.runActionlint).toBe(true);
+  });
+
+  it('runs actionlint only when the diff touches its .github/ inputs', () => {
+    expect(classifyCiRepoLanes(['apps/web/app/page.tsx']).runActionlint).toBe(
+      false
+    );
+    expect(
+      classifyCiRepoLanes(['.github/scripts/run-actionlint.sh']).runActionlint
+    ).toBe(true);
+    expect(classifyCiRepoLanes(['.github/actionlint.yaml']).runActionlint).toBe(
+      true
+    );
+    // The lint runner's release-download helper is part of its input surface.
+    expect(
+      classifyCiRepoLanes(['scripts/lib/github-release-asset.sh']).runActionlint
+    ).toBe(true);
+    expect(classifyCiRepoLanes([]).runActionlint).toBe(false);
   });
 
   it('emits GitHub outputs that skip product suites for Symphony-only diffs', () => {
@@ -216,18 +234,21 @@ describe('JOV-5288 CI repo lanes', () => {
       'run_jovie_typecheck=false',
       'run_symphony_control=true',
       'run_summer_ops=false',
+      'run_actionlint=false',
     ]);
     expect(githubLaneOutputs(plan, { forceAll: true })).toEqual([
       'run_jovie_product=true',
       'run_jovie_typecheck=true',
       'run_symphony_control=true',
       'run_summer_ops=true',
+      'run_actionlint=true',
     ]);
     expect(githubLaneOutputs(plan, { forceNone: true })).toEqual([
       'run_jovie_product=false',
       'run_jovie_typecheck=false',
       'run_symphony_control=false',
       'run_summer_ops=false',
+      'run_actionlint=false',
     ]);
   });
 
@@ -271,7 +292,7 @@ describe('JOV-5288 CI repo lanes', () => {
       else process.env.GITHUB_OUTPUT = previous;
     }
     expect(readFileSync(outputPath, 'utf8')).toBe(
-      'run_jovie_product=false\nrun_jovie_typecheck=false\nrun_symphony_control=false\nrun_summer_ops=false\n'
+      'run_jovie_product=false\nrun_jovie_typecheck=false\nrun_symphony_control=false\nrun_summer_ops=false\nrun_actionlint=false\n'
     );
   });
 });

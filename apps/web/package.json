@@ -225,6 +225,7 @@
     "test:visual-a11y": "pnpm run e2e:visual && pnpm run test:a11y",
     "perf:auth": "tsx scripts/performance-auth.ts",
     "perf:route-js": "node scripts/route-js-budget.mjs",
+    "perf:render-modes": "node scripts/route-render-modes.mjs",
     "perf:interactions": "tsx scripts/performance-interaction-audit.ts",
     "perf:interactions:measure": "tsx scripts/run-interaction-latency-audit.ts",
     "product-surface-counts": "tsx scripts/generate-product-surface-counts.ts",
