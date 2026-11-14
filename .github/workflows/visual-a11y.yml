@@ -18,6 +18,7 @@ on:
       - '!apps/web/app/api/**'
       - '!apps/web/app/actions/**'
       - '!apps/web/tests/**'
+      - 'apps/web/tests/fixtures/**'
       - '!apps/web/docs/**'
       - '!apps/web/**/__tests__/**'
       - '!apps/web/**/*.test.*'

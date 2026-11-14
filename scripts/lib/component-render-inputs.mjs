@@ -36,13 +36,17 @@ const PRODUCER_INPUTS = new Set([
   'scripts/lib/component-render-inputs.mjs',
   '.github/workflows/visual-a11y.yml',
 ]);
+// These support directories contain imported Storybook/runtime code and assets.
+const RUNTIME_SUPPORT_INPUT = /^apps\/web\/(?:tests\/fixtures|lib\/docs)\//;
 /** Mirrors the workflow's render-only eligibility, preserving its older matrix. */
 export function isRenderInput(path) {
   if (ROOT_INPUT.test(path) || PRODUCER_INPUTS.has(path)) return true;
   return (
     /^(?:apps\/web|packages|patches)\//.test(path) &&
     !/^apps\/web\/app\/(?:api|actions)\//.test(path) &&
-    !/(?:^|\/)(?:__tests__|tests|docs)\//.test(path) &&
+    !/(?:^|\/)__tests__\//.test(path) &&
+    (RUNTIME_SUPPORT_INPUT.test(path) ||
+      !/(?:^|\/)(?:tests|docs)\//.test(path)) &&
     !/\.(?:test|spec)\.|\.md$/.test(path)
   );
 }
