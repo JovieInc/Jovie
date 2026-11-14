@@ -316,6 +316,7 @@ export function loadProviders(repoRoot) {
 export function baseProvidersAt(ref, repoRoot) {
   if (!ref) return null;
   const shown = spawnSync('git', ['show', `${ref}:${PROVIDERS_PATH}`], {
+    maxBuffer: 256 * 1024 * 1024,
     cwd: repoRoot,
     encoding: 'utf8',
   });

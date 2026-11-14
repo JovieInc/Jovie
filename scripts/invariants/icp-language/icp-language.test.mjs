@@ -32,7 +32,12 @@ function baselineFixture(t) {
   mkdirSync(dirname(path), { recursive: true });
   const ids = ['artist:old.ts:abc', 'music:old.ts:def'];
   writeFileSync(path, `${JSON.stringify({ count: ids.length, ids })}\n`);
-  const git = args => execFileSync('git', args, { cwd: root, stdio: 'pipe' });
+  const git = args =>
+    execFileSync('git', args, {
+      maxBuffer: 256 * 1024 * 1024,
+      cwd: root,
+      stdio: 'pipe',
+    });
   git(['init', '--quiet']);
   git(['add', '.']);
   git([

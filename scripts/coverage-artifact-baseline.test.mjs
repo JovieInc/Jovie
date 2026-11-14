@@ -24,7 +24,11 @@ function fixture(t) {
   const cwd = mkdtempSync(join(tmpdir(), 'coverage-artifact-'));
   t.after(() => rmSync(cwd, { recursive: true, force: true }));
   const git = (...args) =>
-    execFileSync('git', args, { cwd, encoding: 'utf8' }).trim();
+    execFileSync('git', args, {
+      maxBuffer: 256 * 1024 * 1024,
+      cwd,
+      encoding: 'utf8',
+    }).trim();
   git('init', '--quiet', '--initial-branch=main');
   git('config', 'user.name', 'Coverage Test');
   git('config', 'user.email', 'coverage@example.invalid');
