@@ -58,7 +58,9 @@ const related: BlogPostSummary[] = [
   },
 ];
 
-function renderPost(overrides: Partial<Parameters<typeof BlogPostPage>[0]> = {}) {
+function renderPost(
+  overrides: Partial<Parameters<typeof BlogPostPage>[0]> = {}
+) {
   return render(
     <BlogPostPage
       post={post}
@@ -108,9 +110,7 @@ describe('BlogPostPage certificate', () => {
     });
 
     expect(screen.getByText('One short paragraph.')).toBeVisible();
-    expect(
-      screen.queryByText('The Friday Problem')
-    ).not.toBeInTheDocument();
+    expect(screen.queryByText('The Friday Problem')).not.toBeInTheDocument();
     await expectNoA11yViolations(container);
   });
 

@@ -21,10 +21,9 @@ describe('BrandingBadge certificate', () => {
       </div>
     );
 
-    expect(screen.getByText('Made with Jovie').closest('[dir]')).toHaveAttribute(
-      'dir',
-      'rtl'
-    );
+    expect(
+      screen.getByText('Made with Jovie').closest('[dir]')
+    ).toHaveAttribute('dir', 'rtl');
     await expectNoA11yViolations(container);
   });
 });

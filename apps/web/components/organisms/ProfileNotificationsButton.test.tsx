@@ -49,26 +49,29 @@ describe('ProfileNotificationsButton', () => {
     [{ email: true, sms: false }, 'Subscribed via Email'],
     [{ email: false, sms: true }, 'Subscribed via SMS'],
     [undefined, 'Subscribed'],
-  ])('labels subscribed channels %j as %s on hover', async (channels, label) => {
-    const user = userEvent.setup();
-    const { container } = render(
-      <TooltipProvider delayDuration={0}>
-        <ProfileNotificationsButton
-          hasActiveSubscriptions
-          notificationsState='idle'
-          onClick={vi.fn()}
-          subscribedChannels={channels}
-        />
-      </TooltipProvider>
-    );
+  ])(
+    'labels subscribed channels %j as %s on hover',
+    async (channels, label) => {
+      const user = userEvent.setup();
+      const { container } = render(
+        <TooltipProvider delayDuration={0}>
+          <ProfileNotificationsButton
+            hasActiveSubscriptions
+            notificationsState='idle'
+            onClick={vi.fn()}
+            subscribedChannels={channels}
+          />
+        </TooltipProvider>
+      );
 
-    const button = screen.getByRole('button', {
-      name: 'Manage notification preferences',
-    });
-    await user.hover(button);
-    expect((await screen.findAllByText(label)).length).toBeGreaterThan(0);
-    await expectNoA11yViolations(container);
-  });
+      const button = screen.getByRole('button', {
+        name: 'Manage notification preferences',
+      });
+      await user.hover(button);
+      expect((await screen.findAllByText(label)).length).toBeGreaterThan(0);
+      await expectNoA11yViolations(container);
+    }
+  );
 
   it('stays axe-clean inside a right-to-left document', async () => {
     const { container } = render(

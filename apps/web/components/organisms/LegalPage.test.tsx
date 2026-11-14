@@ -41,10 +41,9 @@ describe('LegalPage certificate', () => {
       screen.getByRole('heading', { level: 1, name: 'Privacy Policy' })
     ).toBeVisible();
     expect(screen.getByText('Questions about this policy?')).toBeVisible();
-    expect(screen.getByRole('link', { name: 'privacy@jov.ie' })).toHaveAttribute(
-      'href',
-      'mailto:privacy@jov.ie'
-    );
+    expect(
+      screen.getByRole('link', { name: 'privacy@jov.ie' })
+    ).toHaveAttribute('href', 'mailto:privacy@jov.ie');
     await expectNoA11yViolations(container);
   });
 

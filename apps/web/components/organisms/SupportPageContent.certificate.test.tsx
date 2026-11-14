@@ -39,7 +39,9 @@ describe('SupportPageContent certificate', () => {
     const { container } = render(<SupportPageContent />);
     stopNavigation(container);
 
-    await user.click(screen.getByRole('link', { name: 'Browse the Help Center' }));
+    await user.click(
+      screen.getByRole('link', { name: 'Browse the Help Center' })
+    );
     await user.click(screen.getByRole('link', { name: 'Contact support' }));
     await user.click(screen.getByRole('link', { name: SUPPORT_EMAIL }));
 

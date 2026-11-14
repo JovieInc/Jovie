@@ -2,8 +2,8 @@ import { render, screen, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import {
-  type FeaturedCreator,
   FeaturedArtistsSection,
+  type FeaturedCreator,
 } from './FeaturedArtistsSection';
 
 // jsdom has no layout, so the real virtualizer measures a zero-width row and
@@ -105,9 +105,9 @@ describe('FeaturedArtistsSection certificate', () => {
       </div>
     );
 
-    expect(
-      within(desktopRow(container)).getAllByRole('listitem')
-    ).toHaveLength(20);
+    expect(within(desktopRow(container)).getAllByRole('listitem')).toHaveLength(
+      20
+    );
     await expectNoA11yViolations(container);
   });
 });

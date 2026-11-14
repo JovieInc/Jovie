@@ -48,6 +48,8 @@ export const RtlProfileHeader: Story = {
   ],
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    await expect(canvas.getByRole('button', { name: 'Get alerts' })).toBeVisible();
+    await expect(
+      canvas.getByRole('button', { name: 'Get alerts' })
+    ).toBeVisible();
   },
 };

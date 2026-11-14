@@ -35,7 +35,9 @@ export const PartialTitleOnly: Story = {
     await expect(
       canvas.getByRole('heading', { name: 'Ready to grow your fanbase?' })
     ).toBeVisible();
-    await expect(canvas.getByRole('link', { name: 'Get started' })).toBeVisible();
+    await expect(
+      canvas.getByRole('link', { name: 'Get started' })
+    ).toBeVisible();
   },
 };
 

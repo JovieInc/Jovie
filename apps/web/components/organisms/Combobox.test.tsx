@@ -102,7 +102,9 @@ describe('Combobox (organisms re-export) certificate', () => {
     const { container } = renderCombobox({ disabled: true });
 
     expect(screen.getByLabelText('Search for an artist')).toBeDisabled();
-    expect(screen.getByRole('button', { name: 'Open dropdown' })).toBeDisabled();
+    expect(
+      screen.getByRole('button', { name: 'Open dropdown' })
+    ).toBeDisabled();
     await expectNoA11yViolations(container);
   });
 });
