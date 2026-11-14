@@ -135,11 +135,8 @@ async function resolveAppRegionAtCenter(
 test('collapsed sidebar toggle stays clickable on headed routes (Home) and Settings', async ({
   page,
 }) => {
-  // Skip outside the explicit dev-auth E2E lane; the shell needs a bypassed Clerk session.
-  test.skip(
-    process.env.E2E_USE_TEST_AUTH_BYPASS !== '1',
-    'Requires E2E_USE_TEST_AUTH_BYPASS=1'
-  );
+  // The authenticated E2E lane must provide its normal test-auth setup.
+  expect(process.env.E2E_USE_TEST_AUTH_BYPASS).toBe('1');
   test.setTimeout(240_000);
 
   await page.setViewportSize({ width: 1440, height: 900 });
