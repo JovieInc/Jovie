@@ -1,4 +1,3 @@
-import { spawnSync } from 'node:child_process';
 import {
   chmodSync,
   existsSync,
@@ -26,6 +25,7 @@ import {
   EXACT_HEAD_COVERAGE_JOB_TIMEOUT_MINUTES,
   EXACT_HEAD_COVERAGE_STEP_TIMEOUT,
 } from '../changed-test-coverage.mjs';
+import { spawnSync } from '../child-process.mjs';
 import {
   MERGE_GROUP_ADMISSION_QUOTA_RECOVERY_MS,
   MERGE_GROUP_ADMISSION_WAIT_MS,

@@ -36,7 +36,11 @@ function arg(name, fallback) {
     : fallback;
 }
 function git(args) {
-  const r = spawnSync('git', args, { cwd: REPO, encoding: 'utf8' });
+  const r = spawnSync('git', args, {
+    maxBuffer: 256 * 1024 * 1024,
+    cwd: REPO,
+    encoding: 'utf8',
+  });
   if (r.status !== 0) throw new Error(`git ${args.join(' ')}: ${r.stderr}`);
   return r.stdout.trim();
 }

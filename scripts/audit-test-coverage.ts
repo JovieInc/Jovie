@@ -585,10 +585,7 @@ async function detectUnmappedHighChurn(surfaces: Surface[]): Promise<string[]> {
   try {
     churnRaw = execSync(
       'git log --since=90.days --name-only --pretty=format: -- apps/web',
-      {
-        cwd: REPO_ROOT,
-        encoding: 'utf8',
-      }
+      { maxBuffer: 256 * 1024 * 1024, cwd: REPO_ROOT, encoding: 'utf8' }
     );
   } catch {
     return [];
