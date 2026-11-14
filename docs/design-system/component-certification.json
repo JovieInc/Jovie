@@ -30,6 +30,222 @@
       "frontend-rules",
       "forced-caps"
     ],
+    "apps/web/components/features/admin/admin-creator-profiles/AdminCreatorsPageWrapper.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/admin/admin-creator-profiles/AlgorithmHealthPanel.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/admin/admin-releases-table/AdminReleasesPageWrapper.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/admin/admin-users-table/AdminUserDetailDrawer.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/admin/agent-os/ApprovalQueuePanel.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/admin/agent-os/ArtifactDrawer.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/admin/agent-os/VerificationGateList.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/admin/agent-os/WorkflowRunRow.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/admin/agent-os/WorkflowStatusPill.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/admin/campaigns/InviteCampaignManager.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/admin/certifications/CertificationFiltersMenu.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/admin/certifications/CertificationGlyphs.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/admin/certifications/CertificationReviewCard.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/admin/certifications/CertificationSummary.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/admin/certifications/OvieCertificationsWorkspace.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/admin/contacts-table/CanonicalLifecycleFunnel.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/admin/customer-recovery/RerunIngestionButton.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/admin/decision-card/DecisionCard.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/admin/feedback-table/feedback-actions.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/admin/hud/FleetVerdictPanel.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/admin/hud/FounderFunnelDrilldown.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/admin/hud/HudBottlenecksCard.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/admin/hud/HudCashMrrBand.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/admin/hud/HudCompanyMetricCards.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
     "apps/web/components/features/profile/ClaimBanner.tsx": [
       "ds-owner",
       "tokens",
@@ -318,6 +534,37 @@
     },
     "apps/web/components/features/admin/OvieRouteUsageBeacon.tsx": {
       "error": "The beacon renders null in every state and is fire-and-forget: a failed POST is swallowed by its .catch, so there is no failure to draw. OvieRouteUsageBeacon.test.tsx rejects the fetch and asserts the page is unchanged and axe-clean."
+    },
+    "apps/web/components/features/admin/admin-users-table/AdminUserDetailDrawer.tsx": {
+      "error": "The drawer renders a user row its parent already loaded and never fetches; the detector matched the copy-failure toast toast.error(`Failed to copy ${label}`), which the certificate test covers.",
+      "permission-denied": "The drawer has no role or permission check (the admin route guards it); the detector matched the billing plan badge user.plan."
+    },
+    "apps/web/components/features/admin/agent-os/ArtifactDrawer.tsx": {
+      "loading": "The drawer renders an artifact its parent already holds (or null for no selection) and never fetches; the detector matched the human-gate label key pending: 'Pending'.",
+      "offline": "The drawer neither fetches nor mutates; it only renders the passed artifact and its outbound links. The offline flag came from the pending: 'Pending' label match."
+    },
+    "apps/web/components/features/admin/agent-os/WorkflowRunRow.tsx": {
+      "empty": "The row renders exactly one artifact and owns no collection; the detector matched the items-start and items-center classes.",
+      "loading": "The row renders an artifact its parent already holds and never fetches; the detector matched the human-gate label key pending: 'Review Required'.",
+      "offline": "The row neither fetches nor mutates; its only handler is onSelect(artifact). The offline flag came from the pending: 'Review Required' label match."
+    },
+    "apps/web/components/features/admin/certifications/CertificationGlyphs.tsx": {
+      "long-content": "The glyphs are fixed-size SVG icons whose only text is a fixed state or tier label in aria-label and <title>; no caller-supplied copy can grow them.",
+      "offline": "The glyphs are pure SVG with no fetch or mutation; the offline flag came from the pending: 'Pending' evidence-status key.",
+      "permission-denied": "The glyphs gate nothing; the detector matched role='img' on each SVG. Evidence and approval states are covered by the State, StateMatrix and EvidenceMatrix stories."
+    },
+    "apps/web/components/features/admin/certifications/OvieCertificationsWorkspace.tsx": {
+      "permission-denied": "The workspace has no role or permission check of its own (the admin route guards it); the detector matched role='toolbar' on the state filter bar. A 403 decision reason is rendered by CertificationDetailRail through decisionError."
+    },
+    "apps/web/components/features/admin/decision-card/DecisionCard.tsx": {
+      "permission-denied": "The card has no role or permission check; the detector matched role='status' and role='alert' on the outcome and error lines. A source with no reject path is shown by PartialNoRejectPath, and a refused write by the Error story."
+    },
+    "apps/web/components/features/admin/feedback-table/feedback-actions.tsx": {
+      "long-content": "The registry emits two fixed labels, 'Copy As Markdown' and 'Dismiss'; no caller copy reaches the rendered actions, so there is no long content to wrap.",
+      "offline": "The registry only builds action definitions and calls the caller's handlers; it never fetches. The offline flag came from the status union 'pending' | 'dismissed'; an in-flight dismiss is the LoadingDismissPending story."
+    },
+    "apps/web/components/features/admin/hud/HudBottlenecksCard.tsx": {
+      "permission-denied": "The card only ranks bottlenecks from metrics its parent already loaded and has no gated action or role check; the detector matched the list semantics role='listitem' on each row."
     },
     "apps/web/components/features/alerts/UnpublishedEntityAlerts.tsx": {
       "offline": "The copy and its fallback never fetch; the alert sign-up it hosts, AlertGrowthLanding, owns the subscribe request and its network error. The detector matched the loading test id on the Suspense fallback (Loading).",
