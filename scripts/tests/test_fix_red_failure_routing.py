@@ -39,7 +39,10 @@ class LocalModulePrerequisiteTest(unittest.TestCase):
         diagnostic = ("lib/waitlist/winback-approval.server.ts(23,8): error TS2307: "
                       "Cannot find module '@/lib/waitlist/winback' or its corresponding type declarations.")
         for state in ("BLOCKED", "BEHIND"):
-            for log in (diagnostic, "passing fixture: API rate limit exceeded\n##[error]" + diagnostic):
+            diagnostics = [diagnostic.replace("lib/waitlist/winback-approval.server.ts", source)
+                           for source in ("lib/waitlist/winback-approval.server.ts", "hooks/useWinback.ts",
+                                          "types/winback.ts", "constants/winback.ts", "infrastructure/winback.ts")]
+            for log in diagnostics + ["passing fixture: API rate limit exceeded\n##[error]" + item for item in diagnostics]:
                 got = classes.classify({**red("Source Validation"), "mergeStateStatus": state}, {"Source Validation": log})
                 self.assertEqual((got["cls"], got["action"]), ("local-module-prerequisite", "sync-main"))
 

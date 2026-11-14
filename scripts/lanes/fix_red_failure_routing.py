@@ -10,7 +10,7 @@ import subprocess
 # BLOCKED rather than BEHIND. Use the existing one-sync-per-head route before
 # asking a model to recreate modules. Unresolved errors still fall back to it.
 LOCAL_MODULE_PREREQUISITE = re.compile(
-    r"\b(?:app|components|lib)/[\w./-]+\.[cm]?[jt]sx?\(\d+,\d+\): error TS2307: "
+    r"\b[\w./-]+\.[cm]?[jt]sx?\(\d+,\d+\): error TS2307: "
     r"Cannot find module ['\"]@/[\w./-]+['\"]")
 
 def has_local_prerequisite_failure(route, logs):
