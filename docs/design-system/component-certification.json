@@ -422,6 +422,12 @@
     "apps/web/components/features/onboarding/OnboardingSecurityCheckRecovery.tsx": {
       "empty": "OnboardingSecurityCheckRecovery always renders one fixed heading, one status line and the retry button, and never a collection; the detector matched the items-start and items-center classes."
     },
+    "apps/web/components/features/opportunity-inbox/OpportunityInboxRouteSkeleton.tsx": {
+      "empty": "The skeleton draws two fixed tab stubs and three placeholder cards from constant keys; it holds no data that could be empty. An empty inbox is OpportunityInboxEmptyState once OpportunityInboxPageClient loads.",
+      "long-content": "It renders no visible text: every bar is an empty skeleton block and its only string is the sr-only status label. OpportunityInboxRouteSkeleton.test.tsx asserts the region holds no other text.",
+      "offline": "The skeleton paints as the shell layout's Suspense fallback before any request runs and never fetches or submits, so connectivity cannot reach it.",
+      "permission-denied": "It takes no props and draws the same placeholders for every role; access to Home is decided by the shell layout before the fallback paints, so there is no gated face to draw."
+    },
     "apps/web/components/features/pricing/MarketingPricingPlans.tsx": {
       "empty": "Plans are the three checked-in public plans filtered by NEXT_PUBLIC_MARKETING_VISIBLE_PLANS, and a filter naming no known plan falls back to all three, so the card list cannot be empty. A plan with no features drops its list, which PartialPlanDetails shows.",
       "permission-denied": "Public pricing has no gated action: every visitor sees every visible plan and its CTA. The detector matched the word plan; entitlement checks happen after the CTA, in checkout."
@@ -921,6 +927,9 @@
       "empty": "The skeleton takes no props: it maps a fixed constant list of six placeholder lines, so there is no collection that can be empty. The detector matched that .map call.",
       "long-content": "The skeleton renders no visible text, only fixed-size placeholder blocks and a fixed 'Loading lyrics' label, so there is no content to grow.",
       "offline": "The skeleton is a static route fallback that fetches nothing; when the lyrics route cannot load, the route's error boundary replaces it, not the skeleton."
+    },
+    "apps/web/components/shell/RuntimeUpdatePill.tsx": {
+      "offline": "The pill never fetches or submits: its press reloads the page on web or restarts the desktop app through the Electron bridge. Whether an update exists is useVersionMonitor's and the desktop updater's, and RuntimeUpdateProvider renders no pill without one."
     },
     "apps/web/components/shell/SidebarInboxLink.tsx": {
       "offline": "The link never fetches: pending work arrives from the server as availability, and an unreadable status falls back to the plain Inbox bell (StatusUnavailable). Opening it is a normal navigation. The detector matched the pending flag."

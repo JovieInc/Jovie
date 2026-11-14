@@ -2409,17 +2409,44 @@ body {
   }
 }
 
-.ask-jovie-mark .ask-jovie-wordmark {
+/* Sidebar brand: mark only at rest; hover/keyboard focus reveals the word.
+   Width (0fr -> 1fr) and opacity move together inside the wordmark's own
+   overflow-hidden box, so the header actions beside it never shift. Shared
+   by the customer Ask Jovie mark and the admin workspace switcher (the
+   switcher's always-on label was what showed "Jovie" at rest). */
+.ask-jovie-mark .ask-jovie-wordmark,
+.sidebar-wordmark-reveal .sidebar-wordmark {
   display: grid;
   grid-template-columns: 0fr;
+  opacity: 0;
   font-weight: var(--font-weight-nav);
-  transition: grid-template-columns var(--duration-subtle)
-    var(--ease-interactive);
+  transition:
+    grid-template-columns var(--duration-subtle) var(--ease-interactive),
+    opacity var(--duration-subtle) var(--ease-interactive);
 }
 
 .ask-jovie-mark:hover .ask-jovie-wordmark,
-.ask-jovie-mark:focus-visible .ask-jovie-wordmark {
+.ask-jovie-mark:focus-visible .ask-jovie-wordmark,
+.sidebar-wordmark-reveal:hover .sidebar-wordmark,
+.sidebar-wordmark-reveal:focus-visible .sidebar-wordmark,
+.sidebar-wordmark-reveal[aria-expanded="true"] .sidebar-wordmark {
   grid-template-columns: 1fr;
+  opacity: 1;
+}
+
+/* The 52px icon rail centers the mark alone; a revealed word would push it
+   off-center and past the rail edge. */
+[data-collapsible="icon"] .ask-jovie-mark:hover .ask-jovie-wordmark,
+[data-collapsible="icon"] .ask-jovie-mark:focus-visible .ask-jovie-wordmark,
+[data-collapsible="icon"] .sidebar-wordmark-reveal:hover .sidebar-wordmark,
+[data-collapsible="icon"]
+  .sidebar-wordmark-reveal:focus-visible
+  .sidebar-wordmark,
+[data-collapsible="icon"]
+  .sidebar-wordmark-reveal[aria-expanded="true"]
+  .sidebar-wordmark {
+  grid-template-columns: 0fr;
+  opacity: 0;
 }
 
 .ask-jovie-panel {
@@ -2427,7 +2454,8 @@ body {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .ask-jovie-mark .ask-jovie-wordmark {
+  .ask-jovie-mark .ask-jovie-wordmark,
+  .sidebar-wordmark-reveal .sidebar-wordmark {
     transition: none;
   }
 }

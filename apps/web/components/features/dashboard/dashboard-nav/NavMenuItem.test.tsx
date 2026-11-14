@@ -118,6 +118,40 @@ describe('NavMenuItem', () => {
     expect(row.className).toContain('grid-cols-(--app-shell-sidebar-nav-grid)');
   });
 
+  it('lets the nav owner withhold the selected paint from the current page while another row is pending', () => {
+    render(
+      <NavMenuItem
+        item={{ id: 'home', name: 'Inbox', href: '/app', icon: Music }}
+        isActive
+        highlighted={false}
+      />
+    );
+    const row = screen.getByRole('link', { name: 'Inbox' });
+    // Still the page for assistive tech...
+    expect(row).toHaveAttribute('aria-current', 'page');
+    // ...but it does not paint selected next to the pending destination.
+    expect(row).not.toHaveAttribute('data-nav-highlighted');
+    expect(row.className).not.toContain('bg-sidebar-accent-active');
+  });
+
+  it('marks the selected paint with data-nav-highlighted by default', () => {
+    render(
+      <NavMenuItem
+        item={{
+          id: 'library',
+          name: 'Work',
+          href: '/app/library',
+          icon: Music,
+        }}
+        isActive
+      />
+    );
+    expect(screen.getByRole('link', { name: 'Work' })).toHaveAttribute(
+      'data-nav-highlighted',
+      'true'
+    );
+  });
+
   it('acknowledges a pending destination without changing row geometry', () => {
     render(
       <NavMenuItem

@@ -39,6 +39,12 @@ interface NavMenuItemProps {
   readonly isActive: boolean;
   /** Paint-only acknowledgment while the destination route is resolving. */
   readonly pending?: boolean;
+  /**
+   * Whether this row paints the selected style. Defaults to
+   * `isActive || pending`; the nav owner passes it so a pending destination
+   * and the still-current page never both look selected.
+   */
+  readonly highlighted?: boolean;
   readonly shortcut?: KeyboardShortcut;
   readonly prefetch?: boolean;
   readonly actions?: ReactNode;
@@ -61,6 +67,7 @@ interface NavMenuInteractiveElementProps {
   readonly item: NavItem;
   readonly isActive: boolean;
   readonly pending: boolean;
+  readonly highlighted: boolean;
   readonly prefetch?: boolean;
   readonly preventNavigation: boolean;
   readonly renderAsButton: boolean;
@@ -76,6 +83,7 @@ function NavMenuInteractiveElement({
   item,
   isActive,
   pending,
+  highlighted,
   prefetch,
   preventNavigation,
   renderAsButton,
@@ -98,6 +106,7 @@ function NavMenuInteractiveElement({
         aria-busy={pending || undefined}
         data-navigation-item-id={item.id}
         data-navigation-pending={pending || undefined}
+        data-nav-highlighted={highlighted || undefined}
         className={className}
       >
         {children}
@@ -118,6 +127,7 @@ function NavMenuInteractiveElement({
       aria-disabled={preventNavigation || undefined}
       data-navigation-item-id={item.id}
       data-navigation-pending={pending || undefined}
+      data-nav-highlighted={highlighted || undefined}
       className={className}
     >
       {children}
@@ -130,6 +140,7 @@ export function NavMenuItem({
   item,
   isActive,
   pending = false,
+  highlighted: highlightedProp,
   shortcut,
   prefetch,
   actions,
@@ -142,6 +153,7 @@ export function NavMenuItem({
   renderAsButton = false,
   onPrefetch,
 }: NavMenuItemProps) {
+  const highlighted = highlightedProp ?? (isActive || pending);
   const isElectronRuntime = useIsElectronRuntime();
   const pendingNavigationRef = useRef(false);
   const clearPendingNavigationListenersRef = useRef<(() => void) | null>(null);
@@ -289,7 +301,7 @@ export function NavMenuItem({
     : undefined;
   const shellNavClassName = getSidebarNavRowClassName({
     calm,
-    active: isActive || pending,
+    active: highlighted,
     tone: item.tone,
     className:
       'group-data-[collapsible=icon]:mx-auto group-data-[collapsible=icon]:w-10 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0',
@@ -301,7 +313,7 @@ export function NavMenuItem({
           name={item.iconName}
           className={getSidebarNavIconClassName({
             calm,
-            active: isActive || pending,
+            active: highlighted,
             tone: item.tone,
           })}
           strokeWidth={2.25}
@@ -311,7 +323,7 @@ export function NavMenuItem({
         <item.icon
           className={getSidebarNavIconClassName({
             calm,
-            active: isActive || pending,
+            active: highlighted,
             tone: item.tone,
           })}
           strokeWidth={2.25}
@@ -362,6 +374,7 @@ export function NavMenuItem({
               item={item}
               isActive={isActive}
               pending={pending}
+              highlighted={highlighted}
               prefetch={prefetch}
               preventNavigation={preventNavigation}
               renderAsButton={renderAsButton}

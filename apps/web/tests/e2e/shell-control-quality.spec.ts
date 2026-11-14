@@ -7,6 +7,7 @@ import {
   detectReversibleControl,
   type ReversibleActivation,
 } from '../utils/reversible-control-detector';
+import { findClippedFocusRings } from './utils/focus-ring-clipping';
 import { inspectShellMaterial } from './utils/shell-material-detector';
 import { controls, expectRailPushesRoute } from './utils/shell-rail-controls';
 import {
@@ -89,24 +90,86 @@ test.beforeEach(async ({ page }) => {
   );
   await expect(page.locator('[data-app-shell-frame]')).toBeVisible();
   await waitForHydration(page);
-  // JOV-8973 (#23006) discloses the inbox Notes on demand, so open the
-  // disclosure first: the Notes box stays this spec's settle/draft anchor.
-  await page.getByRole('button', { name: 'Add Notes' }).click();
-  await expect(
-    page.getByRole('textbox', { name: 'Notes', exact: true })
-  ).toBeVisible();
+  // Home's Notes only render beside a real queue item and this persona's
+  // queue can be empty, so the Needs You tab is the settle/focus anchor.
+  await expect(homeFocusAnchor(page)).toBeVisible();
   await expect(controls(page, 'left')).toHaveCount(1);
   await page
     .locator('[data-app-shell-frame]')
     .evaluate(element => element.setAttribute('data-quality-probe', 'mounted'));
 });
 
+/** Always-present Home control used to hold keyboard focus while rails move. */
+function homeFocusAnchor(page: Page) {
+  return page.getByRole('button', { name: 'Needs You', exact: true });
+}
+
+/**
+ * A main-plane text field that holds a typed draft while rails move. Home only
+ * renders Notes beside a real queue item, so draft checks use the chat
+ * composer; `panel=profile` is the existing E2E switch for its profile rail.
+ */
+async function openDraftAnchor(page: Page) {
+  await gotoAuthenticatedChatRoute(page, { path: '/app/chat?panel=profile' });
+  await waitForHydration(page);
+  const composer = page.getByRole('textbox', {
+    name: 'Chat Message Input',
+    exact: true,
+  });
+  await expect(composer).toBeVisible();
+  await expect(controls(page, 'left')).toHaveCount(1);
+  await page
+    .locator('[data-app-shell-frame]')
+    .evaluate(element => element.setAttribute('data-quality-probe', 'mounted'));
+  return composer;
+}
+
+/**
+ * At most one rail row may be the page (`aria-current="page"`) and at most
+ * one may paint the selected style (`data-nav-highlighted`). Tim's
+ * 2026-11-14 screenshot showed Inbox and Audience selected together on
+ * `/app` while a navigation was pending.
+ */
+async function expectAtMostOneSelectedNavRow(page: Page, route: string) {
+  const rail = page.locator('#shell-left-rail');
+  const current = await rail
+    .locator('[data-navigation-item-id][aria-current="page"]')
+    .evaluateAll(rows =>
+      rows.map(row => row.getAttribute('data-navigation-item-id'))
+    );
+  const painted = await rail
+    .locator('[data-navigation-item-id][data-nav-highlighted]')
+    .evaluateAll(rows =>
+      rows.map(row => row.getAttribute('data-navigation-item-id'))
+    );
+  expect(current.length, `${route} aria-current rows: ${current}`).toBeLessThan(
+    2
+  );
+  expect(painted.length, `${route} selected rows: ${painted}`).toBeLessThan(2);
+}
+
+test('keyboard focus rings on the app shell are never clipped by an overflow ancestor', async ({
+  page,
+}, testInfo) => {
+  const report = await findClippedFocusRings(page);
+  await testInfo.attach('focus-ring-clipping', {
+    body: JSON.stringify(report, null, 2),
+    contentType: 'application/json',
+  });
+  expect(report.visited).toBeGreaterThan(0);
+  // The sidebar header (bell, search, rail toggle) must be in the tab walk.
+  await expect(
+    page.locator('[data-sidebar-header-actions] [data-inbox-attention]')
+  ).toBeVisible();
+  expect(report.findings).toEqual([]);
+});
+
 test('composed browser rails survive ten complete mixed-input cycles, preserve drafts, and reject duplicate actions', async ({
   page,
 }, testInfo) => {
+  const notes = await openDraftAnchor(page);
   await certify(page, 'left');
   await certify(page, 'right');
-  const notes = page.getByRole('textbox', { name: 'Notes', exact: true });
   await notes.fill('Shell regression draft [ ]');
   const before = await controls(page, 'left').getAttribute('aria-expanded');
   await notes.press('ControlOrMeta+b');
@@ -216,7 +279,7 @@ for (const side of ['right'] as const) {
           requestAnimationFrame(() => requestAnimationFrame(resolve))
         )
     );
-    const notes = page.getByRole('textbox', { name: 'Notes', exact: true });
+    const notes = homeFocusAnchor(page);
     await notes.focus();
     await page.mouse.move(700, 450);
     const plane = page.locator('main#main-content');
@@ -374,17 +437,27 @@ test('route navigation keeps the shell attached and inspects rendered materials 
         document.documentElement.classList.toggle('dark', value === 'dark'),
       theme
     );
-    // [sidebar link, page heading, pathname]. The root link is `Inbox` since
-    // #20840 (header still titles `/app` as Home via breadcrumb-labels), and
-    // the Identity destination is titled `Profiles` since #20953.
-    for (const [linkName, heading, pathname] of [
+    // [sidebar entry, page heading, pathname]. The Identity destination is
+    // titled `Profiles` since #20953. `/app` has no rail row any more: the
+    // header bell (named Inbox) is its entry, and header + tab title say
+    // Inbox to match (Tim 2026-11-14).
+    for (const [entry, heading, pathname] of [
       ['New Chat', 'New Chat', '/app/chat'],
       ['Identity', 'Profiles', '/app/presence'],
       ['Work', 'Work', '/app/library'],
-      ['Inbox', 'Home', '/app'],
+      ['bell', 'Inbox', '/app'],
     ] as const) {
-      await page.getByRole('link', { name: linkName, exact: true }).click();
+      await (entry === 'bell'
+        ? page.locator('[data-sidebar-header-actions] [data-inbox-attention]')
+        : page.getByRole('link', { name: entry, exact: true })
+      ).click();
+      // While the destination resolves, at most one row may look selected.
+      await expectAtMostOneSelectedNavRow(page, `${pathname} (loading)`);
       await page.waitForURL(url => url.pathname === pathname);
+      await expectAtMostOneSelectedNavRow(page, pathname);
+      if (pathname === '/app') {
+        await expect(page).toHaveTitle(/^Inbox \| /);
+      }
       await expect(
         page.getByRole('heading', { name: heading, exact: true }).first()
       ).toBeVisible();
@@ -460,7 +533,7 @@ test('chat profile stays mounted through closed, opening and interrupted exits',
 test('resizing through narrow drawers clears stale locks and preserves the desktop pin', async ({
   page,
 }, testInfo) => {
-  const notes = page.getByRole('textbox', { name: 'Notes', exact: true });
+  const notes = homeFocusAnchor(page);
   await expect(controls(page, 'left')).toHaveAttribute('aria-pressed', 'true');
   const savedPin = (await page.context().cookies()).filter(
     cookie => cookie.name === 'sidebar:state'
