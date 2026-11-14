@@ -41,6 +41,7 @@ interface MerchRecoverySentryEventLike {
   readonly title?: string | null;
   readonly message?: string | null;
   readonly logentry?: {
+    readonly message?: string | null;
     readonly formatted?: string | null;
   } | null;
   readonly extra?: Record<string, unknown> | null;
