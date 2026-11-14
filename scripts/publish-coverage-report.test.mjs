@@ -12,6 +12,9 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
 import { load } from 'js-yaml';
+// Trusted-base source contracts invoke this entry directly. Keep the artifact
+// behaviors in that suite even before the runner inventory update has landed.
+import './coverage-artifact-baseline.test.mjs';
 import {
   inFlightReport,
   publishNightlyReport,
