@@ -1,10 +1,30 @@
-import { Skeleton } from '@jovie/ui';
+import { LoadingSkeleton } from '@jovie/ui';
 
 const INBOX_LOADING_CARDS = [
   { key: 'inbox-loading-1', titleWidth: 'w-3/4', bodyWidth: 'w-1/2' },
   { key: 'inbox-loading-2', titleWidth: 'w-2/3', bodyWidth: 'w-2/5' },
   { key: 'inbox-loading-3', titleWidth: 'w-4/5', bodyWidth: 'w-1/3' },
 ] as const;
+
+/** One placeholder bar; the region around it owns the loading announcement. */
+function Bar({
+  height,
+  width = 'w-full',
+  rounded = 'sm',
+}: {
+  readonly height: string;
+  readonly width?: string;
+  readonly rounded?: 'sm' | 'md' | 'full';
+}) {
+  return (
+    <LoadingSkeleton
+      height={height}
+      width={width}
+      rounded={rounded}
+      announce={false}
+    />
+  );
+}
 
 /** Card-shaped placeholders for the Needs You queue. */
 export function OpportunityInboxLoadingCards() {
@@ -22,12 +42,16 @@ export function OpportunityInboxLoadingCards() {
           data-testid='opportunity-inbox-loading-card'
           className='flex flex-col gap-2 rounded-xl border border-subtle bg-surface-0 p-4'
         >
-          <Skeleton className='h-3 w-20' rounded='full' />
-          <Skeleton className={`h-4 ${card.titleWidth}`} />
-          <Skeleton className={`h-3 ${card.bodyWidth}`} />
+          <Bar height='h-3' width='w-20' rounded='full' />
+          <Bar height='h-4' width={card.titleWidth} />
+          <Bar height='h-3' width={card.bodyWidth} />
           <div className='mt-2 flex gap-2'>
-            <Skeleton className='h-7 w-20' rounded='full' />
-            <Skeleton className='h-7 w-16' rounded='full' />
+            <div className='w-20'>
+              <Bar height='h-7' rounded='full' />
+            </div>
+            <div className='w-16'>
+              <Bar height='h-7' rounded='full' />
+            </div>
           </div>
         </div>
       ))}
@@ -54,8 +78,12 @@ export function OpportunityInboxRouteSkeleton() {
           className='mb-4 flex min-h-7 items-center justify-center gap-1'
           aria-hidden='true'
         >
-          <Skeleton className='h-7 w-24' rounded='md' />
-          <Skeleton className='h-7 w-28' rounded='md' />
+          <div className='w-24'>
+            <Bar height='h-7' rounded='md' />
+          </div>
+          <div className='w-28'>
+            <Bar height='h-7' rounded='md' />
+          </div>
         </div>
         <OpportunityInboxLoadingCards />
       </div>

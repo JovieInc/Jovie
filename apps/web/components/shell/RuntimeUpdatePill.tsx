@@ -41,7 +41,7 @@ export function RuntimeUpdatePill({
         aria-label={title}
         aria-describedby={descriptionId}
         className={cn(
-          'pointer-events-auto max-w-80 gap-1.5 rounded-full shadow-card',
+          'pointer-events-auto max-w-80',
           busy && 'cursor-progress'
         )}
       >

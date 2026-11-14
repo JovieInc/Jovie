@@ -426,6 +426,7 @@
       "empty": "The skeleton draws two fixed tab stubs and three placeholder cards from constant keys; it holds no data that could be empty. An empty inbox is OpportunityInboxEmptyState once OpportunityInboxPageClient loads.",
       "long-content": "It renders no visible text: every bar is an empty skeleton block and its only string is the sr-only status label. OpportunityInboxRouteSkeleton.test.tsx asserts the region holds no other text.",
       "offline": "The skeleton paints as the shell layout's Suspense fallback before any request runs and never fetches or submits, so connectivity cannot reach it.",
+      "partial": "The skeleton has no data, so it has no half-loaded face: it draws the same fixed tab stubs and three placeholder cards until the page swaps it out whole. The detector matched the width and height props passed to each placeholder bar.",
       "permission-denied": "It takes no props and draws the same placeholders for every role; access to Home is decided by the shell layout before the fallback paints, so there is no gated face to draw."
     },
     "apps/web/components/features/pricing/MarketingPricingPlans.tsx": {
