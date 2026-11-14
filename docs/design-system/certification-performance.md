@@ -116,6 +116,13 @@ each, v2 about 205 on average. Keep it that way:
   incremental run, not one per component.
 - Watch the plan line in the run summary. If `reused` stays low after a quiet
   merge, a file has crept into the shared set. `stats.shared` from
-  `componentRenderBindings` gives its size (81 files at `5bf11983`), and
+  `componentRenderBindings` gives its size (89 files at `5bf11983`: 81 traced
+  plus the 8 capture-code files), and
   `buildRenderGraph(root).closure(['apps/web/.storybook/preview.tsx']).files`
   lists what the preview reaches.
+- A change to the capture code (`PRODUCER_INPUTS`: the producer scripts and
+  `visual-a11y.yml`) re-proves every receipt, so expect one cold run after it.
+- Axe findings and wrong-theme renders are reused as failures until the
+  component's closure changes. Any other failure (no capture, no render, an
+  error, no screenshot) is marked `retry` and captured again on the next run,
+  so one flaky run never parks a component.
