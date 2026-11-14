@@ -62,6 +62,240 @@
       "a11y",
       "frontend-rules"
     ],
+    "apps/web/components/marketing/MarketingOfferSummary.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/marketing/MarketingPhoneImage.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/marketing/MarketingPhoneStateGallery.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/marketing/MarketingPlatformSpecBento.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/marketing/MarketingPosterHero.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/marketing/MarketingRoundedFrame.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/marketing/MarketingScreenshot.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/marketing/MarketingSectionFrame.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/marketing/MarketingSectionIntro.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/marketing/MarketingShippedSitesShowcase.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/marketing/NoOrphanText.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/marketing/NumberedSection.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/marketing/artist-notifications/ArtistNotificationsBenefitsSection.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/marketing/artist-notifications/ArtistNotificationsHero.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/marketing/artist-profile/ArtistProfileAdaptiveSection.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/marketing/artist-profile/ArtistProfileAdaptiveSequence.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/marketing/artist-profile/ArtistProfileCaptureSection.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/marketing/artist-profile/ArtistProfileFaq.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/marketing/artist-profile/ArtistProfileFinalCta.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/marketing/artist-profile/ArtistProfileHero.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/marketing/artist-profile/ArtistProfileHeroAdaptiveIntro.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/marketing/artist-profile/ArtistProfileHowItWorks.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/marketing/artist-profile/ArtistProfileLandingRoute.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/marketing/artist-profile/ArtistProfileLogoBar.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/marketing/artist-profile/ArtistProfileModeSwitcher.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/marketing/artist-profile/ArtistProfileOpinionatedSection.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
     "apps/web/components/molecules/ContentSectionHeader.tsx": [
       "ds-owner",
       "tokens",
@@ -677,15 +911,33 @@
     "apps/web/components/marketing/MarketingHero.tsx": {
       "permission-denied": "The hero renders public copy and links with no gated action or permission input. The detector matched the word permission in the logos prop's doc comment, which is about a page's permission to show distributor logos, decided by the caller."
     },
+    "apps/web/components/marketing/MarketingOfferSummary.tsx": {
+      "permission-denied": "The summary has no gated or role-dependent branch; every visitor sees the public offer. The detector matched the words plan (the public pricing plan id) and entitlement (the PRICING_COMPARISON row name each inclusion cites)."
+    },
     "apps/web/components/marketing/MarketingPageShell.tsx": {
       "partial": "MarketingPageShell holds no data: it wraps children, and its optional props (className, penContractId) are class hooks and a design-diff id with defaults, so nothing can be partially present.",
       "permission-denied": "MarketingPageShell is a layout wrapper with no gated action or permission input; the detector matched the word 'role' in its comment."
+    },
+    "apps/web/components/marketing/MarketingPlatformSpecBento.tsx": {
+      "empty": "The bento maps the fixed PLATFORM_SPEC_TILES constant and takes no data prop (only testId), so its tile list cannot be empty.",
+      "long-content": "Every string comes from the fixed PLATFORM_SPEC_BENTO_COPY and PLATFORM_SPEC_TILES constants; the only prop is testId, so no caller can lengthen the copy."
+    },
+    "apps/web/components/marketing/MarketingShippedSitesShowcase.tsx": {
+      "empty": "The gallery maps the fixed PROFILE_STATE_TILES constant and takes no data prop (only testId), so its tile list cannot be empty.",
+      "partial": "No content prop can be omitted: the only optional props are testId on the section and className on the internal ProfileStateCard, and every tile comes from the fixed PROFILE_STATE_TILES constant.",
+      "long-content": "Every string comes from the fixed SHIPPED_SITES_SHOWCASE_COPY and PROFILE_STATE_TILES constants; the only prop is testId, so no caller can lengthen the copy."
     },
     "apps/web/components/marketing/ProductScreenshotFrame.tsx": {
       "loading": "While the capture loads, the frame shows an aria-hidden skeleton in the capture's aspect ratio; a static story cannot hold a local image request in flight, so ProductScreenshotFrame.test.tsx covers the skeleton-to-image swap.",
       "partial": "The required scenarioId resolves the whole capture record (URL, size, alt, optional focus) from the screenshot registry, which throws on an incomplete record; the other optional props are presentation flags, so a frame is never partially drawn.",
       "offline": "It never fetches or mutates; lost connectivity reaches it only as a capture that fails to load, which the ErrorPreviewUnavailable story shows.",
       "permission-denied": "It only frames a product capture and has no gated action or permission input; the detector matched role='img' on the fallback and 'locked' in the founder-locked recipe comment."
+    },
+    "apps/web/components/marketing/artist-profile/ArtistProfileCaptureSection.tsx": {
+      "empty": "The section renders one capture card or one editorial demo and owns no collection that could be empty. The detector matched the items-center class on its layout grid."
+    },
+    "apps/web/components/marketing/artist-profile/ArtistProfileOpinionatedSection.tsx": {
+      "empty": "The section renders one headline, body and capture and owns no collection that could be empty. The detector matched the items-center class on its layout grid."
     },
     "apps/web/components/molecules/AuthActions.tsx": {
       "empty": "AuthActions always renders its fixed links (Log in and Sign up when signed out, Open App when signed in) and never a collection; the detector matched the items-center class."
