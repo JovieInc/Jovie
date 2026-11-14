@@ -460,7 +460,7 @@
     },
     "packages/ui/atoms/link.tsx": {
       "libraryVersion": 1,
-      "sourceHash": "05b144bd33b20564e61dc7ace8591c51a78df9aa0b35beb2a486bfd608b02b75",
+      "sourceHash": "55e4951efb85c7341b6333792520c2a506385c37fa27b945c191123ce189be78",
       "reference": "WAI-ARIA APG Link; Radix Slot (asChild); shadcn/ui Button link variant",
       "checked": "Compared native anchor semantics with APG Link and current shadcn link/Slot composition; reviewed forwarded DOM props/ref and caller-provided aria-current, data-state precedence, disabled activation, target/RTL/reserved-label and reduced-motion contracts. Twelve Chromium story/theme observations cover six Link states, and two computed-color sequences check visited idle, keyboard focus, hover, press and restoration. Native :visited selectors remain; no history inspection was added.",
       "gaps": [
@@ -482,13 +482,13 @@
           "decision": "adopt",
           "status": "done",
           "reference": "APG Link; existing Link visited prop and native :visited contract",
-          "evidence": "Two Chromium computed-color regressions fail before and pass after: idle/focus use visited, hover/press use the interactive token, leaving the target restores visited. Native history selectors, disabled activation and the existing tab-order skip are unchanged."
+          "evidence": "Two Chromium computed-color regressions fail before and pass after: idle/focus use visited, hover/press use the interactive token, leaving restores visited. The named Link-scoped semantic state requires the existing component/state attributes; native history selectors and the existing disabled tab-order skip are unchanged. The final 16-case replay passes without any identity allowlist or baseline change."
         }
       ],
       "judge": "OpenAI Codex (source/reference/browser review)",
       "date": "2026-11-14",
       "reviewMethod": "Fetched APG and current shadcn source; read the current implementation and executed focused unit and Chromium regressions. The combined unit batch passed 148 tests with one inherited jsdom mouse-leave skip; color proof comes from the browser. No external model invocation.",
-      "reviewSource": "b88966ecd1e440a307e5e326a5c89e6a45bc5e33",
+      "reviewSource": "962a117b844f3fd11f469867b5b5a5f06818e276",
       "references": [
         "https://www.w3.org/WAI/ARIA/apg/patterns/link/",
         "https://github.com/shadcn-ui/ui/blob/main/apps/v4/registry/bases/radix/ui/button.tsx",
@@ -499,12 +499,13 @@
       },
       "reviewedDependencies": {
         "apps/web/styles/design-system.css": "a9b845db84790c1a5750fd1d274530abeddb2c10f33248b4582fb5b34f5e817e",
-        "packages/ui/lib/dropdown-styles.ts": "edc676c620a8c953f0d01a41a3ea7e3f5f2272afb86287dd3eddf9e0b58c7252"
+        "packages/ui/lib/dropdown-styles.ts": "edc676c620a8c953f0d01a41a3ea7e3f5f2272afb86287dd3eddf9e0b58c7252",
+        "apps/web/styles/tailwind-foundation.css": "0d1d8b2b77e51ce80246d8044168e5c90d95b9577a15d3c55c16da0b3cc3b913"
       },
       "evidence": [
         "packages/ui/atoms/link.test.tsx",
         "apps/web/tests/e2e/storybook-input.spec.ts",
-        "https://github.com/JovieInc/Jovie/commit/b88966ecd1e440a307e5e326a5c89e6a45bc5e33"
+        "https://github.com/JovieInc/Jovie/commit/962a117b844f3fd11f469867b5b5a5f06818e276"
       ]
     },
     "packages/ui/atoms/native-select.tsx": {
@@ -797,7 +798,7 @@
       "judge": "OpenAI Codex (source/reference/browser review)",
       "date": "2026-11-14",
       "reviewMethod": "Fetched APG and current shadcn source; read current Tooltip and shared style behavior, ran focused unit regressions and two strict Danger Chromium observations. The inherited jsdom mouse-leave skip remains disclosed and unchanged. No external model invocation.",
-      "reviewSource": "b88966ecd1e440a307e5e326a5c89e6a45bc5e33",
+      "reviewSource": "962a117b844f3fd11f469867b5b5a5f06818e276",
       "references": [
         "https://www.w3.org/WAI/ARIA/apg/patterns/tooltip/",
         "https://github.com/shadcn-ui/ui/blob/main/apps/v4/registry/bases/radix/ui/tooltip.tsx",
@@ -808,7 +809,8 @@
       },
       "reviewedDependencies": {
         "apps/web/styles/design-system.css": "a9b845db84790c1a5750fd1d274530abeddb2c10f33248b4582fb5b34f5e817e",
-        "packages/ui/lib/dropdown-styles.ts": "edc676c620a8c953f0d01a41a3ea7e3f5f2272afb86287dd3eddf9e0b58c7252"
+        "packages/ui/lib/dropdown-styles.ts": "edc676c620a8c953f0d01a41a3ea7e3f5f2272afb86287dd3eddf9e0b58c7252",
+        "apps/web/styles/tailwind-foundation.css": "0d1d8b2b77e51ce80246d8044168e5c90d95b9577a15d3c55c16da0b3cc3b913"
       },
       "evidence": [
         "packages/ui/atoms/tooltip.test.tsx",
@@ -816,7 +818,7 @@
         "packages/ui/atoms/tooltip-collision.test.tsx",
         "packages/ui/atoms/tooltip-shortcut.test.tsx",
         "apps/web/tests/e2e/storybook-input.spec.ts",
-        "https://github.com/JovieInc/Jovie/commit/b88966ecd1e440a307e5e326a5c89e6a45bc5e33"
+        "https://github.com/JovieInc/Jovie/commit/962a117b844f3fd11f469867b5b5a5f06818e276"
       ]
     },
     "packages/ui/atoms/tooltip-shortcut.tsx": {
