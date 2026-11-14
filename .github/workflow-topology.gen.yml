@@ -282,7 +282,7 @@ nodes:
       - workflow_dispatch
       - workflow_run
     terminalReceipt: job:certify
-    jobCount: 1
+    jobCount: 2
   - name: Controller Quota Replay
     path: .github/workflows/controller-quota-replay.yml
     active: true
