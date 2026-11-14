@@ -62,6 +62,51 @@
       "a11y",
       "frontend-rules"
     ],
+    "apps/web/components/marketing/artist-notifications/ArtistNotificationsLanding.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/marketing/artist-profile/ArtistProfileLandingPage.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/marketing/artist-profile/ArtistProfileOutcomeDuo.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/marketing/artist-profile/ArtistProfileSectionHeader.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/marketing/engineering/EngineeringPublication.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
     "apps/web/components/molecules/ContentSectionHeader.tsx": [
       "ds-owner",
       "tokens",
@@ -686,6 +731,9 @@
       "partial": "The required scenarioId resolves the whole capture record (URL, size, alt, optional focus) from the screenshot registry, which throws on an incomplete record; the other optional props are presentation flags, so a frame is never partially drawn.",
       "offline": "It never fetches or mutates; lost connectivity reaches it only as a capture that fails to load, which the ErrorPreviewUnavailable story shows.",
       "permission-denied": "It only frames a product capture and has no gated action or permission input; the detector matched role='img' on the fallback and 'locked' in the founder-locked recipe comment."
+    },
+    "apps/web/components/marketing/artist-notifications/ArtistNotificationsLanding.tsx": {
+      "permission-denied": "The public landing page has no gated action or permission input; the detector matched the logo-permissions import and the comment \"Renders only logos with a permission for this page\", which is about which partner logos the page may show, decided by HomeTrustSection."
     },
     "apps/web/components/molecules/AuthActions.tsx": {
       "empty": "AuthActions always renders its fixed links (Log in and Sign up when signed out, Open App when signed in) and never a collection; the detector matched the items-center class."
