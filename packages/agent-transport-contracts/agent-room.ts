@@ -113,11 +113,14 @@ export interface AgentRoomView {
 
 const SPEAKER_PREFIX =
   /^\s*\[([^\]\n→]{1,80}?)\s*(?:→|->)\s*([^\]\n]{1,80}?)\s*\]\s*/u;
+// Provider failure receipts, not talk about limits: "Codex couldn't start a
+// task…", "You have reached your Codex usage limits", "Rate limited…". Only a
+// message's first line is read, where a receipt states its failure.
 const FAILURE_PATTERNS: readonly RegExp[] = [
   /\bcouldn'?t start a task\b/iu,
-  /\busage limits?\b/iu,
+  /\b(?:reached|hit|exceeded)\s+(?:your\s+|the\s+)?(?:[\w-]+\s+){0,3}(?:usage|rate)\s+limits?\b/iu,
   /\bno available environments?\b/iu,
-  /\brate limit(?:ed)?\b/iu,
+  /^\s*rate[- ]limited\b/iu,
 ];
 
 export interface SpeakerPrefix {
@@ -185,7 +188,8 @@ export function discoveredAgentId(label: string): string {
 }
 
 export function classifyMessageKind(text: string): AgentRoomEvent['kind'] {
-  return FAILURE_PATTERNS.some(pattern => pattern.test(text))
+  const firstLine = text.trim().split('\n', 1)[0] ?? '';
+  return FAILURE_PATTERNS.some(pattern => pattern.test(firstLine))
     ? 'error'
     : 'message';
 }
@@ -226,8 +230,9 @@ function presenceFor(
   nowMs: number
 ): AgentRoomPresence {
   if (!latest) return 'unseen';
-  if (latest.kind === 'error') return 'blocked';
   const age = nowMs - Date.parse(latest.at);
+  // A failure blocks for a day at most; after that the agent reads as quiet.
+  if (latest.kind === 'error' && age <= AGENT_ROOM_RECENT_MS) return 'blocked';
   if (age <= AGENT_ROOM_ACTIVE_MS) return 'active';
   if (age <= AGENT_ROOM_RECENT_MS) return 'recent';
   return 'quiet';

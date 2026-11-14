@@ -294,5 +294,26 @@ class QueueEvidenceTest(unittest.TestCase):
             operation.assert_not_called()
 
 
+class RouteBudgetRoutingTest(unittest.TestCase):
+    def test_route_budget_ratchet_syncs_main_before_mocked_infra_noise(self):
+        # PR #25125: main tightened budgets while this head retained the old
+        # file. Both the build guard and the CLI integration test report growth.
+        errors = [
+            "2026-11-13T02:54:35.2625435Z ##[error]routes./app/chat/[id] grew 823 -> 1385",
+            "AssertionError: ::error::routes./app/chat grew 822 -> 1385",
+            "::error::firstLoad.baselines./start grew 804 -> 1247",
+            "::error::groups.dashboard.baselineKb grew 1199 -> 1385",
+        ]
+        for error in errors:
+            log = "passing fixture: API rate limit exceeded; github-quota-deferred\n" + error
+            got = classes.classify(red("Exact-head Coverage"), {"Exact-head Coverage": log})
+            self.assertEqual((got["cls"], got["action"]), ("route-budget-growth", "sync-main"), error)
+        # Measurement overruns and passing test titles are not stale-policy proof.
+        for text in ["routes./app/chat grew 822 -> 1385", "✔ rejects routes./app/chat grew 822 -> 1385",
+                     "::error::/app/chat: 1400 KB exceeds 822 KB budget", "::error::routes./app/chat grew invalid"]:
+            got = classes.classify(red("Exact-head Coverage"), {"Exact-head Coverage": text})
+            self.assertEqual((got["cls"], got["action"]), ("other", "agent"), text)
+
+
 if __name__ == '__main__':
     unittest.main()
