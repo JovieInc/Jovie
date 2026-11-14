@@ -105,7 +105,7 @@
     "production-release.yml": {"runsPerMergedPr":0,"triggers":["workflow_call"]},
     "public-app-certification.yml": {"runsPerMergedPr":4.4,"triggers":["pull_request","push"]},
     "public-benchmark.yml": {"runsPerMergedPr":0,"triggers":["schedule","workflow_dispatch"]},
-    "quality-gap-finder.yml": {"runsPerMergedPr":0.5,"triggers":["push","repository_dispatch:quality-gap-scan","workflow_dispatch"]},
+    "quality-gap-finder.yml": {"runsPerMergedPr":0.52,"triggers":["push","repository_dispatch:quality-gap-scan","workflow_dispatch","workflow_run:Test Coverage Audit"]},
     "remediation-sweep.yml": {"runsPerMergedPr":0,"triggers":["schedule","workflow_dispatch"]},
     "repository-docs-shadow.yml": {"runsPerMergedPr":4.4,"triggers":["pull_request","push","workflow_dispatch"]},
     "rolling-ci-dispatch.yml": {"runsPerMergedPr":0,"triggers":["workflow_run:CI"]},
