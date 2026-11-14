@@ -192,7 +192,8 @@
       "exports": ["MarketingFooter"],
       "ownerFiles": [
         "apps/web/components/site/MarketingFooter.tsx",
-        "apps/web/components/site/MarketingFooter.css"
+        "apps/web/components/site/MarketingFooter.css",
+        "apps/web/components/organisms/RootNotFoundFooter.tsx"
       ],
       "internals": ["mf-mark-tagline", "mf-eyebrow", "mf-baseband"]
     },

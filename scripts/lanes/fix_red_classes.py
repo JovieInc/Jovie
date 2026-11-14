@@ -33,6 +33,7 @@ from fix_red_screen_cert import SCREEN_CERT_TEXT, screen_cert_paths
 from fix_red_failure_routing import (ALIAS_ACTION, ALIAS_REVIEW_FAILURE, ROUTE_BUDGET_GROWTH, alias_owner_metadata,
                                      error_signature, fingerprint_key, owner_handoff_reason, LOCAL_MODULE_PREREQUISITE)
 from atomic_state import atomic_write_text
+from fix_red_header_zindex import HEADER_ZINDEX, OVERLAY_HEADER_Z, rewrite_header_site_zindex  # noqa: F401
 from fix_red_source_edits import (  # noqa: F401
     balance_added_headings, snap_added_conservative_spacing, strip_added_legacy_cache_exports,
     resolve_additive_node_tests_text, resolve_additive_node_test_file, resolve_additive_list_conflict, size_500_stale_hit,
@@ -46,7 +47,7 @@ RERUN, SYNC_MAIN, WIRE_CI_FAST, RENUMBER, STAMP_CHANGELOG, SNAP_SPACING, STRIP_C
     "strip-cache-exports", "merge-narrowed-preflight", "register-domain-writes", "atomic-write", "repair-screen-cert", "balance-headings", "ui-feel", "agent", "compose")
 DETERMINISTIC = frozenset({
     RERUN, SYNC_MAIN, WIRE_CI_FAST, RENUMBER, STAMP_CHANGELOG, SNAP_SPACING, STRIP_CACHE, MERGE_NARROWED,
-    REGISTER_DOMAIN, ATOMIC_WRITE, REPAIR_SCREEN_CERT, BALANCE_HEADINGS, UI_FEEL, ALIAS_ACTION})
+    REGISTER_DOMAIN, ATOMIC_WRITE, REPAIR_SCREEN_CERT, BALANCE_HEADINGS, UI_FEEL, HEADER_ZINDEX, ALIAS_ACTION})
 
 # remediation.INFRA_TEXT (runner loss, OOM, 5xx) plus the platform failures seen in 52 agent-declined
 # fix runs. Kept out of INFRA_TEXT: the exhausted-PR classifier deliberately routes a rate-limited
@@ -151,6 +152,7 @@ _JSON_KEY = re.compile(r'^\s*"([^"\n]+)"\s*:')
 # (class, pattern, action). First match wins per check; order is most specific first.
 SIGNATURES = (
     ("alias-review-deadline", ALIAS_REVIEW_FAILURE, ALIAS_ACTION),
+    ("overlay-header-zindex", OVERLAY_HEADER_Z, HEADER_ZINDEX),
     ("component-test-evidence", COMPONENT_TEST_TEXT, AGENT),
     ("local-module-prerequisite", LOCAL_MODULE_PREREQUISITE, SYNC_MAIN),
     ("narrowed-preflight", NARROWED_CONFLICT, MERGE_NARROWED),

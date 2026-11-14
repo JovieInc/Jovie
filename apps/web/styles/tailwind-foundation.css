@@ -132,6 +132,8 @@
   --z-index-modal: 70;
   --z-index-popover: 80;
   --z-index-tooltip: 150;
+  /* Marketing header chrome: above z-index 90 shell menus, below drawer 120. */
+  --z-index-site-header: 100;
   /* Shadow tokens — register design-system.css shadows as Tailwind utilities */
   --shadow-sm: var(--shadow-sm);
   --shadow-md: var(--shadow-md);
