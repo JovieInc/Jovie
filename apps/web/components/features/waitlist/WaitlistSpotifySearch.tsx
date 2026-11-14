@@ -135,6 +135,7 @@ export function WaitlistSpotifySearch({
 
   const handleKeyDown = useCallback(
     (e: KeyboardEvent<HTMLInputElement>) => {
+      if (e.nativeEvent.isComposing) return;
       if (!showResults) {
         if (e.key === 'Escape') {
           e.preventDefault();

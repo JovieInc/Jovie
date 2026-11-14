@@ -9,6 +9,14 @@ import {
   test,
 } from '@playwright/test';
 import { wcag22AaAxeOptions } from '@/lib/a11y-gates/wcag-standard.cjs';
+import {
+  attachWaitlistDiagnostics,
+  type ComposingKeyObservation,
+  dispatchComposingKey,
+  focusWaitlistOption,
+  observeWaitlistProofErrors,
+  WAITLIST_COMPOSING_KEYS,
+} from './fixtures/waitlist-composition-evidence';
 
 const INPUT_MATRIX_STORY_ID = 'ui-atoms-input--conformance-matrix';
 const INPUT_FOCUS_STORY_ID = 'ui-atoms-input--keyboard-focus';
@@ -394,5 +402,98 @@ test.describe('Link and danger-tooltip text contrast', () => {
         restored: tokens.visited,
       });
     });
+  }
+});
+
+test.describe('Waitlist Spotify native composition events', () => {
+  for (const theme of ['light', 'dark'] as const) {
+    for (const option of ['artist', 'manual'] as const) {
+      test(`composition preserves editing before ordinary ${option} activation [${theme}]`, async ({
+        page,
+      }, testInfo) => {
+        const { pageErrors, resourceErrors } = observeWaitlistProofErrors(page);
+        const events: ComposingKeyObservation[] = [];
+
+        const root = page.locator('#storybook-root');
+        const view = page.locator('body');
+        const name = `waitlist-composition-${theme}-${option}`;
+        let failure: unknown;
+        let screenshotFailure: unknown;
+        try {
+          await setStoryTheme(page, theme);
+          await openStory(
+            page,
+            'features-waitlist-waitlistspotifysearch--results'
+          );
+          await expect(page.locator('html')).toHaveClass(new RegExp(theme));
+          const search = root.getByRole('combobox', {
+            name: 'Search Spotify artists',
+          });
+          await expect(search).toHaveValue('Neon');
+          await expect(
+            root.getByRole('button', { name: /Neon Harbour/ })
+          ).toBeVisible();
+          await focusWaitlistOption(page, search, option);
+          const activeOption =
+            option === 'artist' ? 'spotify-result-0' : 'spotify-result-2';
+          await expect(search).toHaveAttribute(
+            'aria-activedescendant',
+            activeOption
+          );
+
+          // These are native DOM event flags, not an OS input-method replay.
+          for (const key of WAITLIST_COMPOSING_KEYS) {
+            const event = await dispatchComposingKey(search, key);
+            events.push(event);
+            expect(event.isComposing).toBe(true);
+            expect(event.defaultPrevented).toBe(false);
+            await expect(search).toBeVisible();
+            await expect(search).toBeFocused();
+            await expect(search).toHaveValue('Neon');
+            await expect(search).toHaveAttribute('aria-expanded', 'true');
+            await expect(search).toHaveAttribute(
+              'aria-activedescendant',
+              activeOption
+            );
+          }
+          await attachScreenshot(testInfo, `${name}-editing.png`, view);
+          await attachA11yResult(page, testInfo, `${name}-editing-a11y.json`);
+
+          await page.keyboard.press('Enter');
+          if (option === 'artist') {
+            await expect(
+              root.getByRole('button', { name: 'Change', exact: true })
+            ).toBeVisible();
+            await expect(
+              root.getByText('Neon Harbor', { exact: true })
+            ).toBeVisible();
+          } else {
+            await expect(root.getByLabel('Spotify link')).toBeVisible();
+          }
+          await expect(search).toHaveCount(0);
+          await assertNoHorizontalOverflow(page, name);
+        } catch (error) {
+          failure = error;
+        } finally {
+          try {
+            await attachScreenshot(testInfo, `${name}-final.png`, view);
+          } catch (error) {
+            screenshotFailure = error;
+          }
+          await attachWaitlistDiagnostics(testInfo, EVIDENCE_DIR, name, {
+            theme,
+            option,
+            events,
+            pageErrors,
+            resourceErrors,
+            failure,
+            screenshotFailure,
+          });
+        }
+        await attachA11yResult(page, testInfo, `${name}-a11y.json`);
+        expect(pageErrors).toEqual([]);
+        expect(resourceErrors).toEqual([]);
+      });
+    }
   }
 });
