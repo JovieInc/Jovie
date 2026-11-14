@@ -61,6 +61,8 @@ const optionalCopyTargets = [
 ];
 
 const standaloneRuntimePackages = [
+  'react',
+  'react-dom',
   '@next/env',
   '@swc/helpers',
   '@statsig/statsig-node-core',
@@ -390,13 +392,9 @@ for (const packageName of standaloneRuntimePackages) {
 /**
  * Turbopack's standalone bundle externalizes some packages with a content
  * hash (e.g. `@sentry/nextjs-223beba69777d308`, `require-in-the-middle-<hash>`).
- * Node's runtime require can't resolve the hash-suffixed name, so every server
- * response that touches the affected chunk crashes with
- * `Cannot find module '<pkg>-<hash>'`.
- *
- * Scan the standalone chunks for those references and stub each hashed name
- * with a tiny re-export package, so Node finds it at runtime. We write the
- * stubs into BOTH `node_modules` lookup locations (the app-level dir and the
+ * Node cannot resolve these hash-suffixed names without re-export stubs.
+ * Scan standalone chunks and create the stubs for runtime resolution in
+ * BOTH `node_modules` lookup locations (the app-level dir and the
  * `.next/node_modules` dir Turbopack's chunk runtime resolves against) so
  * neither resolution path misses them.
  */

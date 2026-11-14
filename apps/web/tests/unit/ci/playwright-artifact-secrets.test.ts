@@ -40,6 +40,7 @@ import {
   MAX_PLAYWRIGHT_PNG_WIDTH,
   validPlaywrightPng,
 } from '../../../../../scripts/lib/playwright-png.mjs';
+import { allowanceEnabled } from './artifact-allowance';
 import productionSmokeProducers from './fixtures/production-smoke-producers.json';
 
 const webRoot = resolve(import.meta.dirname, '../../..');
@@ -117,7 +118,7 @@ const producerStageExempt = new Set([
 ]);
 // Jobs that must keep the receipt even if their uploads move elsewhere.
 const producerStageRequired = [
-  ...'ci-fast-remaining ci-visual-snapshot-compare ci-build-layout ci-storybook-surfaces ci-layout-guard ci-mobile-overflow ci-lighthouse-pr ci-lighthouse-dashboard-pr ci-a11y ci-a11y-authed ci-e2e-smoke ci-golden-path ci-admin-smoke ci-e2e-tests ci-smoke-required'
+  ...'ci-fast-remaining ci-visual-snapshot-homepage ci-visual-marketing-dom ci-visual-marketing-routes ci-build-layout ci-storybook-surfaces ci-layout-guard ci-mobile-overflow ci-lighthouse-pr ci-lighthouse-dashboard-pr ci-a11y ci-a11y-authed ci-e2e-smoke ci-golden-path ci-admin-smoke ci-e2e-tests ci-smoke-required'
     .split(' ')
     .map(job => `ci.yml:${job}`),
   'e2e-full-matrix.yml:e2e-full-matrix',
@@ -131,20 +132,14 @@ const producerStageRequired = [
   'synthetic-monitoring.yml:synthetic-test',
   'visual-regression.yml:visual-regression',
 ];
-// Image and Markdown evidence widen what an artifact may carry; each job
-// that opts in is reviewed here.
-// An expression-valued flag can evaluate true, so anything but an explicit
-// false counts as an allowance.
-const allowanceEnabled = (value: unknown) =>
-  value !== undefined &&
-  value !== false &&
-  !['', 'false'].includes(String(value));
 const imageAllowedJobs = new Set([
   'ci.yml:ci-fast-remaining',
   'ci.yml:ci-golden-path',
   'ci.yml:ci-lighthouse-pr',
   'ci.yml:ci-storybook-surfaces',
-  'ci.yml:ci-visual-snapshot-compare',
+  'ci.yml:ci-visual-snapshot-homepage',
+  'ci.yml:ci-visual-marketing-dom',
+  'ci.yml:ci-visual-marketing-routes',
   // Manual public-profile CTA identity captures only (dispatch-gated flag).
   'e2e-full-matrix.yml:e2e-full-matrix',
   'product-crawl.yml:crawl',
@@ -162,7 +157,9 @@ const markdownAllowedJobs = new Set([
   'ci.yml:ci-golden-path',
   'ci.yml:ci-smoke-required',
   'ci.yml:ci-storybook-surfaces',
-  'ci.yml:ci-visual-snapshot-compare',
+  'ci.yml:ci-visual-snapshot-homepage',
+  'ci.yml:ci-visual-marketing-dom',
+  'ci.yml:ci-visual-marketing-routes',
   'e2e-full-matrix.yml:e2e-full-matrix',
   'nightly-testing-agent.yml:report',
   'postdeploy-probes.yml:auth-smoke',

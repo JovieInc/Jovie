@@ -28,6 +28,7 @@ from pathlib import Path
 import machine_gap
 import migration_renumber
 import remediation
+from reviewable_split import measured_changes, reviewable_split
 from fix_red_mixed_repairs import first_route_reason, mixed_repairs  # noqa: F401
 from fix_red_screen_cert import SCREEN_CERT_TEXT, screen_cert_paths
 from fix_red_failure_routing import (ALIAS_ACTION, ALIAS_REVIEW_FAILURE, ROUTE_BUDGET_GROWTH, alias_owner_metadata,
@@ -1149,37 +1150,11 @@ def costs_from_metrics(state: Path) -> dict:
     return out
 
 
-def reviewable_split(changes: dict[str, int], layers: list[list[str]], cap: int = 1500) -> list[int]:
-    """Validate an exhaustive split, counting tests. Caller measures generated paths as zero.
-
-    This plans file-level layers only; each layer still owes dependency/build/test proof.
-    No Git mutation or policy exception is authorized by a passing plan.
-    """
-    if type(cap) is not int or cap < 1 or not changes or not layers:
-        raise ValueError("nonempty measurements/layers and a positive integer cap required")
-    if any(type(count) is not int or count < 0 for count in changes.values()):
-        raise ValueError("unknown, binary or negative line count")
-    seen, totals = set(), []
-    for layer in layers:
-        if not isinstance(layer, list) or not layer:
-            raise ValueError("empty or invalid layer")
-        for path in layer:
-            if path not in changes or path in seen:
-                raise ValueError(f"unknown or duplicate path: {path}")
-            seen.add(path)
-        total = sum(changes[path] for path in layer)
-        if total > cap:
-            raise ValueError(f"layer {len(totals) + 1} exceeds cap: {total}/{cap}")
-        totals.append(total)
-    if seen != set(changes):
-        raise ValueError(f"unassigned paths: {sorted(set(changes) - seen)}")
-    return totals
-
-
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("command", choices=["measure", "split-plan"])
     parser.add_argument("--plan", type=Path, help="JSON {changes: {path: measured lines}, layers: [[path]]}")
+    parser.add_argument("--numstat", type=Path, help="Verify plan counts against git diff --numstat; counts all rows")
     parser.add_argument("--state", default=str(Path.home() / ".local/state/jovie-lanes"))
     parser.add_argument("--days", type=int, default=5)
     parser.add_argument("--now", type=float, default=None)
@@ -1189,6 +1164,8 @@ def main(argv=None) -> int:
             parser.error("split-plan requires --plan")
         plan = json.loads(args.plan.read_text())
         try:
+            if args.numstat is not None and plan["changes"] != measured_changes(args.numstat.read_text()):
+                raise ValueError("plan measurements differ from Git numstat; regenerate for the current base/head")
             totals = reviewable_split(plan["changes"], plan["layers"])
         except ValueError as error:
             parser.error(str(error))
