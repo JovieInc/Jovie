@@ -18,6 +18,14 @@ import {
   runMutationHarness,
 } from '../mutation-lifecycle.mjs';
 
+import {
+  assertCompleteSnapshot,
+  assertNonzeroSnapshotRejected,
+  assertOversizedSnapshotRejected,
+  assertPostExitSnapshotFailsClosed,
+  restoreSnapshotFixtures,
+} from './fixtures/mutation-process-snapshots.mjs';
+
 const REPO = resolve(import.meta.dirname, '../../..');
 const ORIGINAL = 'export const value = true;\n';
 const INSTRUMENTED =
@@ -34,6 +42,7 @@ const alive = pid => {
   return !/^[ZX]/u.test(result.stdout.trim());
 };
 afterEach(() => {
+  restoreSnapshotFixtures();
   for (const pid of owned.splice(0)) {
     if (alive(pid)) {
       try {
@@ -459,6 +468,25 @@ process.exitCode=1;`
     ]
   ).toMatchObject({ status: 'error', score: null });
   expect(readFileSync(output, 'utf8')).toContain('scored=0');
+});
+
+describe('process snapshot buffer', () => {
+  it(
+    'reads a complete table above 1 MiB with exact owned PID, start and live-state filtering',
+    assertCompleteSnapshot
+  );
+  it(
+    'rejects oversized output rather than accepting its valid owned-row prefix',
+    assertOversizedSnapshotRejected
+  );
+  it(
+    'rejects nonzero ps exits even when stdout contains valid owned rows',
+    assertNonzeroSnapshotRejected
+  );
+  it(
+    'preserves recovery and rejects a zero-exit partial report after an oversized cleanup snapshot',
+    assertPostExitSnapshotFailsClosed
+  );
 });
 
 function relativeModule(parent, path) {

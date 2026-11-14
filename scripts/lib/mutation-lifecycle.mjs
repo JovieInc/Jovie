@@ -16,9 +16,10 @@ import { basename, dirname, join, relative } from 'node:path';
 const pause = ms => new Promise(resolve => setTimeout(resolve, ms));
 
 /** A detached group is the ownership boundary, including children after its leader exits. */
-function groupMembers(pid) {
+export function groupMembers(pid) {
   const snapshot = spawnSync('ps', ['-eo', 'pid=,pgid=,stat=,lstart='], {
     encoding: 'utf8',
+    maxBuffer: 4 * 1024 * 1024,
     timeout: 2000,
   });
   if (snapshot.status !== 0)
