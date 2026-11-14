@@ -18,11 +18,22 @@
  * Usage: node scripts/route-js-budget.mjs [--next-dir .next] [--budgets file] [--json] [--write]
  */
 import { spawnSync } from 'node:child_process';
-import { existsSync, readdirSync, readFileSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { runInNewContext } from 'node:vm';
 import { gzipSync } from 'node:zlib';
+
+import {
+  collectFirstLoadFiles,
+  collectRouteFiles,
+} from './route-js-manifests.mjs';
+
+export {
+  collectFirstLoadFiles,
+  routeFromManifestKey,
+} from './route-js-manifests.mjs';
+
+/** @typedef {{ route: string, gzipKb: number, chunks: number }} RouteJsMeasurement */
 
 import {
   checkGroupBudgets,
@@ -38,7 +49,6 @@ import {
 } from './route-js-budget-policy.mjs';
 import {
   findBaselineSlack,
-  isInterceptedManifestKey,
   reportRouteRatchet,
   writeBaselines,
 } from './route-js-ratchet.mjs';
@@ -69,69 +79,7 @@ export {
 
 const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(SCRIPT_DIR, '../..');
-const MANIFEST_NAME = 'page_client-reference-manifest.js';
 export const BUDGET_RELATIVE = 'apps/web/scripts/route-js-budgets.json';
-/** @param {string} key */
-export function routeFromManifestKey(key) {
-  const route = key
-    .replace(/\/page$/, '')
-    .replace(/\/\([^/)]+\)/g, '')
-    .replace(/\/@[^/]+/g, '');
-  return route === '' ? '/' : route;
-}
-
-function findManifests(dir, out = []) {
-  if (!existsSync(dir)) return out;
-  for (const entry of readdirSync(dir, { withFileTypes: true })) {
-    const path = join(dir, entry.name);
-    if (entry.isDirectory()) findManifests(path, out);
-    else if (entry.name === MANIFEST_NAME) out.push(path);
-  }
-  return out;
-}
-
-function readClientManifest(path) {
-  const sandbox = { globalThis: {} };
-  sandbox.globalThis = sandbox;
-  runInNewContext(readFileSync(path, 'utf8'), sandbox);
-  const entries = Object.entries(sandbox.__RSC_MANIFEST ?? {});
-  if (entries.length !== 1) {
-    throw new Error(`Expected one client manifest entry in ${path}`);
-  }
-  return entries[0];
-}
-
-/** @typedef {{ route: string, gzipKb: number, chunks: number }} RouteJsMeasurement */
-
-/**
- * Initial JS files per /app route: root main files plus the page's
- * client-reference entry chunks.
- * @param {string} nextDir
- * @returns {{ route: string, files: Set<string> }[]}
- */
-function collectRouteFiles(
-  nextDir,
-  root = join(nextDir, 'server', 'app', 'app'),
-  { intercepted = false } = {}
-) {
-  const buildManifest = JSON.parse(
-    readFileSync(join(nextDir, 'build-manifest.json'), 'utf8')
-  );
-  const rootFiles = [
-    ...(buildManifest.rootMainFiles ?? []),
-    ...(buildManifest.polyfillFiles ?? []),
-  ];
-  return findManifests(root).flatMap(path => {
-    const [key, manifest] = readClientManifest(path);
-    if (!intercepted && isInterceptedManifestKey(key)) return [];
-    const files = new Set(rootFiles);
-    for (const chunks of Object.values(manifest.entryJSFiles ?? {})) {
-      for (const chunk of chunks) files.add(chunk);
-    }
-    return [{ route: routeFromManifestKey(key), files }];
-  });
-}
-
 /**
  * Drop the CI sourceMappingURL trailer. It is not executed code, and the
  * sibling map is not part of this budget.
@@ -248,51 +196,46 @@ export function checkBudgets(measurements, budgets) {
   return { rows, violations, unlisted, staleBudgets };
 }
 
-function rememberRoute(routes, route, files) {
-  if (!route || route.startsWith('/_')) return;
-  const set = routes.get(route) ?? new Set();
-  routes.set(route, set);
-  for (const file of files) {
-    if (typeof file === 'string' && file.endsWith('.js')) set.add(file);
-  }
-}
-
-export function collectFirstLoadFiles(nextDir) {
-  const buildManifest = JSON.parse(
-    readFileSync(join(nextDir, 'build-manifest.json'), 'utf8')
-  );
-  const shared = [
-    ...(buildManifest.rootMainFiles ?? []),
-    ...(buildManifest.polyfillFiles ?? []),
-  ];
-  /** @type {Map<string, Set<string>>} */
-  const routes = new Map();
-  const appManifestPath = join(nextDir, 'app-build-manifest.json');
-  if (existsSync(appManifestPath)) {
-    const pages = JSON.parse(readFileSync(appManifestPath, 'utf8')).pages;
-    if (!pages || typeof pages !== 'object' || Array.isArray(pages)) {
-      throw new Error(`${appManifestPath} is missing pages`);
-    }
-    for (const [key, files] of Object.entries(pages)) {
-      if (!Array.isArray(files)) {
-        throw new Error(`app-build-manifest pages[${key}] is not a file list`);
-      }
-      if (isInterceptedManifestKey(key)) continue;
-      rememberRoute(routes, routeFromManifestKey(key), [...shared, ...files]);
-    }
-  } else {
-    for (const { route, files } of collectRouteFiles(
-      nextDir,
-      join(nextDir, 'server', 'app')
-    )) {
-      if (!isAuthedAppRoute(route)) rememberRoute(routes, route, files);
-    }
-  }
-  return [...routes.entries()].map(([route, files]) => ({ route, files }));
-}
-
 export function measureFirstLoadJs(nextDir) {
   return measureRouteJs(nextDir, collectFirstLoadFiles(nextDir));
+}
+
+/** @typedef {{file: string, gzipBytes: number}} ChunkContribution */
+/** @typedef {{route: string, gzipBytes: number, files: ChunkContribution[]}} RouteContribution */
+
+/**
+ * Explain the same emitted chunks measured by the gate, without rounding.
+ * @param {string} nextDir
+ * @param {Iterable<string>} routes
+ * @returns {RouteContribution[]}
+ */
+export function routeJsContributors(nextDir, routes) {
+  const wanted = new Set(routes);
+  if (!wanted.size) return [];
+  /** @type {Map<string, RouteContribution>} */
+  const byRoute = new Map();
+  for (const row of [
+    ...collectRouteFiles(nextDir),
+    ...collectFirstLoadFiles(nextDir).filter(
+      row => !isAuthedAppRoute(row.route)
+    ),
+  ]) {
+    if (!wanted.has(row.route)) continue;
+    const chunks = [...row.files]
+      .map(file => ({
+        file,
+        gzipBytes: gzipSync(budgetJsBytes(readFileSync(join(nextDir, file))), {
+          level: 9,
+        }).length,
+      }))
+      .sort(
+        (a, b) => b.gzipBytes - a.gzipBytes || a.file.localeCompare(b.file)
+      );
+    const gzipBytes = chunks.reduce((sum, chunk) => sum + chunk.gzipBytes, 0);
+    if (gzipBytes > (byRoute.get(row.route)?.gzipBytes ?? -1))
+      byRoute.set(row.route, { route: row.route, gzipBytes, files: chunks });
+  }
+  return [...byRoute.values()];
 }
 
 export function resolveFirstLoadTarget(route, firstLoad) {
@@ -499,11 +442,29 @@ function main() {
     routeGroups,
     routeGroupsAncestor: routeBudgetsAncestor.ancestor?.routes ?? null,
   });
-  if (options.json) console.log(JSON.stringify(result, null, 2));
+  const contributors = routeJsContributors(
+    options.nextDir,
+    [
+      ...result.app.violations,
+      ...result.app.unlisted,
+      ...result.first.violations,
+      ...result.first.unlisted,
+      ...(result.groups?.violations ?? []),
+    ].map(row => row.route)
+  );
+  if (options.json)
+    console.log(JSON.stringify({ ...result, contributors }, null, 2));
   else {
     printRows(result.app.rows);
     printRows(result.first.rows);
     if (result.groups) printGroupRows(result.groups);
+    for (const row of contributors) {
+      console.log(
+        `\nLargest initial JS chunks for ${row.route} (${row.gzipBytes} bytes gzip):`
+      );
+      for (const chunk of row.files.slice(0, 8))
+        console.log(`  ${chunk.gzipBytes} bytes gzip  ${chunk.file}`);
+    }
   }
   for (const error of [...result.shape, ...result.growth])
     console.error(`::error::${error}`);

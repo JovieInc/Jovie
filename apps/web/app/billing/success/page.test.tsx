@@ -1,517 +1,364 @@
-import { render, screen, waitFor } from '@testing-library/react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-const {
-  fetchMock,
-  pageMock,
-  trackMock,
-  useBillingStatusQueryMock,
-  searchParamsMock,
-} = vi.hoisted(() => ({
-  fetchMock: vi.fn(),
-  pageMock: vi.fn(),
-  trackMock: vi.fn(),
-  useBillingStatusQueryMock: vi.fn(),
-  searchParamsMock: vi.fn(() => new URLSearchParams()),
+const mocks = vi.hoisted(() => ({
+  fetch: vi.fn(),
+  page: vi.fn(),
+  track: vi.fn(),
+  search: new URLSearchParams(),
+  billing: { isPro: true, plan: 'pro' },
 }));
-
-vi.stubGlobal('fetch', fetchMock);
-
-vi.mock('next/navigation', () => ({
-  useSearchParams: () => searchParamsMock(),
-}));
-
+vi.stubGlobal('fetch', mocks.fetch);
+vi.mock('next/navigation', () => ({ useSearchParams: () => mocks.search }));
 vi.mock('next/link', () => ({
   default: ({
     children,
     href,
   }: {
-    readonly children: React.ReactNode;
-    readonly href: string;
+    children: React.ReactNode;
+    href: string;
   }) => <a href={href}>{children}</a>,
 }));
-
-vi.mock('@/components/atoms/Confetti', () => ({
-  ConfettiOverlay: (props: { readonly viewport?: boolean }) => (
-    <div
-      data-testid='confetti-overlay'
-      data-viewport={props.viewport ? 'true' : 'false'}
-    />
-  ),
-}));
-
-vi.mock('@/components/molecules/UpgradeButton', () => ({
-  UpgradeButton: ({ children }: { readonly children?: string }) => (
-    <button type='button'>{children}</button>
-  ),
-}));
-
-vi.mock('@/lib/analytics', () => ({
-  page: pageMock,
-  track: trackMock,
-}));
-
+vi.mock('@/lib/analytics', () => ({ page: mocks.page, track: mocks.track }));
 vi.mock('@/lib/queries', () => ({
-  useBillingStatusQuery: useBillingStatusQueryMock,
+  useBillingStatusQuery: () => ({ data: mocks.billing }),
 }));
 
 import CheckoutSuccessPage from './page';
+import {
+  CHECKOUT_CONFIRMATION_ATTEMPTS,
+  CHECKOUT_CONFIRMATION_INTERVAL_MS,
+} from './use-checkout-confirmation';
 
-function setSearchParams(query: string) {
-  searchParamsMock.mockReturnValue(new URLSearchParams(query));
+const CONFIRMED = {
+  status: 'confirmed',
+  plan: 'pro',
+  paymentStatus: 'paid',
+  needsProfile: false,
+  proofPending: false,
+  profileShareUrl: null,
+};
+function response(body = CONFIRMED) {
+  return { ok: true, status: 200, json: async () => body };
 }
 
-function mockBilling(
-  plan: string | null,
-  opts: { readonly isPro?: boolean; readonly isLoading?: boolean } = {}
-) {
-  const derivedIsPro = plan === 'pro' || plan === 'max' || plan === 'trial';
-  const isLoading = opts.isLoading ?? false;
-  useBillingStatusQueryMock.mockReturnValue({
-    data: isLoading
-      ? undefined
-      : {
-          isPro: opts.isPro ?? derivedIsPro,
-          plan,
-        },
-    isLoading,
-    isFetched: !isLoading,
-    error: null,
-  });
-}
+beforeEach(() => {
+  mocks.fetch.mockReset().mockResolvedValue(response());
+  mocks.page.mockReset();
+  mocks.track.mockReset();
+  mocks.search = new URLSearchParams('session_id=cs_test');
+  mocks.billing = { isPro: true, plan: 'pro' };
+});
+afterEach(() => {
+  vi.useRealTimers();
+});
 
-function mockValidatedSessionPlan(plan: string | null, ok = true) {
-  fetchMock.mockResolvedValue({
-    ok,
-    json: vi.fn().mockResolvedValue({ plan }),
-  });
-}
-
-function createDeferred<T>() {
-  let resolve!: (value: T) => void;
-  const promise = new Promise<T>(resolver => {
-    resolve = resolver;
-  });
-
-  return { promise, resolve };
-}
-
-describe('CheckoutSuccessPage — plan headline resolution', () => {
-  beforeEach(() => {
-    fetchMock.mockReset();
-    pageMock.mockReset();
-    trackMock.mockReset();
-    useBillingStatusQueryMock.mockReset();
-    searchParamsMock.mockReset();
-    searchParamsMock.mockReturnValue(new URLSearchParams());
-  });
-
-  it('shows "Welcome to Artist Presence" when the checkout session validates pro', async () => {
-    setSearchParams('session_id=cs_test&plan_id=pro');
-    mockValidatedSessionPlan('pro');
-    mockBilling(null);
-    render(<CheckoutSuccessPage />);
-    expect(
-      await screen.findByRole('heading', {
-        name: /welcome to artist presence/i,
-      })
-    ).toBeInTheDocument();
-  });
-
-  it('shows "Welcome to Max" when the checkout session validates max', async () => {
-    setSearchParams('session_id=cs_test&plan_id=max');
-    mockValidatedSessionPlan('max');
-    mockBilling(null);
-    render(<CheckoutSuccessPage />);
-    expect(
-      await screen.findByRole('heading', { name: /welcome to max/i })
-    ).toBeInTheDocument();
-  });
-
-  it('maps legacy founding -> Pro when it matches the validated session plan', async () => {
-    setSearchParams('session_id=cs_test&plan_id=founding');
-    mockValidatedSessionPlan('pro');
-    mockBilling(null);
-    render(<CheckoutSuccessPage />);
-    expect(
-      await screen.findByRole('heading', {
-        name: /welcome to artist presence/i,
-      })
-    ).toBeInTheDocument();
-  });
-
-  it('maps legacy growth -> Max when it matches the validated session plan', async () => {
-    setSearchParams('session_id=cs_test&plan_id=growth');
-    mockValidatedSessionPlan('max');
-    mockBilling(null);
-    render(<CheckoutSuccessPage />);
-    expect(
-      await screen.findByRole('heading', { name: /welcome to max/i })
-    ).toBeInTheDocument();
-  });
-
-  it('falls back to billing data when plan_id is absent', () => {
-    mockBilling('pro');
-    render(<CheckoutSuccessPage />);
-    expect(
-      screen.getByRole('heading', { name: /welcome to artist presence/i })
-    ).toBeInTheDocument();
-  });
-
-  it('ignores an unvalidated plan_id when billing data is missing', async () => {
-    setSearchParams('plan_id=max');
-    mockBilling(null);
-    render(<CheckoutSuccessPage />);
-    await waitFor(() => {
+describe('checkout confirmation claims', () => {
+  it.each(['pro', 'free'])(
+    'direct navigation with %s cached billing never reports a new checkout',
+    plan => {
+      mocks.search = new URLSearchParams('plan_id=max');
+      mocks.billing.plan = plan;
+      render(<CheckoutSuccessPage />);
       expect(
-        screen.getByRole('heading', { name: /checkout not confirmed/i })
+        screen.getByTestId('checkout-success-recovery')
       ).toBeInTheDocument();
+      expect(mocks.fetch).not.toHaveBeenCalled();
+      expect(mocks.page).not.toHaveBeenCalled();
+      expect(mocks.track).not.toHaveBeenCalled();
+      expect(
+        screen.getByRole('link', { name: 'View Billing' })
+      ).toHaveAttribute('href', '/billing');
+      expect(screen.queryByText('Payment confirmed')).not.toBeInTheDocument();
+    }
+  );
+
+  it.each([
+    { status: 'pending', plan: null },
+    { status: 'unconfirmed', plan: 'pro' },
+    { status: 'confirmed', plan: 'pro', paymentStatus: 'unpaid' },
+    { plan: 'pro' },
+  ])('never upgrades incomplete or old server evidence: %j', async payload => {
+    mocks.fetch.mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => payload,
     });
+    render(<CheckoutSuccessPage />);
+    await waitFor(() => expect(mocks.fetch).toHaveBeenCalledTimes(1));
+    await act(async () => {});
     expect(
-      screen.queryByRole('heading', { name: /welcome to max/i })
+      screen.queryByTestId('checkout-success-paid')
     ).not.toBeInTheDocument();
+    expect(screen.queryByText('Payment confirmed')).not.toBeInTheDocument();
+    expect(mocks.track).not.toHaveBeenCalled();
+    expect(mocks.page).not.toHaveBeenCalled();
     expect(
-      screen.queryByRole('heading', { name: /welcome to your new plan/i })
+      screen.queryByRole('button', { name: /retry checkout/i })
     ).not.toBeInTheDocument();
   });
 
-  it('shows recovery instead of generic paid success when plan_id is invalid AND billing is missing', () => {
-    setSearchParams('plan_id=not-a-real-plan');
-    mockBilling(null);
+  it.each(['pro', 'max'])(
+    'uses a reconciled %s receipt, ignoring URL and stale shell billing',
+    async plan => {
+      mocks.search.set('plan_id', 'unsupported');
+      mocks.billing = { plan: 'free', isPro: false };
+      mocks.fetch.mockResolvedValue(response({ ...CONFIRMED, plan }));
+      render(<CheckoutSuccessPage />);
+      expect(
+        await screen.findByTestId('checkout-success-paid')
+      ).toBeInTheDocument();
+      expect(screen.getByTestId('checkout-success-status')).toHaveTextContent(
+        'Payment confirmed'
+      );
+      expect(screen.getByRole('heading')).toHaveTextContent(
+        plan === 'pro' ? 'Artist Presence' : 'Max'
+      );
+      if (plan === 'pro') {
+        expect(screen.getByText('Release emails')).toBeInTheDocument();
+        expect(
+          screen.getByRole('link', { name: /open your fan list/i })
+        ).toHaveAttribute('href', '/app/contacts?tab=audience');
+      } else {
+        expect(
+          screen.getByRole('link', { name: /view your releases/i })
+        ).toHaveAttribute('href', '/app/releases');
+      }
+    }
+  );
+
+  it('describes a valid trial or zero-charge checkout without claiming a payment', async () => {
+    mocks.fetch.mockResolvedValue(
+      response({ ...CONFIRMED, paymentStatus: 'no_payment_required' })
+    );
     render(<CheckoutSuccessPage />);
     expect(
-      screen.getByRole('heading', { name: /checkout not confirmed/i })
-    ).toBeInTheDocument();
-    expect(
-      screen.queryByRole('heading', { name: /welcome to your new plan/i })
-    ).not.toBeInTheDocument();
-    expect(
-      screen.queryByRole('heading', { name: /welcome to free/i })
-    ).not.toBeInTheDocument();
+      await screen.findByTestId('checkout-success-status')
+    ).toHaveTextContent('Checkout confirmed — no payment due');
+    expect(screen.queryByText('Payment confirmed')).not.toBeInTheDocument();
   });
 
-  it('never shows "Welcome to Free" even when billing reports free', () => {
-    mockBilling('free', { isPro: false });
+  it('repeated visits report page views, never additional conversion events', async () => {
+    const first = render(<CheckoutSuccessPage />);
+    await screen.findByTestId('checkout-success-paid');
+    first.unmount();
     render(<CheckoutSuccessPage />);
+    await screen.findByTestId('checkout-success-paid');
     expect(
-      screen.queryByRole('heading', { name: /welcome to free/i })
+      screen.queryByText(/welcome to|just unlocked|live and upgraded/i)
     ).not.toBeInTheDocument();
-    expect(
-      screen.queryByRole('heading', { name: /welcome to your new plan/i })
-    ).not.toBeInTheDocument();
-    expect(
-      screen.getByRole('heading', { name: /checkout not confirmed/i })
-    ).toBeInTheDocument();
-  });
-
-  it('uses the validated checkout session plan when billing data disagrees', async () => {
-    setSearchParams('session_id=cs_test&plan_id=max');
-    mockValidatedSessionPlan('max');
-    mockBilling('pro');
-    render(<CheckoutSuccessPage />);
-    expect(
-      await screen.findByRole('heading', { name: /welcome to max/i })
-    ).toBeInTheDocument();
-    expect(
-      screen.queryByRole('heading', { name: /welcome to artist presence/i })
-    ).not.toBeInTheDocument();
-  });
-
-  it('ignores a mismatched raw plan_id and trusts the validated plan', async () => {
-    setSearchParams('session_id=cs_test&plan_id=max');
-    mockValidatedSessionPlan('pro');
-    mockBilling(null);
-    render(<CheckoutSuccessPage />);
-    expect(
-      await screen.findByRole('heading', {
-        name: /welcome to artist presence/i,
-      })
-    ).toBeInTheDocument();
-    expect(
-      screen.queryByRole('heading', { name: /welcome to max/i })
-    ).not.toBeInTheDocument();
-  });
-
-  it('uses the onboarding title when source=onboarding', async () => {
-    setSearchParams('source=onboarding&session_id=cs_test&plan_id=pro');
-    mockValidatedSessionPlan('pro');
-    mockBilling('pro');
-    render(<CheckoutSuccessPage />);
-    expect(
-      await screen.findByRole('heading', {
-        name: /your profile is live and upgraded/i,
-      })
-    ).toBeInTheDocument();
+    expect(mocks.page).toHaveBeenCalledTimes(2);
+    expect(mocks.page).toHaveBeenCalledWith(
+      'checkout_success',
+      expect.objectContaining({ conversion: false })
+    );
+    expect(mocks.track).not.toHaveBeenCalledWith(
+      'subscription_success',
+      expect.anything()
+    );
+    expect(mocks.track).not.toHaveBeenCalledWith(
+      'onboarding_upgrade_success',
+      expect.anything()
+    );
   });
 });
 
-describe('CheckoutSuccessPage — unlock tiles', () => {
-  beforeEach(() => {
-    fetchMock.mockReset();
-    pageMock.mockReset();
-    trackMock.mockReset();
-    useBillingStatusQueryMock.mockReset();
-    searchParamsMock.mockReset();
-    searchParamsMock.mockReturnValue(new URLSearchParams());
+describe('bounded recovery and interrupted navigation', () => {
+  it('aborts an in-flight confirmation when leaving the page', () => {
+    let signal: AbortSignal | undefined;
+    mocks.fetch.mockImplementation((_url, options: { signal: AbortSignal }) => {
+      signal = options.signal;
+      return new Promise(() => {});
+    });
+    const mounted = render(<CheckoutSuccessPage />);
+    expect(mocks.fetch).toHaveBeenCalledTimes(1);
+    expect(signal?.aborted).toBe(false);
+    mounted.unmount();
+    expect(signal?.aborted).toBe(true);
   });
 
-  it('shows the certified Artist Presence unlocks instead of legacy Pro tiles', async () => {
-    setSearchParams('session_id=cs_test&plan_id=pro');
-    mockValidatedSessionPlan('pro');
-    mockBilling('pro');
+  it('confirms checkout when AbortSignal.any is unavailable', async () => {
+    const descriptor = Object.getOwnPropertyDescriptor(AbortSignal, 'any');
+    Object.defineProperty(AbortSignal, 'any', {
+      value: undefined,
+      configurable: true,
+    });
+    try {
+      render(<CheckoutSuccessPage />);
+      await waitFor(() =>
+        expect(screen.getByTestId('checkout-success-paid')).toBeInTheDocument()
+      );
+      expect(mocks.fetch).toHaveBeenCalledTimes(1);
+    } finally {
+      if (descriptor) Object.defineProperty(AbortSignal, 'any', descriptor);
+      else Reflect.deleteProperty(AbortSignal, 'any');
+    }
+  });
+
+  it('refreshes pending entitlement and stops after confirmation', async () => {
+    vi.useFakeTimers();
+    mocks.fetch.mockResolvedValueOnce(
+      response({ ...CONFIRMED, status: 'pending' })
+    );
     render(<CheckoutSuccessPage />);
+    await act(async () => {});
+    expect(screen.getByTestId('checkout-success-pending')).toBeInTheDocument();
+    await act(() =>
+      vi.advanceTimersByTimeAsync(CHECKOUT_CONFIRMATION_INTERVAL_MS)
+    );
+    expect(screen.getByTestId('checkout-success-paid')).toBeInTheDocument();
+    await act(() => vi.advanceTimersByTimeAsync(60_000));
+    expect(mocks.fetch).toHaveBeenCalledTimes(2);
+  });
+
+  it('bounds 503 retries and offers a read retry, never a second purchase', async () => {
+    vi.useFakeTimers();
+    mocks.fetch.mockResolvedValue({ ok: false, status: 503 });
+    render(<CheckoutSuccessPage />);
+    await act(() => vi.advanceTimersByTimeAsync(60_000));
+    expect(mocks.fetch).toHaveBeenCalledTimes(CHECKOUT_CONFIRMATION_ATTEMPTS);
+    expect(screen.getByTestId('checkout-success-recovery')).toBeInTheDocument();
     expect(
-      await screen.findByTestId('artist-visibility-activation')
+      screen.getByRole('button', { name: 'Check Again' })
     ).toBeInTheDocument();
-    expect(screen.getByText('Release emails')).toBeInTheDocument();
-    expect(screen.getByText('Verification')).toBeInTheDocument();
-    // Internal-only monitoring is never promised to a paying customer.
-    expect(screen.queryByText('Monitor')).not.toBeInTheDocument();
-    expect(screen.queryByText(/agentic fixes/i)).not.toBeInTheDocument();
-    expect(screen.queryByText('Release Notifications')).not.toBeInTheDocument();
-    expect(screen.queryByText('Contact Export')).not.toBeInTheDocument();
-  });
-
-  it('shows Max tiles when the validated plan is max', async () => {
-    setSearchParams('session_id=cs_test&plan_id=max');
-    mockValidatedSessionPlan('max');
-    mockBilling('max');
-    render(<CheckoutSuccessPage />);
     expect(
-      await screen.findByText('Release Plan Generation')
-    ).toBeInTheDocument();
-    expect(screen.getByText('Metadata Submission Agent')).toBeInTheDocument();
+      screen.queryByRole('button', { name: /retry checkout/i })
+    ).not.toBeInTheDocument();
+    mocks.fetch.mockResolvedValue(response());
+    await act(async () =>
+      fireEvent.click(screen.getByRole('button', { name: 'Check Again' }))
+    );
+    expect(screen.getByTestId('checkout-success-paid')).toBeInTheDocument();
   });
 
-  it('does not show generic paid tiles when plan cannot be resolved', () => {
-    setSearchParams('plan_id=not-a-real-plan');
-    mockBilling(null);
+  it.each([404, 401])('does not retry a %s automatically', async status => {
+    mocks.fetch.mockResolvedValue({ ok: false, status });
     render(<CheckoutSuccessPage />);
-    expect(screen.queryByText('Your plan is active')).not.toBeInTheDocument();
+    await screen.findByTestId('checkout-success-recovery');
+    expect(mocks.fetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('recovers from a network error with explicit retry', async () => {
+    mocks.fetch.mockRejectedValueOnce(new Error('offline'));
+    render(<CheckoutSuccessPage />);
+    await screen.findByTestId('checkout-success-recovery');
+    fireEvent.click(screen.getByRole('button', { name: 'Check Again' }));
+    await screen.findByTestId('checkout-success-paid');
+    expect(mocks.fetch).toHaveBeenCalledTimes(2);
+  });
+
+  it('times out a stalled request without claiming success', async () => {
+    vi.useFakeTimers();
+    mocks.fetch.mockImplementation(
+      (_url, { signal }: { signal: AbortSignal }) =>
+        new Promise((_resolve, reject) => {
+          signal.addEventListener('abort', () => reject(new Error('aborted')), {
+            once: true,
+          });
+        })
+    );
+    render(<CheckoutSuccessPage />);
+    await act(() => vi.advanceTimersByTimeAsync(10_000));
     expect(screen.getByTestId('checkout-success-recovery')).toBeInTheDocument();
   });
+
+  it('discards a late prior-session result after navigation', async () => {
+    let resolveOld!: (value: ReturnType<typeof response>) => void;
+    mocks.fetch.mockImplementationOnce(
+      () =>
+        new Promise(resolve => {
+          resolveOld = resolve;
+        })
+    );
+    const mounted = render(<CheckoutSuccessPage />);
+    mocks.search = new URLSearchParams('session_id=cs_new');
+    mocks.fetch.mockResolvedValue({ ok: false, status: 404 });
+    mounted.rerender(<CheckoutSuccessPage />);
+    await screen.findByTestId('checkout-success-recovery');
+    await act(async () => resolveOld(response()));
+    expect(
+      screen.queryByTestId('checkout-success-paid')
+    ).not.toBeInTheDocument();
+    expect(mocks.page).not.toHaveBeenCalled();
+  });
+
+  it('cancels pending polling when leaving the page', async () => {
+    vi.useFakeTimers();
+    mocks.fetch.mockResolvedValue(
+      response({ ...CONFIRMED, status: 'pending' })
+    );
+    const mounted = render(<CheckoutSuccessPage />);
+    await act(async () => {});
+    mounted.unmount();
+    await act(() => vi.advanceTimersByTimeAsync(60_000));
+    expect(mocks.fetch).toHaveBeenCalledTimes(1);
+  });
 });
 
-describe('CheckoutSuccessPage — CTAs and verification', () => {
-  beforeEach(() => {
-    fetchMock.mockReset();
-    pageMock.mockReset();
-    trackMock.mockReset();
-    useBillingStatusQueryMock.mockReset();
-    searchParamsMock.mockReset();
-    searchParamsMock.mockReturnValue(new URLSearchParams());
-  });
+describe('profile claims and activation', () => {
+  it.each([false, true])(
+    'does not call a profile live merely because proofPending is %s',
+    async proofPending => {
+      mocks.search.set('source', 'onboarding');
+      mocks.fetch.mockResolvedValue(response({ ...CONFIRMED, proofPending }));
+      render(<CheckoutSuccessPage />);
+      await screen.findByTestId('checkout-success-paid');
+      expect(
+        screen.queryByRole('heading', { name: /profile is live/i })
+      ).not.toBeInTheDocument();
+      expect(screen.getByRole('heading')).toHaveTextContent(
+        'Your plan is active'
+      );
+    }
+  );
 
-  it('primary Pro CTA routes to the Identity workspace, with the paid-only export card', () => {
-    mockBilling('pro');
-    render(<CheckoutSuccessPage />);
-    expect(
-      screen.getByRole('link', { name: /open identity/i })
-    ).toHaveAttribute('href', '/app/presence');
-    expect(
-      screen.getByRole('link', { name: /open your fan list/i })
-    ).toHaveAttribute('href', '/app/contacts?tab=audience');
-    expect(screen.getByTestId('paid-unlock-fan-list')).toHaveTextContent(
-      'Your fan list: export'
-    );
-    expect(screen.getByTestId('paid-unlock-fan-list')).toHaveTextContent(
-      /You're on .+: unlocked/
-    );
-  });
-
-  it('leads with sharing the live page to collect the first fans', async () => {
-    setSearchParams('session_id=cs_test&plan_id=pro');
-    fetchMock.mockResolvedValue({
+  it('only calls a profile live and shares it when the server supplies its verified share link', async () => {
+    mocks.search.set('source', 'onboarding');
+    mocks.fetch.mockResolvedValue({
       ok: true,
-      json: vi.fn().mockResolvedValue({
-        plan: 'pro',
-        needsProfile: false,
+      status: 200,
+      json: async () => ({
+        ...CONFIRMED,
         profileShareUrl: 'https://jov.ie/artist',
       }),
     });
-    mockBilling('pro');
     render(<CheckoutSuccessPage />);
-    expect(await screen.findByTestId('paid-share-prompt')).toHaveTextContent(
-      'Share your page to collect your first fans'
+    await screen.findByTestId('paid-share-prompt');
+    expect(screen.getByRole('heading')).toHaveTextContent(
+      'Your profile is live'
     );
-    expect(screen.getByTestId('paid-share-link')).toHaveTextContent(
-      'jov.ie/artist'
-    );
+    expect(
+      screen.getByRole('link', { name: /explore your dashboard/i })
+    ).toHaveAttribute('href', '/app');
   });
 
-  it('sends a buyer who paid before claiming a link on to claim it', async () => {
-    setSearchParams('session_id=cs_test&plan_id=pro');
-    fetchMock.mockResolvedValue({
-      ok: true,
-      json: vi.fn().mockResolvedValue({ plan: 'pro', needsProfile: true }),
-    });
-    mockBilling('pro');
+  it('routes a buyer without a profile to claim and hides export', async () => {
+    mocks.fetch.mockResolvedValue(
+      response({ ...CONFIRMED, needsProfile: true })
+    );
     render(<CheckoutSuccessPage />);
     expect(
       await screen.findByRole('link', { name: /claim your link/i })
     ).toHaveAttribute('href', '/start');
     expect(
-      screen.queryByRole('link', { name: /open identity/i })
+      screen.queryByRole('link', { name: /open your fan list/i })
     ).not.toBeInTheDocument();
   });
 
-  it('secondary CTA routes to /app/releases on Max', () => {
-    mockBilling('max');
+  it('preserves the verification request and its confirmed result', async () => {
     render(<CheckoutSuccessPage />);
-    expect(
-      screen.getByRole('link', { name: /view your releases/i })
-    ).toHaveAttribute('href', '/app/releases');
-  });
-
-  it('hides the secondary CTA on onboarding flow and shows "Explore your dashboard"', () => {
-    setSearchParams('source=onboarding');
-    mockBilling('pro');
-    render(<CheckoutSuccessPage />);
-    expect(
-      screen.getByRole('link', { name: /explore your dashboard/i })
-    ).toHaveAttribute('href', '/app');
-    expect(
-      screen.queryByRole('link', { name: /view your releases/i })
-    ).not.toBeInTheDocument();
-  });
-
-  it('shows verification button when isPro is true', () => {
-    mockBilling('pro', { isPro: true });
-    render(<CheckoutSuccessPage />);
-    expect(
-      screen.getByRole('button', { name: /request verification/i })
-    ).toBeInTheDocument();
-  });
-
-  it('hides verification button when isPro is false', () => {
-    mockBilling('pro', { isPro: false });
-    render(<CheckoutSuccessPage />);
-    expect(
-      screen.queryByRole('button', { name: /request verification/i })
-    ).not.toBeInTheDocument();
-  });
-});
-
-describe('CheckoutSuccessPage — analytics and shell', () => {
-  beforeEach(() => {
-    fetchMock.mockReset();
-    pageMock.mockReset();
-    trackMock.mockReset();
-    useBillingStatusQueryMock.mockReset();
-    searchParamsMock.mockReset();
-    searchParamsMock.mockReturnValue(new URLSearchParams());
-  });
-
-  it('emits subscription_success + checkout_success after paid entitlement is reconciled', () => {
-    mockBilling('pro');
-    render(<CheckoutSuccessPage />);
-    expect(trackMock).toHaveBeenCalledWith(
-      'subscription_success',
-      expect.any(Object)
+    fireEvent.click(
+      await screen.findByRole('button', { name: /request verification/i })
     );
-    expect(pageMock).toHaveBeenCalledWith(
-      'checkout_success',
-      expect.any(Object)
-    );
-  });
-
-  it('emits checkout_celebration_shown with the validated canonical planType', async () => {
-    setSearchParams('session_id=cs_test&plan_id=growth'); // legacy alias -> max
-    mockValidatedSessionPlan('max');
-    mockBilling(null);
-    render(<CheckoutSuccessPage />);
-    await waitFor(() => {
-      expect(trackMock).toHaveBeenCalledWith('checkout_celebration_shown', {
-        planType: 'max',
-      });
+    await screen.findByRole('button', { name: 'Verification requested' });
+    expect(mocks.fetch).toHaveBeenLastCalledWith('/api/verification/request', {
+      method: 'POST',
     });
-  });
-
-  it('emits checkout_celebration_shown once when billing and session plans differ', async () => {
-    const deferredPlan = createDeferred<{
-      ok: true;
-      json: () => Promise<{ plan: string }>;
-    }>();
-
-    setSearchParams('session_id=cs_test&plan_id=max');
-    fetchMock.mockReturnValue(deferredPlan.promise);
-    mockBilling('pro');
-    render(<CheckoutSuccessPage />);
-
-    expect(trackMock).not.toHaveBeenCalledWith('checkout_celebration_shown', {
-      planType: 'pro',
-    });
-    expect(trackMock).not.toHaveBeenCalledWith(
-      'subscription_success',
-      expect.any(Object)
-    );
-    expect(screen.getByTestId('checkout-success-pending')).toBeInTheDocument();
-
-    deferredPlan.resolve({
-      ok: true,
-      json: async () => ({ plan: 'max' }),
-    });
-
-    await waitFor(() => {
-      expect(trackMock).toHaveBeenCalledWith('checkout_celebration_shown', {
-        planType: 'max',
-      });
-    });
-    expect(
-      trackMock.mock.calls.filter(
-        ([event]) => event === 'checkout_celebration_shown'
-      )
-    ).toHaveLength(1);
-  });
-
-  it('settles in place on verified paid success: no confetti, a status pill and the billing link', () => {
-    mockBilling('pro');
-    render(<CheckoutSuccessPage />);
-    expect(screen.queryByTestId('confetti-overlay')).not.toBeInTheDocument();
-    expect(screen.getByTestId('checkout-success-status')).toHaveTextContent(
-      'Payment confirmed'
-    );
-    expect(screen.getByRole('link', { name: 'Billing page' })).toHaveAttribute(
-      'href',
-      '/billing'
-    );
-    expect(
-      screen
-        .getByTestId('checkout-success-paid')
-        .querySelector('.translate-y-6')
-    ).toBeNull();
-  });
-
-  it('does not declare paid success when checkout-session fetch fails', async () => {
-    setSearchParams('session_id=cs_test&plan_id=pro');
-    mockValidatedSessionPlan(null, false);
-    mockBilling('pro');
-    render(<CheckoutSuccessPage />);
-    expect(
-      await screen.findByTestId('checkout-success-recovery')
-    ).toBeInTheDocument();
-    expect(
-      screen.queryByRole('heading', { name: /welcome to your new plan/i })
-    ).not.toBeInTheDocument();
-    expect(screen.queryByTestId('confetti-overlay')).not.toBeInTheDocument();
-    expect(trackMock).not.toHaveBeenCalledWith(
-      'subscription_success',
-      expect.any(Object)
-    );
-    expect(
-      screen.getByRole('button', { name: /retry checkout/i })
-    ).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /go home/i })).toHaveAttribute(
-      'href',
-      '/'
-    );
-  });
-
-  it('keeps pending chrome and no conversion events while billing is still loading', () => {
-    mockBilling(null, { isLoading: true });
-    render(<CheckoutSuccessPage />);
-    expect(screen.getByTestId('checkout-success-pending')).toBeInTheDocument();
-    expect(screen.queryByTestId('confetti-overlay')).not.toBeInTheDocument();
-    expect(pageMock).not.toHaveBeenCalled();
   });
 });

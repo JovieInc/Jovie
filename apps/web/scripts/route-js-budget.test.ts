@@ -21,6 +21,7 @@ import {
   measureRouteJs,
   readBudgetAncestor,
   routeFromManifestKey,
+  routeJsContributors,
   validateBudgetShape,
 } from './route-js-budget.mjs';
 
@@ -149,6 +150,46 @@ describe('route-js-budget', () => {
     expect(findForbiddenClientCode(nextDir).map(hit => hit.file)).toEqual([
       'static/chunks/modal.js',
     ]);
+  });
+
+  it('explains emitted route bytes once per chunk, largest first', () => {
+    const nextDir = buildFixture();
+    const [row] = routeJsContributors(nextDir, ['/app/settings']);
+    expect(row.route).toBe('/app/settings');
+    expect(row.files.map(chunk => chunk.file)).toEqual([
+      'static/chunks/shell.js',
+      'static/chunks/main.js',
+    ]);
+    const expectedBytes = row.files.reduce((sum, chunk) => {
+      const bytes = readFileSync(join(nextDir, chunk.file));
+      expect(chunk.gzipBytes).toBe(
+        gzipSync(budgetJsBytes(bytes), { level: 9 }).length
+      );
+      return sum + chunk.gzipBytes;
+    }, 0);
+    expect(row.gzipBytes).toBe(expectedBytes);
+    expect(Math.round(row.gzipBytes / 1024)).toBe(
+      measureRouteJs(nextDir).find(route => route.route === row.route)?.gzipKb
+    );
+  });
+
+  it('explains the worst parallel app entry instead of unioning separate entries', () => {
+    const nextDir = buildFixture();
+    writeManifest(nextDir, '@dialog/settings', '/app/@dialog/settings/page', {
+      page: ['static/chunks/heavy.js'],
+    });
+    const [row] = routeJsContributors(nextDir, ['/app/settings']);
+    expect(row.files.map(chunk => chunk.file)).toEqual([
+      'static/chunks/heavy.js',
+      'static/chunks/main.js',
+    ]);
+    expect(Math.round(row.gzipBytes / 1024)).toBe(
+      Math.max(
+        ...measureRouteJs(nextDir)
+          .filter(route => route.route === row.route)
+          .map(route => route.gzipKb)
+      )
+    );
   });
 
   it('ships a per-route baseline for every route, none above its section ceiling', () => {

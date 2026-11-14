@@ -12,10 +12,12 @@ import {
   type PlanId,
   resolveCanonicalPlanId,
 } from '@/lib/entitlements/registry';
+import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 import { captureError } from '@/lib/error-tracking';
 import { extractCheckoutCorrelation } from '@/lib/stripe/checkout-correlation';
 import { stripe } from '@/lib/stripe/client';
 import { getPriceMappingDetails } from '@/lib/stripe/config';
+import { getUserBillingInfo } from '@/lib/stripe/customer-sync';
 import {
   isTransientStripeError,
   StripeRetryExhaustedError,
@@ -96,7 +98,7 @@ export async function GET(request: NextRequest) {
 
     const session = await withStripeRetry('retrieveCheckoutSession', () =>
       stripe.checkout.sessions.retrieve(sessionId, {
-        expand: ['line_items.data.price'],
+        expand: ['line_items.data.price', 'subscription'],
       })
     );
 
@@ -106,25 +108,81 @@ export async function GET(request: NextRequest) {
 
     if (session.mode !== 'subscription' || session.status !== 'complete') {
       return NextResponse.json(
-        { plan: null, priceId: null },
+        { status: 'unconfirmed', plan: null, priceId: null },
+        { headers: NO_STORE_HEADERS }
+      );
+    }
+
+    // Completion means the checkout UI finished, not that payment settled.
+    // Trials and zero-charge checkouts legitimately need no payment.
+    if (session.payment_status === 'unpaid') {
+      return NextResponse.json(
+        { status: 'pending', plan: null, priceId: null },
+        { headers: NO_STORE_HEADERS }
+      );
+    }
+    const subscription = session.subscription;
+    if (
+      !['paid', 'no_payment_required'].includes(session.payment_status) ||
+      !subscription ||
+      typeof subscription === 'string' ||
+      !['active', 'trialing'].includes(subscription.status)
+    ) {
+      return NextResponse.json(
+        { status: 'unconfirmed', plan: null, priceId: null },
         { headers: NO_STORE_HEADERS }
       );
     }
 
     const lineItemPriceId = getLineItemPriceId(session.line_items?.data);
     const plan =
-      resolvePaidPlan(session.metadata?.plan ?? null) ??
       (lineItemPriceId
         ? resolvePaidPlan(getPriceMappingDetails(lineItemPriceId)?.plan ?? null)
-        : null);
-    const profileState = plan
-      ? await buyerProfileState(userId)
-      : { needsProfile: false, isPublic: false, username: null };
+        : null) ?? resolvePaidPlan(session.metadata?.plan ?? null);
+    // Use canonical entitlement resolution for access, and canonical billing
+    // identity for correlation. An old receipt cannot certify a new subscription.
+    const [entitlement, billing] = await Promise.all([
+      getCurrentUserEntitlements(),
+      getUserBillingInfo(),
+    ]);
+    const entitlementPlan = resolvePaidPlan(entitlement.plan);
+    const confirmedPlan =
+      entitlementPlan === 'trial' && subscription.status === 'trialing'
+        ? entitlementPlan
+        : plan;
+    const customerId =
+      typeof session.customer === 'string'
+        ? session.customer
+        : session.customer?.id;
+    const subscriptionCustomerId =
+      typeof subscription.customer === 'string'
+        ? subscription.customer
+        : subscription.customer.id;
+    if (
+      !plan ||
+      !lineItemPriceId ||
+      subscription.items.data[0]?.price.id !== lineItemPriceId ||
+      entitlement.userId !== userId ||
+      entitlement.billingVerification !== 'verified' ||
+      !entitlement.isPro ||
+      entitlementPlan !== confirmedPlan ||
+      !billing.success ||
+      billing.data?.stripeSubscriptionId !== subscription.id ||
+      !customerId ||
+      customerId !== subscriptionCustomerId ||
+      billing.data.stripeCustomerId !== customerId
+    ) {
+      return NextResponse.json(
+        { status: 'pending', plan: null, priceId: lineItemPriceId },
+        { headers: NO_STORE_HEADERS }
+      );
+    }
+    const profileState = await buyerProfileState(userId);
     const needsProfile = profileState.needsProfile;
-    const proofPending = plan ? await hasProofPendingProfile(userId) : false;
+    const proofPending = await hasProofPendingProfile(userId);
     // Paying never publishes a page. The stage is "profile live", so a private
     // page waiting for proof must not record it.
-    if (plan && !needsProfile && profileState.isPublic && !proofPending) {
+    if (!needsProfile && profileState.isPublic && !proofPending) {
       // Paid and the claimed profile is live: last artist-offer funnel stage.
       await recordArtistOfferStage(
         extractCheckoutCorrelation(session.metadata).acquisitionId,
@@ -135,7 +193,6 @@ export async function GET(request: NextRequest) {
     // Only a live, claimed page is shareable: a private page waiting for
     // proof must not be handed out as a link.
     const profileShareUrl =
-      plan &&
       !needsProfile &&
       profileState.isPublic &&
       !proofPending &&
@@ -145,7 +202,9 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json(
       {
-        plan,
+        status: 'confirmed',
+        paymentStatus: session.payment_status,
+        plan: confirmedPlan,
         priceId: lineItemPriceId,
         needsProfile,
         proofPending,
