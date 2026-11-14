@@ -18,6 +18,19 @@ import { lostStatePrevious } from '../liveness-lost-state.mjs';
 // P0 stayed open with no resolution path. A lost restore must reconcile:
 // stateless critical rows read as red, so a recovered loop resolves its open
 // alert on the same run, and a failed apply persists that red for a retry.
+//
+// JOV-9006 extension, observed 2026-11-14 12:53-13:01Z: the 403 does not
+// always leave the state file missing. The restore step's
+// `unzip -p liveness/prior.zip state.json > liveness/state.json 2>/dev/null
+// || true` creates a 0-byte `liveness/state.json` when the download fails
+// (the `>` redirect truncates the target into existence), and a bare
+// existsSync check counted that empty file as a restored state. The 12:53
+// run filed `automation-liveness-gem-lanes-tick` red (ok); the 12:59 run's
+// restore 403'd, so the empty file suppressed the reconciliation, the run
+// emitted no green decision for the already-recovered row, and it persisted
+// a state rebuilt from nothing (the fingerprint flipped to green without a
+// resolution) — stranding the open alert with no later retry. An empty state
+// file must reconcile exactly like a missing one.
 
 const HEARTBEAT = livenessFingerprint('summer:heartbeat');
 const MODEL_TURNS = livenessFingerprint('summer:model-turns');
@@ -36,7 +49,8 @@ const row = (id, status) => ({
 function statePath(withState) {
   const dir = mkdtempSync(join(tmpdir(), 'liveness-lost-state-'));
   const path = join(dir, 'state.json');
-  if (withState) writeFileSync(path, `${JSON.stringify(withState)}\n`);
+  if (withState === 'empty') writeFileSync(path, '');
+  else if (withState) writeFileSync(path, `${JSON.stringify(withState)}\n`);
   return path;
 }
 
@@ -67,6 +81,30 @@ describe('lostStatePrevious (JOV-9641)', () => {
     });
   });
 
+  it("records 'red' when the restore left a 0-byte state file (JOV-9006)", () => {
+    // The workflow's `> liveness/state.json` redirect creates the file even
+    // when the download behind `|| true` failed, so a bare existsSync check
+    // misread the empty file as a restored state and dropped the red -> green
+    // resolution for automation-liveness-gem-lanes-tick on 2026-11-14.
+    const args = { previous: statePath('empty') };
+    const report = {
+      results: [
+        row('summer:heartbeat', 'fresh'),
+        { ...row('summer:receiver-outcomes', 'missing'), critical: false },
+      ],
+    };
+    expect(lostStatePrevious(args, report, {})).toEqual({
+      [HEARTBEAT]: 'red',
+    });
+  });
+
+  it('treats a 0-byte state file exactly like a missing one', () => {
+    const report = { results: [row('summer:heartbeat', 'fresh')] };
+    expect(
+      lostStatePrevious({ previous: statePath('empty') }, report, {})
+    ).toEqual(lostStatePrevious({ previous: statePath(false) }, report, {}));
+  });
+
   it('keeps recorded states and never invents one for a non-critical row', () => {
     const args = { previous: statePath(false) };
     const report = {
@@ -92,6 +130,19 @@ describe('a lost restore resolves the alert instead of stranding it (JOV-9641)',
   it('fires the green resolution for a recovered loop with no recorded state', () => {
     expect(
       livenessDecisions(report, lostStatePrevious(args, report, {}))
+    ).toEqual([
+      { action: 'green', fingerprint: HEARTBEAT, id: 'summer:heartbeat' },
+    ]);
+  });
+
+  it('fires the green resolution when the restore left a 0-byte state file (JOV-9006)', () => {
+    // Pre-fix, the 2026-11-14T12:59Z liveness run after the gem:lanes-tick red
+    // produced no decision here: the empty file counted as restored state, so
+    // the recovered row had no recorded red to resolve and the open alert was
+    // stranded permanently.
+    const emptied = { previous: statePath('empty') };
+    expect(
+      livenessDecisions(report, lostStatePrevious(emptied, report, {}))
     ).toEqual([
       { action: 'green', fingerprint: HEARTBEAT, id: 'summer:heartbeat' },
     ]);

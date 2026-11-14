@@ -8,6 +8,7 @@ export function failureSummaryLines(out) {
   const anchors = [
     /^\s*test at .+:\d+(?::\d+)?$/,
     /^\s*FAIL(?:\s|\|)/,
+    /^\s*[\w-]+-guard:\s+\S+:\d+(?:,\d+)*\s+[\w-]+:/,
     /^\s*not ok \d+\b/,
     /^\s*[✖✗×]\s+(?!failing tests:)/,
     /^\s*(?:\w*Error(?:\s*\[[^\]]+\])?:|(?:.+(?::\d+(?::\d+)?|\(\d+,\d+\)):\s*)?error TS\d+:)/,
