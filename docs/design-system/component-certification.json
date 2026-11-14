@@ -30,6 +30,114 @@
       "frontend-rules",
       "forced-caps"
     ],
+    "apps/web/components/features/admin/ingest-profile-dropdown/IngestProfileDropdown.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/admin/investors/HypotheticalDilutionPreview.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/admin/leads/GrowthIntakeComposer.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/admin/leads/LeadKeywordsManager.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/admin/leads/LeadPipelineControls.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/admin/leads/UnifiedUrlIntake.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/admin/outreach/EmailQueuePanel.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/admin/waitlist-table/AdminWaitlistTableWithViews.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/admin/wiki/WikiNamespaceSection.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/admin/wiki/WikiSearchResults.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/admin/wiki/WikiUnavailableNotice.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/agent-room/AgentRoomComposer.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
     "apps/web/components/features/profile/ClaimBanner.tsx": [
       "ds-owner",
       "tokens",
@@ -318,6 +426,15 @@
     },
     "apps/web/components/features/admin/OvieRouteUsageBeacon.tsx": {
       "error": "The beacon renders null in every state and is fire-and-forget: a failed POST is swallowed by its .catch, so there is no failure to draw. OvieRouteUsageBeacon.test.tsx rejects the fetch and asserts the page is unchanged and axe-clean."
+    },
+    "apps/web/components/features/admin/investors/HypotheticalDilutionPreview.tsx": {
+      "permission-denied": "The preview is local-only with no permission or role gating; the detector matched role=status on its status line."
+    },
+    "apps/web/components/features/admin/wiki/WikiUnavailableNotice.tsx": {
+      "long-content": "The notice takes no props and renders one fixed sentence; the detector matched the word text in class names such as text-lg."
+    },
+    "apps/web/components/features/agent-room/AgentRoomComposer.tsx": {
+      "permission-denied": "The composer has no permission or role gating; the detector matched role=status on its live result line."
     },
     "apps/web/components/features/alerts/UnpublishedEntityAlerts.tsx": {
       "offline": "The copy and its fallback never fetch; the alert sign-up it hosts, AlertGrowthLanding, owns the subscribe request and its network error. The detector matched the loading test id on the Suspense fallback (Loading).",
