@@ -66,6 +66,7 @@ vi.mock('@/lib/workspace-lock/unlock-with-passkey', () => ({
 
 import { usePathname, useRouter } from 'next/navigation';
 import { useDesktopUpdateContext } from '@/components/organisms/desktop-update/DesktopUpdateProvider';
+import { ACCOUNT_LOADING_FILL } from '@/components/organisms/user-button/account-loading-fill';
 import { UserButton } from '@/components/organisms/user-button/UserButton';
 import { useAuthSafe, useUserSafe } from '@/hooks/useClerkSafe';
 import {
@@ -307,7 +308,7 @@ describe('UserButton states', () => {
     }
   );
 
-  it('draws the loading row with the theme-safe interactive-hover token', () => {
+  it('draws the loading row with the fill that clears 3:1 on every surface', () => {
     mockUseUserSafe.mockReturnValue({
       isLoaded: false,
       isSignedIn: false,
@@ -316,12 +317,16 @@ describe('UserButton states', () => {
     render(<UserButton showUserInfo />);
 
     const loading = screen.getByTestId('user-button-loading');
-    const indicators = [...loading.querySelectorAll('.animate-pulse')];
+    // Steady, not pulsing: the pulse's 50% opacity falls below 3:1.
+    const indicators = [
+      ...loading.querySelectorAll('[data-user-button-loading-fill]'),
+    ];
     // Avatar disc and name line.
     expect(indicators).toHaveLength(2);
     for (const indicator of indicators) {
-      // Same 168 176 195 / 6% as before in dark; 6% ink on the light rail.
-      expect(indicator).toHaveClass('bg-interactive-hover');
+      // account-loading-fill.test.ts asserts this fill clears the 3:1
+      // non-text floor in light and dark (JOV-12383).
+      expect(indicator).toHaveClass(ACCOUNT_LOADING_FILL);
       // bg-sidebar-accent is ~1.04:1 on the light rail: invisible (JOV-12383).
       expect(indicator).not.toHaveClass('bg-sidebar-accent');
     }
