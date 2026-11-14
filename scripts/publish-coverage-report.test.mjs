@@ -14,7 +14,6 @@ import { test } from 'node:test';
 import { load } from 'js-yaml';
 import {
   inFlightReport,
-  publishCoverageReport,
   publishNightlyReport,
   REPORT_COALESCE_MS,
 } from './lib/publish-coverage-report.mjs';
@@ -30,8 +29,8 @@ import {
  * }} Workflow
  */
 
-const heatmap = 'docs/TEST_COVERAGE_HEATMAP.md';
-const snapshot = 'apps/web/reports/test-coverage-snapshot.json';
+const heatmap = 'docs/NIGHTLY_TESTING_AGENT_REPORT.md';
+const snapshot = 'apps/web/reports/nightly-agent/last-run.json';
 const url = 'https://github.com/JovieInc/Jovie/pull/123';
 
 test('every integrated workflow retains origin data and the handoff grants only read permissions', () => {
@@ -43,7 +42,6 @@ test('every integrated workflow retains origin data and the handoff grants only 
     'screenshots',
     'sentry-autofix',
     'shipping-slo',
-    'test-coverage-audit',
   ]) {
     const workflow = /** @type {Workflow} */ (
       load(
@@ -55,9 +53,7 @@ test('every integrated workflow retains origin data and the handoff grants only 
     );
     const steps = Object.values(workflow.jobs).flatMap(job => job.steps ?? []);
     const publisher = steps.findIndex(step =>
-      /emit-automation|publishCoverageReport|publishNightlyReport/.test(
-        step.run ?? ''
-      )
+      /emit-automation|publishNightlyReport/.test(step.run ?? '')
     );
     const retention = steps.findIndex(
       step => step.with?.name === 'shipping-origin-v1'
@@ -88,7 +84,7 @@ test('every integrated workflow retains origin data and the handoff grants only 
   assert.equal(token.with['permission-pull-requests'], 'read');
 });
 
-function fixture(t, nightly = false) {
+function fixture(t, nightly = true) {
   const root = mkdtempSync(join(tmpdir(), 'coverage-publication-test-'));
   t.after(() => rmSync(root, { recursive: true, force: true }));
   const cwd = join(root, 'checkout');
@@ -101,7 +97,7 @@ function fixture(t, nightly = false) {
   git('config', 'user.email', 'coverage@example.invalid');
   git('config', 'commit.gpgsign', 'false');
   mkdirSync(join(cwd, 'docs'), { recursive: true });
-  mkdirSync(join(cwd, 'apps/web/reports'), { recursive: true });
+  mkdirSync(join(cwd, 'apps/web/reports/nightly-agent'), { recursive: true });
   writeFileSync(join(cwd, heatmap), 'before\n');
   writeFileSync(join(cwd, snapshot), '{}\n');
   if (nightly) {
@@ -223,7 +219,7 @@ test('publishes only measured reports on an exact-source draft branch while main
   f.change();
   writeFileSync(join(f.cwd, snapshot), '{"coverage":86.8}\n');
   writeFileSync(join(f.cwd, 'untracked.txt'), 'not a report');
-  const result = publishCoverageReport(f);
+  const result = publishNightlyReport(f);
   assert.equal(result.url, url);
   assert.equal(result.status, 'published');
   assert.deepEqual(f.origins, [{ pr: url, head: f.git('rev-parse', 'HEAD') }]);
@@ -288,14 +284,14 @@ test('nightly evidence uses the existing exact-source draft publication with pro
 test('nightly publication skips unchanged evidence and rejects unrelated coverage output', t => {
   const f = fixture(t, true);
   assert.equal(publishNightlyReport(f).status, 'unchanged');
-  f.change();
+  writeFileSync(join(f.cwd, 'source.txt'), 'unrelated');
   assert.throws(() => publishNightlyReport(f), /unrelated/);
   assert.deepEqual(f.calls, []);
 });
 
 test('does not mint git credentials or create a PR when the report is unchanged', t => {
   const f = fixture(t);
-  assert.deepEqual(publishCoverageReport(f), {
+  assert.deepEqual(publishNightlyReport(f), {
     status: 'unchanged',
     source: f.source,
   });
@@ -307,7 +303,7 @@ test('refuses mismatched source and unrelated staged changes before external pub
   f.change();
   assert.throws(
     () =>
-      publishCoverageReport({
+      publishNightlyReport({
         ...f,
         env: { ...f.env, GITHUB_SHA: 'a'.repeat(40) },
       }),
@@ -315,7 +311,7 @@ test('refuses mismatched source and unrelated staged changes before external pub
   );
   writeFileSync(join(f.cwd, 'source.txt'), 'unmeasured');
   f.git('add', 'source.txt');
-  assert.throws(() => publishCoverageReport(f), /unrelated/);
+  assert.throws(() => publishNightlyReport(f), /unrelated/);
   assert.deepEqual(f.calls, []);
   assert.equal(f.git('rev-parse', 'HEAD'), f.source);
 });
@@ -330,7 +326,7 @@ test('rejects missing or malformed producer identity without running publication
   ]) {
     for (const value of [undefined, '--invalid']) {
       assert.throws(
-        () => publishCoverageReport({ ...f, env: { ...f.env, [key]: value } }),
+        () => publishNightlyReport({ ...f, env: { ...f.env, [key]: value } }),
         /Invalid coverage/
       );
     }
@@ -339,7 +335,7 @@ test('rejects missing or malformed producer identity without running publication
 });
 
 test('report publication retries workflow-check timeouts with the same exact-source commit', async t => {
-  for (const nightly of [false, true]) {
+  for (const nightly of [true]) {
     await t.test(nightly ? 'nightly' : 'coverage', sub => {
       const f = fixture(sub, nightly);
       writeFileSync(
@@ -352,7 +348,7 @@ test('report publication retries workflow-check timeouts with the same exact-sou
         waits.push(args[3]);
         return 'timed-out';
       });
-      const publish = nightly ? publishNightlyReport : publishCoverageReport;
+      const publish = nightly ? publishNightlyReport : publishNightlyReport;
       const result = publish(f);
       assert.equal(result.status, 'published');
       assert.deepEqual(attempts(), Array(3).fill(f.git('rev-parse', 'HEAD')));
@@ -393,7 +389,7 @@ test('a permission-denied branch push fails immediately without creating a PR or
   t.mock.method(Atomics, 'wait', () => {
     assert.fail('permission denials must not be retried');
   });
-  assert.throws(() => publishCoverageReport(f), /Command failed/);
+  assert.throws(() => publishNightlyReport(f), /Command failed/);
   assert.equal(attempts().length, 1);
   // The in-flight read, then git auth; no PR is created.
   assert.equal(f.calls.length, 2);
@@ -408,7 +404,7 @@ test('PR creation failure and missing receipts fail rather than reporting public
       f.change();
       assert.throws(
         () =>
-          publishCoverageReport({
+          publishNightlyReport({
             ...f,
             gh: args => {
               if (args[0] === 'pr' && fail)
@@ -462,7 +458,7 @@ test('the real gh adapter absorbs a multi-megabyte open-PR listing when retiring
     ghScript.replace("pr:list) echo '[]' ;;", `pr:list) cat '${listing}' ;;`),
     { mode: 0o755 }
   );
-  const result = publishCoverageReport({
+  const result = publishNightlyReport({
     cwd: f.cwd,
     env: { ...f.env, PATH: `${bin}:${process.env.PATH}` },
   });
@@ -478,7 +474,7 @@ test('uses the real gh command adapter and supports runners without a summary fi
   installOriginFixture(f, bin);
   const env = { ...f.env, PATH: `${bin}:${process.env.PATH}` };
   delete env.GITHUB_STEP_SUMMARY;
-  assert.equal(publishCoverageReport({ cwd: f.cwd, env }).url, url);
+  assert.equal(publishNightlyReport({ cwd: f.cwd, env }).url, url);
   const head = f.git('rev-parse', 'HEAD');
   const receipt = JSON.parse(
     readFileSync(
@@ -504,7 +500,7 @@ test('real publication retires an ancestor report but preserves divergent measur
     number: 1,
     isDraft: true,
     labels: [],
-    headRefName: 'bot/coverage-audit-1-1',
+    headRefName: 'bot/nightly-evidence-1-1',
     body,
   };
   const remotePr = {
@@ -513,7 +509,7 @@ test('real publication retires an ancestor report but preserves divergent measur
     labels: [],
     base: { ref: 'main' },
     body,
-    title: 'chore(testing): refresh changed-evidence heatmap',
+    title: 'chore(testing): refresh nightly testing evidence',
     head: {
       ref: prior.headRefName,
       sha: 'c'.repeat(40),
@@ -542,7 +538,7 @@ test('real publication retires an ancestor report but preserves divergent measur
     if (args[0] === 'api') return JSON.stringify(remotePr);
     return f.gh(args);
   };
-  assert.equal(publishCoverageReport({ ...f, gh }).url, url);
+  assert.equal(publishNightlyReport({ ...f, gh }).url, url);
   assert.deepEqual(closes, ['1']);
   assert.match(
     readFileSync(f.env.GITHUB_STEP_SUMMARY, 'utf8'),

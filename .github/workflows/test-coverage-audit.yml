@@ -1,17 +1,13 @@
-# controller-hop-exception: jovie-controller-hop/v1
-# accountable-writer: Codex
-# necessary-trust-boundary: The existing audit publishes only generated reports through the existing Jovie Bot installation token after coverage; its read-only checkout token cannot trigger normal PR checks. No merge, deploy, or founder-decision authority is added.
-# revisit-trigger: Remove the report publication hop if the canonical coverage baseline becomes artifact-backed and no longer requires committed report files.
 # Test Coverage Audit
 #
 # PURPOSE: Regenerate docs/TEST_COVERAGE_HEATMAP.md daily from main HEAD
 # (source, tests and the hand-curated docs/TEST_RISK_REGISTER.md).
 #
-# Output: opens a draft report PR when values change and uploads resulting
-# unit coverage to Codecov. Normal CI and the native queue govern publication.
+# Output: writes generated reports to the existing Actions artifact store and uploads
+# unit coverage to Codecov. Report data never opens a PR.
 # Includes apps/web/reports/test-coverage-snapshot.json (machine-readable
-# baseline) so `pnpm run test:coverage:diff` (and local
-# `test:coverage:diff`) can compare to the canonical baseline from main.
+# baseline). The audit restores the latest successful main-run artifact baseline before drift checks;
+# the committed snapshot remains the bootstrap/local baseline.
 # Failures notify Slack. GitHub Issues are not a backlog destination.
 #
 # Strategy spec: docs/TEST_RISK_REGISTER.md
@@ -27,11 +23,6 @@ on:
   repository_dispatch:
     types: [clock_test_coverage_audit]
   workflow_dispatch:
-    inputs:
-      commit:
-        description: 'Open a draft PR for the regenerated heatmap if it changed'
-        type: boolean
-        default: true
 
 permissions: {}
 
@@ -50,6 +41,7 @@ jobs:
     timeout-minutes: 90
     permissions:
       contents: read
+      actions: read
     env:
       SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
     steps:
@@ -60,11 +52,17 @@ jobs:
 
       - uses: ./.github/actions/setup-node-pnpm
 
+      - name: Restore artifact coverage baseline
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          node --input-type=module -e "import { restoreCoverageBaseline } from './scripts/lib/publish-coverage-report.mjs'; console.log(restoreCoverageBaseline());"
+
       - name: Run coverage
         run: pnpm --filter @jovie/web test:coverage
 
       - name: Check RED-surface coverage drift
-        # Compare the just-collected coverage against the committed snapshot
+        # Compare the just-collected coverage against the restored artifact snapshot
         # before rewriting it. Exits 1 on RED-surface drops ≥3pp.
         # Standard merge-queue unit shards stay coverage-off; the separate
         # Exact-head Coverage gate owns promotion evidence on PR/queue heads.
@@ -81,35 +79,6 @@ jobs:
           flags: nightly-unittests
           fail_ci_if_error: false
           verbose: true
-
-      # Mint after the long coverage run so the installation token is fresh.
-      # App-authored pushes trigger normal PR checks; GITHUB_TOKEN pushes do not.
-      - name: Generate report publication token
-        if: ${{ github.event_name == 'repository_dispatch' || inputs.commit }}
-        id: report-token
-        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
-        with:
-          app-id: ${{ vars.JOVIE_BOT_APP_ID }}
-          private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}
-          permission-contents: write
-          permission-pull-requests: write
-
-      - name: Open coverage report PR
-        if: ${{ github.event_name == 'repository_dispatch' || inputs.commit }}
-        env:
-          GH_TOKEN: ${{ steps.report-token.outputs.token }}
-        run: |
-          node --input-type=module -e "import { publishCoverageReport } from './scripts/lib/publish-coverage-report.mjs'; console.log(publishCoverageReport());"
-
-
-      - name: Retain immutable origin payload
-        if: ${{ always() }}
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: shipping-origin-v1
-          path: ${{ runner.temp }}/shipping-origin/*.json
-          if-no-files-found: ignore
-          retention-days: 30
 
       - name: Slack alert on failure
         if: ${{ failure() && env.SLACK_WEBHOOK_URL != '' }}

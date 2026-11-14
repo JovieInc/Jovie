@@ -1,20 +1,15 @@
 import { execFileSync } from 'node:child_process';
-import { appendFileSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  appendFileSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { retireGeneratedReports } from './retire-coverage-reports.mjs';
 
-const COVERAGE = {
-  files: [
-    'docs/TEST_COVERAGE_HEATMAP.md',
-    'apps/web/reports/test-coverage-snapshot.json',
-  ],
-  branch: 'coverage-audit',
-  title: 'chore(testing): refresh changed-evidence heatmap',
-  description: 'Refresh the generated coverage heatmap and baseline',
-  evidence:
-    'Full web coverage and RED-surface drift checks passed before generation.',
-};
 const NIGHTLY = {
   files: [
     'docs/NIGHTLY_TESTING_AGENT_REPORT.md',
@@ -95,7 +90,7 @@ function publishReport(
         { cwd, env, encoding: 'utf8', timeout: 60000 }
       ),
   } = {},
-  profile = COVERAGE
+  profile = NIGHTLY
 ) {
   const git = (...args) =>
     execFileSync('git', args, { cwd, env, encoding: 'utf8' }).trim();
@@ -248,10 +243,101 @@ function publishReport(
   }
 }
 
-export function publishCoverageReport(options = {}) {
-  return publishReport(options, COVERAGE);
-}
-
 export function publishNightlyReport(options = {}) {
   return publishReport(options, NIGHTLY);
+}
+
+const SNAPSHOT = 'apps/web/reports/test-coverage-snapshot.json';
+
+/** Restore from GitHub's successful main-run artifacts, never from a PR or a
+ * failed audit. The existing upload-artifact step owns publication/retention. */
+export function restoreCoverageBaseline({
+  cwd = process.cwd(),
+  env = process.env,
+  baselineFile = join(cwd, SNAPSHOT),
+  gh = args =>
+    execFileSync('gh', args, {
+      cwd,
+      env,
+      encoding: 'utf8',
+      timeout: 60_000,
+      maxBuffer: GH_MAX_BUFFER,
+    }).trim(),
+} = {}) {
+  const repo = env.GITHUB_REPOSITORY;
+  if (!/^[\w.-]+\/[\w.-]+$/.test(repo ?? '')) {
+    throw new Error('Invalid coverage repository');
+  }
+  const { workflow_runs: runs } = JSON.parse(
+    gh([
+      'api',
+      `repos/${repo}/actions/workflows/test-coverage-audit.yml/runs?branch=main&status=success&per_page=1`,
+    ])
+  );
+  if (!Array.isArray(runs))
+    throw new Error('Invalid coverage workflow inventory');
+  // Initial bootstrap only. Transport/auth/expiry/validation errors fail closed.
+  if (runs.length === 0) return { status: 'bootstrap', baseline: SNAPSHOT };
+  const run = runs[0];
+  if (
+    !Number.isSafeInteger(run.id) ||
+    run.id <= 0 ||
+    run.repository?.full_name !== repo ||
+    run.head_repository?.full_name !== repo ||
+    run.path !== '.github/workflows/test-coverage-audit.yml' ||
+    run.head_branch !== 'main' ||
+    run.status !== 'completed' ||
+    run.conclusion !== 'success' ||
+    !/^[a-f0-9]{40}$/.test(run.head_sha ?? '')
+  ) {
+    throw new Error('Invalid coverage baseline provenance');
+  }
+  execFileSync('git', ['merge-base', '--is-ancestor', run.head_sha, 'HEAD'], {
+    cwd,
+  });
+  const dir = mkdtempSync(join(tmpdir(), 'coverage-baseline-'));
+  try {
+    gh([
+      'run',
+      'download',
+      String(run.id),
+      '--repo',
+      repo,
+      '--name',
+      `coverage-audit-${run.id}`,
+      '--dir',
+      dir,
+    ]);
+    const raw = readFileSync(join(dir, SNAPSHOT), 'utf8');
+    const snapshot = JSON.parse(raw);
+    if (
+      !snapshot?.surfaces ||
+      !Object.keys(snapshot.surfaces).length ||
+      !Number.isFinite(Date.parse(snapshot.generated_at)) ||
+      Object.values(snapshot.surfaces).some(
+        surface =>
+          !surface ||
+          !Number.isFinite(surface.coverage_pct) ||
+          surface.coverage_pct < 0 ||
+          surface.coverage_pct > 100 ||
+          !Number.isFinite(surface.branch_pct) ||
+          surface.branch_pct < 0 ||
+          surface.branch_pct > 100 ||
+          !Number.isFinite(surface.risk_score) ||
+          !['RED', 'YELLOW', 'GREEN'].includes(surface.status)
+      )
+    ) {
+      throw new Error('Invalid coverage artifact snapshot');
+    }
+    writeFileSync(baselineFile, raw);
+    if (env.GITHUB_STEP_SUMMARY) {
+      appendFileSync(
+        env.GITHUB_STEP_SUMMARY,
+        `Coverage baseline: https://github.com/${repo}/actions/runs/${run.id}, measured source ${run.head_sha}.\n`
+      );
+    }
+    return { status: 'restored', source: run.head_sha, run: run.id };
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
 }

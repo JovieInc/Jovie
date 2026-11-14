@@ -27,7 +27,7 @@ function getStepBlock(workflow: string, stepName: string): string {
 }
 
 describe('test coverage audit workflow', () => {
-  it('runs daily and manually while retaining the report publication opt-out', () => {
+  it('runs daily and manually without publishing report PRs', () => {
     const workflow = readFileSync(workflowPath, 'utf8');
     const triggers = workflow.split('\non:\n')[1]!.split('\npermissions:')[0]!;
 
@@ -36,14 +36,7 @@ describe('test coverage audit workflow', () => {
     );
     expect(triggers).toContain('  workflow_dispatch:');
     expect(triggers).not.toMatch(/^  (push|schedule):/m);
-    for (const name of [
-      'Generate report publication token',
-      'Open coverage report PR',
-    ]) {
-      expect(getStepBlock(workflow, name)).toContain(
-        "if: ${{ github.event_name == 'repository_dispatch' || inputs.commit }}"
-      );
-    }
+    expect(workflow).not.toContain('Open coverage report PR');
   });
 
   it('leaves measured time for full coverage plus baseline publication', () => {
@@ -63,28 +56,33 @@ describe('test coverage audit workflow', () => {
     );
   });
 
-  it('publishes through an app-authored draft PR after coverage, without a main push', () => {
+  it('restores the successful main-run artifact using only read permissions', () => {
     const workflow = readFileSync(workflowPath, 'utf8');
-    const publishStep = getStepBlock(workflow, 'Open coverage report PR');
-    const tokenStep = getStepBlock(
+    const restoreStep = getStepBlock(
       workflow,
-      'Generate report publication token'
+      'Restore artifact coverage baseline'
     );
 
-    expect(publishStep).toContain('publishCoverageReport');
-    expect(publishStep).toContain('steps.report-token.outputs.token');
-    expect(tokenStep).toContain('vars.JOVIE_BOT_APP_ID');
-    expect(tokenStep).toContain('permission-pull-requests: write');
+    expect(restoreStep).toContain('restoreCoverageBaseline');
+    expect(restoreStep).toContain('GH_TOKEN: ${{ github.token }}');
     expect(
-      workflow.indexOf('- name: Generate report publication token')
-    ).toBeGreaterThan(workflow.indexOf('- name: Generate heatmap'));
+      workflow.indexOf('- name: Restore artifact coverage baseline')
+    ).toBeLessThan(workflow.indexOf('- name: Run coverage'));
     expect(workflow).toContain('persist-credentials: false');
     expect(workflow).toContain('contents: read');
+    expect(workflow).toContain('actions: read');
+    expect(workflow).not.toContain('create-github-app-token');
     expect(workflow).not.toContain('git push');
-    expect(workflow).not.toContain('git pull --rebase');
+    expect(workflow).not.toContain('permission-pull-requests: write');
+    const artifacts = getStepBlock(workflow, 'Upload artifacts');
+    expect(artifacts).toContain('if: always()');
+    expect(artifacts).toContain('name: coverage-audit-${{ github.run_id }}');
+    expect(artifacts).toContain('retention-days: 14');
+    expect(artifacts).toContain('apps/web/reports/test-coverage-snapshot.json');
+    expect(artifacts).toContain('docs/TEST_COVERAGE_HEATMAP.md');
   });
 
-  it('gates RED-surface decay against the committed snapshot before rewriting it', () => {
+  it('gates RED-surface decay against the restored artifact snapshot before rewriting it', () => {
     const workflow = readFileSync(workflowPath, 'utf8');
     const checkStep = getStepBlock(
       workflow,

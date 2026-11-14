@@ -1091,6 +1091,7 @@ export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
   'scripts/lib/__tests__/source-guard-dependency-generation.test.mjs',
   'scripts/retire-coverage-reports.test.mjs',
   'scripts/publish-coverage-report.test.mjs',
+  'scripts/coverage-artifact-baseline.test.mjs',
   'scripts/lib/__tests__/canonical-artist-site-intake.test.mjs',
   'scripts/lib/__tests__/canonical-json.test.mjs',
   'scripts/lib/__tests__/format-biome-json.test.mjs',
@@ -2836,7 +2837,7 @@ export async function runStructural(opts = {}) {
     'node --test scripts/backlog-orchestrator/__tests__/pre-lease-gates.test.mjs',
     'node --test scripts/backlog-orchestrator/__tests__/gate-next-hold.test.mjs',
     'node --test scripts/backlog-orchestrator/__tests__/ownership-inventory.test.mjs',
-    'node --test --experimental-test-coverage --test-coverage-include=scripts/lib/publish-coverage-report.mjs --test-coverage-lines=95 --test-coverage-branches=85 --test-coverage-functions=95 scripts/publish-coverage-report.test.mjs',
+    'node --test --experimental-test-coverage --test-coverage-include=scripts/lib/publish-coverage-report.mjs --test-coverage-lines=95 --test-coverage-branches=85 --test-coverage-functions=95 scripts/publish-coverage-report.test.mjs scripts/coverage-artifact-baseline.test.mjs',
     ...STRUCTURAL_PYTHON_REGRESSION_COMMANDS,
     // actionlint runs as a dedicated workflow step before this script (.github/scripts/run-actionlint.sh).
   ];
