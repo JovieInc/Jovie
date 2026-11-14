@@ -655,9 +655,8 @@ export const PRODUCT_FLAG_CAPABILITIES = {
  * added to `PRODUCT_FLAG_CAPABILITIES` instead.
  */
 export const MARKETING_STATIC_PRESENTATION_FLAG_PATTERN = /^SHOW_[A-Z0-9_]+$/u;
-export const MARKETING_STATIC_ACCESS_FLAGS = [
-  'WAITLIST_ENABLED',
-] as const satisfies readonly MarketingStaticFlagName[];
+export const MARKETING_STATIC_ACCESS_FLAGS =
+  [] as const satisfies readonly MarketingStaticFlagName[];
 
 const CAPABILITY_ENTRIES = Object.entries(
   PRODUCT_CAPABILITIES

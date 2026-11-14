@@ -11,26 +11,12 @@
 import { readdirSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { render, screen, within } from '@testing-library/react';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { MARKETING_ROUTE_MANIFEST } from '@/data/marketing';
 import { getMarketingRecipe } from '@/data/marketing/recipes';
 import { getPublicPriceClaim } from '@/lib/billing/offer-truth';
 import { getEndUserPerfRouteById } from '@/scripts/performance-route-manifest';
 
-const gate = vi.hoisted(() => ({ WAITLIST_ENABLED: true }));
-vi.mock('@/lib/flags/marketing-static', async importOriginal => {
-  const actual =
-    await importOriginal<typeof import('@/lib/flags/marketing-static')>();
-  return {
-    ...actual,
-    FEATURE_FLAGS: new Proxy(actual.FEATURE_FLAGS, {
-      get: (target, key) =>
-        key === 'WAITLIST_ENABLED'
-          ? gate.WAITLIST_ENABLED
-          : target[key as keyof typeof target],
-    }),
-  };
-});
 vi.mock('@/lib/analytics', () => ({ track: vi.fn(), page: vi.fn() }));
 vi.mock('@/lib/content-records/store.server', async () => {
   const { MARKETING_PAGE_KIND } = await import(
@@ -95,9 +81,6 @@ const HOMEPAGE_STYLES = [
 const PRICE_TEXT = /\$\s?\d|\d+\s?\/\s?mo\b|\bper month\b|\b\d+-day\b/i;
 
 describe('homepage contract', { timeout: 60_000 }, () => {
-  beforeEach(() => {
-    gate.WAITLIST_ENABLED = true;
-  });
   afterEach(() => {
     vi.resetModules();
   });
@@ -155,45 +138,41 @@ describe('homepage contract', { timeout: 60_000 }, () => {
     ]);
   });
 
-  it.each([true, false])(
-    'ends in the one claim action into /start, waitlist=%s',
-    async waitlist => {
-      gate.WAITLIST_ENABLED = waitlist;
-      const { HOMEPAGE_INVITE_ANCHOR } = await loadCopy();
-      const { getClaimProfileIntent } = await import(
-        '@/data/marketingCtaIntents'
-      );
-      const claim = getClaimProfileIntent();
-      const { container } = await renderHomePage();
+  it('ends in the one claim action into /start', async () => {
+    const { HOMEPAGE_INVITE_ANCHOR } = await loadCopy();
+    const { getClaimProfileIntent } = await import(
+      '@/data/marketingCtaIntents'
+    );
+    const claim = getClaimProfileIntent();
+    const { container } = await renderHomePage();
 
-      // No on-page form: the closing section hands off to /start.
-      expect(container.querySelectorAll('form')).toHaveLength(0);
-      const close = container.querySelector(`#${HOMEPAGE_INVITE_ANCHOR}`);
-      expect(close).toHaveAttribute('data-testid', 'marketing-section-cta');
-      const closeCta = within(close as HTMLElement).getByTestId(
-        'homepage-close-cta'
-      );
-      expect(closeCta).toHaveAttribute('href', claim.href);
-      expect(closeCta).toHaveTextContent(claim.label);
+    // No on-page form: the closing section hands off to /start.
+    expect(container.querySelectorAll('form')).toHaveLength(0);
+    const close = container.querySelector(`#${HOMEPAGE_INVITE_ANCHOR}`);
+    expect(close).toHaveAttribute('data-testid', 'marketing-section-cta');
+    const closeCta = within(close as HTMLElement).getByTestId(
+      'homepage-close-cta'
+    );
+    expect(closeCta).toHaveAttribute('href', claim.href);
+    expect(closeCta).toHaveTextContent(claim.label);
 
-      // The hero's primary action is the same claim; one primary action.
-      const primary = screen.getByTestId('homepage-primary-cta');
-      expect(primary).toHaveAttribute('href', claim.href);
-      expect(primary).toHaveTextContent(claim.label);
-      expect(
-        container.querySelectorAll('[data-primary-action="true"]')
-      ).toHaveLength(1);
-      const hrefs = [...container.querySelectorAll('a[href]')].map(
-        link => link.getAttribute('href') ?? ''
-      );
-      expect(
-        hrefs.filter(href => /^\/(signup|sign-up|claim)\b/.test(href))
-      ).toEqual([]);
-      expect(new Set(hrefs.filter(href => /^\/start\b/.test(href)))).toEqual(
-        new Set(['/start'])
-      );
-    }
-  );
+    // The hero's primary action is the same claim; one primary action.
+    const primary = screen.getByTestId('homepage-primary-cta');
+    expect(primary).toHaveAttribute('href', claim.href);
+    expect(primary).toHaveTextContent(claim.label);
+    expect(
+      container.querySelectorAll('[data-primary-action="true"]')
+    ).toHaveLength(1);
+    const hrefs = [...container.querySelectorAll('a[href]')].map(
+      link => link.getAttribute('href') ?? ''
+    );
+    expect(
+      hrefs.filter(href => /^\/(signup|sign-up|claim)\b/.test(href))
+    ).toEqual([]);
+    expect(new Set(hrefs.filter(href => /^\/start\b/.test(href)))).toEqual(
+      new Set(['/start'])
+    );
+  });
 
   it('binds performance readiness to the rendered hero and its action', async () => {
     const { container } = await renderHomePage();

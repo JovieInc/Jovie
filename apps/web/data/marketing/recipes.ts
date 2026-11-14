@@ -900,7 +900,8 @@ export const MARKETING_RECIPES: readonly MarketingRecipe[] = [
     },
     minContent: ['hero.headline', 'capture.inputSlot'],
     maxContent: { maxSections: 5 },
-    chooseWhen: 'conversion=request-access AND WAITLIST_ENABLED=true',
+    chooseWhen:
+      'conversion=request-access AND brandConstraints.waitlistEnabled=true',
     neverUse: [
       'With multiple competing CTAs (capture is the conversion — one input, one submit)',
       'Without interaction states on capture (Design F2: submitting/success/error/already-subscribed)',

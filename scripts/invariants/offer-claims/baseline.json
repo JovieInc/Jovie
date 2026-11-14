@@ -136,7 +136,7 @@
     "free_forever_claim": 1
   },
   "apps/web/data/homepageV2Copy.ts": {
-    "trial_claim": 3,
+    "trial_claim": 2,
     "no_card_claim": 1,
     "free_forever_claim": 1
   },

@@ -1,13 +1,10 @@
 import { APP_ROUTES } from '@/constants/routes';
 import { getHomepageFrontDoorCtaContract } from '@/data/homepageFrontDoorCta';
-import { FEATURE_FLAGS } from '@/lib/flags/marketing-static';
 import { TIM_WHITE_PROFILE } from '@/lib/tim-white';
 
-// Prelaunch front-door label. JOV-5085 locks Get started → /start.
+// Front-door label. JOV-5085 locks the claim → /start.
 // Server-side waitlist gate handles post-/start routing, not the homepage href.
-export const HOMEPAGE_FRONT_DOOR_CTA = getHomepageFrontDoorCtaContract(
-  FEATURE_FLAGS.WAITLIST_ENABLED
-);
+export const HOMEPAGE_FRONT_DOOR_CTA = getHomepageFrontDoorCtaContract();
 export const FRONT_DOOR_CTA_LABEL = HOMEPAGE_FRONT_DOOR_CTA.primary.label;
 const FALLBACK_CTA_SUPPORT = HOMEPAGE_FRONT_DOOR_CTA.fallbackSupport;
 
