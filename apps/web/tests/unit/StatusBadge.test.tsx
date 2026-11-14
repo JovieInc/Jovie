@@ -76,7 +76,10 @@ describe('StatusBadge', () => {
 
       expect(badge).toHaveClass('bg-surface-1');
       expect(badge).toHaveClass('border-info/20');
-      expect(badge).toHaveClass('text-info');
+      expect(badge).toHaveClass(
+        'text-(--color-accent-blue-text)',
+        'dark:text-info'
+      );
     });
 
     it('renders green variant', () => {
@@ -94,7 +97,7 @@ describe('StatusBadge', () => {
 
       expect(badge).toHaveClass('bg-surface-1');
       expect(badge).toHaveClass('border-accent/20');
-      expect(badge).toHaveClass('text-accent');
+      expect(badge).toHaveClass('text-accent-text');
     });
 
     it('renders orange variant', () => {

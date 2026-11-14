@@ -40,6 +40,26 @@ function minimalReport() {
   });
 }
 
+function stubMainLookup(root) {
+  const bin = resolve(root, 'bin');
+  writeFileSync(
+    resolve(bin, 'git'),
+    '#!/bin/bash\ntouch "$RUNNER_TEMP/main-read"\nprintf "%s\\trefs/heads/main\\n" "$FIXTURE_MAIN_SHA"\n',
+    { mode: 0o755 }
+  );
+  writeFileSync(resolve(bin, 'gh'), '#!/bin/bash\nexit 1\n', { mode: 0o755 });
+  writeFileSync(resolve(bin, 'sleep'), '#!/bin/bash\nexit 0\n', {
+    mode: 0o755,
+  });
+  writeFileSync(
+    resolve(bin, 'timeout'),
+    '#!/bin/bash\n[ "$1" = 30s ] && [ "$RESOLVE_MAIN_BUDGET_SECONDS" = 0 ] || exit 99\n[ "${FIXTURE_MAIN_TIMEOUT:-false}" != true ] || exit 124\nshift\nexec "$@"\n',
+    {
+      mode: 0o755,
+    }
+  );
+}
+
 afterEach(() => {
   for (const root of fixtureRoots.splice(0))
     rmSync(root, { recursive: true, force: true });
@@ -54,6 +74,8 @@ describe('Ovie delivery outcome from the real workflow shell', () => {
     exit: 1,
     outcome: 'failed',
     sent: false,
+    mainSha: 'f'.repeat(40),
+    timedOut: false,
   };
   it.each([
     {
@@ -67,6 +89,15 @@ describe('Ovie delivery outcome from the real workflow shell', () => {
     },
     { ...notSent, report: false, reason: 'report-unavailable' },
     { ...notSent, secret: false, reason: 'credential-unavailable' },
+    {
+      ...notSent,
+      mainSha: 'a'.repeat(40),
+      exit: 0,
+      outcome: 'skipped',
+      reason: 'superseded-main',
+    },
+    { ...notSent, mainSha: '', reason: 'main-ref-unavailable' },
+    { ...notSent, timedOut: true, reason: 'main-ref-unavailable' },
     ...[
       '200',
       '202',
@@ -89,6 +120,8 @@ describe('Ovie delivery outcome from the real workflow shell', () => {
         ? 'readback-required'
         : 'http-or-transport-error',
       sent: true,
+      mainSha: 'f'.repeat(40),
+      timedOut: false,
     })),
   ])(
     'records $outcome for HTTP $code, requested=$requested, secret=$secret, report=$report',
@@ -96,6 +129,7 @@ describe('Ovie delivery outcome from the real workflow shell', () => {
       const root = fixtureRoot('certificate-delivery-');
       mkdirSync(resolve(root, 'component-certificate'));
       mkdirSync(resolve(root, 'bin'));
+      stubMainLookup(root);
       if (fixture.report)
         writeFileSync(
           resolve(root, 'component-certificate/report.json'),
@@ -123,7 +157,12 @@ describe('Ovie delivery outcome from the real workflow shell', () => {
             RUNNER_TEMP: root,
             GITHUB_STEP_SUMMARY: summary,
             GITHUB_OUTPUT: output,
-            CERT_SHA: 'fixture-sha',
+            CERT_SHA: 'f'.repeat(40),
+            GITHUB_REPOSITORY: 'JovieInc/Jovie',
+            GH_TOKEN: 'fixture-readonly-token',
+            GITHUB_TOKEN: '',
+            FIXTURE_MAIN_SHA: fixture.mainSha,
+            FIXTURE_MAIN_TIMEOUT: String(fixture.timedOut),
             POST_REQUESTED: String(fixture.requested),
             CRON_SECRET: fixture.secret ? 'fixture-secret-value' : '',
             OVIE_BASE_URL: 'https://ovie.invalid',
@@ -137,7 +176,7 @@ describe('Ovie delivery outcome from the real workflow shell', () => {
         'utf8'
       );
       expect(JSON.parse(receiptText)).toMatchObject({
-        headSha: 'fixture-sha',
+        headSha: 'f'.repeat(40),
         requested: fixture.requested,
         outcome: fixture.outcome,
         reason: fixture.reason,
@@ -145,6 +184,13 @@ describe('Ovie delivery outcome from the real workflow shell', () => {
         ingestion: 'unverified',
       });
       expect(existsSync(resolve(root, 'sent'))).toBe(fixture.sent);
+      if (fixture.report)
+        expect(
+          readFileSync(
+            resolve(root, 'component-certificate/report.json'),
+            'utf8'
+          )
+        ).toBe(minimalReport());
       if (fixture.sent) {
         // The step must post the compact payload, never the full report.
         const postedArg = readFileSync(resolve(root, 'posted-arg.txt'), 'utf8');
@@ -183,6 +229,7 @@ describe('Ovie delivery outcome from the real workflow shell', () => {
     const root = fixtureRoot('certificate-delivery-oversized-');
     mkdirSync(resolve(root, 'component-certificate'));
     mkdirSync(resolve(root, 'bin'));
+    stubMainLookup(root);
     const bigCertificates = Array.from({ length: 30000 }, (_, i) => ({
       applicable: 10,
       certified: false,
@@ -228,7 +275,10 @@ describe('Ovie delivery outcome from the real workflow shell', () => {
           RUNNER_TEMP: root,
           GITHUB_STEP_SUMMARY: summary,
           GITHUB_OUTPUT: output,
-          CERT_SHA: 'fixture-sha',
+          CERT_SHA: 'f'.repeat(40),
+          GH_TOKEN: 'fixture-readonly-token',
+          GITHUB_TOKEN: '',
+          FIXTURE_MAIN_SHA: 'f'.repeat(40),
           GITHUB_SERVER_URL: 'https://github.com',
           GITHUB_REPOSITORY: 'JovieInc/Jovie',
           GITHUB_RUN_ID: '123',

@@ -144,7 +144,7 @@ describe('Badge', () => {
       );
       const badge = screen.getByTestId('badge');
       expect(badge.className).toContain('border-accent/20');
-      expect(badge.className).toContain('text-accent');
+      expect(badge).toHaveClass('text-accent-text');
       expect(badge).toHaveAttribute('data-tone', 'accent');
     });
 
@@ -168,7 +168,7 @@ describe('Badge', () => {
     });
 
     it.each([
-      ['info', 'border-info/20', 'text-info'],
+      ['info', 'border-info/20', 'text-(--color-accent-blue-text)'],
       ['success', 'border-success/20', 'text-success-text'],
       ['warning', 'border-warning/20', 'text-warning-text'],
     ] as const)('applies %s tone overrides', (tone, border, text) => {

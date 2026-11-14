@@ -4,6 +4,7 @@ import os
 import sys
 import tempfile
 import unittest
+from datetime import datetime, timezone
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
@@ -332,6 +333,37 @@ class ReconcileTest(unittest.TestCase):
         self.assertEqual((result["status"], result["resetAt"]), ("linear-rate-limited", NOW + 60))
         saved = json.loads((self.host.state / "issue-reconcile.json").read_text())
         self.assertEqual(saved["result"]["status"], "linear-rate-limited")
+
+
+
+class FleetReservedTest(unittest.TestCase):
+    """A `fleet` issue addressed to a Linear-bus agent stays off the lanes for 72h (JOV-12439)."""
+
+    @staticmethod
+    def iso(at):
+        return datetime.fromtimestamp(at, timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+    def issue(self, title, labels=("fleet",), description="body", age=3600):
+        return lane.Issue("id-1", "JOV-1", title, description, 2, self.iso(NOW - age), list(labels))
+
+    def test_addressed_fleet_issue_is_reserved_until_it_expires(self):
+        lola = self.issue("One tab level on Audience (Lola)")
+        self.assertEqual(epics.fleet_reserved(lola, NOW), "Lola")
+        self.assertEqual(epics.fleet_reserved(self.issue("First-run Home (Lola, Astra)"), NOW), "Lola")
+        chloe = self.issue("Screens", description="**For Chloe** (dispatch to Codex cloud)")
+        self.assertEqual(epics.fleet_reserved(chloe, NOW), "Chloe")
+        self.assertIsNone(epics.fleet_reserved(lola, NOW + epics.HOLD_EXPIRY_S))
+
+    def test_unaddressed_or_unlabelled_issues_stay_in_the_pool(self):
+        self.assertIsNone(epics.fleet_reserved(self.issue("Write the judge CLI"), NOW))
+        self.assertIsNone(epics.fleet_reserved(self.issue("Fix it (Lola)", labels=("agent-ready",)), NOW))
+        self.assertIsNone(epics.fleet_reserved(self.issue("Lola reviewed this table"), NOW))
+
+    def test_label_rejection_keeps_a_reserved_issue_off_every_lane(self):
+        reserved = self.issue("Drawer seam (Lola)")
+        with patch.object(epics.time, "time", return_value=NOW):
+            for provider in ("hyperagent", "codex", "claude"):
+                self.assertEqual(lane.label_rejection(reserved, provider), "fleet-reserved:Lola")
 
 
 if __name__ == "__main__":

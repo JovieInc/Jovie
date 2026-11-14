@@ -6,7 +6,8 @@ same module with a different body stays unresolved unless the actual diff3
 base proves an additive import change and a full-file binding check passes.
 
 A duplicate UTC-noon test clock pin keeps main's patch target and the head's
-fixed instant. Any other overlap stays unresolved.
+fixed instant. A two-way `it()` pair that shares one trailing `});` is the
+same insertion, with main's test first. Any other overlap stays unresolved.
 """
 from __future__ import annotations
 
@@ -35,6 +36,12 @@ _MARKERS = re.compile(r"(?m)^(?:<{7}|\|{7}|={7}|>{7})")
 _NAMED_IMPORT = re.compile(
     r"import \{ (?P<names>[A-Za-z_$][\w$]*(?:, [A-Za-z_$][\w$]*)*) \} "
     r"from (?P<quote>['\"])(?P<module>[^'\"\\\n]+)(?P=quote);\n")
+_TWOWAY_HUNK = re.compile(
+    r"^<<<<<<<[^\n]*\n(?P<ours>.*?)^=======\n(?P<theirs>.*?)^>>>>>>>[^\n]*\n",
+    re.M | re.S)
+_IT_CLOSER = re.compile(r"[ \t]*\}\);\n")
+_IT_START = re.compile(r"[ \t]*it\(")
+_IT_TITLE = re.compile(r"^[ \t]*it\(\s*(['\"])(?P<title>(?:\\.|(?!\1).)*)\1")
 
 
 def _additive_named_imports(base: str, ours: str, theirs: str) -> str | None:
@@ -261,6 +268,63 @@ def resolve_additive_statements_text(text: str, *, validate_imports=None) -> str
         if validate_imports is None or not validate_imports(text, spans):
             return None
     return text
+
+
+def _one_shared_it(side: str, closer: str) -> tuple[str, str] | None:
+    """One `it()` finished by the shared closer. None for any other shape."""
+    if not _IT_START.match(side) or side.lstrip().startswith("it.each"):
+        return None
+    statements = _statements(side + closer)
+    if statements is None or len(statements) != 1:
+        return None
+    statement = statements[0]
+    title = _IT_TITLE.match(statement)
+    if title is None or _key(statement) is None:
+        return None
+    return title.group("title"), statement
+
+
+def resolve_shared_closer_it_text(text: str) -> str | None:
+    """Union two-way `it()` insertions that share one trailing `});`.
+
+    Git's default merge keeps one identical closer after the hunk. Main's test
+    stays first, then head's, each closed. Diff3 hunks, `it.each`, the same
+    title with two bodies, a closer that does not finish exactly one statement,
+    and any other shape stay unresolved.
+    """
+    if "|||||||" in text or _MARKERS.search(text) is None:
+        return None
+    matches = list(_TWOWAY_HUNK.finditer(text))
+    if not matches or text.count("<<<<<<<") != len(matches):
+        return None
+    pieces: list[str] = []
+    cursor = 0
+    for match in matches:
+        closer_match = _IT_CLOSER.match(text, match.end())
+        if closer_match is None:
+            return None
+        ours = _one_shared_it(match["ours"], closer_match.group(0))
+        theirs = _one_shared_it(match["theirs"], closer_match.group(0))
+        if ours is None or theirs is None:
+            return None
+        our_title, our_body = ours
+        their_title, their_body = theirs
+        if our_title == their_title and our_body.strip() != their_body.strip():
+            return None
+        if our_body.strip() == their_body.strip():
+            block = their_body if their_body.endswith("\n") else their_body + "\n"
+        else:
+            main = their_body if their_body.endswith("\n") else their_body + "\n"
+            head = our_body if our_body.endswith("\n") else our_body + "\n"
+            block = main if main.endswith("\n\n") else main + "\n"
+            block += head
+        pieces.append(text[cursor:match.start()])
+        pieces.append(block)
+        cursor = closer_match.end()
+    resolved = "".join(pieces) + text[cursor:]
+    if _MARKERS.search(resolved):
+        return None
+    return resolved
 
 
 def contained_by_main(base: str, ours: str, theirs: str) -> str | None:

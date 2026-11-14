@@ -91,7 +91,7 @@
     "apps/web/components/features/dashboard/organisms/profile-contact-sidebar/SuggestedDspMatches.tsx": "a11y,ds-owner,frontend-rules,states,tests",
     "apps/web/components/features/dashboard/release-tasks/CatalogTaskBuilderDialog.tsx": "a11y,forced-caps,frontend-rules,states,tests",
     "apps/web/components/features/dashboard/release-tasks/ReleaseTaskAssigneeBadge.tsx": "states,tokens",
-    "apps/web/components/features/dashboard/release-tasks/ReleaseTaskCategoryGroup.tsx": "a11y,ds-owner,states,tests,tokens",
+    "apps/web/components/features/dashboard/release-tasks/ReleaseTaskCategoryGroup.tsx": "a11y,ds-owner,states,tokens",
     "apps/web/components/features/dashboard/release-tasks/ReleaseTaskChecklist.tsx": "a11y,ds-owner,states,tests",
     "apps/web/components/features/dashboard/release-tasks/ReleaseTaskCompactRow.tsx": "a11y,ds-owner,states,tests,tokens",
     "apps/web/components/features/dashboard/release-tasks/ReleaseTaskExplainerPopover.tsx": "a11y,ds-owner,states,tests",

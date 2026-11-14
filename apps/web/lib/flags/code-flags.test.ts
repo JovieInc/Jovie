@@ -63,12 +63,4 @@ describe('code flags', () => {
     expect(isCodeFlagEnabled('ONBOARDING_VALUE_BEFORE_PAYWALL')).toBe(false);
     delete process.env.FEATURE_ONBOARDING_VALUE_BEFORE_PAYWALL;
   });
-
-  it('keeps the auth offer summary off unless the env override is true', () => {
-    expect(CODE_FLAGS.AUTH_OFFER_SUMMARY).toBe(false);
-    expect(isCodeFlagEnabled('AUTH_OFFER_SUMMARY')).toBe(false);
-    process.env.FEATURE_AUTH_OFFER_SUMMARY = 'true';
-    expect(isCodeFlagEnabled('AUTH_OFFER_SUMMARY')).toBe(true);
-    delete process.env.FEATURE_AUTH_OFFER_SUMMARY;
-  });
 });

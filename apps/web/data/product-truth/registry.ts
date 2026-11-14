@@ -627,10 +627,6 @@ export const PRODUCT_FLAG_CAPABILITIES = {
       'ChatGPT directory MCP kill switch; anonymous public creator reads; default off',
   },
   ...INTERNAL_FLAG_CAPABILITIES,
-  AUTH_OFFER_SUMMARY: {
-    nonMarketing:
-      'auth offer recap; default off; no price, trial, or entitlement change',
-  },
   SOCIAL_HTML_ISOLATED_PROVIDER: {
     nonMarketing:
       'internal ingestion routing kill switch; reserved for future isolated provider rollout',
@@ -647,6 +643,10 @@ export const PRODUCT_FLAG_CAPABILITIES = {
     nonMarketing:
       'daily sweep over grandfathered claims; default off; no public capability claim',
   },
+  OVIE_FLEET_ROOM: {
+    nonMarketing:
+      'Ovie operator fleet room; admins only; no customer or public capability claim',
+  },
 } as const satisfies Readonly<Record<ProductFlagKey, FlagCapabilityBinding>>;
 
 /**
@@ -655,9 +655,8 @@ export const PRODUCT_FLAG_CAPABILITIES = {
  * added to `PRODUCT_FLAG_CAPABILITIES` instead.
  */
 export const MARKETING_STATIC_PRESENTATION_FLAG_PATTERN = /^SHOW_[A-Z0-9_]+$/u;
-export const MARKETING_STATIC_ACCESS_FLAGS = [
-  'WAITLIST_ENABLED',
-] as const satisfies readonly MarketingStaticFlagName[];
+export const MARKETING_STATIC_ACCESS_FLAGS =
+  [] as const satisfies readonly MarketingStaticFlagName[];
 
 const CAPABILITY_ENTRIES = Object.entries(
   PRODUCT_CAPABILITIES

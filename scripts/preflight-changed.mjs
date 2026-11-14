@@ -66,7 +66,7 @@ import {
 export { baseRefCandidates, resolveBaseRef };
 
 import { dateChecks } from './lib/preflight-date-checks.mjs';
-import { checkInstallMatchesLockfile } from './lib/preflight-install.mjs';
+import { checkPrerequisites } from './lib/preflight-prerequisites.mjs';
 import { remoteHint } from './lib/remote-hint.mjs';
 
 const SELF = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -594,8 +594,8 @@ export async function main({
   const cwd = args.repo;
   const hint = remoteHint({ env });
   if (hint) log(hint);
-  // Fail fast before any check runs against an install this worktree did not make.
-  const install = checkInstallMatchesLockfile({ repo: cwd });
+  // Fail fast on install provenance and incompatible installed tools.
+  const install = checkPrerequisites({ repo: cwd, env, list: args.list });
   if (!install.ok) {
     log(`[preflight:changed] ${install.message}`);
     return 1;

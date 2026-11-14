@@ -48,6 +48,12 @@ process.stdout.write(JSON.stringify({
 NODE
 }
 
+if [[ "${JOVIE_CODEX_SECRET_FREE:-0}" == "1" ]]; then
+  # The secret-free lane skips setup.sh, including its offline tool checks.
+  . "$REPO_ROOT/scripts/lib/setup-worktree-health.sh"
+  jovie_setup_gh_api_slurp_ok WARNING || true
+fi
+
 if [[ "$CODEX_HOOK" == "1" ]]; then
   if [[ "${JOVIE_CODEX_SECRET_FREE:-0}" == "1" ]]; then
     node "$REPO_ROOT/scripts/codex-cloud-setup.mjs" >&2
