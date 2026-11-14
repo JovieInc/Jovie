@@ -743,6 +743,7 @@
   "tests/unit/ci/ready-gates.test.ts",
   "tests/unit/ci/repo-license-hygiene.test.ts",
   "tests/unit/ci/retired-test-blocks.test.ts",
+  "tests/unit/ci/route-ratchet-workflow-contract.test.ts",
   "tests/unit/ci/runner-autoscaler-canary-workflow.test.ts",
   "tests/unit/ci/runner-host-capacity.test.ts",
   "tests/unit/ci/screen-marketing-route-bindings.test.ts",
