@@ -138,3 +138,67 @@ describe('buildReferencedEntitiesBlock', () => {
     expect(occurrences).toBe(1);
   });
 });
+
+describe('@profile references (chats started from a profile)', () => {
+  const profileChip = serializeEntity({
+    kind: 'profile',
+    id: 'profile-own',
+    label: 'Luna Waves',
+  });
+
+  it('resolves the signed-in creator profile and briefs a specific opener', () => {
+    const block = buildReferencedEntitiesBlock({
+      userTexts: [profileChip],
+      ownedReleases: [],
+      artist: ARTIST,
+      ownProfileId: 'profile-own',
+    });
+    expect(block).toContain(
+      `- profile:profile-own "Luna Waves" (@lunawaves) — the user's own Jovie profile.`
+    );
+    expect(block).toContain('Do not reply with a generic menu');
+    expect(block).toContain('one or two real numbers');
+    expect(block).toContain('never repeat their ids');
+  });
+
+  it('briefs only from the latest turn, not an earlier chip', () => {
+    const block = buildReferencedEntitiesBlock({
+      userTexts: ['What should I post this week?', profileChip],
+      ownedReleases: [],
+      artist: ARTIST,
+      ownProfileId: 'profile-own',
+    });
+    expect(block).not.toContain('Do not reply with a generic menu');
+  });
+
+  it('skips the opener brief once the person asks something', () => {
+    const asked = `${profileChip} How do I grow my audience?`;
+    const block = buildReferencedEntitiesBlock({
+      userTexts: [asked],
+      ownedReleases: [],
+      artist: ARTIST,
+      ownProfileId: 'profile-own',
+    });
+    expect(block).toContain("the user's own Jovie profile");
+    expect(block).not.toContain('Do not reply with a generic menu');
+  });
+
+  it('never trusts a profile id that is not the signed-in creator', () => {
+    const other = serializeEntity({
+      kind: 'profile',
+      id: 'profile-other',
+      label: 'Someone Else',
+    });
+    for (const ownProfileId of ['profile-own', null, undefined]) {
+      const block = buildReferencedEntitiesBlock({
+        userTexts: [other],
+        ownedReleases: [],
+        artist: ARTIST,
+        ownProfileId,
+      });
+      expect(block).toContain('profile:profile-other — unavailable');
+      expect(block).not.toContain('Someone Else');
+      expect(block).not.toContain('Do not reply with a generic menu');
+    }
+  });
+});

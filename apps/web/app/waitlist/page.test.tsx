@@ -103,4 +103,35 @@ describe('waitlist receipt reload', () => {
     // Invite-only GTM: the waitlist receipt never carries a paid ask.
     expect(receipt.props.proCheckoutPriceId).toBeUndefined();
   });
+
+  it('smoke runtime: hands an anonymous visitor to /start with signup open (prod parity)', async () => {
+    vi.stubEnv('PUBLIC_NOAUTH_SMOKE', '1');
+    mocks.resolve.mockResolvedValue({ state: 'UNAUTHENTICATED', context: {} });
+    mocks.signupClosed.mockReturnValue(false);
+
+    await expect(WaitlistPage()).rejects.toThrow(
+      `redirect:${APP_ROUTES.START}`
+    );
+    expect(mocks.access).not.toHaveBeenCalled();
+  });
+
+  it('smoke runtime: keeps the landing when public signup is closed', async () => {
+    vi.stubEnv('PUBLIC_NOAUTH_SMOKE', '1');
+    mocks.resolve.mockResolvedValue({ state: 'UNAUTHENTICATED', context: {} });
+    mocks.signupClosed.mockReturnValue(true);
+
+    const result = await WaitlistPage();
+
+    expect(result.props.children.props.signupClosed).toBe(true);
+  });
+
+  it('smoke runtime: a synthetic actor the DB-less gate cannot resolve keeps the landing', async () => {
+    vi.stubEnv('PUBLIC_NOAUTH_SMOKE', '1');
+    mocks.resolve.mockRejectedValue(new Error('noop database'));
+    mocks.signupClosed.mockReturnValue(false);
+
+    const result = await WaitlistPage();
+
+    expect(result.props.children.props.signupClosed).toBe(false);
+  });
 });

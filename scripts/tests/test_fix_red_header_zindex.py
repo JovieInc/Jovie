@@ -4,6 +4,7 @@ import sys
 import tempfile
 import textwrap
 import unittest
+from unittest.mock import patch, sentinel
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "lanes"))
@@ -108,8 +109,20 @@ class HeaderZIndexRouteTest(unittest.TestCase):
         route = classes.classify(_pr(), {name: log})
         self.assertEqual(route["cls"], "overlay-header-zindex")
         self.assertEqual(route["action"], classes.HEADER_ZINDEX)
-        runner = Path(__file__).resolve().parents[1].joinpath("lanes/lane_runner.py").read_text()
-        self.assertIn("fix_red_classes.HEADER_ZINDEX", runner)
+
+    def test_shared_dispatcher_runs_the_header_rewrite(self):
+        import fix_red_compose
+        import lane_runner as lane
+
+        pr, worktree, log, receipt = _pr(), Path("tree"), "log", {}
+        with patch.object(lane.fix_red_rewrite, "rewrite_commit_push", return_value=sentinel.pushed) as rewrite:
+            fixer = fix_red_compose.deterministic_fixer(lane, classes.HEADER_ZINDEX)
+            self.assertIs(fixer(None, pr, {}, worktree, log, receipt), sentinel.pushed)
+        rewrite.assert_called_once_with(
+            lane.sh, pr, worktree, log, receipt, ("apps/web", "scripts/invariants"),
+            classes.rewrite_header_site_zindex,
+            "fix(web): point header chrome at the site-header z-index token",
+            "rewrote-header-zindex", "rewroteFiles")
 
     def test_lane_tests_lists_this_file(self):
         runner = Path(__file__).resolve().parents[1].joinpath("lanes/lane_runner.py").read_text()

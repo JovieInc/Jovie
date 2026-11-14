@@ -232,7 +232,7 @@ function ProfileReadyCard({
             </div>
           ) : (
             <div className='flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-surface-2 text-tertiary-token'>
-              <span className='text-lg font-medium'>
+              <span className='text-base font-medium'>
                 {displayName?.[0]?.toUpperCase() ?? '?'}
               </span>
             </div>

@@ -1,14 +1,23 @@
-"""Union empty-base Vitest statement insertions.
+"""Union Vitest statement insertions and proven additive named imports.
 
 Main's statements stay first, then head-only statements. A changed existing
 line, control flow, an unbalanced side, or a repeated binding or import of the
-same module with a different body stays unresolved. The caller proves the
-diff3 base is empty.
+same module with a different body stays unresolved unless the actual diff3
+base proves an additive import change and a full-file binding check passes.
+
+A duplicate UTC-noon test clock pin keeps main's patch target and the head's
+fixed instant. Any other overlap stays unresolved.
 """
 from __future__ import annotations
 
 import difflib
+import json
 import re
+import tempfile
+from datetime import datetime, timezone
+from pathlib import Path
+
+from atomic_state import atomic_write_text
 
 _HUNK = re.compile(
     r"^<<<<<<<[^\n]*\n(?P<ours>.*?)^\|{7}[^\n]*\n(?P<base>.*?)"
@@ -23,6 +32,111 @@ _CALL = re.compile(r"^[A-Za-z_$][\w$.]*\(")
 _FLOW = re.compile(
     r"^(?:return|throw|break|continue|yield|if|for|while|switch|try|else|catch|do)\b")
 _MARKERS = re.compile(r"(?m)^(?:<{7}|\|{7}|={7}|>{7})")
+_NAMED_IMPORT = re.compile(
+    r"import \{ (?P<names>[A-Za-z_$][\w$]*(?:, [A-Za-z_$][\w$]*)*) \} "
+    r"from (?P<quote>['\"])(?P<module>[^'\"\\\n]+)(?P=quote);\n")
+
+
+def _additive_named_imports(base: str, ours: str, theirs: str) -> str | None:
+    """Union only one-line named imports; every base binding must survive both sides."""
+    def parse(side):
+        imports, bindings, offset = {}, set(), 0
+        for match in _NAMED_IMPORT.finditer(side):
+            names = match['names'].split(', ')
+            module = match['module']
+            if (match.start() != offset or module in imports
+                    or len(names) != len(set(names)) or bindings.intersection(names)):
+                return None
+            imports[module] = (names, match['quote'])
+            bindings.update(names)
+            offset = match.end()
+        return imports if imports and offset == len(side) else None
+
+    original, head, main = parse(base), parse(ours), parse(theirs)
+    if original is None or head is None or main is None:
+        return None
+    for module, (names, _) in original.items():
+        if any(module not in side or not set(names).issubset(side[module][0])
+               for side in (head, main)):
+            return None
+    if any([module for module in side if module in original] != list(original)
+           for side in (head, main)):
+        return None
+    result, bindings = [], set()
+    for module in dict.fromkeys([*main, *head]):
+        names, quote = main.get(module, head.get(module))
+        merged = list(dict.fromkeys([*names, *head.get(module, ([], quote))[0]]))
+        if bindings.intersection(merged):
+            return None
+        bindings.update(merged)
+        result.append(f"import {{ {', '.join(merged)} }} from {quote}{module}{quote};\n")
+    return ''.join(result)
+
+
+# Reuse the installed TypeScript parser rather than approximating TSX bindings
+# with regex. This conservative check also refuses harmless local shadowing.
+_IMPORT_BINDINGS_CHECK = """
+const ts = require(process.argv[1]);
+const text = require('node:fs').readFileSync(process.argv[2], 'utf8');
+const source = ts.createSourceFile('merged.tsx', text, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+if (source.parseDiagnostics.length) process.exit(1);
+const spans = JSON.parse(process.argv[3]);
+const byteOffset = offset => Buffer.byteLength(text.slice(0, offset));
+const imports = source.statements.filter(ts.isImportDeclaration).map(statement => [
+  byteOffset(statement.getStart(source)), byteOffset(statement.end + (text[statement.end] === '\\n' ? 1 : 0)),
+]);
+for (const [start, end] of spans) {
+  let cursor = start;
+  for (const [from, to] of imports.filter(([from]) => from >= start && from < end)) {
+    if (from !== cursor || to > end) process.exit(1);
+    cursor = to;
+  }
+  if (cursor !== end) process.exit(1);
+}
+const imported = new Set();
+let valid = true;
+function names(name, visit) {
+  if (ts.isIdentifier(name)) visit(name.text);
+  else if (ts.isObjectBindingPattern(name) || ts.isArrayBindingPattern(name)) {
+    for (const element of name.elements) if (ts.isBindingElement(element)) names(element.name, visit);
+  }
+}
+for (const statement of source.statements) {
+  const add = name => { if (imported.has(name)) valid = false; imported.add(name); };
+  if (ts.isImportEqualsDeclaration(statement)) add(statement.name.text);
+  if (!ts.isImportDeclaration(statement) || !statement.importClause) continue;
+  const clause = statement.importClause;
+  if (clause.name) add(clause.name.text);
+  if (clause.namedBindings) {
+    if (ts.isNamespaceImport(clause.namedBindings)) add(clause.namedBindings.name.text);
+    else for (const element of clause.namedBindings.elements) add(element.name.text);
+  }
+}
+function declarations(node) {
+  if (node.name && (ts.isVariableDeclaration(node) || ts.isParameter(node)
+      || ts.isFunctionDeclaration(node) || ts.isClassDeclaration(node)
+      || ts.isEnumDeclaration(node) || ts.isTypeAliasDeclaration(node)
+      || ts.isInterfaceDeclaration(node) || ts.isModuleDeclaration(node))) {
+    names(node.name, name => { if (imported.has(name)) valid = false; });
+  }
+  ts.forEachChild(node, declarations);
+}
+declarations(source);
+process.exit(valid ? 0 : 1);
+"""
+
+
+def unique_import_bindings(text: str, worktree: Path, sh, spans=()) -> bool:
+    """Check the full resolved TSX file; missing installed parser leaves it manual."""
+    parser = Path(__file__).resolve().parents[2] / 'node_modules' / 'typescript'
+    try:
+        with tempfile.TemporaryDirectory() as scratch:
+            source = Path(scratch) / 'merged.tsx'
+            atomic_write_text(source, text)
+            return sh(['node', '-e', _IMPORT_BINDINGS_CHECK, str(parser), str(source), json.dumps(spans)],
+                      cwd=worktree).returncode == 0
+    except OSError:
+        return False
 
 
 def _statements(side: str) -> list[str] | None:
@@ -98,8 +212,8 @@ def _key(statement: str) -> str | None:
     return None
 
 
-def resolve_additive_statements_text(text: str) -> str | None:
-    """Union diff3 hunks whose base is empty and whose sides are statements.
+def resolve_additive_statements_text(text: str, *, validate_imports=None) -> str | None:
+    """Union empty-base statement hunks or additive named imports proven by diff3.
 
     None when any hunk has another shape, so the caller leaves that merge
     unresolved.
@@ -107,9 +221,21 @@ def resolve_additive_statements_text(text: str) -> str | None:
     matches = list(_HUNK.finditer(text))
     if not matches:
         return None
+    import_spans = []
+
+    def replace(match, replacement):
+        nonlocal text
+        delta = len(replacement) - (match.end() - match.start())
+        import_spans[:] = [(start + delta, end + delta) for start, end in import_spans]
+        text = text[:match.start()] + replacement + text[match.end():]
     for match in reversed(matches):
         if match["base"].strip():
-            return None
+            merged = _additive_named_imports(match['base'], match['ours'], match['theirs'])
+            if merged is None:
+                return None
+            replace(match, merged)
+            import_spans.append((match.start(), match.start() + len(merged)))
+            continue
         ours = _statements(match["ours"])
         theirs = _statements(match["theirs"])
         if ours is None or theirs is None:
@@ -126,9 +252,14 @@ def resolve_additive_statements_text(text: str) -> str | None:
             if prior is None:
                 seen[key] = statement.strip()
                 ordered.append(statement)
-        text = text[:match.start()] + "".join(ordered) + text[match.end():]
+        replace(match, "".join(ordered))
     if _MARKERS.search(text):
         return None
+    if import_spans:
+        # TypeScript reports UTF-16 positions; byte spans keep Unicode context exact.
+        spans = [(len(text[:start].encode()), len(text[:end].encode())) for start, end in import_spans]
+        if validate_imports is None or not validate_imports(text, spans):
+            return None
     return text
 
 
@@ -162,12 +293,121 @@ def contained_by_main(base: str, ours: str, theirs: str) -> str | None:
     return theirs
 
 
+# Head pins the shared time module to one UTC noon. Main wraps the same test
+# around patch.object(lane.time, "time") and still samples the wall clock.
+_HEAD_PIN = re.compile(
+    r"(?P<indent>[ ]+)"
+    r"(?:#.*\n(?P=indent))*"
+    r"@patch\(\"time\.time\", return_value=(?P<literal>\d[\d_]*(?:\.\d[\d_]*)?)\)"
+    r"(?:[ \t]+#.*)?\n"
+    r"(?P=indent)def (?P<name>test_[A-Za-z0-9_]+)\(self, _clock\):\n")
+_MAIN_WRAP = re.compile(
+    r"(?P<indent>[ ]+)def (?P<name>test_[A-Za-z0-9_]+)\(self\):\n"
+    r"(?:(?P=indent)[ ]+#.*\n)*"
+    r"(?P=indent)    now = \(time\.time\(\) - 12 \* 3600\) // 86400 \* 86400 \+ 12 \* 3600\n"
+    r"(?P=indent)    with patch\.object\((?P<target>[A-Za-z_]\w*)\.time, \"time\", "
+    r"return_value=now\):\n"
+    r"(?P=indent)        self\.(?P<helper>_[A-Za-z0-9_]+)\(now\)\n"
+    r"\n"
+    r"(?P=indent)def (?P=helper)\(self, now: float\):\n")
+_NOON_FORMULA = "    now = (time.time() - 12 * 3600) // 86400 * 86400 + 12 * 3600\n"
+
+
+def _one(pattern: re.Pattern[str], text: str) -> re.Match[str] | None:
+    found = list(pattern.finditer(text))
+    if len(found) != 1:
+        return None
+    return found[0]
+
+
+def _body_after(text: str, body_at: int, indent: str) -> tuple[str, int]:
+    """Lines of a method, including blank lines, up to the next sibling."""
+    index = body_at
+    while index < len(text):
+        newline = text.find("\n", index)
+        end = len(text) if newline < 0 else newline + 1
+        line = text[index:end]
+        if line.strip() and not line.startswith(indent + " "):
+            break
+        index = end
+    return text[body_at:index], index
+
+
+def _utc_noon(literal: str) -> str | None:
+    """Stamp a numeric literal that is an exact UTC noon, keeping its spelling."""
+    try:
+        number = float(literal)
+    except ValueError:
+        return None
+    if number != int(number):
+        return None
+    seconds = int(number)
+    if seconds % 86400 != 12 * 3600:
+        return None
+    return datetime.fromtimestamp(seconds, timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def merge_duplicate_clock_pin(base: str, ours: str, theirs: str) -> str | None:
+    """Keep main's lane.time patch and replace its formula with the head's noon.
+
+    The head may only add same-indent comments, one ``@patch("time.time")``
+    decorator, and a ``_clock`` parameter. Main may only wrap that same test in
+    ``patch.object`` and move its body into the helper, dropping one
+    ``now = time.time()`` line. A second edit on either side stays unresolved.
+    """
+    if any(_MARKERS.search(side) for side in (base, ours, theirs)):
+        return None
+    pin = _one(_HEAD_PIN, ours)
+    wrap = _one(_MAIN_WRAP, theirs)
+    if pin is None or wrap is None or pin.group("name") != wrap.group("name"):
+        return None
+    indent = pin.group("indent")
+    restored = indent + f"def {pin.group('name')}(self):\n"
+    if ours[:pin.start()] + restored + ours[pin.end():] != base:
+        return None
+    stamp = _utc_noon(pin.group("literal"))
+    if stamp is None or wrap.group("indent") != indent:
+        return None
+    header = indent + f"def {pin.group('name')}(self):\n"
+    base_at = base.find(header)
+    if base_at < 0 or base.find(header, base_at + 1) >= 0:
+        return None
+    if base_at and base[base_at - 1] != "\n":
+        return None
+    base_body, _base_end = _body_after(base, base_at + len(header), indent)
+    clock = [line for line in base_body.splitlines(keepends=True) if line.strip() == "now = time.time()"]
+    if len(clock) != 1 or base_body.count(clock[0]) != 1:
+        return None
+    helper_body, helper_end = _body_after(theirs, wrap.end(), indent)
+    if helper_body != base_body.replace(clock[0], "", 1):
+        return None
+    if theirs[:wrap.start()] + header + base_body + theirs[helper_end:] != base:
+        return None
+    formula = indent + _NOON_FORMULA
+    if theirs.count(formula) != 1:
+        return None
+    merged = theirs.replace(
+        formula,
+        indent + f"    now = {pin.group('literal')}  # {stamp}\n",
+        1)
+    if _MARKERS.search(merged):
+        return None
+    return merged
+
+
 def contained_by_main_file(worktree, rel, sh) -> str | None:
-    """Read Git's actual base/PR/main stages, refusing missing stages."""
+    """Read Git's actual base/PR/main stages, refusing missing stages.
+
+    A duplicate UTC-noon clock pin is merged when main does not already
+    contain the PR edit. Every other shape still fails closed.
+    """
     stages = []
     for stage in (1, 2, 3):
         blob = sh(["git", "show", f":{stage}:{rel}"], cwd=worktree)
         if blob.returncode:
             return None
         stages.append(blob.stdout)
-    return contained_by_main(*stages)
+    landed = contained_by_main(*stages)
+    if landed is not None:
+        return landed
+    return merge_duplicate_clock_pin(*stages)

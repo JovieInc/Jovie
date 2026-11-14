@@ -1,9 +1,10 @@
 'use client';
 
-import { Tooltip, TooltipContent, TooltipTrigger } from '@jovie/ui';
+import { Button, Tooltip, TooltipContent, TooltipTrigger } from '@jovie/ui';
 import { Lock } from 'lucide-react';
 import Link from 'next/link';
 import { useEffect, useRef } from 'react';
+import { UpgradeButton } from '@/components/molecules/UpgradeButton';
 import { APP_ROUTES } from '@/constants/routes';
 import { track } from '@/lib/analytics';
 import { PRO_PLAN_DISPLAY_NAME } from '@/lib/config/plan-prices';
@@ -40,19 +41,38 @@ export function SettingsPlanGateLabel({
     ? `${featureContext} is available on ${planName}`
     : `Available on ${planName}`;
 
+  const trigger = (
+    <TooltipTrigger asChild>
+      <Button
+        type='button'
+        variant='link'
+        size='sm'
+        asChild={planName !== PRO_PLAN_DISPLAY_NAME}
+        aria-label={`Upgrade to ${planName}`}
+        onClick={handleUpgradeClick}
+      >
+        {planName === PRO_PLAN_DISPLAY_NAME ? (
+          <>
+            <Lock className='h-3.5 w-3.5' aria-hidden='true' />
+            {planName}
+          </>
+        ) : (
+          <Link href={APP_ROUTES.PRICING}>
+            <Lock className='h-3.5 w-3.5' aria-hidden='true' />
+            {planName}
+          </Link>
+        )}
+      </Button>
+    </TooltipTrigger>
+  );
+
   return (
     <Tooltip>
-      <TooltipTrigger asChild>
-        <Link
-          href={APP_ROUTES.PRICING}
-          aria-label={`Upgrade to ${planName}`}
-          className='inline-flex items-center gap-1 rounded-sm text-app text-tertiary-token underline underline-offset-2 transition-colors hover:text-secondary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus/20'
-          onClick={handleUpgradeClick}
-        >
-          <Lock className='h-3.5 w-3.5' aria-hidden='true' />
-          {planName}
-        </Link>
-      </TooltipTrigger>
+      {planName === PRO_PLAN_DISPLAY_NAME ? (
+        <UpgradeButton asChild>{trigger}</UpgradeButton>
+      ) : (
+        trigger
+      )}
       <TooltipContent side='top'>
         <span>{tooltipLabel}</span>
       </TooltipContent>

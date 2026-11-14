@@ -99,7 +99,13 @@ export function Footer({
 
     return (
       <footer className={`${config.containerClass} ${className}`}>
-        <div className='flex flex-col items-center justify-center space-y-1.5 pb-2'>
+        {/* Mobile reserves the band the absolute legal links occupy
+            (bottom-2 right-4, 44pt hit boxes): without it the centered
+            branding link's own 44pt box overlaps them at narrow widths and
+            the unobscured target falls under 24px (axe target-size,
+            WCAG 2.5.8). Desktop pins its legal links to the viewport
+            corner instead, so the reservation is mobile-only. */}
+        <div className='flex flex-col items-center justify-center space-y-1.5 pb-16 md:pb-2'>
           <FooterBranding
             artistHandle={artistHandle}
             variant={config.colorVariant}
