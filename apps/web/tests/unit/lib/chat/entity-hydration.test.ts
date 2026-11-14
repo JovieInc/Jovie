@@ -171,6 +171,17 @@ describe('@profile references (chats started from a profile)', () => {
     expect(block).not.toContain('Do not reply with a generic menu');
   });
 
+  it('briefs only the opening turn, matching where next moves show', () => {
+    const block = buildReferencedEntitiesBlock({
+      userTexts: [profileChip, 'What should I post this week?'],
+      ownedReleases: [],
+      artist: ARTIST,
+      ownProfileId: 'profile-own',
+    });
+    expect(block).toContain("the user's own Jovie profile");
+    expect(block).not.toContain('Do not reply with a generic menu');
+  });
+
   it('skips the opener brief once the person asks something', () => {
     const asked = `${profileChip} How do I grow my audience?`;
     const block = buildReferencedEntitiesBlock({
