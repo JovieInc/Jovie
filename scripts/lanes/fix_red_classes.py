@@ -37,15 +37,16 @@ from fix_red_source_edits import (  # noqa: F401
     balance_added_headings, snap_added_conservative_spacing, strip_added_legacy_cache_exports,
     resolve_additive_node_tests_text, resolve_additive_node_test_file, resolve_additive_list_conflict, size_500_stale_hit,
 )
+from fix_red_ui_feel import apply as apply_ui_feel, publish as publish_ui_feel  # noqa: F401
 
 SCHEMA = "jovie-fix-red-class/v1"
 # Actions a class can route to. `agent` is the default (a model run); the others spend no model.
-RERUN, SYNC_MAIN, WIRE_CI_FAST, RENUMBER, STAMP_CHANGELOG, SNAP_SPACING, STRIP_CACHE, MERGE_NARROWED, REGISTER_DOMAIN, ATOMIC_WRITE, REPAIR_SCREEN_CERT, BALANCE_HEADINGS, AGENT, COMPOSE = (
+RERUN, SYNC_MAIN, WIRE_CI_FAST, RENUMBER, STAMP_CHANGELOG, SNAP_SPACING, STRIP_CACHE, MERGE_NARROWED, REGISTER_DOMAIN, ATOMIC_WRITE, REPAIR_SCREEN_CERT, BALANCE_HEADINGS, UI_FEEL, AGENT, COMPOSE = (
     "rerun", "sync-main", "wire-ci-fast", "renumber-migrations", "stamp-changelog", "snap-spacing",
-    "strip-cache-exports", "merge-narrowed-preflight", "register-domain-writes", "atomic-write", "repair-screen-cert", "balance-headings", "agent", "compose")
+    "strip-cache-exports", "merge-narrowed-preflight", "register-domain-writes", "atomic-write", "repair-screen-cert", "balance-headings", "ui-feel", "agent", "compose")
 DETERMINISTIC = frozenset({
     RERUN, SYNC_MAIN, WIRE_CI_FAST, RENUMBER, STAMP_CHANGELOG, SNAP_SPACING, STRIP_CACHE, MERGE_NARROWED,
-    REGISTER_DOMAIN, ATOMIC_WRITE, REPAIR_SCREEN_CERT, BALANCE_HEADINGS, ALIAS_ACTION})
+    REGISTER_DOMAIN, ATOMIC_WRITE, REPAIR_SCREEN_CERT, BALANCE_HEADINGS, UI_FEEL, ALIAS_ACTION})
 
 # remediation.INFRA_TEXT (runner loss, OOM, 5xx) plus the platform failures seen in 52 agent-declined
 # fix runs. Kept out of INFRA_TEXT: the exhausted-PR classifier deliberately routes a rate-limited
@@ -59,6 +60,7 @@ PLATFORM_TEXT = re.compile(
 # scripts/security/dual-license-elections.json. Never drop a deny-licenses id.
 DEPENDENCY_LICENSE = re.compile(r"Dependency review detected incompatible licenses")
 QUOTA_TEXT = re.compile(r"github-quota-deferred|Fleet rule evidence is (?:missing|deferred)", re.IGNORECASE)
+UI_FEEL_TEXT = re.compile(r"\[lint:ui-feel\] new violations on lines this change adds:")
 UNWIRED = re.compile(r"Unwired: (.+?)\. Wire each file into a ci-fast lane")
 ATOMIC_TEXT = re.compile(r"use atomic_state\.atomic_write_text for whole-file state")
 BODY_TEXT = re.compile(r"red-before-green:|PR body is missing|missing (?:a )?`?## ?(?:Red-before-green|Blast radius)",
@@ -156,6 +158,7 @@ SIGNATURES = (
     ("changelog-metadata", CHANGELOG_MISSING, STAMP_CHANGELOG),
     ("cache-surface", CACHE_SURFACE_TEXT, STRIP_CACHE),
     ("spacing-scale", SPACING_RATCHET_TEXT, SNAP_SPACING),
+    ("ui-feel", UI_FEEL_TEXT, UI_FEEL),
     ("heading-balance", HEADING_BALANCE_TEXT, BALANCE_HEADINGS),
     ("census-certification", CENSUS_CERTIFICATION, SYNC_MAIN),
     ("design-source-cli", DESIGN_SOURCE_CLI, SYNC_MAIN),
