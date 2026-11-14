@@ -76,6 +76,70 @@ vi.mock('next/navigation', () => ({
   redirect: vi.fn(),
 }));
 
+// Shell leaf-route metadata coverage (dogfood 2026-11-10): the page modules
+// below are imported only to read their static `metadata` exports. Their
+// heavy children are mocked; nothing renders here.
+vi.mock('@/components/organisms/table', () => ({
+  PAGE_TOOLBAR_META_TEXT_CLASS: 'test-toolbar-meta',
+  PageToolbar: () => null,
+}));
+vi.mock('@/components/organisms/WorkspacePage', () => ({
+  WorkspacePage: () => null,
+}));
+vi.mock('@/features/feedback/PageErrorState', () => ({
+  PageErrorState: () => null,
+}));
+vi.mock('@/features/dashboard/insights/InsightsPanel', () => ({
+  InsightsPanel: () => null,
+}));
+vi.mock('@/app/app/(shell)/app-shell-route-context', () => ({
+  loadAppShellRouteContext: vi.fn().mockResolvedValue({
+    ok: true,
+    profileId: 'profile-1',
+    userId: 'user-1',
+    dashboardData: {
+      selectedProfile: { username: 'test-artist' },
+    },
+  }),
+}));
+vi.mock('@/app/app/(shell)/links/LinksPageClient', () => ({
+  LinksPageClient: () => null,
+}));
+vi.mock('@/app/app/(shell)/links/links-data', () => ({
+  loadLinksWorkspaceData: vi
+    .fn()
+    .mockResolvedValue({ rows: [], loadFailed: false }),
+}));
+vi.mock('@/app/app/(shell)/threads/ThreadsPageClient', () => ({
+  ChatsPageClient: () => null,
+}));
+vi.mock('@/app/app/(shell)/tour-dates/TourDatesPageClient', () => ({
+  TourDatesPageClient: () => null,
+}));
+vi.mock('@/app/app/(shell)/dashboard/tour-dates/actions', () => ({
+  loadTourDates: vi.fn().mockResolvedValue([]),
+  checkBandsintownConnection: vi.fn().mockResolvedValue({
+    connected: false,
+    hasApiKey: false,
+    artistName: null,
+    lastSyncedAt: null,
+  }),
+}));
+vi.mock('@/lib/error-tracking', () => ({
+  captureError: vi.fn(),
+}));
+vi.mock('@/lib/queries', () => ({
+  queryKeys: {
+    tourDates: {
+      connection: () => 'tour-dates-connection',
+      list: () => 'tour-dates-list',
+    },
+    events: {
+      list: () => 'events-list',
+    },
+  },
+}));
+
 const CHAT_THREAD_PAGE = resolve(
   process.cwd(),
   'app/app/(shell)/chat/[id]/page.tsx'
@@ -159,5 +223,36 @@ describe('dashboard metadata generation', () => {
     expect(children.some(child => child.type === OpportunityInboxRoute)).toBe(
       true
     );
+  });
+});
+
+// The root app layout owns `title: { template: '%s | Jovie' }`. Shell pages
+// must export the bare route name so the template supplies exactly one brand
+// suffix; a child title that already carries `| Jovie` renders it twice
+// ('Links | Jovie | Jovie'), and a page without metadata falls back to the
+// bare default and never names the route.
+describe('shell leaf-route document titles', () => {
+  it('names the links route and lets the layout template brand it', async () => {
+    const { metadata } = await import('@/app/app/(shell)/links/page');
+
+    expect(metadata?.title).toBe('Links');
+  });
+
+  it('names the tour dates route and lets the layout template brand it', async () => {
+    const { metadata } = await import('@/app/app/(shell)/tour-dates/page');
+
+    expect(metadata?.title).toBe('Tour Dates');
+  });
+
+  it('gives the chats route its own document title', async () => {
+    const { metadata } = await import('@/app/app/(shell)/chats/page');
+
+    expect(metadata?.title).toBe('Chats');
+  });
+
+  it('gives the insights route its own document title', async () => {
+    const { metadata } = await import('@/app/app/(shell)/insights/page');
+
+    expect(metadata?.title).toBe('Insights');
   });
 });
