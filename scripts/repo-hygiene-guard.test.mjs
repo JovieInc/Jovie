@@ -18,6 +18,7 @@ import {
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import test from 'node:test';
+import { gitLsFiles } from './lib/git-ls-files.mjs';
 import {
   GEN_JSON_SIZE_ALLOWLIST,
   MAX_GEN_JSON_BYTES,
@@ -494,12 +495,7 @@ test('blocks new repository-root entries outside the allowlist', () => {
 });
 
 test('root allowlist names exactly the tracked top-level entries', () => {
-  const tracked = new Set(
-    execFileSync('git', ['ls-files', '-z'], { encoding: 'utf8' })
-      .split('\0')
-      .filter(Boolean)
-      .map(path => path.split('/')[0])
-  );
+  const tracked = new Set(gitLsFiles().map(path => path.split('/')[0]));
   const stale = [...REPO_ROOT_ALLOWLIST].filter(entry => !tracked.has(entry));
   const missing = [...tracked].filter(entry => !REPO_ROOT_ALLOWLIST.has(entry));
   assert.deepEqual(

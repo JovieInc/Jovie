@@ -10,6 +10,7 @@ import {
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
+import { gitLsFiles } from '../git-ls-files.mjs';
 import {
   classifyLockfileChange,
   classifyProductLanes,
@@ -1064,11 +1065,7 @@ describe('product lane classifier', () => {
     expect(() => classifyProductLanes(['new-product/main.ts'])).toThrow(
       ProductLaneClassificationError
     );
-    const tracked = execFileSync('git', ['ls-files', '-z'], {
-      encoding: 'utf8',
-    })
-      .split('\0')
-      .filter(Boolean);
+    const tracked = gitLsFiles();
     expect(() => classifyProductLanes(tracked)).not.toThrow();
   });
 

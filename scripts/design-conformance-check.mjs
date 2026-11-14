@@ -72,7 +72,10 @@ function safeRepoPath(value) {
 
 function trackedFiles(repoRoot) {
   return new Set(
-    execFileSync('git', ['ls-files', '-z'], { cwd: repoRoot })
+    execFileSync('git', ['ls-files', '-z'], {
+      cwd: repoRoot,
+      maxBuffer: 256 * 1024 * 1024,
+    })
       .toString('utf8')
       .split('\0')
       .filter(Boolean)
