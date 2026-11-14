@@ -9,6 +9,14 @@ import {
   test,
 } from '@playwright/test';
 import { wcag22AaAxeOptions } from '@/lib/a11y-gates/wcag-standard.cjs';
+import {
+  attachWaitlistDiagnostics,
+  type ComposingKeyObservation,
+  dispatchComposingKey,
+  focusWaitlistOption,
+  observeWaitlistProofErrors,
+  WAITLIST_COMPOSING_KEYS,
+} from './fixtures/waitlist-composition-evidence';
 
 const INPUT_MATRIX_STORY_ID = 'ui-atoms-input--conformance-matrix';
 const INPUT_FOCUS_STORY_ID = 'ui-atoms-input--keyboard-focus';
@@ -403,26 +411,8 @@ test.describe('Waitlist Spotify native composition events', () => {
       test(`composition preserves editing before ordinary ${option} activation [${theme}]`, async ({
         page,
       }, testInfo) => {
-        const pageErrors: string[] = [];
-        const resourceErrors: string[] = [];
-        const events: Array<{
-          key: string;
-          isComposing: boolean;
-          defaultPrevented: boolean;
-        }> = [];
-        page.on('pageerror', error => pageErrors.push(error.message));
-        page.on('console', message => {
-          if (message.type() === 'error') pageErrors.push(message.text());
-        });
-        page.on('requestfailed', request =>
-          resourceErrors.push(
-            `${request.url()}: ${request.failure()?.errorText}`
-          )
-        );
-        page.on('response', response => {
-          if (response.status() >= 400)
-            resourceErrors.push(`${response.status()} ${response.url()}`);
-        });
+        const { pageErrors, resourceErrors } = observeWaitlistProofErrors(page);
+        const events: ComposingKeyObservation[] = [];
 
         const root = page.locator('#storybook-root');
         const name = `waitlist-composition-${theme}-${option}`;
@@ -442,12 +432,7 @@ test.describe('Waitlist Spotify native composition events', () => {
           await expect(
             root.getByRole('button', { name: /Neon Harbour/ })
           ).toBeVisible();
-          await search.focus();
-          await page.keyboard.press('ArrowDown');
-          if (option === 'manual') {
-            await page.keyboard.press('ArrowDown');
-            await page.keyboard.press('ArrowDown');
-          }
+          await focusWaitlistOption(page, search, option);
           const activeOption =
             option === 'artist' ? 'spotify-result-0' : 'spotify-result-2';
           await expect(search).toHaveAttribute(
@@ -456,27 +441,8 @@ test.describe('Waitlist Spotify native composition events', () => {
           );
 
           // These are native DOM event flags, not an OS input-method replay.
-          for (const key of [
-            'Enter',
-            'ArrowDown',
-            'ArrowUp',
-            'Escape',
-            'Tab',
-          ]) {
-            const event = await search.evaluate((element, composingKey) => {
-              const keydown = new KeyboardEvent('keydown', {
-                key: composingKey,
-                isComposing: true,
-                bubbles: true,
-                cancelable: true,
-              });
-              element.dispatchEvent(keydown);
-              return {
-                key: composingKey,
-                isComposing: keydown.isComposing,
-                defaultPrevented: keydown.defaultPrevented,
-              };
-            }, key);
+          for (const key of WAITLIST_COMPOSING_KEYS) {
+            const event = await dispatchComposingKey(search, key);
             events.push(event);
             expect(event.isComposing).toBe(true);
             expect(event.defaultPrevented).toBe(false);
@@ -513,31 +479,16 @@ test.describe('Waitlist Spotify native composition events', () => {
           } catch (error) {
             screenshotFailure = error;
           }
-          const evidence = JSON.stringify(
-            {
-              theme,
-              option,
-              events,
-              pageErrors,
-              resourceErrors,
-              failure: failure === undefined ? null : String(failure),
-              screenshotFailure:
-                screenshotFailure === undefined
-                  ? null
-                  : String(screenshotFailure),
-            },
-            null,
-            2
-          );
-          await testInfo.attach(`${name}.json`, {
-            body: evidence,
-            contentType: 'application/json',
+          await attachWaitlistDiagnostics(testInfo, EVIDENCE_DIR, name, {
+            theme,
+            option,
+            events,
+            pageErrors,
+            resourceErrors,
+            failure,
+            screenshotFailure,
           });
-          await mkdir(EVIDENCE_DIR, { recursive: true });
-          await writeFile(join(EVIDENCE_DIR, `${name}.json`), evidence);
         }
-        if (failure !== undefined) throw failure;
-        if (screenshotFailure !== undefined) throw screenshotFailure;
         await attachA11yResult(page, testInfo, `${name}-a11y.json`);
         expect(pageErrors).toEqual([]);
         expect(resourceErrors).toEqual([]);
