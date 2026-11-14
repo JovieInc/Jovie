@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { YoutubeThumbnailsLanding } from '@/app/(marketing)/youtube-thumbnails/YoutubeThumbnailsLanding';
 import { MARKETING_PAGE_CONTRACTS } from '@/data/marketing/pageContracts';
 import { MARKETING_PEN_CONTRACT_IDS } from '@/data/marketing/penContracts';
+import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import { MarketingPageContractMarkers } from './MarketingPageContractMarkers';
 import { PublicPageShell } from './PublicPageShell';
 
@@ -181,6 +182,31 @@ describe('PublicPageShell', () => {
     expect(
       screen.getByRole('link', { name: 'Claim your profile' })
     ).toHaveAttribute('href', '/start');
+  });
+
+  it.each([
+    ['default frame', {}],
+    ['minimal frame', { footerVariant: 'minimal' as const, mainOffset: false }],
+  ])('has no axe violations in the %s', async (_label, props) => {
+    const { container } = render(
+      <PublicPageShell {...props}>
+        <h1>Public page content</h1>
+      </PublicPageShell>
+    );
+    expect(screen.getByRole('main')).toHaveTextContent('Public page content');
+    await expectNoA11yViolations(container);
+  });
+
+  it('keeps one main landmark for a right-to-left page', async () => {
+    const { container } = render(
+      <div dir='rtl' lang='ar'>
+        <PublicPageShell footerVariant='minimal'>
+          <h1>محتوى الصفحة العامة</h1>
+        </PublicPageShell>
+      </div>
+    );
+    expect(screen.getAllByRole('main')).toHaveLength(1);
+    await expectNoA11yViolations(container);
   });
 
   it('uses min-h-svh so iOS Safari chrome cannot jump the public shell', () => {

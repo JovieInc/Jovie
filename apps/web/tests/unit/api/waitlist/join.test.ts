@@ -65,11 +65,16 @@ describe('POST /api/waitlist/join', () => {
     delete process.env.FEATURE_PUBLIC_SIGNUP_CLOSED;
   });
 
-  it('is inert while public signup is open', async () => {
+  it('keeps saving entries while the signup kill switch is off (open signup)', async () => {
+    // Public signup is open by default (Tim, 2026-11-09): the homepage
+    // waitlist role form keeps working. The rest of this suite runs with the
+    // kill switch on (beforeEach) and must save entries too — the route
+    // serves both modes.
     process.env.FEATURE_PUBLIC_SIGNUP_CLOSED = 'false';
     const response = await POST(request(validBody));
-    expect(response.status).toBe(404);
-    expect(mocks.joinWaitlistWithRole).not.toHaveBeenCalled();
+    expect(response.status).toBe(201);
+    await expect(response.json()).resolves.toEqual({ state: 'joined' });
+    expect(mocks.joinWaitlistWithRole).toHaveBeenCalled();
   });
 
   it('stores the role and normalized email after Turnstile passes', async () => {

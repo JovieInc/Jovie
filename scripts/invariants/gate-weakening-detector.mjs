@@ -39,7 +39,9 @@ export function loadConfig(url = CONFIG_URL) {
 export function evaluateGateWeakening(files, config = loadConfig()) {
   const findings = [];
   for (const file of files ?? []) {
-    if (!file?.path || excluded(file.path, config) || isGeneratedReport(file.path, config)) continue;
+    if (!file?.path) continue;
+    if ((config.jumpPolicyPin?.paths ?? []).includes(file.previousPath)) findings.push(finding('jump-policy-changed', file.path, `${file.previousPath} renamed out of the watched paths`));
+    if (excluded(file.path, config) || isGeneratedReport(file.path, config)) continue;
     findings.push(...inspectInvariantTest(file));
     if (isSelf(file.path, config)) {
       findings.push(...inspectSelf(file));
@@ -170,7 +172,6 @@ function inspectGateFile(file, config) {
     if (removed.includes(config.jumpPolicyPin?.guardId)) add('jump-policy-changed', `${config.jumpPolicyPin.guardId} guard removed`);
   }
   if ((config.jumpPolicyPin?.paths ?? []).includes(file.path) && file.before != null && file.after !== file.before) add('jump-policy-changed', 'jump policy pin changed');
-  if ((config.jumpPolicyPin?.paths ?? []).includes(file.previousPath)) add('jump-policy-changed', `${file.previousPath} renamed out of the watched paths`);
   if (isCiYaml(file.path)) {
     for (const line of added) {
       if (/^\s*#/.test(line)) continue;
@@ -210,7 +211,7 @@ function inspectInvariantTest(file) {
 }
 function inspectSelf(file) {
   if (file.path.endsWith('gate-weakening-detector.mjs')) {
-    return file.before != null && file.after == null ? [finding('detector-deleted', file.path, 'script removed')] : [];
+    return file.after == null ? [finding('detector-deleted', file.path, 'script removed')] : file.before !== file.after ? [finding('detector-modified', file.path, 'script modified')] : [];
   }
   if (!file.path.endsWith('gate-weakening-detector.config.json') || file.before == null) {
     return [];
@@ -229,9 +230,9 @@ function inspectSelf(file) {
   const findings = [];
   const add = (kind, detail) => findings.push(finding(kind, file.path, detail));
   if (before.schema !== after.schema || before.invariantId !== after.invariantId) add('detector-rule-removed', 'identity');
-  for (const kind of before.requiredKinds ?? []) {
-    if (!(after.requiredKinds ?? []).includes(kind)) add('detector-rule-removed', kind);
-  }
+  for (const kind of before.requiredKinds ?? []) if (!(after.requiredKinds ?? []).includes(kind)) add('detector-rule-removed', kind);
+  for (const entry of new Set([...(before.selfPaths ?? []), ...(after.selfPaths ?? [])]))
+    if ((before.selfPaths ?? []).includes(entry) !== (after.selfPaths ?? []).includes(entry)) add('detector-selfpaths-changed', entry);
   if (before.jumpPolicyPin != null && (JSON.stringify(before.jumpPolicyPin.paths ?? []) !== JSON.stringify(after.jumpPolicyPin?.paths ?? []) || before.jumpPolicyPin.guardId !== after.jumpPolicyPin?.guardId)) add('jump-policy-changed', 'jumpPolicyPin watch changed');
   for (const exclusion of after.scanExclusions ?? []) {
     if (!(before.scanExclusions ?? []).includes(exclusion)) {
@@ -438,7 +439,7 @@ const excluded = (path, config) => (config.scanExclusions ?? []).some(prefix => 
 // Machine-written reports (exact paths) are measurements, not gates: a refresh of
 // their numbers is not a threshold change. Growing the list is itself flagged.
 const isGeneratedReport = (path, config) => (config.generatedReports ?? []).includes(path);
-const isSelf = (path, config) => (config.selfPaths ?? []).includes(path);
+const isSelf = (path, config) => /gate-weakening-detector\.(?:mjs|config\.json|test\.mjs)$/.test(path) || (config.selfPaths ?? []).includes(path);
 const isRuleset = path => /ruleset|branch-protection|branch_protection/i.test(path);
 const isCiYaml = path => /^(\.github\/|github\/rulesets\/|scripts\/ci-|scripts\/lib\/ci-)/.test(path) && /\.(?:yml|yaml|mjs|js)$/.test(path);
 const isShrinkOnly = path => {

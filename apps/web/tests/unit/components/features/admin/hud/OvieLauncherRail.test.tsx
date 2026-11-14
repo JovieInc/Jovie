@@ -207,4 +207,25 @@ describe('OvieLauncherRail loading geometry', () => {
     ).toBeInTheDocument();
     expect(screen.queryByTestId('ovie-launcher-skeleton')).toBeNull();
   });
+
+  it('keeps the reserved geometry when the lock status replaces the skeleton', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi
+        .fn()
+        .mockResolvedValue({ ok: false, status: 403, json: async () => ({}) })
+    );
+    render(<OvieLauncherRail />);
+    expect(
+      await screen.findByText(
+        'Admin data is locked. Unlock with Touch ID, then retry.'
+      )
+    ).toBeInTheDocument();
+    // The 403 swap must not collapse the reserved slot geometry: the
+    // skeleton stays mounted as invisible quiet structure under the status
+    // overlay, so the lock swap cannot shift the HUD below the rail
+    // (JOV-12518 CLS on /hud?fs=1).
+    const skeleton = screen.getByTestId('ovie-launcher-skeleton');
+    expect(skeleton.parentElement).toHaveClass('invisible');
+  });
 });

@@ -16,6 +16,15 @@ ds-owner, tokens, states, tests, a11y and frontend-rules as each component is
 certified; mutation, visual and benchmark join once their producers record
 source-bound evidence.
 
+Order: `gates` and `waivers` in `component-certification.json` and screen
+`debt` in `cert-screens.json` stay sorted by component path (plain code-unit
+order), so a new entry lands at its own place instead of at the end, where
+every PR appends; two PRs then conflict only when their components are path
+neighbours. The gate fails on a map out of order, and
+`node scripts/component-certificate.mjs --sort` sorts all three (the state
+order inside a waiver stays as written). `--refresh` and `--enroll` write debt
+sorted.
+
 Fail-closed: a criterion with no evidence is `unknown` and counts as missing.
 Invalid JSON in an input file blocks report generation with a nonzero exit.
 
@@ -25,24 +34,45 @@ Invalid JSON in an input file blocks report generation with a nonzero exit.
 | tokens | no palette classes, raw white/black, hex or colour functions | source (static) |
 | states | each reachable state (loading, empty, error, partial, long-content, offline, permission-denied, rtl-overflow) has a story export, or a written waiver in `component-certification.json` | story file |
 | tests | colocated test with assertions and, for interactive components, user-event interaction | test file |
-| a11y | axe assertion in the current unit test, or passing CI evidence with the current component `sourceHash` | test file / CI |
+| a11y | current source/render-bound CI evidence, or unit axe when no CI observation exists | test file / CI |
 | frontend-rules | no inline components, autoFocus, unstable keys, dimensionless images, null-while-loading, reset-on-open effects; text inputs have an input-retention test | source + test |
 | forced-caps | no `uppercase` utility, `text-transform: uppercase` or inline `textTransform: 'uppercase'` (ASR-022); artist and release names keep their own spelling | source (static), rule in `scripts/lib/design-rules/forced-caps.mjs` |
 | mutation | sweep score at least `policy.mutationMin` (80), matching the current source/test `blob` key with a recorded run `sha` | `jovie-mutation` sweep state |
-| visual | CI-captured baseline of the state stories with the current component `sourceHash` (never a Storybook build on gem) | CI artifact |
+| visual | CI capture of state stories with current component `sourceHash` and shared `renderInputs` binding (never a Storybook build on gem) | CI artifact |
 | journeys | every golden-path journey touching the component has a browser spec | `component-journeys.json` |
 | benchmark | judgment recorded against the current `benchmark-library.json`, source unchanged, a named `reference` (or a written `noPatternReason`), every gap with item/decision/reference, every adopt/adapt gap done, every skip has a reason | `component-benchmarks.json` |
 
 The certificate computes its binding from the component's actual source bytes.
 CI a11y, visual, and benchmark records must carry that SHA-256 `sourceHash`;
-stale or unbound records remain `unknown`. Current unit-axe assertions remain
-an independent source of a11y evidence.
+stale or unbound records remain `unknown`. Unit axe remains a fallback when
+there is no CI observation; it cannot mask a stale pass or failure.
 
 A passing a11y or visual record is a story-capture receipt
 (`jovie.component-story-evidence/v1`, `scripts/lib/component-evidence.mjs`):
-`sourceHash`, `captured`, and `stories: [{ id, themes }]` where every story was
+`sourceHash`, `renderInputs`, `captured`, and `stories: [{ id, themes }]` where every story was
 captured in both `light` and `dark`. A pass without that proof is ignored (the
-CLI names it on stderr), so the criterion stays unknown; a `fail` always stands.
+CLI names it on stderr), so the criterion stays unknown. Both passes and failures
+need current source and render bindings. Legacy receipts without the new binding
+remain readable historical evidence but cannot certify the current tree.
+
+`renderInputs` uses `jovie.component-render-inputs/v1`: one sorted current-byte
+SHA-256 snapshot per run, shared by every component. It includes frontend and
+workspace package inputs, styles, stories, public assets, root build/package
+pins, patches, and capture/evaluator scripts. Ordinary API/action routes, tests,
+and documentation are excluded. Additions and unstaged edits count; missing
+tracked files or unreadable Git/input state fail closed. Internal asset symlinks
+bind their literal target and resolved file bytes; escaping/broken links fail
+closed. The workflow contract tests enumerate current inputs and asset targets
+to prove they can trigger refresh. New links into otherwise excluded locations
+need explicit trigger admission. This is conservative render provenance, not a
+complete transitive graph or authentication of an arbitrary `--base-url` server.
+
+The consumer expects the hosted full-catalog Storybook settings (manual axe,
+development mode, default public build values). Pilot or other noncanonical settings
+cannot reuse that binding. Hosted capture starts a fresh server from the same
+checkout. New shared-input paths refresh the existing canonical capture job;
+the sixteen-shard matrix keeps its previous eligibility. Benchmarks and mutation
+retain their existing, narrower contracts; this binding does not upgrade them.
 
 `scripts/component-story-evidence.mjs` produces those receipts for every
 `packages/ui` component. The `component-story-evidence` job in

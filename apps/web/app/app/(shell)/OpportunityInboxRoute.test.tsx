@@ -12,6 +12,7 @@ const mocks = vi.hoisted(() => ({
   loadAuthenticatedAppShellUserId: vi.fn(),
   loadOpportunityInboxData: vi.fn(),
   loadOpportunityInboxTourDateSections: vi.fn(),
+  shouldShowPmfSurvey: vi.fn(),
   redirect: vi.fn((url: string) => {
     throw new Error(`REDIRECT:${url}`);
   }),
@@ -20,6 +21,17 @@ const mocks = vi.hoisted(() => ({
 vi.mock('@/lib/admin/middleware', () => ({ checkIsAdmin: mocks.checkIsAdmin }));
 vi.mock('./PipelineBottleneckBannerLazy', () => ({
   PipelineBottleneckBannerLazy: () => <div data-testid='pipeline-banner' />,
+}));
+
+vi.mock('@/lib/pmf/prompt.server', () => ({
+  shouldShowPmfSurvey: mocks.shouldShowPmfSurvey,
+}));
+vi.mock('./pmf-survey-actions', () => ({
+  dismissPmfSurvey: vi.fn(),
+  submitPmfSurveyAnswer: vi.fn(),
+}));
+vi.mock('@/components/features/pmf-survey/PmfSurveyCard', () => ({
+  PmfSurveyCard: () => <div data-testid='pmf-survey-card' />,
 }));
 
 vi.mock('next/navigation', () => ({
@@ -142,6 +154,19 @@ describe('OpportunityInboxRoute', () => {
     mocks.getProfileSocialLinks.mockResolvedValue([{ id: 'link-1' }]);
     mocks.loadOpportunityInboxTourDateSections.mockResolvedValue(TOUR_DATES);
     mocks.getCanonicalProfileDSPs.mockReturnValue([{ id: 'spotify' }]);
+    mocks.shouldShowPmfSurvey.mockResolvedValue(false);
+  });
+
+  it('mounts the PMF survey card only when the prompt is due', async () => {
+    const view = render(await OpportunityInboxRoute());
+    expect(screen.queryByTestId('pmf-survey-card')).not.toBeInTheDocument();
+    mocks.shouldShowPmfSurvey.mockResolvedValue(true);
+    view.rerender(await OpportunityInboxRoute());
+    expect(screen.getByTestId('pmf-survey-card')).toBeInTheDocument();
+    expect(screen.getByTestId('opportunity-inbox-client')).toBeInTheDocument();
+    expect(mocks.shouldShowPmfSurvey).toHaveBeenCalledWith({
+      now: expect.any(Date),
+    });
   });
 
   it('mounts the banner only for admins', async () => {

@@ -1,5 +1,6 @@
-import { render, screen } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { fireEvent, render, screen } from '@testing-library/react';
+import { describe, expect, it, vi } from 'vitest';
+import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import {
   inspectLoadingOwners,
   loadingOwnerIssueCodes,
@@ -110,5 +111,56 @@ describe('PersonCell', () => {
 
     const { container: sized } = render(<PersonCellSkeleton width='240px' />);
     expect(sized.firstElementChild).toHaveStyle({ width: '240px' });
+  });
+
+  it('opens the name link without also selecting the row', () => {
+    const onRowClick = vi.fn();
+    render(
+      <PersonCell
+        name='Ada Lovelace'
+        nameHref='/people/ada'
+        secondary='Subscriber'
+      />
+    );
+    document.body.addEventListener('click', onRowClick);
+
+    fireEvent.click(screen.getByRole('link', { name: 'Ada Lovelace' }));
+    expect(onRowClick).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByText('Subscriber'));
+    expect(onRowClick).toHaveBeenCalledTimes(1);
+    document.body.removeEventListener('click', onRowClick);
+  });
+
+  it.each([
+    [
+      'full',
+      <PersonCell
+        key='full'
+        name='Maya Okafor'
+        nameHref='/people/maya'
+        secondary='maya@example.com'
+        verified
+      />,
+    ],
+    ['partial', <PersonCell key='partial' name='Jordan Reyes' />],
+    ['anonymous', <PersonCell key='anon' name='Anonymous Fan' anonymous />],
+    [
+      'long',
+      <PersonCell
+        key='long'
+        name='Alexandria Constantinople-Whitfield of The Midnight Orchestra'
+        secondary='alexandria.constantinople-whitfield@example-records-group.com'
+      />,
+    ],
+    [
+      'rtl',
+      <div key='rtl' dir='rtl' lang='ar'>
+        <PersonCell name='ليلى حداد' secondary='layla@example.com' />
+      </div>,
+    ],
+  ])('has no accessibility violations when %s', async (_name, ui) => {
+    const { container } = render(ui);
+    await expectNoA11yViolations(container);
   });
 });

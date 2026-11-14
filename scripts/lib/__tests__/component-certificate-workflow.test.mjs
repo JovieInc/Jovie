@@ -15,14 +15,19 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { renderCertificateSummary } from '../component-certificate-summary.mjs';
 
 const REPO_ROOT = resolve(import.meta.dirname, '..', '..', '..');
-const workflow = readFileSync(
-  resolve(REPO_ROOT, '.github/workflows/component-certificate.yml'),
-  'utf8'
-);
+function workflowText(name) {
+  return readFileSync(resolve(REPO_ROOT, '.github/workflows', name), 'utf8');
+}
+const workflow = workflowText('component-certificate.yml');
 const { load } = createRequire(import.meta.url)('js-yaml');
 const job = load(workflow).jobs.certify;
 const steps = job.steps;
 const fixtureRoots = [];
+function fixtureRoot(prefix) {
+  const root = mkdtempSync(resolve(tmpdir(), prefix));
+  fixtureRoots.push(root);
+  return root;
+}
 
 afterEach(() => {
   for (const root of fixtureRoots.splice(0))
@@ -30,10 +35,7 @@ afterEach(() => {
 });
 /** @param {{report?: string, workspaceDecoy?: boolean}} options */
 function reportUploadEligible({ report, workspaceDecoy = false }) {
-  const root = mkdtempSync(
-    resolve(tmpdir(), 'component-certificate-artifact-')
-  );
-  fixtureRoots.push(root);
+  const root = fixtureRoot('component-certificate-artifact-');
   const workspace = resolve(root, 'workspace');
   const runner = resolve(root, 'runner');
   mkdirSync(workspace);
@@ -110,12 +112,7 @@ describe('certificate artifact retention with separate runner and checkout roots
 
 describe('Component Certificate workflow contract', () => {
   it('registers every root Source Validation command, including the certificate gate', () => {
-    const source = load(
-      readFileSync(
-        resolve(REPO_ROOT, '.github/workflows/source-validation.yml'),
-        'utf8'
-      )
-    );
+    const source = load(workflowText('source-validation.yml'));
     const contract = source.jobs.deterministic.steps.find(
       step => step.name === 'Run deterministic source contract'
     ).run;
@@ -142,8 +139,7 @@ describe('Component Certificate workflow contract', () => {
   it.each([false, true])(
     'checks main ancestry before executing checkout scripts (unmerged=%s)',
     unmerged => {
-      const root = mkdtempSync(resolve(tmpdir(), 'certificate-lineage-'));
-      fixtureRoots.push(root);
+      const root = fixtureRoot('certificate-lineage-');
       const gate = steps.find(step => step.name === 'Require main ancestry');
       const commit =
         'git -c user.name=Fixture -c user.email=fixture@example.invalid commit --allow-empty -qm fixture';
@@ -170,8 +166,8 @@ ${gate?.run || 'true'}`,
       step => step.name === 'Restore mutation evidence'
     );
     expect(restore.uses).toMatch(/^actions\/cache\/restore@/u);
-    expect(restore.with.path).toBe('~/.local/state/jovie-mutation');
-    expect(restore.with['restore-keys']).toBe('mutation-sweep-state-');
+    expect(restore.with.path).toBe('.cache/jovie-mutation');
+    expect(restore.with['restore-keys']).toBe('mutation-sweep-portable-v2-');
   });
   it('restores story-capture receipts and passes them only when they exist', () => {
     const restore = steps.find(step => step.name === 'Restore story evidence');
@@ -183,8 +179,7 @@ ${gate?.run || 'true'}`,
     );
     expect(steps.indexOf(restore)).toBeLessThan(steps.indexOf(build));
     const runBuild = files => {
-      const root = mkdtempSync(resolve(tmpdir(), 'certificate-evidence-'));
-      fixtureRoots.push(root);
+      const root = fixtureRoot('certificate-evidence-');
       mkdirSync(resolve(root, 'bin'));
       const dir = resolve(root, '.local/state/jovie-story-evidence');
       mkdirSync(dir, { recursive: true });
@@ -221,27 +216,35 @@ ${gate?.run || 'true'}`,
     expect(none).not.toMatch(/--(visual|a11y)\b/u);
     expect(runBuild(['a11y.json'])).not.toContain('--visual');
   });
-  it('is event-driven: no cron, no pull_request, main CI completion only', () => {
-    expect(workflow).not.toMatch(/^\s*schedule:/mu);
-    expect(workflow).not.toMatch(/pull_request/u);
-    expect(workflow).toMatch(
-      /workflows: \[CI\]\n\s+types: \[completed\]\n\s+branches: \[main\]/u
-    );
-    expect(workflow).toContain(
-      "github.event.workflow_run.conclusion == 'success'"
-    );
-  });
   it('installs only typescript, not the workspace', () => {
     expect(workflow).not.toContain('setup-node-pnpm');
     expect(workflow).not.toMatch(/pnpm install/u);
   });
-  it('is informational: uncertified components cannot fail the job, the Ovie post cannot either', () => {
+  it('keeps certification informational but records every requested delivery failure', () => {
     expect(workflow).toContain('scripts/component-certificate.mjs --all');
     expect(workflow).not.toMatch(/--(strict|fail-on)/u);
-    const post = workflow.slice(workflow.indexOf('- name: Post to Ovie'));
-    expect(post).toContain('CRON_SECRET not available');
-    expect(post).toContain('ingest route not deployed');
-    expect(post).toMatch(/exit 0\n\n\s+- name: Clean scratch/u);
+    const install = steps.find(step => step.name === 'Install Doppler CLI');
+    const resolver = steps.find(step => step.name === 'Resolve CRON_SECRET');
+    const post = steps.find(step => step.name === 'Post to Ovie');
+    expect(install.uses).toBe('./.github/actions/setup-doppler');
+    expect(steps.indexOf(install)).toBeLessThan(steps.indexOf(resolver));
+    expect(install.if).toBe(resolver.if);
+    expect(post.if).toContain('!cancelled()');
+    // JOV-12456: delivery posts the bounded compact payload built from the
+    // report; the full report is never the request body.
+    expect(post.run).toContain(
+      'node scripts/lib/component-certificate-delivery.mjs "$report" --out "$payload"'
+    );
+    expect(post.run).toContain('--data-binary "@${payload}"');
+    expect(post.run).not.toContain('--data-binary "@${report}"');
+    const receipt = steps.find(step => step.name === 'Upload delivery receipt');
+    expect(receipt.if).toContain('always()');
+    expect(receipt.with.path).toBe(
+      '${{ runner.temp }}/component-certificate/delivery.json'
+    );
+    expect(steps.indexOf(receipt)).toBeLessThan(
+      steps.findIndex(step => step.name === 'Clean scratch')
+    );
   });
   it('exposes CRON_SECRET only to the resolve step and read-only permissions', () => {
     expect(workflow).toContain('permissions: {}');
@@ -265,8 +268,119 @@ describe('renderCertificateSummary', () => {
     expect(md).toContain('1 of 3 components certified');
     expect(md).toContain('`abcdef123456`');
     expect(md).toContain('| story | 2 | 1 | 0 | 0 |');
+    expect(md).toContain(
+      'Report generation: complete. Delivery and persisted ingestion are separate'
+    );
+    expect(md).toContain('0 unknown criterion results');
+    expect(md).toContain('structural evidence, not executed receipts');
+    expect(md).toContain(
+      'Screenshot hashes prove capture, not visual regression approval'
+    );
+    expect(md).toContain(
+      'does not yet include shared UI/global CSS dependencies'
+    );
+    expect(md).toContain('Journey N/A does not prove journey coverage');
   });
   it('throws on a malformed report so the job fails on a crash', () => {
     expect(() => renderCertificateSummary({})).toThrow();
+  });
+});
+
+describe('Visual a11y execution summaries', () => {
+  const visual = load(workflowText('visual-a11y.yml'));
+  const visualSteps = visual.jobs['storybook-a11y'].steps;
+  const passing = {
+    success: true,
+    numTotalTestSuites: 1,
+    numPassedTestSuites: 1,
+    numFailedTestSuites: 0,
+    numPendingTestSuites: 0,
+    testResults: [
+      {
+        status: 'passed',
+        assertionResults: [{ status: 'passed' }, { status: 'passed' }],
+      },
+    ],
+    numTotalTests: 2,
+    numPassedTests: 2,
+    numFailedTests: 0,
+    numPendingTests: 0,
+    numTodoTests: 0,
+  };
+  it.each([
+    ['success', passing, 'PASS: 2 tests passed in this shard.'],
+    ['failure', passing, 'FAIL: test command failed'],
+    ['skipped', passing, 'SKIPPED:'],
+    ['cancelled', passing, 'CANCELLED:'],
+    ['', passing, 'UNKNOWN:'],
+    ...[
+      'numFailedTestSuites',
+      'numPendingTestSuites',
+      'numPendingTests',
+      'numTodoTests',
+    ].map(
+      key =>
+        /** @type {[string, object, string]} */ ([
+          'success',
+          { ...passing, [key]: 1 },
+          'UNKNOWN:',
+        ])
+    ),
+    ['success', { ...passing, testResults: [] }, 'UNKNOWN:'],
+    [
+      'success',
+      { ...passing, testResults: [{ status: 'failed', assertionResults: [] }] },
+      'UNKNOWN:',
+    ],
+    ['success', undefined, 'UNKNOWN:'],
+    ['success', 'invalid-json', 'UNKNOWN:'],
+    [
+      'success',
+      { ...passing, numTotalTests: 0, numPassedTests: 0 },
+      'UNKNOWN:',
+    ],
+    ['success', { ...passing, success: false, numFailedTests: 1 }, 'UNKNOWN:'],
+  ])('reports %s with %j as %s', (outcome, receipt, expected) => {
+    const root = fixtureRoot('a11y-summary-');
+    if (receipt !== undefined)
+      writeFileSync(
+        resolve(root, 'a11y-shard-3.json'),
+        typeof receipt === 'string' ? receipt : JSON.stringify(receipt)
+      );
+    const summary = resolve(root, 'summary.md');
+    const result = spawnSync(
+      'bash',
+      [
+        '-c',
+        visualSteps
+          .find(step => step.name === 'A11y Results Summary')
+          .run.replaceAll('${{ matrix.shard }}', '3'),
+      ],
+      {
+        cwd: REPO_ROOT,
+        encoding: 'utf8',
+        env: {
+          ...process.env,
+          RUNNER_TEMP: root,
+          GITHUB_STEP_SUMMARY: summary,
+          A11Y_OUTCOME: outcome,
+        },
+      }
+    );
+    expect(result.status, result.stderr).toBe(0);
+    const md = readFileSync(summary, 'utf8');
+    expect(md).toContain(expected);
+    expect(md).toContain('shard 3/16');
+    expect(md).toContain('not a required PR check');
+    if (!expected.startsWith('PASS:')) expect(md).not.toContain('PASS:');
+  });
+  it('retains JSON and logs without adding a required gate', () => {
+    expect(visualSteps.find(step => step.id === 'a11y-test').run).toContain(
+      '--reporter=json'
+    );
+    expect(
+      visualSteps.find(step => step.name === 'Upload shard execution evidence')
+    ).toMatchObject({ if: 'always()', with: { 'if-no-files-found': 'warn' } });
+    expect(visual.on).not.toHaveProperty('pull_request');
   });
 });

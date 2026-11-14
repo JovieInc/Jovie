@@ -1,6 +1,12 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  chmodSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import test from 'node:test';
@@ -101,4 +107,70 @@ test('map/crawl require a URL and the API key', () => {
   const r = run(['crawl', 'https://x'], { PATH: process.env.PATH });
   assert.match(r.stderr, /FIRECRAWL_API_KEY/);
   assert.notEqual(r.status, 0);
+});
+
+// Hermetic: a fake curl on PATH stands in for Firecrawl, so no request leaves
+// the machine. It logs each call and answers with v2-shaped bodies.
+const FAKE_CURL = `#!/usr/bin/env bash
+m=GET; u=; b=
+while [ $# -gt 0 ]; do
+  case "$1" in
+    -X) m=$2; shift 2;;
+    -H) shift 2;;
+    -d) b=$2; shift 2;;
+    -*) shift;;
+    *) u=$1; shift;;
+  esac
+done
+printf '%s %s %s\\n' "$m" "$u" "$b" >> "$FAKE_LOG"
+case "$m $u" in
+  "POST https://api.firecrawl.dev/v2/map")
+    echo '{"success":true,"links":[{"url":"https://x/a","title":"A"},{"url":"https://x/b"}]}';;
+  "POST https://api.firecrawl.dev/v2/batch/scrape")
+    echo '{"success":true,"id":"job1","url":"https://api.firecrawl.dev/v2/batch/scrape/job1","invalidURLs":[]}';;
+  "GET https://api.firecrawl.dev/v2/batch/scrape/job1")
+    echo '{"status":"completed","total":2,"completed":2,"next":"https://api.firecrawl.dev/v2/batch/scrape/job1?skip=1","data":[{"markdown":"# A","metadata":{"sourceURL":"https://x/a","url":"https://x/a"}}]}';;
+  "GET https://api.firecrawl.dev/v2/batch/scrape/job1?skip=1")
+    echo '{"status":"completed","total":2,"completed":2,"next":null,"data":[{"markdown":"# B","metadata":{"sourceURL":"https://x/b","url":"https://x/b/"}}]}';;
+  *) echo "unexpected $m $u" >&2; exit 22;;
+esac
+`;
+
+test('crawl: v2 map + batch scrape, follows next pages, records every page', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'fc-v2-'));
+  try {
+    const bin = join(dir, 'bin');
+    spawnSync('mkdir', ['-p', bin]);
+    writeFileSync(join(bin, 'curl'), FAKE_CURL);
+    chmodSync(join(bin, 'curl'), 0o755);
+    const log = join(dir, 'calls.log');
+    const r = run(['crawl', 'https://x'], {
+      PATH: `${bin}:${process.env.PATH}`,
+      FIRECRAWL_API_KEY: 'test-key',
+      FIRECRAWL_REGISTRY_DIR: join(dir, 'reg'),
+      FIRECRAWL_POLL_S: '0',
+      FAKE_LOG: log,
+    });
+    assert.equal(r.status, 0, r.stderr);
+    const calls = readFileSync(log, 'utf8').trim().split('\n');
+    assert.ok(
+      calls.every(c => !c.includes('/v1/')),
+      calls.join('\n')
+    );
+    const map = JSON.parse(calls[0].replace(/^POST \S+ /, ''));
+    assert.equal(map.sitemap, 'include');
+    assert.equal(map.ignoreQueryParameters, false);
+    const batch = JSON.parse(calls[1].replace(/^POST \S+ /, ''));
+    assert.deepEqual(batch.urls, ['https://x/a', 'https://x/b']);
+    assert.deepEqual(batch.formats, ['markdown']);
+    assert.equal(batch.maxAge, 0);
+    assert.equal(calls.length, 4);
+    const reg = JSON.parse(readFileSync(join(dir, 'reg', 'x.json'), 'utf8'));
+    assert.deepEqual(Object.keys(reg.pages).sort(), [
+      'https://x/a',
+      'https://x/b',
+    ]);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
 });

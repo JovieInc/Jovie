@@ -23,6 +23,7 @@ import {
   isExternalBaseUrl,
   primeOriginBoundVercelBypass,
 } from '../helpers/vercel-preview';
+import { registerBlankMediaFixtures } from './route-dom-blank-media-fixtures';
 import {
   axisSection,
   busyImg,
@@ -31,7 +32,6 @@ import {
   exactBaseUrl,
   expectAtomicContrastCapture,
   expectDeliberateRed,
-  flatImg,
   isTasteKind,
   markupKinds,
   outputRoot,
@@ -41,7 +41,6 @@ import {
   profileStates,
   profileViewports,
   safeName,
-  slowImageBlankMedia,
   sourceGitSha,
   tasteBaseline,
   tasteBaselinePath,
@@ -296,30 +295,7 @@ test.describe('Route DOM detector deliberate-red fixtures', () => {
     page_ref = page;
   });
 
-  test('blank-media: flags a near-uniform image in a designed section', async () => {
-    expect(
-      await kindsOf(
-        `<main><section data-pen-section="hero"><h1>Product</h1><img src="${flatImg}" width="600" height="400" alt="Dashboard"></section></main>`
-      )
-    ).toContain('blank-media');
-  });
-
-  test('blank-media: ignores a busy image and a data-decorative image', async () => {
-    expect(
-      await kindsOf(
-        `<main><section data-pen-section="hero"><h1>Product</h1><img src="${busyImg}" width="600" height="400" alt="Dashboard"></section></main>`
-      )
-    ).not.toContain('blank-media');
-    expect(
-      await kindsOf(
-        `<main><section data-pen-section="hero"><h1>Product</h1><img data-decorative src="${flatImg}" width="600" height="400" alt=""></section></main>`
-      )
-    ).not.toContain('blank-media');
-  });
-
-  test('blank-media: judges a slow image once it has loaded, not its empty slot', async () => {
-    expect(await slowImageBlankMedia(page_ref)).not.toContain('blank-media');
-  });
+  registerBlankMediaFixtures();
 
   test('placeholder-copy: flags common placeholders in text, alt and aria', async () => {
     for (const html of [

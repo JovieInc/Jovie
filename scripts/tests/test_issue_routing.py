@@ -229,11 +229,28 @@ class AvailabilityTest(unittest.TestCase):
             self.assertEqual(lane.quota_pressure(self.host, "codex", PROVIDERS["codex"], 0)["why"], "accounts unread")
 
     def test_router_end_to_end_logs_its_rationale(self):
+        # The router reads the wall clock for pool expiry, and Hyperagent's allowance ends at UTC midnight.
+        # Pin the clock to the last UTC noon so the 1 hour Claude window below never races midnight
+        # (this test failed every night from 23:00 to 00:00 UTC).
+        now = 1_794_484_800.0  # 2026-11-12T12:00:00Z
+        with patch.object(lane.time, "time", return_value=now):
+            self._router_end_to_end(now)
+
+    def _router_end_to_end(self, now: float):
         router = lane.issue_router(self.host, "claude", PROVIDERS, POLICY)
         frontier = lane_issue("JOV-9", "Staging controller blocks every authorization")
-        self.assertIsNone(lane.admission_rejection(frontier, {}, time.time(), frozenset(), "claude", router))
-        self.assertEqual(lane.admission_rejection(lane_issue("JOV-10"), {}, time.time(), frozenset(), "claude",
-                                                  router), "routed:devin")
+        self.assertIsNone(lane.admission_rejection(frontier, {}, now, frozenset(), "claude", router))
+        # Standard work: Devin is cheapest, but an idle Claude lane has no window to lose, so the pool with
+        # a real expiry (Hyperagent's daily cap) takes it (model-pools.json).
+        self.assertEqual(lane.admission_rejection(lane_issue("JOV-10"), {}, now, frozenset(), "claude", router),
+                         "routed:hyperagent")
+        self.assertIn(("claude-subscription", None, "claude-lane-window-not-open"), [
+            (row["pool"], row["expiresAt"], row["basis"]) for row in router.decisions["JOV-10"]["pool"]["considered"]])
+        # Once the Claude 5h window is open it is the allowance lost first.
+        self.write("claude-quota.json", {"runs": [{"at": now - 4 * 3600, "model": "claude-opus-5-5"}]})
+        opened = lane.issue_router(self.host, "claude", PROVIDERS, POLICY)
+        self.assertIsNone(lane.admission_rejection(lane_issue("JOV-11"), {}, now, frozenset(), "claude", opened))
+        self.assertEqual(opened.decisions["JOV-11"]["pool"]["chosenPool"], "claude-subscription")
         decision = router.decisions["JOV-9"]
         self.assertEqual(decision["chosen"]["model"], "claude-opus-5-5")
         lane.log_route(self.host, "claude", decision)

@@ -28,6 +28,9 @@ export const CHAT_ROUTE_TOOL_IDS = [
   'proposeSocialLink',
   'proposeSocialLinkRemoval',
   'submitFeedback',
+  // Skills and capability requests (all plans)
+  'useSkill',
+  'requestCapability',
   // Account (all plans)
   'showAccountStatus',
   'showUsage',
@@ -38,12 +41,9 @@ export const CHAT_ROUTE_TOOL_IDS = [
   'importBioFromUrl',
   'inspectPressSource',
   'checkCanvasStatus',
-  'suggestRelatedArtists',
   'writeWorldClassBio',
-  'generateCanvasPlan',
   'generateAlbumArt',
   'retouchImage',
-  'createPromoStrategy',
   'voicePromo',
   'markCanvasUploaded',
   'formatLyrics',

@@ -190,5 +190,49 @@ class LinearClientAppModeTest(unittest.TestCase):
         self.assertEqual(lane._hinted_reset_s(headers, 0), 2000000)
 
 
+class DoctorTokenMetadataTest(unittest.TestCase):
+    # Reuse the existing bounded GitHub publication fixture, without inheriting its tests.
+    def setUp(self):
+        from scripts.tests import test_doctor as fixtures
+        fixtures.PublishTest.setUp(self)
+
+    def feed(self, count=0):
+        from scripts.tests import test_doctor as fixtures
+        return fixtures.PublishTest.feed(self, count)
+
+    def test_token_failure_is_visible_even_during_linear_cooldown(self):
+        from scripts.tests import test_doctor as fixtures
+        doctor, obs = fixtures.doctor, fixtures.obs
+        key = "linear-app-token-unavailable"
+        for view in ({}, {"scopeMatches": True, "expiresInS": 0, "mintFailed": False},
+                     {"scopeMatches": True, "expiresInS": 100, "mintFailed": True},
+                     {"scopeMatches": False, "expiresInS": 100, "mintFailed": False}):
+            with self.subTest(view=view):
+                self.assertIn(key, doctor.judge(obs(linearAppCredential=True, linearAppToken=view,
+                                                   linearSkipped="cooldown")))
+        healthy = {"scopeMatches": True, "expiresInS": 100, "mintFailed": False}
+        self.assertNotIn(key, doctor.judge(obs(linearAppCredential=True, linearAppToken=healthy)))
+        self.assertNotIn(key, doctor.judge(obs(linearAppCredential=False, linearAppToken={})))
+
+    def test_token_alarm_publishes_with_linear_unavailable(self):
+        from scripts.tests import test_doctor as fixtures
+        doctor, obs = fixtures.doctor, fixtures.obs
+        key = "linear-app-token-unavailable"
+        observed = obs(linearAppCredential=True, linearSkipped="cooldown",
+                       linearAppToken={"scopeMatches": True, "expiresInS": None, "mintFailed": True})
+        alerts = doctor.judge(observed)
+        self.assertIn(key, alerts)
+        events = doctor.condition_receipts(alerts, {}, observed, "gem")
+        reconciled = doctor.reconcile(alerts, {}, None, observed["now"], events)
+        feed = {**self.feed(0), "alerts": alerts, "conditions": reconciled["conditions"]}
+        self.lane.Linear = mock.Mock(side_effect=AssertionError("Linear unavailable"))
+        doctor.publish_status(self.host, self.lane, feed)
+        public = json.loads(self.api.files["lanes-status.json"])
+        self.assertIn(key, public["alerts"])
+        self.assertEqual(public["conditions"][key]["state"], "active")
+        self.lane.Linear.assert_not_called()
+        self.assertIn("verifiedAt", json.loads(self.record.read_text()))
+
+
 if __name__ == "__main__":
     unittest.main()

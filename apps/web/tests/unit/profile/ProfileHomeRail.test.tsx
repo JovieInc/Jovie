@@ -1,6 +1,6 @@
 import { render, screen, within } from '@testing-library/react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ProfileHomeRail } from '@/features/profile/ProfileHomeRail';
 import type { ProfilePrimaryActionCardRelease } from '@/features/profile/ProfilePrimaryActionCard';
 import { ProfilePacCard } from '@/features/profile/pac/ProfilePacCard';
@@ -105,6 +105,17 @@ function makeTourDate(ticketUrl: string | null): TourDateViewModel {
 }
 
 describe('ProfileHomeRail', () => {
+  // The rail keeps only upcoming shows: pin the clock so the fixture show
+  // stays upcoming whatever day the suite runs.
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-08-14T12:00:00.000Z'));
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it('renders the PAC as the single featured card surface — no carousel stack', () => {
     render(
       <ProfileHomeRail
@@ -261,8 +272,11 @@ describe('ProfileHomeRail', () => {
       expect(artwork).toHaveAttribute('loading', 'eager');
       if (renderMode === 'interactive') {
         expect(artwork).toHaveAttribute('fetchpriority', 'high');
+        // JOV-9611: the LCP cover decodes with its first frame.
+        expect(artwork).toHaveAttribute('decoding', 'sync');
       } else {
         expect(artwork).not.toHaveAttribute('fetchpriority');
+        expect(artwork).toHaveAttribute('decoding', 'async');
       }
     }
   );
@@ -314,6 +328,13 @@ describe('ProfileHomeRail', () => {
     expect(preload?.getAttribute('imagesizes')).toBe(
       artwork?.getAttribute('sizes')
     );
+    // JOV-9611: phones request the 104px slot (x DPR), never a wide
+    // candidate, and the preload applies at every width (no media scope).
+    expect(artwork?.getAttribute('sizes')).toBe(
+      '(min-width: 1024px) 400px, 104px'
+    );
+    expect(artwork?.getAttribute('decoding')).toBe('sync');
+    expect(preload?.hasAttribute('media')).toBe(false);
   });
 
   it('renders tip-only inventory as a support PAC instead of a blank Listen card', () => {

@@ -8,6 +8,8 @@ import tempfile
 from pathlib import Path
 
 from atomic_state import atomic_write_text
+from fix_red_statement_merge import contained_by_main, contained_by_main_file, resolve_additive_statements_text, unique_import_bindings
+from screen_debt_merge import resolve_subtractive_screen_debt
 
 LEGACY_CACHE_EXPORT = re.compile(
     r"^\s*export const (?:dynamic|fetchCache|revalidate)\s*=")
@@ -45,17 +47,14 @@ def _spacing_product_path(path: str) -> bool:
     return rel.startswith(SPACING_SCAN_PREFIXES)
 
 
-def _added_spacing_edits(diff: str) -> dict[str, dict[int, tuple[str, str]]]:
-    """Map eligible file -> {new 1-based line: (added text, snapped text)} for utilities the diff adds."""
-    edits: dict[str, dict[int, tuple[str, str]]] = {}
+def iter_added_lines(diff: str):
+    """Yield (path, new 1-based line, added text) for each added unified-diff line."""
     rel = ""
-    eligible = False
     new_line = 0
     in_hunk = False
     for raw in str(diff or "").splitlines():
         if raw.startswith("+++ b/"):
             rel = raw[6:]
-            eligible = _spacing_product_path(rel)
             in_hunk = False
             continue
         if raw.startswith("--- ") or raw.startswith("diff --git "):
@@ -65,34 +64,30 @@ def _added_spacing_edits(diff: str) -> dict[str, dict[int, tuple[str, str]]]:
             new_line = int(header.group(1))
             in_hunk = True
             continue
-        if not in_hunk:
+        if not in_hunk or raw.startswith("\\"):
             continue
-        if raw.startswith("\\"):
-            continue  # "\ No newline at end of file" is not a source line
         if raw.startswith("+"):
-            added = raw[1:]
-            snapped = _snap_spacing_line(added)
-            if eligible and snapped != added:
-                edits.setdefault(rel, {})[new_line] = (added, snapped)
+            yield rel, new_line, raw[1:]
             new_line += 1
-        elif raw.startswith("-"):
-            continue
-        else:
-            # A context line (rare with -U0) still occupies a new-file line.
+        elif not raw.startswith("-"):
             new_line += 1
+
+
+def _added_spacing_edits(diff: str) -> dict[str, dict[int, tuple[str, str]]]:
+    """Map eligible file -> {new 1-based line: (added text, snapped text)} for utilities the diff adds."""
+    edits: dict[str, dict[int, tuple[str, str]]] = {}
+    for rel, new_line, added in iter_added_lines(diff):
+        snapped = _snap_spacing_line(added)
+        if _spacing_product_path(rel) and snapped != added:
+            edits.setdefault(rel, {})[new_line] = (added, snapped)
     return edits
 
 
-def snap_added_conservative_spacing(root: Path, diff: str) -> list[str]:
-    """Snap conservative spacing utilities on lines this diff adds. Returns the files written.
-
-    Grandfathered lines are left alone, including an identical `gap-2.5` elsewhere in the
-    file. A line that no longer matches the diff is left alone so a stale patch cannot
-    rewrite a neighbor. 2.5 -> 2 (10px -> 8px) and 3.5 -> 3 (14px -> 12px).
-    """
+def _rewrite_added_lines(root: Path, edits: dict[str, dict[int, tuple[str, str]]]) -> list[str]:
+    """Replace added lines that still match. A stale line is left alone."""
     changed = []
     root = Path(root)
-    for rel, lines in _added_spacing_edits(diff).items():
+    for rel, lines in edits.items():
         path = root / rel
         try:
             original = path.read_text()
@@ -100,7 +95,7 @@ def snap_added_conservative_spacing(root: Path, diff: str) -> list[str]:
             continue
         file_lines = original.splitlines(keepends=True)
         dirty = False
-        for lineno, (added, snapped) in lines.items():
+        for lineno, (added, rewritten) in lines.items():
             index = lineno - 1
             if index < 0 or index >= len(file_lines):
                 continue
@@ -108,7 +103,7 @@ def snap_added_conservative_spacing(root: Path, diff: str) -> list[str]:
             current = file_lines[index][: len(file_lines[index]) - len(ending)]
             if current != added:
                 continue
-            file_lines[index] = snapped + ending
+            file_lines[index] = rewritten + ending
             dirty = True
         if not dirty:
             continue
@@ -118,6 +113,11 @@ def snap_added_conservative_spacing(root: Path, diff: str) -> list[str]:
             continue
         changed.append(rel)
     return sorted(changed)
+
+
+def snap_added_conservative_spacing(root: Path, diff: str) -> list[str]:
+    """Snap added 2.5/3.5 utilities to 2/3. Grandfathered and stale lines stay."""
+    return _rewrite_added_lines(root, _added_spacing_edits(diff))
 
 
 def _legacy_cache_path(path: str) -> bool:
@@ -133,46 +133,70 @@ def _legacy_cache_path(path: str) -> bool:
 def _added_legacy_cache_exports(diff: str) -> dict[str, dict[int, str]]:
     """Map eligible file -> {new 1-based line: added text} for cache exports the diff adds."""
     edits: dict[str, dict[int, str]] = {}
-    rel = ""
-    eligible = False
-    new_line = 0
-    in_hunk = False
-    for raw in str(diff or "").splitlines():
-        if raw.startswith("+++ b/"):
-            rel = raw[6:]
-            eligible = _legacy_cache_path(rel)
-            in_hunk = False
-            continue
-        if raw.startswith("--- ") or raw.startswith("diff --git "):
-            continue
-        header = re.match(r"^@@ -\d+(?:,\d+)? \+(\d+)(?:,\d+)? @@", raw)
-        if header:
-            new_line = int(header.group(1))
-            in_hunk = True
-            continue
-        if not in_hunk:
-            continue
-        if raw.startswith("\\"):
-            continue
-        if raw.startswith("+"):
-            added = raw[1:]
-            if eligible and LEGACY_CACHE_EXPORT.match(added):
-                edits.setdefault(rel, {})[new_line] = added
-            new_line += 1
-        elif raw.startswith("-"):
-            continue
-        else:
-            new_line += 1
+    for rel, new_line, added in iter_added_lines(diff):
+        if _legacy_cache_path(rel) and LEGACY_CACHE_EXPORT.match(added):
+            edits.setdefault(rel, {})[new_line] = added
     return edits
 
 
-def strip_added_legacy_cache_exports(root: Path, diff: str) -> list[str]:
-    """Delete route-segment cache exports on lines this diff adds. Returns the files written.
+_HEADING_TAG = re.compile(r"<h[1-6]\b[^>]*>", re.I)
+_BALANCE_EXEMPT = re.compile(
+    r"\b(?:text-balance|text-pretty|text-wrap|text-nowrap|truncate|sr-only|line-clamp-)\w*|\bwhitespace-nowrap\b")
+_QUOTED_CLASS = re.compile(r"""className=(['"])(.*?)\1""")
+_TEMPLATE_CLASS = re.compile(r"className=\{`([^`]*)`\}")
 
-    Grandfathered exports stay, including an identical line elsewhere in the file.
-    A line that no longer matches the diff stays, so a stale patch cannot delete a
-    neighbor. `export const runtime` is not a legacy surface and is left alone.
-    """
+
+def _heading_product_path(path: str) -> bool:
+    rel = str(path or "").replace("\\", "/")
+    if not rel.endswith(".tsx") or rel.startswith("/") or ".." in Path(rel).parts:
+        return False
+    if re.search(r"\.(?:test|spec|stories)\.tsx$", rel):
+        return False
+    return rel.startswith(("apps/web/", "packages/ui/"))
+
+
+def _balance_tag(tag: str) -> str:
+    if "textWrap" in tag:
+        return tag
+    quoted = _QUOTED_CLASS.search(tag)
+    if quoted:
+        body = quoted.group(2)
+        if _BALANCE_EXEMPT.search(body):
+            return tag
+        quote = quoted.group(1)
+        insert = "text-balance" if body == "" else f"text-balance {body}"
+        return f"{tag[:quoted.start()]}className={quote}{insert}{quote}{tag[quoted.end():]}"
+    template = _TEMPLATE_CLASS.search(tag)
+    if template:
+        body = template.group(1)
+        if "${" in body or _BALANCE_EXEMPT.search(body):
+            return tag
+        insert = "text-balance" if body == "" else f"text-balance {body}"
+        return f"{tag[:template.start()]}className={{`{insert}`}}{tag[template.end():]}"
+    if "className=" in tag:
+        return tag
+    if tag.endswith("/>"):
+        return tag[:-2] + ' className="text-balance" />'
+    return tag[:-1] + ' className="text-balance">'
+
+
+def balance_heading_line(line: str) -> str:
+    """Balance static heading tags using the shared exemption and class rules."""
+    return _HEADING_TAG.sub(lambda match: _balance_tag(match.group(0)), line)
+
+
+def balance_added_headings(root: Path, diff: str) -> list[str]:
+    """Add text-balance on added heading tags. Dynamic and stale lines stay."""
+    edits: dict[str, dict[int, tuple[str, str]]] = {}
+    for rel, new_line, added in iter_added_lines(diff):
+        balanced = balance_heading_line(added)
+        if _heading_product_path(rel) and balanced != added:
+            edits.setdefault(rel, {})[new_line] = (added, balanced)
+    return _rewrite_added_lines(root, edits)
+
+
+def strip_added_legacy_cache_exports(root: Path, diff: str) -> list[str]:
+    """Delete added dynamic/fetchCache/revalidate exports. Stale and runtime lines stay."""
     changed = []
     root = Path(root)
     for rel, lines in _added_legacy_cache_exports(diff).items():
@@ -242,10 +266,8 @@ def resolve_additive_node_tests_text(text: str) -> str | None:
     return None if re.search(r"(?m)^(?:<{7}|\|{7}|={7}|>{7})", text) else text
 
 
-def resolve_additive_node_test_file(worktree: Path, rel: str, sh) -> str | None:
-    """Use Git's actual three stages to prove test conflicts are insertions only."""
-    if not re.fullmatch(r"[\w./-]+\.(?:test|spec)\.mjs", rel):
-        return None
+def _diff3_conflict(worktree: Path, rel: str, sh) -> str | None:
+    """Render Git's three stages as one diff3 conflict. None unless merge-file reports conflicts."""
     with tempfile.TemporaryDirectory() as scratch:
         paths = []
         for stage in (2, 1, 3):  # merge-file expects ours, base, theirs
@@ -259,7 +281,78 @@ def resolve_additive_node_test_file(worktree: Path, rel: str, sh) -> str | None:
         # Git returns the conflict count (capped at 127); errors wrap above it.
         if not 1 <= probe.returncode <= 127:
             return None
-        return resolve_additive_node_tests_text(probe.stdout)
+        return probe.stdout
+
+
+# Next.js route groups, dynamic segments, parallel routes and intercepts.
+_TEST_PATH = r"[\w./()[\]@+-]+"
+
+
+def resolve_additive_node_test_file(worktree: Path, rel: str, sh) -> str | None:
+    """Use Git's actual three stages to prove test conflicts are insertions only."""
+    if not re.fullmatch(_TEST_PATH + r"\.(?:test|spec)\.mjs", rel):
+        return None
+    conflict = _diff3_conflict(worktree, rel, sh)
+    if conflict is None:
+        return None
+    return resolve_additive_node_tests_text(conflict)
+
+
+def resolve_additive_statement_file(worktree: Path, rel: str, sh) -> str | None:
+    """Union empty-base statement insertions in a Vitest file, proven from Git's three stages."""
+    if not re.fullmatch(_TEST_PATH + r"\.(?:test|spec)\.tsx?", rel):
+        return None
+    conflict = _diff3_conflict(worktree, rel, sh)
+    if conflict is None:
+        return None
+    return resolve_additive_statements_text(
+        conflict, validate_imports=lambda text, spans: unique_import_bindings(text, worktree, sh, spans))
+
+
+def _unique_json_object(pairs):
+    result = {}
+    for key, value in pairs:
+        if key in result:
+            raise ValueError("duplicate JSON key")
+        result[key] = value
+    return result
+
+
+def _load_json_object_stages(worktree: Path, rel: str, sh, field: str, accept) -> tuple[dict, dict, dict] | None:
+    """Base, ours, and theirs for one JSON object field.
+
+    None unless every stage is one object, `accept` passes the field, and every
+    other field still matches base."""
+    documents = []
+    for stage in (1, 2, 3):
+        blob = sh(["git", "show", f":{stage}:{rel}"], cwd=worktree)
+        if blob.returncode:
+            return None
+        try:
+            document = json.loads(blob.stdout, object_pairs_hook=_unique_json_object)
+        except (ValueError, TypeError):
+            return None
+        if not isinstance(document, dict) or not accept(document.get(field)):
+            return None
+        documents.append(document)
+    base, ours, theirs = documents
+    base_rest = {key: value for key, value in base.items() if key != field}
+    for document in (ours, theirs):
+        if {key: value for key, value in document.items() if key != field} != base_rest:
+            return None
+    return base, ours, theirs
+
+
+def _waiver_rows(value) -> bool:
+    return isinstance(value, dict) and all(
+        isinstance(row, dict) and row and all(
+            isinstance(reason, str) and reason.strip() for reason in row.values())
+        for row in value.values())
+
+
+def _debt_rows(value) -> bool:
+    return isinstance(value, dict) and all(
+        isinstance(reason, str) and reason.strip() for reason in value.values())
 
 
 def resolve_additive_certificate_waivers(worktree: Path, rel: str, sh) -> str | None:
@@ -267,39 +360,16 @@ def resolve_additive_certificate_waivers(worktree: Path, rel: str, sh) -> str | 
 
     This is authored policy, not generated metadata. Existing rows and every
     other policy field must be unchanged; ambiguous edits remain unresolved.
+    The union is written sorted by component path, as the certificate gate
+    requires (`node scripts/component-certificate.mjs --sort`).
     """
     if rel != "docs/design-system/component-certification.json":
         return None
-
-    def unique_object(pairs):
-        result = {}
-        for key, value in pairs:
-            if key in result:
-                raise ValueError("duplicate JSON key")
-            result[key] = value
-        return result
-
-    documents = []
-    for stage in (1, 2, 3):
-        blob = sh(["git", "show", f":{stage}:{rel}"], cwd=worktree)
-        if blob.returncode:
-            return None
-        try:
-            document = json.loads(blob.stdout, object_pairs_hook=unique_object)
-        except (ValueError, TypeError):
-            return None
-        if not isinstance(document, dict) or not isinstance(document.get("waivers"), dict):
-            return None
-        if any(not isinstance(row, dict) or not row or
-               any(not isinstance(reason, str) or not reason.strip() for reason in row.values())
-               for row in document["waivers"].values()):
-            return None
-        documents.append(document)
-    base, ours, theirs = documents
-    base_policy = {key: value for key, value in base.items() if key != "waivers"}
+    loaded = _load_json_object_stages(worktree, rel, sh, "waivers", _waiver_rows)
+    if loaded is None:
+        return None
+    base, ours, theirs = loaded
     for document in (ours, theirs):
-        if {key: value for key, value in document.items() if key != "waivers"} != base_policy:
-            return None
         if any(document["waivers"].get(key) != value for key, value in base["waivers"].items()):
             return None
     merged = dict(theirs["waivers"])
@@ -307,15 +377,53 @@ def resolve_additive_certificate_waivers(worktree: Path, rel: str, sh) -> str | 
         if key in merged and merged[key] != value:
             return None
         merged[key] = value
-    theirs["waivers"] = merged
+    theirs["waivers"] = dict(sorted(merged.items()))
     return json.dumps(theirs, ensure_ascii=False, indent=2) + "\n"
 
 
-def resolve_additive_list_conflict(worktree: Path, branch: str, log, *, sh, merge_entries, guard=lambda: None) -> bool:
-    """Union quoted list entries, additive node:test blocks or certificate rows.
+# Same argv as lane_runner.WORKTREE_INSTALL. A fresh repair worktree has no
+# node_modules, so the pre-commit hook cannot find lint-staged and the merge
+# is aborted before the hook checks any file. Keep these flags identical.
+MERGE_COMMIT_INSTALL = [
+    "pnpm", "install", "--frozen-lockfile", "--prefer-offline",
+    "--package-import-method=hardlink",
+]
+_LINT_STAGED_MISSING = re.compile(r'Command "lint-staged" not found')
+
+
+def _command_text(result) -> str:
+    return f"{getattr(result, 'stdout', '') or ''}{getattr(result, 'stderr', '') or ''}"
+
+
+def commit_open_merge(worktree, paths, sh, log, *, guard=lambda: None) -> bool:
+    """Stage `paths` and commit the open merge. None means the caller already staged.
+
+    When the hook fails only because `pnpm exec lint-staged` is not installed,
+    install once and retry that commit. Any other failure aborts the merge.
+    """
+    guard()
+    if paths:
+        if sh(["git", "add", "--", *paths], cwd=worktree, log=log).returncode != 0:
+            sh(["git", "merge", "--abort"], cwd=worktree, log=log)
+            return False
+    commit = sh(["git", "commit", "--no-edit"], cwd=worktree, log=log)
+    if commit.returncode != 0 and _LINT_STAGED_MISSING.search(_command_text(commit)):
+        guard()
+        installed = sh(MERGE_COMMIT_INSTALL, cwd=worktree, timeout=1800, log=log)
+        if installed.returncode == 0:
+            commit = sh(["git", "commit", "--no-edit"], cwd=worktree, log=log)
+    if commit.returncode != 0:
+        sh(["git", "merge", "--abort"], cwd=worktree, log=log)
+        return False
+    return True
+
+
+def resolve_additive_list_conflict(worktree: Path, branch: str, log, *, sh, merge_entries, guard=lambda: None, push: bool = True, stage_choice=None) -> bool:
+    """Union quoted lists, node:test blocks, Vitest statement insertions, waiver rows, or dropped screen-debt rows.
 
     Main's order stays, then head-only lines. A prose hunk or any other shape aborts
-    and leaves the PR to the model. The push is a fast-forward of the PR branch."""
+    and leaves the PR to the model. The push is a fast-forward of the PR branch.
+    `push=False` leaves that fast-forward to the caller."""
     guard()
     merged = sh(["git", "merge", "--no-edit", "origin/main"], cwd=worktree, log=log)
     if merged.returncode != 0:
@@ -327,11 +435,15 @@ def resolve_additive_list_conflict(worktree: Path, branch: str, log, *, sh, merg
         for path in conflicted:
             target = worktree / path
             try:
-                text = merge_entries(target.read_text())
-                if text is None:
+                text = stage_choice(worktree, path, sh) if stage_choice else merge_entries(target.read_text())
+                if text is None and not stage_choice:
                     text = resolve_additive_node_test_file(worktree, path, sh)
-                if text is None:
+                if text is None and not stage_choice:
+                    text = resolve_additive_statement_file(worktree, path, sh)
+                if text is None and not stage_choice:
                     text = resolve_additive_certificate_waivers(worktree, path, sh)
+                if text is None and not stage_choice:
+                    text = resolve_subtractive_screen_debt(worktree, path, sh)
             except OSError:
                 text = None
             if text is None:
@@ -344,10 +456,30 @@ def resolve_additive_list_conflict(worktree: Path, branch: str, log, *, sh, merg
         except OSError:
             sh(["git", "merge", "--abort"], cwd=worktree, log=log)
             return False
-        guard()
-        if sh(["git", "add", "--", *conflicted], cwd=worktree, log=log).returncode != 0 \
-                or sh(["git", "commit", "--no-edit"], cwd=worktree, log=log).returncode != 0:
-            sh(["git", "merge", "--abort"], cwd=worktree, log=log)
+        if not commit_open_merge(worktree, conflicted, sh, log, guard=guard):
             return False
     guard()
+    if not push:
+        return True
     return sh(["git", "push", "-q", "origin", f"HEAD:refs/heads/{branch}"], cwd=worktree, log=log).returncode == 0
+
+
+# Company guards annotates each over-baseline file, then Actions appends
+# "Process completed with exit code 1." A stale branch still carries files
+# main already shrunk, and a red check reports BLOCKED so the BEHIND fallback
+# never runs. Sync main when those growth lines are the only errors. Another
+# error stays with the model. classify() checks this after SIGNATURES.
+_SIZE_500_ERROR = re.compile(r"size-500: \S+: grew \d+ -> \d+\s*$")
+_ANNOTATED_ERROR = re.compile(r"##\[error\]([^\n]+)")
+_GHA_EXIT = re.compile(r"Process completed with exit code \d+\.?\s*$")
+
+
+def size_500_stale_hit(text: object) -> tuple[str, str] | None:
+    """Return `("size-500-stale", "sync-main")` when every annotated error is size growth."""
+    if not isinstance(text, str):
+        return None
+    errors = [item.strip() for item in _ANNOTATED_ERROR.findall(text)]
+    errors = [item for item in errors if _GHA_EXIT.fullmatch(item) is None]
+    if not errors or any(_SIZE_500_ERROR.fullmatch(item) is None for item in errors):
+        return None
+    return ("size-500-stale", "sync-main")

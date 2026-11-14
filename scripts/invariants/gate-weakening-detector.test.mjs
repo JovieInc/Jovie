@@ -150,6 +150,23 @@ describe('JOV-INV-045 gate-weakening detector', () => {
     const moved = { path: 'scripts/invariants/renamed-pin.json', previousPath: pin, before, after: '{"pin":{"maxJumped":9}}\n' };
     assert.deepEqual(evaluateGateWeakening([moved], config).map(item => item.kind), ['jump-policy-changed']);
   });
+  it('catches watched pin renames before destination self-path and exclusion dispatch', () => {
+    const before = '{"pin":{"maxJumped":2}}\n';
+    const scoped = { ...config, scanExclusions: ['scripts/invariants/excluded/'] };
+    for (const path of [
+      'scripts/invariants/renamed/gate-weakening-detector.test.mjs',
+      'scripts/invariants/renamed/gate-weakening-detector.config.json',
+      'scripts/invariants/renamed/gate-weakening-detector.mjs',
+      config.generatedReports[0],
+      'scripts/invariants/excluded/pin.json',
+      'scripts/invariants/moved-pin.json',
+    ]) {
+      const file = { path, previousPath: scoped.jumpPolicyPin.paths[0], before, after: before };
+      const findings = evaluateGateWeakening([file], scoped);
+      assert.ok(findings.some(item => item.kind === 'jump-policy-changed'), path);
+      assert.equal(decide(findings, { body: '', labels: [] }, scoped).ok, false, path);
+    }
+  });
   it('treats a new shrink-only ledger as tightening but still rejects growth of an existing one', () => {
     const path = 'apps/web/new-guard.baseline.json';
     assert.deepEqual(kindsOf({ path, before: null, after: '{"files":{"a.tsx":2}}' }), []);
@@ -167,6 +184,13 @@ describe('JOV-INV-045 gate-weakening detector', () => {
     expectKind(JSON.stringify({ ...config, scanExclusions: ['scripts/hidden/'] }), 'scan-exclusion-grew');
     expectKind(JSON.stringify({ ...config, generatedReports: [...config.generatedReports, 'scripts/ci-fast-lanes.mjs'] }), 'scan-exclusion-grew');
     expectKind(JSON.stringify({ ...config, requiredKinds: config.requiredKinds.slice(1) }), 'detector-rule-removed');
+    const stripped = JSON.stringify({ ...config, selfPaths: config.selfPaths.filter(p => !p.endsWith('gate-weakening-detector.mjs')) });
+    const rename = JSON.stringify({ ...config, selfPaths: [...config.selfPaths.slice(1), 'scripts/invariants/elsewhere.mjs'] });
+    expectKind(JSON.stringify({ ...config, selfPaths: [...config.selfPaths, '.github/workflows/ci.yml'] }), 'detector-selfpaths-changed');
+    expectKind(stripped, 'detector-selfpaths-changed');
+    expectKind(JSON.stringify({ ...config, selfPaths: [] }), 'detector-selfpaths-changed');
+    assert.ok(kindsOf({ path, before: stripped, after: JSON.stringify(config) }).includes('detector-selfpaths-changed'), 'detector path added back');
+    assert.equal(kindsOf({ path, before: JSON.stringify(config), after: rename }).filter(k => k === 'detector-selfpaths-changed').length, 2, 'rename is a removal plus an addition');
     expectKind(JSON.stringify({ ...config, override: { ...config.override, label: 'other' } }), 'override-policy-changed');
     expectKind(JSON.stringify({ ...config, jumpPolicyPin: { ...config.jumpPolicyPin, paths: [] } }), 'jump-policy-changed');
     expectKind(JSON.stringify({ ...config, jumpPolicyPin: { ...config.jumpPolicyPin, guardId: 'other-guard' } }), 'jump-policy-changed');
@@ -180,6 +204,23 @@ describe('JOV-INV-045 gate-weakening detector', () => {
     assert.ok(kindsOf(hidden).includes('test-skip'));
     const excluded = { ...config, scanExclusions: ['scripts/invariants/fixtures/gate-weakening/'] };
     assert.deepEqual(evaluateGateWeakening([hidden], excluded), []);
+  });
+  it('flags any modification of the detector body, cleared only by the override ceremony, and still flags deletion', () => {
+    const path = 'scripts/invariants/gate-weakening-detector.mjs';
+    const before = 'export function inspectSelf() {\n  return [];\n}\n';
+    const after = 'export function inspectSelf() {\n  return hardened;\n}\n';
+    const edit = { path, before, after };
+    assert.deepEqual(kindsOf(edit), ['detector-modified']);
+    assert.deepEqual(kindsOf({ path, before, after: `${before}\n` }), ['detector-modified']);
+    const override = { body: 'note\ngate-change: detector self-protection tightened\n', labels: ['codeowners-approved'] };
+    const allowed = decide(evaluateGateWeakening([fileOf(edit)], config), override, config);
+    assert.equal(allowed.ok, true);
+    assert.match(formatReport(allowed), /OVERRIDE/);
+    assert.match(formatReport(allowed), /detector-modified/);
+    const raw = evaluateGateWeakening([fileOf(edit)], config);
+    assert.equal(decide(raw, { body: override.body, labels: [] }, config).ok, false);
+    assert.equal(decide(raw, { body: '', labels: ['codeowners-approved'] }, config).ok, false);
+    assert.deepEqual(kindsOf({ path, before, after: null }), ['detector-deleted']);
   });
   it('skips a listed generated report, but still flags the same edit in a gate file', () => {
     const edit = path => ({ path, before: '{\n  "risk_score": 50\n}\n', after: '{\n  "risk_score": 42.1\n}\n' });
@@ -281,7 +322,7 @@ describe('JOV-INV-045 gate-weakening detector', () => {
       git(['mv', 'scripts/invariants/jump-policy-pin.json', 'scripts/invariants/jump-policy-pin.moved.json']);
       git(['commit', '-m', 'rename the pin out of the watched path']);
       const renamed = loadDiffFiles(dir, 'main');
-      assert.ok(renamed.some(file => file.previousPath === 'scripts/invariants/jump-policy-pin.json'), renamed);
+      assert.ok(renamed.some(file => file.previousPath === 'scripts/invariants/jump-policy-pin.json'), JSON.stringify(renamed));
       assert.ok(evaluateGateWeakening(renamed, config).some(item => item.kind === 'jump-policy-changed'));
       writeFileSync(join(dir, 'scripts/invariants/jump-policy-pin.moved.json'), '{"pin":{"maxJumped":9}}\n');
       git(['add', '.']);

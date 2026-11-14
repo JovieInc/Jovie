@@ -26,6 +26,7 @@ from pathlib import Path
 import pathlib as _pl, sys as _sys  # noqa: E402
 _sys.path[:0] = [p for p in [str(_pl.Path(__file__).resolve().parent)] if p not in _sys.path]  # sibling module of the release
 from atomic_state import atomic_write_text  # noqa: E402
+import model_pools  # noqa: E402  (Anthropic models never run on the Gateway)
 
 STEPS = ("tools", "telemetry", "agent-help", "adversarial")
 PROBE_TIMEOUT_S = 120
@@ -200,6 +201,10 @@ def _gateway_request(body: bytes, key: str, timeout: int):
 
 def gateway_judge(question: str, model: str, urlopen=None, timeout: int = 90) -> dict:
     """One strict three-way verdict from a model of another family through the AI Gateway."""
+    # Anthropic models never run on the Gateway (model-pools.json): refused and recorded before any spend.
+    refused = model_pools.refusal(model, "vercel-ai-gateway", site="outcome-escalation:gateway-judge")
+    if refused:
+        return {"ran": False, "result": f"refused: {refused['reason']}"}
     key = gateway_key()
     if not key:
         return {"ran": False, "result": f"unavailable: no AI Gateway key on this host ({GATEWAY_ENV})"}

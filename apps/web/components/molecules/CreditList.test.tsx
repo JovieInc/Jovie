@@ -1,6 +1,7 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
+import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import { CreditList } from './CreditList';
 
 describe('CreditList', () => {
@@ -93,5 +94,67 @@ describe('CreditList', () => {
       document.querySelectorAll("span[class='text-white/70']")
     );
     expect(separators.map(node => node.textContent)).toEqual([', ', ' and ']);
+  });
+});
+
+describe('CreditList states', () => {
+  const link = (name: string) => <a href={`/search?q=${name}`}>{name}</a>;
+
+  it('shows the fallback when every entry is blank', async () => {
+    const { container } = render(
+      <p>
+        <CreditList names={['', '  ']} fallback='Tim White' />
+      </p>
+    );
+    expect(container.textContent).toBe('Tim White');
+    await expectNoA11yViolations(container);
+  });
+
+  it('drops blanks and duplicates from a partial list of linked credits', async () => {
+    const { container } = render(
+      <p>
+        <CreditList
+          names={['Vigel', '', ' Vigel ', 'Tim White']}
+          renderName={link}
+        />
+      </p>
+    );
+    expect(screen.getAllByRole('link').map(a => a.textContent)).toEqual([
+      'Vigel',
+      'Tim White',
+    ]);
+    expect(container.textContent).toBe('Vigel and Tim White');
+    await expectNoA11yViolations(container);
+  });
+
+  it('joins many long credits into one line', async () => {
+    const names = [
+      'The Los Angeles After Hours Orchestra',
+      'Cosmic Gate',
+      'Vigel',
+      'Tim White',
+    ];
+    const { container } = render(
+      <p>
+        <CreditList names={names} className='block max-w-64' />
+      </p>
+    );
+    expect(container.textContent).toBe(
+      'The Los Angeles After Hours Orchestra, Cosmic Gate, Vigel and Tim White'
+    );
+    await expectNoA11yViolations(container);
+  });
+
+  it('keeps Hebrew credits in order inside a right-to-left page', async () => {
+    const { container } = render(
+      <div dir='rtl' lang='he'>
+        <CreditList names={['עופר לב', 'שלמה ארצי']} renderName={link} />
+      </div>
+    );
+    expect(screen.getAllByRole('link').map(a => a.textContent)).toEqual([
+      'עופר לב',
+      'שלמה ארצי',
+    ]);
+    await expectNoA11yViolations(container);
   });
 });

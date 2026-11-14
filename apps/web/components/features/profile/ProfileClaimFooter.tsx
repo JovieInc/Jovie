@@ -39,8 +39,8 @@ export function ProfileClaimFooter({
 
   const content = (
     <>
-      <span className='text-white/55'>Jovie</span>
-      <span className='text-white/30' aria-hidden='true'>
+      <span className='text-on-media/55'>Jovie</span>
+      <span className='text-on-media/30' aria-hidden='true'>
         ·
       </span>
       <span>{label}</span>

@@ -138,7 +138,7 @@ export const ReleaseTableSubheader = memo(function ReleaseTableSubheader({
                 className={cn(
                   PAGE_TOOLBAR_ACTION_BUTTON_CLASS,
                   PAGE_TOOLBAR_ACTION_ICON_ONLY_BUTTON_CLASS,
-                  'h-7 rounded-full px-1.5 [&_svg]:h-3 [&_svg]:w-3'
+                  'h-7 rounded-full px-1.5'
                 )}
                 aria-label='Loading Filters'
                 disabled
@@ -154,7 +154,7 @@ export const ReleaseTableSubheader = memo(function ReleaseTableSubheader({
               counts={counts}
               buttonClassName={cn(
                 PAGE_TOOLBAR_ACTION_BUTTON_CLASS,
-                'h-7 rounded-full px-1.5 [&_svg]:h-3 [&_svg]:w-3'
+                'h-7 rounded-full px-1.5'
               )}
               iconOnly
             />
@@ -167,7 +167,7 @@ export const ReleaseTableSubheader = memo(function ReleaseTableSubheader({
                 className={cn(
                   PAGE_TOOLBAR_ACTION_BUTTON_CLASS,
                   PAGE_TOOLBAR_ACTION_ICON_ONLY_BUTTON_CLASS,
-                  'h-7 w-7 rounded-full px-0 [&_svg]:h-3 [&_svg]:w-3'
+                  'h-7 w-7 rounded-full px-0'
                 )}
                 aria-label='Export'
                 disabled

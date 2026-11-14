@@ -64,6 +64,10 @@ export function FeedbackProvider({ children }: FeedbackProviderProps) {
         <Toaster
           theme={getToasterTheme(resolvedTheme)}
           position='bottom-right'
+          // Jovie ships left-to-right only. Without an explicit dir, sonner
+          // calls getComputedStyle(document.documentElement) on every render,
+          // forcing a full style recalc inside the hydration frame.
+          dir='ltr'
           // Expand stacked notifications on hover
           expand
           // Manual close affordance on every toast (accessibility)

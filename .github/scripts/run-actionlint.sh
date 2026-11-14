@@ -18,6 +18,15 @@
 # Tools are passed by absolute path, so the runner's preinstalled shellcheck
 # is never used. Any download, checksum, platform, or version mismatch fails
 # closed before linting. Arguments are forwarded to actionlint.
+#
+# Network: with PINNED_DOWNLOAD_CACHE_DIR set, every pinned download is kept in
+# a content-addressed cache (file name = its sha256) and re-verified on each
+# use, so a warm cache fetches no source, patch, shellcheck or pyflakes bytes.
+# CI restores that directory from the cache main writes (tsc-cache-warm.yml).
+# On a cold cache a failed shellcheck release download falls back to the
+# digest-pinned koalaman/shellcheck image, whose /bin/shellcheck is the same
+# bytes (same binary sha256 pin). GitHub release downloads failed 29 merge
+# groups on 2026-11-08 and 2026-11-10.
 set -euo pipefail
 
 readonly ACTIONLINT_COMMIT='fd33e9f582a01a02885c93ae3775e1190cf63653'
@@ -30,6 +39,9 @@ readonly ACTIONLINT_QUEUE_PATCH_SHA256='0378db3d77631edba189ecb92159417b0f5ed607
 readonly SHELLCHECK_VERSION='0.11.0'
 readonly SHELLCHECK_TARBALL_SHA256='8c3be12b05d5c177a04c29e3c78ce89ac86f1595681cab149b65b97c4e227198'
 readonly SHELLCHECK_BINARY_SHA256='4da528ddb3a4d1b7b24a59d4e16eb2f5fd960f4bd9a3708a15baddbdf1d5a55b'
+# Docker Hub index digest of koalaman/shellcheck:v0.11.0 (verified 2026-11-11:
+# its linux/amd64 /bin/shellcheck has SHELLCHECK_BINARY_SHA256).
+readonly SHELLCHECK_IMAGE='koalaman/shellcheck@sha256:61862eba1fcf09a484ebcc6feea46f1782532571a34ed51fedf90dd25f925a8d'
 readonly PYFLAKES_VERSION='3.4.0'
 readonly PYFLAKES_WHEEL_SHA256='f742a7dbd0d9cb9ea41e9a24a918996e8170c799fa528688d40dd582c8265f4f'
 
@@ -39,6 +51,7 @@ fail() {
 }
 
 # Shellcheck retains the exact native artifacts already used in CI.
+shellcheck_image=''
 platform="$(uname -s) $(uname -m)"
 case "$platform" in
   'Linux x86_64')
@@ -47,6 +60,7 @@ case "$platform" in
     shellcheck_platform='linux.x86_64'
     shellcheck_tarball_sha256="$SHELLCHECK_TARBALL_SHA256"
     shellcheck_binary_sha256="$SHELLCHECK_BINARY_SHA256"
+    shellcheck_image="$SHELLCHECK_IMAGE"
     ;;
   'Darwin arm64')
     actionlint_goos='darwin'
@@ -80,18 +94,68 @@ trap 'rm -rf "$tool_dir"' EXIT
 # outlasted six retries on 11-08. Eight exponential retries ride out about
 # four minutes of 5xx before failing closed. Release assets use
 # scripts/lib/github-release-asset.sh (authenticated fallback).
-download() {
-  local url="$1" out="$2" sha="$3"
+sha_ok() { # file sha256
+  printf '%s  %s\n' "$2" "$1" | sha256sum --check --status
+}
+
+# Optional content-addressed cache. An entry is trusted only after its bytes
+# hash to its own name; a bad entry is dropped and fetched again.
+cache_dir="${PINNED_DOWNLOAD_CACHE_DIR:-}"
+if [[ -n "$cache_dir" ]] && ! mkdir -p "$cache_dir" 2>/dev/null; then
+  cache_dir=''
+fi
+
+cache_get() { # sha256 out
+  [[ -n "$cache_dir" && -f "$cache_dir/$1" ]] || return 1
+  if sha_ok "$cache_dir/$1" "$1"; then
+    cp "$cache_dir/$1" "$2"
+    return 0
+  fi
+  rm -f "$cache_dir/$1"
+  return 1
+}
+
+cache_put() { # file sha256 (already verified by the caller)
+  [[ -n "$cache_dir" ]] || return 0
+  local tmp
+  tmp="$(mktemp "$cache_dir/.put.XXXXXX")" || return 0
+  if cp "$1" "$tmp" && mv "$tmp" "$cache_dir/$2"; then return 0; fi
+  rm -f "$tmp"
+}
+
+fetch() { # url out [release-attempts]; returns non-zero instead of exiting
+  local url="$1" out="$2"
   if [[ "$url" == https://github.com/*/releases/download/* ]]; then
-    "${BASH:-bash}" "$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)/scripts/lib/github-release-asset.sh" \
-      "$url" "$out" || fail "download failed: $url"
+    RELEASE_DOWNLOAD_ATTEMPTS="${3:-${RELEASE_DOWNLOAD_ATTEMPTS:-6}}" \
+      "${BASH:-bash}" "$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)/scripts/lib/github-release-asset.sh" \
+      "$url" "$out"
   else
     curl --fail --silent --show-error --location --proto '=https' --tlsv1.2 \
-      --retry 8 --retry-all-errors --max-time 120 --output "$out" "$url" ||
-      fail "download failed: $url"
+      --retry 8 --retry-all-errors --max-time 120 --output "$out" "$url"
   fi
-  printf '%s  %s\n' "$sha" "$out" | sha256sum --check --status ||
-    fail "sha256 mismatch: $url"
+}
+
+download() {
+  local url="$1" out="$2" sha="$3"
+  if cache_get "$sha" "$out"; then return 0; fi
+  fetch "$url" "$out" || fail "download failed: $url"
+  sha_ok "$out" "$sha" || fail "sha256 mismatch: $url"
+  cache_put "$out" "$sha"
+}
+
+# Copy /bin/shellcheck out of the digest-pinned image. The caller verifies the
+# binary sha256, so a wrong or tampered image fails closed.
+shellcheck_from_image() { # out
+  local cid
+  [[ -n "$shellcheck_image" ]] && command -v docker >/dev/null 2>&1 || return 1
+  docker pull --quiet "$shellcheck_image" >/dev/null || return 1
+  cid="$(docker create "$shellcheck_image")" || return 1
+  if docker cp "$cid:/bin/shellcheck" "$1"; then
+    docker rm "$cid" >/dev/null 2>&1 || true
+    return 0
+  fi
+  docker rm "$cid" >/dev/null 2>&1 || true
+  return 1
 }
 
 download \
@@ -137,13 +201,29 @@ command -v go >/dev/null || fail 'Go is required to build the source-pinned acti
       -o "$tool_dir/actionlint" ./cmd/actionlint
 ) || fail 'source-pinned actionlint build failed'
 
-download \
-  "https://github.com/koalaman/shellcheck/releases/download/v${SHELLCHECK_VERSION}/shellcheck-v${SHELLCHECK_VERSION}.${shellcheck_platform}.tar.xz" \
-  "$tool_dir/shellcheck.tar.xz" "$shellcheck_tarball_sha256"
-tar -xJf "$tool_dir/shellcheck.tar.xz" -C "$tool_dir" --strip-components=1 \
-  "shellcheck-v${SHELLCHECK_VERSION}/shellcheck"
-printf '%s  %s\n' "$shellcheck_binary_sha256" "$tool_dir/shellcheck" |
-  sha256sum --check --status || fail 'extracted shellcheck binary sha256 mismatch'
+# The verified binary is cached by its own sha256. Cold: release tarball
+# (three tries when the image fallback exists, so it is reached quickly), then
+# the pinned image; either source must yield the pinned binary.
+shellcheck_url="https://github.com/koalaman/shellcheck/releases/download/v${SHELLCHECK_VERSION}/shellcheck-v${SHELLCHECK_VERSION}.${shellcheck_platform}.tar.xz"
+if ! cache_get "$shellcheck_binary_sha256" "$tool_dir/shellcheck"; then
+  shellcheck_attempts=''
+  if [[ -n "$shellcheck_image" ]] && command -v docker >/dev/null 2>&1; then
+    shellcheck_attempts=3
+  fi
+  if fetch "$shellcheck_url" "$tool_dir/shellcheck.tar.xz" "$shellcheck_attempts"; then
+    sha_ok "$tool_dir/shellcheck.tar.xz" "$shellcheck_tarball_sha256" ||
+      fail "sha256 mismatch: $shellcheck_url"
+    tar -xJf "$tool_dir/shellcheck.tar.xz" -C "$tool_dir" --strip-components=1 \
+      "shellcheck-v${SHELLCHECK_VERSION}/shellcheck"
+  elif shellcheck_from_image "$tool_dir/shellcheck"; then
+    echo "::warning title=actionlint toolchain::shellcheck release download failed; using the digest-pinned container image" >&2
+  else
+    fail "download failed: $shellcheck_url"
+  fi
+  sha_ok "$tool_dir/shellcheck" "$shellcheck_binary_sha256" ||
+    fail 'extracted shellcheck binary sha256 mismatch'
+  cache_put "$tool_dir/shellcheck" "$shellcheck_binary_sha256"
+fi
 
 download \
   "https://files.pythonhosted.org/packages/c2/2f/81d580a0fb83baeb066698975cb14a618bdbed7720678566f1b046a95fe8/pyflakes-${PYFLAKES_VERSION}-py2.py3-none-any.whl" \

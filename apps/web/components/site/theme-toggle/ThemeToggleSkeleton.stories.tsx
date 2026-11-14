@@ -30,3 +30,29 @@ export const Segmented: Story = {
     appearance: 'segmented',
   },
 };
+
+/**
+ * Loading: the whole component is the pre-hydration placeholder. This is the
+ * footer size, which reserves the 44px root target the live toggle keeps.
+ */
+export const LoadingFooterSegmented: Story = {
+  args: {
+    appearance: 'segmented',
+    size: 'footer',
+  },
+};
+
+/** Right-to-left: the reserved segments inside an RTL footer row. */
+export const RtlSegmented: Story = {
+  args: {
+    appearance: 'segmented',
+    size: 'footer',
+  },
+  decorators: [
+    Story => (
+      <div dir='rtl'>
+        <Story />
+      </div>
+    ),
+  ],
+};

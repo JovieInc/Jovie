@@ -1,22 +1,33 @@
-import { remark } from 'remark';
-import remarkGfm from 'remark-gfm';
-import remarkHtml from 'remark-html';
+import type { remark as Remark } from 'remark';
 import { sanitizeServerHtml } from '@/lib/html/sanitize';
 
-let markdownProcessor: ReturnType<typeof remark> | null = null;
+type MarkdownProcessor = ReturnType<typeof Remark>;
 
-function getMarkdownProcessor(): ReturnType<typeof remark> {
-  if (!markdownProcessor) {
-    markdownProcessor = remark()
-      .use(remarkGfm)
-      .use(remarkHtml, { sanitize: false });
-  }
+let markdownProcessor: Promise<MarkdownProcessor> | null = null;
+
+/*
+ * remark, remark-gfm and remark-html load on the first copy,
+ * not with the chat: they are about 120 KB of the chat entry bundle and only
+ * the copy action needs them.
+ */
+function getMarkdownProcessor(): Promise<MarkdownProcessor> {
+  markdownProcessor ??= Promise.all([
+    import('remark'),
+    import('remark-gfm'),
+    import('remark-html'),
+  ]).then(([{ remark }, { default: remarkGfm }, { default: remarkHtml }]) =>
+    remark().use(remarkGfm).use(remarkHtml, { sanitize: false })
+  );
+  markdownProcessor.catch(() => {
+    markdownProcessor = null;
+  });
   return markdownProcessor;
 }
 
 /** Render markdown to sanitized HTML for rich clipboard payloads. */
 export async function markdownToHtml(markdown: string): Promise<string> {
-  const result = await getMarkdownProcessor().process(markdown);
+  const processor = await getMarkdownProcessor();
+  const result = await processor.process(markdown);
   return sanitizeServerHtml(String(result));
 }
 
@@ -54,11 +65,15 @@ export async function copyMarkdownToClipboard(
       navigator.clipboard?.write &&
       typeof ClipboardItem !== 'undefined'
     ) {
-      const html = await markdownToHtml(markdown);
+      // The HTML goes in as a promise so write() runs inside the click:
+      // the renderer loads on first copy, and Safari drops clipboard access
+      // once a click handler awaits.
       await navigator.clipboard.write([
         new ClipboardItem({
           'text/plain': new Blob([markdown], { type: 'text/plain' }),
-          'text/html': new Blob([html], { type: 'text/html' }),
+          'text/html': markdownToHtml(markdown).then(
+            html => new Blob([html], { type: 'text/html' })
+          ),
         }),
       ]);
       return true;

@@ -92,6 +92,8 @@ apps/docs/scripts/*.test.mjs
 !apps/web/lib/docs/**
 !apps/web/lib/chat/knowledge/topics/
 !apps/web/lib/chat/knowledge/topics/**
+!apps/web/lib/chat/skills/library/
+!apps/web/lib/chat/skills/library/**
 !apps/web/lib/e2e/
 !apps/web/lib/e2e/**
 !apps/web/lib/submission-agent/artifacts/

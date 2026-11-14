@@ -2,19 +2,20 @@ name: PR Fleet Rules
 on:
   pull_request:
     types: [opened, edited, synchronize, labeled, unlabeled, reopened]
-  merge_group:
-    types: [checks_requested]
+  # No merge_group: every rule here reads the source PR (body, labels, receipts),
+  # which a synthetic head does not have, and the policy returned no verdict there.
+  # It stays on the PR (.github/MERGE_QUEUE.md "Queue parity").
 permissions:
   contents: read
   pull-requests: read
 concurrency:
-  # Serialize metadata revisions for a PR; groups have independent exact-head keys.
-  group: pr-fleet-rules-${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.event.merge_group.head_sha || github.ref }}
+  # Serialize metadata revisions for a PR.
+  group: pr-fleet-rules-${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: false
 jobs:
   fleet:
     name: PR Fleet Rules
-    runs-on: ${{ github.event.pull_request.head.repo.fork && 'ubuntu-latest' || github.event_name == 'merge_group' && vars.MERGE_GATE_POOL == 'fixed' && fromJSON('["self-hosted","Linux","X64","jovie-fixed"]') || fromJSON(vars.RUNNER_CONTROL_PLANE || '"ubuntu-latest"') }}
+    runs-on: ${{ github.event.pull_request.head.repo.fork && 'ubuntu-latest' || fromJSON(vars.RUNNER_CONTROL_PLANE || '"ubuntu-latest"') }}
     # 3 min of work plus bounded quota holds (FLEET_RULES_QUOTA_HOLD_SECONDS, 120s).
     timeout-minutes: 6
     steps:
@@ -48,7 +49,7 @@ jobs:
       # label or body edit cannot change (a script change arrives as opened or
       # synchronize). Label and edit events still run the verdict step below.
       - name: Test fleet policy with coverage
-        if: github.event_name != 'pull_request' || contains(fromJSON('["opened","synchronize","reopened"]'), github.event.action)
+        if: contains(fromJSON('["opened","synchronize","reopened"]'), github.event.action)
         run: node --test --experimental-test-coverage --test-coverage-include=scripts/pr-fleet-rules.mjs --test-coverage-lines=95 --test-coverage-functions=100 --test-coverage-branches=90 scripts/pr-fleet-rules.test.mjs
       # One evidence read prints the blast-radius warnings and enforces the
       # blocking rules. Two reads doubled this workflow's installation-budget

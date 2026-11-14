@@ -1,4 +1,4 @@
-import { APP_ROUTES } from '@/constants/routes';
+import { PUBLIC_ENTRY_HREF } from '@/constants/routes';
 import { YOUTUBE_THUMBNAILS_OPTIMIZATION } from '@/data/youtubeThumbnailsCopy';
 import type {
   CertificationEvidenceReceipt,
@@ -635,7 +635,7 @@ export function resolveInboundAcquisition(input: {
     action: input.existingRun
       ? ('waitlist_and_resume' as const)
       : ('waitlist_and_create' as const),
-    nextPath: APP_ROUTES.WAITLIST,
+    nextPath: PUBLIC_ENTRY_HREF,
     candidateId: input.existingRun?.candidateId ?? null,
     notification: null,
   };

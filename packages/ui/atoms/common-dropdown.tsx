@@ -73,6 +73,8 @@ export function CommonDropdown(props: CommonDropdownProps) {
     disabled = false,
     minWidth,
     maxHeight,
+    scrollBody,
+    motion,
     children,
   } = props;
   const deepMenu = menuSubmenuDepth(items) > MENU_MAX_SUBMENU_DEPTH;
@@ -238,6 +240,12 @@ export function CommonDropdown(props: CommonDropdownProps) {
   }
 
   function renderDropdownContent() {
+    const dropdownBody = renderRootBody({
+      isLoading,
+      items: filteredItems,
+      emptyMessage,
+      renderItems: itemsToRender => renderItems(itemsToRender, 'dropdown'),
+    });
     const content = (
       <DropdownMenuPrimitive.Content
         align={align}
@@ -247,8 +255,38 @@ export function CommonDropdown(props: CommonDropdownProps) {
         data-menu-surface='toolbar'
         data-slot='common-dropdown-content'
         aria-busy={isLoading || undefined}
-        className={cn(dropdownContentBase, contentClassName)}
-        style={getContentStyle(minWidth, maxHeight, 'dropdown')}
+        /* A text input is not an allowed child of role="menu" (axe
+           aria-required-children), so a searchable menu presents its
+           surface as a group and keeps the item rows in an inner menu.
+           Radix hardcodes aria-orientation on the content; orientation is
+           not an allowed aria-* attribute on role="group" (axe
+           aria-allowed-attr), so strip it in the group form. */
+        role={searchable ? 'group' : 'menu'}
+        aria-orientation={searchable ? undefined : 'vertical'}
+        data-scroll-body={scrollBody ? 'true' : undefined}
+        data-motion={motion?.name ?? 'fade'}
+        className={cn(
+          dropdownContentBase,
+          scrollBody?.contentClassName,
+          motion?.className,
+          contentClassName
+        )}
+        style={
+          scrollBody
+            ? scrollBody.getContentStyle(minWidth, maxHeight)
+            : getContentStyle(minWidth, maxHeight, 'dropdown')
+        }
+        onKeyDown={
+          searchable && scrollBody
+            ? event =>
+                scrollBody.redirectTyping(
+                  event,
+                  rootSearchInputRef.current,
+                  searchQueryRef.current,
+                  handleSearchChange
+                )
+            : undefined
+        }
         onEscapeKeyDown={event => {
           if (searchQuery) {
             event.preventDefault();
@@ -265,12 +303,15 @@ export function CommonDropdown(props: CommonDropdownProps) {
             onClear={clearSearch}
           />
         ) : null}
-        {renderRootBody({
-          isLoading,
-          items: filteredItems,
-          emptyMessage,
-          renderItems: itemsToRender => renderItems(itemsToRender, 'dropdown'),
-        })}
+        {scrollBody ? (
+          <scrollBody.Body>
+            {searchable ? <div role='menu'>{dropdownBody}</div> : dropdownBody}
+          </scrollBody.Body>
+        ) : searchable ? (
+          <div role='menu'>{dropdownBody}</div>
+        ) : (
+          dropdownBody
+        )}
       </DropdownMenuPrimitive.Content>
     );
 
@@ -296,6 +337,11 @@ export function CommonDropdown(props: CommonDropdownProps) {
         data-menu-surface='toolbar'
         data-slot='common-dropdown-content'
         aria-busy={isLoading || undefined}
+        /* Same searchable group/menu split as the dropdown content above.
+           Radix hardcodes aria-orientation; it is not allowed on
+           role="group" (axe aria-allowed-attr). */
+        role={searchable ? 'group' : 'menu'}
+        aria-orientation={searchable ? undefined : 'vertical'}
         className={cn(contextContentBase, contentClassName)}
         style={getContentStyle(minWidth, maxHeight, 'context')}
         onEscapeKeyDown={event => {
@@ -314,12 +360,24 @@ export function CommonDropdown(props: CommonDropdownProps) {
             onClear={clearSearch}
           />
         ) : null}
-        {renderRootBody({
-          isLoading,
-          items: filteredItems,
-          emptyMessage,
-          renderItems: itemsToRender => renderItems(itemsToRender, 'context'),
-        })}
+        {searchable ? (
+          <div role='menu'>
+            {renderRootBody({
+              isLoading,
+              items: filteredItems,
+              emptyMessage,
+              renderItems: itemsToRender =>
+                renderItems(itemsToRender, 'context'),
+            })}
+          </div>
+        ) : (
+          renderRootBody({
+            isLoading,
+            items: filteredItems,
+            emptyMessage,
+            renderItems: itemsToRender => renderItems(itemsToRender, 'context'),
+          })
+        )}
       </ContextMenuPrimitive.Content>
     );
 

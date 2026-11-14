@@ -96,6 +96,22 @@ function defaultReporter(): SpendReporter {
 }
 
 /**
+ * Hourly Gateway spend rows for a UTC date range (company metrics sync, which
+ * buckets the hours into Pacific days).
+ */
+export async function readGatewaySpendReport(
+  range: { readonly startDate: string; readonly endDate: string },
+  report: SpendReporter = defaultReporter()
+): Promise<readonly GatewaySpendReportRow[]> {
+  const response = await report({
+    ...range,
+    groupBy: 'day',
+    datePart: 'hour',
+  });
+  return response.results;
+}
+
+/**
  * Reads the previous UTC day's Gateway spend by tag and by model, plus the
  * trailing 30-day total. Tag rows overlap (one request carries several tags),
  * so the daily total comes from the model grouping.

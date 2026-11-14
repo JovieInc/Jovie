@@ -33,3 +33,26 @@ export const SignupClosed: Story = {
     await expect(liveControls.length).toBeGreaterThan(0);
   },
 };
+
+/**
+ * Right-to-left: the closed-signup handoff inside an RTL document. The role
+ * form and the Log in prompt must mirror without clipping or overlapping.
+ */
+export const RtlSignupClosed: Story = {
+  args: { signupClosed: true },
+  decorators: [
+    Story => (
+      <div dir='rtl'>
+        <Story />
+      </div>
+    ),
+  ],
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(canvas.getByTestId('waitlist-role-form')).toBeVisible();
+    await expect(canvas.getByRole('link', { name: 'Log in' })).toHaveAttribute(
+      'href',
+      '/signin'
+    );
+  },
+};

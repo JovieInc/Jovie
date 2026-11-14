@@ -1032,6 +1032,14 @@ Mouse and hardware-keyboard hints remain available on hybrid devices. Actual
 touch activates the control first and leaves no sticky hint. Essential actions
 remain visible for coarse/no-hover input.
 
+Tooltip content never outlives its trigger: the shared `@jovie/ui` root closes
+it when the trigger unmounts, hides, collapses to zero size, or leaves the
+viewport or its clipping container. Tooltip copy is a title of 6 words or fewer
+plus at most one sentence of 15 words or fewer, with no claims or how-it-works
+explanations; rich content is `Kbd` or a list of at most 3 items, never
+interactive. `pnpm design:tooltip-copy:check` fails new violations. See
+`apps/web/components/atoms/Tooltip.README.md`.
+
 An open interactive menu belongs to its rail through the trigger's ARIA control
 relationship, including nested portals. Retain that rail's presentation until
 dismissal or detachment, without changing persisted pin intent. Unrelated

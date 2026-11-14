@@ -1,3 +1,4 @@
+import { NextRequest } from 'next/server';
 import { describe, expect, it, vi } from 'vitest';
 
 const mockGetCurrentUserEntitlements = vi.hoisted(() => vi.fn());
@@ -14,7 +15,11 @@ describe('POST /api/admin/test-user/set-plan', () => {
     });
 
     const { POST } = await import('@/app/api/admin/test-user/set-plan/route');
-    const response = await POST();
+    const response = await POST(
+      new NextRequest('http://localhost/api/admin/test-user/set-plan', {
+        method: 'POST',
+      })
+    );
     const body = await response.json();
 
     expect(response.status).toBe(403);
@@ -28,7 +33,11 @@ describe('POST /api/admin/test-user/set-plan', () => {
     });
 
     const { POST } = await import('@/app/api/admin/test-user/set-plan/route');
-    const response = await POST();
+    const response = await POST(
+      new NextRequest('http://localhost/api/admin/test-user/set-plan', {
+        method: 'POST',
+      })
+    );
     const body = await response.json();
 
     expect(response.status).toBe(410);

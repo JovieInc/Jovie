@@ -7,12 +7,12 @@ import {
   MarketingPageShell,
 } from '@/components/marketing';
 import { MarketingCtaSection } from '@/components/site/MarketingCtaSection';
-import { APP_ROUTES } from '@/constants/routes';
+import { APP_ROUTES, PUBLIC_ENTRY_HREF } from '@/constants/routes';
 import { YOUTUBE_THUMBNAILS_COPY as copy } from '@/data/youtubeThumbnailsCopy';
 import { YoutubeThumbnailPasteForm } from './YoutubeThumbnailPasteForm';
 
-/** Apply needs an account and YouTube Connect. Live mutation is JOV-5158. */
-export const YOUTUBE_THUMBNAILS_APPLY_HREF = `${APP_ROUTES.SIGNUP}?source=youtube-thumbnails&intent=apply`;
+/** Apply needs an account and YouTube Connect; /start makes the account. */
+export const YOUTUBE_THUMBNAILS_APPLY_HREF = `${PUBLIC_ENTRY_HREF}?source=youtube-thumbnails&intent=apply`;
 export const YOUTUBE_THUMBNAILS_GET_STARTED_HREF = `${APP_ROUTES.START}?source=youtube-thumbnails`;
 
 export function YoutubeThumbnailsLanding() {

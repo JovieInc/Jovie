@@ -35,7 +35,8 @@ describe('initial cookie banner visibility', () => {
     ['XX', undefined, true],
     ['JP', undefined, false],
     ['US', 'TX', false],
-    ['US', 'CA', true],
+    ['US', 'CA', false],
+    ['CA', 'QC', true],
   ] as const)(
     'uses current geo %s/%s over a stale cookie',
     async (country, region, expected) => {

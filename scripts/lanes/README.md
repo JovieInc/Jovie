@@ -33,8 +33,9 @@ The harness, not the model, owns:
 | Sweep (every 30 min per lane): retire only explicitly labeled duplicates after live head, hold and queue revalidation; preserve unlabelled stale drafts | `sweep_lane_prs()` |
 | Generated-file conflicts: merge main, restore its generated copies (including cleanly merged outputs), run each file's canonical regenerator (`pnpm install --lockfile-only` for `pnpm-lock.yaml`, `pnpm ci:topology:write` for `.github/workflow-topology.gen.yml`, `node scripts/agent-context/rule-scopes.mjs --write` for `scripts/agent-context/rule-scopes.json`), push; after resolving source conflicts, reuse the same regeneration helper | `resolve_generated_conflict()`, `regenerate_merged_generated()`, `remediation.GENERATED_RESOLVERS` |
 | Shell `&&` conflicts: when every hunk is only an `&&` chain, keep base order and append head-only prefixes; `node --test` and vitest paths follow the same rule | `resolve_and_chain_conflict()`, `fix_red_classes.resolve_and_chain_text()` |
-| Quoted-list conflicts: when every hunk is only `'path',` entries, keep main's order and append head-only lines; any other hunk stays for the model | `resolve_additive_list_conflict()`, `fix_red_classes.resolve_additive_quoted_list_text()` |
+| Quoted-list conflicts: when every hunk is only `'path',` or `"path",` entries, keep main's order and append head-only lines; double-quoted rows are then sorted so JSON path registries stay lexicographic. Any other hunk stays for the model | `resolve_additive_list_conflict()`, `fix_red_classes.resolve_additive_quoted_list_text()` |
 | Identifier-list conflicts: when every hunk is one comma-separated line of slugs, keep main's order and append head-only tokens; any other hunk stays for the model. The repair mutation budget is the class list plus the model dispatch, so a new class still runs | `resolve_identifier_list_conflict()`, `fix_red_classes.merge_additive_identifier_list()`, `conflict_resolvers()` |
+| Certification JSON conflicts: component waivers that only add rows are written as their union, sorted by component path as the certificate gate requires. Screen debt that only drops rows keeps main's remaining order and drops either side's removals. A changed value stays unresolved | `resolve_additive_list_conflict()`, `resolve_additive_certificate_waivers()`, `resolve_subtractive_screen_debt()` |
 | Slot locks that die with their holder | `Locked` |
 | Worktree from `origin/main`: a pre-installed pool slot when one is ready (`worktreeSource: pool` on the receipt), else fresh; shared-store hardlink install; background refill; afterwards an idle, clean checkout with fresh origin publication proof is recycled into the pool (`verdict: recycled` in `worktree-removals.jsonl`) or removed. Busy, dirty, unpublished or unverified source is preserved with a cleanup receipt; its branch is deleted only after successful checkout retirement | `run_issue()`, `worktree_pool.take()`, `remove_worktree()`, `worktree_pool.recycle()` |
 | GBrain context pack in the prompt, plus the repo contract | `context_pack()`, `render_prompt()` |
@@ -530,13 +531,49 @@ exclusions.
 
 Each lane's `routes` in `providers.json` give a model, the capability it clears (`bounded` < `standard` < `frontier`), a cost class and a base cost: Devin SWE-2 free 0, Hyperagent GLM 5.3 subsidized 1, Sonnet 5.5 2, Opus 5.5 frontier 3, Codex xhigh frontier 3.5 (headroom for the Codex-only sensitive labels). No route calls a raw model API key. `routing.json` sets the floor: JOV-7343 protected surfaces and orchestration labels are frontier, frozen plans and docs are bounded (a frozen plan on a protected surface stays frontier), the rest is standard.
 
-Effective cost = base x (1 + quota pressure): Claude runs in its 5h window, banked Codex accounts, Hyperagent runs per day. Banked, cooling, unhealthy, saturated, budget-blocked or slotless lanes are unavailable; the next cheapest qualifying route takes the work. Frontier work with no frontier route is held (`route-held:frontier`), never downgraded. `route:<lane>[:<alias>]` or the lane label pins a route that clears the floor. Each claim writes the decision to `runs/routing.jsonl`, the receipt (`route`) and the Linear claim comment; the doctor uses the same router for idle capacity. Claude and Hyperagent lanes:
+Effective cost = base x (1 + quota pressure): Claude runs in its 5h window, banked Codex accounts, Hyperagent runs per day. Banked, cooling, unhealthy, saturated, budget-blocked or slotless lanes are unavailable; the next cheapest qualifying route takes the work, except that within a capability class the pool whose allowance expires first wins (see Model pools). Frontier work with no frontier route is held (`route-held:frontier`), never downgraded. `route:<lane>[:<alias>]` or the lane label pins a route that clears the floor. Each claim writes the decision to `runs/routing.jsonl`, the receipt (`route`) and the Linear claim comment; the doctor uses the same router for idle capacity. Claude and Hyperagent lanes:
 
 `claude_lane.py run --model <id>` runs `claude -p` (`bypassPermissions`, JSON output, no session files, hooks on) on the host's claude.ai subscription or a `claude setup-token` in `~/.config/jovie-lanes/claude.env`. Anthropic API credentials are stripped and `health` refuses an API-key login. A usage limit banks the lane until its reset (default 5h); a burst limit backs off 5 minutes; a banked run exits 75 so the harness fails over. Repairs use Sonnet.
 
 Hyperagent runs agent `cmtj3n2q901i407adklzzq01t` (GLM 5.3 Developer, `auto`; the agent id picks the model, Astra Planner is `confirm`). It is remote-only (`repairs: false`): it claims issues through `hyperagent_lane.py` and local lanes maintain its PRs. Each attempt joins a live `list_agents` identity read with the owner's attestation at `~/.config/jovie-lanes/hyperagent-attestation.json` (`agentId`, `model`, `repository`, `currentInstructions`, `allInCap`, `balanceUsd`, `maxCostUsd`, `attestedAt`, `expiresAt`, `attestedBy`), because the API exposes no balance or cap. Without it the lane is unhealthy. Only the owner can write the attestation — the API exposes no balance or cap for an agent to read back — so a host that lacks it must scope the lane off with `LANES_SLOTS_HYPERAGENT=0` (no probe, no `provider-down` alert) rather than page on a credential that does not exist.
 
 Hyperagent can also repair existing PRs remotely (`hyperagent_repair.py`, enabled by `remoteRepairs: true` in `providers.json`; it ships `false` until GLM 5.3 model timeouts stop ending repair threads early). The shared daily cap below applies either way. Each hyperagent lane turn first takes one DIRTY or required-check-red PR (revenue and golden-path first, then `compounding`, then oldest), sends the branch, head and failing-check log excerpt, and the agent pushes to the same branch with a `Hyperagent-Repair: <attempt>` trailer. The lane counts a success only when the PR head moved forward (no force push), the tip carries that trailer, and every required check is green; the receipt (`kind: remote-repair`, stage stamps, thread URL) goes to `runs/ledger.jsonl` and a PR comment. It never touches a hold-labelled PR or a head pushed in the last 30 minutes. One writer per PR: the local `locks/repair-pr-N.lock` flock, an in-flight `fix-attempts.json` record (no local attempt charged) and a lane claim comment; a definite failure releases all three, an unknown remote outcome keeps the record and comment until their TTLs. The 24 threads/day cap (`HYPERAGENT_RUNS_PER_DAY`) is shared with the mesh bridge counter and the lane's issue runs; a spent cap ends the hyperagent turn before it claims issues. `hyperagent_repair.py status` shows cap use and the queue; `run --pr N` does one repair by hand.
+
+### Model pools
+
+`model-pools.json` is the one table of the fleet's pools: the Claude subscription, Hyperagent,
+Codex, Grok, Devin, Kimi, and the two metered routes (Vercel AI Gateway, Anthropic API key). Each
+row says what quota or credit is behind the pool and where its reset or expiry is read from.
+`model_pools.py` uses it in four places:
+
+- Anthropic rule (Tim, 2026-11-11): Fable, Opus, Sonnet, Haiku and any `claude-*` run only on the
+  Claude subscription (`claude_lane.py`) or Hyperagent, never the Gateway or a metered API key.
+- CI: `python3 scripts/lanes/model_pools.py check` runs in the fast lane's guard chain and fails on
+  any lane config, registry row or workflow that routes an Anthropic model through a forbidden or
+  undeclared pool. Exceptions are named in the table with an owner and a removal trigger; one
+  that matches nothing fails, so the list only shrinks.
+- Runtime: `run_agent` refuses the command before it starts, the router never offers a forbidden
+  route, and the outcome judge refuses an Anthropic model on the Gateway. Each refusal is appended
+  to `runs/model-pool-refusals.jsonl`. The command check reads every model spelling (`-m X`, `-m=X`,
+  `--model X`, `--model=X`, a `model=X` config override, the pool's `modelEnv` variables) and fails
+  closed: a raw `claude` CLI and a model flag with no value are refused. That reading applies to
+  agent entry points (pool executors and the table's `agentRunners`); a gate command such as
+  `git commit -m ...` is read only for a long `--model` value. CI runs the agent check on every
+  configured `cmd`.
+- Direct API calls: `model_pool_calls.py` checks every model request body before it is sent
+  (`scripts/apiclient`, the PR remediation swarm's model pick, the outcome judge). An Anthropic model
+  addressed to the Gateway or `api.anthropic.com`, or a model request there whose model cannot be
+  read, is refused and recorded.
+- Selection: among available routes of the chosen capability class that still have soft allowance
+  left, the pool whose unused allowance is lost first takes the run (Claude's 5 hour window while one is open; an idle lane has no expiry,
+  Hyperagent's UTC day cap and credit expiry, the weekly reset of Codex and Grok from the capacity
+  registry and its live overlay, Devin's free window). A pool with no reading sorts last and the
+  cost order decides ties. The choice is on the routing decision and the run receipt (`modelPool`).
+
+`python3 scripts/lanes/model_pools.py utilization [--window-hours 24] [--write]` prints, per pool,
+runs and agent busy time over the window against declared capacity (slots x window, soft run cap),
+with the pool's current expiry reading. `--write` saves it as `model-pool-utilization.json` in the
+lanes state dir for a board to read. Slots and concurrency are not set here.
 
 ## Install on a host
 
@@ -911,6 +948,17 @@ Also in the same module and companions:
 - `codex_delegate.py --agent dots -- codex exec ...`: agents that delegate to Codex take a
   `slots/codex.N` seat under the lanes' admission lock and cap (exit 75 if none) and are logged per
   agent in `runs/delegations.jsonl`.
+- `pool_feed.py`: seats, not one free slot, decide how much backlog a lane holds. The router's
+  choice per issue used to stand while that lane had any free slot, so one free seat on the cheapest
+  lane took the routing of the whole backlog and every other lane left as `none-eligible`. A worker
+  now seats the admitted backlog in claim order along each issue's own candidate order (the router's:
+  cost, quota pressure, the use-or-lose pace discount): a lane takes as many issues as it has free
+  intake seats, the next issue goes to the next available lane, and a lane that idled after it was
+  offered an issue has declined it. Admission gates, capability floors, pins, the sensitive-surface
+  restriction, PR and WIP budgets and every quota limit are unchanged; no seat or limit is added.
+  Each pass records, per lane, free seats, seats fed and the reason any seat stayed idle
+  (`pool-feed.json`, `runs/pool-feed.jsonl`, `pool_feed.py status`). `LANES_POOL_FEED=0` restores
+  the old routing; `observe` records what it would do and claims as before.
 
 ## Tests
 

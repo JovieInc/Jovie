@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
+import { expect, fireEvent, within } from 'storybook/test';
 import { ProductScreenshotFrame } from './ProductScreenshotFrame';
 import { marketingFullscreenParameters } from './storybook/marketingStoryMeta';
 
@@ -127,6 +128,68 @@ export const DarkGlassFill: Story = {
   decorators: [
     Story => (
       <div style={{ width: 'min(960px, 100%)', aspectRatio: '16 / 10' }}>
+        <Story />
+      </div>
+    ),
+  ],
+};
+
+/**
+ * Error: the capture failed to load (a missing export behaves the same). The
+ * play function fires the image's error event, and the frame keeps its
+ * geometry with the named "Preview unavailable" fallback.
+ */
+export const ErrorPreviewUnavailable: Story = {
+  args: { variant: 'dark-glass' },
+  play: async ({ canvasElement }) => {
+    const image = canvasElement.querySelector('img.psf__image');
+    await expect(image).not.toBeNull();
+    if (image) fireEvent.error(image);
+    const canvas = within(canvasElement);
+    await expect(
+      await canvas.findByText('Preview unavailable')
+    ).toBeInTheDocument();
+    await expect(
+      canvasElement.querySelector('[data-status="error"]')
+    ).not.toBeNull();
+  },
+};
+
+/** Long content: a long focus label on the narrowest (phone) frame truncates. */
+export const LongContentPhoneFocusLabel: Story = {
+  args: {
+    variant: 'dark-glass',
+    device: 'phone',
+    scenarioId: 'public-profile-mobile',
+    sizes: '(min-width: 640px) 320px, 80vw',
+    focus: {
+      label:
+        'Every link, release and contact option on one profile, ordered by what visitors tap first',
+      region: { x: 6, y: 30, width: 88, height: 40 },
+    },
+  },
+  parameters: { viewport: { defaultViewport: 'mobile' } },
+  decorators: [
+    Story => (
+      <div style={{ width: 'min(320px, 100%)', margin: '0 auto' }}>
+        <Story />
+      </div>
+    ),
+  ],
+};
+
+/** Right-to-left: an Arabic focus label inside an RTL document. */
+export const RtlFocusLabel: Story = {
+  args: {
+    variant: 'dark-glass',
+    focus: {
+      label: 'شريط الإصدارات الموحد',
+      region: { x: 62, y: 6, width: 34, height: 88 },
+    },
+  },
+  decorators: [
+    Story => (
+      <div dir='rtl'>
         <Story />
       </div>
     ),

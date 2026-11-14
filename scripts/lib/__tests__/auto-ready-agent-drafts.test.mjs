@@ -5,19 +5,27 @@ import {
   AUTO_READY_HOLD_LABELS,
   classifyAutoReadyPromotion,
   classifyFxChildCommit,
-  FX_WRITER_EMAIL,
-  FX_WRITER_NAME,
   parseFxSourceHeadTrailer,
+  shipIntent,
   TRUSTED_FX_WORKFLOW_NAME,
-  TRUSTED_FX_WORKFLOW_PATH,
 } from '../auto-ready-provenance.mjs';
 import { triggerNames, workflowTriggers } from '../workflow-triggers.mjs';
 import {
-  buildWriterProofReceipt,
   evaluateWriterPromotion,
-  renderWriterProofReceipt,
   WRITER_PROMOTION_BLOCKER_SCHEMA,
 } from '../writer-owned-pr-promotion.mjs';
+import {
+  child,
+  fxCommit,
+  other,
+  parent,
+  prNumber,
+  promotion,
+  proofBody,
+  proofReceipt,
+  trustedFxRun,
+  writerLogin,
+} from './auto-ready-fixtures.mjs';
 
 const repoRoot = resolve(import.meta.dirname, '../../..');
 const fleetScript = readFileSync(
@@ -36,73 +44,6 @@ const fxWorkflow = readFileSync(
   resolve(repoRoot, '.github/workflows/rolling-ci-dispatch.yml'),
   'utf8'
 );
-const parent = 'a'.repeat(40);
-const child = 'b'.repeat(40);
-const other = 'c'.repeat(40);
-const prNumber = 14359;
-const writerLogin = 'itstimwhite';
-const proofBase = {
-  issueId: 'JOV-5751',
-  prNumber,
-  headSha: child,
-  writerLogin,
-  requiredTests: 'passed: focused tests and hosted CI',
-  reviewSweep: 'complete: top-level, inline, and review summaries checked',
-  ticketEvidence: 'attached: Linear workpad is current',
-  prEvidence: 'attached: PR body has validation evidence',
-  issuedAt: '2026-08-31T00:00:00.000Z',
-};
-
-function trustedFxRun(overrides = {}) {
-  return {
-    workflowPath: TRUSTED_FX_WORKFLOW_PATH,
-    workflowName: TRUSTED_FX_WORKFLOW_NAME,
-    conclusion: 'success',
-    event: 'workflow_run',
-    headSha: parent,
-    ...overrides,
-  };
-}
-
-function fxCommit(overrides = {}) {
-  return {
-    sha: child,
-    message: `fix(ci): remediate exact-head failure\n\nFX-Source-Head: ${parent}\n`,
-    parentShas: [parent],
-    authorName: FX_WRITER_NAME,
-    authorEmail: FX_WRITER_EMAIL,
-    authorLogin: '',
-    committerName: FX_WRITER_NAME,
-    committerEmail: FX_WRITER_EMAIL,
-    committerLogin: 'jovie-bot[bot]',
-    verified: true,
-    ...overrides,
-  };
-}
-
-function proofReceipt(overrides = {}) {
-  return buildWriterProofReceipt({ ...proofBase, ...overrides });
-}
-
-function proofBody(overrides = {}) {
-  return renderWriterProofReceipt(proofReceipt(overrides));
-}
-
-function promotion(overrides = {}) {
-  return classifyAutoReadyPromotion({
-    prNumber,
-    authorLogin: writerLogin,
-    title: 'fix(ci): remediate exact-head failure',
-    branch: 'tim/jov-5477-human-draft',
-    labels: [],
-    headSha: child,
-    body: proofBody(),
-    commit: fxCommit(),
-    fxRun: trustedFxRun(),
-    ...overrides,
-  });
-}
-
 function prState(overrides = {}) {
   return {
     state: 'OPEN',
@@ -241,6 +182,28 @@ describe('Auto-Ready provenance selector', () => {
         title: '[canary] prove the gate stays red',
       })
     ).toEqual({ eligible: false, reason: 'controlled-proof' });
+  });
+
+  it('ships a trusted writer draft on green by default unless it parks', () => {
+    const park = '<!-- jovie-auto-ready: park -->';
+    const verdict = o =>
+      promotion({ body: 'Opened via REST.', greenSource: true, ...o });
+    expect(verdict()).toEqual({
+      eligible: true,
+      reason: 'writer-on-green-default',
+    });
+    expect(verdict({ authorLogin: 'jovie-bot[bot]' }).eligible).toBe(true);
+    // Park wins over the default, the marker and even a complete receipt.
+    for (const body of [park, `${proofBody()}\n${park}`]) {
+      expect(verdict({ body })).toEqual({
+        eligible: false,
+        reason: 'writer-parked',
+      });
+    }
+    expect(verdict({ authorLogin: 'outside-contributor' }).eligible).toBe(
+      false
+    );
+    expect(verdict({ greenSource: false }).eligible).toBe(false);
   });
 
   it('allows an exact author-owned proof receipt on any branch', () => {
@@ -444,6 +407,16 @@ describe('Auto-Ready App-token workflow', () => {
     expect(workflow).toContain('persist-credentials: false');
   });
 
+  it('resolves bot review threads on the green head after the undraft', () => {
+    const step = workflow.split(
+      '- name: Resolve bot review threads on the green head'
+    )[1];
+    expect(step).toContain("github.event_name == 'workflow_run'");
+    expect(step).toContain(
+      'node scripts/lib/bot-review-threads.mjs --repo "$REPO" --pr "$TARGET_PR" --head "$TARGET_HEAD"'
+    );
+  });
+
   it('keeps workflow recovery manual-only and never source-event driven', () => {
     // Manual recovery plus completed source-check runs; no PR, schedule or
     // ready_for_review wake can start a cascade.
@@ -455,5 +428,41 @@ describe('Auto-Ready App-token workflow', () => {
       "github.event_name == 'workflow_dispatch' && inputs.pr_number == ''"
     );
     expect(workflow).not.toContain('ready_for_review/CI cascade');
+  });
+});
+
+describe('shipIntent (pr:open opt-in)', () => {
+  const ON = '<!-- jovie-auto-ready: on-green -->';
+  const PARK = '<!-- jovie-auto-ready: park -->';
+  const count = body => body.split(ON).length - 1;
+  it('opts a new PR in, once, and --park keeps it parked', () => {
+    expect(shipIntent('Body', { cmd: 'open' })).toBe(`Body\n\n${ON}\n`);
+    expect(count(shipIntent(`Body\n\n${ON}\n`, { cmd: 'open' }))).toBe(1);
+    expect(shipIntent('Body', { cmd: 'draft' })).toContain(ON);
+    // --park writes the park marker (an unmarked writer draft ships on green).
+    expect(shipIntent(`Body\n${ON}\n`, { cmd: 'open', park: true })).toBe(
+      `Body\n\n${PARK}\n`
+    );
+    const parked = shipIntent('Body', { cmd: 'open', park: true });
+    expect(promotion({ body: parked, greenSource: true }).reason).toBe(
+      'writer-parked'
+    );
+  });
+  it('a refresh keeps a park; --on-green replaces it', () => {
+    const opts = { cmd: 'update', number: '42' };
+    expect(shipIntent('New', opts, `Old\n${PARK}`)).toBe(`New\n\n${PARK}\n`);
+    // A park the writer wrote in the body itself survives a fresh open.
+    expect(shipIntent(`Body\n${PARK}\n`, { cmd: 'open' })).toBe(
+      `Body\n\n${PARK}\n`
+    );
+    const on = shipIntent(`New\n${PARK}`, { ...opts, onGreen: true }, 'Old');
+    expect(on).toBe(`New\n\n${ON}\n`);
+  });
+  it('keeps an existing opt-in on refresh and adds none uninvited', () => {
+    const opts = { cmd: 'update', number: '42' };
+    expect(shipIntent('New', opts, `Old\n${ON}`)).toBe(`New\n\n${ON}\n`);
+    expect(shipIntent('New', opts, 'Old')).toBe('New');
+    expect(shipIntent('New', { ...opts, onGreen: true }, 'Old')).toContain(ON);
+    expect(shipIntent('New', { cmd: 'draft', number: '42' })).toBe('New');
   });
 });

@@ -1,6 +1,7 @@
 import { cleanup, fireEvent, render } from '@testing-library/react';
 import Link from 'next/link';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { expectNoA11yViolations } from '@/tests/utils/a11y';
 
 const { trackFunnelStep } = vi.hoisted(() => ({ trackFunnelStep: vi.fn() }));
 vi.mock('@/lib/analytics/signup-funnel-client', () => ({ trackFunnelStep }));
@@ -30,7 +31,7 @@ describe('SignupFunnelBeacon', () => {
     trackFunnelStep.mockClear();
   });
 
-  it('tracks one landing view and a cta click for signup links only', () => {
+  it('tracks one landing view and a cta click for signup links only', async () => {
     const { container } = render(
       <div>
         <SignupFunnelBeacon surface='homepage' />
@@ -60,10 +61,32 @@ describe('SignupFunnelBeacon', () => {
       step: 'cta_click',
       surface: 'homepage',
     });
+    // The beacon adds no markup to the page it instruments.
+    await expectNoA11yViolations(container);
   });
 
-  it('skips the landing view when told to', () => {
-    render(<SignupFunnelBeacon surface='profile_claim' trackLanding={false} />);
+  it('skips the landing view when told to and renders nothing', async () => {
+    const { container } = render(
+      <SignupFunnelBeacon surface='profile_claim' trackLanding={false} />
+    );
+    expect(trackFunnelStep).not.toHaveBeenCalled();
+    // The beacon returns null, so axe audits the empty container.
+    expect(container).toBeEmptyDOMElement();
+    await expectNoA11yViolations(container);
+  });
+
+  it('stops listening for CTA clicks after unmount', () => {
+    const { unmount } = render(<SignupFunnelBeacon surface='homepage' />);
+    trackFunnelStep.mockClear();
+    unmount();
+
+    const link = document.createElement('a');
+    link.href = '/signup';
+    link.addEventListener('click', event => event.preventDefault());
+    document.body.append(link);
+    fireEvent.click(link);
+    link.remove();
+
     expect(trackFunnelStep).not.toHaveBeenCalled();
   });
 });

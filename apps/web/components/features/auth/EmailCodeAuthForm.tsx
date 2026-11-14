@@ -17,6 +17,13 @@ import {
 } from '@/lib/auth/auth-shell-intent';
 import { authClient } from '@/lib/auth/client';
 import { AUTH_CLASSES } from '@/lib/auth/constants';
+import {
+  getSendErrorMessage,
+  getVerifyErrorMessage,
+  isMaxAttemptsError,
+  isSpentCodeError,
+  reportUnmappedVerifyError,
+} from '@/lib/auth/email-code-errors';
 import { logger } from '@/lib/utils/logger';
 
 /**
@@ -58,65 +65,6 @@ interface EmailCodeAuthFormProps {
    * their centered presentation.
    */
   readonly align?: 'left' | 'center';
-}
-
-// ============================================================================
-// Code → copy table (plan design row 18)
-// ============================================================================
-// Better Auth error codes mapped to user-facing messages. The lockout state
-// (MAX_ATTEMPTS) surfaces a "Request a new code" affordance that resets the
-// flow back to the email step.
-
-const SEND_ERROR_COPY: Record<string, string> = {
-  rate_limit_exceeded: 'Too many requests. Please wait a moment and try again.',
-  form_param_format_invalid:
-    'That email address doesn’t look right. Check it and try again.',
-};
-
-const VERIFY_ERROR_COPY: Record<string, string> = {
-  invalid_otp: 'That code is incorrect. Check your email and try again.',
-  otp_expired: 'That code has expired. Send a new one and try again.',
-  max_attempts_reached:
-    'Too many incorrect attempts. Request a new code to try again.',
-  too_many_attempts:
-    'Too many incorrect attempts. Request a new code to try again.',
-  rate_limit_exceeded: 'Too many attempts. Please wait a moment and try again.',
-};
-
-function readErrorCode(error: unknown): string | undefined {
-  if (!error || typeof error !== 'object') return undefined;
-  const candidate = error as {
-    code?: unknown;
-    message?: unknown;
-    status?: unknown;
-  };
-  // Better Auth rate-limit rejections are bare 429s with no error code.
-  if (candidate.status === 429) return 'rate_limit_exceeded';
-  if (typeof candidate.code === 'string') return candidate.code.toLowerCase();
-  if (typeof candidate.message === 'string') {
-    // Better Auth errors sometimes carry the code in `message` as
-    // `"code: ..."` — fall through to that.
-    const match = /^([a-z_]+):/i.exec(candidate.message);
-    if (match) return match[1].toLowerCase();
-  }
-  return undefined;
-}
-
-function getSendErrorMessage(error: unknown): string {
-  const code = readErrorCode(error);
-  if (code && SEND_ERROR_COPY[code]) return SEND_ERROR_COPY[code];
-  return 'Could not send the code. Please try again.';
-}
-
-function getVerifyErrorMessage(error: unknown): string {
-  const code = readErrorCode(error);
-  if (code && VERIFY_ERROR_COPY[code]) return VERIFY_ERROR_COPY[code];
-  return 'Could not verify the code. Please try again.';
-}
-
-function isMaxAttemptsError(error: unknown): boolean {
-  const code = readErrorCode(error);
-  return code === 'max_attempts_reached' || code === 'too_many_attempts';
 }
 
 // ============================================================================
@@ -298,7 +246,9 @@ export function EmailCodeAuthForm({
           setStep('locked');
           setErrorMessage(null);
         } else {
+          if (isSpentCodeError(error)) setCode('');
           setErrorMessage(getVerifyErrorMessage(error));
+          reportUnmappedVerifyError(error);
         }
         setIsPending(false);
       }
@@ -417,15 +367,11 @@ export function EmailCodeAuthForm({
           {isPending ? 'Verifying…' : 'Verify Code'}
         </Button>
         <div
-          className={`grid grid-cols-2 items-stretch gap-3 ${align === 'left' ? 'text-left' : 'text-center'}`}
+          className={`grid min-h-11 grid-cols-2 items-center justify-items-center gap-3 ${align === 'left' ? 'text-left' : 'text-center'}`}
         >
-          <button
-            type='button'
-            onClick={handleBackToEmail}
-            className='auth-quiet-target focus-ring-themed rounded-md text-app font-medium text-secondary-token transition-colors duration-subtle hover:text-primary-token'
-          >
+          <Button type='button' variant='tertiary' onClick={handleBackToEmail}>
             {AUTH_EMAIL_CHANGE_LABEL}
-          </button>
+          </Button>
           {resendCooldown > 0 ? (
             <span
               className='auth-quiet-target text-app font-medium text-tertiary-token'
@@ -434,15 +380,15 @@ export function EmailCodeAuthForm({
               Resend in {resendCooldown}s
             </span>
           ) : (
-            <button
+            <Button
               type='button'
+              variant='tertiary'
               onClick={handleResendCode}
               disabled={isPending}
               aria-label='Resend Verification Code'
-              className='auth-quiet-target focus-ring-themed rounded-md text-app font-medium text-secondary-token transition-colors duration-subtle hover:text-primary-token disabled:opacity-50'
             >
-              Resend code
-            </button>
+              Resend Code
+            </Button>
           )}
         </div>
       </form>

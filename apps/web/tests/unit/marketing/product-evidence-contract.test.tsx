@@ -368,7 +368,7 @@ describe('product-evidence contract (JOV-6917)', () => {
     expect(within(howItWorks!).getAllByRole('article')).toHaveLength(3);
     expect(within(close!).getByRole('link')).toHaveAttribute(
       'href',
-      '/signup?source=smart-links&intent=create'
+      '/start?source=smart-links&intent=create'
     );
     expect(
       entry.renderedSections.map(binding =>

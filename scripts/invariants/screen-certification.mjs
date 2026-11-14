@@ -303,7 +303,7 @@ web.legal-privacy|web|legal-privacy|apps/web/app/(dynamic)/legal/privacy/|deskto
 web.legal-terms|web|legal-terms|apps/web/app/(dynamic)/legal/terms/|desktop,mobile
 web.legal-cookies|web|legal-cookies|apps/web/app/(dynamic)/legal/cookies/|desktop,mobile
 web.legal-dmca|web|legal-dmca|apps/web/app/(dynamic)/legal/dmca/|desktop,mobile
-web.playlists-index|web|public-playlists|apps/web/app/(dynamic)/playlists/page.tsx,apps/web/app/(dynamic)/playlists/layout.tsx|desktop,mobile
+web.playlists-index|web|public-playlists|apps/web/app/(dynamic)/playlists/page.tsx,apps/web/app/(dynamic)/playlists/layout.tsx,apps/web/app/(dynamic)/playlists/genre/[genre]/page.tsx,apps/web/app/(dynamic)/playlists/mood/[mood]/page.tsx|desktop,mobile
 web.brand|web|marketing-brand|apps/web/app/brand/page.tsx,apps/web/app/brand/layout.tsx|desktop,mobile
 web.marketing-renders|web|marketing-renders|apps/web/app/(marketing)/renders/|desktop,mobile
 web.profile-admission|web|profile-admission|apps/web/app/(profile-admission)/renders/profile-admission/page.tsx|desktop,mobile
@@ -321,7 +321,7 @@ web.public-profile-shop|web|public-profile|apps/web/app/[username]/shop/page.tsx
 web.auth|web|browser-input-assurance|apps/web/app/(auth)/,apps/web/app/@auth/,apps/web/app/auth-return/,apps/web/app/desktop-auth/,apps/web/app/mobile-auth-return/,apps/web/components/features/auth/|desktop,mobile
 web.artist-pay|web|artist-pay|apps/web/app/[username]/pay/page.tsx|desktop,mobile
 web.artist-alerts|web|artist-alerts|apps/web/app/[username]/alerts/page.tsx|desktop,mobile
-web.profile-mode-render|web|profile-mode-render|apps/web/app/[username]/profile-mode-render/|desktop,mobile
+web.profile-mode-render|web|profile-mode-render|apps/web/app/[username]/profile-mode-render/,apps/web/app/[username]/profile-miss/page.tsx|desktop,mobile
 web.release-landing|web|release-landing|apps/web/app/r/[slug]/page.tsx,apps/web/app/r/[slug]/ReleaseLandingPage.tsx|desktop,mobile
 web.smartlink-release|web|release-landing|apps/web/app/[username]/[...slug]/page.tsx,apps/web/app/[username]/[slug]/page.tsx,apps/web/app/[username]/[slug]/not-found.tsx|desktop,mobile
 web.smartlink-sounds|web|release-landing|apps/web/app/[username]/[slug]/sounds/page.tsx|desktop,mobile

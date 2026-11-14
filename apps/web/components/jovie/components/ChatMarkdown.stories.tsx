@@ -38,3 +38,14 @@ export const Inline: Story = {
     content: 'a **quick** inline note',
   },
 };
+
+/**
+ * Loading: the first streamed chunk of a reply, cut off inside a bold span
+ * and a list. The streaming parser renders it without raw markdown markers.
+ */
+export const PendingFirstStreamedChunk: Story = {
+  args: {
+    isStreaming: true,
+    content: "Here's what I found:\n\n- **Midnight Dri",
+  },
+};

@@ -31,3 +31,26 @@ export const Loading: Story = {
 export const Persistent: Story = {
   args: { size: 'persistent' },
 };
+
+/** Only the required props: the label falls back to the playback state. */
+export const PartialNoLabel: Story = {
+  args: { isPlaying: false, label: undefined, size: 'bar' },
+};
+
+export const LongContentLabel: Story = {
+  args: {
+    label:
+      'Play the preview of Midnight Drive (Extended Club Mix) by The Long Weekend Collective',
+  },
+};
+
+export const Rtl: Story = {
+  args: { isPlaying: true, label: 'إيقاف المعاينة مؤقتًا' },
+  decorators: [
+    Story => (
+      <div dir='rtl' lang='ar'>
+        <Story />
+      </div>
+    ),
+  ],
+};

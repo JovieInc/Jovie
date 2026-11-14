@@ -1,6 +1,7 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { CheckCircle2 } from 'lucide-react';
 import { describe, expect, it, vi } from 'vitest';
+import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import {
   EntityHeader,
   EntityHeaderStatusGlyph,
@@ -22,8 +23,8 @@ vi.mock('next/image', () => ({
 }));
 
 describe('EntityHeader', () => {
-  it('renders one dominant title and a quiet details line', () => {
-    render(
+  it('renders one dominant title and a quiet details line', async () => {
+    const { container } = render(
       <EntityHeader
         thumbnail={<EntityHeaderThumbnail variant='person' name='Tim White' />}
         title='Tim White'
@@ -39,6 +40,7 @@ describe('EntityHeader', () => {
     expect(details).toHaveTextContent('Brand partnerships · Worldwide');
     expect(details).toHaveClass('text-secondary-token');
     expect(details.className).not.toContain('font-semibold');
+    await expectNoA11yViolations(container);
   });
 
   it('omits the details row entirely when no subtitle or status glyph exist', () => {
