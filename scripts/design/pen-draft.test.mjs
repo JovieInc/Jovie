@@ -117,18 +117,30 @@ test('the agent is told the editor loads slowly and may retry timed-out calls', 
   assert.ok(ATTEMPTS >= 2);
 });
 
-test('attempts leave upload time in each 25-minute frame job', () => {
-  assert.equal(attemptTimeout(0), 14 * 60_000);
-  assert.equal(attemptTimeout(10 * 60_000), 10 * 60_000);
-  assert.equal(attemptTimeout(15 * 60_000), 5 * 60_000);
-  assert.equal(attemptTimeout(15 * 60_000 + 1), 0);
-  const first = attemptTimeout(2000);
-  assert.ok(attemptTimeout(2000 + first + 10, undefined, 2) >= 5 * 60_000);
-  assert.equal(attemptTimeout(0, undefined, 2), 15 * 60_000);
+test('one attempt gets 23 minutes of the 25-minute frame job', () => {
+  // audience-analytics was still building when its 14-minute first attempt
+  // and 6-minute restart were each stopped (run 43339513257).
+  assert.equal(attemptTimeout(0), 23 * 60_000);
+  assert.equal(attemptTimeout(10 * 60_000), 13 * 60_000);
   assert.equal(attemptTimeout(0, 4 * 60_000), 0);
 });
 
-test('the CLI retries a timed-out draft after setup and process cleanup, including opt-in trimming', () => {
+test('a retry starts from scratch, so it needs room for a whole draft', () => {
+  // An attempt that ran out its time is not restarted in what is left.
+  assert.equal(attemptTimeout(23 * 60_000 + 10), 0);
+  assert.equal(attemptTimeout(13 * 60_000 + 1), 0);
+  // One that failed early (a rate limit, the failed-call cap) is.
+  assert.equal(attemptTimeout(3 * 60_000), 20 * 60_000);
+  assert.equal(attemptTimeout(13 * 60_000), 10 * 60_000);
+});
+
+test('the agent is told to build in small calls and that a stopped run saves nothing', () => {
+  assert.match(LOAD_NOTE, /one screen or state per call/);
+  assert.match(LOAD_NOTE, /within 20 minutes/);
+  assert.match(LOAD_NOTE, /saves nothing/);
+});
+
+test('the CLI retries a draft that failed early, including opt-in trimming', () => {
   const work = mkdtempSync(join(tmpdir(), 'pen-retry-'));
   const preload = join(work, 'timeout.mjs');
   // Exercise the real CLI and receipt writer. Only the provider boundary and
@@ -151,8 +163,8 @@ test('the CLI retries a timed-out draft after setup and process cleanup, includi
       if (command !== 'npx') throw new Error('unexpected command');
       calls++;
       if (calls % 2 === 1) {
-        now += options.timeout + 10;
-        throw new Error('spawnSync npx ETIMEDOUT');
+        now += 3 * 60_000;
+        throw new Error('Command failed: npx');
       }
       const arg = flag => args[args.indexOf(flag) + 1];
       const doc = JSON.parse(fs.readFileSync(arg('--in'), 'utf8'));
@@ -210,6 +222,59 @@ test('the CLI retries a timed-out draft after setup and process cleanup, includi
       if (trim === '1') assert.equal(doc.children[1].x, 600);
     }
   }
+});
+
+test('a draft stopped at the time limit is not restarted', () => {
+  const work = mkdtempSync(join(tmpdir(), 'pen-timeout-'));
+  const preload = join(work, 'timeout.mjs');
+  const calls = join(work, 'calls');
+  writeFileSync(
+    preload,
+    `
+    import cp from 'node:child_process';
+    import fs from 'node:fs';
+    import { syncBuiltinESMExports } from 'node:module';
+    let now = 0;
+    Date.now = () => now;
+    cp.execFileSync = (command, args, options) => {
+      fs.appendFileSync(${JSON.stringify(calls)}, String(options.timeout) + '\\n');
+      now += options.timeout + 10;
+      throw new Error('spawnSync npx ETIMEDOUT');
+    };
+    syncBuiltinESMExports();
+  `
+  );
+  const out = join(work, 'out');
+  assert.throws(() =>
+    execFileSync(
+      process.execPath,
+      [
+        '--import',
+        preload,
+        resolve('scripts/design/pen-draft.mjs'),
+        '--out',
+        out,
+        '--only',
+        'claim',
+      ],
+      {
+        stdio: 'ignore',
+        env: {
+          ...process.env,
+          PEN_CLI_KEY: 'fixture',
+          PEN_DRAFT_TRIM: '0',
+          PEN_GOLDEN_PATH_FILE_URL: `data:application/json,${encodeURIComponent(JSON.stringify({ children: [] }))}`,
+        },
+      }
+    )
+  );
+  assert.equal(readFileSync(calls, 'utf8'), `${23 * 60_000}\n`);
+  const { drafts } = JSON.parse(
+    readFileSync(join(out, 'receipt.json'), 'utf8')
+  );
+  assert.equal(drafts[0].status, 'failed');
+  assert.equal(drafts[0].attempts, 1);
+  assert.match(drafts[0].error, /ETIMEDOUT/);
 });
 
 test('missing secrets are named, so a blocked run never reads as done', () => {

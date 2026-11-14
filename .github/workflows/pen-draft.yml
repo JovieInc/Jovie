@@ -101,7 +101,8 @@ jobs:
     needs: plan
     if: ${{ needs.plan.outputs.frames != '[]' }}
     runs-on: ubuntu-24.04
-    # pen-draft.mjs budgets 20 minutes for bounded retries; reserve five for setup and upload.
+    # pen-draft.mjs budgets 23 minutes: one attempt, or a retry after an early
+    # failure. Setup and upload take under a minute, so two are reserved.
     timeout-minutes: 25
     # Share the editor lease across PRs, main pushes and manual runs. Native
     # queueing retains up to 100 pending jobs instead of replacing the oldest.

@@ -88,25 +88,28 @@ export function loadBriefs(dir = BRIEFS_DIR, only = null) {
 // The canonical document is about 25 MB, so the editor takes a minute or two
 // to load it and early canvas calls time out. With 8 allowed failures the
 // agent gave up on 3 of 4 briefs before the editor was ready (run 42457693051).
+// A build call ran past ten minutes once the agent set out to draw four rail
+// states (run 43339513257), and pen only saves when the agent finishes.
 export const LOAD_NOTE =
-  'The document is large and the editor can take a few minutes to load it. Work in the open editor (leave the file path empty), and when a canvas call times out, wait and retry it rather than giving up.';
-/** Attempts per brief: a second try starts with the editor cache warm. */
+  'The document is large and the editor can take a few minutes to load it. Work in the open editor (leave the file path empty), and when a canvas call times out, wait and retry it rather than giving up. Build in small steps, one screen or state per call: a call that builds several at once can run for many minutes on this file. Saving takes two minutes and the run is stopped at 23, so anything not finished within 20 minutes saves nothing: finish as soon as the frame matches the brief.';
+/** Attempts per brief: a draft that failed early gets one more try. */
 export const ATTEMPTS = 2;
-// Each matrix job has 25 minutes; reserve five for setup and uploading.
-export const BUDGET_MS = 20 * 60_000;
-const ATTEMPT_MS = 15 * 60_000;
-const MIN_ATTEMPT_MS = 5 * 60_000;
+// Each matrix job has 25 minutes. Setup and upload took 20 seconds in run
+// 43339513257, so two minutes are reserved, not the five that left a first
+// attempt 14 minutes and its restart 6: the largest brief was still building
+// when each was stopped. Finished drafts have taken 7 to 13 minutes.
+export const BUDGET_MS = 23 * 60_000;
+// A retry starts from the canonical file again, so less than this is no use.
+const MIN_ATTEMPT_MS = 10 * 60_000;
 
-/** How long the next attempt may run, or 0 when the budget can't fit one. */
-export function attemptTimeout(elapsedMs, budgetMs = BUDGET_MS, attempt = 1) {
+/**
+ * How long the next attempt may run, or 0 when the budget can't fit one. The
+ * first attempt gets the whole budget, so one that runs it out is not
+ * restarted; one that fails early leaves room for a second.
+ */
+export function attemptTimeout(elapsedMs, budgetMs = BUDGET_MS) {
   const left = budgetMs - elapsedMs;
-  // Reserve a retry plus one minute for process teardown/startup. Giving the
-  // first attempt all 15 minutes left <5 minutes after even 1 ms of overhead.
-  const reserve = MIN_ATTEMPT_MS + 60_000;
-  const retry = attempt < ATTEMPTS && left >= MIN_ATTEMPT_MS + reserve;
-  return left < MIN_ATTEMPT_MS
-    ? 0
-    : Math.min(ATTEMPT_MS, left - (retry ? reserve : 0));
+  return left < MIN_ATTEMPT_MS ? 0 : left;
 }
 
 /** Files whose change means every frame has to be drafted again. */
@@ -359,12 +362,9 @@ async function main() {
       );
     }
     for (let attempt = 1; attempt <= ATTEMPTS; attempt++) {
-      const timeout = attemptTimeout(
-        Date.now() - startedAt,
-        BUDGET_MS,
-        attempt
-      );
+      const timeout = attemptTimeout(Date.now() - startedAt);
       if (!timeout) {
+        // Keep the first attempt's own error: it says why there's no draft.
         row.status ??= 'failed';
         row.error ??= 'no time left in the job for an attempt';
         break;
