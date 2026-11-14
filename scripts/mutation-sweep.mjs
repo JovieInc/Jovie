@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+
 // Rolling mutation sweep over every tested apps/web module, on spare compute.
 //
 //   node scripts/mutation-sweep.mjs --state ~/.local/state/jovie-mutation/sweep-state.json \
@@ -15,7 +16,6 @@
 // mutants. The state file is the per-module metric of record; each run also
 // appends p50/p95-ready timing rows to <state>.runs.jsonl.
 
-import { spawnSync } from 'node:child_process';
 import {
   appendFileSync,
   existsSync,
@@ -28,6 +28,7 @@ import {
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
+import { spawnSync } from './lib/child-process.mjs';
 import {
   createTestSelector,
   readModuleSource,
