@@ -55,7 +55,7 @@ describe('shared Presence status vocabulary', () => {
 
   // Raw mint (#3ffa8b) as text fails 4.5:1 on light surfaces; status copy
   // uses the derived AA-safe -text token (axe color-contrast).
-  it('renders the success and error tones in the AA-safe -text tokens', () => {
+  it('keeps healthy rows quiet and marks errors in the AA-safe -text token', () => {
     render(
       <TooltipProvider>
         <PresenceStatusBadge
@@ -81,8 +81,11 @@ describe('shared Presence status vocabulary', () => {
 
     // The tone sits on the badge, beside the icon. The label is an inner span
     // that only carries layout classes, same as the warning assertion above.
+    // Healthy is the quiet default (Tim, Nov 14: green on every row was
+    // noise); colour is reserved for rows that need attention.
     const connected = screen.getByText('Connected').parentElement;
-    expect(connected).toHaveClass('text-success-text');
+    expect(connected).toHaveClass('text-tertiary-token');
+    expect(connected).not.toHaveClass('text-success-text');
     expect(connected).not.toHaveClass('text-success');
     const disconnected = screen.getByText('Disconnected').parentElement;
     expect(disconnected).toHaveClass('text-error-text');
