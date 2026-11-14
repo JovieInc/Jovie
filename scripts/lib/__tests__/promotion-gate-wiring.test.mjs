@@ -448,7 +448,7 @@ describe('trusted gate tooling grades older and current candidates', () => {
   const shown = spawnSync(
     'git',
     ['show', `${OLD_CANDIDATE}:scripts/promotion-gate-ci.mjs`],
-    { cwd: root, encoding: 'utf8' }
+    { maxBuffer: 256 * 1024 * 1024, cwd: root, encoding: 'utf8' }
   );
 
   it.skipIf(shown.status !== 0)(
@@ -489,7 +489,7 @@ describe('trusted gate tooling grades older and current candidates', () => {
     const mainBlob = spawnSync(
       'git',
       ['show', `${CURRENT_MAIN}:scripts/promotion-gate-ci.mjs`],
-      { cwd: root, encoding: 'utf8' }
+      { maxBuffer: 256 * 1024 * 1024, cwd: root, encoding: 'utf8' }
     );
     if (mainBlob.status === 0) expect(mainBlob.stdout).toBe(current);
     const result = resolveBase(
