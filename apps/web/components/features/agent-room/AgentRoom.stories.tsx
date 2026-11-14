@@ -1,6 +1,7 @@
 import '@/app/globals.css';
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { AgentRoom } from './AgentRoom';
+import { AgentRoomComposer } from './AgentRoomComposer';
 import { fleetRoomFixtureView } from './fixtures';
 
 const meta = {
@@ -22,5 +23,19 @@ export const ActivityUnavailable: Story = {
     view: fleetRoomFixtureView([]),
     unavailableReason:
       'Activity could not be read just now. Refresh to retry; the roster still shows.',
+  },
+};
+
+export const WithComposer: Story = {
+  args: {
+    composer: (
+      <AgentRoomComposer
+        agents={[
+          { id: 'summer', name: 'Summer' },
+          { id: 'chloe', name: 'Chloe' },
+        ]}
+        action={async () => ({ status: 'idle' })}
+      />
+    ),
   },
 };
