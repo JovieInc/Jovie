@@ -1,7 +1,10 @@
 'use client';
 
 import { INSET_PANEL_ICON_COLUMN, INSET_PANEL_ROW_LAYOUT } from '@jovie/ui';
-import { SHELL_RAIL_STAGE } from '@/components/shell/rail-motion';
+import {
+  SHELL_RAIL_ICON_BOX,
+  SHELL_RAIL_STAGE,
+} from '@/components/shell/rail-motion';
 import { cn } from '@/lib/utils';
 import { Avatar } from '../../molecules/Avatar/Avatar';
 import { ACCOUNT_LOADING_FILL } from './account-loading-fill';
@@ -54,7 +57,8 @@ export function UserButtonLoadingPlaceholder({
     <div
       data-testid='user-button-loading'
       className={cn(
-        'flex w-full items-center gap-2 rounded-md px-2 py-1 group-data-[collapsible=icon]:mx-auto group-data-[collapsible=icon]:size-7 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:gap-0 group-data-[collapsible=icon]:p-0',
+        'flex w-full items-center gap-2 rounded-md px-2 py-1',
+        SHELL_RAIL_ICON_BOX,
         // Founder lock 2026-09-25: single compact 32px row.
         calm && 'h-8'
       )}
