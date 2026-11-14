@@ -52,6 +52,7 @@ jobs:
 
       - uses: ./.github/actions/setup-node-pnpm
 
+      # github-token-budget: 3 calls/run - list successful runs, list and download the baseline artifact
       - name: Restore artifact coverage baseline
         env:
           GH_TOKEN: ${{ github.token }}

@@ -12,6 +12,7 @@ import { dirname, join } from 'node:path';
 import { test } from 'node:test';
 import { restoreCoverageBaseline } from './lib/publish-coverage-report.mjs';
 
+const heatmapPath = 'docs/TEST_COVERAGE_HEATMAP.md';
 const snapshotPath = 'apps/web/reports/test-coverage-snapshot.json';
 const snapshot = {
   generated_at: '2026-11-14T08:00:00Z',
@@ -30,6 +31,8 @@ function fixture(t) {
   git('config', 'commit.gpgsign', 'false');
   mkdirSync(join(cwd, dirname(snapshotPath)), { recursive: true });
   writeFileSync(join(cwd, snapshotPath), 'seed\n');
+  mkdirSync(join(cwd, 'docs'));
+  writeFileSync(join(cwd, heatmapPath), 'seed heatmap\n');
   git('add', '.');
   git('commit', '--quiet', '-m', 'measured');
   const source = git('rev-parse', 'HEAD');
@@ -65,6 +68,11 @@ function fixture(t) {
     downloadedDir = args.at(-1);
     mkdirSync(join(downloadedDir, dirname(snapshotPath)), { recursive: true });
     writeFileSync(join(downloadedDir, snapshotPath), JSON.stringify(snapshot));
+    mkdirSync(join(downloadedDir, 'docs'));
+    writeFileSync(
+      join(downloadedDir, heatmapPath),
+      '# Generated: 2026-11-14T08:00:00Z\n'
+    );
     return '';
   };
   return {
@@ -93,6 +101,10 @@ test('restores a successful main-run snapshot without branch, commit or publicat
   assert.deepEqual(
     JSON.parse(readFileSync(join(f.cwd, snapshotPath), 'utf8')),
     snapshot
+  );
+  assert.equal(
+    readFileSync(join(f.cwd, heatmapPath), 'utf8'),
+    '# Generated: 2026-11-14T08:00:00Z\n'
   );
   assert.equal(f.git('rev-parse', 'HEAD'), f.source);
   assert.equal(f.git('branch', '--show-current'), 'main');
@@ -216,12 +228,16 @@ test('the real gh adapter downloads and validates the named artifact with the su
     join(bin, 'gh'),
     `#!/bin/sh
 case "$1:$2" in
-api:*) cat "$COVERAGE_FIXTURE_RUN" ;;
+api:*)
+  printf 'HTTP/2.0 200 OK\\r\\n\\r\\n'
+  cat "$COVERAGE_FIXTURE_RUN" ;;
 run:download)
   [ "$3" = 43569817448 ] || exit 1
   [ "$7" = coverage-audit-43569817448 ] || exit 1
   mkdir -p "$9/apps/web/reports"
-  cp "$COVERAGE_FIXTURE_SNAPSHOT" "$9/${snapshotPath}" ;;
+  cp "$COVERAGE_FIXTURE_SNAPSHOT" "$9/${snapshotPath}"
+  mkdir -p "$9/docs"
+  printf '# Generated: 2026-11-14T08:00:00Z\\n' > "$9/${heatmapPath}" ;;
 *) exit 1 ;;
 esac
 `,
@@ -232,11 +248,35 @@ esac
     ...f.env,
     PATH: `${bin}:${process.env.PATH}`,
     COVERAGE_FIXTURE_RUN: fixtureRun,
+    LANES_STATE: join(f.cwd, 'ledger'),
+    GH_TOKEN: 'fixture-only-token',
     COVERAGE_FIXTURE_SNAPSHOT: fixtureSnapshot,
   };
   assert.equal(restoreCoverageBaseline({ cwd: f.cwd, env }).status, 'restored');
   assert.deepEqual(
     JSON.parse(readFileSync(join(f.cwd, snapshotPath), 'utf8')),
     snapshot
+  );
+});
+
+test('an invalid heatmap does not partially replace valid baseline data', t => {
+  const f = fixture(t);
+  assert.throws(
+    () =>
+      restoreCoverageBaseline({
+        ...f,
+        gh: args => {
+          const result = f.gh(args);
+          if (args[0] === 'run')
+            writeFileSync(join(args.at(-1), heatmapPath), '');
+          return result;
+        },
+      }),
+    /Invalid coverage artifact heatmap/
+  );
+  assert.equal(readFileSync(join(f.cwd, snapshotPath), 'utf8'), 'seed\n');
+  assert.equal(
+    readFileSync(join(f.cwd, heatmapPath), 'utf8'),
+    'seed heatmap\n'
   );
 });

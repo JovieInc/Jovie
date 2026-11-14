@@ -98,6 +98,28 @@ describe('test coverage audit workflow', () => {
     expect(generateIndex).toBeGreaterThan(checkIndex);
   });
 
+  it('refreshes quality-gap evidence when a successful main audit finishes', () => {
+    const workflow = readFileSync(
+      resolve(repoRoot, '.github/workflows/quality-gap-finder.yml'),
+      'utf8'
+    );
+    expect(workflow).toContain('workflows: [Test Coverage Audit]');
+    expect(workflow).toContain('types: [completed]');
+    expect(workflow).toContain(
+      "github.event.workflow_run.conclusion == 'success'"
+    );
+    expect(workflow).toContain(
+      "github.event.workflow_run.head_branch == 'main'"
+    );
+    expect(workflow).toContain('actions: read');
+    expect(getStepBlock(workflow, 'Restore coverage evidence')).toContain(
+      'restoreCoverageBaseline'
+    );
+    expect(workflow.indexOf('- name: Restore coverage evidence')).toBeLessThan(
+      workflow.indexOf('- name: Find and file quality gaps')
+    );
+  });
+
   it('keeps standard unit shards coverage-off while the exact-head lane collects', () => {
     const ciWorkflow = readFileSync(
       resolve(repoRoot, '.github/workflows/ci.yml'),

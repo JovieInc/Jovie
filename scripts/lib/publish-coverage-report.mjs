@@ -1,3 +1,4 @@
+// api-budget: github-actions-token 120/hr - at most 40 hourly audit/quality scans, 3 baseline reads each at report priority; shared client sheds quota pressure
 import { execFileSync } from 'node:child_process';
 import {
   appendFileSync,
@@ -248,6 +249,7 @@ export function publishNightlyReport(options = {}) {
 }
 
 const SNAPSHOT = 'apps/web/reports/test-coverage-snapshot.json';
+const HEATMAP = 'docs/TEST_COVERAGE_HEATMAP.md';
 
 /** Restore from GitHub's successful main-run artifacts, never from a PR or a
  * failed audit. The existing upload-artifact step owns publication/retention. */
@@ -255,14 +257,26 @@ export function restoreCoverageBaseline({
   cwd = process.cwd(),
   env = process.env,
   baselineFile = join(cwd, SNAPSHOT),
+  heatmapFile = join(cwd, HEATMAP),
   gh = args =>
-    execFileSync('gh', args, {
-      cwd,
-      env,
-      encoding: 'utf8',
-      timeout: 60_000,
-      maxBuffer: GH_MAX_BUFFER,
-    }).trim(),
+    execFileSync(
+      process.execPath,
+      [
+        new URL('../../packages/api-client/cli.ts', import.meta.url).pathname,
+        'gh',
+        '--priority',
+        'report',
+        '--',
+        ...args,
+      ],
+      {
+        cwd,
+        env,
+        encoding: 'utf8',
+        timeout: 60_000,
+        maxBuffer: GH_MAX_BUFFER,
+      }
+    ).trim(),
 } = {}) {
   const repo = env.GITHUB_REPOSITORY;
   if (!/^[\w.-]+\/[\w.-]+$/.test(repo ?? '')) {
@@ -329,7 +343,10 @@ export function restoreCoverageBaseline({
     ) {
       throw new Error('Invalid coverage artifact snapshot');
     }
+    const heatmap = readFileSync(join(dir, HEATMAP), 'utf8');
+    if (!heatmap.trim()) throw new Error('Invalid coverage artifact heatmap');
     writeFileSync(baselineFile, raw);
+    writeFileSync(heatmapFile, heatmap);
     if (env.GITHUB_STEP_SUMMARY) {
       appendFileSync(
         env.GITHUB_STEP_SUMMARY,

@@ -1239,6 +1239,7 @@ nodes:
       - push
       - repository_dispatch
       - workflow_dispatch
+      - workflow_run
     terminalReceipt: job:find
     jobCount: 1
   - name: Remediation Sweep
@@ -1548,6 +1549,7 @@ nodes:
     authoritativeProducer: Source Validation
     authoritativeFor: []
     allowedConsumers:
+      - Quality Gap Finder
       - SonarCloud
     triggeringStateTransition:
       - repository_dispatch
@@ -1826,6 +1828,9 @@ edges:
   - from: Production Release
     to: Canary Health Gate
     type: workflow_call
+  - from: Test Coverage Audit
+    to: Quality Gap Finder
+    type: workflow_run
   - from: Eve Pilot
     to: Safe PR Remediation
     type: workflow_run
