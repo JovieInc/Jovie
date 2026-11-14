@@ -7,6 +7,7 @@
  * truncated/unavailable states so a partial read can never render as
  * "no releases exist" (dogfood 2026-11-10).
  */
+import { promptListItem } from './prompt-list-item';
 import type { ReleaseCatalogMeta } from './types';
 
 /** Structural shape both ReleasePromptContext and ReleaseContext satisfy. */
@@ -57,7 +58,9 @@ export function describeReleaseTiming(
 
 function formatReleaseLine(release: DiscographyRelease, now: Date): string {
   const trackLabel = release.totalTracks === 1 ? 'track' : 'tracks';
-  return `- ${release.title} (${release.releaseType}, ${release.totalTracks} ${trackLabel}; ${describeReleaseTiming(release.releaseDate, now)})`;
+  return promptListItem(
+    `${release.title} (${release.releaseType}, ${release.totalTracks} ${trackLabel}; ${describeReleaseTiming(release.releaseDate, now)})`
+  );
 }
 
 /** Titles named this turn that are absent from the shown rows. No new heading. */
@@ -77,7 +80,10 @@ function namedReleaseBlock(
     .slice(0, 3)
     .map(release => formatReleaseLine(release, now));
   if (lines.length === 0) return '';
-  return `- Named this turn, resolved from the full catalog:\n${lines.join('\n')}`;
+  return [
+    promptListItem('Named this turn, resolved from the full catalog:'),
+    ...lines,
+  ].join('\n');
 }
 
 /**
@@ -108,14 +114,19 @@ export function buildDiscographySection(
 ): string {
   if (catalog?.status === 'unavailable') {
     return [
-      '- The release catalog could not be read this turn.',
-      '- Do not say the artist has no releases and do not guess a release count. If asked, say the catalog is temporarily unavailable and to try again shortly.',
+      promptListItem('The release catalog could not be read this turn.'),
+      promptListItem(
+        'Do not say the artist has no releases and do not guess a release count. If asked, say the catalog is temporarily unavailable and to try again shortly.'
+      ),
     ].join('\n');
   }
 
   if (releases.length === 0) {
     const named = namedReleaseBlock(namedReleases, releases, now);
-    return named || '- No releases found in the connected discography yet.';
+    return (
+      named ||
+      promptListItem('No releases found in the connected discography yet.')
+    );
   }
 
   const total = catalog?.total ?? releases.length;
@@ -125,18 +136,17 @@ export function buildDiscographySection(
     .join('\n');
   const overflowCount = total - DISCOGRAPHY_PROMPT_ROW_LIMIT;
   const releasePlural = overflowCount === 1 ? '' : 's';
+  const overflowBody = catalog
+    ? `...and ${overflowCount} more release${releasePlural} in the catalog (${total} total, ${DISCOGRAPHY_PROMPT_ROW_LIMIT} most recent shown).`
+    : `...and ${overflowCount} more release${releasePlural} in the catalog.`;
   const overflowLine =
-    overflowCount > 0
-      ? catalog
-        ? `\n- ...and ${overflowCount} more release${releasePlural} in the catalog (${total} total, ${DISCOGRAPHY_PROMPT_ROW_LIMIT} most recent shown).`
-        : `\n- ...and ${overflowCount} more release${releasePlural} in the catalog.`
-      : '';
+    overflowCount > 0 ? `\n${promptListItem(overflowBody)}` : '';
   // Fires whenever the prompt list itself is truncated, not only when the
   // catalog extends beyond the loaded slice: the 26th+ loaded release is
   // equally invisible to the model.
   const truncationNote =
     releases.length > DISCOGRAPHY_PROMPT_ROW_LIMIT
-      ? '\n- This list is truncated. If the artist names a release that is not shown, never claim it is not theirs; tool calls resolve titles against the full catalog.'
+      ? `\n${promptListItem('This list is truncated. If the artist names a release that is not shown, never claim it is not theirs; tool calls resolve titles against the full catalog.')}`
       : '';
   const named = namedReleaseBlock(namedReleases, releases, now);
   const namedSuffix = named ? `\n${named}` : '';
