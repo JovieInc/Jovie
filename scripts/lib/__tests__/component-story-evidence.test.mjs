@@ -294,6 +294,8 @@ describe('receipt assembly', () => {
     assert.equal(thrown.visual.components[path].status, 'fail');
     assert.equal(thrown.a11y.components[path].status, 'fail');
     assert.match(thrown.visual.components[path].detail, /\[dark\].*boom/);
+    // A throw may be a flake, so the next run captures it again.
+    assert.equal(thrown.visual.components[path].retry, true);
 
     const axe = assembleEvidence(
       one(path, ['b--a']),
@@ -305,6 +307,8 @@ describe('receipt assembly', () => {
       axe.a11y.components[path].detail,
       'b--a [light]: axe color-contrast'
     );
+    // An axe finding repeats on the same inputs, so it is reused, not retried.
+    assert.equal(axe.a11y.components[path].retry, undefined);
     // Failing receipts always stand in the certificate.
     assert.equal(
       acceptStoryReceipts(axe.a11y.components).components[path].status,

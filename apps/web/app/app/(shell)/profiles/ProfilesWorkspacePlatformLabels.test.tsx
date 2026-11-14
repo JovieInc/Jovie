@@ -154,4 +154,25 @@ describe('ProfilesWorkspace platform labels and handles', () => {
     // Username-rooted platforms still infer the handle in the subtitle.
     expect(lineSubtitle).toHaveTextContent('LINE · @timwhite');
   });
+
+  it('hides the rank columns while every row is a dash, and shows them once a rank exists', () => {
+    const unranked = data.rows.map(row =>
+      row.rowType === 'surface'
+        ? { ...row, rank: null, previousRank: null }
+        : row
+    );
+    const { unmount } = renderWorkspace({ ...data, rows: unranked });
+    expect(
+      screen.getByRole('columnheader', { name: 'Search Rank' })
+    ).toHaveClass('hidden');
+    expect(screen.getByRole('columnheader', { name: 'Change' })).toHaveClass(
+      'hidden'
+    );
+    unmount();
+
+    renderWorkspace(data);
+    expect(
+      screen.getByRole('columnheader', { name: 'Search Rank' })
+    ).not.toHaveClass('hidden');
+  });
 });

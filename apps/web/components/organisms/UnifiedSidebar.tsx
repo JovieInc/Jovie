@@ -7,7 +7,7 @@ import { ArrowLeft, ChevronRight } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
 import { AskJovieMark } from '@/components/ask-jovie/AskJovie';
 import { BrandLogo } from '@/components/atoms/BrandLogo';
@@ -51,6 +51,11 @@ import { useAppFlag } from '@/lib/flags/client';
 import { useDashboardProfileQuery } from '@/lib/queries/useDashboardProfileQuery';
 import { cn } from '@/lib/utils';
 import type { AppShellSection } from '@/types/app-shell';
+import {
+  OPERATOR_RAIL_PINNED_GROUP_CLASS,
+  resolveOperatorNavGroup,
+  useOperatorGroupOpen,
+} from './operator-nav-group';
 import {
   isOperatorNavigationHrefActive,
   OPERATOR_NAV_GROUP_LABEL,
@@ -105,10 +110,6 @@ function SettingsNavGroup({
   );
 }
 
-/** Tools keeps its original key so saved preferences survive; others append the id. */
-const groupOpenKey = (id: string) =>
-  id === 'tools' ? 'ovie.nav.tools-open.v1' : `ovie.nav.${id}-open.v1`;
-
 /**
  * One operator nav group. Tools is collapsed by default (Tim 2026-10-21: Ovie
  * is one Home), remembers the viewer's choice, and is always open while one
@@ -128,36 +129,23 @@ function OperatorNavGroup({
       .then(m => queryClient.prefetchQuery(m.shippingStateQueryOptions))
       .catch(() => undefined); // A missed prefetch must not reload the page.
   };
-  const [stored, setStored] = useState(false);
-  useEffect(() => {
-    if (!section.collapsible) return;
-    try {
-      setStored(
-        globalThis.localStorage?.getItem(groupOpenKey(section.id)) === '1'
-      );
-    } catch {
-      // Storage is a per-viewer convenience; the group defaults to closed.
-    }
-  }, [section.collapsible, section.id]);
+  const { stored, toggle } = useOperatorGroupOpen(section);
+  const { state, isMobile } = useSidebar();
   const isActive = (item: NavItem) =>
     isOperatorNavigationHrefActive(pathname, item.href);
-  const holdsActive = section.items.some(isActive);
-  const open = !section.collapsible || stored || holdsActive;
-  const toggle = () => {
-    const next = !stored;
-    setStored(next);
-    try {
-      globalThis.localStorage?.setItem(
-        groupOpenKey(section.id),
-        next ? '1' : '0'
-      );
-    } catch {
-      // Ignore unavailable storage.
-    }
-  };
+  const { holdsActive, open, items, pinnedInRail } = resolveOperatorNavGroup({
+    collapsible: section.collapsible,
+    items: section.items,
+    isActive,
+    stored,
+    railCollapsed: state === 'closed' && !isMobile,
+  });
   const groupId = `ov-nav-${section.id}`;
   return (
-    <div data-testid={`ov-nav-section-${section.id}`}>
+    <div
+      data-testid={`ov-nav-section-${section.id}`}
+      className={cn(pinnedInRail && OPERATOR_RAIL_PINNED_GROUP_CLASS)}
+    >
       {section.label && section.collapsible ? (
         <button
           type='button'
@@ -187,7 +175,7 @@ function OperatorNavGroup({
       ) : null}
       <div id={groupId} hidden={!open}>
         <SettingsNavGroup
-          items={section.items}
+          items={items}
           pathname={pathname}
           isItemActive={isActive}
           onPrefetch={prefetchShipping}
@@ -199,6 +187,7 @@ function OperatorNavGroup({
 
 /** Dedicated operator navigation; customer DashboardNav stays customer-only. */
 function OperatorNavigation({ pathname }: { readonly pathname: string }) {
+  const { state, isMobile } = useSidebar();
   return (
     <div className='flex flex-1 flex-col gap-4 overflow-y-auto pt-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden'>
       <nav aria-label='OV Navigation' className='flex flex-col gap-4'>
@@ -212,7 +201,9 @@ function OperatorNavigation({ pathname }: { readonly pathname: string }) {
       </nav>
       {/* Dynamic list hrefs stay outside the canonical OV landmark so the
           registry link set remains exact. */}
-      <OperatorListsNav pathname={pathname} />
+      <div hidden={state === 'closed' && !isMobile}>
+        <OperatorListsNav pathname={pathname} />
+      </div>
     </div>
   );
 }

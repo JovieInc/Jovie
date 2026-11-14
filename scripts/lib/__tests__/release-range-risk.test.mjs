@@ -1,4 +1,3 @@
-import { execFileSync, spawnSync } from 'node:child_process';
 import {
   mkdirSync,
   mkdtempSync,
@@ -10,6 +9,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterAll, describe, expect, it } from 'vitest';
+import { execFileSync, spawnSync } from '../child-process.mjs';
 import { classifyCiRisk, loadCiHarnessManifest } from '../ci-harness.mjs';
 import { planProductionLaneRange } from '../production-lane-range.mjs';
 import {
