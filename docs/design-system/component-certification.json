@@ -94,6 +94,42 @@
       "a11y",
       "frontend-rules"
     ],
+    "apps/web/components/organisms/billing/BillingActionsSection.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/organisms/billing/BillingHeader.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/organisms/billing/BillingHistorySection.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/organisms/billing/BillingLoadingSkeleton.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
     "apps/web/components/organisms/billing/CheckoutUnlockCards.tsx": [
       "ds-owner",
       "tokens",
@@ -101,6 +137,240 @@
       "tests",
       "a11y",
       "frontend-rules"
+    ],
+    "apps/web/components/organisms/combobox/ComboboxDropdown.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/organisms/combobox/ComboboxOptionItem.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/organisms/desktop-update/DesktopUpdateProvider.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/organisms/home-loop/HomeLoopAnswerPanel.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/organisms/home-loop/HomeLoopCanvas.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/organisms/home-loop/HomeLoopKanban.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/organisms/home-loop/HomeLoopLatency.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/organisms/home-loop/HomeLoopPulse.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/organisms/home-loop/HomeLoopSection.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/organisms/home-loop/HomeLoopStageRows.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/organisms/home-loop/HomeLoopStageStrip.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/organisms/opportunity-card/OpportunityCard.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/organisms/profile-shell/ProfileNotificationsContext.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/organisms/profile-shell/ProfileShell.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/organisms/public-surface/PublicSurfaceFooter.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/organisms/release-sidebar/ReleaseActionErrorCard.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/organisms/release-sidebar/ReleaseArtwork.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/organisms/release-sidebar/ReleaseFields.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/organisms/release-sidebar/ReleasePropertiesPanel.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/organisms/release-sidebar/ReleaseSaveStatusRow.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/organisms/release-sidebar/ReleaseSidebar.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/organisms/release-sidebar/ReleaseSmartLinkAnalytics.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/organisms/release-sidebar/TrackDetailPanel.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/organisms/release-sidebar/TrackMetaSummary.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/organisms/release-sidebar/TrackPlatformLinksSection.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/organisms/table/NoirIonWorkspaceStatesSpecimen.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
     ],
     "packages/ui/": [
       "ds-owner",
@@ -817,12 +1087,85 @@
       "empty": "StandaloneProductPage is a layout shell that renders its required children in a main landmark; it owns no collection, and the detector matched the items-center class.",
       "partial": "Its optional props (className, contentClassName, width, centered) are layout options, not content fields, so there is no partially filled state; Centered and NarrowWidth show them."
     },
+    "apps/web/components/organisms/billing/BillingActionsSection.tsx": {
+      "empty": "The card renders a fixed portal link, one cancel button and a confirm dialog with a fixed four-item list of lost features; it owns no collection that can be empty.",
+      "error": "The section takes no error prop: handleCancelSubscription belongs to the billing page, which reports a failed cancellation itself; this card only shows the pending confirm button (PendingCancellation story).",
+      "offline": "The section makes no request of its own; the cancel mutation and its network failure live in the billing page that passes handleCancelSubscription and cancelMutationPending.",
+      "permission-denied": "Only a subscribed user reaches this card and every subscriber may cancel; the detector matched PRO_PLAN_DISPLAY_NAME, which is the plan name in the dialog copy."
+    },
+    "apps/web/components/organisms/billing/BillingHeader.tsx": {
+      "permission-denied": "The header renders the same title and plan sentence for every viewer; the detector matched the word plan in getPlanDisplayName(plan), which only names the plan."
+    },
+    "apps/web/components/organisms/billing/BillingLoadingSkeleton.tsx": {
+      "empty": "The skeleton maps a fixed three-entry PLAN_CARD_SKELETONS constant; it takes no data, so there is nothing that can be empty.",
+      "offline": "The skeleton takes no props and makes no request; connectivity belongs to the billing page that shows it while its own queries load."
+    },
+    "apps/web/components/organisms/combobox/ComboboxDropdown.tsx": {
+      "offline": "The dropdown makes no request; it renders isLoading, query and filteredOptions handed down by Combobox, whose caller owns the artist search and its network failure.",
+      "permission-denied": "Anyone typing an artist name sees the same suggestions; the detector matched role='status' on the live region that announces search progress."
+    },
+    "apps/web/components/organisms/combobox/ComboboxOptionItem.tsx": {
+      "loading": "The only loading frame is the image shimmer shown until next/image fires onLoad, which lasts as long as the network does, so no story can hold it; the shimmer is asserted in ComboboxOptionItem.certificate.test.tsx.",
+      "empty": "The row renders exactly one option passed in by ComboboxDropdown; an empty list is the dropdown's no-results state (ComboboxDropdown EmptySearchResults story).",
+      "offline": "The row makes no request; an image that cannot load while offline takes the same initials fallback as the ErrorImageFallback story."
+    },
     "apps/web/components/organisms/desktop-update/DesktopUpdateControl.tsx": {
       "permission-denied": "Every desktop user may download, restart or retry an update; the control has no account, role or gated action. The detector matched role='status' on the polite announcement."
+    },
+    "apps/web/components/organisms/desktop-update/DesktopUpdateProvider.tsx": {
+      "error": "The provider draws no error UI of its own: it passes the updater's error phase to DesktopUpdateModal, whose ErrorState and ErrorNotRetryable stories show it; a browser canvas has no update bridge, so the provider renders only children.",
+      "long-content": "The provider has no copy of its own; it renders children plus DesktopUpdateModal, whose AvailableLongNotes story covers long release notes.",
+      "permission-denied": "Updates need no permission; the detector matched the comment 'passive update announcements still wait behind permission/error notices', which is about banner priority.",
+      "rtl-overflow": "The provider has no copy of its own; text direction belongs to its children and to DesktopUpdateModal, which renders the update copy."
+    },
+    "apps/web/components/organisms/home-loop/HomeLoopAnswerPanel.tsx": {
+      "offline": "The panel makes no request: prompt, reply and pending come from the Home canvas owner that streams the turn, so a dropped connection reaches it only as the pending or empty reply already shown in LoadingReply and EmptyReply."
+    },
+    "apps/web/components/organisms/home-loop/HomeLoopCanvas.tsx": {
+      "offline": "The canvas makes no request; it renders loopStatus and asksStatus from the Home page reads, and an offline read lands as their error status, shown with retry in the ErrorState and PartialShippingReadFailed stories."
+    },
+    "apps/web/components/organisms/home-loop/HomeLoopKanban.tsx": {
+      "error": "The board takes no error input; a failed shipping read is drawn by the enclosing HomeLoopSection (its ErrorState story). The detector matched the border-l-error and text-error classes that mark blocked cards."
+    },
+    "apps/web/components/organisms/home-loop/HomeLoopPulse.tsx": {
+      "offline": "The pulse row and banner make no request; they render tiles and a constraint passed in, and an unavailable read shows as the unknown banner with empty frames (ErrorReadUnknown).",
+      "permission-denied": "Every Home viewer sees the same tiles; the detector matched role='status' on the constraint banner and role='img' on the tone dots."
+    },
+    "apps/web/components/organisms/home-loop/HomeLoopSection.tsx": {
+      "offline": "The section makes no request; it renders the status its caller passes, and an offline read arrives as status='error' with the retry button (ErrorState and LongContentError stories).",
+      "permission-denied": "A section has no gated content; the detector matched role='alert' on the error line and role='status' on the source notice."
+    },
+    "apps/web/components/organisms/home-loop/HomeLoopStageRows.tsx": {
+      "error": "The rows take no error input; a failed read is drawn by the enclosing HomeLoopSection. The detector matched the bg-error and text-error classes that mark a blocked row.",
+      "offline": "The rows make no request; they render rows passed in by the Home loop, whose failed or offline read is shown by HomeLoopSection's error state."
+    },
+    "apps/web/components/organisms/home-loop/HomeLoopStageStrip.tsx": {
+      "error": "The strip takes no error input; when the loop read fails the canvas passes items=[] and it shows its empty label (EmptyNotMeasured). The detector matched the text-error-text tone class for slow values."
+    },
+    "apps/web/components/organisms/profile-shell/ProfileShell.tsx": {
+      "loading": "Only next/dynamic fallbacks load: null for PayDrawer and a static idle ProfileNotificationsButton; no loading UI of the shell's own.",
+      "error": "Detector matched the '// @ts-expect-error - joviePixel' comments; the shell has no error UI.",
+      "offline": "The shell makes no request of its own; detector matched the next/dynamic 'loading:' option."
     },
     "apps/web/components/organisms/public-surface/PublicSurfaceStage.tsx": {
       "empty": "The stage holds no data: children is required and is the profile card itself. The detector matched the items-stretch and items-center layout classes.",
       "partial": "Nothing can be partially present: className and panelClassName are styling and afterPanel is one optional slot, which Default shows absent and WithAfterPanel shows present."
+    },
+    "apps/web/components/organisms/release-sidebar/ReleaseActionErrorCard.tsx": {
+      "empty": "Renders one message and its action; there is no collection to be empty."
+    },
+    "apps/web/components/organisms/release-sidebar/ReleaseSaveStatusRow.tsx": {
+      "partial": "Takes one status plus optional feedback; there is no partial data.",
+      "permission-denied": "False positive on role='status'; the row has no permission gate."
+    },
+    "apps/web/components/organisms/release-sidebar/ReleaseSmartLinkAnalytics.tsx": {
+      "permission-denied": "A 403 shows the same 'Analytics unavailable' line as ErrorLoadingAnalytics; detector matched the test-auth bypass constants."
+    },
+    "apps/web/components/organisms/release-sidebar/TrackDetailPanel.tsx": {
+      "error": "Copy failures surface only as app Toaster toasts ('Failed to copy ISRC' / 'Failed to copy link'), asserted in TrackDetailPanel.certificate.test.tsx."
+    },
+    "apps/web/components/organisms/release-sidebar/TrackMetaSummary.tsx": {
+      "empty": "Renders one track's metadata; there is no collection to be empty."
     },
     "apps/web/components/organisms/sidebar-identity-group/SidebarIdentityGroup.tsx": {
       "empty": "The group renders one identity control and at most one Public Profile link; it owns no collection. A missing profile is the partial state (PartialWithoutPublicProfile). The detector matched the items-center class."
@@ -833,6 +1176,11 @@
     "apps/web/components/organisms/sidebar/menu.tsx": {
       "empty": "These are list primitives that render the children a caller passes; they hold no data, so an empty section belongs to the caller (see the sidebar group EmptyGroup story). The detector matched the items-center class.",
       "offline": "The primitives make no request; SidebarMenuSkeleton is a static placeholder the caller shows while its own data loads. The detector matched the Skeleton import."
+    },
+    "apps/web/components/organisms/table/NoirIonWorkspaceStatesSpecimen.tsx": {
+      "empty": "Fixed specimen with no props or data; its rows are always the four state rows.",
+      "long-content": "Fixed specimen copy with no props; there is no variable content to overflow.",
+      "offline": "Static specimen that makes no request."
     },
     "apps/web/components/organisms/table/atoms/GroupHeader.tsx": {
       "empty": "GroupHeader renders one group's label and count, not a collection; groups come from useTableGrouping, which only creates a group for a row it has seen, so the count is never zero. The detector matched the items-center class.",
