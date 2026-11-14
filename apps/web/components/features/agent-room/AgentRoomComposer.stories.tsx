@@ -24,3 +24,13 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const Composer: Story = {};
+
+/** A failed send: the error shows and the typed message stays for a retry. */
+export const FailedSend: Story = {
+  args: {
+    action: async () => ({
+      status: 'error' as const,
+      message: 'Linear did not take the message. Try again.',
+    }),
+  },
+};
