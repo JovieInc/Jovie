@@ -75,3 +75,10 @@ export async function updateOnboardingProfile(_updates: {
   console.log('[Storybook Mock] updateOnboardingProfile called');
   return { success: true };
 }
+
+/** Storybook must never write an onboarding offer receipt. */
+export async function recordOnboardingUpgradeOfferDecision(): Promise<{
+  ok: boolean;
+}> {
+  return { ok: true };
+}

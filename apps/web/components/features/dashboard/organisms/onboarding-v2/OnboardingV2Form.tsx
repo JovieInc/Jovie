@@ -1,6 +1,6 @@
 'use client';
 
-// @coverage-via apps/web/tests/components/dashboard/organisms/onboarding-v2-performance.test.tsx
+// @coverage-via apps/web/tests/components/dashboard/organisms/OnboardingPlanOffer.test.tsx
 
 import { Button, Spinner as LoadingSpinner } from '@jovie/ui';
 import { ArrowRight, AudioLines, Music2, RefreshCw } from 'lucide-react';
@@ -53,6 +53,7 @@ import {
 import { presentUnmanagedListing } from '@/lib/profile/artist-status-presentation';
 import { type SpotifyArtistResult, useArtistSearchQuery } from '@/lib/queries';
 import { cn } from '@/lib/utils';
+import { OnboardingPlanOffer } from './OnboardingPlanOffer';
 
 const DISCOVERY_POLL_INTERVAL_MS = 1200;
 const DISCOVERY_FETCH_TIMEOUT_MS = 10_000;
@@ -1830,13 +1831,7 @@ export function OnboardingV2Form({
             }
           >
             <ContentSurfaceCard className='p-5'>
-              <p className='text-sm font-semibold text-primary-token'>
-                Your import is ready.
-              </p>
-              <p className='mt-2 text-sm leading-6 text-secondary-token'>
-                Upgrade unlocks album art, pitch tools, and advanced AI. After
-                checkout, you&apos;ll return here to finish setup.
-              </p>
+              <OnboardingPlanOffer />
             </ContentSurfaceCard>
           </StepFrame>
         );
