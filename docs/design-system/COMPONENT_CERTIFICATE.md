@@ -84,7 +84,16 @@ axe violations. A story that pins its theme through story `globals` (such as
 dark proof. Only a screenshot hash is recorded, since there are no pixel
 baselines yet. The job saves `visual.json` and `a11y.json` to the
 `component-story-evidence-` cache, and `component-certificate.yml` restores
-them. Locally: start `storybook dev` in `apps/web`, then run
+them. A successful trusted main CI, render, or mutation producer completion
+refreshes the event's immutable current-main SHA, even when the producer ran
+on an older ancestor. The trigger must be an ancestor of the target, which must
+belong to main. Cancellation is scoped to that target. Cache reuse still requires
+matching current input bindings; a late completion never refreshes old hashes.
+Immediately before posting, the workflow rechecks current main and keeps a
+superseded report only as an immutable artifact (including explicit historical
+dispatch targets). An unreadable main fails delivery closed. This check is not
+atomic with Ovie ingestion and does not provide monotonic storage ordering.
+Locally: start `storybook dev` in `apps/web`, then run
 `node scripts/component-story-evidence.mjs --local --component packages/ui/atoms/button.tsx`.
 
 Mutation records keep the canonical sweep format: `blob` is
