@@ -326,9 +326,9 @@ test('a frame published twice updates its issue and never makes a second', async
     network.ops().filter(op => op === 'PenDraftApprovalCreate').length,
     1
   );
-  const update = network.calls.findLast(
-    call => call.op === 'PenDraftApprovalUpdate'
-  );
+  const update = network.calls
+    .filter(call => call.op === 'PenDraftApprovalUpdate')
+    .at(-1);
   // The label is already on the issue, so only the description changes.
   assert.deepEqual(update.variables, {
     id: 'new-0',
@@ -418,12 +418,10 @@ test('no png means no Linear call; a png without the key fails', async () => {
 });
 
 test('the workflow publishes the run that drafted, with read-only tokens', () => {
-  const draft = yamlLoad(
-    readFileSync('.github/workflows/pen-draft.yml', 'utf8')
-  );
-  const workflow = yamlLoad(
-    readFileSync('.github/workflows/pen-draft-publish.yml', 'utf8')
-  );
+  /** @type {(file: string) => any} */
+  const parsed = file => yamlLoad(readFileSync(file, 'utf8'));
+  const draft = parsed('.github/workflows/pen-draft.yml');
+  const workflow = parsed('.github/workflows/pen-draft-publish.yml');
   assert.deepEqual(workflow.on.workflow_run, {
     workflows: [draft.name],
     types: ['completed'],

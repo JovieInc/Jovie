@@ -33,6 +33,28 @@ export const CREATE_STATE_NAME = 'Backlog';
 // Linear rejects larger uploads; a frame preview is a few hundred KB.
 export const MAX_PNG_BYTES = 25 * 1024 * 1024;
 
+/**
+ * @typedef {{ok: false, reason: string, detail?: string}} Failure
+ * @typedef {{ok: true, data: any}} GraphqlOk
+ * @typedef {{ok: true, labelId: string, stateId: string | null}} TeamRefs
+ * @typedef {{ok: true, assetUrl: string}} Uploaded
+ * @typedef {{ok: true, issue: any}} FoundIssue
+ * @typedef {{ok: true, action: string, identifier: string | null}} Upserted
+ * @typedef {{frame: string, ok: true, action: string, identifier?: string | null}} PublishedRow
+ * @typedef {{frame: string, ok: false, reason: string, detail?: string}} FailedRow
+ * @typedef {PublishedRow | FailedRow} FrameRow
+ * @typedef {{ok: boolean, reason?: string, frames: FrameRow[]}} PublishResult
+ * @typedef {{apiKey?: string, fetchImpl: typeof fetch, env: NodeJS.ProcessEnv, sleep?: (ms: number) => Promise<void>, log?: (line: string) => void}} Context
+ */
+
+/**
+ * scripts checkJs runs without strict null checks, so `!result.ok` does not
+ * narrow a result union; this guard does.
+ * @param {{ok: boolean}} result
+ * @returns {result is Failure}
+ */
+const failed = result => !result.ok;
+
 const FRAME_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const TERMINAL_STATES = new Set(['completed', 'canceled']);
 
@@ -103,7 +125,14 @@ export function collectFrames(dir) {
     });
 }
 
-/** One Linear GraphQL call in the shape scripts/lib/linear-retry.mjs retries. */
+/**
+ * One Linear GraphQL call in the shape scripts/lib/linear-retry.mjs retries.
+ * @param {Context} ctx
+ * @param {string} op
+ * @param {string} query
+ * @param {Record<string, unknown>} variables
+ * @returns {Promise<GraphqlOk | Failure>}
+ */
 async function linearGraphql(ctx, op, query, variables) {
   const result = await linearRequest({
     key: ctx.apiKey,
@@ -127,6 +156,14 @@ async function linearGraphql(ctx, op, query, variables) {
   return { ok: true, data: result.data?.data ?? null };
 }
 
+/**
+ * @template {{ok: boolean, reason?: string}} T
+ * @param {Context} ctx
+ * @param {string} frame
+ * @param {string} op
+ * @param {() => Promise<T>} run
+ * @returns {Promise<T>}
+ */
 const retried = (ctx, frame, op, run) =>
   withLinearRetry(run, {
     fingerprint: frame,
@@ -135,7 +172,11 @@ const retried = (ctx, frame, op, run) =>
     log: ctx.log,
   });
 
-/** The approval label's id and the state a new issue starts in. */
+/**
+ * The approval label's id and the state a new issue starts in.
+ * @param {Context} ctx
+ * @returns {Promise<TeamRefs | Failure>}
+ */
 export async function resolveTeamRefs(ctx) {
   const found = await retried(ctx, 'team', 'pen_publish_refs', () =>
     linearGraphql(
@@ -150,7 +191,7 @@ export async function resolveTeamRefs(ctx) {
       { teamId: JOVIE_TEAM_ID, names: [APPROVAL_LABEL] }
     )
   );
-  if (!found.ok) return found;
+  if (failed(found)) return found;
   // A Jovie team label wins over a workspace label of the same name.
   const labels = (found.data?.issueLabels?.nodes ?? []).filter(
     label => label?.name === APPROVAL_LABEL
@@ -167,7 +208,12 @@ export async function resolveTeamRefs(ctx) {
   return { ok: true, labelId: label.id, stateId };
 }
 
-/** Upload one png: ask Linear for a signed URL, then PUT the bytes to it. */
+/**
+ * Upload one png: ask Linear for a signed URL, then PUT the bytes to it.
+ * @param {Context} ctx
+ * @param {{frame: string, bytes: Buffer}} upload
+ * @returns {Promise<Uploaded | Failure>}
+ */
 export async function uploadPng(ctx, { frame, bytes }) {
   const filename = `${frame}.png`;
   const signed = await linearGraphql(
@@ -181,7 +227,7 @@ export async function uploadPng(ctx, { frame, bytes }) {
     }`,
     { contentType: 'image/png', filename, size: bytes.length }
   );
-  if (!signed.ok) return signed;
+  if (failed(signed)) return signed;
   const file = signed.data?.fileUpload?.uploadFile;
   if (
     !signed.data?.fileUpload?.success ||
@@ -200,7 +246,7 @@ export async function uploadPng(ctx, { frame, bytes }) {
     response = await ctx.fetchImpl(file.uploadUrl, {
       method: 'PUT',
       headers,
-      body: bytes,
+      body: /** @type {BodyInit} */ (/** @type {unknown} */ (bytes)),
       signal: AbortSignal.timeout(60_000),
     });
   } catch {
@@ -212,6 +258,11 @@ export async function uploadPng(ctx, { frame, bytes }) {
   return { ok: true, assetUrl: file.assetUrl };
 }
 
+/**
+ * @param {Context} ctx
+ * @param {string} frame
+ * @returns {Promise<FoundIssue | Failure>}
+ */
 async function findApprovalIssue(ctx, frame) {
   const found = await linearGraphql(
     ctx,
@@ -227,19 +278,24 @@ async function findApprovalIssue(ctx, frame) {
     }`,
     { teamId: JOVIE_TEAM_ID, title: approvalTitle(frame) }
   );
-  if (!found.ok) return found;
+  if (failed(found)) return found;
   return {
     ok: true,
     issue: pickApprovalIssue(found.data?.issues?.nodes, frame),
   };
 }
 
-/** Create the frame's approval issue, or put the new picture on the old one. */
+/**
+ * Create the frame's approval issue, or put the new picture on the old one.
+ * @param {Context} ctx
+ * @param {{frame: string, description: string, refs: TeamRefs}} draft
+ * @returns {Promise<Upserted | Failure>}
+ */
 export async function upsertApprovalIssue(ctx, { frame, description, refs }) {
   const found = await retried(ctx, frame, 'pen_issue_find', () =>
     findApprovalIssue(ctx, frame)
   );
-  if (!found.ok) return found;
+  if (failed(found)) return found;
   if (found.issue) {
     const labelled = (found.issue.labels?.nodes ?? []).some(
       label => label?.id === refs.labelId
@@ -260,7 +316,7 @@ export async function upsertApprovalIssue(ctx, { frame, description, refs }) {
         }
       )
     );
-    if (!updated.ok) return updated;
+    if (failed(updated)) return updated;
     if (!updated.data?.issueUpdate?.success)
       return { ok: false, reason: 'pen_issue_update_unsuccessful' };
     return {
@@ -287,7 +343,7 @@ export async function upsertApprovalIssue(ctx, { frame, description, refs }) {
       },
     }
   );
-  if (!created.ok) return created;
+  if (failed(created)) return created;
   if (!created.data?.issueCreate?.success)
     return { ok: false, reason: 'pen_issue_create_unsuccessful' };
   return {
@@ -300,6 +356,8 @@ export async function upsertApprovalIssue(ctx, { frame, description, refs }) {
 /**
  * Publish every frame under `dir` that has a png. Returns one row per frame;
  * `ok` is false when any upload or issue write failed.
+ * @param {{dir: string, runUrl: string, apiKey?: string, fetchImpl?: typeof fetch, env?: NodeJS.ProcessEnv, sleep?: (ms: number) => Promise<void>, log?: (line: string) => void, readFile?: (path: string) => Buffer}} options
+ * @returns {Promise<PublishResult>}
  */
 export async function publishDrafts({
   dir,
@@ -314,14 +372,19 @@ export async function publishDrafts({
   const ctx = { apiKey, fetchImpl, env, sleep, log };
   const frames = collectFrames(dir);
   const withPng = frames.filter(entry => entry.png);
+  /** @type {FrameRow[]} */
   const rows = frames
     .filter(entry => !entry.png)
-    .map(entry => ({ frame: entry.frame, ok: true, action: 'skipped-no-png' }));
+    .map(entry => ({
+      frame: entry.frame,
+      ok: /** @type {const} */ (true),
+      action: 'skipped-no-png',
+    }));
   if (withPng.length === 0) return { ok: true, frames: rows };
   if (!apiKey)
     return { ok: false, reason: 'missing_linear_api_key', frames: rows };
   const refs = await resolveTeamRefs(ctx);
-  if (!refs.ok) return { ok: false, reason: refs.reason, frames: rows };
+  if (failed(refs)) return { ok: false, reason: refs.reason, frames: rows };
   for (const { frame, png } of withPng) {
     const bytes = readFile(png);
     if (bytes.length === 0 || bytes.length > MAX_PNG_BYTES) {
@@ -331,7 +394,7 @@ export async function publishDrafts({
     const upload = await retried(ctx, frame, 'pen_upload', () =>
       uploadPng(ctx, { frame, bytes })
     );
-    if (!upload.ok) {
+    if (failed(upload)) {
       rows.push({ frame, ok: false, reason: upload.reason });
       continue;
     }
@@ -345,14 +408,14 @@ export async function publishDrafts({
       refs,
     });
     rows.push(
-      issue.ok
-        ? {
+      failed(issue)
+        ? { frame, ok: false, reason: issue.reason, detail: issue.detail }
+        : {
             frame,
             ok: true,
             action: issue.action,
             identifier: issue.identifier,
           }
-        : { frame, ok: false, reason: issue.reason, detail: issue.detail }
     );
   }
   return { ok: rows.every(row => row.ok), frames: rows };
@@ -368,10 +431,12 @@ async function main() {
     dir: resolve(values.dir),
     runUrl: runUrlFor(values['run-id']),
   });
-  for (const row of result.frames)
-    console.log(
-      `pen-draft-publish: ${row.frame}: ${row.ok ? `${row.action}${row.identifier ? ` ${row.identifier}` : ''}` : `FAILED ${row.reason}${row.detail ? ` (${row.detail})` : ''}`}`
-    );
+  for (const row of result.frames) {
+    const outcome = failed(row)
+      ? `FAILED ${row.reason}${row.detail ? ` (${row.detail})` : ''}`
+      : `${row.action}${row.identifier ? ` ${row.identifier}` : ''}`;
+    console.log(`pen-draft-publish: ${row.frame}: ${outcome}`);
+  }
   if (result.reason) console.log(`pen-draft-publish: FAILED ${result.reason}`);
   if (result.frames.length === 0)
     console.log('pen-draft-publish: the run left no pen-draft artifacts');
