@@ -96,8 +96,6 @@
     "apps/web/components/features/dashboard/release-tasks/ReleaseTaskCompactRow.tsx": "a11y,ds-owner,states,tests,tokens",
     "apps/web/components/features/dashboard/release-tasks/ReleaseTaskExplainerPopover.tsx": "a11y,ds-owner,states,tests",
     "apps/web/components/features/dashboard/release-tasks/ReleaseTaskPastReleaseState.tsx": "a11y,ds-owner,states,tests",
-    "apps/web/components/features/dashboard/tasks/TasksUpgradeInterstitial.tsx": "a11y,states,tests,tokens",
-    "apps/web/components/features/feedback/ErrorDetails.tsx": "a11y,ds-owner,states",
     "apps/web/components/features/onboarding/OnboardingMessageRecoveryRow.tsx": "a11y,ds-owner,states",
     "apps/web/components/features/onboarding/OnboardingToolArtifacts.tsx": "a11y,ds-owner,frontend-rules,states,tests,tokens",
     "apps/web/components/features/onboarding/OnboardingTurnstile.tsx": "states",
