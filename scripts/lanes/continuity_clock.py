@@ -72,7 +72,7 @@ CLOCKS = (
     # Runaway production event volume (cost) can start with no deploy.
     Clock("costAnomaly", "cost-anomaly-gate.yml", "clock_cost_anomaly_gate", 900,
           "cost-anomaly-clock.json"),
-    # Resolve or reopen autofixed incidents once their 45-minute post-deploy soak elapses.
+    # Evaluate registered Sentry validation observations against the verified production artifact.
     Clock("sentryRecurrence", "sentry-autofix-recurrence.yml", "clock_sentry_autofix_recurrence", 3600,
           "sentry-recurrence-clock.json"),
     # Weekly archive-then-delete of stale remote branches (7,752 on 2026-10-20). A clock event
