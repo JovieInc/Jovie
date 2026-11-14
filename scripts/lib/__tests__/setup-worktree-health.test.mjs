@@ -262,6 +262,9 @@ describe('SessionStart still uses setup.sh for the skip', () => {
     expect(setupSh).toContain('jovie_setup_worktree_healthy');
     expect(setupSh).toContain('jovie_setup_repair_linked_worktree_git_config');
     expect(setupSh).toContain('Worktree already healthy — skipped setup body');
+    expect(setupSh.indexOf('jovie_setup_gh_api_slurp_ok')).toBeLessThan(
+      setupSh.indexOf('jovie_setup_worktree_healthy')
+    );
     expect(
       setupSh.indexOf('jovie_setup_repair_linked_worktree_git_config')
     ).toBeLessThan(setupSh.indexOf('git rev-parse --is-inside-work-tree'));
