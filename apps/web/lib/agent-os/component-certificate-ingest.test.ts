@@ -12,7 +12,10 @@ vi.mock('@/lib/ovie/mcp/postgres-backend', () => ({
 }));
 vi.mock('@/lib/utils/logger', () => ({ logger: { warn: mocks.warn } }));
 
-import { recordComponentCertificateDelivery } from './component-certificate-ingest';
+import {
+  readLatestComponentCertificateDelivery,
+  recordComponentCertificateDelivery,
+} from './component-certificate-ingest';
 
 const packet = {
   headSha: 'a'.repeat(40),
@@ -44,7 +47,7 @@ describe('component certificate persistence boundary', () => {
       packet,
     });
     expect(mocks.setIfAbsent).toHaveBeenCalledWith(
-      'component-certificate:latest',
+      'component-certificate:source-ordered-latest/v1',
       packet,
       expect.any(Number)
     );
@@ -97,5 +100,67 @@ describe('component certificate persistence boundary', () => {
     );
     expect(mocks.set).not.toHaveBeenCalled();
     expect(mocks.warn).not.toHaveBeenCalled();
+  });
+  it('reads legacy latest only until the new authority exists', async () => {
+    const legacy = { headSha: 'c'.repeat(40) };
+    mocks.get.mockResolvedValueOnce(null).mockResolvedValueOnce(legacy);
+    await expect(readLatestComponentCertificateDelivery()).resolves.toEqual(
+      legacy
+    );
+    expect(mocks.get.mock.calls).toEqual([
+      ['component-certificate:source-ordered-latest/v1'],
+      ['component-certificate:latest'],
+    ]);
+    mocks.get.mockReset().mockResolvedValue(packet);
+    await expect(readLatestComponentCertificateDelivery()).resolves.toEqual(
+      packet
+    );
+    expect(mocks.get).toHaveBeenCalledExactlyOnceWith(
+      'component-certificate:source-ordered-latest/v1'
+    );
+  });
+  it('never falls back to legacy after an authoritative read error', async () => {
+    mocks.get.mockRejectedValue(new Error('authority unavailable'));
+    await expect(readLatestComponentCertificateDelivery()).rejects.toThrow(
+      'authority unavailable'
+    );
+    expect(mocks.get).toHaveBeenCalledOnce();
+  });
+  it('fences an old deployed unconditional write released after new acceptance', async () => {
+    const legacyKey = 'component-certificate:latest';
+    const legacy = { headSha: 'c'.repeat(40) };
+    const rows = new Map<string, unknown>();
+    let releaseOld!: () => void;
+    const oldGate = new Promise<void>(resolve => {
+      releaseOld = resolve;
+    });
+    mocks.get.mockImplementation(async key =>
+      structuredClone(rows.get(key) ?? null)
+    );
+    mocks.set.mockImplementation(async (key, value) => {
+      if (key === legacyKey) await oldGate;
+      rows.set(key, structuredClone(value));
+    });
+    mocks.setIfAbsent.mockImplementation(async (key, value) => {
+      if (rows.has(key)) return false;
+      rows.set(key, structuredClone(value));
+      return true;
+    });
+    // Exact old deployment's persistence primitive, deliberately held in flight.
+    const oldWrite = mocks.set(legacyKey, legacy);
+    const accepted = await recordComponentCertificateDelivery(packet);
+    expect(accepted.accepted).toBe(true);
+    releaseOld();
+    await oldWrite;
+    expect(rows.get(legacyKey)).toEqual(legacy);
+    await expect(readLatestComponentCertificateDelivery()).resolves.toEqual(
+      packet
+    );
+    const rejected = await recordComponentCertificateDelivery(legacy);
+    expect(rejected).toMatchObject({
+      accepted: false,
+      reason: 'legacy-after-ordered',
+      packet,
+    });
   });
 });

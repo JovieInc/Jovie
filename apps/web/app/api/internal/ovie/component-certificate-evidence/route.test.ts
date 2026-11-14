@@ -67,7 +67,7 @@ describe('POST /api/internal/ovie/component-certificate-evidence', () => {
       accepted: true,
       reason: 'stored',
       historyCount: 1,
-      key: 'component-certificate:latest',
+      key: 'component-certificate:source-ordered-latest/v1',
       packet: { headSha: HEAD_SHA },
     });
   });

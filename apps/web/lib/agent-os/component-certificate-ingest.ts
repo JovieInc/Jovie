@@ -12,7 +12,10 @@ import {
  * no new table or migration is introduced.
  */
 
-const LATEST_KEY = 'component-certificate:latest';
+// Old deployed receivers still unconditionally write the legacy key. A separate
+// namespace keeps those in-flight writes outside the new atomic authority.
+const LATEST_KEY = 'component-certificate:source-ordered-latest/v1';
+const LEGACY_LATEST_KEY = 'component-certificate:latest';
 const HISTORY_KEY = 'component-certificate:history';
 // Small history rows (~200 bytes each) stay far under the 256KB KV row
 // budget; the full compact packet is only kept under `latest`.
@@ -87,5 +90,8 @@ export async function recordComponentCertificateDelivery(
 
 export async function readLatestComponentCertificateDelivery(): Promise<unknown> {
   const backend = postgresRecordBackend();
-  return backend.get(LATEST_KEY);
+  const current = await backend.get(LATEST_KEY);
+  return current === null || current === undefined
+    ? backend.get(LEGACY_LATEST_KEY)
+    : current;
 }

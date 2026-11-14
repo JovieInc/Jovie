@@ -89,7 +89,7 @@ describe('POST /api/internal/ovie/component-certificate-evidence: real auth', ()
       accepted: true,
       reason: 'stored',
       historyCount: 1,
-      key: 'component-certificate:latest',
+      key: 'component-certificate:source-ordered-latest/v1',
       packet: { headSha: HEAD_SHA },
     });
     vi.stubEnv('CRON_SECRET', 'the-real-secret');

@@ -104,9 +104,15 @@ Source ordinal wins first, then run/attempt for the same SHA. Stale generations,
 equal-height different SHAs, inconsistent same-SHA ordinals, and conflicting
 equal-order content are rejected with 409 and the actually stored SHA. Exact
 duplicates are idempotent. Legacy packets work only before ordered state exists.
-All receiver writes, including legacy requests, use the same bounded CAS path;
-storage failure or exhausted contention returns 503. The capped 50-row history
-is explicitly best effort and cannot change latest acceptance.
+All new receiver writes, including legacy requests, use the same bounded CAS
+path under `component-certificate:source-ordered-latest/v1`. In-flight old
+deployments can still unconditionally write `component-certificate:latest`;
+that legacy namespace cannot overwrite the new authority. The canonical
+`readLatestComponentCertificateDelivery` helper prefers the new key and falls
+back to legacy only while the new key is absent, never after a read error. No
+write is mirrored back to the legacy key. Storage failure or exhausted
+contention returns 503. The capped 50-row history is explicitly best effort and
+cannot change latest acceptance.
 
 The sender first requires authenticated OPTIONS on the existing route to return
 `{ok:true,deliveryOrderSchema:"jovie.source-order/v1"}`; negotiation does no DB

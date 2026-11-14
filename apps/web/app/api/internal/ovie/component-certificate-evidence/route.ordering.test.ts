@@ -103,6 +103,8 @@ it('runs real cron auth, validation and ordered persistence without an ingest mo
     reason: 'legacy-after-ordered',
     storedHeadSha: newer.headSha,
   });
-  expect(state.rows.get('component-certificate:latest')).toEqual(newer);
+  expect(
+    state.rows.get('component-certificate:source-ordered-latest/v1')
+  ).toEqual(newer);
   expect(state.rows.get('component-certificate:history')).toHaveLength(1);
 });
