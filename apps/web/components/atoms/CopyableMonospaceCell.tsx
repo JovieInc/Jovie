@@ -1,6 +1,5 @@
 'use client';
 
-import { PlainButton } from '@jovie/ui';
 import { memo, useCallback, useState } from 'react';
 import { Icon } from '@/components/atoms/Icon';
 import { cn } from '@/lib/utils';
@@ -62,7 +61,7 @@ export const CopyableMonospaceCell = memo(function CopyableMonospaceCell({
   const styles = sizeClasses[size];
 
   return (
-    <PlainButton
+    <button
       type='button'
       onClick={handleCopy}
       className={cn(
@@ -96,6 +95,6 @@ export const CopyableMonospaceCell = memo(function CopyableMonospaceCell({
       <span className='sr-only' aria-live='polite'>
         {copied ? `${label} copied` : ''}
       </span>
-    </PlainButton>
+    </button>
   );
 });

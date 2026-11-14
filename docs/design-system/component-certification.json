@@ -30,15 +30,6 @@
       "frontend-rules",
       "forced-caps"
     ],
-    "apps/web/components/atoms/CopyableMonospaceCell.tsx": [
-      "ds-owner",
-      "tokens",
-      "states",
-      "tests",
-      "a11y",
-      "frontend-rules",
-      "forced-caps"
-    ],
     "apps/web/components/atoms/Copyright.tsx": [
       "ds-owner",
       "tokens",
