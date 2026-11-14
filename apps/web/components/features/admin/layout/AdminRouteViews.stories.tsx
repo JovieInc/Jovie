@@ -25,3 +25,8 @@ export const Fleet: Story = {
   args: { group: 'operations' },
   parameters: { nextjs: { navigation: { pathname: '/app/ov/system' } } },
 };
+
+export const FleetRoom: Story = {
+  args: { group: 'operations' },
+  parameters: { nextjs: { navigation: { pathname: '/app/ov/room' } } },
+};
