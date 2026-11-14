@@ -459,7 +459,7 @@ locator: () => ({ evaluate: async () => null }), close: async () => {}, };
 const receipt = await evaluateManifestWithBrowser(input.manifest, {
 root: input.root, baseUrl: 'http://fixture.invalid', strict: true, launchBrowser,
 });
-assert.equal(launches, 2); assert.equal(closes, 1);
+assert.equal(launches, 2); assert.equal(closes, 2);
 assert.equal(receipt.frames[0].reason, 'comparison-unavailable');
 assert.equal(receipt.frames[1].verdict, 'pass'); assert.equal(receipt.pass, false);
 });

@@ -129,7 +129,10 @@ const session = /** @type {{ browser?: import('playwright').Browser }} */ ({});
 const launchBrowser = options.launchBrowser ?? (async () => {
 const { chromium } = await import('playwright'); return chromium.launch(); });
 try { return await evaluateManifest(manifest, { ...options, capture: async (frame, url) => {
-if (!session.browser || !session.browser.isConnected()) session.browser = await launchBrowser();
+if (session.browser && !session.browser.isConnected()) {
+const disconnected = session.browser; session.browser = undefined; await disconnected.close();
+}
+if (!session.browser) session.browser = await launchBrowser();
 return captureSurfacePng(session.browser, { url,
 viewport: frame.viewport, mode: frame.mode, selector: frame.sectionSelector,
 mockupSelector: frame.mockupSelector, expectedPath: new URL(url).pathname, });
