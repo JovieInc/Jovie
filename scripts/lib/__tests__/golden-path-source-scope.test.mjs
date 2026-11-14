@@ -36,6 +36,7 @@ function fixture(paths = ['docs/company/shipping.md']) {
   };
   const git = (...args) =>
     execFileSync('git', args, {
+      maxBuffer: 256 * 1024 * 1024,
       cwd: dir,
       env,
       encoding: 'utf8',
@@ -353,7 +354,7 @@ it('keeps pure CI measurement dependencies outside product source', () => {
       '*.ts',
       '*.tsx',
     ],
-    { cwd: root, encoding: 'utf8' }
+    { maxBuffer: 256 * 1024 * 1024, cwd: root, encoding: 'utf8' }
   )
     .trim()
     .split('\n')
