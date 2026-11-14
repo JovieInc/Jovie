@@ -1,4 +1,3 @@
-import { spawn, spawnSync } from 'node:child_process';
 import {
   chmodSync,
   cpSync,
@@ -32,6 +31,7 @@ import {
   runControlTestCommands,
 } from '../../run-affected-tests.mjs';
 import { classifyBlogContentChanges } from '../blog-content-ci.mjs';
+import { spawn, spawnSync } from '../child-process.mjs';
 import { resolveBaseRef } from '../git-base-ref.mjs';
 
 const SERVICE_CENSUS_QUALIFICATION_INPUTS = [

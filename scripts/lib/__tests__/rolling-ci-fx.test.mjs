@@ -1,4 +1,3 @@
-import { execFileSync, spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import {
   mkdirSync,
@@ -11,6 +10,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 import { MIN_CHANGED_LINE_COVERAGE } from '../changed-test-coverage.mjs';
+import { execFileSync, spawnSync } from '../child-process.mjs';
 import { FX_EXECUTOR_POLICY } from '../fx-remediation-lane.mjs';
 import {
   normalizeFailureEvents,

@@ -1,5 +1,4 @@
 import assert from 'node:assert/strict';
-import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import {
   copyFileSync,
@@ -16,6 +15,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
+import { spawnSync } from './lib/child-process.mjs';
 import { snapshotSourceGuardActions } from './lib/source-guard-action-snapshot.mjs';
 import {
   applyExclusions,
