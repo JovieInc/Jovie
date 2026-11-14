@@ -182,11 +182,16 @@ def _balance_tag(tag: str) -> str:
     return tag[:-1] + ' className="text-balance">'
 
 
+def balance_heading_line(line: str) -> str:
+    """Balance static heading tags using the shared exemption and class rules."""
+    return _HEADING_TAG.sub(lambda match: _balance_tag(match.group(0)), line)
+
+
 def balance_added_headings(root: Path, diff: str) -> list[str]:
     """Add text-balance on added heading tags. Dynamic and stale lines stay."""
     edits: dict[str, dict[int, tuple[str, str]]] = {}
     for rel, new_line, added in iter_added_lines(diff):
-        balanced = _HEADING_TAG.sub(lambda match: _balance_tag(match.group(0)), added)
+        balanced = balance_heading_line(added)
         if _heading_product_path(rel) and balanced != added:
             edits.setdefault(rel, {})[new_line] = (added, balanced)
     return _rewrite_added_lines(root, edits)
