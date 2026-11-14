@@ -939,13 +939,26 @@ nodes:
       - workflow_dispatch
     terminalReceipt: job:canary
     jobCount: 1
+  - name: Pen draft pictures to Linear
+    path: .github/workflows/pen-draft-publish.yml
+    active: true
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - workflow_dispatch
+      - workflow_run
+    terminalReceipt: job:publish
+    jobCount: 1
   - name: Pen draft missing frames
     path: .github/workflows/pen-draft.yml
     active: true
     category: source-validation
     authoritativeProducer: Source Validation
     authoritativeFor: []
-    allowedConsumers: []
+    allowedConsumers:
+      - Pen draft pictures to Linear
     triggeringStateTransition:
       - pull_request
       - push
@@ -1816,6 +1829,9 @@ edges:
   - from: Publish @jovie/cli to npm
     to: CLI Chaos
     type: workflow_call
+  - from: Pen draft missing frames
+    to: Pen draft pictures to Linear
+    type: workflow_run
   - from: Production Controller
     to: Post-Deploy Probes
     type: workflow_run

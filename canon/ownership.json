@@ -92,6 +92,7 @@
     {"id": "workflow:pr-preparation-canary", "kind": "workflow", "owner": "gem-ci-repair", "status": "active", "ref": ".github/workflows/pr-preparation-canary.yml"},
     {"id": "workflow:public-app-certification", "kind": "workflow", "owner": "summer", "status": "active", "ref": ".github/workflows/public-app-certification.yml"},
     {"id": "workflow:pen-draft", "kind": "workflow", "owner": "gem-ci-repair", "status": "active", "ref": ".github/workflows/pen-draft.yml"},
+    {"id": "workflow:pen-draft-publish", "kind": "workflow", "owner": "gem-ci-repair", "status": "active", "ref": ".github/workflows/pen-draft-publish.yml"},
     {"id": "workflow:pen-inspect", "kind": "workflow", "owner": "gem-ci-repair", "status": "active", "ref": ".github/workflows/pen-inspect.yml"},
     {"id": "workflow:pen-still-diff", "kind": "workflow", "owner": "gem-ci-repair", "status": "active", "ref": ".github/workflows/pen-still-diff.yml"},
     {"id": "workflow:pen-token-parity", "kind": "workflow", "owner": "gem-ci-repair", "status": "active", "ref": ".github/workflows/pen-token-parity.yml"},
