@@ -240,6 +240,26 @@ describe('CardDescription', () => {
     expect(description.tagName).toBe('DIV');
     expect(description.className).toContain('text-app');
   });
+
+  it('preserves custom status copy in a partial semantic card', () => {
+    render(
+      <Card asChild contentState='partial'>
+        <article aria-label='Cached audience'>
+          <CardDescription asChild className='text-warning-text'>
+            <p role='status'>Some audience data is still loading.</p>
+          </CardDescription>
+        </article>
+      </Card>
+    );
+
+    expect(
+      screen.getByRole('article', { name: 'Cached audience' })
+    ).toHaveAttribute('aria-busy', 'true');
+    const status = screen.getByRole('status');
+    expect(status).toHaveTextContent('Some audience data is still loading.');
+    expect(status).toHaveClass('text-warning-text');
+    expect(status).not.toHaveClass('text-secondary-token');
+  });
 });
 
 describe('CardContent', () => {

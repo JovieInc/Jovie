@@ -2100,7 +2100,7 @@ html[data-profile-flow-open="true"] .cookie-banner-card {
   );
   --state-offline-fg: var(--color-warning);
   --state-permission-bg: var(--color-warning-subtle);
-  --state-permission-fg: var(--color-warning);
+  --state-permission-fg: var(--color-warning-text);
   --state-permission-border: color-mix(
     in oklab,
     var(--color-warning) 20%,
@@ -2441,7 +2441,7 @@ html[data-profile-flow-open="true"] .cookie-banner-card {
   );
   --state-offline-fg: var(--color-warning);
   --state-permission-bg: var(--color-warning-subtle);
-  --state-permission-fg: var(--color-warning);
+  --state-permission-fg: var(--color-warning-text);
   --state-permission-border: color-mix(
     in oklab,
     var(--color-warning) 20%,
@@ -3350,6 +3350,13 @@ html[data-profile-flow-open="true"] .cookie-banner-card {
   --color-warning-text: var(--color-warning);
   --color-error-text: color-mix(in srgb, var(--color-error) 75%, white);
   --color-accent-text: var(--color-accent);
+}
+
+/* Partial cards dim their subtree. Strengthen default description copy while
+   preserving custom semantic foregrounds, which replace the secondary class. */
+:where([data-content-state="partial"])
+[data-slot="card-description"].text-secondary-token {
+  color: var(--color-text-primary-token);
 }
 
 /* ============================================
