@@ -1,4 +1,14 @@
 #!/usr/bin/env node
+import {
+  appendFileSync,
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  realpathSync,
+} from 'node:fs';
+import { homedir, tmpdir } from 'node:os';
+import path from 'node:path';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 /**
  * `pnpm preflight:changed` (JOV-9727): run, locally and in one pass, every
  * repo rule CI would enforce on the paths this branch changes, so a PR needs
@@ -26,17 +36,7 @@
  * ~/.local/state/jovie-lanes/preflight-changed.jsonl; that is the
  * first-push pass-rate measurement (see scripts/lib/ci-rounds.mjs).
  */
-import { spawn, spawnSync } from 'node:child_process';
-import {
-  appendFileSync,
-  existsSync,
-  mkdirSync,
-  readFileSync,
-  realpathSync,
-} from 'node:fs';
-import { homedir, tmpdir } from 'node:os';
-import path from 'node:path';
-import { fileURLToPath, pathToFileURL } from 'node:url';
+import { spawn, spawnSync } from './lib/child-process.mjs';
 import { baseRefCandidates, resolveBaseRef } from './lib/git-base-ref.mjs';
 import {
   companionChecklist,

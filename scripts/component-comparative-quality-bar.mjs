@@ -5,11 +5,11 @@
  * and consumes rendered/behavioral observations, never third-party source.
  */
 
-import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { REPO_ROOT } from './component-ship-policy.mjs';
+import { execFileSync } from './lib/child-process.mjs';
 import {
   COMPARATIVE_DELIBERATE_RED_FIXTURES,
   COMPARATIVE_QUALIFICATION_CONTROLS,
