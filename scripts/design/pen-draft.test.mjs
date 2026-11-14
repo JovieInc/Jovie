@@ -37,7 +37,10 @@ test('every checked-in brief parses and names a unique frame', () => {
       'claim',
       'empty-states',
       'homepage',
+      'insights-empty',
       'insights',
+      'page-skeletons-2',
+      'page-skeletons-3',
       'page-skeletons',
       'profile-analytics-card',
       'request-access',
@@ -117,27 +120,30 @@ test('the agent is told the editor loads slowly and may retry timed-out calls', 
   assert.ok(ATTEMPTS >= 2);
 });
 
-test('one attempt gets 55 minutes of the 60-minute frame job', () => {
+test('one attempt gets 23 minutes of the 25-minute frame job', () => {
   // audience-analytics was still building when its 14-minute first attempt
   // and 6-minute restart were each stopped (run 43339513257).
-  assert.equal(attemptTimeout(0), 55 * 60_000);
-  assert.equal(attemptTimeout(10 * 60_000), 45 * 60_000);
+  assert.equal(attemptTimeout(0), 23 * 60_000);
+  assert.equal(attemptTimeout(10 * 60_000), 13 * 60_000);
   assert.equal(attemptTimeout(0, 4 * 60_000), 0);
 });
 
 test('a retry starts from scratch, so it needs room for a whole draft', () => {
   // An attempt that ran out its time is not restarted in what is left.
-  assert.equal(attemptTimeout(55 * 60_000 + 10), 0);
-  assert.equal(attemptTimeout(45 * 60_000 + 1), 0);
+  assert.equal(attemptTimeout(23 * 60_000 + 10), 0);
+  assert.equal(attemptTimeout(13 * 60_000 + 1), 0);
   // One that failed early (a rate limit, the failed-call cap) is.
-  assert.equal(attemptTimeout(3 * 60_000), 52 * 60_000);
-  assert.equal(attemptTimeout(13 * 60_000), 42 * 60_000);
+  assert.equal(attemptTimeout(3 * 60_000), 20 * 60_000);
+  assert.equal(attemptTimeout(13 * 60_000), 10 * 60_000);
 });
 
 test('the agent is told to build in small calls and that a stopped run saves nothing', () => {
   assert.match(LOAD_NOTE, /one screen or state per call/);
-  assert.match(LOAD_NOTE, /within 50 minutes/);
+  assert.match(LOAD_NOTE, /within 20 minutes/);
   assert.match(LOAD_NOTE, /saves nothing/);
+  // Run 43568417528: after a batch call timed out the agent re-read the image
+  // it was going to write and burned attempts on a file that never existed.
+  assert.match(LOAD_NOTE, /wrote nothing/);
 });
 
 test('the CLI retries a draft that failed early, including opt-in trimming', () => {
@@ -268,7 +274,7 @@ test('a draft stopped at the time limit is not restarted', () => {
       }
     )
   );
-  assert.equal(readFileSync(calls, 'utf8'), `${55 * 60_000}\n`);
+  assert.equal(readFileSync(calls, 'utf8'), `${23 * 60_000}\n`);
   const { drafts } = JSON.parse(
     readFileSync(join(out, 'receipt.json'), 'utf8')
   );
