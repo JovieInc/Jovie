@@ -62,42 +62,11 @@ vi.mock('next/navigation', () => ({
   }),
 }));
 
-vi.mock('@/lib/founder-review/client', () => ({
-  listFounderReviewReceipts: vi.fn().mockResolvedValue([]),
-  deleteFounderReviewAudio: vi.fn(),
-  uploadFounderReviewAudio: vi.fn(),
-  createFounderReviewClient: vi.fn().mockImplementation(async review => ({
-    id: review.segmentId,
-    target: review.target,
-    decision: review.decision,
-    recording: { mediaAvailable: false },
-    actionOutcome: {
-      status:
-        review.decision === 'approved' || review.decision === 'rejected'
-          ? 'pending'
-          : 'not-applicable',
-      updatedAt: '2026-09-01T18:00:08.000Z',
-      errorCode: null,
-    },
-  })),
-  updateFounderReviewActionOutcome: vi.fn().mockImplementation(async input => ({
-    id: input.receiptId,
-    target: {
-      type: 'inbox-card',
-      id: 'card-1',
-      title: 'Saved founder review',
-      sourceKind: 'test.suggestion',
-      category: 'suggestion',
-    },
-    decision: 'approved',
-    recording: { mediaAvailable: false },
-    actionOutcome: {
-      status: input.status,
-      updatedAt: '2026-09-01T18:00:08.000Z',
-      errorCode: input.errorCode,
-    },
-  })),
-}));
+vi.mock('@/lib/founder-review/client', async () =>
+  (
+    await import('./opportunity-inbox-page-client-mocks')
+  ).founderReviewClientMock()
+);
 
 vi.mock('@/lib/chat/transcriber', () => ({
   createWebSpeechTranscriber: () => ({
@@ -121,40 +90,11 @@ vi.mock('@/features/dashboard/organisms/PreviewDataHydrator', () => ({
   ),
 }));
 
-vi.mock('@/lib/queries/useOpportunityInboxMutations', () => ({
-  useOpportunityInboxMutations: () => ({
-    approveMutation: {
-      isPending: false,
-      variables: undefined,
-      mutate: mutateMock,
-      mutateAsync: mutateAsyncMock,
-    },
-    dismissMutation: {
-      isPending: false,
-      variables: undefined,
-      mutate: mutateMock,
-      mutateAsync: mutateAsyncMock,
-    },
-    feedbackMutation: {
-      isPending: false,
-      variables: undefined,
-      mutate: mutateMock,
-      mutateAsync: mutateAsyncMock,
-    },
-    reviseMutation: {
-      isPending: false,
-      variables: undefined,
-      mutate: mutateMock,
-      mutateAsync: mutateAsyncMock,
-    },
-    nextStepMutation: {
-      isPending: false,
-      variables: undefined,
-      mutate: mutateMock,
-      mutateAsync: mutateAsyncMock,
-    },
-  }),
-}));
+vi.mock('@/lib/queries/useOpportunityInboxMutations', async () =>
+  (await import('./opportunity-inbox-page-client-mocks')).inboxMutationsMock(
+    () => ({ mutate: mutateMock, mutateAsync: mutateAsyncMock })
+  )
+);
 
 const tourDateMutateMock = vi.fn();
 

@@ -1,4 +1,10 @@
 import { expect, test } from '@playwright/test';
+import {
+  desktopUpdateInstalls,
+  desktopUpdateListener,
+  fireDesktopUpdate,
+  installDesktopUpdateFixture,
+} from './utils/desktop-update-fixture';
 
 /**
  * Surface-elevation matrix visual regression (JOV-2156).
@@ -572,45 +578,16 @@ test.describe('central runtime notifications', () => {
   test('desktop update stays pending and is actionable in Inbox', async ({
     page,
   }) => {
-    await page.addInitScript(() => {
-      const fixture = window as unknown as {
-        available?: () => void;
-        downloaded?: () => void;
-        installs: number;
-        electronAPI: unknown;
-      };
-      fixture.installs = 0;
-      fixture.electronAPI = {
-        platform: 'darwin',
-        electronVersion: 'fixture',
-        onUpdateAvailable: (cb: () => void) => {
-          fixture.available = cb;
-          return () => {};
-        },
-        onUpdateDownloaded: (cb: () => void) => {
-          fixture.downloaded = cb;
-          return () => {};
-        },
-        installUpdateAndRestart: () => {
-          fixture.installs++;
-        },
-      };
-    });
+    await installDesktopUpdateFixture(page);
     await openStory(
       page,
       'dashboard-navigation-customer-rail--runtime-update',
       'light'
     );
     await expect
-      .poll(() =>
-        page.evaluate(
-          () => typeof (window as unknown as { available?: unknown }).available
-        )
-      )
+      .poll(() => desktopUpdateListener(page, 'available'))
       .toBe('function');
-    await page.evaluate(() =>
-      (window as unknown as { available: () => void }).available()
-    );
+    await fireDesktopUpdate(page, 'available');
     await expect(
       page.getByRole('button', { name: 'Downloading Jovie Update…' })
     ).toBeDisabled();
@@ -621,23 +598,13 @@ test.describe('central runtime notifications', () => {
     await expect(
       page.getByRole('link', { name: /App Update Available/ })
     ).toHaveCount(0);
-    await page.evaluate(() =>
-      (window as unknown as { downloaded: () => void }).downloaded()
-    );
+    await fireDesktopUpdate(page, 'downloaded');
     await expect(
       page.getByRole('button', { name: 'Restart Jovie To Update' })
     ).toBeEnabled();
-    expect(
-      await page.evaluate(
-        () => (window as unknown as { installs: number }).installs
-      )
-    ).toBe(0);
+    expect(await desktopUpdateInstalls(page)).toBe(0);
     await page.getByRole('button', { name: 'Restart Jovie To Update' }).click();
-    expect(
-      await page.evaluate(
-        () => (window as unknown as { installs: number }).installs
-      )
-    ).toBe(1);
+    expect(await desktopUpdateInstalls(page)).toBe(1);
   });
 });
 
