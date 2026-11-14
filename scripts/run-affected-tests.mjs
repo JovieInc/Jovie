@@ -6,7 +6,10 @@ import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
   DELIVERY_CONTROLLER_COVERAGE_ARGS,
+  LANES_PYTEST_FILES,
+  SCRIPT_CONTRACT_NODE_TESTS,
   SCRIPT_CONTRACT_VITEST_TESTS,
+  STRUCTURAL_PYTEST_FILES,
   STRUCTURAL_PYTHON_REGRESSION_COMMANDS,
 } from './ci-fast-lanes.mjs';
 import {
@@ -17,6 +20,8 @@ import {
 
 import { baseRefCandidates, resolveBaseRef } from './lib/git-base-ref.mjs';
 import { KNOWN_VITEST_FIXTURE_PRODUCERS } from './lib/onboarding-test-producers.mjs';
+
+import { selectSourceReadTests } from './lib/web-source-read-tests.mjs';
 
 const REPO_ROOT = resolve(fileURLToPath(new URL('..', import.meta.url)));
 // Full-suite shards are deliberately independent so one Vitest process cannot
@@ -1262,6 +1267,59 @@ const MAIN_RED_EJECT_PLUMBING_TESTS = [
   ...AFFECTED_TEST_SELECTOR_TESTS,
 ];
 
+const DAILY_WORKFLOW_QUALIFICATION_INPUTS = new Set([
+  '.github/workflow-topology.gen.yml',
+  '.github/workflows/e2e-full-matrix.yml',
+  '.github/workflows/nightly-tests.yml',
+  '.github/workflows/test-coverage-audit.yml',
+  'apps/web/tests/unit/ci/deploy-workflow.test.ts',
+  'apps/web/tests/unit/ci/test-coverage-audit-workflow.test.ts',
+  'canon/automation-registry.jsonl',
+  'docs/TEST_COVERAGE_HEATMAP.md',
+  'scripts/audit-test-coverage.ts',
+  'scripts/lanes/continuity_clock.py',
+  'scripts/shipping_origin.py',
+  'scripts/tests/test_agent_workflow_hygiene.py',
+  'scripts/tests/test_continuity_clock.py',
+  'scripts/tests/test_shipping_origin.py',
+]);
+const DAILY_WORKFLOW_SCRIPT_TESTS = [
+  'scripts/lib/__tests__/automation-registry.test.mjs',
+  'scripts/lib/__tests__/automation-liveness.test.mjs',
+  'scripts/lib/__tests__/automation-verify.test.mjs',
+  'scripts/lib/__tests__/ci-fast-lanes.test.mjs',
+  'scripts/lib/__tests__/ci-fast-workflow-contract.test.mjs',
+  'scripts/lib/__tests__/ci-script-test-inventory.test.mjs',
+];
+const DAILY_WORKFLOW_NODE_TESTS = [
+  'scripts/coverage-surface-files.test.mjs',
+  'scripts/lib/__tests__/web-source-read-tests.test.mjs',
+  'scripts/installation-budget-sentinel.test.mjs',
+];
+const DAILY_WORKFLOW_PYTHON_TESTS = [
+  'scripts/tests/test_continuity_clock.py',
+  'scripts/tests/test_shipping_origin.py',
+  'scripts/tests/test_agent_workflow_hygiene.py',
+];
+
+const SELECTOR_SPARSE_DISCOVERY_INPUTS = new Set([
+  ...AFFECTED_TEST_SELECTOR_MANIFEST,
+  '.github/workflows/rolling-ci-dispatch.yml',
+]);
+const SELECTOR_SPARSE_DISCOVERY_SCRIPT_TESTS = [
+  ...AFFECTED_TEST_SELECTOR_TESTS,
+  'scripts/lib/__tests__/sparse-checkout-import-closure.test.mjs',
+  'scripts/lib/__tests__/rolling-ci-dispatch.test.mjs',
+  'scripts/lib/__tests__/rolling-ci-handoff.test.mjs',
+  'scripts/lib/__tests__/rolling-ci-fx.test.mjs',
+  'scripts/lib/__tests__/rolling-ci-hosted-writer.test.mjs',
+  'scripts/lib/__tests__/ci-fast-lanes.test.mjs',
+  'scripts/lib/__tests__/ci-fast-workflow-contract.test.mjs',
+  'scripts/lib/__tests__/ci-script-test-inventory.test.mjs',
+];
+const SELECTOR_SPARSE_DISCOVERY_NODE_TEST =
+  'scripts/lib/__tests__/web-source-read-tests.test.mjs';
+
 export function buildAffectedTestPlan(changedFiles, options) {
   const files = unique(changedFiles.filter(Boolean));
   const plan = planAffectedTests(files, options);
@@ -1376,7 +1434,11 @@ function planAffectedTests(
     isFileAvailable = file => existsSync(resolve(REPO_ROOT, file)),
     readFile = readRepoFile,
     blogContentReceipt = undefined,
+    lanePytestFiles = LANES_PYTEST_FILES,
+    structuralPytestFiles = STRUCTURAL_PYTEST_FILES,
     scriptContractVitestTests = SCRIPT_CONTRACT_VITEST_TESTS,
+    scriptContractNodeTests = SCRIPT_CONTRACT_NODE_TESTS,
+    controlScriptTests = CI_CONTROL_SCRIPT_TESTS,
   } = {}
 ) {
   const files = unique(changedFiles.filter(Boolean)).sort();
@@ -1433,6 +1495,107 @@ function planAffectedTests(
       pythonUnittestTests: [],
       nodeTests: [],
       scriptVitestTests: qualificationTests,
+    };
+  }
+  if (
+    files.includes('.github/workflows/rolling-ci-dispatch.yml') &&
+    files.includes('scripts/run-affected-tests.mjs') &&
+    files.every(file => SELECTOR_SPARSE_DISCOVERY_INPUTS.has(file)) &&
+    files.length !== SELECTOR_SPARSE_DISCOVERY_INPUTS.size
+  ) {
+    return fullSuitePlan(
+      'selector sparse discovery requires its complete source/test pair'
+    );
+  }
+  if (
+    files.length === SELECTOR_SPARSE_DISCOVERY_INPUTS.size &&
+    files.every(file => SELECTOR_SPARSE_DISCOVERY_INPUTS.has(file))
+  ) {
+    const selectedTests = unique([
+      ...selectSourceReadTests(files, { root: REPO_ROOT }),
+      'apps/web/tests/unit/ci/playwright-artifact-secrets.test.ts',
+    ]);
+    if (
+      ![
+        ...selectedTests,
+        ...SELECTOR_SPARSE_DISCOVERY_SCRIPT_TESTS,
+        SELECTOR_SPARSE_DISCOVERY_NODE_TEST,
+        'scripts/lib/web-source-read-tests.mjs',
+      ].every(isFileAvailable) ||
+      !SELECTOR_SPARSE_DISCOVERY_SCRIPT_TESTS.every(
+        test =>
+          scriptContractVitestTests.includes(test) ||
+          controlScriptTests.includes(test)
+      ) ||
+      !scriptContractNodeTests.includes(SELECTOR_SPARSE_DISCOVERY_NODE_TEST)
+    ) {
+      return fullSuitePlan(
+        'selector sparse discovery behavior or CI inventory proof is unavailable'
+      );
+    }
+    return {
+      mode: 'selected',
+      relatedFiles: [],
+      mandatoryTests: [],
+      selectedTests,
+      rootVitestTests: [],
+      pythonTests: [],
+      pythonUnittestTests: [],
+      nodeTests: [SELECTOR_SPARSE_DISCOVERY_NODE_TEST],
+      scriptVitestTests: SELECTOR_SPARSE_DISCOVERY_SCRIPT_TESTS,
+    };
+  }
+  const dailySelectorInputs = files.filter(file =>
+    AFFECTED_TEST_SELECTOR_MANIFEST.has(file)
+  );
+  const isExactDailyWorkflowQualification =
+    [...DAILY_WORKFLOW_QUALIFICATION_INPUTS].every(file =>
+      files.includes(file)
+    ) &&
+    files.length ===
+      DAILY_WORKFLOW_QUALIFICATION_INPUTS.size + dailySelectorInputs.length &&
+    (dailySelectorInputs.length === 0 ||
+      dailySelectorInputs.length === AFFECTED_TEST_SELECTOR_MANIFEST.size);
+  if (isExactDailyWorkflowQualification) {
+    // Preserve every disk-read web contract using the existing source selector,
+    // plus the browser artifact policy excluded by that selector's no-browser guard.
+    const selectedTests = unique([
+      ...selectSourceReadTests(files, { root: REPO_ROOT }),
+      'apps/web/tests/unit/ci/deploy-workflow.test.ts',
+      'apps/web/tests/unit/ci/test-coverage-audit-workflow.test.ts',
+      'apps/web/tests/unit/ci/nightly-workflow-residuals.test.ts',
+      'apps/web/tests/unit/ci/playwright-artifact-secrets.test.ts',
+    ]);
+    const proofFiles = [
+      ...selectedTests,
+      ...DAILY_WORKFLOW_SCRIPT_TESTS,
+      ...DAILY_WORKFLOW_NODE_TESTS,
+      ...DAILY_WORKFLOW_PYTHON_TESTS,
+    ];
+    if (
+      !proofFiles.every(isFileAvailable) ||
+      !DAILY_WORKFLOW_PYTHON_TESTS.slice(0, 2).every(test =>
+        lanePytestFiles.includes(test)
+      ) ||
+      !structuralPytestFiles.includes(DAILY_WORKFLOW_PYTHON_TESTS[2])
+    ) {
+      return fullSuitePlan(
+        'daily workflow behavior or CI inventory proof is unavailable'
+      );
+    }
+    return {
+      mode: 'selected',
+      relatedFiles: [],
+      mandatoryTests: [],
+      selectedTests,
+      rootVitestTests: [],
+      lanePythonCoverage: true,
+      // The unchanged lane coverage command retains clock/origin integration
+      // and all current CI floors. Hygiene belongs to structural pytest.
+      pythonTests: [DAILY_WORKFLOW_PYTHON_TESTS[2]],
+      pythonUnittestTests: [],
+      nodeTests: DAILY_WORKFLOW_NODE_TESTS,
+      scriptVitestTests: DAILY_WORKFLOW_SCRIPT_TESTS,
     };
   }
   const sentryGateInputs = new Set([

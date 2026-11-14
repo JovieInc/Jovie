@@ -4792,3 +4792,168 @@ printf '%s\\n' "$TURBO_SCM_BASE:$*" >> '${calls}'
     }
   });
 });
+
+describe('daily workflow qualification closure', () => {
+  it('propagates a real selected web contract process failure', async () => {
+    const dir = mkdtempSync(resolve(tmpdir(), 'daily-contract-failure-'));
+    try {
+      writeFileSync(
+        resolve(dir, 'pnpm'),
+        `#!${process.execPath}\nrequire('node:assert/strict').equal(1, 2, 'selected daily workflow contract failed');\n`,
+        { mode: 0o755 }
+      );
+      const plan = buildAffectedTestPlan(inputs);
+      const command = buildSelectedTestCommands(plan, '1').find(
+        ([name, args]) => name === 'pnpm' && args.includes('@jovie/web')
+      );
+      expect(command).toBeDefined();
+      const status = await runCommandStatus(
+        'env',
+        [`PATH=${dir}:${process.env.PATH}`, command[0], ...command[1]],
+        {
+          timeoutMs: 5000,
+          label: 'daily workflow selected contract',
+          logger: () => {},
+        }
+      );
+      expect(status).toBe(1);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  const inputs = [
+    '.github/workflow-topology.gen.yml',
+    '.github/workflows/e2e-full-matrix.yml',
+    '.github/workflows/nightly-tests.yml',
+    '.github/workflows/test-coverage-audit.yml',
+    'apps/web/tests/unit/ci/deploy-workflow.test.ts',
+    'apps/web/tests/unit/ci/test-coverage-audit-workflow.test.ts',
+    'canon/automation-registry.jsonl',
+    'docs/TEST_COVERAGE_HEATMAP.md',
+    'scripts/audit-test-coverage.ts',
+    'scripts/lanes/continuity_clock.py',
+    'scripts/shipping_origin.py',
+    'scripts/tests/test_agent_workflow_hygiene.py',
+    'scripts/tests/test_continuity_clock.py',
+    'scripts/tests/test_shipping_origin.py',
+  ];
+  it('keeps actual disk-read web guards, lane coverage, hygiene and audit behavior', () => {
+    const plan = buildAffectedTestPlan(inputs);
+    expect(plan.mode).toBe('selected');
+    expect(plan.lanePythonCoverage).toBe(true);
+    expect(plan.selectedTests).toEqual(
+      expect.arrayContaining([
+        'apps/web/tests/unit/ci/deploy-workflow.test.ts',
+        'apps/web/tests/unit/ci/test-coverage-audit-workflow.test.ts',
+        'apps/web/tests/unit/ci/nightly-workflow-residuals.test.ts',
+        'apps/web/tests/unit/ci/playwright-artifact-secrets.test.ts',
+        'apps/web/tests/unit/ci/neon-branch-guard.test.ts',
+      ])
+    );
+    const commands = buildSelectedTestCommands(plan, '1');
+    expect(commands[0]).toEqual([
+      'env',
+      ['CI=true', 'bash', '-c', STRUCTURAL_PYTHON_REGRESSION_COMMANDS[0]],
+    ]);
+    expect(commands).toContainEqual([
+      'python3',
+      ['-m', 'pytest', 'scripts/tests/test_agent_workflow_hygiene.py', '-q'],
+    ]);
+    expect(commands.find(command => command[0] === 'node')[1]).toContain(
+      'scripts/coverage-surface-files.test.mjs'
+    );
+  });
+  it.each([
+    'scripts/tests/test_continuity_clock.py',
+    'scripts/tests/test_shipping_origin.py',
+    'scripts/tests/test_agent_workflow_hygiene.py',
+    'scripts/coverage-surface-files.test.mjs',
+    'scripts/lib/__tests__/automation-registry.test.mjs',
+    'apps/web/tests/unit/ci/playwright-artifact-secrets.test.ts',
+  ])('fails closed without behavior proof %s', missing => {
+    expect(
+      buildAffectedTestPlan(inputs, {
+        isFileAvailable: file => file !== missing,
+      }).mode
+    ).toBe('full');
+  });
+  it.each([{ lanePytestFiles: [] }, { structuralPytestFiles: [] }])(
+    'fails closed without actual CI Python registration %j',
+    options => {
+      expect(buildAffectedTestPlan(inputs, options).mode).toBe('full');
+    }
+  );
+  it.each(
+    [
+      inputs.slice(1),
+      [...inputs, 'apps/web/lib/unknown.ts'],
+      [...inputs, 'scripts/unknown.py'],
+      [...inputs, '.github/workflows/production-release.yml'],
+      [...inputs, 'scripts/run-affected-tests.mjs'],
+    ].map(files => ({ files }))
+  )('retains full fallback for incomplete or mixed peers %#', ({ files }) => {
+    expect(buildAffectedTestPlan(files).mode).toBe('full');
+  });
+  it('allows only the complete selector source/test companion pair', () => {
+    expect(
+      buildAffectedTestPlan([
+        ...inputs,
+        'scripts/run-affected-tests.mjs',
+        'scripts/lib/__tests__/automation-verify.test.mjs',
+      ]).mode
+    ).toBe('selected');
+  });
+});
+
+describe('selector sparse discovery companion', () => {
+  const inputs = [
+    'scripts/run-affected-tests.mjs',
+    'scripts/lib/__tests__/automation-verify.test.mjs',
+    '.github/workflows/rolling-ci-dispatch.yml',
+  ];
+  it('selects actual rolling behavior, sparse import closure and matching web contracts', () => {
+    const plan = buildAffectedTestPlan(inputs);
+    expect(plan.mode).toBe('selected');
+    expect(plan.scriptVitestTests).toEqual(
+      expect.arrayContaining([
+        'scripts/lib/__tests__/sparse-checkout-import-closure.test.mjs',
+        'scripts/lib/__tests__/rolling-ci-dispatch.test.mjs',
+        'scripts/lib/__tests__/rolling-ci-hosted-writer.test.mjs',
+      ])
+    );
+    expect(plan.selectedTests).toContain(
+      'apps/web/tests/unit/ci/playwright-artifact-secrets.test.ts'
+    );
+    expect(plan.nodeTests).toEqual([
+      'scripts/lib/__tests__/web-source-read-tests.test.mjs',
+    ]);
+    expect(buildSelectedTestCommands(plan, '1').length).toBeGreaterThan(0);
+  });
+  it.each([
+    'scripts/lib/web-source-read-tests.mjs',
+    'scripts/lib/__tests__/sparse-checkout-import-closure.test.mjs',
+    'scripts/lib/__tests__/rolling-ci-dispatch.test.mjs',
+  ])('retains full fallback without required proof %s', missing => {
+    expect(
+      buildAffectedTestPlan(inputs, {
+        isFileAvailable: file => file !== missing,
+      }).mode
+    ).toBe('full');
+  });
+  it.each([
+    { scriptContractVitestTests: [] },
+    { scriptContractNodeTests: [] },
+    { controlScriptTests: [] },
+  ])('retains full fallback without CI test registration %j', options => {
+    expect(buildAffectedTestPlan(inputs, options).mode).toBe('full');
+  });
+  it.each([
+    { files: [inputs[0], inputs[2]] },
+    { files: [...inputs, 'apps/web/lib/unknown.ts'] },
+    { files: [...inputs, '.github/workflows/production-release.yml'] },
+    { files: [...inputs, 'scripts/unknown.py'] },
+  ])('keeps incomplete and unknown peers full %#', ({ files }) => {
+    expect(buildAffectedTestPlan(files).mode).toBe('full');
+  });
+});
