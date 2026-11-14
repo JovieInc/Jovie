@@ -71,17 +71,18 @@ on:
         default: '60'
         type: string
 
-# Prevent overlapping evaluations and duplicate alerts.
-concurrency:
-  group: cost-anomaly-gate
-  cancel-in-progress: false
-
 permissions:
   contents: read
 
 jobs:
   evaluate:
     name: Evaluate Production Event Volume
+    # Job-level groups: a 15-minute clock tick can replace a pending evaluate,
+    # never the daily drift job below (JOV-12620).
+    # Prevent overlapping evaluations and duplicate alerts.
+    concurrency:
+      group: cost-anomaly-gate
+      cancel-in-progress: false
     runs-on: ubuntu-latest
     timeout-minutes: 10
     environment:
@@ -384,6 +385,9 @@ jobs:
     # Daily, not on every 15-minute lanes tick: spend drift is a $/day signal.
     name: AI Routing Drift
     if: github.event_name == 'workflow_dispatch' || github.event.schedule == '7 14 * * *'
+    concurrency:
+      group: cost-anomaly-gate-ai-routing-drift
+      cancel-in-progress: false
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
