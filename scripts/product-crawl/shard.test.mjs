@@ -144,3 +144,20 @@ test('deadline and walk gaps add up across shards', () => {
   assert.deepEqual(merged.outOfTime, { loadsLeft: 5, resamplesLeft: 1 });
   assert.deepEqual(merged.overlayWalks, { walks: [{ route: '/' }], left: 4 });
 });
+
+test('a shard that lost its sign-in fails the merged gate', () => {
+  const now = Date.parse('2026-11-14T21:00:00Z');
+  const { shards } = fixture(4);
+  const lost = shards[2];
+  lost.signedIn = false;
+  lost.pages = lost.pages.filter(p => p.identity === 'stranger');
+  const merged = mergeReceipts(shards);
+  assert.equal(merged.signedIn, false);
+  assert.deepEqual(merged.strangerOnlyShards, [3]);
+  const { ready, reasons } = productReady(merged, { now });
+  assert.equal(ready, false);
+  assert.ok(
+    reasons.includes('shard 3 crawled only as a stranger'),
+    `${reasons}`
+  );
+});

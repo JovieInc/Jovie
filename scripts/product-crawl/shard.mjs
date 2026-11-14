@@ -64,7 +64,13 @@ export function mergeReceipts(receipts) {
     sha: first.sha ?? null,
     at: receipts.map(r => r.at).sort()[0],
     shards: count,
-    signedIn: receipts.some(r => r.signedIn),
+    signedIn: receipts.every(r => r.signedIn),
+    // A shard that lost its sign-in crawled its routes only as a stranger.
+    // The gate fails on these, as it fails a whole crawl that never signed in.
+    strangerOnlyShards: receipts
+      .filter(r => !r.signedIn)
+      .map(r => r.shard?.index ?? 1)
+      .sort((a, b) => a - b),
     routes: [...new Set(receipts.flatMap(r => r.routes ?? []))].sort(),
     samples: first.samples,
     sitemapProblem:
