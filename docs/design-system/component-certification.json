@@ -62,6 +62,69 @@
       "a11y",
       "frontend-rules"
     ],
+    "apps/web/components/features/release/ReleaseCountdown.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/release/ReleaseCreditsDrawer.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/release/ScheduledReleasePage.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/release/SmartLinkArtwork.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/release/SmartLinkProviderButton.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/release/UnreleasedReleaseHero.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/share/PublicShareMenu.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
     "apps/web/components/molecules/ContentSectionHeader.tsx": [
       "ds-owner",
       "tokens",
@@ -495,10 +558,23 @@
     "apps/web/components/features/release/MusicServiceDial.tsx": {
       "error": "The dial has no failure UI: its only catch skips the localStorage copy of the choice when storage is unavailable, and the cookie still remembers it. MusicServiceDial.test.tsx streams and checks the cookie with storage throwing, with axe."
     },
+    "apps/web/components/features/release/ReleaseCreditsDrawer.tsx": {
+      "permission-denied": "The drawer has no permission or gated state. The detector matched the credit role in `<section key={group.role} aria-labelledby={`credits-${group.role}`}>` (roles such as producer)."
+    },
+    "apps/web/components/features/release/ScheduledReleasePage.tsx": {
+      "empty": "The page renders one release; it owns no collection. The detector matched items-center in `className='mt-5 flex w-full items-center justify-center rounded-xl ...'`.",
+      "permission-denied": "The page has no permission or gated state. The detector matched the doc comment `\"Coming Soon\" page for unreleased content from free-plan creators.`"
+    },
+    "apps/web/components/features/release/SmartLinkArtwork.tsx": {
+      "empty": "The artwork renders one image or its placeholder glyph; it owns no collection. The detector matched items-center in `<div className='flex h-full w-full items-center justify-center'>`, and the missing-artwork case is PartialNoArtwork."
+    },
     "apps/web/components/features/release/SmartLinkLoadingState.tsx": {
       "empty": "The skeleton draws a fixed five provider rows from a constant key list and takes no props, so there is no collection that can be empty; the detector matched that .map(.",
       "long-content": "It renders skeleton bars only, with no text from any caller; the detector matched the text-center class, so nothing can overflow.",
       "offline": "A static skeleton with no fetch or mutation; the route that shows it owns any network failure. The detector matched 'skeleton' in its row keys."
+    },
+    "apps/web/components/features/release/SmartLinkProviderButton.tsx": {
+      "empty": "A provider row renders one label and optional icon; it owns no collection. The detector matched items-center in SMART_LINK_PRIMARY_PROVIDER_BUTTON_CLASSNAME ('group flex min-h-13 w-full items-center ...')."
     },
     "apps/web/components/features/release/SmartLinkShell.tsx": {
       "error": "The shell has no failure UI: its only catch is useSmartLinkShare swallowing a cancelled share sheet or a refused clipboard copy, which draws nothing. SmartLinkShell.test.tsx asserts the swallowed copy failure; EmptyArtwork shows the nearest degraded state (no artwork)."
@@ -511,6 +587,9 @@
       "offline": "Offline, the cross-origin frame simply never fires load, which is the same held skeleton and timed-out onError as the error state (LoadingSkeleton story, YouTubeEmbed.test.tsx); the embed itself never fetches.",
       "partial": "Nothing can be partially present: videoId and title are required, className is styling and onError is a callback, so the frame either has its video or is still loading (LoadingSkeleton).",
       "long-content": "The title is only the iframe's accessible name and is never drawn, so no text can overflow the 16:9 frame; the detector matched the title prop. YouTubeEmbed.test.tsx asserts the title lands on the frame as its accessible name."
+    },
+    "apps/web/components/features/share/PublicShareMenu.tsx": {
+      "empty": "The rows come from PUBLIC_SHARE_DESTINATIONS, a fixed constant of five destinations in lib/share/destinations.ts, so the list can never be empty (`{PUBLIC_SHARE_DESTINATIONS.map(destination => (`)."
     },
     "apps/web/components/features/teleprompter-studio/StudioCameraBlocked.tsx": {
       "empty": "Renders one fixed message for one camera error and no collection; the detector matched the items-start layout class.",
