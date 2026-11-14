@@ -70,7 +70,9 @@ fs.writeFileSync(path.join(root, 'source.ts'), ${JSON.stringify(INSTRUMENTED)});
 ${ignoreTerm ? `process.on('SIGTERM', () => fs.writeFileSync(path.join(root, 'term-saw-backup'), String(fs.existsSync(backup))));` : ''}
 const child = spawn(process.execPath, ['-e', 'process.on("SIGTERM", () => {}); process.send("ready"); setInterval(() => {}, 1000)'], { stdio: ['ignore', 'ignore', 'ignore', 'ipc'] });
 child.on('message', () => {
-  fs.writeFileSync(path.join(root, 'pids.json'), JSON.stringify({ leader: process.pid, child: child.pid }));
+  const pidsPath = path.join(root, 'pids.json');
+  fs.writeFileSync(pidsPath + '.tmp', JSON.stringify({ leader: process.pid, child: child.pid }));
+  fs.renameSync(pidsPath + '.tmp', pidsPath);
   ${leaderExit ? `const timer = setInterval(() => { if (fs.existsSync(path.join(process.env.STRYKER_TEMP_DIR, 'recovery.json'))) { clearInterval(timer); process.exit(0); } }, 5);` : ''}
 });
 setInterval(() => {}, 1000);
