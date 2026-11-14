@@ -779,9 +779,8 @@ describe('ProfilePacCard landscape states', () => {
         />
       );
 
-      const img = screen
-        .getByTestId('profile-pac-featured-art')
-        .querySelector('img');
+      const art = screen.getByTestId('profile-pac-featured-art');
+      const img = art.querySelector('img');
       expect(img).toHaveAttribute(
         'data-sizes',
         '(min-width: 1024px) 400px, 104px'
