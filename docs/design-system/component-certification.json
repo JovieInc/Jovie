@@ -30,14 +30,6 @@
       "frontend-rules",
       "forced-caps"
     ],
-    "apps/web/components/features/auth/AuthOfferSummary.tsx": [
-      "ds-owner",
-      "tokens",
-      "states",
-      "tests",
-      "a11y",
-      "frontend-rules"
-    ],
     "apps/web/components/features/profile/ClaimBanner.tsx": [
       "ds-owner",
       "tokens",
@@ -336,9 +328,6 @@
     },
     "apps/web/components/features/auth/AuthLayout.tsx": {
       "empty": "AuthLayout is the auth chrome around one children slot and takes no collection; the detector matched the items-center and items-stretch classes. An absent title and footer is the PartialFormOnly story."
-    },
-    "apps/web/components/features/auth/AuthOfferSummary.tsx": {
-      "permission-denied": "The recap has no permission input or gated action; the detector matched the pricing plan. Sign-in for an existing subscriber is shown by SignInContinue."
     },
     "apps/web/components/features/auth/AuthProviderButtons.tsx": {
       "empty": "The only product caller that renders a provider group, AuthShell, renders it only when at least one provider is enabled and otherwise leads with the email form (AuthShell.test.tsx, 'leads with the email form when no provider is enabled'); AuthProviderButtonSlots has no other caller, so an empty group never renders.",

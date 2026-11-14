@@ -168,7 +168,6 @@ The source defaults below are preserved in this slice.
 
 | Flag | Source default | Disposition |
 |---|---|---|
-| `AUTH_OFFER_SUMMARY` | `false` | Remove copy/layout gate after selecting the supported offer recap; no pricing, auth or entitlement change. |
 | `CLAIM_LEGACY_PROOF_SWEEP` | `false` | Keep rollout stop for the grandfathered-claim sweep that takes 50k+ pages private after the 30-day nudge; remove once the first flip is observed. |
 | `CHATGPT_APP_DIRECTORY_MCP` | `false` | Keep public API exposure security control; no dynamic client registration grant. |
 | `INVESTOR_PORTAL_YC_DECK` | `false` | Remove narrative/layout gate in favor of the supported private brief; preserve financial privacy and sourced claims. |

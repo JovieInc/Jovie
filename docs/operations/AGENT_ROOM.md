@@ -36,10 +36,7 @@ no environment, couldn't start a task), `active` under 30 minutes, `recent`
 under 24 hours, `quiet` older, `unseen` with no event. Blocked sorts first,
 because that is the agent that needs someone.
 
-## Ovie fleet room (slice 1)
-
-Ships in two PRs to fit the size cap: first the shared contract, source,
-store and roster; then the Ovie ingest, backstop, page and component.
+## Ovie fleet room (slice 1, shipped)
 
 - Roster: Summer, Elsa, Chloe, Lola, Codex, Cursor, Copilot, Tim. Unknown
   prefixed speakers still appear, after the roster.

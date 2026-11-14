@@ -121,11 +121,10 @@ SENSITIVE_LABELS = frozenset({
     "billing", "blocked:payments", "stripe", "cost-monitoring", "blocked:auth", "auth",
     "area:auth", "infra", "area:infra", "infrastructure", "vercel",
 })
-# Tim 2026-10-11: no label parks an issue forever. `hold` is the one stop signal, and the
-# reconcile pass (epics.reconcile) expires it after 72h without activity. `codex-blocked`
-# only steers routing away from codex; `reasoning-job` belongs to the reason lane only when
-# Summer's job block is present; `type:epic` is a decomposition unit (epics.py);
-# `no-symphony` no longer excludes (the claiming agent decides what the issue needs).
+# Tim 2026-10-11: no label parks an issue forever. `hold` is the one stop signal (epics.reconcile
+# expires it after 72h idle); `codex-blocked` steers routing off codex; `reasoning-job` is the reason
+# lane's only with Summer's job block; `type:epic` is a decomposition unit; `no-symphony` no longer
+# excludes. A `fleet` issue addressed to Lola, Chloe or Aeon is theirs for 72h (epics.fleet_reserved).
 HARD_EXCLUDED_LABELS = frozenset({"hold"})
 CODEX_BLOCKED_LABEL = "codex-blocked"
 REASONING_JOB_LABEL = "reasoning-job"
@@ -710,9 +709,10 @@ def sensitive_text_released(issue: Issue) -> bool:
 def label_rejection(issue: Issue, provider: str | None = None) -> str | None:
     """Label policy shared by the Jovie pool and every binding (bindings.refusal)."""
     labels = {label.lower() for label in issue.labels}
-    excluded = sorted(HARD_EXCLUDED_LABELS & labels)
-    if excluded:
+    if excluded := sorted(HARD_EXCLUDED_LABELS & labels):
         return "excluded-label:" + excluded[0]
+    if agent := epics.fleet_reserved(issue):
+        return "fleet-reserved:" + agent
     if REASONING_JOB_LABEL in labels and reason_lane.has_job_block(issue.description):
         return "reason-lane-job"
     if CODEX_BLOCKED_LABEL in labels and provider == "codex":

@@ -64,8 +64,8 @@ jobs:
           key: mutation-sweep-portable-v2-${{ github.run_id }}-${{ github.run_attempt }}
           restore-keys: mutation-sweep-portable-v2-
       # Story-capture receipts from visual-a11y.yml (component-story-evidence,
-      # hosted runners only). Receipts bind to source hashes, so an older
-      # capture only counts for components that have not changed since.
+      # hosted runners only). Component AND shared input bindings are required;
+      # stale/legacy passes and failures both become unknown after restore.
       - name: Restore story evidence
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:

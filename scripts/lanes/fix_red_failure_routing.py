@@ -32,26 +32,42 @@ _SHA = re.compile(r'[0-9a-f]{40}')
 _ROLLUPS = {'ci-fast', 'PR Ready', 'Product Lane Receipt'}
 _RED = {'FAILURE', 'ERROR', 'TIMED_OUT', 'CANCELLED', 'STARTUP_FAILURE'}
 
+# The budget CLI checks the committed policy against current origin/main.
+# A stale head can retain ceilings main already lowered (#25125), including
+# inside disk-read CLI tests. Sync once through the existing owner; persistent
+# growth still needs a source repair, never a raised budget or an infra retry.
+# ##[error] is the build annotation. ::error:: is the same finding when the CLI
+# integration test prints it, including AssertionError: ::error:: lines.
+_BUDGET_GROWTH_LINE = re.compile(
+    r'^(?:\d{4}-\d\d-\d\dT[\d:.]+Z )?(?:AssertionError: )?'
+    r'(?:##\[error\]|::error::)'
+    r'(?:routes\.\S+|firstLoad\.baselines\.\S+|groups\.[A-Za-z]+\.baselineKb)'
+    r' grew (\d+(?:\.\d+)?) -> (\d+(?:\.\d+)?)\s*$')
+_OTHER_FAILURE = re.compile(
+    r'\bFAIL\b|\b(?:Error|AssertionError|TypeError|ReferenceError|SyntaxError):|error TS\d+:')
+
+
+def _budget_log_rejects(line):
+    """A non-growth failure in the same log is a real repair, not a stale ceiling."""
+    if '##[error]' in line and 'Process completed with exit code 1.' not in line:
+        return True
+    return _OTHER_FAILURE.search(line) is not None
+
 
 class RouteBudgetGrowth:
     """Try the existing bounded main sync for stale ceilings, never relax a budget."""
 
     def search(self, text):
         clean = _ANSI.sub('', str(text or ''))
-        growth = re.compile(
-            r'^(?:\d{4}-\d\d-\d\dT[\d:.]+Z )?##\[error\]'
-            r'(?:routes\.\S+|firstLoad\.baselines\.\S+|groups\.[a-z]+\.baselineKb)'
-            r' grew (\d+(?:\.\d+)?) -> (\d+(?:\.\d+)?)\s*$')
         matches = []
         for line in clean.splitlines():
             line = _LOG_FAILED_PREFIX.sub('', line, count=1)
-            match = growth.fullmatch(line)
+            match = _BUDGET_GROWTH_LINE.fullmatch(line)
             if match:
                 if float(match[2]) <= float(match[1]):
                     return None
                 matches.append(match)
-            elif ('##[error]' in line and 'Process completed with exit code 1.' not in line
-                  or re.search(r'\bFAIL\b|\b(?:Error|AssertionError|TypeError|ReferenceError|SyntaxError):|error TS\d+:', line)):
+            elif _budget_log_rejects(line):
                 return None
         return matches[0] if matches else None
 
