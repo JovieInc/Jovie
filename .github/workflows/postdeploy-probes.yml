@@ -65,12 +65,16 @@ jobs:
       # A rate-limited trigger read sets quota_deferred and must not dispatch
       # probes or page production. Commit identity is resolved with git,
       # outside that REST quota (JOV-8495).
-      should_probe: ${{ steps.trigger.outputs.should_probe == 'true' && steps.trigger.outputs.quota_deferred != 'true' }}
+      should_probe: ${{ steps.admission.outputs.admitted == 'true' && steps.trigger.outputs.quota_deferred != 'true' && steps.admission.outputs.quota_deferred != 'true' }}
       # JOV-9822: certify the golden path after every Production Verified
       # promotion, on the 12 h clock, on manual dispatch, and whenever the
       # read-only probes run. A superset of should_probe.
-      should_certify: ${{ (steps.trigger.outputs.should_probe == 'true' || steps.trigger.outputs.should_certify == 'true') && steps.trigger.outputs.quota_deferred != 'true' }}
-      quota_deferred: ${{ steps.trigger.outputs.quota_deferred == 'true' }}
+      should_certify: ${{ (steps.trigger.outputs.should_certify == 'true' || (steps.admission.outputs.admitted == 'true' && steps.admission.outputs.quota_deferred != 'true')) && steps.trigger.outputs.quota_deferred != 'true' }}
+      quota_deferred: ${{ steps.trigger.outputs.quota_deferred == 'true' || steps.admission.outputs.quota_deferred == 'true' }}
+      probe_artifact_name: ${{ steps.admission.outputs.artifact_name }}
+      probe_policy_digest: ${{ steps.admission.outputs.policy_digest }}
+      probe_notify_allowed: ${{ steps.admission.outputs.notify_allowed }}
+      probe_admission: ${{ steps.admission.outputs.decision }}
       deployment_id: ${{ steps.target.outputs.deployment_id }}
       deployment_url_b64: ${{ steps.target.outputs.deployment_url_b64 }}
       commit_sha: ${{ steps.target.outputs.commit_sha }}
@@ -404,6 +408,50 @@ jobs:
             echo "commit_sha=$commit_sha"
           } >> "$GITHUB_OUTPUT"
           echo "Resolved landed production target: $deployment_id ($deployment_url) at $commit_sha."
+
+      - name: Admit bounded probes for the resolved production target
+        id: admission
+        if: ${{ github.ref == 'refs/heads/main' && steps.target.outputs.commit_sha != '' && steps.trigger.outputs.should_probe == 'true' && steps.trigger.outputs.quota_deferred != 'true' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TARGET_COMMIT_SHA: ${{ steps.target.outputs.commit_sha }}
+          TARGET_DEPLOYMENT_ID: ${{ steps.target.outputs.deployment_id }}
+          TARGET_ORIGIN_B64: ${{ steps.target.outputs.deployment_url_b64 }}
+        run: |
+          set -euo pipefail
+          context="$RUNNER_TEMP/postdeploy-probe-context.json"
+          PROBE_CONTEXT_FILE="$context" node --input-type=module <<'NODE'
+          import { createHash } from 'node:crypto';
+          import { readFileSync, writeFileSync, appendFileSync } from 'node:fs';
+          const e = process.env;
+          const policyDigest = createHash('sha256').update(readFileSync('.github/workflows/postdeploy-probes.yml')).digest('hex');
+          writeFileSync(e.PROBE_CONTEXT_FILE, JSON.stringify({
+            repository: e.GITHUB_REPOSITORY, workflowPath: '.github/workflows/postdeploy-probes.yml',
+            runId: Number(e.GITHUB_RUN_ID), runAttempt: Number(e.GITHUB_RUN_ATTEMPT), workflowSha: e.GITHUB_SHA,
+            mode: e.GITHUB_EVENT_NAME === 'workflow_dispatch' ? 'manual' : 'automatic', now: new Date().toISOString(),
+            target: { sha: e.TARGET_COMMIT_SHA, deploymentId: e.TARGET_DEPLOYMENT_ID,
+              origin: Buffer.from(e.TARGET_ORIGIN_B64, 'base64').toString('utf8'), policyDigest }
+          }));
+          appendFileSync(e.GITHUB_OUTPUT, `policy_digest=${policyDigest}\n`);
+          NODE
+          status=0
+          node scripts/postdeploy-probe-admission.mjs admit --context-file "$context" \
+            --out-dir "$RUNNER_TEMP/postdeploy-probe-admission" --github-output "$GITHUB_OUTPUT" || status=$?
+          if [ "$status" -eq 75 ]; then
+            echo "::warning::GitHub quota deferred probe admission; no production verdict or page."
+            exit 0
+          fi
+          exit "$status"
+
+      - name: Preserve probe admission before production requests
+        if: ${{ steps.admission.outputs.admitted == 'true' && steps.admission.outputs.reservation_needed == 'true' }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: ${{ steps.admission.outputs.artifact_name }}
+          path: ${{ runner.temp }}/postdeploy-probe-admission/ledger.json
+          retention-days: 90
+          overwrite: false
+          if-no-files-found: error
 
   smoke:
     name: Post-Deploy Smoke (Landed Production)
@@ -898,16 +946,50 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          ref: ${{ github.sha }}
           fetch-depth: 1
           persist-credentials: false
+      - name: Record the actual probe attempt outcomes
+        id: probe-outcome
+        if: ${{ needs.resolve-target.result == 'success' && needs.resolve-target.outputs.should_probe == 'true' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TARGET_COMMIT_SHA: ${{ needs.resolve-target.outputs.commit_sha }}
+          TARGET_DEPLOYMENT_ID: ${{ needs.resolve-target.outputs.deployment_id }}
+          TARGET_ORIGIN_B64: ${{ needs.resolve-target.outputs.deployment_url_b64 }}
+          PROBE_POLICY_DIGEST: ${{ needs.resolve-target.outputs.probe_policy_digest }}
+        run: |
+          set -euo pipefail
+          context="$RUNNER_TEMP/postdeploy-probe-context.json"
+          PROBE_CONTEXT_FILE="$context" node --input-type=module <<'NODE'
+          import { writeFileSync } from 'node:fs';
+          const e = process.env;
+          writeFileSync(e.PROBE_CONTEXT_FILE, JSON.stringify({
+            repository: e.GITHUB_REPOSITORY, workflowPath: '.github/workflows/postdeploy-probes.yml',
+            runId: Number(e.GITHUB_RUN_ID), runAttempt: Number(e.GITHUB_RUN_ATTEMPT), workflowSha: e.GITHUB_SHA,
+            mode: e.GITHUB_EVENT_NAME === 'workflow_dispatch' ? 'manual' : 'automatic', now: new Date().toISOString(),
+            target: { sha: e.TARGET_COMMIT_SHA, deploymentId: e.TARGET_DEPLOYMENT_ID,
+              origin: Buffer.from(e.TARGET_ORIGIN_B64, 'base64').toString('utf8'), policyDigest: e.PROBE_POLICY_DIGEST }
+          }));
+          NODE
+          status=0
+          node scripts/postdeploy-probe-admission.mjs record --context-file "$context" \
+            --out-dir "$RUNNER_TEMP/postdeploy-probe-admission" --github-output "$GITHUB_OUTPUT" || status=$?
+          if [ "$status" -eq 75 ]; then
+            echo "::warning::GitHub quota deferred probe outcome recording; pending admission remains incomplete."
+            exit 0
+          fi
+          exit "$status"
+
       - name: File or resolve production-monitor-postdeploy-probes
+        if: ${{ needs.resolve-target.outputs.quota_deferred == 'true' || steps.probe-outcome.outputs.quota_deferred == 'true' || needs.resolve-target.result == 'failure' || steps.probe-outcome.outputs.outcome == 'passed' || (needs.resolve-target.outputs.probe_notify_allowed == 'true' && steps.probe-outcome.outputs.outcome == 'failed') }}
         env:
           LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
           REMEDIATION_INTAKE_DISABLED: ${{ vars.REMEDIATION_INTAKE_DISABLED }}
           REMEDIATION_MODE: monitor
           REMEDIATION_FINGERPRINT: production-monitor-postdeploy-probes
           REMEDIATION_SOURCE: postdeploy-probes.yml
-          REMEDIATION_CONCLUSION: ${{ needs.resolve-target.outputs.quota_deferred == 'true' && 'quota-deferred' || ((needs.resolve-target.result == 'success' && needs.smoke.result == 'success' && needs.auth-smoke.result == 'success' && needs.lighthouse.result == 'success') && 'success' || 'failure') }}
+          REMEDIATION_CONCLUSION: ${{ (needs.resolve-target.outputs.quota_deferred == 'true' || steps.probe-outcome.outputs.quota_deferred == 'true') && 'quota-deferred' || (steps.probe-outcome.outputs.outcome == 'passed' && 'success' || (needs.resolve-target.result == 'failure' || steps.probe-outcome.outputs.outcome == 'failed') && 'failure' || 'unknown') }}
           REMEDIATION_DETAIL: quota-deferred=${{ needs.resolve-target.outputs.quota_deferred }} resolve=${{ needs.resolve-target.result }} sha=${{ needs.resolve-target.outputs.commit_sha }} deployment=${{ needs.resolve-target.outputs.deployment_id }} smoke=${{ needs.smoke.result }} auth-smoke=${{ needs.auth-smoke.result }} lighthouse=${{ needs.lighthouse.result }}; landed-build evidence only, never release or freeze recovery proof (JOV-7195)
           REMEDIATION_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: node scripts/remediation-signal-intake.mjs
@@ -915,7 +997,7 @@ jobs:
   notify-failure:
     name: Alert on post-deploy probe failure
     needs: [resolve-target, smoke, auth-smoke, lighthouse]
-    if: ${{ always() && (needs.resolve-target.result == 'failure' || (needs.resolve-target.outputs.should_probe == 'true' && (needs.smoke.result != 'success' || needs.lighthouse.result != 'success' || needs.auth-smoke.result != 'success'))) }}
+    if: ${{ always() && (needs.resolve-target.result == 'failure' || (needs.resolve-target.outputs.should_probe == 'true' && needs.resolve-target.outputs.probe_notify_allowed == 'true' && (needs.smoke.result != 'success' || needs.lighthouse.result != 'success' || needs.auth-smoke.result != 'success'))) }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
