@@ -136,7 +136,7 @@
     "ui-story-coverage-audit.yml": {"runsPerMergedPr":1.9,"triggers":["pull_request:opened","pull_request:reopened","pull_request:synchronize","push","workflow_dispatch"]},
     "unstack-merged-parent.yml": {"runsPerMergedPr":3.2,"triggers":["pull_request_target:closed","pull_request_target:edited","workflow_dispatch"]},
     "vercel-preview-cleanup.yml": {"runsPerMergedPr":1.2,"triggers":["pull_request:closed"]},
-    "visual-a11y.yml": {"runsPerMergedPr":0.3,"triggers":["push","workflow_dispatch"]},
+    "visual-a11y.yml": {"runsPerMergedPr":0.527,"triggers":["push","workflow_dispatch"]},
     "visual-regression.yml": {"runsPerMergedPr":0,"triggers":["schedule","workflow_dispatch"]},
     "voc-mine.yml": {"runsPerMergedPr":0,"triggers":["schedule","workflow_dispatch"]},
     "vs-linktree-claims.yml": {"runsPerMergedPr":0,"triggers":["repository_dispatch:clock_vs_linktree_claims","workflow_dispatch"]},
