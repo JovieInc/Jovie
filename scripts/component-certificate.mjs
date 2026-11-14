@@ -31,7 +31,7 @@ import {
   mutationStateKey,
   mutationTestsFor,
 } from './lib/component-certificate-mutation.mjs';
-import { acceptStoryReceipts } from './lib/component-evidence.mjs';
+import { loadStoryReceipts } from './lib/component-story-receipts.mjs';
 
 const { values } = parseArgs({
   options: {
@@ -140,20 +140,7 @@ const registry = readJson(values.registry, { policy: {}, waivers: {} });
 const policy = { ...DEFAULT_POLICY, ...(registry.policy ?? {}) };
 const mutation =
   readJson(values['mutation-state'], { modules: {} }).modules ?? {};
-// Story-capture receipts count only when every story was captured in light
-// and dark; partial passes are dropped (and listed) rather than trusted.
-const receipts = kind => {
-  const { components, rejected } = acceptStoryReceipts(
-    readJson(values[kind], { components: {} }).components
-  );
-  for (const r of rejected)
-    console.error(
-      `[component-certificate] ignored ${kind} receipt for ${r.path}: ${r.problem}`
-    );
-  return components;
-};
-const a11y = receipts('a11y');
-const visual = receipts('visual');
+const { a11y, visual, renderInputs } = loadStoryReceipts(root, values);
 const journeyMap = readJson(values.journeys, { components: {}, journeys: {} });
 const benchmarks =
   readJson(values.benchmarks, { components: {} }).components ?? {};
@@ -261,6 +248,7 @@ const certificates = list.map(c => {
     policy,
     packagesUi: c.sourceRel.startsWith('packages/ui/'),
     evidence: {
+      renderInputs,
       mutation: mutation[mutationStateKey(c.sourceRel)],
       a11y: a11y[c.sourceRel],
       visual: visual[c.sourceRel],

@@ -10,6 +10,7 @@
  */
 import { createHash } from 'node:crypto';
 import ts from 'typescript';
+import { storyCriterion } from './component-story-receipts.mjs';
 import { forcedCapsCriterion } from './design-rules/forced-caps.mjs';
 import { RAW_COLOR_PATTERNS } from './design-rules/raw-colors.mjs';
 import { moduleKey } from './mutation-sweep.mjs';
@@ -392,7 +393,6 @@ export function certifyComponent({
   policy = DEFAULT_POLICY,
   packagesUi = false,
 }) {
-  // Bind to current bytes; share one fresh tree between the source guards.
   const sourceHash = sha(source);
   const sourceFile = parseSource(source, path);
   const sourceBound = receipt => receipt?.sourceHash === sourceHash;
@@ -511,42 +511,14 @@ export function certifyComponent({
     } else criteria.push(crit('tests', 'pass'));
   }
 
-  // a11y
-  const axeInTest =
-    !!testSource &&
-    /expectNoA11yViolations|\baxe\(|vitest-axe|toHaveNoViolations/.test(
-      testSource
-    );
-  const a11yEv = evidence.a11y;
-  const a11yCurrent = sourceBound(a11yEv);
-  if (a11yCurrent && a11yEv.status === 'pass')
-    criteria.push(crit('a11y', 'pass', { source: 'storybook-a11y' }));
-  else if (a11yCurrent && a11yEv.status === 'fail') {
-    criteria.push(crit('a11y', 'fail', { detail: a11yEv.detail }));
-    miss(
-      'a11y',
-      `axe violations: ${a11yEv.detail ?? 'see report'}`,
-      'Fix violations; keep stories axe-clean'
-    );
-  } else if (axeInTest)
-    criteria.push(crit('a11y', 'pass', { source: 'unit-axe' }));
-  else {
-    criteria.push(
-      crit('a11y', 'unknown', {
-        detail:
-          a11yEv && !a11yCurrent
-            ? 'CI a11y evidence is stale or missing a source hash'
-            : 'no axe assertion in unit test and no CI a11y evidence',
-      })
-    );
-    miss(
-      'a11y',
-      a11yEv && !a11yCurrent
-        ? 'no current source-bound axe evidence'
-        : 'no axe evidence',
-      'Call expectNoA11yViolations(container) from apps/web/tests/utils/a11y.ts in the unit test for each rendered state'
-    );
-  }
+  const a11yCriterion = storyCriterion(
+    'a11y',
+    evidence,
+    sourceHash,
+    testSource
+  );
+  criteria.push(a11yCriterion.criterion);
+  if (a11yCriterion.missing) missing.push(a11yCriterion.missing);
 
   // frontend-rules
   const jank = jankFromSourceFile(sourceFile);
@@ -643,31 +615,14 @@ export function certifyComponent({
     );
   }
 
-  // visual
-  const v = evidence.visual;
-  const visualCurrent = sourceBound(v);
-  if (visualCurrent && v.status === 'pass')
-    criteria.push(crit('visual', 'pass', { captured: v.captured }));
-  else if (visualCurrent && v.status === 'fail') {
-    criteria.push(crit('visual', 'fail', { detail: v.detail }));
-    miss('visual', v.detail ?? 'visual diff', 'Review the CI capture diff');
-  } else {
-    criteria.push(
-      crit('visual', 'unknown', {
-        detail:
-          v && !visualCurrent
-            ? 'CI capture is stale or missing a source hash'
-            : 'no CI capture',
-      })
-    );
-    miss(
-      'visual',
-      v && !visualCurrent
-        ? 'no current source-bound CI capture'
-        : 'no CI-captured baseline for the state stories',
-      'Land state stories; the component-certificate workflow captures them in CI (never a Storybook build on gem)'
-    );
-  }
+  const visualCriterion = storyCriterion(
+    'visual',
+    evidence,
+    sourceHash,
+    testSource
+  );
+  criteria.push(visualCriterion.criterion);
+  if (visualCriterion.missing) missing.push(visualCriterion.missing);
 
   // journeys
   const j = evidence.journeys;
