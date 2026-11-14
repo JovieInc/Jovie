@@ -1069,7 +1069,11 @@ describe('ProfilesWorkspace', { timeout: 15_000 }, () => {
       'relative',
       'flex'
     );
-    expect(screen.getByTestId('profiles-rail-summary')).toBeInTheDocument();
+    // Spotify is locked: status already leads Signals, so no stat card that
+    // would only read "Limit Reached / — / No change yet".
+    expect(
+      screen.queryByTestId('profiles-rail-summary')
+    ).not.toBeInTheDocument();
     expect(
       screen.getByTestId('profiles-rail-shareable-link')
     ).toHaveTextContent('open.spotify.com/artist/tim');
@@ -1101,7 +1105,6 @@ describe('ProfilesWorkspace', { timeout: 15_000 }, () => {
 
     const content = screen.getByTestId('profiles-rail-content');
     const ordered = [
-      screen.getByTestId('profiles-rail-summary'),
       screen.getByText('Signals'),
       screen.getByRole('link', { name: 'Open' }),
       screen.getByText('Profile / Page'),
