@@ -15,7 +15,7 @@ export const ALIAS_ROUTES = [
 export const ALIAS_SURFACES = {
   production: {
     surface: 'production-canonical-alias',
-    job: 'Production Release / Production public-profile alias usable-result gate',
+    job: 'Production public-profile alias usable-result gate',
     step: 'Gate canonical public-profile aliases on usable results',
   },
   staging: {

@@ -328,7 +328,7 @@ describe('public-profile alias graduation policy', () => {
           jobs: [
             {
               id: id * 10,
-              name: 'Production Release / Production public-profile alias usable-result gate',
+              name: 'Production public-profile alias usable-result gate',
               status: 'completed',
               conclusion: 'success',
               completed_at: at,

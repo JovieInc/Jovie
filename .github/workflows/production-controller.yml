@@ -925,14 +925,14 @@ jobs:
     permissions:
       contents: read
     # Production canonical-alias policy is measured independently from staging.
-    # Ship now: BLOCK on certified pages only; the 2026-10-31 receipt has 14/14
+    # Ship now: BLOCK on certified pages only; the 2026-11-09 receipt has 14/14
     # qualifying runs and a current streak of 14/14 (worst twenty-sample
-    # nearest-rank p95 1268.4ms against 1500ms). A route blocks only while its
+    # nearest-rank p95 1283.1ms against 1500ms). A route blocks only while its
     # golden-path surface holds a current production certification in the Ovie
     # certification ledger; every other route warns (Tim 2026-10-31: quality
     # gates never stall launch). The blocking set grows as surfaces certify.
     # Re-evaluate when: any selected run misses, and
-    # no later than 2026-11-07 (JOV-8737). Then: refresh the receipt; return
+    # no later than 2026-11-16 (JOV-8737). Then: refresh the receipt; return
     # this gate to WARN only if the refreshed window no longer qualifies. Evidence:
     # docs/performance/public-profile-alias-graduation.json.
     outputs:
@@ -1007,7 +1007,7 @@ jobs:
           if [ -n "$blocking" ]; then
             # shellcheck disable=SC2086
             if ! guard $blocking; then
-              echo "::error::Production public-profile alias budgets failed on certified pages (${blocking}) on jov.ie. Receipt 2026-10-31: 14/14 qualifying, streak 14/14; review by 2026-11-07 (JOV-8737)."
+              echo "::error::Production public-profile alias budgets failed on certified pages (${blocking}) on jov.ie. Receipt 2026-11-09: 14/14 qualifying, streak 14/14; review by 2026-11-16 (JOV-8737)."
               echo "performance_status=failed" >> "$GITHUB_OUTPUT"
               exit 1
             fi

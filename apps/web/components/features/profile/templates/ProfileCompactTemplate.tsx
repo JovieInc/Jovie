@@ -66,8 +66,11 @@ import type { Artist, LegacySocialLink } from '@/types/db';
 import type { NotificationContentType } from '@/types/notifications';
 import type { PressPhoto } from '@/types/press-photos';
 import { ProfileCompactSurface } from './ProfileCompactSurface';
-import { ProfileDesktopSurface } from './ProfileDesktopSurface';
 import { PublicProfileLayoutShell } from './PublicProfileLayoutShell';
+import {
+  DesktopSurfaceSlot,
+  useDesktopSurfaceModule,
+} from './useDesktopSurfaceModule';
 
 interface ProfileCompactTemplateProps {
   readonly mode: ProfileMode;
@@ -352,6 +355,11 @@ export function ProfileCompactTemplate({
   );
   const [isHydrated, setIsHydrated] = useState(false);
   const [desktopSurfaceReady, setDesktopSurfaceReady] = useState(false);
+  // Loads only when a viewport or preview can present the desktop surface —
+  // mobile never parses, hydrates, or preloads it (JOV-12207/JOV-12208).
+  const { Surface } = useDesktopSurfaceModule(
+    PROFILE_DESKTOP_SURFACE_ENABLED && (isDesktopLayout || embeddedPreview)
+  );
   const [requestedMode, setRequestedMode] = useState<ProfileMode>(() =>
     getInitialModeFromLocation(mode, false)
   );
@@ -1249,9 +1257,9 @@ export function ProfileCompactTemplate({
           </div>
         }
         desktopBanner={
-          embeddedPreview || !PROFILE_DESKTOP_SURFACE_ENABLED
-            ? null
-            : profileBanner
+          PROFILE_DESKTOP_SURFACE_ENABLED && isDesktopLayout
+            ? profileBanner
+            : null
         }
         desktopSurface={
           PROFILE_DESKTOP_SURFACE_ENABLED ? (
@@ -1259,7 +1267,8 @@ export function ProfileCompactTemplate({
               className='relative flex min-h-0 w-full flex-1 flex-col'
               data-sheet-container
             >
-              <ProfileDesktopSurface
+              <DesktopSurfaceSlot
+                surface={Surface}
                 presentation='embedded'
                 overlaysEnabled={isDesktopLayout}
                 onReady={handleDesktopSurfaceReady}
