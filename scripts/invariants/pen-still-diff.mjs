@@ -8,10 +8,11 @@
 *
 * Advisory exits 0; strict requires at least one active frame and every active comparison to pass.
 * Parked and fork frames are excluded. Dark is the primary mode.
-* Capture reuses clef-screenshot-evaluator.mjs.
+* Capture reuses clef-screenshot-capture.mjs with one browser per manifest.
 */
 import { createHash } from 'node:crypto';
 import { BINDING_SCHEMA, bindingsToStillFrames } from '../design/pen-bindings-lib.mjs';
+import { captureSurfacePng } from './clef-screenshot-capture.mjs';
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path'; import { fileURLToPath } from 'node:url'; import {
 composeTriptych, decodePng, diffImage, encodePng, judgePair, measureGeometry, measureImage,
@@ -19,7 +20,8 @@ PEN_STILL_TOLERANCES, resizeImage, ssim, syntheticPair, } from './pen-still-diff
 export const MANIFEST_SCHEMA = 'pen-still-manifest/v1'; export const RECEIPT_SCHEMA = 'pen-still-diff/v1';
 export const COMMENT_MARKER = '<!-- pen-still-diff -->'; const LOCKED_HEADLINE = 'Be found. Be understood.';
 const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), '../..'); function frameId(frame) { return {
-sectionId: frame.sectionId, penNodeId: frame.penNodeId, viewport: frame.viewport, mode: frame.mode, }; }
+sectionId: frame.sectionId, penNodeId: frame.penNodeId, viewport: frame.viewport, mode: frame.mode,
+...(frame.route ? { route: frame.route } : {}), ...(frame.story ? { story: frame.story } : {}), }; }
 /** @param {unknown} value */
 export function validateManifest(value) { const errors = []; if (!value || typeof value !== 'object')
 return { ok: false, errors: ['manifest must be an object'] };
@@ -38,7 +40,7 @@ errors.push(`${label}.mode must be dark or light`); if (!['active', 'parked', 'f
 errors.push(`${label}.status must be active, parked, or fork`);
 if (frame.fileHash != null && typeof frame.fileHash !== 'string')
 errors.push(`${label}.fileHash must be a string or null`);
-const id = `${frame.sectionId}:${frame.mode}:${frame.viewport}`;
+const id = JSON.stringify([frame.route ?? null, frame.story ?? null, frame.sectionId, frame.mode, frame.viewport]);
 if (seen.has(id)) errors.push(`${label} duplicates ${id}`); seen.add(id); } return errors.length
 ? { ok: false, errors } : { ok: true, manifest: { ...manifest, primaryMode: 'dark' } }; }
 /** @param {string} text */
@@ -50,6 +52,8 @@ for (const frame of manifest.frames) { if (frame.status !== 'active') excluded.p
 else active.push(frame); } active.sort((a, b) => {
 const mode = Number(a.mode !== 'dark') - Number(b.mode !== 'dark'); if (mode) return mode;
 const viewport = Number(a.viewport !== 1440) - Number(b.viewport !== 1440); if (viewport) return viewport;
+const target = JSON.stringify([a.route ?? null, a.story ?? null]).localeCompare(JSON.stringify([b.route ?? null, b.story ?? null]));
+if (target) return target;
 return String(a.sectionId).localeCompare(String(b.sectionId)); }); return { active, excluded }; }
 /**
 * @param {{route?: string, story?: string}} frame
@@ -113,10 +117,24 @@ advisory: !options.strict, primaryMode: 'dark', lockedHeadline: LOCKED_HEADLINE,
 excluded: excluded.map(frame => ({ sectionId: frame.sectionId, status: frame.status, mode: frame.mode,
 viewport: frame.viewport, })), frames: frames.map(({ triptych: _triptych, ...rest }) => rest),
 triptychs: frames.flatMap(frame => frame.triptych ? [ { sectionId: frame.sectionId, mode: frame.mode,
-viewport: frame.viewport, triptych: frame.triptych, }, ] : [] ),
+viewport: frame.viewport, ...(frame.route ? { route: frame.route } : {}),
+...(frame.story ? { story: frame.story } : {}), triptych: frame.triptych, }, ] : [] ),
 sample: comparable ? null : syntheticComparison(), pass: options.strict
 ? frames.length > 0 && frames.every(frame => frame.verdict === 'pass')
 : frames.every(frame => frame.verdict !== 'fail'), }; }
+/** Lazily share Chromium; captureSurfacePng gives every frame its own page/context. */
+export async function evaluateManifestWithBrowser(manifest, options = {}) {
+if (options.capture || (!options.baseUrl && !options.storybookUrl)) return evaluateManifest(manifest, options);
+const session = /** @type {{ browser?: import('playwright').Browser }} */ ({});
+const launchBrowser = options.launchBrowser ?? (async () => {
+const { chromium } = await import('playwright'); return chromium.launch(); });
+try { return await evaluateManifest(manifest, { ...options, capture: async (frame, url) => {
+if (!session.browser || !session.browser.isConnected()) session.browser = await launchBrowser();
+return captureSurfacePng(session.browser, { url,
+viewport: frame.viewport, mode: frame.mode, selector: frame.sectionSelector,
+mockupSelector: frame.mockupSelector, expectedPath: new URL(url).pathname, });
+} }); } finally { await session.browser?.close(); }
+}
 export function formatComment(receipt) { const lines = [ COMMENT_MARKER, `## Pen still diff (${receipt.advisory ? 'advisory' : 'strict'})`, '',
 `Dark is the primary review mode. ${receipt.advisory ? 'This job does not block merge.' : `Strict qualification: ${receipt.pass ? 'pass' : 'fail'}. Every active frame must be compared and pass.`}`,
 '', ]; if (receipt.sample) lines.push(receipt.sample.reason, ''); lines.push(
@@ -127,7 +145,7 @@ mode: 'dark', viewport: '—', verdict: receipt.sample.pass ? 'pass' : 'fail', j
 const ratio = frame.judgment ? frame.judgment.sectionHeightRatio.toFixed(3) : '—'; lines.push(
 `| ${frame.sectionId} | ${frame.mode} | ${frame.viewport} | ${frame.verdict} | ${ssimScore} | ${ratio} |` ); }
 for (const item of receipt.triptychs) { if (item.file) lines.push('',
-`![Pen, render, and diff: ${String(item.sectionId).replace(/[\[\]\r\n]/g, ' ')} (${item.mode}, ${item.viewport})](${item.file})`); }
+`![Pen, render, and diff: ${String([item.route, item.story, item.sectionId].filter(Boolean).join(' / ')).replace(/[\[\]\r\n]/g, ' ')} (${item.mode}, ${item.viewport})](${item.file})`); }
 if (receipt.sample?.file) lines.push('', `![Synthetic sample (not design evidence)](${receipt.sample.file})`);
 lines.push( '',
 `Excluded parked or fork frames: ${receipt.excluded.length}.`, '' ); return lines.join('\n'); }
@@ -142,13 +160,10 @@ process.exit(args.help ? 0 : 2); } const manifestText = readFileSync(String(args
 ? { schema: MANIFEST_SCHEMA, primaryMode: 'dark', frames: bindingsToStillFrames(JSON.parse(manifestText), typeof args.route === 'string' ? args.route : null) }
 : parseManifest(manifestText);
 const baseUrl = args['base-url'] || process.env.PEN_STILL_BASE_URL; const storybookUrl =
-args['storybook-url'] || process.env.PEN_STILL_STORYBOOK_URL; const capture = options.capture ?? (baseUrl || storybookUrl
-? async (frame, url) => { const { captureSurfacePng, withCaptureBrowser } = await import(
-'./clef-screenshot-evaluator.mjs' ); return withCaptureBrowser(browser => captureSurfacePng(browser, { url,
-viewport: frame.viewport, mode: frame.mode, selector: frame.sectionSelector,
-mockupSelector: frame.mockupSelector, expectedPath: new URL(url).pathname, }) ); } : undefined); const receipt = await evaluateManifest(manifest, {
+args['storybook-url'] || process.env.PEN_STILL_STORYBOOK_URL; const receipt = await evaluateManifestWithBrowser(manifest, {
 root: options.root ?? REPO_ROOT, strict: Boolean(args.strict), baseUrl: typeof baseUrl === 'string' ? baseUrl : undefined,
-storybookUrl: typeof storybookUrl === 'string' ? storybookUrl : undefined, capture, });
+storybookUrl: typeof storybookUrl === 'string' ? storybookUrl : undefined,
+capture: options.capture, launchBrowser: options.launchBrowser, });
 const outDir = resolve(String(args.out ?? 'pen-still-out')); mkdirSync(outDir, { recursive: true });
 // Hash the full identity, not a lossy slug: separators, case, Unicode and long IDs stay distinct.
 const triptychs = receipt.triptychs.map(({ triptych, ...identity }) => {
