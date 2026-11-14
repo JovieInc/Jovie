@@ -5,7 +5,9 @@ import {
   fileBottleneckIssue,
   PAID_PATH,
   paidPathOrder,
+  splitLine,
   topBottleneck,
+  verdictSplit,
 } from '../cert-bottleneck.mjs';
 import { SURFACE_IDS } from '../prod-cert.mjs';
 
@@ -36,8 +38,32 @@ describe('the topmost Golden Path bottleneck', () => {
         status: 'blocked',
         summary: 'no browser evidence',
       },
+      alongside: [],
       behind: ['checkout'],
     });
+  });
+
+  it('batches every surface held by the same check instead of queueing them', () => {
+    const receipts = allPassed();
+    for (const s of ['landing', 'claim', 'checkout'])
+      receipts[SURFACE_IDS.indexOf(s)] = receipt(s, 'failed', [
+        check('walk', 'passed'),
+        check('pen.design-exists', 'failed', 'no Pen design yet'),
+      ]);
+    receipts[SURFACE_IDS.indexOf('onboarding')] = receipt(
+      'onboarding',
+      'failed',
+      [check('pen.matches-production', 'failed')]
+    );
+    const top = topBottleneck(receipts, SURFACE_IDS);
+    expect(top?.check.id).toBe('pen.design-exists');
+    expect([top?.surface, ...(top?.alongside ?? [])].sort()).toEqual(
+      ['checkout', 'claim', 'landing'].sort()
+    );
+    expect(top?.behind).toEqual(['onboarding']);
+    const { description } = bottleneckIssue(top, { servedSha: SHA });
+    expect(description).toContain('## Same check, fix in the same batch');
+    expect(description).toMatch(/Fix all 3 surfaces in one batch/u);
   });
 
   it('names a failed check before a blocked one on the same surface', () => {
@@ -76,6 +102,37 @@ describe('the topmost Golden Path bottleneck', () => {
     expect(description).toContain('- `claim`');
     expect(description).toContain('node scripts/prod-cert.mjs');
     expect(description).toMatch(/- \[ \] A production certification run/u);
+  });
+});
+
+describe('the functional and design split', () => {
+  it('shows a working walk that is red only on Pen design', () => {
+    const receipts = SURFACE_IDS.map(s =>
+      receipt(s, 'failed', [
+        check('walk', 'passed'),
+        check('pen.design-exists', s === 'chat' ? 'passed' : 'failed'),
+      ])
+    );
+    receipts[0] = receipt(SURFACE_IDS[0], 'failed', [
+      check('walk', 'failed'),
+      check('pen.design-exists', 'failed'),
+    ]);
+    const split = verdictSplit(receipts, SURFACE_IDS);
+    expect(split.functional).toHaveLength(SURFACE_IDS.length - 1);
+    expect(split.functional).not.toContain(SURFACE_IDS[0]);
+    expect(split.design).toEqual(['chat']);
+    expect(splitLine(split)).toBe(
+      `functional walk ${SURFACE_IDS.length - 1}/${SURFACE_IDS.length} surfaces green, Pen design 1/${SURFACE_IDS.length}`
+    );
+  });
+
+  it('never counts a surface with no checks or no receipt as green', () => {
+    const split = verdictSplit(
+      [receipt(SURFACE_IDS[0], 'blocked', [])],
+      SURFACE_IDS
+    );
+    expect(split.functional).toEqual([]);
+    expect(split.design).toEqual([]);
   });
 });
 

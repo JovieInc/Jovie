@@ -52,7 +52,7 @@ export function topBottleneck(receipts, surfaceOrder) {
     s => bySurface.get(s)?.status !== 'passed'
   );
   if (notGreen.length === 0) return null;
-  const [surface, ...behind] = notGreen;
+  const [surface, ...rest] = notGreen;
   const checks = bySurface.get(surface)?.checks ?? [];
   const check = checks.find(c => c.status === 'failed') ??
     checks.find(c => c.status === 'blocked') ?? {
@@ -62,26 +62,75 @@ export function topBottleneck(receipts, surfaceOrder) {
         ? 'the receipt records no checks'
         : 'no receipt was written for this surface',
     };
+  // Surfaces held by the same check are one batch, not a queue: four
+  // surfaces missing a Pen frame get drafted together, not one per run.
+  const alongside = rest.filter(s =>
+    (bySurface.get(s)?.checks ?? []).some(
+      c => c.id === check.id && c.status !== 'passed'
+    )
+  );
   return {
     surface,
     check: { id: check.id, status: check.status, summary: check.summary ?? '' },
-    behind,
+    alongside,
+    behind: rest.filter(s => !alongside.includes(s)),
   };
 }
+
+/** Pen design checks; every other check is the functional walk. */
+export const isDesignCheck = (/** @type {{ id: string }} */ c) =>
+  c.id.startsWith('pen.');
+
+/**
+ * How many surfaces pass the functional walk and how many pass Pen design,
+ * so a run that is red only on design still shows a working Golden Path,
+ * and a functional regression is not hidden inside an already-red verdict.
+ * Certification itself still needs both.
+ * @param {{ surface: string, checks?: { id: string, status: string }[] }[]} receipts
+ * @param {readonly string[]} surfaceOrder
+ */
+export function verdictSplit(receipts, surfaceOrder) {
+  const bySurface = new Map(receipts.map(r => [r.surface, r]));
+  const green = (/** @type {{ id: string, status: string }[]} */ checks) =>
+    checks.length > 0 && checks.every(c => c.status === 'passed');
+  const functional = [];
+  const design = [];
+  for (const s of surfaceOrder) {
+    const checks = bySurface.get(s)?.checks ?? [];
+    if (green(checks.filter(c => !isDesignCheck(c)))) functional.push(s);
+    if (green(checks.filter(isDesignCheck))) design.push(s);
+  }
+  return { total: surfaceOrder.length, functional, design };
+}
+
+/** @param {ReturnType<typeof verdictSplit>} split */
+export const splitLine = split =>
+  `functional walk ${split.functional.length}/${split.total} surfaces green, Pen design ${split.design.length}/${split.total}`;
 
 /**
  * @param {NonNullable<ReturnType<typeof topBottleneck>>} bottleneck
  * @param {{ servedSha: string, runUrl?: string | null }} context
  */
-export function bottleneckIssue(bottleneck, { servedSha, runUrl = null }) {
-  const { surface, check, behind } = bottleneck;
+export function bottleneckIssue(
+  bottleneck,
+  { servedSha, runUrl = null, split = null }
+) {
+  const { surface, check, behind, alongside = [] } = bottleneck;
+  const batch = [surface, ...alongside];
   return {
     title: `Golden path bottleneck: fix this first (${BOTTLENECK_FINGERPRINT})`,
     description: `## The bottleneck
 \`${surface}\` is the first Golden Path surface a stranger reaches that is not certified. Its first ${check.status} check is \`${check.id}\`: ${check.summary || 'no summary recorded'}.
 
-Served build \`${servedSha}\`. This issue is rewritten by every production certification run, so it always names the current bottleneck.
-
+Served build \`${servedSha}\`.${split ? ` This run: ${splitLine(split)}.` : ''} This issue is rewritten by every production certification run, so it always names the current bottleneck.
+${
+  alongside.length
+    ? `
+## Same check, fix in the same batch
+\`${check.id}\` also holds ${alongside.map(s => `\`${s}\``).join(', ')}. Fix all ${batch.length} surfaces in one batch (one PR, or one Pen drafting pass), not one surface per run.
+`
+    : ''
+}
 ## Why it goes first
 Nothing after \`${surface}\` can certify while a stranger stops here. Tim, 2026-11-07: put the agents on the topmost bottleneck to certification until it is certified. Tim, 2026-11-08: the main goal is a first paid signup from an artist sent their own profile with a claim banner, so the paid path (${PAID_PATH.join(', ')}) is worked before the rest.
 
@@ -92,7 +141,7 @@ ${behind.length ? behind.map(s => `- \`${s}\``).join('\n') : '- nothing: this is
 \`node scripts/prod-cert.mjs --origin https://jov.ie\` prints every surface's checks. The check ids are defined in \`scripts/lib/prod-cert*.mjs\`. The per-surface issue \`prod-cert-${surface}\` lists every failed check on this surface.
 
 ## Acceptance criteria
-- [ ] A production certification run passes \`${check.id}\` on \`${surface}\`.
+- [ ] A production certification run passes \`${check.id}\` on ${batch.map(s => `\`${s}\``).join(', ')}.
 - [ ] This issue then names the next bottleneck, and closes itself when all surfaces pass.
 
 Run: ${runUrl ?? 'n/a'}`,
@@ -135,6 +184,7 @@ export async function fileBottleneckIssue(
   const { title, description } = bottleneckIssue(bottleneck, {
     servedSha,
     runUrl,
+    split: verdictSplit(receipts, surfaceOrder),
   });
   const result = await upsert({
     fingerprint: BOTTLENECK_FINGERPRINT,
