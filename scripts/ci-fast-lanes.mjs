@@ -1,7 +1,5 @@
 #!/usr/bin/env node
 /**
- * Run the cheap CI cluster as labeled lanes.
- *
  * Used by the dedicated `ci-fast-typecheck`, `ci-fast-remaining` and
  * `ci-fast-structural-web` jobs in `.github/workflows/ci.yml` (JOV-4477).
  * Each hosted job checks out and installs once, invokes one value from
@@ -1310,6 +1308,7 @@ export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/source-qualification-receipt.test.mjs',
   'scripts/lib/__tests__/workers-inventory.test.mjs',
   'scripts/lib/__tests__/setup-pinned-node.test.mjs',
+  'scripts/lib/__tests__/screen-proof-resolver.transport-retry.test.mjs',
 ]);
 export const SCRIPT_CONTRACT_VITEST_COMMAND = `pnpm exec vitest --root scripts --config vitest.config.mts run ${SCRIPT_CONTRACT_VITEST_TESTS.map(
   test => test.replace(/(^| )scripts\//gu, '$1')

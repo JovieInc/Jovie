@@ -25,32 +25,24 @@ export const REQUIRED_MARKETING_QUALITY_CHECKS = Object.freeze([
 ]);
 const SKEW = 5 * 60_000;
 const MAX_AGE = 24 * 60 * 60_000;
-// The marketing artifact currently contains 240 files (60 routes x two
-// viewports x PNG/receipt). Keep modest headroom while rejecting zip bombs.
+// The marketing artifact currently holds 240 files (60 routes x two
+// viewports x PNG/receipt); headroom while rejecting zip bombs.
 const MAX_ARCHIVE_MEMBERS = 256;
 const MAX_EXTRACTED_ARTIFACT_BYTES = 512 * 1024 * 1024;
-// JOV-INV-018 incident (2026-09-28): `spawnSync`'s default-scoped 32MB
-// stdout cap silently killed `gh api .../zip` once the marketing bundle
-// (60 routes x two viewports of full-page PNGs) grew past ~33MB — observed
-// at 163MB. The kill sets `status: null`, so `run()` threw the generic
-// 'controlled transport unavailable', which every caller reported as
-// "controlled GitHub artifact resolver is unavailable" for every screen
-// routed through that artifact, masking real per-screen findings (or a
-// real pass) behind a misleading transport error. The download transport
-// must never be the tightest ceiling in this pipeline: extraction already
-// owns the authoritative zip-bomb limit via MAX_EXTRACTED_ARTIFACT_BYTES,
-// so give the raw (already PNG-compressed, so barely smaller) download the
-// same ceiling plus headroom rather than an arbitrary lower one.
+// JOV-INV-018 (2026-09-28): spawnSync's 32MB stdout cap silently killed
+// `gh api .../zip` once the marketing bundle grew past ~33MB (observed at
+// 163MB); status null → 'controlled transport unavailable', masking real
+// per-screen findings behind a misleading transport error. The download
+// transport must never be the tightest ceiling here: extraction already
+// owns the authoritative zip-bomb limit — give the raw (barely smaller)
+// download the same ceiling plus headroom, not an arbitrary lower one.
 const MAX_ARTIFACT_DOWNLOAD_BYTES =
   MAX_EXTRACTED_ARTIFACT_BYTES + 128 * 1024 * 1024;
 const validId = value => Number.isSafeInteger(value) && value > 0;
-// Read-after-write on the jobs API. Runs 39786806070, 39791190562, and
-// 39795196640 rejected every screen with the trust failure while Generate
-// Screenshots had already concluded success; a later read of the same
-// attempt accepted the screens that were checked after the row appeared.
-// The sleeps below total 150s, which covers the ~117s lag before that row
-// was visible. This does not accept any other conclusion, repository,
-// workflow, head, or digest.
+// Read-after-write on the jobs API: runs 39786806070/39791190562/39795196640
+// rejected every screen while Generate Screenshots had already concluded
+// success, and a later read accepted them. The sleeps total 150s (~117s
+// observed lag); no other conclusion, repository, workflow, head or digest.
 export const PRODUCER_LAG_DELAYS_MS = Object.freeze([
   10_000, 20_000, 30_000, 30_000, 30_000, 30_000,
 ]);
@@ -159,13 +151,33 @@ export function screenProofArtifactName(screenId) {
   if (!/^[a-z0-9-]+$/.test(suffix)) return null;
   return `${PRODUCER.artifact}-${suffix}`;
 }
-function run(command, args, binary = false) {
+function runOnce(command, args, binary = false) {
   const result = spawnSync(command, args, {
     encoding: binary ? undefined : 'utf8',
     maxBuffer: binary ? MAX_ARTIFACT_DOWNLOAD_BYTES : 32 * 1024 * 1024,
   });
   if (result.status !== 0) throw new Error('controlled transport unavailable');
   return result.stdout;
+}
+// Run 42650227305: a single transient GitHub CLI exit per screen (rate limit
+// / blip) killed four screens' exact-head proofs with no retry while every
+// producer artifact sat intact in the same run. Transport retries here
+// only, bounded; trust findings are never retried or softened.
+let transportRetryDelays = [0, 15_000, 30_000];
+export function setTransportRetryDelaysForTests(delays) {
+  transportRetryDelays = Array.isArray(delays) ? delays : [0, 15_000, 30_000];
+}
+export function run(command, args, binary = false) {
+  let lastError;
+  for (const delay of transportRetryDelays) {
+    if (delay) pause(delay);
+    try {
+      return runOnce(command, args, binary);
+    } catch (error) {
+      lastError = error;
+    }
+  }
+  throw lastError;
 }
 function api(path, binary = false) {
   return run('gh', ['api', `repos/${PRODUCER.repository}/${path}`], binary);
