@@ -193,6 +193,34 @@ describe('golden-path lock evaluators', () => {
     ).toMatchObject({ ok: false });
   });
 
+  it('accepts the open claim front door: "Claim your profile" linking to /start', () => {
+    // Shape of the production hero once the on-page invitation form is gone:
+    // the shared claim-profile intent renders one link into /start.
+    const open = `<a class="btn" data-testid="homepage-primary-cta" href="/start"><span>Claim your profile</span></a>`;
+    expect(evaluateHomepageHtml(open)).toEqual({
+      id: 'homepage-cta',
+      ok: true,
+      reason: 'found claim CTA "Claim your profile" linking to /start',
+    });
+    // The label and a /start link in different controls is not the claim CTA.
+    expect(
+      evaluateHomepageHtml(
+        '<a href="/start">Get started</a><button>Claim your profile</button>'
+      )
+    ).toMatchObject({ ok: false });
+    expect(
+      evaluateHomepageHtml(
+        '<a href="/start">Get started</a><a href="/pricing">Claim your profile</a>'
+      )
+    ).toMatchObject({ ok: false });
+    // The invitation form production served on 2026-11-13 has no way into /start.
+    expect(
+      evaluateHomepageHtml(
+        '<form data-testid="waitlist-role-form" aria-label="Jovie opens by invitation"><button>Request an invitation</button></form>'
+      )
+    ).toMatchObject({ ok: false });
+  });
+
   it('fails 401 and fake rate-limit copy on logged-out first message', () => {
     expect(
       evaluateChatFirstMessage({ status: 401, body: { error: 'Unauthorized' } })
