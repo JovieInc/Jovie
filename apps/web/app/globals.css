@@ -1771,7 +1771,7 @@ body {
     }
   }
   .text-destructive {
-    color: var(--color-error);
+    color: var(--color-error-text);
   }
 
   .homepage-section-shell {

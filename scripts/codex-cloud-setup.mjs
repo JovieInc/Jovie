@@ -37,6 +37,8 @@ export function bootstrap(root, env = process.env) {
       ...options,
       env: {
         ...env,
+        // pnpm can exit successfully at an unanswered modules-replacement prompt.
+        CI: 'true',
         PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: '1',
         ONNXRUNTIME_NODE_INSTALL: 'skip',
       },
