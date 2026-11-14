@@ -6,7 +6,6 @@ import { APP_ROUTES } from '@/constants/routes';
 import { isAdmin as checkAdminRole } from '@/lib/admin/roles';
 import { getCachedAuth } from '@/lib/auth/cached';
 import { captureError } from '@/lib/error-tracking';
-import { getAppFlagValue } from '@/lib/flags/server';
 import { sendFleetRoomMessage } from '@/lib/ovie/fleet-room-send.server';
 import { assertOviePrivacyUnlocked } from '@/lib/ovie/privacy-lock/server';
 
@@ -19,7 +18,7 @@ const SEND_COPY = {
   'post-failed': 'Linear did not take the message. Try again.',
 } as const;
 
-/** Composer action: admins only, behind OVIE_FLEET_ROOM, MFA-fresh session. */
+/** Composer action: admins only, MFA-fresh session, Ovie privacy lock open. */
 export async function sendFleetRoomMessageAction(
   _previous: AgentRoomComposerState,
   formData: FormData
@@ -29,9 +28,6 @@ export async function sendFleetRoomMessageAction(
     return { status: 'error', message: 'Only Ovie operators can send here.' };
   }
   await assertOviePrivacyUnlocked();
-  if (!(await getAppFlagValue('OVIE_FLEET_ROOM', { userId }))) {
-    return { status: 'error', message: 'The fleet room is off.' };
-  }
   const agentId = String(formData.get('agentId') ?? '');
   const text = String(formData.get('text') ?? '');
   try {
