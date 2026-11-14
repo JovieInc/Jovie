@@ -21,7 +21,151 @@
       "frontend-rules",
       "forced-caps"
     ],
+    "apps/web/components/atoms/ArtistName.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/atoms/Calendar.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/atoms/CalendarInner.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/atoms/CanvasGrain.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/atoms/Confetti.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/atoms/DSPButton.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/atoms/EmptyCell.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/atoms/FrostedButton.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/atoms/HeaderIconButton.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/atoms/IconBadge.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/atoms/IconGlyphFrame.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
     "apps/web/components/atoms/LogoIcon.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/atoms/LogoLoader.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/atoms/NavLink.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/atoms/SectionHeading.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/atoms/StatusBadge.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/atoms/TableErrorFallback.tsx": [
       "ds-owner",
       "tokens",
       "states",
@@ -62,6 +206,114 @@
       "a11y",
       "frontend-rules"
     ],
+    "apps/web/components/molecules/ActivityFeed.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/molecules/ArtistCard.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/molecules/ArtistInfo.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/molecules/BillingPortalLink.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/molecules/BlogMarkdownReader.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/molecules/CompactLinkRail.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/molecules/ContentChartState.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/molecules/ContentMetricCard.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/molecules/ContentMetricCardSkeleton.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/molecules/ContentMetricDelta.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/molecules/ContentMetricRow.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/molecules/ContentMetricStat.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
     "apps/web/components/molecules/ContentSectionHeader.tsx": [
       "ds-owner",
       "tokens",
@@ -69,6 +321,15 @@
       "tests",
       "a11y",
       "frontend-rules"
+    ],
+    "apps/web/components/molecules/ContentSectionHeaderSkeleton.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
     ],
     "apps/web/components/molecules/ContentSurfaceCard.tsx": [
       "ds-owner",
@@ -78,6 +339,15 @@
       "a11y",
       "frontend-rules"
     ],
+    "apps/web/components/molecules/ContentTable.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
     "apps/web/components/molecules/CopyableUrlRow.tsx": [
       "ds-owner",
       "tokens",
@@ -85,6 +355,33 @@
       "tests",
       "a11y",
       "frontend-rules"
+    ],
+    "apps/web/components/molecules/DSPButtonGroup.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/molecules/DataCard.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/molecules/DocPrintScope.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
     ],
     "apps/web/components/organisms/StandaloneProductPage.tsx": [
       "ds-owner",
@@ -225,6 +522,9 @@
       "long-content": "The control is a fixed 28px or 32px icon square; its label is announced through aria-label rather than rendered, and tooltip text layout belongs to TooltipShortcut, so no content can overflow the button.",
       "rtl-overflow": "The control is a symmetric icon square with no text or inline-direction classes and its tooltip opens below it, so it renders the same under dir='rtl'; mirroring a directional glyph is the caller's choice of child icon."
     },
+    "apps/web/components/atoms/ArtistName.tsx": {
+      "empty": "ArtistName renders one required name and an optional badge; it owns no collection that could be empty. The detector matched the items-center class on its wrapper."
+    },
     "apps/web/components/atoms/ArtworkFallbackTile.tsx": {
       "empty": "The tile holds no collection: seed is required and draws the whole face. The detector matched the items-center class; Default and PartialNoLabel show the tile with only a seed."
     },
@@ -239,10 +539,17 @@
     "apps/web/components/atoms/BrandLogo.tsx": {
       "permission-denied": "BrandLogo only draws the brand mark and has no permission input or gated action; the detector matched role='img' on the svg."
     },
+    "apps/web/components/atoms/Calendar.tsx": {
+      "loading": "The only in-flight state is the empty aria-hidden h-64 placeholder next/dynamic paints while the CalendarInner chunk loads. A static story cannot hold that chunk, so Calendar.certificate.test.tsx asserts the placeholder before the grid paints.",
+      "offline": "The wrapper fetches no data; its only network step is the code-split CalendarInner chunk, whose load failure belongs to the app error boundary. The detector matched the next/dynamic loading option."
+    },
     "apps/web/components/atoms/CopyToggleIcon.tsx": {
       "partial": "The only required prop is copied; Idle and Copied already render with every optional prop (className, size, strokeWidth) left out, and Large sets size. There is no data that could arrive incomplete.",
       "long-content": "The atom draws one fixed-size icon and no text, so nothing can grow. The detector matched aria-label in the doc-comment example and the text- colour class.",
       "rtl-overflow": "The atom draws one symmetric icon and no text, so direction changes nothing. The detector matched aria-label in the doc-comment example and the text- colour class."
+    },
+    "apps/web/components/atoms/DSPButton.tsx": {
+      "empty": "The button renders one service name, logo and label; it owns no collection that could be empty. The detector matched the items-center class on its label row."
     },
     "apps/web/components/atoms/Divider.tsx": {
       "permission-denied": "A divider is a styled separator line with no action, data or account; nothing can be gated. The detector matched role='separator'."
@@ -258,6 +565,12 @@
       "partial": "Icon's only data input is name; ariaLabel, ariaHidden, size and className are accessibility and presentation options with defaults, so a glyph is either drawn whole or not at all.",
       "long-content": "Icon lays out no text; its only other string input, ariaLabel, is announced rather than rendered, so there is no content to overflow.",
       "permission-denied": "Icon has no gated action or permission input; the detector matched role='img' on a labelled glyph."
+    },
+    "apps/web/components/atoms/IconBadge.tsx": {
+      "permission-denied": "The badge has no account, role or gated action. The detector matched the role='img' it sets when an accessible label is given."
+    },
+    "apps/web/components/atoms/IconGlyphFrame.tsx": {
+      "empty": "The frame is decoration around one glyph its enclosing control passes in; it owns no collection that could be empty. The detector matched the items-center class."
     },
     "apps/web/components/atoms/ImageWithFallback.tsx": {
       "partial": "ImageWithFallback renders exactly one image or one placeholder: a source is present, absent (EmptySource) or broken (ErrorBrokenSource); its other optional props are styling and an error callback, so nothing can be partially present.",
@@ -291,6 +604,13 @@
       "partial": "LogoLink takes no data; its optional props (href, sizes, variant, reveal, prefetch, className) are presentation defaults and its mark and accessible name are fixed, so nothing can be partially present.",
       "long-content": "LogoLink renders no caller text; its only strings are the fixed 'Jovie' wordmark and aria-label, which the detector matched as label."
     },
+    "apps/web/components/atoms/LogoLoader.tsx": {
+      "empty": "The loader renders one fixed mark and a live-region label; it owns no collection that could be empty. The detector matched the items-center class.",
+      "offline": "The loader never fetches or submits; it is the placeholder its parent shows while that parent's own request runs, so connectivity cannot reach it. The detector matched the loading state name on the mark."
+    },
+    "apps/web/components/atoms/NavLink.tsx": {
+      "empty": "The link renders one label for one href; it owns no collection that could be empty. The detector matched the items-center class on its label span."
+    },
     "apps/web/components/atoms/ProviderIcon.tsx": {
       "loading": "The icon is a bundled SVG resolved synchronously from PROVIDER_CONFIG and SocialIcon, so nothing loads. The detector matched the phrase 'centralized icon loading' in the file's doc comment.",
       "offline": "The icon makes no network request; brand marks ship as bundled SVGs, so it renders identically offline. The detector matched the word loading in the doc comment.",
@@ -308,6 +628,12 @@
     "apps/web/components/atoms/SocialIcon.tsx": {
       "long-content": "SocialIcon draws one fixed 24x24 glyph and lays out no text; its only string input, aria-label, is announced rather than rendered, so there is no content to overflow.",
       "permission-denied": "SocialIcon only draws a platform glyph and has no gated action or permission input; the detector matched role='img' on the labelled svg."
+    },
+    "apps/web/components/atoms/StatusBadge.tsx": {
+      "permission-denied": "The badge has no account, role or gated action. The detector matched role='status', which it sets when the badge announces dynamic state."
+    },
+    "apps/web/components/atoms/TableErrorFallback.tsx": {
+      "loading": "The fallback renders only after a table has already failed; it never loads anything itself. The detector matched the words 'loading the table' in its default error copy."
     },
     "apps/web/components/atoms/VerifiedBadge.tsx": {
       "partial": "VerifiedBadge takes no data; its only optional props are size and className, both styling with defaults, and its glyph and accessible name are fixed, so nothing can be partially present.",
@@ -687,6 +1013,13 @@
       "offline": "It never fetches or mutates; lost connectivity reaches it only as a capture that fails to load, which the ErrorPreviewUnavailable story shows.",
       "permission-denied": "It only frames a product capture and has no gated action or permission input; the detector matched role='img' on the fallback and 'locked' in the founder-locked recipe comment."
     },
+    "apps/web/components/molecules/ActivityFeed.tsx": {
+      "offline": "The feed is presentational: its parent fetches the events and passes isLoading, so it never requests anything and connectivity cannot reach it. The detector matched the isLoading prop.",
+      "permission-denied": "The feed has no account, role or gated action. The detector matched role='feed' and role='status' on its list and loading regions."
+    },
+    "apps/web/components/molecules/ArtistInfo.tsx": {
+      "empty": "The profile header renders one artist; it owns no collection that could be empty, and a profile with no photo or tagline is the Partial story. The detector matched the items-center class."
+    },
     "apps/web/components/molecules/AuthActions.tsx": {
       "empty": "AuthActions always renders its fixed links (Log in and Sign up when signed out, Open App when signed in) and never a collection; the detector matched the items-center class."
     },
@@ -699,13 +1032,39 @@
       "empty": "The ring draws one SVG from a number and a status; it owns no collection. Zero progress is the Idle story, and AvatarProgressRing.test.tsx asserts the empty sweep. The detector matched the items-center class.",
       "long-content": "The ring renders no text: it is an aria-hidden SVG and a status icon sized from the size prop, so there is no content to grow. The detector matched text-* colour classes."
     },
+    "apps/web/components/molecules/BillingPortalLink.tsx": {
+      "empty": "The button renders one label and at most one error line; it owns no collection that could be empty. The detector matched the items-center class on the button."
+    },
+    "apps/web/components/molecules/ContentChartState.tsx": {
+      "permission-denied": "The chart frame has no account, role or gated action. The detector matched role='alert' and role='status' on its error and empty messages."
+    },
+    "apps/web/components/molecules/ContentMetricCard.tsx": {
+      "offline": "The card is presentational: its parent fetches the metric and passes the value, so it never requests anything and connectivity cannot reach it. The detector matched the word skeletons in a comment.",
+      "permission-denied": "The card has no account, role or gated action. The detector matched the optional role prop it forwards to its surface."
+    },
+    "apps/web/components/molecules/ContentMetricCardSkeleton.tsx": {
+      "empty": "The skeleton paints fixed placeholder lines and owns no collection that could be empty. The detector matched the items-center class.",
+      "offline": "The skeleton paints while its parent's request runs and never fetches or submits, so connectivity cannot reach it."
+    },
+    "apps/web/components/molecules/ContentMetricDelta.tsx": {
+      "error": "The delta has no failure state; a falling value uses the text-error colour token, which is the Partial story. The detector matched that class name."
+    },
+    "apps/web/components/molecules/ContentMetricStat.tsx": {
+      "offline": "The stat and its skeleton are presentational: the parent fetches the value, so neither requests anything and connectivity cannot reach them. The detector matched the skeleton export."
+    },
     "apps/web/components/molecules/ContentSectionHeader.tsx": {
       "empty": "ContentSectionHeader renders no collection: a required title with optional subtitle and actions (PartialTitleOnly); the detector matched the items-center class."
+    },
+    "apps/web/components/molecules/ContentTable.tsx": {
+      "offline": "The table is presentational: its parent fetches the rows and passes isLoading to the state row, so it never requests anything and connectivity cannot reach it. The detector matched the isLoading prop."
     },
     "apps/web/components/molecules/CookieActions.tsx": {
       "empty": "CookieActions always renders the same three consent buttons (Reject all, Accept all, Customize) and takes no collection; the detector matched the items-center class.",
       "partial": "Its three handlers are required and its optional props (className, disabled, compact) are presentation flags with defaults, so there is no partially present data; Compact, Standard and Disabled show them.",
       "long-content": "The three button labels are fixed consent copy with no props or caller text, so the content cannot grow; the detector matched text in the --linear-text-primary token and a layout comment."
+    },
+    "apps/web/components/molecules/DataCard.tsx": {
+      "empty": "The card renders one record; it owns no collection that could be empty, and a card with only a title is the Partial story. The detector matched the items-center class."
     },
     "apps/web/components/molecules/InfoBox.tsx": {
       "permission-denied": "InfoBox shows caller copy in a variant tone and has no account, role or gated action of its own. The detector matched role='alert' on the error variant (Error story)."
