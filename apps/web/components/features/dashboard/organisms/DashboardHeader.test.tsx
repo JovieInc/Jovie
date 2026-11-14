@@ -86,10 +86,16 @@ describe('DashboardHeader', () => {
     expect(source).not.toContain('sm:h-(--app-shell-header-height-compact)');
   });
 
-  it('exposes the header row as an Electron drag region', () => {
+  it('exposes the content row, not the padded header box, as an Electron drag region', () => {
     render(<DashboardHeader breadcrumbs={[{ label: 'New Chat' }]} />);
 
-    expect(screen.getByTestId('dashboard-header')).toHaveAttribute(
+    // JOV-7207: the header box carries the collapsed-rail padding that sits
+    // under the window controls; a drag region there swallowed the sidebar
+    // toggle on Home. Only the content row past that padding may drag.
+    expect(screen.getByTestId('dashboard-header')).not.toHaveAttribute(
+      'data-electron-drag-region'
+    );
+    expect(screen.getByTestId('dashboard-header-row')).toHaveAttribute(
       'data-electron-drag-region',
       'true'
     );

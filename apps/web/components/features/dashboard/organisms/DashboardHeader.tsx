@@ -99,7 +99,6 @@ export function DashboardHeader({
       data-testid='dashboard-header'
       data-grid-anchor='desktop-content'
       data-top-spacing-owner='shell-header'
-      data-electron-drag-region='true'
       className={cn(
         'z-20',
         // Keep ordinary headers on the AppShellFrame plane. Chat explicitly
@@ -111,7 +110,18 @@ export function DashboardHeader({
       {/* Keep responsive chrome in one DOM owner. Breakpoint classes change
           presentation without duplicating headings, search, or actions in the
           accessibility tree. */}
+      {/* JOV-7207: the drag region is the content row, not the header box.
+          Electron resolves app-region rects in document order, ignoring
+          z-index, and this header renders after the window controls. While
+          the rail is collapsed the header's padded left edge sits under the
+          titlebar's sidebar toggle, so a drag region on the header box turned
+          that toggle into a window-drag handle on Home while Settings, whose
+          header sits in a centered column clear of the controls, kept
+          working. The padding reserves exactly the controls' overlap, so the
+          content row starts past them. */}
       <div
+        data-testid='dashboard-header-row'
+        data-electron-drag-region='true'
         className={cn(
           'relative flex w-full items-center gap-2',
           MOBILE_HEADER_PADDING,
