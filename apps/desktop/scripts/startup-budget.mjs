@@ -269,6 +269,7 @@ export async function main() {
     }).trim();
     receipt.sourceDirty = Boolean(
       execFileSync('git', ['status', '--porcelain'], {
+        maxBuffer: 256 * 1024 * 1024,
         cwd: desktopRoot,
         encoding: 'utf8',
       }).trim()

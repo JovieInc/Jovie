@@ -216,7 +216,13 @@ test('warns offline about an incompatible installed gh without blocking setup or
           ['init'],
           ['add', '.nvmrc', 'package.json', 'pnpm-lock.yaml'],
         ]) {
-          assert.equal(spawnSync('git', gitArgs, { cwd: root }).status, 0);
+          assert.equal(
+            spawnSync('git', gitArgs, {
+              maxBuffer: 256 * 1024 * 1024,
+              cwd: root,
+            }).status,
+            0
+          );
         }
         mkdirSync(join(root, 'node_modules/.cache/jovie-setup'), {
           recursive: true,
