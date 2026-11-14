@@ -13,8 +13,11 @@
 # still self-heals stale/missing baselines via a single auto-PR (same JOVIE_BOT
 # + merge-queue pattern as screenshots.yml).
 #
-# Functional assertions in the spec (horizontal scroll, CTA clipping) still fail the
-# refresh run — a broken layout never silently becomes the new baseline.
+# JOV-12638: every spec is its own matrix entry (fail-fast: false), so one red
+# spec no longer hides the rest. One setup job owns the Neon branch, seed and
+# build; one publish job opens a single PR with the baselines of every suite
+# that passed and lists the suites that did not. Functional assertions still
+# fail their suite, so a broken layout never silently becomes the new baseline.
 name: Visual Regression
 # clock-class: skip-if-unchanged
 
@@ -40,21 +43,14 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  visual-regression:
-    name: Visual Regression (baseline refresh)
+  visual-baseline-setup:
+    name: Visual Regression (Neon seed + build)
     if: ${{ !inputs.approved_homepage_baselines }}
     environment: Preview – jovie
     runs-on: ubuntu-24.04
-    timeout-minutes: 35
+    timeout-minutes: 25
     permissions:
-      actions: read
       contents: read
-    env:
-      REFRESH_MODE: 'true'
-      SNAPSHOT_DIR: apps/web/tests/e2e/__snapshots__
-      PLAYWRIGHT_ARTIFACT_REQUIRE_PRODUCER_STAGE: 'true'
-      PLAYWRIGHT_ARTIFACT_ALLOW_IMAGES: 'true'
-      PLAYWRIGHT_ARTIFACT_ALLOW_MARKDOWN: 'true'
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -62,9 +58,6 @@ jobs:
           persist-credentials: false
 
       - uses: ./.github/actions/setup-node-pnpm
-
-      - name: Setup Playwright (Chromium)
-        uses: ./.github/actions/setup-playwright
 
       - name: Create ephemeral Neon database branch
         id: neon-branch
@@ -119,185 +112,271 @@ jobs:
           NEXT_IGNORE_TYPECHECK: '1'
           NEXT_PRIVATE_SKIP_SIZE_CHECK: 'true'
 
-      - name: Run visual regression suite
-        id: visual
+      - name: Package build and Neon connection for the suites
+        # Same shared-Neon + build-artifact hand-off as ci.yml's mobile
+        # overflow and Full E2E shards: one branch, one seed, one build.
+        run: |
+          set -euo pipefail
+          if [ ! -f apps/web/.next/standalone/apps/web/server.js ]; then
+            echo "::error::Standalone server not found — visual regression cannot start."
+            exit 1
+          fi
+          tar -cf "$RUNNER_TEMP/nextjs-build.tar" -C apps/web .next
+          mkdir -p "$RUNNER_TEMP/visual-neon"
+          jq -n --arg url "$DATABASE_URL" '{db_url: $url, db_url_pooled: $url}' \
+            > "$RUNNER_TEMP/visual-neon/connection.json"
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: visual-regression-build-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/nextjs-build.tar
+          retention-days: 1
+          if-no-files-found: error
+
+      - name: Upload Neon DB connection artifact
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: visual-regression-neon-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/visual-neon/connection.json
+          retention-days: 1
+          if-no-files-found: error
+
+  visual-regression:
+    name: Visual Regression (${{ matrix.suite }})
+    needs: [visual-baseline-setup]
+    # Storybook suites need neither the seed nor the build, so they still
+    # run (and refresh) when setup fails; app suites then fail at download.
+    if: ${{ !cancelled() && !inputs.approved_homepage_baselines }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      actions: read
+      contents: read
+    strategy:
+      fail-fast: false
+      max-parallel: 4
+      matrix:
+        include:
+          # Public marketing/auth baselines (JOV-4060)
+          - { suite: visual-regression, spec: visual-regression.spec.ts, server: app, update: 'true', persona: admin }
+          # Auth modal + auth pages (JOV-4039)
+          - { suite: auth-visual, spec: auth-visual.spec.ts, server: app, update: 'true', persona: admin }
+          # Public profile capture audit (JOV-4039): ready-selector and layout
+          # assertions gate; no snapshot compare, captures stay run-local.
+          - { suite: profile-visual-audit, spec: profile-visual-audit.spec.ts, server: app, update: 'false', persona: admin }
+          # Chat composer (JOV-4039), authenticated via the dev test-auth bypass
+          - { suite: chat-visual, spec: chat-visual.spec.ts, server: app, update: 'true', persona: creator }
+          # Electron titlebar/shell geometry (JOV-7713) over seeded personas
+          - { suite: electron-titlebar-geometry, spec: electron-titlebar-geometry.spec.ts, server: app, update: 'false', persona: admin }
+          # Admin surfaces (JOV-4062)
+          - { suite: admin-visual-regression, spec: admin-visual-regression.spec.ts, server: app, update: 'true', persona: admin }
+          # Surface elevation matrix (JOV-2156) and chat history switcher,
+          # Storybook iframe screenshots independent of the app server.
+          - { suite: storybook-elevation, spec: storybook-elevation.spec.ts, server: storybook, update: 'true', persona: admin }
+          - { suite: storybook-chat-history-switcher, spec: storybook-chat-history-switcher.spec.ts, server: storybook, update: 'true', persona: admin }
+    env:
+      REFRESH_MODE: 'true'
+      SNAPSHOT_DIR: apps/web/tests/e2e/__snapshots__
+      SUITE_SPEC: ${{ matrix.spec }}
+      SUITE_SERVER: ${{ matrix.server }}
+      SUITE_UPDATES: ${{ matrix.update }}
+      PLAYWRIGHT_ARTIFACT_REQUIRE_PRODUCER_STAGE: 'true'
+      PLAYWRIGHT_ARTIFACT_ALLOW_IMAGES: 'true'
+      PLAYWRIGHT_ARTIFACT_ALLOW_MARKDOWN: 'true'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+
+      - uses: ./.github/actions/setup-node-pnpm
+
+      - name: Setup Playwright (Chromium)
+        uses: ./.github/actions/setup-playwright
+
+      - name: Download Neon DB connection artifact
+        if: ${{ matrix.server == 'app' }}
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: visual-regression-neon-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/visual-neon
+
+      - name: Resolve DATABASE_URL from Neon artifact
+        if: ${{ matrix.server == 'app' }}
+        id: resolve-suite-db-url
+        uses: ./.github/actions/resolve-neon-database-url
+        with:
+          connection_file: ${{ runner.temp }}/visual-neon/connection.json
+          candidate_json_key: db_url
+          fallback_json_key: db_url_pooled
+
+      - name: Download build artifact
+        if: ${{ matrix.server == 'app' }}
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: visual-regression-build-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/nextjs-build-download
+
+      - name: Run visual suite
+        id: suite
         # Scheduled/manual deep evidence only; source PRs and merge groups never
         # provision this secret-bound Neon + Playwright lane.
         run: |
           cd apps/web
-
           # Empty auth state so Playwright's auth-setup project doesn't crash.
-          # The public suite tests anonymous visitor routes only.
           mkdir -p tests/.auth
           echo '{"cookies":[],"origins":[]}' > tests/.auth/user.json
 
           cleanup() {
-            kill "$SERVER_PID" 2>/dev/null || true
-            wait "$SERVER_PID" 2>/dev/null || true
+            kill "${SERVER_PID:-}" 2>/dev/null || true
+            wait "${SERVER_PID:-}" 2>/dev/null || true
           }
           trap cleanup EXIT
 
-          if [ ! -f .next/standalone/apps/web/server.js ]; then
-            echo "::error::Standalone server not found — visual regression cannot start."
-            exit 1
+          if [ "$SUITE_SERVER" = "storybook" ]; then
+            pnpm exec storybook dev -p 6006 --no-open &
+            SERVER_PID=$!
+            READY_URL=http://localhost:6006/iframe.html READY_TRIES=150 READY_WAIT=2
+            CONFIG=playwright.config.storybook.ts
+            export STORYBOOK_BASE_URL=http://localhost:6006
+          else
+            tar -xf "$RUNNER_TEMP/nextjs-build-download/nextjs-build.tar" -C .
+            if [ ! -f .next/standalone/apps/web/server.js ]; then
+              echo "::error::Standalone server not found — visual regression cannot start."
+              exit 1
+            fi
+            # GitHub sets HOSTNAME to the runner machine name. Pin the standalone
+            # server to loopback so the existing test-auth gate can verify it.
+            export HOSTNAME=localhost
+            PORT=3100 node .next/standalone/apps/web/server.js &
+            SERVER_PID=$!
+            READY_URL=http://localhost:3100 READY_TRIES=30 READY_WAIT=1
+            CONFIG=playwright.config.ts
           fi
 
-          # GitHub sets HOSTNAME to the runner machine name. Pin the standalone
-          # server to loopback so the existing test-auth gate can verify it.
-          export HOSTNAME=localhost
-
-          PORT=3100 node .next/standalone/apps/web/server.js &
-          SERVER_PID=$!
-
           SERVER_READY=false
-          for _attempt in $(seq 1 30); do
-            if curl -sf http://localhost:3100 > /dev/null 2>&1; then
+          for _attempt in $(seq 1 "$READY_TRIES"); do
+            if curl -sf "$READY_URL" > /dev/null 2>&1; then
               SERVER_READY=true
               break
             fi
-            sleep 1
+            sleep "$READY_WAIT"
           done
-
           if [ "$SERVER_READY" = "false" ]; then
-            echo "::error::Standalone server failed to start within 30s."
+            echo "::error::$SUITE_SERVER server failed to start ($READY_URL)."
             exit 1
           fi
 
           UPDATE_FLAG=""
-          if [ "$REFRESH_MODE" = "true" ]; then
+          if [ "$REFRESH_MODE" = "true" ] && [ "$SUITE_UPDATES" = "true" ]; then
             UPDATE_FLAG="--update-snapshots"
           fi
-
-          # Public marketing/auth baselines (JOV-4060)
-          node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs" --run -- pnpm exec playwright test tests/e2e/visual-regression.spec.ts \
-            --config=playwright.config.ts --project=chromium --reporter=line $UPDATE_FLAG
-
-          # Auth modal + auth pages (JOV-4039) — anonymous surfaces; missing or
-          # stale baselines self-heal through the same refresh auto-PR below.
-          node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs" --run -- pnpm exec playwright test tests/e2e/auth-visual.spec.ts \
-            --config=playwright.config.ts --project=chromium --reporter=line $UPDATE_FLAG
-
-          # Public profile surfaces (JOV-4039) — capture audit across themes and
-          # breakpoints; ready-selector and layout assertions gate (this spec has
-          # no snapshot compare). Captures stay run-local: the artifact guard
-          # omits images from staged uploads by design.
-          PROFILE_AUDIT_CYCLE=run-${{ github.run_id }} \
-            node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs" --run -- pnpm exec playwright test tests/e2e/profile-visual-audit.spec.ts \
-            --config=playwright.config.ts --project=chromium --reporter=line
-
-          # Chat composer surface (JOV-4039) — authenticated via the dev
-          # test-auth bypass, the same mechanism the admin lane below uses.
-          E2E_USE_TEST_AUTH_BYPASS=1 E2E_TEST_AUTH_PERSONA=creator \
-            node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs" --run -- pnpm exec playwright test tests/e2e/chat-visual.spec.ts \
-            --config=playwright.config.ts --project=chromium --reporter=line $UPDATE_FLAG
-
-          # Electron titlebar/shell geometry (JOV-7713). Browser-emulated
-          # desktop runtime over seeded personas; it needs this lane's Neon
-          # seed, so it lives here rather than in the noop-DB PR lanes.
-          E2E_USE_TEST_AUTH_BYPASS=1 \
-            node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs" --run -- pnpm exec playwright test tests/e2e/electron-titlebar-geometry.spec.ts \
-            --config=playwright.config.ts --project=chromium --reporter=line
-
-          # Admin surfaces (JOV-4062) — the same refresh server heals stale
-          # admin baselines only after functional assertions pass.
-          E2E_USE_TEST_AUTH_BYPASS=1 E2E_TEST_AUTH_PERSONA=admin \
-            node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs" --run -- pnpm exec playwright test tests/e2e/admin-visual-regression.spec.ts \
-            --config=playwright.config.ts --project=chromium --reporter=line $UPDATE_FLAG
-
+          node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs" --run -- pnpm exec playwright test "tests/e2e/$SUITE_SPEC" \
+            --config="$CONFIG" --project=chromium --reporter=line $UPDATE_FLAG
         env:
           BASE_URL: http://localhost:3100
           SMOKE_ONLY: '1'
           CI: true
-          DATABASE_URL: ${{ env.DATABASE_URL }}
+          DATABASE_URL: ${{ steps.resolve-suite-db-url.outputs.database_url }}
           E2E_USE_TEST_AUTH_BYPASS: '1'
-          E2E_TEST_AUTH_PERSONA: admin
+          E2E_TEST_AUTH_PERSONA: ${{ matrix.persona }}
+          PROFILE_AUDIT_CYCLE: run-${{ github.run_id }}
           URL_ENCRYPTION_KEY: visual-regression-ci-url-encryption-key
           AI_GATEWAY_API_KEY: visual-regression-ci
 
-      - name: Run Storybook visual specs
-        id: storybook
-        # Storybook iframe screenshots need no app server or database, so they
-        # run in their own step: a red app spec above must not stop component
-        # baselines from refreshing. Functional assertions still fail this step.
-        if: ${{ !cancelled() && steps.visual.outcome != 'skipped' }}
-        run: |
-          cd apps/web
-          UPDATE_FLAG=""
-          if [ "$REFRESH_MODE" = "true" ]; then
-            UPDATE_FLAG="--update-snapshots"
-          fi
-
-          # Surface elevation matrix (JOV-2156) — Storybook iframe screenshots,
-          # independent of the app server. Banned-combination baselines are the
-          # intentional "should look BROKEN" sanity check; functional
-          # assertions in the spec still fail the refresh run.
-          pnpm exec storybook dev -p 6006 --no-open &
-          STORYBOOK_PID=$!
-
-          STORYBOOK_READY=false
-          for _attempt in $(seq 1 150); do
-            if curl -sf http://localhost:6006/iframe.html > /dev/null 2>&1; then
-              STORYBOOK_READY=true
-              break
-            fi
-            sleep 2
-          done
-
-          if [ "$STORYBOOK_READY" = "false" ]; then
-            echo "::error::Storybook dev server failed to start within 300s."
-            exit 1
-          fi
-
-          STORYBOOK_BASE_URL=http://localhost:6006 \
-            node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs" --run -- pnpm exec playwright test tests/e2e/storybook-elevation.spec.ts \
-            tests/e2e/storybook-chat-history-switcher.spec.ts \
-            --config=playwright.config.storybook.ts --project=chromium --reporter=line $UPDATE_FLAG
-
-          kill "$STORYBOOK_PID" 2>/dev/null || true
-        env:
-          CI: true
-
       - name: Upload Playwright results on failure
-        if: ${{ always() && (steps.visual.outcome == 'failure' || steps.storybook.outcome == 'failure') && hashFiles('apps/web/test-results/**') != '' }}
+        if: ${{ always() && steps.suite.outcome == 'failure' && hashFiles('apps/web/test-results/**') != '' }}
         uses: ./.github/actions/upload-safe-playwright-artifact
         with:
-          name: visual-regression-report-${{ github.run_id }}-${{ github.run_attempt }}
+          name: visual-regression-report-${{ matrix.suite }}-${{ github.run_id }}-${{ github.run_attempt }}
           path: apps/web/test-results/
           allow-images: 'true'
           allow-markdown: 'true'
           retention-days: 7
 
+      - name: Record suite result and stage refreshed baselines
+        # A suite publishes only its own spec's snapshots, and only when green.
+        if: ${{ always() }}
+        env:
+          SUITE_NAME: ${{ matrix.suite }}
+          SUITE_OUTCOME: ${{ steps.suite.outcome || 'skipped' }}
+        run: |
+          set -euo pipefail
+          OUT="$RUNNER_TEMP/visual-suite"
+          mkdir -p "$OUT/baselines"
+          if [ "$SUITE_OUTCOME" = "success" ] && [ "$REFRESH_MODE" = "true" ] && [ "$SUITE_UPDATES" = "true" ] \
+            && [ -d "$SNAPSHOT_DIR/$SUITE_SPEC" ]; then
+            (cd "$SNAPSHOT_DIR/$SUITE_SPEC" && git ls-files -z -m -o --exclude-standard -- . \
+              | xargs -0 -r cp --parents -t "$OUT/baselines")
+          fi
+          BASELINES=false
+          if [ -n "$(find "$OUT/baselines" -type f -print -quit)" ]; then BASELINES=true; fi
+          jq -n --arg suite "$SUITE_NAME" --arg spec "$SUITE_SPEC" --arg outcome "$SUITE_OUTCOME" \
+            --argjson baselines "$BASELINES" '{suite: $suite, spec: $spec, outcome: $outcome, baselines: $baselines}' \
+            > "$OUT/receipt.json"
+          cat "$OUT/receipt.json"
+
+      - name: Upload suite result
+        if: ${{ always() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: visual-suite-${{ matrix.suite }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/visual-suite/
+          retention-days: 1
+          if-no-files-found: error
+
+  publish-baselines:
+    name: Visual Regression (baseline refresh PR)
+    needs: [visual-regression]
+    # Only main may publish baselines: a dispatch on any other ref would
+    # commit that ref's unreviewed source into the bot PR with auto-merge.
+    if: ${{ !cancelled() && !inputs.approved_homepage_baselines && github.ref == 'refs/heads/main' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    env:
+      REFRESH_MODE: 'true'
+      SNAPSHOT_DIR: apps/web/tests/e2e/__snapshots__
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+
+      - name: Download suite results
+        continue-on-error: true
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: visual-suite-*-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/visual-suites
+
       - name: Check for baseline changes (refresh only)
         id: diff
-        # Only main may publish baselines: a dispatch on any other ref would
-        # commit that ref's unreviewed source into the bot PR with auto-merge.
-        if: ${{ !cancelled() && env.REFRESH_MODE == 'true' && (steps.visual.outcome == 'success' || steps.storybook.outcome == 'success') && github.ref == 'refs/heads/main' }}
-        env:
-          APP_OUTCOME: ${{ steps.visual.outcome }}
-          STORYBOOK_OUTCOME: ${{ steps.storybook.outcome }}
+        if: ${{ env.REFRESH_MODE == 'true' && github.ref == 'refs/heads/main' }}
         run: |
-          # Publish only the suites that passed. A red app suite still lets the
-          # Storybook baselines through, and the reverse, so one broken spec
-          # never blocks every other baseline from refreshing.
-          if [ "$APP_OUTCOME" != "success" ]; then
-            git ls-files -z -m -- "$SNAPSHOT_DIR" | grep -zv '/storybook-' \
-              | xargs -0 -r git checkout -q -- || true
-            git ls-files -z -o --exclude-standard -- "$SNAPSHOT_DIR" \
-              | grep -zv '/storybook-' | xargs -0 -r rm -f -- || true
+          # One PR for the whole run: baselines of every suite that passed,
+          # and a list of the suites that did not (scripts/lib/visual-baseline-refresh.mjs).
+          node scripts/lib/visual-baseline-refresh.mjs --suites-dir "$RUNNER_TEMP/visual-suites" \
+            --snapshot-dir "$SNAPSHOT_DIR" --body-file "$RUNNER_TEMP/visual-baseline-pr-body.md"
+          if git status --porcelain --untracked-files=all | grep -v -F " $SNAPSHOT_DIR/" | grep -q .; then
+            echo "::error::Baseline refresh changed files outside $SNAPSHOT_DIR."
+            git status --porcelain --untracked-files=all
+            exit 1
           fi
-          if [ "$STORYBOOK_OUTCOME" != "success" ]; then
-            git ls-files -z -m -- "$SNAPSHOT_DIR" | grep -z '/storybook-' \
-              | xargs -0 -r git checkout -q -- || true
-            git ls-files -z -o --exclude-standard -- "$SNAPSHOT_DIR" \
-              | grep -z '/storybook-' | xargs -0 -r rm -f -- || true
-          fi
-          if [ -z "$(git status --porcelain "$SNAPSHOT_DIR")" ]; then
+          if [ -z "$(git status --porcelain --untracked-files=all -- "$SNAPSHOT_DIR")" ]; then
             echo "changed=false" >> "$GITHUB_OUTPUT"
             echo "No baseline changes detected."
           else
             echo "changed=true" >> "$GITHUB_OUTPUT"
             echo "Baselines changed:"
-            git status --short "$SNAPSHOT_DIR"
+            git status --short --untracked-files=all "$SNAPSHOT_DIR"
           fi
 
       - name: Generate Jovie Bot token (refresh only)
@@ -365,14 +444,35 @@ jobs:
           fi
 
           if [ -n "$EXISTING_PR" ]; then
+            # Refresh the body too, so its failing-suite list matches this run.
+            node packages/api-client/cli.ts gh --priority default -- pr edit "$EXISTING_PR" \
+              --body-file "$RUNNER_TEMP/visual-baseline-pr-body.md" \
+              || echo "::warning::Could not refresh the body of PR #$EXISTING_PR."
             echo "Updated existing PR #$EXISTING_PR via force-push"
             echo "Native autoenroll owns queue mutation; the merge-queue label is retired."
           else
             PR_URL=$(gh pr create \
               --title "chore: refresh visual regression baselines" \
-              --body "Auto-generated scheduled/manual baseline refresh triggered by ${GITHUB_SHA::8}. Generated on ubuntu-latest + Chromium (pinned via pnpm).")
+              --body-file "$RUNNER_TEMP/visual-baseline-pr-body.md")
             echo "Opened $PR_URL. Native autoenroll owns queue mutation; the merge-queue label is retired."
           fi
+
+  cleanup-neon:
+    name: Visual Regression (Neon cleanup)
+    needs: [visual-baseline-setup, visual-regression]
+    if: ${{ always() && !inputs.approved_homepage_baselines }}
+    environment: Preview – jovie
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+
+      - uses: ./.github/actions/setup-node-pnpm
 
       - name: Cleanup Neon branch
         if: always()
@@ -544,11 +644,12 @@ jobs:
           # Plain fast-forward push: never force, so a newer branch commit wins.
           git -c "http.https://github.com/.extraheader=$AUTH_HEADER" push origin "HEAD:refs/heads/${GITHUB_REF_NAME}"
 
+
   report-scheduled-failure:
     # Nothing fails silently (docs/design-system/GOVERNANCE.md): a red scheduled
     # run opens or updates one standing issue, deduped by title. Not required.
     name: Report scheduled failure
-    needs: [visual-regression]
+    needs: [visual-baseline-setup, visual-regression, publish-baselines]
     if: ${{ always() && github.event_name == 'schedule' && contains(needs.*.result, 'failure') }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -568,7 +669,7 @@ jobs:
 
           Run: $RUN_URL
 
-          Spec: \`apps/web/tests/e2e/visual-regression.spec.ts\` (Playwright report is attached to the run).
+          Each spec is its own \`Visual Regression (<suite>)\` job; the red ones carry a Playwright report. Suites that passed still refreshed their baselines.
           EOF
           )
           EXISTING=$(gh issue list --state open --search "in:title \"$TITLE\"" --json number,title \
