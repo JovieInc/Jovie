@@ -1,5 +1,4 @@
 import assert from 'node:assert/strict';
-import { execFileSync, spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import {
@@ -34,6 +33,7 @@ import {
   formatReleaseStampFailureDetails,
   readGitObjectContent,
 } from './desktop-release-guard.mjs';
+import { execFileSync, spawnSync } from './lib/child-process.mjs';
 import { discoverVersionedManifests, planStamp } from './version-stamp.mjs';
 
 const desktopRequire = createRequire(

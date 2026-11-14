@@ -105,6 +105,7 @@ describe('route-group policy reaches the existing evaluator and CLI', () => {
     const indexBefore = readFileSync(parentIndex);
     const git = (dir: string, env: NodeJS.ProcessEnv, args: string[]) => {
       const run = spawnSync('git', args, {
+        maxBuffer: 256 * 1024 * 1024,
         cwd: dir,
         env,
         encoding: 'utf8',
@@ -256,6 +257,7 @@ describe('route-group policy reaches the existing evaluator and CLI', () => {
       });
       const git = (args: string[]) => {
         const result = spawnSync('git', args, {
+          maxBuffer: 256 * 1024 * 1024,
           cwd: nextDir,
           env,
           encoding: 'utf8',

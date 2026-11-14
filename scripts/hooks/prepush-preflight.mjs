@@ -21,7 +21,11 @@ import {
 } from '../lib/prepush-offload.mjs';
 
 const env = process.env;
-const g = a => spawnSync('git', a, { encoding: 'utf8' }).stdout.trim();
+const g = a =>
+  spawnSync('git', a, {
+    maxBuffer: 256 * 1024 * 1024,
+    encoding: 'utf8',
+  }).stdout.trim();
 
 function run(argv) {
   return new Promise(resolve => {
