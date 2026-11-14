@@ -37,7 +37,10 @@ test('every checked-in brief parses and names a unique frame', () => {
       'claim',
       'empty-states',
       'homepage',
+      'insights-empty',
       'insights',
+      'page-skeletons-2',
+      'page-skeletons-3',
       'page-skeletons',
       'profile-analytics-card',
       'request-access',
@@ -138,6 +141,9 @@ test('the agent is told to build in small calls and that a stopped run saves not
   assert.match(LOAD_NOTE, /one screen or state per call/);
   assert.match(LOAD_NOTE, /within 20 minutes/);
   assert.match(LOAD_NOTE, /saves nothing/);
+  // Run 43568417528: after a batch call timed out the agent re-read the image
+  // it was going to write and burned attempts on a file that never existed.
+  assert.match(LOAD_NOTE, /wrote nothing/);
 });
 
 test('the CLI retries a draft that failed early, including opt-in trimming', () => {
