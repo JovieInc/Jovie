@@ -1036,6 +1036,7 @@ export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
   'scripts/screenshot-loop/screenshot-bug-loop.test.mjs',
   'scripts/security/audit-workflow-execution.test.mjs',
   'scripts/security/findings.test.mjs',
+  'scripts/security/sarif-upload-gate.test.mjs',
   'scripts/summer-commissioning/canonical-registry.test.mjs',
   'scripts/summer-commissioning/commissioning.test.mjs',
   'scripts/summer-commissioning/company-registry.test.mjs',
