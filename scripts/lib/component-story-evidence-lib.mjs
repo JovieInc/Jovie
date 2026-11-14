@@ -9,6 +9,7 @@
  */
 import { posix } from 'node:path';
 import {
+  mergeEvidence,
   REQUIRED_THEMES,
   STORY_EVIDENCE_SCHEMA,
 } from './component-evidence.mjs';
@@ -194,7 +195,11 @@ function pinnedTheme(id, results) {
   return null;
 }
 
-function receiptFor(kind, { sourceHash, storyIds }, results) {
+function receiptFor(
+  kind,
+  { sourceHash, storyIds, renderInputs = null },
+  results
+) {
   const stories = [];
   const failures = [];
   for (const id of storyIds) {
@@ -221,6 +226,7 @@ function receiptFor(kind, { sourceHash, storyIds }, results) {
   const receipt = {
     schema: STORY_EVIDENCE_SCHEMA,
     sourceHash,
+    renderInputs,
     status: failures.length || !stories.length ? 'fail' : 'pass',
     captured: stories.length,
     stories,
@@ -238,7 +244,7 @@ function receiptFor(kind, { sourceHash, storyIds }, results) {
 
 /**
  * Visual and a11y evidence files from the captures of one run.
- * @param {Map<string, { sourceHash: string, storyIds: string[] }>} components
+ * @param {Map<string, { sourceHash: string, storyIds: string[], renderInputs?: any }>} components
  * @param {Array<{ storyId: string, theme: string }>} captures
  * @returns {{ visual: { components: Record<string, any> }, a11y: { components: Record<string, any> } }}
  */
@@ -257,24 +263,7 @@ export function assembleEvidence(components, captures) {
   return { visual: { components: visual }, a11y: { components: a11y } };
 }
 
-/**
- * Join shard files. Shards own disjoint components; if two disagree about
- * one anyway, the failing receipt wins (fail closed).
- * @param {Array<{ components?: Record<string, any> }>} files
- */
-export function mergeEvidence(files) {
-  const merged = {};
-  for (const file of files)
-    for (const [path, receipt] of Object.entries(file?.components ?? {})) {
-      const prior = merged[path];
-      if (!prior || prior.status !== 'fail') merged[path] = receipt;
-    }
-  return {
-    components: Object.fromEntries(
-      Object.entries(merged).sort(([a], [b]) => a.localeCompare(b))
-    ),
-  };
-}
+export { mergeEvidence };
 
 /** One line per component for the run log and step summary. */
 export function summarizeEvidence({ visual, a11y }) {

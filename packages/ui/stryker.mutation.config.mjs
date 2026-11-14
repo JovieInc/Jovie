@@ -21,6 +21,7 @@ export default {
   coverageAnalysis: 'off',
   disableTypeChecks: false,
   inPlace: true,
+  tempDirName: process.env.STRYKER_TEMP_DIR ?? '.stryker-tmp',
   reporters: ['clear-text', 'json'],
   jsonReporter: {
     fileName: process.env.STRYKER_REPORT_FILE ?? 'reports/mutation/ui.json',

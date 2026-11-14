@@ -701,9 +701,7 @@ jobs:
           IS_FORK="${IS_FORK_PULL_REQUEST}"
           # Determine changed files
           if [[ "${EVENT_NAME}" == "merge_group" ]]; then
-            # JOV-4446: never fall through to github.base_ref / event.before —
-            # those push/PR-only fields are empty on merge_group and produce
-            # "Could not resolve origin/" + false docs-only classification.
+            # JOV-4446: merge_group must use its exact SHAs; PR/push fields are empty.
             MERGE_GROUP_BASE_SHA="${EVENT_MERGE_GROUP_BASE_SHA}"
             MERGE_GROUP_HEAD_SHA="${EVENT_MERGE_GROUP_HEAD_SHA}"
             if [[ ! "$MERGE_GROUP_BASE_SHA" =~ ^[0-9a-f]{40}$ ]] ||
@@ -933,9 +931,7 @@ jobs:
             echo "run_storybook_a11y=false" >> "$GITHUB_OUTPUT"
           fi
 
-          # Screenshot-only product exports live under public/product-screenshots and
-          # must not force public Lighthouse + Neon on main (they are marketing assets,
-          # not route code). Filter that tree out before matching public/* paths.
+          # Exclude screenshot exports (marketing assets) from public Lighthouse + Neon.
           PUBLIC_LIGHTHOUSE_PATTERN='^(\.github/workflows/ci\.yml|scripts/lighthouse-retry\.mjs|apps/web/\.lighthouserc\.pr\.json|apps/web/\.lighthouserc\.public-launch\.json|apps/web/app/\(home\)/|apps/web/app/\(marketing\)/|apps/web/app/\(dynamic\)/legal/|apps/web/content/legal/|apps/web/app/\[username\]/|apps/web/app/layout\.tsx|apps/web/app/globals\.css|apps/web/public/|apps/web/styles/|apps/web/components/features/home/|apps/web/components/features/marketing/|apps/web/components/features/profile/|apps/web/components/homepage/|apps/web/components/marketing/|apps/web/scripts/run-public-lighthouse\.ts|apps/web/scripts/public-route-qa\.ts|apps/web/scripts/public-surface-qa\.ts|apps/web/scripts/performance-route-manifest\.ts|apps/web/tests/e2e/public-exhaustive\.spec\.ts|apps/web/tests/e2e/profile-mobile-viewport-stability\.spec\.ts|apps/web/tests/e2e/axe-audit\.spec\.ts|apps/web/tests/e2e/utils/(public-surface-(manifest|helpers)|smoke-test-utils|mobile-profile-viewports)\.ts|packages/|apps/web/package.*\.json|package.*\.json|apps/web/tailwind\.config\.|apps/web/postcss\.config\.)'
           PUBLIC_LIGHTHOUSE_FILES=$(echo "$CHANGED_FILES" | grep -v -E '^apps/web/public/product-screenshots/' || true)
           if echo "$PUBLIC_LIGHTHOUSE_FILES" | grep -q -E "$PUBLIC_LIGHTHOUSE_PATTERN"; then
@@ -944,7 +940,7 @@ jobs:
             echo "run_public_lighthouse=false" >> "$GITHUB_OUTPUT"
           fi
 
-          DASHBOARD_LIGHTHOUSE_PATTERN='^(\.github/(workflows/ci\.yml|scripts/lighthouse-.*)|apps/web/(\.lighthouserc\.(dashboard|chat|onboarding)\.pr\.json|scripts/lighthouse-.*))$'
+          DASHBOARD_LIGHTHOUSE_PATTERN='^(\.github/(workflows/ci\.yml|scripts/lighthouse-.*)|apps/web/(\.lighthouserc\.(dashboard|chat|onboarding)\.pr\.json|scripts/lighthouse-.*)|scripts/ci/wait-background-build\.sh)$'
           dash_lh=false
           if [[ "$RUN_BUILD" == "true" || "$RUN_TEST" == "true" ]] || echo "$CHANGED_FILES" | grep -q -E "$DASHBOARD_LIGHTHOUSE_PATTERN"; then dash_lh=true; fi
           echo "run_dashboard_lighthouse=$dash_lh" >> "$GITHUB_OUTPUT"
@@ -988,7 +984,7 @@ jobs:
           fi
 
           # Launch-gate golden path (JOV-3758), mirroring docs/launch/LAUNCH_GATES.md.
-          LAUNCH_GATE_PATTERN='^(apps/web/app/onboarding/|apps/web/components/features/onboarding/|apps/web/lib/onboarding/|apps/web/app/\(auth\)/|apps/web/app/sign-?(in|up)/|apps/web/app/app/\(shell\)/|apps/web/components/features/dashboard/|apps/web/components/organisms/sidebar/|apps/web/lib/app-shell/|apps/web/tests/e2e/(shell-(nav-click-through|route-health)|releases-first-paint-visual)\.spec\.ts|apps/web/(components/(shell|jovie|chat)/|instrumentation-client\.ts|proxy\.ts|tests/e2e/(utils/)?dashboard-click-navigation)|apps/web/lib/releases/|apps/web/app/api/stripe/|apps/web/app/api/billing/|apps/web/app/api/checkout/|apps/web/lib/stripe/|apps/web/tests/e2e/golden-path\.spec\.ts|apps/web/tests/helpers/auth.ts|apps/web/tests/global-setup\.ts|apps/web/playwright\.config\.ts|\.github/workflows/ci\.yml|apps/web/\.lighthouserc\.(dashboard|onboarding|chat)\.pr\.json|docs/launch/LAUNCH_GATES\.md|apps/web/package.*\.json|package.*\.json)'
+          LAUNCH_GATE_PATTERN='^(apps/web/app/onboarding/|apps/web/components/features/onboarding/|apps/web/lib/onboarding/|apps/web/app/\(auth\)/|apps/web/app/sign-?(in|up)/|apps/web/app/app/\(shell\)/|apps/web/components/features/dashboard/|apps/web/components/organisms/sidebar/|apps/web/lib/app-shell/|apps/web/tests/e2e/(shell-(nav-click-through|route-health)|releases-first-paint-visual)\.spec\.ts|apps/web/(components/(shell|jovie|chat)/|instrumentation-client\.ts|proxy\.ts|tests/e2e/(utils/)?dashboard-click-navigation)|apps/web/lib/releases/|apps/web/app/api/stripe/|apps/web/app/api/billing/|apps/web/app/api/checkout/|apps/web/lib/stripe/|apps/web/tests/e2e/golden-path\.spec\.ts|apps/web/tests/helpers/auth.ts|apps/web/tests/global-setup\.ts|apps/web/playwright\.config\.ts|\.github/workflows/ci\.yml|apps/web/\.lighthouserc\.(dashboard|onboarding|chat)\.pr\.json|docs/launch/LAUNCH_GATES\.md|apps/web/package.*\.json|package.*\.json|scripts/ci/wait-background-build\.sh)'
           if echo "$CHANGED_FILES" | grep -q -E "$LAUNCH_GATE_PATTERN"; then
             echo "run_golden_path=true" >> "$GITHUB_OUTPUT"
           else
@@ -4936,47 +4932,15 @@ jobs:
       - uses: ./.github/actions/setup-node-pnpm
         if: steps.check_changes.outputs.run_full_ci == 'true'
 
-      - name: Setup Playwright (Chromium)
-        if: steps.check_changes.outputs.run_full_ci == 'true'
-        uses: ./.github/actions/setup-playwright
-
-      - name: Create ephemeral Neon database branch (with retry)
-        id: neon-branch
-        if: steps.check_changes.outputs.run_full_ci == 'true'
-        uses: ./.github/actions/neon-create-branch-with-retry
-        with:
-          project_id: ${{ vars.NEON_PROJECT_ID }}
-          branch_name: dashboard-lighthouse-${{ github.run_id }}-${{ github.run_attempt }}
-          role: neondb_owner
-          api_key: ${{ secrets.NEON_API_KEY }}
-          protected_branches: main,production,prod,development,preview,br-main,br-production,${{ needs.neon-db.outputs.branch_name }}
-
-      - name: Resolve DATABASE_URL (Neon ephemeral)
-        if: steps.check_changes.outputs.run_full_ci == 'true'
-        id: resolve-dashboard-neon-db-url
-        uses: ./.github/actions/resolve-neon-database-url
-        with:
-          candidate_url: ${{ steps.neon-branch.outputs.db_url_pooled }}
-          fallback_candidate_url: ${{ steps.neon-branch.outputs.db_url }}
-          credential_source_url: ${{ secrets.DATABASE_URL_MAIN }}
-          credential_fallback_url: ${{ secrets.DATABASE_URL }}
-
-      - name: Export DATABASE_URL
-        if: steps.check_changes.outputs.run_full_ci == 'true'
-        run: echo "DATABASE_URL=${{ steps.resolve-dashboard-neon-db-url.outputs.database_url }}" >> "$GITHUB_ENV"
-
-      - name: Run migrations (ephemeral Neon)
-        if: steps.check_changes.outputs.run_full_ci == 'true'
-        run: pnpm --filter=@jovie/web run drizzle:migrate:ci
-        env:
-          DATABASE_URL: ${{ env.DATABASE_URL }}
-          NODE_ENV: test
-          GIT_BRANCH: pr-${{ github.event.pull_request.number }}
-          ALLOW_PROD_MIGRATIONS: 'true'
-
-      # Same read-only Turbopack compiler cache Build + Layout restores (writer:
-      # next-build-cache-warm.yml; keep the key scheme identical). This job
-      # now compiles twice, base then head, and head reuses base's state.
+      # Relative budgets compile the merge-group base in this workspace, then
+      # head. Restore the read-only Turbopack cache first so both compiles
+      # start warm (writer: next-build-cache-warm.yml; this job never saves).
+      # Head's compile starts only after the workspace is back on the exact
+      # head, in the background, so it overlaps Playwright, the Neon branch
+      # and migrations. Those steps do not read or write apps/web/.next.
+      # A built baseline never uses the prebuilt artifact. An artifact hit
+      # never starts a second build. The two writers of apps/web/.next stay
+      # mutually exclusive.
       - name: Resolve Next build cache hour (Lighthouse)
         id: next-build-cache-hour
         if: steps.check_changes.outputs.run_full_ci == 'true'
@@ -5030,16 +4994,98 @@ jobs:
         if: steps.check_changes.outputs.run_full_ci == 'true' && steps.download-build.outcome == 'success' && steps.lighthouse-baseline.outputs.built != 'true'
         run: tar -xf "$RUNNER_TEMP/nextjs-build-download/nextjs-build.tar" -C apps/web
 
-      # With a baseline, head is always built here: same command and env as
-      # the base build, so the two differ only by the change.
-      - name: Build app fallback for dashboard Lighthouse
+      # Same command and env as the base build, so the two differ only by the
+      # change. setsid puts the build in its own process group so the wait
+      # step and the job-end cleanup can kill the whole pnpm/next tree. The
+      # status file is written atomically (tmp + mv) and the wait step fails
+      # closed on a nonzero status, a process that died without one, or a
+      # timeout.
+      - name: Start fallback build in background
+        id: background-build-start
         if: steps.check_changes.outputs.run_full_ci == 'true' && (steps.download-build.outcome != 'success' || steps.lighthouse-baseline.outputs.built == 'true')
-        run: pnpm --filter=@jovie/web run build
+        shell: bash
         env:
           NEXT_IGNORE_ESLINT: '1'
           NEXT_IGNORE_TYPECHECK: '1'
           NEXT_PRIVATE_SKIP_SIZE_CHECK: 'true'
           SKIP_SKILLS_CATALOG_SYNC: '1'
+        run: |
+          set -euo pipefail
+          log="$RUNNER_TEMP/next-build-fallback.log"
+          exit_file="$RUNNER_TEMP/next-build-fallback.exit"
+          pid_file="$RUNNER_TEMP/next-build-fallback.pid"
+          rm -f "$log" "$exit_file" "$exit_file.tmp" "$pid_file"
+          setsid bash -c "
+            pnpm --filter=@jovie/web run build > '$log' 2>&1
+            status=\$?
+            printf '%s' \"\$status\" > '$exit_file.tmp'
+            mv '$exit_file.tmp' '$exit_file'
+          " >/dev/null 2>&1 &
+          echo "$!" > "$pid_file"
+          echo "started=true" >> "$GITHUB_OUTPUT"
+          echo "Background fallback build started (pid $(cat "$pid_file")); log: $log"
+
+      # A change limited to scripts/ci/wait-background-build.sh selects this
+      # job, but unit shards require run_web and scripts/** routes to
+      # operations lanes. Run the helper contracts here, on the path that
+      # launches the build, while that build compiles.
+      - name: Run background-build helper contract tests
+        if: steps.check_changes.outputs.run_full_ci == 'true' && (steps.download-build.outcome != 'success' || steps.lighthouse-baseline.outputs.built == 'true')
+        shell: bash
+        run: >-
+          pnpm --filter @jovie/web exec vitest run
+          tests/unit/ci/lighthouse-launch-gates.test.ts
+          tests/unit/ci/lighthouse-background-build.test.ts
+
+      - name: Setup Playwright (Chromium)
+        if: steps.check_changes.outputs.run_full_ci == 'true'
+        uses: ./.github/actions/setup-playwright
+
+      - name: Create ephemeral Neon database branch (with retry)
+        id: neon-branch
+        if: steps.check_changes.outputs.run_full_ci == 'true'
+        uses: ./.github/actions/neon-create-branch-with-retry
+        with:
+          project_id: ${{ vars.NEON_PROJECT_ID }}
+          branch_name: dashboard-lighthouse-${{ github.run_id }}-${{ github.run_attempt }}
+          role: neondb_owner
+          api_key: ${{ secrets.NEON_API_KEY }}
+          protected_branches: main,production,prod,development,preview,br-main,br-production,${{ needs.neon-db.outputs.branch_name }}
+
+      - name: Resolve DATABASE_URL (Neon ephemeral)
+        if: steps.check_changes.outputs.run_full_ci == 'true'
+        id: resolve-dashboard-neon-db-url
+        uses: ./.github/actions/resolve-neon-database-url
+        with:
+          candidate_url: ${{ steps.neon-branch.outputs.db_url_pooled }}
+          fallback_candidate_url: ${{ steps.neon-branch.outputs.db_url }}
+          credential_source_url: ${{ secrets.DATABASE_URL_MAIN }}
+          credential_fallback_url: ${{ secrets.DATABASE_URL }}
+
+      - name: Export DATABASE_URL
+        if: steps.check_changes.outputs.run_full_ci == 'true'
+        run: echo "DATABASE_URL=${{ steps.resolve-dashboard-neon-db-url.outputs.database_url }}" >> "$GITHUB_ENV"
+
+      - name: Run migrations (ephemeral Neon)
+        if: steps.check_changes.outputs.run_full_ci == 'true'
+        run: pnpm --filter=@jovie/web run drizzle:migrate:ci
+        env:
+          DATABASE_URL: ${{ env.DATABASE_URL }}
+          NODE_ENV: test
+          GIT_BRANCH: pr-${{ github.event.pull_request.number }}
+          ALLOW_PROD_MIGRATIONS: 'true'
+
+      # Runs whenever the background build was launched, after migrations.
+      # The wait protocol lives in scripts/ci/wait-background-build.sh.
+      - name: Wait for background fallback build
+        if: steps.check_changes.outputs.run_full_ci == 'true' && steps.background-build-start.outputs.started == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash scripts/ci/wait-background-build.sh \
+            "$(cat "$RUNNER_TEMP/next-build-fallback.pid")" \
+            "$RUNNER_TEMP/next-build-fallback.exit" \
+            "$RUNNER_TEMP/next-build-fallback.log"
 
       - name: Run signed-in shell navigation
         if: steps.check_changes.outputs.run_full_ci == 'true'
@@ -5167,6 +5213,22 @@ jobs:
             apps/web/.lighthouseci/relative/
           if-no-files-found: ignore
           retention-days: 3
+
+      - name: Kill background build process group (if still alive)
+        # Best-effort job-end backstop: the wait step already kills the
+        # group on timeout, but a cancelled or failed job can leave the
+        # setsid build tree running. Every kill is guarded, so this step
+        # can never fail the job.
+        if: (always() && steps.check_changes.outputs.run_full_ci == 'true' && steps.background-build-start.outputs.started == 'true')
+        shell: bash
+        run: |
+          pid_file="$RUNNER_TEMP/next-build-fallback.pid"
+          if [ -f "$pid_file" ]; then
+            pid="$(cat "$pid_file" 2>/dev/null || true)"
+            if [ "$pid" -ge 1 ] 2>/dev/null; then
+              kill -KILL -- "-$pid" 2>/dev/null || kill -KILL "$pid" 2>/dev/null || true
+            fi
+          fi
 
       - name: Cleanup ephemeral Neon branch
         if: (always() && steps.check_changes.outputs.run_full_ci == 'true' && steps.neon-branch.outputs.branch_id != '')
@@ -7229,7 +7291,7 @@ jobs:
         env:
           PROFILE_CERT_DIR: ${{ runner.temp }}/canonical-artist-site/profile
           PROFILE_RESULT: ${{ runner.temp }}/canonical-artist-site/profile-result.json
-        run: mkdir -p "$(dirname "$PROFILE_RESULT")" && pnpm --filter=@jovie/web exec tsx scripts/certify-artist-profile.ts --output "$PROFILE_CERT_DIR" > "$PROFILE_RESULT" && cat "$PROFILE_RESULT"
+        run: mkdir -p "$(dirname "$PROFILE_RESULT")" && pnpm --filter=@jovie/web exec sh -c 'exec tsx scripts/certify-artist-profile.ts --output "$PROFILE_CERT_DIR" > "$PROFILE_RESULT"' && cat "$PROFILE_RESULT"
 
       - name: Verify live canonical profile navigation
         id: canonical_navigation

@@ -38,6 +38,7 @@ interface SelectOptions {
   failed?: boolean;
   branch?: string;
   baseline?: boolean;
+  started?: string;
 }
 
 const REPO_ROOT = resolve(process.cwd(), '../..');
@@ -62,12 +63,13 @@ describe('Lighthouse identity admission', () => {
       failed = false,
       branch = 'fixture-branch',
       baseline = false,
+      started = 'true',
     }: SelectOptions = {}
   ): boolean => {
     const expression = (step?.if ?? 'success()')
       .replace(/\$\{\{|\}\}/g, '')
       .replace(
-        /\.(lighthouse-identity|lighthouse-baseline|download-build|neon-branch|ci-path-changes|neon-db)\b/g,
+        /\.(lighthouse-identity|lighthouse-baseline|background-build-start|download-build|neon-branch|ci-path-changes|neon-db)\b/g,
         "['$1']"
       );
     // Actions implicitly applies success() unless the expression explicitly
@@ -80,6 +82,7 @@ describe('Lighthouse identity admission', () => {
       steps: {
         'lighthouse-identity': { outputs: { available } },
         'lighthouse-baseline': { outputs: { built: String(baseline) } },
+        'background-build-start': { outputs: { started } },
         check_changes: { outputs: { run_full_ci: String(relevant) } },
         'download-build': { outcome: download },
         'neon-branch': { outputs: { branch_id: branch } },
@@ -208,7 +211,7 @@ describe('Lighthouse identity admission', () => {
     expect(names.indexOf(restore.name)).toBe(names.indexOf(baseline.name) + 1);
     for (const later of [
       'Extract build artifact',
-      'Build app fallback for dashboard Lighthouse',
+      'Start fallback build in background',
       'Run signed-in shell navigation',
       'Run signed-in Lighthouse budgets',
     ]) {
@@ -218,11 +221,8 @@ describe('Lighthouse identity admission', () => {
     }
     // Base and head are built by the same command with the same env, so the
     // prebuilt artifact (other env) is not used once a baseline exists.
-    const fallback = stepNamed(
-      job,
-      'Build app fallback for dashboard Lighthouse'
-    );
-    expect(fallback.run).toBe('pnpm --filter=@jovie/web run build');
+    const fallback = stepNamed(job, 'Start fallback build in background');
+    expect(fallback.run).toContain('pnpm --filter=@jovie/web run build');
     for (const key of Object.keys(fallback.env)) {
       expect(baseline.env[key], key).toBe(fallback.env[key]);
     }
@@ -355,6 +355,7 @@ describe('Lighthouse identity admission', () => {
       'apps/web/scripts/lighthouse-relative-gate.mjs',
       '.github/scripts/lighthouse-build-baseline.sh',
       '.github/scripts/lighthouse-install-scope.mjs',
+      'scripts/ci/wait-background-build.sh',
     ]) {
       expect(pattern.test(path), path).toBe(true);
     }
@@ -417,7 +418,11 @@ describe('Lighthouse identity admission', () => {
     const job = workflow.jobs[`ci-lighthouse-${surface}-pr`];
     it(`${surface}: present identity preserves artifact fallback, real probes and failure cleanup`, () => {
       const byName = (name: string) => stepNamed(job, name);
-      const fallback = byName(`Build app fallback for ${surface} Lighthouse`);
+      const fallback = byName(
+        surface === 'dashboard'
+          ? 'Start fallback build in background'
+          : `Build app fallback for ${surface} Lighthouse`
+      );
       expect(selected(fallback, 'true')).toBe(true);
       expect(selected(fallback, 'true', { failed: true })).toBe(false);
       expect(selected(fallback, 'true', { download: 'success' })).toBe(false);

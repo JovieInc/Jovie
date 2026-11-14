@@ -113,6 +113,36 @@ describe('promoteApprovedWinbackBatch', () => {
     ).rejects.toThrow(/no valid approval record/);
   });
 
+  it('refuses a record for an obsolete template before selecting jobs', async () => {
+    const { tx, clauses } = fakeTx([
+      [{ value: { ...APPROVAL, templateVersion: 'obsolete/v0' } }],
+    ]);
+
+    await expect(
+      promoteApprovedWinbackBatch(tx, APPROVAL.batchId)
+    ).rejects.toThrow(/no valid approval record/);
+    expect(clauses).toHaveLength(1);
+  });
+
+  it('leaves entries outside the approved batch held', async () => {
+    const { tx } = fakeTx([
+      [{ value: APPROVAL }],
+      [
+        {
+          id: 'other-job',
+          payload: {
+            type: 'winback_capability_shipped',
+            entryId: 'other-entry',
+          },
+        },
+      ],
+    ]);
+
+    await expect(
+      promoteApprovedWinbackBatch(tx, APPROVAL.batchId)
+    ).resolves.toEqual({ promoted: 0 });
+  });
+
   it('selects held send_waitlist_winback_email jobs for an approved batch', async () => {
     const { tx, clauses } = fakeTx([
       [{ value: APPROVAL }],
@@ -140,6 +170,38 @@ describe('promoteApprovedWinbackBatch', () => {
 });
 
 describe('getLastUnansweredWinbackSentAt', () => {
+  it('keeps the latest unanswered send charged to the outreach budget', async () => {
+    const sentAt = new Date('2026-11-09T12:00:00.000Z');
+    const { tx } = fakeTx([[{ occurredAt: sentAt }], []]);
+
+    await expect(getLastUnansweredWinbackSentAt(tx, ENTRY_ID)).resolves.toEqual(
+      sentAt
+    );
+  });
+
+  it('frees the outreach budget after a later reply', async () => {
+    const { tx } = fakeTx([
+      [{ occurredAt: new Date('2026-11-09T12:00:00.000Z') }],
+      [{ occurredAt: new Date('2026-11-10T12:00:00.000Z') }],
+    ]);
+
+    await expect(
+      getLastUnansweredWinbackSentAt(tx, ENTRY_ID)
+    ).resolves.toBeNull();
+  });
+
+  it('does not free the budget for a reply preceding the latest send', async () => {
+    const sentAt = new Date('2026-11-09T12:00:00.000Z');
+    const { tx } = fakeTx([
+      [{ occurredAt: sentAt }],
+      [{ occurredAt: new Date('2026-11-08T12:00:00.000Z') }],
+    ]);
+
+    await expect(getLastUnansweredWinbackSentAt(tx, ENTRY_ID)).resolves.toEqual(
+      sentAt
+    );
+  });
+
   it('returns null when this person has no winback_sent event', async () => {
     const { tx } = fakeTx([[]]);
 

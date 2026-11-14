@@ -723,6 +723,7 @@
   "tests/unit/ci/eslint-changed-gate.test.ts",
   "tests/unit/ci/fixed-runner-canary-workflow.test.ts",
   "tests/unit/ci/golden-path-signup-open.test.ts",
+  "tests/unit/ci/lighthouse-background-build.test.ts",
   "tests/unit/ci/lighthouse-install-scope.test.ts",
   "tests/unit/ci/lighthouse-launch-gates.test.ts",
   "tests/unit/ci/m2-revenue-path-canary-workflow.test.ts",

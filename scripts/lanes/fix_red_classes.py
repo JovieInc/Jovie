@@ -31,7 +31,7 @@ import remediation
 from fix_red_mixed_repairs import first_route_reason, mixed_repairs  # noqa: F401
 from fix_red_screen_cert import SCREEN_CERT_TEXT, screen_cert_paths
 from fix_red_failure_routing import (ALIAS_ACTION, ALIAS_REVIEW_FAILURE, ROUTE_BUDGET_GROWTH, alias_owner_metadata,
-                                     error_signature, fingerprint_key, owner_handoff_reason)
+                                     error_signature, fingerprint_key, owner_handoff_reason, LOCAL_MODULE_PREREQUISITE)
 from atomic_state import atomic_write_text
 from fix_red_source_edits import (  # noqa: F401
     balance_added_headings, snap_added_conservative_spacing, strip_added_legacy_cache_exports,
@@ -137,7 +137,7 @@ _NARROWED_HUNK = re.compile(
 _NARROWED_SIDE = re.compile(
     r"\A(?P<prefix>(?:[ \t]*command:\n)?)(?P<cindent>[ \t]*)'(?P<command>[^'\n]+)',\n"
     r"(?P<nindent>[ \t]*)note: '(?P<note>[^'\n]+)',\n?\Z")
-_QUOTED_LIST_ENTRY = re.compile(r"^[ \t]*'[^'\n]+',[ \t]*$")
+_QUOTED_LIST_ENTRY = re.compile(r"""^[ \t]*(?:'[^'\n]+'|"[^"\n]+"),[ \t]*$""")
 _IDENT_TOKEN = re.compile(r"[A-Za-z][A-Za-z0-9-]*")
 _AND_CHAIN_LINE = re.compile(
     r"""^(?P<indent>[ \t]*)(?P<prefix>(?:"[^"\n]+"\s*:\s*)?)(?P<q>['"])(?P<command>[^'"\n]*&&[^'"\n]*)(?P=q)(?P<suffix>,?)\s*$""")
@@ -152,6 +152,7 @@ _JSON_KEY = re.compile(r'^\s*"([^"\n]+)"\s*:')
 SIGNATURES = (
     ("alias-review-deadline", ALIAS_REVIEW_FAILURE, ALIAS_ACTION),
     ("component-test-evidence", COMPONENT_TEST_TEXT, AGENT),
+    ("local-module-prerequisite", LOCAL_MODULE_PREREQUISITE, SYNC_MAIN),
     ("narrowed-preflight", NARROWED_CONFLICT, MERGE_NARROWED),
     # Before platform-infra: a Source Validation log can carry passing-test rate-limit lines beside the guard error that actually failed the job.
     ("domain-write", DOMAIN_WRITE, REGISTER_DOMAIN),
@@ -583,10 +584,7 @@ def resolve_preflight_narrowed_text(text: str) -> str | None:
 
 
 def merge_additive_quoted_entries(ours: str, theirs: str) -> str | None:
-    """Union two conflict sides that only add quoted list entries.
-
-    Main's order stays, then head-only lines. A blank side, a non-entry line, or a
-    repeated path with different text returns None."""
+    """Union quoted list entries. Single quotes keep main order; double quotes sort. A non-entry returns None."""
 
     def rows(side: str) -> list[str] | None:
         if not str(side or "").endswith("\n"):
@@ -604,6 +602,10 @@ def merge_additive_quoted_entries(ours: str, theirs: str) -> str | None:
     for line in theirs_rows + ours_rows:
         if line not in seen:
             seen.append(line)
+    # Double-quoted rows are JSON path registries. Those files must stay sorted.
+    if seen and all(line.strip().startswith('"') for line in seen):
+        pad = seen[0][:len(seen[0]) - len(seen[0].lstrip(" \t"))]
+        seen = [f'{pad}"{line.strip()[1:-2]}",' for line in sorted(seen, key=lambda line: line.strip())]
     return "\n".join(seen) + "\n"
 
 
