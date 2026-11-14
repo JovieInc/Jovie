@@ -98,7 +98,6 @@ export const SettingsHeaderAlignment: Story = {
             <SettingsSection
               id='account'
               title='Account'
-              description='Security, theme, and notifications.'
               headerAction={<Button type='button'>Save</Button>}
             >
               <p>Account settings</p>
