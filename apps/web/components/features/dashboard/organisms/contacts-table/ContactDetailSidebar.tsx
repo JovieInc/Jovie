@@ -10,6 +10,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@jovie/ui';
+import { useDebouncer } from '@tanstack/react-pacer';
 import { Check, Copy, Trash2 } from 'lucide-react';
 import { memo, useCallback, useEffect, useRef, useState } from 'react';
 import { Icon } from '@/components/atoms/Icon';
@@ -170,49 +171,28 @@ export const ContactDetailSidebar = memo(function ContactDetailSidebar({
   contextMenuItems,
 }: ContactDetailSidebarProps) {
   const [activeTab, setActiveTab] = useState<'info' | 'territories'>('info');
-  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  // Use a ref so the debounced timeout always calls the latest onSave,
+  // Use a ref so the debounced save always calls the latest onSave,
   // avoiding stale closures when contact state updates between scheduling and firing.
   const onSaveRef = useRef(onSave);
   useEffect(() => {
     onSaveRef.current = onSave;
   }, [onSave]);
 
-  // Debounced save: coalesces rapid edits into a single save call
-  const debouncedSave = useCallback(() => {
-    if (saveTimerRef.current) {
-      clearTimeout(saveTimerRef.current);
-    }
-    saveTimerRef.current = setTimeout(() => {
-      saveTimerRef.current = null;
-      onSaveRef.current();
-    }, PACER_TIMING.SAVE_DEBOUNCE_MS);
-  }, []);
-
-  // Flush any pending debounced save immediately
-  const flushSave = useCallback(() => {
-    if (saveTimerRef.current) {
-      clearTimeout(saveTimerRef.current);
-      saveTimerRef.current = null;
-      onSaveRef.current();
-    }
-  }, []);
+  // Debounced save: coalesces rapid edits into a single save call. A pending
+  // save is flushed (not cancelled) on every unmount path, so an edit made
+  // just before a route change or remount is never dropped.
+  const saveDebouncer = useDebouncer(() => onSaveRef.current(), {
+    wait: PACER_TIMING.SAVE_DEBOUNCE_MS,
+    onUnmount: debouncer => debouncer.flush(),
+  });
+  const debouncedSave = saveDebouncer.maybeExecute;
+  const flushSave = saveDebouncer.flush;
 
   // Flush pending save on close to prevent data loss
   const handleClose = useCallback(() => {
     flushSave();
     onClose();
   }, [flushSave, onClose]);
-
-  // Cleanup timer on unmount
-  useEffect(() => {
-    return () => {
-      if (saveTimerRef.current) {
-        clearTimeout(saveTimerRef.current);
-      }
-    };
-  }, []);
 
   const handleRoleChange = useCallback(
     (newRole: string) => {

@@ -199,6 +199,49 @@ describe('ContactDetailSidebar', () => {
     });
   });
 
+  it('flushes a pending debounced save when unmounted without closing', async () => {
+    const user = userEvent.setup();
+    const onSave = vi.fn();
+
+    const { unmount } = render(
+      <ContactDetailSidebar
+        contact={contact}
+        isOpen
+        onClose={() => undefined}
+        onUpdate={() => undefined}
+        onSave={onSave}
+        onDelete={() => undefined}
+      />
+    );
+
+    await user.click(screen.getByRole('tab', { name: 'Territories' }));
+    await user.click(screen.getByRole('button', { name: 'Europe (ex-UK)' }));
+    expect(onSave).not.toHaveBeenCalled();
+
+    unmount();
+
+    expect(onSave).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not save on unmount when nothing is pending', () => {
+    const onSave = vi.fn();
+
+    const { unmount } = render(
+      <ContactDetailSidebar
+        contact={contact}
+        isOpen
+        onClose={() => undefined}
+        onUpdate={() => undefined}
+        onSave={onSave}
+        onDelete={() => undefined}
+      />
+    );
+
+    unmount();
+
+    expect(onSave).not.toHaveBeenCalled();
+  });
+
   it('keeps saving and error feedback semantic without introducing cards', () => {
     const contactWithFeedback: EditableContact = {
       ...contact,
