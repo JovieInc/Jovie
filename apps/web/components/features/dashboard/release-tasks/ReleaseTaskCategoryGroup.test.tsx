@@ -28,4 +28,16 @@ describe('ReleaseTaskCategoryGroup', () => {
     expect(toggle).toHaveAttribute('aria-expanded', 'false');
     expect(screen.queryByText('Row')).toBeNull();
   });
+
+  it('marks a finished group with the success token, not a palette colour', () => {
+    const { container } = render(
+      <ReleaseTaskCategoryGroup category='Creative' done={2} total={2} allDone>
+        <div>Row</div>
+      </ReleaseTaskCategoryGroup>
+    );
+
+    const check = container.querySelector('button svg');
+    expect(check).toHaveClass('text-success');
+    expect(check).not.toHaveClass('text-emerald-500');
+  });
 });
