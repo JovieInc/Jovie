@@ -58,7 +58,9 @@ describe('Source Validation manifest parity', () => {
       'wf:token-scope',
     ])
       expect(ids).toContain(id);
-    expect(selectManifestGuards(['README.md'])).toEqual([]);
+    expect(selectManifestGuards(['README.md']).map(g => g.id)).toEqual([
+      'projected-tree-budget',
+    ]);
   });
 
   it.each([
