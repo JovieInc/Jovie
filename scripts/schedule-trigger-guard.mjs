@@ -72,7 +72,7 @@ function git(root, ...args) {
 export function diffBase(root, env = process.env) {
   if (env.TURBO_SCM_BASE) return env.TURBO_SCM_BASE;
   const merged = git(root, 'merge-base', 'HEAD', 'origin/main');
-  return merged ? merged.stdout.trim() : null;
+  return merged ? merged.trim() : null;
 }
 
 /**
@@ -83,7 +83,8 @@ export function diffBase(root, env = process.env) {
  */
 export function collectAddedLines(root, base) {
   const files = (
-    git(root, 'diff', '--name-only', '--diff-filter=ACMR', `${base}..HEAD`) ?? ''
+    git(root, 'diff', '--name-only', '--diff-filter=ACMR', `${base}..HEAD`) ??
+    ''
   )
     .split('\n')
     .filter(Boolean);
@@ -119,7 +120,9 @@ export function loadAllowlist(root) {
     return { invalid: `${ALLOWLIST_PATH} is not valid JSON` };
   }
   if (parsed?.schema !== ALLOWLIST_SCHEMA) {
-    return { invalid: `${ALLOWLIST_PATH} must declare schema ${ALLOWLIST_SCHEMA}` };
+    return {
+      invalid: `${ALLOWLIST_PATH} must declare schema ${ALLOWLIST_SCHEMA}`,
+    };
   }
   return Array.isArray(parsed.entries) ? parsed.entries : [];
 }
@@ -218,7 +221,10 @@ export function main(root = process.cwd(), env = process.env) {
   return errors.length ? 1 : 0;
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+if (
+  process.argv[1] &&
+  import.meta.url === pathToFileURL(process.argv[1]).href
+) {
   const root = join(dirname(fileURLToPath(import.meta.url)), '..');
   process.exitCode = main(root);
 }
