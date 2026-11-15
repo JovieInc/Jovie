@@ -133,6 +133,13 @@ const ACTIVITY_SUBHEADER = (
 const ACTIVITY_CONTAINER_CLASSNAME =
   'h-full border-0 bg-(--app-shell-content-surface)';
 
+// The horizontally scrolling table region needs keyboard access (axe
+// scrollable-region-focusable); tabIndex in JSX is rejected by the
+// noNoninteractiveTabindex source guard, so set the DOM property via ref.
+function setTableKeyboardFocusable(element: HTMLDivElement | null) {
+  if (element) element.tabIndex = 0;
+}
+
 export function ActivityTableUnified({
   items,
 }: Readonly<ActivityTableUnifiedProps>) {
@@ -149,7 +156,7 @@ export function ActivityTableUnified({
       data-testid='admin-activity-content'
     >
       {ACTIVITY_SUBHEADER}
-      <div className='overflow-x-auto'>
+      <div ref={setTableKeyboardFocusable} className='overflow-x-auto'>
         <AdminDataTable
           data={items}
           columns={columns}
@@ -196,7 +203,7 @@ export function ActivityTableSkeleton({
   return (
     <div className={ACTIVITY_CONTAINER_CLASSNAME} aria-busy='true'>
       {ACTIVITY_SUBHEADER}
-      <div className='overflow-x-auto'>
+      <div ref={setTableKeyboardFocusable} className='overflow-x-auto'>
         <AdminDataTable<AdminActivityItem>
           data={[]}
           columns={columns}

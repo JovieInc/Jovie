@@ -246,7 +246,7 @@ describe('SidebarBottomNowPlaying', () => {
       />
     );
 
-    fireEvent.click(screen.getByRole('button', { name: 'Show Player' }));
+    fireEvent.click(screen.getByRole('button', { name: /Show Player/ }));
     expect(onExpand).toHaveBeenCalledOnce();
   });
 
@@ -268,5 +268,21 @@ describe('SidebarBottomNowPlaying', () => {
     ).toHaveClass('size-7');
     expect(container.querySelector('.lucide-audio-lines')).toBeInTheDocument();
     expect(screen.queryByText('Bahamas')).not.toBeInTheDocument();
+  });
+
+  it('names the expand button from its visible text plus the sr-only purpose', () => {
+    render(
+      <SidebarBottomNowPlaying
+        track={fullTrack}
+        isPlaying={false}
+        onPlay={() => {}}
+        onExpand={() => {}}
+      />
+    );
+
+    const button = screen.getByRole('button', { name: /Show Player/ });
+    expect(button).not.toHaveAttribute('aria-label');
+    expect(button).toHaveTextContent('Lost in the Light');
+    expect(button).toHaveTextContent('Bahamas');
   });
 });

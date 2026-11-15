@@ -145,7 +145,6 @@ export const SidebarBottomNowPlaying = React.memo(
             variant='ghost'
             size='sm'
             onClick={onExpand}
-            aria-label='Show Player'
             className='min-w-0 flex-1 justify-start'
           >
             <div className='min-w-0 flex-1'>
@@ -159,6 +158,10 @@ export const SidebarBottomNowPlaying = React.memo(
                 {artistName}
               </div>
             </div>
+            {/* An aria-label would shadow the visible title/artist and trip axe
+                label-content-name-mismatch; append the purpose instead so the
+                accessible name contains the visible text. */}
+            <span className='sr-only'>Show Player</span>
           </Button>
         ) : (
           <div className='min-w-0 flex-1'>

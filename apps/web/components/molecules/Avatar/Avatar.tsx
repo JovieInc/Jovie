@@ -122,7 +122,11 @@ const AvatarImage = forwardRef<HTMLDivElement, AvatarProps>(function Avatar(
           aria-hidden={alt ? undefined : true}
         >
           <BaseAvatarFallback size={size} shape={shape}>
-            {initials}
+            {/* Initials are a decorative shorthand for the labelled role=img.
+                Hiding them keeps ancestor labels (e.g. "Go to {name}'s
+                profile") containing their visible text (axe
+                label-content-name-mismatch). */}
+            <span aria-hidden='true'>{initials}</span>
           </BaseAvatarFallback>
         </BaseAvatar>
         {verified && shape === 'person' && (

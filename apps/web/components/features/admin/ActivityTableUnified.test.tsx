@@ -77,4 +77,17 @@ describe('ActivityTableUnified', () => {
     expect(source).not.toContain('biome-ignore-all');
     expect(source).not.toContain('biome-ignore-start');
   });
+
+  it('makes the horizontally scrolling table region keyboard-accessible', () => {
+    const source = readFileSync(
+      resolve(
+        process.cwd(),
+        'components/features/admin/ActivityTableUnified.tsx'
+      ),
+      'utf8'
+    );
+
+    expect(source).toContain('function setTableKeyboardFocusable');
+    expect(source).toContain('ref={setTableKeyboardFocusable}');
+  });
 });

@@ -174,4 +174,13 @@ describe('Avatar', () => {
     ).toHaveTextContent('فا');
     await expectNoA11yViolations(container);
   });
+
+  it('hides fallback initials from the accessible text so ancestor labels match visible text', () => {
+    render(<Avatar alt='Jordan Lee' name='Jordan Lee' />);
+
+    const avatar = screen.getByRole('img', { name: 'Jordan Lee' });
+    expect(avatar.querySelector('[aria-hidden="true"]')).toHaveTextContent(
+      'JL'
+    );
+  });
 });

@@ -1,5 +1,9 @@
-import { describe, expect, it } from 'vitest';
-import { shippingChartData } from './ShippingVelocityCanvas';
+import { render, screen } from '@testing-library/react';
+import { describe, expect, it, vi } from 'vitest';
+import {
+  ShippingVelocityCanvas,
+  shippingChartData,
+} from './ShippingVelocityCanvas';
 
 describe('ShippingVelocityCanvas', () => {
   const rows = [
@@ -39,5 +43,22 @@ describe('ShippingVelocityCanvas', () => {
     expect(
       shippingChartData(rows, ['blue', 'purple', 'gray'], true).datasets[2]
     ).toMatchObject({ hidden: false });
+  });
+
+  it('gives the daily data scroll region keyboard access', () => {
+    render(
+      <ShippingVelocityCanvas
+        data={rows}
+        spotlight={null}
+        showClosed={false}
+        onLineClick={vi.fn()}
+        onChartClick={vi.fn()}
+      />
+    );
+
+    expect(screen.getByTestId('shipping-velocity-canvas')).not.toBeNull();
+    const scrollRegion = document.querySelector('.max-h-64.overflow-auto');
+    expect(scrollRegion).not.toBeNull();
+    expect(scrollRegion).toHaveAttribute('tabindex', '0');
   });
 });
