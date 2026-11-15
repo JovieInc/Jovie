@@ -165,8 +165,10 @@ class TreeByteBudgetTest(unittest.TestCase):
     def test_a_non_budget_hygiene_bullet_stays_with_the_agent(self):
         budget = '  - 198.05 MiB of tracked regular files exceeds the 198.00 MiB repository budget\n'
         other = '  - docs/example.tmp: temporary/backup files are not tracked\n'
-        for bullets in (budget + other, other + budget):
-            log = '[repo-hygiene] blocked:\n' + bullets + '##[error]Process completed with exit code 1.\n'
+        for header, bullets in (('', budget + other), ('', other + budget),
+                               ('[repo-hygiene] blocked:\n', budget + other),
+                               ('[repo-hygiene] blocked:\n', other + budget)):
+            log = header + bullets + '##[error]Process completed with exit code 1.\n'
             for prefix in ('', '2026-11-15T05:42:55.9330300Z ',
                            'PR Size Guard\tUNKNOWN STEP\t2026-11-15T05:42:55.9330300Z '):
                 with self.subTest(bullets=bullets, prefix=prefix):
