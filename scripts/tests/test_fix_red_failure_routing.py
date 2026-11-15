@@ -162,6 +162,18 @@ class TreeByteBudgetTest(unittest.TestCase):
         route = classes.classify(red('PR Size Guard'), {'PR Size Guard': log})
         self.assertEqual(route['action'], 'agent')
 
+    def test_a_non_budget_hygiene_bullet_stays_with_the_agent(self):
+        budget = '  - 198.05 MiB of tracked regular files exceeds the 198.00 MiB repository budget\n'
+        other = '  - docs/example.tmp: temporary/backup files are not tracked\n'
+        for bullets in (budget + other, other + budget):
+            log = '[repo-hygiene] blocked:\n' + bullets + '##[error]Process completed with exit code 1.\n'
+            for prefix in ('', '2026-11-15T05:42:55.9330300Z ',
+                           'PR Size Guard\tUNKNOWN STEP\t2026-11-15T05:42:55.9330300Z '):
+                with self.subTest(bullets=bullets, prefix=prefix):
+                    prefixed = ''.join(prefix + line + '\n' for line in log.splitlines())
+                    route = classes.classify(red('PR Size Guard'), {'PR Size Guard': prefixed})
+                    self.assertEqual(route['action'], 'agent')
+
 
 class AliasClassificationTest(unittest.TestCase):
     def test_real_annotation_and_complete_failure_have_owned_no_model_route(self):

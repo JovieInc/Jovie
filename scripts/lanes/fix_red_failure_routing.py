@@ -100,11 +100,18 @@ class TreeByteBudget:
     def search(self, text):
         clean = _ANSI.sub('', str(text or ''))
         hit = None
+        hygiene_blocked = False
         for raw in clean.splitlines():
             line = _TREE_STAMP.sub('', _LOG_FAILED_PREFIX.sub('', raw, count=1))
+            if line.strip() == '[repo-hygiene] blocked:':
+                hygiene_blocked = True
+                continue
             if _TREE_BYTE_LINE.search(line) or _TREE_HYGIENE_LINE.search(line):
                 hit = line
                 continue
+            # Hygiene violations are plain bullets, not Actions annotations.
+            if hygiene_blocked and line.lstrip().startswith('- '):
+                return None
             if _TREE_ERROR_MARK.search(line) and not _TREE_FOLLOWER.search(line):
                 return None
         return hit
