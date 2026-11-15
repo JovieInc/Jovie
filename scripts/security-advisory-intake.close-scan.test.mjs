@@ -4,6 +4,7 @@
 
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
+import { join } from 'node:path';
 import { test } from 'node:test';
 import {
   clearRemediationLabelCache,
@@ -457,24 +458,42 @@ test('failedOnLinearRateLimit is true only for quota-only failures', () => {
 
 test('a rate-limited green resolve defers instead of failing the run', async () => {
   clearRemediationLabelCache();
-  const fetchImpl = async () => ({
-    ok: false,
-    status: 429,
-    headers: new Map([['retry-after', '30']]),
-    text: async () =>
-      JSON.stringify({ errors: [{ extensions: { code: 'RATELIMITED' } }] }),
-  });
-  const result = await applyRemediationDecision(
-    { action: 'green', fingerprints: ['some-monitor'] },
-    {
-      fingerprint: 'some-monitor',
-      source: 'production-controller.yml',
-      runUrl: 'https://github.com/JovieInc/Jovie/actions/runs/1',
-      apiKey: 'lin_test',
-      fetchImpl,
-    }
-  );
-  assert.equal(result.ok, false);
-  assert.equal(result.action, 'green');
-  assert.equal(failedOnLinearRateLimit(result), true);
+  // Isolate the lane-cooldown store: the 429 below rate-limits later suites.
+  const { mkdtempSync: mkTemp, rmSync } = await import('node:fs');
+  const { tmpdir } = await import('node:os');
+  const cooldownDir = mkTemp(join(tmpdir(), 'defer-cooldown-'));
+  const prevCooldownDir = process.env.LINEAR_COOLDOWN_STATE_DIR;
+  const prevFallbackDir = process.env.LINEAR_COOLDOWN_FALLBACK_DIR;
+  process.env.LINEAR_COOLDOWN_STATE_DIR = cooldownDir;
+  process.env.LINEAR_COOLDOWN_FALLBACK_DIR = join(cooldownDir, 'fallback');
+  try {
+    const fetchImpl = async () => ({
+      ok: false,
+      status: 429,
+      headers: new Map([['retry-after', '30']]),
+      text: async () =>
+        JSON.stringify({ errors: [{ extensions: { code: 'RATELIMITED' } }] }),
+    });
+    const result = await applyRemediationDecision(
+      { action: 'green', fingerprints: ['some-monitor'] },
+      {
+        fingerprint: 'some-monitor',
+        source: 'production-controller.yml',
+        runUrl: 'https://github.com/JovieInc/Jovie/actions/runs/1',
+        apiKey: 'lin_test',
+        fetchImpl,
+      }
+    );
+    assert.equal(result.ok, false);
+    assert.equal(result.action, 'green');
+    assert.equal(failedOnLinearRateLimit(result), true);
+  } finally {
+    if (prevCooldownDir === undefined)
+      delete process.env.LINEAR_COOLDOWN_STATE_DIR;
+    else process.env.LINEAR_COOLDOWN_STATE_DIR = prevCooldownDir;
+    if (prevFallbackDir === undefined)
+      delete process.env.LINEAR_COOLDOWN_FALLBACK_DIR;
+    else process.env.LINEAR_COOLDOWN_FALLBACK_DIR = prevFallbackDir;
+    rmSync(cooldownDir, { recursive: true, force: true });
+  }
 });
