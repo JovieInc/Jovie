@@ -322,7 +322,7 @@ fi
 # ─── 2. pnpm ────────────────────────────────────────────────────────────────
 echo ""
 echo "── pnpm ────────────────────────────────────────────────────────────────"
-REQUIRED_PNPM="9.15.9"
+REQUIRED_PNPM="$(jovie_setup_required_pnpm "$REPO_ROOT")" || { warn "package.json packageManager must pin pnpm@X.Y.Z exactly"; exit 1; }
 if command -v pnpm &>/dev/null; then
   PNPM_VERSION=$(pnpm --version)
   if [[ "$PNPM_VERSION" == "$REQUIRED_PNPM" ]]; then
@@ -456,8 +456,9 @@ if command -v pnpm &>/dev/null; then
   if [[ -n "$DEP_FINGERPRINT" && -f "$REPO_ROOT/node_modules/.modules.yaml" && "$DEP_FINGERPRINT" == "$PREVIOUS_DEP_FINGERPRINT" ]]; then
     success "Dependencies unchanged — skipped pnpm install"
   else
-    info "Running pnpm install..."
-    pnpm install
+    # The one frozen install every agent session start runs (JOV-12623).
+    info "Running frozen pnpm install..."
+    node "$REPO_ROOT/scripts/codex-cloud-setup.mjs" install
     mkdir -p "$SETUP_CACHE_DIR"
     if [[ -n "$DEP_FINGERPRINT" ]]; then
       printf '%s\n' "$DEP_FINGERPRINT" >"$DEP_FINGERPRINT_FILE"
