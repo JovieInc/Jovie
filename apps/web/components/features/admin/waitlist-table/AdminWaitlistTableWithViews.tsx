@@ -200,7 +200,14 @@ export function AdminWaitlistTableWithViews(props: WaitlistTableProps) {
         },
       },
     ];
-  }, [entries, selectedIds, clearSelection, approveEntry, disapproveMutation]);
+  }, [
+    entries,
+    selectedIds,
+    clearSelection,
+    approveEntry,
+    disapproveMutation,
+    onActionError,
+  ]);
 
   // Group entries by status for Kanban board
   const kanbanColumns = useMemo<KanbanColumn<WaitlistEntryRow>[]>(() => {
