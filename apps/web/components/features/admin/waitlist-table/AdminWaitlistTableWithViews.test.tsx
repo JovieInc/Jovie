@@ -64,6 +64,11 @@ describe('AdminWaitlistTableWithViews', () => {
     );
     expect(screen.getByText('Waitlist links look healthy')).toBeVisible();
     expect(screen.queryByText(/waitlist integrity issues/)).toBeNull();
+    const healthyIcon = screen
+      .getByText('Waitlist links look healthy')
+      .parentElement?.querySelector('svg');
+    expect(healthyIcon).toHaveClass('text-success');
+    expect(healthyIcon).not.toHaveClass('text-emerald-500');
   });
 
   it('keeps integrity visible and excludes covered actions until selection is cleared', async () => {

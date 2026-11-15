@@ -68,6 +68,9 @@ describe('IngestProfileDropdown', () => {
     const resultsPanel = result.parentElement;
     expect(resultsPanel).toHaveClass('bg-surface-elevated');
     expect(resultsPanel).not.toHaveClass('bg-background-elevated');
+    expect(
+      screen.getByRole('dialog', { name: 'Ingest Social Profile' })
+    ).toBeInTheDocument();
 
     fireEvent.click(result);
     expect(selectSpotifyArtistMock).toHaveBeenCalledWith(
