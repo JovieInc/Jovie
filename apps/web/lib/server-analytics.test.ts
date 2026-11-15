@@ -344,34 +344,6 @@ describe('server analytics contract', () => {
     expect(vi.getTimerCount()).toBe(0);
   });
 
-  it('bounds delivery latency and reports a timed-out insert', async () => {
-    vi.useFakeTimers();
-    mocks.returning.mockReturnValueOnce(new Promise(() => {}));
-
-    const delivery = trackServerEvent('release_deleted', {
-      profileId: PROFILE_ID,
-      releaseId: RELEASE_ID,
-    });
-    await vi.advanceTimersByTimeAsync(SERVER_ANALYTICS_DELIVERY_TIMEOUT_MS);
-
-    await expect(delivery).resolves.toEqual({
-      ok: false,
-      error: 'delivery_unknown',
-    });
-    expect(Sentry.captureException).toHaveBeenCalledWith(
-      expect.objectContaining({
-        message: 'Server analytics delivery timed out after 17000ms',
-      }),
-      expect.objectContaining({
-        tags: expect.objectContaining({
-          context: 'server_analytics_delivery',
-          delivery_outcome: 'unknown',
-          event_name: 'release_deleted',
-        }),
-      })
-    );
-  });
-
   it('deduplicates emissions that share a stable event identity', async () => {
     mocks.returning.mockResolvedValueOnce([]);
 

@@ -7,7 +7,10 @@
 // snapshot directory. The publish job downloads them all, applies the
 // baselines of the suites that passed, and opens one PR whose body lists the
 // suites that did not pass. A failing suite's snapshots never reach the PR:
-// a broken layout must not become the new baseline.
+// a broken layout must not become the new baseline. The PR body states the
+// blast radius of replacing baselines and cites the design operating system
+// when a published spec is a Fleet Rules locked area. Publishing refuses a
+// tree that would exceed the canonical snapshot budget.
 import {
   copyFileSync,
   existsSync,
@@ -19,6 +22,8 @@ import {
 } from 'node:fs';
 import { dirname, join, relative, resolve, sep } from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { isLockedArea } from '../pr-fleet-rules.mjs';
+import { HYGIENE_LIMITS } from './repo-hygiene-limits.mjs';
 
 export const SUITE_RECEIPT = 'receipt.json';
 export const SUITE_BASELINES = 'baselines';
@@ -129,6 +134,49 @@ export function applyBaselineRefresh(plan, snapshotDir) {
   return written;
 }
 
+/** Every regular file under the canonical snapshot directory. */
+export function measureSnapshotBudget(snapshotDir) {
+  let files = 0;
+  let bytes = 0;
+  const visit = directory => {
+    if (!existsSync(directory)) return;
+    for (const entry of readdirSync(directory, { withFileTypes: true })) {
+      const path = join(directory, entry.name);
+      if (entry.isSymbolicLink())
+        throw new Error(
+          `refusing symlinked baseline ${relative(snapshotDir, path)}`
+        );
+      if (entry.isDirectory()) visit(path);
+      else if (entry.isFile()) {
+        files += 1;
+        bytes += lstatSync(path).size;
+      }
+    }
+  };
+  visit(snapshotDir);
+  return { files, bytes };
+}
+
+/**
+ * Fail closed before a refresh PR is opened. The publish step commits only
+ * after this script exits 0.
+ * @param {string} snapshotDir
+ */
+export function assertSnapshotBudget(snapshotDir) {
+  const measured = measureSnapshotBudget(snapshotDir);
+  if (measured.files > HYGIENE_LIMITS.maxSnapshotFiles) {
+    throw new Error(
+      `${measured.files} canonical visual-test baselines exceed the ${HYGIENE_LIMITS.maxSnapshotFiles}-file budget. Prune unreferenced baselines or raise maxSnapshotFiles within the +10% cap (docs/ci/repository-health.md) before publishing.`
+    );
+  }
+  if (measured.bytes > HYGIENE_LIMITS.maxSnapshotBytes) {
+    throw new Error(
+      `${measured.bytes} canonical visual-baseline bytes exceed the ${HYGIENE_LIMITS.maxSnapshotBytes}-byte budget.`
+    );
+  }
+  return measured;
+}
+
 /** @param {{ plan: RefreshPlan, sha?: string, runUrl?: string }} input */
 export function renderBaselinePrBody({ plan, sha = '', runUrl = '' }) {
   const lines = [
@@ -148,6 +196,25 @@ export function renderBaselinePrBody({ plan, sha = '', runUrl = '' }) {
       lines.push(`- \`${receipt.spec}\` (${receipt.outcome})`);
     for (const entry of plan.invalid)
       lines.push(`- \`${entry}\` (no readable suite receipt)`);
+  }
+  lines.push(
+    '',
+    '## Blast radius',
+    '- What could break: Playwright visual compares for the refreshed suites if these png baselines no longer match the pinned ubuntu-24.04 Chromium render.',
+    '- Proof: the publish job copies only passing-suite pngs into apps/web/tests/e2e/__snapshots__ and leaves failing suites unchanged.'
+  );
+  const locked = plan.publish.some(receipt =>
+    isLockedArea(
+      `apps/web/tests/e2e/__snapshots__/${receipt.spec}/baseline.png`
+    )
+  );
+  if (locked) {
+    lines.push(
+      '',
+      '## Locked areas',
+      '',
+      'GBrain: design/design-operating-system'
+    );
   }
   return `${lines.join('\n')}\n`;
 }
@@ -175,6 +242,7 @@ export function main(argv = process.argv.slice(2), env = process.env) {
   const { receipts, invalid } = readSuiteReceipts(args['suites-dir']);
   const plan = planBaselineRefresh(receipts, invalid);
   const written = applyBaselineRefresh(plan, args['snapshot-dir']);
+  assertSnapshotBudget(args['snapshot-dir']);
   const runUrl =
     env.GITHUB_SERVER_URL && env.GITHUB_REPOSITORY && env.GITHUB_RUN_ID
       ? `${env.GITHUB_SERVER_URL}/${env.GITHUB_REPOSITORY}/actions/runs/${env.GITHUB_RUN_ID}`
