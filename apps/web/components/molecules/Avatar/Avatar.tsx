@@ -126,7 +126,7 @@ const AvatarImage = forwardRef<HTMLDivElement, AvatarProps>(function Avatar(
                 Hiding them keeps ancestor labels (e.g. "Go to {name}'s
                 profile") containing their visible text (axe
                 label-content-name-mismatch). */}
-            <span aria-hidden='true'>{initials}</span>
+            <span aria-hidden='true' className='select-none'>{initials}</span>
           </BaseAvatarFallback>
         </BaseAvatar>
         {verified && shape === 'person' && (
