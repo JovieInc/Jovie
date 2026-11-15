@@ -24,7 +24,7 @@ describe('/claim canonical', () => {
     );
 
     expect(source).toMatch(
-      /import\s*\{\s*HomepageQueryProvider\s*\}\s*from\s*'\.{2}\/\(home\)\/homepage-query-provider';/
+      /import\s*\{\s*HomepageQueryProvider\s*\}\s*from\s*'\.{2}\/\(home\)\/HomepageQueryProvider';/
     );
     const wrapped = source.match(
       /<HomepageQueryProvider>[\s\S]*?<ClaimArtistSearch\s*\/>[\s\S]*?<\/HomepageQueryProvider>/

@@ -18,7 +18,7 @@ import {
 } from '@/lib/claim/artist-offer-claim';
 import { resolveInitialCookieBannerVisible } from '@/lib/cookies/banner-initial-visibility.server';
 import { getRootLayoutChromeState } from '@/lib/demo-recording';
-import { HomepageQueryProvider } from '../(home)/homepage-query-provider';
+import { HomepageQueryProvider } from '../(home)/HomepageQueryProvider';
 import { ClaimArtistSearch } from './ClaimArtistSearch';
 
 const PRO_CLAIM = getPublicPriceClaim('pro');

@@ -6,7 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { APP_ROUTES } from '@/constants/routes';
 import type { SpotifyArtistResult } from '@/lib/contracts/api';
 import { expectNoA11yViolations } from '@/tests/utils/a11y';
-import { HomepageQueryProvider } from '../(home)/homepage-query-provider';
+import { HomepageQueryProvider } from '../(home)/HomepageQueryProvider';
 import { ClaimArtistSearch } from './ClaimArtistSearch';
 
 const RESULTS: SpotifyArtistResult[] = [
