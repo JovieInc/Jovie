@@ -9,11 +9,19 @@ import { REPO } from './fixtures/validation-world.mjs';
 // response shape, plus the caller logic with mocked batchPulls.
 const SELECTION =
   'number state mergedAt mergeCommitSha title body base { ref }';
-const wrappedGraphQL = pullRequests => ({
+// GitHub answers each alias with the pull the QUERY asked for, so the mock
+// keys its response by the alias -> number mapping in the request body
+// (numbers batch in descending order; the fixture object's own key order
+// would cross the answers).
+const wrappedGraphQL = (body, pullRequests) => ({
   data: Object.fromEntries(
-    Object.entries(pullRequests).map(([key, pullRequest], index) => [
-      `k${index}`,
-      { pullRequest },
+    [
+      ...String(body).matchAll(
+        /(k\d+): repository\(owner: [^)]*\) \{\s*pullRequest\(number: (\d+)\)/g
+      ),
+    ].map(([, alias, number]) => [
+      alias,
+      { pullRequest: pullRequests[number] ?? null },
     ])
   ),
 });
@@ -41,7 +49,7 @@ describe('batchPulls unwraps the api-client response (JOV-12768)', () => {
           'pullRequest(number: 18293) { number state mergedAt mergeCommitSha title body base { ref } }'
         );
         return graphqlResponse(
-          wrappedGraphQL({
+          wrappedGraphQL(init.body, {
             18293: {
               number: 18293,
               state: 'MERGED',
@@ -63,13 +71,13 @@ describe('batchPulls unwraps the api-client response (JOV-12768)', () => {
     );
     expect(posts).toBe(1);
     expect(out.get(18293)).toEqual({
-      number: 18293,
       state: 'MERGED',
       mergedAt: '2026-11-01T00:00:00Z',
       mergeCommitSha: 'a'.repeat(40),
       title: 'fix(JOV-2)',
       body: 'closes JOV-2',
-      base: { ref: 'main' },
+      baseRef: 'main',
+      headRef: '',
     });
     expect(Object.hasOwn(out.get(18293) ?? {}, 'pullRequest')).toBe(false);
   });
@@ -78,7 +86,7 @@ describe('batchPulls unwraps the api-client response (JOV-12768)', () => {
     const fetchMock = async (url, init) => {
       if (String(url).endsWith('/graphql')) {
         return graphqlResponse(
-          wrappedGraphQL({
+          wrappedGraphQL(init.body, {
             18293: {
               number: 18293,
               state: 'MERGED',
@@ -130,7 +138,7 @@ describe('batchPulls unwraps the api-client response (JOV-12768)', () => {
           posts += 1;
           expect(init.method).toBe('POST');
           return graphqlResponse(
-            wrappedGraphQL({
+            wrappedGraphQL(init.body, {
               18293: {
                 number: 18293,
                 state: 'MERGED',
@@ -168,9 +176,9 @@ describe('batchPulls unwraps the api-client response (JOV-12768)', () => {
   });
 
   it('maps a null alias (missing PR, no errors) to null so the caller falls back to REST', async () => {
-    const fetchMock = async url => {
+    const fetchMock = async (url, init) => {
       if (String(url).endsWith('/graphql')) {
-        return graphqlResponse(wrappedGraphQL({ 18293: null }));
+        return graphqlResponse(wrappedGraphQL(init.body, { 18293: null }));
       }
       throw new Error(`unexpected call ${url}`);
     };
