@@ -1,8 +1,11 @@
 import type { Decorator, Meta, StoryObj } from '@storybook/nextjs-vite';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import type { ComponentProps } from 'react';
 import { expect, userEvent, within } from 'storybook/test';
 import { type AdminLeadKeyword, queryKeys } from '@/lib/queries';
 import { LeadKeywordsManager } from './LeadKeywordsManager';
+
+type LeadKeywordsManagerArgs = ComponentProps<typeof LeadKeywordsManager>;
 
 /**
  * Rendered states of the discovery keyword manager. Stories seed the keyword
@@ -31,7 +34,9 @@ function keyword(
   };
 }
 
-function withKeywords(keywords: AdminLeadKeyword[] | null): Decorator {
+function withKeywords(
+  keywords: AdminLeadKeyword[] | null
+): Decorator<LeadKeywordsManagerArgs> {
   return function WithKeywords(Story) {
     const client = new QueryClient({
       defaultOptions: {
@@ -126,7 +131,7 @@ export const LongContentKeywords: Story = {
   ],
 };
 
-const withRtl: Decorator = function WithRtl(Story) {
+const withRtl: Decorator<LeadKeywordsManagerArgs> = function WithRtl(Story) {
   return (
     <div dir='rtl' lang='ar'>
       <Story />
