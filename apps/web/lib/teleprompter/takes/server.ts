@@ -1,6 +1,7 @@
 import 'server-only';
 
 import { del, get, head, list, put } from '@vercel/blob';
+import { getBlobWithRetry } from '@/lib/blob/get-with-retry';
 import { getBlobCommandOptions } from '@/lib/blob-config';
 import {
   type SaveTeleprompterTakeInput,
@@ -25,11 +26,15 @@ export class TeleprompterTakeError extends Error {
 async function readRecord(
   pathname: string
 ): Promise<TeleprompterTakeRecord | null> {
-  const blob = await get(pathname, {
-    access: 'private',
-    useCache: false,
-    ...getBlobCommandOptions(),
-  });
+  const blob = await getBlobWithRetry(
+    () =>
+      get(pathname, {
+        access: 'private',
+        useCache: false,
+        ...getBlobCommandOptions(),
+      }),
+    'teleprompter.readRecord'
+  );
   if (!blob || blob.statusCode !== 200 || !blob.stream) return null;
   const text = await new Response(blob.stream).text();
   try {
@@ -201,12 +206,16 @@ export async function openTeleprompterTakeMedia(
   range: string | null
 ) {
   const record = await loadOwnedTeleprompterTake(ownerId, takeId);
-  const blob = await get(record.videoPathname, {
-    access: 'private',
-    useCache: false,
-    ...(range ? { headers: { Range: range } } : {}),
-    ...getBlobCommandOptions(),
-  });
+  const blob = await getBlobWithRetry(
+    () =>
+      get(record.videoPathname, {
+        access: 'private',
+        useCache: false,
+        ...(range ? { headers: { Range: range } } : {}),
+        ...getBlobCommandOptions(),
+      }),
+    'teleprompter.takeMedia'
+  );
   if (!blob || blob.statusCode !== 200 || !blob.stream) {
     throw new TeleprompterTakeError('take-media-unavailable', 404);
   }

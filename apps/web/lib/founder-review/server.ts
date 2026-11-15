@@ -3,6 +3,7 @@ import 'server-only';
 import { createHash } from 'node:crypto';
 import { del, get } from '@vercel/blob';
 import { and, desc, sql as drizzleSql, eq, inArray, lt } from 'drizzle-orm';
+import { getBlobWithRetry } from '@/lib/blob/get-with-retry';
 import { db } from '@/lib/db';
 import { getUserByIdentity } from '@/lib/db/queries/shared';
 import { suggestedActions } from '@/lib/db/schema/connectors';
@@ -108,10 +109,14 @@ async function verifyRetainedMedia(input: {
   if (!media.pathname.startsWith(prefix)) {
     throw new FounderReviewError('invalid-founder-review-media-path', 422);
   }
-  const blob = await get(media.pathname, {
-    access: 'private',
-    useCache: false,
-  });
+  const blob = await getBlobWithRetry(
+    () =>
+      get(media.pathname, {
+        access: 'private',
+        useCache: false,
+      }),
+    'founder-review.verifyMedia'
+  );
   if (!blob) {
     throw new FounderReviewError(
       'founder-review-media-verification-failed',
@@ -612,11 +617,15 @@ export async function getFounderReviewMedia(input: {
   if (!pathname) {
     throw new FounderReviewError('founder-review-media-unavailable', 404);
   }
-  const blob = await get(pathname, {
-    access: 'private',
-    useCache: false,
-    ...(input.range ? { headers: { Range: input.range } } : {}),
-  });
+  const blob = await getBlobWithRetry(
+    () =>
+      get(pathname, {
+        access: 'private',
+        useCache: false,
+        ...(input.range ? { headers: { Range: input.range } } : {}),
+      }),
+    'founder-review.openMedia'
+  );
   if (!blob) {
     throw new FounderReviewError('founder-review-media-unavailable', 404);
   }

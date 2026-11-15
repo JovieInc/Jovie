@@ -1,5 +1,6 @@
 import { get } from '@vercel/blob';
 import { NextResponse } from 'next/server';
+import { getBlobWithRetry } from '@/lib/blob/get-with-retry';
 import { NO_STORE_HEADERS } from '@/lib/http/headers';
 import { resolveOviePrincipal } from '@/lib/ovie/mcp/principal';
 import { WorkflowCaptureExecutionResultSchema } from '@/lib/workflow-capture/contract';
@@ -37,11 +38,15 @@ export async function GET(request: Request, { params }: RouteParams) {
       throw new WorkflowCaptureError('capture-request-expired', 410);
     }
     const range = request.headers.get('range');
-    const blob = await get(stored.data.pathname, {
-      access: 'private',
-      useCache: false,
-      ...(range ? { headers: { Range: range } } : {}),
-    });
+    const blob = await getBlobWithRetry(
+      () =>
+        get(stored.data.pathname, {
+          access: 'private',
+          useCache: false,
+          ...(range ? { headers: { Range: range } } : {}),
+        }),
+      'workflow-capture.media'
+    );
     if (!blob || blob.statusCode !== 200 || !blob.stream) {
       throw new WorkflowCaptureError('capture-media-unavailable', 404);
     }
