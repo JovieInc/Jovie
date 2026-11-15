@@ -246,7 +246,7 @@ describe('SidebarBottomNowPlaying', () => {
       />
     );
 
-    fireEvent.click(screen.getByRole('button', { name: 'Show Player' }));
+    fireEvent.click(screen.getByRole('button', { name: /Show Player/ }));
     expect(onExpand).toHaveBeenCalledOnce();
   });
 

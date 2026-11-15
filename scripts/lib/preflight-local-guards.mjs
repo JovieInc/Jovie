@@ -43,6 +43,23 @@ const BUILD_ENV = [
 /** @type {readonly {id:string,name:string,command:string,when:(p:string)=>boolean,heavy?:boolean,timeoutMs?:number}[]} */
 export const LOCAL_GUARDS = Object.freeze([
   {
+    id: 'projected-tree-budget',
+    name: 'projected combined-tree byte budget',
+    command:
+      'PR_BASE_SHA="$(git rev-parse --verify "$CI_BASE_REF^{commit}")" PR_MERGE_BASE="$(git merge-base "$CI_BASE_REF" HEAD)" PR_HEAD_SHA="$(git rev-parse --verify HEAD)" node scripts/lib/projected-tree-budget.mjs',
+    // Every tracked file counts, including docs, stories and test evidence.
+    when: () => true,
+  },
+  {
+    id: 'design-authority',
+    name: 'design authority and raw control debt',
+    command: 'node scripts/design-authority-guard.mjs',
+    when: p =>
+      /^(?:apps\/web\/|scripts\/design-authority|DESIGN\.md$|docs\/llms-design-manifest\.txt$|\.claude\/rules\/ui\.md$|\.agents\/skills\/gstack\/design-(?:canonical|consultation)\/)/.test(
+        p
+      ),
+  },
+  {
     id: 'design-noise',
     name: 'design-noise lint (apps/web/design-noise.baseline.json)',
     command: 'node apps/web/scripts/lint-design-noise.mjs',

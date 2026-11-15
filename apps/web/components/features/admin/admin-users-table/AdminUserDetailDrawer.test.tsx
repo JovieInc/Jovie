@@ -202,4 +202,28 @@ describe('AdminUserDetailDrawer', () => {
     expect(screen.getByRole('link', { name: 'سبوتيفاي' })).toBeInTheDocument();
     await expectNoA11yViolations(container);
   });
+
+  it('keeps the copy buttons at a 24px+ touch target', () => {
+    render(<AdminUserDetailDrawer user={adminUser} onClose={() => {}} />);
+
+    const copyEmail = screen.getByRole('button', { name: 'Copy Email' });
+    expect(copyEmail).toHaveClass('size-6');
+  });
+
+  it('keeps the copy buttons unsqueezed in long-content rows', () => {
+    render(<AdminUserDetailDrawer user={longContentUser} onClose={vi.fn()} />);
+
+    for (const label of ['Copy Email', 'Copy User ID', 'Copy Clerk ID']) {
+      expect(screen.getByRole('button', { name: label })).toHaveClass(
+        'size-6',
+        'shrink-0'
+      );
+    }
+
+    // The truncating value spans must shrink inside their flex rows — an
+    // overflowing email box pushes the copy button under the header clip
+    // (axe target-size: partially obscured).
+    const email = longContentUser.email ?? '';
+    expect(screen.getByText(email)).toHaveClass('min-w-0');
+  });
 });

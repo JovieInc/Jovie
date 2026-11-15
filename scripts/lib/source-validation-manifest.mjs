@@ -33,6 +33,14 @@ const WORKFLOWS = /^\.github\/(?:workflows|actions)\//;
 /** @type {readonly Guard[]} */
 export const SOURCE_VALIDATION_GUARDS = Object.freeze([
   {
+    id: 'web-eslint',
+    name: 'changed web ESLint (including hook dependencies)',
+    command:
+      'ESLINT_CHANGED_BASE="origin/{base}" pnpm --filter @jovie/web run lint:eslint:changed',
+    when: /^apps\/web\/.+\.tsx?$/,
+    covers: ['pnpm --filter @jovie/web run lint:eslint:changed'],
+  },
+  {
     id: 'wf:refs',
     name: 'workflow references',
     command: 'node scripts/verify-workflow-references.mjs',

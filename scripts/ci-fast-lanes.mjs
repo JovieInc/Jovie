@@ -863,6 +863,7 @@ export const STRUCTURAL_PYTHON_REGRESSION_COMMANDS = Object.freeze([
 
 export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
   'scripts/ios-certification-config.test.mjs',
+  'scripts/schedule-trigger-guard.test.mjs', // JOV-12720 event-driven guard.
   'scripts/resolve-main-sha.test.mjs', // JOV-12497 SIGPIPE regression.
   'scripts/hostops/pen-golden-path-sync.test.mjs',
   'scripts/design/pen-inspect.test.mjs',
@@ -1132,6 +1133,7 @@ export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/mutation-score-floor.test.mjs',
   'scripts/lib/__tests__/mutation-floor-intake.test.mjs',
   'scripts/lib/__tests__/mutation-diff-workflow.test.mjs',
+  'scripts/lib/__tests__/component-certificate-admission.test.mjs',
   'scripts/lib/__tests__/component-certificate-workflow.test.mjs',
   'scripts/lib/__tests__/component-certificate-delivery.test.mjs',
   'scripts/lib/__tests__/component-certificate-ordering.test.mjs',
