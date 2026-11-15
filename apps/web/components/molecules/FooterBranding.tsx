@@ -1,70 +1,70 @@
-import Link from 'next/link';
-import type { CSSProperties, ReactNode } from 'react';
-import { BrandLogo } from '@/components/atoms/BrandLogo';
-import { Logo } from '@/components/atoms/Logo';
-import { Mark } from '@/lib/brand/primitives';
-import { cn } from '@/lib/utils';
+import Link from "next/link";
+import type { CSSProperties, ReactNode } from "react";
+import { BrandLogo } from "@/components/atoms/BrandLogo";
+import { Logo } from "@/components/atoms/Logo";
+import { Mark } from "@/lib/brand/primitives";
+import { cn } from "@/lib/utils";
 
 interface FooterBrandingProps {
-  readonly artistHandle?: string;
-  readonly variant?: 'light' | 'dark' | 'linear';
-  readonly className?: string;
-  readonly showCTA?: boolean;
-  readonly size?: 'sm' | 'md';
-  readonly mark?: 'wordmark' | 'icon' | 'text' | 'brand';
+	readonly artistHandle?: string;
+	readonly variant?: "light" | "dark" | "linear";
+	readonly className?: string;
+	readonly showCTA?: boolean;
+	readonly size?: "sm" | "md";
+	readonly mark?: "wordmark" | "icon" | "text" | "brand";
 }
 
 function buildUtmLink(base: string, artistHandle?: string): string {
-  if (!artistHandle) return base;
-  const separator = base.includes('?') ? '&' : '?';
-  return `${base}${separator}utm_source=profile&utm_artist=${artistHandle}`;
+	if (!artistHandle) return base;
+	const separator = base.includes("?") ? "&" : "?";
+	return `${base}${separator}utm_source=profile&utm_artist=${artistHandle}`;
 }
 
 function renderLogoMark(
-  mark: 'wordmark' | 'icon' | 'text' | 'brand',
-  size: 'sm' | 'md',
-  isLinear: boolean,
-  logoClass: string
+	mark: "wordmark" | "icon" | "text" | "brand",
+	size: "sm" | "md",
+	isLinear: boolean,
+	logoClass: string,
 ): ReactNode {
-  if (mark === 'icon') {
-    return (
-      <BrandLogo
-        size={size === 'sm' ? 'chrome' : 'control'}
-        tone={isLinear ? 'white' : 'auto'}
-        className={logoClass}
-      />
-    );
-  }
+	if (mark === "icon") {
+		return (
+			<BrandLogo
+				size={size === "sm" ? "chrome" : "control"}
+				tone={isLinear ? "white" : "auto"}
+				className={logoClass}
+			/>
+		);
+	}
 
-  if (mark === 'brand') {
-    return (
-      <>
-        <Mark size={16} className='h-4 w-4' />
-        <span>Made with Jovie</span>
-      </>
-    );
-  }
+	if (mark === "brand") {
+		return (
+			<>
+				<Mark size={16} className="h-4 w-4" />
+				<span>Made with Jovie</span>
+			</>
+		);
+	}
 
-  if (mark === 'text') {
-    return (
-      <>
-        {/* Explicit trailing space: the two spans concatenate in the
+	if (mark === "text") {
+		return (
+			<>
+				{/* Explicit trailing space: the two spans concatenate in the
             accessible text, and the label-in-name contract needs the
             visible text verbatim inside the link's name. */}
-        <span>{'Powered by '}</span>
-        <span className='font-semibold'>Jovie</span>
-      </>
-    );
-  }
+				<span>{"Powered by "}</span>
+				<span className="font-semibold">Jovie</span>
+			</>
+		);
+	}
 
-  return (
-    <Logo
-      size={size === 'sm' ? 'xs' : 'sm'}
-      variant='wordAlt'
-      tone={isLinear ? 'white' : 'auto'}
-      className={logoClass}
-    />
-  );
+	return (
+		<Logo
+			size={size === "sm" ? "xs" : "sm"}
+			variant="wordAlt"
+			tone={isLinear ? "white" : "auto"}
+			className={logoClass}
+		/>
+	);
 }
 
 /**
@@ -72,85 +72,85 @@ function renderLogoMark(
  * box back to layout so the visible mark and its spacing do not move.
  */
 const LOGO_HIT_AREA_CLASS =
-  'inline-flex min-h-11 min-w-11 items-center justify-center -mx-3 -my-2';
+	"inline-flex min-h-11 min-w-11 items-center justify-center -mx-3 -my-2";
 
 function getLogoLinkClass(mark: string, isLinear: boolean): string {
-  if (mark === 'brand') {
-    // Same brand line as the smart-link footer: 14px medium, quiet token
-    // color. Real 44px box via padding; negative margins hand the extra box
-    // back to layout (pseudo-element hit areas are invisible to axe's
-    // target-size rule).
-    return 'relative inline-flex min-h-11 items-center gap-2 rounded-md py-3 -my-3 text-sm font-medium text-secondary-token transition-colors duration-subtle hover:text-primary-token focus-ring-themed';
-  }
-  if (mark === 'text') {
-    return 'inline-flex min-h-11 min-w-11 items-center justify-center gap-1 rounded-md px-2 -mx-2 -my-3 focus-ring-themed text-3xs tracking-widest text-secondary-token hover:text-primary-token';
-  }
-  if (isLinear) {
-    return cn(
-      LOGO_HIT_AREA_CLASS,
-      'rounded-md focus-ring-themed transition-opacity duration-subtle ease-out hover:opacity-80'
-    );
-  }
-  return cn(
-    LOGO_HIT_AREA_CLASS,
-    'rounded-md focus-ring-themed transition-colors duration-subtle ease-out hover:bg-surface-1'
-  );
+	if (mark === "brand") {
+		// Same brand line as the smart-link footer: 14px medium, quiet token
+		// color. Real 44px box via padding; negative margins hand the extra box
+		// back to layout (pseudo-element hit areas are invisible to axe's
+		// target-size rule).
+		return "relative inline-flex min-h-11 items-center gap-2 rounded-md py-3 -my-3 text-sm font-medium text-secondary-token transition-colors duration-subtle hover:text-primary-token focus-ring-themed";
+	}
+	if (mark === "text") {
+		return "inline-flex min-h-11 min-w-11 items-center justify-center gap-1 rounded-md px-2 -mx-2 -my-3 focus-ring-themed text-3xs tracking-widest text-secondary-token hover:text-primary-token";
+	}
+	if (isLinear) {
+		return cn(
+			LOGO_HIT_AREA_CLASS,
+			"rounded-md focus-ring-themed transition-opacity duration-subtle ease-out hover:opacity-80",
+		);
+	}
+	return cn(
+		LOGO_HIT_AREA_CLASS,
+		"rounded-md focus-ring-themed transition-colors duration-subtle ease-out hover:bg-surface-1",
+	);
 }
 
 export function FooterBranding({
-  artistHandle,
-  variant = 'light',
-  className = '',
-  showCTA = true,
-  size = 'md',
-  mark = 'icon',
+	artistHandle,
+	variant = "light",
+	className = "",
+	showCTA = true,
+	size = "md",
+	mark = "icon",
 }: FooterBrandingProps) {
-  const signUpLink = buildUtmLink('/start', artistHandle);
-  const logoHref = buildUtmLink('/', artistHandle);
+	const signUpLink = buildUtmLink("/start", artistHandle);
+	const logoHref = buildUtmLink("/", artistHandle);
 
-  const isLinear = variant === 'linear';
-  const logoLinkClass = getLogoLinkClass(mark, isLinear);
+	const isLinear = variant === "linear";
+	const logoLinkClass = getLogoLinkClass(mark, isLinear);
 
-  const logoClass = isLinear
-    ? 'opacity-100'
-    : 'opacity-50 transition-opacity duration-subtle ease-out group-hover:opacity-100 group-focus-within:opacity-100';
+	const logoClass = isLinear
+		? "opacity-100"
+		: "opacity-50 transition-opacity duration-subtle ease-out group-hover:opacity-100 group-focus-within:opacity-100";
 
-  const ctaStyle: CSSProperties | undefined = isLinear
-    ? { color: 'var(--linear-text-tertiary)' }
-    : undefined;
+	const ctaStyle: CSSProperties | undefined = isLinear
+		? { color: "var(--linear-text-tertiary)" }
+		: undefined;
 
-  return (
-    <div
-      className={cn(
-        'group flex flex-col items-center justify-center space-y-2',
-        className
-      )}
-    >
-      <Link
-        href={logoHref}
-        prefetch={false}
-        aria-label={mark === 'brand' ? undefined : 'Powered by Jovie Home'}
-        className={logoLinkClass}
-      >
-        {renderLogoMark(mark, size, isLinear, logoClass)}
-      </Link>
+	return (
+		<div
+			className={cn(
+				"group flex flex-col items-center justify-center space-y-2",
+				className,
+			)}
+		>
+			<Link
+				href={logoHref}
+				prefetch={false}
+				aria-label={mark === "brand" ? undefined : "Powered by Jovie Home"}
+				className={logoLinkClass}
+			>
+				{renderLogoMark(mark, size, isLinear, logoClass)}
+			</Link>
 
-      {showCTA && (
-        <Link
-          href={signUpLink}
-          prefetch={false}
-          className={cn(
-            'text-3xs leading-snug font-semibold tracking-[0.04em]',
-            'text-center',
-            'rounded-md px-2 py-1.5 -mx-2 -my-1.5',
-            !isLinear && 'text-secondary-token hover:text-primary-token',
-            !isLinear && 'hover:bg-surface-1'
-          )}
-          style={ctaStyle}
-        >
-          Claim your handle
-        </Link>
-      )}
-    </div>
-  );
+			{showCTA && (
+				<Link
+					href={signUpLink}
+					prefetch={false}
+					className={cn(
+						"text-3xs leading-snug font-semibold tracking-[0.04em]",
+						"text-center",
+						"rounded-md px-2 py-1.5 -mx-2 -my-1.5",
+						!isLinear && "text-secondary-token hover:text-primary-token",
+						!isLinear && "hover:bg-surface-1",
+					)}
+					style={ctaStyle}
+				>
+					Claim your handle
+				</Link>
+			)}
+		</div>
+	);
 }
