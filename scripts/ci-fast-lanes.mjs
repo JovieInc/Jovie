@@ -867,6 +867,7 @@ export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
   'scripts/hostops/pen-golden-path-sync.test.mjs',
   'scripts/design/pen-inspect.test.mjs',
   'scripts/design/pen-draft-publish.test.mjs',
+  'scripts/design/pen-draft-quota.test.mjs',
   'scripts/design/pen-draft-picture.test.mjs',
   'scripts/design/pen-draft-frames.test.mjs',
   'scripts/hostops/pen-files-worker/src/index.test.mjs',

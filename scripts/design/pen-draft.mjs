@@ -27,7 +27,6 @@
  */
 import { execFileSync, spawnSync } from 'node:child_process';
 import {
-  appendFileSync,
   existsSync,
   mkdirSync,
   readdirSync,
@@ -36,8 +35,10 @@ import {
 } from 'node:fs';
 import { basename, dirname, join, resolve } from 'node:path';
 import { parseArgs } from 'node:util';
+import { deferralReason, writeDeferredSummary } from './pen-draft-quota.mjs';
 import { spliceDraft, trimCanonical } from './pen-trim.mjs';
 
+export { deferralReason, writeDeferredSummary } from './pen-draft-quota.mjs';
 export { briefTerms, spliceDraft, trimCanonical } from './pen-trim.mjs';
 
 // 0.3.16 is the first Pen CLI that lists claude-fable-5-2; older ones reject
@@ -104,51 +105,6 @@ export const BUDGET_MS = 23 * 60_000;
 // A retry starts from the canonical file again, so less than this is no use.
 const MIN_ATTEMPT_MS = 10 * 60_000;
 
-// Run 43621008907: the drafting agent's Claude Code weekly limit ran out
-// mid-run, and the last frames each burned a retry on the same refusal before
-// failing with the same generic npx error. A quota refusal is the account's,
-// not the frame's, so the frame is deferred — visibly, with the reset the
-// agent itself reports — instead of failed and retried.
-const RATE_LIMIT_LINE = /\b(?:rate_limit|weekly limit|usage limit)\b/i;
-const RATE_LIMIT_RESET = /resets ([^\n\r]+)/i;
-
-/**
- * Why a failed drafting call defers the frame instead of failing it: the
- * agent is out of its model quota until the provider resets it, so every
- * frame after it fails the same way. Null when the failure is the frame's own.
- */
-export function deferralReason(output) {
-  const text = String(output ?? '');
-  if (!RATE_LIMIT_LINE.test(text)) return null;
-  return {
-    reason: 'rate_limit',
-    reset: RATE_LIMIT_RESET.exec(text)?.[1]?.trim() ?? null,
-    detail:
-      (text.split(/[\r\n]+/).find(line => RATE_LIMIT_LINE.test(line)) ?? '')
-        .trim()
-        .slice(0, 200) || null,
-  };
-}
-
-/**
- * The run page's job summary, when GitHub provides one, so a red deferred
- * job says why it is red and when the refusal lifts.
- */
-export function writeDeferredSummary(frame, deferred, env = process.env) {
-  if (!env.GITHUB_STEP_SUMMARY) return;
-  appendFileSync(
-    env.GITHUB_STEP_SUMMARY,
-    [
-      `### Deferred: ${frame}`,
-      '',
-      `The drafting agent is out of its model quota (${deferred.reason}), so this frame was not drafted and is not retried this run.`,
-      ...(deferred.reset ? [`- Resets: ${deferred.reset}`] : []),
-      '- The next pen-draft run after the reset drafts this frame again.',
-      '',
-    ].join('\n')
-  );
-}
-
 /**
  * How long the next attempt may run, or 0 when the budget can't fit one. The
  * first attempt gets the whole budget, so one that runs it out is not
@@ -162,6 +118,7 @@ export function attemptTimeout(elapsedMs, budgetMs = BUDGET_MS) {
 /** Files whose change means every frame has to be drafted again. */
 export const DRAFTER_FILES = [
   'scripts/design/pen-draft.mjs',
+  'scripts/design/pen-draft-quota.mjs',
   'scripts/design/pen-trim.mjs',
   '.github/workflows/pen-draft.yml',
 ];

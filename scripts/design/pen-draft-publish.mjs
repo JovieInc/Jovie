@@ -18,10 +18,9 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { parseArgs } from 'node:util';
-import { linearRequest } from '../lib/linear-cooldown.mjs';
 import { JOVIE_TEAM_ID } from '../lib/linear-issue-intake.mjs';
-import { withLinearRetry } from '../lib/linear-retry.mjs';
 import { collectFrames, pictureFor } from './pen-draft-frames.mjs';
+import { linearGraphql, retried } from './pen-draft-linear.mjs';
 
 export const TITLE_PREFIX = 'Pen draft for approval: ';
 // A label of its own for design approvals. `quality-gap:needs-tim` is a gate
@@ -102,53 +101,6 @@ export function runUrlFor(runId, env = process.env) {
   const repo = env.GITHUB_REPOSITORY || 'JovieInc/Jovie';
   return `${server}/${repo}/actions/runs/${runId}`;
 }
-
-/**
- * One Linear GraphQL call in the shape scripts/lib/linear-retry.mjs retries.
- * @param {Context} ctx
- * @param {string} op
- * @param {string} query
- * @param {Record<string, unknown>} variables
- * @returns {Promise<GraphqlOk | Failure>}
- */
-async function linearGraphql(ctx, op, query, variables) {
-  const result = await linearRequest({
-    key: ctx.apiKey,
-    query,
-    variables,
-    fetchImpl: ctx.fetchImpl,
-    env: ctx.env,
-  });
-  if (result.rateLimited) return { ok: false, reason: 'linear_rate_limited' };
-  if (result.reason === 'missing_linear_api_key')
-    return { ok: false, reason: result.reason };
-  if (result.reason === 'transport')
-    return { ok: false, reason: `${op}_transport` };
-  if (!result.ok) return { ok: false, reason: `${op}_${result.status}` };
-  if (Array.isArray(result.data?.errors) && result.data.errors.length > 0)
-    return {
-      ok: false,
-      reason: `${op}_graphql_error`,
-      detail: String(result.data.errors[0]?.message ?? '').slice(0, 200),
-    };
-  return { ok: true, data: result.data?.data ?? null };
-}
-
-/**
- * @template {{ok: boolean, reason?: string}} T
- * @param {Context} ctx
- * @param {string} frame
- * @param {string} op
- * @param {() => Promise<T>} run
- * @returns {Promise<T>}
- */
-const retried = (ctx, frame, op, run) =>
-  withLinearRetry(run, {
-    fingerprint: frame,
-    op,
-    sleep: ctx.sleep,
-    log: ctx.log,
-  });
 
 /**
  * The approval label's id and the state a new issue starts in.
