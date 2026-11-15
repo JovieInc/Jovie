@@ -1,5 +1,6 @@
 import 'server-only';
 
+import { get } from '@vercel/blob';
 import { executeWithRetry } from '@/lib/resilience/primitives';
 import { logger } from '@/lib/utils/logger';
 
@@ -38,11 +39,15 @@ export function isTransientBlobReadError(error: unknown): boolean {
   );
 }
 
-export async function getBlobWithRetry<T>(
-  operation: () => Promise<T>,
+type BlobGetPathname = Parameters<typeof get>[0];
+type BlobGetOptions = NonNullable<Parameters<typeof get>[1]>;
+
+export async function getBlobWithRetry(
+  pathname: BlobGetPathname,
+  options: BlobGetOptions,
   context: string
-): Promise<T> {
-  return executeWithRetry(operation, {
+): Promise<Awaited<ReturnType<typeof get>>> {
+  return executeWithRetry(() => get(pathname, options), {
     maxRetries: BLOB_READ_RETRIES,
     baseDelayMs: BLOB_READ_BASE_DELAY_MS,
     maxDelayMs: BLOB_READ_MAX_DELAY_MS,

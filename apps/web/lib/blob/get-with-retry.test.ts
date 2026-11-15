@@ -1,5 +1,10 @@
+import { get as mockGet } from '@vercel/blob';
 import { describe, expect, it, vi } from 'vitest';
 import { getBlobWithRetry, isTransientBlobReadError } from './get-with-retry';
+
+vi.mock('@vercel/blob', () => ({ get: vi.fn() }));
+
+const mockGetTyped = vi.mocked(mockGet);
 
 function blobFetchError(status: number, statusText: string): Error {
   return new Error(
@@ -46,41 +51,45 @@ describe('isTransientBlobReadError', () => {
 });
 
 describe('getBlobWithRetry', () => {
-  it('retries a transient upstream 5xx and returns the eventual result', async () => {
-    const operation = vi
-      .fn<() => Promise<{ ok: boolean }>>()
-      .mockRejectedValueOnce(blobFetchError(500, 'Internal Server Error'))
-      .mockResolvedValue({ ok: true });
+  it('passes the pathname and options through to the SDK unchanged', async () => {
+    const options = { access: 'private', useCache: false } as const;
+    mockGetTyped.mockResolvedValueOnce({ statusCode: 200 } as never);
 
-    await expect(getBlobWithRetry(operation, 'test.readBlob')).resolves.toEqual(
-      { ok: true }
-    );
-    expect(operation).toHaveBeenCalledTimes(2);
+    await getBlobWithRetry('some/path.json', options, 'test.readBlob');
+
+    expect(mockGetTyped).toHaveBeenCalledWith('some/path.json', options);
+  });
+
+  it('retries a transient upstream 5xx and returns the eventual result', async () => {
+    mockGetTyped
+      .mockRejectedValueOnce(blobFetchError(500, 'Internal Server Error'))
+      .mockResolvedValueOnce({ ok: true } as never);
+
+    await expect(getBlobWithRetry('p', {}, 'test.readBlob')).resolves.toEqual({
+      ok: true,
+    });
+    expect(mockGetTyped).toHaveBeenCalledTimes(2);
   });
 
   it('does not retry a non-retryable error', async () => {
-    const operation = vi
-      .fn<() => Promise<unknown>>()
-      .mockRejectedValue(blobFetchError(403, 'Forbidden'));
+    mockGetTyped.mockRejectedValue(blobFetchError(403, 'Forbidden'));
 
     await expect(
-      getBlobWithRetry(operation, 'test.readBlob')
+      getBlobWithRetry('p', {}, 'test.readBlob')
     ).rejects.toMatchObject({
       message: 'Vercel Blob: Failed to fetch blob: 403 Forbidden',
     });
-    expect(operation).toHaveBeenCalledTimes(1);
+    expect(mockGetTyped).toHaveBeenCalledTimes(1);
   });
 
   it('throws the last error after exhausting the bounded retries', async () => {
-    const operation = vi
-      .fn<() => Promise<unknown>>()
-      .mockRejectedValue(blobFetchError(503, 'Service Unavailable'));
+    mockGetTyped.mockRejectedValue(blobFetchError(503, 'Service Unavailable'));
 
     await expect(
-      getBlobWithRetry(operation, 'test.readBlob')
+      getBlobWithRetry('p', {}, 'test.readBlob')
     ).rejects.toMatchObject({
       message: 'Vercel Blob: Failed to fetch blob: 503 Service Unavailable',
     });
-    expect(operation).toHaveBeenCalledTimes(3);
+    expect(mockGetTyped).toHaveBeenCalledTimes(3);
   });
 });
