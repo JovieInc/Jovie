@@ -10,10 +10,8 @@ vi.mock('@/lib/utils/logger', () => ({
   logger: { error: mocks.error, warn: vi.fn(), info: vi.fn() },
 }));
 
-import {
-  findRedirectByOldSlug,
-  findSupersededReleaseSlug,
-} from '@/lib/discography/slug';
+import { findRedirectByOldSlug } from '@/lib/discography/slug';
+import { findSupersededReleaseSlug } from '@/lib/discography/superseded-slug';
 
 /** Queue one result per db.select() call, in call order. */
 function queries(...results: Array<unknown[] | Error>) {
