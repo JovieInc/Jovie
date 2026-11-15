@@ -17,6 +17,18 @@ const wrappedGraphQL = pullRequests => ({
     ])
   ),
 });
+// The api-client reads response.text() and JSON.parses it (client.ts:
+// `json: <T>() => JSON.parse(text)`); response.json() is never called, and
+// classifyFailure needs a real Headers (Map.get returns undefined where
+// Headers.get returns null). Both merge-group failures came from mocking
+// the wrong surface. Proven by the plain-node repro in the PR thread.
+const graphqlResponse = payload => ({
+  ok: true,
+  status: 200,
+  text: async () => JSON.stringify(payload),
+  json: async () => payload,
+  headers: new Headers({ 'content-type': 'application/json' }),
+});
 
 describe('batchPulls unwraps the api-client response (JOV-12768)', () => {
   it('returns flat pull entries, not the repository wrapper', async () => {
@@ -28,24 +40,19 @@ describe('batchPulls unwraps the api-client response (JOV-12768)', () => {
         expect(String(init.body)).toContain(
           'pullRequest(number: 18293) { number state mergedAt mergeCommitSha title body base { ref } }'
         );
-        return {
-          ok: true,
-          status: 200,
-          json: async () =>
-            wrappedGraphQL({
-              18293: {
-                number: 18293,
-                state: 'MERGED',
-                mergedAt: '2026-11-01T00:00:00Z',
-                mergeCommitSha: 'a'.repeat(40),
-                title: 'fix(JOV-2)',
-                body: 'closes JOV-2',
-                base: { ref: 'main' },
-              },
-            }),
-          text: async () => '{}',
-          headers: new Headers({ 'content-type': 'application/json' }),
-        };
+        return graphqlResponse(
+          wrappedGraphQL({
+            18293: {
+              number: 18293,
+              state: 'MERGED',
+              mergedAt: '2026-11-01T00:00:00Z',
+              mergeCommitSha: 'a'.repeat(40),
+              title: 'fix(JOV-2)',
+              body: 'closes JOV-2',
+              base: { ref: 'main' },
+            },
+          })
+        );
       }
       throw new Error(`unexpected REST call ${url}`);
     };
@@ -70,33 +77,28 @@ describe('batchPulls unwraps the api-client response (JOV-12768)', () => {
   it('keeps a MERGED pull bound end-to-end (not dropped) and skips OPEN', async () => {
     const fetchMock = async (url, init) => {
       if (String(url).endsWith('/graphql')) {
-        return {
-          ok: true,
-          status: 200,
-          json: async () =>
-            wrappedGraphQL({
-              18293: {
-                number: 18293,
-                state: 'MERGED',
-                mergedAt: '2026-11-01T00:00:00Z',
-                mergeCommitSha: 'a'.repeat(40),
-                title: 'fix(JOV-2)',
-                body: 'closes JOV-2',
-                base: { ref: 'main' },
-              },
-              25500: {
-                number: 25500,
-                state: 'OPEN',
-                mergedAt: null,
-                mergeCommitSha: null,
-                title: 'wip',
-                body: '',
-                base: { ref: 'main' },
-              },
-            }),
-          text: async () => '{}',
-          headers: new Headers({ 'content-type': 'application/json' }),
-        };
+        return graphqlResponse(
+          wrappedGraphQL({
+            18293: {
+              number: 18293,
+              state: 'MERGED',
+              mergedAt: '2026-11-01T00:00:00Z',
+              mergeCommitSha: 'a'.repeat(40),
+              title: 'fix(JOV-2)',
+              body: 'closes JOV-2',
+              base: { ref: 'main' },
+            },
+            25500: {
+              number: 25500,
+              state: 'OPEN',
+              mergedAt: null,
+              mergeCommitSha: null,
+              title: 'wip',
+              body: '',
+              base: { ref: 'main' },
+            },
+          })
+        );
       }
       // A REST per-pull read here would mean the batch answer was ignored.
       throw new Error(`REST read must not happen for ${url}`);
@@ -127,24 +129,19 @@ describe('batchPulls unwraps the api-client response (JOV-12768)', () => {
         if (String(url).endsWith('/graphql')) {
           posts += 1;
           expect(init.method).toBe('POST');
-          return {
-            ok: true,
-            status: 200,
-            json: async () =>
-              wrappedGraphQL({
-                18293: {
-                  number: 18293,
-                  state: 'MERGED',
-                  mergedAt: '2026-11-01T00:00:00Z',
-                  mergeCommitSha: 'a'.repeat(40),
-                  title: 'fix(JOV-2)',
-                  body: 'closes JOV-2',
-                  base: { ref: 'main' },
-                },
-              }),
-            text: async () => '{}',
-            headers: new Headers({ 'content-type': 'application/json' }),
-          };
+          return graphqlResponse(
+            wrappedGraphQL({
+              18293: {
+                number: 18293,
+                state: 'MERGED',
+                mergedAt: '2026-11-01T00:00:00Z',
+                mergeCommitSha: 'a'.repeat(40),
+                title: 'fix(JOV-2)',
+                body: 'closes JOV-2',
+                base: { ref: 'main' },
+              },
+            })
+          );
         }
         if (/\/pulls\/\d+$/.test(String(url))) {
           restPullReads += 1;
@@ -173,13 +170,7 @@ describe('batchPulls unwraps the api-client response (JOV-12768)', () => {
   it('maps a null alias (missing PR, no errors) to null so the caller falls back to REST', async () => {
     const fetchMock = async url => {
       if (String(url).endsWith('/graphql')) {
-        return {
-          ok: true,
-          status: 200,
-          json: async () => wrappedGraphQL({ 18293: null }),
-          text: async () => '{}',
-          headers: new Headers({ 'content-type': 'application/json' }),
-        };
+        return graphqlResponse(wrappedGraphQL({ 18293: null }));
       }
       throw new Error(`unexpected call ${url}`);
     };
