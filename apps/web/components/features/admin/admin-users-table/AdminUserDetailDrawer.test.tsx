@@ -226,4 +226,19 @@ describe('AdminUserDetailDrawer', () => {
     const email = longContentUser.email ?? '';
     expect(screen.getByText(email)).toHaveClass('min-w-0');
   });
+
+  it('reserves the floating action band beside the header identity', () => {
+    render(<AdminUserDetailDrawer user={longContentUser} onClose={vi.fn()} />);
+
+    // A long email parks the Copy Email button at the identity column's right
+    // edge, directly under the card-top-right floating cluster (right-3 12px
+    // offset + 28px overflow trigger + 6px gap + 28px close = 74px). The
+    // column must reserve that band or the cluster paints over the target's
+    // edge and axe target-size reports a partially obscured 20x24 hit area —
+    // pr-9 (36px) under-reserved it by exactly the reported 4px.
+    const identity = screen
+      .getByTestId('entity-header-title')
+      .closest('div.space-y-1');
+    expect(identity).toHaveClass('pr-20');
+  });
 });
