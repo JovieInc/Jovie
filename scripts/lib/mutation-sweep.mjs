@@ -458,11 +458,14 @@ export function shardOf(file, count) {
 
 /**
  * Merges sweep states module by module, keeping each module's most recent
- * entry. Other top-level fields (the model fingerprint) come from the first
- * state that has them, so pass the state of record first.
+ * entry (a model-change re-arm counts from its rearmedAt). Other top-level fields
+ * (the model fingerprint) come from the first state that has them: pass the state of record first.
  * @param {...unknown} states
  */
 export function mergeStates(...states) {
+  /** @param {{ at: string, rearmedAt?: string }} e */
+  const fresh = e =>
+    Math.max(Date.parse(e.at), Date.parse(e.rearmedAt ?? '') || 0);
   const merged = emptyState();
   const top = /** @type {Record<string, unknown>} */ (merged);
   for (const raw of states) {
@@ -471,8 +474,7 @@ export function mergeStates(...states) {
       if (key !== 'modules' && value != null && !(key in top)) top[key] = value;
     for (const [file, entry] of Object.entries(state.modules)) {
       const known = merged.modules[file];
-      if (!known || Date.parse(entry.at) > Date.parse(known.at))
-        merged.modules[file] = entry;
+      if (!known || fresh(entry) > fresh(known)) merged.modules[file] = entry;
     }
   }
   return merged;

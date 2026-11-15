@@ -184,4 +184,7 @@ test('model fingerprint is order independent and rearm marks top scored modules'
     )
   ).toBe(2);
   expect(s.modules['lib/billing/a.ts'].at).toBe(new Date(0).toISOString());
+  expect(Date.parse(s.modules['lib/billing/a.ts'].rearmedAt)).toBeGreaterThan(
+    0
+  );
 });

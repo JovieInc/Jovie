@@ -361,6 +361,22 @@ describe('baseline shards', () => {
     ).toEqual({ 'lib/a.ts': 60, 'lib/b.ts': 70, 'lib/c.ts': 80 });
   });
 
+  it('lets a re-arm beat an older baseline score but not a newer one', () => {
+    const scored = at => ({ at, score: 70, status: 'scored' });
+    const rearmed = {
+      ...scored('2026-11-01T00:00:00Z'),
+      at: new Date(0).toISOString(),
+      rearmedAt: '2026-11-05T00:00:00Z',
+    };
+    const fold = baselineAt =>
+      mergeStates(
+        { ...emptyState(), modules: { 'lib/a.ts': rearmed } },
+        { ...emptyState(), modules: { 'lib/a.ts': scored(baselineAt) } }
+      ).modules['lib/a.ts'];
+    expect(fold('2026-11-03T00:00:00Z')).toBe(rearmed);
+    expect(fold('2026-11-06T00:00:00Z').at).toBe('2026-11-06T00:00:00Z');
+  });
+
   it('keeps top-level fields from the first state that has them', () => {
     const merged = mergeStates(
       { ...emptyState(), modelFingerprint: 'f1', modelIds: ['m1'] },
