@@ -1,5 +1,6 @@
 'use client';
 
+import { PlainButton } from '@jovie/ui';
 import { Check } from 'lucide-react';
 import { type ReactNode, useState } from 'react';
 
@@ -24,8 +25,7 @@ export function ReleaseTaskCategoryGroup({
 
   return (
     <section aria-label={`${category} — ${done} of ${total} complete`}>
-      <button
-        type='button'
+      <PlainButton
         onClick={() => setIsOpen(!isOpen)}
         className='flex w-full items-center justify-between px-3 py-1 text-xs font-caption text-secondary-token hover:bg-surface-1 rounded transition-colors'
         aria-expanded={isOpen}
@@ -36,7 +36,7 @@ export function ReleaseTaskCategoryGroup({
             ({done}/{total})
           </span>
           {allDone && (
-            <Check className='h-3 w-3 text-emerald-500' aria-hidden='true' />
+            <Check className='h-3 w-3 text-success' aria-hidden='true' />
           )}
         </span>
         <svg
@@ -52,7 +52,7 @@ export function ReleaseTaskCategoryGroup({
           <title>Toggle section</title>
           <path d='M3 5L6 8L9 5' />
         </svg>
-      </button>
+      </PlainButton>
       {isOpen && <div className='space-y-0'>{children}</div>}
     </section>
   );
