@@ -120,4 +120,16 @@ describe('FilterChip', () => {
     expect(btn).toHaveAttribute('tabindex', '-1');
     expect(btn).toHaveAttribute('aria-describedby', 'help-text');
   });
+
+  it('renders through the design-system plain button', () => {
+    render(
+      <FilterChip pressed={false} onClick={vi.fn()}>
+        Overdue
+      </FilterChip>
+    );
+    expect(screen.getByRole('button', { name: 'Overdue' })).toHaveAttribute(
+      'data-slot',
+      'plain-button'
+    );
+  });
 });
