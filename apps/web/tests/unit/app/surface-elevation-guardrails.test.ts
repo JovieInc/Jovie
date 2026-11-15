@@ -98,16 +98,24 @@ describe('surface elevation guardrails', () => {
       'utf-8'
     );
 
+    const focusCanon = readFileSync(join(ROOT, 'styles/focus.css'), 'utf-8');
+
     // Noir Ion focus ring (ion) — not a white halo or retired aqua
     expect(linearTokens).toContain(
       '--linear-border-focus: rgba(17, 175, 255, 0.72);'
     );
     expect(designSystem).toContain('--focus-ring-width: 1px;');
-    expect(designSystem).toMatch(
-      /:where\(:focus-visible\)\s*{[\s\S]*box-shadow:[\s\S]*0 0 0 2px var\(--linear-bg-page\)[\s\S]*0 0 0 4px var\(--color-border-focus\);/
+    // One keyboard-only outline that follows the radius (styles/focus.css),
+    // not a global box-shadow halo on every focused element.
+    expect(focusCanon).toMatch(
+      /\):focus-visible\s*{\s*outline: var\(--focus-outline-width\) solid var\(--focus-outline-color\) !important;/
     );
-    expect(designSystem).toMatch(
-      /:where\([\s\S]*input,[\s\S]*textarea,[\s\S]*\[role="textbox"\][\s\S]*\):focus\s*{[\s\S]*outline:\s*none;/
+    expect(designSystem).not.toMatch(
+      /:where\(:focus-visible\)\s*{[^}]*box-shadow:\s*0 0 0/
+    );
+    // Text fields hug their own border instead of drawing a second box.
+    expect(focusCanon).toMatch(
+      /textarea,[\s\S]*\[role="textbox"\][\s\S]*\):focus-visible\s*{\s*outline-offset: -1px !important;/
     );
     expect(designSystem).toMatch(
       /:where\([\s\S]*input,[\s\S]*textarea,[\s\S]*\[role="textbox"\][\s\S]*\):focus-visible\s*{[\s\S]*box-shadow:\s*none;/

@@ -4131,17 +4131,9 @@ html:not(.dark) .smart-link-powered-by {
   letter-spacing: -0.01em;
 }
 
-/* Keyboard focus fallback — canonical visible focus ring (WCAG SC 2.4.7).
-   Design-system consistent recipe used across shell/chrome (smallwin + a11y polish):
-     focus-visible:outline-none
-     focus-visible:ring-2 focus-visible:ring-focus
-     focus-visible:ring-offset-2 focus-visible:ring-offset-(--linear-bg-page)
-   Box-shadow equivalent ensures global application to any :focus-visible without
-   explicit treatment. :where() keeps specificity at 0 so component-level overrides
-   (stronger CTA rings, public-action-*, Clerk, surface-specific offsets, input borders)
-   win cleanly. Eliminates all browser default outline artifacts.
-   The canonical focus color retains non-text contrast. The base cascade layer
-   lets component utilities own explicit focus geometry and treatments. */
+/* Keyboard focus is drawn once, by styles/focus.css: a :focus-visible outline
+   that follows each control's radius and is drawn inside clipping containers.
+   This only eases border-color and shadow changes on focus. */
 @layer base {
   :where(:focus-visible) {
     transition:
