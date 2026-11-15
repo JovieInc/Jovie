@@ -13,7 +13,7 @@ const baseStyles = 'text-xs font-normal tracking-tight';
 // Use semantic tokens for proper dark mode support
 const variantStyles = {
   light: 'text-tertiary-token',
-  dark: 'text-white/50',
+  dark: 'text-on-media/50',
 } as const;
 
 export function Copyright({

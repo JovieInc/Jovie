@@ -97,7 +97,7 @@
       ".github/workflows/unstack-merged-parent.yml": 2,
       ".github/workflows/vercel-preview-cleanup.yml": 1,
       ".github/workflows/visual-a11y.yml": 2,
-      ".github/workflows/visual-regression.yml": 2,
+      ".github/workflows/visual-regression.yml": 1,
       ".github/workflows/voc-mine.yml": 1,
       ".github/workflows/wins-ledger.yml": 1
     },
