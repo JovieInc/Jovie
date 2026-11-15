@@ -3668,7 +3668,6 @@ it('reads structural control paths from data, one alternative per line (JOV-6837
     maxBuffer: 256 * 1024 * 1024,
     cwd: REPO_ROOT,
     encoding: 'utf8',
-    maxBuffer: 256 * 1024 * 1024,
   })
     .split('\n')
     .filter(path => new RegExp(structuralControlPattern()).test(path));

@@ -245,7 +245,6 @@ describe('git-backed scan', () => {
       maxBuffer: 256 * 1024 * 1024,
       cwd: root,
       encoding: 'utf8',
-      maxBuffer: 256 * 1024 * 1024,
     })
       .split('\n')
       .filter(Boolean);
