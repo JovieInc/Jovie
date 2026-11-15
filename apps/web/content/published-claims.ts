@@ -196,7 +196,7 @@ export const PUBLISHED_CLAIM_RECEIPTS = {
   'jovie.agent-draft-connector': {
     id: 'jovie.agent-draft-connector',
     statement:
-      'The anonymous agent connector creates unpublished artist and release drafts. start_upgrade returns a Jovie checkout entry URL; the person reviews plans and completes any purchase on Jovie. The connector does not process payments.',
+      'The anonymous agent connector creates unpublished drafts. start_upgrade returns a Jovie checkout entry URL; the person reviews plans and completes any purchase on Jovie. The connector does not process payments.',
     evidence: [
       'https://github.com/JovieInc/Jovie/blob/0ad88cd074910eb3a88f3b5731f713d5b20cfc53/apps/web/app/api/mcp/route.ts',
       'https://github.com/JovieInc/Jovie/blob/0ad88cd074910eb3a88f3b5731f713d5b20cfc53/apps/web/lib/agent-acquisition/api.ts',
