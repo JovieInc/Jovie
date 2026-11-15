@@ -15,6 +15,7 @@ import { useRegisterRightPanel } from '@/hooks/useRegisterRightPanel';
 import { SIDEBAR_WIDTH } from '@/lib/constants/layout';
 import { queryKeys } from '@/lib/queries/keys';
 import { useDspEnrichmentStatusQuery } from '@/lib/queries/useDspEnrichmentStatusQuery';
+import { extractSpotifyArtistId } from '@/lib/spotify/artist-id';
 import { AddPlatformDialog } from './AddPlatformDialog';
 import { CatalogHealthSection } from './CatalogHealthSection';
 import { DspPresenceSidebar } from './DspPresenceSidebar';
@@ -41,7 +42,12 @@ export function DspPresenceView({
 
   const profileId = dashboardData.selectedProfile?.id ?? '';
   const isAdmin = dashboardData.isAdmin;
-  const spotifyId = dashboardData.selectedProfile?.spotifyId ?? null;
+  // Legacy profiles keep only spotify_url; resolve the exact artist ID from
+  // either field so Catalog Health is not silently hidden for them.
+  const selectedSpotifyUrl = dashboardData.selectedProfile?.spotifyUrl;
+  const spotifyId =
+    dashboardData.selectedProfile?.spotifyId ??
+    (selectedSpotifyUrl ? extractSpotifyArtistId(selectedSpotifyUrl) : null);
 
   // Poll enrichment status and invalidate matches cache when discovery completes
   const onDiscoveryComplete = useCallback(() => {

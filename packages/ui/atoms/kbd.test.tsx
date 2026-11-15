@@ -127,6 +127,25 @@ describe('Kbd', () => {
       );
     });
 
+    it('treats a whitespace-padded Shift glyph as Shift', () => {
+      render(<Kbd data-testid='kbd'>{' ⇧ '}</Kbd>);
+      const kbd = screen.getByTestId('kbd');
+      expect(kbd).toHaveAttribute('data-key', 'shift');
+      expect(kbd.querySelector('[data-kbd-shift-icon="true"]')).not.toBeNull();
+    });
+
+    it('renders element children unchanged, without the Shift mark', () => {
+      render(
+        <Kbd data-testid='kbd'>
+          <span data-testid='inner'>⇧</span>
+        </Kbd>
+      );
+      const kbd = screen.getByTestId('kbd');
+      expect(kbd).not.toHaveAttribute('data-key');
+      expect(screen.getByTestId('inner')).toHaveTextContent('⇧');
+      expect(kbd.querySelector('[data-kbd-shift-icon="true"]')).toBeNull();
+    });
+
     it('renders single key', () => {
       render(<Kbd>K</Kbd>);
       expect(screen.getByText('K')).toBeInTheDocument();
@@ -165,10 +184,26 @@ describe('Kbd', () => {
           <Kbd variant='tooltip'>⌘K</Kbd>
         </div>
       );
-      const kbd = screen.getByText('⌘K');
+      const kbd = screen.getByText('⌘K').closest('kbd') as HTMLElement;
       expect(kbd.className).toContain('bg-surface-tooltip');
       expect(kbd.className).toContain('text-tooltip-foreground');
     });
+  });
+
+  it.each([
+    ['⌘K', 'Command K'],
+    ['⌥⌘P', 'Option Command P'],
+    ['⌃Enter', 'Control Enter'],
+    ['⇧⌘K', 'Shift Command K'],
+  ])('gives %s spoken modifier names (%s)', (glyphs, spoken) => {
+    render(<Kbd data-testid='kbd'>{glyphs}</Kbd>);
+    expect(screen.getByText(glyphs)).toHaveAttribute('aria-hidden', 'true');
+    expect(screen.getByText(spoken)).toHaveClass('sr-only');
+  });
+
+  it('leaves plain keys unchanged', () => {
+    render(<Kbd data-testid='kbd'>Esc</Kbd>);
+    expect(screen.getByTestId('kbd').innerHTML).toBe('Esc');
   });
 });
 

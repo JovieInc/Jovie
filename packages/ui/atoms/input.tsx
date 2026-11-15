@@ -82,22 +82,22 @@ export interface InputProps
  * Built on native HTML input with enhanced features for forms.
  */
 
-// Helper function to get padding class based on inputSize
-function getPaddingRight(
+// Inline-end padding for the trailing slot (logical, so it mirrors in RTL)
+function getPaddingEnd(
   inputSize: InputProps['inputSize']
-): 'pr-8' | 'pr-12' | 'pr-10' {
-  if (inputSize === 'sm') return 'pr-8';
-  if (inputSize === 'lg') return 'pr-12';
-  return 'pr-10';
+): 'pe-8' | 'pe-12' | 'pe-10' {
+  if (inputSize === 'sm') return 'pe-8';
+  if (inputSize === 'lg') return 'pe-12';
+  return 'pe-10';
 }
 
-// Helper function to get position class based on inputSize
-function getRightPosition(
+// Inline-end offset for the trailing slot (logical, so it mirrors in RTL)
+function getEndPosition(
   inputSize: InputProps['inputSize']
-): 'right-2' | 'right-3' | 'right-2.5' {
-  if (inputSize === 'sm') return 'right-2';
-  if (inputSize === 'lg') return 'right-3';
-  return 'right-2.5';
+): 'end-2' | 'end-3' | 'end-2.5' {
+  if (inputSize === 'sm') return 'end-2';
+  if (inputSize === 'lg') return 'end-3';
+  return 'end-2.5';
 }
 
 // Helper function to get spinner size class based on inputSize
@@ -236,11 +236,13 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
               variant: effectiveVariant,
               inputSize: effectiveSize,
             }),
-            hasRightContent && getPaddingRight(effectiveSize),
+            hasRightContent && getPaddingEnd(effectiveSize),
             className
           )}
           ref={ref}
-          disabled={disabled || loading}
+          // Loading freezes the value but keeps focus; native disabled drops it.
+          disabled={disabled}
+          readOnly={loading || undefined}
           aria-invalid={effectiveAriaInvalid}
           aria-busy={effectiveAriaBusy}
           aria-describedby={describedBy}
@@ -252,7 +254,7 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
           <div
             className={cn(
               'absolute top-1/2 -translate-y-1/2 flex items-center gap-1',
-              getRightPosition(effectiveSize)
+              getEndPosition(effectiveSize)
             )}
           >
             {/* Loading spinner - decorative since input has aria-busy */}
@@ -290,7 +292,7 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
             >
               {label}
               {props.required && (
-                <span className='text-destructive ml-1' aria-hidden='true'>
+                <span className='text-destructive ms-1' aria-hidden='true'>
                   *
                 </span>
               )}
@@ -306,7 +308,8 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
 
           {inputElement}
 
-          <div className='min-h-5' aria-live='polite'>
+          {/* role=alert announces the error once; no aria-live wrapper too. */}
+          <div className='min-h-5'>
             {error && (
               <p id={errorId} className='text-sm text-destructive' role='alert'>
                 {error}

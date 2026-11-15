@@ -318,4 +318,28 @@ describe('UnifiedTable keyboard selection', () => {
     fireEvent.click(screen.getByTestId('row-a'), { shiftKey: true });
     expect(onSelectRowRange).toHaveBeenLastCalledWith([data[0], data[1]]);
   });
+
+  it('reports the focused row in sorted display order, not source order', () => {
+    const onFocusedRowChange = vi.fn();
+    render(
+      <UnifiedTable
+        data={data}
+        columns={columns}
+        sorting={[{ id: 'name', desc: true }]}
+        enableVirtualization={false}
+        enableKeyboardNavigation
+        getRowId={row => row.id}
+        getRowTestId={row => `row-${row.id}`}
+        onRowClick={vi.fn()}
+        onFocusedRowChange={onFocusedRowChange}
+      />
+    );
+
+    // Sorted descending: Di, Cy, Bo, Ada. Display index 1 is Cy, not data[1].
+    const first = screen.getByTestId('row-d');
+    act(() => first.focus());
+    fireEvent.keyDown(first, { key: 'ArrowDown' });
+
+    expect(onFocusedRowChange).toHaveBeenLastCalledWith(1, data[2]);
+  });
 });

@@ -176,6 +176,9 @@ export async function getOutboundReadiness(
           needsProfile: queue.rows.filter(
             row => row.nextAction === 'build_profile'
           ).length,
+          relationshipHeld: queue.rows.filter(
+            row => row.relationshipHold !== null
+          ).length,
         }
       : null,
     evidence,

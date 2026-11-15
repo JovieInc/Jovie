@@ -2,15 +2,15 @@
 
 import { Button, buttonVariants, Input } from '@jovie/ui';
 import Link from 'next/link';
-import { type ReactNode, useEffect, useState } from 'react';
+import type { ReactNode } from 'react';
 import { Avatar } from '@/components/molecules/Avatar/Avatar';
 import { APP_ROUTES } from '@/constants/routes';
 import type { SpotifyArtistResult } from '@/lib/contracts/api';
+import { useArtistSearchQuery } from '@/lib/queries/useArtistSearchQuery';
 
 const SEARCH_DEBOUNCE_MS = 300;
 const SEARCH_LIMIT = 6;
-
-type SearchStatus = 'idle' | 'loading' | 'done' | 'error';
+const SEARCH_MIN_QUERY_LENGTH = 2;
 
 function claimStartHref(spotifyId: string): string {
   return `${APP_ROUTES.CLAIM_START}?spotify=${encodeURIComponent(spotifyId)}`;
@@ -112,42 +112,14 @@ function ArtistRow({ artist }: ArtistRowProps) {
 
 /** Spotify artist search → `/claim/start`, which decides the next step. */
 export function ClaimArtistSearch() {
-  const [query, setQuery] = useState('');
-  const [results, setResults] = useState<SpotifyArtistResult[]>([]);
-  const [status, setStatus] = useState<SearchStatus>('idle');
-
-  useEffect(() => {
-    const trimmed = query.trim();
-    if (trimmed.length < 2) {
-      setResults([]);
-      setStatus('idle');
-      return;
-    }
-
-    const controller = new AbortController();
-    const timer = globalThis.setTimeout(() => {
-      setStatus('loading');
-      fetch(
-        `/api/spotify/search?q=${encodeURIComponent(trimmed)}&limit=${SEARCH_LIMIT}`,
-        { signal: controller.signal, cache: 'no-store' }
-      )
-        .then(async response => {
-          if (!response.ok) throw new Error(`search ${response.status}`);
-          setResults((await response.json()) as SpotifyArtistResult[]);
-          setStatus('done');
-        })
-        .catch(() => {
-          if (controller.signal.aborted) return;
-          setResults([]);
-          setStatus('error');
-        });
-    }, SEARCH_DEBOUNCE_MS);
-
-    return () => {
-      globalThis.clearTimeout(timer);
-      controller.abort();
-    };
-  }, [query]);
+  // The canonical search hook owns the debounce and the query cache: retyping
+  // a previous query is served from cache, and the last results stay on screen
+  // while the next query loads.
+  const { query, results, search, state } = useArtistSearchQuery({
+    debounceMs: SEARCH_DEBOUNCE_MS,
+    limit: SEARCH_LIMIT,
+    minQueryLength: SEARCH_MIN_QUERY_LENGTH,
+  });
 
   return (
     <div className='space-y-4'>
@@ -162,7 +134,7 @@ export function ClaimArtistSearch() {
           id='claim-artist-search'
           type='search'
           value={query}
-          onChange={event => setQuery(event.target.value)}
+          onChange={event => search(event.target.value)}
           placeholder='Artist name'
           autoComplete='off'
           data-testid='claim-artist-search'
@@ -171,27 +143,26 @@ export function ClaimArtistSearch() {
 
       <div
         aria-live='polite'
-        aria-busy={status === 'loading'}
+        aria-busy={state === 'loading'}
         className='min-h-6'
       >
-        {/* With results on screen, a new search dims them in place instead of
-            adding a line above them, so the rows and the button never jump. */}
-        {status === 'loading' && results.length === 0 ? (
+        {/* Keep existing rows in place while the next search loads. */}
+        {state === 'loading' && results.length === 0 ? (
           <p className='text-xs text-tertiary-token'>Searching…</p>
         ) : null}
-        {status === 'error' ? (
+        {state === 'error' ? (
           <p className='text-xs text-secondary-token'>
             Search is unavailable. Try again, or create your profile below.
           </p>
         ) : null}
-        {status === 'done' && results.length === 0 ? (
+        {state === 'empty' ? (
           <p className='text-xs text-secondary-token'>
             No artists found. You can create your profile below.
           </p>
         ) : null}
         {results.length > 0 ? (
           <ul
-            className={`space-y-2 transition-opacity duration-subtle ${status === 'loading' ? 'opacity-60' : ''}`}
+            className={`space-y-2 transition-opacity duration-subtle ${state === 'loading' ? 'opacity-80' : ''}`}
             data-testid='claim-artist-results'
           >
             {results.map(artist => (

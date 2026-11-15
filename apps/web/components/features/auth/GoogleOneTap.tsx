@@ -33,6 +33,32 @@ interface GoogleOneTapProps {
    * When omitted, One Tap keeps the mode-local auth entry fallback.
    */
   readonly callbackURL?: string;
+  /** True when the shell sits in the sign-in dialog over another page. */
+  readonly inDialog?: boolean;
+}
+
+/**
+ * On a phone, One Tap is a bottom sheet over the form, and the page already
+ * shows Continue with Google one tap away. Skip it there so nothing ever sits
+ * on top of the email field or Send sign-in code (Tim, 2026-11-08).
+ */
+export const ONE_TAP_PHONE_QUERY = '(max-width: 599px)';
+
+function isPhoneViewport(): boolean {
+  if (typeof globalThis.matchMedia !== 'function') return false;
+  return globalThis.matchMedia(ONE_TAP_PHONE_QUERY).matches;
+}
+
+/**
+ * Without FedCM, One Tap is an iframe GSI appends to the page body. The
+ * sign-in dialog renders in the browser's top layer above the body, so that
+ * iframe would sit hidden and unclickable behind the dialog's backdrop.
+ */
+function supportsFedCm(): boolean {
+  return (
+    typeof globalThis.window !== 'undefined' &&
+    'IdentityCredential' in globalThis.window
+  );
 }
 
 function isNativeWebview(): boolean {
@@ -66,10 +92,13 @@ export function GoogleOneTap({
   mode,
   suppress,
   callbackURL,
+  inDialog = false,
 }: GoogleOneTapProps) {
   useEffect(() => {
     if (suppress) return;
     if (isNativeWebview()) return;
+    if (isPhoneViewport()) return;
+    if (inDialog && !supportsFedCm()) return;
     // FedCM reports account-less automation as browser console errors before
     // Better Auth's promise settles. The root layout marks managed no-auth QA
     // as e2e mode because Lighthouse masks navigator.webdriver. Skip the
@@ -96,7 +125,7 @@ export function GoogleOneTap({
       // Silent fallback: dismissal, cooldown, or origin not authorized.
       // The provider buttons remain the primary path. No layout shift.
     });
-  }, [callbackURL, mode, suppress]);
+  }, [callbackURL, inDialog, mode, suppress]);
 
   // One Tap renders in Google-owned chrome (an iframe positioned by GSI).
   // This component has no DOM footprint of its own — it's a mount trigger.

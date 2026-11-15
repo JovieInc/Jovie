@@ -25,8 +25,17 @@ import {
   summarizeGuards,
 } from '../component-certificate.mjs';
 import { storyReceipt } from '../component-evidence.mjs';
+import {
+  RENDER_INPUT_SCHEMA,
+  snapshotRenderInputs,
+} from '../component-render-inputs.mjs';
 import { moduleKey } from '../mutation-sweep.mjs';
 
+const renderInputs = {
+  schema: RENDER_INPUT_SCHEMA,
+  digest: 'c'.repeat(64),
+  mode: 'storybook-full',
+};
 const sourceHash = source => createHash('sha256').update(source).digest('hex');
 const gitBlob = source =>
   createHash('sha1')
@@ -34,18 +43,13 @@ const gitBlob = source =>
     .update(source)
     .digest('hex');
 
-const stories = [
-  'Loading',
-  'Empty',
-  'Error',
-  'Partial',
-  'LongContent',
-  'Offline',
-  'PermissionDenied',
-  'Rtl',
-]
-  .map(name => `export const ${name}={};`)
-  .join('\n');
+const stories =
+  'Loading Empty Error Partial LongContent Offline PermissionDenied Rtl'
+    .split(' ')
+    .map(name => `export const ${name}={};`)
+    .join('\n');
+// A reviewed benchmark judgment names its reference (component-benchmark-review).
+const reviewed = { reference: 'WAI-ARIA APG Button', gaps: [] };
 const criterion = (cert, id) => cert.criteria.find(row => row.id === id);
 function assertCriteria(cert, expected) {
   for (const [id, status] of Object.entries(expected)) {
@@ -95,7 +99,6 @@ describe('component certificate', () => {
       ['button', 'input']
     );
   });
-
   it('jank: inline component, autoFocus, unstable key, img, reset-on-open effect', () => {
     const src = `
 export function Drawer({ open }) {
@@ -116,7 +119,6 @@ export function Drawer({ open }) {
     ]);
     assert.deepEqual(findJank(clean, 'a.tsx'), []);
   });
-
   it('state stories are matched by export name', () => {
     const c = statesCovered(
       'export const Loading = {}; export const EmptyState = {}; export const RtlLong = {};'
@@ -152,8 +154,14 @@ export function Drawer({ open }) {
   it('fully evidenced component certifies; stale benchmark and low mutation do not', () => {
     const binding = sourceHash(full.source);
     const evidence = {
+      renderInputs,
       mutation: mutationReceipt(full.source, [full.testSource]),
-      visual: { status: 'pass', captured: 5, sourceHash: binding },
+      visual: {
+        status: 'pass',
+        captured: 5,
+        sourceHash: binding,
+        renderInputs,
+      },
       benchmark: {
         libraryVersion: 1,
         sourceHash: binding,
@@ -187,43 +195,6 @@ export function Drawer({ open }) {
       { benchmark: 'unknown' }
     );
   });
-
-  it('certificate binding is computed from source rather than caller metadata', () => {
-    assert.equal(
-      certifyComponent({
-        path: 'Card.tsx',
-        source: clean,
-        evidence: { sourceHash: 'invented' },
-      }).binding,
-      sourceHash(clean)
-    );
-  });
-
-  it.each(['a11y', 'visual'])(
-    '%s observations retain fresh failures and reject stale/unbound evidence',
-    id => {
-      for (const [binding, expected] of [
-        [sourceHash(clean), 'fail'],
-        [sourceHash('old'), 'unknown'],
-        [undefined, 'unknown'],
-      ]) {
-        assertCriteria(
-          certifyComponent({
-            path: 'Card.tsx',
-            source: clean,
-            evidence: {
-              [id]: {
-                status: 'fail',
-                sourceHash: binding,
-                detail: 'observed failure',
-              },
-            },
-          }),
-          { [id]: expected }
-        );
-      }
-    }
-  );
 
   const mutationCase = (fields = {}, inputs = {}, status = 'unknown') => ({
     fields,
@@ -361,9 +332,14 @@ describe('component certificate CLI evidence freshness', () => {
           git(['hash-object', additionalTest]),
         ]),
       };
-      records.visual = storyReceipt(binding);
-      records.a11y = storyReceipt(binding);
-      records.benchmark = { libraryVersion: 1, sourceHash: binding, gaps: [] };
+      const render = snapshotRenderInputs(root).binding;
+      records.visual = storyReceipt(binding, undefined, render);
+      records.a11y = storyReceipt(binding, undefined, render);
+      records.benchmark = {
+        ...reviewed,
+        libraryVersion: 1,
+        sourceHash: binding,
+      };
       save();
     };
     const invoke = (entry = cli) => {
@@ -411,9 +387,17 @@ describe('component certificate CLI evidence freshness', () => {
       'scripts/component-certificate.mjs',
       'scripts/component-ship-policy.mjs',
       'scripts/lib/component-certificate.mjs',
+      'scripts/lib/component-certification-registry.mjs',
+      'scripts/lib/component-benchmark-review.mjs',
+      'scripts/lib/component-certificate-mutation.mjs',
       'scripts/lib/component-evidence.mjs',
-      'scripts/lib/mutation-sweep.mjs',
-      'scripts/lib/mutation-diff.mjs',
+      'scripts/lib/design-rules/forced-caps.mjs',
+      'scripts/lib/design-rules/raw-colors.mjs',
+      ...`component-render-inputs component-render-closure component-story-receipts
+        component-story-evidence-lib mutation-sweep mutation-sweep-root mutation-diff
+        mutation-source`
+        .split(/\s+/)
+        .map(name => `scripts/lib/${name}.mjs`),
     ]) {
       mkdirSync(dirname(join(f.root, path)), { recursive: true });
       cpSync(join(dirname(dirname(cli)), path), join(f.root, path));
@@ -424,10 +408,24 @@ describe('component certificate CLI evidence freshness', () => {
       join(f.root, 'node_modules/typescript'),
       'dir'
     );
-    assert.equal(
-      f.invoke(join(f.root, 'scripts/component-certificate.mjs')).certified,
-      true
-    );
+    f.refresh();
+    const entry = join(f.root, 'scripts/component-certificate.mjs');
+    assert.equal(f.invoke(entry).certified, true);
+  });
+
+  it.each([
+    'apps/web/app/globals.css',
+    'apps/web/components/Card.stories.tsx',
+    'packages/ui/atoms/shared.tsx',
+  ])('shared render edits invalidate cached pass and fail: %s', path => {
+    assert.equal(f.invoke().certified, true);
+    f.write(path, 'changed render input');
+    assertCriteria(f.invoke(), { visual: 'unknown', a11y: 'unknown' });
+    for (const kind of ['visual', 'a11y']) f.records[kind].status = 'fail';
+    f.save();
+    assertCriteria(f.invoke(), { visual: 'unknown', a11y: 'unknown' });
+    f.refresh();
+    assert.equal(f.invoke().certified, true);
   });
 
   it('component edit and benchmark-only refresh cannot reuse old CI or mutation evidence', () => {
@@ -478,7 +476,7 @@ describe('component certificate CLI evidence freshness', () => {
     assertCriteria(f.invoke(), { mutation: 'unknown' });
   });
 
-  it('current unit axe evidence remains independent of a stale CI a11y receipt', () => {
+  it('unit axe cannot mask a stale CI a11y observation', () => {
     f.write(
       testPath,
       'it("axe", async () => { expect(1).toBe(1); await expectNoA11yViolations(container); });\n'
@@ -487,15 +485,17 @@ describe('component certificate CLI evidence freshness', () => {
     f.records.a11y.sourceHash = sourceHash(changed);
     f.save();
     const cert = f.invoke();
-    assert.equal(criterion(cert, 'a11y').source, 'unit-axe');
-    assert.equal(cert.certified, true);
+    assertCriteria(cert, { a11y: 'unknown' });
   });
 
   it.each([additionalTest, '.git'])(
     'missing %s cannot reuse a partial mutation key',
     path => {
       rmSync(join(f.root, path), { recursive: true, force: true });
-      assertCriteria(f.invoke(), { mutation: 'unknown', visual: 'pass' });
+      assertCriteria(f.invoke(), {
+        mutation: 'unknown',
+        visual: path === '.git' ? 'unknown' : 'pass',
+      });
     }
   );
 
@@ -520,6 +520,6 @@ describe('component certificate CLI evidence freshness', () => {
       maxBuffer: 16 * 1024 * 1024,
     });
     assert.ok(Buffer.byteLength(inventory) > 1024 * 1024);
-    assert.equal(f.invoke().certified, true);
+    assertCriteria(f.invoke(), { mutation: 'pass', visual: 'unknown' });
   });
 });

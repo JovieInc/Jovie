@@ -1,7 +1,14 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { act, cleanup, render, screen } from '@testing-library/react';
+import {
+  act,
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+} from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import { SubscriptionConfirmedBanner } from './SubscriptionConfirmedBanner';
 
 const sourcePath = resolve(__dirname, './SubscriptionConfirmedBanner.tsx');
@@ -62,6 +69,19 @@ describe('SubscriptionConfirmedBanner', () => {
       screen.queryByTestId('subscription-confirmed-banner-viewport')
     ).not.toBeInTheDocument();
     expect(document.querySelector('.shrink-0.pb-3')).not.toBeInTheDocument();
+  });
+
+  it('announces the confirmation without axe violations and dismisses on press', async () => {
+    window.history.replaceState({}, '', '/tim?subscribed=confirmed');
+    const { container } = render(<SubscriptionConfirmedBanner />);
+    await act(async () => {});
+
+    expect(screen.getByRole('status')).toHaveTextContent('Notifications on!');
+    vi.useRealTimers();
+    await expectNoA11yViolations(container);
+
+    fireEvent.click(screen.getByRole('button', { name: /dismiss/i }));
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
   });
 
   it('keeps the source on the canonical banner instead of raw green palette classes', () => {

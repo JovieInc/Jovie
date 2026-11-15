@@ -51,3 +51,27 @@ export const Loading: Story = {
     data: undefined,
   },
 };
+
+export const NoVisitsYet: Story = {
+  args: {
+    data: {
+      profile_views: 0,
+      unique_users: 0,
+      subscribers: 0,
+      total_clicks: 0,
+      listen_clicks: 0,
+      tip_link_visits: 0,
+      top_cities: [],
+      top_countries: [],
+      top_referrers: [],
+      top_links: [],
+    },
+  },
+};
+
+export const DidNotLoad: Story = {
+  args: {
+    data: undefined,
+    onRetry: () => {},
+  },
+};

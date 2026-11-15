@@ -13,14 +13,14 @@ export const revalidate = false;
 
 export const metadata: Metadata = {
   robots: NOINDEX_FOLLOW_ROBOTS,
-  title: documentTitle(`Alternatives — ${APP_NAME}`),
+  title: documentTitle('Alternatives'),
   description:
     'Find a musician-first alternative to generic link-in-bio tools, with smart links and release workflows instead of a list of links.',
   alternates: {
     canonical: `${BASE_URL}${APP_ROUTES.ALTERNATIVES}`,
   },
   openGraph: {
-    title: `Alternatives — ${APP_NAME}`,
+    title: `Alternatives | ${APP_NAME}`,
     description:
       'Find a musician-first alternative to generic link-in-bio tools, with smart links and release workflows instead of a list of links.',
     url: `${BASE_URL}${APP_ROUTES.ALTERNATIVES}`,

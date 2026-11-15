@@ -71,18 +71,6 @@ vi.mock('node:child_process', async importOriginal => {
 const { stuckHead } = await import('../../main-red-eject.mjs');
 const { marker } = await import('../main-red-eject.mjs');
 
-const ORIGINAL_ENV = {
-  GH_TOKEN: process.env.GH_TOKEN,
-  GH_FALLBACK_TOKEN: process.env.GH_FALLBACK_TOKEN,
-  GITHUB_REPOSITORY: process.env.GITHUB_REPOSITORY,
-};
-const restoreEnv = () => {
-  for (const [key, value] of Object.entries(ORIGINAL_ENV)) {
-    if (value === undefined) delete process.env[key];
-    else process.env[key] = value;
-  }
-};
-
 const NOW = Date.parse('2026-10-31T18:06:00Z');
 const HEAD_PR = 24000;
 const PR_ID = 'PR_kwDO_native_pr';
@@ -116,6 +104,10 @@ const okJson = value => ({
   stdout: JSON.stringify(value),
   stderr: '',
 });
+const queueResponse = head =>
+  okJson({
+    data: { repository: { mergeQueue: { entries: { nodes: [head] } } } },
+  });
 const wireHappyBackend = () => {
   const states = [queuedState, prState({})];
   backendRoute = line => {
@@ -132,26 +124,11 @@ const wireHappyBackend = () => {
 const wireHappyGh = () => {
   ghRoutes = line => {
     if (line.includes('mergeQueue(branch:'))
-      return okJson({
-        data: {
-          repository: {
-            mergeQueue: {
-              entries: {
-                nodes: [
-                  {
-                    position: 1,
-                    state: 'UNMERGEABLE',
-                    enqueuedAt: '2026-10-31T17:56:00Z',
-                    pullRequest: {
-                      number: HEAD_PR,
-                      labels: { nodes: [] },
-                    },
-                  },
-                ],
-              },
-            },
-          },
-        },
+      return queueResponse({
+        position: 1,
+        state: 'UNMERGEABLE',
+        enqueuedAt: '2026-10-31T17:56:00Z',
+        pullRequest: { number: HEAD_PR, labels: { nodes: [] } },
       });
     if (line.includes(`/issues/${HEAD_PR}/comments`))
       return okJson([
@@ -182,14 +159,14 @@ beforeEach(() => {
   primaryExhausted = true;
   backendPrimaryExhausted = true;
   fallbackViewerLogin = 'jovie-bot[bot]';
-  process.env.GH_TOKEN = 'installation-token';
-  process.env.GH_FALLBACK_TOKEN = 'fallback-token';
-  process.env.GITHUB_REPOSITORY = 'JovieInc/Jovie';
+  vi.stubEnv('GH_TOKEN', 'installation-token');
+  vi.stubEnv('GH_FALLBACK_TOKEN', 'fallback-token');
+  vi.stubEnv('GITHUB_REPOSITORY', 'JovieInc/Jovie');
   wireHappyBackend();
   wireHappyGh();
 });
 
-afterEach(restoreEnv);
+afterEach(() => vi.unstubAllEnvs());
 
 describe('stuck-head dequeue under installation quota exhaustion (run 41227299023)', () => {
   it('simulates installation-403 on the actor-verify call and completes the dequeue on the fallback token when its identity is a trusted mutation actor', async () => {
@@ -244,6 +221,60 @@ describe('stuck-head dequeue under installation quota exhaustion (run 4122729902
       expect(attempt.line).toContain('dequeue deferred');
     }
   });
+
+  it.each(['pr-remediation-swarm.yml', 'merge-queue-green-enroll.yml'])(
+    'warns when %s is disabled and completes the stuck-head actions (run 42623483651)',
+    async workflow => {
+      const happy = ghRoutes;
+      const message =
+        'gh: Cannot trigger a workflow_dispatch on a DISABLED WORKFLOW (HTTP 422)';
+      ghRoutes = line =>
+        line.includes(workflow)
+          ? { code: 1, stdout: '', stderr: message }
+          : happy(line);
+      const warn = vi.spyOn(console, 'error').mockImplementation(() => {});
+      try {
+        expect(await stuckHead({ doApply: true, now: NOW })).toMatchObject({
+          dequeued: true,
+          stuck: true,
+        });
+        // Assert before mockRestore clears the spy's call history.
+        expect(warn).toHaveBeenCalledWith(
+          `::warning::workflow-disabled: gh workflow run ${workflow}: ${message}`
+        );
+        expect(writes().map(c => c.line)).toEqual(
+          expect.arrayContaining([
+            expect.stringContaining('workflow run pr-remediation-swarm.yml'),
+            expect.stringContaining(
+              'workflow run merge-queue-green-enroll.yml'
+            ),
+            expect.stringContaining('/issues -f'),
+          ])
+        );
+      } finally {
+        warn.mockRestore();
+      }
+    }
+  );
+
+  it.each(['pr-remediation-swarm.yml', 'merge-queue-green-enroll.yml'])(
+    'propagates a real dispatch error from %s and stops follow-up work',
+    async workflow => {
+      const happy = ghRoutes;
+      ghRoutes = line =>
+        line.includes(workflow)
+          ? { code: 1, stdout: '', stderr: 'gh: unknown flag: -x' }
+          : happy(line);
+      await expect(stuckHead({ doApply: true, now: NOW })).rejects.toThrow(
+        'unknown flag'
+      );
+      expect(writes().some(c => c.line.includes('/issues -f'))).toBe(false);
+      if (workflow === 'pr-remediation-swarm.yml')
+        expect(
+          writes().some(c => c.line.includes('merge-queue-green-enroll.yml'))
+        ).toBe(false);
+    }
+  );
 
   it('defers when the fallback token bucket is exhausted too', async () => {
     backendRoute = () => rateLimited;
@@ -428,24 +459,12 @@ describe('stuck-head dequeue under installation quota exhaustion (run 4122729902
     fallbackViewerLogin = 'github-actions[bot]';
     ghRoutes = line => {
       if (line.includes('mergeQueue(branch:'))
-        return okJson({
-          data: {
-            repository: {
-              mergeQueue: {
-                entries: {
-                  nodes: [
-                    {
-                      position: 1,
-                      state: 'AWAITING_CHECKS',
-                      enqueuedAt: '2026-10-31T17:56:00Z',
-                      headCommit: { oid: HEAD },
-                      pullRequest: { number: HEAD_PR, labels: { nodes: [] } },
-                    },
-                  ],
-                },
-              },
-            },
-          },
+        return queueResponse({
+          position: 1,
+          state: 'AWAITING_CHECKS',
+          enqueuedAt: '2026-10-31T17:56:00Z',
+          headCommit: { oid: HEAD },
+          pullRequest: { number: HEAD_PR, labels: { nodes: [] } },
         });
       if (line.includes('check-runs'))
         return okJson({

@@ -40,11 +40,11 @@ const ContextMenuSubTrigger = React.forwardRef<
 >(({ className, inset, children, ...props }, ref) => (
   <ContextMenuPrimitive.SubTrigger
     ref={ref}
-    className={cn(MENU_ITEM_BASE, inset && 'pl-10', className)}
+    className={cn(MENU_ITEM_BASE, inset && 'ps-10', className)}
     {...props}
   >
     {children}
-    <ChevronRight className='ml-auto h-3.5 w-3.5' />
+    <ChevronRight className='ms-auto h-3.5 w-3.5 rtl:rotate-180' />
   </ContextMenuPrimitive.SubTrigger>
 ));
 ContextMenuSubTrigger.displayName = ContextMenuPrimitive.SubTrigger.displayName;
@@ -150,7 +150,7 @@ const ContextMenuItem = React.forwardRef<
     ref={ref}
     className={cn(
       MENU_ITEM_BASE,
-      inset && 'pl-10',
+      inset && 'ps-10',
       variant === 'destructive' && MENU_ITEM_DESTRUCTIVE,
       className
     )}
@@ -169,7 +169,7 @@ const ContextMenuCheckboxItem = React.forwardRef<
     checked={checked}
     {...props}
   >
-    <span className='absolute left-2 flex h-3 w-3 items-center justify-center'>
+    <span className='absolute start-2 flex h-3 w-3 items-center justify-center'>
       <ContextMenuPrimitive.ItemIndicator>
         <Check className='h-3.5 w-3.5' />
       </ContextMenuPrimitive.ItemIndicator>
@@ -189,7 +189,7 @@ const ContextMenuRadioItem = React.forwardRef<
     className={cn(CHECKBOX_RADIO_ITEM_BASE, className)}
     {...props}
   >
-    <span className='absolute left-2 flex h-3 w-3 items-center justify-center'>
+    <span className='absolute start-2 flex h-3 w-3 items-center justify-center'>
       <ContextMenuPrimitive.ItemIndicator>
         <Circle className='h-1.5 w-1.5 fill-current' />
       </ContextMenuPrimitive.ItemIndicator>
@@ -207,7 +207,7 @@ const ContextMenuLabel = React.forwardRef<
 >(({ className, inset, ...props }, ref) => (
   <ContextMenuPrimitive.Label
     ref={ref}
-    className={cn(MENU_LABEL_BASE, inset && 'pl-10', className)}
+    className={cn(MENU_LABEL_BASE, inset && 'ps-10', className)}
     {...props}
   />
 ));

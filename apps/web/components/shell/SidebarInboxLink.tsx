@@ -3,7 +3,10 @@
 import { Bell } from 'lucide-react';
 import Link from 'next/link';
 import { APP_ROUTES } from '@/constants/routes';
-import type { InboxNavigationAvailability } from '@/lib/inbox/navigation-availability';
+import {
+  formatInboxPendingWorkLabel,
+  type InboxNavigationAvailability,
+} from '@/lib/inbox/navigation-availability';
 import { useRuntimeUpdate } from './RuntimeUpdateProvider';
 import { Tooltip } from './Tooltip';
 
@@ -16,7 +19,7 @@ export function SidebarInboxLink({
   const hasRuntimeUpdate = Boolean(useRuntimeUpdate()?.available);
   const pending = availability?.state === 'available';
   const label = pending
-    ? `Inbox — ${availability?.pendingCount} items need attention`
+    ? `Inbox — ${formatInboxPendingWorkLabel(availability?.pendingCount ?? 0)}`
     : availability?.state === 'empty'
       ? 'Inbox — all caught up'
       : 'Inbox';

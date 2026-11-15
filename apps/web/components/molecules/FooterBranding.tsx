@@ -105,7 +105,7 @@ export function FooterBranding({
   size = 'md',
   mark = 'icon',
 }: FooterBrandingProps) {
-  const signUpLink = buildUtmLink('/waitlist', artistHandle);
+  const signUpLink = buildUtmLink('/start', artistHandle);
   const logoHref = buildUtmLink('/', artistHandle);
 
   const isLinear = variant === 'linear';
@@ -149,7 +149,7 @@ export function FooterBranding({
           )}
           style={ctaStyle}
         >
-          Join the waitlist
+          Claim your handle
         </Link>
       )}
     </div>

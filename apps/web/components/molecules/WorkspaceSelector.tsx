@@ -38,8 +38,11 @@ export function WorkspaceSelector<Id extends string>({
           data-electron-no-drag='true'
           style={{ WebkitAppRegion: 'no-drag' } as CSSProperties}
           className={cn(
-            'flex h-7 w-full items-center gap-1.5 rounded-lg px-2.5 transition-colors duration-subtle ease-subtle hover:bg-sidebar-accent/55 focus-visible:outline-none focus-visible:bg-sidebar-accent/55',
-            'group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:gap-0 group-data-[collapsible=icon]:px-0'
+            // The mark sits on the rail's icon column (12px inset), like every nav
+            // icon below it. The hover fill bleeds 6px past the mark instead of
+            // pushing it inward, and the trigger hugs its label.
+            '-ml-1.5 flex h-7 w-fit max-w-full items-center gap-1.5 rounded-lg px-1.5 transition-colors duration-subtle ease-subtle hover:bg-sidebar-accent/55 focus-visible:outline-none focus-visible:bg-sidebar-accent/55',
+            'group-data-[collapsible=icon]:ml-0 group-data-[collapsible=icon]:w-full group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:gap-0 group-data-[collapsible=icon]:px-0'
           )}
         >
           <BrandLogo

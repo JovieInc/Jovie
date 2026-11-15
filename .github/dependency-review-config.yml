@@ -4,7 +4,11 @@
 # upstream; a future major must replace it with an equivalent denylist, not
 # delete the check. LGPL is a separate family and is not denied. A dual license
 # that still offers GPL or AGPL fails, because the action treats the expression
-# as satisfied by the denied id.
+# as satisfied by the denied id. A package shipped under the permissive side of
+# an OR is an election in scripts/security/dual-license-elections.json, mirrored
+# here by allow-dependencies-licenses. That list skips only the license check.
+# purlsMatch ignores version, so the exclusion is the package name. Vulnerability
+# review still applies. Do not set allow-licenses; that disables deny-licenses.
 fail-on-severity: high
 fail-on-scopes:
   - runtime
@@ -33,3 +37,5 @@ deny-licenses:
   - GPL-3.0-only
   - GPL-3.0-or-later
   - GPL-3.0-with-GCC-exception
+allow-dependencies-licenses:
+  - pkg:npm/node-forge

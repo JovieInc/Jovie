@@ -5,94 +5,20 @@ import {
   resolveOwnedOutputDirectory,
 } from '../../scripts/owned-output-path';
 import { expect, test } from './setup';
+import {
+  BREAKPOINTS,
+  type BreakpointConfig,
+  type BreakpointVariant,
+  FAST_ITERATION,
+  PROFILE_CASES,
+  PROFILE_READY_SELECTOR,
+  type ProfileAuditCase,
+  type ShellVariant,
+  TEST_PROFILE,
+  THEMES,
+  type ThemeVariant,
+} from './utils/profile-visual-audit-cases';
 import { waitForHydration } from './utils/smoke-test-utils';
-
-// Only the legacy shell exists today: the v2 shell flag (ff_profile_v2) was
-// removed from the app in #8391. Re-add a variant when a new shell flag ships.
-type ShellVariant = 'legacy';
-type ThemeVariant = 'dark' | 'light';
-type BreakpointVariant = 'mobile' | 'tablet' | 'desktop';
-
-interface BreakpointConfig {
-  readonly name: BreakpointVariant;
-  readonly width: number;
-  readonly height: number;
-}
-
-interface ProfileAuditCase {
-  readonly id: string;
-  readonly path: string;
-  readonly readySelector: string;
-  readonly shells: readonly ShellVariant[];
-  readonly composerVisible?: boolean;
-  readonly focusComposerInput?: boolean;
-}
-
-const TEST_PROFILE = 'dualipa';
-const TIP_PROFILE = 'testartist';
-const PROFILE_READY_SELECTOR = 'h1, [data-testid="profile-header"]';
-// Dead ready selectors removed: subscribe-cta-container and profile-tour-heading
-// were dropped from the app in #8391; the header fallback above is the live gate.
-const FAST_ITERATION = process.env.E2E_FAST_ITERATION === '1';
-const BREAKPOINTS: readonly BreakpointConfig[] = [
-  { name: 'mobile', width: 390, height: 844 },
-  { name: 'tablet', width: 768, height: 1024 },
-  { name: 'desktop', width: 1280, height: 900 },
-];
-const THEMES: readonly ThemeVariant[] = ['dark', 'light'];
-const PROFILE_CASES: readonly ProfileAuditCase[] = [
-  {
-    id: 'profile',
-    path: `/${TEST_PROFILE}`,
-    readySelector: PROFILE_READY_SELECTOR,
-    shells: ['legacy'],
-  },
-  {
-    id: 'listen',
-    path: `/${TEST_PROFILE}?mode=listen`,
-    readySelector: PROFILE_READY_SELECTOR,
-    shells: ['legacy'],
-  },
-  {
-    id: 'subscribe',
-    path: `/${TEST_PROFILE}?mode=subscribe`,
-    readySelector: PROFILE_READY_SELECTOR,
-    shells: ['legacy'],
-    composerVisible: true,
-  },
-  {
-    id: 'subscribe-focus',
-    path: `/${TEST_PROFILE}?mode=subscribe`,
-    readySelector: PROFILE_READY_SELECTOR,
-    shells: ['legacy'],
-    composerVisible: true,
-    focusComposerInput: true,
-  },
-  {
-    id: 'about',
-    path: `/${TEST_PROFILE}?mode=about`,
-    readySelector: PROFILE_READY_SELECTOR,
-    shells: ['legacy'],
-  },
-  {
-    id: 'tour',
-    path: `/${TEST_PROFILE}?mode=tour`,
-    readySelector: PROFILE_READY_SELECTOR,
-    shells: ['legacy'],
-  },
-  {
-    id: 'contact',
-    path: `/${TEST_PROFILE}?mode=contact`,
-    readySelector: `${PROFILE_READY_SELECTOR}, [data-testid="contact-drawer"]`,
-    shells: ['legacy'],
-  },
-  {
-    id: 'tip',
-    path: `/${TIP_PROFILE}?mode=pay`,
-    readySelector: `${PROFILE_READY_SELECTOR}, [data-testid="tip-drawer"]`,
-    shells: ['legacy'],
-  },
-];
 
 const FAST_ITERATION_CASE_IDS = new Set<ProfileAuditCase['id']>([
   // Fast-feedback smoke keeps the historically flaky deep-link and drawer paths.
@@ -528,6 +454,54 @@ test.describe('profile publication gate', () => {
     expect(unknown.status()).toBe(404);
     expect(await unknown.text()).not.toContain('profile-compact-shell');
   });
+
+  // JOV-12153: the unknown-handle 404 head carries exactly ONE robots meta
+  // containing "noindex" — Next's automatic NonIndex noindex for status > 400
+  // renders. Explicit robots on 404 metadata used to emit a second tag and
+  // fail the synthetic smoke's noindex-count-1 assertion.
+  test('unknown-handle 404 serves exactly one noindex robots meta', async ({
+    page,
+  }) => {
+    const unknown = await page.request.get('/zz-no-such-artist-e2e-gate');
+    expect(unknown.status()).toBe(404);
+    const html = await unknown.text();
+    const robotsMetas = [...html.matchAll(/<meta\s+name="robots"[^>]*>/gi)].map(
+      match => match[0]
+    );
+    expect(
+      robotsMetas.filter(meta => /content="[^"]*noindex/.test(meta))
+    ).toHaveLength(1);
+  });
+
+  // JOV-12081: the unknown-handle 404 must be server-rendered. The miss
+  // rewrite used to target the prerendered profile-mode-render route, where
+  // notFound() during the ISR fallback render served Next's flight-only
+  // `__next_error__` shell — no rendered body, no robots meta — so axe, the
+  // overflow guard and the visual audit all timed out waiting for the branded
+  // boundary. The dynamic profile-miss route renders it in the first HTML.
+  test('unknown-handle 404 renders the branded boundary in the SSR HTML', async ({
+    page,
+  }) => {
+    const unknown = await page.request.get('/zz-no-such-artist-e2e-gate');
+    expect(unknown.status()).toBe(404);
+    const html = await unknown.text();
+    expect(html).not.toContain('__next_error__');
+    expect(html).toContain('data-testid="not-found"');
+    expect(html).not.toContain('profile-compact-shell');
+  });
+
+  // JOV-12081: `?mode=` must survive the prerendered profile route. The
+  // rewrite used to sit in afterFiles, which never wins over a prerendered
+  // route, so ?mode=listen silently rendered the home document and the DSP
+  // audit exercised only the home's Spotify CTA.
+  test('?mode=listen renders the listen surface in the SSR HTML', async ({
+    page,
+  }) => {
+    const response = await page.request.get(`/${TEST_PROFILE}?mode=listen`);
+    expect(response.status()).toBe(200);
+    const html = await response.text();
+    expect(html).toContain('data-profile-mode="listen"');
+  });
 });
 
 // JOV-10246: the release artwork (profile LCP element) is server-rendered
@@ -538,5 +512,25 @@ test.describe('profile LCP artwork', () => {
     expect(response.status()).toBe(200);
     const html = await response.text();
     expect(html).toMatch(/<img[^>]*fetchPriority="high"/i);
+  });
+});
+
+// The latest-release credits now load in the same batch as the other profile
+// reads instead of after them. The document must still arrive whole: status
+// 200 with the artwork in the first HTML, for visits that overlap.
+test.describe('profile batched reads', () => {
+  test('serves the whole profile document to overlapping visits', async ({
+    page,
+  }) => {
+    const responses = await Promise.all([
+      page.request.get(`/${TEST_PROFILE}`),
+      page.request.get(`/${TEST_PROFILE}`),
+    ]);
+
+    for (const response of responses) {
+      expect(response.status()).toBe(200);
+      const html = await response.text();
+      expect(html).toMatch(/<img[^>]*fetchPriority="high"/i);
+    }
   });
 });

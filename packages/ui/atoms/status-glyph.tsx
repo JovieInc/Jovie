@@ -228,6 +228,14 @@ export interface StatusGlyphProps
    * link"). Never rendered visibly.
    */
   readonly tooltipLabel?: string;
+  /**
+   * Puts the glyph in the tab order so keyboard users can open its tooltip
+   * (APG Tooltip). Off by default: glyphs usually sit inside rows, tiles or
+   * buttons, where a second tab stop would nest one control in another. Turn
+   * it on where the glyph stands alone and the tooltip carries words the
+   * page shows nowhere else. Ignored when the glyph is `aria-hidden`.
+   */
+  readonly focusable?: boolean;
 }
 
 export function StatusGlyph({
@@ -235,6 +243,7 @@ export function StatusGlyph({
   size = 'md',
   label,
   tooltipLabel,
+  focusable = false,
   className,
   ...props
 }: StatusGlyphProps) {
@@ -251,6 +260,9 @@ export function StatusGlyph({
   }, [working]);
   const spec = STATUS_GLYPH_STATE_SPECS[state];
   const accessibleLabel = tooltipLabel ?? label ?? spec.label;
+  const hidden =
+    props['aria-hidden'] === true || props['aria-hidden'] === 'true';
+  const inTabOrder = focusable && !hidden;
 
   return (
     <TooltipProvider>
@@ -263,9 +275,12 @@ export function StatusGlyph({
             data-status-glyph={state}
             className={cn(
               'inline-flex items-center gap-1.5 align-middle',
+              inTabOrder &&
+                'rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:ring-offset-surface-page',
               className
             )}
             {...props}
+            tabIndex={inTabOrder ? 0 : props.tabIndex}
           >
             <GlyphMark spec={spec} size={size} animate={working && visible} />
             {label ? (

@@ -1,0 +1,345 @@
+import 'server-only';
+
+/**
+ * Server-analytics contract data: the callsite inventory, and the property
+ * name/value allowlists that gate what may be persisted. Kept beside the
+ * emit module so `server-analytics.ts` stays inside its size baseline;
+ * both halves form ONE contract and only move together.
+ */
+
+import {
+  LIMITED_DROP_CARD_PLACEMENTS,
+  LIMITED_DROP_EVENT_NAMES,
+  LIMITED_DROP_FUNNEL_CONTRACT_VERSION,
+  LIMITED_DROP_ITEM_MODES,
+  LIMITED_DROP_PAGE_IDS,
+  LIMITED_DROP_STATES,
+  LIMITED_DROP_TERMINAL_REASONS,
+} from '@/lib/analytics/limited-drop-funnel';
+import {
+  SIGNUP_FUNNEL_ALL_STEPS,
+  SIGNUP_FUNNEL_IDS,
+  SIGNUP_FUNNEL_OUTCOMES,
+  SIGNUP_FUNNEL_SURFACES,
+} from '@/lib/analytics/signup-funnel';
+import { ACCOUNT_METRIC_COHORTS } from '@/lib/utils/email';
+
+export const UUID_PROPERTY_NAMES = new Set([
+  'artist_id',
+  'asset_id',
+  'drop_id',
+  'entry_id',
+  'eventId',
+  'event_id',
+  'profileId',
+  'releaseId',
+  'session_id',
+  'tourDateId',
+]);
+export const SAFE_TOKEN_PROPERTY_NAMES = new Set([
+  'batch_id',
+  'billingReason',
+  'capability_key',
+  'campaign_id',
+  'classifier',
+  'client_status',
+  'decision_kind',
+  'engine',
+  'fallback',
+  'guarded_step',
+  'line_key',
+  'reply_intent',
+  'checkoutSessionId',
+  'code',
+  'error_type',
+  'experiment_id',
+  'gate',
+  'plan',
+  'planRequired',
+  'provider',
+  'reason',
+  'result',
+  'share_id',
+  'source',
+  'stripeEventId',
+  'template_version',
+  'toolName',
+  'ua_class',
+  'variant_id',
+  'winback_cohort',
+]);
+export const ENUM_PROPERTY_VALUES: Readonly<
+  Record<string, ReadonlySet<string>>
+> = {
+  card_placement: new Set(LIMITED_DROP_CARD_PLACEMENTS),
+  channel: new Set(['email', 'sms']),
+  client: new Set(['web', 'ios', 'electron']),
+  contract_version: new Set([LIMITED_DROP_FUNNEL_CONTRACT_VERSION]),
+  intent: new Set(['sign_in', 'sign_up']),
+  method: new Set(['email_link', 'dashboard', 'api', 'dropdown']),
+  funnel_id: new Set(SIGNUP_FUNNEL_IDS),
+  step: new Set(SIGNUP_FUNNEL_ALL_STEPS),
+  outcome: new Set(SIGNUP_FUNNEL_OUTCOMES),
+  cohort: new Set(ACCOUNT_METRIC_COHORTS),
+  item_mode: new Set(LIMITED_DROP_ITEM_MODES),
+  page_id: new Set(LIMITED_DROP_PAGE_IDS),
+  state: new Set(LIMITED_DROP_STATES),
+  surface: new Set(SIGNUP_FUNNEL_SURFACES),
+  terminal_reason: new Set(LIMITED_DROP_TERMINAL_REASONS),
+};
+export const UTM_PROPERTY_VALUES: Readonly<
+  Record<string, ReadonlySet<string>>
+> = {
+  utm_source: new Set([
+    'apple_music',
+    'bandcamp',
+    'blog',
+    'collab',
+    'discord',
+    'email_blast',
+    'epk',
+    'facebook',
+    'google',
+    'influencer',
+    'instagram',
+    'jovie',
+    'label',
+    'linkedin',
+    'linktree',
+    'live_show',
+    'merch',
+    'meta',
+    'newsletter',
+    'playlist_pitch',
+    'podcast',
+    'pr',
+    'qr_code',
+    'radio',
+    'reddit',
+    'referral',
+    'sms',
+    'snapchat',
+    'soundcloud',
+    'spotify',
+    'threads',
+    'tiktok',
+    'twitter',
+    'website',
+    'youtube',
+  ]),
+  utm_medium: new Set([
+    'ad',
+    'announcement',
+    'audio',
+    'banner',
+    'bio_link',
+    'cpc',
+    'digital',
+    'discovery_mode',
+    'email',
+    'insert',
+    'interview',
+    'marquee',
+    'organic',
+    'paid',
+    'paid_social',
+    'paid_video',
+    'partner',
+    'popup',
+    'press',
+    'print',
+    'profile',
+    'social',
+    'sound',
+    'text',
+  ]),
+  utm_content: new Set([
+    'announcement',
+    'bio',
+    'community',
+    'curator',
+    'description',
+    'outreach',
+    'post',
+    'press',
+    'promo',
+    'server',
+    'story',
+    'use_sound',
+  ]),
+};
+export const SERVER_ANALYTICS_CALLSITE_INVENTORY = [
+  {
+    path: 'app/api/auth/native/exchange/route.ts',
+    invocations: 1,
+    events: ['auth_exchange_succeeded', 'auth_exchange_failed'],
+  },
+  {
+    path: 'app/api/dashboard/profile/lib/response.ts',
+    invocations: 1,
+    events: ['dashboard_profile_updated'],
+  },
+  {
+    path: 'app/app/(shell)/dashboard/releases/actions.ts',
+    invocations: 7,
+    events: [
+      'release_isrc_rescan',
+      'apple_music_rescan',
+      'releases_synced',
+      'release_archived',
+      'release_deleted',
+      'release_restored',
+    ],
+  },
+  {
+    path: 'app/app/(shell)/dashboard/tour-dates/actions.ts',
+    invocations: 6,
+    events: [
+      'bandsintown_api_key_saved',
+      'bandsintown_api_key_removed',
+      'tour_dates_synced',
+      'tour_date_created',
+      'tour_date_deleted',
+    ],
+  },
+  {
+    path: 'app/app/(shell)/dashboard/tour-dates/events-actions.ts',
+    invocations: 2,
+    events: [
+      'event_confirmed',
+      'event_rejected',
+      'event_reject_undone',
+      'events_confirmed_bulk',
+      'events_rejected_bulk',
+    ],
+  },
+  {
+    path: 'app/auth/callback/route.ts',
+    invocations: 1,
+    events: ['auth_callback_received', 'auth_returned_to_client'],
+  },
+  {
+    path: 'app/auth/start/route.ts',
+    invocations: 1,
+    events: [
+      'auth_started',
+      'auth_provider_opened',
+      'auth_wrong_surface_prevented',
+    ],
+  },
+  {
+    path: 'app/onboarding/actions/connect-spotify.ts',
+    invocations: 1,
+    events: ['releases_synced', 'claim_completed', 'activation_achieved'],
+  },
+  {
+    path: 'app/onboarding/actions/index.ts',
+    invocations: 0,
+    events: ['claim_completed', 'signup_completed', 'activation_achieved'],
+  },
+  {
+    path: 'lib/claim/self-serve-claim-proof.server.ts',
+    invocations: 0,
+    events: ['claim_private_created'],
+  },
+  {
+    path: 'lib/onboarding/catalog-import.server.ts',
+    invocations: 1,
+    events: ['releases_synced'],
+  },
+  {
+    path: 'lib/agent-acquisition/draft-claim.server.ts',
+    invocations: 0,
+    events: ['claim_completed', 'activation_achieved'],
+  },
+  {
+    path: 'lib/onboarding/upgrade-offer.ts',
+    invocations: 1,
+    events: [
+      'onboarding_upgrade_offer_seen',
+      'onboarding_upgrade_offer_accepted',
+      'onboarding_upgrade_offer_dismissed',
+    ],
+  },
+  {
+    path: 'app/r/[slug]/page.tsx',
+    invocations: 1,
+    events: ['smart_link_clicked'],
+  },
+  {
+    path: 'lib/notifications/analytics.ts',
+    invocations: 7,
+    events: [
+      'notifications_subscribe_attempt',
+      'notifications_subscribe_error',
+      'notifications_subscribe_success',
+      'notifications_unsubscribe_attempt',
+      'notifications_unsubscribe_error',
+      'notifications_unsubscribe_success',
+    ],
+  },
+  {
+    path: 'lib/entitlements/demand-signal.ts',
+    invocations: 1,
+    events: ['entitlement_denial'],
+  },
+  {
+    path: 'app/api/stripe/checkout/route.ts',
+    invocations: 1,
+    events: ['checkout_initiated'],
+  },
+  {
+    path: 'lib/stripe/webhooks/handlers/payment-handler.ts',
+    invocations: 1,
+    events: ['payment_succeeded', 'subscription_renewed'],
+  },
+  {
+    path: 'lib/stripe/webhooks/handlers/subscription-handler.ts',
+    invocations: 1,
+    events: ['subscription_churned'],
+  },
+  {
+    path: 'lib/claim/context.ts',
+    invocations: 1,
+    events: ['claim_started'],
+  },
+  {
+    path: 'lib/analytics/signup-funnel.server.ts',
+    invocations: 1,
+    events: ['funnel_step'],
+  },
+  {
+    path: 'lib/turnstile/onboarding-bot-check.server.ts',
+    invocations: 1,
+    events: ['onboarding_bot_check'],
+  },
+  {
+    path: 'lib/chat/onboarding-script/telemetry.server.ts',
+    invocations: 1,
+    events: ['onboarding_reply'],
+  },
+  {
+    path: 'lib/analytics/limited-drop-funnel.server.ts',
+    invocations: 1,
+    events: LIMITED_DROP_EVENT_NAMES,
+  },
+  {
+    path: 'lib/waitlist/winback-analytics.ts',
+    invocations: 1,
+    events: [
+      'requalify_matched',
+      'data_certified',
+      'winback_drafted',
+      'winback_approved',
+      'winback_sent',
+      'winback_opened',
+      'winback_clicked',
+      'returned',
+      'paid',
+    ],
+  },
+] as const satisfies ReadonlyArray<{
+  readonly path: string;
+  readonly invocations: number;
+  readonly events: readonly string[];
+}>;

@@ -1,6 +1,7 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { isEditorialFooterCtaPath } from '@/lib/marketing/editorial-content-routes';
+import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import { MarketingEmailSignup } from './MarketingEmailSignup';
 
 const route = vi.hoisted(() => ({ pathname: '/blog' as string | null }));
@@ -40,9 +41,9 @@ describe('MarketingEmailSignup placement', () => {
     '/pay',
     '/artist-profiles',
     '/developers',
-  ])('offers product updates on %s with route attribution', pathname => {
+  ])('offers product updates on %s with route attribution', async pathname => {
     route.pathname = pathname;
-    render(<MarketingEmailSignup />);
+    const { container } = render(<MarketingEmailSignup />);
     expect(screen.getByTestId('signup')).toHaveTextContent(
       `marketing:${pathname}`
     );
@@ -55,6 +56,7 @@ describe('MarketingEmailSignup placement', () => {
       'data-defer-security-check',
       'true'
     );
+    await expectNoA11yViolations(container);
   });
   it.each([
     null,

@@ -34,7 +34,12 @@ const env = Object.fromEntries(
   Object.entries(process.env).filter(([key]) => !key.startsWith('GIT_'))
 );
 const git = (cwd, ...args) => {
-  const result = spawnSync('git', args, { cwd, env, encoding: 'utf8' });
+  const result = spawnSync('git', args, {
+    maxBuffer: 256 * 1024 * 1024,
+    cwd,
+    env,
+    encoding: 'utf8',
+  });
   assert.equal(result.status, 0, `git ${args.join(' ')}: ${result.stderr}`);
   return result.stdout.trim();
 };

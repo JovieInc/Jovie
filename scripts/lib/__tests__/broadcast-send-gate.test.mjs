@@ -170,7 +170,10 @@ describe('standalone broadcast safety', () => {
           LEGAL_MAILING_ADDRESS: 'Test address',
         },
         argv: ['--force', '--approval-card', cardId],
-        createClient: async () => client,
+        createClient: async () =>
+          /** @type {Awaited<ReturnType<NonNullable<NonNullable<Parameters<typeof sendChangelog>[0]>['createClient']>>>} */ (
+            /** @type {unknown} */ (client)
+          ),
         createEmailClient: async () => ({ emails: { send } }),
         reserveSharedQuota,
       });

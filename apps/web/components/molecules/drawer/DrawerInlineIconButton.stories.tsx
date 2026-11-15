@@ -6,6 +6,12 @@ import {
   type DrawerInlineIconButtonProps,
 } from './DrawerInlineIconButton';
 
+/** The button branch, named by `aria-label`, which every story here uses. */
+type LabelledButtonProps = Extract<
+  DrawerInlineIconButtonProps,
+  { readonly href?: never; readonly 'aria-label': string }
+>;
+
 const meta = {
   title: 'Molecules/Drawer/DrawerInlineIconButton',
   component: DrawerInlineIconButton,
@@ -24,7 +30,7 @@ const meta = {
     onClick: fn(),
     children: <Copy className='h-3.5 w-3.5' />,
   },
-} satisfies Meta<Extract<DrawerInlineIconButtonProps, { href?: never }>>;
+} satisfies Meta<LabelledButtonProps>;
 
 export default meta;
 type Story = StoryObj<typeof meta>;

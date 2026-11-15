@@ -25,6 +25,7 @@ export default {
   // Tests read repo-root files (canon/, scripts/) that a sandbox copy of
   // apps/web would not contain. Stryker restores the originals on exit.
   inPlace: true,
+  tempDirName: process.env.STRYKER_TEMP_DIR ?? '.stryker-tmp',
   reporters: ['clear-text', 'json'],
   jsonReporter: {
     fileName: process.env.STRYKER_REPORT_FILE ?? 'reports/mutation/diff.json',

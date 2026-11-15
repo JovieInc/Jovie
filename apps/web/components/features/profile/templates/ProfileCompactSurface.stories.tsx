@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
+import type { PublicRelease } from '@/features/profile/releases/types';
 import {
   PROFILE_STORY_ARTIST,
   PROFILE_STORY_CONTENT_PREFS,
@@ -119,4 +120,82 @@ export const StayClose: StoryObj<typeof ProfileCompactSurface> = {
 export const Payments: StoryObj<typeof ProfileCompactSurface> = {
   render: renderInPhoneColumn,
   args: { socialLinks: STORY_SOCIAL_LINKS, activeMode: 'about' },
+};
+
+const STORY_RELEASE: PublicRelease = {
+  id: 'release-1',
+  title: 'Never Say A Word',
+  slug: 'never-say-a-word',
+  releaseType: 'single',
+  releaseDate: '2026-08-01',
+  artworkUrl: '/images/avatars/tim-white.jpg',
+  artistNames: ['Tim White'],
+};
+
+/** Stay close while the visitor assignment is unresolved: the alert form
+ *  holds its skeleton instead of flashing the wrong variant (JOV-6453). */
+export const LoadingVisitorAssignment: StoryObj<typeof ProfileCompactSurface> =
+  {
+    render: renderInPhoneColumn,
+    args: { activeMode: 'subscribe', visitorAssignmentResolved: false },
+  };
+
+/** Music tab for an artist with no releases yet. */
+export const EmptyMusicCatalog: StoryObj<typeof ProfileCompactSurface> = {
+  render: renderInPhoneColumn,
+  args: { activeMode: 'listen', releases: [], latestRelease: null },
+};
+
+/** A new profile: no photo, tagline, location, links or releases. */
+export const PartialNewProfile: StoryObj<typeof ProfileCompactSurface> = {
+  render: renderInPhoneColumn,
+  args: {
+    artist: {
+      ...PROFILE_STORY_ARTIST,
+      image_url: undefined,
+      tagline: undefined,
+      location: null,
+      settings: {},
+    },
+    releases: [],
+    latestRelease: null,
+  },
+};
+
+/** A long artist name over a long Music catalog. */
+export const LongContentNameAndCatalog: StoryObj<typeof ProfileCompactSurface> =
+  {
+    render: renderInPhoneColumn,
+    args: {
+      artist: {
+        ...PROFILE_STORY_ARTIST,
+        name: 'Tim White and the Los Angeles After Hours Orchestra',
+      },
+      socialLinks: STORY_SOCIAL_LINKS,
+      activeMode: 'listen',
+      releases: Array.from({ length: 8 }, (_, index) => ({
+        ...STORY_RELEASE,
+        id: `release-${index + 1}`,
+        slug: `never-say-a-word-part-${index + 1}`,
+        title: `Never Say A Word (Extended Club Mix) Part ${index + 1}`,
+      })),
+    },
+  };
+
+/** The phone profile with its claim bar inside a right-to-left page. */
+export const Rtl: StoryObj<typeof ProfileCompactSurface> = {
+  render: args => (
+    <div dir='rtl' lang='ar' className='mx-auto h-dvh w-full max-w-md bg-base'>
+      <ProfileCompactSurface {...args} />
+    </div>
+  ),
+  args: {
+    artist: {
+      ...PROFILE_STORY_ARTIST,
+      name: 'تيم وايت',
+      tagline: 'منتج وكاتب أغانٍ ورومانسي في ساعات الليل المتأخرة.',
+    },
+    socialLinks: STORY_SOCIAL_LINKS,
+    proofClaimCta: { href: '/start', label: 'احصل على صفحتك' },
+  },
 };

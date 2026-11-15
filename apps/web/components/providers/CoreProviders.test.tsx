@@ -1,6 +1,6 @@
 import { render, screen } from '@testing-library/react';
 import type { ReactNode } from 'react';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   CoreProviders,
   getCoreProviderVariant,
@@ -62,12 +62,31 @@ describe('isThemeEnabledRoute', () => {
   });
 });
 
-vi.mock('next/navigation', () => ({ usePathname: () => '/pricing' }));
+const pathnameRef = vi.hoisted(() => ({ current: '/pricing' }));
+
+vi.mock('next/navigation', () => ({
+  usePathname: () => pathnameRef.current,
+}));
 vi.mock('next-themes', () => ({
   ThemeProvider: ({ children }: { children: ReactNode }) => <>{children}</>,
 }));
+// Both analytics mounts render the same marker, so a test can count them.
 vi.mock('./LazyProviders', () => ({
-  LazyProviders: ({ children }: { children: ReactNode }) => <>{children}</>,
+  LazyProviders: ({
+    children,
+    enableAnalytics,
+  }: {
+    children: ReactNode;
+    enableAnalytics?: boolean;
+  }) => (
+    <>
+      {children}
+      {enableAnalytics ? <span data-testid='vercel-analytics' /> : null}
+    </>
+  ),
+}));
+vi.mock('./DeferredAnalytics', () => ({
+  DeferredAnalytics: () => <span data-testid='vercel-analytics' />,
 }));
 vi.mock('./NuqsProvider', () => ({
   NuqsProvider: ({ children }: { children: ReactNode }) => <>{children}</>,
@@ -122,5 +141,65 @@ describe('prerendered homepage pathname', () => {
     );
     expect(source).toContain('usePublicPathname');
     expect(source).not.toMatch(/\busePathname\b/);
+  });
+});
+
+// Which routes mount Vercel Web Analytics: through LazyProviders on the
+// provider tree, or directly on the homepage's provider-free shell. The
+// homepage and pricing are the top of the signup funnel, so a visitor who
+// lands there must send a pageview, in the production build (theme switching
+// off) as well as with theme switching on.
+describe.each([
+  ['theme switching off (production)', undefined],
+  ['theme switching on', '1'],
+])('Web Analytics route gate, %s', (_label, themeFlag) => {
+  afterEach(() => {
+    vi.doUnmock('@/lib/env-client');
+    vi.resetModules();
+    process.env.NEXT_PUBLIC_FEATURE_THEME_SWITCHING = '1';
+    pathnameRef.current = '/pricing';
+  });
+
+  async function analyticsMountsOn(pathname: string): Promise<number> {
+    vi.resetModules();
+    if (themeFlag) process.env.NEXT_PUBLIC_FEATURE_THEME_SWITCHING = themeFlag;
+    else delete process.env.NEXT_PUBLIC_FEATURE_THEME_SWITCHING;
+    vi.doMock('@/lib/env-client', () => ({
+      env: { IS_TEST: false, IS_E2E: false, IS_DEV: false },
+    }));
+    pathnameRef.current = pathname;
+    const { CoreProviders: FreshCoreProviders } = await import(
+      '@/components/providers/CoreProviders'
+    );
+    const { unmount } = render(
+      <FreshCoreProviders>
+        <main>page</main>
+      </FreshCoreProviders>
+    );
+    const count = screen.queryAllByTestId('vercel-analytics').length;
+    unmount();
+    return count;
+  }
+
+  it('mounts analytics exactly once on the homepage', async () => {
+    expect(await analyticsMountsOn('/')).toBe(1);
+  });
+
+  it('mounts analytics on the prerendered homepage key', async () => {
+    // Next prerenders "/" as "/index"; usePublicPathname maps it back.
+    expect(await analyticsMountsOn('/index')).toBe(1);
+  });
+
+  it('mounts analytics on pricing', async () => {
+    expect(await analyticsMountsOn('/pricing')).toBe(1);
+  });
+
+  it('keeps mounting analytics on other public marketing pages', async () => {
+    expect(await analyticsMountsOn('/artist-profiles')).toBe(1);
+    expect(await analyticsMountsOn('/product')).toBe(1);
+  });
+
+  it('keeps analytics off the excluded marketing prefixes', async () => {
+    expect(await analyticsMountsOn('/blog/some-post')).toBe(0);
   });
 });

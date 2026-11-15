@@ -70,6 +70,7 @@
   height: 1.5rem;
   border-radius: 50%;
   background: var(--hv3-elevated);
+  color: var(--hv3-t2);
 }
 
 .hv3-rp__more {
@@ -98,11 +99,14 @@
 
 /* ── Command palette (xhH9P) ──────────────────────────────────────── */
 
+/* The keystroke sits above the palette it opens, both inset 3rem from the
+   card's sides, so the keycaps never cover a row. */
 .hv3-palette {
   position: absolute;
-  top: 3.5rem;
-  left: 4.5rem;
-  width: 40rem;
+  top: 8rem;
+  right: 3rem;
+  left: 3rem;
+  max-width: 40rem;
   border-radius: calc(var(--radius-lg) + var(--radius-xs));
   background: color-mix(in srgb, var(--hv3-panel) 72%, transparent);
   box-shadow:
@@ -217,8 +221,8 @@
 
 .hv3-keys {
   position: absolute;
+  top: 1.5rem;
   right: 3rem;
-  bottom: 2.5rem;
   display: flex;
   align-items: center;
   gap: 0.625rem;

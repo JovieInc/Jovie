@@ -1,5 +1,6 @@
 'use client';
 
+// @coverage-via apps/web/tests/components/dashboard/organisms/releases/cells/ProviderCell.interaction.test.tsx
 import {
   type MouseEvent,
   memo,
@@ -43,6 +44,7 @@ function ProviderActionButtons({
     >
       <DrawerInlineIconButton
         title='Open'
+        aria-label='Open'
         onClick={event => {
           event.stopPropagation();
           globalThis.open(provider.url, '_blank', 'noopener,noreferrer');
@@ -54,6 +56,7 @@ function ProviderActionButtons({
       </DrawerInlineIconButton>
       <DrawerInlineIconButton
         title={isCopied ? 'Copied' : 'Copy'}
+        aria-label={isCopied ? 'Copied' : 'Copy'}
         data-testid={testId}
         data-url={provider.path ? `${getBaseUrl()}${provider.path}` : undefined}
         onClick={onCopyClick}

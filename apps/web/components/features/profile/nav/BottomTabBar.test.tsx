@@ -425,3 +425,18 @@ describe('BottomTabBar — liquid glass lens', () => {
     });
   });
 });
+
+describe('BottomTabBar — focus ring', () => {
+  it('draws each tab focus ring from the canonical focus token', () => {
+    render(<BottomTabBar {...makeProps({ hasTourDates: true })} />);
+
+    for (const name of ['Home', 'Music', 'Events']) {
+      const tab = screen.getByRole('button', { name });
+      expect(tab).toHaveClass(
+        'focus-visible:ring-2',
+        'focus-visible:ring-focus'
+      );
+      expect(tab.className).not.toContain('var(--focus-ring)');
+    }
+  });
+});

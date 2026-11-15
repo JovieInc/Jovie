@@ -33,6 +33,8 @@ const FAIL_FAST_STEP = 'Post a failing PR Ready on the combined head';
  * - skipped-in-merge-group: the script returns before any API read.
  * - owned: REST reads owned by another lane, budgeted separately.
  * - on-rebuild: spends calls only when a superseded run exists.
+ * - on-download-failure: release asset reads only after an anonymous
+ *   pinned download fails (scripts/lib/github-release-asset.sh).
  * @type {Record<string, { kind: string, greenGroupCalls: number }>}
  */
 const LEDGER = {
@@ -54,6 +56,14 @@ const LEDGER = {
   'ci-merge-group-supersede/Cancel older runs of the same queued PR': {
     // Lists runs with the Jovie Bot token; one cancel per superseded run.
     kind: 'on-rebuild',
+    greenGroupCalls: 0,
+  },
+  'ci-secret-scan/Run secret scan': {
+    kind: 'on-download-failure',
+    greenGroupCalls: 0,
+  },
+  'ci-fast-remaining/Run actionlint': {
+    kind: 'on-download-failure',
     greenGroupCalls: 0,
   },
   'ci-fast-remaining/Start base-branch history fetch': {

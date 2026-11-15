@@ -218,17 +218,17 @@ describe('redis command budget', () => {
     expect(tally).toEqual(emptyTally());
   });
 
-  it('issues one GET when cookie cache is disabled', async () => {
+  it('reads the session and the revocation watermark when cookie cache is disabled', async () => {
     const session = await auth.api.getSession({
       headers: new Headers({ cookie: sessionCookies }),
       query: { disableCookieCache: true },
     });
 
     expect(session?.user.email).toBe('redis-budget@example.com');
-    expect(tally).toEqual({ ...emptyTally(), get: 1 });
+    expect(tally).toEqual({ ...emptyTally(), get: 2 });
   });
 
-  it('issues one GET when the request has no session_data cookie', async () => {
+  it('reads the session and the revocation watermark when the request has no session_data cookie', async () => {
     const tokenOnly = sessionCookies
       .split('; ')
       .filter(part => !part.includes('session_data'))
@@ -239,7 +239,7 @@ describe('redis command budget', () => {
     });
 
     expect(session?.user.email).toBe('redis-budget@example.com');
-    expect(tally).toEqual({ ...emptyTally(), get: 1 });
+    expect(tally).toEqual({ ...emptyTally(), get: 2 });
   });
 
   it('does not touch Redis from the proxy session-cookie check', () => {
@@ -569,14 +569,14 @@ describe('redis command budget', () => {
       fullAfterWarm,
       fullAfterCold,
     }).toEqual({
-      lightweightBeforeDenial: 3,
-      lightweightBeforeMiss: 4,
+      lightweightBeforeDenial: 4,
+      lightweightBeforeMiss: 5,
       lightweightAfterWarm: 1,
-      lightweightAfterCold: 2,
-      fullBeforeDenial: 4,
-      fullBeforeMiss: 5,
+      lightweightAfterCold: 3,
+      fullBeforeDenial: 6,
+      fullBeforeMiss: 7,
       fullAfterWarm: 1,
-      fullAfterCold: 3,
+      fullAfterCold: 5,
     });
   });
 
@@ -643,10 +643,10 @@ describe('redis command budget', () => {
       adminDenialBefore,
       adminMutationAfter,
     }).toEqual({
-      billing: 1,
-      adminMutationBefore: 3,
-      adminDenialBefore: 2,
-      adminMutationAfter: 1,
+      billing: 2,
+      adminMutationBefore: 4,
+      adminDenialBefore: 3,
+      adminMutationAfter: 2,
     });
   });
 });

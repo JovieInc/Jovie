@@ -1,7 +1,7 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
-  results: [] as unknown[][],
+  results: [] as (unknown[] | Error)[],
   select: vi.fn(),
   insert: vi.fn(),
   update: vi.fn(),
@@ -33,6 +33,7 @@ import {
   assertOviePrivacyUnlocked,
   getOviePrivacyLockState,
   mutateOviePrivacyLock,
+  readOviePrivacyPolicy,
 } from './server';
 
 const now = new Date('2026-09-29T20:00:00Z');
@@ -65,7 +66,11 @@ beforeEach(() => {
       innerJoin: () => q,
       leftJoin: () => q,
       where: () => q,
-      limit: async () => mocks.results.shift() ?? [],
+      limit: async () => {
+        const result = mocks.results.shift() ?? [];
+        if (result instanceof Error) throw result;
+        return result;
+      },
     };
     return q;
   });
@@ -90,6 +95,9 @@ beforeEach(() => {
     },
   }));
 });
+afterEach(() => {
+  vi.useRealTimers();
+});
 describe('session-bound Ovie privacy persistence', () => {
   it('does not query receipts when privacy is default-off', async () => {
     mocks.results = [[]];
@@ -106,6 +114,50 @@ describe('session-bound Ovie privacy persistence', () => {
     });
     await expect(assertOviePrivacyUnlocked(auth)).rejects.toThrow('DB down');
   });
+  it('recovers a transient connection failure with a fresh read attempt (JOV-9909)', async () => {
+    mocks.results = [
+      new Error('Connection terminated unexpectedly'),
+      [enabled],
+    ];
+    const pending = expect(readOviePrivacyPolicy('u1')).resolves.toEqual(
+      enabled
+    );
+    await vi.advanceTimersByTimeAsync(2000);
+    await pending;
+    expect(mocks.select).toHaveBeenCalledTimes(2);
+  });
+  it('recovers a transient receipt read failure without unlocking locked data', async () => {
+    mocks.results = [
+      [enabled],
+      new Error('Connection terminated unexpectedly'),
+      [],
+    ];
+    const pending = expect(
+      assertOviePrivacyUnlocked(auth)
+    ).rejects.toMatchObject({
+      code: 'PRIVACY_UNLOCK_REQUIRED',
+    });
+    await vi.advanceTimersByTimeAsync(2000);
+    await pending;
+    expect(mocks.select).toHaveBeenCalledTimes(3);
+  });
+  it.each(['policy', 'receipt'])(
+    'fails closed after exhausting transient %s read retries',
+    async read => {
+      const failure = new Error('Connection terminated unexpectedly');
+      mocks.results = [
+        ...(read === 'receipt' ? [[enabled]] : []),
+        failure,
+        failure,
+      ];
+      const pending = expect(assertOviePrivacyUnlocked(auth)).rejects.toBe(
+        failure
+      );
+      await vi.advanceTimersByTimeAsync(2000);
+      await pending;
+      expect(mocks.select).toHaveBeenCalledTimes(read === 'receipt' ? 3 : 2);
+    }
+  );
   it('skips the Postgres policy read for the synthetic capture session', async () => {
     mocks.syntheticCapture = true;
     mocks.bypassSession = { dbUserId: 'u1' };

@@ -48,10 +48,23 @@ function load(env) {
   );
   return { config: captured.config, sentryOptions: captured.sentryOptions };
 }
+// Policy (2026-11-09, run 42614405519): a non-Vercel production build keeps
+// browser maps so the Lighthouse dashboard gate's script-treemap attribution
+// can name the modules inside a failing chunk; Vercel builds never emit
+// orphan maps (the plugin uploads and deletes, or nothing is emitted).
 for (const token of [undefined, '', '[SENSITIVE]', '   ', ' [SENSITIVE]\n']) {
-  test(`does not emit browser maps or enable uploads with unusable token ${String(token)}`, () => {
+  test(`CI build (no VERCEL_ENV) keeps maps for gate attribution with unusable token ${String(token)}`, () => {
     const { config, sentryOptions } = load({
       NODE_ENV: 'production',
+      SENTRY_AUTH_TOKEN: token,
+    });
+    assert.equal(config.productionBrowserSourceMaps, true);
+    assert.equal(sentryOptions, undefined);
+  });
+  test(`Vercel build never emits orphan maps with unusable token ${String(token)}`, () => {
+    const { config, sentryOptions } = load({
+      NODE_ENV: 'production',
+      VERCEL_ENV: 'production',
       SENTRY_AUTH_TOKEN: token,
     });
     assert.equal(config.productionBrowserSourceMaps, false);

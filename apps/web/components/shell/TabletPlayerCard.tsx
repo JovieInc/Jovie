@@ -73,7 +73,7 @@ export const TabletPlayerCard = React.memo(function TabletPlayerCard({
         className
       )}
     >
-      <div className='rounded-2xl backdrop-blur-2xl bg-(--app-shell-content-surface)/70 border border-(--app-shell-frame-seam) shadow-[0_10px_40px_rgba(0,0,0,0.18)] relative overflow-hidden'>
+      <div className='rounded-2xl backdrop-blur-2xl bg-(--app-shell-content-surface)/70 border border-(--app-shell-frame-seam) shadow-(--shadow-popover) relative overflow-hidden'>
         <span
           aria-hidden='true'
           className='absolute top-0 left-0 right-0 h-px bg-tertiary-token/30'

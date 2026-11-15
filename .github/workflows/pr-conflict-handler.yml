@@ -1042,7 +1042,7 @@ jobs:
             --volume "$GITHUB_WORKSPACE:/workspace:rw" \
             "${trusted_mounts[@]}" \
             --workdir /workspace \
-            'node:24.22.1-bookworm@sha256:6449e19d8184d84062525b6a7524def03146c2cb04a7f08b076680d0e8e4240a' \
+            'node:24.22.3-bookworm@sha256:aca79828f8a4afc627f189387c965625bcc419233946210a3b9522d90a59b5c6' \
             bash -lc 'corepack enable && corepack prepare pnpm@9.15.9 --activate && pnpm install --frozen-lockfile && node scripts/run-affected-tests.mjs --base "$SOURCE_HEAD" --max-workers 2'
           verify_rc=$?
           set -e

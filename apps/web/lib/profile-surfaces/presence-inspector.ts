@@ -67,7 +67,12 @@ export function derivePresenceInspector(
   providerAvailable = true
 ): PresenceInspectorModel {
   const status = getConnectionStatus(row, providerAvailable);
-  const searchUnavailable = status.label === 'Search Unavailable';
+  // JOV-9021: collapse search diagnostics only. Identity and monitoring
+  // actions keep their evidence visible even while the search provider is down.
+  const searchUnavailable =
+    row.rowType === 'surface' &&
+    !providerAvailable &&
+    (status.label === 'Connected' || status.label === 'Search Unavailable');
   const needsIdentityDecision =
     row.rowType === 'surface' &&
     (row.qualificationStatus === 'suggested' ||
