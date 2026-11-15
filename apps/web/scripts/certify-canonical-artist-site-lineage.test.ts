@@ -9,15 +9,6 @@ import { classifyDeployedRevisionFromGit } from './certify-canonical-artist-site
 
 const temporaryDirectories: string[] = [];
 
-function git(root: string, args: readonly string[]) {
-  return execFileSync('git', args, {
-    cwd: root,
-    stdio: ['ignore', 'pipe', 'pipe'],
-  })
-    .toString()
-    .trim();
-}
-
 afterEach(() => {
   for (const directory of temporaryDirectories.splice(0)) {
     rmSync(directory, { recursive: true, force: true });
