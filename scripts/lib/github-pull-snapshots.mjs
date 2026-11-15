@@ -9,6 +9,7 @@
  *   input: string | URL | Request,
  *   init?: RequestInit,
  * ) => Promise<HttpResponse>} HttpFetch
+ * @typedef {(path: string) => Promise<{ body: any, link: string }>} GithubGetBase
  * @typedef {(path: string) => Promise<{ body: any, link: string }>} GithubGet
 /**
  * GitHub pull-request transport for the Linear validation lifecycle:
@@ -111,7 +112,7 @@ export function githubStatusError(status, headers, body, path) {
 
 /**
  * Attach the single-attempt GraphQL POST to a githubClient (JOV-12717).
- * @param {{ graphql?: unknown }} client
+ * @param {GithubGetBase & { graphql?: (query: string) => Promise<any> }} client
  * @param {Parameters<typeof fetchWithRetry>[0]} fetchImpl
  * @param {string} token
  */
@@ -269,6 +270,18 @@ function nextPageLink(link) {
   return '';
 }
 
+/**
+ * @typedef {{
+ *   number: number,
+ *   title: string,
+ *   body: string,
+ *   headRef: string,
+ *   merged: boolean,
+ *   mergedAt: string,
+ *   mergeCommitSha: string,
+ *   baseRef: string,
+ * }} ClosedPullSnapshotEntry
+ */
 const MAX_CLOSED_PULL_SNAPSHOT_PAGES = 10;
 
 export async function readClosedPullSnapshot(input) {
@@ -315,12 +328,15 @@ export async function readClosedPullSnapshot(input) {
  * Aliased pullRequest nodes, 50 per call. Any failure throws so the caller
  * falls back to the existing per-pull REST reads (whose immutable cache and
  * quota classification stay authoritative).
- * @param {{ graphql: (query: string) => Promise<any> }} github
+ * @param {GithubGetBase & { graphql?: (query: string) => Promise<any> }} github
  * @param {string} repository
  * @param {readonly number[]} numbers
  * @returns {Promise<Map<number, { state: string, mergedAt: string, mergeCommitSha: string, title: string, body: string, baseRef: string }>>}
  */
 export async function fetchPullStatesBatched(github, repository, numbers) {
+  if (typeof github.graphql !== 'function') {
+    throw new Error('batched pull states need a graphql-capable client');
+  }
   const [owner, name] = String(repository).split('/');
   if (!owner || !name || numbers.length === 0) {
     throw new Error('batched pull states need a repository and numbers');
