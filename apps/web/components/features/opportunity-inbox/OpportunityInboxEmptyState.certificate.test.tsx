@@ -80,9 +80,10 @@ describe('OpportunityInboxEmptyState certificate', () => {
 
     // JOV-12615: finished setup folds into the quiet "Setup Complete" chip,
     // so the checklist text is gone even in a right-to-left document.
-    expect(
-      screen.getByTestId('opportunity-inbox-empty-state')
-    ).toHaveAttribute('data-home-setup-state', 'complete');
+    expect(screen.getByTestId('opportunity-inbox-empty-state')).toHaveAttribute(
+      'data-home-setup-state',
+      'complete'
+    );
     expect(screen.queryByText('3 of 3 complete')).not.toBeInTheDocument();
     expect(screen.queryByRole('progressbar')).not.toBeInTheDocument();
     await expectNoA11yViolations(container);
