@@ -371,7 +371,7 @@ export function PersistentAudioBar() {
       const target =
         surface?.querySelector<HTMLButtonElement>(
           compactPlayerVisible
-            ? 'button[aria-label="Show Player"]'
+            ? 'button[data-audio-expand-player="true"]'
             : 'button[aria-label="Hide Player"]'
         ) ?? surface?.querySelector<HTMLButtonElement>('button');
       target?.focus({ preventScroll: true });

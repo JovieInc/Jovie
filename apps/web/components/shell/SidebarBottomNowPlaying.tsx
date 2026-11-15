@@ -145,6 +145,7 @@ export const SidebarBottomNowPlaying = React.memo(
             variant='ghost'
             size='sm'
             onClick={onExpand}
+            data-audio-expand-player='true'
             className='min-w-0 flex-1 justify-start'
           >
             <div className='min-w-0 flex-1'>
