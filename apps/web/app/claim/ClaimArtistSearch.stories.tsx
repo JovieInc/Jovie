@@ -128,6 +128,10 @@ export const RefreshingResults: Story = {
   play: async ({ canvasElement }) => {
     const canvas = await search(canvasElement, 'Steady');
     const list = await canvas.findByTestId('claim-artist-results');
+    const textBefore = list.textContent;
+    const linksBefore = Array.from(list.querySelectorAll('a'), link =>
+      link.getAttribute('href')
+    );
     const create = canvas.getByTestId('claim-create-profile');
     const input = canvas.getByRole('searchbox', {
       name: 'Find your artist on Spotify',
@@ -142,7 +146,11 @@ export const RefreshingResults: Story = {
     );
     await expect(canvas.queryByText('Searching…')).toBeNull();
     await expect(canvas.getByTestId('claim-artist-results')).toBe(list);
-    await expect(list).toHaveClass('opacity-80');
+    await expect(list.textContent).toBe(textBefore);
+    await expect(
+      Array.from(list.querySelectorAll('a'), link => link.getAttribute('href'))
+    ).toEqual(linksBefore);
+    await expect(list).toHaveClass('opacity-90');
     await expect(list.getBoundingClientRect().y).toBe(before.y);
     await expect(list.getBoundingClientRect().height).toBe(before.height);
     await expect(create.getBoundingClientRect().y).toBe(createBefore.y);

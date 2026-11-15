@@ -90,6 +90,10 @@ describe('claim artist search rows', () => {
   it('keeps the rows in place while a new search runs', async () => {
     await searchFor('artist');
     const before = screen.getByTestId('claim-artist-results');
+    const textBefore = before.textContent;
+    const linksBefore = Array.from(before.querySelectorAll('a'), link =>
+      link.getAttribute('href')
+    );
     let respond!: (response: Response) => void;
     vi.mocked(globalThis.fetch).mockImplementation(
       () =>
@@ -107,8 +111,12 @@ describe('claim artist search rows', () => {
     expect(screen.queryByText('Searching…')).toBeNull();
     const list = screen.getByTestId('claim-artist-results');
     expect(list).toBe(before);
+    expect(list.textContent).toBe(textBefore);
+    expect(
+      Array.from(list.querySelectorAll('a'), link => link.getAttribute('href'))
+    ).toEqual(linksBefore);
     expect(list.parentElement).toHaveAttribute('aria-busy', 'true');
-    expect(list.className).toContain('opacity-80');
+    expect(list.className).toContain('opacity-90');
 
     await act(async () => {
       respond(Response.json([{ ...RESULTS[0], name: 'Updated Artist' }]));
@@ -116,7 +124,7 @@ describe('claim artist search rows', () => {
     await screen.findByText('Updated Artist');
     expect(screen.getByTestId('claim-artist-results')).toBe(before);
     expect(list.parentElement).toHaveAttribute('aria-busy', 'false');
-    expect(list.className).not.toContain('opacity-80');
+    expect(list.className).not.toContain('opacity-90');
   });
 
   it('says it is searching before the first results arrive', async () => {

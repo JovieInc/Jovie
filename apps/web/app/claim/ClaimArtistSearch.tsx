@@ -162,7 +162,7 @@ export function ClaimArtistSearch() {
         ) : null}
         {results.length > 0 ? (
           <ul
-            className={`space-y-2 transition-opacity duration-subtle ${state === 'loading' ? 'opacity-80' : ''}`}
+            className={`space-y-2 transition-opacity duration-subtle motion-reduce:transition-none ${state === 'loading' ? 'opacity-90' : ''}`}
             data-testid='claim-artist-results'
           >
             {results.map(artist => (
