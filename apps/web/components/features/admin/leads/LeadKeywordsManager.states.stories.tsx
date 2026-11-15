@@ -81,6 +81,26 @@ export const EmptyKeywords: Story = {
   decorators: [withKeywords([])],
 };
 
+/** Partial props: embedded callers can omit the optional error reporter. */
+export const PartialEmbeddedWithoutReporter: Story = {
+  args: { embedded: true },
+  decorators: [withKeywords([keyword(1)])],
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(canvas.getByLabelText('New Discovery Keywords')).toBeEnabled();
+    await expect(
+      canvas.getByRole('switch', { name: `Toggle ${keyword(1).query}` })
+    ).toBeChecked();
+    await userEvent.type(
+      canvas.getByLabelText('New Discovery Keywords'),
+      'music'
+    );
+    await expect(
+      canvas.getByRole('button', { name: 'Add Keywords' })
+    ).toBeEnabled();
+  },
+};
+
 /** Error: the API refuses the new keywords and the error toast shows. */
 export const ErrorAddKeywords: Story = {
   args: { onActionError: fn() },

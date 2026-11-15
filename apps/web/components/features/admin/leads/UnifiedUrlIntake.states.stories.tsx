@@ -42,6 +42,22 @@ export const EmptyIntake: Story = {
   },
 };
 
+/** Partial props: submission works without either optional owner callback. */
+export const PartialWithoutOwnerCallbacks: Story = {
+  args: { onSubmitted: undefined },
+  beforeEach: stubFetch(async () =>
+    Response.json({ summary: { created: 1, duplicate: 0, invalid: 0 } })
+  ),
+  play: async ({ canvasElement }) => {
+    await pasteAndQueue(canvasElement, 'https://linktr.ee/artist');
+    const canvas = within(canvasElement);
+    await expect(canvas.getByLabelText('Lead URLs')).toHaveValue('');
+    await expect(
+      canvas.getByRole('button', { name: 'Queue URLs' })
+    ).toBeDisabled();
+  },
+};
+
 /** Loading: the queue request is in flight and the button shows a spinner. */
 export const LoadingQueue: Story = {
   beforeEach: stubFetch(() => new Promise<Response>(() => undefined)),
