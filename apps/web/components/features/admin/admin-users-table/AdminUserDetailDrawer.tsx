@@ -117,7 +117,7 @@ export function AdminUserDetailDrawer({
                     {/* min-w-0 lets the truncating span shrink inside the flex
                      * row. The header uses layout='grid' so the floating
                      * card-top-right action cluster reserves a REAL grid cell
-                     * (the action bar's own pr-11 / pr-[4.75rem] padding) —
+                     * (the action bar's own cluster-width padding) —
                      * a pr-* reservation on the identity column is dead CSS
                      * in the Storybook a11y build because globals.css
                      * excludes components/features/admin from its Tailwind
