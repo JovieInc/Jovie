@@ -21,7 +21,11 @@ import {
   resolveLinearIssueByFingerprint,
   upsertLinearIssueByTitleFingerprint,
 } from './lib/linear-issue-intake.mjs';
-import { logFailedLinearAction, withLinearRetry } from './lib/linear-retry.mjs';
+import {
+  isLinearRateLimitedAction,
+  logFailedLinearAction,
+  withLinearRetry,
+} from './lib/linear-retry.mjs';
 import {
   issueDescription,
   issueTitle,
@@ -42,19 +46,6 @@ export const CLOSE_SCAN_TITLE_TEXT = 'secadv-';
 export const CLOSE_SCAN_LABEL_PREFIX = 'remediation:secadv-';
 export const CLOSE_SCAN_PAGE_SIZE = 100;
 export const CLOSE_SCAN_MAX_PAGES = 5;
-
-/**
- * A failed close/scan action caused only by the shared Linear quota (not a
- * hard failure). Rate-limited close work re-attempts on every run by design
- * (the close list re-scans all historical fixed groups), so it defers.
- */
-export function isLinearRateLimitedAction(action) {
-  return (
-    action?.reason === 'linear_rate_limited' ||
-    action?.action === 'linear_rate_limited' ||
-    action?.action === 'deferred_rate_limited'
-  );
-}
 
 const CLOSE_CANDIDATE_FIELDS = `
   id identifier url title
@@ -263,10 +254,10 @@ export async function recordBlindSource(
 
 /**
  * Run the planned closes against the scanned candidates. Fail-closed by
- * construction: any close failure (including a rate limit on the last group,
- * where no deferred group would otherwise fail the run) marks the result not
- * ok, and the caller exits 1. Rate-limited closes stop the loop; the remaining
- * groups are deferred with ok:false so incomplete Linear work is never green.
+ * construction: any close failure marks the result not ok, and the caller
+ * exits 1 unless EVERY failure is the shared Linear quota (which defers, exit
+ * 75). Rate-limited closes stop the loop; the remaining groups are deferred
+ * with ok:false so incomplete Linear work is never green.
  */
 /**
  * @typedef {Object} AdvisoryCloseResult
@@ -282,7 +273,7 @@ export async function recordBlindSource(
  * @param {string} [input.comment]
  * @param {(group: {fingerprint: string, fixedAt?: string, deployedAt?: string}) => string} [input.commentFor]
  * @param {(input: {fingerprint: string, runId?: string, comment?: string}) => Promise<AdvisoryCloseResult>} [input.close]
- * @returns {Promise<{actions: Array<{fingerprint: string, op: string, ok: boolean, action: string | undefined}>, ok: boolean}>}
+ * @returns {Promise<{actions: Array<{fingerprint: string, op: string, ok: boolean, action: string | undefined, reason?: string}>, ok: boolean}>}
  */
 export async function runAdvisoryCloses({
   closes,
@@ -337,11 +328,6 @@ async function main() {
   const repo = process.env.GITHUB_REPOSITORY || 'JovieInc/Jovie';
   const alertsToken = process.env.ALERTS_TOKEN || process.env.GH_TOKEN;
   const now = new Date();
-  // Set when Linear work failed ONLY on the shared quota: defer the run
-  // (exit 75, EX_TEMPFAIL) instead of failing it. The next loop run (4h clock
-  // or dependency push) re-attempts upserts, the close scan and every close,
-  // so nothing is lost; a hard failure below still exits 1.
-  let linearDeferred = false;
   let alerts;
   try {
     alerts = [
@@ -431,25 +417,12 @@ async function main() {
         { fingerprint: 'secadv-close-scan', op: 'scan' }
       );
       if (!scan.ok) {
-        if (scan.reason === 'linear_rate_limited') {
-          linearDeferred = true;
-          console.warn(
-            '::warning title=Linear quota deferred::secadv close scan deferred on Linear rate limit (linear_rate_limited); closes resume on the next loop run.'
-          );
-        } else {
-          logFailedLinearAction({
-            fingerprint: 'secadv-close-scan',
-            op: 'scan',
-            reason: scan.reason,
-          });
-        }
         receipt.actions.push({
           fingerprint: 'secadv-close-scan',
           op: 'scan',
           ok: false,
           action: scan.reason,
         });
-        if (scan.reason !== 'linear_rate_limited') process.exitCode = 1;
       } else {
         receipt.closeScan = {
           scanned: scan.nodes.length,
@@ -463,18 +436,6 @@ async function main() {
             `Fixed on main at ${g.fixedAt} and deployed: Production deployment at ${g.deployedAt} postdates the fix.`,
         });
         receipt.actions.push(...closeResult.actions);
-        const closeFailures = closeResult.actions.filter(a => !a.ok);
-        if (closeFailures.length > 0) {
-          if (closeFailures.every(isLinearRateLimitedAction)) {
-            linearDeferred = true;
-            console.warn(
-              `::warning title=Linear quota deferred::${closeFailures.length} advisory close(s) deferred on Linear rate limit; closes resume on the next loop run.`
-            );
-          } else {
-            for (const a of closeFailures) logFailedLinearAction(a);
-            process.exitCode = 1;
-          }
-        }
       }
     }
   }
@@ -484,12 +445,22 @@ async function main() {
     JSON.stringify(receipt, null, 2)
   );
   console.log(JSON.stringify({ ...receipt, actions: receipt.actions.length }));
-  // Hard failures above keep exit 1; only a purely rate-limited run defers.
-  if (linearDeferred && process.exitCode !== 1) {
-    console.warn(
-      '::warning title=Linear quota deferred::sync ended deferred on the Linear workspace budget (exit 75); the next loop run resumes the deferred work.'
-    );
-    process.exitCode = 75;
+  // Classify Linear failures once: quota-only failures re-attempt on the next
+  // loop run (defer, exit 75); any hard failure keeps exit 1. Upsert failures
+  // already logged and exited 1 above; scan/close failures log here.
+  const failures = receipt.actions.filter(a => !a.ok);
+  if (failures.length > 0) {
+    if (failures.every(isLinearRateLimitedAction)) {
+      if (process.exitCode !== 1) {
+        console.warn(
+          `::warning title=Linear quota deferred::${failures.length} Linear action(s) deferred on the workspace budget; the next loop run (4h clock or dependency push) resumes them.`
+        );
+        process.exitCode = 75;
+      }
+    } else {
+      for (const a of failures) if (a.op !== 'upsert') logFailedLinearAction(a);
+      process.exitCode = 1;
+    }
   }
   if (
     check &&

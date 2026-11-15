@@ -7,13 +7,12 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { dirname } from 'node:path';
-
+import { failedOnLinearRateLimit } from './lib/linear-retry.mjs';
 import {
   applyRemediationDecisionWithRetry,
   decideAuthSmokeSignal,
   decideLoginSignal,
   decideMonitorSignal,
-  failedOnLinearRateLimit,
   gateSteadyGreen,
   isLoginTimeout,
   readLoginMatrixEvidence,

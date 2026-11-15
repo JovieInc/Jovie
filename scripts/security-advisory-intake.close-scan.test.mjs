@@ -5,11 +5,19 @@
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { test } from 'node:test';
-import { resolveLinearIssueByFingerprint } from './lib/linear-issue-intake.mjs';
-import { logFailedLinearAction, withLinearRetry } from './lib/linear-retry.mjs';
+import {
+  clearRemediationLabelCache,
+  resolveLinearIssueByFingerprint,
+} from './lib/linear-issue-intake.mjs';
+import {
+  failedOnLinearRateLimit,
+  isLinearRateLimitedAction,
+  logFailedLinearAction,
+  withLinearRetry,
+} from './lib/linear-retry.mjs';
+import { applyRemediationDecision } from './lib/remediation-signal.mjs';
 import {
   CLOSE_SCAN_MAX_PAGES,
-  isLinearRateLimitedAction,
   listSecadvIssueCandidates,
   runAdvisoryCloses,
 } from './security-advisory-intake.mjs';
@@ -408,4 +416,65 @@ test('isLinearRateLimitedAction classifies quota-only failures, not hard ones', 
     false
   );
   assert.equal(isLinearRateLimitedAction(undefined), false);
+});
+
+test('failedOnLinearRateLimit is true only for quota-only failures', () => {
+  assert.equal(failedOnLinearRateLimit(undefined), false);
+  assert.equal(failedOnLinearRateLimit({ ok: true }), false);
+  assert.equal(
+    failedOnLinearRateLimit({ ok: false, reason: 'linear_rate_limited' }),
+    true
+  );
+  assert.equal(
+    failedOnLinearRateLimit({
+      ok: false,
+      action: 'green',
+      results: [{ ok: false, reason: 'linear_rate_limited' }],
+    }),
+    true
+  );
+  // A hard failure mixed into the results is not deferrable.
+  assert.equal(
+    failedOnLinearRateLimit({
+      ok: false,
+      action: 'green',
+      results: [
+        { ok: false, reason: 'linear_rate_limited' },
+        { ok: false, reason: 'linear_comment_create_400' },
+      ],
+    }),
+    false
+  );
+  assert.equal(
+    failedOnLinearRateLimit({
+      ok: false,
+      action: 'green',
+      results: [{ ok: false, reason: 'missing_linear_api_key' }],
+    }),
+    false
+  );
+});
+
+test('a rate-limited green resolve defers instead of failing the run', async () => {
+  clearRemediationLabelCache();
+  const fetchImpl = async () => ({
+    ok: false,
+    status: 429,
+    headers: new Map([['retry-after', '30']]),
+    text: async () =>
+      JSON.stringify({ errors: [{ extensions: { code: 'RATELIMITED' } }] }),
+  });
+  const result = await applyRemediationDecision(
+    { action: 'green', fingerprints: ['some-monitor'] },
+    {
+      fingerprint: 'some-monitor',
+      source: 'production-controller.yml',
+      runUrl: 'https://github.com/JovieInc/Jovie/actions/runs/1',
+      apiKey: 'lin_test',
+      fetchImpl,
+    }
+  );
+  assert.equal(result.ok, false);
+  assert.equal(result.action, 'green');
+  assert.equal(failedOnLinearRateLimit(result), true);
 });
