@@ -387,6 +387,7 @@ describe('component certificate CLI evidence freshness', () => {
       'scripts/component-certificate.mjs',
       'scripts/component-ship-policy.mjs',
       'scripts/lib/component-certificate.mjs',
+      'scripts/lib/component-certification-registry.mjs',
       'scripts/lib/component-benchmark-review.mjs',
       'scripts/lib/component-certificate-mutation.mjs',
       'scripts/lib/component-evidence.mjs',
