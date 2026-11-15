@@ -4,10 +4,12 @@ import { createRequire } from 'node:module';
 import { resolve } from 'node:path';
 import { afterEach, beforeEach, describe, it, mock } from 'node:test';
 import {
+  guardReader,
   guardRunForRemoval,
   guardVerdict,
   guardWindowStart,
   hasGuardHoldComment,
+  octokitGuardIo,
 } from './lib/merge-queue-guard-hold.mjs';
 
 // JOV-12617 slice 1: a merge-queue ejection by a deterministic Company guards
@@ -390,5 +392,54 @@ describe('merge-queue enrollment hold after a deterministic guard ejection', () 
       guardVerdict({ run: guardRun(), jobs: [guardJob()], annotations: null }),
       { deterministic: false, reason: 'annotations-unavailable' }
     );
+  });
+
+  it('reads guard evidence with the job token, which holds actions and checks read', async () => {
+    const enrollJob = workflow.jobs.enroll;
+    assert.equal(enrollJob.permissions.checks, 'read');
+    assert.match(enrollJob.permissions.actions, /^(read|write)$/);
+    assert.match(
+      script,
+      /guardReader\(\{ github, token: process\.env\.RECHECK_TOKEN \}\)/
+    );
+    class FakeOctokit {
+      constructor(options) {
+        this.options = options;
+      }
+    }
+    const app = new FakeOctokit({ auth: 'app' });
+    assert.equal(guardReader({ github: app, token: '' }), app);
+    assert.deepEqual(guardReader({ github: app, token: 'job' }).options, {
+      auth: 'job',
+    });
+    const calls = [];
+    const client = who => ({
+      rest: {
+        actions: {
+          listWorkflowRuns: async () => (
+            calls.push(`${who}:runs`), { data: { workflow_runs: [] } }
+          ),
+          listJobsForWorkflowRun: async () => (
+            calls.push(`${who}:jobs`), { data: { jobs: [] } }
+          ),
+        },
+        checks: {
+          listAnnotations: async () => (
+            calls.push(`${who}:annotations`), { data: [] }
+          ),
+        },
+      },
+    });
+    const io = octokitGuardIo({
+      github: client('app'),
+      reader: client('job'),
+      owner: 'JovieInc',
+      repo: 'Jovie',
+      prNumber: 7,
+    });
+    await io.listGuardRuns({});
+    await io.listJobs(RUN_ID);
+    await io.listAnnotations(555);
+    assert.deepEqual(calls, ['job:runs', 'job:jobs', 'job:annotations']);
   });
 });

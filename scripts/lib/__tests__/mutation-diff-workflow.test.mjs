@@ -14,10 +14,15 @@ import { runInNewContext } from 'node:vm';
 import { afterEach, describe, expect, it } from 'vitest';
 
 const REPO_ROOT = resolve(import.meta.dirname, '..', '..', '..');
-const workflow = readFileSync(
+const fullWorkflow = readFileSync(
   resolve(REPO_ROOT, '.github/workflows/mutation-diff.yml'),
   'utf8'
 );
+// The one-off sharded baseline (2026-11-15) is the only hosted part; every contract
+// below holds for the diff and rolling-sweep jobs, which come before it.
+const baselineAt = fullWorkflow.indexOf('\n  baseline:');
+const workflow = fullWorkflow.slice(0, baselineAt);
+const baseline = fullWorkflow.slice(baselineAt);
 
 describe('Mutation Diff Gem contract', () => {
   // Policy 2026-10-29 (supersedes 2026-10-26 hosted-by-default): hosted CI is saturated, so every
@@ -73,6 +78,52 @@ describe('Mutation Diff Gem contract', () => {
     expect(sweep).toContain('group: mutation-sweep');
     expect(sweep).toContain('cancel-in-progress: false');
     expect(sweep).toContain('scripts/mutation-sweep-preflight.mjs');
+  });
+});
+
+describe('Mutation baseline contract', () => {
+  it('runs only on a main dispatch, hosted, with capped parallelism', () => {
+    const jobs = load(fullWorkflow).jobs;
+    for (const id of ['baseline', 'baseline-merge']) {
+      expect(jobs[id].if).toContain("inputs.mode == 'baseline'");
+      expect(jobs[id].if).toContain("github.ref == 'refs/heads/main'");
+      expect(jobs[id].if).toContain("github.event_name == 'workflow_dispatch'");
+      expect(jobs[id]['runs-on']).toBe('ubuntu-24.04');
+    }
+    expect(jobs.sweep.if).toContain("inputs.mode != 'baseline'");
+    expect(jobs.baseline.strategy.matrix.shard).toHaveLength(40);
+    expect(jobs.baseline.strategy['max-parallel']).toBeLessThanOrEqual(16);
+    expect(baseline).not.toMatch(/secrets\./u);
+    expect(baseline).not.toMatch(/workflow run mutation-diff/u);
+  });
+
+  it('saves the merged state where every later sweep folds it in', () => {
+    const jobs = load(fullWorkflow).jobs;
+    const merge = jobs['baseline-merge'];
+    expect(merge.needs).toBe('baseline');
+    expect(merge.if).toContain('always()');
+    // A shared group would let any queued sweep replace the pending merge.
+    expect(merge.concurrency).toBeUndefined();
+    const saves = merge.steps
+      .filter(step => step.uses?.startsWith('actions/cache/save@'))
+      .map(step => [step.with.path, step.with.key.split('$')[0]]);
+    expect(saves).toEqual([
+      ['.cache/jovie-mutation', 'mutation-sweep-portable-v2-'],
+      ['.cache/jovie-mutation-baseline', 'mutation-baseline-v1-'],
+    ]);
+    const restore = jobs.sweep.steps.find(
+      step => step.with?.path === '.cache/jovie-mutation-baseline'
+    );
+    expect(restore.with['restore-keys'].trim()).toBe('mutation-baseline-v1-');
+    const score = jobs.sweep.steps.find(step => step.id === 'score').run;
+    const fold = score.indexOf(
+      '.cache/jovie-mutation-baseline/sweep-state.json'
+    );
+    expect(fold).toBeGreaterThan(score.indexOf('flock -n 9'));
+    expect(fold).toBeLessThan(score.indexOf('mutation-sweep.mjs'));
+    expect(baseline).toMatch(/--shard "\$SHARD\/40"/u);
+    expect(baseline).toMatch(/test-quality-loop\.mjs merge/u);
+    expect(baseline).toMatch(/test-quality-loop\.mjs summary/u);
   });
 });
 

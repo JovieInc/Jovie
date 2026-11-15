@@ -17,7 +17,6 @@ import { NavigationDestinationReady } from '@/components/features/dashboard/Navi
 import { JovieWorkFeed } from '@/components/features/dashboard/organisms/jovie-work-feed/JovieWorkFeed';
 import { ErrorBanner } from '@/components/features/feedback/ErrorBanner';
 import { PageShell } from '@/components/organisms/PageShell';
-import { useRuntimeUpdate } from '@/components/shell/RuntimeUpdateProvider';
 import { APP_ROUTES } from '@/constants/routes';
 import {
   EMPTY_OPPORTUNITY_INBOX_TOUR_DATES,
@@ -29,7 +28,6 @@ import { useOpportunityInboxMutations } from '@/lib/queries/useOpportunityInboxM
 import { useTourDateReviewMutations } from '@/lib/queries/useTourDateReviewMutations';
 import { cn } from '@/lib/utils';
 import { getRovingFocusIndex } from '@/lib/utils/keyboard';
-import { InboxRuntimeNotification } from './InboxRuntimeNotification';
 import { OpportunityInboxEmptyState } from './OpportunityInboxEmptyState';
 import { OpportunityInboxFeed } from './OpportunityInboxFeed';
 import { OpportunityInboxTourDateRow } from './OpportunityInboxTourDateRow';
@@ -92,7 +90,6 @@ export function OpportunityInboxPageClient({
   const [notesOpen, setNotesOpen] = useState(false);
   const notesButtonRef = useRef<HTMLButtonElement>(null);
   useEffect(() => setInboxView(initialView), [initialView]);
-  const runtimeUpdate = useRuntimeUpdate();
   const inboxPageRef = useRef<HTMLDivElement>(null);
   const pathname = usePathname();
   const router = useRouter();
@@ -428,10 +425,12 @@ export function OpportunityInboxPageClient({
     hasTourHistory:
       confirmedTourDates.length > 0 || rejectedTourDates.length > 0,
     inboxReadUnavailable,
-    runtimeUpdateAvailable: Boolean(runtimeUpdate?.available),
     hasNotes: notesOpen || Boolean(notes),
   });
   const showHomeSetup = Boolean(setup);
+  // Notes annotate real queue items; with nothing to review they are a stray
+  // control under the tabs. Typed notes stay visible until cleared.
+  const showNotes = hasReviewableItems || notes.length > 0;
   const selectInboxView = (view: 'needs' | 'done') => {
     if (view === 'needs') requestHomeFocus();
     setInboxView(view);
@@ -450,7 +449,7 @@ export function OpportunityInboxPageClient({
       stackKeyboardControlRef.current ??
       signalFilterRefs.current[signalFilterFocusIndex] ??
       inboxPageRef.current?.querySelector<HTMLElement>(
-        '[data-testid="opportunity-inbox-tour-date-review"] button, [data-testid="inbox-runtime-notification"] button:not(:disabled), [data-testid="opportunity-inbox-empty-state"] a, [data-testid="opportunity-inbox-empty-state"] button, [data-testid="opportunity-inbox-availability"] button'
+        '[data-testid="opportunity-inbox-tour-date-review"] button, [data-testid="opportunity-inbox-empty-state"] a, [data-testid="opportunity-inbox-empty-state"] button, [data-testid="opportunity-inbox-availability"] button'
       );
 
     recoveryTarget?.focus();
@@ -509,46 +508,48 @@ export function OpportunityInboxPageClient({
                   Done For You
                 </Button>
               </div>
-              <div className='mb-4' data-testid='opportunity-inbox-notes'>
-                {notes.length === 0 ? (
-                  <div className='flex justify-center'>
-                    <Button
-                      ref={notesButtonRef}
-                      size='sm'
-                      variant='ghost'
-                      aria-expanded={notesOpen}
-                      aria-controls='opportunity-inbox-notes-panel'
-                      onClick={() => setNotesOpen(open => !open)}
-                    >
-                      {notesOpen ? 'Hide Notes' : 'Add Notes'}
-                    </Button>
-                  </div>
-                ) : null}
-                <div
-                  id='opportunity-inbox-notes-panel'
-                  hidden={!notesOpen && !notes}
-                >
-                  <label
-                    htmlFor='opportunity-inbox-notes-field'
-                    className='mb-1 block text-xs font-medium text-secondary-token'
+              {showNotes ? (
+                <div className='mb-4' data-testid='opportunity-inbox-notes'>
+                  {notes.length === 0 ? (
+                    <div className='flex justify-center'>
+                      <Button
+                        ref={notesButtonRef}
+                        size='sm'
+                        variant='ghost'
+                        aria-expanded={notesOpen}
+                        aria-controls='opportunity-inbox-notes-panel'
+                        onClick={() => setNotesOpen(open => !open)}
+                      >
+                        {notesOpen ? 'Hide Notes' : 'Add Notes'}
+                      </Button>
+                    </div>
+                  ) : null}
+                  <div
+                    id='opportunity-inbox-notes-panel'
+                    hidden={!notesOpen && !notes}
                   >
-                    Notes
-                  </label>
-                  <textarea
-                    id='opportunity-inbox-notes-field'
-                    rows={3}
-                    value={notes}
-                    onChange={event => setNotes(event.target.value)}
-                    onKeyDown={event => {
-                      if (event.key === 'Escape' && !notes) {
-                        setNotesOpen(false);
-                        notesButtonRef.current?.focus();
-                      }
-                    }}
-                    className='system-b-opportunity-inbox-comment-input'
-                  />
+                    <label
+                      htmlFor='opportunity-inbox-notes-field'
+                      className='mb-1 block text-xs font-medium text-secondary-token'
+                    >
+                      Notes
+                    </label>
+                    <textarea
+                      id='opportunity-inbox-notes-field'
+                      rows={3}
+                      value={notes}
+                      onChange={event => setNotes(event.target.value)}
+                      onKeyDown={event => {
+                        if (event.key === 'Escape' && !notes) {
+                          setNotesOpen(false);
+                          notesButtonRef.current?.focus();
+                        }
+                      }}
+                      className='system-b-opportunity-inbox-comment-input'
+                    />
+                  </div>
                 </div>
-              </div>
+              ) : null}
             </>
           ) : null}
           {inboxView === 'done' ? (
@@ -569,7 +570,6 @@ export function OpportunityInboxPageClient({
             )
           ) : null}
           <div hidden={inboxView !== 'needs'}>
-            <InboxRuntimeNotification />
             {pendingTourDates.length > 0 ? (
               <section
                 className='system-b-opportunity-inbox-feed'
@@ -662,9 +662,7 @@ export function OpportunityInboxPageClient({
               )
             ) : null}
 
-            {!hasReviewableItems &&
-            !runtimeUpdate?.available &&
-            !inboxReadUnavailable ? (
+            {!hasReviewableItems && !inboxReadUnavailable ? (
               <OpportunityInboxEmptyState setup={setup} />
             ) : null}
 
