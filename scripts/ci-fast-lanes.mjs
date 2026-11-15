@@ -591,6 +591,17 @@ export const SOURCE_GUARDS = Object.freeze([
     prOnly: false,
   }),
   Object.freeze({
+    // Slop-test ratchet (2026-11-15): no new focused, skipped, assertion-free,
+    // tautological, mock-only, snapshot-only, real-sleep or over-mocked tests.
+    // Existing ones are baselined per file and may only go down.
+    id: 'test-hygiene',
+    command:
+      'node scripts/test-hygiene.mjs && pnpm exec vitest run --config scripts/vitest.config.mts lib/__tests__/test-hygiene.test.mjs',
+    inputs:
+      /(?:\.(?:test|spec)\.(?:ts|tsx|mjs|js)$|^scripts\/(?:test-hygiene\.mjs|lib\/test-hygiene\.mjs|test-quality\/test-hygiene-baseline\.json|ci-fast-lanes\.mjs)$)/u,
+    prOnly: false,
+  }),
+  Object.freeze({
     // JOV-INV-045. Trusted-base copy scans the pull request diff and fails
     // when the diff loosens a blocking gate. Pull requests only.
     id: 'gate-weakening-detector',

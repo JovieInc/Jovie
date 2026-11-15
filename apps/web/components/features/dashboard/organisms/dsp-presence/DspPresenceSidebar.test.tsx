@@ -10,12 +10,6 @@ const { mockUseDashboardData, mockUseDspMatchActions } = vi.hoisted(() => ({
   mockUseDspMatchActions: vi.fn(),
 }));
 
-vi.mock('next/image', () => ({
-  default: ({ alt, ...props }: { alt: string; [key: string]: unknown }) => (
-    <img alt={alt} {...props} />
-  ),
-}));
-
 vi.mock('@jovie/ui', async () => {
   const actual = await vi.importActual<object>('@jovie/ui');
   return {
@@ -28,8 +22,6 @@ vi.mock('@jovie/ui', async () => {
   };
 });
 
-vi.mock('next/navigation', () => ({}));
-
 vi.mock('@/app/app/(shell)/dashboard/DashboardDataContext', () => ({
   DashboardDataContext: {
     Provider: ({ children }: { children: React.ReactNode }) => children,
@@ -37,10 +29,6 @@ vi.mock('@/app/app/(shell)/dashboard/DashboardDataContext', () => ({
     displayName: 'DashboardDataContext',
   },
   useDashboardData: mockUseDashboardData,
-}));
-
-vi.mock('@/components/atoms/Icon', () => ({
-  Icon: ({ name }: { name: string }) => <span>{name}</span>,
 }));
 
 vi.mock('@/components/molecules/drawer/DrawerSection', () => ({
@@ -55,12 +43,6 @@ vi.mock('@/components/molecules/drawer/DrawerSection', () => ({
       <h2>{title}</h2>
       {children}
     </section>
-  ),
-}));
-
-vi.mock('@/components/molecules/drawer/DrawerSurfaceCard', () => ({
-  DrawerSurfaceCard: ({ children }: { children: ReactNode }) => (
-    <div>{children}</div>
   ),
 }));
 
@@ -94,10 +76,6 @@ vi.mock('@/features/dashboard/atoms/DspProviderIcon', () => ({
   DspProviderIcon: ({ provider }: { provider: string }) => (
     <span>{provider}</span>
   ),
-}));
-
-vi.mock('@/features/dashboard/atoms/MatchStatusBadge', () => ({
-  MatchStatusBadge: ({ status }: { status: string }) => <span>{status}</span>,
 }));
 
 vi.mock('@/features/dashboard/organisms/dsp-matches/hooks', () => ({
