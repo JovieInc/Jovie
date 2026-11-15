@@ -35,17 +35,6 @@ describe('SimpleTooltip', () => {
       );
       expect(screen.queryByText('Tooltip text')).not.toBeInTheDocument();
     });
-
-    it.skip('shows content on hover', () => {
-      // Skipped: userEvent.hover doesn't reliably trigger Radix tooltips in jsdom
-      // This behavior is tested through controlled mode in other tests
-      expect(true).toBe(true);
-    });
-
-    it.skip('hides content on mouse leave', () => {
-      // Skipped: userEvent.unhover doesn't reliably work with Radix in jsdom
-      expect(true).toBe(true);
-    });
   });
 
   describe('Content', () => {
