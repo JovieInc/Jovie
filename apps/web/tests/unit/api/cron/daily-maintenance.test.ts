@@ -64,13 +64,6 @@ vi.mock('@/lib/error-tracking', () => ({
   captureError: mockCaptureError,
 }));
 
-vi.mock('@/lib/utils/logger', () => ({
-  logger: {
-    info: vi.fn(),
-    error: vi.fn(),
-  },
-}));
-
 vi.mock('@/app/api/cron/billing-reconciliation/route', () => ({
   runReconciliation: mockRunReconciliation,
 }));

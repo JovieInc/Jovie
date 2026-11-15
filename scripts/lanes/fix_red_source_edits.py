@@ -126,3 +126,10 @@ def size_500_stale_hit(text: object) -> tuple[str, str] | None:
     if not errors or any(_SIZE_500_ERROR.fullmatch(item) is None for item in errors):
         return None
     return ("size-500-stale", "sync-main")
+
+
+def size_500_route(text: object) -> tuple[str, str] | None:
+    """Unbaselined over-500 tests split. Growth-only logs sync main. Mixed logs stay with the model."""
+    from fix_red_size_500 import unbaselined_hit
+
+    return unbaselined_hit(text) or size_500_stale_hit(text)

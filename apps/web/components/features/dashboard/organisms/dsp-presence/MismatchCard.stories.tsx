@@ -23,19 +23,18 @@ const mismatch: CatalogMismatch = {
   updatedAt: '2026-09-01T12:00:00.000Z',
 };
 
-const ListShell: Decorator = function ListShell(Story) {
+// The list shell owns the direction: a story-level wrapper div would sit
+// BETWEEN this <ul> and the card's <li> (meta decorators compose outside
+// story decorators), and a <ul> with a <div> child fails the axe list rules.
+const ListShell: Decorator = function ListShell(Story, context) {
+  const { dir, lang } = (context.parameters ?? {}) as {
+    dir?: 'rtl' | 'ltr';
+    lang?: string;
+  };
   return (
-    <ul className='w-full max-w-xl list-none space-y-1.5'>
+    <ul dir={dir} lang={lang} className='w-full max-w-xl list-none space-y-1.5'>
       <Story />
     </ul>
-  );
-};
-
-const RtlShell: Decorator = function RtlShell(Story) {
-  return (
-    <div dir='rtl'>
-      <Story />
-    </div>
   );
 };
 
@@ -112,7 +111,7 @@ export const LongContentNames: Story = {
 
 /** Right-to-left: Arabic track metadata in a right-to-left document. */
 export const RtlArabicTrack: Story = {
-  decorators: [RtlShell],
+  parameters: { dir: 'rtl', lang: 'ar' },
   args: {
     mismatch: {
       ...mismatch,

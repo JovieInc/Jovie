@@ -208,6 +208,10 @@ describe('AdminUserDetailDrawer', () => {
 
     const copyEmail = screen.getByRole('button', { name: 'Copy Email' });
     expect(copyEmail).toHaveClass('size-6');
+    // The header's floating action cluster sits at z-10; the inline copy
+    // targets must share that layer so a long email parked at the column
+    // edge still paints above the cluster (axe target-size, 24x12 overlap).
+    expect(copyEmail).toHaveClass('z-10');
   });
 
   it('keeps the copy buttons unsqueezed in long-content rows', () => {
@@ -219,5 +223,26 @@ describe('AdminUserDetailDrawer', () => {
         'shrink-0'
       );
     }
+
+    // The truncating value spans must shrink inside their flex rows — an
+    // overflowing email box pushes the copy button under the header clip
+    // (axe target-size: partially obscured).
+    const email = longContentUser.email ?? '';
+    expect(screen.getByText(email)).toHaveClass('min-w-0');
+  });
+
+  it('reserves the floating action band beside the header identity', () => {
+    render(<AdminUserDetailDrawer user={longContentUser} onClose={vi.fn()} />);
+
+    // A long email parks the Copy Email button at the identity column's right
+    // edge, directly under the card-top-right floating cluster (right-3 12px
+    // offset + 28px overflow trigger + 6px gap + 28px close = 74px). The
+    // column must reserve that band or the cluster paints over the target's
+    // edge and axe target-size reports a partially obscured 20x24 hit area —
+    // pr-9 (36px) under-reserved it by exactly the reported 4px.
+    const identity = screen
+      .getByTestId('entity-header-title')
+      .closest('div.space-y-1');
+    expect(identity).toHaveClass('pr-20');
   });
 });
