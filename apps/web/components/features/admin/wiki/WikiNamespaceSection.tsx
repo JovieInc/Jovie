@@ -8,7 +8,7 @@ interface Props {
 export function WikiNamespaceSection({ group }: Props) {
   return (
     <section>
-      <h2 className='mb-3 text-lg font-semibold capitalize text-secondary-token'>
+      <h2 className='mb-3 text-balance text-lg font-semibold capitalize text-secondary-token'>
         {group.namespace}
       </h2>
       <ul className='space-y-1'>
