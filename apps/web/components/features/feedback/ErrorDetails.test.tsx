@@ -56,4 +56,12 @@ describe('ErrorDetails', () => {
     fireEvent.click(summary);
     expect(details).toHaveAttribute('open');
   });
+
+  it('renders the copy action on the design-system PlainButton', () => {
+    render(<ErrorDetails />);
+
+    expect(
+      screen.getByRole('button', { name: 'Copy error details to clipboard' })
+    ).toHaveAttribute('data-slot', 'plain-button');
+  });
 });
