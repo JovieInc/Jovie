@@ -714,10 +714,9 @@ test('tracked-bytes budget raise stays within the documented +10% cap', () => {
 });
 
 test('snapshot-file budget raise stays within the documented +10% cap', () => {
-  // 2026-11-15: origin/main measured 119/121 canonical visual baselines, so
-  // the 14 live chat-history switcher baselines could not land. Five
-  // unreferenced admin pngs were pruned in the same change. The policy caps
-  // a single payload raise at +10%.
+  // 2026-11-15: origin/main measured 119/121. Fourteen live switcher baselines
+  // could not land after five unreferenced admin pngs were pruned. The policy
+  // caps a single payload raise at +10%.
   const previousBudget = 121;
   assert.equal(HYGIENE_LIMITS.maxSnapshotFiles, 133);
   assert.ok(
