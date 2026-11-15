@@ -566,8 +566,8 @@ if (process.argv[1]?.endsWith('certify-canonical-artist-site.ts')) {
     for (const failure of certificate.evidenceIntegrityFailures) {
       console.error(`evidence: ${failure}`);
     }
-    const deferred = certificate.receipts.some(receipt =>
-      receipt.detail.startsWith('github-quota-deferred:')
+    const deferred = certificate.checks.some(check =>
+      check.detail.startsWith('github-quota-deferred:')
     );
     if (deferred) {
       // The repository's quota-deferral convention (runWithGitHubRetry): a
