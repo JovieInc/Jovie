@@ -479,3 +479,18 @@ export function mergeStates(...states) {
   }
   return merged;
 }
+
+/**
+ * The candidates a run may score: all of them, only those changed since they were
+ * scored (mode incremental), then only one hash slice of those when --shard is set.
+ */
+export function selectPool(candidates, state, { mode, shard } = {}) {
+  let pool = candidates;
+  if (mode === 'incremental')
+    pool = pool.filter(
+      c => state.modules[c.file] && state.modules[c.file].blob !== c.blob
+    );
+  if (!shard) return pool;
+  const { index, count } = parseShard(shard);
+  return pool.filter(c => shardOf(c.file, count) === index);
+}

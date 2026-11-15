@@ -17,6 +17,7 @@ import {
   ratchetVerdict,
   recordRun,
   SURVIVORS_PER_TASK,
+  selectPool,
   shardOf,
   survivorFingerprint,
   validateEquivalents,
@@ -358,5 +359,35 @@ describe('baseline shards', () => {
         Object.entries(merged.modules).map(([k, v]) => [k, v.score])
       )
     ).toEqual({ 'lib/a.ts': 60, 'lib/b.ts': 70, 'lib/c.ts': 80 });
+  });
+});
+
+describe('selectPool', () => {
+  const candidates = ['lib/a.ts', 'lib/b.ts', 'lib/c.ts', 'lib/d.ts'].map(
+    file => ({ file, blob: `${file}@2`, testCount: 1 })
+  );
+  const state = {
+    modules: {
+      'lib/a.ts': { blob: 'lib/a.ts@1' },
+      'lib/b.ts': { blob: 'lib/b.ts@2' },
+    },
+  };
+
+  it('keeps every candidate in sweep mode and only changed scored ones in incremental', () => {
+    expect(selectPool(candidates, state, { mode: 'sweep' })).toEqual(
+      candidates
+    );
+    expect(
+      selectPool(candidates, state, { mode: 'incremental' }).map(c => c.file)
+    ).toEqual(['lib/a.ts']);
+  });
+
+  it('splits the pool into disjoint shards that cover it', () => {
+    const files = [0, 1, 2].flatMap(index =>
+      selectPool(candidates, state, { mode: 'sweep', shard: `${index}/3` }).map(
+        c => c.file
+      )
+    );
+    expect(files.sort()).toEqual(candidates.map(c => c.file));
   });
 });
