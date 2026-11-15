@@ -116,9 +116,7 @@ test('rapid presentation changes preserve engine, position, identity and sole ac
     await expect(
       page.getByRole('button', { name: 'Dismiss Player', exact: true })
     ).toHaveCount(1);
-    await page
-      .getByRole('button', { name: /Show Player/ })
-      .click();
+    await page.getByRole('button', { name: /Show Player/ }).click();
     await expect(
       page.getByRole('button', { name: 'Dismiss Player', exact: true })
     ).toHaveCount(1);
@@ -146,9 +144,9 @@ test('rapid presentation changes preserve engine, position, identity and sole ac
     '"activeTrackId":"continuity-1"'
   );
   await page.getByRole('button', { name: 'Hide Player', exact: true }).click();
-  await expect(
-    page.getByRole('button', { name: /Show Player/ })
-  ).toContainText('A very long track title');
+  await expect(page.getByRole('button', { name: /Show Player/ })).toContainText(
+    'A very long track title'
+  );
   await expect(
     page.locator('[data-shell-audio-surface="sidebar-compact"] img')
   ).toHaveAttribute('src', '/player-art-dark.svg');
@@ -236,9 +234,7 @@ test('reduced motion and unavailable transition APIs settle without gating contr
   await page.reload();
   await page.getByRole('button', { name: 'First track', exact: true }).click();
   await page.getByRole('button', { name: 'Hide Player', exact: true }).click();
-  await expect(
-    page.getByRole('button', { name: /Show Player/ })
-  ).toBeFocused();
+  await expect(page.getByRole('button', { name: /Show Player/ })).toBeFocused();
   await page.keyboard.press('Enter');
   await expect(
     page.getByRole('button', { name: 'Hide Player', exact: true })
