@@ -64,7 +64,7 @@ function Shell({
 }
 
 const props = {
-  releases: [],
+  releases: [] as AdminReleaseRow[],
   pageSize: 25,
   total: 0,
   search: 'midnight',

@@ -1,6 +1,7 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import type { ShippingCockpitProjection } from '@/lib/ovie/shipping-state/client';
 import type { DeliveryLanes } from '@/lib/ovie/shipping-state/contract';
 import { measuredCount } from '@/lib/ovie/shipping-state/contract';
 import { createEmptyShippingStateView } from '@/lib/ovie/shipping-state-client';
@@ -63,7 +64,9 @@ describe('FleetVerdictPanel certificate', () => {
     vi.stubGlobal('fetch', fetchMock);
     const view = createEmptyShippingStateView();
     const client = new QueryClient();
-    client.setQueryData(shippingStateQueryOptions.queryKey, {
+    // The panel reads only delivery.lanes, so the rest of the projection is
+    // left as the empty view's.
+    const seeded = {
       ...view,
       delivery: {
         ...view.delivery,
@@ -74,7 +77,8 @@ describe('FleetVerdictPanel certificate', () => {
           heldByReason: { 'needs-human-decision': 2 },
         },
       },
-    });
+    } as unknown as ShippingCockpitProjection;
+    client.setQueryData(shippingStateQueryOptions.queryKey, seeded);
     const { container } = renderPanel(client);
     expect(screen.getByText('3 of 3 lanes running')).toBeInTheDocument();
     expect(screen.getByText('needs-human-decision')).toBeInTheDocument();
