@@ -1,5 +1,5 @@
 {
-  "total": 1426,
+  "total": 1425,
   "files": {
     "apps/web/app/(auth)/auth/native-return/page.tsx": 1,
     "apps/web/app/(auth)/identity/IdentityPageClient.tsx": 1,
@@ -295,11 +295,13 @@
     "apps/web/components/shell/SidebarThreadsSection.tsx": 3,
     "apps/web/components/shell/ThreadCardIconBtn.tsx": 3,
     "apps/web/components/shell/ThreadView.tsx": 3,
+    "apps/web/components/site/MarketingFooter.css": 3,
+    "apps/web/components/site/MarketingHeader.css": 1,
     "apps/web/components/site/theme-toggle/ThemeToggle.tsx": 4,
     "apps/web/components/site/theme-toggle/ThemeToggleSegmented.tsx": 2,
     "apps/web/lib/auth/constants.ts": 12,
     "apps/web/lib/footer.ts": 4,
-    "apps/web/styles/design-system.css": 9,
+    "apps/web/styles/design-system.css": 4,
     "apps/web/styles/system-b-app.css": 11,
     "apps/web/styles/theme.css": 2,
     "packages/ui/atoms/button.tsx": 5,

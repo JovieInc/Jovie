@@ -132,8 +132,13 @@ describe('Noir Ion D — workspace state surfaces (JOV-4648)', () => {
     expect(DESIGN_SYSTEM_CSS).toContain(
       'background: var(--color-row-selected);'
     );
-    expect(DESIGN_SYSTEM_CSS).toContain(
-      'color-mix(in oklab, var(--color-focus-ring) 45%, transparent)'
+    // A focused row gets the one focus.css outline, drawn inside the
+    // scrolling table, not a second inset ring of its own.
+    expect(DESIGN_SYSTEM_CSS).not.toMatch(
+      /system-b-table-row-focus-visible\):focus-visible[^{]*\{[^}]*box-shadow/
+    );
+    expect(readFileSync(join(WEB_ROOT, 'styles', 'focus.css'), 'utf8')).toMatch(
+      /\[role="grid"\][\s\S]*\.overflow-auto[\s\S]*\) :focus-visible/
     );
   });
 

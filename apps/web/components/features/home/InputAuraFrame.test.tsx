@@ -60,11 +60,12 @@ describe('InputAuraFrame', () => {
       resolve(__dirname, '../../../app/(home)/home.css'),
       'utf8'
     );
-    // The frame never paints focus; the input fills the pill and rings it.
+    // The frame never paints focus; the input fills the pill and the one
+    // focus.css outline draws inside it (the frame is a data-focus-inset box).
     expect(frameCss).not.toContain(':has(:focus-visible)');
-    expect(homeCss).toMatch(
-      /\.homepage-name-search__input:focus-visible\s*\{[^}]*box-shadow:\s*inset/
-    );
+    expect(homeCss).not.toMatch(/\.homepage-name-search__input:focus/);
+    const { container } = render(<InputAuraFrame>x</InputAuraFrame>);
+    expect(container.firstElementChild).toHaveAttribute('data-focus-inset');
     expect(homeCss).toMatch(
       /\.homepage-name-search__field \.homepage-name-search__input\s*\{[^}]*inset:\s*0;/
     );

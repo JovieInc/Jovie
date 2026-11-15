@@ -176,7 +176,7 @@ describe('mounted homepage FAQ System B source contract', () => {
 
     expect(focusRuleStart).toBeGreaterThanOrEqual(0);
     expect(reducedMotionStart).toBeGreaterThan(focusRuleStart);
-    expect(focusRule).toContain('box-shadow:');
+    expect(focusRule).not.toMatch(/box-shadow:\s*0/);
     expect(focusRule).toContain('box-shadow 150ms');
     expect(focusRule).toContain('border-color 150ms');
     expect(focusRule).not.toContain('transform');

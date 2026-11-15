@@ -213,6 +213,16 @@
   );
 }
 
+.marketing-glass-header[data-presentation="marketing-glass"]
+  .marketing-glass-header__cta:focus-visible,
+.marketing-glass-header[data-presentation="marketing-glass"]
+  .marketing-glass-header__text-link:focus-visible,
+.marketing-glass-header[data-presentation="marketing-glass"]
+  .marketing-glass-header__nav-link:focus-visible {
+  outline: 2px solid var(--noir-ion-ion);
+  outline-offset: 2px;
+}
+
 @media (max-width: 767px) {
   .marketing-glass-header[data-presentation="marketing-glass"] {
     --marketing-glass-top: var(--space-2-5);

@@ -245,7 +245,8 @@ describe('SidebarIdentityGroup', () => {
       join(__dirname, './SidebarIdentityGroup.css'),
       'utf8'
     );
-    expect(identityCss).toContain(':has(:focus-visible)');
+    // Focus is the inner control's one focus.css outline: no group ring.
+    expect(identityCss).not.toContain(':focus');
     expect(identityCss).toContain('[data-collapsible="icon"]');
     expect(
       within(group).getByRole('link', { name: PROFILE_LINK_NAME })

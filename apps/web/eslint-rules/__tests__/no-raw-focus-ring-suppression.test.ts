@@ -35,13 +35,13 @@ describe('no-raw-focus-ring: focus-visible suppression guard', () => {
   });
 });
 
-describe('globals.css default focus-visible layer', () => {
-  it('applies Tailwind focus-visible ring utilities to every interactive element', () => {
+describe('styles/focus.css default focus-visible layer', () => {
+  it('draws one outline on every interactive element, never a ring', () => {
     const css = readFileSync(
-      path.join(__dirname, '../../app/globals.css'),
+      path.join(__dirname, '../../styles/focus.css'),
       'utf8'
     );
-    const start = css.indexOf('DEFAULT FOCUS-VISIBLE');
+    const start = css.indexOf('The one outline');
     expect(start).toBeGreaterThan(-1);
     const block = css.slice(start);
     for (const selector of [
@@ -56,8 +56,8 @@ describe('globals.css default focus-visible layer', () => {
       expect(block).toContain(selector);
     }
     expect(block).toMatch(
-      /@apply[^;]*focus-visible:ring-2[^;]*focus-visible:ring-offset-2/
+      /\):focus-visible\s*\{\s*outline: var\(--focus-outline-width\) solid/
     );
-    expect(block).not.toMatch(/(^|\s)focus:ring/);
+    expect(block).not.toMatch(/@apply|(^|\s)focus:ring/);
   });
 });

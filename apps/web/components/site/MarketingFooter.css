@@ -52,6 +52,16 @@
   color: var(--mf-text);
 }
 
+.marketing-footer-premium .mf-link:focus-visible {
+  outline: 2px solid var(--noir-ion-ion);
+  outline-offset: 2px;
+}
+
+.marketing-footer-premium .mf-logo-link:focus-visible {
+  outline: 2px solid var(--noir-ion-ion);
+  outline-offset: 2px;
+}
+
 .marketing-footer-premium .mf-copyright {
   font-size: 0.75rem;
   line-height: 1.45;
@@ -125,6 +135,11 @@
 .marketing-footer-premium .mf-legal-link:hover,
 .marketing-footer-premium .mf-legal-link:focus-visible {
   color: var(--mf-text);
+}
+
+.marketing-footer-premium .mf-legal-link:focus-visible {
+  outline: 2px solid var(--noir-ion-ion);
+  outline-offset: 2px;
 }
 
 @media (max-width: 40rem) {
