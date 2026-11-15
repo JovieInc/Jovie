@@ -21,6 +21,8 @@ const meta = {
 
 export default meta;
 type Story = StoryObj<typeof meta>;
+/** The component's optional props, as the stories' decorators receive them. */
+type Args = Parameters<typeof LeadPipelineControls>[0];
 
 const SETTINGS: LeadPipelineSettings = {
   enabled: true,
@@ -48,7 +50,7 @@ const SETTINGS: LeadPipelineSettings = {
 
 type Seed = (client: QueryClient) => void;
 
-function withClient(seed: Seed): Decorator {
+function withClient(seed: Seed): Decorator<Args> {
   return function WithClient(Story) {
     const client = new QueryClient({
       defaultOptions: {
@@ -221,7 +223,7 @@ export const LongContentDiagnostics: Story = {
   },
 };
 
-const withRtl: Decorator = function WithRtl(Story) {
+const withRtl: Decorator<Args> = function WithRtl(Story) {
   return (
     <div dir='rtl' lang='ar'>
       <Story />
