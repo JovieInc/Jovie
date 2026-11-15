@@ -433,6 +433,24 @@ describe('current capture bindings before refresh admission', () => {
       );
     }
   );
+  it('names the stale component and the failing class in the refusal', () => {
+    const sourceDrift = cacheFixture();
+    sourceDrift.put(sourceDrift.component, 'export const Proof = () => false;');
+    expect(() =>
+      requireCurrentStoryCache(sourceDrift.root, sourceDrift.cache)
+    ).toThrow(
+      `${sourceDrift.component}: the captured component source changed since the capture`
+    );
+    const inputsDrift = cacheFixture();
+    inputsDrift.change(record => {
+      record.renderInputs.digest = '0'.repeat(64);
+    });
+    expect(() =>
+      requireCurrentStoryCache(inputsDrift.root, inputsDrift.cache)
+    ).toThrow(
+      `${inputsDrift.component}: the captured render inputs changed since the capture`
+    );
+  });
   it.each([
     [
       'source drift',
