@@ -75,8 +75,8 @@ export function MismatchCard({
   // Removing state — animate out
   if (removing) {
     return (
-      <div
-        className='overflow-hidden transition-[max-height,opacity,margin] duration-cinematic ease-out'
+      <li
+        className='list-none overflow-hidden transition-[max-height,opacity,margin] duration-cinematic ease-out'
         style={{ maxHeight: 0, opacity: 0, marginBottom: 0 }}
         aria-hidden='true'
       />
@@ -85,49 +85,54 @@ export function MismatchCard({
 
   // Undo pending state
   if (pendingAction && !error) {
+    // The card sits in a <ul>, so every state keeps an <li> root.
     return (
-      <div
-        className='flex items-center justify-between gap-3 rounded-md border border-subtle bg-surface-1 px-3 py-2.5 transition-colors duration-subtle'
-        role='status'
-        aria-live='polite'
-      >
-        <span className='text-xs text-muted-foreground'>
-          {pendingAction === 'confirmed_mismatch'
-            ? 'Marked as not yours'
-            : 'Dismissed'}
-        </span>
-        <Button
-          variant='ghost'
-          size='sm'
-          onClick={handleUndo}
-          className='h-7 gap-1.5 text-xs'
+      <li className='list-none'>
+        <div
+          className='flex items-center justify-between gap-3 rounded-md border border-subtle bg-surface-1 px-3 py-2.5 transition-colors duration-subtle'
+          role='status'
+          aria-live='polite'
         >
-          <Undo2 className='h-3 w-3' />
-          Undo
-        </Button>
-      </div>
+          <span className='text-xs text-muted-foreground'>
+            {pendingAction === 'confirmed_mismatch'
+              ? 'Marked as not yours'
+              : 'Dismissed'}
+          </span>
+          <Button
+            variant='ghost'
+            size='sm'
+            onClick={handleUndo}
+            className='h-7 gap-1.5 text-xs'
+          >
+            <Undo2 className='h-3 w-3' />
+            Undo
+          </Button>
+        </div>
+      </li>
     );
   }
 
   // Error state
   if (error) {
     return (
-      <div
-        className='flex items-center justify-between gap-3 rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2.5'
-        role='alert'
-      >
-        <span className='text-xs text-destructive'>
-          Failed to update. Try again.
-        </span>
-        <Button
-          variant='ghost'
-          size='sm'
-          onClick={handleRetry}
-          className='h-7 text-xs'
+      <li className='list-none'>
+        <div
+          className='flex items-center justify-between gap-3 rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2.5'
+          role='alert'
         >
-          Retry
-        </Button>
-      </div>
+          <span className='text-xs text-destructive'>
+            Failed to update. Try again.
+          </span>
+          <Button
+            variant='ghost'
+            size='sm'
+            onClick={handleRetry}
+            className='h-7 text-xs'
+          >
+            Retry
+          </Button>
+        </div>
+      </li>
     );
   }
 
@@ -148,6 +153,8 @@ export function MismatchCard({
             <img
               src={mismatch.externalArtworkUrl}
               alt=''
+              width={32}
+              height={32}
               className='h-8 w-8 rounded object-cover'
             />
           ) : (
@@ -160,6 +167,8 @@ export function MismatchCard({
         <img
           src={mismatch.externalArtworkUrl}
           alt=''
+          width={32}
+          height={32}
           className='h-8 w-8 flex-shrink-0 rounded object-cover'
         />
       )}
