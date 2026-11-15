@@ -1,126 +1,126 @@
-import { render, screen } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
-import { describe, expect, it } from 'vitest';
-import { FooterBranding } from './FooterBranding';
+import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { describe, expect, it } from "vitest";
+import { FooterBranding } from "./FooterBranding";
 
-describe('FooterBranding', () => {
-  it.each(['light', 'dark', 'linear'] as const)(
-    'renders the named brand link in the %s variant',
-    variant => {
-      render(
-        <FooterBranding
-          mark='brand'
-          variant={variant}
-          artistHandle='test-artist'
-          showCTA={false}
-        />
-      );
+describe("FooterBranding", () => {
+	it.each(["light", "dark", "linear"] as const)(
+		"renders the named brand link in the %s variant",
+		(variant) => {
+			render(
+				<FooterBranding
+					mark="brand"
+					variant={variant}
+					artistHandle="test-artist"
+					showCTA={false}
+				/>,
+			);
 
-      const link = screen.getByRole('link', { name: 'Made with Jovie' });
-      expect(link).toHaveAttribute(
-        'href',
-        '/?utm_source=profile&utm_artist=test-artist'
-      );
-      expect(link).toHaveTextContent('Made with Jovie');
-      expect(link.querySelector('svg')).toHaveAttribute('aria-hidden', 'true');
-      expect(screen.getAllByRole('link')).toHaveLength(1);
-    }
-  );
+			const link = screen.getByRole("link", { name: "Made with Jovie" });
+			expect(link).toHaveAttribute(
+				"href",
+				"/?utm_source=profile&utm_artist=test-artist",
+			);
+			expect(link).toHaveTextContent("Made with Jovie");
+			expect(link.querySelector("svg")).toHaveAttribute("aria-hidden", "true");
+			expect(screen.getAllByRole("link")).toHaveLength(1);
+		},
+	);
 
-  it('keeps the brand link keyboard accessible', async () => {
-    const user = userEvent.setup();
-    render(<FooterBranding mark='brand' showCTA={false} />);
+	it("keeps the brand link keyboard accessible", async () => {
+		const user = userEvent.setup();
+		render(<FooterBranding mark="brand" showCTA={false} />);
 
-    await user.tab();
+		await user.tab();
 
-    expect(screen.getByRole('link', { name: 'Made with Jovie' })).toHaveFocus();
-  });
+		expect(screen.getByRole("link", { name: "Made with Jovie" })).toHaveFocus();
+	});
 
-  it('gives the brand link a real 44px hit box', () => {
-    render(<FooterBranding mark='brand' showCTA={false} />);
+	it("gives the brand link a real 44px hit box", () => {
+		render(<FooterBranding mark="brand" showCTA={false} />);
 
-    const link = screen.getByRole('link', { name: 'Made with Jovie' });
-    // Real box (axe's target-size cannot see before: pseudo hit areas).
-    expect(link).toHaveClass('min-h-11');
-    expect(link.className).not.toContain('before:h-11');
-  });
+		const link = screen.getByRole("link", { name: "Made with Jovie" });
+		// Real box (axe's target-size cannot see before: pseudo hit areas).
+		expect(link).toHaveClass("min-h-11");
+		expect(link.className).not.toContain("before:h-11");
+	});
 
-  it('uses untracked destinations when there is no artist', () => {
-    render(<FooterBranding mark='brand' />);
+	it("uses untracked destinations when there is no artist", () => {
+		render(<FooterBranding mark="brand" />);
 
-    expect(
-      screen.getByRole('link', { name: 'Made with Jovie' })
-    ).toHaveAttribute('href', '/');
-    expect(
-      screen.getByRole('link', { name: 'Claim your handle' })
-    ).toHaveAttribute('href', '/start');
-  });
+		expect(
+			screen.getByRole("link", { name: "Made with Jovie" }),
+		).toHaveAttribute("href", "/");
+		expect(
+			screen.getByRole("link", { name: "Claim your handle" }),
+		).toHaveAttribute("href", "/start");
+	});
 
-  it('preserves artist attribution on the brand and claim links', () => {
-    render(
-      <FooterBranding
-        mark='brand'
-        variant='linear'
-        artistHandle='test-artist'
-      />
-    );
+	it("preserves artist attribution on the brand and claim links", () => {
+		render(
+			<FooterBranding
+				mark="brand"
+				variant="linear"
+				artistHandle="test-artist"
+			/>,
+		);
 
-    expect(
-      screen.getByRole('link', { name: 'Made with Jovie' })
-    ).toHaveAttribute('href', '/?utm_source=profile&utm_artist=test-artist');
-    expect(
-      screen.getByRole('link', { name: 'Claim your handle' })
-    ).toHaveAttribute(
-      'href',
-      '/start?utm_source=profile&utm_artist=test-artist'
-    );
-  });
+		expect(
+			screen.getByRole("link", { name: "Made with Jovie" }),
+		).toHaveAttribute("href", "/?utm_source=profile&utm_artist=test-artist");
+		expect(
+			screen.getByRole("link", { name: "Claim your handle" }),
+		).toHaveAttribute(
+			"href",
+			"/start?utm_source=profile&utm_artist=test-artist",
+		);
+	});
 
-  it('retains the default icon link and optional claim action', () => {
-    render(<FooterBranding />);
+	it("retains the default icon link and optional claim action", () => {
+		render(<FooterBranding />);
 
-    expect(
-      screen.getByRole('link', { name: 'Powered by Jovie Home' })
-    ).toHaveAttribute('href', '/');
-    expect(screen.queryByText('Made with Jovie')).not.toBeInTheDocument();
-    expect(
-      screen.getByRole('link', { name: 'Claim your handle' })
-    ).toHaveAttribute('href', '/start');
-  });
+		expect(
+			screen.getByRole("link", { name: "Powered by Jovie Home" }),
+		).toHaveAttribute("href", "/");
+		expect(screen.queryByText("Made with Jovie")).not.toBeInTheDocument();
+		expect(
+			screen.getByRole("link", { name: "Claim your handle" }),
+		).toHaveAttribute("href", "/start");
+	});
 
-  it.each(['icon', 'wordmark', 'text'] as const)(
-    'preserves the accessible home link for the %s mark',
-    mark => {
-      render(<FooterBranding mark={mark} size='sm' showCTA={false} />);
+	it.each(["icon", "wordmark", "text"] as const)(
+		"preserves the accessible home link for the %s mark",
+		(mark) => {
+			render(<FooterBranding mark={mark} size="sm" showCTA={false} />);
 
-      expect(
-        screen.getByRole('link', { name: 'Powered by Jovie Home' })
-      ).toHaveAttribute('href', '/');
-      expect(screen.queryByText('Made with Jovie')).not.toBeInTheDocument();
-      expect(screen.getAllByRole('link')).toHaveLength(1);
-      if (mark === 'text') {
-        expect(screen.getByRole('link')).toHaveTextContent(
-          /Powered by\s*Jovie/
-        );
-      }
-    }
-  );
+			expect(
+				screen.getByRole("link", { name: "Powered by Jovie Home" }),
+			).toHaveAttribute("href", "/");
+			expect(screen.queryByText("Made with Jovie")).not.toBeInTheDocument();
+			expect(screen.getAllByRole("link")).toHaveLength(1);
+			if (mark === "text") {
+				expect(screen.getByRole("link")).toHaveTextContent(
+					/Powered by\s*Jovie/,
+				);
+			}
+		},
+	);
 
-  it('does not force the text mark or claim link into capitals', () => {
-    render(<FooterBranding mark='text' showCTA />);
-    expect(
-      screen.getByRole('link', { name: 'Claim your handle' })
-    ).not.toHaveClass('uppercase');
-    expect(
-      screen.getByRole('link', { name: 'Powered by Jovie Home' })
-    ).not.toHaveClass('uppercase');
-  });
+	it("does not force the text mark or claim link into capitals", () => {
+		render(<FooterBranding mark="text" showCTA />);
+		expect(
+			screen.getByRole("link", { name: "Claim your handle" }),
+		).not.toHaveClass("uppercase");
+		expect(
+			screen.getByRole("link", { name: "Powered by Jovie Home" }),
+		).not.toHaveClass("uppercase");
+	});
 
-  it('keeps the claim-handle link a 24px+ touch target', () => {
-    const { container } = render(<FooterBranding mark='brand' />);
+	it("keeps the claim-handle link a 24px+ touch target", () => {
+		const { container } = render(<FooterBranding mark="brand" />);
 
-    const link = container.querySelector('a[href*="/start"]');
-    expect(link).not.toBeNull();
-    expect(link).toHaveClass('py-1.5');
-  });
+		const link = container.querySelector('a[href*="/start"]');
+		expect(link).not.toBeNull();
+		expect(link).toHaveClass("py-1.5");
+	});
 });
