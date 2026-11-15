@@ -62,4 +62,36 @@ describe('AgentRoom', () => {
     );
     expect(screen.getByTestId('slot-composer')).toBeInTheDocument();
   });
+
+  it('gives each pane its own scroll container so the room fills the canvas', () => {
+    const view = fleetRoomFixtureView();
+    render(<AgentRoom view={view} />);
+
+    // The room itself is bounded by its host and never asks the page to
+    // scroll on desktop; each pane owns a scrolling region instead.
+    const room = screen.getByTestId('agent-room');
+    expect(room).toHaveClass('overflow-y-auto', 'lg:overflow-hidden');
+
+    const roster = within(room).getByTestId('agent-roster');
+    expect(roster).toHaveClass('overflow-y-auto');
+    const rosterRows = within(roster).getAllByTestId('agent-room-agent');
+    expect(rosterRows).toHaveLength(view.agents.length);
+
+    const feed = within(room).getByTestId('agent-room-feed');
+    expect(feed).toHaveClass('overflow-y-auto');
+    const feedEvents = within(feed).getAllByTestId('agent-room-event');
+    expect(feedEvents).toHaveLength(view.events.length);
+  });
+
+  it('pins the composer outside the scrolling feed', () => {
+    render(
+      <AgentRoom
+        view={fleetRoomFixtureView()}
+        composer={<form data-testid='slot-composer' />}
+      />
+    );
+    const room = screen.getByTestId('agent-room');
+    const feed = within(room).getByTestId('agent-room-feed');
+    expect(feed).not.toContainElement(screen.getByTestId('slot-composer'));
+  });
 });
