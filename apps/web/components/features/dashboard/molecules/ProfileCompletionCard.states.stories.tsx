@@ -114,13 +114,15 @@ export const LongContentSteps: Story = {
       percentage: 57,
       completedCount: 4,
       totalCount: 8,
-      steps: [1, 2, 3, 4].map(n => ({
-        id: `step-${n}`,
-        label: `Connect every streaming service and social account you use, step ${n}`,
-        description:
-          'A long description that runs past the width of the card so it has to truncate on a single line rather than wrap.',
-        href: APP_ROUTES.SETTINGS_PROFILE,
-      })),
+      steps: (['name', 'avatar', 'handle', 'music-links'] as const).map(
+        (id, n) => ({
+          id,
+          label: `Connect every streaming service and social account you use, step ${n + 1}`,
+          description:
+            'A long description that runs past the width of the card so it has to truncate on a single line rather than wrap.',
+          href: APP_ROUTES.SETTINGS_PROFILE,
+        })
+      ),
       profileIsLive: true,
     }),
   },
