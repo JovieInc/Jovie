@@ -560,7 +560,7 @@
       "gh-shell": 3
     },
     "scripts/lib/validation-sync.mjs": {
-      "provider-host": 0
+      "provider-host": 1
     },
     "scripts/loop-integration-ship.sh": {
       "gh-shell": 4
@@ -664,9 +664,6 @@
     },
     "workers/observability-ingest/src/index.ts": {
       "provider-host": 1
-    },
-    "scripts/lib/github-pull-snapshots.mjs": {
-      "provider-host": 2
     }
   }
 }
