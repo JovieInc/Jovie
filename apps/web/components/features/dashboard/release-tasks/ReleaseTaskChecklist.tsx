@@ -1,5 +1,6 @@
 'use client';
 
+import { PlainButton } from '@jovie/ui';
 import { useQueryClient } from '@tanstack/react-query';
 import { motion } from 'motion/react';
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
@@ -251,23 +252,21 @@ export function ReleaseTaskChecklist({
           className='flex-1'
         />
         {!isCompact && (clustersData?.length ?? 0) > 0 && (
-          <button
-            type='button'
+          <PlainButton
             onClick={() => setCatalogDialogOpen(true)}
             className='flex-shrink-0 text-xs text-muted-foreground hover:text-foreground'
             data-testid='open-catalog-builder'
           >
             Add from catalog
-          </button>
+          </PlainButton>
         )}
         {variant === 'compact' && onNavigateToFullPage && (
-          <button
-            type='button'
+          <PlainButton
             onClick={onNavigateToFullPage}
             className='flex-shrink-0 text-3xs text-accent hover:underline'
           >
             Open &rarr;
-          </button>
+          </PlainButton>
         )}
       </motion.div>
 
