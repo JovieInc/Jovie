@@ -1,5 +1,6 @@
 import '@/styles/system-b-app.css';
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
+import { Toaster } from 'sonner';
 import { expect, screen, userEvent } from 'storybook/test';
 import { FeedbackProvider } from '@/components/feedback';
 import { RightPanelProvider } from '@/contexts/RightPanelContext';
@@ -95,17 +96,17 @@ export const ErrorVerifyFailed: Story = {
     Story => (
       <FeedbackProvider>
         <Story />
+        {/* The harness's mock '/test' pathname is a profile route, where
+       FeedbackProvider mounts no Toaster — mount the lane's own renderer
+       (same sonner store) so the failure toast actually renders. */}
+        <Toaster position='bottom-right' />
       </FeedbackProvider>
     ),
   ],
   play: async () => {
-    const trigger = await screen.findByRole('button', {
-      name: 'More actions',
-    });
-    // Row actions are hover/focus-revealed (system-b-table-contextual-action),
-    // so hover the row shell before the pointer interaction.
-    await userEvent.hover(trigger.closest('tr') ?? trigger);
-    await userEvent.click(trigger);
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'More actions' })
+    );
     await userEvent.click(
       await screen.findByRole('menuitem', { name: 'Verify Creator' })
     );

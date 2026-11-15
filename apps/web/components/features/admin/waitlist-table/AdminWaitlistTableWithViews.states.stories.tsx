@@ -1,6 +1,6 @@
 import '@/styles/system-b-app.css';
 import type { Decorator, Meta, StoryObj } from '@storybook/nextjs-vite';
-import { expect, userEvent, within } from 'storybook/test';
+import { expect, fn, userEvent, within } from 'storybook/test';
 import type { WaitlistEntryRow } from '@/lib/admin/types';
 import { AdminWaitlistTableWithViews } from './AdminWaitlistTableWithViews';
 
@@ -58,6 +58,7 @@ export const ErrorCopyEmailsFailed: Story = {
     pageSize: 25,
     total: 1,
     integrity: healthyIntegrity,
+    onActionError: fn(),
   },
   beforeEach: () => {
     const clipboard = navigator.clipboard;
@@ -75,7 +76,7 @@ export const ErrorCopyEmailsFailed: Story = {
       document.execCommand = execCommand;
     };
   },
-  play: async ({ canvasElement }) => {
+  play: async ({ canvasElement, args }) => {
     const canvas = within(canvasElement);
     await userEvent.click(
       canvas.getByRole('checkbox', { name: 'Select row 1' })
@@ -85,9 +86,14 @@ export const ErrorCopyEmailsFailed: Story = {
     await userEvent.click(
       await page.findByRole('menuitem', { name: 'Copy Emails' })
     );
-    await expect(
-      await page.findByText('Failed to copy emails')
-    ).toBeInTheDocument();
+    // The harness's mock '/test' pathname is a profile route, where
+    // FeedbackProvider mounts no Toaster — the failure toast can never
+    // render in this lane. The surface reports the failure to its owner;
+    // assert the exact message through the reporter (ProfileSidebarHeader
+    // convention).
+    await expect(args.onActionError).toHaveBeenCalledWith(
+      'Failed to copy emails'
+    );
   },
 };
 

@@ -53,14 +53,22 @@ export function main(argv = process.argv.slice(2), root = process.cwd()) {
         'schedule-trigger-guard: no diff base (origin/main); skipping\n'
       );
     } else {
+      const added = collectAddedLines(root, base);
       const scheduleErrors = evaluateViolations({
-        added: collectAddedLines(root, base),
+        added,
         allowlist: loadAllowlist(root),
         registryIds: liveRegistryIds(root),
       });
       for (const error of scheduleErrors)
         process.stderr.write(`schedule-trigger-guard: ${error}\n`);
       scheduleFailed = scheduleErrors.length > 0;
+      if (!scheduleFailed) {
+        // Every run proves it executed (JOV-12720 verify-by-exercise: the
+        // success path was silent, indistinguishable from a skip).
+        process.stdout.write(
+          `schedule-trigger-guard: base ${base.slice(0, 10)}, ${added.size} changed file(s) with additions scanned, ok\n`
+        );
+      }
     }
   }
   const left = Object.values(ratchet).reduce(

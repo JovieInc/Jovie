@@ -238,6 +238,7 @@ test('publication rejects committed formatter drift and accepts the formatted re
     write('scripts/ci-branching-guard.mjs', 'export {};\n');
     write('scripts/component-ship-gate.mjs', 'export {};\n');
     write('scripts/lib/policy-gate-liveness.mjs', 'export {};\n');
+    write('scripts/lib/projected-tree-budget.mjs', 'export {};\n');
     write('scripts/preflight-changed.mjs', 'export {};\n');
     write('scripts/hooks/prepush-preflight.mjs', 'export {};\n');
     write('scripts/security/scan-secrets.sh', 'exit 0\n');
@@ -314,6 +315,7 @@ test('publication blocks missing component stories and tests before publishing',
       true
     );
     write('scripts/ci-branching-guard.mjs', '');
+    write('scripts/lib/projected-tree-budget.mjs', 'export {};\n');
     write('scripts/security/scan-secrets.sh', 'exit 0\n');
     write(
       'scripts/lib/policy-gate-liveness.mjs',
@@ -406,6 +408,7 @@ test('affected qualification rejects stale surface certification before expensiv
   try {
     write('scripts/hooks/pre-push-gate.sh', readFileSync(gateScript));
     write('scripts/hooks/resolve-repo-node.sh', 'exit 0\n');
+    write('scripts/lib/projected-tree-budget.mjs', 'export {};\n');
     write('bin/git', '#!/bin/sh\nexit 0\n');
     write(
       'bin/pnpm',
