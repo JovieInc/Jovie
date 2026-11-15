@@ -1,6 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { expect, userEvent, within } from 'storybook/test';
 import type { SpotifyArtistResult } from '@/lib/contracts/api';
+import { HomepageQueryProvider } from '../(home)/HomepageQueryProvider';
 import { ClaimArtistSearch } from './ClaimArtistSearch';
 
 type ApiMock = (request: {
@@ -153,6 +154,24 @@ export const OfflineSearch: Story = {
       await canvas.findByText(
         'Search is unavailable. Try again, or create your profile below.'
       )
+    ).toBeVisible();
+  },
+};
+
+/** The /claim page renders the search inside its scoped QueryClient provider. */
+export const InsidePageQueryProvider: Story = {
+  beforeEach: answer(RESULTS),
+  decorators: [
+    Story => (
+      <HomepageQueryProvider>
+        <Story />
+      </HomepageQueryProvider>
+    ),
+  ],
+  play: async ({ canvasElement }) => {
+    const canvas = await search(canvasElement, 'Neon');
+    await expect(
+      await canvas.findByTestId('claim-artist-option')
     ).toBeVisible();
   },
 };
