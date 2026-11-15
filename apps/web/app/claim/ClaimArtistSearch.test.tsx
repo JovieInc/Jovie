@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { APP_ROUTES } from '@/constants/routes';
 import type { SpotifyArtistResult } from '@/lib/contracts/api';
 import { expectNoA11yViolations } from '@/tests/utils/a11y';
+import { HomepageQueryProvider } from '../(home)/homepage-query-provider';
 import { ClaimArtistSearch } from './ClaimArtistSearch';
 
 const RESULTS: SpotifyArtistResult[] = [
@@ -73,6 +74,19 @@ describe('ClaimArtistSearch', () => {
 
   afterEach(() => {
     vi.unstubAllGlobals();
+  });
+
+  it('renders inside the scoped QueryClientProvider the claim page provides', async () => {
+    // The /claim page wraps this component in HomepageQueryProvider (the only
+    // QueryClient on that route tree). Render through the real provider
+    // pairing so a broken pairing fails here instead of in the claim dogfood.
+    respondWith(RESULTS);
+    baseRender(
+      <HomepageQueryProvider>
+        <ClaimArtistSearch />
+      </HomepageQueryProvider>
+    );
+    expect(await screen.findByTestId('claim-artist-search')).toBeVisible();
   });
 
   it('starts idle with a labelled search and a create-profile way out', async () => {

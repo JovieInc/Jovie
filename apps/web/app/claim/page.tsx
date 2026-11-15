@@ -18,6 +18,7 @@ import {
 } from '@/lib/claim/artist-offer-claim';
 import { resolveInitialCookieBannerVisible } from '@/lib/cookies/banner-initial-visibility.server';
 import { getRootLayoutChromeState } from '@/lib/demo-recording';
+import { HomepageQueryProvider } from '../(home)/homepage-query-provider';
 import { ClaimArtistSearch } from './ClaimArtistSearch';
 
 const PRO_CLAIM = getPublicPriceClaim('pro');
@@ -119,7 +120,12 @@ export default async function ClaimPage({
             subtitle={`${PRO_CLAIM.displayName} is ${PRICE_DISPLAY}. Cancel anytime.`}
           />
           <div className='px-5 py-5 sm:px-6'>
-            <ClaimArtistSearch />
+            {/* /claim has no layout of its own and the root layout provides no
+                QueryClientProvider, so the search hook would throw "No
+                QueryClient set" during SSR without this scoped client. */}
+            <HomepageQueryProvider>
+              <ClaimArtistSearch />
+            </HomepageQueryProvider>
           </div>
         </ContentSurfaceCard>
       </div>
