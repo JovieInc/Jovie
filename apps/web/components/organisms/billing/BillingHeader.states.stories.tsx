@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import type { ReactNode } from 'react';
-import { expect, within } from 'storybook/test';
+import { expect, waitFor, within } from 'storybook/test';
 import { BillingHeader } from './BillingHeader';
 
 function Frame(Story: () => ReactNode) {
@@ -43,9 +43,14 @@ export const LongContentNarrowColumn: Story = {
   decorators: [Frame],
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    await expect(
-      canvas.getByRole('heading', { level: 1, name: 'Billing' })
-    ).toBeVisible();
+    // The header fades in on mount (motion opacity 0 -> 1, 0.4s); jest-dom's
+    // toBeVisible counts an opacity-0 ancestor as invisible, so await the
+    // settled state instead of racing the animation.
+    await waitFor(() =>
+      expect(
+        canvas.getByRole('heading', { level: 1, name: 'Billing' })
+      ).toBeVisible()
+    );
   },
 };
 
@@ -54,8 +59,13 @@ export const RtlDocument: Story = {
   decorators: [RtlFrame],
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    await expect(
-      canvas.getByRole('heading', { level: 1, name: 'Billing' })
-    ).toBeVisible();
+    // The header fades in on mount (motion opacity 0 -> 1, 0.4s); jest-dom's
+    // toBeVisible counts an opacity-0 ancestor as invisible, so await the
+    // settled state instead of racing the animation.
+    await waitFor(() =>
+      expect(
+        canvas.getByRole('heading', { level: 1, name: 'Billing' })
+      ).toBeVisible()
+    );
   },
 };
