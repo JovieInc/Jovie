@@ -4,9 +4,8 @@ import { NuqsTestingAdapter } from 'nuqs/adapters/testing';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { expectNoA11yViolations } from '@/tests/utils/a11y';
 
-// Mocks mirror tests/unit/demo/demo-releases-experience.test.tsx: they stub
-// auth, URL state and the server-action modules that pull in drizzle, and
-// leave the real demo shell and release list rendering.
+// Isolate auth and server actions while rendering the real demo shell,
+// release list, image component and URL state through NuqsTestingAdapter.
 const captureQuery = vi.hoisted(() => ({ value: '' }));
 
 // Mock Clerk's useUser hook (pulled in transitively via DemoAuthShell → UnifiedSidebar → UserButton)
@@ -21,15 +20,6 @@ vi.mock('@clerk/nextjs', () => ({
     setActive: vi.fn(),
   }),
   ClerkProvider: ({ children }: { children: React.ReactNode }) => children,
-}));
-
-// Mock nuqs sort params hook (avoids deep next/navigation dependency via nuqs → useRouter)
-vi.mock('@/lib/nuqs/hooks', () => ({
-  useReleaseSortParams: () => [{ sort: 'release', direction: 'desc' }, vi.fn()],
-  useAudienceSortParams: () => [
-    { sort: 'createdAt', direction: 'desc' },
-    vi.fn(),
-  ],
 }));
 
 vi.mock('next/navigation', async importOriginal => {
@@ -53,19 +43,6 @@ const runDemoAction = vi.fn(() => Promise.resolve());
 
 vi.mock('@/features/demo/demo-actions', () => ({
   runDemoAction,
-}));
-
-// Mock next/image for test environment
-vi.mock('next/image', () => ({
-  default: (props: Record<string, unknown>) => {
-    const {
-      priority: _priority,
-      fetchPriority: _fp,
-      unoptimized: _unoptimized,
-      ...rest
-    } = props;
-    return <img alt='' {...rest} />;
-  },
 }));
 
 // ─── Drizzle cycle prevention ────────────────────────────────────────────────
