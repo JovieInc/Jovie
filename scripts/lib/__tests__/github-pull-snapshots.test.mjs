@@ -44,7 +44,7 @@ describe('batchPulls unwraps the api-client response (JOV-12768)', () => {
               },
             }),
           text: async () => '{}',
-          headers: new Map(),
+          headers: new Headers({ 'content-type': 'application/json' }),
         };
       }
       throw new Error(`unexpected REST call ${url}`);
@@ -95,7 +95,7 @@ describe('batchPulls unwraps the api-client response (JOV-12768)', () => {
               },
             }),
           text: async () => '{}',
-          headers: new Map(),
+          headers: new Headers({ 'content-type': 'application/json' }),
         };
       }
       // A REST per-pull read here would mean the batch answer was ignored.
@@ -143,7 +143,7 @@ describe('batchPulls unwraps the api-client response (JOV-12768)', () => {
                 },
               }),
             text: async () => '{}',
-            headers: new Map(),
+            headers: new Headers({ 'content-type': 'application/json' }),
           };
         }
         if (/\/pulls\/\d+$/.test(String(url))) {
@@ -178,7 +178,7 @@ describe('batchPulls unwraps the api-client response (JOV-12768)', () => {
           status: 200,
           json: async () => wrappedGraphQL({ 18293: null }),
           text: async () => '{}',
-          headers: new Map(),
+          headers: new Headers({ 'content-type': 'application/json' }),
         };
       }
       throw new Error(`unexpected call ${url}`);
