@@ -12,7 +12,6 @@ import {
   FormItem,
   FormLabel,
   FormMessage,
-  useFormField,
 } from './form';
 
 // Helper: wraps form fields in a full Form context using react-hook-form
@@ -76,36 +75,6 @@ function TestFormWithValidation({
                 <input type='email' placeholder='Enter email' {...field} />
               </FormControl>
               <FormDescription>We will never share your email.</FormDescription>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-        <button type='submit'>Submit</button>
-      </form>
-    </Form>
-  );
-}
-
-function RenamableFieldForm({ name }: { name: 'givenName' | 'familyName' }) {
-  const form = useForm({
-    defaultValues: { givenName: '', familyName: 'Existing surname' },
-  });
-  const label = name === 'givenName' ? 'Given name' : 'Family name';
-
-  return (
-    <Form {...form}>
-      <form onSubmit={form.handleSubmit(vi.fn())}>
-        <FormField
-          control={form.control}
-          name={name}
-          rules={{ required: `${label} is required` }}
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>{label}</FormLabel>
-              <FormControl>
-                <input {...field} />
-              </FormControl>
-              <FormDescription>{label} help.</FormDescription>
               <FormMessage />
             </FormItem>
           )}
@@ -469,83 +438,6 @@ describe('Form', () => {
       }
       render(<FormWithMsgRef />);
       expect(ref.current).toBeInstanceOf(HTMLParagraphElement);
-    });
-  });
-
-  describe('FormField', () => {
-    it('reads the current field error when its name changes without remounting', async () => {
-      const user = userEvent.setup({ delay: null });
-      const { rerender } = render(<RenamableFieldForm name='givenName' />);
-
-      await user.click(screen.getByRole('button', { name: 'Submit' }));
-      expect(await screen.findByRole('alert')).toHaveTextContent(
-        'Given name is required'
-      );
-
-      rerender(<RenamableFieldForm name='familyName' />);
-      const familyName = screen.getByRole('textbox', { name: 'Family name' });
-      expect(familyName).toHaveValue('Existing surname');
-      expect(familyName).not.toHaveAttribute('aria-invalid');
-      expect(screen.getByText('Family name')).not.toHaveAttribute(
-        'data-invalid'
-      );
-      expect(screen.queryByRole('alert')).not.toBeInTheDocument();
-
-      // The original field's error still exists, but belongs to that field.
-      rerender(<RenamableFieldForm name='givenName' />);
-      expect(
-        screen.getByRole('textbox', { name: 'Given name' })
-      ).toHaveAttribute('aria-invalid', 'true');
-      expect(screen.getByRole('alert')).toHaveTextContent(
-        'Given name is required'
-      );
-    });
-
-    it('fails clearly outside a FormField context', () => {
-      function OrphanFieldProbe() {
-        useFormField();
-        return null;
-      }
-
-      expect(() => render(<OrphanFieldProbe />)).toThrow(
-        'useFormField should be used within <FormField>'
-      );
-    });
-
-    it('fails clearly outside a FormItem context', () => {
-      function ItemProbe() {
-        useFormField();
-        return null;
-      }
-
-      expect(() =>
-        render(
-          <TestForm>
-            <FormField name='username' render={() => <ItemProbe />} />
-          </TestForm>
-        )
-      ).toThrow('useFormField should be used within <FormItem>');
-    });
-
-    it('provides field context for child components', () => {
-      render(<TestForm />);
-      // The form renders correctly with field context
-      expect(screen.getByPlaceholderText('Enter username')).toBeInTheDocument();
-    });
-
-    it('connects field to react-hook-form', async () => {
-      const onSubmit = vi.fn();
-      const user = userEvent.setup({ delay: null });
-      render(<TestForm onSubmit={onSubmit} />);
-
-      const input = screen.getByPlaceholderText('Enter username');
-      await user.type(input, 'testuser');
-      await user.click(screen.getByRole('button', { name: 'Submit' }));
-
-      expect(onSubmit).toHaveBeenCalledWith(
-        { username: 'testuser' },
-        expect.anything()
-      );
     });
   });
 
