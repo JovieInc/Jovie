@@ -3,6 +3,7 @@ import { resolve } from 'node:path';
 import { render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { AppShellFrame } from '@/components/organisms/AppShellFrame';
+import styles from '@/components/organisms/AppShellFrame.module.css';
 import { AppShellSkeleton } from '@/components/organisms/AppShellSkeleton';
 
 afterEach(() => {
@@ -10,6 +11,29 @@ afterEach(() => {
 });
 
 describe('AppShellFrame', () => {
+  it.each([
+    { brandVariant: 'jovie', placeholder: false, launch: true },
+    { brandVariant: 'jovie', placeholder: true, launch: false },
+    { brandVariant: 'ov', placeholder: false, launch: true },
+    { brandVariant: 'ov', placeholder: true, launch: false },
+  ] as const)(
+    'keeps the live frame timeline stable across workspace skins: $brandVariant, placeholder=$placeholder',
+    ({ brandVariant, placeholder, launch }) => {
+      render(
+        <AppShellFrame
+          sidebar={null}
+          main={<div>Workspace</div>}
+          brandVariant={brandVariant}
+          placeholder={placeholder}
+        />
+      );
+      const main = screen.getByRole('main');
+      expect(main.classList.contains(styles.launchLight)).toBe(launch);
+      expect(main).not.toHaveAttribute('inert');
+      expect(main).not.toHaveAttribute('aria-hidden');
+    }
+  );
+
   it('mounts exactly one deferred titlebar in the desktop shell', async () => {
     document.documentElement.dataset.desktopRuntime = 'electron';
     render(<AppShellFrame sidebar={null} main={<div>Desktop content</div>} />);
