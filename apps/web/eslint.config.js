@@ -556,7 +556,7 @@ module.exports = [
   },
   // PaySelector + ArtistInfo: pre-existing molecule→features layering debt, surfaced by whole-file lint; deferred (JOV-2168 pattern).
   {
-    files: ['components/molecules/PaySelector.tsx', 'components/molecules/ArtistInfo.tsx'],
+    files: ['components/molecules/{PaySelector,ArtistInfo}.tsx'],
     rules: { 'boundaries/element-types': 'off' },
   },
   // Experimental shell routes — not production UI; label-casing ratchet deferred (#11251).
