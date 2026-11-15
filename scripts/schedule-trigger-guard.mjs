@@ -47,9 +47,12 @@ export function isCommentLine(line) {
   return /^\s*(?:\/\/|\/\*|\*|#|--|<!--)/.test(line);
 }
 
-export const SCHEDULE_LINE = /^\s*(?:-\s*cron:|schedule:)/;
+// All four trigger-declaration shapes: mapping (`schedule:`), list item
+// (`- schedule`), array (`on: [push, schedule]`) and the cron entry itself.
+export const SCHEDULE_LINE =
+  /^\s*(?:-\s*cron:|schedule:|-\s*schedule\b)|\bon:\s*\[[^\]]*\bschedule\b/;
 export const LOOP_CONSTRUCT =
-  /\b(?:while\s*\(|while\s+true\b|until\b|setInterval\s*\(|for\s*\(\s*;)/;
+  /\b(?:while\s*\(|while\s+true\b|until\b|setInterval\s*\(|for\s+await\b|for\s*\(\s*;)/;
 export const GITHUB_API_CONSTRUCT =
   /\b(?:gh\s+(?:api|run\s+watch)|api\.github\.com|octokit|github\.rest\.|graphql\()/i;
 
@@ -63,19 +66,44 @@ function git(root, ...args) {
   return run.status === 0 ? run.stdout : null;
 }
 
-/** Diff base: explicit env override, else the merge-base with origin/main. */
+/** The PR's base SHA from the runner's event payload, when present. */
+export function eventBaseSha(env = process.env) {
+  const path = env.GITHUB_EVENT_PATH;
+  if (!path || !existsSync(path)) return null;
+  try {
+    return (
+      JSON.parse(readFileSync(path, 'utf8'))?.pull_request?.base?.sha ?? null
+    );
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Diff base: explicit env override, else the merge-base with origin/main.
+ * A depth-1 merge-ref checkout (PR Fleet Rules) stays shallow at the grafted
+ * commit, so the merge-base cannot traverse it even after fetching main; the
+ * event payload's base SHA is then fetched directly and diffed as a range,
+ * which works on the grafted commit (verified against the PR Fleet Rules
+ * checkout shape). A missing base degrades to the documented skip, like
+ * external-api-guard.
+ */
 export function diffBase(root, env = process.env) {
   if (env.TURBO_SCM_BASE) return env.TURBO_SCM_BASE;
   let merged = git(root, 'merge-base', 'HEAD', 'origin/main');
   if (!merged) {
-    // The PR Fleet Rules checkout carries only the merge ref; fetch the
-    // public main tip so the guard never runs baseless. A failed fetch (no
-    // network, no origin) degrades to the documented skip, like
-    // external-api-guard's missing-base path.
     git(root, 'fetch', '--quiet', '--depth=250', 'origin', 'main');
     merged = git(root, 'merge-base', 'HEAD', 'origin/main');
   }
-  return merged ? merged.trim() : null;
+  if (merged) return merged.trim();
+  const base = eventBaseSha(env);
+  if (
+    base &&
+    git(root, 'fetch', '--quiet', '--depth=1', 'origin', base) !== null
+  ) {
+    return base;
+  }
+  return null;
 }
 
 /**
