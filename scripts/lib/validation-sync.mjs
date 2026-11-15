@@ -68,7 +68,8 @@ const PRODUCTION_VERSION_URL = 'https://jov.ie/api/version';
  *   input: string | URL | Request,
  *   init?: RequestInit,
  * ) => Promise<HttpResponse>} HttpFetch
- * @typedef {(path: string) => Promise<{ body: any, link: string }>} GithubGet
+ * @typedef {(path: string) => Promise<{ body: any, link: string }>} GithubGetBase
+ * @typedef {GithubGetBase & { graphql?: (query: string) => Promise<any> }} GithubGet
  * @typedef {{
  *   status: 'verified' | 'pending' | 'unknown',
  *   sha?: string,
@@ -493,7 +494,6 @@ export async function listMergedLinkedPulls(input) {
         (number === input.eventPull?.number ||
           pullImplementsIssue(
             {
-              number,
               title: batchedPull.title,
               body: batchedPull.body,
               base: { ref: batchedPull.baseRef },
