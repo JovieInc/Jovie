@@ -87,10 +87,18 @@ export const OfflineSpotifySearch: Story = {
   ),
   play: async ({ canvasElement }) => {
     const page = await searchSpotify(canvasElement, 'offline artist');
+    // The fetch layer normalizes network failures to FetchNetworkError
+    // ('Network request failed'); the dropdown renders that message
+    // verbatim (useIngestProfile renders `spotifyError` directly), so the
+    // matcher asserts the actual offline copy, not the raw TypeError text.
     await expect(
-      await page.findByText(/fetch|Spotify search failed/i, undefined, {
-        timeout: 8000,
-      })
+      await page.findByText(
+        /Network request failed|Spotify search failed/i,
+        undefined,
+        {
+          timeout: 8000,
+        }
+      )
     ).toBeInTheDocument();
   },
 };

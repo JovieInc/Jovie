@@ -1,7 +1,7 @@
 import type { Decorator, Meta, StoryObj } from '@storybook/nextjs-vite';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { ComponentProps } from 'react';
-import { expect, userEvent, within } from 'storybook/test';
+import { expect, fn, userEvent, within } from 'storybook/test';
 import { type AdminLeadKeyword, queryKeys } from '@/lib/queries';
 import { LeadKeywordsManager } from './LeadKeywordsManager';
 
@@ -81,39 +81,69 @@ export const EmptyKeywords: Story = {
   decorators: [withKeywords([])],
 };
 
+/** Partial props: embedded callers can omit the optional error reporter. */
+export const PartialEmbeddedWithoutReporter: Story = {
+  args: { embedded: true },
+  decorators: [withKeywords([keyword(1)])],
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(canvas.getByLabelText('New Discovery Keywords')).toBeEnabled();
+    await expect(
+      canvas.getByRole('switch', { name: `Toggle ${keyword(1).query}` })
+    ).toBeChecked();
+    await userEvent.type(
+      canvas.getByLabelText('New Discovery Keywords'),
+      'music'
+    );
+    await expect(
+      canvas.getByRole('button', { name: 'Add Keywords' })
+    ).toBeEnabled();
+  },
+};
+
 /** Error: the API refuses the new keywords and the error toast shows. */
 export const ErrorAddKeywords: Story = {
+  args: { onActionError: fn() },
   decorators: [withKeywords([keyword(1)])],
   beforeEach: stubFetch(async () =>
     Response.json({ error: 'Keyword limit reached' }, { status: 422 })
   ),
-  play: async ({ canvasElement }) => {
+  play: async ({ canvasElement, args }) => {
     const canvas = within(canvasElement);
     await userEvent.type(
       canvas.getByLabelText('New Discovery Keywords'),
       'site:linktr.ee "artist" "tour"'
     );
     await userEvent.click(canvas.getByRole('button', { name: 'Add Keywords' }));
-    const page = within(canvasElement.ownerDocument.body);
-    await expect(
-      await page.findByText('Failed to add keywords')
-    ).toBeInTheDocument();
+    // The harness's mock '/test' pathname is a profile route, where
+    // FeedbackProvider mounts no Toaster — the failure toast can never
+    // render in this lane. The surface reports the failure to its owner;
+    // assert the exact message through the reporter (ProfileSidebarHeader
+    // convention).
+    await expect(args.onActionError).toHaveBeenCalledWith(
+      'Failed to add keywords'
+    );
   },
 };
 
 /** Offline: toggling a keyword cannot reach the API and the toast says so. */
 export const OfflineToggle: Story = {
+  args: { onActionError: fn() },
   decorators: [withKeywords([keyword(1)])],
   beforeEach: stubFetch(() => Promise.reject(new TypeError('Failed to fetch'))),
-  play: async ({ canvasElement }) => {
+  play: async ({ canvasElement, args }) => {
     const canvas = within(canvasElement);
     await userEvent.click(
       canvas.getByRole('switch', { name: `Toggle ${keyword(1).query}` })
     );
-    const page = within(canvasElement.ownerDocument.body);
-    await expect(
-      await page.findByText('Failed to toggle keyword')
-    ).toBeInTheDocument();
+    // The harness's mock '/test' pathname is a profile route, where
+    // FeedbackProvider mounts no Toaster — the failure toast can never
+    // render in this lane. The surface reports the failure to its owner;
+    // assert the exact message through the reporter (ProfileSidebarHeader
+    // convention).
+    await expect(args.onActionError).toHaveBeenCalledWith(
+      'Failed to toggle keyword'
+    );
   },
 };
 
