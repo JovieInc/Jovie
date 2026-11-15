@@ -1341,7 +1341,7 @@ ${fixtureCheckout}
       ['screenshots.yml', 'publish', 'Create or update screenshot PR'],
       [
         'visual-regression.yml',
-        'visual-regression',
+        'publish-baselines',
         'Create or update baseline PR (refresh only)',
       ],
     ] as const) {
