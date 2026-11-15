@@ -176,7 +176,8 @@ export function githubStatusError(status, headers, body, path) {
  * @returns {GithubGet}
  */
 export function githubClient(fetchImpl, token, sleep = defaultSleep) {
-  return async path => {
+  /** GET one API path (bounded retry; quota 403 classified rateLimited). */
+  const client = async path => {
     // Bounded retry for transient GitHub upstream failures: a 503 from
     // api.github.com used to fail the whole lifecycle evaluation (JOV-5143,
     // run 37818346153) even though the next sweep would have converged.
@@ -228,6 +229,43 @@ export function githubClient(fetchImpl, token, sleep = defaultSleep) {
     }
     throw lastError ?? new Error(`GitHub request failed for ${path}`);
   };
+
+  /**
+   * ONE GraphQL POST (JOV-12717: batch the per-pull lifecycle fallback reads
+   * off the exhausted shared REST-core bucket onto the separately-metered
+   * GraphQL budget). Single attempt, no retry: any failure throws so callers
+   * fall back to the existing per-pull REST path, whose quota classification
+   * and immutable cache stay authoritative.
+   * @param {string} query
+   */
+  client.graphql = async query => {
+    const response = await fetchImpl('https://api.github.com/graphql', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+        'User-Agent': 'jovie-linear-sync-on-merge',
+      },
+      body: JSON.stringify({ query }),
+    });
+    const body = await response.json().catch(() => null);
+    if (!response.ok) {
+      throw Object.assign(
+        new Error(
+          `GitHub GraphQL ${response.status}: ${JSON.stringify(body?.errors ?? body ?? '').slice(0, 160)}`
+        ),
+        { rateLimited: response.status === 403 || response.status === 429 }
+      );
+    }
+    if (body?.errors?.length) {
+      throw new Error(
+        `GitHub GraphQL partial failure: ${JSON.stringify(body.errors).slice(0, 160)}`
+      );
+    }
+    return body?.data ?? null;
+  };
+
+  return client;
 }
 
 /** @param {number} ms */
@@ -409,7 +447,7 @@ export function immutableGithubCache(github, dir) {
       // Persistence is optional; the next sweep reads live again.
     }
   };
-  return async path => {
+  const wrapped = async path => {
     const pull = MERGED_PULL.exec(path);
     const files = PULL_FILES.exec(path);
     const cacheable =
@@ -451,6 +489,10 @@ export function immutableGithubCache(github, dir) {
     }
     return result;
   };
+  // GraphQL batch reads bypass the per-path REST cache by design; forward the
+  // capability so callers can use either transport through one client.
+  if (typeof github.graphql === 'function') wrapped.graphql = github.graphql;
+  return wrapped;
 }
 
 /**
@@ -686,6 +728,53 @@ export function pullImplementsIssue(pull, identifier) {
  * }} input
  * @returns {Promise<MergedPull[]>}
  */
+/**
+ * Answer many pull-request states in ONE GraphQL POST (JOV-12717: the shared
+ * REST-core bucket is the one that exhausts; GraphQL is separately metered).
+ * Aliased pullRequest nodes, 50 per call. Any failure throws so the caller
+ * falls back to the existing per-pull REST reads (whose immutable cache and
+ * quota classification stay authoritative).
+ * @param {{ graphql: (query: string) => Promise<any> }} github
+ * @param {string} repository
+ * @param {readonly number[]} numbers
+ * @returns {Promise<Map<number, { state: string, mergedAt: string, mergeCommitSha: string, title: string, body: string, baseRef: string }>>}
+ */
+export async function fetchPullStatesBatched(github, repository, numbers) {
+  const [owner, name] = String(repository).split('/');
+  if (!owner || !name || numbers.length === 0) {
+    throw new Error('batched pull states need a repository and numbers');
+  }
+  const out = new Map();
+  for (let offset = 0; offset < numbers.length; offset += 50) {
+    const chunk = numbers.slice(offset, offset + 50);
+    const aliases = chunk
+      .map(
+        (number, index) =>
+          `p${index}: pullRequest(number: ${number}) { number state mergedAt mergeCommitSha title body base { ref } }`
+      )
+      .join(' ');
+    const data = await github.graphql(
+      `query { repository(owner: "${owner}", name: "${name}") { ${aliases} } }`
+    );
+    const repo = data?.repository;
+    if (!repo) throw new Error('GitHub GraphQL batch returned no repository');
+    for (const value of Object.values(repo)) {
+      const number = Number(value?.number);
+      if (!Number.isSafeInteger(number) || number <= 0) continue;
+      out.set(number, {
+        state: String(value?.state ?? ''),
+        mergedAt: typeof value?.mergedAt === 'string' ? value.mergedAt : '',
+        mergeCommitSha:
+          typeof value?.mergeCommitSha === 'string' ? value.mergeCommitSha : '',
+        title: typeof value?.title === 'string' ? value.title : '',
+        body: typeof value?.body === 'string' ? value.body : '',
+        baseRef: String(value?.base?.ref ?? ''),
+      });
+    }
+  }
+  return out;
+}
+
 export async function listMergedLinkedPulls(input) {
   const prefix = `https://github.com/${input.repository}/pull/`.toLowerCase();
   const numbers = new Set();
@@ -707,6 +796,29 @@ export async function listMergedLinkedPulls(input) {
   const merged = [];
   /** @type {number[]} */
   const unreadable = [];
+  // JOV-12717: numbers the snapshot and open scan cannot answer used to cost
+  // one REST-core GET each, every sweep (the bucket that exhausts). Answer
+  // them all in ONE GraphQL batch (separately metered); any GraphQL failure
+  // falls back to the per-pull REST path below, unchanged.
+  /** @type {Map<number, Awaited<ReturnType<typeof fetchPullStatesBatched>> extends Map<number, infer V> ? V : never> | null} */
+  let batched = null;
+  if (typeof input.github.graphql === 'function') {
+    const needBatch = selected.filter(
+      number =>
+        !input.closedPulls?.get(number) && !input.openPullNumbers?.has(number)
+    );
+    if (needBatch.length > 0) {
+      try {
+        batched = await fetchPullStatesBatched(
+          input.github,
+          input.repository,
+          needBatch
+        );
+      } catch {
+        batched = null; // REST fallback below keeps today's behavior.
+      }
+    }
+  }
   for (const number of selected) {
     const closed = input.closedPulls?.get(number);
     if (closed && !closed.merged) {
@@ -718,6 +830,37 @@ export async function listMergedLinkedPulls(input) {
     }
     if (input.openPullNumbers?.has(number)) {
       // The open scan is complete, so an open number cannot be merged.
+      continue;
+    }
+    const batchedPull = batched?.get(number);
+    if (batchedPull) {
+      // The GraphQL batch answered this number: MERGED is immutable and can
+      // bind; CLOSED-unmerged is immutable and can never bind; OPEN cannot
+      // be merged yet (the same cut the open scan applies).
+      if (
+        batchedPull.state === 'MERGED' &&
+        batchedPull.mergedAt &&
+        /^[0-9a-f]{40}$/i.test(batchedPull.mergeCommitSha) &&
+        batchedPull.baseRef === 'main' &&
+        (number === input.eventPull?.number ||
+          pullImplementsIssue(
+            {
+              number,
+              title: batchedPull.title,
+              body: batchedPull.body,
+              base: { ref: batchedPull.baseRef },
+              head: { ref: '' },
+            },
+            input.identifier
+          ))
+      ) {
+        merged.push({
+          number,
+          url: `https://github.com/${input.repository}/pull/${number}`,
+          mergeSha: batchedPull.mergeCommitSha.toLowerCase(),
+          mergedAt: batchedPull.mergedAt,
+        });
+      }
       continue;
     }
     let body;
