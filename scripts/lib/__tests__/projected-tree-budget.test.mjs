@@ -240,6 +240,28 @@ describe('source-PR projected combined-tree budget', () => {
         mergeBaseSha: mergeBase,
       });
       expect(result).toEqual({ baseBytes: 500, bytes: 1_300, delta: 800 });
+      // A local pre-push check must resolve real refs, ignoring stale CI env.
+      expect(() =>
+        runProjectedTreeBudget({ local: true, git, log: () => {} })
+      ).toThrow();
+      git(['update-ref', 'refs/remotes/origin/main', base]);
+      expect(
+        runProjectedTreeBudget({
+          local: true,
+          env: { PR_BASE_SHA: 'stale', PR_HEAD_SHA: 'stale' },
+          git,
+          log: () => {},
+        })
+      ).toEqual(result);
+      const output = execFileSync(
+        process.execPath,
+        [
+          new URL('../projected-tree-budget.mjs', import.meta.url).pathname,
+          '--local',
+        ],
+        { cwd: dir, encoding: 'utf8' }
+      );
+      expect(output).toContain('PASS — 1300 tracked regular-file bytes');
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
