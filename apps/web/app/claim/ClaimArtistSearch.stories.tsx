@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
-import { expect, userEvent, within } from 'storybook/test';
+import { expect, userEvent, waitFor, within } from 'storybook/test';
 import type { SpotifyArtistResult } from '@/lib/contracts/api';
 import { ClaimArtistSearch } from './ClaimArtistSearch';
 
@@ -114,6 +114,63 @@ export const LoadingSearch: Story = {
   },
 };
 
+/** A second search keeps the existing rows and create-profile target steady. */
+export const RefreshingResults: Story = {
+  parameters: { themes: { themeOverride: 'dark' } },
+  beforeEach: () => {
+    let requests = 0;
+    return mockSpotifySearch(() =>
+      ++requests === 1
+        ? Promise.resolve(Response.json(RESULTS))
+        : new Promise<Response>(() => undefined)
+    )();
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = await search(canvasElement, 'Steady');
+    const list = await canvas.findByTestId('claim-artist-results');
+    const textBefore = list.textContent;
+    const linksBefore = Array.from(list.querySelectorAll('a'), link =>
+      link.getAttribute('href')
+    );
+    const create = canvas.getByTestId('claim-create-profile');
+    const input = canvas.getByRole('searchbox', {
+      name: 'Find your artist on Spotify',
+    });
+    const before = list.getBoundingClientRect();
+    const createBefore = create.getBoundingClientRect();
+    await expect(before.height).toBeGreaterThan(0);
+
+    await userEvent.type(input, ' artist');
+    await waitFor(() =>
+      expect(list.parentElement).toHaveAttribute('aria-busy', 'true')
+    );
+    await expect(canvas.queryByText('Searching…')).toBeNull();
+    await expect(canvas.getByTestId('claim-artist-results')).toBe(list);
+    await expect(list.textContent).toBe(textBefore);
+    await expect(
+      Array.from(list.querySelectorAll('a'), link => link.getAttribute('href'))
+    ).toEqual(linksBefore);
+    await expect(list).toHaveClass('opacity-90');
+    await expect(list.getBoundingClientRect().y).toBe(before.y);
+    await expect(list.getBoundingClientRect().height).toBe(before.height);
+    await expect(create.getBoundingClientRect().y).toBe(createBefore.y);
+    await expect(canvasElement.ownerDocument.activeElement).toBe(input);
+  },
+};
+
+/** The same pending-state geometry and contrast contract in compact light mode. */
+export const RefreshingResultsLight: Story = {
+  ...RefreshingResults,
+  parameters: { themes: { themeOverride: 'light' } },
+  decorators: [
+    Story => (
+      <div className='w-80'>
+        <Story />
+      </div>
+    ),
+  ],
+};
+
 /** Spotify knows no artist by that name. */
 export const EmptyResults: Story = {
   beforeEach: answer([]),
@@ -136,7 +193,9 @@ export const ErrorSearchUnavailable: Story = {
     const canvas = await search(canvasElement, 'Neon');
     await expect(
       await canvas.findByText(
-        'Search is unavailable. Try again, or create your profile below.'
+        'Search is unavailable. Try again, or create your profile below.',
+        {},
+        { timeout: 10_000 }
       )
     ).toBeVisible();
   },
@@ -151,7 +210,9 @@ export const OfflineSearch: Story = {
     const canvas = await search(canvasElement, 'Neon');
     await expect(
       await canvas.findByText(
-        'Search is unavailable. Try again, or create your profile below.'
+        'Search is unavailable. Try again, or create your profile below.',
+        {},
+        { timeout: 10_000 }
       )
     ).toBeVisible();
   },

@@ -78,6 +78,9 @@ describe('EngineeringPublication', () => {
     ).not.toBeInTheDocument();
     expect(screen.getByText('Evidence')).toBeVisible();
     expect(screen.getByText('https://jov.ie/changelog')).toBeVisible();
+    const evidenceKind = screen.getByText('Changelog');
+    expect(evidenceKind).toBeVisible();
+    expect(evidenceKind).not.toHaveClass('uppercase');
     expect(container.querySelector('h1')).toHaveClass(
       'system-b-marketing-route-title'
     );
