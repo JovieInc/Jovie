@@ -36,4 +36,16 @@ describe('CollapsibleSectionHeading', () => {
       'false'
     );
   });
+
+  it('renders through the design-system plain button', () => {
+    render(
+      <CollapsibleSectionHeading isOpen onToggle={vi.fn()}>
+        Details
+      </CollapsibleSectionHeading>
+    );
+    expect(screen.getByRole('button', { name: 'Details' })).toHaveAttribute(
+      'data-slot',
+      'plain-button'
+    );
+  });
 });

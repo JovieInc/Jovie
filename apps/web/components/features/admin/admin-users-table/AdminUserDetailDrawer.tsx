@@ -66,10 +66,10 @@ function CopyButton({
       variant='ghost'
       size='icon'
       onClick={handleCopy}
-      className='inline-flex h-auto w-auto items-center p-0 text-secondary-token hover:bg-transparent hover:text-primary-token transition-colors'
+      className='inline-flex size-6 shrink-0 items-center justify-center text-secondary-token hover:bg-transparent hover:text-primary-token transition-colors'
       aria-label={`Copy ${label}`}
     >
-      <Copy className='h-3 w-3' />
+      <Copy className='h-3.5 w-3.5' />
     </Button>
   );
 }
@@ -113,7 +113,11 @@ export function AdminUserDetailDrawer({
               subtitle={
                 user.email ? (
                   <div className='flex items-center gap-1.5'>
-                    <span className='truncate'>{user.email}</span>
+                    {/* min-w-0 lets the truncating span shrink inside the flex
+                        row; without it the long-email box overflows and the
+                        copy button gets clipped by the header edge (axe
+                        target-size: partially obscured). */}
+                    <span className='min-w-0 truncate'>{user.email}</span>
                     <CopyButton value={user.email} label='Email' />
                   </div>
                 ) : (
