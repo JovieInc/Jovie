@@ -107,9 +107,10 @@ export const ErrorVerifyFailed: Story = {
     await userEvent.click(
       await screen.findByRole('button', { name: 'More actions' })
     );
-    await userEvent.click(
-      await screen.findByRole('menuitem', { name: 'Verify Creator' })
-    );
+    // The modal menu makes the page pointer-inert by design while it is
+    // open, so pointer-clicking the item dead-here; typeahead + Enter is the
+    // path keyboard users get and exercises the same select handler.
+    await userEvent.keyboard('V[Enter]');
     await expect(
       await screen.findByText('Failed to verify creator')
     ).toBeVisible();

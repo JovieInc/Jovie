@@ -219,5 +219,10 @@ describe('AdminUserDetailDrawer', () => {
         'shrink-0'
       );
     }
+
+    // The truncating value spans must shrink inside their flex rows — an
+    // overflowing email box pushes the copy button under the header clip
+    // (axe target-size: partially obscured).
+    expect(screen.getByText(longContentUser.email)).toHaveClass('min-w-0');
   });
 });

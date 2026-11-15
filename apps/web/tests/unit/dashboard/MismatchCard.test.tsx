@@ -223,4 +223,28 @@ describe('MismatchCard', () => {
     );
     expect(screen.getByText('USRC12345678')).toBeInTheDocument();
   });
+
+  it('keeps every rendered state a list item (axe list/listitem)', async () => {
+    mockOnAction.mockResolvedValueOnce(false);
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    const { container } = render(
+      <ul>
+        <MismatchCard
+          mismatch={baseMismatch}
+          onAction={mockOnAction}
+          onRemoved={mockOnRemoved}
+        />
+      </ul>
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Not Mine' }));
+    // The undo window elapses with a failed action behind it → error state.
+    await vi.advanceTimersByTimeAsync(3000);
+    await waitFor(() => expect(screen.getByRole('alert')).toBeInTheDocument());
+
+    const list = container.querySelector('ul');
+    for (const child of list?.children ?? []) {
+      expect(child.tagName).toBe('LI');
+    }
+  });
 });

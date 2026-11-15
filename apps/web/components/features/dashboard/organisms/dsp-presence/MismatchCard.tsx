@@ -75,17 +75,18 @@ export function MismatchCard({
   // Removing state — animate out
   if (removing) {
     return (
-      <li
-        className='list-none overflow-hidden transition-[max-height,opacity,margin] duration-cinematic ease-out'
-        style={{ maxHeight: 0, opacity: 0, marginBottom: 0 }}
-        aria-hidden='true'
-      />
+      <li className='list-none'>
+        <div
+          className='overflow-hidden transition-[max-height,opacity,margin] duration-cinematic ease-out'
+          style={{ maxHeight: 0, opacity: 0, marginBottom: 0 }}
+          aria-hidden='true'
+        />
+      </li>
     );
   }
 
   // Undo pending state
   if (pendingAction && !error) {
-    // The card sits in a <ul>, so every state keeps an <li> root.
     return (
       <li className='list-none'>
         <div
@@ -153,8 +154,6 @@ export function MismatchCard({
             <img
               src={mismatch.externalArtworkUrl}
               alt=''
-              width={32}
-              height={32}
               className='h-8 w-8 rounded object-cover'
             />
           ) : (
@@ -167,8 +166,6 @@ export function MismatchCard({
         <img
           src={mismatch.externalArtworkUrl}
           alt=''
-          width={32}
-          height={32}
           className='h-8 w-8 flex-shrink-0 rounded object-cover'
         />
       )}
