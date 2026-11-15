@@ -360,6 +360,19 @@ describe('baseline shards', () => {
       )
     ).toEqual({ 'lib/a.ts': 60, 'lib/b.ts': 70, 'lib/c.ts': 80 });
   });
+
+  it('keeps top-level fields from the first state that has them', () => {
+    const merged = mergeStates(
+      { ...emptyState(), modelFingerprint: 'f1', modelIds: ['m1'] },
+      { ...emptyState(), modelFingerprint: 'f2', note: 'shard' }
+    );
+    expect(merged).toEqual({
+      ...emptyState(),
+      modelFingerprint: 'f1',
+      modelIds: ['m1'],
+      note: 'shard',
+    });
+  });
 });
 
 describe('selectPool', () => {

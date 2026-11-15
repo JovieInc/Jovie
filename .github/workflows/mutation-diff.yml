@@ -257,6 +257,17 @@ jobs:
             cp -R "$legacy/survivor-tasks" .cache/jovie-mutation/
           fi
 
+      # A full baseline run saves its merged state here too. Folding it in on every sweep
+      # (newest entry per module wins) means a sweep that overlapped the merge can't drop it.
+      - name: Restore the latest full baseline
+        if: steps.capacity.outputs.run == 'true'
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .cache/jovie-mutation-baseline
+          key: mutation-baseline-v1-none
+          restore-keys: |
+            mutation-baseline-v1-
+
       - name: Score the next modules
         id: score
         if: steps.capacity.outputs.run == 'true'
@@ -273,6 +284,11 @@ jobs:
           # Runners share one HOME; serialize on the state file.
           exec 9>"$HOME/.local/state/jovie-mutation/sweep.lock"
           flock -n 9 || { echo "Another sweep holds the state lock; skipping."; exit 0; }
+          if [ -s .cache/jovie-mutation-baseline/sweep-state.json ]; then
+            node scripts/test-quality-loop.mjs merge --out "$RUNNER_TEMP/with-baseline.json" \
+              "$state_dir/sweep-state.json" .cache/jovie-mutation-baseline/sweep-state.json
+            cp "$RUNNER_TEMP/with-baseline.json" "$state_dir/sweep-state.json"
+          fi
           # Rank modules by how high-touch they are (tier weight + git churn) so the sweep
           # expands from billing, auth and the golden path outward.
           git fetch --quiet --unshallow origin main 2>/dev/null || git fetch --quiet --depth=2000 origin main
@@ -435,8 +451,10 @@ jobs:
           retention-days: 30
 
   # Folds the shards into the sweep state of record, so the rolling sweep carries on
-  # from the full baseline, and writes the repo-wide score to the job summary. It joins
-  # the sweep's concurrency group so no sweep saves an older state over it mid-merge.
+  # from the full baseline, and writes the repo-wide score to the job summary. No shared
+  # concurrency group: a queued sweep would replace it as the group's one pending run.
+  # Instead it also saves the merged state under its own key, which every sweep folds in,
+  # so a sweep that saves an older state over this one can't lose the baseline.
   baseline-merge:
     name: Merge mutation baseline
     needs: baseline
@@ -445,9 +463,6 @@ jobs:
     timeout-minutes: 20
     permissions:
       contents: read
-    concurrency:
-      group: mutation-sweep
-      cancel-in-progress: false
     steps:
       - name: Checkout main
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -479,6 +494,8 @@ jobs:
           node scripts/test-quality-loop.mjs merge --out "$RUNNER_TEMP/merged.json" \
             .cache/jovie-mutation/sweep-state.json "$RUNNER_TEMP"/shards/*/sweep-state.json
           cp "$RUNNER_TEMP/merged.json" .cache/jovie-mutation/sweep-state.json
+          mkdir -p .cache/jovie-mutation-baseline
+          cp "$RUNNER_TEMP/merged.json" .cache/jovie-mutation-baseline/sweep-state.json
           node scripts/test-quality-loop.mjs report --state .cache/jovie-mutation/sweep-state.json \
             --out "$RUNNER_TEMP/test-quality-latest.json"
           node scripts/test-quality-loop.mjs summary --state .cache/jovie-mutation/sweep-state.json \
@@ -489,6 +506,12 @@ jobs:
         with:
           path: .cache/jovie-mutation
           key: mutation-sweep-portable-v2-${{ github.run_id }}-${{ github.run_attempt }}
+
+      - name: Save the baseline for later sweeps to fold in
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .cache/jovie-mutation-baseline
+          key: mutation-baseline-v1-${{ github.run_id }}-${{ github.run_attempt }}
 
       - name: Upload merged baseline
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2

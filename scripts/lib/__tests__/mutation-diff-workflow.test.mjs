@@ -97,15 +97,30 @@ describe('Mutation baseline contract', () => {
     expect(baseline).not.toMatch(/workflow run mutation-diff/u);
   });
 
-  it('merges under the sweep lock and saves a cache the rolling sweep restores', () => {
-    const merge = load(fullWorkflow).jobs['baseline-merge'];
+  it('saves the merged state where every later sweep folds it in', () => {
+    const jobs = load(fullWorkflow).jobs;
+    const merge = jobs['baseline-merge'];
     expect(merge.needs).toBe('baseline');
     expect(merge.if).toContain('always()');
-    expect(merge.concurrency.group).toBe('mutation-sweep');
-    const save = merge.steps.find(step =>
-      step.uses?.startsWith('actions/cache/save@')
+    // A shared group would let any queued sweep replace the pending merge.
+    expect(merge.concurrency).toBeUndefined();
+    const saves = merge.steps
+      .filter(step => step.uses?.startsWith('actions/cache/save@'))
+      .map(step => [step.with.path, step.with.key.split('$')[0]]);
+    expect(saves).toEqual([
+      ['.cache/jovie-mutation', 'mutation-sweep-portable-v2-'],
+      ['.cache/jovie-mutation-baseline', 'mutation-baseline-v1-'],
+    ]);
+    const restore = jobs.sweep.steps.find(
+      step => step.with?.path === '.cache/jovie-mutation-baseline'
     );
-    expect(save.with.key).toMatch(/^mutation-sweep-portable-v2-/u);
+    expect(restore.with['restore-keys'].trim()).toBe('mutation-baseline-v1-');
+    const score = jobs.sweep.steps.find(step => step.id === 'score').run;
+    const fold = score.indexOf(
+      '.cache/jovie-mutation-baseline/sweep-state.json'
+    );
+    expect(fold).toBeGreaterThan(score.indexOf('flock -n 9'));
+    expect(fold).toBeLessThan(score.indexOf('mutation-sweep.mjs'));
     expect(baseline).toMatch(/--shard "\$SHARD\/40"/u);
     expect(baseline).toMatch(/test-quality-loop\.mjs merge/u);
     expect(baseline).toMatch(/test-quality-loop\.mjs summary/u);
