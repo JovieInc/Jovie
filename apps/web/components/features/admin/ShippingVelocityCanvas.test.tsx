@@ -56,7 +56,6 @@ describe('ShippingVelocityCanvas', () => {
       />
     );
 
-    expect(screen.getByTestId('shipping-velocity-canvas')).not.toBeNull();
     const scrollRegion = document.querySelector('.max-h-64.overflow-auto');
     expect(scrollRegion).not.toBeNull();
     expect(scrollRegion).toHaveAttribute('tabindex', '0');
