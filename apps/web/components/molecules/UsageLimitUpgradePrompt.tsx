@@ -69,7 +69,7 @@ export function UsageLimitUpgradePrompt({
       className={`rounded-lg border px-4 py-3 ${
         isAtLimit
           ? 'border-destructive/30 bg-destructive/5'
-          : 'border-amber-500/30 bg-amber-500/5'
+          : 'border-warning/30 bg-warning/5'
       } ${className ?? ''}`}
       role='alert'
     >
@@ -77,7 +77,7 @@ export function UsageLimitUpgradePrompt({
       <div className='mb-2 h-1.5 w-full overflow-hidden rounded-full bg-surface-2'>
         <div
           className={`h-full rounded-full transition-[background-color,width] ${
-            isAtLimit ? 'bg-destructive' : 'bg-amber-500'
+            isAtLimit ? 'bg-destructive' : 'bg-warning'
           }`}
           style={{ width: `${Math.min(percentage, 100)}%` }}
         />
