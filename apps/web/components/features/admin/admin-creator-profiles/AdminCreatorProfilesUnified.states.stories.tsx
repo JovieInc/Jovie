@@ -1,6 +1,6 @@
 import '@/styles/system-b-app.css';
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
-import { expect, screen, userEvent } from 'storybook/test';
+import { expect, fn, screen, userEvent } from 'storybook/test';
 import { FeedbackProvider } from '@/components/feedback';
 import { RightPanelProvider } from '@/contexts/RightPanelContext';
 import type { AdminCreatorProfileRow } from '@/lib/admin/types';
@@ -90,7 +90,11 @@ type Story = StoryObj<typeof meta>;
  * Storybook, so the request fails and the table raises its failure toast.
  */
 export const ErrorVerifyFailed: Story = {
-  args: { profiles: errorRows, total: errorRows.length },
+  args: {
+    profiles: errorRows,
+    total: errorRows.length,
+    onActionError: fn(),
+  },
   decorators: [
     Story => (
       <FeedbackProvider>
@@ -98,20 +102,21 @@ export const ErrorVerifyFailed: Story = {
       </FeedbackProvider>
     ),
   ],
-  play: async () => {
-    const trigger = await screen.findByRole('button', {
-      name: 'More actions',
-    });
-    // Row actions are hover/focus-revealed (system-b-table-contextual-action),
-    // so hover the row shell before the pointer interaction.
-    await userEvent.hover(trigger.closest('tr') ?? trigger);
-    await userEvent.click(trigger);
+  play: async ({ args }) => {
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'More actions' })
+    );
     await userEvent.click(
       await screen.findByRole('menuitem', { name: 'Verify Creator' })
     );
-    await expect(
-      await screen.findByText('Failed to verify creator')
-    ).toBeVisible();
+    // The harness's mock '/test' pathname is a profile route, where
+    // FeedbackProvider mounts no Toaster — the failure toast can never
+    // render in this lane. The surface reports the failure to its owner;
+    // assert the exact message through the reporter (ProfileSidebarHeader
+    // convention).
+    await expect(args.onActionError).toHaveBeenCalledWith(
+      'Failed to verify creator'
+    );
   },
 };
 

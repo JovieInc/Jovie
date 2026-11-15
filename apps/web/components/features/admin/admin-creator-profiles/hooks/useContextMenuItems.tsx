@@ -28,6 +28,11 @@ import { buildEmailSignature } from '@/lib/email-signature/build-signature';
 import { buildSignatureInputFromProfile } from '@/lib/email-signature/profile-input';
 import type { AdminCreatorProfileRow, IngestRefreshStatus } from '../types';
 
+/** Reports the exact failure message alongside the error toast, so
+ * storybook lanes can assert action failures (the harness's mock pathname
+ * is a profile route, where FeedbackProvider mounts no Toaster). */
+type ActionErrorReporter = (message: string) => void;
+
 export interface ContextMenuDependencies {
   ingestRefreshStatuses: Record<string, IngestRefreshStatus>;
   refreshIngest: (profileId: string) => void;
@@ -46,6 +51,7 @@ export interface ContextMenuDependencies {
   openDeleteDialog: (profile: AdminCreatorProfileRow) => void;
   openInviteDialog: (profile: AdminCreatorProfileRow) => void;
   openEmailSignatureDialog?: (profile: AdminCreatorProfileRow) => void;
+  onActionError?: ActionErrorReporter;
 }
 
 export function useContextMenuItems({
@@ -57,6 +63,7 @@ export function useContextMenuItems({
   openDeleteDialog,
   openInviteDialog,
   openEmailSignatureDialog,
+  onActionError,
 }: ContextMenuDependencies) {
   const getContextMenuItems = useCallback(
     (profile: AdminCreatorProfileRow): ContextMenuItemType[] => {
@@ -91,6 +98,7 @@ export function useContextMenuItems({
                     toast.success('Creator unverified');
                   } else {
                     toast.error('Failed to unverify creator');
+                    onActionError?.('Failed to unverify creator');
                   }
                 })();
               },
@@ -106,6 +114,7 @@ export function useContextMenuItems({
                     toast.success('Creator verified');
                   } else {
                     toast.error('Failed to verify creator');
+                    onActionError?.('Failed to verify creator');
                   }
                 })();
               },
@@ -128,9 +137,11 @@ export function useContextMenuItems({
                   `Creator ${isFeatured ? 'unfeatured' : 'featured'}`
                 );
               } else {
-                toast.error(
-                  `Failed to ${isFeatured ? 'unfeature' : 'feature'} creator`
-                );
+                const featureMessage = `Failed to ${
+                  isFeatured ? 'unfeature' : 'feature'
+                } creator`;
+                toast.error(featureMessage);
+                onActionError?.(featureMessage);
               }
             })();
           },
@@ -160,6 +171,7 @@ export function useContextMenuItems({
               );
               if (!result.success) {
                 toast.error('Failed to toggle marketing');
+                onActionError?.('Failed to toggle marketing');
               }
             })();
           },
@@ -207,6 +219,7 @@ export function useContextMenuItems({
                 toast.success('Email signature copied');
               } else {
                 toast.error('Failed to copy email signature');
+                onActionError?.('Failed to copy email signature');
               }
             })();
           },
@@ -241,6 +254,7 @@ export function useContextMenuItems({
                   toast.success('Claim link copied to clipboard');
                 } else {
                   toast.error('Failed to copy claim link');
+                  onActionError?.('Failed to copy claim link');
                 }
               })();
             },
