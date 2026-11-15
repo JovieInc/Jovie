@@ -151,7 +151,7 @@ export const SOURCE_VALIDATION_GUARDS = Object.freeze([
     id: 'component-certificate',
     name: 'component and screen certificate gate',
     command: 'pnpm component-certificate:gate',
-    when: /^(?:apps\/web\/(?:app|components)\/|packages\/ui\/|docs\/design-system\/(?:component-certification|cert-screens)\.json$|scripts\/(?:lib\/)?component-(?:certificate|cert-screens))/,
+    when: /^(?:apps\/web\/(?:app|components)\/|packages\/ui\/|docs\/design-system\/(?:(?:component-certification|cert-screens)\.json$|component-certification\.d\/)|scripts\/(?:lib\/)?component-(?:certificate|cert-screens))/,
     covers: ['pnpm component-certificate:gate'],
   },
   {
