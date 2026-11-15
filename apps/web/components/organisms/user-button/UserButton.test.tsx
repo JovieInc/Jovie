@@ -430,7 +430,7 @@ describe('UserButton account surface layout', () => {
       expect(within(menu).getByRole('menuitem', { name })).toBeInTheDocument();
     }
     expect(
-      within(menu).getByRole('button', { name: /Usage remaining/ })
+      within(menu).getByRole('button', { name: /Usage Remaining/ })
     ).toBeInTheDocument();
     expect(within(menu).getAllByRole('separator').length).toBeGreaterThan(2);
   });
@@ -449,8 +449,8 @@ describe('UserButton account surface layout', () => {
 
     // Help uses the normal action row, leaving the header for identity.
     const help = within(menu).getByRole('menuitem', { name: 'Help' });
-    expect(help).toHaveClass('px-2.5');
-    expect(help).not.toHaveClass('px-2');
+    expect(help).toHaveClass('h-8', 'px-(--space-2-5)');
+    expect(help).not.toHaveClass('px-2', 'px-2.5');
 
     // Header and footer dividers are hairlines that stop at the gutter.
     const separators = within(menu).getAllByRole('separator');
@@ -467,7 +467,7 @@ describe('UserButton account surface layout', () => {
     );
 
     // Usage is a normal row: concentric radius, not a square strip.
-    const usage = within(menu).getByRole('button', { name: /Usage remaining/ });
+    const usage = within(menu).getByRole('button', { name: /Usage Remaining/ });
     expect(usage).not.toHaveClass('rounded-none');
     expect(usage).toHaveClass('h-8', 'px-(--space-2-5)');
 

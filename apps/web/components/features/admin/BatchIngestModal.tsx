@@ -2,7 +2,7 @@
 
 import { Button, Textarea } from '@jovie/ui';
 import { CheckCircle2, CircleAlert, CircleMinus } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import {
   Dialog,
   DialogActions,
@@ -57,22 +57,25 @@ export function BatchIngestModal({
 
   const parsedCount = useMemo(() => parseBatchUrls(value).length, [value]);
 
-  // Reset state when modal closes
-  useEffect(() => {
-    if (!open) {
-      setValue('');
-      setResult(null);
-    }
-  }, [open]);
+  // Clear the form only on an explicit close, never on a re-render.
+  const handleClose = () => {
+    setValue('');
+    setResult(null);
+    onOpenChange(false);
+  };
 
   const handleSubmit = async () => {
     const urls = parseBatchUrls(value);
     if (urls.length === 0) return;
-    await mutateAsync({ urls });
+    try {
+      await mutateAsync({ urls });
+    } catch {
+      // The mutation's onError toasts the failure; the pasted URLs stay put.
+    }
   };
 
   return (
-    <Dialog open={open} onClose={() => onOpenChange(false)} size='md'>
+    <Dialog open={open} onClose={handleClose} size='md'>
       <DialogTitle>Batch URL Import</DialogTitle>
       <DialogBody className='space-y-3'>
         <p className='text-xs text-tertiary-token'>
@@ -146,7 +149,7 @@ export function BatchIngestModal({
           type='button'
           variant='ghost'
           size='sm'
-          onClick={() => onOpenChange(false)}
+          onClick={handleClose}
           disabled={isPending}
         >
           {result ? 'Close' : 'Cancel'}
