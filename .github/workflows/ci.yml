@@ -600,6 +600,9 @@ jobs:
       has_code_changes: ${{ steps.detect.outputs.has_code_changes || 'false' }}
       has_web_coverage_changes: ${{ steps.coverage-detect.outputs.has_web_coverage_changes || 'false' }}
       is_noop_merge_group: ${{ steps.detect.outputs.is_noop_merge_group || 'false' }}
+      # JOV-12618: every changed path is documentation (trusted base classifier).
+      # Missing output fails closed: merge groups then run the structural lane.
+      docs_only: ${{ steps.detect.outputs.docs_only || 'false' }}
       # The resolver may replace the event base with the live-main merge-base
       # for coalesced heads. Downstream exact-diff gates must use this same SHA.
       path_diff_base_sha: ${{ steps.detect.outputs.path_diff_base_sha || '' }}
@@ -2594,18 +2597,38 @@ jobs:
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
+          # JOV-12618: the trusted base classifier's docs-only verdict and the
+          # exact base it classified against (merge groups only).
+          STRUCTURAL_DOCS_ONLY: ${{ needs.ci-path-changes.outputs.docs_only }}
+          STRUCTURAL_DIFF_BASE_SHA: ${{ needs.ci-path-changes.outputs.path_diff_base_sha }}
         run: &structural-decision |
           set -euo pipefail
-          if [[ "${{ github.event_name }}" != "pull_request" ]]; then
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            # Full (non-shallow) base fetch: guardrails needs git merge-base with
+            # origin/<base>; a --depth=1 fetch leaves the base tip shallow and fails
+            # desktop-release-guard / version-fanout-guard on PRs.
+            AUTH_HEADER="AUTHORIZATION: basic $(printf 'x-access-token:%s' "$GH_TOKEN" | base64 | tr -d '\n')"
+            git -c "http.https://github.com/.extraheader=$AUTH_HEADER" fetch origin "${{ github.base_ref }}" --no-tags
+            unset AUTH_HEADER GH_TOKEN
+            DIFF_BASE="origin/${{ github.base_ref }}"
+            DIFF_ARGS=(--name-only)
+          elif [[ "${{ github.event_name }}" == "merge_group" && "${STRUCTURAL_DOCS_ONLY:-}" == "true" ]]; then
+            # JOV-12618: a merge group may skip only when the classifier found
+            # every changed path to be documentation AND the source-PR path
+            # decision below, rerun against the group's exact classified base,
+            # selects nothing. Any other file, or an unusable base, runs it.
+            unset GH_TOKEN
+            DIFF_BASE="${STRUCTURAL_DIFF_BASE_SHA:-}"
+            if [[ ! "$DIFF_BASE" =~ ^[0-9a-f]{40}$ ]] || ! git cat-file -e "${DIFF_BASE}^{commit}" 2>/dev/null; then
+              echo "::warning::Merge-group structural base '${DIFF_BASE}' is unusable; running the structural lane."
+              echo "skip=false" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+            DIFF_ARGS=(--no-renames --name-only)
+          else
             echo "skip=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
-          # Full (non-shallow) base fetch: guardrails needs git merge-base with
-          # origin/<base>; a --depth=1 fetch leaves the base tip shallow and fails
-          # desktop-release-guard / version-fanout-guard on PRs.
-          AUTH_HEADER="AUTHORIZATION: basic $(printf 'x-access-token:%s' "$GH_TOKEN" | base64 | tr -d '\n')"
-          git -c "http.https://github.com/.extraheader=$AUTH_HEADER" fetch origin "${{ github.base_ref }}" --no-tags
-          unset AUTH_HEADER GH_TOKEN
           # Control-lane paths are data, one ERE alternative per line, so
           # concurrent additions do not conflict on this file (JOV-6837).
           STRUCTURAL_CONTROL_PATTERN="$(grep -vE '^[[:space:]]*(#|$)' .github/ci-harness/structural-control-paths.ere | paste -sd'|' -)"
@@ -2622,8 +2645,14 @@ jobs:
           STRUCTURAL_DESKTOP_PATTERN='^scripts/desktop-release-(assets|guard|publisher)(\.test)?\.mjs$|^apps/desktop/electron-builder\.yml$|^apps/desktop/scripts/notarize-release-dmg\.cjs$'
           # A new scripts test must prove it is wired into a lane (inventory guard)
           # before the queue; #18714 was ejected for an unwired one.
-          NEW_SCRIPT_TESTS=$(git diff --diff-filter=AR --name-only "origin/${{ github.base_ref }}" HEAD | grep -E '^scripts/.*\.test\.(mjs|ts)$' || true)
-          if [ -n "$NEW_SCRIPT_TESTS" ] || git diff --name-only "origin/${{ github.base_ref }}" HEAD | grep -qE "$STRUCTURAL_CONTROL_PATTERN|$STRUCTURAL_UI_PATTERN|$STRUCTURAL_DESKTOP_PATTERN"; then
+          NEW_SCRIPT_TESTS=$(git diff --diff-filter=AR "${DIFF_ARGS[@]}" "$DIFF_BASE" HEAD | grep -E '^scripts/.*\.test\.(mjs|ts)$' || true)
+          STRUCTURAL_CHANGED_FILES=$(git diff "${DIFF_ARGS[@]}" "$DIFF_BASE" HEAD)
+          # Here-string, not a pipe: grep -q exiting early must not turn a
+          # match into a SIGPIPE pipefail "no match" and skip the lane.
+          if [[ "${{ github.event_name }}" == "merge_group" && -z "${STRUCTURAL_CHANGED_FILES//[$'\t\r\n' ]/}" ]]; then
+            # An empty diff is not proof of a docs-only group.
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          elif [ -n "$NEW_SCRIPT_TESTS" ] || grep -qE "$STRUCTURAL_CONTROL_PATTERN|$STRUCTURAL_UI_PATTERN|$STRUCTURAL_DESKTOP_PATTERN" <<< "$STRUCTURAL_CHANGED_FILES"; then
             echo "skip=false" >> "$GITHUB_OUTPUT"
           else
             echo "skip=true" >> "$GITHUB_OUTPUT"
@@ -3192,6 +3221,8 @@ jobs:
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
+          STRUCTURAL_DOCS_ONLY: ${{ needs.ci-path-changes.outputs.docs_only }}
+          STRUCTURAL_DIFF_BASE_SHA: ${{ needs.ci-path-changes.outputs.path_diff_base_sha }}
         run: *structural-decision
       - *structural-python
       - *structural-pytest
@@ -3233,6 +3264,8 @@ jobs:
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
+          STRUCTURAL_DOCS_ONLY: ${{ needs.ci-path-changes.outputs.docs_only }}
+          STRUCTURAL_DIFF_BASE_SHA: ${{ needs.ci-path-changes.outputs.path_diff_base_sha }}
         run: *structural-decision
       # The web lane group (design conformance + public-profile admission) runs
       # on every head in the background, off remaining's serial cheap-lane
@@ -3307,6 +3340,8 @@ jobs:
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
+          STRUCTURAL_DOCS_ONLY: ${{ needs.ci-path-changes.outputs.docs_only }}
+          STRUCTURAL_DIFF_BASE_SHA: ${{ needs.ci-path-changes.outputs.path_diff_base_sha }}
         run: *structural-decision
       - *structural-python
       - *structural-pytest
