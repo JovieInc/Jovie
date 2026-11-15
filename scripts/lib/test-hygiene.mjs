@@ -29,7 +29,7 @@ const TEST_FNS = new Set(['it', 'test']);
 const SUITE_FNS = new Set(['describe', 'suite']);
 // Members that keep test(...) one test; test.describe, test.step and hooks are not tests of their own.
 const LEAF_MEMBERS = new Set(
-  'only concurrent each fails serial sequential'.split(' ')
+  'only concurrent each fails serial sequential skipIf runIf'.split(' ')
 );
 const FOCUS_ALIASES = new Set(['fit', 'fdescribe']);
 // Built, not spelled out, so the gate-weakening detector (which scans diffs for the literals) doesn't flag this file.
@@ -51,8 +51,9 @@ const SNAPSHOT_MATCHERS = new Set([
   'toThrowErrorMatchingSnapshot',
   'toThrowErrorMatchingInlineSnapshot',
 ]);
-// Calls that count as an assertion when a test delegates to a helper.
-const ASSERTING_CALL = /^(assert|expect|verify|check|should|ensure|must)/iu;
+// Calls that count as an assertion when a test delegates to a helper. A bare check() is Playwright ticking a box.
+const ASSERTING_CALL =
+  /^([Aa]ssert|[Ee]xpect|[Vv]erify|[Ss]hould|[Ee]nsure|[Mm]ust)([A-Z_]|$)|^check[A-Z_]/u;
 const SLEEP_CALL = /^(sleep|delay|wait|pause)$/iu;
 const SLEEP_FLOOR_MS = 50;
 const MOCK_BUDGET = 8;
@@ -62,15 +63,12 @@ function calleePath(expr) {
   const names = [];
   let node = expr;
   while (node) {
-    if (ts.isPropertyAccessExpression(node)) {
-      names.unshift(node.name.text);
-      node = node.expression;
-    } else if (ts.isCallExpression(node)) {
-      node = node.expression; // it.each([...])('name', fn)
-    } else if (ts.isIdentifier(node)) {
-      names.unshift(node.text);
-      break;
-    } else return [];
+    if (ts.isPropertyAccessExpression(node)) names.unshift(node.name.text);
+    else if (ts.isIdentifier(node)) return [node.text, ...names];
+    else if (!ts.isCallExpression(node) && !ts.isTaggedTemplateExpression(node))
+      return [];
+    // it.each([...])('name', fn) and it.each`table`('name', fn)
+    node = ts.isTaggedTemplateExpression(node) ? node.tag : node.expression;
   }
   return names;
 }

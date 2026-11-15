@@ -141,6 +141,25 @@ describe('scanTestFile', () => {
     ).toEqual(['real-sleep']);
   });
 
+  it('scans conditional and table tests, and does not take check() for an assertion', () => {
+    expect(rules("it.skipIf(ci)('a', async () => { await go(); });")).toEqual([
+      'no-assertion',
+    ]);
+    expect(rules("it.each`a\n${1}`('a $a', () => { f(); });")).toEqual([
+      'no-assertion',
+    ]);
+    expect(
+      rules(
+        "test('a', async () => { await box.check(); await checkbox.click(); });"
+      )
+    ).toEqual(['no-assertion']);
+    expect(
+      rules(
+        "test('a', async () => { await checkTotals(page); assertSaved(); });"
+      )
+    ).toEqual([]);
+  });
+
   it('counts a timer inside an awaited promise executor as awaited', () => {
     const body =
       'resolve => { setTimeout(() => { expect(f()).toBe(1); resolve(); }, 1); }';
