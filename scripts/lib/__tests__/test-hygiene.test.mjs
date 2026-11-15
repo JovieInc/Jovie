@@ -24,6 +24,8 @@ describe('scanTestFile', () => {
       rules(`${ONLY('it')}('a', () => { expect(f()).toBe(1); });`)
     ).toEqual(['focused']);
     expect(rules(`${ONLY('describe')}('s', () => {});`)).toEqual(['focused']);
+    expect(rules(`${ONLY('it')}(caseName, () => {});`)).toEqual(['focused']);
+    expect(rules('fit(box, () => {});')).toEqual([]);
     expect(rules("fit('a', () => { expect(f()).toBe(1); });")).toEqual([
       'focused',
     ]);

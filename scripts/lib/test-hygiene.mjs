@@ -369,9 +369,15 @@ export function scanTestFile(file, text, { unit = true } = {}) {
         SKIP_ALIASES.has(root);
       if ((root === 'vi' || root === 'jest') && members[0] === 'mock')
         mocks += 1;
+      // A focused call is focus whatever names it; an alias like fit needs a string name,
+      // so a helper called fit(box, cb) stays clean.
+      if (
+        isTest &&
+        (members.includes('only') ||
+          (FOCUS_ALIASES.has(root) && fn && isStringLike(first)))
+      )
+        findings.push({ rule: 'focused', line: line(node), name });
       if (isTest && isStringLike(node.arguments[0])) {
-        if (members.includes('only') || (FOCUS_ALIASES.has(root) && fn))
-          findings.push({ rule: 'focused', line: line(node), name });
         if (
           unit &&
           (members.includes('skip') ||
