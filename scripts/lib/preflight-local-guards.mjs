@@ -51,6 +51,15 @@ export const LOCAL_GUARDS = Object.freeze([
     when: () => true,
   },
   {
+    id: 'design-authority',
+    name: 'design authority and raw control debt',
+    command: 'node scripts/design-authority-guard.mjs',
+    when: p =>
+      /^(?:apps\/web\/|scripts\/design-authority|DESIGN\.md$|docs\/llms-design-manifest\.txt$|\.claude\/rules\/ui\.md$|\.agents\/skills\/gstack\/design-(?:canonical|consultation)\/)/.test(
+        p
+      ),
+  },
+  {
     id: 'design-noise',
     name: 'design-noise lint (apps/web/design-noise.baseline.json)',
     command: 'node apps/web/scripts/lint-design-noise.mjs',

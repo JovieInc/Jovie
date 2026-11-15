@@ -34,6 +34,19 @@ describe('preflight:changed local guards', () => {
     expect(ids([])).toEqual([]);
   });
 
+  it('checks raw control debt when source or its baseline changes', () => {
+    for (const path of [
+      'apps/web/components/shell/SidebarNavItem.tsx',
+      'scripts/design-authority-interactive-baseline.json',
+      'scripts/design-authority-guard.mjs',
+      'DESIGN.md',
+    ]) {
+      expect(ids([path]), path).toContain('design-authority');
+    }
+    expect(guard('design-authority').heavy).toBeUndefined();
+    expect(ids(['README.md'])).not.toContain('design-authority');
+  });
+
   it('runs design-noise for any web or packages/ui component, in every mode', () => {
     for (const path of [
       'apps/web/components/features/feedback/PmfSurveyCard.tsx',
