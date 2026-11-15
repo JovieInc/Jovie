@@ -1,9 +1,7 @@
 /**
  * Facts and one evaluation step for the Linear validation lifecycle
- * (JOV-7694). GitHub reads are read-only: the served production build, its
- * Production Verified marker, commit ancestry, merged pull requests linked to
- * an issue, and the existing CI risk classification (JOV-5937) of their
- * files. Linear writes go through a port the merge-sync writer supplies.
+ * (JOV-7694): the production build + marker, ancestry, linked merged pulls
+ * and their CI risk (JOV-5937). Linear writes go through a port.
  */
 
 import { execFileSync } from 'node:child_process';
@@ -83,8 +81,8 @@ const PRODUCTION_VERSION_URL = 'https://jov.ie/api/version';
  */
 
 /**
- * One retry for a thrown fetch (not an HTTP status), so a dropped
- * connection does not fail the whole sweep.
+ * One retry for a thrown fetch (not an HTTP status): a dropped connection
+ * does not fail the whole sweep.
  */
 export async function fetchWithRetry(fetchImpl, ...args) {
   try {
@@ -123,8 +121,8 @@ export function headerRetryMs(headers, now = Date.now()) {
 }
 
 /**
- * Wait only when the server named a delay inside the sweep budget; a
- * hinted wait past the cap returns null so the caller defers instead.
+ * Wait only when the server named a delay inside the sweep budget; past
+ * the cap, null, so the caller defers instead.
  */
 export function rateLimitWaitMs(retryAfterMs, attempt, maxAttempts) {
   if (attempt >= maxAttempts) return null;
@@ -357,7 +355,7 @@ export function inspectVerifiedProductionMarker({
 
 /**
  * Immutable reads kept across sweeps (actions/cache): merged pulls, their
- * files, SHA compares. Unmerged pulls stay uncached.
+ * files, SHA compares (unmerged pulls stay uncached).
  */
 export function immutableGithubCache(github, dir) {
   if (!dir) return github;
@@ -381,7 +379,7 @@ export function immutableGithubCache(github, dir) {
       // Persistence is optional; the next sweep reads live again.
     }
   };
-  return async path => {
+  const wrapped = async path => {
     const pull = MERGED_PULL.exec(path);
     const files = PULL_FILES.exec(path);
     const cacheable =
@@ -423,6 +421,10 @@ export function immutableGithubCache(github, dir) {
     }
     return result;
   };
+  // The batch capability must survive the wrapper (JOV-12768 review).
+  if (typeof github.batchPulls === 'function')
+    wrapped.batchPulls = github.batchPulls;
+  return wrapped;
 }
 
 /**
@@ -609,8 +611,8 @@ export function createProductionFacts(input) {
 }
 
 /**
- * Does this pull implement the issue (not just mention it): the identifier
- * in the title/branch, a bind marker, or a closes/fixes clause.
+ * Does this pull implement the issue (not just mention it): identifier in
+ * title/branch, a bind marker, or a closes/fixes clause.
  */
 export function pullImplementsIssue(pull, identifier) {
   const match = /^JOV-(\d+)$/i.exec(identifier);
@@ -670,14 +672,12 @@ export async function listMergedLinkedPulls(input) {
         !input.closedPulls?.get(number) && !input.openPullNumbers?.has(number)
     );
     try {
-      batched =
-        needBatch.length > 0
-          ? await input.github.batchPulls(
-              input.repository,
-              needBatch,
-              'number state mergedAt mergeCommitSha title body base { ref } head { ref }'
-            )
-          : null;
+      if (needBatch.length > 0)
+        batched = await input.github.batchPulls(
+          input.repository,
+          needBatch,
+          'number state mergedAt mergeCommitSha title body base { ref } head { ref }'
+        );
     } catch {
       batched = null;
     }
@@ -685,8 +685,8 @@ export async function listMergedLinkedPulls(input) {
   for (const number of selected) {
     const closed = input.closedPulls?.get(number);
     if (closed && !closed.merged) {
-      // Closed-unmerged can never bind and stays mutable, so without this
-      // cut every sweep re-reads it until the quota dies.
+      // Closed-unmerged can never bind and stays mutable: without this cut
+      // every sweep re-reads it (JOV-7707).
       continue;
     }
     if (input.openPullNumbers?.has(number)) {
