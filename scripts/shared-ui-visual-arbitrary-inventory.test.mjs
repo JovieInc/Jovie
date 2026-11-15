@@ -27,7 +27,7 @@ test('scanner covers the exact tracked production inventory as sources change', 
   const productionFiles = execFileSync(
     'git',
     ['ls-files', '-z', '--', 'packages/ui'],
-    { cwd: REPO_ROOT, encoding: 'utf8' }
+    { maxBuffer: 256 * 1024 * 1024, cwd: REPO_ROOT, encoding: 'utf8' }
   )
     .split('\0')
     .filter(isSharedUiProductionSource)

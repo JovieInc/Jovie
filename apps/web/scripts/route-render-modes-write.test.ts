@@ -219,6 +219,7 @@ describe('route-render-modes CLI', () => {
     });
     const git = (args: string[]) => {
       const result = spawnSync('git', args, {
+        maxBuffer: 256 * 1024 * 1024,
         cwd: root,
         env,
         encoding: 'utf8',

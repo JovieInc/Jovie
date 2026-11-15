@@ -316,7 +316,7 @@ function changedFilesFromGit(root, diffBase, filter = ['--diff-filter=ACMR']) {
   const result = spawnSync(
     'git',
     ['diff', '--name-only', ...filter, `${diffBase}...HEAD`],
-    { cwd: root, encoding: 'utf8' }
+    { maxBuffer: 256 * 1024 * 1024, cwd: root, encoding: 'utf8' }
   );
   if (result.status !== 0) {
     throw new Error(`Could not resolve UI audit diff from ${diffBase}`);
