@@ -5,6 +5,7 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
+  PlainButton,
 } from '@jovie/ui';
 import { Check } from 'lucide-react';
 import Link from 'next/link';
@@ -32,7 +33,7 @@ export function WorkspaceSelector<Id extends string>({
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <button
+        <PlainButton
           type='button'
           aria-label={`Switch Workspace: ${currentWorkspace.label}`}
           data-electron-no-drag='true'
@@ -61,7 +62,7 @@ export function WorkspaceSelector<Id extends string>({
           >
             {currentWorkspace.label}
           </span>
-        </button>
+        </PlainButton>
       </DropdownMenuTrigger>
       <DropdownMenuContent align='start' sideOffset={4} className='w-48'>
         {workspaces.map(workspace => {

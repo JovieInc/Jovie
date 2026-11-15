@@ -12,7 +12,34 @@
       "a11y",
       "frontend-rules"
     ],
+    "apps/web/components/atoms/AmountSelector.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
     "apps/web/components/atoms/AppSegmentControl.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/atoms/Copyright.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/atoms/JovieLogo.tsx": [
       "ds-owner",
       "tokens",
       "states",
@@ -1762,6 +1789,9 @@
       "long-content": "Every visible string is fixed copy in the component and it takes no props, so no caller text can grow. ErrorPhoneWidth shows the heading wrapping at 320px.",
       "rtl-overflow": "Its only copy is the fixed English heading and line, centred, with no caller text or input; the page is served in English to blocked accounts, so no right-to-left text can reach it."
     },
+    "apps/web/components/atoms/AmountSelector.tsx": {
+      "empty": "The tile renders one fixed tip amount and owns no collection that could be empty. The detector matched the items-center class in 'group relative flex h-12 w-full items-center justify-center rounded-full'."
+    },
     "apps/web/components/atoms/AnimatedIconSwap.tsx": {
       "empty": "AnimatedIconSwap renders exactly one keyed icon and never a collection; the detector matched the items-center class.",
       "long-content": "AnimatedIconSwap wraps one icon in a box its caller sizes and lays out no text; every caller passes a lucide glyph, so there is no content to overflow (the detector matched the children prop).",
@@ -1829,6 +1859,9 @@
     "apps/web/components/atoms/JovieIcon.tsx": {
       "partial": "The icon draws one fixed music-note path; its two optional props are size (Sized, Compact) and className, so nothing can be partly present.",
       "long-content": "It renders no text; the detector matched its text- colour classes. Rtl shows the mark beside right-to-left copy."
+    },
+    "apps/web/components/atoms/JovieLogo.tsx": {
+      "empty": "The logo always renders the fixed Jovie wordmark and owns no collection that could be empty. The detector matched the items-center class in \"cn('flex items-center gap-2', className)\"."
     },
     "apps/web/components/atoms/Logo.tsx": {
       "empty": "Logo draws the fixed Jovie wordmark or mark and takes no collection; the detector matched the .map( over the wordmark's own glyph paths from wordmarkGeometry, which always holds the five letters, so there is nothing that can be empty.",

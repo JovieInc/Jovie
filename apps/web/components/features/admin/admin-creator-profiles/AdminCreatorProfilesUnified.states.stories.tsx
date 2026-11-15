@@ -1,5 +1,6 @@
 import '@/styles/system-b-app.css';
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
+import { Toaster } from 'sonner';
 import { expect, screen, userEvent } from 'storybook/test';
 import { FeedbackProvider } from '@/components/feedback';
 import { RightPanelProvider } from '@/contexts/RightPanelContext';
@@ -95,6 +96,10 @@ export const ErrorVerifyFailed: Story = {
     Story => (
       <FeedbackProvider>
         <Story />
+        {/* The harness's mock '/test' pathname is a profile route, where
+       FeedbackProvider mounts no Toaster — mount the lane's own renderer
+       (same sonner store) so the failure toast actually renders. */}
+        <Toaster position='bottom-right' />
       </FeedbackProvider>
     ),
   ],

@@ -14,10 +14,10 @@ const LIVE_CERT_STORIES = [
 ] as const;
 
 const FULL_CATALOG_STORIES = [
-  // Local story matrices (e.g. the surface-elevation visual-regression
-  // matrix, JOV-2156) that are not tied to a single component directory.
+  // Local story matrices not tied to one component directory (JOV-2156).
   './stories/**/*.stories.@(js|jsx|ts|tsx|mdx)',
   '../components/**/*.stories.@(js|jsx|ts|tsx|mdx)',
+  '../app/claim/ClaimArtistSearch.stories.tsx',
   // packages/ui atoms — highest-reuse surface; must enter Storybook
   // (Phase 2 visual-testing coverage; see docs/VISUAL_TESTING_POLICY.md).
   '../../../packages/ui/**/*.stories.@(js|jsx|ts|tsx|mdx)',
