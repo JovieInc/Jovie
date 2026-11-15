@@ -496,7 +496,6 @@ export async function listMergedLinkedPulls(input) {
             {
               title: batchedPull.title,
               body: batchedPull.body,
-              base: { ref: batchedPull.baseRef },
               head: { ref: '' },
             },
             input.identifier
