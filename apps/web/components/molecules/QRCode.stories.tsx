@@ -1,91 +1,89 @@
-import type { Meta, StoryObj } from "@storybook/nextjs-vite";
-import { QRCode } from "./QRCode";
+import type { Meta, StoryObj } from '@storybook/nextjs-vite';
+import { QRCode } from './QRCode';
 
 const meta: Meta<typeof QRCode> = {
-	title: "Molecules/QRCode",
-	component: QRCode,
-	parameters: {
-		layout: "centered",
-	},
-	tags: ["autodocs"],
-	argTypes: {
-		size: {
-			control: { type: "number", min: 100, max: 400, step: 10 },
-		},
-	},
+  title: 'Molecules/QRCode',
+  component: QRCode,
+  parameters: {
+    layout: 'centered',
+  },
+  tags: ['autodocs'],
+  argTypes: {
+    size: {
+      control: { type: 'number', min: 100, max: 400, step: 10 },
+    },
+  },
 };
 
 export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {
-	args: {
-		data: "https://jov.ie/taylorswift",
-		label: "Scan to view profile",
-	},
+  args: {
+    data: 'https://jov.ie/taylorswift',
+    label: 'Scan to view profile',
+  },
 };
 
 export const Small: Story = {
-	args: {
-		data: "https://jov.ie/edsheeran",
-		size: 100,
-		label: "Small QR Code",
-	},
+  args: {
+    data: 'https://jov.ie/edsheeran',
+    size: 100,
+    label: 'Small QR Code',
+  },
 };
 
 export const Large: Story = {
-	args: {
-		data: "https://jov.ie/billieeilish",
-		size: 200,
-		label: "Large QR Code",
-	},
+  args: {
+    data: 'https://jov.ie/billieeilish',
+    size: 200,
+    label: 'Large QR Code',
+  },
 };
 
 export const MobileProfile: Story = {
-	args: {
-		data: "https://jov.ie/theweeknd?utm_source=qr&utm_medium=mobile",
-		size: 150,
-		label: "Scan to view on mobile",
-	},
+  args: {
+    data: 'https://jov.ie/theweeknd?utm_source=qr&utm_medium=mobile',
+    size: 150,
+    label: 'Scan to view on mobile',
+  },
 };
 
 export const PayLink: Story = {
-	args: {
-		data: "https://jov.ie/drake?mode=pay",
-		size: 120,
-		label: "Scan to pay via Apple Pay",
-	},
+  args: {
+    data: 'https://jov.ie/drake?mode=pay',
+    size: 120,
+    label: 'Scan to pay via Apple Pay',
+  },
 };
 
 export const WithCustomURL: Story = {
-	args: {
-		data: "https://custom-domain.com/artist-profile",
-		size: 160,
-		label: "Custom domain QR",
-	},
+  args: {
+    data: 'https://custom-domain.com/artist-profile',
+    size: 160,
+    label: 'Custom domain QR',
+  },
 };
 
 export const InContainer: Story = {
-	render: () => (
-		<div className="text-center space-y-4 p-6 bg-surface-0 rounded-lg shadow-lg">
-			<QRCode
-				data="https://jov.ie/arianagrande"
-				size={180}
-				label="Scan to pay via Apple Pay"
-				className="mx-auto"
-			/>
-			<p className="text-sm text-secondary-token">
-				Scan to pay via Apple Pay
-			</p>
-		</div>
-	),
+  render: () => (
+    <div className='text-center space-y-4 p-6 bg-surface-0 rounded-lg shadow-lg'>
+      <QRCode
+        data='https://jov.ie/arianagrande'
+        size={180}
+        label='Scan to pay via Apple Pay'
+        className='mx-auto'
+      />
+      <p className='text-sm text-secondary-token'>Scan to pay via Apple Pay</p>
+    </div>
+  ),
 };
 
 /** Only the required data: the 120px size and the default label apply. */
 export const PartialDataOnly: Story = {
-	args: {
-		data: "https://jov.ie/tim",
-	},
+  args: {
+    data: 'https://jov.ie/tim',
+  },
 };
 
 /**
@@ -94,10 +92,10 @@ export const PartialDataOnly: Story = {
  * path uses renders instead of a code that scans to nothing.
  */
 export const EmptyData: Story = {
-	args: {
-		data: "",
-		label: "HUD Link",
-	},
+  args: {
+    data: '',
+    label: 'HUD Link',
+  },
 };
 
 /**
@@ -108,34 +106,34 @@ export const EmptyData: Story = {
  * error.
  */
 export const FailedGeneration: Story = {
-	args: {
-		data: "https://jov.ie/tim",
-		size: 120,
-		label: "Scan To Open This Profile On Your Phone",
-	},
+  args: {
+    data: 'https://jov.ie/tim',
+    size: 120,
+    label: 'Scan To Open This Profile On Your Phone',
+  },
 };
 
 export const LongContentUrl: Story = {
-	args: {
-		data: "https://jov.ie/tim/never-say-a-word-extended-club-mix?utm_source=qr&utm_medium=print&utm_campaign=summer-tour-poster-los-angeles&utm_content=back-cover",
-		size: 160,
-		label:
-			"Scan to open Never Say A Word (Extended Club Mix) on your phone from the summer tour poster",
-	},
+  args: {
+    data: 'https://jov.ie/tim/never-say-a-word-extended-club-mix?utm_source=qr&utm_medium=print&utm_campaign=summer-tour-poster-los-angeles&utm_content=back-cover',
+    size: 160,
+    label:
+      'Scan to open Never Say A Word (Extended Club Mix) on your phone from the summer tour poster',
+  },
 };
 
 export const RtlCaption: Story = {
-	render: () => (
-		<div dir="rtl" className="space-y-2 text-center">
-			<QRCode
-				data="https://jov.ie/tim"
-				size={120}
-				label="امسح لفتح هذا الملف الشخصي على هاتفك"
-				className="mx-auto"
-			/>
-			<p className="text-xs text-secondary-token">
-				امسح لفتح هذا الملف الشخصي على هاتفك
-			</p>
-		</div>
-	),
+  render: () => (
+    <div dir='rtl' className='space-y-2 text-center'>
+      <QRCode
+        data='https://jov.ie/tim'
+        size={120}
+        label='امسح لفتح هذا الملف الشخصي على هاتفك'
+        className='mx-auto'
+      />
+      <p className='text-xs text-secondary-token'>
+        امسح لفتح هذا الملف الشخصي على هاتفك
+      </p>
+    </div>
+  ),
 };

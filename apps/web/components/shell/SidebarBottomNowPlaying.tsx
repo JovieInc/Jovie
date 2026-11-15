@@ -1,16 +1,16 @@
-"use client";
+'use client';
 
-import { Button, IconButton } from "@jovie/ui";
-import { AudioLines, Pause, Play, X } from "lucide-react";
-import Image from "next/image";
-import React from "react";
+import { Button, IconButton } from '@jovie/ui';
+import { AudioLines, Pause, Play, X } from 'lucide-react';
+import Image from 'next/image';
+import React from 'react';
 import {
-	ARTWORK_FIT_CLASSNAME,
-	ArtworkFrame,
-} from "@/components/atoms/ArtworkFrame";
-import { cn } from "@/lib/utils";
-import type { NowPlayingTrack } from "./SidebarNowPlaying";
-import { Tooltip } from "./Tooltip";
+  ARTWORK_FIT_CLASSNAME,
+  ArtworkFrame,
+} from '@/components/atoms/ArtworkFrame';
+import { cn } from '@/lib/utils';
+import type { NowPlayingTrack } from './SidebarNowPlaying';
+import { Tooltip } from './Tooltip';
 
 /**
  * SidebarBottomNowPlaying — compact now-playing row mounted at the
@@ -33,163 +33,163 @@ import { Tooltip } from "./Tooltip";
  * ```
  */
 export const SidebarBottomNowPlaying = React.memo(
-	function SidebarBottomNowPlaying({
-		track,
-		isPlaying,
-		onPlay,
-		onDismiss,
-		onExpand,
-		collapsed = false,
-		className,
-	}: {
-		readonly track: NowPlayingTrack;
-		readonly isPlaying: boolean;
-		readonly onPlay: () => void;
-		readonly onDismiss?: () => void;
-		/** Reopen the full docked player (JOV-6680). Tapping the track info expands. */
-		readonly onExpand?: () => void;
-		readonly collapsed?: boolean;
-		readonly className?: string;
-	}) {
-		const trackTitle = track.trackTitle ?? "";
-		const artistName = track.artistName ?? "";
-		const artworkUrl = track.artworkUrl ?? "";
+  function SidebarBottomNowPlaying({
+    track,
+    isPlaying,
+    onPlay,
+    onDismiss,
+    onExpand,
+    collapsed = false,
+    className,
+  }: {
+    readonly track: NowPlayingTrack;
+    readonly isPlaying: boolean;
+    readonly onPlay: () => void;
+    readonly onDismiss?: () => void;
+    /** Reopen the full docked player (JOV-6680). Tapping the track info expands. */
+    readonly onExpand?: () => void;
+    readonly collapsed?: boolean;
+    readonly className?: string;
+  }) {
+    const trackTitle = track.trackTitle ?? '';
+    const artistName = track.artistName ?? '';
+    const artworkUrl = track.artworkUrl ?? '';
 
-		if (!trackTitle && !artworkUrl) return null;
+    if (!trackTitle && !artworkUrl) return null;
 
-		if (collapsed) {
-			return (
-				<Tooltip label={trackTitle || "Now playing"} side="right">
-					<Button
-						type="button"
-						variant="ghost"
-						size="icon-sm"
-						onClick={onPlay}
-						aria-label={
-							isPlaying ? `Pause ${trackTitle}` : `Play ${trackTitle}`
-						}
-						className="mx-auto"
-					>
-						<ArtworkFrame size={28} className="size-7 bg-surface-2">
-							{artworkUrl ? (
-								<Image
-									src={artworkUrl}
-									alt=""
-									fill
-									sizes="28px"
-									className={ARTWORK_FIT_CLASSNAME}
-									unoptimized
-								/>
-							) : null}
-						</ArtworkFrame>
-						{isPlaying ? (
-							<span className="absolute -bottom-0.5 -right-0.5 grid size-3.5 place-items-center rounded-full bg-sidebar-accent text-sidebar-item-foreground ring-1 ring-sidebar-border">
-								<AudioLines aria-hidden="true" className="size-2.5" />
-							</span>
-						) : null}
-					</Button>
-				</Tooltip>
-			);
-		}
+    if (collapsed) {
+      return (
+        <Tooltip label={trackTitle || 'Now playing'} side='right'>
+          <Button
+            type='button'
+            variant='ghost'
+            size='icon-sm'
+            onClick={onPlay}
+            aria-label={
+              isPlaying ? `Pause ${trackTitle}` : `Play ${trackTitle}`
+            }
+            className='mx-auto'
+          >
+            <ArtworkFrame size={28} className='size-7 bg-surface-2'>
+              {artworkUrl ? (
+                <Image
+                  src={artworkUrl}
+                  alt=''
+                  fill
+                  sizes='28px'
+                  className={ARTWORK_FIT_CLASSNAME}
+                  unoptimized
+                />
+              ) : null}
+            </ArtworkFrame>
+            {isPlaying ? (
+              <span className='absolute -bottom-0.5 -right-0.5 grid size-3.5 place-items-center rounded-full bg-sidebar-accent text-sidebar-item-foreground ring-1 ring-sidebar-border'>
+                <AudioLines aria-hidden='true' className='size-2.5' />
+              </span>
+            ) : null}
+          </Button>
+        </Tooltip>
+      );
+    }
 
-		return (
-			<div
-				className={cn(
-					"group/now-playing flex h-12 items-center gap-2 rounded-md px-1.5 transition-colors duration-subtle ease-subtle hover:bg-surface-1/40",
-					className,
-				)}
-			>
-				<div className="relative size-9 shrink-0">
-					<ArtworkFrame size={36} className="size-9 bg-surface-2">
-						{artworkUrl ? (
-							<Image
-								src={artworkUrl}
-								alt=""
-								fill
-								sizes="36px"
-								className={ARTWORK_FIT_CLASSNAME}
-								unoptimized
-							/>
-						) : null}
-					</ArtworkFrame>
-					<div className="absolute left-1/2 top-1/2 size-7 -translate-x-1/2 -translate-y-1/2 opacity-0 transition-opacity duration-subtle ease-subtle focus-within:opacity-100 group-hover/now-playing:opacity-100 [@media(hover:none)]:opacity-100">
-						<Button
-							type="button"
-							variant="ghost"
-							size="icon-sm"
-							onClick={onPlay}
-							aria-label={isPlaying ? "Pause" : "Play"}
-						>
-							<span className="pointer-events-none absolute inset-0 rounded-full bg-ink-on-media/55" />
-							{isPlaying ? (
-								<Pause
-									aria-hidden="true"
-									className="relative size-3 text-tooltip-foreground"
-									strokeWidth={2.5}
-									fill="currentColor"
-								/>
-							) : (
-								<Play
-									aria-hidden="true"
-									className="relative size-3 translate-x-px text-tooltip-foreground"
-									strokeWidth={2.5}
-									fill="currentColor"
-								/>
-							)}
-						</Button>
-					</div>
-				</div>
-				{onExpand ? (
-					<Button
-						type="button"
-						variant="ghost"
-						size="sm"
-						onClick={onExpand}
-						data-audio-expand-player="true"
-						className="min-w-0 flex-1 justify-start"
-					>
-						<div className="min-w-0 flex-1">
-							<div
-								className="truncate text-xs font-caption text-primary-token leading-tight"
-								style={{ letterSpacing: "-0.005em" }}
-							>
-								{trackTitle}
-							</div>
-							<div className="truncate text-3xs text-tertiary-token leading-tight mt-0.5">
-								{artistName}
-							</div>
-						</div>
-						{/* An aria-label would shadow the visible title/artist and trip axe
+    return (
+      <div
+        className={cn(
+          'group/now-playing flex h-12 items-center gap-2 rounded-md px-1.5 transition-colors duration-subtle ease-subtle hover:bg-surface-1/40',
+          className
+        )}
+      >
+        <div className='relative size-9 shrink-0'>
+          <ArtworkFrame size={36} className='size-9 bg-surface-2'>
+            {artworkUrl ? (
+              <Image
+                src={artworkUrl}
+                alt=''
+                fill
+                sizes='36px'
+                className={ARTWORK_FIT_CLASSNAME}
+                unoptimized
+              />
+            ) : null}
+          </ArtworkFrame>
+          <div className='absolute left-1/2 top-1/2 size-7 -translate-x-1/2 -translate-y-1/2 opacity-0 transition-opacity duration-subtle ease-subtle focus-within:opacity-100 group-hover/now-playing:opacity-100 [@media(hover:none)]:opacity-100'>
+            <Button
+              type='button'
+              variant='ghost'
+              size='icon-sm'
+              onClick={onPlay}
+              aria-label={isPlaying ? 'Pause' : 'Play'}
+            >
+              <span className='pointer-events-none absolute inset-0 rounded-full bg-ink-on-media/55' />
+              {isPlaying ? (
+                <Pause
+                  aria-hidden='true'
+                  className='relative size-3 text-tooltip-foreground'
+                  strokeWidth={2.5}
+                  fill='currentColor'
+                />
+              ) : (
+                <Play
+                  aria-hidden='true'
+                  className='relative size-3 translate-x-px text-tooltip-foreground'
+                  strokeWidth={2.5}
+                  fill='currentColor'
+                />
+              )}
+            </Button>
+          </div>
+        </div>
+        {onExpand ? (
+          <Button
+            type='button'
+            variant='ghost'
+            size='sm'
+            onClick={onExpand}
+            data-audio-expand-player='true'
+            className='min-w-0 flex-1 justify-start'
+          >
+            <div className='min-w-0 flex-1'>
+              <div
+                className='truncate text-xs font-caption text-primary-token leading-tight'
+                style={{ letterSpacing: '-0.005em' }}
+              >
+                {trackTitle}
+              </div>
+              <div className='truncate text-3xs text-tertiary-token leading-tight mt-0.5'>
+                {artistName}
+              </div>
+            </div>
+            {/* An aria-label would shadow the visible title/artist and trip axe
                 label-content-name-mismatch; append the purpose instead so the
                 accessible name contains the visible text. */}
-						<span className="sr-only">Show Player</span>
-					</Button>
-				) : (
-					<div className="min-w-0 flex-1">
-						<div
-							className="truncate text-xs font-caption text-primary-token leading-tight"
-							style={{ letterSpacing: "-0.005em" }}
-						>
-							{trackTitle}
-						</div>
-						<div className="truncate text-3xs text-tertiary-token leading-tight mt-0.5">
-							{artistName}
-						</div>
-					</div>
-				)}
-				{onDismiss ? (
-					<Tooltip label="Dismiss Player" side="top">
-						<IconButton
-							size="sm"
-							ariaLabel="Dismiss Player"
-							onClick={onDismiss}
-							className="shrink-0"
-						>
-							<X aria-hidden="true" className="size-3.5" strokeWidth={2.25} />
-						</IconButton>
-					</Tooltip>
-				) : null}
-			</div>
-		);
-	},
+            <span className='sr-only'>Show Player</span>
+          </Button>
+        ) : (
+          <div className='min-w-0 flex-1'>
+            <div
+              className='truncate text-xs font-caption text-primary-token leading-tight'
+              style={{ letterSpacing: '-0.005em' }}
+            >
+              {trackTitle}
+            </div>
+            <div className='truncate text-3xs text-tertiary-token leading-tight mt-0.5'>
+              {artistName}
+            </div>
+          </div>
+        )}
+        {onDismiss ? (
+          <Tooltip label='Dismiss Player' side='top'>
+            <IconButton
+              size='sm'
+              ariaLabel='Dismiss Player'
+              onClick={onDismiss}
+              className='shrink-0'
+            >
+              <X aria-hidden='true' className='size-3.5' strokeWidth={2.25} />
+            </IconButton>
+          </Tooltip>
+        ) : null}
+      </div>
+    );
+  }
 );

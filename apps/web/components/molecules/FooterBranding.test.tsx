@@ -106,6 +106,15 @@ describe('FooterBranding', () => {
     }
   );
 
+  it('does not force the text mark or claim link into capitals', () => {
+    render(<FooterBranding mark='text' showCTA />);
+    expect(
+      screen.getByRole('link', { name: 'Claim your handle' })
+    ).not.toHaveClass('uppercase');
+    expect(
+      screen.getByRole('link', { name: 'Powered by Jovie Home' })
+    ).not.toHaveClass('uppercase');
+  });
 
   it('keeps the claim-handle link a 24px+ touch target', () => {
     const { container } = render(<FooterBranding mark='brand' />);
