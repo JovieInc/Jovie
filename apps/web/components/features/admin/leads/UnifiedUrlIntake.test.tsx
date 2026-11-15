@@ -133,4 +133,21 @@ describe('UnifiedUrlIntake', () => {
     expect(screen.getByText('Unified URL intake')).toBeVisible();
     await expectNoA11yViolations(container);
   });
+
+  it('reports queue failures to the owner alongside the error toast', async () => {
+    const user = userEvent.setup();
+    const onActionError = vi.fn();
+    mutateAsync.mockRejectedValue(new Error('Failed to fetch'));
+    render(<UnifiedUrlIntake onActionError={onActionError} />);
+
+    await user.type(
+      screen.getByLabelText('Lead URLs'),
+      'https://linktr.ee/artist'
+    );
+    await user.click(screen.getByRole('button', { name: 'Queue URLs' }));
+
+    await waitFor(() =>
+      expect(onActionError).toHaveBeenCalledWith('Failed to fetch')
+    );
+  });
 });
