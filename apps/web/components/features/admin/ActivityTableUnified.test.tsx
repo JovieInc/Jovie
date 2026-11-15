@@ -90,4 +90,16 @@ describe('ActivityTableUnified', () => {
     expect(source).toContain('function setTableKeyboardFocusable');
     expect(source).toContain('ref={setTableKeyboardFocusable}');
   });
+
+  it('exposes a stable timestamp-cell testid for scoped queries', () => {
+    const source = readFileSync(
+      resolve(
+        process.cwd(),
+        'components/features/admin/ActivityTableUnified.tsx'
+      ),
+      'utf8'
+    );
+
+    expect(source).toContain("data-testid='admin-activity-timestamp'");
+  });
 });

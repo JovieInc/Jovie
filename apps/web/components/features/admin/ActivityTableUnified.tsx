@@ -56,7 +56,12 @@ function renderTimestampCell({
   getValue,
 }: CellContext<AdminActivityItem, string>) {
   return (
-    <span className='whitespace-nowrap text-secondary-token'>{getValue()}</span>
+    <span
+      data-testid='admin-activity-timestamp'
+      className='whitespace-nowrap text-secondary-token'
+    >
+      {getValue()}
+    </span>
   );
 }
 
