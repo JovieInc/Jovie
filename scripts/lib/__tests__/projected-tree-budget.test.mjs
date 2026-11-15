@@ -185,6 +185,33 @@ describe('source-PR projected combined-tree budget', () => {
       /1\.10 MB over budget/
     );
   });
+
+  it('selects the same lowest merge base as CI in a criss-cross history', () => {
+    const lowest = '4'.repeat(40);
+    const treeGit = fakeGit({
+      [BASE_TREE]: [regular(100)],
+      [HEAD_TREE]: [regular(150)],
+      [MERGED_TREE]: [regular(150)],
+    });
+    const git = args => {
+      if (
+        args.join(' ') ===
+        'rev-parse --verify refs/remotes/origin/main^{commit}'
+      )
+        return BASE;
+      if (args.join(' ') === 'rev-parse --verify HEAD^{commit}') return HEAD;
+      if (args[0] === 'merge-base') {
+        expect(args).toEqual(['merge-base', '--all', BASE, HEAD]);
+        return `${MERGE_BASE}\n${lowest}\n`;
+      }
+      if (args[0] === 'merge-tree')
+        expect(args).toContain(`--merge-base=${lowest}`);
+      return treeGit(args);
+    };
+    expect(runProjectedTreeBudget({ local: true, git, log: () => {} })).toEqual(
+      { baseBytes: 100, bytes: 150, delta: 50 }
+    );
+  });
   it('skips with a warning when the PR head conflicts with the base', () => {
     const logs = [];
     expect(

@@ -147,11 +147,25 @@ export function runProjectedTreeBudget({
   // against the fetched base; hosted CI keeps its explicit trusted bindings.
   const refs = local
     ? {
-        PR_BASE_SHA: git(['rev-parse', '--verify', 'origin/main']).trim(),
-        PR_HEAD_SHA: git(['rev-parse', '--verify', 'HEAD']).trim(),
-        PR_MERGE_BASE: git(['merge-base', 'origin/main', 'HEAD']).trim(),
+        PR_BASE_SHA: git([
+          'rev-parse',
+          '--verify',
+          'refs/remotes/origin/main^{commit}',
+        ]).trim(),
+        PR_HEAD_SHA: git(['rev-parse', '--verify', 'HEAD^{commit}']).trim(),
       }
     : env;
+  if (local) {
+    refs.PR_MERGE_BASE = git([
+      'merge-base',
+      '--all',
+      refs.PR_BASE_SHA,
+      refs.PR_HEAD_SHA,
+    ])
+      .trim()
+      .split('\n')
+      .sort()[0];
+  }
   return enforceProjectedTreeBudget({
     baseSha: refs.PR_BASE_SHA,
     git,

@@ -65,7 +65,10 @@ describe('ProfileNotificationsContext', () => {
       const notifications = useProfileNotifications();
       return (
         <>
-          <button type='button' onClick={notifications.openSubscription}>
+          <button
+            type='button'
+            onClick={() => notifications.openSubscription()}
+          >
             Turn on notifications
           </button>
           <Readout />
@@ -87,6 +90,7 @@ describe('ProfileNotificationsContext', () => {
       screen.getByRole('button', { name: 'Turn on notifications' })
     );
     expect(openSubscription).toHaveBeenCalledTimes(1);
+    expect(openSubscription).toHaveBeenCalledWith();
     await expectNoA11yViolations(container);
   });
 });

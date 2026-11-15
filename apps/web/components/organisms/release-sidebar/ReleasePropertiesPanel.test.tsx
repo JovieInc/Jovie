@@ -16,6 +16,7 @@ function buildRelease(overrides: Partial<Release> = {}): Release {
     id: 'release_1',
     title: 'Midnight Echo',
     releaseDate: '2025-06-01T00:00:00.000Z',
+    status: 'released',
     artworkUrl: 'https://example.com/artwork.jpg',
     slug: 'midnight-echo',
     smartLinkPath: '/r/midnight-echo--profile_1',

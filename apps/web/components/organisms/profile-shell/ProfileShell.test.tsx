@@ -1,6 +1,7 @@
 import { screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { encodeContactPayload } from '@/lib/contacts/obfuscation';
 import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import { renderWithQueryClient } from '@/tests/utils/test-utils';
 import type { PublicContact } from '@/types/contacts';
@@ -56,9 +57,24 @@ const venmo = [
   },
 ] as unknown as LegacySocialLink[];
 
-const contacts = [
-  { type: 'email', label: 'Booking', value: 'booking@example.com' },
-] as PublicContact[];
+const contacts: PublicContact[] = [
+  {
+    id: 'contact-1',
+    role: 'bookings',
+    roleLabel: 'Booking',
+    territorySummary: 'Worldwide',
+    territoryCount: 0,
+    channels: [
+      {
+        type: 'email',
+        encoded: encodeContactPayload({
+          type: 'email',
+          value: 'booking@example.com',
+        }),
+      },
+    ],
+  },
+];
 
 describe('ProfileShell', () => {
   beforeEach(() => {
