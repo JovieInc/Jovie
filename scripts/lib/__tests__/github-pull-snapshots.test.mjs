@@ -63,7 +63,7 @@ describe('batchPulls unwraps the api-client response (JOV-12768)', () => {
       body: 'closes JOV-2',
       base: { ref: 'main' },
     });
-    expect(out.get(18293)?.pullRequest).toBeUndefined();
+    expect(Object.hasOwn(out.get(18293) ?? {}, 'pullRequest')).toBe(false);
   });
 
   it('keeps a MERGED pull bound end-to-end (not dropped) and skips OPEN', async () => {
