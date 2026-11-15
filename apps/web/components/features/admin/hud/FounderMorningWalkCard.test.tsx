@@ -1,6 +1,7 @@
 import { act, fireEvent, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import { fastRender } from '@/tests/utils/fast-render';
 import { FounderMorningWalkCard } from './FounderMorningWalkCard';
 
@@ -74,6 +75,17 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllGlobals());
 
 describe('FounderMorningWalkCard', () => {
+  it('labels the card in sentence case and stays axe-clean in both layouts', async () => {
+    const view = renderCard();
+    const label = screen.getByText('Morning walk');
+    expect(label).not.toHaveClass('uppercase');
+    expect(label).toHaveClass('tracking-wide');
+    await expectNoA11yViolations(view.container);
+    view.rerender(<FounderMorningWalkCard compact defaultStatus='Idle' />);
+    expect(screen.getByRole('button', { name: 'Record walk' })).toBeEnabled();
+    await expectNoA11yViolations(view.container);
+  });
+
   it('renders the status and compact control, with no capture for a signed-out viewer', () => {
     h.userId = null;
     const view = renderCard();

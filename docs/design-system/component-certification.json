@@ -30,6 +30,78 @@
       "frontend-rules",
       "forced-caps"
     ],
+    "apps/web/components/features/admin/BatchIngestModal.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/admin/WaitlistSettingsPanel.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/admin/admin-creator-profiles/AdminProfileSidebar.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/admin/capacity/CapacityBoard.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/admin/certifications/CertificationDetailRail.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/admin/fleet-audit/FleetAuditPanel.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/admin/hud/FounderMorningWalkCard.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/admin/hud/OvieLauncherRail.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
     "apps/web/components/features/profile/ClaimBanner.tsx": [
       "ds-owner",
       "tokens",
@@ -318,6 +390,25 @@
     },
     "apps/web/components/features/admin/OvieRouteUsageBeacon.tsx": {
       "error": "The beacon renders null in every state and is fire-and-forget: a failed POST is swallowed by its .catch, so there is no failure to draw. OvieRouteUsageBeacon.test.tsx rejects the fetch and asserts the page is unchanged and axe-clean."
+    },
+    "apps/web/components/features/admin/WaitlistSettingsPanel.tsx": {
+      "empty": "The panel renders a fixed settings form and owns no collection to empty. The detector matched the items-center class on its loading row."
+    },
+    "apps/web/components/features/admin/capacity/CapacityBoard.tsx": {
+      "loading": "The board renders a precomputed CapacityView prop on the server and fetches nothing, so it has no loading phase. The detector matched the registry copy 'Decision pending ({provider.decision.decideBy})'.",
+      "offline": "The board makes no request: the admin page evaluates the capacity registry and passes the view in, so there is no network call that could fail offline. The detector inferred it from the 'Decision pending' copy.",
+      "permission-denied": "The board has no gate of its own; the admin route decides access. The detector matched subscription plan data (plan?.name, 'Plan Spend Per Month') and model roles in RolesCard (role.role), not a permission check."
+    },
+    "apps/web/components/features/admin/certifications/CertificationDetailRail.tsx": {
+      "permission-denied": "The rail is shown only inside the admin certification workspace and has no role, plan or ownership gate of its own. The detector matched role='status' on the decision status slot (<p role='status' aria-live='polite'>)."
+    },
+    "apps/web/components/features/admin/fleet-audit/FleetAuditPanel.tsx": {
+      "permission-denied": "The panel has no role, plan or ownership gate; access is decided by the admin route that renders it. The detector matched role='img' on the storage budget meter (<div role='img' aria-label={...}>)."
+    },
+    "apps/web/components/features/admin/hud/FounderMorningWalkCard.tsx": {
+      "empty": "The card owns no collection: the only .map( is over its four fixed button labels (['Record walk', 'Cancel selection', stopLabel, 'Storing…'].map), rendered invisibly to reserve the button width.",
+      "error": "A failed capture, upload or confirm only raises a toast ('Could not store the walk. Try again.') owned by the toast component and returns the card to its idle view, shown by Default; screen capture cannot be granted in the story runner. FounderMorningWalkCard.test.tsx covers picker denial and retry.",
+      "offline": "An unreachable confirm request takes the same catch branch as any failure: a toast and the idle view shown by Default. Screen capture cannot be granted in the story runner, and FounderMorningWalkCard.test.tsx covers the failure branch."
     },
     "apps/web/components/features/alerts/UnpublishedEntityAlerts.tsx": {
       "offline": "The copy and its fallback never fetch; the alert sign-up it hosts, AlertGrowthLanding, owns the subscribe request and its network error. The detector matched the loading test id on the Suspense fallback (Loading).",
