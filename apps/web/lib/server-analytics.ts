@@ -652,6 +652,7 @@ export async function trackServerEvent(
     );
     void delivery.then(
       result => {
+        if (!result.ok) return;
         Sentry.addBreadcrumb({
           category: 'database',
           level: 'info',
