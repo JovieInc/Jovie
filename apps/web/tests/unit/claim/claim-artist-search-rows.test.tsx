@@ -1,9 +1,10 @@
 import { buttonVariants } from '@jovie/ui';
-import { act, fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ClaimArtistSearch } from '@/app/claim/ClaimArtistSearch';
 import { APP_ROUTES } from '@/constants/routes';
 import type { SpotifyArtistResult } from '@/lib/contracts/api';
+import { renderWithQueryClient as render } from '@/tests/utils/test-utils';
 
 const RESULTS: SpotifyArtistResult[] = [
   {
@@ -38,11 +39,14 @@ async function searchFor(query: string) {
   await act(async () => {
     await vi.advanceTimersByTimeAsync(400);
   });
+  // The debounce has fired; the response body and the query result settle
+  // over the following ticks.
+  await screen.findByTestId('claim-artist-results');
 }
 
 describe('claim artist search rows', () => {
   beforeEach(() => {
-    vi.useFakeTimers();
+    vi.useFakeTimers({ shouldAdvanceTime: true });
     vi.stubGlobal(
       'fetch',
       vi.fn(async () => new Response(JSON.stringify(RESULTS)))
