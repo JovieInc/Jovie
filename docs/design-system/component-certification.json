@@ -1259,7 +1259,7 @@
     },
     "apps/web/components/features/demo/DemoAudienceWorkspace.tsx": {
       "empty": "Takes no props and always reads the fixed twelve-member demo audience; the empty audience belongs to DashboardAudienceWorkspace.",
-      "error": "Its only failure paths are toasts for a failed copy or QR download (covered in DemoAudienceWorkspace.certificate.test.tsx); the workspace itself has no error view."
+      "error": "Its only failure paths are toasts for a failed copy or QR download (covered in DemoAudienceWorkspace.test.tsx); the workspace itself has no error view."
     },
     "apps/web/components/features/demo/DemoAvatar.tsx": {
       "empty": "The avatar draws one assignee and has no collection to empty. The detector matched the items-center class."
@@ -1284,7 +1284,7 @@
       "long-content": "Takes no props: the headline and both calls to action are fixed copy."
     },
     "apps/web/components/features/dev/FlagBadgeContext.tsx": {
-      "error": "The provider renders no UI of its own; a blocked storage read falls back to badges off (covered in FlagBadgeContext.certificate.test.tsx), so there is no error view."
+      "error": "The provider renders no UI of its own; a blocked storage read falls back to badges off (covered in FlagBadgeContext.test.tsx), so there is no error view."
     },
     "apps/web/components/features/feedback/PageErrorState.tsx": {
       "empty": "PageErrorState renders one title, one message and one retry action and takes no collection; the detector matched the items-center utility class.",
