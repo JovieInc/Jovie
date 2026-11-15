@@ -19,8 +19,6 @@ import {
   or,
   type SQL,
 } from 'drizzle-orm';
-import { revalidatePath } from 'next/cache';
-import { APP_ROUTES } from '@/constants/routes';
 import { db } from '@/lib/db';
 import { discogReleases } from '@/lib/db/schema/content';
 import { tasks } from '@/lib/db/schema/tasks';
@@ -227,6 +225,12 @@ function isUniqueViolation(error: unknown): boolean {
   );
 }
 
+// Task mutations in this file do not call `revalidatePath`: every task read
+// (list, board, detail, stats, release tasks) goes through TanStack Query, and
+// the mutation hooks in lib/queries/useTaskMutations.ts and
+// useReleaseTaskMutations.ts invalidate those queries themselves. A path
+// revalidation would only add a full route re-render to each action response
+// and purge the client Router Cache.
 async function createTaskForProfile(
   profileId: string,
   data: CreateTaskInput,
@@ -269,10 +273,6 @@ async function createTaskForProfile(
         metadata: data.metadata ?? {},
       })
       .returning();
-
-    revalidatePath(APP_ROUTES.TASKS);
-    revalidatePath(APP_ROUTES.RELEASES);
-    revalidatePath(APP_ROUTES.DASHBOARD_RELEASES);
 
     return mapTaskRow(created);
   } catch (error) {
@@ -665,10 +665,6 @@ export async function updateTask(
     throw new Error('Task changed in another session');
   }
 
-  revalidatePath(APP_ROUTES.TASKS);
-  revalidatePath(APP_ROUTES.RELEASES);
-  revalidatePath(APP_ROUTES.DASHBOARD_RELEASES);
-
   return mapTaskRow(updated);
 }
 
@@ -844,18 +840,12 @@ export async function moveTask(
     const succeeded = await attemptMoveTask(profileId, movingTask, input);
 
     if (succeeded) {
-      revalidatePath(APP_ROUTES.TASKS);
-      revalidatePath(APP_ROUTES.RELEASES);
-      revalidatePath(APP_ROUTES.DASHBOARD_RELEASES);
       return { success: true };
     }
   }
 
   // All retries exhausted — still succeed from the client's perspective.
   // The onSettled invalidateQueries in useMoveTaskMutation will re-sync state.
-  revalidatePath(APP_ROUTES.TASKS);
-  revalidatePath(APP_ROUTES.RELEASES);
-  revalidatePath(APP_ROUTES.DASHBOARD_RELEASES);
   return { success: true };
 }
 
@@ -873,10 +863,6 @@ export async function deleteTask(
       updatedAt: new Date(),
     })
     .where(eq(tasks.id, taskId));
-
-  revalidatePath(APP_ROUTES.TASKS);
-  revalidatePath(APP_ROUTES.RELEASES);
-  revalidatePath(APP_ROUTES.DASHBOARD_RELEASES);
 
   return { success: true };
 }
