@@ -1092,8 +1092,7 @@ export const MESH_CURRENT_WIRE_COVERAGE_COMMAND =
   'pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/mesh-current-wire.test.mjs --coverage.enabled --coverage.provider=v8 --coverage.include=lanes/mesh-current-wire.mjs --coverage.reportsDirectory="${RUNNER_TEMP:-/tmp}/jovie-mesh-current-wire-coverage" --coverage.reporter=text --coverage.reporter=json --coverage.reporter=json-summary --coverage.thresholds.perFile=true --coverage.thresholds.lines=90 --coverage.thresholds.statements=90 --coverage.thresholds.branches=85 --coverage.thresholds.functions=100';
 export const VALIDATION_LIFECYCLE_COVERAGE_COMMAND =
   'pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/validation-lifecycle.test.mjs lib/__tests__/validation-sync.test.mjs lib/__tests__/linear-sync-on-merge.test.mjs lib/__tests__/founder-taste-order.test.mjs --maxWorkers=1 --coverage --coverage.include="lib/{validation-lifecycle,validation-sync,linear-sync-on-merge,founder-taste-order}.mjs" --coverage.reporter=text --coverage.reporter=json-summary --coverage.reportsDirectory="${RUNNER_TEMP:-/tmp}/jovie-validation-lifecycle-coverage" --coverage.thresholds.perFile --coverage.thresholds.lines=90 --coverage.thresholds.statements=90 --coverage.thresholds.branches=75 --coverage.thresholds.functions=85';
-// Keep scanner-heavy script contracts outside V8 instrumentation; cover the
-// document helpers with the same behavior test in a small separate process.
+// Keep scanner-heavy script contracts outside V8 instrumentation; cover document helpers in a small separate process.
 // Release-lineage contracts. Main Health's idle probe (scripts/main-health.mjs --structural) runs the same
 // files: production-release-supersession held the date that expired on 2026-11-10 and failed every group for 8 h.
 export const RELEASE_LINEAGE_CONTRACT_COMMAND =
@@ -1207,6 +1206,7 @@ export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/mac-lane-script.test.mjs',
   'scripts/lib/__tests__/main-release-readiness.test.mjs',
   'scripts/lib/__tests__/pr-comment-analysis.test.mjs',
+  'scripts/lib/__tests__/bot-review-findings.test.mjs',
   'scripts/lib/__tests__/pr-liveness.test.mjs',
   'scripts/lib/__tests__/postdeploy-probes-workflow.test.mjs',
   'scripts/lib/__tests__/postdeploy-probe-admission.test.mjs',
