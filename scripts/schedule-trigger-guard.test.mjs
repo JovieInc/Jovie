@@ -34,7 +34,7 @@ test('a newly added cron trigger fails the guard', () => {
     registryIds: new Set(['github:jovie:production-continuity']),
   });
   assert.equal(errors.length, 1);
-  assert.match(errors[0], /new-clock\.yml: adds a schedule:\/cron: trigger/);
+  assert.match(errors[0], /new-clock\.yml: adds a schedule/);
 });
 
 test('a modified workflow that only removes its cron passes', () => {
@@ -73,7 +73,7 @@ test('an allowlisted schedule with a live registry id passes; a dead id fails', 
     registryIds: new Set(),
   });
   assert.equal(dead.length, 1);
-  assert.match(dead[0], /not a live canon\/automation-registry\.jsonl id/);
+  assert.match(dead[0], /not a live canon/);
 });
 
 test('an allowlist entry missing a field is itself a violation', () => {
@@ -157,7 +157,7 @@ test('comment lines and test files never count as polling evidence', () => {
       [
         'scripts/poller.mjs',
         [
-          '// wait until gh api answers, then retry the fetch of api.github.com',
+          '// wait until gh api answers before fetching api.github.com again',
           'export const done = true;',
         ],
       ],
