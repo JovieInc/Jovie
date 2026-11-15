@@ -114,6 +114,8 @@ export async function invalidateSocialLinksCache(
   if (usernameNormalized) {
     revalidateTag(createProfileTag(usernameNormalized), 'max');
     revalidatePath(`/${usernameNormalized}`);
+    // The Redis profile entry embeds the links (feeds /api/creator and OG).
+    await invalidateProfileEdgeCache(usernameNormalized);
   }
 
   // Also invalidate dashboard where links are managed
@@ -141,6 +143,8 @@ export async function invalidateAvatarCache(
   if (usernameNormalized) {
     revalidateTag(createProfileTag(usernameNormalized), 'max');
     revalidatePath(`/${usernameNormalized}`);
+    // The Redis profile entry embeds the avatar URL (feeds /api/creator and OG).
+    await invalidateProfileEdgeCache(usernameNormalized);
   }
 
   // Dashboard also shows avatar
