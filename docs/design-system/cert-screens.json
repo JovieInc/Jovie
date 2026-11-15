@@ -157,8 +157,6 @@
     "apps/web/components/shell/DictationWaveform.tsx": "tokens",
     "apps/web/components/shell/HeaderSearchSurfaceFromContext.tsx": "a11y,ds-owner,states",
     "apps/web/components/shell/IconBtn.tsx": "a11y,ds-owner,states",
-    "apps/web/components/shell/ScrubGradient.tsx": "a11y,ds-owner,frontend-rules,states,tests,tokens",
-    "apps/web/components/shell/SidebarNavItem.tsx": "a11y,ds-owner,states",
-    "apps/web/components/shell/SidebarThreadsSection.tsx": "a11y,states,tokens"
+    "apps/web/components/shell/ScrubGradient.tsx": "a11y,ds-owner,frontend-rules,states,tests,tokens"
   }
 }

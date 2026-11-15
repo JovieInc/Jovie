@@ -128,6 +128,15 @@ class RouteBudgetGrowthTest(unittest.TestCase):
 
 
 class TreeByteBudgetTest(unittest.TestCase):
+    def test_stale_head_route_precedes_the_general_tree_budget_route(self):
+        stale = ('##[error]PR head has 207672844 tracked regular-file bytes, exceeding the '
+                 '207618048-byte repository budget, while the merged tree fits at 207583562 bytes\n')
+        hygiene = ('198.05 MiB of tracked regular files exceeds the 198.00 MiB repository budget\n')
+        for log in (stale, hygiene + stale, stale + hygiene):
+            with self.subTest(log=log):
+                route = classes.classify(red('PR Size Guard'), {'PR Size Guard': log})
+                self.assertEqual((route['cls'], route['action']), ('tracked-byte-stale', 'sync-main'))
+
     def test_combined_tree_overflow_syncs_main_and_ignores_the_receipt_follower(self):
         log = (
             '2026-11-15T05:42:55.9330300Z ##[error]207672844 bytes of tracked regular files '

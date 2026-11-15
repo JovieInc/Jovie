@@ -37,7 +37,12 @@ export const LongContentFiftyEvents: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     await expect(canvas.getAllByText('Error').length).toBeGreaterThan(0);
-    await expect(canvas.getByText('50 minutes ago')).toBeInTheDocument();
+    // The timestamp renders twice per row (action cell's mobile span and the
+    // timestamp cell); query the timestamp cell directly instead of unscoped
+    // text.
+    await expect(
+      canvas.getAllByTestId('admin-activity-timestamp')[49]
+    ).toHaveTextContent('50 minutes ago');
   },
 };
 

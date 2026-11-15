@@ -20,6 +20,33 @@ const guard = (id: string) => {
 };
 
 describe('preflight:changed local guards', () => {
+  it('checks the tree byte budget for source, docs and evidence in every mode', () => {
+    for (const path of [
+      'apps/web/components/shell/SidebarNavItem.tsx',
+      'apps/web/components/shell/SidebarNavItem.certificate.test.tsx',
+      'apps/web/components/shell/SidebarNavItem.states.stories.tsx',
+      'docs/design-system/component-certification.d/ds-cert-s17.json',
+      'README.md',
+    ]) {
+      expect(ids([path]), path).toContain('projected-tree-budget');
+    }
+    expect(guard('projected-tree-budget').heavy).toBeUndefined();
+    expect(ids([])).toEqual([]);
+  });
+
+  it('checks raw control debt when source or its baseline changes', () => {
+    for (const path of [
+      'apps/web/components/shell/SidebarNavItem.tsx',
+      'scripts/design-authority-interactive-baseline.json',
+      'scripts/design-authority-guard.mjs',
+      'DESIGN.md',
+    ]) {
+      expect(ids([path]), path).toContain('design-authority');
+    }
+    expect(guard('design-authority').heavy).toBeUndefined();
+    expect(ids(['README.md'])).not.toContain('design-authority');
+  });
+
   it('runs design-noise for any web or packages/ui component, in every mode', () => {
     for (const path of [
       'apps/web/components/features/feedback/PmfSurveyCard.tsx',
@@ -32,7 +59,9 @@ describe('preflight:changed local guards', () => {
       expect(ids([path]), path).toContain('design-noise');
     }
     expect(guard('design-noise').heavy).toBeUndefined();
-    expect(ids(['README.md', 'scripts/ci-fast-lanes.mjs'])).toEqual([]);
+    expect(ids(['README.md', 'scripts/ci-fast-lanes.mjs'])).not.toContain(
+      'design-noise'
+    );
   });
 
   it('runs the route JS budgets when shipped web code changes, as a heavy guard', () => {
@@ -103,6 +132,8 @@ describe('preflight:changed local guards', () => {
     expect(selected).toEqual(
       expect.arrayContaining(['design-noise', 'route-js-budget'])
     );
-    expect(selectManifestGuards(['README.md'])).toEqual([]);
+    expect(selectManifestGuards(['README.md']).map(g => g.id)).toEqual([
+      'projected-tree-budget',
+    ]);
   });
 });

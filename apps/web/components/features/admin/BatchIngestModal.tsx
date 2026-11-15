@@ -30,12 +30,12 @@ const STATUS_CONFIG = {
   },
   skipped: {
     icon: CircleMinus,
-    className: 'text-warning',
+    className: 'text-warning-text',
     label: 'Skipped',
   },
   error: {
     icon: CircleAlert,
-    className: 'text-error',
+    className: 'text-error-text',
     label: 'Error',
   },
 } as const;
@@ -105,13 +105,13 @@ export function BatchIngestModal({
                 </span>
               )}
               {result.summary.skipped > 0 && (
-                <span className='inline-flex items-center gap-1 text-warning'>
+                <span className='inline-flex items-center gap-1 text-warning-text'>
                   <CircleMinus className='size-3' />
                   {result.summary.skipped} skipped
                 </span>
               )}
               {result.summary.error > 0 && (
-                <span className='inline-flex items-center gap-1 text-error'>
+                <span className='inline-flex items-center gap-1 text-error-text'>
                   <CircleAlert className='size-3' />
                   {result.summary.error} errors
                 </span>
