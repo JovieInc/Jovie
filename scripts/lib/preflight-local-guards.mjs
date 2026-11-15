@@ -1,7 +1,7 @@
 /**
- * Guards `pnpm preflight:changed` runs before a push outside the Source
- * Validation manifest: repository hygiene belongs to PR Size Guard; design
- * noise and build budgets belong to the merge group's ci-fast and Build + Layout.
+ * Guards `pnpm preflight:changed` runs before a push that PR CI does not run
+ * itself: the merge group's ci-fast and Build + Layout jobs run them, so a
+ * PR that breaks one is first caught in the queue.
  *
  * In the merge groups of 2026-11-08 to 11-11 (79 failed groups sampled),
  * design-noise failed 8 (10%), e.g. "PmfSurveyCard.tsx disabled-submit x1
@@ -43,13 +43,21 @@ const BUILD_ENV = [
 /** @type {readonly {id:string,name:string,command:string,when:(p:string)=>boolean,heavy?:boolean,timeoutMs?:number}[]} */
 export const LOCAL_GUARDS = Object.freeze([
   {
-    // Evidence-only PR #25594 exceeded the tracked-byte cap before queue admission.
-    // Every file contributes bytes, including tests, stories and documentation.
-    id: 'repo-hygiene',
-    name: 'repository hygiene and tracked-tree byte budget',
+    id: 'projected-tree-budget',
+    name: 'projected combined-tree byte budget',
     command:
-      'node scripts/repo-hygiene-guard.mjs --diff-base "$SHADCN_LINT_DIFF_BASE"',
+      'PR_BASE_SHA="$(git rev-parse --verify "$CI_BASE_REF^{commit}")" PR_MERGE_BASE="$(git merge-base "$CI_BASE_REF" HEAD)" PR_HEAD_SHA="$(git rev-parse --verify HEAD)" node scripts/lib/projected-tree-budget.mjs',
+    // Every tracked file counts, including docs, stories and test evidence.
     when: () => true,
+  },
+  {
+    id: 'design-authority',
+    name: 'design authority and raw control debt',
+    command: 'node scripts/design-authority-guard.mjs',
+    when: p =>
+      /^(?:apps\/web\/|scripts\/design-authority|DESIGN\.md$|docs\/llms-design-manifest\.txt$|\.claude\/rules\/ui\.md$|\.agents\/skills\/gstack\/design-(?:canonical|consultation)\/)/.test(
+        p
+      ),
   },
   {
     id: 'design-noise',

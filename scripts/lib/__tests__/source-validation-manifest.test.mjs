@@ -59,23 +59,8 @@ describe('Source Validation manifest parity', () => {
     ])
       expect(ids).toContain(id);
     expect(selectManifestGuards(['README.md']).map(g => g.id)).toEqual([
-      'repo-hygiene',
+      'projected-tree-budget',
     ]);
-  });
-
-  it.each([
-    'README.md',
-    'apps/web/components/features/admin/lists/StarRating.certificate.test.tsx',
-    'apps/web/components/features/admin/lists/StarRating.states.stories.tsx',
-    'docs/design-system/component-certification.d/ds-cert-e1-3.json',
-  ])('always checks tracked-tree bytes before pushing %s', file => {
-    const gate = selectManifestGuards([file]).find(
-      guard => guard.id === 'repo-hygiene'
-    );
-    expect(gate?.command).toBe(
-      'node scripts/repo-hygiene-guard.mjs --diff-base "$SHADCN_LINT_DIFF_BASE"'
-    );
-    expect(gate?.heavy).not.toBe(true);
   });
 
   it.each([
