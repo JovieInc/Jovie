@@ -71,7 +71,15 @@ function git(root, ...args) {
 /** Diff base: explicit env override, else the merge-base with origin/main. */
 export function diffBase(root, env = process.env) {
   if (env.TURBO_SCM_BASE) return env.TURBO_SCM_BASE;
-  const merged = git(root, 'merge-base', 'HEAD', 'origin/main');
+  let merged = git(root, 'merge-base', 'HEAD', 'origin/main');
+  if (!merged) {
+    // The PR Fleet Rules checkout carries only the merge ref; fetch the
+    // public main tip so the guard never runs baseless. A failed fetch (no
+    // network, no origin) degrades to the documented skip, like
+    // external-api-guard's missing-base path.
+    git(root, 'fetch', '--quiet', '--depth=250', 'origin', 'main');
+    merged = git(root, 'merge-base', 'HEAD', 'origin/main');
+  }
   return merged ? merged.trim() : null;
 }
 
