@@ -30,6 +30,105 @@
       "frontend-rules",
       "forced-caps"
     ],
+    "apps/web/components/features/dashboard/atoms/PlatformPill.parts.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/dashboard/dashboard-nav/NavMenuItem.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/dashboard/molecules/EmailSignatureDialog.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/dashboard/molecules/MatchConfidenceBreakdown.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/dashboard/molecules/ProfileCompletionCard.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/dashboard/molecules/ProfilePaySurface.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/dashboard/organisms/DataPrivacySection.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/dashboard/organisms/EarningsTab.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/dashboard/organisms/LiquidGlassMenu.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/dashboard/organisms/ListenNowForm.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/dashboard/organisms/MobileProfileDrawer.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
     "apps/web/components/features/profile/ClaimBanner.tsx": [
       "ds-owner",
       "tokens",
@@ -375,12 +474,35 @@
       "offline": "InboxAttentionLink never fetches or mutates; it renders the pending count its owner passes, and with no connection that count stays unloaded, which the Partial story shows.",
       "permission-denied": "InboxAttentionLink links to the signed-in Inbox that every account can open and has no gated action; a viewer who cannot reach the dashboard never sees the app rail."
     },
+    "apps/web/components/features/dashboard/dashboard-nav/NavMenuItem.tsx": {
+      "empty": "The row draws one NavItem and owns no collection; the detector matched the word links in the comment \"Optional click side effect for links or buttons\".",
+      "error": "The row draws no failure face: a failed Copy link shows toast.error(\"Failed to copy link\") in the app-wide toaster, outside this component.",
+      "offline": "The row never fetches; pending is a paint-only acknowledgment while the route resolves (LoadingPendingDestination), and an offline navigation fails in the router, outside this row."
+    },
+    "apps/web/components/features/dashboard/molecules/MatchConfidenceBreakdown.tsx": {
+      "error": "A pure display of five numeric scores with no fetch, handler or failure input; the detector matched the colour classes \"text-error\" and \"bg-error/60\" used for a low score (LowConfidence)."
+    },
+    "apps/web/components/features/dashboard/molecules/ProfileCompletionCard.tsx": {
+      "error": "The card draws no failure face: an unreadable localStorage falls back to setDismissed(false) and shows the card, with captureWarning for tracking; ProfileCompletionCard.test.tsx covers it.",
+      "permission-denied": "The card has no gated action or permission input; the detector matched role='progressbar'. The not-live variant, which hides the dismiss button, is PartialNotLiveYet."
+    },
+    "apps/web/components/features/dashboard/molecules/ProfilePaySurface.tsx": {
+      "error": "Its failures are transient status lines set by a user action (\"Could not copy payment link.\", \"Could not download PNG QR code.\") in the aria-live paragraph, and a failed QR preview falls back to the placeholder; no prop reaches them, so ProfilePaySurface.test.tsx covers each by interaction."
+    },
     "apps/web/components/features/dashboard/organisms/DashboardHeader.tsx": {
       "empty": "Every caller passes at least one breadcrumb: useAuthRouteConfig always builds one from the pathname and SettingsSection passes its title, so the header never renders without a title. It owns no collection; the detector matched the items-center class."
     },
     "apps/web/components/features/dashboard/organisms/DashboardMobileTabs.tsx": {
       "empty": "The tab bar is built from fixed navigation config (primaryNavigation, artistNavigation and the settings item), so it always has destinations; only the optional Public Profile row depends on data, and DashboardMobileTabs.test.tsx covers its absence. The detector matched the .map calls over that config.",
       "long-content": "Every label it shows is fixed navigation copy, never caller text; the profile link carries only an href under the fixed Public Profile label. The Default story already renders at the 320px mobile1 viewport."
+    },
+    "apps/web/components/features/dashboard/organisms/DataPrivacySection.tsx": {
+      "error": "The section draws no failure face: a failed export or delete is reported by the mutation hooks' toast (\"useDeleteAccountMutation surfaces the failure toast.\"), outside this component, and the buttons return to idle. DataPrivacySection.test.tsx covers a failed delete that does not sign out.",
+      "offline": "An offline export or delete fails the fetch and lands in the same mutation-hook toast as any other failure, outside this component; the section keeps its idle rows."
+    },
+    "apps/web/components/features/dashboard/organisms/MobileProfileDrawer.tsx": {
+      "empty": "An icon-only trigger whose only prop is onOpen; it holds no collection. The detector matched the items-center class on the button.",
+      "long-content": "Every visible part is fixed: a PanelRight icon and aria-label=\"Open Profile Panel\"; no caller text reaches it. The detector matched that aria-label and the text-secondary-token class."
     },
     "apps/web/components/features/dashboard/organisms/ReleaseTablePendingShell.tsx": {
       "empty": "The shell is the releases route's loading surface: it always draws a fixed SKELETON_ROW_COUNT.TABLE of skeleton rows and owns no data collection that could be empty. The detector matched the skeletonRows prop and the rows of its column config.",

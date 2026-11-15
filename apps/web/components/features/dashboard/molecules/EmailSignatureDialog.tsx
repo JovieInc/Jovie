@@ -20,7 +20,7 @@ interface EmailSignatureDialogProps {
 }
 
 function buildPreviewDocument(signatureHtml: string): string {
-  return `<!doctype html><html><head><meta charset="utf-8"><base target="_blank"><style>html,body{margin:0;padding:16px;background:transparent;color:#0d0e12;}img{max-width:100%;}</style></head><body>${signatureHtml}</body></html>`;
+  return `<!doctype html><html><head><meta charset="utf-8"><base target="_blank"><style>html,body{margin:0;padding:16px;background:transparent;}img{max-width:100%;}</style></head><body>${signatureHtml}</body></html>`;
 }
 
 export function EmailSignatureDialog({
@@ -37,16 +37,20 @@ export function EmailSignatureDialog({
     [signature]
   );
   const [recentCopy, setRecentCopy] = useState<CopyKind | null>(null);
+  const [wasOpen, setWasOpen] = useState(open);
+
+  // Closing drops the copied feedback during render, so no effect has to
+  // reset state when the open prop changes.
+  if (open !== wasOpen) {
+    setWasOpen(open);
+    if (!open) setRecentCopy(null);
+  }
 
   useEffect(() => {
-    if (!open) {
-      setRecentCopy(null);
-      return;
-    }
     if (recentCopy === null) return;
     const timeout = setTimeout(() => setRecentCopy(null), 1800);
     return () => clearTimeout(timeout);
-  }, [open, recentCopy]);
+  }, [recentCopy]);
 
   const handleCopy = async (kind: CopyKind) => {
     if (!signature) return;

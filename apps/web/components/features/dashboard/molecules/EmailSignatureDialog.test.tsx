@@ -181,4 +181,27 @@ describe('EmailSignatureDialog', () => {
     );
     await auditDialog();
   });
+
+  it('leaves preview text colour to the signature markup', () => {
+    render(<EmailSignatureDialog open onClose={vi.fn()} input={input} />);
+    const srcDoc =
+      screen.getByTitle('Email Signature preview').getAttribute('srcDoc') ?? '';
+    expect(srcDoc).toContain(
+      'html,body{margin:0;padding:16px;background:transparent;}'
+    );
+    expect(srcDoc).toContain(buildEmailSignature(input).html);
+  });
+
+  it('keeps copied feedback while the open dialog re-renders', async () => {
+    const user = userEvent.setup();
+    const props = { input, onClose: vi.fn() };
+    const { rerender } = render(<EmailSignatureDialog {...props} open />);
+    await user.click(screen.getByRole('button', { name: 'Copy HTML' }));
+    rerender(<EmailSignatureDialog {...props} open />);
+    expect(
+      screen
+        .getByRole('button', { name: 'Copy HTML' })
+        .querySelector('.lucide-check')
+    ).toBeInTheDocument();
+  });
 });
