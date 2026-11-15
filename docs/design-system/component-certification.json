@@ -332,6 +332,231 @@
       "a11y",
       "frontend-rules"
     ],
+    "apps/web/components/feedback/FeedbackProvider.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/homepage/HomepageCertifiedExposure.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/homepage/HomepageCertifiedSections.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/homepage/HomepageEditorialHero.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/homepage/HomepageElectricSeam.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/homepage/HomepagePosterHero.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/homepage/HomepagePrimaryAction.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/homepage/HomepageTrackedLink.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/homepage/hero-light/HomepageHeroCanvas.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/homepage/hero-light/HomepageHeroLight.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/jovie/components/ChatEmptyStateOpportunityCards.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/jovie/components/ChatStarterActionsRail.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/jovie/components/EntityResolutionProvider.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/jovie/components/FeatureIntroCard.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/marketing/CliLandingPage.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/marketing/ConnectedComponentsGallery.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/marketing/FaqSection.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/marketing/FigCard.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/marketing/MarketingBentoSection.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/marketing/MarketingContentProse.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/marketing/MarketingContentShell.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/marketing/MarketingEditorialBackground.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/marketing/MarketingElectricSeam.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/marketing/MarketingFeatureGrid.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/marketing/MarketingMetricCard.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
     "apps/web/components/molecules/ContentSectionHeader.tsx": [
       "ds-owner",
       "tokens",
@@ -1145,6 +1370,17 @@
     "apps/web/components/feedback/Banner.tsx": {
       "permission-denied": "Banner only renders caller-supplied status copy with an optional action and dismiss, and has no gated action or permission input; the detector matched role='alert' and role='status' on its live region."
     },
+    "apps/web/components/homepage/HomepageCertifiedExposure.tsx": {
+      "error": "The exposure receipt renders null and only calls page() and track() once on mount; analytics failures are swallowed by the analytics client, so there is no failure to draw. The detector matched 'Search-submit' in its doc comment.",
+      "long-content": "The component renders null: it has no text to overflow. The detector matched 'name-search' in its doc comment. HomepageCertifiedExposure.certificate.test.tsx asserts it adds nothing to an axe-clean page.",
+      "offline": "The component renders null and never fetches; offline only changes whether the analytics beacon is delivered, which has no visual state. The detector matched 'Search-submit' in its doc comment.",
+      "rtl-overflow": "The component renders null: it has no text or layout to mirror."
+    },
+    "apps/web/components/homepage/HomepageCertifiedSections.tsx": {
+      "empty": "HomepageEditorialFeatureSection throws for fewer than one or more than two previews (asserted in HomepageCertifiedSections.test.tsx), and HomepageCertifiedSections always passes the record's two steps; there is no empty section to draw.",
+      "loading": "A static server-rendered section: nothing is fetched and no pending state exists. The detector matched the next/image loading='lazy' attribute.",
+      "offline": "A static server-rendered section with no requests of its own; offline has no distinct state. The detector matched the next/image loading='lazy' attribute."
+    },
     "apps/web/components/homepage/HomepageEditorial.tsx": {
       "empty": "Every list in the chapters (chapter index, profile rows, release captions, invite steps) maps over typed copy checked into data/homepageEditorialCopy.ts and is never fetched, so none can be empty; the detector matched those .map( calls.",
       "partial": "Each chapter takes one complete copy object whose fields are all required strings (HeroCopy maps every key to string; chapter copy needs headline and body), defaulting to HOMEPAGE_EDITORIAL_COPY, so a chapter cannot render with part of its copy. The detector counted the optional copy and headingId props.",
@@ -1156,6 +1392,14 @@
     "apps/web/components/homepage/HomepageSpecSections.tsx": {
       "empty": "HomepageSpecSections cannot receive an empty spec: the content-record schema requires one to twelve sections with the hero first (lib/content-records/marketing-page.ts), and the code default always has all four.",
       "permission-denied": "HomepageSpecSections renders the public homepage with no gated action or permission input; the detector matched 'locked headline', which is a copy rule, not access control."
+    },
+    "apps/web/components/homepage/hero-light/HomepageHeroCanvas.tsx": {
+      "empty": "The headline is a required string split into sentence beats, so there is always at least one beat; there is no collection that can be empty. The detector matched beats.map.",
+      "permission-denied": "A public marketing hero with an anonymous claim form; nothing is gated by account or role. The detector matched the phrase 'locked headline' in a doc comment."
+    },
+    "apps/web/components/homepage/hero-light/HomepageHeroLight.tsx": {
+      "long-content": "A decorative aria-hidden light field with no text (HomepageHeroLight.certificate.test.tsx asserts empty text content). The detector matched 'No text' in its doc comment.",
+      "rtl-overflow": "A decorative aria-hidden light field with no text or directional layout to mirror."
     },
     "apps/web/components/homepage/v3/Orbit.tsx": {
       "empty": "Orbit is decorative, aria-hidden geometry: every call site passes a fixed, non-empty literal ring list (homepage chapters, specs moment, home layout footer), so there is no data-driven collection that could be empty."
@@ -1242,6 +1486,9 @@
     "apps/web/components/jovie/components/ErrorDisplay.tsx": {
       "empty": "ErrorDisplay renders exactly one required ChatError and never a collection; the only .filter is over the two parts of the support reference, and the detector matched the items-start and items-center classes."
     },
+    "apps/web/components/jovie/components/FeatureIntroCard.tsx": {
+      "permission-denied": "Every signed-in user sees the same intro catalog; the card gates nothing by role or plan. The detector matched role='region' on the card."
+    },
     "apps/web/components/jovie/components/SlashCommandMenu.tsx": {
       "error": "The menu has no error branch and submits nothing: a commit calls the composer's onSelectSkill, onSelectEntity or onSelectPrompt. The detector matched the word submit in the IME-composition comment of its key handler.",
       "permission-denied": "The menu draws no denied face: a skill the account cannot use (album art without the capability) is left out of the list, so there is nothing locked to show. The detector matched role='combobox' on the filter field."
@@ -1254,11 +1501,22 @@
       "loading": "The provider is pending only while the code-split source-facts module resolves, a microtask after mount; a static story cannot hold a resolved dynamic import, so source-evidence-context.test.tsx asserts data-source-evidence='pending' before 'ready'. Its children render unchanged either way.",
       "offline": "The provider never fetches; it projects facts it was handed through a lazily imported pure module, so lost connectivity can only stop that chunk from loading, and its children still render with no evidence (the Default story's content without source chips)."
     },
+    "apps/web/components/marketing/CliLandingPage.tsx": {
+      "empty": "The page takes no props and renders fixed command, job and FAQ constants defined beside it, so no list can be empty.",
+      "long-content": "The page takes no props: all copy is fixed constants reviewed in cli-landing.test.tsx, and long commands already scroll inside focusable regions (asserted in CliLandingPage.test.tsx).",
+      "rtl-overflow": "The page takes no props and ships one fixed English body; there is no caller-supplied copy to mirror."
+    },
+    "apps/web/components/marketing/MarketingBentoSection.tsx": {
+      "empty": "The section takes four required named card slots and maps that fixed tuple; it cannot be rendered with no cards. The detector matched cards.map and the grid-rows class."
+    },
     "apps/web/components/marketing/MarketingContainer.tsx": {
       "partial": "MarketingContainer holds no data: width picks one of three boxes and children is whatever the caller places; its optional props (bleed, className) are layout and styling flags with defaults, so nothing can be partially present."
     },
     "apps/web/components/marketing/MarketingHero.tsx": {
       "permission-denied": "The hero renders public copy and links with no gated action or permission input. The detector matched the word permission in the logos prop's doc comment, which is about a page's permission to show distributor logos, decided by the caller."
+    },
+    "apps/web/components/marketing/MarketingMetricCard.tsx": {
+      "empty": "A single metric with a required label and value; it owns no collection. The detector matched the items-center and items-end classes."
     },
     "apps/web/components/marketing/MarketingPageShell.tsx": {
       "partial": "MarketingPageShell holds no data: it wraps children, and its optional props (className, penContractId) are class hooks and a design-diff id with defaults, so nothing can be partially present.",
