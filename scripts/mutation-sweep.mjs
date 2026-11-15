@@ -7,6 +7,7 @@
 //   node scripts/mutation-sweep.mjs --mode incremental  # only modules changed since scored
 //   node scripts/mutation-sweep.mjs --list-only          # print the next batch, run nothing
 //   node scripts/mutation-sweep.mjs --include packages/ui/atoms/  # @jovie/ui, keyed by repo path
+//   node scripts/mutation-sweep.mjs --shard 3/40  # one disjoint slice (sharded baseline)
 //
 // Per module it runs scripts/mutation-diff.mjs --scope all (same Stryker
 // harness as the enforced high-risk lane), then records score, mutant counts,
@@ -53,6 +54,7 @@ import {
   proposeBaselineEntries,
   ratchetVerdict,
   recordRun,
+  selectPool,
   validateEquivalents,
 } from './lib/mutation-sweep.mjs';
 import {
@@ -84,6 +86,7 @@ const { values } = parseArgs({
     'touch-file': { type: 'string' },
     'list-only': { type: 'boolean', default: false },
     preflight: { type: 'boolean', default: false },
+    shard: { type: 'string' },
   },
 });
 
@@ -222,12 +225,7 @@ for (const source of sources) {
     testCount: !GENERIC_STEMS.has(stem) && testStems.has(stem) ? 1 : 0,
   });
 }
-let pool = candidates;
-if (values.mode === 'incremental') {
-  pool = candidates.filter(
-    c => state.modules[c.file] && state.modules[c.file].blob !== c.blob
-  );
-}
+const pool = selectPool(candidates, state, values);
 /** @type {string[]} */
 let batch = [];
 if (explicit) batch = candidates.map(c => c.file);
