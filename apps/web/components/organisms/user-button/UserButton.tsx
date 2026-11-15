@@ -4,24 +4,21 @@
 
 import type { CommonDropdownItem, CommonDropdownSubmenu } from '@jovie/ui';
 import {
-  Badge,
   Button,
   CommonDropdown,
-  INSET_PANEL_ICON_COLUMN,
   INSET_PANEL_SECTION_LABEL,
   INSET_PANEL_SEPARATOR,
   PlainButton,
 } from '@jovie/ui';
 import {
   ArrowDownToLine,
+  BookOpen,
   CircleAlert,
   Cookie,
   CreditCard,
-  Eye,
-  EyeOff,
   FileCheck2,
-  HelpCircle,
   Keyboard,
+  LifeBuoy,
   LogOut,
   MessageSquare,
   Monitor,
@@ -54,7 +51,17 @@ import {
 import { Icon } from '../../atoms/Icon';
 import { Avatar } from '../../molecules/Avatar/Avatar';
 import { useDesktopUpdateContext } from '../desktop-update/DesktopUpdateProvider';
+import {
+  ACCOUNT_MENU_HEADER_ROW_CLASS,
+  AccountMenuHeader,
+} from './AccountMenuHeader';
+import { AccountMenuShortcut } from './AccountMenuShortcut';
+import { ACCOUNT_MENU_ROW_CLASS } from './account-menu-row';
 import { DesktopReleaseIdentity } from './desktop-release-identity.lazy';
+import {
+  HideEarningsMenuRow,
+  hideEarningsAccessibleName,
+} from './HideEarningsMenuRow';
 import { OviePrivacyLockControl } from './OviePrivacyLockControl';
 import { ensurePrivacyLockCanBeEnabled } from './privacy-lock-readiness.lazy';
 import type { UserButtonProps } from './types';
@@ -90,6 +97,7 @@ interface BuildDropdownItemsParams {
   displayName: string;
   userInitials: string;
   formattedUsername: string | null;
+  contactEmail: string | undefined;
   handleProfile: () => void;
   handleHelp: () => void;
   handleSettings: () => void;
@@ -163,6 +171,7 @@ export function buildDesktopUpdateMenuItem(
       label: entry.label,
       icon: entry.icon,
       onClick: openModal,
+      className: ACCOUNT_MENU_ROW_CLASS,
     },
     {
       type: 'separator',
@@ -190,6 +199,7 @@ function buildDropdownItems({
   displayName,
   userInitials,
   formattedUsername,
+  contactEmail,
   handleProfile,
   handleHelp,
   handleSettings,
@@ -209,16 +219,6 @@ function buildDropdownItems({
   const updateItems = desktopUpdate
     ? buildDesktopUpdateMenuItem(desktopUpdate.state, desktopUpdate.openModal)
     : [];
-  const profileAvatar = (
-    <Avatar
-      src={userImageUrl}
-      alt={displayName || 'User avatar'}
-      name={displayName || userInitials}
-      size='xs'
-      className='shrink-0'
-    />
-  );
-
   const items: CommonDropdownItem[] = [
     ...updateItems,
     {
@@ -226,36 +226,16 @@ function buildDropdownItems({
       id: 'profile-card',
       label: `Open profile for ${displayName}`,
       onClick: handleProfile,
-      className: 'min-h-12 min-w-0 gap-2 px-(--space-2-5) py-1.5',
+      className: ACCOUNT_MENU_HEADER_ROW_CLASS,
       content: (
-        <>
-          <span className={INSET_PANEL_ICON_COLUMN}>{profileAvatar}</span>
-          <div className='min-w-0 flex-1'>
-            <div className='flex min-w-0 items-center gap-2'>
-              <span
-                title={displayName}
-                className='min-w-0 flex-1 truncate text-app font-medium text-primary-token'
-              >
-                {displayName}
-              </span>
-              {billingStatus.isPro && (
-                <Badge
-                  variant='secondary'
-                  size='sm'
-                  className='shrink-0 rounded-full px-1.5 py-0 text-3xs font-medium'
-                >
-                  Pro
-                </Badge>
-              )}
-            </div>
-            <p
-              aria-hidden={formattedUsername ? undefined : true}
-              className='mt-0.5 h-4 truncate text-2xs text-tertiary-token'
-            >
-              {formattedUsername ?? '\u00A0'}
-            </p>
-          </div>
-        </>
+        <AccountMenuHeader
+          displayName={displayName}
+          userInitials={userInitials}
+          userImageUrl={userImageUrl}
+          formattedUsername={formattedUsername}
+          contactEmail={contactEmail}
+          isPro={billingStatus.isPro}
+        />
       ),
     },
     {
@@ -269,7 +249,8 @@ function buildDropdownItems({
       label: 'Settings',
       icon: Settings,
       onClick: handleSettings,
-      shortcut: 'G S',
+      className: ACCOUNT_MENU_ROW_CLASS,
+      trailing: <AccountMenuShortcut keys={['G', 'S']} />,
     },
     {
       type: 'custom',
@@ -296,6 +277,7 @@ function buildDropdownItems({
           sanitizeInstallUrl(iosAlphaAccess.installUrl) ?? APP_ROUTES.DOWNLOAD;
         window.open(href, '_blank', 'noopener,noreferrer');
       },
+      className: ACCOUNT_MENU_ROW_CLASS,
     });
   }
 
@@ -308,6 +290,7 @@ function buildDropdownItems({
       onClick: () => {
         window.open(APP_ROUTES.DOWNLOAD, '_blank', 'noopener,noreferrer');
       },
+      className: ACCOUNT_MENU_ROW_CLASS,
     });
   }
 
@@ -321,7 +304,7 @@ function buildDropdownItems({
       label: 'Keyboard Shortcuts',
       icon: Keyboard,
       onClick: handleOpenShortcuts,
-      shortcut: `${GLYPH_CMD} /`,
+      trailing: <AccountMenuShortcut keys={[GLYPH_CMD, '/']} />,
     });
   }
 
@@ -372,8 +355,13 @@ function buildDropdownItems({
     type: 'submenu',
     id: 'learn-more',
     label: 'Learn More',
-    icon: HelpCircle,
-    items: learnMoreItems,
+    icon: BookOpen,
+    className: ACCOUNT_MENU_ROW_CLASS,
+    items: learnMoreItems.map(item =>
+      item.type === 'action'
+        ? { ...item, className: ACCOUNT_MENU_ROW_CLASS }
+        : item
+    ),
   };
 
   // Add billing item based on status
@@ -387,11 +375,14 @@ function buildDropdownItems({
     items.push({
       type: 'action',
       id: 'manage-billing',
-      label: loading.manageBilling ? 'Opening…' : 'Manage billing',
+      label: loading.manageBilling ? 'Opening…' : 'Manage Billing',
       icon: CreditCard,
       onClick: handleManageBilling,
       disabled: loading.manageBilling,
-      className: 'disabled:cursor-not-allowed disabled:opacity-70',
+      className: cn(
+        ACCOUNT_MENU_ROW_CLASS,
+        'disabled:cursor-not-allowed disabled:opacity-70'
+      ),
     });
   } else {
     items.push({
@@ -401,7 +392,10 @@ function buildDropdownItems({
       icon: Sparkles,
       onClick: handleUpgrade,
       disabled: loading.upgrade,
-      className: 'disabled:cursor-not-allowed disabled:opacity-70',
+      className: cn(
+        ACCOUNT_MENU_ROW_CLASS,
+        'disabled:cursor-not-allowed disabled:opacity-70'
+      ),
     });
   }
 
@@ -424,9 +418,10 @@ function buildDropdownItems({
     {
       type: 'action',
       id: 'toggle-money',
-      label: moneyHidden ? 'Show money' : 'Hide money',
-      icon: moneyHidden ? Eye : EyeOff,
+      label: hideEarningsAccessibleName(moneyHidden),
       onClick: () => setMoneyHidden(!moneyHidden),
+      className: ACCOUNT_MENU_ROW_CLASS,
+      content: <HideEarningsMenuRow hidden={moneyHidden} />,
     }
   );
 
@@ -442,8 +437,9 @@ function buildDropdownItems({
       type: 'action',
       id: 'help',
       label: 'Help',
-      icon: HelpCircle,
+      icon: LifeBuoy,
       onClick: handleHelp,
+      className: ACCOUNT_MENU_ROW_CLASS,
     },
     learnMoreSubmenu,
     {
@@ -452,6 +448,7 @@ function buildDropdownItems({
       label: 'Send Feedback',
       icon: MessageSquare,
       onClick: () => setIsFeedbackOpen(true),
+      className: ACCOUNT_MENU_ROW_CLASS,
     },
     {
       type: 'separator',
@@ -461,12 +458,15 @@ function buildDropdownItems({
     {
       type: 'action',
       id: 'sign-out',
-      label: loading.signOut ? 'Signing out…' : 'Sign out',
+      label: loading.signOut ? 'Signing Out…' : 'Sign Out',
       icon: LogOut,
       onClick: handleSignOut,
       disabled: loading.signOut,
-      className: 'disabled:cursor-not-allowed disabled:opacity-60',
-      shortcut: `${GLYPH_OPT} ${GLYPH_SHIFT} Q`,
+      className: cn(
+        ACCOUNT_MENU_ROW_CLASS,
+        'disabled:cursor-not-allowed disabled:opacity-60'
+      ),
+      trailing: <AccountMenuShortcut keys={[GLYPH_OPT, GLYPH_SHIFT, 'Q']} />,
     },
     {
       type: 'custom',
@@ -558,8 +558,13 @@ export function UserButton({
     loading,
   } = menuActions;
 
-  const { userImageUrl, displayName, userInitials, formattedUsername } =
-    userInfo;
+  const {
+    userImageUrl,
+    displayName,
+    userInitials,
+    formattedUsername,
+    contactEmail,
+  } = userInfo;
 
   const handleHelp = useCallback(() => {
     window.open(APP_ROUTES.SUPPORT, '_blank', 'noopener,noreferrer');
@@ -646,6 +651,7 @@ export function UserButton({
     displayName,
     userInitials,
     formattedUsername,
+    contactEmail,
     handleProfile,
     handleHelp,
     handleSettings,
@@ -710,10 +716,13 @@ export function UserButton({
         <Icon
           name='ChevronRight'
           data-user-button-chevron
+          data-state={isMenuOpen ? 'open' : 'closed'}
           className={cn(
-            'size-3 text-sidebar-item-icon transition-opacity duration-subtle group-data-[collapsible=icon]:hidden',
+            'size-3 text-sidebar-item-icon transition duration-subtle motion-reduce:transition-none group-data-[collapsible=icon]:hidden',
+            // Open state: the chevron stays visible and turns to point up,
+            // the way the menu opens from the sidebar footer.
             isMenuOpen
-              ? 'opacity-100'
+              ? '-rotate-90 opacity-100'
               : 'opacity-0 group-hover/user-button:opacity-100 group-focus-visible/user-button:opacity-100'
           )}
           aria-hidden='true'
@@ -736,18 +745,20 @@ export function UserButton({
       </Button>
     ));
 
+  const isSidebarRow = showUserInfo && !trigger;
   const dropdown = (
     <CommonDropdown
       variant='dropdown'
       items={dropdownItems}
       trigger={triggerElement}
       align={trigger || showUserInfo ? 'start' : 'end'}
+      // The sidebar row sits in the footer, so its menu opens upward; Radix
+      // still flips it if there is no room above.
+      side={isSidebarRow ? 'top' : 'bottom'}
       open={isMenuOpen}
       onOpenChange={setIsMenuOpen}
       contentClassName={
-        showUserInfo && !trigger
-          ? USER_MENU_SIDEBAR_CONTENT_CLASS
-          : USER_MENU_CONTENT_CLASS
+        isSidebarRow ? USER_MENU_SIDEBAR_CONTENT_CLASS : USER_MENU_CONTENT_CLASS
       }
       maxHeight={USER_MENU_MAX_HEIGHT}
     />
