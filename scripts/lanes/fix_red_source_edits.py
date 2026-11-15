@@ -62,7 +62,7 @@ def commit_open_merge(worktree, paths, sh, log, *, guard=lambda: None) -> bool:
 
 
 def resolve_additive_list_conflict(worktree: Path, branch: str, log, *, sh, merge_entries, guard=lambda: None, push: bool = True, stage_choice=None) -> bool:
-    """Union quoted lists, node:test blocks, Vitest insertions, waiver and gate rows, or dropped screen-debt rows.
+    """Union quoted lists, node:test blocks, Vitest statement insertions, waiver rows, or dropped screen-debt rows.
 
     Main's order stays, then head-only lines. A prose hunk or any other shape aborts
     and leaves the PR to the model. The push is a fast-forward of the PR branch.

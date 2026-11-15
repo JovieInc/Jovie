@@ -82,7 +82,7 @@ function IdentityEnrichmentPanel({
       className='flex flex-col gap-1.5 border-t border-subtle px-1 pt-3'
       data-testid='identity-enrichment-panel'
     >
-      <p className='text-2xs font-medium uppercase tracking-wide text-tertiary-token'>
+      <p className='text-2xs font-medium tracking-wide text-tertiary-token'>
         Identity enrichment
       </p>
       <EnrichmentRow

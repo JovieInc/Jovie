@@ -2,10 +2,7 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { expectNoA11yViolations } from '@/tests/utils/a11y';
-import {
-  RuntimeUpdateProvider,
-  useRuntimeUpdate,
-} from './RuntimeUpdateProvider';
+import { RuntimeUpdateProvider } from './RuntimeUpdateProvider';
 
 const state = vi.hoisted(() => ({
   desktop: true,
@@ -41,31 +38,11 @@ beforeEach(() => {
   state.install.mockResolvedValue(true);
 });
 
-function UpdateProbe() {
-  const update = useRuntimeUpdate();
-  if (!update?.available) return <p>Shell content</p>;
-  return (
-    <>
-      <button
-        type='button'
-        onClick={update.apply}
-        aria-disabled={update.busy || undefined}
-        aria-describedby='runtime-update-description'
-      >
-        {update.title}
-      </button>
-      <p id='runtime-update-description'>{update.description}</p>
-    </>
-  );
-}
-
 describe('RuntimeUpdateProvider certificate', () => {
-  it('renders its children untouched when no update exists, axe-clean', async () => {
+  it('renders its children and no pill when no update exists, axe-clean', async () => {
     const { container } = render(
       <RuntimeUpdateProvider>
-        <main>
-          <UpdateProbe />
-        </main>
+        <main>Shell content</main>
       </RuntimeUpdateProvider>
     );
     expect(screen.getByText('Shell content')).toBeInTheDocument();
@@ -79,9 +56,7 @@ describe('RuntimeUpdateProvider certificate', () => {
     state.downloaded = true;
     const { container } = render(
       <RuntimeUpdateProvider>
-        <main>
-          <UpdateProbe />
-        </main>
+        <main>Shell content</main>
       </RuntimeUpdateProvider>
     );
     await user.click(
@@ -90,7 +65,7 @@ describe('RuntimeUpdateProvider certificate', () => {
     expect(state.install).toHaveBeenCalledTimes(1);
     expect(
       screen.getByRole('button', { name: 'Updating Jovie…' })
-    ).toHaveAttribute('aria-disabled', 'true');
+    ).toBeDisabled();
     await expectNoA11yViolations(container);
   });
 
@@ -101,7 +76,7 @@ describe('RuntimeUpdateProvider certificate', () => {
     state.install.mockRejectedValueOnce(new Error('install failed'));
     render(
       <RuntimeUpdateProvider>
-        <UpdateProbe />
+        <main>Shell content</main>
       </RuntimeUpdateProvider>
     );
     await user.click(
@@ -110,7 +85,7 @@ describe('RuntimeUpdateProvider certificate', () => {
     await waitFor(() =>
       expect(
         screen.getByRole('button', { name: 'Restart Jovie to update' })
-      ).not.toHaveAttribute('aria-disabled')
+      ).toBeEnabled()
     );
   });
 
@@ -119,9 +94,7 @@ describe('RuntimeUpdateProvider certificate', () => {
     state.mismatch = true;
     const { container } = render(
       <RuntimeUpdateProvider>
-        <main>
-          <UpdateProbe />
-        </main>
+        <main>Shell content</main>
       </RuntimeUpdateProvider>
     );
     const button = screen.getByRole('button', {

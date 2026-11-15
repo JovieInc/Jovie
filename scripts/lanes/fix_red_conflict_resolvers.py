@@ -2,7 +2,7 @@
 
 Renders Git's three index stages as one diff3 conflict and resolves only the
 shapes proven additive: complete node:test blocks, Vitest statement
-insertions, and component waiver and gate rows. Split from fix_red_source_edits.py so
+insertions, and component waiver rows. Split from fix_red_source_edits.py so
 that module stays within the 500-line company budget. Callers still reach
 every resolver through fix_red_source_edits.
 """
@@ -122,11 +122,13 @@ def _unique_json_object(pairs):
     return result
 
 
-def _load_json_object_stages(worktree: Path, rel: str, sh, field: str, accept) -> tuple[dict, dict, dict] | None:
-    """Base, ours, and theirs for one JSON object field.
+def _load_json_object_stages(worktree: Path, rel: str, sh, field: str, accept,
+                             *, additional_fields: dict | None = None) -> tuple[dict, dict, dict] | None:
+    """Base, ours, and theirs for explicitly validated JSON object fields.
 
-    None unless every stage is one object, `accept` passes the field, and every
+    None unless every stage is one object, all field validators pass, and every
     other field still matches base."""
+    validators = {field: accept, **(additional_fields or {})}
     documents = []
     for stage in (1, 2, 3):
         blob = sh(["git", "show", f":{stage}:{rel}"], cwd=worktree)
@@ -136,13 +138,13 @@ def _load_json_object_stages(worktree: Path, rel: str, sh, field: str, accept) -
             document = json.loads(blob.stdout, object_pairs_hook=_unique_json_object)
         except (ValueError, TypeError):
             return None
-        if not isinstance(document, dict) or not accept(document.get(field)):
+        if not isinstance(document, dict) or any(not check(document.get(key)) for key, check in validators.items()):
             return None
         documents.append(document)
     base, ours, theirs = documents
-    base_rest = {key: value for key, value in base.items() if key != field}
+    base_rest = {key: value for key, value in base.items() if key not in validators}
     for document in (ours, theirs):
-        if {key: value for key, value in document.items() if key != field} != base_rest:
+        if {key: value for key, value in document.items() if key not in validators} != base_rest:
             return None
     return base, ours, theirs
 
@@ -154,80 +156,41 @@ def _waiver_rows(value) -> bool:
         for row in value.values())
 
 
-def _gate_rows(value) -> bool:
-    return isinstance(value, dict) and all(
-        isinstance(row, list) and row and all(
-            isinstance(item, str) and item.strip() for item in row)
-        for row in value.values())
-
-
 def _debt_rows(value) -> bool:
     return isinstance(value, dict) and all(
         isinstance(reason, str) and reason.strip() for reason in value.values())
 
 
-def _union_additive_map(base: dict, ours: dict, theirs: dict) -> dict | None:
-    """Union additions, then sort by key. An edited, deleted, or conflicting key returns None."""
-    for document in (ours, theirs):
-        if any(document.get(key) != value for key, value in base.items()):
-            return None
-    merged = dict(theirs)
-    for key, value in ours.items():
-        if key in merged and merged[key] != value:
-            return None
-        merged[key] = value
-    return dict(sorted(merged.items()))
+def _gate_rows(value) -> bool:
+    criteria = {"ds-owner", "tokens", "states", "tests", "a11y", "frontend-rules", "forced-caps"}
+    return isinstance(value, dict) and all(
+        isinstance(row, list) and row and all(isinstance(item, str) and item in criteria for item in row)
+        and len(row) == len(set(row)) for row in value.values())
 
 
 def resolve_additive_certificate_waivers(worktree: Path, rel: str, sh) -> str | None:
-    """Union new component waiver and gate rows, proven against Git's three stages.
+    """Union new component gate and waiver rows, proven against Git's three stages.
 
     This is authored policy, not generated metadata. Existing rows and every
-    field besides `waivers` and `gates` must be unchanged; ambiguous edits
-    remain unresolved. The union is written sorted by component path, as the
-    certificate gate requires (`node scripts/component-certificate.mjs --sort`).
+    other policy field must be unchanged; ambiguous edits remain unresolved.
+    The union is written sorted by component path, as the certificate gate
+    requires (`node scripts/component-certificate.mjs --sort`).
     """
     if rel != "docs/design-system/component-certification.json":
         return None
-    loaded = _load_json_documents(worktree, rel, sh)
+    loaded = _load_json_object_stages(worktree, rel, sh, "waivers", _waiver_rows,
+                                      additional_fields={"gates": _gate_rows})
     if loaded is None:
         return None
     base, ours, theirs = loaded
-    if set(base) != set(ours) or set(base) != set(theirs):
-        return None
-    for key, value in base.items():
-        if key in {"waivers", "gates"}:
-            continue
-        if ours[key] != value or theirs[key] != value:
-            return None
-    changed = False
-    for name, accept in (("waivers", _waiver_rows), ("gates", _gate_rows)):
-        if name not in base:
-            continue
-        if not accept(base[name]) or not accept(ours[name]) or not accept(theirs[name]):
-            return None
-        merged = _union_additive_map(base[name], ours[name], theirs[name])
-        if merged is None:
-            return None
-        changed = changed or merged != base[name]
-        theirs[name] = merged
-    if not changed:
-        return None
+    for field in ("gates", "waivers"):
+        for document in (ours, theirs):
+            if any(document[field].get(key) != value for key, value in base[field].items()):
+                return None
+        merged = dict(theirs[field])
+        for key, value in ours[field].items():
+            if key in merged and merged[key] != value:
+                return None
+            merged[key] = value
+        theirs[field] = dict(sorted(merged.items()))
     return json.dumps(theirs, ensure_ascii=False, indent=2) + "\n"
-
-
-def _load_json_documents(worktree: Path, rel: str, sh) -> tuple[dict, dict, dict] | None:
-    """Base, ours, and theirs. None unless every stage is one JSON object."""
-    documents = []
-    for stage in (1, 2, 3):
-        blob = sh(["git", "show", f":{stage}:{rel}"], cwd=worktree)
-        if blob.returncode:
-            return None
-        try:
-            document = json.loads(blob.stdout, object_pairs_hook=_unique_json_object)
-        except (ValueError, TypeError):
-            return None
-        if not isinstance(document, dict):
-            return None
-        documents.append(document)
-    return documents[0], documents[1], documents[2]
