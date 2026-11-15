@@ -6,7 +6,19 @@ import { MarketingContentProse } from '@/components/marketing/MarketingContentPr
 import { MarketingHero } from '@/components/marketing/MarketingHero';
 import { APP_ROUTES } from '@/constants/routes';
 import { ENGINEERING_COPY } from '@/data/engineeringCopy';
-import type { EngineeringStoryRecord } from '@/lib/engineering-publication';
+import type {
+  EngineeringStoryRecord,
+  EngineeringStorySource,
+} from '@/lib/engineering-publication';
+
+type EvidenceKind = EngineeringStorySource['evidence'][number]['kind'];
+
+const EVIDENCE_KIND_LABELS: Record<EvidenceKind, string> = {
+  'public-url': 'Public URL',
+  changelog: 'Changelog',
+  test: 'Test',
+  'pull-request': 'Pull request',
+};
 
 function formatDate(iso: string): string {
   if (!iso) return '';
@@ -211,8 +223,8 @@ export function EngineeringArticle({
             <ul className='space-y-2'>
               {record.source.evidence.map(item => (
                 <li key={item.id} className='text-sm text-secondary-token'>
-                  <span className='mr-2 text-xs uppercase text-tertiary-token'>
-                    {item.kind}
+                  <span className='mr-2 text-xs text-tertiary-token'>
+                    {EVIDENCE_KIND_LABELS[item.kind]}
                   </span>
                   <a
                     href={item.href}
