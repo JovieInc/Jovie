@@ -240,7 +240,7 @@ describe('Form', () => {
       const input = screen.getByPlaceholderText('Enter username');
       const description = screen.getByText('Your public display name.');
       expect(description.id).toBeTruthy();
-      expect(input).toHaveAttribute('aria-describedby', description.id);
+      expect(input).toHaveAccessibleDescription('Your public display name.');
     });
 
     it('omits aria-invalid when no error exists', () => {
