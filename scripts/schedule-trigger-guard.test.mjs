@@ -104,7 +104,7 @@ test('a script whose added lines poll the GitHub API fails; event-shaped reads p
   const polling = [
     'async function waitForChecks() {',
     '  while (true) {',
-    '    const r = await fetch("https://api.github.com/repos/x/y");',
+    "    const r = await client.request('gh api repos/x/y');",
     '    if (r.status === 200) return r;',
     '    await sleep(30_000);',
     '  }',
