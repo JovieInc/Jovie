@@ -374,16 +374,23 @@ describe('quota-deferred lineage: an empty history read is not a product verdict
     };
   };
 
-  it('throws LineageEvidenceUnavailableError instead of issuing a false RED', () => {
-    try {
-      certifyCanonicalArtistSite(
-        deferredFixture({ lineageFileEmpty: true, sourceHistory: [] })
-      );
-      throw new Error('expected LineageEvidenceUnavailableError');
-    } catch (error) {
-      expect(error instanceof Error).toBe(true);
-      expect((error as Error).message).toContain('github-quota-deferred');
-      expect((error as Error).message).toContain('not a product verdict');
+  it('reports a visible quota deferral instead of issuing a false GREEN or a red step', () => {
+    // JOV-12646: the deferral is a transport state. The certificate stays RED
+    // (nothing certifies on an unbound revision) and every binding-affected
+    // receipt carries the github-quota-deferred detail the CLI turns into a
+    // visible warning with exit 0, so Golden Path (manual) does not go red.
+    const certificate = certifyCanonicalArtistSite(
+      deferredFixture({ lineageFileEmpty: true, sourceHistory: [] })
+    );
+    expect(certificate.status).toBe('RED');
+    expect(certificate.safeToSend).toBe(false);
+    const deferredRows = certificate.receipts.filter(receipt =>
+      receipt.detail.startsWith('github-quota-deferred:')
+    );
+    expect(deferredRows.length).toBeGreaterThan(0);
+    for (const row of deferredRows) {
+      expect(row.detail).toContain('not a product verdict');
+      expect(row.detail).toContain('Re-run after the quota resets');
     }
   });
 
