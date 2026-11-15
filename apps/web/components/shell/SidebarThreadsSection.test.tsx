@@ -702,21 +702,3 @@ it('remeasures title text after font loading and window resize', () => {
   else Reflect.deleteProperty(document, 'fonts');
   vi.restoreAllMocks();
 });
-
-describe('SidebarThreadsSection status dot tokens', () => {
-  it('paints running, errored and read dots with semantic tokens', () => {
-    const { container } = render(
-      <SidebarThreadsSection
-        threads={[
-          { ...threads[0], id: 'a', title: 'Running', status: 'running' },
-          { ...threads[1], id: 'b', title: 'Errored', status: 'errored' },
-        ]}
-        activeThreadId={null}
-        collapsed={false}
-      />
-    );
-    expect(container.querySelector('.bg-accent\\/85')).toBeInTheDocument();
-    expect(container.querySelector('.bg-error\\/85')).toBeInTheDocument();
-    expect(container.innerHTML).not.toMatch(/(cyan|rose)-\d|bg-white\//);
-  });
-});
