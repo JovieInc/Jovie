@@ -114,9 +114,14 @@ export function AdminUserDetailDrawer({
                 user.email ? (
                   <div className='flex items-center gap-1.5'>
                     {/* min-w-0 lets the truncating span shrink inside the flex
-                        row; without it the long-email box overflows and the
-                        copy button gets clipped by the header edge (axe
-                        target-size: partially obscured). */}
+                     * row. pr-20 on the identity column (bodyClassName below)
+                     * reserves the card-top-right floating action cluster —
+                     * right-3 offset (12px) + 28px overflow trigger + 6px gap
+                     * + 28px close = 74px. A long email fills the row and
+                     * parks this copy button at the column's right edge;
+                     * pr-9 (36px) under-reserved the cluster, so the close
+                     * button painted over the target's edge and axe saw a
+                     * partially obscured 20x24 target (target-size). */}
                     <span className='min-w-0 truncate'>{user.email}</span>
                     <CopyButton value={user.email} label='Email' />
                   </div>
@@ -153,7 +158,7 @@ export function AdminUserDetailDrawer({
                   className='border-0 bg-transparent px-0 py-0'
                 />
               }
-              bodyClassName='pr-9'
+              bodyClassName='pr-20'
               data-testid='admin-user-entity-header'
             />
           </div>

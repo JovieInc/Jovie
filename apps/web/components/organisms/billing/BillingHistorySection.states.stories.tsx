@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import type { ReactNode } from 'react';
-import { expect, within } from 'storybook/test';
+import { expect, waitFor, within } from 'storybook/test';
 import type { useBillingHistoryQuery } from '@/lib/queries';
 import type { BillingHistoryEntry } from '@/lib/queries/useBillingHistoryQuery';
 import { BillingHistorySection } from './BillingHistorySection';
@@ -68,9 +68,14 @@ export const Loading: Story = {
 export const ErrorLoadingHistory: Story = {
   args: { historyQuery: historyQuery({ error: new Error('500') }) },
   play: async ({ canvasElement }) => {
-    await expect(
-      within(canvasElement).getByText('Unable to load billing history.')
-    ).toBeVisible();
+    // The section fades in on mount (motion opacity 0 -> 1, 0.2s delay);
+    // jest-dom's toBeVisible counts an opacity-0 ancestor as invisible, so
+    // await the settled state instead of racing the mount animation.
+    await waitFor(() =>
+      expect(
+        within(canvasElement).getByText('Unable to load billing history.')
+      ).toBeVisible()
+    );
   },
 };
 
@@ -80,9 +85,13 @@ export const OfflineHistoryUnavailable: Story = {
     historyQuery: historyQuery({ error: new TypeError('Failed to fetch') }),
   },
   play: async ({ canvasElement }) => {
-    await expect(
-      within(canvasElement).getByText('Unable to load billing history.')
-    ).toBeVisible();
+    // Same mount-animation race as Error Loading History — the request
+    // failing offline renders the identical error branch.
+    await waitFor(() =>
+      expect(
+        within(canvasElement).getByText('Unable to load billing history.')
+      ).toBeVisible()
+    );
   },
 };
 
