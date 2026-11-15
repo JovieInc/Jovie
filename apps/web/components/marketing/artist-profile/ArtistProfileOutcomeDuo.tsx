@@ -144,9 +144,9 @@ function TourDrawerPreview({
               index === 0 ? 'pt-1.5' : 'border-t border-subtle'
             )}
           >
-            <span className='ap-outcome-date text-2xs font-medium uppercase text-tertiary-token'>
+            <span className='ap-outcome-date text-2xs font-medium text-tertiary-token'>
               {row.month}
-              <strong className='ap-outcome-tracking mt-0.5 block text-lg font-semibold normal-case text-primary-token'>
+              <strong className='ap-outcome-tracking mt-0.5 block text-lg font-semibold text-primary-token'>
                 {row.day}
               </strong>
             </span>
