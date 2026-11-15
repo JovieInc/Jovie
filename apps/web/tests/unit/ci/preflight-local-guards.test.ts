@@ -32,7 +32,9 @@ describe('preflight:changed local guards', () => {
       expect(ids([path]), path).toContain('design-noise');
     }
     expect(guard('design-noise').heavy).toBeUndefined();
-    expect(ids(['README.md', 'scripts/ci-fast-lanes.mjs'])).toEqual([]);
+    expect(ids(['README.md', 'scripts/ci-fast-lanes.mjs'])).toEqual([
+      'repo-hygiene',
+    ]);
   });
 
   it('runs the route JS budgets when shipped web code changes, as a heavy guard', () => {
@@ -103,6 +105,8 @@ describe('preflight:changed local guards', () => {
     expect(selected).toEqual(
       expect.arrayContaining(['design-noise', 'route-js-budget'])
     );
-    expect(selectManifestGuards(['README.md'])).toEqual([]);
+    expect(selectManifestGuards(['README.md']).map(g => g.id)).toEqual([
+      'repo-hygiene',
+    ]);
   });
 });
