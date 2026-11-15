@@ -247,12 +247,13 @@ function loadSourceHistory(path: string | undefined): {
  * drift. The Golden Path shell always creates the file, so empty content
  * means every history page failed.
  */
+export const LINEAGE_DEFERRAL_DETAIL =
+  'github-quota-deferred: canonical artist-site certification could not bind the deployed revision to the certified source: the commits history read came back empty and git could not answer (GitHub installation quota or transport failure). No certificate was issued; this is not a pass and not a product verdict. Re-run after the quota resets.';
+
 export class LineageEvidenceUnavailableError extends Error {
   readonly deployedRevision: string | null;
   constructor(deployedRevision: string | null) {
-    super(
-      'github-quota-deferred: canonical artist-site certification could not bind the deployed revision to the certified source: the commits history read came back empty (GitHub installation quota or transport failure). No certificate was issued; this is not a pass and not a product verdict. Re-run after the quota resets.'
-    );
+    super(LINEAGE_DEFERRAL_DETAIL);
     this.name = 'LineageEvidenceUnavailableError';
     this.deployedRevision = deployedRevision;
   }
@@ -332,21 +333,23 @@ export function certifyCanonicalArtistSite(
   const revisionBound =
     revisionRelation === 'same' || revisionRelation === 'ancestor';
   // A history file the workflow pre-created but left empty means every
-  // commits-history page failed (GitHub installation-quota 403 or transport):
-  // the deployed revision cannot be bound, which is missing evidence, not
-  // drift. Fail honestly as quota-deferred instead of issuing a false RED
-  // product verdict; the journey results themselves still stand and a re-run
-  // after the quota reset re-reads the history. Real failures keep their RED:
-  // an unhealthy profile or a history that shows a genuinely unrelated
-  // revision never reaches this branch.
-  if (
+  // commits-history page failed (GitHub installation-quota 403 or transport)
+  // and git could not answer either: the deployed revision cannot be bound,
+  // which is missing evidence, not drift. Report a visible deferral instead
+  // of issuing a false GREEN or turning Golden Path (manual) red (JOV-12646):
+  // the certificate stays RED with the deferral detail, the CLI announces the
+  // quota-deferral and exits 0, and a re-run after the quota reset re-reads
+  // the lineage. Real failures keep their hard RED: an unhealthy profile or
+  // genuine drift (git-answered or history-answered unrelated) never reaches
+  // this branch.
+  const revisionDeferral =
     options.lineageFileEmpty === true &&
     gitLineage === 'unanswered' &&
     revisionRelation === 'unrelated' &&
-    profileHealthy
-  ) {
-    throw new LineageEvidenceUnavailableError(deployedRevision);
-  }
+    profileHealthy;
+  const revisionSummary = revisionDeferral
+    ? new LineageEvidenceUnavailableError(deployedRevision).message
+    : `Live profile revision ${deployedRevision ?? 'unknown'} is not ${options.sourceRevision}.`;
   const profilePassed = profileHealthy && revisionBound;
   const exposedDeferred = profile?.exposedDeferredSurfaces;
   const boundDefect = (passesIgnoringRevision: boolean) =>
@@ -377,7 +380,7 @@ export function certifyCanonicalArtistSite(
   const journeyDetail = goldenPassed
     ? 'Production build passed the prebuilt claim, real-auth golden path, start-entry continuity, and Stripe journey.'
     : 'Production-faithful Golden Path did not pass.';
-  const revisionDetail = `Live profile revision ${deployedRevision ?? 'unknown'} is not ${options.sourceRevision}.`;
+  const revisionDetail = revisionSummary;
   const profileDetail = profilePassed
     ? revisionRelation === 'ancestor'
       ? `Live Tim White profile passed. Deployed revision ${deployedRevision ?? 'unknown'} is an ancestor of source revision ${options.sourceRevision}.`
@@ -563,17 +566,24 @@ if (process.argv[1]?.endsWith('certify-canonical-artist-site.ts')) {
     for (const failure of certificate.evidenceIntegrityFailures) {
       console.error(`evidence: ${failure}`);
     }
-    if (!certificate.safeToSend) process.exitCode = 1;
-  } catch (error) {
-    if (error instanceof LineageEvidenceUnavailableError) {
-      // The repository's quota-deferral convention (runWithGitHubRetry): exit
-      // 75 with a github-quota-deferred warning is a transport state, never a
-      // verdict on the change. Re-running after the reset re-reads history.
-      console.error(`::warning title=github-quota-deferred::${error.message}`);
-      process.exitCode = 75;
-    } else {
-      console.error(error instanceof Error ? error.message : String(error));
+    const deferred = certificate.receipts.some(receipt =>
+      receipt.detail.startsWith('github-quota-deferred:')
+    );
+    if (deferred) {
+      // The repository's quota-deferral convention (runWithGitHubRetry): a
+      // transport state, never a verdict on the change (JOV-12646). The
+      // written certificate stays RED — nothing certifies on an unbound
+      // revision — but the deferral must be visible without turning Golden
+      // Path (manual) red. Re-running after the quota reset re-reads lineage.
+      console.error(
+        `::warning title=github-quota-deferred::${LINEAGE_DEFERRAL_DETAIL}`
+      );
+      process.exitCode = 0;
+    } else if (!certificate.safeToSend) {
       process.exitCode = 1;
     }
+  } catch (error) {
+    console.error(error instanceof Error ? error.message : String(error));
+    process.exitCode = 1;
   }
 }
