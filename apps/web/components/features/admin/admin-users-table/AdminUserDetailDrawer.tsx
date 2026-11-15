@@ -113,7 +113,11 @@ export function AdminUserDetailDrawer({
               subtitle={
                 user.email ? (
                   <div className='flex items-center gap-1.5'>
-                    <span className='truncate'>{user.email}</span>
+                    {/* min-w-0 lets the truncating span shrink inside the flex
+                        row; without it the long-email box overflows and the
+                        copy button gets clipped by the header edge (axe
+                        target-size: partially obscured). */}
+                    <span className='min-w-0 truncate'>{user.email}</span>
                     <CopyButton value={user.email} label='Email' />
                   </div>
                 ) : (
