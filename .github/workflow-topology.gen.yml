@@ -817,8 +817,8 @@ nodes:
       - push
       - workflow_dispatch
       - workflow_run
-    terminalReceipt: job:sweep
-    jobCount: 2
+    terminalReceipt: job:baseline-merge
+    jobCount: 4
   - name: Neon Scheduled Branch Cleanup
     path: .github/workflows/neon-scheduled-cleanup.yml
     active: true
