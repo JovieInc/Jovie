@@ -1,3 +1,5 @@
+import { existsSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -33,7 +35,7 @@ vi.mock('@/components/molecules/ContentSurfaceCard', () => ({
   ContentSurfaceCard: () => null,
 }));
 
-import ArtistsPage from '@/app/artists/page';
+import ArtistsPage, { generateMetadata } from '@/app/artists/page';
 
 const artist = {
   id: 'id-1',
@@ -121,5 +123,34 @@ describe('/artists page', () => {
     expect(screen.getByTestId('artists-directory')).toBeInTheDocument();
     expect(mocks.directoryProps).not.toHaveBeenCalled();
     expect(mocks.redirect).not.toHaveBeenCalled();
+  });
+});
+
+describe('/artists SEO contract', () => {
+  it('canonicalizes page 1 to /artists, not the homepage', async () => {
+    const metadata = await generateMetadata({
+      searchParams: Promise.resolve({}),
+    });
+
+    expect(metadata.title).toBe('Artists');
+    expect(metadata.alternates?.canonical).toBe('/artists');
+    expect(metadata.robots).toBeUndefined();
+  });
+
+  it('keeps cursor pages out of the index with no canonical', async () => {
+    const metadata = await generateMetadata({
+      searchParams: Promise.resolve({ cursor: 'abc' }),
+    });
+
+    expect(metadata.alternates).toBeUndefined();
+    expect(metadata.robots).toEqual({ index: false, follow: true });
+  });
+
+  it('has no loading boundary, so the publish-gate redirect is a real HTTP redirect', () => {
+    // A loading.tsx starts the response as 200 before the page runs, which
+    // turns redirect() into a meta refresh on an indexable 200 page.
+    expect(existsSync(resolve(process.cwd(), 'app/artists/loading.tsx'))).toBe(
+      false
+    );
   });
 });
