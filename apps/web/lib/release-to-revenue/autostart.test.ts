@@ -31,7 +31,10 @@ vi.mock('./trigger-new-release', () => ({
   triggerNewRelease: mockTriggerNewRelease,
 }));
 
-import { autostartDesignPartnerAutopilot } from './autostart';
+import {
+  autostartDesignPartnerAutopilot,
+  runDesignPartnerAutopilotSubJob,
+} from './autostart';
 
 const partner = {
   creatorUsername: 'tim',
@@ -102,6 +105,24 @@ describe('autostartDesignPartnerAutopilot', () => {
     await expect(autostartDesignPartnerAutopilot()).resolves.toEqual({
       status: 'trigger-failed',
       detail: 'release-not-found',
+    });
+  });
+
+  it('throws a trigger refusal from the sub-job so cron monitoring sees it', async () => {
+    selectResults.push([{ id: 'release-new' }], []);
+    mockTriggerNewRelease.mockResolvedValue({
+      ok: false,
+      code: 'release-not-found',
+    });
+    await expect(runDesignPartnerAutopilotSubJob()).rejects.toThrow(
+      'release-not-found'
+    );
+  });
+
+  it('keeps a skip as a sub-job success', async () => {
+    mockResolveDesignPartnerConfig.mockResolvedValue(null);
+    await expect(runDesignPartnerAutopilotSubJob()).resolves.toEqual({
+      status: 'not-configured',
     });
   });
 });

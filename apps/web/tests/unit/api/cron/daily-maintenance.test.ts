@@ -124,7 +124,7 @@ vi.mock('@/app/api/cron/sync-ai-crawler-analytics/route', () => ({
 }));
 
 vi.mock('@/lib/release-to-revenue/autostart', () => ({
-  autostartDesignPartnerAutopilot: mockAutostartDesignPartnerAutopilot,
+  runDesignPartnerAutopilotSubJob: mockAutostartDesignPartnerAutopilot,
 }));
 
 vi.mock('@/lib/release-to-revenue/outcome-reconciliation', () => ({
