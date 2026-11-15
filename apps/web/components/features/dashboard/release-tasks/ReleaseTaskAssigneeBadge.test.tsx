@@ -46,4 +46,14 @@ describe('ReleaseTaskAssigneeBadge', () => {
     expect(screen.getByText('Me')).toBeVisible();
     expect(screen.queryByText('Jovie')).not.toBeInTheDocument();
   });
+
+  it('draws the automated assignee with the semantic purple token', () => {
+    const { container } = render(
+      <ReleaseTaskAssigneeBadge assigneeType='ai_workflow' />
+    );
+
+    const dot = container.querySelector('[aria-hidden="true"]');
+    expect(dot).toHaveClass('bg-accent-purple-text');
+    expect(container.innerHTML).not.toMatch(/purple-500/);
+  });
 });
