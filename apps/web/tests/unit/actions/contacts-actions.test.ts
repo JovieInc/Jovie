@@ -8,6 +8,7 @@ const mocked = vi.hoisted(() => ({
   getDashboardContacts: vi.fn(),
   invalidateProfileCache: vi.fn(),
   revalidateTag: vi.fn(),
+  updateTag: vi.fn(),
   noStore: vi.fn(),
 }));
 
@@ -30,6 +31,7 @@ vi.mock('next/cache', () => ({
   unstable_cache: (fn: () => unknown) => fn,
   unstable_noStore: mocked.noStore,
   revalidateTag: mocked.revalidateTag,
+  updateTag: mocked.updateTag,
 }));
 vi.mock('drizzle-orm', () => ({
   and: (...args: unknown[]) => args,
@@ -261,10 +263,9 @@ describe('contacts actions', () => {
 
     expect(tx.insert).toHaveBeenCalledTimes(3);
     expect(mocked.getDashboardContacts).toHaveBeenCalledWith(tx, 'profile-1');
-    expect(mocked.revalidateTag).toHaveBeenCalledWith(
-      'contacts:user-1:profile-1',
-      'max'
-    );
+    // Read-your-own-write: the owner's contact list must not be served stale.
+    expect(mocked.updateTag).toHaveBeenCalledWith('contacts:user-1:profile-1');
+    expect(mocked.revalidateTag).not.toHaveBeenCalled();
     expect(mocked.invalidateProfileCache).toHaveBeenCalledWith('artist');
   });
 
@@ -324,10 +325,9 @@ describe('contacts actions', () => {
     ).resolves.toBeUndefined();
 
     expect(remove).toHaveBeenCalledTimes(2);
-    expect(mocked.revalidateTag).toHaveBeenCalledWith(
-      'contacts:user-1:profile-1',
-      'max'
-    );
+    // Read-your-own-write: the owner's contact list must not be served stale.
+    expect(mocked.updateTag).toHaveBeenCalledWith('contacts:user-1:profile-1');
+    expect(mocked.revalidateTag).not.toHaveBeenCalled();
     expect(mocked.invalidateProfileCache).toHaveBeenCalledWith('artist');
   });
 

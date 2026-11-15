@@ -1,18 +1,19 @@
 #!/usr/bin/env node
-// Dependency-only bootstrap for the existing secret-free Codex Cloud lane.
+// The one frozen dependency install every agent session start runs
+// (JOV-12623): `scripts/setup.sh` and `.claude/hooks/session-start.sh` call
+// `node scripts/codex-cloud-setup.mjs install`; the secret-free Codex Cloud
+// lane calls it with no argument, which also requires the exact .nvmrc Node.
 import { spawnSync } from 'node:child_process';
 import { readFileSync, realpathSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-export function bootstrap(root, env = process.env) {
-  const pin = readFileSync(resolve(root, '.nvmrc'), 'utf8').trim();
+/**
+ * Installs the lockfile exactly, with the pnpm that package.json's
+ * packageManager pins. Never rewrites pnpm-lock.yaml.
+ */
+export function frozenInstall(root, env = process.env) {
   const pkg = JSON.parse(readFileSync(resolve(root, 'package.json'), 'utf8'));
-  if (process.version !== `v${pin}`) {
-    throw new Error(
-      `Expected Node ${pin}; got ${process.version}. Activate the pinned runtime first.`
-    );
-  }
   if (!/^pnpm@\d+\.\d+\.\d+$/u.test(pkg.packageManager ?? '')) {
     throw new Error(
       'Expected an exact pnpm version in package.json packageManager.'
@@ -52,9 +53,35 @@ export function bootstrap(root, env = process.env) {
     );
 }
 
+/** Secret-free Codex Cloud lane: exact .nvmrc Node, then the frozen install. */
+export function bootstrap(root, env = process.env) {
+  const pin = readFileSync(resolve(root, '.nvmrc'), 'utf8').trim();
+  if (process.version !== `v${pin}`) {
+    throw new Error(
+      `Expected Node ${pin}; got ${process.version}. Activate the pinned runtime first.`
+    );
+  }
+  frozenInstall(root, env);
+}
+
+/** CLI: `install` runs the frozen install alone; no argument runs bootstrap. */
+export function main(args, root, env = process.env) {
+  const [command] = args;
+  if (command === 'install') frozenInstall(root, env);
+  else if (command === undefined) bootstrap(root, env);
+  else {
+    console.error(`Unknown command: ${command}. Usage: [install]`);
+    return 2;
+  }
+  return 0;
+}
+
 if (
   process.argv[1] &&
   realpathSync(process.argv[1]) === fileURLToPath(import.meta.url)
 ) {
-  bootstrap(resolve(dirname(fileURLToPath(import.meta.url)), '..'));
+  process.exitCode = main(
+    process.argv.slice(2),
+    resolve(dirname(fileURLToPath(import.meta.url)), '..')
+  );
 }
