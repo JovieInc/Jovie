@@ -122,7 +122,9 @@ const AvatarImage = forwardRef<HTMLDivElement, AvatarProps>(function Avatar(
           aria-hidden={alt ? undefined : true}
         >
           <BaseAvatarFallback size={size} shape={shape}>
-            <span aria-hidden='true' className='select-none'>{initials}</span>
+            <span aria-hidden='true' className='select-none'>
+              {initials}
+            </span>
           </BaseAvatarFallback>
         </BaseAvatar>
         {verified && shape === 'person' && (

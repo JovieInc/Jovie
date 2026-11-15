@@ -102,4 +102,4 @@ describe('ActivityTableUnified', () => {
 
     expect(source).toContain("data-testid='admin-activity-timestamp'");
   });
-})
+});
