@@ -541,22 +541,6 @@ export function isTransientRemediationFailure(result) {
   return !result?.ok && TRANSIENT_FAILURE_RE.test(String(result?.reason ?? ''));
 }
 
-/**
- * True when a result failed ONLY on the workspace's shared Linear quota
- * (linear_rate_limited), never on a hard failure. Green/resolve work that hit
- * the budget can defer: the signal state is untouched, so the next run re
- * resolves. A hard failure mixed into the results is not deferrable.
- */
-export function failedOnLinearRateLimit(result) {
-  if (!result || result.ok) return false;
-  if (result.reason === 'linear_rate_limited') return true;
-  if (!Array.isArray(result.results) || result.results.length === 0)
-    return false;
-  return result.results.every(
-    item => item?.ok || item?.reason === 'linear_rate_limited'
-  );
-}
-
 /** @param {any} decision @param {any} [context] */
 export async function applyRemediationDecision(decision = {}, context = {}) {
   const { fingerprint, source, runUrl, detail, apiKey, fetchImpl } = context;

@@ -11,7 +11,6 @@ import {
   decideAuthSmokeSignal,
   decideLoginSignal,
   decideMonitorSignal,
-  failedOnLinearRateLimit,
   gateSteadyGreen,
   isTransientRemediationFailure,
   remediationIntakeDisabled,
@@ -383,67 +382,6 @@ describe('applyRemediationDecisionWithRetry', () => {
     expect(result.ok).toBe(false);
     expect('reason' in result && result.reason).toBe('missing_linear_api_key');
     expect(fetchImpl).not.toHaveBeenCalled();
-  });
-});
-
-describe('failedOnLinearRateLimit', () => {
-  it('is true only when every failure is the shared Linear quota', () => {
-    expect(failedOnLinearRateLimit(undefined)).toBe(false);
-    expect(failedOnLinearRateLimit({ ok: true })).toBe(false);
-    expect(
-      failedOnLinearRateLimit({ ok: false, reason: 'linear_rate_limited' })
-    ).toBe(true);
-    expect(
-      failedOnLinearRateLimit({
-        ok: false,
-        action: 'green',
-        results: [
-          { ok: false, reason: 'linear_rate_limited', fingerprint: 'a' },
-        ],
-      })
-    ).toBe(true);
-    // A hard failure mixed into the results is not deferrable.
-    expect(
-      failedOnLinearRateLimit({
-        ok: false,
-        action: 'green',
-        results: [
-          { ok: false, reason: 'linear_rate_limited', fingerprint: 'a' },
-          { ok: false, reason: 'linear_comment_create_400', fingerprint: 'b' },
-        ],
-      })
-    ).toBe(false);
-    expect(
-      failedOnLinearRateLimit({
-        ok: false,
-        action: 'green',
-        results: [{ ok: false, reason: 'missing_linear_api_key' }],
-      })
-    ).toBe(false);
-  });
-
-  it('flags a rate-limited green resolve so the run defers, not fails', async () => {
-    clearRemediationLabelCache();
-    const fetchImpl = vi.fn(async () => ({
-      ok: false,
-      status: 429,
-      headers: new Map([['retry-after', '30']]),
-      text: async () =>
-        JSON.stringify({ errors: [{ extensions: { code: 'RATELIMITED' } }] }),
-    }));
-    const result = await applyRemediationDecision(
-      { action: 'green', fingerprints: ['some-monitor'] },
-      {
-        fingerprint: 'some-monitor',
-        source: 'production-controller.yml',
-        runUrl: 'https://github.com/JovieInc/Jovie/actions/runs/1',
-        apiKey: 'lin_test',
-        fetchImpl,
-      }
-    );
-    expect(result.ok).toBe(false);
-    expect(result.action).toBe('green');
-    expect(failedOnLinearRateLimit(result)).toBe(true);
   });
 });
 
