@@ -456,6 +456,7 @@ test('affected qualification rejects stale surface certification before expensiv
   try {
     write('scripts/hooks/pre-push-gate.sh', readFileSync(gateScript));
     write('scripts/hooks/resolve-repo-node.sh', 'exit 0\n');
+    write('scripts/lib/projected-tree-budget.mjs', 'export {};\n');
     write('bin/git', '#!/bin/sh\nexit 0\n');
     write(
       'bin/pnpm',
