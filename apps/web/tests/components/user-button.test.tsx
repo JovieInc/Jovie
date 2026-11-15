@@ -574,7 +574,7 @@ describe('UserButton billing actions', () => {
     await user.click(screen.getByText('Adele Adkins'));
 
     // Wait for dropdown to render
-    const manageBillingButton = await screen.findByText('Manage billing');
+    const manageBillingButton = await screen.findByText('Manage Billing');
     await user.click(manageBillingButton);
 
     await flushMicrotasks();
@@ -868,7 +868,7 @@ describe('UserButton billing actions', () => {
 
     await user.click(screen.getByText('Adele Adkins'));
 
-    expect(screen.getByText('Usage remaining')).toBeInTheDocument();
+    expect(screen.getByText('Usage Remaining')).toBeInTheDocument();
     expect(screen.getByText('73%')).toBeInTheDocument();
     expect(screen.queryByText('Usage Stats')).not.toBeInTheDocument();
   });
@@ -1031,7 +1031,7 @@ describe('UserButton billing actions', () => {
       );
       expect(separator).not.toHaveClass('h-2');
     }
-    const signOut = screen.getByRole('menuitem', { name: /Sign out/ });
+    const signOut = screen.getByRole('menuitem', { name: /Sign Out/ });
     const diagnostics = screen.getByTestId('app-build-diagnostics');
     expect(
       signOut.compareDocumentPosition(diagnostics) &
@@ -1040,9 +1040,12 @@ describe('UserButton billing actions', () => {
 
     for (const menuItem of screen.getAllByRole('menuitem')) {
       if (menuItem.getAttribute('aria-label')?.startsWith('Open profile for')) {
-        expect(menuItem).toHaveClass('min-h-12');
+        // The header hugs its content (name + handle or email); it never
+        // reserves a fixed height for a line that may be absent.
+        expect(menuItem).toHaveClass('h-auto', 'min-h-8');
+        expect(menuItem).not.toHaveClass('min-h-12');
       } else {
-        expect(menuItem).toHaveClass('min-h-8');
+        expect(menuItem).toHaveClass('min-h-8', 'h-8');
       }
     }
   });
