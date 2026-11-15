@@ -605,8 +605,9 @@ export async function trackServerEvent(
   const prepared = prepareServerAnalyticsInsert(event, properties, options);
   if (!prepared.ok) return prepared;
 
+  const delivery = insertServerAnalyticsRow(db, prepared);
   try {
-    return await withTimeout(insertServerAnalyticsRow(db, prepared), {
+    return await withTimeout(delivery, {
       timeoutMs: SERVER_ANALYTICS_DELIVERY_TIMEOUT_MS,
       context: 'Server analytics delivery',
     });
@@ -615,18 +616,67 @@ export async function trackServerEvent(
       error instanceof Error &&
       error.message ===
         `Server analytics delivery timed out after ${SERVER_ANALYTICS_DELIVERY_TIMEOUT_MS}ms`;
-    Sentry.captureException(error, {
-      tags: {
-        context: 'server_analytics_delivery',
-        contract_version: SERVER_ANALYTICS_CONTRACT_VERSION,
-        delivery_outcome: deliveryUnknown ? 'unknown' : 'failed',
-        event_name: prepared.eventName,
+
+    if (!deliveryUnknown) {
+      Sentry.captureException(error, {
+        tags: {
+          context: 'server_analytics_delivery',
+          contract_version: SERVER_ANALYTICS_CONTRACT_VERSION,
+          delivery_outcome: 'failed',
+          event_name: prepared.eventName,
+        },
+      });
+      return { ok: false, error: 'persistence_failed' };
+    }
+
+    // JOV-8319: the JavaScript guard lost the race, but withTimeout abandons
+    // only the await — the insert itself keeps running against Postgres, so
+    // the event frequently lands after the caller already received
+    // `delivery_unknown`. A timeout at this boundary is handled (every
+    // caller treats the structured result as best-effort), so it is reported
+    // as a warning instead of an error exception, and the still-running
+    // insert settles the true outcome below: a late success leaves a
+    // breadcrumb proving the event was not lost; a late failure is a real
+    // loss and still reaches Sentry as an error.
+    Sentry.captureMessage(
+      `Server analytics delivery timed out after ${SERVER_ANALYTICS_DELIVERY_TIMEOUT_MS}ms`,
+      {
+        level: 'warning',
+        tags: {
+          context: 'server_analytics_delivery',
+          contract_version: SERVER_ANALYTICS_CONTRACT_VERSION,
+          delivery_outcome: 'unknown',
+          event_name: prepared.eventName,
+        },
+      }
+    );
+    void delivery.then(
+      result => {
+        Sentry.addBreadcrumb({
+          category: 'database',
+          level: 'info',
+          message:
+            'server_analytics_delivery: insert settled successfully after the delivery timeout; the event was not lost',
+          data: {
+            contract_version: SERVER_ANALYTICS_CONTRACT_VERSION,
+            deduplicated: result.deduplicated,
+            event_name: prepared.eventName,
+            phase: 'late_success',
+          },
+        });
       },
-    });
-    return {
-      ok: false,
-      error: deliveryUnknown ? 'delivery_unknown' : 'persistence_failed',
-    };
+      lateError => {
+        Sentry.captureException(lateError, {
+          tags: {
+            context: 'server_analytics_delivery',
+            contract_version: SERVER_ANALYTICS_CONTRACT_VERSION,
+            delivery_outcome: 'failed_after_timeout',
+            event_name: prepared.eventName,
+          },
+        });
+      }
+    );
+    return { ok: false, error: 'delivery_unknown' };
   }
 }
 
