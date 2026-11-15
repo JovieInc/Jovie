@@ -3,6 +3,7 @@
  * node scripts/schedule-trigger-guard.mjs  fail on newly added schedules or
  *                                          GitHub-API polling loops
  *
+ * api-budget: github-actions-token 0/hr - reads the diff through git only; makes zero GitHub API calls (the detector patterns below are data, not calls).
  * Event-driven-only mandate (.claude/rules/event-driven.md, Tim 2026-10-21 +
  * 2026-11-14): a PR may not ADD a `schedule:`/`cron:` trigger, or a polling
  * loop against the GitHub API, unless the file is on
