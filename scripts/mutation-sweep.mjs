@@ -7,6 +7,7 @@
 //   node scripts/mutation-sweep.mjs --mode incremental  # only modules changed since scored
 //   node scripts/mutation-sweep.mjs --list-only          # print the next batch, run nothing
 //   node scripts/mutation-sweep.mjs --include packages/ui/atoms/  # @jovie/ui, keyed by repo path
+//   node scripts/mutation-sweep.mjs --shard 3/40 ...         # one slice of a sharded baseline run
 //
 // Per module it runs scripts/mutation-diff.mjs --scope all (same Stryker
 // harness as the enforced high-risk lane), then records score, mutant counts,
@@ -48,11 +49,13 @@ import {
   extractSurvivors,
   moduleKey,
   normalizeState,
+  parseShard,
   partitionEquivalents,
   pickBatch,
   proposeBaselineEntries,
   ratchetVerdict,
   recordRun,
+  shardOf,
   validateEquivalents,
 } from './lib/mutation-sweep.mjs';
 import {
@@ -84,6 +87,7 @@ const { values } = parseArgs({
     'touch-file': { type: 'string' },
     'list-only': { type: 'boolean', default: false },
     preflight: { type: 'boolean', default: false },
+    shard: { type: 'string' }, // <index>/<count>: one disjoint slice of the candidates
   },
 });
 
@@ -227,6 +231,10 @@ if (values.mode === 'incremental') {
   pool = candidates.filter(
     c => state.modules[c.file] && state.modules[c.file].blob !== c.blob
   );
+}
+if (values.shard) {
+  const shard = parseShard(values.shard);
+  pool = pool.filter(c => shardOf(c.file, shard.count) === shard.index);
 }
 /** @type {string[]} */
 let batch = [];

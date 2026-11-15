@@ -8,13 +8,16 @@ import {
   emptyState,
   extractSurvivors,
   MIN_RATCHET_VALID,
+  mergeStates,
   moduleKey,
+  parseShard,
   partitionEquivalents,
   pickBatch,
   proposeBaselineEntries,
   ratchetVerdict,
   recordRun,
   SURVIVORS_PER_TASK,
+  shardOf,
   survivorFingerprint,
   validateEquivalents,
 } from '../mutation-sweep.mjs';
@@ -305,5 +308,55 @@ describe('ratchet', () => {
 describe('spare-compute contract', () => {
   it('preflight reports no problems or plain strings', () => {
     expect(Array.isArray(preflight(REPO_ROOT))).toBe(true);
+  });
+});
+
+describe('baseline shards', () => {
+  it('parses an index/count pair and rejects out-of-range or malformed values', () => {
+    expect(parseShard('3/40')).toEqual({ index: 3, count: 40 });
+    expect(parseShard('0/1')).toEqual({ index: 0, count: 1 });
+    for (const bad of ['40/40', '-1/4', '1/0', '2', 'a/b', '1/4/2'])
+      expect(() => parseShard(bad)).toThrow(/--shard/u);
+  });
+
+  it('puts every module in exactly one shard, stably', () => {
+    const files = Array.from({ length: 500 }, (_, i) => `lib/m${i}.ts`);
+    const counts = new Array(8).fill(0);
+    for (const file of files) {
+      const shard = shardOf(file, 8);
+      expect(shard).toBe(shardOf(file, 8));
+      expect(shard).toBeGreaterThanOrEqual(0);
+      expect(shard).toBeLessThan(8);
+      counts[shard] += 1;
+    }
+    expect(counts.reduce((a, b) => a + b, 0)).toBe(500);
+    // A hash split, not one bucket: every shard gets real work.
+    for (const n of counts) expect(n).toBeGreaterThan(30);
+  });
+
+  it('merges shard states keeping the newest entry per module', () => {
+    const entry = (at, score) => ({ at, score, status: 'scored' });
+    const a = {
+      ...emptyState(),
+      modules: {
+        'lib/a.ts': entry('2026-11-01T00:00:00Z', 50),
+        'lib/b.ts': entry('2026-11-03T00:00:00Z', 70),
+      },
+    };
+    const b = {
+      ...emptyState(),
+      modules: {
+        'lib/a.ts': entry('2026-11-02T00:00:00Z', 60),
+        'lib/b.ts': entry('2026-11-02T00:00:00Z', 10),
+        'lib/c.ts': entry('2026-11-02T00:00:00Z', 80),
+      },
+    };
+    const merged = mergeStates(a, b, { schemaVersion: 99, modules: {} });
+    expect(merged.schemaVersion).toBe(emptyState().schemaVersion);
+    expect(
+      Object.fromEntries(
+        Object.entries(merged.modules).map(([k, v]) => [k, v.score])
+      )
+    ).toEqual({ 'lib/a.ts': 60, 'lib/b.ts': 70, 'lib/c.ts': 80 });
   });
 });

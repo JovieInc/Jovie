@@ -14,10 +14,15 @@ import { runInNewContext } from 'node:vm';
 import { afterEach, describe, expect, it } from 'vitest';
 
 const REPO_ROOT = resolve(import.meta.dirname, '..', '..', '..');
-const workflow = readFileSync(
+const fullWorkflow = readFileSync(
   resolve(REPO_ROOT, '.github/workflows/mutation-diff.yml'),
   'utf8'
 );
+// The one-off sharded baseline (2026-11-15) is the only hosted part; every contract
+// below holds for the diff and rolling-sweep jobs, which come before it.
+const baselineAt = fullWorkflow.indexOf('\n  baseline:');
+const workflow = fullWorkflow.slice(0, baselineAt);
+const baseline = fullWorkflow.slice(baselineAt);
 
 describe('Mutation Diff Gem contract', () => {
   // Policy 2026-10-29 (supersedes 2026-10-26 hosted-by-default): hosted CI is saturated, so every
@@ -73,6 +78,37 @@ describe('Mutation Diff Gem contract', () => {
     expect(sweep).toContain('group: mutation-sweep');
     expect(sweep).toContain('cancel-in-progress: false');
     expect(sweep).toContain('scripts/mutation-sweep-preflight.mjs');
+  });
+});
+
+describe('Mutation baseline contract', () => {
+  it('runs only on a main dispatch, hosted, with capped parallelism', () => {
+    const jobs = load(fullWorkflow).jobs;
+    for (const id of ['baseline', 'baseline-merge']) {
+      expect(jobs[id].if).toContain("inputs.mode == 'baseline'");
+      expect(jobs[id].if).toContain("github.ref == 'refs/heads/main'");
+      expect(jobs[id].if).toContain("github.event_name == 'workflow_dispatch'");
+      expect(jobs[id]['runs-on']).toBe('ubuntu-24.04');
+    }
+    expect(jobs.sweep.if).toContain("inputs.mode != 'baseline'");
+    expect(jobs.baseline.strategy.matrix.shard).toHaveLength(40);
+    expect(jobs.baseline.strategy['max-parallel']).toBeLessThanOrEqual(16);
+    expect(baseline).not.toMatch(/secrets\./u);
+    expect(baseline).not.toMatch(/workflow run mutation-diff/u);
+  });
+
+  it('merges under the sweep lock and saves a cache the rolling sweep restores', () => {
+    const merge = load(fullWorkflow).jobs['baseline-merge'];
+    expect(merge.needs).toBe('baseline');
+    expect(merge.if).toContain('always()');
+    expect(merge.concurrency.group).toBe('mutation-sweep');
+    const save = merge.steps.find(step =>
+      step.uses?.startsWith('actions/cache/save@')
+    );
+    expect(save.with.key).toMatch(/^mutation-sweep-portable-v2-/u);
+    expect(baseline).toMatch(/--shard "\$SHARD\/40"/u);
+    expect(baseline).toMatch(/test-quality-loop\.mjs merge/u);
+    expect(baseline).toMatch(/test-quality-loop\.mjs summary/u);
   });
 });
 

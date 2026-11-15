@@ -435,3 +435,47 @@ export function proposeBaselineEntries(state, baseline, source) {
   }
   return out;
 }
+
+/**
+ * Parses a `--shard <index>/<count>` value (0-based index).
+ * @param {string} value
+ * @returns {{ index: number, count: number }}
+ */
+export function parseShard(value) {
+  const match = /^(\d+)\/(\d+)$/u.exec(value.trim());
+  const index = match ? Number(match[1]) : Number.NaN;
+  const count = match ? Number(match[2]) : Number.NaN;
+  if (!(count >= 1 && index >= 0 && index < count))
+    throw new Error(
+      `--shard must be <index>/<count> with 0 <= index < count, got "${value}"`
+    );
+  return { index, count };
+}
+
+/**
+ * Stable shard for a module key, so every shard of one baseline run sees a
+ * disjoint slice and the slices together cover every module.
+ * @param {string} file
+ * @param {number} count
+ */
+export function shardOf(file, count) {
+  return createHash('sha1').update(file).digest().readUInt32BE(0) % count;
+}
+
+/**
+ * Merges sweep states module by module, keeping each module's most recent
+ * entry, so the shards of a baseline run fold into one state of record.
+ * @param {...{ modules: Record<string, { at: string }> }} states
+ */
+export function mergeStates(...states) {
+  const merged = emptyState();
+  for (const raw of states) {
+    const state = normalizeState(raw);
+    for (const [file, entry] of Object.entries(state.modules)) {
+      const known = merged.modules[file];
+      if (!known || Date.parse(entry.at) > Date.parse(known.at))
+        merged.modules[file] = entry;
+    }
+  }
+  return merged;
+}
