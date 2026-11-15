@@ -136,7 +136,7 @@ export function DashboardActivityFeed({
         <span className='inline-flex shrink-0 items-center gap-1.5 text-2xs font-caption text-tertiary-token'>
           <span
             aria-hidden='true'
-            className='h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse'
+            className='h-1.5 w-1.5 rounded-full bg-success animate-pulse motion-reduce:animate-none'
           />
           <span>Live</span>
         </span>
