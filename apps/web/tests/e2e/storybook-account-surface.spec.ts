@@ -248,12 +248,12 @@ for (const [viewportName, viewport] of VIEWPORTS) {
           menu.getByRole('menuitem', { name: 'Install iOS Alpha' })
         ).toBeVisible();
         await expect(
-          menu.getByRole('menuitem', { name: 'Manage billing' })
+          menu.getByRole('menuitem', { name: 'Manage Billing' })
         ).toBeVisible();
         await expect(
           menu.getByTestId('electron-release-identity')
         ).toBeVisible();
-        const usage = menu.getByRole('button', { name: /Usage remaining/ });
+        const usage = menu.getByRole('button', { name: /Usage Remaining/ });
         const usageArrow = await usage.locator('svg').last().boundingBox();
         const supportArrow = await menu
           .getByRole('menuitem', { name: 'Learn More' })
@@ -273,8 +273,12 @@ for (const [viewportName, viewport] of VIEWPORTS) {
           node => node.scrollWidth <= node.clientWidth
         );
         expect(fits).toBe(state !== '-long-name');
-        if (state === '-no-username')
-          await expect(profile).not.toContainText('@');
+        // Second line: the handle, or the account email when there is none.
+        // It is never an empty spacer row.
+        if (state === '-no-username') {
+          await expect(profile).not.toContainText('@timwhite');
+          await expect(profile).toContainText('tim@example.com');
+        }
         const geometry = await menu.evaluate(node => ({
           width: node.getBoundingClientRect().width,
           overflow: node.scrollWidth > node.clientWidth,
@@ -285,7 +289,7 @@ for (const [viewportName, viewport] of VIEWPORTS) {
         expect(geometry.width).toBeLessThanOrEqual(240);
         expect(geometry.overflow).toBe(false);
         expect(geometry.separators.every(height => height <= 1)).toBe(true);
-        const signOut = menu.getByRole('menuitem', { name: /Sign out/ });
+        const signOut = menu.getByRole('menuitem', { name: /Sign Out/ });
         await expect(signOut).toBeInViewport();
         const signOutBox = await signOut.boundingBox();
         const diagnosticsBox = await menu
