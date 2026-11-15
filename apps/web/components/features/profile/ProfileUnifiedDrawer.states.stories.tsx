@@ -1,4 +1,5 @@
 import type { Decorator, Meta, StoryObj } from '@storybook/nextjs-vite';
+import { buildProfileShareContext } from '@/lib/share/context';
 import type { PublicContact } from '@/types/contacts';
 import { ProfileUnifiedDrawer } from './ProfileUnifiedDrawer';
 import {
@@ -33,6 +34,11 @@ const meta = {
     view: 'menu',
     onViewChange: profileStoryNoop,
     artist: PROFILE_STORY_ARTIST,
+    shareContext: buildProfileShareContext({
+      username: PROFILE_STORY_ARTIST.handle,
+      artistName: PROFILE_STORY_ARTIST.name,
+      avatarUrl: null,
+    }),
     socialLinks: [],
     contacts: [],
     primaryChannel: firstChannel,
