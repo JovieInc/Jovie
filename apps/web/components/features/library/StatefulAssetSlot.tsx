@@ -158,6 +158,7 @@ export function StatefulAssetSlot({
       <div className={cn(PANEL, 'flex items-center gap-3')}>
         <span className='grid h-8 w-8 shrink-0 place-items-center overflow-hidden rounded-md bg-surface-1 text-secondary-token'>
           {kind === 'artwork' && previewSrc ? (
+            // eslint-disable-next-line @next/next/no-img-element -- a 32px artwork thumbnail; resizing it through next/image would gain nothing
             <img
               src={previewSrc}
               alt=''
