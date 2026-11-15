@@ -256,11 +256,16 @@ describe('CI accessibility and visual gate contracts (JOV-4060)', () => {
       'schedule',
       'workflow_dispatch',
     ]);
-    const refresh = visualRegression.jobs['visual-regression'] as Job;
-    expect(refresh['continue-on-error']).toBeUndefined();
-    expect(step(refresh, 'Cleanup Neon branch').step.if).toBe('always()');
+    // JOV-12638: one matrix entry per spec; one PR job; Neon cleanup always.
+    const suites = visualRegression.jobs['visual-regression'] as Job;
+    expect(suites['continue-on-error']).toBeUndefined();
+    expect(suites.strategy).toMatchObject({ 'fail-fast': false });
+    const cleanup = visualRegression.jobs['cleanup-neon'] as Job;
+    expect(cleanup.if).toContain('always()');
+    expect(step(cleanup, 'Cleanup Neon branch').step.if).toBe('always()');
+    const publish = visualRegression.jobs['publish-baselines'] as Job;
     expect(
-      step(refresh, 'Create or update baseline PR (refresh only)').step.if
+      step(publish, 'Create or update baseline PR (refresh only)').step.if
     ).toContain("env.REFRESH_MODE == 'true'");
 
     const compare = job('ci-visual-snapshot-compare');
