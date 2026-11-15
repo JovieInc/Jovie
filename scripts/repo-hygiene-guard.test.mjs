@@ -714,11 +714,12 @@ test('tracked-bytes budget raise stays within the documented +10% cap', () => {
 });
 
 test('snapshot-file budget raise stays within the documented +10% cap', () => {
-  // 2026-10-21: origin/main measured 110/110 canonical visual baselines, so
-  // the required Admin Home pair could not land. No unreferenced baseline was
-  // safe to delete. The policy caps a single payload raise at +10%.
-  const previousBudget = 110;
-  assert.equal(HYGIENE_LIMITS.maxSnapshotFiles, 121);
+  // 2026-11-15: origin/main measured 119/121 canonical visual baselines, so
+  // the 14 live chat-history switcher baselines could not land. Five
+  // unreferenced admin pngs were pruned in the same change. The policy caps
+  // a single payload raise at +10%.
+  const previousBudget = 121;
+  assert.equal(HYGIENE_LIMITS.maxSnapshotFiles, 133);
   assert.ok(
     HYGIENE_LIMITS.maxSnapshotFiles <= previousBudget * 1.1,
     'payload budget raises are capped at +10% per docs/ci/repository-health.md'
