@@ -208,6 +208,10 @@ describe('AdminUserDetailDrawer', () => {
 
     const copyEmail = screen.getByRole('button', { name: 'Copy Email' });
     expect(copyEmail).toHaveClass('size-6');
+    // The header's floating action cluster sits at z-10; the inline copy
+    // targets must share that layer so a long email parked at the column
+    // edge still paints above the cluster (axe target-size, 24x12 overlap).
+    expect(copyEmail).toHaveClass('z-10');
   });
 
   it('keeps the copy buttons unsqueezed in long-content rows', () => {

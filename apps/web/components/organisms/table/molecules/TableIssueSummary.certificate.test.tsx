@@ -18,7 +18,10 @@ describe('TableIssueSummary certificate', () => {
     await user.click(trigger);
     const dialog = await screen.findByRole('dialog', { name: 'Issues' });
     expect(screen.getByRole('listitem')).toHaveTextContent('No artwork');
-    expect(screen.getByRole('listitem')).toHaveClass('text-error');
+    // AA contract: the row carries the WCAG-safe error text token
+    // (text-error-text), not the raw accent red that fails 4.5:1 on the
+    // elevated dark popover surface.
+    expect(screen.getByRole('listitem')).toHaveClass('text-error-text');
     expect(dialog).toBeInTheDocument();
     await expectNoA11yViolations(baseElement);
   });

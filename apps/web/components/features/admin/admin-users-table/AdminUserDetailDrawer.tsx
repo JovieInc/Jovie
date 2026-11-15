@@ -66,7 +66,7 @@ function CopyButton({
       variant='ghost'
       size='icon'
       onClick={handleCopy}
-      className='inline-flex size-6 shrink-0 items-center justify-center text-secondary-token hover:bg-transparent hover:text-primary-token transition-colors'
+      className='z-10 inline-flex size-6 shrink-0 items-center justify-center text-secondary-token hover:bg-transparent hover:text-primary-token transition-colors'
       aria-label={`Copy ${label}`}
     >
       <Copy className='h-3.5 w-3.5' />
@@ -121,7 +121,11 @@ export function AdminUserDetailDrawer({
                      * parks this copy button at the column's right edge;
                      * pr-9 (36px) under-reserved the cluster, so the close
                      * button painted over the target's edge and axe saw a
-                     * partially obscured 20x24 target (target-size). */}
+                     * partially obscured 20x24 target (target-size).
+                     * The cluster floats at z-10, so the button must carry
+                     * the same z layer to win paint order by DOM sequence —
+                     * otherwise axe reports a 24x12 partially-obscured
+                     * target whenever the two boxes meet. */}
                     <span className='min-w-0 truncate'>{user.email}</span>
                     <CopyButton value={user.email} label='Email' />
                   </div>

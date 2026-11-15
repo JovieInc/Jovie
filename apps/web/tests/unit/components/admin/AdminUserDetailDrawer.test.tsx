@@ -80,6 +80,13 @@ const user: AdminUserRow = {
 };
 
 describe('AdminUserDetailDrawer', () => {
+  it('keeps the inline copy targets on the floating-cluster z layer', () => {
+    render(<AdminUserDetailDrawer user={user} onClose={() => {}} />);
+    expect(screen.getByRole('button', { name: 'Copy Email' })).toHaveClass(
+      'z-10'
+    );
+  });
+
   it.each([true, false])(
     'keeps header copy focus and targets the current user, including clipboard failure (%s)',
     async succeeds => {
