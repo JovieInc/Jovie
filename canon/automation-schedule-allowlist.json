@@ -1,5 +1,5 @@
 {
   "schema": "jovie-automation-schedule-allowlist/v1",
-  "description": "Files permitted to add schedule:/cron: triggers or GitHub-API polling loops (scripts/schedule-trigger-guard.mjs, run in PR Fleet Rules). Every entry needs a live canon/automation-registry.jsonl id: the mandate (.claude/rules/event-driven.md) allows a clock only for inherently time-based work, with the registry observing it. An entry should be REMOVED when its file loses the schedule or polling loop; keep this list small.",
+  "description": "Files allowed to add schedule:/cron: triggers or GitHub-API polling (scripts/schedule-trigger-guard.mjs). Entries need a live canon/automation-registry.jsonl id; remove an entry when its file loses the clock. Keep this list small.",
   "entries": []
 }
