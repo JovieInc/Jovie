@@ -11,7 +11,7 @@ import {
 export const AGENT_OS_FIXTURE_NOW = '2026-01-15T12:00:00.000Z';
 
 export const LONG_RUN_TITLE =
-  'Add state stories, interaction tests and axe checks for every admin component that still fails certification on missing evidence';
+  'Add state stories, interaction tests and axe checks for every admin component still missing evidence';
 
 export const LONG_RUN_SUMMARY =
   'This deliberately long summary describes a story-coverage batch touching many apps/web/components/features files so the row and drawer can be checked for clean truncation and wrapping at narrow widths without pushing the status pill out of view.';

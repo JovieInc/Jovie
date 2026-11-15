@@ -111,7 +111,7 @@ function Shell({
 }
 
 const props = {
-  profiles: [],
+  profiles: [] as AdminCreatorProfileRow[],
   page: 2,
   pageSize: 25,
   total: 0,

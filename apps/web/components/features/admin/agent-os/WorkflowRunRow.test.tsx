@@ -87,7 +87,7 @@ describe('WorkflowRunRow', () => {
     render(
       <WorkflowRunRow
         artifact={buildArtifact({
-          pullRequestUrl: 'https://user:pass@github.com/JovieInc/Jovie/pull/1',
+          pullRequestUrl: 'https://user:pass@github.com/JovieInc/Jovie/pull/1', // trufflehog:ignore — inert fixture proving credentialed links are dropped, no real credential
           linearIssueUrl: null,
         })}
       />
