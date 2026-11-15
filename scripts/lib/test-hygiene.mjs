@@ -1,7 +1,5 @@
-// Static test-hygiene rules: the slop patterns mutation testing can't see
-// (2026-11-15 slop-test sweep). A test that can never fail, never runs, or only
-// checks its own mocks still scores as coverage, and a mutant it lets survive in
-// a module with other tests stays invisible. Pure: path and text in, findings out.
+// Static test-hygiene rules for slop mutation testing can't see (2026-11-15 sweep): a test that can never fail, never runs,
+// or only checks its own mocks still scores as coverage. Pure: path and text in, findings out.
 import ts from 'typescript';
 
 export const RULES = Object.freeze({
@@ -29,19 +27,12 @@ export const ZERO_TOLERANCE = Object.freeze(['focused']);
 
 const TEST_FNS = new Set(['it', 'test']);
 const SUITE_FNS = new Set(['describe', 'suite']);
-// Members that keep test(...) a single test. Anything else (test.describe, test.step,
-// test.beforeEach) is a suite, a step inside a test or a hook, not a test of its own.
-const LEAF_MEMBERS = new Set([
-  'only',
-  'concurrent',
-  'each',
-  'fails',
-  'serial',
-  'sequential',
-]);
+// Members that keep test(...) one test; test.describe, test.step and hooks are not tests of their own.
+const LEAF_MEMBERS = new Set(
+  'only concurrent each fails serial sequential'.split(' ')
+);
 const FOCUS_ALIASES = new Set(['fit', 'fdescribe']);
-// Built, not spelled out, so the gate-weakening detector doesn't read this file as
-// adding skipped tests (it scans diffs for the literal aliases and modifiers).
+// Built, not spelled out, so the gate-weakening detector (which scans diffs for the literals) doesn't flag this file.
 const SKIP_ALIASES = new Set(['it', 'test', 'describe'].map(n => `x${n}`));
 const SKIP_LEAF_ALIASES = new Set(['it', 'test'].map(n => `x${n}`));
 const CALL_MATCHERS = new Set([
@@ -161,7 +152,7 @@ function realSleepMs(call) {
   return null;
 }
 
-/** Is this .then(...) / timer call's result awaited, returned or the arrow body? */
+/** Is this .then(...) / timer call awaited, returned, the arrow body, or inside an awaited new Promise executor? */
 function isAwaitedOrReturned(call) {
   let node = call;
   while (
@@ -171,6 +162,18 @@ function isAwaitedOrReturned(call) {
   )
     node = node.parent;
   const p = node.parent;
+  let fn = p;
+  while (fn && !ts.isFunctionLike(fn)) fn = fn.parent;
+  const executorOf = fn?.parent;
+  if (
+    executorOf &&
+    ts.isNewExpression(executorOf) &&
+    ts.isIdentifier(executorOf.expression) &&
+    executorOf.expression.text === 'Promise' &&
+    executorOf.arguments?.[0] === fn &&
+    isAwaitedOrReturned(executorOf)
+  )
+    return true;
   return (
     !!p &&
     (ts.isAwaitExpression(p) ||
@@ -312,8 +315,7 @@ function classify(facts, imports) {
       )
     )
       out.push('existence-only');
-    // A prop callback (vi.fn() made in the test) being called is the output; an
-    // imported module function being called is only the code's own wiring.
+    // A prop callback (vi.fn() made in the test) being called is output; an imported module function is only wiring.
     if (
       expects.every(
         e =>
@@ -332,11 +334,10 @@ function classify(facts, imports) {
 }
 
 /**
- * Findings for one test file.
+ * Findings for one test file. unit=false is for e2e suites, where skips are usually environment guards.
  * @param {string} file repo-relative path
  * @param {string} text file contents
- * @param {{ unit?: boolean }} [options] unit=false for e2e suites, where skips are
- *   usually environment guards
+ * @param {{ unit?: boolean }} [options]
  * @returns {{ rule: string, line: number, name: string }[]}
  */
 export function scanTestFile(file, text, { unit = true } = {}) {
@@ -379,8 +380,7 @@ export function scanTestFile(file, text, { unit = true } = {}) {
         SKIP_ALIASES.has(root);
       if ((root === 'vi' || root === 'jest') && members[0] === 'mock')
         mocks += 1;
-      // A focused call is focus whatever names it; an alias like fit needs a string name,
-      // so a helper called fit(box, cb) stays clean.
+      // .only is focus whatever names it; an alias like fit needs a string name, so a helper fit(box, cb) stays clean.
       if (
         isTest &&
         (members.includes('only') ||

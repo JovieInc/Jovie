@@ -141,6 +141,17 @@ describe('scanTestFile', () => {
     ).toEqual(['real-sleep']);
   });
 
+  it('counts a timer inside an awaited promise executor as awaited', () => {
+    const body =
+      'resolve => { setTimeout(() => { expect(f()).toBe(1); resolve(); }, 1); }';
+    expect(
+      rules(`it('a', async () => { await new Promise(${body}); });`)
+    ).toEqual([]);
+    expect(rules(`it('a', () => { new Promise(${body}); });`)).toEqual([
+      'unawaited-expect',
+    ]);
+  });
+
   it('flags expect inside an un-awaited .then, not an awaited or returned one', () => {
     expect(
       rules("it('a', () => { load().then(v => { expect(v).toBe(1); }); });")
