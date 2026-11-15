@@ -29,6 +29,16 @@ export const ZERO_TOLERANCE = Object.freeze(['focused']);
 
 const TEST_FNS = new Set(['it', 'test']);
 const SUITE_FNS = new Set(['describe', 'suite']);
+// Members that keep test(...) a single test. Anything else (test.describe, test.step,
+// test.beforeEach) is a suite, a step inside a test or a hook, not a test of its own.
+const LEAF_MEMBERS = new Set([
+  'only',
+  'concurrent',
+  'each',
+  'fails',
+  'serial',
+  'sequential',
+]);
 const FOCUS_ALIASES = new Set(['fit', 'fdescribe']);
 // Built, not spelled out, so the gate-weakening detector doesn't read this file as
 // adding skipped tests (it scans diffs for the literal aliases and modifiers).
@@ -389,8 +399,7 @@ export function scanTestFile(file, text, { unit = true } = {}) {
           (TEST_FNS.has(root) ||
             root === 'fit' ||
             SKIP_LEAF_ALIASES.has(root)) &&
-          !members.includes('todo') &&
-          !members.includes('skip') &&
+          members.every(member => LEAF_MEMBERS.has(member)) &&
           fn;
         if (isLeafTest) {
           for (const rule of classify(scanTest(fn, helpers), imports)) {

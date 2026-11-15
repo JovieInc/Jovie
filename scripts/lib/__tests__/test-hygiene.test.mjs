@@ -19,6 +19,22 @@ const rules = (text, options) =>
   scanTestFile('x.test.ts', text, options).map(f => f.rule);
 
 describe('scanTestFile', () => {
+  it('scans a test, not its steps, suites or hooks', () => {
+    expect(
+      rules(
+        "test('a', async () => { await test.step('open', async () => { await go(); }); expect(f()).toBe(1); });"
+      )
+    ).toEqual([]);
+    expect(
+      rules(
+        "test.describe('s', () => { test.beforeEach(async () => { await go(); }); });"
+      )
+    ).toEqual([]);
+    expect(rules("test('a', async () => { await go(); });")).toEqual([
+      'no-assertion',
+    ]);
+  });
+
   it('flags focused tests anywhere, but not a helper that happens to be named fit', () => {
     expect(
       rules(`${ONLY('it')}('a', () => { expect(f()).toBe(1); });`)
