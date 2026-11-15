@@ -1,5 +1,5 @@
 import type { Decorator, Meta, StoryObj } from '@storybook/nextjs-vite';
-import { expect, within } from 'storybook/test';
+import { expect, waitFor, within } from 'storybook/test';
 import {
   LocalCheckoutApi,
   UpgradeQueryProvider,
@@ -44,9 +44,10 @@ type Story = StoryObj<typeof meta>;
 export const GatedFeature: Story = {
   args: { featureContext: 'Custom domains' },
   play: async ({ canvasElement }) => {
-    await expect(
-      within(canvasElement).getByRole('button', { name: /^Upgrade to / })
-    ).toBeEnabled();
+    const canvas = within(canvasElement);
+    const upgrade = canvas.getByRole('button', { name: /^Upgrade to / });
+    // Direct-checkout pricing resolves async; the gate enables once it lands.
+    await waitFor(() => expect(upgrade).toBeEnabled());
   },
 };
 

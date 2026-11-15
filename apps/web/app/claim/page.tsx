@@ -27,6 +27,7 @@ export const metadata: Metadata = {
   // The root layout's title template appends the brand.
   title: 'Claim your artist profile',
   description: `Find or create your artist profile and get ${PRO_CLAIM.displayName} for ${PRICE_DISPLAY}.`,
+  alternates: { canonical: APP_ROUTES.CLAIM },
 };
 
 interface StateCopy {
