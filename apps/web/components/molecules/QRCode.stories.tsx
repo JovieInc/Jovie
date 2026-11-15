@@ -67,14 +67,14 @@ export const WithCustomURL: Story = {
 
 export const InContainer: Story = {
 	render: () => (
-		<div className="text-center space-y-4 p-6 bg-white dark:bg-gray-900 rounded-lg shadow-lg">
+		<div className="text-center space-y-4 p-6 bg-surface-0 rounded-lg shadow-lg">
 			<QRCode
 				data="https://jov.ie/arianagrande"
 				size={180}
 				label="Scan to pay via Apple Pay"
 				className="mx-auto"
 			/>
-			<p className="text-sm text-gray-600 dark:text-gray-400">
+			<p className="text-sm text-secondary-token">
 				Scan to pay via Apple Pay
 			</p>
 		</div>

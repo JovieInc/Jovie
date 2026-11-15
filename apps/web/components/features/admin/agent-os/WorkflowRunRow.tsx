@@ -103,7 +103,7 @@ export function WorkflowRunRow({
 				<div className="grid shrink-0 justify-items-end gap-1">
 					<WorkflowStatusPill status={artifact.status} />
 					{artifact.humanApprovalRequired ? (
-						<span className="rounded-md border border-warning/20 bg-surface-0 px-1.5 py-0.5 text-3xs font-[520] text-warning">
+						<span className="rounded-md border border-warning/20 bg-surface-0 px-1.5 py-0.5 text-3xs font-[520] text-warning-text">
 							{HUMAN_GATE_LABELS[artifact.humanGate.status]}
 						</span>
 					) : null}

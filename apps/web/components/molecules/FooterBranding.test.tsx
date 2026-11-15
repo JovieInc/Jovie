@@ -105,4 +105,13 @@ describe('FooterBranding', () => {
       }
     }
   );
+
+
+  it('keeps the claim-handle link a 24px+ touch target', () => {
+    const { container } = render(<FooterBranding mark='brand' />);
+
+    const link = container.querySelector('a[href*="/start"]');
+    expect(link).not.toBeNull();
+    expect(link).toHaveClass('py-1.5');
+  });
 });
