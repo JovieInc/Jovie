@@ -131,7 +131,9 @@
     outline-offset: var(--focus-outline-offset) !important;
   }
 
-  /* 5. A field container owns the outline for the text control inside it. */
+  /* 5. A field container owns the outline for the text control inside it.
+     Only the innermost container draws it, so a full-width form around a
+     composer surface doesn't add a second box. */
   :where(
     [data-focus-container],
     [class*="focus-within:"],
@@ -146,6 +148,23 @@
         [role="textbox"],
         [role="combobox"]
       ):focus-visible
+  ):not(
+    :has(
+      :where(
+          [data-focus-container],
+          [class*="focus-within:"],
+          [class*="has-\5b :focus-visible\5d "],
+          .composite-field
+        )
+        :is(
+          input:not([type="hidden"], [type="checkbox"], [type="radio"]),
+          textarea,
+          select,
+          [contenteditable="true"],
+          [role="textbox"],
+          [role="combobox"]
+        ):focus-visible
+    )
   ) {
     outline: var(--focus-outline-width) solid var(--focus-outline-color) !important;
     outline-offset: -1px !important;
