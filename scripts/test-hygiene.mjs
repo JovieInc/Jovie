@@ -5,7 +5,7 @@
 // counts may only go down. Focused tests are never allowed.
 //
 //   node scripts/test-hygiene.mjs              # check every tracked test file
-//   node scripts/test-hygiene.mjs --update     # lower the baseline after a cleanup
+//   node scripts/test-hygiene.mjs --tighten    # lower the baseline after a cleanup
 //   node scripts/test-hygiene.mjs --report     # counts per rule, as JSON
 import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
@@ -30,7 +30,7 @@ const BASELINE = join(
 );
 const { values } = parseArgs({
   options: {
-    update: { type: 'boolean', default: false },
+    tighten: { type: 'boolean', default: false },
     report: { type: 'boolean', default: false },
   },
 });
@@ -73,7 +73,7 @@ if (values.report) {
     };
   }
   console.log(JSON.stringify({ scannedFiles: files.length, byRule }, null, 1));
-} else if (values.update) {
+} else if (values.tighten) {
   baseline.counts = lowerBaseline(baseline.counts, current);
   writeFileSync(BASELINE, `${JSON.stringify(baseline, null, 2)}\n`);
   console.log(
@@ -94,7 +94,7 @@ if (values.report) {
         console.error(`  line ${hit.line}: ${hit.name}`);
     }
     console.error(
-      `\ntest-hygiene: ${failures.length} file/rule pair(s) grew. Fix the test; the baseline only goes down (node scripts/test-hygiene.mjs --update after a cleanup).`
+      `\ntest-hygiene: ${failures.length} file/rule pair(s) grew. Fix the test; the baseline only goes down (node scripts/test-hygiene.mjs --tighten after a cleanup).`
     );
     process.exitCode = 1;
   }
