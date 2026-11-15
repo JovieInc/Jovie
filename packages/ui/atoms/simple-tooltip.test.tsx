@@ -1,4 +1,5 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import * as React from 'react';
 import { describe, expect, it } from 'vitest';
 import { expectNoA11yViolations } from '../test-utils/a11y';
@@ -34,6 +35,28 @@ describe('SimpleTooltip', () => {
         </TestWrapper>
       );
       expect(screen.queryByText('Tooltip text')).not.toBeInTheDocument();
+    });
+
+    it('opens on keyboard focus and closes on Escape', async () => {
+      const user = userEvent.setup({ delay: null });
+      render(
+        <TestWrapper>
+          <SimpleTooltip content='Tooltip text'>
+            <span>Focus me</span>
+          </SimpleTooltip>
+        </TestWrapper>
+      );
+
+      await user.tab();
+      expect(screen.getByText('Focus me')).toHaveFocus();
+      expect(await screen.findByTestId('tooltip-content')).toHaveTextContent(
+        'Tooltip text'
+      );
+
+      await user.keyboard('{Escape}');
+      await waitFor(() => {
+        expect(screen.queryByTestId('tooltip-content')).not.toBeInTheDocument();
+      });
     });
   });
 
