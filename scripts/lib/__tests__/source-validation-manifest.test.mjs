@@ -67,6 +67,7 @@ describe('Source Validation manifest parity', () => {
     'apps/web/app/app/layout.tsx',
     'packages/ui/atoms/button.tsx',
     'docs/design-system/component-certification.json',
+    'docs/design-system/component-certification.d/e1-admin.json',
     'docs/design-system/cert-screens.json',
     'scripts/lib/component-certificate.mjs',
     'scripts/lib/component-cert-screens.mjs',
