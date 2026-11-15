@@ -79,17 +79,7 @@ export function AdminCreatorProfilesUnified({
   sort,
   mode: _mode = 'admin',
   clientFilter,
-  onActionError,
-}: Readonly<
-  AdminCreatorProfilesWithSidebarProps & {
-    clientFilter?: string;
-    /** Reports the exact failure message alongside the error toast, so
-     * storybook lanes can assert action failures (the harness's mock
-     * pathname is a profile route, where FeedbackProvider mounts no
-     * Toaster). */
-    onActionError?: (message: string) => void;
-  }
->) {
+}: Readonly<AdminCreatorProfilesWithSidebarProps & { clientFilter?: string }>) {
   const { profiles, toggleVerification } =
     useCreatorVerification(initialProfiles);
 
@@ -246,7 +236,6 @@ export function AdminCreatorProfilesUnified({
     openDeleteDialog,
     openInviteDialog,
     openEmailSignatureDialog,
-    onActionError,
   });
 
   const {
