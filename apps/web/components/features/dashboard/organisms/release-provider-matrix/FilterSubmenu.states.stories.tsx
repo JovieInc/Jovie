@@ -1,4 +1,5 @@
 import {
+  Button,
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuTrigger,
@@ -32,9 +33,9 @@ const LONG_LABEL_OPTIONS = [
 const withOpenMenu: Decorator = Story => (
   <DropdownMenu open>
     <DropdownMenuTrigger asChild>
-      <button type='button' inert>
+      <Button type='button' variant='ghost' inert>
         Open filters
-      </button>
+      </Button>
     </DropdownMenuTrigger>
     <DropdownMenuContent>
       <Story />
@@ -46,9 +47,9 @@ const withRtlOpenMenu: Decorator = Story => (
   <div dir='rtl'>
     <DropdownMenu open dir='rtl'>
       <DropdownMenuTrigger asChild>
-        <button type='button' inert>
+        <Button type='button' variant='ghost' inert>
           Open filters
-        </button>
+        </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent>
         <Story />
