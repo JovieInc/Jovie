@@ -511,10 +511,9 @@ function recoverableProductionDraft(overrides = {}) {
 
 test('production recovery selects the exact authorized source and preserves older drafts', () => {
   const candidate = recoverableProductionDraft();
+  // JOV-12659: target_commitish no longer discriminates — a draft whose tag
+  // was renamed to untagged-* carries a stale target and must still recover.
   const others = [
-    { id: 401429954, target_commitish: '85315d'.padEnd(40, '0') },
-    { target_commitish: productionRecoveryInput.releaseSha.slice(0, 7) },
-    { target_commitish: 'main' },
     { name: '26.9.16' },
     { tag_name: 'v26.10.0' },
     { tag_name: 'untagged-invalid' },
