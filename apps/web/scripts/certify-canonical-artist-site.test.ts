@@ -1,3 +1,4 @@
+import { execFileSync } from 'node:child_process';
 import {
   existsSync,
   mkdtempSync,
@@ -12,6 +13,7 @@ import {
   type CanonicalArtistSiteCliOptions,
   certifyCanonicalArtistSite,
   classifyDeployedRevision,
+  classifyDeployedRevisionFromGit,
   parseSourceHistory,
 } from './certify-canonical-artist-site';
 
@@ -452,6 +454,197 @@ describe('quota-deferred lineage: an empty history read is not a product verdict
     expect(certificate.status).toBe('RED');
     expect(certificate.failingChecks.map(check => check.id)).toContain(
       'identity_catalog'
+    );
+  });
+});
+
+describe('git-path lineage binding (JOV-12646)', () => {
+  const git = (root: string, args: readonly string[]) =>
+    execFileSync('git', args, { cwd: root, stdio: ['ignore', 'pipe', 'pipe'] })
+      .toString()
+      .trim();
+
+  /** A two-commit repo: rootSha (deployed) is an ancestor of childSha (source). */
+  function gitRepo() {
+    const root = mkdtempSync(join(tmpdir(), 'jovie-gp-git-'));
+    temporaryDirectories.push(root);
+    git(root, ['init', '--quiet', '--initial-branch', 'main']);
+    git(root, ['config', 'user.email', 'golden-path@example.com']);
+    git(root, ['config', 'user.name', 'Golden Path']);
+    writeFileSync(join(root, 'a.txt'), 'a');
+    git(root, ['add', 'a.txt']);
+    git(root, ['commit', '--quiet', '-m', 'a']);
+    const rootSha = git(root, ['rev-parse', 'HEAD']);
+    writeFileSync(join(root, 'b.txt'), 'b');
+    git(root, ['add', 'b.txt']);
+    git(root, ['commit', '--quiet', '-m', 'b']);
+    const childSha = git(root, ['rev-parse', 'HEAD']);
+    return { root, rootSha, childSha };
+  }
+
+  it('binds an equal revision and an ancestor from the checkout without the commits API', () => {
+    const repo = gitRepo();
+    expect(
+      classifyDeployedRevisionFromGit(repo.root, repo.childSha, repo.childSha)
+    ).toBe('same');
+    expect(
+      classifyDeployedRevisionFromGit(repo.root, repo.childSha, repo.rootSha)
+    ).toBe('ancestor');
+  });
+
+  it('reports real drift when both revisions exist but diverged', () => {
+    const repo = gitRepo();
+    git(repo.root, ['switch', '--quiet', '--orphan', 'other']);
+    writeFileSync(join(repo.root, 'c.txt'), 'c');
+    git(repo.root, ['add', 'c.txt']);
+    git(repo.root, ['commit', '--quiet', '-m', 'c']);
+    const orphanSha = git(repo.root, ['rev-parse', 'HEAD']);
+    expect(
+      classifyDeployedRevisionFromGit(repo.root, repo.childSha, orphanSha)
+    ).toBe('unrelated');
+  });
+
+  it('answers unanswered for a revision the checkout cannot supply', () => {
+    const repo = gitRepo();
+    const missing = 'f'.repeat(40);
+    expect(
+      classifyDeployedRevisionFromGit(repo.root, repo.childSha, missing)
+    ).toBe('unanswered');
+  });
+
+  it('certifies the binding from git even when the lineage file is empty', () => {
+    const repo = gitRepo();
+    const directory = mkdtempSync(join(tmpdir(), 'jovie-gp-git-cert-'));
+    temporaryDirectories.push(directory);
+    const m2ReceiptPath = join(directory, 'm2.json');
+    const profileReportPath = join(directory, 'profile-report.json');
+    const profileResultPath = join(directory, 'profile-result.json');
+    const historyPath = join(directory, 'source-history.txt');
+    writeFileSync(
+      m2ReceiptPath,
+      JSON.stringify({
+        steps: [
+          { name: 'claim', ok: true },
+          { name: 'pro_checkout_199', ok: true },
+          { name: 'activation', ok: true },
+        ],
+      })
+    );
+    writeFileSync(
+      profileReportPath,
+      JSON.stringify({
+        snapshot: { releaseSha: repo.rootSha },
+        linkChecks: [
+          {
+            url: 'https://jov.ie/tim/never-say-a-word',
+            status: 200,
+            canonicalArtistReturn: true,
+          },
+        ],
+      })
+    );
+    writeFileSync(
+      profileResultPath,
+      JSON.stringify({
+        failed: false,
+        reportPath: profileReportPath,
+        exposedDeferredSurfaces: [],
+        checks: [],
+        brokenInternalLinks: [],
+      })
+    );
+    writeFileSync(historyPath, '');
+    const certificate = certifyCanonicalArtistSite({
+      candidateId: 'acquisition:premade-artist-profile:tim-white:run-42',
+      runId: 'run-42',
+      sourceRevision: repo.childSha,
+      runUrl: 'https://github.com/JovieInc/Jovie/actions/runs/42',
+      goldenPathStatus: 'success',
+      claimContractStatus: 'success',
+      waitlistStatus: 'success',
+      m2Status: 'success',
+      m2ReceiptPath,
+      profileStatus: 'success',
+      navigationStatus: 'success',
+      profileResultPath,
+      outputPath: join(directory, 'certificate.json'),
+      gitRoot: repo.root,
+      sourceHistory: [],
+      lineageFileEmpty: true,
+    });
+    expect(certificate.status).toBe('GREEN');
+  });
+
+  it('keeps real drift RED from git even when the lineage file is empty', () => {
+    const repo = gitRepo();
+    git(repo.root, ['switch', '--quiet', '--orphan', 'other']);
+    writeFileSync(join(repo.root, 'c.txt'), 'c');
+    git(repo.root, ['add', 'c.txt']);
+    git(repo.root, ['commit', '--quiet', '-m', 'c']);
+    const orphanSha = git(repo.root, ['rev-parse', 'HEAD']);
+    const directory = mkdtempSync(join(tmpdir(), 'jovie-gp-git-drift-'));
+    temporaryDirectories.push(directory);
+    const m2ReceiptPath = join(directory, 'm2.json');
+    const profileReportPath = join(directory, 'profile-report.json');
+    const profileResultPath = join(directory, 'profile-result.json');
+    const historyPath = join(directory, 'source-history.txt');
+    writeFileSync(
+      m2ReceiptPath,
+      JSON.stringify({
+        steps: [
+          { name: 'claim', ok: true },
+          { name: 'pro_checkout_199', ok: true },
+          { name: 'activation', ok: true },
+        ],
+      })
+    );
+    writeFileSync(
+      profileReportPath,
+      JSON.stringify({
+        snapshot: { releaseSha: orphanSha },
+        linkChecks: [
+          {
+            url: 'https://jov.ie/tim/never-say-a-word',
+            status: 200,
+            canonicalArtistReturn: true,
+          },
+        ],
+      })
+    );
+    writeFileSync(
+      profileResultPath,
+      JSON.stringify({
+        failed: false,
+        reportPath: profileReportPath,
+        exposedDeferredSurfaces: [],
+        checks: [],
+        brokenInternalLinks: [],
+      })
+    );
+    writeFileSync(historyPath, '');
+    const certificate = certifyCanonicalArtistSite({
+      candidateId: 'acquisition:premade-artist-profile:tim-white:run-42',
+      runId: 'run-42',
+      sourceRevision: repo.childSha,
+      runUrl: 'https://github.com/JovieInc/Jovie/actions/runs/42',
+      goldenPathStatus: 'success',
+      claimContractStatus: 'success',
+      waitlistStatus: 'success',
+      m2Status: 'success',
+      m2ReceiptPath,
+      profileStatus: 'success',
+      navigationStatus: 'success',
+      profileResultPath,
+      outputPath: join(directory, 'certificate.json'),
+      gitRoot: repo.root,
+      sourceHistory: [],
+      lineageFileEmpty: true,
+    });
+    expect(certificate.status).toBe('RED');
+    expect(certificate.failingChecks).toContainEqual(
+      expect.objectContaining({
+        defectRef: 'canonical-artist-site-source-revision',
+      })
     );
   });
 });
