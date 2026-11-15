@@ -437,7 +437,12 @@ process.exitCode=1;`
       'fixture',
     ],
   ]) {
-    const git = spawnSync('git', args, { cwd: root, env, encoding: 'utf8' });
+    const git = spawnSync('git', args, {
+      maxBuffer: 256 * 1024 * 1024,
+      cwd: root,
+      env,
+      encoding: 'utf8',
+    });
     expect(git.status, git.stderr).toBe(0);
   }
   const state = join(root, 'state.json');
