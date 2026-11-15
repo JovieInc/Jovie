@@ -69,10 +69,6 @@
   scroll-margin-top: calc(var(--public-shell-header-offset) + var(--space-6));
 }
 
-.changelog-post:focus {
-  outline: none;
-}
-
 .changelog-post__meta {
   display: flex;
   flex-wrap: wrap;
@@ -201,10 +197,6 @@
   line-height: var(--leading-relaxed);
   color: var(--color-text-secondary-token);
   scroll-margin-top: calc(var(--public-shell-header-offset) + var(--space-6));
-}
-
-.changelog-polish__item:focus {
-  outline: none;
 }
 
 .changelog-polish__item::before {

@@ -443,7 +443,6 @@ body:has(.system-b-launch-page) .marketing-glass-header__cta:focus-visible {
 }
 
 :where(.system-b-launch-primary-link:focus-visible) {
-  outline: none;
   box-shadow:
     0 0 0 2px var(--system-b-cinematic-black),
     0 0 0 4px color-mix(in oklab, var(--system-b-text-primary) 35%, transparent);
@@ -465,7 +464,6 @@ body:has(.system-b-launch-page) .marketing-glass-header__cta:focus-visible {
 }
 
 :where(.system-b-launch-secondary-link:focus-visible) {
-  outline: none;
   box-shadow:
     0 0 0 2px var(--system-b-cinematic-black),
     0 0 0 4px color-mix(in oklab, var(--system-b-text-primary) 35%, transparent);
@@ -1211,7 +1209,6 @@ body:has(.system-b-launch-page) .marketing-glass-header__cta:focus-visible {
 }
 
 :where(.system-b-launch-final a:focus-visible) {
-  outline: none;
   box-shadow:
     0 0 0 2px var(--system-b-cinematic-black),
     0 0 0 4px color-mix(in oklab, var(--system-b-text-primary) 35%, transparent);
@@ -1577,7 +1574,6 @@ body:has(.system-b-pricing-page) .marketing-glass-header__cta:focus-visible {
 :where(.system-b-pricing-primary-link:focus-visible),
 :where(.system-b-pricing-secondary-link:focus-visible),
 :where(.system-b-pricing-page .public-action-secondary:focus-visible) {
-  outline: none;
   box-shadow:
     0 0 0 2px var(--system-b-cinematic-black),
     0 0 0 4px color-mix(in oklab, var(--system-b-text-primary) 35%, transparent);
@@ -2383,7 +2379,6 @@ body:has(.system-b-brand-page) .marketing-glass-header__cta:focus-visible {
 :where(.system-b-brand-secondary-link:focus-visible),
 :where(.system-b-brand-text-link:focus-visible),
 :where(.system-b-brand-download-link:focus-visible) {
-  outline: none;
   box-shadow:
     0 0 0 2px var(--system-b-cinematic-black),
     0 0 0 4px color-mix(in oklab, var(--system-b-text-primary) 35%, transparent);
@@ -2408,7 +2403,6 @@ body:has(.system-b-brand-page) .marketing-glass-header__cta:focus-visible {
 }
 
 :where(.system-b-brand-contact-link:focus-visible) {
-  outline: none;
   box-shadow: 0 0 0 3px
     color-mix(in oklab, var(--system-b-text-primary) 28%, transparent);
 }

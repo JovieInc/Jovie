@@ -22,7 +22,6 @@
 }
 
 .marketing-snap-rail__nav-btn:focus-visible {
-  outline: none;
   box-shadow:
     0 0 0 2px var(--system-b-cinematic-black),
     0 0 0 4px
@@ -38,7 +37,6 @@
 }
 
 .marketing-snap-rail__rail-btn:focus-visible {
-  outline: none;
   box-shadow:
     0 18px 42px
     color-mix(in oklab, var(--system-b-cinematic-black) 16%, transparent),

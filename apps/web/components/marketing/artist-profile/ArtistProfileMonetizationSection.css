@@ -74,7 +74,6 @@
 }
 
 .ap-monetization__skip:focus-visible {
-  outline: none;
   box-shadow:
     0 18px 42px
     color-mix(in oklab, var(--system-b-cinematic-black) 16%, transparent),
