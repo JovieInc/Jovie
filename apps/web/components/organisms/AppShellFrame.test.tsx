@@ -2,6 +2,7 @@ import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import { AppShellFrame } from './AppShellFrame';
+import styles from './AppShellFrame.module.css';
 
 const sidebar = (
   <nav aria-label='Workspace' className='h-full w-56 p-4'>
@@ -10,6 +11,29 @@ const sidebar = (
 );
 
 describe('AppShellFrame certificate', () => {
+  it.each([
+    { brandVariant: 'jovie', placeholder: false, launch: true },
+    { brandVariant: 'jovie', placeholder: true, launch: false },
+    { brandVariant: 'ov', placeholder: false, launch: true },
+    { brandVariant: 'ov', placeholder: true, launch: false },
+  ] as const)(
+    'keeps the live frame timeline stable across workspace skins: $brandVariant, placeholder=$placeholder',
+    ({ brandVariant, placeholder, launch }) => {
+      render(
+        <AppShellFrame
+          sidebar={null}
+          main={<div>Workspace</div>}
+          brandVariant={brandVariant}
+          placeholder={placeholder}
+        />
+      );
+      const main = screen.getByRole('main');
+      expect(main.classList.contains(styles.launchLight)).toBe(launch);
+      expect(main).not.toHaveAttribute('inert');
+      expect(main).not.toHaveAttribute('aria-hidden');
+    }
+  );
+
   it('renders the live frame with one main landmark and is axe-clean', async () => {
     const { container } = render(
       <AppShellFrame
