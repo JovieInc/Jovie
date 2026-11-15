@@ -1,14 +1,17 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import type { DashboardData } from '@/app/app/(shell)/dashboard/actions/dashboard-data';
+import type {
+  DashboardData,
+  ProfileCompletionStep,
+} from '@/app/app/(shell)/dashboard/actions/dashboard-data';
 import { DashboardDataProvider } from '@/app/app/(shell)/dashboard/DashboardDataContext';
 import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import { ProfileCompletionCard } from './ProfileCompletionCard';
 
 vi.mock('@/lib/error-tracking', () => ({ captureWarning: vi.fn() }));
 
-const steps = [
+const steps: ProfileCompletionStep[] = [
   {
     id: 'avatar',
     label: 'Add a profile photo',
@@ -16,7 +19,7 @@ const steps = [
     href: '/app/settings/profile',
   },
   {
-    id: 'music',
+    id: 'music-links',
     label: 'Connect your music links',
     description: 'Link Spotify or Apple Music so fans can listen.',
     href: '/app/settings/profile',
@@ -28,7 +31,7 @@ const steps = [
     href: '/app/settings/profile',
   },
   {
-    id: 'bio',
+    id: 'name',
     label: 'Write a bio',
     description: 'Tell fans who you are.',
     href: '/app/settings/profile',
