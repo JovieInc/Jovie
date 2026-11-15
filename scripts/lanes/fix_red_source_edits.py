@@ -19,9 +19,8 @@ from fix_red_diff_edits import (  # noqa: F401
     balance_added_headings, balance_heading_line, snap_added_conservative_spacing, strip_added_legacy_cache_exports,
 )
 from fix_red_conflict_resolvers import (  # noqa: F401
-    apply_certification_shard, resolve_additive_certificate_waivers,
-    resolve_additive_node_test_file, resolve_additive_node_tests_text,
-    resolve_additive_statement_file,
+    resolve_additive_certificate_waivers, resolve_additive_node_test_file,
+    resolve_additive_node_tests_text, resolve_additive_statement_file,
 )
 from screen_debt_merge import resolve_subtractive_screen_debt  # noqa: F401
 
@@ -63,10 +62,9 @@ def commit_open_merge(worktree, paths, sh, log, *, guard=lambda: None) -> bool:
 
 
 def resolve_additive_list_conflict(worktree: Path, branch: str, log, *, sh, merge_entries, guard=lambda: None, push: bool = True, stage_choice=None) -> bool:
-    """Union quoted lists, node:test blocks, Vitest insertions, waiver rows, or screen-debt drops.
+    """Union quoted lists, node:test blocks, Vitest statement insertions, waiver rows, or dropped screen-debt rows.
 
-    Head-only certification additions move into a component-certification.d shard
-    and the registry keeps main's bytes. A prose hunk or any other shape aborts
+    Main's order stays, then head-only lines. A prose hunk or any other shape aborts
     and leaves the PR to the model. The push is a fast-forward of the PR branch.
     `push=False` leaves that fast-forward to the caller."""
     guard()
@@ -77,7 +75,6 @@ def resolve_additive_list_conflict(worktree: Path, branch: str, log, *, sh, merg
             sh(["git", "merge", "--abort"], cwd=worktree, log=log)
             return False
         resolved: dict[str, str] = {}
-        extras: dict[str, str] = {}
         for path in conflicted:
             target = worktree / path
             try:
@@ -90,11 +87,6 @@ def resolve_additive_list_conflict(worktree: Path, branch: str, log, *, sh, merg
                     text = resolve_additive_certificate_waivers(worktree, path, sh)
                 if text is None and not stage_choice:
                     text = resolve_subtractive_screen_debt(worktree, path, sh)
-                if text is None and not stage_choice:
-                    placed = apply_certification_shard(worktree, path, sh, branch)
-                    if placed is not None:
-                        text = placed.pop(path, None)
-                        extras.update(placed)
             except OSError:
                 text = None
             if text is None:
@@ -102,14 +94,12 @@ def resolve_additive_list_conflict(worktree: Path, branch: str, log, *, sh, merg
                 return False
             resolved[path] = text
         try:
-            for path, text in {**resolved, **extras}.items():
-                target = worktree / path
-                target.parent.mkdir(parents=True, exist_ok=True)
-                atomic_write_text(target, text)
+            for path, text in resolved.items():
+                atomic_write_text(worktree / path, text)
         except OSError:
             sh(["git", "merge", "--abort"], cwd=worktree, log=log)
             return False
-        if not commit_open_merge(worktree, [*conflicted, *extras], sh, log, guard=guard):
+        if not commit_open_merge(worktree, conflicted, sh, log, guard=guard):
             return False
     guard()
     if not push:
