@@ -243,7 +243,7 @@ export function FounderMorningWalkCard(props: {
     <ContentSurfaceCard className='p-3' data-testid='founder-morning-walk'>
       <div className='flex flex-wrap items-start justify-between gap-3'>
         <div className='min-w-0 space-y-1'>
-          <p className='text-2xs font-medium uppercase tracking-[0.08em] text-tertiary-token'>
+          <p className='text-2xs font-medium tracking-wide text-tertiary-token'>
             Morning walk
           </p>
           <p className='text-sm text-primary-token'>{props.defaultStatus}</p>

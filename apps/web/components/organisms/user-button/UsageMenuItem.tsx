@@ -4,8 +4,10 @@
 import {
   Button,
   INSET_PANEL_ICON_COLUMN,
+  INSET_PANEL_LABEL,
   INSET_PANEL_ROW_INTERACTIVE,
   INSET_PANEL_ROW_LAYOUT,
+  INSET_PANEL_TRAILING,
 } from '@jovie/ui';
 import { ChevronDown, ChevronRight, ExternalLink, Gauge } from 'lucide-react';
 import Link from 'next/link';
@@ -163,14 +165,17 @@ export function UsageMenuItem({
         className={cn(
           INSET_PANEL_ROW_LAYOUT,
           INSET_PANEL_ROW_INTERACTIVE,
-          'w-full justify-start text-left font-normal'
+          // Button wraps its children in an inline content span. Flatten it
+          // so the icon, label and value are the row's own flex items: the
+          // icon lands in the shared column and the value right-aligns.
+          'w-full justify-start text-left font-normal [&>span]:contents'
         )}
       >
         <span className={INSET_PANEL_ICON_COLUMN}>
           <Gauge className='h-4 w-4' aria-hidden />
         </span>
-        <span className='min-w-0 flex-1'>Usage remaining</span>
-        <span className='shrink-0 tabular-nums text-tertiary-token'>
+        <span className={INSET_PANEL_LABEL}>Usage Remaining</span>
+        <span data-testid='usage-menu-value' className={INSET_PANEL_TRAILING}>
           {isLoading ? (
             <span
               className={cn(
@@ -182,12 +187,12 @@ export function UsageMenuItem({
           ) : (
             collapsedUsageLabel
           )}
+          {expanded ? (
+            <ChevronDown className='h-4 w-4' aria-hidden />
+          ) : (
+            <ChevronRight className='h-4 w-4 rtl:rotate-180' aria-hidden />
+          )}
         </span>
-        {expanded ? (
-          <ChevronDown className='h-3.5 w-3.5 shrink-0 text-tertiary-token' />
-        ) : (
-          <ChevronRight className='h-3.5 w-3.5 shrink-0 text-tertiary-token' />
-        )}
       </Button>
 
       {expanded ? (
@@ -246,7 +251,7 @@ export function UsageMenuItem({
                 'inline-flex items-center gap-1 text-2xs text-secondary-token transition-colors hover:text-primary-token'
               )}
             >
-              Learn more
+              Learn More
               <ExternalLink className='h-3 w-3' aria-hidden />
             </Link>
           </div>

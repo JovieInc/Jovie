@@ -234,12 +234,27 @@ export async function guardEjectionHold(
   return held;
 }
 
+/**
+ * Run, job and annotation reads need actions: read and checks: read. The Jovie
+ * Bot enroll token is minted without either, and asking for an ungranted one
+ * fails the mint for every enrollment, so they use the job's GITHUB_TOKEN.
+ */
+export function guardReader({ github, token }) {
+  return token ? new github.constructor({ auth: token }) : github;
+}
+
 /** The enroll job's Octokit reads and writes for guardEjectionHold. */
-export function octokitGuardIo({ github, owner, repo, prNumber }) {
+export function octokitGuardIo({
+  github,
+  reader = github,
+  owner,
+  repo,
+  prNumber,
+}) {
   return {
     listGuardRuns: async params =>
       (
-        await github.rest.actions.listWorkflowRuns({
+        await reader.rest.actions.listWorkflowRuns({
           owner,
           repo,
           workflow_id: GUARD_HOLD_WORKFLOW.file,
@@ -250,7 +265,7 @@ export function octokitGuardIo({ github, owner, repo, prNumber }) {
       ).data.workflow_runs,
     listJobs: async runId =>
       (
-        await github.rest.actions.listJobsForWorkflowRun({
+        await reader.rest.actions.listJobsForWorkflowRun({
           owner,
           repo,
           run_id: runId,
@@ -260,7 +275,7 @@ export function octokitGuardIo({ github, owner, repo, prNumber }) {
       ).data.jobs,
     listAnnotations: async checkRunId =>
       (
-        await github.rest.checks.listAnnotations({
+        await reader.rest.checks.listAnnotations({
           owner,
           repo,
           check_run_id: checkRunId,
