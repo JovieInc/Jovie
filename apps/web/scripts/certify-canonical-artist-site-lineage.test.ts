@@ -9,9 +9,6 @@ import { classifyDeployedRevisionFromGit } from './certify-canonical-artist-site
 
 const temporaryDirectories: string[] = [];
 
-const source = 'a'.repeat(40);
-const deployed = 'f'.repeat(40);
-
 function git(root: string, args: readonly string[]) {
   return execFileSync('git', args, {
     cwd: root,
@@ -19,24 +16,6 @@ function git(root: string, args: readonly string[]) {
   })
     .toString()
     .trim();
-}
-
-/** A two-commit repo: rootSha (deployed) is an ancestor of childSha (source). */
-function gitRepo() {
-  const root = mkdtempSync(join(tmpdir(), 'jovie-gp-git-'));
-  temporaryDirectories.push(root);
-  git(root, ['init', '--quiet', '--initial-branch', 'main']);
-  git(root, ['config', 'user.email', 'golden-path@example.com']);
-  git(root, ['config', 'user.name', 'Golden Path']);
-  writeFileSync(join(root, 'a.txt'), 'a');
-  git(root, ['add', 'a.txt']);
-  git(root, ['commit', '--quiet', '-m', 'a']);
-  const rootSha = git(root, ['rev-parse', 'HEAD']);
-  writeFileSync(join(root, 'b.txt'), 'b');
-  git(root, ['add', 'b.txt']);
-  git(root, ['commit', '--quiet', '-m', 'b']);
-  const childSha = git(root, ['rev-parse', 'HEAD']);
-  return { root, rootSha, childSha };
 }
 
 afterEach(() => {
