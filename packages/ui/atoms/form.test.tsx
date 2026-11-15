@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import * as React from 'react';
 import { useForm } from 'react-hook-form';
@@ -76,6 +76,36 @@ function TestFormWithValidation({
                 <input type='email' placeholder='Enter email' {...field} />
               </FormControl>
               <FormDescription>We will never share your email.</FormDescription>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        <button type='submit'>Submit</button>
+      </form>
+    </Form>
+  );
+}
+
+function RenamableFieldForm({ name }: { name: 'givenName' | 'familyName' }) {
+  const form = useForm({
+    defaultValues: { givenName: '', familyName: 'Existing surname' },
+  });
+  const label = name === 'givenName' ? 'Given name' : 'Family name';
+
+  return (
+    <Form {...form}>
+      <form onSubmit={form.handleSubmit(vi.fn())}>
+        <FormField
+          control={form.control}
+          name={name}
+          rules={{ required: `${label} is required` }}
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>{label}</FormLabel>
+              <FormControl>
+                <input {...field} />
+              </FormControl>
+              <FormDescription>{label} help.</FormDescription>
               <FormMessage />
             </FormItem>
           )}
@@ -173,7 +203,7 @@ describe('Form', () => {
       expect(label).toHaveAttribute('for', input.id);
     });
 
-    it('applies error styling when field has error', async () => {
+    it('marks an invalid label and clears that state after valid submission', async () => {
       const user = userEvent.setup({ delay: null });
       render(<TestFormWithValidation />);
 
@@ -183,6 +213,19 @@ describe('Form', () => {
       // After validation, the label should have the destructive class
       const label = await screen.findByText('Email');
       expect(label.className).toContain('text-destructive');
+      expect(label).toHaveAttribute('data-invalid', 'true');
+
+      await user.type(
+        screen.getByRole('textbox', { name: 'Email' }),
+        'listener@example.test'
+      );
+      await user.click(screen.getByRole('button', { name: 'Submit' }));
+
+      await waitFor(() => {
+        expect(label).not.toHaveAttribute('data-invalid');
+        expect(label).not.toHaveClass('text-destructive');
+        expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+      });
     });
   });
 
@@ -195,9 +238,9 @@ describe('Form', () => {
     it('sets aria-describedby to description id', () => {
       render(<TestForm />);
       const input = screen.getByPlaceholderText('Enter username');
-      // Should reference the description element
-      expect(input).toHaveAttribute('aria-describedby');
-      expect(input.getAttribute('aria-describedby')).toBeTruthy();
+      const description = screen.getByText('Your public display name.');
+      expect(description.id).toBeTruthy();
+      expect(input).toHaveAttribute('aria-describedby', description.id);
     });
 
     it('omits aria-invalid when no error exists', () => {
@@ -430,6 +473,34 @@ describe('Form', () => {
   });
 
   describe('FormField', () => {
+    it('reads the current field error when its name changes without remounting', async () => {
+      const user = userEvent.setup({ delay: null });
+      const { rerender } = render(<RenamableFieldForm name='givenName' />);
+
+      await user.click(screen.getByRole('button', { name: 'Submit' }));
+      expect(await screen.findByRole('alert')).toHaveTextContent(
+        'Given name is required'
+      );
+
+      rerender(<RenamableFieldForm name='familyName' />);
+      const familyName = screen.getByRole('textbox', { name: 'Family name' });
+      expect(familyName).toHaveValue('Existing surname');
+      expect(familyName).not.toHaveAttribute('aria-invalid');
+      expect(screen.getByText('Family name')).not.toHaveAttribute(
+        'data-invalid'
+      );
+      expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+
+      // The original field's error still exists, but belongs to that field.
+      rerender(<RenamableFieldForm name='givenName' />);
+      expect(
+        screen.getByRole('textbox', { name: 'Given name' })
+      ).toHaveAttribute('aria-invalid', 'true');
+      expect(screen.getByRole('alert')).toHaveTextContent(
+        'Given name is required'
+      );
+    });
+
     it('fails clearly outside a FormField context', () => {
       function OrphanFieldProbe() {
         useFormField();
@@ -521,8 +592,13 @@ describe('Form', () => {
       }
 
       render(<FullForm />);
-      await user.type(screen.getByPlaceholderText('Name'), 'John');
-      await user.type(screen.getByPlaceholderText('Email'), 'john@test.com');
+      const name = screen.getByRole('textbox', { name: 'Name' });
+      const email = screen.getByRole('textbox', { name: 'Email' });
+      expect(name.id).toBeTruthy();
+      expect(email.id).toBeTruthy();
+      expect(name.id).not.toBe(email.id);
+      await user.type(name, 'John');
+      await user.type(email, 'john@test.com');
       await user.click(screen.getByRole('button', { name: 'Submit' }));
 
       expect(onSubmit).toHaveBeenCalledWith(
