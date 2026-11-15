@@ -212,7 +212,8 @@ describe('CapacityBoard', () => {
       /57% used/
     );
     const lapsed = screen.getByTestId('capacity-account-tim-jov-ie');
-    expect(within(lapsed).getByText('lapsed')).toBeTruthy();
+    const lapsedChip = within(lapsed).getByText('Lapsed');
+    expect(lapsedChip).not.toHaveClass('uppercase');
     expect(lapsed.textContent).toMatch(/lapsed: not routable/);
     expect(lapsed.textContent).not.toMatch(/Ahead of pace/);
     expect(screen.getByText(/Decision pending \(2026-10-29\)/)).toBeTruthy();

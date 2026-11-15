@@ -29,18 +29,6 @@ import {
 import type { OpportunityInboxData } from '@/lib/connectors/opportunity-inbox-types';
 import { OpportunityInboxPageClient } from './OpportunityInboxPageClient';
 
-const runtimeState = vi.hoisted(() => ({
-  update: null as null | {
-    available: boolean;
-    busy: boolean;
-    title: string;
-    description: string;
-    apply: () => void;
-  },
-}));
-vi.mock('@/components/shell/RuntimeUpdateProvider', () => ({
-  useRuntimeUpdate: () => runtimeState.update,
-}));
 const mutateMock = vi.fn();
 const refreshMock = vi.fn();
 const mutateAsyncMock = vi.fn().mockResolvedValue({ ok: true });
