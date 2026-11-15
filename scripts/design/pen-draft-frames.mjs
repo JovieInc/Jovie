@@ -22,7 +22,7 @@ const PNG_SIGNATURE = Buffer.from([
 /**
  * @typedef {{ok: false, reason: string, detail?: string}} Failure
  * @typedef {{ok: true, bytes: Buffer}} Picture
- * @typedef {{artifact: string, frame: string, png: string | null, sidecar: string | null}} FrameEntry
+ * @typedef {{artifact: string, frame: string, png: string | null, sidecar: string | null, deferred: {reason: string, reset: string | null, detail: string | null} | null}} FrameEntry
  */
 
 const FRAME_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;

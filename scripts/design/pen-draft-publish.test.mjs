@@ -21,7 +21,6 @@ import {
   DEFERRED_TITLE,
   deferralCommentBody,
   pickApprovalIssue,
-  publishDrafts,
   runUrlFor,
 } from './pen-draft-publish.mjs';
 
@@ -422,8 +421,10 @@ test('a deferred frame leaves one comment with the reason and the reset', async 
   });
   const result = await publish(dir, network);
   assert.equal(result.ok, true);
+  // checkJs does not narrow the FrameRow union on `ok`, so read it as any.
+  const rows = /** @type {any[]} */ (result.frames);
   assert.deepEqual(
-    result.frames.map(row => [row.frame, row.action]),
+    rows.map(row => [row.frame, row.action]),
     [
       ['claim', 'skipped-no-png'],
       ['request-access', 'deferred'],
@@ -483,14 +484,7 @@ test('the first deferral creates the standing issue; without a key it fails', as
     1
   );
   // No key: the deferral note cannot be posted, so the run is red.
-  const noKey = await publishDrafts({
-    dir,
-    runUrl: RUN_URL,
-    apiKey: undefined,
-    fetchImpl: network.fetchImpl,
-    env: {},
-    log: () => {},
-  });
+  const noKey = await publish(dir, network, { apiKey: undefined, env: {} });
   assert.equal(noKey.ok, false);
   assert.equal(noKey.reason, 'missing_linear_api_key');
 });

@@ -48,7 +48,7 @@ export const DEFERRED_DESCRIPTION =
  * @typedef {{frame: string, ok: true, action: string, identifier?: string | null}} PublishedRow
  * @typedef {{frame: string, ok: false, reason: string, detail?: string}} FailedRow
  * @typedef {PublishedRow | FailedRow} FrameRow
- * @typedef {{ok: boolean, reason?: string, frames: FrameRow[]}} PublishResult
+ * @typedef {{ok: boolean, reason?: string, detail?: string, frames: FrameRow[]}} PublishResult
  * @typedef {{apiKey?: string, fetchImpl: typeof fetch, env: NodeJS.ProcessEnv, sleep?: (ms: number) => Promise<void>, log?: (line: string) => void}} Context
  */
 
