@@ -145,7 +145,6 @@ describe('BatchIngestModal', () => {
     expect(screen.getByRole('textbox')).toHaveValue('');
   });
 
-
   it('renders error status copy with the AA error-text token', () => {
     const source = readFileSync(
       resolve(process.cwd(), 'components/features/admin/BatchIngestModal.tsx'),

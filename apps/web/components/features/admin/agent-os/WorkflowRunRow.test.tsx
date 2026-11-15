@@ -120,7 +120,6 @@ describe('WorkflowRunRow', () => {
     await expectNoA11yViolations(container);
   });
 
-
   it('renders the human-gate badge with the AA status-text token', () => {
     render(<WorkflowRunRow artifact={buildPendingApprovalArtifact()} />);
 

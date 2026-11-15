@@ -203,7 +203,6 @@ describe('AdminUserDetailDrawer', () => {
     await expectNoA11yViolations(container);
   });
 
-
   it('keeps the copy buttons at a 24px+ touch target', () => {
     render(<AdminUserDetailDrawer user={adminUser} onClose={() => {}} />);
 

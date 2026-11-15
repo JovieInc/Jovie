@@ -116,7 +116,6 @@ describe('FooterBranding', () => {
     ).not.toHaveClass('uppercase');
   });
 
-
   it('keeps the claim-handle link a 24px+ touch target', () => {
     const { container } = render(<FooterBranding mark='brand' />);
 
