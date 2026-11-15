@@ -6,7 +6,10 @@ import { describe, expect, it } from 'vitest';
 import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import { DateCell } from './DateCell';
 
-const DATE = new Date('2026-09-01T12:00:00.000Z');
+// Local noon, so the date reads Sep 1 in every host time zone.
+const DATE = new Date(2026, 8, 1, 12);
+// UTC noon, for the case that formats in UTC.
+const UTC_DATE = new Date('2026-09-01T12:00:00.000Z');
 
 function renderCell(node: ReactNode) {
   return render(<TooltipProvider delayDuration={0}>{node}</TooltipProvider>);
@@ -44,7 +47,7 @@ describe('DateCell', () => {
     const user = userEvent.setup();
     const { container } = renderCell(
       <DateCell
-        date={DATE}
+        date={UTC_DATE}
         locale='en-GB'
         formatOptions={{ day: 'numeric', month: 'long', timeZone: 'UTC' }}
         tooltipFormatOptions={{ year: 'numeric', timeZone: 'UTC' }}
