@@ -7,6 +7,22 @@ is spent before the edit; a failed edit returns None so the model still runs thi
 from __future__ import annotations
 
 
+def promote_body_and_sync(cls, action, per_check):
+    """A red-before-green body beside only sync-main classes is not a model job.
+
+    Body repair stays on the mixed path. The sync is the route, including when
+    the branch is already BEHIND (that override would otherwise drop the body repair).
+    """
+    import fix_red_classes as classes
+
+    if "pr-body" not in {item_cls for item_cls, _ in per_check}:
+        return cls, action
+    rest = [item_action for item_cls, item_action in per_check if item_cls != "pr-body"]
+    if not rest or any(item_action != classes.SYNC_MAIN for item_action in rest):
+        return cls, action
+    return "mixed", classes.SYNC_MAIN
+
+
 def mixed_repairs(pr: dict, per_check: list) -> list[str]:
     if len({cls for cls, _ in per_check}) < 2:
         return []

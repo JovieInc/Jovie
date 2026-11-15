@@ -72,7 +72,7 @@ export function DspPresenceSummary({
             <>
               <span className='text-quaternary-token'>&middot;</span>
               <span className='inline-flex items-center gap-1.5'>
-                <span className='h-1.5 w-1.5 rounded-full bg-amber-500' />
+                <span className='h-1.5 w-1.5 rounded-full bg-warning' />
                 {suggestedCount} pending
               </span>
             </>
@@ -80,7 +80,7 @@ export function DspPresenceSummary({
           {isDiscovering && enrichmentStatus && (
             <>
               <span className='text-quaternary-token'>&middot;</span>
-              <span className='inline-flex items-center gap-1.5 text-blue-500'>
+              <span className='inline-flex items-center gap-1.5 text-info'>
                 <Loader2 className='h-3 w-3 animate-spin' />
                 {getPhaseLabel(enrichmentStatus.overallPhase)}
               </span>
