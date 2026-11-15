@@ -1,4 +1,3 @@
-import { execFileSync } from 'node:child_process';
 import {
   existsSync,
   mkdirSync,
@@ -10,7 +9,7 @@ import {
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
-import { gitLsFiles } from '../git-ls-files.mjs';
+import { execFileSync } from '../child-process.mjs';
 import {
   classifyLockfileChange,
   classifyProductLanes,
@@ -21,6 +20,8 @@ import {
   ProductLaneClassificationError,
   runProductLaneClassifier,
 } from '../product-lane-classifier.mjs';
+
+import { defineRepositoryClassificationTests } from './product-lane-classifier-repository.cases.mjs';
 
 const ALL = ['ios', 'mac', 'web', 'cross-product'];
 const JS = ['mac', 'web', 'cross-product'];
@@ -34,6 +35,7 @@ const pkg = (before, after, desktop = {}) =>
   });
 
 describe('product lane classifier', () => {
+  defineRepositoryClassificationTests();
   it('routes native playbook-only changes through web checks', () => {
     expect(
       classifyProductLanes([
@@ -1059,14 +1061,6 @@ describe('product lane classifier', () => {
         { ios: ['success'], web: ['failure'] }
       )
     ).toThrow('Unselected web lane produced a non-skipped result');
-  });
-
-  it('rejects unknown paths and maps every tracked path', () => {
-    expect(() => classifyProductLanes(['new-product/main.ts'])).toThrow(
-      ProductLaneClassificationError
-    );
-    const tracked = gitLsFiles();
-    expect(() => classifyProductLanes(tracked)).not.toThrow();
   });
 
   it('writes human-readable and machine-readable receipts', () => {
