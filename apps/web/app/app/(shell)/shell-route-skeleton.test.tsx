@@ -3,6 +3,7 @@ import { join } from 'node:path';
 import { cleanup, render, screen, within } from '@testing-library/react';
 import { isValidElement, type ReactElement } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { OpportunityInboxRouteSkeleton } from '@/components/features/opportunity-inbox/OpportunityInboxRouteSkeleton';
 import { APP_ROUTES } from '@/constants/routes';
 import { RightPanelProvider } from '@/contexts/RightPanelContext';
 import { expectNoA11yViolations } from '@/tests/utils/a11y';
@@ -36,6 +37,7 @@ afterEach(() => cleanup());
 
 describe('resolveShellRouteSkeleton', () => {
   it.each([
+    [APP_ROUTES.DASHBOARD, OpportunityInboxRouteSkeleton],
     [APP_ROUTES.CALENDAR, CalendarRouteSkeleton],
     [APP_ROUTES.LINKS, LinksRouteSkeleton],
     [APP_ROUTES.DASHBOARD_LINKS, LinksRouteSkeleton],
@@ -79,6 +81,16 @@ describe('resolveShellRouteSkeleton', () => {
     cleanup();
     const { container } = render(<LibraryLoadingStateLazy />);
     await vi.waitFor(() => expect(container.innerHTML).toBe(eagerHtml));
+  });
+
+  it('boots Home into the inbox skeleton, not the chat composer', () => {
+    render(<main>{resolveShellRouteSkeleton(APP_ROUTES.DASHBOARD)}</main>);
+    expect(screen.getByLabelText('Loading Inbox')).toHaveAttribute(
+      'aria-busy',
+      'true'
+    );
+    expect(screen.getByTestId('opportunity-inbox-loading')).toBeVisible();
+    expect(screen.queryByRole('textbox')).not.toBeInTheDocument();
   });
 
   it('keeps the generic shell main when the destination is unknown', () => {
@@ -190,6 +202,7 @@ describe('resolved shell skeletons are accessible loading states', () => {
     APP_ROUTES.TOUR_DATES,
     APP_ROUTES.SETTINGS_ACCOUNT,
     APP_ROUTES.EARNINGS,
+    APP_ROUTES.DASHBOARD,
   ])('renders an axe-clean skeleton for %s', async pathname => {
     const node = resolveShellRouteSkeleton(pathname);
     expect(isValidElement(node)).toBe(true);
