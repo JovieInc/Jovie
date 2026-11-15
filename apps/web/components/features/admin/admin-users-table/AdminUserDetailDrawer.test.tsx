@@ -236,7 +236,9 @@ describe('AdminUserDetailDrawer', () => {
     // column must reserve that band or the cluster paints over the target's
     // edge and axe target-size reports a partially obscured 20x24 hit area —
     // pr-9 (36px) under-reserved it by exactly the reported 4px.
-    const identity = screen.getByTestId('entity-header-title').parentElement;
+    const identity = screen
+      .getByTestId('entity-header-title')
+      .closest('div.space-y-1');
     expect(identity).toHaveClass('pr-20');
   });
 });
