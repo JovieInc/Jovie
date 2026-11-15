@@ -48,7 +48,7 @@ describe('JovieLogo', () => {
   it('renders dark variant class when variant="dark"', () => {
     render(<JovieLogo variant='dark' />);
     const svg = document.querySelector('svg');
-    expect(svg).toHaveClass('text-white');
+    expect(svg).toHaveClass('text-on-media');
   });
 
   it('renders showText content when showText=true', () => {
