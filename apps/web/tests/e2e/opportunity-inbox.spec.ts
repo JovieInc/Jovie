@@ -51,7 +51,19 @@ test.describe('Opportunity Inbox', () => {
       });
       await setupLink.focus();
       await expect(setupLink).toBeFocused();
+    } else if (await emptyState.isVisible()) {
+      // A clear queue has nothing to annotate, so no stray Notes line.
+      await expect(emptyState).toContainText('Your Inbox Is Clear');
+      await expect(page.getByRole('button', { name: 'Add Notes' })).toHaveCount(
+        0
+      );
     }
+    // App updates live in the shell corner pill, never in the inbox content.
+    await expect(
+      page
+        .getByTestId('opportunity-inbox-content')
+        .getByTestId('runtime-update-pill')
+    ).toHaveCount(0);
   });
 
   for (const persona of ['creator-ready', 'admin'] as const) {
