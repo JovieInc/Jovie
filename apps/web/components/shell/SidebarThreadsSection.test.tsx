@@ -702,3 +702,39 @@ it('remeasures title text after font loading and window resize', () => {
   else Reflect.deleteProperty(document, 'fonts');
   vi.restoreAllMocks();
 });
+
+it('tones each status dot with design-system color tokens', () => {
+  render(
+    <SidebarThreadsSection
+      threads={[
+        {
+          id: 'running-thread',
+          title: 'Running thread',
+          status: 'running',
+          updatedAt: '2026-05-12T00:00:00.000Z',
+        },
+        {
+          id: 'errored-thread',
+          title: 'Errored thread',
+          status: 'errored',
+          updatedAt: '2026-05-12T00:00:00.000Z',
+        },
+        {
+          id: 'read-thread',
+          title: 'Read thread',
+          status: 'complete',
+          updatedAt: '2026-05-12T00:00:00.000Z',
+        },
+      ]}
+      onSelect={() => undefined}
+      tight
+      collapsed={false}
+    />
+  );
+
+  const dotOf = (name: string) =>
+    screen.getByRole('button', { name }).querySelector('.rounded-full');
+  expect(dotOf('Running thread')).toHaveClass('bg-accent/85');
+  expect(dotOf('Errored thread')).toHaveClass('bg-error/85');
+  expect(dotOf('Read thread')).toHaveClass('bg-primary-token/25');
+});
