@@ -1,4 +1,10 @@
 /**
+ * api-budget: github-app-core 80/hr - Linear Sync lifecycle reads: the GET
+ * client's per-path reads, the 10-page closed-pull snapshot, and the GraphQL
+ * batch that replaces per-pull REST reads (~4 sweeps/hr, ~13 REST + ~5
+ * GraphQL points each).
+ */
+/**
  * @typedef {{
  *   ok: boolean,
  *   status?: number,
