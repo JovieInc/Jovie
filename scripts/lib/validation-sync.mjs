@@ -241,8 +241,9 @@ export function githubClient(fetchImpl, token, sleep = defaultSleep) {
     const [owner, name] = String(repository).split('/');
     const api = createGitHubClient({
       token,
-      fetch: (url, options) =>
-        fetchImpl(url, { ...options, redirect: 'error' }),
+      fetch: /** @type {typeof fetch} */ (
+        (url, options) => fetchImpl(url, { ...options, redirect: 'error' })
+      ),
     });
     const rows = await api.batch(
       numbers.map(String),
