@@ -1,30 +1,24 @@
 #!/usr/bin/env node
 /**
- * node scripts/schedule-trigger-guard.mjs   fail on newly added schedules or
- *                                           GitHub-API polling loops
+ * node scripts/schedule-trigger-guard.mjs  fail on newly added schedules or
+ *                                          GitHub-API polling loops
  *
- * Enforces the event-driven-only mandate (.claude/rules/event-driven.md):
- * a PR may not ADD a `schedule:`/`cron:` trigger, or a polling loop against
- * the GitHub API, unless the file is on
+ * Event-driven-only mandate (.claude/rules/event-driven.md, Tim 2026-10-21 +
+ * 2026-11-14): a PR may not ADD a `schedule:`/`cron:` trigger, or a polling
+ * loop against the GitHub API, unless the file is on
  * canon/automation-schedule-allowlist.json with a justification and a live
- * canon/automation-registry.jsonl id. The allowlist is intentionally small:
- * an entry exists only for work that is inherently time-based, and every
- * entry names its registry id so automation-liveness keeps observing it.
+ * canon/automation-registry.jsonl id (automation-liveness keeps observing it).
  *
- * Deterministic, dependency-free (runs in PR Fleet Rules, which installs
- * nothing), additive to the existing workflow-token-budget and api-budget
- * guards; it loosens nothing. The diff base is origin/main (the same trusted
- * base the biome lane and design-exception-registry use); without a base the
- * guard skips, exactly like scripts/external-api-guard.mjs.
+ * Deterministic, dependency-free, additive to the workflow-token-budget and
+ * api-budget guards; loosens nothing. Diff base: origin/main (same trusted
+ * base as the biome lane); no base = documented skip, like external-api-guard.
  *
- * Polling detection is deliberately narrow: a file is flagged only when its
- * ADDED, non-comment lines contain both a loop construct
- * (while/until/setInterval) and a GitHub API call construct (gh api,
- * api.github.com, octokit, github.rest, GraphQL). Test files are out of
- * scope (they legitimately contain polling-shaped fixtures, the same way the
- * raw-button ratchet excludes *.test.*). Unrelated pairs trip a production
- * file only until it is allowlisted with a justification, which is the
- * review the mandate asks for anyway.
+ * Polling detection is narrow: ADDED, non-comment lines must contain BOTH a
+ * loop construct (while/until/setInterval) and a GitHub API construct (gh
+ * api, api.github.com, octokit, github.rest, GraphQL). Test files are out of
+ * scope (fixture-shaped content, like the raw-button ratchet's *.test.*
+ * exclusion); anything else trips only until allowlisted with a
+ * justification, which is the review the mandate asks for.
  */
 import { spawnSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
