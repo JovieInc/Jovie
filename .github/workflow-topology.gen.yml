@@ -817,8 +817,8 @@ nodes:
       - push
       - workflow_dispatch
       - workflow_run
-    terminalReceipt: job:sweep
-    jobCount: 2
+    terminalReceipt: job:baseline-merge
+    jobCount: 4
   - name: Neon Scheduled Branch Cleanup
     path: .github/workflows/neon-scheduled-cleanup.yml
     active: true
@@ -1003,7 +1003,7 @@ nodes:
       - workflow_dispatch
       - workflow_run
     terminalReceipt: job:notify-failure
-    jobCount: 9
+    jobCount: 10
   - name: PR Conflict Handler
     path: .github/workflows/pr-conflict-handler.yml
     active: false
@@ -1393,17 +1393,6 @@ nodes:
       - schedule
       - workflow_dispatch
     terminalReceipt: job:recurrence
-    jobCount: 1
-  - name: Sentry Autofix
-    path: .github/workflows/sentry-autofix.yml
-    active: true
-    category: remediation-dispatch
-    authoritativeProducer: Lane Fix Relay
-    authoritativeFor: []
-    allowedConsumers: []
-    triggeringStateTransition:
-      - repository_dispatch
-    terminalReceipt: job:autofix
     jobCount: 1
   - name: Shipping Origin Receipt
     path: .github/workflows/shipping-origin.yml

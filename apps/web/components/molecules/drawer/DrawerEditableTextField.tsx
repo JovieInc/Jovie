@@ -1,6 +1,6 @@
 'use client';
 
-import { Input } from '@jovie/ui';
+import { Input, PlainButton } from '@jovie/ui';
 import { Check, Copy, ExternalLink } from 'lucide-react';
 import type { ReactNode } from 'react';
 import React, {
@@ -211,7 +211,7 @@ export const DrawerEditableTextField = React.memo(
             />
           ) : null}
           {editable && !isEditing ? (
-            <button
+            <PlainButton
               type='button'
               onClick={() => setIsEditing(true)}
               onDoubleClick={() => setIsEditing(true)}
@@ -246,7 +246,7 @@ export const DrawerEditableTextField = React.memo(
               >
                 {displayValue}
               </span>
-            </button>
+            </PlainButton>
           ) : null}
           {editable ? null : (
             <span

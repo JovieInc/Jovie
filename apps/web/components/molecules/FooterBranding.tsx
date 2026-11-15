@@ -83,7 +83,7 @@ function getLogoLinkClass(mark: string, isLinear: boolean): string {
     return 'relative inline-flex min-h-11 items-center gap-2 rounded-md py-3 -my-3 text-sm font-medium text-secondary-token transition-colors duration-subtle hover:text-primary-token focus-ring-themed';
   }
   if (mark === 'text') {
-    return 'inline-flex min-h-11 min-w-11 items-center justify-center gap-1 rounded-md px-2 -mx-2 -my-3 focus-ring-themed text-3xs uppercase tracking-widest text-neutral-700 hover:text-neutral-950 dark:text-white/70 dark:hover:text-white';
+    return 'inline-flex min-h-11 min-w-11 items-center justify-center gap-1 rounded-md px-2 -mx-2 -my-3 focus-ring-themed text-3xs tracking-widest text-secondary-token hover:text-primary-token';
   }
   if (isLinear) {
     return cn(
@@ -140,11 +140,10 @@ export function FooterBranding({
           href={signUpLink}
           prefetch={false}
           className={cn(
-            'text-3xs leading-snug uppercase font-semibold tracking-[0.04em]',
+            'text-3xs leading-snug font-semibold tracking-[0.04em]',
             'text-center',
             'rounded-md px-2 py-1 -mx-2 -my-1',
-            !isLinear &&
-              'text-neutral-700 hover:text-neutral-950 dark:text-white/70 dark:hover:text-white',
+            !isLinear && 'text-secondary-token hover:text-primary-token',
             !isLinear && 'hover:bg-surface-1'
           )}
           style={ctaStyle}

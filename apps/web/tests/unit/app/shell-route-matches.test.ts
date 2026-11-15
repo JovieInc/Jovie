@@ -4,6 +4,7 @@ import {
   isAudienceShellRoute,
   isCalendarShellRoute,
   isChatShellRoute,
+  isInboxShellRoute,
   isInsightsShellRoute,
   isLibraryShellRoute,
   isLinksShellRoute,
@@ -78,6 +79,15 @@ describe('isReleasesShellRoute', () => {
     expect(isReleasesShellRoute('/app/dashboard/releases/abc/tasks')).toBe(
       true
     );
+  });
+});
+
+describe('isInboxShellRoute', () => {
+  it('matches only the Home root', () => {
+    expect(isInboxShellRoute(APP_ROUTES.DASHBOARD)).toBe(true);
+    expect(isInboxShellRoute(APP_ROUTES.CHAT)).toBe(false);
+    expect(isInboxShellRoute(`${APP_ROUTES.DASHBOARD}/tasks`)).toBe(false);
+    expect(isInboxShellRoute(null)).toBe(false);
   });
 });
 

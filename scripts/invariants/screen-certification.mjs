@@ -25,6 +25,7 @@ import {
   resolveTrustedArtifactId,
   resolveTrustedScreenProof,
 } from './screen-proof-resolver.mjs';
+import { SCREEN_REGISTRY as registeredScreens } from './screen-registry.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 export const REPO_ROOT = resolve(__dirname, '../..');
@@ -33,6 +34,7 @@ export const SCREEN_CERT_SCHEMA = 'screen-certification/v2';
 export const SCREEN_BROWSER_PROOF_SCHEMA = 'screen-browser-proof/v1';
 export const SCREEN_CERT_GATE = 'screen-certification-gate';
 export const SCREEN_REGISTRATION_GATE = 'screen-registration-gate';
+export const SCREEN_REGISTRY = registeredScreens;
 export const CLS_INTERACTION_BUDGET = 0.05;
 // Every entry below is a screen whose registered `sources` exactly matches
 // (or, for a directory registration, is the sole capture inside) a route in
@@ -227,187 +229,6 @@ export const PROTECTED_REVENUE_SCREEN_SOURCES = Object.freeze({
   'apps/web/app/onboarding/checkout/page.tsx': true,
   'apps/web/app/billing/success/page.tsx': true,
 });
-
-function parseRegistry(raw) {
-  return raw
-    .trim()
-    .split('\n')
-    .map(line => {
-      const [id, platform, owner, sources, viewports, flag, reason] =
-        line.split('|');
-      return Object.freeze({
-        id,
-        platform,
-        owner,
-        sources: sources.split(','),
-        viewports: viewports.split(','),
-        ...(flag === 'x' ? { excluded: true, reason } : {}),
-      });
-    });
-}
-
-/** @type {readonly object[]} */
-export const SCREEN_REGISTRY = Object.freeze(
-  parseRegistry(
-    `
-web.homepage|web|marketing-home|apps/web/app/(home)/page.tsx,apps/web/app/(home)/layout.tsx,apps/web/app/content-preview/|desktop,mobile
-web.root-document|web|root-document-shell|apps/web/app/layout.tsx|desktop,mobile
-web.artists|web|marketing-artists|apps/web/app/artists/page.tsx|desktop,mobile
-web.waitlist|web|marketing-waitlist|apps/web/app/waitlist/page.tsx,apps/web/app/waitlist/layout.tsx,apps/web/app/waitlist/error.tsx|desktop,mobile
-web.developers|web|developer-documentation|apps/web/app/(marketing)/developers/page.tsx|desktop,mobile
-web.developers-agents|web|developer-agent-docs|apps/web/app/(marketing)/developers/agents/page.tsx|desktop,mobile
-web.proof-methodology|web|proof-methodology|apps/web/app/(marketing)/proof/methodology/page.tsx|desktop,mobile
-web.api-versioning-policy|web|api-versioning-policy|apps/web/app/(marketing)/api-versioning/page.tsx|desktop,mobile
-web.cli-landing|web|cli-landing|apps/web/app/(marketing)/cli/page.tsx|desktop,mobile
-web.engineering-publication|web|engineering-publication|apps/web/app/(marketing)/engineering/page.tsx,apps/web/app/(marketing)/engineering/[slug]/page.tsx|desktop,mobile
-web.engineering-preview|web|engineering-preview|apps/web/app/(marketing)/engineering/preview/|desktop,mobile
-web.changelog|web|changelog|apps/web/app/(marketing)/changelog/|desktop,mobile
-web.blog|web|blog|apps/web/app/(marketing)/blog/|desktop,mobile
-web.marketing-ai|web|marketing-ai|apps/web/app/(marketing)/ai/page.tsx|desktop,mobile
-web.marketing-alternatives|web|marketing-alternatives|apps/web/app/(marketing)/alternatives/|desktop,mobile
-web.marketing-card|web|marketing-card|apps/web/app/(marketing)/card/page.tsx|desktop,mobile
-web.marketing-compare|web|marketing-compare|apps/web/app/(marketing)/compare/page.tsx,apps/web/app/(marketing)/compare/[slug]/page.tsx|desktop,mobile
-web.marketing-download|web|marketing-download|apps/web/app/(marketing)/download/page.tsx|desktop,mobile
-web.investor-portal|web|investor-portal|apps/web/app/investor-portal/|desktop,mobile
-web.marketing-launch|web|marketing-launch|apps/web/app/(marketing)/launch/page.tsx|desktop,mobile
-web.marketing-product|web|marketing-product|apps/web/app/(marketing)/product/page.tsx|desktop,mobile
-web.marketing-command-palette|web|marketing-command-palette|apps/web/app/(marketing)/product/command-palette/page.tsx|desktop,mobile
-web.marketing-release-scheduling|web|marketing-release-scheduling|apps/web/app/(marketing)/product/release-scheduling/page.tsx|desktop,mobile
-web.marketing-dsp-links|web|marketing-dsp-links|apps/web/app/(marketing)/product/dsp-links/page.tsx|desktop,mobile
-web.marketing-product-utm-links|web|marketing-product-utm-links|apps/web/app/(marketing)/product/utm-links/page.tsx|desktop,mobile
-web.marketing-isrc|web|marketing-isrc|apps/web/app/(marketing)/product/isrc/page.tsx|desktop,mobile
-web.marketing-pre-save|web|marketing-pre-save|apps/web/app/(marketing)/product/pre-save/page.tsx|desktop,mobile
-web.marketing-link-analytics|web|marketing-link-analytics|apps/web/app/(marketing)/product/link-analytics/page.tsx|desktop,mobile
-web.marketing-smart-links|web|marketing-smart-links|apps/web/app/(marketing)/smart-links/page.tsx|desktop,mobile
-web.marketing-pay|web|marketing-pay|apps/web/app/(marketing)/pay/page.tsx|desktop,mobile
-web.marketing-pricing|web|marketing-pricing|apps/web/app/(marketing)/pricing/page.tsx,apps/web/app/(marketing)/pricing/layout.tsx,apps/web/app/(marketing)/pricing/loading.tsx|desktop,mobile
-web.marketing-new|web|marketing-new|apps/web/app/(marketing)/new/page.tsx|desktop,mobile
-web.marketing-not-found|web|marketing-not-found|apps/web/app/(marketing)/not-found.tsx|desktop,mobile
-web.root-not-found|web|root-not-found|apps/web/app/not-found.tsx|desktop,mobile
-web.marketing-shell|web|marketing-shell|apps/web/app/(marketing)/layout.tsx|desktop,mobile
-web.marketing-about|web|marketing-about|apps/web/app/(marketing)/about/page.tsx|desktop,mobile
-web.marketing-solutions|web|marketing-solutions|apps/web/app/(marketing)/solutions/|desktop,mobile
-web.marketing-support|web|marketing-support|apps/web/app/(marketing)/support/page.tsx|desktop,mobile
-web.marketing-integrations|web|marketing-integrations|apps/web/app/(marketing)/integrations/page.tsx|desktop,mobile
-web.artist-profiles|web|marketing-artist-profiles|apps/web/app/(marketing)/artist-profiles/|desktop,mobile
-web.artist-profile|web|marketing-artist-profile|apps/web/app/(marketing)/artist-profile/page.tsx|desktop,mobile
-web.artist-notifications|web|marketing-artist-notifications|apps/web/app/(marketing)/artist-notifications/page.tsx|desktop,mobile
-web.voice|web|marketing-voice|apps/web/app/(marketing)/voice/page.tsx|desktop,mobile
-web.instant-merch|web|marketing-instant-merch|apps/web/app/(marketing)/instant-merch/|desktop,mobile
-web.youtube-thumbnails|web|marketing-youtube-thumbnails|apps/web/app/(marketing)/youtube-thumbnails/|desktop,mobile
-web.demo-video|web|marketing-demo-video|apps/web/app/(marketing)/demo/video/page.tsx|desktop,mobile
-web.demovideo|web|marketing-demovideo|apps/web/app/(marketing)/demovideo/page.tsx|desktop,mobile
-web.waitlist-invite|web|marketing-waitlist-invite|apps/web/app/waitlist/invite/page.tsx|desktop,mobile
-web.legal-shell|web|legal-shell|apps/web/app/(dynamic)/legal/layout.tsx|desktop,mobile
-web.legal-privacy|web|legal-privacy|apps/web/app/(dynamic)/legal/privacy/|desktop,mobile
-web.legal-terms|web|legal-terms|apps/web/app/(dynamic)/legal/terms/|desktop,mobile
-web.legal-cookies|web|legal-cookies|apps/web/app/(dynamic)/legal/cookies/|desktop,mobile
-web.legal-dmca|web|legal-dmca|apps/web/app/(dynamic)/legal/dmca/|desktop,mobile
-web.playlists-index|web|public-playlists|apps/web/app/(dynamic)/playlists/page.tsx,apps/web/app/(dynamic)/playlists/layout.tsx,apps/web/app/(dynamic)/playlists/genre/[genre]/page.tsx,apps/web/app/(dynamic)/playlists/mood/[mood]/page.tsx|desktop,mobile
-web.brand|web|marketing-brand|apps/web/app/brand/page.tsx,apps/web/app/brand/layout.tsx|desktop,mobile
-web.marketing-renders|web|marketing-renders|apps/web/app/(marketing)/renders/|desktop,mobile
-web.profile-admission|web|profile-admission|apps/web/app/(profile-admission)/renders/profile-admission/page.tsx|desktop,mobile
-web.app-loading|web|app-shell|apps/web/app/app/loading.tsx|desktop,mobile
-web.app-not-found|web|app-shell-not-found|apps/web/app/app/not-found.tsx|desktop,mobile
-web.app-shell|web|app-shell|apps/web/app/app/(shell)/layout.tsx|desktop,mobile
-web.money|web|screen.money|apps/web/app/app/money/page.tsx,apps/web/app/app/money/layout.tsx|desktop,mobile
-web.exp-library-v1|web|exp-library-v1|apps/web/app/exp/library-v1/page.tsx|desktop,mobile
-web.exp-right-rail-shotgun|web|exp-right-rail-shotgun|apps/web/app/exp/right-rail-shotgun/page.tsx|desktop,mobile
-web.public-profile|web|public-profile|apps/web/app/[username]/page.tsx,apps/web/app/[username]/layout.tsx,apps/web/components/features/profile/artist-notifications-cta/,apps/web/components/features/profile/subscribe/|desktop,mobile
-web.public-profile-about|web|public-profile|apps/web/app/[username]/about/page.tsx|desktop,mobile
-web.public-profile-alerts|web|public-profile|apps/web/app/[username]/alerts/page.tsx|desktop,mobile
-web.public-profile-notifications|web|public-profile|apps/web/app/[username]/notifications/page.tsx|desktop,mobile
-web.public-profile-shop|web|public-profile|apps/web/app/[username]/shop/page.tsx|desktop,mobile
-web.auth|web|browser-input-assurance|apps/web/app/(auth)/,apps/web/app/@auth/,apps/web/app/auth-return/,apps/web/app/desktop-auth/,apps/web/app/mobile-auth-return/,apps/web/components/features/auth/|desktop,mobile
-web.artist-pay|web|artist-pay|apps/web/app/[username]/pay/page.tsx|desktop,mobile
-web.artist-alerts|web|artist-alerts|apps/web/app/[username]/alerts/page.tsx|desktop,mobile
-web.profile-mode-render|web|profile-mode-render|apps/web/app/[username]/profile-mode-render/,apps/web/app/[username]/profile-miss/page.tsx|desktop,mobile
-web.release-landing|web|release-landing|apps/web/app/r/[slug]/page.tsx,apps/web/app/r/[slug]/ReleaseLandingPage.tsx|desktop,mobile
-web.smartlink-release|web|release-landing|apps/web/app/[username]/[...slug]/page.tsx,apps/web/app/[username]/[slug]/page.tsx,apps/web/app/[username]/[slug]/not-found.tsx|desktop,mobile
-web.smartlink-sounds|web|release-landing|apps/web/app/[username]/[slug]/sounds/page.tsx|desktop,mobile
-web.smartlink-track|web|release-landing|apps/web/app/[username]/[slug]/[trackSlug]/page.tsx|desktop,mobile
-web.out-link|web|wrapped-link-interstitial|apps/web/app/out/[id]/page.tsx|desktop,mobile
-web.report|web|abuse-report-intake|apps/web/app/report/page.tsx|desktop,mobile
-web.dashboard-releases|web|dashboard-releases|apps/web/app/app/(shell)/dashboard/releases/page.tsx|desktop,mobile
-web.dashboard-presence|web|dashboard-presence|apps/web/app/app/(shell)/dashboard/presence/page.tsx|desktop,mobile
-web.dashboard-contacts|web|dashboard-contacts|apps/web/app/app/(shell)/dashboard/contacts/|desktop,mobile
-web.contacts|web|contacts|apps/web/app/app/(shell)/contacts/page.tsx,apps/web/app/api/dashboard/contacts/route.ts,apps/web/app/api/dashboard/contacts/_lib/screen-cert-fixture.ts,apps/web/lib/screen-cert/app-shell-fixture-gate.ts|desktop,mobile
-web.tasks|web|tasks|apps/web/app/app/(shell)/tasks/page.tsx,apps/web/app/app/(shell)/tasks/TasksRoute.tsx,apps/web/app/app/(shell)/dashboard/tasks/task-actions.ts,apps/web/app/app/(shell)/dashboard/tasks/_lib/screen-cert-fixture.ts,apps/web/lib/screen-cert/app-shell-fixture-gate.ts|desktop,mobile
-web.presence|web|presence|apps/web/app/app/(shell)/presence/page.tsx|desktop,mobile
-web.profiles|web|profiles|apps/web/app/app/(shell)/profiles/page.tsx|desktop,mobile
-web.library|web|library|apps/web/app/app/(shell)/library/page.tsx|desktop,mobile
-web.links|web|links|apps/web/app/app/(shell)/links/page.tsx,apps/web/app/app/(shell)/dashboard/links/page.tsx|desktop,mobile
-web.library-private-share|web|library-asset-share|apps/web/app/p/[token]/|desktop,mobile
-web.settings-admin-redirect|web|settings-admin-redirect|apps/web/app/app/(shell)/settings/admin/page.tsx|desktop,mobile
-web.settings-artist-profile|web|settings-artist-profile|apps/web/app/app/(shell)/settings/profile/page.tsx,apps/web/app/app/(shell)/settings/artist-profile/page.tsx,apps/web/app/app/(shell)/tipping/page.tsx|desktop,mobile
-web.settings-referral|web|settings-referral|apps/web/app/app/(shell)/settings/referral/page.tsx,apps/web/app/app/(shell)/settings/referral/ReferralCodeCopyClient.tsx|desktop,mobile
-web.investor-updates|web|investor-updates|apps/web/app/app/(shell)/admin/investors/updates/page.tsx|desktop,mobile
-web.investor-pipeline|web|investor-pipeline|apps/web/app/app/(shell)/admin/investors/page.tsx|desktop,mobile
-web.ovie-certifications|web|ovie-certifications|apps/web/app/app/(shell)/admin/certifications/page.tsx|desktop,mobile
-web.ovie-outbound|web|ovie-outbound|apps/web/app/app/(shell)/admin/outbound/page.tsx|desktop,mobile
-web.ov-hud-shell|web|ovie-ops-shell|apps/web/app/app/(shell)/admin/hud/page.tsx|desktop,mobile
-web.ov-chat|web|ovie-ops-shell|apps/web/app/app/(shell)/admin/chat/page.tsx,apps/web/app/app/(shell)/admin/page.tsx|desktop,mobile
-web.ov-inbox|web|ovie-ops-shell|apps/web/app/app/(shell)/admin/inbox/page.tsx|desktop,mobile
-web.ov-integrations|web|settings-connectors|apps/web/app/app/(shell)/admin/integrations/page.tsx|desktop,mobile
-web.admin-chat-playground|web|ovie-ops-shell|apps/web/app/app/(shell)/admin/chat-playground/page.tsx,apps/web/app/app/(shell)/admin/chat-playground/layout.tsx|desktop,mobile
-web.ov-founder-cockpit|web|ovie-founder-cockpit|apps/web/app/app/(shell)/admin/activity/page.tsx,apps/web/app/app/(shell)/admin/activity/loading.tsx,apps/web/app/app/(shell)/admin/growth/page.tsx,apps/web/app/app/(shell)/admin/operations/page.tsx,apps/web/app/app/(shell)/admin/product/page.tsx|desktop,mobile
-web.ov-agents|web|ovie-ops-shell|apps/web/app/app/(shell)/admin/system/page.tsx,apps/web/app/app/(shell)/admin/room/page.tsx|desktop,mobile
-web.ov-company-presence|web|ovie-ops-shell|apps/web/app/app/(shell)/admin/presence/page.tsx|desktop,mobile
-web.admin-costs|web|admin-costs|apps/web/app/app/(shell)/admin/costs/page.tsx|desktop,mobile
-web.admin-capacity|web|ovie-ops-shell|apps/web/app/app/(shell)/admin/capacity/page.tsx|desktop,mobile
-web.admin-features|web|admin-features|apps/web/app/app/(shell)/admin/features/page.tsx|desktop,mobile
-web.admin-feature-registry|web|admin-feature-registry|apps/web/app/app/(shell)/admin/feature-registry/page.tsx|desktop,mobile
-web.admin-platform-connections|web|admin-platform-connections|apps/web/app/app/(shell)/admin/platform-connections/|desktop,mobile
-web.admin-growth|web|admin-growth|apps/web/app/app/(shell)/admin/growth/page.tsx|desktop,mobile
-web.admin-people|web|admin-people|apps/web/app/app/(shell)/admin/people/page.tsx|desktop,mobile
-web.admin-agent-runs|web|admin-agent-runs|apps/web/app/app/(shell)/admin/agent-runs/|desktop,mobile
-web.admin-ops-redirect|web|ovie-ops-shell|apps/web/app/app/(shell)/admin/ops/page.tsx|desktop,mobile
-web.admin-yc-metrics-redirect|web|ovie-ops-shell|apps/web/app/app/(shell)/admin/growth/yc-metrics/page.tsx|desktop,mobile
-web.ov-lists|web|ovie-lists|apps/web/app/app/(shell)/admin/lists/|desktop,mobile
-web.admin-screenshots|web|admin-screenshots|apps/web/app/app/(shell)/admin/screenshots/|desktop,mobile
-web.admin-share-studio|web|admin-share-studio|apps/web/app/app/(shell)/admin/share-studio/page.tsx|desktop,mobile
-web.admin-wiki|web|admin-wiki|apps/web/app/app/(shell)/admin/wiki/|desktop,mobile
-web.admin-visibility-audit|web|admin-visibility-audit|apps/web/app/app/(shell)/admin/visibility-audit/page.tsx|desktop,mobile
-web.hud-isolated|web|ovie-ops-isolated|apps/web/app/hud/page.tsx,apps/web/app/hud/layout.tsx|desktop,mobile
-web.hud-tv|web|ovie-ops-isolated|apps/web/app/hud-tv/page.tsx|desktop,mobile
-web.hud-wiki|web|admin-wiki|apps/web/app/hud/wiki/|desktop,mobile
-web.youtube-channel-pilot|web|screen.youtube.channel-pilot|apps/web/app/app/(shell)/youtube/page.tsx|desktop,mobile
-web.shipping-statistics|web|shipping-statistics|apps/web/app/app/(shell)/admin/shipping/page.tsx|desktop,mobile
-web.start|web|organism.onboarding-chat|apps/web/app/(dynamic)/start/page.tsx,apps/web/app/(dynamic)/start/layout.tsx|desktop,mobile
-web.app-root|web|screen.root|apps/web/app/app/(shell)/page.tsx|desktop,mobile
-web.chat|web|screen.chat|apps/web/app/app/(shell)/chat/page.tsx|desktop,mobile
-web.jovie-work|web|screen.jovie.work|apps/web/app/app/(shell)/jovie-work/page.tsx|desktop,mobile
-web.settings-audience|web|screen.settings.audience|apps/web/app/app/(shell)/settings/audience/page.tsx|desktop,mobile
-web.settings-usage|web|screen.settings.usage|apps/web/app/app/(shell)/settings/usage/page.tsx|desktop,mobile
-web.settings-billing|web|screen.settings.billing|apps/web/app/app/(shell)/settings/billing/page.tsx|desktop,mobile
-web.settings-data-privacy|web|screen.settings.data-privacy|apps/web/app/app/(shell)/settings/data-privacy/page.tsx|desktop,mobile
-web.settings-connectors|web|settings-connectors|apps/web/app/app/(shell)/settings/connectors/|desktop,mobile
-web.settings|web|screen.settings|apps/web/app/app/(shell)/settings/layout.tsx|desktop,mobile
-web.onboarding-checkout|web|onboarding-checkout|apps/web/app/onboarding/checkout/page.tsx,apps/web/app/onboarding/checkout/loading.tsx|desktop,mobile
-web.billing-success|web|billing-success|apps/web/app/billing/success/page.tsx,apps/web/app/billing/success/loading.tsx|desktop,mobile
-web.billing-youtube-thumbnails|web|billing-youtube-thumbnails|apps/web/app/billing/youtube-thumbnails/page.tsx|desktop,mobile
-web.billing-youtube-thumbnails-success|web|billing-youtube-thumbnails-success|apps/web/app/billing/youtube-thumbnails/success/page.tsx|desktop,mobile
-web.billing-shell|web|billing-shell|apps/web/app/billing/layout.tsx|desktop,mobile
-web.claim|web|artist-claim-checkout|apps/web/app/claim/page.tsx,apps/web/app/claim/ClaimArtistSearch.tsx,apps/web/app/claim/agent/[draftId]/page.tsx,apps/web/app/claim/agent/[draftId]/AgentClaimScreen.tsx|desktop,mobile
-web.account-shell|web|account-shell|apps/web/app/account/layout.tsx|desktop,mobile
-web.account-creation-recovery|web|account-creation-recovery|apps/web/app/error/user-creation-failed/page.tsx,apps/web/app/error/user-creation-failed/loading.tsx|desktop,mobile
-web.root-error-boundary|web|screen.errors.root|apps/web/app/error.tsx,apps/web/app/global-error.tsx|desktop,mobile
-web.root-layout|web|screen.root|apps/web/app/layout.tsx|desktop,mobile
-macos-electron.hud|macos-electron|desktop-hud|apps/desktop/src/main.ts,apps/desktop/src/navigation.ts|desktop
-ios.dashboard|ios|ios-dashboard|apps/ios/Jovie/Features/Dashboard/DashboardView.swift,apps/ios/Jovie/Features/Dashboard/PublicProfileBrowserView.swift|compact
-ios.chat|ios|ios-chat|apps/ios/Jovie/Features/Chat/MobileChatView.swift|compact
-ios.settings|ios|ios-settings|apps/ios/Jovie/Features/Settings/SettingsView.swift|compact
-ios.library|ios|ios-library|apps/ios/Jovie/Features/Library/|compact
-ios.teleprompter|ios|ios-teleprompter|apps/ios/Jovie/Features/Teleprompter/|compact
-ios.inbox|ios|ios-inbox|apps/ios/Jovie/Features/Inbox/|compact
-macos-electron.ovie-door|macos-electron|ovie|apps/desktop/src/ovie-door.ts|desktop|x|Product-surface implementation owned by Ovie
-macos-electron.auth-security|macos-electron|auth-security|apps/desktop/src/desktop-auth-security.ts|desktop|x|Auth/security lane is out of scope
-macos.menu-monitor|macos-electron|macos-menu-monitor|apps/macos/MenuMonitor/|desktop|x|MenuMonitor is out of scope
-ios.auth|ios|auth-security|apps/ios/Jovie/Features/Auth/|compact|x|Auth/security lane is out of scope
-ios.shell|ios|ios-shell|apps/ios/Jovie/Features/AppShell/|compact|x|iOS shell lane is out of scope
-`.trim()
-  )
-);
 
 function isObject(value) {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
@@ -1079,7 +900,7 @@ function changedFilesFromGit(diffBase, repoRoot = REPO_ROOT) {
   const result = spawnSync(
     'git',
     ['diff', '--diff-filter=ACDMR', '--name-status', `${diffBase}...HEAD`],
-    { cwd: repoRoot, encoding: 'utf8' }
+    { maxBuffer: 256 * 1024 * 1024, cwd: repoRoot, encoding: 'utf8' }
   );
   if (result.status !== 0) {
     throw new Error(

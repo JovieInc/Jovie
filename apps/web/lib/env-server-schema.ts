@@ -320,14 +320,11 @@ export const ServerEnvSchema = z.object({
   RELEASE_COMMUNICATIONS_WEBHOOK_SECRET: z.string().optional(),
   // Linear API key for HUD queries (tim-action-required issues)
   LINEAR_API_KEY: z.string().optional(),
-  // Kill switch for Linear remediation intake. Unset files. 'true' skips.
-  REMEDIATION_TRIGGERS_DISABLED: z.string().optional(),
-  SUMMER_SENTRY_INTAKE_LIVE: z.string().optional(),
   // JOV-7331: internal fleet canary, disabled until deployment approval.
   JOVIE_FLEET_ENABLED: z.enum(['0', '1']).optional(),
   JOVIE_FLEET_LINEAR_TEAM_ID: z.string().uuid().optional(),
 
-  // GitHub dispatch (Sentry autofix pipeline)
+  // GitHub dispatch (Sentry webhook → Lane Fix Relay)
   GH_DISPATCH_TOKEN: z.string().optional(),
   // Vercel-injected Git metadata (used to target the dispatch repo)
   VERCEL_GIT_REPO_OWNER: z.string().optional(),
@@ -682,8 +679,6 @@ export const ENV_KEYS = [
   'SENTRY_ORG_SLUG',
   'LINEAR_WEBHOOK_SECRET',
   'LINEAR_API_KEY',
-  'REMEDIATION_TRIGGERS_DISABLED',
-  'SUMMER_SENTRY_INTAKE_LIVE',
   'RELEASE_COMMUNICATIONS_WEBHOOK_SECRET',
   'JOVIE_FLEET_ENABLED',
   'JOVIE_FLEET_LINEAR_TEAM_ID',
