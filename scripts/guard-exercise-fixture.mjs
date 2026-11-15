@@ -1,10 +1,5 @@
-// Throwaway fixture for the JOV-12720 verify-by-exercise. Deleted at the end
-// of the exercise; makes no API calls (the octokit line below is guard-detection
-// data, not a call).
+// Throwaway fixture for the JOV-12720 verify-by-exercise, phase 2: the
+// polling shape is removed, so the schedule-trigger guard must pass this
+// diff. Deleted at the end of the exercise.
 // api-budget: github-actions-token 0/hr - exercise fixture; no API calls.
-export function exercisePollFixture(octokit) {
-  while (true) {
-    const pr = await octokit.rest.pulls.get({ pull_number: 1 });
-    if (pr) return pr;
-  }
-}
+export const exerciseFixturePhase2 = 'benign';
