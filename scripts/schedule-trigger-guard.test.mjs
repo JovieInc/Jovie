@@ -37,6 +37,37 @@ test('a newly added cron trigger fails the guard', () => {
   assert.match(errors[0], /new-clock\.yml: adds a schedule/);
 });
 
+test('the array and list schedule forms are caught too', () => {
+  for (const lines of [
+    ['on: [push, schedule]', 'jobs:', '  j:', '    runs-on: ubuntu-latest'],
+    ['on:', '  - push', '  - schedule', 'jobs:', '  j:'],
+  ]) {
+    const errors = evaluateViolations({
+      added: addedMap([['.github/workflows/alt-clock.yml', lines]]),
+      allowlist: [],
+      registryIds: new Set(),
+    });
+    assert.equal(errors.length, 1, JSON.stringify(lines));
+    assert.match(errors[0], /alt-clock\.yml: adds a schedule/);
+  }
+  const noise = evaluateViolations({
+    added: addedMap([
+      [
+        '.github/workflows/plain.yml',
+        [
+          'name: Enforce event-driven-only schedules',
+          'on: push',
+          'jobs:',
+          '  j:',
+        ],
+      ],
+    ]),
+    allowlist: [],
+    registryIds: new Set(),
+  });
+  assert.equal(noise.length, 0);
+});
+
 test('a modified workflow that only removes its cron passes', () => {
   const errors = evaluateViolations({
     added: addedMap([
@@ -151,6 +182,25 @@ test('a loop that does not touch the GitHub API is not polling', () => {
   assert.equal(errors.length, 0);
 });
 
+test('a for-await loop that re-reads the GitHub API is polling', () => {
+  const errors = evaluateViolations({
+    added: addedMap([
+      [
+        'scripts/drained.mjs',
+        [
+          'for await (const page of pages) {',
+          '  await octokit.paginate(page)',
+          '}',
+        ],
+      ],
+    ]),
+    allowlist: [],
+    registryIds: new Set(),
+  });
+  assert.equal(errors.length, 1);
+  assert.match(errors[0], /polling/);
+});
+
 test('comment lines and test files never count as polling evidence', () => {
   const commentsOnly = evaluateViolations({
     added: addedMap([
@@ -228,6 +278,70 @@ test('collectAddedLines only returns + lines of the changed files', async () => 
       `${JSON.stringify({ id: 'github:jovie:production-continuity', status: 'live' })}\n`
     );
     assert.equal(main(root, { TURBO_SCM_BASE: base }), 0);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('detects a rogue cron from a depth-1 merge-ref checkout via the event payload', async () => {
+  const { execFileSync } = await import('node:child_process');
+  const { mkdtempSync, mkdirSync, rmSync, writeFileSync } = await import(
+    'node:fs'
+  );
+  const { tmpdir } = await import('node:os');
+  const root = mkdtempSync(join(tmpdir(), 'schedule-guard-shallow-'));
+  try {
+    const origin = join(root, 'origin');
+    mkdirSync(origin, { recursive: true });
+    const run = (cwd, ...args) =>
+      execFileSync('git', args, { cwd, encoding: 'utf8' });
+    const base = 'on: push\njobs:\n  j:\n    steps:\n      - run: echo hi\n';
+    const rogue =
+      'on:\n  schedule:\n    - cron: "*/2 * * * *"\njobs:\n  j:\n    steps:\n      - run: echo hi\n';
+    run(origin, 'init', '-q', '-b', 'main');
+    run(origin, 'config', 'user.email', 't@jov.ie');
+    run(origin, 'config', 'user.name', 'T');
+    mkdirSync(join(origin, '.github', 'workflows'), { recursive: true });
+    writeFileSync(join(origin, '.github/workflows/base.yml'), base);
+    writeFileSync(join(origin, '.github/workflows/rogue.yml'), rogue);
+    run(origin, 'add', '-A');
+    run(origin, 'commit', '-qm', 'main base with a rogue cron in history');
+    // The PR deletes the rogue cron, so the head alone is clean but the
+    // range diff against the base must still see it being re-added... no:
+    // deleting on the branch means the merged tree is clean. Instead the
+    // branch ADDS it, like a real violating PR.
+    writeFileSync(join(origin, '.github/workflows/rogue.yml'), base);
+    run(origin, 'add', '-A');
+    run(origin, 'commit', '-qm', 'base removes the rogue cron (branch point)');
+    const baseSha = run(origin, 'rev-parse', 'HEAD').trim();
+    run(origin, 'checkout', '-qb', 'pr-branch');
+    writeFileSync(join(origin, '.github/workflows/rogue.yml'), rogue);
+    run(origin, 'add', '-A');
+    run(origin, 'commit', '-qm', 'PR re-adds the rogue cron');
+    run(origin, 'checkout', '-qb', 'pr-merge', 'main');
+    run(origin, 'merge', '-q', '--no-ff', '-m', 'merge PR', 'pr-branch');
+    const clone = join(root, 'clone');
+    execFileSync('git', [
+      'clone',
+      '-q',
+      '--depth',
+      '1',
+      '--branch',
+      'pr-merge',
+      `file://${origin}`,
+      clone,
+    ]);
+    const event = join(root, 'event.json');
+    writeFileSync(
+      event,
+      `${JSON.stringify({ pull_request: { base: { sha: baseSha } } })}\n`
+    );
+    // Without the payload the shallow checkout cannot resolve a base (skip).
+    const skipped = main(clone, {});
+    assert.equal(skipped, 0);
+    // With the runner's event payload the rogue cron is caught.
+    const caught = main(clone, { GITHUB_EVENT_PATH: event });
+    assert.equal(caught, 1);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
