@@ -17,7 +17,6 @@ interface HomeSetupInput {
   readonly hasReviewableItems: boolean;
   readonly hasTourHistory: boolean;
   readonly inboxReadUnavailable: boolean;
-  readonly runtimeUpdateAvailable: boolean;
   readonly hasNotes: boolean;
 }
 
@@ -33,7 +32,6 @@ export function useHomeSetup({
   hasReviewableItems,
   hasTourHistory,
   inboxReadUnavailable,
-  runtimeUpdateAvailable,
   hasNotes,
 }: HomeSetupInput) {
   const data = useContext(DashboardDataContext);
@@ -53,7 +51,6 @@ export function useHomeSetup({
       !hasReviewableItems &&
       !hasTourHistory &&
       !inboxReadUnavailable &&
-      !runtimeUpdateAvailable &&
       !hasNotes &&
       inboxView === 'needs'
   );
