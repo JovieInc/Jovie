@@ -1,8 +1,8 @@
 {
   "_generated": {
-    "version": "ce68282e1d75",
+    "version": "8303ffb493d7",
     "toolsListHash": "3b449a88fcfe63cfd959490228de4b89cedfabede3ba1561c63ead05990ad371",
-    "listingHash": "a7665b2f5a09882b4a03e68179c82c6e3651a971c63ad7dfb88cc10b9d213c6f",
+    "listingHash": "4b048773d47a5d27406c4b476185754f4cc5c0ddc3683b8f943f5d2b81e8d759",
     "regenerate": "pnpm --filter @jovie/web agent-distribution:generate"
   },
   "ready": false,

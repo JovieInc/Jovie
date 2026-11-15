@@ -1,7 +1,7 @@
 {
-  "version": "8029a0180cd9",
+  "version": "16159c1e0e42",
   "toolsListHash": "3b449a88fcfe63cfd959490228de4b89cedfabede3ba1561c63ead05990ad371",
-  "listingHash": "a7665b2f5a09882b4a03e68179c82c6e3651a971c63ad7dfb88cc10b9d213c6f",
+  "listingHash": "4b048773d47a5d27406c4b476185754f4cc5c0ddc3683b8f943f5d2b81e8d759",
   "regenerate": "pnpm --filter @jovie/web agent-distribution:generate",
   "icons": {
     "markPath": "packages/brand/svg/jovie-mark-white.svg",
@@ -31,9 +31,9 @@
     "tools-list.snapshot.json"
   ],
   "versions": {
-    "muse": "42e28ac1a6c4",
-    "grok": "da6e5c1b311a",
-    "chatgpt": "e59674c7d972",
-    "claude": "689a08dd9f17"
+    "muse": "8c407f96a568",
+    "grok": "621a8d03d534",
+    "chatgpt": "5e4b6d013f63",
+    "claude": "b67587768e66"
   }
 }

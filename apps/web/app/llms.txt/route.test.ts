@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import snapshot from '@/lib/agent-distribution/generated/tools-list.snapshot.json';
 import { auditLlmsTxtStructure } from '@/lib/seo/agent-site-readiness';
 
 vi.mock('@/constants/app', () => ({
@@ -39,7 +40,7 @@ describe('GET /llms.txt', () => {
     expect(body).toContain('https://jov.ie/openapi.json');
     expect(body).toContain('https://jov.ie/api/v1/openapi.json');
     expect(body).toContain(
-      'General public writes or OAuth — the public profile API and anonymous MCP tools are read-only; owner-only MCP tools require authenticated profile ownership and explicit confirmation for writes'
+      'General public writes or OAuth: the public profile API and anonymous per-profile MCP tools are read-only; owner-only MCP tools require authenticated profile ownership and explicit confirmation for writes'
     );
     expect(body).toContain(
       '[Founder-only Ovie control](https://jov.ie/api/ovie/mcp) — OAuth 2.1 MCP with scopes `ovie:read, ovie:write`; not public profile API access'
@@ -60,16 +61,42 @@ describe('GET /llms.txt', () => {
     expect(failed).toEqual([]);
   });
 
-  it('keeps public developer access read-only and does not invent extra surfaces', async () => {
+  it('discovers the anonymous draft connector and checkout handoff under when-to-use guidance', async () => {
+    const body = await GET().text();
+    const whenToUse = body
+      .split('## When to use Jovie')[1]
+      ?.split('Do not use Jovie for:')[0];
+
+    expect(whenToUse).toMatch(
+      /anonymous agent connector at https:\/\/jov\.ie\/api\/mcp\b/
+    );
+    expect(whenToUse).toContain('https://jov.ie/developers/agents');
+    expect(whenToUse).toMatch(/unpublished.*draft/i);
+    expect(whenToUse).toMatch(/start_upgrade.*checkout entry URL/);
+    expect(whenToUse).toMatch(/person.*completes.*purchase on Jovie/);
+    const connectorResource = body
+      .split('\n')
+      .find(line => line.startsWith('- [Agent draft connector]('));
+    expect(connectorResource).toContain('(https://jov.ie/api/mcp)');
+    expect(connectorResource).toMatch(
+      new RegExp(`\\b${snapshot.tools.length} tools\\b`)
+    );
+    for (const tool of snapshot.tools) {
+      expect(connectorResource).toContain(tool.name);
+    }
+  });
+
+  it('scopes read-only access to anonymous per-profile tools and preserves owner-only requirements', async () => {
     const body = await GET().text();
 
     expect(body).toContain(
-      'the public profile API and anonymous MCP tools are read-only'
+      'the public profile API and anonymous per-profile MCP tools are read-only'
     );
     expect(body).toContain('/api/mcp/{username}');
     expect(body).toContain(
       'owner-only merch and video tools are listed in the manifest and require authenticated ownership'
     );
+    expect(body).not.toContain('anonymous MCP tools are read-only');
     expect(body).not.toContain('Instagram: @meetjovie');
     expect(body).toContain('scopes `ovie:read, ovie:write`');
     expect(body).not.toMatch(/public profile API access.*write/i);

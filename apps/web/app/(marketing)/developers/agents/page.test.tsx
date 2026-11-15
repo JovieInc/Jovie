@@ -14,7 +14,12 @@ describe('agent connector docs page', () => {
     expect(root?.getAttribute('data-tools-list-hash')).toBe(
       hashTools(snapshot.tools)
     );
+    const introduction = screen.getByText(/^The connector has \d+ tools:/);
+    expect(introduction).toHaveTextContent(
+      new RegExp(`\\b${snapshot.tools.length} tools\\b`)
+    );
     for (const tool of snapshot.tools) {
+      expect(introduction).toHaveTextContent(tool.name);
       expect(screen.getByText(tool.name)).toBeInTheDocument();
       expect(
         screen.getByRole('heading', { name: tool.title })
