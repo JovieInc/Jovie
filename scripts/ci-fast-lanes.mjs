@@ -863,6 +863,7 @@ export const STRUCTURAL_PYTHON_REGRESSION_COMMANDS = Object.freeze([
 
 export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
   'scripts/ios-certification-config.test.mjs',
+  'scripts/schedule-trigger-guard.test.mjs', // JOV-12720 event-driven guard.
   'scripts/resolve-main-sha.test.mjs', // JOV-12497 SIGPIPE regression.
   'scripts/hostops/pen-golden-path-sync.test.mjs',
   'scripts/design/pen-inspect.test.mjs',
@@ -998,6 +999,7 @@ export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
   'scripts/inbound-loop/inbound-loop.test.mjs',
   'scripts/lanes/ops-report.test.mjs',
   'scripts/merge-queue-green-enroll.test.mjs',
+  'scripts/merge-queue-guard-hold.test.mjs',
   'scripts/lib/__tests__/merge-group-victim-rearm.test.mjs',
   'scripts/lib/__tests__/pr-unacquired-runner-rerun.test.mjs',
   'scripts/automation-liveness-gate.test.mjs',
@@ -1131,6 +1133,7 @@ export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/mutation-score-floor.test.mjs',
   'scripts/lib/__tests__/mutation-floor-intake.test.mjs',
   'scripts/lib/__tests__/mutation-diff-workflow.test.mjs',
+  'scripts/lib/__tests__/component-certificate-admission.test.mjs',
   'scripts/lib/__tests__/component-certificate-workflow.test.mjs',
   'scripts/lib/__tests__/component-certificate-delivery.test.mjs',
   'scripts/lib/__tests__/component-certificate-ordering.test.mjs',
@@ -1213,6 +1216,7 @@ export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/postdeploy-probe-transport.test.mjs',
   'scripts/lib/__tests__/postdeploy-probe-workflow-admission.test.mjs',
   'scripts/lib/__tests__/postdeploy-crawl-receipt.test.mjs',
+  'scripts/lib/__tests__/golden-path-cert-reuse.test.mjs',
   'scripts/lib/__tests__/postdeploy-cert-after-pen.test.mjs',
   'scripts/lib/__tests__/pr-preparation-safety.test.mjs',
   'scripts/lib/__tests__/production-environment-secrets.test.mjs',
@@ -1283,6 +1287,7 @@ export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/unstack-merged-parent.test.mjs',
   'scripts/lib/__tests__/vercel-branch-exclusions.test.mjs',
   'scripts/lib/__tests__/visual-snapshot-compare.test.mjs',
+  'scripts/lib/__tests__/visual-baseline-refresh.test.mjs',
   'scripts/lib/__tests__/web-test-selectors.test.mjs',
   'scripts/lib/__tests__/web-vitest-fast-runner.test.mjs',
   'scripts/lib/__tests__/ci-unit-selection.test.mjs',

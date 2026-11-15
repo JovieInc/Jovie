@@ -1,0 +1,40 @@
+{
+  "gates": {
+    "apps/web/components/features/admin/outbound/OutboundWorkspace.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/admin/outreach/ReviewQueuePanel.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/admin/waitlist-table/AdminWaitlistTableUnified.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ]
+  },
+  "waivers": {
+    "apps/web/components/features/admin/outbound/OutboundWorkspace.tsx": {
+      "permission-denied": "The workspace sits on an admin-only route that the server layout gates before it renders, and it takes no role or permission input. The detector matched role='toolbar' on the view tabs."
+    },
+    "apps/web/components/features/admin/waitlist-table/AdminWaitlistTableUnified.tsx": {
+      "error": "The table takes its rows as props and never fetches, so it has no failed face to draw; a failed copy or approval is a toast. AdminWaitlistTableUnified.test.tsx asserts the 'Failed to copy name' toast. The detector matched toast.error.",
+      "offline": "The table takes its rows as props and never fetches; isFetchingNextPage is passed through to the shared table (LoadingNextPage) and an offline approval fails as a toast from useApproveEntry. The detector matched isLoading={false} and isFetchingNextPage."
+    }
+  }
+}

@@ -28,4 +28,10 @@ describe('TabBar task density contract', () => {
     expect(trigger).not.toContain('border-b-2');
     expect(source).toContain('bg-surface-3 font-medium text-primary-token');
   });
+
+  it('renders tabs through the design-system plain button, not a raw button', () => {
+    const source = readFileSync(resolve(__dirname, './TabBar.tsx'), 'utf8');
+    expect(source).not.toMatch(/<button[\s>]/);
+    expect(source).toContain('<PlainButton');
+  });
 });

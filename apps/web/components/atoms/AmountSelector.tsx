@@ -1,5 +1,6 @@
 'use client';
 
+import { PlainButton } from '@jovie/ui';
 import { memo, useCallback } from 'react';
 import { cn } from '@/lib/utils';
 
@@ -27,7 +28,7 @@ export const AmountSelector = memo(function AmountSelector({
   }, [onClick, index]);
 
   return (
-    <button
+    <PlainButton
       type='button'
       onClick={handleClick}
       aria-pressed={isSelected}
@@ -37,16 +38,16 @@ export const AmountSelector = memo(function AmountSelector({
       data-selected={isSelected ? 'true' : 'false'}
       className={cn(
         'group relative flex h-12 w-full items-center justify-center rounded-full border px-3 text-center tabular-nums transition-[background-color,border-color,box-shadow,color,opacity] duration-subtle ease-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-base',
-        disabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer',
+        'cursor-pointer disabled:cursor-not-allowed disabled:opacity-50',
         isSelected
-          ? 'border-(--profile-pearl-primary-bg) bg-(--profile-pearl-primary-bg) text-(--profile-pearl-primary-fg) shadow-[0_0_0_1px_rgba(255,255,255,0.12)]'
-          : 'border-black/8 bg-white text-primary-token hover:border-black/14 hover:bg-(--profile-pearl-bg-hover) dark:border-white/12 dark:bg-white/[0.04] dark:hover:border-white/18 dark:hover:bg-white/[0.07]',
+          ? 'border-(--profile-pearl-primary-bg) bg-(--profile-pearl-primary-bg) text-(--profile-pearl-primary-fg) ring-1 ring-on-media/12'
+          : 'border-ink-on-media/8 bg-on-media text-primary-token hover:border-ink-on-media/14 hover:bg-(--profile-pearl-bg-hover) dark:border-on-media/12 dark:bg-on-media/4 dark:hover:border-on-media/18 dark:hover:bg-on-media/7',
         className
       )}
     >
       <span className='text-app font-semibold tracking-[-0.02em]' aria-hidden>
         ${amount}
       </span>
-    </button>
+    </PlainButton>
   );
 });

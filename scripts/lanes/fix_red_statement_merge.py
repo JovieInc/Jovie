@@ -205,6 +205,10 @@ def _key(statement: str) -> str | None:
     body = statement.strip()
     if _FLOW.match(body):
         return None
+    test = _IT_TITLE.match(body)
+    if test:
+        # A shared title with different assertions is an overlap, not two additions.
+        return "it:" + test.group("title")
     imported = _IMPORT.match(body)
     if imported:
         return "import:" + imported.group("mod")
