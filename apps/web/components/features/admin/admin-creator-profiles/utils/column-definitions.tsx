@@ -7,6 +7,7 @@
 
 import { type RefObject, useState } from 'react';
 import { TableActionMenu } from '@/components/atoms/table-action-menu/TableActionMenu';
+import type { TableActionMenuItem } from '@/components/atoms/table-action-menu/types';
 import type { ContextMenuItemType } from '@/components/organisms/table';
 import {
   convertContextMenuItems,
@@ -35,7 +36,7 @@ function CreatorRowActionMenu({
   items,
 }: {
   readonly profileId: string;
-  readonly items: ContextMenuItemType[];
+  readonly items: TableActionMenuItem[];
 }) {
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const open = openMenuId === profileId;

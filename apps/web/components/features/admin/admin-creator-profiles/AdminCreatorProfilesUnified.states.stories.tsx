@@ -1,6 +1,7 @@
 import '@/styles/system-b-app.css';
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
-import { expect, fn, screen, userEvent } from 'storybook/test';
+import { Toaster } from 'sonner';
+import { expect, screen, userEvent } from 'storybook/test';
 import { FeedbackProvider } from '@/components/feedback';
 import { RightPanelProvider } from '@/contexts/RightPanelContext';
 import type { AdminCreatorProfileRow } from '@/lib/admin/types';
@@ -90,33 +91,28 @@ type Story = StoryObj<typeof meta>;
  * Storybook, so the request fails and the table raises its failure toast.
  */
 export const ErrorVerifyFailed: Story = {
-  args: {
-    profiles: errorRows,
-    total: errorRows.length,
-    onActionError: fn(),
-  },
+  args: { profiles: errorRows, total: errorRows.length },
   decorators: [
     Story => (
       <FeedbackProvider>
         <Story />
+        {/* The harness's mock '/test' pathname is a profile route, where
+       FeedbackProvider mounts no Toaster — mount the lane's own renderer
+       (same sonner store) so the failure toast actually renders. */}
+        <Toaster position='bottom-right' />
       </FeedbackProvider>
     ),
   ],
-  play: async ({ args }) => {
+  play: async () => {
     await userEvent.click(
       await screen.findByRole('button', { name: 'More actions' })
     );
     await userEvent.click(
       await screen.findByRole('menuitem', { name: 'Verify Creator' })
     );
-    // The harness's mock '/test' pathname is a profile route, where
-    // FeedbackProvider mounts no Toaster — the failure toast can never
-    // render in this lane. The surface reports the failure to its owner;
-    // assert the exact message through the reporter (ProfileSidebarHeader
-    // convention).
-    await expect(args.onActionError).toHaveBeenCalledWith(
-      'Failed to verify creator'
-    );
+    await expect(
+      await screen.findByText('Failed to verify creator')
+    ).toBeVisible();
   },
 };
 
