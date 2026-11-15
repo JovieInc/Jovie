@@ -30,6 +30,249 @@
       "frontend-rules",
       "forced-caps"
     ],
+    "apps/web/components/features/home/AuthRedirectHandler.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/home/HomePhoneFrame.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/home/HomeProfileShowcase.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/home/HomeRelationshipPanel.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/home/InputAuraFrame.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/home/PipelineBottleneckBanner.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/home/ProductScreenshot.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/home/ProductScreenshotClient.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/home/ProfileMockup.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/home/claim-handle/HandleStatusIcon.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/library-asset-share/LibraryAssetSharePanel.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/library-share/LibraryShareAssetLayouts.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/library-share/LibraryShareDropSurface.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/library/WorkInspectorActions.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/link-analytics/LinkAnalyticsPanel.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/opportunity-inbox/FounderReviewStack.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/opportunity-inbox/InboxRuntimeNotification.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/opportunity-inbox/OpportunityCardStack.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/opportunity-inbox/OpportunityInboxEmptyState.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/opportunity-inbox/OpportunityInboxFeed.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/opportunity-inbox/OpportunityInboxYoutubeThumbnailCard.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/opportunity-inbox/WorkflowCaptureInboxCard.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/pay/PayLanding.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/pitch/PitchEngagement.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/presence/PresenceStatusParts.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/presence/workspace-controller.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/profile/ArtistThemeProvider.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
     "apps/web/components/features/profile/ClaimBanner.tsx": [
       "ds-owner",
       "tokens",
@@ -38,6 +281,24 @@
       "a11y",
       "frontend-rules"
     ],
+    "apps/web/components/features/profile/ListenDrawer.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/profile/PayDrawer.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
     "apps/web/components/features/profile/ProfileAeoProofClaimCard.tsx": [
       "ds-owner",
       "tokens",
@@ -45,6 +306,15 @@
       "tests",
       "a11y",
       "frontend-rules"
+    ],
+    "apps/web/components/features/profile/ProfileFooter.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
     ],
     "apps/web/components/features/profile/ProfileHomeRail.tsx": [
       "ds-owner",
@@ -699,6 +969,16 @@
       "empty": "PageErrorState renders one title, one message and one retry action and takes no collection; the detector matched the items-center utility class.",
       "permission-denied": "PageErrorState has no gated action or permission input; it is the error surface that owners render. The detector matched role='alert'."
     },
+    "apps/web/components/features/home/HomeProfileShowcase.tsx": {
+      "long-content": "Every string the showcase shows comes from the fixed homepage-profile-preview-fixture states picked by stateId; no prop carries caller copy, so there is no longer content to render."
+    },
+    "apps/web/components/features/home/HomeRelationshipPanel.tsx": {
+      "empty": "The panel takes no props and always maps the four fixed RELATIONSHIP_DATA rows; the list can never be empty.",
+      "long-content": "The panel takes no props and renders only the fixed RELATIONSHIP_DATA names, actions and times; there is no caller copy that could run long."
+    },
+    "apps/web/components/features/home/claim-handle/HandleStatusIcon.tsx": {
+      "long-content": "The component renders only a spinner with the fixed label 'Checking Availability' or a check or X icon; the handle and handleError props are read but never shown as text, so no copy can run long."
+    },
     "apps/web/components/features/landing/LandingCTAButton.tsx": {
       "partial": "LandingCTAButton draws one link from its required href, label, eventName and section; its optional props (variant, className, testId) are styling and test wiring with defaults, so no data can be partially present."
     },
@@ -709,6 +989,17 @@
     },
     "apps/web/components/features/onboarding/OnboardingSecurityCheckRecovery.tsx": {
       "empty": "OnboardingSecurityCheckRecovery always renders one fixed heading, one status line and the retry button, and never a collection; the detector matched the items-start and items-center classes."
+    },
+    "apps/web/components/features/opportunity-inbox/InboxRuntimeNotification.tsx": {
+      "long-content": "The card shows only the title and description that RuntimeUpdateProvider builds from fixed update copy (for example 'Restart Jovie to update'); the component takes no props, so no caller copy can run long."
+    },
+    "apps/web/components/features/opportunity-inbox/OpportunityInboxEmptyState.tsx": {
+      "long-content": "All copy is fixed in the component (headings, the three step labels and descriptions); the only prop is setup, three booleans, so no caller copy can run long.",
+      "permission-denied": "The empty state has no gated action or role check. The detector matched the copy 'Plan Your Next Release' and 'music, and plans together'."
+    },
+    "apps/web/components/features/pay/PayLanding.tsx": {
+      "empty": "The page takes no props and maps only the fixed STEPS, BENEFITS and USE_CASES 'as const' arrays (three, three and four items); no list can be empty.",
+      "long-content": "The page takes no props; every heading, step, benefit and use-case label is fixed marketing copy in the component (for example 'Turn every payment into a follower.'), so no caller copy can run long."
     },
     "apps/web/components/features/pricing/MarketingPricingPlans.tsx": {
       "empty": "Plans are the three checked-in public plans filtered by NEXT_PUBLIC_MARKETING_VISIBLE_PLANS, and a filter naming no known plan falls back to all three, so the card list cannot be empty. A plan with no features drops its list, which PartialPlanDetails shows.",
@@ -723,6 +1014,10 @@
     },
     "apps/web/components/features/profile/AnonCookieBootstrap.tsx": {
       "error": "The bootstrap returns null; a rejected or non-OK assignment request keeps the ISR default variant and still fires onResolved, so the error has no visual output. AnonCookieBootstrap.certificate.test.tsx covers both failures with axe."
+    },
+    "apps/web/components/features/profile/ArtistThemeProvider.tsx": {
+      "error": "The provider renders only its children and has no error branch; useArtistThemeMutation saves silently ('This mutation is silent (no toasts)'), and the only throw is useArtistTheme's TypeError for a hook used outside the provider, a developer error.",
+      "offline": "The provider renders only its children; a theme save that cannot reach the network has no UI here, because the chosen theme is applied locally first and useArtistThemeMutation saves silently."
     },
     "apps/web/components/features/profile/ClaimBanner.tsx": {
       "empty": "ClaimBanner renders no collection: it always shows one ownership message and at most one CTA; the detector matched the items-center class. The no-CTA variant is PartialNoClaimAction."
