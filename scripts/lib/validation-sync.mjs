@@ -60,7 +60,7 @@ const PRODUCTION_VERSION_URL = 'https://jov.ie/api/version';
  *     repository: string,
  *     numbers: readonly number[],
  *     selection: string,
- *   ) => Promise<Map<number, { state: string, mergedAt: string, mergeCommitSha: string, title: string, body: string, baseRef: string }>>,
+ *   ) => Promise<Map<number, { state: string, mergedAt: string, mergeCommitSha: string, title: string, body: string, baseRef: string, headRef: string } | null>>,
  * }} GithubGet
  * @typedef {{
  *   status: 'verified' | 'pending' | 'unknown',
@@ -83,12 +83,8 @@ const PRODUCTION_VERSION_URL = 'https://jov.ie/api/version';
  */
 
 /**
- * One retry for a transport failure (a thrown fetch, not an HTTP status), so a
- * dropped connection on a loaded runner does not fail the whole sweep.
- *
- * @param {HttpFetch} fetchImpl
- * @param {Parameters<HttpFetch>} args
- * @returns {Promise<HttpResponse>}
+ * One retry for a thrown fetch (not an HTTP status), so a dropped
+ * connection does not fail the whole sweep.
  */
 export async function fetchWithRetry(fetchImpl, ...args) {
   try {
@@ -127,13 +123,8 @@ export function headerRetryMs(headers, now = Date.now()) {
 }
 
 /**
- * Wait only when the server named a delay inside the sweep budget. A reset
- * that is already past the cap means persist the cursor instead of sleeping.
- *
- * @param {number} retryAfterMs
- * @param {number} attempt
- * @param {number} maxAttempts
- * @returns {number | null}
+ * Wait only when the server named a delay inside the sweep budget; a
+ * hinted wait past the cap returns null so the caller defers instead.
  */
 export function rateLimitWaitMs(retryAfterMs, attempt, maxAttempts) {
   if (attempt >= maxAttempts) return null;
@@ -183,9 +174,8 @@ export function githubStatusError(status, headers, body, path) {
  */
 export function githubClient(fetchImpl, token, sleep = defaultSleep) {
   const client = async path => {
-    // Bounded retry for transient upstream failures (JOV-5143); a primary
-    // quota 403 is not retried past the sweep budget (the caller persists
-    // the cursor), and a single inaccessible pull is `forbidden` to skip.
+    // Bounded retry for transient upstream failures (JOV-5143); a quota 403
+    // is not retried past the sweep budget (the caller persists the cursor).
     const maxAttempts = 4;
     /** @type {Error | null} */
     let lastError = null;
@@ -232,8 +222,7 @@ export function githubClient(fetchImpl, token, sleep = defaultSleep) {
     throw lastError ?? new Error(`GitHub request failed for ${path}`);
   };
 
-  // JOV-12717: one aliased GraphQL batch per link set through the shared
-  // api-client (separately metered); failures throw -> REST fallback.
+  // One aliased GraphQL batch via the shared api-client (JOV-12717).
   client.batchPulls = async (repository, numbers, selection) => {
     const { createGitHubClient, pullRequestField } = await import(
       '../../packages/api-client/github.ts'
@@ -250,7 +239,24 @@ export function githubClient(fetchImpl, token, sleep = defaultSleep) {
       pullRequestField(owner, name, selection),
       { priority: 'repair', maxWaitMs: 0 }
     );
-    return new Map([...rows].map(([key, value]) => [Number(key), value]));
+    // Unwrap repository { pullRequest } } + flatten refs (JOV-12768): nested shapes drop MERGED pulls; null -> REST fallback.
+    return new Map(
+      [...rows].map(([key, value]) => {
+        const pull = value?.pullRequest;
+        return [
+          Number(key),
+          pull && {
+            state: String(pull.state ?? ''),
+            mergedAt: String(pull.mergedAt ?? ''),
+            mergeCommitSha: String(pull.mergeCommitSha ?? ''),
+            title: String(pull.title ?? ''),
+            body: String(pull.body ?? ''),
+            baseRef: String(pull.base?.ref ?? ''),
+            headRef: String(pull.head?.ref ?? ''),
+          },
+        ];
+      })
+    );
   };
 
   return client;
@@ -350,8 +356,8 @@ export function inspectVerifiedProductionMarker({
 }
 
 /**
- * Reads that can never change, kept across sweeps (actions/cache): merged
- * pulls, their files, SHA compares. Unmerged pulls stay uncached.
+ * Immutable reads kept across sweeps (actions/cache): merged pulls, their
+ * files, SHA compares. Unmerged pulls stay uncached.
  */
 export function immutableGithubCache(github, dir) {
   if (!dir) return github;
@@ -604,8 +610,7 @@ export function createProductionFacts(input) {
 
 /**
  * Does this pull implement the issue (not just mention it): the identifier
- * in the title or branch, a bind marker in the body, or a closes/fixes
- * clause naming it.
+ * in the title/branch, a bind marker, or a closes/fixes clause.
  */
 export function pullImplementsIssue(pull, identifier) {
   const match = /^JOV-(\d+)$/i.exec(identifier);
@@ -656,8 +661,8 @@ export async function listMergedLinkedPulls(input) {
   const merged = [];
   /** @type {number[]} */
   const unreadable = [];
-  // Out-of-window numbers: one GraphQL batch instead of one REST GET each;
-  // failure falls back to the per-pull REST path below, unchanged.
+  // Out-of-window numbers: one batch instead of one REST GET each (failure
+  // falls back to the per-pull REST path below, unchanged).
   let batched = null;
   if (typeof input.github.batchPulls === 'function') {
     const needBatch = selected.filter(
@@ -670,7 +675,7 @@ export async function listMergedLinkedPulls(input) {
           ? await input.github.batchPulls(
               input.repository,
               needBatch,
-              'number state mergedAt mergeCommitSha title body base { ref }'
+              'number state mergedAt mergeCommitSha title body base { ref } head { ref }'
             )
           : null;
     } catch {
@@ -680,8 +685,8 @@ export async function listMergedLinkedPulls(input) {
   for (const number of selected) {
     const closed = input.closedPulls?.get(number);
     if (closed && !closed.merged) {
-      // Closed-unmerged can never bind, and unmerged pulls are not immutable,
-      // so without this cut every sweep re-reads them until quota death.
+      // Closed-unmerged can never bind and stays mutable, so without this
+      // cut every sweep re-reads it until the quota dies.
       continue;
     }
     if (input.openPullNumbers?.has(number)) {
@@ -690,7 +695,7 @@ export async function listMergedLinkedPulls(input) {
     }
     const batchedPull = batched?.get(number);
     if (batchedPull) {
-      // MERGED binds; CLOSED-unmerged and OPEN can never bind here.
+      // MERGED binds; CLOSED-unmerged/OPEN can never bind.
       if (
         batchedPull.state === 'MERGED' &&
         batchedPull.mergedAt &&
@@ -701,7 +706,7 @@ export async function listMergedLinkedPulls(input) {
             {
               title: batchedPull.title,
               body: batchedPull.body,
-              head: { ref: '' },
+              head: { ref: batchedPull.headRef },
             },
             input.identifier
           ))
