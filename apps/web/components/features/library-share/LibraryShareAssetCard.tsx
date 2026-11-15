@@ -15,6 +15,7 @@ import {
   ARTWORK_FIT_CLASSNAME,
   ArtworkFrame,
 } from '@/components/atoms/ArtworkFrame';
+import { releaseTypeLabel } from '@/components/jovie/components/entity-mappers';
 import type { LibraryShareDropAsset } from '@/lib/library-share/types';
 
 interface LibraryShareAssetCardProps {
@@ -22,6 +23,12 @@ interface LibraryShareAssetCardProps {
   readonly downloadsEnabled: boolean;
   readonly layout: 'grid' | 'list' | 'reel';
   readonly priorityArtwork?: boolean;
+}
+
+/** Sentence-case the release type token (single, ep, album) for its eyebrow. */
+function formatReleaseType(value: string): string {
+  const label = releaseTypeLabel(value);
+  return label.charAt(0).toUpperCase() + label.slice(1);
 }
 
 function formatReleaseDate(value: string | null): string {
@@ -84,8 +91,8 @@ export function LibraryShareAssetCard({
 
       <div className={isList ? 'min-w-0 flex-1 py-1' : 'space-y-3 p-4'}>
         <div>
-          <p className='text-2xs font-semibold uppercase tracking-[0.08em] text-tertiary-token'>
-            {asset.releaseType}
+          <p className='text-2xs font-semibold tracking-[0.08em] text-tertiary-token'>
+            {formatReleaseType(asset.releaseType)}
           </p>
           <h2 className='mt-1 truncate text-base font-semibold text-primary-token'>
             {asset.title}
