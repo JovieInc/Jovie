@@ -13,7 +13,6 @@ import {
   type CanonicalArtistSiteCliOptions,
   certifyCanonicalArtistSite,
   classifyDeployedRevision,
-  classifyDeployedRevisionFromGit,
   parseSourceHistory,
 } from './certify-canonical-artist-site';
 
