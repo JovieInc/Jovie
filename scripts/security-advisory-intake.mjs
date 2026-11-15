@@ -21,7 +21,11 @@ import {
   resolveLinearIssueByFingerprint,
   upsertLinearIssueByTitleFingerprint,
 } from './lib/linear-issue-intake.mjs';
-import { logFailedLinearAction, withLinearRetry } from './lib/linear-retry.mjs';
+import {
+  isLinearRateLimitedAction,
+  logFailedLinearAction,
+  withLinearRetry,
+} from './lib/linear-retry.mjs';
 import {
   issueDescription,
   issueTitle,
@@ -250,10 +254,10 @@ export async function recordBlindSource(
 
 /**
  * Run the planned closes against the scanned candidates. Fail-closed by
- * construction: any close failure (including a rate limit on the last group,
- * where no deferred group would otherwise fail the run) marks the result not
- * ok, and the caller exits 1. Rate-limited closes stop the loop; the remaining
- * groups are deferred with ok:false so incomplete Linear work is never green.
+ * construction: any close failure marks the result not ok, and the caller
+ * exits 1 unless EVERY failure is the shared Linear quota (which defers, exit
+ * 75). Rate-limited closes stop the loop; the remaining groups are deferred
+ * with ok:false so incomplete Linear work is never green.
  */
 /**
  * @typedef {Object} AdvisoryCloseResult
@@ -269,7 +273,7 @@ export async function recordBlindSource(
  * @param {string} [input.comment]
  * @param {(group: {fingerprint: string, fixedAt?: string, deployedAt?: string}) => string} [input.commentFor]
  * @param {(input: {fingerprint: string, runId?: string, comment?: string}) => Promise<AdvisoryCloseResult>} [input.close]
- * @returns {Promise<{actions: Array<{fingerprint: string, op: string, ok: boolean, action: string | undefined}>, ok: boolean}>}
+ * @returns {Promise<{actions: Array<{fingerprint: string, op: string, ok: boolean, action: string | undefined, reason?: string}>, ok: boolean}>}
  */
 export async function runAdvisoryCloses({
   closes,
@@ -301,12 +305,14 @@ export async function runAdvisoryCloses({
       runId,
       comment: commentFor ? commentFor(g) : comment,
     });
-    actions.push({
+    const action = {
       fingerprint: g.fingerprint,
       op: 'close',
       ok: r.ok,
       action: r.action,
-    });
+    };
+    if (!r.ok) action.reason = r.reason;
+    actions.push(action);
     if (!r.ok) {
       if (r.reason === 'linear_rate_limited') rateLimited = true;
       failed = true;
@@ -411,18 +417,12 @@ async function main() {
         { fingerprint: 'secadv-close-scan', op: 'scan' }
       );
       if (!scan.ok) {
-        logFailedLinearAction({
-          fingerprint: 'secadv-close-scan',
-          op: 'scan',
-          reason: scan.reason,
-        });
         receipt.actions.push({
           fingerprint: 'secadv-close-scan',
           op: 'scan',
           ok: false,
           action: scan.reason,
         });
-        process.exitCode = 1;
       } else {
         receipt.closeScan = {
           scanned: scan.nodes.length,
@@ -436,9 +436,6 @@ async function main() {
             `Fixed on main at ${g.fixedAt} and deployed: Production deployment at ${g.deployedAt} postdates the fix.`,
         });
         receipt.actions.push(...closeResult.actions);
-        for (const a of closeResult.actions)
-          if (!a.ok) logFailedLinearAction(a);
-        if (!closeResult.ok) process.exitCode = 1;
       }
     }
   }
@@ -448,6 +445,23 @@ async function main() {
     JSON.stringify(receipt, null, 2)
   );
   console.log(JSON.stringify({ ...receipt, actions: receipt.actions.length }));
+  // Classify Linear failures once: quota-only failures re-attempt on the next
+  // loop run (defer, exit 75); any hard failure keeps exit 1. Upsert failures
+  // already logged and exited 1 above; scan/close failures log here.
+  const failures = receipt.actions.filter(a => !a.ok);
+  if (failures.length > 0) {
+    if (failures.every(isLinearRateLimitedAction)) {
+      if (process.exitCode !== 1) {
+        console.warn(
+          `::warning title=Linear quota deferred::${failures.length} Linear action(s) deferred on the workspace budget; the next loop run (4h clock or dependency push) resumes them.`
+        );
+        process.exitCode = 75;
+      }
+    } else {
+      for (const a of failures) if (a.op !== 'upsert') logFailedLinearAction(a);
+      process.exitCode = 1;
+    }
+  }
   if (
     check &&
     (plan.breaches.length > 0 || plan.expiredExceptions.length > 0)

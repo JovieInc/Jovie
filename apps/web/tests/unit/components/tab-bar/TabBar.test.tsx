@@ -4,66 +4,79 @@ import { forwardRef } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { TabBar } from '@/components/molecules/tab-bar/TabBar';
 
-vi.mock('@jovie/ui', () => ({
-  DropdownMenu: ({ children }: { readonly children: ReactNode }) => (
-    <>{children}</>
-  ),
-  DropdownMenuContent: ({ children }: { readonly children: ReactNode }) => (
-    <div>{children}</div>
-  ),
-  DropdownMenuRadioGroup: ({ children }: { readonly children: ReactNode }) => (
-    <div>{children}</div>
-  ),
-  DropdownMenuRadioItem: ({ children, ...props }: ComponentProps<'button'>) => (
-    <button type='button' {...props}>
-      {children}
-    </button>
-  ),
-  DropdownMenuTrigger: ({ children }: { readonly children: ReactNode }) => (
-    <>{children}</>
-  ),
-  OverflowMenuTrigger: Object.assign(
-    forwardRef<HTMLButtonElement, ComponentProps<'button'>>(
-      function OverflowMenuTrigger({ children = 'More', ...props }, ref) {
-        const {
-          hasActiveOverflow: _hasActiveOverflow,
-          variant: _variant,
-          ...buttonProps
-        } = props as ComponentProps<'button'> & {
-          hasActiveOverflow?: boolean;
-          variant?: string;
-        };
-
-        return (
-          <button ref={ref} type='button' {...buttonProps}>
-            {children}
-          </button>
-        );
-      }
+vi.mock('@jovie/ui', async () => {
+  const { PlainButton } = await vi.importActual<
+    typeof import('@jovie/ui/atoms/plain-button')
+  >('@jovie/ui/atoms/plain-button');
+  return {
+    PlainButton,
+    DropdownMenu: ({ children }: { readonly children: ReactNode }) => (
+      <>{children}</>
     ),
-    { displayName: 'OverflowMenuTrigger' }
-  ),
-  Tooltip: ({ children }: { readonly children: ReactNode }) => <>{children}</>,
-  TooltipContent: ({ children }: { readonly children: ReactNode }) => (
-    <div>{children}</div>
-  ),
-  TooltipTrigger: ({ children }: { readonly children: ReactNode }) => (
-    <>{children}</>
-  ),
-  useTabOverflow: ({
-    options,
-  }: {
-    readonly options: ReadonlyArray<{ value: string; label: ReactNode }>;
-  }) => ({
-    containerRef: { current: null },
-    moreButtonRef: { current: null },
-    setTabRef: () => undefined,
-    visibleOptions: options,
-    overflowOptions: [],
-    hasOverflow: false,
-    hasMeasured: true,
-  }),
-}));
+    DropdownMenuContent: ({ children }: { readonly children: ReactNode }) => (
+      <div>{children}</div>
+    ),
+    DropdownMenuRadioGroup: ({
+      children,
+    }: {
+      readonly children: ReactNode;
+    }) => <div>{children}</div>,
+    DropdownMenuRadioItem: ({
+      children,
+      ...props
+    }: ComponentProps<'button'>) => (
+      <button type='button' {...props}>
+        {children}
+      </button>
+    ),
+    DropdownMenuTrigger: ({ children }: { readonly children: ReactNode }) => (
+      <>{children}</>
+    ),
+    OverflowMenuTrigger: Object.assign(
+      forwardRef<HTMLButtonElement, ComponentProps<'button'>>(
+        function OverflowMenuTrigger({ children = 'More', ...props }, ref) {
+          const {
+            hasActiveOverflow: _hasActiveOverflow,
+            variant: _variant,
+            ...buttonProps
+          } = props as ComponentProps<'button'> & {
+            hasActiveOverflow?: boolean;
+            variant?: string;
+          };
+
+          return (
+            <button ref={ref} type='button' {...buttonProps}>
+              {children}
+            </button>
+          );
+        }
+      ),
+      { displayName: 'OverflowMenuTrigger' }
+    ),
+    Tooltip: ({ children }: { readonly children: ReactNode }) => (
+      <>{children}</>
+    ),
+    TooltipContent: ({ children }: { readonly children: ReactNode }) => (
+      <div>{children}</div>
+    ),
+    TooltipTrigger: ({ children }: { readonly children: ReactNode }) => (
+      <>{children}</>
+    ),
+    useTabOverflow: ({
+      options,
+    }: {
+      readonly options: ReadonlyArray<{ value: string; label: ReactNode }>;
+    }) => ({
+      containerRef: { current: null },
+      moreButtonRef: { current: null },
+      setTabRef: () => undefined,
+      visibleOptions: options,
+      overflowOptions: [],
+      hasOverflow: false,
+      hasMeasured: true,
+    }),
+  };
+});
 
 const OPTIONS = [
   { value: 'overview', label: 'Overview' },
