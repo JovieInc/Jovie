@@ -1,5 +1,5 @@
 import { buttonVariants } from '@jovie/ui';
-import { act, fireEvent, screen } from '@testing-library/react';
+import { act, fireEvent, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ClaimArtistSearch } from '@/app/claim/ClaimArtistSearch';
 import { APP_ROUTES } from '@/constants/routes';
@@ -85,6 +85,88 @@ describe('claim artist search rows', () => {
     const taken = screen.getByTestId('claim-artist-claimed');
     expect(taken.tagName).not.toBe('A');
     expect(taken).toHaveTextContent('Claimed');
+  });
+
+  it('keeps the rows in place while a new search runs', async () => {
+    await searchFor('artist');
+    const before = screen.getByTestId('claim-artist-results');
+    const textBefore = before.textContent;
+    const linksBefore = Array.from(before.querySelectorAll('a'), link =>
+      link.getAttribute('href')
+    );
+    let respond!: (response: Response) => void;
+    vi.mocked(globalThis.fetch).mockImplementation(
+      () =>
+        new Promise<Response>(resolve => {
+          respond = resolve;
+        })
+    );
+    fireEvent.change(screen.getByTestId('claim-artist-search'), {
+      target: { value: 'artists' },
+    });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(400);
+    });
+    // No status line is inserted above the rows; they dim where they are.
+    expect(screen.queryByText('Searching…')).toBeNull();
+    const list = screen.getByTestId('claim-artist-results');
+    expect(list).toBe(before);
+    expect(list.textContent).toBe(textBefore);
+    expect(
+      Array.from(list.querySelectorAll('a'), link => link.getAttribute('href'))
+    ).toEqual(linksBefore);
+    expect(list.parentElement).toHaveAttribute('aria-busy', 'true');
+    expect(list.className).toContain('opacity-90');
+
+    await act(async () => {
+      respond(Response.json([{ ...RESULTS[0], name: 'Updated Artist' }]));
+    });
+    await screen.findByText('Updated Artist');
+    expect(screen.getByTestId('claim-artist-results')).toBe(before);
+    expect(list.parentElement).toHaveAttribute('aria-busy', 'false');
+    expect(list.className).not.toContain('opacity-90');
+  });
+
+  it('says it is searching before the first results arrive', async () => {
+    vi.mocked(globalThis.fetch).mockImplementation(
+      () => new Promise<Response>(() => undefined)
+    );
+    render(<ClaimArtistSearch />);
+    fireEvent.change(screen.getByTestId('claim-artist-search'), {
+      target: { value: 'artist' },
+    });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(400);
+    });
+    expect(screen.getByText('Searching…')).toBeInTheDocument();
+    expect(screen.getByText('Searching…').parentElement).toHaveAttribute(
+      'aria-busy',
+      'true'
+    );
+  });
+
+  it('clears stale rows and busy feedback when the query is cleared', async () => {
+    await searchFor('artist');
+    vi.mocked(globalThis.fetch).mockImplementation(
+      () => new Promise<Response>(() => undefined)
+    );
+    fireEvent.change(screen.getByTestId('claim-artist-search'), {
+      target: { value: 'artists' },
+    });
+    expect(
+      screen.getByTestId('claim-artist-results').parentElement
+    ).toHaveAttribute('aria-busy', 'true');
+    fireEvent.change(screen.getByTestId('claim-artist-search'), {
+      target: { value: '' },
+    });
+    await waitFor(() =>
+      expect(screen.queryByTestId('claim-artist-results')).toBeNull()
+    );
+    expect(screen.queryByText('Searching…')).toBeNull();
+    expect(document.querySelector('[aria-live="polite"]')).toHaveAttribute(
+      'aria-busy',
+      'false'
+    );
   });
 
   it('uses a readable avatar size', async () => {

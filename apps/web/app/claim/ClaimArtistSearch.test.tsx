@@ -110,21 +110,24 @@ describe('ClaimArtistSearch', () => {
   it('answers a repeated query from the cache and keeps results visible while the next one loads', async () => {
     respondWith(RESULTS);
     const user = await typeQuery('ab');
-    await screen.findByTestId('claim-artist-results');
+    const list = await screen.findByTestId('claim-artist-results');
     expect(fetchMock).toHaveBeenCalledTimes(1);
 
     fetchMock.mockImplementation(() => new Promise<Response>(() => undefined));
     await user.type(searchInput(), 'c');
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
-    expect(screen.getByText('Searching…')).toBeInTheDocument();
+    expect(screen.queryByText('Searching…')).not.toBeInTheDocument();
+    expect(list.parentElement).toHaveAttribute('aria-busy', 'true');
+    expect(list).toHaveClass('opacity-90');
     // Previous results stay on screen instead of flashing to empty.
-    expect(screen.getByTestId('claim-artist-results')).toBeInTheDocument();
+    expect(screen.getByTestId('claim-artist-results')).toBe(list);
 
     await user.type(searchInput(), '{Backspace}');
     await waitFor(() =>
-      expect(screen.queryByText('Searching…')).not.toBeInTheDocument()
+      expect(list.parentElement).toHaveAttribute('aria-busy', 'false')
     );
-    expect(screen.getByTestId('claim-artist-results')).toBeInTheDocument();
+    expect(screen.getByTestId('claim-artist-results')).toBe(list);
+    expect(list).not.toHaveClass('opacity-90');
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
