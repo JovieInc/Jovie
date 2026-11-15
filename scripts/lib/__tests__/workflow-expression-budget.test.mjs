@@ -96,6 +96,7 @@ test('CLI fails the exact head and the head merged into a moved base', () => {
   const root = mkdtempSync(join(tmpdir(), 'workflow-budget-'));
   const git = (...args) =>
     execFileSync('git', args, {
+      maxBuffer: 256 * 1024 * 1024,
       cwd: root,
       encoding: 'utf8',
       env: fixtureEnv,
@@ -182,6 +183,7 @@ test('the workflow load guard runs from a trusted-base extraction (JOV-8840)', (
   const guard = join(guardRoot, 'scripts', 'workflow-expression-budget.mjs');
   const git = (...args) =>
     execFileSync('git', args, {
+      maxBuffer: 256 * 1024 * 1024,
       cwd: root,
       encoding: 'utf8',
       env: fixtureEnv,

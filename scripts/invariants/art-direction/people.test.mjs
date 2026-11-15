@@ -26,7 +26,7 @@ describe('approved people registry', () => {
     );
   });
 
-  it('requires a per-route allowlist and never allows the homepage', () => {
+  it('requires a per-route allowlist and admits / only with the person’s own approval', () => {
     const base = { people: [tim] };
     const none = validateRegistry(
       { ...base, images: [{ path: 'a.jpg', person: 'tim-white' }] },
@@ -43,6 +43,36 @@ describe('approved people registry', () => {
       () => true
     );
     assert.ok(home.some(error => /homepage/u.test(error)));
+    const approved = validateRegistry(
+      {
+        ...base,
+        images: [
+          {
+            path: 'a.jpg',
+            person: 'tim-white',
+            routes: ['/'],
+            homepage: { at: '2026-11-12T19:58:13Z', inTheirWords: 'use me' },
+          },
+        ],
+      },
+      () => true
+    );
+    assert.deepEqual(approved, []);
+    const written = validateRegistry(
+      {
+        people: [{ ...tim, id: 'guest', consent: 'written' }],
+        images: [
+          {
+            path: 'a.jpg',
+            person: 'guest',
+            routes: ['/'],
+            homepage: { at: '2026-11-12T19:58:13Z', inTheirWords: 'yes' },
+          },
+        ],
+      },
+      () => true
+    );
+    assert.ok(written.some(error => /consent self/u.test(error)));
   });
 
   it('rejects missing consent, provenance and unknown people', () => {

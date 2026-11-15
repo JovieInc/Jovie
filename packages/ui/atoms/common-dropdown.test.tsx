@@ -716,7 +716,7 @@ describe('CommonDropdown', () => {
         <CommonDropdown items={basicItems} open={true} isLoading={true} />
       );
       const menu = screen.getByRole('menu');
-      expect(menu).toBeInTheDocument();
+      expect(menu).toHaveAttribute('data-motion', 'fade');
       expect(menu).toHaveAttribute('data-slot', 'common-dropdown-content');
       expect(menu).toHaveAttribute('aria-busy', 'true');
       expect(screen.getByRole('status')).toHaveTextContent(
@@ -769,13 +769,23 @@ describe('CommonDropdown', () => {
       });
     });
 
-    it('renders search input when searchable is true', () => {
+    it('presents a searchable surface as a group holding the items menu', () => {
       render(
         <CommonDropdown items={basicItems} open={true} searchable={true} />
       );
-      expect(screen.getByPlaceholderText('Search...')).toBeInTheDocument();
+      // A text input is not an allowed role="menu" child (axe
+      // aria-required-children): input in the group, items in the inner menu.
+      const input = screen.getByPlaceholderText('Search...');
+      const group = input.closest('[role="group"]');
+      // axe aria-allowed-attr: orientation is not allowed on role="group".
+      expect(group?.hasAttribute('aria-orientation')).toBe(false);
+      expect(input.closest('[role="menu"]')).toBeNull();
+      expect(group?.querySelector('[role="menuitem"]')).not.toBeNull();
     });
 
+    // A text input is not an allowed role="menu" child (axe
+    // aria-required-children): the searchable surface presents as a group
+    // and the item rows stay in an inner menu.
     it('renders custom search placeholder', () => {
       render(
         <CommonDropdown

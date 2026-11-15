@@ -137,6 +137,8 @@ def check_fingerprint(pr: dict) -> str:
     does not open a second class beside a FAILURE or TIMED_OUT. A rollup whose latest
     run is only cancelled still fingerprints that name. Advisory names are skipped.
     PR Ready is skipped unless it is the only hard failure.
+    An empty name list is fix-red-e3b0c44298. empty_review.stale_review_only refuses that
+    dispatch when the only signal is a loaded review with no current-head body.
     """
     red = {"FAILURE", "TIMED_OUT", "CANCELLED"}
     hard = {"FAILURE", "TIMED_OUT"}

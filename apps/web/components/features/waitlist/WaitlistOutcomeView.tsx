@@ -26,8 +26,18 @@ interface WaitlistOutcomeViewProps {
   readonly reservedHandle?: string | null;
 }
 
+/**
+ * The reserved-handle receipt's exact copy (Tim, 2026-11-09): waitlist
+ * wording may appear only as this post-claim state.
+ */
+const RESERVED_HANDLE_TITLE =
+  'Your handle is reserved. You’re on the waitlist.';
+
 type OutcomeCopy = {
-  readonly title: string;
+  /** Static, or resolved against the receipt's email and reserved handle. */
+  readonly title:
+    | string
+    | ((hasEmail: boolean, reservedHandle: string | null) => string);
   /** Body may depend on the known contact email and reserved handle. */
   readonly body: (hasEmail: boolean, reservedHandle: string | null) => string;
   readonly icon: typeof CheckCircle2;
@@ -57,8 +67,8 @@ const OUTCOME_COPY: Record<WaitlistOutcomeViewProps['outcome'], OutcomeCopy> = {
     title: 'Request Saved',
     body: hasEmail =>
       hasEmail
-        ? 'Jovie is in a private rollout. We saved your release context and will email you when access opens — usually within a few days of capacity.'
-        : 'Jovie is in a private rollout. We saved your release context. Return to /start when a spot opens — usually within a few days of capacity.',
+        ? 'We saved your release context and will email you when access opens — usually within a few days of capacity.'
+        : 'We saved your release context. Return to /start when access opens — usually within a few days of capacity.',
     icon: Clock3,
     showNextSteps: true,
   },
@@ -81,13 +91,14 @@ const OUTCOME_COPY: Record<WaitlistOutcomeViewProps['outcome'], OutcomeCopy> = {
     showNextSteps: true,
   },
   pending: {
-    title: "You're on the list",
+    title: (_hasEmail, reservedHandle) =>
+      reservedHandle ? RESERVED_HANDLE_TITLE : "You're on the waitlist.",
     body: (hasEmail, reservedHandle) =>
       reservedHandle
-        ? `jov.ie/${reservedHandle} is yours. Your name and profile are reserved, and we'll email you the moment your spot opens.`
+        ? `jov.ie/${reservedHandle} is yours, and we'll email you the moment your spot opens.`
         : hasEmail
-          ? "We're opening Jovie in waves. Your request is saved, and we'll email you the moment your spot opens."
-          : "We're opening Jovie in waves. Your request is saved. Come back to /start when your spot opens.",
+          ? "Your request is saved, and we'll email you the moment your spot opens."
+          : 'Your request is saved. Come back to /start when your spot opens.',
     icon: Clock3,
     showNextSteps: true,
   },
@@ -168,7 +179,12 @@ export function WaitlistOutcomeView({
   const copy = OUTCOME_COPY[outcome];
   const Icon = copy.icon;
   const hasEmail = Boolean(email?.trim());
-  const body = copy.body(hasEmail, reservedHandle?.trim() || null);
+  const knownHandle = reservedHandle?.trim() || null;
+  const body = copy.body(hasEmail, knownHandle);
+  const title =
+    typeof copy.title === 'function'
+      ? copy.title(hasEmail, knownHandle)
+      : copy.title;
   const canRetry =
     (outcome === 'save_failed' || outcome === 'rate_limited') && onRetry;
   const { signOut } = useAuthSafe();
@@ -183,7 +199,7 @@ export function WaitlistOutcomeView({
           <Icon className='h-4 w-4' aria-hidden />
         </span>
         <h1 className='text-xl font-semibold leading-6 text-primary-token'>
-          {copy.title}
+          {title}
         </h1>
       </div>
       <p className='text-sm leading-6 text-on-media/62'>{body}</p>

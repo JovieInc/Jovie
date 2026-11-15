@@ -62,16 +62,25 @@ if ! command -v gh >/dev/null 2>&1 || [ -z "$token" ]; then
 fi
 
 # gh exits non-zero on a 403 but still prints the status line with -i.
+# The response is written to a temp file and every parse reads the file:
+# the early-exit header awks below close their pipe as soon as the header
+# matches, so parsing `printf | awk` streams under set -o pipefail let a
+# >64KiB single-commit response SIGPIPE the writer mid-parse and kill the
+# script before any SHA was printed (JOV-12497, runs 43478937551 and
+# 42590625677). File-backed parsing keeps the same fields and guards.
+response_file="$(mktemp "${RUNNER_TEMP:-${TMPDIR:-/tmp}}/resolve-main-sha-response.XXXXXX")"
+trap 'rm -f "$response_file"' EXIT
+
 rest_once() {
-  gh api -i "repos/${repository}/commits/main" 2>/dev/null || true
+  gh api -i "repos/${repository}/commits/main" >"$response_file" 2>/dev/null || true
 }
 
 for _rest_attempt in 1 2; do
-  response="$(rest_once)"
-  status="$(printf '%s\n' "$response" | awk 'toupper($1) ~ /^HTTP/ { code=$2 } END { gsub("\r","",code); print code }')"
-  reset="$(printf '%s\n' "$response" | awk 'tolower($1)=="x-ratelimit-reset:" { gsub("\r","",$2); print $2; exit }')"
-  remaining="$(printf '%s\n' "$response" | awk 'tolower($1)=="x-ratelimit-remaining:" { gsub("\r","",$2); print $2; exit }')"
-  body="$(printf '%s\n' "$response" | awk 'BEGIN{p=0} { sub(/\r/,"") } NF==0 { p=1; next } p { print }')"
+  rest_once
+  status="$(awk 'toupper($1) ~ /^HTTP/ { code=$2 } END { gsub("\r","",code); print code }' "$response_file")"
+  reset="$(awk 'tolower($1)=="x-ratelimit-reset:" { gsub("\r","",$2); print $2; exit }' "$response_file")"
+  remaining="$(awk 'tolower($1)=="x-ratelimit-remaining:" { gsub("\r","",$2); print $2; exit }' "$response_file")"
+  body="$(awk 'BEGIN{p=0} { sub(/\r/,"") } NF==0 { p=1; next } p { print }' "$response_file")"
   if [ "$status" = "200" ]; then
     sha="$(printf '%s\n' "$body" | jq -r '.sha // empty' 2>/dev/null || true)"
     if valid_sha "$sha"; then
@@ -81,7 +90,7 @@ for _rest_attempt in 1 2; do
     break
   fi
   rate_limited=false
-  if [ "$remaining" = "0" ] || printf '%s\n' "$body" | grep -qi 'rate limit'; then
+  if [ "$remaining" = "0" ] || [[ "${body,,}" == *'rate limit'* ]]; then
     rate_limited=true
   fi
   if [ "$rate_limited" = true ] && [[ "$reset" =~ ^[0-9]+$ ]]; then

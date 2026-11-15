@@ -310,7 +310,12 @@ describe('ReleaseSidebarSections', () => {
       />
     );
 
-    expect(screen.getByTestId('release-header-meta-strip')).toBeTruthy();
+    // Title block and meta strip share one px-3 inset on the flat rail.
+    const metaStrip = screen.getByTestId('release-header-meta-strip');
+    expect(metaStrip.parentElement).toHaveClass('px-3', 'pt-3');
+    expect(metaStrip.parentElement).toContainElement(
+      screen.getByTestId('entity-header')
+    );
   });
 
   it('uses one canonical artwork geometry and contain-fit contract', () => {

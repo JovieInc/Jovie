@@ -71,7 +71,8 @@ async function main() {
   const info = /** @type {{ commitSha?: string }} */ (
     await (await fetch('https://jov.ie/api/health/build-info')).json()
   );
-  const run = (...a) => spawnSync('git', a, { encoding: 'utf8' });
+  const run = (...a) =>
+    spawnSync('git', a, { maxBuffer: 256 * 1024 * 1024, encoding: 'utf8' });
   const mainSha = run('rev-parse', 'HEAD').stdout.trim();
   let firstUnshippedMs;
   if (info.commitSha && info.commitSha !== mainSha) {

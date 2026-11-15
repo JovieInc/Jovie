@@ -190,8 +190,52 @@ describe('collectRunRows', () => {
     expect(result.truncated).toBe(false);
     expect(result.rows[0].job_id).toBe(90001);
     expect(result.rows[1].job_name).toBe('Unit Tests (5/10)');
-    expect(calls[0]).toContain('/actions/runs/5001/jobs');
-    expect(calls[0]).toContain('filter_run_attempt=1');
+    // Attempt-scoped jobs endpoint: the general /runs/{id}/jobs URL serves
+    // the latest attempt and races reruns.
+    expect(calls[0]).toBe(
+      `/repos/{owner}/{repo}/actions/runs/5001/attempts/1/jobs?per_page=${CAPS.jobsPerPage}`
+    );
+    expect(calls[0]).not.toContain('filter_run_attempt');
+  });
+
+  it('keeps a rerun attempt on its own attempt-scoped endpoint', async () => {
+    const calls = [];
+    const fetchJson = async path => {
+      calls.push(path);
+      return { total_count: 1, jobs: [BASE_JOB] };
+    };
+    await collectRunRows({
+      run: { ...BASE_RUN, run_attempt: 2 },
+      fetchJson,
+      collectedAt: '2026-10-23T19:12:30Z',
+    });
+    expect(calls[0]).toContain('/attempts/2/jobs');
+  });
+
+  it('fetches exactly two pages for 101 jobs', async () => {
+    const calls = [];
+    const jobs = Array.from({ length: 101 }, (_, i) => ({
+      ...BASE_JOB,
+      id: 100000 + i,
+    }));
+    const fetchJson = async path => {
+      calls.push(path);
+      const page = path.includes('page=2') ? 2 : 1;
+      return {
+        total_count: 101,
+        jobs: page === 1 ? jobs.slice(0, 100) : jobs.slice(100),
+      };
+    };
+    const result = await collectRunRows({
+      run: BASE_RUN,
+      fetchJson,
+      collectedAt: '2026-10-23T19:12:30Z',
+    });
+    expect(result.jobsFetched).toBe(101);
+    expect(result.jobPagesFetched).toBe(2);
+    expect(result.truncated).toBe(false);
+    expect(calls).toHaveLength(2);
+    expect(calls[1]).toContain('page=2');
   });
 
   it('enforces the rows-per-run cap and reports truncation', async () => {

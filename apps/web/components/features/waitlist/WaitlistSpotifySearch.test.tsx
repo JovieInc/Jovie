@@ -201,12 +201,141 @@ describe('WaitlistSpotifySearch', () => {
       'aria-activedescendant',
       'spotify-result-1'
     );
+    // Check the result while the list is open. Enter selects the artist and
+    // switches to the URL row, which replaces these buttons with the name.
+    // The buttons are real keyboard-operable controls and must not sit in an
+    // aria-hidden subtree (axe aria-hidden-focus).
+    const resultButton = screen.getByRole('button', { name: /Neon Harbor/ });
+    expect(resultButton.closest('.max-h-64')).not.toHaveAttribute(
+      'aria-hidden'
+    );
+
     await user.keyboard('{ArrowUp}{Enter}');
     expect(onUrlChange).toHaveBeenLastCalledWith(
       'https://open.spotify.com/artist/neon-harbor'
     );
     expect(onArtistNameChange).toHaveBeenLastCalledWith('Neon Harbor');
     expect(screen.getByText('Neon Harbor')).toBeVisible();
+    expect(
+      screen.queryByRole('button', { name: /Neon Harbor/ })
+    ).not.toBeInTheDocument();
+  });
+
+  it.each(['artist', 'manual'] as const)(
+    'keeps composition Enter from choosing the highlighted %s option',
+    async option => {
+      Element.prototype.scrollIntoView = vi.fn();
+      mockHookReturn.results = ARTISTS;
+      mockHookReturn.state = 'success';
+      const onUrlChange = vi.fn();
+      const onArtistNameChange = vi.fn();
+      const user = userEvent.setup();
+      renderSearch({ onUrlChange, onArtistNameChange });
+
+      const combobox = screen.getByRole('combobox');
+      await user.type(combobox, 'neon');
+      await user.keyboard(
+        option === 'artist'
+          ? '{ArrowDown}'
+          : '{ArrowDown}{ArrowDown}{ArrowDown}'
+      );
+      const activeOption =
+        option === 'artist' ? 'spotify-result-0' : 'spotify-result-2';
+      expect(combobox).toHaveAttribute('aria-activedescendant', activeOption);
+
+      const composingEnter = new KeyboardEvent('keydown', {
+        key: 'Enter',
+        isComposing: true,
+        bubbles: true,
+        cancelable: true,
+      });
+      expect(composingEnter.isComposing).toBe(true);
+      fireEvent(combobox, composingEnter);
+
+      expect(onUrlChange).not.toHaveBeenCalled();
+      expect(onArtistNameChange).not.toHaveBeenCalled();
+      expect(mockClear).not.toHaveBeenCalled();
+      expect(screen.getByRole('combobox')).toBe(combobox);
+      expect(combobox).toHaveValue('neon');
+      expect(combobox).toHaveFocus();
+      expect(combobox).toHaveAttribute('aria-expanded', 'true');
+      expect(combobox).toHaveAttribute('aria-activedescendant', activeOption);
+      expect(composingEnter.defaultPrevented).toBe(false);
+
+      await user.keyboard('{Enter}');
+      expect(mockClear).toHaveBeenCalledTimes(1);
+      if (option === 'artist') {
+        expect(onUrlChange).toHaveBeenCalledExactlyOnceWith(ARTISTS[0].url);
+        expect(onArtistNameChange).toHaveBeenCalledExactlyOnceWith(
+          ARTISTS[0].name
+        );
+        expect(screen.getByText(ARTISTS[0].name)).toBeVisible();
+        expect(screen.getByRole('button', { name: 'Change' })).toBeVisible();
+      } else {
+        expect(screen.getByLabelText('Spotify link')).toBeVisible();
+        expect(onUrlChange).not.toHaveBeenCalled();
+        expect(onArtistNameChange).not.toHaveBeenCalled();
+      }
+    }
+  );
+
+  it.each(['ArrowDown', 'ArrowUp', 'Escape', 'Tab'] as const)(
+    'leaves composition %s to native editing instead of navigating the results',
+    async key => {
+      Element.prototype.scrollIntoView = vi.fn();
+      mockHookReturn.results = ARTISTS;
+      mockHookReturn.state = 'success';
+      const user = userEvent.setup();
+      renderSearch();
+      const combobox = screen.getByRole('combobox');
+      await user.type(combobox, 'neon');
+      await user.keyboard('{ArrowDown}{ArrowDown}');
+
+      const composingKey = new KeyboardEvent('keydown', {
+        key,
+        isComposing: true,
+        bubbles: true,
+        cancelable: true,
+      });
+      expect(composingKey.isComposing).toBe(true);
+      fireEvent(combobox, composingKey);
+
+      expect(combobox).toHaveAttribute('aria-expanded', 'true');
+      expect(combobox).toHaveAttribute(
+        'aria-activedescendant',
+        'spotify-result-1'
+      );
+      expect(combobox).toHaveValue('neon');
+      expect(combobox).toHaveFocus();
+      expect(composingKey.defaultPrevented).toBe(false);
+
+      await user.keyboard(`{${key}}`);
+      if (key === 'ArrowDown' || key === 'ArrowUp') {
+        expect(combobox).toHaveAttribute(
+          'aria-activedescendant',
+          key === 'ArrowDown' ? 'spotify-result-2' : 'spotify-result-0'
+        );
+      } else {
+        expect(combobox).toHaveAttribute('aria-expanded', 'false');
+        expect(combobox).not.toHaveAttribute('aria-activedescendant');
+      }
+    }
+  );
+
+  it('does not consume composition Escape when the results are closed', () => {
+    renderSearch();
+    const combobox = screen.getByRole('combobox');
+    const composingEscape = new KeyboardEvent('keydown', {
+      key: 'Escape',
+      isComposing: true,
+      bubbles: true,
+      cancelable: true,
+    });
+    fireEvent(combobox, composingEscape);
+
+    expect(composingEscape.defaultPrevented).toBe(false);
+    expect(combobox).toHaveAttribute('aria-expanded', 'false');
+    expect(combobox).toHaveValue('');
   });
 
   it('closes the results on Escape and keeps the typed query', async () => {
@@ -245,6 +374,23 @@ describe('WaitlistSpotifySearch', () => {
     });
     expect(combobox).toHaveValue('Neon Har');
     vi.useRealTimers();
+  });
+
+  it('clears the pending blur-hide timer on unmount so no deferred setState outlives teardown', () => {
+    vi.useFakeTimers();
+    try {
+      const { unmount } = renderSearch();
+      const combobox = screen.getByRole('combobox');
+
+      fireEvent.change(combobox, { target: { value: 'a' } });
+      fireEvent.blur(combobox);
+      expect(vi.getTimerCount()).toBeGreaterThan(0);
+
+      unmount();
+      expect(vi.getTimerCount()).toBe(0);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('keeps a typed link across a rerender in link mode', async () => {

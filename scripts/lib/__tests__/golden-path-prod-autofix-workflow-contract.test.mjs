@@ -281,7 +281,7 @@ describe('Golden Path Lock merge-gate contract', () => {
     expect(CI_WORKFLOW).toContain('  ci-golden-path-lock:');
     expect(CI_WORKFLOW).toContain('name: Golden Path Lock');
     expect(CI_WORKFLOW).toContain(
-      'needs: [ci-path-changes, ci-risk-classifier, ci-fast, ci-blog-content, ci-exact-head-coverage, ci-secret-scan, ci-golden-path-lock, ci-visual-snapshot-compare, ci-pen-diff, ci-slop-guard]'
+      'needs: [ci-path-changes, ci-risk-classifier, ci-fast, ci-blog-content, ci-exact-head-coverage, ci-secret-scan, ci-golden-path-lock, ci-visual-snapshot-compare, ci-visual-snapshot-homepage, ci-visual-marketing-dom, ci-visual-marketing-routes, ci-pen-diff, ci-slop-guard]'
     );
     expect(CI_WORKFLOW).toContain('ci-golden-path-lock,');
     expect(CI_WORKFLOW).toContain(

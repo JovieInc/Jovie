@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { APP_ROUTES } from '@/constants/routes';
 import type { ChatUsageData } from '@/lib/queries/useChatUsageQuery';
 import { expectNoA11yViolations } from '@/tests/utils/a11y';
+import { ACCOUNT_LOADING_FILL } from './account-loading-fill';
 import { UsageMenuItem } from './UsageMenuItem';
 
 // Focus-retention and cached-balance edge cases are covered in
@@ -69,6 +70,15 @@ describe('UsageMenuItem', () => {
     const toggle = screen.getByRole('button', { name: /usage remaining/i });
     expect(toggle).toHaveAttribute('aria-expanded', 'false');
     expect(toggle).toHaveTextContent('71%');
+    // The toggle is a normal 32px menu row on the shared gutter, with its
+    // gauge in the icon column.
+    expect(toggle).toHaveClass('h-8', 'px-(--space-2-5)');
+    expect(toggle).not.toHaveClass('rounded-none');
+    expect(toggle.querySelector('svg')?.parentElement).toHaveClass(
+      'w-4',
+      'shrink-0',
+      'justify-center'
+    );
     expect(screen.queryByRole('progressbar')).not.toBeInTheDocument();
     await expectNoA11yViolations(container);
 
@@ -99,6 +109,12 @@ describe('UsageMenuItem', () => {
     );
 
     expect(screen.queryByText('—')).not.toBeInTheDocument();
+    // The inline placeholder uses the fill that stays visible in light mode.
+    expect(
+      container.querySelector(
+        `.${ACCOUNT_LOADING_FILL.replace('/', '\\/')}.animate-pulse`
+      )
+    ).not.toBeNull();
     await expand();
     expect(screen.getByText('Loading usage…')).toBeInTheDocument();
     expect(
