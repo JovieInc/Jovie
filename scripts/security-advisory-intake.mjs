@@ -43,6 +43,19 @@ export const CLOSE_SCAN_LABEL_PREFIX = 'remediation:secadv-';
 export const CLOSE_SCAN_PAGE_SIZE = 100;
 export const CLOSE_SCAN_MAX_PAGES = 5;
 
+/**
+ * A failed close/scan action caused only by the shared Linear quota (not a
+ * hard failure). Rate-limited close work re-attempts on every run by design
+ * (the close list re-scans all historical fixed groups), so it defers.
+ */
+export function isLinearRateLimitedAction(action) {
+  return (
+    action?.reason === 'linear_rate_limited' ||
+    action?.action === 'linear_rate_limited' ||
+    action?.action === 'deferred_rate_limited'
+  );
+}
+
 const CLOSE_CANDIDATE_FIELDS = `
   id identifier url title
   state { id name type }
@@ -301,12 +314,14 @@ export async function runAdvisoryCloses({
       runId,
       comment: commentFor ? commentFor(g) : comment,
     });
-    actions.push({
+    const action = {
       fingerprint: g.fingerprint,
       op: 'close',
       ok: r.ok,
       action: r.action,
-    });
+    };
+    if (!r.ok) action.reason = r.reason;
+    actions.push(action);
     if (!r.ok) {
       if (r.reason === 'linear_rate_limited') rateLimited = true;
       failed = true;
@@ -322,6 +337,11 @@ async function main() {
   const repo = process.env.GITHUB_REPOSITORY || 'JovieInc/Jovie';
   const alertsToken = process.env.ALERTS_TOKEN || process.env.GH_TOKEN;
   const now = new Date();
+  // Set when Linear work failed ONLY on the shared quota: defer the run
+  // (exit 75, EX_TEMPFAIL) instead of failing it. The next loop run (4h clock
+  // or dependency push) re-attempts upserts, the close scan and every close,
+  // so nothing is lost; a hard failure below still exits 1.
+  let linearDeferred = false;
   let alerts;
   try {
     alerts = [
@@ -411,18 +431,25 @@ async function main() {
         { fingerprint: 'secadv-close-scan', op: 'scan' }
       );
       if (!scan.ok) {
-        logFailedLinearAction({
-          fingerprint: 'secadv-close-scan',
-          op: 'scan',
-          reason: scan.reason,
-        });
+        if (scan.reason === 'linear_rate_limited') {
+          linearDeferred = true;
+          console.warn(
+            '::warning title=Linear quota deferred::secadv close scan deferred on Linear rate limit (linear_rate_limited); closes resume on the next loop run.'
+          );
+        } else {
+          logFailedLinearAction({
+            fingerprint: 'secadv-close-scan',
+            op: 'scan',
+            reason: scan.reason,
+          });
+        }
         receipt.actions.push({
           fingerprint: 'secadv-close-scan',
           op: 'scan',
           ok: false,
           action: scan.reason,
         });
-        process.exitCode = 1;
+        if (scan.reason !== 'linear_rate_limited') process.exitCode = 1;
       } else {
         receipt.closeScan = {
           scanned: scan.nodes.length,
@@ -436,9 +463,18 @@ async function main() {
             `Fixed on main at ${g.fixedAt} and deployed: Production deployment at ${g.deployedAt} postdates the fix.`,
         });
         receipt.actions.push(...closeResult.actions);
-        for (const a of closeResult.actions)
-          if (!a.ok) logFailedLinearAction(a);
-        if (!closeResult.ok) process.exitCode = 1;
+        const closeFailures = closeResult.actions.filter(a => !a.ok);
+        if (closeFailures.length > 0) {
+          if (closeFailures.every(isLinearRateLimitedAction)) {
+            linearDeferred = true;
+            console.warn(
+              `::warning title=Linear quota deferred::${closeFailures.length} advisory close(s) deferred on Linear rate limit; closes resume on the next loop run.`
+            );
+          } else {
+            for (const a of closeFailures) logFailedLinearAction(a);
+            process.exitCode = 1;
+          }
+        }
       }
     }
   }
@@ -448,6 +484,13 @@ async function main() {
     JSON.stringify(receipt, null, 2)
   );
   console.log(JSON.stringify({ ...receipt, actions: receipt.actions.length }));
+  // Hard failures above keep exit 1; only a purely rate-limited run defers.
+  if (linearDeferred && process.exitCode !== 1) {
+    console.warn(
+      '::warning title=Linear quota deferred::sync ended deferred on the Linear workspace budget (exit 75); the next loop run resumes the deferred work.'
+    );
+    process.exitCode = 75;
+  }
   if (
     check &&
     (plan.breaches.length > 0 || plan.expiredExceptions.length > 0)

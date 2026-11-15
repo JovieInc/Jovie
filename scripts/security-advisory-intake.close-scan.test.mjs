@@ -9,6 +9,7 @@ import { resolveLinearIssueByFingerprint } from './lib/linear-issue-intake.mjs';
 import { logFailedLinearAction, withLinearRetry } from './lib/linear-retry.mjs';
 import {
   CLOSE_SCAN_MAX_PAGES,
+  isLinearRateLimitedAction,
   listSecadvIssueCandidates,
   runAdvisoryCloses,
 } from './security-advisory-intake.mjs';
@@ -200,6 +201,7 @@ test('runAdvisoryCloses defers the tail after a rate limit and fails closed', as
       op: 'close',
       ok: false,
       action: undefined,
+      reason: 'linear_rate_limited',
     },
     {
       fingerprint: 'secadv-ghsa-cccc-dddd-eeee-right-pad',
@@ -368,4 +370,42 @@ test('logFailedLinearAction names the failing op, fingerprint and reason', () =>
     lines[0],
     /upsert for secadv-ghsa-x failed \(linear_search_502\)/
   );
+});
+
+test('rate-limited closes carry the reason so the run can defer, not fail', async () => {
+  const candidates = [
+    candidateNode(
+      'i1',
+      '[secadv-ghsa-aaaa-bbbb-cccc-left-pad] HIGH left-pad: bad'
+    ),
+  ];
+  const result = await runAdvisoryCloses({
+    closes: [{ fingerprint: 'secadv-ghsa-aaaa-bbbb-cccc-left-pad' }],
+    candidates,
+    close: async () => ({ ok: false, reason: 'linear_rate_limited' }),
+  });
+  assert.equal(result.ok, false);
+  assert.equal(result.actions.length, 1);
+  assert.equal(result.actions[0].reason, 'linear_rate_limited');
+  assert.equal(isLinearRateLimitedAction(result.actions[0]), true);
+});
+
+test('isLinearRateLimitedAction classifies quota-only failures, not hard ones', () => {
+  assert.equal(
+    isLinearRateLimitedAction({ ok: false, reason: 'linear_rate_limited' }),
+    true
+  );
+  assert.equal(
+    isLinearRateLimitedAction({ ok: false, action: 'deferred_rate_limited' }),
+    true
+  );
+  assert.equal(
+    isLinearRateLimitedAction({ ok: false, reason: 'linear_close_400' }),
+    false
+  );
+  assert.equal(
+    isLinearRateLimitedAction({ ok: true, action: 'closed' }),
+    false
+  );
+  assert.equal(isLinearRateLimitedAction(undefined), false);
 });

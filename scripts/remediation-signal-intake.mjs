@@ -13,6 +13,7 @@ import {
   decideAuthSmokeSignal,
   decideLoginSignal,
   decideMonitorSignal,
+  failedOnLinearRateLimit,
   gateSteadyGreen,
   isLoginTimeout,
   readLoginMatrixEvidence,
@@ -147,6 +148,16 @@ if (
   );
 }
 const healthy = gated.action !== 'red';
+if (!result.ok && gated.action === 'green' && failedOnLinearRateLimit(result)) {
+  // Resolution work deferred on the shared Linear budget: the state file is
+  // untouched (previous state survives) so the next run re-resolves. Exit 75
+  // (EX_TEMPFAIL) mirrors the GitHub quota-deferred convention; a real red
+  // signal below still exits 1.
+  console.warn(
+    `::warning title=Linear quota deferred::${gated.fingerprint || env.REMEDIATION_FINGERPRINT} resolve deferred on Linear rate limit (linear_rate_limited); resumes on the next run. Previous state: ${previous || 'none'}.`
+  );
+  process.exit(75);
+}
 if (!result.ok && env.REMEDIATION_FAIL_OPEN === '1' && healthy) {
   console.warn(
     '::warning::Linear intake failed while production is healthy; continuing.'
