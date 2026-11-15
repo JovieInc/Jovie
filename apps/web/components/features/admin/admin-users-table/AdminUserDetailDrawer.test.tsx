@@ -202,4 +202,11 @@ describe('AdminUserDetailDrawer', () => {
     expect(screen.getByRole('link', { name: 'سبوتيفاي' })).toBeInTheDocument();
     await expectNoA11yViolations(container);
   });
+
+  it('keeps the copy buttons at a 24px+ touch target', () => {
+    render(<AdminUserDetailDrawer user={adminUser} onClose={() => {}} />);
+
+    const copyEmail = screen.getByRole('button', { name: 'Copy Email' });
+    expect(copyEmail).toHaveClass('size-6');
+  });
 });
