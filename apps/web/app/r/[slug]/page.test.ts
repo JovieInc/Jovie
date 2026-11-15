@@ -114,12 +114,23 @@ describe('legacy release smart-link slug validation', () => {
     });
   }
 
-  it('404s a non-UUID profile id without querying the database', async () => {
-    // Before the UUID guard this slug reached Postgres as
-    // creator_profiles.id = 'not-a-uuid' and threw 22P02 (JOV-12660).
-    await expect(renderPage('my-song--not-a-uuid')).rejects.toThrow(
-      'NOT_FOUND'
-    );
+  it.each(['my-song--not-a-uuid', 'foo--y', 'y'])(
+    '404s malformed slug %s without querying the database',
+    async slug => {
+      // Before the UUID guard this slug reached Postgres as
+      // creator_profiles.id = 'not-a-uuid' and threw 22P02 (JOV-12660).
+      await expect(renderPage(slug)).rejects.toThrow('NOT_FOUND');
+      expect(hoisted.select).not.toHaveBeenCalled();
+    }
+  );
+
+  it('returns not-found metadata for a non-UUID id without a database query', async () => {
+    const { generateMetadata } = await import('./page');
+    const metadata = await generateMetadata({
+      params: Promise.resolve({ slug: 'foo--y' }),
+      searchParams: Promise.resolve({}),
+    });
+    expect(metadata.title).toBe('Release Not Found');
     expect(hoisted.select).not.toHaveBeenCalled();
   });
 
