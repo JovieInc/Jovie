@@ -24,4 +24,11 @@ describe('Section', () => {
       'public-container--bleed'
     );
   });
+
+  it('draws the grid background with the shared pattern, not raw rgba', () => {
+    const { container } = render(<Section withGridBg>Body</Section>);
+    const grid = container.querySelector('[aria-hidden="true"]');
+    expect(grid?.className).toContain('bg-(image:--background-pattern-grid)');
+    expect(grid?.className).not.toContain('rgba(');
+  });
 });
