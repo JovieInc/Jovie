@@ -385,7 +385,7 @@ describe('design-system source identity ratchet (JOV-5301)', () => {
       [resolve(REPO_ROOT, 'scripts/design-system-source-ratchet.mjs')],
       { cwd: REPO_ROOT, encoding: 'utf8' }
     );
-    expect(result.status).toBe(0);
+    expect(result.status, result.error?.message ?? result.stderr).toBe(0);
     expect(result.stdout).toMatch(/PASS/);
   });
 });
