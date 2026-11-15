@@ -185,6 +185,7 @@ jobs:
     timeout-minutes: 5
     permissions:
       actions: write
+      checks: read
       contents: read
     steps:
       - name: Debounce repeated green wakes
@@ -768,7 +769,8 @@ jobs:
                     removals: (pr.breakerEvents?.nodes || []).filter(event =>
                       event.__typename === 'RemovedFromMergeQueueEvent').map(event => event.createdAt) }),
                   removedAt: lastRemoval, persist: process.env.DRY_RUN !== 'true',
-                }, guardPolicy.octokitGuardIo({ github, owner, repo, prNumber: pr.number }));
+                }, guardPolicy.octokitGuardIo({ github, owner, repo, prNumber: pr.number,
+                  reader: guardPolicy.guardReader({ github, token: process.env.RECHECK_TOKEN }) }));
                 if (guardHold.action === 'block') {
                   core.notice(`HELD #${pr.number}@${pr.headRefOid}: ${guardHold.reason} (${guardHold.check}: ${guardHold.step}; run ${guardHold.runId})`);
                   if (guardHold.persistError) core.warning(`#${pr.number} guard hold not persisted: ${guardHold.persistError}`);
