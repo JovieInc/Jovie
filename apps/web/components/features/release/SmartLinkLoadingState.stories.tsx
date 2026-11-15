@@ -14,7 +14,7 @@ type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {};
 
-/** The route fallback while a SmartLink page streams in (app/r/[slug]/loading). */
+/** The route fallback while a SmartLink page streams in (used by PreserveSearchRedirect). */
 export const Loading: Story = {};
 
 /** The same skeleton inside a right-to-left page. */
