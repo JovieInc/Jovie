@@ -48,6 +48,8 @@ export function UnifiedUrlIntake({ onSubmitted }: UnifiedUrlIntakeProps) {
       />
       <div className='space-y-3 px-(--app-shell-content-padding-x) py-(--app-shell-content-padding-y)'>
         <Textarea
+          // ui-casing-allow: URLs abbreviation
+          aria-label='Lead URLs'
           rows={5}
           value={input}
           onChange={event => setInput(event.target.value)}
