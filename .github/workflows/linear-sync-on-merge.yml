@@ -84,6 +84,7 @@ jobs:
             scripts/lib/screen-audit-receipts.mjs
             scripts/invariants/screen-audit.mjs
             scripts/invariants/screen-certification.mjs
+            scripts/invariants/screen-registry.mjs
             scripts/invariants/screen-decision-routing.mjs
             scripts/invariants/browser-owned-input.mjs
             scripts/invariants/browser-owned-input-matrix.json
