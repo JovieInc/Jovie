@@ -3178,9 +3178,14 @@ describe('ci-fast bounded parallel workflow', () => {
     const selectsStructural = new RegExp(`${controlPattern}|${uiPattern}`);
     const uiRe = new RegExp(uiPattern);
 
-    // Source PRs path-gate the remaining structural lane; merge groups never skip.
+    // Source PRs path-gate the remaining structural lane; merge groups skip
+    // only on the trusted docs-only verdict (JOV-12618), and every other
+    // event runs it.
     expect(structuralDecision).toContain(
-      'github.event_name }}" != "pull_request"'
+      'github.event_name }}" == "pull_request"'
+    );
+    expect(structuralDecision).toContain(
+      '"${{ github.event_name }}" == "merge_group" && "${STRUCTURAL_DOCS_ONLY:-}" == "true"'
     );
     expect(structuralDecision).toContain('echo "skip=false"');
     expect(remaining).toMatch(/github\.event_name != 'merge_group'/);
@@ -3359,8 +3364,9 @@ describe('invariant-scanned PR structural selection', () => {
       WORKFLOW.indexOf('- name: Select Storybook browser proof')
     );
     expect(decision).toContain(addition);
+    expect(decision.indexOf(addition)).toBeGreaterThanOrEqual(0);
     expect(decision.indexOf(addition)).toBeLessThan(
-      decision.indexOf('|| git diff --name-only')
+      decision.indexOf('STRUCTURAL_CHANGED_FILES=$(git diff')
     );
 
     const ere = execFileSync(
@@ -3398,7 +3404,11 @@ describe('new scripts test PR structural selection', () => {
     const line = decision
       .split('\n')
       .find(l => l.includes('NEW_SCRIPT_TESTS=$('));
-    expect(line).toContain('git diff --diff-filter=AR --name-only');
+    expect(line).toContain(
+      'git diff --diff-filter=AR "${DIFF_ARGS[@]}" "$DIFF_BASE" HEAD'
+    );
+    expect(decision).toContain('DIFF_ARGS=(--name-only)');
+    expect(decision).toContain('DIFF_ARGS=(--no-renames --name-only)');
     expect(decision).toContain('if [ -n "$NEW_SCRIPT_TESTS" ] ||');
     const ere = line.match(/grep -E '([^']+)'/)[1];
     const selects = path =>

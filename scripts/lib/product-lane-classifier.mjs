@@ -66,6 +66,15 @@ const BLOG_CONTENT_GATE_RECEIPT = {
 const BLOG_CONTENT_PATH =
   /^(apps\/web\/content\/blog\/[a-z0-9]+(?:-[a-z0-9]+)*\.md|apps\/web\/public\/images\/blog\/(?:[a-z0-9]+(?:-[a-z0-9]+)*\/)*[a-z0-9]+(?:-[a-z0-9]+)*\.(?:avif|jpe?g|png|webp))$/;
 
+// JOV-12618: apps/web Markdown no build, test or deploy reads is docs (content/
+// is site copy). Docs-only (gates the merge-group structural skip) never counts
+// .github/ or copy that apps/web/scripts/stage-runtime-data.mjs ships.
+const WEB_DOCS =
+  /^apps\/web\/(?!(?:content|lib|prompts|plugins|public|runtime-data|app|components|tests)\/)(?:[^./][^/]*\/)*[^/]+\.md$/;
+const DOC_PATH =
+  /^(?!\.github\/|docs\/(?:FEATURE_REGISTRY\.md$|certification\/)|apps\/eve-pilot\/identities\/|scripts\/funnel-judge\/).*\.md$/;
+const isDocPath = item =>
+  item.affectedProducts.length === 0 && DOC_PATH.test(item.path);
 const RULES = /** @type {Array<[string, string, string[], RegExp]>} */ ([
   [
     'shared-jev-evaluation',
@@ -207,6 +216,7 @@ const RULES = /** @type {Array<[string, string, string[], RegExp]>} */ ([
   ],
   ['web-changelog', 'web', ['web'], /^CHANGELOG\.md$/],
   ['web-playbook', 'web', ['web'], /^docs\/playbooks\/[^/]+\.playbook\.md$/],
+  ['web-docs', 'operations-tooling', [], WEB_DOCS],
   [
     'web-product',
     'web',
@@ -920,6 +930,8 @@ export function classifyProductLanes(
     classifications,
     selectedLanes,
     skippedLanes,
+    documentationOnly:
+      changedPaths.length > 0 && classifications.every(isDocPath),
     sharedContract: {
       changed: crossProductSelected,
       affectedProducts: sharedAffectedProducts,
@@ -943,10 +955,6 @@ function readFileAtRef(ref, path, cwd) {
     maxBuffer: 64 * 1024 * 1024,
     stdio: ['ignore', 'pipe', 'pipe'],
   });
-}
-
-function readPackageJsonAtRef(ref, cwd) {
-  return readFileAtRef(ref, 'package.json', cwd);
 }
 
 function gitSucceeds(args, cwd) {
@@ -978,10 +986,7 @@ function readOptionalFileAtRef(ref, path, cwd) {
     return { ok: true, text: '' };
   }
   if (type !== 'blob') {
-    return {
-      ok: false,
-      message: `${ref}:${path} is a ${type}, not a blob`,
-    };
+    return { ok: false, message: `${ref}:${path} is a ${type}, not a blob` };
   }
   try {
     return { ok: true, text: readFileAtRef(ref, path, cwd) };
@@ -1084,22 +1089,15 @@ export function runProductLaneClassifier(
   let desktopPackageJsonAfter;
   if (files.map(normalizePath).includes('package.json')) {
     try {
-      packageJsonBefore = readPackageJsonAtRef(args['base-ref'], cwd);
-      packageJsonAfter = readPackageJsonAtRef(args['head-ref'], cwd);
+      packageJsonBefore = readFileAtRef(args['base-ref'], 'package.json', cwd);
+      packageJsonAfter = readFileAtRef(args['head-ref'], 'package.json', cwd);
     } catch (error) {
       console.warn(
         `::warning::Could not inspect package.json change; selecting every product lane: ${error.message}`
       );
     }
-    const beforeDesktop = readOptionalFileAtRef(
-      args['base-ref'],
-      'apps/desktop/package.json',
-      cwd
-    );
-    const afterDesktop = readOptionalFileAtRef(
-      args['head-ref'],
-      'apps/desktop/package.json',
-      cwd
+    const [beforeDesktop, afterDesktop] = ['base-ref', 'head-ref'].map(ref =>
+      readOptionalFileAtRef(args[ref], 'apps/desktop/package.json', cwd)
     );
     if (beforeDesktop.ok && afterDesktop.ok) {
       desktopPackageJsonBefore = beforeDesktop.text;
@@ -1146,6 +1144,7 @@ export function runProductLaneClassifier(
       `run_cross_product=${selected.has('cross-product')}`,
       `selected_lanes=${receipt.selectedLanes.join(',')}`,
       `shared_contract_impact=${receipt.sharedContract.affectedProducts.join(',') || 'none'}`,
+      `docs_only=${receipt.documentationOnly}`,
     ];
     writeFileSync(args['github-output'], `${outputs.join('\n')}\n`, {
       flag: 'a',
