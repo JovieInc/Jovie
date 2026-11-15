@@ -1,7 +1,11 @@
 import assert from 'node:assert/strict';
 import { join } from 'node:path';
 import { test } from 'node:test';
-import { collectFrames, frameFromArtifactName } from './pen-draft-frames.mjs';
+import {
+  collectFrames,
+  deferredFromReceipt,
+  frameFromArtifactName,
+} from './pen-draft-frames.mjs';
 import {
   artifacts,
   fakeNetwork,
@@ -50,6 +54,59 @@ test('only pen-draft folders count, and a frame without a png has none', () => {
     ]
   );
   assert.deepEqual(collectFrames(join(dir, 'missing')), []);
+});
+
+test('a deferred receipt marks its frame deferred, and only that', () => {
+  // Run 43621008907: the drafting agent's quota ran out mid-run, so the last
+  // frames' receipts say why no draft exists.
+  const refusal = {
+    reason: 'rate_limit',
+    reset: 'Nov 21, 5am',
+    detail: "You've hit your weekly limit · resets Nov 21, 5am (UTC)",
+  };
+  const receipt = drafts =>
+    JSON.stringify({
+      schema: 'jovie.pen-draft/v1',
+      at: '2026-11-15T04:31Z',
+      drafts,
+    });
+  const dir = artifacts({
+    'pen-draft-request-access': [
+      [
+        'receipt.json',
+        receipt([
+          {
+            frame: 'request-access',
+            route: '/waitlist',
+            attempts: 1,
+            status: 'deferred',
+            deferred: refusal,
+          },
+        ]),
+      ],
+    ],
+    'pen-draft-homepage': [
+      'homepage.pen',
+      'homepage.png',
+      ['receipt.json', receipt([{ frame: 'homepage', status: 'drafted' }])],
+    ],
+    'pen-draft-claim': ['claim.pen'],
+  });
+  const byFrame = Object.fromEntries(
+    collectFrames(dir).map(entry => [entry.frame, entry])
+  );
+  assert.deepEqual(byFrame['request-access'].deferred, refusal);
+  assert.equal(byFrame.homepage.deferred, null);
+  assert.equal(byFrame.claim.deferred, null);
+  assert.equal(deferredFromReceipt(null), null);
+  assert.equal(
+    deferredFromReceipt(join(dir, 'pen-draft-claim', 'receipt.json')),
+    null
+  );
+  assert.equal(
+    deferredFromReceipt(join(dir, 'pen-draft-homepage', 'receipt.json')),
+    null
+  );
 });
 
 test('a picture of the whole canvas is refused, not uploaded', async () => {

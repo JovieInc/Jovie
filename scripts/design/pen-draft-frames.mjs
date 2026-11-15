@@ -47,6 +47,27 @@ export function pngSize(bytes) {
 }
 
 /**
+ * The frame's deferral from its draft receipt: the drafting agent was out of
+ * model quota (JOV-12708), so no draft exists yet. Null when absent,unreadable
+ * or not deferred.
+ * @param {string | null} path
+ * @param {(path: string) => Buffer} [readFile]
+ * @returns {{reason: string, reset: string | null, detail: string | null} | null}
+ */
+export function deferredFromReceipt(path, readFile = readFileSync) {
+  if (!path) return null;
+  try {
+    const receipt = JSON.parse(readFile(path).toString('utf8'));
+    const row = (receipt?.drafts ?? []).find(
+      draft => draft?.status === 'deferred'
+    );
+    return row?.deferred ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * One entry per `pen-draft-<frame>` folder. `png` is the picture to publish:
  * `<frame>.frame.png`, the frame rendered by pen-draft-picture.mjs, else the
  * draft's own `<frame>.png`; null when the frame drew none. `sidecar` is the
@@ -72,6 +93,9 @@ export function collectFrames(dir) {
         ...entry,
         png: file(`${base}.frame.png`) ?? file(`${base}.png`),
         sidecar: file(`${base}.frame.json`),
+        deferred: deferredFromReceipt(
+          file(join(dir, entry.artifact, 'receipt.json'))
+        ),
       };
     });
 }

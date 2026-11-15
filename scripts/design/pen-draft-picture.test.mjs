@@ -11,6 +11,7 @@ import { tmpdir } from 'node:os';
 import { basename, dirname, join } from 'node:path';
 import { test } from 'node:test';
 import { PEN_CLI_VERSION } from './pen-draft.mjs';
+import { deferredFromReceipt } from './pen-draft-frames.mjs';
 import {
   draftedFrameNode,
   PICTURE_PREFIX,
@@ -162,6 +163,60 @@ test('the Pen program exports exactly the drafted node', () => {
   );
   assert.equal(parsePicture(`${PICTURE_PREFIX}{"id":`), null);
   assert.equal(parsePicture('nothing tagged'), null);
+});
+
+test('the plan gives a deferred frame a job, though it renders nothing', () => {
+  // JOV-12708: a deferred frame has no .pen, but its receipt rides the same
+  // artifact path to the publish step, which explains it on Linear.
+  const dir = mkdtempSync(join(tmpdir(), 'pen-draft-plan-'));
+  const folder = (frame, files) => {
+    mkdirSync(join(dir, `pen-draft-${frame}`), { recursive: true });
+    for (const [name, bytes] of files)
+      writeFileSync(join(dir, `pen-draft-${frame}`, name), bytes);
+  };
+  const refusal = {
+    reason: 'rate_limit',
+    reset: 'Nov 21, 5am',
+    detail: "You've hit your weekly limit · resets Nov 21, 5am (UTC)",
+  };
+  folder('request-access', [
+    [
+      'receipt.json',
+      JSON.stringify({
+        schema: 'jovie.pen-draft/v1',
+        drafts: [
+          {
+            frame: 'request-access',
+            status: 'deferred',
+            deferred: refusal,
+          },
+        ],
+      }),
+    ],
+  ]);
+  folder('homepage', [
+    ['homepage.pen', JSON.stringify({ children: [] })],
+    [
+      'receipt.json',
+      JSON.stringify({
+        schema: 'jovie.pen-draft/v1',
+        drafts: [{ frame: 'homepage', status: 'failed', error: 'x' }],
+      }),
+    ],
+  ]);
+  assert.deepEqual(planFrames(dir), ['homepage', 'request-access']);
+  assert.equal(
+    deferredFromReceipt(join(dir, 'pen-draft-request-access', 'receipt.json'))
+      .reason,
+    'rate_limit'
+  );
+  // The deferred folder renders nothing and fails nothing.
+  assert.equal(
+    existsSync(
+      join(dir, 'pen-draft-request-access', 'request-access.frame.json')
+    ),
+    false
+  );
 });
 
 test('each draft with a .pen gets a picture of its frame alone', async () => {
