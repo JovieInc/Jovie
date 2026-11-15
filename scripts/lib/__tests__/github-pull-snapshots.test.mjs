@@ -1,11 +1,139 @@
 import { describe, expect, it } from 'vitest';
-import { listMergedLinkedPulls } from '../validation-sync.mjs';
+import { githubClient, listMergedLinkedPulls } from '../validation-sync.mjs';
 import { REPO } from './fixtures/validation-world.mjs';
 
-// JOV-12717: out-of-window pulls (attachments older than the closed-pull
-// snapshot) are answered by ONE aliased GraphQL batch through the shared
-// api-client instead of one shared-bucket REST GET each, with the REST path
-// kept as the fallback when the batch cannot run.
+// JOV-12768 / JOV-12717: pullRequestField nests every batch alias as
+// `repository { pullRequest } }`; batchPulls must unwrap it, or the binding
+// checks read `batchedPull.state` off the wrapper and silently drop MERGED
+// pulls. These tests prove the unwrap against the api-client's real wrapped
+// response shape, plus the caller logic with mocked batchPulls.
+const SELECTION =
+  'number state mergedAt mergeCommitSha title body base { ref }';
+const wrappedGraphQL = pullRequests => ({
+  data: Object.fromEntries(
+    Object.entries(pullRequests).map(([key, pullRequest], index) => [
+      `k${index}`,
+      { pullRequest },
+    ])
+  ),
+});
+
+describe('batchPulls unwraps the api-client response (JOV-12768)', () => {
+  it('returns flat pull entries, not the repository wrapper', async () => {
+    let posts = 0;
+    const fetchMock = async (url, init) => {
+      if (String(url).endsWith('/graphql')) {
+        posts += 1;
+        expect(init.method).toBe('POST');
+        expect(String(init.body)).toContain(
+          'pullRequest(number: 18293) { number state mergedAt mergeCommitSha title body base { ref } }'
+        );
+        return {
+          ok: true,
+          status: 200,
+          json: async () =>
+            wrappedGraphQL({
+              18293: {
+                number: 18293,
+                state: 'MERGED',
+                mergedAt: '2026-11-01T00:00:00Z',
+                mergeCommitSha: 'a'.repeat(40),
+                title: 'fix(JOV-2)',
+                body: 'closes JOV-2',
+                base: { ref: 'main' },
+              },
+            }),
+          headers: new Map(),
+        };
+      }
+      throw new Error(`unexpected REST call ${url}`);
+    };
+    const out = await githubClient(fetchMock, 'tok').batchPulls(
+      REPO,
+      [18293],
+      SELECTION
+    );
+    expect(posts).toBe(1);
+    expect(out.get(18293)).toEqual({
+      number: 18293,
+      state: 'MERGED',
+      mergedAt: '2026-11-01T00:00:00Z',
+      mergeCommitSha: 'a'.repeat(40),
+      title: 'fix(JOV-2)',
+      body: 'closes JOV-2',
+      base: { ref: 'main' },
+    });
+    expect(out.get(18293)?.pullRequest).toBeUndefined();
+  });
+
+  it('keeps a MERGED pull bound end-to-end (not dropped) and skips OPEN', async () => {
+    const fetchMock = async (url, init) => {
+      if (String(url).endsWith('/graphql')) {
+        return {
+          ok: true,
+          status: 200,
+          json: async () =>
+            wrappedGraphQL({
+              18293: {
+                number: 18293,
+                state: 'MERGED',
+                mergedAt: '2026-11-01T00:00:00Z',
+                mergeCommitSha: 'a'.repeat(40),
+                title: 'fix(JOV-2)',
+                body: 'closes JOV-2',
+                base: { ref: 'main' },
+              },
+              25500: {
+                number: 25500,
+                state: 'OPEN',
+                mergedAt: null,
+                mergeCommitSha: null,
+                title: 'wip',
+                body: '',
+                base: { ref: 'main' },
+              },
+            }),
+          headers: new Map(),
+        };
+      }
+      // A REST per-pull read here would mean the batch answer was ignored.
+      throw new Error(`REST read must not happen for ${url}`);
+    };
+    const merged = await listMergedLinkedPulls({
+      github: githubClient(fetchMock, 'tok'),
+      repository: REPO,
+      identifier: 'JOV-2',
+      attachmentUrls: [
+        `https://github.com/${REPO}/pull/18293`,
+        `https://github.com/${REPO}/pull/25500`,
+      ],
+    });
+    expect(merged).toHaveLength(1);
+    expect(merged[0].number).toBe(18293);
+    expect(merged[0].mergeSha).toBe('a'.repeat(40));
+  });
+
+  it('maps a null alias (missing PR, no errors) to null so the caller falls back to REST', async () => {
+    const fetchMock = async url => {
+      if (String(url).endsWith('/graphql')) {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => wrappedGraphQL({ 18293: null }),
+          headers: new Map(),
+        };
+      }
+      throw new Error(`unexpected call ${url}`);
+    };
+    const out = await githubClient(fetchMock, 'tok').batchPulls(
+      REPO,
+      [18293],
+      SELECTION
+    );
+    expect(out.get(18293)).toBeNull();
+  });
+});
+
 describe('GraphQL batched pull reads (JOV-12717)', () => {
   it('answers out-of-window pulls with one batch and no REST reads', async () => {
     let rest = 0;
@@ -55,7 +183,6 @@ describe('GraphQL batched pull reads (JOV-12717)', () => {
     });
     expect(merged).toHaveLength(1);
     expect(merged[0].number).toBe(18293);
-    expect(merged[0].mergeSha).toBe('a'.repeat(40));
     expect(batches).toBe(1);
     expect(rest).toBe(0);
   });
