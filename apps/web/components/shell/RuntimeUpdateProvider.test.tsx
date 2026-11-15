@@ -92,6 +92,21 @@ describe('runtime updates in the shell corner pill', () => {
     render(<Surface />);
     expect(screen.queryByTestId('runtime-update-pill')).not.toBeInTheDocument();
   });
+
+  it('keeps one live status region mounted so the update is announced', () => {
+    const { rerender } = render(<Surface />);
+    const status = screen.getByRole('status');
+    expect(status).toBeEmptyDOMElement();
+    state.available = true;
+    state.downloaded = true;
+    rerender(<Surface />);
+    // Same node, now with text: assistive tech announces the change.
+    expect(screen.getByRole('status')).toBe(status);
+    expect(status).not.toBeEmptyDOMElement();
+    expect(
+      screen.getByTestId('runtime-update-pill').getAttribute('aria-live')
+    ).toBeNull();
+  });
   it('renders update status outside the page content area', () => {
     state.available = true;
     state.downloaded = true;
