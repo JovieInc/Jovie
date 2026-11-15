@@ -25,7 +25,7 @@ interface LibraryShareAssetCardProps {
   readonly priorityArtwork?: boolean;
 }
 
-/** Sentence-case the release type token (single, ep, album) for its eyebrow. */
+/** Sentence-case the release type token (single, ep, album) above the title. */
 function formatReleaseType(value: string): string {
   const label = releaseTypeLabel(value);
   return label.charAt(0).toUpperCase() + label.slice(1);

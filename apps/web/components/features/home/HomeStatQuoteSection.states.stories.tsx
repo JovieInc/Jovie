@@ -1,5 +1,8 @@
 import type { Decorator, Meta, StoryObj } from '@storybook/nextjs-vite';
+import type { ComponentProps } from 'react';
 import { HomeStatQuoteSection } from './HomeStatQuoteSection';
+
+type HomeStatQuoteSectionArgs = ComponentProps<typeof HomeStatQuoteSection>;
 
 /** Rendered states of the home stat pull-quote. */
 const meta = {
@@ -8,13 +11,14 @@ const meta = {
   parameters: { layout: 'fullscreen' },
 } satisfies Meta<typeof HomeStatQuoteSection>;
 
-const withRtlDocument: Decorator = function WithRtlDocument(Story) {
-  return (
-    <div dir='rtl' lang='ar'>
-      <Story />
-    </div>
-  );
-};
+const withRtlDocument: Decorator<HomeStatQuoteSectionArgs> =
+  function WithRtlDocument(Story) {
+    return (
+      <div dir='rtl' lang='ar'>
+        <Story />
+      </div>
+    );
+  };
 
 export default meta;
 type Story = StoryObj<typeof meta>;

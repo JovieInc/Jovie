@@ -32,13 +32,11 @@ describe('LibraryAssetShareUrlCell', () => {
     const writeText = vi
       .spyOn(navigator.clipboard, 'writeText')
       .mockResolvedValue(undefined);
+    // Stands in for the table row's click handler, above the cell.
     const onRowClick = vi.fn();
+    document.body.addEventListener('click', onRowClick);
     const { container } = render(
-      // biome-ignore lint/a11y/useKeyWithClickEvents: test stand-in for the table row click
-      // biome-ignore lint/a11y/noStaticElementInteractions: test stand-in for the table row click
-      <div onClick={onRowClick}>
-        <LibraryAssetShareUrlCell asset={asset} share={share} />
-      </div>
+      <LibraryAssetShareUrlCell asset={asset} share={share} />
     );
 
     expect(screen.getByText('jov.ie/p/token-1')).toBeInTheDocument();
@@ -48,6 +46,7 @@ describe('LibraryAssetShareUrlCell', () => {
 
     expect(writeText).toHaveBeenCalledWith('https://jov.ie/p/token-1');
     expect(onRowClick).not.toHaveBeenCalled();
+    document.body.removeEventListener('click', onRowClick);
     const copied = screen.getByRole('button', { name: 'Copied share URL' });
     expect(copied.querySelector('svg')).toHaveClass('text-success');
     expect(copied.querySelector('svg')?.getAttribute('class')).not.toMatch(
