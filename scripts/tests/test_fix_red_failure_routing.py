@@ -127,6 +127,33 @@ class RouteBudgetGrowthTest(unittest.TestCase):
         self.assertEqual(stay['action'], 'agent')
 
 
+class TreeByteBudgetTest(unittest.TestCase):
+    def test_combined_tree_overflow_syncs_main_and_ignores_the_receipt_follower(self):
+        log = (
+            '2026-11-15T05:42:55.9330300Z ##[error]207672844 bytes of tracked regular files '
+            '(merged tree; base 207583562 +89282) exceeds the 207618048-byte combined-tree budget; '
+            'the merge queue would reject this PR\n'
+            '2026-11-15T05:42:55.9418422Z ##[error]Process completed with exit code 1.\n'
+            '2026-11-15T05:42:56.0668553Z ##[error]No files were found with the provided path: '
+            'repo-health-receipt.json. No artifacts will be uploaded.\n')
+        route = classes.classify(red('PR Size Guard'), {'PR Size Guard': log})
+        self.assertEqual((route['cls'], route['action']), ('tree-byte-budget', 'sync-main'))
+        hygiene = (
+            '[repo-hygiene] blocked:\n'
+            '  - 198.05 MiB of tracked regular files exceeds the 198.00 MiB repository budget\n'
+            '##[error]Process completed with exit code 1.\n')
+        again = classes.classify(red('PR Size Guard'), {'PR Size Guard': hygiene})
+        self.assertEqual((again['cls'], again['action']), ('tree-byte-budget', 'sync-main'))
+
+    def test_a_second_size_guard_error_stays_with_the_agent(self):
+        log = (
+            '##[error]207672844 bytes of tracked regular files (merged tree; base 207583562 +89282) '
+            'exceeds the 207618048-byte combined-tree budget; the merge queue would reject this PR\n'
+            '##[error]changed lines 1600 exceed the 1500 line cap\n')
+        route = classes.classify(red('PR Size Guard'), {'PR Size Guard': log})
+        self.assertEqual(route['action'], 'agent')
+
+
 class AliasClassificationTest(unittest.TestCase):
     def test_real_annotation_and_complete_failure_have_owned_no_model_route(self):
         for log in (ANNOTATION, LOG, '\x1b[31m' + LOG + '\x1b[0m',
