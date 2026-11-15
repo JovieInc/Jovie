@@ -144,6 +144,7 @@ export function InspectorShell<T extends string>({
             data-testid='inspector-tab-panel'
             data-scroll-mode='internal'
             aria-busy={isLoading}
+            tabIndex={0}
             className='min-h-0 flex-1 overflow-y-auto overflow-x-hidden overscroll-contain px-3 py-3'
           >
             {/* Keep content mounted so a refresh retains edits and scroll height.
