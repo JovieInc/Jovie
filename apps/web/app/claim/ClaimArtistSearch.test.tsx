@@ -1,5 +1,7 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { render as baseRender, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import type { ReactElement, ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { APP_ROUTES } from '@/constants/routes';
 import type { SpotifyArtistResult } from '@/lib/contracts/api';
@@ -32,6 +34,19 @@ const RESULTS: SpotifyArtistResult[] = [
 ];
 
 const fetchMock = vi.fn<typeof fetch>();
+
+// The search hook retries transient failures; no backoff keeps the error
+// states inside the default findBy timeout.
+function render(ui: ReactElement) {
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retryDelay: 0 } },
+  });
+  return baseRender(ui, {
+    wrapper: ({ children }: { children: ReactNode }) => (
+      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+    ),
+  });
+}
 
 function respondWith(body: unknown, status = 200) {
   fetchMock.mockImplementation(
@@ -89,8 +104,28 @@ describe('ClaimArtistSearch', () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
     const [url, init] = fetchMock.mock.calls[0];
     expect(url).toBe('/api/spotify/search?q=Daft%20Punk&limit=6');
-    expect(init).toMatchObject({ cache: 'no-store' });
     expect((init as RequestInit).signal).toBeInstanceOf(AbortSignal);
+  });
+
+  it('answers a repeated query from the cache and keeps results visible while the next one loads', async () => {
+    respondWith(RESULTS);
+    const user = await typeQuery('ab');
+    await screen.findByTestId('claim-artist-results');
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+
+    fetchMock.mockImplementation(() => new Promise<Response>(() => undefined));
+    await user.type(searchInput(), 'c');
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+    expect(screen.getByText('Searching…')).toBeInTheDocument();
+    // Previous results stay on screen instead of flashing to empty.
+    expect(screen.getByTestId('claim-artist-results')).toBeInTheDocument();
+
+    await user.type(searchInput(), '{Backspace}');
+    await waitFor(() =>
+      expect(screen.queryByText('Searching…')).not.toBeInTheDocument()
+    );
+    expect(screen.getByTestId('claim-artist-results')).toBeInTheDocument();
+    expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
   it('links claimable and owned artists and keeps a taken artist inert', async () => {

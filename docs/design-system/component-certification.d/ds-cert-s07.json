@@ -1,0 +1,68 @@
+{
+  "gates": {
+    "apps/web/components/features/dashboard/tasks/TaskWorkspaceHeaderBar.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/dashboard/tasks/TasksUpgradeInterstitial.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/dashboard/youtube/ChannelIntelligencePanel.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/demo/BrowserFrame.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/dev/DevToolbarRows.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/feedback/ErrorDetails.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ]
+  },
+  "waivers": {
+    "apps/web/components/features/dashboard/tasks/TaskWorkspaceHeaderBar.tsx": {
+      "error": "The toolbar has no error prop or error view; the detector matched `onSubmit={onSubmitCreate}`. A failed create is shown by TasksPageClient, which owns the request.",
+      "offline": "The toolbar sends no request of its own; the detector matched `onSubmit={onSubmitCreate}`. TasksPageClient owns the create call and its offline handling."
+    },
+    "apps/web/components/features/dev/DevToolbarRows.tsx": {
+      "error": "The rows show no error view; the detector matched `catch` in useSafeQueryClient, which returns null outside a QueryClientProvider, and a failed plan switch (`if (res.ok)`) only re-enables the buttons.",
+      "permission-denied": "The rows have no denied view; the detector matched `plan` in PlanToggle. DevToolbarGate (shouldRenderDevToolbar) renders the dev toolbar only in local development, so no restricted viewer ever reaches these rows."
+    }
+  }
+}
