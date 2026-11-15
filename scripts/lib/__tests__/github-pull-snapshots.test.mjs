@@ -43,6 +43,7 @@ describe('batchPulls unwraps the api-client response (JOV-12768)', () => {
                 base: { ref: 'main' },
               },
             }),
+          text: async () => '{}',
           headers: new Map(),
         };
       }
@@ -93,6 +94,7 @@ describe('batchPulls unwraps the api-client response (JOV-12768)', () => {
                 base: { ref: 'main' },
               },
             }),
+          text: async () => '{}',
           headers: new Map(),
         };
       }
@@ -113,6 +115,61 @@ describe('batchPulls unwraps the api-client response (JOV-12768)', () => {
     expect(merged[0].mergeSha).toBe('a'.repeat(40));
   });
 
+  it('keeps GraphQL batching through the immutable cache wrapper: one batch call, zero REST pull reads', async () => {
+    const { mkdtempSync, rmSync } = await import('node:fs');
+    const { tmpdir } = await import('node:os');
+    const { join } = await import('node:path');
+    const dir = mkdtempSync(join(tmpdir(), 'batch-cache-'));
+    try {
+      let posts = 0;
+      let restPullReads = 0;
+      const fetchMock = async (url, init) => {
+        if (String(url).endsWith('/graphql')) {
+          posts += 1;
+          expect(init.method).toBe('POST');
+          return {
+            ok: true,
+            status: 200,
+            json: async () =>
+              wrappedGraphQL({
+                18293: {
+                  number: 18293,
+                  state: 'MERGED',
+                  mergedAt: '2026-11-01T00:00:00Z',
+                  mergeCommitSha: 'a'.repeat(40),
+                  title: 'fix(JOV-2)',
+                  body: 'closes JOV-2',
+                  base: { ref: 'main' },
+                },
+              }),
+            text: async () => '{}',
+            headers: new Map(),
+          };
+        }
+        if (/\/pulls\/\d+$/.test(String(url))) {
+          restPullReads += 1;
+          throw new Error(`REST pull read must not happen for ${url}`);
+        }
+        throw new Error(`unexpected call ${url}`);
+      };
+      const { immutableGithubCache } = await import('../validation-sync.mjs');
+      const cached = immutableGithubCache(githubClient(fetchMock, 'tok'), dir);
+      expect(typeof cached.batchPulls).toBe('function');
+      const merged = await listMergedLinkedPulls({
+        github: cached,
+        repository: REPO,
+        identifier: 'JOV-2',
+        attachmentUrls: [`https://github.com/${REPO}/pull/18293`],
+      });
+      expect(merged).toHaveLength(1);
+      expect(merged[0].number).toBe(18293);
+      expect(posts).toBe(1);
+      expect(restPullReads).toBe(0);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
   it('maps a null alias (missing PR, no errors) to null so the caller falls back to REST', async () => {
     const fetchMock = async url => {
       if (String(url).endsWith('/graphql')) {
@@ -120,6 +177,7 @@ describe('batchPulls unwraps the api-client response (JOV-12768)', () => {
           ok: true,
           status: 200,
           json: async () => wrappedGraphQL({ 18293: null }),
+          text: async () => '{}',
           headers: new Map(),
         };
       }
