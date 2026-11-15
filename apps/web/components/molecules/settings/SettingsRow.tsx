@@ -14,7 +14,7 @@ export interface SettingsRowGate {
 export interface SettingsRowProps {
   /** Row title: what the setting is. */
   readonly title: string;
-  /** One muted line under the title; it truncates rather than wraps. */
+  /** One muted line under the title. It wraps on phones, where there is no hover to read a cut line, and truncates from sm up. */
   readonly description?: string;
   /** Exactly one trailing control: a Select, Switch, Button or value. */
   readonly control?: ReactNode;
@@ -100,7 +100,7 @@ export function SettingsRow({
               id={ids?.descriptionId}
               title={description}
               className={cn(
-                'mt-0.5 truncate text-xs',
+                'mt-0.5 text-xs text-pretty sm:truncate',
                 state === 'idle'
                   ? 'text-secondary-token'
                   : 'text-quaternary-token'

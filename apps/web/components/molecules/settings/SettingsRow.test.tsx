@@ -49,9 +49,16 @@ describe('SettingsRow', () => {
       'font-medium',
       'text-primary-token'
     );
-    expect(
-      screen.getByText('Select or customize your interface color scheme')
-    ).toHaveClass('truncate', 'text-xs', 'text-secondary-token');
+    const description = screen.getByText(
+      'Select or customize your interface color scheme'
+    );
+    // Phones wrap the line (no hover to read a cut one); sm and up truncate.
+    expect(description).toHaveClass(
+      'sm:truncate',
+      'text-xs',
+      'text-secondary-token'
+    );
+    expect(description).not.toHaveClass('truncate');
 
     await userEvent.click(screen.getByRole('button', { name: 'Change' }));
     expect(end).toHaveBeenCalledOnce();
