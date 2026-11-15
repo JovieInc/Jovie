@@ -1,3 +1,5 @@
+import { existsSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const hoisted = vi.hoisted(() => ({
@@ -68,5 +70,15 @@ describe('legacy release metadata', () => {
     const metadata = await generateForHandle('real-song', 'realartist');
 
     expect(metadata.robots).toMatchObject({ index: true, follow: true });
+  });
+});
+
+describe('legacy release route status codes', () => {
+  it('has no loading boundary, so permanentRedirect and notFound keep their HTTP status', () => {
+    // A loading.tsx starts the response as 200 before the page runs, which
+    // turns the 308 into a meta refresh and the 404 into a soft 404.
+    expect(existsSync(resolve(process.cwd(), 'app/r/[slug]/loading.tsx'))).toBe(
+      false
+    );
   });
 });
