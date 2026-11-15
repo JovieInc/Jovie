@@ -42,9 +42,16 @@ on:
   # golden-path certification stays fresh when nothing deploys. It runs the
   # certification only (auth smoke browser steps + receipts), not smoke or
   # Lighthouse.
+  # JOV-12639: a dispatch reuses a fresh certified receipt for the served SHA
+  # unless forced (workflow_dispatch input force, or client_payload.force).
   repository_dispatch:
     types: [clock_prod_golden_path_cert]
   workflow_dispatch:
+    inputs:
+      force:
+        description: Re-certify the golden path even when the served build has a fresh certified receipt
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -78,6 +85,12 @@ jobs:
       deployment_id: ${{ steps.target.outputs.deployment_id }}
       deployment_url_b64: ${{ steps.target.outputs.deployment_url_b64 }}
       commit_sha: ${{ steps.target.outputs.commit_sha }}
+      # JOV-12639: certify each served build once. True when a fresh certified
+      # receipt for this exact SHA exists; golden-path-cert-reused then
+      # re-reads it and uploads it as this run's receipt, marked as reused.
+      cert_reused: ${{ steps.cert-reuse.outputs.reuse == 'true' }}
+      cert_reused_from_run: ${{ steps.cert-reuse.outputs.source_run_id }}
+      cert_reused_artifact: ${{ steps.cert-reuse.outputs.source_artifact_id }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -453,6 +466,24 @@ jobs:
           overwrite: false
           if-no-files-found: error
 
+      # JOV-12639: certify each served build once. A certified receipt for the
+      # exact served SHA, written by the same certification code and younger
+      # than 11 h (24 h verdict window minus the 12 h clock and 1 h margin),
+      # stands in for a new run. Fails open: any lookup error certifies again,
+      # and a lookup failure never fails this job (that would page).
+      - name: Look for a fresh certified receipt for the served build
+        id: cert-reuse
+        if: ${{ steps.target.outputs.commit_sha != '' && steps.trigger.outputs.quota_deferred != 'true' && (steps.trigger.outputs.should_certify == 'true' || (steps.admission.outputs.admitted == 'true' && steps.admission.outputs.quota_deferred != 'true')) }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TARGET_COMMIT_SHA: ${{ steps.target.outputs.commit_sha }}
+          FORCE_RECERTIFY: ${{ (github.event_name == 'workflow_dispatch' && inputs.force) || (github.event_name == 'repository_dispatch' && github.event.client_payload.force == true) }}
+        run: |
+          node scripts/golden-path-cert-reuse.mjs lookup \
+            --served-sha "$TARGET_COMMIT_SHA" --force "$FORCE_RECERTIFY" \
+            --github-output "$GITHUB_OUTPUT" ||
+            echo "::warning::Receipt reuse lookup did not finish; certifying again."
+
   smoke:
     name: Post-Deploy Smoke (Landed Production)
     needs: [resolve-target]
@@ -519,7 +550,8 @@ jobs:
   auth-smoke:
     name: Post-Deploy Auth Smoke (Landed Production)
     needs: [resolve-target]
-    if: ${{ always() && needs.resolve-target.result == 'success' && needs.resolve-target.outputs.should_certify == 'true' }}
+    # Probes still need it; a reused certification (JOV-12639) does not.
+    if: ${{ always() && needs.resolve-target.result == 'success' && needs.resolve-target.outputs.should_certify == 'true' && (needs.resolve-target.outputs.should_probe == 'true' || needs.resolve-target.outputs.cert_reused != 'true') }}
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     permissions:
@@ -942,7 +974,7 @@ jobs:
   golden-path-cert:
     name: Golden Path Certification (Landed Production)
     needs: [resolve-target, auth-smoke]
-    if: ${{ always() && needs.resolve-target.result == 'success' && needs.resolve-target.outputs.should_certify == 'true' }}
+    if: ${{ always() && needs.resolve-target.result == 'success' && needs.resolve-target.outputs.should_certify == 'true' && needs.resolve-target.outputs.cert_reused != 'true' }}
     runs-on: ubuntu-24.04  # Playwright (pen-golden-path.mjs) has no ubuntu 26.04 build
     timeout-minutes: 10
     permissions:
@@ -976,13 +1008,41 @@ jobs:
       # exits 0 once a receipt is written; certification fails on its verdict.
       # If the Pen tooling itself fails first, certification still runs and
       # reports those frames as not exported, so no verdict is skipped.
-      - name: Export Golden Path Pen frames and compare with production
+      # JOV-12639: the export (~75 s of Pen CLI) is cached by the sha256 of the
+      # downloaded Pen source, the Pen CLI version and the frame selection,
+      # never by the URL. The export step fingerprints its own download and
+      # uses a restored set only when its key file matches that fingerprint.
+      - name: Fingerprint the Golden Path Pen source
+        id: pen-source
         env:
           PEN_CLI_KEY: ${{ secrets.PEN_CLI_KEY }}
           PEN_GOLDEN_PATH_FILE_URL: ${{ secrets.PEN_GOLDEN_PATH_FILE_URL }}
-        run: node scripts/invariants/pen-golden-path.mjs --record --out "${RUNNER_TEMP}/pen-golden-path" --base-url https://jov.ie
+        run: node scripts/invariants/pen-golden-path.mjs --fetch-only --out "${RUNNER_TEMP}/pen-golden-path" --github-output "$GITHUB_OUTPUT"
+
+      - name: Restore the Golden Path Pen export for this content
+        if: ${{ steps.pen-source.outputs.cache_key != '' }}
+        uses: ./.github/actions/vendor/actions-cache/restore # actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 v6.1.0 (vendored, JOV-8754)
+        with:
+          path: ${{ runner.temp }}/pen-golden-path/png
+          key: ${{ steps.pen-source.outputs.cache_key }}
+
+      - name: Export Golden Path Pen frames and compare with production
+        id: pen-export
+        env:
+          PEN_CLI_KEY: ${{ secrets.PEN_CLI_KEY }}
+          PEN_GOLDEN_PATH_FILE_URL: ${{ secrets.PEN_GOLDEN_PATH_FILE_URL }}
+        run: node scripts/invariants/pen-golden-path.mjs --record --out "${RUNNER_TEMP}/pen-golden-path" --base-url https://jov.ie --github-output "$GITHUB_OUTPUT"
+
+      # Only a complete fresh export is saved, under the key it was made from.
+      - name: Save the Golden Path Pen export
+        if: ${{ !cancelled() && steps.pen-export.outputs.export_cacheable == 'true' && steps.pen-export.outputs.cache_key != '' }}
+        uses: ./.github/actions/vendor/actions-cache/save # actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 v6.1.0 (vendored, JOV-8754)
+        with:
+          path: ${{ runner.temp }}/pen-golden-path/png
+          key: ${{ steps.pen-export.outputs.cache_key }}
 
       - name: Certify the golden path on production
+        id: certify
         if: ${{ !cancelled() }}
         env:
           PROD_CERT_PEN_DIFF_RECEIPT: ${{ runner.temp }}/pen-golden-path/receipt.json
@@ -1026,6 +1086,80 @@ jobs:
           path: ${{ runner.temp }}/prod-cert-receipts.json
           retention-days: 30
           if-no-files-found: ignore
+
+      # JOV-12639: only a run where every surface passed on the expected SHA
+      # writes the stamp a later run may reuse. A stamp failure only means the
+      # next trigger certifies again.
+      - name: Stamp the receipts certified for reuse
+        id: stamp
+        if: ${{ steps.certify.outcome == 'success' }}
+        env:
+          EXPECTED_COMMIT_SHA: ${{ needs.resolve-target.outputs.commit_sha }}
+        run: |
+          node scripts/golden-path-cert-reuse.mjs stamp \
+            --receipts "${RUNNER_TEMP}/prod-cert-receipts.json" \
+            --expected-sha "$EXPECTED_COMMIT_SHA" \
+            --out "${RUNNER_TEMP}/prod-cert-certified.json" \
+            --github-output "$GITHUB_OUTPUT" ||
+            echo "::warning::No certified stamp written; the next trigger certifies again."
+
+      - name: Upload the certified receipts for reuse
+        if: ${{ steps.stamp.outputs.stamped == 'true' }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: prod-cert-certified-${{ needs.resolve-target.outputs.commit_sha }}
+          path: |
+            ${{ runner.temp }}/prod-cert-receipts.json
+            ${{ runner.temp }}/prod-cert-certified.json
+          retention-days: 2
+          overwrite: true
+          if-no-files-found: error
+
+  # JOV-12639: the served build already has a fresh certified receipt, so no
+  # new certification runs. Re-read that receipt, judge it again and upload it
+  # as this run's receipt with a reuse block naming the source run. Nothing is
+  # posted to the ledger or filed again; a receipt that no longer qualifies
+  # fails this job and the next trigger certifies.
+  golden-path-cert-reused:
+    name: Golden Path Certification (Reused Receipt)
+    needs: [resolve-target]
+    if: ${{ always() && needs.resolve-target.result == 'success' && needs.resolve-target.outputs.should_certify == 'true' && needs.resolve-target.outputs.cert_reused == 'true' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 1
+          persist-credentials: false
+      - name: Prime Node toolcache
+        if: ${{ hashFiles('.github/actions/prime-node-toolcache/action.yml') != '' }}
+        uses: ./.github/actions/prime-node-toolcache
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: '.nvmrc'
+      - name: Adopt the reused certification receipt
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TARGET_COMMIT_SHA: ${{ needs.resolve-target.outputs.commit_sha }}
+          SOURCE_RUN_ID: ${{ needs.resolve-target.outputs.cert_reused_from_run }}
+          SOURCE_ARTIFACT_ID: ${{ needs.resolve-target.outputs.cert_reused_artifact }}
+        run: |
+          node scripts/golden-path-cert-reuse.mjs adopt \
+            --served-sha "$TARGET_COMMIT_SHA" \
+            --source-run-id "$SOURCE_RUN_ID" --artifact-id "$SOURCE_ARTIFACT_ID" \
+            --out "${RUNNER_TEMP}/prod-cert-reused/prod-cert-receipts.json"
+      - name: Upload the reused certification receipts
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: prod-cert-reused-${{ github.run_id }}
+          path: ${{ runner.temp }}/prod-cert-reused/prod-cert-receipts.json
+          retention-days: 30
+          overwrite: true
+          if-no-files-found: error
 
   remediation:
     name: File post-deploy probe remediation
