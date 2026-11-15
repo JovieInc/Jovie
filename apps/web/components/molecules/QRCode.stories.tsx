@@ -74,9 +74,7 @@ export const InContainer: Story = {
         label='Scan to pay via Apple Pay'
         className='mx-auto'
       />
-      <p className='text-sm text-secondary-token'>
-        Scan to pay via Apple Pay
-      </p>
+      <p className='text-sm text-secondary-token'>Scan to pay via Apple Pay</p>
     </div>
   ),
 };
