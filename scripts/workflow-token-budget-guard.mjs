@@ -43,9 +43,8 @@ export function main(argv = process.argv.slice(2), root = process.cwd()) {
   const errors = check({ found, declared, ratchet });
   for (const error of errors)
     process.stderr.write(`workflow-token-budget: ${error}\n`);
-  // Event-driven-only mandate (Tim 2026-10-21 + 2026-11-14, JOV-12720): the
-  // schedule/polling guard rides this same step until the pr-fleet-rules.yml
-  // wiring is split by a workflows-permitted lane (owner follow-up).
+  // Event-driven-only mandate (JOV-12720): the schedule/polling guard rides
+  // this step until an owner splits the pr-fleet-rules.yml wiring.
   let scheduleFailed = false;
   if (!argv.includes('--write') && !argv.includes('--bootstrap')) {
     const base = diffBase(root);
