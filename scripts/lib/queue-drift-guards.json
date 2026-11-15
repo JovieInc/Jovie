@@ -36,6 +36,13 @@
       "semantic": "shrink-only",
       "check": "node scripts/company-guards/size-ratchet.mjs --no-raise origin/main",
       "tighten": "node scripts/company-guards/size-ratchet.mjs --tighten"
+    },
+    {
+      "id": "focus-canon",
+      "baseline": "apps/web/focus-canon.baseline.json",
+      "semantic": "shrink-only",
+      "check": "node apps/web/scripts/lint-focus-canon.mjs",
+      "tighten": "node apps/web/scripts/lint-focus-canon.mjs --tighten"
     }
   ],
   "combineSafe": {

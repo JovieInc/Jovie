@@ -27,6 +27,10 @@
  *   node scripts/lint-focus-canon.mjs          # check
  *   node scripts/lint-focus-canon.mjs --list   # print offenders
  *   node scripts/lint-focus-canon.mjs --update # rewrite the baseline
+ *   node scripts/lint-focus-canon.mjs --tighten # lower it to the live counts
+ *
+ * The baseline holds per-file counts only (no total), so two green PRs that
+ * shrink different files combine without a conflict.
  */
 import { execFileSync } from 'node:child_process';
 import { readFileSync, writeFileSync } from 'node:fs';
@@ -148,16 +152,19 @@ function main() {
       for (const o of found) console.log(`${file}:${o.line}  ${o.snippet}`);
     }
   }
-  if (args.has('--update')) {
-    const sorted = Object.fromEntries(
-      Object.entries(counts).sort(([a], [b]) => (a < b ? -1 : 1))
-    );
-    writeFileSync(
-      BASELINE_PATH,
-      `${JSON.stringify({ total, files: sorted }, null, 2)}\n`
-    );
+  if (args.has('--update') || args.has('--tighten')) {
+    const previous = args.has('--tighten')
+      ? JSON.parse(readFileSync(BASELINE_PATH, 'utf8')).files
+      : null;
+    const next = previous
+      ? Object.entries(previous)
+          .map(([f, n]) => [f, Math.min(n, counts[f] ?? 0)])
+          .filter(([, n]) => n > 0)
+      : Object.entries(counts);
+    const files = Object.fromEntries(next.sort(([a], [b]) => (a < b ? -1 : 1)));
+    writeFileSync(BASELINE_PATH, `${JSON.stringify({ files }, null, 2)}\n`);
     console.log(
-      `focus-canon baseline updated (${total} in ${Object.keys(counts).length} files)`
+      `focus-canon baseline written (${Object.values(files).reduce((a, n) => a + n, 0)} in ${Object.keys(files).length} files)`
     );
     return;
   }

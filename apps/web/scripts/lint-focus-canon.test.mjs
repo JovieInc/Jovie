@@ -75,7 +75,6 @@ describe('repository baseline', () => {
     const baseline = JSON.parse(readFileSync(BASELINE_PATH, 'utf8'));
     const counts = countsOf(collect());
     expect(compareToBaseline(counts, baseline.files)).toEqual([]);
-    const total = Object.values(baseline.files).reduce((a, n) => a + n, 0);
-    expect(baseline.total).toBe(total);
+    expect(Object.keys(baseline)).toEqual(['files']);
   });
 });

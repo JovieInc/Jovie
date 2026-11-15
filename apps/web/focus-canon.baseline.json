@@ -1,5 +1,4 @@
 {
-  "total": 1425,
   "files": {
     "apps/web/app/(auth)/auth/native-return/page.tsx": 1,
     "apps/web/app/(auth)/identity/IdentityPageClient.tsx": 1,
