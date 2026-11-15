@@ -35,6 +35,17 @@ describe('focus canon: field containers', () => {
     expect(document.getElementById('form')?.matches(selector)).toBe(false);
   });
 
+  it('draws nothing on programmatic focus targets but keeps control outlines', () => {
+    const rule = focusCss.match(
+      /:where\(\[tabindex="-1"\], \[role="dialog"\], \[role="alertdialog"\]\):focus-visible\s*\{([^}]*)\}/
+    );
+    expect(rule?.[1]).toContain('outline: none;');
+    expect(rule?.[1]).not.toContain('!important');
+    expect(focusCss).toMatch(
+      /\[role="menuitem"\],[\s\S]*\):focus-visible\s*\{\s*outline: var\(--focus-outline-width\) solid var\(--focus-outline-color\) !important;/
+    );
+  });
+
   it('keeps one Clerk focus indicator, the outline, with no extra shadow', () => {
     const clerkFocus = themeCss.match(
       /\.cl-formButtonPrimary\s*\):focus-visible\s*\{([^}]*)\}/

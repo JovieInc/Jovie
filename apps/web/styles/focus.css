@@ -195,6 +195,14 @@
     outline: none !important;
   }
 
+  /* A programmatic focus target (a dialog, a menu or list that focuses
+     itself, a skip-link target) is not a control, so it draws nothing rather
+     than the browser default. Controls in the list above keep their outline,
+     which is !important. */
+  :where([tabindex="-1"], [role="dialog"], [role="alertdialog"]):focus-visible {
+    outline: none;
+  }
+
   /* A quiet disclosure keeps its underline as its only cue. */
   [data-focus-treatment="underline-only"]:focus-visible {
     outline: none !important;
