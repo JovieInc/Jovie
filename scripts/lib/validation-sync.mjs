@@ -7,19 +7,6 @@
  */
 
 import { execFileSync } from 'node:child_process';
-import { fetchPullStatesBatched } from './github-pull-snapshots.mjs';
-
-// Back-compat: existing consumers import these from validation-sync.
-export {
-  fetchPullStatesBatched,
-  fetchWithRetry,
-  githubClient,
-  githubStatusError,
-  headerRetryMs,
-  rateLimitWaitMs,
-  readClosedPullSnapshot,
-} from './github-pull-snapshots.mjs';
-
 import { createHash } from 'node:crypto';
 import {
   mkdirSync,
@@ -51,8 +38,7 @@ import {
   receiptMatchesAcceptanceEpisode,
 } from './validation-lifecycle.mjs';
 
-// Long-running issues collect many linked pull requests (JOV-7707 had more
-// than 10 on its first live run). The cap only bounds GitHub reads.
+// The cap only bounds GitHub reads (JOV-7707: long-running issues collect many).
 const MAX_LINKED_PULLS = 60;
 const MAX_FILE_PAGES = 30;
 const PRODUCTION_VERSION_URL = 'https://jov.ie/api/version';
@@ -69,7 +55,13 @@ const PRODUCTION_VERSION_URL = 'https://jov.ie/api/version';
  *   init?: RequestInit,
  * ) => Promise<HttpResponse>} HttpFetch
  * @typedef {(path: string) => Promise<{ body: any, link: string }>} GithubGetBase
- * @typedef {GithubGetBase & { graphql?: (query: string) => Promise<any> }} GithubGet
+ * @typedef {GithubGetBase & {
+ *   batchPulls?: (
+ *     repository: string,
+ *     numbers: readonly number[],
+ *     selection: string,
+ *   ) => Promise<Map<number, { state: string, mergedAt: string, mergeCommitSha: string, title: string, body: string, baseRef: string }>>,
+ * }} GithubGet
  * @typedef {{
  *   status: 'verified' | 'pending' | 'unknown',
  *   sha?: string,
@@ -90,36 +82,275 @@ const PRODUCTION_VERSION_URL = 'https://jov.ie/api/version';
  * }} RiskSummary
  */
 
+/**
+ * One retry for a transport failure (a thrown fetch, not an HTTP status), so a
+ * dropped connection on a loaded runner does not fail the whole sweep.
+ *
+ * @param {HttpFetch} fetchImpl
+ * @param {Parameters<HttpFetch>} args
+ * @returns {Promise<HttpResponse>}
+ */
+export async function fetchWithRetry(fetchImpl, ...args) {
+  try {
+    return await fetchImpl(...args);
+  } catch {
+    return fetchImpl(...args);
+  }
+}
+
+/** Do not sleep inside a 15-minute sweep for a reset that is further out. */
+export const RATE_LIMIT_WAIT_CAP_MS = 8_000;
+
+/**
+ * @param {HttpResponse['headers']} headers
+ * @param {number} [now]
+ * @returns {number}
+ */
+export function headerRetryMs(headers, now = Date.now()) {
+  const retry = headers?.get?.('retry-after');
+  if (typeof retry === 'string' && /^\d+(\.\d+)?$/.test(retry.trim())) {
+    return Math.ceil(Number(retry) * 1000);
+  }
+  let best = 0;
+  for (const name of [
+    'x-ratelimit-reset',
+    'x-ratelimit-requests-reset',
+    'x-ratelimit-complexity-reset',
+  ]) {
+    const value = Number(headers?.get?.(name));
+    if (!Number.isFinite(value) || value <= 0) continue;
+    const epochMs = value < 1e11 ? value * 1000 : value;
+    const delta = epochMs - now;
+    if (delta > best) best = delta;
+  }
+  return best;
+}
+
+/**
+ * Wait only when the server named a delay inside the sweep budget. A reset
+ * that is already past the cap means persist the cursor instead of sleeping.
+ *
+ * @param {number} retryAfterMs
+ * @param {number} attempt
+ * @param {number} maxAttempts
+ * @returns {number | null}
+ */
+export function rateLimitWaitMs(retryAfterMs, attempt, maxAttempts) {
+  if (attempt >= maxAttempts) return null;
+  const hinted = Number(retryAfterMs);
+  // A missing reset can use a short backoff. Infinity / a far reset cannot:
+  // the caller persists the cursor instead of sleeping out the hour.
+  if (!Number.isFinite(hinted)) return null;
+  if (hinted > RATE_LIMIT_WAIT_CAP_MS) return null;
+  if (hinted > 0) return hinted;
+  return Math.min(2_000, 2 ** (attempt - 1) * 250);
+}
+
+/**
+ * @param {number | undefined} status
+ * @param {HttpResponse['headers']} headers
+ * @param {any} body
+ * @param {string} [path]
+ */
+export function githubStatusError(status, headers, body, path) {
+  const remaining = headers?.get?.('x-ratelimit-remaining');
+  const message = typeof body?.message === 'string' ? body.message : '';
+  const rateLimited =
+    status === 429 ||
+    ((status === 403 || status === 429) &&
+      (remaining === '0' || /rate limit/i.test(message)));
+  const retryAfterMs = rateLimited ? headerRetryMs(headers) : 0;
+  const forbidden = status === 403 && !rateLimited;
+  const where = path ? ` for ${path}` : '';
+  const detail = message ? `: ${message}` : '';
+  return Object.assign(
+    new Error(`GitHub HTTP ${status ?? 'error'}${where}${detail}`),
+    {
+      rateLimited,
+      forbidden,
+      retryAfterMs:
+        rateLimited && retryAfterMs <= 0
+          ? Number.POSITIVE_INFINITY
+          : retryAfterMs,
+    }
+  );
+}
+
+/**
+ * @param {HttpFetch} fetchImpl
+ * @param {string} token
+ * @returns {GithubGet}
+ */
+export function githubClient(fetchImpl, token, sleep = defaultSleep) {
+  const client = async path => {
+    // Bounded retry for transient upstream failures (JOV-5143); a primary
+    // quota 403 is not retried past the sweep budget (the caller persists
+    // the cursor), and a single inaccessible pull is `forbidden` to skip.
+    const maxAttempts = 4;
+    /** @type {Error | null} */
+    let lastError = null;
+    for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+      const response = await fetchWithRetry(
+        fetchImpl,
+        `https://api.github.com/${path}`,
+        {
+          headers: {
+            Accept: 'application/vnd.github+json',
+            Authorization: `Bearer ${token}`,
+            'X-GitHub-Api-Version': '2022-11-28',
+            'User-Agent': 'jovie-linear-sync-on-merge',
+          },
+        }
+      );
+      if (response.ok) {
+        return {
+          body: await response.json(),
+          link: response.headers?.get?.('link') ?? '',
+        };
+      }
+      const body = await response.json().catch(() => null);
+      lastError = githubStatusError(
+        response.status,
+        response.headers,
+        body,
+        path
+      );
+      const flagged =
+        /** @type {{ rateLimited?: boolean, forbidden?: boolean, retryAfterMs?: number }} */ (
+          lastError
+        );
+      if (flagged.forbidden) throw lastError;
+      const wait = flagged.rateLimited
+        ? rateLimitWaitMs(flagged.retryAfterMs ?? 0, attempt, maxAttempts)
+        : response.status === 429 ||
+            (typeof response.status === 'number' && response.status >= 500)
+          ? Math.min(4_000, 2 ** (attempt - 1) * 250)
+          : null;
+      if (wait == null || attempt === maxAttempts) throw lastError;
+      await sleep(wait);
+    }
+    throw lastError ?? new Error(`GitHub request failed for ${path}`);
+  };
+
+  // JOV-12717: one aliased GraphQL batch per link set through the shared
+  // api-client (separately metered); failures throw -> REST fallback.
+  client.batchPulls = async (repository, numbers, selection) => {
+    const { createGitHubClient, pullRequestField } = await import(
+      '../../packages/api-client/github.ts'
+    );
+    const [owner, name] = String(repository).split('/');
+    const api = createGitHubClient({
+      token,
+      fetch: (url, options) =>
+        fetchImpl(url, { ...options, redirect: 'error' }),
+    });
+    const rows = await api.batch(
+      numbers.map(String),
+      pullRequestField(owner, name, selection),
+      { priority: 'repair', maxWaitMs: 0 }
+    );
+    return new Map([...rows].map(([key, value]) => [Number(key), value]));
+  };
+
+  return client;
+}
+
+/** @param {number} ms */
+function defaultSleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
 const MERGED_PULL = /^repos\/[^/]+\/[^/]+\/pulls\/(\d+)$/;
 const PULL_FILES = /^repos\/[^/]+\/[^/]+\/pulls\/(\d+)\/files\?/;
 const SHA_COMPARE =
   /^repos\/[^/]+\/[^/]+\/compare\/[0-9a-f]{40}\.\.\.[0-9a-f]{40}$/i;
 export const GITHUB_CACHE_KEEP = 4000;
+const MAX_CLOSED_PULL_SNAPSHOT_PAGES = 10;
 
 /**
- * @typedef {{
- *   number: number,
- *   title: string,
- *   body: string,
- *   headRef: string,
- *   merged: boolean,
- *   mergedAt: string,
- *   mergeCommitSha: string,
- *   baseRef: string,
- * }} ClosedPullSnapshotEntry
+ * @typedef {{ number: number, merged: boolean }} ClosedPullSnapshotEntry
  */
 
 /**
- * Reads that can never change, kept across sweeps (actions/cache): a merged
- * pull request, its files, and a compare between two exact commits. Every
- * sweep re-evaluates ~280 lifecycle issues at ~3-4 such reads each, so
- * sweeps that run back to back drained the repo's shared 1,000/h
- * GITHUB_TOKEN quota on 2026-10-11. Open pull requests, artifact markers and
- * the served build stay live. Only the fields the lifecycle reads are kept.
- *
- * @param {GithubGet} github
- * @param {string | undefined} dir
- * @returns {GithubGet}
+ * The next page's API path from a Link header (absolute URLs collapse to
+ * their path so the client does not double the origin).
+ */
+function nextApiPath(link) {
+  for (const part of String(link ?? '').split(',')) {
+    const match = /<([^>]+)>;\s*rel="next"/i.exec(part);
+    if (match) {
+      return String(match[1]).replace(/^https:\/\/api\.github\.com\//i, '');
+    }
+  }
+  return null;
+}
+
+export async function readClosedPullSnapshot(input) {
+  const maxPages = input.maxPages ?? MAX_CLOSED_PULL_SNAPSHOT_PAGES;
+  const github = githubClient(input.fetchImpl, input.token);
+  /** @type {Map<number, ClosedPullSnapshotEntry>} */
+  const snapshot = new Map();
+  let path = `repos/${input.repository}/pulls?state=closed&sort=updated&direction=desc&per_page=100&page=1`;
+  for (let page = 0; page < maxPages; page += 1) {
+    const { body, link } = await github(path);
+    if (!Array.isArray(body)) {
+      throw new Error('GitHub closed pull request snapshot was not a list');
+    }
+    for (const row of body) {
+      const number = Number(row?.number);
+      if (!Number.isInteger(number) || number <= 0) continue;
+      const merged =
+        typeof row?.merged_at === 'string' &&
+        /^[0-9a-f]{40}$/i.test(String(row?.merge_commit_sha ?? ''));
+      snapshot.set(number, { number, merged });
+    }
+    const next = nextApiPath(link);
+    if (!next) break;
+    path = next;
+  }
+  return snapshot;
+}
+
+/**
+ * Reuse the release owner's complete byte/producer/attempt classifier.
+ * @param {{ repository: string, sha: string, controllerWorkflowId: number, execute?: (command: string, args: string[], options: { encoding: 'utf8', timeout: number }) => string | Buffer }} input
+ */
+export function inspectVerifiedProductionMarker({
+  repository,
+  sha,
+  controllerWorkflowId,
+  execute = execFileSync,
+}) {
+  const output = execute(
+    process.execPath,
+    [
+      fileURLToPath(
+        new URL(
+          '../../.github/scripts/production-marker-state.mjs',
+          import.meta.url
+        )
+      ),
+      '--repo',
+      repository,
+      '--sha',
+      sha,
+      '--controller-workflow-id',
+      String(controllerWorkflowId),
+    ],
+    { encoding: 'utf8', timeout: 45_000 }
+  );
+  const result = JSON.parse(String(output));
+  if (result?.state === 'verified') return true;
+  if (['none', 'pending', 'recovery_available'].includes(result?.state))
+    return false;
+  throw new Error(
+    `Production marker proof unavailable: ${result?.reason ?? 'malformed classifier output'}`
+  );
+}
+
+/**
+ * Reads that can never change, kept across sweeps (actions/cache): merged
+ * pulls, their files, SHA compares. Unmerged pulls stay uncached.
  */
 export function immutableGithubCache(github, dir) {
   if (!dir) return github;
@@ -143,7 +374,7 @@ export function immutableGithubCache(github, dir) {
       // Persistence is optional; the next sweep reads live again.
     }
   };
-  const wrapped = async path => {
+  return async path => {
     const pull = MERGED_PULL.exec(path);
     const files = PULL_FILES.exec(path);
     const cacheable =
@@ -185,16 +416,12 @@ export function immutableGithubCache(github, dir) {
     }
     return result;
   };
-  // GraphQL batch reads bypass the per-path REST cache by design; forward the
-  // capability so callers can use either transport through one client.
-  if (typeof github.graphql === 'function') wrapped.graphql = github.graphql;
-  return wrapped;
 }
 
 /**
- * Keep the newest `keep` entries and return a content digest for the cache
- * save key ('' when the directory is empty or unreadable).
- * @param {string} dir
+ * Response cache for immutable reads: merged `pulls/N` bodies, their file
+ * listings and SHA compares (files of unmerged pulls stay uncached; the
+ * githubInstallationQuota bucket is not spent on repeats).
  */
 export function boundGithubCache(dir, keep = GITHUB_CACHE_KEEP) {
   try {
@@ -375,16 +602,9 @@ export function createProductionFacts(input) {
 }
 
 /**
- * Does this pull request implement the issue, rather than mention it? Linear
- * attaches every pull request whose body names an issue, so a passing
- * reference (#20371 naming JOV-7192) must not bind the issue's evidence. The
- * title, the jov-N branch, the merge-sync identifier marker, Summer's issue
- * bind, or a Linear closing keyword count; a bare mention or "Part of" does
- * not.
- *
- * @param {{ title?: string, body?: string, head?: { ref?: string } }} pull
- * @param {string} identifier
- * @returns {boolean}
+ * Does this pull implement the issue (not just mention it): the identifier
+ * in the title or branch, a bind marker in the body, or a closes/fixes
+ * clause naming it.
  */
 export function pullImplementsIssue(pull, identifier) {
   const match = /^JOV-(\d+)$/i.exec(identifier);
@@ -409,20 +629,10 @@ export function pullImplementsIssue(pull, identifier) {
 }
 
 /**
- * Merged pull requests in this repository that implement the issue, from
- * Linear's native attachments plus the merging pull request itself (whose
- * link the merge sync already proved).
- *
- * @param {{
- *   readonly github: GithubGet,
- *   readonly repository: string,
- *   readonly identifier: string,
- *   readonly attachmentUrls: readonly string[],
- *   readonly eventPull?: { number: number },
- *   readonly closedPulls?: ReadonlyMap<number, ClosedPullSnapshotEntry>,
- *   readonly openPullNumbers?: ReadonlySet<number>,
- * }} input
- * @returns {Promise<MergedPull[]>}
+ * The merged pulls in this repository that implement the issue: numbers from
+ * its attachment URLs plus the event pull, answered without per-pull reads
+ * whenever the closed snapshot, the open scan or the GraphQL batch can
+ * decide them (JOV-12717), with the per-pull REST path as the fallback.
  */
 export async function listMergedLinkedPulls(input) {
   const prefix = `https://github.com/${input.repository}/pull/`.toLowerCase();
@@ -445,36 +655,32 @@ export async function listMergedLinkedPulls(input) {
   const merged = [];
   /** @type {number[]} */
   const unreadable = [];
-  // JOV-12717: numbers the snapshot and open scan cannot answer used to cost
-  // one REST-core GET each, every sweep (the bucket that exhausts). Answer
-  // them all in ONE GraphQL batch (separately metered); any GraphQL failure
-  // falls back to the per-pull REST path below, unchanged.
-  /** @type {Map<number, Awaited<ReturnType<typeof fetchPullStatesBatched>> extends Map<number, infer V> ? V : never> | null} */
+  // Out-of-window numbers: one GraphQL batch instead of one REST GET each;
+  // failure falls back to the per-pull REST path below, unchanged.
   let batched = null;
-  if (typeof input.github.graphql === 'function') {
+  if (typeof input.github.batchPulls === 'function') {
     const needBatch = selected.filter(
       number =>
         !input.closedPulls?.get(number) && !input.openPullNumbers?.has(number)
     );
-    if (needBatch.length > 0) {
-      try {
-        batched = await fetchPullStatesBatched(
-          input.github,
-          input.repository,
-          needBatch
-        );
-      } catch {
-        batched = null; // REST fallback below keeps today's behavior.
-      }
+    try {
+      batched =
+        needBatch.length > 0
+          ? await input.github.batchPulls(
+              input.repository,
+              needBatch,
+              'number state mergedAt mergeCommitSha title body base { ref }'
+            )
+          : null;
+    } catch {
+      batched = null;
     }
   }
   for (const number of selected) {
     const closed = input.closedPulls?.get(number);
     if (closed && !closed.merged) {
-      // Closed without merging: the number can never become a binding merge,
-      // and the snapshot row already carries the answer the per-pull read
-      // would return. Unmerged pulls are not immutable, so without this cut
-      // every sweep re-reads them until the shared quota dies.
+      // Closed-unmerged can never bind, and unmerged pulls are not immutable,
+      // so without this cut every sweep re-reads them until quota death.
       continue;
     }
     if (input.openPullNumbers?.has(number)) {
@@ -483,9 +689,7 @@ export async function listMergedLinkedPulls(input) {
     }
     const batchedPull = batched?.get(number);
     if (batchedPull) {
-      // The GraphQL batch answered this number: MERGED is immutable and can
-      // bind; CLOSED-unmerged is immutable and can never bind; OPEN cannot
-      // be merged yet (the same cut the open scan applies).
+      // MERGED binds; CLOSED-unmerged and OPEN can never bind here.
       if (
         batchedPull.state === 'MERGED' &&
         batchedPull.mergedAt &&
@@ -516,8 +720,8 @@ export async function listMergedLinkedPulls(input) {
         `repos/${input.repository}/pulls/${number}`
       ));
     } catch (error) {
-      // A permission 403 on one pull request must not fail the sweep. A rate
-      // limit still throws so the caller can persist the cursor and resume.
+      // A permission 403 on one pull must not fail the sweep; a rate limit
+      // still throws so the caller can persist the cursor and resume.
       if (/** @type {{ forbidden?: boolean }} */ (error)?.forbidden) {
         unreadable.push(number);
         continue;
@@ -1007,40 +1211,4 @@ async function fileTasteOrder(ctx, manifest, deploymentSha) {
     );
   }
   ctx.log(`Filed founder taste order ${orderId} for ${deploymentSha}`);
-}
-/**
- * Reuse the release owner's complete byte/producer/attempt classifier.
- * @param {{ repository: string, sha: string, controllerWorkflowId: number, execute?: (command: string, args: string[], options: { encoding: 'utf8', timeout: number }) => string | Buffer }} input
- */
-export function inspectVerifiedProductionMarker({
-  repository,
-  sha,
-  controllerWorkflowId,
-  execute = execFileSync,
-}) {
-  const output = execute(
-    process.execPath,
-    [
-      fileURLToPath(
-        new URL(
-          '../../.github/scripts/production-marker-state.mjs',
-          import.meta.url
-        )
-      ),
-      '--repo',
-      repository,
-      '--sha',
-      sha,
-      '--controller-workflow-id',
-      String(controllerWorkflowId),
-    ],
-    { encoding: 'utf8', timeout: 45_000 }
-  );
-  const result = JSON.parse(String(output));
-  if (result?.state === 'verified') return true;
-  if (['none', 'pending', 'recovery_available'].includes(result?.state))
-    return false;
-  throw new Error(
-    `Production marker proof unavailable: ${result?.reason ?? 'malformed classifier output'}`
-  );
 }
