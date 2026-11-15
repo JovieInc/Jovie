@@ -593,7 +593,7 @@ describe('OpportunityInboxPageClient', () => {
     expect(screen.queryByText('New single detected')).not.toBeInTheDocument();
   });
 
-  it('renders the calm empty state without setup steps when there are no cards', () => {
+  it('preserves the cleared-queue state when setup context is absent', () => {
     render(
       <OpportunityInboxPageClient
         inbox={{

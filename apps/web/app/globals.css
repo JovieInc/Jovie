@@ -113,8 +113,7 @@ body {
 
 html[data-desktop-runtime="electron"] body {
   background: rgb(var(--sidebar-background));
-  font-family:
-    -apple-system, BlinkMacSystemFont, var(--font-inter), "Inter", sans-serif;
+  font-family: var(--font-sans);
 }
 
 [data-electron-titlebar="true"] {
@@ -1772,7 +1771,7 @@ body {
     }
   }
   .text-destructive {
-    color: var(--color-error);
+    color: var(--color-error-text);
   }
 
   .homepage-section-shell {
@@ -2163,9 +2162,6 @@ body {
   body {
     background-color: var(--color-bg-base);
     color: var(--color-text-primary-token);
-    font-feature-settings:
-      "rlig" 1,
-      "calt" 1;
   }
   h1,
   h2,

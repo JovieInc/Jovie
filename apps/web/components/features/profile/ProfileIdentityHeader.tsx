@@ -1,3 +1,4 @@
+import { PlainButton } from '@jovie/ui';
 import { Bell, Check } from 'lucide-react';
 import Link from 'next/link';
 import type { MouseEvent } from 'react';
@@ -144,7 +145,7 @@ export function ProfileIdentityHeader({
               )}
               {isSubscribed ? 'Updates On' : 'Get Updates'}
             </span>
-            <button
+            <PlainButton
               type='button'
               aria-label={isSubscribed ? 'Updates On' : 'Get Updates'}
               onClick={onGetUpdatesClick}

@@ -4,6 +4,7 @@ import {
   resetAudioChromeSnapshot,
   setAudioChromeSnapshot,
 } from '@/components/organisms/audio-chrome-state';
+import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import { ShellAudioDock } from './ShellAudioDock';
 
 let mockPrefersReducedMotion = false;
@@ -38,8 +39,8 @@ describe('ShellAudioDock', () => {
     resetAudioChromeSnapshot();
   });
 
-  it('stays collapsed while idle — zero height, hidden, inert', () => {
-    render(
+  it('stays collapsed while idle — zero height, hidden, inert', async () => {
+    const { container } = render(
       <ShellAudioDock>
         <div data-testid='player'>Player</div>
       </ShellAudioDock>
@@ -53,10 +54,11 @@ describe('ShellAudioDock', () => {
     expect(dock).toHaveAttribute('data-shell-rail-motion', 'dock');
     expect(dock.style.maxHeight).toBe('0px');
     expect(dock.style.marginTop).toBe('0px');
+    await expectNoA11yViolations(container);
   });
 
-  it('reveals with the cinematic tier when a track starts playing', () => {
-    render(
+  it('reveals with the cinematic tier when a track starts playing', async () => {
+    const { container } = render(
       <ShellAudioDock>
         <div data-testid='player'>Player</div>
       </ShellAudioDock>
@@ -74,6 +76,7 @@ describe('ShellAudioDock', () => {
     );
     expect(getDockContent().style.opacity).toBe('1');
     expect(getDockContent().style.pointerEvents).toBe('auto');
+    await expectNoA11yViolations(container);
   });
 
   it('keeps the dock open when playback pauses', () => {
@@ -94,8 +97,8 @@ describe('ShellAudioDock', () => {
     );
   });
 
-  it('collapses with the standard tier when the player is dismissed', () => {
-    render(
+  it('collapses with the standard tier when the player is dismissed', async () => {
+    const { container } = render(
       <ShellAudioDock>
         <div data-testid='player'>Player</div>
       </ShellAudioDock>
@@ -118,6 +121,7 @@ describe('ShellAudioDock', () => {
     expect(dock.style.transition).not.toContain(
       'var(--ds-motion-cinematic-duration)'
     );
+    await expectNoA11yViolations(container);
   });
 
   it('collapses when the full player is hidden to the sidebar mini', () => {
@@ -149,5 +153,38 @@ describe('ShellAudioDock', () => {
     expect(getDock().style.transition).toBe('none');
     expect(getDockContent().style.transition).toBe('none');
     expect(getDockContent().style.transform).toBe('translateY(0)');
+  });
+
+  it('hosts a long track row without clipping the dock', async () => {
+    const title =
+      'Midnight Drive Through the Neon City (Extended Club Mix featuring the Late Night Strings)';
+    const { container } = render(
+      <ShellAudioDock>
+        <p>{title}</p>
+      </ShellAudioDock>
+    );
+
+    publishSnapshot();
+
+    expect(getDock()).toHaveAttribute('data-state', 'open');
+    expect(screen.getByText(title)).toBeVisible();
+    await expectNoA11yViolations(container);
+  });
+
+  it('opens the same way in a right-to-left shell', async () => {
+    const { container } = render(
+      <div dir='rtl' lang='ar'>
+        <ShellAudioDock>
+          <p>ليالي المدينة الطويلة</p>
+        </ShellAudioDock>
+      </div>
+    );
+
+    publishSnapshot();
+
+    expect(getDock()).toHaveAttribute('data-state', 'open');
+    expect(getDockContent().style.transform).toBe('translateY(0)');
+    expect(screen.getByText('ليالي المدينة الطويلة')).toBeInTheDocument();
+    await expectNoA11yViolations(container);
   });
 });

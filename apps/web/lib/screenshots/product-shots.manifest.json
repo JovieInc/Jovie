@@ -1,0 +1,91 @@
+{
+  "schema": "jovie.product-shots/v1",
+  "shots": {
+    "profile-hero-desktop": {
+      "width": 1640,
+      "height": 1172,
+      "sourceHash": "1c654542b4fe9fee0f01df0b7d35fcc432254f49832d23c5199bcde17e838f0e",
+      "specHash": "431d2bbda1f7a334f405179ebdc85d1f63359bf2683879cf776aa248037d998c",
+      "renderedAt": "2026-11-05T21:47:18.256Z",
+      "sources": [
+        "apps/web/lib/tim-white.ts",
+        "apps/web/components/features/home/home-surface-seed.ts",
+        "apps/web/components/features/demo/DemoTimWhiteProfileSurface.tsx",
+        "apps/web/components/features/demo/demo-profile-showcase-states.ts",
+        "apps/web/components/features/home/homepage-profile-preview-fixture.ts",
+        "apps/web/components/features/profile/templates/ProfileCompactTemplate.tsx",
+        "apps/web/components/features/profile/ProfileIdentityHeader.tsx",
+        "apps/web/components/features/profile/pac/ProfilePacCard.tsx"
+      ],
+      "bytes": {
+        "avif": 28848,
+        "webp": 43542
+      },
+      "sourceEquivalence": {
+        "capturedSourceHash": "46c710b30e3fd924481d76fad35b99dbc46116ff06be80180f2179bc67e744b0",
+        "sourceCommit": "4370e5295b18092ac45b72e0857eef9650ff1cbe",
+        "change": "Image bytes stay the 2026-11-05 capture. They were not re-rendered. ProfileIdentityHeader.tsx and ProfilePacCard.tsx are unchanged. ProfileCompactTemplate.tsx from origin/main only changes the back click handler (resolveTabBackAction; profile mode still passes isProfileRoot true and the handler is not painted), the compact shell class (mx-auto instead of md:mx-auto, the same margin at the 1440px capture viewport), and desktop surface plus desktop credits presentation (embedded, outside the identity-header and profile-pac crop). Commits 4370e5295b1, fb530032d89, and ca703faac2e. On 2026-11-12 ProfileIdentityHeader.tsx swapped the Get Updates hit overlay from a raw button to PlainButton (PR #25157) with the same className; that className already styles focus-visible, so PlainButton adds no classes, only data-slot, and nothing at rest changes. On 2026-11-13 ProfilePacCard.tsx moved the featured cover's load hints into featured-art-hints.ts (PR #25214): fetchPriority and loading are the same values as before, and an interactive profile now also sets decoding=sync on the cover. Those are fetch and decode timing attributes on the same image at the same size and classes, so the settled capture paints the same pixels.",
+        "evidence": "code-diff of ProfileCompactTemplate.tsx between 1e62e8d0dea and 2144845de67; code-diff of ProfileIdentityHeader.tsx for PR #25157 plus PlainButton caller-focus rule; code-diff of ProfilePacCard.tsx for PR #25214 (two lines, load hints only); no screenshot was taken"
+      }
+    },
+    "setup-claim-handle": {
+      "width": 696,
+      "height": 372,
+      "sourceHash": "74216792f949371ab0a3514daa9ff78dc1dea573552f5788cabf2deb9b10cf31",
+      "specHash": "8e8165321af2f58428e0d98ae5f458702ea14d0331883630a01c31630c875ffd",
+      "renderedAt": "2026-11-02T12:28:39.725Z",
+      "sources": [
+        "apps/web/lib/tim-white.ts",
+        "apps/web/components/features/dashboard/organisms/onboarding/OnboardingHandleStep.tsx",
+        "apps/web/components/features/dashboard/organisms/onboarding-v2/shared/types.ts",
+        "apps/web/components/features/demo/DemoShowcaseSurface.tsx",
+        "apps/web/components/features/onboarding/OnboardingExperienceShell.tsx"
+      ],
+      "bytes": {
+        "avif": 6617,
+        "webp": 10728
+      },
+      "sourceEquivalence": {
+        "capturedSourceHash": "44284c581a65d922376078f1a049e09dbe8d8a6b835793bdf4b030c887a32df8",
+        "sourceCommit": "fbae862d8fd2e8eb10480927bf68b451bb41c589",
+        "change": "Only aria-label='Continue' was added; Storybook pixels match with and without it at 390/1440px in light/dark themes, with visible-mutation negative controls.",
+        "evidence": "https://github.com/JovieInc/Jovie/pull/24404#handle-source-equivalence"
+      }
+    },
+    "setup-connect-music": {
+      "width": 972,
+      "height": 530,
+      "sourceHash": "d27ff1afe3d85b07771656f611165c14e24d068446e91313ae647c0a8c600c0e",
+      "specHash": "cc187de12e7d6b300efb2e132d4520b657a8c2f8ae04e359d7589c5978325b90",
+      "renderedAt": "2026-11-02T12:28:41.638Z",
+      "sources": [
+        "apps/web/components/features/dashboard/organisms/onboarding/OnboardingDspStep.tsx",
+        "apps/web/components/features/dashboard/organisms/onboarding-v2/shared/types.ts",
+        "apps/web/components/features/demo/DemoShowcaseSurface.tsx",
+        "apps/web/components/features/onboarding/OnboardingExperienceShell.tsx"
+      ],
+      "bytes": {
+        "avif": 7449,
+        "webp": 13098
+      }
+    },
+    "setup-share-profile": {
+      "width": 764,
+      "height": 568,
+      "sourceHash": "be7a556a2a368640557a393c61d9d6a31986f8fe7dde62412f0ef0787a4622a8",
+      "specHash": "b5e7b8c2e7283ac396ec5dfc619fad20ad240bb90a4f1c4cd23a2ef7f9d8b881",
+      "renderedAt": "2026-11-05T19:26:56.132Z",
+      "sources": [
+        "apps/web/components/features/demo/DemoTimWhiteProfileSurface.tsx",
+        "apps/web/components/features/demo/demo-profile-showcase-states.ts",
+        "apps/web/components/features/profile/ProfileUnifiedDrawer.tsx",
+        "apps/web/components/features/share/PublicShareMenu.tsx",
+        "apps/web/components/features/home/homepage-profile-preview-fixture.ts"
+      ],
+      "bytes": {
+        "avif": 5088,
+        "webp": 9178
+      }
+    }
+  }
+}

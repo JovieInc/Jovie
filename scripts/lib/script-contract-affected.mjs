@@ -98,16 +98,18 @@ export function testsNearChange(tests, changed, root) {
       return new Set();
     }
   };
-  return tests.filter(test => {
-    if (changes.has(test)) return true;
-    for (const dep of near(test)) {
-      if (changes.has(dep)) return true;
-      if (/^scripts\/.+\.(?:mjs|cjs|js)$/u.test(dep))
-        for (const upstream of near(dep))
-          if (changes.has(upstream)) return true;
-    }
-    return false;
-  });
+  return tests.filter(test =>
+    test.split(' ').some(part => {
+      if (changes.has(part)) return true;
+      for (const dep of near(part)) {
+        if (changes.has(dep)) return true;
+        if (/^scripts\/.+\.(?:mjs|cjs|js)$/u.test(dep))
+          for (const upstream of near(dep))
+            if (changes.has(upstream)) return true;
+      }
+      return false;
+    })
+  );
 }
 
 /**
@@ -127,7 +129,7 @@ export function selectScriptContracts(changed, options = {}) {
   ) {
     // Partial checkouts (fixtures, sparse archives) run what they contain.
     const present = (/** @type {string} */ test) =>
-      existsSync(join(root, test));
+      test.split(' ').every(part => existsSync(join(root, part)));
     return {
       full: true,
       node: node.filter(present),
@@ -184,7 +186,9 @@ async function main(args) {
         '--config',
         'vitest.config.mts',
         'run',
-        ...vitest.map(test => test.replace(/^scripts\//u, '')),
+        ...vitest.flatMap(test =>
+          test.split(' ').map(part => part.replace(/^scripts\//u, ''))
+        ),
       ])
     );
   const codes = await Promise.all(runs);

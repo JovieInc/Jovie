@@ -1,6 +1,7 @@
 'use client';
 
 import { Button } from '@jovie/ui';
+import { HostDrawnInput } from '@jovie/ui/atoms/host-drawn-field';
 import { Check, Loader2, Upload, Video } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { TeleprompterShowcaseInterstitial } from '@/components/jovie/components/TeleprompterShowcaseInterstitial';
@@ -140,12 +141,13 @@ export function ChatVideoRecordingProposalCard({
 
   return (
     <>
-      <input
+      <HostDrawnInput
         ref={fileInputRef}
         type='file'
         accept={getTeleprompterVideoAcceptTypes()}
         className='hidden'
         tabIndex={-1}
+        aria-label='Upload Video File'
         onChange={handleFileChange}
       />
       <ContentSurfaceCard

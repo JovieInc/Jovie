@@ -34,24 +34,45 @@ Invalid JSON in an input file blocks report generation with a nonzero exit.
 | tokens | no palette classes, raw white/black, hex or colour functions | source (static) |
 | states | each reachable state (loading, empty, error, partial, long-content, offline, permission-denied, rtl-overflow) has a story export, or a written waiver in `component-certification.json` | story file |
 | tests | colocated test with assertions and, for interactive components, user-event interaction | test file |
-| a11y | axe assertion in the current unit test, or passing CI evidence with the current component `sourceHash` | test file / CI |
+| a11y | current source/render-bound CI evidence, or unit axe when no CI observation exists | test file / CI |
 | frontend-rules | no inline components, autoFocus, unstable keys, dimensionless images, null-while-loading, reset-on-open effects; text inputs have an input-retention test | source + test |
 | forced-caps | no `uppercase` utility, `text-transform: uppercase` or inline `textTransform: 'uppercase'` (ASR-022); artist and release names keep their own spelling | source (static), rule in `scripts/lib/design-rules/forced-caps.mjs` |
 | mutation | sweep score at least `policy.mutationMin` (80), matching the current source/test `blob` key with a recorded run `sha` | `jovie-mutation` sweep state |
-| visual | CI-captured baseline of the state stories with the current component `sourceHash` (never a Storybook build on gem) | CI artifact |
+| visual | CI capture of state stories with current component `sourceHash` and shared `renderInputs` binding (never a Storybook build on gem) | CI artifact |
 | journeys | every golden-path journey touching the component has a browser spec | `component-journeys.json` |
 | benchmark | judgment recorded against the current `benchmark-library.json`, source unchanged, a named `reference` (or a written `noPatternReason`), every gap with item/decision/reference, every adopt/adapt gap done, every skip has a reason | `component-benchmarks.json` |
 
 The certificate computes its binding from the component's actual source bytes.
 CI a11y, visual, and benchmark records must carry that SHA-256 `sourceHash`;
-stale or unbound records remain `unknown`. Current unit-axe assertions remain
-an independent source of a11y evidence.
+stale or unbound records remain `unknown`. Unit axe remains a fallback when
+there is no CI observation; it cannot mask a stale pass or failure.
 
 A passing a11y or visual record is a story-capture receipt
 (`jovie.component-story-evidence/v1`, `scripts/lib/component-evidence.mjs`):
-`sourceHash`, `captured`, and `stories: [{ id, themes }]` where every story was
+`sourceHash`, `renderInputs`, `captured`, and `stories: [{ id, themes }]` where every story was
 captured in both `light` and `dark`. A pass without that proof is ignored (the
-CLI names it on stderr), so the criterion stays unknown; a `fail` always stands.
+CLI names it on stderr), so the criterion stays unknown. Both passes and failures
+need current source and render bindings. Legacy receipts without the new binding
+remain readable historical evidence but cannot certify the current tree.
+
+`renderInputs` uses `jovie.component-render-inputs/v1`: one sorted current-byte
+SHA-256 snapshot per run, shared by every component. It includes frontend and
+workspace package inputs, styles, stories, public assets, root build/package
+pins, patches, and capture/evaluator scripts. Ordinary API/action routes, tests,
+and documentation are excluded. Additions and unstaged edits count; missing
+tracked files or unreadable Git/input state fail closed. Internal asset symlinks
+bind their literal target and resolved file bytes; escaping/broken links fail
+closed. The workflow contract tests enumerate current inputs and asset targets
+to prove they can trigger refresh. New links into otherwise excluded locations
+need explicit trigger admission. This is conservative render provenance, not a
+complete transitive graph or authentication of an arbitrary `--base-url` server.
+
+The consumer expects the hosted full-catalog Storybook settings (manual axe,
+development mode, default public build values). Pilot or other noncanonical settings
+cannot reuse that binding. Hosted capture starts a fresh server from the same
+checkout. New shared-input paths refresh the existing canonical capture job;
+the sixteen-shard matrix keeps its previous eligibility. Benchmarks and mutation
+retain their existing, narrower contracts; this binding does not upgrade them.
 
 `scripts/component-story-evidence.mjs` produces those receipts for every
 `packages/ui` component. The `component-story-evidence` job in
@@ -63,7 +84,46 @@ axe violations. A story that pins its theme through story `globals` (such as
 dark proof. Only a screenshot hash is recorded, since there are no pixel
 baselines yet. The job saves `visual.json` and `a11y.json` to the
 `component-story-evidence-` cache, and `component-certificate.yml` restores
-them. Locally: start `storybook dev` in `apps/web`, then run
+them. A successful trusted main CI, render, or mutation producer completion
+refreshes the event's immutable current-main SHA, even when the producer ran
+on an older ancestor. The trigger must be an ancestor of the target, which must
+belong to main. Cancellation is scoped to that target. Cache reuse still requires
+matching current input bindings; a late completion never refreshes old hashes.
+Before negotiation and immediately before posting, the workflow rechecks main and keeps a
+superseded report only as an immutable artifact (including explicit historical
+dispatch targets). An unreadable main fails delivery closed. This check is not
+atomic with Ovie ingestion; accepted-generation ordering is enforced separately
+by the receiver's existing Postgres JSONB compare-and-set path.
+
+Delivery carries optional `deliveryOrder` metadata with schema
+`jovie.source-order/v1`, a positive safe-integer `sourceOrdinal` from
+`git rev-list --count` on the full-history target, and this workflow's
+`runNumber`/`runAttempt`. The target must match the report SHA. The receiver
+trusts the authorized producer's main/ancestry proof; it does not fetch Git.
+Source ordinal wins first, then run/attempt for the same SHA. Stale generations,
+equal-height different SHAs, inconsistent same-SHA ordinals, and conflicting
+equal-order content are rejected with 409 and the actually stored SHA. Exact
+duplicates are idempotent. Legacy packets work only before ordered state exists.
+All new receiver writes, including legacy requests, use the same bounded CAS
+path under `component-certificate:source-ordered-latest/v1`. In-flight old
+deployments can still unconditionally write `component-certificate:latest`;
+that legacy namespace cannot overwrite the new authority. The canonical
+`readLatestComponentCertificateDelivery` helper prefers the new key and falls
+back to legacy only while the new key is absent, never after a read error. No
+write is mirrored back to the legacy key. Storage failure or exhausted
+contention returns 503. The capped 50-row history is explicitly best effort and
+cannot change latest acceptance.
+
+The sender first requires authenticated OPTIONS on the existing route to return
+`{ok:true,deliveryOrderSchema:"jovie.source-order/v1"}`; negotiation does no DB
+work. Old/unavailable receivers fail delivery with the full artifact retained,
+never a legacy fallback. POST success also requires an acknowledgement of the
+exact stored SHA and order. The existing 64KiB route/60KiB compact-packet bounds
+and full-report artifacts remain intact. HTTP acknowledgement is not an
+independent readback of current persisted state; the delivery receipt retains
+`ingestion: "unverified"` and records the attempted order.
+
+Locally: start `storybook dev` in `apps/web`, then run
 `node scripts/component-story-evidence.mjs --local --component packages/ui/atoms/button.tsx`.
 
 Mutation records keep the canonical sweep format: `blob` is

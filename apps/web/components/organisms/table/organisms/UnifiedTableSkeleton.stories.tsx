@@ -34,3 +34,66 @@ export const HiddenHeader: Story = {
     hideHeader: true,
   },
 };
+
+export const LoadingReleases: Story = {
+  args: {
+    columns,
+    skeletonRows: 6,
+    skeletonColumnConfig: [
+      { width: '240px', variant: 'release' },
+      { width: '160px', variant: 'person' },
+    ],
+  },
+};
+
+export const PartialColumnConfig: Story = {
+  args: {
+    columns,
+    skeletonRows: 6,
+    skeletonColumnConfig: [{ width: '240px', variant: 'release' }],
+  },
+};
+
+const longColumns: ColumnDef<RowData, unknown>[] = [
+  {
+    accessorKey: 'title',
+    header: 'Release Title Including Every Featured Artist And Remix Credit',
+  },
+  {
+    accessorKey: 'artist',
+    header: 'Primary Artist Or Collective Responsible For The Release',
+  },
+];
+
+export const LongHeaderLabels: Story = {
+  args: {
+    columns: longColumns,
+    skeletonRows: 6,
+  },
+  decorators: [
+    Story => (
+      <div className='w-112'>
+        <Story />
+      </div>
+    ),
+  ],
+};
+
+const arabicColumns: ColumnDef<RowData, unknown>[] = [
+  { accessorKey: 'title', header: 'العنوان' },
+  { accessorKey: 'artist', header: 'الفنان' },
+];
+
+export const RtlHeaders: Story = {
+  args: {
+    columns: arabicColumns,
+    skeletonRows: 6,
+  },
+  decorators: [
+    Story => (
+      <div dir='rtl' lang='ar'>
+        <Story />
+      </div>
+    ),
+  ],
+};

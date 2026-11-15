@@ -73,6 +73,24 @@ describe('external API guard', () => {
     );
   });
 
+  it('explains documentation command matches without exempting executable calls', () => {
+    const path = 'scripts/new-helper.mjs';
+    const documentation = '/** Restore failed (`gh api` returned 403). */';
+    const errors = check(scan(path, documentation));
+    expect(errors).toHaveLength(1);
+    expect(errors[0]).toContain('gh-subprocess: 1 direct call(s)');
+    expect(errors[0]).toContain(
+      'Documentation examples are scanned too; describe commands in prose'
+    );
+    expect(
+      check(scan(path, '/** Restore failed (GitHub API returned 403). */'))
+    ).toEqual([]);
+    expect(
+      check(scan(path, "execFileSync('gh', ['api', 'repos/o/r']);"))
+    ).toHaveLength(1);
+    expect(check(scan(path, 'execSync(`gh api repos/o/r`);'))).toHaveLength(1);
+  });
+
   it('never fails a PR for call sites already on the base revision', () => {
     const path = 'scripts/landed-on-main.mjs';
     const two = scan(

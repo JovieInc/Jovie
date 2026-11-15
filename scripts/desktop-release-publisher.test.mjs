@@ -700,7 +700,6 @@ test('production recovery revalidates a fresh same-ID private empty authorized d
     { id: 401449488 },
     { tag_name: 'v26.10.0' },
     { name: '26.9.16' },
-    { target_commitish: OLD_SHA },
     { draft: false },
     { prerelease: true },
     { published_at: '2026-10-02T00:00:00Z' },
@@ -745,7 +744,7 @@ test('production recovery requires strict same-ID exact-tag private empty readba
   }
 });
 
-test('production prepare preserves exact-tag drafts from older sources and skips recovery for exact matches', async () => {
+test('production prepare retargets exact-tag drafts from older sources and skips recovery for exact matches', async () => {
   const { input } = productionRecoveryFixture();
   const client = fakeClient({
     mainSha: input.releaseSha,
@@ -753,18 +752,19 @@ test('production prepare preserves exact-tag drafts from older sources and skips
   });
   client.recoverableProductionDraft = async () =>
     assert.fail('tag already exists');
-  client.retargetEmptyDraft = async () =>
-    assert.fail('must not retarget older source');
-  const before = structuredClone(client.release);
-  await assert.rejects(
-    prepare({ ...input, client }),
-    /not the authorized commit/
-  );
-  assert.deepEqual(client.release, before);
-  client.release.target_commitish = input.releaseSha;
   await prepare({ ...input, client });
-  assert.equal(client.metadataUpdateCalls, 0);
-  assert.deepEqual(client.events, []);
+  assert.equal(client.release.target_commitish, input.releaseSha);
+  assert.equal(client.release.draft, true);
+  assert.deepEqual(client.release.assets, []);
+  assert.equal(client.metadataUpdateCalls, 1);
+  assert.deepEqual(client.events, [
+    `retarget:${input.version}:${input.releaseSha}`,
+  ]);
+  await prepare({ ...input, client });
+  assert.equal(client.metadataUpdateCalls, 1);
+  assert.deepEqual(client.events, [
+    `retarget:${input.version}:${input.releaseSha}`,
+  ]);
 });
 
 test('production keeps immutable version tags and never uses rolling mutations', async t => {
@@ -787,7 +787,7 @@ test('production keeps immutable version tags and never uses rolling mutations',
   malformed.release.prerelease = true;
   await assert.rejects(
     prepare({ ...common, client: malformed }),
-    /title is not exact/
+    /cannot be retargeted/
   );
   assert.deepEqual(
     [malformed.release.name, malformed.release.prerelease],

@@ -1,7 +1,9 @@
 import assert from 'node:assert/strict';
 import {
+  existsSync,
   mkdirSync,
   mkdtempSync,
+  readFileSync,
   realpathSync,
   rmSync,
   symlinkSync,
@@ -14,6 +16,7 @@ import {
   checkInstallMatchesLockfile,
   INSTALL_FIX,
 } from './lib/preflight-install.mjs';
+import { checkPrerequisites } from './lib/preflight-prerequisites.mjs';
 import { main } from './preflight-changed.mjs';
 
 const LOCK = 'lockfileVersion: 9\n';
@@ -137,4 +140,77 @@ test('preflight:changed fails fast before any check when the install is foreign'
     assert.equal(code, 1);
     assert.ok(lines.some(l => l.includes(INSTALL_FIX)));
     assert.ok(!lines.some(l => /source guard|biome|merges cleanly/.test(l)));
+  }));
+
+function githubCliFixture(parent, help) {
+  const repo = checkout(parent);
+  const bin = path.join(repo, 'bin');
+  mkdirSync(bin);
+  symlinkSync('/bin/bash', path.join(bin, 'bash'));
+  if (help !== null)
+    writeFileSync(
+      path.join(bin, 'gh'),
+      `#!/bin/bash
+printf '%s\\n' "$*" >> "$PWD/gh-receipt"
+[[ "$*" == 'api --help' ]] || exit 99
+${help}
+`,
+      { mode: 0o755 }
+    );
+  mkdirSync(path.join(repo, 'scripts/hooks'), { recursive: true });
+  writeFileSync(
+    path.join(repo, 'scripts/hooks/resolve-repo-node.sh'),
+    'printf reached > child-work-receipt\n'
+  );
+  return { repo, env: { PATH: help === null ? bin : `${bin}:/usr/bin:/bin` } };
+}
+
+test('preflight rejects an incompatible installed gh offline before any child check', () =>
+  withTmp(async parent => {
+    for (const help of [
+      "printf 'FLAGS\\n  --paginate Paginate\\n'",
+      "printf 'FLAGS\\n  --slurp Slurp\\n'; exit 7",
+      "printf 'EXAMPLES\\n  gh api --slurp\\nFLAGS\\n  --slurped Other\\n'",
+    ]) {
+      const { repo, env } = githubCliFixture(parent, help);
+      const lines = [];
+      const code = await main({
+        argv: ['--repo', repo],
+        env,
+        log: line => lines.push(line),
+      });
+      assert.equal(code, 1);
+      assert.equal(existsSync(path.join(repo, 'child-work-receipt')), false);
+      assert.match(lines.join('\n'), /ERROR:.*must support --slurp/);
+      assert.ok(lines.join('\n').includes(path.join(repo, 'bin/gh')));
+      assert.match(lines.join('\n'), /existing installation/);
+      assert.equal(
+        readFileSync(path.join(repo, 'gh-receipt'), 'utf8'),
+        'api --help\n'
+      );
+    }
+  }));
+
+test('preflight leaves list inspection available without probing an unsupported gh', () =>
+  withTmp(async parent => {
+    const { repo, env } = githubCliFixture(parent, 'exit 99');
+    assert.equal(checkPrerequisites({ repo, env, list: true }).ok, true);
+    assert.equal(existsSync(path.join(repo, 'gh-receipt')), false);
+  }));
+
+test('preflight retains missing-gh behavior and accepts supported gh without auth', () =>
+  withTmp(async parent => {
+    for (const help of [
+      null,
+      "printf 'FLAGS\\n  --slurp Aggregate paginated JSON\\n'",
+    ]) {
+      const { repo, env } = githubCliFixture(parent, help);
+      const result = checkPrerequisites({ repo, env });
+      assert.equal(result.ok, true, result.message);
+      if (help !== null)
+        assert.equal(
+          readFileSync(path.join(repo, 'gh-receipt'), 'utf8'),
+          'api --help\n'
+        );
+    }
   }));

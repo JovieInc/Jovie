@@ -1,4 +1,10 @@
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  existsSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -312,5 +318,140 @@ describe('deployed revision lineage', () => {
     expect(
       parseSourceHistory(`\n${certified.toUpperCase()}\n\n${live}\n`)
     ).toEqual([certified, live]);
+  });
+});
+
+describe('quota-deferred lineage: an empty history read is not a product verdict', () => {
+  // The Golden Path shell pre-creates the source-history file and clears it
+  // only when a commits-history page fails (e.g. a GitHub installation-quota
+  // 403 on 2026-11-12 run 43314623730). Empty evidence must end as an honest
+  // quota deferral, never as a RED "live revision is not <sha>" verdict.
+  const source = 'a'.repeat(40);
+  const deployed = 'f'.repeat(40);
+
+  const deferredFixture = (
+    overrides: Partial<CanonicalArtistSiteCliOptions>
+  ): CanonicalArtistSiteCliOptions => {
+    const directory = mkdtempSync(join(tmpdir(), 'jovie-quota-deferred-'));
+    temporaryDirectories.push(directory);
+    writeFileSync(
+      join(directory, 'm2.json'),
+      JSON.stringify({
+        steps: [
+          { name: 'claim', ok: true },
+          { name: 'pro_checkout_199', ok: true },
+          { name: 'activation', ok: true },
+        ],
+      })
+    );
+    writeFileSync(
+      join(directory, 'profile-report.json'),
+      JSON.stringify({ snapshot: { releaseSha: deployed } })
+    );
+    writeFileSync(
+      join(directory, 'profile-result.json'),
+      JSON.stringify({
+        reportPath: join(directory, 'profile-report.json'),
+        failed: false,
+      })
+    );
+    return {
+      candidateId: 'acquisition:premade-artist-profile:tim-white:test',
+      runId: 'test-1',
+      sourceRevision: source,
+      runUrl: 'https://github.com/JovieInc/Jovie/actions/runs/1',
+      goldenPathStatus: 'success',
+      claimContractStatus: 'success',
+      waitlistStatus: 'success',
+      m2Status: 'success',
+      m2ReceiptPath: join(directory, 'm2.json'),
+      profileStatus: 'success',
+      profileResultPath: join(directory, 'profile-result.json'),
+      outputPath: join(directory, 'certificate.json'),
+      ...overrides,
+    };
+  };
+
+  it('throws LineageEvidenceUnavailableError instead of issuing a false RED', () => {
+    try {
+      certifyCanonicalArtistSite(
+        deferredFixture({ lineageFileEmpty: true, sourceHistory: [] })
+      );
+      throw new Error('expected LineageEvidenceUnavailableError');
+    } catch (error) {
+      expect(error instanceof Error).toBe(true);
+      expect((error as Error).message).toContain('github-quota-deferred');
+      expect((error as Error).message).toContain('not a product verdict');
+    }
+  });
+
+  it('keeps a real drift verdict when the history file has content', () => {
+    const certificate = certifyCanonicalArtistSite(
+      deferredFixture({ lineageFileEmpty: false, sourceHistory: [source] })
+    );
+    expect(certificate.status).toBe('RED');
+    expect(certificate.failingChecks.map(check => check.id)).toContain(
+      'identity_catalog'
+    );
+  });
+
+  it('still binds an equal SHA even when the history file is empty', () => {
+    const directory = mkdtempSync(join(tmpdir(), 'jovie-quota-deferred-'));
+    temporaryDirectories.push(directory);
+    writeFileSync(
+      join(directory, 'm2.json'),
+      JSON.stringify({
+        steps: [
+          { name: 'claim', ok: true },
+          { name: 'pro_checkout_199', ok: true },
+          { name: 'activation', ok: true },
+        ],
+      })
+    );
+    writeFileSync(
+      join(directory, 'profile-report.json'),
+      JSON.stringify({ snapshot: { releaseSha: source }, failed: false })
+    );
+    writeFileSync(
+      join(directory, 'profile-result.json'),
+      JSON.stringify({
+        reportPath: join(directory, 'profile-report.json'),
+        failed: false,
+      })
+    );
+    const certificate = certifyCanonicalArtistSite({
+      candidateId: 'acquisition:premade-artist-profile:tim-white:test',
+      runId: 'test-1',
+      sourceRevision: source,
+      runUrl: 'https://github.com/JovieInc/Jovie/actions/runs/1',
+      goldenPathStatus: 'success',
+      claimContractStatus: 'success',
+      waitlistStatus: 'success',
+      m2Status: 'success',
+      m2ReceiptPath: join(directory, 'm2.json'),
+      profileStatus: 'success',
+      profileResultPath: join(directory, 'profile-result.json'),
+      outputPath: join(directory, 'certificate.json'),
+      lineageFileEmpty: true,
+      sourceHistory: [],
+    });
+    expect(existsSync(join(directory, 'certificate.json'))).toBe(true);
+    expect(certificate.failingChecks.map(check => check.id)).not.toContain(
+      'identity_catalog'
+    );
+  });
+
+  it('keeps a real RED when the profile itself failed, even on empty lineage', () => {
+    const certificate = certifyCanonicalArtistSite(
+      deferredFixture({
+        lineageFileEmpty: true,
+        sourceHistory: [],
+        profileStatus: 'failure',
+      })
+    );
+    expect(certificate.status).toBe('RED');
+    expect(certificate.failingChecks.map(check => check.id)).toContain(
+      'identity_catalog'
+    );
   });
 });

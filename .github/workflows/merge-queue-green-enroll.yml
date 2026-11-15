@@ -230,6 +230,7 @@ jobs:
             scripts/lib/pre-land-changelog.mjs
             scripts/version-fanout-guard.mjs
             scripts/lib/admission-hold-labels.json
+            scripts/lib/merge-queue-guard-hold.mjs
           sparse-checkout-cone-mode: false
 
       - name: Generate Jovie Bot token
@@ -281,6 +282,9 @@ jobs:
             const { pathToFileURL } = require('node:url');
             const failurePolicy = await import(pathToFileURL(
               `${process.env.GITHUB_WORKSPACE}/scripts/merge-group-failure-hold.mjs`
+            ));
+            const guardPolicy = await import(pathToFileURL(
+              `${process.env.GITHUB_WORKSPACE}/scripts/lib/merge-queue-guard-hold.mjs`
             ));
             // Single source: scripts/lib/admission-hold-labels.json. Stop labels,
             // queue-poison, and lane-fix-red skip the sweep. The Lane Fix Relay
@@ -749,6 +753,30 @@ jobs:
                 ['removed-without-recovery-intent', 'no-current-admission-recovery'].includes(failure.reason) &&
                 removalsOnHead < REENROLL_MAX_REMOVALS &&
                 Date.now() - Date.parse(lastRemoval) >= REENROLL_DWELL_MS;
+              // JOV-12617: Company guards is required on the group but has no
+              // failure hold of its own, so check an unheld automatic ejection
+              // for a guard verdict on this head before re-admitting it. Only a
+              // proven verdict holds (receipt + one comment per head); runner,
+              // network, exit 75, cancelled or unreadable evidence still re-enrolls.
+              if (Boolean(removedUnchangedHead) && automaticRemoval && !humanDequeued &&
+                  failureBeforeReenroll === 'allow' && failure.action === 'block' &&
+                  ['removed-without-recovery-intent', 'no-current-admission-recovery'].includes(failure.reason) &&
+                  removalsOnHead < REENROLL_MAX_REMOVALS) {
+                const guardHold = await guardPolicy.guardEjectionHold({
+                  repository: `${owner}/${repo}`, prNumber: pr.number, headSha: pr.headRefOid, statuses,
+                  since: guardPolicy.guardWindowStart({ headCommittedAt, removedAt: lastRemoval,
+                    removals: (pr.breakerEvents?.nodes || []).filter(event =>
+                      event.__typename === 'RemovedFromMergeQueueEvent').map(event => event.createdAt) }),
+                  removedAt: lastRemoval, persist: process.env.DRY_RUN !== 'true',
+                }, guardPolicy.octokitGuardIo({ github, owner, repo, prNumber: pr.number }));
+                if (guardHold.action === 'block') {
+                  core.notice(`HELD #${pr.number}@${pr.headRefOid}: ${guardHold.reason} (${guardHold.check}: ${guardHold.step}; run ${guardHold.runId})`);
+                  if (guardHold.persistError) core.warning(`#${pr.number} guard hold not persisted: ${guardHold.persistError}`);
+                  receipt(pr, 'held', `${guardHold.reason}:${guardHold.check}`);
+                  continue;
+                }
+                core.info(`#${pr.number} guard hold not applied: ${guardHold.reason}`);
+              }
               if (ejectionReenroll) failure = { action: 'allow', reason: 'ejection-reenroll' };
               if (failure.action === 'block' ||
                   (humanDequeued && failure.action === 'retry-once' &&

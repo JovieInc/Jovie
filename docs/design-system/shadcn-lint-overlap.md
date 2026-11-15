@@ -43,6 +43,22 @@ fixture has reversed that:
 Jovie rules that stay on: theme colors, motion, focus rings, imports, button
 canonicalization, rendered certification.
 
+## PlainButton contract (approved 2026-11-12)
+
+`PlainButton` is the headless `@jovie/ui` button: a native `<button>` with a
+default `type="button"`, the shared keyboard focus ring (added only when the
+caller brings no focus styling) and a `data-disabled` hook, and no look. Its
+callers own its appearance, so `shadcn-no-restyle.options.json` carries one
+contract, `^PlainButton$` with `allow: ["*"]` and `deny: []`. Tim approved it
+so components that rendered raw `<button>` elements could use the design
+system without a visual change.
+
+`apps/web/tests/unit/design-system/plain-button-scope.test.ts` keeps that
+exemption from becoming a way around Button's contract: only the files in
+`plain-button-scope.json` may use PlainButton, the list cannot grow past its
+`maxFiles` ceiling, and no other component may gain a contract. New code uses
+`Button`.
+
 ## Upstream limitations (do not claim complete)
 
 - Default `no-restyle` treats height as allowed. This config **denies** `h-*`,

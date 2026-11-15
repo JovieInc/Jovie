@@ -20,6 +20,7 @@ import argparse
 import copy
 from contextlib import contextmanager, nullcontext
 import fcntl
+from functools import partial
 import hashlib
 import importlib
 import math
@@ -65,7 +66,9 @@ import hyperagent_repair  # noqa: E402
 import migration_renumber  # noqa: E402  (no-model fix for migration number collisions)
 import fix_red_rewrite  # noqa: E402
 import fix_red_failure_routing  # noqa: E402
-import fix_red_classes  # noqa: E402  (fingerprint + deterministic routing of fix-red failures)
+import fix_red_classes, fix_red_screen_cert  # noqa: E402  (fingerprint + deterministic routing of fix-red failures)
+import fix_red_compose  # noqa: E402
+import fix_red_source_edits  # noqa: E402  (merge commits install lint-staged once when the hook cannot find it)
 import sourced_shell_conflict  # noqa: E402  (source-vs-inline shell conflict; ports retry into the helper)
 from gh_budget import gh_call  # noqa: E402  (budgeted gh for new lane code)
 import machine_gap  # noqa: E402
@@ -78,7 +81,7 @@ import board_intake  # noqa: E402  (mesh board work for codex, closed on verifie
 import ownership  # noqa: E402  (started-state live-owner invariant)
 import fleet_ledger  # noqa: E402  (external agent claims, stranded-claim view)
 import cloud_lane_dispatch, cloud_lane  # noqa: E402  (JOV-10357 dormant adapter; every effect gated by LANES_CLOUD_ENABLED)
-import pr_events  # noqa: E402
+import empty_review, pr_events  # noqa: E402
 import repair_order  # noqa: E402  (one fair claim order for event and polling repair)
 import remediation  # noqa: E402  (classifier, router, escalation ladder)
 import model_pools  # noqa: E402  (Anthropic models: subscription or Hyperagent only; refusal before spawn)
@@ -107,6 +110,7 @@ import epics  # noqa: E402  (epic decomposition/closure and the expiring hold)
 # This module as imported: the event hooks take it as `lane`. Bound once, because other
 # loaders (the HUD) may later rebind sys.modules["lane_runner"] to a fresh copy.
 THIS = sys.modules[__name__]
+compose_deterministic_fix = partial(fix_red_compose.compose_deterministic_fix, THIS)
 REPO_SLUG = "JovieInc/Jovie"
 # Tim 2026-10-11: every JOV Todo issue is eligible; no label is required. `agent-ready` +
 # `dispatch-next` still designates bottleneck work, and a lane label (devin, codex, ...) is a
@@ -117,11 +121,10 @@ SENSITIVE_LABELS = frozenset({
     "billing", "blocked:payments", "stripe", "cost-monitoring", "blocked:auth", "auth",
     "area:auth", "infra", "area:infra", "infrastructure", "vercel",
 })
-# Tim 2026-10-11: no label parks an issue forever. `hold` is the one stop signal, and the
-# reconcile pass (epics.reconcile) expires it after 72h without activity. `codex-blocked`
-# only steers routing away from codex; `reasoning-job` belongs to the reason lane only when
-# Summer's job block is present; `type:epic` is a decomposition unit (epics.py);
-# `no-symphony` no longer excludes (the claiming agent decides what the issue needs).
+# Tim 2026-10-11: no label parks an issue forever. `hold` is the one stop signal (epics.reconcile
+# expires it after 72h idle); `codex-blocked` steers routing off codex; `reasoning-job` is the reason
+# lane's only with Summer's job block; `type:epic` is a decomposition unit; `no-symphony` no longer
+# excludes. A `fleet` issue addressed to Lola, Chloe or Aeon is theirs for 72h (epics.fleet_reserved).
 HARD_EXCLUDED_LABELS = frozenset({"hold"})
 CODEX_BLOCKED_LABEL = "codex-blocked"
 REASONING_JOB_LABEL = "reasoning-job"
@@ -150,12 +153,13 @@ MAX_GATE_TIMEOUTS = 3
 CLAIM_TTL_S = pr_events.CLAIM_TTL_S
 HOST = socket.gethostname().split(".")[0]
 # Every file a release must pass before `current` moves to it.
-LANE_TESTS = ["scripts/tests/test_factory_signals.py", "scripts/tests/test_factory_intake.py", "scripts/tests/test_update_drain.py", "scripts/tests/test_machine_gap.py", "scripts/tests/test_slot_yield.py", "scripts/tests/test_machine_metrics.py", "scripts/tests/test_lanes_atomic_state.py", "scripts/tests/test_lifecycle.py", "scripts/tests/test_execution_attempt.py", "scripts/tests/test_backlog_admission.py", "scripts/tests/test_backlog_writer_guard.py", "scripts/tests/test_lane_runner.py", "scripts/tests/test_execution_budget.py", "scripts/tests/test_dispatch_budget.py", "scripts/tests/test_binding_turns.py", "scripts/tests/test_issue_turns.py", "scripts/tests/test_throughput_ghost_runs.py", "scripts/tests/test_ledger_read.py", "scripts/tests/test_hyperagent_lane.py", "scripts/tests/test_hyperagent_network.py", "scripts/tests/test_cloud_lane.py", "scripts/tests/test_hyperagent_repair.py", "scripts/tests/test_fix_red_classes.py", "scripts/tests/test_sourced_shell_conflict.py", "scripts/tests/test_fix_red_source_edits.py", "scripts/tests/test_fix_red_failure_evidence.py", "scripts/tests/test_fix_red_failure_routing.py", "scripts/tests/test_migration_renumber.py", "scripts/tests/test_host_git.py", "scripts/tests/test_reviewable_split.py", "scripts/tests/test_quoted_path_list_merge.py",
+LANE_TESTS = ["scripts/tests/test_factory_signals.py", "scripts/tests/test_factory_intake.py", "scripts/tests/test_update_drain.py", "scripts/tests/test_machine_gap.py", "scripts/tests/test_slot_yield.py", "scripts/tests/test_machine_metrics.py", "scripts/tests/test_lanes_atomic_state.py", "scripts/tests/test_lifecycle.py", "scripts/tests/test_execution_attempt.py", "scripts/tests/test_backlog_admission.py", "scripts/tests/test_backlog_writer_guard.py", "scripts/tests/test_lane_runner.py", "scripts/tests/test_execution_budget.py", "scripts/tests/test_dispatch_budget.py", "scripts/tests/test_binding_turns.py", "scripts/tests/test_issue_turns.py", "scripts/tests/test_throughput_ghost_runs.py", "scripts/tests/test_ledger_read.py", "scripts/tests/test_hyperagent_lane.py", "scripts/tests/test_hyperagent_network.py", "scripts/tests/test_cloud_lane.py", "scripts/tests/test_hyperagent_repair.py", "scripts/tests/test_fix_red_classes.py", "scripts/tests/test_fix_red_ui_feel.py", "scripts/tests/test_fix_red_mixed_repairs.py", "scripts/tests/test_fix_red_compose.py", "scripts/tests/test_sourced_shell_conflict.py", "scripts/tests/test_fix_red_source_edits.py", "scripts/tests/test_screen_debt_merge.py", "scripts/tests/test_heading_balance.py", "scripts/tests/test_commit_open_merge.py", "scripts/tests/test_fix_red_failure_evidence.py", "scripts/tests/test_fix_red_failure_routing.py", "scripts/tests/test_migration_renumber.py", "scripts/tests/test_host_git.py", "scripts/tests/test_reviewable_split.py", "scripts/tests/test_quoted_path_list_merge.py", "scripts/tests/test_detached_native_sync.py", "scripts/tests/test_fix_red_screen_cert.py", "scripts/tests/test_duplicate_clock_pin.py", "scripts/tests/test_fix_red_render_modes.py",
               "scripts/tests/test_codex_lane.py", "scripts/tests/test_hud.py", "scripts/tests/test_devin_free_policy.py",
               "scripts/tests/test_doctor.py", "scripts/tests/test_public_feed.py", "scripts/tests/test_pr_events.py", "scripts/tests/test_pr_events_repair_evidence.py", "scripts/tests/test_pr_body_markup.py", "scripts/tests/test_repair_win.py",
               "scripts/tests/test_reason_lane.py", "scripts/tests/test_yc_corpus.py",
               "scripts/tests/test_gh_app_token.py", "scripts/tests/test_linear_app_token.py",
               "scripts/tests/test_disk_guard.py", "scripts/tests/test_qualification_guard.py",
+              "scripts/tests/test_quota_rerun.py",
               "scripts/tests/test_git_housekeeping.py",
               "scripts/tests/test_continuity_clock.py",
               "scripts/tests/test_worktree_sweep.py", "scripts/tests/test_service_census.py",
@@ -198,7 +202,7 @@ RELEASE_EXTRAS = ["scripts/shipping_origin.py", "scripts/hostops/install-lane-ho
                   "scripts/lib/merge-group-ahead-attribution.mjs",
                   "scripts/lib/merge-group-admission.mjs",
                   "scripts/lib/source-admission-policy.mjs", "scripts/pr-fleet-rules.mjs", "scripts/lib/wins-ledger.mjs",
-                  "scripts/lib/merge-group-member-policy.mjs",
+                  "scripts/tests/repair_customer_decision_cases.py", "scripts/lib/daily-changelog-publication.mjs", "scripts/lib/daily-changelog.mjs", "scripts/lib/changelog-filter-rules.mjs", "scripts/lib/merge-group-member-policy.mjs",
                   "scripts/lib/pr-size-exclusions.mjs",
                   "scripts/lib/product-lane-classifier.mjs",
                   "scripts/lib/pr-size-guard-policy.mjs", "scripts/lib/repo-hygiene-limits.mjs",
@@ -216,7 +220,7 @@ RELEASE_EXTRAS = ["scripts/shipping_origin.py", "scripts/hostops/install-lane-ho
                   "scripts/invariants/jev-gateway.mjs", "scripts/invariants/jev-shadow.mjs",
                   "scripts/invariants/jev-writing-quality.mjs", "scripts/invariants/run-outcome.mjs",
                   "scripts/invariants/writing-surfaces.mjs", "scripts/invariants/writing-surfaces-registry.json",
-                  "scripts/invariants/screen-certification.mjs", "scripts/invariants/screen-decision-routing.mjs",
+                  "scripts/invariants/screen-certification.mjs", "scripts/invariants/screen-registry.mjs", "scripts/invariants/screen-decision-routing.mjs",
                   "scripts/invariants/screen-proof-resolver.mjs", "scripts/invariants/product-reference-coherence.mjs",
                   "scripts/invariants/browser-owned-input.mjs", "scripts/invariants/browser-owned-input-matrix.json",
                   "scripts/lib/playwright-png.mjs", "scripts/invariants/screen-proof-final-paths.mjs", "scripts/invariants/screen-proof-attempt-checks.mjs",
@@ -705,9 +709,10 @@ def sensitive_text_released(issue: Issue) -> bool:
 def label_rejection(issue: Issue, provider: str | None = None) -> str | None:
     """Label policy shared by the Jovie pool and every binding (bindings.refusal)."""
     labels = {label.lower() for label in issue.labels}
-    excluded = sorted(HARD_EXCLUDED_LABELS & labels)
-    if excluded:
+    if excluded := sorted(HARD_EXCLUDED_LABELS & labels):
         return "excluded-label:" + excluded[0]
+    if agent := epics.fleet_reserved(issue):
+        return "fleet-reserved:" + agent
     if REASONING_JOB_LABEL in labels and reason_lane.has_job_block(issue.description):
         return "reason-lane-job"
     if CODEX_BLOCKED_LABEL in labels and provider == "codex":
@@ -6249,7 +6254,7 @@ def review_excerpt(pr: dict, limit: int = 4000) -> str:
         return ""
     rows = list(pr.get("reviewSummaries") or []) + list(pr.get("reviewThreads") or [])
     text = "\n".join(f"- {row['author']['login']}: {row['body']}" for row in rows if row.get("body"))
-    return ("Reviewers requested changes:\n" + text)[:limit] if text else "Reviewers requested changes (no active current-head comment text)."
+    return ("Reviewers requested changes:\n" + text)[:limit] if text else ""
 
 
 def render_fix_prompt(pr: dict, excerpt: str) -> str:
@@ -6402,8 +6407,7 @@ def resolve_generated_conflict(worktree: Path, branch: str, log, *, guard=lambda
                 worktree, conflicted | set(changed.stdout.splitlines()), log, guard=guard):
             sh(["git", "merge", "--abort"], cwd=worktree, log=log)
             return False
-        if sh(["git", "commit", "--no-edit"], cwd=worktree, log=log).returncode != 0:
-            sh(["git", "merge", "--abort"], cwd=worktree, log=log)
+        if not fix_red_source_edits.commit_open_merge(worktree, None, sh, log, guard=guard):
             return False
     guard()
     return sh(["git", "push", "-q", "origin", f"HEAD:refs/heads/{branch}"], cwd=worktree, log=log).returncode == 0
@@ -6435,10 +6439,8 @@ def resolve_narrowed_preflight_conflict(worktree: Path, branch: str, log, *, gua
         except OSError:
             sh(["git", "merge", "--abort"], cwd=worktree, log=log)
             return False
-        guard()
-        if sh(["git", "add", "--", fix_red_classes.NARROWED_PREFLIGHT], cwd=worktree, log=log).returncode != 0 \
-                or sh(["git", "commit", "--no-edit"], cwd=worktree, log=log).returncode != 0:
-            sh(["git", "merge", "--abort"], cwd=worktree, log=log)
+        if not fix_red_source_edits.commit_open_merge(
+                worktree, [fix_red_classes.NARROWED_PREFLIGHT], sh, log, guard=guard):
             return False
     guard()
     pushed = sh(["git", "push", "-q", "origin", f"HEAD:refs/heads/{branch}"], cwd=worktree, log=log).returncode == 0
@@ -6479,10 +6481,8 @@ def resolve_and_chain_conflict(worktree: Path, branch: str, log, *, guard=lambda
         except OSError:
             sh(["git", "merge", "--abort"], cwd=worktree, log=log)
             return False
-        guard()
-        if sh(["git", "add", "--", *conflicted, *extras], cwd=worktree, log=log).returncode != 0 \
-                or sh(["git", "commit", "--no-edit"], cwd=worktree, log=log).returncode != 0:
-            sh(["git", "merge", "--abort"], cwd=worktree, log=log)
+        if not fix_red_source_edits.commit_open_merge(
+                worktree, [*conflicted, *extras], sh, log, guard=guard):
             return False
     guard()
     return sh(["git", "push", "-q", "origin", f"HEAD:refs/heads/{branch}"], cwd=worktree, log=log).returncode == 0
@@ -6523,13 +6523,17 @@ def resolve_identifier_list_conflict(worktree: Path, branch: str, log, *, guard=
         except OSError:
             sh(["git", "merge", "--abort"], cwd=worktree, log=log)
             return False
-        guard()
-        if sh(["git", "add", "--", *conflicted], cwd=worktree, log=log).returncode != 0 \
-                or sh(["git", "commit", "--no-edit"], cwd=worktree, log=log).returncode != 0:
-            sh(["git", "merge", "--abort"], cwd=worktree, log=log)
+        if not fix_red_source_edits.commit_open_merge(worktree, conflicted, sh, log, guard=guard):
             return False
     guard()
     return sh(["git", "push", "-q", "origin", f"HEAD:refs/heads/{branch}"], cwd=worktree, log=log).returncode == 0
+
+
+def resolve_contained_by_main_conflict(worktree: Path, branch: str, log, *, guard=lambda: None) -> bool:
+    """Keep main only when its exact edits contain every PR edit at the same base range."""
+    return fix_red_source_edits.resolve_additive_list_conflict(
+        worktree, branch, log, sh=sh, merge_entries=lambda _: None, guard=guard,
+        stage_choice=fix_red_source_edits.contained_by_main_file)
 
 
 def conflict_resolvers():
@@ -6544,6 +6548,7 @@ def conflict_resolvers():
         ("repair-and-chain", resolve_and_chain_conflict, "and-chain-merged"),
         ("repair-additive-list", resolve_additive_list_conflict, "additive-list-merged"),
         ("repair-identifier-list", resolve_identifier_list_conflict, "identifier-list-merged"),
+        ("repair-contained-by-main", resolve_contained_by_main_conflict, "contained-by-main"),
     )
 
 
@@ -6984,7 +6989,8 @@ def infra_only_red(host: Host, pr: dict) -> str | None:
     logs = failed_logs(host, pr)
     if not logs:
         return None
-    if fix_red_classes.classify(pr, logs).get("action") == fix_red_failure_routing.ALIAS_ACTION:
+    routed = fix_red_classes.classify(pr, logs)
+    if routed.get("action") == fix_red_failure_routing.ALIAS_ACTION or fix_red_failure_routing.has_local_prerequisite_failure(routed, logs):
         return None
     found = set()
     for text in logs.values():
@@ -7117,8 +7123,7 @@ def atomic_state_fix(host: Host, pr: dict, route: dict, worktree: Path, log, rec
 
 
 def wire_ci_fast_fix(host: Host, pr: dict, route: dict, worktree: Path, log, receipt: dict):
-    """The no-model fix for an unwired script test: list it in ci-fast-lanes.mjs, commit, push. Returns a
-    finished-agent stand-in, or None when the edit does not apply (the model then gets the head)."""
+    """List an unwired script test in ci-fast-lanes.mjs, commit and push, or None when it does not apply."""
     added = fix_red_classes.wire_ci_fast(worktree, route.get("files") or [])
     if not added:
         return None
@@ -7186,7 +7191,7 @@ def stamp_changelog_decision(host: Host, pr: dict) -> bool:
 
 def deterministic_route_taken(host: Host, pr: dict, route: dict | None) -> str | None:
     """Run the no-model action for a routed class once per head; the reason on success (None: use the model)."""
-    if reason := fix_red_failure_routing.owner_handoff_reason(route):
+    if reason := fix_red_classes.first_route_reason(host, pr, route, claim_route):
         return reason
     if not route or route["action"] not in {fix_red_classes.RERUN, fix_red_classes.SYNC_MAIN, fix_red_classes.STAMP_CHANGELOG}:
         return None
@@ -7198,13 +7203,16 @@ def deterministic_route_taken(host: Host, pr: dict, route: dict | None) -> str |
         if not claim_route(host, pr, route["action"]):
             return None
         return "infra-rerun:changelog-metadata" if stamp_changelog_decision(host, pr) else None
+    # A named quota reset gets one rerun after that instant (quota_rerun).
+    if route["action"] == fix_red_classes.RERUN and route.get("cls") == "quota-deferred":
+        import quota_rerun
+        return quota_rerun.deferred_rerun(host, pr, failed_logs, update_json, _rerun_failed)
     # One rerun per head, shared with the platform-red gate above; one sync per head.
     if not (claim_infra_rerun(host, pr) if route["action"] == fix_red_classes.RERUN else claim_route(host, pr, route["action"])):
         return None
     if route["action"] == fix_red_classes.RERUN:
         return f"infra-rerun:{route['cls']}" if _rerun_failed(pr) else None
     return f"infra-rerun:{route['cls']}" if pr_events.sync_main(host, THIS, pr, time.time(), terminal_ok=True) == "synced" else None
-
 
 # Per-PR circuit breaker across heads. Gem ledger, 762 fix runs: after 3 consecutive unproductive
 # runs on a PR inside 24 h the next run pushed 7% of the time (13 of 192), against 27% for a first
@@ -8154,7 +8162,7 @@ def _fix_red_pr(host: Host, name: str, spec: dict, pr: dict, *, branch_held=True
             agent = None
             if resolved_name:
                 receipt.update(resolution=resolved_name)
-            else:
+            elif not empty_review.skip_model(pr, lambda: pr_events.consume(THIS, pr, ["review"])):
                 boundary("before-install")
                 install_dependencies(host, worktree, log)
                 excerpt = failure_excerpt(pr)
@@ -8175,14 +8183,12 @@ def _fix_red_pr(host: Host, name: str, spec: dict, pr: dict, *, branch_held=True
                 boundary("before-agent")
                 execution_attempt.boundary(runs / "execution-attempts.jsonl", ident, claimed["fencingToken"],
                                            {"spend": 1, "mutations": 1}, coordination=coordination, boundary_id="repair-dispatch")
-                fixer = {fix_red_classes.WIRE_CI_FAST: wire_ci_fast_fix,
-                         fix_red_classes.ATOMIC_WRITE: atomic_state_fix,
-                         fix_red_classes.RENUMBER: renumber_migrations_fix,
-                         fix_red_classes.SNAP_SPACING: snap_spacing_fix,
-                         fix_red_classes.STRIP_CACHE: strip_cache_exports_fix,
-                         fix_red_classes.MERGE_NARROWED: merge_narrowed_preflight_fix,
-                         fix_red_classes.REGISTER_DOMAIN: register_domain_writes_fix}.get((route or {}).get("action"))
-                agent = fixer(host, pr, route, worktree, log, receipt) if fixer else None
+                action = (route or {}).get("action")
+                if action == fix_red_classes.COMPOSE:
+                    agent = compose_deterministic_fix(host, pr, route, worktree, log, receipt)
+                else:
+                    fixer = fix_red_compose.deterministic_fixer(THIS, action)
+                    agent = fixer(host, pr, route, worktree, log, receipt) if fixer else None
                 agent = agent or run_agent(template(spec["cmd"], {"prompt": prompt, "prompt_file": str(prompt_file),
                                                          "cwd": str(worktree),
                                                          "provider_receipt": str(provider_evidence),
@@ -8214,7 +8220,7 @@ def _fix_red_pr(host: Host, name: str, spec: dict, pr: dict, *, branch_held=True
                                     "after-remote-read")
             if not rewritten:
                 receipt.update(agentExit=agent.returncode if agent else None, headAfter=after,
-                               verdict="fix-pushed" if pushed else "fix-no-change")
+                               verdict="fix-pushed" if pushed else "fix-no-change", **({} if pushed or not empty_review.stale_review_only(pr) else {"reasons": ["empty-current-head-review"]}))
                 if not pushed and agent is not None:
                     log.flush()
                     receipt["reasons"] = classify_unpushed_repair(

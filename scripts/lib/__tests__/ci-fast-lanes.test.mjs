@@ -283,7 +283,7 @@ const WEB_CI_CONTRACT_TESTS_COMMAND = webCiContractTestsCommand(
   ['tests/unit/ci/deploy-workflow.test.ts']
 );
 const STRUCTURAL_RUNNER_COVERAGE_COMMAND =
-  'pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/ci-fast-lanes.test.mjs lib/__tests__/ci-fast-workflow-contract.test.mjs --coverage --coverage.include=ci-fast-lanes.mjs --coverage.include=invariants/scanned-paths.mjs --coverage.include=lib/ci-repo-lanes.mjs --coverage.reporter=text --coverage.reporter=json --coverage.reportsDirectory="${RUNNER_TEMP:-/tmp}/jovie-ci-fast-structural-coverage" --coverage.thresholds.statements=30 --coverage.thresholds.lines=32 --coverage.thresholds.branches=24 --coverage.thresholds.functions=27';
+  'pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/ci-fast-lanes.test.mjs lib/__tests__/ci-fast-workflow-contract.test.mjs --coverage --coverage.include=ci-fast-lanes.mjs --coverage.include=invariants/scanned-paths.mjs --coverage.include=lib/ci-repo-lanes.mjs --coverage.include=lib/ci-failure-excerpts.mjs --coverage.reporter=text --coverage.reporter=json --coverage.reportsDirectory="${RUNNER_TEMP:-/tmp}/jovie-ci-fast-structural-coverage" --coverage.thresholds.statements=30 --coverage.thresholds.lines=32 --coverage.thresholds.branches=24 --coverage.thresholds.functions=27';
 const SUMMER_BRIDGE_COVERAGE_COMMAND =
   'pnpm --dir apps/web exec vitest run --config vitest.config.fast.mts app/api/internal/ovie/summer-bottleneck/route.test.ts --coverage --coverage.include=app/api/internal/ovie/summer-bottleneck/route.ts --coverage.include=lib/ovie/summer-admissions.ts --coverage.include=lib/ovie/summer-ci-audit.ts';
 const REPO_ROOT = resolve(import.meta.dirname, '..', '..', '..');
@@ -746,7 +746,7 @@ describe('runStructural screenshot contract discovery', () => {
     expect(new Set(all).size).toBe(all.length);
     expect(web).toContain('pnpm component-ship-gate');
     expect(web).toContain(
-      'pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/component-live-storybook-certification.test.mjs'
+      'pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/component-live-storybook-certification.test.mjs lib/__tests__/component-story-workers.test.mjs lib/__tests__/component-story-inventory.test.mjs'
     );
     // Merge-group-only guards gate PRs in their own web lane (component-family
     // ratchet is inside tests/unit/design-system), not a structural command.
@@ -2463,7 +2463,7 @@ describe('source-read guard selection', () => {
   it('fails closed onto guards for manual, local, and unreadable diffs', () => {
     const all = SOURCE_GUARDS.map(guard => guard.id);
     // Manual dispatch runs web Unit Tests and structural, which carry the rest.
-    expect(selected('workflow_dispatch', ['README.md'])).toEqual([
+    const failClosed = [
       'capacity-forecast',
       'native-design-system',
       'artist-launch-contract',
@@ -2481,29 +2481,13 @@ describe('source-read guard selection', () => {
       'external-api-guard',
       'domain-write-guard',
       'copy-leak',
-    ]);
+      'jump-policy-pin',
+    ];
+    expect(selected('workflow_dispatch', ['README.md'])).toEqual(failClosed);
     expect(selected('', ['README.md'])).toEqual(all);
     expect(selected('pull_request', null)).toEqual(all);
     expect(selected('pull_request', [])).toEqual(all);
-    expect(selected('merge_group', null)).toEqual([
-      'capacity-forecast',
-      'native-design-system',
-      'artist-launch-contract',
-      'privacy-input-route-trackers',
-      'privacy-compliance',
-      'artist-profile-conformance',
-      'ci-schedule-inventory',
-      'automation-registry',
-      'growth-registry',
-      'outcome-verifier',
-      'synthetic-canary-liveness',
-      'playbook-authoring',
-      'icp-language',
-      'anti-slop',
-      'external-api-guard',
-      'domain-write-guard',
-      'copy-leak',
-    ]);
+    expect(selected('merge_group', null)).toEqual(failClosed);
   });
 
   it('points every guard at a test file that exists', () => {

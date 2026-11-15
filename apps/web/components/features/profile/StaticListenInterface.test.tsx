@@ -188,6 +188,11 @@ describe('StaticListenInterface', () => {
       fireEvent.click(screen.getByRole('link', { name: 'Listen on Spotify' }));
 
       expect(await screen.findByText('Opening Spotify...')).toBeInTheDocument();
+      // label-content-name-mismatch: while the row shows the opening label,
+      // the accessible name renames to match the visible text.
+      expect(
+        screen.getByRole('link', { name: 'Opening Spotify...' })
+      ).toBeInTheDocument();
       await waitFor(() =>
         expect(open).toHaveBeenCalledWith(
           'https://open.spotify.com/artist/4u',

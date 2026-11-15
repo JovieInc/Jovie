@@ -391,9 +391,8 @@ const config: StorybookConfig = {
       target: 'esnext',
     };
 
-    // Keep optimizeDeps on, but never hold browser requests until crawl end.
-    // In this monorepo the crawl is huge; holding deps leaves the iframe spinner
-    // forever while /sb-vite/deps/* never materializes.
+    // Keep optimizeDeps on, but never hold browser requests until crawl end:
+    // the huge crawl would leave the iframe spinner with no /sb-vite/deps/*.
     config.optimizeDeps = {
       ...config.optimizeDeps,
       exclude: [...(config.optimizeDeps?.exclude || [])],
@@ -417,6 +416,7 @@ const config: StorybookConfig = {
           'react-dom/client',
           // Sentry's browser entry imports this CommonJS module by name.
           'next/constants.js',
+          'qrcode', // dynamic dep (QRCode.tsx): cold discovery reloads the iframe
         ]),
       ],
       esbuildOptions: {

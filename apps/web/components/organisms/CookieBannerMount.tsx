@@ -1,7 +1,10 @@
+// @coverage-via apps/web/components/organisms/PrivacyChoices.test.tsx
 'use client';
 
 import {
   type ComponentType,
+  lazy,
+  Suspense,
   useCallback,
   useEffect,
   useRef,
@@ -10,13 +13,8 @@ import {
 import { shouldSuppressCookieBannerForPathname } from '@/lib/cookies/banner-visibility';
 import type { Consent } from '@/lib/cookies/consent';
 import { isCookieBannerRequiredFromCookieString } from '@/lib/cookies/consent-regions';
-import { setConsentState } from '@/lib/tracking/consent';
-
-type CookieModalComponent = ComponentType<{
-  readonly open: boolean;
-  readonly onClose: () => void;
-  readonly onSave?: (consent: Consent) => void;
-}>;
+import { PRIVACY_CHOICES_HREF } from '@/lib/cookies/consent-state';
+import { isGPCEnabled, setConsentState } from '@/lib/tracking/consent';
 
 declare global {
   var JVConsent:
@@ -28,8 +26,19 @@ declare global {
     | undefined;
 }
 
+// Defer only the privacy host so Cookie Settings stays available during its load.
+const PrivacyChoicesHost = lazy(() =>
+  import('./PrivacyChoices').then(mod => ({ default: mod.PrivacyChoicesHost }))
+);
+
+type CookieModalComponent = ComponentType<{
+  readonly open: boolean;
+  readonly onClose: () => void;
+  readonly onSave?: (consent: Consent) => void;
+}>;
+
 function shouldMountCookieBanner(pathname: string): boolean {
-  if (shouldSuppressCookieBannerForPathname(pathname)) {
+  if (isGPCEnabled() || shouldSuppressCookieBannerForPathname(pathname)) {
     return false;
   }
 
@@ -45,13 +54,21 @@ function shouldMountCookieBanner(pathname: string): boolean {
 }
 
 export function CookieBannerMount() {
+  const listenersRef = useRef(new Set<(v: unknown) => void>());
   const [Banner, setBanner] = useState<ComponentType | null>(null);
   const [Modal, setModal] = useState<CookieModalComponent | null>(null);
   const [preferencesOpen, setPreferencesOpen] = useState(false);
-  const listenersRef = useRef(new Set<(v: unknown) => void>());
+  const [privacyOpen, setPrivacyOpen] = useState(false);
+
+  const openPrivacy = useCallback(() => {
+    setPreferencesOpen(false);
+    setPrivacyOpen(true);
+  }, []);
+  const closePrivacy = useCallback(() => setPrivacyOpen(false), []);
 
   const openPreferences = useCallback(() => {
     void import('@/components/organisms/CookieModal').then(mod => {
+      setPrivacyOpen(false);
       setModal(() => mod.CookieModal);
       setPreferencesOpen(true);
     });
@@ -72,18 +89,44 @@ export function CookieBannerMount() {
 
     globalThis.JVConsent = consentApi;
     globalThis.dispatchEvent(new Event('jvconsent:ready'));
-
-    const handleOpen = () => openPreferences();
-    globalThis.addEventListener('jv:cookie:open', handleOpen);
+    globalThis.addEventListener('jv:cookie:open', openPreferences);
 
     return () => {
-      globalThis.removeEventListener('jv:cookie:open', handleOpen);
+      globalThis.removeEventListener('jv:cookie:open', openPreferences);
       if (globalThis.JVConsent === consentApi) {
         globalThis.JVConsent = undefined;
       }
       listeners.clear();
     };
   }, [openPreferences]);
+
+  useEffect(() => {
+    const onHash = () => {
+      if (globalThis.location.hash === '#privacy-choices') openPrivacy();
+    };
+    const onClick = (event: MouseEvent) => {
+      if (
+        event.button !== 0 ||
+        event.metaKey ||
+        event.ctrlKey ||
+        event.shiftKey ||
+        event.altKey
+      )
+        return;
+      const link =
+        event.target instanceof Element ? event.target.closest('a') : null;
+      if (link?.getAttribute('href') !== PRIVACY_CHOICES_HREF) return;
+      event.preventDefault();
+      openPrivacy();
+    };
+    onHash();
+    document.addEventListener('click', onClick, true);
+    globalThis.addEventListener('hashchange', onHash);
+    return () => {
+      document.removeEventListener('click', onClick, true);
+      globalThis.removeEventListener('hashchange', onHash);
+    };
+  }, [openPrivacy]);
 
   useEffect(() => {
     // A page that server-renders the card (see
@@ -111,7 +154,10 @@ export function CookieBannerMount() {
 
   return (
     <>
-      {Banner ? <Banner /> : null}
+      <Suspense fallback={null}>
+        <PrivacyChoicesHost open={privacyOpen} onClose={closePrivacy} />
+      </Suspense>
+      {Banner && !privacyOpen ? <Banner /> : null}
       {Modal ? (
         <Modal
           open={preferencesOpen}
@@ -122,6 +168,3 @@ export function CookieBannerMount() {
     </>
   );
 }
-
-// Note: The rendered banner is a compact floating bottom-right card (see CookieBannerSection).
-// All mount/visibility/geo/persistence logic is unchanged. Visual redesign is internal to the lazy Section.

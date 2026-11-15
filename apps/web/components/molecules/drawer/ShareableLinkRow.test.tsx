@@ -67,6 +67,16 @@ describe('ShareableLinkRow', () => {
     );
   });
 
+  it('keeps table density copy/open targets on the 24px icon-button step', () => {
+    render(
+      <ShareableLinkRow url='https://jov.ie/tim' density='table' testId='row' />
+    );
+    expect(screen.getByRole('button', { name: 'Copy link' })).toHaveClass(
+      'h-6',
+      'w-6'
+    );
+  });
+
   it('locks rail density to the 32px desktop control contract', () => {
     render(
       <ShareableLinkRow url='https://jov.ie/tim' density='rail' testId='row' />
