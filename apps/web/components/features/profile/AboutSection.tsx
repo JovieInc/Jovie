@@ -206,7 +206,7 @@ export function AboutSection({
           className='profile-about-credits'
           data-testid='profile-about-credits'
         >
-          <h2 className='mb-2 text-app font-caption text-on-media/70'>
+          <h2 className='mb-2 text-balance text-app font-caption text-on-media/70'>
             Selected Credits
           </h2>
           <p className='text-sm font-book leading-relaxed text-on-media/70'>
@@ -217,7 +217,7 @@ export function AboutSection({
 
       {hasContacts && (
         <div data-testid='profile-about-contacts'>
-          <h2 className='mb-2 text-app font-caption text-on-media/70'>
+          <h2 className='mb-2 text-balance text-app font-caption text-on-media/70'>
             Booking &amp; Contact
           </h2>
           <ul className='flex flex-col gap-1'>
@@ -248,7 +248,7 @@ export function AboutSection({
       {hasPressPhotos && (
         <div data-testid='profile-about-press-photos'>
           <div className='mb-3 flex items-center justify-between gap-3'>
-            <h2 className='text-app font-caption text-on-media/70'>
+            <h2 className='text-balance text-app font-caption text-on-media/70'>
               Press Photos
             </h2>
           </div>
@@ -277,7 +277,7 @@ export function AboutSection({
                     onClick={() => {
                       void downloadPressPhoto(photo, artist, index);
                     }}
-                    className='absolute bottom-2 right-2 flex h-8 w-8 items-center justify-center rounded-full text-on-media/60 transition-colors duration-normal hover:bg-ink-on-media/40 hover:text-on-media/90 disabled:cursor-not-allowed disabled:opacity-50'
+                    className='absolute bottom-2 right-2 flex h-8 w-8 items-center justify-center rounded-full before:absolute before:left-1/2 before:top-1/2 before:size-10 before:-translate-x-1/2 before:-translate-y-1/2 text-on-media/60 transition-colors duration-normal hover:bg-ink-on-media/40 hover:text-on-media/90 disabled:cursor-not-allowed disabled:opacity-50'
                     aria-label={
                       photo.originalFilename
                         ? `Download ${photo.originalFilename}`

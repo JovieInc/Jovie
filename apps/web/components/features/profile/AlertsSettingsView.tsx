@@ -119,7 +119,7 @@ export function AlertsSettingsView({
     >
       {presentation === 'panel' ? (
         <div className='flex items-baseline justify-between px-4 pb-2 pt-3'>
-          <h2 className='text-xl font-semibold leading-none tracking-tight text-on-media'>
+          <h2 className='text-balance text-xl font-semibold leading-none tracking-tight text-on-media'>
             Alerts
           </h2>
           <span className='text-app font-medium text-on-media/52'>
