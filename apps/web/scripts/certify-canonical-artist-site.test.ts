@@ -384,8 +384,8 @@ describe('quota-deferred lineage: an empty history read is not a product verdict
     );
     expect(certificate.status).toBe('RED');
     expect(certificate.safeToSend).toBe(false);
-    const deferredRows = certificate.receipts.filter(receipt =>
-      receipt.detail.startsWith('github-quota-deferred:')
+    const deferredRows = certificate.checks.filter(check =>
+      check.detail.startsWith('github-quota-deferred:')
     );
     expect(deferredRows.length).toBeGreaterThan(0);
     for (const row of deferredRows) {
