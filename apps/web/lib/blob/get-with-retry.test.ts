@@ -65,7 +65,9 @@ describe('getBlobWithRetry', () => {
       .mockRejectedValueOnce(blobFetchError(500, 'Internal Server Error'))
       .mockResolvedValueOnce({ ok: true } as never);
 
-    await expect(getBlobWithRetry('p', {}, 'test.readBlob')).resolves.toEqual({
+    await expect(
+      getBlobWithRetry('p', { access: 'private' }, 'test.readBlob')
+    ).resolves.toEqual({
       ok: true,
     });
     expect(mockGetTyped).toHaveBeenCalledTimes(2);
@@ -75,7 +77,7 @@ describe('getBlobWithRetry', () => {
     mockGetTyped.mockRejectedValue(blobFetchError(403, 'Forbidden'));
 
     await expect(
-      getBlobWithRetry('p', {}, 'test.readBlob')
+      getBlobWithRetry('p', { access: 'private' }, 'test.readBlob')
     ).rejects.toMatchObject({
       message: 'Vercel Blob: Failed to fetch blob: 403 Forbidden',
     });
@@ -86,7 +88,7 @@ describe('getBlobWithRetry', () => {
     mockGetTyped.mockRejectedValue(blobFetchError(503, 'Service Unavailable'));
 
     await expect(
-      getBlobWithRetry('p', {}, 'test.readBlob')
+      getBlobWithRetry('p', { access: 'private' }, 'test.readBlob')
     ).rejects.toMatchObject({
       message: 'Vercel Blob: Failed to fetch blob: 503 Service Unavailable',
     });
