@@ -198,7 +198,9 @@ describe('PersistentAudioBar', () => {
     );
     const hide = screen.getByRole('button', { name: 'Hide Player' });
     await user.click(hide);
-    const show = screen.getByRole('button', { name: 'Show Player' });
+    // The compact player's accessible name contains the visible track title
+    // plus the sr-only purpose suffix — match the suffix, not the whole name.
+    const show = screen.getByRole('button', { name: /Show Player/ });
     await waitFor(() => expect(show).toHaveFocus());
     await user.click(show);
     await waitFor(() => expect(hide).toHaveFocus());
