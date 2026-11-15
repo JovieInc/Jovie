@@ -94,12 +94,51 @@ describe('source-PR projected combined-tree budget', () => {
     );
   });
 
+  it('requires merging base cleanup when only the stale PR head exceeds budget', () => {
+    const logs = [];
+    expect(() =>
+      enforceProjectedTreeBudget({
+        baseSha: BASE,
+        git: fakeGit({
+          [BASE_TREE]: [regular(80)],
+          [HEAD_TREE]: [regular(120)],
+          [MERGED_TREE]: [regular(90)],
+        }),
+        headSha: HEAD,
+        log: line => logs.push(line),
+        maxTrackedBytes: 100,
+        mergeBaseSha: MERGE_BASE,
+      })
+    ).toThrow(
+      'PR head has 120 tracked regular-file bytes, exceeding the 100-byte repository budget, while the merged tree fits at 90 bytes; merge the current base branch into the PR branch to incorporate its cleanup, then rerun the guard'
+    );
+    expect(logs).toEqual([]);
+  });
+
+  it('accepts the same PR after it incorporates base cleanup', () => {
+    expect(
+      enforceProjectedTreeBudget({
+        baseSha: BASE,
+        git: fakeGit({
+          [BASE_TREE]: [regular(80)],
+          [HEAD_TREE]: [regular(100)],
+          [MERGED_TREE]: [regular(100)],
+        }),
+        headSha: HEAD,
+        log: () => {},
+        maxTrackedBytes: 100,
+        mergeBaseSha: MERGE_BASE,
+      })
+    ).toEqual({ baseBytes: 80, bytes: 100, delta: 20 });
+  });
+
   it('passes a shrinking PR near budget with a headroom warning', () => {
     const logs = [];
     const result = enforceProjectedTreeBudget({
       baseSha: BASE,
       git: fakeGit({
         [BASE_TREE]: [regular(MAX - 260)],
+        [HEAD_TREE]: [regular(MAX - 1_260)],
         [MERGED_TREE]: [regular(MAX - 1_260)],
       }),
       headSha: HEAD,
@@ -122,6 +161,7 @@ describe('source-PR projected combined-tree budget', () => {
       env: { PR_BASE_SHA: BASE, PR_HEAD_SHA: HEAD, PR_MERGE_BASE: MERGE_BASE },
       git: fakeGit({
         [BASE_TREE]: [regular(100)],
+        [HEAD_TREE]: [regular(150)],
         [MERGED_TREE]: [regular(150)],
       }),
       log: line => logs.push(line),

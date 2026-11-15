@@ -6,7 +6,9 @@
 // runs on the source pull_request with local git evidence: it builds the real
 // merged tree of base tip + PR head with `git merge-tree --write-tree` and
 // counts it with the exact parseTrackedRegularTree used by the merge_group
-// check. Scalar `base + (head - merge base)` arithmetic is wrong whenever both
+// check. An over-budget stale head must also incorporate base cleanup before
+// the head-based repository hygiene check can pass. Scalar
+// `base + (head - merge base)` arithmetic is wrong whenever both
 // sides touch the same path, so the merged tree itself is measured. It fails an
 // over-budget PR before queue admission and warns above 95% of budget.
 //
@@ -119,6 +121,12 @@ export function enforceProjectedTreeBudget({
   if (bytes > maxTrackedBytes) {
     throw new Error(
       `${bytes} bytes of tracked regular files (${detail}) exceeds the ${maxTrackedBytes}-byte combined-tree budget; the merge queue would reject this PR`
+    );
+  }
+  const head = measureGitTree(headSha, git);
+  if (head.bytes > maxTrackedBytes) {
+    throw new Error(
+      `PR head has ${head.bytes} tracked regular-file bytes, exceeding the ${maxTrackedBytes}-byte repository budget, while the merged tree fits at ${bytes} bytes; merge the current base branch into the PR branch to incorporate its cleanup, then rerun the guard`
     );
   }
   const warning = trackedBytesBudgetWarning(bytes, maxTrackedBytes);
