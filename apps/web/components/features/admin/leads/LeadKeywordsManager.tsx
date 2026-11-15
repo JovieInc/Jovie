@@ -161,6 +161,7 @@ export function LeadKeywordsManager({
 
       <div className='space-y-2'>
         <Textarea
+          aria-label='New Discovery Keywords'
           rows={3}
           value={newQueries}
           onChange={e => setNewQueries(e.target.value)}

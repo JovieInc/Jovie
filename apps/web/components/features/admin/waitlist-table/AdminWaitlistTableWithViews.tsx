@@ -216,21 +216,21 @@ export function AdminWaitlistTableWithViews(props: WaitlistTableProps) {
         title: 'Pipeline',
         items: newEntries,
         count: newEntries.length,
-        accent: '#3b82f6', // blue
+        accent: 'var(--color-accent-blue)',
       },
       {
         id: 'invited',
         title: 'Invited',
         items: invitedEntries,
         count: invitedEntries.length,
-        accent: '#8b5cf6', // purple
+        accent: 'var(--color-accent-purple)',
       },
       {
         id: 'signed_up',
         title: 'Signed up',
         items: claimedEntries,
         count: claimedEntries.length,
-        accent: '#10b981', // green
+        accent: 'var(--color-accent-green)',
       },
     ];
   }, [entries]);
@@ -405,9 +405,9 @@ function WaitlistIntegrityStatus({
   return (
     <div className='flex min-h-9 items-center gap-2 border-t border-(--app-shell-frame-seam) px-4 py-2 text-2xs'>
       {hasIssues ? (
-        <AlertTriangle className='h-3.5 w-3.5 shrink-0 text-amber-500' />
+        <AlertTriangle className='h-3.5 w-3.5 shrink-0 text-warning' />
       ) : (
-        <CheckCircle className='h-3.5 w-3.5 shrink-0 text-emerald-500' />
+        <CheckCircle className='h-3.5 w-3.5 shrink-0 text-success' />
       )}
       <span className='font-medium text-primary-token'>
         {hasIssues
