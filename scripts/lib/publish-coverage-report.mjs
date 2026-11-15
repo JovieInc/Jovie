@@ -94,7 +94,12 @@ function publishReport(
   profile = NIGHTLY
 ) {
   const git = (...args) =>
-    execFileSync('git', args, { cwd, env, encoding: 'utf8' }).trim();
+    execFileSync('git', args, {
+      maxBuffer: 256 * 1024 * 1024,
+      cwd,
+      env,
+      encoding: 'utf8',
+    }).trim();
   const source = env.GITHUB_SHA;
   const repo = env.GITHUB_REPOSITORY;
   const runId = env.GITHUB_RUN_ID;

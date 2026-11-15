@@ -5145,11 +5145,9 @@
   --ov-brand-accent: var(--color-accent-purple);
 }
 
-/* OV mark carries the identity accent; treatment is CSS-driven so the
-   taste-gated mark decision can land without touching components. */
-.ov-mode [data-brand-variant="ov"] {
-  color: var(--ov-brand-accent);
-}
+/* The OV mark inherits the sidebar foreground like the Jovie mark, so the
+   desktop and web shells read as one product. --ov-brand-accent stays
+   defined for a later identity treatment. */
 
 /* ============================================
    SYSTEM B UNAVAILABLE PAGE PRIMITIVES

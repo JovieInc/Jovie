@@ -718,6 +718,7 @@ describe('UnifiedSidebar library route', () => {
       )
     );
     expect(screen.queryByTestId('dashboard-nav')).not.toBeInTheDocument();
+    expect(screen.getByTestId('ov-nav-section-tools').className).toBe('');
     expect(
       screen.queryByRole('button', { name: 'Search Sidebar' })
     ).not.toBeInTheDocument();

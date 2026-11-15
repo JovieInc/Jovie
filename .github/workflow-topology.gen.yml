@@ -1394,17 +1394,6 @@ nodes:
       - workflow_dispatch
     terminalReceipt: job:recurrence
     jobCount: 1
-  - name: Sentry Autofix
-    path: .github/workflows/sentry-autofix.yml
-    active: true
-    category: remediation-dispatch
-    authoritativeProducer: Lane Fix Relay
-    authoritativeFor: []
-    allowedConsumers: []
-    triggeringStateTransition:
-      - repository_dispatch
-    terminalReceipt: job:autofix
-    jobCount: 1
   - name: Shipping Origin Receipt
     path: .github/workflows/shipping-origin.yml
     active: true

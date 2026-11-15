@@ -1,32 +1,37 @@
-import { expect, type Page } from '@playwright/test';
+import { type BoundingBox, expect, type Page } from '@playwright/test';
 import { APP_ROUTES } from '@/constants/routes';
 
-/** Capture the pending welcome before releasing its controlled summary. */
-export async function openHomeWelcome(page: Page, releaseSummary?: () => void) {
-  // Slow images must not consume the welcome's bounded summary wait before
-  // the test observes the pending state and releases the response fixture.
+/** Open Home and capture the greeting and composer box once both have mounted. */
+export async function openHomeWelcome(page: Page) {
+  // Slow images must not hold the welcome; read it as soon as the DOM is in.
   await page.goto(APP_ROUTES.CHAT, { waitUntil: 'domcontentloaded' });
   const heading = page.getByTestId('chat-empty-state-greeting-text');
   await expect(heading).toBeVisible();
   const initialGreeting = await heading.textContent();
   // The composer is a client-shell surface: the greeting is server-rendered,
   // but the composer mounts on hydration, which can land after this read on a
-  // contended runner. boundingBox() does not wait, so the pending-welcome
-  // geometry was read against a page whose composer was not mounted yet and
-  // returned null (Golden Path run 43276711590, job 131387101056, 2026-11-12
-  // 18:15Z — #23989's added root-layout client JS pushed hydration past the
-  // read). Wait for the composer itself; the before/after position-stability
-  // assertions downstream keep their full strength.
+  // contended runner. boundingBox() does not wait, so wait for the composer
+  // itself (Golden Path run 43276711590, job 131387101056, 2026-11-12).
   const input = page
     .getByRole('textbox', { name: 'Chat message input', exact: false })
     .first();
   await expect(input).toBeVisible();
-  const before = await input.boundingBox();
-  if (releaseSummary) {
-    await expect(
-      page.getByTestId('chat-empty-state-next-step').getByRole('status')
-    ).toHaveText('Finding your next step…');
-    releaseSummary();
-  }
+  // The deferred chat chunk (JOV-10150) swaps the server-rendered welcome for
+  // the loading body and back while the chunk loads, and that swap can land
+  // between the visibility check and a single boundingBox() read, which does
+  // not retry: the box came back null on main pushes 3e772d62c and 875bd2e98
+  // (runs 43645152882 and 43647984362, 2026-11-14). Read the box through a
+  // retrying poll so it is captured from the mounted composer; every
+  // downstream assertion keeps its full strength.
+  let before: BoundingBox | null = null;
+  await expect
+    .poll(
+      async () => {
+        before = await input.boundingBox();
+        return before;
+      },
+      { timeout: 15_000, message: 'mounted composer box' }
+    )
+    .not.toBeNull();
   return { initialGreeting, before };
 }

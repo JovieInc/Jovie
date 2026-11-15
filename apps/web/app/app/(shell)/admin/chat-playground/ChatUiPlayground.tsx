@@ -635,7 +635,7 @@ function ShellStatesFixture() {
     <FixtureGrid>
       <StateSample label='Empty Conversation'>
         <div className='min-h-40 pt-6'>
-          <ChatEmptyStateGreeting firstName='Alex' insight={null} />
+          <ChatEmptyStateGreeting firstName='Alex' />
         </div>
       </StateSample>
       <StateSample label='Loading Conversation'>

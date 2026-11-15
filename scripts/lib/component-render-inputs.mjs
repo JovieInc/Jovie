@@ -29,7 +29,8 @@ export const STORYBOOK_PROFILE = Object.freeze({
 });
 const ROOT_INPUT =
   /^(?:package\.json|pnpm-lock\.yaml|pnpm-workspace\.yaml|\.nvmrc|\.node-version|\.npmrc|\.gitignore|\.gitattributes|\.?pnpmfile\.[cm]?js|tsconfig[^/]*\.json|(?:postcss|tailwind|vite)\.config\.[^/]+)$/;
-const PRODUCER_INPUTS = new Set([
+/** The capture code itself: a change here re-proves every receipt. */
+export const PRODUCER_INPUTS = new Set([
   'scripts/component-story-evidence.mjs',
   'scripts/component-ship-policy.mjs',
   'scripts/lib/component-story-evidence-lib.mjs',
