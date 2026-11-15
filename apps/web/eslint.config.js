@@ -554,14 +554,9 @@ module.exports = [
       '@jovie/no-ad-hoc-currency': 'off',
     },
   },
-  // ArtistInfo: pre-existing molecule→features layering debt (ProfilePhotoContextMenu), surfaced by whole-file lint; deferred (JOV-2168 pattern).
+  // PaySelector + ArtistInfo: pre-existing molecule→features layering debt, surfaced by whole-file lint; deferred (JOV-2168 pattern).
   {
-    files: ['components/molecules/ArtistInfo.tsx'],
-    rules: { 'boundaries/element-types': 'off' },
-  },
-  // PaySelector: pre-existing molecule→features layering debt, surfaced by whole-file lint; deferred (JOV-2168 pattern).
-  {
-    files: ['components/molecules/PaySelector.tsx'],
+    files: ['components/molecules/PaySelector.tsx', 'components/molecules/ArtistInfo.tsx'],
     rules: { 'boundaries/element-types': 'off' },
   },
   // Experimental shell routes — not production UI; label-casing ratchet deferred (#11251).
