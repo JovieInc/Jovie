@@ -18,7 +18,10 @@ import {
   APPROVAL_LINE,
   approvalDescription,
   approvalTitle,
+  DEFERRED_TITLE,
+  deferralCommentBody,
   pickApprovalIssue,
+  publishDrafts,
   runUrlFor,
 } from './pen-draft-publish.mjs';
 
@@ -353,4 +356,141 @@ test('the workflow publishes the run that drafted, with read-only tokens', () =>
   // No job outlasts the 10 minutes the publish job always had.
   for (const each of [plan, render, job])
     assert.ok(each['timeout-minutes'] <= 10);
+});
+
+test('a deferred frame leaves one comment with the reason and the reset', async () => {
+  // JOV-12708: the quota refusal is the account's, so the frame gets no
+  // approval issue — it gets a comment on one standing deferred issue.
+  const refusal = {
+    reason: 'rate_limit',
+    reset: 'Nov 21, 5am',
+    detail: "You've hit your weekly limit · resets Nov 21, 5am (UTC)",
+  };
+  const receipt = drafts =>
+    JSON.stringify({
+      schema: 'jovie.pen-draft/v1',
+      at: '2026-11-15T04:31Z',
+      drafts,
+    });
+  const dir = artifacts({
+    'pen-draft-request-access': [
+      [
+        'receipt.json',
+        receipt([
+          {
+            frame: 'request-access',
+            route: '/waitlist',
+            attempts: 1,
+            status: 'deferred',
+            deferred: refusal,
+          },
+        ]),
+      ],
+    ],
+    'pen-draft-workspace-table': [
+      [
+        'receipt.json',
+        receipt([
+          { frame: 'workspace-table', status: 'deferred', deferred: refusal },
+        ]),
+      ],
+    ],
+    // A frame that failed for its own reasons is not a deferral.
+    'pen-draft-claim': [
+      [
+        'receipt.json',
+        receipt([
+          {
+            frame: 'claim',
+            status: 'failed',
+            error: 'no new top-level frame claim',
+          },
+        ]),
+      ],
+    ],
+  });
+  const network = fakeNetwork({
+    deferredIssues: [
+      {
+        id: 'deferred-1',
+        identifier: 'JOV-9100',
+        title: DEFERRED_TITLE,
+        createdAt: '2026-11-15T04:40:00Z',
+        state: { type: 'backlog' },
+      },
+    ],
+  });
+  const result = await publish(dir, network);
+  assert.equal(result.ok, true);
+  assert.deepEqual(
+    result.frames.map(row => [row.frame, row.action]),
+    [
+      ['claim', 'skipped-no-png'],
+      ['request-access', 'deferred'],
+      ['workspace-table', 'deferred'],
+    ]
+  );
+  const comment = network.calls.find(
+    call => call.op === 'PenDraftDeferredComment'
+  );
+  assert.ok(comment, 'a comment was posted');
+  assert.equal(comment.variables.id, 'deferred-1');
+  assert.match(
+    comment.variables.body,
+    /deferred 2 frames: request-access, workspace-table/
+  );
+  assert.match(comment.variables.body, /rate_limit/);
+  assert.match(comment.variables.body, /resets Nov 21, 5am/);
+  assert.ok(comment.variables.body.includes(RUN_URL));
+  // The comment body is derived, never hand-built per call site.
+  assert.equal(
+    comment.variables.body,
+    deferralCommentBody({
+      deferred: [
+        { frame: 'request-access', deferred: refusal },
+        { frame: 'workspace-table', deferred: refusal },
+      ],
+      runUrl: RUN_URL,
+    })
+  );
+});
+
+test('the first deferral creates the standing issue; without a key it fails', async () => {
+  const refusal = { reason: 'rate_limit', reset: 'Nov 21, 5am', detail: null };
+  const dir = artifacts({
+    'pen-draft-request-access': [
+      [
+        'receipt.json',
+        JSON.stringify({
+          schema: 'jovie.pen-draft/v1',
+          drafts: [
+            { frame: 'request-access', status: 'deferred', deferred: refusal },
+          ],
+        }),
+      ],
+    ],
+  });
+  const network = fakeNetwork();
+  const created = await publish(dir, network);
+  assert.equal(created.ok, true);
+  const create = network.calls.find(
+    call => call.op === 'PenDraftDeferredCreate'
+  );
+  assert.ok(create, 'the standing issue was created once');
+  assert.equal(create.variables.input.title, DEFERRED_TITLE);
+  assert.equal(
+    network.calls.filter(call => call.op === 'PenDraftDeferredCreate').length,
+    1
+  );
+  // No key: the deferral note cannot be posted, so the run is red.
+  const noKey = await publishDrafts({
+    dir,
+    runUrl: RUN_URL,
+    apiKey: undefined,
+    fetchImpl: network.fetchImpl,
+    env: {},
+    log: () => {},
+  });
+  assert.equal(noKey.ok, false);
+  assert.equal(noKey.reason, 'missing_linear_api_key');
 });

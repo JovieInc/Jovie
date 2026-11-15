@@ -44,7 +44,11 @@ export function artifacts(frames) {
 }
 
 /** Fake Linear plus its upload host. Records every request it sees. */
-export function fakeNetwork({ issues = [], failPutFor = [] } = {}) {
+export function fakeNetwork({
+  issues = [],
+  failPutFor = [],
+  deferredIssues = [],
+} = {}) {
   const calls = [];
   const created = [];
   const json = body => ({
@@ -54,6 +58,7 @@ export function fakeNetwork({ issues = [], failPutFor = [] } = {}) {
     text: async () => JSON.stringify(body),
   });
   let pendingFrame = null;
+  const createdDeferrals = [];
   const fetchImpl = async (url, init) => {
     if (init.method === 'PUT') {
       calls.push({ op: 'PUT', url, headers: init.headers, body: init.body });
@@ -98,6 +103,25 @@ export function fakeNetwork({ issues = [], failPutFor = [] } = {}) {
     }
     if (op === 'PenDraftApprovalIssue')
       return json({ data: { issues: { nodes: [...issues, ...created] } } });
+    if (op === 'PenDraftDeferredIssue')
+      return json({
+        data: { issues: { nodes: [...deferredIssues, ...createdDeferrals] } },
+      });
+    if (op === 'PenDraftDeferredCreate') {
+      const issue = {
+        id: `deferred-${createdDeferrals.length}`,
+        identifier: 'JOV-9100',
+        title: variables.input.title,
+        createdAt: '2026-11-15T04:40:00Z',
+        state: { type: 'backlog' },
+      };
+      createdDeferrals.push(issue);
+      return json({ data: { issueCreate: { success: true, issue } } });
+    }
+    if (op === 'PenDraftDeferredComment')
+      return json({
+        data: { commentCreate: { success: true, comment: { id: 'c1' } } },
+      });
     if (op === 'PenDraftApprovalCreate') {
       const issue = {
         id: `new-${created.length}`,
