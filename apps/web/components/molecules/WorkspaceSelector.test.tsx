@@ -9,20 +9,26 @@ vi.mock('next/link', () => ({
   ),
 }));
 
-vi.mock('@jovie/ui', () => ({
-  DropdownMenu: ({ children }: { readonly children: ReactNode }) => (
-    <div>{children}</div>
-  ),
-  DropdownMenuTrigger: ({ children }: { readonly children: ReactNode }) => (
-    <>{children}</>
-  ),
-  DropdownMenuContent: ({ children }: { readonly children: ReactNode }) => (
-    <div>{children}</div>
-  ),
-  DropdownMenuItem: ({ children }: { readonly children: ReactNode }) => (
-    <>{children}</>
-  ),
-}));
+vi.mock('@jovie/ui', async () => {
+  const { PlainButton } = await vi.importActual<
+    typeof import('@jovie/ui/atoms/plain-button')
+  >('@jovie/ui/atoms/plain-button');
+  return {
+    PlainButton,
+    DropdownMenu: ({ children }: { readonly children: ReactNode }) => (
+      <div>{children}</div>
+    ),
+    DropdownMenuTrigger: ({ children }: { readonly children: ReactNode }) => (
+      <>{children}</>
+    ),
+    DropdownMenuContent: ({ children }: { readonly children: ReactNode }) => (
+      <div>{children}</div>
+    ),
+    DropdownMenuItem: ({ children }: { readonly children: ReactNode }) => (
+      <>{children}</>
+    ),
+  };
+});
 
 const workspaces = [
   {

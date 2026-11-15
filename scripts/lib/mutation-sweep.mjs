@@ -435,3 +435,64 @@ export function proposeBaselineEntries(state, baseline, source) {
   }
   return out;
 }
+
+/** Parses a `--shard <index>/<count>` value (0-based index). @param {string} value */
+export function parseShard(value) {
+  const match = /^(\d+)\/(\d+)$/u.exec(value.trim());
+  const [index, count] = match ? [Number(match[1]), Number(match[2])] : [-1, 0];
+  if (!(count >= 1 && index >= 0 && index < count))
+    throw new Error(
+      `--shard must be <index>/<count> with 0 <= index < count, got "${value}"`
+    );
+  return { index, count };
+}
+
+/**
+ * Stable shard for a module key: the slices are disjoint and cover every module.
+ * @param {string} file
+ * @param {number} count
+ */
+export function shardOf(file, count) {
+  return createHash('sha1').update(file).digest().readUInt32BE(0) % count;
+}
+
+/**
+ * Merges sweep states module by module, keeping each module's most recent
+ * entry. Other top-level fields (the model fingerprint) come from the first
+ * state that has them, so pass the state of record first.
+ * @param {...unknown} states
+ */
+export function mergeStates(...states) {
+  const merged = emptyState();
+  const top = /** @type {Record<string, unknown>} */ (merged);
+  for (const raw of states) {
+    const state = normalizeState(raw);
+    for (const [key, value] of Object.entries(state))
+      if (key !== 'modules' && value != null && !(key in top)) top[key] = value;
+    for (const [file, entry] of Object.entries(state.modules)) {
+      const known = merged.modules[file];
+      if (!known || Date.parse(entry.at) > Date.parse(known.at))
+        merged.modules[file] = entry;
+    }
+  }
+  return merged;
+}
+
+/**
+ * The candidates a run may score: changed ones only in incremental mode, one hash slice with --shard.
+ * @template {{ file: string, blob: string }} T
+ * @param {T[]} candidates
+ * @param {{ modules: Record<string, { blob?: string }> }} state
+ * @param {{ mode?: string, shard?: string }} [options]
+ * @returns {T[]}
+ */
+export function selectPool(candidates, state, { mode, shard } = {}) {
+  let pool = candidates;
+  if (mode === 'incremental')
+    pool = pool.filter(
+      c => state.modules[c.file] && state.modules[c.file].blob !== c.blob
+    );
+  if (!shard) return pool;
+  const { index, count } = parseShard(shard);
+  return pool.filter(c => shardOf(c.file, count) === index);
+}
