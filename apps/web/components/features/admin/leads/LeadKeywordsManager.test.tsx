@@ -193,4 +193,21 @@ describe('LeadKeywordsManager', () => {
     ).toBeVisible();
     await expectNoA11yViolations(container);
   });
+
+  it('reports mutation failures to the owner alongside the error toast', async () => {
+    const user = userEvent.setup();
+    addKeywords.mockRejectedValueOnce(new Error('Keyword limit reached'));
+    const onActionError = vi.fn();
+    render(<LeadKeywordsManager onActionError={onActionError} />, { wrapper });
+
+    await user.type(
+      screen.getByLabelText('New Discovery Keywords'),
+      'site:example.com "artist"'
+    );
+    await user.click(screen.getByRole('button', { name: 'Add Keywords' }));
+
+    await waitFor(() =>
+      expect(onActionError).toHaveBeenCalledWith('Failed to add keywords')
+    );
+  });
 });

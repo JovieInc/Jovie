@@ -1,5 +1,5 @@
 import { TooltipProvider } from '@jovie/ui';
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -109,5 +109,46 @@ describe('AdminWaitlistTableWithViews', () => {
     expect(
       screen.getByRole('checkbox', { name: 'Select row 1' })
     ).not.toBeChecked();
+  });
+
+  it('reports clipboard failures to the owner alongside the error toast', async () => {
+    const user = userEvent.setup();
+    const onActionError = vi.fn();
+    render(
+      <TooltipProvider>
+        <AdminWaitlistTableWithViews
+          entries={entries}
+          page={1}
+          pageSize={25}
+          total={1}
+          onActionError={onActionError}
+        />
+      </TooltipProvider>
+    );
+
+    const originalClipboard = navigator.clipboard;
+    const execCommand = document.execCommand;
+    document.execCommand = () => false;
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: { writeText: () => Promise.reject(new Error('denied')) },
+    });
+    try {
+      await user.click(screen.getByRole('checkbox', { name: 'Select row 1' }));
+      await user.click(screen.getByRole('button', { name: 'Actions' }));
+      await user.click(
+        await screen.findByRole('menuitem', { name: 'Copy Emails' })
+      );
+
+      await waitFor(() =>
+        expect(onActionError).toHaveBeenCalledWith('Failed to copy emails')
+      );
+    } finally {
+      document.execCommand = execCommand;
+      Object.defineProperty(navigator, 'clipboard', {
+        configurable: true,
+        value: originalClipboard,
+      });
+    }
   });
 });

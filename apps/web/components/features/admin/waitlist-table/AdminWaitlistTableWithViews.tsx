@@ -58,7 +58,13 @@ import { WaitlistKanbanCard } from './WaitlistKanbanCard';
  * - LocalStorage persistence for view and grouping preferences
  */
 export function AdminWaitlistTableWithViews(props: WaitlistTableProps) {
-  const { entries: initialEntries, pageSize, total, integrity } = props;
+  const {
+    entries: initialEntries,
+    pageSize,
+    total,
+    integrity,
+    onActionError,
+  } = props;
 
   // View mode state with localStorage persistence
   const [viewMode, setViewMode] = useState<ViewMode>(readViewModePreference);
@@ -130,6 +136,7 @@ export function AdminWaitlistTableWithViews(props: WaitlistTableProps) {
             clearSelection();
           } else {
             toast.error('Failed to copy emails');
+            onActionError?.('Failed to copy emails');
           }
         },
       },
@@ -145,6 +152,7 @@ export function AdminWaitlistTableWithViews(props: WaitlistTableProps) {
             clearSelection();
           } else {
             toast.error('Failed to copy names');
+            onActionError?.('Failed to copy names');
           }
         },
       },

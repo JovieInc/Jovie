@@ -56,25 +56,36 @@ export const LoadingQueue: Story = {
 
 /** Error: the API rejects the batch and the toast shows its message. */
 export const ErrorQueueRejected: Story = {
+  args: { onActionError: fn() },
   beforeEach: stubFetch(async () =>
     Response.json({ error: 'Lead intake is paused' }, { status: 503 })
   ),
-  play: async ({ canvasElement }) => {
+  play: async ({ canvasElement, args }) => {
     await pasteAndQueue(canvasElement, 'https://linktr.ee/artist');
-    const page = within(canvasElement.ownerDocument.body);
-    await expect(
-      await page.findByText('Lead intake is paused')
-    ).toBeInTheDocument();
+    // The harness's mock '/test' pathname is a profile route, where
+    // FeedbackProvider mounts no Toaster — the failure toast can never
+    // render in this lane. The surface reports the failure to its owner;
+    // assert the exact message through the reporter (ProfileSidebarHeader
+    // convention).
+    await expect(args.onActionError).toHaveBeenCalledWith(
+      'Lead intake is paused'
+    );
   },
 };
 
 /** Offline: the request never reaches the server; the pasted URLs stay. */
 export const OfflineQueue: Story = {
+  args: { onActionError: fn() },
   beforeEach: stubFetch(() => Promise.reject(new TypeError('Failed to fetch'))),
-  play: async ({ canvasElement }) => {
+  play: async ({ canvasElement, args }) => {
     await pasteAndQueue(canvasElement, 'https://linktr.ee/artist');
-    const page = within(canvasElement.ownerDocument.body);
-    await expect(await page.findByText('Failed to fetch')).toBeInTheDocument();
+    // The harness's mock '/test' pathname is a profile route, where
+    // FeedbackProvider mounts no Toaster — the failure toast can never
+    // render in this lane. The surface reports the failure to its owner;
+    // assert the exact message through the reporter (ProfileSidebarHeader
+    // convention).
+    await expect(args.onActionError).toHaveBeenCalledWith('Failed to fetch');
+    // The offline path keeps the pasted URLs so nothing is lost.
     await expect(within(canvasElement).getByLabelText('Lead URLs')).toHaveValue(
       'https://linktr.ee/artist'
     );

@@ -18,10 +18,16 @@ import {
 
 interface LeadKeywordsManagerProps {
   readonly embedded?: boolean;
+  /** Reports the exact failure message alongside the error toast, so
+   * storybook lanes can assert mutation failures (the harness's mock
+   * pathname is a profile route, where FeedbackProvider mounts no
+   * Toaster). */
+  readonly onActionError?: (message: string) => void;
 }
 
 export function LeadKeywordsManager({
   embedded = false,
+  onActionError,
 }: Readonly<LeadKeywordsManagerProps> = {}) {
   const queryClient = useQueryClient();
   const [newQueries, setNewQueries] = useState('');
@@ -55,6 +61,7 @@ export function LeadKeywordsManager({
       await refreshKeywords();
     } catch {
       toast.error('Failed to add keywords');
+      onActionError?.('Failed to add keywords');
     }
   }
 
@@ -67,6 +74,7 @@ export function LeadKeywordsManager({
       await refreshKeywords();
     } catch {
       toast.error('Failed to seed keywords');
+      onActionError?.('Failed to seed keywords');
     }
   }
 
@@ -77,6 +85,7 @@ export function LeadKeywordsManager({
       await refreshKeywords();
     } catch {
       toast.error('Failed to toggle keyword');
+      onActionError?.('Failed to toggle keyword');
     } finally {
       setTogglingId(null);
     }
@@ -90,6 +99,7 @@ export function LeadKeywordsManager({
       await refreshKeywords();
     } catch {
       toast.error('Failed to delete keyword');
+      onActionError?.('Failed to delete keyword');
     } finally {
       setDeletingId(null);
     }
