@@ -50,6 +50,18 @@ async function openStory(page: Page, story: string, theme: Theme) {
   await expect(page.getByTestId('chat-history-trigger')).toBeVisible();
 }
 
+/**
+ * The preview freezes every CSS animation so screenshots are deterministic
+ * (.storybook/preview.tsx, `[class*="animate-"] { animation: none }`). The
+ * motion checks below need the menu's real motion, so they lift that freeze
+ * on their own page; with it in place getAnimations() is always empty.
+ */
+async function allowMotion(page: Page) {
+  await page.evaluate(() =>
+    document.querySelector('style[data-jovie-storybook-fixtures]')?.remove()
+  );
+}
+
 /** Stories with a play function open the menu themselves; wait for it. */
 async function waitForMenu(page: Page) {
   const menu = page.locator('[data-slot="common-dropdown-scroll-body"]');
@@ -130,6 +142,7 @@ test.describe('chat history switcher', () => {
 
   test('animates in and out', async ({ page }) => {
     await openStory(page, 'closed', 'dark');
+    await allowMotion(page);
     const trigger = page.getByTestId('chat-history-trigger');
     const content = page.locator('[data-motion="anchored"]');
 
@@ -151,6 +164,7 @@ test.describe('chat history switcher', () => {
   test('skips the motion with reduced motion on', async ({ page }) => {
     await page.emulateMedia({ reducedMotion: 'reduce' });
     await openStory(page, 'closed', 'dark');
+    await allowMotion(page);
     await page.getByTestId('chat-history-trigger').click();
     const content = page.locator('[data-motion="anchored"]');
     await expect(content).toHaveAttribute('data-state', 'open');

@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { OpportunityInboxRouteSkeleton } from '@/components/features/opportunity-inbox/OpportunityInboxRouteSkeleton';
 import { LyricsRouteSkeleton } from '@/components/shell/LyricsRouteSkeleton';
 import { TasksRouteSkeleton } from '@/components/shell/TasksRouteSkeleton';
 import { CalendarRouteSkeleton } from './calendar/CalendarRouteSkeleton';
@@ -9,6 +10,7 @@ import {
   isCalendarShellRoute,
   isChatShellRoute,
   isEarningsShellRoute,
+  isInboxShellRoute,
   isLibraryShellRoute,
   isLinksShellRoute,
   isLyricsShellRoute,
@@ -38,6 +40,9 @@ import { TourDatesRouteSkeleton } from './tour-dates/TourDatesRouteSkeleton';
 export function resolveShellRouteSkeleton(
   pathname: string | null
 ): ReactNode | undefined {
+  // Home (`/app`) renders the Opportunity Inbox, not chat: checked first so it
+  // boots into the inbox frame instead of flashing a composer.
+  if (isInboxShellRoute(pathname)) return <OpportunityInboxRouteSkeleton />;
   if (isChatShellRoute(pathname)) return <ChatLoading />;
   if (isReleasesShellRoute(pathname)) {
     return <ReleaseTableSkeletonLazy showHeader={false} />;

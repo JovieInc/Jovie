@@ -9,6 +9,7 @@ import type {
   ProviderView,
 } from '../../../../../../scripts/lib/capacity-registry.mjs';
 import {
+  accountStatusLabel,
   CREDIT_COPY,
   FRESHNESS_TONE,
   formatAge,
@@ -26,7 +27,6 @@ const TONE_TEXT: Record<Tone, string> = {
   danger: 'text-error-text',
   neutral: 'text-tertiary-token',
 };
-
 function Dot({ tone }: Readonly<{ tone: Tone }>) {
   return (
     <span
@@ -154,8 +154,8 @@ function AccountCard({
             </p>
           </div>
           {inactive ? (
-            <span className='rounded-full border border-subtle px-2 py-0.5 text-2xs uppercase text-warning'>
-              {account.status}
+            <span className='rounded-full border border-subtle px-2 py-0.5 text-2xs text-warning'>
+              {accountStatusLabel(account.status)}
             </span>
           ) : null}
         </div>
@@ -502,7 +502,7 @@ function AlertBanner({
           )}
         >
           <div role={alert.severity === 'alarm' ? 'alert' : undefined}>
-            <span className='mr-2 text-2xs font-semibold uppercase'>
+            <span className='mr-2 text-2xs font-semibold'>
               {alert.severity === 'alarm' ? 'Alarm' : 'Note'}
             </span>
             {alert.message}
