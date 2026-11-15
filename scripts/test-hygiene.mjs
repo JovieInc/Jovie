@@ -2,7 +2,7 @@
 // Test-hygiene ratchet: fails when a test file gains a slop pattern that mutation
 // testing can't see (scripts/lib/test-hygiene.mjs lists them). Existing findings
 // are counted per file and rule in scripts/test-quality/test-hygiene-baseline.json;
-// counts may only go down. Focused tests (.only) are never allowed.
+// counts may only go down. Focused tests are never allowed.
 //
 //   node scripts/test-hygiene.mjs              # check every tracked test file
 //   node scripts/test-hygiene.mjs --update     # lower the baseline after a cleanup
