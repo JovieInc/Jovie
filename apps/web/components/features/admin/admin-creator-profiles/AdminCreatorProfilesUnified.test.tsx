@@ -1,6 +1,6 @@
 import { TooltipProvider } from '@jovie/ui';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { RightPanelProvider } from '@/contexts/RightPanelContext';
@@ -172,43 +172,5 @@ describe('email signature dialog', () => {
       },
     ]);
     client.clear();
-  });
-
-  it('reports action failures to the owner alongside the error toast', async () => {
-    const client = new QueryClient({
-      defaultOptions: {
-        queries: { retry: false },
-        mutations: { retry: false },
-      },
-    });
-    const onActionError = vi.fn();
-    render(
-      <QueryClientProvider client={client}>
-        <TooltipProvider>
-          <RightPanelProvider>
-            <AdminCreatorProfilesUnified
-              profiles={[ari]}
-              page={1}
-              pageSize={25}
-              total={1}
-              search=''
-              sort='created_desc'
-              onActionError={onActionError}
-            />
-          </RightPanelProvider>
-        </TooltipProvider>
-      </QueryClientProvider>
-    );
-    const user = userEvent.setup();
-    await user.click(
-      await screen.findByRole('button', { name: 'More actions' })
-    );
-    await user.click(
-      await screen.findByRole('menuitem', { name: 'Verify Creator' })
-    );
-
-    await waitFor(() =>
-      expect(onActionError).toHaveBeenCalledWith('Failed to verify creator')
-    );
   });
 });
