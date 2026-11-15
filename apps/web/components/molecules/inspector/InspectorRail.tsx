@@ -144,6 +144,7 @@ export function InspectorShell<T extends string>({
             data-testid='inspector-tab-panel'
             data-scroll-mode='internal'
             aria-busy={isLoading}
+            // biome-ignore lint/a11y/noNoninteractiveTabindex: the scrolling tab panel must stay keyboard-reachable (axe scrollable-region-focusable).
             tabIndex={0}
             className='min-h-0 flex-1 overflow-y-auto overflow-x-hidden overscroll-contain px-3 py-3'
           >
