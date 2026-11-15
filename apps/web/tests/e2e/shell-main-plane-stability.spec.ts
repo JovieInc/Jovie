@@ -12,12 +12,11 @@ test('hovering and closing either preview keeps every main-plane frame fixed', a
     '/api/dev/test-auth/enter?persona=creator-ready&redirect=/app',
     { waitUntil: 'domcontentloaded' }
   );
-  // JOV-8973 (#23006) discloses the inbox Notes on demand; open it so the
-  // Notes box remains this spec's settle/anchor control.
-  await page.getByRole('button', { name: 'Add Notes' }).click();
-  const notes = page.getByRole('textbox', { name: 'Notes', exact: true });
-  await expect(notes).toBeVisible();
-  await notes.fill('Continuous hover geometry regression');
+  // Home's Notes only render beside a real queue item, and this persona's
+  // queue can be empty, so the always-present Needs You tab is the settle and
+  // focus anchor. Draft preservation is pinned in shell-control-quality.
+  const anchor = page.getByRole('button', { name: 'Needs You', exact: true });
+  await expect(anchor).toBeVisible();
   const control = (side: 'left' | 'right') =>
     page
       .locator(`[data-rail-toggle="${side}"]:not([inert] *)`)
@@ -29,7 +28,7 @@ test('hovering and closing either preview keeps every main-plane frame fixed', a
       await control(side).click();
     }
   }
-  await notes.focus();
+  await anchor.focus();
   await page.mouse.move(700, 450);
   await expect(page.locator('#shell-left-rail')).toHaveAttribute(
     'data-rail-phase',
@@ -106,7 +105,7 @@ test('hovering and closing either preview keeps every main-plane frame fixed', a
         'aria-expanded',
         hoverExpanded
       );
-      await expect(notes).toBeFocused();
+      await expect(anchor).toBeFocused();
       await page.waitForTimeout(120);
       await page.mouse.move(700, 450);
       await expect(control(side)).toHaveAttribute('aria-expanded', 'false');
@@ -125,8 +124,7 @@ test('hovering and closing either preview keeps every main-plane frame fixed', a
     }
     samples.push(...frames.map(frame => ({ side, ...frame })));
   }
-  await expect(notes).toBeFocused();
-  await expect(notes).toHaveValue('Continuous hover geometry regression');
+  await expect(anchor).toBeFocused();
   await testInfo.attach('continuous-main-plane-geometry', {
     body: JSON.stringify(samples),
     contentType: 'application/json',
