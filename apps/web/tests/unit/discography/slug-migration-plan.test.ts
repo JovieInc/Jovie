@@ -124,6 +124,15 @@ describe('planLegacyReleaseSlugRenames', () => {
 });
 
 describe('planLegacyTrackSlugRenames', () => {
+  it('never renames a track onto a reserved route segment', () => {
+    expect(
+      planLegacyTrackSlugRenames([
+        { id: 't1', releaseId: 'r', title: 'Sounds', slug: 'sounds-2' },
+        { id: 't2', releaseId: 'r', title: 'Download', slug: 'download-2' },
+      ])
+    ).toEqual([]);
+  });
+
   it("drops the suffix inside the release (Tim's /sober/sober-2)", () => {
     expect(
       planLegacyTrackSlugRenames([

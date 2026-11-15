@@ -50,4 +50,11 @@ describe('ReleaseDueBadge', () => {
     expect(badge?.className).toContain('bg-error');
     expect(badge?.className).not.toMatch(/\bred-\d/);
   });
+
+  it('uses the warning token for the set-date prompt', () => {
+    render(<ReleaseDueBadge dueDate={null} dueDaysOffset={3} />);
+    const prompt = screen.getByRole('button', { name: 'Set date' });
+    expect(prompt).toHaveClass('text-warning');
+    expect(prompt.className).not.toMatch(/amber-\d/);
+  });
 });

@@ -365,12 +365,12 @@ test.describe('OV responsive navigation exclusivity', () => {
           new Set(ADMIN_NAV_REGISTRY.map(item => item.href))
         );
         // Desktop OV has no page-level Sign Out. The control is the Account
-        // menu item, sentence case, inside the identity group.
+        // menu item, Title Case like every other row, inside the identity group.
         const account = page.getByRole('group', { name: 'Account' });
         await expect(account).toBeVisible();
         await account.getByRole('button').click();
         await expect(
-          page.getByRole('menuitem', { name: 'Sign out' })
+          page.getByRole('menuitem', { name: 'Sign Out' })
         ).toBeVisible();
       }
     });

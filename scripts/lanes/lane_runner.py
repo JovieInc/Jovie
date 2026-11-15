@@ -220,7 +220,7 @@ RELEASE_EXTRAS = ["scripts/shipping_origin.py", "scripts/hostops/install-lane-ho
                   "scripts/invariants/jev-gateway.mjs", "scripts/invariants/jev-shadow.mjs",
                   "scripts/invariants/jev-writing-quality.mjs", "scripts/invariants/run-outcome.mjs",
                   "scripts/invariants/writing-surfaces.mjs", "scripts/invariants/writing-surfaces-registry.json",
-                  "scripts/invariants/screen-certification.mjs", "scripts/invariants/screen-decision-routing.mjs",
+                  "scripts/invariants/screen-certification.mjs", "scripts/invariants/screen-registry.mjs", "scripts/invariants/screen-decision-routing.mjs",
                   "scripts/invariants/screen-proof-resolver.mjs", "scripts/invariants/product-reference-coherence.mjs",
                   "scripts/invariants/browser-owned-input.mjs", "scripts/invariants/browser-owned-input-matrix.json",
                   "scripts/lib/playwright-png.mjs", "scripts/invariants/screen-proof-final-paths.mjs", "scripts/invariants/screen-proof-attempt-checks.mjs",
