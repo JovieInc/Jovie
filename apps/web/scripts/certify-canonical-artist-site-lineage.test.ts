@@ -3,6 +3,7 @@ import { existsSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
+import type { CanonicalArtistSiteCliOptions } from './certify-canonical-artist-site';
 import { certifyCanonicalArtistSite } from './certify-canonical-artist-site';
 import { classifyDeployedRevisionFromGit } from './certify-canonical-artist-site-lineage';
 
