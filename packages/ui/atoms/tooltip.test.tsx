@@ -111,12 +111,6 @@ describe('Tooltip', () => {
         { timeout: 3000 }
       );
     });
-
-    it.skip('hides content on mouse leave', async () => {
-      // Skipped: userEvent.unhover doesn't reliably close Radix tooltips in jsdom
-      // This behavior is tested through controlled mode and other means
-      expect(true).toBe(true);
-    });
   });
 
   describe('TooltipProvider', () => {

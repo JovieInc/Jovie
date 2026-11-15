@@ -122,11 +122,13 @@ def _unique_json_object(pairs):
     return result
 
 
-def _load_json_object_stages(worktree: Path, rel: str, sh, field: str, accept) -> tuple[dict, dict, dict] | None:
-    """Base, ours, and theirs for one JSON object field.
+def _load_json_object_stages(worktree: Path, rel: str, sh, field: str, accept,
+                             *, additional_fields: dict | None = None) -> tuple[dict, dict, dict] | None:
+    """Base, ours, and theirs for explicitly validated JSON object fields.
 
-    None unless every stage is one object, `accept` passes the field, and every
+    None unless every stage is one object, all field validators pass, and every
     other field still matches base."""
+    validators = {field: accept, **(additional_fields or {})}
     documents = []
     for stage in (1, 2, 3):
         blob = sh(["git", "show", f":{stage}:{rel}"], cwd=worktree)
@@ -136,13 +138,13 @@ def _load_json_object_stages(worktree: Path, rel: str, sh, field: str, accept) -
             document = json.loads(blob.stdout, object_pairs_hook=_unique_json_object)
         except (ValueError, TypeError):
             return None
-        if not isinstance(document, dict) or not accept(document.get(field)):
+        if not isinstance(document, dict) or any(not check(document.get(key)) for key, check in validators.items()):
             return None
         documents.append(document)
     base, ours, theirs = documents
-    base_rest = {key: value for key, value in base.items() if key != field}
+    base_rest = {key: value for key, value in base.items() if key not in validators}
     for document in (ours, theirs):
-        if {key: value for key, value in document.items() if key != field} != base_rest:
+        if {key: value for key, value in document.items() if key not in validators} != base_rest:
             return None
     return base, ours, theirs
 
@@ -159,8 +161,15 @@ def _debt_rows(value) -> bool:
         isinstance(reason, str) and reason.strip() for reason in value.values())
 
 
+def _gate_rows(value) -> bool:
+    criteria = {"ds-owner", "tokens", "states", "tests", "a11y", "frontend-rules", "forced-caps"}
+    return isinstance(value, dict) and all(
+        isinstance(row, list) and row and all(isinstance(item, str) and item in criteria for item in row)
+        and len(row) == len(set(row)) for row in value.values())
+
+
 def resolve_additive_certificate_waivers(worktree: Path, rel: str, sh) -> str | None:
-    """Union new component waiver rows, proven against Git's three stages.
+    """Union new component gate and waiver rows, proven against Git's three stages.
 
     This is authored policy, not generated metadata. Existing rows and every
     other policy field must be unchanged; ambiguous edits remain unresolved.
@@ -169,17 +178,19 @@ def resolve_additive_certificate_waivers(worktree: Path, rel: str, sh) -> str | 
     """
     if rel != "docs/design-system/component-certification.json":
         return None
-    loaded = _load_json_object_stages(worktree, rel, sh, "waivers", _waiver_rows)
+    loaded = _load_json_object_stages(worktree, rel, sh, "waivers", _waiver_rows,
+                                      additional_fields={"gates": _gate_rows})
     if loaded is None:
         return None
     base, ours, theirs = loaded
-    for document in (ours, theirs):
-        if any(document["waivers"].get(key) != value for key, value in base["waivers"].items()):
-            return None
-    merged = dict(theirs["waivers"])
-    for key, value in ours["waivers"].items():
-        if key in merged and merged[key] != value:
-            return None
-        merged[key] = value
-    theirs["waivers"] = dict(sorted(merged.items()))
+    for field in ("gates", "waivers"):
+        for document in (ours, theirs):
+            if any(document[field].get(key) != value for key, value in base[field].items()):
+                return None
+        merged = dict(theirs[field])
+        for key, value in ours[field].items():
+            if key in merged and merged[key] != value:
+                return None
+            merged[key] = value
+        theirs[field] = dict(sorted(merged.items()))
     return json.dumps(theirs, ensure_ascii=False, indent=2) + "\n"
