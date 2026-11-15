@@ -7,6 +7,7 @@ const h = vi.hoisted(() => ({
 }));
 
 vi.mock('server-only', () => ({}));
+vi.mock('@/lib/utils/logger', () => ({ logger: { warn: vi.fn() } }));
 vi.mock('@/lib/discography/slug', () => ({
   findRedirectByOldSlug: h.findRedirectByOldSlug,
 }));
@@ -109,6 +110,20 @@ describe('resolveMovedTrackPath', () => {
       'rel-album',
       'song-2'
     );
+    expect(h.getTrackBySlugInRelease).not.toHaveBeenCalled();
+  });
+
+  it('does not redirect when the slug check fails', async () => {
+    h.trackSlugExistsInRelease.mockRejectedValue(new Error('db timeout'));
+    h.getTrackBySlugInRelease.mockResolvedValue({ id: 't1' });
+    await expect(
+      resolveMovedTrackPath({
+        ...base,
+        releaseSlug: 'sober',
+        trackSlug: 'sober-2',
+        releaseId: 'rel-1',
+      })
+    ).resolves.toBeNull();
     expect(h.getTrackBySlugInRelease).not.toHaveBeenCalled();
   });
 });

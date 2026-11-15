@@ -2,10 +2,12 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render as baseRender, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { ReactElement, ReactNode } from 'react';
+import { renderToString } from 'react-dom/server';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { APP_ROUTES } from '@/constants/routes';
 import type { SpotifyArtistResult } from '@/lib/contracts/api';
 import { expectNoA11yViolations } from '@/tests/utils/a11y';
+import { HomepageQueryProvider } from '../(home)/HomepageQueryProvider';
 import { ClaimArtistSearch } from './ClaimArtistSearch';
 
 const RESULTS: SpotifyArtistResult[] = [
@@ -73,6 +75,41 @@ describe('ClaimArtistSearch', () => {
 
   afterEach(() => {
     vi.unstubAllGlobals();
+  });
+
+  it('server-renders the search through the provider pairing without a QueryClient error', () => {
+    // Regression (JOV-12694): claim search went onto TanStack Query while the
+    // /claim tree had no QueryClientProvider, so SSR threw "No QueryClient
+    // set" on every request and the search control never mounted (claim
+    // dogfood run 43663532587; Sentry 7848731693). The page pairs the search
+    // with HomepageQueryProvider; the SSR render must succeed with it.
+    const html = renderToString(
+      <HomepageQueryProvider>
+        <ClaimArtistSearch />
+      </HomepageQueryProvider>
+    );
+    expect(html).toContain('claim-artist-search');
+  });
+
+  it('without a provider, SSR throws the exact error the claim page must avoid', () => {
+    // Pins the failure signature, so the regression test above can only pass
+    // through a provider that actually satisfies useQuery.
+    expect(() => renderToString(<ClaimArtistSearch />)).toThrow(
+      'No QueryClient set'
+    );
+  });
+
+  it('renders inside the scoped QueryClientProvider the claim page provides', async () => {
+    // The /claim page wraps this component in HomepageQueryProvider (the only
+    // QueryClient on that route tree). Render through the real provider
+    // pairing so a broken pairing fails here instead of in the claim dogfood.
+    respondWith(RESULTS);
+    baseRender(
+      <HomepageQueryProvider>
+        <ClaimArtistSearch />
+      </HomepageQueryProvider>
+    );
+    expect(await screen.findByTestId('claim-artist-search')).toBeVisible();
   });
 
   it('starts idle with a labelled search and a create-profile way out', async () => {

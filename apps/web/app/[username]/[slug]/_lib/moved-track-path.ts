@@ -2,6 +2,7 @@ import 'server-only';
 
 import { findRedirectByOldSlug } from '@/lib/discography/slug';
 import { legacyTrackSlugFallback } from '@/lib/discography/slug-migration-plan';
+import { logger } from '@/lib/utils/logger';
 import { getTrackBySlugInRelease } from './data';
 import { trackSlugExistsInRelease } from './track-slug-exists';
 
@@ -33,7 +34,18 @@ export async function resolveMovedTrackPath(input: {
 
   const base = legacyTrackSlugFallback(trackSlug);
   if (!base) return null;
-  if (await trackSlugExistsInRelease(releaseId, trackSlug)) return null;
+  try {
+    if (await trackSlugExistsInRelease(releaseId, trackSlug)) return null;
+  } catch (error) {
+    // A 308 is cached for good, so a failed check never redirects: the
+    // page falls through to its normal lookup and 404 handling.
+    logger.warn('[moved-track-path] slug check failed; not redirecting', {
+      releaseId,
+      trackSlug,
+      error,
+    });
+    return null;
+  }
   const track = await getTrackBySlugInRelease(releaseId, base);
   return track ? `/${handle}/${releaseSlug}/${base}` : null;
 }
