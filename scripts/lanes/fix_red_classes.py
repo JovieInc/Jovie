@@ -149,6 +149,10 @@ _YAML_AND_CHAIN_LINE = re.compile(
     r"^(?P<indent>[ \t]*)(?P<prefix>run: )(?P<q>)"
     r"(?P<command>[\w./@=:\t -]+(?:&&[\w./@=:\t -]+)+)(?P<suffix>)$")
 _JSON_KEY = re.compile(r'^\s*"([^"\n]+)"\s*:')
+# Head is over the tracked-byte budget only because it lacks cleanup already on
+# the base. Sync main. A merged tree that itself exceeds the budget does not match.
+TRACKED_BYTE_STALE = re.compile(
+    r"PR head has \d+ tracked regular-file bytes, exceeding the \d+-byte repository budget, while the merged tree fits at \d+ bytes")
 
 # (class, pattern, action). First match wins per check; order is most specific first.
 SIGNATURES = (
@@ -166,6 +170,7 @@ SIGNATURES = (
     ("census-certification", CENSUS_CERTIFICATION, SYNC_MAIN),
     ("design-source-cli", DESIGN_SOURCE_CLI, SYNC_MAIN),
     ("route-budget-growth", ROUTE_BUDGET_GROWTH, SYNC_MAIN),
+    ("tracked-byte-stale", TRACKED_BYTE_STALE, SYNC_MAIN),
     ("ci-fast-wiring", UNWIRED, WIRE_CI_FAST),
     # The license error is the job failure. A passing fixture can echo quota text.
     ("dependency-license", DEPENDENCY_LICENSE, AGENT),

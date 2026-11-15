@@ -70,3 +70,44 @@ class SplitPlanTest(unittest.TestCase):
         for cap in (0, -1, True):
             with self.assertRaises(ValueError):
                 classes.reviewable_split({"a": 1}, [["a"]], cap)
+
+
+class PackGroupsTest(unittest.TestCase):
+    def test_first_fit_keeps_groups_together_under_the_cap(self):
+        import reviewable_split as split
+
+        changes = {"huge": 1000, "other": 900, "machine": 100}
+        groups = [["huge"], ["other"], ["machine"]]
+        self.assertEqual(split.pack_groups(groups, changes, 1000),
+                         [["huge"], ["other", "machine"]])
+        pinned = split.pack_groups(groups, changes, 1000, pin=["machine"])
+        self.assertEqual(pinned[0][0], "machine")
+        self.assertEqual(split.reviewable_split(changes, pinned, 1000), [1000, 1000])
+
+    def test_layer_cost_counts_before_a_group_shares_a_layer(self):
+        import reviewable_split as split
+
+        changes = {"a": 700, "b": 700}
+        packed = split.pack_groups([["a"], ["b"]], changes, 1500, cost=lambda _paths: 200)
+        self.assertEqual(packed, [["a"], ["b"]])
+        self.assertEqual(split.pack_groups([["a"], ["b"]], changes, 1500), [["a", "b"]])
+        with self.assertRaises(ValueError):
+            split.pack_groups([["a"]], {"a": 1400}, 1500, cost=lambda _paths: 200)
+
+    def test_cli_packs_measured_numstat_including_tests(self):
+        import reviewable_split as split
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            numstat, groups = root / "numstat", root / "groups.json"
+            numstat.write_text("600\t200\tsource.mjs\n701\t0\tsource.test.mjs\n")
+            groups.write_text(json.dumps([["source.mjs", "source.test.mjs"]]))
+            # 800 + 701 counts the test. The default cap rejects that one group.
+            with contextlib.redirect_stderr(io.StringIO()), self.assertRaises(SystemExit) as error:
+                split.main(["pack", "--numstat", str(numstat), "--groups", str(groups)])
+            self.assertEqual(error.exception.code, 2)
+            output = io.StringIO()
+            with contextlib.redirect_stdout(output):
+                self.assertEqual(split.main(
+                    ["pack", "--numstat", str(numstat), "--groups", str(groups), "--cap", "1501"]), 0)
+            self.assertEqual(json.loads(output.getvalue())["reviewableLines"], [1501])

@@ -1,0 +1,5 @@
+{
+  "schema": "jovie-automation-schedule-allowlist/v1",
+  "description": "Files allowed to add schedule:/cron: triggers or GitHub-API polling (scripts/schedule-trigger-guard.mjs). Entries need a live canon/automation-registry.jsonl id; remove an entry when its file loses the clock. Keep this list small.",
+  "entries": []
+}

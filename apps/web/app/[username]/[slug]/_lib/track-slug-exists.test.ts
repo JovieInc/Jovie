@@ -6,7 +6,9 @@ const { results, fromTables } = vi.hoisted(() => ({
 }));
 
 vi.mock('server-only', () => ({}));
+vi.mock('@/lib/db/query-timeout', () => ({ QUERY_TIMEOUTS: { api: 1 } }));
 vi.mock('@/lib/db', () => ({
+  withRetry: (read: () => Promise<unknown>) => read(),
   db: {
     select: () => {
       const builder = {

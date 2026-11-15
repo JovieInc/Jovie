@@ -66,10 +66,10 @@ function CopyButton({
       variant='ghost'
       size='icon'
       onClick={handleCopy}
-      className='inline-flex h-auto w-auto items-center p-0 text-secondary-token hover:bg-transparent hover:text-primary-token transition-colors'
+      className='inline-flex size-6 items-center justify-center text-secondary-token hover:bg-transparent hover:text-primary-token transition-colors'
       aria-label={`Copy ${label}`}
     >
-      <Copy className='h-3 w-3' />
+      <Copy className='h-3.5 w-3.5' />
     </Button>
   );
 }
