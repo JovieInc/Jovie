@@ -1,7 +1,14 @@
-import { execFileSync } from 'node:child_process';
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { execFileSync, spawnSync } from 'node:child_process';
+import {
+  copyFileSync,
+  mkdirSync,
+  mkdtempSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { parseTrackedRegularTree } from '../merge-group-member-policy.mjs';
 import {
@@ -57,6 +64,52 @@ function regular(size, path = 'payload.bin') {
 }
 
 describe('source-PR projected combined-tree budget', () => {
+  it('stops publication and qualification on a rejected tree budget', () => {
+    const repoRoot = fileURLToPath(new URL('../../../', import.meta.url));
+    const root = mkdtempSync(join(tmpdir(), 'pre-push-budget-'));
+    try {
+      for (const directory of ['scripts/hooks', 'scripts/lib', 'bin'])
+        mkdirSync(join(root, directory), { recursive: true });
+      for (const file of ['pre-push-gate.sh', 'resolve-repo-node.sh'])
+        copyFileSync(
+          join(repoRoot, 'scripts/hooks', file),
+          join(root, 'scripts/hooks', file)
+        );
+      copyFileSync(join(repoRoot, '.nvmrc'), join(root, '.nvmrc'));
+      writeFileSync(
+        join(root, 'scripts/lib/projected-tree-budget.mjs'),
+        `
+import assert from 'node:assert/strict';
+assert.deepEqual(process.argv.slice(2), ['--local']);
+console.error('fixture tree exceeds byte budget');
+process.exit(17);
+`
+      );
+      writeFileSync(join(root, 'bin/pnpm'), '#!/usr/bin/env bash\nexit 0\n', {
+        mode: 0o755,
+      });
+      for (const mode of ['affected', 'publication']) {
+        const result = spawnSync(
+          'bash',
+          [join(root, 'scripts/hooks/pre-push-gate.sh'), mode],
+          {
+            cwd: repoRoot,
+            encoding: 'utf8',
+            env: {
+              ...process.env,
+              PATH: `${join(root, 'bin')}:${process.env.PATH}`,
+              JOVIE_PREFLIGHT_DEPTH: undefined,
+              JOVIE_SKIP_PRE_PUSH_GATE: '',
+            },
+          }
+        );
+        expect(result.status, `${result.stdout}\n${result.stderr}`).toBe(17);
+        expect(result.stderr).toMatch(/fixture tree exceeds byte budget/);
+      }
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
   it('parses local ls-tree evidence through the shared merge_group byte counter', () => {
     const output = lsTree([
       { mode: '040000', path: 'scripts', type: 'tree' },

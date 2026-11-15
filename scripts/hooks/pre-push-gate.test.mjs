@@ -80,54 +80,6 @@ test('publication remains policy gated without running affected tests', () => {
   assert.doesNotMatch(publication, /typecheck|coverage|biome check \./);
 });
 
-test('publication and qualification stop on a rejected tree budget', () => {
-  const root = mkdtempSync(path.join(os.tmpdir(), 'pre-push-budget-'));
-  try {
-    mkdirSync(path.join(root, 'scripts/hooks'), { recursive: true });
-    mkdirSync(path.join(root, 'scripts/lib'), { recursive: true });
-    mkdirSync(path.join(root, 'bin'));
-    for (const file of ['pre-push-gate.sh', 'resolve-repo-node.sh'])
-      copyFileSync(
-        path.join(hooksDir, file),
-        path.join(root, 'scripts/hooks', file)
-      );
-    copyFileSync(path.join(repoRoot, '.nvmrc'), path.join(root, '.nvmrc'));
-    writeFileSync(
-      path.join(root, 'scripts/lib/projected-tree-budget.mjs'),
-      `
-import assert from 'node:assert/strict';
-assert.deepEqual(process.argv.slice(2), ['--local']);
-console.error('fixture tree exceeds byte budget');
-process.exit(17);
-`
-    );
-    writeFileSync(
-      path.join(root, 'bin/pnpm'),
-      '#!/usr/bin/env bash\nexit 0\n',
-      { mode: 0o755 }
-    );
-    for (const mode of ['affected', 'publication']) {
-      const result = spawnSync(
-        'bash',
-        [path.join(root, 'scripts/hooks/pre-push-gate.sh'), mode],
-        {
-          cwd: repoRoot,
-          encoding: 'utf8',
-          env: {
-            ...process.env,
-            PATH: `${path.join(root, 'bin')}:${process.env.PATH}`,
-            JOVIE_PREFLIGHT_DEPTH: undefined,
-          },
-        }
-      );
-      assert.equal(result.status, 17, `${result.stdout}\n${result.stderr}`);
-      assert.match(result.stderr, /fixture tree exceeds byte budget/);
-    }
-  } finally {
-    rmSync(root, { recursive: true, force: true });
-  }
-});
-
 for (const linkedWorktree of [false, true]) {
   test(`child Git fixtures cannot mutate the ${linkedWorktree ? 'linked worktree' : 'main repository'} that invoked the hook`, () => {
     const root = mkdtempSync(path.join(os.tmpdir(), 'pre-push-git-env-'));
