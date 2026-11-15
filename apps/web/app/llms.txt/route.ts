@@ -21,6 +21,7 @@ export const LLMS_TXT_CLAIM_IDS = [
   'jovie.ai-assistant',
   'jovie.capability-access',
   'jovie.public-developer-access',
+  'jovie.agent-draft-connector',
   'jovie.childcare-disambiguation',
 ] as const satisfies readonly PublishedClaimId[];
 

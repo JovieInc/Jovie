@@ -193,6 +193,20 @@ export const PUBLISHED_CLAIM_RECEIPTS = {
     verifiedAt: '2026-10-01',
     reviewAfter: '2027-01-01',
   },
+  'jovie.agent-draft-connector': {
+    id: 'jovie.agent-draft-connector',
+    statement:
+      'The anonymous agent connector creates unpublished artist and release drafts. start_upgrade returns a Jovie checkout entry URL; the person reviews plans and completes any purchase on Jovie. The connector does not process payments.',
+    evidence: [
+      'https://github.com/JovieInc/Jovie/blob/0ad88cd074910eb3a88f3b5731f713d5b20cfc53/apps/web/app/api/mcp/route.ts',
+      'https://github.com/JovieInc/Jovie/blob/0ad88cd074910eb3a88f3b5731f713d5b20cfc53/apps/web/lib/agent-acquisition/api.ts',
+      'https://github.com/JovieInc/Jovie/blob/0ad88cd074910eb3a88f3b5731f713d5b20cfc53/apps/web/lib/agent-acquisition/golden-path.server.ts',
+      'https://github.com/JovieInc/Jovie/blob/0ad88cd074910eb3a88f3b5731f713d5b20cfc53/apps/web/lib/agent-distribution/generated/tools-list.snapshot.json',
+    ],
+    owner: 'marketing-architecture',
+    verifiedAt: '2026-11-15',
+    reviewAfter: '2027-01-01',
+  },
   'jovie.founder': {
     id: 'jovie.founder',
     statement: 'Tim White is the founder of Jovie.',
@@ -466,7 +480,7 @@ export const SCOPED_CLAIM_SURFACE_HASHES = {
   '/alternatives/link-in-bio':
     'bd6abd37bd0b7e84d3d409434203227f60cf1096449ad8dc706d077456c9cb15',
   '/llms.txt':
-    '2bc4a4c5e14ec0e63d188d161392bb104d807118a74cedad5b03dc3144aa2bc1',
+    '5668ab60e64d4d01fb9daf4bf6a09d26824456e09e3e1c8ea84c23158f277627',
   '/llms-full.txt':
-    'f7a5901a15cb4cb68f5552bb6d8862c1dcc0353f6624fe19b01834868725757b',
+    'c5dc6cfa86d61ad3eab446ad535360dcde6e6af3ce1b81f66fd7295621b6bbd2',
 } as const;
