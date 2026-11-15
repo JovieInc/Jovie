@@ -1,13 +1,8 @@
-import {
-  act,
-  fireEvent,
-  render,
-  screen,
-  waitFor,
-} from '@testing-library/react';
+import { act, fireEvent, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { HeaderSearchAdapter } from '@/contexts/HeaderActionsContext';
 import { segmentedAccessibleName } from '@/tests/utils/accessible-name';
+import { renderWithQueryClient as render } from '@/tests/utils/test-utils';
 import { HeaderSearchSurface } from './HeaderSearchSurface';
 import type { SearchableRelease } from './header-search-results';
 
@@ -451,7 +446,7 @@ describe('HeaderSearchSurface', () => {
         smartLinkPath: '/old/stale-result',
       },
     ]);
-    await act(async () => Promise.resolve());
+    await act(() => vi.advanceTimersByTimeAsync(0));
     expect(screen.queryByText('Stale Result')).not.toBeInTheDocument();
 
     await act(() => vi.advanceTimersByTimeAsync(250));
@@ -464,7 +459,7 @@ describe('HeaderSearchSurface', () => {
         smartLinkPath: '/midnight-artist/midnight-drive',
       },
     ]);
-    await act(async () => Promise.resolve());
+    await act(() => vi.advanceTimersByTimeAsync(0));
 
     expect(screen.getByText('Midnight Drive')).toBeVisible();
   });
@@ -503,7 +498,7 @@ describe('HeaderSearchSurface', () => {
         smartLinkPath: '/profile-a/release',
       },
     ]);
-    await act(async () => Promise.resolve());
+    await act(() => vi.advanceTimersByTimeAsync(0));
     expect(screen.getByText('Midnight Profile A')).toBeVisible();
 
     rerender(
@@ -522,7 +517,7 @@ describe('HeaderSearchSurface', () => {
         smartLinkPath: '/profile-b/release',
       },
     ]);
-    await act(async () => Promise.resolve());
+    await act(() => vi.advanceTimersByTimeAsync(0));
 
     expect(screen.getByText('Midnight Profile B')).toBeVisible();
     expect(screen.queryByText('Midnight Profile A')).not.toBeInTheDocument();
@@ -553,14 +548,14 @@ describe('HeaderSearchSurface', () => {
     // least one option (axe aria-required-children).
     expect(screen.queryByRole('listbox')).toBeNull();
     await act(() => vi.advanceTimersByTimeAsync(250));
-    await act(async () => Promise.resolve());
+    await act(() => vi.advanceTimersByTimeAsync(0));
     expect(screen.getByRole('status')).toHaveTextContent('No matching results');
     expect(screen.queryByRole('listbox')).toBeNull();
 
     fireEvent.change(input, { target: { value: 'error' } });
     expect(screen.getByRole('status')).toHaveTextContent('Searching…');
     await act(() => vi.advanceTimersByTimeAsync(250));
-    await act(async () => Promise.resolve());
+    await act(() => vi.advanceTimersByTimeAsync(0));
     const status = screen.getByRole('status');
     expect(status).toHaveTextContent('Search unavailable');
     expect(status).toHaveClass('system-b-table-row-shell', 'min-h-10');
