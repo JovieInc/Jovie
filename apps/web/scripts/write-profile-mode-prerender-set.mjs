@@ -44,11 +44,10 @@ const ALIAS_BUDGET_PAIRS = [
 ];
 
 function resolveDatabaseUrl() {
-  return (
-    process.env.DATABASE_URL?.trim() ||
-    process.env.DATABASE_URL_DIRECT?.trim() ||
-    ''
-  );
+  // Same variable lib/db reads (lib/db/client/connection.ts reads only
+  // env.DATABASE_URL), so the script answers exactly the question
+  // generateStaticParams will answer seconds later during `next build`.
+  return process.env.DATABASE_URL?.trim() || '';
 }
 
 async function readPublicUsernames(databaseUrl) {
