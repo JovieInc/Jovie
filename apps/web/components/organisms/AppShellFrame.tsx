@@ -13,6 +13,7 @@ import {
 } from '@/components/shell/rail-motion';
 import type { BrandVariant } from '@/lib/brand/tokens';
 import { cn } from '@/lib/utils';
+import styles from './AppShellFrame.module.css';
 
 export interface AppShellFrameProps {
   readonly brandVariant?: BrandVariant;
@@ -157,7 +158,10 @@ export const AppShellFrame = memo(function AppShellFrame({
                   // Founder lock 2026-09-25: one rounded, borderless, clipped
                   // panel — no border, soft elevation only.
                   'relative isolate flex min-h-0 min-w-0 flex-1 flex-col overflow-clip bg-(--app-shell-content-surface)',
-                  'lg:rounded-(--app-shell-radius) lg:bg-(--app-shell-content-surface) lg:shadow-(--app-shell-shadow)'
+                  'lg:rounded-(--app-shell-radius) lg:bg-(--app-shell-content-surface) lg:shadow-(--app-shell-shadow)',
+                  // The persistent main owns this background-only launch paint,
+                  // so route/wash updates cannot replay it. Never animate a fallback.
+                  !placeholder && styles.launchLight
                 )}
               >
                 {/* The wash covers the full panel, including its header. */}

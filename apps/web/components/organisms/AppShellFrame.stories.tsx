@@ -1,5 +1,5 @@
 import '../../styles/system-b-app.css';
-import { Button } from '@jovie/ui';
+import { Button, Input } from '@jovie/ui';
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { useState } from 'react';
 import SettingsLayout from '@/app/app/(shell)/settings/layout';
@@ -31,6 +31,42 @@ export const Default: Story = {};
 
 export const ChatAmbientGradient: Story = {
   args: { chatAmbientGradient: true, containerClassName: 'h-dvh' },
+};
+
+/** Keeps the frame mounted while route-owned content and the chat wash change. */
+function LaunchLightFixture() {
+  const [chat, setChat] = useState(false);
+  const [ovie, setOvie] = useState(false);
+  return (
+    <AppShellFrame
+      brandVariant={ovie ? 'ov' : 'jovie'}
+      containerClassName='h-dvh'
+      sidebar={<aside className='hidden w-56 p-4 lg:block'>Navigation</aside>}
+      header={
+        <header className='flex items-center gap-3 px-3 py-2'>
+          <span>{chat ? 'Chat' : 'Library'}</span>
+          <Button size='sm' variant='ghost' onClick={() => setChat(!chat)}>
+            {chat ? 'Open library' : 'Open chat'}
+          </Button>
+          <Button size='sm' variant='ghost' onClick={() => setOvie(!ovie)}>
+            {ovie ? 'Return to Jovie' : 'Open Ovie'}
+          </Button>
+        </header>
+      }
+      main={
+        <div className='max-w-md space-y-3 p-3'>
+          <label htmlFor='launch-notes'>Notes</label>
+          <Input id='launch-notes' defaultValue='Keep this draft' />
+          <p>{chat ? 'Your conversation' : 'Your library'}</p>
+        </div>
+      }
+      chatAmbientGradient={chat}
+    />
+  );
+}
+
+export const LaunchLight: Story = {
+  render: () => <LaunchLightFixture />,
 };
 
 /** Suspense placeholder: the frame paints without the live landmark id or
