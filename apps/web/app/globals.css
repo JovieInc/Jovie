@@ -168,6 +168,12 @@ html[data-desktop-runtime="electron"] [data-app-shell-sidebar-mount="true"] {
 
 html[data-desktop-runtime="electron"]
   [data-top-spacing-owner="shell-header"]
+  > div,
+/* The dashboard header keeps its controls reservation (JOV-7207) on a
+   wrapper above the drag box, so its title row sits one level deeper. */
+  html[data-desktop-runtime="electron"]
+  [data-top-spacing-owner="shell-header"]
+  > header
   > div {
   height: var(--electron-titlebar-height);
   padding-block: 0;
