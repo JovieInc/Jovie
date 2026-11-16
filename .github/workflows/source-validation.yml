@@ -128,21 +128,82 @@ jobs:
         run: |
           set -euo pipefail
           git fetch --no-tags --unshallow --filter=blob:none origin "+refs/heads/${BASE_REF}:refs/remotes/origin/${BASE_REF}" "$HEAD_SHA"
+      - &source-docs-prime
+        name: Prime the pinned source runtime before classification
+        if: steps.reuse.outputs.reuse != 'true'
+        uses: ./.github/actions/prime-node-toolcache
+      - &source-docs-runtime
+        name: Select the pinned source runtime without dependency hydration
+        if: steps.reuse.outputs.reuse != 'true'
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+      - &source-docs-scope
+        name: Classify exact source docs before dependency setup
+        id: source_docs
+        if: steps.reuse.outputs.reuse != 'true'
+        shell: bash
+        env:
+          EXPECTED_BASE: ${{ github.event.pull_request.base.sha }}
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha }}
+          BASE_REF: ${{ github.base_ref }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
+          # Older trusted bases retain the full path during rollout.
+          if ! git cat-file -e "$EXPECTED_BASE:scripts/source-docs-check.mjs" 2>/dev/null; then
+            echo 'docs_only=false' >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          policy_root="$(mktemp -d "$RUNNER_TEMP/source-docs-policy.XXXXXX")"
+          git archive "$EXPECTED_BASE" scripts LESSONS.guards.json .github/scripts .github/ci-harness docs/doc-freshness-registry.json repository-docs.json | tar -x -C "$policy_root"
+          export CURRENT_BASE="$(git rev-parse --verify "refs/remotes/origin/$BASE_REF^{commit}")"
+          export SOURCE_DOCS_PLAN="$policy_root/source-docs-plan.json"
+          if node "$policy_root/scripts/source-docs-check.mjs" plan; then
+            echo "helper_root=$policy_root" >> "$GITHUB_OUTPUT"
+          else
+            echo 'Docs applicability unavailable; retaining full validation.'
+            echo 'docs_only=false' >> "$GITHUB_OUTPUT"
+          fi
       - uses: ./.github/actions/setup-node-pnpm
+        if: steps.source_docs.outputs.docs_only != 'true'
+      - &source-docs-check
+        name: Validate applicable docs contracts without workspace dependencies
+        if: steps.source_docs.outputs.docs_only == 'true'
+        env:
+          SOURCE_DOCS_PLAN: ${{ steps.source_docs.outputs.plan }}
+          SOURCE_DOCS_HELPER_ROOT: ${{ steps.source_docs.outputs.helper_root }}
+        run: node "$SOURCE_DOCS_HELPER_ROOT/scripts/source-docs-check.mjs" check
       # Body/label-dependent policy always runs, including exact-head proof reuse.
       # PR fleet rules are decided by the Fleet Rules Evidence workflow (base code
       # only, dedicated CI App budget); PR Ready reads its status below.
       - name: Validate performance policy source bindings
         run: node scripts/invariants/performance-factory.mjs
       - name: Measure actual installed source dependency graph
+        if: steps.source_docs.outputs.docs_only != 'true'
         env:
           DEPENDENCY_PARITY_RECEIPT_DIR: ${{ runner.temp }}/jovie-dependency-parity
         run: node .github/scripts/dependency-parity-evidence.mjs write
       - name: Preserve exact source dependency evidence
+        if: steps.source_docs.outputs.docs_only != 'true'
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: dependency-digest-${{ github.run_id }}-${{ github.run_attempt }}-${{ github.event.pull_request.head.sha }}
           path: ${{ runner.temp }}/jovie-dependency-parity/dep-digest.json
+          if-no-files-found: error
+          retention-days: 14
+      - name: Record docs applicability without claiming an installed graph
+        if: steps.source_docs.outputs.docs_only == 'true'
+        env:
+          DEPENDENCY_PARITY_RECEIPT_DIR: ${{ runner.temp }}/jovie-dependency-parity
+          SOURCE_DOCS_HELPER_ROOT: ${{ steps.source_docs.outputs.helper_root }}
+        run: node "$SOURCE_DOCS_HELPER_ROOT/.github/scripts/dependency-parity-evidence.mjs" write-scope
+      - name: Preserve exact source docs applicability
+        if: steps.source_docs.outputs.docs_only == 'true'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: source-docs-scope-${{ github.run_id }}-${{ github.run_attempt }}-${{ github.event.pull_request.head.sha }}
+          path: ${{ runner.temp }}/jovie-dependency-parity/source-docs-scope.json
           if-no-files-found: error
           retention-days: 14
       # component-ship-gate's live-storybook-cert launches Chromium when the
@@ -154,9 +215,10 @@ jobs:
       # edits with "Executable doesn't exist" (#21956, #21946, #21774, #21725),
       # so it carries the same (absent) condition as that step.
       - name: Setup Playwright (Chromium)
+        if: steps.source_docs.outputs.docs_only != 'true'
         uses: ./.github/actions/setup-playwright
       - name: Verify onboarding recovery browser behavior
-        if: ${{ steps.reuse.outputs.reuse != 'true' }}
+        if: ${{ steps.reuse.outputs.reuse != 'true' && steps.source_docs.outputs.docs_only != 'true' }}
         shell: bash
         env:
           EXPECTED_HEAD: ${{ github.event.pull_request.head.sha }}
@@ -265,7 +327,7 @@ jobs:
       # the author sees it before enqueue. Same checksum-pinned toolchain.
       # Same main-written, sha256-verified download cache as ci-fast; read-only.
       - name: Restore pinned actionlint downloads
-        if: steps.reuse.outputs.reuse != 'true'
+        if: steps.reuse.outputs.reuse != 'true' && steps.source_docs.outputs.docs_only != 'true'
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: /tmp/jovie-pinned-downloads
@@ -273,13 +335,13 @@ jobs:
           restore-keys: |
             pinned-downloads-${{ runner.os }}-${{ runner.arch }}-
       - name: Set up Go for source-pinned actionlint
-        if: steps.reuse.outputs.reuse != 'true'
+        if: steps.reuse.outputs.reuse != 'true' && steps.source_docs.outputs.docs_only != 'true'
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version: '1.26.10'
           cache: false
       - name: Lint changed workflows and actions (actionlint)
-        if: steps.reuse.outputs.reuse != 'true'
+        if: steps.reuse.outputs.reuse != 'true' && steps.source_docs.outputs.docs_only != 'true'
         shell: bash
         env:
           EXPECTED_HEAD: ${{ github.event.pull_request.head.sha }}
@@ -308,11 +370,11 @@ jobs:
       # pnpm typecheck and the ci-fast --force gate are unchanged.
       - name: Resolve tsc cache hour
         id: tsc-cache-hour
-        if: steps.reuse.outputs.reuse != 'true'
+        if: steps.reuse.outputs.reuse != 'true' && steps.source_docs.outputs.docs_only != 'true'
         run: echo "hour=$(date -u +%Y%m%d%H)" >> "$GITHUB_OUTPUT"
       - name: Restore web tsc incremental state
         id: web-tsbuildinfo
-        if: steps.reuse.outputs.reuse != 'true'
+        if: steps.reuse.outputs.reuse != 'true' && steps.source_docs.outputs.docs_only != 'true'
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: apps/web/.cache/tsbuildinfo*
@@ -321,7 +383,7 @@ jobs:
             jovie-web-tsbuildinfo-v2-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml', 'tsconfig.json', 'apps/web/tsconfig.json', 'apps/web/tsconfig.typecheck.json', 'apps/web/tsconfig.test.json', 'apps/web/tsconfig.stories.json') }}-
             jovie-web-tsbuildinfo-v2-${{ runner.os }}-
       - name: Run deterministic source contract
-        if: steps.reuse.outputs.reuse != 'true'
+        if: steps.reuse.outputs.reuse != 'true' && steps.source_docs.outputs.docs_only != 'true'
         env:
           EXPECTED_HEAD: ${{ github.event.pull_request.head.sha }}
           TURBO_SCM_BASE: origin/${{ github.base_ref }}
@@ -370,7 +432,7 @@ jobs:
       # locates only failed in the merge group (#23332: FAQ removed from /about,
       # three ejections). Fail it on its own PR instead.
       - name: Check layout-guard pen contracts are still rendered
-        if: steps.reuse.outputs.reuse != 'true'
+        if: steps.reuse.outputs.reuse != 'true' && steps.source_docs.outputs.docs_only != 'true'
         shell: bash
         run: |
           set -euo pipefail
@@ -399,7 +461,7 @@ jobs:
       # event head and merge base so the regression fails before enqueue.
       # Non-web diffs exit before the ESLint module load.
       - name: Lint changed web files against the shadcn baseline
-        if: steps.reuse.outputs.reuse != 'true'
+        if: steps.reuse.outputs.reuse != 'true' && steps.source_docs.outputs.docs_only != 'true'
         env:
           EXPECTED_HEAD: ${{ github.event.pull_request.head.sha }}
         run: |
@@ -410,7 +472,7 @@ jobs:
           SHADCN_LINT_DIFF_BASE="$base_sha" \
             pnpm --filter @jovie/web exec node eslint-rules/__tests__/shadcn-lint-changed.mjs
       - name: Verify changed CLI publication behavior
-        if: steps.reuse.outputs.reuse != 'true'
+        if: steps.reuse.outputs.reuse != 'true' && steps.source_docs.outputs.docs_only != 'true'
         shell: bash
         run: |
           set -euo pipefail
@@ -574,7 +636,12 @@ jobs:
         run: |
           set -euo pipefail
           git fetch --no-tags --unshallow --filter=blob:none origin "+refs/heads/${BASE_REF}:refs/remotes/origin/${BASE_REF}" "$HEAD_SHA"
-      - *reused-setup
+      - *source-docs-prime
+      - *source-docs-runtime
+      - *source-docs-scope
+      - name: Setup dependencies for applicable source contracts
+        if: steps.reuse.outputs.reuse != 'true' && steps.source_docs.outputs.docs_only != 'true'
+        uses: ./.github/actions/setup-node-pnpm
       - name: Validate changed migration surfaces
         if: steps.reuse.outputs.reuse != 'true'
         env:
@@ -617,7 +684,12 @@ jobs:
       - *proof-reuse
       - *reused-checkout
       - *base-history
-      - *reused-setup
+      - *source-docs-prime
+      - *source-docs-runtime
+      - *source-docs-scope
+      - name: Setup dependencies for applicable source contracts
+        if: steps.reuse.outputs.reuse != 'true' && steps.source_docs.outputs.docs_only != 'true'
+        uses: ./.github/actions/setup-node-pnpm
       - name: Run changed-behavior coverage ratchet
         if: steps.reuse.outputs.reuse != 'true'
         env:
@@ -757,6 +829,46 @@ jobs:
         run: |
           set -euo pipefail
           git fetch --no-tags --unshallow --filter=blob:none origin "+refs/heads/${BASE_REF}:refs/remotes/origin/${BASE_REF}" "$HEAD_SHA"
+      - name: Prime the pinned source runtime before classification
+        if: matrix.shard == '4/4'
+        uses: ./.github/actions/prime-node-toolcache
+      - name: Select the pinned source runtime without dependency hydration
+        if: matrix.shard == '4/4'
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+      - name: Classify exact source docs before dependency setup
+        id: source_docs
+        if: matrix.shard == '4/4'
+        shell: bash
+        env:
+          EXPECTED_BASE: ${{ github.event.pull_request.base.sha }}
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha }}
+          BASE_REF: ${{ github.base_ref }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
+          # Older trusted bases retain the full path during rollout.
+          if ! git cat-file -e "$EXPECTED_BASE:scripts/source-docs-check.mjs" 2>/dev/null; then
+            echo 'docs_only=false' >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          policy_root="$(mktemp -d "$RUNNER_TEMP/source-docs-policy.XXXXXX")"
+          git archive "$EXPECTED_BASE" scripts LESSONS.guards.json .github/scripts .github/ci-harness docs/doc-freshness-registry.json repository-docs.json | tar -x -C "$policy_root"
+          export CURRENT_BASE="$(git rev-parse --verify "refs/remotes/origin/$BASE_REF^{commit}")"
+          export SOURCE_DOCS_PLAN="$policy_root/source-docs-plan.json"
+          if node "$policy_root/scripts/source-docs-check.mjs" plan; then
+            echo "helper_root=$policy_root" >> "$GITHUB_OUTPUT"
+          else
+            echo 'Docs applicability unavailable; retaining full validation.'
+            echo 'docs_only=false' >> "$GITHUB_OUTPUT"
+          fi
+      - name: Validate docs contracts in the merged-guard slot
+        if: matrix.shard == '4/4' && steps.source_docs.outputs.docs_only == 'true'
+        env:
+          SOURCE_DOCS_PLAN: ${{ steps.source_docs.outputs.plan }}
+          SOURCE_DOCS_HELPER_ROOT: ${{ steps.source_docs.outputs.helper_root }}
+        run: node "$SOURCE_DOCS_HELPER_ROOT/scripts/source-docs-check.mjs" check
       - name: Select unit-affecting diff
         id: scope
         if: steps.reuse.outputs.reuse != 'true'
@@ -783,10 +895,10 @@ jobs:
             echo 'No unit-affecting source changed; non-applicable receipt recorded.'
           fi
       - name: Setup Node.js and pnpm
-        if: matrix.shard == '4/4' || (steps.reuse.outputs.reuse != 'true' && (steps.scope.outputs.web == 'true' || steps.scope.outputs.ui == 'true' || steps.scope.outputs.ovie == 'true'))
+        if: (matrix.shard == '4/4' && steps.source_docs.outputs.docs_only != 'true') || (steps.reuse.outputs.reuse != 'true' && (steps.scope.outputs.web == 'true' || steps.scope.outputs.ui == 'true' || steps.scope.outputs.ovie == 'true'))
         uses: ./.github/actions/setup-node-pnpm
       - name: Setup Playwright warm path
-        if: matrix.shard == '4/4' || (steps.reuse.outputs.reuse != 'true' && steps.scope.outputs.web == 'true')
+        if: (matrix.shard == '4/4' && steps.source_docs.outputs.docs_only != 'true') || (steps.reuse.outputs.reuse != 'true' && steps.scope.outputs.web == 'true')
         uses: ./.github/actions/setup-playwright
       - name: Load quarantined unit tests
         id: quarantine
@@ -831,9 +943,13 @@ jobs:
         env:
           EXPECTED_HEAD: ${{ github.event.pull_request.head.sha }}
           SOURCE_GUARD_REQUIRE_CLEAN: 'true'
+          DOCS_ONLY: ${{ steps.source_docs.outputs.docs_only }}
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
+          # No merge/dependency transaction is needed when the exact base is
+          # already contained in the positively classified prose-only head.
+          if [ "$DOCS_ONLY" = true ]; then exit 0; fi
           test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
           echo 'restore_head=false' >> "$GITHUB_OUTPUT"
           # A local dirty checkout is not owned by this transaction.
@@ -882,7 +998,7 @@ jobs:
         id: source_merge_browsers
         uses: ./tmp/source-guard-actions/setup-playwright
       - name: Validate disk-read source contracts from trusted base
-        if: matrix.shard == '4/4'
+        if: matrix.shard == '4/4' && steps.source_docs.outputs.docs_only != 'true'
         shell: bash
         env:
           EXPECTED_HEAD: ${{ github.event.pull_request.head.sha }}
