@@ -9,13 +9,12 @@ import {
   cacheable,
   cacheKey,
   MemoryResponseCache,
-  type ResponseCache,
   toCached,
 } from './cache.ts';
 import {
   CONTRACT,
   callableSpec,
-  type PriorityName,
+  type ProviderSpec,
   priorityPolicy,
   resourceFor,
 } from './contract.ts';
@@ -39,7 +38,14 @@ import {
   type SpendDecision,
   type Transition,
 } from './policy.ts';
-import { credentialLabel, defaultStore, type LedgerStore } from './store.ts';
+import { credentialLabel, defaultStore } from './store.ts';
+
+// Import-type aliases erase completely; installed releases keep one runtime file.
+export type ApiResponse = import('./types.ts').ApiResponse;
+export type RequestOptions = import('./types.ts').RequestOptions;
+export type LedgerHooks = import('./types.ts').LedgerHooks;
+export type ApiClientOptions = import('./types.ts').ApiClientOptions;
+export type ApiClient = import('./types.ts').ApiClient;
 
 export const EX_TEMPFAIL = 75;
 
@@ -105,72 +111,6 @@ export class BudgetExhaustedError extends ApiError {
   }
 }
 
-export interface ApiResponse {
-  readonly status: number;
-  readonly headers: Headers;
-  readonly text: string;
-  readonly fromCache: 'ttl' | 'etag' | null;
-  readonly attempts: number;
-  json<T = unknown>(): T;
-}
-
-export interface RequestOptions {
-  readonly url: string;
-  readonly method?: string;
-  readonly headers?: Readonly<Record<string, string>>;
-  readonly body?: string | object;
-  readonly priority?: PriorityName;
-  readonly costs?: Readonly<Record<string, number>>;
-  readonly write?: boolean;
-  readonly idempotent?: boolean;
-  /** Serve a stored body younger than this without any network call. */
-  readonly cacheTtlMs?: number;
-  /** Send If-None-Match for GETs (default: provider's conditionalGet). */
-  readonly conditional?: boolean;
-  readonly coalesce?: boolean;
-  readonly maxAttempts?: number;
-  readonly maxWaitMs?: number;
-  readonly timeoutMs?: number;
-  readonly signal?: AbortSignal;
-  /** USD this call costs; defaults to the provider's pricing.perCallUsd. */
-  readonly priceUsd?: number;
-}
-
-/** Bridges legacy state files into the ledger (see legacy.ts). */
-export interface LedgerHooks {
-  prepare?(): Promise<unknown>;
-  merge?(state: CredentialState, prepared: unknown, nowMs: number): void;
-  publish?(
-    state: CredentialState,
-    failure: Failure,
-    nowMs: number
-  ): Promise<void>;
-}
-
-export interface ApiClientOptions {
-  readonly provider: string;
-  /** Stable bucket identity (never the secret). See hashCredential(). */
-  readonly credential: string;
-  readonly authorize?: (headers: Headers) => void | Promise<void>;
-  readonly store?: LedgerStore;
-  readonly cache?: ResponseCache;
-  readonly fetch?: typeof fetch;
-  readonly now?: () => number;
-  readonly sleep?: (ms: number) => Promise<void>;
-  readonly random?: () => number;
-  readonly log?: (event: Record<string, unknown>) => void;
-  readonly hooks?: LedgerHooks;
-  /** Per-credential daily USD cap; defaults to the provider's pricing.dailyCapUsd. */
-  readonly dailySpendCapUsd?: number;
-}
-
-export interface ApiClient {
-  readonly provider: string;
-  readonly credential: string;
-  request(options: RequestOptions): Promise<ApiResponse>;
-  state(): Promise<CredentialState | null>;
-}
-
 function respond(
   status: number,
   headers: Headers,
@@ -211,11 +151,6 @@ function maybeJson(text: string, headers: Headers | undefined): unknown {
   }
 }
 
-function bodyText(body: string | object | undefined): string | undefined {
-  if (body === undefined) return undefined;
-  return typeof body === 'string' ? body : JSON.stringify(body);
-}
-
 function graphqlQuery(body: string | undefined): string {
   if (!body) return '';
   try {
@@ -224,6 +159,68 @@ function graphqlQuery(body: string | undefined): string {
   } catch {
     return '';
   }
+}
+
+/** One normalization for transport and in-flight compatibility. */
+function effectiveRequestOptions(
+  provider: string,
+  spec: ProviderSpec,
+  opts: RequestOptions
+) {
+  const method = (opts.method ?? 'GET').toUpperCase();
+  const url = new URL(opts.url);
+  const body =
+    opts.body === undefined || typeof opts.body === 'string'
+      ? opts.body
+      : JSON.stringify(opts.body);
+  const isGraphql = url.pathname.endsWith('/graphql');
+  const read =
+    method === 'GET' ||
+    method === 'HEAD' ||
+    (isGraphql && !/^\s*mutation\b/.test(graphqlQuery(body)));
+  const priority = opts.priority ?? 'default';
+  const policy = priorityPolicy(priority);
+  const resource = resourceFor(provider, url);
+  return {
+    method,
+    url,
+    body,
+    read,
+    coalescible: method === 'GET' || (method === 'POST' && isGraphql && read),
+    write: opts.write ?? !read,
+    idempotent:
+      opts.idempotent ?? (read || method === 'PUT' || method === 'DELETE'),
+    priority,
+    resource,
+    costs: opts.costs ?? { [resource]: 1 },
+    maxAttempts: opts.maxAttempts ?? CONTRACT.defaults.maxAttempts,
+    maxWaitMs: opts.maxWaitMs ?? CONTRACT.defaults.maxWaitMs[policy.class],
+    conditional:
+      method === 'GET' && (opts.conditional ?? spec.conditionalGet === true),
+    cacheTtlMs: opts.cacheTtlMs ?? 0,
+    timeoutMs: opts.timeoutMs ?? CONTRACT.defaults.timeoutMs,
+    price: opts.priceUsd ?? spec.pricing?.perCallUsd ?? 0,
+  };
+}
+
+type EffectiveRequestOptions = ReturnType<typeof effectiveRequestOptions>;
+
+/** Caching shares representations; in-flight work also requires compatible policy. */
+function inFlightKey(
+  key: string,
+  policy: EffectiveRequestOptions,
+  headers: RequestOptions['headers']
+) {
+  return cacheKey([
+    key,
+    JSON.stringify({
+      ...policy,
+      costs: Object.entries(policy.costs).sort(([a], [b]) =>
+        a.localeCompare(b)
+      ),
+      headers: [...new Headers(headers)].sort(([a], [b]) => a.localeCompare(b)),
+    }),
+  ]);
 }
 
 const defaultLog = (event: Record<string, unknown>) => {
@@ -262,32 +259,33 @@ export function createApiClient(options: ApiClientOptions): ApiClient {
       return fn(credentialState(ledger, credential, at), at);
     });
 
-  async function send(opts: RequestOptions, key: string): Promise<ApiResponse> {
-    const method = (opts.method ?? 'GET').toUpperCase();
-    const url = new URL(opts.url);
-    const body = bodyText(opts.body);
-    const isGraphql = url.pathname.endsWith('/graphql');
-    const read =
-      method === 'GET' ||
-      method === 'HEAD' ||
-      (isGraphql && !/^\s*mutation\b/.test(graphqlQuery(body)));
-    const write = opts.write ?? !read;
-    const idempotent =
-      opts.idempotent ?? (read || method === 'PUT' || method === 'DELETE');
-    const priority = opts.priority ?? 'default';
-    const policy = priorityPolicy(priority);
-    const resource = resourceFor(provider, url);
-    const costs = opts.costs ?? { [resource]: 1 };
-    const maxAttempts = opts.maxAttempts ?? CONTRACT.defaults.maxAttempts;
-    const deadline =
-      now() + (opts.maxWaitMs ?? CONTRACT.defaults.maxWaitMs[policy.class]);
-    const conditional =
-      method === 'GET' && (opts.conditional ?? spec.conditionalGet === true);
-    const price = opts.priceUsd ?? spec.pricing?.perCallUsd ?? 0;
+  async function send(
+    opts: RequestOptions,
+    key: string,
+    policy: EffectiveRequestOptions
+  ): Promise<ApiResponse> {
+    const {
+      method,
+      url,
+      body,
+      read,
+      write,
+      idempotent,
+      priority,
+      resource,
+      costs,
+      maxAttempts,
+      maxWaitMs,
+      conditional,
+      cacheTtlMs,
+      timeoutMs,
+      price,
+    } = policy;
+    const deadline = now() + maxWaitMs;
 
-    if (read && opts.cacheTtlMs) {
+    if (read && cacheTtlMs) {
       const hit = await cache.get(key);
-      if (hit && now() - hit.storedAt < opts.cacheTtlMs) {
+      if (hit && now() - hit.storedAt < cacheTtlMs) {
         await inLedger((s, at) => bump(s, priority, 'cacheHits', at));
         return fromCached(hit, 'ttl', 0);
       }
@@ -369,15 +367,12 @@ export function createApiClient(options: ApiClientOptions): ApiClient {
       attempt += 1;
       const headers = new Headers(opts.headers);
       await options.authorize?.(headers);
-      const stored =
-        conditional || opts.cacheTtlMs ? await cache.get(key) : null;
+      const stored = conditional || cacheTtlMs ? await cache.get(key) : null;
       if (conditional && stored?.etag)
         headers.set('if-none-match', stored.etag);
       else if (conditional && stored?.lastModified)
         headers.set('if-modified-since', stored.lastModified);
-      const timeout = AbortSignal.timeout(
-        opts.timeoutMs ?? CONTRACT.defaults.timeoutMs
-      );
+      const timeout = AbortSignal.timeout(timeoutMs);
       let response: Response | null = null;
       let text = '';
       try {
@@ -445,7 +440,7 @@ export function createApiClient(options: ApiClientOptions): ApiClient {
         if (notModified && stored) return fromCached(stored, 'etag', attempt);
         if (
           read &&
-          (conditional || opts.cacheTtlMs) &&
+          (conditional || cacheTtlMs) &&
           cacheable(response.status, response.headers, text)
         ) {
           await cache.set(
@@ -480,27 +475,29 @@ export function createApiClient(options: ApiClientOptions): ApiClient {
     provider,
     credential,
     request(opts) {
-      const method = (opts.method ?? 'GET').toUpperCase();
-      const body = bodyText(opts.body) ?? '';
-      const key = cacheKey([
-        provider,
-        credential,
-        method,
-        opts.url,
-        opts.headers?.accept ?? '',
-        method === 'GET' ? '' : body,
-      ]);
-      const read =
-        method === 'GET' ||
-        (method === 'POST' &&
-          new URL(opts.url).pathname.endsWith('/graphql') &&
-          !/^\s*mutation\b/.test(graphqlQuery(body)));
-      if (!read || opts.coalesce === false) return send(opts, key);
-      const pending = inflight.get(key);
-      if (pending) return pending;
-      const promise = send(opts, key).finally(() => inflight.delete(key));
-      inflight.set(key, promise);
-      return promise;
+      try {
+        const policy = effectiveRequestOptions(provider, spec, opts);
+        const key = cacheKey([
+          provider,
+          credential,
+          policy.method,
+          opts.url,
+          opts.headers?.accept ?? '',
+          policy.method === 'GET' ? '' : (policy.body ?? ''),
+        ]);
+        if (!policy.coalescible || opts.coalesce === false || opts.signal)
+          return send(opts, key, policy);
+        const pendingKey = inFlightKey(key, policy, opts.headers);
+        const pending = inflight.get(pendingKey);
+        if (pending) return pending;
+        const promise = send(opts, key, policy).finally(() =>
+          inflight.delete(pendingKey)
+        );
+        inflight.set(pendingKey, promise);
+        return promise;
+      } catch (error) {
+        return Promise.reject(error);
+      }
     },
     async state() {
       const ledger = await store.read(provider);
