@@ -37,7 +37,7 @@ from label_episodes import RELAY_RED_LABELLER, label_episode_applier  # noqa: E4
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 from atomic_state import append_json_object
-from pr_body_markup import ANY_HEADING, quote_revision_references, red_section_bounds, repair_customer_decision, with_red_section
+from pr_body_markup import ANY_HEADING, quote_revision_references, red_section_bounds, repair_customer_decision, with_blast_radius, with_red_section
 import empty_review, red_repair, remediation  # noqa: E402  (classifier, red-repair admission, non-PR intake)
 REPO = os.environ.get("GITHUB_REPOSITORY", "JovieInc/Jovie")
 PREFIX = "lane-fix-"
@@ -1117,15 +1117,7 @@ def repair_evidence_body(pr: dict, body: str, excerpt: str = "", *, customer_dec
         if red_section_bounds(updated.split("\n"), re.compile(r"^#{2,3}\s*Premise check\s*$", re.I)) is None:
             block = "## Premise check\n\n" + "\n".join(f"- {field}: {premise[field]}" for field in fields)
             updated = updated.rstrip("\n") + "\n\n" + block + "\n"
-    if blast_radius is not None:
-        fields = ("What could break", "Proof")
-        if not isinstance(blast_radius, dict) or any(
-                not isinstance(blast_radius.get(field), str) or not blast_radius[field].strip()
-                or "\n" in blast_radius[field] or "\r" in blast_radius[field] for field in fields):
-            raise ValueError("blast radius requires explicit single-line What could break and Proof")
-        if red_section_bounds(updated.split("\n"), re.compile(r"^#{1,6}\s*Blast radius\s*$", re.I)) is None:
-            block = "## Blast radius\n\n" + "\n".join(f"- {field}: {blast_radius[field]}" for field in fields)
-            updated = updated.rstrip("\n") + "\n\n" + block + "\n"
+    updated = with_blast_radius(updated, blast_radius)
     return quote_revision_references(repair_customer_decision(updated, decisions, customer_decision))
 
 

@@ -54,6 +54,21 @@ def with_red_section(body: str, block: str) -> str:
     return "\n".join(lines[:start] + block.split("\n") + [""] + lines[end:])
 
 
+def with_blast_radius(body: str, evidence: dict | None) -> str:
+    """Append explicit author evidence without replacing an existing visible section."""
+    if evidence is None:
+        return body
+    fields = ("What could break", "Proof")
+    if not isinstance(evidence, dict) or any(
+            not isinstance(evidence.get(field), str) or not evidence[field].strip()
+            or "\n" in evidence[field] or "\r" in evidence[field] for field in fields):
+        raise ValueError("blast radius requires explicit single-line What could break and Proof")
+    if red_section_bounds(body.split("\n"), re.compile(r"^#{1,6}\s*Blast radius\s*$", re.I)) is not None:
+        return body
+    block = "## Blast radius\n\n" + "\n".join(f"- {field}: {evidence[field]}" for field in fields)
+    return body.rstrip("\n") + "\n\n" + block + "\n"
+
+
 def quote_revision_references(body: str) -> str:
     """Wrap bare commit-SHA mentions so company guards do not treat them as people.
 
