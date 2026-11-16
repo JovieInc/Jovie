@@ -12,6 +12,28 @@
     "minAbsoluteSeconds": 60
   },
   "entities": {
+    "merch-concept": {
+      "entityId": "merch generation batch UUID",
+      "description": "Pre-art review receipts persist in private batch artistBrief JSON. Aggregate export is not wired; no live timings are claimed.",
+      "stages": [
+        {
+          "id": "pre-art-review",
+          "meaning": "exact concept plan admission before any image, upload or mockup call",
+          "producer": "apps/web/lib/merch/design-generation.ts",
+          "status": "gap",
+          "source": "merch-concept-receipts",
+          "owner": "JOV-4739"
+        },
+        {
+          "id": "reviewed",
+          "meaning": "terminal concept-admission decision, never artwork or product certification",
+          "producer": "apps/web/lib/merch/generation-concepts.ts",
+          "status": "gap",
+          "source": "merch-concept-receipts",
+          "owner": "JOV-4739"
+        }
+      ]
+    },
     "pen-review": {
       "entityId": "frame id:attempt start[:round]; one observation per timed round or frame",
       "description": "Opt-in Pen review timings; local state ledger and stage-timings-latest.json, not live Mac certification.",
@@ -839,6 +861,11 @@
     }
   },
   "sources": {
+    "merch-concept-receipts": {
+      "kind": "events",
+      "url": null,
+      "owner": "JOV-4739; private merchGenerationBatches.artistBrief.conceptReview.stageEvent; aggregation handoff remains open"
+    },
     "pen-review-ledger": {
       "kind": "events",
       "url": null,

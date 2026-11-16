@@ -82,10 +82,14 @@ export async function reviewDesignProposal(params: {
     linearIssueId: existing.linearIssueId,
   });
 
-  const linearUpdated = await updateDesignLabLinearIssueStatus(
-    existing.linearIssueId,
-    params.decision === 'no' ? 'canceled' : 'completed'
-  );
+  // Taste approval and a dispatch request do not prove implementation completed.
+  const linearUpdated =
+    params.decision === 'no'
+      ? await updateDesignLabLinearIssueStatus(
+          existing.linearIssueId,
+          'canceled'
+        )
+      : false;
 
   return {
     proposal: updatedProposal,
