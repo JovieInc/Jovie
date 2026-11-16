@@ -135,6 +135,7 @@ export function readGraph(cache, root, tools, libraries = null) {
       rawBuildInfoPath: cache,
       rawBuildInfoSha256: sha(bytes),
       toolsDirectory: tools,
+      libraryDirectory: libraries ? resolve(libraries) : null,
       rootDirectory: root,
       version: raw.version,
       fileInfoCount: raw.fileInfos.length,

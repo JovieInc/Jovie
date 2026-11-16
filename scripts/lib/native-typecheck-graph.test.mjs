@@ -84,7 +84,12 @@ function fixture({ equivalentPeers = true } = {}) {
     affectsGlobalScope: false,
   });
   const extraFiles = [];
-  const build = (name, kind = 'baseline', mutate = raw => raw) => {
+  const build = (
+    name,
+    kind = 'baseline',
+    mutate = raw => raw,
+    libraries = null
+  ) => {
     const cache = resolve(output, `${name}.tsbuildinfo`);
     const files = [
       ...(kind === 'baseline'
@@ -112,10 +117,10 @@ function fixture({ equivalentPeers = true } = {}) {
     };
     if (kind === 'auxiliary') {
       raw.fileNames.push(relative(dirname(cache), widgetA));
-      raw.fileIdsList[0].push(5);
+      raw.fileIdsList[0].push(raw.fileNames.length);
     }
     save(cache, mutate(raw));
-    return readGraph(cache, root, tools);
+    return readGraph(cache, root, tools, libraries);
   };
   return {
     root,
@@ -148,6 +153,135 @@ test('retains reference-only names while counting only fileInfo-backed inputs', 
   });
   assert.equal(proof.status, 'context-proven');
   assert.ok(proof.aliases.length > 0);
+});
+
+test('accepts identical auxiliary references without inventing a semantic provider', () => {
+  const data = fixture();
+  const bytes = readFileSync(data.widgetA);
+  rmSync(data.widgetA);
+  writeFileSync(data.widgetA, bytes);
+  assert.notEqual(
+    statSync(data.widgetA, { bigint: true }).ino,
+    statSync(data.widgetB, { bigint: true }).ino
+  );
+  const original = data.build('original', 'auxiliary');
+  const repeated = data.build('repeated', 'auxiliary');
+  assert.deepEqual(original.metadata.auxiliary, repeated.metadata.auxiliary);
+  assert.deepEqual(original.dependencyFiles, repeated.dependencyFiles);
+  assert.ok(!original.dependencyFiles.includes(data.widgetA));
+  assert.equal(
+    assertGraphParity(repeated, original, { compiler, options }).status,
+    'equal'
+  );
+});
+
+test('keeps changed auxiliary paths, incoming contexts and captured linkage blocked', () => {
+  for (const change of [
+    'path',
+    'incoming',
+    'format',
+    'global',
+    'linkage',
+    'stored-path',
+    'id',
+  ]) {
+    const data = fixture();
+    const bytes = readFileSync(data.widgetA);
+    rmSync(data.widgetA);
+    writeFileSync(data.widgetA, bytes);
+    const other = resolve(data.root, 'node_modules/other/index.d.ts');
+    save(other, bytes.toString());
+    const baseline = data.build('baseline', 'auxiliary');
+    const candidate = data.build('candidate', 'auxiliary', raw => {
+      if (change === 'path') raw.fileNames[4] = relative(data.output, other);
+      if (change === 'incoming') raw.referencedMap[0][0] = 2;
+      if (change === 'format') raw.fileInfos[0].impliedFormat = 99;
+      if (change === 'global') raw.fileInfos[0].affectsGlobalScope = true;
+      return raw;
+    });
+    if (change === 'linkage')
+      candidate.metadata.auxiliary[0].incomingSourceIds = [2];
+    if (change === 'stored-path') {
+      candidate.metadata.auxiliary[0].path = other;
+      baseline.metadata.auxiliary[0].path = other;
+    }
+    if (change === 'id') {
+      for (const graph of [candidate, baseline]) {
+        graph.metadata.auxiliary[0].id = 4.5;
+        graph.metadata.auxiliary[0].incomingSourceIds = [];
+      }
+    }
+    assert.throws(
+      () => assertGraphParity(candidate, baseline, { compiler, options }),
+      /auxiliary|linkage|alias/iu,
+      change
+    );
+  }
+});
+
+test('binds bare auxiliary library references to their captured pinned directory', () => {
+  const data = fixture();
+  const libraries = resolve(data.tools, 'compiler/lib');
+  save(
+    resolve(libraries, 'lib.reference.d.ts'),
+    'interface PinnedReference {}'
+  );
+  const mutate = raw => {
+    raw.fileNames[4] = 'lib.reference.d.ts';
+    return raw;
+  };
+  const original = data.build('original', 'auxiliary', mutate, libraries);
+  const repeated = data.build('repeated', 'auxiliary', mutate, libraries);
+  assert.equal(original.metadata.libraryDirectory, libraries);
+  const proof = assertGraphParity(repeated, original, { compiler, options });
+  assert.equal(proof.status, 'equal');
+  assert.equal(
+    proof.sharedAuxiliaryReferences[0].rawPath,
+    resolve(libraries, 'lib.reference.d.ts')
+  );
+});
+
+test('normalizes shared incoming source order without accepting missing semantic inputs', () => {
+  const data = fixture();
+  const bytes = readFileSync(data.widgetA);
+  rmSync(data.widgetA);
+  writeFileSync(data.widgetA, bytes);
+  const original = data.build('original', 'auxiliary', raw => {
+    raw.fileIdsList[1].push(5);
+    return raw;
+  });
+  const reordered = data.build('reordered', 'auxiliary', raw => {
+    raw.fileIdsList[1].push(5);
+    raw.referencedMap.reverse();
+    return raw;
+  });
+  assert.notDeepEqual(
+    original.metadata.auxiliary,
+    reordered.metadata.auxiliary
+  );
+  const proof = assertGraphParity(reordered, original, { compiler, options });
+  assert.equal(proof.status, 'equal');
+  assert.equal(proof.sharedAuxiliaryReferences[0].incoming.length, 2);
+  assert.throws(
+    () =>
+      assertGraphParity(reordered, original, {
+        compiler,
+        options,
+        deadline: -Infinity,
+      }),
+    /time|budget/iu
+  );
+
+  const unique = resolve(data.root, 'node_modules/unique/index.d.ts');
+  save(unique, 'export interface Unique { required: string }');
+  data.extraFiles.push(unique);
+  const complete = data.build('complete', 'auxiliary');
+  data.extraFiles.pop();
+  const missing = data.build('missing', 'auxiliary');
+  assert.throws(
+    () => assertGraphParity(missing, complete, { compiler, options }),
+    /dependency|alias|physical/iu
+  );
 });
 
 test('accepts hardlinked declarations only after recursive peer targets agree', () => {
