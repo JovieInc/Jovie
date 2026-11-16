@@ -57,12 +57,12 @@ on:
   workflow_dispatch:
     inputs:
       mode:
-        description: diff (mutate the given files), sweep (rolling batch, changed modules first), incremental (changed modules only) or baseline (score every module once, 40 hosted shards)
+        description: diff (web files), ui (bounded UI-only targets), sweep (rolling batch), incremental (changed modules) or baseline (40 hosted shards)
         default: diff
         type: choice
-        options: [diff, sweep, incremental, baseline]
+        options: [diff, ui, sweep, incremental, baseline]
       files:
-        description: 'diff mode: space-separated repo paths to mutate (e.g. apps/web/lib/cron/auth.ts)'
+        description: 'diff/ui mode: exact repo source paths, e.g. apps/web/lib/cron/auth.ts or packages/ui/atoms/form.tsx'
         required: false
         type: string
       max_files:
@@ -208,6 +208,34 @@ jobs:
           ref: main
           persist-credentials: false
 
+      # UI targeting stays in this producer; no independent state publisher.
+      - name: Validate UI targets
+        id: ui_scope
+        if: github.event_name == 'workflow_dispatch' && inputs.mode == 'ui'
+        env:
+          INPUT_FILES: ${{ inputs.files }}
+          INPUT_MAX_FILES: ${{ inputs.max_files }}
+        run: |
+          node --input-type=module <<'NODE'
+          import { execFileSync } from 'node:child_process';
+          import { appendFileSync, lstatSync } from 'node:fs';
+          const files = [...new Set((process.env.INPUT_FILES ?? '').split(/[\s,]+/u).filter(Boolean))];
+          const limit = Number(process.env.INPUT_MAX_FILES);
+          const runtime = path => /^packages\/ui\/(?:[\w-]+\/)*[\w-]+\.tsx?$/u.test(path)
+            && !/(?:^|\/)(?:tests?|__tests__|fixtures|__fixtures__|stories)\//u.test(path);
+          const tracked = new Set(execFileSync('git', ['ls-files', '-z', '--', 'packages/ui/'], { encoding: 'utf8' }).split('\0'));
+          if (!files.length || !Number.isSafeInteger(limit) || limit < 1)
+            throw new Error('UI mode requires source files and a positive max_files');
+          for (const file of files) {
+            if (!runtime(file) || !tracked.has(file) || !lstatSync(file).isFile())
+              throw new Error('UI targets must be tracked runtime TypeScript files under packages/ui');
+            // --include is prefix-based; reject a file that could admit a sibling.
+            if ([...tracked].some(other => other !== file && /\.tsx?$/u.test(other) && other.startsWith(file)))
+              throw new Error('UI target has an ambiguous source prefix');
+          }
+          appendFileSync(process.env.GITHUB_OUTPUT, `include=${files.join(',')}\nmax_files=${Math.min(limit, files.length)}\n`);
+          NODE
+
       # Spare compute only: exit 75 means gem is busy, so skip without failing.
       - name: Check the runner has spare capacity
         id: capacity
@@ -275,8 +303,10 @@ jobs:
           CI: 'true'
           STRYKER_CONCURRENCY: '1'
           MUTATION_MAX_LOAD: '8'
-          MODE: ${{ github.event_name == 'workflow_dispatch' && inputs.mode || 'sweep' }}
-          MAX_FILES: ${{ github.event_name == 'workflow_dispatch' && inputs.max_files || (github.event_name == 'workflow_run' && '4') || '6' }}
+          MODE: ${{ github.event_name == 'workflow_dispatch' && (inputs.mode == 'ui' && 'sweep' || inputs.mode) || 'sweep' }}
+          MAX_FILES: ${{ steps.ui_scope.outputs.max_files || (github.event_name == 'workflow_dispatch' && inputs.max_files || (github.event_name == 'workflow_run' && '4') || '6') }}
+          UI_ONLY: ${{ github.event_name == 'workflow_dispatch' && inputs.mode == 'ui' }}
+          UI_INCLUDE: ${{ steps.ui_scope.outputs.include || 'packages/ui/' }}
         run: |
           set -euo pipefail
           state_dir=".cache/jovie-mutation"
@@ -284,6 +314,8 @@ jobs:
           # Runners share one HOME; serialize on the state file.
           exec 9>"$HOME/.local/state/jovie-mutation/sweep.lock"
           flock -n 9 || { echo "Another sweep holds the state lock; skipping."; exit 0; }
+          echo 'admitted=true' >> "$GITHUB_OUTPUT"
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
           if [ -s .cache/jovie-mutation-baseline/sweep-state.json ]; then
             node scripts/test-quality-loop.mjs merge --out "$RUNNER_TEMP/with-baseline.json" \
               "$state_dir/sweep-state.json" .cache/jovie-mutation-baseline/sweep-state.json
@@ -291,28 +323,36 @@ jobs:
           fi
           # Rank modules by how high-touch they are (tier weight + git churn) so the sweep
           # expands from billing, auth and the golden path outward.
-          git fetch --quiet --unshallow origin main 2>/dev/null || git fetch --quiet --depth=2000 origin main
-          node scripts/test-quality-loop.mjs rank --out "$RUNNER_TEMP/ranked.json" --top 0
-          [ -f "$state_dir/sweep-state.json" ] && node scripts/test-quality-loop.mjs model-check \
-            --state "$state_dir/sweep-state.json" --ranked "$RUNNER_TEMP/ranked.json" || true
+          if [ "$UI_ONLY" != true ]; then
+            git fetch --quiet --unshallow origin main 2>/dev/null || git fetch --quiet --depth=2000 origin main
+            node scripts/test-quality-loop.mjs rank --out "$RUNNER_TEMP/ranked.json" --top 0
+            [ -f "$state_dir/sweep-state.json" ] && node scripts/test-quality-loop.mjs model-check \
+              --state "$state_dir/sweep-state.json" --ranked "$RUNNER_TEMP/ranked.json" || true
+          fi
           # @jovie/ui first, on a fixed slice carved out of the apps/web budget (90 -> 75):
           # worst case 10 + 5 (one module's timeout) + 75 + 25 matches the old 90 + 25, inside
           # timeout-minutes. Same state file, keyed packages/ui/<path>, which the component
           # certificate reads. No --github-output: only the apps/web sweep drives chaining.
           ui_status=0
-          nice -n 19 node scripts/mutation-sweep.mjs --include packages/ui/ \
+          ui_extra=()
+          if [ "$UI_ONLY" = true ]; then
+            ui_extra+=(--propose-baseline "$RUNNER_TEMP/baseline-proposal.json")
+          fi
+          nice -n 19 node scripts/mutation-sweep.mjs --include "$UI_INCLUDE" \
             --state "$state_dir/sweep-state.json" \
             --mode "$MODE" --max-files "$MAX_FILES" --max-minutes 10 --file-timeout-minutes 5 \
-            --summary "$GITHUB_STEP_SUMMARY" || ui_status=$?
+            --summary "$GITHUB_STEP_SUMMARY" "${ui_extra[@]}" || ui_status=$?
           # Stryker mutates in place; a killed module must not leave a mutant for apps/web tests.
           git checkout --quiet -- packages/ui
-          nice -n 19 node scripts/mutation-sweep.mjs \
-            --touch-file "$RUNNER_TEMP/ranked.json" \
-            --state "$state_dir/sweep-state.json" \
-            --mode "$MODE" --max-files "$MAX_FILES" --max-minutes 75 \
-            --summary "$GITHUB_STEP_SUMMARY" \
-            --github-output "$GITHUB_OUTPUT" \
-            --propose-baseline "$RUNNER_TEMP/baseline-proposal.json"
+          if [ "$UI_ONLY" != true ]; then
+            nice -n 19 node scripts/mutation-sweep.mjs \
+              --touch-file "$RUNNER_TEMP/ranked.json" \
+              --state "$state_dir/sweep-state.json" \
+              --mode "$MODE" --max-files "$MAX_FILES" --max-minutes 75 \
+              --summary "$GITHUB_STEP_SUMMARY" \
+              --github-output "$GITHUB_OUTPUT" \
+              --propose-baseline "$RUNNER_TEMP/baseline-proposal.json"
+          fi
           # Metrics (mutation score per surface, survivors killed, test minutes, flakes) and the
           # warn-only floor check; the report is uploaded and read by the Shipping SLO feed.
           node scripts/test-quality-loop.mjs report --state "$state_dir/sweep-state.json" \
@@ -322,7 +362,7 @@ jobs:
 
       # Exact survivor text is prepared for review; this step has no outbound credential.
       - name: Prepare survivor issue drafts
-        if: ${{ always() && steps.capacity.outputs.run == 'true' && steps.portable_state.outcome == 'success' && hashFiles('.cache/jovie-mutation/sweep-state.json') != '' }}
+        if: ${{ always() && steps.score.outputs.admitted == 'true' && steps.capacity.outputs.run == 'true' && steps.portable_state.outcome == 'success' && hashFiles('.cache/jovie-mutation/sweep-state.json') != '' }}
         run: |
           node scripts/mutation-sweep-file-issues.mjs \
             --tasks ".cache/jovie-mutation/survivor-tasks" \
@@ -333,7 +373,7 @@ jobs:
       # this one made progress and modules remain; a busy host stops the chain
       # (the capacity step skipped), and the next main CI completion restarts it.
       - name: Chain the next batch
-        if: steps.score.outputs.remaining != '' && steps.score.outputs.remaining != '0' && steps.score.outputs.scored != '0'
+        if: inputs.mode != 'ui' && steps.score.outputs.remaining != '' && steps.score.outputs.remaining != '0' && steps.score.outputs.scored != '0'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -344,18 +384,17 @@ jobs:
           if [ "$queued" -gt 0 ] || [ "$active" -ne 1 ]; then echo "Mutation workflow inventory is not exclusive; no duplicate dispatch."; exit 0; fi
           node packages/api-client/cli.ts gh --priority default -- workflow run mutation-diff.yml --ref main -f mode=sweep -f max_files=6
 
-      - name: Save sweep state
-        if: ${{ always() && steps.capacity.outputs.run == 'true' && steps.portable_state.outcome == 'success' && hashFiles('.cache/jovie-mutation/sweep-state.json') != '' }}
-        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: .cache/jovie-mutation
-          key: mutation-sweep-portable-v2-${{ github.run_id }}-${{ github.run_attempt }}
-
       # Snapshot even a failed score/filing attempt. The cache remains the
       # state owner; copying evidence must not rewrite or clear its history.
+      # Producer provenance does not refresh per-module tested SHA or input receipts.
       - name: Snapshot sweep state and survivor tasks
         id: snapshot
-        if: ${{ always() && steps.capacity.outputs.run == 'true' && steps.portable_state.outcome == 'success' && hashFiles('.cache/jovie-mutation/sweep-state.json') != '' }}
+        if: ${{ always() && steps.score.outputs.admitted == 'true' && steps.capacity.outputs.run == 'true' && steps.portable_state.outcome == 'success' && hashFiles('.cache/jovie-mutation/sweep-state.json') != '' }}
+        env:
+          SCORE_SHA: ${{ steps.score.outputs.sha }}
+          UI_ONLY: ${{ github.event_name == 'workflow_dispatch' && inputs.mode == 'ui' }}
+          UI_INCLUDE: ${{ steps.ui_scope.outputs.include || 'packages/ui/' }}
+          MAX_FILES: ${{ steps.ui_scope.outputs.max_files || (github.event_name == 'workflow_dispatch' && inputs.max_files || (github.event_name == 'workflow_run' && '4') || '6') }}
         run: |
           set -euo pipefail
           state_dir=".cache/jovie-mutation"
@@ -369,6 +408,40 @@ jobs:
           if [ -d "$state_dir/survivor-tasks" ]; then
             cp -R "$state_dir/survivor-tasks" "$out_dir/"
           fi
+          export SNAPSHOT_DIR="$out_dir"
+          node --input-type=module <<'NODE'
+          import { execFileSync } from 'node:child_process';
+          import { createHash } from 'node:crypto';
+          import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+          import { join } from 'node:path';
+          const sha = process.env.SCORE_SHA;
+          const maxFiles = Number(process.env.MAX_FILES);
+          const runId = process.env.GITHUB_RUN_ID;
+          const runAttempt = process.env.GITHUB_RUN_ATTEMPT;
+          if (!/^[a-f0-9]{40}$/u.test(sha ?? '') || execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim() !== sha)
+            throw new Error('Mutation publication source no longer matches scoring');
+          if (!/^[1-9]\d*$/u.test(runId ?? '') || !/^[1-9]\d*$/u.test(runAttempt ?? '') || !Number.isSafeInteger(maxFiles) || maxFiles < 1)
+            throw new Error('Mutation publication needs exact run, attempt and bounds');
+          const hash = name => {
+            const path = join(process.env.SNAPSHOT_DIR, name);
+            return existsSync(path) ? createHash('sha256').update(readFileSync(path)).digest('hex') : null;
+          };
+          const receipt = {
+            schema: 'jovie.mutation-producer-receipt/v1', sha, runId, runAttempt,
+            cacheKey: `mutation-sweep-portable-v2-${runId}-${runAttempt}`,
+            scope: { kind: process.env.UI_ONLY === 'true' ? 'ui' : 'rolling', include: process.env.UI_INCLUDE, maxFiles },
+            runtime: { node: process.versions.node },
+            stateSha256: hash('sweep-state.json'), attemptsSha256: hash('sweep-state.json.runs.jsonl'),
+          };
+          writeFileSync(join(process.env.SNAPSHOT_DIR, 'producer-receipt.json'), `${JSON.stringify(receipt, null, 2)}\n`);
+          NODE
+
+      - name: Save sweep state
+        if: ${{ always() && steps.score.outputs.admitted == 'true' && steps.capacity.outputs.run == 'true' && steps.portable_state.outcome == 'success' && steps.snapshot.outcome == 'success' && hashFiles('.cache/jovie-mutation/sweep-state.json') != '' }}
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .cache/jovie-mutation
+          key: mutation-sweep-portable-v2-${{ github.run_id }}-${{ github.run_attempt }}
 
       - name: Upload sweep state and survivor tasks
         if: ${{ always() && steps.snapshot.outcome == 'success' }}
