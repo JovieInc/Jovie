@@ -195,14 +195,24 @@ export function parseDiagnostics(output, root) {
   );
 }
 
-export function readGraph(cache, root, tools) {
+export function readGraph(cache, root, tools, libraries = null) {
   const raw = JSON.parse(readFileSync(cache, 'utf8'));
   const graph = raw.program ?? raw;
   check(
     Array.isArray(graph.fileNames) && Array.isArray(graph.root),
     'Missing compiler file/root graph'
   );
-  const files = graph.fileNames.map(file => resolve(dirname(cache), file));
+  const files = graph.fileNames.map(file => {
+    if (!/^lib(?:\.[a-z0-9]+)*\.d\.ts$/iu.test(file))
+      return resolve(dirname(cache), file);
+    check(
+      libraries && resolve(libraries).startsWith(`${resolve(tools)}${sep}`),
+      'Bare standard library lacks a pinned compiler location'
+    );
+    const path = resolve(libraries, file);
+    check(existsSync(path), `Pinned standard library missing: ${file}`);
+    return path;
+  });
   const ids = graph.root.flatMap(item => {
     if (!Array.isArray(item)) return [item];
     check(
@@ -311,6 +321,8 @@ export function inspectTools(root, tools) {
     result[alias] = {
       ...pin,
       executable,
+      libraries:
+        alias === 'ts6' ? resolve(directory, 'lib') : dirname(executable),
       packageTreeSha256: hashTree(directory),
     };
   }

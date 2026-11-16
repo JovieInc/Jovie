@@ -168,6 +168,37 @@ test('expands compressed root ranges and rejects empty, out-of-range or external
   }
 });
 
+test('resolves native bare standard libraries only inside the pinned adjacent library directory', () => {
+  const data = fixture();
+  const cache = resolve(data.output, 'native.tsbuildinfo');
+  const libraries = resolve(data.tools, 'libraries');
+  save(resolve(libraries, 'lib.es2022.d.ts'), 'declare const fixture: never;');
+  save(cache, {
+    fileNames: [
+      'lib.es2022.d.ts',
+      relative(dirname(cache), resolve(data.root, FILES[0])),
+    ],
+    root: [2],
+  });
+  assert.deepEqual(
+    readGraph(cache, data.root, data.tools, libraries).dependencyFiles,
+    []
+  );
+  assert.throws(
+    () => readGraph(cache, data.root, data.tools),
+    /pinned compiler location/
+  );
+  assert.throws(
+    () => readGraph(cache, data.root, data.tools, data.root),
+    /pinned compiler location/
+  );
+  rmSync(resolve(libraries, 'lib.es2022.d.ts'));
+  assert.throws(
+    () => readGraph(cache, data.root, data.tools, libraries),
+    /standard library missing/
+  );
+});
+
 test('restores exact source bytes after an edited invocation throws', async () => {
   const data = fixture();
   const path = FILES[0];

@@ -233,7 +233,7 @@ export async function runQualification({
     save(resolve(output, 'receipt.json'), receipt);
     assertCompleted({ ...result, diagnostics: entry.diagnostics });
     check(!interrupted, 'Qualification interrupted');
-    entry.graph = readGraph(cache, root, tools);
+    entry.graph = readGraph(cache, root, tools, pins.packages[alias].libraries);
     entry.completed = true;
     entry.sourceFiles = entry.graph.repositoryFiles.map(path => ({
       path,
