@@ -23,14 +23,17 @@ export function wipAdmission(branch, execute, cwd, priority = 'default') {
   } catch {
     decision = null;
   }
-  if (result.status === 3 && decision)
+  if (
+    (result.status === 3 || result.status === 75) &&
+    decision?.allowed === false
+  )
     return {
       allowed: false,
       reason: decision.reason,
       message:
         decision.reason === 'wip-cap'
           ? `wip-cap: \`${decision.producer}/\` already owns ${decision.used} open PRs (historical cap ${decision.cap}).`
-          : `${decision.reason}: current capacity defers this admission${decision.retryAt ? ` until ${new Date(decision.retryAt * 1000).toISOString()}` : ''}.`,
+          : `${decision.reason?.startsWith('github-') ? 'github-quota-deferred: ' : ''}${decision.reason}: current capacity defers this admission${decision.retryAt ? ` until ${new Date(decision.retryAt * 1000).toISOString()}` : ''}.`,
     };
   return {
     allowed: true,
@@ -69,5 +72,9 @@ export function wipGate(a, branch, { execute, log, record }) {
     log(
       'Refusing to open: current capacity is unavailable. A WIP override cannot bypass quota or CI.'
     );
-  return { refused, override };
+  return {
+    refused,
+    override,
+    ...(refused && wip.reason !== 'wip-cap' ? { deferred: true } : {}),
+  };
 }

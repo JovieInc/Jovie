@@ -446,15 +446,6 @@ class MarginalYieldAndAdmissionTest(unittest.TestCase):
         few = decide(prev, {**seen, "yieldByProvider": {"codex": {"attempts": 3, "converted": 0}}}, sample(), {"codex": 3}, cfg(max={"codex": 6}), NOW)
         self.assertGreaterEqual(self.lane(few, "codex")["effective"], 4, "too few attempts is no evidence")
 
-    def test_stale_proxy_counts_and_historical_merge_dwell_do_not_veto_intake(self):
-        seen = obs(runningByProvider={"codex": 3}, eligiblePoolByProvider={"codex": 50}, maintenanceQueueByProvider={"codex": 20},
-                   openPRCount=315, wipMax=80, quotaDeferredHeads=2,
-                   mergeThroughput={"queueDepth": 9, "queueWaitP50Minutes": 45, "mergedPerHour": 9, "openedPerHour": 5, "ejectionRate": 0.0},
-                   newIssueBudgetByProvider={"codex": {"reason": "wip-cap"}})
-        row = self.lane(decide(None, seen, sample(), {"codex": 3}, cfg(max={"codex": 6}), NOW), "codex")
-        self.assertEqual(row["intakeBlockers"], [])
-        self.assertGreater(row["intakeEffective"], 3)
-
     def test_current_capacity_blocks_intake_while_repair_seats_remain(self):
         base = obs(runningByProvider={"codex": 3}, eligiblePoolByProvider={"codex": 50}, maintenanceQueueByProvider={"codex": 20})
         for token in ("github-quota:graphql", "github-quota:core", "ci-runner-backlog"):
@@ -469,50 +460,6 @@ class MarginalYieldAndAdmissionTest(unittest.TestCase):
         row = self.lane(decide(None, saturated, sample(), {"codex": 3}, cfg(max={"codex": 6}), NOW), "codex")
         self.assertEqual(row["intakeEffective"], 0)
         self.assertIn("ci-runner-backlog", row["intakeBlockers"])
-
-    def test_unknown_capacity_allows_existing_base_but_never_growth_and_recovers_on_fresh_evidence(self):
-        unknown = {"allowed": True, "known": False, "reason": "capacity-unknown", "unknown": ["ci"]}
-        seen = obs(runningByProvider={"codex": 3}, eligiblePoolByProvider={"codex": 50}, maintenanceQueueByProvider={"codex": 20},
-                   newIssueBudgetByProvider={"codex": {"reason": "capacity-unknown", "capacity": unknown}})
-        held = decide(None, seen, sample(), {"codex": 3}, cfg(max={"codex": 6}), NOW)
-        row = self.lane(held, "codex")
-        self.assertEqual((row["effective"], row["intakeEffective"]), (3, 3))
-        self.assertEqual(row["lastReason"], "hold:capacity-unknown")
-        self.assertEqual(row["intakeBlockers"], [])
-        healthy = obs(runningByProvider={"codex": 3}, eligiblePoolByProvider={"codex": 50}, maintenanceQueueByProvider={"codex": 20})
-        recovered = decide(held, healthy, sample(), {"codex": 3}, cfg(max={"codex": 6}), NOW + A.HOST_SETTLE_S)
-        self.assertGreater(self.lane(recovered, "codex")["intakeEffective"], 3)
-
-    def test_fresh_global_capacity_supersedes_cached_provider_and_scalar_proxies(self):
-        healthy = {"allowed": True, "known": True, "reason": "within-capacity", "blockers": [], "observedAt": NOW,
-                   "ci": {"known": True, "queuedRuns": 0, "oldestMin": None}}
-        for old in ({"reason": "wip-cap"},
-                    {"reason": "capacity-unknown", "capacity": {"allowed": True, "known": False}},
-                    {"reason": "github-quota:core", "capacity": {"allowed": False, "known": True, "blockers": ["github-quota:core"]}}):
-            with self.subTest(old=old):
-                seen = obs(admissionCapacity=healthy, githubRemaining=0, quotaDeferredHeads=3, openPRCount=999,
-                           newIssueBudgetByProvider={"codex": old}, runningByProvider={"codex": 3},
-                           eligiblePoolByProvider={"codex": 50}, maintenanceQueueByProvider={"codex": 20})
-                row = self.lane(decide(None, seen, sample(), {"codex": 3}, cfg(max={"codex": 6}), NOW), "codex")
-                self.assertGreater(row["intakeEffective"], 3)
-                self.assertEqual(row["intakeBlockers"], [])
-
-    def test_global_capacity_unknown_does_not_trust_positive_legacy_scalar_or_deadlock_recovery(self):
-        unknown = {"allowed": True, "known": False, "reason": "capacity-unknown", "unknown": ["github:core", "ci"]}
-        seen = obs(admissionCapacity=unknown, githubRemaining=4000, runningByProvider={"codex": 3},
-                   eligiblePoolByProvider={"codex": 50}, maintenanceQueueByProvider={"codex": 20})
-        row = self.lane(decide(None, seen, sample(), {"codex": 3}, cfg(max={"codex": 6}), NOW), "codex")
-        self.assertEqual((row["effective"], row["intakeEffective"]), (3, 3))
-        self.assertEqual(row["lastReason"], "hold:capacity-unknown")
-
-    def test_global_real_zero_blocks_intake_without_eliminating_recovery(self):
-        zero = {"allowed": False, "known": True, "reason": "github-quota:core", "blockers": ["github-quota:core"], "retryAt": NOW + 60}
-        seen = obs(admissionCapacity=zero, githubRemaining=4000, runningByProvider={"codex": 3},
-                   eligiblePoolByProvider={"codex": 50}, maintenanceQueueByProvider={"codex": 20})
-        row = self.lane(decide(None, seen, sample(), {"codex": 3}, cfg(max={"codex": 6}), NOW), "codex")
-        self.assertEqual(row["intakeEffective"], 0)
-        self.assertIn("github-quota:core", row["intakeBlockers"])
-        self.assertGreater(row["effective"], 0)
 
     def test_flow_metrics_and_swarm_claims(self):
         with tempfile.TemporaryDirectory() as tmp:

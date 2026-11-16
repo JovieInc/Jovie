@@ -1,8 +1,11 @@
+import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { draftBody, gate, redOutput } from '../../pr-open.mjs';
 import { countSizeGuardFiles } from '../merge-group-member-policy.mjs';
+import { admissionPriority } from '../pr-publication.mjs';
 import {
   filterCountedRows,
   isSizeExcluded,
@@ -166,14 +169,18 @@ describe('pr-open capacity admission', () => {
         'codex/fix',
         {
           execute: python(
-            3,
+            75,
             JSON.stringify({ allowed: false, reason, retryAt: 1800003600 })
           ),
           log: () => {},
           record: row => rows.push(row),
         }
       );
-      expect(result).toEqual({ refused: true, override: false });
+      expect(result).toEqual({
+        refused: true,
+        override: false,
+        deferred: true,
+      });
       expect(rows.at(-1).reason).toBe(reason);
       expect(rows.at(-1)).not.toHaveProperty('override');
     }
@@ -233,4 +240,61 @@ describe('pr-open capacity admission', () => {
       override: false,
     });
   });
+});
+
+it('only evidence-qualified correctness repairs use the existing repair reserve', () => {
+  const repair = {
+    title: 'fix(merch): prevent an invalid payment',
+    labels: [],
+    evidence: {
+      failingCommand: 'node --test payment.test.mjs',
+      failingRun: 'https://github.com/JovieInc/Jovie/actions/runs/1',
+    },
+    body: '## Red-before-green\n\n- Failing command: `node --test payment.test.mjs`\n- Failing run (before fix): https://github.com/JovieInc/Jovie/actions/runs/1\n',
+    files: [{ filename: 'apps/web/lib/merch/order.ts' }],
+  };
+  assert.equal(admissionPriority(repair), 'repair');
+  for (const filename of [
+    'apps/web/lib/auth/session.ts',
+    'apps/web/lib/agent-os/admission.ts',
+    '.github/workflows/ci.yml',
+  ])
+    assert.equal(
+      admissionPriority({ ...repair, files: [{ filename }] }),
+      'repair'
+    );
+  assert.equal(
+    admissionPriority({ ...repair, title: 'feat(merch): add a payment' }),
+    'default'
+  );
+  assert.equal(admissionPriority({ ...repair, evidence: {} }), 'default');
+  assert.equal(
+    admissionPriority({ ...repair, files: [{ filename: 'docs/payments.md' }] }),
+    'default'
+  );
+  assert.equal(
+    admissionPriority({
+      ...repair,
+      files: [{ filename: 'apps/web/components/ui/button.tsx' }],
+    }),
+    'default'
+  );
+});
+
+it('Vitest logs become literal FAIL evidence accepted by Fleet Rules', () => {
+  const log =
+    '\x1b[31m ❯ scripts/thing.test.ts (3 tests | 1 failed)\x1b[0m\nAssertionError: expected 0 to be 1\n Test Files  1 failed (1)';
+  const files = [{ filename: 'scripts/x.test.mjs', status: 'added' }];
+  const body = draftBody({
+    title: 'fix(web): regression',
+    files,
+    failingCommand: 'pnpm exec vitest run',
+    failingLog: log,
+  });
+  assert.match(body, /```text\nFAIL ❯ scripts\/thing.test.ts/);
+  assert.deepEqual(
+    gate({ title: 'fix(web): regression', body, files }).errors,
+    []
+  );
+  assert.throws(() => redOutput('All 3 tests passed'), /no failure evidence/);
 });

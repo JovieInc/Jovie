@@ -131,6 +131,27 @@ def _capacity_file(path: Path, limit: int) -> dict:
         return {}
 
 
+def capacity_from_observation(obs: dict, name: str = "") -> dict:
+    """Current canonical evidence outranks cached per-provider observations."""
+    obj = lambda value: value if isinstance(value, dict) else {}
+    return (obj(obs["admissionCapacity"]) if "admissionCapacity" in obs
+            else obj(obj(obj(obs.get("newIssueBudgetByProvider")).get(name)).get("capacity")))
+
+
+def intake_blockers(obs: dict, name: str = "") -> list[str]:
+    """Current resources gate intake; historical symptoms are diagnostic. Repairs remain independent."""
+    capacity, gates = capacity_from_observation(obs, name), []
+    if capacity.get("allowed") is False:
+        gates.extend(capacity.get("blockers") or [capacity.get("reason", "capacity-unavailable")])
+    ci = obs.get("ciQueue") if isinstance(obs.get("ciQueue"), dict) else {}
+    queued, oldest = ci.get("queuedRuns"), ci.get("oldestMin")
+    saturated = ((type(queued) is int and queued >= CI_QUEUED_RUNS_BRAKE)
+                 or (type(oldest) in (int, float) and math.isfinite(oldest) and oldest >= CI_QUEUED_OLDEST_BRAKE_MIN))
+    if "admissionCapacity" not in obs and ci.get("fresh") and saturated:
+        gates.append("ci-runner-backlog")
+    return list(dict.fromkeys(gates))
+
+
 def capacity_snapshot(*, store=None, credential=None, state_dir=None, now=None, priority="default") -> dict:
     """Read the exact caller's ledger and current CI backlog. No API call or new state.
 
@@ -369,7 +390,7 @@ def main(argv: list[str] | None = None) -> int:
         # Counts do not participate in admission, so avoid the paginated PR census.
         decision = admit(None, producer_of(args.branch), policy, capacity=observe_capacity(refresh=True, priority=args.priority))
         print(json.dumps(decision))
-        return 0 if decision["allowed"] else 3
+        return 0 if decision["allowed"] else 75
     prs = fetch_open_prs()
     if prs is None:
         print(json.dumps({"error": "open-prs-unreadable"}))

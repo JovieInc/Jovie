@@ -15,7 +15,6 @@ import test from 'node:test';
 import { execFileSync, spawnSync } from './lib/child-process.mjs';
 import { evaluateFleetRules } from './pr-fleet-rules.mjs';
 import {
-  admissionPriority,
   CUSTOMER_MARKER,
   commonDirectories,
   deriveEvidence,
@@ -23,44 +22,8 @@ import {
   gate,
   lockedCitation,
   main,
-  redOutput,
   refreshBodyChecks,
 } from './pr-open.mjs';
-
-test('only evidence-qualified correctness repairs use the existing repair reserve', () => {
-  const repair = {
-    title: 'fix(merch): prevent an invalid payment',
-    labels: [],
-    body: '## Red-before-green\n\n- Failing command: `node --test payment.test.mjs`\n- Failing run (before fix): https://github.com/JovieInc/Jovie/actions/runs/1\n',
-    files: [{ filename: 'apps/web/lib/merch/order.ts' }],
-  };
-  assert.equal(admissionPriority(repair), 'repair');
-  for (const filename of [
-    'apps/web/lib/auth/session.ts',
-    'apps/web/lib/agent-os/admission.ts',
-    '.github/workflows/ci.yml',
-  ])
-    assert.equal(
-      admissionPriority({ ...repair, files: [{ filename }] }),
-      'repair'
-    );
-  assert.equal(
-    admissionPriority({ ...repair, title: 'feat(merch): add a payment' }),
-    'default'
-  );
-  assert.equal(admissionPriority({ ...repair, body: '' }), 'default');
-  assert.equal(
-    admissionPriority({ ...repair, files: [{ filename: 'docs/payments.md' }] }),
-    'default'
-  );
-  assert.equal(
-    admissionPriority({
-      ...repair,
-      files: [{ filename: 'apps/web/components/ui/button.tsx' }],
-    }),
-    'default'
-  );
-});
 
 const file = (filename, status = 'modified') => ({
   filename,
@@ -277,24 +240,6 @@ test('derives last failed CI URL and measured before-value from PR or linked iss
     ),
     {}
   );
-});
-
-test('Vitest logs become literal FAIL evidence accepted by Fleet Rules', () => {
-  const log =
-    '\x1b[31m ❯ scripts/thing.test.ts (3 tests | 1 failed)\x1b[0m\nAssertionError: expected 0 to be 1\n Test Files  1 failed (1)';
-  const files = [file('scripts/x.test.mjs', 'added')];
-  const body = draftBody({
-    title: 'fix(web): regression',
-    files,
-    failingCommand: 'pnpm exec vitest run',
-    failingLog: log,
-  });
-  assert.match(body, /```text\nFAIL ❯ scripts\/thing.test.ts/);
-  assert.deepEqual(
-    gate({ title: 'fix(web): regression', body, files }).errors,
-    []
-  );
-  assert.throws(() => redOutput('All 3 tests passed'), /no failure evidence/);
 });
 
 test('refresh edits once when the body changed and never requests stale reruns', async () => {

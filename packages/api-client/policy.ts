@@ -10,12 +10,14 @@ import {
   priorityPolicy,
 } from './contract.ts';
 import type { Failure, Observation } from './headers.ts';
+import {
+  mergeObservation,
+  UNTIMED_OBSERVATION_MS,
+} from './observation-policy.ts';
 
 export const LEDGER_SCHEMA = 'jovie-api-ledger/v1';
 const HOUR_MS = 3_600_000;
 const USAGE_HOURS = 24;
-/** An observation without a reset time is trusted this long. */
-const UNTIMED_OBSERVATION_MS = 60_000;
 
 export interface Bucket {
   limit: number | null;
@@ -325,31 +327,13 @@ export function observe(
   conservative = false
 ): void {
   for (const obs of observations) {
-    const current = state.buckets[obs.resource];
-    if (
-      current?.resetAt != null &&
-      obs.resetAt !== null &&
-      obs.resetAt < current.resetAt - 1000
-    ) {
-      continue; // a response from an older window arrived late
-    }
-    const retain =
-      conservative &&
-      current &&
-      (obs.resetAt === null ||
-        current.resetAt === null ||
-        current.resetAt === obs.resetAt) &&
-      nowMs < (current.resetAt ?? current.observedAt + UNTIMED_OBSERVATION_MS);
-    const resetAt =
-      retain && obs.resetAt === null ? current.resetAt : obs.resetAt;
-    state.buckets[obs.resource] = {
-      limit: obs.limit ?? current?.limit ?? null,
-      remaining: retain
-        ? Math.min(current.remaining, obs.remaining)
-        : obs.remaining,
-      resetAt,
-      observedAt: retain && resetAt === null ? current.observedAt : nowMs,
-    };
+    const bucket = mergeObservation(
+      state.buckets[obs.resource],
+      obs,
+      nowMs,
+      conservative
+    );
+    if (bucket) state.buckets[obs.resource] = bucket;
   }
 }
 

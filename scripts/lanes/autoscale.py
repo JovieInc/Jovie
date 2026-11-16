@@ -407,20 +407,7 @@ def _throughput_brake(previous: dict, obs: dict, now: float) -> dict:
             "signal": {"queueDepth": depth, "queueWaitP50Minutes": wait, "mergedPerHour": merged,
                        "openedPerHour": opened, "ejectionRate": ejections}}
 def _intake_gates(obs: dict, brake: dict, name: str = "") -> list[str]:
-    """Only current resource evidence gates intake. Repair seats remain independent.
-
-    PR counts, historical merge dwell and deferred-head counts cannot attest present
-    capacity or a provider reset. They remain available as diagnostic telemetry.
-    """
-    gates = []
-    capacity = (_obj(obs["admissionCapacity"]) if "admissionCapacity" in obs
-                else _obj(_obj(_obj(obs.get("newIssueBudgetByProvider")).get(name)).get("capacity")))
-    if capacity.get("allowed") is False:
-        gates.extend(capacity.get("blockers") or [capacity.get("reason", "capacity-unavailable")])
-    ci = _obj(obs.get("ciQueue"))
-    if "admissionCapacity" not in obs and ci.get("fresh") and ((_count(ci.get("queuedRuns")) or 0) >= CI_QUEUED_RUNS_BRAKE or (_num(ci.get("oldestMin")) or 0) >= CI_QUEUED_OLDEST_BRAKE_MIN):
-        gates.append("ci-runner-backlog")
-    return list(dict.fromkeys(gates))
+    return pr_wip.intake_blockers(obs, name)
 def _increase_blockers(name, obs, sample, now, running, demand) -> list[str]:
     """Only measured limits and unknown measurements. No streaks, budgets or trailing averages."""
     reason = _obj(_obj(obs.get("newIssueBudgetByProvider")).get(name)).get("reason")
@@ -586,8 +573,7 @@ def decide(previous: dict | None, obs: dict, host_sample: dict, bases: dict, con
                 used += 0 if chosen in remote_lanes else grow
     for name, row in rows.items():
         base = row["base"]
-        capacity = (_obj(obs["admissionCapacity"]) if "admissionCapacity" in obs
-                    else _obj(_obj(_obj(obs.get("newIssueBudgetByProvider")).get(name)).get("capacity")))
+        capacity = pr_wip.capacity_from_observation(obs, name)
         capacity_unknown = "capacity-unknown" if capacity and capacity.get("known") is not True else None
         limit_unknown = unknown or capacity_unknown
         if base > 0 and row["effective"] > base and limit_unknown:

@@ -345,7 +345,7 @@ class CapacityObservation(unittest.TestCase):
 class AdmissionCommand(unittest.TestCase):
     def test_admission_uses_one_capacity_observation_without_spending_a_pr_census(self):
         for capacity, code in ((HEALTHY, 0),
-                               ({"allowed": False, "known": True, "reason": "github-quota:core", "blockers": ["github-quota:core"]}, 3)):
+                               ({"allowed": False, "known": True, "reason": "github-quota:core", "blockers": ["github-quota:core"]}, 75)):
             with self.subTest(capacity=capacity), patch.object(pr_wip, "observe_capacity", return_value=capacity) as observe, \
                     patch.object(pr_wip, "fetch_open_prs", side_effect=AssertionError("admission must not read PR count")), \
                     patch.object(pr_wip.time, "time", return_value=NOW), patch("sys.stdout", new_callable=io.StringIO) as output:
@@ -379,6 +379,82 @@ class LaneBudget(unittest.TestCase):
             result = lane.read_new_issue_budget("codex", 3)
         self.assertEqual((result["allowed"], result["reason"], result["wip"], result["error"]), (False, "github-quota:graphql", None, None))
         snapshot.assert_called_once()
+
+
+class AutoscaleCapacityTest(unittest.TestCase):
+    """Admission evidence precedence and recovery, independent of PR-count diagnostics."""
+    lane = staticmethod(lambda state, name: state["lanes"][name])
+
+    def setUp(self):
+        import autoscale
+        self.autoscale, self.now = autoscale, 1_800_000_000.0
+        self.config = {"mode": "apply", "max": {"codex": 6}, "hostMax": None}
+        self.host_sample = {"cpuCount": 16, "load1": 1.0, "memAvailableBytes": 16 * 1024 ** 3,
+                            "psi": {"cpuSomeAvg10": 1.0, "memoryFullAvg10": 0.0, "ioFullAvg10": 0.0}}
+
+    def observation(self, **over):
+        base = {"doctorFresh": True, "runningByProvider": {"codex": 3}, "eligiblePoolByProvider": {"codex": 50},
+                "maintenanceQueueByProvider": {"codex": 20}, "newIssueBudgetByProvider": {"codex": {"capacity": HEALTHY}},
+                "cooling": [], "cooldownAt": {}, "rateBankAt": {}, "unhealthy": [], "codexUnleasedAvailable": 2,
+                "githubRemaining": 4000, "mergeThroughputFresh": True, "disk": {"admitted": True, "freePct": 40}}
+        return {**base, **over}
+
+    def test_stale_proxy_counts_and_historical_merge_dwell_do_not_veto_intake(self):
+        seen = self.observation(runningByProvider={"codex": 3}, eligiblePoolByProvider={"codex": 50}, maintenanceQueueByProvider={"codex": 20},
+                   openPRCount=315, wipMax=80, quotaDeferredHeads=2,
+                   mergeThroughput={"queueDepth": 9, "queueWaitP50Minutes": 45, "mergedPerHour": 9, "openedPerHour": 5, "ejectionRate": 0.0},
+                   newIssueBudgetByProvider={"codex": {"reason": "wip-cap"}})
+        row = self.lane(self.autoscale.decide(None, seen, self.host_sample, {"codex": 3}, self.config, self.now), "codex")
+        self.assertEqual(row["intakeBlockers"], [])
+        self.assertGreater(row["intakeEffective"], 3)
+
+
+    def test_unknown_capacity_allows_existing_base_but_never_growth_and_recovers_on_fresh_evidence(self):
+        unknown = {"allowed": True, "known": False, "reason": "capacity-unknown", "unknown": ["ci"]}
+        seen = self.observation(runningByProvider={"codex": 3}, eligiblePoolByProvider={"codex": 50}, maintenanceQueueByProvider={"codex": 20},
+                   newIssueBudgetByProvider={"codex": {"reason": "capacity-unknown", "capacity": unknown}})
+        held = self.autoscale.decide(None, seen, self.host_sample, {"codex": 3}, self.config, self.now)
+        row = self.lane(held, "codex")
+        self.assertEqual((row["effective"], row["intakeEffective"]), (3, 3))
+        self.assertEqual(row["lastReason"], "hold:capacity-unknown")
+        self.assertEqual(row["intakeBlockers"], [])
+        healthy = self.observation(runningByProvider={"codex": 3}, eligiblePoolByProvider={"codex": 50}, maintenanceQueueByProvider={"codex": 20})
+        recovered = self.autoscale.decide(held, healthy, self.host_sample, {"codex": 3}, self.config, self.now + self.autoscale.HOST_SETTLE_S)
+        self.assertGreater(self.lane(recovered, "codex")["intakeEffective"], 3)
+
+
+    def test_fresh_global_capacity_supersedes_cached_provider_and_scalar_proxies(self):
+        healthy = {"allowed": True, "known": True, "reason": "within-capacity", "blockers": [], "observedAt": self.now,
+                   "ci": {"known": True, "queuedRuns": 0, "oldestMin": None}}
+        for old in ({"reason": "wip-cap"},
+                    {"reason": "capacity-unknown", "capacity": {"allowed": True, "known": False}},
+                    {"reason": "github-quota:core", "capacity": {"allowed": False, "known": True, "blockers": ["github-quota:core"]}}):
+            with self.subTest(old=old):
+                seen = self.observation(admissionCapacity=healthy, githubRemaining=0, quotaDeferredHeads=3, openPRCount=999,
+                           newIssueBudgetByProvider={"codex": old}, runningByProvider={"codex": 3},
+                           eligiblePoolByProvider={"codex": 50}, maintenanceQueueByProvider={"codex": 20})
+                row = self.lane(self.autoscale.decide(None, seen, self.host_sample, {"codex": 3}, self.config, self.now), "codex")
+                self.assertGreater(row["intakeEffective"], 3)
+                self.assertEqual(row["intakeBlockers"], [])
+
+
+    def test_global_capacity_unknown_does_not_trust_positive_legacy_scalar_or_deadlock_recovery(self):
+        unknown = {"allowed": True, "known": False, "reason": "capacity-unknown", "unknown": ["github:core", "ci"]}
+        seen = self.observation(admissionCapacity=unknown, githubRemaining=4000, runningByProvider={"codex": 3},
+                   eligiblePoolByProvider={"codex": 50}, maintenanceQueueByProvider={"codex": 20})
+        row = self.lane(self.autoscale.decide(None, seen, self.host_sample, {"codex": 3}, self.config, self.now), "codex")
+        self.assertEqual((row["effective"], row["intakeEffective"]), (3, 3))
+        self.assertEqual(row["lastReason"], "hold:capacity-unknown")
+
+
+    def test_global_real_zero_blocks_intake_without_eliminating_recovery(self):
+        zero = {"allowed": False, "known": True, "reason": "github-quota:core", "blockers": ["github-quota:core"], "retryAt": self.now + 60}
+        seen = self.observation(admissionCapacity=zero, githubRemaining=4000, runningByProvider={"codex": 3},
+                   eligiblePoolByProvider={"codex": 50}, maintenanceQueueByProvider={"codex": 20})
+        row = self.lane(self.autoscale.decide(None, seen, self.host_sample, {"codex": 3}, self.config, self.now), "codex")
+        self.assertEqual(row["intakeEffective"], 0)
+        self.assertIn("github-quota:core", row["intakeBlockers"])
+        self.assertGreater(row["effective"], 0)
 
 
 class CappedRepairOrderTest(unittest.TestCase):
