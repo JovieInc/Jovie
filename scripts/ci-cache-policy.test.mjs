@@ -1,5 +1,7 @@
 import assert from 'node:assert/strict';
-import { readdirSync, readFileSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
+import { mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
@@ -9,6 +11,165 @@ const repoRoot = path.resolve(
   '..'
 );
 const read = file => readFileSync(path.join(repoRoot, file), 'utf8');
+
+// Execute the composite's real shell, replacing only external commands. This
+// covers cold/evicted installs without downloading dependencies in the test.
+function dependencySetup(t, names, outputs = {}, failCommand = '') {
+  const root = mkdtempSync(path.join(tmpdir(), 'jovie-dependency-setup-'));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  const action = read('.github/actions/setup-node-pnpm/action.yml');
+  const values = {
+    'steps.runner-prereqs.outputs.dependencies_warm': 'false',
+    'steps.runner-prereqs.outputs.installed_tree_archive_path':
+      '/unused/tree.tar',
+    'steps.runner-prereqs.outputs.installed_tree_archive_sha256': 'unused',
+    'runner.environment': 'github-hosted',
+    'steps.node-modules-cache.outputs.cache-hit': 'false',
+    'steps.node-modules-cache.outputs.cache-matched-key': '',
+    ...outputs,
+  };
+  const scripts = names.map(name => {
+    const block = action
+      .split(/(?=^    - name: )/m)
+      .find(part => part.startsWith(`    - name: ${name}\n`));
+    // The old prefetch step is included when present, so the cold-path test
+    // detects the extra package-manager pass before its removal.
+    if (!block && name === 'Warm pnpm store') return '';
+    assert.ok(block, name);
+    const run = /^      run: (.+)$/m.exec(block);
+    assert.ok(run, `${name} shell`);
+    if (run[1] !== '|') return run[1];
+    const lines = block.slice(run.index + run[0].length + 1).split('\n');
+    const end = lines.findIndex(line => line && !line.startsWith('        '));
+    return lines
+      .slice(0, end < 0 ? undefined : end)
+      .map(line => line.slice(8))
+      .join('\n');
+  });
+  const script = scripts
+    .join('\n')
+    .replace(/\$\{\{\s*([^}]+?)\s*\}\}/g, (_, key) => {
+      assert.ok(Object.hasOwn(values, key), `fixture output ${key}`);
+      return values[key];
+    });
+  const result = spawnSync(
+    'bash',
+    [
+      '--noprofile',
+      '--norc',
+      '-e',
+      '-o',
+      'pipefail',
+      '-c',
+      `
+      record() {
+        printf '%s\\n' "$*" >> "$CI_CACHE_COMMAND_LOG"
+        if [[ "$*" == "$CI_CACHE_FAIL_COMMAND" ]]; then return 29; fi
+        return 0
+      }
+      pnpm() { record pnpm "$@"; }
+      node() { record node "$@"; }
+      rm() { record rm "$@"; }
+      ${script}
+    `,
+    ],
+    {
+      cwd: root,
+      encoding: 'utf8',
+      env: {
+        ...process.env,
+        CI_CACHE_COMMAND_LOG: path.join(root, 'commands'),
+        CI_CACHE_FAIL_COMMAND: failCommand,
+      },
+    }
+  );
+  return {
+    ...result,
+    commands: readFileSync(path.join(root, 'commands'), 'utf8')
+      .trim()
+      .split('\n'),
+  };
+}
+
+const installSteps = [
+  'Warm pnpm store',
+  'Install dependencies',
+  'Stamp installed workspace receipt',
+];
+const mergeWorkspaceStep = ['Require prepared merge-group workspace'];
+const installCommand = 'pnpm install --frozen-lockfile';
+const patchCommand = 'node scripts/lib/verify-patched-dependencies.mjs';
+const prepareCommand = 'node scripts/lib/ci-dependency-workspace.mjs prepare';
+const validateCommand = 'node scripts/lib/ci-dependency-workspace.mjs validate';
+
+test('a dependency cache miss installs the full frozen workspace once before stamping', t => {
+  const result = dependencySetup(t, installSteps);
+  assert.equal(result.status, 0, result.stderr);
+  assert.deepEqual(result.commands, [
+    installCommand,
+    patchCommand,
+    prepareCommand,
+  ]);
+});
+
+test('evicted merge workspaces rebuild and validate both cold and partial restores', t => {
+  for (const matchedKey of ['', 'prior-installed-tree']) {
+    const result = dependencySetup(t, mergeWorkspaceStep, {
+      'steps.node-modules-cache.outputs.cache-matched-key': matchedKey,
+    });
+    assert.equal(result.status, 0, result.stderr);
+    assert.deepEqual(result.commands, [
+      installCommand,
+      prepareCommand,
+      validateCommand,
+    ]);
+  }
+});
+
+test('an exact merge workspace hit validates its receipt without reinstalling', t => {
+  const result = dependencySetup(t, mergeWorkspaceStep, {
+    'steps.node-modules-cache.outputs.cache-hit': 'true',
+  });
+  assert.equal(result.status, 0, result.stderr);
+  assert.deepEqual(result.commands, [validateCommand]);
+});
+
+test('install, patch and receipt failures cannot certify a dependency workspace', t => {
+  /** @type {[string[], string][]} */
+  const failures = [
+    [installSteps, installCommand],
+    [installSteps, patchCommand],
+    [installSteps, prepareCommand],
+    [mergeWorkspaceStep, installCommand],
+    [mergeWorkspaceStep, prepareCommand],
+    [mergeWorkspaceStep, validateCommand],
+  ];
+  for (const [steps, failure] of failures) {
+    const result = dependencySetup(t, steps, {}, failure);
+    assert.equal(result.status, 29, failure);
+    if (failure === installCommand || failure === patchCommand)
+      assert.ok(!result.commands.includes(prepareCommand), failure);
+    if (failure === patchCommand)
+      assert.deepEqual(
+        result.commands.filter(
+          command => command === installCommand || command === patchCommand
+        ),
+        [installCommand, patchCommand, installCommand, patchCommand]
+      );
+    if (failure === prepareCommand)
+      assert.ok(!result.commands.includes(validateCommand), failure);
+  }
+  const invalidHit = dependencySetup(
+    t,
+    mergeWorkspaceStep,
+    {
+      'steps.node-modules-cache.outputs.cache-hit': 'true',
+    },
+    validateCommand
+  );
+  assert.equal(invalidHit.status, 29);
+  assert.deepEqual(invalidHit.commands, [validateCommand]);
+});
 
 test('Python workflows cache the pinned pytest dependency set', () => {
   for (const file of [

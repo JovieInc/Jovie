@@ -7,7 +7,7 @@ const H = '[0-9a-f]+';
 const FAMILIES = [
   `(\\w+-next-build-web-v1)-${H}-\\d{8}(?:\\d{2})?`,
   `(jovie-web-tsbuildinfo-v2-\\w+)-${H}-(h\\d{10}|${H})`,
-  `(pnpm-node-modules-v4-\\w+-\\w+)-${H}-${H}`,
+  `(pnpm-node-modules-v[45]-\\w+-\\w+)-${H}-${H}`,
   `(jovie-production-next-cache-v1-\\w+)-${H}`,
   `(\\w+-turbo)-${H}`,
   `(linear-sync-github-v1)-${H}`,

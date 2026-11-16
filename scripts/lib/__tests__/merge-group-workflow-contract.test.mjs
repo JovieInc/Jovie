@@ -317,7 +317,7 @@ describe('merge_group workflow contract', () => {
     }
 
     for (const fragment of [
-      'key: pnpm-node-modules-v4-',
+      'key: pnpm-node-modules-v5-',
       "github.event_name == 'merge_group' && inputs.reuse_merge_group_workspace == 'true'",
       'Prepared merge-group dependency workspace was not restored.',
       'node scripts/lib/ci-dependency-workspace.mjs prepare',

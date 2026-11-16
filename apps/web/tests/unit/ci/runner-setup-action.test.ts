@@ -97,9 +97,9 @@ describe('self-hosted runner setup action', () => {
       actionSteps.filter(step => /^actions\/cache@/.test(step.uses ?? ''))
     ).toEqual([]);
     expect(JSON.stringify(setupAction)).not.toContain('STORE_PATH');
-    expect(actionStep('Warm pnpm store').run).toContain(
-      'pnpm fetch --frozen-lockfile'
-    );
+    expect(
+      actionSteps.filter(step => /pnpm fetch\b/.test(step.run ?? ''))
+    ).toEqual([]);
     expect(actionStep('Install dependencies').run).toContain(
       'pnpm install --frozen-lockfile'
     );
@@ -109,7 +109,7 @@ describe('self-hosted runner setup action', () => {
     expect(JSON.stringify(pnpm)).not.toContain('--no-deprecation');
   });
 
-  it('checks the baked image first and skips setup and fetch when it is warm', () => {
+  it('checks the baked image first and restores its tree without package setup when warm', () => {
     const verify = stepIndex('Verify baked runner prerequisites');
     expect(actionSteps[verify]?.id).toBe('runner-prereqs');
     expect(actionSteps[verify]?.run).toContain(
@@ -123,7 +123,6 @@ describe('self-hosted runner setup action', () => {
       'Setup pnpm',
       'Restore installed node_modules (GitHub-hosted)',
       'Setup Node.js with pnpm cache',
-      'Warm pnpm store',
     ]) {
       expect(stepIndex(name), name).toBeGreaterThan(verify);
       expect(evaluateCondition(actionStep(name).if, warm), name).toBe(false);
@@ -131,6 +130,12 @@ describe('self-hosted runner setup action', () => {
         true
       );
     }
+    expect(evaluateCondition(actionStep('Install dependencies').if, warm)).toBe(
+      true
+    );
+    expect(actionStep('Install dependencies').run).toContain(
+      '.github/runner-image/restore-installed-tree.sh'
+    );
   });
 
   it('restores an exact installed tree only on GitHub-hosted runners', () => {
@@ -149,10 +154,10 @@ describe('self-hosted runner setup action', () => {
     // .npmrc. The only fallback is a prior tree for the same OS, arch and
     // Node pin, which the frozen install then reconciles (cache-hit false).
     const key =
-      "pnpm-node-modules-v4-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('.nvmrc') }}-${{ hashFiles('pnpm-lock.yaml', 'pnpm-workspace.yaml', '.npmrc', 'package.json', 'apps/*/package.json', 'packages/*/package.json', 'workers/*/package.json', 'patches/**') }}";
+      "pnpm-node-modules-v5-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('.nvmrc') }}-${{ hashFiles('pnpm-lock.yaml', 'pnpm-workspace.yaml', '.npmrc', 'package.json', 'apps/*/package.json', 'packages/*/package.json', 'workers/*/package.json', 'patches/**') }}";
     expect(restore.with?.key).toBe(key);
     const prefix =
-      "pnpm-node-modules-v4-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('.nvmrc') }}-";
+      "pnpm-node-modules-v5-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('.nvmrc') }}-";
     expect(String(restore.with?.['restore-keys']).trim().split('\n')).toEqual([
       prefix,
     ]);
@@ -172,7 +177,7 @@ describe('self-hosted runner setup action', () => {
     ).toBe(false);
   });
 
-  it('skips the pnpm store and fetch whenever a tree was restored', () => {
+  it('skips the pnpm store cache but reconciles the full workspace whenever a tree was restored', () => {
     const hit = {
       ...coldHosted,
       'steps.node-modules-cache.outputs.cache-hit': 'true',
@@ -186,14 +191,8 @@ describe('self-hosted runner setup action', () => {
     };
     for (const restored of [hit, prior])
       expect(
-        evaluateCondition(actionStep('Warm pnpm store').if, restored)
-      ).toBe(false);
-    expect(
-      evaluateCondition(actionStep('Warm pnpm store').if, coldHosted)
-    ).toBe(true);
-    expect(
-      evaluateCondition(actionStep('Install dependencies').if, prior)
-    ).toBe(true);
+        evaluateCondition(actionStep('Install dependencies').if, restored)
+      ).toBe(true);
     expect(
       evaluateCondition(
         actionStep('Save installed node_modules (GitHub-hosted)').if,
@@ -386,10 +385,9 @@ describe('self-hosted runner setup action', () => {
       expect(result.status, result.stderr).toBe(0);
       return readFileSync(resolve(root, 'calls.log'), 'utf8');
     };
-    // Nothing restored: fetch the whole store, then install and re-stamp.
+    // Nothing restored: the full frozen install fetches, links and re-stamps.
     expect(run('')).toBe(
       [
-        'pnpm fetch --frozen-lockfile',
         'pnpm install --frozen-lockfile',
         'node scripts/lib/ci-dependency-workspace.mjs prepare',
         'node scripts/lib/ci-dependency-workspace.mjs validate',
@@ -398,7 +396,7 @@ describe('self-hosted runner setup action', () => {
     );
     // A prior tree: install fetches only the delta; the receipt is re-stamped
     // and validated exactly as before.
-    expect(run('pnpm-node-modules-v4-prior')).toBe(
+    expect(run('pnpm-node-modules-v5-prior')).toBe(
       [
         'pnpm install --frozen-lockfile',
         'node scripts/lib/ci-dependency-workspace.mjs prepare',
@@ -416,7 +414,6 @@ describe('self-hosted runner setup action', () => {
         .filter(step => step.env?.ONNXRUNTIME_NODE_INSTALL === 'skip')
         .map(step => step.name)
     ).toEqual([
-      'Warm pnpm store',
       'Install dependencies',
       'Require prepared merge-group workspace',
     ]);

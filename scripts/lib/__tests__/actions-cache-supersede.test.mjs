@@ -43,6 +43,25 @@ it('runs inside Actions Cache GC, not as a second listing workflow', () => {
   expect(gc).not.toMatch(/^ {2}schedule:/m);
 });
 
+it('supersedes v5 within its namespace while retaining the newest v4 for in-flight jobs', () => {
+  const entries = [
+    'pnpm-node-modules-v4-Linux-X64-a-c0',
+    'pnpm-node-modules-v4-Linux-X64-a-c1',
+    'pnpm-node-modules-v5-Linux-X64-a-c0',
+    'pnpm-node-modules-v5-Linux-X64-a-c1',
+    'pnpm-node-modules-v5-Linux-ARM64-a-c0',
+  ].map((key, i) => ({
+    id: i + 1,
+    key,
+    ref: 'refs/heads/main',
+    created_at: `2026-11-16T0${i}:00:00Z`,
+  }));
+  expect(ids(entries).sort((a, b) => a - b)).toEqual([1, 3]);
+  expect(
+    ids(entries.map(row => ({ ...row, ref: 'refs/pull/1/merge' })))
+  ).toEqual([]);
+});
+
 it('keeps only the newest evidence cache of each quota-saving family', () => {
   const evidence = [
     'linear-sync-github-v1-0123456789abcdef',

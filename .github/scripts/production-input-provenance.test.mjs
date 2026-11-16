@@ -361,7 +361,7 @@ function fakePnpm(t, script) {
   return { dir, pnpm };
 }
 
-test('promote-production installs into a warm pnpm store before generating the SBOM', () => {
+test('promote-production populates its pnpm store with a full frozen install before the SBOM', () => {
   const workflow = readFileSync(
     new URL('../workflows/production-release.yml', import.meta.url),
     'utf8'
@@ -392,10 +392,7 @@ test('promote-production installs into a warm pnpm store before generating the S
     step('Restore installed node_modules (GitHub-hosted)'),
     /inputs\.package_cache == 'true'/
   );
-  assert.match(
-    step('Warm pnpm store'),
-    /steps\.node-modules-cache\.outputs\.cache-matched-key == ''[\s\S]*pnpm fetch --frozen-lockfile/
-  );
+  assert.match(step('Install dependencies'), /pnpm install --frozen-lockfile/);
 });
 
 test('generates the SBOM from the pnpm license report of the installed tree', t => {
