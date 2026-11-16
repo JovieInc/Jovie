@@ -16,11 +16,21 @@ for (const width of [320, 390, 767]) {
     await expect(next).toBeEnabled();
     await expect(previous).toBeDisabled();
 
+    const unfocusedIndicator = await next.evaluate(element => {
+      const style = getComputedStyle(element);
+      return { outline: style.outline, shadow: style.boxShadow };
+    });
     await next.focus();
     await expect(next).toBeFocused();
     expect(
       await next.evaluate(element => element.matches(':focus-visible'))
     ).toBe(true);
+    expect(
+      await next.evaluate(element => {
+        const style = getComputedStyle(element);
+        return { outline: style.outline, shadow: style.boxShadow };
+      })
+    ).not.toEqual(unfocusedIndicator);
     const scrollTop = await page.evaluate(() => scrollY);
     await page.keyboard.press('Enter');
     await expect
