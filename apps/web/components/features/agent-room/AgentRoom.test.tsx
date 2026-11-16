@@ -17,9 +17,9 @@ describe('AgentRoom', () => {
         }
       />
     );
-    const server = within(
-      new DOMParser().parseFromString(html, 'text/html').body
-    );
+    const root = document.createElement('div');
+    root.innerHTML = html;
+    const server = within(root);
 
     expect(
       server
