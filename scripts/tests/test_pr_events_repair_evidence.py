@@ -374,6 +374,29 @@ console.log(JSON.stringify(JSON.parse(readFileSync(0, 'utf8')).map(body =>
         self.assertEqual(events.repair_evidence_body(self.PR, updated, locking_pr=23295), updated)
         self.assertEqual(updated.count("customer-changelog/v1"), 1)
 
+    def test_locking_pr_ignores_diagnostic_headings_and_passes_fleet(self):
+        bodies = []
+        for fence in ("```", "~~~"):
+            diagnostic = f"{fence}text\n## Locked areas\nGBrain: example/only\n{fence}\n"
+            body = events.red_before_green_block(self.PR) + "\n" + diagnostic
+            updated = events.repair_evidence_body(self.PR, body, locking_pr=22599,
+                                                  customer_decision={"releaseWorthy": False})
+            self.assertIn(diagnostic, updated)
+            self.assertEqual(updated.count("Locking PR: #22599"), 1)
+            self.assertEqual(events.repair_evidence_body(self.PR, updated, locking_pr=22599), updated)
+            bodies.append(updated)
+        checked = subprocess.run(["node", "--input-type=module", "-e", """
+import { readFileSync } from 'node:fs';
+import { evaluateFleetRules } from './scripts/pr-fleet-rules.mjs';
+const bodies = JSON.parse(readFileSync(0, 'utf8'));
+console.log(JSON.stringify(bodies.map(body => evaluateFleetRules({
+  pr: {title: 'fix(tests): repair auth test evidence', body},
+  files: [{filename: 'apps/web/tests/helpers/auth.ts', status: 'added'},
+          {filename: 'apps/web/tests/unit/e2e/auth-helper.test.ts', status: 'added'}],
+}).errors)));
+"""], cwd=ROOT, input=json.dumps(bodies), text=True, capture_output=True, check=True)
+        self.assertEqual(json.loads(checked.stdout), [[], []])
+
     def test_locking_reference_is_explicit_validated_and_never_overwrites_authority(self):
         body = events.red_before_green_block(self.PR)
         self.assertNotIn("## Locked areas", events.repair_evidence_body(self.PR, body))
