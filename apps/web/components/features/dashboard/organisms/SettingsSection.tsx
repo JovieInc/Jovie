@@ -48,7 +48,7 @@ export function SettingsSection({
               height to --electron-titlebar-height): centering the title in it
               puts the title on the traffic-light row instead of one band
               below it. Buttons inside are no-drag via the drag-region CSS. */}
-          <div className='flex items-center justify-between gap-3 px-(--app-shell-content-padding-x)'>
+          <div className='flex items-center justify-between gap-3 px-4 sm:px-(--app-shell-header-padding-x)'>
             <h1 className='min-w-0 truncate text-xl font-medium text-primary-token'>
               {title}
             </h1>
