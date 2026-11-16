@@ -54,6 +54,8 @@ function supplier(
     privacy: 'approved',
     terms: 'approved',
     policyRef: 'policy:read-only',
+    ownerRef: 'owner:connector',
+    authority: 'read',
     reviewedAt: BEFORE,
     validUntil: AFTER,
     expected: metrics,
@@ -127,6 +129,32 @@ function fact(
     territory: null,
     match: 'verified',
     ...overrides,
+  };
+}
+function certification(
+  source: CapabilitySupplier
+): NonNullable<CompileOutcomeCommand['certifications']>[number] {
+  return {
+    id: `cert:${source.id}`,
+    scope,
+    primitive: source.primitive,
+    supplierDigest: supplierDigest(source),
+    ownerRef: source.ownerRef!,
+    authority: source.authority!,
+    buildSha: 'a'.repeat(40),
+    verifiedAt: BEFORE,
+    expiresAt: AFTER,
+    verdict: 'pass',
+    evidenceRefs: ['test:conformance'],
+    tests: (
+      [
+        'tenant-isolation',
+        'revocation',
+        'replay',
+        'failure-recovery',
+        'unsupported',
+      ] as const
+    ).map(id => ({ id, status: 'pass', evidenceRef: `test:${id}` })),
   };
 }
 function harness() {
@@ -270,7 +298,10 @@ describe('outcome → primitive → replaceable source', () => {
     const first = supplier();
     const initial = compilePresenceOutcome(command(), NOW);
     const measured = compilePresenceOutcome(
-      command({ trials: [trial(first)] }),
+      command({
+        trials: [trial(first)],
+        certifications: [certification(first)],
+      }),
       NOW,
       initial
     );
@@ -286,6 +317,7 @@ describe('outcome → primitive → replaceable source', () => {
         command({
           suppliers: [replacement],
           trials: [trial(replacement, { id: 'trial-2' })],
+          certifications: [certification(replacement)],
         }),
         NOW,
         measured
@@ -395,11 +427,32 @@ describe('outcome → primitive → replaceable source', () => {
     expect(
       bio(
         compilePresenceOutcome(
-          command({ facts: [observed], suppliers: [source] }),
+          command({
+            facts: [observed],
+            suppliers: [source],
+            certifications: [certification(source)],
+            outcomes: [
+              {
+                id: 'outcome:source',
+                scope,
+                primitive,
+                supplierDigest: supplierDigest(source),
+                certificationId: certification(source).id,
+                authority: 'read',
+                buildSha: 'a'.repeat(40),
+                jobId: 'job:profile-current',
+                startedAt: BEFORE,
+                completedAt: NOW.toISOString(),
+                status: 'correct_completed',
+                evidenceRefs: [observed.evidenceRef],
+                realized: metrics,
+              },
+            ],
+          }),
           NOW
         )
-      )
-    ).toBeUndefined();
+      ).state
+    ).toBe('known');
     expect(
       bio(
         compilePresenceOutcome(
@@ -478,6 +531,7 @@ it('prefers measured lower-cost routes and deterministically breaks supplier tie
   const tie = supplier('z-last');
   const input = command({
     suppliers: [costly, tie, cheap],
+    certifications: [costly, tie, cheap].map(certification),
     trials: [
       trial(costly, {
         id: 'costly',
@@ -525,7 +579,12 @@ describe('durable disabled capability drafts in the existing governor', () => {
     await expect(
       h.send({ op: 'claim', id: first.rows[0].plan.id, worker: 'worker' })
     ).rejects.toThrow('allocation-not-ready');
-    const promoted = await h.send(command({ trials: [trial(supplier())] }));
+    const promoted = await h.send(
+      command({
+        trials: [trial(supplier())],
+        certifications: [certification(supplier())],
+      })
+    );
     const row = promoted.rows.find(
       item => item.plan.capabilityDraft?.primitive.id === primitive.id
     )!;
