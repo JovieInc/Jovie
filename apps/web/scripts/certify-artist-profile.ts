@@ -282,6 +282,31 @@ async function certifyDiscovery(
   }
 }
 
+/**
+ * One bounded retry for THROWN probes only (JOV-12832): a transport error
+ * (connection reset, DNS blip) is not evidence of a broken link, and a single
+ * unretried throw red-flagged main twice on 2026-11-16 while sibling probes
+ * to the same origin succeeded in the same minute. HTTP error statuses are
+ * real responses and are never retried; a second throw propagates so the
+ * caller still records status: null and fails the certification (fail-closed).
+ */
+const LINK_PROBE_RETRY_DELAY_MS = 1_000;
+
+async function probeWithRetry(
+  fetcher: typeof fetch,
+  url: string,
+  init: RequestInit
+): Promise<Response> {
+  try {
+    return await fetcher(url, init);
+  } catch {
+    await new Promise(resolve => {
+      setTimeout(resolve, LINK_PROBE_RETRY_DELAY_MS);
+    });
+    return fetcher(url, init);
+  }
+}
+
 export async function certifyArtistProfile(
   args: string[],
   fetcher: typeof fetch = fetch
@@ -357,7 +382,7 @@ export async function certifyArtistProfile(
       ...(await Promise.all(
         internalLinks.slice(offset, offset + 4).map(async url => {
           try {
-            const result = await fetcher(url, {
+            const result = await probeWithRetry(fetcher, url, {
               signal: AbortSignal.timeout(15_000),
               redirect: 'manual',
             });
@@ -379,7 +404,7 @@ export async function certifyArtistProfile(
                   finalStatus: null,
                 };
               }
-              const final = await fetcher(target.href, {
+              const final = await probeWithRetry(fetcher, target.href, {
                 signal: AbortSignal.timeout(15_000),
                 redirect: 'manual',
               });
