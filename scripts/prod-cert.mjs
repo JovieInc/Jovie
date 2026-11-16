@@ -14,7 +14,12 @@
  */
 import { readFileSync, writeFileSync } from 'node:fs';
 import { parseArgs } from 'node:util';
-import { fileBottleneckIssue, paidPathOrder } from './lib/cert-bottleneck.mjs';
+import {
+  fileBottleneckIssue,
+  paidPathOrder,
+  splitLine,
+  verdictSplit,
+} from './lib/cert-bottleneck.mjs';
 import {
   closeLinearIssueByFingerprint,
   remediationTriggersEnabled,
@@ -295,6 +300,7 @@ async function main() {
       ? `certified: all surfaces passed on ${served.sha}`
       : `not certified on ${served.sha}: ${verdict.notGreen.map(n => `${n.surface} (${n.why})`).join(', ')}`
   );
+  console.log(splitLine(verdictSplit(receipts, SURFACE_IDS)));
   if (values['file-issues'] && remediationTriggersEnabled()) {
     console.log(JSON.stringify(await fileSurfaceIssues(receipts, { runUrl })));
     console.log(

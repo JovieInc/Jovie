@@ -230,6 +230,7 @@ test('the actual sparse relay checkout can wake through the shared API policy', 
   const fixture = join(scratch, 'checkout');
   const git = (cwd, args) => {
     const result = spawnSync('git', args, {
+      maxBuffer: 256 * 1024 * 1024,
       cwd,
       encoding: 'utf8',
       timeout: 30000,

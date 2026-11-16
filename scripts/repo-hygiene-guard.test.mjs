@@ -1,5 +1,4 @@
 import assert from 'node:assert/strict';
-import { execFileSync, spawnSync } from 'node:child_process';
 import {
   closeSync,
   existsSync,
@@ -18,6 +17,7 @@ import {
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import test from 'node:test';
+import { execFileSync, spawnSync } from './lib/child-process.mjs';
 import {
   GEN_JSON_SIZE_ALLOWLIST,
   MAX_GEN_JSON_BYTES,
@@ -714,11 +714,11 @@ test('tracked-bytes budget raise stays within the documented +10% cap', () => {
 });
 
 test('snapshot-file budget raise stays within the documented +10% cap', () => {
-  // 2026-10-21: origin/main measured 110/110 canonical visual baselines, so
-  // the required Admin Home pair could not land. No unreferenced baseline was
-  // safe to delete. The policy caps a single payload raise at +10%.
-  const previousBudget = 110;
-  assert.equal(HYGIENE_LIMITS.maxSnapshotFiles, 121);
+  // 2026-11-15: origin/main measured 119/121. Fourteen live switcher baselines
+  // could not land after five unreferenced admin pngs were pruned. The policy
+  // caps a single payload raise at +10%.
+  const previousBudget = 121;
+  assert.equal(HYGIENE_LIMITS.maxSnapshotFiles, 133);
   assert.ok(
     HYGIENE_LIMITS.maxSnapshotFiles <= previousBudget * 1.1,
     'payload budget raises are capped at +10% per docs/ci/repository-health.md'

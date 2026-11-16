@@ -28,17 +28,20 @@ interface TourModePanelProps {
   readonly tourDates: TourDateViewModel[];
 }
 
+// The media-stage contrast floor for muted text is on-media/52 (~5.6:1 on
+// the dark stage, WCAG 2.2 AA — axe color-contrast). on-media/38 measures
+// ~3.4:1 there and fails the Storybook a11y lane.
 function getTicketStatusClassName(
   ticketStatus: TourDateViewModel['ticketStatus'],
   canBuyTickets: boolean
 ): string {
   if (ticketStatus === 'sold_out') {
-    return 'border-on-media/8 bg-transparent text-on-media/38';
+    return 'border-on-media/8 bg-transparent text-on-media/52';
   }
 
   return canBuyTickets
     ? 'border-on-media/14 bg-on-media/[0.02] text-on-media dark:text-on-media'
-    : 'border-on-media/8 bg-transparent text-on-media/38';
+    : 'border-on-media/8 bg-transparent text-on-media/52';
 }
 
 function getTicketStatusLabel(
@@ -74,9 +77,12 @@ function toDisplayDate(value: string) {
 function DateBox({
   date,
   featured: _featured,
+  muted = false,
 }: Readonly<{
   readonly date: string;
   readonly featured: boolean;
+  /** Cancelled rows mute the whole row with tokens instead of container opacity. */
+  readonly muted?: boolean;
 }>) {
   const displayDate = useMemo(() => toDisplayDate(date), [date]);
 
@@ -85,7 +91,12 @@ function DateBox({
       <span className='text-3xs font-semibold tracking-wider text-on-media/52'>
         {displayDate.month}
       </span>
-      <span className='mt-1 text-xl font-bold leading-none tracking-tighter text-(--color-text-tooltip) tabular-nums'>
+      <span
+        className={cn(
+          'mt-1 text-xl font-bold leading-none tracking-tighter tabular-nums',
+          muted ? 'text-on-media/52' : 'text-(--color-text-tooltip)'
+        )}
+      >
         {displayDate.day}
       </span>
     </div>
@@ -116,18 +127,28 @@ function TourDateRow({
     item.date.ticketUrl
   );
 
+  const cancelled = item.date.ticketStatus === 'cancelled';
+
   return (
     <div
       className={cn(
         'grid min-w-0 grid-cols-[44px_minmax(0,1fr)_auto] items-center gap-3 px-4 py-3 transition-colors duration-subtle hover:bg-on-media/[0.03]',
-        'border-t border-on-media/[0.075] first:border-t-0',
-        item.date.ticketStatus === 'cancelled' && 'opacity-50'
+        'border-t border-on-media/[0.075] first:border-t-0'
+        // Cancelled rows are muted with per-element tokens (on-media/52 is
+        // ~5.6:1 on the dark stage), never a container opacity-50: the
+        // halved alpha compounds with the muted tokens down to ~2.2:1 and
+        // fails WCAG 2.2 AA (axe color-contrast).
       )}
     >
-      <DateBox date={item.date.startDate} featured={false} />
+      <DateBox date={item.date.startDate} featured={false} muted={cancelled} />
 
       <div className='min-w-0'>
-        <p className='min-w-0 truncate text-mid font-medium tracking-[-0.03em] text-(--color-text-tooltip)'>
+        <p
+          className={cn(
+            'min-w-0 truncate text-mid font-medium tracking-[-0.03em]',
+            cancelled ? 'text-on-media/52' : 'text-(--color-text-tooltip)'
+          )}
+        >
           {item.date.venueName}
         </p>
         <p className='mt-0.5 min-w-0 truncate text-xs font-medium tracking-tight text-on-media/52'>
@@ -166,7 +187,7 @@ function TourDateRow({
       ) : (
         // No ticket target: plain muted meta text — a non-interactive span
         // must never wear button chrome.
-        <span className='shrink-0 text-xs font-medium text-on-media/38'>
+        <span className='shrink-0 text-xs font-medium text-on-media/52'>
           {getTicketStatusLabel(item.date.ticketStatus, canBuyTickets)}
         </span>
       )}

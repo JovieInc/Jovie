@@ -2,11 +2,13 @@
 // automation-liveness.test.mjs (JOV-8788): that file's committed size budget
 // never rises, so new coverage for this observer lands here.
 
+import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { runLiveness as runLivenessImpl } from '../../automation-liveness.mjs';
 import { livenessDecisions, loadRegistry } from '../automation-registry.mjs';
+import { QUEUE_REMOVAL_REENROLL_MAX } from '../green-enqueue-admission.mjs';
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
 const registry = loadRegistry(repoRoot);
@@ -147,5 +149,133 @@ describe('green-to-enqueue timing reads', () => {
       reason: 'green-enqueue-checks-unreadable',
     });
     expect(livenessDecisions(report)[0].action).toBe('red');
+  });
+});
+
+describe('queue-removal holds (JOV-8788)', () => {
+  // 2026-11-14: #25253 sat ready, green, CLEAN and unqueued for 205 minutes
+  // after its exact head had been removed from the merge queue three times
+  // (two conflict-lane dequeues around a native ejection). The enroll
+  // controller correctly refused to re-admit that unchanged head — the
+  // bounded re-admission budget was spent, so only a new head from the PR's
+  // owner re-enters the queue. The dead-man counted the PR as automation
+  // silence and filed a false P0; it must report the hold instead.
+  const removedPr = ({ removals, committedAgo = 240 }) => ({
+    number: 1,
+    isDraft: false,
+    isInMergeQueue: false,
+    mergeStateStatus: 'CLEAN',
+    baseRefName: 'main',
+    headRefOid: '1'.repeat(40),
+    labels: { nodes: [], pageInfo: { hasNextPage: false } },
+    commits: { nodes: [{ commit: { committedDate: iso(committedAgo) } }] },
+    timelineItems: {
+      nodes: removals.map(removal => ({
+        createdAt: iso(removal.ago),
+        actor: removal.actor,
+      })),
+    },
+  });
+  const bot = { __typename: 'Bot', login: 'jovie-bot[bot]' };
+  const person = { __typename: 'User', login: 'itstimwhite' };
+  const greenRoutes = pr => ({
+    '/graphql': { data: { repository: { pullRequests: { nodes: [pr] } } } },
+    '/check-runs': {
+      check_runs: [
+        { name: 'PR Ready', conclusion: 'success', completed_at: iso(205) },
+        {
+          name: 'Migration Guard',
+          conclusion: 'success',
+          completed_at: iso(205),
+        },
+        {
+          name: 'PR Size Guard',
+          conclusion: 'success',
+          completed_at: iso(205),
+        },
+      ],
+    },
+    '/status': {
+      statuses: [
+        {
+          context: 'Fork PR Gate',
+          state: 'success',
+          created_at: iso(205),
+        },
+      ],
+    },
+  });
+  const observe = async pr => {
+    const { report } = await runLiveness({
+      registry: only('github:jovie:green-to-enqueue'),
+      nowMs: NOW,
+      token: 't',
+      fetchImpl: fakeFetch(greenRoutes(pr)),
+    });
+    return {
+      row: rowFor(report, 'github:jovie:green-to-enqueue'),
+      decisions: livenessDecisions(report),
+    };
+  };
+
+  it('reports a re-enroll-exhausted head as removal-held, not automation silence', async () => {
+    const { row, decisions } = await observe(
+      removedPr({
+        removals: [
+          { ago: 200, actor: bot },
+          { ago: 150, actor: bot },
+          { ago: 100, actor: bot },
+        ],
+      })
+    );
+    expect(row.status).toBe('fresh');
+    expect(row.reason).toContain('ready-green-unqueued=0[]');
+    expect(row.reason).toContain('removal-held=1[#1]');
+    expect(decisions).toEqual([]);
+  });
+
+  it('still counts a head inside the bounded re-admission budget', async () => {
+    const { row, decisions } = await observe(
+      removedPr({
+        removals: [
+          { ago: 150, actor: bot },
+          { ago: 100, actor: bot },
+        ],
+      })
+    );
+    expect(row.status).toBe('stale');
+    expect(row.reason).toContain('ready-green-unqueued=1[#1:205m]');
+    expect(row.reason).toContain('removal-held=0[]');
+    expect(decisions[0].action).toBe('red');
+  });
+
+  it('never counts a head a person dequeued', async () => {
+    const { row, decisions } = await observe(
+      removedPr({ removals: [{ ago: 100, actor: person }] })
+    );
+    expect(row.status).toBe('fresh');
+    expect(row.reason).toContain('removal-held=1[#1]');
+    expect(decisions).toEqual([]);
+  });
+
+  it('counts the head again once a new commit follows the removal', async () => {
+    // The removal predates the head commit, so the exact head being watched
+    // has spent none of its re-admission budget: it still counts as waiting.
+    const { row } = await observe(
+      removedPr({ removals: [{ ago: 300, actor: bot }] })
+    );
+    expect(row.status).toBe('stale');
+    expect(row.reason).toContain('ready-green-unqueued=1[#1:205m]');
+    expect(row.reason).toContain('removal-held=0[]');
+  });
+
+  it('keeps QUEUE_REMOVAL_REENROLL_MAX equal to the enroll controller budget', () => {
+    const workflow = readFileSync(
+      resolve(repoRoot, '.github/workflows/merge-queue-green-enroll.yml'),
+      'utf8'
+    );
+    const inline = /const REENROLL_MAX_REMOVALS = (\d+),/.exec(workflow);
+    expect(inline).not.toBeNull();
+    expect(Number(inline[1])).toBe(QUEUE_REMOVAL_REENROLL_MAX);
   });
 });

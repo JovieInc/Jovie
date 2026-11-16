@@ -1,5 +1,7 @@
 // Homepage page contract (Tim, 2026-11-03: "Jovie helps you move your music
-// forward." on `/`; invite-only, the story ends in the role waitlist form).
+// forward." on `/`; Tim, 2026-11-12: "Switch it", so the story ends in the
+// claim-your-profile action into `/start`, or in the role waitlist form only
+// while the PUBLIC_SIGNUP_CLOSED kill switch is on).
 // One table-driven contract: it renders the real `/` page module and checks
 // the route manifest, copy truth sources, the one primary action, product
 // imagery, and tokenized styles. Changing the page means changing its typed
@@ -9,26 +11,12 @@
 import { readdirSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { render, screen, within } from '@testing-library/react';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { MARKETING_ROUTE_MANIFEST } from '@/data/marketing';
 import { getMarketingRecipe } from '@/data/marketing/recipes';
 import { getPublicPriceClaim } from '@/lib/billing/offer-truth';
 import { getEndUserPerfRouteById } from '@/scripts/performance-route-manifest';
 
-const gate = vi.hoisted(() => ({ WAITLIST_ENABLED: true }));
-vi.mock('@/lib/flags/marketing-static', async importOriginal => {
-  const actual =
-    await importOriginal<typeof import('@/lib/flags/marketing-static')>();
-  return {
-    ...actual,
-    FEATURE_FLAGS: new Proxy(actual.FEATURE_FLAGS, {
-      get: (target, key) =>
-        key === 'WAITLIST_ENABLED'
-          ? gate.WAITLIST_ENABLED
-          : target[key as keyof typeof target],
-    }),
-  };
-});
 vi.mock('@/lib/analytics', () => ({ track: vi.fn(), page: vi.fn() }));
 vi.mock('@/lib/content-records/store.server', async () => {
   const { MARKETING_PAGE_KIND } = await import(
@@ -93,9 +81,6 @@ const HOMEPAGE_STYLES = [
 const PRICE_TEXT = /\$\s?\d|\d+\s?\/\s?mo\b|\bper month\b|\b\d+-day\b/i;
 
 describe('homepage contract', { timeout: 60_000 }, () => {
-  beforeEach(() => {
-    gate.WAITLIST_ENABLED = true;
-  });
   afterEach(() => {
     vi.resetModules();
   });
@@ -149,42 +134,45 @@ describe('homepage contract', { timeout: 60_000 }, () => {
       copy.profile.headline,
       copy.releases.headline,
       specs.headline,
-      copy.invite.headline,
+      copy.claim.headline,
     ]);
   });
 
-  it.each([true, false])(
-    'ends in the one role waitlist form and links nowhere near signup, waitlist=%s',
-    async waitlist => {
-      gate.WAITLIST_ENABLED = waitlist;
-      const { HOMEPAGE_EDITORIAL_COPY: copy, HOMEPAGE_INVITE_ANCHOR } =
-        await loadCopy();
-      const { container } = await renderHomePage();
+  it('ends in the one claim action into /start', async () => {
+    const { HOMEPAGE_INVITE_ANCHOR } = await loadCopy();
+    const { getClaimProfileIntent } = await import(
+      '@/data/marketingCtaIntents'
+    );
+    const claim = getClaimProfileIntent();
+    const { container } = await renderHomePage();
 
-      // One conversion: the role waitlist form inside the closing section.
-      const forms = [...container.querySelectorAll('form')];
-      expect(forms).toHaveLength(1);
-      expect(forms[0]).toHaveAttribute('data-testid', 'waitlist-role-form');
-      const close = container.querySelector(`#${HOMEPAGE_INVITE_ANCHOR}`);
-      expect(close).toHaveAttribute('data-testid', 'marketing-section-cta');
-      expect(close?.contains(forms[0] ?? null)).toBe(true);
-      expect(within(forms[0]!).getAllByRole('radio')).toHaveLength(6);
+    // No on-page form: the closing section hands off to /start.
+    expect(container.querySelectorAll('form')).toHaveLength(0);
+    const close = container.querySelector(`#${HOMEPAGE_INVITE_ANCHOR}`);
+    expect(close).toHaveAttribute('data-testid', 'marketing-section-cta');
+    const closeCta = within(close as HTMLElement).getByTestId(
+      'homepage-close-cta'
+    );
+    expect(closeCta).toHaveAttribute('href', claim.href);
+    expect(closeCta).toHaveTextContent(claim.label);
 
-      // The hero's primary action scrolls to that form; no public signup.
-      const primary = screen.getByTestId('homepage-primary-cta');
-      expect(primary).toHaveAttribute('href', `#${HOMEPAGE_INVITE_ANCHOR}`);
-      expect(primary).toHaveTextContent(copy.hero.primaryAction);
-      expect(
-        container.querySelectorAll('[data-primary-action="true"]')
-      ).toHaveLength(1);
-      const hrefs = [...container.querySelectorAll('a[href]')].map(
-        link => link.getAttribute('href') ?? ''
-      );
-      expect(
-        hrefs.filter(href => /^\/(signup|sign-up|start|claim)\b/.test(href))
-      ).toEqual([]);
-    }
-  );
+    // The hero's primary action is the same claim; one primary action.
+    const primary = screen.getByTestId('homepage-primary-cta');
+    expect(primary).toHaveAttribute('href', claim.href);
+    expect(primary).toHaveTextContent(claim.label);
+    expect(
+      container.querySelectorAll('[data-primary-action="true"]')
+    ).toHaveLength(1);
+    const hrefs = [...container.querySelectorAll('a[href]')].map(
+      link => link.getAttribute('href') ?? ''
+    );
+    expect(
+      hrefs.filter(href => /^\/(signup|sign-up|claim)\b/.test(href))
+    ).toEqual([]);
+    expect(new Set(hrefs.filter(href => /^\/start\b/.test(href)))).toEqual(
+      new Set(['/start'])
+    );
+  });
 
   it('binds performance readiness to the rendered hero and its action', async () => {
     const { container } = await renderHomePage();
@@ -275,6 +263,7 @@ describe('homepage contract', { timeout: 60_000 }, () => {
     // root with an anchor, so the fragment must name an id the homepage
     // actually renders. A renamed target (e.g. the old claim input)
     // otherwise silently dead-ends every dependent CTA at the top of `/`.
+    const HOMEPAGE_FRAGMENT_HREF = /['"`]\/#([A-Za-z0-9][A-Za-z0-9_-]*)['"`]/g;
     const anchors = new Set<string>();
     const collectAnchors = (dir: string): void => {
       for (const entry of readdirSync(dir, { withFileTypes: true })) {
@@ -288,9 +277,7 @@ describe('homepage contract', { timeout: 60_000 }, () => {
           /\.(ts|tsx)$/.test(entry.name) &&
           !/(\.test\.|\.spec\.|\.stories\.)/.test(entry.name)
         ) {
-          for (const match of read(path).matchAll(
-            /['"`]\/#([A-Za-z0-9][A-Za-z0-9_-]*)['"`]/g
-          )) {
+          for (const match of read(path).matchAll(HOMEPAGE_FRAGMENT_HREF)) {
             anchors.add(match[1]);
           }
         }
@@ -299,12 +286,16 @@ describe('homepage contract', { timeout: 60_000 }, () => {
     collectAnchors('app');
     collectAnchors('components');
 
+    // The changelog footer was the last `/#fragment` link; it now uses the
+    // shared claim CTA, so an empty set is valid. The pattern is proven on a
+    // fixture instead, so the scan cannot go stale silently.
     expect(
-      anchors.size,
-      `no homepage fragment anchors found — the guard scan went stale: ${[
-        ...anchors,
-      ].join(', ')}`
-    ).toBeGreaterThan(0);
+      [
+        ...`href='/#claim-name' "/#faq" '/pricing#plans'`.matchAll(
+          HOMEPAGE_FRAGMENT_HREF
+        ),
+      ].map(match => match[1])
+    ).toEqual(['claim-name', 'faq']);
     const missing = [...anchors].filter(id => !renderedIds.has(id));
     expect(missing).toEqual([]);
   });

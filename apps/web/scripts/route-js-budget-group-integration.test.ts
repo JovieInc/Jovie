@@ -18,13 +18,24 @@ afterEach(() => {
   cleanupFixtures();
 });
 
+// The CLI compares this fixture with origin/main's route-js-budgets.json.
+// Group and route ceilings that the cases do not intentionally move must stay
+// at the committed ratchet, or a later --write looks like growth.
+const committedBudgets = JSON.parse(
+  readFileSync(join(__dirname, 'route-js-budgets.json'), 'utf8')
+) as {
+  routes: { '/app/chat': number };
+  groups: { admin: { baselineKb: number }; dashboard: { baselineKb: number } };
+};
+
 function control() {
   const budgets = firstLoadBudgets({
-    admin: { baselineKb: 1345 },
-    dashboard: { baselineKb: 1385 },
+    admin: { baselineKb: committedBudgets.groups.admin.baselineKb },
+    dashboard: { baselineKb: committedBudgets.groups.dashboard.baselineKb },
     marketing: { baselineKb: 50 },
     public: { baselineKb: 80 },
   });
+  budgets.routes['/app/chat'] = committedBudgets.routes['/app/chat'];
   const routeGroups = {
     admin: { budgets: { initialJS_gzip_kb: 300 } },
     dashboard: { budgets: { initialJS_gzip_kb: 250 } },
@@ -94,6 +105,7 @@ describe('route-group policy reaches the existing evaluator and CLI', () => {
     const indexBefore = readFileSync(parentIndex);
     const git = (dir: string, env: NodeJS.ProcessEnv, args: string[]) => {
       const run = spawnSync('git', args, {
+        maxBuffer: 256 * 1024 * 1024,
         cwd: dir,
         env,
         encoding: 'utf8',
@@ -245,6 +257,7 @@ describe('route-group policy reaches the existing evaluator and CLI', () => {
       });
       const git = (args: string[]) => {
         const result = spawnSync('git', args, {
+          maxBuffer: 256 * 1024 * 1024,
           cwd: nextDir,
           env,
           encoding: 'utf8',

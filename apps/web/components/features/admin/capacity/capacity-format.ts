@@ -100,3 +100,8 @@ export const USAGE_MODEL_LABEL: Record<string, string> = {
   'pay-per-token': 'Pay per token',
   free: 'Free',
 };
+
+/** Sentence-case label for a free-form account status ('lapsed' -> 'Lapsed'). */
+export function accountStatusLabel(status: string): string {
+  return status.charAt(0).toUpperCase() + status.slice(1);
+}

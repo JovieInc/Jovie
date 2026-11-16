@@ -20,6 +20,12 @@ vi.mock('@/lib/referrals/service', () => ({
   getOrCreateReferralCode: mocks.getOrCreateReferralCode,
 }));
 
+// The page renders no gated row; keep the upgrade-checkout graph out of
+// this node import.
+vi.mock('@/components/molecules/settings/SettingsPlanGateLabel', () => ({
+  SettingsPlanGateLabel: () => null,
+}));
+
 describe('settings referral page', () => {
   beforeEach(() => {
     vi.clearAllMocks();

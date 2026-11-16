@@ -152,6 +152,7 @@ async function main(argv) {
     opt[key] = key === 'logs' ? argv[++i] : Number(argv[++i]);
   }
   const known = execFileSync('git', ['ls-files', '--', '.'], {
+    maxBuffer: 256 * 1024 * 1024,
     cwd: webRoot,
     encoding: 'utf8',
   })

@@ -111,6 +111,14 @@ describe('HeaderNav states', () => {
     expect(accountMenu.evaluated).toBe(false);
   });
 
+  it('sends the default public CTA into the one /start flow', () => {
+    render(<HeaderNav authMode='public-static' hideNav={false} />);
+
+    expect(
+      screen.getByRole('link', { name: 'Claim your free profile' })
+    ).toHaveAttribute('href', APP_ROUTES.START);
+  });
+
   it('drops the desktop nav group and its divider when there are no nav links', async () => {
     const { container } = render(
       <HeaderNav authMode='public-static' navLinks={[]} />
@@ -134,6 +142,7 @@ describe('HeaderNav states', () => {
 
     const trigger = screen.getByRole('button', { name: 'Product' });
     expect(trigger).toHaveAttribute('aria-expanded', 'false');
+    expect(trigger).toHaveAttribute('data-slot', 'plain-button');
     await expectNoA11yViolations(container);
 
     await user.hover(trigger);

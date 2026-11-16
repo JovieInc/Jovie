@@ -31,6 +31,11 @@ const UNIFIED_SIDEBAR = findSourceFile(
   resolve(process.cwd(), 'apps/web/components/organisms/UnifiedSidebar.tsx')
 );
 
+const SETTINGS_SIDEBAR_NAV = findSourceFile(
+  resolve(process.cwd(), 'components/organisms/SettingsSidebarNav.tsx'),
+  resolve(process.cwd(), 'apps/web/components/organisms/SettingsSidebarNav.tsx')
+);
+
 const SETTINGS_ALIAS_ROUTES = [
   {
     route: 'settings root',
@@ -255,7 +260,14 @@ describe('settings shell normalization', () => {
     expect(sidebarSource).toContain(
       '<SettingsNavigation pathname={pathname} section={section} />'
     );
-    expect(sidebarSource).toContain('function SettingsNavigation');
+    expect(sidebarSource).toContain("from './SettingsSidebarNav'");
+    expect(SETTINGS_SIDEBAR_NAV).toBeDefined();
+    if (!SETTINGS_SIDEBAR_NAV) {
+      throw new Error('Could not find SettingsSidebarNav source');
+    }
+    expect(readFileSync(SETTINGS_SIDEBAR_NAV, 'utf8')).toContain(
+      'function SettingsNavigation'
+    );
   });
 
   it('keeps legacy settings aliases as lightweight route redirects', () => {

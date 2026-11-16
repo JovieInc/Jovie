@@ -1,22 +1,21 @@
 import { getClaimProfileIntent } from '@/data/marketingCtaIntents';
-import { isCodeFlagEnabled } from '@/lib/flags/code-flags';
 import { isPublicSignupClosed } from '@/lib/waitlist/public-signup-gate';
 
 /**
- * Homepage hero primary action. Public signup reopened on 2026-11-09
- * (canon/PRODUCT.md) and onboarding is one flow, so a stranger should be able
- * to start it from the hero.
+ * Homepage claim actions. Public signup reopened on 2026-11-09
+ * (canon/PRODUCT.md) and onboarding is one flow, so the hero, the header and
+ * the closing section all send a stranger into `/start` with the shared
+ * claim-profile CTA intent (Tim, 2026-11-12 23:46Z: "Switch it").
  *
- * `HOMEPAGE_START_CTA` (default off) swaps the hero action for the shared
- * claim-profile CTA intent, which enters `/start`. Off, or while the
- * `PUBLIC_SIGNUP_CLOSED` kill switch sends `/start` back to the waitlist, the
- * hero keeps its own action: scroll to the on-page invitation form.
+ * The `PUBLIC_SIGNUP_CLOSED` kill switch is the only way back: while it is on,
+ * `/start` redirects to the waitlist, so the homepage keeps its own on-page
+ * invitation form instead.
  *
- * Read on the server at build time (the homepage is static), so a flip takes
- * a redeploy.
+ * Read on the server at build time (the homepage is static), so a flip of the
+ * kill switch takes a redeploy.
  */
 export function isHomepageStartCtaEnabled(): boolean {
-  return isCodeFlagEnabled('HOMEPAGE_START_CTA') && !isPublicSignupClosed();
+  return !isPublicSignupClosed();
 }
 
 export interface HomepageHeroPrimaryAction {

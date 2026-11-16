@@ -8,7 +8,6 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "lanes"))
 import fix_red_classes as classes  # noqa: E402
 
-
 def pr(*names, merge="BLOCKED"):
     return {"mergeStateStatus": merge, "statusCheckRollup": [{"name": n, "conclusion": "FAILURE"} for n in names]
             + [{"name": "PR Ready", "conclusion": "FAILURE"}, {"name": "ok", "conclusion": "SUCCESS"}]}
@@ -17,10 +16,12 @@ def pr(*names, merge="BLOCKED"):
 class ClassifyTest(unittest.TestCase):
     def test_signatures_map_to_classes_and_actions(self):
         cases = {
+            "[lint:ui-feel] new violations on lines this change adds:\n  a.tsx:1  missingTabularNums\ngithub-quota-deferred": ("ui-feel", "ui-feel"),
             "github-quota-deferred; fleet evidence retry": ("quota-deferred", "rerun"),
             "HttpError: API rate limit exceeded for installation": ("platform-infra", "rerun"),
             "Could not fetch gitleaks after 3 attempts (https://example.invalid/gitleaks.tar.gz).": ("platform-infra", "rerun"),
             "##[error]Dependency review detected incompatible licenses.": ("dependency-license", "agent"),
+            "screen certificate gate failed:\n  apps/web/components/jovie/merch-tool-artifacts.tsx [states missing empty]": ("screen-certificate", "repair-screen-cert"),
             "github-quota-deferred\n##[error]Dependency review detected incompatible licenses.": ("dependency-license", "agent"),
             "upstream returned HTTP 500 before the job started": ("platform-infra", "rerun"),
             "Unwired: scripts/a.test.mjs, scripts/b.test.mjs. Wire each file into a ci-fast lane": ("ci-fast-wiring", "wire-ci-fast"),
@@ -29,6 +30,7 @@ class ClassifyTest(unittest.TestCase):
             "Error: legacy Cache Components surface grew to 242 (maximum 241):": ("cache-surface", "strip-cache-exports"),
             "AssertionError: off-grid 10px/14px spacing steps (*-2.5, *-3.5) grew: 591 > baseline 590.": ("spacing-scale", "snap-spacing"),
             "Error: apps/web/app/(marketing)/pricing/page.tsx: source changed; renew certification evidence": ("census-certification", "sync-main"),
+            "Surface census: Transition history is append-only": ("census-history", "sync-main"),
             "use atomic_state.atomic_write_text for whole-file state: [('x.py','f','open-w')]": ("atomic-write", "atomic-write"),
             "red-before-green: include Failing command:": ("pr-body", "agent"),
             "AssertionError: expected 1": ("other", "agent"),
@@ -607,7 +609,6 @@ class T(unittest.TestCase):
         path = Path(__file__).resolve().parents[1] / "tests" / "test_lane_runner.py"
         text = path.read_text()
         self.assertEqual(classes.complete_release_identity_stubs(text), text)
-
 
 if __name__ == "__main__":
     unittest.main()

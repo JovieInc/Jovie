@@ -2,7 +2,7 @@
 // biome-ignore-all assist/source/organizeImports: compact tests keep imports together.
 import assert from 'node:assert/strict'; import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os'; import { join } from 'node:path'; import { test } from 'node:test'; import {
-compareImages, evaluateManifest, formatComment, frameCaptureUrl, parseManifest,
+compareImages, evaluateManifest, evaluateManifestWithBrowser, formatComment, frameCaptureUrl, parseManifest,
 selectFrames, syntheticComparison, validateManifest, } from './pen-still-diff.mjs';
 import { decodePng, encodePng, measureImage, ssim, stretchedPair, syntheticPair } from './pen-still-diff-lib.mjs';
 import { captureSurfacePng } from './clef-screenshot-capture.mjs';
@@ -208,7 +208,7 @@ function fixture(t, ids = ['hero']) {
     const stillPath = `${index}.png`;
     writeFileSync(join(root, stillPath), encodePng(pen));
     return { sectionId, penNodeId: `node-${index}`, stillPath, renderPath: stillPath, captureError: false,
-      fileHash: /** @type {string | null} */ (null),
+      fileHash: /** @type {string | null} */ (null), story: /** @type {string | undefined} */ (undefined),
       viewport: 1440, mode: 'dark', status: 'active', route: '/' };
   });
   return { root, manifest: { schema: 'pen-still-manifest/v1', frames } };
@@ -395,3 +395,95 @@ const frames = bindingsToStillFrames(bound);
 assert.equal(frames.length, 1); assert.equal(frames[0].sectionSelector, "[data-pen-section='hero']");
 assert.equal(frames[0].fileHash, `sha256:${'a'.repeat(64)}`); assert.equal(frames[0].mode, 'dark');
 assert.equal(validateManifest({ schema: 'pen-still-manifest/v1', frames }).ok, true); });
+
+test('one lazy browser captures all frames in isolated pages and closes after a frame fails', async t => {
+const input = fixture(t, Array.from({ length: 12 }, (_, i) => `section-${String(i).padStart(2, '0')}`));
+const calls = []; let launches = 0; let pageIndex = 0;
+const launchBrowser = async () => { launches++; return {
+isConnected: () => true,
+newPage: async options => {
+const index = pageIndex++; let url;
+calls.push(['page', index, options.colorScheme, options.viewport.width]);
+return {
+goto: async target => { url = target; if (index === 1) throw new Error('capture unavailable'); },
+url: () => url, waitForTimeout: async () => {},
+screenshot: async () => readFileSync(join(input.root, `${index}.png`)),
+locator: () => ({ evaluate: async () => null }),
+close: async () => calls.push(['page-close', index]),
+}; }, close: async () => calls.push(['browser-close']),
+}; };
+const receipt = await evaluateManifestWithBrowser(input.manifest, {
+root: input.root, strict: true, baseUrl: 'http://fixture.invalid', launchBrowser,
+});
+assert.equal(launches, 1); assert.equal(pageIndex, 12);
+assert.equal(receipt.frames.length, 12); assert.equal(receipt.frames.filter(frame => frame.verdict === 'pass').length, 11);
+assert.equal(receipt.frames[1].reason, 'comparison-unavailable'); assert.equal(receipt.pass, false);
+assert.equal(calls.filter(call => call[0] === 'page-close').length, 12);
+assert.deepEqual(calls.at(-1), ['browser-close']);
+assert.ok(calls.filter(call => call[0] === 'page').every(call => call[2] === 'dark' && call[3] === 1440));
+const next = await evaluateManifestWithBrowser(input.manifest, {
+root: input.root, baseUrl: 'http://fixture.invalid', launchBrowser,
+capture: async frame => ({ png: readFileSync(join(input.root, frame.stillPath)) }),
+});
+assert.equal(next.pass, true); assert.equal(launches, 1); // injected captures own their lifecycle
+});
+
+test('missing stills, hash failures and absent targets never launch a browser', async t => {
+const input = fixture(t); const launchBrowser = async () => assert.fail('no capture is possible');
+for (const variant of [
+{ ...input.manifest, frames: [{ ...input.manifest.frames[0], stillPath: 'missing.png' }] },
+{ ...input.manifest, frames: [{ ...input.manifest.frames[0], fileHash: 'sha256:deadbeef' }] },
+{ ...input.manifest, frames: [{ ...input.manifest.frames[0], route: undefined }] },
+]) {
+const receipt = await evaluateManifestWithBrowser(variant, {
+root: input.root, baseUrl: 'http://fixture.invalid', strict: true, launchBrowser,
+});
+assert.equal(receipt.pass, false);
+}
+const noTarget = await evaluateManifestWithBrowser(input.manifest, { root: input.root, strict: true, launchBrowser });
+assert.equal(noTarget.frames[0].reason, 'capture-target-missing');
+});
+
+test('a disconnected capture browser is replaced so later frames can still qualify', async t => {
+const input = fixture(t, ['first', 'second']); let launches = 0; let closes = 0;
+const launchBrowser = async () => {
+const first = launches++ === 0; let connected = true;
+return { isConnected: () => connected, close: async () => { closes++; },
+newPage: async () => {
+if (first) { connected = false; throw new Error('browser disconnected'); }
+return { goto: async () => {}, url: () => 'http://fixture.invalid/', waitForTimeout: async () => {},
+screenshot: async () => readFileSync(join(input.root, '1.png')),
+locator: () => ({ evaluate: async () => null }), close: async () => {}, };
+} };
+};
+const receipt = await evaluateManifestWithBrowser(input.manifest, {
+root: input.root, baseUrl: 'http://fixture.invalid', strict: true, launchBrowser,
+});
+assert.equal(launches, 2); assert.equal(closes, 2);
+assert.equal(receipt.frames[0].reason, 'comparison-unavailable');
+assert.equal(receipt.frames[1].verdict, 'pass'); assert.equal(receipt.pass, false);
+});
+
+for (const target of ['route', 'story']) test(`same section and node across ${target}s retain distinct artifacts`, t => {
+const input = fixture(t, ['hero', 'hero']);
+input.manifest.frames[1].penNodeId = input.manifest.frames[0].penNodeId;
+input.manifest.frames.forEach((frame, i) => {
+if (target === 'route') frame.route = i ? '/pricing' : '/about';
+else frame.story = i ? 'pricing--hero' : 'about--hero';
+});
+assert.equal(validateManifest(input.manifest).ok, true);
+const result = runFixtureCli(input);
+assert.equal(result.status, 0, result.stderr); assert.equal(result.receipt.pass, true);
+assert.equal(result.receipt.frames.length, 2); assert.equal(result.receipt.triptychs.length, 2);
+assert.equal(new Set(result.receipt.triptychs.map(item => item.file)).size, 2);
+assert.deepEqual(result.receipt.frames.map(frame => frame[target]).sort(), input.manifest.frames.map(frame => frame[target]).sort());
+for (const artifact of result.receipt.triptychs) {
+assert.ok(existsSync(join(result.outDir, artifact.file)));
+assert.ok(readFileSync(join(result.outDir, 'comment.md'), 'utf8').includes(artifact[target]));
+}
+assert.equal(existsSync(join(result.outDir, 'triptych.png')), false);
+input.manifest.frames.reverse();
+assert.deepEqual(runFixtureCli(input, true, 'again').receipt.triptychs, result.receipt.triptychs);
+input.manifest.frames.push({ ...input.manifest.frames[0] });
+assert.equal(validateManifest(input.manifest).ok, false); // same target duplicates still fail
+});

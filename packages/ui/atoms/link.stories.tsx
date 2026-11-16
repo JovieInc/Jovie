@@ -86,7 +86,7 @@ export const Active: Story = {
     docs: {
       description: {
         story:
-          'Active/pressed link styling via data-state="active" and the interactive accent token --color-accent; native :active applies the same token while pressing.',
+          'Active/pressed link styling via data-state="active" and the readable semantic --color-link-hover token; native :active applies the same token while pressing.',
       },
     },
   },

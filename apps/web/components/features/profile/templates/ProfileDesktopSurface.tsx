@@ -71,6 +71,7 @@ import type { Artist, LegacySocialLink } from '@/types/db';
 import type { NotificationContentType } from '@/types/notifications';
 import type { PressPhoto } from '@/types/press-photos';
 import type { PublicRelease } from '../releases/types';
+import { DesktopSurfaceImage } from './DesktopSurfaceImage';
 
 // JOV-6201: reuse the 360px track at 1180px with min-w-0 on every desktop listen branch.
 export const PROFILE_LISTEN_DESKTOP_GRID_CLASSNAME =
@@ -503,11 +504,9 @@ export function ProfileDesktopSurface({
         >
           <div className='absolute inset-0'>
             {heroImageUrl ? (
-              <ImageWithFallback
+              <DesktopSurfaceImage
                 src={heroImageUrl}
                 alt=''
-                fill
-                priority
                 sizes='(max-width: 1536px) 60vw, 900px'
                 className='object-cover object-center'
                 fallbackVariant='avatar'
@@ -809,12 +808,10 @@ export function ProfileDesktopSurface({
       <DesktopSurfaceCard title='Latest Release'>
         <div className='space-y-4'>
           <div className='relative aspect-square overflow-hidden rounded-3xl border border-white/8'>
-            <ImageWithFallback
+            <DesktopSurfaceImage
               src={latestVisibleRelease?.artworkUrl}
               alt={latestVisibleRelease?.title ?? artist.name}
-              fill
               sizes='320px'
-              priority
               className='object-cover'
               fallbackVariant='release'
             />
