@@ -171,7 +171,7 @@ html[data-desktop-runtime="electron"]
   > div,
 /* The dashboard header keeps its controls reservation (JOV-7207) on a
    wrapper above the drag box, so its title row sits one level deeper. */
-html[data-desktop-runtime="electron"]
+  html[data-desktop-runtime="electron"]
   [data-top-spacing-owner="shell-header"]
   > header
   > div {
