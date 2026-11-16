@@ -64,6 +64,7 @@ import hyperagent_lane  # noqa: E402
 import hyperagent_repair  # noqa: E402
 import migration_renumber  # noqa: E402  (no-model fix for migration number collisions)
 import fix_red_rewrite  # noqa: E402
+import fix_red_failure_routing  # noqa: E402
 import fix_red_classes  # noqa: E402  (fingerprint + deterministic routing of fix-red failures)
 import sourced_shell_conflict  # noqa: E402  (source-vs-inline shell conflict; ports retry into the helper)
 from gh_budget import gh_call  # noqa: E402  (budgeted gh for new lane code)
@@ -147,7 +148,7 @@ MAX_GATE_TIMEOUTS = 3
 CLAIM_TTL_S = pr_events.CLAIM_TTL_S
 HOST = socket.gethostname().split(".")[0]
 # Every file a release must pass before `current` moves to it.
-LANE_TESTS = ["scripts/tests/test_factory_signals.py", "scripts/tests/test_factory_intake.py", "scripts/tests/test_update_drain.py", "scripts/tests/test_machine_gap.py", "scripts/tests/test_slot_yield.py", "scripts/tests/test_machine_metrics.py", "scripts/tests/test_lanes_atomic_state.py", "scripts/tests/test_lifecycle.py", "scripts/tests/test_execution_attempt.py", "scripts/tests/test_backlog_admission.py", "scripts/tests/test_backlog_writer_guard.py", "scripts/tests/test_lane_runner.py", "scripts/tests/test_execution_budget.py", "scripts/tests/test_dispatch_budget.py", "scripts/tests/test_binding_turns.py", "scripts/tests/test_issue_turns.py", "scripts/tests/test_throughput_ghost_runs.py", "scripts/tests/test_ledger_read.py", "scripts/tests/test_hyperagent_lane.py", "scripts/tests/test_hyperagent_network.py", "scripts/tests/test_cloud_lane.py", "scripts/tests/test_hyperagent_repair.py", "scripts/tests/test_fix_red_classes.py", "scripts/tests/test_sourced_shell_conflict.py", "scripts/tests/test_fix_red_source_edits.py", "scripts/tests/test_fix_red_failure_evidence.py", "scripts/tests/test_migration_renumber.py", "scripts/tests/test_host_git.py", "scripts/tests/test_reviewable_split.py", "scripts/tests/test_quoted_path_list_merge.py",
+LANE_TESTS = ["scripts/tests/test_factory_signals.py", "scripts/tests/test_factory_intake.py", "scripts/tests/test_update_drain.py", "scripts/tests/test_machine_gap.py", "scripts/tests/test_slot_yield.py", "scripts/tests/test_machine_metrics.py", "scripts/tests/test_lanes_atomic_state.py", "scripts/tests/test_lifecycle.py", "scripts/tests/test_execution_attempt.py", "scripts/tests/test_backlog_admission.py", "scripts/tests/test_backlog_writer_guard.py", "scripts/tests/test_lane_runner.py", "scripts/tests/test_execution_budget.py", "scripts/tests/test_dispatch_budget.py", "scripts/tests/test_binding_turns.py", "scripts/tests/test_issue_turns.py", "scripts/tests/test_throughput_ghost_runs.py", "scripts/tests/test_ledger_read.py", "scripts/tests/test_hyperagent_lane.py", "scripts/tests/test_hyperagent_network.py", "scripts/tests/test_cloud_lane.py", "scripts/tests/test_hyperagent_repair.py", "scripts/tests/test_fix_red_classes.py", "scripts/tests/test_sourced_shell_conflict.py", "scripts/tests/test_fix_red_source_edits.py", "scripts/tests/test_fix_red_failure_evidence.py", "scripts/tests/test_fix_red_failure_routing.py", "scripts/tests/test_migration_renumber.py", "scripts/tests/test_host_git.py", "scripts/tests/test_reviewable_split.py", "scripts/tests/test_quoted_path_list_merge.py",
               "scripts/tests/test_codex_lane.py", "scripts/tests/test_hud.py", "scripts/tests/test_devin_free_policy.py",
               "scripts/tests/test_doctor.py", "scripts/tests/test_public_feed.py", "scripts/tests/test_pr_events.py", "scripts/tests/test_pr_events_repair_evidence.py",
               "scripts/tests/test_reason_lane.py", "scripts/tests/test_yc_corpus.py",
@@ -6980,6 +6981,8 @@ def infra_only_red(host: Host, pr: dict) -> str | None:
     logs = failed_logs(host, pr)
     if not logs:
         return None
+    if fix_red_classes.classify(pr, logs).get("action") == fix_red_failure_routing.ALIAS_ACTION:
+        return None
     found = set()
     for text in logs.values():
         hit = PLATFORM_RED_TEXT.search(text)
@@ -7159,15 +7162,8 @@ def claim_route(host: Host, pr: dict, action: str) -> bool:
 
 
 def route_fix_red(host: Host, pr: dict) -> dict | None:
-    """Classify this red head by its failed logs. Returns the class (always) so the receipt carries a
-    fingerprint; deterministic classes are acted on by the caller."""
-    if pr.get("mergeStateStatus") == "DIRTY" or pr.get("reviewDecision") == "CHANGES_REQUESTED":
-        return None
-    try:
-        logs = failed_logs(host, pr) or {}
-        return fix_red_classes.classify(pr, logs)
-    except (OSError, ValueError, KeyError, TypeError):
-        return None
+    """Classify own-head or exact-held merge-group evidence before model work."""
+    return fix_red_failure_routing.classify_repair(host, pr, failed_logs, fix_red_classes.classify, gh_call, REPO_SLUG)
 
 
 def stamp_changelog_decision(host: Host, pr: dict) -> bool:
@@ -7187,6 +7183,8 @@ def stamp_changelog_decision(host: Host, pr: dict) -> bool:
 
 def deterministic_route_taken(host: Host, pr: dict, route: dict | None) -> str | None:
     """Run the no-model action for a routed class once per head; the reason on success (None: use the model)."""
+    if reason := fix_red_failure_routing.owner_handoff_reason(route):
+        return reason
     if not route or route["action"] not in {fix_red_classes.RERUN, fix_red_classes.SYNC_MAIN, fix_red_classes.STAMP_CHANGELOG}:
         return None
     if route["action"] == fix_red_classes.STAMP_CHANGELOG:
@@ -8010,7 +8008,7 @@ def _fix_red_pr(host: Host, name: str, spec: dict, pr: dict, *, branch_held=True
         return receipt
     route = route_fix_red(host, pr) if branch_held else None
     if route:
-        receipt["failureFingerprint"] = {key: route[key] for key in ("cls", "key", "action", "signature")}
+        receipt["failureFingerprint"] = {key: route[key] for key in ("cls", "key", "action", "signature", "evidenceOwner") if key in route}
         reason = deterministic_route_taken(host, pr, route)
         if not reason and fingerprint_breaker_open(host, pr, route["key"]):
             reason = f"infra-rerun:breaker-{route['cls']}"
