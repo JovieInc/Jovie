@@ -17752,6 +17752,7 @@ class FixNowTest(unittest.TestCase):
 
 
 class MixedBodyRepairTest(unittest.TestCase):
+    """Patch the canonical module: release discovery can reload pr_events after lane_runner."""
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
         self.host = lane.Host(state=Path(self.tmp.name))
@@ -17762,23 +17763,23 @@ class MixedBodyRepairTest(unittest.TestCase):
 
     def test_mixed_repairs_write_the_body_once_per_head(self):
         route = {"action": "agent", "cls": "mixed", "repairs": ["stamp-changelog", "red-before-green"]}
-        with patch.object(lane.pr_events, "ensure_red_before_green", return_value=True) as ensure:
+        with patch("pr_events.ensure_red_before_green", return_value=True) as ensure:
             reason = lane.deterministic_route_taken(self.host, self.pr, route)
         self.assertEqual(reason, "infra-rerun:mixed-body-repairs")
         ensure.assert_called_once_with(self.pr, "", customer_decision={"releaseWorthy": False})
-        with patch.object(lane.pr_events, "ensure_red_before_green", return_value=True) as again:
+        with patch("pr_events.ensure_red_before_green", return_value=True) as again:
             self.assertIsNone(lane.deterministic_route_taken(self.host, self.pr, route))
         again.assert_not_called()
 
     def test_agent_route_without_body_repairs_stays_on_the_model(self):
         route = {"action": "agent", "cls": "mixed", "repairs": []}
-        with patch.object(lane.pr_events, "ensure_red_before_green", return_value=True) as ensure:
+        with patch("pr_events.ensure_red_before_green", return_value=True) as ensure:
             self.assertIsNone(lane.deterministic_route_taken(self.host, self.pr, route))
         ensure.assert_not_called()
 
     def test_failed_body_edit_still_hands_the_head_to_the_model(self):
         route = {"action": "agent", "cls": "mixed", "repairs": ["stamp-changelog"]}
-        with patch.object(lane.pr_events, "ensure_red_before_green", return_value=False):
+        with patch("pr_events.ensure_red_before_green", return_value=False):
             self.assertIsNone(lane.deterministic_route_taken(self.host, self.pr, route))
 
     def test_single_class_changelog_keeps_the_primary_stamp_route(self):
