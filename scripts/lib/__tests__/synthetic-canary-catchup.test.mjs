@@ -7,6 +7,7 @@ import { SOURCE_GUARDS } from '../../ci-fast-lanes.mjs';
 import {
   CANARY_WORKFLOW,
   CONFIRM_ATTEMPTS,
+  CONFIRM_DELAY_MS,
   catchup,
   DISPATCH_REF,
   decideCatchup,
@@ -54,18 +55,12 @@ const dispatchRun = (overrides = {}) => ({
 });
 
 /**
- * Fake reader: GET schedule list, GET dispatch list (optionally only after N
- * reads, to model the runs-index lag behind a fresh dispatch), POST dispatch.
- */
-/**
- * dispatchedAfter (1-based): the dispatch-ledger read index from which the
- * rows appear. 1 = the decideCatchup idempotency read sees prior dispatches;
- * 2 = rows appear only on the post-dispatch confirmation reads; Infinity
- * (default) = never, i.e. the dispatch ledger is empty.
- */
-/** @typedef {{status: number, headers?: unknown}} FakeResponse */
-
-/** @param {{scheduled?: Array<Record<string, unknown>>,
+ * Fake reader: GET schedule list, GET dispatch list, POST dispatch.
+ * dispatchedAfter (1-based): the dispatch-ledger read index from which the rows appear. 1 = the
+ * decideCatchup idempotency read sees prior dispatches; 2 = rows appear only on the post-dispatch
+ * confirmation reads; Infinity (default) = never, i.e. the dispatch ledger is empty.
+ * @typedef {{status: number, headers?: unknown}} FakeResponse
+ * @param {{scheduled?: Array<Record<string, unknown>>,
  * dispatched?: Array<Record<string, unknown>>, dispatchedAfter?: number,
  * post?: FakeResponse, scheduleBody?: unknown}} [options] */
 function reader({
@@ -202,21 +197,28 @@ describe('synthetic canary catch-up', () => {
     }
   });
 
-  it('treats an unconfirmable dispatch as a failure so a later check re-evaluates', async () => {
-    const github = reader({
-      scheduled: [scheduledRun({ created_at: iso(421) })],
-      dispatched: [],
-    });
-    const result = await catchup({
-      github,
-      env: { GITHUB_REPOSITORY: repo },
-      now: NOW,
-      sleep: noOpSleep,
-    });
-    expect(result).toMatchObject({ confirmed: false, exitCode: 1 });
-    // 2 evidence GETs + 1 dispatch POST + 5 confirmation GETs.
-    expect(github.rest).toHaveBeenCalledTimes(3 + CONFIRM_ATTEMPTS);
-  });
+  it.each([
+    ['empty ledger', []],
+    ['stale dispatch row predating the window', [dispatchRun({ created_at: iso(10) })]],
+  ])(
+    'treats an unconfirmable dispatch (%s) as a failure so a later check re-evaluates',
+    async (_name, ledger) => {
+      const github = reader({
+        scheduled: [scheduledRun({ created_at: iso(421) })],
+        dispatched: ledger,
+        dispatchedAfter: 1,
+      });
+      const result = await catchup({
+        github,
+        env: { GITHUB_REPOSITORY: repo },
+        now: NOW,
+        sleep: noOpSleep,
+      });
+      expect(result).toMatchObject({ confirmed: false, exitCode: 1 });
+      // 2 evidence GETs + 1 dispatch POST + 5 confirmation GETs.
+      expect(github.rest).toHaveBeenCalledTimes(3 + CONFIRM_ATTEMPTS);
+    }
+  );
 
   it.each([
     [403, { 'x-ratelimit-remaining': '0' }, 75],
@@ -290,10 +292,13 @@ describe('synthetic canary catch-up', () => {
       const github = reader({
         scheduled: [scheduledRun({ created_at: iso(421) })],
       });
-      github.rest.mockImplementation(async (_method, path) =>
-        path.includes('event=workflow_dispatch')
-          ? { status: 200, json: () => ({ workflow_runs: [] }) }
-          : { status: 200, json: () => ({ workflow_runs: scheduled }) }
+      github.rest.mockImplementation(
+        /** @type {any} */ (
+          async (_method, path) =>
+            path.includes('event=workflow_dispatch')
+              ? { status: 200, json: () => ({ workflow_runs: [] }) }
+              : { status: 200, json: () => ({ workflow_runs: scheduled }) }
+        )
       );
       const result = await catchup({
         github,
@@ -445,26 +450,9 @@ describe('catch-up receipts and exit wiring', () => {
     expect(posted(github)).toBeUndefined();
   });
 
-  it('keeps polling past a stale dispatch row that predates the confirmation window', async () => {
-    const github = reader({
-      scheduled: [scheduledRun({ created_at: iso(421) })],
-      dispatched: [dispatchRun({ created_at: iso(10) })],
-      dispatchedAfter: 1,
-    });
-    const result = await catchup({
-      github,
-      env: { GITHUB_REPOSITORY: repo },
-      now: NOW,
-      sleep: noOpSleep,
-    });
-    expect(result).toMatchObject({ confirmed: false, exitCode: 1 });
-    // 2 evidence GETs + 1 dispatch POST + 5 confirmation GETs.
-    expect(github.rest).toHaveBeenCalledTimes(3 + CONFIRM_ATTEMPTS);
-  });
-
   it('treats a non-Error rejection as a plain failure, not a deferral', async () => {
     const github = reader();
-    github.rest.mockRejectedValue('boom-string');
+    github.rest.mockRejectedValue(/** @type {any} */ ('boom-string'));
     expect(
       await catchup({
         github,
@@ -498,14 +486,14 @@ describe('catch-up receipts and exit wiring', () => {
     expect(guard?.command).toContain(
       'lib/__tests__/synthetic-canary-catchup.test.mjs'
     );
-    expect(guard?.command).toContain(
-      '--coverage.include=synthetic-canary-catchup.mjs'
-    );
-    for (const file of [
-      'scripts/synthetic-canary-catchup.mjs',
-      'scripts/lib/__tests__/synthetic-canary-catchup.test.mjs',
-    ]) {
-      expect(guard?.inputs.test(file)).toBe(true);
-    }
+    expect(
+      guard?.command.includes('--coverage.include=synthetic-canary-catchup.mjs')
+    ).toBe(false);
+    expect(guard?.inputs.test('scripts/synthetic-canary-catchup.mjs')).toBe(true);
+    expect(
+      guard?.inputs.test(
+        'scripts/lib/__tests__/synthetic-canary-catchup.test.mjs'
+      )
+    ).toBe(true);
   });
 });
