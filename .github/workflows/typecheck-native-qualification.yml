@@ -12,8 +12,6 @@ jobs:
     name: Qualify tsrs against TS6 and its Microsoft upstream
     runs-on: ubuntu-24.04
     timeout-minutes: 25
-    env:
-      NATIVE_TYPECHECK_OUTPUT: ${{ runner.temp }}/native-typecheck-qualification
     steps:
       - name: Checkout exact dispatched head
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -26,6 +24,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          NATIVE_TYPECHECK_OUTPUT="$RUNNER_TEMP/native-typecheck-qualification"
+          printf 'NATIVE_TYPECHECK_OUTPUT=%s\n' "$NATIVE_TYPECHECK_OUTPUT" >> "$GITHUB_ENV"
           mkdir -p "$NATIVE_TYPECHECK_OUTPUT"
           tools_dir=$(mktemp -d "$RUNNER_TEMP/native-typecheck-tools.XXXXXX")
           cp .github/ci-harness/typecheck-native-tools/package.json "$tools_dir/"

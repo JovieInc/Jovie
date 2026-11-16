@@ -1,5 +1,7 @@
 import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
 import {
+  existsSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
@@ -242,6 +244,38 @@ test('keeps the workflow manual and connects its telemetry to the existing colle
       stage => stage.id
     ),
     ['qualification', 'finished']
+  );
+});
+
+test('initializes qualification receipts with runtime paths for later workflow steps', () => {
+  const root = resolve(import.meta.dirname, '../..');
+  const workflow = readFileSync(
+    resolve(root, '.github/workflows/typecheck-native-qualification.yml'),
+    'utf8'
+  );
+  const install = workflow.split(
+    '      - name: Install the isolated, integrity-pinned compiler tools\n'
+  )[1];
+  const script = install
+    .split('        run: |\n')[1]
+    .split('          tools_dir=')[0]
+    .replace(/^          /gmu, '');
+  const directory = temporary();
+  const runnerTemp = resolve(directory, 'runner temp');
+  const githubEnv = resolve(directory, 'github-env');
+  mkdirSync(runnerTemp);
+  execFileSync('bash', ['-c', script], {
+    env: {
+      PATH: process.env.PATH,
+      RUNNER_TEMP: runnerTemp,
+      GITHUB_ENV: githubEnv,
+    },
+  });
+  const output = resolve(runnerTemp, 'native-typecheck-qualification');
+  assert.ok(existsSync(output));
+  assert.equal(
+    readFileSync(githubEnv, 'utf8'),
+    `NATIVE_TYPECHECK_OUTPUT=${output}\n`
   );
 });
 
