@@ -285,11 +285,19 @@ describe('profile mode query rewrite (JOV-12081)', () => {
 
     it('defaults to the build-generated prerender set (the full alias budget locally)', () => {
       expect(
-        getProfileModeQueryRewrite(gateRequest('/dualipa?mode=listen'))
-      ).not.toBeNull();
+        getProfileModeQueryRewrite(
+          gateRequest('/dualipa?mode=listen')
+        )?.headers.get('x-middleware-rewrite')
+      ).toBe(
+        `${GATE_ORIGIN}/dualipa/profile-mode-render/listen/__profile-mode-alias`
+      );
       expect(
-        getProfileModeQueryRewrite(gateRequest('/testartist?mode=pay'))
-      ).not.toBeNull();
+        getProfileModeQueryRewrite(
+          gateRequest('/testartist?mode=pay')
+        )?.headers.get('x-middleware-rewrite')
+      ).toBe(
+        `${GATE_ORIGIN}/testartist/profile-mode-render/pay/__profile-mode-alias`
+      );
     });
   });
 });
