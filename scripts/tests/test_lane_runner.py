@@ -2905,18 +2905,17 @@ class HostHandoffAdmissionTest(unittest.TestCase):
             self.assertIsNone(lane.next_provider(self.host, {"codex"}, providers, issue=issue(labels=["auth"])))
             self.assertIsNone(lane.next_provider(self.host, set(), providers,
                                                 issue=issue(labels=["auth", "codex-blocked"])))
-            self.assertEqual(lane.next_provider(self.host, {"devin"}, providers,
-                                                issue=issue(labels=["codex-blocked"]))[0], "claude")
-        self.assertTrue(all(call.args[0] is providers["claude"] for call in healthy.call_args_list))
+            self.assertIsNone(lane.next_provider(self.host, {"devin"}, providers,
+                                                issue=issue(labels=["codex-blocked"])))
+        healthy.assert_not_called()
 
-    def test_frontier_handoff_selects_a_frontier_model_without_mutating_the_catalog(self):
+    def test_frontier_handoff_holds_when_only_protected_pool_remains(self):
         providers = self.routed_providers()
         with patch.object(lane, "provider_healthy", return_value=True):
-            name, spec = lane.next_provider(self.host, {"codex"}, providers, issue=issue(labels=["route:frontier"]))
-        self.assertEqual((name, spec["model"]), ("claude", "opus"))
-        self.assertEqual(spec["route"]["required"], "frontier")
+            self.assertIsNone(lane.next_provider(self.host, {"codex"}, providers,
+                                                 issue=issue(labels=["route:frontier"])))
         self.assertEqual(providers["claude"]["model"], "sonnet")
-        self.assertEqual(lane.template(spec["cmd"], {"model": spec["model"]}), ["claude-test", "opus"])
+        self.assertEqual(providers["claude"]["routes"][1]["capability"], "frontier")
 
     def test_handoff_requires_proven_route_capability(self):
         providers = {"devin": {"slots": 1, "model": "unknown", "cmd": ["devin-test"]}}
@@ -2927,10 +2926,8 @@ class HostHandoffAdmissionTest(unittest.TestCase):
         providers = self.routed_providers()
         with patch.object(lane, "provider_healthy", return_value=True), \
                 patch.object(lane, "read_json", return_value={}):
-            name, spec = lane.next_provider(self.host, {"codex"}, providers, issue=issue(),
-                                            minimum_capability="frontier")
-            self.assertEqual((name, spec["model"]), ("claude", "opus"))
-            self.assertEqual(spec["route"]["required"], "frontier")
+            self.assertIsNone(lane.next_provider(self.host, {"codex"}, providers, issue=issue(),
+                                                minimum_capability="frontier"))
             self.assertIsNone(lane.next_provider(self.host, {"codex", "claude"}, providers,
                                                 issue=issue(), minimum_capability="frontier"))
             self.assertIsNone(lane.next_provider(self.host, set(), providers,
@@ -3225,8 +3222,8 @@ class RunIssueTest(unittest.TestCase):
                 patch.object(lane, "run_agent", side_effect=agent):
             receipt = lane.run_issue(self.host, "codex", providers["codex"], FakeLinear([]),
                                      issue(labels=["route:frontier"]))
-        self.assertEqual(seen, [["codex-test"], ["claude-test", "opus"]])
-        self.assertEqual(len(receipt["handoffs"]), 1)
+        self.assertEqual(seen, [["codex-test"]])
+        self.assertEqual(receipt.get("handoffs", []), [])
         self.assertEqual(receipt["verdict"], "provider-error")
 
     def test_next_provider_takes_the_cheapest_enabled_healthy_uncooled_lane(self):

@@ -291,6 +291,13 @@ class NewAutomatedAssignmentTest(unittest.TestCase):
                 self.assertEqual(result["assignmentRejected"], [{"lane": "personal",
                                  "why": "protected-subscription-task-authorization-required"}])
 
+    def test_company_route_retains_frontier_floor_when_codex_is_unavailable(self):
+        decision = remediation.route_issue(self.issue, self.providers, self.policy,
+                                          lambda name, _: {"ok": name != "codex"})
+        self.assertEqual((decision["chosen"]["lane"], decision["chosen"]["capability"]),
+                         ("hyperagent", "frontier"))
+        self.assertEqual(decision["required"], "frontier")
+
     def test_no_personal_availability_or_expiry_probe(self):
         def available(lane, _route):
             self.assertNotEqual(lane, "personal")
