@@ -49,17 +49,25 @@ const gitProbeEnv = (() => {
   );
 })();
 
-function buildAndPostbuildScriptPaths() {
-  const packageJson = JSON.parse(
+function buildAndPostbuildScriptPaths(
+  packageJson = JSON.parse(
     readFileSync(path.join(appRoot, 'package.json'), 'utf8')
-  );
-  const commands = ['build', 'postbuild'].map(scriptName => {
+  )
+) {
+  for (const scriptName of ['build', 'postbuild']) {
     const command = packageJson.scripts?.[scriptName];
     expect(command, `Missing package.json ${scriptName} script`).toEqual(
       expect.any(String)
     );
-    return command;
-  });
+  }
+  const commands = Object.entries(packageJson.scripts)
+    .filter(
+      ([name, command]) =>
+        name === 'build' ||
+        name === 'postbuild' ||
+        /\bnext\s+build\b/.test(command)
+    )
+    .map(([, command]) => command);
   const scriptPaths = new Set();
   const entryPattern =
     /\b(?:node|tsx)\s+(?:(?:--[^\s;&|()]+)\s+)*((?:\.\/)?scripts\/[^\s;&|()]+\.(?:mjs|cjs|js|mts|cts|ts|tsx|jsx))(?=$|[\s;&|()])/g;
@@ -266,6 +274,26 @@ describe('repairSharpRuntimeTraces', () => {
         `Required build source is ignored by .vercelignore: ${relativePath}`
       ).toBe(false);
     }
+  });
+
+  it('includes helpers used only by alternate Next build commands', () => {
+    const entries = buildAndPostbuildScriptPaths({
+      scripts: {
+        build: 'next build --turbopack',
+        postbuild: 'node scripts/postbuild.mjs',
+        'build:strict': 'node scripts/strict.mjs && next build --turbopack',
+        analyze:
+          'node scripts/analyze.mjs && ANALYZE=true next build --webpack',
+        dev: 'node scripts/dev-only.mjs && next dev',
+      },
+    });
+    const probeRoot = createVercelIgnoreProbe(
+      'scripts/\n*.mjs\n!scripts/\n!scripts/postbuild.mjs\n'
+    );
+    const ignored = entries.filter(entry =>
+      isIgnoredByVercelIgnore(entry, probeRoot)
+    );
+    expect(ignored).toEqual(['scripts/analyze.mjs', 'scripts/strict.mjs']);
   });
 
   it('adds libvips only to traces that load the Sharp native addon', () => {

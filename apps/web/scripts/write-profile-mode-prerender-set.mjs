@@ -29,7 +29,7 @@ import { fileURLToPath } from 'node:url';
 import { neon } from '@neondatabase/serverless';
 
 const here = dirname(fileURLToPath(import.meta.url));
-const outputPath = resolve(
+const defaultOutputPath = resolve(
   here,
   '../lib/routing/generated/profile-mode-prerender-set.ts'
 );
@@ -82,26 +82,37 @@ ${lines.join('\n')}
 `;
 }
 
-const databaseUrl = resolveDatabaseUrl();
-let keys = [];
-if (!databaseUrl) {
-  console.log(
-    'profile-mode prerender set: no build database — every ?mode= query keeps the canonical render'
-  );
-} else {
-  try {
-    keys = await readPublicUsernames(databaseUrl);
+export async function writeProfileModePrerenderSet(
+  outputPath = defaultOutputPath
+) {
+  const databaseUrl = resolveDatabaseUrl();
+  let keys = [];
+  if (!databaseUrl) {
     console.log(
-      `profile-mode prerender set: ${keys.length}/${ALIAS_BUDGET_PAIRS.length} alias-budget pairs have a public build profile`
+      'profile-mode prerender set: no build database — every ?mode= query keeps the canonical render'
     );
-  } catch (error) {
-    console.warn(
-      'profile-mode prerender set: build database unreachable — every ?mode= query keeps the canonical render',
-      error instanceof Error ? error.message : error
-    );
-    keys = [];
+  } else {
+    try {
+      keys = await readPublicUsernames(databaseUrl);
+      console.log(
+        `profile-mode prerender set: ${keys.length}/${ALIAS_BUDGET_PAIRS.length} alias-budget pairs have a public build profile`
+      );
+    } catch (error) {
+      console.warn(
+        'profile-mode prerender set: build database unreachable — every ?mode= query keeps the canonical render',
+        error instanceof Error ? error.message : error
+      );
+      keys = [];
+    }
   }
+
+  mkdirSync(dirname(outputPath), { recursive: true });
+  writeFileSync(outputPath, serialize(keys));
 }
 
-mkdirSync(dirname(outputPath), { recursive: true });
-writeFileSync(outputPath, serialize(keys));
+if (
+  process.argv[1] &&
+  resolve(process.argv[1]) === fileURLToPath(import.meta.url)
+) {
+  await writeProfileModePrerenderSet();
+}
