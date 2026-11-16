@@ -331,12 +331,15 @@ ACCESS_DENIED = (
 )
 
 
-NOT_ACCESS = ("rate limit", "=>", "[^", "|", "Object.assign", "', ", "`", "$", "toISOString", "statusCode")
+NOT_ACCESS = ("rate limit", "=>", "[^", "|", "Object.assign", "', ", "`", "$", "toISOString", "statusCode",
+              ", requested=")  # vitest it.each fixture-title marker (JOV-12818)
 
 
 def access_signature(text: str) -> str | None:
     """Normalize one denial: keep HTTP status codes, drop ids, long numbers and tokens; None for noise
-    (rate limits are capacity, not access; quoted source code and regexes are not denials)."""
+    (rate limits are capacity, not access; quoted source code and regexes are not denials; parameterized
+    test titles -- e.g. a vitest it.each case like 'records failed for HTTP 401, requested=true, ...',
+    which landed on gem transcripts as a phantom 401 (JOV-12818) -- are test output, not denials)."""
     import re
     if any(token in text for token in NOT_ACCESS):
         return None
