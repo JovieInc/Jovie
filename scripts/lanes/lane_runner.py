@@ -66,7 +66,6 @@ import hyperagent_repair  # noqa: E402
 import migration_renumber  # noqa: E402  (no-model fix for migration number collisions)
 import fix_red_rewrite  # noqa: E402
 import fix_red_failure_routing  # noqa: E402
-import fix_red_biome  # noqa: E402  (no-model biome format / import-sort repair)
 import fix_red_classes, fix_red_screen_cert  # noqa: E402  (fingerprint + deterministic routing of fix-red failures)
 import fix_red_compose  # noqa: E402
 import fix_red_source_edits  # noqa: E402  (merge commits install lint-staged once when the hook cannot find it)
@@ -7152,12 +7151,6 @@ def strip_cache_exports_fix(host: Host, pr: dict, route: dict, worktree: Path, l
     return fix_red_rewrite.rewrite_commit_push(
         sh, pr, worktree, log, receipt, ("apps/web",), fix_red_classes.strip_added_legacy_cache_exports,
         "fix(ci): drop added legacy cache segment exports", "stripped-cache-exports", "strippedFiles")
-
-
-def biome_format_fix(host: Host, pr: dict, route: dict, worktree: Path, log, receipt: dict):
-    """The no-model fix for a biome format or import-sort failure: rewrite the cited files."""
-    return fix_red_biome.format_commit_push(
-        sh, pr, worktree, log, receipt, route.get("files") or [])
 
 
 

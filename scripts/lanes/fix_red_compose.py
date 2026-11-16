@@ -59,7 +59,8 @@ def deterministic_fixer(lane, action: str):
     table[fix_red_render_modes.ACTION] = fix_red_render_modes.bind(lane.sh, lane.failed_logs)
     import fix_red_size_500
     table[classes.SPLIT_SIZE] = fix_red_size_500.bind(lane.sh, lane.failed_logs)
-    table[classes.BIOME_FORMAT] = lane.biome_format_fix
+    import fix_red_biome
+    table[classes.BIOME_FORMAT] = fix_red_biome.bind(lane.sh)
     return table.get(action)
 
 

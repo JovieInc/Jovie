@@ -59,12 +59,12 @@ class BiomeFormatTest(unittest.TestCase):
         self.assertEqual(got["files"], [".github/scripts/run-actionlint.test.mjs"])
         receipt = {}
         with patch.object(lane.pr_events, "ensure_red_before_green", return_value=True) as stamp, \
-                patch.object(lane, "biome_format_fix", return_value=SimpleNamespace(returncode=0)) as biome:
-            self.assertIs(deterministic_fixer(lane, classes.BIOME_FORMAT), biome)
+                patch.object(fix_red_biome, "format_commit_push", return_value=SimpleNamespace(returncode=0)) as biome:
+            self.assertTrue(callable(deterministic_fixer(lane, classes.BIOME_FORMAT)))
             done = lane.compose_deterministic_fix(None, {}, got, Path("."), None, receipt)
         self.assertEqual(done.returncode, 0)
         stamp.assert_called_once()
-        biome.assert_called_once_with(None, {}, got, Path("."), None, receipt)
+        biome.assert_called_once_with(lane.sh, {}, Path("."), None, receipt, got["files"])
         self.assertEqual(receipt["composedActions"], ["stamp-changelog", "biome-format"])
 
     def test_cites_the_file_and_outranks_platform_noise(self):

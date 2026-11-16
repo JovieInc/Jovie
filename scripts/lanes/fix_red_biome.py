@@ -73,6 +73,13 @@ def write_args(rels: list[str]) -> list[str]:
     return ["pnpm", "exec", "biome", "check", "--write", "--no-errors-on-unmatched", *rels]
 
 
+def bind(sh):
+    """Keep the formatter's side effects on the runner that owns this repair."""
+    def fix(host, pr, route, worktree, log, receipt):
+        return format_commit_push(sh, pr, worktree, log, receipt, route.get("files") or [])
+    return fix
+
+
 def format_commit_push(sh, pr, worktree, log, receipt, files):
     """Rewrite cited files with biome, commit and push. None when nothing applies."""
     rels = safe_rels(worktree, files)
