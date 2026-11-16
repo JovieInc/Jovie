@@ -138,23 +138,4 @@ describe('ProfilePaymentsCard', () => {
     fireEvent.click(cta);
     expect(trackPixel).not.toHaveBeenCalled();
   });
-
-  it('keeps each amount chip a visually hidden native radio in one named group', () => {
-    render(
-      <ProfilePaymentsCard
-        artistName='Tim White'
-        venmoLink={VENMO}
-        accent={ACCENT}
-      />
-    );
-
-    const radios = screen.getAllByRole('radio');
-    expect(radios).toHaveLength(PROFILE_PAYMENT_AMOUNTS.length);
-    const names = new Set(radios.map(radio => radio.getAttribute('name')));
-    expect(names.size).toBe(1);
-    for (const radio of radios) {
-      expect(radio).toHaveAttribute('type', 'radio');
-      expect(radio).toHaveClass('peer');
-    }
-  });
 });

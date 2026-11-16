@@ -1,6 +1,5 @@
 'use client';
 
-import { PlainButton } from '@jovie/ui';
 import { Check, Share2 } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
@@ -51,7 +50,7 @@ export function ProfileAboutShare({
   }, [url, artistName]);
 
   return (
-    <PlainButton
+    <button
       type='button'
       onClick={handleShare}
       className='profile-aeo-content__share inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full transition-colors duration-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--profile-aeo-text)'
@@ -70,6 +69,6 @@ export function ProfileAboutShare({
       <span aria-live='polite' className='sr-only'>
         {shareSuccess ? 'Link Copied' : ''}
       </span>
-    </PlainButton>
+    </button>
   );
 }
