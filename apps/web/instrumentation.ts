@@ -179,6 +179,19 @@ export async function register() {
       throw error;
     }
 
+    // Release event hook for recovery emails (JOV-12766): stamp shipped
+    // fixes' deploy time once per production server boot. On Vercel a lambda
+    // boots only when the new deployment first serves traffic, so boot is the
+    // release event — and boot-time work never lands in a request trace.
+    // The stamp itself is idempotent (setIfAbsent). Never on the build-info
+    // request path: that public receipt is read by monitors on every probe
+    // and must not touch the database.
+    if (process.env.VERCEL_ENV === 'production') {
+      void import('@/lib/recovery/probes.server')
+        .then(m => m.recordShippedFixDeploys())
+        .catch(() => undefined);
+    }
+
     const { musicResolverCutoverReceipt } = await import(
       '@/lib/music-resolver/musicfetch-gate'
     );
