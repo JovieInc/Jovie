@@ -71,6 +71,11 @@ class RevisionReferenceTests(unittest.TestCase):
                 self.assertEqual(updated, f"Environment: main `@{sha}`. Owner @itstimwhite.")
                 self.assertEqual(events.repair_evidence_body({}, updated), updated)
 
+    def test_default_revision_repair_quotes_references_at_end_of_body(self):
+        for sha in (self.SHA, self.SHA[:8]):
+            with self.subTest(sha=sha):
+                self.assertEqual(events.repair_evidence_body({}, f"main @{sha}"), f"main `@{sha}`")
+
     def test_repair_preserves_code_links_metadata_and_real_mentions(self):
         for body in (
             f"`main @{self.SHA}`", f"``main `@{self.SHA}```",
