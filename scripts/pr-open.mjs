@@ -1,20 +1,17 @@
 #!/usr/bin/env node
 // api-budget: linear-requests 10/hr - on-demand, one referenced-issue lookup per update at 10 updates/hr
 import { spawnSync } from 'node:child_process';
-import {
-  appendFileSync,
-  mkdirSync,
-  mkdtempSync,
-  readFileSync,
-  rmSync,
-  writeFileSync,
-} from 'node:fs';
-import { homedir, tmpdir } from 'node:os';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { shipIntent } from './lib/auto-ready-provenance.mjs';
 import { proseOnly, scrubPrText } from './lib/pr-prose.mjs';
-import { admissionPriority, runGithub as gh } from './lib/pr-publication.mjs';
+import {
+  runGithub as gh,
+  publicationPriority,
+  recordPublication,
+} from './lib/pr-publication.mjs';
 import { wipGate } from './lib/pr-wip-gate.mjs';
 import { isRepairPr, lintPrBody } from './lib/preflight-changed.mjs';
 import { requiresWin } from './lib/wins-ledger.mjs';
@@ -389,22 +386,12 @@ function parse(argv) {
     else if (f === '--wip-override') a.wipOverride = v();
     else if (f === '--dry-run') a.dryRun = true;
     else if (f === '--no-push') a.noPush = true;
+    else if (f === '--no-repair-reserve') a.noRepairReserve = true;
+    else if (f.startsWith('--no-repair-reserve='))
+      a.priorityError = '--no-repair-reserve takes no value';
     else if (!f.startsWith('--')) a.number = f;
   }
   return a;
-}
-
-function record(row) {
-  try {
-    const dir = path.join(homedir(), '.local/state/jovie-lanes');
-    mkdirSync(dir, { recursive: true });
-    appendFileSync(
-      path.join(dir, 'pr-open.jsonl'),
-      `${JSON.stringify({ at: new Date().toISOString(), ...row })}\n`
-    );
-  } catch {
-    /* metric write is best effort */
-  }
 }
 
 const PR_FIELDS =
@@ -599,9 +586,14 @@ export async function main(
     execute = run,
     diagnose = console.error,
     pause = ms => new Promise(resolve => setTimeout(resolve, ms)),
+    record = recordPublication,
   } = {}
 ) {
   const a = parse(argv);
+  if (a.priorityError) {
+    log(`FAIL  priority: ${a.priorityError}`);
+    return 2;
+  }
   const git = (args, options = {}) =>
     execute('git', args, { cwd: a.repo, ...options });
   if (!['draft', 'check', 'open', 'update'].includes(a.cmd)) {
@@ -785,12 +777,20 @@ export async function main(
       await refreshBodyChecks(a.repo, pr, body, title, { github, pause, log });
       return 0;
     }
-    const capacityPriority = admissionPriority({
-      title,
-      body,
-      labels,
-      files,
-      evidence: evidenceFromBody(body),
+    const { automaticPriority, priority: capacityPriority } =
+      publicationPriority({
+        title,
+        body,
+        labels,
+        files,
+        evidence: evidenceFromBody(body),
+        noRepairReserve: a.noRepairReserve,
+      });
+    record({
+      cmd: 'publication-priority',
+      automaticPriority,
+      priority: capacityPriority,
+      noRepairReserve: a.noRepairReserve === true,
     });
     const wip = wipGate(
       { ...a, capacityPriority },
