@@ -15,6 +15,7 @@ import test from 'node:test';
 import { execFileSync, spawnSync } from './lib/child-process.mjs';
 import { evaluateFleetRules } from './pr-fleet-rules.mjs';
 import {
+  admissionPriority,
   CUSTOMER_MARKER,
   commonDirectories,
   deriveEvidence,
@@ -25,6 +26,41 @@ import {
   redOutput,
   refreshBodyChecks,
 } from './pr-open.mjs';
+
+test('only evidence-qualified correctness repairs use the existing repair reserve', () => {
+  const repair = {
+    title: 'fix(merch): prevent an invalid payment',
+    labels: [],
+    body: '## Red-before-green\n\n- Failing command: `node --test payment.test.mjs`\n- Failing run (before fix): https://github.com/JovieInc/Jovie/actions/runs/1\n',
+    files: [{ filename: 'apps/web/lib/merch/order.ts' }],
+  };
+  assert.equal(admissionPriority(repair), 'repair');
+  for (const filename of [
+    'apps/web/lib/auth/session.ts',
+    'apps/web/lib/agent-os/admission.ts',
+    '.github/workflows/ci.yml',
+  ])
+    assert.equal(
+      admissionPriority({ ...repair, files: [{ filename }] }),
+      'repair'
+    );
+  assert.equal(
+    admissionPriority({ ...repair, title: 'feat(merch): add a payment' }),
+    'default'
+  );
+  assert.equal(admissionPriority({ ...repair, body: '' }), 'default');
+  assert.equal(
+    admissionPriority({ ...repair, files: [{ filename: 'docs/payments.md' }] }),
+    'default'
+  );
+  assert.equal(
+    admissionPriority({
+      ...repair,
+      files: [{ filename: 'apps/web/components/ui/button.tsx' }],
+    }),
+    'default'
+  );
+});
 
 const file = (filename, status = 'modified') => ({
   filename,
@@ -590,7 +626,7 @@ test('open fills its new self URL after ordinary publication', async () => {
     draftBody({ title: 'perf(ci): cheaper', files: [], metric })
   );
   try {
-    let edited;
+    let edited, createOptions;
     const execute = (command, args) =>
       args[0] === 'log'
         ? okText('perf(ci): cheaper')
@@ -599,9 +635,11 @@ test('open fills its new self URL after ordinary publication', async () => {
           : args[0] === 'ls-remote'
             ? okText(`${'c'.repeat(40)}\trefs/heads/fixture/source\n`)
             : fakeDiffRunner(command, args);
-    const github = (_cwd, args) => {
-      if (args[1] === 'create')
+    const github = (_cwd, args, options) => {
+      if (args[1] === 'create') {
+        createOptions = options;
         return okText('https://github.com/JovieInc/Jovie/pull/42');
+      }
       edited = readFileSync(args[args.indexOf('--body-file') + 1], 'utf8');
       return okText('');
     };
@@ -611,6 +649,11 @@ test('open fills its new self URL after ordinary publication', async () => {
         execute,
       }),
       0
+    );
+    assert.deepEqual(
+      createOptions,
+      { once: true, priority: 'default' },
+      'new PR creation never retries an ambiguous write'
     );
     assert.match(
       edited,

@@ -122,7 +122,7 @@ describe('PR size exclusions', () => {
   });
 });
 
-describe('pr-open per-producer WIP gate', () => {
+describe('pr-open capacity admission', () => {
   const python =
     (status, stdout, stderr = '') =>
     () => ({
@@ -132,22 +132,74 @@ describe('pr-open per-producer WIP gate', () => {
     });
   const over = python(
     3,
-    '{"allowed":false,"producer":"hyperagent","used":36,"cap":5}'
+    '{"allowed":false,"reason":"wip-cap","producer":"hyperagent","used":36,"cap":5}'
   );
 
-  it('wipAdmission refuses only on exit 3 with a decision, and fails open otherwise', () => {
+  it('defers actual capacity refusals and exposes unknown evidence as provisional', () => {
     const refused = wipAdmission('hyperagent/x', over, '.');
     expect(refused.allowed).toBe(false);
     expect(refused.message).toMatch(/wip-cap: `hyperagent\/` already owns 36/);
     const unknown = wipAdmission('codex/x', python(1, '', 'gh down'), '.');
     expect(unknown.allowed).toBe(true);
-    expect(unknown.message).toMatch(/admitting/);
+    expect(unknown.reason).toBe('capacity-unknown');
+    expect(unknown.message).toMatch(/bounded API request gate/);
     const within = wipAdmission(
       'codex/x',
       python(0, '{"allowed":true,"producer":"codex","used":2,"cap":8}'),
       '.'
     );
-    expect(within).toEqual({ allowed: true, message: null });
+    expect(within).toMatchObject({ allowed: true, message: null });
+  });
+
+  it('never applies a PR-count override to real quota or CI saturation', () => {
+    for (const reason of [
+      'github-quota:core',
+      'github-quota:graphql',
+      'ci-runner-backlog',
+    ]) {
+      const rows = [];
+      const result = wipGate(
+        {
+          repo: '.',
+          wipOverride: 'Tim authorized one internal PR-count bypass',
+        },
+        'codex/fix',
+        {
+          execute: python(
+            3,
+            JSON.stringify({ allowed: false, reason, retryAt: 1800003600 })
+          ),
+          log: () => {},
+          record: row => rows.push(row),
+        }
+      );
+      expect(result).toEqual({ refused: true, override: false });
+      expect(rows.at(-1).reason).toBe(reason);
+      expect(rows.at(-1)).not.toHaveProperty('override');
+    }
+  });
+
+  it('allows twelve PRs against the historical eight when capacity is healthy', () => {
+    const result = wipAdmission(
+      'codex/fix',
+      python(
+        0,
+        JSON.stringify({
+          allowed: true,
+          known: true,
+          reason: 'within-capacity',
+          producer: 'codex',
+          used: 12,
+          cap: 8,
+        })
+      ),
+      '.'
+    );
+    expect(result).toEqual({
+      allowed: true,
+      reason: 'within-capacity',
+      message: null,
+    });
   });
 
   it('wipGate refuses over the cap, and a recorded override labels instead', () => {

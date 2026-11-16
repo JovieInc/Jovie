@@ -315,11 +315,14 @@ function decideBudget(
   };
 }
 
-/** Fold response headers into the shared buckets. Server truth wins. */
+/** Fold response headers into shared buckets. gh keeps concurrent debits until
+ * the provider reset (60s for untimed evidence); other adapters retain their
+ * existing server-authoritative reconciliation. */
 export function observe(
   state: CredentialState,
   observations: readonly Observation[],
-  nowMs: number
+  nowMs: number,
+  conservative = false
 ): void {
   for (const obs of observations) {
     const current = state.buckets[obs.resource];
@@ -330,11 +333,22 @@ export function observe(
     ) {
       continue; // a response from an older window arrived late
     }
+    const retain =
+      conservative &&
+      current &&
+      (obs.resetAt === null ||
+        current.resetAt === null ||
+        current.resetAt === obs.resetAt) &&
+      nowMs < (current.resetAt ?? current.observedAt + UNTIMED_OBSERVATION_MS);
+    const resetAt =
+      retain && obs.resetAt === null ? current.resetAt : obs.resetAt;
     state.buckets[obs.resource] = {
       limit: obs.limit ?? current?.limit ?? null,
-      remaining: obs.remaining,
-      resetAt: obs.resetAt,
-      observedAt: nowMs,
+      remaining: retain
+        ? Math.min(current.remaining, obs.remaining)
+        : obs.remaining,
+      resetAt,
+      observedAt: retain && resetAt === null ? current.observedAt : nowMs,
     };
   }
 }

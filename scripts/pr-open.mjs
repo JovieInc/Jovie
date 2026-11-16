@@ -15,6 +15,7 @@ import { homedir, tmpdir } from 'node:os';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { shipIntent } from './lib/auto-ready-provenance.mjs';
+import { classifyCiRisk, loadCiHarnessManifest } from './lib/ci-harness.mjs';
 import { proseOnly, scrubPrText } from './lib/pr-prose.mjs';
 import { wipGate } from './lib/pr-wip-gate.mjs';
 import { isRepairPr, lintPrBody } from './lib/preflight-changed.mjs';
@@ -29,6 +30,37 @@ const PR_URL_PLACEHOLDER = '<PR URL, set after open>';
 export const CUSTOMER_MARKER =
   '<!-- customer-changelog/v1 {"releaseWorthy":false} -->';
 const REPOSITORY = 'JovieInc/Jovie';
+
+/** Called only after all body/diff gates pass. Reuse the existing repair reserve for
+ * evidence-qualified corrections on canonical correctness/control-plane surfaces.
+ * This changes request priority, never the bucket, balance, checks or attempt bound.
+ */
+export function admissionPriority({ title, body, labels, files }) {
+  const evidence = evidenceFromBody(body);
+  if (
+    !isRepairPr({ title, body, labels }) ||
+    !evidence.failingCommand ||
+    !(
+      evidence.failingRun ||
+      /```text\n[^]*?\bFAIL\b[^]*?```/.test(section(body, 'Red-before-green'))
+    )
+  )
+    return 'default';
+  const correctness = new Set([
+    'auth-identity',
+    'billing-money',
+    'proxy-middleware',
+    'ci-workflows',
+    'agent-control-plane',
+  ]);
+  const risk = classifyCiRisk(
+    files.map(file => file.filename),
+    loadCiHarnessManifest()
+  );
+  return risk.matchedRules.some(rule => correctness.has(rule.id))
+    ? 'repair'
+    : 'default';
+}
 
 export function commonDirectories(paths) {
   let dirs = [...new Set(paths.map(p => path.posix.dirname(p)))].sort();
@@ -279,14 +311,15 @@ export function gate({ title, body, labels = [], files, extra = [] }) {
 /** @typedef {(command: string, args: string[], options?: object) => CommandResult} Command */
 
 /** @type {Command} */
-const gh = (cwd, args, opts = {}) =>
+const gh = (cwd, args, { once = false, priority = 'default', ...opts } = {}) =>
   spawnSync(
     'node',
     [
       path.join(cwd, 'packages/api-client/cli.ts'),
       'gh',
       '--priority',
-      'default',
+      priority,
+      ...(once ? ['--once'] : []),
       '--',
       ...args,
     ],
@@ -800,11 +833,16 @@ export async function main(
       await refreshBodyChecks(a.repo, pr, body, title, { github, pause, log });
       return 0;
     }
-    const wip = wipGate(a, git(['branch', '--show-current']).stdout.trim(), {
-      execute,
-      log,
-      record,
-    });
+    const capacityPriority = admissionPriority({ title, body, labels, files });
+    const wip = wipGate(
+      { ...a, capacityPriority },
+      git(['branch', '--show-current']).stdout.trim(),
+      {
+        execute,
+        log,
+        record,
+      }
+    );
     if (wip.refused) return 3;
     if (wip.override) labels.push('wip-override');
     const dir = mkdtempSync(path.join(tmpdir(), 'pr-open-create-'));
@@ -853,22 +891,26 @@ export async function main(
         throw new Error(
           `publication-head: remote head does not match the intended commit for ${branch}`
         );
-      const made = github(a.repo, [
-        'pr',
-        'create',
-        '--head',
-        branch,
-        '--repo',
-        REPOSITORY,
-        '--base',
-        a.base,
-        '--title',
-        title,
-        '--body-file',
-        bodyFile,
-        ...(a.draft ? ['--draft'] : []),
-        ...labels.flatMap(l => ['--label', l]),
-      ]);
+      const made = github(
+        a.repo,
+        [
+          'pr',
+          'create',
+          '--head',
+          branch,
+          '--repo',
+          REPOSITORY,
+          '--base',
+          a.base,
+          '--title',
+          title,
+          '--body-file',
+          bodyFile,
+          ...(a.draft ? ['--draft'] : []),
+          ...labels.flatMap(l => ['--label', l]),
+        ],
+        { once: true, priority: capacityPriority }
+      );
       log((made.stdout || made.stderr).trim());
       const url = made.stdout.trim().split('\n').pop();
       if (made.status === 0 && body.includes(PR_URL_PLACEHOLDER)) {
