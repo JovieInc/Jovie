@@ -1,5 +1,6 @@
 'use client';
 
+import { HostDrawnInput } from '@jovie/ui';
 import { useId, useState } from 'react';
 import type { ProfileRenderMode } from '@/features/profile/contracts';
 import { buildVenmoPaymentUrl } from '@/features/profile/utils/venmo';
@@ -78,13 +79,14 @@ export function ProfilePaymentsCard({
               key={option}
               className='group flex h-11 cursor-pointer items-center'
             >
-              <input
+              <HostDrawnInput
                 type='radio'
                 name={groupName}
                 value={option}
                 checked={selected}
                 onChange={() => setAmount(option)}
-                className='peer sr-only'
+                visuallyHidden
+                className='peer'
               />
               <span
                 className={cn(
