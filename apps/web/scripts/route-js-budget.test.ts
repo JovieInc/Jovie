@@ -23,7 +23,6 @@ import {
   routeFromManifestKey,
   validateBudgetShape,
 } from './route-js-budget.mjs';
-
 import {
   buildFirstLoadFixture,
   cleanupFixtures,
@@ -35,6 +34,7 @@ import {
   validRaise,
   writeChunk,
 } from './route-js-budget-fixtures';
+import { chunkContributions } from './route-js-diagnostics.mjs';
 
 afterEach(cleanupFixtures);
 
@@ -104,6 +104,37 @@ describe('route-js-budget', () => {
     expect(byRoute['/app/settings'].gzipKb).toBeLessThan(62);
     expect(byRoute['/app/chat'].chunks).toBe(3);
     expect(byRoute['/app/chat'].gzipKb).toBeGreaterThanOrEqual(160);
+  });
+
+  it('attributes an over-budget route to unique initial chunks, excluding lazy code', () => {
+    const nextDir = buildFixture();
+    writeChunk(nextDir, 'lazy-only.js', 200 * 1024);
+    const main = 'static/chunks/main.js';
+    const shell = 'static/chunks/shell.js';
+    const heavy = 'static/chunks/heavy.js';
+    const rows = chunkContributions(
+      nextDir,
+      [
+        { route: '/app/chat', files: new Set([main, shell]) },
+        { route: '/app/chat', files: new Set([main, shell, heavy]) },
+        { route: '/app/settings', files: new Set([main, shell]) },
+      ],
+      new Set(['/app/chat'])
+    );
+    expect(rows).toHaveLength(1);
+    expect(rows[0].route).toBe('/app/chat');
+    expect(rows[0].chunks.map(chunk => chunk.file)).toEqual([
+      heavy,
+      shell,
+      main,
+    ]);
+    expect(rows[0].gzipBytes).toBe(
+      rows[0].chunks.reduce((sum, chunk) => sum + chunk.gzipBytes, 0)
+    );
+    expect(Math.round(rows[0].gzipBytes / 1024)).toBe(
+      measureRouteJs(nextDir)[0].gzipKb
+    );
+    expect(chunkContributions(nextDir, [], new Set())).toEqual([]);
   });
 
   it('fails a route over its baseline and fails closed on a route with none', () => {
