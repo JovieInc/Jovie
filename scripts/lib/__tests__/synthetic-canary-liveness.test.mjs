@@ -7,6 +7,7 @@ import { createGitHubClient } from '../../../packages/api-client/github.ts';
 import { SOURCE_GUARDS } from '../../ci-fast-lanes.mjs';
 import {
   checkSyntheticCanary,
+  dispatchSyntheticCanary,
   main,
 } from '../../synthetic-canary-liveness.mjs';
 
@@ -341,6 +342,55 @@ describe('synthetic canary dead-man', () => {
       token: 'test-credential',
     });
     expect(await main({ env: {}, now: NOW })).toBe(0);
+  });
+});
+
+describe('missed-slot backstop', () => {
+  it('dispatches a missed slot only when opted in, single attempt, refusal stays red', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'synthetic-backstop-'));
+    vi.spyOn(console, 'log').mockImplementation(() => {});
+    const dispatchGithub = () => {
+      const rest = vi.fn(async (method, path, body) => {
+        if (method === 'POST' && path.endsWith('/dispatches'))
+          return { status: 403, json: () => ({}) };
+        return {
+          status: 200,
+          json: () => ({ workflow_runs: [run({ created_at: iso(421) })] }),
+        };
+      });
+      return {
+        rest,
+        posts: () => rest.mock.calls.filter(call => call[0] === 'POST'),
+      };
+    };
+    const env = {
+      GITHUB_REPOSITORY: repo,
+      GITHUB_OUTPUT: join(dir, 'o'),
+      GITHUB_STEP_SUMMARY: join(dir, 's'),
+    };
+    try {
+      const off = dispatchGithub();
+      expect(await main({ github: off, env, now: NOW })).toBe(1);
+      expect(off.posts()).toHaveLength(0);
+      const on = dispatchGithub();
+      expect(
+        await main({
+          github: on,
+          env: { ...env, SYNTHETIC_CANARY_DISPATCH: '1' },
+          now: NOW,
+        })
+      ).toBe(1);
+      expect(on.posts()).toHaveLength(1);
+      expect(on.posts()[0][1]).toBe(
+        `/repos/${repo}/actions/workflows/synthetic-monitoring.yml/dispatches`
+      );
+      expect(on.posts()[0][2]).toEqual({ ref: 'main' });
+      await expect(
+        dispatchSyntheticCanary({ github: on, repo })
+      ).rejects.toThrow('dispatch-rejected');
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });
 
