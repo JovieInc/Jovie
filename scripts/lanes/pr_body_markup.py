@@ -37,7 +37,7 @@ def red_section_bounds(lines: list[str], heading=RED_HEADING) -> tuple[int, int]
         if fenced:
             continue
         if start is None:
-            if heading.match(line.strip()):
+            if ANY_HEADING.match(line) and heading.match(line):
                 start = index
         elif ANY_HEADING.match(line):
             return start, index
