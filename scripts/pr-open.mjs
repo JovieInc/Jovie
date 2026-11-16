@@ -1,6 +1,4 @@
 #!/usr/bin/env node
-// api-budget: github-user-core 300/hr - on-demand, 10 updates/hr at <=30 REST calls including bounded fresh-run confirmation
-// api-budget: github-user-graphql 100/hr - on-demand, 10 updates/hr at <=10 points for PR metadata and body edits
 // api-budget: linear-requests 10/hr - on-demand, one referenced-issue lookup per update at 10 updates/hr
 import { spawnSync } from 'node:child_process';
 import {
@@ -16,6 +14,7 @@ import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { shipIntent } from './lib/auto-ready-provenance.mjs';
 import { proseOnly, scrubPrText } from './lib/pr-prose.mjs';
+import { admissionPriority, runGithub as gh } from './lib/pr-publication.mjs';
 import { wipGate } from './lib/pr-wip-gate.mjs';
 import { isRepairPr, lintPrBody } from './lib/preflight-changed.mjs';
 import { requiresWin } from './lib/wins-ledger.mjs';
@@ -278,20 +277,6 @@ export function gate({ title, body, labels = [], files, extra = [] }) {
 /** @typedef {{status: number | null, stdout: string, stderr: string, error?: Error}} CommandResult */
 /** @typedef {(command: string, args: string[], options?: object) => CommandResult} Command */
 
-/** @type {Command} */
-const gh = (cwd, args, opts = {}) =>
-  spawnSync(
-    'node',
-    [
-      path.join(cwd, 'packages/api-client/cli.ts'),
-      'gh',
-      '--priority',
-      'default',
-      '--',
-      ...args,
-    ],
-    { cwd, encoding: 'utf8', ...opts }
-  );
 /** @type {Command} */
 const run = (cmd, args, opts = {}) =>
   spawnSync(cmd, args, { encoding: 'utf8', ...opts });
@@ -800,12 +785,23 @@ export async function main(
       await refreshBodyChecks(a.repo, pr, body, title, { github, pause, log });
       return 0;
     }
-    const wip = wipGate(a, git(['branch', '--show-current']).stdout.trim(), {
-      execute,
-      log,
-      record,
+    const capacityPriority = admissionPriority({
+      title,
+      body,
+      labels,
+      files,
+      evidence: evidenceFromBody(body),
     });
-    if (wip.refused) return 3;
+    const wip = wipGate(
+      { ...a, capacityPriority },
+      git(['branch', '--show-current']).stdout.trim(),
+      {
+        execute,
+        log,
+        record,
+      }
+    );
+    if (wip.refused) return wip.deferred ? 75 : 3;
     if (wip.override) labels.push('wip-override');
     const dir = mkdtempSync(path.join(tmpdir(), 'pr-open-create-'));
     try {
@@ -853,22 +849,26 @@ export async function main(
         throw new Error(
           `publication-head: remote head does not match the intended commit for ${branch}`
         );
-      const made = github(a.repo, [
-        'pr',
-        'create',
-        '--head',
-        branch,
-        '--repo',
-        REPOSITORY,
-        '--base',
-        a.base,
-        '--title',
-        title,
-        '--body-file',
-        bodyFile,
-        ...(a.draft ? ['--draft'] : []),
-        ...labels.flatMap(l => ['--label', l]),
-      ]);
+      const made = github(
+        a.repo,
+        [
+          'pr',
+          'create',
+          '--head',
+          branch,
+          '--repo',
+          REPOSITORY,
+          '--base',
+          a.base,
+          '--title',
+          title,
+          '--body-file',
+          bodyFile,
+          ...(a.draft ? ['--draft'] : []),
+          ...labels.flatMap(l => ['--label', l]),
+        ],
+        { once: true, priority: capacityPriority }
+      );
       log((made.stdout || made.stderr).trim());
       const url = made.stdout.trim().split('\n').pop();
       if (made.status === 0 && body.includes(PR_URL_PLACEHOLDER)) {
