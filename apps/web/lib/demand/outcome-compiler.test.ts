@@ -54,8 +54,6 @@ function supplier(
     privacy: 'approved',
     terms: 'approved',
     policyRef: 'policy:read-only',
-    ownerRef: 'owner:connector',
-    authority: 'read',
     reviewedAt: BEFORE,
     validUntil: AFTER,
     expected: metrics,
@@ -129,32 +127,6 @@ function fact(
     territory: null,
     match: 'verified',
     ...overrides,
-  };
-}
-function certification(
-  source: CapabilitySupplier
-): NonNullable<CompileOutcomeCommand['certifications']>[number] {
-  return {
-    id: `cert:${source.id}`,
-    scope,
-    primitive: source.primitive,
-    supplierDigest: supplierDigest(source),
-    ownerRef: source.ownerRef!,
-    authority: source.authority!,
-    buildSha: 'a'.repeat(40),
-    verifiedAt: BEFORE,
-    expiresAt: AFTER,
-    verdict: 'pass',
-    evidenceRefs: ['test:conformance'],
-    tests: (
-      [
-        'tenant-isolation',
-        'revocation',
-        'replay',
-        'failure-recovery',
-        'unsupported',
-      ] as const
-    ).map(id => ({ id, status: 'pass', evidenceRef: `test:${id}` })),
   };
 }
 function harness() {
@@ -294,20 +266,17 @@ describe('outcome → primitive → replaceable source', () => {
       drafts.find(item => item.primitive.kind === 'action')?.decision.kind
     ).toBe('no_action');
   });
-  it('trials and promotes a newly discovered supplier under the same contract, then replaces it', () => {
+  it('retains measured suppliers under the same contract pending owner certification', () => {
     const first = supplier();
     const initial = compilePresenceOutcome(command(), NOW);
     const measured = compilePresenceOutcome(
-      command({
-        trials: [trial(first)],
-        certifications: [certification(first)],
-      }),
+      command({ trials: [trial(first)] }),
       NOW,
       initial
     );
     expect(bio(measured)).toMatchObject({
       enabled: false,
-      decision: { kind: 'promote', supplierDigest: supplierDigest(first) },
+      decision: { kind: 'no_action', supplierDigest: null },
       state: 'unknown',
     });
     expect(bio(measured).trials[0].realized).toEqual(metrics);
@@ -317,14 +286,13 @@ describe('outcome → primitive → replaceable source', () => {
         command({
           suppliers: [replacement],
           trials: [trial(replacement, { id: 'trial-2' })],
-          certifications: [certification(replacement)],
         }),
         NOW,
         measured
       )
     );
     expect(replaced.primitive).toEqual(primitive);
-    expect(replaced.decision.supplierDigest).toBe(supplierDigest(replacement));
+    expect(replaced.decision.kind).toBe('no_action');
     expect(replaced.trials).toHaveLength(2);
     expect(
       bio(compilePresenceOutcome(command({ suppliers: [] }), NOW, [replaced]))
@@ -418,7 +386,7 @@ describe('outcome → primitive → replaceable source', () => {
       ).state
     ).toBe('partial');
   });
-  it('invalidates dependent facts when a supplier is revoked or its policy changes', () => {
+  it('does not trust uncertified source facts, including after revocation', () => {
     const source = supplier();
     const observed = fact({
       sourceRef: 'provider:observation',
@@ -427,32 +395,11 @@ describe('outcome → primitive → replaceable source', () => {
     expect(
       bio(
         compilePresenceOutcome(
-          command({
-            facts: [observed],
-            suppliers: [source],
-            certifications: [certification(source)],
-            outcomes: [
-              {
-                id: 'outcome:source',
-                scope,
-                primitive,
-                supplierDigest: supplierDigest(source),
-                certificationId: certification(source).id,
-                authority: 'read',
-                buildSha: 'a'.repeat(40),
-                jobId: 'job:profile-current',
-                startedAt: BEFORE,
-                completedAt: NOW.toISOString(),
-                status: 'correct_completed',
-                evidenceRefs: [observed.evidenceRef],
-                realized: metrics,
-              },
-            ],
-          }),
+          command({ facts: [observed], suppliers: [source] }),
           NOW
         )
       ).state
-    ).toBe('known');
+    ).toBe('unknown');
     expect(
       bio(
         compilePresenceOutcome(
@@ -525,13 +472,12 @@ describe('outcome → primitive → replaceable source', () => {
   });
 });
 
-it('prefers measured lower-cost routes and deterministically breaks supplier ties', () => {
+it('requires owner certification even for measured lower-cost routes', () => {
   const costly = supplier('costly');
   const cheap = supplier('cheap');
   const tie = supplier('z-last');
   const input = command({
     suppliers: [costly, tie, cheap],
-    certifications: [costly, tie, cheap].map(certification),
     trials: [
       trial(costly, {
         id: 'costly',
@@ -541,8 +487,8 @@ it('prefers measured lower-cost routes and deterministically breaks supplier tie
       trial(cheap, { id: 'cheap' }),
     ],
   });
-  expect(bio(compilePresenceOutcome(input, NOW)).decision.supplierDigest).toBe(
-    supplierDigest(cheap)
+  expect(bio(compilePresenceOutcome(input, NOW)).decision.kind).toBe(
+    'no_action'
   );
 });
 
@@ -579,16 +525,11 @@ describe('durable disabled capability drafts in the existing governor', () => {
     await expect(
       h.send({ op: 'claim', id: first.rows[0].plan.id, worker: 'worker' })
     ).rejects.toThrow('allocation-not-ready');
-    const promoted = await h.send(
-      command({
-        trials: [trial(supplier())],
-        certifications: [certification(supplier())],
-      })
-    );
+    const promoted = await h.send(command({ trials: [trial(supplier())] }));
     const row = promoted.rows.find(
       item => item.plan.capabilityDraft?.primitive.id === primitive.id
     )!;
-    expect(row.plan.capabilityDraft?.decision.kind).toBe('promote');
+    expect(row.plan.capabilityDraft?.decision.kind).toBe('no_action');
     await expect(
       h.send({ op: 'claim', id: row.plan.id, worker: 'worker' })
     ).rejects.toThrow('allocation-not-ready');
