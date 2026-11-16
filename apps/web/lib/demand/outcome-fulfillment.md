@@ -29,7 +29,7 @@ Runtime admission under JOV-8741 requires existing owners to account for actual 
 
 ## Source canary and remaining acceptance
 
-[Source tests](outcome-fulfillment.test.ts) and the [durable canary](outcome-fulfillment-durable.test.ts) exercise synthetic unmet demand (`internal-synthetic`) -> one deduplicated primitive gap -> economic trial decision -> exact adapter-test certification -> matching use/outcome receipt -> known fact and successful-job cost -> revocation/failure invalidation or recovery. They also exercise CAS persistence failure, concurrent replay, tenant boundaries, authority separation, and affected-capability invalidation. Fixtures prove the receipt integration; they are not a real adapter run or customer completion.
+[Source tests](outcome-fulfillment.test.ts) and the [durable canary](outcome-fulfillment-durable.test.ts) exercise synthetic unmet demand (`internal-synthetic`) -> one deduplicated primitive gap -> economic experiment decision -> exact adapter-test certification -> matching use/outcome receipt -> known fact and successful-job cost -> revocation/failure invalidation or recovery. They also exercise CAS persistence failure, concurrent replay, tenant boundaries, authority separation, and affected-capability invalidation. Fixtures prove the receipt integration; they are not a real adapter run or customer completion.
 
 Local tests/coverage, hosted CI, deployment, and provider/customer runtime are separate evidence layers. This document is source evidence only. JOV-8741 still owes a permitted live source -> supported signal -> eligible Inbox/Audience proposal -> approved outcome with durable exact-deployment receipt. JOV-7140 and JOV-8331 retain their actual mission/catalog acceptance; no live proof is implied.
 
