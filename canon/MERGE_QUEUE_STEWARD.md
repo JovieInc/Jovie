@@ -62,15 +62,18 @@ Every culprit or flake is a class until a guard makes it impossible to reach the
 
 | Class | Guard home | Example (2026-10-31) |
 |---|---|---|
-| Main-dependent drift (baseline, census, ratchet, registry) | `scripts/lib/queue-drift-guards.json`, run by the pre-enroll drift precheck | `postmortem-class-actions` added after #23978 |
+| Main-dependent drift (baseline, census, ratchet, registry) | `scripts/lib/queue-drift-guards.json` lists every baseline with its semantic. Use `scripts/lib/shrink-only-baseline.mjs` (growth fails, a shrink passes, `node scripts/baselines-tighten.mjs` lowers it later) or one entry per file | 2026-11: design-noise, marketing invariants, offer and stat claims (baseline class: 94 of 322 failed groups in 7 days) |
 | PR-level check that only ran in the queue | Move the check onto the PR (path-scoped) | #24057 runs the staged-release proof on PRs that change a release test |
 | Pre-push parity gap | `scripts/lib/source-validation-manifest.mjs`, run by pre-push | #24046 |
 | Load-sensitive timeout | Per-test timeout or cheaper fixture, assertions unchanged | #24077 (ci-fast-lanes Mac discovery) |
 | Staged bundle reads an unshipped file | Self-contained test or `RELEASE_EXTRAS` | #23706 fix 048709a4 |
 
 A new class needs, in one PR: the guard, a test that fails without it, and a row in this table.
-Check first whether `queue-drift-guards.json` already covers the signal; the precheck test fails
-when a baseline-class script is neither listed nor exempt with a reason.
+Check first whether `queue-drift-guards.json` already covers the signal;
+`scripts/lib/__tests__/queue-drift-guards.test.mjs` fails when a tracked baseline file is not
+listed there. Entries under `exactMatch` or `unreviewed` can still fail a combined head:
+migrate one when it shows up in a failed group. There is no pre-enroll drift precheck; combine
+safety comes from the baseline semantic, not from re-running guards before enrollment.
 
 ## Automation
 
@@ -81,7 +84,9 @@ What the machines already do, so the steward does not repeat it:
   culprits, retries bounded infrastructure failures once, and uses ahead-run attribution.
 - `main-red-eject` dequeues a failing head when main is green; victim re-arm and green-head
   re-enrollment put non-culprits back.
-- The pre-enroll drift precheck holds PRs whose drift guards fail against latest main.
+- Shrink-only baselines pass when debt is removed, so a fix never needs a baseline edit to stay
+  green in a group. Nothing lowers them automatically yet: run `node scripts/baselines-tighten.mjs`
+  when a check prints a "baseline can be tightened" notice.
 
 Still on the steward until automated: two-sided reproduction, fixing the culprit, and writing
 the new guard.

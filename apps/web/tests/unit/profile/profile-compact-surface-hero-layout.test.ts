@@ -266,4 +266,25 @@ describe('ProfileCompactSurface identity header layout', () => {
     );
     expect(desktop).not.toContain('grid-template-rows: 1fr auto 1fr');
   });
+
+  // Sentry on #24698: at >= 1024px the grid overrides the scrollport padding,
+  // so the Music panel's -mx-(--page-pad) bleed shifted it left of column 2.
+  it('resets the Music bleed margin on desktop tab panels', () => {
+    const contents = readFileSync(DESIGN_SYSTEM, 'utf8');
+    const desktop = contents.slice(
+      contents.indexOf('Desktop artist profile (Tim, 2026-10-25)')
+    );
+    expect(desktop).toMatch(
+      /\[data-testid="profile-jovie-branding"\]\s*\)\s*\{\s*grid-column:\s*2;[^}]*margin-inline:\s*0;/
+    );
+    expect(
+      readFileSync(
+        join(
+          process.cwd(),
+          'components/features/profile/ProfilePrimaryTabPanel.tsx'
+        ),
+        'utf8'
+      )
+    ).toContain("MUSIC_BLEED_CLASS_NAME = '-mx-(--page-pad)");
+  });
 });

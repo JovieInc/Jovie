@@ -317,6 +317,24 @@ describe('@critical ReleaseLandingPage', () => {
     expect(screen.getByText('Austin Leeds')).toBeVisible();
   });
 
+  it('reports a track page at its full release path', () => {
+    render(
+      <ReleaseLandingPage
+        {...defaultProps}
+        tracking={{
+          contentType: 'track',
+          contentId: 'track-1',
+          smartLinkSlug: 'night-mix',
+        }}
+        parentRelease={{ title: 'Midnight Drive', url: '/timwhite/midnight' }}
+      />
+    );
+    expect(screen.getByTestId('powered-by-footer')).toHaveAttribute(
+      'data-report-target',
+      '/timwhite/midnight/night-mix'
+    );
+  });
+
   it('captures javascript: protocol in provider URLs for XSS audit', () => {
     const xssProviders = [
       {

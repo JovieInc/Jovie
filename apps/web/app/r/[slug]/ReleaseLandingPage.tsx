@@ -339,6 +339,9 @@ export function ReleaseLandingPage({
     ) ?? artist.name;
   const shareSlug = tracking?.smartLinkSlug ?? 'release';
   const sharePathname = getReleaseSharePathname(artist.handle, shareSlug);
+  const reportAt = parentRelease
+    ? `${parentRelease.url}/${shareSlug}`
+    : sharePathname;
   const shareContext = useMemo(
     () =>
       createReleaseShareContext({
@@ -475,12 +478,9 @@ export function ReleaseLandingPage({
           )}
         </div>
 
-        {/* Footer — always pinned at bottom */}
         <div className='shrink-0 pb-[max(env(safe-area-inset-bottom),8px)]'>
           <SmartLinkPoweredByFooter
-            reportTarget={
-              tracking?.smartLinkSlug ? (sharePathname ?? null) : null
-            }
+            reportTarget={tracking?.smartLinkSlug ? (reportAt ?? null) : null}
           />
         </div>
       </div>

@@ -21,6 +21,11 @@ import {
   type WebContents,
 } from 'electron';
 import { autoUpdater } from 'electron-updater';
+import {
+  bindWindowFullScreenState,
+  MACOS_TRAFFIC_LIGHT_POSITION,
+  registerFullScreenStateIpc,
+} from './window-chrome';
 import { openCurrentOvieInBrowser } from './ovie-browser-recovery';
 import {
   OPERATOR_SPAWN_TIMEOUT_MS,
@@ -255,14 +260,6 @@ const desktopBuildIdentity = resolveDesktopBuildIdentity({
 const printBuildIdentityOnStart = process.argv.includes(
   DESKTOP_BUILD_IDENTITY_PRINT_FLAG
 );
-const MACOS_TRAFFIC_LIGHT_X = 20;
-// JOV-8974: the titlebar band sits one app-shell gap (8px) below the window
-// top, so the native lights ride down with the band (was 17 flush-top).
-const MACOS_TRAFFIC_LIGHT_Y = 25;
-const MACOS_TRAFFIC_LIGHT_POSITION = {
-  x: MACOS_TRAFFIC_LIGHT_X,
-  y: MACOS_TRAFFIC_LIGHT_Y,
-} as const;
 const UPDATE_AVAILABLE_CHANNEL = 'update-available';
 const UPDATE_DOWNLOADED_CHANNEL = 'update-downloaded';
 const QUIT_AND_INSTALL_CHANNEL = 'quit-and-install';
@@ -2526,6 +2523,7 @@ function createWindow(initialUrl = APP_ENTRY_URL): BrowserWindow {
 
   mainWindow = win;
   configureSidebarShortcut(win);
+  bindWindowFullScreenState(win);
   const navigationContentsId = win.webContents.id;
   win.webContents.on('render-process-gone', () => {
     desktopNavigation.setReady(navigationContentsId, false);
@@ -3369,6 +3367,8 @@ ipcMain.handle(GO_FORWARD_CHANNEL, (event: IpcMainInvokeEvent) => {
   if (win && !win.isDestroyed() && win.webContents.canGoForward())
     win.webContents.goForward();
 });
+
+registerFullScreenStateIpc(isTrustedIpcSender);
 
 ipcMain.handle(
   OPEN_CURRENT_OVIE_IN_BROWSER_CHANNEL,

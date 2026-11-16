@@ -75,6 +75,35 @@ async function downloadPressPhoto(
   }
 }
 
+interface AboutContactRow {
+  readonly id: string;
+  readonly roleLabel: string;
+  readonly subtitle: string;
+}
+
+/**
+ * The About summary is a link list into the Contact view, which lists every
+ * contact. One row per role keeps two entries for the same role from
+ * rendering as a duplicate "Brand partnerships" (walk 2026-11-09); the row
+ * keeps the first contact's subtitle that has one.
+ */
+function groupAboutContactsByRole(
+  contacts: readonly PublicContact[]
+): AboutContactRow[] {
+  const rows = new Map<string, AboutContactRow>();
+  for (const contact of contacts) {
+    const key = contact.roleLabel.trim().toLowerCase();
+    const subtitle = formatPublicContactSubtitle(contact);
+    const existing = rows.get(key);
+    if (!existing) {
+      rows.set(key, { id: contact.id, roleLabel: contact.roleLabel, subtitle });
+    } else if (!existing.subtitle && subtitle) {
+      rows.set(key, { ...existing, subtitle });
+    }
+  }
+  return [...rows.values()];
+}
+
 export function AboutSection({
   artist,
   genres,
@@ -95,8 +124,8 @@ export function AboutSection({
   const hasPressPhotos = allowPhotoDownloads && pressPhotos.length > 0;
   const hasMetadata = hasLocation || hasHometown || hasActiveSince;
   const hasCredits = Boolean(creditSegments && creditSegments.length > 0);
-  const contactableContacts = contacts.filter(
-    contact => contact.channels.length > 0
+  const contactableContacts = groupAboutContactsByRole(
+    contacts.filter(contact => contact.channels.length > 0)
   );
   const hasContacts = contactableContacts.length > 0;
   const contactHref = `/${encodeURIComponent(artist.handle)}?mode=contact`;
@@ -172,7 +201,10 @@ export function AboutSection({
       )}
 
       {hasCredits && (
-        <div data-testid='profile-about-credits'>
+        <div
+          className='profile-about-credits'
+          data-testid='profile-about-credits'
+        >
           <h2 className='mb-2 text-app font-caption text-white/70'>
             Selected Credits
           </h2>
@@ -188,17 +220,16 @@ export function AboutSection({
             Booking &amp; Contact
           </h2>
           <ul className='flex flex-col gap-1'>
-            {contactableContacts.map(contact => {
-              const subtitle = formatPublicContactSubtitle(contact);
+            {contactableContacts.map(({ id, roleLabel, subtitle }) => {
               return (
-                <li key={contact.id}>
+                <li key={id}>
                   <Link
                     href={contactHref}
                     prefetch={false}
                     className='group inline-flex min-h-11 max-w-full flex-col items-start justify-center gap-0.5 text-left'
                   >
                     <span className='text-sm font-semibold text-white/80 underline-offset-4 group-hover:underline'>
-                      {contact.roleLabel}
+                      {roleLabel}
                     </span>
                     {subtitle ? (
                       <span className='text-xs text-white/50'>{subtitle}</span>

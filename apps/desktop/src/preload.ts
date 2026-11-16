@@ -37,6 +37,8 @@ const LAUNCH_OPERATOR_CONTROL_CHANNEL = 'launch-operator-control';
 const GET_BUILD_IDENTITY_CHANNEL = 'get-build-identity';
 const GET_VISUAL_ACTIVITY_CHANNEL = 'desktop-get-visual-activity';
 const VISUAL_ACTIVITY_CHANNEL = 'desktop-visual-activity';
+const GET_FULL_SCREEN_STATE_CHANNEL = 'desktop-get-full-screen-state';
+const FULL_SCREEN_STATE_CHANNEL = 'desktop-full-screen-changed';
 const DESKTOP_UPDATE_STATE_CHANNEL = 'desktop-update-state';
 const DESKTOP_UPDATE_GET_STATE_CHANNEL = 'desktop-update-get-state';
 const DESKTOP_UPDATE_CHECK_CHANNEL = 'desktop-update-check';
@@ -105,6 +107,17 @@ contextBridge.exposeInMainWorld('electronAPI', {
     };
     ipcRenderer.on(VISUAL_ACTIVITY_CHANNEL, listener);
     return () => ipcRenderer.removeListener(VISUAL_ACTIVITY_CHANNEL, listener);
+  },
+  getFullScreenState: () =>
+    ipcRenderer.invoke(GET_FULL_SCREEN_STATE_CHANNEL) as Promise<boolean>,
+  onFullScreenChanged: (callback: (isFullScreen: boolean) => void) => {
+    if (typeof callback !== 'function') return () => undefined;
+    const listener = (_event: unknown, isFullScreen: unknown) => {
+      if (typeof isFullScreen === 'boolean') callback(isFullScreen);
+    };
+    ipcRenderer.on(FULL_SCREEN_STATE_CHANNEL, listener);
+    return () =>
+      ipcRenderer.removeListener(FULL_SCREEN_STATE_CHANNEL, listener);
   },
 
   /** Fires when electron-updater detects a new version is available for download. */

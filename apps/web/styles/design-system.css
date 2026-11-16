@@ -1421,7 +1421,10 @@ html[data-profile-flow-open="true"] .cookie-banner-card {
     overflow: visible;
   }
 
-  /* The tab's content (Home rail, Music, Events, About) is the right column. */
+  /* The tab's content (Home rail, Music, Events, About) is the right column.
+     The grid owns the inline padding here, so the Music panel's mobile bleed
+     (-mx-(--page-pad), which cancels the phone scrollport padding) would
+     shift it left of the column by --page-pad; reset it. */
   .profile-viewport:not(.profile-viewport--embedded):not(
       .profile-viewport--desktop-surface
     )
@@ -1434,6 +1437,7 @@ html[data-profile-flow-open="true"] .cookie-banner-card {
     grid-row: 1;
     min-width: 0;
     width: 100%;
+    margin-inline: 0;
   }
 
   .profile-viewport:not(.profile-viewport--embedded):not(
@@ -2551,6 +2555,18 @@ html[data-profile-flow-open="true"] .cookie-banner-card {
   -webkit-backdrop-filter: blur(var(--space-4));
 }
 
+/* One brand footer per profile (walk 2026-11-09): from md up, where the
+   "Jovie · Claim yours" footer renders under the card, it already carries the
+   Jovie mark, so the in-card "Made with Jovie" line steps aside instead of
+   stacking a second brand footer above it. Phones keep "Made with Jovie"
+   (the claim footer is md+ only). */
+@media (min-width: 768px) {
+  .profile-viewport:has([data-testid="profile-claim-footer"])
+    [data-testid="profile-jovie-branding"] {
+    display: none;
+  }
+}
+
 /* Public-profile mode cards (Pen D14lo6 / NdEbB / GTSIc / QZvG7). One accent
    per card, set by lib/profile/mode-card-accent.ts through data-accent. The
    gradient centers on the exact accent token; the only contrast lever is
@@ -2666,6 +2682,24 @@ html[data-profile-flow-open="true"] .cookie-banner-card {
       var(--profile-mode-card-accent-shade) 0%,
       transparent 100%
     );
+}
+
+/* Compact mode card (empty states): no reserved height, so a short message
+   never sits under a large blank gradient. One accent glow at the top right
+   only, and a hairline rim, so the corner glow cannot read as a smear past an
+   edge the dark card would otherwise not show (walk 2026-11-09, Events). */
+.profile-mode-card.profile-mode-card--compact {
+  --profile-mode-card-min-height: 0;
+  box-shadow: inset 0 0 0 var(--space-px) var(--profile-mode-card-hairline);
+}
+
+.profile-mode-card.profile-mode-card--compact::before {
+  background: radial-gradient(
+    80% 60% at 100% 0%,
+    var(--profile-mode-card-accent-center) 0%,
+    var(--profile-mode-card-accent-shade) 42%,
+    transparent 100%
+  );
 }
 
 .profile-mode-card[data-accent="ultra"] {
@@ -4292,6 +4326,27 @@ html:not(.dark) .smart-link-powered-by {
   outline: 2px solid var(--jovie-entity-accent);
   outline-offset: 2px;
   border-radius: var(--radius-sm);
+}
+
+/* About credits read as prose, not as accent links: the mention takes the
+   card's primary text color with a quiet underline that firms up on hover,
+   like the profile's AEO prose (walk 2026-11-09: bright blue underlines). */
+.profile-about-credits .profile-entity-mention {
+  color: var(--color-text-tooltip);
+  text-decoration-color: color-mix(
+    in oklab,
+    var(--color-text-tooltip) 32%,
+    transparent
+  );
+}
+
+.profile-about-credits .profile-entity-mention:hover,
+.profile-about-credits .profile-entity-mention:focus-visible {
+  text-decoration-color: var(--color-text-tooltip);
+}
+
+.profile-about-credits .profile-entity-mention:focus-visible {
+  outline-color: var(--color-text-tooltip);
 }
 
 /* ============================================

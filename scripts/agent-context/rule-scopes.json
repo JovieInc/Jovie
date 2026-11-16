@@ -80,6 +80,21 @@
     "bodySha256": "8f3fe75a0a77dd812481cbea13e7e2fabf83b95d48af9f5646b2fc9a2fc725f0"
   },
   {
+    "file": ".claude/rules/hermetic-ci.md",
+    "paths": [
+      "**/*.test.*",
+      "**/*.spec.*",
+      "**/tests/**",
+      "**/test_*.py",
+      "**/vitest.config.*",
+      "**/playwright.config.*",
+      ".github/workflows/**",
+      ".github/actions/**",
+      ".github/scripts/**"
+    ],
+    "bodySha256": "ab6e1ef736a3788ac1fba123dd562ca3a26007affe6331fe2badd74b5ddb55f1"
+  },
+  {
     "file": ".claude/rules/infra.md",
     "paths": [
       ".github/**",
@@ -214,7 +229,7 @@
       "**/vitest.config.*",
       "**/playwright.config.*"
     ],
-    "bodySha256": "b435ddb3d1618cd410c0dd3200197fec57c537bf4bfa91dc72abbfb8c1e05ce7"
+    "bodySha256": "44e87934ad88433f125cae3c7666c7eece49b4043e2d459ebffb60a91e0c6383"
   },
   {
     "file": ".claude/rules/ui.md",

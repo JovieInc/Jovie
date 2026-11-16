@@ -34,7 +34,7 @@ vi.mock(
       readonly triggerLabel?: string;
       readonly source?: string;
     }) =>
-      triggerLabel === 'Turn On Event Alerts' ? (
+      triggerLabel === 'Turn on event alerts' ? (
         <span data-testid='mock-event-alerts-cta' data-source={source}>
           {triggerLabel}
         </span>
@@ -175,7 +175,7 @@ describe('TourEventAlertsAction', () => {
     );
 
     expect(
-      screen.getByRole('button', { name: 'Turn On Event Alerts' })
+      screen.getByRole('button', { name: 'Turn on event alerts' })
     ).toBeDisabled();
     expect(screen.queryByTestId('mock-event-alerts-cta')).toBeNull();
   });

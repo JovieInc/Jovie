@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { DesktopQrOverlay } from '@/features/profile/DesktopQrOverlay';
 
@@ -71,13 +71,47 @@ describe('DesktopQrOverlay', () => {
       expect(imageSrcSetter).not.toHaveBeenCalled();
 
       readyState.mockReturnValue('complete');
-      globalThis.dispatchEvent(new Event('load'));
+      act(() => {
+        globalThis.dispatchEvent(new Event('load'));
+      });
 
       expect(imageSrcSetter).toHaveBeenCalledWith(
         expect.stringContaining('api.qrserver.com')
       );
     } finally {
       readyState.mockRestore();
+    }
+  });
+
+  it('holds the pay-mode QR <img> until the window load event', async () => {
+    // ?mode=pay opens the card at hydration; its <img> must not fetch
+    // api.qrserver.com before load either, or it holds the load event.
+    window.history.pushState({}, '', '/testartist?mode=pay');
+    const readyState = vi
+      .spyOn(document, 'readyState', 'get')
+      .mockReturnValue('loading');
+    try {
+      render(<DesktopQrOverlay handle='testartist' />);
+      expect(
+        screen.queryByAltText('Scan To Open This Profile On Your Phone')
+      ).toBeNull();
+      expect(screen.getByTestId('desktop-qr-placeholder')).toHaveStyle({
+        width: '120px',
+        height: '120px',
+      });
+
+      readyState.mockReturnValue('complete');
+      act(() => {
+        globalThis.dispatchEvent(new Event('load'));
+      });
+
+      expect(
+        await screen.findByAltText('Scan To Open This Profile On Your Phone')
+      ).toHaveAttribute('src', expect.stringContaining('api.qrserver.com'));
+      expect(screen.queryByTestId('desktop-qr-placeholder')).toBeNull();
+    } finally {
+      readyState.mockRestore();
+      window.history.pushState({}, '', '/');
     }
   });
 
