@@ -1,9 +1,40 @@
 import { render, screen, within } from '@testing-library/react';
+import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 import { AgentRoom, roomTimeAgo } from './AgentRoom';
 import { fleetRoomFixtureView } from './fixtures';
 
 describe('AgentRoom', () => {
+  it('includes the full roster, activity, and composer in server HTML before hydration', () => {
+    const view = fleetRoomFixtureView();
+    const html = renderToStaticMarkup(
+      <AgentRoom
+        view={view}
+        composer={
+          <form>
+            <button type='submit'>Send</button>
+          </form>
+        }
+      />
+    );
+    const server = within(
+      new DOMParser().parseFromString(html, 'text/html').body
+    );
+
+    expect(
+      server
+        .getAllByTestId('agent-room-agent')
+        .map(agent => agent.dataset.agentId)
+    ).toEqual(view.agents.map(agent => agent.id));
+    expect(server.getAllByTestId('agent-room-event')).toHaveLength(
+      view.events.length
+    );
+    expect(server.getByRole('button', { name: 'Send' })).toHaveAttribute(
+      'type',
+      'submit'
+    );
+  });
+
   it('shows every roster agent with presence and the feed newest first', () => {
     render(<AgentRoom view={fleetRoomFixtureView()} />);
     const agents = screen.getAllByTestId('agent-room-agent');
