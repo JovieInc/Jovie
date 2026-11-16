@@ -80,7 +80,7 @@ const SEEDS = Object.freeze({
     ],
     [
       "import { __nativeQualificationMissingExport } from '@/lib/hud/number-series';",
-      'TS2305',
+      'TS2724',
     ],
     [
       'export const __nativeQualificationMissingConsumer = __nativeQualificationMissingExport;',

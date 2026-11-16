@@ -20,6 +20,7 @@ import {
   parseArgs,
   parseDiagnostics,
   readGraph,
+  seedPlan,
   writeStageMetrics,
 } from './native-typecheck-evidence.mjs';
 
@@ -86,6 +87,47 @@ test('preserves implicit type roots when an overlay leaves the original director
     JSON.stringify({ extends: original, compilerOptions: { typeRoots: roots } })
   );
   assert.deepEqual(effectiveTypeRoots(relocated, directory, compiler), roots);
+});
+
+test('pins the missing-export suggestion oracle to the actual TS6 diagnostic', () => {
+  const root = temporary();
+  const paths = [
+    'apps/web/lib/hud/number-series.ts',
+    'packages/ui/lib/utils.ts',
+    'apps/web/lib/design/generated/design-tokens.ts',
+    'packages/extension-contracts/index.ts',
+    'apps/web/lib/extensions/summary.ts',
+  ];
+  for (const path of paths) {
+    mkdirSync(resolve(root, path, '..'), { recursive: true });
+    writeFileSync(resolve(root, path), 'export {};\n');
+  }
+  const plan = seedPlan(root, 'web');
+  const source = resolve(root, paths[0]);
+  writeFileSync(source, `export {};\n${plan[paths[0]].suffix}`);
+  const consumer = resolve(root, 'consumer.ts');
+  writeFileSync(
+    consumer,
+    "import { __nativeQualificationMissingExport } from './apps/web/lib/hud/number-series';"
+  );
+  const compiler = createRequire(import.meta.url)('typescript');
+  const program = compiler.createProgram([source, consumer], {
+    noLib: true,
+    noEmit: true,
+    types: [],
+    module: compiler.ModuleKind.ESNext,
+    moduleResolution: compiler.ModuleResolutionKind.Node10,
+  });
+  const diagnostics = program.getSemanticDiagnostics(
+    program.getSourceFile(consumer)
+  );
+  assert.equal(diagnostics.length, 1);
+  assert.equal(diagnostics[0].code, 2724);
+  assert.equal(plan[paths[4]].expected.at(-1).code, `TS${diagnostics[0].code}`);
+  assert.match(
+    compiler.flattenDiagnosticMessageText(diagnostics[0].messageText, '\n'),
+    /Did you mean '__nativeQualificationString'/u
+  );
 });
 
 test('rejects missing or changed warm cache bytes', () => {
