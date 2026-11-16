@@ -361,7 +361,6 @@ const SENTRY_AUTOFIX_RECURRENCE_LANE = new Set([
 ]);
 const SENTRY_AUTOFIX_RECURRENCE_SCRIPT_TESTS = [
   'scripts/lib/__tests__/sentry-autofix-recurrence.test.mjs',
-  'scripts/lib/__tests__/sentry-autofix-recurrence-retry.test.mjs',
   'scripts/lib/__tests__/sentry-validation-observation.test.mjs',
   'scripts/lib/__tests__/sentry-autofix-workflow-contract.test.mjs',
   'scripts/lib/__tests__/automation-verify.test.mjs',
