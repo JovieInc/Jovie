@@ -170,9 +170,11 @@ function effectiveRequestOptions(
   const method = (opts.method ?? 'GET').toUpperCase();
   const url = new URL(opts.url);
   const body =
-    opts.body === undefined || typeof opts.body === 'string'
+    typeof opts.body === 'string'
       ? opts.body
-      : JSON.stringify(opts.body);
+      : opts.body === undefined
+        ? undefined
+        : JSON.stringify(opts.body);
   const isGraphql = url.pathname.endsWith('/graphql');
   const read =
     method === 'GET' ||
