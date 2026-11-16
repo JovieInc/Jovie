@@ -419,6 +419,62 @@ describe('catch-up receipts and exit wiring', () => {
     });
   });
 
+  it('filters off-branch and non-schedule runs when picking the newest canary', () => {
+    const last = latestCanaryScheduledRun(
+      [
+        dispatchRun({ id: 202 }),
+        scheduledRun({ id: 203, head_branch: 'feature' }),
+        scheduledRun({ id: 204, created_at: iso(90) }),
+      ],
+      NOW
+    );
+    expect(last).toMatchObject({ age: 90 });
+    expect(last?.run.id).toBe(204);
+  });
+
+  it('fails closed when the runs body carries a non-array workflow_runs', async () => {
+    const github = reader({ scheduleBody: { workflow_runs: 'nope' } });
+    expect(
+      await catchup({
+        github,
+        env: { GITHUB_REPOSITORY: repo },
+        now: NOW,
+        sleep: noOpSleep,
+      })
+    ).toMatchObject({ action: 'catch-up-error', exitCode: 1 });
+    expect(posted(github)).toBeUndefined();
+  });
+
+  it('keeps polling past a stale dispatch row that predates the confirmation window', async () => {
+    const github = reader({
+      scheduled: [scheduledRun({ created_at: iso(421) })],
+      dispatched: [dispatchRun({ created_at: iso(10) })],
+      dispatchedAfter: 1,
+    });
+    const result = await catchup({
+      github,
+      env: { GITHUB_REPOSITORY: repo },
+      now: NOW,
+      sleep: noOpSleep,
+    });
+    expect(result).toMatchObject({ confirmed: false, exitCode: 1 });
+    // 2 evidence GETs + 1 dispatch POST + 5 confirmation GETs.
+    expect(github.rest).toHaveBeenCalledTimes(3 + CONFIRM_ATTEMPTS);
+  });
+
+  it('treats a non-Error rejection as a plain failure, not a deferral', async () => {
+    const github = reader();
+    github.rest.mockRejectedValue('boom-string');
+    expect(
+      await catchup({
+        github,
+        env: { GITHUB_REPOSITORY: repo },
+        now: NOW,
+        sleep: noOpSleep,
+      })
+    ).toMatchObject({ action: 'catch-up-error', exitCode: 1 });
+  });
+
   it('defaults to the real timer sleep and still confirms on the first poll', async () => {
     vi.useFakeTimers();
     try {
