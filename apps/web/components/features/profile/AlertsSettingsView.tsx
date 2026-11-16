@@ -151,7 +151,7 @@ export function AlertsSettingsView({
           {isUnsubscribing ? 'Turning off...' : 'Turn off alerts'}
         </PlainButton>
       ) : (
-        <p className='px-4 pt-4 text-xs leading-5 text-on-media/42'>
+        <p className='px-4 pt-4 text-xs leading-5 text-on-media/50'>
           Alert preferences appear here after alerts are enabled.
         </p>
       )}

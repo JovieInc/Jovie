@@ -58,6 +58,22 @@ describe('AlertsSettingsView', () => {
     ).toBeVisible();
   });
 
+  it('renders the empty-state copy on the AA-contrast muted token', () => {
+    render(
+      <AlertsSettingsView
+        {...viewProps}
+        isSubscribed={false}
+        onTogglePref={vi.fn()}
+      />
+    );
+
+    const emptyState = screen.getByText(
+      'Alert preferences appear here after alerts are enabled.'
+    );
+    expect(emptyState).toHaveClass('text-on-media/50');
+    expect(emptyState.className).not.toContain('text-on-media/42');
+  });
+
   it('pairs each canonical switch with its row description for announced labels', () => {
     render(
       <AlertsSettingsView {...viewProps} isSubscribed onTogglePref={vi.fn()} />
