@@ -4,7 +4,7 @@ import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { relative, resolve } from 'node:path';
 import { readTestSources } from './mutation-diff.mjs';
-import { shouldPark } from './mutation-evidence.mjs';
+import { shouldPark, strongerHighWater } from './mutation-evidence.mjs';
 
 /** Hash names and actual bytes, including missing files, in stable order. */
 export function inputDigest(paths, read) {
@@ -212,14 +212,44 @@ export function sweepEvidenceCandidates(
   runId
 ) {
   const selectionState = { ...state, modules: { ...state.modules } };
+  const deferred = new Set();
+  const released = new Set();
   for (const candidate of candidates) {
     const known = state.modules[candidate.file];
     if (!known) continue;
-    if (!evidenceIsCurrent(known, configDigest, read, selectionDigest)) {
+    const current = evidenceIsCurrent(
+      known,
+      configDigest,
+      read,
+      selectionDigest
+    );
+    if (
+      known.status === 'unknown' &&
+      known.evidence?.verdict === 'unknown' &&
+      known.evidence.reason ===
+        'configuration changed; reviewed control evidence required'
+    ) {
+      const anchor = strongerHighWater(
+        state.highWater?.[candidate.file],
+        known.highWater
+      );
+      // Identical evidence cannot clear a config review. Keep it unknown
+      // without spending another mutant budget; changed inputs may run again.
+      if (current && anchor?.configDigest !== configDigest)
+        deferred.add(candidate.file);
+      else released.add(candidate.file);
+    }
+    if (!current) {
       known.status = 'stale';
       known.score = null;
     }
-    if (!shouldPark(known, runId) && known.status === 'stale')
+    if (released.has(candidate.file))
+      selectionState.modules[candidate.file] = {
+        ...known,
+        status: 'stale',
+        blob: 'unknown',
+      };
+    else if (!shouldPark(known, runId) && known.status === 'stale')
       selectionState.modules[candidate.file] = { ...known, blob: 'unknown' };
     else if (known.status === 'unknown')
       // Preserve pickBatch's existing one-day error backoff after N-run parking.
@@ -227,7 +257,11 @@ export function sweepEvidenceCandidates(
   }
   return {
     selectionState,
-    eligible: candidates.filter(c => !shouldPark(state.modules[c.file], runId)),
+    eligible: candidates.filter(
+      c =>
+        !deferred.has(c.file) &&
+        (released.has(c.file) || !shouldPark(state.modules[c.file], runId))
+    ),
   };
 }
 

@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createTestSelector } from '../mutation-diff.mjs';
 import {
   configurationPaths,
@@ -8,8 +8,11 @@ import {
   sweepEvidenceCandidates,
   untestedMutationEntry,
 } from '../mutation-inputs.mjs';
+import { pickBatch } from '../mutation-sweep.mjs';
+import { recordEvidenceAttempt } from '../mutation-sweep-attempt.mjs';
 
 describe('exact mutation input receipts', () => {
+  afterEach(() => vi.useRealTimers());
   it('binds actual selected helper bytes and missing inputs, independent of order', () => {
     const files = new Map([
       ['lib/a.ts', 'return true'],
@@ -155,5 +158,106 @@ describe('exact mutation input receipts', () => {
       sweepEvidenceCandidates(candidates, state, 'config', 'graph', read, 5)
         .selectionState.modules['lib/a.ts'].blob
     ).toBe('unknown');
+  });
+  it('defers identical config-review evidence without losing its anchor or hiding changed inputs', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-11-16T00:00:00Z'));
+    const path = 'apps/web/lib/a.ts';
+    const files = new Map([[path, 'export const a = true;']]);
+    const read = file => files.get(file) ?? null;
+    const anchor = {
+      schemaVersion: 1,
+      configDigest: 'old-config',
+      score: 90,
+      valid: 40,
+      sha: 'a'.repeat(40),
+      at: '2020-01-01T00:00:00Z',
+    };
+    const { entry } = recordEvidenceAttempt({
+      state: { modules: {} },
+      file: 'lib/a.ts',
+      blob: 'blob',
+      sha: 'b'.repeat(40),
+      at: new Date().toISOString(),
+      durationMs: 10,
+      mutants: Array.from({ length: 40 }, () => ({ status: 'Killed' })),
+      partialMutants: undefined,
+      source: files.get(path),
+      tests: ['a.test.ts'],
+      baseline: { files: {} },
+      equivalents: { entries: [] },
+      configDigest: 'config',
+      runId: 1,
+      unchanged: true,
+      timedOut: false,
+      error: undefined,
+      previous: { highWater: anchor },
+      receipt: {
+        schemaVersion: 1,
+        configDigest: 'config',
+        selectionDigest: 'graph',
+        inputs: [path],
+        inputDigest: inputDigest([path], read),
+      },
+    });
+    expect(entry).toMatchObject({
+      status: 'unknown',
+      score: null,
+      measuredScore: 100,
+      highWater: anchor,
+    });
+    const candidate = { file: 'lib/a.ts', blob: 'blob', testCount: 1 };
+    const select = (
+      config = 'config',
+      graph = 'graph',
+      previous = entry,
+      highWater = {}
+    ) =>
+      sweepEvidenceCandidates(
+        [candidate],
+        { modules: { 'lib/a.ts': structuredClone(previous) }, highWater },
+        config,
+        graph,
+        read,
+        100
+      );
+    expect(select().eligible).toEqual([]);
+    expect(
+      select('config', 'graph', { ...entry, highWater: undefined }).eligible
+    ).toEqual([]);
+    const deferred = select();
+    expect(
+      pickBatch(deferred.selectionState, deferred.eligible, {
+        max: 1,
+        now: Date.now() + 2 * 86_400_000,
+      })
+    ).toEqual([]);
+    expect(select().selectionState.modules['lib/a.ts']).toMatchObject({
+      status: 'error',
+      score: null,
+      highWater: anchor,
+    });
+    expect(select('next-config').eligible).toEqual([candidate]);
+    expect(select('config', 'new-graph').eligible).toEqual([candidate]);
+    for (const retry of [select('next-config'), select('config', 'new-graph')])
+      expect(
+        pickBatch(retry.selectionState, retry.eligible, { max: 1 })
+      ).toEqual(['lib/a.ts']);
+    expect(
+      select('config', 'graph', {
+        ...entry,
+        highWater: { ...anchor, configDigest: 'config' },
+      }).eligible
+    ).toEqual([candidate]);
+    const reviewed = select('config', 'graph', entry, {
+      'lib/a.ts': { ...anchor, configDigest: 'config' },
+    });
+    expect(
+      pickBatch(reviewed.selectionState, reviewed.eligible, { max: 1 })
+    ).toEqual(['lib/a.ts']);
+    files.set(path, 'export const a = false;');
+    expect(select().eligible).toEqual([candidate]);
+    expect(entry.highWater).toEqual(anchor);
+    expect(entry.status).toBe('unknown');
   });
 });
