@@ -356,7 +356,7 @@ describe('ProfileDesktopSurface', () => {
     expect(profileHeader).toHaveClass('min-w-0', 'max-w-full');
     expect(within(profileHeader).getByText('Tim White')).toHaveClass(
       'min-w-0',
-      'line-clamp-2'
+      'line-clamp-2 wrap-anywhere'
     );
     expect(
       screen.getByText('Producer, songwriter, and after-hours romantic.')

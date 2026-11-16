@@ -6,9 +6,7 @@ import {
   screen,
   waitFor,
 } from '@testing-library/react';
-import type { ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { ProfilesWorkspaceData } from '@/components/features/presence/types';
 import {
   applyCacheScope,
   resetCacheIsolationForTests,
@@ -16,7 +14,7 @@ import {
 import { queryKeys } from '@/lib/queries/keys';
 import { useDashboardProfileQuery } from '@/lib/queries/useDashboardProfileQuery';
 import { useDashboardSocialLinksQuery } from '@/lib/queries/useDashboardSocialLinksQuery';
-import { usePresenceRemoval } from './usePresenceRemoval';
+import { Harness, setup } from './presence-removal-test-harness';
 
 const feedback = vi.hoisted(() => ({ success: vi.fn(), error: vi.fn() }));
 const refresh = vi.hoisted(() => vi.fn());
@@ -27,38 +25,10 @@ import {
   data,
   liveLink,
   navigationScopes,
+  principal,
   row,
-  scope,
 } from './presence-removal-test-fixtures';
 
-function Harness({
-  value = data,
-  selection = row.id,
-  prepare,
-}: {
-  readonly value?: ProfilesWorkspaceData;
-  readonly selection?: string | null;
-  readonly prepare?: (selection: null) => void;
-}) {
-  const removal = usePresenceRemoval(value, scope, selection, prepare);
-  return (
-    <>
-      <button type='button' onClick={() => removal.request(row)}>
-        Remove saved link
-      </button>
-      {removal.dialog}
-    </>
-  );
-}
-function setup() {
-  const client = new QueryClient({
-    defaultOptions: { mutations: { retry: 3 } },
-  });
-  const wrapper = ({ children }: { readonly children: ReactNode }) => (
-    <QueryClientProvider client={client}>{children}</QueryClientProvider>
-  );
-  return { client, ...render(<Harness />, { wrapper }) };
-}
 function deferred<T>() {
   let resolve!: (value: T) => void;
   const promise = new Promise<T>(r => {
@@ -307,6 +277,12 @@ describe('Presence saved-link removal', () => {
     act(() => {
       applyCacheScope({ sessionId: 'new-session' });
     });
+    view.rerender(
+      <Harness
+        prepare={prepare}
+        binding={{ ...principal, sessionId: 'new-session' }}
+      />
+    );
     const newMenu = menu();
     fireEvent.click(screen.getByRole('button', { name: 'Remove saved link' }));
     await act(async () => {

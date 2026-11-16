@@ -64,3 +64,10 @@ export const navigationScopes = [
   },
   { scenario: 'away and back', patch: { profileId: 'other' } },
 ];
+
+export const principal = {
+  appActorId: 'actor',
+  authUserId: 'actor',
+  sessionId: 'session',
+  impersonationSubject: null,
+};
