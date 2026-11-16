@@ -214,7 +214,8 @@ describe('synthetic canary catch-up', () => {
       sleep: noOpSleep,
     });
     expect(result).toMatchObject({ confirmed: false, exitCode: 1 });
-    expect(github.rest).toHaveBeenCalledTimes(2 + CONFIRM_ATTEMPTS);
+    // 2 evidence GETs + 1 dispatch POST + 5 confirmation GETs.
+    expect(github.rest).toHaveBeenCalledTimes(3 + CONFIRM_ATTEMPTS);
   });
 
   it.each([
@@ -424,7 +425,7 @@ describe('catch-up receipts and exit wiring', () => {
       const github = reader({
         scheduled: [scheduledRun({ created_at: iso(421) })],
         dispatched: [dispatchRun({ created_at: new Date(NOW).toISOString() })],
-        dispatchedAfter: 2,
+        dispatchedAfter: 1,
       });
       const pending = dispatchCatchup(github, repo, { now: NOW });
       await vi.advanceTimersByTimeAsync(CONFIRM_DELAY_MS);
