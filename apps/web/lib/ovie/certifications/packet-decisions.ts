@@ -152,7 +152,11 @@ export async function readPacketDecisionLedgers(
       }
     } catch {
       // One round trip means one failure mode: every domain fails closed.
-      return new Map(domains.map(domain => [domain, { ok: false }] as const));
+      const failedRows: Array<
+        [OvieCertificationDomainId, PacketDecisionLedgerRead]
+      > = [];
+      for (const domain of domains) failedRows.push([domain, { ok: false }]);
+      return new Map(failedRows);
     }
   } else {
     await Promise.all(
@@ -168,23 +172,27 @@ export async function readPacketDecisionLedgers(
       })
     );
   }
-  return new Map(
-    domains.map(domain => {
-      if (failed.has(domain)) return [domain, { ok: false }] as const;
-      const raw = raws.get(packetDecisionLedgerKey(domain));
-      if (raw === undefined) {
-        return [domain, { ok: true, ledger: emptyLedger(domain) }] as const;
-      }
-      try {
-        return [
-          domain,
-          { ok: true, ledger: parsePacketDecisionLedger(raw, domain) },
-        ] as const;
-      } catch {
-        return [domain, { ok: false }] as const;
-      }
-    })
-  );
+  const rows: Array<[OvieCertificationDomainId, PacketDecisionLedgerRead]> = [];
+  for (const domain of domains) {
+    if (failed.has(domain)) {
+      rows.push([domain, { ok: false }]);
+      continue;
+    }
+    const raw = raws.get(packetDecisionLedgerKey(domain));
+    if (raw === undefined) {
+      rows.push([domain, { ok: true, ledger: emptyLedger(domain) }]);
+      continue;
+    }
+    try {
+      rows.push([
+        domain,
+        { ok: true, ledger: parsePacketDecisionLedger(raw, domain) },
+      ]);
+    } catch {
+      rows.push([domain, { ok: false }]);
+    }
+  }
+  return new Map(rows);
 }
 
 export type RecordPacketFounderDecisionResult =

@@ -468,7 +468,9 @@ class Size500StaleTest(unittest.TestCase):
     ])
 
     def test_blocked_size_growth_syncs_main(self):
-        got = classes.classify(pr("Company guards", merge="BLOCKED"), {"Company guards": self.LOG})
+        payload = pr("Company guards", merge="BLOCKED")
+        payload["changedFiles"] = []
+        got = classes.classify(payload, {"Company guards": self.LOG})
         self.assertEqual((got["cls"], got["action"]), ("size-500-stale", "sync-main"))
         self.assertIsNone(edits.size_500_stale_hit(None))
         self.assertIsNone(edits.size_500_stale_hit("##[error]Process completed with exit code 1."))

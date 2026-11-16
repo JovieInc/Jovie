@@ -75,13 +75,11 @@ export type RecordBackend = {
     records: Array<{ key: string; value: unknown }>,
     ttlSeconds: number
   ): Promise<boolean>;
-  /** Lexically ordered records confined to prefix, exclusive of after. */
   listRecords?(
     prefix: string,
     after: string | undefined,
     limit: number
   ): Promise<Array<{ key: string; value: unknown }>>;
-  /** Optional multi-get: one round trip for many keys (JOV-12821). */
   getMany?(keys: readonly string[]): Promise<Map<string, unknown>>;
   lpush(key: string, value: string): Promise<void>;
   lrange(key: string, start: number, stop: number): Promise<string[]>;

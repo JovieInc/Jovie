@@ -25,7 +25,7 @@ import {
   readOvieCertificationInventory,
   recordOvieCertificationDecision,
 } from './inventory.server';
-import type { CertificationPacketFile } from './packet-files.server';
+import { deps, packetFile } from './inventory-read.helpers';
 
 vi.mock('@/lib/agent-os/certification-runtime-store', () => ({
   getMarketingCertificationStore: vi.fn(),
@@ -36,56 +36,6 @@ vi.mock('@/lib/acquisition/eligibility.server', () => ({
 vi.mock('@/lib/ovie/mcp/postgres-backend', () => ({
   postgresRecordBackend: vi.fn(),
 }));
-
-function packetFile(
-  subjectId: string,
-  overrides: Partial<CertificationPacketFile> = {}
-): CertificationPacketFile {
-  return {
-    domain: 'flows',
-    surface: 'Golden Path',
-    packetUpdatedAt: '2026-09-27T07:00:00.000Z',
-    links: [{ label: 'Run', href: 'https://ci.test/1', kind: 'test_run' }],
-    packet: fixturePacket(subjectId),
-    file: `docs/certification/${subjectId}.packet.json`,
-    ...overrides,
-  };
-}
-
-function deps(
-  files: readonly CertificationPacketFile[],
-  backend = memoryCertificationBackend()
-): OvieCertificationInventoryDeps & {
-  readonly backendInstance: ReturnType<typeof memoryCertificationBackend>;
-} {
-  const marketingBackend = memoryCertificationBackend();
-  return {
-    backendInstance: backend,
-    backend: () => backend,
-    marketingStore: () =>
-      new MarketingCertificationStore(
-        marketingBackend,
-        MARKETING_COMPONENT_REGISTRY
-      ),
-    readPacketFiles: async () => ({
-      root: '/repo/docs/certification',
-      files,
-      issues: [
-        {
-          domain: null,
-          source: 'docs/certification/bad.packet.json',
-          message: 'Invalid JSON.',
-        },
-      ],
-    }),
-    featureRegistry: {
-      list: async () => ({
-        items: [],
-        sourceUpdatedAt: FIXTURE_NOW,
-      }),
-    },
-  };
-}
 
 describe('readOvieCertificationInventory', () => {
   it.each(['company', 'design_system', 'icps', 'outcomes'] as const)(
@@ -239,24 +189,9 @@ describe('readOvieCertificationInventory', () => {
       'jovie:certification:v1:packet-decisions:flows',
       JSON.stringify({
         schemaVersion: 1,
+        contract: 'jovie.certification/v1',
         domain: 'flows',
-        records: {
-          signup: {
-            decisions: [
-              {
-                id: 'decision-1',
-                subjectId: 'signup',
-                evidenceDigest: 'sha256:' + 'a'.repeat(64),
-                decision: 'approved',
-                decidedAt: '2026-09-27T07:00:00.000Z',
-                reviewer: 'Tim White',
-                notes: null,
-              },
-            ],
-            auditHistory: [],
-            updatedAt: '2026-09-27T07:00:00.000Z',
-          },
-        },
+        records: {},
         updatedAt: '2026-09-27T07:00:00.000Z',
       })
     );

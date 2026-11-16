@@ -24,6 +24,10 @@ import {
 import { getMarketingCertificationStore } from '@/lib/agent-os/certification-runtime-store';
 import { postgresRecordBackend } from '@/lib/ovie/mcp/postgres-backend';
 import {
+  featureRegistryDomain,
+  featureRegistryPacketFile,
+} from './feature-registry-domain.server';
+import {
   countCertificationStates,
   normalizeKernelCertificationRow,
 } from './normalize';
@@ -215,7 +219,7 @@ function laterTimestamp(a: string, b: string): string {
   return Date.parse(a) >= Date.parse(b) ? a : b;
 }
 
-interface CertificationDomainProjection {
+export interface CertificationDomainProjection {
   readonly rows: OvieCertificationRow[];
   readonly deliveries: CertificationInboxDelivery[];
   readonly summary: OvieCertificationDomainSummary;
@@ -400,69 +404,6 @@ async function packetDomain(
   }
 }
 
-const FEATURE_REGISTRY_SURFACE_LABELS = {
-  behavior: 'Atomic Behavior',
-  capability: 'Feature Capability',
-  component: 'Registry Component',
-} as const;
-
-function featureRegistryPacketFile(
-  item: FounderReviewItem,
-  sourceUpdatedAt: string
-): CertificationPacketFile {
-  return {
-    domain: 'feature_registry',
-    surface: FEATURE_REGISTRY_SURFACE_LABELS[item.scope],
-    packetUpdatedAt: sourceUpdatedAt,
-    links: [],
-    packet: item.certificationPacket,
-    file: item.source,
-  };
-}
-
-/**
- * The Feature Registry projects the same kernel admission and decision ledger
- * as packet-file domains; only the packet source differs (the committed
- * FEATURE_REGISTRY.md instead of worker packet files).
- */
-async function featureRegistryDomain(
-  deps: OvieCertificationInventoryDeps,
-  evaluatedAt: string
-): Promise<CertificationDomainProjection> {
-  const domain = 'feature_registry' as const;
-  let source: Awaited<ReturnType<FeatureRegistryCertificationSource['list']>>;
-  try {
-    source = await deps.featureRegistry.list();
-  } catch {
-    return {
-      rows: [],
-      deliveries: [],
-      summary: {
-        domain,
-        label: OVIE_CERTIFICATION_DOMAIN_LABELS[domain],
-        status: 'error',
-        rowCount: 0,
-        note: 'The feature registry source could not be read.',
-      },
-      issues: [
-        {
-          domain,
-          source: 'feature_registry',
-          message: 'Feature registry read failed.',
-        },
-      ],
-    };
-  }
-  return packetDomain(
-    domain,
-    source.items.map(item =>
-      featureRegistryPacketFile(item, source.sourceUpdatedAt)
-    ),
-    deps,
-    evaluatedAt
-  );
-}
-
 /**
  * One customer prospect row plus its inbox delivery. The row is a pure
  * projection of the acquisition store's candidate state — ranking fields are
@@ -631,7 +572,7 @@ export async function readOvieCertificationInventory(
   const results = await Promise.all([
     marketingDomain(deps, generatedAt),
     customersDomain(deps, generatedAt),
-    featureRegistryDomain(deps, generatedAt),
+    featureRegistryDomain(deps, generatedAt, packetDomain),
     ...PACKET_FILE_DOMAINS.map(domain =>
       packetDomain(
         domain,
