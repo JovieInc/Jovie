@@ -61,6 +61,28 @@ describe('UsageMenuItem', () => {
     mockUseChatUsageQuery.mockReset();
   });
 
+  it('lays the row out as icon column, Title Case label, then a right-aligned value and chevron', () => {
+    mockQuery({ data: healthyPro });
+    render(<UsageMenuItem usageStatsUrl={APP_ROUTES.SETTINGS_USAGE} />);
+
+    const toggle = screen.getByRole('button', { name: /^Usage Remaining/ });
+    // Button wraps children in an inline content span; flattening it keeps
+    // the icon in the shared column and stops the value crowding the label.
+    expect(toggle).toHaveClass('[&>span]:contents', 'gap-2');
+    const icon = toggle.querySelector('svg') as SVGElement;
+    expect(icon).toHaveClass('h-4', 'w-4');
+    expect(icon.parentElement).toHaveClass('h-4', 'w-4', 'shrink-0');
+    expect(screen.getByText('Usage Remaining')).toHaveClass(
+      'flex-1',
+      'truncate'
+    );
+
+    const value = screen.getByTestId('usage-menu-value');
+    expect(value).toHaveTextContent('71%');
+    expect(value).toHaveClass('ms-auto', 'tabular-nums', 'text-tertiary-token');
+    expect(value.querySelector('svg')).toHaveClass('h-4', 'w-4');
+  });
+
   it('toggles the usage details disclosure', async () => {
     mockQuery({ data: healthyPro });
     const { container } = render(
