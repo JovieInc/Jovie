@@ -5,6 +5,7 @@ import { gzipSync } from 'node:zlib';
 import { afterEach, describe, expect, it } from 'vitest';
 import {
   BASELINE_HEADROOM_RATIO,
+  baselineWithHeadroom,
   budgetJsBytes,
   checkBudgets,
   checkFirstLoadBudgets,
@@ -14,6 +15,7 @@ import {
   gateWeakeningOverrideApplies,
   grownBudgetNumbers,
   HEADROOM_KB,
+  isInterceptedManifestKey,
   isMarketingRoute,
   measureFirstLoadJs,
   measureRouteJs,
@@ -104,29 +106,67 @@ describe('route-js-budget', () => {
     expect(byRoute['/app/chat'].gzipKb).toBeGreaterThanOrEqual(160);
   });
 
-  it('fails a route over its ceiling and uses the default otherwise', () => {
+  it('fails a route over its baseline and fails closed on a route with none', () => {
     const rows = measureRouteJs(buildFixture());
     const result = checkBudgets(rows, {
-      defaultMaxGzipKb: 100,
       routes: { '/app/chat': 150, '/app/removed': 500 },
     });
 
     expect(result.violations.map(row => row.route)).toEqual(['/app/chat']);
+    // No default to fall back to: an unlisted route is not ok.
+    expect(result.unlisted.map(row => row.route)).toEqual(['/app/settings']);
     expect(
-      result.rows.find(row => row.route === '/app/settings')?.budgetKb
-    ).toBe(100);
+      result.rows.find(row => row.route === '/app/settings')
+    ).toMatchObject({ budgetKb: null, ok: false });
     expect(result.staleBudgets).toEqual(['/app/removed']);
   });
 
-  it('ships budgets that name only real, stricter-than-default routes', () => {
+  it('does not charge an intercepted modal to the route it normalizes to', () => {
+    expect(isInterceptedManifestKey('/@auth/(.)signin/page')).toBe(true);
+    expect(isInterceptedManifestKey('/feed/(..)(..)photo/[id]/page')).toBe(
+      true
+    );
+    expect(isInterceptedManifestKey('/app/(shell)/@modal/chat/page')).toBe(
+      false
+    );
+    expect(isInterceptedManifestKey('/(marketing)/page')).toBe(false);
+
+    const nextDir = buildFixture();
+    const modal = writeChunk(nextDir, 'modal.js', 90 * 1024);
+    writeManifest(nextDir, '@auth/(.)signin', '/app/@auth/(.)signin/page', {
+      '[project]/app/app/@auth/(.)signin/page': [modal],
+    });
+    expect(
+      measureRouteJs(nextDir)
+        .map(row => row.route)
+        .sort()
+    ).toEqual(['/app/chat', '/app/settings']);
+    // The modal still ships to the client, so the forbidden scan reads it.
+    writeFileSync(
+      join(nextDir, 'static', 'chunks', 'modal.js'),
+      'e.exports={invalid_type:"Ungültige Eingabe"};'
+    );
+    expect(findForbiddenClientCode(nextDir).map(hit => hit.file)).toEqual([
+      'static/chunks/modal.js',
+    ]);
+  });
+
+  it('ships a per-route baseline for every route, none above its section ceiling', () => {
     const budgets = JSON.parse(
       readFileSync(join(__dirname, 'route-js-budgets.json'), 'utf8')
     ) as ReturnType<typeof firstLoadBudgets>;
 
     expect(budgets.defaultMaxGzipKb).toBeGreaterThan(0);
+    expect(Object.keys(budgets.routes).length).toBeGreaterThan(100);
     for (const [route, kb] of Object.entries(budgets.routes)) {
       expect(route.startsWith('/app')).toBe(true);
-      expect(kb).toBeGreaterThan(budgets.defaultMaxGzipKb);
+      expect(kb).toBeLessThanOrEqual(budgets.groups.dashboard.baselineKb);
+    }
+    expect(Object.keys(budgets.firstLoad.baselines).length).toBeGreaterThan(
+      100
+    );
+    for (const route of Object.keys(budgets.firstLoad.baselines)) {
+      expect(route.startsWith('/app/') || route === '/app').toBe(false);
     }
     expect(validateBudgetShape(budgets)).toEqual([]);
     expect(budgets.firstLoad.marketingMaxGzipKb).toBeLessThan(
@@ -140,14 +180,11 @@ describe('route-js-budget', () => {
     expect(budgets.firstLoad.defaultMaxGzipKb).toBe(800);
     expect(budgets.defaultMaxGzipKb).toBe(900);
     expect(budgets.firstLoad.routes['/']).toBe(640);
-    expect(budgets.firstLoad.baselines).toEqual(
-      Object.fromEntries(
-        Object.entries(MEASURED_BASELINES).map(([route, kb]) => [
-          route,
-          Math.floor(kb * (1 + BASELINE_HEADROOM_RATIO)),
-        ])
-      )
-    );
+    for (const [route, kb] of Object.entries(MEASURED_BASELINES)) {
+      expect(budgets.firstLoad.baselines[route], route).toBe(
+        baselineWithHeadroom(kb)
+      );
+    }
     expect(grownBudgetNumbers(budgets, budgets)).toEqual([]);
     const ancestor = readBudgetAncestor(join(__dirname, '../..'), {
       fetch: false,
@@ -178,17 +215,19 @@ describe('route-js-budget', () => {
   });
 });
 
+// Measured 2026-11-12 on the CI mock-env build of main 0b82835e.
 const MEASURED_BASELINES = {
-  '/demo/showcase/[surface]': 1284,
-  '/start': 1223,
-  '/demo/founder-video': 1157,
-  '/exp/shell-v1': 947,
-  '/[username]': 883,
-  '/[username]/profile-mode-render/[profileMode]/[marker]': 883,
-  '/exp/page-builder': 881,
-  '/demo/audience': 847,
-  '/demo': 815,
-  '/': 650,
+  '/demo/showcase/[surface]': 1184,
+  '/demo/founder-video': 1148,
+  '/exp/shell-v1': 867,
+  '/[username]': 846,
+  '/[username]/profile-mode-render/[profileMode]/[marker]': 846,
+  '/demo/audience': 844,
+  '/exp/page-builder': 817,
+  '/demo': 792,
+  '/start': 789,
+  // Without the intercepted @auth sign-in and sign-up modals (was 657).
+  '/': 567,
 };
 
 describe('first-load JS budgets', () => {
@@ -204,6 +243,8 @@ describe('first-load JS budgets', () => {
         Math.floor(kb * 1.02)
       );
     }
+    expect(baselineWithHeadroom(650)).toBe(663);
+    expect(baselineWithHeadroom(40)).toBe(40);
     expect(isMarketingRoute('/solutions/artists', ['/solutions/*'])).toBe(true);
     expect(isMarketingRoute('/about', ['/', '/product'])).toBe(false);
   });
@@ -230,7 +271,7 @@ describe('first-load JS budgets', () => {
     expect(judge(budgets, rows).ok).toBe(true);
   });
 
-  it('fails a marketing route over its ceiling while an unlisted route still fits', () => {
+  it('fails a marketing route over its baseline while another route still fits', () => {
     const nextDir = buildFirstLoadFixture();
     writeChunk(nextDir, 'home.js', 80 * 1024);
     const rows = measureFirstLoadJs(nextDir);
@@ -339,7 +380,7 @@ describe('first-load JS budgets', () => {
 
   it('enforces a downward-only ratchet and leaves every other route on its target', () => {
     const budgets = firstLoadBudgets();
-    budgets.firstLoad.baselines = { '/about': 90, '/': 40 };
+    Object.assign(budgets.firstLoad.baselines, { '/about': 90, '/': 40 });
     const rows = measureFirstLoadJs(buildFirstLoadFixture());
     const result = checkFirstLoadBudgets(
       rows.filter(row => row.route !== '/app/chat'),

@@ -10,19 +10,15 @@ vi.mock('@/components/atoms/InvisibleTurnstile', () => ({
 import { ChangelogSubscribeColumn } from './ChangelogSubscribeColumn';
 
 describe('ChangelogSubscribeColumn', () => {
-  it('composes the canonical signup and exposes the feed alternatives', () => {
+  it('composes the canonical signup, set flush left for the page header', () => {
     const { container } = render(<ChangelogSubscribeColumn />);
 
     expect(container.firstElementChild).toHaveClass('changelog-subscribe');
     expect(container.querySelector('form')).toBeInTheDocument();
-
-    const rss = screen.getByRole('link', { name: 'RSS Feed' });
-    expect(rss).toHaveAttribute('href', '/changelog/feed.xml');
-    expect(rss).toHaveClass('changelog-subscribe__alt');
-
-    const json = screen.getByRole('link', { name: 'JSON Feed' });
-    expect(json).toHaveAttribute('href', '/changelog/feed.json');
-    expect(json).toHaveClass('changelog-subscribe__alt');
+    expect(container.querySelector('section')).toHaveClass('items-start');
+    expect(
+      screen.getByRole('heading', { name: 'Get updates' })
+    ).toBeInTheDocument();
   });
 
   it('loads the security check only after the visitor touches the form', () => {

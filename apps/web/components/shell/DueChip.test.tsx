@@ -45,12 +45,12 @@ describe('DueChip', () => {
     expect(screen.queryByText(/y ago/i)).not.toBeInTheDocument();
   });
 
-  it('tints amber for soon-due (<= 2 days)', () => {
+  it('tints with the warning token for soon-due (<= 2 days)', () => {
     const { container } = render(
       <DueChip dueIso='2026-04-26T12:00:00Z' now={NOW} />
     );
     expect((container.firstElementChild as HTMLElement).className).toContain(
-      'amber-300'
+      'text-warning-text'
     );
   });
 
@@ -60,7 +60,7 @@ describe('DueChip', () => {
     );
     expect(
       (container.firstElementChild as HTMLElement).className
-    ).not.toContain('amber-300');
+    ).not.toContain('text-warning-text');
   });
 
   it('tints danger only for recently overdue tasks', () => {

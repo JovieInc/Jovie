@@ -23,7 +23,7 @@ describe('homepage v3 product UI', () => {
     expect(rows).toHaveLength(HOMEPAGE_CATALOG.length);
     const selected = container.querySelector('.hv3-rrow[data-selected="true"]');
     expect(selected).toHaveTextContent(HOMEPAGE_PRODUCT_UI.inspector.title);
-    expect(container).not.toHaveTextContent('Tim White');
+    expect(rows[0]).toHaveTextContent(HOMEPAGE_CATALOG[0]?.title ?? '');
     // Three registry glyphs per row, all in the surrounding ink: the
     // homepage never sets a service in its brand colour.
     const paths = rows[0]?.querySelectorAll('.hv3-dsp svg path') ?? [];
@@ -44,7 +44,9 @@ describe('homepage v3 product UI', () => {
       screen.getByText(HOMEPAGE_PRODUCT_UI.inspector.upc)
     ).toBeInTheDocument();
     expect(container.querySelector('[data-hv3-anchor="upc"]')).not.toBeNull();
-    expect(screen.getByText('Example artist')).toBeInTheDocument();
+    expect(
+      screen.getByText(HOMEPAGE_PRODUCT_UI.inspector.artist)
+    ).toBeInTheDocument();
     expect(container.querySelector('.hv3-insp__ok')).toBeNull();
     await expectNoA11yViolations(container);
   });

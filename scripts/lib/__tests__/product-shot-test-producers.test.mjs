@@ -18,6 +18,7 @@ import ts from 'typescript';
 import { buildAffectedTestPlan } from '../../run-affected-tests.mjs';
 import { ONBOARDING_TEST_PRODUCERS } from '../onboarding-test-producers.mjs';
 import { PRODUCT_SHOT_TEST_PRODUCERS } from '../product-shot-test-producers.mjs';
+import { MODULE_INIT_FILES } from '../trusted-test-planner-snapshot.mjs';
 
 const ROOT = join(import.meta.dirname, '../../..');
 
@@ -135,8 +136,12 @@ test('all rolling sparse bootstraps carry the real selector helper closure', asy
     }
   }
   collect('scripts/run-affected-tests.mjs');
-  // Existing sparse policy declares this module-initialization data input.
-  closure.add('scripts/invariants/latency-sensitive-execution-allowlist.json');
+  // Use the trusted snapshot's same module-initialization data closure.
+  for (const [module, files] of Object.entries(MODULE_INIT_FILES)) {
+    if (!closure.has(module)) continue;
+    required.push(...files);
+    for (const file of files) closure.add(file);
+  }
   for (let index = 0; index < sparse.length; index++) {
     await t.test(
       'bootstrap ' +
@@ -177,7 +182,7 @@ test('all rolling sparse bootstraps carry the real selector helper closure', asy
               0,
               'missing module must not load successfully'
             );
-            assert.match(negative.stderr, /ERR_MODULE_NOT_FOUND/);
+            assert.match(negative.stderr, /ERR_MODULE_NOT_FOUND|ENOENT/);
             assert.ok(!negative.stdout.includes('core-bootstrap-ok'));
           }
         } finally {

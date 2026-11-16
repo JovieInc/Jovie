@@ -37,11 +37,22 @@ interface StoredLive {
   readonly schemaVersion: number;
 }
 
+/** The table probe could not confirm the live table (already logged). */
+class ContentStoreUnavailableError extends Error {}
+
+/**
+ * Reads the live pointer or throws. The table probe returns false on
+ * connection failures too, so it must throw rather than return null:
+ * `unstable_cache` stores every returned value with no expiry, and a cached
+ * null would pin the repo default until the record is published again.
+ */
 async function readStoredLive(
   kind: string,
   key: string
 ): Promise<StoredLive | null> {
-  if (!(await doesTableExist(TABLE))) return null;
+  if (!(await doesTableExist(TABLE))) {
+    throw new ContentStoreUnavailableError(`${TABLE} table unavailable`);
+  }
   const [row] = await db
     .select({
       versionId: contentRecordLive.versionId,
@@ -101,10 +112,12 @@ export async function getLiveContent<T>(
       { tags: [contentRecordCacheTag(definition.kind, key)] }
     )();
   } catch (error) {
-    await captureWarning('Content record read failed', error, {
-      kind: definition.kind,
-      key,
-    });
+    if (!(error instanceof ContentStoreUnavailableError)) {
+      await captureWarning('Content record read failed', error, {
+        kind: definition.kind,
+        key,
+      });
+    }
     return defaultContent(definition, key, 'unavailable');
   }
   if (!stored) return defaultContent(definition, key);

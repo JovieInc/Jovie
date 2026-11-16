@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { APP_ROUTES } from '@/constants/routes';
 import type { ChatUsageData } from '@/lib/queries/useChatUsageQuery';
 import { expectNoA11yViolations } from '@/tests/utils/a11y';
+import { ACCOUNT_LOADING_FILL } from './account-loading-fill';
 import { UsageMenuItem } from './UsageMenuItem';
 
 // Focus-retention and cached-balance edge cases are covered in
@@ -60,6 +61,28 @@ describe('UsageMenuItem', () => {
     mockUseChatUsageQuery.mockReset();
   });
 
+  it('lays the row out as icon column, Title Case label, then a right-aligned value and chevron', () => {
+    mockQuery({ data: healthyPro });
+    render(<UsageMenuItem usageStatsUrl={APP_ROUTES.SETTINGS_USAGE} />);
+
+    const toggle = screen.getByRole('button', { name: /^Usage Remaining/ });
+    // Button wraps children in an inline content span; flattening it keeps
+    // the icon in the shared column and stops the value crowding the label.
+    expect(toggle).toHaveClass('[&>span]:contents', 'gap-2');
+    const icon = toggle.querySelector('svg') as SVGElement;
+    expect(icon).toHaveClass('h-4', 'w-4');
+    expect(icon.parentElement).toHaveClass('h-4', 'w-4', 'shrink-0');
+    expect(screen.getByText('Usage Remaining')).toHaveClass(
+      'flex-1',
+      'truncate'
+    );
+
+    const value = screen.getByTestId('usage-menu-value');
+    expect(value).toHaveTextContent('71%');
+    expect(value).toHaveClass('ms-auto', 'tabular-nums', 'text-tertiary-token');
+    expect(value.querySelector('svg')).toHaveClass('h-4', 'w-4');
+  });
+
   it('toggles the usage details disclosure', async () => {
     mockQuery({ data: healthyPro });
     const { container } = render(
@@ -69,6 +92,15 @@ describe('UsageMenuItem', () => {
     const toggle = screen.getByRole('button', { name: /usage remaining/i });
     expect(toggle).toHaveAttribute('aria-expanded', 'false');
     expect(toggle).toHaveTextContent('71%');
+    // The toggle is a normal 32px menu row on the shared gutter, with its
+    // gauge in the icon column.
+    expect(toggle).toHaveClass('h-8', 'px-(--space-2-5)');
+    expect(toggle).not.toHaveClass('rounded-none');
+    expect(toggle.querySelector('svg')?.parentElement).toHaveClass(
+      'w-4',
+      'shrink-0',
+      'justify-center'
+    );
     expect(screen.queryByRole('progressbar')).not.toBeInTheDocument();
     await expectNoA11yViolations(container);
 
@@ -99,6 +131,12 @@ describe('UsageMenuItem', () => {
     );
 
     expect(screen.queryByText('—')).not.toBeInTheDocument();
+    // The inline placeholder uses the fill that stays visible in light mode.
+    expect(
+      container.querySelector(
+        `.${ACCOUNT_LOADING_FILL.replace('/', '\\/')}.animate-pulse`
+      )
+    ).not.toBeNull();
     await expand();
     expect(screen.getByText('Loading usage…')).toBeInTheDocument();
     expect(

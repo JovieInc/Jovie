@@ -147,6 +147,34 @@ describe('classifyRecordFileThread', () => {
     expect(
       classifyRecordFileThread(thread('Wrong artist credit fixed')).hints
     ).toEqual(['credit_fixed']);
+    expect(
+      classifyRecordFileThread(
+        thread('Wrong artist credit on Remix, still not fixed')
+      ).hints
+    ).toEqual(['credit_dispute']);
+    expect(
+      classifyRecordFileThread(thread("Wrong credit hasn't been corrected"))
+        .hints
+    ).toEqual(['credit_dispute']);
+    expect(
+      classifyRecordFileThread(thread('Wrong artist credit, not yet fixed'))
+        .hints
+    ).toEqual(['credit_dispute']);
+    expect(
+      classifyRecordFileThread(
+        thread('Wrong credit hasn’t been properly corrected')
+      ).hints
+    ).toEqual(['credit_dispute']);
+    for (const subject of [
+      "Wrong artist credit won't be fixed",
+      'Wrong credit can’t be corrected',
+      'Wrong credit cannot be updated',
+      "Wrong artist credit didn't get resolved",
+    ]) {
+      expect(classifyRecordFileThread(thread(subject)).hints).toEqual([
+        'credit_dispute',
+      ]);
+    }
   });
 
   it('keeps the strongest rule when two rules give the same kind', () => {

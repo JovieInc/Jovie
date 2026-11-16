@@ -8,6 +8,7 @@ import {
   currentDebt,
   debtEntry,
   evaluateScreenGates,
+  formatScreenGate,
   isCustomerUi,
   owedCriteria,
   readBaseScreens,
@@ -176,6 +177,47 @@ describe('screen gate', () => {
     ]);
     const owed = registry({ 'apps/web/components/ClaimCard.tsx': ['tests'] });
     assert.equal(evaluateScreenGates(report, owed, byScreen).ok, true);
+    assert.match(
+      formatScreenGate(blocked),
+      /ClaimCard\.tsx \[tests\] on claim\/claim/
+    );
+    assert.equal(blocked.failures[0].missingStates, undefined);
+  });
+
+  it('names the missing states on a states failure', () => {
+    const component = 'apps/web/components/ClaimCard.tsx';
+    const certificates = byScreen.get('claim/claim').map(path => ({
+      component: path,
+      criteria: [
+        { id: 'tests', status: 'pass' },
+        { id: 'a11y', status: 'pass' },
+        {
+          id: 'states',
+          status: path === component ? 'fail' : 'pass',
+          states:
+            path === component
+              ? {
+                  error: { status: 'fail' },
+                  loading: { status: 'waived', reason: 'held in a test' },
+                }
+              : { error: { status: 'pass' } },
+        },
+      ],
+    }));
+    const screens = { ...registry(), criteria: ['tests', 'a11y', 'states'] };
+    const result = evaluateScreenGates({ certificates }, screens, byScreen);
+    assert.deepEqual(result.failures, [
+      {
+        component,
+        screens: ['claim/claim'],
+        criteria: ['states'],
+        missingStates: ['error'],
+      },
+    ]);
+    assert.match(
+      formatScreenGate(result),
+      /ClaimCard\.tsx \[states missing error\] on claim\/claim/
+    );
   });
 
   it('treats a component with no certificate as failing every criterion', () => {
