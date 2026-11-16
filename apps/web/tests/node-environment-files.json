@@ -186,6 +186,7 @@
   "lib/merch/mockup-enrichment.test.ts",
   "lib/merch/mockup-urls.test.ts",
   "lib/merch/mockups.test.ts",
+  "lib/merch/orders-fulfillment.test.ts",
   "lib/merch/orders.test.ts",
   "lib/merch/pricing.test.ts",
   "lib/merch/safety.test.ts",
