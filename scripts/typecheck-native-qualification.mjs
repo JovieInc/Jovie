@@ -1,6 +1,5 @@
 #!/usr/bin/env node
 
-import { execFileSync } from 'node:child_process';
 import {
   cpSync,
   existsSync,
@@ -9,7 +8,7 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { availableParallelism, cpus, totalmem } from 'node:os';
-import { dirname, isAbsolute, resolve, sep } from 'node:path';
+import { isAbsolute, resolve, sep } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import {
   assertCompleted,
@@ -56,17 +55,10 @@ export async function runQualification({
     process.env.GITHUB_SHA,
   emitMetrics = writeStageMetrics,
   resolveTypeRoots = effectiveTypeRoots,
-  programs = Object.keys(PROGRAMS),
 }) {
   check(
     process.platform === 'linux' && process.arch === 'x64',
     'Qualification supports Linux x64 only'
-  );
-  check(
-    programs.length &&
-      new Set(programs).size === programs.length &&
-      programs.every(program => Object.hasOwn(PROGRAMS, program)),
-    'Unsupported program scope'
   );
   const report = /** @type {{ header: { glibcVersionRuntime?: string } }} */ (
     process.report.getReport()
@@ -97,6 +89,8 @@ export async function runQualification({
   const initialTools = json(pins);
   const start = monotonic();
   const deadline = start + BOUNDS.suiteMs;
+  const equivalent = (a, b, label, diagnostics = true) =>
+    assertEquivalent(a, b, label, { deadline, diagnostics });
   const receipt = {
     schema: 'jovie-native-typecheck-qualification/v1',
     sourceSha,
@@ -104,9 +98,8 @@ export async function runQualification({
     status: 'running',
     adoptionEligible: false,
     requiredGate: 'not-run-by-this-tool',
-    scope: programs,
+    scope: Object.keys(PROGRAMS),
     candidate: 'tsrs',
-    reference: 'typescript@7.1.0-beta',
     bounds: BOUNDS,
     pins,
     sourceInventorySha256: sha(json(initial)),
@@ -120,10 +113,6 @@ export async function runQualification({
       totalMemoryBytes: totalmem(),
       node: process.version,
       cpuAffinity: allocation,
-      tasksetVersion: execFileSync('/usr/bin/taskset', ['--version'], {
-        encoding: 'utf8',
-        timeout: 5_000,
-      }).trim(),
       cgroupMemoryMax: existsSync('/sys/fs/cgroup/memory.max')
         ? readFileSync('/sys/fs/cgroup/memory.max', 'utf8').trim()
         : null,
@@ -132,16 +121,6 @@ export async function runQualification({
       'Compiler buildinfo absent for cold; OS page cache retained; caches isolated by program/compiler.',
     memoryMetric:
       '/usr/bin/time peak RSS, not aggregate process-tree memory or a hard memory cap',
-    ci: {
-      runId: process.env.GITHUB_RUN_ID ?? null,
-      attempt: process.env.GITHUB_RUN_ATTEMPT ?? null,
-      jobStartedAt: existsSync(resolve(dirname(output), 'job-started-at.txt'))
-        ? readFileSync(
-            resolve(dirname(output), 'job-started-at.txt'),
-            'utf8'
-          ).trim()
-        : null,
-    },
   };
   mkdirSync(output, { recursive: true });
   save(resolve(output, 'source-inventory.json'), initial);
@@ -219,7 +198,6 @@ export async function runQualification({
       timedOut: result.timedOut,
       completed: false,
       peakRssKb: result.peakRssKb,
-      cpuPercent: result.cpuPercent,
       cacheBefore: before,
       cacheAfter: existsSync(cache) ? sha(readFileSync(cache)) : null,
       primeHash,
@@ -240,11 +218,15 @@ export async function runQualification({
       sha256: sha(readFileSync(resolve(root, path))),
     }));
     cpSync(cache, resolve(output, `${stem}.tsbuildinfo`));
+    entry.graph.metadata.rawBuildInfoPath = resolve(
+      output,
+      `${stem}.tsbuildinfo`
+    );
     save(resolve(output, `${stem}.json`), entry);
     return entry;
   };
   try {
-    for (const program of programs) {
+    for (const program of Object.keys(PROGRAMS)) {
       const configPath = resolve(root, PROGRAMS[program]);
       const originalCache = resolve(
         output,
@@ -278,7 +260,7 @@ export async function runQualification({
         caches.set(alias, cache);
         const cold = await timed(alias, program, 'cold', config, cache);
         check(cold.cacheBefore === null, 'Cold cache was present');
-        assertEquivalent(cold, original, `${program}/${alias}/original intent`);
+        equivalent(cold, original, `${program}/${alias}/original intent`);
         clean.set(alias, cold);
         cpSync(cache, `${cache}.pristine`);
         const warm = await timed(
@@ -289,7 +271,7 @@ export async function runQualification({
           cache,
           cold.cacheAfter
         );
-        assertEquivalent(warm, cold, `${program}/${alias}/warm`);
+        equivalent(warm, cold, `${program}/${alias}/warm`);
       }
       const seed = seedPlan(root, program);
       const expectations = Object.values(seed).flatMap(item => item.expected);
@@ -314,18 +296,16 @@ export async function runQualification({
             )
         );
         assertSeeds(result, expectations);
-        check(
-          same(result.graph, clean.get(alias).graph),
-          'Seeded program graph changed'
+        equivalent(
+          result,
+          clean.get(alias),
+          'Seeded program graph changed',
+          false
         );
         seeded.push(result);
       }
       for (const result of seeded)
-        assertEquivalent(
-          result,
-          seeded[0],
-          `${program}/${result.alias}/seeded`
-        );
+        equivalent(result, seeded[0], `${program}/${result.alias}/seeded`);
       for (const [scenario, path] of program === 'web'
         ? [
             ['leaf-edit', LEAF],
@@ -349,7 +329,7 @@ export async function runQualification({
                 cache,
                 clean.get(alias).cacheAfter
               );
-              assertEquivalent(
+              equivalent(
                 edited,
                 clean.get(alias),
                 `${program}/${alias}/${scenario}`
@@ -363,7 +343,7 @@ export async function runQualification({
             configs.get(alias),
             cache
           );
-          assertEquivalent(
+          equivalent(
             reverted,
             clean.get(alias),
             `${program}/${alias}/${scenario}/revert`
@@ -374,6 +354,10 @@ export async function runQualification({
     check(
       [...originals.values()].every(entry => entry.exitCode === 0),
       'TS6 baseline is failing; diagnostic parity cannot qualify a green checker'
+    );
+    check(
+      monotonic() < deadline,
+      'Qualification deadline reached during context proof'
     );
     receipt.status = 'qualified-for-advisory-observation';
   } catch (error) {
@@ -407,34 +391,13 @@ export async function runQualification({
       receipt.error =
         'Source, generated program input or tool restoration failed';
     }
-    receipt.statistics = receipt.runs.map(
-      ({
-        alias,
-        program,
-        scenario,
-        durationMs,
-        completed,
-        exitCode,
-        timedOut,
-      }) => ({
-        alias,
-        program,
-        scenario,
-        completed,
-        eligibleForTiming:
-          receipt.status === 'qualified-for-advisory-observation' &&
-          completed &&
-          exitCode === 0,
-        exitCode,
-        timedOut,
-        n: completed ? 1 : 0,
-        p50Ms: completed ? durationMs : null,
-        p95Ms: completed ? durationMs : null,
-      })
-    );
+    receipt.sampleCountPerScenario = 1;
+    for (const run of receipt.runs)
+      run.eligibleForTiming =
+        receipt.status === 'qualified-for-advisory-observation' &&
+        run.completed &&
+        run.exitCode === 0;
     receipt.requiredGateCriticalPathSavingsMs = null;
-    receipt.requiredGateTiming =
-      'Existing source and combined-head required CI receipts must be measured separately.';
     save(resolve(output, 'receipt.json'), receipt);
     const events = ['qualification', 'finished'].map(stage => ({
       schema: 'jovie-stage-event/v1',
@@ -453,7 +416,7 @@ export async function runQualification({
     } catch (error) {
       receipt.status = 'blocked';
       receipt.error = error.message;
-      for (const row of receipt.statistics) row.eligibleForTiming = false;
+      for (const row of receipt.runs) row.eligibleForTiming = false;
       for (const event of events) event.outcome = 'failed';
       save(resolve(output, 'receipt.json'), receipt);
     }
@@ -469,18 +432,12 @@ async function main() {
   const args = parseArgs(process.argv.slice(2));
   if (!args) {
     process.stdout.write(
-      'Usage: node scripts/typecheck-native-qualification.mjs --run --tools ABSOLUTE_DIRECTORY --output FRESH_ABSOLUTE_DIRECTORY [--program web|ui]\nManual advisory qualification only; required TS6 gates remain authoritative.\n'
+      'Usage: node scripts/typecheck-native-qualification.mjs --run --tools ABSOLUTE_DIRECTORY --output FRESH_ABSOLUTE_DIRECTORY\nManual advisory qualification only; required TS6 gates remain authoritative.\n'
     );
     return;
   }
   const result = await runQualification(args);
   process.stdout.write(`${result.status}: ${args.output}/receipt.json\n`);
-  if (process.env.GITHUB_STEP_SUMMARY)
-    writeFileSync(
-      process.env.GITHUB_STEP_SUMMARY,
-      `Native checker qualification: **${result.status}**\n\nSource: \`${result.sourceSha}\`; candidate: tsrs ${PINS.tsrs.version}; reference: Microsoft ${PINS.upstream.version}. ${result.runs.length} invocations, ${(result.durationMs / 1000).toFixed(1)}s. Required TS6 gates unchanged; required-gate speedup is not measured by this job.\n`,
-      { flag: 'a' }
-    );
   process.exitCode = result.status === 'blocked' ? 2 : 0;
 }
 

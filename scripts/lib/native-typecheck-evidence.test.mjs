@@ -19,6 +19,7 @@ import {
   effectiveTypeRoots,
   parseArgs,
   parseDiagnostics,
+  readGraph,
   writeStageMetrics,
 } from './native-typecheck-evidence.mjs';
 
@@ -46,7 +47,7 @@ test('requires explicit execution and rejects arbitrary command or configuration
   );
   assert.throws(() => parseArgs(['--command', 'evil']), /Unexpected/);
   assert.throws(() => parseArgs(['--run', '--run']), /Unexpected/);
-  assert.throws(() => parseArgs(['--program', 'scripts']), /Unsupported/);
+  assert.throws(() => parseArgs(['--program', 'scripts']), /Unexpected/);
   assert.deepEqual(parseArgs(['--run', '--tools', tools, '--output', output]), {
     tools,
     output,
@@ -128,9 +129,21 @@ test('rejects a fast timeout, crash, global config failure, unknown exit and fal
 });
 
 test('retains real baseline diagnostics and rejects missing or extra differences', () => {
+  const directory = temporary();
+  const cache = resolve(directory, 'captured.json');
+  writeFileSync(resolve(directory, 'a.ts'), 'export {};');
+  writeFileSync(
+    cache,
+    JSON.stringify({
+      version: '6.0.3',
+      fileNames: ['a.ts'],
+      fileInfos: ['fixture'],
+      root: [1],
+    })
+  );
   const expected = {
     diagnostics: [{ path: 'a.ts', code: 'TS2322', message: 'real issue' }],
-    graph: { repositoryFiles: ['a.ts'] },
+    graph: readGraph(cache, directory, resolve(directory, 'tools')),
   };
   assert.doesNotThrow(() =>
     assertEquivalent(structuredClone(expected), expected, 'same')

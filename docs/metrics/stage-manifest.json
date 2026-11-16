@@ -861,18 +861,15 @@
     },
     "native-typecheck-qualification": {
       "entityId": "source SHA:run id:attempt (local output directory digest)",
-      "description": "Manual web/UI compiler qualification; no required-gate substitution.",
       "stages": [
         {
           "id": "qualification",
-          "meaning": "bounded compiler qualification after admission",
           "producer": "scripts/typecheck-native-qualification.mjs",
           "status": "pushed",
           "source": "native-typecheck-qualification-receipts"
         },
         {
           "id": "finished",
-          "meaning": "terminal advisory qualification outcome",
           "producer": "scripts/typecheck-native-qualification.mjs",
           "status": "pushed",
           "source": "native-typecheck-qualification-receipts"

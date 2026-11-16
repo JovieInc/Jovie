@@ -31,6 +31,12 @@ afterEach(() => {
     rmSync(path, { recursive: true, force: true });
 });
 const save = (path, value) => {
+  if (value && typeof value === 'object' && value.fileNames && !value.version)
+    value = {
+      version: '6.0.3',
+      fileInfos: value.fileNames.map(() => 'fixture-version'),
+      ...value,
+    };
   mkdirSync(dirname(path), { recursive: true });
   writeFileSync(
     path,
@@ -264,7 +270,7 @@ test('completes all matched cold/warm/seed/edit/revert scenarios with honest rec
       .split('\n').length,
     2
   );
-  assert.ok(result.statistics.every(item => item.n === 1));
+  assert.ok(result.sampleCountPerScenario === 1);
 });
 
 test('blocks a candidate which misses one seed and preserves raw failure logs', async () => {
@@ -401,7 +407,7 @@ test('blocks telemetry failure without leaving timing eligibility enabled', asyn
   });
   assert.equal(result.status, 'blocked');
   assert.match(result.error, /telemetry/);
-  assert.ok(result.statistics.every(row => row.eligibleForTiming === false));
+  assert.ok(result.runs.every(row => row.eligibleForTiming === false));
 });
 
 test('checks isolated package identities and rejects lifecycle scripts or changed lock bytes', () => {

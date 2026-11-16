@@ -1,5 +1,12 @@
+import { check, sha } from './native-typecheck-buildinfo.mjs';
+
+export { check, sha } from './native-typecheck-buildinfo.mjs';
+
+import { assertGraphParity } from './native-typecheck-graph.mjs';
+
+export { readGraph } from './native-typecheck-graph.mjs';
+
 import { execFileSync } from 'node:child_process';
-import { createHash } from 'node:crypto';
 import {
   existsSync,
   mkdirSync,
@@ -82,18 +89,13 @@ const SEEDS = Object.freeze({
   ],
 });
 
-export const sha = bytes => createHash('sha256').update(bytes).digest('hex');
 export const json = value => `${JSON.stringify(value, null, 2)}\n`;
 export const same = (left, right) =>
   JSON.stringify(left) === JSON.stringify(right);
-export const check = (condition, message) => {
-  if (!condition) throw new Error(message);
-};
 export const save = (path, value) => {
   mkdirSync(dirname(path), { recursive: true });
   writeFileSync(path, json(value));
 };
-const sorted = values => [...new Set(values)].sort();
 const normalizedPath = (path, root) =>
   relative(root, resolve(root, path.replaceAll('\\', '/')))
     .split(sep)
@@ -101,35 +103,16 @@ const normalizedPath = (path, root) =>
 
 export function parseArgs(args) {
   if (!args.length || same(args, ['--help'])) return null;
-  const result = {};
-  for (let i = 0; i < args.length; i++) {
-    const key = args[i];
-    check(
-      ['--run', '--tools', '--output', '--program'].includes(key) &&
-        !(key in result),
-      `Unexpected argument: ${key}`
-    );
-    if (key === '--run') result[key] = true;
-    else {
-      check(
-        args[i + 1] && !args[i + 1].startsWith('--'),
-        `Missing value: ${key}`
-      );
-      const value = args[++i];
-      if (key === '--program')
-        check(['web', 'ui'].includes(value), 'Unsupported program');
-      result[key] = key === '--program' ? value : resolve(value);
-    }
-  }
   check(
-    result['--run'] && result['--tools'] && result['--output'],
-    'Explicit --run, --tools and --output are required'
+    args.length === 5 &&
+      args[0] === '--run' &&
+      args[1] === '--tools' &&
+      args[3] === '--output' &&
+      !args[2].startsWith('--') &&
+      !args[4].startsWith('--'),
+    'Unexpected or Missing arguments; required: --run --tools PATH --output PATH'
   );
-  return {
-    tools: result['--tools'],
-    output: result['--output'],
-    ...(result['--program'] ? { programs: [result['--program']] } : {}),
-  };
+  return { tools: resolve(args[2]), output: resolve(args[4]) };
 }
 
 export function cpuAllocation(status) {
@@ -193,63 +176,6 @@ export function parseDiagnostics(output, root) {
   return diagnostics.sort((a, b) =>
     JSON.stringify(a).localeCompare(JSON.stringify(b))
   );
-}
-
-export function readGraph(cache, root, tools, libraries = null) {
-  const raw = JSON.parse(readFileSync(cache, 'utf8'));
-  const graph = raw.program ?? raw;
-  check(
-    Array.isArray(graph.fileNames) && Array.isArray(graph.root),
-    'Missing compiler file/root graph'
-  );
-  const files = graph.fileNames.map(file => {
-    if (!/^lib(?:\.[a-z0-9]+)*\.d\.ts$/iu.test(file))
-      return resolve(dirname(cache), file);
-    check(
-      libraries && resolve(libraries).startsWith(`${resolve(tools)}${sep}`),
-      'Bare standard library lacks a pinned compiler location'
-    );
-    const path = resolve(libraries, file);
-    check(existsSync(path), `Pinned standard library missing: ${file}`);
-    return path;
-  });
-  const ids = graph.root.flatMap(item => {
-    if (!Array.isArray(item)) return [item];
-    check(
-      item.length === 2 &&
-        item[1] >= item[0] &&
-        item[1] - item[0] <= files.length,
-      'Invalid root range'
-    );
-    return Array.from({ length: item[1] - item[0] + 1 }, (_, i) => item[0] + i);
-  });
-  check(
-    ids.length &&
-      ids.every(id => Number.isInteger(id) && id > 0 && id <= files.length),
-    'Empty or invalid root graph'
-  );
-  const inside = (file, directory) => file.startsWith(`${directory}${sep}`);
-  const repositoryFiles = sorted(
-    files
-      .filter(
-        file => inside(file, root) && !file.includes(`${sep}node_modules${sep}`)
-      )
-      .map(file => normalizedPath(file, root))
-  );
-  const rootFiles = sorted(ids.map(id => normalizedPath(files[id - 1], root)));
-  const dependencyFiles = sorted(
-    files.filter(
-      file =>
-        !inside(file, tools) &&
-        (!inside(file, root) || file.includes(`${sep}node_modules${sep}`))
-    )
-  );
-  check(
-    repositoryFiles.length &&
-      rootFiles.every(file => repositoryFiles.includes(file)),
-    'Empty or external root program'
-  );
-  return { repositoryFiles, rootFiles, dependencyFiles };
 }
 
 export function git(root, args) {
@@ -329,30 +255,29 @@ export function inspectTools(root, tools) {
   return { lockSha256: sha(lock), packages: result };
 }
 
+function configurationOptions(compiler, config) {
+  const parsed = compiler.getParsedCommandLineOfConfigFile(
+    config,
+    {},
+    {
+      ...compiler.sys,
+      onUnRecoverableConfigFileDiagnostic: () => {
+        throw new Error('Invalid compiler configuration');
+      },
+    }
+  );
+  check(parsed && !parsed.errors.length, 'Invalid compiler configuration');
+  return parsed.options;
+}
+
 export function effectiveTypeRoots(config, tools, compiler = null) {
   const ts6 =
     compiler ??
     createRequire(import.meta.url)(
       resolve(tools, 'node_modules/ts6/lib/typescript.js')
     );
-  const parsed = ts6.getParsedCommandLineOfConfigFile(
-    config,
-    {},
-    {
-      ...ts6.sys,
-      onUnRecoverableConfigFileDiagnostic: diagnostic => {
-        throw new Error(
-          ts6.flattenDiagnosticMessageText(diagnostic.messageText, '\n')
-        );
-      },
-    }
-  );
-  check(
-    parsed && !parsed.errors.length,
-    'Original configuration cannot establish effective type roots'
-  );
   return ts6
-    .getEffectiveTypeRoots(parsed.options, ts6.sys)
+    .getEffectiveTypeRoots(configurationOptions(ts6, config), ts6.sys)
     .map(path => resolve(path));
 }
 
@@ -400,15 +325,30 @@ export async function withMutation(root, changes, run) {
   }
 }
 
-export function assertEquivalent(result, expected, label) {
-  check(
-    same(result.diagnostics, expected.diagnostics),
-    `${label}: diagnostic parity failed`
-  );
-  check(
-    same(result.graph, expected.graph),
-    `${label}: program graph parity failed`
-  );
+export function assertEquivalent(
+  result,
+  expected,
+  label,
+  { deadline = Infinity, diagnostics = true } = {}
+) {
+  if (diagnostics)
+    check(
+      same(result.diagnostics, expected.diagnostics),
+      `${label}: diagnostic parity failed`
+    );
+  result.contextProof = assertGraphParity(result.graph, expected.graph, {
+    deadline,
+    configuration: () => {
+      const compiler = createRequire(import.meta.url)(
+        resolve(
+          result.graph.metadata.toolsDirectory,
+          'node_modules/ts6/lib/typescript.js'
+        )
+      );
+      const config = result.argv[result.argv.indexOf('--project') + 1];
+      return { compiler, options: configurationOptions(compiler, config) };
+    },
+  });
 }
 
 export function assertSeeds(result, expected) {

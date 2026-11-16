@@ -898,6 +898,7 @@ export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
   'scripts/lib/__tests__/typecheck-slot.test.mjs',
   'scripts/typecheck-native-qualification.test.mjs',
   'scripts/lib/native-typecheck-evidence.test.mjs',
+  'scripts/lib/native-typecheck-graph.test.mjs',
   'scripts/preflight.test.mjs',
   'scripts/preflight-step-control.test.mjs',
   'scripts/installation-budget-sentinel.test.mjs',
