@@ -1,4 +1,3 @@
-import type { CSSProperties } from 'react';
 import { ArtistProfilePhoneFrame } from '@/components/marketing/artist-profile/ArtistProfilePhoneFrame';
 import { MarketingPhoneImage } from '@/components/marketing/MarketingPhoneImage';
 import { MarketingSnapRail } from '@/components/marketing/MarketingSnapRail';
@@ -43,11 +42,6 @@ export function MarketingPhoneStateGallery({
     <div
       className={cn('marketing-phone-gallery-shell', className)}
       data-count={states.length}
-      style={
-        {
-          '--marketing-phone-gallery-columns': Math.max(states.length, 1),
-        } as CSSProperties
-      }
     >
       <MarketingSnapRail
         ariaLabel={label}
