@@ -50,15 +50,14 @@ describe('Mutation Diff Gem contract', () => {
     expect(workflow).toMatch(/--touch-file/u);
   });
 
-  it('confines its one secret to the issue-filing step and never runs on pull requests', () => {
-    const secrets = workflow.match(/\$\{\{\s*secrets\.[A-Z_]+/gu) ?? [];
-    expect(secrets).toHaveLength(1);
-    expect(secrets[0]).toMatch(/LINEAR_API_KEY/u);
+  it('prepares bounded survivor drafts without a secret or PR trigger', () => {
+    expect(workflow).not.toMatch(/\$\{\{\s*secrets\./u);
     const step = workflow
-      .split('- name: File survivor issues')[1]
+      .split('- name: Prepare survivor issue drafts')[1]
       .split(/\n {6}- name:/u)[0];
-    expect(step).toMatch(/secrets\.LINEAR_API_KEY/u);
     expect(step).toMatch(/mutation-sweep-file-issues\.mjs/u);
+    expect(step).toContain('--drafts');
+    expect(step).toContain('--state');
     expect(step).not.toMatch(/mutation-sweep\.mjs|stryker|vitest/iu);
     expect(workflow).not.toMatch(/pull_request/u);
   });

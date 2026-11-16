@@ -83,7 +83,13 @@ describe('linkDesignLabDispatchToLinearIssue', () => {
     };
     expect(commentBody.variables.issueId).toBe('issue-uuid');
     expect(commentBody.variables.body).toContain(
-      'Design HTML builder dispatched'
+      'Design HTML dispatch attempt recorded'
+    );
+    expect(commentBody.variables.body).toContain(
+      'Request acceptance and worker execution are unconfirmed.'
+    );
+    expect(commentBody.variables.body).toContain(
+      'This record does not establish execution or completion.'
     );
     expect(commentBody.variables.body).toContain('profile-page');
     expect(commentBody.variables.body).toContain(

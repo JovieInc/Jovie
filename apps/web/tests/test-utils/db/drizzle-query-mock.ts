@@ -24,6 +24,33 @@ import { vi } from 'vitest';
 
 export type MockFn = ReturnType<typeof vi.fn>;
 
+/** A resolved, thenable query chain for read/write route contract fixtures. */
+export function createResolvedQueryChain(rows: Array<Record<string, unknown>>) {
+  const promise = Promise.resolve(rows);
+  const chain = () => createResolvedQueryChain(rows);
+
+  return {
+    from: chain,
+    innerJoin: chain,
+    leftJoin: chain,
+    where: chain,
+    orderBy: chain,
+    limit: chain,
+    groupBy: chain,
+    offset: async () => rows,
+    values: chain,
+    returning: chain,
+    set: chain,
+    delete: chain,
+    insert: chain,
+    update: chain,
+    onConflictDoNothing: async () => {},
+    then: promise.then.bind(promise),
+    catch: promise.catch.bind(promise),
+    finally: promise.finally.bind(promise),
+  };
+}
+
 /**
  * Creates a chainable select mock that follows Drizzle's pattern:
  * db.select().from().where().limit()
