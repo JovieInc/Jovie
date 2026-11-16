@@ -74,6 +74,7 @@
     "mutation-diff.yml": {"runsPerMergedPr":1.3,"triggers":["push","workflow_dispatch","workflow_run:CI"]},
     "neon-scheduled-cleanup.yml": {"runsPerMergedPr":0,"triggers":["workflow_dispatch"]},
     "next-build-cache-warm.yml": {"runsPerMergedPr":0.9,"triggers":["push","workflow_dispatch"]},
+    "typecheck-native-qualification.yml": {"runsPerMergedPr":0,"triggers":["workflow_dispatch"]},
     "nightly-testing-agent.yml": {"runsPerMergedPr":0.5,"triggers":["push","workflow_dispatch"]},
     "nightly-tests.yml": {"runsPerMergedPr":0.1,"triggers":["repository_dispatch:clock_nightly_tests","workflow_dispatch"]},
     "node-runtime-compatibility.yml": {"runsPerMergedPr":0,"triggers":["schedule","workflow_dispatch"]},

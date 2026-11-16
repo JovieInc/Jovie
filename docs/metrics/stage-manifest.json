@@ -61,6 +61,23 @@
         }
       ]
     },
+    "native-typecheck-qualification": {
+      "entityId": "source SHA:run id:attempt (local output directory digest)",
+      "stages": [
+        {
+          "id": "qualification",
+          "producer": "scripts/typecheck-native-qualification.mjs",
+          "status": "pushed",
+          "source": "native-typecheck-qualification-receipts"
+        },
+        {
+          "id": "finished",
+          "producer": "scripts/typecheck-native-qualification.mjs",
+          "status": "pushed",
+          "source": "native-typecheck-qualification-receipts"
+        }
+      ]
+    },
     "chat-comparison": {
       "entityId": "source SHA (build) or source SHA:attempt (smoke)",
       "stages": [
@@ -871,6 +888,13 @@
       "url": null,
       "owner": "design-system; ~/.local/state/jovie-pen-review/ledger.jsonl and local stage-timings-latest.json"
     },
+    "native-typecheck-qualification-receipts": {
+      "kind": "events",
+      "url": null,
+      "artifact": "native-typecheck-qualification/results/stage-events.ndjson",
+      "workflow": "typecheck-native-qualification.yml",
+      "owner": "JOV-8258"
+    },
     "preflight-stages.jsonl": {
       "kind": "events",
       "url": null,
@@ -983,6 +1007,10 @@
         "shipping:deployed"
       ],
       "canary-health-gate.yml": ["release:canary"],
+      "typecheck-native-qualification.yml": [
+        "native-typecheck-qualification:qualification",
+        "native-typecheck-qualification:finished"
+      ],
       "shipping-slo.yml": ["metrics:stage-timings"]
     },
     "exempt": {
