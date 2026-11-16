@@ -27,6 +27,7 @@ import {
   renderRadioGroup,
   renderSeparator,
 } from './common-dropdown-item-renderers';
+import { useSubmenuLayout } from './common-dropdown-submenu-layout';
 import type {
   CommonDropdownItem,
   CommonDropdownSubmenu,
@@ -41,11 +42,7 @@ import {
   isSeparator,
   isSubmenu,
 } from './common-dropdown-types';
-import {
-  filterItems,
-  getContentStyle,
-  menuNeedsSearch,
-} from './common-dropdown-utils';
+import { filterItems, menuNeedsSearch } from './common-dropdown-utils';
 
 export type MenuPrimitiveKind = 'dropdown' | 'context';
 
@@ -326,9 +323,6 @@ function CommonDropdownSubmenuRenderer({
   const submenuGroup = React.useContext(SubmenuGroupContext);
   const [localOpen, setLocalOpen] = React.useState(false);
   const [query, setQuery] = React.useState('');
-  const [measuredMinWidth, setMeasuredMinWidth] = React.useState<
-    string | undefined
-  >(undefined);
   const contentRef = React.useRef<HTMLDivElement>(null);
   const inputRef = React.useRef<HTMLInputElement>(null);
   const triggerRef = React.useRef<HTMLDivElement>(null);
@@ -355,6 +349,14 @@ function CommonDropdownSubmenuRenderer({
   const open = submenuGroup
     ? submenuGroup.activeSubmenuId === item.id
     : localOpen;
+  const layout = useSubmenuLayout({
+    open,
+    triggerRef,
+    contentRef,
+    minWidth: item.minWidth,
+    maxHeight: item.maxHeight,
+    kind: context.kind,
+  });
   const filteredItems = React.useMemo(
     () => filterItems(item.items, query, 'recursive', item.filterItem),
     [item.filterItem, item.items, query]
@@ -388,29 +390,15 @@ function CommonDropdownSubmenuRenderer({
     }
   }, [clearQuery, open, query]);
 
-  const measureTriggerWidth = React.useCallback(() => {
-    if (item.minWidth !== undefined || !triggerRef.current) {
-      return;
-    }
-
-    const nextWidth = Math.round(
-      triggerRef.current.getBoundingClientRect().width
-    );
-    setMeasuredMinWidth(nextWidth > 0 ? `${nextWidth}px` : undefined);
-  }, [item.minWidth]);
-
   const content = (
     <SubContent
-      ref={contentRef}
+      ref={layout.setContentRef}
+      {...layout.placement}
       data-menu-surface='toolbar'
       data-slot='common-dropdown-subcontent'
       aria-busy={item.isLoading || undefined}
       className={cn(subMenuContentClasses, transformOrigin)}
-      style={getContentStyle(
-        item.minWidth ?? measuredMinWidth,
-        item.maxHeight,
-        context.kind
-      )}
+      style={layout.style}
       onFocusOutside={event => {
         if (contentRef.current?.contains(event.target as Node)) {
           event.preventDefault();
@@ -453,7 +441,7 @@ function CommonDropdownSubmenuRenderer({
       open={open}
       onOpenChange={nextOpen => {
         if (nextOpen) {
-          measureTriggerWidth();
+          layout.measureTriggerWidth();
         }
         if (submenuGroup) {
           submenuGroup.setActiveSubmenuId(currentId => {

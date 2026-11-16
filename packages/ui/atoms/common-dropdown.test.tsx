@@ -1441,7 +1441,11 @@ describe('CommonDropdown', () => {
         const submenu = screen
           .getByRole('menuitem', { name: 'Copy Link' })
           .closest('[role="menu"]');
-        expect(submenu).toHaveStyle({ minWidth: '237px' });
+        expect(submenu).toHaveStyle({
+          minWidth:
+            'min(237px, var(--radix-dropdown-menu-content-available-width))',
+          maxWidth: 'var(--radix-dropdown-menu-content-available-width)',
+        });
       });
 
       expect(triggerRectSpy).toHaveBeenCalled();
@@ -1478,7 +1482,11 @@ describe('CommonDropdown', () => {
         const submenu = screen
           .getByRole('menuitem', { name: 'Copy Link' })
           .closest('[role="menu"]');
-        expect(submenu).toHaveStyle({ minWidth: '320px' });
+        expect(submenu).toHaveStyle({
+          minWidth:
+            'min(320px, var(--radix-dropdown-menu-content-available-width))',
+          maxWidth: 'var(--radix-dropdown-menu-content-available-width)',
+        });
       });
     });
 
