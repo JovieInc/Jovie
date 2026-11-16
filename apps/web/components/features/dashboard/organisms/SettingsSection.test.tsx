@@ -40,8 +40,9 @@ it.each([false, true])(
     expect(screen.queryByTestId('dashboard-header')).not.toBeInTheDocument();
     expect(container.querySelector('.border-b')).toBeNull();
     expect(container.querySelectorAll('p')).toHaveLength(1);
-    // The Mac app keeps an empty, draggable title bar strip above the title
-    // so the title clears the window controls; web has no such strip.
+    // The Mac app renders the title INSIDE the draggable title-bar strip so
+    // it shares the traffic-light band (native-band contract); web has no
+    // such strip.
     const titlebar = screen.queryByTestId('settings-titlebar');
     if (desktop) {
       expect(titlebar).toHaveAttribute(
@@ -49,7 +50,7 @@ it.each([false, true])(
         'shell-header'
       );
       expect(titlebar).toHaveAttribute('data-electron-drag-region', 'true');
-      expect(titlebar?.textContent).toBe('');
+      expect(titlebar).toContainElement(headings[0] as HTMLElement);
     } else {
       expect(titlebar).not.toBeInTheDocument();
     }
