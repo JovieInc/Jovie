@@ -11,6 +11,7 @@ export const RECONCILED = 'reconciled' as const;
 export type StripeReconciliationReason =
   | 'unknown_price_id'
   | 'merch_order_not_found'
+  | 'merch_checkout_mismatch'
   | 'tip_unattributed'
   | 'invoice_unattributed';
 

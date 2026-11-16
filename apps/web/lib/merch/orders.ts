@@ -31,6 +31,7 @@ import {
 } from '@/lib/stripe/connect-readiness';
 import { StripeReconciliationRequiredError } from '@/lib/stripe/webhooks/reconciliation';
 import { logger } from '@/lib/utils/logger';
+import { assertMerchCheckoutPaymentProof } from './checkout-payment-proof';
 import {
   isPriorMerchSaleStatus,
   notifyFirstMerchSaleBestEffort,
@@ -60,12 +61,6 @@ const PRE_SUBMIT_ORDER_STATUSES: ReadonlySet<MerchOrder['status']> = new Set([
   'paid_fulfillment_hold',
   'paid_fulfillment_failed',
 ]);
-
-// Async payment methods (e.g. ACH) reach checkout.session.completed while the
-// session is still unpaid. Only settled sessions may be fulfilled (JOV-12769).
-const FULFILLABLE_PAYMENT_STATUSES: ReadonlySet<
-  Stripe.Checkout.Session['payment_status']
-> = new Set(['paid', 'no_payment_required']);
 
 function merchBaseUrl(): string {
   return publicEnv.NEXT_PUBLIC_PROFILE_URL || 'https://jov.ie';
@@ -300,7 +295,7 @@ export async function handleMerchCheckoutCompleted(
     return;
   }
 
-  if (!FULFILLABLE_PAYMENT_STATUSES.has(session.payment_status)) {
+  if (session.payment_status === 'unpaid') {
     // Wait for checkout.session.async_payment_succeeded; fulfilling an unpaid
     // session would ship goods for money not captured (JOV-12769).
     logger.warn(
@@ -313,6 +308,8 @@ export async function handleMerchCheckoutCompleted(
     );
     return;
   }
+
+  assertMerchCheckoutPaymentProof(session, existing.order, existing.card);
 
   if (
     existing.order.status !== 'checkout_created' &&
@@ -447,6 +444,12 @@ export async function handleMerchCheckoutPaymentFailed(
 
   const existing = await getOrderWithCard(orderId);
   if (!existing || existing.order.status !== 'checkout_created') return;
+  assertMerchCheckoutPaymentProof(
+    session,
+    existing.order,
+    existing.card,
+    'unpaid'
+  );
 
   await db
     .update(merchOrders)
@@ -456,7 +459,13 @@ export async function handleMerchCheckoutPaymentFailed(
       error: `Async payment failed for checkout session ${session.id}`,
       updatedAt: new Date(),
     })
-    .where(eq(merchOrders.id, orderId));
+    .where(
+      and(
+        eq(merchOrders.id, orderId),
+        eq(merchOrders.stripeCheckoutSessionId, session.id),
+        eq(merchOrders.status, 'checkout_created')
+      )
+    );
   logger.warn('[merch] Async payment failed for merch checkout', {
     orderId,
     sessionId: session.id,
@@ -572,16 +581,6 @@ export async function fulfillMerchOrder(orderId: string): Promise<void> {
     'printful_draft_created',
   ]);
   if (!retryableStatuses.has(row.order.status)) {
-    if (row.order.status === 'checkout_created') {
-      await db
-        .update(merchOrders)
-        .set({
-          status: 'paid_fulfillment_hold',
-          error: `Order status ${row.order.status} is not fulfillment-ready`,
-          updatedAt: new Date(),
-        })
-        .where(eq(merchOrders.id, orderId));
-    }
     throw new Error(`Merch order ${orderId} is not fulfillment-ready`);
   }
 
