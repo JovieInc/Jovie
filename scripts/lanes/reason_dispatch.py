@@ -66,5 +66,3 @@ def checked_tick(host, lane, linear_factory, *, check, now_iso) -> dict:
     receipt["observedAt"] = now_iso()
     atomic_write_text(path, json.dumps(receipt))
     return receipt
-
-

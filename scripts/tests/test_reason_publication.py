@@ -380,5 +380,3 @@ class PublicationDrainTest(unittest.TestCase):
         self.assertEqual(result["status"], "publication-blocked")
         self.assertEqual(result["blocked"][0]["owner"], "reason-lane")
         self.assertTrue(result["blocked"][0]["nextAction"])
-
-

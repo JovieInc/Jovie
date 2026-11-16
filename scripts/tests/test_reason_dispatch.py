@@ -241,5 +241,3 @@ class SchedulingTest(unittest.TestCase):
             self.assertEqual(reason.guarded_main(["tick"]), 0)
             self.assertEqual(checked.call_args.args[:2], (host.return_value, lane_runner))
             self.assertEqual(json.loads(output.getvalue()), {"status": "idle"})
-
-

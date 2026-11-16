@@ -305,4 +305,3 @@ def publish_result(linear, issue: dict, job: dict, config: dict, state: Path, ou
     saved["payloadDigest"] = _digest({key: saved[key] for key in PUBLICATION_FIELDS})
     _save_publication(path, saved)  # Produced bytes survive before any result publication.
     return _publish_saved(linear, issue, saved, path, run, is_expired)
-
