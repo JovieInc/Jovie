@@ -858,6 +858,26 @@
         }
       ],
       "endToEnd": [["launch", "finished"]]
+    },
+    "native-typecheck-qualification": {
+      "entityId": "source SHA:run id:attempt (local output directory digest)",
+      "description": "Manual web/UI compiler qualification; no required-gate substitution.",
+      "stages": [
+        {
+          "id": "qualification",
+          "meaning": "bounded compiler qualification after admission",
+          "producer": "scripts/typecheck-native-qualification.mjs",
+          "status": "pushed",
+          "source": "native-typecheck-qualification-receipts"
+        },
+        {
+          "id": "finished",
+          "meaning": "terminal advisory qualification outcome",
+          "producer": "scripts/typecheck-native-qualification.mjs",
+          "status": "pushed",
+          "source": "native-typecheck-qualification-receipts"
+        }
+      ]
     }
   },
   "sources": {
@@ -961,6 +981,13 @@
       "artifact": "desktop-startup-receipts/stage-events.ndjson",
       "workflow": "ci.yml",
       "owner": "desktop startup (JOV-12388)"
+    },
+    "native-typecheck-qualification-receipts": {
+      "kind": "events",
+      "url": null,
+      "artifact": "native-typecheck-qualification/results/stage-events.ndjson",
+      "workflow": "typecheck-native-qualification.yml",
+      "owner": "JOV-8258"
     }
   },
   "producers": {
@@ -983,7 +1010,11 @@
         "shipping:deployed"
       ],
       "canary-health-gate.yml": ["release:canary"],
-      "shipping-slo.yml": ["metrics:stage-timings"]
+      "shipping-slo.yml": ["metrics:stage-timings"],
+      "typecheck-native-qualification.yml": [
+        "native-typecheck-qualification:qualification",
+        "native-typecheck-qualification:finished"
+      ]
     },
     "exempt": {
       "ci-shard-contract-canary.yml": "contract self-test, not a delivery stage",
