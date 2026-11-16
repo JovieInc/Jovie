@@ -132,10 +132,15 @@ function safetyHarness() {
 // (JOV-12804), never by re-planning through the live policy. The mock delegates to
 // the actual policy by default so existing behavior is unchanged; tests below swap
 // the implementation to simulate policy and owner revisions.
-let actualPlan: typeof import('./learning-policy').planAcquisitionLearningEvent;
+type PlanFn = typeof import('./learning-policy').planAcquisitionLearningEvent;
+// vi.hoisted so the mock factory (which runs during import evaluation) can capture
+// the actual implementation without touching not-yet-initialized module state.
+const policyMock = vi.hoisted(() => ({
+  actualPlan: undefined as PlanFn | undefined,
+}));
 vi.mock('./learning-policy', async importOriginal => {
   const actual = await importOriginal<typeof import('./learning-policy')>();
-  actualPlan = actual.planAcquisitionLearningEvent;
+  policyMock.actualPlan = actual.planAcquisitionLearningEvent;
   return {
     ...actual,
     planAcquisitionLearningEvent: vi.fn(actual.planAcquisitionLearningEvent),
@@ -274,10 +279,10 @@ describe('private acquisition feedback safety boundaries', () => {
 
 describe('policy evolution replay (JOV-12804)', () => {
   afterEach(async () => {
-    if (actualPlan) {
+    if (policyMock.actualPlan) {
       const policy = await import('./learning-policy');
       vi.mocked(policy.planAcquisitionLearningEvent).mockImplementation(
-        actualPlan
+        policyMock.actualPlan
       );
     }
   });
@@ -314,14 +319,17 @@ describe('policy evolution replay (JOV-12804)', () => {
     expect(receipt.plan).toMatchObject({ action: 'route', issue: 'JOV-5598' });
     const policy = await import('./learning-policy');
     vi.mocked(policy.planAcquisitionLearningEvent).mockImplementation(input => {
-      const plan = actualPlan!(input);
+      const plan = policyMock.actualPlan!(input);
       return plan.action === 'route'
         ? { ...plan, issue: 'JOV-0000', route: 'reassigned_owner' }
         : plan;
     });
     const reloaded = new AcquisitionCertificationStore(h.backend, h.ports);
     const projection = await reloaded.project(SUBJECT);
-    expect(projection.learningFeedback[0].plan.issue).toBe('JOV-5598');
+    expect(projection.learningFeedback[0].plan).toMatchObject({
+      action: 'route',
+      issue: 'JOV-5598',
+    });
     expect(projection.learningFeedback[0].planDigest).toBe(receipt.planDigest);
     // A tampered route under the changed policy is still rejected.
     const [key, raw] = [...h.backend.records.entries()][0];
