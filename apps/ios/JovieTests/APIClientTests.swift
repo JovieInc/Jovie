@@ -581,6 +581,198 @@ struct APIClientTests {
     }
   }
 
+  /// JOV-12807 race: a delayed 401 for a replaced login (A) must not clear
+  /// the session that replaced it (B) — including the same-user re-login ABA.
+  @Test(arguments: ["user-b", "user-a"])
+  func lateUnauthorizedFromAReplacedLoginCannotClearTheReplacement(
+    replacementUserID: String
+  ) async throws {
+    try await withNativeSessionTokenStoreTestIsolation {
+      let expiry = Date(timeIntervalSince1970: Date().timeIntervalSince1970.rounded() + 3_600)
+      NativeSessionTokenStore.save(token: "request-a", userID: "user-a", expiresAt: expiry)
+      var requestCount = 0
+      MockURLProtocol.requestHandler = { request in
+        requestCount += 1
+        #expect(request.value(forHTTPHeaderField: "Authorization") == "Bearer request-a")
+        // Session B replaces A only after A's bearer has been dispatched;
+        // A's 401 then arrives late, against the newer login.
+        NativeSessionTokenStore.save(token: "login-b", userID: replacementUserID, expiresAt: expiry)
+        return (
+          HTTPURLResponse(url: request.url!, statusCode: 401, httpVersion: nil, headerFields: nil)!,
+          Data()
+        )
+      }
+      defer { MockURLProtocol.requestHandler = nil }
+
+      let client = APIClient(
+        baseURL: URL(string: "https://jov.ie")!,
+        session: makeSession(),
+        tokenProvider: NativeSessionTokenProvider()
+      )
+
+      await #expect(throws: APIClientError.requestFailed(statusCode: 401)) {
+        _ = try await client.fetchMe()
+      }
+      #expect(requestCount == 1)
+      #expect(
+        NativeSessionTokenStore.load()
+          == NativeStoredSession(userID: replacementUserID, token: "login-b", expiresAt: expiry)
+      )
+    }
+  }
+
+  /// Same race through an unmanaged provider: the stale 401 is discarded
+  /// without a retry or terminal clear, so session B survives untouched.
+  @Test func unmanagedLateUnauthorizedFromAReplacedLoginCannotClearTheReplacement() async throws {
+    try await withNativeSessionTokenStoreTestIsolation {
+      let expiry = Date(timeIntervalSince1970: Date().timeIntervalSince1970.rounded() + 3_600)
+      NativeSessionTokenStore.save(token: "request-a", userID: "user-a", expiresAt: expiry)
+      let tokenProvider = MockTokenProvider(tokens: ["request-a"])
+      var requestCount = 0
+      MockURLProtocol.requestHandler = { request in
+        requestCount += 1
+        #expect(request.value(forHTTPHeaderField: "Authorization") == "Bearer request-a")
+        NativeSessionTokenStore.save(token: "login-b", userID: "user-b", expiresAt: expiry)
+        return (
+          HTTPURLResponse(url: request.url!, statusCode: 401, httpVersion: nil, headerFields: nil)!,
+          Data()
+        )
+      }
+      defer { MockURLProtocol.requestHandler = nil }
+
+      let client = APIClient(
+        baseURL: URL(string: "https://jov.ie")!,
+        session: makeSession(),
+        tokenProvider: tokenProvider
+      )
+
+      await #expect(throws: APIClientError.requestFailed(statusCode: 401)) {
+        _ = try await client.fetchMe()
+      }
+      #expect(requestCount == 1)
+      #expect(await tokenProvider.recordedForceRefreshValues() == [false])
+      #expect(
+        NativeSessionTokenStore.load()
+          == NativeStoredSession(userID: "user-b", token: "login-b", expiresAt: expiry)
+      )
+    }
+  }
+
+  /// A 401 for a token minted from a login replaced while the retried request
+  /// is in flight is discarded at the terminal leg instead of clearing B.
+  @Test func unauthorizedRetryRacingAReplacedLoginCannotClearTheReplacement() async throws {
+    try await withNativeSessionTokenStoreTestIsolation {
+      let expiry = Date(timeIntervalSince1970: Date().timeIntervalSince1970.rounded() + 3_600)
+      NativeSessionTokenStore.save(token: "request-a", userID: "user-a", expiresAt: expiry)
+      let tokenProvider = MockTokenProvider(tokens: ["request-a", "retry-token"])
+      var requestCount = 0
+      MockURLProtocol.requestHandler = { request in
+        requestCount += 1
+        if requestCount == 1 {
+          #expect(request.value(forHTTPHeaderField: "Authorization") == "Bearer request-a")
+          return (
+            HTTPURLResponse(url: request.url!, statusCode: 401, httpVersion: nil, headerFields: nil)!,
+            Data()
+          )
+        }
+        #expect(request.value(forHTTPHeaderField: "Authorization") == "Bearer retry-token")
+        NativeSessionTokenStore.save(token: "login-b", userID: "user-b", expiresAt: expiry)
+        return (
+          HTTPURLResponse(url: request.url!, statusCode: 401, httpVersion: nil, headerFields: nil)!,
+          Data()
+        )
+      }
+      defer { MockURLProtocol.requestHandler = nil }
+
+      let client = APIClient(
+        baseURL: URL(string: "https://jov.ie")!,
+        session: makeSession(),
+        tokenProvider: tokenProvider
+      )
+
+      await #expect(throws: APIClientError.requestFailed(statusCode: 401)) {
+        _ = try await client.fetchMe()
+      }
+      #expect(requestCount == 2)
+      #expect(
+        NativeSessionTokenStore.load()
+          == NativeStoredSession(userID: "user-b", token: "login-b", expiresAt: expiry)
+      )
+    }
+  }
+
+  /// Fence must not over-block: a 401 against the still-current session
+  /// terminates exactly as before.
+  @Test func unauthorizedOnTheCurrentSessionStillTerminates() async throws {
+    try await withNativeSessionTokenStoreTestIsolation {
+      let expiry = Date(timeIntervalSince1970: Date().timeIntervalSince1970.rounded() + 3_600)
+      NativeSessionTokenStore.save(token: "current-a", userID: "user-a", expiresAt: expiry)
+      var requestCount = 0
+      MockURLProtocol.requestHandler = { request in
+        requestCount += 1
+        #expect(request.value(forHTTPHeaderField: "Authorization") == "Bearer current-a")
+        return (
+          HTTPURLResponse(url: request.url!, statusCode: 401, httpVersion: nil, headerFields: nil)!,
+          Data()
+        )
+      }
+      defer { MockURLProtocol.requestHandler = nil }
+
+      let client = APIClient(
+        baseURL: URL(string: "https://jov.ie")!,
+        session: makeSession(),
+        tokenProvider: NativeSessionTokenProvider()
+      )
+
+      await #expect(throws: APIClientError.missingToken) {
+        _ = try await client.fetchMe()
+      }
+      #expect(requestCount == 1)
+      #expect(NativeSessionTokenStore.load() == nil)
+    }
+  }
+
+  /// Fence must not over-block: a 401 against the still-current session with
+  /// a provider that can mint a different token still refreshes and retries.
+  @Test func unauthorizedOnTheCurrentSessionStillRefreshesAndRetries() async throws {
+    try await withNativeSessionTokenStoreTestIsolation {
+      let expiry = Date(timeIntervalSince1970: Date().timeIntervalSince1970.rounded() + 3_600)
+      NativeSessionTokenStore.save(token: "request-a", userID: "user-a", expiresAt: expiry)
+      let storedBeforeRequest = try #require(NativeSessionTokenStore.load())
+      let tokenProvider = MockTokenProvider(tokens: ["request-a", "retry-token"])
+      var requestCount = 0
+      MockURLProtocol.requestHandler = { request in
+        requestCount += 1
+        let unauthorized = requestCount == 1
+        #expect(
+          request.value(forHTTPHeaderField: "Authorization")
+            == (unauthorized ? "Bearer request-a" : "Bearer retry-token")
+        )
+        let data = unauthorized ? Data() : try JSONEncoder().encode(MobileMeResponse.previewReady)
+        return (
+          HTTPURLResponse(
+            url: request.url!, statusCode: unauthorized ? 401 : 200, httpVersion: nil,
+            headerFields: nil
+          )!,
+          data
+        )
+      }
+      defer { MockURLProtocol.requestHandler = nil }
+
+      let client = APIClient(
+        baseURL: URL(string: "https://jov.ie")!,
+        session: makeSession(),
+        tokenProvider: tokenProvider
+      )
+
+      let response = try await client.fetchMe()
+      #expect(response.state == .ready)
+      #expect(requestCount == 2)
+      #expect(await tokenProvider.recordedForceRefreshValues() == [false, true])
+      #expect(NativeSessionTokenStore.load() == storedBeforeRequest)
+    }
+  }
+
   @Test func completesProfileWithBearerAuthenticatedJSON() async throws {
     let tokenProvider = MockTokenProvider(tokens: ["token-1"])
     MockURLProtocol.requestHandler = { request in

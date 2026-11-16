@@ -701,6 +701,21 @@ enum NativeSessionTokenStore {
     }
   }
 
+  /// Clears only when the store still belongs to `ownership`'s login. A
+  /// delayed 401 from a replaced login must not clear the session that
+  /// replaced it; check and clear share one lock acquisition.
+  @discardableResult
+  static func clearIfCurrent(_ ownership: NativeSessionOwnership) -> Bool {
+    withLock {
+      guard state.generation == ownership.generation else { return false }
+      state.intent = UUID()
+      state.pendingAuth = nil
+      state.delivery = nil
+      clearLocked()
+      return true
+    }
+  }
+
   private static func clearLocked() {
     state.generation = UUID()
     state.bearerRevision = UUID()
