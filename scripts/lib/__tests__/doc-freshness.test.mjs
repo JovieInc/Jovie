@@ -16,6 +16,7 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { execFileSync, spawnSync } from '../child-process.mjs';
+import { registerTriageSourceDocsTest } from './helpers/triage-source-docs.mjs';
 
 // Lets a test make one directory vanish mid-walk, the way parallel CI
 // commands delete apps/web/coverage while doc:freshness:check runs.
@@ -71,18 +72,16 @@ afterEach(() => {
 });
 
 describe('doc-freshness registry', () => {
-  it('loads the checked-in registry', () => {
+  it('loads and validates the current repository docs', () => {
     const registry = loadDocFreshnessRegistry();
     expect(registry.schemaVersion).toBe(1);
     expect(registry.agentsMap.maxLines).toBe(120);
-  });
-
-  it('passes on the current repository docs', () => {
-    const registry = loadDocFreshnessRegistry();
     const result = runDocFreshnessLint(registry);
     expect(result.ok).toBe(true);
     expect(result.violations).toEqual([]);
   });
+
+  registerTriageSourceDocsTest();
 
   it('detects broken cross-links with remediation text', () => {
     const repoRoot = makeRepo({
