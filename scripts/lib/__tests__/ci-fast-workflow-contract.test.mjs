@@ -2601,6 +2601,10 @@ describe('ci-fast bounded parallel workflow', () => {
     expect(script).toMatch(
       /^readonly SHELLCHECK_IMAGE='koalaman\/shellcheck@sha256:[0-9a-f]{64}'$/m
     );
+    expect(script).toContain(
+      'sha_ok "$VENDORED_QUEUE_PATCH" "$ACTIONLINT_QUEUE_PATCH_SHA256"'
+    );
+    expect(script).toContain('vendored queue patch sha256 mismatch');
     expect(script).toContain('--fail');
     expect(script).toContain('-shellcheck="$tool_dir/shellcheck"');
     expect(script).toContain('-pyflakes="$tool_dir/pyflakes"');
