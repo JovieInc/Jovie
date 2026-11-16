@@ -1,9 +1,27 @@
 import { NextResponse } from 'next/server';
+import { type AccessPolicy, defineRoute } from '@/lib/api/route-pipeline';
 import { verifyCronRequest } from '@/lib/cron/auth';
 import { recordShippedFixDeploys } from '@/lib/recovery/probes.server';
 
 export const runtime = 'nodejs';
-export const dynamic = 'force-dynamic';
+
+/**
+ * Same caller family as the cron routes: cron bearer + Jovie-owned host
+ * origin (requireTrustedOrigin). instrumentation.ts cannot hold the cron
+ * bearer itself, so it only fires the request; this policy proves it.
+ */
+const cronAccess: AccessPolicy<null> = {
+  name: 'cron-bearer',
+  async authorize(request) {
+    const authError = verifyCronRequest(request, {
+      route: '/api/internal/ovie/fix-deploy-stamp',
+      requireTrustedOrigin: true,
+    });
+    return authError
+      ? { ok: false, status: authError.status, body: { error: 'unauthorized' } }
+      : { ok: true, auth: null };
+  },
+};
 
 /**
  * Boot-triggered release event for recovery emails (JOV-12766).
@@ -22,15 +40,17 @@ export const dynamic = 'force-dynamic';
  * past Vercel's 250 MB uncompressed-function-size limit. The graph lives only
  * in this route's own function.
  */
-export async function POST(request: Request): Promise<NextResponse> {
-  const authError = verifyCronRequest(request, {
+export const POST = defineRoute(
+  {
     route: '/api/internal/ovie/fix-deploy-stamp',
-    requireTrustedOrigin: true,
-  });
-  if (authError) return authError;
-  await recordShippedFixDeploys();
-  return NextResponse.json(
-    { contract: 'fix-deploy-stamp/v1', stamped: true },
-    { status: 200, headers: { 'Cache-Control': 'no-store' } }
-  );
-}
+    access: cronAccess,
+    errorMessage: 'Failed to stamp shipped-fix deploy times',
+  },
+  async () => {
+    await recordShippedFixDeploys();
+    return NextResponse.json({
+      contract: 'fix-deploy-stamp/v1',
+      stamped: true,
+    });
+  }
+);

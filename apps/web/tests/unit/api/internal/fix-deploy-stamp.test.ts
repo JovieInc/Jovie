@@ -29,12 +29,10 @@ describe('POST /api/internal/ovie/fix-deploy-stamp (JOV-12766)', () => {
     mockRecordShippedFixDeploys.mockImplementation(() => Promise.resolve());
   });
 
-  it('passes the cron-auth rejection through and stamps nothing', async () => {
-    const rejection = NextResponse.json(
-      { error: 'Unauthorized' },
-      { status: 401, headers: { 'Cache-Control': 'no-store' } }
+  it('rejects a call without the cron bearer and stamps nothing', async () => {
+    mockVerifyCronRequest.mockReturnValueOnce(
+      NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     );
-    mockVerifyCronRequest.mockReturnValueOnce(rejection);
 
     const { POST } = await import(
       '@/app/api/internal/ovie/fix-deploy-stamp/route'
@@ -46,6 +44,8 @@ describe('POST /api/internal/ovie/fix-deploy-stamp (JOV-12766)', () => {
     );
 
     expect(response.status).toBe(401);
+    expect(response.headers.get('cache-control')).toBe('no-store');
+    await expect(response.json()).resolves.toEqual({ error: 'unauthorized' });
     expect(mockVerifyCronRequest).toHaveBeenCalledTimes(1);
     expect(mockRecordShippedFixDeploys).not.toHaveBeenCalled();
   });
