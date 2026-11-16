@@ -432,7 +432,7 @@ def prepare_red(a, plan: dict, pr: dict) -> int:
     plan["logDiag"] = LOG_DIAG[:4]
     regen = next((cmd for name, pat, cmd in REGEN if pat.search(joined)), None)
     action = plan["action"]
-    skip = None
+    skip = classes.owner_handoff_reason(cls) if action == cls["action"] else None
     if regen and action == classes.AGENT:
         plan.update(action="regen", regen=regen, cls="regen")
         action = "regen"
