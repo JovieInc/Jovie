@@ -10,9 +10,10 @@ type QueryRows = Array<Record<string, unknown>>;
 
 // Hoist mocks to avoid module resets
 const mockRequireAuth = vi.fn();
+const mockGetSessionContext = vi.fn();
 const mockWithDbSession = vi.fn();
 const mockWithDbSessionTx = vi.fn();
-const mockGetUserDashboardAnalytics = vi.fn();
+const mockGetDashboardAnalyticsForProfile = vi.fn();
 
 const mockCacheQuery = vi.fn();
 const mockInvalidateCache = vi.fn();
@@ -80,6 +81,7 @@ function createSelectQueue(responses: QueryRows[]) {
 
 vi.mock('@/lib/auth/session', () => ({
   requireAuth: (...args: any[]) => mockRequireAuth(...args),
+  getSessionContext: (...args: any[]) => mockGetSessionContext(...args),
   withDbSession: (...args: any[]) => mockWithDbSession(...args),
   withDbSessionTx: (...args: any[]) => mockWithDbSessionTx(...args),
 }));
@@ -101,8 +103,8 @@ vi.mock('@/lib/db', () => ({
 }));
 
 vi.mock('@/lib/db/queries/analytics', () => ({
-  getUserDashboardAnalytics: (...args: any[]) =>
-    mockGetUserDashboardAnalytics(...args),
+  getDashboardAnalyticsForProfile: (...args: any[]) =>
+    mockGetDashboardAnalyticsForProfile(...args),
 }));
 
 vi.mock('@/lib/db/queries/shared', () => ({
@@ -210,6 +212,10 @@ function mockSession({
   } else {
     mockRequireAuth.mockResolvedValue(TEST_USER_ID);
   }
+  mockGetSessionContext.mockResolvedValue({
+    user: { id: TEST_USER_ID },
+    profile: { id: PROFILE_ID, userId: TEST_USER_ID },
+  });
   mockWithDbSession.mockImplementation(
     async (callback: (userId: string) => Promise<unknown>) => {
       if (unauthorized) throw new Error('Unauthorized');
@@ -314,7 +320,7 @@ describe('Dashboard API contracts', () => {
   describe('Analytics', () => {
     it('returns analytics payload with normalized arrays', async () => {
       mockSession();
-      mockGetUserDashboardAnalytics.mockResolvedValue({
+      mockGetDashboardAnalyticsForProfile.mockResolvedValue({
         profile_views: 42,
         unique_users: 21,
         top_cities: [{ city: 'Austin', count: 3 }],
