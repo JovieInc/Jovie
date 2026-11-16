@@ -19,6 +19,28 @@ const runs = deriveSteps(read(WORKFLOW_PATH))
 const commands = workflowCommands(runs, pkg.scripts, coveredBy);
 
 describe('Source Validation manifest parity', () => {
+  it('runs overlapping local and CI guards once, preserving the worktree-aware command', () => {
+    const guards = selectManifestGuards(
+      ['apps/web/app/[username]/tip/thank-you/page.tsx'],
+      'release/test'
+    );
+    expect(new Set(guards.map(g => g.id)).size).toBe(guards.length);
+    expect(guards.find(g => g.id === 'web-eslint')?.command).toBe(
+      'LINT_CHANGED_WORKTREE=1 ESLINT_CHANGED_BASE=origin/release/test pnpm --filter @jovie/web run lint:eslint:changed'
+    );
+    expect(guards.map(g => g.id)).toEqual(
+      expect.arrayContaining([
+        'projected-tree-budget',
+        'design-authority',
+        'web-eslint',
+        'stack-pattern-ratchet',
+        'dead-ends',
+        'design-noise',
+        'route-js-budget',
+      ])
+    );
+  });
+
   it('every command Source Validation runs is a manifest guard or has a NOT_LOCAL reason', () => {
     const missing = commands.filter(c => !coveredBy(c));
     expect(
@@ -75,7 +97,7 @@ describe('Source Validation manifest parity', () => {
         entry => entry.id === 'web-eslint'
       );
       expect(guard?.command).toBe(
-        'ESLINT_CHANGED_BASE="origin/staging" pnpm --filter @jovie/web run lint:eslint:changed'
+        'LINT_CHANGED_WORKTREE=1 ESLINT_CHANGED_BASE=origin/staging pnpm --filter @jovie/web run lint:eslint:changed'
       );
       expect(guard?.heavy).not.toBe(true);
     }

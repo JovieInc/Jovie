@@ -60,6 +60,36 @@ export const LOCAL_GUARDS = Object.freeze([
       ),
   },
   {
+    id: 'web-eslint',
+    name: 'changed web ESLint and UI-feel rules',
+    command:
+      'LINT_CHANGED_WORKTREE=1 ESLINT_CHANGED_BASE=origin/{base} pnpm --filter @jovie/web run lint:eslint:changed',
+    when: p =>
+      /^apps\/web\/.+\.(?:ts|tsx)$/.test(p) ||
+      /^apps\/web\/(?:eslint\.config\.js|eslint-rules\/|scripts\/lint-(?:eslint-changed|ui-feel)\.mjs)/.test(
+        p
+      ),
+  },
+  {
+    id: 'stack-pattern-ratchet',
+    name: 'legacy Next cache configuration ratchet',
+    command: 'node scripts/invariants/stack-pattern-ratchet.mjs',
+    when: p =>
+      (/^apps\/web\/(?:app|lib)\/.+\.[cm]?[jt]sx?$/.test(p) &&
+        !WEB_TEST_OR_STORY.test(p)) ||
+      p === 'apps/web/next.config.js' ||
+      p === 'scripts/invariants/stack-pattern-ratchet.mjs' ||
+      p === 'scripts/capability-benchmark/capability-reconciliation.mjs',
+  },
+  {
+    id: 'dead-ends',
+    name: 'rendered dead-end copy, controls and links',
+    command: 'pnpm design:no-dead-ends:check',
+    when: p =>
+      /^(?:apps\/web|apps\/desktop\/src|packages\/ui)\/.+\.[jt]sx?$/.test(p) ||
+      /^packages\/copy\/(?:dead-ends|rules)/.test(p),
+  },
+  {
     id: 'design-noise',
     name: 'design-noise lint (apps/web/design-noise.baseline.json)',
     command: 'node apps/web/scripts/lint-design-noise.mjs',
