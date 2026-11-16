@@ -21,7 +21,8 @@ export const BUILD_INFO_ATTEMPT_DELAYS_MS = [500, 1_500];
 /**
  * Fetch the public build-info receipt with bounded retries.
  * @param {string} [url]
- * @param {typeof fetch} [fetchImpl]
+ * @param {(url: string) => Promise<{ ok: boolean, status?: number, json: () => Promise<unknown> }>} [fetchImpl]
+ *   structural: the global fetch satisfies it and test fakes need no casts
  * @param {number[]} [delaysMs] sleep before retry attempt N (attempts 2..N+1)
  */
 export async function readBuildInfo(
