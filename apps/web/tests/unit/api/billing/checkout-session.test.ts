@@ -62,7 +62,6 @@ vi.mock('@/lib/stripe/config', () => ({
   getPriceMappingDetails: () =>
     mocks.mappedPlan ? { plan: mocks.mappedPlan } : null,
 }));
-vi.mock('@/lib/error-tracking', () => ({ captureError: vi.fn() }));
 vi.mock('@/lib/db', () => ({
   db: {
     select: () => ({
