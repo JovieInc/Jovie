@@ -1,6 +1,7 @@
 ---
 frame: profile-analytics-card
 route: /app/chat?panel=profile
+context: profile, drawer, analytics
 ---
 Design the analytics card in the artist's profile drawer, desktop 1440 wide with the drawer about 360 wide on the right, and mobile 390 wide with the drawer as a full-height sheet, dark mode first.
 

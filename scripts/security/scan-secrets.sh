@@ -9,6 +9,8 @@ set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$REPO_ROOT"
+# shellcheck source=scripts/security/scan-secrets-sonar-pin.sh
+. "$REPO_ROOT/scripts/security/scan-secrets-sonar-pin.sh"
 
 MODE="${1:-pre-commit}"
 BASE_REF="${2:-origin/main}"
@@ -154,7 +156,7 @@ is_trufflehog_excluded() {
   return 1
 }
 
-# Filter only the known GitHubOauth2 false positive inside an action SHA.
+# Filter known false positives inside an action SHA.
 # Git findings must use the attributed commit's source, never the current file.
 # Keep the Commit lines consumed by the existing exact-range classifiers.
 filter_trufflehog_findings() {
@@ -195,6 +197,7 @@ filter_trufflehog_findings() {
         fi
       fi
     fi
+    skip_recorded_sonar_pin "$source" "$file" "$raw" "$commit" "$finding" && continue
     kept=$((kept + 1))
     printf 'Found result: %q:%q (detector %q)\n' "$file" "$line" "$(jq -r '.DetectorName' <<<"$finding")"
     [[ -z "$commit" ]] || printf 'Commit: %s\n' "$commit"

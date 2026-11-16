@@ -16,11 +16,16 @@ const dequeuePullRequest = vi.fn(async () => ({ ok: true }));
 vi.mock('../../merge-queue-backend.mjs', () => ({ dequeuePullRequest }));
 
 const { stuckHead } = await import('../../main-red-eject.mjs');
-const { decideFailingHead, failingHeadComment, failingRequiredChecks } =
-  await import('../main-red-eject.mjs');
+const {
+  decideFailingHead,
+  failingHeadComment,
+  failingRequiredChecks,
+  marker,
+  supersededIncidents,
+} = await import('../main-red-eject.mjs');
 
 const run = (id, name, conclusion) => ({ id, name, conclusion });
-const queue = (state, sha = 'abc123') => ({
+const queue = (state, sha = 'abc123', dwellMin = 10) => ({
   data: {
     repository: {
       mergeQueue: {
@@ -29,7 +34,9 @@ const queue = (state, sha = 'abc123') => ({
             {
               position: 1,
               state,
-              enqueuedAt: new Date(Date.now() - 10 * 60_000).toISOString(),
+              enqueuedAt: new Date(
+                Date.now() - dwellMin * 60_000
+              ).toISOString(),
               headCommit: sha ? { oid: sha } : null,
               pullRequest: { number: 23966, labels: { nodes: [] } },
             },
@@ -155,6 +162,47 @@ describe('stuckHead failing-head pass', () => {
     wire({ checks: [], sha: null });
     await stuckHead({ doApply: true });
     expect(calls.some(c => c.includes('check-runs'))).toBe(false);
+  });
+});
+
+describe('stale queue-head-stuck alerts', () => {
+  const alert = (number, key) => ({
+    number,
+    body: `${marker({ key })}\nstuck`,
+  });
+  it('picks only other heads in the same alert family', () => {
+    const found = [
+      alert(1, 'queue-head-stuck:100'),
+      alert(2, 'queue-head-stuck:23966'),
+      alert(3, 'eject:abc'),
+      { number: 4, body: 'no marker' },
+    ];
+    expect(supersededIncidents(found, 'queue-head-stuck:23966')).toEqual([
+      found[0],
+    ]);
+    expect(supersededIncidents(found, 'eject:abc')).toEqual([]);
+  });
+
+  it('closes older heads alerts when a new head alerts, and keeps its own', async () => {
+    routes = {
+      'api graphql': queue('AWAITING_CHECKS', 'abc123', 60),
+      'check-runs': { check_runs: [] },
+      'labels=main-health-incident': [
+        alert(24100, 'queue-head-stuck:24099'),
+        alert(24200, 'queue-head-stuck:23966'),
+        alert(24300, 'eject:abc'),
+      ],
+      '-X PATCH': {},
+      '-X POST': {},
+    };
+    await stuckHead({ doApply: true });
+    const closes = calls.filter(c => c.includes('-X PATCH'));
+    expect(closes).toHaveLength(1);
+    expect(closes[0]).toContain('issues/24100');
+    expect(closes[0]).toContain('state=closed');
+    // The current head's own alert gets a comment, not a duplicate issue.
+    expect(calls.some(c => c.includes('issues/24200/comments'))).toBe(true);
+    expect(calls.some(c => c.includes('title=queue head'))).toBe(false);
   });
 });
 

@@ -5,9 +5,12 @@ import { useEffect } from 'react';
 /**
  * The homepage v3 client layer. It renders nothing.
  *
+ * 0. Between 1024 and 1439 every stage keeps its 1248px design frame and is
+ *    zoomed to fit the content box exactly (CSS carries stepped floors).
  * 1. Callouts and the catalog connector follow anchors inside the 3D rigs, so
  *    they are placed from projected geometry after layout, on resize and once
- *    fonts load. They move by transform and fade in, never by layout.
+ *    fonts load. They move by transform and fade in, never by layout, and a
+ *    callout's label stays inside its section's frame guides.
  * 2. Motion (skipped under prefers-reduced-motion): the hero inspector's
  *    scroll parallax, the Orbit light sweep (CSS, enabled by a class), and ⌘K
  *    typing "releases" then selecting the Releases row. Fade-ups are CSS
@@ -19,6 +22,55 @@ const SVG_NS = 'http://www.w3.org/2000/svg';
 function anchorRect(id: string): DOMRect | null {
   const anchor = document.querySelector(`[data-hv3-anchor="${id}"]`);
   return anchor ? anchor.getBoundingClientRect() : null;
+}
+
+/** Shortest leader a callout keeps when it gives way to a frame guide. */
+const MIN_LEADER = 16;
+
+/**
+ * The frame guides of the section a callout sits in, in viewport pixels. The
+ * section's rule is padded to the guides, so its padding is where they fall.
+ */
+function guidesFor(
+  callout: HTMLElement
+): { left: number; right: number } | null {
+  const section = callout.closest<HTMLElement>('.hv3-chapter, .hv3-hero');
+  const rule = section?.querySelector<HTMLElement>(':scope > .hv3-rule');
+  if (!section || !rule) return null;
+  const side = Number.parseFloat(getComputedStyle(rule).paddingLeft);
+  if (!Number.isFinite(side)) return null;
+  const box = section.getBoundingClientRect();
+  return { left: box.left + side, right: box.right - side };
+}
+
+/** The approved design frame of every stage, the content box, in rem. */
+const BOX_REM = 78;
+
+/**
+ * Fit each homepage's stage zoom to its content box, so every mockup's edges
+ * land on the frame guides at any width from 1024 to 1439. Outside that range
+ * the CSS value stands (1 at 1440 and up; stages flow at their own size below
+ * 1024).
+ */
+function fitStages() {
+  const zoomed = matchMedia(
+    '(min-width: 64rem) and (max-width: 89.9375rem)'
+  ).matches;
+  for (const root of document.querySelectorAll<HTMLElement>('.hv3')) {
+    const rule = root.querySelector<HTMLElement>('.hv3-rule');
+    const side = rule
+      ? Number.parseFloat(getComputedStyle(rule).paddingLeft)
+      : NaN;
+    const rem = Number.parseFloat(
+      getComputedStyle(document.documentElement).fontSize
+    );
+    if (!zoomed || !Number.isFinite(side) || !(rem > 0)) {
+      root.style.removeProperty('--hv3-z');
+      continue;
+    }
+    const fit = (root.clientWidth - side * 2) / (BOX_REM * rem);
+    root.style.setProperty('--hv3-z', String(Math.min(1, Math.max(0.5, fit))));
+  }
 }
 
 function placeCallouts() {
@@ -39,9 +91,23 @@ function placeCallouts() {
         : 1;
     const x = (rect.left + rect.width / 2 - box.left) / scale;
     const y = (rect.top + rect.height / 2 - box.top) / scale;
-    const left = callout.classList.contains('hv3-callout--l')
-      ? x + 4.5 - callout.offsetWidth
-      : x - 4.5;
+    const onLeft = callout.classList.contains('hv3-callout--l');
+    const leader = callout.querySelector<HTMLElement>('.hv3-callout__leader');
+    if (leader) leader.style.width = '';
+    let left = onLeft ? x + 4.5 - callout.offsetWidth : x - 4.5;
+    // The label never crosses a frame guide: the leader gives way first.
+    const guides = guidesFor(callout);
+    if (guides && leader) {
+      const edge = onLeft
+        ? (guides.left - box.left) / scale - left
+        : left + callout.offsetWidth - (guides.right - box.left) / scale;
+      if (edge > 0) {
+        const length = leader.offsetWidth;
+        const next = Math.max(MIN_LEADER, length - Math.ceil(edge));
+        leader.style.width = `${next}px`;
+        if (onLeft) left += length - next;
+      }
+    }
     const top = Math.round((y - callout.offsetHeight / 2) / 4) * 4;
     callout.style.transform = `translate(${Math.round(left)}px, ${top}px)`;
     callout.dataset.placed = 'true';
@@ -164,6 +230,7 @@ export function StageMotion({
 }: Readonly<{ paletteQuery: string; paletteTarget: string }>) {
   useEffect(() => {
     const layout = () => {
+      fitStages();
       placeCallouts();
       drawConnectors();
     };

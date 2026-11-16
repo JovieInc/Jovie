@@ -119,13 +119,9 @@ export const GOLDEN_PATH_CLAIMS: readonly GoldenPathClaim[] = [
     step: 'homepage',
     route: '/',
     source: HOMEPAGE_COPY,
-    copy: 'Your profile, every release and the people who follow your work, in one quiet workspace.',
+    copy: 'Your profile, every release, and a link to each place the music is streaming.',
     nature: 'capability',
-    capabilityIds: [
-      'artist-profiles',
-      'public-profile',
-      'artist-notifications',
-    ],
+    capabilityIds: ['artist-profiles', 'public-profile'],
   },
   {
     id: 'homepage.profile.body',

@@ -1,200 +1,135 @@
-"""Source rewrites for the fix-red no-model routes: snap added off-grid spacing utilities and
-strip added legacy Cache Components exports. Split from fix_red_classes to keep it under its size ceiling."""
+"""Source rewrites for the fix-red no-model routes: resolve additive source conflicts.
+
+Split from fix_red_classes to keep it under its size ceiling, then split again
+when that ceiling was reached: the diff-driven line rewrites (spacing snap,
+legacy cache strip, heading balance) live in fix_red_diff_edits and the
+three-stage resolvers in fix_red_conflict_resolvers. This module stays the
+entrypoint every caller imports, re-exports that public surface, and owns the
+open-merge commit, the list-conflict orchestration, and the size-500 stale
+classification.
+"""
 from __future__ import annotations
 
 import re
 from pathlib import Path
 
 from atomic_state import atomic_write_text
+from fix_red_statement_merge import contained_by_main, contained_by_main_file  # noqa: F401
+from fix_red_diff_edits import (  # noqa: F401
+    balance_added_headings, balance_heading_line, snap_added_conservative_spacing, strip_added_legacy_cache_exports,
+)
+from fix_red_conflict_resolvers import (  # noqa: F401
+    resolve_additive_certificate_waivers, resolve_additive_node_test_file,
+    resolve_additive_node_tests_text, resolve_additive_statement_file,
+)
+from screen_debt_merge import resolve_subtractive_screen_debt  # noqa: F401
 
-LEGACY_CACHE_EXPORT = re.compile(
-    r"^\s*export const (?:dynamic|fetchCache|revalidate)\s*=")
-CACHE_SCAN_PREFIXES = ("apps/web/app/", "apps/web/lib/")
-CACHE_SOURCE = re.compile(r"\.(?:cjs|js|json|mjs|ts|tsx)$")
-# Same skip as stackAdoptionCoverage: tests and stories are not legacy surfaces.
-CACHE_SKIP = re.compile(r"\.(?:stories|test)\.[^.]+$")
-# Same utility shape as apps/web/scripts/optical-grid-scanners.ts, limited to the
-# armed conservative steps. Longer prefixes are not required: `p` fails closed on
-# `px-2.5` because the step hyphen does not follow `p`.
-CONSERVATIVE_UTILITY = re.compile(
-    r"(?<![\w-])(?P<sign>-)?(?P<prefix>p|px|py|pt|pr|pb|pl|ps|pe|m|mx|my|mt|mr|mb|ml|ms|me|"
-    r"gap|gap-x|gap-y|space-x|space-y)-(?P<step>2\.5|3\.5)(?![\w./%])")
-# 10px and 14px sit halfway between canonical seams. Tie-break toward the lower
-# seam (8px / 12px) so the rewrite is deterministic and stays on the 4px grid.
-SNAP_STEP = {"2.5": "2", "3.5": "3"}
-SPACING_SCAN_PREFIXES = ("apps/web/app/", "apps/web/components/", "packages/ui/")
-NON_PRODUCT_SPACING = re.compile(r"\.(?:test|spec|stories)\.[tj]sx?$")
-
-
-def _snap_spacing_line(line: str) -> str:
-    def repl(match: re.Match) -> str:
-        sign = match.group("sign") or ""
-        return f"{sign}{match.group('prefix')}-{SNAP_STEP[match.group('step')]}"
-    return CONSERVATIVE_UTILITY.sub(repl, line)
+# Same argv as lane_runner.WORKTREE_INSTALL. A fresh repair worktree has no
+# node_modules, so the pre-commit hook cannot find lint-staged and the merge
+# is aborted before the hook checks any file. Keep these flags identical.
+MERGE_COMMIT_INSTALL = [
+    "pnpm", "install", "--frozen-lockfile", "--prefer-offline",
+    "--package-import-method=hardlink",
+]
+_LINT_STAGED_MISSING = re.compile(r'Command "lint-staged" not found')
 
 
-def _spacing_product_path(path: str) -> bool:
-    """Product TS/TSX under the spacing ratchet's scan roots. Tests and stories are debt-free."""
-    rel = str(path or "").replace("\\", "/")
-    if not rel or rel.startswith("/") or ".." in Path(rel).parts:
-        return False
-    if not rel.endswith((".ts", ".tsx")) or NON_PRODUCT_SPACING.search(rel):
-        return False
-    return rel.startswith(SPACING_SCAN_PREFIXES)
+def _command_text(result) -> str:
+    return f"{getattr(result, 'stdout', '') or ''}{getattr(result, 'stderr', '') or ''}"
 
 
-def _added_spacing_edits(diff: str) -> dict[str, dict[int, tuple[str, str]]]:
-    """Map eligible file -> {new 1-based line: (added text, snapped text)} for utilities the diff adds."""
-    edits: dict[str, dict[int, tuple[str, str]]] = {}
-    rel = ""
-    eligible = False
-    new_line = 0
-    in_hunk = False
-    for raw in str(diff or "").splitlines():
-        if raw.startswith("+++ b/"):
-            rel = raw[6:]
-            eligible = _spacing_product_path(rel)
-            in_hunk = False
-            continue
-        if raw.startswith("--- ") or raw.startswith("diff --git "):
-            continue
-        header = re.match(r"^@@ -\d+(?:,\d+)? \+(\d+)(?:,\d+)? @@", raw)
-        if header:
-            new_line = int(header.group(1))
-            in_hunk = True
-            continue
-        if not in_hunk:
-            continue
-        if raw.startswith("\\"):
-            continue  # "\ No newline at end of file" is not a source line
-        if raw.startswith("+"):
-            added = raw[1:]
-            snapped = _snap_spacing_line(added)
-            if eligible and snapped != added:
-                edits.setdefault(rel, {})[new_line] = (added, snapped)
-            new_line += 1
-        elif raw.startswith("-"):
-            continue
-        else:
-            # A context line (rare with -U0) still occupies a new-file line.
-            new_line += 1
-    return edits
+def commit_open_merge(worktree, paths, sh, log, *, guard=lambda: None) -> bool:
+    """Stage `paths` and commit the open merge. None means the caller already staged.
 
-
-def snap_added_conservative_spacing(root: Path, diff: str) -> list[str]:
-    """Snap conservative spacing utilities on lines this diff adds. Returns the files written.
-
-    Grandfathered lines are left alone, including an identical `gap-2.5` elsewhere in the
-    file. A line that no longer matches the diff is left alone so a stale patch cannot
-    rewrite a neighbor. 2.5 -> 2 (10px -> 8px) and 3.5 -> 3 (14px -> 12px).
+    When the hook fails only because `pnpm exec lint-staged` is not installed,
+    install once and retry that commit. Any other failure aborts the merge.
     """
-    changed = []
-    root = Path(root)
-    for rel, lines in _added_spacing_edits(diff).items():
-        path = root / rel
-        try:
-            original = path.read_text()
-        except OSError:
-            continue
-        file_lines = original.splitlines(keepends=True)
-        dirty = False
-        for lineno, (added, snapped) in lines.items():
-            index = lineno - 1
-            if index < 0 or index >= len(file_lines):
-                continue
-            ending = "\r\n" if file_lines[index].endswith("\r\n") else "\n" if file_lines[index].endswith("\n") else ""
-            current = file_lines[index][: len(file_lines[index]) - len(ending)]
-            if current != added:
-                continue
-            file_lines[index] = snapped + ending
-            dirty = True
-        if not dirty:
-            continue
-        try:
-            atomic_write_text(path, "".join(file_lines))
-        except OSError:
-            continue
-        changed.append(rel)
-    return sorted(changed)
-
-
-def _legacy_cache_path(path: str) -> bool:
-    """Product source under the Cache Components scan. Tests and stories are not counted."""
-    rel = str(path or "").replace("\\", "/")
-    if not rel or rel.startswith("/") or ".." in Path(rel).parts:
+    guard()
+    if paths:
+        if sh(["git", "add", "--", *paths], cwd=worktree, log=log).returncode != 0:
+            sh(["git", "merge", "--abort"], cwd=worktree, log=log)
+            return False
+    commit = sh(["git", "commit", "--no-edit"], cwd=worktree, log=log)
+    if commit.returncode != 0 and _LINT_STAGED_MISSING.search(_command_text(commit)):
+        guard()
+        installed = sh(MERGE_COMMIT_INSTALL, cwd=worktree, timeout=1800, log=log)
+        if installed.returncode == 0:
+            commit = sh(["git", "commit", "--no-edit"], cwd=worktree, log=log)
+    if commit.returncode != 0:
+        sh(["git", "merge", "--abort"], cwd=worktree, log=log)
         return False
-    if not CACHE_SOURCE.search(rel) or CACHE_SKIP.search(rel):
-        return False
-    return rel.startswith(CACHE_SCAN_PREFIXES)
+    return True
 
 
-def _added_legacy_cache_exports(diff: str) -> dict[str, dict[int, str]]:
-    """Map eligible file -> {new 1-based line: added text} for cache exports the diff adds."""
-    edits: dict[str, dict[int, str]] = {}
-    rel = ""
-    eligible = False
-    new_line = 0
-    in_hunk = False
-    for raw in str(diff or "").splitlines():
-        if raw.startswith("+++ b/"):
-            rel = raw[6:]
-            eligible = _legacy_cache_path(rel)
-            in_hunk = False
-            continue
-        if raw.startswith("--- ") or raw.startswith("diff --git "):
-            continue
-        header = re.match(r"^@@ -\d+(?:,\d+)? \+(\d+)(?:,\d+)? @@", raw)
-        if header:
-            new_line = int(header.group(1))
-            in_hunk = True
-            continue
-        if not in_hunk:
-            continue
-        if raw.startswith("\\"):
-            continue
-        if raw.startswith("+"):
-            added = raw[1:]
-            if eligible and LEGACY_CACHE_EXPORT.match(added):
-                edits.setdefault(rel, {})[new_line] = added
-            new_line += 1
-        elif raw.startswith("-"):
-            continue
-        else:
-            new_line += 1
-    return edits
+def resolve_additive_list_conflict(worktree: Path, branch: str, log, *, sh, merge_entries, guard=lambda: None, push: bool = True, stage_choice=None) -> bool:
+    """Union quoted lists, node:test blocks, Vitest statement insertions, waiver rows, or dropped screen-debt rows.
 
-
-def strip_added_legacy_cache_exports(root: Path, diff: str) -> list[str]:
-    """Delete route-segment cache exports on lines this diff adds. Returns the files written.
-
-    Grandfathered exports stay, including an identical line elsewhere in the file.
-    A line that no longer matches the diff stays, so a stale patch cannot delete a
-    neighbor. `export const runtime` is not a legacy surface and is left alone.
-    """
-    changed = []
-    root = Path(root)
-    for rel, lines in _added_legacy_cache_exports(diff).items():
-        path = root / rel
+    Main's order stays, then head-only lines. A prose hunk or any other shape aborts
+    and leaves the PR to the model. The push is a fast-forward of the PR branch.
+    `push=False` leaves that fast-forward to the caller."""
+    guard()
+    merged = sh(["git", "merge", "--no-edit", "origin/main"], cwd=worktree, log=log)
+    if merged.returncode != 0:
+        conflicted = [path for path in (sh(["git", "diff", "--name-only", "--diff-filter=U"], cwd=worktree).stdout or "").split() if path]
+        if not conflicted:
+            sh(["git", "merge", "--abort"], cwd=worktree, log=log)
+            return False
+        resolved: dict[str, str] = {}
+        for path in conflicted:
+            target = worktree / path
+            try:
+                text = stage_choice(worktree, path, sh) if stage_choice else merge_entries(target.read_text())
+                if text is None and not stage_choice:
+                    text = resolve_additive_node_test_file(worktree, path, sh)
+                if text is None and not stage_choice:
+                    text = resolve_additive_statement_file(worktree, path, sh)
+                if text is None and not stage_choice:
+                    text = resolve_additive_certificate_waivers(worktree, path, sh)
+                if text is None and not stage_choice:
+                    text = resolve_subtractive_screen_debt(worktree, path, sh)
+            except OSError:
+                text = None
+            if text is None:
+                sh(["git", "merge", "--abort"], cwd=worktree, log=log)
+                return False
+            resolved[path] = text
         try:
-            original = path.read_text()
+            for path, text in resolved.items():
+                atomic_write_text(worktree / path, text)
         except OSError:
-            continue
-        file_lines = original.splitlines(keepends=True)
-        drop: set[int] = set()
-        for lineno, added in lines.items():
-            index = lineno - 1
-            if index < 0 or index >= len(file_lines):
-                continue
-            ending = "\r\n" if file_lines[index].endswith("\r\n") else "\n" if file_lines[index].endswith("\n") else ""
-            current = file_lines[index][: len(file_lines[index]) - len(ending)]
-            if current == added:
-                drop.add(index)
-        if not drop:
-            continue
-        kept = [line for index, line in enumerate(file_lines) if index not in drop]
-        try:
-            atomic_write_text(path, "".join(kept))
-        except OSError:
-            continue
-        changed.append(rel)
-    return sorted(changed)
+            sh(["git", "merge", "--abort"], cwd=worktree, log=log)
+            return False
+        if not commit_open_merge(worktree, conflicted, sh, log, guard=guard):
+            return False
+    guard()
+    if not push:
+        return True
+    return sh(["git", "push", "-q", "origin", f"HEAD:refs/heads/{branch}"], cwd=worktree, log=log).returncode == 0
+
+
+# Company guards annotates each over-baseline file, then Actions appends
+# "Process completed with exit code 1." A stale branch still carries files
+# main already shrunk, and a red check reports BLOCKED so the BEHIND fallback
+# never runs. Sync main when those growth lines are the only errors. Another
+# error stays with the model. classify() checks this after SIGNATURES.
+_SIZE_500_ERROR = re.compile(r"size-500: \S+: grew \d+ -> \d+\s*$")
+_ANNOTATED_ERROR = re.compile(r"##\[error\]([^\n]+)")
+_GHA_EXIT = re.compile(r"Process completed with exit code \d+\.?\s*$")
+
+
+def size_500_stale_hit(text: object) -> tuple[str, str] | None:
+    """Return `("size-500-stale", "sync-main")` when every annotated error is size growth."""
+    if not isinstance(text, str):
+        return None
+    errors = [item.strip() for item in _ANNOTATED_ERROR.findall(text)]
+    errors = [item for item in errors if _GHA_EXIT.fullmatch(item) is None]
+    if not errors or any(_SIZE_500_ERROR.fullmatch(item) is None for item in errors):
+        return None
+    return ("size-500-stale", "sync-main")
+
+
+def size_500_route(text: object) -> tuple[str, str] | None:
+    """Unbaselined over-500 tests split. Growth-only logs sync main. Mixed logs stay with the model."""
+    from fix_red_size_500 import unbaselined_hit
+
+    return unbaselined_hit(text) or size_500_stale_hit(text)

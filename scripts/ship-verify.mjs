@@ -24,7 +24,10 @@ function value(args, flag, fallback) {
 
 function git(args, fallback = '') {
   try {
-    return execFileSync('git', args, { encoding: 'utf8' }).trim();
+    return execFileSync('git', args, {
+      maxBuffer: 256 * 1024 * 1024,
+      encoding: 'utf8',
+    }).trim();
   } catch {
     return fallback;
   }

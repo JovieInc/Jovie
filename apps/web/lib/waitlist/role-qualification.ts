@@ -35,7 +35,7 @@ export const momTestAnswersSchema = z
   .object({
     /** "What's the last thing you did to grow your fans, and how did it go?" */
     lastGrowthAttempt: z.string().trim().min(1).max(600).optional(),
-    /** "What do you pay for today to promote your music?" */
+    /** "What do you pay each month to promote your music?" */
     promoSpend: z.enum(PROMO_SPEND_BANDS).optional(),
   })
   .strict();

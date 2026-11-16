@@ -1,6 +1,7 @@
 ---
 frame: claim
 route: /[username]?claim=1
+context: profile, sign in, auth
 ---
 Design an unclaimed artist profile with a claim banner, desktop 1440 wide and mobile 390 wide, dark mode first.
 

@@ -1,5 +1,6 @@
 import { render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import { ImpersonationBannerWrapper } from './ImpersonationBannerWrapper';
 
 const {
@@ -73,9 +74,10 @@ describe('ImpersonationBannerWrapper', () => {
   });
 
   it('uses the administrator actor id and renders the active banner', async () => {
-    render(await ImpersonationBannerWrapper());
+    const { container } = render(await ImpersonationBannerWrapper());
 
     expect(mockGetImpersonationState).toHaveBeenCalledWith('admin-actor-id');
     expect(screen.getByTestId('impersonation-banner')).toBeInTheDocument();
+    await expectNoA11yViolations(container);
   });
 });

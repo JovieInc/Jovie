@@ -1,6 +1,7 @@
 ---
 frame: tour-dates-connect
 route: /app/tour-dates
+context: dashboard, empty state, calendar
 ---
 Design the Tour Dates page for an artist who has not connected Bandsintown yet, desktop 1440 wide and mobile 390 wide, dark mode first.
 

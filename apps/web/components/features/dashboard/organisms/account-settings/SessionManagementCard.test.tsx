@@ -95,7 +95,7 @@ describe('SessionManagementCard', () => {
           action === 'single' ? 'End session' : 'Sign out other sessions';
         await userEvent.click(await screen.findByRole('button', { name }));
         await userEvent.click(
-          within(screen.getByRole('dialog')).getByRole('button', { name })
+          within(screen.getByRole('alertdialog')).getByRole('button', { name })
         );
         expect(revoke).toHaveBeenCalledTimes(1);
         if (removal === 'hide') {

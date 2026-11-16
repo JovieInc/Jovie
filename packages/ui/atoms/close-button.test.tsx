@@ -76,7 +76,9 @@ describe('CloseButtonIcon', () => {
 describe('closeButtonStyles', () => {
   it('has base styles', () => {
     expect(closeButtonStyles.base).toContain('absolute');
-    expect(closeButtonStyles.base).toContain('right-4');
+    // Logical inset: the close control sits at the inline end in LTR and RTL.
+    expect(closeButtonStyles.base).toContain('end-4');
+    expect(closeButtonStyles.base).not.toMatch(/(?:^|\s)(?:left|right)-\d/);
     expect(closeButtonStyles.base).toContain('top-4');
     expect(closeButtonStyles.base).toContain('size-9');
     expect(closeButtonStyles.base).toContain('before:h-11');

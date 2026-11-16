@@ -53,6 +53,53 @@ test('parses one record per failed test with file, line, project and title', () 
   assert.ok(failures[0].error.includes('Received: closed'));
 });
 
+// Real CI shape (JOV-8805): the tee'd line reporter prefixes every line
+// with cursor-control escapes (\x1B[1A\x1B[2K) even under CI=true, so the
+// numbered failure block never matched ^\s*\d+\) — the guard fell back to
+// the JSON tail and the actual error stayed invisible to remediation.
+const ciEscapedFailureLog = [
+  'Running 5 tests using 1 worker',
+  '\u001B[1A\u001B[2K[1/2] [auth-setup] › tests/e2e/auth.setup.ts:11:8 › Auth Setup › authenticate',
+  '\u001B[1A\u001B[2K  1) [chromium] › tests/e2e/claim-checkout.spec.ts:288:7 › Claim checkout dogfood › high reach: pay → pending verification → Ovie card → reject with a test refund, then approve ──',
+  '',
+  '    Error: Timed out waiting for the poll.',
+  '',
+  '    Expected: pending_verification',
+  '    Received: awaiting_payment',
+  '',
+  '  4 passed (35.1s)',
+  '  1 failed',
+].join('\n');
+
+test('parses the CI ANSI-escaped numbered failure block (JOV-8805)', () => {
+  const failures = parsePlaywrightFailures(ciEscapedFailureLog);
+  assert.equal(failures.length, 1);
+  assert.equal(failures[0].project, 'chromium');
+  assert.equal(failures[0].file, 'tests/e2e/claim-checkout.spec.ts');
+  assert.equal(failures[0].line, 288);
+  assert.ok(
+    failures[0].title.startsWith('Claim checkout dogfood › high reach: pay')
+  );
+  assert.ok(failures[0].error.includes('Expected: pending_verification'));
+  const { annotations } = collectPlaywrightFailureAnnotations(
+    ciEscapedFailureLog,
+    { redact: value => value }
+  );
+  assert.equal(annotations.length, 1);
+  assert.ok(annotations[0].includes('claim-checkout.spec.ts:288'));
+  assert.ok(annotations[0].includes('pending_verification'));
+});
+
+test('diagnostic lines survive the CI escape prefixes', () => {
+  const output = [
+    '\u001B[1A\u001B[2K    at fake',
+    '\u001B[1A\u001B[2K  POST /api/stripe/checkout returned 500: {"error":"boom"}',
+  ].join('\n');
+  assert.deepEqual(collectDiagnosticLines(output), [
+    '  POST /api/stripe/checkout returned 500: {"error":"boom"}',
+  ]);
+});
+
 test('ignores flaky, passed and skipped summary lines', () => {
   const failures = parsePlaywrightFailures(
     [

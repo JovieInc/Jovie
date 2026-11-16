@@ -123,6 +123,16 @@ describe('Dialog', () => {
       expect(screen.getByTestId('dialog-header')).toBeInTheDocument();
     });
 
+    it('mirrors the header gutter and close control in RTL (logical insets)', () => {
+      render(<TestDialog open={true} />);
+      const header = screen.getByTestId('dialog-header');
+      expect(header).toHaveClass('pe-10', 'text-start');
+      expect(header).not.toHaveClass('pr-10', 'text-left');
+      const close = screen.getByTestId('dialog-close-button');
+      expect(close).toHaveClass('end-4');
+      expect(close).not.toHaveClass('right-4');
+    });
+
     it('contains title and description', () => {
       render(
         <TestDialog
@@ -177,6 +187,59 @@ describe('Dialog', () => {
       const closeButton = footer.querySelector('button');
       expect(closeButton).toBeInTheDocument();
       expect(closeButton).toHaveTextContent('Close');
+    });
+  });
+
+  describe('Portal placement', () => {
+    it.each([
+      { name: 'by default', contentProps: {} },
+      {
+        name: 'when disablePortal is false',
+        contentProps: { disablePortal: false },
+      },
+    ])(
+      'portals the content and overlay outside the host $name',
+      ({ contentProps }) => {
+        const { container } = render(
+          <Dialog open>
+            <DialogContent {...contentProps}>
+              <DialogTitle>Portal placement</DialogTitle>
+              <DialogDescription>
+                Content belongs to this modal.
+              </DialogDescription>
+            </DialogContent>
+          </Dialog>
+        );
+        const dialog = screen.getByRole('dialog', { name: 'Portal placement' });
+        const overlay = screen.getByTestId('dialog-overlay');
+
+        expect(container).not.toContainElement(dialog);
+        expect(container).not.toContainElement(overlay);
+        expect(document.body).toContainElement(dialog);
+        expect(document.body).toContainElement(overlay);
+        expect(dialog).toHaveAccessibleDescription(
+          'Content belongs to this modal.'
+        );
+      }
+    );
+
+    it('keeps content and overlay inside the host when the portal is disabled', () => {
+      const onOpenChange = vi.fn();
+      const { container } = render(
+        <Dialog open onOpenChange={onOpenChange}>
+          <DialogContent disablePortal>
+            <DialogTitle>Inline placement</DialogTitle>
+            <DialogDescription>Content stays in its host.</DialogDescription>
+          </DialogContent>
+        </Dialog>
+      );
+      const dialog = screen.getByRole('dialog', { name: 'Inline placement' });
+
+      expect(container).toContainElement(dialog);
+      expect(container).toContainElement(screen.getByTestId('dialog-overlay'));
+      expect(dialog).toHaveAccessibleDescription('Content stays in its host.');
+      fireEvent.keyDown(dialog, { key: 'Escape' });
+      expect(onOpenChange).toHaveBeenCalledWith(false);
     });
   });
 

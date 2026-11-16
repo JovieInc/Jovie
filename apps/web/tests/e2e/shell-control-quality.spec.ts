@@ -8,6 +8,7 @@ import {
   type ReversibleActivation,
 } from '../utils/reversible-control-detector';
 import { inspectShellMaterial } from './utils/shell-material-detector';
+import { controls, expectRailPushesRoute } from './utils/shell-rail-controls';
 import {
   gotoAuthenticatedChatRoute,
   waitForHydration,
@@ -24,10 +25,6 @@ const sequence: ReversibleActivation[] = Array.from(
   { length: 20 },
   (_, index) => (index % 3 === 0 ? 'keyboard' : 'pointer')
 );
-const controls = (page: Page, side: 'left' | 'right') =>
-  page
-    .locator(`[data-rail-toggle="${side}"]:not([inert] *)`)
-    .filter({ visible: true });
 
 async function certify(page: Page, side: 'left' | 'right') {
   const toggle = controls(page, side);
@@ -265,6 +262,8 @@ for (const side of ['right'] as const) {
     await page.mouse.move(700, 450);
     await page.waitForTimeout(SHELL_RAIL_PREVIEW_GRACE_MS + 30);
     await expect(controls(page, side)).toHaveAttribute('aria-expanded', 'true');
+    // Founder call (2026-11-08): the preview floats; a pinned rail pushes.
+    await expectRailPushesRoute(plane, inspector, initial);
     await testInfo.attach(`${side}-preview-after`, {
       body: await page.screenshot(),
       contentType: 'image/png',

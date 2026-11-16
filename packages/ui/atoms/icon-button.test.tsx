@@ -180,7 +180,9 @@ describe('IconButton', () => {
     const loadingButton = screen.getByRole('button', {
       name: 'Secondary state',
     });
-    expect(loadingButton).toBeDisabled();
+    // Loading keeps focus: aria-disabled blocks activation, not native disabled.
+    expect(loadingButton).not.toBeDisabled();
+    expect(loadingButton).toHaveAttribute('aria-disabled', 'true');
     expect(loadingButton).toHaveAttribute('data-state', 'loading');
     expect(loadingButton).toHaveAttribute('aria-busy', 'true');
     expect(loadingButton.className).toContain('h-8');
@@ -389,5 +391,32 @@ describe('IconButton accessibility', () => {
       </div>
     );
     await expectNoA11yViolations(container);
+  });
+});
+
+describe('IconButton accessible name', () => {
+  it('takes its name from aria-labelledby', () => {
+    render(
+      <>
+        <span id='icon-button-name'>Archive release</span>
+        <IconButton aria-labelledby='icon-button-name'>
+          <svg aria-hidden='true' />
+        </IconButton>
+      </>
+    );
+    expect(
+      screen.getByRole('button', { name: 'Archive release' })
+    ).toBeInTheDocument();
+  });
+
+  it('falls back to aria-label when the ariaLabel alias is blank', () => {
+    render(
+      <IconButton ariaLabel='  ' aria-label='Close panel'>
+        <svg aria-hidden='true' />
+      </IconButton>
+    );
+    expect(
+      screen.getByRole('button', { name: 'Close panel' })
+    ).toBeInTheDocument();
   });
 });

@@ -5,7 +5,6 @@ import {
   unstable_noStore as noStore,
   revalidatePath,
   revalidateTag,
-  unstable_cache,
 } from 'next/cache';
 import { isRedirectError } from 'next/dist/client/components/redirect-error';
 import { redirect } from 'next/navigation';
@@ -18,6 +17,7 @@ import {
   isBandsintownConfigured,
   verifyBandsintownArtist,
 } from '@/lib/bandsintown';
+import { createProfileTag } from '@/lib/cache/tags';
 import { db } from '@/lib/db';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { type TourDate, tourDates } from '@/lib/db/schema/tour';
@@ -75,6 +75,15 @@ async function requireProfile(): Promise<{
     handle:
       data.selectedProfile.usernameNormalized ?? data.selectedProfile.username,
   };
+}
+
+/**
+ * Tour dates render on the public profile page, so writes expire its tag.
+ * Tag-only (not `invalidateProfileCache`): no route re-render in the action.
+ */
+function invalidatePublicTourDates(handle: string | null | undefined): void {
+  if (!handle) return;
+  revalidateTag(createProfileTag(handle.toLowerCase()), 'max');
 }
 
 /**
@@ -153,7 +162,7 @@ async function upsertBandsintownEvents(
 // ============================================================================
 
 /**
- * Core tour dates fetch logic (cacheable)
+ * Core tour dates fetch logic.
  */
 async function fetchTourDatesCore(
   profileId: string
@@ -168,8 +177,9 @@ async function fetchTourDatesCore(
 }
 
 /**
- * Core tour dates loading logic (cacheable).
- * Cache is invalidated on mutations (create, update, delete, sync).
+ * Core tour dates loading logic. Not persistently cached: TanStack Query
+ * refetches this right after each mutation and must read the creator's own
+ * write; `updateTag` would re-render the route and reset client state.
  */
 async function resolveTourDates(
   requestedProfileId?: string
@@ -186,15 +196,7 @@ async function resolveTourDates(
     return [];
   }
 
-  // Cache with 30s TTL and tags for invalidation
-  return unstable_cache(
-    () => fetchTourDatesCore(resolvedProfileId),
-    ['tour-dates', userId, resolvedProfileId],
-    {
-      revalidate: 30,
-      tags: [`tour-dates:${userId}:${resolvedProfileId}`],
-    }
-  )();
+  return fetchTourDatesCore(resolvedProfileId);
 }
 
 /**
@@ -426,6 +428,7 @@ export async function connectBandsintownArtist(params: {
 
   revalidatePath(APP_ROUTES.TOUR_DATES);
   revalidatePath(APP_ROUTES.SETTINGS_TOURING);
+  invalidatePublicTourDates(profile.handle);
 
   // Load updated tour dates
   const dates = await db
@@ -493,8 +496,7 @@ export async function syncFromBandsintown(): Promise<{
     source: 'bandsintown',
   });
 
-  // Invalidate cache tag so next server fetch returns fresh data
-  revalidateTag(`tour-dates:${userId}:${profile.id}`, 'max');
+  invalidatePublicTourDates(profile.handle);
   // Skip revalidatePath — the mutation hook handles cache updates via TanStack
   // Query, and a path revalidation resets client-side state (closing the sidebar).
 
@@ -567,8 +569,7 @@ export async function createTourDate(params: {
     source: 'manual',
   });
 
-  // Invalidate cache tag so next server fetch returns fresh data
-  revalidateTag(`tour-dates:${userId}:${profile.id}`, 'max');
+  invalidatePublicTourDates(profile.handle);
   // Skip revalidatePath — the mutation hook handles cache updates via TanStack
   // Query, and a path revalidation resets client-side state (closing the sidebar).
 
@@ -650,8 +651,7 @@ export async function updateTourDate(params: {
     throw new TypeError('Tour date not found');
   }
 
-  // Invalidate cache tag so next server fetch returns fresh data
-  revalidateTag(`tour-dates:${userId}:${profile.id}`, 'max');
+  invalidatePublicTourDates(profile.handle);
   // Skip revalidatePath — the mutation hook handles cache updates via TanStack
   // Query, and a path revalidation resets client-side state (closing the sidebar).
 
@@ -687,8 +687,7 @@ export async function deleteTourDate(
     tourDateId: id,
   });
 
-  // Invalidate cache tag so next server fetch returns fresh data
-  revalidateTag(`tour-dates:${userId}:${profile.id}`, 'max');
+  invalidatePublicTourDates(profile.handle);
   // Skip revalidatePath — the mutation hook handles cache updates via TanStack
   // Query, and a path revalidation resets client-side state (closing the sidebar).
 
@@ -730,6 +729,7 @@ export async function disconnectBandsintown(): Promise<{ success: boolean }> {
 
     revalidatePath(APP_ROUTES.TOUR_DATES);
     revalidatePath(APP_ROUTES.SETTINGS_TOURING);
+    invalidatePublicTourDates(profile.handle);
 
     return { success: true };
   } catch (error) {

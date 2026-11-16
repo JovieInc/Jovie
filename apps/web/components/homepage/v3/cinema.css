@@ -106,3 +106,35 @@
     transform: translate3d(0, 6rem, 0) scale(0.96);
   }
 }
+
+/* ── Precision ────────────────────────────────────────────────────── *
+ * Tim (2026-11-08): "make it feel premium not consumer" and "polished
+ * linear, like ocd designer/tech savvy djs types. they want precision but
+ * cool sexy dark mode."
+ *
+ * Frame guides: one hairline on each content edge runs the length of the
+ * page, so every column visibly sits on the same grid. Drawn as hard
+ * gradient stops on the box width, so they land on whole pixels.
+ *
+ * Print-sheet registration crosses and gradient-clipped headlines are
+ * banned (ASR-033). Headlines inherit solid primary ink from `.hv3`.
+ */
+
+.hv3 {
+  --hv3-guide: color-mix(in srgb, var(--hv3-b1) 70%, transparent);
+}
+
+.hv3-hero,
+.hv3-chapter {
+  background-image: linear-gradient(
+    90deg,
+    transparent var(--hv3-side),
+    var(--hv3-guide) var(--hv3-side),
+    var(--hv3-guide) calc(var(--hv3-side) + 1px),
+    transparent calc(var(--hv3-side) + 1px),
+    transparent calc(100% - var(--hv3-side) - 1px),
+    var(--hv3-guide) calc(100% - var(--hv3-side) - 1px),
+    var(--hv3-guide) calc(100% - var(--hv3-side)),
+    transparent calc(100% - var(--hv3-side))
+  );
+}

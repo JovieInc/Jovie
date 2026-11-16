@@ -6,6 +6,7 @@ import {
   waitFor,
 } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { SHELL_RAIL_MOTION_MS } from '@/components/shell/rail-motion';
 import { ArtistProfileContent } from './ArtistProfileContent';
 
 const { contextState, openPreview, previewState, refresh } = vi.hoisted(() => ({
@@ -121,10 +122,35 @@ describe('ArtistProfileContent', () => {
     rerender(<ArtistProfileContent />);
     expect(reserved()).toHaveLength(0);
 
+    // A re-pin needs no reservation: the shell rail column pushes the pane.
     previewState.isOpen = true;
     previewState.isPinned = true;
     rerender(<ArtistProfileContent />);
-    expect(reserved()).toHaveLength(1);
+    expect(reserved()).toHaveLength(0);
+  });
+
+  it('hands the reservation to the pushing rail once the first pin settles', () => {
+    vi.useFakeTimers();
+    try {
+      const { rerender } = render(<ArtistProfileContent />);
+      const reserved = () =>
+        document.querySelectorAll('[data-settings-companion-rail="true"]');
+      expect(reserved()).toHaveLength(1);
+      previewState.isOpen = true;
+      previewState.isPinned = true;
+      rerender(<ArtistProfileContent />);
+      // Held through the opening motion so the pane never steps.
+      act(() => {
+        vi.advanceTimersByTime(SHELL_RAIL_MOTION_MS - 1);
+      });
+      expect(reserved()).toHaveLength(1);
+      act(() => {
+        vi.advanceTimersByTime(1);
+      });
+      expect(reserved()).toHaveLength(0);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   afterEach(() => {

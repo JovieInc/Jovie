@@ -16,9 +16,10 @@
   border-top: 1px solid var(--hv3-b1);
 }
 
-/* Stages keep the approved 1440 coordinate frame and centre on wider screens. */
+/* A stage spans exactly the content box. Its own coordinates are the 1248px
+   design frame (zoom scales its margins too, hence the division). */
 .hv3-frame {
-  margin: 0 var(--hv3-edge);
+  margin-inline: calc(var(--hv3-side) / var(--hv3-z));
 }
 
 .hv3-btn {
@@ -27,7 +28,7 @@
   gap: 0.5rem;
   height: 2.75rem;
   padding: 0 1.375rem;
-  border-radius: var(--radius-pill);
+  border-radius: var(--radius-sm);
   font-size: 0.9375rem;
   font-weight: 500;
   line-height: 1;
@@ -59,11 +60,6 @@
   height: 88.75rem;
   overflow: hidden;
   padding-top: 10.5rem;
-}
-
-.hv3-hero > .hv3-orbit {
-  top: -6.25rem;
-  left: calc(var(--hv3-edge) - 12.5rem);
 }
 
 /* JOV-INV-038: the headline dominates and the support line recedes, both in
@@ -111,61 +107,123 @@
 .hv3-stage--hero {
   position: absolute;
   top: 28.125rem;
-  right: var(--hv3-edge);
-  left: var(--hv3-edge);
+  right: calc(var(--hv3-side) / var(--hv3-z));
+  left: calc(var(--hv3-side) / var(--hv3-z));
   height: 47.5rem;
-  perspective-origin: 50% 10%;
 }
 
-.hv3-stage--hero::before {
+/*
+ * Key light (Tim, 2026-11-12: "less ai slop more premium artdirected
+ * lighting"). One source, one hue, asymmetric: an Ion wedge from above the
+ * frame, right of the headline so the headline's zone stays black. Its apex
+ * stays out of sight: the beam only comes up out of the dark under the
+ * actions and opens onto the window's top edge, so it reads as light falling
+ * on the product, not as a shape behind the copy. The window stands in front
+ * of it; below the window it is spill. Everything else falls to black.
+ * The wedge is clipped on ::before and blurred here, so its edges are soft
+ * (a filter on the clipped element itself would leave them hard).
+ * Replaces the hero's rings, arc and glow blobs.
+ */
+.hv3-keylight {
   position: absolute;
-  top: 10rem;
-  right: 0;
-  left: 0;
-  height: 40rem;
-  background: radial-gradient(
-    60% 50% at 55% 75%,
-    color-mix(in srgb, var(--hv3-t2) 7%, transparent),
-    transparent 70%
-  );
-  content: "";
+  top: -26rem;
+  left: 46%;
+  /* container-width-allow: light geometry in the approved 1440 frame, not a page column */
+  width: 34rem;
+  height: 78rem;
+  filter: blur(1.75rem);
   pointer-events: none;
 }
 
-.hv3-stage--hero .hv3-bounce {
-  top: 37.5rem;
-  left: 7.5rem;
-  /* container-width-allow: stage geometry in the approved 1440 frame, not a page column */
-  width: 81.25rem;
-  height: 15rem;
-  background: radial-gradient(
-    closest-side,
-    color-mix(in srgb, var(--hv3-ion) 22%, transparent),
-    color-mix(in srgb, var(--hv3-t2) 6%, transparent) 60%,
+.hv3-keylight::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    180deg,
+    transparent 15%,
+    color-mix(in srgb, var(--hv3-ion) 4%, transparent) 20%,
+    color-mix(in srgb, var(--hv3-ion) 11%, transparent) 27%,
+    color-mix(in srgb, var(--hv3-ion) 7%, transparent) 55%,
+    transparent 80%
+  );
+  clip-path: polygon(44% 0, 56% 0, 100% 100%, 0 100%);
+}
+
+/* Where the beam meets the window's top edge: a hard 1px rim, brightest
+   under the beam's centre, gone at both ends. */
+.hv3-rig--hero .hv3-window::before {
+  left: 30%;
+  width: 60%;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    color-mix(in srgb, var(--hv3-ion) 80%, transparent) 55%,
     transparent
+  );
+}
+
+/* The window's own corner glow answered the old arc; under a top key it
+   would be a second source. */
+.hv3-rig--hero .hv3-app::after {
+  content: none;
+}
+
+/* Top light on the window's surface, falling off down the list. */
+.hv3-rig--hero .hv3-sheen {
+  inset: 0;
+  width: auto;
+  background: radial-gradient(
+    45% 55% at 64% 0,
+    color-mix(in srgb, var(--hv3-light) 6%, transparent),
+    transparent 70%
+  );
+}
+
+/* The release page is lit from above, not from the corner: bright top edge,
+   dark flanks. */
+.hv3-rig--hero .hv3-lift--page.hv3-edge::after {
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--hv3-light) 30%, transparent),
+    color-mix(in srgb, var(--hv3-light) 5%, transparent) 18%,
+    color-mix(in srgb, var(--hv3-light) 2%, transparent)
   );
 }
 
 .hv3-rig--hero {
   top: 3.75rem;
-  left: 3.75rem;
-  /* container-width-allow: stage geometry in the approved 1440 frame, not a page column */
-  width: 78rem;
+  left: 0;
+  width: var(--hv3-box);
   height: 36.5rem;
-  transform: var(--hv3-cam) scale(1.06);
-  transform-origin: 50% 0;
+  transform: var(--hv3-cam);
+  transform-origin: 0 0;
 }
 
-/* The inspector is lifted out of the window in depth only, so its edges stay
-   parallel to the window under the one camera. Its height ends below the UPC
-   row (v3 left an empty band there). */
-.hv3-lift--inspector {
-  top: 2.5rem;
-  left: 53rem;
-  width: 25rem;
-  height: 29rem;
-  border-radius: var(--radius-md);
-  transform: translate3d(0, var(--hv3-par, 0px), 5.625rem);
+/* The release page sits on the third column of the box, its right edge on
+   the window's, lifted by shadow alone. It is the 390 phone scaled to the
+   column and runs past the window's foot far enough to show the first listen
+   rows under the title, fading out the way a page keeps going below the
+   fold. */
+.hv3-lift--page {
+  top: 1.75rem;
+  left: calc(var(--hv3-col2) + 1.5rem);
+  width: var(--hv3-col1);
+  height: 44rem;
+  border-radius: calc(var(--radius-3xl) + var(--radius-sm));
+  mask-image: linear-gradient(var(--hv3-shade) 78%, transparent);
+  transform: translateY(var(--hv3-par, 0px));
+}
+
+.hv3-phone.hv3-phone--hero {
+  inset: 0 auto auto 0;
+  width: 24.375rem;
+  height: 53.75rem;
+  /* The lift's mask clips anything outside its box, so the page's edge is an
+     inner hairline that fades out with it. */
+  box-shadow: inset 0 0 0 1px var(--hv3-b2);
+  transform: scale(1.0256);
+  transform-origin: 0 0;
 }
 
 .hv3-index {
@@ -249,7 +307,6 @@
 
 .hv3-stage--profile {
   height: 53.75rem;
-  perspective-origin: 7.0125rem 30%;
 }
 
 .hv3-stage--profile > .hv3-orbit {
@@ -285,9 +342,8 @@
 }
 
 .hv3-stage--releases {
-  height: 53.75rem;
+  height: 57rem;
   margin-top: 1.5rem;
-  perspective-origin: 50% 20%;
 }
 
 .hv3-stage--releases > .hv3-orbit {
@@ -296,44 +352,46 @@
 }
 
 .hv3-stage--releases .hv3-bounce {
-  top: 42.5rem;
-  left: 17.5rem;
+  top: 46rem;
+  left: 10.875rem;
   /* container-width-allow: stage geometry in the approved 1440 frame, not a page column */
   width: 56.25rem;
   height: 11.25rem;
 }
 
+/* The catalog spans the first two caption columns and the release page the
+   third, so each pane's edges sit on the grid the captions below it use. */
 .hv3-rig--releases {
   top: 6.875rem;
-  left: 18.75rem;
-  /* container-width-allow: stage geometry in the approved 1440 frame, not a page column */
-  width: 56.25rem;
+  left: 0;
+  width: var(--hv3-box);
   height: 40rem;
-  transform-origin: 50% 50%;
+  transform-origin: 0 0;
 }
 
 .hv3-plate {
   position: absolute;
   top: 3.75rem;
   left: 0;
-  width: 29.375rem;
+  width: calc(var(--hv3-col2) / 1.12);
   height: 29.5rem;
   overflow: hidden;
   border-radius: var(--radius-lg);
   background: var(--hv3-shell);
   box-shadow: var(--hv3-cast);
-  transform: translateZ(-3.75rem) scale(1.12);
+  transform: scale(1.12);
   transform-origin: 0 0;
 }
 
 .hv3-phone.hv3-phone--release {
-  top: -1.875rem;
-  left: 35rem;
+  top: -5.875rem;
+  left: calc(var(--hv3-col2) + 1.5rem);
   width: 24.375rem;
   height: 53.75rem;
   border-radius: calc(var(--radius-3xl) + var(--radius-lg));
   background: var(--hv3-canvas);
-  transform: translateZ(7.5rem) scale(0.86);
+  /* The 390px phone scaled to the 25rem column: 25 / 24.375. */
+  transform: scale(1.0256);
   transform-origin: 0 0;
 }
 
@@ -373,29 +431,6 @@
 
 .hv3-invite__inner > * {
   position: relative;
-}
-
-.hv3-invite__inner > .hv3-orbit {
-  position: absolute;
-  /* container-width-allow: stage geometry in the approved 1440 frame, not a page column */
-  width: 50rem;
-  height: 50rem;
-  top: 1.875rem;
-  left: calc(50% - 25rem);
-}
-
-.hv3-invite__inner > .hv3-orbit::before {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  width: 40rem;
-  height: 40rem;
-  border-radius: 50%;
-  background: radial-gradient(closest-side, var(--hv3-ion-glow), transparent);
-  content: "";
-  filter: blur(1.875rem);
-  opacity: 0.55;
-  transform: translate(-50%, -50%);
 }
 
 .hv3-invite .hv3-lede {

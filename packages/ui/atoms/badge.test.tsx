@@ -144,8 +144,43 @@ describe('Badge', () => {
       );
       const badge = screen.getByTestId('badge');
       expect(badge.className).toContain('border-accent/20');
-      expect(badge.className).toContain('text-accent');
+      expect(badge).toHaveClass('text-accent-text');
       expect(badge).toHaveAttribute('data-tone', 'accent');
+    });
+
+    it('applies outline variant and the primary alias', () => {
+      render(
+        <>
+          <Badge variant='outline' data-testid='outline'>
+            Draft
+          </Badge>
+          <Badge variant='primary' data-testid='primary'>
+            Live
+          </Badge>
+        </>
+      );
+      const outline = screen.getByTestId('outline').className;
+      expect(outline).toContain('bg-transparent');
+      expect(outline).toContain('text-(--linear-text-secondary)');
+      const primary = screen.getByTestId('primary').className;
+      expect(primary).toContain('bg-(--color-bg-primary)');
+      expect(primary).toContain('text-(--linear-text-primary)');
+    });
+
+    it.each([
+      ['info', 'border-info/20', 'text-(--color-accent-blue-text)'],
+      ['success', 'border-success/20', 'text-success-text'],
+      ['warning', 'border-warning/20', 'text-warning-text'],
+    ] as const)('applies %s tone overrides', (tone, border, text) => {
+      render(
+        <Badge tone={tone} data-testid='badge'>
+          Tone
+        </Badge>
+      );
+      const badge = screen.getByTestId('badge');
+      expect(badge.className).toContain(border);
+      expect(badge.className).toContain('bg-surface-1');
+      expect(badge.className).toContain(text);
     });
   });
 
@@ -319,6 +354,11 @@ describe('Badge', () => {
       const badge = screen.getByTestId('badge');
       expect(badge).toHaveAttribute('data-state', 'permission-restricted');
       expect(badge.className).toContain('bg-(--state-permission-bg)');
+    });
+
+    it('sets no permission state on other variants', () => {
+      render(<Badge data-testid='badge'>Open</Badge>);
+      expect(screen.getByTestId('badge')).not.toHaveAttribute('data-state');
     });
   });
 });

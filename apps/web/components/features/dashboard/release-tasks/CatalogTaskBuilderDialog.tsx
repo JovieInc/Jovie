@@ -151,7 +151,7 @@ export function CatalogTaskBuilderDialog({
                 const heading = cluster?.displayName ?? 'Uncategorized';
                 return (
                   <div key={String(clusterId ?? 'null')}>
-                    <div className='text-xs uppercase tracking-wide text-muted-foreground mb-1.5'>
+                    <div className='text-xs tracking-wide text-muted-foreground mb-1.5'>
                       {heading}
                     </div>
                     <ul className='space-y-1'>

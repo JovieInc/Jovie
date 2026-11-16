@@ -6,6 +6,11 @@
  * gate keep their `lintVoice` contract; do not add rules here.
  */
 import { lintCopy } from '@jovie/copy';
+import {
+  ARTIST_RULE_REPLY_FALLBACK,
+  type EnforcedArtistRule,
+  findArtistRuleViolations,
+} from '@/lib/artist-rules/gate';
 import { repairCopyFloorText } from '@/lib/chat/copy-floor-repair';
 
 export interface VoiceLintViolation {
@@ -44,13 +49,28 @@ export interface GatedAssistantReply {
 }
 
 /**
- * Gate a completed assistant reply against the copy floor. Mechanical
- * violations (dashes) are rewritten first, as the floor requires; only a reply
- * that still fails is replaced with the safe fallback. Returns the violations
- * so the caller can log which rules fired.
+ * Gate a completed assistant reply against the copy floor and the artist's
+ * own rules. Mechanical violations (dashes) are rewritten first, as the floor
+ * requires; only a reply that still fails is replaced with the safe fallback.
+ * A reply that names someone the artist asked never to feature is held back.
+ * Returns the violations (artist rules by id, never by name) so the caller
+ * can log which rules fired.
  */
-export function gateAssistantReply(text: string): GatedAssistantReply {
+export function gateAssistantReply(
+  text: string,
+  context?: { readonly artistRules?: readonly EnforcedArtistRule[] }
+): GatedAssistantReply {
   const repaired = repairCopyFloorText(text);
+  const ruleViolations = findArtistRuleViolations(
+    repaired,
+    context?.artistRules
+  ).map(violation => ({
+    rule: `artist-rule:${violation.category}`,
+    match: violation.ruleId,
+  }));
+  if (ruleViolations.length > 0) {
+    return { text: ARTIST_RULE_REPLY_FALLBACK, violations: ruleViolations };
+  }
   const { ok, violations } = lintVoice(repaired);
   return { text: ok ? repaired : ASSISTANT_REPLY_FALLBACK, violations };
 }

@@ -11,7 +11,7 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { listProductTruthClaims } from '@/data/product-truth/claims';
-import { ClaimSchema } from '@/data/product-truth/registry';
+import { ClaimSchema } from '@/data/product-truth/registry.schema';
 import {
   buildTruthDigest,
   diffTruthDigest,

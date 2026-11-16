@@ -159,3 +159,30 @@ export const LoadingStates: Story = {
     </div>
   ),
 };
+
+/**
+ * A long bio placeholder in a narrow column: twelve lines and a long
+ * accessible name, which reaches screen readers only.
+ */
+export const LongContentParagraph: Story = {
+  render: () => (
+    <div className='w-60'>
+      <LoadingSkeleton
+        lines={12}
+        height='h-3'
+        label='Loading the full artist biography, press quotes and tour history for Maximilian Featherstonehaugh'
+      />
+    </div>
+  ),
+};
+
+/** Card, table and line skeletons in a right-to-left page with an Arabic label. */
+export const RtlArabic: Story = {
+  render: () => (
+    <div dir='rtl' lang='ar' className='w-96 space-y-6'>
+      <LoadingSkeleton lines={2} width='w-3/4' label='جارٍ تحميل الملف الشخصي' />
+      <CardSkeleton />
+      <TableSkeleton rows={3} columns={3} />
+    </div>
+  ),
+};

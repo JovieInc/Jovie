@@ -142,38 +142,16 @@ describe('CommonDropdown', () => {
   });
 
   describe('Default Trigger', () => {
-    it('renders default button trigger', () => {
-      render(<CommonDropdown items={basicItems} />);
-      expect(
-        screen.getByRole('button', { name: 'More actions' })
-      ).toBeInTheDocument();
-    });
-
-    it('renders select-style trigger', () => {
-      render(<CommonDropdown items={basicItems} defaultTriggerType='select' />);
-      expect(
-        screen.getByRole('button', { name: 'Open dropdown' })
-      ).toBeInTheDocument();
-      expect(screen.getByText('Select...')).toBeInTheDocument();
-    });
-
-    it('uses custom aria-label', () => {
-      render(<CommonDropdown items={basicItems} aria-label='Custom actions' />);
-      expect(
-        screen.getByRole('button', { name: 'Custom actions' })
-      ).toBeInTheDocument();
-    });
-
-    it('renders custom trigger', () => {
-      render(
-        <CommonDropdown
-          items={basicItems}
-          trigger={<button type='button'>Custom</button>}
-        />
-      );
-      expect(
-        screen.getByRole('button', { name: 'Custom' })
-      ).toBeInTheDocument();
+    it.each([
+      ['default button', {}, 'More actions'],
+      ['select-style', { defaultTriggerType: 'select' }, 'Open dropdown'],
+      ['custom label', { 'aria-label': 'Custom actions' }, 'Custom actions'],
+      ['custom', { trigger: <button type='button'>Custom</button> }, 'Custom'],
+    ] as const)('renders the %s trigger', (_kind, props, name) => {
+      render(<CommonDropdown items={basicItems} {...props} />);
+      expect(screen.getByRole('button', { name })).toBeInTheDocument();
+      if ('defaultTriggerType' in props)
+        expect(screen.getByText('Select...')).toBeInTheDocument();
     });
   });
 
@@ -475,7 +453,7 @@ describe('CommonDropdown', () => {
       ];
       render(<CommonDropdown items={items} open={true} />);
       const label = screen.getByText('Inset Label');
-      expect(label.className).toContain('pl-10');
+      expect(label.className).toContain('ps-10');
     });
   });
 
@@ -738,7 +716,7 @@ describe('CommonDropdown', () => {
         <CommonDropdown items={basicItems} open={true} isLoading={true} />
       );
       const menu = screen.getByRole('menu');
-      expect(menu).toBeInTheDocument();
+      expect(menu).toHaveAttribute('data-motion', 'fade');
       expect(menu).toHaveAttribute('data-slot', 'common-dropdown-content');
       expect(menu).toHaveAttribute('aria-busy', 'true');
       expect(screen.getByRole('status')).toHaveTextContent(
@@ -750,20 +728,32 @@ describe('CommonDropdown', () => {
   });
 
   describe('Empty State', () => {
-    it('shows empty message when no items', () => {
-      render(<CommonDropdown items={[]} open={true} />);
-      expect(screen.getByRole('status')).toHaveTextContent('No items found');
-    });
-
-    it('shows custom empty message', () => {
+    it.each([
+      [undefined, 'No items found'],
+      ['Nothing to see here', 'Nothing to see here'],
+    ])('shows the empty message (%s)', (emptyMessage, text) => {
       render(
-        <CommonDropdown
-          items={[]}
-          open={true}
-          emptyMessage='Nothing to see here'
-        />
+        <CommonDropdown items={[]} open={true} emptyMessage={emptyMessage} />
       );
-      expect(screen.getByText('Nothing to see here')).toBeInTheDocument();
+      expect(screen.getByRole('status')).toHaveTextContent(text);
+    });
+  });
+
+  describe('Direction', () => {
+    it('passes dir to the dropdown and context menu primitives', () => {
+      const { unmount } = render(
+        <CommonDropdown items={basicItems} open={true} dir='rtl' />
+      );
+      expect(screen.getByRole('menu')).toHaveAttribute('dir', 'rtl');
+      unmount();
+
+      render(
+        <CommonDropdown variant='context' items={basicItems} dir='rtl'>
+          <div>Row</div>
+        </CommonDropdown>
+      );
+      fireEvent.contextMenu(screen.getByText('Row'));
+      expect(screen.getByRole('menu')).toHaveAttribute('dir', 'rtl');
     });
   });
 
@@ -779,13 +769,23 @@ describe('CommonDropdown', () => {
       });
     });
 
-    it('renders search input when searchable is true', () => {
+    it('presents a searchable surface as a group holding the items menu', () => {
       render(
         <CommonDropdown items={basicItems} open={true} searchable={true} />
       );
-      expect(screen.getByPlaceholderText('Search...')).toBeInTheDocument();
+      // A text input is not an allowed role="menu" child (axe
+      // aria-required-children): input in the group, items in the inner menu.
+      const input = screen.getByPlaceholderText('Search...');
+      const group = input.closest('[role="group"]');
+      // axe aria-allowed-attr: orientation is not allowed on role="group".
+      expect(group?.hasAttribute('aria-orientation')).toBe(false);
+      expect(input.closest('[role="menu"]')).toBeNull();
+      expect(group?.querySelector('[role="menuitem"]')).not.toBeNull();
     });
 
+    // A text input is not an allowed role="menu" child (axe
+    // aria-required-children): the searchable surface presents as a group
+    // and the item rows stay in an inner menu.
     it('renders custom search placeholder', () => {
       render(
         <CommonDropdown

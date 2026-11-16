@@ -47,6 +47,7 @@
         "SENTRY_*",
         "STATSIG_*",
         "FLAGS_*",
+        "FEATURE_*",
         "EXPERIMENTATION_*"
       ],
       // Runtime-only secrets and deployment-specific vars are passed through
@@ -130,7 +131,7 @@
       "dependsOn": [],
       "inputs": ["$TURBO_DEFAULT$", "vitest.config.*", "tests/**"],
       "outputs": [],
-      "env": ["NODE_ENV", "CI"]
+      "env": ["NODE_ENV", "CI", "VITEST_ISOLATE"]
     },
     "test:ci": {
       "description": "CI-matching web unit selector (same graph as test:fast; used by pnpm test:ci and node-runtime compatibility)",

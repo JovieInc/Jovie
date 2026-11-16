@@ -1,6 +1,7 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { mockArtist } from '@/lib/test-utils/mock-data';
+import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import {
   UnpublishedEntityAlerts,
   UnpublishedEntityAlertsFallback,
@@ -53,5 +54,50 @@ describe('<UnpublishedEntityAlertsFallback>', () => {
 
     expect(container).not.toBeEmptyDOMElement();
     expect(screen.getByRole('status')).toHaveAttribute('aria-busy', 'true');
+  });
+});
+
+describe('UnpublishedEntityAlerts states', () => {
+  it('has no axe violations for the default and the loading fallback', async () => {
+    const view = render(<UnpublishedEntityAlerts artist={mockArtist} />);
+    await expectNoA11yViolations(view.container);
+    view.unmount();
+
+    const fallback = render(<UnpublishedEntityAlertsFallback />);
+    expect(
+      screen.getByRole('status', { name: 'Loading Alerts Sign-up' })
+    ).toBeInTheDocument();
+    await expectNoA11yViolations(fallback.container);
+  });
+
+  it('falls back to the handle and keeps a long title in the copy', async () => {
+    const title = 'Never Say A Word (Extended Club Mix) feat. Sunrise Set';
+    const { container } = render(
+      <UnpublishedEntityAlerts
+        artist={{ ...mockArtist, name: '   ' }}
+        entityTitle={title}
+      />
+    );
+    expect(
+      screen.getByRole('link', { name: mockArtist.handle })
+    ).toHaveAttribute('href', `/${mockArtist.handle}`);
+    expect(screen.getByText(title)).toBeInTheDocument();
+    await expectNoA11yViolations(container);
+  });
+
+  it('lowercases the profile link and stays axe-clean right to left', async () => {
+    const { container } = render(
+      <div dir='rtl' lang='ar'>
+        <UnpublishedEntityAlerts
+          artist={{ ...mockArtist, name: 'تيم وايت', handle: ' TimWhite ' }}
+          entityTitle='منتصف الليل'
+        />
+      </div>
+    );
+    expect(screen.getByRole('link', { name: 'تيم وايت' })).toHaveAttribute(
+      'href',
+      '/timwhite'
+    );
+    await expectNoA11yViolations(container);
   });
 });

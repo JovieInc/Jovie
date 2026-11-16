@@ -3,7 +3,6 @@ import {
   Bell,
   Building2,
   Calendar,
-  CircleCheck,
   Clock,
   Ellipsis,
   House,
@@ -69,14 +68,18 @@ export function Cover({
   );
 }
 
-/** A registry DSP logo, drawn from its path data in the brand colour. */
+/**
+ * A registry DSP logo, drawn from its path data in the surrounding ink. The
+ * homepage sets every service in one tone, so colour never competes with
+ * the product (Tim, 2026-11-08: "premium not consumer").
+ */
 export function DspGlyph({
   glyph,
   size,
 }: Readonly<{ glyph: DspGlyphData; size: number }>) {
   return (
     <svg aria-hidden viewBox={glyph.viewBox} width={size} height={size}>
-      <path fill={glyph.color} d={glyph.path} />
+      <path fill='currentColor' d={glyph.path} />
     </svg>
   );
 }
@@ -218,10 +221,7 @@ export function ReleaseInspector({
         <Cover src={release.src} size={56} eager={eager} />
         <div>
           <b>{release.title}</b>
-          <span>
-            {release.artist}
-            <CircleCheck className='hv3-ui-i hv3-insp__ok' />
-          </span>
+          <span>{release.artist}</span>
         </div>
         <Ellipsis className='hv3-ui-i hv3-insp__more' />
       </div>
@@ -315,10 +315,7 @@ export function CatalogPlate() {
           <ReleaseTitle release={release} />
           <RowServices />
           {release.selected ? (
-            <>
-              <Anchor id='rowR' className='hv3-anchor--row-end' />
-              <Anchor id='row' className='hv3-anchor--row-start' />
-            </>
+            <Anchor id='rowR' className='hv3-anchor--row-end' />
           ) : null}
         </div>
       ))}

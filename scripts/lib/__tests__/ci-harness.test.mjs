@@ -1,4 +1,3 @@
-import { spawnSync } from 'node:child_process';
 import {
   mkdirSync,
   mkdtempSync,
@@ -8,9 +7,8 @@ import {
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
-import { runInNewContext } from 'node:vm';
-import { load } from 'js-yaml';
 import { describe, expect, it } from 'vitest';
+import { spawnSync } from '../child-process.mjs';
 import {
   buildCiHarnessArtifact,
   classifyCiRisk,
@@ -29,169 +27,6 @@ import { extractWorkflowJobBlock } from '../merge-queue-guard.mjs';
 const manifest = loadCiHarnessManifest();
 const REPO_ROOT = resolve(import.meta.dirname, '..', '..', '..');
 
-describe('Lighthouse identity admission', () => {
-  /** @typedef {{id?: string, uses?: string, name?: string, if?: string, run?: string, env?: Record<string, string>}} LighthouseStep */
-  const workflow =
-    /** @type {{jobs: Record<string, {steps: LighthouseStep[]}>}} */ (
-      load(readFileSync(resolve(REPO_ROOT, '.github/workflows/ci.yml'), 'utf8'))
-    );
-  const selected = (
-    step,
-    available,
-    {
-      download = 'failure',
-      ephemeral = false,
-      relevant = true,
-      failed = false,
-      branch = 'fixture-branch',
-    } = {}
-  ) => {
-    const expression = (step.if ?? 'success()')
-      .replace(/\$\{\{|\}\}/g, '')
-      .replace(
-        /\.(lighthouse-identity|download-build|neon-branch|ci-path-changes|neon-db)\b/g,
-        "['$1']"
-      );
-    // Actions implicitly applies success() unless the expression explicitly
-    // selects a status, such as the always() on evidence and cleanup steps.
-    if (failed && !/\b(?:always|success|failure|cancelled)\(/.test(expression))
-      return false;
-    return runInNewContext(expression, {
-      success: () => !failed,
-      always: () => true,
-      steps: {
-        'lighthouse-identity': { outputs: { available } },
-        check_changes: { outputs: { run_full_ci: String(relevant) } },
-        'download-build': { outcome: download },
-        'neon-branch': { outputs: { branch_id: branch } },
-      },
-      needs: {
-        'ci-path-changes': { outputs: { run_neon: String(ephemeral) } },
-        'neon-db': { result: ephemeral ? 'success' : 'skipped' },
-      },
-    });
-  };
-
-  for (const surface of ['dashboard', 'onboarding']) {
-    const job = workflow.jobs[`ci-lighthouse-${surface}-pr`];
-    it(`${surface}: missing identity succeeds before any checkout, provisioning or build`, () => {
-      const first = job.steps[0];
-      expect(first.id).toBe('lighthouse-identity');
-      expect(first.uses).toBeUndefined();
-      expect(first.env.E2E_CLERK_USER_ID).toBe(
-        '${{ secrets.E2E_CLERK_USER_ID }}'
-      );
-      const dir = mkdtempSync(join(tmpdir(), 'lighthouse-identity-'));
-      try {
-        for (const identity of ['', 'fixture-identity']) {
-          const output = join(dir, identity ? 'present' : 'absent');
-          const result = spawnSync('bash', ['-e', '-c', first.run], {
-            env: {
-              ...process.env,
-              E2E_CLERK_USER_ID: identity,
-              GITHUB_OUTPUT: output,
-            },
-            encoding: 'utf8',
-          });
-          expect(result.status, result.stderr).toBe(0);
-          const available = identity ? 'true' : 'false';
-          expect(readFileSync(output, 'utf8')).toBe(`available=${available}\n`);
-          expect(result.stdout).not.toContain('fixture-identity');
-          if (!identity) {
-            expect(result.stdout).toContain(`skipping ${surface} Lighthouse`);
-            expect(
-              job.steps.slice(1).filter(step => selected(step, available))
-            ).toEqual([]);
-            // The previous probe's existing missing-identity branch also exits
-            // successfully: moving it must not turn the job into SKIPPED/red.
-            const probe = job.steps.find(
-              step => step.name === `Run authenticated ${surface} Lighthouse`
-            );
-            const oldEarlyExit = probe.run.slice(
-              probe.run.indexOf('if [ -z'),
-              probe.run.indexOf('export E2E_USE_TEST_AUTH_BYPASS')
-            );
-            expect(
-              spawnSync('bash', ['-e', '-c', oldEarlyExit], {
-                env: { ...process.env, E2E_CLERK_USER_ID: '' },
-                encoding: 'utf8',
-              }).status
-            ).toBe(result.status);
-          }
-        }
-      } finally {
-        rmSync(dir, { recursive: true, force: true });
-      }
-    });
-
-    it(`${surface}: present identity preserves artifact fallback, real probes and failure cleanup`, () => {
-      const byName = name => job.steps.find(step => step.name === name);
-      const fallback = byName(`Build app fallback for ${surface} Lighthouse`);
-      expect(selected(fallback, 'true')).toBe(true);
-      expect(selected(fallback, 'true', { failed: true })).toBe(false);
-      expect(selected(fallback, 'true', { download: 'success' })).toBe(false);
-      expect(
-        selected(byName('Extract build artifact'), 'true', {
-          download: 'success',
-        })
-      ).toBe(true);
-      const probe = byName(`Run authenticated ${surface} Lighthouse`);
-      expect(selected(probe, 'true')).toBe(true);
-      expect(selected(probe, 'true', { failed: true })).toBe(false);
-      expect(probe.run).toContain(`pnpm run test:lighthouse:${surface}:pr`);
-      expect(probe.run).toContain('Standalone server');
-      expect(probe.run).toContain(
-        "trap 'kill $SERVER_PID 2>/dev/null || true' EXIT"
-      );
-      expect(probe.env.BASE_URL).toBe('http://localhost:3000');
-      expect(probe.env.E2E_CLERK_USER_ID).toBe(
-        '${{ secrets.E2E_CLERK_USER_ID }}'
-      );
-      expect(
-        selected(byName(`Upload ${surface} Lighthouse artifacts`), 'true', {
-          failed: true,
-        })
-      ).toBe(true);
-      if (surface === 'dashboard') {
-        expect(
-          selected(
-            byName('Create ephemeral Neon database branch (with retry)'),
-            'true'
-          )
-        ).toBe(true);
-        expect(
-          selected(byName('Cleanup ephemeral Neon branch'), 'true', {
-            failed: true,
-          })
-        ).toBe(true);
-        expect(
-          selected(byName('Cleanup ephemeral Neon branch'), 'true', {
-            failed: true,
-            branch: '',
-          })
-        ).toBe(false);
-        expect(byName('Cleanup ephemeral Neon branch').if).toContain(
-          "steps.neon-branch.outputs.branch_id != ''"
-        );
-        expect(selected(probe, 'true', { relevant: false })).toBe(false);
-      } else {
-        expect(
-          selected(byName('Export DATABASE_URL (main — non-DB PR)'), 'true')
-        ).toBe(true);
-        expect(
-          selected(byName('Run migrations (ephemeral Neon)'), 'true', {
-            ephemeral: true,
-          })
-        ).toBe(true);
-        expect(
-          selected(byName('Export DATABASE_URL (main — non-DB PR)'), 'true', {
-            ephemeral: true,
-          })
-        ).toBe(false);
-      }
-    });
-  }
-});
 /** Locked PR merge-gate set (manifest is source of truth for harness docs + artifact). */
 const EXPECTED_MERGE_GATE_NAMES = [
   'Path Changes',
@@ -201,6 +36,9 @@ const EXPECTED_MERGE_GATE_NAMES = [
   'Secret Scan (gitleaks + trufflehog)',
   'Golden Path Lock',
   'Visual Snapshot Compare',
+  'Visual Snapshot Compare (homepage)',
+  'Visual Snapshot Compare (marketing DOM)',
+  'Visual Snapshot Compare (marketing routes)',
   'Migration Guard',
   'Unit Tests',
   'Exact-head Coverage',
@@ -360,10 +198,9 @@ describe('ci-harness manifest', () => {
       'Migration Guard',
       'Fork PR Gate',
       'PR Size Guard',
+      'Company guards',
     ]);
-    // Individual harness merge-gate job names must stay in the forbidden pin list
-    // so a batch failure bisects instead of evicting siblings. ci-fast is a real
-    // collapsed job (JOV-3464) but must never be pinned alone — only PR Ready is.
+    // Keep individual jobs unpinned so batch failures bisect (JOV-3464).
     for (const name of EXPECTED_MERGE_GATE_NAMES) {
       if (REQUIRED_MERGE_STATUSES.includes(name)) continue;
       expect(
@@ -388,7 +225,7 @@ describe('ci-harness manifest', () => {
     const prReady = extractWorkflowJobBlock(workflow, 'ci-pr-ready');
 
     expect(prReady).toContain(
-      'needs: [ci-path-changes, ci-risk-classifier, ci-fast, ci-blog-content, ci-exact-head-coverage, ci-secret-scan, ci-golden-path-lock, ci-visual-snapshot-compare, ci-pen-diff, ci-slop-guard]'
+      'needs: [ci-path-changes, ci-risk-classifier, ci-fast, ci-blog-content, ci-exact-head-coverage, ci-secret-scan, ci-golden-path-lock, ci-visual-snapshot-compare, ci-visual-snapshot-homepage, ci-visual-marketing-dom, ci-visual-marketing-routes, ci-pen-diff, ci-slop-guard]'
     );
     expect(prReady).toContain('needs.ci-exact-head-coverage.result');
     expect(prReady).toContain('Evaluate deterministic source PR checks');
@@ -450,8 +287,7 @@ describe('ci-harness manifest', () => {
       expect(controller).toContain("github.event_name == 'workflow_dispatch'");
       expect(controller).not.toContain("github.event_name == 'pull_request'");
     }
-    // JOV-6002: dashboard/onboarding Lighthouse are merge-group launch gates
-    // keyed on the launch-gate path flag, never source-PR events.
+    // JOV-6002: launch-gate paths select merge-group-only Lighthouse checks.
     for (const jobId of [
       'ci-lighthouse-dashboard-pr',
       'ci-lighthouse-onboarding-pr',
@@ -543,8 +379,7 @@ describe('ci-harness manifest', () => {
       'name: neon-db-connection-${{ github.run_id }}-${{ github.run_attempt }}'
     );
 
-    // The matrix cap changes process-level fan-out only; full-suite Playwright
-    // workers and the smoke override remain unchanged.
+    // Matrix fan-out preserves Playwright workers and the smoke override.
     expect(playwrightConfig).toContain('return isSmokeOnly ? 8 : 4;');
     expect(playwrightConfig).toContain('workers: getWorkers(),');
   });

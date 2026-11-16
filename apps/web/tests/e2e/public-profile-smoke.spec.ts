@@ -138,18 +138,23 @@ test('public profile renders core elements within budget', async ({ page }) => {
 // path. A profile that renders while its releases 404 or show the "Coming
 // soon" placeholder reached production unnoticed because nothing walked them.
 const RELEASE_PAGE_HANDLE = process.env.SMOKE_RELEASE_HANDLE ?? 'tim';
-// Historical slug shared outside Jovie before the release was re-slugged. It
-// must keep resolving to the live release (redirect to its current slug).
+// Two URLs for one release that must both keep resolving: the bare slug shared
+// outside Jovie before the release was suffixed, and the suffixed slug it had
+// until the legacy slug migration (JOV-7140) renamed it back. Whichever one is
+// current, the other redirects to it, so both must end on the same page.
 const LEGACY_RELEASE_SLUG =
   process.env.SMOKE_LEGACY_RELEASE_SLUG ?? 'take-me-over';
 const LEGACY_RELEASE_TARGET =
   process.env.SMOKE_LEGACY_RELEASE_TARGET ?? 'take-me-over-2';
+// Both legacy slugs belong to this one release. A rename changes its slug but
+// never its title, so the current page is identified by title, not by a slug
+// allowlist that goes stale on every rename (JOV-12716).
+const LEGACY_RELEASE_TITLE = 'Take Me Over';
 // Known catalog gap: Tim's solo "Seaside Heights" is not imported yet. Until it
 // is, the bare slug must be a clean 404. It must not redirect to the Vigel
-// version (seaside-heights-3) and must not render a Coming soon placeholder.
+// version and must not render a Coming soon placeholder.
 const MISSING_RELEASE_SLUG =
   process.env.SMOKE_MISSING_RELEASE_SLUG ?? 'seaside-heights';
-const MISSING_RELEASE_WRONG_TARGET = 'seaside-heights-3';
 
 async function expectLiveReleasePage(
   page: import('@playwright/test').Page,
@@ -204,13 +209,23 @@ test('legacy release slug resolves to its current release page', async ({
   page,
 }) => {
   test.setTimeout(60_000);
-  await expectLiveReleasePage(
-    page,
-    `/${RELEASE_PAGE_HANDLE}/${LEGACY_RELEASE_SLUG}`
+  const landedOn: string[] = [];
+  for (const slug of [LEGACY_RELEASE_SLUG, LEGACY_RELEASE_TARGET]) {
+    await expectLiveReleasePage(page, `/${RELEASE_PAGE_HANDLE}/${slug}`);
+    landedOn.push(new URL(page.url()).pathname);
+  }
+  expect(landedOn[0], 'both URLs must reach the same release').toBe(
+    landedOn[1]
   );
-  expect(new URL(page.url()).pathname).toBe(
-    `/${RELEASE_PAGE_HANDLE}/${LEGACY_RELEASE_TARGET}`
-  );
+  // The slugs above are historical URLs, never the landing: after the second
+  // rename the release lives at its qualifier slug, and both legacy URLs
+  // redirect straight to it. Assert the release identity of that landing —
+  // the page renders this release's own title — instead of pinning a slug
+  // that the next rename would retire again.
+  await expect(
+    page.locator('h1').first(),
+    'the page both legacy slugs land on is not this release'
+  ).toHaveText(LEGACY_RELEASE_TITLE);
 });
 
 test('an unimported release slug is a clean 404, not a placeholder or wrong release', async ({
@@ -222,8 +237,8 @@ test('an unimported release slug is a clean 404, not a placeholder or wrong rele
     { waitUntil: 'domcontentloaded' }
   );
   expect(response?.status()).toBe(404);
-  expect(new URL(page.url()).pathname).not.toContain(
-    MISSING_RELEASE_WRONG_TARGET
+  expect(new URL(page.url()).pathname).toBe(
+    `/${RELEASE_PAGE_HANDLE}/${MISSING_RELEASE_SLUG}`
   );
   expect(await page.title()).not.toMatch(/^Coming soon/i);
   await expect(page.getByText(/coming soon/i)).toHaveCount(0);

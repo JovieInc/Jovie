@@ -146,3 +146,20 @@ test('light elevation is raised = lighter; the retired inverted ramp is rejected
   );
   assert.ok(details.includes('light canvas must be darker than surface-0'));
 });
+
+test('verified blue and on-media white are ZiaWI marks the CSS must project', () => {
+  const palette = loadPalette();
+  const drifted = structuredClone(palette);
+  drifted.swatches.verified.light.hex = '#11AFFF';
+  const details = validateOklchPalette(drifted).map(i => i.detail);
+  assert.ok(details.some(d => d.startsWith('verified.light want ZiaWI')));
+  const css = readFileSync(join(REPO_ROOT, DESIGN_SYSTEM_PATH), 'utf8');
+  const raw = css.replace(
+    '--color-verified: #0084d1;',
+    '--color-verified: #0284c7;'
+  );
+  const issues = validateOklchPalette(palette, REPO_ROOT, { css: raw });
+  assert.ok(
+    issues.some(i => i.detail.includes('--color-verified want #0084D1'))
+  );
+});

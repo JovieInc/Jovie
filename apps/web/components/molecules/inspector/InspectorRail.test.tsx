@@ -123,6 +123,8 @@ describe('InspectorShell', () => {
     const header = screen.getByTestId('entity-sidebar-entity-header');
     const tabs = screen.getByRole('tablist', { name: 'Inspector tabs' });
     const panel = screen.getByTestId('inspector-tab-panel');
+    // The internal scroll surface is keyboard-reachable (axe scrollable-region-focusable).
+    expect(panel).toHaveAttribute('tabindex', '0');
 
     expect(header).toContainElement(screen.getByTestId('object-header'));
     expect(

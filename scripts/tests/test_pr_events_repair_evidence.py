@@ -55,7 +55,10 @@ class Shell:
         return [call for call in self.calls if tuple(call[:len(prefix)]) == prefix]
 
 
-class RedBeforeGreenEvidenceTests(unittest.TestCase):
+from .repair_customer_decision_cases import CustomerDecisionCases
+
+
+class RedBeforeGreenEvidenceTests(CustomerDecisionCases, unittest.TestCase):
     PR = {"number": 7, "headRefOid": "a" * 40, "statusCheckRollup": [
         {"name": "Source Validation", "conclusion": "FAILURE",
          "detailsUrl": "https://github.com/JovieInc/Jovie/actions/runs/123/job/456"}]}
@@ -70,6 +73,13 @@ class RedBeforeGreenEvidenceTests(unittest.TestCase):
         "Falsifying test": "node /tmp/compare-profile-writes.mjs",
         "Result": "Main: 2; head: 3; head without hold block: 2.",
     }
+
+    def test_repair_refuses_ambiguous_customer_decisions_before_publication(self):
+        decision = '<!-- customer-changelog/v1 {"releaseWorthy":false} -->'
+        for duplicate in [decision, '<!-- customer-changelog/v1 {"releaseWorthy":true} -->']:
+            with self.assertRaisesRegex(ValueError, "exactly one customer changelog decision"):
+                events.repair_evidence_body(self.PR, decision + "\n" + duplicate,
+                                            customer_decision={"releaseWorthy": False})
 
     def test_explicit_premise_repairs_body_and_passes_canonical_policy(self):
         body = events.red_before_green_block(self.PR)
@@ -140,6 +150,37 @@ console.log(JSON.stringify(bodies.map(body => evaluateFleetRules({
         template = "\n<!--\n## Win\n-->\n```text\n## Win\n```\n"
         updated = events.repair_evidence_body(self.PR, body + template, win_section=self.WIN)
         self.assertTrue(updated.endswith(self.WIN))
+
+    def test_measured_win_replacement_requires_the_observed_section(self):
+        old = "## Win\n\n- Claim: Existing unmeasured claim\n"
+        suffix = "## Verification\n\nKeep the original runtime proof.\n"
+        body = events.red_before_green_block(self.PR) + "\n" + old + "\n" + suffix
+        updated = events.repair_evidence_body(
+            self.PR, body, win_section=self.WIN, previous_win_section=old,
+            customer_decision={"releaseWorthy": False})
+        self.assertNotIn(old, updated)
+        self.assertIn(suffix, updated)
+        self.assertEqual(updated.count("## Win"), 1)
+        self.assertIn(self.WIN, updated)
+        self.assertEqual(updated.count("customer-changelog/v1"), 1)
+        checked = subprocess.run(["node", "--input-type=module", "-e", """
+import { readFileSync } from 'node:fs';
+import { evaluateFleetRules } from './scripts/pr-fleet-rules.mjs';
+const bodies = JSON.parse(readFileSync(0, 'utf8'));
+console.log(JSON.stringify(bodies.map(body => evaluateFleetRules({
+  pr: {title: 'ci: repair annotation evidence', body}, files: [],
+}).errors)));
+"""], cwd=ROOT, input=json.dumps([body, updated]), text=True, capture_output=True, check=True)
+        before, after = json.loads(checked.stdout)
+        self.assertTrue(any(error.startswith("win:") for error in before), before)
+        self.assertEqual(after, [])
+        with self.assertRaisesRegex(ValueError, "Win section changed"):
+            events.repair_evidence_body(self.PR, body.replace(old, self.WIN),
+                                        win_section=self.WIN, previous_win_section=old)
+        with self.assertRaisesRegex(ValueError, "replacement requires"):
+            events.repair_evidence_body(self.PR, body, previous_win_section=old)
+        with self.assertRaisesRegex(ValueError, "Win section changed"):
+            events.repair_evidence_body(self.PR, suffix, win_section=self.WIN, previous_win_section=old)
 
     def test_ensure_can_write_measured_win_without_a_red_run(self):
         written = []
@@ -345,7 +386,7 @@ console.log(JSON.stringify(JSON.parse(readFileSync(0, 'utf8')).map(body =>
 
     def test_public_decision_round_trips_without_comment_injection(self):
         decision = {"releaseWorthy": True, "text": "Choose a link --> continue"}
-        updated = events.repair_evidence_body(self.PR, "Summary", customer_decision=decision)
+        updated = events.repair_evidence_body(self.PR, "Summary: customer-changelog/v1 is missing", customer_decision=decision)
         marker = updated.split("<!-- customer-changelog/v1 ", 1)[1].split(" -->", 1)[0]
         self.assertEqual(json.loads(marker), decision)
         self.assertNotIn("Choose a link -->", updated)

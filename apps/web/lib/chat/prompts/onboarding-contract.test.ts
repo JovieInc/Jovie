@@ -90,6 +90,10 @@ describe('deterministic onboarding prompt contract', () => {
       'Record each stated objection through `recordInterviewSignal`',
     ],
     [
+      'recordsSignalsSilently',
+      'When the visitor says what they want Jovie to do, record it as a `want`',
+    ],
+    [
       'redirectsGeneralSupportIntoIntake',
       'For general support, redirect to the intake',
     ],

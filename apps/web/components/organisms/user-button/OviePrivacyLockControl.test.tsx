@@ -1,5 +1,6 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { expectNoA11yViolations } from '@/tests/utils/a11y';
 
 const { getState, updateState, lock, ensureReady } = vi.hoisted(() => ({
   getState: vi.fn(),
@@ -47,6 +48,10 @@ describe('OviePrivacyLockControl', () => {
       <OviePrivacyLockControl ensurePrivacyLockCanBeEnabled={ensureReady} />
     );
     await screen.findByText('Off · requires an existing admin passkey');
+    // The block starts on the same gutter as every other menu row.
+    expect(screen.getByTestId('ovie-privacy-lock-control')).toHaveClass(
+      'px-(--space-2-5)'
+    );
     fireEvent.click(
       screen.getByRole('button', { name: 'Enable Ovie privacy lock' })
     );
@@ -122,7 +127,7 @@ describe('OviePrivacyLockControl', () => {
     });
     lock.mockResolvedValue(undefined);
 
-    render(
+    const { container } = render(
       <OviePrivacyLockControl ensurePrivacyLockCanBeEnabled={ensureReady} />
     );
     expect(
@@ -134,5 +139,6 @@ describe('OviePrivacyLockControl', () => {
     expect(
       screen.getByRole('button', { name: 'Lock Ovie Now' })
     ).toBeInTheDocument();
+    await expectNoA11yViolations(container);
   });
 });
