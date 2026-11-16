@@ -13,7 +13,6 @@ import {
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { retryTransient } from './transient-retry.mjs';
 
 const MARKER_FILE = 'production-generation-verified.json';
 const RECOVERY_FILE = 'production-generation-recovery.json';
@@ -1357,8 +1356,10 @@ function downloadJsonArtifact(
   const directory = mkdtempSync(join(tmpdir(), 'jovie-production-marker-'));
   const archive = join(directory, 'artifact.zip');
   try {
-    const endpoint = `repos/${repo}/actions/artifacts/${artifactId}/zip`;
-    const body = retryTransient(() => runZip('gh', ['api', endpoint]));
+    const body = runZip('gh', [
+      'api',
+      `repos/${repo}/actions/artifacts/${artifactId}/zip`,
+    ]);
     writeFileSync(archive, body);
     const entries = runText('unzip', ['-Z1', archive])
       .split('\n')
