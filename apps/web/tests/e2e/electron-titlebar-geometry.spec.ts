@@ -311,10 +311,21 @@ test('Electron shell keeps one control contract across chat, calendar, tasks, li
         '[data-top-spacing-owner="shell-header"]'
       );
       const title = header?.querySelector<HTMLElement>('h1');
-      const headerInner = header?.firstElementChild as HTMLElement | null;
-      const headerPaddingLeft = headerInner
-        ? Number.parseFloat(getComputedStyle(headerInner).paddingLeft)
-        : null;
+      // JOV-7207 (#25590) moved the window-controls reservation padding onto
+      // the [data-top-spacing-owner] wrapper and deepened the header to
+      // wrapper > header > row. The content column's inner start is now the
+      // wrapper's reservation padding plus the title row's own header
+      // padding-x — read both instead of firstElementChild (the unpadded
+      // <header> box since that refactor).
+      const headerInner =
+        header?.querySelector<HTMLElement>(
+          '[data-testid="dashboard-header-row"]'
+        ) ?? (header?.firstElementChild as HTMLElement | null);
+      const headerPaddingLeft =
+        headerInner && header
+          ? Number.parseFloat(getComputedStyle(headerInner).paddingLeft) +
+            Number.parseFloat(getComputedStyle(header).paddingLeft)
+          : null;
       const settingsShellBox = settingsShell?.getBoundingClientRect();
       const settingsColumnBox = settingsColumn?.getBoundingClientRect();
       const mainContentBox = mainContent?.getBoundingClientRect();
