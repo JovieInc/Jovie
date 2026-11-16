@@ -147,13 +147,16 @@ describe('checkout confirmation claims', () => {
   it('repeated visits report page views, never additional conversion events', async () => {
     const first = render(<CheckoutSuccessPage />);
     await screen.findByTestId('checkout-success-paid');
+    // The paid node commits before the page-view effect. Unmounting on
+    // that node drops the visit, so wait until this view is recorded.
+    await waitFor(() => expect(mocks.page).toHaveBeenCalledTimes(1));
     first.unmount();
     render(<CheckoutSuccessPage />);
     await screen.findByTestId('checkout-success-paid');
+    await waitFor(() => expect(mocks.page).toHaveBeenCalledTimes(2));
     expect(
       screen.queryByText(/welcome to|just unlocked|live and upgraded/i)
     ).not.toBeInTheDocument();
-    expect(mocks.page).toHaveBeenCalledTimes(2);
     expect(mocks.page).toHaveBeenCalledWith(
       'checkout_success',
       expect.objectContaining({ conversion: false })
