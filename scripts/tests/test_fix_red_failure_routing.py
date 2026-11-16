@@ -163,6 +163,58 @@ class RouteBudgetGrowthTest(unittest.TestCase):
         self.assertEqual(stay['action'], 'agent')
 
 
+class RenderModeSnapshotDriftTest(unittest.TestCase):
+    LOSS = ('/brand baseline weakened: html 103027 -> 105679 bytes. '
+            'A loss needs an unexpired overrides entry in apps/web/scripts/route-render-modes.json '
+            '(owner, reason, issue, removalCondition, evidence, expiresOn).')
+
+    def test_inherited_snapshot_loosening_syncs_main_before_fixture_infra(self):
+        marked = '::error::' + self.LOSS + '\n'
+        prefixed = ('Exact-head Coverage\tCheck render modes\t'
+                    '2026-11-16T04:14:32.0162757Z ##[error]' + self.LOSS + '\n'
+                    'Exact-head Coverage\tCheck render modes\t'
+                    '2026-11-16T04:14:32.0162758Z ##[error]Process completed with exit code 1.\n')
+        notice = ('::notice::67 route(s) are cheaper than recorded '
+                  '(e.g. /: static html=287251 -> static html=274803). Lock the win in.\n')
+        mode = '::error::/auth-return baseline weakened: render mode static -> dynamic. A loss needs an override.\n'
+        window = '::error::/about baseline weakened: revalidate window 3600 s -> 60 s. A loss needs an override.\n'
+        for log in (marked, '##[error]' + self.LOSS + '\n',
+                    '2026-11-16T04:14:32.0162757Z ::error::' + self.LOSS + '\n',
+                    '\x1b[31m' + marked + '\x1b[0m',
+                    'passing fixture: API rate limit exceeded; HTTP 503\n' + notice + marked,
+                    prefixed, marked + mode + window):
+            route = classes.classify(red('Exact-head Coverage'), {'Exact-head Coverage': log})
+            self.assertEqual((route['cls'], route['action']), ('render-mode-snapshot', 'sync-main'), log)
+
+    def test_real_render_regressions_and_unmarked_lines_stay_with_agent(self):
+        marked = '::error::' + self.LOSS + '\n'
+        for log in (self.LOSS + '\n',
+                    'echo "' + marked.strip() + '"\n',
+                    '::error::/brand baseline weakened: html 105679 -> 103027 bytes. A loss needs an override.\n',
+                    '::error::/brand baseline weakened: html 103027 -> 103027 bytes. A loss needs an override.\n',
+                    marked + '::error::/brand prerendered HTML grew 1 -> 2 bytes (allowed 9).\n',
+                    marked + '::error::/brand lost cacheability: static -> dynamic.\n',
+                    marked + 'FAIL home.test.tsx > shows setup\nAssertionError: hidden setup\n',
+                    marked + 'Error: the build failed\n'):
+            route = classes.classify(red('Exact-head Coverage'), {'Exact-head Coverage': log})
+            self.assertEqual(route['action'], 'agent', log)
+
+    def test_design_source_and_snapshot_drift_compose_one_main_sync(self):
+        source = (' FAIL workspace-scripts lib/__tests__/design-system-source-ratchet.test.mjs'
+                  ' > design-system source identity ratchet > exits zero from the CLI on the live tree\n')
+        coverage = '::error::' + self.LOSS + '\n::notice::1 route(s) are cheaper than recorded.\n'
+        route = classes.classify(
+            red('Source Validation', 'Exact-head Coverage'),
+            {'Source Validation': source, 'Exact-head Coverage': coverage})
+        self.assertEqual((route['cls'], route['action']), ('composed', 'sync-main'))
+        self.assertEqual(route['actions'], ['sync-main'])
+
+    def test_budget_growth_log_still_syncs_main(self):
+        growth = '##[error]routes./app/chat/[id] grew 823 -> 1385\n'
+        route = classes.classify(red('Exact-head Coverage'), {'Exact-head Coverage': growth})
+        self.assertEqual((route['cls'], route['action']), ('route-budget-growth', 'sync-main'))
+
+
 class TreeByteBudgetTest(unittest.TestCase):
     def test_stale_head_route_precedes_the_general_tree_budget_route(self):
         stale = ('##[error]PR head has 207672844 tracked regular-file bytes, exceeding the '
