@@ -5,11 +5,7 @@ import { SettingsUsageStatsSection } from '@/features/dashboard/organisms/Settin
 
 export default function SettingsUsagePage() {
   return (
-    <SettingsSection
-      id='usage'
-      title='Usage stats'
-      description='Plan limits, messages used, remaining quota, and upgrade options.'
-    >
+    <SettingsSection id='usage' title='Usage stats'>
       <SettingsUsageStatsSection />
     </SettingsSection>
   );
