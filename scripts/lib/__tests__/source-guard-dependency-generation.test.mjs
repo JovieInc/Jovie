@@ -335,8 +335,8 @@ function expression(value, context) {
     .trim()
     .replace(/^\$\{\{\s*|\s*\}\}$/g, '')
     .replace(/\.([\w]+-[\w-]+)/g, (_, key) => `[${JSON.stringify(key)}]`);
-  // GitHub's expression subset used by this local transaction consists of
-  // property reads, comparisons, boolean operators and status functions.
+  // GitHub supplies empty outputs for an absent or skipped docs scope step.
+  context.steps.source_docs ??= { outputs: { docs_only: '' } };
   return Function(
     ...Object.keys(context),
     `return (${code});`

@@ -949,7 +949,7 @@ jobs:
           set -euo pipefail
           # No merge/dependency transaction is needed when the exact base is
           # already contained in the positively classified prose-only head.
-          if [ "$DOCS_ONLY" = true ]; then exit 0; fi
+          if [ "${DOCS_ONLY:-}" = true ]; then exit 0; fi
           test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
           echo 'restore_head=false' >> "$GITHUB_OUTPUT"
           # A local dirty checkout is not owned by this transaction.
