@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   fixturePacket,
   memoryCertificationBackend,
@@ -128,6 +128,20 @@ function safetyHarness() {
   };
 }
 
+// Replay must verify recorded history against the digests recorded at preparation
+// (JOV-12804), never by re-planning through the live policy. The mock delegates to
+// the actual policy by default so existing behavior is unchanged; tests below swap
+// the implementation to simulate policy and owner revisions.
+let actualPlan: typeof import('./learning-policy').planAcquisitionLearningEvent;
+vi.mock('./learning-policy', async importOriginal => {
+  const actual = await importOriginal<typeof import('./learning-policy')>();
+  actualPlan = actual.planAcquisitionLearningEvent;
+  return {
+    ...actual,
+    planAcquisitionLearningEvent: vi.fn(actual.planAcquisitionLearningEvent),
+  };
+});
+
 describe('private acquisition feedback safety boundaries', () => {
   it.each(['reason', 'uncertainty'] as const)(
     'rejects credential-shaped freeform %s before private persistence',
@@ -256,4 +270,66 @@ describe('private acquisition feedback safety boundaries', () => {
       expect(h.backend.records.size).toBe(0);
     }
   );
+});
+
+describe('policy evolution replay (JOV-12804)', () => {
+  afterEach(async () => {
+    if (actualPlan) {
+      const policy = await import('./learning-policy');
+      vi.mocked(policy.planAcquisitionLearningEvent).mockImplementation(
+        actualPlan
+      );
+    }
+  });
+
+  it('replays recorded history when the live policy changes, while real tampering still fails', async () => {
+    const h = safetyHarness();
+    const receipt = await h.store.ingestLearningFeedback(h.source().request);
+    const policy = await import('./learning-policy');
+    // A policy revision is simulated as a wholesale behavioral change.
+    vi.mocked(policy.planAcquisitionLearningEvent).mockImplementation(() => {
+      throw new Error('policy revision changed');
+    });
+    const reloaded = new AcquisitionCertificationStore(h.backend, h.ports);
+    const projection = await reloaded.project(SUBJECT);
+    expect(projection.learningFeedback).toEqual([receipt]);
+    // Real tampering still fails, and verification never consults the live policy.
+    const [key, raw] = [...h.backend.records.entries()][0];
+    const record = JSON.parse(raw as string);
+    record.learningFeedback[0].plan.issue = 'JOV-9999';
+    h.backend.records.set(key, JSON.stringify(record));
+    await expect(
+      new AcquisitionCertificationStore(h.backend, h.ports).project(SUBJECT)
+    ).rejects.toThrow('Invalid persisted acquisition feedback identity.');
+    // Fresh preparation still resolves through the live policy.
+    await expect(
+      h.store.ingestLearningFeedback(h.source(1).request)
+    ).rejects.toThrow('policy revision changed');
+    expect(h.backend.records.size).toBe(1);
+  });
+
+  it('an owners change preserves the recorded route attribution while replay still verifies', async () => {
+    const h = safetyHarness();
+    const receipt = await h.store.ingestLearningFeedback(h.source().request);
+    expect(receipt.plan).toMatchObject({ action: 'route', issue: 'JOV-5598' });
+    const policy = await import('./learning-policy');
+    vi.mocked(policy.planAcquisitionLearningEvent).mockImplementation(input => {
+      const plan = actualPlan!(input);
+      return plan.action === 'route'
+        ? { ...plan, issue: 'JOV-0000', route: 'reassigned_owner' }
+        : plan;
+    });
+    const reloaded = new AcquisitionCertificationStore(h.backend, h.ports);
+    const projection = await reloaded.project(SUBJECT);
+    expect(projection.learningFeedback[0].plan.issue).toBe('JOV-5598');
+    expect(projection.learningFeedback[0].planDigest).toBe(receipt.planDigest);
+    // A tampered route under the changed policy is still rejected.
+    const [key, raw] = [...h.backend.records.entries()][0];
+    const record = JSON.parse(raw as string);
+    record.learningFeedback[0].plan.route = 'reassigned_owner';
+    h.backend.records.set(key, JSON.stringify(record));
+    await expect(
+      new AcquisitionCertificationStore(h.backend, h.ports).project(SUBJECT)
+    ).rejects.toThrow('Invalid persisted acquisition feedback identity.');
+  });
 });
