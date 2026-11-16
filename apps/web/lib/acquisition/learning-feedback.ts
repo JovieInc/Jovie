@@ -80,6 +80,11 @@ export interface AcquisitionLearningFeedbackReceipt {
   readonly feedback: AcquisitionLearningFeedback;
   readonly eventKey: string;
   readonly plan: ReturnType<typeof planAcquisitionLearningEvent>;
+  /** Digest of the recorded plan as produced by the policy version in force at
+   * preparation. Replay verifies against this digest instead of re-planning
+   * against the live policy, so policy/owner changes never invalidate history.
+   */
+  readonly planDigest: string;
   readonly preparedAt: string;
   readonly sourceSha: string;
   readonly executionAuthority: 'none';
@@ -126,6 +131,23 @@ function feedbackPlan(
   });
 }
 
+/** Digest of the event binding recomputed from the stored feedback bytes alone.
+ * This derivation lives in this record contract (not the policy module), so it is
+ * stable across policy and owner changes.
+ */
+function recordedEventKey(feedback: AcquisitionLearningFeedback): string {
+  const { evidenceRefs: _refs, ...binding } = eventFor(feedback);
+  return learningDigest(binding);
+}
+
+/** Replay verifies persisted history WITHOUT the live policy (JOV-12804): a
+ * policy or owners change must not fail digest verification of recorded history.
+ * Each row is checked against the digests recorded at preparation time:
+ * - eventKey recomputed from the stored feedback bytes (tamper-evident binding);
+ * - plan bytes against the stored planDigest (the plan the recording policy produced);
+ * - structural cross-consistency between the plan and its eventKey.
+ * Real tampering with any recorded field still fails.
+ */
 export function parseLearningFeedbackHistory(
   value: unknown
 ): AcquisitionLearningFeedbackReceipt[] {
@@ -136,6 +158,7 @@ export function parseLearningFeedbackHistory(
         feedback: AcquisitionLearningFeedbackSchema,
         eventKey: z.string().regex(/^[a-f0-9]{64}$/),
         plan: z.record(z.string(), z.unknown()),
+        planDigest: z.string().regex(/^[a-f0-9]{64}$/),
         preparedAt: z.iso.datetime(),
         sourceSha: z.string().regex(/^[a-f0-9]{40}$/),
         executionAuthority: z.literal('none'),
@@ -145,26 +168,23 @@ export function parseLearningFeedbackHistory(
     .parse(value);
   const identities = new Set<string>();
   const history: AcquisitionLearningFeedbackReceipt[] = [];
-  const zero = Object.fromEntries(LEARNING_RESOURCES.map(key => [key, 0]));
-  const budget = LearningBudgetSchema.parse({
-    cancelled: false,
-    case: { limit: zero, used: zero },
-    experiment: { limit: zero, used: zero },
-  });
   for (const row of rows) {
     const identity = learningDigest([
       row.feedback.source.ref,
       row.feedback.source.revision,
     ]);
-    const plan = feedbackPlan(row.feedback, history, budget);
     if (
       identities.has(identity) ||
-      row.eventKey !== plan.eventKey ||
-      learningDigest(row.plan) !== learningDigest(plan)
+      row.eventKey !== recordedEventKey(row.feedback) ||
+      learningDigest(row.plan) !== row.planDigest ||
+      row.plan.eventKey !== row.eventKey
     )
       throw new Error('Invalid persisted acquisition feedback identity.');
     identities.add(identity);
-    history.push({ ...row, plan });
+    history.push({
+      ...row,
+      plan: row.plan as AcquisitionLearningFeedbackReceipt['plan'],
+    });
   }
   return history;
 }
@@ -233,6 +253,7 @@ export function prepareLearningFeedback(input: {
     feedback,
     eventKey: plan.eventKey,
     plan,
+    planDigest: learningDigest(plan),
     preparedAt: input.now,
     sourceSha,
     executionAuthority: 'none',
