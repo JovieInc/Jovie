@@ -12,6 +12,7 @@ import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
 import { runInNewContext } from 'node:vm';
 import { afterEach, describe, expect, it } from 'vitest';
+import { commitMutationFixture } from './fixtures/mutation-git-receipt.mjs';
 
 const REPO_ROOT = resolve(import.meta.dirname, '..', '..', '..');
 const fullWorkflow = readFileSync(
@@ -277,7 +278,7 @@ describe('portable mutation evidence', () => {
         step => step.name === 'Upload sweep state and survivor tasks'
       );
       expect(snapshot).toBeDefined();
-      expect(sweep.indexOf(save)).toBeLessThan(sweep.indexOf(snapshot));
+      expect(sweep.indexOf(snapshot)).toBeLessThan(sweep.indexOf(save));
       expect(sweep.indexOf(snapshot)).toBeLessThan(sweep.indexOf(upload));
       expect(upload.if).toContain("steps.snapshot.outcome == 'success'");
       expect(upload.if).not.toContain('hashFiles');
@@ -291,7 +292,7 @@ describe('portable mutation evidence', () => {
           steps: {
             capacity: { outputs: { run: capacity } },
             portable_state: { outcome: portable },
-            score: { outcome: 'failure' },
+            score: { outcome: 'failure', outputs: { admitted: 'true' } },
           },
         });
       expect(allowed('true', 'success', true)).toBe(true);
@@ -317,6 +318,12 @@ describe('portable mutation evidence', () => {
       };
       for (const [name, content] of Object.entries(files))
         writeFileSync(resolve(cache, name), content);
+      writeFileSync(resolve(workspace, 'source.txt'), 'fixture');
+      commitMutationFixture(workspace);
+      const sha = spawnSync('git', ['rev-parse', 'HEAD'], {
+        cwd: workspace,
+        encoding: 'utf8',
+      }).stdout.trim();
       if (optional) {
         writeFileSync(
           resolve(runnerTemp, 'test-quality-latest.json'),
@@ -335,7 +342,16 @@ describe('portable mutation evidence', () => {
         {
           cwd: workspace,
           encoding: 'utf8',
-          env: { ...process.env, RUNNER_TEMP: runnerTemp },
+          env: {
+            ...process.env,
+            RUNNER_TEMP: runnerTemp,
+            SCORE_SHA: sha,
+            UI_ONLY: 'false',
+            UI_INCLUDE: 'packages/ui/',
+            MAX_FILES: '4',
+            GITHUB_RUN_ID: '123',
+            GITHUB_RUN_ATTEMPT: '1',
+          },
         }
       );
       expect(result.status, result.stderr).toBe(0);
