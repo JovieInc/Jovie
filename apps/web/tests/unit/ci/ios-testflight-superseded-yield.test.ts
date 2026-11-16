@@ -36,7 +36,16 @@ const { resolveRealGh, runWithRealGh } = realGhHarness as unknown as {
 // The companion suite (ios-testflight-authorization.test.ts) is size-pinned
 // at 1698 lines, so these cases live here and leave that file untouched.
 
-type Step = { name?: string; conclusion?: string };
+type Step = {
+  id?: string;
+  if?: string;
+  name?: string;
+  run?: string;
+  uses?: string;
+  conclusion?: string;
+  env?: Record<string, string>;
+  with?: Record<string, unknown>;
+};
 type Job = {
   outputs?: Record<string, string>;
   if?: string;
