@@ -5,6 +5,8 @@ import {
   merchGenerationBatches,
 } from '@/lib/db/schema/merch';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
+import { evaluateMerchConceptPlan } from './concept-review';
+import { syntheticConceptReview } from './concept-review.test-support';
 import {
   MERCH_PERSON_CONTENT_PUBLISH_BLOCKER,
   MerchPersonContentRejectedError,
@@ -33,6 +35,7 @@ const {
   createGeneratedMerchArtworkMock,
   scheduleMerchMockupEnrichmentMock,
   resolveMerchCatalogSelectionMock,
+  reviewStoredMerchConceptPlanMock,
 } = vi.hoisted(() => ({
   dbMock: { insert: vi.fn(), update: vi.fn(), select: vi.fn() },
   captureErrorMock: vi.fn(),
@@ -41,6 +44,12 @@ const {
   createGeneratedMerchArtworkMock: vi.fn(),
   scheduleMerchMockupEnrichmentMock: vi.fn(),
   resolveMerchCatalogSelectionMock: vi.fn(),
+  reviewStoredMerchConceptPlanMock: vi.fn(),
+}));
+
+vi.mock('./concept-review-store', () => ({
+  getMerchConceptFeedback: async () => [],
+  reviewStoredMerchConceptPlan: reviewStoredMerchConceptPlanMock,
 }));
 
 vi.mock('@/lib/db', () => ({ db: dbMock }));
@@ -154,6 +163,9 @@ function awaitableChain(rows: readonly unknown[]) {
 beforeEach(() => {
   vi.resetAllMocks();
   updatePatches.length = 0;
+  reviewStoredMerchConceptPlanMock.mockImplementation(async (plan, now) =>
+    evaluateMerchConceptPlan(plan, syntheticConceptReview(plan, now), now)
+  );
 
   dbMock.select.mockImplementation(() => {
     const builder: Record<string, unknown> = {};
@@ -199,6 +211,81 @@ function batchPatch(status: string): UpdatePatch | undefined {
 }
 
 describe('generateMerchDesigns production outcome contract', () => {
+  it('persists an unreviewed concept gate and makes zero image, upload or mockup calls', async () => {
+    reviewStoredMerchConceptPlanMock.mockImplementation(async (plan, now) =>
+      evaluateMerchConceptPlan(plan, null, now)
+    );
+    const result = await generateMerchDesigns({
+      profileId: 'profile-1',
+      clerkUserId: 'user-1',
+      prompt: PASS_PROMPT,
+      source,
+    });
+    expect(result).toMatchObject({
+      state: 'concept_review_required',
+      designs: [],
+    });
+    expect(generatePrintGraphicMock).not.toHaveBeenCalled();
+    expect(createGeneratedMerchArtworkMock).not.toHaveBeenCalled();
+    expect(scheduleMerchMockupEnrichmentMock).not.toHaveBeenCalled();
+    expect(captureErrorMock).not.toHaveBeenCalled();
+    expect(captureWarningMock).not.toHaveBeenCalled();
+    const anchors = dbMock.insert.mock.calls.filter(
+      call => call[0] === merchDesignOptions
+    );
+    expect(anchors).toHaveLength(3);
+    const insert = dbMock.insert.mock.results[0].value.values;
+    expect(insert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        status: 'failed',
+        error: 'concept_review_required',
+        artistBrief: expect.objectContaining({
+          conceptReview: expect.objectContaining({
+            phase: 'pre_art',
+            imageCallsExecuted: 0,
+            stageEvent: expect.objectContaining({
+              schema: 'jovie-stage-event/v1',
+              outcome: 'failed',
+            }),
+          }),
+        }),
+      })
+    );
+  });
+
+  it('does not cross an image boundary when the concept receipt cannot persist', async () => {
+    dbMock.insert.mockImplementation(() => ({
+      values: vi
+        .fn()
+        .mockRejectedValue(new Error('synthetic persistence failure')),
+    }));
+    await expect(
+      generateMerchDesigns({
+        profileId: 'profile-1',
+        clerkUserId: 'user-1',
+        prompt: PASS_PROMPT,
+        source,
+      })
+    ).rejects.toThrow('synthetic persistence failure');
+    expect(generatePrintGraphicMock).not.toHaveBeenCalled();
+  });
+
+  it.each([0, -1, 1.5, Number.NaN, Number.POSITIVE_INFINITY, 5])(
+    'rejects invalid count %s before work starts',
+    async count => {
+      await expect(
+        generateMerchDesigns({
+          profileId: 'profile-1',
+          clerkUserId: 'user-1',
+          prompt: PASS_PROMPT,
+          source,
+          count,
+        })
+      ).rejects.toThrow(RangeError);
+      expect(dbMock.select).not.toHaveBeenCalled();
+      expect(generatePrintGraphicMock).not.toHaveBeenCalled();
+    }
+  );
   it('classifies an all-provider-failure batch, marks the batch failed, and captures exactly one incident', async () => {
     generatePrintGraphicMock.mockRejectedValue(
       new Error('image provider request failed with status 503')
@@ -350,6 +437,13 @@ describe('generateMerchDesigns production outcome contract', () => {
 
     // Fallback pricing keeps generation alive but draft-only (not sellable).
     expect(result.designs).toHaveLength(3);
+    const plannedPrompts =
+      reviewStoredMerchConceptPlanMock.mock.calls[0][0].candidates.map(
+        (candidate: { prompt: string }) => candidate.prompt
+      );
+    expect(
+      generatePrintGraphicMock.mock.calls.map(call => call[0].prompt)
+    ).toEqual(plannedPrompts);
     expect(result.designs[0].sellability?.sellable).toBe(false);
 
     const summary = failureSummaryOf(result);
