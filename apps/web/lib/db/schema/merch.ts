@@ -13,6 +13,7 @@ import {
   uuid,
 } from 'drizzle-orm/pg-core';
 import { createInsertSchema, createSelectSchema } from 'drizzle-zod';
+import type { MerchSource } from '@/lib/merch/source-candidates';
 import { chatConversations, chatTurns } from './chat';
 import {
   currencyCodeEnum,
@@ -39,23 +40,15 @@ export interface MerchArtistBrief {
   best_merch_hypothesis: string;
   commercial_angle: string;
   risk_level: 'safe' | 'medium' | 'experimental';
+  /** Exact pre-art plan and its durable review receipt, not artwork certification. */
+  conceptPlan?: unknown;
+  conceptReview?: Record<string, unknown>;
   /**
    * The exact catalog phrase or artist-owned asset used for this generation.
    * Kept in the batch JSON so an option can be audited without a schema
    * migration and selection can reject legacy, ungrounded generations.
    */
-  source?: {
-    sourceType:
-      | 'song_title'
-      | 'album_title'
-      | 'library_asset'
-      | 'user_provided';
-    sourceText: string;
-    provenanceTitle: string;
-    rightsStatus: 'owned' | 'user_provided';
-    assetId?: string;
-    assetUrl?: string;
-  };
+  source?: MerchSource;
 }
 
 export interface MerchVariantMap {
