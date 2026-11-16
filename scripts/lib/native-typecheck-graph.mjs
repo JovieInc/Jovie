@@ -4,7 +4,13 @@ import { existsSync, readFileSync, realpathSync, statSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { dirname, relative, resolve } from 'node:path';
 
-import { check, info, sha, sorted } from './native-typecheck-buildinfo.mjs';
+import {
+  buildInfoPath,
+  check,
+  info,
+  sha,
+  sorted,
+} from './native-typecheck-buildinfo.mjs';
 
 const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 
@@ -34,6 +40,7 @@ export function assertGraphParity(
   const proof = {
     status: 'equal',
     aliases: [],
+    sharedAuxiliaryReferences: [],
     nodes: 0,
     edges: 0,
     ambient: [],
@@ -67,6 +74,7 @@ export function assertGraphParity(
     const value = identity(path);
     return `${value.device}:${value.inode}:${value.sha256}`;
   };
+  const auxiliaryContexts = new Map();
   const records = graph => {
     const bytes = readFileSync(graph.metadata.rawBuildInfoPath);
     check(
@@ -74,6 +82,50 @@ export function assertGraphParity(
       'Captured graph snapshot hash changed'
     );
     const raw = JSON.parse(bytes.toString());
+    const paths = raw.fileNames.map(name =>
+      buildInfoPath(
+        name,
+        graph.metadata.rawBuildInfoPath,
+        graph.metadata.toolsDirectory,
+        graph.metadata.libraryDirectory
+      )
+    );
+    auxiliaryContexts.set(
+      graph,
+      new Map(
+        graph.metadata.auxiliary.map(reference => {
+          check(performance.now() < end, 'Context proof time budget exceeded');
+          const incoming = raw.referencedMap
+            .filter(([, list]) =>
+              raw.fileIdsList[list - 1].includes(reference.id)
+            )
+            .map(([source]) => source);
+          check(
+            Number.isInteger(reference.id) &&
+              reference.id > raw.fileInfos.length &&
+              reference.id <= paths.length &&
+              reference.path === paths[reference.id - 1] &&
+              incoming.length > 0 &&
+              same(incoming, reference.incomingSourceIds),
+            'Auxiliary reference linkage differs from captured graph'
+          );
+          return [
+            reference.path,
+            {
+              rawPath: paths[reference.id - 1],
+              incoming: incoming
+                .map(id => ({
+                  path: paths[id - 1],
+                  format: info(raw.fileInfos[id - 1]).impliedFormat ?? null,
+                  global:
+                    info(raw.fileInfos[id - 1]).affectsGlobalScope ?? false,
+                }))
+                .sort((a, b) => a.path.localeCompare(b.path)),
+            },
+          ];
+        })
+      )
+    );
     const values = new Map();
     raw.fileNames
       .slice(0, raw.fileInfos.length)
@@ -112,6 +164,13 @@ export function assertGraphParity(
       queue.push([path, target]);
     }
     for (const { path } of graph.metadata.auxiliary) {
+      const context = auxiliaryContexts.get(graph).get(path);
+      const shared = auxiliaryContexts.get(other).get(path);
+      if (context && shared && same(context, shared)) {
+        if (graph === actual)
+          proof.sharedAuxiliaryReferences.push({ path, ...context });
+        continue;
+      }
       const target = counterpart(path, [
         ...graph.dependencyFiles,
         ...other.dependencyFiles,
@@ -120,6 +179,7 @@ export function assertGraphParity(
       queue.push([path, target]);
     }
   }
+  check(performance.now() < end, 'Context proof time budget exceeded');
   if (!queue.length) return proof;
   bounded();
   const configured = configuration?.();
