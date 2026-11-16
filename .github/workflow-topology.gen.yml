@@ -1601,7 +1601,7 @@ nodes:
       - push
       - workflow_dispatch
     terminalReceipt: job:report-scheduled-failure
-    jobCount: 3
+    jobCount: 4
   - name: Visual Regression
     path: .github/workflows/visual-regression.yml
     active: true

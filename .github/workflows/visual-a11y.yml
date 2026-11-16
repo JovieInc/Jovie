@@ -122,11 +122,85 @@ jobs:
             echo "PASS: All Storybook components passed accessibility checks." >> "$GITHUB_STEP_SUMMARY"
           fi
 
+  component-story-evidence:
+    # Certificate evidence (docs/design-system/COMPONENT_CERTIFICATE.md): every
+    # @jovie/ui story rendered in light and dark, failing on page/console
+    # errors and WCAG 2.2 AA axe violations, with a screenshot hash. The
+    # receipts go to an actions/cache entry that component-certificate.yml
+    # restores. Hosted only: Storybook never builds or runs on gem, and the
+    # producer refuses any runner that is not GitHub-hosted.
+    name: Component Story Evidence
+    needs: [ci-visual-path-changes]
+    if: ${{ needs.ci-visual-path-changes.outputs.has_visual_changes == 'true' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+      - name: Prime Node toolcache (no GitHub API manifest call)
+        if: ${{ hashFiles('.github/actions/prime-node-toolcache/action.yml') != '' }}
+        uses: ./.github/actions/prime-node-toolcache
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'pnpm'
+      - run: pnpm install --frozen-lockfile
+      # Same boot as ci.yml ci-storybook-surfaces: detached, logged to a
+      # file, pid exported; the capture step waits, fails if it died, prints
+      # the log and stops it. The manual-axe flag drops the automatic a11y
+      # addon so its scan cannot race the producer's own axe pass.
+      - name: Start Storybook dev server
+        working-directory: apps/web
+        run: |
+          set -euo pipefail
+          nohup pnpm exec storybook dev -p 6006 --no-open \
+            > "$RUNNER_TEMP/storybook-dev.log" 2>&1 &
+          echo "STORYBOOK_PID=$!" >> "$GITHUB_ENV"
+        env:
+          CI: true
+          JOVIE_STORYBOOK_MANUAL_AXE: '1'
+      - name: Setup Playwright (Chromium)
+        uses: ./.github/actions/setup-playwright
+      - name: Capture story evidence
+        run: |
+          set -euo pipefail
+          : "${STORYBOOK_PID:?Storybook dev server was not started}"
+          trap 'kill "$STORYBOOK_PID" 2>/dev/null || true
+            echo "::group::Storybook dev server log"
+            cat "$RUNNER_TEMP/storybook-dev.log" 2>/dev/null || true
+            echo "::endgroup::"' EXIT
+          for attempt in $(seq 1 150); do
+            kill -0 "$STORYBOOK_PID" 2>/dev/null || {
+              echo "::error::Storybook dev server died"
+              exit 1
+            }
+            if curl -sf http://localhost:6006/index.json >/dev/null 2>&1; then
+              node scripts/component-story-evidence.mjs \
+                --base-url http://localhost:6006 \
+                --out-dir "$HOME/.local/state/jovie-story-evidence" \
+                | tee -a "$GITHUB_STEP_SUMMARY"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "::error::Storybook dev server failed to start within 300s"
+          exit 1
+        env:
+          CI: true
+          JOVIE_STORYBOOK_MANUAL_AXE: '1'
+      - name: Save story evidence
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.local/state/jovie-story-evidence
+          key: component-story-evidence-${{ github.run_id }}-${{ github.run_attempt }}
+
   report-scheduled-failure:
     # Nothing fails silently (docs/design-system/GOVERNANCE.md): a red main
     # run opens or updates one standing issue, deduped by title. Not required.
     name: Report main failure
-    needs: [ci-visual-path-changes, storybook-a11y]
+    needs: [ci-visual-path-changes, storybook-a11y, component-story-evidence]
     if: ${{ always() && github.event_name == 'push' && github.ref_name == 'main' && contains(needs.*.result, 'failure') }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
