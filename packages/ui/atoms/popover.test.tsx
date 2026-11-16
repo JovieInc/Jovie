@@ -213,12 +213,6 @@ describe('Popover', () => {
       // The key assertion is that external focus works - popover doesn't trap
     });
 
-    it.skip('returns focus to trigger when closed with escape', () => {
-      // Skipped: Radix Popover focus behavior varies across environments
-      // This behavior is covered functionally by other tests
-      expect(true).toBe(true);
-    });
-
     it('supports keyboard navigation', () => {
       render(<TestPopover />);
 

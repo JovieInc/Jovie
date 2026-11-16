@@ -1,13 +1,16 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { mockAdminSystemMap, mockRequireAccess } = vi.hoisted(() => ({
-  mockAdminSystemMap: vi.fn(({ activeTab }: { activeTab: string }) => (
-    <div data-testid='system-map-probe'>{activeTab}</div>
-  )),
-  mockRequireAccess: vi.fn().mockResolvedValue('user_admin'),
-}));
+const { mockAdminSystemMap, mockRequireAccess, mockReadRoom } = vi.hoisted(
+  () => ({
+    mockAdminSystemMap: vi.fn(({ activeTab }: { activeTab: string }) => (
+      <div data-testid='system-map-probe'>{activeTab}</div>
+    )),
+    mockRequireAccess: vi.fn().mockResolvedValue('user_admin'),
+    mockReadRoom: vi.fn(),
+  })
+);
 
 vi.mock('@/components/features/admin/layout/AdminPage', () => ({
   AdminPage: ({
@@ -37,60 +40,94 @@ vi.mock('@/components/features/admin/system-map/AdminSystemMap', () => ({
 vi.mock('@/lib/admin/page-access', () => ({
   requireCurrentAdminPageAccess: mockRequireAccess,
 }));
+vi.mock('@/lib/ovie/fleet-room.server', () => ({
+  readOvieFleetRoom: mockReadRoom,
+}));
 vi.mock('@/lib/seo/noindex-metadata', () => ({
   NOINDEX_ROBOTS: { index: false, follow: false },
 }));
 
-describe('AdminSystemPage', () => {
-  beforeEach(() => vi.clearAllMocks());
+const ROOM_AGENT_VIEW = {
+  id: 'summer',
+  name: 'Summer',
+  kind: 'agent',
+  role: 'Company governor',
+  onRoster: true,
+  presence: 'active',
+  lastAt: null,
+  lastExcerpt: null,
+  lastThread: null,
+  events24h: 0,
+} as const;
 
-  it('defaults unknown tabs to skills without rendering a duplicate title', async () => {
-    const { default: AdminSystemPage } = await import(
-      '@/app/app/(shell)/admin/system/page'
-    );
-    render(
-      await AdminSystemPage({ searchParams: Promise.resolve({ tab: 'bad' }) })
-    );
+const { default: AdminSystemPage } = await import(
+  '@/app/app/(shell)/admin/system/page'
+);
+
+describe('AdminSystemPage', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockReadRoom.mockResolvedValue({
+      status: 'ok',
+      view: { agents: [ROOM_AGENT_VIEW] },
+    });
+  });
+
+  it('defaults to the dense agent roster without rendering the system map', async () => {
+    render(await AdminSystemPage({ searchParams: Promise.resolve({}) }));
 
     expect(mockRequireAccess).toHaveBeenCalledOnce();
+    expect(mockReadRoom).toHaveBeenCalledOnce();
     expect(screen.getByTestId('admin-system-page')).toHaveAttribute(
       'data-page-title',
       'Agents'
     );
     expect(screen.getByTestId('admin-system-page')).toHaveAttribute(
       'data-active-tab',
-      'skills'
+      'roster'
     );
-    expect(mockAdminSystemMap).toHaveBeenCalledWith(
-      expect.objectContaining({ activeTab: 'skills' }),
-      undefined
-    );
+    expect(screen.getByTestId('agent-roster')).toBeVisible();
+    const rosterRows = screen.getAllByTestId('agent-room-agent');
+    expect(within(rosterRows[0]).getByText('Summer')).toBeInTheDocument();
+    expect(mockAdminSystemMap).not.toHaveBeenCalled();
     expect(
       screen.queryByRole('heading', { name: 'Agents' })
     ).not.toBeInTheDocument();
   });
 
-  it('preserves an explicit tab from array search params', async () => {
-    const { default: AdminSystemPage } = await import(
-      '@/app/app/(shell)/admin/system/page'
-    );
+  it('opens the system map from the secondary tabs, keeping deep links working', async () => {
     render(
       await AdminSystemPage({
         searchParams: Promise.resolve({ tab: ['memory', 'tools'] }),
       })
     );
 
+    expect(screen.getByTestId('admin-system-page')).toHaveAttribute(
+      'data-active-tab',
+      'memory'
+    );
     expect(screen.getByTestId('system-map-probe')).toHaveTextContent('memory');
     expect(mockAdminSystemMap).toHaveBeenCalledWith(
       expect.objectContaining({ activeTab: 'memory' }),
       undefined
     );
+    expect(screen.queryByTestId('agent-roster')).toBeNull();
+  });
+
+  it('falls back unknown tabs to the roster', async () => {
+    render(
+      await AdminSystemPage({ searchParams: Promise.resolve({ tab: 'bad' }) })
+    );
+
+    expect(screen.getByTestId('admin-system-page')).toHaveAttribute(
+      'data-active-tab',
+      'roster'
+    );
+    expect(screen.getByTestId('agent-roster')).toBeVisible();
+    expect(mockAdminSystemMap).not.toHaveBeenCalled();
   });
 
   it('keeps direct diagnostic access behind the admin gate', async () => {
-    const { default: AdminSystemPage } = await import(
-      '@/app/app/(shell)/admin/system/page'
-    );
     mockRequireAccess.mockRejectedValueOnce(new Error('Admin access required'));
 
     await expect(

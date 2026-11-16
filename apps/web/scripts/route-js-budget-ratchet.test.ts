@@ -256,6 +256,14 @@ describe('route-js-budget --write', () => {
     );
     const budgetPath = join(nextDir, 'route-js-budgets.json');
     const budgets = budgetsWithGroups();
+    // --write leaves an unmeasured group alone. That leftover must already
+    // match origin/main or the CLI reports growth against the live ratchet.
+    const committedAdminKb = (
+      JSON.parse(
+        readFileSync(join(__dirname, 'route-js-budgets.json'), 'utf8')
+      ) as { groups: { admin: { baselineKb: number } } }
+    ).groups.admin.baselineKb;
+    budgets.groups.admin.baselineKb = committedAdminKb;
     budgets.firstLoad.baselines = {};
     budgets.routes = {};
     writeFileSync(budgetPath, JSON.stringify(budgets));
@@ -294,7 +302,7 @@ describe('route-js-budget --write', () => {
     });
     expect(recorded.routes).toEqual({ '/app/chat': 16 });
     expect(recorded.groups).toEqual({
-      admin: { baselineKb: 1345 },
+      admin: { baselineKb: committedAdminKb },
       dashboard: { baselineKb: 16 },
       marketing: { baselineKb: 16 },
       public: { baselineKb: 48 },

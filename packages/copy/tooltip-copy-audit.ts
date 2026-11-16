@@ -122,12 +122,17 @@ function readCopies(node: ts.Node | undefined): Copy[] {
     return [...readCopies(node.whenTrue), ...readCopies(node.whenFalse)];
   if (
     ts.isBinaryExpression(node) &&
+    node.operatorToken.kind === ts.SyntaxKind.AmpersandAmpersandToken
+  )
+    return readCopies(node.right);
+  if (
+    ts.isBinaryExpression(node) &&
     (node.operatorToken.kind === ts.SyntaxKind.BarBarToken ||
       node.operatorToken.kind === ts.SyntaxKind.QuestionQuestionToken)
   )
     return [...readCopies(node.left), ...readCopies(node.right)];
   if (ts.isJsxElement(node) || ts.isJsxFragment(node))
-    return [readJsx(node, node.children)];
+    return readJsx(node, node.children);
   if (ts.isJsxSelfClosingElement(node))
     return [
       {
@@ -140,36 +145,46 @@ function readCopies(node: ts.Node | undefined): Copy[] {
   return [];
 }
 
-function readJsx(node: ts.Node, children: ts.NodeArray<ts.JsxChild>): Copy {
-  let interactive =
-    ts.isJsxElement(node) &&
-    INTERACTIVE_TAG.test(node.openingElement.tagName.getText());
-  let listItems =
-    ts.isJsxElement(node) &&
-    LIST_ITEM_TAG.test(node.openingElement.tagName.getText())
-      ? 1
-      : 0;
-  const parts: string[] = [];
+function readJsx(node: ts.Node, children: ts.NodeArray<ts.JsxChild>): Copy[] {
+  let copies: Copy[] = [
+    {
+      node,
+      text: '',
+      interactive:
+        ts.isJsxElement(node) &&
+        INTERACTIVE_TAG.test(node.openingElement.tagName.getText()),
+      listItems:
+        ts.isJsxElement(node) &&
+        LIST_ITEM_TAG.test(node.openingElement.tagName.getText())
+          ? 1
+          : 0,
+    },
+  ];
   for (const child of children) {
-    if (ts.isJsxText(child)) {
-      parts.push(child.text);
-      continue;
-    }
-    const [copy] = readCopies(child);
-    if (copy) {
-      parts.push(copy.text);
-      interactive ||= copy.interactive;
-      listItems += copy.listItems;
-    } else if (ts.isJsxExpression(child) && child.expression) {
-      parts.push('{x}');
-    }
+    const alternatives = ts.isJsxText(child)
+      ? [{ node: child, text: child.text, interactive: false, listItems: 0 }]
+      : readCopies(child);
+    if (!alternatives.length)
+      alternatives.push({
+        node: child,
+        text: ts.isJsxExpression(child) && child.expression ? '{x}' : '',
+        interactive: false,
+        listItems: 0,
+      });
+    // Siblings render together; branches remain separate alternatives.
+    copies = copies.flatMap(copy =>
+      alternatives.map(alternative => ({
+        node,
+        text: `${copy.text} ${alternative.text}`,
+        interactive: copy.interactive || alternative.interactive,
+        listItems: copy.listItems + alternative.listItems,
+      }))
+    );
   }
-  return {
-    node,
-    text: parts.join(' ').replace(/\s+/g, ' ').trim(),
-    interactive,
-    listItems,
-  };
+  return copies.map(copy => ({
+    ...copy,
+    text: copy.text.replace(/\s+/g, ' ').trim(),
+  }));
 }
 
 export function scanTooltipCopy(
@@ -210,7 +225,7 @@ export function scanTooltipCopy(
       ts.isJsxElement(node) &&
       node.openingElement.tagName.getText(file) === 'TooltipContent'
     )
-      report([readJsx(node, node.children)]);
+      report(readJsx(node, node.children));
     if (
       ts.isPropertyAssignment(node) &&
       (ts.isIdentifier(node.name) || ts.isStringLiteral(node.name)) &&

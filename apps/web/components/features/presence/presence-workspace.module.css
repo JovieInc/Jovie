@@ -32,7 +32,7 @@
   .mobileArtist {
     display: block;
     color: var(--color-text-secondary-token);
-    font-size: 0.75rem;
+    font-size: var(--text-app);
     line-height: 1rem;
   }
 
@@ -94,7 +94,7 @@
   }
   .identityContainer .identityLabel > :first-child {
     width: auto;
-    font-size: 0.75rem;
+    font-size: var(--text-app);
     line-height: 1rem;
   }
   .identityContainer .identityLabel > [data-testid="presence-page-identity"] {

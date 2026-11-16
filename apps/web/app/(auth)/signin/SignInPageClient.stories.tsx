@@ -54,9 +54,8 @@ type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {};
 
-/** The pricing hand-off: the plan recap sits above the providers. */
+/** The pricing hand-off: AuthShell shows the plan recap above the providers. */
 export const WithOfferSummary: Story = {
-  args: { showOfferSummary: true },
   decorators: withQuery('plan=pro&interval=month'),
 };
 

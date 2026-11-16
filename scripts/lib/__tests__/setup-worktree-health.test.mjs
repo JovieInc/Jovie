@@ -54,7 +54,10 @@ function makeToolStubs({
 
 function makeWorktree() {
   const root = makeTempDir('jovie-setup-health-repo-');
-  writeFileSync(join(root, 'package.json'), '{"name":"fixture"}\n');
+  writeFileSync(
+    join(root, 'package.json'),
+    '{"name":"fixture","packageManager":"pnpm@9.15.9"}\n'
+  );
   writeFileSync(join(root, '.nvmrc'), '24.21.0\n');
   writeFileSync(join(root, 'pnpm-lock.yaml'), 'lockfileVersion: 9.0\n');
   writeFileSync(join(root, 'pnpm-workspace.yaml'), 'packages: []\n');
@@ -262,6 +265,9 @@ describe('SessionStart still uses setup.sh for the skip', () => {
     expect(setupSh).toContain('jovie_setup_worktree_healthy');
     expect(setupSh).toContain('jovie_setup_repair_linked_worktree_git_config');
     expect(setupSh).toContain('Worktree already healthy — skipped setup body');
+    expect(setupSh.indexOf('jovie_setup_gh_api_slurp_ok')).toBeLessThan(
+      setupSh.indexOf('jovie_setup_worktree_healthy')
+    );
     expect(
       setupSh.indexOf('jovie_setup_repair_linked_worktree_git_config')
     ).toBeLessThan(setupSh.indexOf('git rev-parse --is-inside-work-tree'));
@@ -291,6 +297,49 @@ describe('SessionStart still uses setup.sh for the skip', () => {
     );
     expect(codexSetupSh).toContain('GBrain sync');
     expect(codexSetupSh).toContain('independent and always runs');
+  });
+});
+
+describe('one frozen dependency install for every agent session start (JOV-12623)', () => {
+  const pin = JSON.parse(
+    readFileSync(resolve(repoRoot, 'package.json'), 'utf8')
+  ).packageManager.replace(/^pnpm@/u, '');
+  const helperSh = readFileSync(helperPath, 'utf8');
+  const readPin = worktree =>
+    runHelper(`. ${JSON.stringify(helperPath)}
+      jovie_setup_required_pnpm ${JSON.stringify(worktree)}`);
+  const setPin = (worktree, packageManager) =>
+    writeFileSync(
+      join(worktree, 'package.json'),
+      `${JSON.stringify({ name: 'fixture', packageManager }, null, 2)}\n`
+    );
+
+  it('setup.sh and SessionStart call the shared frozen install; nothing hardcodes pnpm', () => {
+    for (const script of [setupSh, sessionStartSh]) {
+      expect(script).toContain('scripts/codex-cloud-setup.mjs" install');
+      expect(script).not.toMatch(/^\s*pnpm install\b/mu);
+    }
+    expect(pin).toMatch(/^\d+\.\d+\.\d+$/u);
+    for (const script of [setupSh, sessionStartSh, helperSh]) {
+      expect(script).not.toContain(pin);
+      expect(script).not.toMatch(/pnpm@\d+\.\d+\.\d+/u);
+    }
+  });
+
+  it('reads the pnpm pin from packageManager and the warm skip follows it', () => {
+    const worktree = makeWorktree();
+    expect(readPin(worktree).stdout.trim()).toBe('9.15.9');
+    for (const packageManager of [undefined, 'pnpm@latest']) {
+      setPin(worktree, packageManager);
+      expect(readPin(worktree)).toMatchObject({ status: 1, stdout: '' });
+    }
+    setPin(worktree, 'pnpm@10.2.1');
+    expect(readPin(worktree).stdout.trim()).toBe('10.2.1');
+    seedHealthyCache(worktree);
+    const health = pnpmVersion =>
+      evaluateHealth(worktree, { pathPrefix: makeToolStubs({ pnpmVersion }) });
+    expect(health('9.15.9')).toBe('run');
+    expect(health('10.2.1')).toBe('skip');
   });
 });
 

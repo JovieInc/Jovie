@@ -44,10 +44,9 @@ version failure propagates; setup never labels it as success.
 
 Setup shell exports do not persist into later cloud command shells. Retain
 the toolchain on disk and activate its PATH in the cloud Start skill. Refresh
-frozen dependencies after a checkout or lockfile change. Until the checkout
-contains the secret-free wrapper, use the environment's dependency-only
-install script and disable repository hooks for nested CLI invocations with
-`-c features.hooks=false`.
+frozen dependencies after a checkout or lockfile change. Use only the
+per-agent Codex cloud environments, never a legacy one; see the guardrail in
+[canon/FLEET.md](canon/FLEET.md).
 
 Authenticated web tests/builds, browser E2E, database/migration checks, native
 builds, and release acceptance require their own environments and receipts.

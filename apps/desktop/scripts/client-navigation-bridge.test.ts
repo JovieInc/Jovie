@@ -23,6 +23,7 @@ vi.mock('electron', () => ({
 beforeEach(() => {
   vi.resetModules();
   vi.clearAllMocks();
+  ipc.invoke.mockResolvedValue(false);
   exposed.clear();
   listeners.clear();
   ipc.on.mockImplementation((channel, listener) => {

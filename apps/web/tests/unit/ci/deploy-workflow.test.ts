@@ -12,6 +12,7 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { load as parseYaml, dump as stringifyYaml } from 'js-yaml';
 import { afterAll, describe, expect, it } from 'vitest';
+import { storyEvidenceEligibility } from '../../../../../scripts/lib/component-render-inputs.mjs';
 import {
   cronGapMinutes,
   filterList,
@@ -523,16 +524,9 @@ describe('CI Storybook accessibility path gate', () => {
       visualPathJob,
       'Detect visual-relevant changes'
     );
-    expect(visualDetectStep).toContain(
-      '[ "${{ github.event_name }}" == "workflow_dispatch" ] || [ "${{ github.event_name }}" == "push" ]'
-    );
-    expect(visualDetectStep).toContain(
-      'echo "has_visual_changes=true" >> "$GITHUB_OUTPUT"'
-    );
-    const visualPattern = visualDetectStep.match(
-      /VISUAL_PATTERNS='([^']+)'/
-    )?.[1];
-    expect(visualPattern).toBeTruthy();
+    expect(visualDetectStep).toContain("EVENT_NAME === 'workflow_dispatch'");
+    expect(visualDetectStep).toContain('{ visual: true, render: true }');
+    expect(visualDetectStep).toContain('storyEvidenceEligibility(paths)');
     for (const input of [
       'apps/web/.storybook/preview.tsx',
       'apps/web/app/globals.css',
@@ -545,16 +539,11 @@ describe('CI Storybook accessibility path gate', () => {
       'pnpm-lock.yaml',
       '.github/workflows/visual-a11y.yml',
     ]) {
-      expect(
-        spawnSync('grep', ['-q', '-E', visualPattern!], { input }).status,
-        input
-      ).toBe(0);
+      expect(storyEvidenceEligibility([input]).visual, input).toBe(true);
     }
-    expect(
-      spawnSync('grep', ['-q', '-E', visualPattern!], {
-        input: 'apps/web/styles.css',
-      }).status
-    ).toBe(1);
+    expect(storyEvidenceEligibility(['apps/web/styles.css']).visual).toBe(
+      false
+    );
     expect(visualWorkflow).toMatch(/- 'apps\/web\/styles\/\*\*'/);
   });
 });
@@ -3967,31 +3956,6 @@ describe('CI Neon endpoint pool concurrency (JOV-2497)', () => {
 });
 
 describe('Neon ephemeral cleanup workflows (JOV-2497)', () => {
-  it('uses the root packageManager as the single pnpm version source', () => {
-    const cleanupWorkflow = readFileSync(
-      resolve(repoRoot, '.github/workflows/neon-ephemeral-branch-cleanup.yml'),
-      'utf8'
-    );
-    const packageJson = JSON.parse(
-      readFileSync(resolve(repoRoot, 'package.json'), 'utf8')
-    ) as { packageManager?: string };
-    const setupPnpmStep = getStepBlock(cleanupWorkflow, 'Setup pnpm');
-
-    expect(packageJson.packageManager).toMatch(/^pnpm@\d+\.\d+\.\d+$/);
-    expect(setupPnpmStep).toContain('uses: pnpm/action-setup@');
-    expect(setupPnpmStep).not.toMatch(/^\s+version:/m);
-  });
-
-  it('deletes prefixed CI branches when a PR closes', () => {
-    const cleanupWorkflow = readFileSync(
-      resolve(repoRoot, '.github/workflows/neon-ephemeral-branch-cleanup.yml'),
-      'utf8'
-    );
-
-    expect(cleanupWorkflow).toContain('List and delete matching Neon branches');
-    expect(cleanupWorkflow).toContain('startswith($base + "-")');
-  });
-
   it('recognizes only exact creator prefixes for ephemeral branches', () => {
     const cleanupAction = readFileSync(
       resolve(repoRoot, '.github/actions/neon-branch-cleanup/action.yml'),

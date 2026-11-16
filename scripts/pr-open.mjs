@@ -15,7 +15,7 @@ import { homedir, tmpdir } from 'node:os';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { shipIntent } from './lib/auto-ready-provenance.mjs';
-import { proseOnly } from './lib/pr-prose.mjs';
+import { proseOnly, scrubPrText } from './lib/pr-prose.mjs';
 import { wipGate } from './lib/pr-wip-gate.mjs';
 import { isRepairPr, lintPrBody } from './lib/preflight-changed.mjs';
 import { requiresWin } from './lib/wins-ledger.mjs';
@@ -701,7 +701,7 @@ export async function main(
             f.filename,
           ]).stdout;
     }
-    const title = a.title || pr?.title || subjects[0] || '';
+    const title = scrubPrText(a.title || pr?.title || subjects[0] || '');
     const labels = [
       ...new Set([
         ...(pr?.labels ?? []).map(l => (typeof l === 'string' ? l : l.name)),
@@ -746,7 +746,7 @@ export async function main(
     const raw = a.bodyFile
       ? readFileSync(a.bodyFile, 'utf8')
       : draftBody(input);
-    const body = shipIntent(raw, a, pr?.body);
+    const body = scrubPrText(shipIntent(raw, a, pr?.body));
     const identity = a.number ? targetErrors(body, a.number, true) : [];
     const needs = a.bodyFile ? [] : missingEvidence(input);
     if (needs.length)
