@@ -139,6 +139,9 @@ function fixture() {
     inspect: () => structuredClone(pins),
     expectedSha: git(root, ['rev-parse', 'HEAD']),
     emitMetrics: async () => {},
+    resolveTypeRoots: config => [
+      resolve(dirname(config), 'node_modules/@types'),
+    ],
     execute,
     calls,
     monotonic: () => tick++,
@@ -220,6 +223,9 @@ test('completes all matched cold/warm/seed/edit/revert scenarios with honest rec
     resolve(data.root, 'apps/web/tests/types/vitest')
   );
   assert.equal(overlay.compilerOptions.strict, undefined);
+  assert.deepEqual(overlay.compilerOptions.typeRoots, [
+    resolve(data.root, 'apps/web/node_modules/@types'),
+  ]);
   assert.equal(git(data.root, ['status', '--porcelain']), '');
   assert.equal(
     readFileSync(resolve(data.output, 'stage-events.ndjson'), 'utf8')

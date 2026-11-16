@@ -8,6 +8,7 @@ import {
   realpathSync,
   writeFileSync,
 } from 'node:fs';
+import { createRequire } from 'node:module';
 import { dirname, relative, resolve, sep } from 'node:path';
 
 const TOOL_CONFIG = '.github/ci-harness/typecheck-native-tools';
@@ -314,6 +315,33 @@ export function inspectTools(root, tools) {
     };
   }
   return { lockSha256: sha(lock), packages: result };
+}
+
+export function effectiveTypeRoots(config, tools, compiler = null) {
+  const ts6 =
+    compiler ??
+    createRequire(import.meta.url)(
+      resolve(tools, 'node_modules/ts6/lib/typescript.js')
+    );
+  const parsed = ts6.getParsedCommandLineOfConfigFile(
+    config,
+    {},
+    {
+      ...ts6.sys,
+      onUnRecoverableConfigFileDiagnostic: diagnostic => {
+        throw new Error(
+          ts6.flattenDiagnosticMessageText(diagnostic.messageText, '\n')
+        );
+      },
+    }
+  );
+  check(
+    parsed && !parsed.errors.length,
+    'Original configuration cannot establish effective type roots'
+  );
+  return ts6
+    .getEffectiveTypeRoots(parsed.options, ts6.sys)
+    .map(path => resolve(path));
 }
 
 export function seedPlan(root, program) {

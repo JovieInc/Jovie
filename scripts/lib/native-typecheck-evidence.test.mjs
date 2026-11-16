@@ -1,5 +1,12 @@
 import assert from 'node:assert/strict';
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
+import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
 import { afterEach, test } from 'node:test';
@@ -9,6 +16,7 @@ import {
   assertPrime,
   assertSeeds,
   cpuAllocation,
+  effectiveTypeRoots,
   parseArgs,
   parseDiagnostics,
   writeStageMetrics,
@@ -54,6 +62,29 @@ test('uses the same first two permitted CPUs including sparse affinity masks', (
   assert.equal(cpuAllocation('Cpus_allowed_list:\t3,8-10\n').selected, '3,8');
   assert.throws(() => cpuAllocation('Cpus_allowed_list:\t1\n'), /two/);
   assert.throws(() => cpuAllocation('no affinity'), /Cannot/);
+});
+
+test('preserves implicit type roots when an overlay leaves the original directory', () => {
+  const directory = temporary();
+  const original = resolve(directory, 'app/tsconfig.json');
+  const relocated = resolve(directory, 'outside/tsconfig.json');
+  mkdirSync(resolve(directory, 'app'), { recursive: true });
+  mkdirSync(resolve(directory, 'outside'), { recursive: true });
+  writeFileSync(resolve(directory, 'app/source.ts'), 'export {};');
+  writeFileSync(original, JSON.stringify({ include: ['source.ts'] }));
+  writeFileSync(relocated, JSON.stringify({ extends: original }));
+  const compiler = createRequire(import.meta.url)('typescript');
+  const roots = effectiveTypeRoots(original, directory, compiler);
+  assert.equal(roots[0], resolve(directory, 'app/node_modules/@types'));
+  assert.notDeepEqual(
+    effectiveTypeRoots(relocated, directory, compiler),
+    roots
+  );
+  writeFileSync(
+    relocated,
+    JSON.stringify({ extends: original, compilerOptions: { typeRoots: roots } })
+  );
+  assert.deepEqual(effectiveTypeRoots(relocated, directory, compiler), roots);
 });
 
 test('rejects missing or changed warm cache bytes', () => {

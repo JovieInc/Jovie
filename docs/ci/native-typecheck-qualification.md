@@ -36,10 +36,11 @@ compilers; it does not attest global process absence or aggregate tree memory.
 
 Qualification covers `apps/web/tsconfig.typecheck.json` and
 `packages/ui/tsconfig.json`. Isolated overlays remove the TS7-removed `baseUrl`,
-preserve the original absolute web type entries, relocate the UI `rootDir`, and
+preserve the original absolute web type entries and effective type roots derived
+with the pinned TS6 configuration API, relocate the UI `rootDir`, and
 use separate compiler buildinfo paths. Includes, excludes and strictness retain
-the original intent. Complete root/repository file identities must agree; counts
-alone cannot establish coverage.
+the original intent. Complete root, repository and dependency file identities must
+agree; counts alone cannot establish coverage.
 
 Serial cold/warm, deliberately seeded errors, representative leaf/wide edits and
 revert checks compare tsrs with TS6 and its exact native reference. Cold means

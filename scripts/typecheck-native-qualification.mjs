@@ -18,6 +18,7 @@ import {
   assertSeeds,
   check,
   cpuAllocation,
+  effectiveTypeRoots,
   git,
   inspectTools,
   inventory,
@@ -54,6 +55,7 @@ export async function runQualification({
   expectedSha = process.env.NATIVE_TYPECHECK_EXPECTED_SHA ??
     process.env.GITHUB_SHA,
   emitMetrics = writeStageMetrics,
+  resolveTypeRoots = effectiveTypeRoots,
   programs = Object.keys(PROGRAMS),
 }) {
   check(
@@ -260,7 +262,10 @@ export async function runQualification({
       const configs = new Map();
       const caches = new Map();
       for (const alias of Object.keys(PINS)) {
-        const options = { baseUrl: null };
+        const options = {
+          baseUrl: null,
+          typeRoots: resolveTypeRoots(configPath, tools),
+        };
         if (program === 'web')
           options.types = ['vitest', 'jest-dom'].map(name =>
             resolve(root, 'apps/web/tests/types', name)
