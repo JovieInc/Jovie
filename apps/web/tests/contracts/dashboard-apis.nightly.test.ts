@@ -1,5 +1,6 @@
 import { NextRequest } from 'next/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { createResolvedQueryChain as createQueryResult } from '@/tests/test-utils/db/drizzle-query-mock';
 
 const TEST_USER_ID = 'user_123';
 const NO_STORE = 'no-store';
@@ -42,32 +43,6 @@ const mockSyncPrimaryMusicUrlsFromSocialLinks = vi.fn();
 
 let dbSelectResponses: QueryRows[] = [];
 let dbSelectCallIndex = 0;
-
-function createQueryResult(rows: QueryRows) {
-  const promise = Promise.resolve(rows);
-  const chain = () => createQueryResult(rows);
-
-  return {
-    from: chain,
-    innerJoin: chain,
-    leftJoin: chain,
-    where: chain,
-    orderBy: chain,
-    limit: chain,
-    groupBy: chain,
-    offset: async () => rows,
-    values: chain,
-    returning: chain,
-    set: chain,
-    delete: chain,
-    insert: chain,
-    update: chain,
-    onConflictDoNothing: async () => {},
-    then: promise.then.bind(promise),
-    catch: promise.catch.bind(promise),
-    finally: promise.finally.bind(promise),
-  };
-}
 
 function createSelectQueue(responses: QueryRows[]) {
   let callIndex = 0;

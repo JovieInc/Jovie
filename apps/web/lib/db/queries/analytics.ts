@@ -59,22 +59,9 @@ import type {
   DashboardAnalyticsView,
   TourDateAnalyticsData,
 } from '@/types/analytics';
+import { type JsonArray, parseJsonArray } from './analytics-row-mapping';
 
-type JsonArray<T> = T[] | string | null;
 type AggregateValue = string | number | null;
-
-const parseJsonArray = <T>(value: JsonArray<T>): T[] => {
-  if (!value) return [];
-  if (typeof value === 'string') {
-    try {
-      return JSON.parse(value) as T[];
-    } catch {
-      return [];
-    }
-  }
-
-  return value;
-};
 
 export async function getUserDashboardAnalytics(
   clerkUserId: string,
