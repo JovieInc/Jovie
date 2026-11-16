@@ -106,7 +106,9 @@ describe('entity reference contract (JOV-8019 deliberate-red fixtures)', () => {
       expect(screen.queryByText('Other account secret')).toBeNull();
       expect(
         screen.getAllByRole('button', {
-          name: 'Release: Unavailable reference',
+          // The name now carries the rendered chip content after the
+          // action prefix (label-content-name-mismatch repair).
+          name: /^Release: Unavailable reference/,
         })
       ).toHaveLength(2);
       await userEvent.click(

@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { DesktopQrOverlay } from '@/features/profile/DesktopQrOverlay';
 
@@ -50,13 +50,69 @@ describe('DesktopQrOverlay', () => {
     ).toBeNull();
   });
 
-  it('preloads the QR image URL on mount', () => {
+  it('preloads the QR image URL on mount once the page has loaded', () => {
     render(<DesktopQrOverlay handle='tim' />);
     expect(imageSrcSetter).toHaveBeenCalledWith(
       expect.stringContaining(
         encodeURIComponent(`${globalThis.location.origin}/tim`)
       )
     );
+  });
+
+  it('waits for the window load event before fetching the third-party QR image', () => {
+    // A slow api.qrserver.com response must never hold the profile's load
+    // event: the product crawl saw /[username] time out at 30s on desktop.
+    const readyState = vi
+      .spyOn(document, 'readyState', 'get')
+      .mockReturnValue('loading');
+    try {
+      render(<DesktopQrOverlay handle='tim' />);
+      expect(screen.getByLabelText('Open On Phone')).toBeInTheDocument();
+      expect(imageSrcSetter).not.toHaveBeenCalled();
+
+      readyState.mockReturnValue('complete');
+      act(() => {
+        globalThis.dispatchEvent(new Event('load'));
+      });
+
+      expect(imageSrcSetter).toHaveBeenCalledWith(
+        expect.stringContaining('api.qrserver.com')
+      );
+    } finally {
+      readyState.mockRestore();
+    }
+  });
+
+  it('holds the pay-mode QR <img> until the window load event', async () => {
+    // ?mode=pay opens the card at hydration; its <img> must not fetch
+    // api.qrserver.com before load either, or it holds the load event.
+    window.history.pushState({}, '', '/testartist?mode=pay');
+    const readyState = vi
+      .spyOn(document, 'readyState', 'get')
+      .mockReturnValue('loading');
+    try {
+      render(<DesktopQrOverlay handle='testartist' />);
+      expect(
+        screen.queryByAltText('Scan To Open This Profile On Your Phone')
+      ).toBeNull();
+      expect(screen.getByTestId('desktop-qr-placeholder')).toHaveStyle({
+        width: '120px',
+        height: '120px',
+      });
+
+      readyState.mockReturnValue('complete');
+      act(() => {
+        globalThis.dispatchEvent(new Event('load'));
+      });
+
+      expect(
+        await screen.findByAltText('Scan To Open This Profile On Your Phone')
+      ).toHaveAttribute('src', expect.stringContaining('api.qrserver.com'));
+      expect(screen.queryByTestId('desktop-qr-placeholder')).toBeNull();
+    } finally {
+      readyState.mockRestore();
+      window.history.pushState({}, '', '/');
+    }
   });
 
   it('opens the QR code on desktop when the profile is in pay mode', async () => {

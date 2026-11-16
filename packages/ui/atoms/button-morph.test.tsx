@@ -122,7 +122,9 @@ describe('Button pill state choreography', () => {
 
   it('keeps the opt-in bounded to text pills and respects explicit disabled state', () => {
     const { rerender } = render(<Button loading>Legacy</Button>);
-    expect(screen.getByRole('button')).toBeDisabled();
+    // Legacy loading stays focusable: aria-disabled, never native disabled.
+    expect(screen.getByRole('button')).not.toBeDisabled();
+    expect(screen.getByRole('button')).toHaveAttribute('aria-disabled', 'true');
     expect(screen.getByRole('button')).not.toHaveAttribute(
       'data-pending-presentation'
     );

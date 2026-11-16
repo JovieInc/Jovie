@@ -82,7 +82,7 @@ const BINARY_ALLOWLIST = [
   /^apps\/web\/public\//,
   /^apps\/web\/screenshot-catalog\/current\//,
   /^apps\/web\/tests\/(?:[^/]+\/)*__snapshots__\//,
-  /^docs\/screenshots\//,
+  /^docs\/(?:pen-stills|screenshots)\//,
 ];
 
 const FORBIDDEN_ROOT_DIRECTORIES = new Set([

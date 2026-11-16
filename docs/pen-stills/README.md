@@ -5,7 +5,12 @@ records the historical headline **Be found. Be understood.** This
 manifest and headline are unqualified inputs, not approval of the current
 homepage or authority to change its copy or Pen IDs.
 
-Canonical section stills are not in the repo yet. Provide authorized exports
+The homepage stills in `home/<viewport>/<section>.png` are the approved
+homepage v3 (Tim, 2026-11-08 01:43Z, design-approvals receipt
+home-canonical-v3): hero, profile, releases, specs, invite and footer at 1440
+and 390. The page code marks the same sections with `data-pen-section`.
+
+Other canonical section stills are not in the repo yet. Provide authorized exports
 locally to qualify comparisons; do not commit native images or upload private
 screenshots. The default diff remains advisory. Parked and fork frames stay in
 the manifest so the exclusion is explicit, and they are never captured.

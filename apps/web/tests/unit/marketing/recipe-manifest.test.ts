@@ -1554,7 +1554,7 @@ describe('current acquisition source inventory (JOV-4065)', () => {
     // Source inventory is separate from deployed mounted and visual certification.
     expect(entry.bindingEvidence.status).toBe('verified');
     expect(bindings.map(binding => binding.variantId)).toEqual([
-      'centered-none',
+      'left-none',
       'phone-right',
       'release-rail',
       'final-single-claim',

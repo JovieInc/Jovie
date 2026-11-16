@@ -74,6 +74,9 @@ export const authClient = createAuthClient({
             // (GsiButtonConfiguration.theme); One Tap prompt chrome is
             // Google-controlled, so no theme config is needed here.
             promptOptions: { fedCM: true },
+            // A tap anywhere outside the prompt dismisses it, so it can never
+            // hold a person off the form under it.
+            cancelOnTapOutside: true,
           }),
         ]
       : []),

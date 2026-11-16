@@ -64,6 +64,7 @@ function greenChecks(overrides = []) {
     { name: 'Migration Guard', bucket: 'pass', state: 'SUCCESS' },
     { name: 'Fork PR Gate', bucket: 'pass', state: 'SUCCESS' },
     { name: 'PR Size Guard', bucket: 'pass', state: 'SUCCESS' },
+    { name: 'Company guards', bucket: 'pass', state: 'SUCCESS' },
     ...overrides,
   ];
 }
@@ -755,7 +756,6 @@ describe('green-source shell controller (fake gh)', () => {
     expect(result.status).toBe(0);
     expect(result.stdout).toContain('missed candidate #2');
     expect(result.stdout).not.toContain('#1 ');
-    // pr list + (state, checks) twice before the (dry-run) mutation.
-    expect(result.calls.length).toBeLessThanOrEqual(5);
+    expect(result.calls.length).toBeLessThanOrEqual(5); // pr list + (state, checks) x2
   });
 });

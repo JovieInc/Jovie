@@ -1,5 +1,6 @@
 import { render } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
+import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import { ThemeToggleIcon } from './ThemeToggleIcon';
 
 vi.mock('./ThemeIcons', () => ({
@@ -9,14 +10,15 @@ vi.mock('./ThemeIcons', () => ({
 }));
 
 describe('ThemeToggleIcon', () => {
-  it('uses the system icon while the system preference is selected', () => {
-    const { getByTestId, queryByTestId } = render(
+  it('uses the system icon while the system preference is selected', async () => {
+    const { container, getByTestId, queryByTestId } = render(
       <ThemeToggleIcon theme='system' resolvedTheme='dark' />
     );
 
     expect(getByTestId('system-icon')).toBeInTheDocument();
     expect(queryByTestId('sun-icon')).not.toBeInTheDocument();
     expect(queryByTestId('moon-icon')).not.toBeInTheDocument();
+    await expectNoA11yViolations(container);
   });
 
   it('uses the moon icon for an explicitly light theme', () => {

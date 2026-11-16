@@ -340,4 +340,12 @@ describe('prerendered homepage pathname', () => {
     expect(source).toContain('usePublicPathname');
     expect(source).not.toMatch(/\busePathname\b/);
   });
+
+  it('tags the footer with the Pen section it is diffed against', () => {
+    render(<MarketingFooter variant='minimal' penSection='footer' />);
+    expect(screen.getByTestId('marketing-footer')).toHaveAttribute(
+      'data-pen-section',
+      'footer'
+    );
+  });
 });

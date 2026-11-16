@@ -17,7 +17,7 @@ on:
       - '.github/workflows/screenshots.yml'
       - 'scripts/invariants/screen-certification.mjs'
       - 'scripts/invariants/screen-proof-emit.mjs'
-      - 'scripts/invariants/screen-proof-resolver.mjs'
+      - 'scripts/invariants/screen-proof-*.mjs'
       - 'apps/web/app/artists/**'
       - 'apps/web/app/hud/**'
       - 'apps/web/lib/admin/roles.ts'

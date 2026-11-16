@@ -5,19 +5,19 @@ import { documentTitle } from '@/lib/seo/document-title';
 export const revalidate = false;
 
 export const metadata: Metadata = {
-  title: documentTitle(`${APP_NAME} Pricing`),
+  title: documentTitle('Pricing'),
   description: 'Jovie pricing for your profile, smart links, and audience.',
   alternates: {
     canonical: `${BASE_URL}/pricing`,
   },
   openGraph: {
-    title: `${APP_NAME} Pricing`,
+    title: `Pricing | ${APP_NAME}`,
     description: 'Jovie pricing for your profile, smart links, and audience.',
     url: `${BASE_URL}/pricing`,
   },
   twitter: {
     card: 'summary',
-    title: `${APP_NAME} Pricing`,
+    title: `Pricing | ${APP_NAME}`,
     description: 'Jovie pricing for your profile, smart links, and audience.',
   },
 };

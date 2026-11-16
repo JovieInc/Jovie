@@ -16,7 +16,7 @@ export interface InlineSubscribeProps
   readonly inputRef?: React.Ref<HTMLInputElement>;
   readonly placeholder?: string;
   readonly loading?: boolean;
-  /** Freeze the field while a request is in flight. */
+  /** Freeze the field (read-only, still focusable) while a request is in flight. */
   readonly pending?: boolean;
   /**
    * Only for a genuinely unavailable service (for example a failed security
@@ -77,7 +77,9 @@ export function InlineSubscribe({
         aria-invalid={invalid ? 'true' : undefined}
         aria-describedby={describedBy}
         value={value}
-        disabled={pending}
+        // Freeze without native disabled, which would drop focus mid-submit.
+        readOnly={pending}
+        aria-busy={pending || undefined}
         required
         onChange={event => onValueChange(event.target.value)}
         className='min-w-0 flex-1 bg-transparent text-base text-primary-token placeholder:text-tertiary-token'

@@ -96,6 +96,7 @@ async function waitForClerkAuthUi(page: import('@playwright/test').Page) {
           authUnavailable ||
           bodyText.includes('sign in to jovie') ||
           bodyText.includes('request access') ||
+          bodyText.includes('request an invite') ||
           bodyText.includes('create your')
         );
       },

@@ -11,7 +11,12 @@ import { routeLead } from './route-lead';
 import { spotifyEnrichLead } from './spotify-enrich-lead';
 
 export interface ApproveLeadResult {
-  ingestion: { success: boolean; profileId?: string; error?: string } | null;
+  ingestion: {
+    success: boolean;
+    profileId?: string;
+    error?: string;
+    reason?: string;
+  } | null;
   routing: {
     route?: string;
     error?: string;
@@ -131,7 +136,11 @@ export async function approveLead(lead: Lead): Promise<ApproveLeadResult> {
     pipelineWarn(
       'approve',
       'Ingestion failed — holding lead for review, skipping routing',
-      { leadId, error: ingestion?.error ?? 'No profile constructed' }
+      {
+        leadId,
+        error: ingestion?.error ?? 'No profile constructed',
+        reason: ingestion?.reason ?? null,
+      }
     );
     await db
       .update(leads)

@@ -425,13 +425,13 @@ describe('ProfileCompactSurface', () => {
     expect(onBack).toHaveBeenCalledTimes(1);
   });
 
-  it('hides the back control on the public profile root first landing for logged-out visitors', () => {
-    renderSurface();
-
-    expect(
-      screen.queryByRole('button', { name: 'Back' })
-    ).not.toBeInTheDocument();
-  });
+  it.each(['profile', 'listen', 'tour', 'about'] as const)(
+    'hides the back control on the %s tab first landing for logged-out visitors',
+    activeMode => {
+      renderSurface({ activeMode });
+      expect(screen.queryByRole('button', { name: 'Back' })).toBeNull();
+    }
+  );
 
   it('keeps the signed-in back control subject to hideBackButton', () => {
     mockUseIsAuthenticated.mockReturnValue(true);

@@ -167,7 +167,7 @@ vi.mock('@/lib/leads/pipeline-logger', () => ({
 }));
 
 vi.mock('@/lib/leads/process-batch', () => ({
-  processLeadBatch: vi.fn(),
+  processLeadBatch: vi.fn(async () => ({ total: 0, error: 0 })),
 }));
 
 vi.mock('@/lib/notifications/suppression', () => ({
@@ -215,15 +215,14 @@ describe('GET /api/cron/frequent', () => {
     vi.setSystemTime(new Date('2026-03-24T10:15:00.000Z'));
 
     mockDbExecute.mockResolvedValue(undefined);
+    const settingsLimit = vi
+      .fn()
+      .mockResolvedValue([{ enabled: true, discoveryEnabled: false }]);
     mockDbSelect.mockReturnValue({
       from: vi.fn().mockReturnValue({
         where: vi.fn().mockReturnValue({
-          limit: vi.fn().mockResolvedValue([
-            {
-              enabled: true,
-              discoveryEnabled: false,
-            },
-          ]),
+          limit: settingsLimit,
+          orderBy: vi.fn().mockReturnValue({ limit: settingsLimit }),
         }),
       }),
     });

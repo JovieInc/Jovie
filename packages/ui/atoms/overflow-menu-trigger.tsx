@@ -56,7 +56,7 @@ export const OverflowMenuTrigger = React.forwardRef<
       />
       {hasActiveOverflow ? (
         <span
-          className='absolute -right-0.5 -top-0.5 h-1.5 w-1.5 rounded-full bg-accent'
+          className='absolute -end-0.5 -top-0.5 h-1.5 w-1.5 rounded-full bg-accent'
           aria-hidden='true'
         />
       ) : null}

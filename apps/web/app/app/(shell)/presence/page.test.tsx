@@ -5,6 +5,7 @@ import { APP_ROUTES } from '@/constants/routes';
 
 const mocks = vi.hoisted(() => ({
   auth: vi.fn(),
+  session: vi.fn(),
   flag: vi.fn(),
   shell: vi.fn(),
   capture: vi.fn(),
@@ -21,6 +22,9 @@ vi.mock('server-only', () => ({}));
 vi.mock('next/navigation', () => ({
   notFound: mocks.notFound,
   redirect: mocks.redirect,
+}));
+vi.mock('@/lib/auth/request-session', () => ({
+  getRequestSession: mocks.session,
 }));
 vi.mock('@/lib/auth/cached', () => ({ getCachedAuth: mocks.auth }));
 vi.mock('@/lib/flags/server', () => ({ getAppFlagValue: mocks.flag }));
@@ -43,6 +47,10 @@ describe('Profiles public page route', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.auth.mockResolvedValue({ userId: 'actor-1' });
+    mocks.session.mockResolvedValue({
+      user: { id: 'ba-actor-1' },
+      session: { id: 'session-1', userId: 'ba-actor-1' },
+    });
     mocks.flag.mockResolvedValue(true);
     mocks.shell.mockResolvedValue({
       user: { id: 'database-user-1' },
@@ -85,6 +93,15 @@ describe('Profiles public page route', () => {
       const result = await PresencePage();
 
       expect(isValidElement(result)).toBe(true);
+      if (!isValidElement(result)) throw new Error('Expected workspace');
+      expect(result.props).toMatchObject({
+        removalPrincipal: {
+          appActorId: 'actor-1',
+          authUserId: 'ba-actor-1',
+          sessionId: 'session-1',
+          impersonationSubject: null,
+        },
+      });
       expect(mocks.loadProfiles).toHaveBeenCalledWith({
         clerkUserId: 'actor-1',
         databaseUserId: 'database-user-1',

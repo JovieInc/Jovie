@@ -91,3 +91,134 @@ export const LoadingNestedMenu: Story = {
     </DropdownMenuPrimitive.Root>
   ),
 };
+
+const LONG_ITEMS: SearchableSubmenuItem[] = [
+  {
+    id: 'long-1',
+    label: 'Spotify for Artists — the main verified artist profile',
+    description:
+      'Connected through the label distribution account with weekly sync',
+    badge: '1,284',
+  },
+  {
+    id: 'long-2',
+    label: 'Apple Music for Artists with the extended catalog of remixes',
+    description: 'Connected, waiting for the next catalog refresh to finish',
+  },
+  {
+    id: 'long-3',
+    label: 'Bandcamp storefront for vinyl, cassettes and digital bundles',
+    description: 'Available to connect from the distribution settings page',
+  },
+];
+
+const RTL_ITEMS: SearchableSubmenuItem[] = [
+  { id: 'rtl-1', label: 'سبوتيفاي', description: 'متصل', badge: '24' },
+  {
+    id: 'rtl-2',
+    label: 'آبل ميوزك للفنانين مع الكتالوج الكامل للإصدارات',
+    description: 'متصل عبر حساب التوزيع الخاص بشركة الإنتاج',
+  },
+  { id: 'rtl-3', label: 'يوتيوب', description: 'يتطلب صلاحية', disabled: true },
+];
+
+export const Partial: Story = {
+  render: () => (
+    <div className='w-72 rounded-(--system-b-radius-overlay) border border-default bg-surface-elevated p-1 shadow-popover'>
+      <SearchableList
+        items={[
+          { id: 'p-1', label: 'Spotify' },
+          { id: 'p-2', label: 'Apple Music' },
+          { id: 'p-3', label: 'SoundCloud' },
+        ]}
+        onSelect={() => undefined}
+      />
+    </div>
+  ),
+  parameters: {
+    docs: {
+      description: {
+        story:
+          'Only the required items and onSelect, with item descriptions, badges, icons, placeholder and empty copy omitted; the default search placeholder fills in.',
+      },
+    },
+  },
+};
+
+export const LongContent: Story = {
+  render: () => (
+    <div className='w-72 rounded-(--system-b-radius-overlay) border border-default bg-surface-elevated p-1 shadow-popover'>
+      <SearchableList
+        items={LONG_ITEMS}
+        onSelect={() => undefined}
+        placeholder='Filter every connected and available platform'
+      />
+    </div>
+  ),
+  parameters: {
+    docs: {
+      description: {
+        story:
+          'Long labels, descriptions and a long placeholder truncate inside a fixed-width list while badges stay visible.',
+      },
+    },
+  },
+};
+
+export const Rtl: Story = {
+  render: () => (
+    <div
+      dir='rtl'
+      className='w-72 rounded-(--system-b-radius-overlay) border border-default bg-surface-elevated p-1 shadow-popover'
+    >
+      <SearchableList
+        items={RTL_ITEMS}
+        onSelect={() => undefined}
+        placeholder='ابحث عن منصة'
+        emptyMessage='لا توجد منصات مطابقة'
+      />
+    </div>
+  ),
+  parameters: {
+    docs: {
+      description: {
+        story:
+          'Right-to-left Arabic labels and descriptions align to the start edge and truncate inside the list width; the search field keeps symmetric padding so text never runs under its icons.',
+      },
+    },
+  },
+};
+
+export const PermissionDenied: Story = {
+  render: () => (
+    <div className='w-72 rounded-(--system-b-radius-overlay) border border-default bg-surface-elevated p-1 shadow-popover'>
+      <SearchableList
+        items={[
+          { id: 'pd-1', label: 'Spotify', description: 'Connected' },
+          {
+            id: 'pd-2',
+            label: 'YouTube Content ID',
+            description: 'Requires label admin access',
+            disabled: true,
+          },
+          {
+            id: 'pd-3',
+            label: 'Distributor payouts',
+            description: 'Requires owner access',
+            disabled: true,
+          },
+        ]}
+        onSelect={() => undefined}
+        placeholder='Filter platforms'
+      />
+    </div>
+  ),
+  parameters: {
+    docs: {
+      description: {
+        story:
+          'Options the viewer lacks access to stay visible as disabled rows with the reason in the description; keyboard navigation skips them.',
+      },
+    },
+  },
+};

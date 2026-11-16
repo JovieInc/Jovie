@@ -1,4 +1,5 @@
 import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 import { expectNoA11yViolations } from '../test-utils/a11y';
 import {
@@ -198,6 +199,54 @@ describe('StatusGlyph accessibility', () => {
       </div>
     );
 
+    await expectNoA11yViolations(container);
+  });
+});
+
+describe('StatusGlyph keyboard reach', () => {
+  it('stays out of the tab order by default', () => {
+    render(<StatusGlyph state='failed' tooltipLabel='Distributor rejected' />);
+    expect(
+      screen.getByRole('img', { name: 'Distributor rejected' })
+    ).not.toHaveAttribute('tabindex');
+  });
+
+  it('opens its tooltip from the keyboard when focusable', async () => {
+    const user = userEvent.setup();
+    render(
+      <StatusGlyph
+        state='failed'
+        tooltipLabel='Distributor rejected'
+        focusable
+      />
+    );
+    const glyph = screen.getByRole('img', { name: 'Distributor rejected' });
+    expect(glyph).toHaveAttribute('tabindex', '0');
+    expect(glyph.className).toContain('focus-visible:ring-2');
+
+    await user.tab();
+    expect(glyph).toHaveFocus();
+    expect(await screen.findByRole('tooltip')).toHaveTextContent(
+      'Distributor rejected'
+    );
+  });
+
+  it('never enters the tab order while aria-hidden', () => {
+    const { container } = render(
+      <StatusGlyph state='working' focusable aria-hidden='true' />
+    );
+    const glyph = container.querySelector('[data-status-glyph]');
+    expect(glyph).not.toHaveAttribute('tabindex');
+  });
+
+  it('has no axe violations when focusable', async () => {
+    const { container } = render(
+      <StatusGlyph
+        state='blocked'
+        tooltipLabel='Waiting on artwork'
+        focusable
+      />
+    );
     await expectNoA11yViolations(container);
   });
 });

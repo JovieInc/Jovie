@@ -64,7 +64,11 @@ describe('LinksPageClient', () => {
     renderLinksWorkspace(<LinksPageClient rows={[]} />);
 
     expect(screen.getByTestId('links-empty-state')).toBeInTheDocument();
-    expect(screen.getByText('No links yet')).toBeInTheDocument();
+    expect(screen.getByText('No Links Yet')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Open Releases' })).toHaveAttribute(
+      'href',
+      '/app/releases'
+    );
   });
 
   it('renders each row with status, clicks, and campaign fallbacks', () => {
@@ -121,7 +125,7 @@ describe('LinksPageClient', () => {
       'Destination',
       'Clicks',
       'Campaign',
-      'Jovie link',
+      'Jovie Link',
     ]);
 
     // Numeric alignment matches the shared table idiom: right-aligned header
@@ -132,9 +136,102 @@ describe('LinksPageClient', () => {
     expect(clicksHeader.className).toContain('text-right');
 
     const firstRow = within(table).getAllByRole('row')[1];
-    const clicksCell = within(firstRow).getByText('17');
-    expect(clicksCell.className).toContain('text-right');
-    expect(clicksCell.className).toContain('tabular-nums');
+    const clicksValue = within(firstRow).getByText('17');
+    expect(clicksValue.className).toContain('tabular-nums');
+    expect(clicksValue.closest('td')?.className).toContain('text-right');
+  });
+
+  it('renders through the shared UnifiedTable with dense shared rows', () => {
+    renderLinksWorkspace(
+      <LinksPageClient rows={[baseRow, { ...baseRow, id: 'row-2' }]} />
+    );
+
+    const table = screen.getByRole('table');
+    expect(table).toHaveAttribute('data-table-row-mode', 'dense');
+    const row = screen.getByTestId('links-row-row-1');
+    // Shared row shell owns height, hover and focus states; no local copies.
+    expect(row.className).toContain('system-b-table-row-shell');
+    expect(row.className).toContain('system-b-table-row-hover');
+    expect(row.className).toContain('system-b-table-row-focus-visible');
+  });
+
+  it('aligns every header with its column', () => {
+    renderLinksWorkspace(<LinksPageClient rows={[baseRow]} />);
+
+    const table = screen.getByRole('table');
+    const headers = within(table).getAllByRole('columnheader');
+    const cells = within(within(table).getAllByRole('row')[1]).getAllByRole(
+      'cell'
+    );
+    expect(cells).toHaveLength(headers.length);
+    headers.forEach((header, index) => {
+      const headerRight = header.className.includes('text-right');
+      const cellRight = cells[index].className.includes('text-right');
+      expect(cellRight, header.textContent ?? '').toBe(headerRight);
+    });
+  });
+
+  it('fixes column widths so long values truncate instead of widening columns', () => {
+    renderLinksWorkspace(<LinksPageClient rows={[baseRow]} />);
+
+    const table = screen.getByRole('table');
+    expect(table).toHaveClass('table-fixed');
+    expect(table.querySelectorAll('colgroup col')).toHaveLength(
+      within(table).getAllByRole('columnheader').length
+    );
+  });
+
+  it('moves the open inspector to the focused row after a sort', async () => {
+    const user = userEvent.setup();
+    HTMLElement.prototype.scrollIntoView = vi.fn();
+    renderLinksWorkspace(
+      <LinksPageClient
+        rows={[
+          { ...baseRow, id: 'row-a', title: 'Midnight City', clicks: 5 },
+          { ...baseRow, id: 'row-b', title: 'Neon Sky', clicks: 50 },
+          { ...baseRow, id: 'row-c', title: 'Afterglow', clicks: 20 },
+        ]}
+      />
+    );
+
+    await user.click(
+      screen.getByRole('button', {
+        name: 'Clicks: not sorted, activate to sort',
+      })
+    );
+    const bodyRows = within(screen.getByRole('table'))
+      .getAllByRole('row')
+      .slice(1);
+    const order = bodyRows.map(row => row.getAttribute('data-testid'));
+    expect(order).not.toEqual([
+      'links-row-row-a',
+      'links-row-row-b',
+      'links-row-row-c',
+    ]);
+
+    // Open the first displayed row, then arrow to the second displayed row.
+    await user.click(within(bodyRows[0]).getAllByRole('cell')[1]);
+    const expectedNext = bodyRows[1];
+    bodyRows[0].focus();
+    await user.keyboard('{ArrowDown}');
+
+    const nextTitle =
+      within(expectedNext).getAllByRole('cell')[0].textContent ?? '';
+    expect(screen.getByTestId('links-inspector')).toHaveTextContent(nextTitle);
+    expect(expectedNext).toHaveAttribute('aria-selected', 'true');
+  });
+
+  it('opens the inspector from a row click and marks the row selected', async () => {
+    const user = userEvent.setup();
+    renderLinksWorkspace(<LinksPageClient rows={[baseRow]} />);
+
+    const row = screen.getByTestId('links-row-row-1');
+    await user.click(within(row).getByText('Release'));
+
+    expect(screen.getByTestId('links-inspector')).toHaveTextContent(
+      'Midnight City'
+    );
+    expect(row).toHaveAttribute('aria-selected', 'true');
   });
 
   it('discloses truncated long values through title attributes', () => {

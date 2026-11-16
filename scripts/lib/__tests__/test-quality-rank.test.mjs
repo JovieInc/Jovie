@@ -114,6 +114,23 @@ test('aggregateByTier weights by valid mutants and skips unscored', () => {
   expect(t.default.modules).toBe(1);
 });
 
+test('aggregateByTier leaves @jovie/ui sweep modules out of the web tiers', () => {
+  const withUi = {
+    modules: {
+      ...state.modules,
+      'packages/ui/atoms/badge.tsx': {
+        status: 'scored',
+        valid: 50,
+        killed: 0,
+        survived: 50,
+      },
+    },
+  };
+  expect(aggregateByTier(withUi, surfaces)).toEqual(
+    aggregateByTier(state, surfaces)
+  );
+});
+
 test('floors only ratchet up and violations are reported', () => {
   const t = aggregateByTier(state, surfaces);
   expect(evaluateFloors(t, { billing: 70 }).violations).toEqual([

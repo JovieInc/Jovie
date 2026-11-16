@@ -197,6 +197,28 @@ test('scanner policy, credentials boundary and original job deadline remain bloc
     (/** @type {any} */ s) => s.name === 'Scan the exact source diff'
   );
   assert.match(scan.run, /scan-secrets\.sh ci-pr "\$base_sha"/);
+  assert.equal(scan.env.RELEASE_DOWNLOAD_TOKEN, '${{ github.token }}');
   assert.ok(prepare && !prepare['continue-on-error']);
   assert.ok(security.steps.indexOf(prepare) < security.steps.indexOf(scan));
+  for (const [file, command] of [
+    ['../../../.github/workflows/ci.yml', 'scan-secrets.sh ci-pr "$BASE_SHA"'],
+    [
+      '../../../.github/workflows/security.yml',
+      'scan-secrets.sh ci-pr "origin/${{ github.base_ref }}"',
+    ],
+    [
+      '../../../.github/workflows/security.yml',
+      'scan-secrets.sh ci-pr-trufflehog "origin/${{ github.base_ref }}"',
+    ],
+  ]) {
+    const text = readFileSync(resolve(import.meta.dirname, file), 'utf8');
+    const at = text.indexOf(command);
+    assert.notEqual(at, -1, `${file} ${command}`);
+    const step = text.slice(text.lastIndexOf('\n      - ', at), at);
+    assert.match(
+      step,
+      /RELEASE_DOWNLOAD_TOKEN: \$\{\{ github\.token \}\}/,
+      file
+    );
+  }
 });

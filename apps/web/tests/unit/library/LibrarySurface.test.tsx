@@ -15,7 +15,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   LibrarySurface,
   PRESETS,
-  resolveLibraryReviewStep,
   workPrimaryActionLabel,
 } from '@/app/app/(shell)/library/LibrarySurface';
 import type { LibraryReleaseAsset } from '@/app/app/(shell)/library/library-data';
@@ -33,11 +32,27 @@ import {
   useShellSidebarOverride,
 } from '@/contexts/ShellSidebarOverrideContext';
 import {
+  consumePendingChatDraft,
+  consumePendingChatPrompt,
+} from '@/lib/chat/open-chat-with-prompt';
+import {
   type LibraryPostReleaseBundle,
   withInspectorScope,
 } from '@/lib/library/post-release-types';
+import {
+  applyCacheScope,
+  resetCacheIsolationForTests,
+} from '@/lib/queries/cache-isolation';
+import { buildAsset } from './library-surface-fixtures';
 
 Element.prototype.scrollIntoView = vi.fn();
+
+const founderDoor = vi.hoisted(() => ({
+  chatMode: undefined as 'ov' | undefined,
+}));
+vi.mock('@/contexts/FounderDoorContext', () => ({
+  useFounderDoor: () => founderDoor,
+}));
 
 const LIBRARY_SURFACE_SOURCE = 'app/app/(shell)/library/LibrarySurface.tsx';
 const legacyGeistAccentPattern = new RegExp(
@@ -66,6 +81,7 @@ const librarySurfaceLocalVisualRecipePatterns = [
 ] as const;
 
 const navigationMock = vi.hoisted(() => ({
+  push: vi.fn(),
   refresh: vi.fn(),
   replace: vi.fn(),
   searchParams: new URLSearchParams(),
@@ -146,7 +162,7 @@ vi.mock('@/lib/queries/useReleaseMutations', () => ({
 
 vi.mock('next/navigation', () => ({
   useRouter: () => ({
-    push: vi.fn(),
+    push: navigationMock.push,
     replace: navigationMock.replace,
     refresh: navigationMock.refresh,
   }),
@@ -165,50 +181,6 @@ vi.mock('next/image', () => ({
     return <img alt='' {...imgProps} />;
   },
 }));
-
-function buildAsset(
-  overrides: Partial<LibraryReleaseAsset> = {}
-): LibraryReleaseAsset {
-  return {
-    id: 'release-1',
-    title: 'Take Me Over',
-    artist: 'Tim White',
-    artworkUrl: 'https://cdn.example.com/artwork.jpg',
-    previewUrl: 'https://cdn.example.com/preview.mp3',
-    previewVerification: 'verified',
-    videoUrl: null,
-    waveformSeed: 17,
-    smartLinkPath: '/tim/take-me-over',
-    releaseDate: '2026-04-28T00:00:00.000Z',
-    releaseType: 'single',
-    status: 'released',
-    approvalStatus: 'draft',
-    profileVisibility: 'visible',
-    lifecycleStatus: 'active',
-    trackCount: 1,
-    providerCount: 1,
-    providers: [
-      {
-        key: 'spotify',
-        label: 'Spotify',
-        url: 'https://open.spotify.com/album/take-me-over',
-      },
-    ],
-    hasLyrics: true,
-    hasArtwork: true,
-    hasVideoLinks: false,
-    assetKinds: ['artwork', 'preview', 'lyrics', 'providers'],
-    genres: ['Progressive House'],
-    spotifyPopularity: 68,
-    targetPlaylistCount: 2,
-    isExplicit: false,
-    label: 'Jovie',
-    upc: '123456789012',
-    distributor: 'Jovie',
-    totalDurationMs: 212_000,
-    ...overrides,
-  };
-}
 
 function RightPanelOutlet() {
   return useRightPanel();
@@ -397,6 +369,7 @@ describe('LibrarySurface', () => {
   );
 
   beforeEach(() => {
+    founderDoor.chatMode = undefined;
     window.localStorage.clear();
     // Grid is the shipped default view mode; most tests below exercise the
     // list renderer, so seed the persisted preference explicitly instead of
@@ -545,21 +518,20 @@ describe('LibrarySurface', () => {
     renderLibrary([]);
 
     const emptyState = screen.getByTestId('library-workspace-empty-state');
-    expect(screen.getByText('No work yet')).toBeDefined();
+    expect(screen.getByText('No Work Yet')).toBeDefined();
     expect(
       screen.getByText(
-        'Releases, merch, images, videos, and audio will appear here as they land.'
+        'Your releases, videos, images, audio, and merch live here.'
       )
     ).toBeDefined();
+    // One next step: the toolbar no longer repeats the empty state's action.
     const firstActions = screen.getAllByRole('link', {
       name: 'Open Releases',
     });
-    expect(firstActions).toHaveLength(2);
-    for (const action of firstActions) {
-      expect(action).toHaveAttribute('href', APP_ROUTES.RELEASES);
-    }
+    expect(firstActions).toHaveLength(1);
+    expect(firstActions[0]).toHaveAttribute('href', APP_ROUTES.RELEASES);
     expect(emptyState).toHaveClass('py-16', 'min-h-90');
-    expect(screen.getByRole('heading', { name: 'No work yet' })).toHaveClass(
+    expect(screen.getByRole('heading', { name: 'No Work Yet' })).toHaveClass(
       'text-sm',
       'font-semibold',
       'text-primary-token'
@@ -1150,6 +1122,54 @@ describe('LibrarySurface', () => {
 
     expect(writeText).toHaveBeenCalledWith('https://jov.ie/p/token-1');
   });
+
+  it.each([false, true, 'ovie'] as const)(
+    'opens selected work as an unsent draft, rejecting a changed profile: %s',
+    async changedProfile => {
+      founderDoor.chatMode = changedProfile === 'ovie' ? 'ov' : undefined;
+      resetCacheIsolationForTests();
+      applyCacheScope({
+        userId: 'user-1',
+        sessionId: 'session-1',
+        profileId: 'profile-1',
+        ready: true,
+      });
+      const user = userEvent.setup();
+      render(
+        <TooltipProvider>
+          <RightPanelProvider>
+            <LibrarySurface assets={[buildAsset()]} profileId='profile-1' />
+            <RightPanelOutlet />
+          </RightPanelProvider>
+        </TooltipProvider>
+      );
+      const actions = within(
+        screen.getByTestId('library-row-actions-release-1')
+      );
+      await user.click(actions.getByRole('button', { name: 'More actions' }));
+      if (changedProfile === true) applyCacheScope({ profileId: 'profile-2' });
+      await user.click(screen.getByRole('menuitem', { name: 'Ask Jovie' }));
+      expect(consumePendingChatPrompt()).toBeNull();
+      const draft = consumePendingChatDraft('profile-1');
+      if (changedProfile === 'ovie') {
+        expect(draft).toBeNull();
+        expect(navigationMock.push).not.toHaveBeenCalled();
+        expect(feedbackMocks.error).toHaveBeenCalledWith(
+          'Switch to Jovie, then ask about this item again.'
+        );
+      } else if (changedProfile) {
+        expect(draft).toBeNull();
+        expect(feedbackMocks.error).toHaveBeenCalledWith(
+          'Chat is unavailable. Reopen this item and try again.'
+        );
+      } else {
+        expect(draft).toContain('"kind":"release"');
+        expect(draft).toContain('"id":"release-1"');
+        expect(draft).toContain('"profileId":"profile-1"');
+      }
+      resetCacheIsolationForTests();
+    }
+  );
 
   it('rolls back profile visibility when the canonical mutation fails', async () => {
     const user = userEvent.setup();
@@ -2848,62 +2868,5 @@ describe('LibrarySurface', () => {
     });
     expect(trigger).toHaveFocus();
     expect(globalThis.scrollY).toBe(320);
-  });
-});
-
-describe('resolveLibraryReviewStep', () => {
-  const page = document.body;
-
-  it('moves one item on J/K and one row of tiles on up/down in the grid', () => {
-    expect(resolveLibraryReviewStep('j', page, 5)).toEqual({
-      kind: 'move',
-      delta: 1,
-    });
-    expect(resolveLibraryReviewStep('k', page, 5)).toEqual({
-      kind: 'move',
-      delta: -1,
-    });
-    expect(resolveLibraryReviewStep('ArrowDown', page, 5)).toEqual({
-      kind: 'move',
-      delta: 5,
-    });
-    expect(resolveLibraryReviewStep('ArrowUp', page, 5)).toEqual({
-      kind: 'move',
-      delta: -5,
-    });
-    expect(resolveLibraryReviewStep('ArrowLeft', page, 5)).toEqual({
-      kind: 'move',
-      delta: -1,
-    });
-    // Lists and tables move one row and leave left/right to scrolling.
-    expect(resolveLibraryReviewStep('ArrowDown', page, null)).toEqual({
-      kind: 'move',
-      delta: 1,
-    });
-    expect(resolveLibraryReviewStep('ArrowRight', page, null)).toBeNull();
-    expect(resolveLibraryReviewStep('End', page, null)).toEqual({
-      kind: 'edge',
-      to: 'last',
-    });
-  });
-
-  it('plays on Space and inspects on Enter without stealing native controls', () => {
-    const tile = document.createElement('button');
-    tile.dataset.libraryItemFocus = '';
-    const control = document.createElement('button');
-    const slider = document.createElement('div');
-    slider.setAttribute('role', 'slider');
-    const input = document.createElement('input');
-
-    expect(resolveLibraryReviewStep(' ', page, 4)).toEqual({ kind: 'play' });
-    expect(resolveLibraryReviewStep(' ', tile, 4)).toEqual({ kind: 'play' });
-    expect(resolveLibraryReviewStep(' ', control, 4)).toBeNull();
-    expect(resolveLibraryReviewStep('Enter', page, 4)).toEqual({
-      kind: 'open',
-    });
-    expect(resolveLibraryReviewStep('Enter', tile, 4)).toBeNull();
-    expect(resolveLibraryReviewStep('j', slider, 4)).toBeNull();
-    expect(resolveLibraryReviewStep('j', input, 4)).toBeNull();
-    expect(resolveLibraryReviewStep('ArrowLeft', input, 4)).toBeNull();
   });
 });

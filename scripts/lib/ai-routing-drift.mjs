@@ -44,6 +44,16 @@ export function usdPerDayByKey(rows, days) {
   return out;
 }
 
+/** Requests/day by report key — separates call-count growth from cost per call. */
+export function requestsPerDayByKey(rows, days) {
+  const out = {};
+  for (const row of rows) {
+    const key = reportKey(row);
+    out[key] = (out[key] ?? 0) + (row.request_count ?? 0) / days;
+  }
+  return out;
+}
+
 export function usdPerDayByModel(rows, days) {
   const out = {};
   for (const row of rows) {
@@ -240,6 +250,7 @@ export function evaluateRouting({
 }) {
   const findings = evaluateSubsidyPools({ routing, profiles });
   const keyUsd = usdPerDayByKey(keyRows, days);
+  const keyRequests = requestsPerDayByKey(keyRows, days);
   const modelUsd = usdPerDayByModel(modelRows, days);
   const ceilings = declaredCeilings(routing);
   const knownKeys = new Set(Object.keys(ceilings));
@@ -264,7 +275,11 @@ export function evaluateRouting({
           'gateway-over-ceiling',
           key,
           `Gateway key ${key} spends $${round(usd)}/day, over the $${round(ceiling)}/day its declared routing allows. The documented route (workers-first or workers-ai-only) is not what is running.`,
-          { usdPerDay: round(usd), ceilingUsdPerDay: round(ceiling) }
+          {
+            usdPerDay: round(usd),
+            ceilingUsdPerDay: round(ceiling),
+            requestsPerDay: round(keyRequests[key] ?? 0, 1),
+          }
         )
       );
     }
@@ -348,7 +363,11 @@ export function evaluateRouting({
     byKey: Object.fromEntries(
       Object.entries(keyUsd).map(([k, v]) => [
         k,
-        { usdPerDay: round(v), ceilingUsdPerDay: round(ceilings[k] ?? null) },
+        {
+          usdPerDay: round(v),
+          ceilingUsdPerDay: round(ceilings[k] ?? null),
+          requestsPerDay: round(keyRequests[k] ?? 0, 1),
+        },
       ])
     ),
     unreferencedCeilings: [...knownKeys].filter(key => !(key in keyUsd)),

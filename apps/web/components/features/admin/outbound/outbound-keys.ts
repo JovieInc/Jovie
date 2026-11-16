@@ -39,7 +39,7 @@ export function isTypingTarget(target: EventTarget | null): boolean {
   if (target.isContentEditable) return true;
   return Boolean(
     target.closest(
-      'input, textarea, select, [role="combobox"], [role="listbox"], [role="menu"], [role="dialog"]'
+      'input, textarea, select, [role="combobox"], [role="listbox"], [role="menu"], [role="dialog"], [role="alertdialog"]'
     )
   );
 }

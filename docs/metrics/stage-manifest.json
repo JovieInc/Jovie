@@ -12,6 +12,33 @@
     "minAbsoluteSeconds": 60
   },
   "entities": {
+    "pen-review": {
+      "entityId": "frame id:attempt start[:round]; one observation per timed round or frame",
+      "description": "Opt-in Pen review timings; local state ledger and stage-timings-latest.json, not live Mac certification.",
+      "stages": [
+        {
+          "id": "pen-review-round",
+          "meaning": "render/check/judge/fix round duration",
+          "producer": "scripts/pen-review/metrics.mjs",
+          "status": "pushed",
+          "source": "pen-review-ledger"
+        },
+        {
+          "id": "pen-review-frame",
+          "meaning": "whole frame attempt duration",
+          "producer": "scripts/pen-review/metrics.mjs",
+          "status": "pushed",
+          "source": "pen-review-ledger"
+        },
+        {
+          "id": "finished",
+          "meaning": "terminal frame outcome",
+          "producer": "scripts/pen-review/metrics.mjs",
+          "status": "pushed",
+          "source": "pen-review-ledger"
+        }
+      ]
+    },
     "chat-comparison": {
       "entityId": "source SHA (build) or source SHA:attempt (smoke)",
       "stages": [
@@ -749,6 +776,11 @@
     }
   },
   "sources": {
+    "pen-review-ledger": {
+      "kind": "events",
+      "url": null,
+      "owner": "design-system; ~/.local/state/jovie-pen-review/ledger.jsonl and local stage-timings-latest.json"
+    },
     "preflight-stages.jsonl": {
       "kind": "events",
       "url": null,

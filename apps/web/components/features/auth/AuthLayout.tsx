@@ -21,6 +21,7 @@ import { useMobileKeyboard } from '@/hooks/useMobileKeyboard';
 import { AUTH_SHELL_KIND } from '@/lib/auth/auth-shell-layout-contract';
 import { BRAND_MARK_SIZE } from '@/lib/brand/tokens';
 import { cn } from '@/lib/utils';
+import { AuthBackdrop } from './AuthBackdrop';
 import { AuthBrandPanel } from './AuthBrandPanel';
 
 interface AuthLayoutProps {
@@ -247,6 +248,8 @@ export function AuthLayout({
         'transition-[padding] duration-subtle ease-subtle'
       )}
     >
+      {isSplitVariant || isSplashB ? null : <AuthBackdrop />}
+
       {showSkipLink ? (
         // Native fragment navigation transfers focus even in this fixed shell.
         <a

@@ -230,3 +230,34 @@ export const Rtl: Story = {
     },
   },
 };
+
+function RadioSemanticsDemo() {
+  const [range, setRange] = useState<'7d' | '30d' | '90d'>('30d');
+  return (
+    <SegmentControl
+      semantics='radio'
+      variant='linear-pill'
+      layout='hug'
+      value={range}
+      onValueChange={setRange}
+      aria-label='Time range'
+      options={[
+        { value: '7d', label: '7 days' },
+        { value: '30d', label: '30 days' },
+        { value: '90d', label: '90 days' },
+      ]}
+    />
+  );
+}
+
+export const RadioSemantics: Story = {
+  render: () => <RadioSemanticsDemo />,
+  parameters: {
+    docs: {
+      description: {
+        story:
+          'A pure choice with no panel, such as a time range, uses radio semantics: a named radio group, no tabpanels, same keys and look.',
+      },
+    },
+  },
+};

@@ -3,6 +3,7 @@ import { APP_ROUTES } from '@/constants/routes';
 import { requireCreatorDocumentAccess } from '@/lib/creator-documents/access';
 import type { CreatorDocumentListItem } from '@/lib/creator-documents/types';
 import { listCreatorDocuments } from '@/lib/db/creator-documents/store';
+import { getDspMatchesForProfile } from '@/lib/dsp-enrichment/queries.server';
 import { captureError } from '@/lib/error-tracking';
 import type { LibraryAssetShareViewModel } from '@/lib/library/asset-share';
 import {
@@ -19,7 +20,7 @@ import type { LibraryProfileVisibility } from '@/lib/library/profile-visibility'
 import { getLibraryProfileStateMapForProfile } from '@/lib/library/profile-visibility.server';
 import type { LibraryRelationshipView } from '@/lib/library/track-drawer-types';
 import { getLibraryMerchCardsForProfile } from '@/lib/merch/service';
-import { queryKeys } from '@/lib/queries';
+import { type DspMatch, queryKeys } from '@/lib/queries';
 import { HydrateClient } from '@/lib/queries/HydrateClient';
 import { getDehydratedState, getQueryClient } from '@/lib/queries/server';
 import {
@@ -41,14 +42,30 @@ export const metadata: Metadata = {
   description: 'Manage what you make and put into the world',
 };
 
+// Same rows GET /api/dsp/matches sends, which the client reads into this
+// key; the client types that JSON as DspMatch the same way.
+async function loadDspMatches(
+  profileId: string,
+  userId: string
+): Promise<DspMatch[]> {
+  const matches = await getDspMatchesForProfile(profileId, userId);
+  return matches.map(match => ({
+    ...match,
+    createdAt: match.createdAt.toISOString(),
+    updatedAt: match.updatedAt.toISOString(),
+  })) as DspMatch[];
+}
+
 export default async function LibraryPage({
   searchParams,
 }: {
   readonly searchParams: Promise<{
     readonly section?: string | string[] | undefined;
+    readonly view?: string | string[] | undefined;
   }>;
 }) {
-  await searchParams;
+  const { view } = await searchParams;
+  const isReleasesView = view === 'releases';
   const routeContext = await loadAppShellRouteContext({
     route: APP_ROUTES.LIBRARY,
     authFailure: 'notFound',
@@ -167,6 +184,24 @@ export default async function LibraryPage({
             creatorProfileId: profileId,
             route: APP_ROUTES.LIBRARY,
           }),
+          // The releases view shows an Apple Music banner above its list.
+          // Read its matches here so the banner is in the first paint;
+          // fetched on the client, the banner landed after the list and
+          // pushed it down (layout shift 0.075 against the 0.06 budget).
+          isReleasesView
+            ? queryClient
+                .fetchQuery({
+                  queryKey: queryKeys.dspEnrichment.matches(profileId),
+                  queryFn: () => loadDspMatches(profileId, routeContext.userId),
+                })
+                .catch(error => {
+                  void captureError(
+                    'DSP matches prefetch failed on library page',
+                    error,
+                    { route: APP_ROUTES.LIBRARY }
+                  );
+                })
+            : undefined,
         ]);
         merchCards = merch;
         archivedMerchCards = archivedMerch;

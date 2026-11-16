@@ -552,6 +552,9 @@ jobs:
           echo '{"cookies":[],"origins":[]}' > tests/.auth/user.json
           test -n "$PRODUCTION_BASE_URL"
           specs=(tests/e2e/smoke-prod-auth.spec.ts)
+          # One browser at a time: the cert judges each surface's longest
+          # frame, and four browsers sharing the runner's CPUs stretch every
+          # React render (Nov 10: chat loads 274/103/269 ms in parallel).
           [ -f tests/e2e/prod-cert-start-chat.spec.ts ] && specs+=(tests/e2e/prod-cert-start-chat.spec.ts)
           doppler run --project jovie-web --config prd \
             --only-secrets=E2E_PROD_USER_EMAIL,DATABASE_URL \
@@ -562,7 +565,7 @@ jobs:
               EXPECTED_VERCEL_ENVIRONMENT=production \
               PLAYWRIGHT_DYNAMIC_SECRETS_FILE="$RUNNER_TEMP/playwright-dynamic-cookie-values" \
                 node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs" --run -- \
-                  pnpm exec playwright test "${specs[@]}" --project=chromium --reporter=line
+                  pnpm exec playwright test "${specs[@]}" --project=chromium --reporter=line --workers=1
           echo "auth_smoke_status=passed" >> "$GITHUB_OUTPUT"
         env:
           EXPECTED_COMMIT_SHA: ${{ needs.resolve-target.outputs.commit_sha }}
@@ -680,8 +683,13 @@ jobs:
                       --grep "sign-in works and dashboard loads"
           ) || echo "::warning::Signed-in session not established; crawling as a stranger only."
           if [ -s "$auth_state" ]; then state_args=(--storage-state "$auth_state"); fi
-          node scripts/product-crawl/crawl.mjs --origin "$PRODUCTION_BASE_URL" \
-            --out product-crawl-receipt "${state_args[@]}"
+          # This job uploads only from the guard's producer stage, so the
+          # crawl writes its receipt under the guard too. Run outside it, the
+          # receipt never reached the stage and every upload was refused.
+          PLAYWRIGHT_ARTIFACT_PATHS='product-crawl-receipt/*.json' \
+            node .github/scripts/guard-playwright-artifacts.mjs --run -- \
+              node scripts/product-crawl/crawl.mjs --origin "$PRODUCTION_BASE_URL" \
+                --out product-crawl-receipt "${state_args[@]}"
           cat product-crawl-receipt/summary.md >> "$GITHUB_STEP_SUMMARY"
       - name: Upload crawl receipt
         if: ${{ always() && steps.has-crawl.outputs.skip != 'true' && hashFiles('product-crawl-receipt/*.json') != '' }}
@@ -790,7 +798,7 @@ jobs:
     name: Golden Path Certification (Landed Production)
     needs: [resolve-target, auth-smoke]
     if: ${{ always() && needs.resolve-target.result == 'success' && needs.resolve-target.outputs.should_certify == 'true' }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04  # Playwright (pen-golden-path.mjs) has no ubuntu 26.04 build
     timeout-minutes: 10
     permissions:
       contents: read

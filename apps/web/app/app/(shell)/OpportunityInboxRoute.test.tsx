@@ -18,8 +18,8 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock('@/lib/admin/middleware', () => ({ checkIsAdmin: mocks.checkIsAdmin }));
-vi.mock('@/components/features/home/PipelineBottleneckBanner', () => ({
-  PipelineBottleneckBanner: () => <div data-testid='pipeline-banner' />,
+vi.mock('./PipelineBottleneckBannerLazy', () => ({
+  PipelineBottleneckBannerLazy: () => <div data-testid='pipeline-banner' />,
 }));
 
 vi.mock('next/navigation', () => ({

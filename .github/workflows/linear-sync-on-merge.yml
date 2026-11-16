@@ -89,6 +89,8 @@ jobs:
             scripts/invariants/browser-owned-input-matrix.json
             scripts/invariants/product-reference-coherence.mjs
             scripts/invariants/screen-proof-resolver.mjs
+            scripts/invariants/screen-proof-final-paths.mjs
+            scripts/invariants/screen-proof-attempt-checks.mjs
             scripts/lib/playwright-png.mjs
             packages/api-client/cache.ts
             packages/api-client/cli.ts

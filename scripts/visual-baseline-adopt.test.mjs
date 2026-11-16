@@ -9,6 +9,9 @@ const baselines = [
   '/snap/a.spec.ts/dup.png',
   '/snap/b.spec.ts/dup.png',
 ];
+// Mapping tests run without Pen bindings so repo bindings (e.g. Pen stills
+// for /) cannot change their outcome; the refusal path has its own test.
+const noBindings = { bindings: { routes: {} }, config: {} };
 
 test('maps each -actual.png to its one committed baseline', () => {
   const { copies, problems } = planAdoption(
@@ -17,7 +20,8 @@ test('maps each -actual.png to its one committed baseline', () => {
       '/art/test-results/visual-regression-JOV-2081-x-chromium/homepage-2560-diff.png',
       '/art/test-results/visual-regression-JOV-2081-x-chromium/homepage-2560-expected.png',
     ],
-    baselines
+    baselines,
+    noBindings
   );
   assert.deepEqual(problems, []);
   assert.deepEqual(copies, [
@@ -31,7 +35,8 @@ test('maps each -actual.png to its one committed baseline', () => {
 test('dedupes retries of the same shot', () => {
   const { copies } = planAdoption(
     ['/art/r1/homepage-375-actual.png', '/art/r2/homepage-375-actual.png'],
-    baselines
+    baselines,
+    noBindings
   );
   assert.equal(copies.length, 1);
 });
@@ -39,11 +44,33 @@ test('dedupes retries of the same shot', () => {
 test('reports unknown and ambiguous names instead of guessing', () => {
   const { copies, problems } = planAdoption(
     ['/art/new-shot-actual.png', '/art/dup-actual.png'],
-    baselines
+    baselines,
+    noBindings
   );
   assert.deepEqual(copies, []);
   assert.deepEqual(problems, [
     'no committed baseline named new-shot.png',
     'ambiguous baseline dup.png: 2 matches',
   ]);
+});
+
+test('refuses to adopt a baseline for a route that has Pen stills', () => {
+  const guard = {
+    bindings: {
+      routes: {
+        '/': {
+          sources: [],
+          viewports: { 1440: [{ section: 'hero', still: 's.png' }] },
+        },
+      },
+    },
+    config: { baselinePrefixes: { '/': ['homepage'] } },
+  };
+  const { copies, problems } = planAdoption(
+    ['/tmp/a/homepage-375-actual.png', '/tmp/a/other-actual.png'],
+    ['/repo/snap/homepage-375.png', '/repo/snap/other.png'],
+    guard
+  );
+  assert.equal(copies.length, 1);
+  assert.match(problems.join('\n'), /refusing to adopt homepage-375\.png/);
 });

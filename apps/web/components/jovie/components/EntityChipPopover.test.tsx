@@ -61,7 +61,11 @@ describe('EntityChipPopover', () => {
     expect(trigger.tagName).toBe('BUTTON');
     expect(trigger.getAttribute('aria-haspopup')).toBe('dialog');
     expect(trigger.getAttribute('aria-expanded')).toBe('false');
-    expect(trigger.getAttribute('aria-label')).toBe('Release: Sober');
+    // The name now includes the rendered chip content (the sr-only action
+    // prefix joins the visible label instead of an aria-label replacing it).
+    expect(trigger.querySelector('.sr-only')?.textContent).toBe(
+      'Release: Sober — '
+    );
     expect(trigger).toHaveClass('system-b-entity-chip-trigger');
   });
 

@@ -1,12 +1,52 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import Link from 'next/link';
-import { beforeEach, expect, it } from 'vitest';
-import { SidebarProvider } from './context';
+import { beforeEach, expect, it, vi } from 'vitest';
+import { SidebarProvider, useSidebar } from './context';
 import { Sidebar } from './sidebar';
+
+const breakpoint = vi.hoisted(() => ({ mobile: false }));
+vi.mock('@/hooks/useBreakpoint', async importOriginal => ({
+  ...(await importOriginal<typeof import('@/hooks/useBreakpoint')>()),
+  useBreakpointDown: () => breakpoint.mobile,
+}));
+
+function MobileOpenFixture() {
+  const { toggleSidebar } = useSidebar();
+  return (
+    <button type='button' onClick={toggleSidebar}>
+      Open Drawer
+    </button>
+  );
+}
 
 beforeEach(() => {
   document.cookie = 'sidebar:state=; path=/; max-age=0';
+  breakpoint.mobile = false;
+});
+
+it('opens the phone drawer without lighting up its first control', async () => {
+  breakpoint.mobile = true;
+  const user = userEvent.setup();
+  render(
+    <SidebarProvider>
+      <MobileOpenFixture />
+      <Sidebar collapsible='offcanvas'>
+        <button type='button'>Switch Workspace</button>
+        <Link href='/app'>Home</Link>
+      </Sidebar>
+    </SidebarProvider>
+  );
+  await user.click(screen.getByRole('button', { name: 'Open Drawer' }));
+  const dialog = await screen.findByRole('dialog');
+  // Radix would focus the brand switcher and paint its focus fill. The
+  // drawer takes focus itself so the first row rests like every other.
+  expect(dialog).toHaveFocus();
+  expect(
+    screen.getByRole('button', { name: 'Switch Workspace' })
+  ).not.toHaveFocus();
+  await user.keyboard('{Tab}');
+  expect(dialog).toContainElement(document.activeElement as HTMLElement);
 });
 
 it('removes a closed offcanvas rail from keyboard and assistive navigation', () => {

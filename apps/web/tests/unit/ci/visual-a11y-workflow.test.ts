@@ -151,20 +151,24 @@ describe('CI accessibility and visual gate contracts (JOV-4060)', () => {
     expect(buildLayout.if).not.toContain("github.event_name == 'pull_request'");
   });
 
-  it('runs the Storybook matrix on two workers of three hosted runners', () => {
+  it('runs three two-worker browser shards beside one merge-group certification', () => {
     const storybook = job('ci-storybook-surfaces');
     expect(storybook['runs-on']).toMatch(/^ubuntu-(?:latest|24\.04)$/);
-    // Three disjoint Playwright shards cover the full spec list; one failing
-    // shard fails the job result the aggregates read.
+    // Three disjoint Playwright shards cover the full spec list. Merge groups
+    // also require one parallel certification; any member failure fails the
+    // matrix result read by the aggregates.
     expect(storybook.strategy).toEqual({
       'fail-fast': true,
-      matrix: { shard: [1, 2, 3] },
+      matrix: {
+        shard:
+          "${{ fromJSON(github.event_name == 'merge_group' && '[1, 2, 3, \"certification\"]' || '[1, 2, 3]') }}",
+      },
     });
     const matrix = step(storybook, 'Run surface elevation matrix (Storybook)');
-    expect(matrix.step.env?.STORYBOOK_SHARD).toBe('${{ matrix.shard }}/3');
+    expect(matrix.step.env?.STORYBOOK_SHARD).toBe('${{ matrix.shard }}');
     const command = String(matrix.step.run).replace(/\s*\\\n\s*/g, ' ');
     expect(command).toMatch(
-      /--config=playwright\.config\.storybook\.ts --project=chromium --reporter=line --workers=2 --shard="\$STORYBOOK_SHARD"/
+      /--config=playwright\.config\.storybook\.ts --project=chromium --reporter=line --workers=2 --shard="\$STORYBOOK_SHARD\/3"/
     );
     expect(command).not.toMatch(/--update-snapshots|--retries|--repeat-each/);
     const config = readFileSync(
@@ -219,13 +223,13 @@ describe('CI accessibility and visual gate contracts (JOV-4060)', () => {
     await withLiveServer(async (pid, exited) => {
       const ready = runStep(matrixRun, stubs, {
         STORYBOOK_PID: pid,
-        STORYBOOK_SHARD: '2/2',
+        STORYBOOK_SHARD: '2',
       });
       expect(ready.status, ready.stderr).toBe(0);
       expect(ready.calls).toMatch(
         /node .*guard-playwright-artifacts\.mjs --run -- pnpm exec playwright test/
       );
-      expect(ready.calls).toContain('--shard=2/2');
+      expect(ready.calls).toContain('--shard=2/3');
       // The EXIT trap terminates the owned child; await reaping before kill -0.
       expect((await exited)[1]).toBe('SIGTERM');
       expect(spawnSync('kill', ['-0', pid]).status).not.toBe(0);

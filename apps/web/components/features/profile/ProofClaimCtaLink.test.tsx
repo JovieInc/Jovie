@@ -47,4 +47,10 @@ describe('ProofClaimCtaLink', () => {
     // below the WCAG 2.2 target-size floor. The visual stays text-sized.
     expect(proofClaimFooterClassName().split(' ')).toContain('min-h-6');
   });
+
+  it('keeps the footer action brighter than its muted brand prefix', () => {
+    const classes = proofClaimFooterClassName().split(' ');
+    expect(classes).toContain('text-white/88');
+    expect(classes).not.toContain('text-white/55');
+  });
 });

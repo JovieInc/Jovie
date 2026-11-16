@@ -9,6 +9,6 @@ describe('LogoIcon', () => {
     const icon = screen.getByRole('img', { name: 'Jovie' });
     expect(icon).toHaveAttribute('width', '24');
     expect(icon).toHaveAttribute('height', '24');
-    expect(icon.parentElement?.className).toContain(`text-${'white'}`);
+    expect(icon.parentElement?.className).toContain('text-on-media');
   });
 });

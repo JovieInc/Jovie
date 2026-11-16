@@ -19,7 +19,7 @@ import { cn } from '@/lib/utils';
 import { formatLocationString } from '@/lib/utils/string-utils';
 import type { Artist } from '@/types/db';
 import { ArtistNotificationsCTA } from './artist-notifications-cta/ArtistNotificationsCTA';
-import { subscriptionPrimaryActionClassName } from './artist-notifications-cta/shared';
+import { subscriptionMutedActionClassName } from './artist-notifications-cta/shared';
 import type { NotificationSourceContext } from './artist-notifications-cta/types';
 import { ProfileDrawerShell } from './ProfileDrawerShell';
 
@@ -174,6 +174,10 @@ function TourDateRow({
   );
 }
 
+export const EVENT_ALERTS_LABEL = 'Turn on event alerts';
+
+const EVENT_ALERTS_TRIGGER_CLASS_NAME = `${subscriptionMutedActionClassName} profile-glass-pill profile-glass-pill--flat w-full justify-center gap-1.5 text-mid font-medium`;
+
 /**
  * Event alerts opt-in shown when an artist has no upcoming events. Shared by
  * the tour drawer empty state and the Events mode card.
@@ -191,12 +195,12 @@ export function TourEventAlertsAction({
     return (
       <Button
         type='button'
-        variant='primary'
+        variant='secondary'
         size='marketing'
         className='w-full'
         disabled
       >
-        Turn On Event Alerts
+        {EVENT_ALERTS_LABEL}
       </Button>
     );
   }
@@ -208,9 +212,10 @@ export function TourEventAlertsAction({
       hideListenFallback
       source={sourceContext.ctaLocation}
       sourceContext={sourceContext}
-      triggerLabel='Turn On Event Alerts'
-      // Canonical Button owns the 32px control and 44px touch floor.
-      triggerClassName={`${subscriptionPrimaryActionClassName} w-full justify-center gap-2 px-4 text-xs`}
+      triggerLabel={EVENT_ALERTS_LABEL}
+      // Canonical Button owns the 28px control and 44px touch floor; the flat
+      // glass pill matches the identity header's Get updates action.
+      triggerClassName={EVENT_ALERTS_TRIGGER_CLASS_NAME}
       presentation='overlay'
     />
   );

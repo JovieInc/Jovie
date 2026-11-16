@@ -18,7 +18,6 @@
     "apps/web/app/app/(shell)/links/LinksPageClient.tsx": 1,
     "apps/web/app/investor-portal/_components/InvestorNav.tsx": 1,
     "apps/web/app/investor-portal/_components/MemoContent.tsx": 1,
-    "apps/web/app/onboarding/loading.tsx": 1,
     "apps/web/components/features/admin/agent-os/ArtifactDrawer.tsx": 2,
     "apps/web/components/features/admin/capacity/CapacityBoard.tsx": 1,
     "apps/web/components/features/admin/certifications/CertificationWalkthrough.tsx": 1,

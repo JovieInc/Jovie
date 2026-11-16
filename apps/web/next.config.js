@@ -63,12 +63,12 @@ const nextConfig = {
     // CI sets NEXT_IGNORE_TYPECHECK=1 — skip during build since typecheck runs separately
     ignoreBuildErrors: !!process.env.NEXT_IGNORE_TYPECHECK,
   },
-  // Browser source maps are emitted only when the Sentry plugin will upload
-  // them, and the plugin deletes them from .next after upload
-  // (sourcemaps.deleteSourcemapsAfterUpload below). They are never served to
-  // browsers; the release workflows fail closed if any .map reaches
-  // .vercel/output/static.
-  productionBrowserSourceMaps: shouldUseSentryPlugin,
+  // Maps ship only when the Sentry plugin uploads them (deleted from .next
+  // after upload) or on non-Vercel CI production builds — the Lighthouse
+  // gate's treemap needs served .map files (run 42614405519, JOV-12023).
+  productionBrowserSourceMaps:
+    shouldUseSentryPlugin ||
+    (process.env.NODE_ENV === 'production' && !process.env.VERCEL_ENV),
   output: isVercelPreview ? undefined : 'standalone',
   // Monorepo root for standalone output file tracing (prevents lockfile detection warnings)
   outputFileTracingRoot: isVercelPreview

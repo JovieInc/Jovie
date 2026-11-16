@@ -271,6 +271,92 @@ test.describe('Homepage', () => {
     }
   });
 
+  test('keeps every section and mockup inside the one content box', async ({
+    page,
+  }) => {
+    test.setTimeout(180_000);
+    // Static geometry: the scroll-driven fade-ups scale what they reveal.
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    for (const viewport of [
+      { width: 390, height: 844 },
+      { width: 1024, height: 900 },
+      { width: 1280, height: 900 },
+      { width: 1440, height: 900 },
+      { width: 1512, height: 900 },
+      { width: 1920, height: 1080 },
+    ]) {
+      await page.setViewportSize(viewport);
+      await gotoHomepage(page);
+      await page.evaluate(() => document.fonts.ready);
+      const report = await page.evaluate(() => {
+        const out: string[] = [];
+        const desktop = window.innerWidth >= 1024;
+        const sections = document.querySelectorAll<HTMLElement>('.hv3');
+        if (sections.length < 4) out.push(`only ${sections.length} sections`);
+        for (const section of sections) {
+          const rule = section.querySelector<HTMLElement>(':scope > .hv3-rule');
+          if (!rule) continue;
+          const side = Number.parseFloat(getComputedStyle(rule).paddingLeft);
+          const box = section.getBoundingClientRect();
+          const left = box.left + side;
+          const right = box.right - side;
+          const name = section.className;
+          // Everything a reader sees as a pane or a column stays in the box.
+          for (const el of section.querySelectorAll<HTMLElement>(
+            '.hv3-stage, .hv3-window, .hv3-lift, .hv3-plate, .hv3-phone, .hv3-captions, .hv3-moment, .hv3-sheet, .hv3-steps, .hv3-index'
+          )) {
+            if (
+              el.closest('[hidden]') ||
+              getComputedStyle(el).display === 'none'
+            )
+              continue;
+            const r = el.getBoundingClientRect();
+            if (r.width === 0) continue;
+            // On phones a stage crops its mockup at the box: measure the
+            // visible part.
+            const clip = el.closest<HTMLElement>('.hv3-stage');
+            const c = clip && clip !== el ? clip.getBoundingClientRect() : null;
+            const l = c ? Math.max(r.left, c.left) : r.left;
+            const rr = c ? Math.min(r.right, c.right) : r.right;
+            if (l < left - 1 || rr > right + 1) {
+              out.push(
+                `${name} ${el.className}: ${l.toFixed(1)}-${rr.toFixed(1)} outside ${left.toFixed(1)}-${right.toFixed(1)}`
+              );
+            }
+          }
+          // A full-width stage is the box itself, edge to edge.
+          for (const stage of section.querySelectorAll<HTMLElement>(
+            '.hv3-stage--hero, .hv3-stage--releases'
+          )) {
+            const r = stage.getBoundingClientRect();
+            if (Math.abs(r.left - left) > 1 || Math.abs(r.right - right) > 1) {
+              out.push(
+                `${name} ${stage.className}: ${r.left.toFixed(1)}-${r.right.toFixed(1)} is not the box ${left.toFixed(1)}-${right.toFixed(1)}`
+              );
+            }
+          }
+          // On desktop the hero window and the release panes fill the box.
+          if (!desktop) continue;
+          for (const sel of [
+            '.hv3-rig--hero .hv3-window',
+            '.hv3-rig--releases',
+          ]) {
+            const el = section.querySelector<HTMLElement>(sel);
+            if (!el) continue;
+            const r = el.getBoundingClientRect();
+            if (Math.abs(r.left - left) > 1 || Math.abs(r.right - right) > 1) {
+              out.push(
+                `${name} ${sel}: ${r.left.toFixed(1)}-${r.right.toFixed(1)} does not fill ${left.toFixed(1)}-${right.toFixed(1)}`
+              );
+            }
+          }
+        }
+        return out;
+      });
+      expect(report, `${viewport.width}px`).toEqual([]);
+    }
+  });
+
   test('keeps layout shift under 0.1 while the hero loads', async ({
     page,
   }) => {

@@ -313,10 +313,26 @@ describe('app-installation rate-limit guard (2026-10-31 5 h queue stall)', () =>
 describe('workflow dispatch inputs', () => {
   const root = resolve(here, '../../..');
   const dispatches = caller =>
-    [...caller.matchAll(/'run',\s*'([\w./-]+\.yml)'([\s\S]*?)\]/g)].map(m => ({
+    [
+      ...caller.matchAll(
+        /(?:'run',|dispatchWorkflow\()\s*'([\w./-]+\.yml)'([\s\S]*?)(?:\]|\);)/g
+      ),
+    ].map(m => ({
       workflow: m[1],
       inputs: [...m[2].matchAll(/`([\w-]+)=/g)].map(x => x[1]),
     }));
+
+  it.each([
+    "gh(['workflow', 'run', 'pr-remediation-swarm.yml', '-f', `pr_numbers=7`]);",
+    "dispatchWorkflow('pr-remediation-swarm.yml', `pr_numbers=7`, 'repair');",
+  ])(
+    'detects undeclared input names in direct and wrapped dispatches: %s',
+    caller => {
+      expect(dispatches(caller)).toEqual([
+        { workflow: 'pr-remediation-swarm.yml', inputs: ['pr_numbers'] },
+      ]);
+    }
+  );
 
   it('passes only inputs the target workflow declares (run 41122896980: pr_numbers 422)', () => {
     const caller = readFileSync(

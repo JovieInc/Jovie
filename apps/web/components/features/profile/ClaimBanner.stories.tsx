@@ -42,3 +42,26 @@ export const InProfileContext: Story = {
     </div>
   ),
 };
+
+/** Partial: no verified Spotify identity, so the banner states ownership with no claim action. */
+export const PartialNoClaimAction: Story = {
+  args: {
+    profileHandle: 'artistname',
+    displayName: 'Artist Name',
+    variant: 'unsupported',
+  },
+};
+
+/** RTL: copy and CTA follow the reading direction; the CTA label never wraps. */
+export const RtlArabicName: Story = {
+  render: () => (
+    <div dir='rtl' lang='ar'>
+      <ClaimBanner
+        profileHandle='nour'
+        displayName='نور الهدى'
+        ctaHref='/nour/claim?next=auth'
+        variant='claim_intent'
+      />
+    </div>
+  ),
+};

@@ -6,14 +6,12 @@ const {
   pageMock,
   trackMock,
   useBillingStatusQueryMock,
-  useReducedMotionMock,
   searchParamsMock,
 } = vi.hoisted(() => ({
   fetchMock: vi.fn(),
   pageMock: vi.fn(),
   trackMock: vi.fn(),
   useBillingStatusQueryMock: vi.fn(),
-  useReducedMotionMock: vi.fn(() => false),
   searchParamsMock: vi.fn(() => new URLSearchParams()),
 }));
 
@@ -55,10 +53,6 @@ vi.mock('@/lib/analytics', () => ({
 
 vi.mock('@/lib/queries', () => ({
   useBillingStatusQuery: useBillingStatusQueryMock,
-}));
-
-vi.mock('@/lib/hooks/useReducedMotion', () => ({
-  useReducedMotion: () => useReducedMotionMock(),
 }));
 
 import CheckoutSuccessPage from './page';
@@ -108,8 +102,6 @@ describe('CheckoutSuccessPage — plan headline resolution', () => {
     pageMock.mockReset();
     trackMock.mockReset();
     useBillingStatusQueryMock.mockReset();
-    useReducedMotionMock.mockReset();
-    useReducedMotionMock.mockReturnValue(false);
     searchParamsMock.mockReset();
     searchParamsMock.mockReturnValue(new URLSearchParams());
   });
@@ -259,8 +251,6 @@ describe('CheckoutSuccessPage — unlock tiles', () => {
     pageMock.mockReset();
     trackMock.mockReset();
     useBillingStatusQueryMock.mockReset();
-    useReducedMotionMock.mockReset();
-    useReducedMotionMock.mockReturnValue(false);
     searchParamsMock.mockReset();
     searchParamsMock.mockReturnValue(new URLSearchParams());
   });
@@ -308,8 +298,6 @@ describe('CheckoutSuccessPage — CTAs and verification', () => {
     pageMock.mockReset();
     trackMock.mockReset();
     useBillingStatusQueryMock.mockReset();
-    useReducedMotionMock.mockReset();
-    useReducedMotionMock.mockReturnValue(false);
     searchParamsMock.mockReset();
     searchParamsMock.mockReturnValue(new URLSearchParams());
   });
@@ -410,8 +398,6 @@ describe('CheckoutSuccessPage — analytics and shell', () => {
     pageMock.mockReset();
     trackMock.mockReset();
     useBillingStatusQueryMock.mockReset();
-    useReducedMotionMock.mockReset();
-    useReducedMotionMock.mockReturnValue(false);
     searchParamsMock.mockReset();
     searchParamsMock.mockReturnValue(new URLSearchParams());
   });
@@ -478,37 +464,22 @@ describe('CheckoutSuccessPage — analytics and shell', () => {
     ).toHaveLength(1);
   });
 
-  it('emits paid-success analytics once even when reduced motion resolves after first render', async () => {
-    useReducedMotionMock.mockReturnValueOnce(true).mockReturnValue(false);
-    mockBilling('pro');
-    render(<CheckoutSuccessPage />);
-
-    await waitFor(() => {
-      expect(
-        trackMock.mock.calls.filter(
-          ([event]) => event === 'subscription_success'
-        )
-      ).toHaveLength(1);
-      expect(
-        pageMock.mock.calls.filter(([event]) => event === 'checkout_success')
-      ).toHaveLength(1);
-    });
-  });
-
-  it('skips confetti when reduced motion is enabled', () => {
-    useReducedMotionMock.mockReturnValue(true);
+  it('settles in place on verified paid success: no confetti, a status pill and the billing link', () => {
     mockBilling('pro');
     render(<CheckoutSuccessPage />);
     expect(screen.queryByTestId('confetti-overlay')).not.toBeInTheDocument();
-  });
-
-  it('renders viewport confetti when motion is allowed and paid success is verified', () => {
-    mockBilling('pro');
-    render(<CheckoutSuccessPage />);
-    expect(screen.getByTestId('confetti-overlay')).toHaveAttribute(
-      'data-viewport',
-      'true'
+    expect(screen.getByTestId('checkout-success-status')).toHaveTextContent(
+      'Payment confirmed'
     );
+    expect(screen.getByRole('link', { name: 'Billing page' })).toHaveAttribute(
+      'href',
+      '/billing'
+    );
+    expect(
+      screen
+        .getByTestId('checkout-success-paid')
+        .querySelector('.translate-y-6')
+    ).toBeNull();
   });
 
   it('does not declare paid success when checkout-session fetch fails', async () => {

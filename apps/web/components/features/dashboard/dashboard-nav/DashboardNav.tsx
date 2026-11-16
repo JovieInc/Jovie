@@ -1,7 +1,7 @@
 'use client';
 
 import { useQueryClient } from '@tanstack/react-query';
-import { Bell, Plus } from 'lucide-react';
+import { Plus } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname, useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -43,6 +43,7 @@ import {
   inboxNavItem,
   userSettingsNavigation,
 } from './config';
+import { InboxAttentionLink } from './InboxAttentionLink';
 import { NavMenuItem } from './NavMenuItem';
 import { isNavigationItemActive } from './navigation-state';
 import type { DashboardNavProps, NavItem } from './types';
@@ -67,6 +68,12 @@ interface PendingNavigationRecord {
 // immediately. A transition that fails without committing a URL recovers on
 // the same drop-off window navigation telemetry uses instead of sticking.
 const PENDING_NAVIGATION_MIN_VISIBLE_MS = 400;
+const NEW_CHAT_ROW_ITEM: NavItem = {
+  ...chatNavItem,
+  icon: Plus,
+  iconName: 'Plus',
+  tone: undefined,
+};
 const PENDING_NAVIGATION_RECOVERY_MS = NAVIGATION_DROP_OFF_MS;
 
 export function DashboardNav({
@@ -449,6 +456,58 @@ export function DashboardNav({
     </Link>
   );
 
+  // Header owns bell and search: New Chat takes a labelled row (shell-ia.md).
+  const newChatOwnsRow = headerOwnsInbox && !searchSurface;
+
+  const commandSlot = (
+    <div
+      data-sidebar-search-slot='true'
+      className={cn(
+        'mx-1 flex h-9 shrink-0 items-center gap-(--space-2-5) pr-1.5 lg:overflow-hidden',
+        // The command slot keeps its vertical allocation while the
+        // surrounding rail narrows; navigation below never moves.
+        'group-data-[collapsible=icon]:mx-0 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:gap-0 group-data-[collapsible=icon]:border-transparent group-data-[collapsible=icon]:bg-transparent group-data-[collapsible=icon]:pr-0'
+      )}
+    >
+      <RailStagedContent
+        hidden={sidebarState === 'closed' && !isMobile}
+        className={cn(
+          'flex min-w-0 items-center gap-(--space-2-5)',
+          searchSurface && 'flex-1'
+        )}
+      >
+        {searchSurface}
+        {searchSurface ? (
+          <span
+            aria-hidden='true'
+            data-sidebar-search-divider
+            className='h-4 w-px bg-subtle'
+          />
+        ) : null}
+        {headerOwnsInbox ? null : (
+          <InboxAttentionLink
+            label={homeAttentionName}
+            itemId={inboxNavItem.id}
+            attention={
+              hasRuntimeUpdate
+                ? 'available'
+                : (inboxNavigation?.state ?? 'unknown')
+            }
+            pendingCount={
+              inboxNavigation?.state === 'available'
+                ? (inboxNavigation.pendingCount ?? 0)
+                : 0
+            }
+            runtimeUpdate={hasRuntimeUpdate}
+            navigationPending={pendingNavigation?.itemId === inboxNavItem.id}
+            onClick={event => handleCommandClick(event, inboxNavItem)}
+          />
+        )}
+      </RailStagedContent>
+      {newChatAction}
+    </div>
+  );
+
   // Memoize renderSection to prevent creating new functions on every render
   const renderSection = useCallback(
     (items: readonly NavItem[]) => (
@@ -484,79 +543,14 @@ export function DashboardNav({
           </>
         ) : (
           <SidebarGroup className='p-0'>
-            <div
-              data-sidebar-search-slot='true'
-              className={cn(
-                'mx-1 flex h-9 shrink-0 items-center gap-(--space-2-5) pr-1.5 lg:overflow-hidden',
-                // The command slot keeps its vertical allocation while the
-                // surrounding rail narrows; navigation below never moves.
-                'group-data-[collapsible=icon]:mx-0 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:gap-0 group-data-[collapsible=icon]:border-transparent group-data-[collapsible=icon]:bg-transparent group-data-[collapsible=icon]:pr-0'
-              )}
-            >
-              <RailStagedContent
-                hidden={sidebarState === 'closed' && !isMobile}
-                className={cn(
-                  'flex min-w-0 items-center gap-(--space-2-5)',
-                  searchSurface && 'flex-1'
-                )}
-              >
-                {searchSurface}
-                {searchSurface ? (
-                  <span
-                    aria-hidden='true'
-                    data-sidebar-search-divider
-                    className='h-4 w-px bg-subtle'
-                  />
-                ) : null}
-                {headerOwnsInbox ? null : (
-                  <Link
-                    href={APP_ROUTES.DASHBOARD}
-                    onClick={event => handleCommandClick(event, inboxNavItem)}
-                    prefetch={false}
-                    aria-busy={
-                      pendingNavigation?.itemId === inboxNavItem.id || undefined
-                    }
-                    aria-label={homeAttentionName}
-                    data-inbox-attention={
-                      hasRuntimeUpdate
-                        ? 'available'
-                        : (inboxNavigation?.state ?? 'unknown')
-                    }
-                    data-navigation-item-id={inboxNavItem.id}
-                    data-navigation-pending={
-                      pendingNavigation?.itemId === inboxNavItem.id || undefined
-                    }
-                    className={cn(
-                      'relative flex size-7 shrink-0 items-center justify-center rounded-full text-secondary-token transition-colors duration-subtle ease-subtle hover:bg-sidebar-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring after:absolute after:-inset-2 after:lg:hidden',
-                      pendingNavigation?.itemId === inboxNavItem.id &&
-                        'bg-sidebar-accent-active text-primary-token'
-                    )}
-                  >
-                    <Bell
-                      className='size-(--app-shell-sidebar-icon-size)'
-                      aria-hidden='true'
-                    />
-                    {inboxNavigation?.state === 'available' &&
-                    (inboxNavigation.pendingCount ?? 0) > 0 ? (
-                      <span
-                        role='status'
-                        aria-label={`${inboxNavigation.pendingCount} pending items`}
-                        className='absolute -right-0.5 -top-0.5 flex min-w-3.5 h-3.5 items-center justify-center rounded-full bg-accent text-(length:--app-shell-sidebar-badge-font-size) font-bold text-(--color-bg-base)'
-                      >
-                        {Math.min(inboxNavigation.pendingCount ?? 0, 99)}
-                      </span>
-                    ) : hasRuntimeUpdate ? (
-                      <span
-                        aria-hidden='true'
-                        data-inbox-runtime-update
-                        className='absolute right-0 top-0 size-1.5 rounded-full bg-accent'
-                      />
-                    ) : null}
-                  </Link>
-                )}
-              </RailStagedContent>
-              {newChatAction}
-            </div>
+            {newChatOwnsRow ? (
+              // Full 44px touch target; the row has free space around it.
+              <div data-nav-section='create' className='[&_a]:after:-inset-y-2'>
+                {renderSection([NEW_CHAT_ROW_ITEM])}
+              </div>
+            ) : (
+              commandSlot
+            )}
             <SidebarGroupContent className='pb-2 pt-5'>
               {navSections.map(section => (
                 <div key={section.key} data-nav-section={section.key}>

@@ -92,6 +92,20 @@ describe('DashboardNav route warming', () => {
     expect(document.querySelector('[data-sidebar-search-divider]')).toBeNull();
   });
 
+  it('gives New Chat a labeled row on the icon column when the header owns inbox and search', () => {
+    renderDashboardNav({
+      renderFn: render,
+      headerOwnsInbox: true,
+    });
+    // The command slot used to hold a lone "+" here, leaving an empty row.
+    expect(document.querySelector('[data-sidebar-search-slot]')).toBeNull();
+    const createSection = document.querySelector('[data-nav-section="create"]');
+    expect(createSection).toBeInTheDocument();
+    const newChat = screen.getByRole('link', { name: 'New Chat' });
+    expect(createSection).toContainElement(newChat);
+    expect(newChat).toHaveTextContent('New Chat');
+  });
+
   it('keeps the divider when a search surface precedes navigation actions', () => {
     renderDashboardNav({
       renderFn: render,

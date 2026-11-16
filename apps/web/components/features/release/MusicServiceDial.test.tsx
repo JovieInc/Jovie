@@ -56,6 +56,20 @@ describe('MusicServiceDial', () => {
     expect(document.cookie).toContain(`${LISTEN_COOKIE}=deezer`);
   });
 
+  it('drops the swipe hint when only one service exists', () => {
+    render(
+      <MusicServiceDial
+        providers={PROVIDERS.slice(0, 1)}
+        utmParams={{}}
+        onStream={vi.fn()}
+      />
+    );
+    expect(
+      screen.getByRole('link', { name: 'Stream Now with Spotify' })
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/Swipe to switch/)).not.toBeInTheDocument();
+  });
+
   it('persists a newly settled choice before the next visit', () => {
     vi.useFakeTimers();
     render(

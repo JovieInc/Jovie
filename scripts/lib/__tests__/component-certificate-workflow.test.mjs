@@ -109,6 +109,36 @@ describe('certificate artifact retention with separate runner and checkout roots
 });
 
 describe('Component Certificate workflow contract', () => {
+  it('registers every root Source Validation command, including the certificate gate', () => {
+    const source = load(
+      readFileSync(
+        resolve(REPO_ROOT, '.github/workflows/source-validation.yml'),
+        'utf8'
+      )
+    );
+    const contract = source.jobs.deterministic.steps.find(
+      step => step.name === 'Run deterministic source contract'
+    ).run;
+    const commands = [
+      ...new Set(
+        [...contract.matchAll(/^\s*pnpm (?:run )?([a-z][\w:-]*)/gm)].map(
+          match => match[1]
+        )
+      ),
+    ];
+    expect(commands).toContain('component-certificate:gate');
+    const { scripts } = JSON.parse(
+      readFileSync(resolve(REPO_ROOT, 'package.json'), 'utf8')
+    );
+    const missing = registry =>
+      commands.filter(name => !registry[name]?.trim());
+    expect(missing(scripts)).toEqual([]);
+    for (const name of commands) {
+      const stale = { ...scripts };
+      delete stale[name];
+      expect(missing(stale)).toEqual([name]);
+    }
+  });
   it.each([false, true])(
     'checks main ancestry before executing checkout scripts (unmerged=%s)',
     unmerged => {
@@ -142,6 +172,54 @@ ${gate?.run || 'true'}`,
     expect(restore.uses).toMatch(/^actions\/cache\/restore@/u);
     expect(restore.with.path).toBe('~/.local/state/jovie-mutation');
     expect(restore.with['restore-keys']).toBe('mutation-sweep-state-');
+  });
+  it('restores story-capture receipts and passes them only when they exist', () => {
+    const restore = steps.find(step => step.name === 'Restore story evidence');
+    expect(restore.uses).toMatch(/^actions\/cache\/restore@/u);
+    expect(restore.with.path).toBe('~/.local/state/jovie-story-evidence');
+    expect(restore.with['restore-keys']).toBe('component-story-evidence-');
+    const build = steps.find(
+      step => step.name === 'Build the certificate report'
+    );
+    expect(steps.indexOf(restore)).toBeLessThan(steps.indexOf(build));
+    const runBuild = files => {
+      const root = mkdtempSync(resolve(tmpdir(), 'certificate-evidence-'));
+      fixtureRoots.push(root);
+      mkdirSync(resolve(root, 'bin'));
+      const dir = resolve(root, '.local/state/jovie-story-evidence');
+      mkdirSync(dir, { recursive: true });
+      for (const name of files) writeFileSync(resolve(dir, name), '{}');
+      for (const tool of ['nice', 'node'])
+        writeFileSync(
+          resolve(root, 'bin', tool),
+          `#!/bin/bash\necho "${tool} $*" >> "${root}/calls.log"\n`,
+          { mode: 0o755 }
+        );
+      const result = spawnSync('bash', ['-c', build.run], {
+        cwd: root,
+        encoding: 'utf8',
+        env: {
+          PATH: `${resolve(root, 'bin')}:${process.env.PATH}`,
+          HOME: root,
+          RUNNER_TEMP: root,
+          GITHUB_STEP_SUMMARY: resolve(root, 'summary.md'),
+          CERT_SHA: 'abc',
+        },
+      });
+      expect(result.status, result.stderr).toBe(0);
+      return readFileSync(resolve(root, 'calls.log'), 'utf8')
+        .split('\n')
+        .find(line => line.startsWith('nice '));
+    };
+    const dir = '/.local/state/jovie-story-evidence';
+    const both = runBuild(['visual.json', 'a11y.json']);
+    expect(both).toContain(`--visual `);
+    expect(both).toContain(`${dir}/visual.json --a11y `);
+    expect(both).toContain(`${dir}/a11y.json`);
+    const none = runBuild([]);
+    expect(none).toContain('scripts/component-certificate.mjs --all');
+    expect(none).not.toMatch(/--(visual|a11y)\b/u);
+    expect(runBuild(['a11y.json'])).not.toContain('--visual');
   });
   it('is event-driven: no cron, no pull_request, main CI completion only', () => {
     expect(workflow).not.toMatch(/^\s*schedule:/mu);

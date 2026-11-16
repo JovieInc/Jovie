@@ -71,3 +71,22 @@ export const MobilePending: Story = {
   name: 'Pending receipt / mobile',
   parameters: { viewport: { defaultViewport: 'mobile1' } },
 };
+
+/**
+ * Offline: the intake request never reached the server (WaitlistIntakeChat
+ * maps a rejected fetch to save_failed). The receipt says nothing was saved,
+ * keeps the answers on the device and offers Try Again.
+ */
+export const OfflineSaveFailed: Story = {
+  name: 'Request not saved / offline',
+  args: { outcome: 'save_failed', onRetry: fn() },
+  play: async ({ canvasElement, args }) => {
+    const canvas = within(canvasElement);
+    await expect(
+      canvas.getByRole('heading', { name: "We Couldn't Save This" })
+    ).toBeVisible();
+    await expect(canvas.queryByText("You're on the list")).toBeNull();
+    await userEvent.click(canvas.getByRole('button', { name: 'Try Again' }));
+    await expect(args.onRetry).toHaveBeenCalledOnce();
+  },
+};

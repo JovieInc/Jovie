@@ -33,7 +33,7 @@ describe('HomepageSpecSections', () => {
     expect(
       screen.getByRole('heading', {
         level: 1,
-        name: 'Jovie helps you move your music forward.',
+        name: 'Move your music forward.',
       })
     ).toBeTruthy();
     expect(screen.getByText('Spec subhead.')).toBeTruthy();

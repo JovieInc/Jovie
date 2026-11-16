@@ -41,6 +41,7 @@ Branch protection pins aggregate contexts only—never individual CI jobs.
 | `Migration Guard` | Path-gated migration policy                                                                                              | Re-emitted and evaluated on the combined head                                                                                                                                        |
 | `Fork PR Gate`    | Human approval policy for external forks                                                                                 | Revalidates every exact group member before emitting the combined-head context                                                                                                       |
 | `PR Size Guard`   | Source-diff size policy                                                                                                  | Revalidates every exact group member before emitting the combined-head context                                                                                                       |
+| `Company guards`  | Shared company guard suite (size baselines, canon guards)                                                                | Runs on merge_group, so queue entries report it directly                                                                                                                             |
 
 ### GITHUB_TOKEN budget per group
 

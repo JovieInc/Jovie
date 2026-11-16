@@ -12,6 +12,10 @@ import { dirname, join, resolve } from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 import {
+  checkDualLicenseElections,
+  problemsFor,
+} from '../security/dual-license-elections.mjs';
+import {
   assertSha256,
   installSquawk,
   isChangedMigrationSql,
@@ -189,7 +193,7 @@ test('rejects a squawk download that does not match the pinned sha256', async ()
       installSquawk({
         platform: 'linux',
         arch: 'x64',
-        fetchImpl: async () => new Response('not-the-release'),
+        download: () => ({ ok: true, bytes: Buffer.from('not-the-release') }),
       }),
     /Squawk checksum mismatch/
   );
@@ -198,6 +202,25 @@ test('rejects a squawk download that does not match the pinned sha256', async ()
     /mismatch/
   );
   assert.match(SQUAWK_VERSION, /^2\.70\.0$/);
+});
+
+test('a squawk release outage fails closed with the HTTP status', async () => {
+  const urls = [];
+  await assert.rejects(
+    () =>
+      installSquawk({
+        platform: 'linux',
+        arch: 'x64',
+        download: url => {
+          urls.push(url);
+          return { ok: false, status: '504', error: 'release download exit 1' };
+        },
+      }),
+    /^Error: Squawk 2\.70\.0 download failed: 504 https:\/\/github\.com\/sbdchd\/squawk\/releases\/download\/v2\.70\.0\/squawk-linux-x64$/
+  );
+  assert.deepEqual(urls, [
+    'https://github.com/sbdchd/squawk/releases/download/v2.70.0/squawk-linux-x64',
+  ]);
 });
 
 test('source validation blocks dependency and migration diffs', () => {
@@ -255,6 +278,8 @@ test('source validation blocks dependency and migration diffs', () => {
     assert.match(config, new RegExp(`^  - ${id}$`, 'm'));
   }
   assert.doesNotMatch(config, /LGPL-/);
+  assert.deepEqual(checkDualLicenseElections(REPO_ROOT), []);
+  assert.doesNotMatch(config, /^allow-licenses:/m);
   assert.match(squawk, /^assume_in_transaction = true$/m);
   assert.match(squawk, /^pg_version = "16\.0"$/m);
   const excluded = [...squawk.matchAll(/^ {2}"([a-z0-9-]+)",$/gm)].map(
@@ -278,6 +303,47 @@ test('source validation blocks dependency and migration diffs', () => {
   ]) {
     assert.equal(excluded.includes(kept), false);
   }
+});
+
+test('dual-license elections reject a loosened denylist or an unrecorded exclusion', () => {
+  const config = read('.github/dependency-review-config.yml');
+  const elections = JSON.parse(
+    read('scripts/security/dual-license-elections.json')
+  );
+  const versioned = structuredClone(elections);
+  versioned.elections[0].purl = 'pkg:npm/node-forge@1.4.3';
+  assert.match(
+    problemsFor({ configText: config, elections: versioned }).join('\n'),
+    /unversioned npm package url/
+  );
+
+  const deniedElected = structuredClone(elections);
+  deniedElected.elections[0].elected = 'GPL-2.0';
+  assert.match(
+    problemsFor({ configText: config, elections: deniedElected }).join('\n'),
+    /permissive disjunct/
+  );
+
+  const extraAllow = config.replace(
+    '  - pkg:npm/node-forge\n',
+    '  - pkg:npm/left-pad\n  - pkg:npm/node-forge\n'
+  );
+  assert.match(
+    problemsFor({ configText: extraAllow, elections }).join('\n'),
+    /allow-dependencies-licenses must equal/
+  );
+
+  const dropped = config.replace('  - GPL-2.0\n', '');
+  assert.match(
+    problemsFor({ configText: dropped, elections }).join('\n'),
+    /deny-licenses dropped GPL-2.0/
+  );
+
+  const allowList = `${config}\nallow-licenses:\n  - MIT\n`;
+  assert.match(
+    problemsFor({ configText: allowList, elections }).join('\n'),
+    /allow-licenses is set/
+  );
 });
 
 test('migration runner loads its config beside the script in a separate checkout', {

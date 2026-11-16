@@ -244,8 +244,8 @@ export default async function RootLayout({
         <script id='jovie-theme-route-policy' type='application/json'>
           {JSON.stringify(THEME_ROUTE_POLICY)}
         </script>
-        {/* eslint-disable-next-line @next/next/no-sync-scripts -- Must run before React hydration; next/script nonce drift causes local E2E console errors. */}
-        <script src='/electron-runtime-init.js' />
+        {/* Runs before React hydration (async executes well ahead of bundle eval); next/script nonce drift causes local E2E console errors. Async keeps this browser no-op off the render-blocking chain (JOV-12023). */}
+        <script async src='/electron-runtime-init.js' />
         {/* eslint-disable-next-line @next/next/no-sync-scripts -- Must run before React hydration; next/script nonce drift causes local E2E console errors. */}
         <script src='/theme-init.js' />
         {shouldMountGa && isValidGaMeasurementId(gaMeasurementId) ? (

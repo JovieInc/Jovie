@@ -59,8 +59,7 @@ import {
   type OnboardingEntryMode,
 } from './OnboardingChatEmptyIntro';
 import { OnboardingMessageRecoveryRow } from './OnboardingMessageRecoveryRow';
-import type { OnboardingProfileBuilderState } from './OnboardingProfileRail';
-import { OnboardingProfileRail } from './OnboardingProfileRail';
+import { OnboardingProfileRail } from './OnboardingProfileRailLazy';
 import { OnboardingSecurityCheckRecovery } from './OnboardingSecurityCheckRecovery';
 import {
   OnboardingArtistConfirmedCard,
@@ -92,26 +91,21 @@ import {
   THINKING_PLACEHOLDER_ID,
   type ToolPart,
 } from './onboardingChatHelpers';
+import {
+  preloadOnboardingConversationChunks,
+  scheduleOnboardingConversationPreload,
+} from './onboardingConversationWarm';
+import type { OnboardingProfileBuilderState } from './onboardingProfileRailState';
 
 /**
  * /start LCP (JOV-9611): the empty state paints only the intro heading and the
  * composer. Everything that renders a conversation (markdown/streamdown message
  * bodies, tool UI, proposal cards) is split out of the entry bundle so the
- * first paint is not starved behind its evaluation on slow mobile CPUs.
- * `preloadOnboardingConversationChunks` warms them once the page is idle, so
- * the first assistant reply never waits on a network fetch.
+ * first paint is not starved behind its evaluation on slow mobile CPUs. The
+ * chunks warm on user intent, never on idle (JOV-12023) — see
+ * onboardingConversationWarm.
  * Guard: tests/unit/onboarding/OnboardingChat.entry-bundle.test.ts
  */
-const loadChatMessage = () =>
-  import('@/components/jovie/components/ChatMessage').then(
-    mod => mod.ChatMessage
-  );
-const loadToolPartsRenderer = () =>
-  import('@/components/jovie/tool-ui').then(mod => mod.ToolPartsRenderer);
-const loadChatProposeCheckoutCard = () =>
-  import('./ChatProposeCheckoutCard').then(mod => mod.ChatProposeCheckoutCard);
-const loadChatProposeNextStepCard = () =>
-  import('./ChatProposeNextStepCard').then(mod => mod.ChatProposeNextStepCard);
 
 // Inline import() inside dynamic() keeps Next's loadable preload metadata; the
 // loaders above resolve to the same chunks for idle preloading. Message rows
@@ -144,30 +138,6 @@ const ChatProposeNextStepCard = dynamic(
     ),
   { loading: () => <ReservedChatSlot minHeightClass='min-h-24' /> }
 );
-
-function preloadOnboardingConversationChunks() {
-  void Promise.all([
-    loadChatMessage(),
-    loadToolPartsRenderer(),
-    loadChatProposeCheckoutCard(),
-    loadChatProposeNextStepCard(),
-  ]).catch(() => undefined);
-}
-
-function scheduleOnboardingConversationPreload(): () => void {
-  if (typeof globalThis.requestIdleCallback === 'function') {
-    const handle = globalThis.requestIdleCallback(
-      preloadOnboardingConversationChunks,
-      { timeout: 4000 }
-    );
-    return () => globalThis.cancelIdleCallback?.(handle);
-  }
-  const handle = globalThis.setTimeout(
-    preloadOnboardingConversationChunks,
-    1500
-  );
-  return () => globalThis.clearTimeout(handle);
-}
 
 const STARTER_VERIFICATION_INSTRUCTION = 'One quick check before we send';
 
@@ -888,7 +858,11 @@ export function OnboardingChat({
   const composerInputRef = useRef<HTMLTextAreaElement | null>(null);
   const [hasSentFirst, setHasSentFirst] = useState(initialMessages.length > 0);
 
-  useEffect(() => scheduleOnboardingConversationPreload(), []);
+  const chatSectionRef = useRef<HTMLElement | null>(null);
+  useEffect(
+    () => scheduleOnboardingConversationPreload(chatSectionRef.current),
+    []
+  );
   const [verificationRequested, setVerificationRequested] = useState(false);
   const [chatError, setChatError] = useState<ChatError | null>(null);
   const [composerPickerOpen, setComposerPickerOpen] = useState(false);
@@ -1045,6 +1019,8 @@ export function OnboardingChat({
         hasAutoSubmittedStarterPromptRef.current = true;
         return;
       }
+      // JOV-12023: the starter auto-send has no gesture, so submit warms too.
+      preloadOnboardingConversationChunks();
       lastAttemptedMessageRef.current = text;
       setChatError(null);
       notifyJankSend();
@@ -1419,6 +1395,7 @@ export function OnboardingChat({
 
   return (
     <section
+      ref={chatSectionRef}
       className='system-b-onboarding-chat relative flex h-full min-h-0 flex-1 flex-col overflow-hidden bg-(--app-shell-content-surface)'
       aria-label='Jovie Onboarding Chat'
       data-testid='onboarding-chat'

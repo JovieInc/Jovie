@@ -23,14 +23,14 @@ sameAs:
 
 - https://open.spotify.com/artist/4Uwpa6zW3zzCSQvooQNksm
 
-## DSP presence (41 registry platforms)
+## DSP presence (47 registry platforms)
 
-1 present, 40 missing. Presence is a stored URL on a dsp-registry platform. MusicFetch is not called.
+1 present, 46 missing. Presence is a stored URL on a dsp-registry platform. MusicFetch is not called.
 
 ### streaming
 
 - Spotify: present (https://open.spotify.com/artist/4Uwpa6zW3zzCSQvooQNksm)
-- Missing: Apple Music, YouTube Music, SoundCloud, Deezer, Tidal, Amazon Music, Bandcamp, Pandora, Napster, Audiomack, Qobuz, Anghami, Boomplay, iHeartRadio, Beatport, Amazon, AWA, Audius, FLO, Gaana, JioSaavn, JOOX, KKBOX, LINE MUSIC, NetEase Music, QQ Music, Trebel, Yandex Music, YouTube
+- Missing: Apple Music, YouTube Music, SoundCloud, Deezer, Tidal, Amazon Music, Bandcamp, Pandora, Napster, Audiomack, Qobuz, Anghami, Boomplay, iHeartRadio, Beatport, Amazon, AWA, Audius, FLO, Gaana, JioSaavn, JOOX, KKBOX, LINE MUSIC, NetEase Music, QQ Music, Trebel, Yandex Music, VK Music, Traxsource, Bugs, fizy, Juno Download, eMusic, YouTube
 
 ### video
 

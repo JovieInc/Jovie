@@ -4,12 +4,13 @@
 
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import type { CSSProperties } from 'react';
-import { useContext } from 'react';
+import { useContext, useEffect } from 'react';
 import { RailToggleButton } from '@/components/atoms/RailToggleButton';
 import { SidebarContext } from '@/components/organisms/sidebar/context';
 import { SIDEBAR_KEYBOARD_SHORTCUT_BARE } from '@/hooks/useSidebarKeyboardShortcut';
 import {
   type DesktopBuildIdentity,
+  observeDesktopFullScreen,
   useDesktopBuildIdentity,
   useDesktopNavigation,
   useIsElectronRuntime,
@@ -152,6 +153,20 @@ export function DesktopTitlebar() {
     ? sidebarCtx?.openMobile === true
     : sidebarCtx?.state === 'open';
 
+  // JOV-8940: macOS hides the native lights in full screen. Track the
+  // native state so the shell collapses its traffic-light reserve while the
+  // 44pt title row keeps its height. Outside Electron the flag stays off.
+  useEffect(() => {
+    const root = document.documentElement;
+    if (!isDesktop) {
+      delete root.dataset.electronFullscreen;
+      return;
+    }
+    return observeDesktopFullScreen(isFullScreen => {
+      root.dataset.electronFullscreen = isFullScreen ? 'true' : 'false';
+    });
+  }, [isDesktop]);
+
   return (
     <div
       data-electron-titlebar='true'
@@ -167,7 +182,7 @@ export function DesktopTitlebar() {
         <div
           data-testid='electron-titlebar-sidebar-cell'
           data-electron-no-drag='true'
-          className='flex w-full min-w-0 items-center gap-(--app-shell-sidebar-icon-gap)'
+          className='flex h-full w-full min-w-0 items-center gap-(--electron-traffic-light-toggle-gap)'
           style={{ WebkitAppRegion: 'no-drag' } as CSSProperties}
         >
           <div

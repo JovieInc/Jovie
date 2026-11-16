@@ -77,10 +77,39 @@ describe('ProfileMobileNotificationsFlow', () => {
     }
   );
 
+  it('opens on a sentence-case Get updates sheet', () => {
+    renderFlow({ step: 'email', onDismissCapture: vi.fn() });
+
+    expect(screen.getByText('Get updates')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Switch to SMS' })).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Not now' })).toBeVisible();
+  });
+
   it('keeps the inline flow outside modal dialog semantics', () => {
     renderFlow({ presentation: 'inline', step: 'email' });
 
     expect(screen.queryByRole('dialog')).toBeNull();
+  });
+
+  it('marks the root while the flow is open so the consent card cannot stack over it (JOV-3209)', () => {
+    const { unmount } = renderFlow({ presentation: 'inline', step: 'email' });
+
+    expect(
+      document.documentElement.getAttribute('data-profile-flow-open')
+    ).toBe('true');
+
+    unmount();
+    expect(
+      document.documentElement.hasAttribute('data-profile-flow-open')
+    ).toBe(false);
+  });
+
+  it('leaves the root unmarked when the flow is closed', () => {
+    renderFlow({ open: false, presentation: 'inline', step: 'email' });
+
+    expect(
+      document.documentElement.hasAttribute('data-profile-flow-open')
+    ).toBe(false);
   });
 
   it('makes the capture screen immediately visible without a sliding transition', () => {

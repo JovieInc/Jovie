@@ -464,7 +464,7 @@ export const ARTIST_PROFILE_COPY: ArtistProfileLandingCopy = {
         label: 'Pre-save',
         headline: 'Collect release alerts before it lands.',
         description: 'Collect release alerts before it lands.',
-        pathLabel: 'jov.ie/you',
+        pathLabel: 'jov.ie/yourname',
         drawer: {
           title: 'The Deep End',
           subtitle: 'New release arriving soon.',
@@ -505,7 +505,7 @@ export const ARTIST_PROFILE_COPY: ArtistProfileLandingCopy = {
           'When the song is live, listeners go straight to the right service.',
         description:
           'When the song is live, listeners go straight to the right service.',
-        pathLabel: 'jov.ie/you/listen',
+        pathLabel: 'jov.ie/yourname/listen',
         drawer: {
           title: 'Listen',
           subtitle: 'The latest release stays front and center.',
@@ -544,7 +544,7 @@ export const ARTIST_PROFILE_COPY: ArtistProfileLandingCopy = {
         label: 'On tour',
         headline: "When you're on the road, nearby dates come first.",
         description: "When you're on the road, nearby dates come first.",
-        pathLabel: 'jov.ie/you/tour',
+        pathLabel: 'jov.ie/yourname/tour',
         drawer: {
           title: 'Tour dates',
           subtitle: 'Nearby dates rise to the top.',
@@ -583,7 +583,7 @@ export const ARTIST_PROFILE_COPY: ArtistProfileLandingCopy = {
         headline: 'At the merch table, one scan becomes support and capture.',
         description:
           'At the merch table, one scan becomes support and capture.',
-        pathLabel: 'jov.ie/you/pay',
+        pathLabel: 'jov.ie/yourname/pay',
         drawer: {
           title: 'Support',
           subtitle: 'Choose an amount.',

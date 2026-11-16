@@ -166,7 +166,7 @@ describe('public changelog page', () => {
 
   it('uses a descriptive product-update title for search and sharing', () => {
     expect(applyRootTitleTemplate(metadata.title)).toBe(
-      'Jovie Changelog: Product Updates & New Features'
+      'Changelog: product updates and new features | Jovie'
     );
   });
 

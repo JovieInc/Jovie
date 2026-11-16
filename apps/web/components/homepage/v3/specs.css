@@ -1,0 +1,196 @@
+/* Homepage v3 specs chapter (an Apple tech-specs sheet) and the footer horizon. */
+
+.hv3-specs__head {
+  display: grid;
+  grid-template-columns: 5fr 7fr;
+  align-items: end;
+  column-gap: 1.5rem;
+  padding: 10rem var(--hv3-side) 5rem;
+}
+
+/* No optical pull here: the T's bar already starts at its own origin, so
+   the -0.05em that squares a stem (M, F) set "The details." past the guide
+   that its "03 · specs" label sits on. */
+.hv3-specs__head .hv3-statement {
+  margin-left: 0;
+}
+
+.hv3-specs__head .hv3-body {
+  max-width: 26.25rem;
+}
+
+.hv3-sheet {
+  margin: 0 var(--hv3-side);
+}
+
+.hv3-sheet__row {
+  display: grid;
+  grid-template-columns: 18.75rem 1fr 1fr 1fr;
+  column-gap: 1.5rem;
+  padding: 2.5rem 0 2.75rem;
+  border-top: 1px solid var(--hv3-b2);
+}
+
+.hv3-sheet__row:last-child {
+  border-bottom: 1px solid var(--hv3-b2);
+}
+
+.hv3-sheet__label {
+  font-size: 1.25rem;
+  font-weight: 500;
+  line-height: 1.75rem;
+}
+
+.hv3-num {
+  display: block;
+  font-family: var(--hv3-display);
+  font-size: 5.5rem;
+  font-weight: 500;
+  letter-spacing: -0.04em;
+  line-height: 5.5rem;
+}
+
+.hv3-num--sm {
+  font-size: 3rem;
+  letter-spacing: -0.035em;
+  line-height: 3.5rem;
+}
+
+.hv3-sheet__cell p {
+  margin-top: 0.875rem;
+  color: var(--hv3-t3);
+  font-size: 0.9375rem;
+  line-height: 1.375rem;
+}
+
+.hv3-sheet__cell strong {
+  display: block;
+  color: var(--hv3-t1);
+  font-weight: 500;
+}
+
+.hv3-sheet__cell--meter {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  padding-bottom: 0.25rem;
+}
+
+.hv3-meter {
+  display: grid;
+  grid-auto-columns: 1fr;
+  grid-auto-flow: column;
+  gap: 2px;
+}
+
+.hv3-meter i {
+  height: 1.75rem;
+  border-radius: var(--radius-xs);
+  background: var(--hv3-floating);
+}
+
+.hv3-meter i[data-on="true"] {
+  background: var(--hv3-ion);
+  box-shadow: 0 0 0.75rem var(--hv3-ion-glow);
+}
+
+.hv3-moments {
+  display: grid;
+  grid-template-columns: 7fr 5fr;
+  align-items: stretch;
+  gap: 1.5rem;
+  margin: 7.5rem var(--hv3-side) 0;
+}
+
+.hv3-moment {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border-radius: var(--radius-2xl);
+  background: var(--hv3-shell);
+  box-shadow: inset 0 0 0 1px var(--hv3-b1);
+}
+
+.hv3-moment__stage {
+  position: relative;
+  height: 32.5rem;
+  overflow: hidden;
+}
+
+.hv3-moment__cap {
+  flex: 1;
+  padding: 1.5rem 2rem 1.875rem;
+  border-top: 1px solid var(--hv3-b1);
+  color: var(--hv3-t3);
+  font-size: 1rem;
+  line-height: 1.625rem;
+}
+
+.hv3-moment__cap b {
+  color: var(--hv3-t1);
+  font-weight: 500;
+}
+
+.hv3-moment__stage > .hv3-orbit {
+  top: -16.25rem;
+  left: -11.25rem;
+}
+
+.hv3-glow {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(3.125rem);
+}
+
+.hv3-glow--palette {
+  top: 8.25rem;
+  left: 7.5rem;
+  width: 35rem;
+  height: 21.25rem;
+  background: radial-gradient(
+    closest-side,
+    color-mix(in srgb, var(--hv3-ion) 22%, transparent),
+    transparent
+  );
+}
+
+.hv3-glow--insp {
+  top: 5rem;
+  left: 2.5rem;
+  width: 32.5rem;
+  height: 26.25rem;
+  background: radial-gradient(
+    closest-side,
+    color-mix(in srgb, var(--hv3-ion) 16%, transparent),
+    transparent
+  );
+}
+
+.hv3-rig--moment {
+  top: 3.75rem;
+  left: 4.375rem;
+  width: 25rem;
+  height: 34rem;
+}
+
+.hv3-lift--moment {
+  inset: 0;
+}
+
+/* ── Footer (MarketingFooter, homepage presentation) ─────────────── */
+
+.hv3-footer {
+  position: relative;
+  overflow: hidden;
+  border-top: 1px solid var(--hv3-b1);
+}
+
+.hv3-footer > .hv3-orbit {
+  top: -1.125rem;
+  left: calc(50% - 88.75rem);
+  opacity: 0.9;
+}
+
+.hv3-footer .hv3-orbit__light {
+  opacity: 0.5;
+}

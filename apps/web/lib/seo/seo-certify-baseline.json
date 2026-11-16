@@ -3,7 +3,6 @@
   "failures": {
     "/": ["geo:geo-sibling-links"],
     "/ai": ["agentic:structured-data"],
-    "/alternatives": ["copy:copy-lint"],
     "/alternatives/linktree": ["geo:geo-last-updated", "geo:geo-sibling-links"],
     "/api-versioning": ["geo:geo-jsonld-type", "geo:geo-sibling-links"],
     "/artist-notifications": [
@@ -30,7 +29,6 @@
     ],
     "/changelog/26.8.1": ["geo:geo-last-updated"],
     "/cli": ["copy:copy-lint", "geo:geo-sibling-links"],
-    "/compare": ["copy:copy-lint"],
     "/compare/linktree": ["geo:geo-last-updated", "geo:geo-sibling-links"],
     "/developers": ["geo:geo-jsonld-type"],
     "/download": ["geo:geo-jsonld-type", "geo:geo-sibling-links"],

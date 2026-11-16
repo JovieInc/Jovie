@@ -119,7 +119,12 @@ describe('LibraryLoadingState', () => {
     expect(source).not.toMatch(/from '\.\/LibrarySurface'/);
     expect(source).not.toMatch(/from '@\/components\/organisms\/table'/);
 
-    const layout = readFileSync(join(__dirname, '..', 'layout.tsx'), 'utf8');
-    expect(layout).not.toMatch(/from '\.\/library\/LibrarySurface'/);
+    for (const shellFile of ['layout.tsx', 'shell-route-skeleton.tsx']) {
+      const shellSource = readFileSync(
+        join(__dirname, '..', shellFile),
+        'utf8'
+      );
+      expect(shellSource).not.toMatch(/from '\.\/library\/LibrarySurface'/);
+    }
   });
 });

@@ -47,6 +47,8 @@ export interface HeaderNavProps {
   readonly minimalAuthLabel?: 'Sign in' | 'Log in';
   readonly includePublicLoginInMobileNav?: boolean;
   readonly publicCta?: HeaderNavCta;
+  /** Marketing-glass only: render Log in without the primary CTA (invite-only homepage). */
+  readonly hidePublicCta?: boolean;
   readonly presentation?: 'default' | 'homepage-embedded' | 'marketing-glass';
   readonly flyoutMenus?: readonly HeaderFlyoutMenu[];
   readonly showContactLink?: boolean;
@@ -199,9 +201,11 @@ function HeaderPrimaryAuthLink({
 function GlassAuthActions({
   publicCta = DEFAULT_PUBLIC_CTA,
   showContactLink = true,
+  hidePublicCta = false,
 }: Readonly<{
   publicCta?: HeaderNavCta;
   showContactLink?: boolean;
+  hidePublicCta?: boolean;
 }>) {
   return (
     <div className='flex items-center gap-1'>
@@ -220,11 +224,13 @@ function GlassAuthActions({
       >
         Log in
       </Link>
-      <HeaderPrimaryAuthLink
-        href={publicCta.href}
-        label={publicCta.label}
-        className='marketing-glass-header__cta'
-      />
+      {hidePublicCta ? null : (
+        <HeaderPrimaryAuthLink
+          href={publicCta.href}
+          label={publicCta.label}
+          className='marketing-glass-header__cta'
+        />
+      )}
     </div>
   );
 }
@@ -366,6 +372,7 @@ export function HeaderNav({
   minimalAuthLabel = 'Sign in',
   includePublicLoginInMobileNav = true,
   publicCta,
+  hidePublicCta = false,
   presentation = 'default',
   flyoutMenus,
   showContactLink = true,
@@ -679,6 +686,7 @@ export function HeaderNav({
             >
               {authMode === 'public-static' && isMarketingGlass ? (
                 <GlassAuthActions
+                  hidePublicCta={hidePublicCta}
                   publicCta={publicCta}
                   showContactLink={showContactLink}
                 />

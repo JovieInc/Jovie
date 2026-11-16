@@ -1,6 +1,6 @@
 import type { Decorator, Meta, StoryObj } from '@storybook/nextjs-vite';
 import { useLayoutEffect, useState } from 'react';
-import { expect, userEvent, within } from 'storybook/test';
+import { expect, userEvent, waitFor, within } from 'storybook/test';
 import { createSignedInApiMock } from '../../../.storybook/signed-in-session';
 import { JovieAuthValuesProvider } from '../../../hooks/useJovieAuth';
 import { OnboardingSessionBoundary } from './OnboardingSessionBoundary';
@@ -101,11 +101,21 @@ export const Resumed: Story = {
     await expect(
       await canvas.findByText('Your progress is saved. We can continue here.')
     ).toBeVisible();
+    // Recovery actions live in the canonical overflow menu (JOV-7774);
+    // its content portals to the document body, not the canvas.
+    await userEvent.click(
+      canvas.getByRole('button', { name: 'Onboarding options' })
+    );
+    const body = within(canvasElement.ownerDocument.body);
     await expect(
-      canvas.getByRole('button', { name: 'Start Over' })
+      body.getByRole('menuitem', { name: 'Start over' })
     ).toBeVisible();
-    await expect(canvas.getByRole('button', { name: 'Log Out' })).toBeVisible();
-    await expect(canvas.queryByRole('link', { name: 'Sign in' })).toBeNull();
+    await expect(body.getByRole('menuitem', { name: 'Log out' })).toBeVisible();
+    await expect(body.queryByRole('menuitem', { name: 'Sign in' })).toBeNull();
+    await userEvent.keyboard('{Escape}');
+    await expect(
+      canvas.getByRole('button', { name: 'Onboarding options' })
+    ).toHaveFocus();
   },
 };
 
@@ -113,13 +123,27 @@ export const StartOver: Story = {
   play: async context => {
     await Resumed.play?.(context);
     const canvas = within(context.canvasElement);
-    await userEvent.click(canvas.getByRole('button', { name: 'Start Over' }));
+    const body = within(context.canvasElement.ownerDocument.body);
+    await userEvent.click(
+      canvas.getByRole('button', { name: 'Onboarding options' })
+    );
+    await userEvent.click(body.getByRole('menuitem', { name: 'Start over' }));
+    // Restarting discards the restored transcript: the saved-progress banner
+    // disappears once the boundary remounts the fresh conversation.
+    await waitFor(() =>
+      expect(
+        canvas.queryByText('Your progress is saved. We can continue here.')
+      ).toBeNull()
+    );
+    // The restarted conversation still exists (a fresh id), so Start over
+    // stays offered and enabled.
+    await userEvent.click(
+      canvas.getByRole('button', { name: 'Onboarding options' })
+    );
     await expect(
-      await canvas.findByRole('button', { name: 'Start Over' })
-    ).toBeEnabled();
-    await expect(
-      canvas.queryByText('Your progress is saved. We can continue here.')
-    ).toBeNull();
+      body.getByRole('menuitem', { name: 'Start over' })
+    ).not.toHaveAttribute('aria-disabled');
+    await userEvent.keyboard('{Escape}');
   },
 };
 

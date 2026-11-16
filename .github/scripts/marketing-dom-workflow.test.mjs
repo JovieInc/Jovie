@@ -26,6 +26,9 @@ test('real selector covers every rendered marketing input and unrelated API chan
     'apps/web/styles/system-b-app.css',
     'apps/web/public/device-bezels/phone.png',
     'apps/web/tests/e2e/utils/route-dom-detector.ts',
+    'apps/web/tests/e2e/utils/route-dom-blank-media.ts',
+    'apps/web/tests/e2e/utils/route-dom-outcome-dom.ts',
+    'apps/web/tests/e2e/utils/image-contrast-detector.ts',
     'apps/web/tests/product-screenshots/route-dom-certification.spec.ts',
     'packages/ui/atoms/Button.tsx',
   ]) {

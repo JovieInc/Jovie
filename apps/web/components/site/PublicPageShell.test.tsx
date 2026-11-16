@@ -219,4 +219,24 @@ describe('prerendered homepage pathname', () => {
     expect(source).toContain('usePublicPathname');
     expect(source).not.toMatch(/\busePathname\b/);
   });
+
+  it('drops the header primary CTA and tags the footer for the Pen diff gate', () => {
+    const { container } = render(
+      <PublicPageShell
+        footerPenSection='footer'
+        footerVariant='expanded'
+        headerCta={{ href: '/#request-invite', label: 'Request an Invite' }}
+        headerHidePrimaryCta
+        headerVariant='landing'
+      >
+        <p>route content</p>
+      </PublicPageShell>
+    );
+    expect(
+      screen.queryByRole('link', { name: 'Request an Invite' })
+    ).not.toBeInTheDocument();
+    expect(
+      container.querySelector('footer[data-pen-section="footer"]')
+    ).not.toBeNull();
+  });
 });

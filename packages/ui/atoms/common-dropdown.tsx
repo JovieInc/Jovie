@@ -50,6 +50,7 @@ export function CommonDropdown(props: CommonDropdownProps) {
     defaultTriggerType = 'button',
     triggerIcon: TriggerIcon = MoreVertical,
     align = 'end',
+    dir,
     side = 'bottom',
     sideOffset = 4,
     open,
@@ -176,7 +177,7 @@ export function CommonDropdown(props: CommonDropdownProps) {
 
   if (variant === 'context') {
     return (
-      <ContextMenuPrimitive.Root onOpenChange={handleOpenChange}>
+      <ContextMenuPrimitive.Root dir={dir} onOpenChange={handleOpenChange}>
         <ContextMenuPrimitive.Trigger
           asChild
           disabled={disabled}
@@ -191,6 +192,7 @@ export function CommonDropdown(props: CommonDropdownProps) {
 
   return (
     <DropdownMenuPrimitive.Root
+      dir={dir}
       open={open}
       onOpenChange={handleOpenChange}
       modal={modal}

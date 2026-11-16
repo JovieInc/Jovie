@@ -380,3 +380,16 @@ it.each(['marketing-glass', 'default'] as const)(
     );
   }
 );
+
+it('marketing-glass header can render Log in without the primary CTA', () => {
+  render(
+    createElement<HeaderNavProps>(HeaderNav, {
+      authMode: 'public-static',
+      presentation: 'marketing-glass',
+      publicCta: { href: '/pricing', label: 'See plans' },
+      hidePublicCta: true,
+    })
+  );
+  expect(screen.getByRole('link', { name: 'Log in' })).toBeInTheDocument();
+  expect(screen.queryByRole('link', { name: 'See plans' })).toBeNull();
+});

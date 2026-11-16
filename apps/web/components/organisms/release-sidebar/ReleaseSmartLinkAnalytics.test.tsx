@@ -96,4 +96,18 @@ describe('ReleaseSmartLinkAnalytics', () => {
       screen.getByTestId('drawer-analytics-metric-value-last-click')
     ).toHaveTextContent(RELATIVE_TEXT);
   });
+
+  it('gives the share menu trigger an accessible name, not only a tooltip', () => {
+    render(
+      <ReleaseSmartLinkAnalytics
+        release={mockRelease}
+        artistName='Calvin Harris'
+      />
+    );
+
+    // Deliberate-red: the trigger had only a title, so it announced as "button".
+    expect(
+      screen.getByRole('button', { name: 'Share Smart Link' })
+    ).toHaveAttribute('aria-label', 'Share Smart Link');
+  });
 });

@@ -31,6 +31,13 @@ describe('CompositeField', () => {
       'field'
     );
   });
+
+  it('pads the md size with logical gutters so they mirror in RTL', () => {
+    render(<CompositeField data-testid='field' size='md' />);
+    const field = screen.getByTestId('field');
+    expect(field).toHaveClass('pe-2', 'ps-4');
+    expect(field).not.toHaveClass('pr-2', 'pl-4');
+  });
 });
 
 function ClaimHandleHarness({

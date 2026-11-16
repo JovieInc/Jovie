@@ -24,21 +24,25 @@ describe('AudioPlayButton', () => {
     );
 
     const button = screen.getByRole('button', { name: 'Loading track' });
-    expect(button).toBeDisabled();
+    // Loading keeps the button focusable; activation is cancelled instead.
+    expect(button).toHaveAttribute('aria-disabled', 'true');
     fireEvent.click(button);
     expect(onClick).not.toHaveBeenCalled();
 
     rerender(<AudioPlayButton isPlaying isLoading onClick={onClick} />);
     expect(
       screen.getByRole('button', { name: 'Loading track' })
-    ).toBeDisabled();
+    ).toHaveAttribute('aria-disabled', 'true');
   });
 
   it('keeps an explicit label ahead of loading and playback state', () => {
     const { rerender } = render(
       <AudioPlayButton isPlaying isLoading label='Preview' onClick={vi.fn()} />
     );
-    expect(screen.getByRole('button', { name: 'Preview' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Preview' })).toHaveAttribute(
+      'aria-disabled',
+      'true'
+    );
 
     rerender(<AudioPlayButton isPlaying={false} label='' onClick={vi.fn()} />);
     expect(screen.getByRole('button')).toHaveAttribute('aria-label', '');
