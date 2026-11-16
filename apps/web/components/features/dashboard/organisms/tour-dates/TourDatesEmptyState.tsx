@@ -94,7 +94,11 @@ export function TourDatesEmptyState({
               onChange={e => setApiKey(e.target.value)}
               disabled={saveApiKeyMutation.isPending}
               onKeyDown={e => {
-                if (e.key === 'Enter') {
+                if (
+                  e.key === 'Enter' &&
+                  !e.nativeEvent.isComposing &&
+                  e.nativeEvent.keyCode !== 229
+                ) {
                   e.preventDefault();
                   handleSaveApiKey();
                 }
@@ -155,7 +159,11 @@ export function TourDatesEmptyState({
             onChange={e => setArtistName(e.target.value)}
             disabled={connectMutation.isPending}
             onKeyDown={e => {
-              if (e.key === 'Enter') {
+              if (
+                e.key === 'Enter' &&
+                !e.nativeEvent.isComposing &&
+                e.nativeEvent.keyCode !== 229
+              ) {
                 e.preventDefault();
                 handleConnect();
               }
