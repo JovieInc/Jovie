@@ -443,43 +443,57 @@ describe('fulfillMerchOrder Printful draft resume (JOV-12770)', () => {
     expect(hoisted.printfulConfirmOrder).not.toHaveBeenCalled();
   });
 
-  it('keeps a failed confirm resumable: the draft state survives and the next run confirms it', async () => {
-    // Dispatch on chain shape: the claim query uses .where().orderBy(),
-    // the order lookup uses .innerJoin().
-    hoisted.dbSelect.mockImplementation(() => ({
-      from: () => ({
-        innerJoin: () => ({
+  it.each([
+    DRAFT_ORDER,
+    ORDER,
+    { ...ORDER, status: 'refunded' },
+    { ...ORDER, status: 'shipped' },
+  ])(
+    'preserves protected order state on two worker attempts ($status)',
+    async order => {
+      // Dispatch on chain shape: the claim query uses .where().orderBy(),
+      // the order lookup uses .innerJoin().
+      hoisted.dbSelect.mockImplementation(() => ({
+        from: () => ({
+          innerJoin: () => ({
+            where: () => ({
+              limit: () => Promise.resolve([{ order, card: FULFILLMENT_CARD }]),
+            }),
+          }),
           where: () => ({
-            limit: () =>
-              Promise.resolve([{ order: DRAFT_ORDER, card: FULFILLMENT_CARD }]),
+            orderBy: () => ({
+              limit: () => Promise.resolve([FULFILLMENT_JOB]),
+            }),
           }),
         }),
-        where: () => ({
-          orderBy: () => ({ limit: () => Promise.resolve([FULFILLMENT_JOB]) }),
-        }),
-      }),
-    }));
-    hoisted.printfulConfirmOrder
-      .mockRejectedValueOnce(new Error('Printful confirm failed'))
-      .mockResolvedValue({ id: 901, status: 'pending' });
+      }));
+      hoisted.printfulConfirmOrder
+        .mockRejectedValueOnce(new Error('Printful confirm failed'))
+        .mockResolvedValue({ id: 901, status: 'pending' });
 
-    await processMerchFulfillmentJobs();
+      await processMerchFulfillmentJobs();
 
-    expect(jobSets.at(-1)).toMatchObject({ status: 'failed' });
-    expect(orderWhereQueries.at(-1)?.sql).toContain(
-      '"merch_orders"."status" <> '
-    );
-    expect(orderWhereQueries.at(-1)?.params).toEqual([
-      'order-1',
-      'printful_draft_created',
-    ]);
+      expect(jobSets.at(-1)).toMatchObject({ status: 'failed' });
+      expect(orderWhereQueries.at(-1)?.sql).toContain(
+        '"merch_orders"."status" in ('
+      );
+      expect(orderWhereQueries.at(-1)?.params).toEqual([
+        'order-1',
+        'paid',
+        'paid_fulfillment_hold',
+        'paid_fulfillment_failed',
+      ]);
 
-    await processMerchFulfillmentJobs();
+      await processMerchFulfillmentJobs();
 
-    expect(hoisted.printfulCreateDraftOrder).not.toHaveBeenCalled();
-    expect(hoisted.printfulConfirmOrder).toHaveBeenCalledTimes(2);
-    expect(updateSets.at(-1)).toMatchObject({
-      status: 'submitted_to_printful',
-    });
-  });
+      expect(hoisted.printfulCreateDraftOrder).not.toHaveBeenCalled();
+      expect(hoisted.printfulConfirmOrder).toHaveBeenCalledTimes(
+        order === DRAFT_ORDER ? 2 : 0
+      );
+      if (order === DRAFT_ORDER)
+        expect(updateSets.at(-1)).toMatchObject({
+          status: 'submitted_to_printful',
+        });
+    }
+  );
 });

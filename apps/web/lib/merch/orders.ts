@@ -757,9 +757,13 @@ export async function processMerchFulfillmentJobs(limit = 5): Promise<{
         .where(
           and(
             eq(merchOrders.id, job.merchOrderId),
-            // A failed confirm leaves a live supplier draft behind; keep the
-            // order resumable instead of resetting it (JOV-12770).
-            ne(merchOrders.status, 'printful_draft_created')
+            // Retry bookkeeping cannot promote unpaid or terminal orders,
+            // or erase a resumable supplier draft.
+            inArray(merchOrders.status, [
+              'paid',
+              'paid_fulfillment_hold',
+              'paid_fulfillment_failed',
+            ])
           )
         );
       failed++;
