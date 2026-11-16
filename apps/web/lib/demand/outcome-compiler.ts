@@ -272,16 +272,31 @@ export function compilePresenceOutcome(
         if (
           !receipt ||
           time - Date.parse(receipt.completedAt) >
-            command.budget.maxFreshnessSeconds * 1000 ||
-          !meetsFloor(receipt.realized, command, primitive.kind)
+            command.budget.maxFreshnessSeconds * 1000
         )
           return [];
-        return [{ supplier, receipt }];
+        const metrics = fulfillment.summary.attemptedJobs
+          ? {
+              ...receipt.realized,
+              correctness: Math.min(
+                receipt.realized.correctness,
+                fulfillment.summary.correctCompletedJobs /
+                  fulfillment.summary.attemptedJobs
+              ),
+              fullyLoadedCostCents:
+                fulfillment.summary.costPerSuccessfulOutcomeCents ?? 0,
+              latencyMs:
+                fulfillment.summary.successfulOutcomeLatencyMs?.p95 ??
+                receipt.realized.latencyMs,
+            }
+          : receipt.realized;
+        return meetsFloor(metrics, command, primitive.kind)
+          ? [{ supplier, metrics }]
+          : [];
       })
       .sort(
         (a, b) =>
-          netValue(b.receipt.realized, command) -
-            netValue(a.receipt.realized, command) ||
+          netValue(b.metrics, command) - netValue(a.metrics, command) ||
           sourceRank(a.supplier) - sourceRank(b.supplier) ||
           a.supplier.id.localeCompare(b.supplier.id)
       );
@@ -306,39 +321,9 @@ export function compilePresenceOutcome(
           sourceRank(a) - sourceRank(b) ||
           a.id.localeCompare(b.id)
       )[0];
-    const selected = measured
-      .flatMap(({ supplier, receipt: trial }) => {
-        const result = fulfillmentFor(supplier);
-        if (!result.summary.certified) return [];
-        if (!result.summary.attemptedJobs)
-          return [{ supplier, metrics: trial.realized }];
-        const receipt = result.newest;
-        if (
-          !receipt ||
-          !result.accepted.some(item => item.id === receipt.id) ||
-          time - Date.parse(receipt.completedAt) >
-            command.budget.maxFreshnessSeconds * 1000
-        )
-          return [];
-        const metrics = {
-          ...receipt.realized,
-          correctness: Math.min(
-            receipt.realized.correctness,
-            result.summary.correctCompletedJobs / result.summary.attemptedJobs
-          ),
-          fullyLoadedCostCents:
-            result.summary.costPerSuccessfulOutcomeCents ?? 0,
-        };
-        return meetsFloor(metrics, command, primitive.kind)
-          ? [{ supplier, metrics }]
-          : [];
-      })
-      .sort(
-        (a, b) =>
-          netValue(b.metrics, command) - netValue(a.metrics, command) ||
-          sourceRank(a.supplier) - sourceRank(b.supplier) ||
-          a.supplier.id.localeCompare(b.supplier.id)
-      )[0]?.supplier;
+    const selected = measured.find(
+      ({ supplier }) => fulfillmentFor(supplier).summary.certified
+    )?.supplier;
     const evidenceSupplier =
       selected ??
       measured[0]?.supplier ??

@@ -1,5 +1,3 @@
-# Source-owner fulfillment receipts
-
 Reviewed 2026-11-16. This JOV-8741 slice makes source selection depend on owner certification and completed jobs. It adds receipt reconciliation to [the existing compiler](outcome-compiler.ts); execution remains disabled.
 
 ## Demand and ownership
@@ -7,10 +5,6 @@ Reviewed 2026-11-16. This JOV-8741 slice makes source selection depend on owner 
 [JOV-6259](https://linear.app/jovie/issue/JOV-6259) owns the outcome-to-primitive compiler. Tim's authenticated founder requests there and in [JOV-7140](https://linear.app/jovie/issue/JOV-7140) establish the demand: useful creator conversations, current Presence, and accurate music findings. This is founder demand, with no inferred external customer count. [JOV-8741](https://linear.app/jovie/issue/JOV-8741) owns canonical-owner fulfillment and the source canary; JOV-7140 retains the full music mission.
 
 Reuse ownership: [JOV-4496](https://linear.app/jovie/issue/JOV-4496) owns the consented profile registry; [JOV-2919](https://linear.app/jovie/issue/JOV-2919) owns registry consolidation; [JOV-8331](https://linear.app/jovie/issue/JOV-8331) owns catalog qualification; [JOV-7363](https://linear.app/jovie/issue/JOV-7363) owns shared Connections with account separation; [JOV-7315](https://linear.app/jovie/issue/JOV-7315) owns capability-event research; [JOV-3942](https://linear.app/jovie/issue/JOV-3942) owns skill lifecycle. Their status labels do not prove runtime behavior. Existing [connector manifests](../connectors/registry.ts) and [catalog projection](../connectors/artist-profile-catalog.ts) remain canonical. No provider-specific issue, registry, watcher, governor, or UI is added.
-
-The implementation session holds the JOV-8741 In Progress receipt. `gbrain-unavailable: no callable tool or CLI`; this host has no complete live fleet lease inventory. Source and Linear reconciliation cannot certify absence of remote writers. Shipping capacity remains governed by the existing allocation gate.
-
-## Receipt boundary
 
 [The contract](outcome-contract.ts) accepts immutable certification and outcome references through `compile_outcome`. Owners submit material research, demand, source-policy, revocation, deletion, or outcome changes for reconciliation through the [existing Summer OIDC endpoint](../../app/api/internal/ovie/summer-company/demand-allocation/route.ts) and CAS ledger. This slice adds no polling sweep or delivery mechanism. Stable gap identity coalesces repeated demand; immutable receipt IDs reject conflicting replay in the retained window. A stable domain `jobId` coalesces webhook/backfill deliveries. The source owner remains responsible for durable event identity outside that window.
 
@@ -26,24 +20,10 @@ YouTube is an existing implementation candidate named by JOV-8741, not a newly s
 
 Official evidence checked 2026-11-16:
 
-- [OAuth scopes](https://developers.google.com/identity/protocols/oauth2/scopes#youtube):
-  `youtube.readonly` is read access; `youtube.force-ssl` includes editing/deleting
-  comments and videos. Select exact method scopes and minimize requested grants.
-- [Token revocation](https://developers.google.com/identity/protocols/oauth2/web-server#tokenrevoke):
-  revoke through Google's endpoint; combined project grants can be invalidated
-  together. Local dependent work must stop without waiting for propagation.
-- [YouTube data policy](https://developers.google.com/youtube/terms/developer-policies):
-  honor consent and approved-agent access; app revocation requires prompt token
-  revocation and authorized-data deletion within seven days. User deletion also
-  requires deletion within seven days; Google-settings revocation has a 30-day
-  deletion limit. Other stored authorized data generally needs refresh or deletion
-  within 30 days. The source owner must implement the applicable lifecycle.
-- [Comment threads](https://developers.google.com/youtube/data/reference/rest/v3/commentThreads/list)
-  cost one unit per request/page, with up to 100 threads per page; moderation
-  filters require authorization.
-  [Quota rules](https://developers.google.com/youtube/data/determine_quota_cost)
-  charge additional pages and invalid requests. Use actual project quota/usage;
-  adapter page caps are not quota measurements or completeness proof.
+- [OAuth scopes](https://developers.google.com/identity/protocols/oauth2/scopes#youtube): minimize method-specific read grants; broad `youtube.force-ssl` includes comment/video modification.
+- [Revocation](https://developers.google.com/identity/protocols/oauth2/web-server#tokenrevoke) can invalidate combined project grants; stop local dependent work immediately.
+- [Data policy](https://developers.google.com/youtube/terms/developer-policies) governs consent, token revocation, deletion and refresh deadlines; the source owner implements that lifecycle.
+- [Comment threads](https://developers.google.com/youtube/data/reference/rest/v3/commentThreads/list) cost one unit per page (up to 100 threads). [Quota rules](https://developers.google.com/youtube/data/determine_quota_cost) also charge invalid requests and extra pages. Measure actual project usage.
 
 Runtime admission under JOV-8741 requires existing owners to account for actual quota, title batches, cache freshness, event debounce/coalescing, backpressure, Retry-After, and bounded recovery. No new source access or spend is authorized.
 

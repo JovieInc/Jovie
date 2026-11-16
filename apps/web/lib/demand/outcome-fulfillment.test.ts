@@ -18,6 +18,43 @@ import {
 } from './outcome-fulfillment.fixtures';
 
 describe('source-owner certification and completed customer jobs', () => {
+  it('ranks completed-job economics before rejecting a single costly successful job', () => {
+    const sources = ['a', 'b'].map(id => supplier({ id: `fixture:${id}` }));
+    const receipts = Array.from({ length: 10 }, (_, index) =>
+      outcome(sources[0], {
+        id: `job-a:${index}`,
+        jobId: `job-a:${index}`,
+        certificationId: 'cert:a',
+        completedAt: `2026-11-16T10:06:0${index}.000Z`,
+        realized: { ...metrics, fullyLoadedCostCents: index === 9 ? 101 : 1 },
+      })
+    );
+    receipts.push(
+      outcome(sources[1], {
+        id: 'job-b',
+        jobId: 'job-b',
+        certificationId: 'cert:b',
+        realized: { ...metrics, fullyLoadedCostCents: 20 },
+      })
+    );
+    expect(
+      bio(
+        command({
+          suppliers: sources,
+          certifications: sources.map((source, index) =>
+            certification(source, {
+              id: index ? 'cert:b' : 'cert:a',
+            })
+          ),
+          outcomes: receipts,
+        })
+      ).decision
+    ).toMatchObject({
+      kind: 'promote',
+      supplierDigest: supplierDigest(sources[0]),
+    });
+  });
+
   it('selects the supplier with better completed-job economics over its cheaper trial competitor', () => {
     const sources = ['a', 'b'].map(id => supplier({ id: `fixture:${id}` }));
     const input = command({
