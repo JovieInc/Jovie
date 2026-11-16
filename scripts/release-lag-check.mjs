@@ -10,6 +10,42 @@ import { pathToFileURL } from 'node:url';
 
 export const DEFAULT_MAX_LAG_HOURS = 3;
 
+// The build-info read crosses the public internet to jov.ie; a transient
+// ECONNRESET killed the whole dead-man on 2026-11-16 15:04Z ("Production
+// release lag" step failed with fetch ECONNRESET, no retry). Bounded: two
+// fixed backoffs, transient shapes only (network errors, 5xx, 429); after the
+// last attempt the original failure semantics stand, so an unreadable deploy
+// still fails the check instead of reporting a false green.
+export const BUILD_INFO_ATTEMPT_DELAYS_MS = [500, 1_500];
+
+/**
+ * Fetch the public build-info receipt with bounded retries.
+ * @param {string} [url]
+ * @param {typeof fetch} [fetchImpl]
+ * @param {number[]} [delaysMs] sleep before retry attempt N (attempts 2..N+1)
+ */
+export async function readBuildInfo(
+  url = 'https://jov.ie/api/health/build-info',
+  fetchImpl = fetch,
+  delaysMs = BUILD_INFO_ATTEMPT_DELAYS_MS
+) {
+  let lastError;
+  for (let attempt = 0; attempt <= delaysMs.length; attempt += 1) {
+    if (attempt > 0)
+      await new Promise(resolve => setTimeout(resolve, delaysMs[attempt - 1]));
+    try {
+      const response = await fetchImpl(url);
+      if (response.ok) return await response.json();
+      lastError = new Error(`build-info HTTP ${response.status}`);
+      // A deterministic status is an answer, not a transient failure.
+      if (response.status < 500 && response.status !== 429) break;
+    } catch (error) {
+      lastError = /** @type {Error} */ (error); // ECONNRESET, ETIMEDOUT, hang up
+    }
+  }
+  throw lastError;
+}
+
 /**
  * firstUnshippedMs: commit time of the oldest main commit not in production
  * (undefined when production already contains main). The build-info deployedAt
@@ -68,9 +104,7 @@ async function main() {
   const maxLagHours = Number(
     process.env.MAX_LAG_HOURS ?? DEFAULT_MAX_LAG_HOURS
   );
-  const info = /** @type {{ commitSha?: string }} */ (
-    await (await fetch('https://jov.ie/api/health/build-info')).json()
-  );
+  const info = /** @type {{ commitSha?: string }} */ (await readBuildInfo());
   const run = (...a) =>
     spawnSync('git', a, { maxBuffer: 256 * 1024 * 1024, encoding: 'utf8' });
   const mainSha = run('rev-parse', 'HEAD').stdout.trim();
