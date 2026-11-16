@@ -1,7 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { ReactNode } from 'react';
-import { expect, within } from 'storybook/test';
+import { expect, waitFor, within } from 'storybook/test';
 import { BillingActionsSection } from './BillingActionsSection';
 
 function Frame(Story: () => ReactNode) {
@@ -60,9 +60,14 @@ export const LongContentNarrowCard: Story = {
   decorators: [Frame2],
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    await expect(
-      canvas.getByRole('button', { name: 'Cancel Subscription' })
-    ).toBeVisible();
+    // The section fades in on mount (motion opacity 0 -> 1, 0.15s delay +
+    // 0.5s duration); jest-dom's toBeVisible counts an opacity-0 ancestor as
+    // invisible, so await the settled state instead of racing the animation.
+    await waitFor(() =>
+      expect(
+        canvas.getByRole('button', { name: 'Cancel Subscription' })
+      ).toBeVisible()
+    );
   },
 };
 
@@ -71,6 +76,9 @@ export const RtlDocument: Story = {
   decorators: [RtlFrame],
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    await expect(canvas.getByText('Manage Subscription')).toBeVisible();
+    // Same mount-fade race as Long Content Narrow Card above.
+    await waitFor(() =>
+      expect(canvas.getByText('Manage Subscription')).toBeVisible()
+    );
   },
 };
