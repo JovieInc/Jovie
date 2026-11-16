@@ -30,7 +30,7 @@ function session(patch: Record<string, unknown> = {}): Stripe.Checkout.Session {
       profile_id: 'profile-1',
     },
     ...patch,
-  } as Stripe.Checkout.Session;
+  } as unknown as Stripe.Checkout.Session;
 }
 describe('merch checkout proof contract', () => {
   it.each([null, ''])(
