@@ -163,6 +163,54 @@ class GhTest(unittest.TestCase):
             with self.subTest(args=args):
                 self.assertNotIn("cost", gh_shape(args))
 
+    def test_bounded_per_job_full_and_failed_logs_use_rest_core(self):
+        expected = {"resource": "core", "write": False, "idempotent": True, "cost": 5}
+        for log_flag in ("--log", "--log-failed"):
+            for attempt in ([], ["--attempt", "2"]):
+                args = ["run", "view", "--job", "12", *attempt, log_flag]
+                for argv in (args, [*args[:2], "--repo", "o/r", *args[2:]]):
+                    with self.subTest(args=argv):
+                        self.assertEqual(gh_shape(argv), expected)
+        for args in (
+            ["run", "view", "--repo", "o/r", "--job", "0", "--log-failed"],
+            ["run", "view", "--repo", "o/r", "--job", "-1", "--log-failed"],
+            ["run", "view", "--job", "12", "--attempt", "0", "--log-failed"],
+            ["run", "view", "--job", "12", "--attempt", "--log-failed"],
+            ["run", "view", "--job", "12", "--log", "--log-failed"],
+            ["run", "view", "--repo", "invalid", "--job", "12", "--log-failed"],
+            ["run", "view", "12", "--log-failed"],
+            ["run", "view", "--job", "12"],
+            ["pr", "view", "12"],
+        ):
+            with self.subTest(args=args):
+                self.assertEqual(gh_shape(args), {"resource": "graphql", "write": False, "idempotent": True})
+
+    def test_failed_job_logs_obey_core_independently_of_graphql_budget(self):
+        args = ["run", "view", "--repo", "o/r", "--job", "12", "--log-failed"]
+        for core, graphql, expected_calls in ((5, 0, 1), (4, 100, 0), (0, 100, 0)):
+            with self.subTest(core=core, graphql=graphql):
+                clock, store, calls = FakeClock(), MemoryLedgerStore(), []
+                def seed(ledger):
+                    state = credential_state(ledger, "c", clock.now)
+                    for resource, remaining in (("core", core), ("graphql", graphql)):
+                        state["buckets"][resource] = {"limit": None, "remaining": remaining,
+                                                       "resetAt": clock.now + 60000, "observedAt": clock.now}
+                store.transact("github", seed)
+                def execute(argv, env):
+                    calls.append(argv)
+                    return 0, "failed job log", ""
+                result = run_gh(args, priority="repair", store=store, credential="c", run=execute,
+                                now=clock.read, sleep=clock.sleep, random=lambda: 0, log=quiet,
+                                max_attempts=1, max_wait_ms=0)
+                self.assertEqual(calls, [args] if expected_calls else [])
+                self.assertEqual(result["code"], 0 if expected_calls else 75)
+                self.assertEqual(result["deferred"], not expected_calls)
+                self.assertEqual(clock.now, FakeClock().now, "admission never waits")
+                remaining = store.transact("github", lambda ledger: {
+                    resource: ledger["credentials"]["c"]["buckets"][resource]["remaining"]
+                    for resource in ("core", "graphql")})
+                self.assertEqual(remaining, {"core": core - expected_calls * 5, "graphql": graphql})
+
     def test_safe_job_log_reserves_five_core_reads_before_execution(self):
         for remaining, expected_calls in ((4, 0), (5, 1)):
             with self.subTest(remaining=remaining):

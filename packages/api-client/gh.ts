@@ -73,22 +73,24 @@ export function ghShape(args: readonly string[]): {
   cost?: number;
 } {
   const logArgs =
-    args.length === 9 &&
+    (args.length === 7 || args.length === 9) &&
     args[2] === '--repo' &&
     /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(args[3] ?? '')
       ? [...args.slice(0, 2), ...args.slice(4)]
       : args;
   if (
-    logArgs.length === 7 &&
+    (logArgs.length === 5 ||
+      (logArgs.length === 7 &&
+        logArgs[4] === '--attempt' &&
+        /^[1-9][0-9]*$/.test(logArgs[5] ?? ''))) &&
     logArgs[0] === 'run' &&
     logArgs[1] === 'view' &&
     logArgs[2] === '--job' &&
     /^[1-9][0-9]*$/.test(logArgs[3] ?? '') &&
-    logArgs[4] === '--attempt' &&
-    /^[1-9][0-9]*$/.test(logArgs[5] ?? '') &&
-    logArgs[6] === '--log'
+    ['--log', '--log-failed'].includes(logArgs[logArgs.length - 1] ?? '')
   ) {
-    // gh 2.102 cold cache: job, attempt, workflow, ZIP, per-job fallback.
+    // Per-job logs use REST, returning before the summary's GraphQL PR lookup.
+    // gh 2.102 cold cache: job, run/attempt, workflow, ZIP, per-job fallback.
     return { resource: 'core', write: false, idempotent: true, cost: 5 };
   }
   if (args[0] === 'api') {
