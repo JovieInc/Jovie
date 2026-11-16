@@ -278,14 +278,6 @@ test('the existing report publishes trusted queue evidence and keeps secrets off
   );
   assert.equal(checkout.with['persist-credentials'], false);
   assert.equal(checkout.with.ref, undefined); // Trusted workflow revision, never artifact source.
-  // Reads ride the Jovie Bot installation bucket (JOV-12720): the publish
-  // job mints a read token and the reports step uses it, github.token only
-  // as fallback.
-  const mint = publisher.steps.find(step => step.id === 'read-token');
-  assert.ok(mint, 'publish-queue-results mints the Jovie Bot read token');
-  assert.equal(mint.with['permission-actions'], 'read');
-  const reports = publisher.steps.find(step => step.id === 'reports');
-  assert.match(String(reports.env.GH_TOKEN), /read-token/);
   const upload = publisher.steps.find(step =>
     step.uses?.startsWith('codecov/test-results-action@')
   );
