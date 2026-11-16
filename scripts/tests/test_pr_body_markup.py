@@ -7,6 +7,7 @@ import subprocess
 import sys
 import unittest
 from pathlib import Path
+from types import SimpleNamespace
 
 os.environ["LANES_EXECUTION_BACKEND"] = "local-test"
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "lanes"))
@@ -15,6 +16,52 @@ import pr_events as events
 
 class RevisionReferenceTests(unittest.TestCase):
     SHA = "036b3506525bb56da96330731090028d357c4b04"
+
+    def test_repair_quotes_only_explicit_literal_mentions_and_is_idempotent(self):
+        body = "The new @critical test. Owner @someone-unknown. Tag @critical-path."
+        updated = events.repair_evidence_body({}, body, literal_mentions=("@critical",))
+        self.assertEqual(updated, "The new `@critical` test. Owner @someone-unknown. Tag @critical-path.")
+        self.assertEqual(events.repair_evidence_body({}, updated, literal_mentions=("@critical",)), updated)
+        self.assertEqual(events.repair_evidence_body({}, "Tag @critical", literal_mentions=("@critical",)),
+                         "Tag `@critical`")
+
+    def test_existing_publisher_can_repair_only_a_literal_mention(self):
+        edited = []
+
+        def shell(args):
+            if args[:2] == ["pr", "view"]:
+                return SimpleNamespace(returncode=0, stdout="The @critical test.")
+            self.assertEqual(args[:2], ["pr", "edit"])
+            edited.append(Path(args[-1]).read_text())
+            return SimpleNamespace(returncode=0)
+
+        self.assertTrue(events.ensure_red_before_green({"number": 7}, sh=shell,
+                                                       literal_mentions=("@critical",)))
+        self.assertEqual(edited, ["The `@critical` test."])
+
+    def test_literal_mentions_preserve_proof_metadata_links_and_code(self):
+        for body in (
+            "`@critical`", "``literal `@critical` text``", "```text\nFAIL @critical\n```",
+            "~~~text\nFAIL @critical\n~~~", '<!-- receipt {"tag":"@critical"} -->',
+            "https://example.com/@critical", "[source](https://example.com/@critical)",
+            "Package @critical/name. Email name@critical.com.",
+        ):
+            with self.subTest(body=body):
+                self.assertEqual(events.repair_evidence_body({}, body, literal_mentions=("@critical",)), body)
+        proof = "## Red-before-green\n\n- Failing command: `vitest run`\n\n```text\nFAIL @critical\n```\n"
+        decision = '<!-- customer-changelog/v1 {"releaseWorthy":false} -->'
+        body = "The @critical test.\n\n" + proof + "\n" + decision
+        updated = events.repair_evidence_body({}, body, literal_mentions=("@critical",),
+                                              customer_decision={"releaseWorthy": False})
+        self.assertIn("The `@critical` test.", updated)
+        self.assertIn(proof, updated)
+        self.assertEqual(updated.count(decision), 1)
+        self.assertTrue(events.red_section_complete(updated))
+
+    def test_literal_mentions_require_explicit_complete_mention_tokens(self):
+        for invalid in ("@critical", ("critical",), ("@critical/path",), ("@critical\n",), (None,)):
+            with self.subTest(invalid=invalid), self.assertRaises(ValueError):
+                events.repair_evidence_body({}, "The @critical test.", literal_mentions=invalid)
 
     def test_repair_quotes_bare_full_revision_references_and_is_idempotent(self):
         for sha in (self.SHA, self.SHA.upper()):
