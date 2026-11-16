@@ -13,6 +13,23 @@ export interface KbdProps extends React.HTMLAttributes<HTMLElement> {
   readonly variant?: 'default' | 'tooltip';
 }
 
+// Modifier glyphs are read as raw symbols (or skipped) by screen readers, so
+// a keycap that shows one also carries the spoken key names.
+const MODIFIER_NAMES: Readonly<Record<string, string>> = {
+  '⌘': 'Command',
+  '⌥': 'Option',
+  '⌃': 'Control',
+  '⇧': 'Shift',
+};
+
+function spokenKeyNames(children: React.ReactNode): string | null {
+  if (typeof children !== 'string' || !/[⌘⌥⌃⇧]/.test(children)) return null;
+  return children
+    .replace(/[⌘⌥⌃⇧]/g, glyph => ` ${MODIFIER_NAMES[glyph]} `)
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 const Kbd = React.forwardRef<HTMLElement, KbdProps>(
   ({ className, variant = 'default', children, ...props }, ref) => {
     // The text glyph is retained for the accessibility tree while the visible
@@ -20,6 +37,7 @@ const Kbd = React.forwardRef<HTMLElement, KbdProps>(
     // compact keycap size without introducing a bespoke glyph asset.
     const isShiftGlyph =
       typeof children === 'string' && children.trim() === '⇧';
+    const spoken = isShiftGlyph ? null : spokenKeyNames(children);
 
     return (
       <kbd
@@ -48,6 +66,11 @@ const Kbd = React.forwardRef<HTMLElement, KbdProps>(
               className='h-3 w-3 shrink-0'
               strokeWidth={1.75}
             />
+          </>
+        ) : spoken ? (
+          <>
+            <span aria-hidden='true'>{children}</span>
+            <span className='sr-only'>{spoken}</span>
           </>
         ) : (
           children

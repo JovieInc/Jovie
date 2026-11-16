@@ -12,6 +12,8 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
+import { downloadReleaseAsset } from '../lib/github-release-asset.mjs';
+
 export const SQUAWK_VERSION = '2.70.0';
 export const SQUAWK_CONFIG = 'scripts/db/squawk.toml';
 export const MIGRATION_PREFIX = 'apps/web/drizzle/migrations/';
@@ -78,7 +80,7 @@ export function assertSha256(bytes, expected) {
 }
 
 /**
- * @param {{ fetchImpl?: typeof fetch, arch?: string, platform?: string }} [options]
+ * @param {{ download?: typeof downloadReleaseAsset, arch?: string, platform?: string }} [options]
  */
 export async function installSquawk(options = {}) {
   const platform = options.platform ?? process.platform;
@@ -90,14 +92,16 @@ export async function installSquawk(options = {}) {
   }
   const asset = `squawk-linux-${arch}`;
   const url = `https://github.com/sbdchd/squawk/releases/download/v${SQUAWK_VERSION}/${asset}`;
-  const fetchImpl = options.fetchImpl ?? globalThis.fetch;
-  const response = await fetchImpl(url);
-  if (!response.ok) {
+  // The shared helper backs off, falls back to the authenticated releases
+  // API (anonymous 504s for hours, #23770) and fails closed; the sha256 pin
+  // below still decides.
+  const fetched = (options.download ?? downloadReleaseAsset)(url);
+  if (fetched.ok === false) {
     throw new Error(
-      `Squawk ${SQUAWK_VERSION} download failed: ${response.status} ${url}`
+      `Squawk ${SQUAWK_VERSION} download failed: ${fetched.status} ${url}`
     );
   }
-  const bytes = Buffer.from(await response.arrayBuffer());
+  const bytes = fetched.bytes;
   assertSha256(bytes, SQUAWK_SHA256[arch]);
   const bin = join(mkdtempSync(join(tmpdir(), 'squawk-')), 'squawk');
   writeFileSync(bin, bytes);
@@ -142,7 +146,7 @@ export function readMigrationDiff(repoRoot, base, head, run = spawnSync) {
  *   nameStatus?: string,
  *   squawkBin?: string,
  *   run?: RunCommand,
- *   fetchImpl?: typeof fetch,
+ *   download?: typeof downloadReleaseAsset,
  *   platform?: string,
  *   arch?: string,
  *   stdio?: 'inherit' | 'pipe',
@@ -165,7 +169,7 @@ export async function lintChangedMigrations(options) {
     options.squawkBin ??
     process.env.SQUAWK_BIN ??
     (await installSquawk({
-      fetchImpl: options.fetchImpl,
+      download: options.download,
       platform: options.platform,
       arch: options.arch,
     }));

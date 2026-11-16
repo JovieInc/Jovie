@@ -143,11 +143,6 @@
     "apps/web/components/features/dashboard/dashboard-nav/DashboardNav.tsx": {
       "copy:dead-end-not-available:${item.name} is not available in demo mode": 1
     },
-    "apps/web/components/features/dashboard/organisms/DashboardAnalyticsCards.tsx": {
-      "copy:dead-end-not-available:Analytics Overview Unavailable": 1,
-      "copy:dead-end-not-available:Profile Views Metric Unavailable": 1,
-      "copy:dead-end-not-available:Unique Visitors Metric Unavailable": 1
-    },
     "apps/web/components/features/dashboard/organisms/SettingsBillingSection.tsx": {
       "copy:dead-end-not-available:Billing unavailable": 1
     },

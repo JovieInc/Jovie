@@ -14,7 +14,9 @@ export interface ProfileEventsCardProps {
 
 /**
  * Events mode card (Pen NdEbB). With no dates it says so plainly and offers
- * only the event-alerts opt-in; with dates it hosts the event list.
+ * only the event-alerts opt-in, in a compact card with no reserved height
+ * (walk 2026-11-09: the reserved 17rem read as a large blank gradient); with
+ * dates it hosts the event list.
  */
 export function ProfileEventsCard({
   accent,
@@ -30,6 +32,7 @@ export function ProfileEventsCard({
         title='No upcoming events'
         description='New dates will appear here.'
         dataTestId='profile-primary-tab-events-empty'
+        className='profile-mode-card--compact'
       >
         {emptyAction}
       </ProfileModeCard>

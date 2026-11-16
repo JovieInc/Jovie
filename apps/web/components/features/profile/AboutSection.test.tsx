@@ -65,6 +65,32 @@ describe('AboutSection', () => {
     expect(screen.queryByTestId('profile-about-contacts')).toBeNull();
   });
 
+  it('renders one row per contact role and wraps credits for prose links', () => {
+    render(
+      <AboutSection
+        artist={PROFILE_STORY_ARTIST}
+        creditSegments={[{ type: 'text', text: 'Credits.' }]}
+        contacts={[
+          { ...bookingContact, id: 'brand-1', roleLabel: 'Brand partnerships' },
+          {
+            ...bookingContact,
+            id: 'brand-2',
+            roleLabel: 'Brand partnerships',
+            companyLabel: 'Maverick',
+          },
+        ]}
+      />
+    );
+
+    expect(
+      screen.getAllByRole('link', { name: /Brand partnerships/ })
+    ).toHaveLength(1);
+    expect(screen.getByText('Maverick')).toBeVisible();
+    expect(screen.getByTestId('profile-about-credits')).toHaveClass(
+      'profile-about-credits'
+    );
+  });
+
   it('skips contacts with no reachable channel', () => {
     render(
       <AboutSection
@@ -78,7 +104,7 @@ describe('AboutSection', () => {
 });
 
 describe('AboutSection text contrast contract (JOV-8873)', () => {
-  it('raises muted copy to white/50', async () => {
+  it('raises muted copy to on-media/50 (white/50)', async () => {
     const { readFileSync } = await import('node:fs');
     const { resolve } = await import('node:path');
     const webRoot = process.cwd().endsWith('/apps/web')
@@ -88,7 +114,23 @@ describe('AboutSection text contrast contract (JOV-8873)', () => {
       resolve(webRoot, 'components/features/profile/AboutSection.tsx'),
       'utf8'
     );
-    expect(source).toContain('text-sm font-book text-white/50');
+    expect(source).toContain('text-sm font-book text-on-media/50');
+    expect(source).not.toContain('text-on-media/40');
     expect(source).not.toContain('text-white/40');
+  });
+
+  it('styles credit mentions with the prose link treatment', async () => {
+    const { readFileSync } = await import('node:fs');
+    const { resolve } = await import('node:path');
+    const webRoot = process.cwd().endsWith('/apps/web')
+      ? process.cwd()
+      : resolve(process.cwd(), 'apps/web');
+    const css = readFileSync(
+      resolve(webRoot, 'styles/design-system.css'),
+      'utf8'
+    );
+    expect(css).toMatch(
+      /\.profile-about-credits \.profile-entity-mention \{\s*color: var\(--color-text-tooltip\);/
+    );
   });
 });

@@ -16,7 +16,12 @@ export function collectWorktreeIdentity(cwd, port) {
   }
   /** @param {string[]} args */
   const git = args =>
-    execFileSync('git', args, { cwd, encoding: 'utf8', timeout: 5000 }).trim();
+    execFileSync('git', args, {
+      maxBuffer: 256 * 1024 * 1024,
+      cwd,
+      encoding: 'utf8',
+      timeout: 5000,
+    }).trim();
   const root = realpathSync(git(['rev-parse', '--show-toplevel']));
   const head = git(['rev-parse', '--verify', 'HEAD']);
   if (!/^[a-f0-9]{40}$/.test(head))

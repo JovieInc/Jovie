@@ -576,7 +576,7 @@ describe('CLI', () => {
         '--repository',
         REPOSITORY,
         '--issued-at',
-        '2026-11-02T10:00:00Z',
+        new Date().toISOString(),
       ]);
       expect(built.status).toBe(0);
       const receipt = JSON.parse(built.stdout);

@@ -5,6 +5,7 @@ import { DatabaseSync } from 'node:sqlite';
 import { test } from 'node:test';
 import { MailboxStore, sha256Hex } from './core.ts';
 import { Outbox } from './outbox.ts';
+import { PROBE } from './presence.ts';
 
 // Exercise the real DO methods and SQLite stores; only the platform base is stubbed.
 registerHooks({
@@ -20,6 +21,7 @@ registerHooks({
 globalThis.WebSocketRequestResponsePair = class {};
 const { Mailbox } = await import('./mailbox.ts');
 const { Registry } = await import('./registry.ts');
+const { default: hub } = await import('./index.ts');
 
 function context() {
   const db = new DatabaseSync(':memory:');
@@ -211,4 +213,169 @@ test('hub reply identities do not collide across target kind and original correl
   assert.equal(recipient.enqueue(second.replies[0]).ok, true);
   assert.equal(recipient.unackedCount(), 2);
   assert.notEqual(first.replies[0].id, second.replies[0].id);
+});
+
+// Keep the negative controls at the request/DO boundary: pure state-machine
+// tests cannot catch a producer recording unrelated traffic as consumer proof.
+async function probeFixture() {
+  const registryCtx = context();
+  const mailboxCtx = context();
+  let registry;
+  let mailbox;
+  const env = {
+    ALERT_KINDS: 'summer',
+    MAILBOX: {
+      idFromName: kind => kind,
+      get: kind =>
+        kind === 'codex'
+          ? mailbox
+          : {
+              enqueue: async () => ({ ok: true }),
+              configure: async () => {},
+            },
+    },
+    REGISTRY: { idFromName: kind => kind, get: () => registry },
+  };
+  registry = new Registry(registryCtx, env);
+  mailbox = new Mailbox(mailboxCtx, env);
+  const token = 'consumer-liveness-test-token-at-least-32';
+  await registry.upsert([
+    {
+      kind: 'codex',
+      tokenSha256: await sha256Hex(token),
+      probe: true,
+    },
+    { kind: 'summer', tokenSha256: '0'.repeat(64) },
+  ]);
+  const request = async (path, body) => {
+    const response = await hub.fetch(
+      new Request(`https://mesh.test/v1/${path}`, {
+        method: body === undefined ? 'GET' : 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+      }),
+      env
+    );
+    assert.ok(
+      response.ok,
+      `${path}: ${response.status} ${await response.text()}`
+    );
+  };
+  return {
+    registry,
+    mailbox,
+    mailboxCtx,
+    request,
+    store: new MailboxStore(mailboxCtx.storage.sql),
+    events: () =>
+      registryCtx.storage.sql
+        .exec(
+          "SELECT type FROM events WHERE type IN ('agent.unreachable', 'agent.reachable') ORDER BY id"
+        )
+        .toArray()
+        .map(row => row.type),
+  };
+}
+
+test('adaptive probe still alarms and stays unreachable while non-consumer traffic continues', async t => {
+  let now = 1_000_000;
+  t.mock.method(Date, 'now', () => now);
+  const f = await probeFixture();
+  await f.request('mailbox');
+  now += PROBE.intervalMs;
+  const socket = { send() {} };
+  f.mailboxCtx.getWebSockets = () => [socket];
+  f.mailboxCtx.getWebSocketAutoResponseTimestamp = () => new Date(now);
+  const unrelatedTraffic = async () => {
+    for (const path of ['status', 'metrics', 'agents', 'history'])
+      await f.request(path);
+    await f.request('send', {
+      to: 'summer',
+      correlationId: `background-${now}`,
+      body: 'background status',
+      sha256: await sha256Hex('background status'),
+      refs: [],
+    });
+    await f.mailbox.webSocketMessage(socket, 'invalid json');
+    await f.mailbox.webSocketMessage(
+      socket,
+      JSON.stringify({ type: 'unknown' })
+    );
+  };
+  await unrelatedTraffic();
+  await f.registry.sweep();
+  assert.ok(
+    f.store.lastProbe(),
+    'only consuming mail can postpone the first probe'
+  );
+  for (let miss = 0; miss < PROBE.missesToAlarm; miss++) {
+    now += PROBE.missAfterMs;
+    await unrelatedTraffic();
+    await f.registry.sweep();
+  }
+  assert.deepEqual(f.events(), ['agent.unreachable']);
+  now += 60_000;
+  await unrelatedTraffic();
+  await f.registry.sweep();
+  assert.deepEqual(
+    f.events(),
+    ['agent.unreachable'],
+    'API traffic must not emit recovery'
+  );
+  await f.request('mailbox');
+  await f.registry.sweep();
+  assert.deepEqual(f.events(), ['agent.unreachable', 'agent.reachable']);
+});
+
+test('consumer actions postpone probes, persist across restart, and recover an unreachable agent', async t => {
+  let now = 2_000_000;
+  t.mock.method(Date, 'now', () => now);
+  const actions = [
+    f => f.request('mailbox'),
+    f => f.request('ack', { ids: ['unknown:message'] }),
+    f => f.request('receipt', { ids: ['unknown:message'] }),
+    f =>
+      f.mailbox.webSocketMessage(
+        { send() {} },
+        JSON.stringify({ type: 'ack', ids: [] })
+      ),
+    f =>
+      f.mailbox.webSocketMessage(
+        { send() {} },
+        JSON.stringify({ type: 'receipt', ids: [] })
+      ),
+    f =>
+      f.mailbox.webSocketMessage(
+        { send() {} },
+        JSON.stringify({ type: 'sync' })
+      ),
+  ];
+  for (const consume of actions) {
+    const f = await probeFixture();
+    // Old general activity must never be adopted as consumer proof on upgrade.
+    f.store.setMeta('lastActivityAt', String(now));
+    await f.registry.sweep();
+    assert.ok(f.store.lastProbe());
+    for (let miss = 0; miss < PROBE.missesToAlarm; miss++) {
+      now += PROBE.missAfterMs;
+      await f.registry.sweep();
+    }
+    assert.deepEqual(f.events(), ['agent.unreachable']);
+    now++;
+    await consume(f);
+    await f.registry.sweep();
+    assert.deepEqual(f.events(), ['agent.unreachable', 'agent.reachable']);
+    const restarted = new Mailbox(f.mailboxCtx, {});
+    assert.equal((await restarted.liveness()).lastConsumerActivityAt, now);
+    const lastProbe = f.store.lastProbe();
+    now += PROBE.intervalMs - 1;
+    await f.registry.sweep();
+    assert.deepEqual(f.store.lastProbe(), lastProbe);
+    now++;
+    await f.registry.sweep();
+    assert.equal(f.store.lastProbe().acceptedAt, now);
+  }
 });

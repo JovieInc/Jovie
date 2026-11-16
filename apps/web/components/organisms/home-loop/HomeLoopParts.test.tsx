@@ -106,6 +106,34 @@ describe('HomeLoopConstraintBanner details', () => {
 });
 
 describe('HomeLoopPulse', () => {
+  it('keeps the provenance layout capability across loading and unavailable states', () => {
+    const { rerender } = render(
+      <HomeLoopPulse tiles={[]} loading reserveSourceCaption />
+    );
+    const pulse = screen.getByTestId('home-loop-pulse');
+    const layout = pulse.className;
+    rerender(
+      <HomeLoopPulse tiles={HOME_LOOP_FIXTURE_PULSE} reserveSourceCaption />
+    );
+    expect(pulse.className).toBe(layout);
+    rerender(<HomeLoopPulse tiles={[]} reserveSourceCaption />);
+    expect(pulse.className).toBe(layout);
+  });
+
+  it('renders measurement provenance separately from the target', () => {
+    render(
+      <HomeLoopPulse
+        tiles={[
+          {
+            ...HOME_LOOP_FIXTURE_PULSE[0],
+            sourceCaption: 'Snapshot 2026-11-07 14:24 UTC',
+          },
+        ]}
+      />
+    );
+    expect(screen.getByText('Snapshot 2026-11-07 14:24 UTC')).toBeVisible();
+  });
+
   it('shows each tile with its previous value and a named tone', () => {
     render(<HomeLoopPulse tiles={HOME_LOOP_FIXTURE_PULSE} />);
     expect(

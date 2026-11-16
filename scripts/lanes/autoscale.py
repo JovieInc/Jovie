@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Adaptive per-lane slots on the minute dispatch tick. Default mode is apply. Kill switch: SYMPHONY_AUTOSCALE=0. decide() is pure and does no I/O at import."""
 from __future__ import annotations
-import json; import math; import os; import sys; import stat; import re; import time; from datetime import datetime, timezone; from pathlib import Path; SCHEMA = "symphony-lanes-autoscale/v1"; sys.path.insert(0, str(Path(__file__).resolve().parent)); import stage_timings  # noqa: E402
+import json; import math; import os; import sys; import stat; import re; import time; from datetime import datetime, timezone; from pathlib import Path; SCHEMA = "symphony-lanes-autoscale/v1"; sys.path.insert(0, str(Path(__file__).resolve().parent)); import pr_wip; import stage_timings  # noqa: E402
 # Tim 2026-10-12: no arbitrary timers. Seats follow proven demand every tick; only measured limits
 # (host load/memory/PSI/disk, provider credits and leases, GitHub quota, current failure rate on
 # this release) hold or shrink them. HOST_SETTLE_S is the measurement lag of the signal itself:
@@ -20,9 +20,9 @@ MERGE_QUEUE_WAIT_BRAKE_MIN = 30
 YIELD_WINDOW_S, YIELD_MIN_ATTEMPTS, YIELD_FLOOR = 7200, 6, 0.12
 _CONVERTED = frozenset({"pushed", "fix-pushed", "pr-opened", "landing", "decomposed"})
 _ATTEMPTED = _CONVERTED | frozenset({"failed", "fix-no-change", "provider-error", "not-shippable"})
-# WIP cap (2026-10-28): finish before starting. Above this many open PRs, new-issue intake stops; fix-red,
-# conflict and other remediation seats keep running, so inventory converges instead of piling up.
-WIP_MAX_DEFAULT, SWARM_CLAIM_STALE_S = 80, 1800
+# WIP cap (2026-11-07), per producer: a lane's intake stops while its own producer is at its pr-wip-policy.json cap
+# (budget reason `wip-cap`). The repo-wide open-PR count is only a backstop at the sum of all caps (122); remediation seats keep running.
+WIP_MAX_DEFAULT, SWARM_CLAIM_STALE_S = pr_wip.total_cap(), 1800
 # Hosted-runner backlog (throughput_sentinel release-flow.json): push admission pauses, remediation does not.
 CI_QUEUED_RUNS_BRAKE, CI_QUEUED_OLDEST_BRAKE_MIN, CI_SIGNAL_STALE_S = 400, 15, 900
 # A census is stamped with its source rows' age (up to 3 x 60 s cache TTLs), read on the next minute tick.
@@ -257,7 +257,7 @@ def flow_metrics(observed: dict, yields: dict, swarm: int, wip_max: int, now: fl
             "cycleMinutesP50": _pctl(cycle, .5), "cycleMinutesP95": _pctl(cycle, .95), "openPrWip": _count(observed.get("openPRCount")),
             "wipMax": wip_max, "backlog": backlog, "swarmClaims": swarm,
             "burnDownEtaDays": round(backlog / merged_day, 1) if backlog is not None and merged_day else None,
-            "targets": {"mergedPerDay": 100, "mergedPerAttempt": 0.6, "openPrWip": 80, "burnDownEtaDays": 14}}
+            "targets": {"mergedPerDay": 100, "mergedPerAttempt": 0.6, "openPrWip": wip_max, "burnDownEtaDays": 14}}
 def collect(state_dir: Path, tick: dict, now: float, wip_max: int = WIP_MAX_DEFAULT) -> dict:
     """Local files only: no GitHub or Linear calls."""
     root, doctor = Path(state_dir), _obj(_read_json(Path(state_dir) / "doctor.json")); observed = _obj(doctor.get("observed"))
@@ -402,11 +402,11 @@ def _throughput_brake(previous: dict, obs: dict, now: float) -> dict:
             "heldForS": max(0, now - since) if since is not None else 0,
             "signal": {"queueDepth": depth, "queueWaitP50Minutes": wait, "mergedPerHour": merged,
                        "openedPerHour": opened, "ejectionRate": ejections}}
-def _intake_gates(obs: dict, brake: dict) -> list[str]:
+def _intake_gates(obs: dict, brake: dict, name: str = "") -> list[str]:
     """Push admission, not remediation fan-out: new issues become new PRs that spend CI, merge-queue and
-    GitHub quota, so they stop on WIP, CI queue wait or quota deferral. Fix-red seats are untouched."""
+    GitHub quota, so they stop on WIP, CI queue wait or quota deferral. Fix-red seats are untouched. `wip-cap`: own producer at cap, or the repo-wide backstop."""
     gates, wip, wip_max = [], _count(obs.get("openPRCount")), _count(obs.get("wipMax"))
-    if wip is not None and wip_max and wip > wip_max:
+    if _obj(_obj(obs.get("newIssueBudgetByProvider")).get(name)).get("reason") == "wip-cap" or (wip is not None and wip_max and wip > wip_max):
         gates.append("wip-cap")
     if "queue-wait" in (brake.get("reasons") or []):
         gates.append("ci-queue-wait")
@@ -589,7 +589,7 @@ def decide(previous: dict | None, obs: dict, host_sample: dict, bases: dict, con
             intake_blockers.append("unhealthy")
         if name in set(obs.get("cooling") or []):
             intake_blockers.append("cooling")
-        intake_blockers += _intake_gates(obs, brake)
+        intake_blockers += _intake_gates(obs, brake, name)
         row.update(intakeEffective=0 if intake_blockers else row["effective"], intakeBlockers=intake_blockers)
         before = _int(_obj(prev_lanes.get(name)).get("effective")); before = base if before is None else before
         if row["effective"] != before:

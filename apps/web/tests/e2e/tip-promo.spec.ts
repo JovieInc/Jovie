@@ -5,19 +5,9 @@ import { SMOKE_TIMEOUTS, waitForHydration } from './utils/smoke-test-utils';
 test.use({ storageState: { cookies: [], origins: [] } });
 
 test.describe
-  .skip('TipPromo Feature Flag', () => {
-    test.describe('when NEXT_PUBLIC_FEATURE_TIPS is enabled', () => {
+  .skip('TipPromo', () => {
+    test.describe('on the homepage', () => {
       test.beforeEach(async ({ page }) => {
-        // Set the environment variable before visiting the page
-        await page.addInitScript(() => {
-          // Mock the environment variable at runtime
-          Object.defineProperty(process.env, 'NEXT_PUBLIC_FEATURE_TIPS', {
-            value: 'true',
-            writable: true,
-            configurable: true,
-          });
-        });
-
         await page.route('**/api/profile/view', route =>
           route.fulfill({ status: 200, body: '{}' })
         );
@@ -115,61 +105,6 @@ test.describe
         await expect(
           page.getByRole('link', { name: 'See it live' })
         ).toBeVisible();
-      });
-    });
-
-    test.describe('when NEXT_PUBLIC_FEATURE_TIPS is disabled', () => {
-      test.beforeEach(async ({ page }) => {
-        // Ensure the environment variable is not set to 'true'
-        await page.addInitScript(() => {
-          // Mock the environment variable as disabled
-          Object.defineProperty(process.env, 'NEXT_PUBLIC_FEATURE_TIPS', {
-            value: 'false',
-            writable: true,
-            configurable: true,
-          });
-        });
-
-        await page.route('**/api/profile/view', route =>
-          route.fulfill({ status: 200, body: '{}' })
-        );
-        await page.route('**/api/audience/visit', route =>
-          route.fulfill({ status: 200, body: '{}' })
-        );
-        await page.route('**/api/track', route =>
-          route.fulfill({ status: 200, body: '{}' })
-        );
-        await page.goto('/', { timeout: SMOKE_TIMEOUTS.NAVIGATION });
-        await waitForHydration(page);
-      });
-
-      test('does not display the TipPromo section', async ({ page }) => {
-        // Check that the TipPromo section is not visible
-        const tipSection = page
-          .locator('section')
-          .filter({ hasText: 'Pay, instantly' });
-        await expect(tipSection).not.toBeVisible();
-
-        // Also check that the specific text is not present
-        await expect(page.getByText('Pay, instantly.')).not.toBeVisible();
-        await expect(
-          page.getByRole('link', { name: 'See it live' })
-        ).not.toBeVisible();
-      });
-
-      test('page loads normally without the TipPromo section', async ({
-        page,
-      }) => {
-        // Ensure other sections are still visible
-        await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
-        await expect(
-          page
-            .locator('section')
-            .filter({ hasText: 'Stop designing. Start converting.' })
-        ).toBeVisible();
-
-        // Check that page doesn't have JavaScript errors
-        await expect(page.locator('body')).not.toContainText('Error');
       });
     });
   });

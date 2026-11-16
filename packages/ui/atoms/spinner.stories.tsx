@@ -65,3 +65,63 @@ export const SizeAndToneMatrix: Story = {
     </div>
   ),
 };
+
+export const Loading: Story = {
+  render: () => (
+    <div className='flex items-center gap-2 text-sm text-secondary-token'>
+      <Spinner size='sm' tone='muted' label='Saving changes' />
+      <span aria-hidden='true'>Saving changes…</span>
+    </div>
+  ),
+  parameters: {
+    docs: {
+      description: {
+        story:
+          'The in-flight state: an animated ring announced politely as “Saving changes” beside its visible caption.',
+      },
+    },
+  },
+};
+
+export const LongContent: Story = {
+  render: () => (
+    <div className='flex w-56 items-center gap-2 text-sm text-secondary-token'>
+      <Spinner
+        size='sm'
+        label='Importing the complete back catalog from every distributor'
+      />
+      <span aria-hidden='true' className='min-w-0'>
+        Importing the complete back catalog from every distributor…
+      </span>
+    </div>
+  ),
+  parameters: {
+    docs: {
+      description: {
+        story:
+          'Beside a long wrapping caption in a narrow row the spinner keeps its fixed square size instead of being squeezed.',
+      },
+    },
+  },
+};
+
+export const Rtl: Story = {
+  render: () => (
+    <div
+      dir='rtl'
+      lang='ar'
+      className='flex items-center gap-2 text-sm text-secondary-token'
+    >
+      <Spinner size='sm' label='جارٍ الحفظ' />
+      <span aria-hidden='true'>جارٍ الحفظ…</span>
+    </div>
+  ),
+  parameters: {
+    docs: {
+      description: {
+        story:
+          'In a right-to-left row the spinner leads from the start (right) edge and announces its Arabic label.',
+      },
+    },
+  },
+};

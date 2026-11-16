@@ -1,5 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { buildLibraryReleaseAssets } from '@/app/app/(shell)/library/library-data';
+import { buildLibraryTakeAssets } from '@/app/app/(shell)/library/library-take-assets';
 import { LibraryCatalogArtworkCell } from './library-catalog-columns';
 
 const [asset] = buildLibraryReleaseAssets([
@@ -21,6 +22,23 @@ const [asset] = buildLibraryReleaseAssets([
   },
 ]);
 
+const [take] = buildLibraryTakeAssets(
+  [
+    {
+      takeId: 'take-1',
+      takeNumber: 3,
+      title: 'Release day shout-out',
+      kind: 'promo',
+      source: 'script',
+      durationMs: 42_000,
+      kept: true,
+      createdAt: '2026-11-11T12:00:00.000Z',
+      mediaUrl: '/api/teleprompter/takes/take-1/media',
+    },
+  ],
+  'Tim White'
+);
+
 const meta = {
   title: 'Library/LibraryCatalogArtworkCell',
   component: LibraryCatalogArtworkCell,
@@ -32,3 +50,6 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {};
+
+/** A private studio take in Work: a video with no artwork. */
+export const StudioTake: Story = { args: { asset: take! } };

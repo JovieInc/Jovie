@@ -62,7 +62,7 @@ const VALID_REPOSITORY = Object.freeze(
 );
 const VALID_RULESET = Object.freeze(
   JSON.parse(
-    `{"id":${RULESET_ID},"enforcement":"active","target":"branch","conditions":{"ref_name":{"include":["refs/heads/main"],"exclude":[]}},"bypass_actors":[],"rules":[{"type":"required_status_checks","parameters":{"strict_required_status_checks_policy":false,"required_status_checks":[{"context":"PR Ready"},{"context":"Migration Guard"},{"context":"Fork PR Gate"},{"context":"PR Size Guard"}]}},{"type":"merge_queue","parameters":{"check_response_timeout_minutes":30,"grouping_strategy":"HEADGREEN","max_entries_to_build":4,"max_entries_to_merge":10,"merge_method":"SQUASH","min_entries_to_merge":1,"min_entries_to_merge_wait_minutes":0}}]}`
+    `{"id":${RULESET_ID},"enforcement":"active","target":"branch","conditions":{"ref_name":{"include":["refs/heads/main"],"exclude":[]}},"bypass_actors":[],"rules":[{"type":"required_status_checks","parameters":{"strict_required_status_checks_policy":false,"required_status_checks":[{"context":"PR Ready"},{"context":"Migration Guard"},{"context":"Fork PR Gate"},{"context":"PR Size Guard"},{"context":"Company guards"}]}},{"type":"merge_queue","parameters":{"check_response_timeout_minutes":30,"grouping_strategy":"HEADGREEN","max_entries_to_build":4,"max_entries_to_merge":10,"merge_method":"SQUASH","min_entries_to_merge":1,"min_entries_to_merge_wait_minutes":0}}]}`
   )
 );
 const VALID_WORKFLOW = `name: CI
@@ -1560,7 +1560,7 @@ describe('native live preflight', () => {
       expect.arrayContaining([
         'ruleset enforcement must be active',
         'ruleset must contain an active merge_queue rule',
-        'ruleset is missing required checks: Migration Guard, Fork PR Gate, PR Size Guard',
+        'ruleset is missing required checks: Migration Guard, Fork PR Gate, PR Size Guard, Company guards',
         'ruleset bypass_actors must be empty before native enrollment',
         'repository auto-merge must be enabled',
         'CI workflow must handle merge_group checks_requested',

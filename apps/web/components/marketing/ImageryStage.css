@@ -1,0 +1,4 @@
+.imagery-stage__img {
+  border-radius: var(--radius-lg);
+  object-fit: cover;
+}

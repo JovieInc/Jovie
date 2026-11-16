@@ -13,13 +13,13 @@ import { documentTitle } from '@/lib/seo/document-title';
 export const revalidate = false;
 
 export const metadata: Metadata = {
-  title: documentTitle(`CLI — ${APP_NAME}`),
+  title: documentTitle('CLI'),
   description: CLI_SUBTITLE,
   alternates: {
     canonical: `${BASE_URL}${APP_ROUTES.CLI}`,
   },
   openGraph: {
-    title: `CLI — ${APP_NAME}`,
+    title: `CLI | ${APP_NAME}`,
     description: CLI_SUBTITLE,
     url: `${BASE_URL}${APP_ROUTES.CLI}`,
     type: 'website',

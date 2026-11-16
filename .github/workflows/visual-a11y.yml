@@ -9,11 +9,21 @@ name: Visual & A11y Tests
 # stays Storybook-only to avoid double Neon/build cost. It is deep evidence, so
 # source PRs and main releases never wait on it.
 on:
-  # Runs once the inputs it audits land on main. These paths mirror
-  # VISUAL_PATTERNS below; nothing else can change a Storybook a11y result.
+  # Shared render inputs refresh the existing capture job. The older matrix
+  # keeps its eligibility; new inputs do not fan out to sixteen shards.
   push:
     branches: [main]
     paths:
+      - 'apps/web/**'
+      - '!apps/web/app/api/**'
+      - '!apps/web/app/actions/**'
+      - '!apps/web/tests/**'
+      - 'apps/web/tests/fixtures/**'
+      - '!apps/web/docs/**'
+      - '!apps/web/**/__tests__/**'
+      - '!apps/web/**/*.test.*'
+      - '!apps/web/**/*.spec.*'
+      - '!apps/web/**/*.md'
       - 'apps/web/components/**'
       - 'apps/web/.storybook/**'
       - 'apps/web/app/globals.css'
@@ -23,8 +33,30 @@ on:
       - 'apps/web/vitest.config.storybook.mts'
       - 'apps/web/package.json'
       - 'packages/ui/**'
+      - 'packages/**'
+      - 'patches/**'
+      - 'package.json'
       - 'pnpm-lock.yaml'
+      - 'pnpm-workspace.yaml'
+      - '.nvmrc'
+      - '.node-version'
+      - '.npmrc'
+      - '.gitignore'
+      - '.gitattributes'
+      - '*pnpmfile.*js'
+      - 'tsconfig*.json'
+      - 'postcss.config.*'
+      - 'tailwind.config.*'
+      - 'vite.config.*'
       - '.github/workflows/visual-a11y.yml'
+      - 'scripts/lib/component-certificate-summary.mjs'
+      - 'scripts/component-story-evidence.mjs'
+      - 'scripts/component-ship-policy.mjs'
+      - 'scripts/lib/component-story-evidence-lib.mjs'
+      - 'scripts/lib/component-evidence.mjs'
+      - 'scripts/lib/component-story-receipts.mjs'
+      - 'scripts/lib/component-render-inputs.mjs'
+      - 'scripts/lib/component-render-closure.mjs'
   workflow_dispatch:
 
 permissions:
@@ -43,19 +75,37 @@ jobs:
     timeout-minutes: 2
     outputs:
       has_visual_changes: ${{ steps.detect.outputs.has_visual_changes }}
+      has_render_changes: ${{ steps.detect.outputs.has_render_changes }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
+      - name: Prime Node toolcache (no GitHub API manifest call)
+        if: ${{ hashFiles('.github/actions/prime-node-toolcache/action.yml') != '' }}
+        uses: ./.github/actions/prime-node-toolcache
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: '.nvmrc'
       - name: Detect visual-relevant changes
         id: detect
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_SHA: ${{ github.event.before }}
+          HEAD_SHA: ${{ github.sha }}
         run: |
-          VISUAL_PATTERNS='^(apps/web/components/|apps/web/\.storybook/|apps/web/app/globals\.css|apps/web/styles/|apps/web/(tailwind|postcss)\.config\.|apps/web/vitest\.config\.storybook\.mts|apps/web/package\.json|packages/ui/|pnpm-lock\.yaml|\.github/workflows/visual-a11y\.yml)'
-          if [ "${{ github.event_name }}" == "workflow_dispatch" ] || [ "${{ github.event_name }}" == "push" ]; then
-            echo "has_visual_changes=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "has_visual_changes=false" >> "$GITHUB_OUTPUT"
-          fi
+          node --input-type=module <<'NODE'
+          import { execFileSync } from 'node:child_process';
+          import { appendFileSync } from 'node:fs';
+          import { storyEvidenceEligibility } from './scripts/lib/component-render-inputs.mjs';
+          const { EVENT_NAME, BASE_SHA, HEAD_SHA, GITHUB_OUTPUT } = process.env;
+          const args = BASE_SHA && !/^0+$/.test(BASE_SHA)
+            ? ['diff', '--no-renames', '--name-only', '-z', BASE_SHA, HEAD_SHA]
+            : ['show', '--no-renames', '--format=', '--name-only', '-z', HEAD_SHA];
+          const paths = execFileSync('git', args, { encoding: 'utf8' }).split('\0').filter(Boolean);
+          const result = EVENT_NAME === 'workflow_dispatch'
+            ? { visual: true, render: true } : storyEvidenceEligibility(paths);
+          appendFileSync(GITHUB_OUTPUT, `has_visual_changes=${result.visual}\nhas_render_changes=${result.render}\n`);
+          NODE
 
   storybook-a11y:
     name: Storybook A11y Checks (${{ matrix.shard }}/16)
@@ -74,7 +124,7 @@ jobs:
         shard: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
       - name: Prime Node toolcache (no GitHub API manifest call)
         if: ${{ hashFiles('.github/actions/prime-node-toolcache/action.yml') != '' }}
         uses: ./.github/actions/prime-node-toolcache
@@ -89,17 +139,17 @@ jobs:
         id: a11y-test
         run: |
           set -o pipefail
-          pnpm --filter @jovie/web test:a11y --shard=${{ matrix.shard }}/16 2>&1 \
+          pnpm --filter @jovie/web test:a11y --shard=${{ matrix.shard }}/16 \
+            --reporter=default --reporter=json \
+            --outputFile="$RUNNER_TEMP/a11y-shard-${{ matrix.shard }}.json" 2>&1 \
             | tee "$RUNNER_TEMP/a11y-shard-${{ matrix.shard }}.log"
       - name: A11y Results Summary
         if: always()
         run: |
-          if [ "${{ steps.a11y-test.outcome }}" == "failure" ]; then
-            echo "## A11y Check Results" >> "$GITHUB_STEP_SUMMARY"
-            echo "" >> "$GITHUB_STEP_SUMMARY"
-            echo "FAIL: Accessibility violations detected - blocking this PR." >> "$GITHUB_STEP_SUMMARY"
-            echo "" >> "$GITHUB_STEP_SUMMARY"
-            echo "To run locally: pnpm --filter @jovie/web test:a11y" >> "$GITHUB_STEP_SUMMARY"
+          node scripts/lib/component-certificate-summary.mjs --a11y \
+            "$A11Y_OUTCOME" "$RUNNER_TEMP/a11y-shard-${{ matrix.shard }}.json" \
+            "${{ matrix.shard }}" >> "$GITHUB_STEP_SUMMARY"
+          if [ "$A11Y_OUTCOME" != "success" ]; then
             # Surface the failing axe nodes in the run summary so readers
             # without job-log access can see them. Last 2000 lines of this
             # shard's output, ANSI stripped, capped under the 1 MiB
@@ -116,17 +166,240 @@ jobs:
                 echo "</details>"
               } >> "$GITHUB_STEP_SUMMARY"
             fi
-          else
-            echo "## A11y Check Results" >> "$GITHUB_STEP_SUMMARY"
-            echo "" >> "$GITHUB_STEP_SUMMARY"
-            echo "PASS: All Storybook components passed accessibility checks." >> "$GITHUB_STEP_SUMMARY"
           fi
+        env:
+          A11Y_OUTCOME: ${{ steps.a11y-test.outcome }}
+      - name: Upload shard execution evidence
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: a11y-shard-${{ matrix.shard }}-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/a11y-shard-${{ matrix.shard }}.json
+            ${{ runner.temp }}/a11y-shard-${{ matrix.shard }}.log
+          if-no-files-found: warn
+          retention-days: 14
+
+
+  story-evidence-plan:
+    # Certificate evidence (docs/design-system/COMPONENT_CERTIFICATE.md):
+    # every certified component's stories rendered in light and dark, failing
+    # on page/console errors and WCAG 2.2 AA axe violations, with a screenshot
+    # hash. Each receipt is bound to that component's own render closure
+    # (jovie.component-render-inputs/v2), so this job restores the last
+    # evidence, keeps every receipt whose closure did not change, and plans
+    # shards only for the rest. Hosted only: Storybook never builds or runs
+    # on gem, and the producer refuses any runner that is not GitHub-hosted.
+    name: Plan Story Evidence
+    needs: [ci-visual-path-changes]
+    if: ${{ needs.ci-visual-path-changes.outputs.has_render_changes == 'true' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    outputs:
+      matrix: ${{ steps.plan.outputs.matrix }}
+      shards: ${{ steps.plan.outputs.shards }}
+      capture: ${{ steps.plan.outputs.capture }}
+      started: ${{ steps.clock.outputs.started }}
+    env:
+      CI: true
+      JOVIE_STORYBOOK_MANUAL_AXE: '1'
+    steps:
+      - name: Start budget clock
+        id: clock
+        run: echo "started=$(date +%s)" >> "$GITHUB_OUTPUT"
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
+      - name: Prime Node toolcache (no GitHub API manifest call)
+        if: ${{ hashFiles('.github/actions/prime-node-toolcache/action.yml') != '' }}
+        uses: ./.github/actions/prime-node-toolcache
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'pnpm'
+      - run: pnpm install --frozen-lockfile
+      - name: Restore prior story evidence
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.local/state/jovie-story-evidence
+          key: component-story-evidence-${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: component-story-evidence-
+      - name: Build static story index
+        working-directory: apps/web
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/story-plan"
+          node node_modules/storybook/dist/bin/core.js index -o "$RUNNER_TEMP/story-plan/index.json"
+      - name: Plan shards
+        id: plan
+        run: |
+          set -euo pipefail
+          prior="$HOME/.local/state/jovie-story-evidence"
+          mkdir -p "$prior" "$RUNNER_TEMP/story-plan/prior"
+          cp -R "$prior/." "$RUNNER_TEMP/story-plan/prior/"
+          plan=$(node scripts/component-story-evidence.mjs \
+            --index "$RUNNER_TEMP/story-plan/index.json" \
+            --reuse-dir "$RUNNER_TEMP/story-plan/prior" --plan 20)
+          echo "$plan"
+          {
+            echo "matrix=$(jq -c .matrix <<<"$plan")"
+            echo "shards=$(jq -r .shards <<<"$plan")"
+            echo "capture=$(jq -r .capture <<<"$plan")"
+          } >> "$GITHUB_OUTPUT"
+          jq -r '"Story evidence plan: \(.capture) components to capture (\(.renders) renders) on \(.shards) shards, \(.reused) reused."' \
+            <<<"$plan" >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: story-plan
+          path: ${{ runner.temp }}/story-plan
+          retention-days: 3
+
+  story-evidence-capture:
+    name: Capture Story Evidence (${{ matrix.shard }}/${{ needs.story-evidence-plan.outputs.shards }})
+    needs: [story-evidence-plan]
+    if: ${{ needs.story-evidence-plan.outputs.shards != '0' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: ${{ fromJSON(needs.story-evidence-plan.outputs.matrix) }}
+    env:
+      CI: true
+      JOVIE_STORYBOOK_MANUAL_AXE: '1'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
+      - name: Prime Node toolcache (no GitHub API manifest call)
+        if: ${{ hashFiles('.github/actions/prime-node-toolcache/action.yml') != '' }}
+        uses: ./.github/actions/prime-node-toolcache
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'pnpm'
+      - run: pnpm install --frozen-lockfile
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: story-plan
+          path: ${{ runner.temp }}/story-plan
+      # Same boot as ci.yml ci-storybook-surfaces: detached, logged to a
+      # file, pid exported; the capture step waits, fails if it died, prints
+      # the log and stops it. The manual-axe flag drops the automatic a11y
+      # addon so its scan cannot race the producer's own axe pass.
+      - name: Start Storybook dev server
+        working-directory: apps/web
+        run: |
+          set -euo pipefail
+          nohup pnpm exec storybook dev -p 6006 --no-open \
+            > "$RUNNER_TEMP/storybook-dev.log" 2>&1 &
+          echo "STORYBOOK_PID=$!" >> "$GITHUB_ENV"
+      - name: Setup Playwright (Chromium)
+        uses: ./.github/actions/setup-playwright
+      - name: Capture story evidence
+        run: |
+          set -euo pipefail
+          : "${STORYBOOK_PID:?Storybook dev server was not started}"
+          trap 'kill "$STORYBOOK_PID" 2>/dev/null || true
+            echo "::group::Storybook dev server log"
+            cat "$RUNNER_TEMP/storybook-dev.log" 2>/dev/null || true
+            echo "::endgroup::"' EXIT
+          for attempt in $(seq 1 150); do
+            kill -0 "$STORYBOOK_PID" 2>/dev/null || {
+              echo "::error::Storybook dev server died"
+              exit 1
+            }
+            if curl -sf http://localhost:6006/index.json >/dev/null 2>&1; then
+              node scripts/component-story-evidence.mjs \
+                --base-url http://localhost:6006 \
+                --index "$RUNNER_TEMP/story-plan/index.json" \
+                --reuse-dir "$RUNNER_TEMP/story-plan/prior" \
+                --shard "$SHARD/$SHARDS" \
+                --out-dir "$RUNNER_TEMP/story-shard"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "::error::Storybook dev server failed to start within 300s"
+          exit 1
+        env:
+          SHARD: ${{ matrix.shard }}
+          SHARDS: ${{ needs.story-evidence-plan.outputs.shards }}
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: story-shard-${{ matrix.shard }}
+          path: ${{ runner.temp }}/story-shard
+          retention-days: 3
+
+  component-story-evidence:
+    # Merges the shards with every reused receipt into the evidence set that
+    # component-certificate.yml restores, and reports the run against its
+    # budget (docs/design-system/COMPONENT_CERTIFICATE.md, "Keeping it fast").
+    name: Component Story Evidence
+    needs: [story-evidence-plan, story-evidence-capture]
+    if: ${{ always() && needs.story-evidence-plan.result == 'success' && (needs.story-evidence-capture.result == 'success' || needs.story-evidence-capture.result == 'skipped') }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      CI: true
+      JOVIE_STORYBOOK_MANUAL_AXE: '1'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
+      - name: Prime Node toolcache (no GitHub API manifest call)
+        if: ${{ hashFiles('.github/actions/prime-node-toolcache/action.yml') != '' }}
+        uses: ./.github/actions/prime-node-toolcache
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'pnpm'
+      - run: pnpm install --frozen-lockfile
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: story-*
+          path: ${{ runner.temp }}/story
+      - name: Merge story evidence
+        env:
+          CAPTURE: ${{ needs.story-evidence-plan.outputs.capture }}
+        run: |
+          set -euo pipefail
+          out="$HOME/.local/state/jovie-story-evidence"
+          rm -rf "$out"
+          shopt -s nullglob
+          shards=("$RUNNER_TEMP"/story/story-shard-*)
+          node scripts/component-story-evidence.mjs --merge \
+            --reuse-dir "$RUNNER_TEMP/story/story-plan/prior" \
+            --expect "$CAPTURE" --out-dir "$out" "${shards[@]}" \
+            | tee -a "$GITHUB_STEP_SUMMARY"
+      - name: Report run budget
+        env:
+          CAPTURE: ${{ needs.story-evidence-plan.outputs.capture }}
+          STARTED: ${{ needs.story-evidence-plan.outputs.started }}
+        run: |
+          set -euo pipefail
+          minutes=$(( ( $(date +%s) - STARTED ) / 60 ))
+          # Budget: a cold run (every component) within 15 minutes, an
+          # incremental run within 6. Over budget warns; it never fails.
+          if [ "$CAPTURE" -ge 1000 ]; then budget=15; else budget=6; fi
+          echo "Story evidence took ${minutes} min for ${CAPTURE} captured components (budget ${budget} min)." >> "$GITHUB_STEP_SUMMARY"
+          if [ "$minutes" -gt "$budget" ]; then
+            echo "::warning::Story evidence took ${minutes} min, over its ${budget} min budget"
+          fi
+      - name: Save story evidence
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.local/state/jovie-story-evidence
+          key: component-story-evidence-${{ github.run_id }}-${{ github.run_attempt }}
 
   report-scheduled-failure:
     # Nothing fails silently (docs/design-system/GOVERNANCE.md): a red main
     # run opens or updates one standing issue, deduped by title. Not required.
     name: Report main failure
-    needs: [ci-visual-path-changes, storybook-a11y]
+    needs: [ci-visual-path-changes, storybook-a11y, story-evidence-plan, story-evidence-capture, component-story-evidence]
     if: ${{ always() && github.event_name == 'push' && github.ref_name == 'main' && contains(needs.*.result, 'failure') }}
     runs-on: ubuntu-latest
     timeout-minutes: 5

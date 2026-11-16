@@ -181,7 +181,7 @@ const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(
             >
               {label}
               {props.required && (
-                <span className='text-destructive ml-1' aria-hidden='true'>
+                <span className='text-destructive ms-1' aria-hidden='true'>
                   *
                 </span>
               )}
@@ -197,7 +197,8 @@ const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(
             </p>
           )}
 
-          <div className='min-h-5' aria-live='polite'>
+          {/* role=alert announces the error once; no aria-live wrapper too. */}
+          <div className='min-h-5'>
             {error && (
               <p id={errorId} className='text-sm text-destructive' role='alert'>
                 {error}

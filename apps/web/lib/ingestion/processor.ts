@@ -13,6 +13,7 @@
 
 import type { DbOrTransaction } from '@/lib/db';
 import type { ingestionJobs } from '@/lib/db/schema/ingestion';
+import { importMissingAppleMusicReleases } from '@/lib/discography/apple-music-import';
 import {
   processDspArtistDiscoveryJob,
   processMusicFetchEnrichmentJob,
@@ -21,6 +22,7 @@ import { musicFetchEnrichmentPayloadSchema } from '@/lib/dsp-enrichment/jobs/mus
 import { processReleaseEnrichmentJob } from '@/lib/dsp-enrichment/jobs/release-enrichment';
 import { processSendClaimInviteJob } from '@/lib/email/jobs/send-claim-invite';
 import { processWaitlistEmailJob } from '@/lib/waitlist/email-jobs';
+import { processWaitlistWinbackEmailJob } from '@/lib/waitlist/winback-email-job';
 import { processBeaconsJob } from './jobs/beacons';
 import { processLayloJob } from './jobs/laylo';
 import { processTikTokJob } from './jobs/tiktok';
@@ -116,10 +118,20 @@ export async function processJob(
       return processSendClaimInviteJob(conn, job.payload);
     case 'send_waitlist_email':
       return processWaitlistEmailJob(conn, job.payload, { jobId: job.id });
+    case 'send_waitlist_winback_email':
+      return processWaitlistWinbackEmailJob(conn, job.payload, {
+        jobId: job.id,
+      });
     case 'dsp_artist_discovery':
       return processDspArtistDiscoveryJob(conn, job.payload);
-    case 'dsp_track_enrichment':
-      return processReleaseEnrichmentJob(conn, job.payload);
+    case 'dsp_track_enrichment': {
+      const result = await processReleaseEnrichmentJob(conn, job.payload);
+      // Links never create releases; add Apple-only ones too (JOV-7140).
+      if (result.providerId === 'apple_music') {
+        await importMissingAppleMusicReleases(result.creatorProfileId, conn);
+      }
+      return result;
+    }
     case 'musicfetch_enrichment': {
       const parsed = musicFetchEnrichmentPayloadSchema.safeParse(job.payload);
       const recoveryProfileId =

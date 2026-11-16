@@ -13,15 +13,16 @@ import { getAeoMeasurementDisclosure } from '@/lib/aeo/citation-monitor';
 import { PRO_PLAN_DISPLAY_NAME } from '@/lib/config/plan-prices';
 import { useAiCrawlerAnalyticsQuery } from '@/lib/queries/useAiCrawlerAnalyticsQuery';
 import { cn } from '@/lib/utils';
+import { formatShortDateUTC } from '@/lib/utils/date-formatting';
 import type { AiCrawlerStat } from '@/types/ai-crawler-analytics';
 
 const ACCENT_COLORS = [
-  'var(--color-accent-blue, #2563ff)',
-  'var(--color-accent-purple, #8b1eff)',
-  'var(--color-accent-pink, #d61a7f)',
-  'var(--color-accent-teal, #22b8a7)',
-  'var(--color-accent-orange, #ff9800)',
-  'var(--color-accent-green, #2f9e44)',
+  'var(--color-accent-blue)',
+  'var(--color-accent-purple)',
+  'var(--color-accent-pink)',
+  'var(--color-accent-teal)',
+  'var(--color-accent-orange)',
+  'var(--color-accent-green)',
 ] as const;
 const CRAWLER_READ_DISCLOSURE = getAeoMeasurementDisclosure('crawler_read');
 
@@ -242,7 +243,7 @@ export function AiCrawlerDetailPanel({
         />
         {data?.syncedAt ? (
           <p className='mt-3 text-3xs text-tertiary-token'>
-            Updated {new Date(data.syncedAt).toLocaleString()}
+            Updated {formatShortDateUTC(data.syncedAt)}
           </p>
         ) : (
           <p className='mt-3 text-3xs text-tertiary-token'>

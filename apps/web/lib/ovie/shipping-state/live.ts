@@ -1090,7 +1090,7 @@ export async function readLanesStatus(io: LiveIo): Promise<AuthorityRead> {
   };
 }
 
-async function githubGraphql(
+export async function githubGraphql(
   io: LiveIo,
   sourceId: ShippingSourceId,
   query: string,
@@ -1133,7 +1133,7 @@ async function githubGraphql(
   return body.data;
 }
 
-function isAuthorityRead(value: unknown): value is AuthorityRead {
+export function isAuthorityRead(value: unknown): value is AuthorityRead {
   return (
     isRecord(value) && typeof value.status === 'string' && 'sourceId' in value
   );
@@ -1380,7 +1380,7 @@ function recentMerged(
     .slice(0, 12);
 }
 
-function issueCount(data: Record<string, unknown>, alias: string) {
+export function issueCount(data: Record<string, unknown>, alias: string) {
   const search = data[alias];
   return isRecord(search) &&
     Number.isSafeInteger(search.issueCount) &&

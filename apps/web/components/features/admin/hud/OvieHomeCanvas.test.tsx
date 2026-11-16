@@ -6,11 +6,14 @@ import { mockFitLayout } from '@/components/organisms/home-loop/fit-layout.test-
 import { HOME_LOOP_UNDO_WINDOW_MS } from '@/components/organisms/home-loop/useUndoableAnswers';
 import { APP_ROUTES } from '@/constants/routes';
 import type { OvieInbox } from '@/lib/ovie/inbox';
-import { INTERACTION_CASE_CONTRACT } from '@/lib/ovie/interaction-case';
 import { SUMMER_OPS_CARD_SCHEMA } from '@/lib/ovie/ops-card';
 import { emptyDeliverySummary } from '@/lib/ovie/shipping-state/contract';
 import { OvieHomeCanvas } from './OvieHomeCanvas';
-import { snapshot } from './OvieHomeCanvas.test-fixtures';
+import {
+  COMPANY_RESPONSES,
+  INBOX,
+  snapshot,
+} from './OvieHomeCanvas.test-fixtures';
 
 const toastMock = vi.hoisted(() =>
   Object.assign(vi.fn(), {
@@ -47,30 +50,6 @@ vi.mock('./useHudShippingStateQuery', () => ({
       : { isPending: true, isFetching: true, refetch: shipping.refetch },
 }));
 
-const INBOX: OvieInbox = {
-  issues: [],
-  cases: [
-    {
-      contract: INTERACTION_CASE_CONTRACT,
-      id: 'summer:card-1',
-      kind: 'spend',
-      source: { system: 'summer', id: 'card-1', revision: null },
-      title: 'Vercel on-demand concurrency',
-      recommendation: 'Approve about $6 a month',
-      owner: null,
-      state: 'needs_you',
-      priority: 1,
-      createdAt: '2026-10-20T18:00:00.000Z',
-      nextAction: null,
-      waitingUntil: null,
-      confidence: null,
-      evidence: [],
-      body: 'Preview floods stalled production for five hours.',
-      decisionTarget: { kind: 'summer', id: 'card-1' },
-    },
-  ],
-};
-
 function renderCanvas(chat?: HomeCanvasState) {
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false } },
@@ -97,34 +76,6 @@ function renderThenAsk(chat: HomeCanvasState) {
   view.rerenderChat(chat);
   return view;
 }
-
-const COMPANY_RESPONSES: Record<string, unknown> = {
-  '/api/hud/metrics': {
-    overview: {
-      mrrUsd: 0,
-      activeSubscribers: 0,
-      balanceUsd: 22.96,
-      burnRateUsd: 110,
-      runwayMonths: 0.2,
-      defaultStatus: 'dead',
-      defaultStatusDetail: '',
-      financialDataAvailable: true,
-      weekAgo: { mrrUsd: 0, activeSubscribers: 0 },
-    },
-  },
-  '/api/admin/hud/founder-funnel?range=7d': {
-    stages: [{ key: 'accounts_created', count: 2, drillDownHref: null }],
-  },
-  '/api/ovie/certifications': {
-    rows: [
-      {
-        domain: 'flows',
-        state: 'working',
-        tiers: { runtime_dogfood: 'passed' },
-      },
-    ],
-  },
-};
 
 function opsCard(kind: 'shipping' | 'revenue', title: string) {
   return {
@@ -179,6 +130,16 @@ function chatState(overrides: Partial<HomeCanvasState> = {}): HomeCanvasState {
 }
 
 describe('OvieHomeCanvas', () => {
+  it('reserves the same shipping provenance layout before and after data arrives', () => {
+    shipping.data = undefined;
+    const loading = renderCanvas();
+    const layout = screen.getByTestId('home-loop-pulse').className;
+    loading.unmount();
+    shipping.data = snapshot();
+    renderCanvas();
+    expect(screen.getByTestId('home-loop-pulse').className).toBe(layout);
+  });
+
   const fetchMock = vi.fn();
   let inbox: OvieInbox;
   let companyResponses: Record<string, unknown>;

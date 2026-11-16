@@ -305,4 +305,28 @@ describe('buildSystemPrompt', () => {
     expect(yes).toContain('Yes (the public profile shows streaming links)');
     expect(yes).toContain('unless Has Music Links above says No');
   });
+
+  it('puts the artist rules in the stable prompt, and nothing when there are none', () => {
+    const none = buildSystemPromptParts(baseContext, []);
+    expect(none.stable).not.toContain('## Artist Rules');
+    const withRules = buildSystemPromptParts(
+      {
+        ...baseContext,
+        artistRules: [
+          {
+            id: 'rule-1',
+            category: 'people',
+            ruleKey: 'Sam Rivera',
+            instruction: 'Keep them out of anything public.',
+            strength: 'hard_constraint',
+          },
+        ],
+      },
+      []
+    );
+    expect(withRules.stable).toContain('## Artist Rules');
+    expect(withRules.stable).toContain(
+      'never feature, name or suggest Sam Rivera'
+    );
+  });
 });

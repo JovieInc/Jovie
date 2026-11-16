@@ -141,3 +141,19 @@ export function getMerchOrderSellability(
   };
   return getMerchSellability(pricing);
 }
+
+export function assertMerchCardCheckoutSellable(card: MerchCard): void {
+  const result = getMerchCardSellability(card);
+  if (!result.sellable) {
+    throw new Error(`Merch item is not sellable: ${result.reasons.join(' ')}`);
+  }
+}
+
+export function assertMerchOrderSellable(
+  order: MerchOrderSellabilityInput
+): void {
+  const result = getMerchOrderSellability(order);
+  if (!result.sellable) {
+    throw new Error(`Merch order is not sellable: ${result.reasons.join(' ')}`);
+  }
+}

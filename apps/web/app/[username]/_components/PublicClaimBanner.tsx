@@ -80,12 +80,18 @@ function subscribeToLocationSearch(onStoreChange: () => void): () => void {
   };
 }
 
-function getLocationSearchSnapshot(): string {
+function getLocationSearchSnapshot(): string | null {
   if (globalThis.location === undefined) {
-    return '';
+    return null;
   }
 
   return globalThis.location.search;
+}
+
+// The profile page is static, so the server never sees the visitor's query
+// string. Null marks "not known yet" until hydration reads the real URL.
+function getServerLocationSearchSnapshot(): null {
+  return null;
 }
 
 export function PublicClaimBanner({
@@ -100,19 +106,26 @@ export function PublicClaimBanner({
   const locationSearch = useSyncExternalStore(
     subscribeToLocationSearch,
     getLocationSearchSnapshot,
-    () => ''
+    getServerLocationSearchSnapshot
   );
+  const locationKnown = locationSearch !== null;
   const claimSearchParam =
-    new URLSearchParams(locationSearch).get('claim') ?? undefined;
+    new URLSearchParams(locationSearch ?? '').get('claim') ?? undefined;
+  const bannerInputs = {
+    visitorState,
+    directClaimSupported,
+    claimRequiresVerification,
+    isClaimed,
+  };
   const { claimBannerVariant, shouldShowClaimBanner } = resolveClaimBannerState(
-    {
-      visitorState,
-      claimSearchParam,
-      directClaimSupported,
-      claimRequiresVerification,
-      isClaimed,
-    }
+    { ...bannerInputs, claimSearchParam }
   );
+  // A claim link lands on ?claim=1, which only the browser can read. Reserve
+  // the room for both copies so the banner never changes height on hydration.
+  const alternateVariant = resolveClaimBannerState({
+    ...bannerInputs,
+    claimSearchParam: claimSearchParam === '1' ? undefined : '1',
+  }).claimBannerVariant;
 
   if (!shouldShowClaimBanner) {
     return null;
@@ -124,6 +137,8 @@ export function PublicClaimBanner({
       displayName={displayName}
       prefetch={prefetch}
       variant={claimBannerVariant ?? undefined}
+      reserveVariant={alternateVariant ?? undefined}
+      trackExposure={locationKnown}
       ctaHref={
         claimBannerVariant === 'unsupported'
           ? undefined

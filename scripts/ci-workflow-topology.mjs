@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { dump as yamlDump, load as yamlLoad } from 'js-yaml';
+import { scan as scanAiReviewBoundary } from './company-guards/ai-review-boundary.mjs';
 import { checkRunnerPins } from './workflow-runner-pin-check.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -144,6 +145,13 @@ export function syncTopology(repoRoot = root, write = false) {
   const outputPath = path.join(repoRoot, '.github/workflow-topology.gen.yml');
   const topology = buildTopology(repoRoot);
   const result = validateTopology(topology);
+  // AI review boundary: a workflow or script pairing a model-backed reviewer
+  // (Seer, Warden, ...) with a merge-blocking signal (requestChanges,
+  // --fail-on, failCheck) fails the topology contract.
+  for (const v of scanAiReviewBoundary(repoRoot))
+    result.errors.push(
+      `ai-review boundary: ${v.file} pairs an AI reviewer with blocking signal "${v.signal}"; AI review stays advisory (no requestChanges, --fail-on, failCheck, or required check)`,
+    );
   const serialized = yamlDump({ ...topology.policy, generatedAt: 'deterministic', normalPrCheckRecords: result.normalPrCheckRecords, nodes: topology.nodes, edges: topology.edges }, { lineWidth: -1, noRefs: true });
   result.errors.push(...checkRunnerPins({ workflowsDir: path.join(repoRoot, '.github/workflows'), allowlistPath: path.join(repoRoot, '.github/runner-pin-allowlist.json') }));
   if (write) {

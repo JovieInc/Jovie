@@ -12,6 +12,7 @@ const required = [
   'Migration Guard',
   'Fork PR Gate',
   'PR Size Guard',
+  'Company guards',
 ].map(context => ({ context }));
 const policy = {
   required,

@@ -28,15 +28,17 @@ import {
 // ============================================================================
 
 describe('DSP Registry completeness', () => {
-  it('contains 41 entries (all MusicFetch services)', () => {
-    expect(DSP_REGISTRY.length).toBe(41);
+  it('contains 47 entries (41 MusicFetch services + 6 URL-only)', () => {
+    expect(DSP_REGISTRY.length).toBe(47);
   });
 
   it('every entry has required fields', () => {
     for (const entry of DSP_REGISTRY) {
       expect(entry.key).toBeTruthy();
       expect(entry.name).toBeTruthy();
-      expect(entry.musicfetchService).toBeTruthy();
+      expect(
+        entry.musicfetchService === null || entry.musicfetchService
+      ).not.toBe('');
       expect(entry.color).toMatch(/^#[0-9A-Fa-f]{6}$/);
       expect(entry.textColor).toBeTruthy();
       expect(entry.logoSvg).toContain('<svg');
@@ -52,7 +54,9 @@ describe('DSP Registry completeness', () => {
   });
 
   it('has no duplicate musicfetchService names', () => {
-    const services = DSP_REGISTRY.map(e => e.musicfetchService);
+    const services = DSP_REGISTRY.flatMap(e =>
+      e.musicfetchService ? [e.musicfetchService] : []
+    );
     expect(new Set(services).size).toBe(services.length);
   });
 
@@ -75,12 +79,15 @@ describe('Derived exports', () => {
     expect(STREAMING_DSP_KEYS).toEqual(expected);
   });
 
-  it('MUSICFETCH_ALL_SERVICES has one entry per registry entry', () => {
-    expect(MUSICFETCH_ALL_SERVICES.length).toBe(DSP_REGISTRY.length);
+  it('MUSICFETCH_ALL_SERVICES has one entry per MusicFetch-resolvable entry', () => {
+    expect(MUSICFETCH_ALL_SERVICES.length).toBe(
+      DSP_REGISTRY.filter(e => e.musicfetchService).length
+    );
   });
 
   it('SERVICE_TO_PROVIDER maps all musicfetchService values to valid keys', () => {
     for (const entry of DSP_REGISTRY) {
+      if (!entry.musicfetchService) continue;
       expect(SERVICE_TO_PROVIDER[entry.musicfetchService]).toBe(entry.key);
     }
   });
@@ -246,8 +253,10 @@ describe('buildSearchUrl', () => {
 // ============================================================================
 
 describe('Drift prevention', () => {
-  it('MUSICFETCH_ALL_SERVICES length equals registry length', () => {
-    expect(MUSICFETCH_ALL_SERVICES.length).toBe(DSP_REGISTRY.length);
+  it('MUSICFETCH_ALL_SERVICES length equals resolvable registry length', () => {
+    expect(MUSICFETCH_ALL_SERVICES.length).toBe(
+      DSP_REGISTRY.filter(e => e.musicfetchService).length
+    );
   });
 
   it('every streaming DSP has a config', () => {
@@ -256,10 +265,10 @@ describe('Drift prevention', () => {
     }
   });
 
-  it('streaming DSP count is reasonable (29-35 range)', () => {
+  it('streaming DSP count is reasonable (29-45 range)', () => {
     // Guard against accidental bulk deletion or addition
     expect(STREAMING_DSP_KEYS.length).toBeGreaterThanOrEqual(29);
-    expect(STREAMING_DSP_KEYS.length).toBeLessThanOrEqual(35);
+    expect(STREAMING_DSP_KEYS.length).toBeLessThanOrEqual(45);
   });
 
   it('registry categories are distributed correctly', () => {

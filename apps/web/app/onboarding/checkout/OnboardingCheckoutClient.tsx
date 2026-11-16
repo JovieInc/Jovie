@@ -8,8 +8,6 @@ import { useCallback, useEffect, useState } from 'react';
 import { recordOnboardingUpgradeOfferDecision } from '@/app/onboarding/actions/upgrade-offer';
 import { Avatar } from '@/components/molecules/Avatar/Avatar';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
-import { AppShellFrame } from '@/components/organisms/AppShellFrame';
-import { SidebarProvider } from '@/components/organisms/sidebar';
 import {
   emitProofClaimEvent,
   hasStoredProofClaimAttribution,
@@ -26,6 +24,8 @@ import { normalizeOnboardingReturnTo } from '@/lib/onboarding/return-to';
 import type { ClaimTimeFinding } from '@/lib/proof/claim-time-proof';
 import { cn } from '@/lib/utils';
 import { formatAmount } from '@/lib/utils/format-number';
+import { OnboardingCheckoutColumn } from './OnboardingCheckoutColumn';
+import { OnboardingCheckoutFrame } from './OnboardingCheckoutFrame';
 
 interface OnboardingCheckoutClientProps {
   readonly plan: PlanIntentTier;
@@ -400,7 +400,7 @@ export function OnboardingCheckoutClient({
       if (data.url) {
         globalThis.location.href = data.url;
       } else {
-        throw new Error('No checkout URL returned.');
+        throw new Error('Checkout failed. Please try again.');
       }
     } catch (err) {
       setError(
@@ -426,16 +426,16 @@ export function OnboardingCheckoutClient({
     globalThis.location.href = returnTo;
   }, [isDefaultUpsell, plan, profileId, returnTo]);
 
-  const checkoutContent = (
-    <div className='flex flex-col items-center justify-center py-8'>
-      <div className={`w-full max-w-md ${FORM_LAYOUT.formContainer}`}>
+  return (
+    <OnboardingCheckoutFrame>
+      <OnboardingCheckoutColumn>
         <div className={FORM_LAYOUT.headerSection}>
           <h1 className={FORM_LAYOUT.title}>
             {`Upgrade To ${planMarketing.displayName}`}
           </h1>
           <p className={FORM_LAYOUT.hint}>
             {isDefaultUpsell && username
-              ? `Congrats! Your profile, links, and fan capture are live at jov.ie/${username} — free forever. Here's what ${planMarketing.displayName} adds on top.`
+              ? `Your profile, links, and fan capture are live at jov.ie/${username}, free forever. Here's what ${planMarketing.displayName} adds on top.`
               : username
                 ? `Your profile is live and stays free either way. Here's what ${planMarketing.displayName} adds on top.`
                 : `Here's what ${planMarketing.displayName} adds on top of the free plan.`}
@@ -503,16 +503,6 @@ export function OnboardingCheckoutClient({
           </span>
         </div>
 
-        {/* Error message */}
-        {error ? (
-          <ContentSurfaceCard
-            className='mb-4 border-error/30 bg-error/5 px-4 py-3 text-app text-error'
-            role='alert'
-          >
-            {error}
-          </ContentSurfaceCard>
-        ) : null}
-
         {/* CTA */}
         <Button
           onClick={handleCheckout}
@@ -526,6 +516,16 @@ export function OnboardingCheckoutClient({
             ? 'Redirecting to checkout...'
             : `Upgrade to ${planMarketing.displayName}`}
         </Button>
+
+        {/* Below the button, so a failed checkout never pushes it down */}
+        {error ? (
+          <ContentSurfaceCard
+            className='mt-4 border-error/30 bg-error/5 px-4 py-3 text-app text-error'
+            role='alert'
+          >
+            {error}
+          </ContentSurfaceCard>
+        ) : null}
 
         {/* Skip — the free profile is already live; never imply otherwise */}
         <button
@@ -541,19 +541,7 @@ export function OnboardingCheckoutClient({
             Your public profile stays live and free forever.
           </p>
         ) : null}
-      </div>
-    </div>
-  );
-
-  return (
-    <SidebarProvider defaultOpen={false}>
-      <AppShellFrame
-        sidebar={null}
-        containerClassName='[color-scheme:dark]'
-        contentClassName='overflow-hidden!'
-        main={checkoutContent}
-        rightPanel={null}
-      />
-    </SidebarProvider>
+      </OnboardingCheckoutColumn>
+    </OnboardingCheckoutFrame>
   );
 }

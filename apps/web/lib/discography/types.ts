@@ -29,7 +29,13 @@ export type ProviderKey =
   | 'netease'
   | 'qq_music'
   | 'trebel'
-  | 'yandex';
+  | 'yandex'
+  | 'vk_music'
+  | 'traxsource'
+  | 'bugs'
+  | 'fizy'
+  | 'juno_download'
+  | 'emusic';
 
 /** Short-form video provider keys for "Use this sound" feature */
 export type VideoProviderKey =
