@@ -2,9 +2,8 @@ name: Neon Scheduled Branch Cleanup
 
 # Manual reconciliation only; no clock. The shared create-with-retry action
 # gives every ephemeral Neon branch a TTL (expires_in_hours 2-4) that Neon
-# enforces itself, PR close deletes its branch (neon-ephemeral-branch-cleanup),
-# and branch creation cleans up and retries when the project hits its branch
-# limit. A daily sweep re-did work those three events already own.
+# enforces itself, and branch creation cleans up and retries when the project
+# hits its branch limit. A daily sweep re-did work those two events already own.
 on:
   workflow_dispatch:
     inputs:

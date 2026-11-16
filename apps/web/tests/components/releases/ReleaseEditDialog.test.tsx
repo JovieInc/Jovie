@@ -225,6 +225,21 @@ describe('ReleaseEditDialog token compliance', () => {
   });
 });
 
+describe('ReleaseEditDialog scale tokens', () => {
+  it('uses the 16px text-base step instead of the text-lg alias', () => {
+    const source = readFileSync(
+      resolve(
+        __dirname,
+        '../../../components/features/dashboard/organisms/releases/ReleaseEditDialog.tsx'
+      ),
+      'utf8'
+    );
+
+    expect(source).not.toMatch(/(?<![\w-])text-lg\b/);
+    expect(source).toContain('text-base');
+  });
+});
+
 describe('ReleaseEditDialog icon geometry', () => {
   it('keeps glyphs on the 4px grid (16px, never the 18px half step)', () => {
     const source = readFileSync(

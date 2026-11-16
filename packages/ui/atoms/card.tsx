@@ -156,6 +156,7 @@ const CardDescription = React.forwardRef<
       ref={ref}
       className={cn('text-app text-secondary-token', className)}
       {...props}
+      data-slot='card-description'
     />
   );
 });

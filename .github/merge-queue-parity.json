@@ -207,7 +207,28 @@
     {
       "job": "ci.yml#ci-visual-snapshot-compare",
       "kind": "gap",
-      "reason": "The homepage and marketing visual snapshot compare runs only in the queue; the baselines lane owns closing it.",
+      "reason": "The shared visual build and inventory run only in the queue; the rendered suites split from this job inherit the same gap and deadline below. The baselines lane owns closing it.",
+      "createdOn": "2026-11-11",
+      "expiresOn": "2027-02-09"
+    },
+    {
+      "job": "ci.yml#ci-visual-snapshot-homepage",
+      "kind": "gap",
+      "reason": "Homepage snapshot comparison inherits the queue-only runtime gap split from ci-visual-snapshot-compare; its commands and selection are unchanged. The baselines lane owns closing it.",
+      "createdOn": "2026-11-11",
+      "expiresOn": "2027-02-09"
+    },
+    {
+      "job": "ci.yml#ci-visual-marketing-dom",
+      "kind": "gap",
+      "reason": "Marketing DOM certification inherits the queue-only runtime gap split from ci-visual-snapshot-compare; its commands and selection are unchanged. The baselines lane owns closing it.",
+      "createdOn": "2026-11-11",
+      "expiresOn": "2027-02-09"
+    },
+    {
+      "job": "ci.yml#ci-visual-marketing-routes",
+      "kind": "gap",
+      "reason": "Marketing route capture inherits the queue-only runtime gap split from ci-visual-snapshot-compare; its commands and selection are unchanged. The baselines lane owns closing it.",
       "createdOn": "2026-11-11",
       "expiresOn": "2027-02-09"
     },

@@ -11,7 +11,10 @@ import {
 import { upsertLinearIssueByTitleFingerprint } from './lib/linear-issue-intake.mjs';
 
 function git(args) {
-  return execFileSync('git', args, { encoding: 'utf8' });
+  return execFileSync('git', args, {
+    maxBuffer: 256 * 1024 * 1024,
+    encoding: 'utf8',
+  });
 }
 
 function readRevisionFile(revision, path, gitImpl) {

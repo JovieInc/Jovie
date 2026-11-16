@@ -166,22 +166,46 @@ describe('fixture handles', () => {
 });
 
 describe('profile mode query rewrite (JOV-12081)', () => {
-  it.each([
-    'listen',
-    'pay',
-    'subscribe',
-    'about',
-    'contact',
-    'tour',
-    'releases',
-    'tip',
-  ])('rewrites the mode query %s to the guarded marker destination', mode => {
+  // The rewrite is bounded to the (handle, mode) pairs the mode-render route
+  // prerenders (aliasBudgetProfileModeParams): the route's ISR fallback render
+  // for a handle the build did not prerender serves a 404, not the profile
+  // (JOV-12481 — a freshly claimed, published, exempt profile 404'd for the
+  // full 180 s Golden Path poll on run 43433399178). Every other handle keeps
+  // the canonical render.
+  it.each(['listen', 'subscribe', 'releases', 'tour'])(
+    'rewrites the prerendered dualipa mode query %s to the guarded marker destination',
+    mode => {
+      const rewrite = getProfileModeQueryRewrite(
+        gateRequest(`/dualipa?mode=${mode}`)
+      );
+      expect(rewrite?.headers.get('x-middleware-rewrite')).toBe(
+        `${GATE_ORIGIN}/dualipa/profile-mode-render/${mode}/__profile-mode-alias`
+      );
+    }
+  );
+
+  it('rewrites the prerendered testartist pay alias', () => {
     const rewrite = getProfileModeQueryRewrite(
-      gateRequest(`/dualipa?mode=${mode}`)
+      gateRequest('/testartist?mode=pay')
     );
     expect(rewrite?.headers.get('x-middleware-rewrite')).toBe(
-      `${GATE_ORIGIN}/dualipa/profile-mode-render/${mode}/__profile-mode-alias`
+      `${GATE_ORIGIN}/testartist/profile-mode-render/pay/__profile-mode-alias`
     );
+  });
+
+  it.each(['pay', 'about', 'contact', 'tip'])(
+    'keeps dualipa %s on the canonical render: no mode document is prerendered for that pair',
+    mode => {
+      expect(
+        getProfileModeQueryRewrite(gateRequest(`/dualipa?mode=${mode}`))
+      ).toBeNull();
+    }
+  );
+
+  it('never sends a freshly claimed handle into the mode-render fallback (JOV-12481)', () => {
+    expect(
+      getProfileModeQueryRewrite(gateRequest('/tmwf0e76ofc781?mode=listen'))
+    ).toBeNull();
   });
 
   it('lowercases the handle and keeps the request a rewrite, not a redirect', () => {

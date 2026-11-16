@@ -114,7 +114,8 @@
     "/app/threads": 726,
     "/app/tipping": 726,
     "/app/tracks": 726,
-    "/app/money": 547
+    "/app/money": 547,
+    "/app/admin/room": 687
   },
   "$firstLoadComment": "First-load JS gzip (level 9) for app routes outside /app. firstLoad.baselines holds one entry per measured route at measured size plus 2% and is the operative per-route ratchet (JOV-8555): a route with no entry fails closed, and --write only lowers, adds and removes entries. firstLoad.routes, marketingMaxGzipKb and defaultMaxGzipKb are targets: they bound a new route's first baseline (640 marketing, 800 otherwise) and are shown beside each row. Intercepting routes (@auth/(.)signin, (.)signup) are client-navigation JS and are excluded, which is why / dropped from 657 to 567 KB measured on 2026-11-12. Raising any number fails unless raises[key] is an unexpired design-exception-registry gate-weakening override.",
   "firstLoad": {

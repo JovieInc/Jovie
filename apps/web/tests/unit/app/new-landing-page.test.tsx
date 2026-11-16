@@ -48,8 +48,8 @@ describe('NewLandingPage', () => {
     );
     expect(screen.queryByRole('link', { name: 'Contact' })).toBeNull();
     expect(
-      screen.getByRole('link', { name: 'Claim your profile' })
-    ).toHaveAttribute('href', '/signup');
+      screen.getByRole('link', { name: 'Claim your free profile' })
+    ).toHaveAttribute('href', '/start');
 
     expect(() => render(<NewLandingPage />)).toThrow('NEXT_REDIRECT');
     expect(redirectMock).toHaveBeenCalledWith(APP_ROUTES.HOME);

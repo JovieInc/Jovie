@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { readProfilePublished } from '@/lib/profile/publication-read';
+import { aliasBudgetProfileModeParams } from '@/lib/routing/alias-budget-static-params';
 import {
   isReservedUsername,
   USERNAME_MAX_LENGTH,
@@ -142,7 +143,24 @@ const PROFILE_QUERY_MODES = new Set([
  * `/:username`-sourced beforeFiles rewrite would hijack concrete
  * single-segment pages that carry a mode query. The proxy runs per request
  * ahead of the ISR cache, so the rewrite happens here, URL unchanged.
+ * The rewrite is bounded to the (handle, mode) pairs the mode-render route
+ * actually prerenders (`aliasBudgetProfileModeParams`, the same constant its
+ * generateStaticParams consumes). The route's ISR fallback render for a
+ * handle the build did not prerender serves a 404, not the profile: the
+ * production-faithful Golden Path polled a freshly claimed, published,
+ * exempt profile at `/{handle}?mode=listen` for 180 s on run 43433399178 and
+ * every response was 404 (JOV-12481, regressed by the unbounded rewrite),
+ * while the canonical `/[username]` render of the same handle works. Any
+ * other handle keeps the canonical render — the pre-JOV-12081 behavior,
+ * which is what production serves today — until the fallback-render defect
+ * is fixed with deployment-level evidence.
  */
+const PRERENDERED_PROFILE_MODE_PARAMS: ReadonlySet<string> = new Set(
+  aliasBudgetProfileModeParams().map(
+    param => `${param.username}:${param.profileMode}`
+  )
+);
+
 export function getProfileModeQueryRewrite(
   request: ProfilePublicationGateRequest
 ): NextResponse | null {
@@ -151,6 +169,7 @@ export function getProfileModeQueryRewrite(
   if (!handle) return null;
   const mode = request.nextUrl.searchParams.get('mode');
   if (!mode || !PROFILE_QUERY_MODES.has(mode)) return null;
+  if (!PRERENDERED_PROFILE_MODE_PARAMS.has(`${handle}:${mode}`)) return null;
   const rewriteUrl = new URL(
     `/${encodeURIComponent(handle)}/profile-mode-render/${mode}/__profile-mode-alias`,
     request.nextUrl.origin

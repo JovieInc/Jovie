@@ -703,6 +703,12 @@ jobs:
       - name: Enforce authed route initial JS budgets
         if: steps.reuse.outputs.reuse != 'true' && steps.scope.outputs.build == 'true'
         run: node apps/web/scripts/route-js-budget.mjs --next-dir apps/web/.next
+      # Reads the same build's prerender manifest: fails when a route loses
+      # cacheability (static -> ISR -> dynamic) or its prerendered HTML grows
+      # past the allowance. No server, no network, under a second.
+      - name: Enforce route render modes and HTML weight
+        if: steps.reuse.outputs.reuse != 'true' && steps.scope.outputs.build == 'true'
+        run: node apps/web/scripts/route-render-modes.mjs --next-dir apps/web/.next
       - name: Certify marketing SEO against prerendered HTML
         if: steps.reuse.outputs.reuse != 'true' && steps.scope.outputs.build == 'true'
         env:

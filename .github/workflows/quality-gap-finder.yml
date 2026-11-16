@@ -14,6 +14,9 @@ name: Quality Gap Finder
 # /api/webhooks/linear when a post-mortem action or escaped defect closes.
 
 on:
+  workflow_run:
+    workflows: [Test Coverage Audit]
+    types: [completed]
   push:
     branches: [main]
     paths:
@@ -47,10 +50,12 @@ concurrency:
 
 jobs:
   find:
+    if: ${{ github.event_name != 'workflow_run' || (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch == 'main') }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
       contents: read
+      actions: read
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -77,6 +82,13 @@ jobs:
           if [ "$DRY_RUN" != 'true' ]; then flags+=(--apply); fi
           node scripts/postmortem-review.mjs "${flags[@]}" \
             --out postmortem-review.json > /dev/null
+
+      # github-token-budget: 3 calls/run - restore successful coverage artifact before scanning it
+      - name: Restore coverage evidence
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          node --input-type=module -e "import { restoreCoverageBaseline } from './scripts/lib/publish-coverage-report.mjs'; console.log(restoreCoverageBaseline());"
 
       - name: Find and file quality gaps
         env:

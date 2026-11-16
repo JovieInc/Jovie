@@ -76,7 +76,15 @@ async function openMenu(canvasElement: HTMLElement) {
 const meta = {
   title: 'Chat/ChatHistorySwitcher',
   component: ChatHistorySwitcher,
-  args: { title: 'Tour Budget For The Fall Run', activeConversationId: 'tour' },
+  args: {
+    title: 'Tour Budget For The Fall Run',
+    activeConversationId: 'tour',
+    // `modal: false`: a modal Radix menu `hideOthers`-ARIA-hides the story
+    // canvas around the portaled content, which fails axe aria-hidden-focus
+    // on the focusable trigger. Non-modal is visually identical for demos
+    // (AudienceRowActionsMenu stories follow the same convention).
+    modal: false,
+  },
   decorators: [withHistory(HISTORY)],
   parameters: { layout: 'fullscreen' },
 } satisfies Meta<typeof ChatHistorySwitcher>;

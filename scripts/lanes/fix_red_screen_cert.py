@@ -19,9 +19,17 @@ def screen_cert_paths(log: str) -> list[str]:
     return sorted(set(SCREEN_CERT_FILE.findall(log or "")))
 
 
+def bind_ui_feel(sh, failed_logs, classes):
+    """Adapt the ui-feel publisher to the fixer call the lane already uses."""
+    def fix(host, pr, route, worktree, log, receipt):
+        del route
+        return classes.publish_ui_feel(sh, failed_logs, host, pr, worktree, log, receipt)
+    return fix
+
+
 def dispatch(classes, sh, fixers: dict):
-    """Fixer table the lane used to inline. Screen-cert is the only new route."""
-    return {
+    """Route screen-cert, heading balance, and log-reported ui-feel repairs."""
+    table = {
         classes.WIRE_CI_FAST: fixers["wire"],
         classes.ATOMIC_WRITE: fixers["atomic"],
         classes.RENUMBER: fixers["renumber"],
@@ -34,6 +42,26 @@ def dispatch(classes, sh, fixers: dict):
                 sh, host, pr, route, worktree, log, receipt)
         ),
     }
+    ui = fixers.get("ui")
+    if ui is not None:
+        table[classes.UI_FEEL] = ui
+    balance = getattr(classes, "BALANCE_HEADINGS", None)
+    if balance is not None:
+        table[balance] = (
+            lambda host, pr, route, worktree, log, receipt: balance_headings_fix(
+                sh, pr, worktree, log, receipt, classes)
+        )
+    return table
+
+
+def balance_headings_fix(sh, pr, worktree, log, receipt, classes):
+    """Commit text-balance on headings this PR adds, then fast-forward the branch."""
+    import fix_red_rewrite
+    return fix_red_rewrite.rewrite_commit_push(
+        sh, pr, worktree, log, receipt, ("apps/web", "packages/ui"),
+        classes.balance_added_headings,
+        "fix(ui): balance headings this change wraps",
+        "balanced-headings", "balancedFiles")
 
 
 def repair_screen_cert_fix(sh, host, pr, route, worktree, log, receipt):
