@@ -10,10 +10,9 @@ import {
   priorityPolicy,
 } from './contract.ts';
 import type { Failure, Observation } from './headers.ts';
-import {
-  mergeObservation,
-  UNTIMED_OBSERVATION_MS,
-} from './observation-policy.ts';
+import { mergeObservation, UNTIMED_OBSERVATION_MS } from './headers.ts';
+
+export { UNTIMED_OBSERVATION_MS } from './headers.ts';
 
 export const LEDGER_SCHEMA = 'jovie-api-ledger/v1';
 const HOUR_MS = 3_600_000;

@@ -44,6 +44,7 @@ export function admissionPriority({
     : 'default';
 }
 
+/** @type {(cwd: string, args: string[], options?: object) => {status: number|null, stdout: string, stderr: string, error?: Error}} */
 export const runGithub = (
   cwd,
   args,
