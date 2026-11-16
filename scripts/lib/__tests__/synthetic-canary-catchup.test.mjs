@@ -55,10 +55,9 @@ const dispatchRun = (overrides = {}) => ({
 });
 
 /**
- * Fake reader: GET schedule list, GET dispatch list, POST dispatch.
- * dispatchedAfter (1-based): the dispatch-ledger read index from which the rows appear. 1 = the
- * decideCatchup idempotency read sees prior dispatches; 2 = rows appear only on the post-dispatch
- * confirmation reads; Infinity (default) = never, i.e. the dispatch ledger is empty.
+ * Fake reader: GET schedule list, GET dispatch list, POST dispatch. dispatchedAfter (1-based) is
+ * the dispatch-ledger read index from which the rows appear (1 = the decideCatchup idempotency
+ * read sees prior dispatches; 2 = rows appear only on confirmation reads; Infinity = never).
  * @typedef {{status: number, headers?: unknown}} FakeResponse
  * @param {{scheduled?: Array<Record<string, unknown>>,
  * dispatched?: Array<Record<string, unknown>>, dispatchedAfter?: number,
@@ -68,6 +67,7 @@ function reader({
   dispatched = [],
   dispatchedAfter = Infinity,
   post = { status: 204 },
+  scheduleBody,
 } = {}) {
   let dispatchReads = 0;
   const instance = {
@@ -86,13 +86,26 @@ function reader({
         const rows = dispatchReads >= dispatchedAfter ? dispatched : [];
         return { status: 200, json: () => ({ workflow_runs: rows }) };
       }
-      return { status: 200, json: () => ({ workflow_runs: scheduled }) };
+      return {
+        status: 200,
+        json: () => ({ workflow_runs: scheduleBody ?? scheduled }),
+      };
     }),
   };
   return instance;
 }
 const posted = github => github.calls.find(call => call.method === 'POST');
 const noOpSleep = async () => {};
+/** @param {{github?: any, env?: Record<string, unknown>, now?: number}} options */
+const run = options => {
+  const { github, env = {}, now = NOW } = options ?? {};
+  return catchup({
+    github,
+    env: { GITHUB_REPOSITORY: repo, ...env },
+    now,
+    sleep: noOpSleep,
+  });
+};
 
 describe('synthetic canary catch-up', () => {
   it('mirrors the dead-man filter: newest scheduled main canary, daily runs skipped', () => {
@@ -165,12 +178,7 @@ describe('synthetic canary catch-up', () => {
       dispatched: [dispatchRun({ created_at: new Date(NOW).toISOString() })],
       dispatchedAfter: 2,
     });
-    const result = await catchup({
-      github,
-      env: { GITHUB_REPOSITORY: repo },
-      now: NOW,
-      sleep: noOpSleep,
-    });
+    const result = await run({ github });
     expect(result).toMatchObject({
       action: 'dispatch',
       confirmed: true,
@@ -199,7 +207,7 @@ describe('synthetic canary catch-up', () => {
 
   it.each([
     ['empty ledger', []],
-    ['stale dispatch row predating the window', [dispatchRun({ created_at: iso(10) })]],
+    ['stale dispatch row predating the window', [dispatchRun({ created_at: iso(500) })]],
   ])(
     'treats an unconfirmable dispatch (%s) as a failure so a later check re-evaluates',
     async (_name, ledger) => {
@@ -208,12 +216,7 @@ describe('synthetic canary catch-up', () => {
         dispatched: ledger,
         dispatchedAfter: 1,
       });
-      const result = await catchup({
-        github,
-        env: { GITHUB_REPOSITORY: repo },
-        now: NOW,
-        sleep: noOpSleep,
-      });
+      const result = await run({ github });
       expect(result).toMatchObject({ confirmed: false, exitCode: 1 });
       // 2 evidence GETs + 1 dispatch POST + 5 confirmation GETs.
       expect(github.rest).toHaveBeenCalledTimes(3 + CONFIRM_ATTEMPTS);
@@ -231,12 +234,7 @@ describe('synthetic canary catch-up', () => {
         scheduled: [scheduledRun({ created_at: iso(421) })],
         post: { status, headers },
       });
-      const result = await catchup({
-        github,
-        env: { GITHUB_REPOSITORY: repo },
-        now: NOW,
-        sleep: noOpSleep,
-      });
+      const result = await run({ github });
       expect(result).toMatchObject({ deferred: true, exitCode: expected });
     }
   );
@@ -247,12 +245,7 @@ describe('synthetic canary catch-up', () => {
       post: { status: 403 },
     });
     expect(
-      await catchup({
-        github,
-        env: { GITHUB_REPOSITORY: repo },
-        now: NOW,
-        sleep: noOpSleep,
-      })
+      await run({ github })
     ).toMatchObject({ action: 'dispatch-failed', exitCode: 1 });
   });
 
@@ -300,12 +293,7 @@ describe('synthetic canary catch-up', () => {
               : { status: 200, json: () => ({ workflow_runs: scheduled }) }
         )
       );
-      const result = await catchup({
-        github,
-        env: { GITHUB_REPOSITORY: repo },
-        now: NOW,
-        sleep: noOpSleep,
-      });
+      const result = await run({ github });
       expect(result.exitCode).toBe(1);
       expect(posted(github)).toBeUndefined();
     }
@@ -440,12 +428,7 @@ describe('catch-up receipts and exit wiring', () => {
   it('fails closed when the runs body carries a non-array workflow_runs', async () => {
     const github = reader({ scheduleBody: { workflow_runs: 'nope' } });
     expect(
-      await catchup({
-        github,
-        env: { GITHUB_REPOSITORY: repo },
-        now: NOW,
-        sleep: noOpSleep,
-      })
+      await run({ github })
     ).toMatchObject({ action: 'catch-up-error', exitCode: 1 });
     expect(posted(github)).toBeUndefined();
   });
@@ -454,12 +437,7 @@ describe('catch-up receipts and exit wiring', () => {
     const github = reader();
     github.rest.mockRejectedValue(/** @type {any} */ ('boom-string'));
     expect(
-      await catchup({
-        github,
-        env: { GITHUB_REPOSITORY: repo },
-        now: NOW,
-        sleep: noOpSleep,
-      })
+      await run({ github })
     ).toMatchObject({ action: 'catch-up-error', exitCode: 1 });
   });
 
