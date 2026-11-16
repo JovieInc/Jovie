@@ -120,3 +120,30 @@ test('desktop keeps every preview visible and omits mobile controls', async ({
     1440
   );
 });
+
+test('forced colors retain a visible native keyboard focus indicator', async ({
+  page,
+}) => {
+  await page.emulateMedia({ forcedColors: 'active', reducedMotion: 'reduce' });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto(CONNECTED_STORY);
+  const next = page.getByRole('button', { name: 'Next preview' });
+  await expect(next).toBeEnabled();
+  await next.focus();
+  await expect(next).toBeFocused();
+  const indicator = await next.evaluate(element => {
+    const style = getComputedStyle(element);
+    return {
+      keyboardFocus: element.matches(':focus-visible'),
+      outlineStyle: style.outlineStyle,
+      outlineWidth: Number.parseFloat(style.outlineWidth),
+      outlineColor: style.outlineColor,
+      shadow: style.boxShadow,
+    };
+  });
+  expect(indicator.keyboardFocus).toBe(true);
+  expect(indicator.outlineStyle).toBe('solid');
+  expect(indicator.outlineWidth).toBeGreaterThan(0);
+  expect(indicator.outlineColor).not.toBe('rgba(0, 0, 0, 0)');
+  expect(indicator.shadow).toBe('none');
+});
