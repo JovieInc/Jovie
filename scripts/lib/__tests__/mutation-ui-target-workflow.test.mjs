@@ -16,7 +16,8 @@ import { afterEach, describe, expect, it } from 'vitest';
 
 const REPO_ROOT = resolve(import.meta.dirname, '..', '..', '..');
 const fullWorkflow = readFileSync(
-  resolve(REPO_ROOT, '.github/workflows/mutation-diff.yml'),
+  process.env.MUTATION_WORKFLOW_PATH ??
+    resolve(REPO_ROOT, '.github/workflows/mutation-diff.yml'),
   'utf8'
 );
 const { load } = createRequire(import.meta.url)('js-yaml');
@@ -203,7 +204,7 @@ describe('targeted UI mutation recovery', () => {
     }
   );
 
-  it.each([0, 1, 'held', 'rolling'])(
+  it.each([0, 1, 'held', 'rolling', 'handoff'])(
     'keeps bounded routing and canonical publication for %s',
     outcome => {
       const uiOnly = outcome !== 'rolling';
@@ -265,6 +266,7 @@ if (args[0] === 'scripts/test-quality-loop.mjs' && args[1] === 'report') writeFi
         CI: 'true',
         STRYKER_CONCURRENCY: '1',
         MUTATION_MAX_LOAD: '8',
+        NEXT_SELECTED: String(outcome === 'handoff'),
         SCORE_BODY: score.run,
         TEST_SHA: sha,
         SCORE_SHA: sha,
@@ -345,6 +347,18 @@ if (args[0] === 'scripts/test-quality-loop.mjs' && args[1] === 'report') writeFi
         );
       }
       expect(mutation[0]).not.toContain('--github-output');
+      if (outcome === 'handoff') {
+        const controls = invocations.filter(
+          args => args[0] === '.github/scripts/mutation-next-target-cli.mjs'
+        );
+        expect(controls.map(args => args[1])).toEqual(['begin', 'finish']);
+        expect(invocations.indexOf(controls[0])).toBeLessThan(
+          invocations.indexOf(mutation[0])
+        );
+        expect(invocations.indexOf(controls[1])).toBeGreaterThan(
+          invocations.indexOf(mutation[0])
+        );
+      }
       for (const command of ['rank', 'model-check'])
         expect(invocations.some(args => args[1] === command)).toBe(!uiOnly);
       expect(invocations.some(args => args[0].includes('api-client'))).toBe(
