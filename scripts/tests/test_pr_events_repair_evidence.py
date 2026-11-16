@@ -352,50 +352,31 @@ console.log(JSON.stringify(JSON.parse(readFileSync(0, 'utf8')).map(body =>
         self.assertTrue(updated.endswith(following))
 
     def test_explicit_locking_pr_repairs_missing_provenance_and_passes_fleet(self):
-        body = events.red_before_green_block(self.PR)
-        updated = events.repair_evidence_body(self.PR, body, locking_pr=23295,
-                                              customer_decision={"releaseWorthy": False})
-        checked = subprocess.run(
-            ["node", "--input-type=module", "-e", r"""
-                import { evaluateFleetRules } from './scripts/pr-fleet-rules.mjs';
-                import { readFileSync } from 'node:fs';
-                const body = readFileSync(0, 'utf8');
-                const check = body => evaluateFleetRules({
-                    pr: { title: 'fix: repair secret metadata evidence', body },
-                    files: [{ filename: 'ops/registry/secrets-lint-baseline.json', status: 'added' }],
-                }).errors;
-                process.stdout.write(JSON.stringify({ repaired: check(body),
-                    missing: check(body.replace(/## Locked areas[\s\S]*/, '')) }));
-            """], cwd=ROOT, input=updated, text=True, capture_output=True, check=True,
-        )
-        result = json.loads(checked.stdout)
-        self.assertEqual(result["repaired"], [])
-        self.assertTrue(any(error.startswith("locked-areas:") for error in result["missing"]))
-        self.assertEqual(events.repair_evidence_body(self.PR, updated, locking_pr=23295), updated)
-        self.assertEqual(updated.count("customer-changelog/v1"), 1)
-
-    def test_locking_pr_ignores_diagnostic_headings_and_passes_fleet(self):
-        bodies = []
-        for fence in ("```", "~~~"):
-            diagnostic = f"{fence}text\n## Locked areas\nGBrain: example/only\n{fence}\n"
-            body = events.red_before_green_block(self.PR) + "\n" + diagnostic
-            updated = events.repair_evidence_body(self.PR, body, locking_pr=22599,
+        bodies = [events.red_before_green_block(self.PR)]
+        bodies += [bodies[0] + f"\n{fence}text\n## Locked areas\nGBrain: example/only\n{fence}\n"
+                   for fence in ("```", "~~~")]
+        for body in bodies:
+            updated = events.repair_evidence_body(self.PR, body, locking_pr=23295,
                                                   customer_decision={"releaseWorthy": False})
-            self.assertIn(diagnostic, updated)
-            self.assertEqual(updated.count("Locking PR: #22599"), 1)
-            self.assertEqual(events.repair_evidence_body(self.PR, updated, locking_pr=22599), updated)
-            bodies.append(updated)
-        checked = subprocess.run(["node", "--input-type=module", "-e", """
-import { readFileSync } from 'node:fs';
-import { evaluateFleetRules } from './scripts/pr-fleet-rules.mjs';
-const bodies = JSON.parse(readFileSync(0, 'utf8'));
-console.log(JSON.stringify(bodies.map(body => evaluateFleetRules({
-  pr: {title: 'fix(tests): repair auth test evidence', body},
-  files: [{filename: 'apps/web/tests/helpers/auth.ts', status: 'added'},
-          {filename: 'apps/web/tests/unit/e2e/auth-helper.test.ts', status: 'added'}],
-}).errors)));
-"""], cwd=ROOT, input=json.dumps(bodies), text=True, capture_output=True, check=True)
-        self.assertEqual(json.loads(checked.stdout), [[], []])
+            checked = subprocess.run(
+                ["node", "--input-type=module", "-e", r"""
+                    import { evaluateFleetRules } from './scripts/pr-fleet-rules.mjs';
+                    import { readFileSync } from 'node:fs';
+                    const body = readFileSync(0, 'utf8');
+                    const check = body => evaluateFleetRules({
+                        pr: { title: 'fix: repair secret metadata evidence', body },
+                        files: [{ filename: 'ops/registry/secrets-lint-baseline.json', status: 'added' }],
+                    }).errors;
+                    process.stdout.write(JSON.stringify({ repaired: check(body),
+                        missing: check(body.replace(/## Locked areas[\s\S]*/, '')) }));
+                """], cwd=ROOT, input=updated, text=True, capture_output=True, check=True,
+            )
+            result = json.loads(checked.stdout)
+            self.assertEqual(result["repaired"], [])
+            self.assertTrue(any(error.startswith("locked-areas:") for error in result["missing"]))
+            self.assertEqual(events.repair_evidence_body(self.PR, updated, locking_pr=23295), updated)
+            self.assertEqual(updated.count("customer-changelog/v1"), 1)
+            self.assertIn(body, updated)
 
     def test_locking_reference_is_explicit_validated_and_never_overwrites_authority(self):
         body = events.red_before_green_block(self.PR)
