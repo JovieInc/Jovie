@@ -66,7 +66,7 @@ function CopyButton({
       variant='ghost'
       size='icon'
       onClick={handleCopy}
-      className='z-10 inline-flex size-6 shrink-0 items-center justify-center text-secondary-token hover:bg-transparent hover:text-primary-token transition-colors'
+      className='inline-flex size-6 shrink-0 items-center justify-center text-secondary-token hover:bg-transparent hover:text-primary-token transition-colors'
       aria-label={`Copy ${label}`}
     >
       <Copy className='h-3.5 w-3.5' />
@@ -104,6 +104,7 @@ export function AdminUserDetailDrawer({
               reserveSubtitleSlot
               reserveMetaSlot
               metaOverflow='scroll'
+              layout='grid'
               thumbnail={
                 <UserAvatar
                   name={user.name ?? user.email ?? 'User'}
@@ -114,18 +115,14 @@ export function AdminUserDetailDrawer({
                 user.email ? (
                   <div className='flex items-center gap-1.5'>
                     {/* min-w-0 lets the truncating span shrink inside the flex
-                     * row. pr-20 on the identity column (bodyClassName below)
-                     * reserves the card-top-right floating action cluster —
-                     * right-3 offset (12px) + 28px overflow trigger + 6px gap
-                     * + 28px close = 74px. A long email fills the row and
-                     * parks this copy button at the column's right edge;
-                     * pr-9 (36px) under-reserved the cluster, so the close
-                     * button painted over the target's edge and axe saw a
-                     * partially obscured 20x24 target (target-size).
-                     * The cluster floats at z-10, so the button must carry
-                     * the same z layer to win paint order by DOM sequence —
-                     * otherwise axe reports a 24x12 partially-obscured
-                     * target whenever the two boxes meet. */}
+                     * row. The header uses layout='grid' so the floating
+                     * card-top-right action cluster reserves a REAL grid cell
+                     * (the action bar's own cluster-width padding) —
+                     * a pr-* reservation on the identity column is dead CSS
+                     * in the Storybook a11y build because globals.css
+                     * excludes components/features/admin from its Tailwind
+                     * scan, and a long email then parks this copy button
+                     * under the cluster (axe target-size 24x12 overlap). */}
                     <span className='min-w-0 truncate'>{user.email}</span>
                     <CopyButton value={user.email} label='Email' />
                   </div>
@@ -162,7 +159,6 @@ export function AdminUserDetailDrawer({
                   className='border-0 bg-transparent px-0 py-0'
                 />
               }
-              bodyClassName='pr-20'
               data-testid='admin-user-entity-header'
             />
           </div>
