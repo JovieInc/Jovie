@@ -122,7 +122,9 @@ export default async function AboutPage({ params }: Props) {
 
   // Selected credits: exact structured release-credit edges only, resolved
   // against the owner's exact Spotify identity (same gate as the profile root).
-  const creditSegments = await (async () => {
+  // Started here and awaited together with the bio below: the two groups are
+  // independent, and this route renders per request.
+  const creditSegmentsPromise = (async () => {
     try {
       const ownerSpotifyIdentity = resolveSpotifyArtistIdentity([
         profile.spotify_id,
@@ -158,7 +160,7 @@ export default async function AboutPage({ params }: Props) {
   // Entity-linked bio: resolve this profile's own releases + credited artists
   // with public Jovie profiles, then link mentions in the tagline. Failures
   // degrade to plain text.
-  const bioSegments = await (async () => {
+  const bioSegmentsPromise = (async () => {
     const tagline = artist.tagline?.trim();
     if (!tagline) return undefined;
     try {
@@ -184,6 +186,11 @@ export default async function AboutPage({ params }: Props) {
       return undefined;
     }
   })();
+
+  const [creditSegments, bioSegments] = await Promise.all([
+    creditSegmentsPromise,
+    bioSegmentsPromise,
+  ]);
 
   return (
     <ProfileIntentPage

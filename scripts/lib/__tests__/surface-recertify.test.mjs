@@ -343,6 +343,7 @@ test('two PRs that each renew their own certified file combine green; an unrenew
   const root = mkdtempSync(join(tmpdir(), 'census-combine-'));
   const git = (...args) =>
     execFileSync('git', args, {
+      maxBuffer: 256 * 1024 * 1024,
       cwd: root,
       encoding: 'utf8',
       env: {

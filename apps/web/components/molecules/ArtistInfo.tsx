@@ -1,4 +1,4 @@
-import { getAvatarSizePx } from '@jovie/ui';
+import { getAvatarSizePx, getInitials } from '@jovie/ui';
 import Link from 'next/link';
 import type { ReactNode } from 'react';
 import { ArtistName } from '@/components/atoms/ArtistName';
@@ -97,7 +97,15 @@ export function ArtistInfo({
           <Link
             href={`/${artist.handle}`}
             className='rounded-full focus-ring-themed'
-            aria-label={`Go to ${artist.name}'s profile`}
+            /* Without a photo the fallback initials are the link's only
+               visible text, and the accessible name must contain it (axe
+               label-content-name-mismatch / ACT 2ee8b8 — the check counts
+               visually rendered text even when the span is aria-hidden). */
+            aria-label={
+              artist.image_url
+                ? `Go to ${artist.name}'s profile`
+                : `Go to ${artist.name}'s profile — ${getInitials(artist.name)}`
+            }
           >
             {avatarContent}
           </Link>

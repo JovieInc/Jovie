@@ -399,7 +399,7 @@ test.describe('Public profile visual audit @smoke', () => {
   }
 });
 
-test.describe('Public profile compact shell sizing', () => {
+test.describe('Public profile surface sizing', () => {
   test.use({ storageState: { cookies: [], origins: [] } });
 
   test('desktop shell stays materially below viewport height', async ({
@@ -421,19 +421,19 @@ test.describe('Public profile compact shell sizing', () => {
     await waitForImages(page);
     await waitForSettle(page);
 
-    const shell = page.getByTestId('profile-compact-shell');
+    // #24709: desktop surface canonical at >=1180px; compact shell unmounts.
+    await expect(page.getByTestId('profile-compact-shell')).toHaveCount(0);
+    const shell = page.getByTestId('profile-desktop-surface');
     await expect(shell).toBeVisible();
-
     const shellBox = await shell.boundingBox();
     expect(shellBox).not.toBeNull();
-
     if (!shellBox) {
       return;
     }
 
-    // At 1280x900 with md:py-8, the compact card should sit well inside the
-    // viewport instead of stretching close to full height again.
-    expect(shellBox.height).toBeLessThan(780);
+    // Stage pad clamp(16px, 2vw, 24px) = 24px at 1280; surface height caps
+    // at min(940px, 100dvh - 48px) = 852px — well inside the viewport.
+    expect(shellBox.height).toBeLessThanOrEqual(852);
     expect(shellBox.y).toBeGreaterThanOrEqual(24);
     expect(shellBox.y + shellBox.height).toBeLessThanOrEqual(876);
   });
@@ -471,6 +471,36 @@ test.describe('profile publication gate', () => {
     expect(
       robotsMetas.filter(meta => /content="[^"]*noindex/.test(meta))
     ).toHaveLength(1);
+  });
+
+  // JOV-12081: the unknown-handle 404 must be server-rendered. The miss
+  // rewrite used to target the prerendered profile-mode-render route, where
+  // notFound() during the ISR fallback render served Next's flight-only
+  // `__next_error__` shell — no rendered body, no robots meta — so axe, the
+  // overflow guard and the visual audit all timed out waiting for the branded
+  // boundary. The dynamic profile-miss route renders it in the first HTML.
+  test('unknown-handle 404 renders the branded boundary in the SSR HTML', async ({
+    page,
+  }) => {
+    const unknown = await page.request.get('/zz-no-such-artist-e2e-gate');
+    expect(unknown.status()).toBe(404);
+    const html = await unknown.text();
+    expect(html).not.toContain('__next_error__');
+    expect(html).toContain('data-testid="not-found"');
+    expect(html).not.toContain('profile-compact-shell');
+  });
+
+  // JOV-12081: `?mode=` must survive the prerendered profile route. The
+  // rewrite used to sit in afterFiles, which never wins over a prerendered
+  // route, so ?mode=listen silently rendered the home document and the DSP
+  // audit exercised only the home's Spotify CTA.
+  test('?mode=listen renders the listen surface in the SSR HTML', async ({
+    page,
+  }) => {
+    const response = await page.request.get(`/${TEST_PROFILE}?mode=listen`);
+    expect(response.status()).toBe(200);
+    const html = await response.text();
+    expect(html).toContain('data-profile-mode="listen"');
   });
 });
 

@@ -153,4 +153,65 @@ describe('component certificate companion files', () => {
     ]);
     assert.equal(run().status, 0);
   });
+  it('merges gates and waivers from component-certification.d shards', () => {
+    const docs = join(root, 'docs/design-system');
+    mkdirSync(join(docs, 'component-certification.d'), { recursive: true });
+    const shard = join(docs, 'component-certification.d/batch.json');
+    const run = () =>
+      spawnSync(process.execPath, [cli, '--repo-root', root, '--gate'], {
+        encoding: 'utf8',
+      });
+    writeFileSync(
+      join(docs, 'component-certification.json'),
+      JSON.stringify({ policy: {}, gates: {}, waivers: {} })
+    );
+    // A gate written only in a shard is enforced.
+    writeFileSync(
+      shard,
+      JSON.stringify({ gates: { [component]: ['states'] } })
+    );
+    const red = run();
+    assert.equal(red.status, 1, red.stdout);
+    assert.match(red.stdout, /note\.tsx \[states\] fail/);
+    write(
+      'note.states.stories.tsx',
+      'export const LongContent = {};\nexport const Rtl = {};\n'
+    );
+    const green = run();
+    assert.equal(green.status, 0, green.stdout);
+
+    // The same component in two files fails until one entry is left.
+    writeFileSync(
+      join(docs, 'component-certification.d/other.json'),
+      JSON.stringify({ gates: { [component]: ['states'] } })
+    );
+    const twice = run();
+    assert.equal(twice.status, 1, twice.stdout);
+    assert.match(
+      twice.stdout,
+      /other\.json: gates names packages\/ui\/atoms\/note\.tsx, already in .*batch\.json/
+    );
+    rmSync(join(docs, 'component-certification.d/other.json'));
+
+    // A shard out of path order fails, and --sort fixes it in place.
+    writeFileSync(
+      shard,
+      JSON.stringify({
+        gates: { [component]: ['states'] },
+        waivers: {
+          'packages/ui/b.tsx': { rtl: 'No text' },
+          'packages/ui/a.tsx': { offline: 'No network' },
+        },
+      })
+    );
+    const unsorted = run();
+    assert.equal(unsorted.status, 1, unsorted.stdout);
+    assert.match(unsorted.stdout, /batch\.json: waivers is not sorted/);
+    spawnSync(process.execPath, [cli, '--repo-root', root, '--sort']);
+    assert.deepEqual(
+      Object.keys(JSON.parse(readFileSync(shard, 'utf8')).waivers),
+      ['packages/ui/a.tsx', 'packages/ui/b.tsx']
+    );
+    assert.equal(run().status, 0);
+  });
 });

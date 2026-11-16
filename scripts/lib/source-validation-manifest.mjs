@@ -33,6 +33,14 @@ const WORKFLOWS = /^\.github\/(?:workflows|actions)\//;
 /** @type {readonly Guard[]} */
 export const SOURCE_VALIDATION_GUARDS = Object.freeze([
   {
+    id: 'web-eslint',
+    name: 'changed web ESLint (including hook dependencies)',
+    command:
+      'ESLINT_CHANGED_BASE="origin/{base}" pnpm --filter @jovie/web run lint:eslint:changed',
+    when: /^apps\/web\/.+\.tsx?$/,
+    covers: ['pnpm --filter @jovie/web run lint:eslint:changed'],
+  },
+  {
     id: 'wf:refs',
     name: 'workflow references',
     command: 'node scripts/verify-workflow-references.mjs',
@@ -151,7 +159,7 @@ export const SOURCE_VALIDATION_GUARDS = Object.freeze([
     id: 'component-certificate',
     name: 'component and screen certificate gate',
     command: 'pnpm component-certificate:gate',
-    when: /^(?:apps\/web\/(?:app|components)\/|packages\/ui\/|docs\/design-system\/(?:component-certification|cert-screens)\.json$|scripts\/(?:lib\/)?component-(?:certificate|cert-screens))/,
+    when: /^(?:apps\/web\/(?:app|components)\/|packages\/ui\/|docs\/design-system\/(?:(?:component-certification|cert-screens)\.json$|component-certification\.d\/)|scripts\/(?:lib\/)?component-(?:certificate|cert-screens))/,
     covers: ['pnpm component-certificate:gate'],
   },
   {

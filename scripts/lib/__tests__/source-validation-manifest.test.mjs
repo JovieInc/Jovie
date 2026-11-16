@@ -58,8 +58,28 @@ describe('Source Validation manifest parity', () => {
       'wf:token-scope',
     ])
       expect(ids).toContain(id);
-    expect(selectManifestGuards(['README.md'])).toEqual([]);
+    expect(selectManifestGuards(['README.md']).map(g => g.id)).toEqual([
+      'projected-tree-budget',
+    ]);
   });
+
+  it.each([
+    'apps/web/components/features/admin/waitlist-table/AdminWaitlistTableWithViews.tsx',
+    'apps/web/components/example.test.tsx',
+    'apps/web/components/example.stories.tsx',
+    'apps/web/lib/example.ts',
+  ])(
+    'runs CI changed-web ESLint locally for %s, including hook dependencies',
+    file => {
+      const guard = selectManifestGuards([file], 'staging').find(
+        entry => entry.id === 'web-eslint'
+      );
+      expect(guard?.command).toBe(
+        'ESLINT_CHANGED_BASE="origin/staging" pnpm --filter @jovie/web run lint:eslint:changed'
+      );
+      expect(guard?.heavy).not.toBe(true);
+    }
+  );
 
   it.each([
     'apps/web/components/organisms/DesktopTitlebarSlot.tsx',
@@ -67,6 +87,7 @@ describe('Source Validation manifest parity', () => {
     'apps/web/app/app/layout.tsx',
     'packages/ui/atoms/button.tsx',
     'docs/design-system/component-certification.json',
+    'docs/design-system/component-certification.d/e1-admin.json',
     'docs/design-system/cert-screens.json',
     'scripts/lib/component-certificate.mjs',
     'scripts/lib/component-cert-screens.mjs',

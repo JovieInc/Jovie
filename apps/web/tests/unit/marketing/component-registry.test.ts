@@ -1768,7 +1768,7 @@ vi.mock('next/link', async () => {
 it('preserves the mounted homepage front-door auth boundary and public secondary navigation', () => {
   const { container } = render(createElement(HomepageV2Route));
   const auth = screen.getByTestId('homepage-v2-hero-primary-cta');
-  expect(auth).toHaveAttribute('href', '/signup');
+  expect(auth).toHaveAttribute('href', '/start');
   expect(auth).toHaveAttribute('data-test-prefetch', 'false');
   const publicLink = container.querySelector('a.public-action-secondary');
   expect(publicLink).toHaveAttribute('href', '/artist-profiles');

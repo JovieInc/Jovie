@@ -37,7 +37,7 @@ from label_episodes import RELAY_RED_LABELLER, label_episode_applier  # noqa: E4
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 from atomic_state import append_json_object
-from pr_body_markup import ANY_HEADING, quote_revision_references, red_section_bounds, with_red_section
+from pr_body_markup import ANY_HEADING, quote_revision_references, red_section_bounds, repair_customer_decision, with_red_section
 import empty_review, red_repair, remediation  # noqa: E402  (classifier, red-repair admission, non-PR intake)
 REPO = os.environ.get("GITHUB_REPOSITORY", "JovieInc/Jovie")
 PREFIX = "lane-fix-"
@@ -1080,22 +1080,14 @@ def repair_evidence_body(pr: dict, body: str, excerpt: str = "", *, customer_dec
                          locking_pr: int | None = None, win_section: str | None = None,
                          premise: dict | None = None, previous_win_section: str | None = None) -> str:
     """Complete explicit evidence; preserve proof/decisions for Fleet/changelog validation."""
-    if len(re.findall(r"<!--\s*customer-changelog/v1\b[\s\S]*?-->", body)) > 1:
+    decisions = re.findall(r"<!--\s*customer-changelog/v1\b[\s\S]*?-->", body)
+    if len(decisions) > 1:
         raise ValueError("repair requires exactly one customer changelog decision")
     updated = body
     if not red_section_complete(updated):
         block = red_before_green_block(pr, excerpt)
         if block:
             updated = with_red_section(updated, block)
-    if customer_decision is not None and "customer-changelog/v1" not in updated:
-        if not isinstance(customer_decision, dict) or type(customer_decision.get("releaseWorthy")) is not bool:
-            raise ValueError("customer decision requires an explicit releaseWorthy boolean")
-        if customer_decision["releaseWorthy"] is False:
-            from fix_red_classes import stamp_internal_changelog
-            updated = stamp_internal_changelog(updated)
-        else:
-            note = json.dumps(customer_decision, separators=(",", ":")).replace("<", "\\u003c").replace(">", "\\u003e")
-            updated = updated.rstrip("\n") + "\n<!-- customer-changelog/v1 " + note + " -->\n"
     if locking_pr is not None:
         if type(locking_pr) is not int or locking_pr < 1:
             raise ValueError("locking PR requires an explicit positive PR number")
@@ -1124,7 +1116,7 @@ def repair_evidence_body(pr: dict, body: str, excerpt: str = "", *, customer_dec
         if red_section_bounds(updated.split("\n"), re.compile(r"^#{2,3}\s*Premise check\s*$", re.I)) is None:
             block = "## Premise check\n\n" + "\n".join(f"- {field}: {premise[field]}" for field in fields)
             updated = updated.rstrip("\n") + "\n\n" + block + "\n"
-    return quote_revision_references(updated)
+    return quote_revision_references(repair_customer_decision(updated, decisions, customer_decision))
 
 
 def api_gh(args, **_):

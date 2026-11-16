@@ -15,6 +15,13 @@ import {
   tighten,
   writeRatchet,
 } from './lib/workflow-token-budget.mjs';
+import {
+  collectAddedLines,
+  diffBase,
+  evaluateViolations,
+  liveRegistryIds,
+  loadAllowlist,
+} from './schedule-trigger-guard.mjs';
 
 export function main(argv = process.argv.slice(2), root = process.cwd()) {
   const { found, declared } = scanRepo(root);
@@ -36,14 +43,42 @@ export function main(argv = process.argv.slice(2), root = process.cwd()) {
   const errors = check({ found, declared, ratchet });
   for (const error of errors)
     process.stderr.write(`workflow-token-budget: ${error}\n`);
+  // Event-driven-only mandate (JOV-12720): the schedule/polling guard rides
+  // this step until an owner splits the pr-fleet-rules.yml wiring.
+  let scheduleFailed = false;
+  if (!argv.includes('--write') && !argv.includes('--bootstrap')) {
+    const base = diffBase(root);
+    if (!base) {
+      process.stdout.write(
+        'schedule-trigger-guard: no diff base (origin/main); skipping\n'
+      );
+    } else {
+      const added = collectAddedLines(root, base);
+      const scheduleErrors = evaluateViolations({
+        added,
+        allowlist: loadAllowlist(root),
+        registryIds: liveRegistryIds(root),
+      });
+      for (const error of scheduleErrors)
+        process.stderr.write(`schedule-trigger-guard: ${error}\n`);
+      scheduleFailed = scheduleErrors.length > 0;
+      if (!scheduleFailed) {
+        // Every run proves it executed (JOV-12720 verify-by-exercise: the
+        // success path was silent, indistinguishable from a skip).
+        process.stdout.write(
+          `schedule-trigger-guard: base ${base.slice(0, 10)}, ${added.size} changed file(s) with additions scanned, ok\n`
+        );
+      }
+    }
+  }
   const left = Object.values(ratchet).reduce(
     (n, rules) => n + Object.values(rules).reduce((a, b) => a + b, 0),
     0
   );
   process.stdout.write(
-    `workflow-token-budget: ${errors.length ? 'FAIL' : 'ok'} (${left} grandfathered unbudgeted GITHUB_TOKEN sites, ${Object.keys(declared).length} declared budgets)\n`
+    `workflow-token-budget: ${errors.length || scheduleFailed ? 'FAIL' : 'ok'} (${left} grandfathered unbudgeted GITHUB_TOKEN sites, ${Object.keys(declared).length} declared budgets)\n`
   );
-  return errors.length ? 1 : 0;
+  return errors.length || scheduleFailed ? 1 : 0;
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href)

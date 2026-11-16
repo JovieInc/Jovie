@@ -22,7 +22,9 @@ test.describe('Opportunity Inbox', () => {
       timeout: 30_000,
     });
     await expect(
-      page.getByRole('button', { name: 'Needs You', exact: true })
+      page
+        .getByRole('button', { name: 'Needs You', exact: true })
+        .or(page.getByRole('heading', { name: 'Make Jovie Yours' }))
     ).toBeVisible();
 
     const feed = page.getByTestId('opportunity-inbox-feed');
@@ -33,6 +35,35 @@ test.describe('Opportunity Inbox', () => {
         .or(emptyState)
         .or(page.getByTestId('opportunity-inbox-availability'))
     ).toBeVisible();
+    if ((await emptyState.getAttribute('data-home-setup')) === 'true') {
+      await expect(
+        page.getByRole('toolbar', { name: 'Inbox View' })
+      ).toHaveCount(0);
+      await expect(page.getByRole('button', { name: 'Add Notes' })).toHaveCount(
+        0
+      );
+      await expect(
+        emptyState.getByRole('link', { name: 'Start A Chat' })
+      ).toHaveAttribute('href', APP_ROUTES.CHAT);
+      await expect(emptyState.getByRole('progressbar')).toBeVisible();
+      const setupLink = emptyState.getByRole('link', {
+        name: /Complete Your Profile/,
+      });
+      await setupLink.focus();
+      await expect(setupLink).toBeFocused();
+    } else if (await emptyState.isVisible()) {
+      // A clear queue has nothing to annotate, so no stray Notes line.
+      await expect(emptyState).toContainText('Your Inbox Is Clear');
+      await expect(page.getByRole('button', { name: 'Add Notes' })).toHaveCount(
+        0
+      );
+    }
+    // App updates live in the shell corner pill, never in the inbox content.
+    await expect(
+      page
+        .getByTestId('opportunity-inbox-content')
+        .getByTestId('runtime-update-pill')
+    ).toHaveCount(0);
   });
 
   for (const persona of ['creator-ready', 'admin'] as const) {

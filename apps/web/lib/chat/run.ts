@@ -411,10 +411,9 @@ export async function executeChatTurn(
     if (!artistContext) {
       throw new Error('artistContext is required when mode is "app"');
     }
-    // Resolve `@kind:id[label]` entity tokens from the recent user turns against
-    // the artist's own catalog (the same `releases` rows that feed the
-    // right-rail entity panel) so the model recognises owned assets instead of
-    // mis-attributing them to another artist (JOV-3537).
+    // Resolve `@kind:id[label]` tokens from recent user turns against the
+    // artist's own catalog and profile so the model recognises owned assets
+    // instead of mis-attributing them to another artist (JOV-3537).
     const referencedEntities = buildReferencedEntitiesBlock({
       userTexts: recentUserTexts(uiMessages),
       ownedReleases: releases,
@@ -423,6 +422,7 @@ export async function executeChatTurn(
         username: artistContext.username,
         spotifyUrl: artistContext.spotifyUrl,
       },
+      ownProfileId: resolvedProfileId,
     });
     const pinnedOpportunityBlock =
       buildPinnedOpportunityBlock(pinnedOpportunity);

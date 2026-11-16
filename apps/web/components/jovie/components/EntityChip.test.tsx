@@ -31,6 +31,7 @@ describe('EntityChip', () => {
     ['artist', 'var(--system-b-entity-chip-artist-accent)'],
     ['track', 'var(--system-b-entity-chip-track-accent)'],
     ['event', 'var(--system-b-entity-chip-event-accent)'],
+    ['profile', 'var(--system-b-entity-chip-profile-accent)'],
   ] as const)('maps kind=%s to the correct accent variable', (kind, accent) => {
     fastRender(
       <EntityChip
@@ -43,6 +44,24 @@ describe('EntityChip', () => {
         .getByTestId('entity-chip')
         .style.getPropertyValue('--jovie-entity-accent')
     ).toBe(accent);
+  });
+
+  it.each([
+    ['release', 'Release'],
+    ['artist', 'Artist'],
+    ['track', 'Track'],
+    ['event', 'Event'],
+    ['profile', 'Profile'],
+  ] as const)('prefixes the tooltip for kind=%s with %s', (kind, prefix) => {
+    fastRender(
+      <EntityChip
+        data={{ kind, id: `${kind}_1`, label: 'Tim White' }}
+        variant='transcript'
+      />
+    );
+    const chip = screen.getByTestId('entity-chip');
+    expect(chip.getAttribute('title')).toBe(`${prefix}: Tim White`);
+    expect(chip.getAttribute('data-entity-kind')).toBe(kind);
   });
 
   it('keeps entity chip tones on System B aliases instead of legacy Geist tokens', () => {

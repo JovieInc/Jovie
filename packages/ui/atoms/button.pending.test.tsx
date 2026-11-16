@@ -1,5 +1,5 @@
 import { fireEvent, render, screen } from '@testing-library/react';
-import type * as React from 'react';
+import * as React from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { Button } from './button';
 
@@ -71,3 +71,155 @@ describe('Button pending focus', () => {
     expect(screen.getByRole('button')).toBeDisabled();
   });
 });
+
+describe.each(['spinner', 'morph'] as const)(
+  'Button %s caller contracts',
+  pendingPresentation => {
+    it.each(['object', 'callback'] as const)(
+      'forwards %s refs to the focused button through pending and unmount',
+      refKind => {
+        const objectRef = React.createRef<HTMLButtonElement>();
+        const callbackRef = vi.fn((_node: HTMLButtonElement | null) => {});
+        const ref = refKind === 'object' ? objectRef : callbackRef;
+        const current = () =>
+          refKind === 'object'
+            ? objectRef.current
+            : (callbackRef.mock.lastCall?.[0] ?? null);
+        const { rerender, unmount } = render(
+          <Button ref={ref} pendingPresentation={pendingPresentation}>
+            Save release
+          </Button>
+        );
+        const button = screen.getByRole('button', { name: 'Save release' });
+        expect(current()).toBe(button);
+        current()?.focus();
+        expect(button).toHaveFocus();
+
+        rerender(
+          <Button ref={ref} pendingPresentation={pendingPresentation} loading>
+            Save release
+          </Button>
+        );
+        expect(current()).toBe(button);
+        expect(button).toHaveFocus();
+        expect(button).not.toBeDisabled();
+        unmount();
+        expect(current()).toBeNull();
+      }
+    );
+
+    it('keeps the caller external label as its accessible name while pending', () => {
+      const view = (loading: boolean) => (
+        <>
+          <span id='release-action-name'>Save release artwork</span>
+          <Button
+            pendingPresentation={pendingPresentation}
+            aria-labelledby='release-action-name'
+            loading={loading}
+          >
+            Save
+          </Button>
+        </>
+      );
+      const { rerender } = render(view(false));
+      const button = screen.getByRole('button', {
+        name: 'Save release artwork',
+      });
+      button.focus();
+      rerender(view(true));
+      expect(button).toHaveAccessibleName('Save release artwork');
+      expect(button).toHaveFocus();
+    });
+
+    it('preserves a caller aria-label instead of replacing it with child copy', () => {
+      const { rerender } = render(
+        <Button
+          pendingPresentation={pendingPresentation}
+          aria-label='Save release metadata'
+        >
+          Save
+        </Button>
+      );
+      const button = screen.getByRole('button', {
+        name: 'Save release metadata',
+      });
+      rerender(
+        <Button
+          pendingPresentation={pendingPresentation}
+          aria-label='Save release metadata'
+          loading
+        >
+          Save
+        </Button>
+      );
+      expect(button).toHaveAccessibleName('Save release metadata');
+    });
+
+    it('forwards idle ARIA flags and makes pending authoritative without losing focus', () => {
+      const view = (loading: boolean, busy: boolean) => (
+        <Button
+          pendingPresentation={pendingPresentation}
+          loading={loading}
+          aria-busy={busy}
+          aria-disabled={false}
+        >
+          Save
+        </Button>
+      );
+      const { rerender } = render(view(false, false));
+      const button = screen.getByRole('button', { name: 'Save' });
+      button.focus();
+      expect(button).toHaveAttribute('aria-busy', 'false');
+      expect(button).toHaveAttribute('aria-disabled', 'false');
+      rerender(view(false, true));
+      expect(button).toHaveAttribute('aria-busy', 'true');
+      expect(button).toHaveAttribute('aria-disabled', 'false');
+      rerender(view(true, false));
+      expect(button).toHaveAttribute('aria-busy', 'true');
+      expect(button).toHaveAttribute('aria-disabled', 'true');
+      expect(button).not.toBeDisabled();
+      expect(button).toHaveFocus();
+    });
+
+    it('composes pointer, keyboard and click handlers with caller cancellation', () => {
+      const order: string[] = [];
+      const submit = vi.fn((event: React.FormEvent) => event.preventDefault());
+      const { getByRole } = render(
+        <form onSubmit={submit}>
+          <Button
+            pendingPresentation={pendingPresentation}
+            type='submit'
+            onPointerDown={event => {
+              expect(event.currentTarget).toBe(button);
+              order.push('pointer');
+              event.preventDefault();
+            }}
+            onKeyDown={event => {
+              expect(event.currentTarget).toBe(button);
+              order.push(`key:${event.key}`);
+              event.preventDefault();
+            }}
+            onClickCapture={event => {
+              expect(event.currentTarget).toBe(button);
+              order.push('capture');
+              event.preventDefault();
+            }}
+            onClick={event => {
+              expect(event.currentTarget).toBe(button);
+              expect(event.defaultPrevented).toBe(true);
+              order.push('bubble');
+            }}
+          >
+            Publish
+          </Button>
+        </form>
+      );
+      const button = getByRole('button', { name: 'Publish' });
+      expect(fireEvent.pointerDown(button)).toBe(false);
+      expect(fireEvent.keyDown(button, { key: 'Enter' })).toBe(false);
+      expect(fireEvent.click(button, { detail: 0 })).toBe(false);
+      expect(order).toEqual(['pointer', 'key:Enter', 'capture', 'bubble']);
+      expect(submit).not.toHaveBeenCalled();
+    });
+  }
+);

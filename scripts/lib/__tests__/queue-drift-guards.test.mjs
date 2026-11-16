@@ -101,6 +101,7 @@ test('only shrink-only guards are tightened, by a command that cannot raise a ba
       'offer-claims',
       'stat-claims',
       'size-500',
+      'test-hygiene',
     ]
   );
   for (const { id, tighten } of commands) {

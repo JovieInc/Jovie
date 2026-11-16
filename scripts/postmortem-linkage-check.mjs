@@ -219,7 +219,10 @@ export function effectiveMode(policy, now = new Date()) {
 
 function git(args) {
   try {
-    return execFileSync('git', args, { encoding: 'utf8' }).trim();
+    return execFileSync('git', args, {
+      maxBuffer: 256 * 1024 * 1024,
+      encoding: 'utf8',
+    }).trim();
   } catch {
     return null;
   }
