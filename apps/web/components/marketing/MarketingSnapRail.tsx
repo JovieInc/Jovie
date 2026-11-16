@@ -51,8 +51,8 @@ export function MarketingSnapRail({
   overlayControlsOnDesktop = false,
   showMobileControls = false,
   showDesktopControls = true,
-  previousLabel = 'Scroll Left',
-  nextLabel = 'Scroll Right',
+  previousLabel = 'Previous',
+  nextLabel = 'Next',
 }: Readonly<MarketingSnapRailProps>) {
   const generatedId = useId();
   const railId = `marketing-snap-rail-${generatedId}`;
@@ -72,13 +72,17 @@ export function MarketingSnapRail({
     }
 
     const maximumScrollLeft = Math.max(rail.scrollWidth - rail.clientWidth, 0);
+    // Native RTL rails start at zero and advance with negative scrollLeft.
+    const direction =
+      globalThis.getComputedStyle(rail).direction === 'rtl' ? -1 : 1;
+    const scrollOffset = rail.scrollLeft * direction;
     const boundaryTolerance = 2;
     const nextScrollState = {
       ready: true,
-      canScrollPrevious: rail.scrollLeft > boundaryTolerance,
+      canScrollPrevious: scrollOffset > boundaryTolerance,
       canScrollNext:
         maximumScrollLeft > boundaryTolerance &&
-        rail.scrollLeft < maximumScrollLeft - boundaryTolerance,
+        scrollOffset < maximumScrollLeft - boundaryTolerance,
     };
     setScrollState(previousScrollState =>
       previousScrollState.ready === nextScrollState.ready &&
@@ -117,8 +121,10 @@ export function MarketingSnapRail({
       }
 
       const scrollStep = Math.max(rail.clientWidth * 0.8, 240);
+      const directionSign =
+        globalThis.getComputedStyle(rail).direction === 'rtl' ? -1 : 1;
       rail.scrollBy({
-        left: direction === 'next' ? scrollStep : -scrollStep,
+        left: (direction === 'next' ? scrollStep : -scrollStep) * directionSign,
         behavior: reducedMotion ? 'auto' : 'smooth',
       });
     },
@@ -137,7 +143,7 @@ export function MarketingSnapRail({
         }}
         className='marketing-snap-rail__nav-btn pointer-events-auto flex h-11 w-11 items-center justify-center rounded-full backdrop-blur-xl transition-colors disabled:cursor-default disabled:opacity-35'
       >
-        <ChevronLeft className='h-4 w-4' aria-hidden='true' />
+        <ChevronLeft className='h-4 w-4 rtl:rotate-180' aria-hidden='true' />
       </button>
       <button
         type='button'
@@ -149,7 +155,7 @@ export function MarketingSnapRail({
         }}
         className='marketing-snap-rail__nav-btn pointer-events-auto flex h-11 w-11 items-center justify-center rounded-full backdrop-blur-xl transition-colors disabled:cursor-default disabled:opacity-35'
       >
-        <ChevronRight className='h-4 w-4' aria-hidden='true' />
+        <ChevronRight className='h-4 w-4 rtl:rotate-180' aria-hidden='true' />
       </button>
     </>
   );

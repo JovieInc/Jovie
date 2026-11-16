@@ -1,7 +1,10 @@
+import type { CSSProperties } from 'react';
 import { ArtistProfilePhoneFrame } from '@/components/marketing/artist-profile/ArtistProfilePhoneFrame';
 import { MarketingPhoneImage } from '@/components/marketing/MarketingPhoneImage';
+import { MarketingSnapRail } from '@/components/marketing/MarketingSnapRail';
 import { cn } from '@/lib/utils';
 import './MarketingProductStates.css';
+import './MarketingPhoneStateGallery.css';
 
 export interface MarketingPhoneState {
   readonly id: string;
@@ -37,41 +40,53 @@ export function MarketingPhoneStateGallery({
   testId = 'marketing-phone-state-gallery',
 }: Readonly<MarketingPhoneStateGalleryProps>) {
   return (
-    <section
-      className={cn('marketing-phone-gallery', className)}
-      data-testid={testId}
+    <div
+      className={cn('marketing-phone-gallery-shell', className)}
       data-count={states.length}
-      aria-label={label}
-      // biome-ignore lint/a11y/noNoninteractiveTabindex: the rail scrolls on phones, so keyboard users need a focusable region to scroll it (axe scrollable-region-focusable).
-      tabIndex={0}
+      style={
+        {
+          '--marketing-phone-gallery-columns': Math.max(states.length, 1),
+        } as CSSProperties
+      }
     >
-      <ul className='marketing-phone-gallery__list'>
-        {states.map(state => (
-          <li key={state.id} className='marketing-phone-gallery__item'>
-            <figure className='marketing-phone-gallery__figure'>
-              {state.scenarioId ? (
-                <ArtistProfilePhoneFrame className='marketing-phone-gallery__phone'>
-                  <MarketingPhoneImage
-                    scenarioId={state.scenarioId}
-                    altOverride={state.alt}
-                    fill
-                    sizes='(min-width: 1024px) 21.25rem, (min-width: 768px) 30vw, 72vw'
-                    className='object-cover object-top'
-                  />
-                </ArtistProfilePhoneFrame>
-              ) : null}
-              <figcaption className='marketing-phone-gallery__caption'>
-                <span className='marketing-phone-gallery__title'>
-                  {state.title}
-                </span>
-                <span className='marketing-phone-gallery__body'>
-                  {state.body}
-                </span>
-              </figcaption>
-            </figure>
-          </li>
-        ))}
-      </ul>
-    </section>
+      <MarketingSnapRail
+        ariaLabel={label}
+        railClassName='marketing-phone-gallery'
+        testId={`${testId}-navigation`}
+        scrollerTestId={testId}
+        showMobileControls={states.length > 1}
+        showDesktopControls={false}
+        previousLabel='Previous preview'
+        nextLabel='Next preview'
+      >
+        <ul className='marketing-phone-gallery__list'>
+          {states.map(state => (
+            <li key={state.id} className='marketing-phone-gallery__item'>
+              <figure className='marketing-phone-gallery__figure'>
+                {state.scenarioId ? (
+                  <ArtistProfilePhoneFrame className='marketing-phone-gallery__phone'>
+                    <MarketingPhoneImage
+                      scenarioId={state.scenarioId}
+                      altOverride={state.alt}
+                      fill
+                      sizes='(min-width: 1024px) 21.25rem, (min-width: 768px) 30vw, 72vw'
+                      className='object-cover object-top'
+                    />
+                  </ArtistProfilePhoneFrame>
+                ) : null}
+                <figcaption className='marketing-phone-gallery__caption'>
+                  <span className='marketing-phone-gallery__title'>
+                    {state.title}
+                  </span>
+                  <span className='marketing-phone-gallery__body'>
+                    {state.body}
+                  </span>
+                </figcaption>
+              </figure>
+            </li>
+          ))}
+        </ul>
+      </MarketingSnapRail>
+    </div>
   );
 }
