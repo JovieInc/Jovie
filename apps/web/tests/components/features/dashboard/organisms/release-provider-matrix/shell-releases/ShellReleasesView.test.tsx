@@ -468,7 +468,11 @@ describe('ShellReleasesView', () => {
     );
     const menu = screen.getByRole('menu');
     const focusedControl = document.activeElement;
-    expect(menu).toContainElement(focusedControl as HTMLElement);
+    // Searchable surfaces present as a role="group" (holding the search
+    // input) with the items in an inner role="menu"; the preserved
+    // invariant is focus starting inside that surface.
+    const surface = focusedControl?.closest('[role="group"], [role="menu"]');
+    expect(surface).toContainElement(menu as HTMLElement);
 
     mockUseDspMatchesQuery.mockReturnValue({ data: [], isLoading: true });
     act(() => {

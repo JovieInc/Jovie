@@ -212,6 +212,56 @@ describe('Tooltip', () => {
     });
   });
 
+  describe('Anchor invariant wiring', () => {
+    // Full matrix: tooltip-anchor.test.tsx. This keeps the trigger contract
+    // (caller ref and handlers survive the root's bookkeeping) beside it.
+    it('keeps the caller ref and leave/blur handlers on the trigger', () => {
+      const ref = React.createRef<HTMLButtonElement>();
+      const events: string[] = [];
+      render(
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger
+              ref={ref}
+              onPointerLeave={() => events.push('leave')}
+              onBlur={() => events.push('blur')}
+            >
+              <button type='button'>Trigger</button>
+            </TooltipTrigger>
+            <TooltipContent>Label</TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+      );
+      const trigger = screen.getByRole('button', { name: 'Trigger' });
+      expect(ref.current).toBe(trigger);
+      fireEvent.pointerLeave(trigger);
+      fireEvent.focus(trigger);
+      fireEvent.blur(trigger);
+      expect(events).toEqual(['leave', 'blur']);
+    });
+
+    it('closes an open tooltip when its trigger is removed', async () => {
+      const Fixture = ({ show }: { readonly show: boolean }) => (
+        <TooltipProvider>
+          <Tooltip defaultOpen>
+            {show ? (
+              <TooltipTrigger>
+                <button type='button'>Trigger</button>
+              </TooltipTrigger>
+            ) : null}
+            <TooltipContent>Label</TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+      );
+      const { rerender } = render(<Fixture show />);
+      expect(await screen.findByTestId('tooltip-content')).toBeInTheDocument();
+      rerender(<Fixture show={false} />);
+      await waitFor(() =>
+        expect(screen.queryByTestId('tooltip-content')).not.toBeInTheDocument()
+      );
+    });
+  });
+
   describe('Styling', () => {
     it('applies base styling classes (System B tokens)', () => {
       render(<TestTooltip open={true} />);

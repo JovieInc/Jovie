@@ -185,7 +185,7 @@ const VenmoConnectDialog = memo(function VenmoConnectDialog({
           className='flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-accent/20 bg-accent/10'
           aria-hidden='true'
         >
-          <Wallet className='h-4.5 w-4.5 text-accent-token' />
+          <Wallet className='h-4 w-4 text-accent-token' />
         </div>
         <div className='min-w-0 flex-1'>
           <DialogTitle className='text-mid font-semibold tracking-[-0.011em] text-primary-token'>

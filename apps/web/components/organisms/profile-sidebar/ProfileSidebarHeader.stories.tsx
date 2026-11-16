@@ -1,15 +1,21 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
-import { userEvent, within } from 'storybook/test';
+import { expect, userEvent, within } from 'storybook/test';
 import { useProfileHeaderParts } from './ProfileSidebarHeader';
 
 /**
  * Download QR Code fetches the QR image; these stories answer that request
  * so the failure toast shows without leaving the browser.
+ *
+ * The QR image is generated locally (#25170): the component fetches a
+ * `data:` URL carrying the generated PNG. Match on that scheme — the old
+ * `includes('qr')` URL match leaned on the third-party QR service's domain
+ * and silently missed the local payload, so the download succeeded and the
+ * failure toast never rendered.
  */
 function stubQrFetch(respond: () => Promise<Response>) {
   const originalFetch = globalThis.fetch;
   globalThis.fetch = async (input, init) =>
-    String(input).includes('qr') ? respond() : originalFetch(input, init);
+    String(input).startsWith('data:') ? respond() : originalFetch(input, init);
   return () => {
     globalThis.fetch = originalFetch;
   };
@@ -23,6 +29,28 @@ async function openMenu({
   await userEvent.click(
     within(canvasElement).getByRole('button', { name: 'More actions' })
   );
+}
+
+/**
+ * Opens the overflow menu, triggers the QR download, and waits for the
+ * failure toast. Clicking the item closes the menu, so the a11y audit
+ * runs on the settled toast state: a held-open modal menu aria-hides the
+ * page behind it, which axe reports as aria-hidden-focus.
+ */
+async function downloadQrAndAwaitToast({
+  canvasElement,
+}: {
+  readonly canvasElement: HTMLElement;
+}) {
+  await openMenu({ canvasElement });
+  await userEvent.click(
+    within(document.body).getByRole('menuitem', {
+      name: 'Download QR Code',
+    })
+  );
+  await expect(
+    await within(document.body).findByText('Unable to download QR code')
+  ).toBeVisible();
 }
 
 function ProfileSidebarHeaderDemo({
@@ -91,7 +119,7 @@ export const EmptyIdentity: Story = {
 export const ErrorQrDownload: Story = {
   beforeEach: () =>
     stubQrFetch(async () => new Response(null, { status: 500 })),
-  play: openMenu,
+  play: downloadQrAndAwaitToast,
 };
 
 /** Offline: the QR request never reaches the service. */
@@ -100,7 +128,7 @@ export const OfflineQrDownload: Story = {
     stubQrFetch(async () => {
       throw new TypeError('Failed to fetch');
     }),
-  play: openMenu,
+  play: downloadQrAndAwaitToast,
 };
 
 export const LongContentName: Story = {

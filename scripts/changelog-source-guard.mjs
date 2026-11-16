@@ -2,7 +2,11 @@
 import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { parseArgs } from 'node:util';
-import { evaluateCustomerNoteContract } from './lib/daily-changelog-publication.mjs';
+import { customerNoteCopyProblems } from './lib/changelog-filter-rules.mjs';
+import {
+  evaluateCustomerNoteContract,
+  readCustomerNote,
+} from './lib/daily-changelog-publication.mjs';
 import {
   QUOTA_DEFERRED_MARKER,
   runWithGitHubRetry,
@@ -92,6 +96,16 @@ if (local || pr) {
   if (!verdict.passed)
     throw new Error(
       `Customer outcome decision missing or invalid (${verdict.reason}). This PR changes customer-facing code (apps/web/{app,components/features,lib}, apps/ios Swift, apps/desktop/src), so its body needs one marker. Internal work: add the line <!-- customer-changelog/v1 {"releaseWorthy":false} --> to the PR body (the PR template already has it). Customer-visible work: see docs/CHANGELOG_PUBLICATION.md for the releaseWorthy:true form with availability.`
+    );
+  // Headline and wording rules for release-worthy markers in PRs created
+  // after the lint landed; older PRs keep the contract they were admitted under.
+  const copyProblems = customerNoteCopyProblems(
+    readCustomerNote(current.body).note,
+    pr.created_at
+  );
+  if (copyProblems.length)
+    throw new Error(
+      `Customer changelog copy needs a rewrite. Fix the "text" of the customer-changelog/v1 marker in the PR body, then re-run Source Validation:\n${copyProblems.map(problem => `  - ${problem}`).join('\n')}\nRule and examples: docs/CHANGELOG_PUBLICATION.md ("Headlines").`
     );
   process.stdout.write(`${JSON.stringify(verdict)}\n`);
 }

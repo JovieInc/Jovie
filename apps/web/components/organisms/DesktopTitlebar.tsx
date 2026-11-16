@@ -158,6 +158,8 @@ export function DesktopTitlebar() {
   // 44pt title row keeps its height. Outside Electron the flag stays off.
   useEffect(() => {
     const root = document.documentElement;
+    // New shells own this before hydration; retain the observer for older binaries.
+    if (root.dataset.electronFullscreenManaged === 'preload') return;
     if (!isDesktop) {
       delete root.dataset.electronFullscreen;
       return;

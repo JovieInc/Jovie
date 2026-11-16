@@ -5,7 +5,7 @@ import { type ReactNode, useEffect, useState } from 'react';
 import { toast } from '@/components/feedback';
 import type { DrawerHeaderAction } from '@/components/molecules/drawer-header/DrawerHeaderActions';
 import { DrawerHeaderActions } from '@/components/molecules/drawer-header/DrawerHeaderActions';
-import { getQrCodeUrl } from '@/components/molecules/QRCode';
+import { getQrCodeDataUrl } from '@/components/molecules/QRCode';
 import { BASE_URL } from '@/constants/domains';
 import { getProfileModePath } from '@/features/profile/registry';
 import { useAppFlag } from '@/lib/flags/client';
@@ -87,11 +87,12 @@ export function useProfileHeaderParts({
 
   const handleDownloadQRCode = async () => {
     try {
-      const qrUrl = getQrCodeUrl(profileUrl, 420);
-      const response = await fetch(qrUrl);
+      // Generated locally — no third-party request for the QR image.
+      const dataUrl = await getQrCodeDataUrl(profileUrl, 420);
+      const response = await fetch(dataUrl);
 
       if (!response.ok) {
-        throw new Error('Failed to fetch QR code image');
+        throw new Error('Failed to read QR code image');
       }
 
       const qrBlob = await response.blob();

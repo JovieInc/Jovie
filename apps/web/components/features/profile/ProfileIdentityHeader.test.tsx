@@ -137,6 +137,7 @@ describe('ProfileIdentityHeader', () => {
       renderHeader({ onGetUpdatesClick });
 
       const primary = screen.getByRole('button', { name: 'Get Updates' });
+      expect(primary).toHaveAttribute('data-slot', 'plain-button');
       expect(primary.parentElement).toHaveClass('h-11', 'flex-1');
       const pillFace = primary.parentElement?.querySelector(
         '.profile-glass-pill'

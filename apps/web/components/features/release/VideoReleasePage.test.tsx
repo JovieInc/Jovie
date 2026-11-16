@@ -166,7 +166,8 @@ describe('VideoReleasePage', () => {
       'https://www.youtube.com/watch?v=abc123'
     );
     expect(watch).toHaveAttribute('rel', 'noopener noreferrer');
-    expect(watch).toHaveClass('text-on-media/40', 'hover:text-on-media/60');
+    // /40 on the near-black stage measures 3.68:1 — below AA for 12px copy.
+    expect(watch).toHaveClass('text-on-media/60', 'hover:text-on-media/80');
     expect(screen.getByTestId('youtube-embed')).toHaveAttribute(
       'title',
       'Music video: The Deep End (Official Video) by Tim White'

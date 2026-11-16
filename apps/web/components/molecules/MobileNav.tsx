@@ -1,5 +1,6 @@
 'use client';
 
+import { PlainButton } from '@jovie/ui';
 import { ArrowRight, Menu, X } from 'lucide-react';
 import Link from 'next/link';
 import {
@@ -167,7 +168,7 @@ export function MobileNav({
   return (
     <>
       {/* Toggle button */}
-      <button
+      <PlainButton
         ref={toggleRef}
         type='button'
         onClick={() => setIsOpen(prev => !prev)}
@@ -191,7 +192,7 @@ export function MobileNav({
         >
           {isOpen ? <X size={20} /> : <Menu size={20} />}
         </AnimatedIconSwap>
-      </button>
+      </PlainButton>
 
       {/* Portal: render overlay + nav panel outside header to avoid
           backdrop-filter creating a containing block that clips fixed positioning */}

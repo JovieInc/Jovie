@@ -39,10 +39,10 @@ export function PresenceStatusBadge({
       <span
         className={cn(
           'inline-flex min-h-8 items-center gap-1.5 text-xs text-tertiary-token',
-          status.tone === 'success' && 'text-success',
+          status.tone === 'success' && 'text-success-text',
           // JOV-8964: warning renders neutral — the loud orange read as an alarm.
           status.tone === 'warning' && 'text-secondary-token',
-          status.tone === 'error' && 'text-error'
+          status.tone === 'error' && 'text-error-text'
         )}
       >
         <StatusIcon className='h-3.5 w-3.5 shrink-0' aria-hidden />
@@ -78,9 +78,9 @@ export function PresenceSignalList({
             <span
               className={cn(
                 'inline-flex items-center gap-1.5 font-medium',
-                signal.tone === 'error' && 'text-error',
-                signal.tone === 'warning' && 'text-warning',
-                signal.tone === 'success' && 'text-success',
+                signal.tone === 'error' && 'text-error-text',
+                signal.tone === 'warning' && 'text-warning-text',
+                signal.tone === 'success' && 'text-success-text',
                 signal.tone === 'neutral' && 'text-secondary-token'
               )}
             >

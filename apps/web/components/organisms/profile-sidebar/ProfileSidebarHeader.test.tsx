@@ -11,6 +11,12 @@ const { toastMock, downloadBlobMock, walletFlag } = vi.hoisted(() => ({
 }));
 
 vi.mock('@/components/feedback', () => ({ toast: toastMock }));
+// The QR is generated locally (no third-party request); the mock keeps the
+// download flow's fetch/blob assertions meaningful without a real encoder.
+vi.mock('@/components/molecules/QRCode', () => ({
+  __esModule: true,
+  getQrCodeDataUrl: vi.fn(async () => 'data:image/png;base64,QRPNG'),
+}));
 vi.mock('@/lib/utils/download', () => ({ downloadBlob: downloadBlobMock }));
 vi.mock('@/lib/flags/client', () => ({
   useAppFlag: () => walletFlag.enabled,

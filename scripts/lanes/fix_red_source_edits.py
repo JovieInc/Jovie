@@ -8,7 +8,7 @@ import tempfile
 from pathlib import Path
 
 from atomic_state import atomic_write_text
-from fix_red_statement_merge import resolve_additive_statements_text
+from fix_red_statement_merge import contained_by_main, contained_by_main_file, resolve_additive_statements_text
 
 LEGACY_CACHE_EXPORT = re.compile(
     r"^\s*export const (?:dynamic|fetchCache|revalidate)\s*=")
@@ -261,9 +261,13 @@ def _diff3_conflict(worktree: Path, rel: str, sh) -> str | None:
         return probe.stdout
 
 
+# Next.js route groups, dynamic segments, parallel routes and intercepts.
+_TEST_PATH = r"[\w./()[\]@+-]+"
+
+
 def resolve_additive_node_test_file(worktree: Path, rel: str, sh) -> str | None:
     """Use Git's actual three stages to prove test conflicts are insertions only."""
-    if not re.fullmatch(r"[\w./-]+\.(?:test|spec)\.mjs", rel):
+    if not re.fullmatch(_TEST_PATH + r"\.(?:test|spec)\.mjs", rel):
         return None
     conflict = _diff3_conflict(worktree, rel, sh)
     if conflict is None:
@@ -273,7 +277,7 @@ def resolve_additive_node_test_file(worktree: Path, rel: str, sh) -> str | None:
 
 def resolve_additive_statement_file(worktree: Path, rel: str, sh) -> str | None:
     """Union empty-base statement insertions in a Vitest file, proven from Git's three stages."""
-    if not re.fullmatch(r"[\w./-]+\.(?:test|spec)\.tsx?", rel):
+    if not re.fullmatch(_TEST_PATH + r"\.(?:test|spec)\.tsx?", rel):
         return None
     conflict = _diff3_conflict(worktree, rel, sh)
     if conflict is None:
@@ -410,7 +414,7 @@ def commit_open_merge(worktree, paths, sh, log, *, guard=lambda: None) -> bool:
     return True
 
 
-def resolve_additive_list_conflict(worktree: Path, branch: str, log, *, sh, merge_entries, guard=lambda: None, push: bool = True) -> bool:
+def resolve_additive_list_conflict(worktree: Path, branch: str, log, *, sh, merge_entries, guard=lambda: None, push: bool = True, stage_choice=None) -> bool:
     """Union quoted lists, node:test blocks, Vitest statement insertions, waiver rows, or dropped screen-debt rows.
 
     Main's order stays, then head-only lines. A prose hunk or any other shape aborts
@@ -427,14 +431,14 @@ def resolve_additive_list_conflict(worktree: Path, branch: str, log, *, sh, merg
         for path in conflicted:
             target = worktree / path
             try:
-                text = merge_entries(target.read_text())
-                if text is None:
+                text = stage_choice(worktree, path, sh) if stage_choice else merge_entries(target.read_text())
+                if text is None and not stage_choice:
                     text = resolve_additive_node_test_file(worktree, path, sh)
-                if text is None:
+                if text is None and not stage_choice:
                     text = resolve_additive_statement_file(worktree, path, sh)
-                if text is None:
+                if text is None and not stage_choice:
                     text = resolve_additive_certificate_waivers(worktree, path, sh)
-                if text is None:
+                if text is None and not stage_choice:
                     text = resolve_subtractive_screen_debt(worktree, path, sh)
             except OSError:
                 text = None

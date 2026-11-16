@@ -31,7 +31,7 @@ describe('central Inbox bell', () => {
       />
     );
     const link = screen.getByRole('link', {
-      name: 'Inbox — 3 items need attention',
+      name: 'Inbox — 3 Items Need Attention',
     });
     expect(link.querySelector('svg')).toHaveClass(
       'size-(--app-shell-sidebar-icon-size)'
@@ -81,7 +81,7 @@ describe('central Inbox bell', () => {
         />
       );
       const link = screen.getByRole('link', {
-        name: 'Inbox — 3 items need attention; app update available',
+        name: 'Inbox — 3 Items Need Attention; app update available',
       });
       expect(link.querySelectorAll('[data-runtime-update]')).toHaveLength(1);
       expect(link.querySelector('[data-runtime-update]')).toHaveClass(
@@ -112,7 +112,7 @@ describe('central Inbox bell', () => {
       />
     );
     const link = screen.getByRole('link', {
-      name: 'Inbox — 12840 items need attention',
+      name: 'Inbox — 12840 Items Need Attention',
     });
     expect(link).toHaveClass('size-7');
     expect(link.querySelectorAll('[aria-hidden="true"]')).toHaveLength(2);
@@ -128,9 +128,37 @@ describe('central Inbox bell', () => {
       </div>
     );
     const link = screen.getByRole('link', {
-      name: 'Inbox — 3 items need attention',
+      name: 'Inbox — 3 Items Need Attention',
     });
     expect(link).toHaveAttribute('data-inbox-attention', 'available');
     await expectNoA11yViolations(container);
+  });
+
+  it('keeps a lone pending item singular (JOV-9018 class)', () => {
+    render(
+      <SidebarInboxLink
+        availability={{ state: 'available', pendingCount: 1 }}
+      />
+    );
+    expect(
+      screen.getByRole('link', { name: 'Inbox — 1 Item Needs Attention' })
+    ).toBeInTheDocument();
+  });
+
+  it('keeps the runtime-update dot independently labeled next to pending work', () => {
+    runtimeUpdate.available = true;
+    try {
+      render(
+        <SidebarInboxLink
+          availability={{ state: 'available', pendingCount: 1 }}
+        />
+      );
+      const link = screen.getByRole('link', {
+        name: 'Inbox — 1 Item Needs Attention; app update available',
+      });
+      expect(link.querySelector('[data-runtime-update]')).not.toBeNull();
+    } finally {
+      runtimeUpdate.available = false;
+    }
   });
 });

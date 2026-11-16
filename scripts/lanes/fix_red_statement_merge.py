@@ -1,11 +1,13 @@
 """Union empty-base Vitest statement insertions.
 
 Main's statements stay first, then head-only statements. A changed existing
-line, control flow, an unbalanced side, or a repeated binding with a different
-body stays unresolved. The caller proves the diff3 base is empty.
+line, control flow, an unbalanced side, or a repeated binding or import of the
+same module with a different body stays unresolved. The caller proves the
+diff3 base is empty.
 """
 from __future__ import annotations
 
+import difflib
 import re
 
 _HUNK = re.compile(
@@ -14,6 +16,8 @@ _HUNK = re.compile(
     re.M | re.S)
 _BIND = re.compile(
     r"^(?:export\s+)?(?:const|let|var|function|class)\s+([A-Za-z_$][\w$]*)\b")
+_IMPORT = re.compile(
+    r"^import\s+(?:type\s+)?(?:[^'\"\n;]+?\s+from\s+)?(['\"])(?P<mod>[^'\"\n]+)\1\s*;$")
 _MOCK = re.compile(r"^vi\.mock\(\s*(['\"])(?P<mod>[^'\"\n]+)\1")
 _CALL = re.compile(r"^[A-Za-z_$][\w$.]*\(")
 _FLOW = re.compile(
@@ -80,6 +84,9 @@ def _key(statement: str) -> str | None:
     body = statement.strip()
     if _FLOW.match(body):
         return None
+    imported = _IMPORT.match(body)
+    if imported:
+        return "import:" + imported.group("mod")
     bound = _BIND.match(body)
     if bound:
         return "bind:" + bound.group(1)
@@ -123,3 +130,44 @@ def resolve_additive_statements_text(text: str) -> str | None:
     if _MARKERS.search(text):
         return None
     return text
+
+
+def contained_by_main(base: str, ours: str, theirs: str) -> str | None:
+    """Take main when every PR edit is retained within main's edit of the same base range.
+
+    Keep comments, whitespace, directives and string contents significant. Broader
+    overlapping base ranges, renamed locals and text elsewhere remain unresolved.
+    """
+    if any(_MARKERS.search(side) for side in (base, ours, theirs)):
+        return None
+    base_lines = base.splitlines(keepends=True)
+
+    def changes(side):
+        lines = side.splitlines(keepends=True)
+        return {(i1, i2): lines[j1:j2]
+                for tag, i1, i2, j1, j2 in difflib.SequenceMatcher(
+                    a=base_lines, b=lines, autojunk=False).get_opcodes() if tag != "equal"}
+
+    main_changes = changes(theirs)
+    for span, replacement in changes(ours).items():
+        landed = main_changes.get(span)
+        if landed is None:
+            return None
+        if not replacement:
+            if landed:
+                return None
+        elif not any(landed[start:start + len(replacement)] == replacement
+                     for start in range(len(landed) - len(replacement) + 1)):
+            return None
+    return theirs
+
+
+def contained_by_main_file(worktree, rel, sh) -> str | None:
+    """Read Git's actual base/PR/main stages, refusing missing stages."""
+    stages = []
+    for stage in (1, 2, 3):
+        blob = sh(["git", "show", f":{stage}:{rel}"], cwd=worktree)
+        if blob.returncode:
+            return None
+        stages.append(blob.stdout)
+    return contained_by_main(*stages)

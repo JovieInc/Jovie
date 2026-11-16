@@ -30,6 +30,7 @@ test('every checked-in brief parses and names a unique frame', () => {
     [
       'audience-analytics',
       'billing-success',
+      'chat-history-switcher',
       'claim',
       'empty-states',
       'homepage',

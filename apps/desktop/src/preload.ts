@@ -1,5 +1,8 @@
 import { contextBridge, ipcRenderer } from 'electron';
+import { installPreloadFullScreenState } from './preload-fullscreen';
 import { createSessionWorkReporter } from './session-work-state';
+
+installPreloadFullScreenState(ipcRenderer);
 
 // Scoped to this document's isolated world; full navigation cannot inherit idle.
 const sessionWorkReporter = createSessionWorkReporter();

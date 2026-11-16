@@ -214,7 +214,18 @@ export function deriveRemediationEvents({ prs, feed = new Map() }, manifest) {
         events.push(
           ...chainStages('remediation', entityId, stamps, manifest, {
             actor: laneFor(pr),
-          })
+          }),
+          // Writer vs repair split of the same red-to-green dwell. A truncated
+          // timeline cannot prove "no repair label", so it stays unsplit.
+          ...(pr.timelineTruncated
+            ? []
+            : chainStages(
+                classified ? 'remediation-repair' : 'remediation-writer',
+                entityId,
+                stamps.filter(s => s.stage === 'red' || s.stage === 'green'),
+                manifest,
+                { actor: laneFor(pr) }
+              ))
         );
         red = null;
       }
@@ -299,6 +310,8 @@ export function deriveStageEvents(raw, manifest) {
   const derived = new Set([
     'shipping',
     'remediation',
+    'remediation-repair',
+    'remediation-writer',
     'release',
     'ios-release',
   ]);

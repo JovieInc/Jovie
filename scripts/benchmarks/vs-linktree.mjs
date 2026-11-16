@@ -71,10 +71,10 @@ function lighthouseOnce(url, dir, index) {
       .filter(item => item.resourceType === 'Script')
       .reduce((sum, item) => sum + item.transferSize, 0),
     score: Math.round(lhr.categories.performance.score * 100),
-    thirdParty: thirdPartyHosts(
+    thirdPartyHosts: thirdPartyHosts(
       url,
       requests.map(item => item.url)
-    ).length,
+    ),
   };
 }
 
@@ -117,8 +117,12 @@ async function main() {
       jovie: await pageFacts(COMPARATIVE_BENCHMARK.jovieUrl),
       competitor: await pageFacts(COMPARATIVE_BENCHMARK.competitorUrl),
     };
-    const pick = (side, key) =>
-      median(samples[side].map(sample => sample[key]));
+    const pick = (side, keyOrGet) =>
+      median(
+        samples[side].map(sample =>
+          typeof keyOrGet === 'function' ? keyOrGet(sample) : sample[keyOrGet]
+        )
+      );
     const live = {
       'lcp-ms': {
         jovie: pick('jovie', 'lcp'),
@@ -145,8 +149,8 @@ async function main() {
         competitor: pick('competitor', 'score'),
       },
       'third-party-hosts': {
-        jovie: pick('jovie', 'thirdParty'),
-        competitor: pick('competitor', 'thirdParty'),
+        jovie: pick('jovie', sample => sample.thirdPartyHosts.length),
+        competitor: pick('competitor', sample => sample.thirdPartyHosts.length),
       },
       'pinch-zoom': {
         jovie: facts.jovie.zoom,
@@ -162,17 +166,28 @@ async function main() {
       metric: claim.metric,
       live: live[claim.metric],
     }));
+    // Name the hosts on the Jovie side so a flagged exact-zero claim is
+    // diagnosable from the run output alone (receipt and CLAIM-FLAG line).
+    const jovieThirdPartyHosts = [
+      ...new Set(samples.jovie.flatMap(sample => sample.thirdPartyHosts)),
+    ].sort();
+
     const receipt = {
       schema: 'jovie-vs-linktree-receipt/v1',
       measuredAt: new Date().toISOString(),
       runs,
       hostLoad1m: Number(loadavg()[0].toFixed(1)),
       method: COMPARATIVE_BENCHMARK.method,
+      jovieThirdPartyHosts,
       evaluations,
     };
     if (outPath) writeFileSync(outPath, JSON.stringify(receipt, null, 2));
     for (const evaluation of evaluations) {
-      const line = `${evaluation.holds ? 'ok  ' : 'CLAIM-FLAG'} ${evaluation.claimId} jovie=${evaluation.live.jovie} linktree=${evaluation.live.competitor} ${evaluation.reason}`;
+      const hostNote =
+        evaluation.metric === 'third-party-hosts' && !evaluation.holds
+          ? ` jovie-hosts=[${jovieThirdPartyHosts.join(', ')}]`
+          : '';
+      const line = `${evaluation.holds ? 'ok  ' : 'CLAIM-FLAG'} ${evaluation.claimId} jovie=${evaluation.live.jovie} linktree=${evaluation.live.competitor} ${evaluation.reason}${hostNote}`;
       console.log(line);
     }
     process.exitCode = evaluations.every(item => item.holds) ? 0 : 1;

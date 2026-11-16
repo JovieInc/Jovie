@@ -19,10 +19,10 @@ function columnFor(tier: FlagEnvTier) {
 
 async function readOverrideMap(tier: FlagEnvTier): Promise<FlagOverrideMap> {
   try {
-    // Fail safe before the migration lands (CI seeding / fresh branch): no
-    // table means no overrides, so every flag falls through to its default.
+    // The table probe also returns false on connection failures. Keep draft
+    // gating closed when configuration cannot be read; other flags use defaults.
     if (!(await doesTableExist('feature_flag_overrides'))) {
-      return {};
+      return { OUTBOUND_DOGFOOD_GATE: true };
     }
 
     const rows = await db
@@ -40,10 +40,10 @@ async function readOverrideMap(tier: FlagEnvTier): Promise<FlagOverrideMap> {
     }
     return map;
   } catch (error) {
-    // Override store is a convenience layer — never break flag resolution if
-    // the DB hiccups. Fall back to code defaults.
+    // Most flags fall back to code defaults. Draft visibility is a negative
+    // gate: unreadable configuration must not disable its evidence checks.
     await captureWarning('Feature flag override read failed', error, { tier });
-    return {};
+    return { OUTBOUND_DOGFOOD_GATE: true };
   }
 }
 

@@ -68,7 +68,7 @@ export function ReleaseEditDialog({
       <DialogTitle className='flex items-center gap-2.5 text-lg font-semibold text-primary-token'>
         <Icon
           name='Link'
-          className='h-4.5 w-4.5 text-secondary-token'
+          className='h-4 w-4 text-secondary-token'
           aria-hidden='true'
         />
         Edit Release Links
