@@ -10,6 +10,11 @@ import {
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import {
+  EX_TEMPFAIL,
+  isGitHubInfrastructureFailure,
+  QUOTA_DEFERRED_MARKER,
+} from '../../scripts/lib/github-rate-limit.mjs';
 import { collectPaged } from './collect-quarantine-evidence.mjs';
 
 const REPO = 'JovieInc/Jovie';
@@ -216,7 +221,19 @@ if (
   try {
     main();
   } catch (error) {
-    console.error(error.message);
+    const text = `${error instanceof Error ? error.message : String(error)}\n${
+      /** @type {{ stderr?: unknown }} */ (error)?.stderr ?? ''
+    }`;
+    // A quota 403 or an upstream 5xx is infrastructure, never a verdict on
+    // the run being published (defer-don't-red): hold the job out of the
+    // relay's failure path and let the next completion retry.
+    if (isGitHubInfrastructureFailure(text)) {
+      console.error(
+        `::warning::JUnit publication deferred (${QUOTA_DEFERRED_MARKER}): infrastructure, not a verdict; the next completed CI run retries.`
+      );
+      process.exit(EX_TEMPFAIL);
+    }
+    console.error(error instanceof Error ? error.message : String(error));
     process.exitCode = 1;
   }
 }

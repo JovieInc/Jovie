@@ -1,8 +1,5 @@
-// Diff-scoped mutation testing for high-risk apps/web source.
-// Stryker's vitest runner (10.0.0) loses results for tests nested in
-// `describe` blocks under vitest 5, so every killed mutant there scores as
-// Survived. This lane uses Stryker's command runner instead: each mutant runs
-// a plain `vitest run` over the tests that import the mutated file.
+// Diff-scoped mutation testing uses the command runner over related tests.
+// Core 10.0's Vitest adapter loses describe-block results under Vitest 5.
 
 import {
   existsSync,
@@ -13,7 +10,14 @@ import {
 } from 'node:fs';
 import { join, posix, relative, resolve } from 'node:path';
 import ts from 'typescript';
-import { hasMutationSource, parseModule } from './mutation-source.mjs';
+import {
+  hasMutationSource,
+  parseModule,
+  scoreMutants,
+  withMutationEvidence,
+} from './mutation-source.mjs';
+
+export { scoreMutants } from './mutation-source.mjs';
 
 export const WEB_ROOT = 'apps/web';
 
@@ -131,6 +135,8 @@ function runtimeImports(path, contents) {
   const mocks = [];
   /** @type {string[]} */
   const unmocks = [];
+  /** @type {string[]} */
+  const unresolvedExpressions = [];
   /** @param {ts.Node | undefined} node */
   const literal = node => {
     if (node && ts.isStringLiteralLike(node)) return node.text;
@@ -252,12 +258,17 @@ function runtimeImports(path, contents) {
         const specifier = literal(node.arguments[0]);
         if (specifier)
           imports.push({ specifier, actual: method === 'importActual' });
+        else
+          unresolvedExpressions.push(
+            node.arguments[0]?.getText(tree) ?? '<missing>'
+          );
       }
     }
     ts.forEachChild(node, visit);
   };
   visit(tree);
-  return { imports, mocks, unmocks };
+  const unresolved = unresolvedExpressions.length > 0;
+  return { imports, mocks, unmocks, unresolved, unresolvedExpressions };
 }
 
 /**
@@ -302,7 +313,7 @@ export function createTestSelector(
     return null;
   };
   /** @param {string} sourcePath */
-  return sourcePath => {
+  const select = sourcePath => {
     if (!module(sourcePath))
       throw new Error(`Mutation source is missing: ${sourcePath}`);
     const related = [];
@@ -344,6 +355,7 @@ export function createTestSelector(
       )
       .map(test => test.path);
   };
+  return withMutationEvidence(select, module, resolveModule, testSources);
 }
 
 /**
@@ -408,24 +420,6 @@ export function readTestSources(webRoot) {
  * @typedef {{ file: string, tests: string[], mutants: Mutant[], executedTests?: number,
  *   targetExecution?: ReturnType<typeof readTargetExecution> }} FileResult
  */
-
-/** @param {{ status: string }[]} mutants */
-export function scoreMutants(mutants) {
-  /** @type {Record<string, number>} */
-  const counts = {};
-  for (const mutant of mutants) {
-    counts[mutant.status] = (counts[mutant.status] ?? 0) + 1;
-  }
-  const detected = (counts.Killed ?? 0) + (counts.Timeout ?? 0);
-  const undetected = (counts.Survived ?? 0) + (counts.NoCoverage ?? 0);
-  const valid = detected + undetected;
-  return {
-    detected,
-    undetected,
-    valid,
-    score: valid === 0 ? null : Math.round((detected / valid) * 1000) / 10,
-  };
-}
 
 /**
  * Markdown summary: one row per file, then the first survivors per file.
@@ -520,11 +514,17 @@ export function renderSummary({
 /**
  * @param {string} reportPath
  * @param {string} sourcePath apps/web-relative
+ * @param {string | null} [expectedSource] exact source captured before the run
  */
-export function readReportMutants(reportPath, sourcePath) {
+export function readReportMutants(
+  reportPath,
+  sourcePath,
+  expectedSource = null
+) {
   if (!existsSync(reportPath)) return null;
   const report = JSON.parse(readFileSync(reportPath, 'utf8'));
   const entry = report.files?.[sourcePath];
+  if (expectedSource !== null && entry?.source !== expectedSource) return null;
   return entry ? /** @type {Mutant[]} */ (entry.mutants) : null;
 }
 
