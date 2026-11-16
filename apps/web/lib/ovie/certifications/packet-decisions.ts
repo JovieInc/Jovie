@@ -119,6 +119,74 @@ export async function readPacketDecisionLedger(
   return parsePacketDecisionLedger(raw, domain);
 }
 
+export type PacketDecisionLedgerRead =
+  | { readonly ok: true; readonly ledger: PacketDecisionLedger }
+  | { readonly ok: false };
+
+/** Per-domain ledger reads keyed by domain. */
+export type PacketDecisionLedgerReads = ReadonlyMap<
+  OvieCertificationDomainId,
+  PacketDecisionLedgerRead
+>;
+
+/**
+ * Read every domain's decision ledger. A backend with `getMany` batches all
+ * keys into ONE round trip (JOV-12821: the certification inventory read one
+ * identical SELECT per domain); backends without it fall back to per-key
+ * reads with per-domain isolation, so one unreadable ledger fails only its
+ * own domain closed.
+ */
+export async function readPacketDecisionLedgers(
+  backend: CertificationRecordBackend,
+  domains: readonly OvieCertificationDomainId[]
+): Promise<PacketDecisionLedgerReads> {
+  const raws = new Map<string, unknown>();
+  const failed = new Set<OvieCertificationDomainId>();
+  if (typeof backend.getMany === 'function') {
+    try {
+      const rows = await backend.getMany(
+        domains.map(domain => packetDecisionLedgerKey(domain))
+      );
+      for (const [key, value] of rows) {
+        if (value !== null && value !== undefined) raws.set(key, value);
+      }
+    } catch {
+      // One round trip means one failure mode: every domain fails closed.
+      return new Map(domains.map(domain => [domain, { ok: false }] as const));
+    }
+  } else {
+    await Promise.all(
+      domains.map(async domain => {
+        try {
+          const value = await backend.get(packetDecisionLedgerKey(domain));
+          if (value !== null && value !== undefined) {
+            raws.set(packetDecisionLedgerKey(domain), value);
+          }
+        } catch {
+          failed.add(domain);
+        }
+      })
+    );
+  }
+  return new Map(
+    domains.map(domain => {
+      if (failed.has(domain)) return [domain, { ok: false }] as const;
+      const raw = raws.get(packetDecisionLedgerKey(domain));
+      if (raw === undefined) {
+        return [domain, { ok: true, ledger: emptyLedger(domain) }] as const;
+      }
+      try {
+        return [
+          domain,
+          { ok: true, ledger: parsePacketDecisionLedger(raw, domain) },
+        ] as const;
+      } catch {
+        return [domain, { ok: false }] as const;
+      }
+    })
+  );
+}
+
 export type RecordPacketFounderDecisionResult =
   | RecordFounderCertificationDecisionResult
   | {

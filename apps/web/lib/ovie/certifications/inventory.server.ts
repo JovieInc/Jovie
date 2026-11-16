@@ -28,8 +28,10 @@ import {
   normalizeKernelCertificationRow,
 } from './normalize';
 import {
+  type PacketDecisionLedgerReads,
   type PacketDecisionRecord,
   readPacketDecisionLedger,
+  readPacketDecisionLedgers,
   recordPacketFounderDecision,
 } from './packet-decisions';
 import {
@@ -330,7 +332,8 @@ async function packetDomain(
   domain: OvieCertificationDomainId,
   files: readonly CertificationPacketFile[],
   deps: OvieCertificationInventoryDeps,
-  evaluatedAt: string
+  evaluatedAt: string,
+  ledgerReads: Promise<PacketDecisionLedgerReads>
 ): Promise<CertificationDomainProjection> {
   const label = OVIE_CERTIFICATION_DOMAIN_LABELS[domain];
   if (files.length === 0) {
@@ -348,7 +351,12 @@ async function packetDomain(
     };
   }
   try {
-    const ledger = await readPacketDecisionLedger(deps.backend(), domain);
+    const reads = await ledgerReads;
+    const read = reads.get(domain);
+    if (!read || !read.ok) {
+      throw new Error(`Decision ledger read failed for ${domain}.`);
+    }
+    const ledger = read.ledger;
     const projections = files.map(file =>
       packetProjection(
         file,
@@ -614,6 +622,12 @@ export async function readOvieCertificationInventory(
   generatedAt: string = new Date().toISOString()
 ): Promise<OvieCertificationInventory> {
   const packetRead = await deps.readPacketFiles();
+  // One batched read for every packet domain's decision ledger (JOV-12821):
+  // nine same-shape SELECTs here are what Sentry flagged as the N+1.
+  const ledgerReadsPromise = readPacketDecisionLedgers(
+    deps.backend(),
+    PACKET_FILE_DOMAINS
+  );
   const results = await Promise.all([
     marketingDomain(deps, generatedAt),
     customersDomain(deps, generatedAt),
@@ -623,7 +637,8 @@ export async function readOvieCertificationInventory(
         domain,
         packetRead.files.filter(file => file.domain === domain),
         deps,
-        generatedAt
+        generatedAt,
+        ledgerReadsPromise
       )
     ),
   ]);

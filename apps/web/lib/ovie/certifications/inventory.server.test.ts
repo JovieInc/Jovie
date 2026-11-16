@@ -233,6 +233,55 @@ describe('readOvieCertificationInventory', () => {
     expect(inventory.rows.map(row => row.id)).toEqual(['flows:signup']);
   });
 
+  it('reads every packet-domain decision ledger in one backend batch (JOV-12821)', async () => {
+    const backend = memoryCertificationBackend();
+    backend.records.set(
+      'jovie:certification:v1:packet-decisions:flows',
+      JSON.stringify({
+        schemaVersion: 1,
+        domain: 'flows',
+        records: {
+          signup: {
+            decisions: [
+              {
+                id: 'decision-1',
+                subjectId: 'signup',
+                evidenceDigest: 'sha256:' + 'a'.repeat(64),
+                decision: 'approved',
+                decidedAt: '2026-09-27T07:00:00.000Z',
+                reviewer: 'Tim White',
+                notes: null,
+              },
+            ],
+            auditHistory: [],
+            updatedAt: '2026-09-27T07:00:00.000Z',
+          },
+        },
+        updatedAt: '2026-09-27T07:00:00.000Z',
+      })
+    );
+    const getMany = vi.fn(async (keys: readonly string[]) => {
+      const rows = new Map<string, unknown>();
+      for (const key of keys) {
+        if (backend.records.has(key)) rows.set(key, backend.records.get(key));
+      }
+      return rows;
+    });
+    const batched = { ...backend, getMany };
+    const inventory = await readOvieCertificationInventory(
+      deps([packetFile('signup')], batched),
+      FIXTURE_NOW
+    );
+    // One round trip for all nine packet-domain ledger keys, not one
+    // identical SELECT per domain.
+    expect(getMany).toHaveBeenCalledTimes(1);
+    expect(getMany.mock.calls[0]?.[0]).toHaveLength(9);
+    expect(inventory.domains.find(d => d.domain === 'flows')).toMatchObject({
+      status: 'connected',
+      rowCount: 1,
+    });
+  });
+
   it('fails a packet domain closed when its decision ledger cannot be read', async () => {
     const backend = memoryCertificationBackend();
     backend.records.set(

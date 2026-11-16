@@ -12,6 +12,23 @@ export interface CertificationRecordBackend {
     nextValue: string,
     ttlSeconds: number
   ): Promise<boolean>;
+  /**
+   * Optional lexically ordered prefix scan (JOV-12830): lets the marketing
+   * certification store rehydrate per-identity packet shard rows in one call
+   * instead of one get per identity. Backends without it fall back to
+   * per-identity gets.
+   */
+  listRecords?(
+    prefix: string,
+    after: string | undefined,
+    limit: number
+  ): Promise<Array<{ key: string; value: unknown }>>;
+  /**
+   * Optional multi-get (JOV-12821): one round trip for many keys. Backends
+   * without it fall back to per-key gets; absent keys are simply missing from
+   * the returned map.
+   */
+  getMany?(keys: readonly string[]): Promise<Map<string, unknown>>;
 }
 
 export const CERTIFICATION_PERSISTENCE_TTL_SECONDS = 315_576_000;
