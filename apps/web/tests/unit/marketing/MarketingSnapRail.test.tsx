@@ -123,7 +123,7 @@ describe('MarketingSnapRail', () => {
     Object.defineProperty(rail, 'clientWidth', { value: 400 });
     Object.defineProperty(rail, 'scrollWidth', { value: 800 });
     rail.scrollBy = vi.fn();
-    fireEvent(globalThis, new Event('resize'));
+    fireEvent(globalThis.window, new Event('resize'));
 
     const next = screen.getByRole('button', { name: 'Next preview' });
     const previous = screen.getByRole('button', { name: 'Previous preview' });
