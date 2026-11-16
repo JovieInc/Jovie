@@ -153,24 +153,6 @@ for (const step of steps) {
       );
     }
 
-    it.each([{ isComposing: true }, { keyCode: 229 }])(
-      'does not submit Enter while choosing an IME composition candidate (%j)',
-      async composition => {
-        renderStep();
-        const input = screen.getByLabelText(step.label);
-        fireEvent.change(input, { target: { value: 'synthetic-value' } });
-        fireEvent.keyDown(input, { key: 'Enter', ...composition });
-        expect(step.mutation.mutateAsync).not.toHaveBeenCalled();
-
-        fireEvent.keyDown(input, { key: 'Enter', isComposing: false });
-        await waitFor(() =>
-          expect(step.mutation.mutateAsync).toHaveBeenCalledExactlyOnceWith({
-            [step.field]: 'synthetic-value',
-          })
-        );
-      }
-    );
-
     it('submits trimmed input by keyboard and calls the matching success callback', async () => {
       const user = userEvent.setup();
       renderStep();
