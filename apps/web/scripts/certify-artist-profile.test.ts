@@ -465,4 +465,61 @@ describe('artist proof collector', () => {
     expect(failed.failed).toBe(true);
     expect(failed.brokenArtistLoops).toHaveLength(1);
   });
+
+  it('retries a thrown link probe once before recording status null (JOV-12832)', async () => {
+    // 2026-11-16: a single thrown probe (connection-level, status null)
+    // red-flagged Golden Path twice while the same minute's revenue probe
+    // to the same origin succeeded. One bounded retry distinguishes a
+    // transport blip from a broken link without weakening the gate.
+    const profileHtml = `<link rel="canonical" href="https://jov.ie/tim"><script type="application/ld+json">{"@graph":[{"@id":"https://jov.ie/tim#musicgroup","sameAs":["${TIM_WHITE_PROFILE.spotifyUrl}"]}]}</script><section data-testid="profile-aeo-content"><a href="/tim">Tim White</a><a href="/flaky">flaky</a></section>`;
+    const fetcher = (
+      flaky: (calls: number) => Response | Promise<Response>
+    ) => {
+      let flakyCalls = 0;
+      const impl = vi
+        .fn<typeof fetch>()
+        .mockImplementation(async (url, init) => {
+          if (init?.cache === 'no-store')
+            return new Response(profileHtml, { status: 200 });
+          if (String(url) === 'https://jov.ie/flaky') {
+            flakyCalls++;
+            return flaky(flakyCalls);
+          }
+          return new Response(null, { status: 200 });
+        });
+      return { fetcher: impl, calls: () => flakyCalls };
+    };
+
+    // Transport blip on the first attempt: the retry observes the real 200.
+    const recovering = fetcher(calls => {
+      if (calls <= 1) throw new Error('connection reset');
+      return new Response(null, { status: 200 });
+    });
+    const recovered = await certifyArtistProfile(
+      ['--output', await output()],
+      recovering.fetcher
+    );
+    expect(recovered.failed).toBe(false);
+    expect(recovering.calls()).toBe(2);
+    const report = JSON.parse(await readFile(recovered.reportPath, 'utf8'));
+    expect(report.linkChecks).toContainEqual(
+      expect.objectContaining({ url: 'https://jov.ie/flaky', status: 200 })
+    );
+
+    // Fail-closed: a probe that keeps throwing still fails the certification,
+    // after exactly one retry (no unbounded retries, no HTTP-error retries).
+    const alwaysThrowing = fetcher(() => {
+      throw new Error('connection reset');
+    });
+    const failed = await certifyArtistProfile(
+      ['--output', await output()],
+      alwaysThrowing.fetcher
+    );
+    expect(failed.failed).toBe(true);
+    expect(alwaysThrowing.calls()).toBe(2);
+    const failedReport = JSON.parse(await readFile(failed.reportPath, 'utf8'));
+    expect(failedReport.linkChecks).toContainEqual(
+      expect.objectContaining({ url: 'https://jov.ie/flaky', status: null })
+    );
+  });
 });
