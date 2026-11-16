@@ -367,15 +367,11 @@ export function EmailCodeAuthForm({
           {isPending ? 'Verifying…' : 'Verify Code'}
         </Button>
         <div
-          className={`grid grid-cols-2 items-stretch gap-3 ${align === 'left' ? 'text-left' : 'text-center'}`}
+          className={`grid min-h-11 grid-cols-2 items-center justify-items-center gap-3 ${align === 'left' ? 'text-left' : 'text-center'}`}
         >
-          <button
-            type='button'
-            onClick={handleBackToEmail}
-            className='auth-quiet-target focus-ring-themed rounded-md text-app font-medium text-secondary-token transition-colors duration-subtle hover:text-primary-token'
-          >
+          <Button type='button' variant='tertiary' onClick={handleBackToEmail}>
             {AUTH_EMAIL_CHANGE_LABEL}
-          </button>
+          </Button>
           {resendCooldown > 0 ? (
             <span
               className='auth-quiet-target text-app font-medium text-tertiary-token'
@@ -384,15 +380,15 @@ export function EmailCodeAuthForm({
               Resend in {resendCooldown}s
             </span>
           ) : (
-            <button
+            <Button
               type='button'
+              variant='tertiary'
               onClick={handleResendCode}
               disabled={isPending}
               aria-label='Resend Verification Code'
-              className='auth-quiet-target focus-ring-themed rounded-md text-app font-medium text-secondary-token transition-colors duration-subtle hover:text-primary-token disabled:opacity-50'
             >
-              Resend code
-            </button>
+              Resend Code
+            </Button>
           )}
         </div>
       </form>

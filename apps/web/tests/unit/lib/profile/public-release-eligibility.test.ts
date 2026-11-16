@@ -1,10 +1,10 @@
 import { PgDialect } from 'drizzle-orm/pg-core';
 import { describe, expect, it } from 'vitest';
+import { publicReleaseEligibilitySqlPredicate } from '@/lib/profile/public-release-eligibility';
 import {
   hasPublicReleaseArtwork,
   isPublicReleaseEligible,
-  publicReleaseEligibilitySqlPredicate,
-} from '@/lib/profile/public-release-eligibility';
+} from '@/lib/profile/public-release-eligibility.shared';
 import { DATES, FIXED_NOW } from '../../fixtures/release-dates';
 
 const ARTWORK_URL = 'https://cdn.jov.ie/releases/test-artwork.jpg';

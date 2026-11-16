@@ -1,14 +1,13 @@
 /**
  * Consolidated Frequent Cron Handler
  *
- * Runs every 15 minutes. Orchestrates sub-jobs that need sub-hourly frequency.
+ * Runs every 30 minutes. Orchestrates sub-jobs that need sub-hourly frequency.
  * One cold start + one DB connection serves all jobs.
  *
  * Representative sub-jobs (docs/CRON_REGISTRY.md is the complete registry):
- * - DB warm ping: every invocation (15 min) — keeps Neon from auto-suspending
- * - Process campaigns: every invocation (15 min)
- * - Pixel forwarding retry: every other invocation (~30 min)
- * - Schedule + send release notifications: every invocation (15 min)
+ * - DB warm ping (keeps Neon awake) and campaigns: every invocation
+ * - Pixel forwarding retry: every other invocation (hourly)
+ * - Schedule + send release notifications: every invocation
  * - Redis write/read operability canary: hourly
  * - Daily acquisition-canary receipt freshness alarm: hourly
  * - Summer company-state reconciliation: every invocation
@@ -16,8 +15,6 @@
  *
  * Each sub-job runs in an independent try-catch so one failure
  * doesn't block the others.
- *
- * Schedule: every 15 minutes (configured in vercel.json)
  */
 
 import { asc, sql as drizzleSql, eq } from 'drizzle-orm';
@@ -47,6 +44,7 @@ import {
 } from '@/lib/db/schema/leads';
 import { processCampaigns } from '@/lib/email/campaigns/processor';
 import { captureError } from '@/lib/error-tracking';
+import { founderWelcomeJob } from '@/lib/founder-welcome/server';
 import {
   claimPendingJobs,
   handleIngestionJobFailure,
@@ -64,8 +62,9 @@ import { processLeadBatch } from '@/lib/leads/process-batch';
 import { cleanupExpiredSuppressions } from '@/lib/notifications/suppression';
 import { companyHistoryCronJob } from '@/lib/ovie/company-history/configured.server';
 import { refreshCompanyStateCache } from '@/lib/ovie/company-state.server';
+import { fleetRoomCronJob } from '@/lib/ovie/fleet-room.server';
 import { applySummerCardDefaults } from '@/lib/ovie/summer-cards.server';
-import { refreshProofStats } from '@/lib/proof-stats/publish.server';
+import { proofStatsCronJob } from '@/lib/proof-stats/cron.server';
 import {
   probeRedisOperability,
   RedisOperabilityError,
@@ -200,16 +199,7 @@ export async function GET(request: Request) {
         })
       : { success: true, skipped: true };
 
-  // Proof stats: hourly slot, four indexed counts plus one content-record
-  // version when a value or a publishable state changed. A stat that went
-  // stale is withdrawn here, which expires the cache tag so cached pages drop
-  // the number. No new schedule.
-  results.proofStats =
-    minute < 15
-      ? await runSubJob('proofStats', async () => ({
-          ...(await refreshProofStats(new Date())),
-        }))
-      : { success: true, skipped: true };
+  results.proofStats = await proofStatsCronJob(minute, runSubJob);
 
   // JOV-7880: product truth every run; shipping and Linear hourly. Reads use the snapshot.
   results.companyState = await runSubJob('companyState', async () => {
@@ -223,7 +213,9 @@ export async function GET(request: Request) {
     };
   });
 
+  // Hourly Ovie backstops: company history and the fleet room (webhook-first).
   results.companyHistory = await companyHistoryCronJob(minute, runSubJob);
+  results.fleetRoom = await fleetRoomCronJob(minute, runSubJob);
 
   // Default-plus-deadline contract: an overdue founder ask records its
   // declared default (approve or reject) so nothing waits on Tim forever.
@@ -232,6 +224,8 @@ export async function GET(request: Request) {
     'summerCardDefaults',
     async () => ({ ...(await applySummerCardDefaults(new Date())) })
   );
+  // Welcome cards per admitted visitor; sends only the ones Tim approved.
+  results.founderWelcome = await runSubJob('founderWelcome', founderWelcomeJob);
 
   // 2. Process campaigns — every invocation (15 min)
   results.campaigns = await runSubJob('campaigns', async () => {

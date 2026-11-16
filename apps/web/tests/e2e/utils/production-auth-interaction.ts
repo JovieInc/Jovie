@@ -17,6 +17,17 @@ export interface ProductionAuthEmailFormControls {
 const DASHBOARD_MAIN_SELECTOR = 'main';
 
 /**
+ * The hydration-survival gate needs more patience than the visibility waits.
+ * Postdeploy run 43620238651 (2026-11-14) timed out here at 15s on both auth
+ * journeys while the same landed deployment (3b902867) hydrated in seconds on
+ * the runs before and after it — runner-level contention can stretch React
+ * hydration far past the form's first paint. The gate stays fail-closed: a
+ * wiped value or a submit that never enables still reds the probe; only its
+ * patience grows. An explicit larger caller timeout still wins.
+ */
+const HYDRATION_SURVIVAL_TIMEOUT_MS = 45_000;
+
+/**
  * Type the email once, as a user does, and require the value to survive
  * hydration. Re-filling after load is banned: it masks the pre-hydration wipe
  * where the controlled input resets and submit stays disabled.
@@ -65,7 +76,7 @@ export async function prepareProductionAuthEmailForm(
       inputSelector: IDENTIFIER_INPUT_SELECTOR,
       expected: email,
     },
-    { timeout: timeoutMs }
+    { timeout: Math.max(timeoutMs, HYDRATION_SURVIVAL_TIMEOUT_MS) }
   );
   await expect(identifierInput).toHaveValue(email);
 

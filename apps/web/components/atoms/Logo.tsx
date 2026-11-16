@@ -21,7 +21,7 @@ interface LogoProps
 // The wordmark is one ink per surface; 'color' no longer tints it.
 const TONE_TEXT: Record<BrandLogoTone, string | undefined> = {
   auto: undefined,
-  white: 'text-white dark:text-white',
+  white: 'text-on-media',
   color: undefined,
   muted: 'text-muted-foreground/50',
 };

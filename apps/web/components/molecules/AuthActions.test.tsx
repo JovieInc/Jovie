@@ -24,7 +24,7 @@ describe('AuthActions', () => {
     const logIn = screen.getByRole('link', { name: 'Log in' });
     const signUp = screen.getByRole('link', { name: 'Sign up' });
     expect(logIn).toHaveAttribute('href', APP_ROUTES.SIGNIN);
-    expect(signUp).toHaveAttribute('href', APP_ROUTES.SIGNUP);
+    expect(signUp).toHaveAttribute('href', APP_ROUTES.START);
     expect(screen.queryByRole('link', { name: 'Open App' })).toBeNull();
     await expectNoA11yViolations(container);
 

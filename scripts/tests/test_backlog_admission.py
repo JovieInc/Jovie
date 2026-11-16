@@ -669,7 +669,7 @@ class NativeJoinTest(unittest.TestCase):
                 load_providers=lambda: {"codex": {"slots": 6, "quota": {"source": "codex-accounts"}}},
                 read_json=lambda path: {"schema": "current-native-routing"},
                 issue_router=lambda *args: None, admission_rejection=native.admission_rejection,
-                quota_pressure=lambda *args: {"ok": True}, new_issue_budget=native.new_issue_budget,
+                quota_pressure=lambda *args: {"ok": True}, pr_wip=native.pr_wip, new_issue_budget=native.new_issue_budget,
                 hotspot_holds=native.hotspot_holds, pool_rejections=native.pool_rejections,
                 file_overlap=SimpleNamespace(_state_path=native.file_overlap._state_path, local_tasks=lambda *args: [], admission_policy=native.file_overlap.admission_policy),
                 workstreams=native.workstreams, disk_guard=SimpleNamespace(free_pct=lambda path: 30, lanes_free_pct=lambda path: 30, CRITICAL_PCT=5, PRESERVED_REPAIR=native.disk_guard.PRESERVED_REPAIR))
@@ -679,25 +679,25 @@ class NativeJoinTest(unittest.TestCase):
             binding = {"sourceHash": "b" * 64}
             prs = [{"number": 5, "headRefName": "codex/jov-6641-20261016", "headRefOid": "a" * 40,
                     "body": "<!-- linear-issue-id:JOV-6641 -->", "title": "JOV-6641", "labels": [], "files": []}]
-            with patch.object(admission, "_observed_slots", side_effect=slots), patch.object(Path, "home", return_value=state):
+            with patch.object(admission, "_observed_slots", side_effect=slots), patch.object(Path, "home", return_value=state), patch.object(native.pr_wip, "capacity_snapshot", side_effect=lambda **kw: {"allowed": True, "known": True, "reason": "within-capacity", "observedAt": kw["now"]}) as capacity:
                 runtime, own_prs, pending, preimages = admission._native_runtime(reads, row, prs, binding, NOW)
                 self.assertEqual(own_prs, [{"number": 5, "headSha": "a" * 40}]); self.assertEqual(pending, ["existing"])
                 self.assertEqual(runtime["worker"]["claims"], [{"status": "active"}])
                 self.assertTrue(runtime["fileOverlap"]["allowed"])
-                self.assertEqual(runtime["resources"]["workAdmission"], "allowed")
-                self.assertEqual(runtime["resources"]["freeSlots"], 1)
+                self.assertEqual((runtime["resources"]["workAdmission"], runtime["resources"]["budget"]), ("allowed", "within-budget"))
+                self.assertEqual((runtime["resources"]["freeSlots"], "observedAt" in runtime["providerObservations"][0]["budget"]["capacity"]), (1, False))
                 self.assertEqual(len(preimages), 3)
+                capacity.assert_called_once_with(state_dir=state, now=NOW)
+                capacity.side_effect = lambda **kw: {"allowed": False, "known": True, "reason": "github-quota:core", "observedAt": kw["now"]}
+                self.assertEqual(admission._native_runtime(reads, row, [], binding, NOW)[0]["resources"]["budget"], "github-quota:core")
                 codex.status = lambda now: {"accounts": {}}
                 runtime = admission._native_runtime(reads, row, [], binding, NOW)[0]
-                self.assertEqual(runtime["resources"]["quota"], "hold")
-                self.assertEqual(runtime["resources"]["freeSlots"], 0)
+                self.assertEqual((runtime["resources"]["quota"], runtime["resources"]["freeSlots"]), ("hold", 0))
                 fleet["observedAt"] = NOW - 601; (gate / "latest.json").write_text(json.dumps(fleet))
                 fresh = {**deepcopy(fleet), "observedAt": NOW - 5}
                 reads.fleet_observation = lambda: fresh
                 refreshed = admission._native_runtime(reads, row, [], binding, NOW)[0]
-                self.assertEqual(refreshed["resources"]["workAdmission"], "allowed")
-                self.assertEqual(refreshed["resources"]["quota"], "hold")
-                self.assertEqual(refreshed["resources"]["freeSlots"], 0)
+                self.assertEqual((refreshed["resources"]["workAdmission"], refreshed["resources"]["quota"], refreshed["resources"]["freeSlots"]), ("allowed", "hold", 0))
                 reads.fleet_observation = lambda: admission._json_file(gate / "latest.json")
                 with self.assertRaisesRegex(admission.Unavailable, "fleet-typed-work-stale"):
                     admission._native_runtime(reads, row, [], binding, NOW)

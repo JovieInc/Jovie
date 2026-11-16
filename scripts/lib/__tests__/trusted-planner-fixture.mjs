@@ -18,7 +18,12 @@ export function trustedPlannerFixture(t, withProducer) {
   t.after(() => rmSync(root, { recursive: true, force: true }));
   const env = buildVerificationEnv(process.env);
   const git = (...args) => {
-    const result = spawnSync('git', args, { cwd: root, env, encoding: 'utf8' });
+    const result = spawnSync('git', args, {
+      maxBuffer: 256 * 1024 * 1024,
+      cwd: root,
+      env,
+      encoding: 'utf8',
+    });
     assert.equal(result.status, 0, result.stderr);
     return result.stdout.trim();
   };

@@ -41,6 +41,7 @@ export interface AutoApproveResult {
  * - Skips leads with representation (has manager/booking agent)
  * - Skips high-profile leads (>50k followers or >72 popularity)
  * - Skips leads with null fitScore (not yet scored)
+ * - Skips artists held by the existing-relationship registry
  * - Resets daily counter at UTC midnight
  */
 export async function runAutoApprove(
@@ -145,7 +146,12 @@ export async function runAutoApprove(
 
     try {
       const result = await approveLead(lead);
-      if (result.ingestion?.success === false) {
+      if (result.relationshipHold) {
+        // Held by approveLead and flagged for Tim; it is not an approval.
+        pipelineLog('auto-approve', 'Skipping existing relationship', {
+          leadId: lead.id,
+        });
+      } else if (result.ingestion?.success === false) {
         errors++;
         pipelineWarn('auto-approve', 'Auto-approve ingestion failed', {
           leadId: lead.id,

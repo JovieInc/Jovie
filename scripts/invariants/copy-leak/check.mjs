@@ -371,7 +371,11 @@ export function ratchet(findings, baseline, base) {
 
 export function run(root = process.cwd(), baseRef = 'origin/main') {
   const git = args =>
-    execFileSync('git', args, { cwd: root, encoding: 'utf8' });
+    execFileSync('git', args, {
+      maxBuffer: 256 * 1024 * 1024,
+      cwd: root,
+      encoding: 'utf8',
+    });
   const files = git(['ls-files', '-z', '--', ...config.roots])
     .split('\0')
     .filter(p => p && config.extensions.includes(extname(p)) && !excluded(p));

@@ -43,7 +43,7 @@ export const NotFoundCopyButton = memo(function NotFoundCopyButton({
         name={isCopied ? 'Check' : 'Copy'}
         className={cn(
           'h-3 w-3 transition-opacity',
-          isCopied ? 'text-success' : undefined,
+          isCopied ? 'text-success-text' : undefined,
           isCopied
             ? 'opacity-100'
             : 'opacity-0 group-hover/btn:opacity-100 group-focus-visible/btn:opacity-100'
@@ -53,7 +53,7 @@ export const NotFoundCopyButton = memo(function NotFoundCopyButton({
       <span
         className={cn(
           'line-clamp-1',
-          isCopied ? 'text-success' : 'text-tertiary-token'
+          isCopied ? 'text-success-text' : 'text-tertiary-token'
         )}
       >
         {isCopied ? 'Copied!' : '—'}

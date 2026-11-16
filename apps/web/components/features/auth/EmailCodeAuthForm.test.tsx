@@ -357,6 +357,7 @@ describe('EmailCodeAuthForm', () => {
       const resend = screen.getByRole('button', {
         name: 'Resend Verification Code',
       });
+      expect(resend).toHaveTextContent('Resend Code');
       await act(async () => {
         fireEvent.click(resend);
       });

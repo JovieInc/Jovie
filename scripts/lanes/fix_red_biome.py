@@ -11,24 +11,43 @@ import re
 import types
 from pathlib import Path
 
+from fix_red_failure_routing import _ANSI, _LOG_FAILED_PREFIX
+
 BIOME_FORMAT_TEXT = re.compile(
-    r"Formatter would have printed the following content:|Sort these imports\."
+    r"Formatter would have printed the following content:|Sort these imports\.|"
+    r"File content differs from formatting output|Some imports or exports are not organized\."
 )
 _SUFFIX = r"mjs|cjs|js|jsx|ts|tsx|json|jsonc|css"
 _CITED = re.compile(
     rf"(?m)^(?:\d{{4}}-\d\d-\d\dT[\d:.]+Z\s+)?"
-    rf"(?P<path>(?:[\w.+@()-]+/)*[\w.+@()-]+\.(?:{_SUFFIX}))"
+    rf"(?P<path>(?:[\w.+@()\[\]-]+/)*[\w.+@()\[\]-]+\.(?:{_SUFFIX}))"
     rf"(?::\d+:\d+\s+\S*organizeImports|\s+format\b)"
 )
+_ANNOTATION = re.compile(r"::error (?P<fields>[^\r\n]+?)::(?P<message>[^\r\n]*)")
 
 
 def cited_paths(text: str) -> list[str]:
     """Repo-relative paths biome cited for a format or import-sort diagnostic."""
     if not BIOME_FORMAT_TEXT.search(text or ""):
         return []
+    text = "\n".join(_LOG_FAILED_PREFIX.sub("", _ANSI.sub("", line), count=1) for line in text.splitlines())
+    paths = [match.group("path") for match in _CITED.finditer(text)]
+    for match in _ANNOTATION.finditer(text):
+        fields = dict(part.split("=", 1) for part in match["fields"].split(",") if "=" in part)
+        if fields.get("title") not in {"format", "assist/source/organizeImports"} \
+                or not BIOME_FORMAT_TEXT.search(match["message"]):
+            continue
+        path = fields.get("file", "")
+        # Only known checkout roots map to a repo path; arbitrary absolute
+        # suffixes never authorize a write. Other runner layouts use model repair.
+        for root in (str(Path(__file__).resolve().parents[2]) + "/", "/home/runner/work/Jovie/Jovie/"):
+            if path.startswith(root):
+                path = path[len(root):]
+                break
+        if path and not Path(path).is_absolute():
+            paths.append(path)
     seen: list[str] = []
-    for match in _CITED.finditer(text or ""):
-        path = match.group("path")
+    for path in paths:
         if path not in seen and ".." not in Path(path).parts:
             seen.append(path)
     return seen

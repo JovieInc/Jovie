@@ -7,6 +7,7 @@ const mockUpdate = vi.hoisted(() => vi.fn());
 const mockProcessStripeWebhookEvent = vi.hoisted(() => vi.fn());
 const mockMerchCheckout = vi.hoisted(() => vi.fn());
 const mockMerchRefund = vi.hoisted(() => vi.fn());
+const mockMerchPaymentFailed = vi.hoisted(() => vi.fn());
 const mockCaptureCriticalError = vi.hoisted(() => vi.fn());
 
 vi.mock('@/lib/db', () => ({
@@ -23,6 +24,7 @@ vi.mock('@/lib/stripe/webhooks/process-event', () => ({
 vi.mock('@/lib/merch/orders', () => ({
   handleMerchChargeRefunded: mockMerchRefund,
   handleMerchCheckoutCompleted: mockMerchCheckout,
+  handleMerchCheckoutPaymentFailed: mockMerchPaymentFailed,
 }));
 vi.mock('@/lib/error-tracking', () => ({
   captureCriticalError: mockCaptureCriticalError,
@@ -369,5 +371,64 @@ describe('replayUnprocessedStripeWebhooks', () => {
     } finally {
       fixture.close();
     }
+  });
+});
+
+describe('replayUnprocessedStripeWebhooks async merch payment routing (JOV-12769)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockSelect.mockReset();
+    mockUpdate.mockReset();
+    mockProcessStripeWebhookEvent.mockReset();
+    mockProcessStripeWebhookEvent.mockResolvedValue(undefined);
+    mockMerchCheckout.mockResolvedValue(undefined);
+    mockMerchRefund.mockResolvedValue(undefined);
+    mockMerchPaymentFailed.mockResolvedValue(undefined);
+  });
+
+  it('routes a stored async payment success through the merch checkout handler', async () => {
+    mockSelect.mockReturnValueOnce(
+      selectRows([
+        candidate(
+          'evt_async_paid',
+          'checkout.session.async_payment_succeeded',
+          {
+            id: 'cs_1',
+            metadata: { merch_order_id: 'order_1' },
+          }
+        ),
+      ])
+    );
+    mockUpdate
+      .mockReturnValueOnce(updateReturning([{ id: 'row_1' }]))
+      .mockReturnValueOnce(updateReturning([{ id: 'row_1' }]));
+
+    const summary = await replayUnprocessedStripeWebhooks(now);
+
+    expect(summary.processed).toBe(1);
+    expect(mockMerchCheckout).toHaveBeenCalledTimes(1);
+    expect(mockMerchPaymentFailed).not.toHaveBeenCalled();
+    expect(mockProcessStripeWebhookEvent).not.toHaveBeenCalled();
+  });
+
+  it('routes a stored async payment failure through the merch payment-failed handler', async () => {
+    mockSelect.mockReturnValueOnce(
+      selectRows([
+        candidate('evt_async_failed', 'checkout.session.async_payment_failed', {
+          id: 'cs_1',
+          metadata: { merch_order_id: 'order_1' },
+        }),
+      ])
+    );
+    mockUpdate
+      .mockReturnValueOnce(updateReturning([{ id: 'row_1' }]))
+      .mockReturnValueOnce(updateReturning([{ id: 'row_1' }]));
+
+    const summary = await replayUnprocessedStripeWebhooks(now);
+
+    expect(summary.processed).toBe(1);
+    expect(mockMerchPaymentFailed).toHaveBeenCalledTimes(1);
+    expect(mockMerchCheckout).not.toHaveBeenCalled();
+    expect(mockProcessStripeWebhookEvent).not.toHaveBeenCalled();
   });
 });

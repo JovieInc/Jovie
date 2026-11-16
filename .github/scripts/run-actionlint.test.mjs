@@ -54,7 +54,7 @@ describe('run-actionlint vendored queue patch', () => {
     // The checksum verification survives the vendoring.
     assert.match(
       script,
-      /sha256sum --check --status \|\| fail 'vendored queue patch sha256 mismatch'/
+      /sha_ok \"\$VENDORED_QUEUE_PATCH\" \"\$ACTIONLINT_QUEUE_PATCH_SHA256\" \|\| fail 'vendored queue patch sha256 mismatch'/
     );
   });
 });

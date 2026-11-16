@@ -100,7 +100,9 @@ export function fixForRow(
   const issue = [...(health?.issues ?? [])].sort(
     (a, b) => SEVERITY_RANK[a.severity] - SEVERITY_RANK[b.severity]
   )[0];
-  return issue ? proposeFix(issue, mode) : null;
+  return issue
+    ? proposeFix(issue, mode, { label: row.label, url: row.url })
+    : null;
 }
 
 /** Chat deep link that opens the drafted task for the user to review and send. */

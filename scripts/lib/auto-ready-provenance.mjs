@@ -7,15 +7,18 @@
  * author. Bot/FX provenance remains useful diagnostic context, but branch
  * names and trusted automation authors never manufacture missing proof.
  *
- * The one other way in is the writer's own opt-in: a trusted writer (Tim's
- * account, which every agent writer pushes as, or a Jovie App bot) puts
- * `<!-- jovie-auto-ready: on-green -->` in the body to say "ship this when
- * green". It replaces only the receipt. The caller still requires same-repo
- * main base, exact head, PR Ready + required checks SUCCESS and mergeable
- * CLEAN, and holds, parks and controlled-proof markers still win. A draft
- * without the marker stays a draft, so a deliberate WIP draft is never
- * shipped by accident. Tim, Nov 8 2026: "things should merge automatically
- * they should not wait."
+ * The one other way in is ship-on-green by default. A draft opened by a
+ * trusted writer (Tim's account, which every agent writer pushes as, or a
+ * Jovie App bot) is treated as "ship this when green" with no receipt and no
+ * marker, so a draft opened through the REST API ships like one opened by
+ * `pnpm pr:open`. `<!-- jovie-auto-ready: on-green -->` still says the same
+ * thing explicitly. The writer opts out with `<!-- jovie-auto-ready: park -->`
+ * in the body, which wins over any opt-in or receipt. The default replaces
+ * only the receipt. The caller still requires same-repo main base, exact head,
+ * PR Ready + required checks SUCCESS and mergeable CLEAN, and holds, parks
+ * (a draft converted back after its last push) and controlled-proof markers
+ * still win. An untrusted author still needs a complete receipt. Tim, Nov 11
+ * 2026: "all prs must merge automatically on green."
  */
 
 import { readFileSync } from 'node:fs';
@@ -46,6 +49,15 @@ export const TRUSTED_FX_WORKFLOW_PATH =
   '.github/workflows/rolling-ci-dispatch.yml';
 export const TRUSTED_FX_WORKFLOW_NAME = 'Rolling CI Dispatch';
 
+// The writer's explicit opt-out from ship-on-green: the draft stays a draft
+// however green it gets, until the marker is removed.
+export const PARK_MARKER = 'jovie-auto-ready: park';
+const PARK_RE = /<!--\s*jovie-auto-ready:\s*park\s*-->/i;
+
+export function hasParkMarker(body) {
+  return PARK_RE.test(String(body ?? ''));
+}
+
 export const ON_GREEN_MARKER = 'jovie-auto-ready: on-green';
 export const ON_GREEN_WRITERS = Object.freeze([
   'itstimwhite',
@@ -53,12 +65,45 @@ export const ON_GREEN_WRITERS = Object.freeze([
 ]);
 const ON_GREEN_RE = /<!--\s*jovie-auto-ready:\s*on-green\s*-->/i;
 
+/**
+ * The writer's ship intent on a PR body (`pnpm pr:open`). A new PR opts in by
+ * default, so green ships without anyone marking it ready; a refreshed body
+ * keeps the opt-in or park it already had; `--on-green` opts in (dropping a
+ * park); `--park` writes the park marker, the only way to keep a draft parked,
+ * since an unmarked writer draft ships on green by default.
+ * @param {string} body
+ * @param {{ cmd?: string, number?: string, park?: boolean, onGreen?: boolean }} [opts]
+ * @param {string} [prior]
+ */
+export function shipIntent(body, { cmd, number, park, onGreen } = {}, prior) {
+  const strip = re => new RegExp(`\\n*${re.source}\\n*`, 'gi');
+  const bare = String(body ?? '')
+    .replace(strip(ON_GREEN_RE), '\n')
+    .replace(strip(PARK_RE), '\n')
+    .trimEnd();
+  const parked = `${bare}\n\n<!-- ${PARK_MARKER} -->\n`;
+  // --park, or a park marker the writer put in the body itself, keeps it parked
+  // unless --on-green explicitly replaces it.
+  if (park || (hasParkMarker(body) && !onGreen)) return parked;
+  const fresh = cmd === 'open' || (cmd === 'draft' && !number);
+  if (!fresh && !onGreen) {
+    if (hasParkMarker(prior)) return parked;
+    if (!ON_GREEN_RE.test(String(prior ?? ''))) return body;
+  }
+  return `${bare}\n\n<!-- ${ON_GREEN_MARKER} -->\n`;
+}
+
 export function hasOnGreenOptIn(input = {}) {
   const author = String(input.authorLogin ?? input.writerLogin ?? '').trim();
+  // Ship on green is the default for a trusted writer; only park opts out.
   return (
     ON_GREEN_WRITERS.includes(author) &&
-    ON_GREEN_RE.test(String(input.body ?? input.prBody ?? ''))
+    !hasParkMarker(input.body ?? input.prBody)
   );
+}
+
+export function hasExplicitOnGreen(body) {
+  return ON_GREEN_RE.test(String(body ?? ''));
 }
 
 const SHA_RE = /^[0-9a-f]{40}$/;
@@ -219,9 +264,12 @@ export function classifyAutoReadyPromotion(input = {}) {
   if (hasAutoReadyHold(input.labels)) {
     return { eligible: false, reason: 'held' };
   }
+  const body = input.body ?? input.prBody ?? '';
+  if (hasParkMarker(body)) {
+    return { eligible: false, reason: 'writer-parked' };
+  }
   const proof = validateWriterProofReceipt(
-    input.writerProofReceipt ??
-      extractLatestWriterProofReceipt(input.body ?? input.prBody ?? ''),
+    input.writerProofReceipt ?? extractLatestWriterProofReceipt(body),
     {
       expectedHeadSha: input.headSha,
       writerLogin: input.writerLogin ?? input.authorLogin,
@@ -229,11 +277,16 @@ export function classifyAutoReadyPromotion(input = {}) {
     }
   );
   if (proof.ok) return { eligible: true, reason: 'writer-proof-complete' };
-  // Only the green-source path may take the opt-in: it has already proven the
+  // Only the green-source path may ship on green: it has already proven the
   // head green and CLEAN. The writer-proof path readies drafts with pending
   // checks, so it never may.
   if (input.greenSource === true && hasOnGreenOptIn(input)) {
-    return { eligible: true, reason: 'writer-on-green-opt-in' };
+    return {
+      eligible: true,
+      reason: hasExplicitOnGreen(body)
+        ? 'writer-on-green-opt-in'
+        : 'writer-on-green-default',
+    };
   }
   return { eligible: false, reason: `writer-proof-${proof.reason}` };
 }

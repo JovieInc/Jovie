@@ -103,6 +103,27 @@ describe('library entity actions', () => {
     resetCacheIsolationForTests();
   });
 
+  it('hands chat the clicked release as an entity chip, never JSON', () => {
+    applyCacheScope({
+      userId: 'user-1',
+      sessionId: 'session-1',
+      profileId: 'profile-1',
+      ready: true,
+    });
+    const router = { push: vi.fn() };
+    const asset = buildAsset({ id: 'release-9', title: 'Wheels Up' });
+    const actions = buildActions(asset, {
+      onAskJovie: draft => {
+        openChatWithDraft(draft, router);
+      },
+    });
+    actions.find(action => action.id === 'ask-jovie')?.onExecute?.();
+    expect(consumePendingChatDraft('profile-1')).toBe(
+      '@release:release-9[Wheels Up]'
+    );
+    resetCacheIsolationForTests();
+  });
+
   it('does not invoke Ask without a selected profile even if called programmatically', () => {
     const onAskJovie = vi.fn();
     const action = buildActions(buildAsset(), {
@@ -149,6 +170,26 @@ describe('library entity actions', () => {
     ]);
     expect(actions.find(action => action.id === 'open-primary')?.label).toBe(
       'Open Merch'
+    );
+  });
+
+  it('offers a private studio take only Watch Take and Copy', () => {
+    const openUrl = vi.fn();
+    const actions = buildActions(
+      buildAsset({
+        id: 'take-take_1',
+        itemKind: 'video',
+        primaryActionLabel: 'Watch Take',
+        primaryActionHref: '/api/teleprompter/takes/take_1/media',
+        share: null,
+      }),
+      { openUrl }
+    );
+
+    expect(actions.map(action => action.id)).toEqual(['open-primary', 'copy']);
+    void actions[0]?.onExecute?.();
+    expect(openUrl).toHaveBeenCalledWith(
+      '/api/teleprompter/takes/take_1/media'
     );
   });
 
