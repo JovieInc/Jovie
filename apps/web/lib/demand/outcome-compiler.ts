@@ -367,7 +367,7 @@ export function compilePresenceOutcome(
               kind: 'no_action',
               supplierDigest: null,
               reason:
-                'No owner-certified route meets the measured floor or permitted trial remains; retain unknown/partial.',
+                'No owner-certified route meets the measured floor or permitted experiment remains; retain unknown/partial.',
             };
     return [
       capabilityDraftSchema.parse({
