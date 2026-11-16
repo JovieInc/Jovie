@@ -9,7 +9,7 @@
 // Scores below --low are flagged. Files with no committed floor stay advisory.
 
 import { spawnSync } from 'node:child_process';
-import { appendFileSync, mkdirSync, rmSync } from 'node:fs';
+import { appendFileSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
@@ -30,6 +30,11 @@ import {
   buildWorkflowRunUrl,
   fileMutationFloorIssues,
 } from './lib/mutation-floor-intake.mjs';
+import {
+  mutationInputReceipt,
+  mutationInputsUnchanged,
+  repositoryReader,
+} from './lib/mutation-inputs.mjs';
 import {
   evaluateMutationScore,
   loadMutationScoreBaseline,
@@ -97,6 +102,28 @@ const selectTests =
     ? createTestSelector(readTestSources(webRoot), readModule)
     : () => [];
 
+const tracked = spawnSync('git', ['ls-files', '-z'], {
+  cwd: repoRoot,
+  encoding: 'utf8',
+  maxBuffer: 256 * 1024 * 1024,
+});
+if (tracked.status !== 0)
+  throw new Error('Mutation input inventory unavailable');
+const inputPaths = tracked.stdout.split('\0').filter(Boolean);
+const readInput = repositoryReader(repoRoot);
+if (!values['list-only']) {
+  const head = spawnSync('git', ['rev-parse', values.head], {
+    cwd: repoRoot,
+    encoding: 'utf8',
+  });
+  const actual = spawnSync('git', ['rev-parse', 'HEAD'], {
+    cwd: repoRoot,
+    encoding: 'utf8',
+  });
+  if (head.status !== 0 || actual.status !== 0 || head.stdout !== actual.stdout)
+    throw new Error('--head must match the checked-out commit for execution');
+}
+
 /** @type {import('./lib/mutation-diff.mjs').FileResult[]} */
 const results = [];
 /** @type {string[]} */
@@ -117,6 +144,19 @@ for (const source of toRun) {
       console.log(`${source}\n  ${tests.join('\n  ')}`);
       continue;
     }
+    const receipt = mutationInputReceipt({
+      root: WEB_ROOT,
+      source,
+      tests,
+      selector: selectTests,
+      tracked: inputPaths,
+      read: readInput,
+    });
+    if (receipt.unresolvedInputs.length)
+      throw new Error(
+        `Unresolved mutation inputs: ${receipt.unresolvedInputs.join(', ')}`
+      );
+    const originalSource = readModule(source);
     const reportFile = `reports/mutation/diff/${source.replace(/[^\w.-]+/gu, '_')}.json`;
     const reportPath = join(webRoot, reportFile);
     const testReceipt = `${reportPath}.tests.json`;
@@ -125,6 +165,7 @@ for (const source of toRun) {
     // Never accept a stale successful report from a previous invocation.
     rmSync(reportPath, { force: true });
     rmSync(testReceipt, { force: true });
+    rmSync(`${reportPath}.evidence.json`, { force: true });
     rmSync(coverageDir, { recursive: true, force: true });
     console.log(`\n▶ ${source} (${tests.length} test file(s))`);
     const baseline = spawnSync(
@@ -174,11 +215,27 @@ for (const source of toRun) {
       }
     );
     if (run.status !== 0) throw new Error('Stryker process failed');
-    const mutants = readReportMutants(reportPath, source);
+    const mutants = readReportMutants(reportPath, source, originalSource);
+    if (
+      !mutationInputsUnchanged(receipt, {
+        root: WEB_ROOT,
+        rootDir: webRoot,
+        selector: selectTests,
+        read: readInput,
+      })
+    )
+      throw new Error('Mutation inputs changed during baseline or scoring');
     if (!mutants) throw new Error('Stryker did not report the selected source');
     if (mutants.length === 0) throw new Error('Stryker generated zero mutants');
-    if (scoreMutants(mutants).valid === 0)
-      throw new Error('Stryker reported zero valid mutants');
+    const scored = scoreMutants(mutants);
+    if (scored.valid === 0 || !scored.complete)
+      throw new Error(
+        'Stryker evidence is unknown: unresolved or zero valid mutants'
+      );
+    writeFileSync(
+      `${reportPath}.evidence.json`,
+      `${JSON.stringify({ receipt, executedTests, targetExecution, scored }, null, 1)}\n`
+    );
     results.push({
       file: source,
       tests,
