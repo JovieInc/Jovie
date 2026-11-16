@@ -332,6 +332,7 @@
   "scripts/sync-skills-catalog.test.ts",
   "scripts/synthetic-audience-markers.test.ts",
   "scripts/test-performance-profiler.test.ts",
+  "scripts/vercel-build-source-closure.test.mjs",
   "scripts/verify-db-migrations.test.ts",
   "scripts/vitest-phase-timing-reporter.test.ts",
   "tests/app/",
