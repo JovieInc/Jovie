@@ -5,8 +5,9 @@ import { tmpdir } from 'node:os'; import { join } from 'node:path'; import { tes
 compareImages, evaluateManifest, formatComment, frameCaptureUrl, parseManifest,
 selectFrames, syntheticComparison, validateManifest, } from './pen-still-diff.mjs';
 import { decodePng, encodePng, measureImage, ssim, stretchedPair, syntheticPair } from './pen-still-diff-lib.mjs';
-const manifest = JSON.parse(readFileSync(join(import.meta.dirname, '../../docs/pen-stills/homepage/manifest.json'), 'utf8'));
-test('homepage manifest is valid, dark-first, and drops parked and fork frames', () => {
+// Inline fixture: the legacy homepage manifest was folded into docs/design-system/pen-bindings.json.
+const manifest = JSON.parse(`{"schema": "pen-still-manifest/v1", "surface": "homepage", "primaryMode": "dark", "penFile": {"name": "Jovie Homepage Profiles Claim \u2014 review copy 2026-10-01.pen", "sha256": null, "note": "The live Pen file is on the design machine and is not in this repo. Fill sha256 when canonical stills are exported."}, "frames": [{"sectionId": "hero", "penNodeId": "pending-canonical-hero", "fileHash": null, "stillPath": "docs/pen-stills/homepage/hero.dark.1440.png", "viewport": 1440, "mode": "dark", "status": "active", "route": "/", "story": "homepage--hero", "sectionSelector": "[data-pen-section='hero']", "mockupSelector": "[data-pen-mockup]"}, {"sectionId": "hero", "penNodeId": "pending-canonical-hero", "fileHash": null, "stillPath": "docs/pen-stills/homepage/hero.dark.390.png", "viewport": 390, "mode": "dark", "status": "active", "route": "/", "story": "homepage--hero", "sectionSelector": "[data-pen-section='hero']", "mockupSelector": "[data-pen-mockup]"}, {"sectionId": "hero", "penNodeId": "pending-canonical-hero", "fileHash": null, "stillPath": "docs/pen-stills/homepage/hero.light.1440.png", "viewport": 1440, "mode": "light", "status": "active", "route": "/", "story": "homepage--hero", "sectionSelector": "[data-pen-section='hero']", "mockupSelector": "[data-pen-mockup]"}, {"sectionId": "parked-exploration", "penNodeId": "parked-example", "fileHash": null, "stillPath": "docs/pen-stills/homepage/parked.dark.1440.png", "viewport": 1440, "mode": "dark", "status": "parked"}, {"sectionId": "taste-fork", "penNodeId": "fork-example", "fileHash": null, "stillPath": "docs/pen-stills/homepage/fork.dark.1440.png", "viewport": 1440, "mode": "dark", "status": "fork"}]}`);
+test('legacy frame manifest is valid, dark-first, and drops parked and fork frames', () => {
 const validated = validateManifest(manifest); assert.equal(validated.ok, true); if (!validated.ok) return;
 assert.equal(validated.manifest.primaryMode, 'dark'); const selected = selectFrames(validated.manifest);
 assert.deepEqual(selected.excluded.map(frame => frame.status).sort(), ['fork', 'parked']);
@@ -234,3 +235,13 @@ test('hash failures with no comparable frames cannot qualify using a passing sam
   assert.equal(result.receipt.triptychs.length, 0);
   assert.equal(result.receipt.sample.pass, true);
 });
+
+test('pen-bindings.json adapts to frames: unbound routes yield none, bound routes yield dark active frames', async () => {
+const { bindingsToStillFrames } = await import('../design/pen-bindings-lib.mjs');
+const doc = JSON.parse(readFileSync(join(import.meta.dirname, '../../docs/design-system/pen-bindings.json'), 'utf8'));
+assert.deepEqual(bindingsToStillFrames(doc), []);
+const bound = { routes: { '/': { approved: { by: 'tim', at: '2026-11-07T00:00:00Z', receipt: 'r' }, viewports: { 1440: [{ section: 'hero', nodeId: 'N1', still: 'docs/pen-stills/home/1440/hero.png', sha256: 'a'.repeat(64) }], 390: [] } } } };
+const frames = bindingsToStillFrames(bound);
+assert.equal(frames.length, 1); assert.equal(frames[0].sectionSelector, "[data-pen-section='hero']");
+assert.equal(frames[0].fileHash, `sha256:${'a'.repeat(64)}`); assert.equal(frames[0].mode, 'dark');
+assert.equal(validateManifest({ schema: 'pen-still-manifest/v1', frames }).ok, true); });

@@ -1086,6 +1086,18 @@ nodes:
       - push
     terminalReceipt: job:guard
     jobCount: 1
+  - name: Product crawl
+    path: .github/workflows/product-crawl.yml
+    active: true
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - pull_request
+      - workflow_dispatch
+    terminalReceipt: job:crawl
+    jobCount: 1
   - name: Production Continuity Guard
     path: .github/workflows/production-continuity.yml
     active: true

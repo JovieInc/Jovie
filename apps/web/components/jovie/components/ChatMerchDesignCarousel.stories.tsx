@@ -127,3 +127,9 @@ export const Loading: Story = {
   },
   render: () => <ChatMerchDesignCarouselLoading />,
 };
+
+export const EmptyBatch: Story = {
+  args: {
+    result: makeResult([]),
+  },
+};

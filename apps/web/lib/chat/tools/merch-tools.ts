@@ -67,11 +67,14 @@ async function resolveVerifiedSource(params: {
   | { readonly error: string }
 > {
   if (!params.source) {
-    return {
-      sourceSelection: sourceSelectionResult(
-        await getMerchSourceCandidates(params.profileId)
-      ),
-    };
+    const candidates = await getMerchSourceCandidates(params.profileId);
+    // Act on the first clear intent: a confirmed catalog title is already
+    // recommended, so start generation instead of asking "want me to run it?".
+    const [recommended] = candidates;
+    if (recommended && !requiresAssetPreservingRender(recommended)) {
+      return { source: recommended };
+    }
+    return { sourceSelection: sourceSelectionResult(candidates) };
   }
 
   if (requiresAssetPreservingRender(params.source)) {
