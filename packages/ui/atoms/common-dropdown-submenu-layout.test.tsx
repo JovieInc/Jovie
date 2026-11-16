@@ -1,11 +1,21 @@
-import { act, renderHook, waitFor } from '@testing-library/react';
+import {
+  act,
+  cleanup,
+  render,
+  renderHook,
+  screen,
+  waitFor,
+} from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import type { RefObject } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { OVERLAY_SIDE_OFFSET } from '../lib/dropdown-styles';
+import { CommonDropdown } from './common-dropdown';
 import {
   measureSubmenuPlacement,
   useSubmenuLayout,
 } from './common-dropdown-submenu-layout';
+import type { CommonDropdownItem } from './common-dropdown-types';
 
 function box(left: number, right: number): DOMRect {
   return {
@@ -37,6 +47,7 @@ function fixture({ left = 13, right = 243, padding = 4, border = 1 } = {}) {
 }
 
 afterEach(() => {
+  cleanup();
   document.body.replaceChildren();
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
@@ -204,5 +215,86 @@ describe('submenu portal layout lifecycle', () => {
     expect(contentRef.current).toBeNull();
     unmount();
     globalThis.ResizeObserver = originalResize;
+  });
+});
+
+describe('submenu width integration', () => {
+  it('inherits submenu min-width from the trigger row when no override is provided', async () => {
+    const items: CommonDropdownItem[] = [
+      {
+        type: 'submenu',
+        id: 'share',
+        label: 'Share',
+        items: [
+          {
+            type: 'action',
+            id: 'copy-link',
+            label: 'Copy Link',
+            onClick: vi.fn(),
+          },
+        ],
+      },
+    ];
+    const user = userEvent.setup({ delay: null });
+    render(<CommonDropdown items={items} open={true} />);
+
+    const shareTrigger = screen.getByRole('menuitem', { name: 'Share' });
+    const triggerRectSpy = vi
+      .spyOn(shareTrigger, 'getBoundingClientRect')
+      .mockReturnValue(new DOMRect(0, 0, 236.6, 32));
+
+    await user.hover(shareTrigger);
+
+    await waitFor(() => {
+      const submenu = screen
+        .getByRole('menuitem', { name: 'Copy Link' })
+        .closest('[role="menu"]');
+      expect(submenu).toHaveStyle({
+        minWidth:
+          'min(237px, var(--radix-dropdown-menu-content-available-width))',
+        maxWidth: 'var(--radix-dropdown-menu-content-available-width)',
+      });
+    });
+
+    expect(triggerRectSpy).toHaveBeenCalled();
+  });
+
+  it('keeps an explicit submenu min-width override when present', async () => {
+    const items: CommonDropdownItem[] = [
+      {
+        type: 'submenu',
+        id: 'share',
+        label: 'Share',
+        minWidth: '320px',
+        items: [
+          {
+            type: 'action',
+            id: 'copy-link',
+            label: 'Copy Link',
+            onClick: vi.fn(),
+          },
+        ],
+      },
+    ];
+    const user = userEvent.setup({ delay: null });
+    render(<CommonDropdown items={items} open={true} />);
+
+    const shareTrigger = screen.getByRole('menuitem', { name: 'Share' });
+    vi.spyOn(shareTrigger, 'getBoundingClientRect').mockReturnValue(
+      new DOMRect(0, 0, 240, 32)
+    );
+
+    await user.hover(shareTrigger);
+
+    await waitFor(() => {
+      const submenu = screen
+        .getByRole('menuitem', { name: 'Copy Link' })
+        .closest('[role="menu"]');
+      expect(submenu).toHaveStyle({
+        minWidth:
+          'min(320px, var(--radix-dropdown-menu-content-available-width))',
+        maxWidth: 'var(--radix-dropdown-menu-content-available-width)',
+      });
+    });
   });
 });
