@@ -13,6 +13,10 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { test } from 'node:test';
 import {
+  SCRIPT_CONTRACT_NODE_TESTS,
+  SCRIPT_CONTRACT_VITEST_TESTS,
+} from '../../scripts/ci-fast-lanes.mjs';
+import {
   collectDependencyParity,
   compareDependencyDigests,
   readDigestArtifact,
@@ -21,12 +25,6 @@ import {
   writeDependencyDigest,
   writeSourceDocsScope,
 } from './dependency-parity-evidence.mjs';
-import '../../scripts/lib/__tests__/source-docs-scope.test.mjs';
-import '../../scripts/lib/__tests__/source-docs-check.test.mjs';
-import {
-  SCRIPT_CONTRACT_NODE_TESTS,
-  SCRIPT_CONTRACT_VITEST_TESTS,
-} from '../../scripts/ci-fast-lanes.mjs';
 
 const sha = 'a'.repeat(40),
   base = 'b'.repeat(40),
