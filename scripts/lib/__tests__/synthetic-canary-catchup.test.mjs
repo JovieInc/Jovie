@@ -418,6 +418,22 @@ describe('catch-up receipts and exit wiring', () => {
     });
   });
 
+  it('defaults to the real timer sleep and still confirms on the first poll', async () => {
+    vi.useFakeTimers();
+    try {
+      const github = reader({
+        scheduled: [scheduledRun({ created_at: iso(421) })],
+        dispatched: [dispatchRun({ created_at: new Date(NOW).toISOString() })],
+        dispatchedAfter: 2,
+      });
+      const pending = dispatchCatchup(github, repo, { now: NOW });
+      await vi.advanceTimersByTimeAsync(CONFIRM_DELAY_MS);
+      expect(await pending).toMatchObject({ confirmed: true, deferred: false });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('is wired into the synthetic-canary-liveness guard with coverage', () => {
     const guard = SOURCE_GUARDS.find(
       item => item.id === 'synthetic-canary-liveness'
