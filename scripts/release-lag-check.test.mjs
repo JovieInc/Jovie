@@ -63,7 +63,11 @@ test('readBuildInfo retries transient network errors and returns the receipt', a
     if (calls < 3) throw new Error('fetch failed: read ECONNRESET');
     return { ok: true, json: async () => ({ commitSha: 'c'.repeat(40) }) };
   };
-  const info = await readBuildInfo('https://jov.ie/api/health/build-info', fetchImpl, [0, 0]);
+  const info = await readBuildInfo(
+    'https://jov.ie/api/health/build-info',
+    fetchImpl,
+    [0, 0]
+  );
   assert.equal(calls, 3);
   assert.deepEqual(info, { commitSha: 'c'.repeat(40) });
 });
