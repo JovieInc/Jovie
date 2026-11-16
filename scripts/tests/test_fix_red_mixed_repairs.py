@@ -96,6 +96,21 @@ class MixedRepairTest(unittest.TestCase):
         self.assertEqual((mixed["cls"], mixed["action"]), ("mixed", "agent"))
         self.assertEqual(mixed["repairs"], ["repair-win"])
 
+    def test_measured_win_and_stale_design_source_use_body_repair_then_main_sync(self):
+        win = "win: this PR needs a measured win (metric, before, after, method, evidence)."
+        design = (
+            "[design-system-source-ratchet] FAIL — 1895 identities (0 new / baseline 1907)\n"
+            "new design identity: apps/web/components/shell/SettingsRow.tsx"
+            "\traw-palette-class\ttext-rose-300\n"
+        )
+        logs = {"PR Fleet Rules": win, "Source Validation": design}
+        for state in ("BLOCKED", "BEHIND"):
+            with self.subTest(state=state):
+                route = classes.classify(pr(*logs, merge=state), logs)
+                self.assertEqual((route["cls"], route["action"]), ("mixed", "sync-main"))
+                self.assertEqual(route["actions"], ["sync-main"])
+                self.assertEqual(route["repairs"], ["repair-win"])
+
     def test_a_failed_win_measurement_still_stamps_the_changelog(self):
         from unittest.mock import patch
         import fix_red_mixed_repairs as mixed

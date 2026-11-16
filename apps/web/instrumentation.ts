@@ -1,4 +1,6 @@
 // Track instrumentation lifecycle for cold start detection
+import { BASE_URL } from '@/constants/domains';
+
 const INSTRUMENTATION_START_TIME = Date.now();
 let firstValidationAttemptTime: number | null = null;
 let validationResolvedTime: number | null = null;
@@ -186,10 +188,21 @@ export async function register() {
     // The stamp itself is idempotent (setIfAbsent). Never on the build-info
     // request path: that public receipt is read by monitors on every probe
     // and must not touch the database.
-    if (process.env.VERCEL_ENV === 'production') {
-      void import('@/lib/recovery/probes.server')
-        .then(m => m.recordShippedFixDeploys())
-        .catch(() => undefined);
+    //
+    // This must stay a fetch, not an import: instrumentation.ts is bundled
+    // into every serverless function, so importing probes.server here traces
+    // its whole database dependency graph (drizzle-orm,
+    // @neondatabase/serverless, ws, the full schema barrel) into every
+    // function and pushed auth/ios/complete past Vercel's 250 MB
+    // uncompressed-function-size limit. The stamp route owns that graph in
+    // its own function; instrumentation-boot.test.ts guards this contract.
+    if (process.env.VERCEL_ENV === 'production' && process.env.CRON_SECRET) {
+      void fetch(`${BASE_URL}/api/internal/ovie/fix-deploy-stamp`, {
+        method: 'POST',
+        headers: { authorization: `Bearer ${process.env.CRON_SECRET}` },
+        cache: 'no-store',
+        signal: AbortSignal.timeout(10_000),
+      }).catch(() => undefined);
     }
 
     const { musicResolverCutoverReceipt } = await import(
