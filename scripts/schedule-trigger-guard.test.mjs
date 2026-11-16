@@ -8,6 +8,7 @@ import {
   ALLOWLIST_PATH,
   ALLOWLIST_SCHEMA,
   collectAddedLines,
+  diffBase,
   evaluateViolations,
   main,
 } from './schedule-trigger-guard.mjs';
@@ -336,12 +337,70 @@ test('detects a rogue cron from a depth-1 merge-ref checkout via the event paylo
       event,
       `${JSON.stringify({ pull_request: { base: { sha: baseSha } } })}\n`
     );
-    // Without the payload the shallow checkout cannot resolve a base (skip).
-    const skipped = main(clone, {});
-    assert.equal(skipped, 0);
-    // With the runner's event payload the rogue cron is caught.
+    // The merge checkout's first parent is the branch point. The guard uses
+    // that parent even when the event payload is absent, and the range still
+    // shows the PR re-adding the cron.
+    assert.equal(diffBase(clone, {}), baseSha);
+    assert.equal(main(clone, {}), 1);
     const caught = main(clone, { GITHUB_EVENT_PATH: event });
     assert.equal(caught, 1);
+    assert.equal(diffBase(clone, { GITHUB_EVENT_PATH: event }), baseSha);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('a depth-1 merge checkout ignores a stale event base older than main', async () => {
+  const { execFileSync } = await import('node:child_process');
+  const root = mkdtempSync(join(tmpdir(), 'schedule-guard-stale-base-'));
+  try {
+    const origin = join(root, 'origin');
+    mkdirSync(origin, { recursive: true });
+    const run = (cwd, ...args) =>
+      execFileSync('git', args, { cwd, encoding: 'utf8' });
+    const pushOnly =
+      'on: push\njobs:\n  j:\n    steps:\n      - run: echo hi\n';
+    const withDaily =
+      'on:\n  push:\n  schedule:\n    - cron: "7 14 * * *"\njobs:\n  j:\n    steps:\n      - run: echo hi\n';
+    run(origin, 'init', '-q', '-b', 'main');
+    run(origin, 'config', 'user.email', 't@jov.ie');
+    run(origin, 'config', 'user.name', 'T');
+    mkdirSync(join(origin, '.github', 'workflows'), { recursive: true });
+    writeFileSync(join(origin, '.github/workflows/clock.yml'), pushOnly);
+    writeFileSync(join(origin, 'README.md'), 'base\n');
+    run(origin, 'add', '-A');
+    run(origin, 'commit', '-qm', 'branch point before main added a cron');
+    const staleBase = run(origin, 'rev-parse', 'HEAD').trim();
+    run(origin, 'checkout', '-qb', 'pr-branch');
+    writeFileSync(join(origin, 'README.md'), 'pr only touches the readme\n');
+    run(origin, 'add', '-A');
+    run(origin, 'commit', '-qm', 'PR does not touch workflows');
+    run(origin, 'checkout', '-q', 'main');
+    writeFileSync(join(origin, '.github/workflows/clock.yml'), withDaily);
+    run(origin, 'add', '-A');
+    run(origin, 'commit', '-qm', 'main adds the daily cron');
+    const mainTip = run(origin, 'rev-parse', 'HEAD').trim();
+    run(origin, 'merge', '-q', '--no-ff', '-m', 'merge PR', 'pr-branch');
+    const clone = join(root, 'clone');
+    execFileSync('git', [
+      'clone',
+      '-q',
+      '--depth',
+      '1',
+      '--branch',
+      'main',
+      `file://${origin}`,
+      clone,
+    ]);
+    const event = join(root, 'event.json');
+    writeFileSync(
+      event,
+      `${JSON.stringify({ pull_request: { base: { sha: staleBase } } })}\n`
+    );
+    const env = { GITHUB_EVENT_PATH: event };
+    assert.equal(diffBase(clone, env), mainTip);
+    assert.notEqual(diffBase(clone, env), staleBase);
+    assert.equal(main(clone, env), 0);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
