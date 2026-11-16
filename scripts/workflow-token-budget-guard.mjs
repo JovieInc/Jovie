@@ -62,13 +62,11 @@ export function main(argv = process.argv.slice(2), root = process.cwd()) {
       for (const error of scheduleErrors)
         process.stderr.write(`schedule-trigger-guard: ${error}\n`);
       scheduleFailed = scheduleErrors.length > 0;
-      if (!scheduleFailed) {
-        // Every run proves it executed (JOV-12720 verify-by-exercise: the
-        // success path was silent, indistinguishable from a skip).
-        process.stdout.write(
-          `schedule-trigger-guard: base ${base.slice(0, 10)}, ${added.size} changed file(s) with additions scanned, ok\n`
-        );
-      }
+      // Every run proves which base it diffed (JOV-12720). A stale event
+      // base and a real addition must be distinguishable in the log.
+      process.stdout.write(
+        `schedule-trigger-guard: base ${base.slice(0, 10)}, ${added.size} changed file(s) with additions scanned, ${scheduleFailed ? 'FAIL' : 'ok'}\n`
+      );
     }
   }
   const left = Object.values(ratchet).reduce(
