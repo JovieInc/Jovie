@@ -9,7 +9,6 @@ import {
   useRef,
   useState,
 } from 'react';
-import { useReducedMotion } from '@/lib/hooks/useReducedMotion';
 import { cn } from '@/lib/utils';
 import './MarketingSnapRail.css';
 
@@ -58,7 +57,6 @@ export function MarketingSnapRail({
   const railId = `marketing-snap-rail-${generatedId}`;
   const describedBy = instructionsId ?? `${railId}-instructions`;
   const scrollerRef = useRef<HTMLElement | null>(null);
-  const reducedMotion = useReducedMotion();
   const [scrollState, setScrollState] = useState({
     ready: false,
     canScrollPrevious: false,
@@ -113,23 +111,23 @@ export function MarketingSnapRail({
     };
   }, [measureScrollState]);
 
-  const scrollByDirection = useCallback(
-    (direction: 'prev' | 'next') => {
-      const rail = scrollerRef.current;
-      if (!rail) {
-        return;
-      }
+  const scrollByDirection = useCallback((direction: 'prev' | 'next') => {
+    const rail = scrollerRef.current;
+    if (!rail) {
+      return;
+    }
 
-      const scrollStep = Math.max(rail.clientWidth * 0.8, 240);
-      const directionSign =
-        globalThis.getComputedStyle(rail).direction === 'rtl' ? -1 : 1;
-      rail.scrollBy({
-        left: (direction === 'next' ? scrollStep : -scrollStep) * directionSign,
-        behavior: reducedMotion ? 'auto' : 'smooth',
-      });
-    },
-    [reducedMotion]
-  );
+    const scrollStep = Math.max(rail.clientWidth * 0.8, 240);
+    const directionSign =
+      globalThis.getComputedStyle(rail).direction === 'rtl' ? -1 : 1;
+    const reducedMotion = globalThis.matchMedia(
+      '(prefers-reduced-motion: reduce)'
+    ).matches;
+    rail.scrollBy({
+      left: (direction === 'next' ? scrollStep : -scrollStep) * directionSign,
+      behavior: reducedMotion ? 'auto' : 'smooth',
+    });
+  }, []);
 
   const navButtons = (
     <>
@@ -252,7 +250,7 @@ export function MarketingSnapRail({
           data-testid={scrollerTestId ?? `${testId}-scroller`}
           className={cn(
             'marketing-snap-rail__scroller relative grid grid-cols-1 gap-3 overflow-visible pb-3 pl-5 pr-5 sm:flex sm:gap-3.5 sm:overflow-x-auto sm:overflow-y-hidden sm:overscroll-x-contain sm:snap-x sm:snap-mandatory sm:pl-6 sm:pr-[12vw] sm:scroll-pl-6 lg:pl-[max(1.5rem,calc((100vw-var(--public-content-max-page))/2))] lg:pr-[14vw] lg:scroll-pl-[max(1.5rem,calc((100vw-var(--public-content-max-page))/2))] [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden',
-            !reducedMotion && 'sm:scroll-smooth',
+            'motion-safe:sm:scroll-smooth',
             railClassName
           )}
         >
