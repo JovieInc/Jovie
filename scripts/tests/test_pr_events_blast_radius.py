@@ -54,3 +54,10 @@ console.log(JSON.stringify(JSON.parse(readFileSync(0, 'utf8')).map(warnings)));
         shell = Shell({("pr", "view"): "Summary"})
         self.assertTrue(events.ensure_red_before_green(self.PR, sh=shell, blast_radius=self.BLAST))
         self.assertEqual(len(shell.made("pr", "edit")), 1)
+
+    def test_blast_radius_composes_with_explicit_literal_mentions(self):
+        evidence = {**self.BLAST, "Proof": "The @critical test tag passes."}
+        updated = events.repair_evidence_body(
+            self.PR, "Summary", blast_radius=evidence, literal_mentions=("@critical",))
+        self.assertIn("- Proof: The `@critical` test tag passes.", updated)
+        self.assertEqual(updated.count("## Blast radius"), 1)

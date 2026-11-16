@@ -1079,7 +1079,7 @@ def red_before_green_block(pr: dict, excerpt: str = "") -> str | None:
 def repair_evidence_body(pr: dict, body: str, excerpt: str = "", *, customer_decision: dict | None = None,
                          locking_pr: int | None = None, win_section: str | None = None,
                          premise: dict | None = None, previous_win_section: str | None = None,
-                         blast_radius: dict | None = None) -> str:
+                         blast_radius: dict | None = None, literal_mentions: tuple[str, ...] = ()) -> str:
     """Complete explicit evidence; preserve proof/decisions for Fleet/changelog validation."""
     decisions = re.findall(r"<!--\s*customer-changelog/v1\b[\s\S]*?-->", body)
     if len(decisions) > 1:
@@ -1118,7 +1118,8 @@ def repair_evidence_body(pr: dict, body: str, excerpt: str = "", *, customer_dec
             block = "## Premise check\n\n" + "\n".join(f"- {field}: {premise[field]}" for field in fields)
             updated = updated.rstrip("\n") + "\n\n" + block + "\n"
     updated = with_blast_radius(updated, blast_radius)
-    return quote_revision_references(repair_customer_decision(updated, decisions, customer_decision))
+    return quote_revision_references(repair_customer_decision(updated, decisions, customer_decision),
+                                     literal_mentions=literal_mentions)
 
 
 def api_gh(args, **_):
@@ -1133,18 +1134,19 @@ def api_gh(args, **_):
 
 def ensure_red_before_green(pr: dict, excerpt: str = "", sh=api_gh, *, customer_decision: dict | None = None,
                             locking_pr: int | None = None, win_section: str | None = None,
-                            premise: dict | None = None, blast_radius: dict | None = None) -> bool:
+                            premise: dict | None = None, blast_radius: dict | None = None,
+                            literal_mentions: tuple[str, ...] = ()) -> bool:
     """Complete repair evidence and an optional caller-selected customer decision."""
     if not isinstance(pr.get("number"), int) or (
             customer_decision is None and locking_pr is None and win_section is None and premise is None and blast_radius is None
-            and red_before_green_block(pr, excerpt) is None):
+            and not literal_mentions and red_before_green_block(pr, excerpt) is None):
         return False
     viewed = sh(["pr", "view", str(pr["number"]), "--repo", REPO, "--json", "body", "--jq", ".body"])
     if viewed.returncode != 0:
         return False
     body = viewed.stdout or ""
     updated = repair_evidence_body(pr, body, excerpt, customer_decision=customer_decision, locking_pr=locking_pr,
-                                   win_section=win_section, premise=premise, blast_radius=blast_radius)
+                                   win_section=win_section, premise=premise, blast_radius=blast_radius, literal_mentions=literal_mentions)
     if updated == body:
         return False
     with tempfile.TemporaryDirectory(prefix="red-before-green-") as tmp:
