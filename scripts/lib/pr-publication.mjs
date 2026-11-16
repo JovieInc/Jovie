@@ -2,6 +2,8 @@
 // api-budget: github-user-core 300/hr - existing on-demand publication/read calls, at most 30 per update
 // api-budget: github-user-graphql 100/hr - existing on-demand publication metadata, at most 10 per update
 import { spawnSync } from 'node:child_process';
+import { appendFileSync, mkdirSync } from 'node:fs';
+import { homedir } from 'node:os';
 import path from 'node:path';
 import { section } from '../pr-fleet-rules.mjs';
 import { classifyCiRisk, loadCiHarnessManifest } from './ci-harness.mjs';
@@ -42,6 +44,32 @@ export function admissionPriority({
   return risk.matchedRules.some(rule => correctness.has(rule.id))
     ? 'repair'
     : 'default';
+}
+
+/**
+ * Callers can decline the repair reserve; this option cannot raise priority.
+ * @param {Parameters<typeof admissionPriority>[0] & {noRepairReserve?: boolean}} input
+ */
+export function publicationPriority({ noRepairReserve = false, ...input }) {
+  const automaticPriority = admissionPriority(input);
+  return {
+    automaticPriority,
+    priority: noRepairReserve === true ? 'default' : automaticPriority,
+  };
+}
+
+/** Existing best-effort publication receipts; quota accounting stays in the shared client. */
+export function recordPublication(row) {
+  try {
+    const dir = path.join(homedir(), '.local/state/jovie-lanes');
+    mkdirSync(dir, { recursive: true });
+    appendFileSync(
+      path.join(dir, 'pr-open.jsonl'),
+      `${JSON.stringify({ at: new Date().toISOString(), ...row })}\n`
+    );
+  } catch {
+    /* metric write is best effort */
+  }
 }
 
 /** @type {(cwd: string, args: string[], options?: object) => {status: number|null, stdout: string, stderr: string, error?: Error}} */

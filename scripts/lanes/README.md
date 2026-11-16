@@ -980,6 +980,12 @@ agent-control-plane, identity, payment or proxy risk surfaces. The same priority
 the prospective gate and the single creation attempt. It can use the existing repair
 reserve; it cannot spend an empty bucket or override CI backlog.
 
+`pr:open open --no-repair-reserve` explicitly declines that reserve and uses `default`
+for both capacity admission and the single creation request. It is a boolean downgrade,
+not a free-form priority setting; automatic selection stays unchanged when omitted.
+The existing publication receipt records the automatic and effective priorities.
+Every quota, CI, source, body and publication-head gate still applies.
+
 Ship now: use observed capacity with the existing event and lanes invocation paths.
 Re-evaluate when: JOV-7514 runtime receipts show idle capacity or a wrong-bucket hold.
 Then: repair that evidence path under JOV-8754; do not add another controller.
