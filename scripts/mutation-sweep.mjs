@@ -1,7 +1,6 @@
 #!/usr/bin/env node
 
 // Rolling spare-capacity sweep; existing web/UI state identities stay stable.
-//   node scripts/mutation-sweep.mjs --state <path> --max-files 6 --max-minutes 90
 //   --mode incremental selects changed inputs; --include packages/ui/ selects UI.
 // Survivor task JSON feeds the separate approval-required draft preparation step.
 
@@ -120,7 +119,8 @@ if (!values.state && !values['list-only'])
 const git = (/** @type {string[]} */ args, input) =>
   spawnSync('git', args, { cwd: repoRoot, encoding: 'utf8', input });
 const head = git(['rev-parse', 'HEAD']);
-if (head.status !== 0) throw new Error('Cannot resolve tested commit');
+if (head.status !== 0 && !values['list-only'])
+  throw new Error('Cannot resolve tested commit');
 const headSha = head.stdout.trim();
 if (values.sha && values.sha !== headSha)
   throw new Error('--sha must match checked-out HEAD');
@@ -171,7 +171,7 @@ for (const row of staged) {
 }
 const tracked = [...blobs.keys()];
 const inventory = git(['ls-files', '-z']);
-if (inventory.status !== 0)
+if (inventory.status !== 0 && !values['list-only'])
   throw new Error('Mutation input inventory unavailable');
 const inputPaths = inventory.stdout.split('\0').filter(Boolean);
 const readInput = repositoryReader(repoRoot);

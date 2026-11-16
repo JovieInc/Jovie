@@ -1,8 +1,5 @@
-// Diff-scoped mutation testing for high-risk apps/web source.
-// Stryker's vitest runner (10.0.0) loses results for tests nested in
-// `describe` blocks under vitest 5, so every killed mutant there scores as
-// Survived. This lane uses Stryker's command runner instead: each mutant runs
-// a plain `vitest run` over the tests that import the mutated file.
+// Diff-scoped mutation testing uses the command runner over related tests.
+// Core 10.0's Vitest adapter loses describe-block results under Vitest 5.
 
 import {
   existsSync,
@@ -13,11 +10,14 @@ import {
 } from 'node:fs';
 import { join, posix, relative, resolve } from 'node:path';
 import ts from 'typescript';
-import { withMutationEvidence } from './mutation-evidence-graph.mjs';
-import { scoreMutants } from './mutation-evidence-score.mjs';
-import { hasMutationSource, parseModule } from './mutation-source.mjs';
+import {
+  hasMutationSource,
+  parseModule,
+  scoreMutants,
+  withMutationEvidence,
+} from './mutation-source.mjs';
 
-export { scoreMutants } from './mutation-evidence-score.mjs';
+export { scoreMutants } from './mutation-source.mjs';
 
 export const WEB_ROOT = 'apps/web';
 
