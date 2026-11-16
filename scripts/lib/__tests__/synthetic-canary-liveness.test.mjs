@@ -188,9 +188,11 @@ describe('synthetic canary dead-man', () => {
         ])
       )
     ).toMatchObject({ ok: true });
+    // JOV-6813 backstop: an executed dispatched canary on main runs the
+    // identical probes, so a fresh successful one now proves the heartbeat.
     expect(
       await check(githubFor([run({ event: 'workflow_dispatch' })]))
-    ).toMatchObject({ ok: false });
+    ).toMatchObject({ ok: true, reason: 'Scheduled canary healthy' });
   });
 
   it.each(['queued', 'in_progress', 'waiting'])(
