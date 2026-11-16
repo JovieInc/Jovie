@@ -110,12 +110,12 @@ async function runInspect(): Promise<Record<string, unknown>> {
   } finally {
     process.argv = argv;
     output.mockRestore();
-    processRunner.mockReset();
   }
 }
 
 describe('production marker artifact-zip bounded retry', () => {
   afterEach(() => {
+    processRunner.mockReset();
     vi.resetModules();
   });
 

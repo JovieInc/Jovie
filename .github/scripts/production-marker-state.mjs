@@ -2,17 +2,11 @@
 
 import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import {
-  closeSync,
-  mkdtempSync,
-  openSync,
-  readFileSync,
-  rmSync,
-  writeFileSync,
-} from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { ghZipWithRetry } from './gh-zip-retry.mjs';
 
 const MARKER_FILE = 'production-generation-verified.json';
 const RECOVERY_FILE = 'production-generation-recovery.json';
@@ -1278,53 +1272,6 @@ function runText(command, args) {
   return result.stdout;
 }
 
-function runZip(command, args) {
-  // gh 2.102 treats every GH_FORCE_TTY value, including 0, as a terminal and
-  // refuses application/zip. A pipe is not a sufficient substitute: write the
-  // body to a file and drop the variable.
-  const env = { ...process.env };
-  delete env.GH_FORCE_TTY;
-  const file = join(
-    tmpdir(),
-    `jovie-gh-zip-${process.pid}-${Date.now()}-${Math.random().toString(16).slice(2)}.bin`
-  );
-  const fd = openSync(file, 'w');
-  let result;
-  try {
-    result = spawnSync(command, args, {
-      env,
-      maxBuffer: 32 * 1024 * 1024,
-      stdio: ['ignore', fd, 'pipe'],
-    });
-  } finally {
-    closeSync(fd);
-  }
-  let stdout = Buffer.alloc(0);
-  try {
-    stdout = readFileSync(file);
-    // Reader doubles return the body on stdout and do not write the fd.
-    if (
-      stdout.length === 0 &&
-      result?.stdout != null &&
-      result.stdout.length > 0
-    ) {
-      stdout = Buffer.isBuffer(result.stdout)
-        ? result.stdout
-        : Buffer.from(String(result.stdout));
-    }
-  } finally {
-    rmSync(file, { force: true });
-  }
-  if (!result || result.status !== 0) {
-    spawnFailure(
-      command,
-      args,
-      result ?? { status: 1, stderr: 'spawn failed' }
-    );
-  }
-  return stdout;
-}
-
 function ghJson(endpoint) {
   return JSON.parse(runText('gh', ['api', endpoint]));
 }
@@ -1347,40 +1294,6 @@ function normalizeArtifacts(payload, expectedName) {
   }));
 }
 
-// A transient GitHub 503 killed the Sentry recurrence dead-man on 2026-11-16
-// 15:43Z with one attempt and no retry (run 43899436210, artifact 14239732099,
-// reason verified_production_artifact_unavailable; the two prior hourly runs
-// passed). Bounded: three attempts with fixed backoffs, transient shapes only
-// (gh HTTP 5xx and connection-level errors); after exhaustion the original
-// spawnFailure error stands, so a real failure still fails closed and no
-// threshold or skip is introduced.
-export const ARTIFACT_ZIP_ATTEMPT_DELAYS_MS = [500, 1_500];
-
-function sleepSync(ms) {
-  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
-}
-
-function transientGhFailure(error) {
-  return /gh: HTTP 5\d\d|ECONNRESET|ECONNREFUSED|ETIMEDOUT|EAI_AGAIN|socket hang up|connection reset/i.test(
-    error?.message ?? ''
-  );
-}
-
-function runZipRetried(args, delaysMs = ARTIFACT_ZIP_ATTEMPT_DELAYS_MS) {
-  let lastError;
-  for (let attempt = 0; attempt <= delaysMs.length; attempt += 1) {
-    if (attempt > 0) sleepSync(delaysMs[attempt - 1]);
-    try {
-      return runZip('gh', args);
-    } catch (error) {
-      lastError = error;
-      // A deterministic error is an answer, not a transient failure.
-      if (!transientGhFailure(error)) break;
-    }
-  }
-  throw lastError;
-}
-
 function downloadJsonArtifact(
   repo,
   artifactId,
@@ -1390,8 +1303,7 @@ function downloadJsonArtifact(
   const directory = mkdtempSync(join(tmpdir(), 'jovie-production-marker-'));
   const archive = join(directory, 'artifact.zip');
   try {
-    const body = runZipRetried([
-      'api',
+    const body = ghZipWithRetry([
       `repos/${repo}/actions/artifacts/${artifactId}/zip`,
     ]);
     writeFileSync(archive, body);
