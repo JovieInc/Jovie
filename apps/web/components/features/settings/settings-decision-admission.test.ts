@@ -131,6 +131,98 @@ describe('filterSettingsAdmissions', () => {
     ).toEqual([]);
   });
 
+  it.each([
+    ['subscription billing', ['billing']],
+    ['  BILLING   subscription  ', ['billing']],
+    ['billing&subscription', ['billing']],
+    ['terms billing', ['billing']],
+    ['scopes connections', ['connections']],
+    ['privacy choices export', ['data-privacy']],
+    ['billing nonsense', []],
+    ['age', []],
+    ['!!!', []],
+  ])('matches every query word at a word boundary: %s', (query, ids) => {
+    expect(
+      filterSettingsAdmissions(SETTINGS_ADMISSION_GROUPS, query).flatMap(
+        group => group.items.map(item => item.id)
+      )
+    ).toEqual(ids);
+  });
+
+  it('searches Unicode labels and descriptions without requiring accents', () => {
+    const groups = [
+      {
+        id: 'synthetic',
+        label: 'Synthetic',
+        items: [
+          {
+            ...SETTINGS_ADMISSION_GROUPS[0].items[0],
+            label: 'Beyoncé — 東京',
+            title: 'Réglages avancés',
+          },
+        ],
+      },
+    ];
+    for (const query of ['BEYONCE 東京', 'avances reglages', 'Beyonce\u0301']) {
+      expect(filterSettingsAdmissions(groups, query)[0]?.items).toEqual(
+        groups[0].items
+      );
+    }
+    expect(filterSettingsAdmissions(groups, 'beyonce missing')).toEqual([]);
+  });
+
+  it('does not search route, identity or admission-control metadata', () => {
+    const groups = [
+      {
+        id: 'synthetic',
+        label: 'Synthetic',
+        items: [
+          {
+            ...SETTINGS_ADMISSION_GROUPS[0].items[0],
+            id: 'hiddenidentity',
+            label: 'Appearance',
+            admission: {
+              ...getSettingsAdmission('account'),
+              userJob: 'Review theme preferences',
+              scope: 'workspace' as const,
+              screenRationale: 'Unlisted explanation',
+            },
+          },
+        ],
+      },
+    ];
+    for (const query of [
+      'hiddenidentity',
+      'workspace',
+      'unlisted',
+      'settings',
+    ]) {
+      expect(filterSettingsAdmissions(groups, query)).toEqual([]);
+    }
+  });
+
+  it('filters admin-only candidates before matching their labels or group', () => {
+    const groups = [
+      {
+        id: 'synthetic',
+        label: 'Synthetic',
+        items: [
+          {
+            ...SETTINGS_ADMISSION_GROUPS[0].items[0],
+            label: 'Operator',
+            adminOnly: true,
+          },
+        ],
+      },
+    ];
+    for (const query of ['', 'synthetic', 'operator']) {
+      expect(filterSettingsAdmissions(groups, query)).toEqual([]);
+      expect(
+        filterSettingsAdmissions(groups, query, { isAdmin: true })[0]?.items
+      ).toEqual(groups[0].items);
+    }
+  });
+
   it('never surfaces operator controls via search, even for admins', () => {
     for (const query of ['admin', 'ops', 'ovie']) {
       expect(
