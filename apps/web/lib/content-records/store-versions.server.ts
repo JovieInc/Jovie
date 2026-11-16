@@ -124,6 +124,26 @@ export async function getLiveContent<T>(
 
   const validated = validateContentRecord(definition, key, stored.data);
   if (!validated.ok || stored.schemaVersion !== definition.schemaVersion) {
+    // A record published under a retired schema revision migrates forward on
+    // the read path (JOV-12824): the store keeps history and rollback, and the
+    // stale-record warning stays reserved for records no migration recognizes.
+    const migrated = definition.migrate?.(stored.data);
+    if (migrated !== null && migrated !== undefined) {
+      const migratedValidated = validateContentRecord(
+        definition,
+        key,
+        migrated
+      );
+      if (migratedValidated.ok) {
+        return {
+          data: migratedValidated.data,
+          source: 'live',
+          versionId: stored.versionId,
+          version: stored.version,
+          publishedAt: stored.publishedAt,
+        };
+      }
+    }
     await captureWarning(
       'Live content record no longer validates',
       new Error(

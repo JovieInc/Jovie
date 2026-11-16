@@ -23,6 +23,14 @@ export interface ContentKindDefinition<T> {
    */
   readonly defaultRecord: (key: string) => T;
   /**
+   * Read-time migration for a stored record that no longer validates or was
+   * published under a different schema revision. Pure: returns a record valid
+   * under the CURRENT schema, or null when the stored data is not
+   * recognizable. A successful migration is served in place of the stale
+   * record without the "no longer validates" warning (JOV-12824).
+   */
+  readonly migrate?: (stored: unknown) => T | null;
+  /**
    * Cross-record rules a schema cannot express (registry membership, locked
    * fields, legal guards). Returns human-readable violations; empty = valid.
    */

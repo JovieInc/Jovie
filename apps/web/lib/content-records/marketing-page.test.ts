@@ -213,6 +213,81 @@ describe('spec section registry', () => {
   });
 });
 
+describe('migration for the retired spec revision (JOV-12824)', () => {
+  const retiredRecord = {
+    schemaVersion: 0,
+    sections: [
+      {
+        section: 'hero',
+        variant: 'centered-handle-claim',
+        copy: {
+          eyebrow: 'Jovie',
+          headline: 'Find yourself.',
+          subhead: 'Search your artist name to claim your profile.',
+        },
+      },
+      {
+        section: 'feature-split',
+        variant: 'phone-right',
+        copy: {
+          headline: 'One name. Found everywhere.',
+          body: 'Your profile at jov.ie leads with what matters now.',
+        },
+      },
+    ],
+  };
+
+  it('migrates the retired centered-handle hero record to the current schema', () => {
+    const migrated = MARKETING_PAGE_KIND.migrate?.(retiredRecord);
+    expect(migrated).not.toBeNull();
+    expect(migrated?.sections.map(s => s.section)).toEqual([
+      'hero',
+      'feature-split',
+      'product-gallery',
+      'cta',
+    ]);
+    // The killed hero copy does not survive the migration; the approved
+    // editorial copy fills the retired slots.
+    const hero = migrated?.sections[0];
+    expect(hero).toMatchObject({ section: 'hero', variant: 'left-none' });
+    // A still-valid published section passes through untouched.
+    const featureSplit = migrated?.sections[1];
+    expect(featureSplit).toMatchObject({
+      section: 'feature-split',
+      copy: { headline: 'One name. Found everywhere.' },
+    });
+    expect(validate(migrated)).toEqual({ ok: true, data: migrated });
+  });
+
+  it('migrates with no invite-only language anywhere in the fallback or migrated copy', () => {
+    for (const spec of [
+      DEFAULT_HOME_SPEC,
+      MARKETING_PAGE_KIND.migrate?.(retiredRecord),
+    ]) {
+      for (const section of spec?.sections ?? []) {
+        for (const text of Object.values(section.copy)) {
+          expect(text.toLowerCase()).not.toContain('invit');
+          expect(text.toLowerCase()).not.toContain('opens by invitation');
+        }
+      }
+    }
+    expect(
+      DEFAULT_HOME_SPEC.sections[0]?.section === 'hero' &&
+        DEFAULT_HOME_SPEC.sections[0].copy.primaryAction
+    ).toBe('Claim your profile');
+  });
+
+  it('migrates the stored record for the live read without a warning', () => {
+    // Store-level behavior is covered in store-versions.server.test.ts; here
+    // the hook must accept exactly what that read path passes it.
+    expect(MARKETING_PAGE_KIND.migrate?.({ sections: [] })).toBeNull();
+    expect(MARKETING_PAGE_KIND.migrate?.('not a spec')).toBeNull();
+    expect(
+      MARKETING_PAGE_KIND.migrate?.({ sections: [{ section: 42 }] })
+    ).toBeNull();
+  });
+});
+
 describe('experiment assignment', () => {
   const experiment = {
     id: 'home-test',

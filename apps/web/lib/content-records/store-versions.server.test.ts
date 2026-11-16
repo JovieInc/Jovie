@@ -60,6 +60,59 @@ beforeEach(() => {
   mocks.store.clear();
 });
 
+describe('read-time migration for a retired record (JOV-12824)', () => {
+  it('serves the migrated record as live without the stale-record warning', async () => {
+    mocks.rows.mockResolvedValue([
+      {
+        versionId: 'v4-old',
+        version: 4,
+        data: {
+          sections: [
+            {
+              section: 'hero',
+              variant: 'centered-handle-claim',
+              copy: {
+                headline: 'Find yourself.',
+                subhead: 'Search your name.',
+              },
+            },
+          ],
+        },
+        schemaVersion: MARKETING_PAGE_KIND.schemaVersion,
+        publishedAt: new Date('2026-10-28T01:00:00Z'),
+      },
+    ]);
+    const live = await getLiveContent(MARKETING_PAGE_KIND, 'home');
+    expect(live.source).toBe('live');
+    expect(live.versionId).toBe('v4-old');
+    expect(live.data.sections.map(s => s.section)).toEqual([
+      'hero',
+      'feature-split',
+      'product-gallery',
+      'cta',
+    ]);
+    expect(mocks.captureWarning).not.toHaveBeenCalled();
+  });
+
+  it('warns and falls back when no migration recognizes the record', async () => {
+    mocks.rows.mockResolvedValue([
+      {
+        versionId: 'v3-old',
+        version: 3,
+        data: { something: 'else entirely' },
+        schemaVersion: MARKETING_PAGE_KIND.schemaVersion - 1,
+        publishedAt: new Date('2026-10-28T01:00:00Z'),
+      },
+    ]);
+    const live = await getLiveContent(MARKETING_PAGE_KIND, 'home');
+    expect(live).toMatchObject({
+      source: 'default',
+      fallbackReason: 'incompatible',
+    });
+    expect(mocks.captureWarning).toHaveBeenCalledTimes(1);
+  });
+});
+
 describe('live content cache correctness', () => {
   it('does not cache the default when the table probe fails transiently', async () => {
     mocks.table.mockResolvedValueOnce(false);

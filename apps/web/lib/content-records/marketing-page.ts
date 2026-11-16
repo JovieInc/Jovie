@@ -3,6 +3,7 @@ import { z } from 'zod';
 import surfaceCensus from '@/data/designSystem/surfaceCensus.json';
 import { HOMEPAGE_EDITORIAL_COPY } from '@/data/homepageEditorialCopy';
 import { MARKETING_SECTIONS } from '@/data/marketing/sections';
+import { getClaimProfileIntent } from '@/data/marketingCtaIntents';
 import icpLanguage from '../../../../scripts/invariants/icp-language/config.json';
 import { experimentSchema } from './experiment';
 import type { ContentKindDefinition } from './kind';
@@ -150,7 +151,62 @@ export type MarketingPageSections = MarketingPageSpec['sections'];
 export const MARKETING_PAGE_KEYS = ['home'] as const;
 export type MarketingPageKey = (typeof MARKETING_PAGE_KEYS)[number];
 
-/** The code default: the editorial story, ending in the invitation form. */
+/**
+ * Read-time migration for records published before the 2026-11-07 editorial
+ * spec revision (JOV-12824, Sentry 7850723501): the retired centered-handle
+ * hero and the invitation close fail the current schema, so every read of the
+ * stale live record re-warned to Sentry and served the code default.
+ *
+ * A stored section that still validates against the current schema passes
+ * through untouched (published copy is preserved); the retired hero and the
+ * invitation close are replaced by the approved editorial copy (open-signup
+ * claim actions, per Tim 2026-11-12: "Switch it"). Returns null when the
+ * stored data is not a recognizable section spec, leaving the store's
+ * incompatible fallback and warning untouched.
+ */
+export function migrateMarketingPageSpec(
+  stored: unknown
+): MarketingPageSpec | null {
+  if (
+    stored === null ||
+    typeof stored !== 'object' ||
+    Array.isArray(stored) ||
+    !Array.isArray((stored as { sections?: unknown }).sections)
+  ) {
+    return null;
+  }
+  const storedSections = (stored as { sections: unknown[] }).sections.filter(
+    section =>
+      section !== null &&
+      typeof section === 'object' &&
+      !Array.isArray(section) &&
+      typeof (section as { section?: unknown }).section === 'string'
+  );
+  if (storedSections.length === 0) return null;
+  const stillValid: MarketingPageSection[] = [];
+  for (const section of storedSections) {
+    const parsed = MarketingPageSectionSchema.safeParse(section);
+    if (parsed.success) stillValid.push(parsed.data);
+  }
+  const findStored = (section: MarketingPageSection['section']) =>
+    stillValid.find(entry => entry.section === section);
+  const approved = (section: MarketingPageSection['section']) =>
+    DEFAULT_HOME_SPEC.sections.find(entry => entry.section === section);
+  // Hero first, cta last (the order rules `sectionsViolations` enforces); a
+  // stored hero on a retired variant or the invitation close do not survive.
+  const sections: MarketingPageSection[] = [
+    findStored('hero') ?? approved('hero')!,
+    findStored('feature-split') ?? approved('feature-split')!,
+    findStored('product-gallery') ?? approved('product-gallery')!,
+    findStored('cta') ?? approved('cta')!,
+  ];
+  const spec = MarketingPageSpecSchema.safeParse({ sections });
+  if (!spec.success) return null;
+  if (marketingPageViolations(spec.data, 'home').length > 0) return null;
+  return spec.data;
+}
+
+/** The code default: the editorial story, ending in the claim close. */
 export const DEFAULT_HOME_SPEC: MarketingPageSpec = {
   sections: [
     {
@@ -158,7 +214,13 @@ export const DEFAULT_HOME_SPEC: MarketingPageSpec = {
       variant: 'left-none',
       copy: {
         subhead: HOMEPAGE_EDITORIAL_COPY.hero.subhead,
-        primaryAction: HOMEPAGE_EDITORIAL_COPY.hero.primaryAction,
+        // Open signup (Tim, 2026-11-12: "Switch it"): the fallback copy
+        // carries the shared claim-profile action, the same label the hero
+        // renders while signup is open. No invite-only language in the
+        // fallback (JOV-12824). While the PUBLIC_SIGNUP_CLOSED kill switch is
+        // on, a published record fills this slot with the invitation form's
+        // own label instead.
+        primaryAction: getClaimProfileIntent().label,
         secondaryAction: HOMEPAGE_EDITORIAL_COPY.hero.secondaryAction,
       },
     },
@@ -182,8 +244,11 @@ export const DEFAULT_HOME_SPEC: MarketingPageSpec = {
       section: 'cta',
       variant: 'final-single-claim',
       copy: {
-        headline: HOMEPAGE_EDITORIAL_COPY.invite.headline,
-        subhead: HOMEPAGE_EDITORIAL_COPY.invite.subhead,
+        // The claim close (open signup), not the invitation copy: the
+        // invitation form's headline and subhead are published-record slots
+        // only (Tim, 2026-11-12: "Switch it"; JOV-12824).
+        headline: HOMEPAGE_EDITORIAL_COPY.claim.headline,
+        subhead: HOMEPAGE_EDITORIAL_COPY.claim.subhead,
       },
     },
   ],
@@ -299,5 +364,6 @@ export const MARKETING_PAGE_KIND: ContentKindDefinition<MarketingPageSpec> = {
   keys: MARKETING_PAGE_KEYS,
   defaultRecord: () => DEFAULT_HOME_SPEC,
   validate: (spec, key) => marketingPageViolations(spec, key),
+  migrate: migrateMarketingPageSpec,
   livePaths: key => (key === 'home' ? ['/'] : []),
 };
