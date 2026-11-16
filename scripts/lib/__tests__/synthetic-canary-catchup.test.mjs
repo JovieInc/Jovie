@@ -207,7 +207,10 @@ describe('synthetic canary catch-up', () => {
 
   it.each([
     ['empty ledger', []],
-    ['stale dispatch row predating the window', [dispatchRun({ created_at: iso(500) })]],
+    [
+      'stale dispatch row predating the window',
+      [dispatchRun({ created_at: iso(500) })],
+    ],
   ])(
     'treats an unconfirmable dispatch (%s) as a failure so a later check re-evaluates',
     async (_name, ledger) => {
@@ -244,9 +247,10 @@ describe('synthetic canary catch-up', () => {
       scheduled: [scheduledRun({ created_at: iso(421) })],
       post: { status: 403 },
     });
-    expect(
-      await run({ github })
-    ).toMatchObject({ action: 'dispatch-failed', exitCode: 1 });
+    expect(await run({ github })).toMatchObject({
+      action: 'dispatch-failed',
+      exitCode: 1,
+    });
   });
 
   it.each([403, 500])(
@@ -427,18 +431,20 @@ describe('catch-up receipts and exit wiring', () => {
 
   it('fails closed when the runs body carries a non-array workflow_runs', async () => {
     const github = reader({ scheduleBody: { workflow_runs: 'nope' } });
-    expect(
-      await run({ github })
-    ).toMatchObject({ action: 'catch-up-error', exitCode: 1 });
+    expect(await run({ github })).toMatchObject({
+      action: 'catch-up-error',
+      exitCode: 1,
+    });
     expect(posted(github)).toBeUndefined();
   });
 
   it('treats a non-Error rejection as a plain failure, not a deferral', async () => {
     const github = reader();
     github.rest.mockRejectedValue(/** @type {any} */ ('boom-string'));
-    expect(
-      await run({ github })
-    ).toMatchObject({ action: 'catch-up-error', exitCode: 1 });
+    expect(await run({ github })).toMatchObject({
+      action: 'catch-up-error',
+      exitCode: 1,
+    });
   });
 
   it('defaults to the real timer sleep and still confirms on the first poll', async () => {
@@ -467,7 +473,9 @@ describe('catch-up receipts and exit wiring', () => {
     expect(
       guard?.command.includes('--coverage.include=synthetic-canary-catchup.mjs')
     ).toBe(false);
-    expect(guard?.inputs.test('scripts/synthetic-canary-catchup.mjs')).toBe(true);
+    expect(guard?.inputs.test('scripts/synthetic-canary-catchup.mjs')).toBe(
+      true
+    );
     expect(
       guard?.inputs.test(
         'scripts/lib/__tests__/synthetic-canary-catchup.test.mjs'
