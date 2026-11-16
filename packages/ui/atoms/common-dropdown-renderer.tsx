@@ -205,39 +205,38 @@ export function SearchableContent({
 
 // Loading and empty menus still own one item (APG Menu): a disabled row that
 // arrow keys skip, holding the polite status that announces the state.
-function LoadingState() {
+function MenuStatus({
+  isLoading,
+  message,
+}: {
+  readonly isLoading: boolean;
+  readonly message: string;
+}) {
+  // A status row is cheaper to render than to retain compiler cache slots.
+  'use no memo';
   return (
     <div
       role='menuitem'
       aria-disabled='true'
       data-disabled=''
       tabIndex={-1}
-      data-slot='common-dropdown-loading'
-      className={MENU_LOADING_STATE_BASE}
+      data-slot={
+        isLoading ? 'common-dropdown-loading' : 'common-dropdown-empty'
+      }
+      className={isLoading ? MENU_LOADING_STATE_BASE : MENU_EMPTY_STATE_BASE}
     >
-      <Loader2
-        aria-hidden='true'
-        className='h-4 w-4 animate-spin motion-reduce:animate-none'
-      />
-      <span role='status' aria-live='polite' className='sr-only'>
-        Loading menu items
-      </span>
-    </div>
-  );
-}
-
-function EmptyState({ message }: { readonly message: string }) {
-  return (
-    <div
-      role='menuitem'
-      aria-disabled='true'
-      data-disabled=''
-      tabIndex={-1}
-      data-slot='common-dropdown-empty'
-      className={MENU_EMPTY_STATE_BASE}
-    >
-      <span role='status' aria-live='polite'>
-        {message}
+      {isLoading ? (
+        <Loader2
+          aria-hidden='true'
+          className='h-4 w-4 animate-spin motion-reduce:animate-none'
+        />
+      ) : null}
+      <span
+        role='status'
+        aria-live='polite'
+        className={isLoading ? 'sr-only' : undefined}
+      >
+        {isLoading ? 'Loading menu items' : message}
       </span>
     </div>
   );
@@ -256,12 +255,8 @@ export function renderRootBody({
     itemsToRender: readonly CommonDropdownItem[]
   ) => React.ReactNode;
 }) {
-  if (isLoading) {
-    return <LoadingState />;
-  }
-
-  if (items.length === 0) {
-    return <EmptyState message={emptyMessage} />;
+  if (isLoading || items.length === 0) {
+    return <MenuStatus isLoading={isLoading} message={emptyMessage} />;
   }
 
   return <SubmenuGroupProvider>{renderItems(items)}</SubmenuGroupProvider>;

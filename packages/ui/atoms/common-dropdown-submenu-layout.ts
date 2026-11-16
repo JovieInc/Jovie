@@ -48,17 +48,12 @@ export function measureSubmenuPlacement(
   const mustOverlap =
     parentBox &&
     usableWidth > 0 &&
-    Math.max(
-      parentBox.left - OVERLAY_COLLISION_PADDING - OVERLAY_SIDE_OFFSET,
-      viewportWidth -
-        parentBox.right -
-        OVERLAY_COLLISION_PADDING -
-        OVERLAY_SIDE_OFFSET
-    ) < Math.min(triggerBox.width, usableWidth);
+    Math.max(parentBox.left, viewportWidth - parentBox.right) -
+      OVERLAY_COLLISION_PADDING -
+      OVERLAY_SIDE_OFFSET <
+      Math.min(triggerBox.width, usableWidth);
   const sideOffset = mustOverlap
-    ? opensLeft
-      ? triggerBox.left - parentBox.right
-      : parentBox.left - triggerBox.right
+    ? parentInset - parentBox.width
     : OVERLAY_SIDE_OFFSET + Math.max(0, parentInset);
   const computed = content.ownerDocument.defaultView?.getComputedStyle(content);
   const topInset =
@@ -86,9 +81,10 @@ export function useSubmenuLayout({
   readonly maxHeight?: number | string;
   readonly kind: 'dropdown' | 'context';
 }): SubmenuLayout {
-  const [measuredMinWidth, setMeasuredMinWidth] = React.useState<
-    string | undefined
-  >();
+  // The callbacks already own their dependencies; compiler memo slots add
+  // shared initial JS without saving layout reads.
+  'use no memo';
+  const [measuredMinWidth, setMeasuredMinWidth] = React.useState<number>();
   const [content, setContent] = React.useState<HTMLDivElement | null>(null);
   const [offsets, setOffsets] = React.useState({
     sideOffset: OVERLAY_SIDE_OFFSET,
@@ -102,11 +98,11 @@ export function useSubmenuLayout({
     },
     [contentRef]
   );
-  const measureTriggerWidth = React.useCallback(() => {
+  const measureTriggerWidth = () => {
     if (minWidth !== undefined || !triggerRef.current) return;
     const width = Math.round(triggerRef.current.getBoundingClientRect().width);
-    setMeasuredMinWidth(width > 0 ? `${width}px` : undefined);
-  }, [minWidth, triggerRef]);
+    setMeasuredMinWidth(width > 0 ? width : undefined);
+  };
 
   React.useLayoutEffect(() => {
     const trigger = triggerRef.current;
@@ -149,10 +145,7 @@ export function useSubmenuLayout({
     placement: { ...offsets, collisionPadding: OVERLAY_COLLISION_PADDING },
     style: {
       ...getContentStyle(minWidth ?? measuredMinWidth, maxHeight, kind),
-      ...submenuViewportFitStyle(
-        kind === 'context' ? 'context-menu' : 'dropdown-menu',
-        minWidth ?? measuredMinWidth
-      ),
+      ...submenuViewportFitStyle(`${kind}-menu`, minWidth ?? measuredMinWidth),
     },
   };
 }
