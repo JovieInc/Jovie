@@ -15,6 +15,7 @@ import {
   MARKETING_CERTIFICATION_AUDIT_ARCHIVE_PREFIX,
   MARKETING_CERTIFICATION_HOT_AUDIT_PER_RECORD,
   MARKETING_CERTIFICATION_LEDGER_MAX_BYTES,
+  MARKETING_CERTIFICATION_PACKET_SHARD_PREFIX,
   MARKETING_CERTIFICATION_STORE_KEY,
   type MarketingAssuranceEvidenceBinding,
   type MarketingAssuranceProfile,
@@ -413,20 +414,27 @@ describe('MarketingCertificationStore', () => {
       backend,
       REGISTRY.slice(0, 1)
     ).projectLedger();
-    const ledger = JSON.parse(
-      records.get(MARKETING_CERTIFICATION_STORE_KEY) as string
-    );
-    ledger.records[REGISTRY[0].id].packet.subject.id = 'incorrect-identity';
-    records.set(MARKETING_CERTIFICATION_STORE_KEY, JSON.stringify(ledger));
+    // Seed real evidence, then corrupt the persisted packet shard row — the
+    // packet payload no longer lives inline in the hot row (JOV-12830).
+    await new MarketingCertificationStore(
+      backend,
+      REGISTRY.slice(0, 1)
+    ).ingestPacket(packet(REGISTRY[0]), '2026-09-04T20:00:00.000Z');
+    const shardKey = `${MARKETING_CERTIFICATION_PACKET_SHARD_PREFIX}${REGISTRY[0].id}`;
+    const shard = JSON.parse(records.get(shardKey) as string);
+    shard.packet.subject.id = 'incorrect-identity';
+    records.set(shardKey, JSON.stringify(shard));
     const projection = await new MarketingCertificationStore(
       backend,
       REGISTRY
     ).projectLedger();
+    const storedShard = JSON.parse(records.get(shardKey) as string);
+    expect(storedShard.packet.subject.id).toBe('incorrect-identity');
+    expect(
+      storedShard.packetUpdatedAt ?? storedShard.evaluatedAt
+    ).toBeDefined();
     const stored = JSON.parse(
       records.get(MARKETING_CERTIFICATION_STORE_KEY) as string
-    );
-    expect(stored.records[REGISTRY[0].id].packet.subject.id).toBe(
-      'incorrect-identity'
     );
     expect(stored.registryIds).toEqual(REGISTRY.map(entry => entry.id));
     const failed = projection.entryOutcomes.find(
@@ -1345,11 +1353,11 @@ describe('MarketingCertificationStore', () => {
     );
     await store.ingestPacket(packet(REGISTRY[0]), '2026-09-04T20:10:00.000Z');
     await store.ingestPacket(packet(REGISTRY[1]), '2026-09-04T20:10:01.000Z');
-    const ledger = JSON.parse(
-      records.get(MARKETING_CERTIFICATION_STORE_KEY) as string
-    );
-    ledger.records[REGISTRY[0].id].packet.subject.title = 'Spoofed title';
-    records.set(MARKETING_CERTIFICATION_STORE_KEY, JSON.stringify(ledger));
+    // The packet payload lives in its shard row (JOV-12830); corrupt it there.
+    const spoofedShardKey = `${MARKETING_CERTIFICATION_PACKET_SHARD_PREFIX}${REGISTRY[0].id}`;
+    const spoofedShard = JSON.parse(records.get(spoofedShardKey) as string);
+    spoofedShard.packet.subject.title = 'Spoofed title';
+    records.set(spoofedShardKey, JSON.stringify(spoofedShard));
 
     const posted = await store.ingestPacket(
       packet(REGISTRY[1]),
@@ -1414,11 +1422,12 @@ describe('MarketingCertificationStore', () => {
 
     const stalePath =
       'apps/web/components/marketing/homepage-v2/HomepageV2Route.tsx';
-    const ledger = JSON.parse(
-      records.get(MARKETING_CERTIFICATION_STORE_KEY) as string
-    );
-    ledger.records[homepage.id].packet.source.paths = [stalePath];
-    records.set(MARKETING_CERTIFICATION_STORE_KEY, JSON.stringify(ledger));
+    // The packet payload lives in its shard row, not inline in the hot row
+    // (JOV-12830); corrupt the persisted source there.
+    const shardKey = `${MARKETING_CERTIFICATION_PACKET_SHARD_PREFIX}${homepage.id}`;
+    const shard = JSON.parse(records.get(shardKey) as string);
+    shard.packet.source.paths = [stalePath];
+    records.set(shardKey, JSON.stringify(shard));
     const beforeWrite = records.get(MARKETING_CERTIFICATION_STORE_KEY);
 
     const viewed = await store.inspectLedger('2026-09-04T20:11:02.500Z');
@@ -1460,13 +1469,12 @@ describe('MarketingCertificationStore', () => {
     expect(homepageRow?.row.packet.canonicalReferences[0]?.summary).toContain(
       stalePath
     );
-    const stored = JSON.parse(
+    const storedShard = JSON.parse(records.get(shardKey) as string);
+    expect(storedShard.packet.source.paths).toEqual([homepage.resolvedSource]);
+    const storedHot = JSON.parse(
       records.get(MARKETING_CERTIFICATION_STORE_KEY) as string
     );
-    expect(stored.records[homepage.id].packet.source.paths).toEqual([
-      homepage.resolvedSource,
-    ]);
-    expect(stored.records[homepage.id].packetUpdatedAt).toBe(
+    expect(storedHot.records[homepage.id].packetUpdatedAt).toBe(
       '2026-09-04T20:11:00.000Z'
     );
 
@@ -1602,7 +1610,7 @@ describe('MarketingCertificationStore', () => {
         packet(REGISTRY[0]),
         '2026-09-04T20:09:01.000Z'
       )
-    ).rejects.toThrow('update lost compare-and-set repeatedly');
+    ).rejects.toThrow(/lost compare-and-set repeatedly/);
   });
 
   it('moves old audit events to append-only chunks without losing any, and keeps the ledger row small', async () => {
@@ -1657,5 +1665,76 @@ describe('MarketingCertificationStore', () => {
     const before = records.get(MARKETING_CERTIFICATION_STORE_KEY);
     await store.ingestPacket(packet(REGISTRY[0]), '2026-09-04T20:05:00.000Z');
     expect(records.get(MARKETING_CERTIFICATION_STORE_KEY)).toBe(before);
+  });
+
+  it('keeps the hot ledger row under the KV row budget when stored packets are large (JOV-12830)', async () => {
+    const records = new Map<string, unknown>();
+    const store = new MarketingCertificationStore(
+      memoryBackend(records),
+      REGISTRY
+    );
+    // A full review packet is kilobytes (a CI run posts dozens of evidence
+    // receipts), and the registry denominator is ~100 identities: the legacy
+    // inline-packet hot row crossed the 256 KiB operating-KV row budget and
+    // warned on every write. Two fat packets push the legacy row over budget
+    // while each per-identity shard row stays under it.
+    const fatReceipts = Array.from({ length: 1200 }, (_, i) =>
+      proof('visual_proof', `jov-12830-fat-${i}`)
+    );
+    for (const [i, entry] of REGISTRY.entries()) {
+      await store.ingestPacket(
+        packet(entry, { visualProof: fatReceipts }),
+        `2026-11-16T20:0${i}:00.000Z`
+      );
+    }
+    // Reconstruct the legacy inline-packet hot row (pre-shard format): the
+    // state main has been writing, and the state this store must migrate.
+    const hot = JSON.parse(
+      records.get(MARKETING_CERTIFICATION_STORE_KEY) as string
+    );
+    for (const [_i, entry] of REGISTRY.entries()) {
+      const shardKey = `${MARKETING_CERTIFICATION_STORE_KEY}:packet:${entry.id}`;
+      const shard = JSON.parse(records.get(shardKey) as string);
+      hot.records[entry.id].packet = shard.packet;
+      records.delete(shardKey);
+    }
+    records.set(MARKETING_CERTIFICATION_STORE_KEY, JSON.stringify(hot));
+    expect(
+      Buffer.byteLength(
+        records.get(MARKETING_CERTIFICATION_STORE_KEY) as string
+      )
+    ).toBeGreaterThan(MARKETING_CERTIFICATION_LEDGER_MAX_BYTES);
+
+    await store.ingestPacket(
+      packet(REGISTRY[0], {
+        testsCoverage: [proof('tests_coverage', 'jov-12830-new', 'failed')],
+      }),
+      '2026-11-16T21:00:00.000Z'
+    );
+
+    expect(
+      Buffer.byteLength(
+        records.get(MARKETING_CERTIFICATION_STORE_KEY) as string
+      )
+    ).toBeLessThan(MARKETING_CERTIFICATION_LEDGER_MAX_BYTES);
+    // Evidence survives the shard split: both identities evaluate from their
+    // shard rows — the re-ingested record with its new coverage receipt, the
+    // untouched sibling still carrying its fat visual proof.
+    const view = await store.inspectLedger('2026-11-16T21:00:01.000Z');
+    const reingested = view.entryOutcomes.find(
+      candidate => candidate.identityId === REGISTRY[0].id
+    );
+    expect(reingested?.evaluation).toBe('evaluated');
+    expect(
+      reingested?.row.packet.testsCoverage?.some(r => r.id === 'jov-12830-new')
+    ).toBe(true);
+    const sibling = view.entryOutcomes.find(
+      candidate => candidate.identityId === REGISTRY[1].id
+    );
+    expect(sibling?.evaluation).toBe('evaluated');
+    expect(sibling?.row.packet.visualProof?.length).toBe(fatReceipts.length);
+    expect(
+      (await store.readAuditHistory(REGISTRY[0].id)).length
+    ).toBeGreaterThan(0);
   });
 });
