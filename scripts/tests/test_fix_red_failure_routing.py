@@ -34,6 +34,42 @@ def red(*names):
             'statusCheckRollup': [{'name': n, 'conclusion': 'FAILURE'} for n in names]}
 
 
+class DesignSourceCliTest(unittest.TestCase):
+    def test_infrastructure_shortcut_preserves_design_failure_routes(self):
+        summary = (' FAIL workspace-scripts lib/__tests__/design-system-source-ratchet.test.mjs'
+                   ' > design-system source identity ratchet > exits zero from the CLI on the live tree\n')
+        direct = ('[design-system-source-ratchet] FAIL — 1900 identities\n'
+                  'new design identity: apps/web/components/shell/StatusBadge.tsx'
+                  '\traw-palette-class\tbg-amber-300\n')
+        for diagnostic in (summary, direct):
+            for mixed in (False, True):
+                pr = {**red('Source Validation'), 'queueFailure': None, 'eventKinds': []}
+                logs = {'Source Validation': 'passing fixture: API rate limit exceeded\n' + diagnostic}
+                if mixed:
+                    pr['statusCheckRollup'].append({'name': 'Unit Tests', 'conclusion': 'FAILURE'})
+                    logs['Unit Tests'] = 'passing fixture: API rate limit exceeded\nAssertionError: real product bug'
+                with patch.object(lane, 'failed_logs', return_value=logs):
+                    self.assertIsNone(lane.infra_only_red(None, pr))
+                    self.assertEqual(lane.route_fix_red(None, pr)['action'], 'agent' if mixed else 'sync-main')
+        pr = {**red('Source Validation'), 'queueFailure': None, 'eventKinds': []}
+        with patch.object(lane, 'failed_logs', return_value={'Source Validation': 'API rate limit exceeded'}):
+            self.assertEqual(lane.infra_only_red(None, pr), 'api-rate-limit-exceeded')
+
+    def test_direct_identity_diagnostic_uses_existing_main_sync_route(self):
+        header = '[design-system-source-ratchet] FAIL — 1900 identities (0 new / baseline 1907)\n'
+        identity = ('new design identity: apps/web/components/shell/StatusBadge.tsx'
+                    '\traw-palette-class\tbg-amber-300\n')
+        noise = 'passing fixture: github-quota-deferred; API rate limit exceeded; HTTP 503\n'
+        for log in (header + identity, noise + header + identity):
+            got = classes.classify(red('Source Validation'), {'Source Validation': log})
+            self.assertEqual((got['cls'], got['action']), ('design-source-cli', 'sync-main'))
+            self.assertEqual(got['actions'], ['sync-main'])
+        for log in (header, identity, header.replace('FAIL', 'PASS') + identity,
+                    header + identity.replace('raw-palette-class', 'unknown-rule')):
+            got = classes.classify(red('Source Validation'), {'Source Validation': noise + log})
+            self.assertEqual((got['cls'], got['action']), ('quota-deferred', 'rerun'))
+
+
 class LocalModulePrerequisiteTest(unittest.TestCase):
     def test_missing_local_prerequisite_syncs_main_before_fixture_infra(self):
         diagnostic = ("lib/waitlist/winback-approval.server.ts(23,8): error TS2307: "

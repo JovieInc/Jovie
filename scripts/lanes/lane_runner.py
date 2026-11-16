@@ -6990,7 +6990,7 @@ def infra_only_red(host: Host, pr: dict) -> str | None:
     if not logs:
         return None
     routed = fix_red_classes.classify(pr, logs)
-    if routed.get("action") == fix_red_failure_routing.ALIAS_ACTION or fix_red_failure_routing.has_local_prerequisite_failure(routed, logs):
+    if routed.get("action") == fix_red_failure_routing.ALIAS_ACTION or fix_red_failure_routing.has_source_prerequisite_failure(routed, logs):
         return None
     found = set()
     for text in logs.values():
