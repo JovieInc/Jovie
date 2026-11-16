@@ -15,6 +15,7 @@ name: Company Guards
 # changed against the base fail; other growth warns) and repo-wide on push.
 on:
   pull_request:
+    types: [opened, synchronize, reopened, labeled, unlabeled]
   merge_group:
     types: [checks_requested]
   push:
@@ -72,6 +73,7 @@ jobs:
       - name: Run guards
         env:
           PR_BODY: ${{ github.event.pull_request.body }}
+          PR_LABELS: ${{ toJSON(github.event.pull_request.labels.*.name) }}
         run: node .company-ci/guards/run.mjs
       # github-token-budget: 3 calls/run - pin drift lists commits on canon, guards, and this workflow
       - name: Pin drift
