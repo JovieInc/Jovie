@@ -202,4 +202,44 @@ describe('AdminUserDetailDrawer', () => {
     expect(screen.getByRole('link', { name: 'سبوتيفاي' })).toBeInTheDocument();
     await expectNoA11yViolations(container);
   });
+
+  it('keeps the copy buttons at a 24px+ touch target', () => {
+    render(<AdminUserDetailDrawer user={adminUser} onClose={() => {}} />);
+
+    const copyEmail = screen.getByRole('button', { name: 'Copy Email' });
+    expect(copyEmail).toHaveClass('size-6');
+  });
+
+  it('keeps the copy buttons unsqueezed in long-content rows', () => {
+    render(<AdminUserDetailDrawer user={longContentUser} onClose={vi.fn()} />);
+
+    for (const label of ['Copy Email', 'Copy User ID', 'Copy Clerk ID']) {
+      expect(screen.getByRole('button', { name: label })).toHaveClass(
+        'size-6',
+        'shrink-0'
+      );
+    }
+
+    // The truncating value spans must shrink inside their flex rows — an
+    // overflowing email box pushes the copy button under the header clip
+    // (axe target-size: partially obscured).
+    const email = longContentUser.email ?? '';
+    expect(screen.getByText(email)).toHaveClass('min-w-0');
+  });
+
+  it('reserves the floating action band in a real grid cell', () => {
+    render(<AdminUserDetailDrawer user={longContentUser} onClose={vi.fn()} />);
+
+    // A long email parks the Copy Email button at the identity column's right
+    // edge, directly beside the card-top-right floating cluster. The grid
+    // layout gives the action bar a real cell whose own pr-11 /
+    // pr-[4.75rem] padding reserves the band — a pr-* class on the identity
+    // column cannot do it: globals.css excludes components/features/admin
+    // from its Tailwind scan, so the reservation utility is missing from the
+    // Storybook a11y build (axe target-size reported the 24x12 overlap).
+    expect(screen.getByTestId('admin-user-entity-header')).toHaveAttribute(
+      'data-layout',
+      'grid'
+    );
+  });
 });

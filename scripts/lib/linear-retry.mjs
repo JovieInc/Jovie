@@ -74,3 +74,26 @@ export function logFailedLinearAction(
   if (githubActions) log(`::error::${line}`);
   else log(line);
 }
+
+/** True when a result failed ONLY on the shared Linear workspace quota
+ * (linear_rate_limited). Quota-limited green/resolve work defers to the next
+ * run; a hard failure mixed into the results is not deferrable. */
+export function failedOnLinearRateLimit(result) {
+  if (!result || result.ok) return false;
+  if (result.reason === 'linear_rate_limited') return true;
+  if (!Array.isArray(result.results) || result.results.length === 0)
+    return false;
+  return result.results.every(
+    item => item?.ok || item?.reason === 'linear_rate_limited'
+  );
+}
+
+/** A failed Linear action caused only by the shared workspace quota, not a
+ * hard failure. Quota-limited work re-attempts on the next run, so it defers. */
+export function isLinearRateLimitedAction(action) {
+  return (
+    action?.reason === 'linear_rate_limited' ||
+    action?.action === 'linear_rate_limited' ||
+    action?.action === 'deferred_rate_limited'
+  );
+}

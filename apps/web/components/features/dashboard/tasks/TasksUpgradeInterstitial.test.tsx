@@ -54,3 +54,15 @@ describe('TasksUpgradeInterstitial scale tokens', () => {
     expect(source).toContain('text-base');
   });
 });
+
+describe('TasksUpgradeInterstitial colour tokens', () => {
+  it('colours the lock badge with the warning text token, not the amber palette', () => {
+    const { container } = render(
+      <CompactReleasePlanUpgradeCard onDismiss={() => {}} />
+    );
+
+    const badge = container.querySelector('svg')?.parentElement;
+    expect(badge).toHaveClass('text-warning-text');
+    expect(badge).not.toHaveClass('text-amber-700');
+  });
+});

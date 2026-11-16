@@ -6,6 +6,16 @@ import json
 import re
 import subprocess
 
+# Inherited design identities removed on main need the existing one-sync-per-head
+# route before source repair. Accept the failed Vitest summary or the CLI's
+# failure plus a typed identity, never a passing title or fixture API error.
+DESIGN_SOURCE_CLI = re.compile(
+    r"\bFAIL\b[^\n]*lib/__tests__/design-system-source-ratchet\.test\.mjs[^\n]*"
+    r">[^\n]*exits zero from the CLI on the live tree|"
+    r"\[design-system-source-ratchet\] FAIL[^\n]*\n[^\n]*new design identity: "
+    r"(?:apps/web|packages/ui)/[^\t\n]+\t"
+    r"(?:raw-hex-color|raw-palette-class|off-scale-step|duplicate-component)\t[^\n]+")
+
 # A local TS2307 can mean a prerequisite has landed on main while the PR is
 # BLOCKED rather than BEHIND. Use the existing one-sync-per-head route before
 # asking a model to recreate modules. Unresolved errors still fall back to it.
@@ -13,9 +23,10 @@ LOCAL_MODULE_PREREQUISITE = re.compile(
     r"\b[\w./-]+\.[cm]?[jt]sx?\(\d+,\d+\): error TS2307: "
     r"Cannot find module ['\"]@/[\w./-]+['\"]")
 
-def has_local_prerequisite_failure(route, logs):
-    """A compiler failure stays out of infrastructure retries even in a mixed route."""
-    return any(LOCAL_MODULE_PREREQUISITE.search(logs.get(name) or "") for name in route["checks"])
+def has_source_prerequisite_failure(route, logs):
+    """Source failures stay out of infrastructure retries even in a mixed route."""
+    return any(pattern.search(logs.get(name) or "") for name in route["checks"]
+               for pattern in (LOCAL_MODULE_PREREQUISITE, DESIGN_SOURCE_CLI))
 
 
 ALIAS_ACTION = 'alias-graduation-owner'
@@ -73,6 +84,48 @@ class RouteBudgetGrowth:
 
 
 ROUTE_BUDGET_GROWTH = RouteBudgetGrowth()
+
+
+# PR Size Guard counts the PR head for repository hygiene and the merged tree
+# for the combined-tree budget. A head that has not yet merged a main prune
+# (drizzle snapshots, #25664) fails both while the live base tip is already
+# under budget. Sync main once; a head that is still over after that sync is
+# a real shrink, and claim_route will not sync it again.
+_TREE_BYTE_LINE = re.compile(
+    r'(?:##\[error\]|::error::)\s*\d+ bytes of tracked regular files '
+    r'\(merged tree; base \d+ [+-]\d+\) exceeds the \d+-byte combined-tree budget')
+_TREE_HYGIENE_LINE = re.compile(
+    r'of tracked regular files exceeds the .+ repository budget')
+_TREE_ERROR_MARK = re.compile(r'(?:##\[error\]|::error::)')
+_TREE_FOLLOWER = re.compile(
+    r'(?:##\[error\]|::error::).*(?:'
+    r'Process completed with exit code 1'
+    r'|No files were found with the provided path: repo-health-receipt\.json'
+    r')')
+_TREE_STAMP = re.compile(r'^\d{4}-\d\d-\d\dT[\d:.]+Z\s*')
+
+
+class TreeByteBudget:
+    """Sync main when the only size-guard failure is the tracked-byte ceiling."""
+
+    def search(self, text):
+        clean = _ANSI.sub('', str(text or ''))
+        hit = None
+        for raw in clean.splitlines():
+            line = _TREE_STAMP.sub('', _LOG_FAILED_PREFIX.sub('', raw, count=1))
+            if _TREE_BYTE_LINE.search(line) or _TREE_HYGIENE_LINE.search(line):
+                hit = line
+                continue
+            # Hygiene violations are plain bullets, not Actions annotations.
+            # The bounded log tail may no longer contain the section header.
+            if line.lstrip().startswith('- '):
+                return None
+            if _TREE_ERROR_MARK.search(line) and not _TREE_FOLLOWER.search(line):
+                return None
+        return hit
+
+
+TREE_BYTE_BUDGET = TreeByteBudget()
 
 
 class SoleAliasReviewFailure:
