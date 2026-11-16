@@ -3409,6 +3409,14 @@
       "classification": "C"
     },
     {
+      "source": "apps/web/app/api/internal/ovie/fix-deploy-stamp/route.ts",
+      "kind": "handler",
+      "route": "/api/internal/ovie/fix-deploy-stamp",
+      "methods": ["POST"],
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
       "source": "apps/web/app/api/internal/ovie/fleet/events/route.ts",
       "kind": "handler",
       "route": "/api/internal/ovie/fleet/events",

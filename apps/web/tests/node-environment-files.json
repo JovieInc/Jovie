@@ -178,6 +178,8 @@
   "lib/merch/artwork.test.ts",
   "lib/merch/availability.test.ts",
   "lib/merch/catalog.test.ts",
+  "lib/merch/concept-review-store.test.ts",
+  "lib/merch/concept-review.test.ts",
   "lib/merch/content-review.test.ts",
   "lib/merch/design-generation.test.ts",
   "lib/merch/first-sale-text.test.ts",
