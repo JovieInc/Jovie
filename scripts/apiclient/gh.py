@@ -33,7 +33,7 @@ def gh_shape(args) -> dict:
             and log_args[:3] == ["run", "view", "--job"]
             and re.fullmatch(r"[1-9][0-9]*", log_args[3]) and log_args[-1] in ("--log", "--log-failed")):
         # Per-job logs use REST, returning before the summary's GraphQL PR lookup.
-        # gh 2.102 cold cache: job, run/attempt, workflow, ZIP, per-job fallback.
+        # gh 2.103 cold cache: job, run/attempt, workflow, ZIP, per-job fallback.
         return {"resource": "core", "write": False, "idempotent": True, "cost": 5}
     if args and args[0] == "api":
         target = next((a for i, a in enumerate(args) if i > 0 and not a.startswith("-")

@@ -90,7 +90,7 @@ export function ghShape(args: readonly string[]): {
     ['--log', '--log-failed'].includes(logArgs[logArgs.length - 1] ?? '')
   ) {
     // Per-job logs use REST, returning before the summary's GraphQL PR lookup.
-    // gh 2.102 cold cache: job, run/attempt, workflow, ZIP, per-job fallback.
+    // gh 2.103 cold cache: job, run/attempt, workflow, ZIP, per-job fallback.
     return { resource: 'core', write: false, idempotent: true, cost: 5 };
   }
   if (args[0] === 'api') {
