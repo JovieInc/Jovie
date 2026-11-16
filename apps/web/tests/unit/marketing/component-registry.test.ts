@@ -719,13 +719,12 @@ describe('canonical marketing component registry', () => {
       ),
     });
 
-    expect(centrallyReadSources.HomepageV2Route).toContain(
-      "aria-hidden='true'"
-    );
-    expect(centrallyReadSources.HomepageV2Route).toContain('inert');
-    expect(centrallyReadSources.HomepageV2Route).toContain(
-      'homepage-v2-hero__demo-scale'
-    );
+    const routeSource = centrallyReadSources.HomepageV2Route;
+    expect(routeSource).toContain("aria-hidden='true'");
+    expect(routeSource).toContain('inert');
+    expect(routeSource).toContain('homepage-v2-hero__demo-scale');
+    // Every below-hero section ships unconditionally: no static flag gates.
+    expect(routeSource).not.toContain('FEATURE_FLAGS');
   });
 
   it('keeps terminal CTA actions on the canonical Button atom', () => {

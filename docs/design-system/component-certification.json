@@ -774,6 +774,9 @@
       "empty": "The dialog maps over the fixed COOKIE_CATEGORIES constant (Essential, Analytics, Marketing), which is never empty, so there is no empty-data state.",
       "long-content": "Every category label, description and button in the dialog is fixed copy from module constants with no props or user text, so its content cannot grow."
     },
+    "apps/web/components/organisms/DesktopTitlebarSlot.tsx": {
+      "error": "The module-level catch only absorbs a failed speculative titlebar import; it never sets render state or draws an error. The existing next/dynamic loader still owns the render import. desktop-startup-contract.cases.mjs executes the rejected warmup and verifies that the desktop render loader remains usable and browser output stays null; DesktopTitlebarSlot.test.tsx covers the mounted titlebar."
+    },
     "apps/web/components/organisms/MarketingSignInLink.tsx": {
       "partial": "The link renders one label and one fixed sign-in route; variant and label are presentation choices with defaults, so there is no data to be partially present.",
       "long-content": "The label prop is typed as the two fixed strings 'Sign in' and 'Log in', so no caller can pass longer copy."
@@ -992,6 +995,11 @@
     },
     "packages/ui/atoms/link.tsx": {
       "partial": "Link renders one label slot; its optional props (variant, active, visited, disabled, touchTarget, reserveLabel) are presentation flags with defaults, and the not-yet-arrived label case is shown by the EmptyStreamedLabel story."
+    },
+    "packages/ui/atoms/plain-button.tsx": {
+      "empty": "PlainButton renders the children its caller passes and owns no collection or data, so it has no empty state of its own.",
+      "error": "PlainButton makes no request and validates nothing; an error belongs to the action its caller wires to onClick.",
+      "offline": "PlainButton makes no network request, so it behaves the same offline; connectivity belongs to the caller's action."
     },
     "packages/ui/atoms/progress.tsx": {
       "permission-denied": "ProgressBar only reports completion of an upload or import and has no gated action or permission input; the detector matched role='progressbar'."

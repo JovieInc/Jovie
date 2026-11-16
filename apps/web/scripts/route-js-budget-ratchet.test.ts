@@ -1,7 +1,7 @@
 import { spawnSync } from 'node:child_process';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   baselineWithHeadroom,
   evaluateBudgets,
@@ -17,10 +17,14 @@ import {
   judge,
   NOW,
   validRaise,
+  writeAncestorGitRepo,
   writeChunk,
 } from './route-js-budget-fixtures';
 
-afterEach(cleanupFixtures);
+afterEach(() => {
+  vi.unstubAllEnvs();
+  cleanupFixtures();
+});
 
 const row = (route: string, gzipKb: number) => ({ route, gzipKb, chunks: 1 });
 
@@ -214,7 +218,12 @@ describe('per-route initial JS ratchet (JOV-8555)', () => {
 });
 
 describe('route-js-budget --write', () => {
-  function cli(nextDir: string, budgetPath: string, ...flags: string[]) {
+  function cli(
+    nextDir: string,
+    budgetPath: string,
+    env: NodeJS.ProcessEnv,
+    ...flags: string[]
+  ) {
     return spawnSync(
       process.execPath,
       [
@@ -228,7 +237,7 @@ describe('route-js-budget --write', () => {
       {
         encoding: 'utf8',
         timeout: 20000,
-        env: { ...process.env, GIT_NO_LAZY_FETCH: '1' },
+        env,
       }
     );
   }
@@ -247,18 +256,42 @@ describe('route-js-budget --write', () => {
     );
     const budgetPath = join(nextDir, 'route-js-budgets.json');
     const budgets = budgetsWithGroups();
+    // --write leaves an unmeasured group alone. That leftover must already
+    // match origin/main or the CLI reports growth against the live ratchet.
+    const committedAdminKb = (
+      JSON.parse(
+        readFileSync(join(__dirname, 'route-js-budgets.json'), 'utf8')
+      ) as { groups: { admin: { baselineKb: number } } }
+    ).groups.admin.baselineKb;
+    budgets.groups.admin.baselineKb = committedAdminKb;
     budgets.firstLoad.baselines = {};
     budgets.routes = {};
     writeFileSync(budgetPath, JSON.stringify(budgets));
+    // The CLI compares the budgets file with origin/main through git, so the
+    // test points git at a fixture repo holding these fixture budgets —
+    // otherwise the real repository's baselines leak into the run.
+    const cliEnv = writeAncestorGitRepo(nextDir, {
+      'apps/web/scripts/route-js-budgets.json': readFileSync(
+        budgetPath,
+        'utf8'
+      ),
+      'docs/performance/route-budgets.json': readFileSync(
+        join(__dirname, '../../../docs/performance/route-budgets.json'),
+        'utf8'
+      ),
+    });
 
-    const closed = cli(nextDir, budgetPath);
+    // A parent Git common directory must not leak back into CLI subprocesses.
+    vi.stubEnv('GIT_COMMON_DIR', join(nextDir, 'unrelated-parent-git'));
+
+    const closed = cli(nextDir, budgetPath, cliEnv);
     expect(closed.status).toBe(1);
     expect(closed.stderr).toContain(
       '/about ships 48 KB gzip initial JS and has no baseline (new routes fail closed). Add "/about": 48 under firstLoad.baselines'
     );
     expect(closed.stderr).toContain('--write');
 
-    const written = cli(nextDir, budgetPath, '--write');
+    const written = cli(nextDir, budgetPath, cliEnv, '--write');
     expect(written.status, written.stderr).toBe(0);
     const recorded = JSON.parse(readFileSync(budgetPath, 'utf8'));
     expect(recorded.firstLoad.baselines).toEqual({
@@ -269,15 +302,15 @@ describe('route-js-budget --write', () => {
     });
     expect(recorded.routes).toEqual({ '/app/chat': 16 });
     expect(recorded.groups).toEqual({
-      admin: { baselineKb: 1345 },
+      admin: { baselineKb: committedAdminKb },
       dashboard: { baselineKb: 16 },
       marketing: { baselineKb: 16 },
       public: { baselineKb: 48 },
     });
-    expect(cli(nextDir, budgetPath).status).toBe(0);
+    expect(cli(nextDir, budgetPath, cliEnv).status).toBe(0);
 
     writeChunk(nextDir, 'about.js', 48 * 1024);
-    const grown = cli(nextDir, budgetPath, '--write');
+    const grown = cli(nextDir, budgetPath, cliEnv, '--write');
     expect(grown.status).toBe(1);
     expect(grown.stderr).toContain(
       '/about ships 56 KB gzip initial JS; its baseline is 48 KB (+8 KB)'

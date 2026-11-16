@@ -1,8 +1,9 @@
 """Union empty-base Vitest statement insertions.
 
 Main's statements stay first, then head-only statements. A changed existing
-line, control flow, an unbalanced side, or a repeated binding with a different
-body stays unresolved. The caller proves the diff3 base is empty.
+line, control flow, an unbalanced side, or a repeated binding or import of the
+same module with a different body stays unresolved. The caller proves the
+diff3 base is empty.
 """
 from __future__ import annotations
 
@@ -15,6 +16,8 @@ _HUNK = re.compile(
     re.M | re.S)
 _BIND = re.compile(
     r"^(?:export\s+)?(?:const|let|var|function|class)\s+([A-Za-z_$][\w$]*)\b")
+_IMPORT = re.compile(
+    r"^import\s+(?:type\s+)?(?:[^'\"\n;]+?\s+from\s+)?(['\"])(?P<mod>[^'\"\n]+)\1\s*;$")
 _MOCK = re.compile(r"^vi\.mock\(\s*(['\"])(?P<mod>[^'\"\n]+)\1")
 _CALL = re.compile(r"^[A-Za-z_$][\w$.]*\(")
 _FLOW = re.compile(
@@ -81,6 +84,9 @@ def _key(statement: str) -> str | None:
     body = statement.strip()
     if _FLOW.match(body):
         return None
+    imported = _IMPORT.match(body)
+    if imported:
+        return "import:" + imported.group("mod")
     bound = _BIND.match(body)
     if bound:
         return "bind:" + bound.group(1)

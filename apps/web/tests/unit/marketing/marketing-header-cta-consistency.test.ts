@@ -3,6 +3,7 @@ import { resolveMarketingHeaderPrimaryCta } from '@/components/site/MarketingHea
 import { APP_ROUTES } from '@/constants/routes';
 import { getHomepageFrontDoorCtaContract } from '@/data/homepageFrontDoorCta';
 import { MARKETING_PAGE_CONTRACTS } from '@/data/marketing/pageContracts';
+import { getClaimProfileIntent } from '@/data/marketingCtaIntents';
 
 /**
  * JOV-6860: the marketing header's primary CTA label must come from the one
@@ -37,13 +38,14 @@ describe('marketing header CTA consistency', () => {
     });
   }
 
-  it('keeps the homepage header on the on-page invitation form in both modes', () => {
-    // Signup is invite-only (PUBLIC_SIGNUP_CLOSED): the homepage header
-    // scrolls to the homepage's own role waitlist form, like the hero.
+  it('keeps the homepage header on the claim-profile action in both modes', () => {
+    // Tim, 2026-11-12: "Switch it". The homepage header enters /start with
+    // the shared claim-profile intent, like the hero and the close.
+    const claim = getClaimProfileIntent();
     for (const waitlistEnabled of [true, false]) {
       expect(
         resolveMarketingHeaderPrimaryCta(APP_ROUTES.HOME, waitlistEnabled)
-      ).toEqual({ label: 'Request an Invite', href: '/#request-invite' });
+      ).toEqual({ label: claim.label, href: claim.href });
     }
   });
 

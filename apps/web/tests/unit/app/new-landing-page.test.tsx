@@ -6,20 +6,6 @@ import { APP_ROUTES } from '@/constants/routes';
 
 const redirectMock = vi.hoisted(() => vi.fn());
 
-// Enable center nav here so this test can assert the canonical public nav.
-vi.mock('@/lib/flags/marketing-static', async importOriginal => {
-  const actual =
-    await importOriginal<typeof import('@/lib/flags/marketing-static')>();
-  return {
-    ...actual,
-    FEATURE_FLAGS: {
-      ...actual.FEATURE_FLAGS,
-      SHOW_MARKETING_CENTER_NAV: true,
-      SHOW_HOMEPAGE_CENTER_NAV: true,
-    },
-  };
-});
-
 vi.mock('@/constants/app', async importOriginal => {
   const actual = await importOriginal<typeof import('@/constants/app')>();
   return {

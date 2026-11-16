@@ -1,5 +1,7 @@
 // Homepage page contract (Tim, 2026-11-03: "Jovie helps you move your music
-// forward." on `/`; invite-only, the story ends in the role waitlist form).
+// forward." on `/`; Tim, 2026-11-12: "Switch it", so the story ends in the
+// claim-your-profile action into `/start`, or in the role waitlist form only
+// while the PUBLIC_SIGNUP_CLOSED kill switch is on).
 // One table-driven contract: it renders the real `/` page module and checks
 // the route manifest, copy truth sources, the one primary action, product
 // imagery, and tokenized styles. Changing the page means changing its typed
@@ -149,31 +151,35 @@ describe('homepage contract', { timeout: 60_000 }, () => {
       copy.profile.headline,
       copy.releases.headline,
       specs.headline,
-      copy.invite.headline,
+      copy.claim.headline,
     ]);
   });
 
   it.each([true, false])(
-    'ends in the one role waitlist form and links nowhere near signup, waitlist=%s',
+    'ends in the one claim action into /start, waitlist=%s',
     async waitlist => {
       gate.WAITLIST_ENABLED = waitlist;
-      const { HOMEPAGE_EDITORIAL_COPY: copy, HOMEPAGE_INVITE_ANCHOR } =
-        await loadCopy();
+      const { HOMEPAGE_INVITE_ANCHOR } = await loadCopy();
+      const { getClaimProfileIntent } = await import(
+        '@/data/marketingCtaIntents'
+      );
+      const claim = getClaimProfileIntent();
       const { container } = await renderHomePage();
 
-      // One conversion: the role waitlist form inside the closing section.
-      const forms = [...container.querySelectorAll('form')];
-      expect(forms).toHaveLength(1);
-      expect(forms[0]).toHaveAttribute('data-testid', 'waitlist-role-form');
+      // No on-page form: the closing section hands off to /start.
+      expect(container.querySelectorAll('form')).toHaveLength(0);
       const close = container.querySelector(`#${HOMEPAGE_INVITE_ANCHOR}`);
       expect(close).toHaveAttribute('data-testid', 'marketing-section-cta');
-      expect(close?.contains(forms[0] ?? null)).toBe(true);
-      expect(within(forms[0]!).getAllByRole('radio')).toHaveLength(6);
+      const closeCta = within(close as HTMLElement).getByTestId(
+        'homepage-close-cta'
+      );
+      expect(closeCta).toHaveAttribute('href', claim.href);
+      expect(closeCta).toHaveTextContent(claim.label);
 
-      // The hero's primary action scrolls to that form; no public signup.
+      // The hero's primary action is the same claim; one primary action.
       const primary = screen.getByTestId('homepage-primary-cta');
-      expect(primary).toHaveAttribute('href', `#${HOMEPAGE_INVITE_ANCHOR}`);
-      expect(primary).toHaveTextContent(copy.hero.primaryAction);
+      expect(primary).toHaveAttribute('href', claim.href);
+      expect(primary).toHaveTextContent(claim.label);
       expect(
         container.querySelectorAll('[data-primary-action="true"]')
       ).toHaveLength(1);
@@ -181,8 +187,11 @@ describe('homepage contract', { timeout: 60_000 }, () => {
         link => link.getAttribute('href') ?? ''
       );
       expect(
-        hrefs.filter(href => /^\/(signup|sign-up|start|claim)\b/.test(href))
+        hrefs.filter(href => /^\/(signup|sign-up|claim)\b/.test(href))
       ).toEqual([]);
+      expect(new Set(hrefs.filter(href => /^\/start\b/.test(href)))).toEqual(
+        new Set(['/start'])
+      );
     }
   );
 

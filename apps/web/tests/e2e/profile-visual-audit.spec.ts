@@ -484,3 +484,23 @@ test.describe('profile LCP artwork', () => {
     expect(html).toMatch(/<img[^>]*fetchPriority="high"/i);
   });
 });
+
+// The latest-release credits now load in the same batch as the other profile
+// reads instead of after them. The document must still arrive whole: status
+// 200 with the artwork in the first HTML, for visits that overlap.
+test.describe('profile batched reads', () => {
+  test('serves the whole profile document to overlapping visits', async ({
+    page,
+  }) => {
+    const responses = await Promise.all([
+      page.request.get(`/${TEST_PROFILE}`),
+      page.request.get(`/${TEST_PROFILE}`),
+    ]);
+
+    for (const response of responses) {
+      expect(response.status()).toBe(200);
+      const html = await response.text();
+      expect(html).toMatch(/<img[^>]*fetchPriority="high"/i);
+    }
+  });
+});
