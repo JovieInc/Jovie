@@ -13,59 +13,26 @@
   "identity": {
     "account": {
       "key": "users.id",
-      "owns": [
-        "authentication",
-        "email",
-        "sessions",
-        "billing",
-        "privacy"
-      ]
+      "owns": ["authentication", "email", "sessions", "billing", "privacy"]
     },
     "creatorProfile": {
       "key": "creator_profiles.id",
-      "owns": [
-        "displayName",
-        "username",
-        "avatar",
-        "bio",
-        "socialLinks"
-      ]
+      "owns": ["displayName", "username", "avatar", "bio", "socialLinks"]
     },
     "claim": {
       "table": "user_profile_claims",
       "accountKey": "user_id",
       "profileKey": "creator_profile_id",
-      "writableRoles": [
-        "owner",
-        "manager"
-      ]
+      "writableRoles": ["owner", "manager"]
     },
     "activeSelection": "users.active_profile_id selects a claimed entity; it does not grant ownership",
     "legacy": "creator_profiles.user_id is a compatibility field, not authority over canonical claims"
   },
   "proofMatrix": {
-    "viewports": [
-      "desktop",
-      "mobile"
-    ],
-    "plans": [
-      "free",
-      "trial",
-      "pro",
-      "max"
-    ],
-    "flags": [
-      "default",
-      "all-on",
-      "all-off"
-    ],
-    "states": [
-      "empty",
-      "populated",
-      "pending",
-      "error",
-      "recovery"
-    ],
+    "viewports": ["desktop", "mobile"],
+    "plans": ["free", "trial", "pro", "max"],
+    "flags": ["default", "all-on", "all-off"],
+    "states": ["empty", "populated", "pending", "error", "recovery"],
     "checks": [
       "direct-url",
       "api",
@@ -92,22 +59,14 @@
         "/api/notifications/preferences"
       ],
       "entry": "/app/settings/account",
-      "channels": [
-        "navigation",
-        "settings",
-        "deep-link",
-        "search",
-        "api"
-      ],
+      "channels": ["navigation", "settings", "deep-link", "search", "api"],
       "components": [
         "apps/web/components/features/dashboard/organisms/account-settings/AccountSettingsSection.tsx",
         "apps/web/components/features/dashboard/organisms/account-settings/EmailManagementCard.tsx",
         "apps/web/components/features/dashboard/organisms/account-settings/SessionManagementCard.tsx"
       ],
       "actions": [],
-      "prerequisites": [
-        "authentication"
-      ]
+      "prerequisites": ["authentication"]
     },
     {
       "id": "artist-identity",
@@ -146,10 +105,7 @@
           "switchActiveProfile"
         ]
       ],
-      "prerequisites": [
-        "claim",
-        "public-profile"
-      ]
+      "prerequisites": ["claim", "public-profile"]
     },
     {
       "id": "authentication",
@@ -167,11 +123,7 @@
         "/api/auth/reset"
       ],
       "entry": "/signin",
-      "channels": [
-        "deep-link",
-        "onboarding",
-        "api"
-      ],
+      "channels": ["deep-link", "onboarding", "api"],
       "components": [],
       "actions": [],
       "prerequisites": []
@@ -187,20 +139,12 @@
         "/api/stripe/portal"
       ],
       "entry": "/app/settings/billing",
-      "channels": [
-        "navigation",
-        "settings",
-        "deep-link",
-        "search",
-        "api"
-      ],
+      "channels": ["navigation", "settings", "deep-link", "search", "api"],
       "components": [
         "apps/web/components/features/dashboard/organisms/SettingsBillingSection.tsx"
       ],
       "actions": [],
-      "prerequisites": [
-        "authentication"
-      ]
+      "prerequisites": ["authentication"]
     },
     {
       "id": "claim",
@@ -215,17 +159,10 @@
         "/api/onboarding/claim"
       ],
       "entry": "/onboarding",
-      "channels": [
-        "deep-link",
-        "onboarding",
-        "api"
-      ],
+      "channels": ["deep-link", "onboarding", "api"],
       "components": [],
       "actions": [],
-      "prerequisites": [
-        "authentication",
-        "public-profile"
-      ]
+      "prerequisites": ["authentication", "public-profile"]
     },
     {
       "id": "deferred",
@@ -247,15 +184,9 @@
       "id": "legal",
       "classification": "A",
       "entity": "account",
-      "routes": [
-        "/legal/privacy",
-        "/legal/terms"
-      ],
+      "routes": ["/legal/privacy", "/legal/terms"],
       "entry": "/legal/privacy",
-      "channels": [
-        "deep-link",
-        "search"
-      ],
+      "channels": ["deep-link", "search"],
       "components": [],
       "actions": [],
       "prerequisites": []
@@ -264,21 +195,12 @@
       "id": "owner-home",
       "classification": "B",
       "entity": "creator-profile",
-      "routes": [
-        "/app",
-        "/app/dashboard"
-      ],
+      "routes": ["/app", "/app/dashboard"],
       "entry": "/app",
-      "channels": [
-        "navigation",
-        "deep-link",
-        "search"
-      ],
+      "channels": ["navigation", "deep-link", "search"],
       "components": [],
       "actions": [],
-      "prerequisites": [
-        "claim"
-      ]
+      "prerequisites": ["claim"]
     },
     {
       "id": "privacy",
@@ -291,28 +213,18 @@
         "/api/account/export"
       ],
       "entry": "/app/settings/data-privacy",
-      "channels": [
-        "navigation",
-        "settings",
-        "deep-link",
-        "search",
-        "api"
-      ],
+      "channels": ["navigation", "settings", "deep-link", "search", "api"],
       "components": [
         "apps/web/components/features/dashboard/organisms/DataPrivacySection.tsx"
       ],
       "actions": [],
-      "prerequisites": [
-        "authentication"
-      ]
+      "prerequisites": ["authentication"]
     },
     {
       "id": "profile-links",
       "classification": "B",
       "entity": "creator-profile",
-      "routes": [
-        "/api/dashboard/social-links"
-      ],
+      "routes": ["/api/dashboard/social-links"],
       "entry": "/app/settings/profile",
       "channels": [
         "navigation",
@@ -329,9 +241,7 @@
           "getProfileSocialLinks"
         ]
       ],
-      "prerequisites": [
-        "artist-identity"
-      ]
+      "prerequisites": ["artist-identity"]
     },
     {
       "id": "public-profile",
@@ -344,10 +254,7 @@
         "/[username]/contact"
       ],
       "entry": "/[username]",
-      "channels": [
-        "deep-link",
-        "search"
-      ],
+      "channels": ["deep-link", "search"],
       "components": [
         "apps/web/components/features/profile/ProfileIdentityHeader.tsx"
       ],
@@ -374,9 +281,7 @@
       ],
       "components": [],
       "actions": [],
-      "prerequisites": [
-        "billing-management"
-      ]
+      "prerequisites": ["billing-management"]
     }
   ],
   "inventory": [
@@ -632,9 +537,7 @@
       "source": "apps/web/app/(marketing)/changelog/feed.json/route.ts",
       "kind": "handler",
       "route": "/changelog/feed.json",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -642,9 +545,7 @@
       "source": "apps/web/app/(marketing)/changelog/feed.xml/route.ts",
       "kind": "handler",
       "route": "/changelog/feed.xml",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -660,9 +561,7 @@
       "source": "apps/web/app/(marketing)/changelog/rss.xml/route.ts",
       "kind": "handler",
       "route": "/changelog/rss.xml",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -670,9 +569,7 @@
       "source": "apps/web/app/(marketing)/changelog/whats-new.json/route.ts",
       "kind": "handler",
       "route": "/changelog/whats-new.json",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -752,9 +649,7 @@
       "source": "apps/web/app/(marketing)/engineering/feed.json/route.ts",
       "kind": "handler",
       "route": "/engineering/feed.json",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -762,9 +657,7 @@
       "source": "apps/web/app/(marketing)/engineering/feed.xml/route.ts",
       "kind": "handler",
       "route": "/engineering/feed.xml",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -1044,9 +937,7 @@
       "source": "apps/web/app/[username]/claim/route.ts",
       "kind": "handler",
       "route": "/[username]/claim",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "claim",
       "classification": "B"
     },
@@ -1062,9 +953,7 @@
       "source": "apps/web/app/[username]/feed.xml/route.ts",
       "kind": "handler",
       "route": "/[username]/feed.xml",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -1072,9 +961,7 @@
       "source": "apps/web/app/[username]/llms.txt/route.ts",
       "kind": "handler",
       "route": "/[username]/llms.txt",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -1130,9 +1017,7 @@
       "source": "apps/web/app/[username]/s/[platform]/route.ts",
       "kind": "handler",
       "route": "/[username]/s/[platform]",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -1223,9 +1108,7 @@
       "source": "apps/web/app/api/account/delete/route.ts",
       "kind": "handler",
       "route": "/api/account/delete",
-      "methods": [
-        "POST"
-      ],
+      "methods": ["POST"],
       "surface": "privacy",
       "classification": "A"
     },
@@ -1233,9 +1116,7 @@
       "source": "apps/web/app/api/account/email/route.ts",
       "kind": "handler",
       "route": "/api/account/email",
-      "methods": [
-        "POST"
-      ],
+      "methods": ["POST"],
       "surface": "account",
       "classification": "A"
     },
@@ -1243,9 +1124,7 @@
       "source": "apps/web/app/api/account/export/route.ts",
       "kind": "handler",
       "route": "/api/account/export",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "privacy",
       "classification": "A"
     },
@@ -1253,9 +1132,7 @@
       "source": "apps/web/app/api/acquisition/agent-handoff/route.ts",
       "kind": "handler",
       "route": "/api/acquisition/agent-handoff",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -1263,9 +1140,7 @@
       "source": "apps/web/app/api/acquisition/proof-claim/route.ts",
       "kind": "handler",
       "route": "/api/acquisition/proof-claim",
-      "methods": [
-        "POST"
-      ],
+      "methods": ["POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -1273,9 +1148,7 @@
       "source": "apps/web/app/api/acquisition/route.ts",
       "kind": "handler",
       "route": "/api/acquisition",
-      "methods": [
-        "POST"
-      ],
+      "methods": ["POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -1283,9 +1156,7 @@
       "source": "apps/web/app/api/admin/acquisition/artist-offer-funnel/route.ts",
       "kind": "handler",
       "route": "/api/admin/acquisition/artist-offer-funnel",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -1293,9 +1164,7 @@
       "source": "apps/web/app/api/admin/acquisition/proof-claim-funnel/route.ts",
       "kind": "handler",
       "route": "/api/admin/acquisition/proof-claim-funnel",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -1303,9 +1172,7 @@
       "source": "apps/web/app/api/admin/agent-os/workflows/dry-run/route.ts",
       "kind": "handler",
       "route": "/api/admin/agent-os/workflows/dry-run",
-      "methods": [
-        "POST"
-      ],
+      "methods": ["POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -1313,9 +1180,7 @@
       "source": "apps/web/app/api/admin/agent-os/workflows/runs/[runId]/route.ts",
       "kind": "handler",
       "route": "/api/admin/agent-os/workflows/runs/[runId]",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -1323,9 +1188,7 @@
       "source": "apps/web/app/api/admin/assets/route.ts",
       "kind": "handler",
       "route": "/api/admin/assets",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -1333,9 +1196,7 @@
       "source": "apps/web/app/api/admin/batch-ingest/route.ts",
       "kind": "handler",
       "route": "/api/admin/batch-ingest",
-      "methods": [
-        "POST"
-      ],
+      "methods": ["POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -1343,9 +1204,7 @@
       "source": "apps/web/app/api/admin/campaigns/invites/route.ts",
       "kind": "handler",
       "route": "/api/admin/campaigns/invites",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -1353,10 +1212,7 @@
       "source": "apps/web/app/api/admin/campaigns/settings/route.ts",
       "kind": "handler",
       "route": "/api/admin/campaigns/settings",
-      "methods": [
-        "GET",
-        "POST"
-      ],
+      "methods": ["GET", "POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -1364,9 +1220,7 @@
       "source": "apps/web/app/api/admin/campaigns/stats/route.ts",
       "kind": "handler",
       "route": "/api/admin/campaigns/stats",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -1374,9 +1228,7 @@
       "source": "apps/web/app/api/admin/claim-verifications/[profileId]/decision/route.ts",
       "kind": "handler",
       "route": "/api/admin/claim-verifications/[profileId]/decision",
-      "methods": [
-        "POST"
-      ],
+      "methods": ["POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -1384,9 +1236,7 @@
       "source": "apps/web/app/api/admin/claim-verifications/route.ts",
       "kind": "handler",
       "route": "/api/admin/claim-verifications",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -1394,10 +1244,7 @@
       "source": "apps/web/app/api/admin/contacts/route.ts",
       "kind": "handler",
       "route": "/api/admin/contacts",
-      "methods": [
-        "GET",
-        "POST"
-      ],
+      "methods": ["GET", "POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -1405,9 +1252,7 @@
       "source": "apps/web/app/api/admin/creator-avatar/route.ts",
       "kind": "handler",
       "route": "/api/admin/creator-avatar",
-      "methods": [
-        "POST"
-      ],
+      "methods": ["POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -1415,9 +1260,7 @@
       "source": "apps/web/app/api/admin/creator-ingest/rerun/route.ts",
       "kind": "handler",
       "route": "/api/admin/creator-ingest/rerun",
-      "methods": [
-        "POST"
-      ],
+      "methods": ["POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -1425,9 +1268,7 @@
       "source": "apps/web/app/api/admin/creator-ingest/route.ts",
       "kind": "handler",
       "route": "/api/admin/creator-ingest",
-      "methods": [
-        "POST"
-      ],
+      "methods": ["POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -1435,10 +1276,7 @@
       "source": "apps/web/app/api/admin/creator-invite/bulk/route.ts",
       "kind": "handler",
       "route": "/api/admin/creator-invite/bulk",
-      "methods": [
-        "GET",
-        "POST"
-      ],
+      "methods": ["GET", "POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -1446,9 +1284,7 @@
       "source": "apps/web/app/api/admin/creator-invite/bulk/stats/route.ts",
       "kind": "handler",
       "route": "/api/admin/creator-invite/bulk/stats",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -1456,9 +1292,7 @@
       "source": "apps/web/app/api/admin/creator-invite/route.ts",
       "kind": "handler",
       "route": "/api/admin/creator-invite",
-      "methods": [
-        "POST"
-      ],
+      "methods": ["POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -1466,10 +1300,7 @@
       "source": "apps/web/app/api/admin/creator-social-links/route.ts",
       "kind": "handler",
       "route": "/api/admin/creator-social-links",
-      "methods": [
-        "GET",
-        "PUT"
-      ],
+      "methods": ["GET", "PUT"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -1477,9 +1308,7 @@
       "source": "apps/web/app/api/admin/creators/route.ts",
       "kind": "handler",
       "route": "/api/admin/creators",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -1487,9 +1316,7 @@
       "source": "apps/web/app/api/admin/design-lab/proposals/[proposalId]/review/route.ts",
       "kind": "handler",
       "route": "/api/admin/design-lab/proposals/[proposalId]/review",
-      "methods": [
-        "POST"
-      ],
+      "methods": ["POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -1497,9 +1324,7 @@
       "source": "apps/web/app/api/admin/design-lab/proposals/route.ts",
       "kind": "handler",
       "route": "/api/admin/design-lab/proposals",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -1507,9 +1332,7 @@
       "source": "apps/web/app/api/admin/feature-flags/rollback/route.ts",
       "kind": "handler",
       "route": "/api/admin/feature-flags/rollback",
-      "methods": [
-        "POST"
-      ],
+      "methods": ["POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -1517,9 +1340,7 @@
       "source": "apps/web/app/api/admin/feature-flags/route.ts",
       "kind": "handler",
       "route": "/api/admin/feature-flags",
-      "methods": [
-        "POST"
-      ],
+      "methods": ["POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -1527,9 +1348,7 @@
       "source": "apps/web/app/api/admin/feedback/[id]/dismiss/route.ts",
       "kind": "handler",
       "route": "/api/admin/feedback/[id]/dismiss",
-      "methods": [
-        "POST"
-      ],
+      "methods": ["POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -1537,10 +1356,7 @@
       "source": "apps/web/app/api/admin/feedback/[id]/disposition/route.ts",
       "kind": "handler",
       "route": "/api/admin/feedback/[id]/disposition",
-      "methods": [
-        "GET",
-        "POST"
-      ],
+      "methods": ["GET", "POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -1548,9 +1364,7 @@
       "source": "apps/web/app/api/admin/feedback/route.ts",
       "kind": "handler",
       "route": "/api/admin/feedback",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -1558,10 +1372,7 @@
       "source": "apps/web/app/api/admin/fit-scores/route.ts",
       "kind": "handler",
       "route": "/api/admin/fit-scores",
-      "methods": [
-        "GET",
-        "POST"
-      ],
+      "methods": ["GET", "POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -1569,9 +1380,7 @@
       "source": "apps/web/app/api/admin/hud/env-exceptions/route.ts",
       "kind": "handler",
       "route": "/api/admin/hud/env-exceptions",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -1579,9 +1388,7 @@
       "source": "apps/web/app/api/admin/hud/founder-funnel/route.ts",
       "kind": "handler",
       "route": "/api/admin/hud/founder-funnel",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -1589,9 +1396,7 @@
       "source": "apps/web/app/api/admin/hud/github-rate-limits/route.ts",
       "kind": "handler",
       "route": "/api/admin/hud/github-rate-limits",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -1599,9 +1404,7 @@
       "source": "apps/web/app/api/admin/hud/ovie-launchers/route.ts",
       "kind": "handler",
       "route": "/api/admin/hud/ovie-launchers",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -1609,10 +1412,7 @@
       "source": "apps/web/app/api/admin/hud/route-usage/route.ts",
       "kind": "handler",
       "route": "/api/admin/hud/route-usage",
-      "methods": [
-        "GET",
-        "POST"
-      ],
+      "methods": ["GET", "POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -1620,9 +1420,7 @@
       "source": "apps/web/app/api/admin/hud/shipper/route.ts",
       "kind": "handler",
       "route": "/api/admin/hud/shipper",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -1630,9 +1428,7 @@
       "source": "apps/web/app/api/admin/hud/shipping-velocity/route.ts",
       "kind": "handler",
       "route": "/api/admin/hud/shipping-velocity",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -1640,10 +1436,7 @@
       "source": "apps/web/app/api/admin/hud/tim-actions/route.ts",
       "kind": "handler",
       "route": "/api/admin/hud/tim-actions",
-      "methods": [
-        "GET",
-        "POST"
-      ],
+      "methods": ["GET", "POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -1651,9 +1444,7 @@
       "source": "apps/web/app/api/admin/hud/visual-qa/[runId]/[surfaceId]/[kind]/route.ts",
       "kind": "handler",
       "route": "/api/admin/hud/visual-qa/[runId]/[surfaceId]/[kind]",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -1661,9 +1452,7 @@
       "source": "apps/web/app/api/admin/hud/visual-qa/[runId]/review/route.ts",
       "kind": "handler",
       "route": "/api/admin/hud/visual-qa/[runId]/review",
-      "methods": [
-        "POST"
-      ],
+      "methods": ["POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -1671,9 +1460,7 @@
       "source": "apps/web/app/api/admin/hud/visual-qa/route.ts",
       "kind": "handler",
       "route": "/api/admin/hud/visual-qa",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -1681,11 +1468,7 @@
       "source": "apps/web/app/api/admin/impersonate/route.ts",
       "kind": "handler",
       "route": "/api/admin/impersonate",
-      "methods": [
-        "DELETE",
-        "GET",
-        "POST"
-      ],
+      "methods": ["DELETE", "GET", "POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -1693,10 +1476,7 @@
       "source": "apps/web/app/api/admin/investors/links/[id]/route.ts",
       "kind": "handler",
       "route": "/api/admin/investors/links/[id]",
-      "methods": [
-        "DELETE",
-        "PATCH"
-      ],
+      "methods": ["DELETE", "PATCH"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -1704,10 +1484,7 @@
       "source": "apps/web/app/api/admin/investors/links/route.ts",
       "kind": "handler",
       "route": "/api/admin/investors/links",
-      "methods": [
-        "GET",
-        "POST"
-      ],
+      "methods": ["GET", "POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -1715,10 +1492,7 @@
       "source": "apps/web/app/api/admin/investors/settings/route.ts",
       "kind": "handler",
       "route": "/api/admin/investors/settings",
-      "methods": [
-        "GET",
-        "PUT"
-      ],
+      "methods": ["GET", "PUT"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -1726,10 +1500,7 @@
       "source": "apps/web/app/api/admin/investors/updates/route.ts",
       "kind": "handler",
       "route": "/api/admin/investors/updates",
-      "methods": [
-        "GET",
-        "POST"
-      ],
+      "methods": ["GET", "POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -1737,9 +1508,7 @@
       "source": "apps/web/app/api/admin/leads/[id]/dm-sent/route.ts",
       "kind": "handler",
       "route": "/api/admin/leads/[id]/dm-sent",
-      "methods": [
-        "PATCH"
-      ],
+      "methods": ["PATCH"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -1747,9 +1516,7 @@
       "source": "apps/web/app/api/admin/leads/[id]/refresh-evidence/route.ts",
       "kind": "handler",
       "route": "/api/admin/leads/[id]/refresh-evidence",
-      "methods": [
-        "POST"
-      ],
+      "methods": ["POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -1757,10 +1524,7 @@
       "source": "apps/web/app/api/admin/leads/[id]/route.ts",
       "kind": "handler",
       "route": "/api/admin/leads/[id]",
-      "methods": [
-        "DELETE",
-        "PATCH"
-      ],
+      "methods": ["DELETE", "PATCH"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -1768,9 +1532,7 @@
       "source": "apps/web/app/api/admin/leads/[id]/skip/route.ts",
       "kind": "handler",
       "route": "/api/admin/leads/[id]/skip",
-      "methods": [
-        "PATCH"
-      ],
+      "methods": ["PATCH"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -1778,9 +1540,7 @@
       "source": "apps/web/app/api/admin/leads/discover/route.ts",
       "kind": "handler",
       "route": "/api/admin/leads/discover",
-      "methods": [
-        "POST"
-      ],
+      "methods": ["POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -1788,9 +1548,7 @@
       "source": "apps/web/app/api/admin/leads/funnel/route.ts",
       "kind": "handler",
       "route": "/api/admin/leads/funnel",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -1798,12 +1556,7 @@
       "source": "apps/web/app/api/admin/leads/keywords/route.ts",
       "kind": "handler",
       "route": "/api/admin/leads/keywords",
-      "methods": [
-        "DELETE",
-        "GET",
-        "PATCH",
-        "POST"
-      ],
+      "methods": ["DELETE", "GET", "PATCH", "POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -1811,9 +1564,7 @@
       "source": "apps/web/app/api/admin/leads/qualify/route.ts",
       "kind": "handler",
       "route": "/api/admin/leads/qualify",
-      "methods": [
-        "POST"
-      ],
+      "methods": ["POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -1821,10 +1572,7 @@
       "source": "apps/web/app/api/admin/leads/route.ts",
       "kind": "handler",
       "route": "/api/admin/leads",
-      "methods": [
-        "GET",
-        "POST"
-      ],
+      "methods": ["GET", "POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -1832,9 +1580,7 @@
       "source": "apps/web/app/api/admin/leads/seed/route.ts",
       "kind": "handler",
       "route": "/api/admin/leads/seed",
-      "methods": [
-        "POST"
-      ],
+      "methods": ["POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -1842,10 +1588,7 @@
       "source": "apps/web/app/api/admin/leads/settings/route.ts",
       "kind": "handler",
       "route": "/api/admin/leads/settings",
-      "methods": [
-        "GET",
-        "PATCH"
-      ],
+      "methods": ["GET", "PATCH"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -1853,10 +1596,7 @@
       "source": "apps/web/app/api/admin/moderation/route.ts",
       "kind": "handler",
       "route": "/api/admin/moderation",
-      "methods": [
-        "GET",
-        "POST"
-      ],
+      "methods": ["GET", "POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -1864,9 +1604,7 @@
       "source": "apps/web/app/api/admin/outbound/readiness/route.ts",
       "kind": "handler",
       "route": "/api/admin/outbound/readiness",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -1874,10 +1612,7 @@
       "source": "apps/web/app/api/admin/outbound/route.ts",
       "kind": "handler",
       "route": "/api/admin/outbound",
-      "methods": [
-        "GET",
-        "POST"
-      ],
+      "methods": ["GET", "POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -1885,9 +1620,7 @@
       "source": "apps/web/app/api/admin/outreach/debug/route.ts",
       "kind": "handler",
       "route": "/api/admin/outreach/debug",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -1895,11 +1628,7 @@
       "source": "apps/web/app/api/admin/outreach/route.ts",
       "kind": "handler",
       "route": "/api/admin/outreach",
-      "methods": [
-        "GET",
-        "PATCH",
-        "POST"
-      ],
+      "methods": ["GET", "PATCH", "POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -1907,9 +1636,7 @@
       "source": "apps/web/app/api/admin/outreach/settings/route.ts",
       "kind": "handler",
       "route": "/api/admin/outreach/settings",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -1917,11 +1644,7 @@
       "source": "apps/web/app/api/admin/ov-lists/[id]/route.ts",
       "kind": "handler",
       "route": "/api/admin/ov-lists/[id]",
-      "methods": [
-        "DELETE",
-        "GET",
-        "PATCH"
-      ],
+      "methods": ["DELETE", "GET", "PATCH"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -1929,9 +1652,7 @@
       "source": "apps/web/app/api/admin/ov-lists/[id]/suggest/route.ts",
       "kind": "handler",
       "route": "/api/admin/ov-lists/[id]/suggest",
-      "methods": [
-        "POST"
-      ],
+      "methods": ["POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -1939,9 +1660,7 @@
       "source": "apps/web/app/api/admin/ov-lists/creators/route.ts",
       "kind": "handler",
       "route": "/api/admin/ov-lists/creators",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -1949,10 +1668,7 @@
       "source": "apps/web/app/api/admin/ov-lists/route.ts",
       "kind": "handler",
       "route": "/api/admin/ov-lists",
-      "methods": [
-        "GET",
-        "POST"
-      ],
+      "methods": ["GET", "POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -1960,9 +1676,7 @@
       "source": "apps/web/app/api/admin/ov-lists/views/[viewId]/route.ts",
       "kind": "handler",
       "route": "/api/admin/ov-lists/views/[viewId]",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -1970,9 +1684,7 @@
       "source": "apps/web/app/api/admin/overview/route.ts",
       "kind": "handler",
       "route": "/api/admin/overview",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -1980,9 +1692,7 @@
       "source": "apps/web/app/api/admin/re-enrich/route.ts",
       "kind": "handler",
       "route": "/api/admin/re-enrich",
-      "methods": [
-        "POST"
-      ],
+      "methods": ["POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -1990,9 +1700,7 @@
       "source": "apps/web/app/api/admin/reference-review/intake/route.ts",
       "kind": "handler",
       "route": "/api/admin/reference-review/intake",
-      "methods": [
-        "POST"
-      ],
+      "methods": ["POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -2000,9 +1708,7 @@
       "source": "apps/web/app/api/admin/reference-review/preview/route.ts",
       "kind": "handler",
       "route": "/api/admin/reference-review/preview",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -2010,10 +1716,7 @@
       "source": "apps/web/app/api/admin/reference-review/route.ts",
       "kind": "handler",
       "route": "/api/admin/reference-review",
-      "methods": [
-        "GET",
-        "POST"
-      ],
+      "methods": ["GET", "POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -2021,9 +1724,7 @@
       "source": "apps/web/app/api/admin/releases/route.ts",
       "kind": "handler",
       "route": "/api/admin/releases",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -2031,10 +1732,7 @@
       "source": "apps/web/app/api/admin/roles/route.ts",
       "kind": "handler",
       "route": "/api/admin/roles",
-      "methods": [
-        "DELETE",
-        "POST"
-      ],
+      "methods": ["DELETE", "POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -2042,9 +1740,7 @@
       "source": "apps/web/app/api/admin/screenshots/[filename]/route.ts",
       "kind": "handler",
       "route": "/api/admin/screenshots/[filename]",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -2052,9 +1748,7 @@
       "source": "apps/web/app/api/admin/set-plan/route.ts",
       "kind": "handler",
       "route": "/api/admin/set-plan",
-      "methods": [
-        "POST"
-      ],
+      "methods": ["POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -2062,9 +1756,7 @@
       "source": "apps/web/app/api/admin/step-up-status/route.ts",
       "kind": "handler",
       "route": "/api/admin/step-up-status",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -2072,9 +1764,7 @@
       "source": "apps/web/app/api/admin/test-user/set-plan/route.ts",
       "kind": "handler",
       "route": "/api/admin/test-user/set-plan",
-      "methods": [
-        "POST"
-      ],
+      "methods": ["POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -2082,9 +1772,7 @@
       "source": "apps/web/app/api/admin/users/route.ts",
       "kind": "handler",
       "route": "/api/admin/users",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -2092,10 +1780,7 @@
       "source": "apps/web/app/api/admin/visibility-audit/route.ts",
       "kind": "handler",
       "route": "/api/admin/visibility-audit",
-      "methods": [
-        "GET",
-        "POST"
-      ],
+      "methods": ["GET", "POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -2103,9 +1788,7 @@
       "source": "apps/web/app/api/admin/waitlist/route.ts",
       "kind": "handler",
       "route": "/api/admin/waitlist",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -2113,9 +1796,7 @@
       "source": "apps/web/app/api/agents/creator-lookup/route.ts",
       "kind": "handler",
       "route": "/api/agents/creator-lookup",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -2123,9 +1804,7 @@
       "source": "apps/web/app/api/agents/drafts/[id]/route.ts",
       "kind": "handler",
       "route": "/api/agents/drafts/[id]",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -2133,9 +1812,7 @@
       "source": "apps/web/app/api/agents/drafts/route.ts",
       "kind": "handler",
       "route": "/api/agents/drafts",
-      "methods": [
-        "POST"
-      ],
+      "methods": ["POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -2143,9 +1820,7 @@
       "source": "apps/web/app/api/agents/feedback/route.ts",
       "kind": "handler",
       "route": "/api/agents/feedback",
-      "methods": [
-        "POST"
-      ],
+      "methods": ["POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -2153,9 +1828,7 @@
       "source": "apps/web/app/api/agents/profiles/route.ts",
       "kind": "handler",
       "route": "/api/agents/profiles",
-      "methods": [
-        "POST"
-      ],
+      "methods": ["POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -2163,10 +1836,7 @@
       "source": "apps/web/app/api/analytics/help-center/route.ts",
       "kind": "handler",
       "route": "/api/analytics/help-center",
-      "methods": [
-        "OPTIONS",
-        "POST"
-      ],
+      "methods": ["OPTIONS", "POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -2174,10 +1844,7 @@
       "source": "apps/web/app/api/analytics/navigation/route.ts",
       "kind": "handler",
       "route": "/api/analytics/navigation",
-      "methods": [
-        "GET",
-        "POST"
-      ],
+      "methods": ["GET", "POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -2185,9 +1852,7 @@
       "source": "apps/web/app/api/apple-music/search/route.ts",
       "kind": "handler",
       "route": "/api/apple-music/search",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -2195,12 +1860,7 @@
       "source": "apps/web/app/api/artist-rules/route.ts",
       "kind": "handler",
       "route": "/api/artist-rules",
-      "methods": [
-        "DELETE",
-        "GET",
-        "PATCH",
-        "POST"
-      ],
+      "methods": ["DELETE", "GET", "PATCH", "POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -2208,9 +1868,7 @@
       "source": "apps/web/app/api/artist/theme/route.ts",
       "kind": "handler",
       "route": "/api/artist/theme",
-      "methods": [
-        "POST"
-      ],
+      "methods": ["POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -2218,9 +1876,7 @@
       "source": "apps/web/app/api/audience/click/route.ts",
       "kind": "handler",
       "route": "/api/audience/click",
-      "methods": [
-        "POST"
-      ],
+      "methods": ["POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -2228,10 +1884,7 @@
       "source": "apps/web/app/api/audience/opt-in/route.ts",
       "kind": "handler",
       "route": "/api/audience/opt-in",
-      "methods": [
-        "GET",
-        "POST"
-      ],
+      "methods": ["GET", "POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -2239,9 +1892,7 @@
       "source": "apps/web/app/api/audience/unsubscribe/route.ts",
       "kind": "handler",
       "route": "/api/audience/unsubscribe",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -2249,9 +1900,7 @@
       "source": "apps/web/app/api/audience/visit-token/route.ts",
       "kind": "handler",
       "route": "/api/audience/visit-token",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -2259,9 +1908,7 @@
       "source": "apps/web/app/api/audience/visit/route.ts",
       "kind": "handler",
       "route": "/api/audience/visit",
-      "methods": [
-        "POST"
-      ],
+      "methods": ["POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -2277,9 +1924,7 @@
       "source": "apps/web/app/api/auth/native/exchange/route.ts",
       "kind": "handler",
       "route": "/api/auth/native/exchange",
-      "methods": [
-        "POST"
-      ],
+      "methods": ["POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -2287,9 +1932,7 @@
       "source": "apps/web/app/api/auth/native/handback/route.ts",
       "kind": "handler",
       "route": "/api/auth/native/handback",
-      "methods": [
-        "POST"
-      ],
+      "methods": ["POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -2297,9 +1940,7 @@
       "source": "apps/web/app/api/auth/ok/route.ts",
       "kind": "handler",
       "route": "/api/auth/ok",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "authentication",
       "classification": "A"
     },
@@ -2307,11 +1948,7 @@
       "source": "apps/web/app/api/auth/reset/route.ts",
       "kind": "handler",
       "route": "/api/auth/reset",
-      "methods": [
-        "GET",
-        "OPTIONS",
-        "POST"
-      ],
+      "methods": ["GET", "OPTIONS", "POST"],
       "surface": "authentication",
       "classification": "A"
     },
@@ -2319,9 +1956,7 @@
       "source": "apps/web/app/api/billing/checkout-session/route.ts",
       "kind": "handler",
       "route": "/api/billing/checkout-session",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "upgrade",
       "classification": "B"
     },
@@ -2329,9 +1964,7 @@
       "source": "apps/web/app/api/billing/health/route.ts",
       "kind": "handler",
       "route": "/api/billing/health",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -2339,9 +1972,7 @@
       "source": "apps/web/app/api/billing/history/route.ts",
       "kind": "handler",
       "route": "/api/billing/history",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "billing-management",
       "classification": "A"
     },
@@ -2349,9 +1980,7 @@
       "source": "apps/web/app/api/billing/status/route.ts",
       "kind": "handler",
       "route": "/api/billing/status",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "billing-management",
       "classification": "A"
     },
@@ -2359,9 +1988,7 @@
       "source": "apps/web/app/api/calendar/[eventId]/route.ts",
       "kind": "handler",
       "route": "/api/calendar/[eventId]",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -2369,9 +1996,7 @@
       "source": "apps/web/app/api/calendar/profile/[username]/route.ts",
       "kind": "handler",
       "route": "/api/calendar/profile/[username]",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -2379,10 +2004,7 @@
       "source": "apps/web/app/api/canary/waitlist/receipt/route.ts",
       "kind": "handler",
       "route": "/api/canary/waitlist/receipt",
-      "methods": [
-        "GET",
-        "POST"
-      ],
+      "methods": ["GET", "POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -2390,10 +2012,7 @@
       "source": "apps/web/app/api/canvas/generate/route.ts",
       "kind": "handler",
       "route": "/api/canvas/generate",
-      "methods": [
-        "GET",
-        "POST"
-      ],
+      "methods": ["GET", "POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -2401,9 +2020,7 @@
       "source": "apps/web/app/api/catalog/collaborators/match/route.ts",
       "kind": "handler",
       "route": "/api/catalog/collaborators/match",
-      "methods": [
-        "POST"
-      ],
+      "methods": ["POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -2411,9 +2028,7 @@
       "source": "apps/web/app/api/celebration-card/[username]/route.tsx",
       "kind": "handler",
       "route": "/api/celebration-card/[username]",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -2421,9 +2036,7 @@
       "source": "apps/web/app/api/changelog/subscribe/route.ts",
       "kind": "handler",
       "route": "/api/changelog/subscribe",
-      "methods": [
-        "POST"
-      ],
+      "methods": ["POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -2431,10 +2044,7 @@
       "source": "apps/web/app/api/changelog/unsubscribe/route.ts",
       "kind": "handler",
       "route": "/api/changelog/unsubscribe",
-      "methods": [
-        "GET",
-        "POST"
-      ],
+      "methods": ["GET", "POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -2442,9 +2052,7 @@
       "source": "apps/web/app/api/changelog/verify/route.ts",
       "kind": "handler",
       "route": "/api/changelog/verify",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -2452,9 +2060,7 @@
       "source": "apps/web/app/api/chat/album-art/apply/route.ts",
       "kind": "handler",
       "route": "/api/chat/album-art/apply",
-      "methods": [
-        "POST"
-      ],
+      "methods": ["POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -2462,9 +2068,7 @@
       "source": "apps/web/app/api/chat/album-art/create-release-and-apply/route.ts",
       "kind": "handler",
       "route": "/api/chat/album-art/create-release-and-apply",
-      "methods": [
-        "POST"
-      ],
+      "methods": ["POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -2472,9 +2076,7 @@
       "source": "apps/web/app/api/chat/audio/route.ts",
       "kind": "handler",
       "route": "/api/chat/audio",
-      "methods": [
-        "POST"
-      ],
+      "methods": ["POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -2482,9 +2084,7 @@
       "source": "apps/web/app/api/chat/capabilities/route.ts",
       "kind": "handler",
       "route": "/api/chat/capabilities",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -2492,9 +2092,7 @@
       "source": "apps/web/app/api/chat/confirm-edit/route.ts",
       "kind": "handler",
       "route": "/api/chat/confirm-edit",
-      "methods": [
-        "POST"
-      ],
+      "methods": ["POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -2502,9 +2100,7 @@
       "source": "apps/web/app/api/chat/confirm-link/route.ts",
       "kind": "handler",
       "route": "/api/chat/confirm-link",
-      "methods": [
-        "POST"
-      ],
+      "methods": ["POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -2512,9 +2108,7 @@
       "source": "apps/web/app/api/chat/confirm-merch-action/route.ts",
       "kind": "handler",
       "route": "/api/chat/confirm-merch-action",
-      "methods": [
-        "POST"
-      ],
+      "methods": ["POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -2522,9 +2116,7 @@
       "source": "apps/web/app/api/chat/confirm-remove-link/route.ts",
       "kind": "handler",
       "route": "/api/chat/confirm-remove-link",
-      "methods": [
-        "POST"
-      ],
+      "methods": ["POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -2532,9 +2124,7 @@
       "source": "apps/web/app/api/chat/conversations/[id]/messages/route.ts",
       "kind": "handler",
       "route": "/api/chat/conversations/[id]/messages",
-      "methods": [
-        "POST"
-      ],
+      "methods": ["POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -2542,11 +2132,7 @@
       "source": "apps/web/app/api/chat/conversations/[id]/route.ts",
       "kind": "handler",
       "route": "/api/chat/conversations/[id]",
-      "methods": [
-        "DELETE",
-        "GET",
-        "PATCH"
-      ],
+      "methods": ["DELETE", "GET", "PATCH"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -2554,10 +2140,7 @@
       "source": "apps/web/app/api/chat/conversations/route.ts",
       "kind": "handler",
       "route": "/api/chat/conversations",
-      "methods": [
-        "GET",
-        "POST"
-      ],
+      "methods": ["GET", "POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -2565,9 +2148,7 @@
       "source": "apps/web/app/api/chat/feedback/route.ts",
       "kind": "handler",
       "route": "/api/chat/feedback",
-      "methods": [
-        "POST"
-      ],
+      "methods": ["POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -2575,9 +2156,7 @@
       "source": "apps/web/app/api/chat/files/confirm/route.ts",
       "kind": "handler",
       "route": "/api/chat/files/confirm",
-      "methods": [
-        "POST"
-      ],
+      "methods": ["POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -2585,9 +2164,7 @@
       "source": "apps/web/app/api/chat/files/upload-token/route.ts",
       "kind": "handler",
       "route": "/api/chat/files/upload-token",
-      "methods": [
-        "POST"
-      ],
+      "methods": ["POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -2595,10 +2172,7 @@
       "source": "apps/web/app/api/chat/route.ts",
       "kind": "handler",
       "route": "/api/chat",
-      "methods": [
-        "OPTIONS",
-        "POST"
-      ],
+      "methods": ["OPTIONS", "POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -2606,9 +2180,7 @@
       "source": "apps/web/app/api/chat/usage/route.ts",
       "kind": "handler",
       "route": "/api/chat/usage",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -2616,11 +2188,7 @@
       "source": "apps/web/app/api/chatgpt/mcp/route.ts",
       "kind": "handler",
       "route": "/api/chatgpt/mcp",
-      "methods": [
-        "DELETE",
-        "GET",
-        "POST"
-      ],
+      "methods": ["DELETE", "GET", "POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -2628,9 +2196,7 @@
       "source": "apps/web/app/api/connectors/google/authorize/route.ts",
       "kind": "handler",
       "route": "/api/connectors/google/authorize",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -2638,9 +2204,7 @@
       "source": "apps/web/app/api/connectors/google/callback/route.ts",
       "kind": "handler",
       "route": "/api/connectors/google/callback",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -2648,9 +2212,7 @@
       "source": "apps/web/app/api/connectors/google/disconnect/route.ts",
       "kind": "handler",
       "route": "/api/connectors/google/disconnect",
-      "methods": [
-        "POST"
-      ],
+      "methods": ["POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -2658,9 +2220,7 @@
       "source": "apps/web/app/api/connectors/spotify/authorize/route.ts",
       "kind": "handler",
       "route": "/api/connectors/spotify/authorize",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -2668,9 +2228,7 @@
       "source": "apps/web/app/api/connectors/spotify/callback/route.ts",
       "kind": "handler",
       "route": "/api/connectors/spotify/callback",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -2678,9 +2236,7 @@
       "source": "apps/web/app/api/connectors/spotify/disconnect/route.ts",
       "kind": "handler",
       "route": "/api/connectors/spotify/disconnect",
-      "methods": [
-        "POST"
-      ],
+      "methods": ["POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -2688,9 +2244,7 @@
       "source": "apps/web/app/api/connectors/suggested-actions/[id]/approve/route.ts",
       "kind": "handler",
       "route": "/api/connectors/suggested-actions/[id]/approve",
-      "methods": [
-        "POST"
-      ],
+      "methods": ["POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -2698,9 +2252,7 @@
       "source": "apps/web/app/api/connectors/suggested-actions/[id]/next-step/route.ts",
       "kind": "handler",
       "route": "/api/connectors/suggested-actions/[id]/next-step",
-      "methods": [
-        "POST"
-      ],
+      "methods": ["POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -2708,9 +2260,7 @@
       "source": "apps/web/app/api/connectors/suggested-actions/[id]/reject/route.ts",
       "kind": "handler",
       "route": "/api/connectors/suggested-actions/[id]/reject",
-      "methods": [
-        "POST"
-      ],
+      "methods": ["POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -2718,9 +2268,7 @@
       "source": "apps/web/app/api/connectors/suggested-actions/[id]/revise/route.ts",
       "kind": "handler",
       "route": "/api/connectors/suggested-actions/[id]/revise",
-      "methods": [
-        "POST"
-      ],
+      "methods": ["POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -2728,9 +2276,7 @@
       "source": "apps/web/app/api/connectors/suggested-actions/route.ts",
       "kind": "handler",
       "route": "/api/connectors/suggested-actions",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -2738,9 +2284,7 @@
       "source": "apps/web/app/api/connectors/youtube/authorize/route.ts",
       "kind": "handler",
       "route": "/api/connectors/youtube/authorize",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -2748,9 +2292,7 @@
       "source": "apps/web/app/api/connectors/youtube/callback/route.ts",
       "kind": "handler",
       "route": "/api/connectors/youtube/callback",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -2758,9 +2300,7 @@
       "source": "apps/web/app/api/connectors/youtube/disconnect/route.ts",
       "kind": "handler",
       "route": "/api/connectors/youtube/disconnect",
-      "methods": [
-        "POST"
-      ],
+      "methods": ["POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -2768,10 +2308,7 @@
       "source": "apps/web/app/api/content-records/[kind]/[key]/route.ts",
       "kind": "handler",
       "route": "/api/content-records/[kind]/[key]",
-      "methods": [
-        "GET",
-        "POST"
-      ],
+      "methods": ["GET", "POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -2779,9 +2316,7 @@
       "source": "apps/web/app/api/content-records/stage-events/route.ts",
       "kind": "handler",
       "route": "/api/content-records/stage-events",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -2789,9 +2324,7 @@
       "source": "apps/web/app/api/create-tip-intent/route.ts",
       "kind": "handler",
       "route": "/api/create-tip-intent",
-      "methods": [
-        "POST"
-      ],
+      "methods": ["POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -2799,9 +2332,7 @@
       "source": "apps/web/app/api/creator/route.ts",
       "kind": "handler",
       "route": "/api/creator",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -2809,9 +2340,7 @@
       "source": "apps/web/app/api/cron/artist-daily-snapshots/route.ts",
       "kind": "handler",
       "route": "/api/cron/artist-daily-snapshots",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -2819,9 +2348,7 @@
       "source": "apps/web/app/api/cron/auth-signup-onboarding-canary/route.ts",
       "kind": "handler",
       "route": "/api/cron/auth-signup-onboarding-canary",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -2829,9 +2356,7 @@
       "source": "apps/web/app/api/cron/billing-reconciliation/route.ts",
       "kind": "handler",
       "route": "/api/cron/billing-reconciliation",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -2839,9 +2364,7 @@
       "source": "apps/web/app/api/cron/cleanup-dogfood-accounts/route.ts",
       "kind": "handler",
       "route": "/api/cron/cleanup-dogfood-accounts",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -2849,9 +2372,7 @@
       "source": "apps/web/app/api/cron/cleanup-idempotency-keys/route.ts",
       "kind": "handler",
       "route": "/api/cron/cleanup-idempotency-keys",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -2859,9 +2380,7 @@
       "source": "apps/web/app/api/cron/cleanup-photos/route.ts",
       "kind": "handler",
       "route": "/api/cron/cleanup-photos",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -2869,9 +2388,7 @@
       "source": "apps/web/app/api/cron/cleanup-sms-intents/route.ts",
       "kind": "handler",
       "route": "/api/cron/cleanup-sms-intents",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -2879,9 +2396,7 @@
       "source": "apps/web/app/api/cron/daily-maintenance/route.ts",
       "kind": "handler",
       "route": "/api/cron/daily-maintenance",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -2889,9 +2404,7 @@
       "source": "apps/web/app/api/cron/data-retention/route.ts",
       "kind": "handler",
       "route": "/api/cron/data-retention",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -2899,9 +2412,7 @@
       "source": "apps/web/app/api/cron/frequent/route.ts",
       "kind": "handler",
       "route": "/api/cron/frequent",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -2909,9 +2420,7 @@
       "source": "apps/web/app/api/cron/generate-insights/route.ts",
       "kind": "handler",
       "route": "/api/cron/generate-insights",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -2919,9 +2428,7 @@
       "source": "apps/web/app/api/cron/generate-playlist/route.ts",
       "kind": "handler",
       "route": "/api/cron/generate-playlist",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -2929,9 +2436,7 @@
       "source": "apps/web/app/api/cron/monitor-metadata-submissions/route.ts",
       "kind": "handler",
       "route": "/api/cron/monitor-metadata-submissions",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -2939,9 +2444,7 @@
       "source": "apps/web/app/api/cron/pixel-forwarding/route.ts",
       "kind": "handler",
       "route": "/api/cron/pixel-forwarding",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -2949,9 +2452,7 @@
       "source": "apps/web/app/api/cron/process-campaigns/route.ts",
       "kind": "handler",
       "route": "/api/cron/process-campaigns",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -2959,9 +2460,7 @@
       "source": "apps/web/app/api/cron/process-ingestion-jobs/route.ts",
       "kind": "handler",
       "route": "/api/cron/process-ingestion-jobs",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -2969,9 +2468,7 @@
       "source": "apps/web/app/api/cron/process-merch-fulfillment/route.ts",
       "kind": "handler",
       "route": "/api/cron/process-merch-fulfillment",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -2979,9 +2476,7 @@
       "source": "apps/web/app/api/cron/process-metadata-submissions/route.ts",
       "kind": "handler",
       "route": "/api/cron/process-metadata-submissions",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -2989,9 +2484,7 @@
       "source": "apps/web/app/api/cron/process-pre-saves/route.ts",
       "kind": "handler",
       "route": "/api/cron/process-pre-saves",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -2999,9 +2492,7 @@
       "source": "apps/web/app/api/cron/process-workflow-runs/route.ts",
       "kind": "handler",
       "route": "/api/cron/process-workflow-runs",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -3009,9 +2500,7 @@
       "source": "apps/web/app/api/cron/public-profile-canary/route.ts",
       "kind": "handler",
       "route": "/api/cron/public-profile-canary",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -3019,9 +2508,7 @@
       "source": "apps/web/app/api/cron/purge-pixel-ips/route.ts",
       "kind": "handler",
       "route": "/api/cron/purge-pixel-ips",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -3029,9 +2516,7 @@
       "source": "apps/web/app/api/cron/queue-tick/route.ts",
       "kind": "handler",
       "route": "/api/cron/queue-tick",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -3039,9 +2524,7 @@
       "source": "apps/web/app/api/cron/schedule-release-notifications/route.ts",
       "kind": "handler",
       "route": "/api/cron/schedule-release-notifications",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -3049,9 +2532,7 @@
       "source": "apps/web/app/api/cron/send-release-notifications/route.ts",
       "kind": "handler",
       "route": "/api/cron/send-release-notifications",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -3059,9 +2540,7 @@
       "source": "apps/web/app/api/cron/summarize-interviews/route.ts",
       "kind": "handler",
       "route": "/api/cron/summarize-interviews",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -3069,9 +2548,7 @@
       "source": "apps/web/app/api/cron/summer-canary/route.ts",
       "kind": "handler",
       "route": "/api/cron/summer-canary",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -3079,9 +2556,7 @@
       "source": "apps/web/app/api/cron/sync-ai-crawler-analytics/route.ts",
       "kind": "handler",
       "route": "/api/cron/sync-ai-crawler-analytics",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -3089,9 +2564,7 @@
       "source": "apps/web/app/api/cron/track-daily-snapshots/route.ts",
       "kind": "handler",
       "route": "/api/cron/track-daily-snapshots",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -3099,9 +2572,7 @@
       "source": "apps/web/app/api/cron/voice-pipeline/route.ts",
       "kind": "handler",
       "route": "/api/cron/voice-pipeline",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -3109,9 +2580,7 @@
       "source": "apps/web/app/api/cron/web-ai-health/route.ts",
       "kind": "handler",
       "route": "/api/cron/web-ai-health",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -3119,9 +2588,7 @@
       "source": "apps/web/app/api/dashboard/activity/recent/route.ts",
       "kind": "handler",
       "route": "/api/dashboard/activity/recent",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -3129,9 +2596,7 @@
       "source": "apps/web/app/api/dashboard/ai-crawlers/route.ts",
       "kind": "handler",
       "route": "/api/dashboard/ai-crawlers",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -3139,9 +2604,7 @@
       "source": "apps/web/app/api/dashboard/analytics/route.ts",
       "kind": "handler",
       "route": "/api/dashboard/analytics",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -3149,10 +2612,7 @@
       "source": "apps/web/app/api/dashboard/approvals/[id]/route.ts",
       "kind": "handler",
       "route": "/api/dashboard/approvals/[id]",
-      "methods": [
-        "DELETE",
-        "POST"
-      ],
+      "methods": ["DELETE", "POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -3160,10 +2620,7 @@
       "source": "apps/web/app/api/dashboard/audience/members/route.ts",
       "kind": "handler",
       "route": "/api/dashboard/audience/members",
-      "methods": [
-        "DELETE",
-        "GET"
-      ],
+      "methods": ["DELETE", "GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -3171,9 +2628,7 @@
       "source": "apps/web/app/api/dashboard/audience/source-groups/[id]/route.ts",
       "kind": "handler",
       "route": "/api/dashboard/audience/source-groups/[id]",
-      "methods": [
-        "PATCH"
-      ],
+      "methods": ["PATCH"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -3181,10 +2636,7 @@
       "source": "apps/web/app/api/dashboard/audience/source-groups/route.ts",
       "kind": "handler",
       "route": "/api/dashboard/audience/source-groups",
-      "methods": [
-        "GET",
-        "POST"
-      ],
+      "methods": ["GET", "POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -3192,9 +2644,7 @@
       "source": "apps/web/app/api/dashboard/audience/source-links/[id]/route.ts",
       "kind": "handler",
       "route": "/api/dashboard/audience/source-links/[id]",
-      "methods": [
-        "PATCH"
-      ],
+      "methods": ["PATCH"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -3202,10 +2652,7 @@
       "source": "apps/web/app/api/dashboard/audience/source-links/route.ts",
       "kind": "handler",
       "route": "/api/dashboard/audience/source-links",
-      "methods": [
-        "GET",
-        "POST"
-      ],
+      "methods": ["GET", "POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -3213,9 +2660,7 @@
       "source": "apps/web/app/api/dashboard/audience/subscribers/route.ts",
       "kind": "handler",
       "route": "/api/dashboard/audience/subscribers",
-      "methods": [
-        "POST"
-      ],
+      "methods": ["POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -3223,9 +2668,7 @@
       "source": "apps/web/app/api/dashboard/contacts/route.ts",
       "kind": "handler",
       "route": "/api/dashboard/contacts",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -3233,9 +2676,7 @@
       "source": "apps/web/app/api/dashboard/earnings/route.ts",
       "kind": "handler",
       "route": "/api/dashboard/earnings",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -3243,9 +2684,7 @@
       "source": "apps/web/app/api/dashboard/jovie-work/recent/route.ts",
       "kind": "handler",
       "route": "/api/dashboard/jovie-work/recent",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -3253,9 +2692,7 @@
       "source": "apps/web/app/api/dashboard/monetization-summary/route.ts",
       "kind": "handler",
       "route": "/api/dashboard/monetization-summary",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -3263,9 +2700,7 @@
       "source": "apps/web/app/api/dashboard/pixels/health/route.ts",
       "kind": "handler",
       "route": "/api/dashboard/pixels/health",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -3273,11 +2708,7 @@
       "source": "apps/web/app/api/dashboard/pixels/route.ts",
       "kind": "handler",
       "route": "/api/dashboard/pixels",
-      "methods": [
-        "DELETE",
-        "GET",
-        "PUT"
-      ],
+      "methods": ["DELETE", "GET", "PUT"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -3285,9 +2716,7 @@
       "source": "apps/web/app/api/dashboard/pixels/test-event/route.ts",
       "kind": "handler",
       "route": "/api/dashboard/pixels/test-event",
-      "methods": [
-        "POST"
-      ],
+      "methods": ["POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -3295,9 +2724,7 @@
       "source": "apps/web/app/api/dashboard/press-photos/route.ts",
       "kind": "handler",
       "route": "/api/dashboard/press-photos",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -3305,9 +2732,7 @@
       "source": "apps/web/app/api/dashboard/profile/create/route.ts",
       "kind": "handler",
       "route": "/api/dashboard/profile/create",
-      "methods": [
-        "POST"
-      ],
+      "methods": ["POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -3315,10 +2740,7 @@
       "source": "apps/web/app/api/dashboard/profile/route.ts",
       "kind": "handler",
       "route": "/api/dashboard/profile",
-      "methods": [
-        "GET",
-        "PUT"
-      ],
+      "methods": ["GET", "PUT"],
       "surface": "artist-identity",
       "classification": "B"
     },
@@ -3326,9 +2748,7 @@
       "source": "apps/web/app/api/dashboard/profile/switch/route.ts",
       "kind": "handler",
       "route": "/api/dashboard/profile/switch",
-      "methods": [
-        "POST"
-      ],
+      "methods": ["POST"],
       "surface": "artist-identity",
       "classification": "B"
     },
@@ -3336,9 +2756,7 @@
       "source": "apps/web/app/api/dashboard/releases/[releaseId]/analytics/route.ts",
       "kind": "handler",
       "route": "/api/dashboard/releases/[releaseId]/analytics",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -3346,9 +2764,7 @@
       "source": "apps/web/app/api/dashboard/releases/[releaseId]/tracks/route.ts",
       "kind": "handler",
       "route": "/api/dashboard/releases/[releaseId]/tracks",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -3356,9 +2772,7 @@
       "source": "apps/web/app/api/dashboard/releases/artwork-downloads/route.ts",
       "kind": "handler",
       "route": "/api/dashboard/releases/artwork-downloads",
-      "methods": [
-        "POST"
-      ],
+      "methods": ["POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -3366,9 +2780,7 @@
       "source": "apps/web/app/api/dashboard/retargeting/ad-creative/route.tsx",
       "kind": "handler",
       "route": "/api/dashboard/retargeting/ad-creative",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -3376,10 +2788,7 @@
       "source": "apps/web/app/api/dashboard/rider/route.ts",
       "kind": "handler",
       "route": "/api/dashboard/rider",
-      "methods": [
-        "GET",
-        "PUT"
-      ],
+      "methods": ["GET", "PUT"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -3387,10 +2796,7 @@
       "source": "apps/web/app/api/dashboard/shop/route.ts",
       "kind": "handler",
       "route": "/api/dashboard/shop",
-      "methods": [
-        "GET",
-        "PUT"
-      ],
+      "methods": ["GET", "PUT"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -3398,13 +2804,7 @@
       "source": "apps/web/app/api/dashboard/social-links/route.ts",
       "kind": "handler",
       "route": "/api/dashboard/social-links",
-      "methods": [
-        "DELETE",
-        "GET",
-        "PATCH",
-        "POST",
-        "PUT"
-      ],
+      "methods": ["DELETE", "GET", "PATCH", "POST", "PUT"],
       "surface": "profile-links",
       "classification": "B"
     },
@@ -3412,9 +2812,7 @@
       "source": "apps/web/app/api/dashboard/tour-dates/[id]/analytics/route.ts",
       "kind": "handler",
       "route": "/api/dashboard/tour-dates/[id]/analytics",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -3422,9 +2820,7 @@
       "source": "apps/web/app/api/demo/download/route.ts",
       "kind": "handler",
       "route": "/api/demo/download",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -3432,9 +2828,7 @@
       "source": "apps/web/app/api/deploy/promote/route.ts",
       "kind": "handler",
       "route": "/api/deploy/promote",
-      "methods": [
-        "POST"
-      ],
+      "methods": ["POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -3442,9 +2836,7 @@
       "source": "apps/web/app/api/deploy/status/route.ts",
       "kind": "handler",
       "route": "/api/deploy/status",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -3452,9 +2844,7 @@
       "source": "apps/web/app/api/desktop-updates/release-notes/route.ts",
       "kind": "handler",
       "route": "/api/desktop-updates/release-notes",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -3462,9 +2852,7 @@
       "source": "apps/web/app/api/desktop/download/route.ts",
       "kind": "handler",
       "route": "/api/desktop/download",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -3472,9 +2860,7 @@
       "source": "apps/web/app/api/dev/clear-session/route.ts",
       "kind": "handler",
       "route": "/api/dev/clear-session",
-      "methods": [
-        "POST"
-      ],
+      "methods": ["POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -3482,9 +2868,7 @@
       "source": "apps/web/app/api/dev/connectors/extract-now/route.ts",
       "kind": "handler",
       "route": "/api/dev/connectors/extract-now",
-      "methods": [
-        "POST"
-      ],
+      "methods": ["POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -3492,9 +2876,7 @@
       "source": "apps/web/app/api/dev/connectors/seed-fixtures/route.ts",
       "kind": "handler",
       "route": "/api/dev/connectors/seed-fixtures",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -3502,9 +2884,7 @@
       "source": "apps/web/app/api/dev/test-auth/enter/route.ts",
       "kind": "handler",
       "route": "/api/dev/test-auth/enter",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -3512,9 +2892,7 @@
       "source": "apps/web/app/api/dev/test-auth/mobile-callback/route.ts",
       "kind": "handler",
       "route": "/api/dev/test-auth/mobile-callback",
-      "methods": [
-        "POST"
-      ],
+      "methods": ["POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -3522,9 +2900,7 @@
       "source": "apps/web/app/api/dev/test-auth/mobile-provider-complete/route.ts",
       "kind": "handler",
       "route": "/api/dev/test-auth/mobile-provider-complete",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -3532,11 +2908,7 @@
       "source": "apps/web/app/api/dev/test-auth/session/route.ts",
       "kind": "handler",
       "route": "/api/dev/test-auth/session",
-      "methods": [
-        "DELETE",
-        "GET",
-        "POST"
-      ],
+      "methods": ["DELETE", "GET", "POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -3544,9 +2916,7 @@
       "source": "apps/web/app/api/dev/test-user/set-plan/route.ts",
       "kind": "handler",
       "route": "/api/dev/test-user/set-plan",
-      "methods": [
-        "POST"
-      ],
+      "methods": ["POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -3554,9 +2924,7 @@
       "source": "apps/web/app/api/dev/unwaitlist/route.ts",
       "kind": "handler",
       "route": "/api/dev/unwaitlist",
-      "methods": [
-        "POST"
-      ],
+      "methods": ["POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -3564,10 +2932,7 @@
       "source": "apps/web/app/api/dsp/bio-sync/route.ts",
       "kind": "handler",
       "route": "/api/dsp/bio-sync",
-      "methods": [
-        "GET",
-        "POST"
-      ],
+      "methods": ["GET", "POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -3575,9 +2940,7 @@
       "source": "apps/web/app/api/dsp/catalog-scan/mismatches/[id]/route.ts",
       "kind": "handler",
       "route": "/api/dsp/catalog-scan/mismatches/[id]",
-      "methods": [
-        "PATCH"
-      ],
+      "methods": ["PATCH"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -3585,9 +2948,7 @@
       "source": "apps/web/app/api/dsp/catalog-scan/results/route.ts",
       "kind": "handler",
       "route": "/api/dsp/catalog-scan/results",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -3595,9 +2956,7 @@
       "source": "apps/web/app/api/dsp/catalog-scan/route.ts",
       "kind": "handler",
       "route": "/api/dsp/catalog-scan",
-      "methods": [
-        "POST"
-      ],
+      "methods": ["POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -3605,9 +2964,7 @@
       "source": "apps/web/app/api/dsp/catalog-scan/status/route.ts",
       "kind": "handler",
       "route": "/api/dsp/catalog-scan/status",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -3615,9 +2972,7 @@
       "source": "apps/web/app/api/dsp/discover/route.ts",
       "kind": "handler",
       "route": "/api/dsp/discover",
-      "methods": [
-        "POST"
-      ],
+      "methods": ["POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -3625,9 +2980,7 @@
       "source": "apps/web/app/api/dsp/enrichment/status/route.ts",
       "kind": "handler",
       "route": "/api/dsp/enrichment/status",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -3635,9 +2988,7 @@
       "source": "apps/web/app/api/dsp/matches/[id]/confirm/route.ts",
       "kind": "handler",
       "route": "/api/dsp/matches/[id]/confirm",
-      "methods": [
-        "POST"
-      ],
+      "methods": ["POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -3645,9 +2996,7 @@
       "source": "apps/web/app/api/dsp/matches/[id]/reject/route.ts",
       "kind": "handler",
       "route": "/api/dsp/matches/[id]/reject",
-      "methods": [
-        "POST"
-      ],
+      "methods": ["POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -3655,9 +3004,7 @@
       "source": "apps/web/app/api/dsp/matches/route.ts",
       "kind": "handler",
       "route": "/api/dsp/matches",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -3665,9 +3012,7 @@
       "source": "apps/web/app/api/email/track/click/route.ts",
       "kind": "handler",
       "route": "/api/email/track/click",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -3675,9 +3020,7 @@
       "source": "apps/web/app/api/email/track/open/route.ts",
       "kind": "handler",
       "route": "/api/email/track/open",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -3685,10 +3028,7 @@
       "source": "apps/web/app/api/extension/action-log/route.ts",
       "kind": "handler",
       "route": "/api/extension/action-log",
-      "methods": [
-        "OPTIONS",
-        "POST"
-      ],
+      "methods": ["OPTIONS", "POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -3696,10 +3036,7 @@
       "source": "apps/web/app/api/extension/actions/fill-preview/route.ts",
       "kind": "handler",
       "route": "/api/extension/actions/fill-preview",
-      "methods": [
-        "OPTIONS",
-        "POST"
-      ],
+      "methods": ["OPTIONS", "POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -3707,10 +3044,7 @@
       "source": "apps/web/app/api/extension/flags/route.ts",
       "kind": "handler",
       "route": "/api/extension/flags",
-      "methods": [
-        "GET",
-        "OPTIONS"
-      ],
+      "methods": ["GET", "OPTIONS"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -3718,10 +3052,7 @@
       "source": "apps/web/app/api/extension/session/status/route.ts",
       "kind": "handler",
       "route": "/api/extension/session/status",
-      "methods": [
-        "GET",
-        "OPTIONS"
-      ],
+      "methods": ["GET", "OPTIONS"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -3729,10 +3060,7 @@
       "source": "apps/web/app/api/extension/summary/route.ts",
       "kind": "handler",
       "route": "/api/extension/summary",
-      "methods": [
-        "GET",
-        "OPTIONS"
-      ],
+      "methods": ["GET", "OPTIONS"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -3740,9 +3068,7 @@
       "source": "apps/web/app/api/featured-creators/route.ts",
       "kind": "handler",
       "route": "/api/featured-creators",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -3750,9 +3076,7 @@
       "source": "apps/web/app/api/feedback/route.ts",
       "kind": "handler",
       "route": "/api/feedback",
-      "methods": [
-        "POST"
-      ],
+      "methods": ["POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -3760,11 +3084,7 @@
       "source": "apps/web/app/api/finance/budget/route.ts",
       "kind": "handler",
       "route": "/api/finance/budget",
-      "methods": [
-        "DELETE",
-        "GET",
-        "PUT"
-      ],
+      "methods": ["DELETE", "GET", "PUT"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -3772,9 +3092,7 @@
       "source": "apps/web/app/api/growth-access-request/route.ts",
       "kind": "handler",
       "route": "/api/growth-access-request",
-      "methods": [
-        "POST"
-      ],
+      "methods": ["POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -3782,9 +3100,7 @@
       "source": "apps/web/app/api/handle/check/route.ts",
       "kind": "handler",
       "route": "/api/handle/check",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -3792,9 +3108,7 @@
       "source": "apps/web/app/api/health/auth/route.ts",
       "kind": "handler",
       "route": "/api/health/auth",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -3802,9 +3116,7 @@
       "source": "apps/web/app/api/health/build-info/route.ts",
       "kind": "handler",
       "route": "/api/health/build-info",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -3812,9 +3124,7 @@
       "source": "apps/web/app/api/health/comprehensive/route.ts",
       "kind": "handler",
       "route": "/api/health/comprehensive",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -3822,9 +3132,7 @@
       "source": "apps/web/app/api/health/db/performance/route.ts",
       "kind": "handler",
       "route": "/api/health/db/performance",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -3832,9 +3140,7 @@
       "source": "apps/web/app/api/health/db/route.ts",
       "kind": "handler",
       "route": "/api/health/db",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -3842,9 +3148,7 @@
       "source": "apps/web/app/api/health/deploy/route.ts",
       "kind": "handler",
       "route": "/api/health/deploy",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -3852,9 +3156,7 @@
       "source": "apps/web/app/api/health/env/route.ts",
       "kind": "handler",
       "route": "/api/health/env",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -3862,9 +3164,7 @@
       "source": "apps/web/app/api/health/homepage/route.ts",
       "kind": "handler",
       "route": "/api/health/homepage",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -3872,9 +3172,7 @@
       "source": "apps/web/app/api/health/keys/route.ts",
       "kind": "handler",
       "route": "/api/health/keys",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -3882,9 +3180,7 @@
       "source": "apps/web/app/api/health/redis/route.ts",
       "kind": "handler",
       "route": "/api/health/redis",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -3892,9 +3188,7 @@
       "source": "apps/web/app/api/health/revenue-spine/route.ts",
       "kind": "handler",
       "route": "/api/health/revenue-spine",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -3902,9 +3196,7 @@
       "source": "apps/web/app/api/health/route.ts",
       "kind": "handler",
       "route": "/api/health",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -3912,9 +3204,7 @@
       "source": "apps/web/app/api/hud/ai-ops/dispatch/route.ts",
       "kind": "handler",
       "route": "/api/hud/ai-ops/dispatch",
-      "methods": [
-        "POST"
-      ],
+      "methods": ["POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -3922,9 +3212,7 @@
       "source": "apps/web/app/api/hud/founder-walks/route.ts",
       "kind": "handler",
       "route": "/api/hud/founder-walks",
-      "methods": [
-        "POST"
-      ],
+      "methods": ["POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -3932,10 +3220,7 @@
       "source": "apps/web/app/api/hud/hermes-events/route.ts",
       "kind": "handler",
       "route": "/api/hud/hermes-events",
-      "methods": [
-        "GET",
-        "POST"
-      ],
+      "methods": ["GET", "POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -3943,9 +3228,7 @@
       "source": "apps/web/app/api/hud/kiosk-session/route.ts",
       "kind": "handler",
       "route": "/api/hud/kiosk-session",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -3953,9 +3236,7 @@
       "source": "apps/web/app/api/hud/metrics/route.ts",
       "kind": "handler",
       "route": "/api/hud/metrics",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -3963,9 +3244,7 @@
       "source": "apps/web/app/api/hud/shipping-state/route.ts",
       "kind": "handler",
       "route": "/api/hud/shipping-state",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -3973,9 +3252,7 @@
       "source": "apps/web/app/api/images/artwork/upload/route.ts",
       "kind": "handler",
       "route": "/api/images/artwork/upload",
-      "methods": [
-        "POST"
-      ],
+      "methods": ["POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -3983,9 +3260,7 @@
       "source": "apps/web/app/api/images/convert/route.ts",
       "kind": "handler",
       "route": "/api/images/convert",
-      "methods": [
-        "POST"
-      ],
+      "methods": ["POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -3993,9 +3268,7 @@
       "source": "apps/web/app/api/images/press-photos/[photoId]/route.ts",
       "kind": "handler",
       "route": "/api/images/press-photos/[photoId]",
-      "methods": [
-        "DELETE"
-      ],
+      "methods": ["DELETE"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -4003,9 +3276,7 @@
       "source": "apps/web/app/api/images/status/[id]/route.ts",
       "kind": "handler",
       "route": "/api/images/status/[id]",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -4013,9 +3284,7 @@
       "source": "apps/web/app/api/images/upload/route.ts",
       "kind": "handler",
       "route": "/api/images/upload",
-      "methods": [
-        "POST"
-      ],
+      "methods": ["POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -4023,10 +3292,7 @@
       "source": "apps/web/app/api/inbox/founder-reviews/[id]/media/route.ts",
       "kind": "handler",
       "route": "/api/inbox/founder-reviews/[id]/media",
-      "methods": [
-        "DELETE",
-        "GET"
-      ],
+      "methods": ["DELETE", "GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -4034,9 +3300,7 @@
       "source": "apps/web/app/api/inbox/founder-reviews/[id]/outcome/route.ts",
       "kind": "handler",
       "route": "/api/inbox/founder-reviews/[id]/outcome",
-      "methods": [
-        "PATCH"
-      ],
+      "methods": ["PATCH"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -4044,10 +3308,7 @@
       "source": "apps/web/app/api/inbox/founder-reviews/route.ts",
       "kind": "handler",
       "route": "/api/inbox/founder-reviews",
-      "methods": [
-        "GET",
-        "POST"
-      ],
+      "methods": ["GET", "POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -4055,9 +3316,7 @@
       "source": "apps/web/app/api/inbox/founder-reviews/upload-token/route.ts",
       "kind": "handler",
       "route": "/api/inbox/founder-reviews/upload-token",
-      "methods": [
-        "POST"
-      ],
+      "methods": ["POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -4065,9 +3324,7 @@
       "source": "apps/web/app/api/ingestion/jobs/route.ts",
       "kind": "handler",
       "route": "/api/ingestion/jobs",
-      "methods": [
-        "POST"
-      ],
+      "methods": ["POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -4075,9 +3332,7 @@
       "source": "apps/web/app/api/insights/[id]/route.ts",
       "kind": "handler",
       "route": "/api/insights/[id]",
-      "methods": [
-        "PATCH"
-      ],
+      "methods": ["PATCH"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -4085,9 +3340,7 @@
       "source": "apps/web/app/api/insights/generate/route.ts",
       "kind": "handler",
       "route": "/api/insights/generate",
-      "methods": [
-        "POST"
-      ],
+      "methods": ["POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -4095,9 +3348,7 @@
       "source": "apps/web/app/api/insights/route.ts",
       "kind": "handler",
       "route": "/api/insights",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -4105,9 +3356,7 @@
       "source": "apps/web/app/api/insights/summary/route.ts",
       "kind": "handler",
       "route": "/api/insights/summary",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -4115,10 +3364,7 @@
       "source": "apps/web/app/api/internal/canary/reset/route.ts",
       "kind": "handler",
       "route": "/api/internal/canary/reset",
-      "methods": [
-        "GET",
-        "POST"
-      ],
+      "methods": ["GET", "POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -4126,9 +3372,7 @@
       "source": "apps/web/app/api/internal/ovie/certification-evidence/route.ts",
       "kind": "handler",
       "route": "/api/internal/ovie/certification-evidence",
-      "methods": [
-        "POST"
-      ],
+      "methods": ["POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -4136,10 +3380,7 @@
       "source": "apps/web/app/api/internal/ovie/component-certificate-evidence/route.ts",
       "kind": "handler",
       "route": "/api/internal/ovie/component-certificate-evidence",
-      "methods": [
-        "OPTIONS",
-        "POST"
-      ],
+      "methods": ["OPTIONS", "POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -4147,9 +3388,7 @@
       "source": "apps/web/app/api/internal/ovie/customer-voice/[id]/reply/route.ts",
       "kind": "handler",
       "route": "/api/internal/ovie/customer-voice/[id]/reply",
-      "methods": [
-        "POST"
-      ],
+      "methods": ["POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -4157,9 +3396,7 @@
       "source": "apps/web/app/api/internal/ovie/design-ci-judge-evidence/route.ts",
       "kind": "handler",
       "route": "/api/internal/ovie/design-ci-judge-evidence",
-      "methods": [
-        "POST"
-      ],
+      "methods": ["POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -4167,9 +3404,7 @@
       "source": "apps/web/app/api/internal/ovie/dogfood-judge-evidence/route.ts",
       "kind": "handler",
       "route": "/api/internal/ovie/dogfood-judge-evidence",
-      "methods": [
-        "POST"
-      ],
+      "methods": ["POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -4177,9 +3412,7 @@
       "source": "apps/web/app/api/internal/ovie/fix-deploy-stamp/route.ts",
       "kind": "handler",
       "route": "/api/internal/ovie/fix-deploy-stamp",
-      "methods": [
-        "POST"
-      ],
+      "methods": ["POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -4187,9 +3420,7 @@
       "source": "apps/web/app/api/internal/ovie/fleet/events/route.ts",
       "kind": "handler",
       "route": "/api/internal/ovie/fleet/events",
-      "methods": [
-        "POST"
-      ],
+      "methods": ["POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -4197,9 +3428,7 @@
       "source": "apps/web/app/api/internal/ovie/founder-welcome/route.ts",
       "kind": "handler",
       "route": "/api/internal/ovie/founder-welcome",
-      "methods": [
-        "POST"
-      ],
+      "methods": ["POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -4207,10 +3436,7 @@
       "source": "apps/web/app/api/internal/ovie/golden-path-evidence/route.ts",
       "kind": "handler",
       "route": "/api/internal/ovie/golden-path-evidence",
-      "methods": [
-        "GET",
-        "POST"
-      ],
+      "methods": ["GET", "POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -4218,9 +3444,7 @@
       "source": "apps/web/app/api/internal/ovie/lyb-mrr/route.ts",
       "kind": "handler",
       "route": "/api/internal/ovie/lyb-mrr",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -4228,9 +3452,7 @@
       "source": "apps/web/app/api/internal/ovie/objections/[id]/decision/route.ts",
       "kind": "handler",
       "route": "/api/internal/ovie/objections/[id]/decision",
-      "methods": [
-        "POST"
-      ],
+      "methods": ["POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -4238,9 +3460,7 @@
       "source": "apps/web/app/api/internal/ovie/objections/route.ts",
       "kind": "handler",
       "route": "/api/internal/ovie/objections",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -4248,9 +3468,7 @@
       "source": "apps/web/app/api/internal/ovie/pipeline-bottleneck/contributions/route.ts",
       "kind": "handler",
       "route": "/api/internal/ovie/pipeline-bottleneck/contributions",
-      "methods": [
-        "POST"
-      ],
+      "methods": ["POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -4258,9 +3476,7 @@
       "source": "apps/web/app/api/internal/ovie/pipeline-bottleneck/route.ts",
       "kind": "handler",
       "route": "/api/internal/ovie/pipeline-bottleneck",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -4268,10 +3484,7 @@
       "source": "apps/web/app/api/internal/ovie/recovery-emails/route.ts",
       "kind": "handler",
       "route": "/api/internal/ovie/recovery-emails",
-      "methods": [
-        "GET",
-        "POST"
-      ],
+      "methods": ["GET", "POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -4279,9 +3492,7 @@
       "source": "apps/web/app/api/internal/ovie/summer-bottleneck/route.ts",
       "kind": "handler",
       "route": "/api/internal/ovie/summer-bottleneck",
-      "methods": [
-        "POST"
-      ],
+      "methods": ["POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -4289,9 +3500,7 @@
       "source": "apps/web/app/api/internal/ovie/summer-cards/[id]/decision/route.ts",
       "kind": "handler",
       "route": "/api/internal/ovie/summer-cards/[id]/decision",
-      "methods": [
-        "POST"
-      ],
+      "methods": ["POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -4299,9 +3508,7 @@
       "source": "apps/web/app/api/internal/ovie/summer-cards/[id]/supersede/route.ts",
       "kind": "handler",
       "route": "/api/internal/ovie/summer-cards/[id]/supersede",
-      "methods": [
-        "POST"
-      ],
+      "methods": ["POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -4309,10 +3516,7 @@
       "source": "apps/web/app/api/internal/ovie/summer-cards/route.ts",
       "kind": "handler",
       "route": "/api/internal/ovie/summer-cards",
-      "methods": [
-        "GET",
-        "POST"
-      ],
+      "methods": ["GET", "POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -4320,9 +3524,7 @@
       "source": "apps/web/app/api/internal/ovie/summer-company/acquisition-eligibility/route.ts",
       "kind": "handler",
       "route": "/api/internal/ovie/summer-company/acquisition-eligibility",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -4330,9 +3532,7 @@
       "source": "apps/web/app/api/internal/ovie/summer-company/charts/metric/route.ts",
       "kind": "handler",
       "route": "/api/internal/ovie/summer-company/charts/metric",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -4340,9 +3540,7 @@
       "source": "apps/web/app/api/internal/ovie/summer-company/charts/shipping/route.ts",
       "kind": "handler",
       "route": "/api/internal/ovie/summer-company/charts/shipping",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -4350,9 +3548,7 @@
       "source": "apps/web/app/api/internal/ovie/summer-company/cohorts/route.ts",
       "kind": "handler",
       "route": "/api/internal/ovie/summer-company/cohorts",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -4360,9 +3556,7 @@
       "source": "apps/web/app/api/internal/ovie/summer-company/conversation-insights/route.ts",
       "kind": "handler",
       "route": "/api/internal/ovie/summer-company/conversation-insights",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -4370,9 +3564,7 @@
       "source": "apps/web/app/api/internal/ovie/summer-company/conversation-insights/run/route.ts",
       "kind": "handler",
       "route": "/api/internal/ovie/summer-company/conversation-insights/run",
-      "methods": [
-        "POST"
-      ],
+      "methods": ["POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -4380,9 +3572,7 @@
       "source": "apps/web/app/api/internal/ovie/summer-company/demand-allocation/route.ts",
       "kind": "handler",
       "route": "/api/internal/ovie/summer-company/demand-allocation",
-      "methods": [
-        "POST"
-      ],
+      "methods": ["POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -4390,9 +3580,7 @@
       "source": "apps/web/app/api/internal/ovie/summer-company/funnel-benchmarks/route.ts",
       "kind": "handler",
       "route": "/api/internal/ovie/summer-company/funnel-benchmarks",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -4400,9 +3588,7 @@
       "source": "apps/web/app/api/internal/ovie/summer-company/funnel/route.ts",
       "kind": "handler",
       "route": "/api/internal/ovie/summer-company/funnel",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -4410,9 +3596,7 @@
       "source": "apps/web/app/api/internal/ovie/summer-company/golden-path/route.ts",
       "kind": "handler",
       "route": "/api/internal/ovie/summer-company/golden-path",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -4420,9 +3604,7 @@
       "source": "apps/web/app/api/internal/ovie/summer-company/history/route.ts",
       "kind": "handler",
       "route": "/api/internal/ovie/summer-company/history",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -4430,9 +3612,7 @@
       "source": "apps/web/app/api/internal/ovie/summer-company/metrics/route.ts",
       "kind": "handler",
       "route": "/api/internal/ovie/summer-company/metrics",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -4440,9 +3620,7 @@
       "source": "apps/web/app/api/internal/ovie/summer-company/revenue/route.ts",
       "kind": "handler",
       "route": "/api/internal/ovie/summer-company/revenue",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -4450,9 +3628,7 @@
       "source": "apps/web/app/api/internal/ovie/summer-company/state/route.ts",
       "kind": "handler",
       "route": "/api/internal/ovie/summer-company/state",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -4460,9 +3636,7 @@
       "source": "apps/web/app/api/internal/ovie/summer-company/stuck-signups/route.ts",
       "kind": "handler",
       "route": "/api/internal/ovie/summer-company/stuck-signups",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -4470,10 +3644,7 @@
       "source": "apps/web/app/api/internal/ovie/summer-shadow/route.ts",
       "kind": "handler",
       "route": "/api/internal/ovie/summer-shadow",
-      "methods": [
-        "GET",
-        "POST"
-      ],
+      "methods": ["GET", "POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -4481,10 +3652,7 @@
       "source": "apps/web/app/api/internal/proof-stats/route.ts",
       "kind": "handler",
       "route": "/api/internal/proof-stats",
-      "methods": [
-        "GET",
-        "POST"
-      ],
+      "methods": ["GET", "POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -4492,9 +3660,7 @@
       "source": "apps/web/app/api/internal/release-communications/merge-events/route.ts",
       "kind": "handler",
       "route": "/api/internal/release-communications/merge-events",
-      "methods": [
-        "POST"
-      ],
+      "methods": ["POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -4502,9 +3668,7 @@
       "source": "apps/web/app/api/investors/respond/route.ts",
       "kind": "handler",
       "route": "/api/investors/respond",
-      "methods": [
-        "POST"
-      ],
+      "methods": ["POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -4512,9 +3676,7 @@
       "source": "apps/web/app/api/investors/track/route.ts",
       "kind": "handler",
       "route": "/api/investors/track",
-      "methods": [
-        "POST"
-      ],
+      "methods": ["POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -4522,9 +3684,7 @@
       "source": "apps/web/app/api/journey/step/route.ts",
       "kind": "handler",
       "route": "/api/journey/step",
-      "methods": [
-        "POST"
-      ],
+      "methods": ["POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -4532,10 +3692,7 @@
       "source": "apps/web/app/api/library/approval-status/route.ts",
       "kind": "handler",
       "route": "/api/library/approval-status",
-      "methods": [
-        "GET",
-        "PATCH"
-      ],
+      "methods": ["GET", "PATCH"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -4543,9 +3700,7 @@
       "source": "apps/web/app/api/library/asset-share/revoke/route.ts",
       "kind": "handler",
       "route": "/api/library/asset-share/revoke",
-      "methods": [
-        "POST"
-      ],
+      "methods": ["POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -4553,11 +3708,7 @@
       "source": "apps/web/app/api/library/asset-share/route.ts",
       "kind": "handler",
       "route": "/api/library/asset-share",
-      "methods": [
-        "GET",
-        "PATCH",
-        "POST"
-      ],
+      "methods": ["GET", "PATCH", "POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -4565,9 +3716,7 @@
       "source": "apps/web/app/api/library/audio/confirm/route.ts",
       "kind": "handler",
       "route": "/api/library/audio/confirm",
-      "methods": [
-        "POST"
-      ],
+      "methods": ["POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -4575,10 +3724,7 @@
       "source": "apps/web/app/api/library/audio/snippet/route.ts",
       "kind": "handler",
       "route": "/api/library/audio/snippet",
-      "methods": [
-        "GET",
-        "POST"
-      ],
+      "methods": ["GET", "POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -4586,9 +3732,7 @@
       "source": "apps/web/app/api/library/audio/upload-token/route.ts",
       "kind": "handler",
       "route": "/api/library/audio/upload-token",
-      "methods": [
-        "POST"
-      ],
+      "methods": ["POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -4596,9 +3740,7 @@
       "source": "apps/web/app/api/library/documents/[id]/approve/route.ts",
       "kind": "handler",
       "route": "/api/library/documents/[id]/approve",
-      "methods": [
-        "POST"
-      ],
+      "methods": ["POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -4606,9 +3748,7 @@
       "source": "apps/web/app/api/library/documents/[id]/claims/route.ts",
       "kind": "handler",
       "route": "/api/library/documents/[id]/claims",
-      "methods": [
-        "POST"
-      ],
+      "methods": ["POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -4616,9 +3756,7 @@
       "source": "apps/web/app/api/library/documents/[id]/review/route.ts",
       "kind": "handler",
       "route": "/api/library/documents/[id]/review",
-      "methods": [
-        "POST"
-      ],
+      "methods": ["POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -4626,9 +3764,7 @@
       "source": "apps/web/app/api/library/documents/[id]/route.ts",
       "kind": "handler",
       "route": "/api/library/documents/[id]",
-      "methods": [
-        "PATCH"
-      ],
+      "methods": ["PATCH"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -4636,10 +3772,7 @@
       "source": "apps/web/app/api/library/documents/route.ts",
       "kind": "handler",
       "route": "/api/library/documents",
-      "methods": [
-        "GET",
-        "POST"
-      ],
+      "methods": ["GET", "POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -4647,10 +3780,7 @@
       "source": "apps/web/app/api/library/post-release/route.ts",
       "kind": "handler",
       "route": "/api/library/post-release",
-      "methods": [
-        "GET",
-        "PATCH"
-      ],
+      "methods": ["GET", "PATCH"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -4658,9 +3788,7 @@
       "source": "apps/web/app/api/library/profile-visibility/route.ts",
       "kind": "handler",
       "route": "/api/library/profile-visibility",
-      "methods": [
-        "PATCH"
-      ],
+      "methods": ["PATCH"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -4668,10 +3796,7 @@
       "source": "apps/web/app/api/library/relationships/route.ts",
       "kind": "handler",
       "route": "/api/library/relationships",
-      "methods": [
-        "DELETE",
-        "POST"
-      ],
+      "methods": ["DELETE", "POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -4679,9 +3804,7 @@
       "source": "apps/web/app/api/library/share-drops/[token]/unlock/route.ts",
       "kind": "handler",
       "route": "/api/library/share-drops/[token]/unlock",
-      "methods": [
-        "POST"
-      ],
+      "methods": ["POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -4689,9 +3812,7 @@
       "source": "apps/web/app/api/library/share-drops/route.ts",
       "kind": "handler",
       "route": "/api/library/share-drops",
-      "methods": [
-        "POST"
-      ],
+      "methods": ["POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -4699,12 +3820,7 @@
       "source": "apps/web/app/api/link/[id]/route.ts",
       "kind": "handler",
       "route": "/api/link/[id]",
-      "methods": [
-        "DELETE",
-        "GET",
-        "POST",
-        "PUT"
-      ],
+      "methods": ["DELETE", "GET", "POST", "PUT"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -4712,9 +3828,7 @@
       "source": "apps/web/app/api/max-access-request/route.ts",
       "kind": "handler",
       "route": "/api/max-access-request",
-      "methods": [
-        "POST"
-      ],
+      "methods": ["POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -4722,10 +3836,7 @@
       "source": "apps/web/app/api/mcp/[username]/route.ts",
       "kind": "handler",
       "route": "/api/mcp/[username]",
-      "methods": [
-        "GET",
-        "POST"
-      ],
+      "methods": ["GET", "POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -4733,10 +3844,7 @@
       "source": "apps/web/app/api/mcp/route.ts",
       "kind": "handler",
       "route": "/api/mcp",
-      "methods": [
-        "GET",
-        "POST"
-      ],
+      "methods": ["GET", "POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -4744,9 +3852,7 @@
       "source": "apps/web/app/api/memory/graph/route.ts",
       "kind": "handler",
       "route": "/api/memory/graph",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -4754,10 +3860,7 @@
       "source": "apps/web/app/api/merch/[sku]/availability/route.ts",
       "kind": "handler",
       "route": "/api/merch/[sku]/availability",
-      "methods": [
-        "GET",
-        "OPTIONS"
-      ],
+      "methods": ["GET", "OPTIONS"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -4765,9 +3868,7 @@
       "source": "apps/web/app/api/merch/checkout/route.ts",
       "kind": "handler",
       "route": "/api/merch/checkout",
-      "methods": [
-        "POST"
-      ],
+      "methods": ["POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -4775,9 +3876,7 @@
       "source": "apps/web/app/api/metadata-submissions/approve-send/route.ts",
       "kind": "handler",
       "route": "/api/metadata-submissions/approve-send",
-      "methods": [
-        "POST"
-      ],
+      "methods": ["POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -4785,9 +3884,7 @@
       "source": "apps/web/app/api/metadata-submissions/draft-correction/route.ts",
       "kind": "handler",
       "route": "/api/metadata-submissions/draft-correction",
-      "methods": [
-        "POST"
-      ],
+      "methods": ["POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -4795,9 +3892,7 @@
       "source": "apps/web/app/api/metadata-submissions/prepare/route.ts",
       "kind": "handler",
       "route": "/api/metadata-submissions/prepare",
-      "methods": [
-        "POST"
-      ],
+      "methods": ["POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -4805,9 +3900,7 @@
       "source": "apps/web/app/api/metadata-submissions/providers/route.ts",
       "kind": "handler",
       "route": "/api/metadata-submissions/providers",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -4815,9 +3908,7 @@
       "source": "apps/web/app/api/metadata-submissions/status/route.ts",
       "kind": "handler",
       "route": "/api/metadata-submissions/status",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -4825,9 +3916,7 @@
       "source": "apps/web/app/api/mobile/v1/audience/highlights/route.ts",
       "kind": "handler",
       "route": "/api/mobile/v1/audience/highlights",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -4835,9 +3924,7 @@
       "source": "apps/web/app/api/mobile/v1/auth/ticket/route.ts",
       "kind": "handler",
       "route": "/api/mobile/v1/auth/ticket",
-      "methods": [
-        "POST"
-      ],
+      "methods": ["POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -4845,9 +3932,7 @@
       "source": "apps/web/app/api/mobile/v1/calendar/route.ts",
       "kind": "handler",
       "route": "/api/mobile/v1/calendar",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -4855,9 +3940,7 @@
       "source": "apps/web/app/api/mobile/v1/chat/conversations/[id]/route.ts",
       "kind": "handler",
       "route": "/api/mobile/v1/chat/conversations/[id]",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -4865,9 +3948,7 @@
       "source": "apps/web/app/api/mobile/v1/chat/conversations/route.ts",
       "kind": "handler",
       "route": "/api/mobile/v1/chat/conversations",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -4875,9 +3956,7 @@
       "source": "apps/web/app/api/mobile/v1/chat/turns/route.ts",
       "kind": "handler",
       "route": "/api/mobile/v1/chat/turns",
-      "methods": [
-        "POST"
-      ],
+      "methods": ["POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -4885,9 +3964,7 @@
       "source": "apps/web/app/api/mobile/v1/eyes-free-capture/route.ts",
       "kind": "handler",
       "route": "/api/mobile/v1/eyes-free-capture",
-      "methods": [
-        "POST"
-      ],
+      "methods": ["POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -4895,9 +3972,7 @@
       "source": "apps/web/app/api/mobile/v1/inbox/route.ts",
       "kind": "handler",
       "route": "/api/mobile/v1/inbox",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -4905,9 +3980,7 @@
       "source": "apps/web/app/api/mobile/v1/ios-access/route.ts",
       "kind": "handler",
       "route": "/api/mobile/v1/ios-access",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -4915,9 +3988,7 @@
       "source": "apps/web/app/api/mobile/v1/me/route.ts",
       "kind": "handler",
       "route": "/api/mobile/v1/me",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -4925,9 +3996,7 @@
       "source": "apps/web/app/api/mobile/v1/profile/complete/route.ts",
       "kind": "handler",
       "route": "/api/mobile/v1/profile/complete",
-      "methods": [
-        "POST"
-      ],
+      "methods": ["POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -4935,10 +4004,7 @@
       "source": "apps/web/app/api/mobile/v1/push-devices/route.ts",
       "kind": "handler",
       "route": "/api/mobile/v1/push-devices",
-      "methods": [
-        "DELETE",
-        "PUT"
-      ],
+      "methods": ["DELETE", "PUT"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -4946,11 +4012,7 @@
       "source": "apps/web/app/api/music/mcp/route.ts",
       "kind": "handler",
       "route": "/api/music/mcp",
-      "methods": [
-        "DELETE",
-        "GET",
-        "POST"
-      ],
+      "methods": ["DELETE", "GET", "POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -4958,9 +4020,7 @@
       "source": "apps/web/app/api/notifications/confirm/route.ts",
       "kind": "handler",
       "route": "/api/notifications/confirm",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -4968,9 +4028,7 @@
       "source": "apps/web/app/api/notifications/preferences/route.ts",
       "kind": "handler",
       "route": "/api/notifications/preferences",
-      "methods": [
-        "PATCH"
-      ],
+      "methods": ["PATCH"],
       "surface": "account",
       "classification": "A"
     },
@@ -4978,9 +4036,7 @@
       "source": "apps/web/app/api/notifications/sms-intents/[id]/status/route.ts",
       "kind": "handler",
       "route": "/api/notifications/sms-intents/[id]/status",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -4988,9 +4044,7 @@
       "source": "apps/web/app/api/notifications/sms-intents/route.ts",
       "kind": "handler",
       "route": "/api/notifications/sms-intents",
-      "methods": [
-        "POST"
-      ],
+      "methods": ["POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -4998,9 +4052,7 @@
       "source": "apps/web/app/api/notifications/status/route.ts",
       "kind": "handler",
       "route": "/api/notifications/status",
-      "methods": [
-        "POST"
-      ],
+      "methods": ["POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -5008,9 +4060,7 @@
       "source": "apps/web/app/api/notifications/subscribe/route.ts",
       "kind": "handler",
       "route": "/api/notifications/subscribe",
-      "methods": [
-        "POST"
-      ],
+      "methods": ["POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -5018,9 +4068,7 @@
       "source": "apps/web/app/api/notifications/unsubscribe/one-click/route.ts",
       "kind": "handler",
       "route": "/api/notifications/unsubscribe/one-click",
-      "methods": [
-        "POST"
-      ],
+      "methods": ["POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -5028,9 +4076,7 @@
       "source": "apps/web/app/api/notifications/unsubscribe/route.ts",
       "kind": "handler",
       "route": "/api/notifications/unsubscribe",
-      "methods": [
-        "POST"
-      ],
+      "methods": ["POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -5038,9 +4084,7 @@
       "source": "apps/web/app/api/notifications/update-birthday/route.ts",
       "kind": "handler",
       "route": "/api/notifications/update-birthday",
-      "methods": [
-        "PATCH"
-      ],
+      "methods": ["PATCH"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -5048,9 +4092,7 @@
       "source": "apps/web/app/api/notifications/update-name/route.ts",
       "kind": "handler",
       "route": "/api/notifications/update-name",
-      "methods": [
-        "PATCH"
-      ],
+      "methods": ["PATCH"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -5058,9 +4100,7 @@
       "source": "apps/web/app/api/notifications/verify-email-otp/route.ts",
       "kind": "handler",
       "route": "/api/notifications/verify-email-otp",
-      "methods": [
-        "POST"
-      ],
+      "methods": ["POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -5068,9 +4108,7 @@
       "source": "apps/web/app/api/offer/route.ts",
       "kind": "handler",
       "route": "/api/offer",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -5078,9 +4116,7 @@
       "source": "apps/web/app/api/onboarding/claim/route.ts",
       "kind": "handler",
       "route": "/api/onboarding/claim",
-      "methods": [
-        "POST"
-      ],
+      "methods": ["POST"],
       "surface": "claim",
       "classification": "B"
     },
@@ -5088,10 +4124,7 @@
       "source": "apps/web/app/api/onboarding/conversation/route.ts",
       "kind": "handler",
       "route": "/api/onboarding/conversation",
-      "methods": [
-        "GET",
-        "POST"
-      ],
+      "methods": ["GET", "POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -5099,9 +4132,7 @@
       "source": "apps/web/app/api/onboarding/discovery/route.ts",
       "kind": "handler",
       "route": "/api/onboarding/discovery",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -5109,9 +4140,7 @@
       "source": "apps/web/app/api/onboarding/distribution-event/route.ts",
       "kind": "handler",
       "route": "/api/onboarding/distribution-event",
-      "methods": [
-        "POST"
-      ],
+      "methods": ["POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -5119,9 +4148,7 @@
       "source": "apps/web/app/api/onboarding/intake/route.ts",
       "kind": "handler",
       "route": "/api/onboarding/intake",
-      "methods": [
-        "POST"
-      ],
+      "methods": ["POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -5129,9 +4156,7 @@
       "source": "apps/web/app/api/onboarding/presence-build/route.ts",
       "kind": "handler",
       "route": "/api/onboarding/presence-build",
-      "methods": [
-        "POST"
-      ],
+      "methods": ["POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -5139,9 +4164,7 @@
       "source": "apps/web/app/api/onboarding/replay/route.ts",
       "kind": "handler",
       "route": "/api/onboarding/replay",
-      "methods": [
-        "POST"
-      ],
+      "methods": ["POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -5149,9 +4172,7 @@
       "source": "apps/web/app/api/onboarding/welcome-chat/route.ts",
       "kind": "handler",
       "route": "/api/onboarding/welcome-chat",
-      "methods": [
-        "POST"
-      ],
+      "methods": ["POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -5159,9 +4180,7 @@
       "source": "apps/web/app/api/ops/what-shipped/route.ts",
       "kind": "handler",
       "route": "/api/ops/what-shipped",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -5169,9 +4188,7 @@
       "source": "apps/web/app/api/ovie/certifications/decisions/route.ts",
       "kind": "handler",
       "route": "/api/ovie/certifications/decisions",
-      "methods": [
-        "POST"
-      ],
+      "methods": ["POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -5179,9 +4196,7 @@
       "source": "apps/web/app/api/ovie/certifications/metrics/route.ts",
       "kind": "handler",
       "route": "/api/ovie/certifications/metrics",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -5189,9 +4204,7 @@
       "source": "apps/web/app/api/ovie/certifications/route.ts",
       "kind": "handler",
       "route": "/api/ovie/certifications",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -5199,10 +4212,7 @@
       "source": "apps/web/app/api/ovie/dogfooders/route.ts",
       "kind": "handler",
       "route": "/api/ovie/dogfooders",
-      "methods": [
-        "GET",
-        "POST"
-      ],
+      "methods": ["GET", "POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -5210,9 +4220,7 @@
       "source": "apps/web/app/api/ovie/fleet-audit/route.ts",
       "kind": "handler",
       "route": "/api/ovie/fleet-audit",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -5220,9 +4228,7 @@
       "source": "apps/web/app/api/ovie/home/blocker/route.ts",
       "kind": "handler",
       "route": "/api/ovie/home/blocker",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -5230,9 +4236,7 @@
       "source": "apps/web/app/api/ovie/inbox/route.ts",
       "kind": "handler",
       "route": "/api/ovie/inbox",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -5240,9 +4244,7 @@
       "source": "apps/web/app/api/ovie/ingest/route.ts",
       "kind": "handler",
       "route": "/api/ovie/ingest",
-      "methods": [
-        "POST"
-      ],
+      "methods": ["POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -5250,9 +4252,7 @@
       "source": "apps/web/app/api/ovie/landed/route.ts",
       "kind": "handler",
       "route": "/api/ovie/landed",
-      "methods": [
-        "POST"
-      ],
+      "methods": ["POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -5260,11 +4260,7 @@
       "source": "apps/web/app/api/ovie/mcp/route.ts",
       "kind": "handler",
       "route": "/api/ovie/mcp",
-      "methods": [
-        "GET",
-        "OPTIONS",
-        "POST"
-      ],
+      "methods": ["GET", "OPTIONS", "POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -5272,9 +4268,7 @@
       "source": "apps/web/app/api/ovie/music-resolver/route.ts",
       "kind": "handler",
       "route": "/api/ovie/music-resolver",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -5282,9 +4276,7 @@
       "source": "apps/web/app/api/ovie/oauth/authorize/route.ts",
       "kind": "handler",
       "route": "/api/ovie/oauth/authorize",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -5292,9 +4284,7 @@
       "source": "apps/web/app/api/ovie/oauth/register/route.ts",
       "kind": "handler",
       "route": "/api/ovie/oauth/register",
-      "methods": [
-        "POST"
-      ],
+      "methods": ["POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -5302,9 +4292,7 @@
       "source": "apps/web/app/api/ovie/oauth/route.ts",
       "kind": "handler",
       "route": "/api/ovie/oauth",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -5312,9 +4300,7 @@
       "source": "apps/web/app/api/ovie/oauth/token/route.ts",
       "kind": "handler",
       "route": "/api/ovie/oauth/token",
-      "methods": [
-        "POST"
-      ],
+      "methods": ["POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -5322,9 +4308,7 @@
       "source": "apps/web/app/api/ovie/pending/route.ts",
       "kind": "handler",
       "route": "/api/ovie/pending",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -5332,10 +4316,7 @@
       "source": "apps/web/app/api/ovie/privacy-lock/route.ts",
       "kind": "handler",
       "route": "/api/ovie/privacy-lock",
-      "methods": [
-        "GET",
-        "POST"
-      ],
+      "methods": ["GET", "POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -5343,9 +4324,7 @@
       "source": "apps/web/app/api/ovie/summer-cards/[id]/decision/route.ts",
       "kind": "handler",
       "route": "/api/ovie/summer-cards/[id]/decision",
-      "methods": [
-        "POST"
-      ],
+      "methods": ["POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -5353,9 +4332,7 @@
       "source": "apps/web/app/api/ovie/summer-cards/[id]/feedback/route.ts",
       "kind": "handler",
       "route": "/api/ovie/summer-cards/[id]/feedback",
-      "methods": [
-        "POST"
-      ],
+      "methods": ["POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -5363,9 +4340,7 @@
       "source": "apps/web/app/api/ovie/summer-cards/route.ts",
       "kind": "handler",
       "route": "/api/ovie/summer-cards",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -5373,9 +4348,7 @@
       "source": "apps/web/app/api/ovie/summer/history/route.ts",
       "kind": "handler",
       "route": "/api/ovie/summer/history",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -5383,9 +4356,7 @@
       "source": "apps/web/app/api/ovie/summer/reconcile/route.ts",
       "kind": "handler",
       "route": "/api/ovie/summer/reconcile",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -5393,10 +4364,7 @@
       "source": "apps/web/app/api/ovie/summer/route.ts",
       "kind": "handler",
       "route": "/api/ovie/summer",
-      "methods": [
-        "GET",
-        "POST"
-      ],
+      "methods": ["GET", "POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -5404,9 +4372,7 @@
       "source": "apps/web/app/api/pre-save/apple/route.ts",
       "kind": "handler",
       "route": "/api/pre-save/apple",
-      "methods": [
-        "POST"
-      ],
+      "methods": ["POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -5414,9 +4380,7 @@
       "source": "apps/web/app/api/pre-save/spotify/callback/route.ts",
       "kind": "handler",
       "route": "/api/pre-save/spotify/callback",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -5424,9 +4388,7 @@
       "source": "apps/web/app/api/preview-url/refresh/route.ts",
       "kind": "handler",
       "route": "/api/preview-url/refresh",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -5434,9 +4396,7 @@
       "source": "apps/web/app/api/profile-alias-decision/[username]/[slug]/route.ts",
       "kind": "handler",
       "route": "/api/profile-alias-decision/[username]/[slug]",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -5444,9 +4404,7 @@
       "source": "apps/web/app/api/profile-alias-decision/route.ts",
       "kind": "handler",
       "route": "/api/profile-alias-decision",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -5454,9 +4412,7 @@
       "source": "apps/web/app/api/profile-publication/route.ts",
       "kind": "handler",
       "route": "/api/profile-publication",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -5464,9 +4420,7 @@
       "source": "apps/web/app/api/profile-surfaces/[id]/qualification/route.ts",
       "kind": "handler",
       "route": "/api/profile-surfaces/[id]/qualification",
-      "methods": [
-        "POST"
-      ],
+      "methods": ["POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -5474,9 +4428,7 @@
       "source": "apps/web/app/api/profile-surfaces/[id]/source/route.ts",
       "kind": "handler",
       "route": "/api/profile-surfaces/[id]/source",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -5484,9 +4436,7 @@
       "source": "apps/web/app/api/profile/[username]/ask/route.ts",
       "kind": "handler",
       "route": "/api/profile/[username]/ask",
-      "methods": [
-        "POST"
-      ],
+      "methods": ["POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -5494,9 +4444,7 @@
       "source": "apps/web/app/api/profile/audience-anon-cookie/route.ts",
       "kind": "handler",
       "route": "/api/profile/audience-anon-cookie",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -5504,10 +4452,7 @@
       "source": "apps/web/app/api/profile/capture-dismissal/route.ts",
       "kind": "handler",
       "route": "/api/profile/capture-dismissal",
-      "methods": [
-        "GET",
-        "POST"
-      ],
+      "methods": ["GET", "POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -5515,9 +4460,7 @@
       "source": "apps/web/app/api/profile/pac-event/route.ts",
       "kind": "handler",
       "route": "/api/profile/pac-event",
-      "methods": [
-        "POST"
-      ],
+      "methods": ["POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -5525,9 +4468,7 @@
       "source": "apps/web/app/api/profile/search/route.ts",
       "kind": "handler",
       "route": "/api/profile/search",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -5535,9 +4476,7 @@
       "source": "apps/web/app/api/profile/view/route.ts",
       "kind": "handler",
       "route": "/api/profile/view",
-      "methods": [
-        "POST"
-      ],
+      "methods": ["POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -5545,9 +4484,7 @@
       "source": "apps/web/app/api/promo-downloads/[id]/request-otp/route.ts",
       "kind": "handler",
       "route": "/api/promo-downloads/[id]/request-otp",
-      "methods": [
-        "POST"
-      ],
+      "methods": ["POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -5555,10 +4492,7 @@
       "source": "apps/web/app/api/promo-downloads/[id]/route.ts",
       "kind": "handler",
       "route": "/api/promo-downloads/[id]",
-      "methods": [
-        "DELETE",
-        "PATCH"
-      ],
+      "methods": ["DELETE", "PATCH"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -5566,9 +4500,7 @@
       "source": "apps/web/app/api/promo-downloads/[id]/verify-otp/route.ts",
       "kind": "handler",
       "route": "/api/promo-downloads/[id]/verify-otp",
-      "methods": [
-        "POST"
-      ],
+      "methods": ["POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -5576,10 +4508,7 @@
       "source": "apps/web/app/api/promo-downloads/confirm/route.ts",
       "kind": "handler",
       "route": "/api/promo-downloads/confirm",
-      "methods": [
-        "GET",
-        "POST"
-      ],
+      "methods": ["GET", "POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -5587,9 +4516,7 @@
       "source": "apps/web/app/api/promo-downloads/upload-token/route.ts",
       "kind": "handler",
       "route": "/api/promo-downloads/upload-token",
-      "methods": [
-        "POST"
-      ],
+      "methods": ["POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -5597,10 +4524,7 @@
       "source": "apps/web/app/api/px/route.ts",
       "kind": "handler",
       "route": "/api/px",
-      "methods": [
-        "OPTIONS",
-        "POST"
-      ],
+      "methods": ["OPTIONS", "POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -5608,9 +4532,7 @@
       "source": "apps/web/app/api/referrals/apply/route.ts",
       "kind": "handler",
       "route": "/api/referrals/apply",
-      "methods": [
-        "POST"
-      ],
+      "methods": ["POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -5618,10 +4540,7 @@
       "source": "apps/web/app/api/referrals/code/route.ts",
       "kind": "handler",
       "route": "/api/referrals/code",
-      "methods": [
-        "GET",
-        "POST"
-      ],
+      "methods": ["GET", "POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -5629,9 +4548,7 @@
       "source": "apps/web/app/api/referrals/stats/route.ts",
       "kind": "handler",
       "route": "/api/referrals/stats",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -5639,9 +4556,7 @@
       "source": "apps/web/app/api/release-autopilot/run/route.ts",
       "kind": "handler",
       "route": "/api/release-autopilot/run",
-      "methods": [
-        "POST"
-      ],
+      "methods": ["POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -5649,9 +4564,7 @@
       "source": "apps/web/app/api/release-to-revenue/runs/[runId]/drafts/[draftId]/approve/route.ts",
       "kind": "handler",
       "route": "/api/release-to-revenue/runs/[runId]/drafts/[draftId]/approve",
-      "methods": [
-        "POST"
-      ],
+      "methods": ["POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -5659,9 +4572,7 @@
       "source": "apps/web/app/api/release-to-revenue/runs/[runId]/drafts/[draftId]/reject/route.ts",
       "kind": "handler",
       "route": "/api/release-to-revenue/runs/[runId]/drafts/[draftId]/reject",
-      "methods": [
-        "POST"
-      ],
+      "methods": ["POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -5669,9 +4580,7 @@
       "source": "apps/web/app/api/release-to-revenue/runs/[runId]/drafts/route.ts",
       "kind": "handler",
       "route": "/api/release-to-revenue/runs/[runId]/drafts",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -5679,9 +4588,7 @@
       "source": "apps/web/app/api/report/route.ts",
       "kind": "handler",
       "route": "/api/report",
-      "methods": [
-        "POST"
-      ],
+      "methods": ["POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -5689,9 +4596,7 @@
       "source": "apps/web/app/api/revalidate/featured-creators/route.ts",
       "kind": "handler",
       "route": "/api/revalidate/featured-creators",
-      "methods": [
-        "POST"
-      ],
+      "methods": ["POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -5699,10 +4604,7 @@
       "source": "apps/web/app/api/rider/[username]/route.ts",
       "kind": "handler",
       "route": "/api/rider/[username]",
-      "methods": [
-        "GET",
-        "POST"
-      ],
+      "methods": ["GET", "POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -5710,9 +4612,7 @@
       "source": "apps/web/app/api/search/header/route.ts",
       "kind": "handler",
       "route": "/api/search/header",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -5720,9 +4620,7 @@
       "source": "apps/web/app/api/sentry-example-api/route.ts",
       "kind": "handler",
       "route": "/api/sentry-example-api",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -5730,9 +4628,7 @@
       "source": "apps/web/app/api/share/proof-brief/route.tsx",
       "kind": "handler",
       "route": "/api/share/proof-brief",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -5740,9 +4636,7 @@
       "source": "apps/web/app/api/share/story/blog/route.tsx",
       "kind": "handler",
       "route": "/api/share/story/blog",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -5750,9 +4644,7 @@
       "source": "apps/web/app/api/share/story/playlist/route.tsx",
       "kind": "handler",
       "route": "/api/share/story/playlist",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -5760,9 +4652,7 @@
       "source": "apps/web/app/api/share/story/profile/route.tsx",
       "kind": "handler",
       "route": "/api/share/story/profile",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -5770,9 +4660,7 @@
       "source": "apps/web/app/api/share/story/release/route.tsx",
       "kind": "handler",
       "route": "/api/share/story/release",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -5780,9 +4668,7 @@
       "source": "apps/web/app/api/sms-access-request/route.ts",
       "kind": "handler",
       "route": "/api/sms-access-request",
-      "methods": [
-        "POST"
-      ],
+      "methods": ["POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -5790,9 +4676,7 @@
       "source": "apps/web/app/api/spotify/fal-analysis/route.ts",
       "kind": "handler",
       "route": "/api/spotify/fal-analysis",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -5800,9 +4684,7 @@
       "source": "apps/web/app/api/spotify/search/route.ts",
       "kind": "handler",
       "route": "/api/spotify/search",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -5810,9 +4692,7 @@
       "source": "apps/web/app/api/stripe-connect/disconnect/route.ts",
       "kind": "handler",
       "route": "/api/stripe-connect/disconnect",
-      "methods": [
-        "POST"
-      ],
+      "methods": ["POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -5820,9 +4700,7 @@
       "source": "apps/web/app/api/stripe-connect/onboard/route.ts",
       "kind": "handler",
       "route": "/api/stripe-connect/onboard",
-      "methods": [
-        "POST"
-      ],
+      "methods": ["POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -5830,9 +4708,7 @@
       "source": "apps/web/app/api/stripe-connect/return/route.ts",
       "kind": "handler",
       "route": "/api/stripe-connect/return",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -5840,9 +4716,7 @@
       "source": "apps/web/app/api/stripe-connect/status/route.ts",
       "kind": "handler",
       "route": "/api/stripe-connect/status",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -5850,10 +4724,7 @@
       "source": "apps/web/app/api/stripe/cancel/route.ts",
       "kind": "handler",
       "route": "/api/stripe/cancel",
-      "methods": [
-        "GET",
-        "POST"
-      ],
+      "methods": ["GET", "POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -5861,10 +4732,7 @@
       "source": "apps/web/app/api/stripe/checkout/route.ts",
       "kind": "handler",
       "route": "/api/stripe/checkout",
-      "methods": [
-        "GET",
-        "POST"
-      ],
+      "methods": ["GET", "POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -5872,10 +4740,7 @@
       "source": "apps/web/app/api/stripe/plan-change/preview/route.ts",
       "kind": "handler",
       "route": "/api/stripe/plan-change/preview",
-      "methods": [
-        "GET",
-        "POST"
-      ],
+      "methods": ["GET", "POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -5883,11 +4748,7 @@
       "source": "apps/web/app/api/stripe/plan-change/route.ts",
       "kind": "handler",
       "route": "/api/stripe/plan-change",
-      "methods": [
-        "DELETE",
-        "GET",
-        "POST"
-      ],
+      "methods": ["DELETE", "GET", "POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -5895,10 +4756,7 @@
       "source": "apps/web/app/api/stripe/portal/route.ts",
       "kind": "handler",
       "route": "/api/stripe/portal",
-      "methods": [
-        "GET",
-        "POST"
-      ],
+      "methods": ["GET", "POST"],
       "surface": "billing-management",
       "classification": "A"
     },
@@ -5906,9 +4764,7 @@
       "source": "apps/web/app/api/stripe/pricing-options/route.ts",
       "kind": "handler",
       "route": "/api/stripe/pricing-options",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -5916,10 +4772,7 @@
       "source": "apps/web/app/api/stripe/webhooks/route.ts",
       "kind": "handler",
       "route": "/api/stripe/webhooks",
-      "methods": [
-        "GET",
-        "POST"
-      ],
+      "methods": ["GET", "POST"],
       "surface": "upgrade",
       "classification": "B"
     },
@@ -5927,9 +4780,7 @@
       "source": "apps/web/app/api/suggestions/avatars/[id]/dismiss/route.ts",
       "kind": "handler",
       "route": "/api/suggestions/avatars/[id]/dismiss",
-      "methods": [
-        "POST"
-      ],
+      "methods": ["POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -5937,9 +4788,7 @@
       "source": "apps/web/app/api/suggestions/avatars/[id]/select/route.ts",
       "kind": "handler",
       "route": "/api/suggestions/avatars/[id]/select",
-      "methods": [
-        "POST"
-      ],
+      "methods": ["POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -5947,9 +4796,7 @@
       "source": "apps/web/app/api/suggestions/playlist-fallback/[id]/approve/route.ts",
       "kind": "handler",
       "route": "/api/suggestions/playlist-fallback/[id]/approve",
-      "methods": [
-        "POST"
-      ],
+      "methods": ["POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -5957,9 +4804,7 @@
       "source": "apps/web/app/api/suggestions/playlist-fallback/[id]/reject/route.ts",
       "kind": "handler",
       "route": "/api/suggestions/playlist-fallback/[id]/reject",
-      "methods": [
-        "POST"
-      ],
+      "methods": ["POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -5967,9 +4812,7 @@
       "source": "apps/web/app/api/suggestions/route.ts",
       "kind": "handler",
       "route": "/api/suggestions",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -5977,9 +4820,7 @@
       "source": "apps/web/app/api/suggestions/social-links/[id]/approve/route.ts",
       "kind": "handler",
       "route": "/api/suggestions/social-links/[id]/approve",
-      "methods": [
-        "POST"
-      ],
+      "methods": ["POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -5987,9 +4828,7 @@
       "source": "apps/web/app/api/suggestions/social-links/[id]/reject/route.ts",
       "kind": "handler",
       "route": "/api/suggestions/social-links/[id]/reject",
-      "methods": [
-        "POST"
-      ],
+      "methods": ["POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -5997,9 +4836,7 @@
       "source": "apps/web/app/api/summer/control/route.ts",
       "kind": "handler",
       "route": "/api/summer/control",
-      "methods": [
-        "POST"
-      ],
+      "methods": ["POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -6007,9 +4844,7 @@
       "source": "apps/web/app/api/teleprompter/takes/[takeId]/media/route.ts",
       "kind": "handler",
       "route": "/api/teleprompter/takes/[takeId]/media",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -6017,10 +4852,7 @@
       "source": "apps/web/app/api/teleprompter/takes/[takeId]/route.ts",
       "kind": "handler",
       "route": "/api/teleprompter/takes/[takeId]",
-      "methods": [
-        "DELETE",
-        "PATCH"
-      ],
+      "methods": ["DELETE", "PATCH"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -6028,10 +4860,7 @@
       "source": "apps/web/app/api/teleprompter/takes/route.ts",
       "kind": "handler",
       "route": "/api/teleprompter/takes",
-      "methods": [
-        "GET",
-        "POST"
-      ],
+      "methods": ["GET", "POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -6039,9 +4868,7 @@
       "source": "apps/web/app/api/teleprompter/takes/upload-token/route.ts",
       "kind": "handler",
       "route": "/api/teleprompter/takes/upload-token",
-      "methods": [
-        "POST"
-      ],
+      "methods": ["POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -6049,10 +4876,7 @@
       "source": "apps/web/app/api/tips/create-checkout/route.ts",
       "kind": "handler",
       "route": "/api/tips/create-checkout",
-      "methods": [
-        "GET",
-        "POST"
-      ],
+      "methods": ["GET", "POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -6060,9 +4884,7 @@
       "source": "apps/web/app/api/track/route.ts",
       "kind": "handler",
       "route": "/api/track",
-      "methods": [
-        "POST"
-      ],
+      "methods": ["POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -6070,10 +4892,7 @@
       "source": "apps/web/app/api/unsubscribe/claim-invites/route.ts",
       "kind": "handler",
       "route": "/api/unsubscribe/claim-invites",
-      "methods": [
-        "GET",
-        "POST"
-      ],
+      "methods": ["GET", "POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -6081,10 +4900,7 @@
       "source": "apps/web/app/api/unsubscribe/recovery/route.ts",
       "kind": "handler",
       "route": "/api/unsubscribe/recovery",
-      "methods": [
-        "GET",
-        "POST"
-      ],
+      "methods": ["GET", "POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -6092,9 +4908,7 @@
       "source": "apps/web/app/api/usage/summary/route.ts",
       "kind": "handler",
       "route": "/api/usage/summary",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -6102,9 +4916,7 @@
       "source": "apps/web/app/api/user-interviews/route.ts",
       "kind": "handler",
       "route": "/api/user-interviews",
-      "methods": [
-        "POST"
-      ],
+      "methods": ["POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -6112,9 +4924,7 @@
       "source": "apps/web/app/api/v1/[username]/route.ts",
       "kind": "handler",
       "route": "/api/v1/[username]",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -6122,9 +4932,7 @@
       "source": "apps/web/app/api/v1/actions/[actionId]/invoke/route.ts",
       "kind": "handler",
       "route": "/api/v1/actions/[actionId]/invoke",
-      "methods": [
-        "POST"
-      ],
+      "methods": ["POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -6132,9 +4940,7 @@
       "source": "apps/web/app/api/v1/actions/route.ts",
       "kind": "handler",
       "route": "/api/v1/actions",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -6142,9 +4948,7 @@
       "source": "apps/web/app/api/v1/fleet/[operation]/route.ts",
       "kind": "handler",
       "route": "/api/v1/fleet/[operation]",
-      "methods": [
-        "POST"
-      ],
+      "methods": ["POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -6152,9 +4956,7 @@
       "source": "apps/web/app/api/v1/music/resolve/route.ts",
       "kind": "handler",
       "route": "/api/v1/music/resolve",
-      "methods": [
-        "POST"
-      ],
+      "methods": ["POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -6162,9 +4964,7 @@
       "source": "apps/web/app/api/v1/openapi.json/route.ts",
       "kind": "handler",
       "route": "/api/v1/openapi.json",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -6172,9 +4972,7 @@
       "source": "apps/web/app/api/v1/route.ts",
       "kind": "handler",
       "route": "/api/v1",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -6182,9 +4980,7 @@
       "source": "apps/web/app/api/verification/request/route.ts",
       "kind": "handler",
       "route": "/api/verification/request",
-      "methods": [
-        "POST"
-      ],
+      "methods": ["POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -6192,9 +4988,7 @@
       "source": "apps/web/app/api/version/route.ts",
       "kind": "handler",
       "route": "/api/version",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -6202,9 +4996,7 @@
       "source": "apps/web/app/api/visibility-audit/offer/route.ts",
       "kind": "handler",
       "route": "/api/visibility-audit/offer",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -6212,9 +5004,7 @@
       "source": "apps/web/app/api/waitlist/join/route.ts",
       "kind": "handler",
       "route": "/api/waitlist/join",
-      "methods": [
-        "POST"
-      ],
+      "methods": ["POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -6222,10 +5012,7 @@
       "source": "apps/web/app/api/waitlist/route.ts",
       "kind": "handler",
       "route": "/api/waitlist",
-      "methods": [
-        "GET",
-        "POST"
-      ],
+      "methods": ["GET", "POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -6233,9 +5020,7 @@
       "source": "apps/web/app/api/wallet/apple/profile-pass/route.ts",
       "kind": "handler",
       "route": "/api/wallet/apple/profile-pass",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -6243,10 +5028,7 @@
       "source": "apps/web/app/api/wallet/apple/v1/devices/[deviceLibraryIdentifier]/registrations/[passTypeIdentifier]/[serialNumber]/route.ts",
       "kind": "handler",
       "route": "/api/wallet/apple/v1/devices/[deviceLibraryIdentifier]/registrations/[passTypeIdentifier]/[serialNumber]",
-      "methods": [
-        "DELETE",
-        "POST"
-      ],
+      "methods": ["DELETE", "POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -6254,9 +5036,7 @@
       "source": "apps/web/app/api/wallet/apple/v1/devices/[deviceLibraryIdentifier]/registrations/[passTypeIdentifier]/route.ts",
       "kind": "handler",
       "route": "/api/wallet/apple/v1/devices/[deviceLibraryIdentifier]/registrations/[passTypeIdentifier]",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -6264,9 +5044,7 @@
       "source": "apps/web/app/api/wallet/apple/v1/log/route.ts",
       "kind": "handler",
       "route": "/api/wallet/apple/v1/log",
-      "methods": [
-        "POST"
-      ],
+      "methods": ["POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -6274,9 +5052,7 @@
       "source": "apps/web/app/api/wallet/apple/v1/passes/[passTypeIdentifier]/[serialNumber]/route.ts",
       "kind": "handler",
       "route": "/api/wallet/apple/v1/passes/[passTypeIdentifier]/[serialNumber]",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -6284,9 +5060,7 @@
       "source": "apps/web/app/api/webhooks/instantly/route.ts",
       "kind": "handler",
       "route": "/api/webhooks/instantly",
-      "methods": [
-        "POST"
-      ],
+      "methods": ["POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -6294,9 +5068,7 @@
       "source": "apps/web/app/api/webhooks/linear/route.ts",
       "kind": "handler",
       "route": "/api/webhooks/linear",
-      "methods": [
-        "POST"
-      ],
+      "methods": ["POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -6304,9 +5076,7 @@
       "source": "apps/web/app/api/webhooks/printful/route.ts",
       "kind": "handler",
       "route": "/api/webhooks/printful",
-      "methods": [
-        "POST"
-      ],
+      "methods": ["POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -6314,9 +5084,7 @@
       "source": "apps/web/app/api/webhooks/resend-inbound/route.ts",
       "kind": "handler",
       "route": "/api/webhooks/resend-inbound",
-      "methods": [
-        "POST"
-      ],
+      "methods": ["POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -6324,10 +5092,7 @@
       "source": "apps/web/app/api/webhooks/resend/route.ts",
       "kind": "handler",
       "route": "/api/webhooks/resend",
-      "methods": [
-        "GET",
-        "POST"
-      ],
+      "methods": ["GET", "POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -6335,10 +5100,7 @@
       "source": "apps/web/app/api/webhooks/sentry/route.ts",
       "kind": "handler",
       "route": "/api/webhooks/sentry",
-      "methods": [
-        "GET",
-        "POST"
-      ],
+      "methods": ["GET", "POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -6346,9 +5108,7 @@
       "source": "apps/web/app/api/webhooks/sms/route.ts",
       "kind": "handler",
       "route": "/api/webhooks/sms",
-      "methods": [
-        "POST"
-      ],
+      "methods": ["POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -6356,10 +5116,7 @@
       "source": "apps/web/app/api/webhooks/stripe-connect/route.ts",
       "kind": "handler",
       "route": "/api/webhooks/stripe-connect",
-      "methods": [
-        "GET",
-        "POST"
-      ],
+      "methods": ["GET", "POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -6367,9 +5124,7 @@
       "source": "apps/web/app/api/webhooks/stripe-merch/route.ts",
       "kind": "handler",
       "route": "/api/webhooks/stripe-merch",
-      "methods": [
-        "POST"
-      ],
+      "methods": ["POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -6377,9 +5132,7 @@
       "source": "apps/web/app/api/webhooks/stripe-tips/route.ts",
       "kind": "handler",
       "route": "/api/webhooks/stripe-tips",
-      "methods": [
-        "POST"
-      ],
+      "methods": ["POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -6387,9 +5140,7 @@
       "source": "apps/web/app/api/webhooks/voice-pipeline/route.ts",
       "kind": "handler",
       "route": "/api/webhooks/voice-pipeline",
-      "methods": [
-        "POST"
-      ],
+      "methods": ["POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -6397,9 +5148,7 @@
       "source": "apps/web/app/api/whats-new/dismiss/route.ts",
       "kind": "handler",
       "route": "/api/whats-new/dismiss",
-      "methods": [
-        "POST"
-      ],
+      "methods": ["POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -6407,9 +5156,7 @@
       "source": "apps/web/app/api/whats-new/route.ts",
       "kind": "handler",
       "route": "/api/whats-new",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -6417,9 +5164,7 @@
       "source": "apps/web/app/api/workflow-captures/[id]/media/route.ts",
       "kind": "handler",
       "route": "/api/workflow-captures/[id]/media",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -6427,10 +5172,7 @@
       "source": "apps/web/app/api/workflow-captures/[id]/route.ts",
       "kind": "handler",
       "route": "/api/workflow-captures/[id]",
-      "methods": [
-        "GET",
-        "PATCH"
-      ],
+      "methods": ["GET", "PATCH"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -6438,9 +5180,7 @@
       "source": "apps/web/app/api/workflow-captures/[id]/upload-token/route.ts",
       "kind": "handler",
       "route": "/api/workflow-captures/[id]/upload-token",
-      "methods": [
-        "POST"
-      ],
+      "methods": ["POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -6448,9 +5188,7 @@
       "source": "apps/web/app/api/workflow-captures/route.ts",
       "kind": "handler",
       "route": "/api/workflow-captures",
-      "methods": [
-        "POST"
-      ],
+      "methods": ["POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -6458,12 +5196,7 @@
       "source": "apps/web/app/api/wrap-link/route.ts",
       "kind": "handler",
       "route": "/api/wrap-link",
-      "methods": [
-        "DELETE",
-        "GET",
-        "POST",
-        "PUT"
-      ],
+      "methods": ["DELETE", "GET", "POST", "PUT"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -6471,9 +5204,7 @@
       "source": "apps/web/app/api/youtube-library/links/[id]/approve/route.ts",
       "kind": "handler",
       "route": "/api/youtube-library/links/[id]/approve",
-      "methods": [
-        "POST"
-      ],
+      "methods": ["POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -6481,9 +5212,7 @@
       "source": "apps/web/app/api/youtube-library/links/[id]/reject/route.ts",
       "kind": "handler",
       "route": "/api/youtube-library/links/[id]/reject",
-      "methods": [
-        "POST"
-      ],
+      "methods": ["POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -6491,10 +5220,7 @@
       "source": "apps/web/app/api/youtube-library/sync/route.ts",
       "kind": "handler",
       "route": "/api/youtube-library/sync",
-      "methods": [
-        "GET",
-        "POST"
-      ],
+      "methods": ["GET", "POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -6502,10 +5228,7 @@
       "source": "apps/web/app/api/youtube-library/videos/[videoId]/link/route.ts",
       "kind": "handler",
       "route": "/api/youtube-library/videos/[videoId]/link",
-      "methods": [
-        "GET",
-        "POST"
-      ],
+      "methods": ["GET", "POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -6513,9 +5236,7 @@
       "source": "apps/web/app/api/youtube-library/videos/[videoId]/optimization/route.ts",
       "kind": "handler",
       "route": "/api/youtube-library/videos/[videoId]/optimization",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -6523,9 +5244,7 @@
       "source": "apps/web/app/api/youtube-thumbnails/preview/route.ts",
       "kind": "handler",
       "route": "/api/youtube-thumbnails/preview",
-      "methods": [
-        "POST"
-      ],
+      "methods": ["POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -6682,9 +5401,7 @@
       "source": "apps/web/app/app/(shell)/admin/creators/bulk-feature/route.ts",
       "kind": "handler",
       "route": "/app/admin/creators/bulk-feature",
-      "methods": [
-        "POST"
-      ],
+      "methods": ["POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -6692,9 +5409,7 @@
       "source": "apps/web/app/app/(shell)/admin/creators/bulk-refresh/route.ts",
       "kind": "handler",
       "route": "/app/admin/creators/bulk-refresh",
-      "methods": [
-        "POST"
-      ],
+      "methods": ["POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -6702,9 +5417,7 @@
       "source": "apps/web/app/app/(shell)/admin/creators/bulk-verify/route.ts",
       "kind": "handler",
       "route": "/app/admin/creators/bulk-verify",
-      "methods": [
-        "POST"
-      ],
+      "methods": ["POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -6712,9 +5425,7 @@
       "source": "apps/web/app/app/(shell)/admin/creators/delete/route.ts",
       "kind": "handler",
       "route": "/app/admin/creators/delete",
-      "methods": [
-        "POST"
-      ],
+      "methods": ["POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -6730,9 +5441,7 @@
       "source": "apps/web/app/app/(shell)/admin/creators/toggle-featured/route.ts",
       "kind": "handler",
       "route": "/app/admin/creators/toggle-featured",
-      "methods": [
-        "POST"
-      ],
+      "methods": ["POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -6740,9 +5449,7 @@
       "source": "apps/web/app/app/(shell)/admin/creators/toggle-marketing/route.ts",
       "kind": "handler",
       "route": "/app/admin/creators/toggle-marketing",
-      "methods": [
-        "POST"
-      ],
+      "methods": ["POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -6750,9 +5457,7 @@
       "source": "apps/web/app/app/(shell)/admin/creators/toggle-verify/route.ts",
       "kind": "handler",
       "route": "/app/admin/creators/toggle-verify",
-      "methods": [
-        "POST"
-      ],
+      "methods": ["POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -7106,9 +5811,7 @@
       "source": "apps/web/app/app/(shell)/admin/users/ban/route.ts",
       "kind": "handler",
       "route": "/app/admin/users/ban",
-      "methods": [
-        "POST"
-      ],
+      "methods": ["POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -7116,9 +5819,7 @@
       "source": "apps/web/app/app/(shell)/admin/users/delete/route.ts",
       "kind": "handler",
       "route": "/app/admin/users/delete",
-      "methods": [
-        "POST"
-      ],
+      "methods": ["POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -7134,9 +5835,7 @@
       "source": "apps/web/app/app/(shell)/admin/users/toggle-featured/route.ts",
       "kind": "handler",
       "route": "/app/admin/users/toggle-featured",
-      "methods": [
-        "POST"
-      ],
+      "methods": ["POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -7144,9 +5843,7 @@
       "source": "apps/web/app/app/(shell)/admin/users/toggle-marketing/route.ts",
       "kind": "handler",
       "route": "/app/admin/users/toggle-marketing",
-      "methods": [
-        "POST"
-      ],
+      "methods": ["POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -7154,9 +5851,7 @@
       "source": "apps/web/app/app/(shell)/admin/users/toggle-verify/route.ts",
       "kind": "handler",
       "route": "/app/admin/users/toggle-verify",
-      "methods": [
-        "POST"
-      ],
+      "methods": ["POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -7164,9 +5859,7 @@
       "source": "apps/web/app/app/(shell)/admin/users/unban/route.ts",
       "kind": "handler",
       "route": "/app/admin/users/unban",
-      "methods": [
-        "POST"
-      ],
+      "methods": ["POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -7182,9 +5875,7 @@
       "source": "apps/web/app/app/(shell)/admin/waitlist/approve/route.ts",
       "kind": "handler",
       "route": "/app/admin/waitlist/approve",
-      "methods": [
-        "POST"
-      ],
+      "methods": ["POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -7192,9 +5883,7 @@
       "source": "apps/web/app/app/(shell)/admin/waitlist/disapprove/route.ts",
       "kind": "handler",
       "route": "/app/admin/waitlist/disapprove",
-      "methods": [
-        "POST"
-      ],
+      "methods": ["POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -7210,9 +5899,7 @@
       "source": "apps/web/app/app/(shell)/admin/waitlist/resend-invite/route.ts",
       "kind": "handler",
       "route": "/app/admin/waitlist/resend-invite",
-      "methods": [
-        "POST"
-      ],
+      "methods": ["POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -7220,10 +5907,7 @@
       "source": "apps/web/app/app/(shell)/admin/waitlist/settings/route.ts",
       "kind": "handler",
       "route": "/app/admin/waitlist/settings",
-      "methods": [
-        "GET",
-        "PATCH"
-      ],
+      "methods": ["GET", "PATCH"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -7231,9 +5915,7 @@
       "source": "apps/web/app/app/(shell)/admin/waitlist/update-status/route.ts",
       "kind": "handler",
       "route": "/app/admin/waitlist/update-status",
-      "methods": [
-        "POST"
-      ],
+      "methods": ["POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -8443,9 +7125,7 @@
       "source": "apps/web/app/apple-app-site-association/route.ts",
       "kind": "handler",
       "route": "/apple-app-site-association",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -8461,9 +7141,7 @@
       "source": "apps/web/app/artists/[artistId]/route.ts",
       "kind": "handler",
       "route": "/artists/[artistId]",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -8487,9 +7165,7 @@
       "source": "apps/web/app/auth/callback/route.ts",
       "kind": "handler",
       "route": "/auth/callback",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "authentication",
       "classification": "A"
     },
@@ -8497,10 +7173,7 @@
       "source": "apps/web/app/auth/start/route.ts",
       "kind": "handler",
       "route": "/auth/start",
-      "methods": [
-        "GET",
-        "POST"
-      ],
+      "methods": ["GET", "POST"],
       "surface": "authentication",
       "classification": "A"
     },
@@ -8564,9 +7237,7 @@
       "source": "apps/web/app/claim/[token]/route.ts",
       "kind": "handler",
       "route": "/claim/[token]",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "claim",
       "classification": "B"
     },
@@ -8597,9 +7268,7 @@
       "source": "apps/web/app/claim/start/route.ts",
       "kind": "handler",
       "route": "/claim/start",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "claim",
       "classification": "B"
     },
@@ -8751,9 +7420,7 @@
       "source": "apps/web/app/ga-consent-init.js/route.ts",
       "kind": "handler",
       "route": "/ga-consent-init.js",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -8761,12 +7428,7 @@
       "source": "apps/web/app/go/[id]/route.ts",
       "kind": "handler",
       "route": "/go/[id]",
-      "methods": [
-        "DELETE",
-        "GET",
-        "POST",
-        "PUT"
-      ],
+      "methods": ["DELETE", "GET", "POST", "PUT"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -8822,9 +7484,7 @@
       "source": "apps/web/app/investor-portal/deck/[...path]/route.ts",
       "kind": "handler",
       "route": "/investor-portal/deck/[...path]",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -8832,9 +7492,7 @@
       "source": "apps/web/app/investor-portal/events/route.ts",
       "kind": "handler",
       "route": "/investor-portal/events",
-      "methods": [
-        "POST"
-      ],
+      "methods": ["POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -8850,9 +7508,7 @@
       "source": "apps/web/app/llms-full.txt/route.ts",
       "kind": "handler",
       "route": "/llms-full.txt",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -8860,9 +7516,7 @@
       "source": "apps/web/app/llms.txt/route.ts",
       "kind": "handler",
       "route": "/llms.txt",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -9020,9 +7674,7 @@
       "source": "apps/web/app/openapi.json/route.ts",
       "kind": "handler",
       "route": "/openapi.json",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -9054,9 +7706,7 @@
       "source": "apps/web/app/r/isrc/[isrc]/route.ts",
       "kind": "handler",
       "route": "/r/isrc/[isrc]",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -9072,9 +7722,7 @@
       "source": "apps/web/app/s/[code]/route.ts",
       "kind": "handler",
       "route": "/s/[code]",
-      "methods": [
-        "GET"
-      ],
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
