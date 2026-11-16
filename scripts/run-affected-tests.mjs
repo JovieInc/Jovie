@@ -19,7 +19,7 @@ import {
 } from './lib/blog-content-ci.mjs';
 
 import { baseRefCandidates, resolveBaseRef } from './lib/git-base-ref.mjs';
-import { ONBOARDING_TEST_PRODUCERS } from './lib/onboarding-test-producers.mjs';
+import { KNOWN_VITEST_FIXTURE_PRODUCERS } from './lib/onboarding-test-producers.mjs';
 
 import { selectSourceReadTests } from './lib/web-source-read-tests.mjs';
 
@@ -107,7 +107,7 @@ const KNOWN_VITEST_FIXTURE_TESTS = new Map([
     'apps/web/lib/notifications/campaign-scheduling.ts',
     ['apps/web/lib/notifications/campaign-scheduling.test.ts'],
   ],
-  ...ONBOARDING_TEST_PRODUCERS,
+  ...KNOWN_VITEST_FIXTURE_PRODUCERS,
   [
     'apps/web/tests/e2e/utils/start-entry-layout.ts',
     [
@@ -127,6 +127,14 @@ const KNOWN_VITEST_FIXTURE_TESTS = new Map([
     ['apps/web/tests/unit/e2e/golden-path-tracking.test.ts'],
   ],
 ]);
+// Census evidence entries (surfaceCensus.evidence/) select the census validator.
+const CENSUS =
+  /^apps\/web\/data\/designSystem\/surfaceCensus\.(json$|evidence\/)/;
+const touchesCensus = files => files.some(file => CENSUS.test(file));
+const fixtureTestsFor = file =>
+  CENSUS.test(file) && !file.endsWith('surfaceCensus.json')
+    ? ['scripts/lib/__tests__/design-surface-census.test.mjs']
+    : KNOWN_VITEST_FIXTURE_TESTS.get(file);
 // Any web source that uses TanStack Virtual must stay out of React Compiler
 // memoization (JOV-6702); the invariant has no import edge to such files.
 const VIRTUALIZER_COMPILER_INVARIANT_TEST =
@@ -345,7 +353,6 @@ const SUMMER_COMMISSIONING_NODE_TESTS = [
 ];
 const SENTRY_AUTOFIX_RECURRENCE_PRIMARY_INPUTS = new Set([
   '.github/workflows/sentry-autofix-recurrence.yml',
-  '.github/workflows/sentry-autofix.yml',
   'scripts/sentry-autofix-recurrence.mjs',
   'scripts/lib/sentry-validation-observation.mjs',
   'scripts/lib/__tests__/sentry-validation-observation.test.mjs',
@@ -1366,10 +1373,8 @@ export function buildAffectedTestPlan(changedFiles, options) {
     nodeTestArgs: [],
     retouchPromptCoverage: false,
     ...plan,
-    censusValidation: files.includes(
-      'apps/web/data/designSystem/surfaceCensus.json'
-    ),
-    ...(files.includes('apps/web/data/designSystem/surfaceCensus.json') &&
+    censusValidation: touchesCensus(files),
+    ...(touchesCensus(files) &&
     plan.mode === 'full' &&
     isFileAvailable('scripts/lib/__tests__/design-surface-census.test.mjs')
       ? {
@@ -2419,9 +2424,7 @@ function planAffectedTests(
       'apps/web/tests/unit/design-system/arbitrary-values-ratchet.test.ts'
     );
   }
-  const fixtureProducers = files.flatMap(
-    file => KNOWN_VITEST_FIXTURE_TESTS.get(file) ?? []
-  );
+  const fixtureProducers = files.flatMap(file => fixtureTestsFor(file) ?? []);
   mandatoryTests.push(
     ...fixtureProducers.filter(test => !test.startsWith('scripts/'))
   );
@@ -2567,7 +2570,7 @@ function planAffectedTests(
       CERTIFICATION_NORMALIZATION_MANIFEST.has(file)
     )
       return true;
-    const fixtureTests = KNOWN_VITEST_FIXTURE_TESTS.get(file);
+    const fixtureTests = fixtureTestsFor(file);
     if (fixtureTests) return fixtureTests.every(isFileAvailable);
     if (file.startsWith('apps/web/components/features/profile/')) return true;
     if (file.startsWith('apps/web/app/[username]/')) return true;
@@ -2939,10 +2942,7 @@ function changedFiles(base) {
   return execFileSync(
     'git',
     ['diff', '--diff-filter=ACDMR', '--name-only', `${base}...HEAD`],
-    {
-      cwd: REPO_ROOT,
-      encoding: 'utf8',
-    }
+    { maxBuffer: 256 * 1024 * 1024, cwd: REPO_ROOT, encoding: 'utf8' }
   )
     .trim()
     .split('\n')

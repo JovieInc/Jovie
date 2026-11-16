@@ -30,4 +30,10 @@ export const PROVIDER_LABELS: Record<string, string> = {
   audius: 'Audius',
   joox: 'JOOX',
   awa: 'AWA',
+  vk_music: 'VK Music',
+  traxsource: 'Traxsource',
+  bugs: 'Bugs',
+  fizy: 'fizy',
+  juno_download: 'Juno Download',
+  emusic: 'eMusic',
 };

@@ -14,7 +14,7 @@ describe('ReleaseTaskEmptyState', () => {
     );
     expect(
       screen.getByText(
-        '20 battle-tested tasks to maximize your release — from DSP pitching to fan notifications.'
+        'A checklist of 20 tasks, from editorial pitching to fan notifications.'
       )
     ).toBeVisible();
 

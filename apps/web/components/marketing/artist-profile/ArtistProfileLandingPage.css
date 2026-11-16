@@ -1675,7 +1675,11 @@ body:has(.system-b-pricing-page) .marketing-glass-header__cta:focus-visible {
 :where(.system-b-pricing-page .marketing-pricing-plan-card) {
   min-height: 0;
   border: 0;
-  border-radius: var(--radius-xl);
+  /* The plans render as one joined panel: the 1px grid gap is the divider and
+     the panel's own radius clips the outer corners. Rounding each card here
+     let the divider colour show through as notches at every join; the panel
+     is the rounded card here. */
+  border-radius: var(--radius-none);
   background: var(--system-b-bg-surface-0);
   box-shadow: none;
   padding: var(--space-6);
@@ -1909,7 +1913,9 @@ body:has(.system-b-pricing-page) .marketing-glass-header__cta:focus-visible {
   }
 }
 
-:where(.system-b-pricing-select) {
+/* The plan picker is the selector's only select; @jovie/ui HostDrawnSelect
+   renders it with no class, so the selector draws it. */
+:where(.system-b-pricing-mobile-selector > select) {
   width: 100%;
   min-height: calc(var(--space-10) + var(--space-1));
   border: 1px solid

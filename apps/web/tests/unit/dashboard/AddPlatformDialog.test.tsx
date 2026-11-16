@@ -120,6 +120,32 @@ describe('AddPlatformDialog', () => {
     expect(alert.className).not.toMatch(/\bred-\d/);
   });
 
+  it('names what failed instead of a bare error when the save throws', async () => {
+    const user = userEvent.setup();
+    addManualDspMatchMock.mockRejectedValueOnce(new Error('network'));
+
+    render(
+      <AddPlatformDialog
+        open
+        onClose={() => undefined}
+        existingProviderIds={[]}
+      />
+    );
+
+    await user.click(screen.getByRole('button', { name: /Spotify/ }));
+    await user.type(screen.getByLabelText('Artist name'), 'Midnight Echo');
+    await user.type(
+      screen.getByLabelText('Profile URL'),
+      'https://open.spotify.com/artist/123'
+    );
+    await user.click(screen.getByRole('button', { name: 'Add Platform' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      "This profile couldn't be added. Check the link and try again."
+    );
+    expect(screen.queryByText(/Something went wrong/)).toBeNull();
+  });
+
   it('updates the inline error when the form is resubmitted with new input', async () => {
     const user = userEvent.setup();
     addManualDspMatchMock

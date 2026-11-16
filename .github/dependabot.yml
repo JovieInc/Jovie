@@ -119,6 +119,23 @@ updates:
         versions: ['>1.60.0']
       - dependency-name: 'playwright-core'
         versions: ['>1.60.0']
+      # Pinned by pnpm.patchedDependencies (2026-11-09): every package below
+      # has an exact-version patch entry in the root package.json, so a version
+      # bump leaves the patch without a package and pnpm refuses to resolve.
+      # Dependabot cannot re-key patches — each bump fails the update job with
+      # dependency_file_not_resolvable / 'Error while updating ... in update
+      # group "patchedDependencies"' (runs 42593015332 and 42593014331). Bump
+      # these manually: re-key the patchedDependencies entry, re-create the
+      # patch against the new version, verify `pnpm install --frozen-lockfile`,
+      # and drop the matching ignore in the same PR.
+      - dependency-name: 'next'
+      - dependency-name: '@better-auth/oauth-provider'
+      - dependency-name: '@parse/node-apn'
+      - dependency-name: '@storybook/nextjs-vite'
+      - dependency-name: 'eslint-plugin-react'
+      - dependency-name: 'nextra'
+      - dependency-name: 'prebuild-install'
+      - dependency-name: 'zod'
 
   # Isolated Eve pilot manifest (JOV-5214). This directory entry exists so
   # SECURITY advisories are tracked for the standalone install; version

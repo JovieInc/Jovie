@@ -12,6 +12,72 @@
     "minAbsoluteSeconds": 60
   },
   "entities": {
+    "merch-concept": {
+      "entityId": "merch generation batch UUID",
+      "description": "Pre-art review receipts persist in private batch artistBrief JSON. Aggregate export is not wired; no live timings are claimed.",
+      "stages": [
+        {
+          "id": "pre-art-review",
+          "meaning": "exact concept plan admission before any image, upload or mockup call",
+          "producer": "apps/web/lib/merch/design-generation.ts",
+          "status": "gap",
+          "source": "merch-concept-receipts",
+          "owner": "JOV-4739"
+        },
+        {
+          "id": "reviewed",
+          "meaning": "terminal concept-admission decision, never artwork or product certification",
+          "producer": "apps/web/lib/merch/generation-concepts.ts",
+          "status": "gap",
+          "source": "merch-concept-receipts",
+          "owner": "JOV-4739"
+        }
+      ]
+    },
+    "pen-review": {
+      "entityId": "frame id:attempt start[:round]; one observation per timed round or frame",
+      "description": "Opt-in Pen review timings; local state ledger and stage-timings-latest.json, not live Mac certification.",
+      "stages": [
+        {
+          "id": "pen-review-round",
+          "meaning": "render/check/judge/fix round duration",
+          "producer": "scripts/pen-review/metrics.mjs",
+          "status": "pushed",
+          "source": "pen-review-ledger"
+        },
+        {
+          "id": "pen-review-frame",
+          "meaning": "whole frame attempt duration",
+          "producer": "scripts/pen-review/metrics.mjs",
+          "status": "pushed",
+          "source": "pen-review-ledger"
+        },
+        {
+          "id": "finished",
+          "meaning": "terminal frame outcome",
+          "producer": "scripts/pen-review/metrics.mjs",
+          "status": "pushed",
+          "source": "pen-review-ledger"
+        }
+      ]
+    },
+    "native-typecheck-qualification": {
+      "entityId": "source SHA:run id:attempt (local output directory digest)",
+      "stages": [
+        {
+          "id": "qualification",
+          "producer": "scripts/typecheck-native-qualification.mjs",
+          "status": "pushed",
+          "source": "native-typecheck-qualification-receipts"
+        },
+        {
+          "id": "finished",
+          "producer": "scripts/typecheck-native-qualification.mjs",
+          "status": "pushed",
+          "source": "native-typecheck-qualification-receipts"
+        }
+      ]
+    },
     "chat-comparison": {
       "entityId": "source SHA (build) or source SHA:attempt (smoke)",
       "stages": [
@@ -186,6 +252,48 @@
           "status": "spec",
           "source": "lanes-stage-feed",
           "owner": "lanes worker"
+        },
+        {
+          "id": "green",
+          "meaning": "first later commit whose check rollup is SUCCESS",
+          "producer": "github",
+          "status": "derived",
+          "source": "github-pr"
+        }
+      ]
+    },
+    "remediation-repair": {
+      "entityId": "owner/repo#pr@red-sha",
+      "description": "Red-to-green dwell per red head SHA, greened by lanes repair only (a lane-fix-<kind> label was applied between red and green). Split from remediation so lanes repair and writer self-fix p50/p95 are tracked apart (red-repair admission, 2026-11-12).",
+      "endToEnd": [["red", "green"]],
+      "stages": [
+        {
+          "id": "red",
+          "meaning": "first failing GitHub Actions check suite on a PR commit",
+          "producer": "github",
+          "status": "derived",
+          "source": "github-pr"
+        },
+        {
+          "id": "green",
+          "meaning": "first later commit whose check rollup is SUCCESS",
+          "producer": "github",
+          "status": "derived",
+          "source": "github-pr"
+        }
+      ]
+    },
+    "remediation-writer": {
+      "entityId": "owner/repo#pr@red-sha",
+      "description": "Red-to-green dwell per red head SHA, greened by its own writer only (no lane-fix-<kind> label between red and green). Split from remediation so lanes repair and writer self-fix p50/p95 are tracked apart (red-repair admission, 2026-11-12).",
+      "endToEnd": [["red", "green"]],
+      "stages": [
+        {
+          "id": "red",
+          "meaning": "first failing GitHub Actions check suite on a PR commit",
+          "producer": "github",
+          "status": "derived",
+          "source": "github-pr"
         },
         {
           "id": "green",
@@ -644,6 +752,78 @@
         }
       ]
     },
+    "design-loop": {
+      "entityId": "design loop id, one per ask: <route-slug>-<yyyymmdd>[-n]",
+      "description": "One Pen-to-code taste round trip, from the ask to a preview Tim can judge and the review. Dwell SLO 30 min for brief to preview (.claude/rules/event-driven.md). Rows are appended by scripts/design/design-loop-ledger.mjs to docs/metrics/design-loop-ledger.ndjson; pen-export appends export and approved.",
+      "sloSeconds": 1800,
+      "endToEnd": [["brief", "preview"], ["brief", "review"]],
+      "stages": [
+        {
+          "id": "brief",
+          "meaning": "ask received until the art-director brief (mission, audience, references) is written",
+          "producer": "design-loop-ledger",
+          "status": "pushed",
+          "source": "design-loop-ledger",
+          "owner": "Tim ask, or Summer on his behalf"
+        },
+        {
+          "id": "variants",
+          "meaning": "brief until Pen variants are generated in a side .pen file and finalists are presented",
+          "producer": "design-loop-ledger",
+          "status": "pushed",
+          "source": "design-loop-ledger",
+          "owner": "art director (Opus)"
+        },
+        {
+          "id": "approved",
+          "meaning": "finalists presented until Tim's taste receipt (or the default shipped at its deadline) is recorded in pen-bindings.json",
+          "producer": "design-loop-ledger",
+          "status": "pushed",
+          "source": "design-loop-ledger",
+          "owner": "founder taste"
+        },
+        {
+          "id": "export",
+          "meaning": "approved frames until stills and sha256 are committed to the manifest (pnpm design:pen-export)",
+          "producer": "design-loop-ledger",
+          "status": "pushed",
+          "source": "design-loop-ledger",
+          "owner": "pen-export"
+        },
+        {
+          "id": "codegen",
+          "meaning": "stills committed until the React section is generated with data-pen-section markers",
+          "producer": "design-loop-ledger",
+          "status": "pushed",
+          "source": "design-loop-ledger",
+          "owner": "pen-codegen"
+        },
+        {
+          "id": "preview",
+          "meaning": "code generated until a preview URL is live for the route",
+          "producer": "design-loop-ledger",
+          "status": "pushed",
+          "source": "design-loop-ledger",
+          "owner": "CI preview"
+        },
+        {
+          "id": "diff",
+          "meaning": "preview live until the Pen diff gate returns pass or fail",
+          "producer": "design-loop-ledger",
+          "status": "pushed",
+          "source": "design-loop-ledger",
+          "owner": "pen-diff gate"
+        },
+        {
+          "id": "review",
+          "meaning": "gate result until the taste round trip is closed: Tim judged the preview, or the default shipped",
+          "producer": "design-loop-ledger",
+          "status": "pushed",
+          "source": "design-loop-ledger",
+          "owner": "founder taste"
+        }
+      ]
+    },
     "board-task": {
       "entityId": "mesh hub board task id claimed by the lanes (stall-..., jov-123-c1)",
       "description": "One mesh board task the Gem lanes claimed through scripts/lanes/board_intake.py, from posting to its verified close. posted = claim latency, running = run time; the terminal stage's failRate is 1 - success rate. Journal: runs/board-intake.jsonl on Gem.",
@@ -674,9 +854,47 @@
           "owner": "lanes worker"
         }
       ]
+    },
+    "desktop-startup": {
+      "entityId": "source SHA:receipt start:launch index",
+      "description": "Synthetic Ubuntu local HTTP stub; not installed-native first-paint or a speedup measurement.",
+      "stages": [
+        {
+          "id": "launch",
+          "meaning": "bounded launch, sampling and cleanup duration",
+          "producer": "apps/desktop/scripts/startup-budget.mjs",
+          "status": "pushed",
+          "source": "desktop-startup-receipts"
+        },
+        {
+          "id": "finished",
+          "meaning": "measurement ended with captured or unavailable evidence",
+          "producer": "apps/desktop/scripts/startup-budget.mjs",
+          "status": "pushed",
+          "source": "desktop-startup-receipts"
+        }
+      ],
+      "endToEnd": [["launch", "finished"]]
     }
   },
   "sources": {
+    "merch-concept-receipts": {
+      "kind": "events",
+      "url": null,
+      "owner": "JOV-4739; private merchGenerationBatches.artistBrief.conceptReview.stageEvent; aggregation handoff remains open"
+    },
+    "pen-review-ledger": {
+      "kind": "events",
+      "url": null,
+      "owner": "design-system; ~/.local/state/jovie-pen-review/ledger.jsonl and local stage-timings-latest.json"
+    },
+    "native-typecheck-qualification-receipts": {
+      "kind": "events",
+      "url": null,
+      "artifact": "native-typecheck-qualification/results/stage-events.ndjson",
+      "workflow": "typecheck-native-qualification.yml",
+      "owner": "JOV-8258"
+    },
     "preflight-stages.jsonl": {
       "kind": "events",
       "url": null,
@@ -755,6 +973,18 @@
       "url": null,
       "artifact": "stage-events.ndjson next to the watcher state (rolling 28 d, written by scripts/signals/signal_watch.py)",
       "owner": "signals; published through the lanes status feed once the Gem tick is live"
+    },
+    "design-loop-ledger": {
+      "kind": "events",
+      "url": null,
+      "owner": "scripts/design/design-loop-ledger.mjs (docs/metrics/design-loop-ledger.ndjson)"
+    },
+    "desktop-startup-receipts": {
+      "kind": "events",
+      "url": null,
+      "artifact": "desktop-startup-receipts/stage-events.ndjson",
+      "workflow": "ci.yml",
+      "owner": "desktop startup (JOV-12388)"
     }
   },
   "producers": {
@@ -777,6 +1007,10 @@
         "shipping:deployed"
       ],
       "canary-health-gate.yml": ["release:canary"],
+      "typecheck-native-qualification.yml": [
+        "native-typecheck-qualification:qualification",
+        "native-typecheck-qualification:finished"
+      ],
       "shipping-slo.yml": ["metrics:stage-timings"]
     },
     "exempt": {

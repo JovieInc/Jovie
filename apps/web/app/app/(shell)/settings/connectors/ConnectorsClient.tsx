@@ -148,8 +148,9 @@ export function ConnectorsClient({
           error?: string;
         };
         if (!res.ok) throw new Error(data.error ?? 'Extract failed');
+        const created = data.suggestedActionsCreated ?? 0;
         toast.success(
-          `Extraction complete — ${data.suggestedActionsCreated ?? 0} new suggestion(s)`
+          `Extraction complete. ${created} new ${created === 1 ? 'suggestion' : 'suggestions'}`
         );
         router.refresh();
       } catch (err) {
@@ -171,7 +172,6 @@ export function ConnectorsClient({
       id='connectors'
       title='Integrations'
       // ui-casing-allow: sentence-case description (Found === Expected)
-      description='Connect the services Jovie uses to understand and manage your work.'
     >
       <SettingsPanel title='Connected accounts' bodyClassName='px-4 sm:px-5'>
         {oauthFailed && (

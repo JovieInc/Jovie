@@ -42,9 +42,16 @@ on:
   # golden-path certification stays fresh when nothing deploys. It runs the
   # certification only (auth smoke browser steps + receipts), not smoke or
   # Lighthouse.
+  # JOV-12639: a dispatch reuses a fresh certified receipt for the served SHA
+  # unless forced (workflow_dispatch input force, or client_payload.force).
   repository_dispatch:
     types: [clock_prod_golden_path_cert]
   workflow_dispatch:
+    inputs:
+      force:
+        description: Re-certify the golden path even when the served build has a fresh certified receipt
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -65,15 +72,25 @@ jobs:
       # A rate-limited trigger read sets quota_deferred and must not dispatch
       # probes or page production. Commit identity is resolved with git,
       # outside that REST quota (JOV-8495).
-      should_probe: ${{ steps.trigger.outputs.should_probe == 'true' && steps.trigger.outputs.quota_deferred != 'true' }}
+      should_probe: ${{ steps.admission.outputs.admitted == 'true' && steps.trigger.outputs.quota_deferred != 'true' && steps.admission.outputs.quota_deferred != 'true' }}
       # JOV-9822: certify the golden path after every Production Verified
       # promotion, on the 12 h clock, on manual dispatch, and whenever the
       # read-only probes run. A superset of should_probe.
-      should_certify: ${{ (steps.trigger.outputs.should_probe == 'true' || steps.trigger.outputs.should_certify == 'true') && steps.trigger.outputs.quota_deferred != 'true' }}
-      quota_deferred: ${{ steps.trigger.outputs.quota_deferred == 'true' }}
+      should_certify: ${{ (steps.trigger.outputs.should_certify == 'true' || (steps.admission.outputs.admitted == 'true' && steps.admission.outputs.quota_deferred != 'true')) && steps.trigger.outputs.quota_deferred != 'true' }}
+      quota_deferred: ${{ steps.trigger.outputs.quota_deferred == 'true' || steps.admission.outputs.quota_deferred == 'true' }}
+      probe_artifact_name: ${{ steps.admission.outputs.artifact_name }}
+      probe_policy_digest: ${{ steps.admission.outputs.policy_digest }}
+      probe_notify_allowed: ${{ steps.admission.outputs.notify_allowed }}
+      probe_admission: ${{ steps.admission.outputs.decision }}
       deployment_id: ${{ steps.target.outputs.deployment_id }}
       deployment_url_b64: ${{ steps.target.outputs.deployment_url_b64 }}
       commit_sha: ${{ steps.target.outputs.commit_sha }}
+      # JOV-12639: certify each served build once. True when a fresh certified
+      # receipt for this exact SHA exists; golden-path-cert-reused then
+      # re-reads it and uploads it as this run's receipt, marked as reused.
+      cert_reused: ${{ steps.cert-reuse.outputs.reuse == 'true' }}
+      cert_reused_from_run: ${{ steps.cert-reuse.outputs.source_run_id }}
+      cert_reused_artifact: ${{ steps.cert-reuse.outputs.source_artifact_id }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -258,6 +275,11 @@ jobs:
               ;;
           esac
 
+      - name: Record full-crawl containment
+        if: ${{ always() && (github.event_name != 'workflow_dispatch' || github.ref != 'refs/heads/main') }}
+        run: |
+          echo "Full product crawl skipped for cost containment; no production readiness score produced. Existing health and authentication probes retain their policy." >> "$GITHUB_STEP_SUMMARY"
+
       - name: Resolve exact canonical production deployment
         id: target
         if: ${{ steps.trigger.outputs.should_probe == 'true' || steps.trigger.outputs.should_certify == 'true' }}
@@ -400,6 +422,68 @@ jobs:
           } >> "$GITHUB_OUTPUT"
           echo "Resolved landed production target: $deployment_id ($deployment_url) at $commit_sha."
 
+      - name: Admit bounded probes for the resolved production target
+        id: admission
+        if: ${{ github.ref == 'refs/heads/main' && steps.target.outputs.commit_sha != '' && steps.trigger.outputs.should_probe == 'true' && steps.trigger.outputs.quota_deferred != 'true' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TARGET_COMMIT_SHA: ${{ steps.target.outputs.commit_sha }}
+          TARGET_DEPLOYMENT_ID: ${{ steps.target.outputs.deployment_id }}
+          TARGET_ORIGIN_B64: ${{ steps.target.outputs.deployment_url_b64 }}
+        run: |
+          set -euo pipefail
+          context="$RUNNER_TEMP/postdeploy-probe-context.json"
+          PROBE_CONTEXT_FILE="$context" node --input-type=module <<'NODE'
+          import { createHash } from 'node:crypto';
+          import { readFileSync, writeFileSync, appendFileSync } from 'node:fs';
+          const e = process.env;
+          const policyDigest = createHash('sha256').update(readFileSync('.github/workflows/postdeploy-probes.yml')).digest('hex');
+          writeFileSync(e.PROBE_CONTEXT_FILE, JSON.stringify({
+            repository: e.GITHUB_REPOSITORY, workflowPath: '.github/workflows/postdeploy-probes.yml',
+            runId: Number(e.GITHUB_RUN_ID), runAttempt: Number(e.GITHUB_RUN_ATTEMPT), workflowSha: e.GITHUB_SHA,
+            mode: e.GITHUB_EVENT_NAME === 'workflow_dispatch' ? 'manual' : 'automatic', now: new Date().toISOString(),
+            target: { sha: e.TARGET_COMMIT_SHA, deploymentId: e.TARGET_DEPLOYMENT_ID,
+              origin: Buffer.from(e.TARGET_ORIGIN_B64, 'base64').toString('utf8'), policyDigest }
+          }));
+          appendFileSync(e.GITHUB_OUTPUT, `policy_digest=${policyDigest}\n`);
+          NODE
+          status=0
+          node scripts/postdeploy-probe-admission.mjs admit --context-file "$context" \
+            --out-dir "$RUNNER_TEMP/postdeploy-probe-admission" --github-output "$GITHUB_OUTPUT" || status=$?
+          if [ "$status" -eq 75 ]; then
+            echo "::warning::GitHub quota deferred probe admission; no production verdict or page."
+            exit 0
+          fi
+          exit "$status"
+
+      - name: Preserve probe admission before production requests
+        if: ${{ steps.admission.outputs.admitted == 'true' && steps.admission.outputs.reservation_needed == 'true' }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: ${{ steps.admission.outputs.artifact_name }}
+          path: ${{ runner.temp }}/postdeploy-probe-admission/ledger.json
+          retention-days: 90
+          overwrite: false
+          if-no-files-found: error
+
+      # JOV-12639: certify each served build once. A certified receipt for the
+      # exact served SHA, written by the same certification code and younger
+      # than 11 h (24 h verdict window minus the 12 h clock and 1 h margin),
+      # stands in for a new run. Fails open: any lookup error certifies again,
+      # and a lookup failure never fails this job (that would page).
+      - name: Look for a fresh certified receipt for the served build
+        id: cert-reuse
+        if: ${{ steps.target.outputs.commit_sha != '' && steps.trigger.outputs.quota_deferred != 'true' && (steps.trigger.outputs.should_certify == 'true' || (steps.admission.outputs.admitted == 'true' && steps.admission.outputs.quota_deferred != 'true')) }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TARGET_COMMIT_SHA: ${{ steps.target.outputs.commit_sha }}
+          FORCE_RECERTIFY: ${{ (github.event_name == 'workflow_dispatch' && inputs.force) || (github.event_name == 'repository_dispatch' && github.event.client_payload.force == true) }}
+        run: |
+          node scripts/golden-path-cert-reuse.mjs lookup \
+            --served-sha "$TARGET_COMMIT_SHA" --force "$FORCE_RECERTIFY" \
+            --github-output "$GITHUB_OUTPUT" ||
+            echo "::warning::Receipt reuse lookup did not finish; certifying again."
+
   smoke:
     name: Post-Deploy Smoke (Landed Production)
     needs: [resolve-target]
@@ -466,7 +550,8 @@ jobs:
   auth-smoke:
     name: Post-Deploy Auth Smoke (Landed Production)
     needs: [resolve-target]
-    if: ${{ always() && needs.resolve-target.result == 'success' && needs.resolve-target.outputs.should_certify == 'true' }}
+    # Probes still need it; a reused certification (JOV-12639) does not.
+    if: ${{ always() && needs.resolve-target.result == 'success' && needs.resolve-target.outputs.should_certify == 'true' && (needs.resolve-target.outputs.should_probe == 'true' || needs.resolve-target.outputs.cert_reused != 'true') }}
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     permissions:
@@ -552,6 +637,9 @@ jobs:
           echo '{"cookies":[],"origins":[]}' > tests/.auth/user.json
           test -n "$PRODUCTION_BASE_URL"
           specs=(tests/e2e/smoke-prod-auth.spec.ts)
+          # One browser at a time: the cert judges each surface's longest
+          # frame, and four browsers sharing the runner's CPUs stretch every
+          # React render (Nov 10: chat loads 274/103/269 ms in parallel).
           [ -f tests/e2e/prod-cert-start-chat.spec.ts ] && specs+=(tests/e2e/prod-cert-start-chat.spec.ts)
           doppler run --project jovie-web --config prd \
             --only-secrets=E2E_PROD_USER_EMAIL,DATABASE_URL \
@@ -562,7 +650,7 @@ jobs:
               EXPECTED_VERCEL_ENVIRONMENT=production \
               PLAYWRIGHT_DYNAMIC_SECRETS_FILE="$RUNNER_TEMP/playwright-dynamic-cookie-values" \
                 node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs" --run -- \
-                  pnpm exec playwright test "${specs[@]}" --project=chromium --reporter=line
+                  pnpm exec playwright test "${specs[@]}" --project=chromium --reporter=line --workers=1
           echo "auth_smoke_status=passed" >> "$GITHUB_OUTPUT"
         env:
           EXPECTED_COMMIT_SHA: ${{ needs.resolve-target.outputs.commit_sha }}
@@ -605,6 +693,188 @@ jobs:
             apps/web/test-results/
           retention-days: 3
           allow-markdown: 'true'
+
+  # Step zero before artist outreach: crawl every page of the landed build as
+  # a stranger and signed in as the sanctioned smoke identity, and judge it
+  # with scripts/product-crawl/ready-gate.mjs. Report only: it never fails
+  # the release, and it only loads pages (no clicks, submits or payments).
+  # Runs after auth-smoke so the two sign-ins never overlap.
+  # Cost containment: full crawls require explicit manual-main dispatch. Existing
+  # smoke, authentication, Lighthouse and golden-path certification stay automatic.
+  # Four shards split the routes (scripts/product-crawl/shard.mjs) so the crawl
+  # takes about a quarter of the ~18 minutes one runner took (JOV-12635);
+  # product-crawl-merge judges the combined receipt.
+  product-crawl:
+    name: Product Crawl (Landed Production, shard ${{ matrix.shard }}/4)
+    needs: [resolve-target, auth-smoke]
+    if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && needs.resolve-target.result == 'success' && needs.resolve-target.outputs.should_certify == 'true' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
+    permissions:
+      contents: read
+    env: { PLAYWRIGHT_ARTIFACT_REQUIRE_PRODUCER_STAGE: 'true' }
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.resolve-target.outputs.commit_sha }}
+          fetch-depth: 1
+          persist-credentials: false
+      - name: Establish crawl deadline
+        run: |
+          set -euo pipefail
+          # Job timeout-minutes: 40. Reserve 240s for the receipt write, upload
+          # and cleanup, so a slow crawl still leaves a receipt instead of a
+          # silent GitHub cancel. Runs right after checkout, which the
+          # safe-upload audit requires to be the first step.
+          deadline_s=$(( $(date +%s) + 40 * 60 - 240 ))
+          echo "CRAWL_DEADLINE_EPOCH_MS=$(( deadline_s * 1000 ))" >> "$GITHUB_ENV"
+          echo "Crawl stops starting page loads at epoch ms $(( deadline_s * 1000 ))"
+      - name: Check the landed build has the crawl
+        id: has-crawl
+        run: |
+          if [ -f scripts/product-crawl/crawl.mjs ]; then
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "::notice::Landed build predates the product crawl."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          fi
+      - uses: ./.github/actions/setup-doppler
+        if: steps.has-crawl.outputs.skip != 'true'
+      - uses: ./.github/actions/setup-node-pnpm
+        if: steps.has-crawl.outputs.skip != 'true'
+      - name: Setup Playwright (Chromium)
+        if: steps.has-crawl.outputs.skip != 'true'
+        uses: ./.github/actions/setup-playwright
+      - name: Crawl as a stranger and signed in
+        if: steps.has-crawl.outputs.skip != 'true'
+        env:
+          EXPECTED_COMMIT_SHA: ${{ needs.resolve-target.outputs.commit_sha }}
+          CRAWL_SHARD: ${{ matrix.shard }}/4
+          SHARD_INDEX: ${{ matrix.shard }}
+          PLAYWRIGHT_ARTIFACT_ALLOW_MARKDOWN: 'true'
+          PLAYWRIGHT_VERCEL_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
+          PRODUCTION_BASE_URL_B64: ${{ needs.resolve-target.outputs.deployment_url_b64 }}
+          DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN_PRD }}
+        run: |
+          set -euo pipefail
+          PRODUCTION_BASE_URL="$(printf '%s' "$PRODUCTION_BASE_URL_B64" | base64 --decode)"
+          [[ "$PRODUCTION_BASE_URL" =~ ^https://jovie-[a-z0-9-]+-jovie\.vercel\.app$ ]] || {
+            echo "::error::Exact production deployment URL is missing or invalid."
+            exit 1
+          }
+          auth_state="$RUNNER_TEMP/product-crawl-auth-${GITHUB_RUN_ID}.json"
+          dynamic_secrets_file="$RUNNER_TEMP/product-crawl-dynamic-secrets-${GITHUB_RUN_ID}"
+          trap 'rm -f "$auth_state" "$dynamic_secrets_file"' EXIT
+          state_args=()
+          # Each shard signs in with its own fresh email code. A new code can
+          # void a code still in flight, so the shards start their sign-ins
+          # 45s apart and retry once after a pause instead of all at once.
+          sleep $(( (SHARD_INDEX - 1) * 45 ))
+          for attempt in 1 2; do
+            rm -f "$auth_state"
+            (
+              cd apps/web
+              mkdir -p tests/.auth
+              echo '{"cookies":[],"origins":[]}' > tests/.auth/user.json
+              doppler run --project jovie-web --config prd \
+                --only-secrets=E2E_PROD_USER_EMAIL,DATABASE_URL \
+                --no-fallback -- env -u DOPPLER_TOKEN \
+                  CI=true \
+                  BASE_URL="$PRODUCTION_BASE_URL" \
+                  EXPECTED_VERCEL_DEPLOYMENT_ORIGIN="$PRODUCTION_BASE_URL" \
+                  EXPECTED_VERCEL_ENVIRONMENT=production \
+                  PERFORMANCE_AUTH_STATE_PATH="$auth_state" \
+                  PLAYWRIGHT_DYNAMIC_SECRETS_FILE="$dynamic_secrets_file" \
+                    node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs" --run -- \
+                      pnpm exec playwright test tests/e2e/smoke-prod-auth.spec.ts \
+                        --project=chromium --reporter=line \
+                        --grep "sign-in works and dashboard loads"
+            ) && [ -s "$auth_state" ] && break
+            echo "::warning::Sign-in attempt $attempt for shard $CRAWL_SHARD did not establish a session."
+            [ "$attempt" = 2 ] || sleep $(( 30 + SHARD_INDEX * 15 ))
+          done
+          [ -s "$auth_state" ] || echo "::warning::Signed-in session not established; crawling as a stranger only."
+          if [ -s "$auth_state" ]; then state_args=(--storage-state "$auth_state"); fi
+          # This job uploads only from the guard's producer stage, so the
+          # crawl writes its receipt under the guard too. Run outside it, the
+          # receipt never reached the stage and every upload was refused.
+          PLAYWRIGHT_ARTIFACT_PATHS='product-crawl-receipt/*.json' \
+            node .github/scripts/guard-playwright-artifacts.mjs --run -- \
+              node scripts/product-crawl/crawl.mjs --origin "$PRODUCTION_BASE_URL" \
+                --out product-crawl-receipt "${state_args[@]}"
+          cat product-crawl-receipt/summary.md >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload crawl receipt
+        if: ${{ always() && steps.has-crawl.outputs.skip != 'true' && hashFiles('product-crawl-receipt/*.json') != '' }}
+        uses: ./.github/actions/upload-safe-playwright-artifact
+        with:
+          name: product-crawl-shard-${{ matrix.shard }}-${{ github.run_id }}
+          path: product-crawl-receipt/*.json
+          retention-days: 7
+
+  # One verdict for the whole crawl: combine the four shard receipts and judge
+  # them with ready-gate.mjs. A missing shard or a shard of another build makes
+  # the merge fail, so a partial crawl never reads as ready.
+  product-crawl-merge:
+    name: Product Crawl Verdict (Landed Production)
+    needs: [resolve-target, product-crawl]
+    if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && needs.resolve-target.result == 'success' && needs.resolve-target.outputs.should_certify == 'true' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    env: { PLAYWRIGHT_ARTIFACT_REQUIRE_PRODUCER_STAGE: 'true' }
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.resolve-target.outputs.commit_sha }}
+          fetch-depth: 1
+          persist-credentials: false
+      - name: Check the landed build shards the crawl
+        id: has-merge
+        run: |
+          if [ -f scripts/product-crawl/merge-receipts.mjs ]; then
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "::notice::Landed build predates the sharded product crawl."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Prime Node toolcache
+        if: ${{ steps.has-merge.outputs.skip != 'true' && hashFiles('.github/actions/prime-node-toolcache/action.yml') != '' }}
+        uses: ./.github/actions/prime-node-toolcache
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        if: steps.has-merge.outputs.skip != 'true'
+        with:
+          node-version-file: '.nvmrc'
+      - name: Download shard receipts
+        if: steps.has-merge.outputs.skip != 'true'
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: product-crawl-shard-*-${{ github.run_id }}
+          path: product-crawl-shards
+      - name: Merge and judge the shard receipts
+        if: steps.has-merge.outputs.skip != 'true'
+        env:
+          PLAYWRIGHT_ARTIFACT_ALLOW_MARKDOWN: 'true'
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          shard_dirs=(product-crawl-shards/*/)
+          PLAYWRIGHT_ARTIFACT_PATHS='product-crawl-receipt/*.json' \
+            node .github/scripts/guard-playwright-artifacts.mjs --run -- \
+              node scripts/product-crawl/merge-receipts.mjs \
+                --out product-crawl-receipt "${shard_dirs[@]}"
+          cat product-crawl-receipt/summary.md >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload crawl receipt
+        if: ${{ always() && steps.has-merge.outputs.skip != 'true' && hashFiles('product-crawl-receipt/*.json') != '' }}
+        uses: ./.github/actions/upload-safe-playwright-artifact
+        with:
+          name: product-crawl-receipt-${{ github.run_id }}
+          path: product-crawl-receipt/*.json
+          retention-days: 7
 
   lighthouse:
     name: Lighthouse CI (Landed Production)
@@ -704,8 +974,8 @@ jobs:
   golden-path-cert:
     name: Golden Path Certification (Landed Production)
     needs: [resolve-target, auth-smoke]
-    if: ${{ always() && needs.resolve-target.result == 'success' && needs.resolve-target.outputs.should_certify == 'true' }}
-    runs-on: ubuntu-latest
+    if: ${{ always() && needs.resolve-target.result == 'success' && needs.resolve-target.outputs.should_certify == 'true' && needs.resolve-target.outputs.cert_reused != 'true' }}
+    runs-on: ubuntu-24.04  # Playwright (pen-golden-path.mjs) has no ubuntu 26.04 build
     timeout-minutes: 10
     permissions:
       contents: read
@@ -731,8 +1001,51 @@ jobs:
           CRON_SECRET: ${{ secrets.CRON_SECRET }}
         run: node .github/scripts/resolve-synthetic-secrets.mjs --name CRON_SECRET
 
-      - name: Certify the golden path on production
+      # Design first (Tim, 2026-11-08): export every Golden Path Pen frame with
+      # the headless Pen CLI and diff it against production. Without
+      # PEN_CLI_KEY and PEN_GOLDEN_PATH_FILE_URL it exports nothing, and the
+      # certification below reports those frames as not exported. --record
+      # exits 0 once a receipt is written; certification fails on its verdict.
+      # If the Pen tooling itself fails first, certification still runs and
+      # reports those frames as not exported, so no verdict is skipped.
+      # JOV-12639: the export (~75 s of Pen CLI) is cached by the sha256 of the
+      # downloaded Pen source, the Pen CLI version and the frame selection,
+      # never by the URL. The export step fingerprints its own download and
+      # uses a restored set only when its key file matches that fingerprint.
+      - name: Fingerprint the Golden Path Pen source
+        id: pen-source
         env:
+          PEN_CLI_KEY: ${{ secrets.PEN_CLI_KEY }}
+          PEN_GOLDEN_PATH_FILE_URL: ${{ secrets.PEN_GOLDEN_PATH_FILE_URL }}
+        run: node scripts/invariants/pen-golden-path.mjs --fetch-only --out "${RUNNER_TEMP}/pen-golden-path" --github-output "$GITHUB_OUTPUT"
+
+      - name: Restore the Golden Path Pen export for this content
+        if: ${{ steps.pen-source.outputs.cache_key != '' }}
+        uses: ./.github/actions/vendor/actions-cache/restore # actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 v6.1.0 (vendored, JOV-8754)
+        with:
+          path: ${{ runner.temp }}/pen-golden-path/png
+          key: ${{ steps.pen-source.outputs.cache_key }}
+
+      - name: Export Golden Path Pen frames and compare with production
+        id: pen-export
+        env:
+          PEN_CLI_KEY: ${{ secrets.PEN_CLI_KEY }}
+          PEN_GOLDEN_PATH_FILE_URL: ${{ secrets.PEN_GOLDEN_PATH_FILE_URL }}
+        run: node scripts/invariants/pen-golden-path.mjs --record --out "${RUNNER_TEMP}/pen-golden-path" --base-url https://jov.ie --github-output "$GITHUB_OUTPUT"
+
+      # Only a complete fresh export is saved, under the key it was made from.
+      - name: Save the Golden Path Pen export
+        if: ${{ !cancelled() && steps.pen-export.outputs.export_cacheable == 'true' && steps.pen-export.outputs.cache_key != '' }}
+        uses: ./.github/actions/vendor/actions-cache/save # actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 v6.1.0 (vendored, JOV-8754)
+        with:
+          path: ${{ runner.temp }}/pen-golden-path/png
+          key: ${{ steps.pen-export.outputs.cache_key }}
+
+      - name: Certify the golden path on production
+        id: certify
+        if: ${{ !cancelled() }}
+        env:
+          PROD_CERT_PEN_DIFF_RECEIPT: ${{ runner.temp }}/pen-golden-path/receipt.json
           AUTH_SMOKE_STATUS: ${{ needs.auth-smoke.outputs.auth_smoke_status || (needs.auth-smoke.result == 'success' && 'passed') || 'failed' }}
           EXPECTED_COMMIT_SHA: ${{ needs.resolve-target.outputs.commit_sha }}
           LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
@@ -747,11 +1060,23 @@ jobs:
           else
             echo '[]' > "$steps_json"
           fi
+          status=0
           node scripts/prod-cert.mjs \
             --origin https://jov.ie \
             --steps "$steps_json" \
             --out "${RUNNER_TEMP}/prod-cert-receipts.json" \
-            --post --file-issues
+            --post --file-issues || status=$?
+          # JOV-12620: a not-certified verdict (exit 1) is already posted to the
+          # ledger, filed in Linear and uploaded below: its own receipt, not a
+          # probe failure. Only smoke, auth and Lighthouse turn this run red; a
+          # crash that records no verdict (exit 2) still fails.
+          if [ "$status" -eq 1 ]; then
+            echo "::warning title=Golden path not certified::Receipts recorded; see the job summary and the prod-cert-receipts artifact."
+            { echo "### Golden path not certified (receipt, non-blocking)"; echo "| Surface | Status | Failing |"; echo "|---|---|---|"
+              jq -r '.receipts[] | select(.status != "passed") | "| \(.surface) | \(.status) | \(.blocker // ([.checks[]? | select(.status == "failed") | .id] | join(", "))) |"' "${RUNNER_TEMP}/prod-cert-receipts.json"; } >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          exit "$status"
 
       - name: Upload certification receipts
         if: ${{ always() }}
@@ -761,6 +1086,80 @@ jobs:
           path: ${{ runner.temp }}/prod-cert-receipts.json
           retention-days: 30
           if-no-files-found: ignore
+
+      # JOV-12639: only a run where every surface passed on the expected SHA
+      # writes the stamp a later run may reuse. A stamp failure only means the
+      # next trigger certifies again.
+      - name: Stamp the receipts certified for reuse
+        id: stamp
+        if: ${{ steps.certify.outcome == 'success' }}
+        env:
+          EXPECTED_COMMIT_SHA: ${{ needs.resolve-target.outputs.commit_sha }}
+        run: |
+          node scripts/golden-path-cert-reuse.mjs stamp \
+            --receipts "${RUNNER_TEMP}/prod-cert-receipts.json" \
+            --expected-sha "$EXPECTED_COMMIT_SHA" \
+            --out "${RUNNER_TEMP}/prod-cert-certified.json" \
+            --github-output "$GITHUB_OUTPUT" ||
+            echo "::warning::No certified stamp written; the next trigger certifies again."
+
+      - name: Upload the certified receipts for reuse
+        if: ${{ steps.stamp.outputs.stamped == 'true' }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: prod-cert-certified-${{ needs.resolve-target.outputs.commit_sha }}
+          path: |
+            ${{ runner.temp }}/prod-cert-receipts.json
+            ${{ runner.temp }}/prod-cert-certified.json
+          retention-days: 2
+          overwrite: true
+          if-no-files-found: error
+
+  # JOV-12639: the served build already has a fresh certified receipt, so no
+  # new certification runs. Re-read that receipt, judge it again and upload it
+  # as this run's receipt with a reuse block naming the source run. Nothing is
+  # posted to the ledger or filed again; a receipt that no longer qualifies
+  # fails this job and the next trigger certifies.
+  golden-path-cert-reused:
+    name: Golden Path Certification (Reused Receipt)
+    needs: [resolve-target]
+    if: ${{ always() && needs.resolve-target.result == 'success' && needs.resolve-target.outputs.should_certify == 'true' && needs.resolve-target.outputs.cert_reused == 'true' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 1
+          persist-credentials: false
+      - name: Prime Node toolcache
+        if: ${{ hashFiles('.github/actions/prime-node-toolcache/action.yml') != '' }}
+        uses: ./.github/actions/prime-node-toolcache
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: '.nvmrc'
+      - name: Adopt the reused certification receipt
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TARGET_COMMIT_SHA: ${{ needs.resolve-target.outputs.commit_sha }}
+          SOURCE_RUN_ID: ${{ needs.resolve-target.outputs.cert_reused_from_run }}
+          SOURCE_ARTIFACT_ID: ${{ needs.resolve-target.outputs.cert_reused_artifact }}
+        run: |
+          node scripts/golden-path-cert-reuse.mjs adopt \
+            --served-sha "$TARGET_COMMIT_SHA" \
+            --source-run-id "$SOURCE_RUN_ID" --artifact-id "$SOURCE_ARTIFACT_ID" \
+            --out "${RUNNER_TEMP}/prod-cert-reused/prod-cert-receipts.json"
+      - name: Upload the reused certification receipts
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: prod-cert-reused-${{ github.run_id }}
+          path: ${{ runner.temp }}/prod-cert-reused/prod-cert-receipts.json
+          retention-days: 30
+          overwrite: true
+          if-no-files-found: error
 
   remediation:
     name: File post-deploy probe remediation
@@ -773,16 +1172,50 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          ref: ${{ github.sha }}
           fetch-depth: 1
           persist-credentials: false
+      - name: Record the actual probe attempt outcomes
+        id: probe-outcome
+        if: ${{ needs.resolve-target.result == 'success' && needs.resolve-target.outputs.should_probe == 'true' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TARGET_COMMIT_SHA: ${{ needs.resolve-target.outputs.commit_sha }}
+          TARGET_DEPLOYMENT_ID: ${{ needs.resolve-target.outputs.deployment_id }}
+          TARGET_ORIGIN_B64: ${{ needs.resolve-target.outputs.deployment_url_b64 }}
+          PROBE_POLICY_DIGEST: ${{ needs.resolve-target.outputs.probe_policy_digest }}
+        run: |
+          set -euo pipefail
+          context="$RUNNER_TEMP/postdeploy-probe-context.json"
+          PROBE_CONTEXT_FILE="$context" node --input-type=module <<'NODE'
+          import { writeFileSync } from 'node:fs';
+          const e = process.env;
+          writeFileSync(e.PROBE_CONTEXT_FILE, JSON.stringify({
+            repository: e.GITHUB_REPOSITORY, workflowPath: '.github/workflows/postdeploy-probes.yml',
+            runId: Number(e.GITHUB_RUN_ID), runAttempt: Number(e.GITHUB_RUN_ATTEMPT), workflowSha: e.GITHUB_SHA,
+            mode: e.GITHUB_EVENT_NAME === 'workflow_dispatch' ? 'manual' : 'automatic', now: new Date().toISOString(),
+            target: { sha: e.TARGET_COMMIT_SHA, deploymentId: e.TARGET_DEPLOYMENT_ID,
+              origin: Buffer.from(e.TARGET_ORIGIN_B64, 'base64').toString('utf8'), policyDigest: e.PROBE_POLICY_DIGEST }
+          }));
+          NODE
+          status=0
+          node scripts/postdeploy-probe-admission.mjs record --context-file "$context" \
+            --out-dir "$RUNNER_TEMP/postdeploy-probe-admission" --github-output "$GITHUB_OUTPUT" || status=$?
+          if [ "$status" -eq 75 ]; then
+            echo "::warning::GitHub quota deferred probe outcome recording; pending admission remains incomplete."
+            exit 0
+          fi
+          exit "$status"
+
       - name: File or resolve production-monitor-postdeploy-probes
+        if: ${{ needs.resolve-target.outputs.quota_deferred == 'true' || steps.probe-outcome.outputs.quota_deferred == 'true' || needs.resolve-target.result == 'failure' || steps.probe-outcome.outputs.outcome == 'passed' || (needs.resolve-target.outputs.probe_notify_allowed == 'true' && steps.probe-outcome.outputs.outcome == 'failed') }}
         env:
           LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
           REMEDIATION_INTAKE_DISABLED: ${{ vars.REMEDIATION_INTAKE_DISABLED }}
           REMEDIATION_MODE: monitor
           REMEDIATION_FINGERPRINT: production-monitor-postdeploy-probes
           REMEDIATION_SOURCE: postdeploy-probes.yml
-          REMEDIATION_CONCLUSION: ${{ needs.resolve-target.outputs.quota_deferred == 'true' && 'quota-deferred' || ((needs.resolve-target.result == 'success' && needs.smoke.result == 'success' && needs.auth-smoke.result == 'success' && needs.lighthouse.result == 'success') && 'success' || 'failure') }}
+          REMEDIATION_CONCLUSION: ${{ (needs.resolve-target.outputs.quota_deferred == 'true' || steps.probe-outcome.outputs.quota_deferred == 'true') && 'quota-deferred' || (steps.probe-outcome.outputs.outcome == 'passed' && 'success' || (needs.resolve-target.result == 'failure' || steps.probe-outcome.outputs.outcome == 'failed') && 'failure' || 'unknown') }}
           REMEDIATION_DETAIL: quota-deferred=${{ needs.resolve-target.outputs.quota_deferred }} resolve=${{ needs.resolve-target.result }} sha=${{ needs.resolve-target.outputs.commit_sha }} deployment=${{ needs.resolve-target.outputs.deployment_id }} smoke=${{ needs.smoke.result }} auth-smoke=${{ needs.auth-smoke.result }} lighthouse=${{ needs.lighthouse.result }}; landed-build evidence only, never release or freeze recovery proof (JOV-7195)
           REMEDIATION_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: node scripts/remediation-signal-intake.mjs
@@ -790,7 +1223,7 @@ jobs:
   notify-failure:
     name: Alert on post-deploy probe failure
     needs: [resolve-target, smoke, auth-smoke, lighthouse]
-    if: ${{ always() && (needs.resolve-target.result == 'failure' || (needs.resolve-target.outputs.should_probe == 'true' && (needs.smoke.result != 'success' || needs.lighthouse.result != 'success' || needs.auth-smoke.result != 'success'))) }}
+    if: ${{ always() && (needs.resolve-target.result == 'failure' || (needs.resolve-target.outputs.should_probe == 'true' && needs.resolve-target.outputs.probe_notify_allowed == 'true' && (needs.smoke.result != 'success' || needs.lighthouse.result != 'success' || needs.auth-smoke.result != 'success'))) }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:

@@ -37,3 +37,24 @@ export const CaughtUp: Story = {
 export const StatusUnavailable: Story = {
   args: { availability: { state: 'unknown', pendingCount: null } },
 };
+
+/** Nothing waits in the Inbox: the bell carries no attention dot. */
+export const EmptyInbox: Story = {
+  args: { availability: { state: 'empty', pendingCount: 0 } },
+};
+
+/** A large backlog lengthens only the tooltip and accessible name. */
+export const LongContentLargeBacklog: Story = {
+  args: { availability: { state: 'available', pendingCount: 12840 } },
+};
+
+export const Rtl: Story = {
+  args: { availability: { state: 'available', pendingCount: 3 } },
+  decorators: [
+    Story => (
+      <div dir='rtl' lang='ar'>
+        <Story />
+      </div>
+    ),
+  ],
+};

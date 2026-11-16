@@ -1,5 +1,6 @@
 'use client';
 
+import { PlainButton } from '@jovie/ui';
 import { ArrowRight, Menu, X } from 'lucide-react';
 import Link from 'next/link';
 import {
@@ -12,7 +13,7 @@ import {
 } from 'react';
 import { createPortal } from 'react-dom';
 import { AnimatedIconSwap } from '@/components/atoms/AnimatedIconSwap';
-import { APP_ROUTES } from '@/constants/routes';
+import { APP_ROUTES, PUBLIC_ENTRY_HREF } from '@/constants/routes';
 import { useAuthSafe } from '@/hooks/useClerkSafe';
 import { useIsAuthenticated } from '@/hooks/useIsAuthenticated';
 import { usePublicPathname } from '@/lib/navigation/use-public-pathname';
@@ -30,7 +31,7 @@ const CTA_BUTTON_STYLE: CSSProperties = {
 };
 
 const OVERLAY_STYLE: CSSProperties = {
-  background: 'oklch(0% 0 0 / 0.6)',
+  background: 'var(--mobile-nav-scrim)',
   backdropFilter: 'blur(8px)',
   WebkitBackdropFilter: 'blur(8px)',
 };
@@ -40,8 +41,7 @@ const NAV_PANEL_STYLE: CSSProperties = {
     'color-mix(in oklab, var(--linear-bg-surface-0) 95%, white 5%)',
   borderTop:
     '1px solid color-mix(in oklab, var(--linear-border-subtle) 85%, white 15%)',
-  boxShadow:
-    '0 -8px 40px oklch(0% 0 0 / 0.25), 0 -2px 12px oklch(0% 0 0 / 0.15)',
+  boxShadow: 'var(--shadow-mobile-nav-sheet)',
   paddingBottom: 'calc(24px + env(safe-area-inset-bottom))',
   maxHeight: 'calc(100dvh - env(safe-area-inset-top))',
   overflowY: 'auto',
@@ -76,7 +76,7 @@ function buildNavLinks(
 function MobileNavCta({
   showAuthenticatedAction,
   close,
-  publicCtaHref = APP_ROUTES.SIGNUP,
+  publicCtaHref = PUBLIC_ENTRY_HREF,
   publicCtaLabel = 'Sign up',
 }: Readonly<{
   showAuthenticatedAction: boolean;
@@ -168,7 +168,7 @@ export function MobileNav({
   return (
     <>
       {/* Toggle button */}
-      <button
+      <PlainButton
         ref={toggleRef}
         type='button'
         onClick={() => setIsOpen(prev => !prev)}
@@ -192,7 +192,7 @@ export function MobileNav({
         >
           {isOpen ? <X size={20} /> : <Menu size={20} />}
         </AnimatedIconSwap>
-      </button>
+      </PlainButton>
 
       {/* Portal: render overlay + nav panel outside header to avoid
           backdrop-filter creating a containing block that clips fixed positioning */}

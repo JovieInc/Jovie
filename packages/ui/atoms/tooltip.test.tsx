@@ -2,6 +2,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import * as React from 'react';
 import { describe, expect, it } from 'vitest';
+import { expectNoA11yViolations } from '../test-utils/a11y';
 
 import {
   Tooltip,
@@ -110,12 +111,6 @@ describe('Tooltip', () => {
         { timeout: 3000 }
       );
     });
-
-    it.skip('hides content on mouse leave', async () => {
-      // Skipped: userEvent.unhover doesn't reliably close Radix tooltips in jsdom
-      // This behavior is tested through controlled mode and other means
-      expect(true).toBe(true);
-    });
   });
 
   describe('TooltipProvider', () => {
@@ -208,6 +203,56 @@ describe('Tooltip', () => {
         </TooltipProvider>
       );
       expect(ref.current).toBeInstanceOf(HTMLButtonElement);
+    });
+  });
+
+  describe('Anchor invariant wiring', () => {
+    // Full matrix: tooltip-anchor.test.tsx. This keeps the trigger contract
+    // (caller ref and handlers survive the root's bookkeeping) beside it.
+    it('keeps the caller ref and leave/blur handlers on the trigger', () => {
+      const ref = React.createRef<HTMLButtonElement>();
+      const events: string[] = [];
+      render(
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger
+              ref={ref}
+              onPointerLeave={() => events.push('leave')}
+              onBlur={() => events.push('blur')}
+            >
+              <button type='button'>Trigger</button>
+            </TooltipTrigger>
+            <TooltipContent>Label</TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+      );
+      const trigger = screen.getByRole('button', { name: 'Trigger' });
+      expect(ref.current).toBe(trigger);
+      fireEvent.pointerLeave(trigger);
+      fireEvent.focus(trigger);
+      fireEvent.blur(trigger);
+      expect(events).toEqual(['leave', 'blur']);
+    });
+
+    it('closes an open tooltip when its trigger is removed', async () => {
+      const Fixture = ({ show }: { readonly show: boolean }) => (
+        <TooltipProvider>
+          <Tooltip defaultOpen>
+            {show ? (
+              <TooltipTrigger>
+                <button type='button'>Trigger</button>
+              </TooltipTrigger>
+            ) : null}
+            <TooltipContent>Label</TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+      );
+      const { rerender } = render(<Fixture show />);
+      expect(await screen.findByTestId('tooltip-content')).toBeInTheDocument();
+      rerender(<Fixture show={false} />);
+      await waitFor(() =>
+        expect(screen.queryByTestId('tooltip-content')).not.toBeInTheDocument()
+      );
     });
   });
 
@@ -312,8 +357,8 @@ describe('Tooltip', () => {
       const content = screen.getByTestId('tooltip-content');
       expect(content.className).toContain('border-error/30');
       expect(content.className).toContain('bg-error-subtle');
-      expect(content.className).toContain('text-error');
-      expect(content.className).not.toContain('bg-surface-tooltip');
+      expect(content).toHaveClass('text-error-text');
+      expect(content).not.toHaveClass('bg-surface-tooltip', 'text-error');
       expect(content.className).not.toMatch(/\bred-\d/);
     });
 
@@ -379,5 +424,55 @@ describe('Tooltip', () => {
       expect(content).toHaveTextContent('Bold');
       expect(content).toHaveTextContent('italic');
     });
+  });
+});
+
+describe('Tooltip accessibility', () => {
+  it('has no axe violations with default, danger and RTL tooltips open', async () => {
+    const { container } = render(
+      <TooltipProvider delayDuration={0}>
+        <Tooltip open>
+          <TooltipTrigger>
+            <button type='button'>Copy link</button>
+          </TooltipTrigger>
+          <TooltipContent showArrow>
+            Copies the public profile URL
+          </TooltipContent>
+        </Tooltip>
+        <Tooltip open>
+          <TooltipTrigger>
+            <button type='button'>Retry sync</button>
+          </TooltipTrigger>
+          <TooltipContent tone='danger' testId='danger-tooltip'>
+            Spotify sync failed
+          </TooltipContent>
+        </Tooltip>
+        <div dir='rtl'>
+          <Tooltip open>
+            <TooltipTrigger>
+              <button type='button' aria-label='مشاركة'>
+                <svg aria-hidden='true' />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent dir='rtl' testId='rtl-tooltip'>
+              انسخ رابط الملف الشخصي
+            </TooltipContent>
+          </Tooltip>
+        </div>
+      </TooltipProvider>
+    );
+    expect(screen.getByTestId('tooltip-content')).toBeInTheDocument();
+    expect(screen.getByTestId('danger-tooltip')).toBeInTheDocument();
+    expect(screen.getByTestId('rtl-tooltip')).toHaveAttribute('dir', 'rtl');
+    // Audit the triggers and every portalled tooltip layer in document.body.
+    // The bare test page has no landmarks, so each rendered subtree is
+    // audited on its own rather than the landmark-less page shell.
+    const layers = document.body.querySelectorAll(
+      '[data-radix-popper-content-wrapper]'
+    );
+    expect(layers).toHaveLength(3);
+    for (const node of [container, ...layers]) {
+      await expectNoA11yViolations(node);
+    }
   });
 });

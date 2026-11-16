@@ -43,6 +43,10 @@ export function shiftedEnv(days, env = process.env) {
     .filter(option => option && !option.includes('shift-clock.mjs'));
   return {
     ...env,
+    // Deliberate calendar deadlines (apps/web/tests/utils/calendar-deadline-clock.ts)
+    // read the real clock only here, so they file an issue instead of failing
+    // required lanes.
+    CALENDAR_DEADLINE_SCAN: '1',
     TIME_SHIFT_DAYS: String(days),
     NODE_OPTIONS: [...options, `--import=${SHIM}`].join(' '),
   };

@@ -42,6 +42,72 @@ persist. `pen-save-receipt/v1` remains editor-state evidence at handback; it
 does not replace the mtime gate. Autosave, a visible canvas change, an MCP
 success response, or an opaque backup alone is insufficient.
 
+## Writer lease and guarded save
+
+- Acquire before mutations: `node scripts/pen-review/run.mjs lease acquire --holder <you> --scope <what>`. Another owner receives exit 3; expired leases can be acquired again.
+- Keep the returned token; renew with `lease acquire --holder <you> --token <token>`.
+- Save with `node scripts/pen-review/run.mjs save --holder <you> --token <token> --touched <top-level ids>`. It refuses foreign unsaved changes outside your touched set, preventing accidental publication of another writer's work.
+- Release with `lease release --holder <you> --token <token>`.
+
+## PROPOSAL review loop
+
+Frames named `PROPOSAL / …` (or with a `· PROPOSAL` segment) are reviewed
+by `scripts/pen-review/` when explicitly invoked or after opting into the
+installer `scripts/hostops/install-pen-review.sh` (requires `PEN_REVIEW_PLAYWRIGHT` and installed Chromium; launchd on every canonical
+save plus a 10-minute sweep). Render,
+render guard, deterministic checks, System-1 panel, fix, re-render; only frames
+renamed `· ready for Tim r<receipt>` may be shown to Tim. Receipts:
+`~/.local/state/jovie-pen-review/receipts/<run>/<frame>/`; each invocation
+retains its own attempts. Workers renew exclusive leases and release them on success or failure.
+Automatic retries stop after three attempts per unchanged digest; edit the frame or invoke review explicitly to retry.
+
+Every panel includes an artist-dignity reader, and three checks always block:
+`artist-dignity` (copy that implies a small audience, empty rooms, failure or
+obscurity), `logo-size` (a Jovie mark above `$logo-size-max` 32px; default
+`$logo-size-default` 28px; wordmarks cap at 32px tall) and `private-ratings`
+("Never push" only on a frame named "fictional catalog").
+
+## Trustworthy renders
+
+Never judge, show or diff a render from the desktop app's raster export. Once
+its GPU state degrades it returns byte-identical garbled rows for any frame
+wider than about 1000px (0.5x stays clean), and `TakeScreenshot` degrades with
+it. Render out of process instead: `exportFramesHeadless` in
+`scripts/pen-review/pen-bridge.mjs` reads the live frame tree (unsaved edits
+included), grafts it into a private snapshot copy of the canonical file and
+exports it with a fresh headless `pen`. The snapshot sits in a hidden sibling
+folder with the workspace's `fonts/`, `images/` and other assets linked beside
+it: the "?" Material Symbols icons came from headless copies that had no
+`fonts/` folder next to them. Each frame is exported twice and the second
+export is used. The render guard (`render-guard.mjs`) fails garbled rasters
+(speckle per band), blank or noisy renders, fallback glyphs, inkless text and
+unloaded image fills. `html-css` exports are structural aids, not pixel truth:
+their flex translation stretches some vertical stacks.
+
+## Fast path for Pen agents
+
+1. One `execute` per section, not per node: loops, helpers and spreads; persist
+   ids with bare globals (`x=Insert(...)`); fix failures with `edits` and the
+   `editId`, never by resending.
+2. Components and refs with `descendants` overrides instead of duplicated
+   nodes; `$tokens` for colour, spacing, type and logo size, never raw values.
+3. Structural checks without screenshots: `Get` visitors with `ctx.bounds` and
+   `ctx.problems` (alignment, clipping, off-centre, type scale, raw colours) in
+   the same call. `TakeScreenshot` only at the end of a section, on the
+   smallest node.
+4. Images for review, parity or Tim come from `exportFramesHeadless` (or
+   `scripts/pen-review/export-refs.mjs` for parity references), never from the
+   desktop raster export.
+5. CLI exports: pass the export type explicitly and assert the output file
+   exists and is non-empty; failures can exit 0.
+6. Headless `pen interactive -i <copy> -o <scratch>` is for read-only snapshot,
+   export and render jobs on a copy. Live canonical edits stay in the app with
+   one writer. Headless prints raw result text, not JSON, and each `execute`
+   has about a 55 s budget: split graft and export into separate calls.
+7. Before each batch, `get_app_state()` to confirm the active document.
+8. Size properties (`width`, `height`) do not bind variables: `Update(id,{width:"$logo-size-default"})` is silently ignored. Set the number (logo marks 28, never above 32) and let the `logo-size` check enforce it. Colour, type size, radius, gap and padding do bind `$tokens`.
+9. A headless render shows the saved file plus the grafted frame. After editing a master or a variable, run the guarded save before rendering, or the render shows the old master.
+
 ## Cold readback
 
 [`scripts/agent/pen-cold-readback.mjs`](../../scripts/agent/PEN_COLD_READBACK.md)

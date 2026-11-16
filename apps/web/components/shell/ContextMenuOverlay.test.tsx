@@ -87,6 +87,19 @@ describe('ContextMenuOverlay', () => {
     expect(onClose).toHaveBeenCalledOnce();
   });
 
+  it('paints a danger item with the AA error text token', () => {
+    const state: ContextMenuState = {
+      x: 0,
+      y: 0,
+      items: [{ label: 'Delete', tone: 'danger', onSelect: () => undefined }],
+    };
+    render(<ContextMenuOverlay state={state} onClose={() => undefined} />);
+    const item = screen.getByRole('menuitem', { name: 'Delete' });
+    const classes = item.className.split(/\s+/);
+    expect(classes).toContain('text-error-text');
+    expect(classes).not.toContain('text-rose-300');
+  });
+
   it('renders an icon when supplied', () => {
     const state: ContextMenuState = {
       x: 0,
@@ -152,5 +165,17 @@ describe('JOV-5466 token retire', () => {
       'utf8'
     );
     expect(source).not.toMatch(/--linear-app-/);
+  });
+  it('uses the theme popover shadow instead of a fixed dark one', () => {
+    const state: ContextMenuState = {
+      x: 0,
+      y: 0,
+      items: [{ label: 'Play', onSelect: () => undefined }],
+    };
+    const { container } = render(
+      <ContextMenuOverlay state={state} onClose={() => undefined} />
+    );
+    expect(container.innerHTML).toContain('shadow-(--shadow-popover)');
+    expect(container.innerHTML).not.toMatch(/shadow-\[[^\]]*rgba/);
   });
 });

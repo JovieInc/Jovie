@@ -29,7 +29,6 @@ Scheduled workflows in `.github/workflows/`. Not Vercel crons — these run on G
 | `CI Duration Ratchet` | `25 6 * * *` UTC + push to local-gate files on `main` | Measures rolling p95 of recent PR merge-gate CI runs and fails + Slack-alerts when p95 exceeds the committed baseline + margin. `dev-loop` job times every `.husky/pre-commit` rung + pre-push publication against budgets in `scripts/dev-loop-latency.mjs`. | `.github/workflows/ci-duration-ratchet.yml` |
 | `Shipping SLO Ratchet` | `13 7 * * *` UTC + manual | JOV-6783: rolling 7d p50/p95 across CI wall time (per required workflow event), merge-queue wait/ejection, PR lead time by lane, red→green remediation, production lag, and merges/day throughput vs the +8% WoW growth line and its second-order trend. >10% improvement held 3 days → draft ratchet PR on `docs/metrics/shipping-slo-baseline.json`; >20% regression/throughput drop or flat growth → deduped `slo-regression` issues. Commits `docs/metrics/shipping-slo-latest.json` so the Symphony lanes status gist (`scripts/lanes/doctor.py`) embeds the `slo` block. The same run derives `jovie-stage-event/v1` stage timings (24h/7d/28d p50/p95/n + regression flags) into `docs/metrics/stage-timings-latest.json` ([STAGE_EVENTS.md](metrics/STAGE_EVENTS.md)). LLM-free. | `.github/workflows/shipping-slo.yml` |
 | `Merge Queue Ruleset Verify` | `17 6 * * *` UTC + push to ruleset/source files on `main` + manual | Live GitHub ruleset 10512119 parity (`pnpm ci:merge-queue:verify`). Also runs on `main` pushes to ruleset/source files. Slack on failure. Not a source-PR or merge-group gate. | `.github/workflows/merge-queue-ruleset-verify.yml` |
-| `Neon Ephemeral Branch Cleanup` | (see workflow) | Terminal-event cleanup: deletes ephemeral Neon branches when PRs close and emits a `jovie-preview-env-cleanup/v1` receipt (JOV-5941). | `.github/workflows/neon-ephemeral-branch-cleanup.yml` |
 | `Vercel Preview Cleanup` | (see workflow) | Terminal-event cleanup: cancels/deletes preview deployments for a closed PR's ref and emits a `jovie-preview-env-cleanup/v1` receipt (JOV-5941). | `.github/workflows/vercel-preview-cleanup.yml` |
 | `M2 Revenue-Path Canary` | `37 6 * * *` UTC + Production Controller `workflow_run` + manual / `workflow_call` | Daily + deploy-hook money-path probe: signed-out → claim → $199 Pro checkout → activation. Timestamped receipt; Slack + Linear with repro on red. Distinct from Canary Health Gate uptime. | `.github/workflows/m2-revenue-path-canary.yml` |
 | `Golden Path Nightly` | `23 9 * * *` UTC (skip-if-unchanged) + manual | JOV-6920: dispatches the real-auth + Stripe test-mode Golden Path lane in `ci.yml` on `main` and exits (skipped when main has a green Golden Path under 24 h old). The dispatched run's `Golden Path Report` job files one fingerprinted P0 Linear issue on red or resolves it on green; a red run reopens the existing issue into Todo. Acquisition eligibility reads that ci.yml job, not this dispatcher. Its completion also starts the daily `claim-checkout-dogfood.yml` run ($12 claim browser dogfood, Stripe test mode, `workflow_run`), which also runs after every successful Staging Controller and files its own fingerprinted issue. | `.github/workflows/golden-path-nightly.yml` |
@@ -97,18 +96,14 @@ Source of truth: `apps/web/vercel.json`. The Vercel project's Root Directory is 
 | Cron Path | Schedule | Frequency |
 |-----------|----------|-----------|
 | `/api/cron/frequent` | `*/30 * * * *` | Every 30 minutes (cut 2026-10-29 from `*/15 * * * *`: zero-user cost cut) |
+| `/api/cron/queue-tick` | `*/30 * * * *` | Every 30 minutes: shared fail-safe drain for interview, ingestion, workflow-run and merch queues. Enqueue sites kick individual queues at insert time; per-queue routes remain callable. Replaces five direct schedules, including the voice-pipeline no-op, while preserving the zero-user polling cost cut. |
 | `/api/cron/daily-maintenance` | `0 0 * * *` | Daily at midnight UTC |
 | `/api/cron/generate-insights` | `0 5 * * *` | Daily at 05:00 UTC |
-| `/api/cron/process-ingestion-jobs` | `*/30 * * * *` | Every 30 minutes (cut 2026-10-29 from `*/6 * * * *`: zero-user cost cut) (JOV-2500: lets Neon 5min autosuspend reclaim compute) |
-| `/api/cron/process-merch-fulfillment` | `*/30 * * * *` | Every 30 minutes (cut 2026-10-29 from `*/10 * * * *`: zero-user cost cut) |
 | `/api/cron/purge-pixel-ips` | `0 3 * * *` | Daily at 03:00 UTC |
-| `/api/cron/summarize-interviews` | `0 * * * *` | Hourly (cut 2026-10-29 from `*/5 * * * *`: zero-user cost cut) |
 | `/api/cron/generate-playlist` | `0 6 * * *` | Daily at 06:00 UTC |
 | `/api/cron/process-pre-saves` | `0 2 * * *` | Daily at 02:00 UTC |
 | `/api/cron/monitor-metadata-submissions` | `0 * * * *` | Hourly |
 | `/api/cron/process-metadata-submissions` | `0 4 * * *` | Daily at 04:00 UTC |
-| `/api/cron/process-workflow-runs` | `0 * * * *` | Hourly (cut 2026-10-29 from `*/6 * * * *`: zero-user cost cut) (403 at the trusted-origin check on every call as of 2026-10-20) |
-| `/api/cron/voice-pipeline` | `0 * * * *` | Hourly (cut 2026-10-29 from `*/5 * * * *`: zero-user cost cut) (missing from the unused root `vercel.json`) |
 | `/api/cron/public-profile-canary` | `13 6 * * *` | Daily at 06:13 UTC |
 | `/api/cron/auth-signup-onboarding-canary` | `23 6 * * *` | Daily at 06:23 UTC (JOV-1871) |
 | `/api/cron/artist-daily-snapshots` | `15 9 * * *` | Daily at 09:15 UTC. No-op unless `ARTIST_DAILY_SNAPSHOTS` is true. YouTube Data API statistics when `YOUTUBE_DATA_API_KEY` is set; Wikimedia pageviews. Social HTML waits for isolated egress. |
@@ -141,6 +136,8 @@ Source of truth: `apps/web/vercel.json`. The Vercel project's Root Directory is 
 | 14 | canaryReceiptFreshness | Hourly (`minute < 15`) | Reads the two daily acquisition-canary reports; missing, invalid, future or 26-hour-old receipts fail the sub-job with Sentry `canary_receipt_stale`, even when acquisition is disabled. Two Redis reads/run; no new schedule (JOV-7895). |
 | 15 | summerCardDefaults | Every invocation | Default-plus-deadline contract: records each overdue pending Summer card's declared default (`approve`/`reject`; `reject` when none was declared) with `decidedBy: default-on-expiry`, so no founder ask waits forever. One KV list read, at most 100 compare-and-set writes; a concurrent founder decision wins. |
 | 16 | proofStats | Hourly (`minute < 15`) | Measures the production proof stats (`apps/web/data/proof-stats/registry.json`, source kind `production`) with internal/test/synthetic accounts excluded, publishes a `proof-stats/observations` content-record version when a value or a publishable state changed, and records milestone, published and withdrawn events for Summer. Four counts and at most one version write per run; no new schedule. |
+| 17 | companyHistory | Hourly (`minute < 15`) | Fills `summer:company-history:v1:*`: merged-PR counts per Pacific day for the org and the Jovie, LogYourBody and summer-config repositories, 120 days kept. Today and yesterday every run; older days only until final (observed an hour after they ended). At most two aliased GitHub search requests per run; Beside it, `summer:company-history:v1:daily:*` holds signups, paid signups and onboarding chats (one grouped first-party query each), AI Gateway spend in cents (one hourly report), failed CI runs on Jovie (one REST total_count per day, at most 14 per run) and Linear JOV issues opened and closed (one aliased request each), with the same today-and-yesterday plus not-yet-final rule. Summer's history, metrics and chart routes read the cache with zero provider calls. |
+| 18 | founderWelcome | Every invocation | Files one `outbound` founder welcome card per admitted /start visitor with a claimed profile, and sends a welcome email only where that person's own card is approved and its recipient and words still match. Cards never default or expire into a send. One admitted-visitor query and one KV read per visitor; no new schedule. |
 
 Source: `apps/web/app/api/cron/frequent/route.ts`
 
@@ -175,10 +172,7 @@ These have their own Vercel schedule OR exist as callable endpoints (also invoke
 | Route | maxDuration | Description | Also called by |
 |-------|-------------|-------------|----------------|
 | `/api/cron/generate-insights` | 300s | AI insights for eligible Pro/Founding/Growth profiles with sufficient click data | — |
-| `/api/cron/process-ingestion-jobs` | 300s | Claims up to 5 pending ingestion jobs, processes 3 concurrently | `frequent` (fallback) |
-| `/api/cron/process-merch-fulfillment` | 300s | Submits queued paid merch orders to Printful and confirms them idempotently | — |
 | `/api/cron/purge-pixel-ips` | 60s | NULLs `client_ip` from pixel events >48h old (privacy); retains `ip_hash` | — |
-| `/api/cron/summarize-interviews` | 300s (default) | Haiku-powered interview summarization; queued jobs stall without this schedule | — |
 | `/api/cron/generate-playlist` | 300s (default) | Daily AI playlist generation for admin review | — |
 | `/api/cron/process-pre-saves` | 300s (default) | Processes pending Spotify pre-saves where release date has passed; up to 500/run | — |
 | `/api/cron/cleanup-sms-intents` | 60s | Marks expired SMS subscribe intents and hard-deletes rows >24h old (no longer scheduled directly — called via `daily-maintenance` sub-job; file kept as admin escape hatch) | `daily-maintenance` |

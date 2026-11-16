@@ -18,6 +18,10 @@ class_name = "Registry"
 name = "BOARD"
 class_name = "Board"
 
+[[durable_objects.bindings]]
+name = "MCP_AUTH"
+class_name = "McpAuth"
+
 [[migrations]]
 tag = "v1"
 new_sqlite_classes = ["Mailbox", "Registry"]
@@ -26,6 +30,11 @@ new_sqlite_classes = ["Mailbox", "Registry"]
 [[migrations]]
 tag = "v2"
 new_sqlite_classes = ["Board"]
+
+# Remote MCP OAuth server state (src/mcp-oauth.ts).
+[[migrations]]
+tag = "v3"
+new_sqlite_classes = ["McpAuth"]
 
 # Hub model executor (failover for kinds with no live reader). Workers AI binding: no secret.
 [ai]
@@ -36,6 +45,7 @@ enabled = true
 
 # Secrets (wrangler secret put; values live in Doppler agent-mesh/prd, never here):
 #   HUB_ADMIN_TOKEN            registry writes only
+#   MCP_OWNER_TOTP_SECRET      base32 TOTP secret of Tim; without it /mcp consent refuses everyone
 #   SUMMER_HUB_WEBHOOK_SECRET  HMAC for pushes to Summer (optional until Summer consumes the hub)
 
 [vars]

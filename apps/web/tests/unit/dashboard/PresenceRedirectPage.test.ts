@@ -5,11 +5,13 @@ const {
   loadAppShellRouteContextMock,
   loadProfilesWorkspaceDataMock,
   redirectMock,
+  loadRemovalPrincipalMock,
   requireAppShellDashboardUserIdMock,
 } = vi.hoisted(() => ({
   loadAppShellRouteContextMock: vi.fn(),
   loadProfilesWorkspaceDataMock: vi.fn(),
   redirectMock: vi.fn(),
+  loadRemovalPrincipalMock: vi.fn(),
   requireAppShellDashboardUserIdMock: vi.fn(),
 }));
 
@@ -24,6 +26,10 @@ vi.mock('@/app/app/(shell)/app-shell-route-context', () => ({
 
 vi.mock('@/app/app/(shell)/profiles/data', () => ({
   loadProfilesWorkspaceData: loadProfilesWorkspaceDataMock,
+}));
+
+vi.mock('@/app/app/(shell)/profiles/removal-principal.server', () => ({
+  loadPresenceRemovalPrincipal: loadRemovalPrincipalMock,
 }));
 
 vi.mock('@/app/app/(shell)/profiles/ProfilesWorkspace', () => ({
@@ -47,6 +53,13 @@ describe('Presence route separation', () => {
     loadProfilesWorkspaceDataMock.mockResolvedValue({
       profileId: 'identity-1',
     });
+    const principal = {
+      appActorId: 'clerk-user',
+      authUserId: 'ba-user',
+      sessionId: 'session',
+      impersonationSubject: null,
+    };
+    loadRemovalPrincipalMock.mockResolvedValue(principal);
     const { default: PresencePage } = await import(
       '../../../app/app/(shell)/presence/page'
     );
@@ -54,6 +67,7 @@ describe('Presence route separation', () => {
     const result = (await PresencePage()) as {
       readonly props: {
         readonly data: { readonly profileId: string };
+        readonly removalPrincipal: typeof principal;
       };
     };
 
@@ -66,6 +80,10 @@ describe('Presence route separation', () => {
       profileId: 'identity-1',
     });
     expect(result.props.data.profileId).toBe('identity-1');
+    expect(loadRemovalPrincipalMock).toHaveBeenCalledExactlyOnceWith(
+      'clerk-user'
+    );
+    expect(result.props.removalPrincipal).toEqual(principal);
   });
 
   it('redirects the legacy profiles route to Presence without a rollout provider', async () => {

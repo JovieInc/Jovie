@@ -1,5 +1,10 @@
 import { APP_ROUTES, buildLyricsRoute } from '../constants/routes';
 import {
+  assertValidPerfAliasRoute,
+  PROFILE_ALIAS_READY_CONTENT_SELECTORS,
+  PROFILE_ALIAS_READY_SHELL_SELECTORS,
+} from './performance-alias-readiness';
+import {
   resolveActiveProfileOnboardingPath,
   resolveChatConversationPerfPath,
   resolveReleaseTasksPerfPath,
@@ -307,54 +312,7 @@ export function assertValidPerfRouteDefinition(route: PerfRouteDefinition) {
     }
   }
 
-  if (route.aliasUsableResult) {
-    const usableBudget = getRouteTimingBudgets(route).find(
-      timing => timing.metric === 'usable-alias-result'
-    );
-    if (
-      route.surface !== 'public-profile' ||
-      route.measureMode !== 'redirect'
-    ) {
-      throw new TypeError(
-        `Alias usable-result route "${route.id}" must be a public-profile redirect.`
-      );
-    }
-    if (usableBudget?.budget !== 1000) {
-      throw new TypeError(
-        `Alias usable-result route "${route.id}" must preserve its 1000ms median budget.`
-      );
-    }
-    if (
-      getRouteTimingBudgets(route).some(
-        timing => timing.metric === 'redirect-complete'
-      )
-    ) {
-      throw new TypeError(
-        `Alias usable-result route "${route.id}" must not claim redirect-complete timing.`
-      );
-    }
-    if (
-      !route.readySelectors.shell?.includes('[data-testid="profile-header"]')
-    ) {
-      throw new TypeError(
-        `Alias usable-result route "${route.id}" must require the visible profile header.`
-      );
-    }
-    if (
-      !route.readySelectors.content?.includes(
-        '[data-testid="profile-compact-shell"][data-interactive-ready="true"]'
-      )
-    ) {
-      throw new TypeError(
-        `Alias usable-result route "${route.id}" must require the interactive compact shell.`
-      );
-    }
-    if (route.aliasUsableResult.destinationAffordances.length === 0) {
-      throw new TypeError(
-        `Alias usable-result route "${route.id}" must require a destination affordance.`
-      );
-    }
-  }
+  assertValidPerfAliasRoute(route, getRouteTimingBudgets(route));
 
   if (DYNAMIC_ROUTE_TOKEN_PATTERN.test(route.path) && !route.resolvePath) {
     throw new TypeError(
@@ -643,10 +601,8 @@ const PUBLIC_PROFILE_CORE_ROUTES = [
     warmupStrategy: 'public-route',
     measureMode: 'redirect',
     readySelectors: {
-      shell: ['[data-testid="profile-header"]'],
-      content: [
-        '[data-testid="profile-compact-shell"][data-interactive-ready="true"]',
-      ],
+      shell: PROFILE_ALIAS_READY_SHELL_SELECTORS,
+      content: PROFILE_ALIAS_READY_CONTENT_SELECTORS,
       redirectDestinations: ['/[username]?mode=listen'],
     },
     timings: [
@@ -674,10 +630,8 @@ const PUBLIC_PROFILE_CORE_ROUTES = [
     warmupStrategy: 'public-route',
     measureMode: 'redirect',
     readySelectors: {
-      shell: ['[data-testid="profile-header"]'],
-      content: [
-        '[data-testid="profile-compact-shell"][data-interactive-ready="true"]',
-      ],
+      shell: PROFILE_ALIAS_READY_SHELL_SELECTORS,
+      content: PROFILE_ALIAS_READY_CONTENT_SELECTORS,
       redirectDestinations: ['/[username]?mode=listen'],
     },
     timings: [
@@ -747,10 +701,8 @@ const PUBLIC_PROFILE_CORE_ROUTES = [
     warmupStrategy: 'public-route',
     measureMode: 'redirect',
     readySelectors: {
-      shell: ['[data-testid="profile-header"]'],
-      content: [
-        '[data-testid="profile-compact-shell"][data-interactive-ready="true"]',
-      ],
+      shell: PROFILE_ALIAS_READY_SHELL_SELECTORS,
+      content: PROFILE_ALIAS_READY_CONTENT_SELECTORS,
       redirectDestinations: ['/[username]?mode=subscribe'],
     },
     timings: [
@@ -759,7 +711,11 @@ const PUBLIC_PROFILE_CORE_ROUTES = [
     ],
     aliasUsableResult: {
       canonicalPath: '/[username]?mode=subscribe',
-      destinationAffordances: ['[data-testid="profile-primary-tab-subscribe"]'],
+      destinationAffordances: [
+        '[data-testid="profile-primary-tab-subscribe"]',
+        '[data-testid="profile-desktop-get-updates"]',
+        '[data-testid="profile-desktop-manage-updates"]',
+      ],
     },
     resourceSizes: DEFAULT_PUBLIC_RESOURCE_BUDGETS,
     priority: 7,
@@ -775,10 +731,8 @@ const PUBLIC_PROFILE_CORE_ROUTES = [
     warmupStrategy: 'public-route',
     measureMode: 'redirect',
     readySelectors: {
-      shell: ['[data-testid="profile-header"]'],
-      content: [
-        '[data-testid="profile-compact-shell"][data-interactive-ready="true"]',
-      ],
+      shell: PROFILE_ALIAS_READY_SHELL_SELECTORS,
+      content: PROFILE_ALIAS_READY_CONTENT_SELECTORS,
       redirectDestinations: ['/[username]?mode=pay'],
     },
     timings: [
@@ -787,7 +741,10 @@ const PUBLIC_PROFILE_CORE_ROUTES = [
     ],
     aliasUsableResult: {
       canonicalPath: '/[username]?mode=pay',
-      destinationAffordances: ['[data-testid="profile-mode-drawer-pay"]'],
+      destinationAffordances: [
+        '[data-testid="profile-mode-drawer-pay"]',
+        '[data-testid="profile-desktop-open-payments"]',
+      ],
     },
     resourceSizes: DEFAULT_PUBLIC_RESOURCE_BUDGETS,
     priority: 8,
@@ -803,10 +760,8 @@ const PUBLIC_PROFILE_CORE_ROUTES = [
     warmupStrategy: 'public-route',
     measureMode: 'redirect',
     readySelectors: {
-      shell: ['[data-testid="profile-header"]'],
-      content: [
-        '[data-testid="profile-compact-shell"][data-interactive-ready="true"]',
-      ],
+      shell: PROFILE_ALIAS_READY_SHELL_SELECTORS,
+      content: PROFILE_ALIAS_READY_CONTENT_SELECTORS,
       redirectDestinations: ['/[username]?mode=tour'],
     },
     timings: [
@@ -831,10 +786,8 @@ const PUBLIC_PROFILE_CORE_ROUTES = [
     warmupStrategy: 'public-route',
     measureMode: 'redirect',
     readySelectors: {
-      shell: ['[data-testid="profile-header"]'],
-      content: [
-        '[data-testid="profile-compact-shell"][data-interactive-ready="true"]',
-      ],
+      shell: PROFILE_ALIAS_READY_SHELL_SELECTORS,
+      content: PROFILE_ALIAS_READY_CONTENT_SELECTORS,
       redirectDestinations: ['/[username]?mode=releases'],
     },
     timings: [

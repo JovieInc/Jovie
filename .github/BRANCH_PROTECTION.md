@@ -20,6 +20,7 @@ gh api repos/JovieInc/Jovie/rulesets/10512119 \
 2. **Migration Guard** - Database migration validation (path-gated to DB/schema changes)
 3. **Fork PR Gate** - Blocks unreviewed external fork PRs; auto-passes for agents + team
 4. **PR Size Guard** - Caps PR size (800 lines / 40 files) to force small, reviewable PRs; `big-pr` remains mechanical-only. A labeled `integration-train` with a machine-readable body block linking at least two component PRs has a fail-closed 2500-line / 60-file cap.
+5. **Company Guards** - Shared company guard suite (size baselines and canon guards from `JovieInc/ci`); runs on `pull_request`, `merge_group` and `push`.
 
 ### Configuration Details
 
@@ -53,6 +54,9 @@ EOF
 Full configuration is tracked in `/Users/timwhite/.claude/plans/glistening-dazzling-pike.md`
 
 ## History
+
+- **2026-11-08**: Added **Company Guards** to required status checks (sync to live ruleset 10512119)
+  - The check was added dashboard-side; this syncs the checked-in policy so `Merge Queue Ruleset Verify` parity holds
 
 - **2026-06-29**: Added **PR Size Guard** to required status checks (ruleset 10512119, GH #12131)
   - Caps PRs at 800 lines / 40 files (repo vars `PR_MAX_LINES` / `PR_MAX_FILES`); `big-pr` label opts out

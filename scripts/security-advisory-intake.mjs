@@ -14,10 +14,18 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { runGh } from '../packages/api-client/gh.ts';
 import { resolveLabelId } from './deprecation-intake.mjs';
+import { linearRequest } from './lib/linear-cooldown.mjs';
 import {
   closeLinearIssueByFingerprint,
+  JOVIE_TEAM_ID,
+  resolveLinearIssueByFingerprint,
   upsertLinearIssueByTitleFingerprint,
 } from './lib/linear-issue-intake.mjs';
+import {
+  isLinearRateLimitedAction,
+  logFailedLinearAction,
+  withLinearRetry,
+} from './lib/linear-retry.mjs';
 import {
   issueDescription,
   issueTitle,
@@ -26,6 +34,96 @@ import {
 } from './lib/security-advisory-policy.mjs';
 
 export const MAX_UPSERTS_PER_RUN = 60;
+
+// One paged scan replaces one Linear search per fixed advisory. The close list
+// re-attempts every historical fixed group on every run (~340 groups on run
+// 43179965779): those per-group searches sustained several hundred Linear
+// requests per run, tripped the shared key's rate limit mid-loop, and every
+// later close then failed with linear_rate_limited, failing the run. A close
+// can only act on an issue that exists, so candidates are resolved from a
+// single scan and groups with no issue are recorded as `none` for free.
+export const CLOSE_SCAN_TITLE_TEXT = 'secadv-';
+export const CLOSE_SCAN_LABEL_PREFIX = 'remediation:secadv-';
+export const CLOSE_SCAN_PAGE_SIZE = 100;
+export const CLOSE_SCAN_MAX_PAGES = 5;
+
+const CLOSE_CANDIDATE_FIELDS = `
+  id identifier url title
+  state { id name type }
+  labels(first: 50) { nodes { id name } }
+`;
+
+export async function listSecadvIssueCandidates({
+  apiKey = process.env.LINEAR_API_KEY,
+  fetchImpl = fetch,
+} = {}) {
+  if (!apiKey) return { ok: false, reason: 'missing_linear_api_key' };
+  const nodes = [];
+  let cursor = null;
+  for (let page = 0; page < CLOSE_SCAN_MAX_PAGES; page += 1) {
+    const result = await linearRequest({
+      key: apiKey,
+      query: `
+        query ListSecadvCloseCandidates(
+          $teamFilterId: ID!
+          $titleText: String!
+          $labelPrefix: String!
+          $pageSize: Int!
+          $cursor: String
+        ) {
+          issues(
+            filter: {
+              team: { id: { eq: $teamFilterId } }
+              or: [
+                { title: { contains: $titleText } }
+                { labels: { some: { name: { startsWith: $labelPrefix } } } }
+              ]
+            }
+            first: $pageSize
+            after: $cursor
+          ) {
+            nodes { ${CLOSE_CANDIDATE_FIELDS} }
+            pageInfo { hasNextPage endCursor }
+          }
+        }
+      `,
+      variables: {
+        teamFilterId: JOVIE_TEAM_ID,
+        titleText: CLOSE_SCAN_TITLE_TEXT,
+        labelPrefix: CLOSE_SCAN_LABEL_PREFIX,
+        pageSize: CLOSE_SCAN_PAGE_SIZE,
+        cursor,
+      },
+      fetchImpl,
+    });
+    if (result.rateLimited) {
+      return {
+        ok: false,
+        reason: 'linear_rate_limited',
+        resetAt: result.resetAt,
+      };
+    }
+    if (!result.ok) {
+      return {
+        ok: false,
+        reason: `linear_close_scan_${result.status ?? 'error'}`,
+      };
+    }
+    if (Array.isArray(result.data?.errors) && result.data.errors.length > 0) {
+      return {
+        ok: false,
+        reason: 'linear_close_scan_graphql_error',
+        body: result.data.errors,
+      };
+    }
+    const collection = result.data?.data?.issues;
+    nodes.push(...(collection?.nodes ?? []));
+    const pageInfo = collection?.pageInfo;
+    if (!pageInfo?.hasNextPage) return { ok: true, nodes, truncated: false };
+    cursor = pageInfo.endCursor;
+  }
+  return { ok: true, nodes, truncated: true };
+}
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
 async function gh(args, token, { paginate = true } = {}) {
@@ -154,6 +252,75 @@ export async function recordBlindSource(
     throw new Error('Failed to persist the blind advisory repair card');
 }
 
+/**
+ * Run the planned closes against the scanned candidates. Fail-closed by
+ * construction: any close failure marks the result not ok, and the caller
+ * exits 1 unless EVERY failure is the shared Linear quota (which defers, exit
+ * 75). Rate-limited closes stop the loop; the remaining groups are deferred
+ * with ok:false so incomplete Linear work is never green.
+ */
+/**
+ * @typedef {Object} AdvisoryCloseResult
+ * @property {boolean} ok
+ * @property {string} [action]
+ * @property {string} [reason]
+ */
+/**
+ * @param {Object} input
+ * @param {Array<{fingerprint: string, fixedAt?: string, deployedAt?: string}>} input.closes
+ * @param {Array<unknown>} input.candidates
+ * @param {string} [input.runId]
+ * @param {string} [input.comment]
+ * @param {(group: {fingerprint: string, fixedAt?: string, deployedAt?: string}) => string} [input.commentFor]
+ * @param {(input: {fingerprint: string, runId?: string, comment?: string}) => Promise<AdvisoryCloseResult>} [input.close]
+ * @returns {Promise<{actions: Array<{fingerprint: string, op: string, ok: boolean, action: string | undefined, reason?: string}>, ok: boolean}>}
+ */
+export async function runAdvisoryCloses({
+  closes,
+  candidates,
+  runId,
+  comment,
+  commentFor = null,
+  close = closeLinearIssueByFingerprint,
+}) {
+  const actions = [];
+  let rateLimited = false;
+  let failed = false;
+  for (const g of closes) {
+    const candidate = rateLimited
+      ? null
+      : resolveLinearIssueByFingerprint(candidates, g.fingerprint);
+    if (!candidate) {
+      actions.push({
+        fingerprint: g.fingerprint,
+        op: 'close',
+        ok: !rateLimited,
+        action: rateLimited ? 'deferred_rate_limited' : 'none',
+      });
+      if (rateLimited) failed = true;
+      continue;
+    }
+    const r = await close({
+      fingerprint: g.fingerprint,
+      runId,
+      comment: commentFor ? commentFor(g) : comment,
+    });
+    const action = {
+      fingerprint: g.fingerprint,
+      op: 'close',
+      ok: r.ok,
+      action: r.action,
+    };
+    if (!r.ok) action.reason = r.reason;
+    actions.push(action);
+    if (!r.ok) {
+      if (r.reason === 'linear_rate_limited') rateLimited = true;
+      failed = true;
+    }
+  }
+  return { actions, ok: !failed };
+}
+
 async function main() {
   const argv = new Set(process.argv.slice(2));
   const check = argv.has('--check');
@@ -214,37 +381,62 @@ async function main() {
     const devin = await resolveLabelId('devin', process.env.LINEAR_API_KEY);
     if (!devin) throw new Error('Linear label "devin" not found');
     for (const g of plan.upserts.slice(0, MAX_UPSERTS_PER_RUN)) {
-      const r = await upsertLinearIssueByTitleFingerprint({
-        fingerprint: g.fingerprint,
-        title: issueTitle(g),
-        description: issueDescription(g),
-        priority: LINEAR_PRIORITY[g.severity],
-        createStateName: 'Todo',
-        reopenTerminal: true,
-        createLabelIds: [devin],
-      });
-      receipt.actions.push({
+      const r = await withLinearRetry(
+        () =>
+          upsertLinearIssueByTitleFingerprint({
+            fingerprint: g.fingerprint,
+            title: issueTitle(g),
+            description: issueDescription(g),
+            priority: LINEAR_PRIORITY[g.severity],
+            createStateName: 'Todo',
+            reopenTerminal: true,
+            createLabelIds: [devin],
+          }),
+        { fingerprint: g.fingerprint, op: 'upsert' }
+      );
+      const action = {
         fingerprint: g.fingerprint,
         op: 'upsert',
         ok: r.ok,
         action: r.action,
         id: r.identifier,
-      });
-      if (!r.ok) process.exitCode = 1;
+      };
+      if (!r.ok) action.reason = r.reason;
+      receipt.actions.push(action);
+      if (!r.ok) {
+        logFailedLinearAction(action);
+        process.exitCode = 1;
+      }
     }
-    for (const g of plan.closes) {
-      const r = await closeLinearIssueByFingerprint({
-        fingerprint: g.fingerprint,
-        runId: process.env.GITHUB_RUN_ID || now.toISOString(),
-        comment: `Fixed on main at ${g.fixedAt} and deployed: Production deployment at ${g.deployedAt} postdates the fix.`,
-      });
-      receipt.actions.push({
-        fingerprint: g.fingerprint,
-        op: 'close',
-        ok: r.ok,
-        action: r.action,
-      });
-      if (!r.ok && r.reason !== 'not_found') process.exitCode = 1;
+    if (plan.closes.length > 0) {
+      const scan = await withLinearRetry(
+        () =>
+          listSecadvIssueCandidates({
+            apiKey: process.env.LINEAR_API_KEY,
+          }),
+        { fingerprint: 'secadv-close-scan', op: 'scan' }
+      );
+      if (!scan.ok) {
+        receipt.actions.push({
+          fingerprint: 'secadv-close-scan',
+          op: 'scan',
+          ok: false,
+          action: scan.reason,
+        });
+      } else {
+        receipt.closeScan = {
+          scanned: scan.nodes.length,
+          truncated: scan.truncated,
+        };
+        const closeResult = await runAdvisoryCloses({
+          closes: plan.closes,
+          candidates: scan.nodes,
+          runId: process.env.GITHUB_RUN_ID || now.toISOString(),
+          commentFor: g =>
+            `Fixed on main at ${g.fixedAt} and deployed: Production deployment at ${g.deployedAt} postdates the fix.`,
+        });
+        receipt.actions.push(...closeResult.actions);
+      }
     }
   }
 
@@ -253,6 +445,23 @@ async function main() {
     JSON.stringify(receipt, null, 2)
   );
   console.log(JSON.stringify({ ...receipt, actions: receipt.actions.length }));
+  // Classify Linear failures once: quota-only failures re-attempt on the next
+  // loop run (defer, exit 75); any hard failure keeps exit 1. Upsert failures
+  // already logged and exited 1 above; scan/close failures log here.
+  const failures = receipt.actions.filter(a => !a.ok);
+  if (failures.length > 0) {
+    if (failures.every(isLinearRateLimitedAction)) {
+      if (process.exitCode !== 1) {
+        console.warn(
+          `::warning title=Linear quota deferred::${failures.length} Linear action(s) deferred on the workspace budget; the next loop run (4h clock or dependency push) resumes them.`
+        );
+        process.exitCode = 75;
+      }
+    } else {
+      for (const a of failures) if (a.op !== 'upsert') logFailedLinearAction(a);
+      process.exitCode = 1;
+    }
+  }
   if (
     check &&
     (plan.breaches.length > 0 || plan.expiredExceptions.length > 0)

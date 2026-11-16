@@ -1,0 +1,25 @@
+{
+  "schema": "jovie.pen-codegen-rules/v1",
+  "$comment": "Reviewed snaps for the EDH071 hero proposal. Each entry is Pen drift: the proposal uses off-palette greys and a 22px body size. Fix in Pen and delete the entry; the report lists every snap used.",
+  "colorOverrides": {
+    "#f5f5f7": {
+      "token": "text.primary",
+      "reason": "OKLab 0.006 from text.primary, imperceptible"
+    },
+    "#c3c7cf": {
+      "token": "text.secondary",
+      "reason": "OKLab 0.108: Pen lede is lighter than DS secondary; art-director call"
+    },
+    "#b5bbc5": {
+      "token": "text.secondary",
+      "reason": "OKLab 0.069 from text.secondary"
+    }
+  },
+  "typeOverrides": {
+    "inter:22": {
+      "size": "text-xl",
+      "reason": "22px is off the 10/12/14/16/20/24 scale; snapped to 20"
+    }
+  },
+  "links": { "Request Access": "/waitlist" }
+}

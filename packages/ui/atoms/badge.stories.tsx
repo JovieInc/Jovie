@@ -97,3 +97,51 @@ export const ConstrainedDestructiveLabel: Story = {
     },
   },
 };
+
+export const ErrorState: Story = {
+  args: {
+    variant: 'error',
+    children: 'Sync failed',
+  },
+  parameters: {
+    docs: {
+      description: {
+        story:
+          'Error tone for a failed status, using the semantic error tokens.',
+      },
+    },
+  },
+};
+
+export const LongContent: Story = {
+  render: () => (
+    <div className='w-40'>
+      <Badge>Featured on the editorial playlist this week</Badge>
+    </div>
+  ),
+  parameters: {
+    docs: {
+      description: {
+        story:
+          'A long label in a narrow container wraps inside the badge instead of overflowing it.',
+      },
+    },
+  },
+};
+
+export const Rtl: Story = {
+  render: () => (
+    <div dir='rtl' className='flex w-40 flex-wrap items-center gap-2'>
+      <Badge>جديد</Badge>
+      <Badge variant='success'>تم النشر على جميع المنصات</Badge>
+    </div>
+  ),
+  parameters: {
+    docs: {
+      description: {
+        story:
+          'Right-to-left labels keep their reading order and wrap within the container.',
+      },
+    },
+  },
+};

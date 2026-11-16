@@ -264,14 +264,11 @@ export function buildTaskPitchChatPrompt(params: {
       id: params.releaseId,
       label: params.releaseTitle,
     })}`,
-    'Generate the pitch for this release task.',
-    JSON.stringify({
-      releaseId: params.releaseId,
-      releaseTitle: params.releaseTitle,
-      taskTitle: params.taskTitle,
-      taskCategory: params.taskCategory ?? null,
-      instruction:
-        'Infer the destination from the task when possible. Ask me where to pitch it only when the task does not clearly map to a destination.',
-    }),
+    `Generate the pitch for my task "${params.taskTitle.trim()}"${
+      params.taskCategory
+        ? ` (${params.taskCategory.replaceAll('_', ' ')})`
+        : ''
+    }.`,
+    'Work out where to pitch it from the task, and ask me only if the task does not say.',
   ].join('\n');
 }

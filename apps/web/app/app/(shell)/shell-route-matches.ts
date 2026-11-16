@@ -85,6 +85,11 @@ export function resolveAppShellLoadingPath(
   return null;
 }
 
+/** Home (`/app`) renders the Opportunity Inbox. */
+export function isInboxShellRoute(pathname: string | null): boolean {
+  return matchesExactRoute(pathname, APP_ROUTES.DASHBOARD);
+}
+
 export function isChatShellRoute(pathname: string | null): boolean {
   return (
     matchesExactRoute(pathname, APP_ROUTES.DASHBOARD) ||
@@ -204,6 +209,15 @@ function isDashboardSubRoute(pathname: string | null): boolean {
 
 export function isSettingsShellRoute(pathname: string | null): boolean {
   return matchesRoutePrefix(pathname, APP_ROUTES.SETTINGS);
+}
+
+/** Earnings has no page of its own: it redirects into profile settings. */
+export function isEarningsShellRoute(pathname: string | null): boolean {
+  return matchesRoutePrefix(
+    pathname,
+    APP_ROUTES.EARNINGS,
+    APP_ROUTES.DASHBOARD_EARNINGS
+  );
 }
 
 function isLightweightShellRoute(pathname: string | null): boolean {

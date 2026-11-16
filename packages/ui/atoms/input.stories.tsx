@@ -174,3 +174,101 @@ export const LongPlaceholder: Story = {
     ),
   ],
 };
+
+export const Empty: Story = {
+  args: {
+    label: 'Artist name',
+    placeholder: 'Add the name fans know you by',
+    helpText: 'Shown at the top of your profile.',
+    id: 'input-empty',
+  },
+  decorators: [
+    Story => (
+      <div className='w-72'>
+        <Story />
+      </div>
+    ),
+  ],
+  parameters: {
+    docs: {
+      description: {
+        story:
+          'No value yet: the placeholder reads in the tertiary token and the feedback slot stays reserved.',
+      },
+    },
+  },
+};
+
+export const PartialEntry: Story = {
+  args: {
+    label: 'Artist URL',
+    defaultValue: 'https://jov.ie/',
+    id: 'input-partial',
+  },
+  decorators: [
+    Story => (
+      <div className='w-72'>
+        <Story />
+      </div>
+    ),
+  ],
+  parameters: {
+    docs: {
+      description: {
+        story:
+          'Only the label slot is supplied (no help text, status, or error) and the value is half entered.',
+      },
+    },
+  },
+};
+
+export const PermissionDenied: Story = {
+  args: {
+    label: 'Profile handle',
+    defaultValue: 'jovie',
+    readOnly: true,
+    helpText: 'Only workspace owners can change the profile handle.',
+    id: 'input-permission-denied',
+  },
+  decorators: [
+    Story => (
+      <div className='w-72'>
+        <Story />
+      </div>
+    ),
+  ],
+  parameters: {
+    docs: {
+      description: {
+        story:
+          'Read-only for a viewer without edit rights: the value stays selectable and the help text says who can change it.',
+      },
+    },
+  },
+};
+
+export const Rtl: Story = {
+  render: () => (
+    <div dir='rtl' className='grid w-64 gap-4'>
+      <Input
+        id='input-rtl-placeholder'
+        label='رابط الملف الشخصي للفنان كما يظهر للمعجبين'
+        placeholder='الصق رابط ملفك الشخصي الطويل هنا ليبقى مقصوصًا داخل الحقل'
+        helpText='يظهر هذا الرابط في صفحة الروابط الخاصة بك وفي جميع الإصدارات القادمة.'
+      />
+      <Input
+        id='input-rtl-value'
+        label='اسم الفنان'
+        defaultValue='فرقة الليل الطويل وأصدقاؤها من الموسيقيين المستقلين'
+      />
+    </div>
+  ),
+  parameters: {
+    docs: {
+      description: {
+        story:
+          'Arabic label, help text, placeholder, and value in a narrow right-to-left container: text aligns to the start and long values clip inside the field.',
+      },
+    },
+  },
+};

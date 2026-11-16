@@ -42,6 +42,11 @@ import {
  * with Stripe's documented test PaymentMethod and the signed event goes
  * through the real webhook route.
  */
+// One spec asserts one class: this file is the functional journey only.
+// The layout-shift budget for /claim and /billing/success lives in
+// claim-checkout-layout.perf.spec.ts and reports as its own check, so a
+// layout regression never turns the revenue canary red (docs/ON_CALL_PROCESS.md).
+
 test.describe('Self-serve artist profile checkout', () => {
   test.use({ storageState: { cookies: [], origins: [] } });
 
@@ -255,12 +260,24 @@ test.describe('Claim checkout dogfood', () => {
         `/${DOGFOOD_LOW_REACH_ARTIST.handle}/claim?next=auth`
       );
 
-      // At or above it: the buyer's own sign-up and checkout, never a dead end.
+      // At or above it: the buyer's own sign-up and checkout, never a dead
+      // end. One front door (Tim, 2026-11-09): anonymous claim start hands
+      // off into the /start onboarding chat with the artist context; the
+      // Pro-monthly intent rides the plan-intent cookies, not the URL.
       await options.filter({ hasText: DOGFOOD_HIGH_REACH_ARTIST.name }).click();
-      await expect(page).toHaveURL(/\/signup\?.*plan=pro/, { timeout: 30_000 });
+      await expect(page).toHaveURL(/\/start\?.*starter_prompt=/, {
+        timeout: 30_000,
+      });
       expect(decodeURIComponent(page.url())).toContain(
         DOGFOOD_HIGH_REACH_ARTIST.id
       );
+      const planIntentCookies = await page.context().cookies();
+      expect(
+        planIntentCookies.find(c => c.name === 'jovie_plan_intent')?.value
+      ).toBe('pro');
+      expect(
+        planIntentCookies.find(c => c.name === 'jv_claim_flow')?.value
+      ).toBe('1');
 
       await expect
         .poll(() => readFunnelStages(acquisitionId), { timeout: 15_000 })

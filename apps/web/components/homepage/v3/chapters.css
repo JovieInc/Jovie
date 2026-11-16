@@ -1,0 +1,465 @@
+/* Homepage v3 chapters at the approved 1440 frame (hero, profile, releases, invite). */
+
+.hv3-hero,
+.hv3-chapter {
+  background: var(--hv3-canvas);
+}
+
+.hv3-chapter {
+  position: relative;
+  overflow: hidden;
+  padding-bottom: 10rem;
+}
+
+.hv3-rule {
+  padding: 1.25rem var(--hv3-side) 0;
+  border-top: 1px solid var(--hv3-b1);
+}
+
+/* A stage spans exactly the content box. Its own coordinates are the 1248px
+   design frame (zoom scales its margins too, hence the division). */
+.hv3-frame {
+  margin-inline: calc(var(--hv3-side) / var(--hv3-z));
+}
+
+.hv3-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  height: 2.75rem;
+  padding: 0 1.375rem;
+  border-radius: var(--radius-sm);
+  font-size: 0.9375rem;
+  font-weight: 500;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.hv3-btn--primary {
+  background: var(--hv3-t1);
+  box-shadow:
+    inset 0 -1px 0 color-mix(in srgb, var(--hv3-shade) 20%, transparent),
+    0 0 0 1px color-mix(in srgb, var(--hv3-light) 10%, transparent);
+  color: var(--hv3-canvas);
+}
+
+.hv3-btn--ghost {
+  padding: 0 0.375rem;
+  color: var(--hv3-t1);
+}
+
+.hv3-btn:focus-visible {
+  outline: 2px solid var(--color-border-focus);
+  outline-offset: 2px;
+}
+
+/* ── Hero ─────────────────────────────────────────────────────────── */
+
+.hv3-hero {
+  position: relative;
+  height: 88.75rem;
+  overflow: hidden;
+  padding-top: 10.5rem;
+}
+
+/* JOV-INV-038: the headline dominates and the support line recedes, both in
+   semantic ink tokens. The approved v3 display scale (Tim, receipt
+   home-canonical-v3) is larger than the shared marketing title ramp. */
+.hv3-hero .marketing-hero-headline {
+  color: var(--color-text-primary-token);
+  font-size: 7rem;
+}
+
+.hv3-hero .marketing-hero-subtitle {
+  color: var(--color-text-secondary-token);
+  font-size: 1.25rem;
+}
+
+.hv3-hero__copy {
+  position: relative;
+  z-index: 3;
+  display: grid;
+  grid-template-columns: 7fr 5fr;
+  align-items: end;
+  column-gap: 1.5rem;
+  padding: 0 var(--hv3-side);
+}
+
+.hv3-hero__side {
+  padding-bottom: 0.5rem;
+}
+
+.hv3-hero__side .hv3-lede {
+  max-width: 27.5rem;
+}
+
+.hv3-ctas {
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+  margin-top: 2rem;
+}
+
+.hv3-hero__note {
+  margin-top: 1.25rem;
+}
+
+.hv3-stage--hero {
+  position: absolute;
+  top: 28.125rem;
+  right: calc(var(--hv3-side) / var(--hv3-z));
+  left: calc(var(--hv3-side) / var(--hv3-z));
+  height: 47.5rem;
+}
+
+/*
+ * Key light (Tim, 2026-11-12: "less ai slop more premium artdirected
+ * lighting"). One source, one hue, asymmetric: an Ion wedge from above the
+ * frame, right of the headline so the headline's zone stays black. Its apex
+ * stays out of sight: the beam only comes up out of the dark under the
+ * actions and opens onto the window's top edge, so it reads as light falling
+ * on the product, not as a shape behind the copy. The window stands in front
+ * of it; below the window it is spill. Everything else falls to black.
+ * The wedge is clipped on ::before and blurred here, so its edges are soft
+ * (a filter on the clipped element itself would leave them hard).
+ * Replaces the hero's rings, arc and glow blobs.
+ */
+.hv3-keylight {
+  position: absolute;
+  top: -26rem;
+  left: 46%;
+  /* container-width-allow: light geometry in the approved 1440 frame, not a page column */
+  width: 34rem;
+  height: 78rem;
+  filter: blur(1.75rem);
+  pointer-events: none;
+}
+
+.hv3-keylight::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    180deg,
+    transparent 15%,
+    color-mix(in srgb, var(--hv3-ion) 4%, transparent) 20%,
+    color-mix(in srgb, var(--hv3-ion) 11%, transparent) 27%,
+    color-mix(in srgb, var(--hv3-ion) 7%, transparent) 55%,
+    transparent 80%
+  );
+  clip-path: polygon(44% 0, 56% 0, 100% 100%, 0 100%);
+}
+
+/* Where the beam meets the window's top edge: a hard 1px rim, brightest
+   under the beam's centre, gone at both ends. */
+.hv3-rig--hero .hv3-window::before {
+  left: 30%;
+  width: 60%;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    color-mix(in srgb, var(--hv3-ion) 80%, transparent) 55%,
+    transparent
+  );
+}
+
+/* The window's own corner glow answered the old arc; under a top key it
+   would be a second source. */
+.hv3-rig--hero .hv3-app::after {
+  content: none;
+}
+
+/* Top light on the window's surface, falling off down the list. */
+.hv3-rig--hero .hv3-sheen {
+  inset: 0;
+  width: auto;
+  background: radial-gradient(
+    45% 55% at 64% 0,
+    color-mix(in srgb, var(--hv3-light) 6%, transparent),
+    transparent 70%
+  );
+}
+
+/* The release page is lit from above, not from the corner: bright top edge,
+   dark flanks. */
+.hv3-rig--hero .hv3-lift--page.hv3-edge::after {
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--hv3-light) 30%, transparent),
+    color-mix(in srgb, var(--hv3-light) 5%, transparent) 18%,
+    color-mix(in srgb, var(--hv3-light) 2%, transparent)
+  );
+}
+
+.hv3-rig--hero {
+  top: 3.75rem;
+  left: 0;
+  width: var(--hv3-box);
+  height: 36.5rem;
+  transform: var(--hv3-cam);
+  transform-origin: 0 0;
+}
+
+/* The release page sits on the third column of the box, its right edge on
+   the window's, lifted by shadow alone. It is the 390 phone scaled to the
+   column and runs past the window's foot far enough to show the first listen
+   rows under the title, fading out the way a page keeps going below the
+   fold. */
+.hv3-lift--page {
+  top: 1.75rem;
+  left: calc(var(--hv3-col2) + 1.5rem);
+  width: var(--hv3-col1);
+  height: 44rem;
+  border-radius: calc(var(--radius-3xl) + var(--radius-sm));
+  mask-image: linear-gradient(var(--hv3-shade) 78%, transparent);
+  transform: translateY(var(--hv3-par, 0px));
+}
+
+.hv3-phone.hv3-phone--hero {
+  inset: 0 auto auto 0;
+  width: 24.375rem;
+  height: 53.75rem;
+  /* The lift's mask clips anything outside its box, so the page's edge is an
+     inner hairline that fades out with it. */
+  box-shadow: inset 0 0 0 1px var(--hv3-b2);
+  transform: scale(1.0256);
+  transform-origin: 0 0;
+}
+
+.hv3-index {
+  position: absolute;
+  right: var(--hv3-side);
+  bottom: 0;
+  left: var(--hv3-side);
+  z-index: 4;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  padding: 1.25rem 0 1.75rem;
+  border-top: 1px solid var(--hv3-b1);
+  background: linear-gradient(transparent, var(--hv3-canvas) 30%);
+  list-style: none;
+}
+
+.hv3-index a {
+  display: inline-flex;
+  gap: 0.625rem;
+}
+
+.hv3-index b {
+  color: var(--hv3-t4);
+  font-weight: 500;
+}
+
+/* ── Profile ──────────────────────────────────────────────────────── */
+
+/* Two equal columns so "Found everywhere." sets on one line, as the
+   headline's break data and the approved 390 still set it (a one-word last
+   line fails the route DOM taste ratchet). The stage offsets below subtract
+   the 6.375rem the stage column moved, so the phone renders where v3 put it. */
+.hv3-split {
+  display: grid;
+  grid-template-columns: 6fr 6fr;
+  align-items: center;
+  column-gap: 1.5rem;
+  padding: 7.5rem var(--hv3-side) 0;
+}
+
+.hv3-split .hv3-statement {
+  margin-left: -0.05em;
+}
+
+/* The copy sits high enough that the one-line "Found everywhere." clears
+   the "get updates" callout row beside the phone. */
+.hv3-split > .hv3-reveal {
+  align-self: start;
+  padding-top: 7rem;
+}
+
+.hv3-split .hv3-body {
+  max-width: 28.75rem;
+  margin-top: 2rem;
+}
+
+.hv3-rows {
+  max-width: 30.75rem;
+  margin-top: 3rem;
+}
+
+.hv3-rows > div {
+  display: flex;
+  justify-content: space-between;
+  padding: 1rem 0;
+  border-top: 1px solid var(--hv3-b1);
+  font-size: 0.875rem;
+}
+
+.hv3-rows > div:last-child {
+  border-bottom: 1px solid var(--hv3-b1);
+}
+
+.hv3-rows dt {
+  color: var(--hv3-t1);
+}
+
+.hv3-rows dd {
+  color: var(--hv3-t3);
+}
+
+.hv3-stage--profile {
+  height: 53.75rem;
+}
+
+.hv3-stage--profile > .hv3-orbit {
+  top: -0.625rem;
+  left: -2.625rem;
+}
+
+.hv3-stage--profile .hv3-bounce {
+  top: 47.5rem;
+  left: -1.375rem;
+  width: 43.75rem;
+  height: 10rem;
+}
+
+.hv3-rig--profile {
+  top: 4.375rem;
+  left: 9.25rem;
+  width: 19.375rem;
+  height: 33.8125rem;
+  transform: var(--hv3-cam) scale(1.38);
+  transform-origin: 50% 0;
+}
+
+/* ── Releases ─────────────────────────────────────────────────────── */
+
+.hv3-centered {
+  padding-top: 10rem;
+  text-align: center;
+}
+
+.hv3-centered .hv3-lede {
+  margin-top: 1.75rem;
+}
+
+.hv3-stage--releases {
+  height: 57rem;
+  margin-top: 1.5rem;
+}
+
+.hv3-stage--releases > .hv3-orbit {
+  top: 2.5rem;
+  left: calc(50% - 20.625rem);
+}
+
+.hv3-stage--releases .hv3-bounce {
+  top: 46rem;
+  left: 10.875rem;
+  /* container-width-allow: stage geometry in the approved 1440 frame, not a page column */
+  width: 56.25rem;
+  height: 11.25rem;
+}
+
+/* The catalog spans the first two caption columns and the release page the
+   third, so each pane's edges sit on the grid the captions below it use. */
+.hv3-rig--releases {
+  top: 6.875rem;
+  left: 0;
+  width: var(--hv3-box);
+  height: 40rem;
+  transform-origin: 0 0;
+}
+
+.hv3-plate {
+  position: absolute;
+  top: 3.75rem;
+  left: 0;
+  width: calc(var(--hv3-col2) / 1.12);
+  height: 29.5rem;
+  overflow: hidden;
+  border-radius: var(--radius-lg);
+  background: var(--hv3-shell);
+  box-shadow: var(--hv3-cast);
+  transform: scale(1.12);
+  transform-origin: 0 0;
+}
+
+.hv3-phone.hv3-phone--release {
+  top: -5.875rem;
+  left: calc(var(--hv3-col2) + 1.5rem);
+  width: 24.375rem;
+  height: 53.75rem;
+  border-radius: calc(var(--radius-3xl) + var(--radius-lg));
+  background: var(--hv3-canvas);
+  /* The 390px phone scaled to the 25rem column: 25 / 24.375. */
+  transform: scale(1.0256);
+  transform-origin: 0 0;
+}
+
+.hv3-captions {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  column-gap: 1.5rem;
+  padding: 0 var(--hv3-side);
+}
+
+.hv3-captions > div {
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--hv3-b1);
+}
+
+.hv3-captions h3 {
+  font-size: 1rem;
+  font-weight: 500;
+  line-height: 1.5rem;
+}
+
+.hv3-captions p {
+  max-width: 22.5rem;
+  margin-top: 0.25rem;
+  color: var(--hv3-t3);
+  font-size: 0.9375rem;
+  line-height: 1.5rem;
+}
+
+/* ── Invite ───────────────────────────────────────────────────────── */
+
+.hv3-invite__inner {
+  position: relative;
+  padding-top: 11.25rem;
+  text-align: center;
+}
+
+.hv3-invite__inner > * {
+  position: relative;
+}
+
+.hv3-invite .hv3-lede {
+  max-width: 30rem;
+  margin-top: 1.5rem;
+}
+
+.hv3-steps {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1.5rem;
+  margin: 12.5rem var(--hv3-side) 0;
+  list-style: none;
+  text-align: left;
+}
+
+.hv3-steps li {
+  display: grid;
+  gap: 0.375rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--hv3-b1);
+}
+
+.hv3-steps b {
+  font-size: 0.9375rem;
+  font-weight: 500;
+}
+
+.hv3-steps li > span:last-child {
+  color: var(--hv3-t3);
+  font-size: 0.875rem;
+}

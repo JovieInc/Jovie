@@ -136,7 +136,7 @@ function changedFiles(diffBase) {
   const result = spawnSync(
     'git',
     ['diff', '--diff-filter=ACMR', '--name-only', `${diffBase}...HEAD`],
-    { cwd: REPO_ROOT, encoding: 'utf8' }
+    { maxBuffer: 256 * 1024 * 1024, cwd: REPO_ROOT, encoding: 'utf8' }
   );
   if (result.status !== 0) {
     throw new Error(
@@ -1731,7 +1731,7 @@ function existedAtDiffBase(diffBase, sourceRel) {
   const result = spawnSync(
     'git',
     ['cat-file', '-e', `${diffBase}:${sourceRel}`],
-    { cwd: REPO_ROOT, encoding: 'utf8' }
+    { maxBuffer: 256 * 1024 * 1024, cwd: REPO_ROOT, encoding: 'utf8' }
   );
   return result.status === 0;
 }

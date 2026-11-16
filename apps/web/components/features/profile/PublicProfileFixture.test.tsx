@@ -34,6 +34,8 @@ vi.mock('@/features/profile/templates/ProfileCompactTemplate', () => ({
     tourDates,
     showPayButton,
     releaseCredits,
+    releases,
+    allowFanCapture,
   }: {
     artist: { name: string };
     embeddedPreview: boolean;
@@ -41,6 +43,8 @@ vi.mock('@/features/profile/templates/ProfileCompactTemplate', () => ({
     tourDates: readonly TourDateViewModel[];
     showPayButton?: boolean;
     releaseCredits?: readonly unknown[];
+    releases?: readonly { title: string }[];
+    allowFanCapture?: boolean;
   }) => (
     <div
       data-preview={String(embeddedPreview)}
@@ -48,6 +52,8 @@ vi.mock('@/features/profile/templates/ProfileCompactTemplate', () => ({
       data-tour-dates={String(tourDates.length)}
       data-show-pay={String(Boolean(showPayButton))}
       data-release-credits={String(releaseCredits?.length ?? 0)}
+      data-fan-capture={String(Boolean(allowFanCapture))}
+      data-release-titles={(releases ?? []).map(r => r.title).join('|')}
     >
       <h1>{artist.name}</h1>
       {profileBanner}
@@ -56,6 +62,16 @@ vi.mock('@/features/profile/templates/ProfileCompactTemplate', () => ({
 }));
 
 describe('PublicProfileFixture', () => {
+  it('renders the single-word clipping regression through the real fixture props', () => {
+    render(<PublicProfileFixture displayName='UNMARKED' />);
+
+    expect(
+      screen.getByRole('heading', { name: 'UNMARKED' })
+    ).toBeInTheDocument();
+    expect(screen.getByTestId('public-claim-banner')).toHaveTextContent(
+      'UNMARKED'
+    );
+  });
   it('paints the profile content in server HTML before JavaScript runs', () => {
     const html = renderToString(<PublicProfileFixture state='claimed' />);
     expect(html).toContain('data-testid="profile-template"');
@@ -140,6 +156,22 @@ describe('PublicProfileFixture', () => {
     expect(screen.getByTestId('profile-template')).toHaveAttribute(
       'data-tour-dates',
       '0'
+    );
+  });
+
+  it('mounts the desktop rail and overlong titles only when asked', () => {
+    const { rerender } = render(<PublicProfileFixture />);
+    const template = () => screen.getByTestId('profile-template');
+    expect(template()).toHaveAttribute('data-fan-capture', 'false');
+    expect(template().getAttribute('data-release-titles')).not.toContain(
+      'Extended Midnight Radio Orchestra Remix'
+    );
+
+    rerender(<PublicProfileFixture fanCapture longTitles />);
+    expect(template()).toHaveAttribute('data-fan-capture', 'true');
+    const titles = template().getAttribute('data-release-titles') ?? '';
+    expect(titles.split('|').every(t => t.endsWith('Orchestra Remix)'))).toBe(
+      true
     );
   });
 });

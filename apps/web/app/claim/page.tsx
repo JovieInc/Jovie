@@ -5,7 +5,6 @@ import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeade
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { CookieBannerSection } from '@/components/organisms/CookieBannerSection';
 import { StandaloneProductPage } from '@/components/organisms/StandaloneProductPage';
-import { APP_NAME } from '@/constants/app';
 import { SUPPORT_EMAIL } from '@/constants/domains';
 import { APP_ROUTES } from '@/constants/routes';
 import {
@@ -19,14 +18,17 @@ import {
 } from '@/lib/claim/artist-offer-claim';
 import { resolveInitialCookieBannerVisible } from '@/lib/cookies/banner-initial-visibility.server';
 import { getRootLayoutChromeState } from '@/lib/demo-recording';
+import { HomepageQueryProvider } from '../(home)/HomepageQueryProvider';
 import { ClaimArtistSearch } from './ClaimArtistSearch';
 
 const PRO_CLAIM = getPublicPriceClaim('pro');
 const PRICE_DISPLAY = formatPublicPriceDisplay(PRO_CLAIM);
 
 export const metadata: Metadata = {
-  title: `Claim your artist profile | ${APP_NAME}`,
+  // The root layout's title template appends the brand.
+  title: 'Claim your artist profile',
   description: `Find or create your artist profile and get ${PRO_CLAIM.displayName} for ${PRICE_DISPLAY}.`,
+  alternates: { canonical: APP_ROUTES.CLAIM },
 };
 
 interface StateCopy {
@@ -82,7 +84,11 @@ export default async function ClaimPage({
     }).shouldRenderCookieBanner && (await resolveInitialCookieBannerVisible());
 
   return (
-    <StandaloneProductPage width='sm' centered>
+    // Top-aligned, not centered: centering re-centers the card each time the
+    // search results change height, so the whole card jumps while typing.
+    // h-svh makes the page its own scroll container: html and body never
+    // scroll here, so a min-height page would clip the card on short phones.
+    <StandaloneProductPage width='sm' className='h-svh sm:pt-24'>
       {showCookieBanner ? <CookieBannerSection initialVisible /> : null}
       <div className='space-y-4' data-testid='claim-page'>
         {stateCopy ? (
@@ -107,11 +113,19 @@ export default async function ClaimPage({
         <ContentSurfaceCard className='overflow-hidden'>
           <ContentSectionHeader
             headingLevel='h1'
+            className='px-5 py-4 sm:px-6'
+            titleClassName='text-base'
+            subtitleClassName='mt-1 text-sm leading-5'
             title='Claim Your Artist Profile'
             subtitle={`${PRO_CLAIM.displayName} is ${PRICE_DISPLAY}. Cancel anytime.`}
           />
           <div className='px-5 py-5 sm:px-6'>
-            <ClaimArtistSearch />
+            {/* /claim has no layout of its own and the root layout provides no
+                QueryClientProvider, so the search hook would throw "No
+                QueryClient set" during SSR without this scoped client. */}
+            <HomepageQueryProvider>
+              <ClaimArtistSearch />
+            </HomepageQueryProvider>
           </div>
         </ContentSurfaceCard>
       </div>

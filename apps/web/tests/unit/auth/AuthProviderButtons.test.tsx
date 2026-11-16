@@ -66,10 +66,7 @@ describe('AuthProviderButtonSlots', () => {
       </div>
     );
     const button = screen.getByRole('button');
-    expect(button.querySelector('img')).toHaveAttribute(
-      'src',
-      '/auth/apple-logo.svg'
-    );
+    expect(button.querySelector('svg')).toHaveAttribute('aria-hidden', 'true');
     const touch = { changedTouches: [{ clientX: 10, clientY: 10 }] };
     Object.defineProperty(document, 'elementFromPoint', {
       configurable: true,
@@ -92,10 +89,34 @@ describe('AuthProviderButtonSlots', () => {
     const google = screen.getByRole('button', { name: 'Continue with Google' });
     const apple = screen.getByRole('button', { name: 'Continue with Apple' });
     expect(apple.className).toBe(google.className);
-    const gi = google.querySelector('img')!;
-    const ai = apple.querySelector('img')!;
-    expect(ai.getAttribute('width')).toBe(gi.getAttribute('width'));
+    const gi = google.querySelector('[data-auth-provider-face] img')!;
+    const ai = apple.querySelector('[data-auth-provider-face] svg')!;
+    expect(ai.getAttribute('width')).toBe('16');
+    expect(gi.getAttribute('width')).toBe('16');
     expect(ai.getAttribute('height')).toBe(gi.getAttribute('height'));
+    expect(apple.querySelector('[data-auth-provider-face]')?.className).toBe(
+      google.querySelector('[data-auth-provider-face]')?.className
+    );
+  });
+
+  it('lists Google before Apple, as Pen oaz9c does', () => {
+    render(
+      <AuthProviderButtonSlots providers={getEnabledAuthOAuthProviders()} />
+    );
+    expect(
+      screen.getAllByRole('button').map(b => b.dataset.authProviderSlot)
+    ).toEqual(['google', 'apple']);
+  });
+
+  it('pins the Pen oaz9c 28px face with a visible hairline', () => {
+    const css = readFileSync(join(process.cwd(), 'styles/theme.css'), 'utf8');
+    const face = css.match(/\n\.auth-provider-face \{([^}]*)\}/)?.[1] ?? '';
+
+    expect(face).toMatch(/min-height: 28px;/);
+    expect(face).toMatch(/padding: 0 16px;/);
+    // The transparent pill has no fill, so the subtle hairline vanished.
+    expect(face).toMatch(/border: 1px solid var\(--color-border-default\);/);
+    expect(face).not.toMatch(/--color-border-subtle/);
   });
 
   it('keeps type and geometry shared in theme.css, not per provider', () => {

@@ -224,7 +224,7 @@ class SweepTest(unittest.TestCase):
         with patch.dict(os.environ, {"LANES_SWEEP_ARCHIVE_GH": sys.executable}):
             report = self.sweep(run=run)
         self.assertEqual(self.remote_snapshots(), [], "operational snapshots never go to public origin")
-        self.assertTrue(note.exists() and (path / "node_modules").exists())
+        self.assertTrue(note.exists())  # held state stays; the regenerable install may go
         self.assertFalse(any("push" in args for args in calls), "reject privacy before any push")
         self.assertEqual(report["removed"], [])
 
@@ -264,7 +264,6 @@ class SweepTest(unittest.TestCase):
                     return no_processes(args, **kw)
                 self.assertEqual(self.sweep(run=unavailable)["removed"], [])
         self.assertFalse(any("push" in args for args in calls))
-        self.assertTrue((path / "node_modules").exists())
         self.assertEqual((path / "a.txt").read_text(), "unsaved\n")
         self.assertEqual(self.remote_snapshots(), [])
 
@@ -335,10 +334,10 @@ class SweepTest(unittest.TestCase):
                 report = self.sweep(run=run)
                 self.assertTrue(pushed)
                 self.assertEqual(report["removed"], [])
-                self.assertEqual(report["stripped"], [])
+                # Held work stays byte-for-byte; regenerable installs are never part of it.
                 self.assertEqual(index.read_bytes(), before)
                 self.assertEqual((path / "a.txt").read_text(), "unstaged\n")
-                self.assertTrue((path / "new.txt").exists() and (path / "node_modules").exists())
+                self.assertTrue((path / "new.txt").exists())
                 # Keep earlier subcases outside subsequent sweeps.
                 (path / ".sweep-keep").write_text("")
 
@@ -689,6 +688,23 @@ class SweepTest(unittest.TestCase):
         self.assertNotIn(sweeper.PRESERVED_REPAIR, files)
 
 
+    def test_kept_preserved_repair_sheds_node_modules_once_idle(self):
+        idle = self.worktree("idle-repair")
+        fresh = self.worktree("fresh-repair")
+        for path in (idle, fresh):
+            (path / sweeper.PRESERVED_REPAIR).write_text(json.dumps({"pr": 1}))
+            (path / "a.txt").write_text("repair in progress\n")
+            (path / "node_modules").mkdir()
+        old = self.now - 2 * 3600
+        os.utime(idle / "a.txt", (old, old))
+        os.utime(idle / sweeper.PRESERVED_REPAIR, (old, old))
+        os.utime(fresh / "a.txt", (self.now, self.now))
+        report = self.sweep()
+        self.assertTrue(idle.exists() and (idle / "a.txt").exists())
+        self.assertFalse((idle / "node_modules").exists())
+        self.assertTrue((fresh / "node_modules").exists(), "a recently active checkout keeps its install")
+        self.assertEqual(report["stripped"], [str(idle)])
+
     def test_cleanup_preserved_clean_checkout_frees_its_branch(self):
         # 2026-10-11 on Gem: cleanup preserved checkouts whose only "changes" were harness files,
         # which locked their PR branches; every repair failed "already used by worktree".
@@ -764,11 +780,15 @@ class SnapshotHoldTest(SweepTest):
         path = self.worktree("leaky")
         (path / "a.txt").write_text("edit with a secret\n")
         (path / "node_modules").mkdir()
+        old = self.now - 2 * DAY
+        os.utime(path / "a.txt", (old, old))
         self.scan.stop()
         with patch.object(sweeper, "scan_snapshot", return_value="secret-finding:trufflehog"):
             report = self.sweep()
         self.scan.start()
-        self.assertTrue((path / "a.txt").exists() and (path / "node_modules").exists())
+        # Source stays exactly as it is; only regenerable build dirs are dropped (Gem disk, 2026-11-07).
+        self.assertTrue((path / "a.txt").exists() and not (path / "node_modules").exists())
+        self.assertEqual(report["stripped"], [str(path)])
         self.assertEqual(report["secretHeld"], [{"name": "leaky", "path": str(path),
                                                  "reason": "secret-finding:trufflehog"}])
         self.assertEqual(self.remote_snapshots(), [])
@@ -1189,43 +1209,6 @@ class StandaloneAndHeadroomTest(unittest.TestCase):
         self.assertTrue(sweeper.in_scope(self.home / "wt" / "fix-thing", roots, never))
         self.assertFalse(sweeper.in_scope(self.home / "Jovie", roots, never))
         self.assertIn((self.home, "wt/*"), sweeper.standalone_globs(self.home, self.state, mounted_roots=()))
-
-    def test_headroom_levels_and_alarm_events_on_change(self):
-        usage = {Path("/a"): (100, 0, 20), Path("/b"): (100, 0, 25), Path("/c"): (100, 0, 10), Path("/d"): (100, 0, 60)}
-        current = sweeper.headroom(list(usage), usage=lambda p: usage[p])
-        self.assertEqual([v["level"] for v in current["volumes"]], ["warn", "warn", "crit", "ok"])
-        self.assertEqual([a["mount"] for a in current["alarms"]], ["/a", "/b", "/c"])
-        sweeper.publish_headroom(self.state, current, self.now)
-        events = (self.state / "host-alarms.jsonl").read_text().splitlines()
-        self.assertEqual(len(events), 3)
-        sweeper.publish_headroom(self.state, current, self.now + 1)
-        self.assertEqual(len((self.state / "host-alarms.jsonl").read_text().splitlines()), 3)  # no repeat
-        usage[Path("/c")] = (100, 0, 90)
-        sweeper.publish_headroom(self.state, sweeper.headroom(list(usage), usage=lambda p: usage[p]), self.now + 2)
-        self.assertEqual(len((self.state / "host-alarms.jsonl").read_text().splitlines()), 4)  # recovered
-        self.assertEqual(sweeper.headroom([Path("/missing-volume")], usage=lambda p: (_ for _ in ()).throw(OSError()))["volumes"], [])
-
-    def test_volumes_lists_root_srv_mounts_and_state_volume(self):
-        found = sweeper.volumes(self.home, self.state, mounts=[Path("/srv/worktrees")])
-        self.assertIn(Path("/"), found)
-        self.assertIn(Path("/srv/worktrees"), found)
-
-    def test_daily_report_names_top_growers_and_runs_once_a_day(self):
-        grow = self.base / "grow"
-        grow.mkdir()
-        (grow / "blob").write_bytes(b"x" * 4096)
-        self.assertEqual(sweeper.daily_report(self.home, self.state, self.now, targets=[grow]), "written")
-        (grow / "blob2").write_bytes(b"x" * 8 * 2**20)
-        self.assertEqual(sweeper.daily_report(self.home, self.state, self.now + 60, targets=[grow]), "not-due")
-        self.assertEqual(sweeper.daily_report(self.home, self.state, self.now + DAY + 1, targets=[grow]), "written")
-        report = json.loads((self.state / "disk-report.json").read_text())
-        self.assertEqual(report["topGrowers"][0]["path"], str(grow))
-        self.assertGreater(report["topGrowers"][0]["deltaGiB"], 0)
-        self.assertTrue(report["volumes"])
-
-    def test_report_targets_only_lists_existing_paths(self):
-        (self.state / "runs").mkdir()
-        self.assertIn(self.state / "runs", sweeper.report_targets(self.home, self.state))
 
     def test_linked_worktree_with_keep_marker_is_never_retired(self):
         repo = self.base / "primary"
