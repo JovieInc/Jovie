@@ -8,6 +8,18 @@ export const check = (value, message) => {
 export const sha = bytes => createHash('sha256').update(bytes).digest('hex');
 export const sorted = values => [...new Set(values)].sort();
 const inside = (file, directory) => file.startsWith(`${directory}${sep}`);
+export function buildInfoPath(name, cache, tools, libraries) {
+  check(typeof name === 'string', 'Invalid graph filename');
+  if (!/^lib(?:\.[a-z0-9]+)*\.d\.ts$/iu.test(name))
+    return resolve(dirname(cache), name);
+  check(
+    libraries && inside(resolve(libraries), resolve(tools)),
+    'Bare standard library lacks a pinned compiler location'
+  );
+  const path = resolve(libraries, name);
+  check(existsSync(path), `Pinned standard library missing: ${name}`);
+  return path;
+}
 export const info = value =>
   typeof value === 'string'
     ? { version: value }
@@ -48,18 +60,9 @@ export function readGraph(cache, root, tools, libraries = null) {
       'Contradictory fileInfo module formats'
     );
   }
-  const paths = raw.fileNames.map(name => {
-    check(typeof name === 'string', 'Invalid graph filename');
-    if (!/^lib(?:\.[a-z0-9]+)*\.d\.ts$/iu.test(name))
-      return resolve(dirname(cache), name);
-    check(
-      libraries && inside(resolve(libraries), resolve(tools)),
-      'Bare standard library lacks a pinned compiler location'
-    );
-    const path = resolve(libraries, name);
-    check(existsSync(path), `Pinned standard library missing: ${name}`);
-    return path;
-  });
+  const paths = raw.fileNames.map(name =>
+    buildInfoPath(name, cache, tools, libraries)
+  );
   const roots = raw.root.flatMap(item => {
     if (!Array.isArray(item)) return [item];
     check(

@@ -4,7 +4,13 @@ import { existsSync, readFileSync, realpathSync, statSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { dirname, relative, resolve } from 'node:path';
 
-import { check, info, sha, sorted } from './native-typecheck-buildinfo.mjs';
+import {
+  buildInfoPath,
+  check,
+  info,
+  sha,
+  sorted,
+} from './native-typecheck-buildinfo.mjs';
 
 const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 
@@ -77,12 +83,11 @@ export function assertGraphParity(
     );
     const raw = JSON.parse(bytes.toString());
     const paths = raw.fileNames.map(name =>
-      resolve(
-        /^lib(?:\.[a-z0-9]+)*\.d\.ts$/iu.test(name) &&
-          graph.metadata.libraryDirectory
-          ? graph.metadata.libraryDirectory
-          : dirname(graph.metadata.rawBuildInfoPath),
-        name
+      buildInfoPath(
+        name,
+        graph.metadata.rawBuildInfoPath,
+        graph.metadata.toolsDirectory,
+        graph.metadata.libraryDirectory
       )
     );
     auxiliaryContexts.set(
