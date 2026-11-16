@@ -320,17 +320,14 @@ jobs:
           node scripts/test-quality-loop.mjs ratchet --state "$state_dir/sweep-state.json" || true
           [ "$ui_status" -eq 0 ] || { echo "::error::packages/ui mutation sweep exited $ui_status"; exit "$ui_status"; }
 
-      # The only step that sees a secret. It reads the task JSON the sweep wrote
-      # and never runs Stryker or repo tests.
-      - name: File survivor issues
-        if: ${{ always() && steps.capacity.outputs.run == 'true' && steps.portable_state.outcome == 'success' }}
-        env:
-          LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
-          REMEDIATION_TRIGGERS_DISABLED: ${{ vars.REMEDIATION_TRIGGERS_DISABLED }}
+      # Exact survivor text is prepared for review; this step has no outbound credential.
+      - name: Prepare survivor issue drafts
+        if: ${{ always() && steps.capacity.outputs.run == 'true' && steps.portable_state.outcome == 'success' && hashFiles('.cache/jovie-mutation/sweep-state.json') != '' }}
         run: |
           node scripts/mutation-sweep-file-issues.mjs \
             --tasks ".cache/jovie-mutation/survivor-tasks" \
-            --run-url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+            --state ".cache/jovie-mutation/sweep-state.json" \
+            --drafts ".cache/jovie-mutation/survivor-drafts.json"
 
       # No clock: the backlog drains by chaining. The next run starts only if
       # this one made progress and modules remain; a busy host stops the chain
@@ -339,7 +336,13 @@ jobs:
         if: steps.score.outputs.remaining != '' && steps.score.outputs.remaining != '0' && steps.score.outputs.scored != '0'
         env:
           GH_TOKEN: ${{ github.token }}
-        run: node packages/api-client/cli.ts gh --priority default -- workflow run mutation-diff.yml --ref main -f mode=sweep -f max_files=6
+        run: |
+          set -euo pipefail
+          queued=$(node packages/api-client/cli.ts gh --priority default -- api "repos/$GITHUB_REPOSITORY/actions/workflows/mutation-diff.yml/runs?status=queued&branch=main&per_page=1" --jq '.total_count')
+          active=$(node packages/api-client/cli.ts gh --priority default -- api "repos/$GITHUB_REPOSITORY/actions/workflows/mutation-diff.yml/runs?status=in_progress&branch=main&per_page=1" --jq '.total_count')
+          [[ "$queued" =~ ^[0-9]+$ && "$active" =~ ^[0-9]+$ ]] || { echo "Queued sweep inventory unknown; not dispatching."; exit 1; }
+          if [ "$queued" -gt 0 ] || [ "$active" -ne 1 ]; then echo "Mutation workflow inventory is not exclusive; no duplicate dispatch."; exit 0; fi
+          node packages/api-client/cli.ts gh --priority default -- workflow run mutation-diff.yml --ref main -f mode=sweep -f max_files=6
 
       - name: Save sweep state
         if: ${{ always() && steps.capacity.outputs.run == 'true' && steps.portable_state.outcome == 'success' && hashFiles('.cache/jovie-mutation/sweep-state.json') != '' }}
@@ -360,7 +363,7 @@ jobs:
           mkdir -p "$out_dir"
           cp "$state_dir/sweep-state.json" "$out_dir/"
           for file in "$state_dir/sweep-state.json.runs.jsonl" \
-            "$RUNNER_TEMP/test-quality-latest.json" "$RUNNER_TEMP/baseline-proposal.json"; do
+            "$RUNNER_TEMP/test-quality-latest.json" "$RUNNER_TEMP/baseline-proposal.json" "$state_dir/survivor-drafts.json"; do
             if [ -f "$file" ]; then cp "$file" "$out_dir/"; fi
           done
           if [ -d "$state_dir/survivor-tasks" ]; then
