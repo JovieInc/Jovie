@@ -455,8 +455,11 @@ console.log(JSON.stringify(JSON.parse(readFileSync(0, 'utf8')).map(body =>
             "gh run list --workflow=fleet-rules-evidence.yml\n"
             "- Verify: https://github.com/JovieInc/Jovie/actions/runs/123\n"
         )
-        for command, url in cases:
-            body = (f"## Summary\nKeep this.\n\n## Red-before-green\n"
+        cases = [(cmd, url, "## Red-before-green") for cmd, url in cases]
+        cases.extend(("node --test", run_url, heading) for heading in
+                     ("  ## Red-before-green", "##Red-before-green"))
+        for command, url, heading in cases:
+            body = (f"## Summary\nKeep this.\n\n{heading}\n"
                     f"- Failing command: `{command}`\n- Failing run (before fix): {url}\n"
                     "\n## Blast radius\nWhat could break: repair evidence.\nProof: regression tests.\n"
                     + win_section)
@@ -465,7 +468,7 @@ console.log(JSON.stringify(JSON.parse(readFileSync(0, 'utf8')).map(body =>
                 written.append(Path(args[-1]).read_text())
                 return (0, "")
             shell = Shell({("pr", "view"): (0, body), ("pr", "edit"): edit})
-            with self.subTest(command=command, url=url):
+            with self.subTest(command=command, url=url, heading=heading):
                 self.assertTrue(events.ensure_red_before_green(self.PR, sh=shell))
                 self.assertEqual(len(written), 1)
                 self.assertIn("## Summary\nKeep this.", written[0])

@@ -3,6 +3,7 @@
 import { Input } from '@jovie/ui';
 import { useMemo, useState } from 'react';
 import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
+import { matchesSettingsSearchQuery } from '@/components/features/settings/settings-decision-admission';
 import { SidebarMenu } from '@/components/organisms/sidebar';
 import { SHELL_RAIL_LABEL } from '@/components/shell/rail-motion';
 import { SIDEBAR_ENTRY_LABEL_INSET_CLASS } from '@/components/shell/sidebar-optical';
@@ -61,11 +62,11 @@ export function matchesSettingsSearch(
   item: SettingsNavItem,
   query: string
 ): boolean {
-  const needle = query.trim().toLowerCase();
-  if (!needle) return true;
-  return [item.name, item.description, item.admission.userJob].some(text =>
-    text?.toLowerCase().includes(needle)
-  );
+  return matchesSettingsSearchQuery(query, [
+    item.name,
+    item.description,
+    item.admission.userJob,
+  ]);
 }
 
 function useArtistDisplayName(): string | undefined {

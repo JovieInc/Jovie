@@ -111,7 +111,7 @@ jovie_setup_gh_api_slurp_ok() {
   local gh_path api_help
   gh_path="$(command -v gh)" || return 0
   if api_help="$("$gh_path" api --help 2>/dev/null)" &&
-    grep -Eq '^[[:space:]]*--slurp([[:space:]]|$)' <<<"$api_help"; then
+    grep -Eq '^[[:space:]]*--slurp(\[=true\|false\])?([[:space:]]|$)' <<<"$api_help"; then
     return 0
   fi
   printf '%s\n' \
