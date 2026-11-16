@@ -1347,6 +1347,40 @@ function normalizeArtifacts(payload, expectedName) {
   }));
 }
 
+// A transient GitHub 503 killed the Sentry recurrence dead-man on 2026-11-16
+// 15:43Z with one attempt and no retry (run 43899436210, artifact 14239732099,
+// reason verified_production_artifact_unavailable; the two prior hourly runs
+// passed). Bounded: three attempts with fixed backoffs, transient shapes only
+// (gh HTTP 5xx and connection-level errors); after exhaustion the original
+// spawnFailure error stands, so a real failure still fails closed and no
+// threshold or skip is introduced.
+export const ARTIFACT_ZIP_ATTEMPT_DELAYS_MS = [500, 1_500];
+
+function sleepSync(ms) {
+  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+}
+
+function transientGhFailure(error) {
+  return /gh: HTTP 5\d\d|ECONNRESET|ECONNREFUSED|ETIMEDOUT|EAI_AGAIN|socket hang up|connection reset/i.test(
+    error?.message ?? ''
+  );
+}
+
+function runZipRetried(args, delaysMs = ARTIFACT_ZIP_ATTEMPT_DELAYS_MS) {
+  let lastError;
+  for (let attempt = 0; attempt <= delaysMs.length; attempt += 1) {
+    if (attempt > 0) sleepSync(delaysMs[attempt - 1]);
+    try {
+      return runZip('gh', args);
+    } catch (error) {
+      lastError = error;
+      // A deterministic error is an answer, not a transient failure.
+      if (!transientGhFailure(error)) break;
+    }
+  }
+  throw lastError;
+}
+
 function downloadJsonArtifact(
   repo,
   artifactId,
@@ -1356,7 +1390,7 @@ function downloadJsonArtifact(
   const directory = mkdtempSync(join(tmpdir(), 'jovie-production-marker-'));
   const archive = join(directory, 'artifact.zip');
   try {
-    const body = runZip('gh', [
+    const body = runZipRetried([
       'api',
       `repos/${repo}/actions/artifacts/${artifactId}/zip`,
     ]);
