@@ -21,6 +21,13 @@
   color: var(--color-text-primary-token);
 }
 
+.marketing-snap-rail__nav-btn:focus-visible {
+  outline: none;
+  box-shadow:
+    0 0 0 2px var(--system-b-cinematic-black),
+    0 0 0 4px color-mix(in oklab, var(--color-border-focus) 100%, transparent);
+}
+
 .marketing-snap-rail__rail-btn {
   border: 1px solid
     color-mix(in oklab, var(--system-b-cinematic-black) 12%, transparent);
@@ -29,13 +36,14 @@
     color-mix(in oklab, var(--system-b-cinematic-black) 16%, transparent);
 }
 
-/* Use the canonical focus tokens so the rail's unlayered elevation does not
-   hide the shared keyboard indicator or reduce its contrast. */
-.marketing-snap-rail__nav-btn:focus-visible,
 .marketing-snap-rail__rail-btn:focus-visible {
-  outline: var(--focus-ring-width) solid var(--color-focus-ring);
-  outline-offset: var(--focus-ring-offset);
+  outline: none;
+  box-shadow:
+    0 18px 42px
+    color-mix(in oklab, var(--system-b-cinematic-black) 16%, transparent),
+    0 0 0 2px color-mix(in oklab, var(--color-border-focus) 100%, transparent);
 }
+
 /**
  * Shared System B public-page theme bridge.
  *
