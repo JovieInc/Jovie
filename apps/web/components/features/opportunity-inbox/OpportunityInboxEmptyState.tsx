@@ -5,6 +5,7 @@ import { ArrowRight, Check, Circle } from 'lucide-react';
 import Link from 'next/link';
 import { EmptyState } from '@/components/molecules/EmptyState';
 import { APP_ROUTES } from '@/constants/routes';
+import { HomeSetupComplete, type HomeSetupStep } from './HomeSetupComplete';
 
 export interface HomeSetupProgress {
   readonly profileComplete: boolean;
@@ -30,7 +31,7 @@ export function OpportunityInboxEmptyState({
     );
   }
 
-  const steps = [
+  const steps: readonly HomeSetupStep[] = [
     {
       label: 'Complete Your Profile',
       description: 'Add your name, photo, handle, and music.',
@@ -49,12 +50,17 @@ export function OpportunityInboxEmptyState({
   ];
   const completedCount = steps.filter(step => step.complete).length;
 
+  if (completedCount === steps.length) {
+    return <HomeSetupComplete steps={steps} />;
+  }
+
   return (
     <section
       aria-labelledby='home-setup-heading'
       className='w-full max-w-xl space-y-8'
       data-testid='opportunity-inbox-empty-state'
       data-home-setup='true'
+      data-home-setup-state='incomplete'
     >
       <header className='space-y-2'>
         <h1

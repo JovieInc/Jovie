@@ -1,8 +1,7 @@
 #!/usr/bin/env node
-// Files one bounded "strengthen test" Linear issue per module that has real
-// survivors, from the task JSON the sweep wrote. Kept separate from the sweep
-// so the only step that sees LINEAR_API_KEY never runs Stryker or repo tests.
-import { readdirSync, readFileSync } from 'node:fs';
+// Prepares reviewed survivor drafts from exact sweep evidence. The CLI never
+// posts; the legacy explicit intake API retains its shared-quota stop behavior.
+import { readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
@@ -14,8 +13,7 @@ import {
 import { buildSurvivorIssue } from './lib/mutation-sweep.mjs';
 
 /**
- * File one survivor issue for a task. Exported so tests (and the sweep's own
- * in-process filing) can drive the exact CLI behavior with a fake upsert.
+ * Build canonical per-module outbound text without posting it.
  * @param {{ file: string, survivors: unknown[], score?: number|null, valid?: number, tests?: string[], sha?: string }} task
  * @param {{ runUrl?: string | null }} [options]
  */
@@ -105,11 +103,28 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
     options: {
       tasks: { type: 'string' },
       'run-url': { type: 'string' },
+      drafts: { type: 'string' },
+      state: { type: 'string' },
+      'existing-issues': { type: 'string' },
     },
   });
   if (!values.tasks) throw new Error('--tasks <dir> is required');
-  await fileSurvivorIssues({
-    tasksDir: values.tasks,
-    runUrl: values['run-url'] ?? null,
-  });
+  if (values.drafts) {
+    if (!values.state)
+      throw new Error('--state is required for reviewed survivor drafts');
+    const { prepareSurvivorDrafts } = await import(
+      './lib/mutation-survivor-draft-inputs.mjs'
+    );
+    const drafts = prepareSurvivorDrafts({
+      tasksDir: values.tasks,
+      statePath: values.state,
+      existingIssuesPath: values['existing-issues'],
+    });
+    writeFileSync(values.drafts, `${JSON.stringify(drafts, null, 2)}\n`);
+  } else
+    await fileSurvivorIssues({
+      tasksDir: values.tasks,
+      runUrl: values['run-url'] ?? null,
+      enabled: false, // CLI output is a preview; exact outbound text requires approval.
+    });
 }

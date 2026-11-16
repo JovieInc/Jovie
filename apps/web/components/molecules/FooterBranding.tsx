@@ -142,7 +142,7 @@ export function FooterBranding({
           className={cn(
             'text-3xs leading-snug font-semibold tracking-[0.04em]',
             'text-center',
-            'rounded-md px-2 py-1 -mx-2 -my-1',
+            'rounded-md px-2 py-1.5 -mx-2 -my-1.5',
             !isLinear && 'text-secondary-token hover:text-primary-token',
             !isLinear && 'hover:bg-surface-1'
           )}

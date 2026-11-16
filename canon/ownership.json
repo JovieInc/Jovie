@@ -134,6 +134,7 @@
     {"id": "workflow:synthetic-monitoring", "kind": "workflow", "owner": "symphony-release", "status": "active", "ref": ".github/workflows/synthetic-monitoring.yml"},
     {"id": "workflow:test-coverage-audit", "kind": "workflow", "owner": "gem-ci-repair", "status": "active", "ref": ".github/workflows/test-coverage-audit.yml"},
     {"id": "workflow:test-flakiness-report", "kind": "workflow", "owner": "gem-ci-repair", "status": "active", "ref": ".github/workflows/test-flakiness-report.yml"},
+    {"id": "workflow:typecheck-native-qualification", "kind": "workflow", "owner": "gem-ci-repair", "status": "active", "ref": ".github/workflows/typecheck-native-qualification.yml"},
     {"id": "workflow:tsc-cache-warm", "kind": "workflow", "owner": "gem-hostops", "status": "active", "ref": ".github/workflows/tsc-cache-warm.yml"},
     {"id": "workflow:ui-story-coverage-audit", "kind": "workflow", "owner": "gem-ci-repair", "status": "active", "ref": ".github/workflows/ui-story-coverage-audit.yml"},
     {"id": "workflow:auto-merge-base-guard", "kind": "workflow", "owner": "gem-lanes", "status": "active", "ref": ".github/workflows/auto-merge-base-guard.yml"},

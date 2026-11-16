@@ -30,3 +30,16 @@ describe('TaskStatusIcon', () => {
     expect(screen.getByLabelText('Cancelled')).toBeInTheDocument();
   });
 });
+
+describe('TaskStatusIcon semantic tokens', () => {
+  it('uses the accent token for in progress and the success token for done', () => {
+    const { rerender } = render(<TaskStatusIcon status='in_progress' />);
+    expect(screen.getByRole('img', { name: 'In progress' })).toHaveClass(
+      'text-accent'
+    );
+    rerender(<TaskStatusIcon status='done' />);
+    const done = screen.getByRole('img', { name: 'Done' });
+    expect(done).toHaveClass('bg-success/85');
+    expect(done.className).not.toMatch(/emerald/);
+  });
+});
