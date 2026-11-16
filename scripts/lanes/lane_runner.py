@@ -10142,6 +10142,12 @@ def _dispatch(host: Host, unclean_previous: dict | None) -> int:
                 except (Exception, SystemExit) as error:
                     tick["linearSyncError"] = f"{type(error).__name__}: {error}"[:200]
             raise DiskAdmissionError(tick["disk"].get("reason", "disk-unobservable"))
+        # Queue reads run in the native reason process so neither lane waits on
+        # the other's dependencies. Its existing drain owns job leases and budgets.
+        try:
+            tick["reason"] = reason_lane.schedule_tick(host, THIS)
+        except (Exception, SystemExit) as error:  # reasoning failure never blocks code dispatch
+            tick["reasonError"] = f"{type(error).__name__}: {error}"[:200]
         ensure_full_history(host)
         if not os.environ.get("LANES_SELFTEST"):
             try:
@@ -10246,16 +10252,12 @@ def _dispatch(host: Host, unclean_previous: dict | None) -> int:
     except Exception as error:  # the tick must still leave a receipt the doctor can raise
         tick["error"] = f"{type(error).__name__}: {error}"[:300]
     if tick["error"] or tick.get("admissionDenied"):
-        # A denied tick must not launch another worker through ancillary event paths.
+        # Do not launch later ancillary workers after code preparation fails or disk admission is denied.
         return finish_dispatch(host, tick)
     try:
         tick["events"] = pr_events.tick(host, THIS, lambda: Linear(host.linear_env))
     except (Exception, SystemExit) as error:  # the ready/orphan queue never takes dispatch down
         tick["eventsError"] = f"{type(error).__name__}: {error}"[:200]
-    try:
-        tick["reason"] = reason_lane.tick(host, THIS, lambda: Linear(host.linear_env))
-    except (Exception, SystemExit) as error:  # Summer's reasoning jobs never take dispatch down
-        tick["reasonError"] = f"{type(error).__name__}: {error}"[:200]
     try:
         owner = os.environ.get("OUTCOME_LANE_OWNER", "gem").split(".")[0]
         tick["outcome"] = (outcome_lane.tick(host, THIS) if HOST == owner else

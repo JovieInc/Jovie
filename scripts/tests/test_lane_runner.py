@@ -5381,6 +5381,140 @@ class DispatchTest(unittest.TestCase):
         self.origin_collect = origins.start()
         self.addCleanup(origins.stop)
 
+    def test_code_dispatch_progresses_while_the_reason_queue_read_is_held(self):
+        entered, release, code_started = threading.Event(), threading.Event(), threading.Event()
+        workers, errors = [], []
+
+        def held_queue(*args):
+            entered.set()
+            if not release.wait(3):
+                raise AssertionError("test did not release the held queue")
+            return []
+
+        def dispatch():
+            try:
+                lane._dispatch(host, None)
+            except BaseException as error:
+                errors.append(error)
+
+        def spawn(args, **kwargs):
+            if args[-1] == "tick":
+                child = threading.Thread(target=lambda: lane.reason_lane.tick(host, lane, lambda: None))
+                workers.append(child)
+                child.start()
+                self.assertTrue(entered.wait(2))
+            else:
+                self.assertEqual(args[-2:], ["--provider", "codex"])
+                code_started.set()
+            return SimpleNamespace(pid=123)
+
+        with contextlib.ExitStack() as stack:
+            tmp = stack.enter_context(tempfile.TemporaryDirectory())
+            stack.enter_context(patch.dict(os.environ, {
+                "LANES_SELFTEST": "", "LANES_EXECUTION_BACKEND": "", "LANES_SLOTS_CODEX": "1"}))
+            for target, name, kwargs in (
+                (lane.autoscale, "mode", {"return_value": "off"}),
+                (lane.disk_guard, "check", {"return_value": {"freePct": 50, "admitted": True}}),
+                (lane.disk_guard, "maybe_sweep", {"return_value": "not-due"}),
+                (lane.worktree_sweep, "maybe_spawn", {"return_value": "not-due"}),
+                (lane.reason_lane, "queued_jobs", {"side_effect": held_queue}),
+                (lane, "ensure_full_history", {}),
+                (lane, "load_providers", {"return_value": {"codex": {"slots": 1}}}),
+                (lane, "provider_healthy", {"return_value": True}),
+                (lane, "quota_pressure", {"return_value": {"ok": True}}),
+                (lane, "claim_remediation_events", {"return_value": {}}),
+                (lane, "Linear", {"return_value": SimpleNamespace(admit=lambda _: True)}),
+                (lane.linear_sync, "tick", {"return_value": {}}),
+                (lane.board_intake, "tick", {"return_value": {}}),
+                (lane.bindings, "extra_bindings", {"return_value": []}),
+                (lane.binding_refill, "refill", {"return_value": {}}),
+                (lane.binding_refill, "rank_pass", {"return_value": {}}),
+                (lane.priority_admission, "run", {"return_value": {}}),
+                (lane.decompose_pass, "maybe_spawn", {"return_value": {}}),
+                (lane.escalation_reconcile, "due", {"return_value": False}),
+                (lane.pr_events, "tick", {"return_value": {}}),
+                (lane.epics, "reconcile", {"return_value": {}}),
+                (lane.ownership, "reconcile", {"return_value": {}}),
+                (lane, "in_flight_issues", {"return_value": set()}),
+                (lane, "finish_dispatch", {"return_value": 0}),
+                (lane.subprocess, "Popen", {"side_effect": spawn}),
+            ):
+                stack.enter_context(patch.object(target, name, **kwargs))
+            host = lane.Host(state=Path(tmp), repo=Path(tmp))
+            worker = threading.Thread(target=dispatch)
+            worker.start()
+            try:
+                self.assertTrue(entered.wait(2))
+                self.assertTrue(code_started.wait(2), "reason queue read held code dispatch")
+                self.assertFalse(release.is_set())
+            finally:
+                release.set()
+                worker.join(3)
+                for child in workers:
+                    child.join(3)
+            self.assertFalse(worker.is_alive())
+            self.assertFalse(errors)
+
+    def test_reasoning_starts_before_unrelated_code_history_can_fail(self):
+        order = []
+
+        def reasoning(*args):
+            order.append("reason")
+            return {"status": "scheduled"}
+
+        def history(*args):
+            order.append("history")
+            raise RuntimeError("code history unavailable")
+
+        with tempfile.TemporaryDirectory() as tmp, \
+                patch.object(lane.autoscale, "mode", return_value="off"), \
+                patch.object(lane.disk_guard, "check", return_value={"freePct": 50, "admitted": True}), \
+                patch.object(lane.disk_guard, "maybe_sweep", return_value="not-due"), \
+                patch.object(lane.worktree_sweep, "maybe_spawn", return_value="not-due"), \
+                patch.object(lane.reason_lane, "schedule_tick", side_effect=reasoning) as reason_tick, \
+                patch.object(lane, "ensure_full_history", side_effect=history), \
+                patch.object(lane, "finish_dispatch", return_value=1) as finish:
+            host = lane.Host(state=Path(tmp), repo=Path(tmp))
+            self.assertEqual(lane._dispatch(host, None), 1)
+            reason_tick.assert_called_once()
+            self.assertEqual(reason_tick.call_args.args[:2], (host, lane.THIS))
+            self.assertEqual(order, ["reason", "history"])
+            tick = finish.call_args.args[1]
+            self.assertEqual(tick["reason"], {"status": "scheduled"})
+            self.assertIn("code history unavailable", tick["error"])
+
+    def test_code_history_failures_preserve_the_existing_reason_worker_lock(self):
+        real_lock, probes = lane.Locked, []
+
+        def tracked_lock(*args, **kwargs):
+            probe = real_lock(*args, **kwargs)
+            probes.append(probe)
+            return probe
+
+        with tempfile.TemporaryDirectory() as tmp, \
+                patch.dict(os.environ, {"LANES_SELFTEST": "", "LANES_EXECUTION_BACKEND": ""}), \
+                patch.object(lane.autoscale, "mode", return_value="off"), \
+                patch.object(lane.disk_guard, "check", return_value={"freePct": 50, "admitted": True}), \
+                patch.object(lane.disk_guard, "maybe_sweep", return_value="not-due"), \
+                patch.object(lane.worktree_sweep, "maybe_spawn", return_value="not-due"), \
+                patch.object(lane, "ensure_full_history", side_effect=RuntimeError("code history unavailable")), \
+                patch.object(lane.reason_lane, "queued_jobs") as queue, \
+                patch.object(lane, "Locked", side_effect=tracked_lock), \
+                patch.object(lane, "finish_dispatch", return_value=1) as finish:
+            host = lane.Host(state=Path(tmp), repo=Path(tmp))
+            active = real_lock(host.state / "reason.lock", blocking=False)
+            try:
+                self.assertTrue(active.held)
+                for _ in range(2):
+                    self.assertEqual(lane._dispatch(host, None), 1)
+                    self.assertEqual(finish.call_args.args[1]["reason"], {"status": "busy"})
+                queue.assert_not_called()
+            finally:
+                active.release()
+                for probe in probes:
+                    if not probe.handle.closed:
+                        probe.release()
+
     def test_coding_dispatch_continues_when_coordinator_reasoning_and_alerts_are_unavailable(self):
         # Summer/Gateway failure affects optional reasoning and observability, not
         # the independently admitted coding lane. Keep all existing disk/slot gates.
@@ -5394,7 +5528,7 @@ class DispatchTest(unittest.TestCase):
                 patch.object(lane, "provider_healthy", return_value=True), \
                 patch.object(lane, "claim_remediation_events", side_effect=RuntimeError("coordinator offline")), \
                 patch.object(lane.pr_events, "tick", return_value={}), \
-                patch.object(lane.reason_lane, "tick", side_effect=RuntimeError("credits unavailable")), \
+                patch.object(lane.reason_lane, "schedule_tick", side_effect=RuntimeError("reason launcher unavailable")), \
                 patch.object(lane.doctor, "run", side_effect=RuntimeError("coordinator offline")), \
                 patch.object(lane, "HOST", "gem"), \
                 patch.dict(os.environ, {"YC_CORPUS_OWNER": "gem"}), \
@@ -5532,7 +5666,7 @@ class DispatchTest(unittest.TestCase):
                     patch.object(lane, "ensure_full_history") as history, \
                     patch.object(lane.subprocess, "Popen") as spawn, \
                     patch.object(lane.pr_events, "tick") as events, \
-                    patch.object(lane.reason_lane, "tick") as reasoning, \
+                    patch.object(lane.reason_lane, "schedule_tick") as reasoning, \
                     patch.object(lane.doctor, "run") as doctor, \
                     patch.object(lane, "sh") as shell:
                 host = lane.Host(state=Path(tmp), repo=Path(tmp))
