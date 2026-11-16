@@ -11,6 +11,8 @@
  * successful dispatch never turns the dead-man green, never loosens the
  * 7-hour threshold, and never skips or weakens the check. Quota exhaustion
  * defers (exit 75, `github-quota-deferred`); it is never a final verdict.
+ *
+ * api-budget: github-actions-token 24/hr - 2 evidence reads per due check plus 1 dispatch POST and up to 5 confirmation reads per missed-slot dispatch, only while the canary dead-man is red (at most 3 due checks per hour, 20-minute bucket)
  */
 import { appendFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
