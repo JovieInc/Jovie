@@ -1,7 +1,9 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import {
   admitSubscription,
+  DEEPSEC_SUBSCRIPTION_VERSION,
   subscriptionEnvironment,
   subscriptionPlan,
   subscriptionReceipt,
@@ -17,6 +19,17 @@ const input = {
   headRepository: 'JovieInc/Jovie',
 };
 const plan = subscriptionPlan(input);
+test('native admission tracks the frozen dependency pin', () => {
+  const read = path =>
+    JSON.parse(readFileSync(new URL(path, import.meta.url), 'utf8'));
+  const manifest = read('./deepsec/package.json');
+  const lock = read('./deepsec/package-lock.json');
+  const pinned = manifest.dependencies.deepsec;
+  assert.match(pinned, /^\d+\.\d+\.\d+$/);
+  assert.equal(lock.packages[''].dependencies.deepsec, pinned);
+  assert.equal(lock.packages['node_modules/deepsec'].version, pinned);
+  assert.equal(DEEPSEC_SUBSCRIPTION_VERSION, pinned);
+});
 const result = (count = 0, analyses = 1) => ({
   status: count ? 1 : 0,
   stdout: `Scanning 1 file(s)…\nProcessing complete. Run: native-1\n  Analyses: ${analyses}\n  Findings: ${count}\n${count ? `${count} new finding(s) — exiting 1` : 'No findings.'}\n`,
@@ -105,7 +118,7 @@ test('invalid source, fork, workspace and target rosters cannot dispatch', () =>
 });
 
 test('API-key login, unknown status and scanner version drift fail closed', () => {
-  const version = { status: 0, stdout: '2.3.10\n' };
+  const version = { status: 0, stdout: `${DEEPSEC_SUBSCRIPTION_VERSION}\n` };
   const login = { status: 0, stderr: 'Logged in using ChatGPT\n' };
   assert.equal(admitSubscription({ version, login }), true);
   for (const bad of [
@@ -116,7 +129,7 @@ test('API-key login, unknown status and scanner version drift fail closed', () =
     assert.throws(() => admitSubscription({ version, login: bad }));
   for (const bad of [
     { status: 0, stdout: '2.3.11' },
-    { status: 1, stdout: '2.3.10' },
+    { status: 1, stdout: DEEPSEC_SUBSCRIPTION_VERSION },
     {},
   ])
     assert.throws(() => admitSubscription({ version: bad, login }));

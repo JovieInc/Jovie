@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "dependencies": {
-    "deepsec": "2.3.10"
+    "deepsec": "2.3.12"
   },
   "overrides": {
     "brace-expansion": "5.0.12",
