@@ -62,7 +62,12 @@ describe('AuthBackButton certificate', () => {
     );
 
     await user.tab();
-    const button = screen.getByRole('button', { name: 'رجوع' });
+    // Regression (axe label-content-name-mismatch): a localized aria-label
+    // keeps its wording but the accessible name must still contain the
+    // visible label text.
+    const button = screen.getByRole('button', { name: 'رجوع Back' });
+    expect(button).toHaveAccessibleName('رجوع Back');
+    expect(button).toHaveTextContent('Back');
     expect(button).toHaveFocus();
     await user.keyboard('{Enter}');
     expect(lightMock).toHaveBeenCalledTimes(1);
