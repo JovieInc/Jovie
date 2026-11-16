@@ -50,8 +50,15 @@ export async function checkSyntheticCanary({ github, repo, now = Date.now() }) {
       `/repos/${repo}/actions/workflows/synthetic-monitoring.yml/runs?branch=main&event=schedule&per_page=10`
     );
     if (!Array.isArray(runs)) throw new Error('invalid-runs');
+    // An executed dispatched canary on main runs the identical probes (the
+    // synthetic-test job admits workflow_dispatch), so it is heartbeat evidence
+    // too: the schedule-miss backstop's own runs keep monitoring alive.
     const scheduled = runs
-      .filter(run => run.event === 'schedule' && run.head_branch === 'main')
+      .filter(
+        run =>
+          (run.event === 'schedule' || run.event === 'workflow_dispatch') &&
+          run.head_branch === 'main'
+      )
       .sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at));
     let pending = false;
     for (const run of scheduled) {
@@ -66,7 +73,13 @@ export async function checkSyntheticCanary({ github, repo, now = Date.now() }) {
       )
         throw new Error('invalid-run');
       if (age > MAX_SILENCE_MINUTES) {
-        return result(false, 'No scheduled canary within 7 hours', run);
+        // A fresher candidate in flight (the backstop's own dispatch, a rerun)
+        // means the slot is being re-served; re-dispatching would only queue a
+        // duplicate.
+        return {
+          ...result(false, 'No scheduled canary within 7 hours', run),
+          missedSlot: !pending,
+        };
       }
       // Bind to this attempt: an older green attempt cannot hide a skipped rerun.
       const { jobs, total_count: total } = await read(
@@ -122,11 +135,32 @@ export async function checkSyntheticCanary({ github, repo, now = Date.now() }) {
       // A fresh queued run is not a heartbeat. Still require a recent success.
       pending = true;
     }
-    return result(false, 'No recent completed scheduled canary found');
+    return {
+      ...result(false, 'No recent completed scheduled canary found'),
+      missedSlot: !pending,
+    };
   } catch {
     // Do not publish raw API errors (which may contain credential material).
     return result(false, 'Synthetic canary evidence unavailable');
   }
+}
+
+/**
+ * Single-attempt backstop: re-trigger the canary when GitHub's schedule missed
+ * its slot. One attempt only -- a timed-out-but-accepted dispatch retried
+ * would enqueue a duplicate. Requires a token with actions:write; the
+ * observer's read-only token gets 403 and the red stands. A rejected dispatch
+ * never softens the dead-man verdict.
+ * @param {{github: WorkflowReader, repo: string}} input
+ */
+export async function dispatchSyntheticCanary({ github, repo }) {
+  const response = await github.rest(
+    'POST',
+    `/repos/${repo}/actions/workflows/synthetic-monitoring.yml/dispatches`,
+    { ref: 'main' },
+    { priority: 'poll', timeoutMs: 10_000, maxAttempts: 1, maxWaitMs: 5_000 }
+  );
+  if (response.status !== 204) throw new Error('dispatch-rejected');
 }
 
 /** @param {{env?: NodeJS.ProcessEnv, github?: WorkflowReader, now?: number}} [options] */
@@ -135,13 +169,20 @@ export async function main({
   github,
   now = Date.now(),
 } = {}) {
-  const checked = await checkSyntheticCanary({
-    github:
-      github ??
-      createGitHubClient({ token: env.GH_TOKEN || env.GITHUB_TOKEN || '' }),
-    repo: env.GITHUB_REPOSITORY || 'JovieInc/Jovie',
-    now,
-  });
+  const repo = env.GITHUB_REPOSITORY || 'JovieInc/Jovie';
+  const client =
+    github ??
+    createGitHubClient({ token: env.GH_TOKEN || env.GITHUB_TOKEN || '' });
+  const checked = await checkSyntheticCanary({ github: client, repo, now });
+  let missedSlotDispatched = false;
+  if (checked.missedSlot && env.SYNTHETIC_CANARY_DISPATCH === '1') {
+    try {
+      await dispatchSyntheticCanary({ github: client, repo });
+      missedSlotDispatched = true;
+    } catch {
+      missedSlotDispatched = false; // A rejected dispatch stays red, never softer.
+    }
+  }
   const status = checked.ok ? 'passed' : 'failed';
   if (env.GITHUB_OUTPUT) {
     appendFileSync(
@@ -154,6 +195,11 @@ export async function main({
       env.GITHUB_STEP_SUMMARY,
       `### Synthetic canary dead-man\n\n${new Date(now).toISOString()}: **${status}** — ${checked.reason}\n\n[Canary evidence](${checked.runUrl})\n`
     );
+    if (checked.missedSlot)
+      appendFileSync(
+        env.GITHUB_STEP_SUMMARY,
+        `\nBackstop: ${missedSlotDispatched ? 'canary re-dispatched' : 'dispatch not attempted or refused'}\n`
+      );
   }
   console.log(
     JSON.stringify({ checkedAt: new Date(now).toISOString(), ...checked })
