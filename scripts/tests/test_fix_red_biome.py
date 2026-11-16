@@ -17,6 +17,13 @@ def pr(*names):
 
 
 class BiomeFormatTest(unittest.TestCase):
+    def test_parses_each_machine_citation_even_when_summary_messages_are_truncated(self):
+        paths = ["scripts/example.mjs", "apps/web/app/api/internal/ovie/component-certificate-evidence/route.ts"]
+        log = "##[error]File content differs from formatting output\n##[error]Diagnostics: | " + " | ".join(
+            f"::error title=format,file=/home/runner/work/Jovie/Jovie/{path},line=1::File content differs from formatting…"
+            for path in paths)
+        self.assertEqual(fix_red_biome.cited_paths(log), paths)
+
     def test_parses_ci_reporter_and_gh_log_prefix_without_guessing_absolute_roots(self):
         rel = "apps/web/app/[username]/page.tsx"
         prefix = "Source Validation\tUNKNOWN STEP\t2026-11-16T13:00:00.000Z "

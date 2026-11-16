@@ -23,7 +23,7 @@ _CITED = re.compile(
     rf"(?P<path>(?:[\w.+@()\[\]-]+/)*[\w.+@()\[\]-]+\.(?:{_SUFFIX}))"
     rf"(?::\d+:\d+\s+\S*organizeImports|\s+format\b)"
 )
-_ANNOTATION = re.compile(r"::error (?P<fields>[^\r\n]+?)::(?P<message>[^\r\n]*)")
+_ANNOTATION = re.compile(r"::error (?P<fields>[^\r\n]+?)::")
 
 
 def cited_paths(text: str) -> list[str]:
@@ -34,8 +34,7 @@ def cited_paths(text: str) -> list[str]:
     paths = [match.group("path") for match in _CITED.finditer(text)]
     for match in _ANNOTATION.finditer(text):
         fields = dict(part.split("=", 1) for part in match["fields"].split(",") if "=" in part)
-        if fields.get("title") not in {"format", "assist/source/organizeImports"} \
-                or not BIOME_FORMAT_TEXT.search(match["message"]):
+        if fields.get("title") not in {"format", "assist/source/organizeImports"}:
             continue
         path = fields.get("file", "")
         # Only known checkout roots map to a repo path; arbitrary absolute
