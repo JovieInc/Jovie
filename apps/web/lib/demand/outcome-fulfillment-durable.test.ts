@@ -15,6 +15,13 @@ import {
   supplier,
 } from './outcome-fulfillment.fixtures';
 
+type Ledger = Awaited<ReturnType<ReturnType<typeof harness>['send']>>;
+function draftFor(ledger: Ledger, id = primitive.id) {
+  return ledger.rows.find(
+    row => row.plan.id === capabilityGapId(scope, { ...primitive, id })
+  )!.plan.capabilityDraft!;
+}
+
 describe('durable source canary in the existing allocation ledger', () => {
   it.each(['revoked', 'deleted'] as const)(
     'commits %s after a full evidence window and cannot revive an evicted certificate by replay',
@@ -42,12 +49,6 @@ describe('durable source canary in the existing allocation ledger', () => {
           ).toISOString(),
         })
       );
-      const draftFor = (
-        ledger: Awaited<ReturnType<typeof h.send>>,
-        id: string = primitive.id
-      ) =>
-        ledger.rows.find(row => row.plan.capabilityDraft?.primitive.id === id)!
-          .plan.capabilityDraft!;
       await h.send(command({ suppliers: sources }));
       await h.send(
         fulfilled({
@@ -150,10 +151,6 @@ describe('durable source canary in the existing allocation ledger', () => {
         jobId: `fixture:tied-job:${index}`,
       })
     );
-    const draftFor = (ledger: Awaited<ReturnType<typeof h.send>>) =>
-      ledger.rows.find(
-        row => row.plan.id === capabilityGapId(scope, primitive)
-      )!.plan.capabilityDraft!;
     await h.send(command());
     await h.send(fulfilled({ outcomes: tied }));
     const boundary = outcome(supplier(), {
@@ -200,12 +197,8 @@ describe('durable source canary in the existing allocation ledger', () => {
         startedAt: '2026-11-16T10:05:00.000Z',
         completedAt: '2026-11-16T10:08:00.000Z',
       });
-      const draft = (ledger: Awaited<ReturnType<typeof h.send>>) =>
-        ledger.rows.find(
-          row => row.plan.id === capabilityGapId(scope, primitive)
-        )!.plan.capabilityDraft!;
       const finished = await h.send(fulfilled({ outcomes: [inFlight] }));
-      expect(draft(finished)).toMatchObject({
+      expect(draftFor(finished)).toMatchObject({
         state: 'unknown',
         enabled: false,
         fulfillment: {
@@ -216,7 +209,7 @@ describe('durable source canary in the existing allocation ledger', () => {
         },
       });
       // A stale available-source snapshot cannot erase the durable boundary.
-      expect(draft(await h.send(fulfilled()))).toEqual(draft(finished));
+      expect(draftFor(await h.send(fulfilled()))).toEqual(draftFor(finished));
 
       const renewed = certification(supplier(), {
         id: 'certification:renewed-by-canonical-owner',
@@ -244,7 +237,7 @@ describe('durable source canary in the existing allocation ledger', () => {
           ],
         })
       );
-      expect(draft(restored)).toMatchObject({
+      expect(draftFor(restored)).toMatchObject({
         state: 'known',
         enabled: false,
         fulfillment: {
@@ -280,9 +273,7 @@ describe('durable source canary in the existing allocation ledger', () => {
       }),
     ]) {
       const ledger = await h.send(fulfilled({ outcomes: [replay] }));
-      const draft = ledger.rows.find(
-        row => row.plan.id === capabilityGapId(scope, primitive)
-      )!.plan.capabilityDraft!;
+      const draft = draftFor(ledger);
       expect(draft.fulfillment).toMatchObject({
         attemptedJobs: 1,
         correctCompletedJobs: 1,
@@ -367,9 +358,7 @@ describe('durable source canary in the existing allocation ledger', () => {
       h.send(command({ outcomes: [outcome()] })),
     ]);
     const result = await h.send(command({ facts: [fact()] }));
-    const draft = result.rows.find(
-      row => row.plan.id === capabilityGapId(scope, primitive)
-    )!.plan.capabilityDraft!;
+    const draft = draftFor(result);
     expect(draft).toMatchObject({
       state: 'known',
       fulfillment: {
@@ -396,9 +385,7 @@ describe('durable source canary in the existing allocation ledger', () => {
     expect(h.records.get(DEMAND_ALLOCATION_KEY)).toBe(before);
     h.backend.compareAndSet = persist;
     const result = await h.send(fulfilled());
-    const draft = result.rows.find(
-      row => row.plan.id === capabilityGapId(scope, primitive)
-    )!.plan.capabilityDraft!;
+    const draft = draftFor(result);
     expect(draft.fulfillment).toMatchObject({
       attemptedJobs: 1,
       correctCompletedJobs: 1,

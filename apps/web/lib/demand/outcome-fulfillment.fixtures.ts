@@ -1,8 +1,10 @@
-import type { CertificationRecordBackend } from '@/lib/agent-os/certification-cas';
+import { memoryCertificationBackend } from '@/lib/ovie/certifications/fixtures';
 import { governDemandAllocation } from './allocation-governor';
 import { compilePresenceOutcome, supplierDigest } from './outcome-compiler';
 import type {
+  CapabilityCertification,
   CapabilityDraft,
+  CapabilityOutcome,
   CapabilitySupplier,
   CompileOutcomeCommand,
 } from './outcome-contract';
@@ -35,10 +37,6 @@ export const metrics = {
   latencyMs: 50,
   fullyLoadedCostCents: 4,
 };
-type Certification = NonNullable<
-  CompileOutcomeCommand['certifications']
->[number];
-type Outcome = NonNullable<CompileOutcomeCommand['outcomes']>[number];
 
 export function supplier(
   overrides: Partial<CapabilitySupplier> = {}
@@ -66,8 +64,8 @@ export function supplier(
 
 export function certification(
   source = supplier(),
-  overrides: Partial<Certification> = {}
-): Certification {
+  overrides: Partial<CapabilityCertification> = {}
+): CapabilityCertification {
   return {
     id: `certification:${source.primitive.id}`,
     scope: source.scope,
@@ -95,8 +93,8 @@ export function certification(
 
 export function outcome(
   source = supplier(),
-  overrides: Partial<Outcome> = {}
-): Outcome {
+  overrides: Partial<CapabilityOutcome> = {}
+): CapabilityOutcome {
   return {
     id: `outcome:${source.primitive.id}:1`,
     scope: source.scope,
@@ -192,20 +190,8 @@ export function bio(
 }
 
 export function harness() {
-  const records = new Map<string, unknown>();
-  const backend: CertificationRecordBackend = {
-    get: async key => records.get(key) ?? null,
-    setIfAbsent: async (key, value) => {
-      if (records.has(key)) return false;
-      records.set(key, value);
-      return true;
-    },
-    compareAndSet: async (key, expected, next) => {
-      if (records.get(key) !== expected) return false;
-      records.set(key, next);
-      return true;
-    },
-  };
+  const backend = memoryCertificationBackend();
+  const { records } = backend;
   const send = (value: unknown) =>
     governDemandAllocation({
       backend,

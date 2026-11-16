@@ -240,6 +240,33 @@ describe('source-owner certification and completed customer jobs', () => {
     }
   });
 
+  it('coalesces identical same-job outcomes with distinct delivery receipt ids', () => {
+    const receipt = outcome();
+    const copy = { ...receipt, id: 'outcome:backfill-copy' };
+    const expected = bio(fulfilled({ outcomes: [receipt] }));
+    for (const outcomes of [
+      [receipt, copy],
+      [copy, receipt],
+    ]) {
+      const current = bio(fulfilled({ outcomes }));
+      expect(current.state).toBe('known');
+      expect(current.decision.kind).toBe(expected.decision.kind);
+      expect(current.fulfillment).toEqual(expected.fulfillment);
+    }
+    const conflicting = {
+      ...copy,
+      realized: { ...copy.realized, fullyLoadedCostCents: 8 },
+    };
+    expect(bio(fulfilled({ outcomes: [receipt, conflicting] }))).toMatchObject({
+      state: 'unknown',
+      fulfillment: {
+        attemptedJobs: 1,
+        correctCompletedJobs: 0,
+        fullyLoadedCostCents: 8,
+      },
+    });
+  });
+
   it('recovers a failed job only after a newer certified completion with fresh linked evidence', () => {
     const failure = outcome(supplier(), {
       id: 'outcome:failed-attempt',
@@ -289,16 +316,11 @@ describe('source-owner certification and completed customer jobs', () => {
   });
 
   it('fails closed when distinct certification receipts have the same verification time', () => {
-    expect(
-      bio(
-        fulfilled({
-          certifications: [
-            certification(),
-            certification(supplier(), { id: 'certification:ambiguous-peer' }),
-          ],
-        })
-      )
-    ).toMatchObject({
+    const certifications = [
+      certification(),
+      certification(supplier(), { id: 'certification:ambiguous-peer' }),
+    ];
+    expect(bio(fulfilled({ certifications }))).toMatchObject({
       state: 'unknown',
       fulfillment: { certified: false, correctCompletedJobs: 0 },
     });

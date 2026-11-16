@@ -36,9 +36,15 @@ export function projectSupplierFulfillment(
     certifications.filter(item => item.supplierDigest === digest),
     item => item.verifiedAt
   );
-  const sourceOutcomes = outcomes.filter(
-    item => item.supplierDigest === digest
-  );
+  // Transport aliases retain ledger identity but project one domain outcome.
+  const sourceOutcomes = [
+    ...new Map(
+      outcomes
+        .filter(item => item.supplierDigest === digest)
+        .sort((a, b) => a.id.localeCompare(b.id))
+        .map(item => [JSON.stringify({ ...item, id: undefined }), item])
+    ).values(),
+  ];
   // Revocation/deletion is a source boundary, not a failed job to retry.
   const invalidatedAt = Math.max(
     -Infinity,
