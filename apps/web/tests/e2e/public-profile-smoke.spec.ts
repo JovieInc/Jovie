@@ -146,6 +146,10 @@ const LEGACY_RELEASE_SLUG =
   process.env.SMOKE_LEGACY_RELEASE_SLUG ?? 'take-me-over';
 const LEGACY_RELEASE_TARGET =
   process.env.SMOKE_LEGACY_RELEASE_TARGET ?? 'take-me-over-2';
+// Both legacy slugs belong to this one release. A rename changes its slug but
+// never its title, so the current page is identified by title, not by a slug
+// allowlist that goes stale on every rename (JOV-12716).
+const LEGACY_RELEASE_TITLE = 'Take Me Over';
 // Known catalog gap: Tim's solo "Seaside Heights" is not imported yet. Until it
 // is, the bare slug must be a clean 404. It must not redirect to the Vigel
 // version and must not render a Coming soon placeholder.
@@ -213,9 +217,15 @@ test('legacy release slug resolves to its current release page', async ({
   expect(landedOn[0], 'both URLs must reach the same release').toBe(
     landedOn[1]
   );
-  expect([LEGACY_RELEASE_SLUG, LEGACY_RELEASE_TARGET]).toContain(
-    landedOn[0]?.split('/')[2]
-  );
+  // The slugs above are historical URLs, never the landing: after the second
+  // rename the release lives at its qualifier slug, and both legacy URLs
+  // redirect straight to it. Assert the release identity of that landing —
+  // the page renders this release's own title — instead of pinning a slug
+  // that the next rename would retire again.
+  await expect(
+    page.locator('h1').first(),
+    'the page both legacy slugs land on is not this release'
+  ).toHaveText(LEGACY_RELEASE_TITLE);
 });
 
 test('an unimported release slug is a clean 404, not a placeholder or wrong release', async ({

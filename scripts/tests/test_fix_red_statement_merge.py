@@ -33,6 +33,13 @@ class AdditiveStatementMergeTest(unittest.TestCase):
             self.conflict(ours, theirs, base)),
             "import { describe, expect, it, vi, afterEach } from 'vitest';\n" + extra)
 
+    def test_overlapping_tests_deduplicate_but_changed_same_title_stays_unresolved(self):
+        live = "  it('keeps a live track', async () => {\n    expect(await exists()).toBe(true);\n  });\n"
+        failed = "  it('does not redirect after a failed check', async () => {\n    await expect(resolve()).resolves.toBeNull();\n  });\n"
+        self.assertEqual(self.resolve(self.conflict(live + failed, live)), live + failed)
+        changed = live.replace('toBe(true)', 'toBe(false)')
+        self.assertIsNone(self.resolve(self.conflict(live, changed)))
+
     def test_named_import_deletions_aliases_and_binding_collisions_stay_unresolved(self):
         base = "import { describe, it } from 'vitest';\n"
         added = "import { describe, it, expect } from 'vitest';\n"

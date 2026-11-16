@@ -48,6 +48,38 @@ class MixedRepairTest(unittest.TestCase):
         noise = classes.classify(pr("A", "B"), {"A": "API rate limit exceeded", "B": "AssertionError"})
         self.assertEqual(noise["repairs"], [])
 
+    def test_a_red_body_beside_only_sync_main_classes_syncs_main(self):
+        red = 'red-before-green: this repair PR has no "## Red-before-green" section'
+        summary = (
+            " FAIL  workspace-scripts lib/__tests__/design-system-source-ratchet.test.mjs"
+            " > design-system source identity ratchet (JOV-5301)"
+            " > exits zero from the CLI on the live tree\n"
+        )
+        names = ("PR Fleet Rules", "Source Validation")
+        logs = {"PR Fleet Rules": red, "Source Validation": summary}
+        bare = classes.classify({**pr(*names), "body": "## Summary\n"}, logs)
+        self.assertEqual((bare["cls"], bare["action"]), ("mixed", "sync-main"))
+        self.assertEqual(bare["repairs"], ["red-before-green"])
+        self.assertEqual(bare["actions"], ["sync-main"])
+        behind = classes.classify({**pr(*names, merge="BEHIND"), "body": "## Summary\n"}, logs)
+        self.assertEqual((behind["cls"], behind["action"]), ("mixed", "sync-main"))
+        self.assertEqual(behind["repairs"], ["red-before-green"])
+        complete = (
+            "## Summary\n\n## Red-before-green\n\n"
+            "- Failing command: `node scripts/design-system-source-ratchet.mjs`\n"
+            "- Failing run (before fix): https://github.com/JovieInc/Jovie/actions/runs/43692020331\n\n"
+            "```text\nFAIL design-system-source-ratchet\n```\n"
+        )
+        done = classes.classify({**pr(*names), "body": complete}, logs)
+        self.assertEqual(done["repairs"], [])
+        self.assertEqual((done["cls"], done["action"]), ("mixed", "sync-main"))
+        assertion = classes.classify(
+            {**pr(*names), "body": "## Summary\n"},
+            {"PR Fleet Rules": red, "Source Validation": "AssertionError: expected 1"},
+        )
+        self.assertEqual((assertion["cls"], assertion["action"]), ("mixed", "agent"))
+        self.assertEqual(assertion["repairs"], ["red-before-green"])
+
     def test_a_measured_win_failure_is_one_deterministic_class(self):
         win = ("win: this PR needs a measured win "
                "(metric, before, after, method, evidence).")

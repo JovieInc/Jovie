@@ -242,6 +242,7 @@ export const MacAccountMenuLongName: Story = {
   ...MacAccountMenu,
   args: { calm: true, artist: LONG_NAME_ARTIST },
 };
+/** No handle: the header's second line falls back to the account email. */
 export const MacAccountMenuNoUsername: Story = {
   ...MacAccountMenu,
   beforeEach: () => setupMacMenu(true),
