@@ -1284,6 +1284,7 @@ export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/sparse-checkout-import-closure.test.mjs',
   'scripts/lib/__tests__/shipping-slo-collector.test.mjs',
   'scripts/lib/__tests__/shipping-slo.test.mjs',
+  'scripts/lib/__tests__/shipping-slo-snapshot.test.mjs',
   'scripts/lib/__tests__/shipping-slo-history.test.mjs',
   'scripts/lib/__tests__/stage-collect-linear.test.mjs',
   'scripts/lib/__tests__/stage-derive.test.mjs',
