@@ -12,7 +12,6 @@ def pr(*names, merge="BLOCKED"):
     return {"mergeStateStatus": merge, "statusCheckRollup": [{"name": n, "conclusion": "FAILURE"} for n in names]
             + [{"name": "PR Ready", "conclusion": "FAILURE"}, {"name": "ok", "conclusion": "SUCCESS"}]}
 
-
 class ClassifyTest(unittest.TestCase):
     def test_signatures_map_to_classes_and_actions(self):
         cases = {
