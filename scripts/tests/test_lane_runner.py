@@ -4714,20 +4714,22 @@ class WorkerTest(unittest.TestCase):
         self.assertFalse((self.host.state / "worker-idle.json").exists())
         self.assertEqual(self.linear.moves, [])
 
-    def test_a_lane_at_its_wip_cap_stops_claiming_new_work(self):
+    def test_capacity_controls_claiming_above_the_diagnostic_wip_cap(self):
         cap = lane.pr_wip.cap_for("devin", lane.pr_wip.load_policy())
         rows = lambda n: [{"number": i, "headRefName": f"devin/jov-{i}-20260927t000000", "isDraft": True} for i in range(1, n + 1)]
         lane.lane_prs, ran = (lambda name, fields="", *, inventory=None: []), []
         lane.run_issue = lambda *a: ran.append(1) or {"verdict": "landing", "prUrl": "u"}
         real = lane.new_issue_budget
-        for n, claimed in ((cap, []), (cap - 1, [1])):
-            with patch.object(lane, "read_new_issue_budget", side_effect=lambda name, slots, n=n: real(name, slots, rows(n))):
+        healthy = {"allowed": True, "known": True, "reason": "within-capacity"}
+        exhausted = {"allowed": False, "known": True, "reason": "github-quota:core"}
+        for capacity, claimed in ((exhausted, []), (healthy, [1])):
+            with patch.object(lane, "read_new_issue_budget", side_effect=lambda name, slots: real(name, slots, rows(cap + 4), capacity=capacity)):
                 lane.worker(self.host, "devin")
-            self.assertEqual(ran, claimed, "claims only under the cap")
-        self.assertEqual(json.loads((self.host.state / "worker-idle.json").read_text())["devin"]["reason"], "wip-cap")
+            self.assertEqual(ran, claimed, "claims only when actual capacity permits")
+        self.assertEqual(json.loads((self.host.state / "worker-idle.json").read_text())["devin"]["reason"], "github-quota:core")
 
     def test_new_issue_budget_uses_base_slots_not_autoscaled(self):
-        """JOV-7514: parked-PR caps stay on configured slots as autoscale capacity rises."""
+        """JOV-7514: intake retains the configured seat bound as autoscale capacity rises."""
         seen = []
         lane.read_new_issue_budget = lambda name, slots: seen.append(slots) or {"allowed": True}
         lane.run_issue = lambda *a: {"verdict": "landing", "prUrl": "u"}
@@ -4920,12 +4922,12 @@ class ExhaustedRepairPublicationTest(unittest.TestCase):
 
 
 class NewIssueBudgetTest(unittest.TestCase):
-    """2026-11-01: one ceiling, the per-producer WIP cap shared with pr-open; the slot caps stay gone."""
+    """Capacity governs admission; the legacy budget envelope and PR diagnostics remain stable."""
     def row(self, number=1, branch=None, draft=True, state="CLEAN", labels=()):
         return {"number": number, "headRefName": branch or f"codex/jov-{number}-20261002",
                 "isDraft": draft, "mergeStateStatus": state, "labels": [{"name": name} for name in labels]}
 
-    def test_only_the_wip_cap_refuses_new_issues_and_held_prs_do_not_count(self):
+    def test_counts_do_not_refuse_new_issues_and_held_prs_remain_diagnostic(self):
         cap = lane.pr_wip.cap_for("codex", lane.pr_wip.load_policy())
         parked = [self.row(n, labels=("hold",)) for n in range(1, 40)]
         active = [self.row(n, state="BLOCKED") for n in range(40, 40 + cap - 1)]
@@ -4934,7 +4936,8 @@ class NewIssueBudgetTest(unittest.TestCase):
                          (True, "within-budget", None, None))
         self.assertEqual((result["used"], result["terminal"], result["wip"]), (cap - 1, 39, cap - 1))
         full = lane.new_issue_budget("codex", 1, parked + active + [self.row(99, branch="codex/manual")])
-        self.assertEqual((full["allowed"], full["reason"], full["wipCap"]), (False, "wip-cap", cap))
+        self.assertEqual((full["allowed"], full["reason"], full["wipCap"]), (True, "within-budget", cap))
+        self.assertEqual((full["capacity"]["known"], full["capacity"]["reason"]), (False, "capacity-unknown"))
         self.assertEqual(lane.new_issue_budget("codex", 0, None)["reason"], "provider-disabled")
         self.assertFalse(hasattr(lane, "OPEN_PRS_PER_SLOT") or hasattr(lane, "TERMINAL_PRS_PER_SLOT")
                          or hasattr(lane, "over_budget"))

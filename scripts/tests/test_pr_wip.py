@@ -363,9 +363,29 @@ class LaneBudget(unittest.TestCase):
         prs = [pr(n, f"codex/jov-{n}-20261101") for n in range(cap + 4)]
         healthy = lane.new_issue_budget("codex", 3, prs, capacity=HEALTHY)
         self.assertEqual((healthy["allowed"], healthy["wip"], healthy["wipCap"]), (True, cap + 4, cap))
+        self.assertEqual((healthy["reason"], healthy["capacity"]["reason"]), ("within-budget", "within-capacity"))
         exhausted = {"allowed": False, "known": True, "reason": "github-quota:core", "blockers": ["github-quota:core"]}
         self.assertFalse(lane.new_issue_budget("codex", 3, prs, capacity=exhausted)["allowed"])
         self.assertEqual(lane.new_issue_budget("codex", 0, prs, capacity=HEALTHY)["reason"], "provider-disabled")
+
+    def test_doctor_recognizes_empty_demand_without_losing_capacity_uncertainty(self):
+        import lane_runner as lane
+        import doctor
+        for capacity in (HEALTHY, None, {"allowed": False, "known": True, "reason": "github-quota:core"}):
+            budget = lane.new_issue_budget("codex", 3, [], capacity=capacity)
+            observation = {"eligiblePool": 0, "openPRCount": 0, "newIssueBudgetByProvider": {"codex": budget}}
+            self.assertEqual(doctor.new_work_empty(observation), budget["allowed"])
+            self.assertEqual(budget["capacity"]["known"], capacity is not None)
+
+    def test_native_revalidation_preserves_balances_while_sampling_time_advances(self):
+        import backlog_admission as native
+        reads = type("Reads", (), {"runtime_preimages": {}})()
+        runtime = {"observedAt": NOW, "resources": {"observedAt": NOW}, "providerObservations": [{"capacity": {"remaining": 10, "observedAt": NOW - 1}}]}
+        native._SharedReads.observe_runtime(reads, {"id": "issue"}, runtime)
+        native._SharedReads.observe_runtime(reads, {"id": "issue"}, {**runtime, "observedAt": NOW + 1, "resources": {"observedAt": NOW + 1}})
+        runtime["providerObservations"][0]["capacity"]["remaining"] = 0
+        with self.assertRaisesRegex(native.Unavailable, "prepared-native-eligibility-changed"):
+            native._SharedReads.observe_runtime(reads, {"id": "issue"}, runtime)
 
     def test_exhausted_escalated_and_poisoned_prs_remain_diagnostic_exclusions(self):
         parked = [pr(n, "codex/x", labels=(label,)) for n, label in enumerate(("lane-fix-exhausted", "lane-fix-escalating", "queue-poison"), 1)]

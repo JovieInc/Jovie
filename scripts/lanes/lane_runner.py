@@ -8773,7 +8773,7 @@ def new_issue_budget(name: str, slots: int, inventory: list[dict] | None = None,
     dated = re.compile(rf"^{re.escape(name)}/jov-\d+-\d{{8}}")
     own = [pr for pr in inventory or [] if dated.match(pr.get("headRefName") or "")]
     wip = pr_wip.admit(inventory, name, capacity=capacity)
-    return {"allowed": wip["allowed"], "reason": wip["reason"], "capacity": wip,
+    return {"allowed": wip["allowed"], "reason": "within-budget" if wip["allowed"] else wip["reason"], "capacity": wip,
             "used": None if inventory is None else sum(not is_green(pr) and not pr_is_terminal(pr) for pr in own),
             "cap": None, "terminal": None if inventory is None else sum(pr_is_terminal(pr) for pr in own), "terminalCap": None, "wip": wip["used"], "wipCap": wip["cap"]}
 
