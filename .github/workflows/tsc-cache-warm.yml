@@ -59,3 +59,41 @@ jobs:
         with:
           path: apps/web/.cache/tsbuildinfo*
           key: ${{ steps.web-tsbuildinfo.outputs.cache-primary-key }}
+      # Only main-scoped writer of the pinned actionlint downloads (source,
+      # patch, shellcheck, pyflakes) that ci.yml, source-validation.yml and
+      # actionlint.yml restore read-only: merge_group and PR runs can read a
+      # main cache, not each other's. A hit costs one restore. On a new key the
+      # script runs once to fill the content-addressed directory. Runs after
+      # the tsc warm and whatever its result; a failed fill saves nothing.
+      - name: Restore pinned actionlint downloads
+        id: pinned-downloads
+        if: ${{ !cancelled() }}
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: /tmp/jovie-pinned-downloads
+          key: pinned-downloads-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('.github/scripts/run-actionlint.sh') }}
+          restore-keys: |
+            pinned-downloads-${{ runner.os }}-${{ runner.arch }}-
+      - name: Set up Go for source-pinned actionlint
+        if: ${{ !cancelled() && steps.pinned-downloads.outputs.cache-hit != 'true' }}
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: '1.26.10'
+          cache: false
+      - name: Fill pinned actionlint downloads
+        id: pinned-fill
+        if: ${{ !cancelled() && steps.pinned-downloads.outputs.cache-hit != 'true' }}
+        env:
+          PINNED_DOWNLOAD_CACHE_DIR: /tmp/jovie-pinned-downloads
+        run: |
+          if bash .github/scripts/run-actionlint.sh -version; then
+            echo "filled=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::warning title=Pinned download cache::fill failed; the next main push retries"
+          fi
+      - name: Save pinned actionlint downloads
+        if: ${{ !cancelled() && steps.pinned-downloads.outputs.cache-hit != 'true' && steps.pinned-fill.outputs.filled == 'true' }}
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: /tmp/jovie-pinned-downloads
+          key: ${{ steps.pinned-downloads.outputs.cache-primary-key }}

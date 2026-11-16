@@ -782,10 +782,20 @@ jobs:
         with:
           ref: ${{ inputs.expected_sha }}
           persist-credentials: false
+      # Release reads use the Jovie Bot App's own REST bucket: GITHUB_TOKEN is shared by every
+      # workflow and planned past its hourly limit, so a quota deferral here failed releases closed.
+      - name: Mint read-only Jovie Bot token for release reads
+        id: read-token
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        with:
+          app-id: ${{ vars.JOVIE_BOT_APP_ID }}
+          private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}
+          permission-actions: read
+          permission-contents: read
       - name: Require predecessor verdict PASS before migration
         id: predecessor-verdict
         env:
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ steps.read-token.outputs.token }}
           PREDECESSOR_SHA: ${{ inputs.predecessor_sha }}
           RELEASE_SHA: ${{ inputs.expected_sha }}
         run: >-
@@ -1493,6 +1503,18 @@ jobs:
           --no-fallback --
           env -u DOPPLER_TOKEN node scripts/security/security-gate.mjs
 
+      # Release reads use the Jovie Bot App's own REST bucket: GITHUB_TOKEN is shared by every
+      # workflow and planned past its hourly limit, so a quota deferral here failed releases closed.
+      - name: Mint read-only Jovie Bot token for release reads
+        id: read-token
+        if: ${{ steps.final-current.outputs.is_current == 'true' }}
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        with:
+          app-id: ${{ vars.JOVIE_BOT_APP_ID }}
+          private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}
+          permission-actions: read
+          permission-contents: read
+
       # Pre-promotion journey gate (JOV-5937). Grades the full range from the
       # live production SHA to this candidate; a range touching auth/billing (or
       # unknown) needs fresh exact-SHA Golden Path evidence from a run that
@@ -1533,7 +1555,7 @@ jobs:
         id: journey-gate
         if: ${{ steps.final-current.outputs.is_current == 'true' }}
         env:
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ steps.read-token.outputs.token }}
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           CANDIDATE_SHA: ${{ inputs.expected_sha }}
@@ -1583,7 +1605,7 @@ jobs:
         id: predecessor-verdict
         if: ${{ steps.final-current.outputs.is_current == 'true' && steps.journey-gate.outcome == 'success' }}
         env:
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ steps.read-token.outputs.token }}
           PREDECESSOR_SHA: ${{ inputs.predecessor_sha }}
           RELEASE_SHA: ${{ inputs.expected_sha }}
         run: >-

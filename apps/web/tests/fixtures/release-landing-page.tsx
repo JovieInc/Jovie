@@ -109,7 +109,9 @@ vi.mock('@/features/release/SmartLinkAudioPreview', () => ({
 }));
 
 vi.mock('@/features/release/SmartLinkPagePrimitives', () => ({
-  SmartLinkPoweredByFooter: () => <div data-testid='powered-by-footer' />,
+  SmartLinkPoweredByFooter: ({ reportTarget }: { reportTarget?: string }) => (
+    <div data-testid='powered-by-footer' data-report-target={reportTarget} />
+  ),
 }));
 
 vi.mock('@/features/release/SmartLinkProviderButton', () => ({

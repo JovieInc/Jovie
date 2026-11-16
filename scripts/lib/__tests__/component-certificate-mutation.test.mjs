@@ -73,7 +73,11 @@ describe('mutation inventory per workspace root', () => {
 describe('certificate CLI reads packages/ui sweep evidence', () => {
   let root;
   const git = (...args) => {
-    const r = spawnSync('git', args, { cwd: root, encoding: 'utf8' });
+    const r = spawnSync('git', args, {
+      maxBuffer: 256 * 1024 * 1024,
+      cwd: root,
+      encoding: 'utf8',
+    });
     expect(r.status, r.stderr).toBe(0);
     return r.stdout;
   };

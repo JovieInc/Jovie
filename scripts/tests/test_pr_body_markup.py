@@ -1,7 +1,9 @@
 """PR repair quotes commit references without hiding real mentions or changing proof."""
 from __future__ import annotations
 
+import json
 import os
+import subprocess
 import sys
 import unittest
 from pathlib import Path
@@ -44,3 +46,28 @@ class RevisionReferenceTests(unittest.TestCase):
         self.assertIn(proof, updated)
         self.assertEqual(updated.count(decision), 1)
         self.assertTrue(events.red_section_complete(updated))
+
+    def test_repair_quotes_eight_char_hex_prefixes_for_the_mention_guard(self):
+        prefix = "036b3506"
+        body = f"Copied from main @{prefix}."
+        updated = events.repair_evidence_body({}, body)
+        self.assertEqual(updated, f"Copied from main `@{prefix}`.")
+        self.assertEqual(events.repair_evidence_body({}, updated), updated)
+        script = (
+            "import { readFileSync } from 'node:fs';\n"
+            "const re = /(?<![\\w@./`-])@([A-Za-z0-9](?:[A-Za-z0-9-]{0,38}"
+            "[A-Za-z0-9])?(?:\\[bot\\])?)(?![\\w-]*\\/|\\w*\\.\\w)/g;\n"
+            "const text = readFileSync(0, 'utf8');\n"
+            "const stripped = text.replace(/```[\\s\\S]*?```/g, ' ')"
+            ".replace(/`[^`\\n]*`/g, ' ');\n"
+            "const hits = [...stripped.matchAll(re)].map((match) => match[1]);\n"
+            "console.log(JSON.stringify(hits));\n"
+        )
+        checked = subprocess.run(
+            ["node", "--input-type=module", "-e", script],
+            input=updated,
+            text=True,
+            capture_output=True,
+            check=True,
+        )
+        self.assertEqual(json.loads(checked.stdout), [])

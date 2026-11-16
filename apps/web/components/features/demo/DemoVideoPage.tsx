@@ -1,6 +1,6 @@
 import { Button } from '@jovie/ui';
 import Link from 'next/link';
-import { APP_ROUTES } from '@/constants/routes';
+import { PUBLIC_ENTRY_HREF } from '@/constants/routes';
 import {
   DEMO_CAPTIONS_PUBLIC_PATH,
   getDemoVideoDownloadHref,
@@ -51,7 +51,7 @@ export function DemoVideoPage() {
           variant='primary'
           className='h-12 px-8 text-sm font-semibold'
         >
-          <Link href={APP_ROUTES.SIGNUP}>Try it free</Link>
+          <Link href={PUBLIC_ENTRY_HREF}>Try it free</Link>
         </Button>
       </div>
     </section>

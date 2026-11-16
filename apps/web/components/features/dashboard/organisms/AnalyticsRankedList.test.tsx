@@ -21,6 +21,12 @@ describe('AnalyticsRankedList', () => {
     expect(rows).toHaveLength(2);
     expect(rows[0]).toHaveTextContent('1Instagram42');
     expect(rows[1]).toHaveTextContent('2São Paulo7');
+    // Rank digits right-align in a fixed tabular column.
+    expect(screen.getByText('1')).toHaveClass(
+      'w-4',
+      'text-right',
+      'tabular-nums'
+    );
   });
 
   it('keeps one height across loading, empty and loaded states', () => {

@@ -373,6 +373,7 @@ The source export is preparatory; deployment and commissioning require separate 
         'packages/agent-transport-contracts',
       ],
       {
+        maxBuffer: 256 * 1024 * 1024,
         cwd: resolve(source, '../..'),
         encoding: 'utf8',
       }

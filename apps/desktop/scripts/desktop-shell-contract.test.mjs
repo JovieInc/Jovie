@@ -11,6 +11,9 @@ import { build } from 'esbuild';
 import ts from 'typescript';
 import { bundleDesktopPreload } from './bundle-preload.mjs';
 import { deriveStagingReleaseVersion } from './sync-version.mjs';
+import './desktop-titlebar-contract.cases.mjs';
+import './desktop-startup-contract.cases.mjs';
+import './desktop-update-control-contract.cases.mjs';
 
 const desktopRoot = dirname(dirname(fileURLToPath(import.meta.url)));
 const execFileAsync = promisify(execFile);
@@ -262,7 +265,7 @@ async function readBundledPreload(t) {
 }
 
 test('desktop window enters the authenticated chat shell instead of the web root', async () => {
-  const mainSource = await readFile(join(desktopRoot, 'src/main.ts'), 'utf8');
+  const mainSource = await readWindowChromeSource();
 
   assert.match(
     mainSource,
@@ -277,10 +280,10 @@ test('desktop window enters the authenticated chat shell instead of the web root
     mainSource,
     /await shell\.openExternal\(parsed\.toString\(\)\);/
   );
-  assert.match(mainSource, /const MACOS_TRAFFIC_LIGHT_X = 20;/);
-  // JOV-8974: 17px native + one app-shell gap (8px) — the lights ride the
-  // titlebar band down below the window's top gutter.
-  assert.match(mainSource, /const MACOS_TRAFFIC_LIGHT_Y = 25;/);
+  assert.match(mainSource, /const MACOS_TRAFFIC_LIGHT_X = 12;/);
+  // JOV-8940: locked 44pt title row — 15px in-band + the JOV-8974 top
+  // gutter, so the light centers sit on the row's icon centerline.
+  assert.match(mainSource, /const MACOS_TRAFFIC_LIGHT_Y = 23;/);
   assert.match(
     mainSource,
     /const MACOS_TRAFFIC_LIGHT_POSITION = \{\s*x: MACOS_TRAFFIC_LIGHT_X,\s*y: MACOS_TRAFFIC_LIGHT_Y,\s*\} as const;/
@@ -766,7 +769,7 @@ test('Mac boot splash uses the locked cinematic wordmark and quiet corner mark',
   assert.match(wordmarkPathFn, /process\.resourcesPath/);
   assert.match(
     whenReadyBody,
-    /const bootSplashWordmarkReady = preloadDesktopBootSplashWordmark\(\);/
+    /const bootSplashWordmarkReady = nightlyUpdateLaunch[\s\S]*?: preloadDesktopBootSplashWordmark\(\);/
   );
   const preloadAwait = whenReadyBody.indexOf('await bootSplashWordmarkReady;');
   const firstCreateWindow = whenReadyBody.indexOf('createWindow(');
@@ -1266,7 +1269,7 @@ test('desktop bridge exposes bounded dictation support', async () => {
   assert.match(mainSource, /scheduleNightlyUpdateLaunchAgent/);
   assert.match(
     mainSource,
-    /await hydrateWindowState\(\);[\s\S]*createWindow\([\s\S]*scheduleNightlyUpdateLaunchAgent\(\)/
+    /await Promise\.all\(\[[\s\S]*hydrateWindowState\(\),[\s\S]*createWindow\([\s\S]*scheduleNightlyUpdateLaunchAgent\(\)/
   );
   assert.doesNotMatch(mainSource, /spawnSync/);
   assert.doesNotMatch(mainSource, /writeFileSync/);
@@ -1745,158 +1748,6 @@ test('hud layout pings the desktop boot watchdog', async () => {
   assert.match(hudBoot, /useDesktopAppBootSignal/);
 });
 
-test('hosted web app has an early Electron runtime marker before first paint', async () => {
-  const webRoot = join(desktopRoot, '..', 'web');
-  const rootLayout = await readFile(join(webRoot, 'app/layout.tsx'), 'utf8');
-  const globalsCss = await readFile(join(webRoot, 'app/globals.css'), 'utf8');
-  const titlebarSource = await readFile(
-    join(webRoot, 'components/organisms/DesktopTitlebar.tsx'),
-    'utf8'
-  );
-  const runtimeInit = await readFile(
-    join(webRoot, 'public/electron-runtime-init.js'),
-    'utf8'
-  );
-
-  // Plain <script> in <head> (not next/script); async still runs before
-  // React hydration and keeps it off the FCP chain (JOV-12023).
-  assert.match(rootLayout, /async src='\/electron-runtime-init\.js'/);
-  assert.match(runtimeInit, /params\.get\('runtime'\) === 'electron'/);
-  assert.match(runtimeInit, /JovieDesktop\\\//);
-  assert.match(runtimeInit, /root\.dataset\.desktopRuntime = 'electron'/);
-  assert.match(runtimeInit, /root\.dataset\.devChromeDisabled = '1'/);
-  assert.match(globalsCss, /--electron-titlebar-height: 40px;/);
-  assert.match(globalsCss, /--electron-traffic-light-control-size: 14px;/);
-  assert.match(globalsCss, /--electron-traffic-light-clearance: 8px;/);
-  assert.match(globalsCss, /--electron-traffic-light-safe-width:\s*calc\(/);
-  assert.doesNotMatch(
-    globalsCss,
-    /--electron-traffic-light-safe-width:\s*\d+px;/
-  );
-  assert.match(globalsCss, /--electron-traffic-light-x: 20px;/);
-  assert.match(globalsCss, /--electron-traffic-light-y: 25px;/);
-  // JOV-8974: the shell keeps one gutter on every edge. The body's top
-  // padding and the titlebar band's top offset both use the shell gap.
-  assert.match(
-    globalsCss,
-    /\[data-app-shell-body="true"\]\[data-electron-top-gap-owner="titlebar"\] \{[^}]*padding-top:\s*var\(--app-shell-gap\);/s
-  );
-  assert.match(
-    globalsCss,
-    /\[data-electron-titlebar="true"\] \{[^}]*top:\s*var\(--app-shell-gap\);/s
-  );
-  assert.match(
-    globalsCss,
-    /--electron-sidebar-width: var\(--app-shell-sidebar-width\);/
-  );
-  assert.match(globalsCss, /--electron-sidebar-collapsed-width: 52px;/);
-  // The electron titlebar is an absolute flex overlay sharing one top row
-  // with the page header; the retired two-column grid must stay gone.
-  assert.doesNotMatch(
-    globalsCss,
-    /grid-template-columns: var\(--electron-sidebar-width\)/
-  );
-  // The overlay reserves a fixed control-row width for native window controls.
-  assert.match(globalsCss, /--electron-controls-width: 200px;/);
-  assert.doesNotMatch(
-    globalsCss,
-    /grid-template-columns: var\(--linear-app-sidebar-width\)/
-  );
-  // JOV-7740: the titlebar stays a flex row. A grid track must not return.
-  assert.match(
-    globalsCss,
-    /\[data-electron-titlebar="true"\] \{[^}]*display:\s*flex;/s
-  );
-  assert.match(
-    globalsCss,
-    /width:\s*calc\(var\(--app-shell-gap\)\s*\+\s*var\(--electron-sidebar-width\)\);/
-  );
-  assert.match(
-    titlebarSource,
-    /data-testid='electron-traffic-light-safe-area'/
-  );
-  // Tailwind v4 CSS-var utility form (not arbitrary w-[var(...)]).
-  assert.match(titlebarSource, /w-\(--electron-traffic-light-safe-width\)/);
-  assert.doesNotMatch(titlebarSource, /w-\[72px\]/);
-});
-
-test('macOS titlebar reserve safely contains traffic lights at every supported window size', async () => {
-  const mainSource = await readFile(join(desktopRoot, 'src/main.ts'), 'utf8');
-  const webRoot = join(desktopRoot, '..', 'web');
-  const globalsCss = await readFile(join(webRoot, 'app/globals.css'), 'utf8');
-  const designSystem = await readFile(
-    join(webRoot, 'styles/design-system.css'),
-    'utf8'
-  );
-
-  // These values deliberately cross the native-window and hosted-renderer
-  // boundary. The renderer must reserve enough room for the native controls;
-  // a route cannot paper over a collision at compact width or after resize.
-  const x = Number(
-    mainSource.match(/const MACOS_TRAFFIC_LIGHT_X = (\d+);/)?.[1]
-  );
-  const y = Number(
-    mainSource.match(/const MACOS_TRAFFIC_LIGHT_Y = (\d+);/)?.[1]
-  );
-  const titlebarHeight = Number(
-    globalsCss.match(/--electron-titlebar-height: (\d+)px;/)?.[1]
-  );
-  const controlDiameter = Number(
-    globalsCss.match(/--electron-traffic-light-control-size: (\d+)px;/)?.[1]
-  );
-  const trailingClearance = Number(
-    globalsCss.match(/--electron-traffic-light-clearance: (\d+)px;/)?.[1]
-  );
-  const shellGap = Number(
-    designSystem.match(/--app-shell-gap:\s*(\d+)px;/)?.[1]
-  );
-  const space2Rem = Number(
-    designSystem.match(/--space-2:\s*([\d.]+)rem;/)?.[1]
-  );
-  const iconGap = space2Rem * 16;
-  // Safe width is a calc of those tokens. The titlebar's padding-left is the
-  // shell gap, so the reserve is measured from the content origin:
-  // x - gap + 3 controls + 2 inter-light gaps + trailing clearance - icon gap.
-  const safeWidth =
-    x -
-    shellGap +
-    3 * controlDiameter +
-    2 * trailingClearance +
-    trailingClearance -
-    iconGap;
-
-  assert.ok(Number.isFinite(x) && Number.isFinite(y));
-  assert.ok(Number.isFinite(titlebarHeight) && Number.isFinite(safeWidth));
-  assert.equal(safeWidth, 70);
-
-  // The first interactive control starts at window x = shell gap + reserve +
-  // the shared icon gap. That must clear the third traffic light plus the
-  // trailing buffer at every supported window size.
-  const lightsEnd = x + 3 * controlDiameter + 2 * trailingClearance;
-  const toggleStart = shellGap + safeWidth + iconGap;
-  assert.ok(
-    toggleStart >= lightsEnd + trailingClearance,
-    `toggle window x (${toggleStart}px) must clear lights ending at ${lightsEnd}px plus ${trailingClearance}px`
-  );
-  assert.ok(
-    titlebarHeight >= y + controlDiameter,
-    `titlebar height (${titlebarHeight}px) must contain y=${y}px + traffic-light height`
-  );
-
-  // JOV-8974: the CSS mirror of the native light position must track
-  // MACOS_TRAFFIC_LIGHT_Y — the band and the lights sit one shell gap down.
-  const cssLightY = Number(
-    globalsCss.match(/--electron-traffic-light-y:\s*(\d+)px;/)?.[1]
-  );
-  assert.equal(cssLightY, y);
-
-  // Main-content clearance comes from the header-inset path: the shared top
-  // row reserves the fixed control-row width so chrome never overlaps the
-  // native control reserve after resize.
-  assert.match(globalsCss, /padding-left: var\(--electron-controls-width\);/);
-  assert.match(mainSource, /minWidth: 800,/);
-});
-
 test('Ovie recovery main IPC binds the live main window and root frame without a renderer URL', async () => {
   const source = await readFile(join(desktopRoot, 'src/main.ts'), 'utf8');
   const ast = ts.createSourceFile(
@@ -1981,6 +1832,7 @@ test('Ovie recovery real preload sends zero arguments on its dedicated channel',
           },
         },
         ipcRenderer: {
+          on() {},
           invoke(...args) {
             calls.push(args);
             return Promise.resolve(response);
@@ -1990,7 +1842,10 @@ test('Ovie recovery real preload sends zero arguments on its dedicated channel',
     },
   });
   assert.equal(await api.openCurrentOvieInBrowser(), response);
-  assert.deepEqual(calls, [['open-current-ovie-in-browser']]);
+  assert.deepEqual(calls, [
+    ['desktop-get-full-screen-state'],
+    ['open-current-ovie-in-browser'],
+  ]);
 });
 
 test('real native cancel wiring retries only an interrupted workspace document', async () => {
@@ -2261,6 +2116,7 @@ test('View Toggle Sidebar sends one command through the real preload and unsubsc
           },
         },
         ipcRenderer: {
+          invoke: async () => false,
           on: (channel, listener) => listeners.set(channel, listener),
           removeListener: (channel, listener) => {
             assert.equal(listeners.get(channel), listener);
@@ -2293,7 +2149,8 @@ test('View Toggle Sidebar sends one command through the real preload and unsubsc
   toggle.click();
   assert.equal(toggles, 1);
   unsubscribe();
-  assert.equal(listeners.size, 0);
+  assert.equal(listeners.has('toggle-sidebar'), false);
+  assert.deepEqual([...listeners.keys()], ['desktop-full-screen-changed']);
 });
 
 test('Cmd+B reaches the renderer policy without consuming editor input or other menu accelerators', async () => {
@@ -2334,3 +2191,16 @@ test('Cmd+B reaches the renderer policy without consuming editor input or other 
   beforeInput(event, { ...input, meta: false });
   assert.deepEqual(ignored, [true, true, false, false, false, false]);
 });
+
+// Keep source contracts bound to the imported native/renderer token owners.
+async function readWindowChromeSource() {
+  const main = await readFile(join(desktopRoot, 'src/main.ts'), 'utf8');
+  assert.match(main, /from '\.\/window-chrome';/);
+  assert.match(main, /bindWindowFullScreenState\(win\)/);
+  assert.match(main, /registerFullScreenStateIpc\(isTrustedIpcSender\)/);
+  return (
+    main +
+    '\n' +
+    (await readFile(join(desktopRoot, 'src/window-chrome.ts'), 'utf8'))
+  );
+}

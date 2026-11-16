@@ -3,13 +3,19 @@
 //   node scripts/test-quality-loop.mjs rank [--out ranked.json] [--top 20]
 // Ranks apps/web modules by how high-touch they are (tier weight + git churn)
 // so the mutation sweep expands from the top outward.
+//   node scripts/test-quality-loop.mjs merge --out merged.json a.json b.json ...
+// Folds sweep states (one per baseline shard) into one, newest entry per module.
+//   node scripts/test-quality-loop.mjs summary --state state.json
+// Prints the repo-wide mutation score and per-tier scores as markdown.
 import { spawnSync } from 'node:child_process';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
+import { mergeStates } from './lib/mutation-sweep.mjs';
 import {
   aggregateByTier,
+  baselineSummary,
   evaluateFloors,
   modelFingerprint,
   modelIds,
@@ -68,6 +74,17 @@ if (positionals[0] === 'rank') {
     console.log(
       `${String(r.touch).padStart(4)}  ${r.tier.padEnd(14)} ${String(r.commits).padStart(3)}  ${r.file}`
     );
+} else if (positionals[0] === 'merge') {
+  const inputs = positionals.slice(1).filter(path => existsSync(path));
+  if (!values.out || inputs.length === 0)
+    throw new Error('merge needs --out and at least one existing state file');
+  const merged = mergeStates(
+    ...inputs.map(path => JSON.parse(readFileSync(path, 'utf8')))
+  );
+  writeFileSync(values.out, `${JSON.stringify(merged, null, 1)}\n`);
+  console.log(
+    `Merged ${inputs.length} state file(s): ${Object.keys(merged.modules).length} modules.`
+  );
 } else if (positionals[0] === 'report' || positionals[0] === 'ratchet') {
   const surfaces = cfg(SURFACES_CONFIG_PATH);
   const state = JSON.parse(readFileSync(values.state, 'utf8'));
@@ -127,6 +144,13 @@ if (positionals[0] === 'rank') {
       JSON.stringify({ ...report, survivorsByModule: undefined }, null, 1)
     );
   }
+} else if (positionals[0] === 'summary') {
+  const state = JSON.parse(readFileSync(values.state, 'utf8'));
+  const summary = baselineSummary(state, cfg(SURFACES_CONFIG_PATH));
+  console.log(summary.markdown);
+  console.log(
+    `BASELINE overall=${summary.score} scored=${summary.counts.scored} untested=${summary.counts.untested} error=${summary.counts.error}`
+  );
 } else if (positionals[0] === 'model-check') {
   // The fingerprint lives in the sweep state (which persists on Gem), so a registry
   // change needs no commit-back: compare, re-arm the top-touch modules, record.
@@ -151,6 +175,8 @@ if (positionals[0] === 'rank') {
   state.modelIds = ids;
   writeFileSync(values.state, `${JSON.stringify(state)}\n`);
 } else {
-  console.error('usage: test-quality-loop.mjs rank|report|ratchet|model-check');
+  console.error(
+    'usage: test-quality-loop.mjs rank|merge|summary|report|ratchet|model-check'
+  );
   process.exit(2);
 }

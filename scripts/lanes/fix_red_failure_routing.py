@@ -6,6 +6,29 @@ import json
 import re
 import subprocess
 
+# Inherited design identities removed on main need the existing one-sync-per-head
+# route before source repair. Accept the failed Vitest summary or the CLI's
+# failure plus a typed identity, never a passing title or fixture API error.
+DESIGN_SOURCE_CLI = re.compile(
+    r"\bFAIL\b[^\n]*lib/__tests__/design-system-source-ratchet\.test\.mjs[^\n]*"
+    r">[^\n]*exits zero from the CLI on the live tree|"
+    r"\[design-system-source-ratchet\] FAIL[^\n]*\n[^\n]*new design identity: "
+    r"(?:apps/web|packages/ui)/[^\t\n]+\t"
+    r"(?:raw-hex-color|raw-palette-class|off-scale-step|duplicate-component)\t[^\n]+")
+
+# A local TS2307 can mean a prerequisite has landed on main while the PR is
+# BLOCKED rather than BEHIND. Use the existing one-sync-per-head route before
+# asking a model to recreate modules. Unresolved errors still fall back to it.
+LOCAL_MODULE_PREREQUISITE = re.compile(
+    r"\b[\w./-]+\.[cm]?[jt]sx?\(\d+,\d+\): error TS2307: "
+    r"Cannot find module ['\"]@/[\w./-]+['\"]")
+
+def has_source_prerequisite_failure(route, logs):
+    """Source failures stay out of infrastructure retries even in a mixed route."""
+    return any(pattern.search(logs.get(name) or "") for name in route["checks"]
+               for pattern in (LOCAL_MODULE_PREREQUISITE, DESIGN_SOURCE_CLI))
+
+
 ALIAS_ACTION = 'alias-graduation-owner'
 COLLECTOR = 'scripts/lib/public-profile-alias-graduation.mjs'
 _ALIAS_ERROR = re.compile(
@@ -13,10 +36,96 @@ _ALIAS_ERROR = re.compile(
     r'\d{4}-\d\d-\d\dT[\d:.]+Z \((?P<issue>JOV-[1-9]\d*)\) '
     r'and its \d+h grace ended \d{4}-\d\d-\d\dT[\d:.]+Z; re-review and refresh it\.')
 _ANSI = re.compile(r'\x1b\[[0-9;]*m')
+# `gh run view --log-failed` prefixes each line `job \t step \t` before the timestamp.
+_LOG_FAILED_PREFIX = re.compile(r'^[^\t]+\t[^\t]+\t(?=\d{4}-\d\d-\d\dT|##\[error\])')
 _HOLD = re.compile(r'class=deterministic-source;n=[1-9]\d*;run=([1-9]\d*);try=([1-9]\d*)')
 _SHA = re.compile(r'[0-9a-f]{40}')
 _ROLLUPS = {'ci-fast', 'PR Ready', 'Product Lane Receipt'}
 _RED = {'FAILURE', 'ERROR', 'TIMED_OUT', 'CANCELLED', 'STARTUP_FAILURE'}
+
+# The budget CLI checks the committed policy against current origin/main.
+# A stale head can retain ceilings main already lowered (#25125), including
+# inside disk-read CLI tests. Sync once through the existing owner; persistent
+# growth still needs a source repair, never a raised budget or an infra retry.
+# ##[error] is the build annotation. ::error:: is the same finding when the CLI
+# integration test prints it, including AssertionError: ::error:: lines.
+_BUDGET_GROWTH_LINE = re.compile(
+    r'^(?:\d{4}-\d\d-\d\dT[\d:.]+Z )?(?:AssertionError: )?'
+    r'(?:##\[error\]|::error::)'
+    r'(?:routes\.\S+|firstLoad\.baselines\.\S+|groups\.[A-Za-z]+\.baselineKb)'
+    r' grew (\d+(?:\.\d+)?) -> (\d+(?:\.\d+)?)\s*$')
+_OTHER_FAILURE = re.compile(
+    r'\bFAIL\b|\b(?:Error|AssertionError|TypeError|ReferenceError|SyntaxError):|error TS\d+:')
+
+
+def _budget_log_rejects(line):
+    """A non-growth failure in the same log is a real repair, not a stale ceiling."""
+    if '##[error]' in line and 'Process completed with exit code 1.' not in line:
+        return True
+    return _OTHER_FAILURE.search(line) is not None
+
+
+class RouteBudgetGrowth:
+    """Try the existing bounded main sync for stale ceilings, never relax a budget."""
+
+    def search(self, text):
+        clean = _ANSI.sub('', str(text or ''))
+        matches = []
+        for line in clean.splitlines():
+            line = _LOG_FAILED_PREFIX.sub('', line, count=1)
+            match = _BUDGET_GROWTH_LINE.fullmatch(line)
+            if match:
+                if float(match[2]) <= float(match[1]):
+                    return None
+                matches.append(match)
+            elif _budget_log_rejects(line):
+                return None
+        return matches[0] if matches else None
+
+
+ROUTE_BUDGET_GROWTH = RouteBudgetGrowth()
+
+
+# PR Size Guard counts the PR head for repository hygiene and the merged tree
+# for the combined-tree budget. A head that has not yet merged a main prune
+# (drizzle snapshots, #25664) fails both while the live base tip is already
+# under budget. Sync main once; a head that is still over after that sync is
+# a real shrink, and claim_route will not sync it again.
+_TREE_BYTE_LINE = re.compile(
+    r'(?:##\[error\]|::error::)\s*\d+ bytes of tracked regular files '
+    r'\(merged tree; base \d+ [+-]\d+\) exceeds the \d+-byte combined-tree budget')
+_TREE_HYGIENE_LINE = re.compile(
+    r'of tracked regular files exceeds the .+ repository budget')
+_TREE_ERROR_MARK = re.compile(r'(?:##\[error\]|::error::)')
+_TREE_FOLLOWER = re.compile(
+    r'(?:##\[error\]|::error::).*(?:'
+    r'Process completed with exit code 1'
+    r'|No files were found with the provided path: repo-health-receipt\.json'
+    r')')
+_TREE_STAMP = re.compile(r'^\d{4}-\d\d-\d\dT[\d:.]+Z\s*')
+
+
+class TreeByteBudget:
+    """Sync main when the only size-guard failure is the tracked-byte ceiling."""
+
+    def search(self, text):
+        clean = _ANSI.sub('', str(text or ''))
+        hit = None
+        for raw in clean.splitlines():
+            line = _TREE_STAMP.sub('', _LOG_FAILED_PREFIX.sub('', raw, count=1))
+            if _TREE_BYTE_LINE.search(line) or _TREE_HYGIENE_LINE.search(line):
+                hit = line
+                continue
+            # Hygiene violations are plain bullets, not Actions annotations.
+            # The bounded log tail may no longer contain the section header.
+            if line.lstrip().startswith('- '):
+                return None
+            if _TREE_ERROR_MARK.search(line) and not _TREE_FOLLOWER.search(line):
+                return None
+        return hit
+
+
+TREE_BYTE_BUDGET = TreeByteBudget()
 
 
 class SoleAliasReviewFailure:
@@ -181,3 +290,41 @@ def fingerprint_key(cls: str, names: list[str], signature: str = "") -> str:
     if cls in {"other", "mixed"}:
         parts.append(signature)
     return hashlib.sha256("|".join(parts).encode()).hexdigest()[:12]
+
+
+def not_shippable_reason(output: str) -> str | None:
+    """The agent's explicit decline, e.g. already fixed on main; routed to Triage, never retried."""
+    found = re.findall(r"NOT-SHIPPABLE:\s*(.+)", output)
+    return found[-1].strip()[:500] if found else None
+
+
+LANE_CRASH_SIGNATURES = (
+    ("codex-account-metadata-timeout", re.compile(r"TimeoutError: account/read: app-server response unavailable")),
+)
+DECLINE_INFRA = re.compile(
+    r"rate limit|HTTP 40[38]|HTTP 5\d\d|infrastructure|timed out fetching|outage|flak|Doppler",
+    re.IGNORECASE)
+DECLINE_BASE_RED = re.compile(
+    r"origin/main|untouched main|\bmain\b|merge base|pre-existing|preexisting|inherited|unrelated|"
+    r"identically|already fixed", re.IGNORECASE)
+
+
+def classify_unpushed_repair(exit_code, log_text: str) -> list[str]:
+    """Specific reason codes for a fix run that pushed nothing. The first code is the cause.
+
+    lane-crash:<signature>      the provider wrapper died before an agent worked (attempt refunded)
+    agent-exit:<n>              the agent exited non-zero without pushing
+    agent-declined:<class>:<why> NOT-SHIPPABLE; class infra | base-red | other (infra and
+                                base-red spend the head's budget: a second read declines again)
+    no-change:agent-ended-without-push  the agent finished cleanly and pushed nothing
+    """
+    if exit_code not in (0, None):
+        for name, pattern in LANE_CRASH_SIGNATURES:
+            if pattern.search(log_text):
+                return [f"lane-crash:{name}", f"agent-exit:{exit_code}"]
+        return [f"agent-exit:{exit_code}"]
+    declined = not_shippable_reason(log_text)
+    if declined:
+        kind = "infra" if DECLINE_INFRA.search(declined) else "base-red" if DECLINE_BASE_RED.search(declined) else "other"
+        return [f"agent-declined:{kind}:{declined[:160]}"]
+    return ["no-change:agent-ended-without-push"]

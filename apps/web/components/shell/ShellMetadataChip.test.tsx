@@ -61,3 +61,16 @@ describe('JOV-6773 red drift', () => {
     expect(source).not.toMatch(/\bred-\d/);
   });
 });
+
+describe('semantic tone tokens', () => {
+  it('draws the soon and warning tones with accent and warning tokens', () => {
+    const { container, rerender } = render(
+      <ShellMetadataChip tone='soon'>Soon</ShellMetadataChip>
+    );
+    const chip = () => container.firstElementChild as HTMLElement;
+    expect(chip()).toHaveClass('border-accent/40', 'bg-accent/10');
+    rerender(<ShellMetadataChip tone='warning'>Late</ShellMetadataChip>);
+    expect(chip()).toHaveClass('border-warning/20', 'bg-warning/5');
+    expect(chip().className).not.toMatch(/(cyan|amber)-\d/);
+  });
+});

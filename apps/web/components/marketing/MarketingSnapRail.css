@@ -151,4 +151,5 @@
   --system-b-entity-chip-artist-accent: var(--color-accent-purple);
   --system-b-entity-chip-track-accent: var(--color-accent-blue);
   --system-b-entity-chip-event-accent: var(--color-accent-orange);
+  --system-b-entity-chip-profile-accent: var(--color-accent-purple);
 }

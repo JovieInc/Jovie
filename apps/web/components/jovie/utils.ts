@@ -390,3 +390,13 @@ export function getPreferredErrorMessage(
 
   return rawMessage;
 }
+
+/** Index of the last assistant message, or -1. */
+export function findLastAssistantIndex(
+  messages: readonly { id: string; role: string }[]
+): number {
+  for (let i = messages.length - 1; i >= 0; i--) {
+    if (messages[i].role === 'assistant') return i;
+  }
+  return -1;
+}
