@@ -156,5 +156,3 @@ test('separate selections reread changed modules and newly created or removed in
     rmSync(root, { recursive: true, force: true });
   }
 });
-
-import './source-docs-scope.test.mjs';
