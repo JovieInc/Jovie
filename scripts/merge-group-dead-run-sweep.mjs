@@ -25,8 +25,15 @@
 // bucket); only the cancel requests spend the repo GITHUB_TOKEN (CANCEL_TOKEN,
 // actions: write), capped at MAX_CANCELS per run. Any failed read logs a
 // warning and cancels nothing; the sweep gates nothing and always exits 0.
+// Before the cancel loop, one GET /rate_limit probe on the CANCEL_TOKEN's own
+// view (free: it never counts against the bucket it reports) defers the whole
+// loop when the Actions core bucket cannot cover the cancels plus a reserve -
+// dead runs are housekeeping, and
+// housekeeping never takes the last calls of a dying bucket (JOV-12720;
+// 2026-11-15 19:17-20:17 PT the core bucket hit 5000/5000 while the app
+// bucket idled at 37/5000).
 // api-budget: github-app-core 120/hr - estimate: 30 sweeps/hr in a dequeue storm (one concurrency slot coalesces the rest) x 4 reads (three run listings and recent main)
-// api-budget: github-actions-token 100/hr - one cancel per dead merge-group run; dead runs are bounded by the groups that die, capped at MAX_CANCELS per sweep
+// api-budget: github-actions-token 100/hr - one cancel per dead merge-group run; dead runs are bounded by the groups that die, capped at MAX_CANCELS per sweep, and the loop defers under core-bucket pressure
 
 import { spawnSync } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
@@ -38,7 +45,35 @@ export const QUEUE_BRANCH =
 export const UNFINISHED_STATUSES = ['queued', 'pending', 'in_progress'];
 export const MAX_PAGES = 5;
 export const MAX_CANCELS = 100;
+// Reserve left for the gates that answer PRs; the cancel loop never takes
+// the Actions core bucket below it.
+export const MIN_CORE_REMAINING = 50;
 const SHA = /^[0-9a-f]{40}$/;
+
+/**
+ * Pure guard over the free /rate_limit probe (read with the cancel token's
+ * own view): defer the cancel loop when the Actions core bucket cannot cover
+ * the planned cancels plus the reserve.
+ * An unreadable probe defers too - the same cancel-nothing rule every other
+ * failed read in this sweep already follows.
+ *
+ * @param {unknown} rateLimit
+ * @param {number} cancelsNeeded
+ * @param {number} [floor]
+ */
+export function coreQuotaDefersCancels(
+  rateLimit,
+  cancelsNeeded,
+  floor = MIN_CORE_REMAINING
+) {
+  const remaining = Number(
+    /** @type {{ resources?: { core?: { remaining?: unknown } } } | null } */ (
+      rateLimit
+    )?.resources?.core?.remaining
+  );
+  if (!Number.isFinite(remaining)) return true;
+  return remaining < cancelsNeeded + floor;
+}
 
 /**
  * Pure decision over already-fetched evidence.
@@ -153,6 +188,22 @@ export function makeIo(env = process.env) {
         `repos/${env.REPOSITORY}/actions/runs/${id}/cancel`,
       ]).ok;
     },
+    actionsCoreQuota() {
+      // The probe must read the CANCEL_TOKEN's own /rate_limit view - the app
+      // token's buckets are a different meter. GET /rate_limit never counts
+      // against the bucket it reports, and a housekeeping probe never waits:
+      // poll priority answers or fails immediately.
+      const r = run(
+        process.execPath,
+        [API_CLIENT_CLI, 'gh', '--priority', 'poll', '--', 'api', 'rate_limit'],
+        { GH_TOKEN: env.CANCEL_TOKEN, GH_PROMPT_DISABLED: '1' }
+      );
+      try {
+        return r.ok ? JSON.parse(r.stdout) : null;
+      } catch {
+        return null;
+      }
+    },
   };
 }
 
@@ -206,6 +257,20 @@ export function main(env = process.env, io = makeIo(env), log = say) {
     'notice',
     `${runs.length} unfinished merge_group runs: ${plan.cancel.length} dead, ${plan.live} on live groups, ${plan.landed} landed.`
   );
+  if (plan.cancel.length > 0) {
+    const quota = io.actionsCoreQuota();
+    if (coreQuotaDefersCancels(quota, plan.cancel.length)) {
+      log(
+        'notice',
+        `github-quota-deferred: ${plan.cancel.length} dead-run cancels deferred; core remaining=${
+          /** @type {{ resources?: { core?: { remaining?: unknown } } } | null } */ (
+            quota
+          )?.resources?.core?.remaining ?? 'unknown'
+        }, reserve ${MIN_CORE_REMAINING}. The next sweep retries.`
+      );
+      return { cancelled: [] };
+    }
+  }
   const cancelled = [];
   for (const { id, branch, workflow } of plan.cancel) {
     if (io.cancel(id)) {
