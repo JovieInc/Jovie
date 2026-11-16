@@ -29,26 +29,26 @@ import machine_gap
 import migration_renumber
 import remediation
 from reviewable_split import measured_changes, reviewable_split
-from fix_red_mixed_repairs import first_route_reason, mixed_repairs  # noqa: F401
+from fix_red_mixed_repairs import first_route_reason, mixed_repairs, promote_body_and_sync  # noqa: F401
 from fix_red_screen_cert import SCREEN_CERT_TEXT, screen_cert_paths
-from fix_red_failure_routing import (ALIAS_ACTION, ALIAS_REVIEW_FAILURE, ROUTE_BUDGET_GROWTH, alias_owner_metadata,
+from fix_red_failure_routing import (ALIAS_ACTION, ALIAS_REVIEW_FAILURE, DESIGN_SOURCE_CLI, ROUTE_BUDGET_GROWTH, TREE_BYTE_BUDGET, alias_owner_metadata,
                                      error_signature, fingerprint_key, owner_handoff_reason, LOCAL_MODULE_PREREQUISITE)
 from atomic_state import atomic_write_text
 from fix_red_source_edits import (  # noqa: F401
     balance_added_headings, snap_added_conservative_spacing, strip_added_legacy_cache_exports,
-    resolve_additive_node_tests_text, resolve_additive_node_test_file, resolve_additive_list_conflict, size_500_stale_hit,
+    resolve_additive_node_tests_text, resolve_additive_node_test_file, resolve_additive_list_conflict, size_500_route,
 )
 from fix_red_ui_feel import apply as apply_ui_feel, publish as publish_ui_feel  # noqa: F401
 from fix_red_render_modes import ACTION as ADMIT_RENDER_MODE, hit as render_mode_hit  # noqa: F401
 
 SCHEMA = "jovie-fix-red-class/v1"
 # Actions a class can route to. `agent` is the default (a model run); the others spend no model.
-RERUN, SYNC_MAIN, WIRE_CI_FAST, RENUMBER, STAMP_CHANGELOG, SNAP_SPACING, STRIP_CACHE, MERGE_NARROWED, REGISTER_DOMAIN, ATOMIC_WRITE, REPAIR_SCREEN_CERT, BALANCE_HEADINGS, UI_FEEL, AGENT, COMPOSE, REPAIR_WIN = (
+RERUN, SYNC_MAIN, WIRE_CI_FAST, RENUMBER, STAMP_CHANGELOG, SNAP_SPACING, STRIP_CACHE, MERGE_NARROWED, REGISTER_DOMAIN, ATOMIC_WRITE, REPAIR_SCREEN_CERT, BALANCE_HEADINGS, UI_FEEL, AGENT, COMPOSE, REPAIR_WIN, SPLIT_SIZE = (
     "rerun", "sync-main", "wire-ci-fast", "renumber-migrations", "stamp-changelog", "snap-spacing",
-    "strip-cache-exports", "merge-narrowed-preflight", "register-domain-writes", "atomic-write", "repair-screen-cert", "balance-headings", "ui-feel", "agent", "compose", "repair-win")
+    "strip-cache-exports", "merge-narrowed-preflight", "register-domain-writes", "atomic-write", "repair-screen-cert", "balance-headings", "ui-feel", "agent", "compose", "repair-win", "split-size-500")
 DETERMINISTIC = frozenset({
     RERUN, SYNC_MAIN, WIRE_CI_FAST, RENUMBER, STAMP_CHANGELOG, SNAP_SPACING, STRIP_CACHE, MERGE_NARROWED,
-    REGISTER_DOMAIN, ATOMIC_WRITE, REPAIR_SCREEN_CERT, BALANCE_HEADINGS, UI_FEEL, ADMIT_RENDER_MODE, ALIAS_ACTION, REPAIR_WIN})
+    REGISTER_DOMAIN, ATOMIC_WRITE, REPAIR_SCREEN_CERT, BALANCE_HEADINGS, UI_FEEL, ADMIT_RENDER_MODE, ALIAS_ACTION, REPAIR_WIN, SPLIT_SIZE})
 
 # remediation.INFRA_TEXT (runner loss, OOM, 5xx) plus the platform failures seen in 52 agent-declined
 # fix runs. Kept out of INFRA_TEXT: the exhausted-PR classifier deliberately routes a rate-limited
@@ -86,13 +86,6 @@ CHANGELOG_QUOTA_READ = re.compile(r"github-quota-deferred: PR metadata read hit 
 # lines. A branch that already contains main fails update-branch and still
 # reaches a model, which is the only path that may renew a digest the PR owns.
 CENSUS_CERTIFICATION = re.compile(r"source changed; renew certification evidence")
-# The CLI compares source with origin/main as well as the committed baseline.
-# An inherited identity removed on main can fail a stale branch (#24406).
-# Match the failed-test summary, never passing-test titles or fixture API errors.
-# The existing sync route tries once per head, then falls back to the agent.
-DESIGN_SOURCE_CLI = re.compile(
-    r"\bFAIL\b[^\n]*lib/__tests__/design-system-source-ratchet\.test\.mjs[^\n]*"
-    r">[^\n]*exits zero from the CLI on the live tree")
 # Armed spacing ratchet (spacing-scale-ratchet.test.ts). The count grew because a
 # PR added a 10px/14px utility. Snap those added utilities; do not raise the floor.
 SPACING_RATCHET_TEXT = re.compile(
@@ -149,6 +142,10 @@ _YAML_AND_CHAIN_LINE = re.compile(
     r"^(?P<indent>[ \t]*)(?P<prefix>run: )(?P<q>)"
     r"(?P<command>[\w./@=:\t -]+(?:&&[\w./@=:\t -]+)+)(?P<suffix>)$")
 _JSON_KEY = re.compile(r'^\s*"([^"\n]+)"\s*:')
+# Head is over the tracked-byte budget only because it lacks cleanup already on
+# the base. Sync main. A merged tree that itself exceeds the budget does not match.
+TRACKED_BYTE_STALE = re.compile(
+    r"PR head has \d+ tracked regular-file bytes, exceeding the \d+-byte repository budget, while the merged tree fits at \d+ bytes")
 
 # (class, pattern, action). First match wins per check; order is most specific first.
 SIGNATURES = (
@@ -166,6 +163,8 @@ SIGNATURES = (
     ("census-certification", CENSUS_CERTIFICATION, SYNC_MAIN),
     ("design-source-cli", DESIGN_SOURCE_CLI, SYNC_MAIN),
     ("route-budget-growth", ROUTE_BUDGET_GROWTH, SYNC_MAIN),
+    ("tracked-byte-stale", TRACKED_BYTE_STALE, SYNC_MAIN),
+    ("tree-byte-budget", TREE_BYTE_BUDGET, SYNC_MAIN),
     ("ci-fast-wiring", UNWIRED, WIRE_CI_FAST),
     # The license error is the job failure. A passing fixture can echo quota text.
     ("dependency-license", DEPENDENCY_LICENSE, AGENT),
@@ -209,7 +208,7 @@ def classify(pr: dict, logs: dict[str, str] | None = None) -> dict:
     for name in names:
         text = logs.get(name) or ""
         hit = next(((cls, action) for cls, pattern, action in SIGNATURES if pattern.search(text)), None)
-        per_check.append(detached_native_sync.hit(text) or render_mode_hit(text) or hit or size_500_stale_hit(text) or ("other", AGENT))
+        per_check.append(detached_native_sync.hit(text) or render_mode_hit(text) or hit or size_500_route(text) or ("other", AGENT))
     classes = {cls for cls, _ in per_check}
     actions: list[str] = []
     if len(classes) == 1:
@@ -225,6 +224,8 @@ def classify(pr: dict, logs: dict[str, str] | None = None) -> dict:
     signature = error_signature("\n".join(logs.get(name) or "" for name in names)) if cls in {"other", "mixed"} else ""
     if cls in {"other", "mixed"} and pr.get("mergeStateStatus") == "BEHIND":
         cls, action = BEHIND_CLASS, SYNC_MAIN
+    # A body defect beside only sync-main classes still stamps red-before-green, then syncs.
+    cls, action = promote_body_and_sync(cls, action, per_check)
     # Attempt 2 of the changelog guard reports only the quota error. Stamp the missing internal
     # note when the body can take one; a body that already has a note stays a quota rerun.
     if cls == "quota-deferred" and CHANGELOG_QUOTA_READ.search("\n".join(logs.get(name) or "" for name in names)) \

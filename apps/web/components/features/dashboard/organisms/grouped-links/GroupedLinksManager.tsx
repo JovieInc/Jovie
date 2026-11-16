@@ -69,7 +69,7 @@ function AnimatedHint({ hint }: { readonly hint: string | null }) {
         transform: visible ? 'translateY(0)' : 'translateY(-10px)',
         display: 'block',
       }}
-      className='rounded-lg border border-amber-300/40 bg-amber-50 px-3 py-2 text-app text-amber-900 dark:bg-amber-950/30 dark:text-amber-200'
+      className='rounded-lg border border-warning/30 bg-warning-subtle px-3 py-2 text-app text-warning-text'
       aria-live='polite'
     >
       {displayHint}

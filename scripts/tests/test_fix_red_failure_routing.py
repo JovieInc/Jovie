@@ -34,6 +34,42 @@ def red(*names):
             'statusCheckRollup': [{'name': n, 'conclusion': 'FAILURE'} for n in names]}
 
 
+class DesignSourceCliTest(unittest.TestCase):
+    def test_infrastructure_shortcut_preserves_design_failure_routes(self):
+        summary = (' FAIL workspace-scripts lib/__tests__/design-system-source-ratchet.test.mjs'
+                   ' > design-system source identity ratchet > exits zero from the CLI on the live tree\n')
+        direct = ('[design-system-source-ratchet] FAIL — 1900 identities\n'
+                  'new design identity: apps/web/components/shell/StatusBadge.tsx'
+                  '\traw-palette-class\tbg-amber-300\n')
+        for diagnostic in (summary, direct):
+            for mixed in (False, True):
+                pr = {**red('Source Validation'), 'queueFailure': None, 'eventKinds': []}
+                logs = {'Source Validation': 'passing fixture: API rate limit exceeded\n' + diagnostic}
+                if mixed:
+                    pr['statusCheckRollup'].append({'name': 'Unit Tests', 'conclusion': 'FAILURE'})
+                    logs['Unit Tests'] = 'passing fixture: API rate limit exceeded\nAssertionError: real product bug'
+                with patch.object(lane, 'failed_logs', return_value=logs):
+                    self.assertIsNone(lane.infra_only_red(None, pr))
+                    self.assertEqual(lane.route_fix_red(None, pr)['action'], 'agent' if mixed else 'sync-main')
+        pr = {**red('Source Validation'), 'queueFailure': None, 'eventKinds': []}
+        with patch.object(lane, 'failed_logs', return_value={'Source Validation': 'API rate limit exceeded'}):
+            self.assertEqual(lane.infra_only_red(None, pr), 'api-rate-limit-exceeded')
+
+    def test_direct_identity_diagnostic_uses_existing_main_sync_route(self):
+        header = '[design-system-source-ratchet] FAIL — 1900 identities (0 new / baseline 1907)\n'
+        identity = ('new design identity: apps/web/components/shell/StatusBadge.tsx'
+                    '\traw-palette-class\tbg-amber-300\n')
+        noise = 'passing fixture: github-quota-deferred; API rate limit exceeded; HTTP 503\n'
+        for log in (header + identity, noise + header + identity):
+            got = classes.classify(red('Source Validation'), {'Source Validation': log})
+            self.assertEqual((got['cls'], got['action']), ('design-source-cli', 'sync-main'))
+            self.assertEqual(got['actions'], ['sync-main'])
+        for log in (header, identity, header.replace('FAIL', 'PASS') + identity,
+                    header + identity.replace('raw-palette-class', 'unknown-rule')):
+            got = classes.classify(red('Source Validation'), {'Source Validation': noise + log})
+            self.assertEqual((got['cls'], got['action']), ('quota-deferred', 'rerun'))
+
+
 class LocalModulePrerequisiteTest(unittest.TestCase):
     def test_missing_local_prerequisite_syncs_main_before_fixture_infra(self):
         diagnostic = ("lib/waitlist/winback-approval.server.ts(23,8): error TS2307: "
@@ -125,6 +161,56 @@ class RouteBudgetGrowthTest(unittest.TestCase):
             'Exact-head Coverage\tUNKNOWN STEP\t2026-11-13T19:16:14.0000000Z ##[error]AssertionError: expected 1 to be +0\n')
         stay = classes.classify(red('Exact-head Coverage'), {'Exact-head Coverage': poisoned})
         self.assertEqual(stay['action'], 'agent')
+
+
+class TreeByteBudgetTest(unittest.TestCase):
+    def test_stale_head_route_precedes_the_general_tree_budget_route(self):
+        stale = ('##[error]PR head has 207672844 tracked regular-file bytes, exceeding the '
+                 '207618048-byte repository budget, while the merged tree fits at 207583562 bytes\n')
+        hygiene = ('198.05 MiB of tracked regular files exceeds the 198.00 MiB repository budget\n')
+        for log in (stale, hygiene + stale, stale + hygiene):
+            with self.subTest(log=log):
+                route = classes.classify(red('PR Size Guard'), {'PR Size Guard': log})
+                self.assertEqual((route['cls'], route['action']), ('tracked-byte-stale', 'sync-main'))
+
+    def test_combined_tree_overflow_syncs_main_and_ignores_the_receipt_follower(self):
+        log = (
+            '2026-11-15T05:42:55.9330300Z ##[error]207672844 bytes of tracked regular files '
+            '(merged tree; base 207583562 +89282) exceeds the 207618048-byte combined-tree budget; '
+            'the merge queue would reject this PR\n'
+            '2026-11-15T05:42:55.9418422Z ##[error]Process completed with exit code 1.\n'
+            '2026-11-15T05:42:56.0668553Z ##[error]No files were found with the provided path: '
+            'repo-health-receipt.json. No artifacts will be uploaded.\n')
+        route = classes.classify(red('PR Size Guard'), {'PR Size Guard': log})
+        self.assertEqual((route['cls'], route['action']), ('tree-byte-budget', 'sync-main'))
+        hygiene = (
+            '[repo-hygiene] blocked:\n'
+            '  - 198.05 MiB of tracked regular files exceeds the 198.00 MiB repository budget\n'
+            '##[error]Process completed with exit code 1.\n')
+        again = classes.classify(red('PR Size Guard'), {'PR Size Guard': hygiene})
+        self.assertEqual((again['cls'], again['action']), ('tree-byte-budget', 'sync-main'))
+
+    def test_a_second_size_guard_error_stays_with_the_agent(self):
+        log = (
+            '##[error]207672844 bytes of tracked regular files (merged tree; base 207583562 +89282) '
+            'exceeds the 207618048-byte combined-tree budget; the merge queue would reject this PR\n'
+            '##[error]changed lines 1600 exceed the 1500 line cap\n')
+        route = classes.classify(red('PR Size Guard'), {'PR Size Guard': log})
+        self.assertEqual(route['action'], 'agent')
+
+    def test_a_non_budget_hygiene_bullet_stays_with_the_agent(self):
+        budget = '  - 198.05 MiB of tracked regular files exceeds the 198.00 MiB repository budget\n'
+        other = '  - docs/example.tmp: temporary/backup files are not tracked\n'
+        for header, bullets in (('', budget + other), ('', other + budget),
+                               ('[repo-hygiene] blocked:\n', budget + other),
+                               ('[repo-hygiene] blocked:\n', other + budget)):
+            log = header + bullets + '##[error]Process completed with exit code 1.\n'
+            for prefix in ('', '2026-11-15T05:42:55.9330300Z ',
+                           'PR Size Guard\tUNKNOWN STEP\t2026-11-15T05:42:55.9330300Z '):
+                with self.subTest(bullets=bullets, prefix=prefix):
+                    prefixed = ''.join(prefix + line + '\n' for line in log.splitlines())
+                    route = classes.classify(red('PR Size Guard'), {'PR Size Guard': prefixed})
+                    self.assertEqual(route['action'], 'agent')
 
 
 class AliasClassificationTest(unittest.TestCase):

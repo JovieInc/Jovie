@@ -21,3 +21,13 @@ describe('shell StatusBadge', () => {
     expect(screen.getByText(label).className).not.toMatch(/tracking-\[/);
   });
 });
+
+describe('shell StatusBadge dot tokens', () => {
+  it('keeps the scheduled and announced dots on warning and accent tokens', () => {
+    const { container, rerender } = render(<StatusBadge status='scheduled' />);
+    expect(container.querySelector('.bg-warning\\/70')).toBeInTheDocument();
+    rerender(<StatusBadge status='announced' />);
+    expect(container.querySelector('.bg-accent\\/75')).toBeInTheDocument();
+    expect(container.innerHTML).not.toMatch(/(amber|cyan)-\d|bg-white/);
+  });
+});
