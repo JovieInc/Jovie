@@ -118,7 +118,7 @@ function readClientManifest(path) {
  * @param {string} nextDir
  * @returns {{ route: string, files: Set<string> }[]}
  */
-function collectRouteFiles(
+export function collectRouteFiles(
   nextDir,
   root = join(nextDir, 'server', 'app', 'app'),
   { intercepted = false } = {}

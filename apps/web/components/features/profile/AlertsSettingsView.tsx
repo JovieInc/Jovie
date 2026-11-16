@@ -1,6 +1,6 @@
 'use client';
 
-import { Switch } from '@jovie/ui';
+import { PlainButton, Switch } from '@jovie/ui';
 import { useId } from 'react';
 import { cn } from '@/lib/utils';
 import type { NotificationContentType } from '@/types/notifications';
@@ -59,17 +59,17 @@ function AlertsSettingsRow({
       htmlFor={switchId}
       aria-disabled={disabled || undefined}
       className={cn(
-        'flex min-h-15 w-full items-center gap-3 border-t border-white/[0.075] px-4 py-3 text-left transition-colors duration-subtle first:border-t-0 hover:bg-white/[0.03]',
+        'flex min-h-15 w-full items-center gap-3 border-t border-on-media/[0.075] px-4 py-3 text-left transition-colors duration-subtle first:border-t-0 hover:bg-on-media/[0.03]',
         disabled && 'cursor-default hover:bg-transparent'
       )}
     >
       <div className='min-w-0 flex-1'>
-        <p className='truncate text-sm font-medium tracking-tight text-white dark:text-white'>
+        <p className='truncate text-sm font-medium tracking-tight text-on-media'>
           {label}
         </p>
         <p
           id={descriptionId}
-          className='truncate text-2xs leading-4 text-white/50'
+          className='truncate text-2xs leading-4 text-on-media/50'
         >
           {description}
         </p>
@@ -119,16 +119,16 @@ export function AlertsSettingsView({
     >
       {presentation === 'panel' ? (
         <div className='flex items-baseline justify-between px-4 pb-2 pt-3'>
-          <h2 className='text-xl font-semibold leading-none tracking-tight text-white dark:text-white'>
+          <h2 className='text-balance text-xl font-semibold leading-none tracking-tight text-on-media'>
             Alerts
           </h2>
-          <span className='text-app font-medium text-white/52'>
+          <span className='text-app font-medium text-on-media/52'>
             {isSubscribed ? 'On' : 'Off'}
           </span>
         </div>
       ) : null}
 
-      <div className='border-y border-white/[0.075]'>
+      <div className='border-y border-on-media/[0.075]'>
         {PREFERENCE_ROWS.map(([label, description, key]) => (
           <AlertsSettingsRow
             key={key}
@@ -142,16 +142,16 @@ export function AlertsSettingsView({
       </div>
 
       {isSubscribed ? (
-        <button
+        <PlainButton
           type='button'
           onClick={onUnsubscribe}
           disabled={isUnsubscribing}
-          className='mt-5 w-full px-4 py-3 text-center text-sm font-semibold text-white/72 transition-colors duration-subtle hover:text-white disabled:cursor-not-allowed disabled:text-white/36'
+          className='mt-5 w-full px-4 py-3 text-center text-sm font-semibold text-on-media/72 transition-colors duration-subtle hover:text-on-media disabled:cursor-not-allowed disabled:text-on-media/36'
         >
           {isUnsubscribing ? 'Turning off...' : 'Turn off alerts'}
-        </button>
+        </PlainButton>
       ) : (
-        <p className='px-4 pt-4 text-xs leading-5 text-white/42'>
+        <p className='px-4 pt-4 text-xs leading-5 text-on-media/42'>
           Alert preferences appear here after alerts are enabled.
         </p>
       )}
