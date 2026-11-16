@@ -99,7 +99,6 @@ export async function runQualification({
     adoptionEligible: false,
     requiredGate: 'not-run-by-this-tool',
     scope: Object.keys(PROGRAMS),
-    candidate: 'tsrs',
     bounds: BOUNDS,
     pins,
     sourceInventorySha256: sha(json(initial)),
