@@ -16,7 +16,7 @@ import {
 } from './outcome-fulfillment.fixtures';
 
 type Ledger = Awaited<ReturnType<ReturnType<typeof harness>['send']>>;
-function draftFor(ledger: Ledger, id = primitive.id) {
+function draftFor(ledger: Ledger, id: string = primitive.id) {
   return ledger.rows.find(
     row => row.plan.id === capabilityGapId(scope, { ...primitive, id })
   )!.plan.capabilityDraft!;
