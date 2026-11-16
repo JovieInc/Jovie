@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mockVerifyCronRequest = vi.hoisted(() => vi.fn());
@@ -38,7 +38,7 @@ describe('POST /api/internal/ovie/fix-deploy-stamp (JOV-12766)', () => {
       '@/app/api/internal/ovie/fix-deploy-stamp/route'
     );
     const response = await POST(
-      new Request('https://jov.ie/', {
+      new NextRequest('https://jov.ie/', {
         method: 'POST',
       })
     );
@@ -57,7 +57,7 @@ describe('POST /api/internal/ovie/fix-deploy-stamp (JOV-12766)', () => {
       '@/app/api/internal/ovie/fix-deploy-stamp/route'
     );
     const response = await POST(
-      new Request('https://jov.ie/', {
+      new NextRequest('https://jov.ie/', {
         method: 'POST',
         headers: { authorization: 'Bearer secret' },
       })
@@ -78,7 +78,7 @@ describe('POST /api/internal/ovie/fix-deploy-stamp (JOV-12766)', () => {
     const { POST } = await import(
       '@/app/api/internal/ovie/fix-deploy-stamp/route'
     );
-    await POST(new Request('https://jov.ie/', { method: 'POST' }));
+    await POST(new NextRequest('https://jov.ie/', { method: 'POST' }));
 
     expect(mockVerifyCronRequest).toHaveBeenCalledWith(expect.any(Request), {
       route: '/api/internal/ovie/fix-deploy-stamp',
