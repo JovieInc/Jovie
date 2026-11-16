@@ -10,11 +10,15 @@ import {
   HOMEPAGE_INVITE_ANCHOR,
 } from '@/data/homepageEditorialCopy';
 import { HOMEPAGE_LATEST_RELEASE } from '@/data/homepageProductUi';
-import { resolveHomepageHeroPrimaryAction } from '@/data/homepageStartCta';
+import {
+  isHomepageStartCtaEnabled,
+  resolveHomepageHeroPrimaryAction,
+} from '@/data/homepageStartCta';
 import { MARKETING_PEN_CONTRACT_IDS } from '@/data/marketing/penContracts';
+import { getClaimProfileIntent } from '@/data/marketingCtaIntents';
 import { HOME_SPEC } from './v3/home-spec';
 import { Orbit } from './v3/Orbit';
-import { AppWindow, CatalogPlate, ReleaseInspector } from './v3/ProductUi';
+import { AppWindow, CatalogPlate } from './v3/ProductUi';
 import { Callout, ReleasePage } from './v3/Surfaces';
 import './v3/stage.css';
 import './v3/product-ui.css';
@@ -34,6 +38,13 @@ const CHAPTER_ANCHORS = [
   'specs',
   HOMEPAGE_INVITE_ANCHOR,
 ];
+
+/** Chapter index labels: the close is `claim` while public signup is open. */
+function chapterLabels(): readonly string[] {
+  return isHomepageStartCtaEnabled()
+    ? [...COPY.chapters.slice(0, 3), COPY.claim.chapter]
+    : COPY.chapters;
+}
 
 type HeroCopy = {
   readonly [K in keyof typeof HOMEPAGE_EDITORIAL_COPY.hero]: string;
@@ -62,8 +73,9 @@ function ChapterRule({
 }
 
 /**
- * Hero: the locked line beside the lede and actions, then Jovie for Mac under
- * the one camera, its inspector lifted out of the window, lit by the Orbit.
+ * Hero: the locked line beside the lede and actions, then Jovie for Mac shot
+ * straight on, its release page lifted out of the window, standing in one
+ * key light from above. No rings or glow blobs: light, edge and shadow only.
  */
 export function HomepageStoryHero({
   copy = HOMEPAGE_EDITORIAL_COPY.hero,
@@ -80,12 +92,6 @@ export function HomepageStoryHero({
       aria-labelledby={headingId}
       className='hv3 hv3-hero marketing-hero-dock'
     >
-      <Orbit
-        id='hv3-orbit-hero'
-        rings={[1800, 1400, 1000]}
-        arc={[282, 34]}
-        arcRing={1}
-      />
       <div className='hv3-hero__copy'>
         <h1
           id={headingId}
@@ -126,7 +132,10 @@ export function HomepageStoryHero({
         className='hv3-stage hv3-stage--hero'
         data-dom-certification='ignore'
       >
-        <div className='hv3-bounce' />
+        {/* The key light: one Ion wedge from above the frame, falling onto the
+            selected release. The window stands in it; it shows only as haze
+            above the window and as spill below it. */}
+        <div aria-hidden className='hv3-keylight' />
         <div
           className='hv3-rig hv3-rig--hero'
           role='img'
@@ -136,17 +145,21 @@ export function HomepageStoryHero({
             <AppWindow />
             <div className='hv3-sheen' />
           </div>
+          {/* What a listener gets from the selected row: its release page,
+              on the third column, down to its first listen rows. */}
           <div
-            className='hv3-lift hv3-lift--inspector hv3-edge'
+            aria-hidden
+            className='hv3-lift hv3-lift--page hv3-edge'
             data-hv3-parallax
           >
-            <ReleaseInspector anchor='upc' eager />
+            <div className='hv3-phone hv3-phone--hero'>
+              <ReleasePage titleAnchor='htitle' />
+            </div>
           </div>
         </div>
-        <Callout anchor='upc' label={COPY.hero.upcCallout} />
       </div>
       <nav className='hv3-index' aria-label={COPY.chaptersLabel}>
-        {COPY.chapters.map((label, index) => (
+        {chapterLabels().map((label, index) => (
           <a
             key={label}
             href={`#${CHAPTER_ANCHORS[index]}`}
@@ -299,7 +312,58 @@ export function HomepageReleasesChapter({
   );
 }
 
-/** 04 invitation: the role waitlist form, the page's one conversion. */
+/**
+ * 04 claim: the page's one conversion while public signup is open, the shared
+ * claim-profile intent into `/start`. Code-owned copy (see `COPY.claim`).
+ */
+function ClaimCloseBody() {
+  const claim = COPY.claim;
+  const intent = getClaimProfileIntent();
+  return (
+    <>
+      <ChapterRule index='04' label={claim.chapter} />
+      <div className='hv3-invite__inner'>
+        <h2 className='hv3-statement text-balance'>{lines(claim.headline)}</h2>
+        <p className='hv3-lede hv3-lede--center'>{claim.subhead}</p>
+        <div className='hv3-form'>
+          <Link
+            href={intent.href}
+            prefetch={false}
+            className='hv3-btn hv3-btn--primary'
+            data-testid='homepage-close-cta'
+          >
+            {intent.label}
+          </Link>
+        </div>
+        <Steps steps={claim.steps} />
+      </div>
+    </>
+  );
+}
+
+function Steps({
+  steps,
+}: Readonly<{
+  steps: readonly { readonly title: string; readonly body: string }[];
+}>) {
+  return (
+    <ol className='hv3-steps hv3-reveal'>
+      {steps.map((step, index) => (
+        <li key={step.title}>
+          <span className='hv3-mono'>{`0${index + 1}`}</span>
+          <b>{step.title}</b>
+          <span>{step.body}</span>
+        </li>
+      ))}
+    </ol>
+  );
+}
+
+/**
+ * 04 close. Public signup open: the claim close. Only while the
+ * `PUBLIC_SIGNUP_CLOSED` kill switch is on: the role waitlist form, whose
+ * headline and subhead the `cta` record slots fill.
+ */
 export function HomepageInviteClose({
   copy = HOMEPAGE_EDITORIAL_COPY.invite,
 }: Readonly<{
@@ -316,30 +380,30 @@ export function HomepageInviteClose({
       data-pen-contract={MARKETING_PEN_CONTRACT_IDS.section.cta}
       className='hv3 hv3-chapter hv3-invite'
     >
-      <ChapterRule index='04' label={COPY.chapters[3]} />
-      <div className='hv3-invite__inner'>
-        <h2 className='hv3-statement text-balance'>{lines(copy.headline)}</h2>
-        <p className='hv3-lede hv3-lede--center'>{copy.subhead}</p>
-        <div className='hv3-form'>
-          <WaitlistRoleForm
-            presentation='chips'
-            align='center'
-            headingLevel={2}
-            title={copy.headline}
-            roleLabel={invite.roleLabel}
-            submitLabel={invite.action}
-          />
-        </div>
-        <ol className='hv3-steps hv3-reveal'>
-          {invite.steps.map((step, index) => (
-            <li key={step.title}>
-              <span className='hv3-mono'>{`0${index + 1}`}</span>
-              <b>{step.title}</b>
-              <span>{step.body}</span>
-            </li>
-          ))}
-        </ol>
-      </div>
+      {isHomepageStartCtaEnabled() ? (
+        <ClaimCloseBody />
+      ) : (
+        <>
+          <ChapterRule index='04' label={COPY.chapters[3]} />
+          <div className='hv3-invite__inner'>
+            <h2 className='hv3-statement text-balance'>
+              {lines(copy.headline)}
+            </h2>
+            <p className='hv3-lede hv3-lede--center'>{copy.subhead}</p>
+            <div className='hv3-form'>
+              <WaitlistRoleForm
+                presentation='chips'
+                align='center'
+                headingLevel={2}
+                title={copy.headline}
+                roleLabel={invite.roleLabel}
+                submitLabel={invite.action}
+              />
+            </div>
+            <Steps steps={invite.steps} />
+          </div>
+        </>
+      )}
     </section>
   );
 }

@@ -242,7 +242,12 @@ describe('bot review thread resolution on a green head', () => {
       gh,
       log: () => {},
     });
-    expect(out).toEqual({ resolved: ['T1'], failed: [], skip: null });
+    expect(out).toEqual({
+      resolved: ['T1'],
+      failed: [],
+      filed: [],
+      skip: null,
+    });
     expect(calls).toHaveLength(2);
     expect(calls[1]).toContain(`query=${RESOLVE_MUTATION}`);
     expect(calls[1]).toContain('id=T1');
@@ -270,6 +275,11 @@ describe('bot review thread resolution on a green head', () => {
       gh: async () => ({ code: 75, stdout: '' }),
       log: () => {},
     });
-    expect(failed).toEqual({ resolved: [], failed: [], skip: 'read-failed' });
+    expect(failed).toEqual({
+      resolved: [],
+      failed: [],
+      filed: [],
+      skip: 'read-failed',
+    });
   });
 });

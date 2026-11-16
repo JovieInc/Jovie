@@ -25,9 +25,9 @@ export type TaskStatus =
  *
  * - `backlog` — dashed circle, quaternary tone (the row is parked).
  * - `todo` — solid circle outline, tertiary tone (queued).
- * - `in_progress` — half-filled cyan circle. When `agentRunning` is true,
+ * - `in_progress` — half-filled accent circle. When `agentRunning` is true,
  *   the glyph adds a calm-breath pulse so the row reads as live.
- * - `done` — emerald-filled circle with a check (clearly resolved).
+ * - `done` — success-filled circle with a check (clearly resolved).
  * - `cancelled` — slashed-circle, faded (intentionally retired).
  *
  * Pure leaf — caller controls `status` and the optional `agentRunning`
@@ -70,7 +70,7 @@ export function TaskStatusIcon({
         <svg
           viewBox='0 0 14 14'
           className={cn(
-            'h-3.5 w-3.5 text-cyan-400',
+            'h-3.5 w-3.5 text-accent',
             agentRunning && 'anim-calm-breath',
             className
           )}
@@ -97,7 +97,7 @@ export function TaskStatusIcon({
           role='img'
           aria-label='Done'
           className={cn(
-            'inline-flex items-center justify-center h-3.5 w-3.5 rounded-full bg-emerald-500/85 text-(--linear-bg-page)',
+            'inline-flex items-center justify-center h-3.5 w-3.5 rounded-full bg-success/85 text-(--linear-bg-page)',
             className
           )}
         >

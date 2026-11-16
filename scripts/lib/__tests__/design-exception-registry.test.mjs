@@ -274,6 +274,42 @@ describe('design exception-registry contract (JOV-5447)', () => {
     }
   );
 
+  it('locks the source-identity baseline and allowlist against unguarded growth', () => {
+    const baselinePath = `${DS}/source-identity.baseline.json`;
+    const allowlistPath = `${DS}/source-identity.allowlist.json`;
+    const baseline = readJson(baselinePath);
+    const allowlist = readJson(allowlistPath);
+    const grown = evaluatePair({
+      [baselinePath]: {
+        ...baseline,
+        identities: [...baseline.identities, 'a.tsx\tarbitrary-value\tw-[1px]'],
+      },
+      [allowlistPath]: {
+        ...allowlist,
+        identities: [
+          ...allowlist.identities,
+          { file: 'a.tsx', rule: 'arbitrary-value', value: 'w-[1px]' },
+        ],
+      },
+    });
+    for (const registry of ['source-identity', 'source-identity-allowlist'])
+      expect(grown.issues).toContainEqual(
+        expect.objectContaining({ registry, code: ISSUE_CODES.SET_GROWTH })
+      );
+    // Pruning, and rewording an existing allowlist reason, are not growth.
+    expect(
+      evaluatePair({
+        [baselinePath]: { ...baseline, identities: [] },
+        [allowlistPath]: {
+          ...allowlist,
+          identities: allowlist.identities
+            .slice(1)
+            .map(entry => ({ ...entry, reason: 'reworded reason' })),
+        },
+      }).ok
+    ).toBe(true);
+  });
+
   it('passes shrink, unchanged, and complete documented exceptions', () => {
     expect(evaluatePair().ok).toBe(true);
     const arbitrary = readJson(ARBITRARY);
@@ -352,7 +388,11 @@ describe('design exception-registry native ci-fast gate (JOV-5447)', () => {
   it('propagates a validator failure as a nonzero native gate result', () => {
     const fixture = mkdtempSync(join(tmpdir(), 'design-exception-registry-'));
     const git = args =>
-      spawnSync('git', args, { cwd: fixture, encoding: 'utf8' });
+      spawnSync('git', args, {
+        maxBuffer: 256 * 1024 * 1024,
+        cwd: fixture,
+        encoding: 'utf8',
+      });
     try {
       git(['init', '-b', 'main']);
       git(['config', 'user.email', 'jovie-agent@example.com']);

@@ -2,18 +2,16 @@ import 'server-only';
 
 import { getCachedAuth } from '@/lib/auth/cached';
 import { captureError } from '@/lib/error-tracking';
-import { isCodeFlagEnabled } from '@/lib/flags/code-flags';
 import { isPmfSurveyEligibleForUser } from './store.server';
 
 /**
- * The signed-in user the PMF prompt is due for, or null. Null when the flag
- * is off, nobody is signed in, the prompt is not due, or an admin is
- * impersonating: an admin's answer is not the artist's.
+ * The signed-in user the PMF prompt is due for, or null. Null when nobody is
+ * signed in, the prompt is not due, or an admin is impersonating: an admin's
+ * answer is not the artist's.
  */
 export async function resolvePmfSurveyUserId(input: {
   readonly now: Date;
 }): Promise<string | null> {
-  if (!isCodeFlagEnabled('PMF_SURVEY_PROMPT')) return null;
   const auth = await getCachedAuth();
   if (!auth.userId) return null;
   if (auth.actorUserId && auth.actorUserId !== auth.userId) return null;

@@ -4,7 +4,6 @@ import { type ReactNode, useLayoutEffect, useState } from 'react';
 import { RenderedSidebarFamily } from '@/.storybook/rendered-family';
 import type { DashboardData } from '@/app/app/(shell)/dashboard/actions/dashboard-data';
 import { DashboardDataProvider } from '@/app/app/(shell)/dashboard/DashboardDataContext';
-import { InboxRuntimeNotification } from '@/components/features/opportunity-inbox/InboxRuntimeNotification';
 import {
   Sidebar,
   SidebarContent,
@@ -95,7 +94,6 @@ export const RuntimeUpdate: Story = {
   render: () => (
     <RuntimeUpdateProvider>
       <DashboardNav />
-      <InboxRuntimeNotification />
     </RuntimeUpdateProvider>
   ),
 };

@@ -2,6 +2,7 @@ import '../../styles/system-b-app.css';
 import type { Decorator, Meta, StoryObj } from '@storybook/nextjs-vite';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { expect, userEvent, within } from 'storybook/test';
+import { THREAD_READ_STORAGE_KEY } from '@/components/shell/SidebarThreadsSection';
 import { queryKeys } from '@/lib/queries/keys';
 import type { ChatConversation } from '@/lib/queries/useChatConversationsQuery';
 import { ChatHistorySwitcher } from './ChatHistorySwitcher';
@@ -65,13 +66,25 @@ async function openMenu(canvasElement: HTMLElement) {
   await userEvent.click(
     within(canvasElement).getByTestId('chat-history-trigger')
   );
-  return within(document.body).findByRole('menu');
+  // A searchable menu presents its content as a group — a text input is not
+  // an allowed child of role="menu" (axe aria-required-children) — with the
+  // item rows in an inner menu. Scope to the group so the pinned search
+  // field is inside the queried container.
+  return within(document.body).findByRole('group');
 }
 
 const meta = {
   title: 'Chat/ChatHistorySwitcher',
   component: ChatHistorySwitcher,
-  args: { title: 'Tour Budget For The Fall Run', activeConversationId: 'tour' },
+  args: {
+    title: 'Tour Budget For The Fall Run',
+    activeConversationId: 'tour',
+    // `modal: false`: a modal Radix menu `hideOthers`-ARIA-hides the story
+    // canvas around the portaled content, which fails axe aria-hidden-focus
+    // on the focusable trigger. Non-modal is visually identical for demos
+    // (AudienceRowActionsMenu stories follow the same convention).
+    modal: false,
+  },
   decorators: [withHistory(HISTORY)],
   parameters: { layout: 'fullscreen' },
 } satisfies Meta<typeof ChatHistorySwitcher>;
@@ -92,6 +105,34 @@ export const Open: Story = {
     await expect(
       within(menu).getByPlaceholderText('Chat History')
     ).toBeInTheDocument();
+  },
+};
+
+/** New replies since this browser last read them get a dot; read rows don't. */
+export const Unread: Story = {
+  beforeEach: () => {
+    const previous = globalThis.localStorage.getItem(THREAD_READ_STORAGE_KEY);
+    const readLater = new Date(Date.now() + HOUR).toISOString();
+    const readAt = Object.fromEntries(
+      HISTORY.filter(row => !['release', 'merch'].includes(row.id)).map(row => [
+        row.id,
+        readLater,
+      ])
+    );
+    globalThis.localStorage.setItem(
+      THREAD_READ_STORAGE_KEY,
+      JSON.stringify(readAt)
+    );
+    return () => {
+      if (previous === null) {
+        globalThis.localStorage.removeItem(THREAD_READ_STORAGE_KEY);
+      } else {
+        globalThis.localStorage.setItem(THREAD_READ_STORAGE_KEY, previous);
+      }
+    };
+  },
+  play: async ({ canvasElement }) => {
+    await openMenu(canvasElement);
   },
 };
 

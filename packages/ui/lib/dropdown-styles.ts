@@ -74,7 +74,7 @@ export const TOOLTIP_SURFACE_BASE =
  * system instead of a one-off className restyle (JOV-6773).
  */
 export const TOOLTIP_SURFACE_DANGER =
-  'border border-error/30 bg-error-subtle text-error shadow-sm';
+  'border border-error/30 bg-error-subtle text-error-text shadow-sm';
 
 /**
  * The shared rounded rectangle used by wrapped overlay content.

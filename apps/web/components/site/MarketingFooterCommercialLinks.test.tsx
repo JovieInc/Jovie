@@ -26,7 +26,6 @@ vi.mock('@/lib/flags/marketing-static', async importOriginal => {
     ...actual,
     FEATURE_FLAGS: {
       ...actual.FEATURE_FLAGS,
-      SHOW_MARKETING_FULL_FOOTER: true,
       SHOW_PUBLIC_ABOUT_FOOTER_REFRESH: true,
     },
   };

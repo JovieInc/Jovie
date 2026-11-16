@@ -110,11 +110,15 @@ function ancestorIds(repoRoot, relPath) {
     };
   const spec = `origin/main:${relPath}`;
   if (
-    spawnSync('git', ['cat-file', '-e', spec], { cwd: repoRoot }).status !== 0
+    spawnSync('git', ['cat-file', '-e', spec], {
+      maxBuffer: 256 * 1024 * 1024,
+      cwd: repoRoot,
+    }).status !== 0
   ) {
     return { ok: true, ancestor: null };
   }
   const show = spawnSync('git', ['show', spec], {
+    maxBuffer: 256 * 1024 * 1024,
     cwd: repoRoot,
     encoding: 'utf8',
   });

@@ -1164,9 +1164,7 @@ describe('LibrarySurface', () => {
           'Chat is unavailable. Reopen this item and try again.'
         );
       } else {
-        expect(draft).toContain('"kind":"release"');
-        expect(draft).toContain('"id":"release-1"');
-        expect(draft).toContain('"profileId":"profile-1"');
+        expect(draft).toBe('@release:release-1[Take Me Over]');
       }
       resetCacheIsolationForTests();
     }

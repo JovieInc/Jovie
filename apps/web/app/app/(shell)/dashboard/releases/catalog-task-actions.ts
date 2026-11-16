@@ -229,7 +229,6 @@ export async function instantiateReleaseTasksFromCatalog(
       .where(eq(discogReleases.id, releaseId));
   });
 
-  revalidatePath(APP_ROUTES.RELEASES);
   revalidatePath(APP_ROUTES.DASHBOARD_RELEASES);
   revalidatePath(APP_ROUTES.TASKS);
 
@@ -441,7 +440,6 @@ export async function addCatalogTaskToRelease(releaseId: string, slug: string) {
     if (!isUniqueViolation) throw error;
   }
 
-  revalidatePath(APP_ROUTES.RELEASES);
   revalidatePath(APP_ROUTES.DASHBOARD_RELEASES);
   revalidatePath(APP_ROUTES.TASKS);
 

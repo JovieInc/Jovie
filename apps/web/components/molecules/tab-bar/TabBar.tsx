@@ -7,6 +7,7 @@ import {
   DropdownMenuRadioItem,
   DropdownMenuTrigger,
   OverflowMenuTrigger,
+  PlainButton,
   type SegmentControlOption,
   Tooltip,
   TooltipContent,
@@ -166,7 +167,7 @@ export function TabBar<T extends string>({
             )}
           >
             {displayOptions.map(option => (
-              <button
+              <PlainButton
                 key={option.value}
                 ref={el => setTabRef(option.value, el)}
                 type='button'
@@ -184,7 +185,7 @@ export function TabBar<T extends string>({
                 )}
               >
                 {option.label}
-              </button>
+              </PlainButton>
             ))}
             {/* Hidden sr-only tab for active overflow item (ARIA compliance) */}
             {showOverflow && activeInOverflow ? (
@@ -320,7 +321,7 @@ function LegacyTabBar<T extends string>({
       )}
     >
       {options.map(option => (
-        <button
+        <PlainButton
           key={option.value}
           type='button'
           role='tab'
@@ -337,7 +338,7 @@ function LegacyTabBar<T extends string>({
           )}
         >
           {option.label}
-        </button>
+        </PlainButton>
       ))}
     </div>
   );

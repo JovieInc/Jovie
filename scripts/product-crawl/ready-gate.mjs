@@ -223,10 +223,36 @@ export function pageFindings(page, closed = []) {
 }
 
 /**
+ * One finding per overlay left on screen without its anchor during an
+ * interaction walk (overlay-walk.mjs), with the steps that led to it.
+ * @param {{ route: string, identity: string, viewport?: string,
+ *   steps?: { step: string, trail?: string[], screenshot?: string | null,
+ *     orphans?: { kind: string, text: string, overlay: string, reason: string,
+ *       anchor: string | null }[] }[] }} walk
+ */
+export function overlayWalkFindings(walk) {
+  return (walk.steps ?? []).flatMap(s =>
+    (s.orphans ?? []).map(o => ({
+      route: walk.route,
+      identity: walk.identity,
+      viewport: walk.viewport ?? 'desktop',
+      kind: 'orphaned-overlay',
+      detail: `${o.kind} ${o.text ? `"${o.text}"` : o.overlay} left on screen (${o.reason}${
+        o.anchor ? `: ${o.anchor}` : ''
+      }) after: ${(s.trail ?? [s.step]).join(' > ')}${
+        s.screenshot ? `; screenshot ${s.screenshot}` : ''
+      }`,
+    }))
+  );
+}
+
+/**
  * @param {{ origin: string, sha?: string, at: string, routes: string[],
  *   uncovered?: { route: string, reason: string, accepted?: boolean }[],
  *   closedInProduction?: { prefix: string, reason: string, exact?: boolean }[],
  *   outOfTime?: { loadsLeft: number, resamplesLeft: number } | null,
+ *   strangerOnlyShards?: number[],
+ *   overlayWalks?: { walks: Parameters<typeof overlayWalkFindings>[0][] },
  *   pages: Parameters<typeof pageFindings>[0][] }} receipt
  * @param {{ now?: number, deployedSha?: string }} [opts]
  */
@@ -234,7 +260,10 @@ export function productReady(receipt, opts = {}) {
   const now = opts.now ?? Date.now();
   const reasons = [];
   const closed = receipt?.closedInProduction ?? [];
-  const findings = (receipt?.pages ?? []).flatMap(p => pageFindings(p, closed));
+  const findings = [
+    ...(receipt?.pages ?? []).flatMap(p => pageFindings(p, closed)),
+    ...(receipt?.overlayWalks?.walks ?? []).flatMap(overlayWalkFindings),
+  ];
   if (!receipt?.pages?.length) reasons.push('no crawl');
   else {
     const age = now - Date.parse(receipt.at);
@@ -246,6 +275,11 @@ export function productReady(receipt, opts = {}) {
         reasons.push(
           `not crawled ${id === 'stranger' ? 'as a stranger' : 'signed in'}`
         );
+    const strangerOnly = receipt.strangerOnlyShards ?? [];
+    if (strangerOnly.length)
+      reasons.push(
+        `shard ${strangerOnly.join(', ')} crawled only as a stranger`
+      );
     const seen = new Set([
       ...receipt.pages.filter(p => !p.error && !p.authGated).map(p => p.route),
       ...(receipt.uncovered ?? [])
@@ -278,6 +312,7 @@ const ORDER = [
   'claim-banner-missing',
   'closed-route-open',
   'frozen-frame',
+  'orphaned-overlay',
   'layout-shift',
   'slow-paint',
   'slow-load',
