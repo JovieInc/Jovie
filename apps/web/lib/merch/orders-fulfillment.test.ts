@@ -1,12 +1,13 @@
+import type { SQL } from 'drizzle-orm';
+import { PgDialect } from 'drizzle-orm/pg-core';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { StripeConnectReadiness } from '@/lib/stripe/connect-readiness';
+import { merchFulfillmentJobs } from '@/lib/db/schema/merch';
 
 const hoisted = vi.hoisted(() => ({
   dbSelect: vi.fn(),
   dbInsert: vi.fn(),
   dbUpdate: vi.fn(),
   stripeSessionCreate: vi.fn(),
-  getStripeConnectReadiness: vi.fn(),
   resolveReleaseWorkflowRunIdForMerchCard: vi.fn().mockResolvedValue(null),
   refreshMerchRank: vi.fn(),
   resolveVariantId: vi.fn().mockReturnValue(501),
@@ -14,16 +15,6 @@ const hoisted = vi.hoisted(() => ({
   printfulConfirmOrder: vi.fn(),
   printfulCreateDraftOrder: vi.fn(),
   printfulIsConfigured: vi.fn().mockReturnValue(true),
-  drizzleNe: vi.fn(),
-}));
-
-vi.mock('drizzle-orm', () => ({
-  and: vi.fn((...conditions: unknown[]) => conditions),
-  asc: vi.fn(),
-  sql: vi.fn(),
-  eq: vi.fn((column: unknown, value: unknown) => ({ column, value })),
-  inArray: vi.fn(),
-  ne: hoisted.drizzleNe,
 }));
 
 vi.mock('@/lib/db', () => ({
@@ -32,24 +23,6 @@ vi.mock('@/lib/db', () => ({
     insert: hoisted.dbInsert,
     update: hoisted.dbUpdate,
   },
-}));
-
-vi.mock('@/lib/db/schema/merch', () => ({
-  merchCards: { __table: 'merch_cards' },
-  merchFulfillmentJobs: { __table: 'merch_fulfillment_jobs' },
-  merchOrders: {
-    __table: 'merch_orders',
-    status: { __column: 'merch_orders.status' },
-  },
-  merchPayoutLedgerEntries: { __table: 'merch_payout_ledger_entries' },
-}));
-
-vi.mock('@/lib/db/schema/profiles', () => ({
-  creatorProfiles: { __table: 'creator_profiles' },
-}));
-
-vi.mock('@/lib/env-public', () => ({
-  publicEnv: { NEXT_PUBLIC_PROFILE_URL: 'https://jov.ie' },
 }));
 
 vi.mock('@/lib/cron/kick-queue', () => ({
@@ -76,30 +49,9 @@ vi.mock('@/lib/stripe/client', () => ({
   },
 }));
 
-vi.mock('@/lib/stripe/connect-readiness', () => ({
-  getStripeConnectReadiness: hoisted.getStripeConnectReadiness,
-  // Mirrors the real fail-closed predicate; the predicate itself is covered
-  // by lib/stripe/connect-readiness.test.ts.
-  isStripeConnectChargesReady: (readiness: StripeConnectReadiness | null) =>
-    readiness !== null &&
-    readiness.source !== 'cache-stale-stripe-failed' &&
-    readiness.chargesEnabled === true &&
-    readiness.payoutsEnabled === true &&
-    readiness.detailsSubmitted === true,
-}));
-
-vi.mock('@/lib/utils/logger', () => ({
-  logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
-}));
-
 vi.mock('./first-sale-text', () => ({
   isPriorMerchSaleStatus: vi.fn().mockReturnValue(false),
   notifyFirstMerchSaleBestEffort: vi.fn(),
-}));
-
-vi.mock('./pricing', () => ({
-  estimateStripeFeeCents: vi.fn().mockReturnValue(100),
-  MERCH_DEFAULT_REFUND_RESERVE_CENTS: 200,
 }));
 
 vi.mock('./safety', () => ({
@@ -192,6 +144,13 @@ const FULFILLMENT_CARD = {
 
 const updateSets: Record<string, unknown>[] = [];
 const jobSets: Record<string, unknown>[] = [];
+const FULFILLMENT_JOB = {
+  id: 'job-1',
+  merchOrderId: 'order-1',
+  attempts: 1,
+};
+const orderWhereQueries: ReturnType<PgDialect['sqlToQuery']>[] = [];
+const dialect = new PgDialect();
 
 /** Awaitable that also supports a trailing `.returning()` (drizzle inserts). */
 function thenableWithReturning(rows: unknown[]) {
@@ -232,6 +191,7 @@ describe('handleMerchCheckoutCompleted payment gating (JOV-12769)', () => {
     vi.clearAllMocks();
     updateSets.length = 0;
     jobSets.length = 0;
+    orderWhereQueries.length = 0;
     hoisted.dbInsert.mockImplementation(() => ({
       values: () => ({
         onConflictDoNothing: () => thenableWithReturning([{ id: 'ledger-1' }]),
@@ -295,20 +255,25 @@ describe('fulfillMerchOrder Printful draft resume (JOV-12770)', () => {
     vi.clearAllMocks();
     updateSets.length = 0;
     jobSets.length = 0;
+    orderWhereQueries.length = 0;
     hoisted.dbUpdate.mockImplementation((table: unknown) => {
-      const tableName = (table as { __table?: string } | null)?.__table;
-      if (tableName === 'merch_fulfillment_jobs') {
+      if (table === merchFulfillmentJobs) {
         return {
           set: (values: Record<string, unknown>) => {
             jobSets.push(values);
-            return { where: () => thenableWithReturning([{ id: 'job-1' }]) };
+            return { where: () => thenableWithReturning([FULFILLMENT_JOB]) };
           },
         };
       }
       return {
         set: (values: Record<string, unknown>) => {
           updateSets.push(values);
-          return { where: () => Promise.resolve(undefined) };
+          return {
+            where: (condition: SQL) => {
+              orderWhereQueries.push(dialect.sqlToQuery(condition));
+              return Promise.resolve(undefined);
+            },
+          };
         },
       };
     });
@@ -369,7 +334,6 @@ describe('fulfillMerchOrder Printful draft resume (JOV-12770)', () => {
   });
 
   it('keeps a failed confirm resumable: the draft state survives and the next run confirms it', async () => {
-    const job = { id: 'job-1', merchOrderId: 'order-1', attempts: 1 };
     // Dispatch on chain shape: the claim query uses .where().orderBy(),
     // the order lookup uses .innerJoin().
     hoisted.dbSelect.mockImplementation(() => ({
@@ -381,7 +345,7 @@ describe('fulfillMerchOrder Printful draft resume (JOV-12770)', () => {
           }),
         }),
         where: () => ({
-          orderBy: () => ({ limit: () => Promise.resolve([job]) }),
+          orderBy: () => ({ limit: () => Promise.resolve([FULFILLMENT_JOB]) }),
         }),
       }),
     }));
@@ -392,11 +356,13 @@ describe('fulfillMerchOrder Printful draft resume (JOV-12770)', () => {
     await processMerchFulfillmentJobs();
 
     expect(jobSets.at(-1)).toMatchObject({ status: 'failed' });
-    expect(
-      hoisted.drizzleNe.mock.calls.some(
-        call => call[1] === 'printful_draft_created'
-      )
-    ).toBe(true);
+    expect(orderWhereQueries.at(-1)?.sql).toContain(
+      '"merch_orders"."status" <> '
+    );
+    expect(orderWhereQueries.at(-1)?.params).toEqual([
+      'order-1',
+      'printful_draft_created',
+    ]);
 
     await processMerchFulfillmentJobs();
 
