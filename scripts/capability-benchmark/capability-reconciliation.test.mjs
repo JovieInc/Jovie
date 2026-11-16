@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
+import { readFileSync } from 'node:fs';
 import test from 'node:test';
 
 import * as reconciliation from './capability-reconciliation.mjs';
@@ -247,7 +248,7 @@ test('commissions Next and TanStack deltas through one commit-bound Summer path'
   // biome-ignore format: the three dispositions are the asserted decision boundary
   const next = run(makeDelta('next'), ['ADOPT', 'DEFER', 'ADOPT'], reconciliation.NEXT_CACHE_COMPONENTS_EXCEPTION);
   // biome-ignore format: compact assertions keep commissioning evidence together
-  assert.equal(inventory.rows.find(row => row.app === 'apps/web' && row.package === 'next').resolvedVersion, '16.4.1');
+  assert.equal(inventory.rows.find(row => row.app === 'apps/web' && row.package === 'next').resolvedVersion, JSON.parse(readFileSync(new URL('../../apps/web/package.json', import.meta.url), 'utf8')).dependencies.next);
   // biome-ignore format: explicit denominator equality is the coverage contract
   assert.equal(next.assessment.coverage.denominator, Object.values(next.assessment.coverage.counts).reduce((sum, count) => sum + count, 0));
   // biome-ignore format: exact completed-foundation impact receipt
