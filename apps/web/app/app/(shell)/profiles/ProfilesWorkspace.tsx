@@ -50,6 +50,7 @@ import {
   PresenceStatusBadge,
 } from '@/components/features/presence/PresenceStatusParts';
 import styles from '@/components/features/presence/presence-workspace.module.css';
+import type { PresenceRemovalPrincipal } from '@/components/features/presence/types';
 import { CREATOR_PRESENCE_ADAPTER } from '@/components/features/presence/workspace-adapters';
 import {
   PresenceWorkspaceBoundary,
@@ -105,7 +106,7 @@ import { getCacheScope } from '@/lib/queries/cache-isolation';
 import { type ColumnDef, createColumnHelper } from '@/lib/tanstack-table';
 import { cn } from '@/lib/utils';
 import type { ConnectionIntakeCandidate } from './AddConnectionRail';
-import { buildConnectionActions } from './connection-actions';
+import { buildConnectionActions, kindLabel } from './connection-actions';
 import { connectionChatDraft } from './connection-chat-context';
 import {
   type ConnectionSuggestion,
@@ -133,6 +134,7 @@ import type {
 } from './data';
 import { PresenceIdentityPhoto } from './PresenceIdentityPhoto';
 import { PresenceLockAffordance } from './PresenceLockAffordance';
+import { usePresenceRemoval } from './usePresenceRemoval';
 
 const AddConnectionRail = dynamic(() =>
   import('./AddConnectionRail').then(module => module.AddConnectionRail)
@@ -191,18 +193,6 @@ function isConnectionSuggestion(
     typeof suggestion.externalUrl === 'string' &&
     suggestion.externalUrl.trim().length > 0
   );
-}
-
-function kindLabel(row: ProfileWorkspaceRow): string {
-  const labels = {
-    jovie: 'Jovie',
-    website: 'Website',
-    social: 'Social',
-    dsp: 'DSP',
-    authority: 'Source',
-    connector: 'Connector',
-  } as const;
-  return labels[row.kind];
 }
 
 function ConnectionTypeGlyph({
@@ -1145,13 +1135,20 @@ function SuggestedConnectionsReview({
 export function ProfilesWorkspace({
   data,
   scope,
+  removalPrincipal,
 }: Readonly<{
   data: ProfilesWorkspaceData | null;
   scope: PresenceWorkspaceScope;
+  removalPrincipal?: PresenceRemovalPrincipal | null;
 }>) {
   return (
     <PresenceWorkspaceBoundary scope={scope}>
-      <ProfilesWorkspaceContent data={data} scope={scope} />
+      <ProfilesWorkspaceContent
+        key={JSON.stringify(removalPrincipal ?? null)}
+        data={data}
+        scope={scope}
+        removalPrincipal={removalPrincipal}
+      />
     </PresenceWorkspaceBoundary>
   );
 }
@@ -1159,9 +1156,11 @@ export function ProfilesWorkspace({
 function ProfilesWorkspaceContent({
   data,
   scope,
+  removalPrincipal,
 }: Readonly<{
   data: ProfilesWorkspaceData | null;
   scope: PresenceWorkspaceScope;
+  removalPrincipal?: PresenceRemovalPrincipal | null;
 }>) {
   const sourceIdentityQueries = useQueries({
     combine: combineSourceIdentityQueries,
@@ -1276,6 +1275,18 @@ function ProfilesWorkspaceContent({
   const suggestionActionRefs = useRef(new Map<string, HTMLButtonElement>());
   const suggestedRegionRef = useRef<HTMLDivElement>(null);
   const pendingSuggestionFocusTargetRef = useRef<string | null>(null);
+  const {
+    request: requestRemoval,
+    registerTrigger: registerRemovalTrigger,
+    hasIntent: hasRemovalIntent,
+    dialog: removalDialog,
+  } = usePresenceRemoval(
+    data,
+    scope,
+    selected?.id ?? null,
+    setSelected,
+    removalPrincipal
+  );
   const router = useRouter();
   const { chatMode: founderChatMode } = useFounderDoor();
   const searchParams = useSearchParams();
@@ -1451,6 +1462,9 @@ function ProfilesWorkspaceContent({
       if (row.id.startsWith('preview:')) return [];
       const primaryAction = getConnectionPrimaryAction(row);
       return buildConnectionActions(row, primaryAction, {
+        onRemoveLink: connection => {
+          requestRemoval(connection);
+        },
         onEditProfile: () => router.push(APP_ROUTES.SETTINGS_PROFILE),
         onAskJovie: connection => {
           if (founderChatMode === 'ov') {
@@ -1497,7 +1511,7 @@ function ProfilesWorkspaceContent({
         },
       });
     },
-    [data, router, setSelected, founderChatMode]
+    [data, router, setSelected, founderChatMode, requestRemoval]
   );
   const columns = useMemo(
     () => [
@@ -1655,6 +1669,7 @@ function ProfilesWorkspaceContent({
                 <button
                   type='button'
                   aria-label={`Actions for ${row.label}`}
+                  ref={node => registerRemovalTrigger(row.id, node)}
                   onClick={event => event.stopPropagation()}
                   onKeyDown={event => event.stopPropagation()}
                   className='inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-transparent bg-transparent text-tertiary-token transition-colors duration-fast hover:bg-surface-1 hover:text-primary-token focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-focus/50 sm:h-8 sm:w-8'
@@ -1673,6 +1688,7 @@ function ProfilesWorkspaceContent({
       getContextMenuItems,
       router,
       selected?.id,
+      registerRemovalTrigger,
     ]
   );
 
@@ -1812,6 +1828,7 @@ function ProfilesWorkspaceContent({
         />
       }
     >
+      {removalDialog}
       {showSuggestions ? (
         <div id='profile-suggestions'>
           <SuggestedConnectionsReview
@@ -1833,7 +1850,9 @@ function ProfilesWorkspaceContent({
         columns={columns as ColumnDef<ProfileWorkspaceRow, unknown>[]}
         getRowId={row => row.id}
         onRowClick={row => {
-          if (!row.id.startsWith('preview:')) setSelected(row);
+          // A menu's closing click must not open an inspector above confirmation.
+          if (!row.id.startsWith('preview:') && !hasRemovalIntent())
+            setSelected(row);
         }}
         onRowContextMenu={(row, event) => {
           if (row.id.startsWith('preview:')) {

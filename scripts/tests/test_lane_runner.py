@@ -2923,7 +2923,7 @@ class HostHandoffAdmissionTest(unittest.TestCase):
                       "routes": [{"model": "standard", "capability": "standard", "cost": 0}]},
             "codex": {"tier": 1, "slots": 1, "model": "frontier", "cmd": ["codex-test"],
                       "routes": [{"model": "frontier", "capability": "frontier", "cost": 3}]},
-            "claude": {"tier": 2, "slots": 1, "model": "sonnet", "cmd": ["claude-test", "{model}"],
+            "claude": {"tier": 2, "slots": 1, "model": "sonnet", "cmd": ["claude-test", "{model}"], "accountClass": "claude-subscription",
                        "routes": [{"model": "sonnet", "capability": "standard", "cost": 1},
                                   {"model": "opus", "capability": "frontier", "cost": 2}]},
             "hyperagent": {"tier": 0, "slots": 1, "repairs": False, "cmd": ["remote-test"],

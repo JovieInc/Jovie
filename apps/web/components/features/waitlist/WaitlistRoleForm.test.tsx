@@ -81,17 +81,44 @@ describe('WaitlistRoleForm', () => {
     ).toBeNull();
   });
 
-  it('offers every role in Title Case', () => {
+  it('offers the homepage role choices, in the same order, on /waitlist', () => {
+    const { unmount } = render(<WaitlistRoleForm presentation='chips' />);
+    const chipLabels = screen
+      .getAllByRole('radio')
+      .map(radio => radio.closest('label')?.textContent);
+    unmount();
+
     render(<WaitlistRoleForm />);
-    for (const label of [
+    const radioLabels = screen
+      .getAllByRole('radio')
+      .map(radio => radio.closest('label')?.textContent);
+    expect(radioLabels).toEqual([
       'Artist',
       'Manager',
       'Label',
-      'Producer/Songwriter',
+      'Producer',
+      'Songwriter',
       'Other',
-    ]) {
-      expect(screen.getByRole('radio', { name: label })).toBeInTheDocument();
-    }
+    ]);
+    expect(radioLabels).toEqual(chipLabels);
+    // The choices span the form so they start on the email field's edge.
+    expect(screen.getByTestId('waitlist-role-radios')).toHaveClass('w-full');
+  });
+
+  it('stores Producer and Songwriter radios as the one producer_songwriter role', async () => {
+    fetchMock.mockResolvedValue(
+      new Response(JSON.stringify({ state: 'joined' }), { status: 201 })
+    );
+    render(<WaitlistRoleForm />);
+    fireEvent.click(screen.getByRole('radio', { name: 'Songwriter' }));
+    fireEvent.change(screen.getByLabelText('Email address'), {
+      target: { value: 'tim@example.com' },
+    });
+    fireEvent.submit(screen.getByTestId('waitlist-role-form'));
+    await waitFor(() => expect(fetchMock).toHaveBeenCalled());
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body).role).toBe(
+      'producer_songwriter'
+    );
   });
 
   it('captures a name and a general role on the company homepage without assuming an industry', async () => {

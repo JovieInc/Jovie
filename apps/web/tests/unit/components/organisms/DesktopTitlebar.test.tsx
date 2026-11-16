@@ -105,7 +105,7 @@ describe('DesktopTitlebar', () => {
       screen.getByTestId('electron-titlebar-sidebar-cell')
     ).toContainElement(screen.getByTestId('electron-traffic-light-safe-area'));
     expect(screen.getByTestId('electron-titlebar-sidebar-cell')).toHaveClass(
-      'gap-(--app-shell-sidebar-icon-gap)'
+      'gap-(--electron-traffic-light-toggle-gap)'
     );
     expect(
       screen.getByTestId('electron-titlebar-sidebar-cell')

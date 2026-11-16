@@ -13,6 +13,7 @@ import {
   type NewFeedbackDecisionRow,
 } from '@/lib/db/schema/feedback';
 import {
+  CLOSED_LOOP_SOURCES,
   classifyFeedbackMessage,
   feedbackFingerprint,
   isTasteBearing,
@@ -50,14 +51,9 @@ export interface AdminFeedbackItemsResult {
 const CLASSIFIER_ACTOR = 'system:classifier';
 
 /**
- * Closed-loop routing only applies to free-text feedback intakes
- * (JOV-6433). Other `feedback_items` writers — abuse reports, inbox-decision
- * learning rows — have their own disposition machinery and are left
- * unclassified (disposition stays 'pending', no ledger rows).
+ * Free-text feedback written by customers (not agents) goes to Tim. Closed
+ * loop sources such as `onboarding_want` stay out: they must never ping.
  */
-const CLOSED_LOOP_SOURCES = new Set(['dashboard', 'chat', 'agent_cli']);
-
-/** Free-text feedback written by customers (not agents) goes to Tim. */
 const CUSTOMER_VOICE_FEEDBACK_SOURCES = new Set(['dashboard', 'chat']);
 
 /**

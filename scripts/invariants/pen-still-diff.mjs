@@ -87,7 +87,24 @@ if (expectedHash && expectedHash !== actualHash) { frames.push({ ...frameId(fram
 reason: 'file-hash-mismatch', }); continue; } const url = frameCaptureUrl(frame, options);
 if (!url || !options.capture) { frames.push({ ...frameId(frame), verdict: 'waiting',
 reason: 'capture-target-missing', }); continue; } const captured = await options.capture(frame, url);
-const compared = compareImages( decodePng(readFileSync(stillPath)), decodePng(captured.png), captured.geometry
+// JOV-11623: an anonymous capture that landed on a different route (the
+// closed-signup /start handoff to /waitlist, /app/chat to /signin) is not
+// this frame's surface; diffing it against the Pen still fabricated
+// failures. Report the frame as waiting for a comparable capture instead.
+const landedPath = captured.finalUrl
+  ? new URL(captured.finalUrl).pathname
+  : null;
+if (captured.redirected || (landedPath && landedPath !== new URL(url).pathname)) {
+  frames.push({ ...frameId(frame), verdict: 'waiting',
+    reason: 'capture-redirected-off-route' }); continue; }
+// Pair like with like: the Pen still's text bands and mockup box are
+// pixel-derived, so the render's must be too. DOM geometry counts
+// different things (h1/h2/h3/p elements vs painted glyph bands; a
+// [data-pen-mockup] element vs the largest painted non-text region),
+// which failed every comparison structurally — textBlockYDelta 1 and
+// null mockup errors on every frame, including one that scored SSIM
+// 0.96 against its design (JOV-11623).
+const compared = compareImages( decodePng(readFileSync(stillPath)), decodePng(captured.png)
 ); frames.push({ ...frameId(frame), verdict: compared.judgment.pass ? 'pass' : 'fail',
 judgment: compared.judgment, triptych: compared.triptych, }); } catch {
 frames.push({ ...frameId(frame), verdict: 'fail', reason: 'comparison-unavailable' }); } }
@@ -129,7 +146,7 @@ args['storybook-url'] || process.env.PEN_STILL_STORYBOOK_URL; const capture = op
 ? async (frame, url) => { const { captureSurfacePng, withCaptureBrowser } = await import(
 './clef-screenshot-evaluator.mjs' ); return withCaptureBrowser(browser => captureSurfacePng(browser, { url,
 viewport: frame.viewport, mode: frame.mode, selector: frame.sectionSelector,
-mockupSelector: frame.mockupSelector, }) ); } : undefined); const receipt = await evaluateManifest(manifest, {
+mockupSelector: frame.mockupSelector, expectedPath: new URL(url).pathname, }) ); } : undefined); const receipt = await evaluateManifest(manifest, {
 root: options.root ?? REPO_ROOT, strict: Boolean(args.strict), baseUrl: typeof baseUrl === 'string' ? baseUrl : undefined,
 storybookUrl: typeof storybookUrl === 'string' ? storybookUrl : undefined, capture, });
 const outDir = resolve(String(args.out ?? 'pen-still-out')); mkdirSync(outDir, { recursive: true });

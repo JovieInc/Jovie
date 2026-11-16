@@ -5,6 +5,7 @@ import {
   HOMEPAGE_SPECS_COPY,
 } from '@/data/homepageProductUi';
 import { PUBLIC_ARTIST_API_VERSIONING_POLICY } from '@/lib/api/v1/contract';
+import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import { HOME_SPEC } from './home-spec';
 import { SpecsChapter } from './SpecsChapter';
 import { ReleasePage } from './Surfaces';
@@ -19,7 +20,7 @@ vi.mock('next/image', () => ({
 }));
 
 describe('homepage v3 specs', () => {
-  it('shows the registry counts and one meter segment per recognised service', () => {
+  it('shows the registry counts and one meter segment per recognised service', async () => {
     const { container } = render(<SpecsChapter />);
     expect(
       container.querySelector('[data-pen-section="specs"]')
@@ -42,6 +43,22 @@ describe('homepage v3 specs', () => {
         name: HOMEPAGE_SPECS_COPY.headline,
       })
     ).toBeInTheDocument();
+    await expectNoA11yViolations(container);
+  });
+
+  it('keeps the specs chapter accessible in a right-to-left document', async () => {
+    const { container } = render(
+      <div dir='rtl'>
+        <SpecsChapter />
+      </div>
+    );
+    expect(
+      screen.getByRole('heading', {
+        level: 2,
+        name: HOMEPAGE_SPECS_COPY.headline,
+      })
+    ).toBeInTheDocument();
+    await expectNoA11yViolations(container);
   });
 
   it('reads the UPC and the API version from where they live', () => {

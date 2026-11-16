@@ -1051,12 +1051,12 @@ describe('Profile AEO content', () => {
     const paragraph = content.description.at(-1);
 
     expect(paragraph).toBe(
-      'DJ Test\'s credited collaborators include Austin Leeds on "Take Me Over (Austin Leeds Remix)", Vigel on "Seaside Heights", Lynx on "Wheels Up", and Bowles on "The Sound".'
+      "DJ Test's credited collaborators include Austin Leeds on \u201cTake Me Over (Austin Leeds Remix)\u201d, Vigel on \u201cSeaside Heights\u201d, Lynx on \u201cWheels Up\u201d, and Bowles on \u201cThe Sound\u201d."
     );
     expect(paragraph).not.toContain(
-      'Lynx on "Take Me Over (Austin Leeds Remix)"'
+      'Lynx on \u201cTake Me Over (Austin Leeds Remix)\u201d'
     );
-    expect(paragraph).not.toContain('Bowles on "Seaside Heights"');
+    expect(paragraph).not.toContain('Bowles on \u201cSeaside Heights\u201d');
 
     const segments = content.descriptionSegments.at(-1) ?? [];
     for (const credit of credits) {

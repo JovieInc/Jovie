@@ -1,0 +1,6 @@
+{
+  "file": "apps/web/components/site/MarketingFooter.tsx",
+  "sha256": "63d71308eeb5e0ff82ea2580e79a5b5049c61e0eb498e7bac956fe837cbcddac",
+  "at": "2026-11-11T07:44:56.022Z",
+  "ref": "Footer column label ids keyed by position, not title slug; mock release page title h4 to h3. Attribute and heading-level only, no class or layout change. Verified with MarketingFooter and Surfaces axe/RTL tests and app/(home)/layout.hydration.test.tsx."
+}

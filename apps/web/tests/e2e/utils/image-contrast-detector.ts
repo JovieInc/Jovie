@@ -7,18 +7,15 @@ import {
   percentile,
   relativeLuminance,
   sampleRegionLuminances,
+  sampleRegionPainters,
   sampleRegionPixelGrid,
   sampleRegionStacks,
 } from './image-contrast-sample';
 
 // Invariant consumer: JOV-INV-019 `text-aware-contrast` (JOV-6916).
-// Unlike the token-pair ratchet (scripts/lint-contrast-ratchet.mjs), this
-// inspects RENDERED pixels: for every text node and interactive control whose
-// box overlaps a painted image layer (hero photo, editorial card, CSS
-// background image), the glyph ink is hidden and the pixels behind the glyph
-// box are sampled. WCAG AA is enforced against the worst-case percentile of
-// the sampled background luminance, so art direction must reserve contrast
-// rather than rely on a post-hoc overlay.
+// Unlike the token-pair ratchet, this inspects RENDERED pixels: glyph ink is
+// hidden and the pixels behind each glyph box sampled, WCAG AA judged on the
+// worst-case background percentile.
 
 export const IMAGE_CONTRAST_CERTIFICATION_SCHEMA =
   'jovie-image-contrast/v1' as const;
@@ -397,12 +394,8 @@ async function scanCandidates(
 /**
  * Inspect the rendered page for text and interactive controls painted over
  * image layers, then measure real contrast by hiding the glyph ink and
- * sampling the pixels exposed behind each glyph box.
- *
- * WCAG AA is applied against the worst-case background percentile: for light
- * foregrounds the 90th-percentile background luminance, for dark foregrounds
- * the 10th. Large text (>=24px, or >=18.66px bold) requires 3:1; everything
- * else requires 4.5:1.
+ * sampling the pixels behind each glyph box. WCAG AA uses the worst-case
+ * background percentile; large text (>=24px, or >=18.66px bold) needs 3:1.
  */
 export async function inspectImageContrast(
   page: Page
@@ -437,8 +430,7 @@ export async function inspectImageContrast(
 
   for (const candidate of candidates) {
     // Sample where the element IS at capture time, not where the scan saw it.
-    const scannedBox = candidate.box;
-    const liveBox = freshBoxes[String(candidate.index)] ?? scannedBox;
+    const liveBox = freshBoxes[String(candidate.index)] ?? candidate.box;
     const box = {
       x: liveBox.x,
       y: liveBox.y,
@@ -501,6 +493,13 @@ export async function inspectImageContrast(
     });
 
     if (!pass) {
+      const painterCensus = await sampleRegionPainters(
+        screenshot,
+        page,
+        box,
+        deviceScaleFactor,
+        HIDE_ATTRIBUTE
+      );
       findings.push({
         kind: 'image-contrast',
         message: `"${candidate.text}" on ${candidate.element} [${(candidate.ancestorChain ?? []).join(' > ')}] renders ${worstRatio.toFixed(2)}:1 against the sampled background behind ${(candidate.layerChain ?? []).join(' > ') || 'no single layer'} at ${Math.round(box.x)},${Math.round(box.y)} ${Math.round(box.width)}x${Math.round(box.height)} (bg p10 ${Math.round(p10 * 1000) / 1000} / p90 ${Math.round(p90 * 1000) / 1000}; requires ${requiredRatio}:1).`,
@@ -515,6 +514,7 @@ export async function inspectImageContrast(
           backgroundLuminanceP90: Math.round(p90 * 1000) / 1000,
           sampledPixelGrid: pixelGrid,
           sampledStacks,
+          painterCensus,
         },
       });
     }

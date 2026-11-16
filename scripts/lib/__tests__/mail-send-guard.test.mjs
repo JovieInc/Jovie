@@ -208,6 +208,8 @@ describe('mailguard integration and immutable base evidence', () => {
       'scripts/lib/mail-send-guard.ratchet.gen.json',
       'scripts/lib/subscription-cli-guard.json',
       'scripts/lib/price-literal-guard.ratchet.json',
+      'scripts/lib/wall-clock-test-guard.ratchet.json',
+      'scripts/lib/hermetic-ci-guard.ratchet.json',
     ])
       expect(guard.inputs.test(path)).toBe(true);
     expect(SCRIPT_CONTRACT_VITEST_TESTS).toContain(

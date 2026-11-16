@@ -4,6 +4,7 @@ import { render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { MarketingFooter } from '@/components/site/MarketingFooter';
 import { MARKETING_PEN_CONTRACT_IDS } from '@/data/marketing/penContracts';
+import { expectNoA11yViolations } from '@/tests/utils/a11y';
 
 // These cases cover the theme-switching policy itself; production ships with
 // theme switching off (dark forced), covered in lib/theme/route-policy.test.ts.
@@ -319,6 +320,37 @@ describe('MarketingFooter', () => {
     rerender(<MarketingFooter variant='minimal' />);
 
     expect(screen.queryByTestId('marketing-footer-controls')).toBeNull();
+  });
+
+  it.each([
+    ['expanded', {}],
+    ['minimal', { variant: 'minimal' as const }],
+    ['empty columns', { variant: 'expanded' as const, columns: [] }],
+  ])('has no axe violations in the %s footer', async (_label, props) => {
+    const { container } = render(<MarketingFooter {...props} />);
+    expect(screen.getByTestId('marketing-footer')).toBeInTheDocument();
+    await expectNoA11yViolations(container);
+  });
+
+  it('labels each right-to-left column by its own heading', async () => {
+    const { container } = render(
+      <div dir='rtl' lang='ar'>
+        <MarketingFooter
+          variant='expanded'
+          showCta={false}
+          columns={[
+            {
+              title: 'المنتج',
+              links: [{ href: '/pricing', label: 'الأسعار' }],
+            },
+            { title: 'الشركة', links: [{ href: '/about', label: 'من نحن' }] },
+          ]}
+        />
+      </div>
+    );
+    expect(screen.getByRole('region', { name: 'المنتج' })).toBeInTheDocument();
+    expect(screen.getByRole('region', { name: 'الشركة' })).toBeInTheDocument();
+    await expectNoA11yViolations(container);
   });
 
   it('keeps the legal entity line in code, with the current year', () => {

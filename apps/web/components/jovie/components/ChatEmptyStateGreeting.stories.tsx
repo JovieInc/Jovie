@@ -61,3 +61,47 @@ export const NoInsightWhenSourceIsEmpty: Story = {
 export const LoadingNextStep: Story = {
   args: { isLoading: true },
 };
+
+/** No eligible next step: the welcome keeps the profile review path. */
+export const EmptyNoNextStep: Story = {
+  args: { action: null },
+};
+
+/** No first name resolved: a plain time-of-day welcome, same next step. */
+export const PartialNoFirstName: Story = {
+  args: { firstName: null },
+};
+
+export const LongNameAndSuggestion: Story = {
+  args: {
+    firstName: 'The Extraordinarily Long Touring Ensemble Of Northern Lights',
+    action: {
+      insightId: 'long-fixture',
+      suggestion:
+        'Draft a fan update about the three new cities on the winter run, the rescheduled hometown show and the limited vinyl pressing that sold through overnight',
+      prompt: 'Help me draft a fan update. Ask for missing facts.',
+      expiresAt: Date.parse('2099-01-01T00:00:00Z'),
+    },
+    onSelectAction: fn(),
+  },
+};
+
+export const RtlGreeting: Story = {
+  args: {
+    firstName: 'ليلى',
+    action: {
+      insightId: 'rtl-fixture',
+      suggestion: 'اكتب تحديثًا للمعجبين عن الإصدار الجديد',
+      prompt: 'Help me draft a fan update. Ask for missing facts.',
+      expiresAt: Date.parse('2099-01-01T00:00:00Z'),
+    },
+    onSelectAction: fn(),
+  },
+  decorators: [
+    Story => (
+      <div dir='rtl' lang='ar'>
+        <Story />
+      </div>
+    ),
+  ],
+};

@@ -1,5 +1,7 @@
 import { fireEvent, render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import { ChatEmptyStateGreeting } from './ChatEmptyStateGreeting';
 
 describe('ChatEmptyStateGreeting', () => {
@@ -79,5 +81,108 @@ describe('ChatEmptyStateGreeting', () => {
     );
     expect(screen.queryByRole('button')).toBeNull();
     expect(screen.queryByRole('link')).toBeNull();
+  });
+});
+
+// axe schedules work on timers, so these fake only the clock.
+describe('ChatEmptyStateGreeting states', () => {
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-01-01T09:00:00'));
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('is axe-clean with no next step and keeps the profile review link', async () => {
+    const { container } = render(
+      <ChatEmptyStateGreeting firstName='Tim' action={null} />
+    );
+    expect(
+      screen.getByRole('link', { name: 'Review Your Profile' })
+    ).toBeInTheDocument();
+    await expectNoA11yViolations(container);
+  });
+
+  it('is axe-clean while the next step loads', async () => {
+    const { container } = render(
+      <ChatEmptyStateGreeting firstName='Tim' isLoading />
+    );
+    expect(screen.getByRole('status')).toBeInTheDocument();
+    await expectNoA11yViolations(container);
+  });
+
+  it('is axe-clean without a first name', async () => {
+    const { container } = render(<ChatEmptyStateGreeting firstName={null} />);
+    expect(screen.getByRole('heading')).toHaveTextContent('Good morning.');
+    await expectNoA11yViolations(container);
+  });
+
+  it('drafts the offered step from the keyboard', async () => {
+    const user = userEvent.setup();
+    const onSelectAction = vi.fn();
+    const { container } = render(
+      <ChatEmptyStateGreeting
+        firstName='Tim'
+        action={{
+          insightId: 'release-1',
+          expiresAt: Date.parse('2099-01-01T00:00:00Z'),
+          suggestion: 'Draft a release update',
+          prompt: 'Help me draft a release update.',
+        }}
+        onSelectAction={onSelectAction}
+      />
+    );
+    await user.tab();
+    expect(
+      screen.getByRole('button', { name: 'Draft This With Jovie' })
+    ).toHaveFocus();
+    await user.keyboard('{Enter}');
+    expect(onSelectAction).toHaveBeenCalledExactlyOnceWith(
+      'Help me draft a release update.'
+    );
+    await expectNoA11yViolations(container);
+  });
+
+  it('keeps a long name and suggestion whole', async () => {
+    const suggestion =
+      'Draft a fan update about the three new cities on the winter run and the limited vinyl pressing';
+    const { container } = render(
+      <ChatEmptyStateGreeting
+        firstName='The Extraordinarily Long Touring Ensemble'
+        action={{
+          insightId: 'long-1',
+          expiresAt: Date.parse('2099-01-01T00:00:00Z'),
+          suggestion,
+          prompt: 'Help me draft a fan update.',
+        }}
+        onSelectAction={vi.fn()}
+      />
+    );
+    expect(screen.getByRole('heading')).toHaveTextContent(
+      'Good morning, The Extraordinarily Long Touring Ensemble.'
+    );
+    expect(screen.getByText(suggestion)).toBeInTheDocument();
+    await expectNoA11yViolations(container);
+  });
+
+  it('is axe-clean in a right-to-left layout', async () => {
+    const { container } = render(
+      <div dir='rtl' lang='ar'>
+        <ChatEmptyStateGreeting
+          firstName='ليلى'
+          action={{
+            insightId: 'rtl-1',
+            expiresAt: Date.parse('2099-01-01T00:00:00Z'),
+            suggestion: 'اكتب تحديثًا للمعجبين',
+            prompt: 'Help me draft a fan update.',
+          }}
+          onSelectAction={vi.fn()}
+        />
+      </div>
+    );
+    expect(screen.getByRole('heading')).toHaveTextContent('ليلى');
+    await expectNoA11yViolations(container);
   });
 });

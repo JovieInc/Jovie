@@ -43,6 +43,45 @@ const REPO_ROOT = process.cwd();
 const FULL_RUN_INPUT =
   /^(?:\.github\/.+|package\.json|pnpm-lock\.yaml|biome\.json|scripts\/.+\.(?:mjs|cjs|js|ts|mts|tsx))$/u;
 
+// extract.mjs is at the size ceiling, so this predicate lives with the
+// selector and must stay aligned with allowed() there. A public marketing
+// source, or anything under scripts/copy-inventory/ (ids.gen.json is not a
+// FULL_RUN_INPUT), selects the inventory contract without the full lists.
+export const COPY_INVENTORY_TEST = 'scripts/copy-inventory/extract.test.mjs';
+
+/** @param {string} file */
+export function copyInventoryScanPath(file) {
+  if (file.startsWith('scripts/copy-inventory/')) return true;
+  if (!/^apps\/web\/.+\.(?:tsx?|jsx?)$/u.test(file)) return false;
+  if (/(?:\.test\.|\.stories\.|\.d\.ts$|\.gen\.)/u.test(file)) return false;
+  const rel = file.slice('apps/web/'.length);
+  if (/^components\/(?:ui|atoms|icons)\//u.test(rel)) return false;
+  if (/^data\/(?:marketing|product-truth|designSystem)\//u.test(rel))
+    return false;
+  if (rel.startsWith('lib/')) {
+    if (rel.startsWith('lib/content-records/')) return false;
+    return /copy|content|labels/iu.test(rel);
+  }
+  return /^(?:app|components|data)\//u.test(rel);
+}
+
+/**
+ * @param {readonly string[]} catalog
+ * @param {readonly string[]} selected
+ * @param {readonly string[]} changed
+ * @returns {string[]}
+ */
+function unionCopyInventory(catalog, selected, changed) {
+  if (
+    !catalog.includes(COPY_INVENTORY_TEST) ||
+    selected.includes(COPY_INVENTORY_TEST) ||
+    !changed.some(copyInventoryScanPath)
+  ) {
+    return [...selected];
+  }
+  return [...selected, COPY_INVENTORY_TEST];
+}
+
 /**
  * Local pre-push scope: tests that are the changed file, import it directly, or
  * import a script module that imports it (its direct importers). The full
@@ -96,10 +135,15 @@ export function selectScriptContracts(changed, options = {}) {
     };
   }
   const select = options.derivedOnly ? testsNearChange : testsAffectedBy;
+  const changedFiles = changed ?? [];
   return {
     full: false,
-    node: select(node, changed ?? [], root),
-    vitest: select(vitest, changed ?? [], root),
+    node: unionCopyInventory(
+      node,
+      select(node, changedFiles, root),
+      changedFiles
+    ),
+    vitest: select(vitest, changedFiles, root),
   };
 }
 
