@@ -102,7 +102,7 @@ export function DesktopSurfaceSlot({
  * weight regressed the weekly public-profile benchmark after the desktop
  * surface shipped by default (JOV-12207: LCP 5.5s vs 2.5s budget, JOV-12208:
  * TBT 436ms vs 200ms budget), so the chunk is fetched only when a >=1180px
- * viewport or an embedded preview host can render it.
+ * viewport can render it. Embedded previews stay compact and never load it.
  *
  * Importing on mount keeps the module a separate chunk (mirroring
  * `useProfileUnifiedDrawerModule`) with no suspend/retry lane: the module

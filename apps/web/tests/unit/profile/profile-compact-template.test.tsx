@@ -14,10 +14,25 @@ import { PublicClaimBanner } from '@/app/[username]/_components/PublicClaimBanne
 import { AboutSection } from '@/components/features/profile/AboutSection';
 import { ProfileDrawerShell } from '@/components/features/profile/ProfileDrawerShell';
 import type { PublicRelease } from '@/components/features/profile/releases/types';
+import { useDesktopSurfaceModule } from '@/components/features/profile/templates/useDesktopSurfaceModule';
 import type { PublicContact } from '@/types/contacts';
 import type { Artist } from '@/types/db';
 import { ProfileCompactSurface } from '../../../components/features/profile/templates/ProfileCompactSurface';
 import { ProfileCompactTemplate } from '../../../components/features/profile/templates/ProfileCompactTemplate';
+
+vi.mock(
+  '@/components/features/profile/templates/useDesktopSurfaceModule',
+  async importOriginal => {
+    const actual =
+      await importOriginal<
+        typeof import('@/components/features/profile/templates/useDesktopSurfaceModule')
+      >();
+    return {
+      ...actual,
+      useDesktopSurfaceModule: vi.fn(actual.useDesktopSurfaceModule),
+    };
+  }
+);
 
 // The desktop surface ships behind a build-time flag (default off). Most of
 // this suite pins it ON to keep covering the flagged desktop surface; the
@@ -323,6 +338,7 @@ describe('ProfileCompactTemplate', () => {
     mockUseProfileShell.mockReset();
     mockProfileInlineNotificationsCTA.mockClear();
     mockProfileDesktopSurface.mockClear();
+    vi.mocked(useDesktopSurfaceModule).mockClear();
     mockProfileUnifiedDrawer.mockClear();
     mockProfilePrimaryTabPanel.mockClear();
     mockProfileInlineNotificationsCTA.mockImplementation(
@@ -3397,6 +3413,8 @@ describe('ProfileCompactTemplate', () => {
       );
       expect(mockProfileDesktopSurface).not.toHaveBeenCalled();
     });
+
+    expect(useDesktopSurfaceModule).not.toHaveBeenCalledWith(true);
 
     restoreViewport();
   });

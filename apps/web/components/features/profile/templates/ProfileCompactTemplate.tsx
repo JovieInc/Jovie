@@ -355,10 +355,10 @@ export function ProfileCompactTemplate({
   );
   const [isHydrated, setIsHydrated] = useState(false);
   const [desktopSurfaceReady, setDesktopSurfaceReady] = useState(false);
-  // Loads only when a viewport or preview can present the desktop surface —
-  // mobile never parses, hydrates, or preloads it (JOV-12207/JOV-12208).
+  // Embedded previews always render the compact surface. Only a desktop
+  // viewport can present this graph (JOV-12207/JOV-12208).
   const { Surface } = useDesktopSurfaceModule(
-    PROFILE_DESKTOP_SURFACE_ENABLED && (isDesktopLayout || embeddedPreview)
+    PROFILE_DESKTOP_SURFACE_ENABLED && isDesktopLayout
   );
   const [requestedMode, setRequestedMode] = useState<ProfileMode>(() =>
     getInitialModeFromLocation(mode, false)
