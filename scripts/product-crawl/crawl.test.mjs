@@ -226,3 +226,15 @@ test('without a bypass secret no handler is installed and signed-in coverage sta
   assert.deepEqual(verdict.reasons, ['not crawled signed in']);
   assert.equal(verdict.findings.length, 0);
 });
+
+test('a rejected continuation preserves the original stranger-only receipt assertions', async t => {
+  const { receipt, verdict, summary } = await crawl(t, 'reject-continue', {
+    signedIn: false,
+  });
+  assert.equal(receipt.pages.length, 4, 'both viewports of both routes');
+  for (const page of receipt.pages)
+    assert.equal(page.error, undefined, `${page.route} loaded`);
+  assert.deepEqual(verdict.reasons, ['not crawled signed in']);
+  assert.equal(verdict.findings.length, 0);
+  assert.match(summary, /^## Product crawl: not ready/m);
+});
