@@ -61,10 +61,7 @@ LEDGER_CADENCE_S = 3600
 SUBSCRIPTION_REFRESH_LEAD_S = 900
 SUBSCRIPTION_RETRY_S = 240
 EVIDENCE_MAX_AGE_S = 2 * 3600
-AUTH = re.compile(r"not logged in|login required|unauthori[sz]ed|invalid.*(token|credential)|\b401\b", re.I)
 # "Try again at 3:15 PM", "try again in 2 hours 5 minutes", "resets at 2026-09-27T01:00:00Z"
-RESET_AT = re.compile(r"(?:try again|resets?|available)\s+(?:at|on)\s+([0-9T:\-\. ]+(?:AM|PM|Z)?)", re.I)
-RESET_IN = re.compile(r"try again in\s+((?:\d+\s*(?:days?|hours?|hrs?|minutes?|mins?|seconds?|secs?|[dhms])\s*)+)", re.I)
 NO_ACCOUNT_EXIT = 75  # EX_TEMPFAIL: the lane treats it as provider-error and cools down
 PROVIDER_EVIDENCE_SCHEMA = "jovie-provider-lease/v1"
 ACCOUNT_CLASS = "chatgpt-oauth"
