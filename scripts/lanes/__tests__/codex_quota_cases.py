@@ -258,6 +258,57 @@ class CodexQuotaCases:
         self.assertEqual((row["lastKind"], row["exhaustedUntil"]), ("rate", self.NOW + 120))
         self.assertEqual(row["lastObservation"]["message"], "Try again in 2 minutes")
 
+    def test_trailing_transport_error_preserves_the_current_quota_reset_details(self):
+        cases = [
+            ("usage limit. Try again in 2 hours.\nstream error: 429 Too Many Requests\n", "limit", 7200),
+            ("ERROR: You've hit your usage limit.\nTry again in 2 hours.\nRetrying 1/5\nstream error: 429 Too Many Requests\n", "limit", 7200),
+            ("error: rate limit\nTry again in 2 minutes.\nstream error: 429 Too Many Requests\n", "rate", 120),
+        ]
+        for output, kind, seconds in cases:
+            with self.subTest(output=output):
+                self.codex.write_state({})
+                result, calls, _, _ = self.run_pool_failure(output)
+                self.assertEqual((result, len(calls)), (0, 2))
+                row = self.codex.read_state()["current-login"]
+                self.assertEqual((row["lastKind"], row["exhaustedUntil"]), (kind, self.NOW + seconds))
+                self.assertEqual(row["lastObservation"]["reportedResetAt"], self.NOW + seconds)
+                self.assertEqual(row["subscriptionLedger"]["observationId"], row["lastObservation"]["id"])
+
+    def test_quota_details_do_not_cross_transcript_or_auth_failure_boundaries(self):
+        cases = [
+            ("quoted usage limit. Try again in 12 hours.\nerror: 429\n", "rate", 120),
+            ("quoted usage limit\nTry again in 12 hours.\nerror: 429\n", "rate", 120),
+            ("usage limit. Try again in 12 hours.\nfinished editing source\nerror: 429\n", "rate", 120),
+            ("usage limit. Try again in 12 hours.\nerror: login required\n", "auth", 86400),
+            ("error: rate limit\nRetrying quoted usage limit. Try again in 12 hours.\nstream error: 429 Too Many Requests\n", "rate", 120),
+            ("error: rate limit\nRetrying 1/5 quoted usage limit. Try again in 12 hours.\nstream error: 429 Too Many Requests\n", "rate", 120),
+            ("error: rate limit\nTry again in 2 minutes. quoted usage limit\nstream error: 429 Too Many Requests\n", "rate", 120),
+        ]
+        for output, kind, seconds in cases:
+            with self.subTest(output=output):
+                self.codex.write_state({})
+                result, calls, _, _ = self.run_pool_failure(output)
+                self.assertEqual((result, len(calls)), (0, 2))
+                row = self.codex.read_state()["current-login"]
+                self.assertEqual((row["lastKind"], row["exhaustedUntil"]), (kind, self.NOW + seconds))
+                self.assertIsNone(row["lastObservation"]["reportedResetAt"])
+
+    def test_generic_transport_error_uses_the_nearest_specific_quota_detail(self):
+        cases = [
+            ("usage limit. Try again in 12 hours.\nerror: rate limit. Try again in 2 minutes.\nstream error: 429 Too Many Requests\n", "rate", 120, 120),
+            ("usage limit. Try again in 12 hours.\nerror: rate limit\nTry again in 2 minutes.\nstream error: 429 Too Many Requests\n", "rate", 120, 120),
+            ("rate limit. Try again in 12 hours.\nusage limit. Try again in 2 hours.\nstream error: 429 Too Many Requests\n", "limit", 7200, 7200),
+            ("rate limit. Try again in 12 hours.\nusage limit\nstream error: 429 Too Many Requests\n", "limit", self.codex.DEFAULT_COOLDOWN_S, None),
+        ]
+        for output, kind, seconds, reported in cases:
+            with self.subTest(output=output):
+                self.codex.write_state({})
+                result, calls, _, _ = self.run_pool_failure(output)
+                self.assertEqual((result, len(calls)), (0, 2))
+                row = self.codex.read_state()["current-login"]
+                self.assertEqual((row["lastKind"], row["exhaustedUntil"]), (kind, self.NOW + seconds))
+                self.assertEqual(row["lastObservation"]["reportedResetAt"], self.NOW + reported if reported else None)
+
     def test_event_stamp_failure_prevents_readback_and_can_resume_the_same_event(self):
         self.reconcile()
         self.execute("lyb-pro", "usage limit. Try again in 1 hour.\n", 1)
