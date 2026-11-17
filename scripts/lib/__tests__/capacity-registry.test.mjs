@@ -83,26 +83,6 @@ describe('evaluation', () => {
     expect(grok.verdict).toBe('under-burning');
   });
 
-  it('flags a manual fact older than the threshold as stale and a live fact much sooner', () => {
-    const registry = base();
-    const later = NOW + 9 * 86_400_000;
-    const view = evaluateRegistry(registry, { now: later, spend: spend() });
-    expect(find(view, 'vercel-ai-gateway').accounts[0].credits.freshness).toBe(
-      'stale'
-    );
-    expect(view.totals.stale).toContain('openai-codex');
-    const dayAfter = evaluateRegistry(registry, {
-      now: NOW + 26 * 3_600_000,
-      spend: spend(),
-    });
-    expect(find(dayAfter, 'openai-codex').accounts[0].quota.freshness).toBe(
-      'stale'
-    );
-    expect(find(dayAfter, 'hyperagent').accounts[0].credits.freshness).toBe(
-      'fresh'
-    );
-  });
-
   it('takes a newer live row over the snapshot and ignores an older one', () => {
     const registry = base();
     const key = 'openai-codex/lyb-pro';

@@ -16,6 +16,14 @@
  * Pure functions only; live reads and filing live in the callers.
  */
 
+import {
+  burnRate,
+  isRunwayPagingResolved,
+  runwayStatusErrors,
+} from './credentials-runway-rules.mjs';
+
+export { burnRate };
+
 export const DAY_MS = 24 * 60 * 60 * 1000;
 export const CREDENTIALS_SCHEMA = 'jovie.credentials-registry/v1';
 export const SPEND_SCHEMA = 'jovie.spend-ledger/v1';
@@ -145,6 +153,7 @@ export function validateSpendLedger(ledger) {
     if (!entry.id) errors.push('spend entry without id');
     if (ids.has(entry.id)) errors.push(`duplicate spend id ${entry.id}`);
     ids.add(entry.id);
+    errors.push(...runwayStatusErrors(entry));
     if (entry.cap && !(entry.cap.amountUsd > 0))
       errors.push(`${entry.id}: cap.amountUsd must be positive`);
   }
@@ -345,34 +354,6 @@ export function evaluateInventory(registry, nowMs, thresholds = {}) {
   return { findings, secretNames, unclaimed: unclaimed.length };
 }
 
-/**
- * Burn per day. Prefer the measured slope between the committed baseline and a
- * live read of the same cumulative counter; fall back to the declared value.
- */
-export function burnRate(entry, live) {
-  const base = entry.snapshot;
-  if (
-    live &&
-    Number.isFinite(live.totalUsedUsd) &&
-    Number.isFinite(base?.totalUsedUsd)
-  ) {
-    const days =
-      (Date.parse(live.observedAt) - Date.parse(base.observedAt)) / DAY_MS;
-    if (days >= 0.5) {
-      const value = (live.totalUsedUsd - base.totalUsedUsd) / days;
-      if (value >= 0)
-        return { value, source: 'measured-slope', windowDays: round(days, 2) };
-    }
-  }
-  if (Number.isFinite(entry.burnPerDayUsd?.value))
-    return {
-      value: entry.burnPerDayUsd.value,
-      source: entry.burnPerDayUsd.source ?? 'declared',
-      windowDays: null,
-    };
-  return null;
-}
-
 export function evaluateSpend(ledger, nowMs, live = {}, thresholds = {}) {
   const t = { ...DEFAULT_THRESHOLDS, ...ledger?.thresholds, ...thresholds };
   const findings = [];
@@ -414,7 +395,11 @@ export function evaluateSpend(ledger, nowMs, live = {}, thresholds = {}) {
       const age = -daysUntil(observed.observedAt, nowMs);
       if (age > t.observationMaxAgeDays) unmeasured.push(entry.id);
     }
-    if (runwayDays !== null && runwayDays < t.runwayAlertDays) {
+    if (
+      !isRunwayPagingResolved(entry) &&
+      runwayDays !== null &&
+      runwayDays < t.runwayAlertDays
+    ) {
       findings.push(
         finding({
           fingerprint: `spend-runway:${entry.id}`,
@@ -427,7 +412,11 @@ export function evaluateSpend(ledger, nowMs, live = {}, thresholds = {}) {
         })
       );
     }
-    if (runwayDays !== null && runwayDays < t.runwayPageDays) {
+    if (
+      !isRunwayPagingResolved(entry) &&
+      runwayDays !== null &&
+      runwayDays < t.runwayPageDays
+    ) {
       findings.push(
         finding({
           fingerprint: `spend-runway-page:${entry.id}`,
