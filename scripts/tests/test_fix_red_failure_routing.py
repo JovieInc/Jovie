@@ -472,6 +472,8 @@ class StuckSyncRetryTest(unittest.TestCase):
         self.assertFalse(claim(self.pr, self.routes, {'25257': {'from': self.head, 'ok': False}}, True))
         self.assertFalse(claim({'number': '25257', 'headRefOid': self.head}, self.routes, {}, True))
         self.assertFalse(claim(self.pr, self.routes, [], True))
+        self.assertEqual(classes.RERUN, 'rerun')
+        self.assertEqual(classes.SYNC_MAIN, 'sync-main')
 
     def test_route_retries_sync_once_when_the_merge_is_clean(self):
         host = types.SimpleNamespace(state=Path('/tmp/stuck-sync'))

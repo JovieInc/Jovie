@@ -7196,15 +7196,10 @@ def deterministic_route_taken(host: Host, pr: dict, route: dict | None) -> str |
     if route["action"] == fix_red_classes.RERUN and route.get("cls") == "quota-deferred":
         import quota_rerun
         return quota_rerun.deferred_rerun(host, pr, failed_logs, update_json, _rerun_failed)
-    # One rerun per head. A sync-main claim with no receipt retries once when main merges clean.
-    action = route["action"]
-    claimed = claim_infra_rerun(host, pr) if action == fix_red_classes.RERUN else claim_route(host, pr, action)
-    if not claimed and action == fix_red_classes.SYNC_MAIN and fix_red_failure_routing.stuck_sync_claim(
-            pr, read_json(host.state / "class-routes.json"), read_json(host.state / "synced.json")):
-        claimed = conflict_files(host, pr) == []
-    if not claimed:
+    # One rerun per head. Retry a receipt-less sync-main once when main merges clean.
+    if not fix_red_failure_routing.sync_claim_or_retry(route, claim_infra_rerun, claim_route, host, pr, read_json, conflict_files):
         return None
-    if action == fix_red_classes.RERUN:
+    if route["action"] == fix_red_classes.RERUN:
         return f"infra-rerun:{route['cls']}" if _rerun_failed(pr) else None
     return f"infra-rerun:{route['cls']}" if pr_events.sync_main(host, THIS, pr, time.time(), terminal_ok=True) == "synced" else None
 

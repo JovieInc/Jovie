@@ -317,6 +317,22 @@ def stuck_sync_is_clean(pr, routes, synced, merge_clean) -> bool:
     return stuck_sync_claim(pr, routes, synced) and merge_clean is True
 
 
+def sync_claim_or_retry(route, claim_infra, claim_route, host, pr, read_json, conflict_files) -> bool:
+    """Claim the route. Retry a receipt-less sync-main once when main merges clean.
+
+    ``rerun`` and ``sync-main`` are the fix_red_classes action strings. The
+    caller passes the lane's claim and merge-tree functions so this module
+    stays free of the runner import cycle.
+    """
+    action = route.get("action") if isinstance(route, dict) else None
+    claimed = claim_infra(host, pr) if action == "rerun" else claim_route(host, pr, action)
+    if claimed or action != "sync-main":
+        return bool(claimed)
+    routes = read_json(host.state / "class-routes.json")
+    synced = read_json(host.state / "synced.json")
+    return stuck_sync_claim(pr, routes, synced) and conflict_files(host, pr) == []
+
+
 def classify_repair(host, pr, read_logs, classify, read, repository):
     """Use own-head failures first; legacy queue excerpts alone carry no routing authority."""
     if pr.get('mergeStateStatus') == 'DIRTY' or pr.get('reviewDecision') == 'CHANGES_REQUESTED':
