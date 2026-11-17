@@ -79,16 +79,10 @@ export function judgeCandidate(
     `charging ${subscription.unitAmountCents} cents per ${interval}, lock ${lock.priceVersionId} is ${lockedAmount}`
   );
 }
-export interface ReconcileSummary {
-  readonly checked: number;
-  readonly counts: Readonly<Record<PriceLockVerdict, number>>;
-  readonly findings: readonly ReconcileFinding[];
-  readonly alarms: readonly ReconcileFinding[];
-}
 export function reconcilePriceLocks(
   candidates: readonly ReconcileCandidate[],
   isPriceMapped: (priceId: string) => boolean
-): ReconcileSummary {
+) {
   const counts = Object.fromEntries(
     PRICE_LOCK_VERDICTS.map(verdict => [verdict, 0])
   ) as Record<PriceLockVerdict, number>;
@@ -98,10 +92,12 @@ export function reconcilePriceLocks(
   for (const finding of findings) counts[finding.verdict] += 1;
   return {
     checked: findings.length,
-    counts,
-    findings,
-    alarms: findings.filter(f => f.verdict !== 'ok'),
-  };
+    counts: counts as Readonly<Record<PriceLockVerdict, number>>,
+    findings: findings as readonly ReconcileFinding[],
+    alarms: findings.filter(
+      f => f.verdict !== 'ok'
+    ) as readonly ReconcileFinding[],
+  } as const;
 }
 export function alarmSeverity(
   verdict: PriceLockVerdict

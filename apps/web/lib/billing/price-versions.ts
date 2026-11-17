@@ -20,14 +20,12 @@ export const PRICE_VERSIONS: readonly PriceVersion[] = [
   },
 ];
 export const CURRENT_PRICE_VERSION_ID = 'pro-2026-10-20-m12';
-export const PRICE_LOCK_SOURCES = [
-  'signup',
-  'waitlist',
-  'checkout',
-  'first_view',
-  'backfill_subscription',
-] as const;
-export type PriceLockSource = (typeof PRICE_LOCK_SOURCES)[number];
+export type PriceLockSource =
+  | 'signup'
+  | 'waitlist'
+  | 'checkout'
+  | 'first_view'
+  | 'backfill_subscription';
 export interface PriceLockSnapshot {
   readonly plan: PriceLockPlan;
   readonly priceVersionId: string;
@@ -74,10 +72,9 @@ export function getCurrentPriceVersion(
   }
   return current;
 }
-export interface StripePriceIdSnapshot {
-  readonly monthly: string | null;
-  readonly yearly: string | null;
-}
+export type StripePriceIdSnapshot = Readonly<
+  Record<'monthly' | 'yearly', string | null>
+>;
 export function buildPriceLockSnapshot(input: {
   readonly source: PriceLockSource;
   readonly now: Date;

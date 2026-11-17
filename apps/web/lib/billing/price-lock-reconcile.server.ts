@@ -36,7 +36,8 @@ export function toReconcileSubscription(
     mappedPlan: mapping?.plan ?? null,
     unitAmountCents: price?.unit_amount ?? null,
     currency: price?.currency ?? null,
-    interval: interval === 'month' || interval === 'year' ? interval : null,
+    interval:
+      interval === 'month' ? 'month' : interval === 'year' ? 'year' : null,
   };
 }
 

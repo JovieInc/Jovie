@@ -15,21 +15,13 @@ export type LockedCheckoutExpectation = Pick<
   ResolvedLockedPrice,
   'amountCents' | 'currency' | 'interval'
 >;
-export type CheckoutPriceDecision =
-  | { readonly kind: 'list'; readonly priceId: string }
-  | {
-      readonly kind: 'locked';
-      readonly priceId: string;
-      readonly plan: PriceLockSnapshot['plan'];
-      readonly expectation: LockedCheckoutExpectation;
-      readonly substituted: boolean;
-    };
 export function resolveCheckoutPrice(input: {
   readonly requestedPriceId: string;
   readonly requestedMapping: CheckoutPriceMapping | null;
   readonly lock: PriceLockSnapshot | null;
-}): CheckoutPriceDecision {
+}) {
   const { requestedPriceId, requestedMapping, lock } = input;
+  const listed = { kind: 'list', priceId: requestedPriceId } as const;
   const ownedInterval =
     requestedPriceId === lock?.stripePriceIdMonthly
       ? 'month'
@@ -38,17 +30,17 @@ export function resolveCheckoutPrice(input: {
         : null;
   const ownsPrice = ownedInterval !== null;
   if (!lock || (requestedMapping?.legacy && !ownsPrice)) {
-    return { kind: 'list', priceId: requestedPriceId };
+    return listed;
   }
   // The requested id is one of the lock's own ids (possibly retired/unmapped).
-  const interval: PriceInterval | null = requestedMapping
-    ? requestedMapping.plan === lock.plan
+  const interval: PriceInterval | null = !requestedMapping
+    ? ownedInterval
+    : requestedMapping.plan === lock.plan
       ? requestedMapping.interval
-      : null
-    : ownedInterval;
-  if (!interval) return { kind: 'list', priceId: requestedPriceId };
+      : null;
+  if (!interval) return listed;
   const price = resolveLockedPrice({ lock, interval });
-  if (!price?.locked) return { kind: 'list', priceId: requestedPriceId };
+  if (!price?.locked) return listed;
   if (!price.stripePriceId) throw new Error('The locked price is unavailable');
   if (
     !ownsPrice &&
@@ -69,5 +61,5 @@ export function resolveCheckoutPrice(input: {
       interval,
     },
     substituted: price.stripePriceId !== requestedPriceId && !ownsPrice,
-  };
+  } as const;
 }

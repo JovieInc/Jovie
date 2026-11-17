@@ -5,10 +5,6 @@
 import type { PriceLockView } from '@/lib/billing/price-lock-view';
 import { FetchError, fetchWithTimeout } from './fetch';
 
-interface PriceLockResponse {
-  readonly priceLock: PriceLockView;
-}
-
 /** Null when there is no lock to apply; any outage fails the query. */
 export async function fetchPriceLock({
   signal,
@@ -16,7 +12,7 @@ export async function fetchPriceLock({
   signal?: AbortSignal;
 }): Promise<PriceLockView | null> {
   try {
-    const data = await fetchWithTimeout<PriceLockResponse>(
+    const data = await fetchWithTimeout<{ readonly priceLock: PriceLockView }>(
       '/api/billing/price-lock',
       { signal, cache: 'no-store' }
     );
