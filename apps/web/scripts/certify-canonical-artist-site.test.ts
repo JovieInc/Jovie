@@ -1,79 +1,18 @@
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { readFileSync, writeFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import {
-  type CanonicalArtistSiteCliOptions,
   certifyCanonicalArtistSite,
   classifyDeployedRevision,
   parseSourceHistory,
 } from './certify-canonical-artist-site';
+import {
+  cleanupFixtures,
+  fixture,
+  sourceRevision,
+} from './certify-canonical-artist-site.fixtures';
 
-const sourceRevision = '8d2f49a8bdb2618db89368931d2313158b0a01bc';
-const temporaryDirectories: string[] = [];
-
-function fixture(): CanonicalArtistSiteCliOptions {
-  const directory = mkdtempSync(join(tmpdir(), 'jovie-jov-6572-'));
-  temporaryDirectories.push(directory);
-  const m2ReceiptPath = join(directory, 'm2.json');
-  const profileReportPath = join(directory, 'profile-report.json');
-  const profileResultPath = join(directory, 'profile-result.json');
-  writeFileSync(
-    m2ReceiptPath,
-    JSON.stringify({
-      steps: [
-        { name: 'claim', ok: true },
-        { name: 'pro_checkout_199', ok: true },
-        { name: 'activation', ok: true },
-      ],
-    })
-  );
-  writeFileSync(
-    profileReportPath,
-    JSON.stringify({
-      snapshot: { releaseSha: sourceRevision },
-      linkChecks: [
-        {
-          url: 'https://jov.ie/tim/never-say-a-word',
-          status: 200,
-          canonicalArtistReturn: true,
-        },
-      ],
-    })
-  );
-  writeFileSync(
-    profileResultPath,
-    JSON.stringify({
-      failed: false,
-      reportPath: profileReportPath,
-      exposedDeferredSurfaces: [],
-      checks: [],
-      brokenInternalLinks: [],
-    })
-  );
-  return {
-    candidateId: 'acquisition:premade-artist-profile:tim-white:run-42',
-    runId: 'run-42',
-    sourceRevision,
-    runUrl: 'https://github.com/JovieInc/Jovie/actions/runs/42',
-    goldenPathStatus: 'success',
-    claimContractStatus: 'success',
-    waitlistStatus: 'success',
-    m2Status: 'success',
-    m2ReceiptPath,
-    profileStatus: 'success',
-    navigationStatus: 'success',
-    profileResultPath,
-    outputPath: join(directory, 'certificate.json'),
-    gitRoot: directory,
-  };
-}
-
-afterEach(() => {
-  for (const directory of temporaryDirectories.splice(0)) {
-    rmSync(directory, { recursive: true, force: true });
-  }
-});
+afterEach(cleanupFixtures);
 
 describe('canonical artist-site certification CLI adapter', () => {
   it.each(['failure', 'skipped', undefined])(
@@ -285,6 +224,185 @@ describe('canonical artist-site certification CLI adapter', () => {
       certificate.failingChecks.find(check => check.id === 'deferred_surfaces')
         ?.status
     ).toBe('failed');
+  });
+});
+
+function journeyReport(
+  directory: string,
+  okByFile: Record<string, boolean>
+): string {
+  const path = join(directory, 'playwright-report.json');
+  writeFileSync(
+    path,
+    JSON.stringify({
+      suites: Object.entries(okByFile).map(([file, ok]) => ({
+        file,
+        specs: [
+          {
+            file,
+            ok,
+            tests: [
+              {
+                status: ok ? 'expected' : 'unexpected',
+                expectedStatus: 'passed',
+                results: [{ status: ok ? 'passed' : 'failed' }],
+              },
+            ],
+          },
+        ],
+      })),
+    })
+  );
+  return path;
+}
+
+describe('revenue checks read their own spec, not the whole journey step', () => {
+  const allOk = {
+    'claim-prebuilt.smoke.spec.ts': true,
+    'golden-path-home-welcome.spec.ts': true,
+    'golden-path.spec.ts': true,
+    'start-entry-continuity.spec.ts': true,
+  };
+  const failing = (
+    certificate: ReturnType<typeof certifyCanonicalArtistSite>
+  ) => certificate.failingChecks.map(check => check.id);
+
+  it('an unrelated /start layout spec failure no longer flips payment_entitlement', () => {
+    const options = fixture();
+    const certificate = certifyCanonicalArtistSite({
+      ...options,
+      goldenPathStatus: 'failure',
+      journeyReportPath: journeyReport(dirname(options.outputPath), {
+        ...allOk,
+        'start-entry-continuity.spec.ts': false,
+      }),
+    });
+    expect(failing(certificate)).not.toContain('payment_entitlement');
+    expect(failing(certificate)).not.toContain('free_state_value');
+    expect(failing(certificate)).not.toContain('immediate_value');
+    expect(
+      certificate.checks.find(check => check.id === 'free_state_value')
+    ).toMatchObject({
+      status: 'passed',
+      detail: 'Prebuilt claim, home-welcome, and golden-path specs passed.',
+    });
+    expect(
+      certificate.checks.find(check => check.id === 'payment_entitlement')
+    ).toMatchObject({
+      status: 'passed',
+      detail:
+        'Golden-path billing spec and revenue-path Pro checkout and activation passed.',
+    });
+    expect(failing(certificate)).toContain('profile_hierarchy');
+  });
+
+  it('a failing billing journey spec flips payment_entitlement', () => {
+    const options = fixture();
+    const certificate = certifyCanonicalArtistSite({
+      ...options,
+      goldenPathStatus: 'failure',
+      journeyReportPath: journeyReport(dirname(options.outputPath), {
+        ...allOk,
+        'golden-path.spec.ts': false,
+      }),
+    });
+    expect(failing(certificate)).toContain('payment_entitlement');
+  });
+
+  it('a failing free-state spec flips free_state_value but not payment_entitlement', () => {
+    const options = fixture();
+    const certificate = certifyCanonicalArtistSite({
+      ...options,
+      goldenPathStatus: 'failure',
+      journeyReportPath: journeyReport(dirname(options.outputPath), {
+        ...allOk,
+        'golden-path-home-welcome.spec.ts': false,
+      }),
+    });
+    expect(failing(certificate)).toContain('free_state_value');
+    expect(failing(certificate)).not.toContain('payment_entitlement');
+  });
+
+  it('keeps a missing report red when the aggregate journey also failed', () => {
+    const certificate = certifyCanonicalArtistSite({
+      ...fixture(),
+      goldenPathStatus: 'failure',
+      journeyReportPath: '/nonexistent/playwright-report.json',
+    });
+    expect(failing(certificate)).toContain('payment_entitlement');
+  });
+
+  it('does not accept a green aggregate in place of an explicitly requested missing report', () => {
+    const certificate = certifyCanonicalArtistSite({
+      ...fixture(),
+      journeyReportPath: '/nonexistent/playwright-report.json',
+    });
+    expect(failing(certificate)).toEqual(
+      expect.arrayContaining([
+        'payment_entitlement',
+        'free_state_value',
+        'immediate_value',
+      ])
+    );
+  });
+
+  const execution = (
+    status: string,
+    expectedStatus = 'passed',
+    attempts = [status]
+  ) => ({
+    status,
+    expectedStatus,
+    results: attempts.map(status => ({ status })),
+  });
+  it.each([
+    { name: 'zero executed tests', tests: [] },
+    { name: 'a skipped test', tests: [execution('skipped')] },
+    {
+      name: 'an expected failure',
+      tests: [execution('expected', 'failed', ['failed'])],
+    },
+    {
+      name: 'a flaky retry',
+      tests: [execution('flaky', 'passed', ['failed', 'passed'])],
+    },
+  ])('rejects $name even when Playwright spec.ok is true', ({ tests }) => {
+    const options = fixture();
+    const reportPath = journeyReport(dirname(options.outputPath), allOk);
+    const report = JSON.parse(readFileSync(reportPath, 'utf8')) as {
+      suites: {
+        file: string;
+        specs: { tests: typeof tests }[];
+      }[];
+    };
+    const billing = report.suites.find(
+      suite => suite.file === 'golden-path.spec.ts'
+    );
+    expect(billing).toBeDefined();
+    billing!.specs[0].tests = tests;
+    writeFileSync(reportPath, JSON.stringify(report));
+    const certificate = certifyCanonicalArtistSite({
+      ...options,
+      journeyReportPath: reportPath,
+    });
+    expect(failing(certificate)).toEqual(
+      expect.arrayContaining([
+        'payment_entitlement',
+        'free_state_value',
+        'immediate_value',
+      ])
+    );
+  });
+
+  it('keeps a failed revenue activation red despite passed journey specs', () => {
+    const options = fixture();
+    const certificate = certifyCanonicalArtistSite({
+      ...options,
+      m2Status: 'failure',
+      journeyReportPath: journeyReport(dirname(options.outputPath), allOk),
+    });
+    expect(failing(certificate)).toContain('payment_entitlement');
+    expect(failing(certificate)).toContain('immediate_value');
   });
 });
 

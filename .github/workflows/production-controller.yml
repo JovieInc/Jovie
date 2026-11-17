@@ -733,7 +733,7 @@ jobs:
               staging_receipt_sha="$web_evidence_sha"
               staging_deployment_id=""
               if [[ ! "$staging_receipt_sha" =~ ^[0-9a-f]{40}$ ]]; then
-                staging_identity="$(curl --fail --silent --show-error --max-time 20 https://staging.jov.ie/api/health/build-info)" || { echo "::error::Canonical staging identity is unavailable. Next: inspect staging.jov.ie build-info."; exit 1; }
+                staging_identity="$(bash .github/scripts/staging-identity-read.sh)" || { echo "::error::Canonical staging identity is unavailable. Next: inspect staging.jov.ie build-info."; exit 1; }
                 staging_receipt_sha="$(jq -er '.commitSha | select(type == "string" and test("^[0-9a-f]{40}$"))' <<<"$staging_identity")"
                 staging_deployment_id="$(jq -er '.deploymentId | select(type == "string" and test("^dpl_[A-Za-z0-9]+$"))' <<<"$staging_identity")"
               fi
@@ -747,7 +747,7 @@ jobs:
                 else
                   # A same-SHA CI rerun can select no Web lane. Authenticate the
                   # existing canonical deployment rather than using an empty ID.
-                  canonical_staging_identity="$(curl --fail --silent --show-error --max-time 20 https://staging.jov.ie/api/health/build-info)"
+                  canonical_staging_identity="$(bash .github/scripts/staging-identity-read.sh)"
                   staging_deployment_id="$(jq -er '.deploymentId | select(type == "string" and test("^dpl_[A-Za-z0-9]+$"))' <<<"$canonical_staging_identity")"
                   staging_artifact_id="$(CANONICAL_STAGING_IDENTITY="$canonical_staging_identity" \
                     REPOSITORY="$REPOSITORY" EXPECTED_SHA="$EXPECTED_SHA" \
@@ -763,7 +763,7 @@ jobs:
                   # historical head. A carryover staging run deploys a later
                   # main head. Further non-Web commits may advance main before
                   # production authorizes; require Web <= staging <= release.
-                  canonical_staging_identity="$(curl --fail --silent --show-error --max-time 20 https://staging.jov.ie/api/health/build-info)"
+                  canonical_staging_identity="$(bash .github/scripts/staging-identity-read.sh)"
                   canonical_staging_sha="$(jq -er '.commitSha | select(type == "string" and test("^[0-9a-f]{40}$"))' <<<"$canonical_staging_identity")"
                   web_to_staging="$(gh api "repos/$REPOSITORY/compare/${staging_receipt_sha}...${canonical_staging_sha}" --jq '.status // empty')"
                   staging_to_release="$(gh api "repos/$REPOSITORY/compare/${canonical_staging_sha}...${EXPECTED_SHA}" --jq '.status // empty')"

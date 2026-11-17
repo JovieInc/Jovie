@@ -1,4 +1,5 @@
 import { APP_ROUTES } from '@/constants/routes';
+import { HOMEPAGE_EDITORIAL_COPY } from '@/data/homepageEditorialCopy';
 import {
   COMPUTED_PROOF_SLOTS,
   type ComputedProofSlotId,
@@ -110,7 +111,7 @@ export const GOLDEN_PATH_CLAIMS: readonly GoldenPathClaim[] = [
     step: 'homepage',
     route: '/',
     source: HOMEPAGE_COPY,
-    copy: 'Move your music forward.',
+    copy: HOMEPAGE_EDITORIAL_COPY.hero.headline,
     nature: 'capability',
     capabilityIds: ['artist-profiles', 'public-profile'],
   },
@@ -119,7 +120,7 @@ export const GOLDEN_PATH_CLAIMS: readonly GoldenPathClaim[] = [
     step: 'homepage',
     route: '/',
     source: HOMEPAGE_COPY,
-    copy: 'Your profile, every release, and a link to each place the music is streaming.',
+    copy: HOMEPAGE_EDITORIAL_COPY.hero.subhead,
     nature: 'capability',
     capabilityIds: ['artist-profiles', 'public-profile'],
   },

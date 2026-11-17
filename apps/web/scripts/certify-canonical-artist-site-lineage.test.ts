@@ -1,15 +1,27 @@
-import { execFileSync } from 'node:child_process';
-import { existsSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { execFileSync, spawnSync } from 'node:child_process';
+import {
+  existsSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import type { CanonicalArtistSiteCliOptions } from './certify-canonical-artist-site';
 import { certifyCanonicalArtistSite } from './certify-canonical-artist-site';
+import {
+  cleanupFixtures,
+  fixture,
+} from './certify-canonical-artist-site.fixtures';
+import { reportCanonicalCertificate } from './certify-canonical-artist-site-evidence';
 import { classifyDeployedRevisionFromGit } from './certify-canonical-artist-site-lineage';
 
 const temporaryDirectories: string[] = [];
 
 afterEach(() => {
+  cleanupFixtures();
   for (const directory of temporaryDirectories.splice(0)) {
     rmSync(directory, { recursive: true, force: true });
   }
@@ -348,4 +360,100 @@ describe('git-path lineage binding (JOV-12646)', () => {
       })
     );
   });
+});
+
+describe('CLI quota deferral preserves independent failures', () => {
+  it.each([
+    ['quota only', 0, null],
+    ['billing', 1, 'pro_handoff_199'],
+    ['journey', 1, 'payment_entitlement'],
+    ['claim', 1, 'claim_auth_intent'],
+    ['navigation', 1, 'profile_modes'],
+    ['exposed surface', 1, 'deferred_surfaces'],
+    ['integrity', 1, null],
+  ] as const)(
+    'keeps %s evidence honest at the real CLI boundary',
+    (kind, exit, failedId) => {
+      const options = fixture();
+      const directory = dirname(options.outputPath);
+      const profile = JSON.parse(
+        readFileSync(options.profileResultPath, 'utf8')
+      );
+      const report = JSON.parse(readFileSync(profile.reportPath, 'utf8'));
+      report.snapshot.releaseSha = 'b'.repeat(40);
+      writeFileSync(profile.reportPath, JSON.stringify(report));
+      if (kind === 'billing') {
+        const m2 = JSON.parse(readFileSync(options.m2ReceiptPath, 'utf8'));
+        m2.steps.find(
+          (step: { name: string }) => step.name === 'pro_checkout_199'
+        ).ok = false;
+        writeFileSync(options.m2ReceiptPath, JSON.stringify(m2));
+      }
+      if (kind === 'exposed surface') {
+        profile.exposedDeferredSurfaces = ['broad_ai'];
+        writeFileSync(options.profileResultPath, JSON.stringify(profile));
+      }
+      const history = join(directory, 'history.txt');
+      writeFileSync(history, '');
+      const args = Object.entries({
+        ...options,
+        candidateId:
+          kind === 'integrity' ? 'x'.repeat(201) : options.candidateId,
+        sourceRevision: 'a'.repeat(40),
+        claimContractStatus: kind === 'claim' ? 'failure' : 'success',
+        navigationStatus: kind === 'navigation' ? 'failure' : 'success',
+        sourceHistory: history,
+        gitRoot: directory,
+        ...(kind === 'journey'
+          ? { journeyReportPath: join(directory, 'missing-report.json') }
+          : {}),
+      }).flatMap(([name, value]) =>
+        typeof value === 'string'
+          ? [
+              `--${name.replace(/Path$/, '').replace(/[A-Z]/g, letter => `-${letter.toLowerCase()}`)}`,
+              value,
+            ]
+          : []
+      );
+      const result = spawnSync(
+        process.execPath,
+        [
+          '--import',
+          'tsx',
+          resolve('scripts/certify-canonical-artist-site.ts'),
+          ...args,
+        ],
+        { cwd: process.cwd(), encoding: 'utf8' }
+      );
+      const certificate = JSON.parse(readFileSync(options.outputPath, 'utf8'));
+      expect(
+        reportCanonicalCertificate(
+          certificate,
+          'github-quota-deferred: fixture'
+        )
+      ).toBe(exit);
+      expect(result.status, result.stderr).toBe(exit);
+      expect(certificate.status).toBe('RED');
+      expect(certificate.safeToSend).toBe(false);
+      expect(result.stderr).toContain('github-quota-deferred');
+      if (failedId) {
+        const failure = certificate.failingChecks.find(
+          (check: { id: string }) => check.id === failedId
+        );
+        expect(failure).toBeDefined();
+        expect(failure.detail.startsWith('github-quota-deferred:')).toBe(false);
+      }
+      if (kind === 'quota only') {
+        expect(certificate.evidenceIntegrityFailures).toEqual([]);
+        expect(
+          certificate.failingChecks.every((check: { detail: string }) =>
+            check.detail.startsWith('github-quota-deferred:')
+          )
+        ).toBe(true);
+        expect(result.stderr).toContain('Re-run after the quota resets');
+      }
+      if (kind === 'integrity')
+        expect(certificate.evidenceIntegrityFailures.length).toBeGreaterThan(0);
+    }
+  );
 });

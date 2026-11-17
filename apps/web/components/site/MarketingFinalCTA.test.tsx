@@ -1,5 +1,6 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
+import { HOMEPAGE_EDITORIAL_COPY } from '@/data/homepageEditorialCopy';
 import { HOMEPAGE_FRONT_DOOR_CTA } from '@/data/homepageLaunchCopy';
 import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import { MarketingFinalCTA } from './MarketingFinalCTA';
@@ -10,10 +11,12 @@ describe('MarketingFinalCTA', () => {
 
     expect(screen.getByTestId('marketing-final-cta')).toBeInTheDocument();
     expect(
-      screen.getByRole('heading', { name: 'Request private launch access.' })
+      screen.getByRole('heading', {
+        name: HOMEPAGE_EDITORIAL_COPY.claim.headline,
+      })
     ).toBeInTheDocument();
     expect(
-      screen.getByRole('link', { name: 'Request Access' })
+      screen.getByRole('link', { name: HOMEPAGE_FRONT_DOOR_CTA.primary.label })
     ).toHaveAttribute('href', HOMEPAGE_FRONT_DOOR_CTA.primary.href);
     await expectNoA11yViolations(container);
   });

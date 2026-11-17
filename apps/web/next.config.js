@@ -77,9 +77,8 @@ const nextConfig = {
   // Request-time readers build data paths dynamically, so NFT cannot infer
   // their files. List only the data they read; the broad directory entries
   // are small content, chat-topic and chat-skill catalogs.
-  // Monorepo files are staged into apps/web/runtime-data by
-  // scripts/stage-runtime-data.mjs; never trace outside apps/web (Vercel's
-  // project root), which breaks deployment extraction.
+  // Monorepo runtime data is staged inside apps/web by
+  // scripts/stage-runtime-data.mjs; traces must stay inside the project root.
   outputFileTracingIncludes: {
     '/*': [
       'runtime-data/CHANGELOG.md',
@@ -95,6 +94,7 @@ const nextConfig = {
       'public/fonts/Satoshi-Bold.ttf',
       'public/fonts/DMSans-Regular.ttf',
     ],
+    '/api/ovie/mcp': ['runtime-data/canon/invariants.jsonl'],
     '/api/ovie/certifications': ['runtime-data/docs/certification/**/*'],
     '/api/ovie/certifications/**': ['runtime-data/docs/certification/**/*'],
     '/api/admin/outbound/readiness': [

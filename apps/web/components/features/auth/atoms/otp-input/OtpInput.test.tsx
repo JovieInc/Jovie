@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { useState } from 'react';
 import { describe, expect, it, vi } from 'vitest';
@@ -17,22 +17,21 @@ const digit = (n: number) => screen.getByLabelText(`Digit ${n} of 6`);
 
 function ControlledOtp({
   onComplete,
+  note = '',
 }: {
   readonly onComplete?: (value: string) => void;
+  readonly note?: string;
 }) {
   const [value, setValue] = useState('');
-  const [renders, setRenders] = useState(0);
   return (
     <>
+      <p>{note}</p>
       <OtpInput
         value={value}
         onChange={setValue}
         onComplete={onComplete}
         autoFocus={false}
       />
-      <button type='button' onClick={() => setRenders(renders + 1)}>
-        Rerender {renders}
-      </button>
     </>
   );
 }
@@ -54,11 +53,14 @@ describe('OtpInput', () => {
 
   it('keeps typed digits and focus when the parent re-renders', async () => {
     const user = userEvent.setup();
-    render(<ControlledOtp />);
+    const { rerender } = render(<ControlledOtp note='Enter the code' />);
 
     await user.type(digit(1), '123');
-    await user.click(screen.getByRole('button', { name: 'Rerender 0' }));
-    await user.click(digit(4));
+    const focusedInput = digit(4);
+    expect(focusedInput).toHaveFocus();
+    rerender(<ControlledOtp note='We sent a new code' />);
+    expect(digit(4)).toBe(focusedInput);
+    expect(digit(4)).toHaveFocus();
     await user.keyboard('{Escape}');
 
     expect(digit(1)).toHaveValue('1');
@@ -87,6 +89,39 @@ describe('OtpInput', () => {
 
     expect(digit(2)).toHaveValue('');
     expect(digit(1)).toHaveValue('1');
+  });
+
+  it('fills every box from a pasted code', () => {
+    const onComplete = vi.fn();
+    render(<OtpInput autoFocus={false} onComplete={onComplete} />);
+
+    fireEvent.paste(screen.getByRole('group', { name: 'One-time password' }), {
+      clipboardData: { getData: () => '987654' },
+    });
+
+    expect(onComplete).toHaveBeenCalledWith('987654');
+    expect(digit(1)).toHaveValue('9');
+    expect(digit(6)).toHaveValue('4');
+  });
+
+  it('takes a platform one-time code through the autofill overlay', () => {
+    const onComplete = vi.fn();
+    render(<OtpInput autoFocus={false} onComplete={onComplete} />);
+
+    const overlay = screen.getByTestId('otp-autofill-input');
+    expect(overlay).toHaveAttribute('autocomplete', 'one-time-code');
+    expect(overlay).toHaveAttribute('tabindex', '-1');
+    expect(overlay).toHaveAttribute('inputmode', 'numeric');
+
+    fireEvent.change(overlay, { target: { value: '246810' } });
+    expect(onComplete).toHaveBeenCalledWith('246810');
+    expect(digit(4)).toHaveValue('8');
+  });
+
+  it('hints one-time-code on the first box only', () => {
+    render(<OtpInput autoFocus={false} />);
+    expect(digit(1)).toHaveAttribute('autocomplete', 'one-time-code');
+    expect(digit(2)).toHaveAttribute('autocomplete', 'off');
   });
 
   it('marks every box invalid and ties it to the error message', () => {
@@ -132,6 +167,15 @@ describe('OtpInput', () => {
         <OtpInput value='000000' error errorId='otp-error' autoFocus={false} />
         <p id='otp-error'>That code did not match.</p>
       </>
+    );
+    await expectNoA11yViolations(container);
+  });
+
+  it('has no accessibility violations in a right-to-left layout', async () => {
+    const { container } = render(
+      <div dir='rtl'>
+        <OtpInput autoFocus={false} aria-label='رمز التحقق' value='12' />
+      </div>
     );
     await expectNoA11yViolations(container);
   });
