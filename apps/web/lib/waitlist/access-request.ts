@@ -18,7 +18,10 @@ import { notifySlackWaitlist } from '@/lib/notifications/providers/slack';
 import { normalizeEmail } from '@/lib/utils/email';
 import { logger } from '@/lib/utils/logger';
 import type { WaitlistRequestPayload } from '@/lib/validation/schemas';
-import { buildEntryValues } from '@/lib/waitlist/access-request-entry';
+import {
+  buildEntryValues,
+  shouldPreserveWaitlistDecision,
+} from '@/lib/waitlist/access-request-entry';
 import {
   type AdmissionScore,
   isOutrankedByQueue,
@@ -30,7 +33,6 @@ import {
 } from '@/lib/waitlist/approval';
 import { insertWaitlistAuditLog } from '@/lib/waitlist/audit';
 import { insertChatCapabilityWants } from '@/lib/waitlist/capability-wants.server';
-import { QUALIFICATION_RULE_VERSION } from '@/lib/waitlist/decision';
 import { enqueueWaitlistEmailJob } from '@/lib/waitlist/email-jobs';
 import type { GoldenPathAdmissionDecision } from '@/lib/waitlist/golden-path-admission';
 import {
@@ -417,9 +419,7 @@ async function handleExistingEntryResubmission(params: {
     };
   }
 
-  const preserveDecision =
-    existing.decisionRuleVersion === QUALIFICATION_RULE_VERSION ||
-    ['queued', 'qualified', 'disqualified'].includes(existing.status);
+  const preserveDecision = shouldPreserveWaitlistDecision(existing);
   const nextExistingStatus = preserveDecision
     ? existing.status
     : isWaitlistPendingStatus(existing.status) || existing.status === 'expired'
@@ -524,7 +524,11 @@ export async function submitWaitlistAccessRequest(
             admissionScore: input.admissionScore,
           });
 
-          if (existing && !isUnqualifiedSignupEntry(existing)) {
+          if (
+            existing &&
+            (shouldPreserveWaitlistDecision(existing) ||
+              !isUnqualifiedSignupEntry(existing))
+          ) {
             return handleExistingEntryResubmission({
               tx,
               existing,

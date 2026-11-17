@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { baseInput } from './fixtures/access-request-input';
+import { baseInput, repeatIntakeCases } from './fixtures/access-request-input';
 
 // Hoisted mocks: the module under test pulls in server-only DB modules at
 // import time; we replace the boundary collaborators here so the unit test
@@ -667,11 +667,13 @@ describe('submitWaitlistAccessRequest', { timeout: 20_000 }, () => {
     expect(notifySlackWaitlist).not.toHaveBeenCalled();
   });
 
-  it.each(['new', 'queued', 'qualified', 'disqualified'] as const)(
-    'preserves returning %s decisions without Slack',
-    async status => {
+  it.each(repeatIntakeCases)(
+    'preserves returning $status/$source decisions without Slack',
+    async ({ status, source, decisionRuleVersion, expectedStatus }) => {
       userRow = { id: 'user-1', userStatus: 'waitlist_pending' };
-      findLatestEntryByEmail.mockReturnValueOnce([{ id: 'entry-1', status }]);
+      findLatestEntryByEmail.mockReturnValueOnce([
+        { id: 'entry-1', status, source, decisionRuleVersion },
+      ]);
 
       const { submitWaitlistAccessRequest } = await import(
         '@/lib/waitlist/access-request'
@@ -679,8 +681,8 @@ describe('submitWaitlistAccessRequest', { timeout: 20_000 }, () => {
       const result = await submitWaitlistAccessRequest(baseInput);
 
       expect(result.outcome).toBe('already_waitlisted');
-      expect(result.status).toBe(status === 'new' ? 'waitlisted' : status);
-      if (status !== 'new')
+      expect(result.status).toBe(expectedStatus);
+      if (expectedStatus !== 'waitlisted')
         expect(
           updatedRows.some(
             row =>

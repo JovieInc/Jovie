@@ -1,3 +1,5 @@
+import { QUALIFICATION_RULE_VERSION } from '@/lib/waitlist/decision';
+import type { WaitlistStatus } from '@/lib/waitlist/state-machine';
 import 'server-only';
 
 import { detectPlatformFromUrl } from '@/lib/utils/social-platform';
@@ -76,4 +78,18 @@ export function buildEntryValues(params: {
     // Store a useful fallback in existing fields without inventing launch scoring.
     primarySocialFollowerCount: null,
   };
+}
+
+/** Preserve a recorded hold/verdict; legacy expiry still follows requeue. */
+export function shouldPreserveWaitlistDecision(entry: {
+  readonly status: WaitlistStatus;
+  readonly decisionRuleVersion: string | null;
+}): boolean {
+  return (
+    (entry.status === 'new' &&
+      entry.decisionRuleVersion === QUALIFICATION_RULE_VERSION) ||
+    entry.status === 'queued' ||
+    entry.status === 'qualified' ||
+    entry.status === 'disqualified'
+  );
 }
