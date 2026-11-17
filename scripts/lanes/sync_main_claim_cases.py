@@ -13,6 +13,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+import atomic_state
 import fix_red_classes as classes
 import fix_red_failure_routing as routing
 import lane_runner as lane
@@ -35,14 +36,19 @@ class SyncClaimTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as name:
             host = lane.Host(state=Path(name))
             head, tip_a, tip_b = 'c' * 40, 'd' * 40, 'e' * 40
-            (host.state / 'class-routes.json').write_text(json.dumps({'25910': {'sync-main': head}}))
+            atomic_state.atomic_write_text(
+                host.state / 'class-routes.json',
+                json.dumps({'25910': {'sync-main': head}}),
+            )
             pr = {'number': 25910, 'headRefOid': head, 'baseRefOid': tip_a, 'body': ''}
             route = {'action': 'sync-main', 'cls': 'tracked-byte-stale'}
 
             def finished(*_args, **_kwargs):
                 # Production sync_main writes this receipt before it returns.
-                (host.state / 'synced.json').write_text(json.dumps(
-                    {'25910': {'from': head, 'ok': True}}))
+                atomic_state.atomic_write_text(
+                    host.state / 'synced.json',
+                    json.dumps({'25910': {'from': head, 'ok': True}}),
+                )
                 return 'synced'
 
             with patch.object(lane.pr_events, 'sync_main', side_effect=finished) as sync:
