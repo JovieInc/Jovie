@@ -1,9 +1,147 @@
 import assert from 'node:assert/strict';
-import { readFile, rm } from 'node:fs/promises';
+import { execFileSync } from 'node:child_process';
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { createServer } from 'node:http';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
 
 import { buildTree, runCrawl, sha } from './fixtures/crawl-harness.mjs';
+import { adoptionFixture } from './fixtures/receipt-adoption.mjs';
+import { createColdVisit } from './load-reuse.mjs';
+import { lookupPublicReceipt } from './receipt-adoption.mjs';
+import { producerScope } from './receipt-producer.mjs';
+import { readPublicAdoption } from './receipt-reuse.mjs';
+
+test('an exact transported stranger observation avoids a real network load while sessions and discovery stay fresh', async t => {
+  const f = adoptionFixture();
+  const calls = [],
+    received = [];
+  const server = createServer((req, res) => {
+    received.push(req.url);
+    res.end('current fixture');
+  });
+  await new Promise(resolve =>
+    server.listen(0, '127.0.0.1', () => resolve(undefined))
+  );
+  t.after(() => new Promise(resolve => server.close(resolve)));
+  const address = server.address();
+  assert.ok(address && typeof address !== 'string');
+  const localOrigin = `http://127.0.0.1:${address.port}`;
+  const packet = lookupPublicReceipt({ ...f });
+  const adoption = readPublicAdoption(
+    Buffer.from(JSON.stringify(packet)).toString('base64'),
+    { ...f.scope, shard: { index: 1, count: 4 } },
+    f.inventory,
+    () => f.now
+  );
+  const loader = createColdVisit(
+    async job => {
+      calls.push(job);
+      await (await fetch(new URL(job.target, localOrigin))).text();
+      return { ...job, status: 200 };
+    },
+    f.scope.target.origin,
+    { adoption }
+  );
+  const job = {
+    route: '/pricing',
+    target: '/pricing',
+    identity: 'stranger',
+    viewport: 'desktop',
+  };
+  const reused = await loader.visit(job);
+  await loader.visit({ ...job, identity: 'signed-in' });
+  await loader.visit({ ...job, target: '/discovery', collect: true });
+  assert.equal(calls.length, 2);
+  assert.equal(
+    received.length,
+    2,
+    'the adopted stranger page made no HTTP request'
+  );
+  assert.equal(reused.measuredAt, '2026-11-17T09:00:00Z');
+  assert.equal(reused.measurementAdoption.runId, 10);
+});
+
+test('producer scope proves the actual clean checkout and manual invocation without session data', async t => {
+  const root = await mkdtemp(join(tmpdir(), 'crawl-producer-'));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const files = [
+    'scripts/product-crawl/crawl.mjs',
+    'docs/product/generated/artist-launch-inventory.json',
+    '.nvmrc',
+    'package.json',
+    'pnpm-lock.yaml',
+    '.github/workflows/postdeploy-probes.yml',
+    'apps/web/scripts/vercel-protected-origin.cjs',
+    'apps/web/scripts/vercel-surface-verifier.cjs',
+    'apps/web/scripts/lighthouse-vercel-bypass.cjs',
+    'scripts/lib/postdeploy-probe-admission.mjs',
+    'scripts/lib/golden-path-cert-reuse.mjs',
+  ];
+  for (const file of files) {
+    await mkdir(join(root, file, '..'), { recursive: true });
+    await writeFile(join(root, file), 'fixture');
+  }
+  const git = args =>
+    execFileSync('git', args, {
+      cwd: root,
+      encoding: 'utf8',
+      timeout: 10000,
+      env: {
+        ...process.env,
+        GIT_CONFIG_GLOBAL: '/dev/null',
+        GIT_CONFIG_NOSYSTEM: '1',
+      },
+      stdio: ['ignore', 'pipe', 'ignore'],
+    });
+  git(['init', '--quiet']);
+  git(['add', '.']);
+  git([
+    '-c',
+    'user.name=Fixture',
+    '-c',
+    'user.email=fixture@example.invalid',
+    'commit',
+    '--quiet',
+    '-m',
+    'fixture',
+  ]);
+  const sourceSha = git(['rev-parse', 'HEAD']).trim();
+  const input = {
+    origin: 'https://jovie-fixture-jovie.vercel.app',
+    sha: sourceSha,
+    deploymentId: 'dpl_fixture',
+  };
+  const env = {
+    GITHUB_REPOSITORY: 'JovieInc/Jovie',
+    GITHUB_EVENT_NAME: 'workflow_dispatch',
+    GITHUB_REF: 'refs/heads/main',
+    GITHUB_WORKFLOW_REF:
+      'JovieInc/Jovie/.github/workflows/postdeploy-probes.yml@refs/heads/main',
+    GITHUB_SHA: sourceSha,
+    GITHUB_RUN_ID: '20',
+    GITHUB_RUN_ATTEMPT: '1',
+    PRIVATE_SESSION: 'never exported',
+  };
+  const scope = producerScope(root, input, env);
+  assert.equal(scope.sourceSha, sourceSha);
+  assert.doesNotMatch(JSON.stringify(scope), /never exported|PRIVATE_SESSION/);
+  assert.equal(
+    producerScope(root, { ...input, sha: 'f'.repeat(40) }, env),
+    null
+  );
+  assert.equal(
+    producerScope(root, input, { ...env, GITHUB_REF: 'refs/heads/foreign' }),
+    null
+  );
+  await writeFile(join(root, files[0]), 'changed producer');
+  assert.equal(
+    producerScope(root, input, env),
+    null,
+    'dirty producer source is unknown'
+  );
+});
 
 async function crawl(t, fixture, opts) {
   const root = await buildTree();
