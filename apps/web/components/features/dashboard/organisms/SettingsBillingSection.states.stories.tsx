@@ -1,7 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { ReactNode } from 'react';
-import { expect, within } from 'storybook/test';
+import { expect, waitFor, within } from 'storybook/test';
 import { queryKeys } from '@/lib/queries/keys';
 import type { BillingStatusData } from '@/lib/queries/useBillingStatusQuery';
 import { SettingsBillingSection } from './SettingsBillingSection';
@@ -119,9 +119,13 @@ export const ErrorUnavailable: Story = {
   ],
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    await expect(
-      canvas.getByRole('button', { name: /Retry billing/ })
-    ).toBeVisible();
+    // The classified retry backoff lands the terminal error a beat after
+    // mount, so poll for the retry affordance instead of asserting once.
+    await waitFor(() =>
+      expect(
+        canvas.getByRole('button', { name: /Retry billing/ })
+      ).toBeVisible()
+    );
   },
 };
 

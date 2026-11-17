@@ -1,4 +1,4 @@
-import { and, eq } from 'drizzle-orm';
+import { and, eq, inArray } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import {
   compareAndSetOperatingRecords,
@@ -39,6 +39,14 @@ export function postgresRecordBackend(): RecordBackend {
         .where(eq(ovieOperatingKv.key, key))
         .limit(1);
       return rows[0]?.value ?? null;
+    },
+    async getMany(keys) {
+      if (keys.length === 0) return new Map<string, unknown>();
+      const rows = await db
+        .select({ key: ovieOperatingKv.key, value: ovieOperatingKv.value })
+        .from(ovieOperatingKv)
+        .where(inArray(ovieOperatingKv.key, [...keys]));
+      return new Map(rows.map(row => [row.key, row.value]));
     },
     async set(key, value) {
       warnIfOverBudget(key, value);

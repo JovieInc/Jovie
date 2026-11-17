@@ -252,7 +252,8 @@ export function overlayWalkFindings(walk) {
  *   closedInProduction?: { prefix: string, reason: string, exact?: boolean }[],
  *   outOfTime?: { loadsLeft: number, resamplesLeft: number } | null,
  *   strangerOnlyShards?: number[],
- *   overlayWalks?: { walks: Parameters<typeof overlayWalkFindings>[0][] },
+ *   traffic?: { admission?: { blocked?: number, visitsNotStarted?: number }, accounting?: unknown },
+ *   overlayWalks?: { walks: (Parameters<typeof overlayWalkFindings>[0] & { stoppedForTime?: boolean, cleanupPending?: boolean, error?: string })[], left?: number, skipped?: unknown[] },
  *   pages: Parameters<typeof pageFindings>[0][] }} receipt
  * @param {{ now?: number, deployedSha?: string }} [opts]
  */
@@ -299,6 +300,22 @@ export function productReady(receipt, opts = {}) {
         `crawl hit its deadline with ${late.resamplesLeft} timing suspects judged on one load`
       );
   }
+  const overlays = receipt?.overlayWalks;
+  const admission = receipt?.traffic?.admission;
+  if (admission?.blocked || admission?.visitsNotStarted)
+    reasons.push(
+      `crawl admission budget stopped ${admission.blocked || 0} request hops and ${admission.visitsNotStarted || 0} visits`
+    );
+  if (overlays?.left || overlays?.skipped?.length)
+    reasons.push(
+      `${overlays.left || overlays.skipped.length} overlay pages not walked before the deadline`
+    );
+  if (overlays?.walks?.some(w => w.stoppedForTime))
+    reasons.push('overlay walks stopped at the deadline');
+  if (overlays?.walks?.some(w => w.error))
+    reasons.push('overlay walks stopped on an error');
+  if (overlays?.walks?.some(w => w.cleanupPending))
+    reasons.push('overlay walk cleanup is unconfirmed');
   if (findings.length) reasons.push(`${findings.length} findings`);
   return { ready: reasons.length === 0, reasons, findings };
 }

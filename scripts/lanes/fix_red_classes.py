@@ -25,6 +25,7 @@ from collections import defaultdict
 from datetime import datetime, timezone
 from pathlib import Path
 
+import fix_red_size_split
 import machine_gap
 import migration_renumber
 import remediation
@@ -45,12 +46,12 @@ from fix_red_render_modes import ACTION as ADMIT_RENDER_MODE, hit as render_mode
 SCHEMA = "jovie-fix-red-class/v1"
 # Actions a class can route to. `agent` is the default (a model run); the others spend no model.
 BIOME_FORMAT = "biome-format"
-RERUN, SYNC_MAIN, WIRE_CI_FAST, RENUMBER, STAMP_CHANGELOG, SNAP_SPACING, STRIP_CACHE, MERGE_NARROWED, REGISTER_DOMAIN, ATOMIC_WRITE, REPAIR_SCREEN_CERT, BALANCE_HEADINGS, UI_FEEL, AGENT, COMPOSE, REPAIR_WIN, SPLIT_SIZE = (
-    "rerun", "sync-main", "wire-ci-fast", "renumber-migrations", "stamp-changelog", "snap-spacing",
+RERUN, SYNC_MAIN, WIRE_CI_FAST, RENUMBER, STAMP_CHANGELOG, STAMP_REPAIR, SNAP_SPACING, STRIP_CACHE, MERGE_NARROWED, REGISTER_DOMAIN, ATOMIC_WRITE, REPAIR_SCREEN_CERT, BALANCE_HEADINGS, UI_FEEL, AGENT, COMPOSE, REPAIR_WIN, SPLIT_SIZE = (
+    "rerun", "sync-main", "wire-ci-fast", "renumber-migrations", "stamp-changelog", "stamp-repair-evidence", "snap-spacing",
     "strip-cache-exports", "merge-narrowed-preflight", "register-domain-writes", "atomic-write", "repair-screen-cert", "balance-headings", "ui-feel", "agent", "compose", "repair-win", "split-size-500")
 DETERMINISTIC = frozenset({
     RERUN, SYNC_MAIN, WIRE_CI_FAST, RENUMBER, STAMP_CHANGELOG, SNAP_SPACING, STRIP_CACHE, MERGE_NARROWED,
-    REGISTER_DOMAIN, ATOMIC_WRITE, REPAIR_SCREEN_CERT, BALANCE_HEADINGS, UI_FEEL, ADMIT_RENDER_MODE, ALIAS_ACTION, REPAIR_WIN, SPLIT_SIZE, BIOME_FORMAT})
+    REGISTER_DOMAIN, ATOMIC_WRITE, REPAIR_SCREEN_CERT, BALANCE_HEADINGS, UI_FEEL, ADMIT_RENDER_MODE, ALIAS_ACTION, REPAIR_WIN, SPLIT_SIZE, BIOME_FORMAT, STAMP_REPAIR})
 
 # remediation.INFRA_TEXT (runner loss, OOM, 5xx) plus the platform failures seen in 52 agent-declined
 # fix runs. Kept out of INFRA_TEXT: the exhausted-PR classifier deliberately routes a rate-limited
@@ -69,6 +70,7 @@ UNWIRED = re.compile(r"Unwired: (.+?)\. Wire each file into a ci-fast lane")
 ATOMIC_TEXT = re.compile(r"use atomic_state\.atomic_write_text for whole-file state")
 BODY_TEXT = re.compile(r"red-before-green:|PR body is missing|missing (?:a )?`?## ?(?:Red-before-green|Blast radius)",
                        re.IGNORECASE)
+FLEET_BODY_ERROR, FLEET_WIN_ERROR = re.compile(r"##\[error\](?:red-before-green:|win:)"), re.compile(r"##\[error\]win:")
 # Source Validation includes passing fixtures that print quota/network errors.
 # A concrete component error needs regression coverage, never an infra retry.
 COMPONENT_TEST_TEXT = re.compile(
@@ -166,6 +168,7 @@ SIGNATURES = (
     ("tracked-byte-stale", TRACKED_BYTE_STALE, SYNC_MAIN),
     ("tree-byte-budget", TREE_BYTE_BUDGET, SYNC_MAIN),
     ("ci-fast-wiring", UNWIRED, WIRE_CI_FAST),
+    ("copy-registry-gap", re.compile(r"✖ committed ID registry covers every extracted row"), SYNC_MAIN),
     # The license error is the job failure. A passing fixture can echo quota text.
     ("dependency-license", DEPENDENCY_LICENSE, AGENT),
     # Before quota/platform: a Source Validation log echoes passing-test rate-limit lines beside the gate that failed the job.
@@ -174,6 +177,7 @@ SIGNATURES = (
     ("platform-infra", PLATFORM_TEXT, RERUN),
     ("migration-number", migration_renumber.LOG_TEXT, RENUMBER),
     ("atomic-write", ATOMIC_TEXT, ATOMIC_WRITE),
+    ("fleet-body", FLEET_BODY_ERROR, STAMP_REPAIR),
     ("measured-win", re.compile(r"needs a measured win \(metric, before, after, method, evidence\)"), REPAIR_WIN),
     ("pr-body", BODY_TEXT, AGENT),
 )
@@ -202,17 +206,22 @@ def classify(pr: dict, logs: dict[str, str] | None = None) -> dict:
     """{cls, key, action, actions, checks, signature, files, repairs}. `logs` maps a failing check name to its failed-job log;
     a check with no log is `other`. A BEHIND branch with nothing deterministic to say is `stale-branch`."""
     logs = logs or {}
-    import detached_native_sync
+    import cert_stub_sync, detached_native_sync
     names = sorted({str(check.get("name")) for check in real_failures(pr)})
     per_check = []
     for name in names:
         text = logs.get(name) or ""
         hit = next(((cls, action) for cls, pattern, action in SIGNATURES if pattern.search(text)), None)
-        per_check.append(detached_native_sync.hit(text) or render_mode_hit(text) or hit or size_500_route(text) or ("other", AGENT))
+        hit = fix_red_size_split.legacy_hit(text, hit)
+        if hit and hit[0] == "fleet-body" and FLEET_WIN_ERROR.search(text):
+            hit = ("fleet-body", AGENT)
+        per_check.append(detached_native_sync.hit(text) or cert_stub_sync.hit(text) or render_mode_hit(text) or hit or size_500_route(text, pr) or ("other", AGENT))
     classes = {cls for cls, _ in per_check}
     actions: list[str] = []
     if len(classes) == 1:
         cls, action = per_check[0]
+    elif classes & {"size-baseline-grew", "copy-registry-gap"} and all(item_action == SYNC_MAIN for _, item_action in per_check):
+        cls, action = BEHIND_CLASS, SYNC_MAIN
     elif classes and all(item_action in DETERMINISTIC for _, item_action in per_check):
         import fix_red_compose
         cls, action, actions = fix_red_compose.composed_route(
@@ -234,6 +243,7 @@ def classify(pr: dict, logs: dict[str, str] | None = None) -> dict:
     owner = alias_owner_metadata(names, logs) if cls == "alias-review-deadline" else None
     if cls == "alias-review-deadline" and owner is None:
         cls, action, signature = "mixed", AGENT, error_signature("\n".join(logs.get(name) or "" for name in names))
+    if cls == "fleet-body" and FLEET_WIN_ERROR.search("\n".join(logs.get(name) or "" for name in names)): action = AGENT
     if action != COMPOSE:
         actions = [action] if action in DETERMINISTIC else []
     from fix_red_compose import repair_files
@@ -437,11 +447,7 @@ def resolve_and_chain_text(text: str) -> str | None:
     pieces = []
     last = 0
     for hunk in hunks:
-        resolved = _resolve_and_chain_hunk(hunk.group("ours"), hunk.group("theirs"))
-        if resolved is None:
-            # A quoted coverage-include brace list is not an opaque && edit.
-            from fix_red_conflict_resolvers import resolve_coverage_include_hunk
-            resolved = resolve_coverage_include_hunk(hunk.group("ours"), hunk.group("theirs"))
+        resolved = _resolve_and_chain_hunk(hunk.group("ours"), hunk.group("theirs")) or __import__("fix_red_conflict_resolvers").resolve_coverage_include_hunk(hunk.group("ours"), hunk.group("theirs"))
         if resolved is None:
             return None
         pieces.append(text[last:hunk.start()])
@@ -666,8 +672,8 @@ def merge_additive_identifier_list(ours: str, theirs: str) -> str | None:
 
 
 def resolve_additive_identifier_list_text(text: str) -> str | None:
-    """Replace conflict hunks that are only a one-line identifier list. None when any
-    hunk has another shape, so the caller leaves that merge to a model."""
+    """Replace hunks that are one identifier list or one quoted pytest path list.
+    None when any hunk has another shape, so the caller leaves that merge to a model."""
     if "<<<<<<<" not in str(text or ""):
         return None
     hunks = list(_NARROWED_HUNK.finditer(text))
@@ -678,7 +684,7 @@ def resolve_additive_identifier_list_text(text: str) -> str | None:
     pieces = []
     last = 0
     for hunk in hunks:
-        merged = merge_additive_identifier_list(hunk.group("ours"), hunk.group("theirs"))
+        merged = merge_additive_identifier_list(hunk.group("ours"), hunk.group("theirs")) or __import__("fix_red_conflict_resolvers").merge_pytest_file_list(hunk.group("ours"), hunk.group("theirs"))
         if merged is None:
             return None
         pieces.append(text[last:hunk.start()])

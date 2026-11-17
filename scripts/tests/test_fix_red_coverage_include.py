@@ -39,6 +39,19 @@ class CoverageIncludeMergeTest(unittest.TestCase):
         drifted = conflict.replace(f'    "test": "{ours}",\n', "    const drifted = true;\n")
         self.assertIsNone(classes.resolve_and_chain_text(drifted))
 
+    def test_unions_quoted_pytest_paths_in_main_order(self):
+        from fix_red_conflict_resolvers import merge_pytest_file_list
+        main = "  'scripts/tests/test_a.py scripts/tests/test_reason_events.py'.split(\n"
+        head = "  'scripts/tests/test_a.py scripts/tests/test_fix_red_coverage_include.py'.split(\n"
+        union = "  'scripts/tests/test_a.py scripts/tests/test_reason_events.py scripts/tests/test_fix_red_coverage_include.py'.split(\n"
+        self.assertEqual(merge_pytest_file_list(head, main), union)
+        conflict = "<<<<<<< HEAD\n" + head + "=======\n" + main + ">>>>>>> origin/main\n"
+        self.assertEqual(classes.resolve_additive_identifier_list_text(conflict), union)
+        self.assertIsNone(merge_pytest_file_list("  'scripts/tests/test_reason_events.py scripts/tests/test_a.py'.split(\n", main))
+        self.assertIsNone(merge_pytest_file_list("  'scripts/tests/test_a.py scripts/tests/test_a.py'.split(\n", main))
+        self.assertIsNone(merge_pytest_file_list(head + main, main))
+        self.assertIsNone(classes.resolve_additive_identifier_list_text(conflict.replace(".split(", ".join(", 1)))
+
 
 if __name__ == "__main__":
     unittest.main()

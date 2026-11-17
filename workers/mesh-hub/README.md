@@ -118,11 +118,4 @@ The probe needs a relay that sends receipts.
 | `GET /v1/agents`, `/v1/status`, `/v1/metrics?hours=` | Directory, presence and alarms, and p50/p95 latency with dead and unhandled counts. |
 | `GET /health` | Public. Returns 503 when the cron sweep is stale. |
 
-The same worker has a bounded Devin adapter. `MESH_KIND=devin bash
-workers/mesh-hub/worker/install-worker.sh` uses the existing installed Devin CLI
-and trusted home workspace with its default account, model and permissions.
-Direct messages need no tools; board execution is disabled for this adapter.
-The real CLI stdout and exported transcript are retained with execution hashes.
-A confirmation refusal, trust failure or nonzero exit is not a reply. The
-consumer never forwards injected hub or unrelated provider secrets to a model
-process. No permission-mode or model override is installed.
+The same worker has a bounded Devin adapter: `MESH_KIND=devin bash workers/mesh-hub/worker/install-worker.sh` uses the existing installed CLI and trusted home workspace with its default account, model and permissions. Direct messages need no tools; board execution is disabled. CLI stdout and the exported transcript are retained with execution hashes. A confirmation refusal, trust failure, or nonzero exit is not a reply. The consumer never forwards hub or unrelated provider secrets to a model process, and installs no permission-mode or model override.

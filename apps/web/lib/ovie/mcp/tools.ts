@@ -38,7 +38,6 @@ import {
   createWorkflowCaptureRequest,
   getWorkflowCaptureReceipt,
 } from '@/lib/workflow-capture/server';
-import stewardshipAudit from '../generated/invariant-stewardship.current-week.json';
 import {
   certificationPasses,
   findProfileCapability,
@@ -58,6 +57,7 @@ import {
   stringList,
   stringOpt,
 } from './handoff';
+import { getInvariantStewardship } from './invariant-stewardship';
 import { newRecordId, type OperatingStore } from './store';
 import {
   INITIATIVE_CONFIDENCE,
@@ -450,7 +450,7 @@ export async function callOvieMcpTool(
     case 'get_org_state':
       return { ok: true, result: await getOrgState(store, args) };
     case 'get_invariant_stewardship':
-      return { ok: true, result: getInvariantStewardship() };
+      return { ok: true, result: await getInvariantStewardship() };
     case 'record_decision':
       return { ok: true, result: await recordDecision(store, args) };
     case 'create_initiative':
@@ -638,27 +638,6 @@ function workflowCaptureToolReceipt(
     ...(receipt.state === 'ready'
       ? { mediaPath: `/api/workflow-captures/${receipt.captureId}/media` }
       : {}),
-  };
-}
-
-function getInvariantStewardship() {
-  return {
-    schemaVersion: stewardshipAudit.schemaVersion,
-    generatedAt: stewardshipAudit.generatedAt,
-    window: stewardshipAudit.window,
-    canonicalRegistry: stewardshipAudit.canonicalRegistry,
-    summary: {
-      candidates: stewardshipAudit.candidates.length,
-      actionableExceptions: stewardshipAudit.declaredFindings.length,
-      founderDecisions: stewardshipAudit.founderQueue.length,
-      sourceGaps: stewardshipAudit.sources.filter(
-        source => source.status !== 'covered' && source.status !== 'excluded'
-      ).length,
-    },
-    summerQueue: stewardshipAudit.declaredFindings,
-    founderQueue: stewardshipAudit.founderQueue,
-    drillDown:
-      'apps/web/lib/ovie/generated/invariant-stewardship.current-week.json' as const,
   };
 }
 

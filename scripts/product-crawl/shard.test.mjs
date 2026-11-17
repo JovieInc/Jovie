@@ -161,3 +161,37 @@ test('a shard that lost its sign-in fails the merged gate', () => {
     `${reasons}`
   );
 });
+
+test('merged receipts preserve the skipped overlay targets and partial cleanup state', () => {
+  const { shards } = fixture(2);
+  shards[0].overlayWalks = {
+    walks: [],
+    left: 1,
+    skipped: [{ route: '/pricing', reason: 'deadline' }],
+  };
+  shards[1].overlayWalks = {
+    walks: [
+      {
+        route: '/',
+        identity: 'stranger',
+        steps: [],
+        stoppedForTime: true,
+        cleanupPending: true,
+      },
+    ],
+    left: 0,
+  };
+  shards[0].measurementReuses = 2;
+  const merged = mergeReceipts(shards);
+  assert.deepEqual(merged.overlayWalks.skipped, [
+    { route: '/pricing', reason: 'deadline' },
+  ]);
+  assert.equal(merged.measurementReuses, 2);
+  const verdict = productReady(merged, {
+    now: Date.parse('2026-11-14T21:00:00Z'),
+  });
+  assert.ok(
+    verdict.reasons.some(reason => reason.includes('overlay pages not walked'))
+  );
+  assert.ok(verdict.reasons.includes('overlay walk cleanup is unconfirmed'));
+});

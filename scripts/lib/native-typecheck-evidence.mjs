@@ -301,6 +301,13 @@ export function seedPlan(root, program) {
   );
 }
 
+/**
+ * @template Result
+ * @param {string} root
+ * @param {Record<string, string>} changes
+ * @param {() => Result | Promise<Result>} run
+ * @returns {Promise<Result>}
+ */
 export async function withMutation(root, changes, run) {
   /** @type {[string, Buffer][]} */
   const originals = Object.keys(changes).map(path => [
