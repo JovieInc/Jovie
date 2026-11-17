@@ -85,10 +85,11 @@ describe('AdminWaitlistTableUnified', () => {
 
     // Converged: no explicit getRowClassName; presets.tableRow + rowState provide hover
     expect(capturedGetRowClassName).toBeUndefined();
-    // Waitlist people use the 32px dense row (JOV-7798).
+    // A decision reason and two-line evidence preview use the canonical
+    // description budget, shared with loading rows and virtualization.
     expect(screen.getByTestId('admin-data-table')).toHaveAttribute(
       'data-row-mode',
-      'dense'
+      'description'
     );
 
     expect(screen.getByText('No waitlist entries').className).toContain(
