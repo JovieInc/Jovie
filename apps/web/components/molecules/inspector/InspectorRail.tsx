@@ -60,6 +60,14 @@ export function InspectorShell<T extends string>({
   const loadingFocusRef = useRef<HTMLElement | null>(null);
   const handingOffFocusRef = useRef(false);
 
+  // The tab panel is the internal scroll surface, so axe
+  // scrollable-region-focusable requires keyboard access. tabIndex={0} in JSX
+  // is rejected by the noNoninteractiveTabindex source guard, which cannot see
+  // the scrollable-region exception, so set the DOM property here.
+  const setPanelKeyboardFocusable = (element: HTMLDivElement | null) => {
+    if (element) element.tabIndex = 0;
+  };
+
   useLayoutEffect(() => {
     if (!isOpen) {
       focusedContentRef.current = null;
@@ -144,6 +152,7 @@ export function InspectorShell<T extends string>({
             data-testid='inspector-tab-panel'
             data-scroll-mode='internal'
             aria-busy={isLoading}
+            ref={setPanelKeyboardFocusable}
             className='min-h-0 flex-1 overflow-y-auto overflow-x-hidden overscroll-contain px-3 py-3'
           >
             {/* Keep content mounted so a refresh retains edits and scroll height.

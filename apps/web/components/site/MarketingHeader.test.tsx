@@ -81,6 +81,16 @@ describe('MarketingHeader states', () => {
     ).toBeGreaterThan(0);
   });
 
+  it('sends the default landing CTA into the one /start flow', () => {
+    render(<MarketingHeader />);
+
+    expect(
+      within(screen.getByRole('banner')).getByRole('link', {
+        name: 'Claim your free profile',
+      })
+    ).toHaveAttribute('href', APP_ROUTES.START);
+  });
+
   it('draws no empty nav row or menu when there are no links', async () => {
     const { container } = render(<MarketingHeader navLinks={[]} />);
 

@@ -1,12 +1,12 @@
 import { NextResponse } from 'next/server';
 import { readProfilePublished } from '@/lib/profile/publication-read';
-import { aliasBudgetProfileModeParams } from '@/lib/routing/alias-budget-static-params';
 import {
   isReservedUsername,
   USERNAME_MAX_LENGTH,
   USERNAME_MIN_LENGTH,
   USERNAME_PATTERN,
 } from '@/lib/validation/username-core';
+import { PROFILE_MODE_PRERENDERED_KEYS } from './generated/profile-mode-prerender-set';
 import { STATIC_TOP_LEVEL_ROUTE_SEGMENTS } from './static-top-level-route-segments';
 
 /**
@@ -154,22 +154,33 @@ const PROFILE_QUERY_MODES = new Set([
  * other handle keeps the canonical render — the pre-JOV-12081 behavior,
  * which is what production serves today — until the fallback-render defect
  * is fixed with deployment-level evidence.
+ *
+ * The budget constant is necessary but not sufficient: the mode documents
+ * only exist when the build could actually prerender them.
+ * getProfileModeRenderStaticParams returns [] when the build has no database
+ * (the daily workflow_dispatch CI build runs without a DATABASE_URL), and an
+ * ISR fallback render for a pair the build did not prerender serves Next's
+ * flight-only __next_error__ shell — no h1, no testids (JOV-12481; observed
+ * in the daily CI lanes and on the /:username/notifications -> ?mode=subscribe
+ * chain the public Lighthouse crawl audits). The rewrite is therefore bounded
+ * by PROFILE_MODE_PRERENDERED_KEYS, written from the build database seconds
+ * before `next build` runs, so a build that could not prerender keeps every
+ * `?mode=` query on the canonical render.
  */
 const PRERENDERED_PROFILE_MODE_PARAMS: ReadonlySet<string> = new Set(
-  aliasBudgetProfileModeParams().map(
-    param => `${param.username}:${param.profileMode}`
-  )
+  PROFILE_MODE_PRERENDERED_KEYS
 );
 
 export function getProfileModeQueryRewrite(
-  request: ProfilePublicationGateRequest
+  request: ProfilePublicationGateRequest,
+  prerenderedPairs: ReadonlySet<string> = PRERENDERED_PROFILE_MODE_PARAMS
 ): NextResponse | null {
   if (request.method !== 'GET' && request.method !== 'HEAD') return null;
   const handle = getGatedProfileHandle(request.nextUrl.pathname);
   if (!handle) return null;
   const mode = request.nextUrl.searchParams.get('mode');
   if (!mode || !PROFILE_QUERY_MODES.has(mode)) return null;
-  if (!PRERENDERED_PROFILE_MODE_PARAMS.has(`${handle}:${mode}`)) return null;
+  if (!prerenderedPairs.has(`${handle}:${mode}`)) return null;
   const rewriteUrl = new URL(
     `/${encodeURIComponent(handle)}/profile-mode-render/${mode}/__profile-mode-alias`,
     request.nextUrl.origin

@@ -1,9 +1,17 @@
 'use client';
 
 import { Button, type ButtonProps } from '@jovie/ui';
+import { Slot } from '@radix-ui/react-slot';
 import { Rocket } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { useEffect, useRef, useState } from 'react';
+import {
+  cloneElement,
+  isValidElement,
+  useEffect,
+  useId,
+  useRef,
+  useState,
+} from 'react';
 import { APP_ROUTES } from '@/constants/routes';
 import { track, useFeatureFlag } from '@/lib/analytics';
 import {
@@ -15,6 +23,8 @@ import { useCheckoutMutation, usePricingOptionsQuery } from '@/lib/queries';
 
 interface UpgradeButtonProps {
   readonly className?: string;
+  /** Compose an existing button (including tooltip triggers), retaining its label and style. */
+  readonly asChild?: boolean;
   readonly children?: React.ReactNode;
   readonly variant?: 'primary' | 'secondary' | 'outline' | 'ghost';
   readonly size?: 'sm' | 'md' | 'lg';
@@ -23,6 +33,7 @@ interface UpgradeButtonProps {
 
 export function UpgradeButton({
   className,
+  asChild = false,
   children = `Upgrade to ${PRO_PLAN_DISPLAY_NAME}`,
   variant = 'primary',
   size = 'md',
@@ -124,27 +135,59 @@ export function UpgradeButton({
     (directUpgradeEnabled && !priceId && pricing.isPending);
   const unavailable = directUpgradeEnabled && !resolvedPriceId && !isLoading;
   const error = checkoutMutation.error;
+  const statusId = useId();
+  const unavailableMessage = 'Checkout is unavailable. Please try again later.';
+  // Slot normally gives child props precedence. Checkout state must still win
+  // when a composed button explicitly supplies disabled={false}.
+  const child =
+    asChild && isValidElement<ButtonProps>(children)
+      ? cloneElement(children, {
+          disabled: isLoading || unavailable || children.props.disabled,
+          'aria-busy': isLoading || children.props['aria-busy'],
+          'aria-describedby':
+            unavailable || error
+              ? statusId
+              : children.props['aria-describedby'],
+          title: unavailable ? unavailableMessage : children.props.title,
+        })
+      : children;
 
   return (
     <div className={className}>
-      <Button
-        onClick={handleClick}
-        type='button'
-        disabled={isLoading || unavailable}
-        variant={variant}
-        size={mappedSize}
-        className='inline-flex items-center gap-2'
-      >
-        <Rocket className='h-4 w-4' />
-        {isLoading ? 'Loading...' : children}
-      </Button>
+      {asChild ? (
+        <Slot onClick={handleClick} aria-busy={isLoading || undefined}>
+          {child}
+        </Slot>
+      ) : (
+        <Button
+          onClick={handleClick}
+          type='button'
+          disabled={isLoading || unavailable}
+          variant={variant}
+          size={mappedSize}
+          className='inline-flex items-center gap-2'
+        >
+          <Rocket className='h-4 w-4' />
+          {isLoading ? 'Loading...' : children}
+        </Button>
+      )}
       {unavailable && (
-        <p role='status' className='mt-2 text-sm text-secondary-token'>
-          Checkout is unavailable. Please try again later.
+        <p
+          id={statusId}
+          role='status'
+          className='mt-2 text-sm text-secondary-token'
+        >
+          {unavailableMessage}
         </p>
       )}
-      {error && (
-        <p className='mt-2 text-sm text-destructive'>
+      {/* The mutation already emits an error toast. Compact composed controls
+          keep an accessible status without expanding their surrounding row. */}
+      {error && !unavailable && (
+        <p
+          id={statusId}
+          role='status'
+          className={asChild ? 'sr-only' : 'mt-2 text-sm text-destructive'}
+        >
           {error instanceof Error ? error.message : 'Failed to start checkout'}
         </p>
       )}

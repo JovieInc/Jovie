@@ -1,0 +1,88 @@
+{
+  "gates": {
+    "apps/web/components/features/dashboard/organisms/releases/components/AddProviderUrlPopover.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/dashboard/organisms/shopify/ShopifyStoreCard.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/dashboard/organisms/tour-dates/TourDatesEmptyState.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/dashboard/release-tasks/CatalogTaskBuilderDialog.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/dashboard/release-tasks/ReleaseTaskAssigneeBadge.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/dashboard/release-tasks/ReleaseTaskCategoryGroup.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/dashboard/release-tasks/ReleaseTaskChecklist.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/dashboard/release-tasks/ReleaseTaskPastReleaseState.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ]
+  },
+  "waivers": {
+    "apps/web/components/features/dashboard/organisms/shopify/ShopifyStoreCard.tsx": {
+      "permission-denied": "Any signed-in artist can link a store; the card has no role, plan or gated action. The detector matched role='status' on the loading skeleton."
+    },
+    "apps/web/components/features/dashboard/release-tasks/ReleaseTaskAssigneeBadge.tsx": {
+      "long-content": "The badge label is fixed to 'Me' or 'Jovie' by assigneeType, so no caller can pass long text. The detector matched the label prop passed to DotBadge."
+    },
+    "apps/web/components/features/dashboard/release-tasks/ReleaseTaskPastReleaseState.tsx": {
+      "empty": "The past-release state takes no collection to empty; it renders fixed copy and one action. The detector matched the items-center class on its wrapper.",
+      "permission-denied": "Anyone who owns the release can generate a plan; there is no role or gated action. The detector matched the word Plan in the copy 'Generate Release Plan Anyway'."
+    }
+  }
+}

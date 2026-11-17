@@ -254,7 +254,7 @@ surfaces:
 
 > **Question this answers:** "Which surfaces in the codebase carry the highest blast radius if they break, and what coverage do they require?"
 
-> This file is the **input taxonomy** for the risk-based testing strategy. The auto-generated heatmap at [`TEST_COVERAGE_HEATMAP.md`](TEST_COVERAGE_HEATMAP.md) joins these rows with measured coverage to produce a prioritized action list.
+> This file is the **input taxonomy** for the risk-based testing strategy. The daily artifact-backed heatmap (restore it using [testing guidelines](TESTING_GUIDELINES.md)) joins these rows with measured coverage to produce a prioritized action list.
 
 ## Scoring
 

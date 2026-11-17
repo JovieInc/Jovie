@@ -173,26 +173,24 @@ describe('Button', () => {
   });
 
   it('locks the ActionButton contract while allowing native text growth', () => {
-    const source = readFileSync(path.join(process.cwd(), 'atoms/button.tsx'), {
-      encoding: 'utf8',
-    });
-
     expect(ACTION_BUTTON_VISIBLE_HEIGHT_PX).toBe(28);
     expect(ACTION_BUTTON_MOBILE_HIT_TARGET_PX).toBe(44);
     expect(ACTION_BUTTON_LABEL_WEIGHT).toBe(510);
     expect(ACTION_BUTTON_RADIUS_PX).toBe(999);
-    expect(source).toContain('[font-weight:var(--font-weight-medium)]');
-    expect(source).toContain('rounded-full');
-    const textContract = source.match(
-      /const TEXT_BUTTON_CLASSES =\s*'([^']+)'/
-    )?.[1];
-    expect(textContract).toBeTruthy();
-    expect(textContract).toContain('h-auto');
-    expect(textContract).toContain('min-h-7');
-    expect(textContract).toContain('before:h-full');
-    expect(textContract).toContain('before:min-h-11');
-    expect(textContract).toContain('before:min-w-11');
-    expect(textContract).not.toMatch(/\bh-8\b|\bmin-h-8\b/);
+    render(<Button>Grow with the label</Button>);
+    const control = screen.getByRole('button', { name: 'Grow with the label' });
+    expect(control).toHaveClass(
+      '[font-weight:var(--font-weight-medium)]',
+      'rounded-full',
+      'h-auto',
+      'min-h-7',
+      'before:h-full',
+      'before:min-h-11',
+      'before:min-w-11'
+    );
+    for (const fixedHeight of ['h-8', 'min-h-8']) {
+      expect(control).not.toHaveClass(fixedHeight);
+    }
   });
 
   it('keeps the marketing text contract at 28px visible inside a 44px target', () => {

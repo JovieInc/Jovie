@@ -69,7 +69,13 @@ const IS_LOCAL_AUTH_BYPASS =
   process.env.NEXT_PUBLIC_AUTH_PROXY_DISABLED === '1';
 const IS_REQUIRED_GOLDEN_PATH = process.env.GOLDEN_PATH_REQUIRED === '1';
 
-/** Auth is real from this journey; Insight responses below are presentation fixtures. */
+/**
+ * Auth is real from this journey; the Insight response below is a fixture.
+ * Nov 14: an active AI insight used to become a chore ("Review your tip flow
+ * with Jovie" + "Draft This With Jovie"). Home now shows only finished work on
+ * a real item, so with an insight and no finished result it shows the
+ * greeting and composer alone.
+ */
 async function verifyHomeWelcome(page: Page) {
   const insight = {
     id: 'home-tip-fixture',
@@ -86,11 +92,6 @@ async function verifyHomeWelcome(page: Page) {
     createdAt: new Date().toISOString(),
     expiresAt: new Date(Date.now() + 3_600_000).toISOString(),
   };
-  let mode: 'action' | 'empty' | 'error' = 'action';
-  let releaseSummary: () => void = () => {};
-  const ready = new Promise<void>(resolve => {
-    releaseSummary = resolve;
-  });
   let chatPosts = 0;
   const watchPosts = (request: import('@playwright/test').Request) => {
     if (
@@ -100,44 +101,22 @@ async function verifyHomeWelcome(page: Page) {
       chatPosts++;
   };
   page.on('request', watchPosts);
-  await page.route('**/api/insights/summary', async route => {
-    await ready;
-    if (mode === 'error') {
-      await route
-        .fulfill({
-          status: 500,
-          json: { error: 'Controlled summary failure' },
-        })
-        .catch(() => {});
-      return;
-    }
-    // An earlier aborted summary must not reject the live fulfill.
-    await route
+  await page.route('**/api/insights/summary', route =>
+    route
       .fulfill({
         json: {
-          insights:
-            mode === 'empty'
-              ? []
-              : [
-                  {
-                    ...insight,
-                    id: 'expired',
-                    expiresAt: new Date(Date.now() - 1000).toISOString(),
-                  },
-                  insight,
-                ],
-          totalActive: mode === 'empty' ? 0 : 1,
+          insights: [insight],
+          totalActive: 1,
           lastGeneratedAt: new Date().toISOString(),
         },
       })
-      .catch(() => {});
-  });
+      .catch(() => {})
+  );
   const heading = page.getByTestId('chat-empty-state-greeting-text');
   const input = page.getByRole('textbox', {
     name: 'Chat message input',
     exact: false,
   });
-  const nextStep = page.getByTestId('chat-empty-state-next-step');
   const measureCenter = () =>
     page.evaluate(() => {
       const group = document.querySelector(
@@ -157,13 +136,21 @@ async function verifyHomeWelcome(page: Page) {
         tolerance: Math.max(4, (bottom - top) * 0.02),
       };
     });
+  const assertNoChore = async () => {
+    await expect(page.getByTestId('chat-empty-state-result')).toHaveCount(0);
+    await expect(page.getByText(insight.title, { exact: true })).toHaveCount(0);
+    await expect(page.getByText(/tip flow/i)).toHaveCount(0);
+    await expect(page.getByText('Finding your next step…')).toHaveCount(0);
+    await expect(
+      page.getByRole('button', { name: 'Draft This With Jovie' })
+    ).toHaveCount(0);
+    await expect(
+      page.getByRole('link', { name: 'Review Your Profile' })
+    ).toHaveCount(0);
+  };
   const assertGeometry = async () => {
-    // Clearing the starter shrinks the composer through a Motion size layout
-    // transition; audit the settled box, not a mid-tween frame.
     await waitForStableGeometry(page, '[data-testid="chat-composer-surface"]');
-    const selectors = [
-      '[data-testid="chat-empty-state-next-step"] button, [data-testid="chat-empty-state-next-step"] a',
-    ];
+    const selectors: string[] = [];
     for (const button of await page
       .getByTestId('chat-composer-surface')
       .getByRole('button')
@@ -186,7 +173,6 @@ async function verifyHomeWelcome(page: Page) {
       await inspectEssentialViewport(page, [
         ...selectors,
         '[data-testid="chat-empty-state-greeting-text"]',
-        '[data-testid="chat-empty-state-next-step"]',
         '[data-testid="chat-composer-surface"]',
         '[aria-label="Chat message input" i]',
       ])
@@ -197,9 +183,8 @@ async function verifyHomeWelcome(page: Page) {
       expect(centering.delta).toBeLessThanOrEqual(centering.tolerance);
     await expect(heading).toHaveCount(1);
     await expect(heading).toContainText(TEST_SPOTIFY_ARTIST.name.split(' ')[0]);
-    await expect(nextStep).toHaveCount(1);
     await expect(page.getByTestId('chat-empty-state-sample')).toHaveCount(0);
-    await expect(page.getByText(insight.title, { exact: true })).toHaveCount(0);
+    await assertNoChore();
   };
   try {
     for (const viewport of [
@@ -212,20 +197,20 @@ async function verifyHomeWelcome(page: Page) {
       await page.emulateMedia({
         reducedMotion: viewport.width === 615 ? 'reduce' : 'no-preference',
       });
-      const { initialGreeting, before } = await openHomeWelcome(
-        page,
-        viewport.width === 1440 ? releaseSummary : undefined
-      );
-      const action = page.getByRole('button', {
-        name: 'Draft This With Jovie',
-      });
-      await expect(action).toBeVisible();
-      await expect(nextStep.locator('[data-insight-id]')).toHaveAttribute(
-        'data-insight-id',
-        insight.id
-      );
+      const { initialGreeting, before } = await openHomeWelcome(page);
       await expect(heading).toHaveText(initialGreeting!);
-      const after = await input.boundingBox();
+      // Same chunk-swap race as the helper's `before` read: re-read the box
+      // until the mounted composer yields a real one, never a single sample.
+      let after: import('@playwright/test').BoundingBox | null = null;
+      await expect
+        .poll(
+          async () => {
+            after = await input.boundingBox();
+            return after;
+          },
+          { timeout: 15_000, message: 'mounted composer box' }
+        )
+        .not.toBeNull();
       expect(before).not.toBeNull();
       expect(after).not.toBeNull();
       if (before && after) {
@@ -250,17 +235,7 @@ async function verifyHomeWelcome(page: Page) {
         }, previousStyle);
         await assertGeometry();
       }
-      await action.focus();
-      await page.keyboard.press('Enter');
-      await expect(input).toHaveValue(new RegExp(`Insight ${insight.id}:`));
-      await expect(input).toBeFocused();
-      expect(chatPosts).toBe(0);
-      await input.fill('');
-      await assertGeometry();
       await page.waitForTimeout(1000); // Idle effects are part of the contract.
-      await assertGeometry();
-      await page.reload();
-      await expect(action).toBeVisible();
       await assertGeometry();
       expect(chatPosts).toBe(0);
       if (process.env.GOLDEN_PATH_KEYFRAME_DIR)
@@ -268,19 +243,7 @@ async function verifyHomeWelcome(page: Page) {
           expectedArtistName: TEST_SPOTIFY_ARTIST.name,
         });
     }
-    for (const state of ['empty', 'error'] as const) {
-      mode = state;
-      await page.goto(APP_ROUTES.CHAT);
-      await expect(
-        page.getByRole('link', { name: 'Review Your Profile' })
-      ).toBeVisible({ timeout: 30_000 });
-      await expect(
-        page.getByRole('button', { name: 'Draft This With Jovie' })
-      ).toHaveCount(0);
-      await assertGeometry();
-    }
   } finally {
-    releaseSummary();
     page.off('request', watchPosts);
     await page.unroute('**/api/insights/summary');
     await page.setViewportSize({ width: 1280, height: 720 });

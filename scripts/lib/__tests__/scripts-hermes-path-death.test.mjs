@@ -10,7 +10,7 @@ function citations() {
   const result = spawnSync(
     'git',
     ['grep', '-n', '-I', DEAD, '--', ':(exclude)CHANGELOG.md'],
-    { cwd: ROOT, encoding: 'utf8' }
+    { maxBuffer: 256 * 1024 * 1024, cwd: ROOT, encoding: 'utf8' }
   );
   if (result.status === 1) return [];
   if (result.status !== 0) throw new Error(result.stderr);

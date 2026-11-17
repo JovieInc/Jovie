@@ -192,7 +192,7 @@ export const ShopifyStoreCard = memo(function ShopifyStoreCard() {
 
         {saveState === 'success' && (
           <output
-            className='flex items-center gap-2 rounded-lg border border-emerald-500/15 bg-emerald-500/6 px-3 py-2 text-app font-caption text-emerald-700 dark:text-emerald-300'
+            className='flex items-center gap-2 rounded-lg border border-success/15 bg-success/6 px-3 py-2 text-app font-caption text-success-text'
             aria-live='polite'
           >
             <Check className='h-3.5 w-3.5' />

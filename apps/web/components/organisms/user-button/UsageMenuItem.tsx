@@ -1,7 +1,14 @@
 'use client';
 
 // @coverage-via apps/web/tests/unit/user-button/UsageMenuItem.test.tsx
-import { Button } from '@jovie/ui';
+import {
+  Button,
+  INSET_PANEL_ICON_COLUMN,
+  INSET_PANEL_LABEL,
+  INSET_PANEL_ROW_INTERACTIVE,
+  INSET_PANEL_ROW_LAYOUT,
+  INSET_PANEL_TRAILING,
+} from '@jovie/ui';
 import { ChevronDown, ChevronRight, ExternalLink, Gauge } from 'lucide-react';
 import Link from 'next/link';
 import { type ReactNode, useEffect, useId, useRef, useState } from 'react';
@@ -17,6 +24,7 @@ import { env } from '@/lib/env-client';
 import { useChatUsageQuery } from '@/lib/queries';
 import type { ChatUsageData } from '@/lib/queries/useChatUsageQuery';
 import { cn } from '@/lib/utils';
+import { ACCOUNT_LOADING_FILL } from './account-loading-fill';
 
 interface UsageMenuItemProps {
   readonly usageStatsUrl: string;
@@ -154,27 +162,37 @@ export function UsageMenuItem({
         onClick={toggleExpanded}
         aria-expanded={expanded}
         aria-controls={detailsId}
-        className='min-h-8 w-full justify-start gap-2 rounded-none px-2.5 py-1.5 text-left text-app font-normal text-secondary-token hover:text-secondary-token focus-visible:bg-interactive-hover'
+        className={cn(
+          INSET_PANEL_ROW_LAYOUT,
+          INSET_PANEL_ROW_INTERACTIVE,
+          // Button wraps its children in an inline content span. Flatten it
+          // so the icon, label and value are the row's own flex items: the
+          // icon lands in the shared column and the value right-aligns.
+          'w-full justify-start text-left font-normal [&>span]:contents'
+        )}
       >
-        <span className='flex h-4 w-4 shrink-0 items-center justify-center text-tertiary-token'>
+        <span className={INSET_PANEL_ICON_COLUMN}>
           <Gauge className='h-4 w-4' aria-hidden />
         </span>
-        <span className='min-w-0 flex-1'>Usage remaining</span>
-        <span className='shrink-0 tabular-nums text-tertiary-token'>
+        <span className={INSET_PANEL_LABEL}>Usage Remaining</span>
+        <span data-testid='usage-menu-value' className={INSET_PANEL_TRAILING}>
           {isLoading ? (
             <span
-              className='inline-block h-3 w-8 animate-pulse rounded bg-surface-2 motion-reduce:animate-none'
+              className={cn(
+                'inline-block h-3 w-8 animate-pulse rounded motion-reduce:animate-none',
+                ACCOUNT_LOADING_FILL
+              )}
               aria-hidden
             />
           ) : (
             collapsedUsageLabel
           )}
+          {expanded ? (
+            <ChevronDown className='h-4 w-4' aria-hidden />
+          ) : (
+            <ChevronRight className='h-4 w-4 rtl:rotate-180' aria-hidden />
+          )}
         </span>
-        {expanded ? (
-          <ChevronDown className='h-3.5 w-3.5 shrink-0 text-tertiary-token' />
-        ) : (
-          <ChevronRight className='h-3.5 w-3.5 shrink-0 text-tertiary-token' />
-        )}
       </Button>
 
       {expanded ? (
@@ -233,7 +251,7 @@ export function UsageMenuItem({
                 'inline-flex items-center gap-1 text-2xs text-secondary-token transition-colors hover:text-primary-token'
               )}
             >
-              Learn more
+              Learn More
               <ExternalLink className='h-3 w-3' aria-hidden />
             </Link>
           </div>

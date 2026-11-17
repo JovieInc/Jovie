@@ -16,6 +16,7 @@ def pr(*names, merge="BLOCKED"):
 class ClassifyTest(unittest.TestCase):
     def test_signatures_map_to_classes_and_actions(self):
         cases = {
+            "[lint:ui-feel] new violations on lines this change adds:\n  a.tsx:1  missingTabularNums\ngithub-quota-deferred": ("ui-feel", "ui-feel"),
             "github-quota-deferred; fleet evidence retry": ("quota-deferred", "rerun"),
             "HttpError: API rate limit exceeded for installation": ("platform-infra", "rerun"),
             "Could not fetch gitleaks after 3 attempts (https://example.invalid/gitleaks.tar.gz).": ("platform-infra", "rerun"),
@@ -607,7 +608,6 @@ class T(unittest.TestCase):
         path = Path(__file__).resolve().parents[1] / "tests" / "test_lane_runner.py"
         text = path.read_text()
         self.assertEqual(classes.complete_release_identity_stubs(text), text)
-
 
 if __name__ == "__main__":
     unittest.main()
