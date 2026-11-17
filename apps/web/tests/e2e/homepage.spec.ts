@@ -116,7 +116,15 @@ test.describe('Homepage', () => {
     await expect(close.getByTestId('waitlist-role-form')).toHaveCount(0);
     const cta = close.getByTestId('homepage-close-cta');
     await expect(cta).toBeVisible();
-    await expect(cta).toHaveAttribute('href', getClaimProfileIntent().href);
+    await expect(cta).toHaveAttribute('type', 'submit');
+    await expect(close.getByTestId('homepage-claim-entry')).toHaveAttribute(
+      'method',
+      'get'
+    );
+    await expect(close.getByTestId('homepage-claim-entry')).toHaveAttribute(
+      'action',
+      getClaimProfileIntent().href
+    );
   });
 
   test('mounts hero, profile, releases, and the claim close in order', async ({
@@ -463,8 +471,16 @@ test.describe('Homepage without JavaScript', () => {
       await expect(
         page
           .locator(`#${HOMEPAGE_INVITE_ANCHOR}`)
-          .getByTestId('homepage-close-cta')
-      ).toHaveAttribute('href', getClaimProfileIntent().href);
+          .getByTestId('homepage-claim-entry')
+      ).toHaveAttribute('action', getClaimProfileIntent().href);
+      await expect(page.getByTestId('homepage-claim-entry')).toHaveAttribute(
+        'method',
+        'get'
+      );
+      await expect(page.getByTestId('homepage-close-cta')).toHaveAttribute(
+        'type',
+        'submit'
+      );
     } finally {
       await context.close();
     }
