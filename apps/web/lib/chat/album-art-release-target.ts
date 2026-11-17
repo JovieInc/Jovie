@@ -47,8 +47,7 @@ export async function resolveAlbumArtReleaseTarget(
     };
   }
 
-  // Exact tiers first: local exact, then the owned catalog beyond the slice.
-  // A local fuzzy match must not suppress a full-catalog exact match.
+  // Full-catalog exact must beat a loaded partial.
   const exact = await resolveChatRelease(profileId, releases, {
     releaseTitle: input.releaseTitle,
     match: 'exact',
