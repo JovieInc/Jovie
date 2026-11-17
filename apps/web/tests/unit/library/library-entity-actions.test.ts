@@ -229,6 +229,7 @@ describe('library entity actions', () => {
       'open-primary',
       'copy',
       'ask-jovie',
+      'draft-promotion',
     ]);
 
     const visibility = actions.find(
@@ -277,6 +278,7 @@ describe('library entity actions', () => {
       'open-primary',
       'copy',
       'ask-jovie',
+      'draft-promotion',
       'archive',
     ]);
   });
