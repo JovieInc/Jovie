@@ -116,13 +116,20 @@ async function openContext({ viewport, identity }) {
   if (BYPASS)
     await ctx.route(
       u => u.host === host,
-      r =>
-        r.continue({
-          headers: {
-            ...r.request().headers(),
-            'x-vercel-protection-bypass': BYPASS,
-          },
-        })
+      // A rejected continuation must not kill the crawl before its receipt.
+      // visit() still records failed navigation and HTTP error outcomes.
+      async r => {
+        try {
+          await r.continue({
+            headers: {
+              ...r.request().headers(),
+              'x-vercel-protection-bypass': BYPASS,
+            },
+          });
+        } catch {
+          // Keep reporting; catching this does not certify the page as ready.
+        }
+      }
     );
   return ctx;
 }
@@ -230,6 +237,36 @@ const safeVisit = job =>
     return { route, url: target, identity, viewport, error };
   });
 
+// Discovery already takes a cold, observed load. Reuse that measurement only
+// inside this invocation, with the same identity, viewport, target and fixture.
+// Rechecks always call safeVisit directly and retain their independent cold jar.
+const coldLoads = new Map();
+let measurementReuses = 0;
+const coldVisit = async job => {
+  const key = JSON.stringify([
+    job.identity,
+    job.viewport,
+    new URL(job.target, args.origin).href,
+    job.fixture ?? null,
+  ]);
+  const cached = coldLoads.get(key);
+  if (cached && Date.now() - cached.at < 5 * 60_000) {
+    const row = await cached.promise;
+    if (
+      !row.error &&
+      row.status >= 100 &&
+      row.status < 400 &&
+      (!job.collect || row.collected)
+    ) {
+      measurementReuses++;
+      return { ...row, route: job.route, measurementReused: true };
+    }
+  }
+  const promise = safeVisit(job);
+  coldLoads.set(key, { at: Date.now(), promise });
+  return promise;
+};
+
 // Real values for dynamic routes (sample-params.mjs): repo constants, the
 // deployed sitemap, and links on pages read first (they are crawled too).
 const signedIn = Boolean(args['storage-state']);
@@ -261,7 +298,7 @@ for (let attempt = 1; attempt <= 2; attempt++) {
 if (sitemapProblem) console.warn(`[crawl] /sitemap.xml: ${sitemapProblem}`);
 const seen = [];
 const look = (target, identity) =>
-  safeVisit({
+  coldVisit({
     route: target,
     target,
     viewport: 'desktop',
@@ -333,7 +370,7 @@ for (let i = 0; i < todo.length; i += 4) {
     break;
   }
   const batch = todo.slice(i, i + 4);
-  const rows = await Promise.all(batch.map(safeVisit));
+  const rows = await Promise.all(batch.map(coldVisit));
   rows.forEach((row, k) => jobs.set(row, batch[k]));
   pages.push(...rows);
   if ((i / 4) % 25 === 24)
@@ -402,6 +439,7 @@ const overlayWalks = await runOverlayWalks({
   out: args.out,
   openContext,
   pastDeadline,
+  deadlineEpochMs: DEADLINE,
   skip: skipSignedIn,
   // Each shard walks its own pages; together they walk about one crawl's worth.
   max: Math.max(1, Math.ceil(MAX_WALKS_PER_IDENTITY / shard.count)),
@@ -423,6 +461,7 @@ const receipt = {
   closedInProduction,
   outOfTime: loadsLeft || resamplesLeft ? { loadsLeft, resamplesLeft } : null,
   overlayWalks,
+  measurementReuses,
   pages,
 };
 const verdict = productReady(receipt);

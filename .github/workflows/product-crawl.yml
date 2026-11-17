@@ -26,6 +26,13 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+      - name: Establish crawl deadline
+        run: |
+          set -euo pipefail
+          # Reserve four minutes for receipt writing, reviewed uploads and cleanup.
+          deadline_s=$(( $(date +%s) + 30 * 60 - 240 ))
+          echo "CRAWL_DEADLINE_EPOCH_MS=$(( deadline_s * 1000 ))" >> "$GITHUB_ENV"
+          echo "Crawl stops starting page loads at epoch ms $(( deadline_s * 1000 ))"
       - uses: ./.github/actions/setup-node-pnpm
       - uses: ./.github/actions/setup-playwright
       - name: Crawl production as a stranger
