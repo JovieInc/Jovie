@@ -5,6 +5,7 @@ import {
   ContextMenuContent,
   ContextMenuItem,
   ContextMenuTrigger,
+  PlainButton,
 } from '@jovie/ui';
 import { Copy, ExternalLink } from 'lucide-react';
 import Link from 'next/link';
@@ -96,7 +97,7 @@ function NavMenuInteractiveElement({
 }: NavMenuInteractiveElementProps) {
   if (renderAsButton) {
     return (
-      <button
+      <PlainButton
         type='button'
         onClick={onButtonClick}
         onPointerDown={onPressStart}
@@ -110,7 +111,7 @@ function NavMenuInteractiveElement({
         className={className}
       >
         {children}
-      </button>
+      </PlainButton>
     );
   }
 

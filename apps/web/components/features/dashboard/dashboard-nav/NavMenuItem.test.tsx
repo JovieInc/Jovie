@@ -210,4 +210,22 @@ describe('NavMenuItem', () => {
     expect(source).toContain("@/components/organisms/sidebar'");
     expect(source).not.toContain(`@/components/organisms/${'Sidebar'}'`);
   });
+
+  it('renders the button row on the headless PlainButton atom', () => {
+    render(
+      <NavMenuItem
+        item={{
+          id: 'library',
+          name: 'Library',
+          href: '/app/library',
+          icon: Music,
+        }}
+        isActive={false}
+        renderAsButton
+      />
+    );
+    const button = screen.getByRole('button', { name: 'Library' });
+    expect(button).toHaveAttribute('data-slot', 'plain-button');
+    expect(button).toHaveAttribute('type', 'button');
+  });
 });
