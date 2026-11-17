@@ -1455,27 +1455,7 @@ export {
   userInterviews,
 } from './user-interviews';
 // Waitlist
-export {
-  insertWaitlistAuditLogSchema,
-  insertWaitlistEntrySchema,
-  insertWaitlistInviteSchema,
-  insertWaitlistSettingsSchema,
-  type NewWaitlistAuditLog,
-  type NewWaitlistEntry,
-  type NewWaitlistInvite,
-  selectWaitlistAuditLogSchema,
-  selectWaitlistEntrySchema,
-  selectWaitlistInviteSchema,
-  selectWaitlistSettingsSchema,
-  type WaitlistAuditLog,
-  type WaitlistEntry,
-  type WaitlistInvite,
-  type WaitlistSettings,
-  waitlistAuditLogs,
-  waitlistEntries,
-  waitlistInvites,
-  waitlistSettings,
-} from './waitlist';
+export * from './waitlist';
 // Apple Wallet profile passes
 export {
   type AppleWalletPassDevice,
