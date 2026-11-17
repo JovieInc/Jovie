@@ -17,6 +17,7 @@ import {
 } from '@/lib/db/schema/creator-documents';
 import {
   CatalogSelectionUnavailable,
+  hasCapturedPromotion,
   promotionCaptureSql,
 } from './catalog-promotion';
 
@@ -202,12 +203,21 @@ export async function captureCreatorIdea(input: {
     from target_document
     left join inserted_revision
       on inserted_revision."document_id" = target_document."id"
-    ${source?.confirmed ?? drizzleSql.empty()}
   `);
   const result = captured.rows[0];
   if (!result?.documentId) {
     if (selected) throw new CatalogSelectionUnavailable();
     throw new Error('Idea capture did not persist');
+  }
+  // A competing insert may have committed while the upsert was waiting.
+  // Read its relationship in a fresh snapshot before confirming the replay.
+  if (selected && !result.created) {
+    const linked = await hasCapturedPromotion(
+      input.creatorProfileId,
+      result.documentId,
+      selected.releaseId
+    );
+    if (!linked) throw new CatalogSelectionUnavailable();
   }
   return { documentId: result.documentId, deduplicated: !result.created };
 }
