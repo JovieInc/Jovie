@@ -36,10 +36,7 @@ const NAMED_CANDIDATE_LIMIT = 20;
 /** Named releases appended to the discography section. */
 const NAMED_PROMPT_LIMIT = 3;
 
-/**
- * Unquoted single-word titles shorter than this are too easy to false-match
- * ("love", "single"). Quoted titles and multi-word titles stay eligible.
- */
+/** Require longer unquoted single-word titles; quoted/multi-word titles stay eligible. */
 const UNQUOTED_SINGLE_WORD_MIN = 8;
 
 function releaseColumns() {
@@ -94,19 +91,9 @@ async function queryOwnedReleases(
 }
 
 /**
- * Owned release lookup for chat tool executors, against the FULL catalog
- * rather than the per-turn prompt slice (dogfood 2026-11-10: a release past
- * the 50-row slice was reported as "not found").
- *
- * - Scoped to `profileId` and live rows only (soft-deleted/archived excluded),
- *   so a lookup can never resolve another artist's release.
- * - Title matching: exact (case-insensitive) first, then substring. Both
- *   tiers order `releaseDate DESC NULLS LAST` with an id tiebreaker so
- *   duplicate or undated titles resolve deterministically (known dates first).
- * - Returns identity + catalog identifiers + provider links so tool output
- *   can ground statements about the release with evidence.
- * - Throws on DB failure: callers surface an error/unavailable outcome
- *   rather than a false "not found".
+ * Read a live, profile-owned release beyond the prompt slice, with identifiers
+ * and bounded provider evidence. Prefer case-insensitive literal titles over
+ * escaped substrings; known dates then ID break ties. DB failures propagate.
  */
 export async function findOwnedReleaseForChat(
   profileId: string,
@@ -197,15 +184,8 @@ function matchesPartial(release: ReleaseContext, title: string): boolean {
 }
 
 /**
- * Resolve a release the artist referenced by id or title, with explicit
- * precedence (dogfood 2026-11-10, Astra review): local exact → owned database
- * exact → local partial → owned database partial. A local substring match
- * (e.g. a loaded "Title — Remix") must never beat a full-catalog exact match
- * ("Title" beyond the loaded slice).
- *
- * `match: 'exact'` stops after the exact tiers, for callers with their own
- * ambiguity handling. DB failures propagate so callers never answer a false
- * "not found".
+ * Prefer local exact → owned exact → local partial → owned partial.
+ * `match: 'exact'` stops before partials. DB failures remain visible.
  */
 export async function resolveChatRelease(
   profileId: string | null,
@@ -257,11 +237,8 @@ export async function resolveChatRelease(
 }
 
 /**
- * Resolve `@release:<id>` entity tokens whose ids are missing from the loaded
- * slice, through the same ownership-scoped query (Astra review: beyond-slice
- * token hydration). Bounded and deduplicated; supplements hydration input
- * only — it never inflates catalog counts or lifts the prompt cap. Token
- * labels are never trusted; ids are resolved against the owned catalog.
+ * Hydrate bounded, deduplicated owned token IDs beyond the loaded slice.
+ * Ignore token labels; catalog counts and prompt limits never change.
  */
 export async function resolveOwnedReleaseTokensForHydration(
   releases: readonly ReleaseContext[],
@@ -334,10 +311,8 @@ function toReleaseContext(row: ReleaseRow): ReleaseContext {
 }
 
 /**
- * Releases the artist named in prose that are not already in the shown
- * discography rows. Loaded-but-unshown rows are matched in memory; anything
- * past the loaded slice is one profile-scoped scan. Callers must skip this
- * when the catalog read itself failed.
+ * Resolve unshown named releases from loaded rows or one owned catalog scan.
+ * Callers skip this when the catalog read failed.
  */
 export async function resolveNamedOwnedReleasesForPrompt(
   releases: readonly ReleaseContext[],
