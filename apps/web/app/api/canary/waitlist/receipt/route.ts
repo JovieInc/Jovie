@@ -185,7 +185,9 @@ export async function GET(request: Request) {
     if (
       !entry ||
       !exactEntryClaim ||
-      entry.status !== 'waitlisted' ||
+      // Mom Test funnel: a gate-held canary lands `queued` (our readiness),
+      // legacy resubmits keep `waitlisted`.
+      (entry.status !== 'queued' && entry.status !== 'waitlisted') ||
       entry.source !== 'waitlist_form' ||
       !entry.canonical ||
       appUser?.waitlistEntryId !== entryId ||

@@ -413,7 +413,7 @@ describe('POST /api/onboarding/claim — race, idempotency, failure paths', () =
     });
     mockSubmitWaitlistAccessRequest.mockResolvedValue({
       entryId: 'entry-1',
-      status: 'waitlisted',
+      status: 'queued',
       outcome: 'waitlisted_gate_on',
     });
     mockIsWaitlistGateEnabled.mockResolvedValue(false);
@@ -475,7 +475,7 @@ describe('POST /api/onboarding/claim — race, idempotency, failure paths', () =
       claimed: 0,
       alreadyClaimed: true,
       conversationId: 'conv_already_claimed',
-      waitlist: { entryId: 'entry-1', status: 'waitlisted' },
+      waitlist: { entryId: 'entry-1', status: 'queued' },
     });
     expect(mockSubmitWaitlistAccessRequest).toHaveBeenCalledTimes(1);
     // The recovered receipt re-asserts the hidden handle reservation
@@ -606,7 +606,7 @@ describe('POST /api/onboarding/claim — race, idempotency, failure paths', () =
       conversationId: 'conv_waitlist',
       waitlist: {
         entryId: 'entry-1',
-        status: 'waitlisted',
+        status: 'queued',
         outcome: 'waitlisted_gate_on',
       },
       profile: {
@@ -718,7 +718,7 @@ describe('POST /api/onboarding/claim — race, idempotency, failure paths', () =
     expect(res.status).toBe(200);
     expect(await res.json()).toMatchObject({
       claimed: 1,
-      waitlist: { entryId: 'entry-1', status: 'waitlisted' },
+      waitlist: { entryId: 'entry-1', status: 'queued' },
     });
     expect(mockCaptureError).toHaveBeenCalledWith(
       'Onboarding waitlist handle reservation failed',

@@ -45,6 +45,8 @@ function entry(overrides: Partial<WaitlistEntryRow> = {}): WaitlistEntryRow {
     spotifyArtistName: null,
     heardAbout: null,
     status: 'new',
+    decisionReason: null,
+    wants: null,
     primarySocialFollowerCount: null,
     createdAt: new Date('2026-01-10T00:00:00.000Z'),
     updatedAt: new Date('2026-01-10T00:00:00.000Z'),
@@ -87,9 +89,69 @@ describe('AdminWaitlistTableUnified', () => {
     expect(screen.getByText('Waitlisted')).toBeInTheDocument();
     expect(screen.getByText('Jan 10, 2026')).toBeInTheDocument();
     expect(screen.getByRole('table').getAttribute('data-table-row-mode')).toBe(
-      'dense'
+      'description'
     );
     await expectNoA11yViolations(container);
+  });
+
+  it('shows held and not-a-fit decisions with captured words', () => {
+    renderTable({
+      entries: [
+        entry({
+          id: 'held',
+          status: 'queued',
+          decisionReason: 'hold_capacity_full',
+          wants: 'objection: I cannot prepare every release twice',
+        }),
+        entry({
+          id: 'not-fit',
+          status: 'disqualified',
+          decisionReason: 'disqualified_wrong_audience',
+          wants: 'current_tool: my existing workflow',
+        }),
+      ],
+      total: 2,
+    });
+    expect(
+      screen.getByRole('columnheader', { name: /Decision/ })
+    ).toBeInTheDocument();
+    expect(screen.getByText('Queued (held)')).toBeInTheDocument();
+    expect(screen.getByText('Not a fit')).toBeInTheDocument();
+    expect(screen.getByText('hold_capacity_full')).toBeInTheDocument();
+    expect(screen.getByText('disqualified_wrong_audience')).toBeInTheDocument();
+    expect(
+      screen.getByText('objection: I cannot prepare every release twice')
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText('current_tool: my existing workflow')
+    ).toBeInTheDocument();
+  });
+
+  it('opens complete captured words by keyboard without changing a decision', async () => {
+    const user = userEvent.setup();
+    const wants = 'objection: I cannot prepare every release twice';
+    renderTable({
+      entries: [
+        entry({
+          status: 'queued',
+          decisionReason: 'hold_capacity_full',
+          wants,
+        }),
+      ],
+    });
+    const trigger = screen.getByRole('button', {
+      name: 'Read full captured words for Ari Lane',
+    });
+    trigger.focus();
+    await user.keyboard('{Enter}');
+    expect(
+      screen.getByRole('dialog', { name: 'captured words for Ari Lane' })
+    ).toHaveTextContent(wants);
+    expect(mocks.approveEntry).not.toHaveBeenCalled();
+    expect(mocks.resendInvite).not.toHaveBeenCalled();
+    await user.keyboard('{Escape}');
+    expect(trigger).toHaveFocus();
+    expect(screen.queryByRole('dialog')).toBeNull();
   });
 
   it('explains the empty waitlist', async () => {

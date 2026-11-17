@@ -97,6 +97,8 @@ export interface WaitlistEntryRow {
   spotifyArtistName: string | null;
   heardAbout: string | null;
   status: WaitlistStatus;
+  decisionReason: string | null;
+  wants: string | null;
   primarySocialFollowerCount: number | null;
   createdAt: Date;
   updatedAt: Date;

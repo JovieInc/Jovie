@@ -41,7 +41,12 @@ export interface QualificationConfig {
 
 export interface QualificationDecision {
   readonly qualified: boolean;
-  readonly status: 'approved' | 'waitlisted' | 'blocked';
+  /**
+   * Mom Test funnel (qualify/2026-11-v1): `waitlisted` only ever appears for
+   * legacy/removed approvals; every hold lands `queued` and evidence gaps
+   * land `new` with the gap recorded as the decision reason.
+   */
+  readonly status: 'approved' | 'queued' | 'new' | 'waitlisted' | 'blocked';
   readonly reasonCode: QualificationReasonCode;
   readonly details: Record<string, unknown>;
 }
@@ -81,18 +86,20 @@ export function evaluateWaitlistQualification(params: {
   }
 
   if (!hasValidPrimarySocialUrl(params.payload)) {
+    // Evidence gap, not a verdict: pending review with the gap recorded.
     return {
       qualified: false,
-      status: 'waitlisted',
+      status: 'new',
       reasonCode: 'invalid_primary_social_url',
       details: { field: 'primarySocialUrl' },
     };
   }
 
   if (params.config.mode === 'hard_closed') {
+    // Our gate, not their fit: held until we open up.
     return {
       qualified: true,
-      status: 'waitlisted',
+      status: 'queued',
       reasonCode: 'hard_closed',
       details: { mode: params.config.mode },
     };
@@ -117,9 +124,10 @@ export function evaluateWaitlistQualification(params: {
       params.config.autoAcceptReserved === false
         ? 'hold_capacity_full'
         : (params.config.goldenPath?.reason ?? 'hold_golden_path_not_green');
+    // Every hold is OUR readiness or capacity — queued, never disqualified.
     return {
       qualified: true,
-      status: 'waitlisted',
+      status: 'queued',
       reasonCode:
         params.config.autoAcceptReserved === false ||
         holdReason === 'hold_capacity_full'

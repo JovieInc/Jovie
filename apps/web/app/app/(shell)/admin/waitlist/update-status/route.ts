@@ -9,7 +9,7 @@ import { parseJsonBody } from '@/lib/http/parse-json';
 import { withSystemIngestionSession } from '@/lib/ingestion/session';
 import { insertWaitlistAuditLog } from '@/lib/waitlist/audit';
 import {
-  canTransitionWaitlistStatus,
+  transitionWaitlistStatus,
   type WaitlistStatus,
 } from '@/lib/waitlist/state-machine';
 
@@ -23,9 +23,13 @@ const updateStatusSchema = z.object({
     'new',
     'chat_started',
     'qualified',
+    'queued',
+    'disqualified',
     'waitlisted',
     'rejected',
   ]),
+  // Required when entering queued/disqualified (Mom Test funnel rules).
+  decisionReason: z.string().trim().min(1).max(120).optional(),
 });
 
 export async function POST(request: Request) {
@@ -84,12 +88,15 @@ export async function POST(request: Request) {
           return { outcome: 'not_found' as const };
         }
 
-        if (
-          !canTransitionWaitlistStatus(
-            entry.status as WaitlistStatus,
-            parsed.data.status
-          )
-        ) {
+        const transition = transitionWaitlistStatus(
+          entry.status as WaitlistStatus,
+          parsed.data.status,
+          { decisionReason: parsed.data.decisionReason }
+        );
+        if (!transition.ok) {
+          if (transition.error === 'decision_reason_required') {
+            return { outcome: 'reason_required' as const };
+          }
           return {
             outcome: 'invalid_transition' as const,
             fromStatus: entry.status,
@@ -110,6 +117,19 @@ export async function POST(request: Request) {
             status: parsed.data.status,
             statusReason: 'admin_status_update',
             adminActorId: adminUserId,
+            decisionReason: parsed.data.decisionReason ?? null,
+            // A manual admin override is not a rule-versioned decision.
+            decisionRuleVersion: null,
+            decidedAt:
+              parsed.data.status === 'queued' ||
+              parsed.data.status === 'disqualified'
+                ? now
+                : null,
+            decidedBy:
+              parsed.data.status === 'queued' ||
+              parsed.data.status === 'disqualified'
+                ? adminUserId
+                : null,
             ...statusTimestamps,
             updatedAt: now,
           })
@@ -136,6 +156,16 @@ export async function POST(request: Request) {
       return NextResponse.json(
         { success: false, error: 'Waitlist entry not found' },
         { status: 404, headers: NO_STORE_HEADERS }
+      );
+    }
+
+    if (result.outcome === 'reason_required') {
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'A decisionReason is required for queued/disqualified.',
+        },
+        { status: 400, headers: NO_STORE_HEADERS }
       );
     }
 

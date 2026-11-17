@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { baseInput, repeatIntakeCases } from './fixtures/access-request-input';
 
 // Hoisted mocks: the module under test pulls in server-only DB modules at
 // import time; we replace the boundary collaborators here so the unit test
@@ -166,20 +167,6 @@ function createTxMock() {
   return { execute, select, update, insert };
 }
 
-const baseInput = {
-  appUserId: '3a53ba3e-150c-4ab5-8e73-2d2499764e2c',
-  email: 'Creator@Example.com',
-  fullName: 'Test Creator',
-  data: {
-    primaryGoal: 'launch',
-    primarySocialUrl: 'https://instagram.com/x',
-    spotifyUrl: undefined,
-    spotifyArtistName: undefined,
-    heardAbout: undefined,
-    selectedPlan: undefined,
-  } as never,
-};
-
 // Cold import of access-request pulls email-jobs / notifications graph (~5–7s
 // on CI shards). Raise describe timeout so the first case can pay that cost.
 describe('submitWaitlistAccessRequest', { timeout: 20_000 }, () => {
@@ -296,7 +283,7 @@ describe('submitWaitlistAccessRequest', { timeout: 20_000 }, () => {
             biggestBlocker: 'I cannot get my release links out to my fans',
           },
         });
-        expect(result.status).toBe('waitlisted');
+        expect(result.status).toBe('queued');
         expect(tryReserveAutoAcceptSlot).not.toHaveBeenCalled();
         expect(approveWaitlistEntryInTx).not.toHaveBeenCalled();
         expect(finalizeWaitlistApproval).not.toHaveBeenCalled();
@@ -314,7 +301,7 @@ describe('submitWaitlistAccessRequest', { timeout: 20_000 }, () => {
         ...baseInput,
         goldenPathAdmission: admit,
       });
-      expect(result.status).toBe('waitlisted');
+      expect(result.status).toBe('queued');
       expect(tryReserveAutoAcceptSlot).not.toHaveBeenCalled();
       expect(approveWaitlistEntryInTx).not.toHaveBeenCalled();
     });
@@ -345,7 +332,7 @@ describe('submitWaitlistAccessRequest', { timeout: 20_000 }, () => {
         ...baseInput,
         goldenPathAdmission: admit,
       });
-      expect(result.status).toBe('waitlisted');
+      expect(result.status).toBe('queued');
       expect(withSystemIngestionSession).toHaveBeenCalledTimes(2);
       expect(readCachedAcquisitionEligibility).toHaveBeenCalledTimes(2);
       expect(tryReserveAutoAcceptSlot).not.toHaveBeenCalled();
@@ -389,7 +376,7 @@ describe('submitWaitlistAccessRequest', { timeout: 20_000 }, () => {
         });
         expect(tryReserveAutoAcceptSlot).toHaveBeenCalledTimes(1);
         expect(result.status).toBe(
-          reservationReason === 'reserved' ? 'approved' : 'waitlisted'
+          reservationReason === 'reserved' ? 'approved' : 'queued'
         );
         if (reservationReason === 'capacity_full') {
           expect(approveWaitlistEntryInTx).not.toHaveBeenCalled();
@@ -448,7 +435,7 @@ describe('submitWaitlistAccessRequest', { timeout: 20_000 }, () => {
         goldenPathAdmission: admit,
       });
 
-      expect(result.status).toBe('waitlisted');
+      expect(result.status).toBe('queued');
       expect(approveWaitlistEntryInTx).not.toHaveBeenCalled();
       expect(
         updatedRows.find(row => row.statusReason === 'waitlist_capacity_full')
@@ -469,7 +456,7 @@ describe('submitWaitlistAccessRequest', { timeout: 20_000 }, () => {
         goldenPathAdmission: admit,
       });
 
-      expect(result.status).toBe('waitlisted');
+      expect(result.status).toBe('queued');
       expect(releaseAutoAcceptSlot).toHaveBeenCalledTimes(1);
     });
 
@@ -527,7 +514,7 @@ describe('submitWaitlistAccessRequest', { timeout: 20_000 }, () => {
         }),
       });
 
-      expect(result.status).toBe('waitlisted');
+      expect(result.status).toBe('queued');
       expect(tryReserveAutoAcceptSlot).not.toHaveBeenCalled();
       expect(
         updatedRows.find(row => {
@@ -555,7 +542,7 @@ describe('submitWaitlistAccessRequest', { timeout: 20_000 }, () => {
         },
       });
 
-      expect(result.status).toBe('waitlisted');
+      expect(result.status).toBe('queued');
       expect(tryReserveAutoAcceptSlot).not.toHaveBeenCalled();
       expect(
         updatedRows.find(row => {
@@ -588,7 +575,7 @@ describe('submitWaitlistAccessRequest', { timeout: 20_000 }, () => {
     const result = await submitWaitlistAccessRequest(baseInput);
 
     expect(result.outcome).toBe('waitlisted_gate_on');
-    expect(result.status).toBe('waitlisted');
+    expect(result.status).toBe('queued');
     expect(tryReserveAutoAcceptSlot).not.toHaveBeenCalled();
     expect(approveWaitlistEntryInTx).not.toHaveBeenCalled();
     expect(notifySlackWaitlist).toHaveBeenCalledTimes(1);
@@ -614,7 +601,7 @@ describe('submitWaitlistAccessRequest', { timeout: 20_000 }, () => {
     // already_waitlisted short-circuit.
     expect(result).toMatchObject({
       entryId: 'entry-signup',
-      status: 'waitlisted',
+      status: 'queued',
       outcome: 'waitlisted_gate_on',
     });
     expect(
@@ -680,21 +667,33 @@ describe('submitWaitlistAccessRequest', { timeout: 20_000 }, () => {
     expect(notifySlackWaitlist).not.toHaveBeenCalled();
   });
 
-  it('does NOT fire Slack on already_waitlisted (returning user, existing pending entry)', async () => {
-    userRow = { id: 'user-1', userStatus: 'waitlist_pending' };
-    findLatestEntryByEmail.mockReturnValueOnce([
-      { id: 'entry-1', status: 'new' },
-    ]);
+  it.each(repeatIntakeCases)(
+    'preserves returning $status/$source decisions without Slack',
+    async ({ status, source, decisionRuleVersion, expectedStatus }) => {
+      userRow = { id: 'user-1', userStatus: 'waitlist_pending' };
+      findLatestEntryByEmail.mockReturnValueOnce([
+        { id: 'entry-1', status, source, decisionRuleVersion },
+      ]);
 
-    const { submitWaitlistAccessRequest } = await import(
-      '@/lib/waitlist/access-request'
-    );
-    const result = await submitWaitlistAccessRequest(baseInput);
+      const { submitWaitlistAccessRequest } = await import(
+        '@/lib/waitlist/access-request'
+      );
+      const result = await submitWaitlistAccessRequest(baseInput);
 
-    expect(result.outcome).toBe('already_waitlisted');
-    expect(result.status).toBe('waitlisted');
-    expect(notifySlackWaitlist).not.toHaveBeenCalled();
-  });
+      expect(result.outcome).toBe('already_waitlisted');
+      expect(result.status).toBe(expectedStatus);
+      if (expectedStatus !== 'waitlisted')
+        expect(
+          updatedRows.some(
+            row =>
+              'qualificationResult' in row ||
+              'statusReason' in row ||
+              'waitlistedAt' in row
+          )
+        ).toBe(false);
+      expect(notifySlackWaitlist).not.toHaveBeenCalled();
+    }
+  );
 
   it('preserves original waitlist age when a pending user resubmits', async () => {
     const originalWaitlistedAt = new Date('2026-04-01T00:00:00.000Z');
@@ -782,7 +781,7 @@ describe('submitWaitlistAccessRequest', { timeout: 20_000 }, () => {
     });
 
     expect(result).toMatchObject({
-      status: 'waitlisted',
+      status: 'queued',
       outcome: 'waitlisted_gate_on',
     });
     expect(

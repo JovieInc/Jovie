@@ -65,6 +65,8 @@ const entry = {
   spotifyArtistName: null,
   heardAbout: null,
   status: 'new' as const,
+  decisionReason: null,
+  wants: null,
   primarySocialFollowerCount: null,
   createdAt: new Date('2026-01-10T00:00:00.000Z'),
   updatedAt: new Date('2026-01-10T00:00:00.000Z'),
@@ -83,10 +85,11 @@ describe('AdminWaitlistTableUnified', () => {
 
     // Converged: no explicit getRowClassName; presets.tableRow + rowState provide hover
     expect(capturedGetRowClassName).toBeUndefined();
-    // Waitlist people use the 32px dense row (JOV-7798).
+    // A decision reason and two-line evidence preview use the canonical
+    // description budget, shared with loading rows and virtualization.
     expect(screen.getByTestId('admin-data-table')).toHaveAttribute(
       'data-row-mode',
-      'dense'
+      'description'
     );
 
     expect(screen.getByText('No waitlist entries').className).toContain(
@@ -125,6 +128,7 @@ describe('AdminWaitlistTableUnified', () => {
       'spotify',
       'heardAbout',
       'status',
+      'decision',
       'created',
       'actions',
     ]);

@@ -34,7 +34,7 @@ describe('evaluateWaitlistQualification', () => {
           autoAcceptReserved: true,
         },
       });
-      expect(result.status).toBe('waitlisted');
+      expect(result.status).toBe('queued');
       expect(result.details).toMatchObject({
         goldenPathHold: goldenPath?.reason ?? 'hold_golden_path_not_green',
       });
@@ -53,7 +53,7 @@ describe('evaluateWaitlistQualification', () => {
       },
     });
     expect(result).toMatchObject({
-      status: 'waitlisted',
+      status: 'queued',
       reasonCode: 'waitlist_capacity_full',
     });
   });
@@ -81,7 +81,7 @@ describe('evaluateWaitlistQualification', () => {
       })
     ).toMatchObject({
       qualified: true,
-      status: 'waitlisted',
+      status: 'queued',
       reasonCode: 'waitlist_gate_enabled',
     });
   });
@@ -127,7 +127,7 @@ describe('evaluateWaitlistQualification', () => {
     });
   });
 
-  it('keeps gate-on signups waitlisted when the interview score is below threshold', () => {
+  it('queues gate-on signups when the interview score is below threshold', () => {
     expect(
       evaluateWaitlistQualification({
         email: 'artist@example.com',
@@ -139,7 +139,7 @@ describe('evaluateWaitlistQualification', () => {
       })
     ).toMatchObject({
       qualified: true,
-      status: 'waitlisted',
+      status: 'queued',
       reasonCode: 'waitlist_gate_enabled',
     });
   });
@@ -179,7 +179,7 @@ describe('evaluateWaitlistQualification', () => {
     });
   });
 
-  it('waitlists qualified users when the gate is hard closed', () => {
+  it('queues qualified users when the gate is hard closed', () => {
     expect(
       evaluateWaitlistQualification({
         email: 'artist@example.com',
@@ -188,12 +188,12 @@ describe('evaluateWaitlistQualification', () => {
       })
     ).toMatchObject({
       qualified: true,
-      status: 'waitlisted',
+      status: 'queued',
       reasonCode: 'hard_closed',
     });
   });
 
-  it('waitlists invalid primary social URLs with a deterministic reason', () => {
+  it('marks invalid primary social URLs as pending with a deterministic reason', () => {
     expect(
       evaluateWaitlistQualification({
         email: 'artist@example.com',
@@ -205,12 +205,12 @@ describe('evaluateWaitlistQualification', () => {
       })
     ).toMatchObject({
       qualified: false,
-      status: 'waitlisted',
+      status: 'new',
       reasonCode: 'invalid_primary_social_url',
     });
   });
 
-  it('waitlists users when reserved auto-accept capacity is exhausted', () => {
+  it('queues users when reserved auto-accept capacity is exhausted', () => {
     expect(
       evaluateWaitlistQualification({
         email: 'artist@example.com',
@@ -219,7 +219,7 @@ describe('evaluateWaitlistQualification', () => {
       })
     ).toMatchObject({
       qualified: true,
-      status: 'waitlisted',
+      status: 'queued',
       reasonCode: 'waitlist_capacity_full',
     });
   });
@@ -251,7 +251,7 @@ describe('golden-path admission in qualification', () => {
     });
   });
 
-  it('records the hold reason on a waitlisted decision', () => {
+  it('records the hold reason on a queued decision', () => {
     const result = evaluateWaitlistQualification({
       email: 'a@example.com',
       payload,
@@ -260,7 +260,7 @@ describe('golden-path admission in qualification', () => {
         goldenPath: { admit: false, reason: 'hold_golden_path_not_green' },
       },
     });
-    expect(result.status).toBe('waitlisted');
+    expect(result.status).toBe('queued');
     expect(result.reasonCode).toBe('waitlist_gate_enabled');
     expect(result.details).toMatchObject({
       goldenPathHold: 'hold_golden_path_not_green',

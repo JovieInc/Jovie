@@ -13,6 +13,7 @@ import {
   TableCheckboxCell,
 } from '@/components/organisms/table';
 import { PersonCell } from '@/components/organisms/table/atoms/PersonCell';
+import { TableDescription } from '@/components/organisms/table/molecules/TableDescription';
 import { PlatformPill } from '@/features/dashboard/atoms/PlatformPill';
 import type { WaitlistEntryRow } from '@/lib/admin/types';
 import type { CellContext, HeaderContext, Table } from '@/lib/tanstack-table';
@@ -121,6 +122,31 @@ export function renderSpotifyCell(entry: WaitlistEntryRow) {
       primaryText={displayName}
       onClick={() => globalThis.open(spotifyUrl, '_blank')}
     />
+  );
+}
+
+/**
+ * Renders the Mom Test decision cell (qualify/2026-11-v1): the decision code
+ * plus any wants/objections captured in their words.
+ */
+export function renderDecisionCell(entry: WaitlistEntryRow) {
+  if (!entry.decisionReason && !entry.wants) {
+    return <EmptyCell />;
+  }
+  return (
+    <div className='min-w-0 space-y-1 whitespace-normal'>
+      {entry.decisionReason ? (
+        <div className='text-tertiary-token font-mono text-xs'>
+          {entry.decisionReason}
+        </div>
+      ) : null}
+      {entry.wants ? (
+        <TableDescription
+          text={entry.wants}
+          label={`captured words for ${entry.fullName}`}
+        />
+      ) : null}
+    </div>
   );
 }
 

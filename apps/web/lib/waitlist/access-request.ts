@@ -17,8 +17,11 @@ import { withSystemIngestionSession } from '@/lib/ingestion/session';
 import { notifySlackWaitlist } from '@/lib/notifications/providers/slack';
 import { normalizeEmail } from '@/lib/utils/email';
 import { logger } from '@/lib/utils/logger';
-import { detectPlatformFromUrl } from '@/lib/utils/social-platform';
 import type { WaitlistRequestPayload } from '@/lib/validation/schemas';
+import {
+  buildEntryValues,
+  shouldPreserveWaitlistDecision,
+} from '@/lib/waitlist/access-request-entry';
 import {
   type AdmissionScore,
   isOutrankedByQueue,
@@ -29,6 +32,7 @@ import {
   type WaitlistApprovalResult,
 } from '@/lib/waitlist/approval';
 import { insertWaitlistAuditLog } from '@/lib/waitlist/audit';
+import { insertChatCapabilityWants } from '@/lib/waitlist/capability-wants.server';
 import { enqueueWaitlistEmailJob } from '@/lib/waitlist/email-jobs';
 import type { GoldenPathAdmissionDecision } from '@/lib/waitlist/golden-path-admission';
 import {
@@ -44,10 +48,7 @@ import {
   releaseAutoAcceptSlot,
   tryReserveAutoAcceptSlot,
 } from '@/lib/waitlist/settings';
-import {
-  hashEmailForWaitlist,
-  isUnqualifiedSignupEntry,
-} from '@/lib/waitlist/signup-entry';
+import { isUnqualifiedSignupEntry } from '@/lib/waitlist/signup-entry';
 import {
   isWaitlistApprovedStatus,
   isWaitlistPendingStatus,
@@ -103,79 +104,6 @@ export interface WaitlistAccessRequestResult {
   readonly outcome: WaitlistAccessOutcome;
 }
 
-function normalizeSpotifyUrl(url: string): string {
-  try {
-    const parsed = new URL(url);
-    parsed.protocol = 'https:';
-    for (const param of [
-      'si',
-      'utm_source',
-      'utm_medium',
-      'utm_campaign',
-      'nd',
-    ]) {
-      parsed.searchParams.delete(param);
-    }
-    return parsed.toString();
-  } catch {
-    return url;
-  }
-}
-
-function buildQualificationInputs(data: WaitlistRequestPayload) {
-  return {
-    primaryGoal: data.primaryGoal ?? null,
-    primarySocialUrl: data.primarySocialUrl,
-    spotifyUrl: data.spotifyUrl ?? null,
-    spotifyArtistName: data.spotifyArtistName?.trim() || null,
-    heardAbout: data.heardAbout?.trim() || null,
-    selectedPlan: data.selectedPlan ?? null,
-  };
-}
-
-function buildEntryValues(params: {
-  readonly data: WaitlistRequestPayload;
-  readonly email: string;
-  readonly fullName: string;
-  readonly source: string;
-  readonly admissionScore?: AdmissionScore;
-}) {
-  const { data, email, fullName, source } = params;
-  const { platform, normalizedUrl } = detectPlatformFromUrl(
-    data.primarySocialUrl
-  );
-  const spotifyUrlNormalized = data.spotifyUrl
-    ? normalizeSpotifyUrl(data.spotifyUrl)
-    : null;
-
-  return {
-    fullName,
-    email,
-    emailNormalized: email,
-    emailHash: hashEmailForWaitlist(email),
-    primaryGoal: data.primaryGoal ?? null,
-    primarySocialUrl: data.primarySocialUrl,
-    primarySocialPlatform: platform,
-    primarySocialUrlNormalized: normalizedUrl,
-    spotifyUrl: data.spotifyUrl ?? null,
-    spotifyUrlNormalized,
-    spotifyArtistName: data.spotifyArtistName?.trim() || null,
-    heardAbout: data.heardAbout?.trim() || null,
-    selectedPlan: data.selectedPlan ?? null,
-    source,
-    canonical: true,
-    qualificationInputs: {
-      ...buildQualificationInputs(data),
-      ...(params.admissionScore
-        ? { admissionScore: params.admissionScore }
-        : {}),
-    },
-    updatedAt: new Date(),
-    // Store a useful fallback in existing fields without inventing launch scoring.
-    primarySocialFollowerCount: null,
-  };
-}
-
 async function lockWaitlistEmail(
   tx: DbOrTransaction,
   normalizedEmail: string
@@ -195,6 +123,7 @@ async function findLatestEntryByEmail(
       id: waitlistEntries.id,
       status: waitlistEntries.status,
       source: waitlistEntries.source,
+      decisionRuleVersion: waitlistEntries.decisionRuleVersion,
       waitlistedAt: waitlistEntries.waitlistedAt,
     })
     .from(waitlistEntries)
@@ -410,7 +339,10 @@ async function decideAccess(params: {
     };
   }
 
-  if (qualification.status === 'waitlisted') {
+  if (
+    qualification.status === 'queued' ||
+    qualification.status === 'waitlisted'
+  ) {
     return {
       outcome: 'waitlisted_gate_on',
       approval: null,
@@ -429,7 +361,7 @@ async function decideAccess(params: {
     if (reservedAdmissionSlot) await releaseAutoAcceptSlot(params.tx);
     const failedQualification: QualificationDecision = {
       ...qualification,
-      status: 'waitlisted',
+      status: 'queued',
       reasonCode: 'waitlist_capacity_full',
       details: {
         ...qualification.details,
@@ -487,24 +419,27 @@ async function handleExistingEntryResubmission(params: {
     };
   }
 
-  const nextExistingStatus =
-    isWaitlistPendingStatus(existing.status) || existing.status === 'expired'
+  const preserveDecision = shouldPreserveWaitlistDecision(existing);
+  const nextExistingStatus = preserveDecision
+    ? existing.status
+    : isWaitlistPendingStatus(existing.status) || existing.status === 'expired'
       ? 'waitlisted'
       : existing.status;
 
-  await tx
-    .update(waitlistEntries)
-    .set({
-      ...entryValues,
-      qualificationResult: {
-        status: 'waitlisted',
-        reasonCode: 'already_waitlisted',
-      },
-      status: nextExistingStatus,
-      statusReason: 'already_waitlisted',
-      waitlistedAt: existing.waitlistedAt ?? new Date(),
-    })
-    .where(eq(waitlistEntries.id, existing.id));
+  if (!preserveDecision)
+    await tx
+      .update(waitlistEntries)
+      .set({
+        ...entryValues,
+        qualificationResult: {
+          status: 'waitlisted',
+          reasonCode: 'already_waitlisted',
+        },
+        status: nextExistingStatus,
+        statusReason: 'already_waitlisted',
+        waitlistedAt: existing.waitlistedAt ?? new Date(),
+      })
+      .where(eq(waitlistEntries.id, existing.id));
 
   const statusChange = await upsertUserStatus({
     tx,
@@ -589,7 +524,11 @@ export async function submitWaitlistAccessRequest(
             admissionScore: input.admissionScore,
           });
 
-          if (existing && !isUnqualifiedSignupEntry(existing)) {
+          if (
+            existing &&
+            (shouldPreserveWaitlistDecision(existing) ||
+              !isUnqualifiedSignupEntry(existing))
+          ) {
             return handleExistingEntryResubmission({
               tx,
               existing,
@@ -664,6 +603,10 @@ export async function submitWaitlistAccessRequest(
             .set({
               status: nextStatus,
               statusReason: decision.qualification.reasonCode,
+              decisionReason: decision.qualification.reasonCode,
+              decisionRuleVersion: 'qualify/2026-11-v1',
+              decidedAt: now,
+              decidedBy: 'rules',
               qualificationResult: {
                 qualified: decision.qualification.qualified,
                 status: decision.qualification.status,
@@ -690,6 +633,12 @@ export async function submitWaitlistAccessRequest(
               ...(syntheticCanary ? { syntheticCanary } : {}),
             },
           });
+
+          await insertChatCapabilityWants(
+            tx,
+            entry.id,
+            input.interviewResponses
+          );
 
           if (nextStatus === 'waitlisted' && !suppressCanaryCommunications) {
             await enqueueWaitlistEmailJob(tx, {

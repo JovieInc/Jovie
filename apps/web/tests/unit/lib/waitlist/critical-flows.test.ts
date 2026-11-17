@@ -38,18 +38,21 @@ describe('waitlist critical flow contracts', () => {
     expect(canTransitionWaitlistStatus('approved', 'signed_up')).toBe(true);
   });
 
-  it('chat onboarding -> waitlist -> waitlist email contract', () => {
+  it('chat onboarding -> queued hold -> waitlist email contract', () => {
     const decision = evaluateWaitlistQualification({
       email: 'artist@example.com',
       payload: basePayload,
       config: { mode: 'waitlist_enabled' },
     });
 
+    // qualify/2026-11-v1: a gate hold lands queued (our readiness), and the
+    // confirmation email stays bound to real waitlisted entries only.
     expect(decision).toMatchObject({
       qualified: true,
-      status: 'waitlisted',
+      status: 'queued',
       reasonCode: 'waitlist_gate_enabled',
     });
+    expect(isWaitlistPendingStatus('queued')).toBe(true);
     expect(isWaitlistPendingStatus('waitlisted')).toBe(true);
   });
 

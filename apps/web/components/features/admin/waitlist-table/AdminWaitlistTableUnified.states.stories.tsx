@@ -19,6 +19,8 @@ function entry(overrides: Partial<WaitlistEntryRow> = {}): WaitlistEntryRow {
     spotifyArtistName: null,
     heardAbout: null,
     status: 'new',
+    decisionReason: null,
+    wants: null,
     primarySocialFollowerCount: null,
     createdAt: new Date('2026-01-10T00:00:00.000Z'),
     updatedAt: new Date('2026-01-10T00:00:00.000Z'),
@@ -72,6 +74,42 @@ export const LoadingNextPage: Story = {
     const canvas = within(canvasElement);
     await expect(
       canvas.getByRole('columnheader', { name: /^Name/ })
+    ).toBeVisible();
+  },
+};
+
+/** Held and not-fit decisions retain the evidence in the person's words. */
+export const DecisionOutcomes: Story = {
+  args: {
+    entries: [
+      entry({
+        status: 'queued',
+        decisionReason: 'hold_capacity_full',
+        wants: 'objection: I cannot prepare every release twice',
+      }),
+      entry({
+        id: 'waitlist_2',
+        fullName: 'Bea',
+        email: 'bea@example.com',
+        status: 'disqualified',
+        decisionReason: 'disqualified_wrong_audience',
+        wants: 'current_tool: my existing workflow',
+      }),
+    ],
+    total: 2,
+  },
+  decorators: [FrameDecorator],
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(canvas.getByText('Queued (held)')).toBeVisible();
+    await expect(canvas.getByText('Not a fit')).toBeVisible();
+    await expect(canvas.getByText('hold_capacity_full')).toBeVisible();
+    await expect(canvas.getByText('disqualified_wrong_audience')).toBeVisible();
+    await expect(
+      canvas.getByText('objection: I cannot prepare every release twice')
+    ).toBeVisible();
+    await expect(
+      canvas.getByText('current_tool: my existing workflow')
     ).toBeVisible();
   },
 };

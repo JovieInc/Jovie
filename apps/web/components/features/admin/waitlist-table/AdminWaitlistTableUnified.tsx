@@ -20,6 +20,7 @@ import {
   createSelectCellRenderer,
   createSelectHeaderRenderer,
   renderDateCellWrapper,
+  renderDecisionCell,
   renderEmailCell,
   renderHeardAboutCell,
   renderNameCell,
@@ -191,6 +192,14 @@ export function AdminWaitlistTableUnified({
         size: 110,
       }),
 
+      // Mom Test decision (reason + wants/objections, their words)
+      columnHelper.accessor('decisionReason', {
+        id: 'decision',
+        header: 'Decision',
+        cell: ({ row }) => renderDecisionCell(row.original),
+        size: 220,
+      }),
+
       // Created Date column
       columnHelper.accessor('createdAt', {
         id: 'created',
@@ -241,7 +250,7 @@ export function AdminWaitlistTableUnified({
         </div>
       }
       getRowId={row => row.id}
-      rowMode='dense'
+      rowMode='description'
       overscan={5}
       minWidth={`${TABLE_MIN_WIDTHS.LARGE}px`}
       rowSelection={rowSelection}
