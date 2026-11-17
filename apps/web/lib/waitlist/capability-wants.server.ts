@@ -11,11 +11,14 @@ import { capabilityWants } from '@/lib/db/schema/waitlist';
 export async function insertChatCapabilityWants(
   tx: DbOrTransaction,
   entryId: string,
-  interviewResponses: {
-    readonly currentWorkflow?: string | null;
-    readonly biggestBlocker?: string | null;
-    readonly launchGoal?: string | null;
-  } | null
+  interviewResponses:
+    | {
+        readonly currentWorkflow?: string | null;
+        readonly biggestBlocker?: string | null;
+        readonly launchGoal?: string | null;
+      }
+    | null
+    | undefined
 ): Promise<void> {
   const answers = [
     { kind: 'current_tool', text: interviewResponses?.currentWorkflow },
