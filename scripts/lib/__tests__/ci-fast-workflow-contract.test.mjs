@@ -449,7 +449,10 @@ describe('ci-fast bounded parallel workflow', () => {
     expect([...whole, ...keyed[0].files].sort()).toEqual(
       [...LANES_PYTEST_FILES].sort()
     );
-    expect(LANES_PYTEST_FILES).toHaveLength(48);
+    expect(LANES_PYTEST_FILES).toHaveLength(51);
+    expect(whole).toContain('scripts/tests/test_reason_dispatch.py');
+    expect(whole).toContain('scripts/tests/test_reason_publication.py');
+    expect(whole).toContain('scripts/tests/test_pr_events_blast_radius.py');
     expect(whole).toContain('scripts/tests/test_pr_events_repair_evidence.py');
     expect(whole).toContain('scripts/tests/test_pr_events_red_repair.py');
     expect(whole).toContain('scripts/tests/test_pr_body_markup.py');
@@ -2600,6 +2603,10 @@ describe('ci-fast bounded parallel workflow', () => {
     expect(script).toMatch(
       /^readonly SHELLCHECK_IMAGE='koalaman\/shellcheck@sha256:[0-9a-f]{64}'$/m
     );
+    expect(script).toContain(
+      'sha_ok "$VENDORED_QUEUE_PATCH" "$ACTIONLINT_QUEUE_PATCH_SHA256"'
+    );
+    expect(script).toContain('vendored queue patch sha256 mismatch');
     expect(script).toContain('--fail');
     expect(script).toContain('-shellcheck="$tool_dir/shellcheck"');
     expect(script).toContain('-pyflakes="$tool_dir/pyflakes"');

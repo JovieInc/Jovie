@@ -48,7 +48,6 @@
     "missing-accent:apps/web/components/marketing/MarketingBentoSection.tsx",
     "missing-accent:apps/web/components/marketing/MarketingContentProse.tsx",
     "missing-accent:apps/web/components/marketing/MarketingHero.tsx",
-    "missing-accent:apps/web/components/marketing/MarketingPhoneStateGallery.tsx",
     "missing-accent:apps/web/components/marketing/MarketingPlatformSpecBento.tsx",
     "missing-accent:apps/web/components/marketing/MarketingSectionFrame.tsx",
     "missing-accent:apps/web/components/marketing/MarketingShippedSitesShowcase.tsx",

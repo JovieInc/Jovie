@@ -168,6 +168,7 @@ export async function GET(request: NextRequest) {
       entitlementPlan !== confirmedPlan ||
       !billing.success ||
       billing.data?.stripeSubscriptionId !== subscription.id ||
+      billing.data.stripePriceId !== lineItemPriceId ||
       !customerId ||
       customerId !== subscriptionCustomerId ||
       billing.data.stripeCustomerId !== customerId

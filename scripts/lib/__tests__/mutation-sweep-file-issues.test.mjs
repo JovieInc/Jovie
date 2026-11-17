@@ -31,6 +31,36 @@ describe('mutation-sweep-file-issues', () => {
     );
   });
 
+  it('writes empty drafts for an unscored state without a task directory', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'mutation-empty-drafts-'));
+    try {
+      const state = join(dir, 'state.json');
+      const drafts = join(dir, 'drafts.json');
+      writeFileSync(state, JSON.stringify({ schemaVersion: 1, modules: {} }));
+      const result = spawnSync(
+        process.execPath,
+        [
+          script,
+          '--tasks',
+          join(dir, 'missing'),
+          '--state',
+          state,
+          '--drafts',
+          drafts,
+        ],
+        { encoding: 'utf8' }
+      );
+      expect(result.status, result.stderr).toBe(0);
+      expect(JSON.parse(readFileSync(drafts, 'utf8'))).toEqual({
+        approvalRequired: true,
+        batches: [],
+        skipped: [],
+      });
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
   it('dry-runs without LINEAR_API_KEY and skips modules with no survivors', () => {
     const dir = mkdtempSync(join(tmpdir(), 'mutation-tasks-'));
     writeFileSync(

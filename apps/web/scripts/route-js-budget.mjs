@@ -15,21 +15,28 @@
  * route-js-ratchet.mjs). Route-group ceilings and the one-way rules for hand
  * edits live in route-js-budget-policy.mjs.
  *
- * Usage: node scripts/route-js-budget.mjs [--next-dir .next] [--budgets file] [--json] [--write]
+ * Usage: node scripts/route-js-budget.mjs [--next-dir .next] [--budgets file] [--json] [--write] [--explain-route /app/path]
  */
 import { spawnSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { gzipSync } from 'node:zlib';
-
+import {
+  budgetJsBytes,
+  chunkContributions,
+  printGroupRows,
+  printRows,
+} from './route-js-diagnostics.mjs';
 import {
   collectFirstLoadFiles,
   collectRouteFiles,
 } from './route-js-manifests.mjs';
 
+export { budgetJsBytes } from './route-js-diagnostics.mjs';
 export {
   collectFirstLoadFiles,
+  collectRouteFiles,
   routeFromManifestKey,
 } from './route-js-manifests.mjs';
 
@@ -80,18 +87,6 @@ export {
 const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(SCRIPT_DIR, '../..');
 export const BUDGET_RELATIVE = 'apps/web/scripts/route-js-budgets.json';
-/**
- * Drop the CI sourceMappingURL trailer. It is not executed code, and the
- * sibling map is not part of this budget.
- * @param {Buffer} bytes
- * @returns {Buffer}
- */
-export function budgetJsBytes(bytes) {
-  const source = bytes.toString('utf8');
-  const stripped = source.replace(/\r?\n\/\/# sourceMappingURL=\S+\s*$/, '');
-  return stripped === source ? bytes : Buffer.from(stripped);
-}
-
 /**
  * @param {string} nextDir
  * @returns {RouteJsMeasurement[]}
@@ -210,32 +205,16 @@ export function measureFirstLoadJs(nextDir) {
  * @returns {RouteContribution[]}
  */
 export function routeJsContributors(nextDir, routes) {
-  const wanted = new Set(routes);
-  if (!wanted.size) return [];
-  /** @type {Map<string, RouteContribution>} */
-  const byRoute = new Map();
-  for (const row of [
-    ...collectRouteFiles(nextDir),
-    ...collectFirstLoadFiles(nextDir).filter(
-      row => !isAuthedAppRoute(row.route)
-    ),
-  ]) {
-    if (!wanted.has(row.route)) continue;
-    const chunks = [...row.files]
-      .map(file => ({
-        file,
-        gzipBytes: gzipSync(budgetJsBytes(readFileSync(join(nextDir, file))), {
-          level: 9,
-        }).length,
-      }))
-      .sort(
-        (a, b) => b.gzipBytes - a.gzipBytes || a.file.localeCompare(b.file)
-      );
-    const gzipBytes = chunks.reduce((sum, chunk) => sum + chunk.gzipBytes, 0);
-    if (gzipBytes > (byRoute.get(row.route)?.gzipBytes ?? -1))
-      byRoute.set(row.route, { route: row.route, gzipBytes, files: chunks });
-  }
-  return [...byRoute.values()];
+  return chunkContributions(
+    nextDir,
+    [
+      ...collectRouteFiles(nextDir),
+      ...collectFirstLoadFiles(nextDir).filter(
+        row => !isAuthedAppRoute(row.route)
+      ),
+    ],
+    new Set(routes)
+  ).map(({ chunks, ...row }) => ({ ...row, files: chunks }));
 }
 
 export function resolveFirstLoadTarget(route, firstLoad) {
@@ -381,6 +360,7 @@ function parseArgs(argv) {
     budgetsPath: join(SCRIPT_DIR, 'route-js-budgets.json'),
     json: false,
     write: false,
+    explainRoute: undefined,
   };
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index];
@@ -388,33 +368,10 @@ function parseArgs(argv) {
     else if (arg === '--budgets') options.budgetsPath = resolve(argv[++index]);
     else if (arg === '--json') options.json = true;
     else if (arg === '--write') options.write = true;
+    else if (arg === '--explain-route') options.explainRoute = argv[++index];
     else throw new Error(`Unknown argument: ${arg}`);
   }
   return options;
-}
-
-function printRows(rows) {
-  for (const row of rows) {
-    const mark = row.ok ? 'ok  ' : row.budgetKb === null ? 'NEW ' : 'OVER';
-    console.log(
-      `${mark} ${String(row.gzipKb).padStart(5)} / ${String(row.budgetKb ?? '-').padStart(5)} KB gz  ${row.route}`
-    );
-  }
-}
-
-/**
- * JOV-8561: the per-route-group table. One row per route-budgets.json group:
- * worst measured route against the group's own operative baseline, with the
- * group target from route-budgets.json alongside it.
- */
-function printGroupRows(groups) {
-  console.log('\nRoute-group initial-JS budgets (JOV-8561)');
-  for (const row of groups.rows) {
-    const mark = row.ok ? 'ok  ' : 'OVER';
-    console.log(
-      `${mark} ${String(row.worstKb).padStart(5)} / ${String(row.baselineKb).padStart(5)} KB gz  ${row.group} group (target ${row.targetKb} KB; ${row.routes} routes; worst ${row.worstRoute})`
-    );
-  }
 }
 
 function main() {
@@ -473,6 +430,24 @@ function main() {
       `::error::${route} has a first-load budget but was not in the build manifest`
     );
   reportRouteRatchet(result);
+  const explain = new Set([
+    ...result.app.violations.map(row => row.route),
+    ...result.first.violations.map(row => row.route),
+    ...(options.explainRoute ? [options.explainRoute] : []),
+  ]);
+  if (explain.size) {
+    const files = [
+      ...collectRouteFiles(options.nextDir),
+      ...collectFirstLoadFiles(options.nextDir),
+    ];
+    for (const row of chunkContributions(options.nextDir, files, explain)) {
+      console.error(
+        `Initial JS contributors for ${row.route} (${row.gzipBytes} gzip bytes):`
+      );
+      for (const chunk of row.chunks.slice(0, 5))
+        console.error(`  ${chunk.gzipBytes} gzip bytes  ${chunk.file}`);
+    }
+  }
   const forbidden = findForbiddenClientCode(options.nextDir);
   for (const hit of forbidden) {
     console.error(

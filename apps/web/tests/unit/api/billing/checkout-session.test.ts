@@ -14,6 +14,7 @@ const mocks = vi.hoisted(() => ({
     data: {
       stripeSubscriptionId: 'sub_current',
       stripeCustomerId: 'cus_current',
+      stripePriceId: 'price_pro' as string | null,
     },
   },
   session: {} as Record<string, unknown>,
@@ -96,6 +97,7 @@ describe('GET /api/billing/checkout-session', () => {
       data: {
         stripeSubscriptionId: 'sub_current',
         stripeCustomerId: 'cus_current',
+        stripePriceId: 'price_pro',
       },
     };
     mocks.session = {
@@ -235,6 +237,25 @@ describe('GET /api/billing/checkout-session', () => {
       expect(await (await GET(request())).json()).toMatchObject({
         status: 'unconfirmed',
         plan: null,
+      });
+    }
+  );
+
+  it.each(['price_previous', null, ''])(
+    'waits until canonical billing price %j catches up with the current subscription',
+    async priceId => {
+      mocks.billing.data.stripePriceId = priceId;
+      const { GET } = await import('@/app/api/billing/checkout-session/route');
+      expect(await (await GET(request())).json()).toMatchObject({
+        status: 'pending',
+        plan: null,
+        priceId: 'price_pro',
+      });
+      expect(mocks.recordedStages).toEqual([]);
+      mocks.billing.data.stripePriceId = 'price_pro';
+      expect(await (await GET(request())).json()).toMatchObject({
+        status: 'confirmed',
+        plan: 'pro',
       });
     }
   );
