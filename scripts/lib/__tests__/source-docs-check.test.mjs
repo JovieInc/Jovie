@@ -109,7 +109,8 @@ test('a diverged exact base retains full validation', t => {
     'base-not-ancestor'
   );
 });
-for (const [name, bytes, executable] of [
+/** @type {Array<[string, Buffer, boolean?]>} */
+const nonInertMarkdownCases = [
   ['executable mode', Buffer.from('# Research notes\n'), true],
   ['shell shebang', Buffer.from('#!/bin/sh\nprintf unsafe\n')],
   [
@@ -122,7 +123,8 @@ for (const [name, bytes, executable] of [
   ['executable fence', Buffer.from('```sh\npnpm -w deploy\n```\n')],
   ['nested indented instruction', Buffer.from('>     pnpm deploy\n')],
   ['active URI', Buffer.from('[Open](javascript:alert(1))\n')],
-]) {
+];
+for (const [name, bytes, executable] of nonInertMarkdownCases) {
   test(`non-inert Markdown retains full validation: ${name}`, t => {
     const f = fixture(t);
     writeFileSync(join(f.root, 'docs/research/notes.md'), bytes);

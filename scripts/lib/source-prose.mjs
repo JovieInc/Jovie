@@ -73,6 +73,7 @@ export function readSourceProseEntries({ root, headSha, paths }) {
     '--literal-pathspecs',
     '--no-lazy-fetch',
   ];
+  /** @type {import('node:child_process').ExecFileSyncOptions & { env: NodeJS.ProcessEnv }} */
   const options = {
     cwd: root,
     timeout: 30000,
