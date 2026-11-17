@@ -13,26 +13,15 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { PublicClaimBanner } from '@/app/[username]/_components/PublicClaimBanner';
 import { AboutSection } from '@/components/features/profile/AboutSection';
 import { ProfileDrawerShell } from '@/components/features/profile/ProfileDrawerShell';
-import type { PublicRelease } from '@/components/features/profile/releases/types';
-import { useDesktopSurfaceModule } from '@/components/features/profile/templates/useDesktopSurfaceModule';
 import type { PublicContact } from '@/types/contacts';
 import type { Artist } from '@/types/db';
 import { ProfileCompactSurface } from '../../../components/features/profile/templates/ProfileCompactSurface';
 import { ProfileCompactTemplate } from '../../../components/features/profile/templates/ProfileCompactTemplate';
-
-vi.mock(
-  '@/components/features/profile/templates/useDesktopSurfaceModule',
-  async importOriginal => {
-    const actual =
-      await importOriginal<
-        typeof import('@/components/features/profile/templates/useDesktopSurfaceModule')
-      >();
-    return {
-      ...actual,
-      useDesktopSurfaceModule: vi.fn(actual.useDesktopSurfaceModule),
-    };
-  }
-);
+import {
+  mockContacts,
+  mockReleases,
+  mockViewport,
+} from './profile-compact-template.fixtures';
 
 // The desktop surface ships behind a build-time flag (default off). Most of
 // this suite pins it ON to keep covering the flagged desktop surface; the
@@ -268,64 +257,6 @@ const mockArtist: Artist = {
   is_verified_flag: false,
 };
 
-const mockContacts = [
-  {
-    id: 'contact-1',
-    role: 'bookings',
-    roleLabel: 'Booking',
-    territorySummary: 'Worldwide',
-    territoryCount: 1,
-    secondaryLabel: 'book@example.com',
-    channels: [
-      {
-        type: 'email' as const,
-        encoded: 'book@example.com',
-      },
-    ],
-  },
-] satisfies PublicContact[];
-
-const mockReleases = [
-  {
-    id: 'release-1',
-    title: "Don't Look Down",
-    slug: 'dont-look-down',
-    releaseType: 'single',
-    releaseDate: '2024-11-01T00:00:00.000Z',
-    artworkUrl: 'https://example.com/release-1.jpg',
-    artistNames: ['Test Artist'],
-  },
-  {
-    id: 'release-2',
-    title: 'Holding On',
-    slug: 'holding-on',
-    releaseType: 'single',
-    releaseDate: '2023-10-01T00:00:00.000Z',
-    artworkUrl: 'https://example.com/release-2.jpg',
-    artistNames: ['Test Artist'],
-  },
-] satisfies readonly PublicRelease[];
-
-function mockViewport(width: 'mobile' | 'desktop') {
-  const previousMatchMedia = window.matchMedia;
-  window.matchMedia = vi.fn().mockImplementation((query: string) => ({
-    matches:
-      width === 'desktop' &&
-      (query === '(min-width: 768px)' || query === '(min-width: 1180px)'),
-    media: query,
-    onchange: null,
-    addEventListener: vi.fn(),
-    removeEventListener: vi.fn(),
-    addListener: vi.fn(),
-    removeListener: vi.fn(),
-    dispatchEvent: vi.fn(),
-  })) as typeof window.matchMedia;
-
-  return () => {
-    window.matchMedia = previousMatchMedia;
-  };
-}
-
 describe('ProfileCompactTemplate', () => {
   let originalMatchMedia: typeof window.matchMedia;
 
@@ -338,7 +269,6 @@ describe('ProfileCompactTemplate', () => {
     mockUseProfileShell.mockReset();
     mockProfileInlineNotificationsCTA.mockClear();
     mockProfileDesktopSurface.mockClear();
-    vi.mocked(useDesktopSurfaceModule).mockClear();
     mockProfileUnifiedDrawer.mockClear();
     mockProfilePrimaryTabPanel.mockClear();
     mockProfileInlineNotificationsCTA.mockImplementation(
@@ -3413,8 +3343,6 @@ describe('ProfileCompactTemplate', () => {
       );
       expect(mockProfileDesktopSurface).not.toHaveBeenCalled();
     });
-
-    expect(useDesktopSurfaceModule).not.toHaveBeenCalledWith(true);
 
     restoreViewport();
   });

@@ -1,5 +1,3 @@
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import React from 'react';
 import { renderToString } from 'react-dom/server';
@@ -12,6 +10,7 @@ import type { TourDateViewModel } from '@/lib/tour-dates/types';
 import type { PublicContact } from '@/types/contacts';
 import type { Artist, LegacySocialLink } from '@/types/db';
 import type { NotificationContentType } from '@/types/notifications';
+import { PROFILE_STORY_ARTIST } from '../profile-story-fixture';
 import {
   PROFILE_LISTEN_DESKTOP_GRID_CLASSNAME,
   PROFILE_LISTEN_DSP_COLUMN_CLASSNAME,
@@ -151,25 +150,9 @@ vi.mock('@/hooks/useIsAuthenticated', () => ({
 }));
 
 const artist = {
-  id: 'artist-1',
-  owner_user_id: 'user-1',
-  name: 'Tim White',
-  handle: 'timwhite',
-  spotify_id: '4u',
+  ...PROFILE_STORY_ARTIST,
   image_url: 'https://example.com/tim.jpg',
-  tagline: 'Producer, songwriter, and after-hours romantic.',
   location: null,
-  hometown: null,
-  career_highlights: null,
-  is_verified: true,
-  active_since_year: null,
-  published: true,
-  is_featured: false,
-  marketing_opt_out: false,
-  created_at: '2026-04-24T00:00:00.000Z',
-  settings: {
-    heroRoleLabel: 'DJ / PRODUCER',
-  },
 } satisfies Artist;
 
 const contacts = [] satisfies PublicContact[];
@@ -1206,19 +1189,5 @@ describe('ProfileDesktopSurface', () => {
     expect(
       screen.queryByTestId('profile-desktop-payments-card')
     ).not.toBeInTheDocument();
-  });
-
-  it('keeps its props interface exported for the lazy module loader (JOV-12207)', () => {
-    // apps/web/components/features/profile/templates/useDesktopSurfaceModule.ts
-    // types the lazily-loaded desktop surface against this module's own props
-    // interface; the export is the contract that keeps that loader typed.
-    const source = readFileSync(
-      resolve(
-        process.cwd(),
-        'components/features/profile/templates/ProfileDesktopSurface.tsx'
-      ),
-      'utf8'
-    );
-    expect(source).toContain('export interface ProfileDesktopSurfaceProps');
   });
 });

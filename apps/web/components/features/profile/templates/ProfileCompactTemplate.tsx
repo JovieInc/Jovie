@@ -207,18 +207,6 @@ function getInitialModeFromLocation(
   return modeParam === null ? fallbackMode : getProfileMode(modeParam);
 }
 
-function getInitialDrawerPresentation(): ProfileSurfacePresentation {
-  // Keep the first client render identical to the server render. The responsive
-  // presentation is synced in an effect immediately after hydration.
-  return 'standalone';
-}
-
-function getInitialIsDesktopLayout(): boolean {
-  // Keep the first client render identical to the server render. The responsive
-  // layout is synced in an effect immediately after hydration.
-  return false;
-}
-
 function getModeFromUrl(): ProfileMode {
   if (globalThis.window === undefined) {
     return 'profile';
@@ -348,11 +336,10 @@ export function ProfileCompactTemplate({
   const [drawerView, setDrawerView] = useState<DrawerView>(
     initialDrawerView ?? 'menu'
   );
+  // Match the server render until hydration resolves the responsive layout.
   const [drawerPresentation, setDrawerPresentation] =
-    useState<ProfileSurfacePresentation>(getInitialDrawerPresentation);
-  const [isDesktopLayout, setIsDesktopLayout] = useState(
-    getInitialIsDesktopLayout
-  );
+    useState<ProfileSurfacePresentation>('standalone');
+  const [isDesktopLayout, setIsDesktopLayout] = useState(false);
   const [isHydrated, setIsHydrated] = useState(false);
   const [desktopSurfaceReady, setDesktopSurfaceReady] = useState(false);
   // Embedded previews always render the compact surface. Only a desktop

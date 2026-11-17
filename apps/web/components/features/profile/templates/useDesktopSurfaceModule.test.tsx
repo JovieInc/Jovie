@@ -1,7 +1,9 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { renderToString } from 'react-dom/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { Artist } from '@/types/db';
+import { PROFILE_STORY_ARTIST } from '../profile-story-fixture';
 import type { ProfileDesktopSurfaceProps } from './ProfileDesktopSurface';
 import {
   DesktopSurfaceSlot,
@@ -28,24 +30,11 @@ beforeEach(() => {
 });
 
 const artist = {
-  id: 'artist-1',
-  owner_user_id: 'user-1',
+  ...PROFILE_STORY_ARTIST,
   name: 'Test Artist',
   handle: 'testartist',
-  spotify_id: null,
   image_url: 'https://example.com/desktop-hero.jpg',
-  tagline: null,
-  location: null,
-  hometown: null,
-  career_highlights: null,
-  is_verified: false,
-  active_since_year: null,
-  published: true,
-  is_featured: false,
-  marketing_opt_out: false,
-  created_at: '2026-11-17T00:00:00.000Z',
-  settings: {},
-} satisfies Artist;
+};
 
 const props = {
   artist,
@@ -60,7 +49,7 @@ const props = {
   profileHref: '/testartist',
 } satisfies ProfileDesktopSurfaceProps;
 
-function serverPaint(imageUrl: string | null = artist.image_url) {
+function serverPaint(imageUrl?: string) {
   const container = document.createElement('div');
   container.innerHTML = renderToString(
     <DesktopSurfaceSlot
@@ -73,8 +62,22 @@ function serverPaint(imageUrl: string | null = artist.image_url) {
 }
 
 describe('desktop surface server paint', () => {
+  it('keeps its props interface exported for the lazy module loader (JOV-12207)', () => {
+    // apps/web/components/features/profile/templates/useDesktopSurfaceModule.ts
+    // types the lazily-loaded desktop surface against this module's own props
+    // interface; the export is the contract that keeps that loader typed.
+    const source = readFileSync(
+      resolve(
+        process.cwd(),
+        'components/features/profile/templates/ProfileDesktopSurface.tsx'
+      ),
+      'utf8'
+    );
+    expect(source).toContain('export interface ProfileDesktopSurfaceProps');
+  });
+
   it('keeps the hidden desktop hero out of mobile image preloads', () => {
-    const container = serverPaint();
+    const container = serverPaint(artist.image_url);
     expect(container.querySelector('img')).toHaveAttribute('loading', 'lazy');
     expect(
       container.querySelector('link[rel="preload"][as="image"]')
@@ -89,7 +92,7 @@ describe('desktop surface server paint', () => {
     expect(container.textContent).toContain(artist.name);
   });
 
-  it.each([null, '/avatars/default-user.png'])(
+  it.each([undefined, '/avatars/default-user.png'])(
     'keeps the fallback navigable without a custom artist image (%s)',
     imageUrl => {
       const container = serverPaint(imageUrl);
