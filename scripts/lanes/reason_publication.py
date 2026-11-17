@@ -156,6 +156,28 @@ def _valid_publication(saved, issue: dict) -> bool:
         return False
 
 
+def _read_publication(path: Path, issue: dict) -> dict:
+    info, directory = path.lstat(), path.parent.lstat()
+    if (not stat.S_ISREG(info.st_mode) or not stat.S_ISDIR(directory.st_mode)
+            or info.st_uid != os.getuid() or directory.st_uid != os.getuid()
+            or stat.S_IMODE(info.st_mode) != 0o600 or stat.S_IMODE(directory.st_mode) != 0o700):
+        raise ValueError("unsafe result path")
+    saved = json.loads(path.read_text())
+    if not _valid_publication(saved, issue):
+        raise ValueError("invalid result identity")
+    return saved
+
+
+def verified_saved_result(state: Path, issue: dict) -> bool:
+    """Read existing proof only; a file's presence cannot settle an uncertain attempt."""
+    try:
+        saved = _read_publication(publication_path(state, issue), issue)
+        backend = (saved["outcome"]["record"].get("provenance") or {}).get("backend")
+        return backend is None or isinstance(backend, dict) and backend.get("status") == "qualified"
+    except (OSError, ValueError, TypeError, KeyError, AttributeError):
+        return False
+
+
 def _blocked_publication(record: dict, reason: str) -> dict:
     action = ("The incumbent must reconcile the retained result and obtain current deadline authority before "
               "any publication; do not rerun the model." if reason == "reason-result-deadline-passed" else
@@ -256,14 +278,7 @@ def resume_result(linear, issue: dict, state: Path, *, is_expired, invalid_recor
     path = publication_path(state, issue)
     if pending_publication(state, issue):
         try:
-            info, directory = path.lstat(), path.parent.lstat()
-            if (not stat.S_ISREG(info.st_mode) or not stat.S_ISDIR(directory.st_mode)
-                    or info.st_uid != os.getuid() or directory.st_uid != os.getuid()
-                    or stat.S_IMODE(info.st_mode) != 0o600 or stat.S_IMODE(directory.st_mode) != 0o700):
-                raise ValueError("unsafe result path")
-            saved = json.loads(path.read_text())
-            if not _valid_publication(saved, issue):
-                raise ValueError("invalid result identity")
+            saved = _read_publication(path, issue)
         except (OSError, ValueError, TypeError, KeyError):
             record = invalid_record()
             blocked = _blocked_publication(record, "reason-saved-result-invalid-or-input-changed")

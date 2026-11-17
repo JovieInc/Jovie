@@ -81,6 +81,62 @@ def acquire_run_lease(state: Path, issue_id: str, identifier: str, lane: str):
     return handle
 
 
+def reason_run_block(reason: str = "reason-attempt-outcome-unknown") -> dict:
+    return {"status": "blocked", "reason": reason, "owner": "reason-lane",
+            "nextAction": ("Observe the existing local owner and retry after its lease is released."
+                           if reason == "reason-run-already-owned" else
+                           "The incumbent must reconcile the retained or remote attempt before releasing its "
+                           "local claim. Resume any sealed result without model work; never blindly repeat an uncertain paid attempt.")}
+
+
+class ReasonRunHeld(RuntimeError):
+    def __init__(self, reason):
+        super().__init__(reason)
+        self.receipt = reason_run_block(reason)
+
+
+def _reason_result(state: Path, issue: dict) -> bool:
+    from reason_publication import verified_saved_result
+    return verified_saved_result(state, issue)
+
+
+def _lost_reason(claim, lease) -> bool:
+    return linear_sync.reason_outcome_pending(claim) and lease != "live"
+
+
+def begin_reason_run(state: Path, issue: dict):
+    """Reuse the local claim and live lease; neither is a cross-host claim."""
+    from reason_publication import pending_publication
+    previous = linear_sync._claims(state).get(issue["id"])
+    retained = _reason_result(state, issue)
+    if _lost_reason(previous, run_lease(state, issue["id"])) and not retained:
+        raise ReasonRunHeld("reason-attempt-outcome-unknown")
+    lease = acquire_run_lease(state, issue["id"], issue["identifier"], "reason")
+    if lease is None:
+        raise ReasonRunHeld("reason-run-already-owned")
+    try:
+        if (previous or {}).get("lane") == "reason" and retained:
+            pass  # Resume the original artifact even after mirror supersession.
+        elif (previous or {}).get("status") == "active":
+            raise ReasonRunHeld("reason-run-already-owned")
+        elif not linear_sync.claim(state, issue["id"], issue["identifier"], "reason"):
+            raise ReasonRunHeld("reason-run-already-owned")
+        if pending_publication(state, issue) and not retained:
+            raise ReasonRunHeld("reason-attempt-outcome-unknown")
+        return lease
+    except BaseException:
+        lease.close()
+        raise
+
+
+def finish_reason_run(state: Path, issue_id: str, lease, *, settled: bool, reason="reason:returned"):
+    try:
+        if settled:
+            linear_sync.release(state, issue_id, "released", reason)
+    finally:
+        lease.close()  # A lost/uncertain attempt retains its claim for explicit reconciliation.
+
+
 def _flock_state(path: Path) -> str:
     try:
         with open(path, "a") as handle:
@@ -264,6 +320,7 @@ def reconcile(state: Path, repo: Path, open_prs: frozenset[str] | None, *, run=s
         previous = {}
     since = previous.get("ownerlessSince") if isinstance(previous.get("ownerlessSince"), dict) else {}
     rows = list((linear_sync.read_mirror(state, team).get("issues") or {}).values())
+    by_id = {row["id"]: row for row in rows}
     pending = linear_sync._pending_moves(state)
     claims = linear_sync._claims(state)
     merged = merged_identifiers(repo, run)
@@ -282,10 +339,19 @@ def reconcile(state: Path, repo: Path, open_prs: frozenset[str] | None, *, run=s
         row = {**row, "state": current}
         report["started"] += 1
         claim = claims.get(row["id"])
-        owner = owner_of(row, claim, run_lease(state, row["id"]),
+        lease = run_lease(state, row["id"])
+        lost_reason = _lost_reason(claim, lease)
+        if lost_reason and not _reason_result(state, row):
+            report["ownerless"] += 1
+            why = "reason-attempt-outcome-unknown"
+            report["unresolved"][why] = report["unresolved"].get(why, 0) + 1
+            if len(report["sample"]) < 20:
+                report["sample"].append({"issue": row["identifier"], "state": current, **reason_run_block(why)})
+            continue
+        owner = None if lost_reason else owner_of(row, claim, lease,
                          open_prs=open_prs or frozenset(), merged=merged, handoffs=handoffs,
                          worktrees=worktrees, open_children=open_children, now=now)
-        if owner is None and open_prs is None:
+        if owner is None and open_prs is None and not lost_reason:
             owner = "unknown-pr-inventory"  # an unreadable PR list never orphans an issue
         if owner is None and current in ("Merging", "Validating"):
             evidence = org_merged_evidence(state, row["identifier"].upper(), search, now, budget)
@@ -346,6 +412,8 @@ def reconcile(state: Path, repo: Path, open_prs: frozenset[str] | None, *, run=s
             lease = binding_lease(state, ident) or lease
         if lease == "live":
             continue
+        if _lost_reason(claim, lease) and not _reason_result(state, by_id.get(issue_id, {"id": issue_id})):
+            continue  # Never turn an uncertain reason attempt into generic Todo replay.
         if lease is None and now - claim["claimedAt"] < LEGACY_RUN_GRACE_S:
             continue
         linear_sync.release(state, issue_id, "released", "ownership:no-live-lease")

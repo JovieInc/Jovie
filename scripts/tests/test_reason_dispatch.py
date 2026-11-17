@@ -407,8 +407,7 @@ with open(os.environ['INSTALL_COMMAND_LOG'], 'a') as log:
             def publish(*args, **kwargs):
                 self.assertTrue(rejected.wait(3), "competing drain did not return busy")
                 (host.state / "durable-result").write_text("accepted once")
-                linear.move(job["id"], "Done")
-                return {"confidence": "high", "publication": {"status": "published"}}
+                return importlib.import_module("scripts.tests.test_release_fixtures").publish_reason_fixture(reason, *args)
             def spawn(*args, **kwargs):
                 first_checked.set()
                 barrier.wait(3)

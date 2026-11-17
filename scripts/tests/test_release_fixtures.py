@@ -21,6 +21,15 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 
 
+def publish_reason_fixture(reason, linear, issue, config, state):
+    """Use the real seal/readback protocol when a scheduler fixture claims publication."""
+    job = reason.parse_job(issue["identifier"], issue["title"], issue.get("description") or "")
+    record = reason.result_record(job, {"confidence": "high", "agreement": 1, "reasons": ["fixture"]},
+                                  None, None, "fixture", None, None)
+    return reason.publish_result(linear, issue, job, config, state, {"record": record}, "", "fixture",
+                                 render=reason.render_comment, is_expired=lambda _: False, run=None)
+
+
 def release_lists(path=ROOT / "scripts/lanes/lane_runner.py"):
     """LANE_TESTS and RELEASE_EXTRAS as lane_runner.py declares them (literals, read without importing)."""
     found = {}

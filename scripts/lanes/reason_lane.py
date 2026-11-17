@@ -908,16 +908,14 @@ def drain(host, lane, config: dict | None = None, run=lifecycle.run) -> dict:
                     attempted.add(issue["identifier"])
                     continue  # another host took it; a cached queue must not spin on it
                 # The run lease is this process's live ownership of the started issue.
-                lease = _ownership().acquire_run_lease(host.state, issue["id"], issue["identifier"], "reason")
-                linear.move(issue["id"], "In Progress", owner="reason-run-lease")
+                try:
+                    lease = _reason_dispatch.accept_run(host, linear, issue)
+                except _ownership().ReasonRunHeld as error:
+                    blocked.append({"job": issue["identifier"], **error.receipt}); attempted.add(issue["identifier"]); continue
             finally:
                 claim.release()
             attempted.add(issue["identifier"])  # a retried job waits for the next drain
-            try:
-                record = one_job(linear, issue, config, host.state, run=run)
-            finally:
-                if lease is not None:
-                    lease.close()
+            record = _reason_dispatch.run_claimed(host, linear, issue, config, lease, one_job=one_job, run=run)
             publication = record.get("publication") or {}
             if publication.get("status") == "blocked":
                 blocked.append({"job": issue["identifier"], **publication})
@@ -972,14 +970,7 @@ def guarded_main(argv: list[str] | None = None) -> int:
     team, number = args.identifier.upper().split("-")
     node = linear.gql('query($t:String!,$n:Float!){issues(first:1,filter:{team:{key:{eq:$t}},number:{eq:$n}})'
                       '{nodes{id identifier title description}}}', {"t": team, "n": float(number)})["issues"]["nodes"][0]
-    lease = _ownership().acquire_run_lease(host.state, node["id"], node["identifier"], "reason")
-    linear.move(node["id"], "In Progress", owner="reason-run-lease")
-    try:
-        print(json.dumps(one_job(linear, node, config, host.state), indent=1))
-    finally:
-        if lease is not None:
-            lease.close()
-    return 0
+    return _reason_dispatch.direct_run(host, lane, linear, node, config, one_job=one_job)
 
 
 def main(argv: list[str] | None = None) -> int:
