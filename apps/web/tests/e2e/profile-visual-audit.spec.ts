@@ -472,6 +472,36 @@ test.describe('profile publication gate', () => {
       robotsMetas.filter(meta => /content="[^"]*noindex/.test(meta))
     ).toHaveLength(1);
   });
+
+  // JOV-12081: the unknown-handle 404 must be server-rendered. The miss
+  // rewrite used to target the prerendered profile-mode-render route, where
+  // notFound() during the ISR fallback render served Next's flight-only
+  // `__next_error__` shell — no rendered body, no robots meta — so axe, the
+  // overflow guard and the visual audit all timed out waiting for the branded
+  // boundary. The dynamic profile-miss route renders it in the first HTML.
+  test('unknown-handle 404 renders the branded boundary in the SSR HTML', async ({
+    page,
+  }) => {
+    const unknown = await page.request.get('/zz-no-such-artist-e2e-gate');
+    expect(unknown.status()).toBe(404);
+    const html = await unknown.text();
+    expect(html).not.toContain('__next_error__');
+    expect(html).toContain('data-testid="not-found"');
+    expect(html).not.toContain('profile-compact-shell');
+  });
+
+  // JOV-12081: `?mode=` must survive the prerendered profile route. The
+  // rewrite used to sit in afterFiles, which never wins over a prerendered
+  // route, so ?mode=listen silently rendered the home document and the DSP
+  // audit exercised only the home's Spotify CTA.
+  test('?mode=listen renders the listen surface in the SSR HTML', async ({
+    page,
+  }) => {
+    const response = await page.request.get(`/${TEST_PROFILE}?mode=listen`);
+    expect(response.status()).toBe(200);
+    const html = await response.text();
+    expect(html).toContain('data-profile-mode="listen"');
+  });
 });
 
 // JOV-10246: the release artwork (profile LCP element) is server-rendered
@@ -482,5 +512,25 @@ test.describe('profile LCP artwork', () => {
     expect(response.status()).toBe(200);
     const html = await response.text();
     expect(html).toMatch(/<img[^>]*fetchPriority="high"/i);
+  });
+});
+
+// The latest-release credits now load in the same batch as the other profile
+// reads instead of after them. The document must still arrive whole: status
+// 200 with the artwork in the first HTML, for visits that overlap.
+test.describe('profile batched reads', () => {
+  test('serves the whole profile document to overlapping visits', async ({
+    page,
+  }) => {
+    const responses = await Promise.all([
+      page.request.get(`/${TEST_PROFILE}`),
+      page.request.get(`/${TEST_PROFILE}`),
+    ]);
+
+    for (const response of responses) {
+      expect(response.status()).toBe(200);
+      const html = await response.text();
+      expect(html).toMatch(/<img[^>]*fetchPriority="high"/i);
+    }
   });
 });

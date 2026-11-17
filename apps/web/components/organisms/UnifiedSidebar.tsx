@@ -7,7 +7,6 @@ import { ArrowLeft, ChevronRight } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { useEffect, useMemo, useState } from 'react';
 import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
 import { AskJovieMark } from '@/components/ask-jovie/AskJovie';
 import { BrandLogo } from '@/components/atoms/BrandLogo';
@@ -20,7 +19,6 @@ import {
   SidebarGroup,
   SidebarGroupContent,
   SidebarHeader,
-  SidebarMenu,
   useSidebar,
 } from '@/components/organisms/sidebar';
 import { SidebarIdentityGroup } from '@/components/organisms/sidebar-identity-group';
@@ -31,26 +29,22 @@ import {
   SHELL_RAIL_LABEL,
 } from '@/components/shell/rail-motion';
 import { SidebarInboxLink } from '@/components/shell/SidebarInboxLink';
-import { SIDEBAR_ENTRY_LABEL_INSET_CLASS } from '@/components/shell/sidebar-optical';
 import { APP_ROUTES, isDemoRoutePath } from '@/constants/routes';
 import { useShellSidebarOverride } from '@/contexts/ShellSidebarOverrideContext';
 import { DashboardNav } from '@/features/dashboard/dashboard-nav';
-import {
-  artistSettingsNavigation,
-  paymentsNavItem,
-  userSettingsNavigation,
-} from '@/features/dashboard/dashboard-nav/config';
-import { NavMenuItem } from '@/features/dashboard/dashboard-nav/NavMenuItem';
 import type { NavItem } from '@/features/dashboard/dashboard-nav/types';
 import { ProfileCompletionCard } from '@/features/dashboard/molecules/ProfileCompletionCard';
 import { useProfileData } from '@/hooks/useProfileData';
 import { APP_SHELL_WORKSPACES } from '@/lib/app-shell/workspaces';
 import { BRAND_WORDMARKS, type BrandVariant } from '@/lib/brand/tokens';
 import { useIsElectronRuntime } from '@/lib/desktop/electron-bridge';
-import { useAppFlag } from '@/lib/flags/client';
-import { useDashboardProfileQuery } from '@/lib/queries/useDashboardProfileQuery';
 import { cn } from '@/lib/utils';
 import type { AppShellSection } from '@/types/app-shell';
+import {
+  OPERATOR_RAIL_PINNED_GROUP_CLASS,
+  resolveOperatorNavGroup,
+  useOperatorGroupOpen,
+} from './operator-nav-group';
 import {
   isOperatorNavigationHrefActive,
   OPERATOR_NAV_GROUP_LABEL,
@@ -58,6 +52,7 @@ import {
   type OperatorNavSection,
 } from './operator-navigation';
 import { IdentitySwitcher } from './ProfileSwitcher';
+import { SettingsNavGroup, SettingsNavigation } from './SettingsSidebarNav';
 import { SidebarDockBridge } from './SidebarDockBridge';
 
 // Founder-only (OV) block: split out so creator routes never ship it.
@@ -72,42 +67,6 @@ export interface UnifiedSidebarProps {
   /** Only transfer the collapsed browser action when a header is present. */
   readonly headerOwnsCollapsedToggle?: boolean;
 }
-
-/** Render a group of nav items */
-function SettingsNavGroup({
-  items,
-  pathname,
-  isItemActive,
-  onPrefetch,
-}: Readonly<{
-  items: readonly NavItem[];
-  pathname: string;
-  isItemActive?: (item: NavItem) => boolean;
-  onPrefetch?: (item: NavItem) => void;
-}>) {
-  return (
-    <SidebarMenu>
-      {items.map(item => {
-        const isActive =
-          isItemActive?.(item) ??
-          (pathname === item.href || pathname.startsWith(`${item.href}/`));
-        return (
-          <NavMenuItem
-            key={item.id}
-            item={item}
-            isActive={isActive}
-            calm
-            onPrefetch={onPrefetch ? () => onPrefetch(item) : undefined}
-          />
-        );
-      })}
-    </SidebarMenu>
-  );
-}
-
-/** Tools keeps its original key so saved preferences survive; others append the id. */
-const groupOpenKey = (id: string) =>
-  id === 'tools' ? 'ovie.nav.tools-open.v1' : `ovie.nav.${id}-open.v1`;
 
 /**
  * One operator nav group. Tools is collapsed by default (Tim 2026-10-21: Ovie
@@ -128,36 +87,23 @@ function OperatorNavGroup({
       .then(m => queryClient.prefetchQuery(m.shippingStateQueryOptions))
       .catch(() => undefined); // A missed prefetch must not reload the page.
   };
-  const [stored, setStored] = useState(false);
-  useEffect(() => {
-    if (!section.collapsible) return;
-    try {
-      setStored(
-        globalThis.localStorage?.getItem(groupOpenKey(section.id)) === '1'
-      );
-    } catch {
-      // Storage is a per-viewer convenience; the group defaults to closed.
-    }
-  }, [section.collapsible, section.id]);
+  const { stored, toggle } = useOperatorGroupOpen(section);
+  const { state, isMobile } = useSidebar();
   const isActive = (item: NavItem) =>
     isOperatorNavigationHrefActive(pathname, item.href);
-  const holdsActive = section.items.some(isActive);
-  const open = !section.collapsible || stored || holdsActive;
-  const toggle = () => {
-    const next = !stored;
-    setStored(next);
-    try {
-      globalThis.localStorage?.setItem(
-        groupOpenKey(section.id),
-        next ? '1' : '0'
-      );
-    } catch {
-      // Ignore unavailable storage.
-    }
-  };
+  const { holdsActive, open, items, pinnedInRail } = resolveOperatorNavGroup({
+    collapsible: section.collapsible,
+    items: section.items,
+    isActive,
+    stored,
+    railCollapsed: state === 'closed' && !isMobile,
+  });
   const groupId = `ov-nav-${section.id}`;
   return (
-    <div data-testid={`ov-nav-section-${section.id}`}>
+    <div
+      data-testid={`ov-nav-section-${section.id}`}
+      className={cn(pinnedInRail && OPERATOR_RAIL_PINNED_GROUP_CLASS)}
+    >
       {section.label && section.collapsible ? (
         <button
           type='button'
@@ -187,7 +133,7 @@ function OperatorNavGroup({
       ) : null}
       <div id={groupId} hidden={!open}>
         <SettingsNavGroup
-          items={section.items}
+          items={items}
           pathname={pathname}
           isItemActive={isActive}
           onPrefetch={prefetchShipping}
@@ -199,6 +145,7 @@ function OperatorNavGroup({
 
 /** Dedicated operator navigation; customer DashboardNav stays customer-only. */
 function OperatorNavigation({ pathname }: { readonly pathname: string }) {
+  const { state, isMobile } = useSidebar();
   return (
     <div className='flex flex-1 flex-col gap-4 overflow-y-auto pt-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden'>
       <nav aria-label='OV Navigation' className='flex flex-col gap-4'>
@@ -212,90 +159,10 @@ function OperatorNavigation({ pathname }: { readonly pathname: string }) {
       </nav>
       {/* Dynamic list hrefs stay outside the canonical OV landmark so the
           registry link set remains exact. */}
-      <OperatorListsNav pathname={pathname} />
+      <div hidden={state === 'closed' && !isMobile}>
+        <OperatorListsNav pathname={pathname} />
+      </div>
     </div>
-  );
-}
-
-/** Navigation list for settings section — grouped with labels like Linear */
-function SettingsNavigation({
-  pathname,
-  section,
-}: {
-  pathname: string;
-  section: string;
-}) {
-  const { selectedProfile } = useDashboardData();
-  const isStripeConnectEnabled = useAppFlag('STRIPE_CONNECT_ENABLED');
-  // Prefer the TanStack Query cache (updated by profile mutations) over
-  // the server-rendered context so the sidebar reflects name edits immediately.
-  const { data: cachedProfileData } = useDashboardProfileQuery();
-  // Cache may hold either the unwrapped DashboardProfile (from optimistic updates)
-  // or the { profile: DashboardProfile } envelope (from server refetch).
-  const cachedDisplayName =
-    cachedProfileData?.displayName ??
-    (
-      cachedProfileData as unknown as {
-        profile?: { displayName?: string | null };
-      }
-    )?.profile?.displayName;
-  // Only fall back to selectedProfile when cache hasn't loaded yet (undefined/null).
-  // If cachedDisplayName is empty string, the user intentionally cleared it.
-  const artistName =
-    cachedDisplayName == null
-      ? selectedProfile?.displayName?.trim() || undefined
-      : cachedDisplayName.trim() || undefined;
-
-  // Build user settings items with conditional Payments
-  const userItems = useMemo(() => {
-    if (!isStripeConnectEnabled) return userSettingsNavigation;
-    // Insert Payments after Billing & Subscription
-    const billingIndex = userSettingsNavigation.findIndex(
-      i => i.id === 'billing'
-    );
-    const items = [...userSettingsNavigation];
-    items.splice(billingIndex + 1, 0, paymentsNavItem);
-    return items;
-  }, [isStripeConnectEnabled]);
-
-  // Replace "Profile" label with the artist's display name when available
-  const artistItems = useMemo(() => {
-    if (!artistName) return artistSettingsNavigation;
-    return artistSettingsNavigation.map(item =>
-      item.id === 'artist-profile' ? { ...item, name: artistName } : item
-    );
-  }, [artistName]);
-
-  return (
-    <nav
-      aria-label={`${section} navigation`}
-      className='flex flex-1 flex-col gap-4 overflow-y-auto pt-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden'
-    >
-      <div>
-        <span
-          className={cn(
-            'mb-1.5 block text-xs font-caption tracking-normal text-sidebar-muted',
-            SIDEBAR_ENTRY_LABEL_INSET_CLASS,
-            SHELL_RAIL_LABEL
-          )}
-        >
-          Account
-        </span>
-        <SettingsNavGroup items={userItems} pathname={pathname} />
-      </div>
-      <div>
-        <span
-          className={cn(
-            'mb-1.5 block text-xs font-caption tracking-normal text-sidebar-muted',
-            SIDEBAR_ENTRY_LABEL_INSET_CLASS,
-            SHELL_RAIL_LABEL
-          )}
-        >
-          Artist
-        </span>
-        <SettingsNavGroup items={artistItems} pathname={pathname} />
-      </div>
-    </nav>
   );
 }
 
@@ -528,7 +395,9 @@ export function UnifiedSidebar({
             {section === 'ov' ? (
               <OperatorNavigation pathname={pathname} />
             ) : isInSettings ? (
-              <SettingsNavigation pathname={pathname} section={section} />
+              <div className='flex flex-1 flex-col overflow-y-auto pt-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden'>
+                <SettingsNavigation pathname={pathname} section={section} />
+              </div>
             ) : sidebarOverride ? (
               sidebarOverride.content
             ) : (

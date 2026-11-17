@@ -10,6 +10,7 @@ const {
   mockSet,
   mockWhere,
   mockRevalidateTag,
+  mockUpdateTag,
   mockTrackServerEvent,
   mockAnd,
   mockEq,
@@ -23,6 +24,7 @@ const {
   mockSet: vi.fn(),
   mockWhere: vi.fn(),
   mockRevalidateTag: vi.fn(),
+  mockUpdateTag: vi.fn(),
   mockTrackServerEvent: vi.fn(),
   mockAnd: vi.fn((...args: unknown[]) => ({ _and: args })),
   mockEq: vi.fn((a: unknown, b: unknown) => ({ _eq: [a, b] })),
@@ -58,6 +60,7 @@ vi.mock('@/lib/server-analytics', () => ({
 vi.mock('next/cache', () => ({
   unstable_noStore: vi.fn(),
   revalidateTag: mockRevalidateTag,
+  updateTag: mockUpdateTag,
 }));
 
 vi.mock('drizzle-orm', () => ({
@@ -74,7 +77,11 @@ function setupAuthenticatedUser() {
   mockGetDashboardDataEssential.mockResolvedValue({
     dashboardLoadError: null,
     needsOnboarding: false,
-    selectedProfile: { id: 'prof_123' },
+    selectedProfile: {
+      id: 'prof_123',
+      username: 'TestArtist',
+      usernameNormalized: 'testartist',
+    },
   });
 }
 
@@ -107,6 +114,7 @@ describe('event moderation server actions', () => {
     expect(result).toEqual({ ok: false, reason: 'not_found' });
     expect(mockDbUpdate).not.toHaveBeenCalled();
     expect(mockRevalidateTag).not.toHaveBeenCalled();
+    expect(mockUpdateTag).not.toHaveBeenCalled();
     expect(mockTrackServerEvent).not.toHaveBeenCalled();
   });
 
@@ -121,6 +129,7 @@ describe('event moderation server actions', () => {
     expect(result).toEqual({ ok: false, reason: 'not_found' });
     expect(mockDbUpdate).toHaveBeenCalledOnce();
     expect(mockRevalidateTag).not.toHaveBeenCalled();
+    expect(mockUpdateTag).not.toHaveBeenCalled();
     expect(mockTrackServerEvent).not.toHaveBeenCalled();
   });
 
@@ -134,6 +143,7 @@ describe('event moderation server actions', () => {
     expect(result).toEqual({ ok: false, reason: 'not_found' });
     expect(mockDbUpdate).not.toHaveBeenCalled();
     expect(mockRevalidateTag).not.toHaveBeenCalled();
+    expect(mockUpdateTag).not.toHaveBeenCalled();
     expect(mockTrackServerEvent).not.toHaveBeenCalled();
   });
 
@@ -149,6 +159,7 @@ describe('event moderation server actions', () => {
     expect(result).toEqual({ ok: false, reason: 'not_found' });
     expect(mockDbUpdate).not.toHaveBeenCalled();
     expect(mockRevalidateTag).not.toHaveBeenCalled();
+    expect(mockUpdateTag).not.toHaveBeenCalled();
     expect(mockTrackServerEvent).not.toHaveBeenCalled();
   });
 
@@ -166,11 +177,11 @@ describe('event moderation server actions', () => {
     expect(result).toEqual({ ok: false, reason: 'not_found' });
     expect(mockDbUpdate).toHaveBeenCalledOnce();
     // Cache MUST flush so stale TanStack/Next caches do not show pre-action state.
-    expect(mockRevalidateTag).toHaveBeenCalledWith(
-      'tour-dates:user_123:prof_123',
-      'max'
-    );
-    expect(mockRevalidateTag).toHaveBeenCalledWith('dashboard-data', 'max');
+    // Read-your-own-write for the inbox badge; stale-while-revalidate for the
+    // public profile page that lists confirmed dates.
+    expect(mockUpdateTag).toHaveBeenCalledWith('dashboard-data');
+    expect(mockRevalidateTag).toHaveBeenCalledWith('profile:testartist', 'max');
+    expect(mockRevalidateTag).toHaveBeenCalledTimes(1);
     expect(mockTrackServerEvent).not.toHaveBeenCalled();
   });
 
@@ -189,11 +200,11 @@ describe('event moderation server actions', () => {
       requested: 2,
       updated: 2,
     });
-    expect(mockRevalidateTag).toHaveBeenCalledWith(
-      'tour-dates:user_123:prof_123',
-      'max'
-    );
-    expect(mockRevalidateTag).toHaveBeenCalledWith('dashboard-data', 'max');
+    // Read-your-own-write for the inbox badge; stale-while-revalidate for the
+    // public profile page that lists confirmed dates.
+    expect(mockUpdateTag).toHaveBeenCalledWith('dashboard-data');
+    expect(mockRevalidateTag).toHaveBeenCalledWith('profile:testartist', 'max');
+    expect(mockRevalidateTag).toHaveBeenCalledTimes(1);
   });
 
   it('undoRejectEvent stays scoped to profileId and only matches rejected rows', async () => {

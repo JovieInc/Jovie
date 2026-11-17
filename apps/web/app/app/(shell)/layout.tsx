@@ -4,6 +4,7 @@ import { headers } from 'next/headers';
 import { redirect, unstable_rethrow } from 'next/navigation';
 import { Suspense } from 'react';
 import { OvieRouteUsageBeacon } from '@/components/features/admin/OvieRouteUsageBeacon';
+import { TeleprompterStudioHost } from '@/components/features/teleprompter-studio/TeleprompterStudioHost';
 import { AppShellSkeleton } from '@/components/organisms/AppShellSkeleton';
 import { PersistentAudioBar } from '@/components/organisms/PersistentAudioBar';
 import { NuqsProvider } from '@/components/providers/NuqsProvider';
@@ -136,6 +137,7 @@ export default async function AppShellLayout({
     return (
       <NuqsProvider>
         {mode === 'ov' ? <OvieRouteUsageBeacon /> : null}
+        <TeleprompterStudioHost />
         <Suspense fallback={shellFallback}>
           <DashboardShellContent
             userId={auth.userId}

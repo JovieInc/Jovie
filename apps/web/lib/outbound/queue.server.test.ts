@@ -4,6 +4,8 @@ const mocks = vi.hoisted(() => ({
   results: [] as unknown[][],
   ledger: vi.fn(),
   execute: vi.fn(),
+  flag: vi.fn(),
+  judgeLedger: vi.fn(),
 }));
 
 function chain(result: unknown[]) {
@@ -28,6 +30,20 @@ vi.mock('@/constants/domains', () => ({
   getAppUrl: (path: string) => `https://jov.ie${path}`,
 }));
 
+vi.mock('@/lib/flags/server', () => ({ getAppFlagValue: mocks.flag }));
+vi.mock('@/lib/agent-os/dogfood-judge-runtime-store', () => ({
+  getDogfoodJudgeLedger: () => ({ read: mocks.judgeLedger }),
+}));
+vi.mock('@/lib/leads/lead-claim-token', () => ({
+  resolveLeadClaimToken: vi.fn(async () => 'tok'),
+}));
+
+import {
+  outboundCopyEvidenceKey,
+  outboundCopyRevision,
+  outboundTargetRevision,
+} from './approval';
+import { outboundTargetFromLead } from './ledger.server';
 import { getOutboundQueue } from './queue.server';
 
 const base = {
@@ -55,6 +71,8 @@ const base = {
 
 describe('getOutboundQueue', () => {
   beforeEach(() => {
+    mocks.flag.mockReset().mockResolvedValue(false);
+    mocks.judgeLedger.mockReset().mockResolvedValue(null);
     mocks.ledger.mockResolvedValue(new Map());
     mocks.execute.mockReset();
     mocks.execute.mockResolvedValue({ rows: [] });
@@ -163,5 +181,154 @@ describe('getOutboundQueue', () => {
     expect(queue.rows).toEqual([]);
     expect(queue.counts.ready).toBe(0);
     expect(mocks.execute).not.toHaveBeenCalled();
+  });
+});
+
+const NOW = new Date('2026-11-12T12:00:00Z');
+const lead = {
+  ...base,
+  id: 'lead-1',
+  linktreeHandle: 'ada',
+  displayName: 'Ada',
+  contactEmail: 'ada@example.com',
+  status: 'ingested',
+  fitScore: 70,
+  creatorProfileId: 'profile-1',
+  profileUsername: 'ada',
+};
+const surfaces = ['onboarding', 'outbound-artifact:profile-1'] as const;
+function judgeEvidence() {
+  return {
+    schema: 'jovie.dogfood-judge-ledger/v1',
+    currentFingerprint: 'fp',
+    requiredSurfaces: surfaces,
+    surfaces: Object.fromEntries(
+      surfaces.map(id => [
+        id,
+        {
+          verdict: 'pass',
+          nothingWrong: true,
+          signatureVerified: true,
+          fingerprint: 'fp',
+          sourceSha: null,
+          judgedAt: NOW.toISOString(),
+        },
+      ])
+    ),
+  };
+}
+
+describe('queue draft visibility', () => {
+  beforeEach(() => {
+    mocks.flag.mockReset().mockResolvedValue(true);
+    mocks.judgeLedger.mockReset().mockResolvedValue(judgeEvidence());
+    mocks.results = [[lead], [], []];
+    mocks.ledger.mockResolvedValue(new Map());
+    mocks.execute.mockResolvedValue({
+      rows: [
+        {
+          id: 'profile-1',
+          dsp: true,
+          catalog: true,
+          search: true,
+          reachability: true,
+        },
+      ],
+    });
+  });
+
+  function saveCopy() {
+    const targetRevision = outboundTargetRevision(outboundTargetFromLead(lead));
+    const copy = {
+      channel: 'email' as const,
+      subject: 'Private subject',
+      body: 'Private saved draft',
+    };
+    mocks.ledger.mockResolvedValue(
+      new Map([
+        [
+          lead.id,
+          [
+            {
+              evidenceKey: outboundCopyEvidenceKey(lead.id),
+              evidenceRevision: outboundCopyRevision(targetRevision, copy),
+              decision: 'unsure',
+              snapshot: { targetRevision, ...copy },
+              actorUserId: 'tim',
+              createdAt: NOW,
+            },
+          ],
+        ],
+      ])
+    );
+    return copy;
+  }
+
+  it.each(surfaces)(
+    'hides generated and saved drafts when %s is missing or fails',
+    async surface => {
+      for (const saved of [false, true]) {
+        if (saved) saveCopy();
+        for (const verdict of [null, 'fail']) {
+          const evidence = judgeEvidence();
+          if (verdict === null) delete evidence.surfaces[surface];
+          else evidence.surfaces[surface].verdict = verdict;
+          mocks.judgeLedger.mockResolvedValue(evidence);
+          mocks.results = [[lead], [], []];
+          const queue = await getOutboundQueue(NOW);
+          expect(queue.rows[0]).toMatchObject({
+            view: 'needs_judge',
+            nextAction: 'await_judge',
+            message: null,
+          });
+          expect(queue.counts.needs_judge).toBe(1);
+          expect(JSON.stringify(queue)).not.toContain('Private saved draft');
+        }
+      }
+    }
+  );
+
+  it('retains generated and saved drafts only after both surfaces pass', async () => {
+    const generated = await getOutboundQueue(NOW);
+    expect(generated.rows[0].view).toBe('ready');
+    expect(generated.rows[0].message?.body).toContain('/claim/tok');
+    const copy = saveCopy();
+    mocks.results = [[lead], [], []];
+    expect((await getOutboundQueue(NOW)).rows[0].message).toMatchObject(copy);
+    expect(mocks.judgeLedger).toHaveBeenCalledTimes(2);
+    expect(mocks.flag).toHaveBeenCalledWith('OUTBOUND_DOGFOOD_GATE');
+  });
+
+  it.each(['absent', 'unreadable', 'stale', 'flag-unreadable', 'no-profile'])(
+    'fails closed for %s evidence',
+    async failure => {
+      saveCopy();
+      if (failure === 'absent') mocks.judgeLedger.mockResolvedValue(null);
+      if (failure === 'unreadable')
+        mocks.judgeLedger.mockRejectedValue(new Error('offline'));
+      if (failure === 'stale') {
+        const evidence = judgeEvidence();
+        evidence.surfaces.onboarding.judgedAt = '2026-10-01T00:00:00Z';
+        mocks.judgeLedger.mockResolvedValue(evidence);
+      }
+      if (failure === 'flag-unreadable') {
+        mocks.flag.mockRejectedValue(new Error('offline'));
+        mocks.judgeLedger.mockResolvedValue(null);
+      }
+      if (failure === 'no-profile')
+        mocks.results = [[{ ...lead, creatorProfileId: null }], [], []];
+      expect((await getOutboundQueue(NOW)).rows[0]).toMatchObject({
+        view: 'needs_judge',
+        message: null,
+      });
+    }
+  );
+
+  it('preserves existing draft visibility without reading the judge when explicitly disabled', async () => {
+    mocks.flag.mockResolvedValue(false);
+    mocks.judgeLedger.mockRejectedValue(new Error('must not read'));
+    const copy = saveCopy();
+    expect((await getOutboundQueue(NOW)).rows[0].message).toMatchObject(copy);
+    expect(mocks.judgeLedger).not.toHaveBeenCalled();
   });
 });

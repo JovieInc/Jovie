@@ -14,6 +14,14 @@ import {
   certificationRecordJson,
   mutateCertificationRecord,
 } from '@/lib/agent-os/certification-cas';
+import { learningRef } from './learning-contract';
+import {
+  type AcquisitionLearningFeedbackPorts,
+  type AcquisitionLearningFeedbackReceipt,
+  attachLearningFeedback,
+  parseLearningFeedbackHistory,
+  prepareLearningFeedback,
+} from './learning-feedback';
 
 export interface AcquisitionCertificationCandidate {
   readonly subjectId: string;
@@ -58,10 +66,12 @@ interface AcquisitionCertificationRecord {
   readonly contract: 'jovie.certification/v1';
   readonly subjectId: string;
   readonly receipts: readonly AcquisitionDecisionReceipt[];
+  readonly learningFeedback?: readonly AcquisitionLearningFeedbackReceipt[];
 }
 
 /** Server integrations must supply these guarantees before any action is exposed. */
 export interface AcquisitionCertificationPorts {
+  readonly learningFeedback?: AcquisitionLearningFeedbackPorts;
   /** Hold/recheck the canonical domain revision through the operation's writes. */
   withCurrentCandidate<T>(
     subjectId: string,
@@ -146,9 +156,13 @@ function bindCandidate(
 function projectCandidate(
   candidate: AcquisitionCertificationCandidate,
   now: string,
-  receipts: readonly AcquisitionDecisionReceipt[]
+  receipts: readonly AcquisitionDecisionReceipt[],
+  learningFeedback: readonly AcquisitionLearningFeedbackReceipt[] = []
 ) {
-  const packet = bindCandidate(candidate);
+  const packet = attachLearningFeedback(
+    bindCandidate(candidate),
+    learningFeedback
+  );
   const missing: string[] = [];
   for (const key of [
     'leadId',
@@ -210,6 +224,7 @@ function projectCandidate(
     evidenceDigest: buildCertificationDecisionDigest(packet),
     canCertify: missing.length === 0 && admission.state === 'review_ready',
     receipts,
+    learningFeedback,
   };
 }
 
@@ -224,6 +239,7 @@ function parseRecord(stored: unknown): AcquisitionCertificationRecord {
   )
     throw new Error('Invalid acquisition certification record.');
   subjectKey(value.subjectId);
+  parseLearningFeedbackHistory(value.learningFeedback);
   const ids = new Set<string>();
   for (const receipt of value.receipts) {
     if (
@@ -286,6 +302,53 @@ export class AcquisitionCertificationStore {
     });
   }
 
+  /** Private source intake only; no fix, compiler, rebuild, send or exposure executes. */
+  async ingestLearningFeedback(request: {
+    subjectId: string;
+    sourceRef: string;
+    expectedRevision: string;
+  }): Promise<AcquisitionLearningFeedbackReceipt> {
+    subjectKey(request.subjectId);
+    const ports = this.ports.learningFeedback;
+    if (!ports) throw new Error('No canonical feedback source connected.');
+    return this.ports.withCurrentCandidate(
+      request.subjectId,
+      async candidate => {
+        if (
+          candidate.subjectId !== request.subjectId ||
+          candidate.revision !== request.expectedRevision
+        )
+          throw new Error('Stale feedback candidate revision.');
+        const feedback = await ports.resolve(
+          learningRef.parse(request.sourceRef)
+        );
+        const prepare = (
+          history: readonly AcquisitionLearningFeedbackReceipt[]
+        ) =>
+          prepareLearningFeedback({
+            candidate,
+            context: ports.context(candidate),
+            sourceRef: request.sourceRef,
+            feedback,
+            history,
+            now: this.ports.now(),
+          });
+        prepare([]); // Check cancellation and binding before even initializing a record.
+        return this.mutate(request.subjectId, record => {
+          const history = record.learningFeedback ?? [];
+          const next = prepare(history);
+          return {
+            ledger:
+              next.history === history
+                ? record
+                : { ...record, learningFeedback: next.history },
+            result: next.receipt,
+          };
+        });
+      }
+    );
+  }
+
   async project(subjectId: string) {
     subjectKey(subjectId);
     return this.ports.withCurrentCandidate(subjectId, async candidate => {
@@ -298,7 +361,8 @@ export class AcquisitionCertificationStore {
       const projection = projectCandidate(
         candidate,
         this.ports.now(),
-        record?.receipts ?? []
+        record?.receipts ?? [],
+        record?.learningFeedback ?? []
       );
       if (!this.ports.effect) {
         return {
@@ -356,7 +420,8 @@ export class AcquisitionCertificationStore {
           const projection = projectCandidate(
             candidate,
             now,
-            previous ? [] : record.receipts
+            previous ? [] : record.receipts,
+            record.learningFeedback ?? []
           );
           if (
             request.revision !== candidate.revision ||

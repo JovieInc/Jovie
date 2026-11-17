@@ -1,4 +1,4 @@
-import { render, screen, within } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { usePathname } from 'next/navigation';
 import { useEffect } from 'react';
@@ -12,6 +12,7 @@ import {
   KeyboardShortcutsProvider,
   useKeyboardShortcuts,
 } from '@/contexts/KeyboardShortcutsContext';
+import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import { KeyboardShortcutsSheet } from './KeyboardShortcutsSheet';
 
 vi.mock('next/navigation', () => ({ usePathname: vi.fn(() => '/app') }));
@@ -24,9 +25,14 @@ function OpenOnMount() {
   return null;
 }
 
-function renderSheet(isAdmin: boolean, pathname = '/app') {
-  vi.mocked(usePathname).mockReturnValue(pathname);
-  return render(
+function SheetTree({
+  isAdmin,
+  tick = 0,
+}: {
+  readonly isAdmin: boolean;
+  readonly tick?: number;
+}) {
+  return (
     <DashboardDataContext.Provider
       value={
         {
@@ -42,8 +48,14 @@ function renderSheet(isAdmin: boolean, pathname = '/app') {
           <KeyboardShortcutsSheet />
         </KeyboardShortcutsProvider>
       </FounderDoorProvider>
+      <span data-tick={tick} hidden />
     </DashboardDataContext.Provider>
   );
+}
+
+function renderSheet(isAdmin: boolean, pathname = '/app') {
+  vi.mocked(usePathname).mockReturnValue(pathname);
+  return render(<SheetTree isAdmin={isAdmin} />);
 }
 
 describe('KeyboardShortcutsSheet', () => {
@@ -104,4 +116,40 @@ it('offers a Clear Search next step from the no-results state', async () => {
     within(noResults).getByRole('button', { name: 'Clear Search' })
   );
   expect(view.getByText('Open command menu')).toBeInTheDocument();
+});
+
+it('is axe-clean with results and in the no-results state', async () => {
+  renderSheet(false);
+  const user = userEvent.setup();
+  const sheet = screen.getByRole('dialog');
+  await expectNoA11yViolations(sheet);
+
+  await user.type(screen.getByPlaceholderText('Search shortcuts'), 'zzzz');
+  expect(screen.getByText(/No shortcuts found/)).toBeInTheDocument();
+  await expectNoA11yViolations(sheet);
+});
+
+// Escape is excluded on purpose: it is the sheet's dismiss key (Radix closes
+// the dialog and handleOpenChange clears the query), so a typed query is not
+// expected to survive it. Retention is asserted across a parent rerender and
+// a blur, which must never touch the query or move focus on their own.
+it('keeps the typed query and focus through a parent rerender and blur', async () => {
+  vi.mocked(usePathname).mockReturnValue('/app');
+  const view = render(<SheetTree isAdmin={false} tick={0} />);
+  const user = userEvent.setup();
+  const input = screen.getByPlaceholderText('Search shortcuts');
+
+  await user.type(input, 'command');
+  expect(input).toHaveValue('command');
+  expect(input).toHaveFocus();
+
+  view.rerender(<SheetTree isAdmin={false} tick={1} />);
+  const afterRerender = screen.getByPlaceholderText('Search shortcuts');
+  expect(afterRerender).toBe(input);
+  expect(afterRerender).toHaveValue('command');
+  expect(afterRerender).toHaveFocus();
+
+  fireEvent.blur(afterRerender);
+  expect(afterRerender).toHaveValue('command');
+  expect(screen.getByText('Open command menu')).toBeInTheDocument();
 });

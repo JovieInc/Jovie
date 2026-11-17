@@ -224,7 +224,12 @@ test('baseline only shrinks, rejects moved/new/repeated hits and stale entries',
 
 test('deliberate-red CLI proof: a tracked production route exits 1; clean exits 0', () => {
   const root = mkdtempSync(join(tmpdir(), 'jovie-copy-leak-'));
-  const git = args => execFileSync('git', args, { cwd: root, stdio: 'pipe' });
+  const git = args =>
+    execFileSync('git', args, {
+      maxBuffer: 256 * 1024 * 1024,
+      cwd: root,
+      stdio: 'pipe',
+    });
   try {
     symlinkSync(
       join(process.cwd(), 'node_modules'),

@@ -11,6 +11,8 @@ const source = readFileSync(
 const ci = load(source);
 const paths = ci.jobs['ci-path-changes'];
 const compare = ci.jobs['ci-visual-snapshot-compare'];
+const marketingDom = ci.jobs['ci-visual-marketing-dom'];
+const marketingRoutes = ci.jobs['ci-visual-marketing-routes'];
 const ready = ci.jobs['ci-pr-ready'];
 test('real selector covers every rendered marketing input and unrelated API changes stay out', () => {
   const run = paths.steps.find(s =>
@@ -49,16 +51,58 @@ test('real selector covers every rendered marketing input and unrelated API chan
     "${{ steps.homepage-visual.outputs.run_marketing_dom || 'false' }}"
   );
 });
-test('existing compare job builds and certifies selected marketing inputs with exact head and no retries', () => {
+test('split lane builds selected marketing inputs once and certifies them with exact head and no retries', () => {
   assert.match(compare.if, /run_marketing_dom == 'true'/);
   for (const s of compare.steps.filter(
     s =>
       s.uses?.includes('setup-node-pnpm') ||
-      s.uses?.includes('setup-playwright') ||
-      s.name === 'Build homepage for rendered snapshot compare'
+      s.name === 'Build homepage for rendered snapshot compare' ||
+      s.name === 'Package visual compare build' ||
+      s.name === 'Upload visual compare build'
   ))
     assert.match(s.if, /run_marketing_dom == 'true'/);
-  const cert = compare.steps.find(
+  // The build job publishes exactly the artifact the suite jobs download.
+  const upload = compare.steps.find(
+    s => s.name === 'Upload visual compare build'
+  );
+  assert.equal(
+    upload.uses,
+    'actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9'
+  );
+  assert.equal(upload.with.name, 'visual-compare-build-${{ github.run_id }}');
+  assert.equal(
+    upload.continueOnError ?? upload['continue-on-error'],
+    undefined
+  );
+  // Suite jobs run only on the shared build's success and marketing selection.
+  for (const [job, selector] of [
+    [marketingDom, 'run_marketing_dom'],
+    [marketingRoutes, 'run_marketing_dom'],
+  ]) {
+    assert.ok(job, 'suite job missing');
+    assert.match(
+      job.if,
+      /needs\.ci-visual-snapshot-compare\.result == 'success'/
+    );
+    assert.match(job.if, new RegExp(selector + " == 'true'"));
+    assert.equal(job.continueOnError ?? job['continue-on-error'], undefined);
+    const download = job.steps.find(
+      s => s.name === 'Download visual compare build'
+    );
+    assert.equal(
+      download.uses,
+      'actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333'
+    );
+    assert.equal(
+      download.with.name,
+      'visual-compare-build-${{ github.run_id }}'
+    );
+    assert.equal(
+      download.continueOnError ?? download['continue-on-error'],
+      undefined
+    );
+  }
+  const cert = marketingDom.steps.find(
     s => s.name === 'Certify marketing route DOM invariants'
   );
   assert.equal(
@@ -69,38 +113,69 @@ test('existing compare job builds and certifies selected marketing inputs with e
   assert.equal(cert.env.EXPECTED_COMMIT_SHA, '${{ github.sha }}');
   assert.equal(cert.env.ROUTE_DOM_CERTIFICATION_SCOPE, 'marketing');
   assert.match(cert.run, /--retries=0/);
+  assert.match(cert.run, /--workers=1/);
   assert.match(cert.run, /guard-playwright-artifacts\.mjs"? --run/);
-  assert.ok(ready.needs.includes('ci-visual-snapshot-compare'));
+  for (const id of [
+    'ci-visual-snapshot-compare',
+    'ci-visual-snapshot-homepage',
+    'ci-visual-marketing-dom',
+    'ci-visual-marketing-routes',
+  ])
+    assert.ok(ready.needs.includes(id));
 });
 test('actual PR-ready shell rejects skipped, failed, cancelled and missing selected certification', () => {
   const run = ready.steps.find(s =>
     s.run?.includes('Marketing DOM invariant certification did not pass')
   ).run;
-  const block = run.match(/if \[\[ "\$RUN_MARKETING_DOM"[\s\S]*?^\s*fi/m)[0];
-  for (const status of ['success', 'skipped', 'failure', 'cancelled', '']) {
-    const result = spawnSync('bash', ['-c', block], {
-      env: {
-        ...process.env,
-        RUN_MARKETING_DOM: 'true',
-        VISUAL_COMPARE_RESULT: status,
-      },
-      encoding: 'utf8',
-    });
-    assert.equal(result.status, status === 'success' ? 0 : 1, status);
+  // Every marketing-gated block must fail closed: shared build, DOM
+  // certification, and exact-route capture each get their own check.
+  const blocks = [
+    ...run.matchAll(/if \[\[ "\$RUN_MARKETING_DOM"[\s\S]*?^\s*fi/gm),
+  ].map(m => m[0]);
+  assert.equal(blocks.length, 3);
+  const blockVars = [
+    'VISUAL_COMPARE_RESULT',
+    'VISUAL_MARKETING_DOM_RESULT',
+    'VISUAL_MARKETING_ROUTES_RESULT',
+  ];
+  for (const [block, varName] of [
+    [blocks[0], blockVars[0]],
+    [blocks[1], blockVars[1]],
+    [blocks[2], blockVars[2]],
+  ]) {
+    assert.ok(block.includes(`"$${varName}"`), `${varName} block`);
+    for (const status of ['success', 'skipped', 'failure', 'cancelled', '']) {
+      const result = spawnSync('bash', ['-c', block], {
+        env: {
+          ...process.env,
+          RUN_MARKETING_DOM: 'true',
+          VISUAL_COMPARE_RESULT: 'success',
+          VISUAL_HOMEPAGE_RESULT: 'success',
+          VISUAL_MARKETING_DOM_RESULT: 'success',
+          VISUAL_MARKETING_ROUTES_RESULT: 'success',
+          [varName]: status,
+        },
+        encoding: 'utf8',
+      });
+      assert.equal(result.status, status === 'success' ? 0 : 1, status);
+    }
+    assert.equal(
+      spawnSync('bash', ['-c', block], {
+        env: {
+          ...process.env,
+          RUN_MARKETING_DOM: 'false',
+          VISUAL_COMPARE_RESULT: 'skipped',
+          VISUAL_HOMEPAGE_RESULT: 'skipped',
+          VISUAL_MARKETING_DOM_RESULT: 'skipped',
+          VISUAL_MARKETING_ROUTES_RESULT: 'skipped',
+        },
+      }).status,
+      0
+    );
   }
-  assert.equal(
-    spawnSync('bash', ['-c', block], {
-      env: {
-        ...process.env,
-        RUN_MARKETING_DOM: 'false',
-        VISUAL_COMPARE_RESULT: 'skipped',
-      },
-    }).status,
-    0
-  );
 });
-test('compare job also runs the exact marketing route spec pre-merge, unskipped and unforked from screenshots.yml', () => {
-  const capture = compare.steps.find(
+test('marketing routes suite also runs the exact marketing route spec pre-merge, unskipped and unforked from screenshots.yml', () => {
+  const capture = marketingRoutes.steps.find(
     s => s.name === 'Capture exact marketing routes (marketing-routes.spec.ts)'
   );
   assert.ok(capture, 'pre-merge exact-route capture step is missing');

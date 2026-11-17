@@ -262,7 +262,11 @@ test('release-stamp CLI reads base CHANGELOG objects above the spawn maxBuffer',
   );
   t.after(() => rm(root, { force: true, recursive: true }));
   const git = (...args) =>
-    execFileSync('git', args, { cwd: root, encoding: 'utf8' }).trim();
+    execFileSync('git', args, {
+      maxBuffer: 256 * 1024 * 1024,
+      cwd: root,
+      encoding: 'utf8',
+    }).trim();
   const write = async (path, content) => {
     const destination = join(root, path);
     await mkdir(join(destination, '..'), { recursive: true });

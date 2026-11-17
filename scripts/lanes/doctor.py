@@ -56,6 +56,7 @@ import stage_events  # noqa: E402  (jovie-stage-event/v1 rows for the stage coll
 import ledger_archive  # noqa: E402  (bounded runs/ledger.jsonl)
 import throughput_sentinel  # noqa: E402
 import health_checks  # noqa: E402  (source certification and release health providers)
+import credentials_spend  # noqa: E402  (shared redacted Linear app metadata)
 import integration_probes  # noqa: E402  (synthetic probes of the Gem integrations fleet work depends on)
 
 COOL_OFF_S = 6 * 3600
@@ -603,6 +604,7 @@ def observe(host, lane, codex, now: float | None = None) -> dict:
         "gateWaitMedianS24h": int(statistics.median(gate_waits)) if gate_waits else None,
         "gateWaitMaxS24h": int(max(gate_waits)) if gate_waits else None,
         "failed24h": sum(1 for r in receipts if r.get("verdict") == "failed"),
+        "failed24hByReason": failed_run_reason_counts(receipts),
         "noWorkRepairs24h": dict(Counter(
             (r.get("reasons") or ["?"])[0].split(":", 1)[0] for r in receipts
             if r.get("kind") == "fix-red" and r.get("verdict") in NO_WORK_REPAIR_VERDICTS)),
@@ -646,6 +648,8 @@ def observe(host, lane, codex, now: float | None = None) -> dict:
         "publicFeed": read_json(state / "public-feed-sizes.json", {}),
         "installLag": {key: read_json(state / "update.json", {}).get(key) for key in ("behindS", "behindCommit", "error", "at")},
         "linearAppCredential": _linear_app_credential(lane),
+        # Local status only: this remains observable when Linear itself cannot file an issue.
+        "linearAppToken": credentials_spend.app_token_status(state, now, True),
         "strandedClaims": stranded_claims,
         "ownership": {key: value for key, value in read_json(state / "ownership.json", {}).items()
                       if key not in ("ownerlessSince", "evidenceNoted", "moved", "claimsReleased")},
@@ -838,6 +842,18 @@ def failed_by_reason(failures: dict) -> dict[str, int]:
     for record in failures.values():
         code = record.get("reason", "legacy") if isinstance(record, dict) else "legacy"
         counts[code] = counts.get(code, 0) + 1
+    return dict(sorted(counts.items()))
+
+
+def failed_run_reason_counts(receipts: list) -> dict[str, int]:
+    """Verdict=="failed" run receipts by reason class: the first reason prefix (JOV-12820).
+
+    Mirrors the noWorkRepairs24h grouping (claim-error / timeout / harness-error / ...),
+    which names the failing layer without reading runs/ledger.jsonl on the host — the
+    per-run reason strings never leave gem, so the alert used to file 'Root cause:
+    UNKNOWN' and every condition generation auto-closed unlearned."""
+    counts = Counter((r.get("reasons") or ["?"])[0].split(":", 1)[0]
+                     for r in receipts if r.get("verdict") == "failed")
     return dict(sorted(counts.items()))
 
 
@@ -1217,6 +1233,15 @@ def judge(obs: dict, previous: dict | None = None) -> dict[str, str]:
         alerts["linear-app-credential-missing"] = (
             "no Jovie Lanes Linear app credential (~/.config/jovie-lanes/linear-app.env); lanes Linear "
             "access fails closed (no personal-key fallback) until the lanes host owner reinstalls it")
+    app_status = obs.get("linearAppToken") or {}
+    expiry = app_status.get("expiresInS")
+    if obs.get("linearAppCredential") is True and (
+            app_status.get("mintFailed") or app_status.get("scopeMatches") is not True or
+            type(expiry) not in (int, float) or expiry <= 0):
+        alerts["linear-app-token-unavailable"] = (
+            "Jovie Lanes app token metadata is missing, expired, scope-mismatched, or reports a failed mint; "
+            "owner gem-lanes: inspect redacted token status. This condition remains in the independent "
+            "GitHub status feed when Linear filing is unavailable; credential changes need separate authority")
     probed = obs.get("integrationProbes")
     # A red probe of the same component is the more specific incident: one issue, not two.
     same_incident = integration_probes.suppressed_silence(probed)
@@ -1343,7 +1368,9 @@ def judge(obs: dict, previous: dict | None = None) -> dict[str, str]:
     if obs.get("gateTimeouts24h", 0) >= GATE_TIMEOUT_ALERT:
         alerts["gate-timeouts"] = f"{obs['gateTimeouts24h']} gate timeouts in 24h: host too slow for the gate (fewer slots or a longer LANES_GATE_TIMEOUT_S)"
     if obs.get("failed24h", 0) >= FAILED_RUN_ALERT:
-        alerts["failed-runs"] = f"{obs['failed24h']} harness-failed runs in 24h; read runs/ledger.jsonl reasons"
+        named = ", ".join(f"{reason} {count}" for reason, count in (obs.get("failed24hByReason") or {}).items())
+        alerts["failed-runs"] = (f"{obs['failed24h']} harness-failed runs in 24h ({named or 'reason classes ungrouped'}); "
+                                 "full reason strings in runs/ledger.jsonl")
     no_work = obs.get("noWorkRepairs24h") or {}
     if sum(no_work.values()) >= NO_WORK_REPAIR_ALERT:
         causes = ", ".join(f"{reason} {count}" for reason, count in sorted(no_work.items(), key=lambda kv: -kv[1])[:3])
@@ -2120,6 +2147,7 @@ def status_feed(host, lane, obs: dict, alerts: dict, tick: dict, previous: dict 
             "delivery": obs.get("delivery"),
             "diskFreePct": obs.get("diskFreePct"), "githubRemaining": obs.get("githubRemaining"),
             "held_by_reason": obs.get("heldByReason") or {}, "failed_by_reason": obs.get("failedByReason") or {},
+            "failed_runs_by_reason": obs.get("failed24hByReason") or {},
             "throughput": throughput, "throughputError": obs.get("mergedAttributionError"),
             "shippingAttribution": attribution,
             "sentinel": {key: (obs.get("sentinel") or {}).get(key) for key in

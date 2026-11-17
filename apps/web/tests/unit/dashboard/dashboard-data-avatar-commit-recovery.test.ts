@@ -1,169 +1,39 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { getDashboardData } from '@/app/app/(shell)/dashboard/actions/dashboard-data';
+import {
+  capturedCascadeErrors,
+  fail,
+  queueDashboardReads,
+  queueRetriedReadOutcome,
+  resetTxHarness,
+  txHarness,
+} from './dashboard-tx-recovery-harness';
 
 /**
- * Shared transaction-isolation harness, verbatim from
- * dashboard-data-tx-isolation.test.ts (which is pinned by the Company
- * Guards size-500 per-file baseline and may not grow). See that file for
- * the full JOV-4189/JOV-4241 explanation of the 25P02 cascade these
- * mocks simulate.
+ * Regression tests for commit-wrapped transport recovery on the dashboard's
+ * side-effect-free reads (JOV-12096 avatar, JOV-12188 social-links +
+ * creator_distribution_events).
+ *
+ * Drizzle wraps a post-callback COMMIT transport failure as `Failed query:
+ * commit`. Classifying that wrapper by its cause text misses shapes whose
+ * cause chain carries none of the retryable transport vocabulary (undici
+ * `fetch failed`, a bare WebSocket close, a generic Neon proxy error) — the
+ * recovery then declines a replay-safe read and the degrade reporter pages
+ * Sentry for a degradation that already returned its safe fallback. The
+ * `Failed query: commit` wrapper shape alone is the replay-safety proof.
+ *
+ * Shared transaction harness: see dashboard-tx-recovery-harness.ts. The
+ * poison/25P02 machinery lives only in dashboard-data-tx-isolation.test.ts
+ * (pinned by the Company Guards size-500 per-file baseline and may not grow).
  */
 
-type QueryOutcome = () => { rows?: unknown[]; error?: unknown };
-
-type TxState = { poisoned: boolean; closed: boolean; rolledBack: boolean };
-
-const {
-  captureExceptionMock,
-  cleanupGates,
-  commitFailures,
-  loggerErrorMock,
-  loggerWarnMock,
-  outcomes,
-  setupFailures,
-  txStates,
-  withDbSessionTxMock,
-} = vi.hoisted(() => {
-  const cleanupGates = new Map<number, () => Promise<void>>();
-  const commitFailures = new Map<number, QueryOutcome>();
-  const outcomes: QueryOutcome[] = [];
-  const setupFailures = new Map<number, QueryOutcome>();
-  const txStates: TxState[] = [];
-
-  function createAbortedTxError(): Error & { code?: string } {
-    const error = new Error(
-      "Failed query: SELECT set_config('statement_timeout', $1, false)\n" +
-        'cause: current transaction is aborted, commands ignored until end of transaction block'
-    ) as Error & { code?: string };
-    error.code = '25P02';
-    return error;
-  }
-
-  function createTx(state: TxState) {
-    const tx = {
-      __isPoisoned: () => state.poisoned,
-      execute: vi.fn(async () => {
-        if (state.poisoned) throw createAbortedTxError();
-        return { rows: [] };
-      }),
-      select: vi.fn(() => {
-        // Annotated so the fallback widens to QueryOutcome; the un-annotated
-        // form infers a narrower { rows: never[] } union member that makes
-        // result.error a TS2339 (the pinned original baselines that error).
-        const outcome: QueryOutcome =
-          outcomes.shift() ?? (() => ({ rows: [] }));
-        const builder: Record<string, unknown> = {};
-        const chain = () => builder;
-        builder.from = chain;
-        builder.where = chain;
-        builder.limit = chain;
-        builder.orderBy = chain;
-        // Thenable: drizzle query builders are awaited directly. Once the
-        // transaction is poisoned, every later statement rejects with a
-        // 25P02-style error — that is the real Postgres behavior.
-        builder.then = (
-          onFulfilled?: (value: unknown) => unknown,
-          onRejected?: (reason: unknown) => unknown
-        ) => {
-          let settled: Promise<unknown>;
-          if (state.poisoned) {
-            settled = Promise.reject(createAbortedTxError());
-          } else {
-            try {
-              const result = outcome();
-              if (result.error) {
-                state.poisoned = true;
-                settled = Promise.reject(result.error);
-              } else {
-                settled = Promise.resolve(result.rows ?? []);
-              }
-            } catch (error) {
-              state.poisoned = true;
-              settled = Promise.reject(error);
-            }
-          }
-          return settled.then(onFulfilled, onRejected);
-        };
-        return builder;
-      }),
-    };
-    return tx;
-  }
-
-  const withDbSessionTxMock = vi.fn(
-    async (handler: (tx: unknown, userId: string) => Promise<unknown>) => {
-      const state: TxState = {
-        poisoned: false,
-        closed: false,
-        rolledBack: false,
-      };
-      const transactionIndex = txStates.length;
-      txStates.push(state);
-      try {
-        const setupError = setupFailures.get(transactionIndex)?.().error;
-        if (setupError) {
-          state.poisoned = true;
-          throw setupError;
-        }
-        const result = await handler(createTx(state), 'user_123');
-        const commitError = commitFailures.get(transactionIndex)?.().error;
-        if (commitError) {
-          // The callback already finished; Drizzle's post-callback COMMIT
-          // failed on the wire and the wrapper discarded the client (JOV-8641
-          // preserves this original error instead of letting ROLLBACK mask
-          // it). Nothing the callback wrote can be acknowledged.
-          throw commitError;
-        }
-        return result;
-      } catch (error) {
-        state.rolledBack = true;
-        throw error;
-      } finally {
-        const cleanup = cleanupGates.get(transactionIndex);
-        if (cleanup) await cleanup();
-        state.closed = true;
-      }
-    }
-  );
-
-  return {
+const { captureExceptionMock, loggerErrorMock, loggerWarnMock } = vi.hoisted(
+  () => ({
     captureExceptionMock: vi.fn(),
-    cleanupGates,
-    commitFailures,
     loggerErrorMock: vi.fn(),
     loggerWarnMock: vi.fn(),
-    outcomes,
-    setupFailures,
-    txStates,
-    withDbSessionTxMock,
-  };
-});
-
-const ok =
-  (rows: unknown[]): QueryOutcome =>
-  () => ({ rows });
-const fail =
-  (error: unknown): QueryOutcome =>
-  () => ({ error });
-
-const dashboardProfile = {
-  id: 'profile_1',
-  userId: 'user_db_1',
-  username: 'tim',
-  usernameNormalized: 'tim',
-  displayName: 'Tim White',
-  avatarUrl: 'https://example.com/avatar.jpg',
-  isPublic: true,
-  onboardingCompletedAt: new Date('2026-07-20T00:00:00.000Z'),
-  createdAt: new Date('2026-07-20T00:00:00.000Z'),
-  updatedAt: new Date('2026-07-20T00:00:00.000Z'),
-};
-
-const userRow = {
-  id: 'user_db_1',
-  email: 'user@example.com',
-  activeProfileId: 'profile_1',
-};
+  })
+);
 
 vi.mock('react', async () => {
   const actual = await vi.importActual<typeof import('react')>('react');
@@ -219,9 +89,10 @@ vi.mock('@/lib/auth/gate', () => ({
   resolveUserState: vi.fn(),
 }));
 
-vi.mock('@/lib/auth/session', () => ({
-  withDbSessionTx: withDbSessionTxMock,
-}));
+vi.mock('@/lib/auth/session', async () => {
+  const harness = await import('./dashboard-tx-recovery-harness');
+  return { withDbSessionTx: harness.withDbSessionTx };
+});
 
 vi.mock('@/lib/entitlements/server', () => ({
   getCurrentUserEntitlements: vi.fn(async () => ({
@@ -245,26 +116,7 @@ vi.mock('@/lib/db', () => ({
 vi.mock('@/lib/db/query-timeout', () => ({
   QUERY_TIMEOUTS: { dashboard: 8000, api: 5000, default: 5000 },
   setStatementTimeout: vi.fn(async () => {}),
-  // Mirrors the real wrapper: statement_timeout is applied on the target
-  // client before the query — on a poisoned transaction that set_config is
-  // the statement that fails, which is exactly the production fingerprint.
-  dashboardQuery: vi.fn(
-    async (
-      fn: () => Promise<unknown>,
-      _context?: string,
-      options?: { db?: { __isPoisoned?: () => boolean } }
-    ) => {
-      if (options?.db?.__isPoisoned?.()) {
-        const error = new Error(
-          "Failed query: SELECT set_config('statement_timeout', $1, false)\n" +
-            'cause: current transaction is aborted, commands ignored until end of transaction block'
-        ) as Error & { code?: string };
-        error.code = '25P02';
-        throw error;
-      }
-      return fn();
-    }
-  ),
+  dashboardQuery: vi.fn(async (fn: () => Promise<unknown>) => fn()),
   isQueryTimeoutError: (error: unknown) =>
     error instanceof Error && error.name === 'QueryTimeoutError',
   // Mirrors the real helper, which recurses into error.cause — Drizzle wraps
@@ -368,70 +220,32 @@ vi.mock('@/lib/utils/logger', () => ({
   },
 }));
 
-function capturedErrors(): unknown[] {
-  return captureExceptionMock.mock.calls.map(call => call[0]);
-}
-
-function capturedCascadeErrors(): unknown[] {
-  return capturedErrors().filter(
-    error =>
-      error instanceof Error &&
-      /25P02|current transaction is aborted|set_config\('statement_timeout'/.test(
-        error.message
-      )
-  );
-}
-
-function queueReadsBeforeDistribution(): void {
-  outcomes.push(
-    ok([userRow]),
-    ok([dashboardProfile]),
-    ok([{ sidebarCollapsed: false }]),
-    ok([{ count: 0 }]),
-    ok([{ count: 0 }]),
-    ok([{ hasLinks: true, hasMusicLinks: true }]),
-    ok([{ width: 1024, height: 1024 }]),
-    ok([{ totalReceived: 100, monthReceived: 50, tipsSubmitted: 2 }]),
-    ok([{ total: 3, qr: 1, link: 2 }])
-  );
-}
-
-// ---- JOV-12096 regression tests ----
+// The harness owns the withDbSessionTx mock target: see
+// dashboard-tx-recovery-harness.ts.
+const commitFetchFailed = () =>
+  new Error('Failed query: commit', { cause: new Error('fetch failed') });
 
 describe('avatar commit-wrapped transport recovery (JOV-12096)', () => {
-  beforeEach(async () => {
-    vi.clearAllMocks();
+  beforeEach(() => {
+    resetTxHarness();
     captureExceptionMock.mockReset();
     loggerWarnMock.mockReset();
-    const { setStatementTimeout } = await import('@/lib/db/query-timeout');
-    vi.mocked(setStatementTimeout).mockReset().mockResolvedValue(undefined);
-    const { doesTableExist } = await import('@/lib/db');
-    vi.mocked(doesTableExist).mockReset().mockResolvedValue(false);
-    cleanupGates.clear();
-    commitFailures.clear();
-    outcomes.length = 0;
-    setupFailures.clear();
-    txStates.length = 0;
+    loggerErrorMock.mockReset();
   });
 
   it('recovers a commit-wrapped transport failure whose cause text matches no retryable pattern', async () => {
-    // The Nov 9 2026 regression: the commit cause chain carried none of the
-    // transport vocabulary (e.g. undici `fetch failed`), so the cause-text
-    // predicate declined to replay a read whose callback had already
-    // succeeded and paged Sentry for a degradation that had already returned
-    // UNKNOWN. For this side-effect-free read the `Failed query: commit`
-    // wrapper shape alone is the replay-safety proof (JOV-8837 contract).
-    const commitFetchFailed = () =>
-      new Error('Failed query: commit', { cause: new Error('fetch failed') });
-    commitFailures.set(2, fail(commitFetchFailed()));
-    queueReadsBeforeDistribution();
+    txHarness.commitFailures.set(2, fail(commitFetchFailed()));
+    queueDashboardReads();
     // Both avatar attempts consume one profilePhotos outcome each: the first
     // attempt's rows are discarded by its failed commit, so the retry needs
     // its own queued read inserted after the first avatar outcome.
-    outcomes.splice(7, 0, () => {
+    queueRetriedReadOutcome(() => {
       // Recovery starts only after the failed transaction fully closed and
       // was discarded — never on the poisoned, still-open connection.
-      expect(txStates[2]).toMatchObject({ closed: true, rolledBack: true });
+      expect(txHarness.txStates[2]).toMatchObject({
+        closed: true,
+        rolledBack: true,
+      });
       return { rows: [{ width: 2048, height: 2048 }] };
     });
 
@@ -444,39 +258,53 @@ describe('avatar commit-wrapped transport recovery (JOV-12096)', () => {
     });
     expect(result.tippingStats.totalReceivedCents).toBe(100);
     expect(result.dashboardLoadError).toBeUndefined();
-    expect(withDbSessionTxMock).toHaveBeenCalledTimes(6);
-    expect(txStates[2]).toMatchObject({ closed: true, rolledBack: true });
-    expect(txStates[3]).toMatchObject({ closed: true, rolledBack: false });
-    expect(txStates.every(state => state.closed)).toBe(true);
+    expect(txHarness.txStates).toHaveLength(6);
+    expect(txHarness.txStates[2]).toMatchObject({
+      closed: true,
+      rolledBack: true,
+    });
+    expect(txHarness.txStates[3]).toMatchObject({
+      closed: true,
+      rolledBack: false,
+    });
+    expect(txHarness.txStates.every(state => state.closed)).toBe(true);
     expect(captureExceptionMock).not.toHaveBeenCalled();
-    expect(capturedCascadeErrors()).toEqual([]);
+    expect(
+      capturedCascadeErrors(
+        captureExceptionMock.mock.calls.map(call => call[0])
+      )
+    ).toEqual([]);
   });
 
   it('degrades a twice-failed commit-wrapped transport failure log-only', async () => {
-    const commitFetchFailed = () =>
-      new Error('Failed query: commit', { cause: new Error('fetch failed') });
     const firstCommit = commitFetchFailed();
     const secondCommit = commitFetchFailed();
-    commitFailures.set(2, fail(firstCommit));
-    commitFailures.set(3, fail(secondCommit));
+    txHarness.commitFailures.set(2, fail(firstCommit));
+    txHarness.commitFailures.set(3, fail(secondCommit));
     loggerWarnMock.mockImplementation((message: string) => {
       if (message.includes('[avatar-quality]')) {
-        expect(txStates[2]).toMatchObject({ closed: true, rolledBack: true });
-        expect(txStates[3]).toMatchObject({ closed: true, rolledBack: true });
+        expect(txHarness.txStates[2]).toMatchObject({
+          closed: true,
+          rolledBack: true,
+        });
+        expect(txHarness.txStates[3]).toMatchObject({
+          closed: true,
+          rolledBack: true,
+        });
         expect(message).toContain('transient DB condition');
       }
     });
-    queueReadsBeforeDistribution();
+    queueDashboardReads();
     // Both avatar attempts consume one profilePhotos outcome each before
     // their commits die; the retry needs its own queued read.
-    outcomes.splice(7, 0, ok([{ width: 1024, height: 1024 }]));
+    queueRetriedReadOutcome([{ width: 1024, height: 1024 }]);
 
     const result = await getDashboardData();
 
     expect(result.avatarQuality?.status).toBe('unknown');
     expect(result.tippingStats.totalReceivedCents).toBe(100);
     expect(result.dashboardLoadError).toBeUndefined();
-    expect(withDbSessionTxMock).toHaveBeenCalledTimes(6);
+    expect(txHarness.txStates).toHaveLength(6);
     expect(captureExceptionMock).not.toHaveBeenCalled();
     expect(loggerWarnMock).toHaveBeenCalledWith(
       '[avatar-quality] transient DB condition after retry; degrading to unknown quality',
@@ -485,7 +313,117 @@ describe('avatar commit-wrapped transport recovery (JOV-12096)', () => {
         error: expect.stringContaining('fetch failed'),
       })
     );
-    expect(capturedCascadeErrors()).toEqual([]);
-    expect(txStates.every(state => state.closed)).toBe(true);
+    expect(
+      capturedCascadeErrors(
+        captureExceptionMock.mock.calls.map(call => call[0])
+      )
+    ).toEqual([]);
+    expect(txHarness.txStates.every(state => state.closed)).toBe(true);
+  });
+});
+
+describe('social-links commit-wrapped transport recovery (JOV-12188)', () => {
+  beforeEach(() => {
+    resetTxHarness();
+    captureExceptionMock.mockReset();
+    loggerWarnMock.mockReset();
+    loggerErrorMock.mockReset();
+  });
+
+  it('recovers the social-links existence read once on a commit-wrapped transport failure', async () => {
+    txHarness.commitFailures.set(1, fail(commitFetchFailed()));
+    queueDashboardReads();
+    // The retried social-links transaction needs its own queued read: the
+    // first attempt's rows are discarded by its failed commit. The retry's
+    // select runs right after the original hasLinks outcome (index 5).
+    queueRetriedReadOutcome([{ hasLinks: true, hasMusicLinks: true }], 6);
+
+    const result = await getDashboardData();
+
+    expect(result.hasSocialLinks).toBe(true);
+    expect(result.hasMusicLinks).toBe(true);
+    expect(result.dashboardLoadError).toBeUndefined();
+    expect(txHarness.txStates).toHaveLength(6);
+    expect(txHarness.txStates[1]).toMatchObject({
+      closed: true,
+      rolledBack: true,
+    });
+    expect(txHarness.txStates[2]).toMatchObject({
+      closed: true,
+      rolledBack: false,
+    });
+    expect(txHarness.txStates.every(state => state.closed)).toBe(true);
+    expect(captureExceptionMock).not.toHaveBeenCalled();
+  });
+
+  it('degrades a twice-failed social-links commit log-only', async () => {
+    txHarness.commitFailures.set(1, fail(commitFetchFailed()));
+    txHarness.commitFailures.set(2, fail(commitFetchFailed()));
+    queueDashboardReads();
+    queueRetriedReadOutcome([{ hasLinks: true, hasMusicLinks: true }], 6);
+
+    const result = await getDashboardData();
+
+    expect(result.hasSocialLinks).toBe(false);
+    expect(result.hasMusicLinks).toBe(false);
+    expect(result.dashboardLoadError).toBeUndefined();
+    expect(txHarness.txStates).toHaveLength(6);
+    expect(captureExceptionMock).not.toHaveBeenCalled();
+    expect(loggerWarnMock).toHaveBeenCalledWith(
+      '[social-links] transient commit failure after retry; degrading to link-free defaults',
+      expect.objectContaining({
+        error: expect.stringContaining('fetch failed'),
+      })
+    );
+  });
+});
+
+describe('bio-link commit-wrapped transport recovery (JOV-12188)', () => {
+  beforeEach(() => {
+    resetTxHarness();
+    captureExceptionMock.mockReset();
+    loggerWarnMock.mockReset();
+    loggerErrorMock.mockReset();
+  });
+
+  it('recovers the creator_distribution_events read once on a commit-wrapped transport failure', async () => {
+    // No avatar retry here: base(0), links(1), avatar(2), tipping(3), bio(4).
+    txHarness.commitFailures.set(4, fail(commitFetchFailed()));
+    queueDashboardReads();
+
+    const result = await getDashboardData();
+
+    expect(result.bioLinkActivation).not.toBeNull();
+    expect(result.dashboardLoadError).toBeUndefined();
+    expect(txHarness.txStates).toHaveLength(6);
+    expect(txHarness.txStates[4]).toMatchObject({
+      closed: true,
+      rolledBack: true,
+    });
+    expect(txHarness.txStates[5]).toMatchObject({
+      closed: true,
+      rolledBack: false,
+    });
+    expect(txHarness.txStates.every(state => state.closed)).toBe(true);
+    expect(captureExceptionMock).not.toHaveBeenCalled();
+  });
+
+  it('degrades a twice-failed creator_distribution_events commit log-only', async () => {
+    txHarness.commitFailures.set(4, fail(commitFetchFailed()));
+    txHarness.commitFailures.set(5, fail(commitFetchFailed()));
+    queueDashboardReads();
+
+    const result = await getDashboardData();
+
+    // The tolerate-and-degrade catch returns empty event rows, which still
+    // resolves to an activation object with null timestamps.
+    expect(result.bioLinkActivation).not.toBeNull();
+    expect(result.dashboardLoadError).toBeUndefined();
+    expect(txHarness.txStates).toHaveLength(6);
+    expect(captureExceptionMock).not.toHaveBeenCalled();
+    expect(loggerWarnMock).toHaveBeenCalledWith(
+      '[Dashboard] creator_distribution_events transient commit failure after retry; skipping activation lookup',
+      expect.objectContaining({ profileId: 'profile_1' })
+    );
   });
 });

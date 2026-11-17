@@ -14,7 +14,7 @@ const meta = {
       docs: {
         description: {
           component:
-            'Changelog-scoped subscribe column (pen o5CeaF, YgxYz review): canonical ChangelogEmailSignup composed unchanged plus the 44px RSS/JSON feed alternatives row in quiet ink. Deterministic static state; Turnstile renders in its unconfigured local state.',
+            'Changelog page-header subscribe module: the canonical ChangelogEmailSignup set flush left beside the page title. Deterministic static state; Turnstile renders in its unconfigured local state.',
         },
       },
     },

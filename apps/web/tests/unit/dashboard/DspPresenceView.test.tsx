@@ -105,6 +105,15 @@ vi.mock(
   })
 );
 
+vi.mock(
+  '@/features/dashboard/organisms/dsp-presence/CatalogHealthSection',
+  () => ({
+    CatalogHealthSection: ({ spotifyId }: { spotifyId: string | null }) => (
+      <div data-testid='catalog-health-section'>{spotifyId ?? 'none'}</div>
+    ),
+  })
+);
+
 vi.mock('@/components/molecules/EmptyState', () => ({
   EmptyState: ({
     heading,
@@ -299,5 +308,22 @@ describe('DspPresenceView', () => {
     await waitFor(() => {
       expect(screen.getByText('Dialog Open')).toBeInTheDocument();
     });
+  });
+
+  it('keeps Catalog Health for legacy profiles that only store spotify_url', () => {
+    mockUseDashboardData.mockReturnValue({
+      selectedProfile: {
+        id: 'profile-123',
+        spotifyId: null,
+        spotifyUrl: 'https://open.spotify.com/artist/4Uwpa6zW3zzCSQvooQNksm',
+      },
+      isAdmin: false,
+    });
+
+    renderView({ items: [baseItem], confirmedCount: 0, suggestedCount: 1 });
+
+    expect(screen.getByTestId('catalog-health-section')).toHaveTextContent(
+      '4Uwpa6zW3zzCSQvooQNksm'
+    );
   });
 });

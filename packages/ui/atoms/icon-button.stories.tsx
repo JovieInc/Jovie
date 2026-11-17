@@ -1,7 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { ChevronLeft, Ellipsis, RotateCcw, Share2 } from 'lucide-react';
-import { useTheme } from 'next-themes';
-import { type ReactNode, useEffect, useRef } from 'react';
 import { expect, userEvent, waitFor } from 'storybook/test';
 import { IconButton } from './icon-button';
 import {
@@ -31,29 +29,9 @@ const SECONDARY_STATE_EXAMPLES = [
 
 type ProofTheme = 'light' | 'dark';
 
-function RootProofTheme({
-  children,
-  theme,
-}: {
-  readonly children: ReactNode;
-  readonly theme: ProofTheme;
-}) {
-  const { theme: activeTheme, setTheme } = useTheme();
-  const initialTheme = useRef(activeTheme);
-
-  useEffect(() => {
-    setTheme(theme);
-    return () => {
-      setTheme(initialTheme.current ?? 'dark');
-    };
-  }, [setTheme, theme]);
-
-  return children;
-}
-
 function SecondaryStateSurface({ theme }: { readonly theme: ProofTheme }) {
   return (
-    <section>
+    <section data-proof-theme={theme} style={{ colorScheme: theme }}>
       <div className='rounded-xl bg-surface-0 p-5 text-primary-token'>
         <p className='mb-4 text-xs font-medium text-secondary-token'>
           {theme === 'dark' ? 'Dark Surface' : 'Light Surface'}
@@ -82,8 +60,22 @@ async function verifySecondaryStateStory(
   canvasElement: HTMLElement,
   theme: ProofTheme
 ) {
-  const root = canvasElement.ownerDocument.documentElement;
-  await waitFor(() => expect(root).toHaveClass(theme));
+  const document = canvasElement.ownerDocument;
+  await waitFor(() =>
+    expect(
+      ['light', 'dark'].some(value =>
+        document.documentElement.classList.contains(value)
+      )
+    ).toBe(true)
+  );
+  const rootTheme = document.documentElement.className;
+  const storedTheme = document.defaultView?.localStorage.getItem(
+    'jovie-theme-storybook'
+  );
+  const scope = canvasElement.querySelector('[data-proof-theme]');
+  await expect(scope).toHaveAttribute('data-proof-theme', theme);
+  if (!scope) throw new Error('Missing secondary-state proof theme scope');
+  await waitFor(() => expect(getComputedStyle(scope).colorScheme).toBe(theme));
 
   const restControl = canvasElement.querySelector<HTMLButtonElement>(
     'button[data-state="idle"]'
@@ -143,6 +135,11 @@ async function verifySecondaryStateStory(
     await expect([visibleBox.width, visibleBox.height]).toEqual([32, 32]);
     await expect([hitTarget.width, hitTarget.height]).toEqual(['44px', '44px']);
   }
+
+  await expect(document.documentElement.className).toBe(rootTheme);
+  await expect(
+    document.defaultView?.localStorage.getItem('jovie-theme-storybook')
+  ).toBe(storedTheme);
 }
 
 const meta: Meta<typeof IconButton> = {
@@ -224,13 +221,6 @@ export const Secondary: Story = {
 };
 
 export const SecondaryStateMatrix: Story = {
-  decorators: [
-    Story => (
-      <RootProofTheme theme='light'>
-        <Story />
-      </RootProofTheme>
-    ),
-  ],
   render: () => <SecondaryStateSurface theme='light' />,
   play: async ({ canvasElement }) => {
     await verifySecondaryStateStory(canvasElement, 'light');
@@ -247,13 +237,6 @@ export const SecondaryStateMatrix: Story = {
 };
 
 export const SecondaryStateMatrixDark: Story = {
-  decorators: [
-    Story => (
-      <RootProofTheme theme='dark'>
-        <Story />
-      </RootProofTheme>
-    ),
-  ],
   render: () => <SecondaryStateSurface theme='dark' />,
   play: async ({ canvasElement }) => {
     await verifySecondaryStateStory(canvasElement, 'dark');
@@ -262,20 +245,13 @@ export const SecondaryStateMatrixDark: Story = {
     backgrounds: { default: 'dark' },
     docs: {
       description: {
-        story: 'Desktop dark-surface proof using root-scoped dark tokens.',
+        story: 'Desktop dark-surface proof using locally scoped dark tokens.',
       },
     },
   },
 };
 
 export const SecondaryStateMatrixMobile: Story = {
-  decorators: [
-    Story => (
-      <RootProofTheme theme='light'>
-        <Story />
-      </RootProofTheme>
-    ),
-  ],
   render: () => <SecondaryStateSurface theme='light' />,
   play: async ({ canvasElement }) => {
     await verifySecondaryStateStory(canvasElement, 'light');
@@ -287,13 +263,6 @@ export const SecondaryStateMatrixMobile: Story = {
 };
 
 export const SecondaryStateMatrixDarkMobile: Story = {
-  decorators: [
-    Story => (
-      <RootProofTheme theme='dark'>
-        <Story />
-      </RootProofTheme>
-    ),
-  ],
   render: () => <SecondaryStateSurface theme='dark' />,
   play: async ({ canvasElement }) => {
     await verifySecondaryStateStory(canvasElement, 'dark');

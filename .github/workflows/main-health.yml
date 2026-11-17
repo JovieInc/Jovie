@@ -5,6 +5,13 @@ name: Main Health
 # Read-only. The Gem lanes doctor reads the latest completed run of this workflow
 # (scripts/lanes/main_health.py) and pages Summer the moment it fails, then clears
 # when a later run passes. A red run here means "main is broken now", not "a PR is".
+#
+# No cron (admission and landing workflows stay event-driven). When nothing is pushed
+# nothing re-tests main, so a test that expires by the clock stays invisible
+# (2026-11-10: 8 h, zero merges, no run). The lanes doctor dispatches this workflow when
+# its newest run on main is over an hour old; a dispatched run also runs the script
+# contracts of the structural lane, which need the installed tree and several minutes,
+# so pushes keep the 20 second census check and merge groups keep proving the rest.
 
 on:
   push:
@@ -35,4 +42,24 @@ jobs:
         with:
           node-version-file: .nvmrc
       - name: Run main-health checks
+        env:
+          # Certify the checked-out tree as it stands. On main this is what origin/main...HEAD
+          # already meant; a dispatch on another ref has no origin/main fetched (depth 2).
+          TURBO_SCM_BASE: HEAD
         run: node scripts/main-health.mjs --out "$RUNNER_TEMP/main-health.json"
+
+  structural:
+    name: Main health (script contracts, idle probe)
+    if: ${{ github.event_name == 'workflow_dispatch' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: ./.github/actions/setup-node-pnpm
+      # component-rendered-evaluator launches Chromium, as it does in the CI structural lane.
+      - uses: ./.github/actions/setup-playwright
+      - name: Run main-health checks with the script contracts
+        run: node scripts/main-health.mjs --structural --out "$RUNNER_TEMP/main-health.json"
