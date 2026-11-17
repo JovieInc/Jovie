@@ -115,7 +115,7 @@ function installFixture(mode = 'success', options = {}) {
   const cacheDir = join(dir, 'pinned-cache');
   if (warm) {
     mkdirSync(cacheDir);
-    for (const sha of [PINNED.source, PINNED.patch, PINNED.pyflakes])
+    for (const sha of [PINNED.source, PINNED.pyflakes])
       writeFileSync(join(cacheDir, sha), 'fixture');
     writeFileSync(
       join(
@@ -156,7 +156,7 @@ function installFixture(mode = 'success', options = {}) {
   // Linux verifier; on macOS the wrapper routes it to shasum.
   const verifier = `input=$(cat)
     printf '%s\\n' "$input" >> "$TEST_CHECKSUMS"
-    if [ "$TEST_MODE" = queue-checksum-failure ] && [[ "$input" == *actionlint-queue.patch ]]; then exit 1; fi
+    if [ "$TEST_MODE" = queue-checksum-failure ] && [[ "$input" == *queue-*.patch ]]; then exit 1; fi
     if [ "$TEST_MODE" = corrupt-cache ] && [[ "$input" == */pinned-cache/* ]]; then exit 1; fi
     if [ "$TEST_MODE" = bad-binary ] && [[ "$input" == */shellcheck ]]; then exit 1; fi`;
   executable('shasum', verifier);
@@ -373,21 +373,21 @@ describe('checksum-pinned actionlint platform execution', () => {
   it('fills a cold cache with verified downloads named by their sha256', () => {
     const result = installFixture('success', { cache: true });
     expect(result.status, result.output).toBe(0);
-    expect(result.urls).toHaveLength(4);
+    expect(result.urls).toEqual([
+      'https://codeload.github.com/rhysd/actionlint/tar.gz/fd33e9f582a01a02885c93ae3775e1190cf63653',
+      'https://github.com/koalaman/shellcheck/releases/download/v0.11.0/shellcheck-v0.11.0.darwin.aarch64.tar.xz',
+      'https://files.pythonhosted.org/packages/c2/2f/81d580a0fb83baeb066698975cb14a618bdbed7720678566f1b046a95fe8/pyflakes-3.4.0-py2.py3-none-any.whl',
+    ]);
     expect(result.cached).toEqual(
-      [
-        PINNED.source,
-        PINNED.patch,
-        PINNED.pyflakes,
-        PINNED.shellcheckDarwinArm64,
-      ].sort()
+      [PINNED.source, PINNED.pyflakes, PINNED.shellcheckDarwinArm64].sort()
     );
   });
 
   it('drops a cache entry that fails its checksum and downloads it again', () => {
     const result = installFixture('corrupt-cache', { warm: true });
     expect(result.status, result.output).toBe(0);
-    expect(result.urls).toHaveLength(4);
+    expect(result.urls).toHaveLength(3);
+    expect(result.urls.some(url => url.endsWith('.patch'))).toBe(false);
   });
 
   it('keeps failing closed on a cold cache when the network is down', () => {

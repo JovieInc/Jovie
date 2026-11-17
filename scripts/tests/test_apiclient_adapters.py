@@ -7,6 +7,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import threading
 import time
 import unittest
 from pathlib import Path
@@ -152,6 +153,100 @@ class AdapterTest(unittest.TestCase):
 
 class GhTest(unittest.TestCase):
     LOG_ARGS = ["run", "view", "--repo", "o/r", "--job", "12", "--attempt", "2", "--log"]
+
+    def test_quota_free_refresh_observes_only_the_active_credential(self):
+        clock, store = FakeClock(), MemoryLedgerStore()
+        reset = clock.now + 60000
+        def seed(ledger):
+            credential_state(ledger, "c", clock.now)["buckets"]["core"] = {
+                "limit": 5000, "remaining": 0, "resetAt": reset, "observedAt": clock.now}
+            credential_state(ledger, "other-installation", clock.now)["buckets"]["core"] = {
+                "limit": 5000, "remaining": 123, "resetAt": reset, "observedAt": clock.now}
+        store.transact("github", seed)
+        payload = {"resources": {name: {"limit": 5000, "remaining": remaining, "reset": reset // 1000}
+                                  for name, remaining in (("core", 0), ("graphql", 37), ("search", 9))}}
+        result = run_gh(["api", "rate_limit"], priority="report", store=store, credential="c",
+                        now=clock.read, max_wait_ms=0, log=quiet,
+                        run=lambda args, env: (0, json.dumps(payload), ""))
+        self.assertEqual(result["code"], 0)
+        states = store.read("github")["credentials"]
+        self.assertEqual({name: row["remaining"] for name, row in states["c"]["buckets"].items()},
+                         {"core": 0, "graphql": 37, "search": 9})
+        self.assertEqual(states["other-installation"]["buckets"]["core"]["remaining"], 123)
+        self.assertEqual(gh_shape(["api", "-X", "GET", "/rate_limit"])["cost"], 0)
+        for args in (["api", "rate_limit", "-f", "x=y"], ["api", "-X", "POST", "rate_limit"],
+                     ["api", "repos/o/r/rate_limit"], ["api", "https://untrusted.test/rate_limit"]):
+            self.assertNotEqual(gh_shape(args).get("cost"), 0)
+
+    def test_concurrent_responses_do_not_restore_another_admission_debit(self):
+        for order in ((0, 1), (1, 0)):
+            with self.subTest(order=order):
+                clock, root = FakeClock(), tmp(self)
+                store = FileLedgerStore(root, now=clock.read)
+                reset = clock.now + 60000
+                store.transact("github", lambda ledger: credential_state(ledger, "c", clock.now)["buckets"].update(
+                    core={"limit": None, "remaining": 2, "resetAt": reset, "observedAt": clock.now}))
+                entered, releases = [threading.Event() for _ in range(2)], [threading.Event() for _ in range(2)]
+                results = [None, None]
+                def request(index):
+                    def transport(args, env):
+                        entered[index].set()
+                        self.assertTrue(releases[index].wait(5))
+                        return 0, (f"HTTP/2.0 200 OK\nX-Ratelimit-Remaining: {1-index}\n"
+                                   f"X-Ratelimit-Reset: {reset // 1000}\n\n[]"), ""
+                    results[index] = run_gh(["api", "repos/o/r/pulls"], priority="repair", store=store,
+                                            credential="c", run=transport, now=clock.read, log=quiet, max_wait_ms=0)
+                threads = [threading.Thread(target=request, args=(i,)) for i in range(2)]
+                for index in range(2):
+                    threads[index].start()
+                    self.assertTrue(entered[index].wait(5))
+                try:
+                    releases[order[0]].set()
+                    threads[order[0]].join(5)
+                    denied = run_gh(["api", "repos/o/r/pulls"], priority="repair", store=store,
+                                    credential="c", now=clock.read, log=quiet, max_wait_ms=0,
+                                    run=lambda args, env: self.fail("reserved quota spent twice"))
+                    self.assertEqual(denied["code"], 75)
+                finally:
+                    releases[order[1]].set()
+                    for thread in threads:
+                        thread.join(5)
+                self.assertEqual([result["code"] for result in results], [0, 0])
+                self.assertEqual(store.read("github")["credentials"]["c"]["buckets"]["core"]["remaining"], 0)
+                clock.now = reset
+                refreshed = run_gh(["api", "rate_limit"], store=store, credential="c", now=clock.read,
+                                   log=quiet, max_wait_ms=0, run=lambda args, env: (0, json.dumps({"resources": {
+                                       "core": {"limit": 5000, "remaining": 5000, "reset": reset // 1000 + 3600}}}), ""))
+                self.assertEqual(refreshed["code"], 0)
+                self.assertEqual(store.read("github")["credentials"]["c"]["buckets"]["core"]["remaining"], 5000)
+
+    def test_unpersisted_admission_does_not_call_transport(self):
+        clock, root = FakeClock(), tmp(self)
+        store = FileLedgerStore(root, now=clock.read, lock_timeout_ms=0)
+        store.transact("github", lambda ledger: credential_state(ledger, "c", clock.now)["buckets"].update(
+            core={"limit": None, "remaining": 2, "resetAt": clock.now + 60000, "observedAt": clock.now}))
+        lock = store.dir / "github.lock.d"
+        lock.mkdir()
+        (lock / "owner").write_text("other-process")
+        result = run_gh(["api", "repos/o/r/pulls"], store=store, credential="c", log=quiet, now=clock.read,
+                        run=lambda args, env: self.fail("transport must wait for durable admission"))
+        self.assertEqual((result["code"], result["deferred"]), (75, True))
+        self.assertEqual(store.read("github")["credentials"]["c"]["buckets"]["core"]["remaining"], 2)
+        self.assertEqual((lock / "owner").read_text(), "other-process")
+
+    def test_refresh_prefers_headers_and_ignores_malformed_resource_evidence(self):
+        clock, store = FakeClock(), MemoryLedgerStore()
+        reset = clock.now // 1000 + 60
+        body = json.dumps({"resources": {"core": {"limit": 100, "remaining": 90, "reset": reset},
+                                        "graphql": {"limit": 100, "remaining": True, "reset": reset},
+                                        "search": {"limit": 100, "remaining": 101, "reset": reset}}})
+        result = run_gh(["api", "rate_limit"], store=store, credential="c", now=clock.read, log=quiet,
+                        run=lambda args, env: (0, f"HTTP/2.0 200 OK\nX-Ratelimit-Limit: 100\n"
+                                                   f"X-Ratelimit-Remaining: 0\nX-Ratelimit-Reset: {reset}\n\n{body}", ""))
+        self.assertEqual(result["code"], 0)
+        buckets = store.read("github")["credentials"]["c"]["buckets"]
+        self.assertEqual(list(buckets), ["core"])
+        self.assertEqual(buckets["core"]["remaining"], 0)
 
     def test_safe_job_log_shape_is_bounded_and_costed_as_rest(self):
         expected = {"resource": "core", "write": False, "idempotent": True, "cost": 5}

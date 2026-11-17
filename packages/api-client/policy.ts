@@ -10,12 +10,13 @@ import {
   priorityPolicy,
 } from './contract.ts';
 import type { Failure, Observation } from './headers.ts';
+import { mergeObservation, UNTIMED_OBSERVATION_MS } from './headers.ts';
+
+export { UNTIMED_OBSERVATION_MS } from './headers.ts';
 
 export const LEDGER_SCHEMA = 'jovie-api-ledger/v1';
 const HOUR_MS = 3_600_000;
 const USAGE_HOURS = 24;
-/** An observation without a reset time is trusted this long. */
-const UNTIMED_OBSERVATION_MS = 60_000;
 
 export interface Bucket {
   limit: number | null;
@@ -315,27 +316,23 @@ function decideBudget(
   };
 }
 
-/** Fold response headers into the shared buckets. Server truth wins. */
+/** Fold response headers into shared buckets. gh keeps concurrent debits until
+ * the provider reset (60s for untimed evidence); other adapters retain their
+ * existing server-authoritative reconciliation. */
 export function observe(
   state: CredentialState,
   observations: readonly Observation[],
-  nowMs: number
+  nowMs: number,
+  conservative = false
 ): void {
   for (const obs of observations) {
-    const current = state.buckets[obs.resource];
-    if (
-      current?.resetAt != null &&
-      obs.resetAt !== null &&
-      obs.resetAt < current.resetAt - 1000
-    ) {
-      continue; // a response from an older window arrived late
-    }
-    state.buckets[obs.resource] = {
-      limit: obs.limit ?? current?.limit ?? null,
-      remaining: obs.remaining,
-      resetAt: obs.resetAt,
-      observedAt: nowMs,
-    };
+    const bucket = mergeObservation(
+      state.buckets[obs.resource],
+      obs,
+      nowMs,
+      conservative
+    );
+    if (bucket) state.buckets[obs.resource] = bucket;
   }
 }
 
