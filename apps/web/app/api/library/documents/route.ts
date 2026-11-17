@@ -4,6 +4,7 @@ import {
   isUnauthorizedSessionError,
 } from '@/lib/auth/session';
 import { requireCreatorDocumentAccess } from '@/lib/creator-documents/access';
+import { CatalogSelectionUnavailable } from '@/lib/db/creator-documents/catalog-promotion';
 import { saveIdeaInputSchema } from '@/lib/creator-documents/domain';
 import {
   captureCreatorIdea,
@@ -58,6 +59,9 @@ export async function POST(request: Request) {
         { status: 400, headers: NO_STORE_HEADERS }
       );
     }
+    if (parsed.data.catalogSelection) {
+      await requireCreatorDocumentAccess({ userId: user.id, profileId: profile!.id, ownerOnly: true });
+    }
     const saved = await captureCreatorIdea({
       ...parsed.data,
       creatorProfileId: profile!.id,
@@ -73,6 +77,9 @@ export async function POST(request: Request) {
         { error: 'Unauthorized' },
         { status: 401, headers: NO_STORE_HEADERS }
       );
+    }
+    if (error instanceof CatalogSelectionUnavailable) {
+      return NextResponse.json({ error: 'Selected work is unavailable' }, { status: 404, headers: NO_STORE_HEADERS });
     }
     await captureError('Private creator idea save failed', error, {
       route: '/api/library/documents',
