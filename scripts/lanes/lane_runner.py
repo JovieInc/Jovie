@@ -176,7 +176,6 @@ LANE_TESTS = ["scripts/tests/test_factory_signals.py", "scripts/tests/test_facto
               "scripts/tests/test_pytest_hook_names.py"]
 # Dependencies outside scripts/lanes for source admission and HUD PROMOTION (JOV-6836).
 RELEASE_EXTRAS = ["scripts/shipping_origin.py", "scripts/hostops/install-lane-host-git.sh",
-                  "scripts/hyperagent/hyperagent.py", "scripts/hyperagent/models.json",
                   "scripts/tests/test_size_500_stale.py",
                   "scripts/tests/test_cloud_lane_cases/__tests__/cloud_lane_fixtures.py", "scripts/tests/test_cloud_lane_cases/__tests__/cloud_lane_runner_cases.py",
                   "scripts/tests/test_cloud_lane_cases/__tests__/cloud_lane_authorization_cases.py",
@@ -189,6 +188,7 @@ RELEASE_EXTRAS = ["scripts/shipping_origin.py", "scripts/hostops/install-lane-ho
                   # Shared client layer (budgeted gh) used by the throughput sentinel.
                   "scripts/apiclient/__init__.py", "scripts/apiclient/__main__.py", "scripts/apiclient/cache.py", "scripts/apiclient/client.py", "scripts/apiclient/contract.py", "scripts/apiclient/credentials.py", "scripts/apiclient/fake.py", "scripts/apiclient/gh.py", "scripts/apiclient/github.py", "scripts/apiclient/headers.py", "scripts/apiclient/legacy.py", "scripts/apiclient/linear.py", "scripts/apiclient/policy.py", "scripts/apiclient/store.py",
                   "packages/api-client/providers.json",
+                  "scripts/hyperagent/hyperagent.py", "scripts/hyperagent/models.json",
                   "scripts/lib/github-rate-limit.mjs",
                   # The shipped failure-hold module uses the canonical Node client.
                   "packages/api-client/gh.ts", "packages/api-client/client.ts",
