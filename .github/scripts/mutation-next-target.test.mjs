@@ -18,6 +18,7 @@ import {
   set,
   validate,
 } from './fixtures/mutation-next-target-fixture.mjs';
+import { verifyHistoricalPublication } from './mutation-next-evidence.mjs';
 import {
   digest,
   finishMeasurement,
@@ -61,6 +62,51 @@ describe('reviewed request identity and scope', () => {
 });
 
 describe('predecessor publication fence', () => {
+  it('allows an absent historical cache without relaxing live publication or supplied cache identity', () => {
+    const req = request();
+    const evidence = publication(req);
+    delete evidence.cache;
+    assert.equal(verifyHistoricalPublication(req, evidence).status, 'ready');
+    evidence.historical = true;
+    evidence.requireLiveCache = false;
+    assert.equal(verifyPublication(req, evidence).status, 'hold');
+    for (const cache of [
+      {},
+      { key: req.predecessor.cacheKey, ref: 'refs/pull/1/merge' },
+      { key: 'another-cache', ref: 'refs/heads/main' },
+    ]) {
+      evidence.cache = cache;
+      assert.equal(verifyHistoricalPublication(req, evidence).status, 'hold');
+      assert.equal(verifyPublication(req, evidence).status, 'hold');
+    }
+  });
+
+  for (const [path, bad] of [
+    ['run.status', 'in_progress'],
+    ['latestRun.run_attempt', 2],
+    ['run.head_repository.full_name', 'fork/Jovie'],
+    ['run.head_branch', 'topic'],
+    ['run.path', '.github/workflows/ci.yml'],
+    ['run.head_sha', NEXT_SHA],
+    ['jobs.total_count', 2],
+    ['jobs.jobs.0.steps.0.conclusion', 'skipped'],
+    ['jobs.jobs.0.steps.1.conclusion', 'failure'],
+    ['jobs.jobs.0.steps.2.conclusion', 'failure'],
+    ['artifact.expired', true],
+    ['artifact.workflow_run.id', 43867397574],
+    ['receipt.cacheKey', 'another-cache'],
+    ['receipt.runtime.node', null],
+    ['receipt.stateSha256', '0'.repeat(64)],
+    ['receipt.attemptsSha256', '0'.repeat(64)],
+  ])
+    it(`requires authenticated historical publication after eviction: ${path}`, () => {
+      const req = request();
+      const evidence = publication(req);
+      delete evidence.cache;
+      set(evidence, path, bad);
+      assert.equal(verifyHistoricalPublication(req, evidence).status, 'hold');
+    });
+
   it('rejects corrupt structured payloads even when their byte hashes match', () => {
     for (const field of ['stateText', 'historyText']) {
       const req = request();
@@ -115,6 +161,16 @@ describe('predecessor publication fence', () => {
 });
 
 describe('durable request replay', () => {
+  it('authenticates durable historical completion after its live cache is evicted', () => {
+    const evidence = completedEvidence();
+    delete evidence.results.entries[0].publication.cache;
+    assert.equal(selectRequest([request()], evidence).status, 'complete');
+    evidence.results.entries[0].publication.receipt.stateSha256 = '0'.repeat(
+      64
+    );
+    assert.equal(selectRequest([request()], evidence).status, 'hold');
+  });
+
   it('suppresses replay only for a measured result attested by canonical publication', () => {
     const evidence = completedEvidence();
     assert.equal(selectRequest([request()], evidence).status, 'complete');
