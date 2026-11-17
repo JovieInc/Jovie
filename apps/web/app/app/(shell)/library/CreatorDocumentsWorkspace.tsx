@@ -611,6 +611,7 @@ function DocumentEditor({
 export function CreatorDocumentsWorkspace({
   creatorProfileId,
   initialDocuments,
+  initialDocumentId = null,
   initialNextCursor = null,
   initialLoadFailed = false,
   onUnsavedDraftChange,
@@ -618,6 +619,7 @@ export function CreatorDocumentsWorkspace({
 }: Readonly<{
   creatorProfileId: string;
   initialDocuments: readonly CreatorDocumentListItem[];
+  initialDocumentId?: string | null;
   initialNextCursor?: string | null;
   initialLoadFailed?: boolean;
   onUnsavedDraftChange?: (hasDraft: boolean) => void;
@@ -628,7 +630,7 @@ export function CreatorDocumentsWorkspace({
   const [listStatus, setListStatus] = useState<'idle' | 'loading' | 'error'>(
     initialLoadFailed ? 'error' : 'idle'
   );
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(initialDocumentId);
   const [showCapture, setShowCapture] = useState(false);
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
