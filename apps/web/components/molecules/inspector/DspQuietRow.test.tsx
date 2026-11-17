@@ -42,9 +42,7 @@ describe('DspQuietRow', () => {
             name: 'Destination actions for Spotify',
           })
         );
-        await user.click(
-          screen.getByRole('menuitem', { name: 'Copy Link', exact: true })
-        );
+        await user.click(screen.getByRole('menuitem', { name: 'Copy Link' }));
         await waitFor(() => expect(fallback).toHaveBeenCalledWith('copy'));
         if (success) {
           expect(notifications.success).toHaveBeenCalledWith(
