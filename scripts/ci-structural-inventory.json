@@ -322,9 +322,9 @@
       "kind": "suite"
     },
     {
-      "key": "pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/component-ship-gate.test.mjs",
+      "key": "pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/component-ship-gate.test.mjs lib/__tests__/",
       "part": "webParts",
-      "seconds": 4.2,
+      "seconds": 4.4,
       "kind": "suite"
     },
     {

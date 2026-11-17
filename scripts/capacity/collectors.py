@@ -336,9 +336,13 @@ NOT_ACCESS = ("rate limit", "=>", "[^", "|", "Object.assign", "', ", "`", "$", "
 
 def access_signature(text: str) -> str | None:
     """Normalize one denial: keep HTTP status codes, drop ids, long numbers and tokens; None for noise
-    (rate limits are capacity, not access; quoted source code and regexes are not denials)."""
+    (rate limits are capacity, not access; quoted source code and regexes are not denials; parameterized
+    test titles -- e.g. a vitest it.each case like 'records failed for HTTP 401, requested=true, ...',
+    which landed on gem transcripts as a phantom 401 (JOV-12818) -- are test output, not denials)."""
     import re
     if any(token in text for token in NOT_ACCESS):
+        return None
+    if re.match(r"^HTTP 40[13], requested=(true|false), secret=(true|false), report=(true|false)\b", text):
         return None
     sig = re.sub(r"[A-Za-z0-9_-]{24,}|[0-9a-f]{8,}|\d{4,}|\d+ms", "#", text)[:90].strip(" .,:;)({")
     return sig if len(sig) >= 12 else None

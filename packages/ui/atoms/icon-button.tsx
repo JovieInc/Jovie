@@ -141,17 +141,37 @@ const iconButtonVariants = cva(
   }
 );
 
-export type IconButtonProps = Omit<ButtonProps, 'size' | 'variant'> & {
+/**
+ * An icon-only button has no visible words, so its accessible name must come
+ * from `ariaLabel`, `aria-label` or `aria-labelledby`; the type requires one.
+ */
+export type IconButtonName =
+  | {
+      /** Accessible label (alias of `aria-label`). */
+      readonly ariaLabel: string;
+      readonly 'aria-label'?: string;
+      readonly 'aria-labelledby'?: string;
+    }
+  | {
+      readonly ariaLabel?: string;
+      readonly 'aria-label': string;
+      readonly 'aria-labelledby'?: string;
+    }
+  | {
+      readonly ariaLabel?: string;
+      readonly 'aria-label'?: string;
+      readonly 'aria-labelledby': string;
+    };
+
+export type IconButtonProps = Omit<
+  ButtonProps,
+  'size' | 'variant' | 'aria-label' | 'aria-labelledby'
+> & {
   /** Visual variant from the canonical icon-button contract. */
   readonly variant?: IconButtonVariant;
   /** Container size: xs 24 / sm 28 / md 32 / lg 40 / xl 44px. */
   readonly size?: IconButtonSize;
-  /**
-   * Accessible label (alias of `aria-label`). Icon-only buttons must always
-   * resolve a label; the compat wrappers require one in their own props.
-   */
-  readonly ariaLabel?: string;
-};
+} & IconButtonName;
 
 export const IconButton = React.forwardRef<HTMLButtonElement, IconButtonProps>(
   function IconButton(

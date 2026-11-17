@@ -5,13 +5,11 @@
  * steps (returning sign-in, new-user signup, onboarding, chat, checkout entry)
  * come from the post-deploy Playwright run as a steps file and are folded in
  * here, so one receipt per surface is built from every kind of evidence.
- * Receipts are SHA-bound to /api/health/build-info and carry per-check
- * timestamps. A surface that was not exercised is `blocked` with a reason,
- * never silently passed.
+ * Receipts are SHA-bound to /api/health/build-info with per-check times; a
+ * surface that was not exercised is `blocked` with a reason, never passed.
  */
 
-// Cone probe bodies and the shared HTTP helpers live in prod-cert-probes.mjs
-// (company-guards size baseline); this module keeps the receipt logic.
+// Cone probes and HTTP helpers live in prod-cert-probes.mjs (size baseline).
 import {
   checkoutConeChecks,
   coneClaimChecks,
@@ -19,7 +17,16 @@ import {
   EXPECTED_BROWSER_CHECKS,
   expectOk,
   get,
+  missingBrowserChecks,
+  readServedBuild,
 } from './prod-cert-probes.mjs';
+import {
+  forReceipt,
+  loadPenInputs,
+  observationFrom,
+  strangerChecks,
+  truthChecks,
+} from './prod-cert-truth.mjs';
 
 export const RECEIPT_SCHEMA = 'jovie.prod-golden-path-receipt/v1';
 
@@ -179,6 +186,7 @@ export function anonymousChecks({
   const coneClaim = coneCases
     ? coneClaimChecks({ origin, fetchImpl, run })
     : [];
+  const stranger = strangerChecks({ origin, fetchImpl, run });
   return {
     landing: () => [
       run('landing-renders', async () => {
@@ -188,6 +196,7 @@ export function anonymousChecks({
           throw new Error('GET /: empty title');
       }),
       ...coneLanding,
+      ...stranger.landing(),
     ],
     'signup-signin': () => [
       run('signin-form-renders', async () => {
@@ -196,9 +205,7 @@ export function anonymousChecks({
         if (!/type="email"|name="email"/i.test(page.body))
           throw new Error('GET /signin: no email field');
       }),
-      run('signup-renders', async () => {
-        expectOk(await get(origin, '/signup', fetchImpl), 'GET /signup');
-      }),
+      stranger.signup(),
     ],
     claim: () => [
       run('claim-renders', async () => {
@@ -210,9 +217,7 @@ export function anonymousChecks({
           'GET /claim?claim=1'
         );
       }),
-      run('start-renders', async () => {
-        expectOk(await get(origin, '/start', fetchImpl), 'GET /start');
-      }),
+      stranger.start(),
       ...coneClaim,
       run('taken-handle-rejected', async () => {
         const { response, body } = await get(
@@ -301,9 +306,10 @@ export function anonymousChecks({
         };
       }),
     ],
-    ...(coneCases
-      ? { checkout: () => checkoutConeChecks({ origin, fetchImpl, run }) }
-      : {}),
+    checkout: () => [
+      ...(coneCases ? checkoutConeChecks({ origin, fetchImpl, run }) : []),
+      ...stranger.checkout(),
+    ],
   };
 }
 
@@ -311,7 +317,9 @@ export function anonymousChecks({
  * Fold browser steps into checks. A steps file is a list of
  * { surface, id, status, startedAt, endedAt, summary } written by the
  * post-deploy Playwright run; `authStatus` covers the case where the run was
- * skipped (no credentials) or never produced steps.
+ * skipped (no credentials) or never produced steps. A `capabilities` step
+ * (JOV-9854) declares the checks the SERVED build's smoke implements, so a
+ * missing check on an older build reads as deploy skew, not a smoke skip.
  */
 export function stepChecks(
   steps,
@@ -322,16 +330,11 @@ export function stepChecks(
   const observationsBySurface = {};
   const telemetryBySurface = {};
   const screenshotBySurface = {};
+  const capabilitiesBySurface = {};
   let readback = null;
   for (const step of steps ?? []) {
     if (step.kind === 'observation') {
-      (observationsBySurface[step.surface] ??= []).push({
-        contractId: step.contractId,
-        dimension: step.dimension,
-        value: step.value,
-        unit: step.unit,
-        sampleSize: step.sampleSize ?? 1,
-      });
+      (observationsBySurface[step.surface] ??= []).push(observationFrom(step));
       continue;
     }
     if (step.kind === 'telemetry') {
@@ -348,6 +351,18 @@ export function stepChecks(
       };
       continue;
     }
+    if (step.kind === 'capabilities') {
+      if (
+        typeof step.surface === 'string' &&
+        Array.isArray(step.ids) &&
+        step.ids.every(id => typeof id === 'string')
+      ) {
+        // Specs on different workers may declare one surface (claim): union.
+        const declared = (capabilitiesBySurface[step.surface] ??= new Set());
+        for (const id of step.ids) declared.add(id);
+      }
+      continue;
+    }
     if (step.kind === 'readback') {
       // One admin inventory-readback attempt per run; the latest wins.
       readback = {
@@ -356,9 +371,10 @@ export function stepChecks(
       };
       continue;
     }
-    // A Playwright retry re-records the same check. The latest attempt is
-    // the verdict, so one failed attempt followed by a pass is one passed
-    // check, not a failed surface (JOV-9822).
+    // A malformed non-check step must never become a check with a missing id.
+    if (typeof step.id !== 'string' || step.id.length === 0) continue;
+    // A Playwright retry re-records the check; the latest attempt is the
+    // verdict, so a fail then a pass is one passed check (JOV-9822).
     const checks = (bySurface[step.surface] ??= []);
     const record = {
       id: step.id,
@@ -378,47 +394,17 @@ export function stepChecks(
     observationsBySurface,
     telemetryBySurface,
     screenshotBySurface,
+    capabilitiesBySurface,
     adminInventoryReadback: readback,
     authStatus,
     now,
   };
 }
 
-// The browser-check contract moved to prod-cert-probes.mjs together with the
-// JOV-6920 cone probes; re-exported so consumer import paths are unchanged.
-export { EXPECTED_BROWSER_CHECKS };
+// Browser-check contract lives in prod-cert-probes.mjs; re-exported for consumers.
+export { EXPECTED_BROWSER_CHECKS, missingBrowserChecks, readServedBuild };
 
-export function missingBrowserChecks({ surface, present, authStatus, now }) {
-  const expected = EXPECTED_BROWSER_CHECKS[surface] ?? [];
-  const at = now();
-  return expected
-    .filter(id => !present.some(c => c.id === id))
-    .map(id => ({
-      id,
-      status: 'blocked',
-      startedAt: at,
-      endedAt: at,
-      summary:
-        authStatus === 'not-configured'
-          ? 'sanctioned production identity (E2E_PROD_USER_EMAIL + DATABASE_URL in Doppler jovie-web/prd) is not configured for this run'
-          : `browser step did not run (auth smoke ${authStatus || 'unknown'})`,
-    }));
-}
-
-export async function readServedBuild(origin, fetchImpl = fetch) {
-  const response = await fetchImpl(new URL('/api/health/build-info', origin));
-  if (response.status !== 200)
-    throw new Error(`build-info HTTP ${response.status}`);
-  /** @type {any} */
-  const json = await response.json();
-  if (!/^[0-9a-f]{40}$/.test(json.commitSha ?? ''))
-    throw new Error('build-info has no commit sha');
-  return { sha: json.commitSha, deploymentId: json.deploymentId ?? null };
-}
-
-/**
- * Build one receipt per surface in launch order.
- */
+/** Build one receipt per surface in launch order. */
 export async function runProductionCertification({
   origin = 'https://jov.ie',
   fetchImpl = fetch,
@@ -429,10 +415,12 @@ export async function runProductionCertification({
   expectedSha = null,
   profileHandle = 'tim',
   env = {},
+  producerSourceSha = null,
   /** JOV-6920 full-cone checks; the runner enables them, legacy callers keep the legacy set. */
   coneCases = false,
 } = {}) {
   const served = await readServedBuild(origin, fetchImpl);
+  const pen = await loadPenInputs();
   const stepState = stepChecks(steps, authStatus, now);
   const probes = anonymousChecks({
     origin,
@@ -461,9 +449,17 @@ export async function runProductionCertification({
       if (probes[surface])
         checks.push(...(await Promise.all(probes[surface]())));
       const present = stepState.bySurface[surface] ?? [];
-      checks.push(...present);
       checks.push(
-        ...missingBrowserChecks({ surface, present, authStatus, now })
+        ...present,
+        ...truthChecks(surface, stepState.observationsBySurface[surface], pen),
+        ...missingBrowserChecks({
+          surface,
+          present,
+          authStatus,
+          now,
+          capabilities: stepState.capabilitiesBySurface[surface] ?? null,
+          producerSourceSha,
+        })
       );
     }
     receipts.push(
@@ -475,7 +471,7 @@ export async function runProductionCertification({
         runUrl,
         startedAt,
         endedAt: now(),
-        observations: stepState.observationsBySurface[surface] ?? [],
+        observations: forReceipt(stepState.observationsBySurface[surface]),
         consoleErrorCount:
           stepState.telemetryBySurface[surface]?.consoleErrorCount ?? null,
         networkErrorCount:

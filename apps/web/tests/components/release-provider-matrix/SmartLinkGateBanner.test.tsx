@@ -4,6 +4,14 @@ import { describe, expect, it, vi } from 'vitest';
 import { SmartLinkGateBanner } from '@/features/dashboard/organisms/release-provider-matrix/SmartLinkGateBanner';
 import type { NudgeState } from '@/lib/queries/usePlanGate';
 
+vi.mock('@/components/molecules/UpgradeButton', () => ({
+  UpgradeButton: ({ children }: { children: ReactNode }) => (
+    <button type='button' data-testid='shared-upgrade'>
+      {children}
+    </button>
+  ),
+}));
+
 vi.mock('@/components/molecules/drawer', () => ({
   DrawerButton: ({
     children,
@@ -75,7 +83,10 @@ describe('SmartLinkGateBanner', () => {
     expect(
       screen.getByText('You have 2 upcoming releases')
     ).toBeInTheDocument();
-    expect(screen.getByText('Upgrade to Artist Presence')).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Upgrade to Artist Presence' })
+    ).toHaveAttribute('data-testid', 'shared-upgrade');
+    expect(screen.queryByRole('link')).not.toBeInTheDocument();
   });
 
   it('renders trial-aware unreleased copy referencing trial expiry', () => {

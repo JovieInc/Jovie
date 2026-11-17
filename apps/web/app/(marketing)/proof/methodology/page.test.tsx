@@ -8,7 +8,7 @@ describe('proof methodology page', () => {
     expect(
       screen.getByRole('heading', {
         level: 1,
-        name: 'How Jovie Measures Its Numbers',
+        name: 'How Jovie measures its numbers',
       })
     ).toBeInTheDocument();
     expect(

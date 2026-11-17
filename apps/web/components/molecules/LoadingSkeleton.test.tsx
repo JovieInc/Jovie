@@ -13,6 +13,7 @@ vi.mock('@/lib/utils/logger', () => ({
   },
 }));
 
+import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import {
   inspectLoadingOwners,
   loadingOwnerIssueCodes,
@@ -121,10 +122,29 @@ describe('LoadingSkeleton', () => {
     ['auth form', <AuthFormSkeleton key='auth-form' />],
     ['card', <CardSkeleton key='card' />],
     ['table', <TableSkeleton key='table' rows={2} columns={2} />],
-  ])('keeps the %s composite on one named loading owner', (_name, node) => {
-    const { container } = render(node);
+  ])(
+    'keeps the %s composite on one named loading owner',
+    async (_name, node) => {
+      const { container } = render(node);
 
-    expect(loadingOwnerIssueCodes(inspectLoadingOwners(container))).toEqual([]);
+      expect(loadingOwnerIssueCodes(inspectLoadingOwners(container))).toEqual(
+        []
+      );
+      await expectNoA11yViolations(container);
+    }
+  );
+
+  it('keeps a multi-line labelled skeleton axe-clean in a right-to-left page', async () => {
+    const { container } = render(
+      <div dir='rtl' lang='ar'>
+        <LoadingSkeleton lines={3} label='جارٍ تحميل الملف الشخصي' />
+      </div>
+    );
+
+    expect(
+      screen.getByRole('status', { name: 'جارٍ تحميل الملف الشخصي' })
+    ).toHaveAttribute('data-lines', '3');
+    await expectNoA11yViolations(container);
   });
 
   it('uses the semantic separator token in the auth composition', () => {

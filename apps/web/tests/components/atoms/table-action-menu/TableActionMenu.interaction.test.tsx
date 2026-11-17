@@ -142,7 +142,11 @@ describe('TableActionMenu interactions', () => {
 
     await user.click(screen.getByRole('button', { name: 'More actions' }));
 
-    expect(screen.queryByRole('menuitem')).not.toBeInTheDocument();
+    // The only row is the disabled empty-state item, which no click can run.
+    const rows = await screen.findAllByRole('menuitem');
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toHaveAttribute('aria-disabled', 'true');
+    expect(screen.getByRole('status')).toHaveTextContent('No items found');
   });
 
   it('supports in-flight disabling to prevent duplicate action calls on rapid clicks', async () => {

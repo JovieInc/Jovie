@@ -177,4 +177,63 @@ describe('Ovie founder work providers', () => {
     );
     expect(request).not.toHaveBeenCalled();
   });
+
+  it('counts JOV issues per day range in one aliased request', async () => {
+    const request = vi.fn(
+      async (_input: RequestInfo | URL, _options?: TestRequestOptions) =>
+        jsonResponse({
+          data: {
+            w0: {
+              nodes: [{ id: 'a' }, { id: 'b' }],
+              pageInfo: { hasNextPage: false },
+            },
+            w1: { nodes: [{ id: 'c' }], pageInfo: { hasNextPage: true } },
+          },
+        })
+    );
+    const reader = createFounderWorkReader({
+      linearApiKey: () => 'linear-secret',
+      githubToken: async () => 'github-secret',
+      request: request as never,
+    });
+    await expect(
+      reader.countLinearIssuesInWindows('completedAt', [
+        { gte: '2026-11-08T08:00:00.000Z', lt: '2026-11-09T08:00:00.000Z' },
+        { gte: '2026-11-07T08:00:00.000Z', lt: '2026-11-08T08:00:00.000Z' },
+      ])
+    ).resolves.toEqual([2, null]);
+    expect(request).toHaveBeenCalledOnce();
+    const body = JSON.parse(String(request.mock.calls[0]![1]!.body));
+    expect(body.query).toContain('completedAt: { gte: $g1, lt: $l1 }');
+    expect(body.variables).toMatchObject({
+      first: 250,
+      g0: '2026-11-08T08:00:00.000Z',
+    });
+  });
+
+  it('reads a workflow run total_count with one bounded GitHub request', async () => {
+    const request = vi.fn(
+      async (_input: RequestInfo | URL, _options?: TestRequestOptions) =>
+        jsonResponse({ total_count: 17, workflow_runs: [] })
+    );
+    const reader = createFounderWorkReader({
+      linearApiKey: () => 'linear-secret',
+      githubToken: async () => 'github-secret',
+      request: request as never,
+    });
+    await expect(
+      reader.countGithubWorkflowRuns({
+        created: '2026-11-08T08:00:00Z..2026-11-09T07:59:59Z',
+        status: 'failure',
+      })
+    ).resolves.toBe(17);
+    const url = new URL(String(request.mock.calls[0]![0]));
+    expect(url.pathname).toBe('/repos/JovieInc/Jovie/actions/runs');
+    expect(url.searchParams.get('status')).toBe('failure');
+    expect(url.searchParams.get('per_page')).toBe('1');
+    request.mockResolvedValueOnce(jsonResponse({ total_count: 'many' }));
+    await expect(
+      reader.countGithubWorkflowRuns({ created: '2026-11-08' })
+    ).rejects.toThrow('not a number');
+  });
 });

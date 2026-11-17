@@ -1,6 +1,7 @@
 import { render, screen } from '@testing-library/react';
 import * as React from 'react';
 import { describe, expect, it } from 'vitest';
+import { expectNoA11yViolations } from '../test-utils/a11y';
 
 import { Separator } from './separator';
 
@@ -125,5 +126,30 @@ describe('Separator', () => {
       expect(screen.getByTestId('separator')).toBeInTheDocument();
       expect(screen.getByText('Right')).toBeInTheDocument();
     });
+  });
+});
+
+describe('Separator accessibility', () => {
+  it('has no axe violations as decorative and semantic dividers in both orientations', async () => {
+    const { container } = render(
+      <div>
+        <section aria-label='Profile'>
+          <p>Profile details</p>
+          <Separator />
+          <p>Social links</p>
+        </section>
+        <Separator decorative={false} />
+        <nav aria-label='Release actions' className='flex h-5 items-center'>
+          <a href='#edit'>Edit</a>
+          <Separator orientation='vertical' />
+          <a href='#share'>Share</a>
+          <Separator decorative={false} orientation='vertical' />
+          <a href='#archive'>Archive</a>
+        </nav>
+      </div>
+    );
+
+    expect(screen.getAllByRole('separator')).toHaveLength(2);
+    await expectNoA11yViolations(container);
   });
 });

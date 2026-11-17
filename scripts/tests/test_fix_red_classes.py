@@ -8,7 +8,6 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "lanes"))
 import fix_red_classes as classes  # noqa: E402
 
-
 def pr(*names, merge="BLOCKED"):
     return {"mergeStateStatus": merge, "statusCheckRollup": [{"name": n, "conclusion": "FAILURE"} for n in names]
             + [{"name": "PR Ready", "conclusion": "FAILURE"}, {"name": "ok", "conclusion": "SUCCESS"}]}
@@ -17,8 +16,13 @@ def pr(*names, merge="BLOCKED"):
 class ClassifyTest(unittest.TestCase):
     def test_signatures_map_to_classes_and_actions(self):
         cases = {
+            "[lint:ui-feel] new violations on lines this change adds:\n  a.tsx:1  missingTabularNums\ngithub-quota-deferred": ("ui-feel", "ui-feel"),
             "github-quota-deferred; fleet evidence retry": ("quota-deferred", "rerun"),
             "HttpError: API rate limit exceeded for installation": ("platform-infra", "rerun"),
+            "Could not fetch gitleaks after 3 attempts (https://example.invalid/gitleaks.tar.gz).": ("platform-infra", "rerun"),
+            "##[error]Dependency review detected incompatible licenses.": ("dependency-license", "agent"),
+            "screen certificate gate failed:\n  apps/web/components/jovie/merch-tool-artifacts.tsx [states missing empty]": ("screen-certificate", "repair-screen-cert"),
+            "github-quota-deferred\n##[error]Dependency review detected incompatible licenses.": ("dependency-license", "agent"),
             "upstream returned HTTP 500 before the job started": ("platform-infra", "rerun"),
             "Unwired: scripts/a.test.mjs, scripts/b.test.mjs. Wire each file into a ci-fast lane": ("ci-fast-wiring", "wire-ci-fast"),
             "domain-write-guard: apps/web/lib/leads/lead-claim-token.ts writes creatorProfiles directly 1x (allowed 0).": ("domain-write", "register-domain-writes"),
@@ -33,6 +37,20 @@ class ClassifyTest(unittest.TestCase):
         for log, (cls, action) in cases.items():
             got = classes.classify(pr("Source Validation"), {"Source Validation": log})
             self.assertEqual((got["cls"], got["action"]), (cls, action), log)
+
+    def test_failed_live_design_cli_syncs_main_before_retrying_fixture_infra(self):
+        summary = (" FAIL  workspace-scripts lib/__tests__/design-system-source-ratchet.test.mjs"
+                   " > design-system source identity ratchet (JOV-5301)"
+                   " > exits zero from the CLI on the live tree\n")
+        noise = "passing fixture: github-quota-deferred; API rate limit exceeded; HTTP 503\n"
+        for log in (summary, noise + summary, noise + "\x1b[31m" + summary + "\x1b[0m"):
+            got = classes.classify(pr("Source Validation"), {"Source Validation": log})
+            self.assertEqual((got["cls"], got["action"]), ("design-source-cli", "sync-main"))
+        for passing in (summary.replace("FAIL", "PASS"),
+                        summary.replace("design-system-source-ratchet.test.mjs", "other.test.mjs"),
+                        summary.replace("exits zero from the CLI on the live tree", "another test")):
+            got = classes.classify(pr("Source Validation"), {"Source Validation": noise + passing})
+            self.assertEqual((got["cls"], got["action"]), ("quota-deferred", "rerun"))
 
     def test_unwired_outranks_incidental_http_status_in_the_same_log(self):
         log = (
@@ -275,6 +293,27 @@ class AndChainMergeTest(unittest.TestCase):
             classes.merge_and_chain(NarrowedPreflightMergeTest.OURS, NarrowedPreflightMergeTest.THEIRS),
             classes.merge_narrowed_guard_command(NarrowedPreflightMergeTest.OURS, NarrowedPreflightMergeTest.THEIRS),
         )
+
+    def test_unions_plain_yaml_run_chains_in_main_order(self):
+        ours = "pnpm --filter @jovie/extension test && node --experimental-strip-types --test workers/cron-hub/src/index.test.mjs"
+        theirs = "pnpm --filter @jovie/extension test && pnpm --filter @jovie/mesh-hub test"
+        conflict = (f"<<<<<<< HEAD\n        run: {ours}\n=======\n"
+                    f"        run: {theirs}\n>>>>>>> origin/main\n")
+        self.assertEqual(
+            classes.resolve_and_chain_text(conflict),
+            f"        run: {theirs} && node --experimental-strip-types --test workers/cron-hub/src/index.test.mjs\n",
+        )
+        for changed in [theirs.replace("extension test", "extension test --strict"),
+                        theirs + " | cat", theirs + " # comment", theirs + " && echo 'quoted'",
+                        theirs + " && echo ${UNTRUSTED}"]:
+            with self.subTest(changed=changed):
+                self.assertIsNone(classes.resolve_and_chain_text(conflict.replace(theirs, changed)))
+        self.assertIsNone(classes.resolve_and_chain_text(conflict.replace("run:", "name:", 1)))
+        for key in ["if", "name", "working-directory", "env"]:
+            metadata = conflict.replace("        run:", f"        {key}: false\n        run:", 1)
+            metadata = metadata.replace("=======\n", f"=======\n        {key}: true\n", 1)
+            with self.subTest(key=key):
+                self.assertIsNone(classes.resolve_and_chain_text(metadata))
 
     def test_unions_filtered_workspace_checks_and_one_sided_test_runner(self):
         common = "pnpm --filter @jovie/extension typecheck && pnpm --filter @jovie/extension test"
@@ -583,7 +622,6 @@ class T(unittest.TestCase):
         path = Path(__file__).resolve().parents[1] / "tests" / "test_lane_runner.py"
         text = path.read_text()
         self.assertEqual(classes.complete_release_identity_stubs(text), text)
-
 
 if __name__ == "__main__":
     unittest.main()

@@ -24,3 +24,15 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const Confirmed: Story = {};
+
+/** RTL: the success banner mirrors its icon, copy and dismiss control. */
+export const RtlConfirmed: Story = {
+  render: () => {
+    globalThis.history.replaceState({}, '', '/tim?subscribed=confirmed');
+    return (
+      <div className='w-96' dir='rtl'>
+        <SubscriptionConfirmedBanner />
+      </div>
+    );
+  },
+};

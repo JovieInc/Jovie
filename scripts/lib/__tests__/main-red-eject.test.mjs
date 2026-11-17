@@ -156,23 +156,36 @@ describe('decideEject', () => {
         .action
     ).toBe('revert');
   });
-  it('caps attempts per change and gives a live repair its grace', () => {
+  it('caps attempts per change', () => {
     expect(decideEject({ ...base, priorAttempts: 2 }).reason).toBe(
       'attempt-cap'
     );
+  });
+  it('reverts even while a forward fix is open (it wins only by landing first)', () => {
+    // Revert first (canon/MERGE_QUEUE_STEWARD.md): 2026-10-31 the forward fix sat
+    // at queue position 18 behind the stall it was fixing.
     const repair = {
       number: 23712,
-      createdAt: '2026-10-29T19:50:00Z',
-      queued: false,
+      createdAt: '2026-10-29T19:55:00Z',
+      queued: true,
     };
-    expect(decideEject({ ...base, repairs: [repair] }).reason).toBe(
-      'repair-in-flight:#23712'
-    );
+    // decideEject takes no repair list at all now; an extra field is ignored.
     expect(
-      decideEject({
-        ...base,
-        repairs: [{ ...repair, createdAt: '2026-10-29T18:00:00Z' }],
-      }).action
+      decideEject(/** @type {any} */ ({ ...base, repairs: [repair] }))
+    ).toEqual({
+      action: 'revert',
+      reason: 'culprit-attributed',
+    });
+  });
+  it('allows one revert in flight per culprit, whoever opened it', () => {
+    const mainHealth = { number: 9, check: 'Main health', culprit: 'c' };
+    expect(decideEject({ ...base, openReverts: [mainHealth] })).toEqual({
+      action: 'skip',
+      reason: 'revert-in-flight-for-culprit',
+    });
+    expect(
+      decideEject({ ...base, openReverts: [{ ...mainHealth, culprit: 'd' }] })
+        .action
     ).toBe('revert');
   });
   it('builds conventional titles within 100 chars', () => {
@@ -313,10 +326,26 @@ describe('app-installation rate-limit guard (2026-10-31 5 h queue stall)', () =>
 describe('workflow dispatch inputs', () => {
   const root = resolve(here, '../../..');
   const dispatches = caller =>
-    [...caller.matchAll(/'run',\s*'([\w./-]+\.yml)'([\s\S]*?)\]/g)].map(m => ({
+    [
+      ...caller.matchAll(
+        /(?:'run',|dispatchWorkflow\()\s*'([\w./-]+\.yml)'([\s\S]*?)(?:\]|\);)/g
+      ),
+    ].map(m => ({
       workflow: m[1],
       inputs: [...m[2].matchAll(/`([\w-]+)=/g)].map(x => x[1]),
     }));
+
+  it.each([
+    "gh(['workflow', 'run', 'pr-remediation-swarm.yml', '-f', `pr_numbers=7`]);",
+    "dispatchWorkflow('pr-remediation-swarm.yml', `pr_numbers=7`, 'repair');",
+  ])(
+    'detects undeclared input names in direct and wrapped dispatches: %s',
+    caller => {
+      expect(dispatches(caller)).toEqual([
+        { workflow: 'pr-remediation-swarm.yml', inputs: ['pr_numbers'] },
+      ]);
+    }
+  );
 
   it('passes only inputs the target workflow declares (run 41122896980: pr_numbers 422)', () => {
     const caller = readFileSync(

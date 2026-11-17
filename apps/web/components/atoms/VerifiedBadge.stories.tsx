@@ -35,3 +35,22 @@ export const AllSizes: Story = {
     </div>
   ),
 };
+
+/** The badge trails a long artist name that wraps, staying inline at the end. */
+export const LongContentArtistName: Story = {
+  render: () => (
+    <p className='w-56 text-lg font-semibold text-primary-token'>
+      Timothy White and the Very Long Sibling Ensemble Collective{' '}
+      <VerifiedBadge size='sm' />
+    </p>
+  ),
+};
+
+/** Right-to-left: the badge follows an Arabic artist name at the inline end. */
+export const Rtl: Story = {
+  render: () => (
+    <p dir='rtl' className='w-56 text-lg font-semibold text-primary-token'>
+      فرقة الأصوات العربية المستقلة <VerifiedBadge size='sm' />
+    </p>
+  ),
+};

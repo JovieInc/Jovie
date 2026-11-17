@@ -4,6 +4,7 @@ import type { CSSProperties, ReactNode } from 'react';
 import { PhoneFrame } from '@/components/molecules/PhoneFrame';
 import type { PublicRelease } from '@/features/profile/releases/types';
 import { ProfileCompactSurface } from '@/features/profile/templates/ProfileCompactSurface';
+import { DirectDspImagesProvider } from '@/lib/images/direct-dsp-images';
 import { cn } from '@/lib/utils';
 import type { Artist, LegacySocialLink } from '@/types/db';
 
@@ -57,6 +58,8 @@ export interface ProfilePreviewBentoProps {
   /** Extra hero layout classes (sizing, padding). */
   readonly heroClassName?: string;
   readonly phoneFrameClassName?: string;
+  /** Load DSP images straight from their CDN (one-off onboarding preview). */
+  readonly directDspImages?: boolean;
   /** CSS var overrides forwarded to the phone surface wrapper. */
   readonly coverVars?: CSSProperties;
   readonly dataTestId?: string;
@@ -70,12 +73,11 @@ export interface ProfilePreviewBentoProps {
  * ratchet, matching PhoneFrame's own inline-style approach.
  */
 const DEFAULT_HERO_STYLE: CSSProperties = {
-  background:
-    'radial-gradient(120% 90% at 50% -10%, rgba(123,108,255,0.42) 0%, rgba(70,58,170,0.14) 38%, rgba(12,12,20,0) 66%), linear-gradient(180deg, #14131f 0%, #0c0c12 100%)',
+  background: 'var(--profile-preview-bento-hero)',
 };
 
 const BOTTOM_FADE_STYLE: CSSProperties = {
-  background: 'linear-gradient(to bottom, transparent, #0c0c12)',
+  background: 'var(--profile-preview-bento-fade)',
 };
 
 /** Cover/page-pad CSS vars the compact surface reads (inline to avoid arbitrary classes). */
@@ -103,6 +105,7 @@ export function ProfilePreviewBento({
   heroStyle,
   heroClassName,
   phoneFrameClassName,
+  directDspImages = false,
   coverVars,
   dataTestId,
   phonePreviewTestId,
@@ -162,9 +165,9 @@ export function ProfilePreviewBento({
         style={heroStyle ?? DEFAULT_HERO_STYLE}
       >
         {showLiveBadge && (
-          <span className='absolute left-3.5 top-3.5 z-20 inline-flex h-6 items-center gap-1.5 rounded-full border border-white/12 bg-black/50 px-2.5 backdrop-blur-md'>
+          <span className='absolute left-3.5 top-3.5 z-20 inline-flex h-6 items-center gap-1.5 rounded-full border border-on-media/12 bg-ink-on-media/50 px-2.5 backdrop-blur-md'>
             <span className='h-1.5 w-1.5 rounded-full bg-(--color-accent-green)' />
-            <span className='text-3xs font-semibold uppercase tracking-wider text-white dark:text-white'>
+            <span className='text-2xs font-medium text-on-media dark:text-on-media'>
               Live
             </span>
           </span>
@@ -177,7 +180,9 @@ export function ProfilePreviewBento({
           <div className='absolute left-3.5 top-3.5 z-20'>{overlay}</div>
         )}
 
-        {phone}
+        <DirectDspImagesProvider enabled={directDspImages}>
+          {phone}
+        </DirectDspImagesProvider>
 
         {showBottomFade && (
           <div

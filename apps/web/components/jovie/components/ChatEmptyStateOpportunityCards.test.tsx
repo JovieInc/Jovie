@@ -85,3 +85,17 @@ describe('ChatEmptyStateOpportunityCards', () => {
     expect(container).toBeEmptyDOMElement();
   });
 });
+
+describe('ChatEmptyStateOpportunityCards scale tokens', () => {
+  it('keeps type and size utilities on scale tokens instead of arbitrary values', async () => {
+    const { readFileSync } = await import('node:fs');
+    const { join } = await import('node:path');
+    const source = readFileSync(
+      join(import.meta.dirname, 'ChatEmptyStateOpportunityCards.tsx'),
+      'utf8'
+    );
+
+    expect(source).not.toMatch(/max-w-\[28rem\]/);
+    expect(source).toContain('max-w-md');
+  });
+});

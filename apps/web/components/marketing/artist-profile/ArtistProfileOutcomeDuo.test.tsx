@@ -41,6 +41,12 @@ describe('ArtistProfileOutcomeDuo', () => {
     ).toBeInTheDocument();
     expect(screen.getByText('Continue with Venmo')).toBeInTheDocument();
     expect(screen.getByText('The Novo')).toBeInTheDocument();
+    for (const date of section.querySelectorAll('.ap-outcome-date')) {
+      expect(date).not.toHaveClass('uppercase');
+    }
+    expect(section.querySelectorAll('.ap-outcome-date').length).toBeGreaterThan(
+      0
+    );
   });
 
   it('keeps the adjacent Storybook receipt bound to both headline variants', () => {

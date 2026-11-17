@@ -64,7 +64,7 @@
             "type": "string",
             "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$"
           },
-          "penFile": { "type": "string", "pattern": "\\.pen$" },
+          "penFile": { "type": "string", "pattern": "\\.(pen|html)$" },
           "nodeId": { "type": "string", "minLength": 1 },
           "still": {
             "type": "string",

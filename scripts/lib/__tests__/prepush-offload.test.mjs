@@ -9,6 +9,7 @@ import {
   hostOverloaded,
   NARROWED_LOCAL,
   unrelatedFailure,
+  verdictLine,
 } from '../preflight-scope.mjs';
 import { percentile, recordTimings, summarize } from '../preflight-timing.mjs';
 import {
@@ -256,6 +257,17 @@ test('the failing list names every item, however many', () => {
   );
 });
 
+test('a skipped check is named in the verdict, never a bare all clear', () => {
+  const ran = [{ name: 'lint' }];
+  assert.equal(verdictLine(0, ran), '\nall clear.');
+  const skipped = [...ran, { name: 'private data guard', skip: 'no gh' }];
+  assert.equal(
+    verdictLine(0, skipped),
+    '\nall clear; SKIPPED here (CI runs): private data guard.'
+  );
+  assert.match(verdictLine(2, skipped), /^\n2 item\(s\) to fix .*SKIPPED/);
+});
+
 test('host overload is a correctness signal, not only speed', () => {
   assert.equal(hostOverloaded({}, 50, 10), true);
   assert.equal(hostOverloaded({}, 15, 10), false);
@@ -285,4 +297,26 @@ test('a preflight deadline (exit 124) under overload is inconclusive, not a red'
   );
   assert.equal(r.code, 0);
   assert.match(r.warn, /inconclusive/);
+});
+
+test('a busy Gem queue is infra: the hook moves on to hosted runners', async () => {
+  const {
+    DEFAULT_GEM_QUEUE_MAX_SEC,
+    SLOTS_BUSY_EXIT,
+    gemQueueMaxSec,
+    isBackendUnavailable,
+  } = await import('../prepush-offload.mjs');
+  assert.equal(isBackendUnavailable(SLOTS_BUSY_EXIT), true);
+  assert.equal(isBackendUnavailable(127), true);
+  assert.equal(isBackendUnavailable(255), true);
+  // A real red on Gem stays a verdict and is never retried elsewhere.
+  assert.equal(isBackendUnavailable(1), false);
+  assert.equal(isBackendUnavailable(0), false);
+  assert.equal(gemQueueMaxSec({}), DEFAULT_GEM_QUEUE_MAX_SEC);
+  assert.equal(gemQueueMaxSec({ JOVIE_PREPUSH_GEM_QUEUE_MAX_SEC: '0' }), 0);
+  assert.equal(gemQueueMaxSec({ JOVIE_PREPUSH_GEM_QUEUE_MAX_SEC: '30' }), 30);
+  assert.equal(
+    gemQueueMaxSec({ JOVIE_PREPUSH_GEM_QUEUE_MAX_SEC: 'x' }),
+    DEFAULT_GEM_QUEUE_MAX_SEC
+  );
 });

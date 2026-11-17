@@ -425,3 +425,19 @@
     display: none;
   }
 }
+
+/* Homepage v3 header variant (home-viewport scope), owned here with the rest of the header internals. */
+.home-viewport .marketing-glass-header__nav {
+  column-gap: 2.5rem;
+}
+
+.home-viewport .marketing-glass-header .marketing-glass-header__nav-link,
+.home-viewport .marketing-glass-header .marketing-glass-header__text-link {
+  padding-inline: 0;
+  font-size: 0.875rem;
+  font-weight: 400;
+}
+
+.home-viewport .marketing-glass-header .marketing-glass-header__text-link {
+  color: var(--color-text-primary-token);
+}

@@ -10,6 +10,7 @@ import {
   ARTIST_VISIBILITY_OFFER_CONTRACT_ID,
   FORBIDDEN_PUBLIC_PRICING_PAGE_MARKERS,
 } from '@/lib/billing/offer-truth';
+import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import { PricingRecipeBody } from './PricingRecipeBody';
 import { PRICING_RECIPE_STORY_REQUEST_ACCESS_COPY } from './PricingRecipeBody.stories';
 
@@ -74,8 +75,8 @@ describe('PricingRecipeBody', () => {
     );
   });
 
-  it('renders the shipped pricing sections and exact injected production slots', () => {
-    render(
+  it('renders the shipped pricing sections and exact injected production slots', async () => {
+    const { container } = render(
       <PricingRecipeBody
         requestAccessCopy={expectedRequestAccessCopy}
         plans={<div data-testid='plans-slot'>Production plans</div>}
@@ -119,6 +120,40 @@ describe('PricingRecipeBody', () => {
     expect(
       screen.queryByText('Public Jovie profile and audience capture.')
     ).toBeNull();
+    await expectNoA11yViolations(container);
+  });
+
+  it('keeps long and right-to-left closing copy inside the closing section', async () => {
+    const long =
+      'Start free with a profile that stays yours, then upgrade whenever you are ready. This deliberately long closing line runs to several lines so the section can be checked for clean wrapping at every width.';
+    const slots = {
+      plans: <div>Production plans</div>,
+      comparisonChart: <div>Production comparison</div>,
+    };
+    const { container, rerender } = render(
+      <PricingRecipeBody requestAccessCopy={long} {...slots} />
+    );
+    const closing = screen.getByTestId('marketing-section-cta');
+    expect(within(closing).getByText(long)).toBeVisible();
+    expect(within(closing).getAllByRole('link')).toHaveLength(1);
+    expect(screen.queryByTestId('audit-offer-slot')).toBeNull();
+    await expectNoA11yViolations(container);
+
+    rerender(
+      <div dir='rtl'>
+        <PricingRecipeBody
+          requestAccessCopy='ابدأ مجانًا وانتقل إلى خطة أعلى متى شئت.'
+          {...slots}
+        />
+      </div>
+    );
+    expect(
+      screen.getByRole('heading', { level: 1, name: 'Pricing' })
+    ).toBeVisible();
+    expect(
+      screen.getByText('ابدأ مجانًا وانتقل إلى خطة أعلى متى شئت.')
+    ).toBeVisible();
+    await expectNoA11yViolations(container);
   });
 
   it('keeps pricing and actions focal without the rejected particle or shader asset', () => {

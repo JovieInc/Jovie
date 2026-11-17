@@ -310,18 +310,11 @@ describe('Neon deleters are wired through the guard', () => {
     }
   });
 
-  it('PR-close cleanup checks the guard for prefix and exact matches', () => {
-    const wf = read('.github/workflows/neon-ephemeral-branch-cleanup.yml');
-    expect(wf.match(/--assert-deletable/g)?.length).toBe(2);
-    expect(wf).toContain('production|prod|br-main');
-  });
-
   it('no workflow deletes a Neon branch without a run-id-derived name or the guard', () => {
     // The run-scoped deleters build BRANCH_NAME from github.run_id only; they
     // cannot name production/backup. Any new deleter must be listed here.
     const allowed = new Map([
       ['.github/actions/neon-branch-cleanup/action.yml', 'guard'],
-      ['.github/workflows/neon-ephemeral-branch-cleanup.yml', 'guard'],
       ['.github/workflows/visual-regression.yml', 'run-id'],
       ['.github/workflows/e2e-full-matrix.yml', 'run-id'],
       ['.github/workflows/nightly-tests.yml', 'run-id'],

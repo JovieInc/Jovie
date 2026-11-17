@@ -126,6 +126,7 @@ export const BAKED_DESKTOP_BUILD_IDENTITY = {
 export function bakeDesktopEnvAndIdentity({
   env = process.env,
   requireProvenance = false,
+  outputRoot = DESKTOP_ROOT,
 } = {}) {
   const appEnv = resolveAppEnv(env.ELECTRON_ENV);
   const appUrl = resolveAppUrl(appEnv, env.ELECTRON_APP_URL);
@@ -157,15 +158,15 @@ export function bakeDesktopEnvAndIdentity({
   }
 
   writeFileSync(
-    join(DESKTOP_ROOT, 'src', 'env.generated.ts'),
+    join(outputRoot, 'src', 'env.generated.ts'),
     renderEnvSource(appEnv, appUrl)
   );
   writeFileSync(
-    join(DESKTOP_ROOT, 'src', 'build-identity.generated.ts'),
+    join(outputRoot, 'src', 'build-identity.generated.ts'),
     renderIdentitySource(identity)
   );
   writeFileSync(
-    join(DESKTOP_ROOT, 'build', 'build-identity.json'),
+    join(outputRoot, 'build', 'build-identity.json'),
     `${JSON.stringify(identity)}\n`
   );
 

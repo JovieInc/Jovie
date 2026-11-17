@@ -111,7 +111,9 @@ function FlagEnvCell({
           onClick={onClear}
           disabled={pending || !overridden}
           title={overridden ? 'Reset to default' : undefined}
-          aria-label={overridden ? `Reset ${envLabel} to default` : undefined}
+          // The slot is aria-hidden until overridden, so the name is only read
+          // once the reset is available.
+          aria-label={`Reset ${envLabel} to default`}
           aria-hidden={!overridden}
           tabIndex={overridden ? 0 : -1}
           data-testid={

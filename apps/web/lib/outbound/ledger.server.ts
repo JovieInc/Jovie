@@ -10,6 +10,7 @@ import {
   type OutboundTarget,
   outboundCopyEvidenceKey,
   outboundCopyRevision,
+  outboundRelationshipHold,
   outboundTargetEvidenceKey,
   outboundTargetRevision,
 } from './approval';
@@ -29,6 +30,8 @@ export interface OutboundLeadIdentity {
   readonly creatorProfileId: string | null;
   readonly claimToken: string | null;
   readonly avatarUrl?: string | null;
+  /** Public bio; read only by the existing-relationship hold. */
+  readonly bio?: string | null;
 }
 
 export function outboundTargetFromLead(
@@ -41,6 +44,8 @@ export function outboundTargetFromLead(
     instagramHandle: lead.instagramHandle,
     creatorProfileId: lead.creatorProfileId,
     claimUrl: lead.claimToken ? getOutboundClaimUrl(lead.claimToken) : null,
+    handle: lead.linktreeHandle,
+    bio: lead.bio ?? null,
   };
 }
 
@@ -125,7 +130,10 @@ export async function recordOutboundDecision(input: {
   readonly decision: OutboundDecisionInput;
 }): Promise<
   | { readonly ok: true; readonly revision: string }
-  | { readonly ok: false; readonly reason: 'stale_target' | 'invalid' }
+  | {
+      readonly ok: false;
+      readonly reason: 'stale_target' | 'invalid' | 'existing_relationship';
+    }
 > {
   const target = outboundTargetFromLead(input.lead);
   const targetRevision = outboundTargetRevision(target);
@@ -133,6 +141,13 @@ export async function recordOutboundDecision(input: {
   if (decision.expectedTargetRevision !== targetRevision)
     return { ok: false, reason: 'stale_target' };
   if (!input.actorUserId) return { ok: false, reason: 'invalid' };
+  // Hard gate: a held artist takes no approval and no saved draft. Hold and
+  // reject decisions on the target still record.
+  if (
+    outboundRelationshipHold(target) &&
+    (decision.kind === 'copy' || decision.decision === 'yes')
+  )
+    return { ok: false, reason: 'existing_relationship' };
 
   let evidenceKey: string;
   let evidenceRevision: string;
@@ -144,7 +159,7 @@ export async function recordOutboundDecision(input: {
     evidenceRevision = targetRevision;
     snapshot = {
       schema: 'outbound-target/v1',
-      target,
+      target: { ...target, bio: undefined },
       reason: decision.decision === 'no' ? decision.reason : null,
       note: decision.note?.trim() || null,
     };

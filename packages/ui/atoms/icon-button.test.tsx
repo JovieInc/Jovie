@@ -1,5 +1,7 @@
 import { render, screen } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import userEvent from '@testing-library/user-event';
+import { describe, expect, it, vi } from 'vitest';
+import { expectNoA11yViolations } from '../test-utils/a11y';
 
 import { IconButton } from './icon-button';
 import {
@@ -178,7 +180,9 @@ describe('IconButton', () => {
     const loadingButton = screen.getByRole('button', {
       name: 'Secondary state',
     });
-    expect(loadingButton).toBeDisabled();
+    // Loading keeps focus: aria-disabled blocks activation, not native disabled.
+    expect(loadingButton).not.toBeDisabled();
+    expect(loadingButton).toHaveAttribute('aria-disabled', 'true');
     expect(loadingButton).toHaveAttribute('data-state', 'loading');
     expect(loadingButton).toHaveAttribute('aria-busy', 'true');
     expect(loadingButton.className).toContain('h-8');
@@ -317,5 +321,102 @@ describe('IconButton destructive contrast (JOV-8873)', () => {
     const button = screen.getByRole('button', { name: 'Delete item' });
     expect(button).toHaveClass('text-error-text');
     expect(button).not.toHaveClass('text-error');
+  });
+});
+
+describe('IconButton interaction', () => {
+  it('activates on click, Enter and Space', async () => {
+    const user = userEvent.setup();
+    const onClick = vi.fn();
+    render(
+      <IconButton ariaLabel='Share profile' onClick={onClick}>
+        <svg aria-hidden='true' />
+      </IconButton>
+    );
+
+    const button = screen.getByRole('button', { name: 'Share profile' });
+    await user.click(button);
+    expect(onClick).toHaveBeenCalledTimes(1);
+
+    button.focus();
+    await user.keyboard('{Enter}');
+    await user.keyboard(' ');
+    expect(onClick).toHaveBeenCalledTimes(3);
+  });
+
+  it('does not activate while disabled or loading', async () => {
+    const user = userEvent.setup();
+    const onClick = vi.fn();
+    render(
+      <>
+        <IconButton ariaLabel='Disabled share' disabled onClick={onClick}>
+          <svg aria-hidden='true' />
+        </IconButton>
+        <IconButton ariaLabel='Loading share' loading onClick={onClick}>
+          <svg aria-hidden='true' />
+        </IconButton>
+      </>
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Disabled share' }));
+    await user.click(screen.getByRole('button', { name: /Loading share/ }));
+    expect(onClick).not.toHaveBeenCalled();
+  });
+});
+
+describe('IconButton accessibility', () => {
+  it('has no axe violations across variants, error, loading and RTL states', async () => {
+    const { container } = render(
+      <div>
+        {ICON_BUTTON_VARIANT_NAMES.map(variant => (
+          <IconButton
+            key={variant}
+            ariaLabel={`${variant} action`}
+            variant={variant}
+          >
+            <svg aria-hidden='true' />
+          </IconButton>
+        ))}
+        <IconButton ariaLabel='Retry upload' destructive>
+          <svg aria-hidden='true' />
+        </IconButton>
+        <IconButton ariaLabel='Saving' loading>
+          <svg aria-hidden='true' />
+        </IconButton>
+        <div dir='rtl'>
+          <IconButton ariaLabel='مشاركة'>
+            <svg aria-hidden='true' />
+          </IconButton>
+        </div>
+      </div>
+    );
+    await expectNoA11yViolations(container);
+  });
+});
+
+describe('IconButton accessible name', () => {
+  it('takes its name from aria-labelledby', () => {
+    render(
+      <>
+        <span id='icon-button-name'>Archive release</span>
+        <IconButton aria-labelledby='icon-button-name'>
+          <svg aria-hidden='true' />
+        </IconButton>
+      </>
+    );
+    expect(
+      screen.getByRole('button', { name: 'Archive release' })
+    ).toBeInTheDocument();
+  });
+
+  it('falls back to aria-label when the ariaLabel alias is blank', () => {
+    render(
+      <IconButton ariaLabel='  ' aria-label='Close panel'>
+        <svg aria-hidden='true' />
+      </IconButton>
+    );
+    expect(
+      screen.getByRole('button', { name: 'Close panel' })
+    ).toBeInTheDocument();
   });
 });

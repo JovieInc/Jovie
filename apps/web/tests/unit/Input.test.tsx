@@ -63,7 +63,8 @@ describe('Input', () => {
       render(<Input error='Invalid value' placeholder='Input' />);
 
       const errorMessage = screen.getByRole('alert');
-      expect(errorMessage.parentElement).toHaveAttribute('aria-live', 'polite');
+      // role=alert alone: an aria-live wrapper would announce it twice.
+      expect(errorMessage.closest('[aria-live]')).toBeNull();
     });
 
     it('marks input as invalid when error is present', () => {

@@ -233,6 +233,10 @@ describe('MarketingHero source-backed default story', () => {
       'before:min-h-11'
     );
     expect(secondary).not.toHaveClass('h-10');
+    expect(screen.getByRole('link', { name: 'Get started' })).toHaveAttribute(
+      'href',
+      '/start'
+    );
   });
 
   it('routes route-owned presentation through the unstyled shell without hero chrome', () => {

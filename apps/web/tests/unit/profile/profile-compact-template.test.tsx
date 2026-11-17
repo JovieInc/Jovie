@@ -528,7 +528,7 @@ describe('ProfileCompactTemplate', () => {
   it('keeps the floating back control on nested modes with a profile-root destination', async () => {
     render(
       <ProfileCompactTemplate
-        mode='listen'
+        mode='releases'
         artist={mockArtist}
         socialLinks={[]}
         contacts={[]}
@@ -1270,7 +1270,7 @@ describe('ProfileCompactTemplate', () => {
 
     render(
       <ProfileCompactTemplate
-        mode='listen'
+        mode='releases'
         artist={mockArtist}
         socialLinks={[]}
         contacts={[]}
@@ -1389,14 +1389,14 @@ describe('ProfileCompactTemplate', () => {
     vi.unstubAllGlobals();
   });
 
-  it('returns nested listen mode to the profile root instead of leaving the profile', async () => {
+  it('returns nested releases mode to the profile root instead of leaving the profile', async () => {
     const backSpy = vi.spyOn(window.history, 'back').mockImplementation(() => {
       // noop
     });
 
     render(
       <ProfileCompactTemplate
-        mode='listen'
+        mode='releases'
         artist={mockArtist}
         socialLinks={[]}
         contacts={[]}
@@ -1958,7 +1958,7 @@ describe('ProfileCompactTemplate', () => {
         render(profile());
 
         const expectClaimIntent = () => {
-          expect(screen.getByTestId('claim-banner')).toHaveTextContent(
+          expect(screen.getByTestId('claim-banner-copy')).toHaveTextContent(
             'Your profile is ready. Claim it to turn on release emails.'
           );
           expect(screen.getByTestId('claim-banner-cta')).toHaveAttribute(
@@ -2014,7 +2014,7 @@ describe('ProfileCompactTemplate', () => {
           `/test-artist?claim=${claim}&source=qr&token=private-token`
         );
         render(profile());
-        expect(screen.getByTestId('claim-banner')).toHaveTextContent(
+        expect(screen.getByTestId('claim-banner-copy')).toHaveTextContent(
           'This profile is unclaimed. Is it yours? Claim it with Spotify.'
         );
         fireEvent.click(
@@ -3169,7 +3169,7 @@ describe('ProfileCompactTemplate', () => {
         expect.objectContaining({
           artist: mockArtist,
           activeMode: 'profile',
-          presentation: 'modal',
+          presentation: 'embedded',
         })
       );
     });
@@ -3562,7 +3562,7 @@ describe('ProfileCompactTemplate', () => {
     });
   });
 
-  describe('with the desktop surface flag off (shipped default)', () => {
+  describe('with the desktop surface flag off (explicit opt-out)', () => {
     beforeEach(() => {
       vi.stubEnv('NEXT_PUBLIC_FEATURE_PROFILE_DESKTOP_SURFACE', '');
     });
@@ -3616,10 +3616,12 @@ describe('ProfileCompactTemplate', () => {
       expect(viewport).not.toHaveAttribute('data-desktop-ready');
       expect(viewport).not.toHaveClass('profile-viewport--desktop-surface');
       // The compact shell keeps the centered phone-column contract
-      // (max-width: --profile-shell-max-width, md:mx-auto card framing).
+      // (max-width: --profile-shell-max-width, mx-auto at every width).
+      // Embedded browser panes can be wider than the phone cap but narrower
+      // than md, so centering must not wait for tablet card framing.
       const compactShell = screen.getByTestId('profile-compact-shell');
       expect(compactShell).toHaveClass('public-profile-compact-shell');
-      expect(compactShell).toHaveClass('md:mx-auto');
+      expect(compactShell).toHaveClass('mx-auto');
       expect(screen.queryByTestId('profile-desktop-shell')).toBeNull();
       expect(mockProfileDesktopSurface).not.toHaveBeenCalled();
       // The banner stays inside the column instead of the desktop shell.
