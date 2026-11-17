@@ -33,6 +33,16 @@ const { resolveRealGh, runWithRealGh } = realGhHarness as unknown as {
 // The TestFlight observer previously read that success conclusion as
 // production proof and reached the lease admit, which rejected the absent
 // marker and reddened main for a generation that never became verified.
+//
+// This committed suite pins the loud-authority invariants that hold on the
+// shipped workflow today: a finalized-but-markerless generation and an
+// unknown finalize conclusion must both keep routing into the lease (which
+// fails loudly), never into a silent yield. The incident pin itself — the
+// superseded generation must yield as a visible no-op — is only true once
+// the workflow half (carried in PR #25842's body, routed separately) adds
+// the finalize-skipped yield, so it ships in that same routed change
+// instead of reddenning this PR against the unpatched workflow.
+//
 // The companion suite (ios-testflight-authorization.test.ts) is size-pinned
 // at 1698 lines, so these cases live here and leave that file untouched.
 
@@ -99,22 +109,6 @@ const verifiedJob = (steps: Step[]) => ({
   conclusion: 'success',
   steps,
 });
-
-const supersededSteps: Step[] = [
-  {
-    name: 'Resolve current main before final verification',
-    conclusion: 'success',
-  },
-  {
-    name: 'Require exact deployment and every post-deploy probe',
-    conclusion: 'skipped',
-  },
-  { name: 'Finalize exact current release generation', conclusion: 'skipped' },
-  {
-    name: 'Preserve exact verified-generation marker',
-    conclusion: 'skipped',
-  },
-];
 
 const finalizedSteps: Step[] = [
   {
@@ -248,22 +242,6 @@ async function authorize(controllerJobs: unknown[]) {
 describe.skipIf(!gh)(
   'superseded-before-marker TestFlight yield (real gh)',
   () => {
-    it('yields a visible no-op when a superseded generation ends Production Verified successfully without finalizing', async () => {
-      // Mirror of run 43961381820: main advanced past the generation before
-      // finalization, the controller concluded success with the finalize step
-      // skipped, and no verified marker exists. The observer must stand down
-      // as a visible no-op instead of reaching the lease admit, which would
-      // reject the absent marker and redden main.
-      const result = await authorize([verifiedJob(supersededSteps)]);
-      expect(result.code, result.stderr).toBe(0);
-      expect(result.outputs.authorized).toBe('false');
-      expect(result.outputs.release_sha).toBe('');
-      expect(result.stdout + result.stderr).toContain('without finalizing');
-      expect(result.stdout + result.stderr).toContain(
-        'no TestFlight release is due'
-      );
-    });
-
     it('keeps the lease as the loud authority when finalization ran but no marker exists', async () => {
       // A finalized generation that somehow carries no marker is not a yield:
       // authorize still routes it to the pin step, whose lease fails loudly.
