@@ -2,11 +2,12 @@
 
 import { type ComponentProps, useRef } from 'react';
 import { cn } from '@/lib/utils';
-import { SHELL_RAIL_STAGE } from './rail-motion';
+import { SHELL_RAIL_STAGE_CONTROLS } from './rail-motion';
 import { useRailFocusReturn } from './useRailFocusReturn';
 
 /** Staged chrome keeps its visual exit but leaves keyboard/AX navigation
- * immediately when collapsed. Compact icon navigation remains reachable. */
+ * immediately when collapsed. Compact icon navigation remains reachable.
+ * It only clips while collapsed, so expanded focus rings paint in full. */
 export function RailStagedContent({
   hidden,
   stage = true,
@@ -24,7 +25,7 @@ export function RailStagedContent({
       ref={ref}
       aria-hidden={hidden || undefined}
       inert={hidden || undefined}
-      className={cn(stage && SHELL_RAIL_STAGE, className)}
+      className={cn(stage && SHELL_RAIL_STAGE_CONTROLS, className)}
     />
   );
 }
