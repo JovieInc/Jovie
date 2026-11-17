@@ -212,7 +212,7 @@ def classify(pr: dict, logs: dict[str, str] | None = None) -> dict:
         hit = next(((cls, action) for cls, pattern, action in SIGNATURES if pattern.search(text)), None)
         if hit and hit[0] == "fleet-body" and FLEET_WIN_ERROR.search(text):
             hit = ("fleet-body", AGENT)
-        per_check.append(detached_native_sync.hit(text) or render_mode_hit(text) or hit or size_500_route(text) or ("other", AGENT))
+        per_check.append(detached_native_sync.hit(text) or render_mode_hit(text) or hit or size_500_route(text, pr) or ("other", AGENT))
     classes = {cls for cls, _ in per_check}
     actions: list[str] = []
     if len(classes) == 1:

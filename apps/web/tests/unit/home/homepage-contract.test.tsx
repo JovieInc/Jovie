@@ -146,14 +146,22 @@ describe('homepage contract', { timeout: 60_000 }, () => {
     const claim = getClaimProfileIntent();
     const { container } = await renderHomePage();
 
-    // No on-page form: the closing section hands off to /start.
-    expect(container.querySelectorAll('form')).toHaveLength(0);
+    // The one native GET form hands off the handle to /start.
+    expect(container.querySelectorAll('form')).toHaveLength(1);
+    expect(screen.getByTestId('homepage-claim-entry')).toHaveAttribute(
+      'action',
+      claim.href
+    );
+    expect(screen.getByTestId('homepage-claim-entry')).toHaveAttribute(
+      'method',
+      'get'
+    );
     const close = container.querySelector(`#${HOMEPAGE_INVITE_ANCHOR}`);
     expect(close).toHaveAttribute('data-testid', 'marketing-section-cta');
     const closeCta = within(close as HTMLElement).getByTestId(
       'homepage-close-cta'
     );
-    expect(closeCta).toHaveAttribute('href', claim.href);
+    expect(closeCta).toHaveAttribute('type', 'submit');
     expect(closeCta).toHaveTextContent(claim.label);
 
     // The hero's primary action is the same claim; one primary action.

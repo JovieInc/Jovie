@@ -153,9 +153,9 @@ MAX_GATE_TIMEOUTS = 3
 CLAIM_TTL_S = pr_events.CLAIM_TTL_S
 HOST = socket.gethostname().split(".")[0]
 # Every file a release must pass before `current` moves to it.
-LANE_TESTS = ["scripts/tests/test_factory_signals.py", "scripts/tests/test_factory_intake.py", "scripts/tests/test_update_drain.py", "scripts/tests/test_machine_gap.py", "scripts/tests/test_slot_yield.py", "scripts/tests/test_machine_metrics.py", "scripts/tests/test_lanes_atomic_state.py", "scripts/tests/test_lifecycle.py", "scripts/tests/test_execution_attempt.py", "scripts/tests/test_backlog_admission.py", "scripts/tests/test_backlog_writer_guard.py", "scripts/tests/test_lane_runner.py", "scripts/tests/test_execution_budget.py", "scripts/tests/test_dispatch_budget.py", "scripts/tests/test_binding_turns.py", "scripts/tests/test_issue_turns.py", "scripts/tests/test_throughput_ghost_runs.py", "scripts/tests/test_ledger_read.py", "scripts/tests/test_hyperagent_lane.py", "scripts/tests/test_hyperagent_network.py", "scripts/tests/test_cloud_lane.py", "scripts/tests/test_hyperagent_repair.py", "scripts/tests/test_fix_red_classes.py", "scripts/tests/test_fix_red_ui_feel.py", "scripts/tests/test_fix_red_mixed_repairs.py", "scripts/tests/test_fix_red_compose.py", "scripts/tests/test_sourced_shell_conflict.py", "scripts/tests/test_fix_red_source_edits.py", "scripts/tests/test_screen_debt_merge.py", "scripts/tests/test_heading_balance.py", "scripts/tests/test_commit_open_merge.py", "scripts/tests/test_fix_red_failure_evidence.py", "scripts/tests/test_fix_red_failure_routing.py", "scripts/tests/test_migration_renumber.py", "scripts/tests/test_host_git.py", "scripts/tests/test_reviewable_split.py", "scripts/tests/test_quoted_path_list_merge.py", "scripts/tests/test_detached_native_sync.py", "scripts/tests/test_fix_red_screen_cert.py", "scripts/tests/test_duplicate_clock_pin.py", "scripts/tests/test_fix_red_render_modes.py", "scripts/tests/test_fix_red_size_500.py",
+LANE_TESTS = ["scripts/tests/test_factory_signals.py", "scripts/tests/test_factory_intake.py", "scripts/tests/test_update_drain.py", "scripts/tests/test_machine_gap.py", "scripts/tests/test_slot_yield.py", "scripts/tests/test_machine_metrics.py", "scripts/tests/test_lanes_atomic_state.py", "scripts/tests/test_lifecycle.py", "scripts/tests/test_execution_attempt.py", "scripts/tests/test_backlog_admission.py", "scripts/tests/test_backlog_writer_guard.py", "scripts/tests/test_lane_runner.py", "scripts/tests/test_execution_budget.py", "scripts/tests/test_dispatch_budget.py", "scripts/tests/test_binding_turns.py", "scripts/tests/test_issue_turns.py", "scripts/tests/test_throughput_ghost_runs.py", "scripts/tests/test_ledger_read.py", "scripts/tests/test_hyperagent_lane.py", "scripts/tests/test_hyperagent_network.py", "scripts/tests/test_cloud_lane.py", "scripts/tests/test_hyperagent_repair.py", "scripts/tests/test_fix_red_classes.py", "scripts/tests/test_fix_red_ui_feel.py", "scripts/tests/test_fix_red_mixed_repairs.py", "scripts/tests/test_fix_red_compose.py", "scripts/tests/test_sourced_shell_conflict.py", "scripts/tests/test_fix_red_source_edits.py", "scripts/tests/test_split_helper_import.py", "scripts/tests/test_screen_debt_merge.py", "scripts/tests/test_heading_balance.py", "scripts/tests/test_commit_open_merge.py", "scripts/tests/test_fix_red_failure_evidence.py", "scripts/tests/test_fix_red_failure_routing.py", "scripts/tests/test_migration_renumber.py", "scripts/tests/test_host_git.py", "scripts/tests/test_reviewable_split.py", "scripts/tests/test_quoted_path_list_merge.py", "scripts/tests/test_detached_native_sync.py", "scripts/tests/test_fix_red_screen_cert.py", "scripts/tests/test_duplicate_clock_pin.py", "scripts/tests/test_fix_red_render_modes.py", "scripts/tests/test_fix_red_size_500.py",
               "scripts/tests/test_codex_lane.py", "scripts/tests/test_hud.py", "scripts/tests/test_devin_free_policy.py",
-              "scripts/tests/test_doctor.py", "scripts/tests/test_public_feed.py", "scripts/tests/test_pr_events.py", "scripts/tests/test_pr_events_repair_evidence.py", "scripts/tests/test_pr_events_blast_radius.py", "scripts/tests/test_pr_body_markup.py", "scripts/tests/test_repair_win.py",
+              "scripts/tests/test_doctor.py", "scripts/tests/test_public_feed.py", "scripts/tests/test_pr_events.py", "scripts/tests/test_pr_events_repair_evidence.py", "scripts/tests/test_pr_events_locking_evidence.py", "scripts/tests/test_pr_events_blast_radius.py", "scripts/tests/test_pr_body_markup.py", "scripts/tests/test_repair_win.py",
               "scripts/tests/test_reason_lane.py", "scripts/tests/test_reason_publication.py", "scripts/tests/test_reason_dispatch.py", "scripts/tests/test_yc_corpus.py",
               "scripts/tests/test_gh_app_token.py", "scripts/tests/test_linear_app_token.py",
               "scripts/tests/test_disk_guard.py", "scripts/tests/test_qualification_guard.py",
@@ -173,11 +173,10 @@ LANE_TESTS = ["scripts/tests/test_factory_signals.py", "scripts/tests/test_facto
               "scripts/tests/test_escalation_reconcile.py", "scripts/tests/test_board_intake.py", "scripts/tests/test_linear_sync.py", "scripts/tests/test_binding_refill.py", "scripts/tests/test_priority_admission.py", "scripts/tests/test_macos_pool.py",
               "scripts/tests/test_backlog_rank.py", "scripts/tests/test_decompose_pass.py",
               "scripts/tests/test_pytest_hook_names.py"]
-# Dependencies outside scripts/lanes for installed source admission and the HUD's
-# PROMOTION line (JOV-6836).
+# Dependencies outside scripts/lanes for source admission and HUD PROMOTION (JOV-6836).
 RELEASE_EXTRAS = ["scripts/shipping_origin.py", "scripts/hostops/install-lane-host-git.sh",
-                  # The installed Design gate self-test imports immutable Git evidence fixtures.
-                  "scripts/tests/design_gate_git_evidence.py",
+                  # Installed self-tests retain immutable Design evidence and stale-size routing fixtures.
+                  "scripts/tests/design_gate_git_evidence.py", "scripts/tests/test_size_500_stale.py",
                   "scripts/tests/test_cloud_lane_cases/__tests__/cloud_lane_fixtures.py", "scripts/tests/test_cloud_lane_cases/__tests__/cloud_lane_runner_cases.py",
                   "scripts/tests/test_cloud_lane_cases/__tests__/cloud_lane_authorization_cases.py",
                   "scripts/tests/test_cloud_lane_cases/__tests__/cloud_lane_publication_cases.py",
@@ -6289,6 +6288,9 @@ def render_fix_prompt(pr: dict, excerpt: str) -> str:
                    "A one-line comma-separated identifier list is unioned by",
                    "fix_red_classes.merge_additive_identifier_list (main order, then head-only",
                    "tokens). Unknown hunks stay unresolved.",
+                   "When both sides import different modules of the same extracted helpers,",
+                   "split_helper_import.resolve_split_helper_conflict keeps main's identical",
+                   "definitions and the head-only names. Unknown hunks stay unresolved.",
                    "Run the related checks after resolving.", ""]
     else:
         problem = []
