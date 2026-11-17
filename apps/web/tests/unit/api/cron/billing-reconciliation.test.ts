@@ -1,3 +1,4 @@
+import type Stripe from 'stripe';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mockDbSelect = vi.hoisted(() => vi.fn());
@@ -8,6 +9,7 @@ const mockUpdateUserBillingStatus = vi.hoisted(() => vi.fn());
 const mockCaptureWarning = vi.hoisted(() => vi.fn());
 const mockCaptureCriticalError = vi.hoisted(() => vi.fn());
 const mockStripeList = vi.hoisted(() => vi.fn());
+const mockStripeRetrieve = vi.hoisted(() => vi.fn());
 const mockReplayUnprocessedStripeWebhooks = vi.hoisted(() => vi.fn());
 
 vi.mock('@/lib/billing/webhook-replay', () => ({
@@ -58,6 +60,7 @@ vi.mock('@/lib/stripe/client', () => ({
   stripe: {
     subscriptions: {
       list: mockStripeList,
+      retrieve: mockStripeRetrieve,
     },
   },
 }));
@@ -70,6 +73,15 @@ vi.mock('@/lib/error-tracking', () => ({
   captureCriticalError: mockCaptureCriticalError,
   captureWarning: mockCaptureWarning,
 }));
+
+const selectRows = (rows: unknown[]) => ({
+  from: () => ({
+    where: () => ({
+      orderBy: () => ({ limit: async () => rows }),
+      limit: async () => rows,
+    }),
+  }),
+});
 
 describe('GET /api/cron/billing-reconciliation', () => {
   beforeEach(() => {
@@ -94,6 +106,54 @@ describe('GET /api/cron/billing-reconciliation', () => {
     vi.unstubAllEnvs();
   });
 
+  it('reuses only successfully observed first-pass subscriptions without scanning the Stripe corpus', async () => {
+    const subscription = {
+      id: 'sub_observed',
+      status: 'active',
+    } as Stripe.Subscription;
+    mockStripeRetrieve.mockResolvedValue(subscription);
+    const observed: Stripe.Subscription[] = [];
+    const locks = await import('@/lib/billing/price-lock-reconcile.server');
+    const reconcile = vi
+      .spyOn(locks, 'runPriceLockReconcile')
+      .mockImplementation(async deps => {
+        for await (const value of deps.listSubscriptions())
+          observed.push(value);
+        return {
+          summary: { checked: observed.length, counts: {} },
+          backfill: { created: 0 },
+        } as Awaited<ReturnType<typeof locks.runPriceLockReconcile>>;
+      });
+    mockDbSelect
+      .mockReturnValueOnce(
+        selectRows([
+          {
+            id: 'user_observed',
+            clerkId: null,
+            isPro: true,
+            stripeSubscriptionId: subscription.id,
+            stripeCustomerId: 'cus_observed',
+          },
+        ])
+      )
+      .mockReturnValueOnce(selectRows([]))
+      .mockReturnValueOnce(selectRows([]));
+    try {
+      const { runReconciliation } = await import(
+        '@/app/api/cron/billing-reconciliation/route'
+      );
+      const result = await runReconciliation();
+      expect(result.success).toBe(true);
+      expect(observed).toEqual([subscription]);
+      expect(mockStripeRetrieve).toHaveBeenCalledExactlyOnceWith(
+        subscription.id
+      );
+      expect(mockStripeList).not.toHaveBeenCalled();
+    } finally {
+      reconcile.mockRestore();
+    }
+  });
+
   it('returns 401 without proper authorization', async () => {
     const { GET } = await import('@/app/api/cron/billing-reconciliation/route');
     const prefix = 'Bear' + 'er';
@@ -115,29 +175,9 @@ describe('GET /api/cron/billing-reconciliation', () => {
     vi.stubEnv('NODE_ENV', 'production');
 
     mockDbSelect
-      .mockReturnValueOnce({
-        from: vi.fn().mockReturnValue({
-          where: vi.fn().mockReturnValue({
-            orderBy: vi.fn().mockReturnValue({
-              limit: vi.fn().mockResolvedValue([]),
-            }),
-          }),
-        }),
-      })
-      .mockReturnValueOnce({
-        from: vi.fn().mockReturnValue({
-          where: vi.fn().mockReturnValue({
-            limit: vi.fn().mockResolvedValue([]),
-          }),
-        }),
-      })
-      .mockReturnValueOnce({
-        from: vi.fn().mockReturnValue({
-          where: vi.fn().mockReturnValue({
-            limit: vi.fn().mockResolvedValue([]),
-          }),
-        }),
-      });
+      .mockReturnValueOnce(selectRows([]))
+      .mockReturnValueOnce(selectRows([]))
+      .mockReturnValueOnce(selectRows([]));
 
     const { GET } = await import('@/app/api/cron/billing-reconciliation/route');
     const prefix = 'Bear' + 'er';
@@ -188,15 +228,7 @@ describe('GET /api/cron/billing-reconciliation', () => {
 
     mockDbSelect
       // users with subscription ids
-      .mockReturnValueOnce({
-        from: vi.fn().mockReturnValue({
-          where: vi.fn().mockReturnValue({
-            orderBy: vi.fn().mockReturnValue({
-              limit: vi.fn().mockResolvedValue([]),
-            }),
-          }),
-        }),
-      })
+      .mockReturnValueOnce(selectRows([]))
       // pro users without subscription ids
       .mockReturnValueOnce({
         from: vi.fn().mockReturnValue({
@@ -213,13 +245,7 @@ describe('GET /api/cron/billing-reconciliation', () => {
         }),
       })
       // stale customers
-      .mockReturnValueOnce({
-        from: vi.fn().mockReturnValue({
-          where: vi.fn().mockReturnValue({
-            limit: vi.fn().mockResolvedValue([]),
-          }),
-        }),
-      });
+      .mockReturnValueOnce(selectRows([]));
 
     const { GET } = await import('@/app/api/cron/billing-reconciliation/route');
     const request = new Request(
@@ -251,18 +277,8 @@ describe('GET /api/cron/billing-reconciliation', () => {
       data: [{ id: 'sub_old', customer: 'cus_9', status: 'canceled' }],
       has_more: false,
     });
-    const empty = () => ({
-      from: vi.fn().mockReturnValue({
-        where: vi.fn().mockReturnValue({
-          orderBy: vi.fn().mockReturnValue({
-            limit: vi.fn().mockResolvedValue([]),
-          }),
-          limit: vi.fn().mockResolvedValue([]),
-        }),
-      }),
-    });
     mockDbSelect
-      .mockReturnValueOnce(empty())
+      .mockReturnValueOnce(selectRows([]))
       .mockReturnValueOnce({
         from: vi.fn().mockReturnValue({
           where: vi.fn().mockReturnValue({
@@ -277,7 +293,7 @@ describe('GET /api/cron/billing-reconciliation', () => {
           }),
         }),
       })
-      .mockReturnValueOnce(empty());
+      .mockReturnValueOnce(selectRows([]));
 
     const { GET } = await import('@/app/api/cron/billing-reconciliation/route');
     const response = await GET(
@@ -319,15 +335,7 @@ describe('GET /api/cron/billing-reconciliation', () => {
       });
 
     mockDbSelect
-      .mockReturnValueOnce({
-        from: vi.fn().mockReturnValue({
-          where: vi.fn().mockReturnValue({
-            orderBy: vi.fn().mockReturnValue({
-              limit: vi.fn().mockResolvedValue([]),
-            }),
-          }),
-        }),
-      })
+      .mockReturnValueOnce(selectRows([]))
       .mockReturnValueOnce({
         from: vi.fn().mockReturnValue({
           where: vi.fn().mockReturnValue({
@@ -348,13 +356,7 @@ describe('GET /api/cron/billing-reconciliation', () => {
           }),
         }),
       })
-      .mockReturnValueOnce({
-        from: vi.fn().mockReturnValue({
-          where: vi.fn().mockReturnValue({
-            limit: vi.fn().mockResolvedValue([]),
-          }),
-        }),
-      });
+      .mockReturnValueOnce(selectRows([]));
 
     const { GET } = await import('@/app/api/cron/billing-reconciliation/route');
     const request = new Request(
@@ -405,15 +407,7 @@ describe('GET /api/cron/billing-reconciliation', () => {
 
     mockDbSelect
       // users with subscription ids
-      .mockReturnValueOnce({
-        from: vi.fn().mockReturnValue({
-          where: vi.fn().mockReturnValue({
-            orderBy: vi.fn().mockReturnValue({
-              limit: vi.fn().mockResolvedValue([]),
-            }),
-          }),
-        }),
-      })
+      .mockReturnValueOnce(selectRows([]))
       // pro users without subscription ids
       .mockReturnValueOnce({
         from: vi.fn().mockReturnValue({
@@ -430,13 +424,7 @@ describe('GET /api/cron/billing-reconciliation', () => {
         }),
       })
       // stale customers
-      .mockReturnValueOnce({
-        from: vi.fn().mockReturnValue({
-          where: vi.fn().mockReturnValue({
-            limit: vi.fn().mockResolvedValue([]),
-          }),
-        }),
-      });
+      .mockReturnValueOnce(selectRows([]));
 
     const { GET } = await import('@/app/api/cron/billing-reconciliation/route');
     const request = new Request(

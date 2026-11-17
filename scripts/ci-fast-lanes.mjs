@@ -1,7 +1,5 @@
 #!/usr/bin/env node
 /**
- * Run the cheap CI cluster as labeled lanes.
- *
  * Used by the dedicated `ci-fast-typecheck`, `ci-fast-remaining` and
  * `ci-fast-structural-web` jobs in `.github/workflows/ci.yml` (JOV-4477).
  * Each hosted job checks out and installs once, invokes one value from
@@ -358,9 +356,9 @@ export const SOURCE_GUARDS = Object.freeze([
   Object.freeze({
     id: 'synthetic-canary-liveness',
     command:
-      'pnpm exec vitest --root scripts --config vitest.config.mts run --coverage --coverage.include=synthetic-canary-liveness.mjs --coverage.reporter=text --coverage.reportsDirectory="${RUNNER_TEMP:-/tmp}/jovie-synthetic-canary-coverage" --coverage.thresholds.lines=90 --coverage.thresholds.branches=85 --coverage.thresholds.functions=90 lib/__tests__/synthetic-canary-liveness.test.mjs',
+      'pnpm exec vitest --root scripts --config vitest.config.mts run --coverage --coverage.include=synthetic-canary-liveness.mjs --coverage.reporter=text --coverage.reportsDirectory="${RUNNER_TEMP:-/tmp}/jovie-synthetic-canary-coverage" --coverage.thresholds.lines=90 --coverage.thresholds.branches=85 --coverage.thresholds.functions=90 lib/__tests__/synthetic-canary-liveness.test.mjs lib/__tests__/synthetic-canary-catchup.test.mjs',
     inputs:
-      /^(?:\.github\/workflows\/(?:automation-liveness|synthetic-monitoring)\.yml|scripts\/synthetic-canary-liveness\.mjs|scripts\/lib\/__tests__\/synthetic-canary-liveness\.test\.mjs|scripts\/ci-fast-lanes\.mjs)$/u,
+      /^(?:\.github\/workflows\/(?:automation-liveness|synthetic-monitoring)\.yml|scripts\/synthetic-canary-liveness\.mjs|scripts\/synthetic-canary-catchup\.mjs|scripts\/lib\/__tests__\/synthetic-canary-liveness\.test\.mjs|scripts\/lib\/__tests__\/synthetic-canary-catchup\.test\.mjs|scripts\/ci-fast-lanes\.mjs)$/u,
     prOnly: false,
   }),
   Object.freeze({
@@ -873,6 +871,7 @@ export const STRUCTURAL_PYTHON_REGRESSION_COMMANDS = Object.freeze([
 ]);
 
 export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
+  'scripts/lib/__tests__/source-docs-scope.test.mjs',
   'scripts/ios-certification-config.test.mjs',
   'scripts/schedule-trigger-guard.test.mjs', // JOV-12720 event-driven guard.
   'scripts/resolve-main-sha.test.mjs', // JOV-12497 SIGPIPE regression.
@@ -900,6 +899,8 @@ export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
   'scripts/typecheck-native-qualification.test.mjs',
   'scripts/lib/native-typecheck-evidence.test.mjs',
   'scripts/lib/native-typecheck-graph.test.mjs',
+  'scripts/lib/native-typecheck-redirect.test.mjs',
+  'scripts/lib/native-typecheck-redirect-worker.test.mjs',
   'scripts/preflight.test.mjs',
   'scripts/preflight-step-control.test.mjs',
   'scripts/installation-budget-sentinel.test.mjs',
@@ -907,6 +908,7 @@ export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
   'scripts/invariants/shell-ia.test.mjs', // JOV-INV-047 shell+IA registry.
   'scripts/ci-rounds-report.test.mjs',
   'scripts/preflight-changed.test.mjs',
+  'scripts/preflight-process-timeout.test.mjs',
   'scripts/lib/preflight-failure-summary.test.mjs',
   'scripts/preflight-source-size.test.mjs',
   'scripts/preflight-changed-format.test.mjs',
@@ -973,6 +975,7 @@ export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
   'scripts/fleet-audit/import-github-audit.test.mjs',
   'scripts/golden-path-walk/latency-gate.test.mjs',
   'scripts/product-crawl/closed-in-production.test.mjs',
+  'scripts/product-crawl/crawl.test.mjs',
   'scripts/product-crawl/orphaned-overlays.test.mjs',
   'scripts/product-crawl/overlay-walk.test.mjs',
   'scripts/product-crawl/ready-gate.test.mjs',
@@ -988,6 +991,7 @@ export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
   'scripts/homepage-screenshot-output.test.mjs',
   'scripts/invariants/art-direction/hue.test.mjs',
   'scripts/hooks/pre-push-gate.test.mjs',
+  'scripts/hooks/company-size.test.mjs',
   'scripts/node-runtime-bump.test.mjs',
   'scripts/invariants/art-direction/hero-scroll.test.mjs',
   'scripts/idea-radar/idea-radar.test.mjs',
@@ -1224,6 +1228,7 @@ export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/synthetic-monitoring-plan.test.mjs',
   'scripts/lib/__tests__/remediation-detector-plans.test.mjs',
   'scripts/lib/__tests__/docs-deploy-intake-quota.test.mjs',
+  'scripts/lib/__tests__/linear-rate-limit-retry.test.mjs',
   'scripts/lib/__tests__/mac-runner-route-contract.test.mjs',
   'scripts/lib/__tests__/mac-lane-script.test.mjs',
   'scripts/lib/__tests__/main-release-readiness.test.mjs',
@@ -1262,6 +1267,7 @@ export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/credentials-registry.test.mjs',
   'scripts/lib/__tests__/credentials-spend-check.test.mjs',
   'scripts/lib/__tests__/lanes-linear-status.test.mjs',
+  'scripts/lib/__tests__/spend-expiry-status.test.mjs',
   'scripts/lib/__tests__/secrets-tooling.test.mjs',
   'scripts/lib/__tests__/capacity-registry.test.mjs',
   'scripts/lib/__tests__/fleet-registry.test.mjs',
@@ -1340,7 +1346,9 @@ export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/source-qualification-receipt.test.mjs',
   'scripts/lib/__tests__/workers-inventory.test.mjs',
   'scripts/lib/__tests__/setup-pinned-node.test.mjs',
+  'scripts/lib/__tests__/screen-proof-resolver.transport-retry.test.mjs',
   'scripts/lib/__tests__/child-process.test.mjs',
+  'scripts/lib/__tests__/sentry-autofix-recurrence-retry.test.mjs', // JOV-6813 marker-503 retry.
   'scripts/lib/__tests__/product-lane-docs-only.test.mjs',
 ]);
 export const SCRIPT_CONTRACT_VITEST_COMMAND = `pnpm exec vitest --root scripts --config vitest.config.mts run ${SCRIPT_CONTRACT_VITEST_TESTS.map(
@@ -2748,7 +2756,7 @@ export async function runStructural(opts = {}) {
     API_CLIENT_PY_COMMAND,
     RESEARCH_TS_COMMAND,
     'node --test .github/scripts/publish-queue-junit.test.mjs scripts/record-quarantine-releases.test.mjs',
-    'node --test .github/scripts/dependency-parity-evidence.test.mjs',
+    'node --test .github/scripts/dependency-parity-evidence.test.mjs .github/scripts/staging-identity-read.test.mjs',
     'node --test --experimental-test-coverage --test-coverage-include=scripts/security/deepsec-native-controller.mjs --test-coverage-lines=95 --test-coverage-branches=85 --test-coverage-functions=95 scripts/security/deepsec-native-controller.test.mjs',
     'node --test --experimental-test-coverage --test-coverage-include=scripts/security/deepsec-native-reconcile.mjs --test-coverage-lines=95 --test-coverage-branches=85 --test-coverage-functions=95 scripts/security/deepsec-native-reconcile.test.mjs',
     'node --test --experimental-test-coverage --test-coverage-include=scripts/security/deepsec-native-run.mjs --test-coverage-lines=95 --test-coverage-branches=85 --test-coverage-functions=95 scripts/security/deepsec-native-run.test.mjs',

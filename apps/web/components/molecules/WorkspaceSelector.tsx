@@ -42,8 +42,11 @@ export function WorkspaceSelector<Id extends string>({
             // The mark sits on the rail's icon column (12px inset), like every nav
             // icon below it. The hover fill bleeds 6px past the mark instead of
             // pushing it inward, and the trigger hugs its label.
-            '-ml-1.5 flex h-7 w-fit max-w-full items-center gap-1.5 rounded-lg px-1.5 transition-colors duration-subtle ease-subtle hover:bg-sidebar-accent/55 focus-visible:outline-none focus-visible:bg-sidebar-accent/55',
-            'group-data-[collapsible=icon]:ml-0 group-data-[collapsible=icon]:w-full group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:gap-0 group-data-[collapsible=icon]:px-0'
+            // Mark only at rest: `sidebar-wordmark-reveal` (globals.css) grows
+            // the workspace name on hover, keyboard focus or while the menu
+            // is open, the same reveal as the customer Ask Jovie mark.
+            'sidebar-wordmark-reveal -ml-1.5 flex h-7 w-fit max-w-full items-center rounded-lg px-1.5 transition-colors duration-subtle ease-subtle hover:bg-sidebar-accent/55 focus-visible:outline-none focus-visible:bg-sidebar-accent/55',
+            'group-data-[collapsible=icon]:ml-0 group-data-[collapsible=icon]:w-full group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0'
           )}
         >
           <BrandLogo
@@ -54,13 +57,17 @@ export function WorkspaceSelector<Id extends string>({
             className='shrink-0 rounded-sm'
             aria-hidden
           />
-          <span
-            className={cn(
-              'truncate flex-1 text-left text-app tracking-tight text-sidebar-item-foreground [font-weight:var(--font-weight-nav)]',
-              SHELL_RAIL_LABEL
-            )}
-          >
-            {currentWorkspace.label}
+          {/* The mark-to-name gap lives inside the clip so the resting
+              trigger hugs the mark. */}
+          <span className='sidebar-wordmark min-w-0 overflow-hidden'>
+            <span
+              className={cn(
+                'truncate ps-1.5 text-left text-app tracking-tight text-sidebar-item-foreground [font-weight:var(--font-weight-nav)]',
+                SHELL_RAIL_LABEL
+              )}
+            >
+              {currentWorkspace.label}
+            </span>
           </span>
         </PlainButton>
       </DropdownMenuTrigger>

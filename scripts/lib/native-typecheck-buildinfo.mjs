@@ -8,9 +8,26 @@ export const check = (value, message) => {
 export const sha = bytes => createHash('sha256').update(bytes).digest('hex');
 export const sorted = values => [...new Set(values)].sort();
 const inside = (file, directory) => file.startsWith(`${directory}${sep}`);
-export const info = value =>
+export function buildInfoPath(name, cache, tools, libraries) {
+  check(typeof name === 'string', 'Invalid graph filename');
+  if (!/^lib(?:\.[a-z0-9]+)*\.d\.ts$/iu.test(name))
+    return resolve(dirname(cache), name);
+  check(
+    libraries && inside(resolve(libraries), resolve(tools)),
+    'Bare standard library lacks a pinned compiler location'
+  );
+  const path = resolve(libraries, name);
+  check(existsSync(path), `Pinned standard library missing: ${name}`);
+  return path;
+}
+// Native 7.1 compact strings encode CommonJS, not an absent format:
+// microsoft/TypeScript@3e923636, tsc/internal/execute/incremental/buildInfo.go:95-124.
+export const info = (value, schemaVersion = '6.0.3') =>
   typeof value === 'string'
-    ? { version: value }
+    ? {
+        version: value,
+        ...(schemaVersion === '7.1.0-beta' ? { impliedFormat: 1 } : {}),
+      }
     : {
         ...value,
         impliedFormat: value.impliedFormat ?? value.impliedNodeFormat,
@@ -32,7 +49,7 @@ export function readGraph(cache, root, tools, libraries = null) {
     'Invalid buildinfo fileInfo graph'
   );
   for (const value of raw.fileInfos) {
-    const item = info(value);
+    const item = info(value, raw.version);
     check(
       item &&
         typeof item.version === 'string' &&
@@ -48,18 +65,9 @@ export function readGraph(cache, root, tools, libraries = null) {
       'Contradictory fileInfo module formats'
     );
   }
-  const paths = raw.fileNames.map(name => {
-    check(typeof name === 'string', 'Invalid graph filename');
-    if (!/^lib(?:\.[a-z0-9]+)*\.d\.ts$/iu.test(name))
-      return resolve(dirname(cache), name);
-    check(
-      libraries && inside(resolve(libraries), resolve(tools)),
-      'Bare standard library lacks a pinned compiler location'
-    );
-    const path = resolve(libraries, name);
-    check(existsSync(path), `Pinned standard library missing: ${name}`);
-    return path;
-  });
+  const paths = raw.fileNames.map(name =>
+    buildInfoPath(name, cache, tools, libraries)
+  );
   const roots = raw.root.flatMap(item => {
     if (!Array.isArray(item)) return [item];
     check(
@@ -135,6 +143,7 @@ export function readGraph(cache, root, tools, libraries = null) {
       rawBuildInfoPath: cache,
       rawBuildInfoSha256: sha(bytes),
       toolsDirectory: tools,
+      libraryDirectory: libraries ? resolve(libraries) : null,
       rootDirectory: root,
       version: raw.version,
       fileInfoCount: raw.fileInfos.length,

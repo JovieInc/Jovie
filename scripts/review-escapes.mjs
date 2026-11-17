@@ -4,7 +4,7 @@
  * introduced the bug and labelled with the cheapest layer that should have
  * caught it. Deterministic, zero-token, git-only.
  *
- *   node scripts/review-escapes.mjs report [--days 30] [--write-latest]
+ *   node scripts/review-escapes.mjs report [--days 30] [--ref HEAD] [--write-latest]
  *       Scan merged commits on the current branch, write
  *       docs/metrics/review-escapes-latest.json (shipping-slo embeds a compact
  *       copy so Summer sees it in the lanes status feed).
@@ -141,17 +141,24 @@ function git(args, cwd) {
   });
 }
 
-/** @param {{ days?: number, cwd?: string, run?: typeof git }} [options] */
-export function readCommits({ days, cwd = process.cwd(), run = git } = {}) {
+/** @param {{ days?: number, cwd?: string, ref?: string, run?: typeof git }} [options] */
+export function readCommits({
+  days,
+  cwd = process.cwd(),
+  ref = 'HEAD',
+  run = git,
+} = {}) {
   const logArgs = [
     'log',
     `--since=${days} days ago`,
     '--no-merges',
     '--format=%x1e%H%x1f%ct%x1f%s%x1f%b%x1f',
+    ref,
+    '--',
   ];
   let raw;
   try {
-    raw = run([...logArgs, '--numstat'], cwd);
+    raw = run([...logArgs.slice(0, -1), '--numstat', '--'], cwd);
   } catch {
     // A partial clone can lack blobs; PR linkage still works without paths.
     raw = run(['--no-lazy-fetch', ...logArgs], cwd);
@@ -182,7 +189,7 @@ function main() {
     ? JSON.parse(readFileSync(labelsPath, 'utf8'))
     : {};
   const days = Number(arg('--days', command === 'replay-cases' ? '120' : '30'));
-  const commits = readCommits({ days, cwd: root });
+  const commits = readCommits({ days, cwd: root, ref: arg('--ref', 'HEAD') });
   const report = summarize(commits, findEscapes(commits, { labels }), { days });
   if (command === 'replay-cases') {
     for (const e of report.escapes) console.log(JSON.stringify(e));

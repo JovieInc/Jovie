@@ -239,6 +239,18 @@ class AdditiveQuotedListMergeTest(unittest.TestCase):
         self.assertIsNone(classes.merge_additive_quoted_entries("", "  'scripts/a.test.mjs',\n"))
 
 
+class CommentedTestListMergeTest(unittest.TestCase):
+    def test_keeps_main_comment_and_head_entry(self):
+        ours = "  'scripts/lib/__tests__/product-lane-docs-only.test.mjs',\n"
+        theirs = "  'scripts/lib/__tests__/sentry-autofix-recurrence-retry.test.mjs', // JOV-6813 marker-503 retry.\n"
+        self.assertEqual(classes.merge_additive_quoted_entries(ours, theirs), theirs + ours)
+
+    def test_rejects_changed_comments_for_same_entry_and_unknown_code(self):
+        row = "  'scripts/a.test.mjs', // original\n"
+        self.assertIsNone(classes.merge_additive_quoted_entries(row, row.replace('original', 'changed')))
+        self.assertIsNone(classes.merge_additive_quoted_entries(row, "  'scripts/b.test.mjs', run()\n"))
+
+
 class AdditiveIdentifierListMergeTest(unittest.TestCase):
     def test_unions_slug_lines_and_rejects_unknown_hunks(self):
         text = (
