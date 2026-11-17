@@ -730,6 +730,9 @@ export async function submitWaitlistAccessRequest(
     // may still be holding a stale waitlist_pending entry from a prior
     // /waitlist visit. Mirror the normal-approval invalidation so middleware
     // doesn't keep redirecting the user back to /waitlist.
+    //
+    // Only bust the cache when the userStatus row actually changed; otherwise
+    // we'd thrash the cache on every idempotent re-assert.
     await invalidateProxyUserStateCache(input.appUserId).catch(error => {
       logger.warn(
         '[waitlist] Failed to invalidate proxy state on already_accepted',

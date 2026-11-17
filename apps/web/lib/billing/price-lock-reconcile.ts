@@ -40,33 +40,31 @@ export function judgeCandidate(
   // This snapshot promises Pro pricing only; a different plan has no Pro lock obligation.
   if (subscription.mappedPlan && subscription.mappedPlan !== 'pro') return null;
   const base = { userId, subscriptionId: subscription.subscriptionId };
+  const finding = (verdict: PriceLockVerdict, detail: string) => ({
+    ...base,
+    verdict,
+    detail,
+  });
   if (!lock) {
-    return {
-      ...base,
-      verdict: 'missing_lock',
-      detail: 'paying subscriber has no price lock',
-    };
+    return finding('missing_lock', 'paying subscriber has no price lock');
   }
   const lockedIds = [lock.stripePriceIdMonthly, lock.stripePriceIdYearly];
-  for (const id of lockedIds) {
-    if (id && !isPriceMapped(id)) {
-      return {
-        ...base,
-        verdict: 'unmapped_locked_price',
-        detail: `locked price ${id} is not mapped to a plan`,
-      };
-    }
+  const unmapped = lockedIds.find(id => id && !isPriceMapped(id));
+  if (unmapped) {
+    return finding(
+      'unmapped_locked_price',
+      `locked price ${unmapped} is not mapped to a plan`
+    );
   }
   if (subscription.priceId && lockedIds.includes(subscription.priceId)) {
-    return { ...base, verdict: 'ok', detail: 'price id matches the lock' };
+    return finding('ok', 'price id matches the lock');
   }
   const interval = subscription.interval;
   if (subscription.unitAmountCents === null || !interval) {
-    return {
-      ...base,
-      verdict: 'unmapped_locked_price',
-      detail: `subscription price ${subscription.priceId ?? 'unknown'} has no comparable amount or interval for lock ${lock.priceVersionId}`,
-    };
+    return finding(
+      'unmapped_locked_price',
+      `subscription price ${subscription.priceId ?? 'unknown'} has no comparable amount or interval for lock ${lock.priceVersionId}`
+    );
   }
   const lockedAmount =
     interval === 'month' ? lock.monthlyAmountCents : lock.yearlyAmountCents;
@@ -76,14 +74,13 @@ export function judgeCandidate(
     subscription.unitAmountCents === lockedAmount &&
     (subscription.currency ?? lock.currency) === lock.currency
   ) {
-    return { ...base, verdict: 'ok', detail: 'amount matches the lock' };
+    return finding('ok', 'amount matches the lock');
   }
   const over = subscription.unitAmountCents > lockedAmount;
-  return {
-    ...base,
-    verdict: over ? 'overcharged' : 'undercharged',
-    detail: `charging ${subscription.unitAmountCents} cents per ${interval}, lock ${lock.priceVersionId} is ${lockedAmount}`,
-  };
+  return finding(
+    over ? 'overcharged' : 'undercharged',
+    `charging ${subscription.unitAmountCents} cents per ${interval}, lock ${lock.priceVersionId} is ${lockedAmount}`
+  );
 }
 export interface ReconcileSummary {
   readonly checked: number;
@@ -95,24 +92,15 @@ export function reconcilePriceLocks(
   candidates: readonly ReconcileCandidate[],
   isPriceMapped: (priceId: string) => boolean
 ): ReconcileSummary {
-  const counts: Record<PriceLockVerdict, number> = {
-    ok: 0,
-    overcharged: 0,
-    undercharged: 0,
-    missing_lock: 0,
-    unmapped_locked_price: 0,
-  };
-  const findings: ReconcileFinding[] = [];
-  let checked = 0;
-  for (const candidate of candidates) {
-    const finding = judgeCandidate(candidate, isPriceMapped);
-    if (!finding) continue;
-    checked += 1;
-    counts[finding.verdict] += 1;
-    findings.push(finding);
-  }
+  const counts = Object.fromEntries(
+    PRICE_LOCK_VERDICTS.map(verdict => [verdict, 0])
+  ) as Record<PriceLockVerdict, number>;
+  const findings = candidates.flatMap(
+    candidate => judgeCandidate(candidate, isPriceMapped) ?? []
+  );
+  for (const finding of findings) counts[finding.verdict] += 1;
   return {
-    checked,
+    checked: findings.length,
     counts,
     findings,
     alarms: findings.filter(f => f.verdict !== 'ok'),

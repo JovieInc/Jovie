@@ -49,6 +49,11 @@ export {
 /**
  * Result of resolving user state. Contains all information needed
  * to make auth gating decisions and redirect users appropriately.
+ *
+ * `clerkUserId` is preserved as the field name for churn reduction; after
+ * the Clerk → Better Auth cutover it holds the Better Auth user id
+ * (resolved from `auth.api.getSession`). `dbUserId` remains the app
+ * `users.id` UUID.
  */
 export interface AuthGateResult {
   state: CanonicalUserState;

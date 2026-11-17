@@ -2,6 +2,7 @@
 import {
   type PriceInterval,
   type PriceLockSnapshot,
+  type ResolvedLockedPrice,
   resolveLockedPrice,
 } from './price-versions';
 export interface CheckoutPriceMapping {
@@ -10,11 +11,10 @@ export interface CheckoutPriceMapping {
   readonly amount?: number;
   readonly legacy?: boolean;
 }
-export interface LockedCheckoutExpectation {
-  readonly amountCents: number;
-  readonly currency: string;
-  readonly interval: PriceInterval;
-}
+export type LockedCheckoutExpectation = Pick<
+  ResolvedLockedPrice,
+  'amountCents' | 'currency' | 'interval'
+>;
 export type CheckoutPriceDecision =
   | { readonly kind: 'list'; readonly priceId: string }
   | {
@@ -24,22 +24,20 @@ export type CheckoutPriceDecision =
       readonly expectation: LockedCheckoutExpectation;
       readonly substituted: boolean;
     };
-function lockOwnsPriceId(lock: PriceLockSnapshot, priceId: string): boolean {
-  return (
-    priceId === lock.stripePriceIdMonthly ||
-    priceId === lock.stripePriceIdYearly
-  );
-}
 export function resolveCheckoutPrice(input: {
   readonly requestedPriceId: string;
   readonly requestedMapping: CheckoutPriceMapping | null;
   readonly lock: PriceLockSnapshot | null;
 }): CheckoutPriceDecision {
   const { requestedPriceId, requestedMapping, lock } = input;
-  if (
-    !lock ||
-    (requestedMapping?.legacy && !lockOwnsPriceId(lock, requestedPriceId))
-  ) {
+  const ownedInterval =
+    requestedPriceId === lock?.stripePriceIdMonthly
+      ? 'month'
+      : requestedPriceId === lock?.stripePriceIdYearly
+        ? 'year'
+        : null;
+  const ownsPrice = ownedInterval !== null;
+  if (!lock || (requestedMapping?.legacy && !ownsPrice)) {
     return { kind: 'list', priceId: requestedPriceId };
   }
   // The requested id is one of the lock's own ids (possibly retired/unmapped).
@@ -47,17 +45,13 @@ export function resolveCheckoutPrice(input: {
     ? requestedMapping.plan === lock.plan
       ? requestedMapping.interval
       : null
-    : requestedPriceId === lock.stripePriceIdMonthly
-      ? 'month'
-      : requestedPriceId === lock.stripePriceIdYearly
-        ? 'year'
-        : null;
+    : ownedInterval;
   if (!interval) return { kind: 'list', priceId: requestedPriceId };
   const price = resolveLockedPrice({ lock, interval });
   if (!price?.locked) return { kind: 'list', priceId: requestedPriceId };
   if (!price.stripePriceId) throw new Error('The locked price is unavailable');
   if (
-    !lockOwnsPriceId(lock, requestedPriceId) &&
+    !ownsPrice &&
     requestedMapping?.amount !== undefined &&
     price.amountCents > requestedMapping.amount
   ) {
@@ -74,8 +68,6 @@ export function resolveCheckoutPrice(input: {
       currency: price.currency,
       interval,
     },
-    substituted:
-      price.stripePriceId !== requestedPriceId &&
-      !lockOwnsPriceId(lock, requestedPriceId),
+    substituted: price.stripePriceId !== requestedPriceId && !ownsPrice,
   };
 }

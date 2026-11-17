@@ -1,5 +1,6 @@
 /**
  * TanStack Query hooks and utilities.
+ *
  * This module provides centralized query hooks for data fetching with:
  * - Automatic caching and background refetching
  * - Request deduplication
@@ -464,7 +465,6 @@ export {
   usePressPhotosQuery,
   usePressPhotoUploadMutation,
 } from './usePressPhotoMutation';
-export { fetchPriceLock, usePriceLockQuery } from './usePriceLockQuery';
 export {
   type PricingOption,
   type PricingOptionsResponse,

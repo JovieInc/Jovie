@@ -25,7 +25,6 @@ export const queryKeys = {
     invoices: () => [...queryKeys.billing.all, 'invoices'] as const,
     pricingOptions: () =>
       [...queryKeys.billing.all, 'pricing-options'] as const,
-    priceLock: () => [...queryKeys.billing.all, 'price-lock'] as const,
   },
 
   // User/profile queries

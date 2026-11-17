@@ -41,34 +41,17 @@ export function rowToSnapshot(row: PriceLockRow): PriceLockSnapshot {
   };
 }
 function snapshotToValues(snapshot: PriceLockSnapshot) {
-  return {
-    plan: snapshot.plan,
-    priceVersionId: snapshot.priceVersionId,
-    currency: snapshot.currency,
-    monthlyAmountCents: snapshot.monthlyAmountCents,
-    yearlyAmountCents: snapshot.yearlyAmountCents,
-    stripePriceIdMonthly: snapshot.stripePriceIdMonthly,
-    stripePriceIdYearly: snapshot.stripePriceIdYearly,
-    source: snapshot.source,
-    lockedAt: new Date(snapshot.lockedAt),
-  };
-}
-export async function getPriceLockRowForUser(
-  userId: string,
-  client: DbOrTransaction = db
-): Promise<PriceLockRow | null> {
-  const [row] = await client
-    .select()
-    .from(priceLocks)
-    .where(eq(priceLocks.userId, userId))
-    .limit(1);
-  return row ?? null;
+  return { ...snapshot, lockedAt: new Date(snapshot.lockedAt) };
 }
 export async function getPriceLockForUser(
   userId: string,
   client: DbOrTransaction = db
 ): Promise<PriceLockSnapshot | null> {
-  const row = await getPriceLockRowForUser(userId, client);
+  const [row] = await client
+    .select()
+    .from(priceLocks)
+    .where(eq(priceLocks.userId, userId))
+    .limit(1);
   return row ? rowToSnapshot(row) : null;
 }
 /** Existing lock, else the current version snapshotted; idempotent, first write wins. */
@@ -192,18 +175,12 @@ export async function resolveCheckoutPriceForUser(
   readonly lock: PriceLockSnapshot;
 }> {
   const lock = await ensurePriceLockForUser(userId, 'checkout');
-  const mapping = getPriceMappingDetails(requestedPriceId);
-  const decision = resolveCheckoutPrice({
-    requestedPriceId,
-    requestedMapping: mapping
-      ? {
-          plan: mapping.plan,
-          interval: mapping.interval,
-          amount: mapping.amount,
-          legacy: mapping.legacy,
-        }
-      : null,
+  return {
+    decision: resolveCheckoutPrice({
+      requestedPriceId,
+      requestedMapping: getPriceMappingDetails(requestedPriceId),
+      lock,
+    }),
     lock,
-  });
-  return { decision, lock };
+  };
 }

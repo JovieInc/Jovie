@@ -6,12 +6,8 @@
  * the list price constants.
  */
 
-import { useQuery } from '@tanstack/react-query';
 import type { PriceLockView } from '@/lib/billing/price-lock-view';
-import { STABLE_CACHE } from './cache-strategies';
 import { FetchError, fetchWithTimeout } from './fetch';
-import { queryKeys } from './keys';
-import { createClassifiedRetry } from './retry-policy';
 
 interface PriceLockResponse {
   readonly priceLock: PriceLockView;
@@ -41,21 +37,4 @@ export async function fetchPriceLock({
     }
     throw error;
   }
-}
-
-export const priceLockQueryOptions = {
-  get queryKey() {
-    return queryKeys.billing.priceLock();
-  },
-  queryFn: fetchPriceLock,
-  ...STABLE_CACHE,
-  retry: createClassifiedRetry(0),
-};
-
-export function usePriceLockQuery(options?: { enabled?: boolean }) {
-  const { enabled = true } = options ?? {};
-  return useQuery<PriceLockView | null, Error>({
-    ...priceLockQueryOptions,
-    enabled,
-  });
 }
