@@ -1,0 +1,10 @@
+{
+  "name": "jovie-native-typecheck-qualification-tools",
+  "private": true,
+  "packageManager": "pnpm@9.15.9",
+  "dependencies": {
+    "ts6": "npm:typescript@6.0.3",
+    "tsrs": "npm:@tsrs/linux-x64-gnu@0.25.0-ts7.1.0-beta",
+    "upstream": "npm:@typescript/typescript-linux-x64@7.1.0-beta"
+  }
+}

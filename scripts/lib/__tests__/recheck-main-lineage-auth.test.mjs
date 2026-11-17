@@ -61,7 +61,11 @@ async function recheck({
   };
   /** @param {...string} args */
   const git = (...args) =>
-    execFileSync('git', args, { env: gitEnv, encoding: 'utf8' }).trim();
+    execFileSync('git', args, {
+      maxBuffer: 256 * 1024 * 1024,
+      env: gitEnv,
+      encoding: 'utf8',
+    }).trim();
   /** @type {{ path: string, authorized: boolean }[]} */
   const requests = [];
   let advertisements = 0;

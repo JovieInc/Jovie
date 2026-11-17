@@ -73,7 +73,7 @@ describe('JOV-5466 token retire', () => {
   it('keeps the empty-state heading bounded to two lines', () => {
     const source = readFileSync(resolve(__dirname, './LyricsView.tsx'), 'utf8');
     expect(source).toContain(
-      'text-lg font-display text-primary-token line-clamp-2'
+      'text-base font-display text-primary-token line-clamp-2'
     );
   });
 

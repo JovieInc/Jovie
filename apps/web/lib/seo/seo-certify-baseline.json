@@ -22,11 +22,6 @@
       "geo:geo-sibling-links"
     ],
     "/card": ["agentic:structured-data"],
-    "/changelog": [
-      "agentic:structured-data",
-      "geo:geo-jsonld-type",
-      "geo:geo-last-updated"
-    ],
     "/changelog/26.8.1": ["geo:geo-last-updated"],
     "/cli": ["copy:copy-lint", "geo:geo-sibling-links"],
     "/compare/linktree": ["geo:geo-last-updated", "geo:geo-sibling-links"],
@@ -60,7 +55,6 @@
     "/solutions/artists": ["geo:geo-sibling-links"],
     "/support": ["geo:geo-jsonld-type", "geo:geo-sibling-links"],
     "/voice": ["agentic:structured-data", "copy:copy-lint"],
-    "/waitlist": ["technical:html-source"],
     "/waitlist/invite": ["technical:html-source"],
     "/youtube-thumbnails": ["agentic:structured-data"]
   }

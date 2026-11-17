@@ -40,7 +40,12 @@ const LONG_ACTIVITY = Array.from(
 export const LongContent: Story = {
   args: {
     children: (
-      <div className='h-96 w-80 overflow-auto p-3 text-sm'>
+      <section
+        aria-label='Recent rail activity'
+        // biome-ignore lint/a11y/noNoninteractiveTabindex: keyboard entry point for the scrollable region (axe scrollable-region-focusable)
+        tabIndex={0}
+        className='h-96 w-80 overflow-auto p-3 text-sm'
+      >
         <ul className='space-y-2'>
           {LONG_ACTIVITY.map(line => (
             <li key={line} className='truncate'>
@@ -48,7 +53,7 @@ export const LongContent: Story = {
             </li>
           ))}
         </ul>
-      </div>
+      </section>
     ),
   },
 };

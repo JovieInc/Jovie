@@ -8,7 +8,7 @@ import { MARKETING_PAGE_KIND } from '@/lib/content-records/marketing-page';
 import { contentReviewIdentity } from '@/lib/content-records/publication';
 import { getContentVersion } from '@/lib/content-records/store.server';
 import { getDeployedBuildInfo } from '@/lib/observability/build-info';
-import { HomepageQueryProvider } from '../../(home)/homepage-query-provider';
+import { HomepageQueryProvider } from '../../(home)/HomepageQueryProvider';
 
 /**
  * Signed preview of one stored homepage spec version, before or after it is

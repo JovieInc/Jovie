@@ -253,4 +253,36 @@ describe('routeLead', () => {
       expect(row).not.toHaveProperty('claimToken');
     }
   });
+
+  it('never routes an artist Tim already works with to email or DM', async () => {
+    setupLead({ linktreeHandle: 'djdannic', displayName: 'Dannic' });
+
+    const result = await routeLead('lead-1');
+
+    expect(result.route).toBe('manual_review');
+    expect(result.dmCopy).toBeNull();
+    expect(mockSet).toHaveBeenCalledWith(
+      expect.objectContaining({
+        outreachRoute: 'manual_review',
+        hasRepresentation: true,
+        representationSignal:
+          'Existing relationship: Tim has written on Dannic tracks via their management/publisher',
+        dmCopy: null,
+      })
+    );
+  });
+
+  it('holds a lead whose bio names a registered management company', async () => {
+    setupLead({ bio: 'Mgmt: Big MGMT' });
+
+    const result = await routeLead('lead-1');
+
+    expect(result.route).toBe('manual_review');
+    expect(mockSet).toHaveBeenCalledWith(
+      expect.objectContaining({
+        representationSignal:
+          'Existing relationship via Big MGMT: flag to Tim, no cold outreach',
+      })
+    );
+  });
 });

@@ -76,6 +76,7 @@ export function IngestProfileDropdown({
         </Button>
       </PopoverTrigger>
       <PopoverContent
+        aria-label='Ingest Social Profile'
         align='end'
         className='w-105 p-3'
         onOpenAutoFocus={e => {

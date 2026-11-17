@@ -12,6 +12,8 @@
  *  - route-js-budget: reads a finished `next build`, so it is heavy and runs
  *    with --thorough (or on the remote backend). Same build env as Source
  *    Validation's "Build exact PR head", so both measure the same bundles.
+ *    The render-mode and HTML-weight ratchet reads the same build, so it
+ *    runs in the same guard.
  *
  * Each guard: { id, name, command, when (changed-path RegExp), heavy?,
  * timeoutMs? }. Budgets and baselines are read, never changed, here.
@@ -25,7 +27,7 @@ const BUILD_INPUT =
   /^(?:apps\/web\/(?!scripts\/|tests\/|e2e\/|docs\/).+\.(?:[cm]?[jt]sx?|css|json)$|packages\/[^/]+\/.+\.(?:[cm]?[jt]sx?|css|json)$|apps\/web\/(?:next\.config\.[cm]?[jt]s|package\.json)$|pnpm-lock\.yaml$)/;
 
 const ROUTE_JS_INPUT =
-  /^apps\/web\/scripts\/(?:route-js-budget\.mjs|route-js-budgets\.json)$/;
+  /^apps\/web\/scripts\/(?:route-js-(?:budget(?:-policy)?|ratchet)\.mjs|route-js-budgets\.json|route-render-modes(?:-policy)?\.mjs|route-render-modes\.json)$/;
 
 const BUILD_ENV = [
   'NEXT_PUBLIC_APP_URL=http://localhost:3230',
@@ -41,6 +43,53 @@ const BUILD_ENV = [
 /** @type {readonly {id:string,name:string,command:string,when:(p:string)=>boolean,heavy?:boolean,timeoutMs?:number}[]} */
 export const LOCAL_GUARDS = Object.freeze([
   {
+    id: 'projected-tree-budget',
+    name: 'projected combined-tree byte budget',
+    command:
+      'PR_BASE_SHA="$(git rev-parse --verify "$CI_BASE_REF^{commit}")" PR_MERGE_BASE="$(git merge-base "$CI_BASE_REF" HEAD)" PR_HEAD_SHA="$(git rev-parse --verify HEAD)" node scripts/lib/projected-tree-budget.mjs',
+    // Every tracked file counts, including docs, stories and test evidence.
+    when: () => true,
+  },
+  {
+    id: 'design-authority',
+    name: 'design authority and raw control debt',
+    command: 'node scripts/design-authority-guard.mjs',
+    when: p =>
+      /^(?:apps\/web\/|scripts\/design-authority|DESIGN\.md$|docs\/llms-design-manifest\.txt$|\.claude\/rules\/ui\.md$|\.agents\/skills\/gstack\/design-(?:canonical|consultation)\/)/.test(
+        p
+      ),
+  },
+  {
+    id: 'web-eslint',
+    name: 'changed web ESLint and UI-feel rules',
+    command:
+      'LINT_CHANGED_WORKTREE=1 ESLINT_CHANGED_BASE=origin/{base} pnpm --filter @jovie/web run lint:eslint:changed',
+    when: p =>
+      /^apps\/web\/.+\.(?:ts|tsx)$/.test(p) ||
+      /^apps\/web\/(?:eslint\.config\.js|eslint-rules\/|scripts\/lint-(?:eslint-changed|ui-feel)\.mjs)/.test(
+        p
+      ),
+  },
+  {
+    id: 'stack-pattern-ratchet',
+    name: 'legacy Next cache configuration ratchet',
+    command: 'node scripts/invariants/stack-pattern-ratchet.mjs',
+    when: p =>
+      (/^apps\/web\/(?:app|lib)\/.+\.[cm]?[jt]sx?$/.test(p) &&
+        !WEB_TEST_OR_STORY.test(p)) ||
+      p === 'apps/web/next.config.js' ||
+      p === 'scripts/invariants/stack-pattern-ratchet.mjs' ||
+      p === 'scripts/capability-benchmark/capability-reconciliation.mjs',
+  },
+  {
+    id: 'dead-ends',
+    name: 'rendered dead-end copy, controls and links',
+    command: 'pnpm design:no-dead-ends:check',
+    when: p =>
+      /^(?:apps\/web|apps\/desktop\/src|packages\/ui)\/.+\.[jt]sx?$/.test(p) ||
+      /^packages\/copy\/(?:dead-ends|rules)/.test(p),
+  },
+  {
     id: 'design-noise',
     name: 'design-noise lint (apps/web/design-noise.baseline.json)',
     command: 'node apps/web/scripts/lint-design-noise.mjs',
@@ -53,8 +102,8 @@ export const LOCAL_GUARDS = Object.freeze([
   },
   {
     id: 'route-js-budget',
-    name: 'route JS budgets on a production build (apps/web/scripts/route-js-budgets.json)',
-    command: `${BUILD_ENV} pnpm turbo build --filter=@jovie/web && node apps/web/scripts/route-js-budget.mjs --next-dir apps/web/.next`,
+    name: 'route JS budgets and render modes on a production build (apps/web/scripts/route-js-budgets.json, route-render-modes.json)',
+    command: `${BUILD_ENV} pnpm turbo build --filter=@jovie/web && node apps/web/scripts/route-js-budget.mjs --next-dir apps/web/.next && node apps/web/scripts/route-render-modes.mjs --next-dir apps/web/.next`,
     when: p =>
       ROUTE_JS_INPUT.test(p) ||
       (BUILD_INPUT.test(p) && !WEB_TEST_OR_STORY.test(p)),

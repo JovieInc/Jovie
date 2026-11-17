@@ -1,4 +1,3 @@
-import { execFileSync, spawnSync } from 'node:child_process';
 import {
   chmodSync,
   existsSync,
@@ -28,6 +27,7 @@ import {
   SOURCE_SCANNER_TESTS,
   toWebCoverageIncludePaths,
 } from '../changed-test-coverage.mjs';
+import { execFileSync, spawnSync } from '../child-process.mjs';
 import { NATIVE_QUEUE_POLICY } from '../merge-queue-guard.mjs';
 
 const path = 'apps/web/lib/example.ts';

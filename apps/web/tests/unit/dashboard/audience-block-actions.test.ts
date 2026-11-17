@@ -6,7 +6,7 @@ const mocks = vi.hoisted(() => ({
   markHasBlocks: vi.fn(),
   markHasNoBlocks: vi.fn(),
   markVisitorAllowed: vi.fn(),
-  revalidateTag: vi.fn(),
+  updateTag: vi.fn(),
   select: vi.fn(),
   update: vi.fn(),
 }));
@@ -18,7 +18,7 @@ vi.mock('drizzle-orm', () => ({
   isNull: vi.fn(() => 'is-null-clause'),
 }));
 
-vi.mock('next/cache', () => ({ revalidateTag: mocks.revalidateTag }));
+vi.mock('next/cache', () => ({ updateTag: mocks.updateTag }));
 
 vi.mock('@/lib/auth/session', () => ({
   getSessionContext: mocks.getSessionContext,
@@ -154,7 +154,7 @@ describe('audience block actions', () => {
     releaseCacheWrite?.();
     await action;
     expect(actionSettled).toBe(true);
-    expect(mocks.revalidateTag).not.toHaveBeenCalled();
+    expect(mocks.updateTag).not.toHaveBeenCalled();
   });
 
   it('clears the exact visitor decision after the final unblock', async () => {
@@ -169,10 +169,8 @@ describe('audience block actions', () => {
     await unblockAudienceMember('block-1');
 
     expect(mocks.markHasNoBlocks).toHaveBeenCalledWith('tim', 'fingerprint-1');
-    expect(mocks.revalidateTag).toHaveBeenCalledWith(
-      'audience:profile-1',
-      'max'
-    );
+    // Read-your-own-write: the audience list must not be served stale.
+    expect(mocks.updateTag).toHaveBeenCalledWith('audience:profile-1');
   });
 
   it('keeps the profile hot while allowing one unblocked visitor', async () => {

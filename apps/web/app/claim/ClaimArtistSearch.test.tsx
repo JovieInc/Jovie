@@ -1,9 +1,13 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { render as baseRender, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import type { ReactElement, ReactNode } from 'react';
+import { renderToString } from 'react-dom/server';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { APP_ROUTES } from '@/constants/routes';
 import type { SpotifyArtistResult } from '@/lib/contracts/api';
 import { expectNoA11yViolations } from '@/tests/utils/a11y';
+import { HomepageQueryProvider } from '../(home)/HomepageQueryProvider';
 import { ClaimArtistSearch } from './ClaimArtistSearch';
 
 const RESULTS: SpotifyArtistResult[] = [
@@ -33,6 +37,19 @@ const RESULTS: SpotifyArtistResult[] = [
 
 const fetchMock = vi.fn<typeof fetch>();
 
+// The search hook retries transient failures; no backoff keeps the error
+// states inside the default findBy timeout.
+function render(ui: ReactElement) {
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retryDelay: 0 } },
+  });
+  return baseRender(ui, {
+    wrapper: ({ children }: { children: ReactNode }) => (
+      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+    ),
+  });
+}
+
 function respondWith(body: unknown, status = 200) {
   fetchMock.mockImplementation(
     async () => new Response(JSON.stringify(body), { status })
@@ -58,6 +75,41 @@ describe('ClaimArtistSearch', () => {
 
   afterEach(() => {
     vi.unstubAllGlobals();
+  });
+
+  it('server-renders the search through the provider pairing without a QueryClient error', () => {
+    // Regression (JOV-12694): claim search went onto TanStack Query while the
+    // /claim tree had no QueryClientProvider, so SSR threw "No QueryClient
+    // set" on every request and the search control never mounted (claim
+    // dogfood run 43663532587; Sentry 7848731693). The page pairs the search
+    // with HomepageQueryProvider; the SSR render must succeed with it.
+    const html = renderToString(
+      <HomepageQueryProvider>
+        <ClaimArtistSearch />
+      </HomepageQueryProvider>
+    );
+    expect(html).toContain('claim-artist-search');
+  });
+
+  it('without a provider, SSR throws the exact error the claim page must avoid', () => {
+    // Pins the failure signature, so the regression test above can only pass
+    // through a provider that actually satisfies useQuery.
+    expect(() => renderToString(<ClaimArtistSearch />)).toThrow(
+      'No QueryClient set'
+    );
+  });
+
+  it('renders inside the scoped QueryClientProvider the claim page provides', async () => {
+    // The /claim page wraps this component in HomepageQueryProvider (the only
+    // QueryClient on that route tree). Render through the real provider
+    // pairing so a broken pairing fails here instead of in the claim dogfood.
+    respondWith(RESULTS);
+    baseRender(
+      <HomepageQueryProvider>
+        <ClaimArtistSearch />
+      </HomepageQueryProvider>
+    );
+    expect(await screen.findByTestId('claim-artist-search')).toBeVisible();
   });
 
   it('starts idle with a labelled search and a create-profile way out', async () => {
@@ -89,8 +141,31 @@ describe('ClaimArtistSearch', () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
     const [url, init] = fetchMock.mock.calls[0];
     expect(url).toBe('/api/spotify/search?q=Daft%20Punk&limit=6');
-    expect(init).toMatchObject({ cache: 'no-store' });
     expect((init as RequestInit).signal).toBeInstanceOf(AbortSignal);
+  });
+
+  it('answers a repeated query from the cache and keeps results visible while the next one loads', async () => {
+    respondWith(RESULTS);
+    const user = await typeQuery('ab');
+    const list = await screen.findByTestId('claim-artist-results');
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+
+    fetchMock.mockImplementation(() => new Promise<Response>(() => undefined));
+    await user.type(searchInput(), 'c');
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+    expect(screen.queryByText('Searching…')).not.toBeInTheDocument();
+    expect(list.parentElement).toHaveAttribute('aria-busy', 'true');
+    expect(list).toHaveClass('opacity-90');
+    // Previous results stay on screen instead of flashing to empty.
+    expect(screen.getByTestId('claim-artist-results')).toBe(list);
+
+    await user.type(searchInput(), '{Backspace}');
+    await waitFor(() =>
+      expect(list.parentElement).toHaveAttribute('aria-busy', 'false')
+    );
+    expect(screen.getByTestId('claim-artist-results')).toBe(list);
+    expect(list).not.toHaveClass('opacity-90');
+    expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
   it('links claimable and owned artists and keeps a taken artist inert', async () => {

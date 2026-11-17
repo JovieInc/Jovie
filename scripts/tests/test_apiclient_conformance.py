@@ -44,6 +44,18 @@ class HeaderConformanceTest(unittest.TestCase):
 
 
 class PolicyConformanceTest(unittest.TestCase):
+    def test_conservative_untimed_debt_expires_without_erasing_known_reset(self):
+        ledger = empty_ledger("github")
+        state = credential_state(ledger, "c", 0)
+        observe(state, [{"resource": "core", "limit": 100, "remaining": 0, "resetAt": None}], 0)
+        observe(state, [{"resource": "core", "limit": 100, "remaining": 100, "resetAt": None}], 59999, True)
+        self.assertEqual(state["buckets"]["core"]["remaining"], 0)
+        observe(state, [{"resource": "core", "limit": 100, "remaining": 100, "resetAt": None}], 60000, True)
+        self.assertEqual(state["buckets"]["core"]["remaining"], 100)
+        observe(state, [{"resource": "core", "limit": 100, "remaining": 0, "resetAt": 120000}], 60001)
+        observe(state, [{"resource": "core", "limit": 100, "remaining": 100, "resetAt": None}], 60002, True)
+        self.assertEqual((state["buckets"]["core"]["remaining"], state["buckets"]["core"]["resetAt"]), (0, 120000))
+
     def test_backoff(self):
         for case in POLICY["backoff"]:
             with self.subTest(attempt=case["attempt"], random=case["random"]):

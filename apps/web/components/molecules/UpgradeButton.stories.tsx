@@ -1,28 +1,18 @@
+import { Button } from '@jovie/ui';
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { type ReactNode, useLayoutEffect } from 'react';
 import { expect, userEvent, within } from 'storybook/test';
-import { AppFlagProvider } from '@/lib/flags/client';
-import { APP_FLAG_DEFAULTS } from '@/lib/flags/contracts';
+import {
+  LocalCheckoutApi,
+  STORY_PRICE_ID,
+  UpgradeQueryProvider,
+} from '@/tests/fixtures/upgrade-checkout-story';
 import { UpgradeButton } from './UpgradeButton';
-
-function UpgradeQueryProvider({ children }: { readonly children: ReactNode }) {
-  const queryClient = new QueryClient({
-    defaultOptions: {
-      queries: { retry: false },
-      mutations: { retry: false },
-    },
-  });
-
-  return (
-    <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
-  );
-}
 
 const meta = {
   title: 'Molecules/UpgradeButton',
   component: UpgradeButton,
   parameters: {
+    nextjs: { appDirectory: true, navigation: { pathname: '/app' } },
     layout: 'centered',
   },
   decorators: [
@@ -41,55 +31,35 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/**
- * How the story's local checkout endpoint answers. Stories never reach
- * /api/stripe/checkout: fetch is replaced for the life of the story and
- * restored on unmount, and any other request throws.
- */
-type CheckoutReply = 'pending' | 'server-error' | 'offline';
+export const Default: Story = {
+  decorators: [
+    Story => (
+      <LocalCheckoutApi reply='server-error'>
+        <Story />
+      </LocalCheckoutApi>
+    ),
+  ],
+};
 
-function LocalCheckoutApi({
-  reply,
-  children,
-}: {
-  readonly reply: CheckoutReply;
-  readonly children: ReactNode;
-}) {
-  useLayoutEffect(() => {
-    const originalFetch = globalThis.fetch;
-    globalThis.fetch = async input => {
-      if (!String(input).includes('/api/stripe/checkout')) {
-        throw new Error('Unexpected network request in UpgradeButton story.');
-      }
-      if (reply === 'pending') return new Promise<Response>(() => undefined);
-      if (reply === 'offline') throw new TypeError('Failed to fetch');
-      return new Response(
-        JSON.stringify({ error: 'Stories never check out.' }),
-        {
-          status: 503,
-          headers: { 'Content-Type': 'application/json' },
-        }
-      );
-    };
-    return () => {
-      globalThis.fetch = originalFetch;
-    };
-  }, [reply]);
-
-  // Direct checkout is the only path that calls the endpoint, so the flag is
-  // pinned on regardless of the repo default.
-  return (
-    <AppFlagProvider
-      initialFlags={{ ...APP_FLAG_DEFAULTS, BILLING_UPGRADE_DIRECT: true }}
-    >
-      {children}
-    </AppFlagProvider>
-  );
-}
-
-const STORY_PRICE_ID = 'price_story_artist_presence';
-
-export const Default: Story = {};
+export const DefaultPriceCheckout: Story = {
+  decorators: [
+    Story => (
+      <LocalCheckoutApi reply='pending'>
+        <Story />
+      </LocalCheckoutApi>
+    ),
+  ],
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const button = await canvas.findByRole('button', {
+      name: 'Upgrade to Artist Presence',
+    });
+    await userEvent.click(button);
+    await expect(
+      await canvas.findByRole('button', { name: 'Loading...' })
+    ).toBeDisabled();
+  },
+};
 
 export const Secondary: Story = {
   args: {
@@ -188,4 +158,22 @@ export const RtlLabel: Story = {
       <UpgradeButton {...args} />
     </div>
   ),
+};
+
+export const ComposedButton: Story = {
+  args: {
+    asChild: true,
+    children: (
+      <Button type='button' variant='secondary'>
+        Upgrade to Artist Presence
+      </Button>
+    ),
+  },
+  decorators: [
+    Story => (
+      <LocalCheckoutApi reply='server-error'>
+        <Story />
+      </LocalCheckoutApi>
+    ),
+  ],
 };
