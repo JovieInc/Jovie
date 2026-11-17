@@ -126,9 +126,20 @@ async function patchHandler(
       .limit(1);
 
     return NextResponse.json(
-      { ...updated, ingestion: result.ingestion, routing: result.routing },
       {
-        status: 200,
+        ...updated,
+        ingestion: result.ingestion,
+        routing: result.routing,
+        ...(result.relationshipHold
+          ? {
+              error: result.relationshipHold.label,
+              code: 'EXISTING_RELATIONSHIP',
+              relationshipHold: result.relationshipHold,
+            }
+          : {}),
+      },
+      {
+        status: result.relationshipHold ? 409 : 200,
         headers: NO_STORE_HEADERS,
       }
     );

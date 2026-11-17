@@ -182,7 +182,9 @@ jobs:
           # is an argument on the existing create call, so the shell ratchet
           # does not grow.
           snapshot_lines=$(git diff --numstat -M origin/main...HEAD | awk -F'\t' 'NF>=3 {a=($1=="-"?0:$1); d=($2=="-"?0:$2); print a+d "\t" $3}' | node scripts/lib/pr-size-exclusions.mjs | awk -F'\t' '{s+=$1} END{print s+0}')
-          label_args=()
+          # Existing lanes consumers read these snapshots through Contents API.
+          # Declare the per-PR data exception required by Company Guards.
+          label_args=(--label data-exception)
           if [ "$snapshot_lines" -gt 1500 ]; then
             label_args+=(--label big-pr)
             echo "Snapshot is ${snapshot_lines} lines; opening with big-pr."
@@ -192,7 +194,9 @@ jobs:
             --title "chore(metrics): refresh shipping SLO snapshot" \
             --body "Refs JOV-6783.
 
-          Refreshes the committed shipping-SLO and blog-publish-latency snapshots from run ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}."
+          Refreshes the committed shipping-SLO and blog-publish-latency snapshots from run ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}.
+
+          <!-- customer-changelog/v1 {\"releaseWorthy\":false} -->"
           python3 scripts/shipping_origin.py emit-automation \
             --pr "$(gh pr view "$BRANCH" --json number --jq .number)" \
             --head-sha "$(git rev-parse HEAD)" --linear-issue JOV-6783

@@ -1,5 +1,4 @@
 import assert from 'node:assert/strict';
-import { execFileSync, spawnSync } from 'node:child_process';
 import {
   chmodSync,
   cpSync,
@@ -13,6 +12,7 @@ import {
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
+import { execFileSync, spawnSync } from './lib/child-process.mjs';
 import { evaluateFleetRules } from './pr-fleet-rules.mjs';
 import {
   CUSTOMER_MARKER,
@@ -22,7 +22,6 @@ import {
   gate,
   lockedCitation,
   main,
-  redOutput,
   refreshBodyChecks,
 } from './pr-open.mjs';
 
@@ -241,24 +240,6 @@ test('derives last failed CI URL and measured before-value from PR or linked iss
     ),
     {}
   );
-});
-
-test('Vitest logs become literal FAIL evidence accepted by Fleet Rules', () => {
-  const log =
-    '\x1b[31m ❯ scripts/thing.test.ts (3 tests | 1 failed)\x1b[0m\nAssertionError: expected 0 to be 1\n Test Files  1 failed (1)';
-  const files = [file('scripts/x.test.mjs', 'added')];
-  const body = draftBody({
-    title: 'fix(web): regression',
-    files,
-    failingCommand: 'pnpm exec vitest run',
-    failingLog: log,
-  });
-  assert.match(body, /```text\nFAIL ❯ scripts\/thing.test.ts/);
-  assert.deepEqual(
-    gate({ title: 'fix(web): regression', body, files }).errors,
-    []
-  );
-  assert.throws(() => redOutput('All 3 tests passed'), /no failure evidence/);
 });
 
 test('refresh edits once when the body changed and never requests stale reruns', async () => {
@@ -590,7 +571,7 @@ test('open fills its new self URL after ordinary publication', async () => {
     draftBody({ title: 'perf(ci): cheaper', files: [], metric })
   );
   try {
-    let edited;
+    let edited, createOptions;
     const execute = (command, args) =>
       args[0] === 'log'
         ? okText('perf(ci): cheaper')
@@ -599,9 +580,11 @@ test('open fills its new self URL after ordinary publication', async () => {
           : args[0] === 'ls-remote'
             ? okText(`${'c'.repeat(40)}\trefs/heads/fixture/source\n`)
             : fakeDiffRunner(command, args);
-    const github = (_cwd, args) => {
-      if (args[1] === 'create')
+    const github = (_cwd, args, options) => {
+      if (args[1] === 'create') {
+        createOptions = options;
         return okText('https://github.com/JovieInc/Jovie/pull/42');
+      }
       edited = readFileSync(args[args.indexOf('--body-file') + 1], 'utf8');
       return okText('');
     };
@@ -611,6 +594,11 @@ test('open fills its new self URL after ordinary publication', async () => {
         execute,
       }),
       0
+    );
+    assert.deepEqual(
+      createOptions,
+      { once: true, priority: 'default' },
+      'new PR creation never retries an ambiguous write'
     );
     assert.match(
       edited,

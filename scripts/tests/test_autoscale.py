@@ -30,6 +30,9 @@ def obs(**over):
                                 "openedPerHour": 20, "ejectionRate": 0.1},
             "disk": {"admitted": True, "freePct": 40}}
     base.update(over)
+    # Fixtures explicitly attest capacity; dedicated unknown cases pass known=False.
+    base["newIssueBudgetByProvider"] = {name: {"capacity": {"allowed": True, "known": True, "reason": "within-capacity", "blockers": []}, **row}
+                                        for name, row in base["newIssueBudgetByProvider"].items()}
     if "linearDimensions" not in over:
         base["linearDimensions"] = {"requests": {"remaining": base["linearRemaining"], "limit": base["linearLimit"], "observedAt": NOW},
                                     "complexity": {"remaining": 1000000, "limit": 2000000, "observedAt": NOW}}
@@ -443,19 +446,20 @@ class MarginalYieldAndAdmissionTest(unittest.TestCase):
         few = decide(prev, {**seen, "yieldByProvider": {"codex": {"attempts": 3, "converted": 0}}}, sample(), {"codex": 3}, cfg(max={"codex": 6}), NOW)
         self.assertGreaterEqual(self.lane(few, "codex")["effective"], 4, "too few attempts is no evidence")
 
-    def test_intake_gates_stop_new_issues_but_not_remediation_seats(self):
+    def test_current_capacity_blocks_intake_while_repair_seats_remain(self):
         base = obs(runningByProvider={"codex": 3}, eligiblePoolByProvider={"codex": 50}, maintenanceQueueByProvider={"codex": 20})
-        for extra, token in (({"openPRCount": 315, "wipMax": 80}, "wip-cap"),
-                             ({"mergeThroughput": {"queueDepth": 9, "queueWaitP50Minutes": 45, "mergedPerHour": 9, "openedPerHour": 5, "ejectionRate": 0.0}}, "ci-queue-wait"),
-                             ({"quotaDeferredHeads": 2}, "github-quota-deferred"),
-                             ({"ciQueue": {"queuedRuns": 990, "oldestMin": 18.0, "fresh": True}}, "ci-runner-backlog")):
-            state = decide(None, {**base, **extra}, sample(), {"codex": 3}, cfg(max={"codex": 6}), NOW)
-            row = self.lane(state, "codex")
-            self.assertIn(token, row["intakeBlockers"])
-            self.assertEqual(row["intakeEffective"], 0)
-            self.assertGreaterEqual(row["effective"], 3, "remediation seats keep running")
-        under = decide(None, {**base, "openPRCount": 40, "wipMax": 80}, sample(), {"codex": 3}, cfg(max={"codex": 6}), NOW)
-        self.assertEqual(self.lane(under, "codex")["intakeBlockers"], [])
+        for token in ("github-quota:graphql", "github-quota:core", "ci-runner-backlog"):
+            with self.subTest(token=token):
+                capacity = {"allowed": False, "known": True, "reason": token, "blockers": [token]}
+                seen = {**base, "newIssueBudgetByProvider": {"codex": {"reason": token, "capacity": capacity}}}
+                row = self.lane(decide(None, seen, sample(), {"codex": 3}, cfg(max={"codex": 6}), NOW), "codex")
+                self.assertEqual(row["intakeEffective"], 0)
+                self.assertIn(token, row["intakeBlockers"])
+                self.assertGreaterEqual(row["effective"], 3, "recovery retains bounded execution seats")
+        saturated = {**base, "ciQueue": {"queuedRuns": 990, "oldestMin": 18.0, "fresh": True}}
+        row = self.lane(decide(None, saturated, sample(), {"codex": 3}, cfg(max={"codex": 6}), NOW), "codex")
+        self.assertEqual(row["intakeEffective"], 0)
+        self.assertIn("ci-runner-backlog", row["intakeBlockers"])
 
     def test_flow_metrics_and_swarm_claims(self):
         with tempfile.TemporaryDirectory() as tmp:

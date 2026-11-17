@@ -307,7 +307,10 @@ struct DashboardView: View {
     didCopyURL = true
 
     Task {
-      try? await Task.sleep(for: .seconds(2))
+      // Stay "Copied" long enough to be observable: the release-lane UI test
+      // waits 2s for this state after the tap, so a 2s revert window gives the
+      // waiter zero margin under runner load (run 44005192825).
+      try? await Task.sleep(for: .seconds(3))
       didCopyURL = false
     }
   }

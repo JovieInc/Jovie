@@ -1,4 +1,3 @@
-import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import {
   mkdirSync,
@@ -10,6 +9,7 @@ import {
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { spawnSync } from '../child-process.mjs';
 import { normalizeFailureEvents } from '../rolling-ci-dispatch.mjs';
 import {
   planOfflineFailureDispositions,

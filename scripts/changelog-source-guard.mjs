@@ -2,7 +2,11 @@
 import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { parseArgs } from 'node:util';
-import { evaluateCustomerNoteContract } from './lib/daily-changelog-publication.mjs';
+import { customerNoteCopyProblems } from './lib/changelog-filter-rules.mjs';
+import {
+  evaluateCustomerNoteContract,
+  readCustomerNote,
+} from './lib/daily-changelog-publication.mjs';
 import {
   QUOTA_DEFERRED_MARKER,
   runWithGitHubRetry,
@@ -10,19 +14,25 @@ import {
 
 // Local preflight reuses the hosted contract without GitHub calls or writes.
 // Supply a REST PR snapshot and optionally the body proposed for --body-file.
+// --fleet also checks repair evidence with the canonical Fleet evaluator.
 const { values } = parseArgs({
   options: {
     'pr-file': { type: 'string' },
     'body-file': { type: 'string' },
+    fleet: { type: 'boolean', default: false },
   },
 });
 const local = values['pr-file'] !== undefined;
-if ((local || values['body-file']) && process.env.GITHUB_ACTIONS === 'true')
+if (
+  (local || values['body-file'] || values.fleet) &&
+  process.env.GITHUB_ACTIONS === 'true'
+)
   throw new Error(
     'Local preflight arguments are unavailable in GitHub Actions'
   );
 if (values['body-file'] && !local)
   throw new Error('--body-file requires --pr-file');
+if (values.fleet && !local) throw new Error('--fleet requires --pr-file');
 const event =
   !local && process.env.GITHUB_EVENT_PATH
     ? JSON.parse(readFileSync(process.env.GITHUB_EVENT_PATH, 'utf8'))
@@ -47,7 +57,7 @@ if (local || pr) {
   const files = execFileSync(
     'git',
     ['diff', '--name-only', `${pr.base.sha}...${pr.head.sha}`],
-    { encoding: 'utf8' }
+    { maxBuffer: 256 * 1024 * 1024, encoding: 'utf8' }
   )
     .trim()
     .split('\n');
@@ -93,5 +103,40 @@ if (local || pr) {
     throw new Error(
       `Customer outcome decision missing or invalid (${verdict.reason}). This PR changes customer-facing code (apps/web/{app,components/features,lib}, apps/ios Swift, apps/desktop/src), so its body needs one marker. Internal work: add the line <!-- customer-changelog/v1 {"releaseWorthy":false} --> to the PR body (the PR template already has it). Customer-visible work: see docs/CHANGELOG_PUBLICATION.md for the releaseWorthy:true form with availability.`
     );
-  process.stdout.write(`${JSON.stringify(verdict)}\n`);
+  // Headline and wording rules for release-worthy markers in PRs created
+  // after the lint landed; older PRs keep the contract they were admitted under.
+  const copyProblems = customerNoteCopyProblems(
+    readCustomerNote(current.body).note,
+    pr.created_at
+  );
+  if (copyProblems.length)
+    throw new Error(
+      `Customer changelog copy needs a rewrite. Fix the "text" of the customer-changelog/v1 marker in the PR body, then re-run Source Validation:\n${copyProblems.map(problem => `  - ${problem}`).join('\n')}\nRule and examples: docs/CHANGELOG_PUBLICATION.md ("Headlines").`
+    );
+  // Hosted admission bootstraps only the changelog dependencies. Fleet is a
+  // local opt-in and must not expand that bootstrap's required module graph.
+  const fleet = values.fleet
+    ? (await import('./pr-fleet-rules.mjs')).evaluateFleetRules({
+        pr: { ...pr, body: current.body },
+        files: files.filter(Boolean).map(filename => ({
+          filename,
+          patch: execFileSync(
+            'git',
+            [
+              'diff',
+              '--no-ext-diff',
+              `${pr.base.sha}...${pr.head.sha}`,
+              '--',
+              filename,
+            ],
+            { encoding: 'utf8' }
+          ),
+        })),
+      })
+    : undefined;
+  if (fleet?.errors.length)
+    throw new Error(`Fleet evidence invalid: ${fleet.errors.join('; ')}`);
+  process.stdout.write(
+    `${JSON.stringify({ ...verdict, ...(fleet ? { fleet } : {}) })}\n`
+  );
 }

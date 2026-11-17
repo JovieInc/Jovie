@@ -510,37 +510,30 @@ struct APIClientTests {
   }
 
   @Test func retriesWithFreshTokenAfterUnauthorized() async throws {
-    let tokenProvider = MockTokenProvider(tokens: ["stale-token", "fresh-token"])
-    var requestCount = 0
-
-    MockURLProtocol.requestHandler = { request in
-      requestCount += 1
-      let statusCode = requestCount == 1 ? 401 : 200
-      let response = HTTPURLResponse(
-        url: request.url!,
-        statusCode: statusCode,
-        httpVersion: nil,
-        headerFields: nil
-      )!
-
-      if statusCode == 401 {
-        return (response, Data())
+    try await withNativeSessionTokenStoreTestIsolation {
+      let tokenProvider = MockTokenProvider(tokens: ["stale-token", "fresh-token"])
+      var requestCount = 0
+      MockURLProtocol.requestHandler = { request in
+        requestCount += 1
+        let statusCode = requestCount == 1 ? 401 : 200
+        let response = HTTPURLResponse(
+          url: request.url!, statusCode: statusCode, httpVersion: nil, headerFields: nil
+        )!
+        if statusCode == 401 {
+          return (response, Data())
+        }
+        let data = try JSONEncoder().encode(MobileMeResponse.previewReady)
+        return (response, data)
       }
-
-      let data = try JSONEncoder().encode(MobileMeResponse.previewReady)
-      return (response, data)
+      let client = APIClient(
+        baseURL: URL(string: "https://jov.ie")!,
+        session: makeSession(),
+        tokenProvider: tokenProvider
+      )
+      let response = try await client.fetchMe()
+      #expect(response.state == .ready)
+      #expect(await tokenProvider.recordedForceRefreshValues() == [false, true])
     }
-
-    let client = APIClient(
-      baseURL: URL(string: "https://jov.ie")!,
-      session: makeSession(),
-      tokenProvider: tokenProvider
-    )
-
-    let response = try await client.fetchMe()
-
-    #expect(response.state == .ready)
-    #expect(await tokenProvider.recordedForceRefreshValues() == [false, true])
   }
 
   @Test func fetchMeDoesNotRetryUnauthorizedWhenTokenCannotRefresh() async throws {

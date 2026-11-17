@@ -2,8 +2,8 @@
 """The `reason` lane: tier-3 ranking and strategy decisions for Summer, tier-4 deep research.
 
 Summer files a JOV issue labeled `reasoning-job` (Todo) whose description carries a
-`summer.reasoning-job/v1` JSON block. The dispatch tick sees it within a minute and starts
-`reason_lane.py drain`, which, one job at a time:
+`summer.reasoning-job/v1` JSON block. Each admitted dispatch tick schedules a native queue check
+before code preparation; the existing per-host drain processes one job at a time:
 
   1. gathers the referenced context (Linear issues, GBrain pages, open P0/P1 list) itself,
      so the models run with no tools and cannot be steered into acting;
@@ -24,6 +24,7 @@ Budgets: jobs per UTC day, research per day, a context cap and a per-job spend c
 """
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import re
@@ -38,16 +39,19 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import lifecycle  # noqa: E402
+import reason_dispatch as _reason_dispatch  # noqa: E402
 import pathlib as _pl, sys as _sys  # noqa: E402
 _sys.path[:0] = [p for p in [str(_pl.Path(__file__).resolve().parent)] if p not in _sys.path]  # sibling module of the release
 from atomic_state import atomic_write_text  # noqa: E402
+from reason_publication import (  # noqa: E402
+    RESULT_SCHEMA, RESULT_MARKER, pending_publication, publication_path,
+    publish_result, resume_result, write_gbrain,
+)
 JOB_SCHEMA = "summer.reasoning-job/v1"
-RESULT_SCHEMA = "summer.reasoning-result/v1"
 ESCALATION_SCHEMA = "summer.judgment-escalation/v1"
 RECEIPT_SCHEMA = "summer.judgment-escalation-receipt/v1"
 JUDGMENT_MODEL = "claude-opus-5-5"
 PRIOR_ART_SCHEMA = "summer.business-prior-art/v1"
-RESULT_MARKER = "<!-- summer-reasoning-result:v1 -->"
 DECISION_TYPES = frozenset({"ranking", "prioritization", "strategy", "revenue-plan", "capability-gap",
                             "bottleneck", "research"})
 ISSUE_REF = re.compile(r"^(JOV|LYB)-[1-9][0-9]{0,6}$")
@@ -670,11 +674,12 @@ def result_record(job: dict, verdict: dict, proposal: dict | None, review: dict 
     }
 
 
-def render_comment(record: dict, proposal: dict | None, review: dict | None, research: str | None = None) -> str:
+def render_comment(record: dict, proposal: dict | None, review: dict | None, research: str | None = None,
+                   research_limit: int | None = 12000) -> str:
     lines = [f"🧠 Reasoning result: **{record['confidence']} confidence** "
              f"(agreement {record['agreement']}; {', '.join(record['reasons'])})", ""]
     if research:
-        lines += ["**Research memo**", "", research[:12000], ""]
+        lines += ["**Research memo**", "", research[:research_limit], ""]
     if proposal:
         lines += [f"**Decision ({record['proposer']})**: {proposal.get('summary', '')}", ""]
         for index, item in enumerate(proposal.get("ranking", []), 1):
@@ -699,27 +704,7 @@ def render_comment(record: dict, proposal: dict | None, review: dict | None, res
     return "\n".join(lines)
 
 
-def write_gbrain(slug: str, title: str, body: str, run=lifecycle.run) -> bool:
-    """Stored means read back with the body in it (JOV-7715). The page goes on stdin, which
-    both the gbrain CLI and Gem's MCP wrapper read (the wrapper ignored `--content` and stored
-    an empty page). Exit codes are advisory: the wrapper exits 0 on a failed call and the CLI
-    can hang after a successful write, so only the read-back proves the memo exists."""
-    page = f"---\ntype: decision\ntitle: {json.dumps(title[:150])}\ntags: [summer, reasoning-router]\n---\n\n{body}\n"
-    lines = [" ".join(line.split()) for line in body.splitlines() if line.strip()]
-    if not lines:
-        return False
-    try:
-        run(["gbrain", "put", slug], input=page, capture_output=True, text=True, timeout=120)
-    except subprocess.TimeoutExpired:
-        pass
-    except OSError:
-        return False
-    try:
-        stored = run(["gbrain", "get", slug], capture_output=True, text=True, timeout=60)
-    except (OSError, subprocess.SubprocessError):
-        return False
-    text = " ".join((stored.stdout or "").split())
-    return stored.returncode == 0 and lines[0] in text and lines[-1] in text
+
 
 
 # ---------------------------------------------------------------- one job
@@ -749,7 +734,7 @@ def execute(job: dict, config: dict, context: str, state: Path, run=lifecycle.ru
         record = result_record(job, verdict, None, None, spec["name"], None, slug if out["ok"] else None,
                                research=out.get("text"), prior_art=prior_art)
         return {"record": record, "comment": render_comment(record, None, None, out.get("text")),
-                "retry": not out["ok"]}
+                "research": out.get("text"), "retry": not out["ok"]}
     top_n = job.get("topN") or config["defaultTopN"]
     judgment = job.get("escalation") is not None
     proposer = config["judgmentProposer"] if judgment else config["proposer"]
@@ -810,7 +795,7 @@ def run_research(spec: dict, prompt: str, run=lifecycle.run) -> dict:
 
 # ---------------------------------------------------------------- linear + drain
 
-def queued_jobs(linear, label: str) -> list[dict]:
+def queued_jobs(linear, label: str, refresh=False) -> list[dict]:
     import lane_runner as lane
 
     def fetch():
@@ -818,12 +803,18 @@ def queued_jobs(linear, label: str) -> list[dict]:
                           'labels:{name:{eq:$l}}}){nodes{id identifier title description createdAt}}}', {"l": label})
         return sorted(data["issues"]["nodes"], key=lambda node: node["createdAt"])
 
-    jobs = lane.shared(f"claim-reason-jobs-{lane._cache_token(label)}", lane.CLAIM_SCAN_TTL_S, fetch) or []
+    jobs = lane.shared(f"claim-reason-jobs-{lane._cache_token(label)}", 0 if refresh else lane.CLAIM_SCAN_TTL_S, fetch) or []
     return [job for job in jobs if has_job_block(job.get("description") or "")]
 
 
 def one_job(linear, issue: dict, config: dict, state: Path, run=lifecycle.run) -> dict:
     job = parse_job(issue["identifier"], issue["title"], issue.get("description") or "")
+    is_expired = lambda current: expired(parse_job(current["identifier"], current["title"], current.get("description") or ""))
+    recovered = resume_result(linear, issue, state, is_expired=is_expired,
+        invalid_record=lambda: result_record(job, {"confidence": "failed", "reasons": ["saved result needs reconciliation"]},
+                                             None, None, config["proposer"]["model"], None, None), run=run)
+    if recovered is not None:
+        return recovered
     if expired(job):
         record = result_record(job, {"confidence": "failed", "agreement": 0.0, "reasons": ["deadline passed"]},
                                None, None, config["proposer"]["model"], None, None)
@@ -845,6 +836,7 @@ def one_job(linear, issue: dict, config: dict, state: Path, run=lifecycle.run) -
         return record
     context = f"{prior_art_context(prior_art)}\n\n{context}"[:config["maxContextChars"]]
     spend_budget(state, job["decisionType"] == "research")
+    source_digest = hashlib.sha256(Path(__file__).read_bytes()).hexdigest()
     outcome = execute(job, config, context, state, run=run, prior_art=prior_art)
     record = outcome["record"]
     if outcome["retry"]:
@@ -858,15 +850,8 @@ def one_job(linear, issue: dict, config: dict, state: Path, run=lifecycle.run) -
         linear.comment(issue["id"], render_comment(record, None, None))
         linear.move(issue["id"], "Canceled")
         return record
-    if record.get("gbrainSlug"):
-        body = outcome["comment"].replace(RESULT_MARKER, "")
-        title = f"Summer decision {job['identifier']}: {job['question'][:100]}"
-        if not write_gbrain(record["gbrainSlug"], title, f"# {title}\n\n{body}", run=run):
-            record["gbrainSlug"] = None
-            outcome["comment"] = render_comment(record, outcome.get("proposal"), outcome.get("review"))
-    linear.comment(issue["id"], outcome["comment"])
-    linear.move(issue["id"], "Done")  # the state change is the webhook that wakes Summer
-    return record
+    return publish_result(linear, issue, job, config, state, outcome, context, source_digest,
+                          render=render_comment, is_expired=is_expired, run=run)
 
 
 def failure_count(state: Path, identifier: str) -> int:
@@ -892,29 +877,33 @@ def drain(host, lane, config: dict | None = None, run=lifecycle.run) -> dict:
     lock = lane.Locked(host.state / "reason.lock", blocking=False)
     if not lock.held:
         return {"status": "busy"}
-    done, attempted = [], set()
+    done, attempted, blocked = [], set(), []
+    def result(status, **details):
+        return {"status": status, "done": done, **({"blocked": blocked} if blocked else {}), **details}
     try:
         # Research runs on its own model, so a logged-out proposer must not block it (and vice versa).
         ready = {"decision": healthy(config["proposer"], run=run), "research": healthy(config["research"], run=run)}
-        if not any(ready.values()):
-            return {"status": "proposer-unhealthy"}
         linear = lane.Linear(host.linear_env)
+        if not any(ready.values()) and (not (host.state / "reason-results").exists()
+                or not any(pending_publication(host.state, issue) for issue in queued_jobs(linear, config["label"]))):
+            return {"status": "proposer-unhealthy"}
 
         def runnable(job: dict) -> bool:
             research = parse_job(job["identifier"], job["title"], job.get("description") or "")["decisionType"] == "research"
-            return ready["research" if research else "decision"] and budget_allows(host.state, config, research)
+            return pending_publication(host.state, job) or (ready["research" if research else "decision"]
+                                                          and budget_allows(host.state, config, research))
         while True:
             if lifecycle.draining(host.state):
-                return {"status": "operator-draining", "done": done}
+                return result("operator-draining")
             jobs = queued_jobs(linear, config["label"])
             issue = next((job for job in jobs if job["identifier"] not in attempted and runnable(job)), None)
             if issue is None:
                 waiting = [job for job in jobs if job["identifier"] not in attempted]
-                return {"status": "budget-exhausted" if waiting else "idle", "done": done}
+                return result("budget-exhausted" if waiting else "publication-blocked" if blocked else "idle")
             claim = lane.Locked(host.state / "claim.lock", blocking=True)
             try:
                 if lifecycle.draining(host.state):
-                    return {"status": "operator-draining", "done": done}
+                    return result("operator-draining")
                 if linear.state_of(issue["id"]) != "Todo":
                     attempted.add(issue["identifier"])
                     continue  # another host took it; a cached queue must not spin on it
@@ -929,11 +918,16 @@ def drain(host, lane, config: dict | None = None, run=lifecycle.run) -> dict:
             finally:
                 if lease is not None:
                     lease.close()
-            done.append({"job": issue["identifier"], "confidence": record["confidence"]})
+            publication = record.get("publication") or {}
+            if publication.get("status") == "blocked":
+                blocked.append({"job": issue["identifier"], **publication})
+            elif publication.get("status") == "published":
+                done.append({"job": issue["identifier"], "confidence": record["confidence"]})
     except lane.LinearRateLimited as error:
-        return {"status": "linear-rate-limited", "resetAt": error.reset_at, "done": done}
+        return result("linear-rate-limited", resetAt=error.reset_at)
     finally:
         lock.release()
+        _reason_dispatch.wake_pending(host, lane)
 
 
 def _ownership():
@@ -941,23 +935,16 @@ def _ownership():
     return ownership
 
 
-def tick(host, lane, linear_factory, config: dict | None = None, spawn=subprocess.Popen) -> dict:
-    """Dispatch hook: a queued job starts a detached drain unless one is already running."""
-    config = config or load_config()
-    probe = lane.Locked(host.state / "reason.lock", blocking=False)
-    if not probe.held:
-        return {"status": "running"}
-    probe.release()
-    try:
-        jobs = queued_jobs(linear_factory(), config["label"])
-    except lane.LinearRateLimited as error:
-        return {"status": "linear-rate-limited", "resetAt": error.reset_at}
-    if not jobs:
-        return {"status": "idle"}
-    spawn([sys.executable, str(HERE / "reason_lane.py"), "drain"], stdin=subprocess.DEVNULL,
-          stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True,
-          **lifecycle.spawn_kwargs())
-    return {"status": "spawned", "queued": len(jobs)}
+def schedule_tick(host, lane, spawn=None) -> dict:
+    return _reason_dispatch.schedule_tick(host, lane, spawn=spawn)
+
+
+def tick(host, lane, linear_factory, config: dict | None = None, spawn=subprocess.Popen, refresh=False) -> dict:
+    return _reason_dispatch.tick(host, lane, linear_factory, config or load_config(), queued_jobs=queued_jobs, spawn=spawn, queue_refresh=refresh)
+
+
+def checked_tick(host, lane, linear_factory, event_file=None) -> dict:
+    return _reason_dispatch.checked_tick(host, lane, linear_factory, check=tick, now_iso=_reason_dispatch.now_iso, event_file=event_file)
 
 
 def guarded_main(argv: list[str] | None = None) -> int:
@@ -967,10 +954,16 @@ def guarded_main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     sub = parser.add_subparsers(dest="command", required=True)
     sub.add_parser("drain")
+    tick_parser = sub.add_parser("tick")
+    tick_parser.add_argument("--event-file")
     one = sub.add_parser("run")
     one.add_argument("identifier")
     args = parser.parse_args(argv)
     host = lane.Host()
+    if args.command == "tick":
+        receipt = checked_tick(host, lane, lambda: lane.Linear(host.linear_env), event_file=args.event_file)
+        print(json.dumps(receipt))
+        return 1 if receipt["status"] == "blocked" else 0
     if args.command == "drain":
         print(json.dumps(drain(host, lane)))
         return 0

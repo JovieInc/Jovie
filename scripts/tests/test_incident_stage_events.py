@@ -6,11 +6,13 @@ Run with:
 """
 from __future__ import annotations
 
-import importlib.util
+import importlib
 import json
+import pickle
 import sys
 import tempfile
 import unittest
+from unittest import mock
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -18,15 +20,11 @@ sys.path.insert(0, str(ROOT / "scripts/lanes"))
 
 
 def load(name):
-    spec = importlib.util.spec_from_file_location(name, ROOT / f"scripts/lanes/{name}.py")
-    module = importlib.util.module_from_spec(spec)
-    sys.modules[name] = module
-    spec.loader.exec_module(module)
-    return module
+    return importlib.import_module(name)
 
 
 stage_events = load("stage_events")
-T0 = 1_793_590_000.0  # 2026-11-02T02:06:40Z
+T0 = 1_793_590_000.0  # 2026-11-02T03:26:40Z
 KEY = "probe-red:gem:jovie-research"
 
 
@@ -130,11 +128,189 @@ class BoardRows(unittest.TestCase):
             self.assertEqual(stage_events.incident_events(Path(tmp), T0), [])
 
 
+class ReasonCheckRows(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.state = Path(self.tmp.name)
+        (self.state / "runs").mkdir()
+        self.directory = self.state / "runs/reason-checks"
+        self.directory.mkdir()
+        self.path = self.directory / "2026-11-02.jsonl"
+
+    def receipt(self, **changes):
+        return {"schema": "jovie.reason-check/v1", "checkId": "a" * 32, "host": "gem", "owner": "reason-lane",
+                "startedAt": "2026-11-02T03:26:40.125000Z", "observedAt": "2026-11-02T03:26:40.250000Z",
+                "status": "idle", "source": {"status": "available", "producer": "scripts/lanes/reason_dispatch.py",
+                "sourceCommit": "1" * 40, "bundleDigest": "2" * 64, "laneTree": "3" * 40}, **changes}
+
+    def write(self, rows, tail=""):
+        self.path.write_text("".join(json.dumps(row) + "\n" for row in rows) + tail)
+
+    def test_check_precision_and_host_identity_never_claim_job_acceptance(self):
+        self.write([self.receipt(status=status, host=host) for host, status in
+                    (("gem", "idle"), ("mac", "spawned"), ("other", "running"))])
+        rows = stage_events.reason_check_events(self.state, T0 + 10)
+        self.assertEqual(len(rows), 6)
+        self.assertEqual({row["entityType"] for row in rows}, {"reason-check"})
+        self.assertEqual({row["stage"] for row in rows}, {"queue-check", "checked"})
+        self.assertEqual(len({row["entityId"] for row in rows}), 3)
+        checked = stages(rows, "reason-check")
+        self.assertEqual(checked["queue-check"]["enteredAt"], "2026-11-02T03:26:40.125000Z")
+        self.assertEqual(checked["queue-check"]["exitedAt"], "2026-11-02T03:26:40.250000Z")
+        self.assertEqual(checked["checked"]["outcome"], "completed")
+        self.assertEqual(checked["checked"]["enteredAt"], checked["checked"]["exitedAt"])
+
+    def test_blocked_and_rate_limited_checks_are_failed(self):
+        for changes in ({"status": "blocked"}, {"status": "linear-rate-limited"},
+                        {"status": "blocked", "blockedOn": "queue"}, {"blockedOn": "disk-admission"}):
+            with self.subTest(changes=changes):
+                self.write([self.receipt(**changes)])
+                rows = stage_events.reason_check_events(self.state, T0 + 10)
+                self.assertEqual(len(rows), 2)
+                self.assertEqual({row["outcome"] for row in rows}, {"failed"})
+
+    def test_duplicate_receipts_have_stable_event_identity_and_one_sample(self):
+        receipt = self.receipt()
+        self.write([receipt, receipt])
+        rows = stage_events.reason_check_events(self.state, T0 + 10)
+        self.assertEqual(len(rows), 2)
+        text = stage_events.ndjson(self.state / "runs/ledger.jsonl", T0 + 10)
+        self.assertCountEqual([json.loads(line) for line in text.splitlines()], rows)
+        self.assertEqual(rows[0]["sourceReceipt"], "reason-check:gem:" + "a" * 32)
+        self.assertEqual(stage_events.reason_check_events(self.state, T0 + 20), rows)
+
+    def test_conflicting_duplicate_receipts_cannot_select_a_green_sample(self):
+        source = {**self.receipt()["source"], "sourceCommit": "4" * 40}
+        for conflict in (self.receipt(status="blocked", blockedOn="queue"), self.receipt(source=source)):
+            with self.subTest(conflict=conflict):
+                self.write([self.receipt(), conflict])
+                self.assertEqual(stage_events.reason_check_events(self.state, T0 + 10), [])
+
+    def test_identifiable_conflicts_are_quarantined_before_qualification(self):
+        good = self.receipt()
+        conflicts = [self.receipt(status="blocked", blockedOn="queue", source={"status": "unavailable", "reason": "missing release"}),
+                     self.receipt(source=None), self.receipt(observedAt=None), self.receipt(status="checking"),
+                     self.receipt(observedAt="not-a-time"), self.receipt(schema="other"), self.receipt(owner="other")]
+        for conflict in conflicts:
+            for rows in ([good, conflict], [conflict, good]):
+                with self.subTest(conflict=conflict, first=rows[0]):
+                    self.write(rows)
+                    self.assertEqual(stage_events.reason_check_events(self.state, T0 + 10), [])
+                    self.assertEqual(stage_events.ndjson(self.state / "runs/ledger.jsonl", T0 + 10), "")
+        self.write([good, conflicts[0], self.receipt(host="mac")])
+        rows = stage_events.reason_check_events(self.state, T0 + 10)
+        self.assertEqual(len(rows), 2)
+        self.assertEqual({row["entityId"] for row in rows}, {"mac@" + "a" * 32})
+
+    def test_malformed_partial_stale_future_and_unqualified_receipts_are_not_samples(self):
+        source = self.receipt()["source"]
+        invalid = [self.receipt(schema="other"), self.receipt(checkId="short"), self.receipt(host=""),
+                   self.receipt(owner="code"), self.receipt(status="checking"), self.receipt(status="scheduled"),
+                   self.receipt(source={**source, "sourceCommit": "short"}),
+                   self.receipt(source={**source, "bundleDigest": "short"}),
+                   self.receipt(source={**source, "laneTree": "short"}),
+                   self.receipt(source={"status": "unavailable", "reason": "missing release"}),
+                   self.receipt(observedAt=None), self.receipt(startedAt="not-a-time"),
+                   self.receipt(startedAt="2026-11-02T03:26:41Z"),
+                   self.receipt(observedAt="2026-11-02T03:27:00Z"),
+                   self.receipt(startedAt="2026-09-02T02:06:40Z", observedAt="2026-09-02T02:06:41Z")]
+        for receipt in invalid:
+            with self.subTest(receipt=receipt):
+                self.write([receipt])
+                self.assertEqual(stage_events.reason_check_events(self.state, T0 + 10), [])
+        self.write([self.receipt()], tail=json.dumps(self.receipt(checkId="b" * 32)))
+        with self.assertRaisesRegex(OSError, "reason-check-history-incomplete"):
+            stage_events.reason_check_events(self.state, T0 + 10)
+        self.path.write_text(json.dumps(self.receipt()) + '\n{"schema": "jovie.reason-check/v1"\n')
+        with self.assertRaisesRegex(OSError, "reason-check-history-incomplete"):
+            stage_events.ndjson(self.state / "runs/ledger.jsonl", T0 + 10)
+
+    def test_cross_partition_duplicates_and_conflicts_are_global(self):
+        prior = self.directory / "2026-11-01.jsonl"
+        good = self.receipt()
+        self.write([good])
+        prior.write_text(json.dumps(good) + "\n")
+        self.assertEqual(len(stage_events.reason_check_events(self.state, T0 + 10)), 2)
+        conflict = self.receipt(status="blocked", source={"status": "unavailable", "reason": "release unreadable"})
+        for first, second in ((good, conflict), (conflict, good)):
+            with self.subTest(first=first):
+                prior.write_text(json.dumps(first) + "\n")
+                self.write([second])
+                self.assertEqual(stage_events.reason_check_events(self.state, T0 + 10), [])
+
+    def test_only_strict_recent_utc_partitions_are_opened(self):
+        self.write([self.receipt()])
+        ignored = ["2026-10-04.jsonl", "2026-11-03.jsonl", "2026-11-2.jsonl", "2026-02-30.jsonl", "2026-11-02.jsonl.tmp"]
+        for name in ignored:
+            (self.directory / name).write_bytes(b"\xff")
+        legacy = self.state / "runs/reason-ticks.jsonl"
+        legacy.write_bytes(b"preserved old audit\xff")
+        original_open = stage_events.os.open
+        def check_open(path, *args, **kwargs):
+            self.assertNotIn(Path(path).name, ignored + [legacy.name])
+            return original_open(path, *args, **kwargs)
+        with mock.patch.object(stage_events.os, "open", side_effect=check_open), \
+                mock.patch.object(Path, "read_text", side_effect=AssertionError("reason history must stream")):
+            self.assertEqual(len(stage_events.reason_check_events(self.state, T0 + 10)), 2)
+        self.assertEqual(legacy.read_bytes(), b"preserved old audit\xff")
+
+    def test_partition_intersecting_oldest_window_day_is_included(self):
+        edge = self.receipt(checkId="b" * 32, startedAt="2026-10-05T23:00:00Z", observedAt="2026-10-05T23:00:01Z")
+        (self.directory / "2026-10-05.jsonl").write_text(json.dumps(edge) + "\n")
+        self.write([self.receipt()])
+        self.assertEqual(len(stage_events.reason_check_events(self.state, T0 + 10)), 4)
+
+    def test_unreadable_or_corrupt_partition_prevents_partial_statistics(self):
+        self.write([self.receipt()])
+        with mock.patch.object(stage_events.os, "open", side_effect=PermissionError("history unavailable")):
+            with self.assertRaisesRegex(OSError, "reason-check-history-incomplete"):
+                stage_events.reason_check_events(self.state, T0 + 10)
+        (self.directory / "2026-11-01.jsonl").write_bytes(b"\xff\n")
+        with self.assertRaisesRegex(OSError, "reason-check-history-incomplete"):
+            stage_events.ndjson(self.state / "runs/ledger.jsonl", T0 + 10)
+
+
+    def test_oversized_serialized_history_row_is_rejected_before_aggregation(self):
+        oversized = self.receipt(checkId="b" * 32, padding="x" * (1024 * 1024))
+        self.write([self.receipt(), oversized])
+        with self.assertRaisesRegex(OSError, "reason-check-history-incomplete"):
+            stage_events.reason_check_events(self.state, T0 + 10)
+        self.write([self.receipt()], tail=json.dumps(oversized))
+        with self.assertRaisesRegex(OSError, "reason-check-history-incomplete"):
+            stage_events.ndjson(self.state / "runs/ledger.jsonl", T0 + 10)
+
+    def test_incomplete_history_cannot_upload_a_partial_statistical_feed(self):
+        self.write([self.receipt()], tail=json.dumps(self.receipt(checkId="b" * 32)))
+        doctor = load("doctor")
+        lane = mock.Mock()
+        with mock.patch.object(doctor.time, "time", return_value=T0 + 10), \
+                mock.patch.object(doctor.time, "monotonic", return_value=0), \
+                mock.patch.object(doctor, "now_iso", return_value="2026-11-02T03:26:50Z"), \
+                mock.patch.object(doctor, "public_status_projection", return_value="{}"), \
+                mock.patch.object(doctor.lifecycle, "run") as transport:
+            with self.assertRaisesRegex(OSError, "reason-check-history-incomplete") as failure:
+                doctor._publish_status(mock.Mock(state=self.state), lane, {}, "JOV-12871")
+        transport.assert_not_called()
+        lane.load_github_env.assert_not_called()
+        self.assertFalse((self.state / "lanes-status-publish.json").exists())
+        self.assertIn("owner=reason-lane", str(failure.exception)[:120])
+        self.assertIn("action=restore complete daily receipts", str(failure.exception)[:120])
+
 class ManifestAndDoctor(unittest.TestCase):
+    def test_existing_module_and_pickle_identity_are_preserved(self):
+        for name, attribute in (("stage_events", "event"), ("doctor", "Tracker")):
+            with self.subTest(module=name):
+                canonical = importlib.import_module(name)
+                subject = getattr(canonical, attribute)
+                self.assertIs(load(name), canonical)
+                self.assertIs(pickle.loads(pickle.dumps(subject)), subject)
+
     def test_every_emitted_stage_is_registered(self):
         manifest = json.loads((ROOT / "docs/metrics/stage-manifest.json").read_text())
         for entity, ids in (("incident", {"undetected", "unfiled", "open", "cleared"}),
-                            ("board-task", {"posted", "running", "closed"})):
+                            ("board-task", {"posted", "running", "closed"}),
+                            ("reason-check", {"queue-check", "checked"})):
             self.assertEqual({stage["id"] for stage in manifest["entities"][entity]["stages"]}, ids)
 
     def test_doctor_records_last_good(self):

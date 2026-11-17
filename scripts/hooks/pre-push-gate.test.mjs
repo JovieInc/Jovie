@@ -95,7 +95,12 @@ for (const linkedWorktree of [false, true]) {
     env.GIT_CONFIG_NOSYSTEM = '1';
 
     const git = (cwd, ...args) => {
-      const result = spawnSync('git', args, { cwd, env, encoding: 'utf8' });
+      const result = spawnSync('git', args, {
+        maxBuffer: 256 * 1024 * 1024,
+        cwd,
+        env,
+        encoding: 'utf8',
+      });
       assert.equal(result.status, 0, result.stderr);
       return result.stdout.trim();
     };
@@ -233,6 +238,7 @@ test('publication rejects committed formatter drift and accepts the formatted re
     write('scripts/ci-branching-guard.mjs', 'export {};\n');
     write('scripts/component-ship-gate.mjs', 'export {};\n');
     write('scripts/lib/policy-gate-liveness.mjs', 'export {};\n');
+    write('scripts/lib/projected-tree-budget.mjs', 'export {};\n');
     write('scripts/preflight-changed.mjs', 'export {};\n');
     write('scripts/hooks/prepush-preflight.mjs', 'export {};\n');
     write('scripts/security/scan-secrets.sh', 'exit 0\n');
@@ -278,7 +284,8 @@ test('publication rejects committed formatter drift and accepts the formatted re
     git('commit', '-m', 'format the repair');
     const accepted = publish();
     assert.equal(accepted.status, 0, `${accepted.stdout}\n${accepted.stderr}`);
-    assert.match(accepted.stdout, /Checked 1 file/);
+    // Biome 2.6 prints "Checked N files" on stderr. The gate still uses the exit code.
+    assert.match(`${accepted.stdout}\n${accepted.stderr}`, /Checked 1 file/);
 
     rmSync(path.join(root, 'node_modules/.bin/biome'));
     const missingTool = publish();
@@ -309,6 +316,7 @@ test('publication blocks missing component stories and tests before publishing',
       true
     );
     write('scripts/ci-branching-guard.mjs', '');
+    write('scripts/lib/projected-tree-budget.mjs', 'export {};\n');
     write('scripts/security/scan-secrets.sh', 'exit 0\n');
     write(
       'scripts/lib/policy-gate-liveness.mjs',
@@ -401,6 +409,7 @@ test('affected qualification rejects stale surface certification before expensiv
   try {
     write('scripts/hooks/pre-push-gate.sh', readFileSync(gateScript));
     write('scripts/hooks/resolve-repo-node.sh', 'exit 0\n');
+    write('scripts/lib/projected-tree-budget.mjs', 'export {};\n');
     write('bin/git', '#!/bin/sh\nexit 0\n');
     write(
       'bin/pnpm',

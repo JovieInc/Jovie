@@ -26,6 +26,7 @@ import {
   watchStorybookBuildResources,
   withBoundedLifecycle,
 } from './component-live-storybook-lifecycle.mjs';
+import { collectStoryMatrix } from './lib/component-story-workers.mjs';
 import { oklchToRgb, parseOklch } from './lib/oklch.mjs';
 
 const require = createRequire(import.meta.url);
@@ -651,32 +652,26 @@ export async function collectLiveObservations(options = {}) {
       });
       const { chromium } = await import('playwright');
       const browser = await chromium.launch({ headless: true });
-      const observations = [];
       try {
-        const context = await browser.newContext({
+        return await collectStoryMatrix({
+          browser,
+          viewports: LIVE_VIEWPORTS,
+          measure: measureStory,
           baseURL: `http://127.0.0.1:${port}`,
+          axePath,
+          signal,
+          concurrency: options.concurrency,
+          stories: resolveLiveStoriesForRun({
+            storyIds: process.env.JOVIE_LIVE_STORY_IDS
+              ? process.env.JOVIE_LIVE_STORY_IDS.split(',').filter(Boolean)
+              : options.storyIds,
+            changedComponents: options.changedComponents,
+          }),
         });
-        const page = await context.newPage();
-        for (const story of resolveLiveStoriesForRun({
-          storyIds: process.env.JOVIE_LIVE_STORY_IDS
-            ? process.env.JOVIE_LIVE_STORY_IDS.split(',').filter(Boolean)
-            : options.storyIds,
-          changedComponents: options.changedComponents,
-        })) {
-          for (const viewport of LIVE_VIEWPORTS) {
-            if (signal.aborted) {
-              failCollect('live Storybook collect aborted; fail closed');
-            }
-            observations.push(
-              await measureStory(page, story, viewport, axePath)
-            );
-          }
-        }
       } finally {
         await browser.close().catch(() => undefined);
         await closeServer(server);
       }
-      return observations;
     }
   );
 }

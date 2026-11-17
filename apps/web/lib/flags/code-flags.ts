@@ -5,7 +5,7 @@
  *
  * @example
  * ```shell
- * FEATURE_CANVAS_GRAIN=true pnpm run dev:web
+ * FEATURE_MUSICFETCH_FALLBACK=true pnpm run dev:web
  * ```
  *
  * Keep keys in alphabetical order (code-flags.test.ts enforces it). Concurrent
@@ -14,30 +14,15 @@
  */
 
 export const CODE_FLAGS = {
-  // JOV-6202: signup/signin offer recap. Default off so auth pages and copy
-  // stay unchanged. FEATURE_AUTH_OFFER_SUMMARY=true shows the 14-day Pro
-  // trial recap. No price, trial-length, Stripe, or entitlement effect.
-  AUTH_OFFER_SUMMARY: false,
-  CANVAS_GRAIN: true,
   // ChatGPT app-directory MCP at /api/chatgpt/mcp. Default off: the route
   // 404s and is not a live connector. FEATURE_CHATGPT_APP_DIRECTORY_MCP=true
   // enables the anonymous public-artist tools. Does not enable DCR.
   CHATGPT_APP_DIRECTORY_MCP: false,
-  CHAT_COMPOSER_V2: true,
   // Claim-verify spec Q2: daily sweep over grandfathered (legacy) claims.
   // Default off so the first run that takes 50k+ pages private is a
   // deliberate, observable flip. FEATURE_CLAIM_LEGACY_PROOF_SWEEP=true stamps
   // the 30-day nudge and reopens 50k+ claims past it as proof-only requests.
   CLAIM_LEGACY_PROOF_SWEEP: false,
-  CYAN_FOCUS_GLOW: true,
-  // Homepage hero primary action enters the one onboarding flow at /start
-  // (public signup reopened 2026-11-09, canon/PRODUCT.md). Default off: the
-  // hero keeps "Request an invite" until Tim approves the copy by
-  // screenshot. FEATURE_HOMEPAGE_START_CTA=true swaps the hero action to the
-  // shared claim-profile CTA intent and drops the invite note under it. No
-  // effect while PUBLIC_SIGNUP_CLOSED is on. The homepage is static, so the
-  // flip needs a redeploy.
-  HOMEPAGE_START_CTA: false,
   // Fundraising YC section order. Default off until Tim approves the
   // narrative in Pen. FEATURE_INVESTOR_PORTAL_YC_DECK=true reorders the
   // existing brief sentences and shows only sourced traction stats.
@@ -61,7 +46,6 @@ export const CODE_FLAGS = {
   MUSICFETCH_FALLBACK: false,
   MUSIC_RESOLVER_PROVIDER_LINKS: false,
   MUSIC_RESOLVER_RELEASE_FACTS: false,
-  NEW_RELEASE_PAGE: true,
   // JOV-9758: value before paywall. On: the onboarding preview shows the
   // matched artist's real Spotify catalog, the materialized profile imports
   // that catalog, and the upgrade page leads with it before the price.
@@ -73,10 +57,6 @@ export const CODE_FLAGS = {
   // registration limited to the shared MCP redirect allowlist. The founder
   // Ovie issuer advertises /api/ovie/oauth/register on its own.
   OVIE_MCP_DYNAMIC_CLIENT_REGISTRATION: false,
-  // Sean Ellis PMF survey card on the dashboard home for admitted, activated
-  // creators. Default off. FEATURE_PMF_SURVEY_PROMPT=true shows the in-app
-  // card; answers are stored for the admin metric. No outbound of any kind.
-  PMF_SURVEY_PROMPT: false,
   // Public signup is OPEN (Tim, 2026-11-09 11:01 PM PT), superseding the
   // 2026-11-02 invite-only closure. /signup and anonymous /start render the
   // sign-up surfaces directly; the homepage waitlist role form keeps saving
