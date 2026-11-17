@@ -181,6 +181,7 @@ describe('PmfSurveyCard', () => {
     const { rerender } = render(
       <PmfSurveyCard onDismiss={onDismiss} onSubmit={onSubmit} />
     );
+    await user.click(screen.getByRole('button', { name: 'Answer' }));
 
     const benefit = screen.getByLabelText(/main benefit/);
     await user.click(benefit);
@@ -213,6 +214,7 @@ describe('PmfSurveyCard', () => {
         })}
       />
     );
+    await user.click(screen.getByRole('button', { name: 'Answer' }));
     await expectNoA11yViolations(container);
 
     await user.click(screen.getByRole('button', { name: 'Send answer' }));
