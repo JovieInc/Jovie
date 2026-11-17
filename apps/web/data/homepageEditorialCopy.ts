@@ -96,6 +96,8 @@ export const HOMEPAGE_EDITORIAL_COPY = {
    */
   claim: {
     chapter: 'claim',
+    handleLabel: 'Your handle',
+    handlePlaceholder: 'yourname',
     headline: 'Claim your name on Jovie.',
     subhead:
       'Find yourself on Spotify and your catalog comes in once. Your profile and a page for every release are ready when you finish.',
