@@ -105,9 +105,18 @@ function notPublishedResponse(
       `/${encodeURIComponent(handle)}/${PROFILE_MISS_REWRITE_SEGMENTS}`,
       request.nextUrl.origin
     );
-    return NextResponse.rewrite(missUrl, {
-      headers: { 'Cache-Control': 'private, no-store, max-age=0' },
-    });
+    // No constructor headers on this rewrite. NextResponse.rewrite(url,
+    // { headers }) makes the Turbopack standalone build render the
+    // destination's notFound() as Next's flight-only __next_error__ shell —
+    // 404 status and the automatic noindex meta, but no branded body
+    // (profile-visual-audit run 43944168912, job 133572331204; reproduced in
+    // a minimal Next 16.4.1 --turbopack standalone app: the identical rewrite
+    // without constructor headers renders the branded boundary, and any
+    // render failure inside a rewritten destination shells the same way).
+    // The dynamic miss destination's own 404 response already carries Next's
+    // `private, no-cache, no-store, max-age=0, must-revalidate`, so the miss
+    // body stays uncacheable (JOV-8629 §6.2) without the constructor form.
+    return NextResponse.rewrite(missUrl);
   }
   return new NextResponse('Not Found', {
     status: 404,
