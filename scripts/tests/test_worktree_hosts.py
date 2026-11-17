@@ -133,6 +133,10 @@ class HostPolicyTest(unittest.TestCase):
             with self.subTest(spec=spec):
                 self.assertTrue(policy.spawn_allowed("gem", spec, environ))
                 self.assertFalse(policy.spawn_allowed("mac", spec, environ))
+                self.assertEqual(policy.checkout_denial("mac", "/repo", lambda a, **k: worktree_list(0), spec, environ),
+                                 "worktree-host-not-allowed:mac")
+        self.assertIsNone(policy.checkout_denial("mac", "/repo", lambda a, **k: worktree_list(9),
+                                                 {"repairs": False}, environ))
 
     def test_count_worktrees_reads_linked_entries_only(self):
         self.assertEqual(policy.count_worktrees("/repo", lambda a, **k: worktree_list(3)), 3)

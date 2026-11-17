@@ -98,6 +98,13 @@ def lane_needs_worktree(spec: dict) -> bool:
     return not (spec.get("remote") is True or spec.get("repairs") is False)
 
 
+def checkout_denial(host_name: str, repo, run, spec: dict, environ=None):
+    """Reason a checkout lane must stay idle, else None. Remote lanes are never denied."""
+    if not lane_needs_worktree(spec):
+        return None
+    return admission(host_name, repo, run, environ)
+
+
 def spawn_allowed(host_name: str, spec: dict, environ=None) -> bool:
     """May this host spawn workers of this lane? Remote lanes run anywhere;
     checkout lanes only on an allowed host (the cap is enforced per run, at creation)."""

@@ -3261,8 +3261,19 @@ class DiskAdmissionError(RuntimeError):
     pass
 
 
-def worktree_count_run(args, **kwargs):
-    return sh(args, timeout=kwargs.get("timeout", 60))
+def worktree_count_run(args, **kwargs): return sh(args, timeout=kwargs.get("timeout", 60))
+
+
+def ledger_host_hold(host, receipt, runs, *, checkout_held=None, result=False, before_ledger=None):
+    reason = checkout_held or worktree_hosts.admission(HOST, host.repo, worktree_count_run)
+    if not reason:
+        return False
+    receipt.update(verdict="worktree-host-held", reasons=[reason], endedAt=now_iso(), **(
+        {"result": {"verdict": "worktree-host-held", "pr": None, "commit": None}} if result else {}))
+    if before_ledger:
+        before_ledger()
+    append_json_object(runs / "ledger.jsonl", receipt)
+    return True
 
 
 def require_disk(host: Host, stage: str) -> None:
@@ -3543,8 +3554,6 @@ def run_issue(host: Host, name: str, spec: dict, linear: Linear, issue: Issue) -
 
 def _run_issue(host: Host, name: str, spec: dict, linear: Linear, issue: Issue, *,
                release_checkout=lambda: None, checkout_held=None) -> dict:
-    if name == "hyperagent":
-        return run_hyperagent_issue(host, spec, issue, linear)
     run_id = f"{datetime.now(timezone.utc):%Y%m%dT%H%M%SZ}-{issue.identifier}-{name}-{uuid.uuid4().hex[:6]}"
     runs = host.state / "runs"
     runs.mkdir(parents=True, exist_ok=True)
@@ -3574,11 +3583,7 @@ def _run_issue(host: Host, name: str, spec: dict, linear: Linear, issue: Issue, 
                        endedAt=now_iso(), result={"verdict": "recovery-handoff", "pr": None, "commit": None})
         append_json_object(runs / "ledger.jsonl", receipt)
         return receipt
-    host_held = checkout_held or worktree_hosts.admission(HOST, host.repo, worktree_count_run)
-    if host_held:
-        receipt.update(verdict="worktree-host-held", reasons=[host_held], endedAt=now_iso(),
-                       result={"verdict": "worktree-host-held", "pr": None, "commit": None})
-        append_json_object(runs / "ledger.jsonl", receipt)
+    if ledger_host_hold(host, receipt, runs, checkout_held=checkout_held, result=True):
         return receipt
     policy = {"attempts": MAX_FAILURES, "concurrency": 1, "wallSeconds": host.agent_timeout * MAX_FAILURES,
               "spend": MAX_FAILURES, "mutations": MAX_FAILURES,
@@ -7422,8 +7427,7 @@ def unworked_fix_attempt(receipt: dict) -> str | None:
 # not the PR, and an immediate next-tick re-claim would crash-loop the same failure (Gem
 # 2026-10-23: 7 target-state-unavailable + 6 worktree-unavailable stops in 24h).
 INFRA_PRECONDITION_REASONS = frozenset({"target-state-unavailable", "worktree-unavailable", "lane-crash", "infra-rerun",
-    "worktree-cap", "worktree-admission-busy", "worktree-count-unavailable", "worktree-lock-unavailable",
-    "worktree-host-not-allowed"})
+    "worktree-cap", "worktree-admission-busy", "worktree-count-unavailable", "worktree-lock-unavailable", "worktree-host-not-allowed"})
 
 
 def end_local_fix_attempt(host: Host, pr: dict, receipt: dict) -> None:
@@ -8019,12 +8023,8 @@ def _fix_red_pr(host: Host, name: str, spec: dict, pr: dict, *, branch_held=True
                "worktree": str(worktree), "branch": pr["headRefName"], "pr": pr["number"],
                "headBefore": pr["headRefOid"], "requestSource": fix_request_source(pr),
                "startedAt": now_iso()}
-    repair_held = worktree_hosts.admission(HOST, host.repo, worktree_count_run)
-    if repair_held:
-        receipt.update(verdict="worktree-host-held", reasons=[repair_held], endedAt=now_iso())
-        if branch_held:
-            end_local_fix_attempt(host, pr, receipt)
-        append_json_object(runs / "ledger.jsonl", receipt)
+    if ledger_host_hold(host, receipt, runs, before_ledger=(
+            (lambda: end_local_fix_attempt(host, pr, receipt)) if branch_held else None)):
         return receipt
     receipt["targetStateReads"] = 1
     try:
@@ -8410,10 +8410,7 @@ def _adopt_pr(host: Host, name: str, pr: dict, claim: GateClaim, *, sensitive: b
                "origin": AUTONOMOUS_ORIGIN, "attribution": {"category": "review-only", "provider": name},
                "worktree": str(worktree), "branch": pr.get("headRefName"), "pr": pr["number"],
                "startedAt": now_iso()}
-    adopt_held = worktree_hosts.admission(HOST, host.repo, worktree_count_run)
-    if adopt_held:
-        receipt.update(verdict="worktree-host-held", reasons=[adopt_held], endedAt=now_iso())
-        append_json_object(runs / "ledger.jsonl", receipt)
+    if ledger_host_hold(host, receipt, runs):
         return receipt
     with open(runs / f"{run_id}.log", "w") as log:
         try:
@@ -9632,12 +9629,10 @@ def worker_with_slot(host: Host, name: str, spec: dict, slot: Locked, *, mainten
         record_idle_exit(host, name, "disk-unobservable")
         slot.release()
         return 1
-    if worktree_hosts.lane_needs_worktree(spec):
-        reason = worktree_hosts.admission(HOST, host.repo, worktree_count_run)
-        if reason:
-            record_idle_exit(host, name, reason)
-            slot.release()
-            return 1
+    if reason := worktree_hosts.checkout_denial(HOST, host.repo, worktree_count_run, spec):
+        record_idle_exit(host, name, reason)
+        slot.release()
+        return 1
     # Extra repository bindings (LYB) share this seat, alternating with pending Jovie work (binding_turns).
     pending, bound = jovie_repair_pending(host), None  # a binding fault never blocks the Jovie path
     try:
