@@ -31,6 +31,13 @@ export const ErrorState: Story = {
   },
 };
 
+export const Disabled: Story = {
+  args: {
+    value: '12',
+    disabled: true,
+  },
+};
+
 // A full code in every density: the longest content each box row can hold.
 export const LongContentFullCode: Story = {
   args: {

@@ -60,6 +60,12 @@ const meta = {
         lang={rtl ? 'ar' : undefined}
         className='relative h-96 bg-base'
       >
+        {/* The runner's viewport is desktop-width, where this mobile-only bar
+            is correctly lg:hidden — its play functions could never reach it.
+            Pin the mobile presentation here so the bar's interactive states
+            are exercisable (same story-scoped override pattern as
+            NumberedSection's scroll-animation settle). */}
+        <style>{`[data-mobile-navigation='true'] { display: block !important; }`}</style>
         <LiquidGlassMenu {...args} />
       </div>
     );
