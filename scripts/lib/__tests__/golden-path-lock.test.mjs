@@ -665,6 +665,17 @@ describe('golden-path lock autofix planner', () => {
     );
   });
 
+  it('names the open claim CTA as a certified front door in the autofix prompt', () => {
+    const prompt = buildAutofixPrompt({
+      fingerprint: 'x',
+      checks: [{ id: 'homepage-cta', ok: false, reason: 'missing' }],
+    });
+    expect(prompt).toContain(
+      'claim CTA "Claim your profile" linking to /start'
+    );
+    expect(prompt).toContain('Never revert an open claim CTA');
+  });
+
   it('matches owned agents by fingerprint and encodes Basic auth', () => {
     expect(
       findOwnedAgents(

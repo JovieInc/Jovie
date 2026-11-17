@@ -139,6 +139,9 @@ it('scrubPrText strips personal emails and phone numbers, keeps service addresse
   expect(scrubPrText(keep)).toBe(keep);
   const files = 'assets icon@2x.png, logo@1.5x.webp and foo@next.js stay';
   expect(scrubPrText(files)).toBe(files);
+  expect(scrubPrText('mail person@2x.co now')).toBe(
+    'mail [REDACTED-PERSONAL] now'
+  );
   expect(scrubPrText('token ' + 'ghp_' + 'a'.repeat(36))).toBe(`token ${MARK}`);
 });
 

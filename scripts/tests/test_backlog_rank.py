@@ -163,6 +163,16 @@ class RankWriteTests(unittest.TestCase):
         after = {**swapped, **plan}
         self.assertEqual(sorted(after, key=after.get), [row["id"] for row in ranked])
 
+    def test_kept_rows_with_linear_precision_are_not_rewritten(self):  # JOV-12550
+        ranked = [{"id": f"r{n}"} for n in range(5)]
+        current = {f"r{n}": -100.123456789 + n + n * 1e-9 for n in range(5)}
+        current["r2"], current["r3"] = current["r3"], current["r2"]
+        plan = br.plan_sort_orders(ranked, current, -50.0)
+        self.assertLessEqual(len(plan), 1)
+        after = {**current, **plan}
+        self.assertEqual(sorted(after, key=after.get), [row["id"] for row in ranked])
+        self.assertEqual(br.plan_sort_orders(ranked, after, -50.0), {})
+
     def test_row_leaving_the_list_does_not_rewrite_the_rest(self):  # JOV-12550
         ranked = [{"id": f"r{n}"} for n in range(40)]
         current = {f"r{n}": -100.0 + n for n in range(41)}  # r40 dropped to 41st: it is now an "other"

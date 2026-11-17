@@ -11,8 +11,8 @@ import {
 import { productReady } from '../../product-crawl/ready-gate.mjs';
 import { selectScriptContracts } from '../script-contract-affected.mjs';
 
-/** @typedef {{ name?: string, if?: string, run?: string, uses?: string, with?: { path?: string } }} WorkflowStep */
-/** @typedef {{ if?: string, needs?: string[], env?: Record<string, string>, steps: WorkflowStep[] }} WorkflowJob */
+/** @typedef {{ name?: string, if?: string, run?: string, uses?: string, env?: Record<string, string>, with?: { path?: string, name?: string, pattern?: string } }} WorkflowStep */
+/** @typedef {{ if?: string, needs?: string[], env?: Record<string, string>, strategy?: { 'fail-fast'?: boolean, matrix?: Record<string, unknown> }, steps: WorkflowStep[] }} WorkflowJob */
 /** @typedef {{ event: string, ref: string, resolveResult?: string, shouldCertify?: string }} CrawlEvent */
 
 const REPO_ROOT = resolve(import.meta.dirname, '../../..');
@@ -220,4 +220,42 @@ it('writes the crawl receipt under the artifact guard it uploads from', () => {
     step => step.uses === './.github/actions/upload-safe-playwright-artifact'
   );
   expect(upload?.with?.path).toBe(guarded?.[1]);
+});
+
+it('judges the sharded crawl once, from every shard, under the same admission', () => {
+  // JOV-12635: four shards each write their own receipt; the merge job
+  // combines them and uploads the one receipt under the original name.
+  const crawl = workflow.jobs['product-crawl'];
+  const merge = workflow.jobs['product-crawl-merge'];
+  expect(crawl.strategy?.matrix?.shard).toEqual([1, 2, 3, 4]);
+  expect(crawl.strategy?.['fail-fast']).toBe(false);
+  expect(merge.needs).toEqual(['resolve-target', 'product-crawl']);
+  expect(merge.if).toBe(crawl.if);
+  expect(merge.env?.PLAYWRIGHT_ARTIFACT_REQUIRE_PRODUCER_STAGE).toBe('true');
+  const step = merge.steps.find(s =>
+    s.run?.includes('node scripts/product-crawl/merge-receipts.mjs')
+  );
+  const guarded = step?.run?.match(
+    /PLAYWRIGHT_ARTIFACT_PATHS='([^']+)' \\\s+node \.github\/scripts\/guard-playwright-artifacts\.mjs --run -- \\\s+node scripts\/product-crawl\/merge-receipts\.mjs/
+  );
+  expect(guarded?.[1]).toBe('product-crawl-receipt/*.json');
+  const download = merge.steps.find(s =>
+    s.uses?.startsWith('actions/download-artifact@')
+  );
+  const shardUpload = crawl.steps.find(
+    s => s.uses === './.github/actions/upload-safe-playwright-artifact'
+  );
+  expect(download?.with?.pattern).toBe(
+    'product-crawl-shard-*-${{ github.run_id }}'
+  );
+  expect(shardUpload?.with?.name).toBe(
+    'product-crawl-shard-${{ matrix.shard }}-${{ github.run_id }}'
+  );
+  const upload = merge.steps.find(
+    s => s.uses === './.github/actions/upload-safe-playwright-artifact'
+  );
+  expect(upload?.with?.name).toBe('product-crawl-receipt-${{ github.run_id }}');
+  expect(upload?.with?.path).toBe(guarded?.[1]);
+  const run = crawl.steps.find(s => s.run?.includes('crawl.mjs --origin'));
+  expect(run?.env?.CRAWL_SHARD).toBe('${{ matrix.shard }}/4');
 });

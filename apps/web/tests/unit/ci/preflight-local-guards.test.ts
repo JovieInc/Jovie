@@ -20,6 +20,33 @@ const guard = (id: string) => {
 };
 
 describe('preflight:changed local guards', () => {
+  it('checks the tree byte budget for source, docs and evidence in every mode', () => {
+    for (const path of [
+      'apps/web/components/shell/SidebarNavItem.tsx',
+      'apps/web/components/shell/SidebarNavItem.certificate.test.tsx',
+      'apps/web/components/shell/SidebarNavItem.states.stories.tsx',
+      'docs/design-system/component-certification.d/ds-cert-s17.json',
+      'README.md',
+    ]) {
+      expect(ids([path]), path).toContain('projected-tree-budget');
+    }
+    expect(guard('projected-tree-budget').heavy).toBeUndefined();
+    expect(ids([])).toEqual([]);
+  });
+
+  it('checks raw control debt when source or its baseline changes', () => {
+    for (const path of [
+      'apps/web/components/shell/SidebarNavItem.tsx',
+      'scripts/design-authority-interactive-baseline.json',
+      'scripts/design-authority-guard.mjs',
+      'DESIGN.md',
+    ]) {
+      expect(ids([path]), path).toContain('design-authority');
+    }
+    expect(guard('design-authority').heavy).toBeUndefined();
+    expect(ids(['README.md'])).not.toContain('design-authority');
+  });
+
   it('runs design-noise for any web or packages/ui component, in every mode', () => {
     for (const path of [
       'apps/web/components/features/feedback/PmfSurveyCard.tsx',
@@ -32,7 +59,57 @@ describe('preflight:changed local guards', () => {
       expect(ids([path]), path).toContain('design-noise');
     }
     expect(guard('design-noise').heavy).toBeUndefined();
-    expect(ids(['README.md', 'scripts/ci-fast-lanes.mjs'])).toEqual([]);
+    expect(ids(['README.md', 'scripts/ci-fast-lanes.mjs'])).not.toContain(
+      'design-noise'
+    );
+  });
+
+  it('runs changed ESLint and the cache ratchet before pushing web source', () => {
+    const route = 'apps/web/app/[username]/tip/thank-you/page.tsx';
+    expect(ids([route])).toEqual(
+      expect.arrayContaining([
+        'web-eslint',
+        'stack-pattern-ratchet',
+        'dead-ends',
+      ])
+    );
+    expect(guard('web-eslint').command).toBe(
+      'LINT_CHANGED_WORKTREE=1 ESLINT_CHANGED_BASE=origin/{base} pnpm --filter @jovie/web run lint:eslint:changed'
+    );
+    expect(guard('stack-pattern-ratchet').command).toBe(
+      'node scripts/invariants/stack-pattern-ratchet.mjs'
+    );
+    for (const id of ['web-eslint', 'stack-pattern-ratchet']) {
+      expect(guard(id).heavy).toBeUndefined();
+    }
+    expect(ids(['README.md', 'apps/web/app/route.stories.tsx'])).not.toContain(
+      'stack-pattern-ratchet'
+    );
+    expect(ids(['apps/web/eslint.config.js'])).toContain('web-eslint');
+    expect(
+      ids(['apps/web/lib/services/tips/checkout-return.server.ts'])
+    ).toEqual(
+      expect.arrayContaining([
+        'web-eslint',
+        'stack-pattern-ratchet',
+        'dead-ends',
+      ])
+    );
+    expect(selectManifestGuards([route]).map(g => g.id)).toEqual(
+      expect.arrayContaining([
+        'web-eslint',
+        'stack-pattern-ratchet',
+        'dead-ends',
+      ])
+    );
+    for (const base of ['main', 'release/test']) {
+      expect(
+        selectManifestGuards([route], base).find(g => g.id === 'web-eslint')
+          ?.command
+      ).toBe(
+        `LINT_CHANGED_WORKTREE=1 ESLINT_CHANGED_BASE=origin/${base} pnpm --filter @jovie/web run lint:eslint:changed`
+      );
+    }
   });
 
   it('runs the route JS budgets when shipped web code changes, as a heavy guard', () => {
@@ -47,6 +124,11 @@ describe('preflight:changed local guards', () => {
       'pnpm-lock.yaml',
       'apps/web/scripts/route-js-budgets.json',
       'apps/web/scripts/route-js-budget.mjs',
+      'apps/web/scripts/route-js-budget-policy.mjs',
+      'apps/web/scripts/route-js-ratchet.mjs',
+      'apps/web/scripts/route-render-modes-policy.mjs',
+      'apps/web/scripts/route-render-modes.mjs',
+      'apps/web/scripts/route-render-modes.json',
     ]) {
       expect(ids([path]), path).toContain('route-js-budget');
     }
@@ -72,6 +154,9 @@ describe('preflight:changed local guards', () => {
     expect(budget).toContain(
       'node apps/web/scripts/route-js-budget.mjs --next-dir apps/web/.next'
     );
+    expect(budget).toContain(
+      'node apps/web/scripts/route-render-modes.mjs --next-dir apps/web/.next'
+    );
     for (const env of [
       'NEXT_PUBLIC_AUTH_MOCK=1',
       'NEXT_PUBLIC_E2E_MODE=1',
@@ -95,6 +180,8 @@ describe('preflight:changed local guards', () => {
     expect(selected).toEqual(
       expect.arrayContaining(['design-noise', 'route-js-budget'])
     );
-    expect(selectManifestGuards(['README.md'])).toEqual([]);
+    expect(selectManifestGuards(['README.md']).map(g => g.id)).toEqual([
+      'projected-tree-budget',
+    ]);
   });
 });

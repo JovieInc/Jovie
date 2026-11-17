@@ -56,6 +56,24 @@ describe('Banner', () => {
     await expectNoA11yViolations(container);
   });
 
+  it('renders its controls through the shared Button atom', () => {
+    render(
+      <Banner
+        title='Connection restored'
+        action={{ label: 'Review', onClick: () => {} }}
+        onDismiss={() => {}}
+      />
+    );
+
+    const review = screen.getByRole('button', { name: 'Review' });
+    expect(review).toHaveAttribute('data-variant', 'secondary');
+    expect(review).toHaveAttribute('data-size', 'sm');
+    expect(screen.getByRole('button', { name: 'Dismiss' })).toHaveAttribute(
+      'data-variant',
+      'ghost'
+    );
+  });
+
   it('renders an href action as a link', async () => {
     const { container } = render(
       <Banner

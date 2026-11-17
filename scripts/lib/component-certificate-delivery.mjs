@@ -17,8 +17,47 @@ import { pathToFileURL } from 'node:url';
 import { parseArgs } from 'node:util';
 
 export const DELIVERY_SCHEMA = 'jovie.component-certificate-evidence/v1';
+export const SOURCE_ORDER_SCHEMA = 'jovie.source-order/v1';
 export const MAX_FAILING_COMPONENTS = 25;
 export const MAX_DELIVERY_BYTES = 60 * 1024;
+
+export function validateDeliveryOrder(order) {
+  const keys = ['schema', 'sourceOrdinal', 'runNumber', 'runAttempt'];
+  if (
+    !order ||
+    typeof order !== 'object' ||
+    Array.isArray(order) ||
+    Object.keys(order).length !== keys.length ||
+    !keys.every(key => Object.hasOwn(order, key)) ||
+    order.schema !== SOURCE_ORDER_SCHEMA ||
+    !keys
+      .slice(1)
+      .every(key => Number.isSafeInteger(order[key]) && order[key] > 0)
+  )
+    throw new Error('invalid delivery order');
+  return order;
+}
+
+export function requireOrderingCapability(response) {
+  if (
+    response?.ok !== true ||
+    response.deliveryOrderSchema !== SOURCE_ORDER_SCHEMA
+  )
+    throw new Error('receiver does not advertise source ordering');
+}
+
+export function requireDeliveryAcknowledgement(response, payload) {
+  const expected = validateDeliveryOrder(payload.deliveryOrder);
+  const actual = validateDeliveryOrder(response?.deliveryOrder);
+  if (
+    response.ok !== true ||
+    response.accepted !== true ||
+    !['stored', 'duplicate'].includes(response.reason) ||
+    response.storedHeadSha !== payload.headSha ||
+    Object.keys(expected).some(key => actual[key] !== expected[key])
+  )
+    throw new Error('receiver did not acknowledge the ordered generation');
+}
 
 function countFailing(report) {
   return (report.certificates ?? []).filter(c => c?.certified === false).length;
@@ -44,6 +83,9 @@ export function buildDeliveryPayload(report, meta = {}) {
   return {
     schema: DELIVERY_SCHEMA,
     headSha: report.headSha,
+    ...(meta.deliveryOrder === undefined
+      ? {}
+      : { deliveryOrder: validateDeliveryOrder(meta.deliveryOrder) }),
     evaluatedAt: meta.evaluatedAt ?? report.generatedAt ?? null,
     reportBytes: meta.reportBytes ?? null,
     totals: {
@@ -73,9 +115,23 @@ function main() {
     options: {
       out: { type: 'string' },
       'artifact-name': { type: 'string' },
+      'source-ordinal': { type: 'string' },
+      'source-sha': { type: 'string' },
+      'verify-capability': { type: 'boolean' },
+      'verify-ack': { type: 'boolean' },
     },
     allowPositionals: true,
   });
+  if (values['verify-capability'] || values['verify-ack']) {
+    const response = JSON.parse(readFileSync(positionals[0], 'utf8'));
+    if (values['verify-ack'])
+      requireDeliveryAcknowledgement(
+        response,
+        JSON.parse(readFileSync(positionals[1], 'utf8'))
+      );
+    else requireOrderingCapability(response);
+    return;
+  }
   const reportPath = positionals[0];
   if (!reportPath || !values.out) {
     console.error(
@@ -84,6 +140,12 @@ function main() {
     process.exit(2);
   }
   const report = JSON.parse(readFileSync(reportPath, 'utf8'));
+  if (
+    values['source-ordinal'] !== undefined &&
+    (!/^[0-9a-f]{40}$/.test(values['source-sha'] ?? '') ||
+      report.headSha !== values['source-sha'])
+  )
+    throw new Error('ordered delivery must match the checked source SHA');
   const serverUrl = process.env.GITHUB_SERVER_URL;
   const runId = process.env.GITHUB_RUN_ID;
   const repository = process.env.GITHUB_REPOSITORY;
@@ -92,6 +154,16 @@ function main() {
       ? `${serverUrl}/${repository}/actions/runs/${runId}`
       : null;
   const payload = buildDeliveryPayload(report, {
+    ...(values['source-ordinal'] === undefined
+      ? {}
+      : {
+          deliveryOrder: {
+            schema: SOURCE_ORDER_SCHEMA,
+            sourceOrdinal: positiveInteger(values['source-ordinal']),
+            runNumber: positiveInteger(process.env.GITHUB_RUN_NUMBER),
+            runAttempt: positiveInteger(process.env.GITHUB_RUN_ATTEMPT),
+          },
+        }),
     reportBytes: statSync(reportPath).size,
     runUrl,
     artifactName:
@@ -99,6 +171,12 @@ function main() {
       (runId ? `component-certificate-${runId}` : null),
   });
   writeFileSync(values.out, serializeDeliveryPayload(payload));
+}
+
+function positiveInteger(value) {
+  if (!/^[1-9]\d*$/.test(value ?? '') || !Number.isSafeInteger(Number(value)))
+    throw new Error('missing or invalid source/workflow generation');
+  return Number(value);
 }
 
 if (

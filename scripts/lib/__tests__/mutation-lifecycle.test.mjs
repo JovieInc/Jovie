@@ -18,6 +18,14 @@ import {
   runMutationHarness,
 } from '../mutation-lifecycle.mjs';
 
+import {
+  assertCompleteSnapshot,
+  assertNonzeroSnapshotRejected,
+  assertOversizedSnapshotRejected,
+  assertPostExitSnapshotFailsClosed,
+  restoreSnapshotFixtures,
+} from './fixtures/mutation-process-snapshots.mjs';
+
 const REPO = resolve(import.meta.dirname, '../../..');
 const ORIGINAL = 'export const value = true;\n';
 const INSTRUMENTED =
@@ -34,6 +42,7 @@ const alive = pid => {
   return !/^[ZX]/u.test(result.stdout.trim());
 };
 afterEach(() => {
+  restoreSnapshotFixtures();
   for (const pid of owned.splice(0)) {
     if (alive(pid)) {
       try {
@@ -70,7 +79,9 @@ fs.writeFileSync(path.join(root, 'source.ts'), ${JSON.stringify(INSTRUMENTED)});
 ${ignoreTerm ? `process.on('SIGTERM', () => fs.writeFileSync(path.join(root, 'term-saw-backup'), String(fs.existsSync(backup))));` : ''}
 const child = spawn(process.execPath, ['-e', 'process.on("SIGTERM", () => {}); process.send("ready"); setInterval(() => {}, 1000)'], { stdio: ['ignore', 'ignore', 'ignore', 'ipc'] });
 child.on('message', () => {
-  fs.writeFileSync(path.join(root, 'pids.json'), JSON.stringify({ leader: process.pid, child: child.pid }));
+  const pidsPath = path.join(root, 'pids.json');
+  fs.writeFileSync(pidsPath + '.tmp', JSON.stringify({ leader: process.pid, child: child.pid }));
+  fs.renameSync(pidsPath + '.tmp', pidsPath);
   ${leaderExit ? `const timer = setInterval(() => { if (fs.existsSync(path.join(process.env.STRYKER_TEMP_DIR, 'recovery.json'))) { clearInterval(timer); process.exit(0); } }, 5);` : ''}
 });
 setInterval(() => {}, 1000);
@@ -426,7 +437,12 @@ process.exitCode=1;`
       'fixture',
     ],
   ]) {
-    const git = spawnSync('git', args, { cwd: root, env, encoding: 'utf8' });
+    const git = spawnSync('git', args, {
+      maxBuffer: 256 * 1024 * 1024,
+      cwd: root,
+      env,
+      encoding: 'utf8',
+    });
     expect(git.status, git.stderr).toBe(0);
   }
   const state = join(root, 'state.json');
@@ -457,6 +473,25 @@ process.exitCode=1;`
     ]
   ).toMatchObject({ status: 'error', score: null });
   expect(readFileSync(output, 'utf8')).toContain('scored=0');
+});
+
+describe('process snapshot buffer', () => {
+  it(
+    'reads a complete table above 1 MiB with exact owned PID, start and live-state filtering',
+    assertCompleteSnapshot
+  );
+  it(
+    'rejects oversized output rather than accepting its valid owned-row prefix',
+    assertOversizedSnapshotRejected
+  );
+  it(
+    'rejects nonzero ps exits even when stdout contains valid owned rows',
+    assertNonzeroSnapshotRejected
+  );
+  it(
+    'preserves recovery and rejects a zero-exit partial report after an oversized cleanup snapshot',
+    assertPostExitSnapshotFailsClosed
+  );
 });
 
 function relativeModule(parent, path) {

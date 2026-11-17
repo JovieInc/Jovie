@@ -9,8 +9,8 @@
 #
 # Skip (return 0) only when ALL of:
 #   1. JOVIE_SETUP_FORCE is not 1
-#   2. Node pin is 24.21.0+
-#   3. pnpm pin is exactly 9.15.9
+#   2. Node satisfies .nvmrc (same major, at least the pinned version)
+#   3. pnpm is exactly package.json's packageManager pin
 #   4. $repo/node_modules/.modules.yaml exists
 #   5. deps fingerprint matches node_modules/.cache/jovie-setup/deps.sha256
 #
@@ -87,9 +87,21 @@ jovie_setup_node_pin_ok() {
   ((10#$v_minor > 10#$p_minor || (10#$v_minor == 10#$p_minor && 10#$v_patch >= 10#$p_patch)))
 }
 
+# Print the exact pnpm version that package.json's packageManager pins
+# ("pnpm@X.Y.Z"), or fail when there is no exact pin. The repo keeps that one
+# pin; nothing else hardcodes a pnpm version.
+jovie_setup_required_pnpm() {
+  local repo_root="${1:-${REPO_ROOT:-.}}" pinned
+  pinned="$(sed -n 's/.*"packageManager"[[:space:]]*:[[:space:]]*"pnpm@\([0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*\)".*/\1/p' "$repo_root/package.json" 2>/dev/null | head -n 1)"
+  [[ -n "$pinned" ]] || return 1
+  printf '%s\n' "$pinned"
+}
+
 jovie_setup_pnpm_pin_ok() {
   command -v pnpm &>/dev/null || return 1
-  [[ "$(pnpm --version 2>/dev/null || true)" == "9.15.9" ]]
+  local repo_root="${1:-${REPO_ROOT:-.}}" pinned
+  pinned="$(jovie_setup_required_pnpm "$repo_root")" || return 1
+  [[ "$(pnpm --version 2>/dev/null || true)" == "$pinned" ]]
 }
 
 # Workflows already depend on paginated JSON aggregation. Probe help locally so
@@ -99,7 +111,7 @@ jovie_setup_gh_api_slurp_ok() {
   local gh_path api_help
   gh_path="$(command -v gh)" || return 0
   if api_help="$("$gh_path" api --help 2>/dev/null)" &&
-    grep -Eq '^[[:space:]]*--slurp([[:space:]]|$)' <<<"$api_help"; then
+    grep -Eq '^[[:space:]]*--slurp(\[=true\|false\])?([[:space:]]|$)' <<<"$api_help"; then
     return 0
   fi
   printf '%s\n' \
@@ -115,7 +127,7 @@ jovie_setup_worktree_healthy() {
 
   [[ "${JOVIE_SETUP_FORCE:-0}" != "1" ]] || return 1
   jovie_setup_node_pin_ok "$repo_root" || return 1
-  jovie_setup_pnpm_pin_ok || return 1
+  jovie_setup_pnpm_pin_ok "$repo_root" || return 1
   [[ -f "$repo_root/node_modules/.modules.yaml" ]] || return 1
 
   fingerprint="$(jovie_setup_hash_dependency_inputs "$repo_root" || true)"

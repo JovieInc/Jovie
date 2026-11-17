@@ -4,7 +4,6 @@ const mocks = vi.hoisted(() => ({
   auth: vi.fn(),
   isAdmin: vi.fn(),
   privacy: vi.fn(),
-  flag: vi.fn(),
   send: vi.fn(),
   revalidate: vi.fn(),
   captureError: vi.fn(),
@@ -16,7 +15,6 @@ vi.mock('@/lib/admin/roles', () => ({ isAdmin: mocks.isAdmin }));
 vi.mock('@/lib/ovie/privacy-lock/server', () => ({
   assertOviePrivacyUnlocked: mocks.privacy,
 }));
-vi.mock('@/lib/flags/server', () => ({ getAppFlagValue: mocks.flag }));
 vi.mock('@/lib/ovie/fleet-room-send.server', () => ({
   sendFleetRoomMessage: mocks.send,
 }));
@@ -40,10 +38,9 @@ describe('sendFleetRoomMessageAction', () => {
     mocks.auth.mockResolvedValue({ userId: 'u1' });
     mocks.isAdmin.mockResolvedValue(true);
     mocks.privacy.mockResolvedValue(undefined);
-    mocks.flag.mockResolvedValue(true);
   });
 
-  it('posts for an admin with the flag on and refreshes the room', async () => {
+  it('posts for an admin and refreshes the room', async () => {
     mocks.send.mockResolvedValue({
       status: 'sent',
       eventId: 'linear-comment:c1',
@@ -60,23 +57,17 @@ describe('sendFleetRoomMessageAction', () => {
     expect(mocks.revalidate).toHaveBeenCalledWith('/app/ov/room');
   });
 
-  it('refuses non-admins and a flag that is off without sending', async () => {
+  it('refuses non-admins without sending', async () => {
     mocks.isAdmin.mockResolvedValueOnce(false);
-    expect(
-      (
-        await sendFleetRoomMessageAction(
-          IDLE,
-          await form({ agentId: 'chloe', text: 'hi' })
-        )
-      ).status
-    ).toBe('error');
-    mocks.flag.mockResolvedValueOnce(false);
     expect(
       await sendFleetRoomMessageAction(
         IDLE,
         await form({ agentId: 'chloe', text: 'hi' })
       )
-    ).toEqual({ status: 'error', message: 'The fleet room is off.' });
+    ).toEqual({
+      status: 'error',
+      message: 'Only Ovie operators can send here.',
+    });
     expect(mocks.send).not.toHaveBeenCalled();
   });
 

@@ -1462,6 +1462,7 @@ esac
     mkdirSync(src);
     const git = args => {
       const result = spawnSync('git', args, {
+        maxBuffer: 256 * 1024 * 1024,
         cwd: src,
         encoding: 'utf8',
         env: {

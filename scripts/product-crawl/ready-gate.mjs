@@ -251,6 +251,7 @@ export function overlayWalkFindings(walk) {
  *   uncovered?: { route: string, reason: string, accepted?: boolean }[],
  *   closedInProduction?: { prefix: string, reason: string, exact?: boolean }[],
  *   outOfTime?: { loadsLeft: number, resamplesLeft: number } | null,
+ *   strangerOnlyShards?: number[],
  *   overlayWalks?: { walks: Parameters<typeof overlayWalkFindings>[0][] },
  *   pages: Parameters<typeof pageFindings>[0][] }} receipt
  * @param {{ now?: number, deployedSha?: string }} [opts]
@@ -274,6 +275,11 @@ export function productReady(receipt, opts = {}) {
         reasons.push(
           `not crawled ${id === 'stranger' ? 'as a stranger' : 'signed in'}`
         );
+    const strangerOnly = receipt.strangerOnlyShards ?? [];
+    if (strangerOnly.length)
+      reasons.push(
+        `shard ${strangerOnly.join(', ')} crawled only as a stranger`
+      );
     const seen = new Set([
       ...receipt.pages.filter(p => !p.error && !p.authGated).map(p => p.route),
       ...(receipt.uncovered ?? [])

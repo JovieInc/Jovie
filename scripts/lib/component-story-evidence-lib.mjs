@@ -16,6 +16,11 @@ import {
 
 export const STORY_THEMES = REQUIRED_THEMES;
 export const UI_PREFIX = 'packages/ui/';
+/** Story files the certificate can own: workspace packages and the web app. */
+export const STORY_PREFIXES = Object.freeze(['packages/', 'apps/web/']);
+/** Capture budget per shard: about 400 story x theme renders (~3 min). */
+export const RENDERS_PER_SHARD = 400;
+export const MAX_SHARDS = 20;
 /** The theme key the Storybook preview's ThemeProvider reads (preview.tsx). */
 export const THEME_STORAGE_KEY = 'jovie-theme-storybook';
 const STORY_FILE_RE = /^(.+)\.stories\.(tsx|ts|jsx|js)$/i;
@@ -57,11 +62,16 @@ export function parseShard(value) {
 export function repoPathForImport(importPath, storybookCwd = 'apps/web') {
   if (typeof importPath !== 'string' || !importPath) return null;
   const clean = importPath.replace(/\\/g, '/');
+  // Root-relative first: a cwd-relative `./packages/...` would name
+  // `apps/web/packages/...`, which never exists.
   for (const candidate of [
-    posix.normalize(posix.join(storybookCwd, clean)),
     posix.normalize(clean),
+    posix.normalize(posix.join(storybookCwd, clean)),
   ])
-    if (!candidate.startsWith('../') && candidate.startsWith(UI_PREFIX))
+    if (
+      !candidate.startsWith('../') &&
+      STORY_PREFIXES.some(prefix => candidate.startsWith(prefix))
+    )
       return candidate;
   return null;
 }
@@ -98,8 +108,8 @@ export function componentForStoryFile(storyRel, componentPaths) {
 }
 
 /**
- * Stories (never docs entries) whose file lives under packages/ui, grouped
- * by the component they cover.
+ * Stories (never docs entries) of every certified component, grouped by the
+ * component they cover (name kept from the packages/ui-only producer).
  * @returns {{ components: Map<string, string[]>, unmapped: string[] }}
  */
 export function selectUiStories(index, componentPaths, storybookCwd) {
@@ -184,6 +194,8 @@ export function captureProblems(result, theme, kind) {
   return problems;
 }
 
+const DETERMINISTIC_PROBLEM = /^(?:axe |rendered )/;
+
 const shorten = text => String(text).replace(/\s+/g, ' ').trim().slice(0, 160);
 
 /** The theme a story pins through its own globals, if any (either capture says). */
@@ -202,6 +214,7 @@ function receiptFor(
 ) {
   const stories = [];
   const failures = [];
+  let transient = false;
   for (const id of storyIds) {
     // A story that pins one theme (e.g. OperationsDark) can't prove both, so
     // it is checked in its own theme only and left out of the light+dark list.
@@ -211,6 +224,10 @@ function receiptFor(
     for (const theme of pinned ? [pinned] : STORY_THEMES) {
       const result = results.get(`${id}\u0000${theme}`);
       const problems = captureProblems(result, theme, kind);
+      // Axe findings and a wrong theme repeat on the same inputs; anything
+      // else (no capture, no render, errors, no screenshot) may be a flake.
+      if (problems.some(problem => !DETERMINISTIC_PROBLEM.test(problem)))
+        transient = true;
       if (problems.length)
         failures.push(`${id} [${theme}]: ${shorten(problems.join('; '))}`);
       else {
@@ -231,6 +248,8 @@ function receiptFor(
     captured: stories.length,
     stories,
   };
+  if (receipt.status === 'fail' && (transient || !stories.length))
+    receipt.retry = true;
   if (!stories.length) receipt.detail = 'no stories captured';
   else if (failures.length) {
     const more = failures.length - DETAIL_LIMIT;
@@ -264,6 +283,38 @@ export function assembleEvidence(components, captures) {
 }
 
 export { mergeEvidence };
+export const selectStories = selectUiStories;
+
+/**
+ * Prior receipts still valid for the current tree: both kinds present, same
+ * source bytes and the same v2 closure binding. Deterministic failures (axe
+ * findings, a wrong theme) count too: recapturing them is waste. A failure
+ * marked `retry` (no capture, no render, errors) is captured again.
+ * @param {{ visual?: Record<string, any>, a11y?: Record<string, any> }} prior
+ * @param {Map<string, { sourceHash: string, renderInputs: any }>} components
+ * @returns {Map<string, { visual: any, a11y: any }>}
+ */
+export function reusableReceipts(prior, components) {
+  const reuse = new Map();
+  for (const [path, { sourceHash, renderInputs }] of components) {
+    const visual = prior.visual?.[path],
+      a11y = prior.a11y?.[path];
+    const same = receipt =>
+      receipt?.schema === STORY_EVIDENCE_SCHEMA &&
+      receipt.sourceHash === sourceHash &&
+      (receipt.status === 'pass' ||
+        (receipt.status === 'fail' && !receipt.retry)) &&
+      JSON.stringify(receipt.renderInputs) === JSON.stringify(renderInputs);
+    if (renderInputs?.digest && same(visual) && same(a11y))
+      reuse.set(path, { visual, a11y });
+  }
+  return reuse;
+}
+
+/** Shards for a capture: enough to stay inside the per-shard budget. */
+export function shardCount(renders, max = MAX_SHARDS, per = RENDERS_PER_SHARD) {
+  return renders <= 0 ? 0 : Math.min(max, Math.ceil(renders / per));
+}
 
 /** One line per component for the run log and step summary. */
 export function summarizeEvidence({ visual, a11y }) {

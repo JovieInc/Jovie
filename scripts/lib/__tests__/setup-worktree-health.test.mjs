@@ -11,6 +11,7 @@ import {
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
+import { createWorktreeFixtures } from './setup-worktree-health-fixtures.mjs';
 
 const repoRoot = resolve(import.meta.dirname, '../../..');
 const helperPath = resolve(repoRoot, 'scripts/lib/setup-worktree-health.sh');
@@ -25,6 +26,8 @@ const codexSetupSh = readFileSync(
 );
 
 const tempRoots = [];
+const { makeWorktree, makeLinkedWorktreeWithBarePrimary } =
+  createWorktreeFixtures(makeTempDir);
 afterEach(() => {
   for (const root of tempRoots.splice(0)) {
     rmSync(root, { recursive: true, force: true });
@@ -50,60 +53,6 @@ function makeToolStubs({
   writeExecutable(join(bin, 'node'), `#!/bin/sh\necho ${nodeVersion}\n`);
   writeExecutable(join(bin, 'pnpm'), `#!/bin/sh\necho ${pnpmVersion}\n`);
   return bin;
-}
-
-function makeWorktree() {
-  const root = makeTempDir('jovie-setup-health-repo-');
-  writeFileSync(join(root, 'package.json'), '{"name":"fixture"}\n');
-  writeFileSync(join(root, '.nvmrc'), '24.21.0\n');
-  writeFileSync(join(root, 'pnpm-lock.yaml'), 'lockfileVersion: 9.0\n');
-  writeFileSync(join(root, 'pnpm-workspace.yaml'), 'packages: []\n');
-  const git = spawnSync('git', ['-c', 'init.defaultBranch=main', 'init'], {
-    cwd: root,
-    encoding: 'utf8',
-  });
-  expect(git.status, git.stderr).toBe(0);
-  spawnSync('git', ['config', 'user.email', 'setup-health@example.com'], {
-    cwd: root,
-  });
-  spawnSync('git', ['config', 'user.name', 'Setup Health'], { cwd: root });
-  const add = spawnSync(
-    'git',
-    ['add', '.nvmrc', 'package.json', 'pnpm-lock.yaml', 'pnpm-workspace.yaml'],
-    {
-      cwd: root,
-      encoding: 'utf8',
-    }
-  );
-  expect(add.status, add.stderr).toBe(0);
-  return root;
-}
-
-function makeLinkedWorktreeWithBarePrimary() {
-  const primary = makeWorktree();
-  const commit = spawnSync('git', ['commit', '-m', 'fixture'], {
-    cwd: primary,
-    encoding: 'utf8',
-  });
-  expect(commit.status, commit.stderr).toBe(0);
-
-  const linked = join(primary, 'linked-worktree');
-  const add = spawnSync(
-    'git',
-    ['worktree', 'add', '-b', 'linked-fixture', linked],
-    {
-      cwd: primary,
-      encoding: 'utf8',
-    }
-  );
-  expect(add.status, add.stderr).toBe(0);
-
-  const makeBare = spawnSync('git', ['config', 'core.bare', 'true'], {
-    cwd: primary,
-    encoding: 'utf8',
-  });
-  expect(makeBare.status, makeBare.stderr).toBe(0);
-  return { linked, primary };
 }
 
 /**
@@ -172,6 +121,47 @@ function evaluateHealth(worktree, { env = {}, pathPrefix } = {}) {
   expect(result.status, result.stderr).toBe(0);
   return result.stdout.trim();
 }
+
+describe('GitHub CLI api --slurp capability', () => {
+  it.each([
+    ['plain flag row', '      --slurp  Return all pages in an array\n', 0, 0],
+    ['plain flag at end of line', '      --slurp\n', 0, 0],
+    [
+      'optional boolean flag row',
+      '      --slurp[=true|false]  Return all pages in an array\n',
+      0,
+      0,
+    ],
+    ['optional boolean at end of line', '      --slurp[=true|false]\n', 0, 0],
+    ['unsupported CLI', '      --paginate  Make additional requests\n', 0, 1],
+    ['examples only', '  gh api repos/example --paginate --slurp\n', 0, 1],
+    ['similarly named flag', '      --slurped  Not the required flag\n', 0, 1],
+    ['annotated flag suffix', '      --slurp[=true|false]extra\n', 0, 1],
+    ['malformed annotation', '      --slurp[=false|true]\n', 0, 1],
+    ['failed plain help process', '      --slurp\n', 1, 1],
+    ['failed annotated help process', '      --slurp[=true|false]\n', 1, 1],
+  ])('%s', (_name, help, helpStatus, expectedStatus) => {
+    const bin = makeTempDir('jovie-setup-gh-bin-');
+    writeExecutable(
+      join(bin, 'gh'),
+      '#!/bin/sh\n' +
+        '[ "$#" = 2 ] && [ "$1" = api ] && [ "$2" = --help ] || exit 97\n' +
+        'printf "%s" "$GH_HELP_FIXTURE"\n' +
+        'exit "$GH_HELP_STATUS"\n'
+    );
+    const result = runHelper('. "$HELPER_PATH"\njovie_setup_gh_api_slurp_ok', {
+      pathPrefix: bin,
+      env: {
+        HELPER_PATH: helperPath,
+        GH_HELP_FIXTURE: help,
+        GH_HELP_STATUS: String(helpStatus),
+      },
+    });
+    expect(result.status, result.stderr).toBe(expectedStatus);
+    if (expectedStatus === 0) expect(result.stderr).toBe('');
+    else expect(result.stderr).toContain('must support --slurp');
+  });
+});
 
 describe('setup worktree health skip', () => {
   it('skips when fingerprint matches and Node/pnpm pins are ok', () => {
@@ -294,6 +284,49 @@ describe('SessionStart still uses setup.sh for the skip', () => {
     );
     expect(codexSetupSh).toContain('GBrain sync');
     expect(codexSetupSh).toContain('independent and always runs');
+  });
+});
+
+describe('one frozen dependency install for every agent session start (JOV-12623)', () => {
+  const pin = JSON.parse(
+    readFileSync(resolve(repoRoot, 'package.json'), 'utf8')
+  ).packageManager.replace(/^pnpm@/u, '');
+  const helperSh = readFileSync(helperPath, 'utf8');
+  const readPin = worktree =>
+    runHelper(`. ${JSON.stringify(helperPath)}
+      jovie_setup_required_pnpm ${JSON.stringify(worktree)}`);
+  const setPin = (worktree, packageManager) =>
+    writeFileSync(
+      join(worktree, 'package.json'),
+      `${JSON.stringify({ name: 'fixture', packageManager }, null, 2)}\n`
+    );
+
+  it('setup.sh and SessionStart call the shared frozen install; nothing hardcodes pnpm', () => {
+    for (const script of [setupSh, sessionStartSh]) {
+      expect(script).toContain('scripts/codex-cloud-setup.mjs" install');
+      expect(script).not.toMatch(/^\s*pnpm install\b/mu);
+    }
+    expect(pin).toMatch(/^\d+\.\d+\.\d+$/u);
+    for (const script of [setupSh, sessionStartSh, helperSh]) {
+      expect(script).not.toContain(pin);
+      expect(script).not.toMatch(/pnpm@\d+\.\d+\.\d+/u);
+    }
+  });
+
+  it('reads the pnpm pin from packageManager and the warm skip follows it', () => {
+    const worktree = makeWorktree();
+    expect(readPin(worktree).stdout.trim()).toBe('9.15.9');
+    for (const packageManager of [undefined, 'pnpm@latest']) {
+      setPin(worktree, packageManager);
+      expect(readPin(worktree)).toMatchObject({ status: 1, stdout: '' });
+    }
+    setPin(worktree, 'pnpm@10.2.1');
+    expect(readPin(worktree).stdout.trim()).toBe('10.2.1');
+    seedHealthyCache(worktree);
+    const health = pnpmVersion =>
+      evaluateHealth(worktree, { pathPrefix: makeToolStubs({ pnpmVersion }) });
+    expect(health('9.15.9')).toBe('run');
+    expect(health('10.2.1')).toBe('skip');
   });
 });
 

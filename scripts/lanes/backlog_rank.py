@@ -159,7 +159,9 @@ def _fill(values: list[float], kept: set[int], limit: float, step: float) -> lis
                     return None
                 out[n + j] = lo + (hi - lo) * (j + 1) / (run + 1)
         n = end
-    out = [round(value, 6) for value in out]
+    # Round only the values this pass moved: Linear's own sortOrder values carry more decimals, and
+    # rounding a kept value would turn it into a spurious write (or collide two close neighbours).
+    out = [value if n in kept else round(value, 6) for n, value in enumerate(out)]
     if any(b <= a for a, b in pairwise(out)) or (limit != float("inf") and out[-1] >= limit):
         return None
     return out

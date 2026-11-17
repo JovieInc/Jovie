@@ -72,7 +72,7 @@ CLOCKS = (
     # Runaway production event volume (cost) can start with no deploy.
     Clock("costAnomaly", "cost-anomaly-gate.yml", "clock_cost_anomaly_gate", 900,
           "cost-anomaly-clock.json"),
-    # Resolve or reopen autofixed incidents once their 45-minute post-deploy soak elapses.
+    # Evaluate registered Sentry validation observations against the verified production artifact.
     Clock("sentryRecurrence", "sentry-autofix-recurrence.yml", "clock_sentry_autofix_recurrence", 3600,
           "sentry-recurrence-clock.json"),
     # Weekly archive-then-delete of stale remote branches (7,752 on 2026-10-20). A clock event
@@ -198,7 +198,15 @@ def tick_one(state_dir: Path, clock: Clock, run, now: float) -> dict:
         try:
             result = observe(run, now, clock)
         except (OSError, subprocess.SubprocessError, ValueError, TypeError, KeyError, AttributeError, RuntimeError) as error:
+            # JOV-12812: a failed observation (gh api error, quota, malformed page) used to
+            # consume the whole interval -- the hourly summerCanary ran 2h apart on
+            # 2026-11-16 because its 03:38 tick failed here and the next attempt was
+            # 04:38. Retry after the same short window an uncertain dispatch gets, but
+            # never longer than the clock's own interval (a 5-minute clock keeps its
+            # cadence). The error class is the only safe detail: api() scrubs output that
+            # can carry credentials.
             result = {"status": "failed", "error": type(error).__name__}
+            state["nextAttemptAt"] = now + min(UNCERTAIN_S, clock.interval_s)
         if result["status"] == "overdue":
             state.update(nextAttemptAt=now + UNCERTAIN_S,
                          lastResult={"status": "dispatch-uncertain", "requestedAt": now})

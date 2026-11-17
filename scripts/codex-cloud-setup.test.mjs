@@ -13,7 +13,7 @@ import {
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import test from 'node:test';
-import { bootstrap } from './codex-cloud-setup.mjs';
+import { bootstrap, frozenInstall, main } from './codex-cloud-setup.mjs';
 import { evaluateRepoHygiene } from './repo-hygiene-guard.mjs';
 
 test('desktop source configuration stays shareable without admitting runtime state', () => {
@@ -134,6 +134,66 @@ test('forces noninteractive installation without changing the caller or version 
   }
 });
 
+test('the shared frozen install leaves the Node gate to its caller', t => {
+  const { root, env } = fixture(t);
+  writeFileSync(join(root, '.nvmrc'), '0.0.0');
+  frozenInstall(root, env);
+  assert.equal(
+    readFileSync(join(root, 'install-receipt'), 'utf8'),
+    `${root}\ninstall --frozen-lockfile --prefer-offline\n1\nskip\ntrue\n`
+  );
+  for (const packageManager of [undefined, 'pnpm@latest']) {
+    writeFileSync(
+      join(root, 'package.json'),
+      JSON.stringify({ packageManager })
+    );
+    assert.throws(() => frozenInstall(root, env), /exact pnpm/);
+  }
+});
+
+test('the install subcommand that setup.sh and SessionStart call runs the frozen install', t => {
+  const { root, env } = fixture(t);
+  mkdirSync(join(root, 'scripts'));
+  copyFileSync(
+    resolve('scripts/codex-cloud-setup.mjs'),
+    join(root, 'scripts/codex-cloud-setup.mjs')
+  );
+  writeFileSync(join(root, '.nvmrc'), '0.0.0');
+  const cli = args =>
+    spawnSync(
+      process.execPath,
+      [join(root, 'scripts/codex-cloud-setup.mjs'), ...args],
+      { encoding: 'utf8', env }
+    );
+  const install = cli(['install']);
+  assert.equal(install.status, 0, install.stderr);
+  assert.match(
+    readFileSync(join(root, 'install-receipt'), 'utf8'),
+    /^install --frozen-lockfile --prefer-offline$/mu
+  );
+  rmSync(join(root, 'install-receipt'));
+  const unknown = cli(['reinstall']);
+  assert.equal(unknown.status, 2);
+  assert.match(unknown.stderr, /Unknown command: reinstall/);
+  assert.throws(() => readFileSync(join(root, 'install-receipt')), /ENOENT/);
+});
+
+test('main dispatches install, bootstrap and unknown commands in-process', t => {
+  const { root, env } = fixture(t);
+  assert.equal(main(['install'], root, env), 0);
+  assert.match(
+    readFileSync(join(root, 'install-receipt'), 'utf8'),
+    /^install --frozen-lockfile --prefer-offline$/mu
+  );
+  assert.equal(main([], root, env), 0);
+  writeFileSync(join(root, '.nvmrc'), '0.0.0');
+  assert.throws(() => main([], root, env), /Expected Node/);
+  assert.equal(main(['install'], root, env), 0);
+  const error = t.mock.method(console, 'error', () => {});
+  assert.equal(main(['reinstall'], root, env), 2);
+  assert.match(error.mock.calls[0].arguments[0], /Unknown command/);
+});
+
 test('rejects a runtime mismatch before running the installer', t => {
   const { root, env } = fixture(t);
   writeFileSync(join(root, '.nvmrc'), '0.0.0');
@@ -216,7 +276,13 @@ test('warns offline about an incompatible installed gh without blocking setup or
           ['init'],
           ['add', '.nvmrc', 'package.json', 'pnpm-lock.yaml'],
         ]) {
-          assert.equal(spawnSync('git', gitArgs, { cwd: root }).status, 0);
+          assert.equal(
+            spawnSync('git', gitArgs, {
+              maxBuffer: 256 * 1024 * 1024,
+              cwd: root,
+            }).status,
+            0
+          );
         }
         mkdirSync(join(root, 'node_modules/.cache/jovie-setup'), {
           recursive: true,

@@ -1,7 +1,10 @@
 """Compose every deterministic fix-red class on one head, then run them with no model.
 
 Split from fix_red_classes and lane_runner so those files stay inside the company
-size ceiling. Stamp the body before a fixer push. An action outside the leaf order
+size ceiling. Stamp the body before a fixer push. Stamp the changelog before
+repair-win: that publisher also stamps a missing note, so running it first makes
+the later stamp a no-op and fails the compose. A repair-win publish that does
+not change the body fails the compose. An action outside the leaf order
 (alias graduation) is not run as a partial compose.
 """
 from __future__ import annotations
@@ -12,11 +15,13 @@ import types
 def compose_actions(actions: list[str]) -> list[str]:
     """Stable order for leaf actions. Drops anything outside the order, including `compose`."""
     import fix_red_classes as classes
+    import fix_red_render_modes
 
     order = (
-        classes.SYNC_MAIN, classes.STAMP_CHANGELOG, classes.WIRE_CI_FAST, classes.RENUMBER,
+        classes.SYNC_MAIN, classes.STAMP_CHANGELOG, classes.REPAIR_WIN, classes.WIRE_CI_FAST, classes.RENUMBER,
         classes.SNAP_SPACING, classes.STRIP_CACHE, classes.MERGE_NARROWED, classes.REGISTER_DOMAIN,
-        classes.ATOMIC_WRITE, classes.REPAIR_SCREEN_CERT, classes.BALANCE_HEADINGS, classes.UI_FEEL, classes.RERUN)
+        classes.ATOMIC_WRITE, classes.REPAIR_SCREEN_CERT, classes.BALANCE_HEADINGS, classes.UI_FEEL,
+        fix_red_render_modes.ACTION, classes.SPLIT_SIZE, classes.BIOME_FORMAT, classes.RERUN)
     rank = {name: index for index, name in enumerate(order)}
     chosen: list[str] = []
     for action in actions:
@@ -42,13 +47,21 @@ def deterministic_fixer(lane, action: str):
     """Resolve leaf fixers on the owning runner, including after a loader rebind."""
     import fix_red_classes as classes
 
-    return lane.fix_red_screen_cert.dispatch(classes, lane.sh, {
+    import fix_red_render_modes
+
+    table = lane.fix_red_screen_cert.dispatch(classes, lane.sh, {
         "wire": lane.wire_ci_fast_fix, "atomic": lane.atomic_state_fix,
         "renumber": lane.renumber_migrations_fix, "snap": lane.snap_spacing_fix,
         "strip": lane.strip_cache_exports_fix, "merge": lane.merge_narrowed_preflight_fix,
         "register": lane.register_domain_writes_fix,
         "ui": lane.fix_red_screen_cert.bind_ui_feel(lane.sh, lane.failed_logs, classes),
-    }).get(action)
+    })
+    table[fix_red_render_modes.ACTION] = fix_red_render_modes.bind(lane.sh, lane.failed_logs)
+    import fix_red_size_500
+    table[classes.SPLIT_SIZE] = fix_red_size_500.bind(lane.sh, lane.failed_logs)
+    import fix_red_biome
+    table[classes.BIOME_FORMAT] = fix_red_biome.bind(lane.sh)
+    return table.get(action)
 
 
 def compose_deterministic_fix(lane, host, pr, route, worktree, log, receipt):
@@ -68,6 +81,10 @@ def compose_deterministic_fix(lane, host, pr, route, worktree, log, receipt):
                 return None
         elif action == classes.RERUN:
             if not lane._rerun_failed(pr):
+                return None
+        elif action == classes.REPAIR_WIN:
+            import fix_red_measured_win
+            if not fix_red_measured_win.publish(pr, lambda args: lane.gh_call(args, priority="repair")):
                 return None
         else:
             fixer = deterministic_fixer(lane, action)
@@ -100,4 +117,15 @@ def repair_files(cls, action, names, logs, per_check):
     if "detached-native-consumer" in wanted and (cls == "detached-native-consumer" or action == classes.COMPOSE):
         files = sorted(set(files) | set(detached_native_sync.paths(
             "\n".join(logs.get(name) or "" for name in names))))
+    if "render-mode-admission" in wanted and action in {"admit-render-mode", classes.COMPOSE}:
+        import fix_red_render_modes
+        files = sorted(set(files) | set(fix_red_render_modes.routes_in(
+            "\n".join(logs.get(name) or "" for name in names))))
+    if "size-500-unbaselined" in wanted and action in {classes.SPLIT_SIZE, classes.COMPOSE}:
+        import fix_red_size_500
+        files = sorted(set(files) | set(fix_red_size_500.paths(
+            "\n".join(logs.get(name) or "" for name in names))))
+    if "biome-format" in wanted and action in {classes.BIOME_FORMAT, classes.COMPOSE}:
+        from fix_red_biome import cited_paths
+        files = sorted(set(files) | set(cited_paths("\n".join(logs.get(name) or "" for name in names))))
     return files

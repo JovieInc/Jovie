@@ -72,6 +72,7 @@ jobs:
             scripts/lib/test-planner-contract-tests.mjs
             scripts/ci-fast-lanes.mjs
             scripts/lib/ci-fast-annotations.mjs
+            scripts/lib/ci-structural-shards.mjs
             scripts/lib/ci-structural-pytest-files.mjs
             scripts/lib/script-contract-node-args.mjs
             scripts/lib/ci-failure-excerpts.mjs
@@ -575,6 +576,7 @@ jobs:
             scripts/lib/test-planner-contract-tests.mjs
             scripts/ci-fast-lanes.mjs
             scripts/lib/ci-fast-annotations.mjs
+            scripts/lib/ci-structural-shards.mjs
             scripts/lib/ci-structural-pytest-files.mjs
             scripts/lib/script-contract-node-args.mjs
             scripts/lib/ci-failure-excerpts.mjs
@@ -864,6 +866,7 @@ jobs:
             scripts/lib/repo-hygiene-limits.mjs
             scripts/ci-fast-lanes.mjs
             scripts/lib/ci-fast-annotations.mjs
+            scripts/lib/ci-structural-shards.mjs
             scripts/lib/ci-structural-pytest-files.mjs
             scripts/lib/script-contract-node-args.mjs
             scripts/lib/ci-failure-excerpts.mjs
@@ -1008,6 +1011,7 @@ jobs:
             scripts/lib/test-planner-contract-tests.mjs
             scripts/ci-fast-lanes.mjs
             scripts/lib/ci-fast-annotations.mjs
+            scripts/lib/ci-structural-shards.mjs
             scripts/lib/ci-structural-pytest-files.mjs
             scripts/lib/script-contract-node-args.mjs
             scripts/lib/ci-failure-excerpts.mjs

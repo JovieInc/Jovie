@@ -1,5 +1,6 @@
 import { spawnSync } from 'node:child_process';
 import {
+  existsSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
@@ -10,6 +11,7 @@ import {
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
+import { commitMutationFixture } from './fixtures/mutation-git-receipt.mjs';
 
 // The rolling sweep must survive a load-driven module timeout: the module is
 // recorded unscored and the run stays green (infra class), while a crashed
@@ -60,7 +62,10 @@ describe('rolling sweep timeout contract', () => {
     // stays green — a load-driven timeout is infrastructure, not a regression.
     writeFileSync(
       join(root, 'scripts/mutation-ui.mjs'),
-      'setTimeout(() => {}, 60000);'
+      `import {mkdirSync,writeFileSync} from 'node:fs';
+       mkdirSync('packages/ui/reports/mutation/diff', {recursive:true});
+       writeFileSync('packages/ui/reports/mutation/diff/atoms_source.ts.json', JSON.stringify({files:{'atoms/source.ts':{source:${JSON.stringify(ORIGINAL)},mutants:[{status:'Killed'},{status:'Pending'}]}}}));
+       setTimeout(() => {}, 60000);`
     );
     const env = {
       ...process.env,
@@ -70,53 +75,61 @@ describe('rolling sweep timeout contract', () => {
     };
     for (const key of Object.keys(env))
       if (key.startsWith('GIT_')) delete env[key];
-    for (const args of [
-      ['init', '-q'],
-      ['add', '.'],
-      [
-        '-c',
-        'user.name=Fixture',
-        '-c',
-        'user.email=fixture@example.invalid',
-        'commit',
-        '-qm',
-        'fixture',
-      ],
-    ]) {
-      const git = spawnSync('git', args, { cwd: root, env, encoding: 'utf8' });
-      expect(git.status, git.stderr).toBe(0);
-    }
+    commitMutationFixture(root, env);
     const state = join(root, 'state.json');
     const output = join(root, 'outputs');
     const summary = join(root, 'summary.md');
-    const run = spawnSync(
-      process.execPath,
-      [
-        'scripts/mutation-sweep.mjs',
-        '--files',
-        'packages/ui/atoms/source.ts',
-        '--state',
-        state,
-        '--github-output',
-        output,
-        '--summary',
-        summary,
-        '--file-timeout-minutes',
-        '0.016',
-      ],
-      {
-        cwd: root,
-        env,
-        encoding: 'utf8',
-        timeout: 60000,
-      }
-    );
+    const invoke = () =>
+      spawnSync(
+        process.execPath,
+        [
+          'scripts/mutation-sweep.mjs',
+          '--files',
+          'packages/ui/atoms/source.ts',
+          '--state',
+          state,
+          '--github-output',
+          output,
+          '--summary',
+          summary,
+          '--file-timeout-minutes',
+          '0.016',
+        ],
+        {
+          cwd: root,
+          env,
+          encoding: 'utf8',
+          timeout: 60000,
+        }
+      );
+    const run = invoke();
     expect(run.status, `${run.stdout}\n${run.stderr}`).toBe(0);
     const entry = JSON.parse(readFileSync(state, 'utf8')).modules[
       'packages/ui/atoms/source.ts'
     ];
     expect(entry).toMatchObject({ status: 'error', score: null });
     expect(entry.error).toContain('timed out');
+    expect(entry.retryAfterRun).toBe(4);
+    expect(entry.partial).toEqual({
+      total: 2,
+      counts: { Killed: 1, Pending: 1 },
+    });
+    expect(entry.evidence.verdict).toBe('unknown');
+    const receipt = JSON.parse(
+      readFileSync(`${state}.runs.jsonl`, 'utf8').trim()
+    );
+    expect(receipt.ratchet).toBe('unknown');
+    for (let i = 0; i < 3; i++) {
+      const parked = invoke();
+      expect(parked.status, parked.stderr).toBe(0);
+      expect(parked.stdout).toContain('batch=0');
+    }
+    const after = JSON.parse(readFileSync(state, 'utf8'));
+    expect(after.sweepSequences['packages/ui']).toBe(4);
+    expect(after.modules['packages/ui/atoms/source.ts'].at).toBe(entry.at);
+    expect(
+      existsSync(join(root, 'survivor-tasks/packages_ui_atoms_source.ts.json'))
+    ).toBe(false);
     expect(readFileSync(output, 'utf8')).toContain('scored=0');
     expect(readFileSync(summary, 'utf8')).toContain('timeout (unscored)');
   });

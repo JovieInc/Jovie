@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import {
   mkdirSync,
   mkdtempSync,
@@ -16,6 +17,7 @@ import {
   STORYBOOK_PROFILE,
   snapshotRenderInputs,
   storybookProfile,
+  storyEvidenceEligibility,
 } from '../component-render-inputs.mjs';
 
 const owned = new Set();
@@ -79,6 +81,16 @@ describe('render input provenance', () => {
     ['an existing story', 'packages/ui/atoms/button.stories.tsx'],
     ['an imported primitive', 'packages/ui/atoms/button.tsx'],
     ['a shared frontend library', 'apps/web/lib/shared.ts'],
+    [
+      'a runtime checkout fixture',
+      'apps/web/tests/fixtures/upgrade-checkout-story.tsx',
+    ],
+    ['a runtime HUD fixture', 'apps/web/tests/fixtures/hud-cockpit.ts'],
+    ['runtime fixture audio', 'apps/web/tests/fixtures/audio/tone.wav'],
+    [
+      'runtime documentation code',
+      'apps/web/lib/docs/parseMarkdownFrontmatter.ts',
+    ],
   ]) {
     it(`invalidates cached observations after ${name} changes without staging`, () => {
       const f = fixture({ 'package.json': '{}', [path]: 'before' });
@@ -87,6 +99,36 @@ describe('render input provenance', () => {
       assert.notEqual(binding(f).digest, before.digest);
     });
   }
+
+  it('rejects old pass and fail receipts when an imported runtime fixture changes', () => {
+    const path = 'apps/web/tests/fixtures/upgrade-checkout-story.tsx';
+    const source =
+      'export const UpgradeButton = () => <button>Upgrade</button>;';
+    const sourceHash = createHash('sha256').update(source).digest('hex');
+    const f = fixture({
+      'package.json': '{}',
+      'apps/web/components/molecules/UpgradeButton.tsx': source,
+      'apps/web/components/molecules/UpgradeButton.stories.tsx':
+        "import { UpgradeQueryProvider } from '@/tests/fixtures/upgrade-checkout-story';",
+      [path]: 'export const UpgradeQueryProvider = ({ children }) => children;',
+    });
+    const before = binding(f);
+    f.put(
+      path,
+      'export const UpgradeQueryProvider = ({ children }) => <section>{children}</section>;'
+    );
+    const after = binding(f);
+    assert.notEqual(after.digest, before.digest);
+    for (const status of ['pass', 'fail']) {
+      const receipt = { status, sourceHash, renderInputs: before };
+      assert.equal(renderReceiptCurrent(receipt, sourceHash, before), true);
+      assert.equal(renderReceiptCurrent(receipt, sourceHash, after), false);
+    }
+    assert.deepEqual(storyEvidenceEligibility([path]), {
+      render: true,
+      visual: false,
+    });
+  });
 
   it('includes a new untracked story and notices its later removal', () => {
     const f = fixture();
@@ -103,6 +145,13 @@ describe('render input provenance', () => {
     f.put('apps/web/app/api/status/route.ts', 'export const GET = () => null');
     f.put('apps/web/tests/unit/status.test.ts', 'test("status", () => {})');
     f.put('packages/ui/docs/status.md', '# Documentation');
+    f.put('apps/web/tests/fixtures/helper.test.ts', 'test("helper", () => {})');
+    f.put(
+      'apps/web/tests/fixtures/__tests__/helper.ts',
+      'export const unit = 1;'
+    );
+    f.put('apps/web/tests/fixtures/README.md', '# Fixture documentation');
+    f.put('apps/web/lib/docs/parser.spec.ts', 'test("parser", () => {})');
     assert.deepEqual(binding(f), before);
   });
 

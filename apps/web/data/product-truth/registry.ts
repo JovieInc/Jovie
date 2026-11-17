@@ -643,10 +643,6 @@ export const PRODUCT_FLAG_CAPABILITIES = {
     nonMarketing:
       'daily sweep over grandfathered claims; default off; no public capability claim',
   },
-  OVIE_FLEET_ROOM: {
-    nonMarketing:
-      'Ovie operator fleet room; admins only; no customer or public capability claim',
-  },
 } as const satisfies Readonly<Record<ProductFlagKey, FlagCapabilityBinding>>;
 
 /**

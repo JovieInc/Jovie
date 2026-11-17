@@ -1,9 +1,40 @@
 import { render, screen, within } from '@testing-library/react';
+import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 import { AgentRoom, roomTimeAgo } from './AgentRoom';
 import { fleetRoomFixtureView } from './fixtures';
 
 describe('AgentRoom', () => {
+  it('includes the full roster, activity, and composer in server HTML before hydration', () => {
+    const view = fleetRoomFixtureView();
+    const html = renderToStaticMarkup(
+      <AgentRoom
+        view={view}
+        composer={
+          <form>
+            <button type='submit'>Send</button>
+          </form>
+        }
+      />
+    );
+    const root = document.createElement('div');
+    root.innerHTML = html;
+    const server = within(root);
+
+    expect(
+      server
+        .getAllByTestId('agent-room-agent')
+        .map(agent => agent.dataset.agentId)
+    ).toEqual(view.agents.map(agent => agent.id));
+    expect(server.getAllByTestId('agent-room-event')).toHaveLength(
+      view.events.length
+    );
+    expect(server.getByRole('button', { name: 'Send' })).toHaveAttribute(
+      'type',
+      'submit'
+    );
+  });
+
   it('shows every roster agent with presence and the feed newest first', () => {
     render(<AgentRoom view={fleetRoomFixtureView()} />);
     const agents = screen.getAllByTestId('agent-room-agent');
@@ -61,5 +92,37 @@ describe('AgentRoom', () => {
       />
     );
     expect(screen.getByTestId('slot-composer')).toBeInTheDocument();
+  });
+
+  it('gives each pane its own scroll container so the room fills the canvas', () => {
+    const view = fleetRoomFixtureView();
+    render(<AgentRoom view={view} />);
+
+    // The room itself is bounded by its host and never asks the page to
+    // scroll on desktop; each pane owns a scrolling region instead.
+    const room = screen.getByTestId('agent-room');
+    expect(room).toHaveClass('overflow-y-auto', 'lg:overflow-hidden');
+
+    const roster = within(room).getByTestId('agent-roster');
+    expect(roster).toHaveClass('overflow-y-auto');
+    const rosterRows = within(roster).getAllByTestId('agent-room-agent');
+    expect(rosterRows).toHaveLength(view.agents.length);
+
+    const feed = within(room).getByTestId('agent-room-feed');
+    expect(feed).toHaveClass('overflow-y-auto');
+    const feedEvents = within(feed).getAllByTestId('agent-room-event');
+    expect(feedEvents).toHaveLength(view.events.length);
+  });
+
+  it('pins the composer outside the scrolling feed', () => {
+    render(
+      <AgentRoom
+        view={fleetRoomFixtureView()}
+        composer={<form data-testid='slot-composer' />}
+      />
+    );
+    const room = screen.getByTestId('agent-room');
+    const feed = within(room).getByTestId('agent-room-feed');
+    expect(feed).not.toContainElement(screen.getByTestId('slot-composer'));
   });
 });
