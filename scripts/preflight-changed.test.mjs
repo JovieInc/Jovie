@@ -15,6 +15,7 @@ import {
   CUSTOMER_MARKER,
   companionChecklist,
   explainShipGate,
+  guardScanScript,
   lintPrBody,
   parseMergeConflicts,
 } from './lib/preflight-changed.mjs';
@@ -24,7 +25,6 @@ import {
   changedFiles,
   downgradeHostRed,
   GENERATORS,
-  guardScanScript,
   HEAVY_GUARDS,
   hostSlotted,
   invariantTestFiles,
@@ -1087,7 +1087,7 @@ test('extracted scan script fails forbidden data and passes a clean change', {
     assert.equal(clean.status, 0, clean.stdout + clean.stderr);
     assert.match(clean.stdout, /0 finding\(s\)/);
     writeFileSync(path.join(repo, '.env'), 'TOKEN=1\n');
-    writeFileSync(path.join(repo, 'leak.md'), 'see /Users/timwhite/notes/x\n');
+    writeFileSync(path.join(repo, 'leak.md'), 'see /Users/test/notes/x\n');
     gitIn(repo, ['add', '-A']);
     gitIn(repo, ['commit', '-m', 'forbidden']);
     const red = run();

@@ -41,6 +41,7 @@ import { baseRefCandidates, resolveBaseRef } from './lib/git-base-ref.mjs';
 import {
   companionChecklist,
   explainShipGate,
+  guardScanScript,
   lintPrBody,
   PR_BODY_SKELETON,
   parseMergeConflicts,
@@ -439,50 +440,6 @@ function loadBody(args, cwd) {
   } catch {
     return null;
   }
-}
-
-/**
- * The pinned guard workflow carries two python heredocs: a base-fetch step and
- * the actual scanner. Preflight must execute the scanner, so select the
- * heredoc from the step named "Scan for private data" — never the first block
- * in the file (JOV-12869: the old first-match extraction ran the base-fetch
- * block and reported false-clean locally). A missing or malformed scan step
- * fails closed instead of passing.
- */
-export function guardScanScript(workflowYaml) {
-  const fail = reason => ({
-    fail: `private-data-guard: ${reason}`,
-    script: '',
-  });
-  const lines = String(workflowYaml).split('\n');
-  const stepAt = lines.findIndex(line =>
-    /^\s*- name: ['"]?Scan for private data['"]?\s*$/.test(line)
-  );
-  if (stepAt === -1)
-    return fail('no "Scan for private data" step in the pinned workflow');
-  const item = lines[stepAt].match(/^ */)[0].length;
-  const end = lines.findIndex(
-    (line, i) =>
-      i > stepAt && /\S/.test(line) && line.match(/^ */)[0].length <= item
-  );
-  const step = lines.slice(stepAt + 1, end === -1 ? lines.length : end);
-  const runAt = step.findIndex(line => /^\s*run:/.test(line));
-  if (runAt === -1) return fail('scan step has no run block');
-  const body = step.slice(runAt + 1);
-  const openAt = body.findIndex(line => /^\s*python3 - <<'PY'\s*$/.test(line));
-  if (openAt === -1) return fail('scan step run block has no python heredoc');
-  const indent = body[openAt].match(/^ */)[0].length;
-  const closeAt = body.findIndex(
-    (line, i) => i > openAt && line.trim() === 'PY'
-  );
-  if (closeAt === -1) return fail('scan step heredoc is unterminated');
-  return {
-    fail: '',
-    script: body
-      .slice(openAt + 1, closeAt)
-      .map(l => l.slice(indent))
-      .join('\n'),
-  };
 }
 
 /** Run the shared Private Data Guard from the pinned JovieInc/ci workflow. */
