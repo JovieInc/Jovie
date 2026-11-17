@@ -49,7 +49,12 @@ describe('LibrarySurface shared right rail contract', () => {
       )
     );
     expect(destinations).toContain('current.providers.map(provider => (');
-    expect(destinations).toContain('<DspQuietRow');
+    expect(destinations).toContain('<DspEntityRow');
+    const entityRow = readFileSync(
+      resolve(process.cwd(), 'components/molecules/inspector/DspEntityRow.tsx'),
+      'utf8'
+    );
+    expect(entityRow).toContain('<DspQuietRow');
     expect(destinations).toContain('label={provider.label}');
     expect(destinations).toContain('href={provider.url}');
     expect(destinations).toContain('closedTabIndex={closedTabIndex}');

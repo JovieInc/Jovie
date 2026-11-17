@@ -38,7 +38,12 @@ describe('DrawerPropertyRow certificate', () => {
     );
 
     expect(screen.getByText('UPC').tagName).toBe('DT');
-    expect(screen.getByText('Not assigned yet').tagName).toBe('DD');
+    const copy = screen.getByRole('button', {
+      name: 'Copy UPC: Not assigned yet',
+    });
+    expect(copy.closest('dd')).toContainElement(
+      screen.getByText('Not assigned yet')
+    );
     await expectNoA11yViolations(container);
   });
 
@@ -63,13 +68,24 @@ describe('DrawerPropertyRow certificate', () => {
   });
 
   it('keeps an Arabic row axe-clean inside an RTL drawer', async () => {
+    const user = userEvent.setup();
+    const writeText = vi
+      .spyOn(navigator.clipboard, 'writeText')
+      .mockResolvedValue();
     const { container } = render(
       <div dir='rtl'>
         <DrawerPropertyRow label='الإصدار' value='ألبوم الصيف' />
       </div>
     );
 
-    expect(screen.queryByRole('button')).toBeNull();
+    const copy = screen.getByRole('button', {
+      name: 'Copy الإصدار: ألبوم الصيف',
+    });
+    await user.tab();
+    expect(copy).toHaveFocus();
+    await user.keyboard('{Enter}');
+    expect(writeText).toHaveBeenCalledWith('ألبوم الصيف');
+    expect(copy).toHaveAttribute('data-copy-value', 'success');
     expect(screen.getByText('ألبوم الصيف')).toBeVisible();
     await expectNoA11yViolations(container);
   });

@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
-import { expect, fn, userEvent, within } from 'storybook/test';
+import { expect, fn, userEvent, waitFor, within } from 'storybook/test';
 import { ProviderIcon } from '@/components/atoms/ProviderIcon';
 import { DspQuietRow } from './DspQuietRow';
 
@@ -72,5 +72,40 @@ export const MissingReadOnly: Story = {
     await expect(canvas.getByText('Spotify')).toBeVisible();
     await expect(canvas.queryByRole('button')).not.toBeInTheDocument();
     await expect(canvas.queryByRole('link')).not.toBeInTheDocument();
+  },
+};
+
+/** Both clipboard paths refuse in this isolated story; restore browser APIs afterward. */
+export const ErrorClipboardRefused: Story = {
+  beforeEach: () => {
+    const original = Object.getOwnPropertyDescriptor(navigator, 'clipboard');
+    const originalExecCommand = document.execCommand;
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: {
+        writeText: () => Promise.reject(new Error('Clipboard refused')),
+      },
+    });
+    document.execCommand = () => false;
+    return () => {
+      if (original) Object.defineProperty(navigator, 'clipboard', original);
+      else Reflect.deleteProperty(navigator, 'clipboard');
+      document.execCommand = originalExecCommand;
+    };
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const actions = canvas.getByRole('button', {
+      name: 'Destination actions for Spotify',
+    });
+    actions.focus();
+    await userEvent.click(actions);
+    const body = within(canvasElement.ownerDocument.body);
+    await userEvent.click(
+      await body.findByRole('menuitem', { name: 'Copy Link', exact: true })
+    );
+    await waitFor(() =>
+      expect(body.getByText('Could not copy to the clipboard')).toBeVisible()
+    );
   },
 };

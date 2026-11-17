@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
-import { expect, fn, userEvent, within } from 'storybook/test';
+import { expect, fn, userEvent, waitFor, within } from 'storybook/test';
 import { DrawerPropertyRow } from './DrawerPropertyRow';
 
 const meta = {
@@ -61,5 +61,34 @@ export const CopyOnClick: Story = {
       name: 'Copy ISRC: NLD681903043',
     });
     await expect(value).toHaveAttribute('title', 'Click to copy');
+  },
+};
+
+/** Both clipboard paths refuse in this isolated story; restore browser APIs afterward. */
+export const ErrorClipboardRefused: Story = {
+  beforeEach: () => {
+    const original = Object.getOwnPropertyDescriptor(navigator, 'clipboard');
+    const originalExecCommand = document.execCommand;
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: {
+        writeText: () => Promise.reject(new Error('Clipboard refused')),
+      },
+    });
+    document.execCommand = () => false;
+    return () => {
+      if (original) Object.defineProperty(navigator, 'clipboard', original);
+      else Reflect.deleteProperty(navigator, 'clipboard');
+      document.execCommand = originalExecCommand;
+    };
+  },
+  play: async ({ canvasElement }) => {
+    const copy = within(canvasElement).getByRole('button', {
+      name: 'Copy Release status: Ready for review',
+    });
+    await userEvent.click(copy);
+    await waitFor(() =>
+      expect(copy).toHaveAttribute('data-copy-value', 'error')
+    );
   },
 };

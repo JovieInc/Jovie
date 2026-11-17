@@ -19,9 +19,16 @@ vi.mock('./OpportunityInboxRoute', () => ({
   ),
 }));
 
-import AppRootPage from './page';
+import AppRootPage, { generateMetadata } from './page';
 
 describe('Inbox direct route', () => {
+  it('uses the same Inbox title as its navigation destination', () => {
+    expect(generateMetadata()).toEqual({
+      title: 'Inbox',
+      description:
+        'Review Jovie suggestions, approve actions, and send feedback from your inbox.',
+    });
+  });
   it('opens Done for you from its permanent history destination while preserving the interview entry', async () => {
     render(
       await AppRootPage({

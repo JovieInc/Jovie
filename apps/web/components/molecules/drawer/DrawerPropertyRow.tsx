@@ -1,5 +1,6 @@
 'use client';
 
+import { PlainButton } from '@jovie/ui';
 import { Check, Copy } from 'lucide-react';
 import { type CSSProperties, type ReactNode, useMemo } from 'react';
 import { useClipboard } from '@/hooks/useClipboard';
@@ -51,7 +52,7 @@ export function DrawerPropertyRow({
   copyable,
   copyText,
 }: DrawerPropertyRowProps) {
-  const Wrapper = interactive ? 'button' : 'div';
+  const Wrapper = interactive ? PlainButton : 'div';
   const Label = definitionList ? 'dt' : 'span';
   const Value = definitionList ? 'dd' : 'span';
 
@@ -100,7 +101,7 @@ export function DrawerPropertyRow({
   );
 
   const valueContent = isCopyable ? (
-    <button
+    <PlainButton
       type='button'
       aria-label={`Copy ${typeof label === 'string' ? label : 'value'}: ${value}`}
       title='Click to copy'
@@ -126,7 +127,7 @@ export function DrawerPropertyRow({
           aria-hidden='true'
         />
       )}
-    </button>
+    </PlainButton>
   ) : (
     value
   );
