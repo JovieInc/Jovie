@@ -734,7 +734,9 @@ export async function observeGreenToEnqueue(
     if (!timing.ok)
       return {
         ...timing,
-        reason: timing.reason ?? 'green-enqueue-checks-unreadable',
+        reason:
+          ('reason' in timing ? timing.reason : null) ??
+          'green-enqueue-checks-unreadable',
       };
     if (timing.greenAt === null) continue;
     if (DEFECT_HOLD_CLASSES.has(timing.holdClass ?? '')) held.push(pr.number);
