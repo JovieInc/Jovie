@@ -1,5 +1,4 @@
 export { DisclosureRow, type DisclosureRowProps } from './DisclosureRow';
-export { DspEntityRow, type DspEntityRowProps } from './DspEntityRow';
 export { DspQuietRow, type DspQuietRowProps } from './DspQuietRow';
 export { buildDspFindUrl } from './dsp-find-url';
 export {

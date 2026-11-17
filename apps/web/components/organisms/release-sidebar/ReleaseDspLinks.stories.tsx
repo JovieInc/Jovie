@@ -92,17 +92,7 @@ export const ReadOnly: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     await expect(canvas.getByText('Apple Music')).toBeVisible();
-    // Read-only rows keep the destination action menu (Open / Copy link /
-    // …, founder note 2026-11-09) but none of the edit controls.
-    await expect(
-      canvas.getByRole('button', { name: 'Destination actions for Spotify' })
-    ).toBeVisible();
-    await expect(
-      canvas.queryByRole('button', { name: 'Find' })
-    ).not.toBeInTheDocument();
-    await expect(
-      canvas.queryByRole('button', { name: 'Actions for Spotify' })
-    ).not.toBeInTheDocument();
+    await expect(canvas.queryByRole('button')).not.toBeInTheDocument();
   },
 };
 

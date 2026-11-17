@@ -16,17 +16,10 @@ describe('DspQuietRow certificate', () => {
         showUrl
       />
     );
-    const link = screen.getByRole('link', {
-      name: 'Spotify open.spotify.com/album/take-me-over',
-    });
+    const link = screen.getByRole('link', { name: 'Spotify' });
     expect(link).toHaveAttribute('target', '_blank');
     expect(link).toHaveTextContent('open.spotify.com/album/take-me-over');
-    expect(
-      screen.getByRole('button', { name: 'Destination actions for Spotify' })
-    ).toHaveAttribute('aria-haspopup', 'menu');
-    expect(
-      screen.queryByRole('button', { name: 'Find' })
-    ).not.toBeInTheDocument();
+    expect(screen.queryByRole('button')).not.toBeInTheDocument();
     await expectNoA11yViolations(container);
   });
 

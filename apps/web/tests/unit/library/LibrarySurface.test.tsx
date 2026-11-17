@@ -44,7 +44,7 @@ import {
   applyCacheScope,
   resetCacheIsolationForTests,
 } from '@/lib/queries/cache-isolation';
-import { expectToolbarControl } from './library-control-assertions';
+import { expectDesktop32Control } from './library-control-assertions';
 import { buildAsset } from './library-surface-fixtures';
 
 Element.prototype.scrollIntoView = vi.fn();
@@ -661,7 +661,7 @@ describe('LibrarySurface', () => {
     );
   });
 
-  it('keeps desktop Library toolbar controls on the 28px scale without desktop 44px hit targets', () => {
+  it('keeps desktop Library toolbar controls at 32px without desktop 44px hit targets', () => {
     window.matchMedia = vi.fn().mockImplementation(query => ({
       matches: query === '(min-width: 1024px)',
       media: query,
@@ -676,29 +676,28 @@ describe('LibrarySurface', () => {
 
     renderLibrary([buildAsset()]);
 
-    // Stage tabs keep the current shared 28px PageToolbarTabButton standard.
-    for (const name of ['All', 'Ideas']) {
-      expect(screen.getByRole('tab', { name })).toHaveClass('h-7');
-      expect(screen.getByRole('tab', { name })).not.toHaveClass('h-8');
-    }
-    expectToolbarControl(
+    expectDesktop32Control(screen.getByRole('tab', { name: 'All' }));
+    expectDesktop32Control(screen.getByRole('tab', { name: 'Ideas' }));
+    expectDesktop32Control(
       screen.getByRole('button', { name: /^Show filters/i }),
       { square: true }
     );
-    expectToolbarControl(
+    expectDesktop32Control(
       screen.getByRole('button', { name: 'Sort by Release Date' }),
       { square: true }
     );
-    expectToolbarControl(screen.getByRole('button', { name: /Small cards/u }), {
-      square: true,
-    });
-    expectToolbarControl(
+    expectDesktop32Control(
+      screen.getByRole('button', { name: /Small cards/u }),
+      { square: true }
+    );
+    expectDesktop32Control(
       screen.getByRole('button', { name: /Medium cards/u }),
       { square: true }
     );
-    expectToolbarControl(screen.getByRole('button', { name: /Large cards/u }), {
-      square: true,
-    });
+    expectDesktop32Control(
+      screen.getByRole('button', { name: /Large cards/u }),
+      { square: true }
+    );
     // The view slider (2026-09-25 header/toolbar IA) is a single fixed-size
     // sliding control rather than three independently-densified buttons, so
     // it intentionally stays at the founder-specified 28px visible size
@@ -2668,7 +2667,7 @@ describe('LibrarySurface', () => {
     const filterTrigger = screen.getByRole('button', {
       name: /^Show filters/i,
     });
-    expectToolbarControl(filterTrigger, { square: true });
+    expectDesktop32Control(filterTrigger, { square: true });
     expect(
       screen.queryByTestId('library-filter-active-indicator')
     ).not.toBeInTheDocument();
@@ -2856,7 +2855,7 @@ describe('LibrarySurface', () => {
     const contentFrame = screen.getByTestId('library-content-frame');
     const before = contentFrame.getBoundingClientRect();
     const trigger = screen.getByRole('button', { name: /^Show filters/i });
-    expectToolbarControl(trigger, { square: true });
+    expectDesktop32Control(trigger, { square: true });
     expect(trigger).toHaveClass(
       'before:h-full',
       'before:min-h-11',

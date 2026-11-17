@@ -29,8 +29,6 @@ export interface OverflowMenuProps {
   readonly disabled?: boolean;
   readonly className?: string;
   readonly testId?: string;
-  /** Tab order for the trigger (closed drawers pass -1 to pull the row). */
-  readonly triggerTabIndex?: number;
 }
 
 /** L4 inspector overflow for rare or destructive verbs. */
@@ -41,7 +39,6 @@ export function OverflowMenu({
   disabled = false,
   className,
   testId,
-  triggerTabIndex,
 }: OverflowMenuProps) {
   const visibleItems = items.filter(Boolean);
 
@@ -58,7 +55,6 @@ export function OverflowMenu({
           disabled={disabled || visibleItems.length === 0}
           data-testid={testId}
           data-disclosure-level='l4'
-          tabIndex={triggerTabIndex}
           className={cn(className)}
         >
           <MoreHorizontal className='h-3.5 w-3.5' aria-hidden='true' />

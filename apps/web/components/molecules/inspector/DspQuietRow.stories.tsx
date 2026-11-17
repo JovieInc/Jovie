@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
-import { expect, fn, userEvent, waitFor, within } from 'storybook/test';
+import { expect, fn, userEvent, within } from 'storybook/test';
 import { ProviderIcon } from '@/components/atoms/ProviderIcon';
 import { DspQuietRow } from './DspQuietRow';
 
@@ -17,8 +17,6 @@ const meta = {
     layout: 'centered',
     chromatic: { viewports: [390, 1024] },
     jovie: { uncoveredProps: ['closedTabIndex', 'testId'] },
-    // docs: destination rows preview on hover (left) and carry the
-    // Open / Copy link / Copy Jovie link / Copy platform URI menu.
   },
   args: {
     label: 'Spotify',
@@ -50,7 +48,7 @@ export const LinkedRowWithUrl: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     await expect(
-      canvas.getByRole('link', { name: /^Spotify/ })
+      canvas.getByRole('link', { name: 'Spotify' })
     ).toHaveTextContent('open.spotify.com/album/example');
   },
 };
@@ -72,43 +70,5 @@ export const MissingReadOnly: Story = {
     await expect(canvas.getByText('Spotify')).toBeVisible();
     await expect(canvas.queryByRole('button')).not.toBeInTheDocument();
     await expect(canvas.queryByRole('link')).not.toBeInTheDocument();
-  },
-};
-
-/** Both clipboard paths refuse in this isolated story; restore browser APIs afterward. */
-export const ErrorClipboardRefused: Story = {
-  // The catalog default /test is a public-profile route, which correctly
-  // suppresses app feedback. This inspector error belongs to the app shell.
-  parameters: { nextjs: { navigation: { pathname: '/app/library' } } },
-  beforeEach: () => {
-    const original = Object.getOwnPropertyDescriptor(navigator, 'clipboard');
-    const originalExecCommand = document.execCommand;
-    Object.defineProperty(navigator, 'clipboard', {
-      configurable: true,
-      value: {
-        writeText: () => Promise.reject(new Error('Clipboard refused')),
-      },
-    });
-    document.execCommand = () => false;
-    return () => {
-      if (original) Object.defineProperty(navigator, 'clipboard', original);
-      else Reflect.deleteProperty(navigator, 'clipboard');
-      document.execCommand = originalExecCommand;
-    };
-  },
-  play: async ({ canvasElement }) => {
-    const canvas = within(canvasElement);
-    const actions = canvas.getByRole('button', {
-      name: 'Destination actions for Spotify',
-    });
-    actions.focus();
-    await userEvent.click(actions);
-    const body = within(canvasElement.ownerDocument.body);
-    await userEvent.click(
-      await body.findByRole('menuitem', { name: 'Copy Link' })
-    );
-    await waitFor(() =>
-      expect(body.getByText('Could not copy to the clipboard')).toBeVisible()
-    );
   },
 };

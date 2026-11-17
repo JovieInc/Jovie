@@ -1,71 +1,9 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { DspQuietRow, displayDspUrl } from './DspQuietRow';
 
-const notifications = vi.hoisted(() => ({ success: vi.fn(), error: vi.fn() }));
-vi.mock('@/lib/hooks/useNotifications', () => ({
-  useNotifications: () => notifications,
-}));
-
 describe('DspQuietRow', () => {
-  it.each([true, false])(
-    'reports the fallback copy outcome when Clipboard API is missing (success=%s)',
-    async success => {
-      const user = userEvent.setup();
-      const clipboard = Object.getOwnPropertyDescriptor(navigator, 'clipboard');
-      const execCommand = Object.getOwnPropertyDescriptor(
-        document,
-        'execCommand'
-      );
-      const fallback = vi.fn(() => success);
-      Object.defineProperty(navigator, 'clipboard', {
-        configurable: true,
-        value: undefined,
-      });
-      Object.defineProperty(document, 'execCommand', {
-        configurable: true,
-        value: fallback,
-      });
-      notifications.success.mockClear();
-      notifications.error.mockClear();
-      try {
-        render(
-          <DspQuietRow
-            label='Spotify'
-            icon={<span aria-hidden='true'>S</span>}
-            href='https://open.spotify.com/album/take-me-over'
-          />
-        );
-        await user.click(
-          screen.getByRole('button', {
-            name: 'Destination actions for Spotify',
-          })
-        );
-        await user.click(screen.getByRole('menuitem', { name: 'Copy Link' }));
-        await waitFor(() => expect(fallback).toHaveBeenCalledWith('copy'));
-        if (success) {
-          expect(notifications.success).toHaveBeenCalledWith(
-            'Spotify link copied'
-          );
-          expect(notifications.error).not.toHaveBeenCalled();
-        } else {
-          expect(notifications.error).toHaveBeenCalledWith(
-            'Could not copy to the clipboard'
-          );
-          expect(notifications.success).not.toHaveBeenCalled();
-        }
-        expect(document.querySelector('textarea')).toBeNull();
-      } finally {
-        if (clipboard) Object.defineProperty(navigator, 'clipboard', clipboard);
-        else Reflect.deleteProperty(navigator, 'clipboard');
-        if (execCommand)
-          Object.defineProperty(document, 'execCommand', execCommand);
-        else Reflect.deleteProperty(document, 'execCommand');
-      }
-    }
-  );
-
   it('renders a quiet name plus outbound control for a linked DSP', () => {
     render(
       <DspQuietRow
@@ -81,15 +19,14 @@ describe('DspQuietRow', () => {
       'href',
       'https://open.spotify.com/album/take-me-over'
     );
-    // The shared row geometry (hover fill, group) lives on the wrapper that
-    // also owns the destination action menu.
-    expect(row.parentElement?.className).toContain('hover:bg-surface-1');
+    expect(row.className).toContain('hover:bg-surface-1');
     expect(row).toHaveAccessibleName('Spotify');
-    // The trailing control is the destination action menu (Open / Copy link
-    // / …) — hover-revealed in the same reserved slot the old ↗ icon used.
-    const menu = row.parentElement?.lastElementChild;
-    expect(menu?.querySelector('button svg')).not.toBeNull();
-    expect(menu?.className).toContain('group-hover:opacity-100');
+    expect(row.querySelector('svg')).toHaveClass(
+      'shrink-0',
+      'opacity-0',
+      'group-hover:opacity-100',
+      'group-focus-within:opacity-100'
+    );
     expect(screen.queryByText('Not found')).not.toBeInTheDocument();
     expect(screen.queryByText('Missing')).not.toBeInTheDocument();
   });
@@ -123,13 +60,8 @@ describe('DspQuietRow', () => {
     );
 
     const row = screen.getByRole('link', { name: /Tidal/ });
-    expect(row).toHaveAccessibleName('Tidal tidal.com/browse/track/77611316');
     expect(row).toHaveTextContent('tidal.com/browse/track/77611316');
-    // showUrl rows keep the action menu permanently visible (no hover
-    // reveal) so link-review lists always expose the controls.
-    expect(row.parentElement?.lastElementChild?.className).not.toContain(
-      'opacity-0'
-    );
+    expect(row.querySelector('svg')).not.toHaveClass('opacity-0');
     expect(displayDspUrl('https://open.spotify.com/track/abc/')).toBe(
       'open.spotify.com/track/abc'
     );
