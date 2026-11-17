@@ -13,6 +13,7 @@ import { useRegisterRightPanel } from '@/hooks/useRegisterRightPanel';
 import type { CreatorDocumentListItem } from '@/lib/creator-documents/types';
 import { richTextDocumentSchema } from '@/lib/rich-text/document';
 import { capitalizeFirst } from '@/lib/utils/string-utils';
+import type { CreatorDocumentsWorkspaceProps } from './creator-documents-workspace-props';
 
 const DOCUMENT_DRAFT_KEY_PREFIX = 'jovie:creator-document-draft:v1:';
 const IDEA_DRAFT_KEY_PREFIX = 'jovie:creator-idea-draft:v1:';
@@ -616,15 +617,7 @@ export function CreatorDocumentsWorkspace({
   initialLoadFailed = false,
   onUnsavedDraftChange,
   onDiscardDraftsReady,
-}: Readonly<{
-  creatorProfileId: string;
-  initialDocuments: readonly CreatorDocumentListItem[];
-  initialDocumentId?: string | null;
-  initialNextCursor?: string | null;
-  initialLoadFailed?: boolean;
-  onUnsavedDraftChange?: (hasDraft: boolean) => void;
-  onDiscardDraftsReady?: (discard: (() => void) | null) => void;
-}>) {
+}: CreatorDocumentsWorkspaceProps) {
   const [documents, setDocuments] = useState([...initialDocuments]);
   const [nextCursor, setNextCursor] = useState(initialNextCursor);
   const [listStatus, setListStatus] = useState<'idle' | 'loading' | 'error'>(
