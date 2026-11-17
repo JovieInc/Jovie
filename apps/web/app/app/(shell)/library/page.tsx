@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
-import { isCanonicalUuid } from '@/lib/auth/profile-access';
 import { APP_ROUTES } from '@/constants/routes';
+import { isCanonicalUuid } from '@/lib/auth/profile-access';
 import { requireCreatorDocumentAccess } from '@/lib/creator-documents/access';
 import type { CreatorDocumentListItem } from '@/lib/creator-documents/types';
 import { loadLibraryDocuments } from '@/lib/db/creator-documents/library-page';
@@ -74,7 +74,10 @@ export default async function LibraryPage({
 }) {
   const { view } = await searchParams;
   const requestedDocument = (await searchParams).document;
-  const requestedId = typeof requestedDocument === 'string' && isCanonicalUuid(requestedDocument) ? requestedDocument : null;
+  const requestedId =
+    typeof requestedDocument === 'string' && isCanonicalUuid(requestedDocument)
+      ? requestedDocument
+      : null;
   const isReleasesView = view === 'releases';
   const routeContext = await loadAppShellRouteContext({
     route: APP_ROUTES.LIBRARY,
@@ -125,7 +128,10 @@ export default async function LibraryPage({
           userId: routeContext.userId,
           profileId,
         });
-        const privateDocuments = await loadLibraryDocuments(profileId, requestedId);
+        const privateDocuments = await loadLibraryDocuments(
+          profileId,
+          requestedId
+        );
         return {
           documents: [...privateDocuments.documents],
           nextCursor: privateDocuments.nextCursor,
@@ -260,7 +266,12 @@ export default async function LibraryPage({
     creatorDocumentsLoadFailed = creatorDocumentsResult.loadFailed;
   }
 
-  if (requestedId && !creatorDocumentsLoadFailed && !creatorDocuments.some(item => item.id === requestedId)) notFound();
+  if (
+    requestedId &&
+    !creatorDocumentsLoadFailed &&
+    !creatorDocuments.some(item => item.id === requestedId)
+  )
+    notFound();
   const teleprompterTakes = await takesPromise;
 
   return (

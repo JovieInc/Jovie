@@ -77,7 +77,10 @@ function decodeDocumentCursor(cursor: string | null | undefined) {
 
 export async function listCreatorDocuments(
   creatorProfileId: string,
-  options: { readonly cursor?: string | null; readonly documentId?: string } = {}
+  options: {
+    readonly cursor?: string | null;
+    readonly documentId?: string;
+  } = {}
 ): Promise<CreatorDocumentPage> {
   const cursor = decodeDocumentCursor(options.cursor);
   if (options.cursor && !cursor) {
@@ -106,7 +109,9 @@ export async function listCreatorDocuments(
     .where(
       and(
         eq(creatorDocuments.creatorProfileId, creatorProfileId),
-        options.documentId ? eq(creatorDocuments.id, options.documentId) : undefined,
+        options.documentId
+          ? eq(creatorDocuments.id, options.documentId)
+          : undefined,
         cursor
           ? or(
               drizzleSql`${creatorDocuments.createdAt} < ${cursor.createdAt}::timestamptz`,
