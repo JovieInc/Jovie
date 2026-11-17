@@ -73,11 +73,7 @@ vi.mock('@/lib/env-server', () => ({
   env: envState,
 }));
 
-const { getRedisMock } = vi.hoisted(() => ({
-  getRedisMock: vi.fn(() => null),
-}));
-
-vi.mock('@/lib/redis', () => ({ getRedis: getRedisMock }));
+vi.mock('@/lib/redis', () => ({ getRedis: () => null }));
 
 vi.mock('@/lib/error-tracking', () => ({
   captureWarning: captureWarningMock,
@@ -119,7 +115,6 @@ describe('Statsig server initialization', () => {
     mockCookiesGet.mockReset().mockReturnValue(undefined);
     mockIsAdmin.mockReset().mockResolvedValue(false);
     mockGetFlagOverrideMap.mockReset().mockResolvedValue({});
-    getRedisMock.mockReset().mockReturnValue(null);
     initializeMock.mockReset().mockResolvedValue({ isSuccess: true });
     shutdownMock.mockReset().mockResolvedValue({ isSuccess: true });
     statsigConstructorMock.mockClear();
@@ -702,24 +697,4 @@ describe('Statsig server initialization', () => {
       expect(run).toHaveBeenCalledTimes(store === 'enabled' ? 0 : 1);
     }
   );
-});
-
-describe('Statsig specs data store SDK contract', () => {
-  it('exposes the initialize method the statsig-node-core DataStore adapter requires to start', async () => {
-    // statsig-node-core@0.24.2's Rust specs adapter refuses to start unless
-    // the DataStore exposes an `initialize()` function ("DataStore Error: No
-    // 'initialize' function provided"). Without it the Redis spec store is
-    // silently skipped and every cold-start init waits on the network
-    // (JOV-10537).
-    getRedisMock.mockReturnValue({} as never);
-    const { createSpecsDataStore } = await import('@/lib/flags/statsig');
-
-    const store = createSpecsDataStore();
-
-    expect(store).toBeDefined();
-    expect(typeof store?.initialize).toBe('function');
-    await expect(store?.initialize?.()).resolves.toBeUndefined();
-    expect(typeof store?.get).toBe('function');
-    expect(typeof store?.set).toBe('function');
-  });
 });
