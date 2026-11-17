@@ -15,7 +15,44 @@ const { run, setTransportRetryDelaysForTests } = await import(
 );
 
 describe('controlled transport retry (run 42650227305)', () => {
+  it.each([
+    [
+      'gh',
+      ['api', 'repos/x/y'],
+      { status: 1, stderr: 'HTTP 401: Bad credentials' },
+    ],
+    [
+      'gh',
+      ['api', 'repos/x/y'],
+      { status: 1, stderr: 'HTTP 403: Resource not accessible by integration' },
+    ],
+    ['gh', ['api', 'repos/x/y'], { status: 1, stderr: 'HTTP 404: Not Found' }],
+    ['gh', ['api', 'repos/x/y'], { status: null, error: { code: 'ENOENT' } }],
+    ['gh', ['api', 'repos/x/y'], { status: null, signal: 'SIGTERM' }],
+    ['unzip', ['-p', 'artifact.zip'], { status: 1, stderr: '' }],
+  ])(
+    'does not retry permanent, cancelled or local-tool failures (%s %j)',
+    (command, args, result) => {
+      setTransportRetryDelaysForTests([0, 0, 0]);
+      spawnSync.mockReset();
+      spawnSync.mockReturnValue(result);
+      expect(() => run(command, args)).toThrow(
+        'controlled transport unavailable'
+      );
+      expect(spawnSync).toHaveBeenCalledTimes(1);
+    }
+  );
+
+  it('still attempts the read once with an empty retry schedule', () => {
+    setTransportRetryDelaysForTests([]);
+    spawnSync.mockReset();
+    spawnSync.mockReturnValue({ status: 0, stdout: 'ok' });
+    expect(run('gh', ['api', 'repos/x/y'])).toBe('ok');
+    expect(spawnSync).toHaveBeenCalledTimes(1);
+  });
+
   it('recovers a screen proof when gh api fails transiently, then succeeds', () => {
+    spawnSync.mockReset();
     setTransportRetryDelaysForTests([0, 0, 0]);
     spawnSync
       .mockImplementationOnce(() => ({ status: 1, stdout: '', stderr: '' }))
