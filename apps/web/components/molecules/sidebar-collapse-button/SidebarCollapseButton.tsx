@@ -6,6 +6,8 @@ import { SIDEBAR_KEYBOARD_SHORTCUT_BARE } from '@/hooks/useSidebarKeyboardShortc
 
 interface SidebarCollapseButtonProps {
   readonly className?: string;
+  /** Glyph size override, passed through to the rail toggle. */
+  readonly iconClassName?: string;
   /** In-content instances opt out so a peek cannot cover the control the
    * pointer is on (the flyout would swap it for the sidebar header). */
   readonly previewTrigger?: boolean;
@@ -13,6 +15,7 @@ interface SidebarCollapseButtonProps {
 
 export function SidebarCollapseButton({
   className,
+  iconClassName,
   previewTrigger,
 }: SidebarCollapseButtonProps) {
   const { toggleSidebar, state, isPreview, open: pinned } = useSidebar();
@@ -34,6 +37,7 @@ export function SidebarCollapseButton({
       onToggle={toggleSidebar}
       shortcut={SIDEBAR_KEYBOARD_SHORTCUT_BARE}
       className={className}
+      iconClassName={iconClassName}
       dataTestId='sidebar-rail-toggle'
       iconTestId='sidebar-rail-toggle-icon'
     />

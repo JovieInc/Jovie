@@ -70,6 +70,11 @@ export function RuntimeUpdateProvider({
       value={{ available, busy, title, description, apply }}
     >
       <DesktopUpdateProvider>{children}</DesktopUpdateProvider>
+      {/* Always mounted, so screen readers announce the update when the text
+          arrives; a live region inserted with its content is often missed. */}
+      <p role='status' className='sr-only' data-testid='runtime-update-status'>
+        {available ? title : ''}
+      </p>
       {available ? (
         <RuntimeUpdatePill
           title={title}
