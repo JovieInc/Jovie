@@ -9,6 +9,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "lanes"))
 import sourced_shell_conflict as conflict  # noqa: E402
+import fix_red_classes as classes  # noqa: E402
 
 REL = "scripts/security/scan-secrets-release-fetch.sh"
 SOURCE = """\
@@ -262,6 +263,23 @@ class SourcedShellConflictTest(unittest.TestCase):
         resolved, extras, helper, _mode = self._resolve(_hunk(SOURCE, INLINE), marked)
         self.assertIsNone(resolved)
         self.assertEqual(helper, marked)
+
+
+class AndChainWorkspaceTest(unittest.TestCase):
+    def test_unions_filtered_workspace_checks_and_one_sided_test_runner(self):
+        common = "pnpm --filter @jovie/extension typecheck && pnpm --filter @jovie/extension test"
+        head_only = "pnpm --filter @jovie/watch typecheck && node --test scripts/watch.test.mjs"
+        base_only = "pnpm --filter @jovie/mesh typecheck"
+        for ours, theirs, expected in [
+            (common + " && " + head_only, common + " && " + base_only,
+             common + " && " + base_only + " && " + head_only),
+            (common + " && " + base_only, common + " && " + head_only,
+             common + " && " + head_only + " && " + base_only),
+        ]:
+            with self.subTest(ours=ours):
+                self.assertEqual(classes.merge_and_chain(ours, theirs), expected)
+        self.assertIsNone(classes.merge_and_chain(common, common.replace(" typecheck", " typecheck --strict")))
+
 
 
 if __name__ == "__main__":
