@@ -10,6 +10,25 @@ afterEach(() => {
 
 describe('SettingsSection certificate', () => {
   it.each([false, true])(
+    'keeps an empty section accessible on desktop=%s',
+    async desktop => {
+      if (desktop) document.documentElement.dataset.desktopRuntime = 'electron';
+      const { container } = render(
+        <SettingsSection id='empty' title='Account'>
+          {null}
+        </SettingsSection>
+      );
+      expect(screen.getByRole('region', { name: 'Account' })).toHaveAttribute(
+        'id',
+        'empty'
+      );
+      expect(screen.getByRole('heading', { name: 'Account' })).toBeVisible();
+      expect(screen.queryByRole('button')).not.toBeInTheDocument();
+      await expectNoA11yViolations(container);
+    }
+  );
+
+  it.each([false, true])(
     'labels the region by its title and runs the header action on desktop=%s',
     async desktop => {
       if (desktop) document.documentElement.dataset.desktopRuntime = 'electron';

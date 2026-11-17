@@ -32,6 +32,16 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
+/** Empty: the section still labels its region when there are no settings. */
+export const Empty: Story = {
+  args: { children: null, description: undefined },
+  play: async ({ canvasElement }) => {
+    await expect(
+      within(canvasElement).getByRole('region', { name: 'Audience & tracking' })
+    ).toBeVisible();
+  },
+};
+
 /** Partial: a section with a title but no description or header action. */
 export const PartialNoDescription: Story = {
   args: { description: undefined },
