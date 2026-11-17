@@ -364,21 +364,30 @@ Ranking, prioritization and strategy decisions are not made on Summer's flash mo
 files a JOV issue labeled `reasoning-job` in Todo, carrying a `summer.reasoning-job/v1` JSON block
 (question, decision type, context refs, deadline). Only issues with that block are reason-lane
 jobs; a `reasoning-job` issue without one is ordinary work for the build lanes.
-Each dispatch tick checks for queued jobs and starts one detached `reason_lane.py drain` per host
-(flock `reason.lock`), so a job starts within a minute. Per job:
+Each disk-admitted dispatch tick schedules the native `reason_lane.py tick` before code-history
+preparation and code-provider work. Its queue read runs separately, so unavailable code history
+does not suppress reasoning and a slow Linear read does not delay code. Disk denial still blocks
+starts; `reason.lock` guards the check and the existing drain, whose job leases, provider health
+and budget checks are unchanged. `tick.json` says only `scheduled`; `reason-tick.json` records the
+queue-check outcome and next action. Neither receipt proves a worker accepted or completed a job.
+Per job:
 
 1. The lane gathers the context itself: `JOV-123` issues, `gbrain:<slug>` pages,
    `linear:open-p0-p1` (open JOV P0/P1 list); URLs are listed, not fetched. Models get no tools.
-2. Proposer: `claude -p` on Opus 5.5 (subscription login; `~/.config/jovie-lanes/claude.env` may
-   hold `CLAUDE_CODE_OAUTH_TOKEN` from `claude setup-token`), structured JSON, `--max-budget-usd`.
+2. Proposer: the configured Hyperagent GLM 5.3 route. Money/auth/release judgment jobs use
+   the configured Hyperagent Opus 5.5 agent; an absent judgment agent stays unavailable.
+   `reason.json` owns the existing routes and limits; personal Claude is not a reasoning route.
 3. Adversarial reviewer, first healthy of: `grok` CLI on grok-4.7 (subscription), then the
    Hyperagent "Grok 4.7 Reviewer" agent (Hyperagent credits, through `~/.local/bin/hyperagent`).
    A 402/quota answer cools that reviewer for 6h.
 4. `reconcile()`: high confidence only when a reviewer ran, kept the #1, shares two of the top
    three, did not reject, and the proposer is at or above 0.6. Anything else is low.
-5. A comment with a `summer.reasoning-result/v1` block, the GBrain page
-   `ops/summer/decisions/<date>-<jov-n>-<slug>`, then Done. That state change is the Linear
-   webhook that wakes Summer. A failed job retries once, then goes to Canceled with a `failed` block.
+5. Seal the full produced result in private `reason-results/` state before publication.
+   Verify the complete GBrain memo and the exact, stable-ID Linear result comment before
+   Done wakes Summer. An uncertain write keeps a blocked receipt with its owner and next
+   action; the existing drain retries those saved bytes without model work. Changed input,
+   expired deadlines and corrupt state stay blocked. Model failures retain their existing
+   bounded retry and Canceled outcome.
 
 `decisionType: research` (tier 4) runs the Hyperagent research backend instead and posts the memo.
 Budgets and models live in `reason.json` (jobs/day, research/day, context cap, per-job spend cap).
