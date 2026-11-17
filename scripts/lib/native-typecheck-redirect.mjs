@@ -37,7 +37,10 @@ const measuredPaths = graph => {
   return {
     paths: [...paths].sort(),
     versions: Object.fromEntries(
-      paths.map((path, index) => [path, info(raw.fileInfos[index]).version])
+      paths.map((path, index) => [
+        path,
+        info(raw.fileInfos[index], raw.version).version,
+      ])
     ),
   };
 };
@@ -175,7 +178,13 @@ export function createRedirectCapture({ root, tools, deadline, cpus }) {
 }
 
 /** Discharge only live-certified redirects and their exact canonical reference targets. */
-export function redirectCoverage(graph, other, contexts, information) {
+export function redirectCoverage(
+  graph,
+  other,
+  contexts,
+  information,
+  oppositeInformation
+) {
   const semanticRedirects = new Map(),
     auxiliaryRedirects = new Map();
   const record = captured.get(graph);
@@ -186,6 +195,18 @@ export function redirectCoverage(graph, other, contexts, information) {
   );
   const own = semantic(graph),
     opposite = semantic(other);
+  const commonMetadata = path => {
+    const left = information.get(path),
+      right = oppositeInformation.get(path);
+    check(
+      left &&
+        right &&
+        (left.impliedFormat ?? null) === (right.impliedFormat ?? null) &&
+        (left.affectsGlobalScope ?? false) ===
+          (right.affectsGlobalScope ?? false),
+      `Certified canonical provider metadata differs: ${path}`
+    );
+  };
   const pairs = new Map();
   for (const pair of record.certificate.redirects) {
     const a = information.get(pair.left.path),
@@ -209,12 +230,15 @@ export function redirectCoverage(graph, other, contexts, information) {
         packageUnchanged(pair.rightPackage),
       'Certified redirect provider/context differs'
     );
+    commonMetadata(pair.right.path);
     for (const ref of pair.references)
-      if (ref.kind !== 'lib')
+      if (ref.kind !== 'lib') {
         check(
           own.has(ref.canonicalPath) && opposite.has(ref.canonicalPath),
           `Certified redirect reference lacks a common semantic provider: ${ref.name}`
         );
+        commonMetadata(ref.canonicalPath);
+      }
     pairs.set(pair.left.path, pair);
     if (!opposite.has(pair.left.path))
       semanticRedirects.set(pair.left.path, pair);

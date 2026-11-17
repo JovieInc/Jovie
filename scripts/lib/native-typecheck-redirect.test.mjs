@@ -11,10 +11,13 @@ import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import { dirname, relative, resolve } from 'node:path';
 import { afterEach, test } from 'node:test';
-import { readGraph, sha } from './native-typecheck-buildinfo.mjs';
+import { info, readGraph, sha } from './native-typecheck-buildinfo.mjs';
 import { withMutation } from './native-typecheck-evidence.mjs';
 import { assertGraphParity } from './native-typecheck-graph.mjs';
-import { createRedirectCapture } from './native-typecheck-redirect.mjs';
+import {
+  createRedirectCapture,
+  redirectCoverage,
+} from './native-typecheck-redirect.mjs';
 
 const require = createRequire(import.meta.url);
 const ts = require('typescript');
@@ -36,6 +39,7 @@ function fixture({
   extraOwner = false,
   missingProvider = false,
   global = false,
+  globalChild = false,
 } = {}) {
   const directory = mkdtempSync(resolve(tmpdir(), 'native-redirect-coverage-'));
   directories.push(directory);
@@ -71,7 +75,9 @@ function fixture({
     );
     save(
       resolve(dirname(widget(name)), 'child.d.ts'),
-      'export interface Child { readonly value: 1 }\n'
+      globalChild
+        ? 'declare const __CanonicalGlobal: unique symbol;\n'
+        : 'export interface Child { readonly value: 1 }\n'
     );
   }
   const source = resolve(root, 'source.ts'),
@@ -123,7 +129,8 @@ function fixture({
     const info = paths.map(path => ({
       version: sha(readFileSync(path)),
       impliedFormat: formats.get(path),
-      affectsGlobalScope: global && path === left,
+      affectsGlobalScope:
+        (global && path === left) || (globalChild && path === provider),
     }));
     const owners = [
       paths.indexOf(left) + 1,
@@ -280,6 +287,127 @@ test('blocks equally wrong raw formats when the live Program formats differ', ()
   assert.throws(
     () => assertGraphParity(data.build('candidate', true), baseline),
     /provider\/context differs/
+  );
+});
+
+test('rejects native-only canonical and reference format/global mismatches', () => {
+  for (const change of [
+    'canonical-format',
+    'canonical-global',
+    'reference-format',
+    'reference-global',
+  ]) {
+    const data = fixture(),
+      baseline = data.build('baseline');
+    const path = change.startsWith('canonical') ? data.right : data.provider;
+    const candidate = data.build('candidate', true, raw => {
+      const index = raw.fileNames.findIndex(
+        name => resolve(dirname(data.root), name) === path
+      );
+      if (change.endsWith('format')) raw.fileInfos[index].impliedFormat = 99;
+      else raw.fileInfos[index].affectsGlobalScope = true;
+    });
+    data.capture(data.entry(baseline), data.config);
+    assert.throws(
+      () => assertGraphParity(candidate, baseline),
+      /canonical provider metadata differs/,
+      change
+    );
+  }
+});
+
+test('requires actual opposite canonical fileInfo rather than claimed membership', () => {
+  const data = fixture(),
+    baseline = data.build('baseline'),
+    candidate = data.build('candidate', true);
+  const information = graph => {
+    const raw = JSON.parse(
+      readFileSync(graph.metadata.rawBuildInfoPath, 'utf8')
+    );
+    return new Map(
+      raw.fileNames
+        .slice(0, raw.fileInfos.length)
+        .map((name, index) => [
+          resolve(dirname(graph.metadata.rawBuildInfoPath), name),
+          info(raw.fileInfos[index], raw.version),
+        ])
+    );
+  };
+  data.capture(data.entry(baseline), data.config);
+  const opposite = information(candidate);
+  opposite.delete(data.right);
+  assert.ok(candidate.dependencyFiles.includes(data.right));
+  assert.throws(
+    () =>
+      redirectCoverage(
+        baseline,
+        candidate,
+        new Map(),
+        information(baseline),
+        opposite
+      ),
+    /canonical provider metadata differs/
+  );
+});
+
+test('retains canonical global providers when both measured metadata records agree', () => {
+  const data = fixture({ globalChild: true });
+  const baseline = data.build('baseline'),
+    candidate = data.build('candidate', true);
+  data.capture(data.entry(baseline), data.config);
+  const proof = assertGraphParity(candidate, baseline);
+  assert.equal(proof.programRedirects.length, 1);
+  assert.equal(
+    proof.redirectAuxiliaryReferences[0].canonical[0].canonicalPath,
+    data.provider
+  );
+});
+
+test('decodes native compact CommonJS records without guessing omitted object formats', () => {
+  assert.equal(info('opaque-native-version', '7.1.0-beta').impliedFormat, 1);
+  assert.equal(info('opaque-ts6-version', '6.0.3').impliedFormat, undefined);
+  assert.equal(
+    info({ version: 'opaque-native-version' }, '7.1.0-beta').impliedFormat,
+    undefined
+  );
+  const data = fixture(),
+    baseline = data.build('baseline');
+  const candidate = data.build('native-compact', true, raw => {
+    raw.version = '7.1.0-beta';
+    raw.fileNames.forEach((name, index) => {
+      if (
+        [data.right, data.provider].includes(resolve(dirname(data.root), name))
+      )
+        raw.fileInfos[index] = raw.fileInfos[index].version;
+    });
+  });
+  data.capture(data.entry(baseline), data.config);
+  assert.equal(
+    assertGraphParity(candidate, baseline).programRedirects.length,
+    1
+  );
+});
+
+test('keeps native object omissions and forged schema provenance blocked', () => {
+  const data = fixture(),
+    baseline = data.build('baseline');
+  const unknown = data.build('native-unknown', true, raw => {
+    raw.version = '7.1.0-beta';
+    const index = raw.fileNames.findIndex(
+      name => resolve(dirname(data.root), name) === data.right
+    );
+    delete raw.fileInfos[index].impliedFormat;
+  });
+  data.capture(data.entry(baseline), data.config);
+  assert.throws(
+    () => assertGraphParity(unknown, baseline),
+    /canonical provider metadata differs/
+  );
+  const forged = data.build('forged', true);
+  forged.metadata.version = '7.1.0-beta';
+  assert.throws(
+    () => assertGraphParity(forged, baseline),
+    /graph version differs/
   );
 });
 

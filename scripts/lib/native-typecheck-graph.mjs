@@ -85,6 +85,10 @@ export function assertGraphParity(
       'Captured graph snapshot hash changed'
     );
     const raw = JSON.parse(bytes.toString());
+    check(
+      raw.version === graph.metadata.version,
+      'Captured graph version differs'
+    );
     const paths = raw.fileNames.map(name =>
       buildInfoPath(
         name,
@@ -119,9 +123,12 @@ export function assertGraphParity(
               incoming: incoming
                 .map(id => ({
                   path: paths[id - 1],
-                  format: info(raw.fileInfos[id - 1]).impliedFormat ?? null,
+                  format:
+                    info(raw.fileInfos[id - 1], raw.version).impliedFormat ??
+                    null,
                   global:
-                    info(raw.fileInfos[id - 1]).affectsGlobalScope ?? false,
+                    info(raw.fileInfos[id - 1], raw.version)
+                      .affectsGlobalScope ?? false,
                 }))
                 .sort((a, b) => a.path.localeCompare(b.path)),
             },
@@ -135,7 +142,7 @@ export function assertGraphParity(
       .forEach((name, index) =>
         values.set(
           resolve(dirname(graph.metadata.rawBuildInfoPath), name),
-          info(raw.fileInfos[index])
+          info(raw.fileInfos[index], raw.version)
         )
       );
     return values;
@@ -163,7 +170,8 @@ export function assertGraphParity(
       graph,
       other,
       auxiliaryContexts.get(graph),
-      graph === actual ? leftInfo : rightInfo
+      graph === actual ? leftInfo : rightInfo,
+      graph === actual ? rightInfo : leftInfo
     );
     for (const path of graph.dependencyFiles.filter(
       path => !other.dependencyFiles.includes(path)
