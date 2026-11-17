@@ -176,17 +176,16 @@ class RouteBudgetGrowthTest(unittest.TestCase):
                     'passing fixture: API rate limit exceeded\n' + line + exit_line):
             route = classes.classify(red('Exact-head Coverage'), {'Exact-head Coverage': log})
             self.assertEqual((route['cls'], route['action']),
-                             ('route-budget-growth', 'sync-main'), log)
+                             ('render-mode-snapshot', 'sync-main'), log)
 
     def test_other_render_weakenings_stay_with_the_agent(self):
         html = '##[error]/ baseline weakened: html 274803 -> 287251 bytes\n'
         for log in (
             '##[error]/ baseline weakened: html 287251 -> 274803 bytes\n',
             '##[error]/ baseline weakened: html 287251 -> 287251 bytes\n',
-            '##[error]/ baseline weakened: render mode static -> dynamic\n',
             '##[error]/ baseline weakened: revalidate window 3600 -> 60\n',
-            html + '##[error]/ baseline weakened: render mode static -> dynamic\n',
             html + '##[error]AssertionError: expected 1 to be +0\n',
+            html + '::error::/brand prerendered HTML grew 1 -> 2 bytes (allowed 9).\n',
             'baseline weakened: html 274803 -> 287251 bytes\n',
         ):
             route = classes.classify(red('Exact-head Coverage'), {'Exact-head Coverage': log})

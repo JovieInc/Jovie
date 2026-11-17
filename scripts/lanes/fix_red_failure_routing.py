@@ -45,11 +45,10 @@ _RED = {'FAILURE', 'ERROR', 'TIMED_OUT', 'CANCELLED', 'STARTUP_FAILURE'}
 
 # The budget CLI checks the committed policy against current origin/main.
 # A stale head can retain ceilings main already lowered (#25125), including
-# inside disk-read CLI tests. The render-mode snapshot does the same for HTML
-# bytes: `baseline weakened: html A -> B` means this head's snapshot is looser
-# than origin/main, which a behind branch inherits without editing the file
-# (#25244). Sync once through the existing owner; persistent growth still needs
-# a source repair, never a raised budget or an infra retry.
+# inside disk-read CLI tests. Sync once through the existing owner; persistent
+# growth still needs a source repair, never a raised budget or an infra retry.
+# HTML byte ceilings belong to RenderModeSnapshotDrift. Matching them here
+# classified a real prerendered-HTML growth as a stale snapshot (#25244).
 # ##[error] is the build annotation. ::error:: is the same finding when the CLI
 # integration test prints it, including AssertionError: ::error:: lines.
 _BUDGET_GROWTH_LINE = re.compile(
@@ -57,12 +56,6 @@ _BUDGET_GROWTH_LINE = re.compile(
     r'(?:##\[error\]|::error::)'
     r'(?:routes\.\S+|firstLoad\.baselines\.\S+|groups\.[A-Za-z]+\.baselineKb)'
     r' grew (\d+(?:\.\d+)?) -> (\d+(?:\.\d+)?)\s*$')
-_HTML_CEILING_LINE = re.compile(
-    r'^(?:\d{4}-\d\d-\d\dT[\d:.]+Z )?(?:AssertionError: )?'
-    r'(?:##\[error\]|::error::)'
-    r'\S+ baseline weakened: html (\d+) -> (\d+) bytes'
-    r'(?:\. A loss needs an unexpired overrides entry in '
-    r'apps/web/scripts/route-render-modes\.json \([^)\n]*\))?\.?\s*$')
 _OTHER_FAILURE = re.compile(
     r'\bFAIL\b|\b(?:Error|AssertionError|TypeError|ReferenceError|SyntaxError):|error TS\d+:')
 
@@ -82,7 +75,7 @@ class RouteBudgetGrowth:
         matches = []
         for line in clean.splitlines():
             line = _LOG_FAILED_PREFIX.sub('', line, count=1)
-            match = _BUDGET_GROWTH_LINE.fullmatch(line) or _HTML_CEILING_LINE.fullmatch(line)
+            match = _BUDGET_GROWTH_LINE.fullmatch(line)
             if match:
                 if float(match[2]) <= float(match[1]):
                     return None
@@ -97,11 +90,13 @@ ROUTE_BUDGET_GROWTH = RouteBudgetGrowth()
 
 # Exact-head Coverage compares apps/web/scripts/route-render-modes.json with
 # origin/main. A stale head keeps HTML bytes or a mode main already tightened
-# (#25599). Sync once; a loss that remains is a real regression, and claim_route
+# (#25599). The homepage route is a bare "/", so "/\S+" misses it (#25244).
+# Sync once; a loss that remains is a real regression, and claim_route
 # will not sync that head again. Never loosen the snapshot or add an override.
 _RENDER_SNAPSHOT_LINE = re.compile(
-    r'^(?:\d{4}-\d\d-\d\dT[\d:.]+Z )?(?:##\[error\]|::error::)\s?'
-    r'/\S+ baseline weakened: '
+    r'^(?:\d{4}-\d\d-\d\dT[\d:.]+Z )?(?:AssertionError: )?'
+    r'(?:##\[error\]|::error::)\s?'
+    r'/(?:\S+)? baseline weakened: '
     r'(?:html (?P<prev>\d+) -> (?P<next>\d+) bytes'
     r'|render mode \S+ -> \S+'
     r'|revalidate window \d+ s -> \d+ s)\b')
