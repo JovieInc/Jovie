@@ -1,9 +1,11 @@
-import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { classifyGitHubFailure } from '../lib/github-rate-limit.mjs';
+import { pause, runTransport } from './screen-proof-transport.mjs';
+
+export { setTransportRetryDelaysForTests } from './screen-proof-transport.mjs';
+
 import { validPlaywrightPng } from '../lib/playwright-png.mjs';
 import { producerAttemptChecks } from './screen-proof-attempt-checks.mjs';
 import { finalPathMatches } from './screen-proof-final-paths.mjs';
@@ -140,62 +142,16 @@ export function screenProofArtifactName(screenId) {
   if (!/^[a-z0-9-]+$/.test(suffix)) return null;
   return `${PRODUCER.artifact}-${suffix}`;
 }
-function runOnce(command, args, binary = false) {
-  const result = spawnSync(command, args, {
-    encoding: binary ? undefined : 'utf8',
-    maxBuffer: binary ? MAX_ARTIFACT_DOWNLOAD_BYTES : 32 * 1024 * 1024,
-  });
-  if (result.status !== 0) {
-    const message = String(result.stderr ?? '');
-    const githubRead = command === 'gh' && args[0] === 'api';
-    const retryable =
-      githubRead &&
-      !result.error &&
-      !result.signal &&
-      (classifyGitHubFailure({ message }).retryable ||
-        /API rate limit exceeded/i.test(message) ||
-        (!message.trim() && (result.status === 1 || result.status === null)));
-    throw Object.assign(new Error('controlled transport unavailable'), {
-      retryable,
-    });
-  }
-  return result.stdout;
-}
-// Run 42650227305: a single transient GitHub CLI exit per screen (rate limit
-// / blip) killed four screens' exact-head proofs with no retry while every
-// producer artifact sat intact in the same run. Transport retries here
-// only, bounded; trust findings are never retried or softened.
-let transportRetryDelays = [0, 15_000, 30_000];
-export function setTransportRetryDelaysForTests(delays) {
-  transportRetryDelays = Array.isArray(delays)
-    ? delays
-        .filter(
-          delay => Number.isSafeInteger(delay) && delay >= 0 && delay <= 30_000
-        )
-        .slice(0, 3)
-    : [0, 15_000, 30_000];
-  if (!transportRetryDelays.length) transportRetryDelays = [0];
-}
 export function run(command, args, binary = false) {
-  let lastError;
-  for (const delay of transportRetryDelays) {
-    if (delay) pause(delay);
-    try {
-      return runOnce(command, args, binary);
-    } catch (error) {
-      lastError = error;
-      if (!error.retryable) throw error;
-    }
-  }
-  throw lastError;
+  return runTransport(
+    command,
+    args,
+    binary,
+    binary ? MAX_ARTIFACT_DOWNLOAD_BYTES : 32 * 1024 * 1024
+  );
 }
 function api(path, binary = false) {
   return run('gh', ['api', `repos/${PRODUCER.repository}/${path}`], binary);
-}
-function pause(ms) {
-  if (!ms) return;
-  const result = spawnSync('sleep', [String(ms / 1000)]);
-  if (result.status !== 0) throw new Error('controlled transport unavailable');
 }
 function producerLagDelays(lagDelays) {
   const source = Array.isArray(lagDelays) ? lagDelays : PRODUCER_LAG_DELAYS_MS;
