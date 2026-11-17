@@ -109,6 +109,12 @@ export function useLibraryFirstArrivalActions(): ArrivalRowActions {
   return actions;
 }
 
+export interface ArrivalEventFailure {
+  readonly event: ArrivalUiEvent;
+  readonly context: ArrivalQueryContext;
+  readonly error: unknown;
+}
+
 export interface LibraryFirstArrivalAdapterProps {
   readonly scope: ArrivalScope;
   readonly context: ArrivalQueryContext;
@@ -117,11 +123,7 @@ export interface LibraryFirstArrivalAdapterProps {
     event: ArrivalUiEvent,
     context: ArrivalQueryContext
   ) => void | Promise<void>;
-  readonly onEventError?: (failure: {
-    readonly event: ArrivalUiEvent;
-    readonly context: ArrivalQueryContext;
-    readonly error: unknown;
-  }) => void;
+  readonly onEventError?: (failure: ArrivalEventFailure) => void;
   readonly motionApproved?: boolean;
   readonly motionProposal?: DominantDelightProposal;
   readonly materialBenefitReceipt?: {
