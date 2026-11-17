@@ -30,6 +30,19 @@ export const Idle: Story = {};
 
 export const Expanded: Story = { args: { initialExpanded: true } };
 
+export const PartialDraft: Story = {
+  args: { initialExpanded: true },
+  play: async ({ args, canvasElement }) => {
+    const canvas = within(canvasElement);
+    const benefit = 'Every release in one link';
+    await userEvent.type(canvas.getByLabelText(/main benefit/), benefit);
+    await userEvent.click(canvas.getByRole('button', { name: 'Hide' }));
+    await userEvent.click(canvas.getByRole('button', { name: 'Answer' }));
+    await expect(canvas.getByLabelText(/main benefit/)).toHaveValue(benefit);
+    await expect(args.onSubmit).not.toHaveBeenCalled();
+  },
+};
+
 export const Answered: Story = {
   args: { initialExpanded: true },
   play: async ({ args, canvasElement }) => {
