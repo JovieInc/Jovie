@@ -139,6 +139,35 @@ class CodexQuotaCases:
         self.codex.reconcile(self.NOW, fetch=lambda name: (seen.append(name), self.snapshot(name))[1])
         self.assertEqual(seen, [])
 
+    def test_older_observer_cannot_overwrite_a_newer_consumed_event(self):
+        for fail_older in (False, True):
+            with self.subTest(fail_older=fail_older):
+                self.codex.write_state({})
+                self.reconcile()
+                self.execute("current-login", "usage limit. Try again in 1 hour.\n", 1)
+                newer = []
+                def newer_snapshot(name):
+                    value = self.snapshot(name)
+                    value["rateLimits"]["rateLimits"]["primary"]["usedPercent"] = 75
+                    return value
+                def observe(name):
+                    self.execute(name, "usage limit. Try again in 2 hours.\n", 1)
+                    self.codex.reconcile_current_subscription(
+                        self.NOW, self.codex.LEDGER_CADENCE_S, newer_snapshot, name)
+                    newer.append(self.codex.read_state()[name])
+                    if fail_older:
+                        raise OSError("older fixture readback failed")
+                    return self.snapshot(name)
+                result = self.codex.reconcile_current_subscription(
+                    self.NOW, self.codex.LEDGER_CADENCE_S, observe, "current-login")
+                row = self.codex.read_state()["current-login"]
+                self.assertEqual(result, {"reconciled": False, "reason": "observation-superseded"})
+                self.assertEqual(row, newer[0])
+                self.assertEqual(row["subscriptionLedger"]["observationId"], row["lastObservation"]["id"])
+                seen = []
+                self.codex.reconcile(self.NOW, fetch=lambda name: (seen.append(name), self.snapshot(name))[1])
+                self.assertEqual(seen, [])
+
     def test_reset_observation_does_not_copy_surrounding_credentials_or_transcript(self):
         self.reconcile()
         self.execute("lyb-pro", "private@example.invalid token=SECRET usage limit. Try again in 3 hours. token=SECRET\n", 1)

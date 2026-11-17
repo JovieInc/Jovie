@@ -30,22 +30,22 @@ from pathlib import Path
 
 try:
     from scripts.lanes.codex_terminal import (
-        AUTH, LIMIT, parse_reset, parse_announcement, pending_terminal_observation,
+        AUTH, LIMIT, RESET_AT, RESET_IN, parse_reset, parse_announcement,
+        pending_terminal_observation, classify as classify_terminal,
         terminal_context, terminal_observation,
     )
 except ModuleNotFoundError:  # Direct executor entry from outside the repository root.
     from codex_terminal import (
-        AUTH, LIMIT, parse_reset, parse_announcement, pending_terminal_observation,
+        AUTH, LIMIT, RESET_AT, RESET_IN, parse_reset, parse_announcement,
+        pending_terminal_observation, classify as classify_terminal,
         terminal_context, terminal_observation,
     )
 
 ACCOUNTS_ROOT = Path(os.environ.get("CODEX_ACCOUNTS_ROOT", Path.home() / ".codex-accounts"))
 STATE = Path(os.environ.get("LANES_STATE", Path.home() / ".local/state/jovie-lanes")) / "codex-accounts.json"
 DEFAULT_COOLDOWN_S = int(os.environ.get("CODEX_DEFAULT_COOLDOWN_S", 5 * 3600))
-LIMIT = re.compile(r"usage limit|rate limit|too many requests|\b429\b|quota", re.I)
 # A short burst limit (429 / "rate limit") backs off briefly and rotates; only a spent
 # plan (usage limit / quota) banks the account until its reset.
-USAGE = re.compile(r"usage limit|quota|insufficient", re.I)
 RATE_BACKOFF_S = int(os.environ.get("CODEX_RATE_BACKOFF_S", 120))
 ROTATE_PAUSE_S = float(os.environ.get("CODEX_ROTATE_PAUSE_S", 20))
 # An account leased by another run is busy, not spent. On Gem (one current-login lease) three
@@ -717,6 +717,7 @@ def reconcile_current_subscription(now, if_due, fetch, name=CURRENT_LOGIN) -> di
     cadence once. A failed observation never certifies capacity or clears banks.
     """
     observation_id = None
+    claim_id = uuid.uuid4().hex
     wake_id = None
     def due(state=None):
         nonlocal wake_id
@@ -753,7 +754,7 @@ def reconcile_current_subscription(now, if_due, fetch, name=CURRENT_LOGIN) -> di
                     and type(last) in (int, float) and 0 <= now - last < if_due)
     def ledger_update(state, errors):
         ledger = {"schema": LEDGER_SCHEMA, "authMode": os.environ.get("CODEX_LANE_AUTH_MODE"),
-                  "reconciledAt": now, "errors": errors}
+                  "reconciledAt": now, "errors": errors, "attemptId": claim_id}
         if subscription_pool_mode():
             previous = (state.get(name) or {}).get("subscriptionLedger") or {}
             consumed = observation_id or previous.get("observationId")
@@ -829,7 +830,13 @@ def reconcile_current_subscription(now, if_due, fetch, name=CURRENT_LOGIN) -> di
         except Exception as error:
             errors[name] = type(error).__name__ + ": public subscription metadata unavailable"
 
+        applied = False
         def apply(state):
+            nonlocal applied
+            ledger = ((state.get(name) or {}).get("subscriptionLedger") if subscription_pool_mode()
+                      else state.get("_ledger")) or {}
+            if ledger.get("attemptId") != claim_id:
+                return  # A newer observer owns the durable stamp and its readback.
             if value is not None:
                 # Merge only observation fields into the current locked row.
                 # Quota/auth banks and run/attempt ownership remain untouched.
@@ -867,11 +874,14 @@ def reconcile_current_subscription(now, if_due, fetch, name=CURRENT_LOGIN) -> di
                                                  "leaseId": value["leaseId"], "previousDigest": _lease_digest(previous) if previous else None,
                                                  "currentDigest": _lease_digest(value), "lease": value}) + "\n")
             ledger_update(state, errors)
+            applied = True
         try:
             update_state(apply)
         except Exception as error:
             errors["_reconcile"] = type(error).__name__ + ": observation storage unavailable"
             return {"reconciled": False, "accounts": [], "errors": errors}
+        if not applied:
+            return {"reconciled": False, "reason": "observation-superseded"}
         return {"reconciled": value is not None, "accounts": [name] if value else [], "errors": errors}
     finally:
         handle.close()
@@ -1015,22 +1025,7 @@ def maybe_redeem(name: str, handle, now: float) -> bool:
 
 
 def classify(output: str, code: int, now: float) -> tuple[str, float | None]:
-    """(kind, exhausted_until): kind is ok | rate | limit | auth | error."""
-    tail = output[-20000:]
-    # Only a failed run can be an exhausted account. A successful run's transcript often
-    # mentions "429", "quota" or "rate limit" (Jovie has a rate limiter), and matching that
-    # banked all 5 healthy accounts for 5h on 2026-09-27. Read only codex's closing lines.
-    closing = terminal_context(tail)
-    if code != 0 and LIMIT.search(closing):
-        if not USAGE.search(closing):
-            return "rate", parse_reset(closing, now) or now + RATE_BACKOFF_S
-        return "limit", parse_reset(closing, now) or now + DEFAULT_COOLDOWN_S
-    # Same rule as limits: only codex's closing lines can say the login failed. An agent
-    # working on auth code prints "401"/"unauthorized" all run long; scanning the whole tail
-    # benched Gem's only login for 24h on a plain 429 (2026-10-12, 96% capacity left).
-    if code != 0 and AUTH.search(closing):
-        return "auth", now + 24 * 3600
-    return ("ok" if code == 0 else "error"), None
+    return classify_terminal(output, code, now, rate_backoff=RATE_BACKOFF_S, usage_cooldown=DEFAULT_COOLDOWN_S)
 
 
 def login_slots(name: str) -> int:

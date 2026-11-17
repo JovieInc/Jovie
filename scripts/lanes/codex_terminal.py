@@ -117,3 +117,25 @@ def parse_announcement(message: dict) -> dict | None:
         flags["immediateReset"] |= bool(IMMEDIATE_RESET.search(clause)) and not banked
     return {"messageId": message["messageId"], "createdAt": message.get("createdAt"), **flags,
             "digest": hashlib.sha256(body.encode()).hexdigest()}
+
+
+USAGE = re.compile(r"usage limit|quota|insufficient", re.I)
+
+
+def classify(output: str, code: int, now: float, *, rate_backoff: float, usage_cooldown: float) -> tuple[str, float | None]:
+    """(kind, exhausted_until): kind is ok | rate | limit | auth | error."""
+    tail = output[-20000:]
+    # Only a failed run can be an exhausted account. A successful run's transcript often
+    # mentions "429", "quota" or "rate limit" (Jovie has a rate limiter), and matching that
+    # banked all 5 healthy accounts for 5h on 2026-09-27. Read only codex's closing lines.
+    closing = terminal_context(tail)
+    if code != 0 and LIMIT.search(closing):
+        if not USAGE.search(closing):
+            return "rate", parse_reset(closing, now) or now + rate_backoff
+        return "limit", parse_reset(closing, now) or now + usage_cooldown
+    # Same rule as limits: only codex's closing lines can say the login failed. An agent
+    # working on auth code prints "401"/"unauthorized" all run long; scanning the whole tail
+    # benched Gem's only login for 24h on a plain 429 (2026-10-12, 96% capacity left).
+    if code != 0 and AUTH.search(closing):
+        return "auth", now + 24 * 3600
+    return ("ok" if code == 0 else "error"), None
