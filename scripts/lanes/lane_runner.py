@@ -67,7 +67,7 @@ import migration_renumber  # noqa: E402  (no-model fix for migration number coll
 import fix_red_rewrite  # noqa: E402
 import fix_red_failure_routing  # noqa: E402
 import fix_red_classes, fix_red_screen_cert  # noqa: E402  (fingerprint + deterministic routing of fix-red failures)
-import fix_red_compose  # noqa: E402
+import fix_red_compose, fix_red_mixed_repairs  # noqa: E401,E402
 import fix_red_source_edits  # noqa: E402  (merge commits install lint-staged once when the hook cannot find it)
 import sourced_shell_conflict  # noqa: E402  (source-vs-inline shell conflict; ports retry into the helper)
 from gh_budget import gh_call  # noqa: E402  (budgeted gh for new lane code)
@@ -7166,14 +7166,7 @@ def route_fix_red(host: Host, pr: dict) -> dict | None:
 
 
 def _publish_pr_body(host: Host, pr: dict, name: str, text: str) -> bool:
-    """Write one PR body through the repair client. The caller decides whether the text is complete."""
-    runs = host.state / "runs"
-    runs.mkdir(parents=True, exist_ok=True)
-    path = runs / f"{name}-{int(pr['number'])}.md"
-    atomic_write_text(path, text)
-    edited = gh_call(["pr", "edit", str(int(pr["number"])), "--repo", REPO_SLUG, "--body-file", str(path)],
-                     priority="repair")
-    return edited.returncode == 0
+    return fix_red_mixed_repairs.publish_pr_body(THIS, host, pr, name, text)
 
 
 def stamp_changelog_decision(host: Host, pr: dict) -> bool:
@@ -7186,15 +7179,7 @@ def stamp_changelog_decision(host: Host, pr: dict) -> bool:
 
 
 def stamp_fleet_body(host: Host, pr: dict) -> str | None:
-    """Stamp a missing Red-before-green block once per head. None leaves the head with the model.
-    A measured win is never added here."""
-    body = pr.get("body")
-    if not isinstance(body, str) or pr_events.red_section_complete(body):
-        return None
-    updated = pr_events.repair_evidence_body(pr, body, "")
-    if updated == body or not claim_route(host, pr, fix_red_classes.STAMP_REPAIR):
-        return None
-    return "stamped-fleet-body" if _publish_pr_body(host, pr, "fleet-body", updated) else None
+    return fix_red_mixed_repairs.stamp_fleet_body(THIS, host, pr)
 
 
 def deterministic_route_taken(host: Host, pr: dict, route: dict | None) -> str | None:
