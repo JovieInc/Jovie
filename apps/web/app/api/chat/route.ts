@@ -68,6 +68,7 @@ import {
   detectAlbumArtGenerationIntent,
   resolveAlbumArtCapability,
 } from '@/lib/chat/album-art-capability';
+import { resolveAlbumArtReleaseTarget } from '@/lib/chat/album-art-release-target';
 import { fetchArtistContext } from '@/lib/chat/artist-context.server';
 import { resolveChatRelease } from '@/lib/chat/catalog-query';
 import { fetchCatalogTrackTitlesForChat } from '@/lib/chat/catalog-titles';
@@ -214,7 +215,6 @@ import {
 import type {
   AlbumArtCandidate,
   AlbumArtStyleId,
-  SuggestedReleaseTarget,
 } from '@/lib/services/album-art/types';
 import { buildCanvasMetadata } from '@/lib/services/canvas/service';
 import { getInsightsSummary } from '@/lib/services/insights/lifecycle';
@@ -254,75 +254,6 @@ const CHAT_KILL_SWITCH_GATES = {
   DISABLED: 'ai_chat_disabled',
   FORCE_LIGHT: 'ai_chat_force_light',
 } as const;
-
-function normalizeReleaseTitle(value: string): string {
-  return value
-    .trim()
-    .toLowerCase()
-    .replaceAll(/[^a-z0-9]+/g, ' ')
-    .replaceAll(/\s+/g, ' ')
-    .trim();
-}
-
-function toSuggestedReleaseTarget(
-  release: ReleaseContext
-): SuggestedReleaseTarget {
-  return {
-    id: release.id,
-    title: release.title,
-    releaseDate: release.releaseDate,
-    artworkUrl: release.artworkUrl,
-  };
-}
-
-async function resolveAlbumArtReleaseTarget(
-  profileId: string | null,
-  releases: ReleaseContext[],
-  input: { releaseId?: string; releaseTitle?: string }
-): Promise<
-  | { status: 'resolved'; release: ReleaseContext }
-  | {
-      status: 'needs_target';
-      suggestedReleases: readonly SuggestedReleaseTarget[];
-    }
-> {
-  if (input.releaseId) {
-    const resolved = await resolveChatRelease(profileId, releases, input);
-    if (resolved) return { status: 'resolved', release: resolved };
-  }
-
-  if (!input.releaseTitle?.trim()) {
-    return {
-      status: 'needs_target',
-      suggestedReleases: releases.slice(0, 8).map(toSuggestedReleaseTarget),
-    };
-  }
-
-  // Exact tiers first: local exact, then the owned catalog beyond the slice.
-  // A local fuzzy match must not suppress a full-catalog exact match.
-  const exact = await resolveChatRelease(profileId, releases, {
-    releaseTitle: input.releaseTitle,
-    match: 'exact',
-  });
-  if (exact) return { status: 'resolved', release: exact };
-
-  const normalized = normalizeReleaseTitle(input.releaseTitle);
-  const fuzzy = releases.filter(release => {
-    const title = normalizeReleaseTitle(release.title);
-    return title.includes(normalized) || normalized.includes(title);
-  });
-
-  if (fuzzy.length === 1) {
-    return { status: 'resolved', release: fuzzy[0] };
-  }
-
-  return {
-    status: 'needs_target',
-    suggestedReleases: (fuzzy.length > 0 ? fuzzy : releases)
-      .slice(0, 8)
-      .map(toSuggestedReleaseTarget),
-  };
-}
 
 /** Format available release titles for error messages. */
 function formatAvailableReleases(releases: ReleaseContext[]): string {

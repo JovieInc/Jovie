@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { resolveAlbumArtReleaseTarget } from '@/lib/chat/album-art-release-target';
 import type { ReleaseContext } from '@/lib/chat/types';
 import { linkRow, makeChain, releaseRow, sqlTokens } from './sql-tokens';
 
@@ -288,6 +289,99 @@ describe('resolveChatRelease precedence', () => {
     });
 
     expect(release).toBeNull();
+  });
+
+  it.each(['Midnight   Blue', 'Midnight—Blue'])(
+    'resolves normalized %s before its similar remix',
+    async title => {
+      const base = { ...sliceRow(title), id: 'base' };
+      const remix = { ...sliceRow(`${title} (Remix)`), id: 'remix' };
+      await expect(
+        resolveAlbumArtReleaseTarget('profile-1', [base, remix], {
+          releaseTitle: 'Midnight Blue',
+        })
+      ).resolves.toEqual({ status: 'resolved', release: base });
+    }
+  );
+
+  it('keeps the full-catalog literal exact ahead of normalized loaded titles', async () => {
+    pendingRows.push([{ ...releaseRow, title: 'Midnight Blue' }], [linkRow]);
+    const target = await resolveAlbumArtReleaseTarget(
+      'profile-1',
+      [sliceRow('Midnight—Blue'), sliceRow('Midnight—Blue (Remix)')],
+      { releaseTitle: 'Midnight Blue' }
+    );
+    expect(target).toMatchObject({
+      status: 'resolved',
+      release: { id: releaseRow.id, title: 'Midnight Blue' },
+    });
+    expect(selectMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('uses the current loaded release on repeated turns without retaining a stale target', async () => {
+    for (const id of ['first', 'current']) {
+      const base = { ...sliceRow('Midnight—Blue'), id };
+      await expect(
+        resolveAlbumArtReleaseTarget(
+          null,
+          [base, sliceRow('Midnight Blue (Remix)')],
+          {
+            releaseTitle: 'Midnight Blue',
+          }
+        )
+      ).resolves.toEqual({ status: 'resolved', release: base });
+    }
+    expect(selectMock).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    new Error('owned catalog denied'),
+    new DOMException('cancelled', 'AbortError'),
+  ])(
+    'propagates lookup failure %s instead of selecting a local fallback',
+    async error => {
+      selectMock.mockImplementationOnce(() => {
+        throw error;
+      });
+      await expect(
+        resolveAlbumArtReleaseTarget('profile-1', [sliceRow('Midnight—Blue')], {
+          releaseTitle: 'Midnight Blue',
+        })
+      ).rejects.toBe(error);
+    }
+  );
+
+  it('keeps ambiguous partial matches and missing titles explicit and suggestions bounded', async () => {
+    const releases = [
+      sliceRow('Midnight Blue'),
+      sliceRow('Midnight Blue (Remix)'),
+    ];
+    await expect(
+      resolveAlbumArtReleaseTarget(null, releases, { releaseTitle: 'Midnight' })
+    ).resolves.toMatchObject({
+      status: 'needs_target',
+      suggestedReleases: releases.map(
+        ({ id, title, releaseDate, artworkUrl }) => ({
+          id,
+          title,
+          releaseDate,
+          artworkUrl,
+        })
+      ),
+    });
+    const missing = await resolveAlbumArtReleaseTarget(
+      null,
+      Array.from({ length: 10 }, () => releases[0]),
+      {}
+    );
+    expect(missing).toMatchObject({ status: 'needs_target' });
+    expect(
+      missing.status === 'needs_target' && missing.suggestedReleases
+    ).toHaveLength(8);
+    await expect(resolveAlbumArtReleaseTarget(null, [], {})).resolves.toEqual({
+      status: 'needs_target',
+      suggestedReleases: [],
+    });
   });
 });
 
