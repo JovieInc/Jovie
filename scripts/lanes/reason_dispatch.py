@@ -15,6 +15,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 import lifecycle
+import ownership
 from atomic_state import append_json_object, atomic_write_text
 
 HERE = Path(__file__).resolve().parent
@@ -368,3 +369,51 @@ def checked_tick(host, lane, linear_factory, *, check, now_iso, event_file=None)
     receipt["observedAt"] = now_iso()
     persist()
     return finish()
+
+
+def accept_run(host, linear, issue):
+    lease = ownership.begin_reason_run(host.state, issue)
+    try:
+        linear.move(issue["id"], "In Progress", owner="reason-run-lease")
+    except BaseException:
+        ownership.finish_reason_run(host.state, issue["id"], lease, settled=True, reason="reason:admission-failed")
+        raise  # No job execution was started.
+    return lease
+
+
+def run_claimed(host, linear, issue, config, lease, *, one_job, run=lifecycle.run):
+    settled = False
+    try:
+        record = one_job(linear, issue, config, host.state, run=run)
+        settled = True
+        return record
+    except Exception:
+        return {"confidence": "failed", "publication": ownership.reason_run_block()}
+    finally:
+        ownership.finish_reason_run(host.state, issue["id"], lease, settled=settled)
+
+
+def direct_run(host, lane, linear, issue, config, *, one_job, run=lifecycle.run) -> int:
+    """Operator work uses the same local mutex, claim and lease as the automatic drain."""
+    lock = lane.Locked(host.state / "reason.lock", blocking=False)
+    try:
+        if not lock.held:
+            print(json.dumps({**ownership.reason_run_block("reason-run-already-owned"), "status": "busy"}))
+            return 75
+        claim = lane.Locked(host.state / "claim.lock", blocking=True)
+        try:
+            if lifecycle.draining(host.state):
+                print(json.dumps({"status": "operator-draining", "owner": "reason-lane",
+                                  "nextAction": "Wait for the existing operator drain to finish."}))
+                return 75
+            lease = accept_run(host, linear, issue)
+        except ownership.ReasonRunHeld as error:
+            print(json.dumps(error.receipt))
+            return 75
+        finally:
+            claim.release()
+        record = run_claimed(host, linear, issue, config, lease, one_job=one_job, run=run)
+        print(json.dumps(record, indent=1))
+        return 75 if (record.get("publication") or {}).get("status") == "blocked" else 0
+    finally:
+        lock.release()

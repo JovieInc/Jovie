@@ -1,12 +1,8 @@
 """Local Linear mirror, claim ledger and write outbox for the one Symphony host.
-
-Tim 2026-10-11: "linear being down should not stop shipping." Under <state>/linear/:
-mirror-<TEAM>.json holds open issues, refreshed incrementally (updatedAt >= cursor) by the
-dispatch tick when the budget admits it, plus every issue an outbox flush reads back;
-dispatch reads it at any age. claims.json is the claim authority (Linear's In Progress is
-its projection). outbox.json holds every lane write, flushed oldest-first with readback;
-a flush that finds the issue closed or parked supersedes the claim and never destroys work.
-No Linear webhook feed reaches Gem yet; `apply()` is where one would land."""
+Under <state>/linear/, mirror-<TEAM>.json refreshes incrementally and remains readable while Linear is down.
+claims.json owns local runs; In Progress is its projection. outbox.json flushes oldest-first with readback.
+Closed/parked remote state supersedes claims without destroying work; uncertain reason outcomes stay retained.
+No Linear webhook feed reaches Gem; apply() is its future landing point."""
 from __future__ import annotations
 
 import fcntl
@@ -281,6 +277,11 @@ def claim_status(state: Path, issue_id: str) -> str | None:
     return (_claims(state).get(issue_id) or {}).get("status")
 
 
+def reason_outcome_pending(row) -> bool:
+    """A mirror status or retention window cannot resolve an uncertain paid attempt."""
+    return isinstance(row, dict) and row.get("lane") == "reason" and row.get("reason") not in {"reason:returned", "reason:admission-failed"}
+
+
 def todo(state: Path, team: str) -> list[dict]:
     """Dispatchable Todo rows: the mirror with this host's pending moves and claims applied."""
     rows = (_read(mirror_path(state, team), MIRROR).get("issues") or {}).values()
@@ -303,10 +304,10 @@ def claim(state: Path, issue_id: str, identifier: str, lane: str) -> bool:
     with _mutating(_claims_path(state), CLAIMS) as data:
         claims = data.setdefault("claims", {})
         now = time.time()
-        for key in [key for key, value in claims.items() if value.get("status") != "active"
+        for key in [key for key, value in claims.items() if value.get("status") != "active" and not reason_outcome_pending(value)
                     and now - (value.get("endedAt") or now) > CLAIM_KEEP_S]:
             claims.pop(key)
-        if (claims.get(issue_id) or {}).get("status") == "active":
+        if (claims.get(issue_id) or {}).get("status") == "active" or reason_outcome_pending(claims.get(issue_id)):
             return False
         claims[issue_id] = {"identifier": identifier, "lane": lane, "status": "active", "claimedAt": now,
                             "baseUpdatedAt": row.get("updatedAt")}
@@ -314,12 +315,10 @@ def claim(state: Path, issue_id: str, identifier: str, lane: str) -> bool:
 
 
 def clear_superseded(state: Path, issue_id: str) -> bool:
-    """Forget a superseded claim so a new explicit decision (priority admission) can move the issue.
-    Outboxed.move drops every move for a superseded claim, so one stale `remote:Backlog` record
-    would otherwise make an issue unpromotable for CLAIM_KEEP_S. Active claims are never touched."""
+    """Allow fresh admission to clear superseded claims; active and uncertain reason claims remain protected."""
     with _mutating(_claims_path(state), CLAIMS) as data:
         claims = data.setdefault("claims", {})
-        if (claims.get(issue_id) or {}).get("status") != "superseded":
+        if (claims.get(issue_id) or {}).get("status") != "superseded" or reason_outcome_pending(claims.get(issue_id)):
             return False
         claims.pop(issue_id)
         return True
@@ -328,7 +327,8 @@ def clear_superseded(state: Path, issue_id: str) -> bool:
 def release(state: Path, issue_id: str, status: str = "released", reason: str = "") -> None:
     with _mutating(_claims_path(state), CLAIMS) as data:
         row = data.setdefault("claims", {}).get(issue_id)
-        if row and row.get("status") == "active":
+        if row and (row.get("status") == "active" or (row.get("lane") == "reason"
+                and reason in {"reason:returned", "reason:admission-failed"})):
             row.update(status=status, endedAt=time.time(), reason=reason)
 
 
