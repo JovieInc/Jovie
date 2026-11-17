@@ -6,6 +6,7 @@ import io
 import importlib
 import json
 import os
+import subprocess
 import sys
 import tempfile
 import threading
@@ -17,7 +18,8 @@ from unittest.mock import patch
 def _fixture(name):
     full = f"scripts.tests.{name}"
     module = sys.modules.get(name) or sys.modules.get(full) or importlib.import_module(full)
-    sys.modules[name] = sys.modules[full] = module
+    sys.modules.setdefault(name, module)
+    sys.modules.setdefault(full, module)
     return module
 
 
@@ -176,6 +178,24 @@ class SchedulingTest(unittest.TestCase):
     def lane(self):
         import lane_runner
         return SimpleNamespace(Locked=FakeLock, LinearRateLimited=lane_runner.LinearRateLimited)
+
+    def test_fixture_import_preserves_native_multiprocessing_targets_with_both_module_names(self):
+        code = """
+import importlib, pickle, sys
+import scripts.tests.conftest
+native = importlib.import_module('scripts.tests.test_lane_runner')
+target = native.repair_inventory_process
+importlib.import_module('scripts.tests.test_binding_turns')
+short = importlib.import_module('test_lane_runner')
+assert short is not native, 'fixture must reproduce the native dual-name import topology'
+importlib.import_module('scripts.tests.test_reason_dispatch')
+pickle.dumps(target)
+assert sys.modules['scripts.tests.test_lane_runner'] is native
+assert sys.modules['test_lane_runner'] is short
+"""
+        result = subprocess.run([sys.executable, '-c', code], cwd=lane_fixtures.ROOT,
+                                capture_output=True, text=True, timeout=30)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
     def test_native_schedule_does_not_read_the_queue_or_probe_a_provider(self):
         with tempfile.TemporaryDirectory() as tmp, \
