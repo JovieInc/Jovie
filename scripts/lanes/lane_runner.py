@@ -7149,12 +7149,12 @@ def strip_cache_exports_fix(host: Host, pr: dict, route: dict, worktree: Path, l
 
 
 def claim_route(host: Host, pr: dict, action: str) -> bool:
-    """True once per (PR, head, action): a deterministic route is tried once, then the model gets the head."""
+    """Once per head. sync-main retries when the live base tip moves, then the model gets that pair."""
     taken = []
     def change(data: dict) -> None:
         row = data.setdefault(str(pr["number"]), {})
-        if row.get(action) != pr["headRefOid"]:
-            row[action] = pr["headRefOid"]
+        if (token := fix_red_failure_routing.sync_claim_token(row.get(action), pr, action)) is not None:
+            row[action] = token
             taken.append(True)
     try:
         update_json(host.state / "class-routes.json", change)
@@ -7207,7 +7207,7 @@ def deterministic_route_taken(host: Host, pr: dict, route: dict | None) -> str |
     if route["action"] == fix_red_classes.RERUN and route.get("cls") == "quota-deferred":
         import quota_rerun
         return quota_rerun.deferred_rerun(host, pr, failed_logs, update_json, _rerun_failed)
-    # One rerun per head, shared with the platform-red gate above; one sync per head.
+    # One rerun per head. sync-main is once per head plus the live base tip.
     if not (claim_infra_rerun(host, pr) if route["action"] == fix_red_classes.RERUN else claim_route(host, pr, route["action"])):
         return None
     if route["action"] == fix_red_classes.RERUN:

@@ -6,9 +6,10 @@ import json
 import re
 import subprocess
 
-# Inherited design identities removed on main need the existing one-sync-per-head
-# route before source repair. Accept the failed Vitest summary or the CLI's
-# failure plus a typed identity, never a passing title or fixture API error.
+# Inherited design identities removed on main need a sync before source repair.
+# sync-main is once per (head, live base tip), so a later main tip can sync
+# again. Accept the failed Vitest summary or the CLI's failure plus a typed
+# identity, never a passing title or fixture API error.
 DESIGN_SOURCE_CLI = re.compile(
     r"\bFAIL\b[^\n]*lib/__tests__/design-system-source-ratchet\.test\.mjs[^\n]*"
     r">[^\n]*exits zero from the CLI on the live tree|"
@@ -373,3 +374,43 @@ def classify_unpushed_repair(exit_code, log_text: str) -> list[str]:
         kind = "infra" if DECLINE_INFRA.search(declined) else "base-red" if DECLINE_BASE_RED.search(declined) else "other"
         return [f"agent-declined:{kind}:{declined[:160]}"]
     return ["no-change:agent-ended-without-push"]
+
+
+_SHA40 = re.compile(r"^[0-9a-f]{40}$")
+SYNC_MAIN_ACTION = "sync-main"
+
+
+def live_base_tip(pr) -> str | None:
+    """Default-branch tip on the PR. baseRefOid is the stale merge-base and is ignored."""
+    if not isinstance(pr, dict):
+        return None
+    base = pr.get("baseRef")
+    target = base.get("target") if isinstance(base, dict) else None
+    oid = target.get("oid") if isinstance(target, dict) else None
+    if isinstance(oid, str) and _SHA40.fullmatch(oid):
+        return oid
+    flat = pr.get("baseTipOid")
+    if isinstance(flat, str) and _SHA40.fullmatch(flat):
+        return flat
+    return None
+
+
+def sync_claim_token(stored, pr, action: str):
+    """Token to record for one deterministic attempt, or None when it was already tried.
+
+    Actions other than sync-main stay once per head. sync-main is once per
+    (head, live base tip): a later main tip on the same head may sync again.
+    A missing tip falls back to the head and does not erase a recorded tip,
+    so a partial PR payload cannot sync on every tick.
+    """
+    head = pr["headRefOid"]
+    if action != SYNC_MAIN_ACTION:
+        return None if stored == head else head
+    tip = live_base_tip(pr)
+    recorded = stored if isinstance(stored, str) else None
+    if tip is None:
+        if recorded == head or (recorded or "").startswith(f"{head}:"):
+            return None
+        return head
+    token = f"{head}:{tip}"
+    return None if recorded == token else token
