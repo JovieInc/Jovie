@@ -96,7 +96,12 @@ describe('AudienceMemberDetails certificate', () => {
     );
     expect(screen.getAllByText('Unknown')).toHaveLength(2);
     expect(screen.getAllByText('—').length).toBeGreaterThanOrEqual(2);
-    expect(screen.queryByRole('button')).not.toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Copy Visits: 8' })
+    ).toBeVisible();
+    expect(
+      screen.queryByRole('button', { name: /Copy (Email|Phone)|Unknown|—/ })
+    ).not.toBeInTheDocument();
     await expectNoA11yViolations(container);
   });
 

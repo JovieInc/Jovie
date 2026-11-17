@@ -1,9 +1,73 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { DspQuietRow, displayDspUrl } from './DspQuietRow';
 
+const notifications = vi.hoisted(() => ({ success: vi.fn(), error: vi.fn() }));
+vi.mock('@/lib/hooks/useNotifications', () => ({
+  useNotifications: () => notifications,
+}));
+
 describe('DspQuietRow', () => {
+  it.each([true, false])(
+    'reports the fallback copy outcome when Clipboard API is missing (success=%s)',
+    async success => {
+      const user = userEvent.setup();
+      const clipboard = Object.getOwnPropertyDescriptor(navigator, 'clipboard');
+      const execCommand = Object.getOwnPropertyDescriptor(
+        document,
+        'execCommand'
+      );
+      const fallback = vi.fn(() => success);
+      Object.defineProperty(navigator, 'clipboard', {
+        configurable: true,
+        value: undefined,
+      });
+      Object.defineProperty(document, 'execCommand', {
+        configurable: true,
+        value: fallback,
+      });
+      notifications.success.mockClear();
+      notifications.error.mockClear();
+      try {
+        render(
+          <DspQuietRow
+            label='Spotify'
+            icon={<span aria-hidden='true'>S</span>}
+            href='https://open.spotify.com/album/take-me-over'
+          />
+        );
+        await user.click(
+          screen.getByRole('button', {
+            name: 'Destination actions for Spotify',
+          })
+        );
+        await user.click(
+          screen.getByRole('menuitem', { name: 'Copy Link', exact: true })
+        );
+        await waitFor(() => expect(fallback).toHaveBeenCalledWith('copy'));
+        if (success) {
+          expect(notifications.success).toHaveBeenCalledWith(
+            'Spotify link copied'
+          );
+          expect(notifications.error).not.toHaveBeenCalled();
+        } else {
+          expect(notifications.error).toHaveBeenCalledWith(
+            'Could not copy to the clipboard'
+          );
+          expect(notifications.success).not.toHaveBeenCalled();
+        }
+        expect(document.querySelector('textarea')).toBeNull();
+      } finally {
+        if (clipboard) Object.defineProperty(navigator, 'clipboard', clipboard);
+        else Reflect.deleteProperty(navigator, 'clipboard');
+        if (execCommand)
+          Object.defineProperty(document, 'execCommand', execCommand);
+        else Reflect.deleteProperty(document, 'execCommand');
+      }
+    }
+  );
+
   it('renders a quiet name plus outbound control for a linked DSP', () => {
     render(
       <DspQuietRow

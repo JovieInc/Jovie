@@ -53,7 +53,7 @@ export function DrawerPropertyRow({
   copyText,
 }: DrawerPropertyRowProps) {
   const Wrapper = interactive ? PlainButton : 'div';
-  const Label = definitionList ? 'dt' : 'span';
+  const PropertyLabel = definitionList ? 'dt' : 'span';
   const Value = definitionList ? 'dd' : 'span';
 
   const notifications = useNotifications();
@@ -146,7 +146,7 @@ export function DrawerPropertyRow({
       )}
       style={gridStyle}
     >
-      <Label
+      <PropertyLabel
         className={cn(
           'font-[500] text-quaternary-token',
           styles.label,
@@ -154,7 +154,7 @@ export function DrawerPropertyRow({
         )}
       >
         {label}
-      </Label>
+      </PropertyLabel>
       <Value
         className={cn(
           'min-w-0 font-[460] text-primary-token',

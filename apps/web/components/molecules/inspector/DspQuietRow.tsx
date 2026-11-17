@@ -3,6 +3,7 @@
 import { Button } from '@jovie/ui';
 import { ExternalLink } from 'lucide-react';
 import type { ComponentPropsWithRef, ReactNode } from 'react';
+import { useClipboard } from '@/hooks/useClipboard';
 import { useNotifications } from '@/lib/hooks/useNotifications';
 import { deriveNativeUri } from '@/lib/links/destination-links';
 import { cn } from '@/lib/utils';
@@ -48,18 +49,6 @@ export function displayDspUrl(href: string): string {
 const DSP_QUIET_ROW_CLASS =
   'group flex min-h-8 items-center gap-2 rounded-md px-0 transition-colors duration-subtle hover:bg-surface-1 focus-visible:bg-surface-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/55';
 
-/** Copy to the clipboard; toast the outcome either way. */
-function copyText(
-  value: string,
-  notifications: ReturnType<typeof useNotifications>,
-  successMessage: string
-): void {
-  navigator.clipboard
-    .writeText(value)
-    .then(() => notifications.success(successMessage))
-    .catch(() => notifications.error('Could not copy to the clipboard'));
-}
-
 /** Track/release DSP row: name + actions, or Find when the provider is not found.
  *
  * Destination-row interaction contract (founder note 2026-11-09): a linked
@@ -83,12 +72,17 @@ export function DspQuietRow({
   ...rowProps
 }: DspQuietRowProps) {
   const notifications = useNotifications();
+  const { copy } = useClipboard({
+    onError: () => notifications.error('Could not copy to the clipboard'),
+  });
   const hasHref = Boolean(href?.trim());
 
   if (hasHref && href) {
     const nativeUri = deriveNativeUri(href);
     const copyRow = (value: string, successMessage: string) => () =>
-      copyText(value, notifications, successMessage);
+      void copy(value).then(copied => {
+        if (copied) notifications.success(successMessage);
+      });
     const menuItems: OverflowMenuItem[] = [
       {
         id: 'open',

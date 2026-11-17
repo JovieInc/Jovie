@@ -44,6 +44,7 @@ import {
   applyCacheScope,
   resetCacheIsolationForTests,
 } from '@/lib/queries/cache-isolation';
+import { expectToolbarControl } from './library-control-assertions';
 import { buildAsset } from './library-surface-fixtures';
 
 Element.prototype.scrollIntoView = vi.fn();
@@ -249,20 +250,6 @@ function renderLibraryWithSidebarProbe(assets: readonly LibraryReleaseAsset[]) {
 
 function clickGridView() {
   fireEvent.click(screen.getByRole('radio', { name: 'Grid View' }));
-}
-
-function expectToolbarControl(
-  control: HTMLElement,
-  { square = false }: { readonly square?: boolean } = {}
-) {
-  // One bar, one height: the app-wide 28px PageToolbar control scale (the
-  // former 32px local density is retired).
-  expect(control).toHaveClass('h-7', 'min-h-7');
-  expect(control).not.toHaveClass('h-8');
-  if (square) {
-    expect(control).toHaveClass('w-7', 'min-w-7');
-    expect(control).not.toHaveClass('w-8');
-  }
 }
 
 describe('LibrarySurface', () => {
