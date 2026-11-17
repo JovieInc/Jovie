@@ -1,5 +1,4 @@
 import { cleanup, render, screen, within } from '@testing-library/react';
-import type { ElementType, ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { OnboardingCheckoutClient } from '@/app/onboarding/checkout/OnboardingCheckoutClient';
 import { OnboardingPlanOffer } from '@/components/features/dashboard/organisms/onboarding-v2/OnboardingPlanOffer';
@@ -13,8 +12,6 @@ const mockPush = vi.fn();
 const mockReplace = vi.fn();
 const mockSearch = vi.fn();
 const mockClear = vi.fn();
-const mockSetHandleValidation = vi.fn();
-const mockValidateHandle = vi.fn();
 const mockTrack = vi.fn();
 
 const mockArtistSearch = {
@@ -195,57 +192,6 @@ vi.mock('next/navigation', () => ({
   useSearchParams: () => new URLSearchParams(),
 }));
 
-vi.mock('next/image', () => ({
-  default: (props: Record<string, unknown>) => {
-    const { alt, fill, unoptimized, ...rest } = props;
-    return <img alt={typeof alt === 'string' ? alt : ''} {...rest} />;
-  },
-}));
-
-vi.mock('next/link', () => ({
-  default: ({
-    children,
-    href,
-    ...rest
-  }: {
-    children: ReactNode;
-    href: string;
-  }) => (
-    <a href={href} {...rest}>
-      {children}
-    </a>
-  ),
-}));
-
-vi.mock('@jovie/ui', async importOriginal => {
-  const actual = await importOriginal<typeof import('@jovie/ui')>();
-
-  return {
-    ...actual,
-    Button: ({
-      asChild,
-      children,
-      ...rest
-    }: {
-      asChild?: boolean;
-      children: ReactNode;
-    }) => <button {...rest}>{children}</button>,
-    Spinner: () => <div data-testid='loading-spinner' />,
-  };
-});
-
-vi.mock('@/components/molecules/ContentSurfaceCard', () => ({
-  ContentSurfaceCard: ({
-    as: Component = 'div',
-    children,
-    ...rest
-  }: {
-    as?: ElementType;
-    children: ReactNode;
-  }) => <Component {...rest}>{children}</Component>,
-  contentSurfaceCardVariants: () => '',
-}));
-
 vi.mock('@/features/auth', () => ({
   AuthBackButton: ({
     ariaLabel,
@@ -271,24 +217,6 @@ vi.mock('@/app/onboarding/actions/upgrade-offer', () => ({
 vi.mock('@/app/onboarding/actions/enrich-profile', () => ({
   enrichProfileFromDsp: vi.fn().mockResolvedValue(null),
 }));
-
-vi.mock(
-  '@/features/dashboard/organisms/onboarding-v2/shared/useHandleValidation',
-  () => ({
-    useHandleValidation: () => ({
-      handle: 'perf-budget',
-      handleValidation: {
-        available: true,
-        checking: false,
-        clientValid: true,
-        error: null,
-        suggestions: [],
-      },
-      setHandleValidation: mockSetHandleValidation,
-      validateHandle: mockValidateHandle,
-    }),
-  })
-);
 
 vi.mock(
   '@/features/dashboard/organisms/onboarding-v2/shared/useOnboardingSubmit',
@@ -338,7 +266,7 @@ describe('Paid offer consistency', () => {
     render(
       <OnboardingV2Form
         initialDisplayName='Test Artist'
-        initialHandle='test-artist'
+        initialHandle={DISCOVERY_SNAPSHOT.profile.username}
         initialProfileId='profile-performance'
         initialResumeStep='upgrade'
         isHydrated
