@@ -12,7 +12,7 @@
  * PR as automation silence and filed a false P0. Such a head is held for its
  * owner, like a defect hold or a label hold, not waiting on the automation.
  */
-import { readGithubJson } from './github-json-read.mjs';
+import { githubReadFailure, readGithubJson } from './github-json-read.mjs';
 
 /** Merge-queue failure-hold status context on a head (ci-plan). */
 export const FAILURE_HOLD_CONTEXT = 'jovie-queue-failure-hold/v1';
@@ -47,17 +47,22 @@ export async function requiredGreenAt(
   repo,
   sha,
   checks,
-  { fetchImpl, token, apiUrl }
+  { fetchImpl, token, apiUrl, nowMs = Date.now() }
 ) {
   const runs = await readGithubJson(
     `${apiUrl}/repos/${repo}/commits/${sha}/check-runs?filter=latest&per_page=100`,
-    { fetchImpl, token }
+    { fetchImpl, token, apiUrl, nowMs }
   );
   const statuses = await readGithubJson(
     `${apiUrl}/repos/${repo}/commits/${sha}/status?per_page=100`,
-    { fetchImpl, token }
+    { fetchImpl, token, apiUrl, nowMs }
   );
-  if (!runs.ok || !statuses.ok) return { ok: false };
+  if (!runs.ok || !statuses.ok) {
+    const quota = [runs, statuses].find(
+      read => !read.ok && read.reason === 'quota-deferred'
+    );
+    return quota ? githubReadFailure(quota) : { ok: false };
+  }
   let greenAt = -Infinity;
   for (const check of checks) {
     const times = [
