@@ -27,10 +27,15 @@
  * scripts/lib/wall-clock-assertion-baseline.json. That scan used to run only
  * inside the operations script-contract bundle, so a new `Date.now()` budget
  * in an iOS test reached main and failed the next merge group that selected
- * the lane. The TypeScript parser is imported only on that default path, so
- * importers of `language` / `stripComments` do not load it. `--write` and
- * `--bootstrap` still touch only the calendar ratchet, which only shrinks.
- * The duration baseline stays shrink-only in no-wall-clock-assertions.test.mjs.
+ * the lane. The TypeScript parser loads only on that default path, so
+ * importers of `language` / `stripComments` do not load it. Source admission
+ * runs a copy of the scanner; the parser resolves from that copy, then from
+ * the checkout. A scripts-only checkout with no node_modules skips the elapsed
+ * scan and still runs the calendar scan. An installed checkout that cannot
+ * load `typescript` fails closed. `--write` and `--bootstrap` still touch only
+ * the calendar ratchet,
+ * which only shrinks. The duration baseline stays shrink-only in
+ * no-wall-clock-assertions.test.mjs.
  */
 import { spawnSync } from 'node:child_process';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
@@ -243,14 +248,50 @@ function loadDurationBaseline(cwd) {
   return parsed.files ?? {};
 }
 
+function typescriptMissing(error) {
+  const seen = new Set();
+  let current = error;
+  while (current && !seen.has(current)) {
+    seen.add(current);
+    if (
+      (current.code === 'ERR_MODULE_NOT_FOUND' ||
+        current.code === 'MODULE_NOT_FOUND') &&
+      /['"]typescript['"]/.test(String(current.message ?? ''))
+    ) {
+      return true;
+    }
+    current = current.cause;
+  }
+  return false;
+}
+
+async function loadDurationHits(cwd, io) {
+  if (Object.hasOwn(io, 'durationHits')) return io.durationHits;
+  try {
+    const scan =
+      io.durationScan ??
+      (await import('./lib/wall-clock-assertions.mjs')).scanRepo;
+    return await scan(cwd);
+  } catch (error) {
+    // Source admission runs this file from a git archive of scripts/ that has
+    // no install. CI and a local checkout have node_modules and still scan.
+    if (!typescriptMissing(error) || existsSync(join(cwd, 'node_modules'))) {
+      throw error;
+    }
+    (io.error ?? console.error)(
+      'wall-clock-test-guard: elapsed scan skipped; typescript is not installed and this checkout has no node_modules'
+    );
+    return null;
+  }
+}
+
 /** Elapsed-time assertions above the shrink-only JOV-10086 baseline. */
 export async function durationViolations(cwd, io = {}) {
   const baseline = Object.hasOwn(io, 'durationBaseline')
     ? io.durationBaseline
     : loadDurationBaseline(cwd);
-  const found = Object.hasOwn(io, 'durationHits')
-    ? io.durationHits
-    : (await import('./lib/wall-clock-assertions.mjs')).scanRepo(cwd);
+  const found = await loadDurationHits(cwd, io);
+  if (found == null) return [];
   return violations(found, baseline);
 }
 

@@ -1,4 +1,6 @@
-import { readFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -182,6 +184,52 @@ describe('wall-clock-test-guard', () => {
 
   it('scans the working tree for new elapsed assertions', async () => {
     expect(await main(['--check'])).toBe(0);
+  });
+
+  it('skips the elapsed scan in a scripts-only checkout with no typescript', async () => {
+    const errors = [];
+    const cwd = mkdtempSync(join(tmpdir(), 'wall-clock-source-'));
+    const missing = new Error(
+      "Cannot find module 'typescript'\nRequire stack:\n- scripts/lib/wall-clock-assertions.mjs"
+    );
+    missing.code = 'MODULE_NOT_FOUND';
+    try {
+      const code = await main(['--check'], {
+        cwd,
+        trackedFiles: [],
+        durationScan: () => {
+          throw missing;
+        },
+        error: line => errors.push(line),
+      });
+      expect(code).toBe(0);
+      expect(errors.join('\n')).toContain('no node_modules');
+    } finally {
+      rmSync(cwd, { recursive: true, force: true });
+    }
+  });
+
+  it('fails closed when an installed checkout cannot load typescript', async () => {
+    const cwd = mkdtempSync(join(tmpdir(), 'wall-clock-installed-'));
+    mkdirSync(join(cwd, 'node_modules'));
+    const missing = new Error("Cannot find package 'typescript'");
+    missing.code = 'ERR_MODULE_NOT_FOUND';
+    try {
+      await expect(
+        main(['--check'], {
+          cwd,
+          trackedFiles: [],
+          durationScan: () => {
+            throw missing;
+          },
+          error: () => {
+            throw new Error('calendar check should not report');
+          },
+        })
+      ).rejects.toThrow(/typescript/);
+    } finally {
+      rmSync(cwd, { recursive: true, force: true });
+    }
   });
 
   it('keeps the committed ratchet at or above what the tree holds today', () => {
