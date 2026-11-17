@@ -2,6 +2,7 @@
 
 // @coverage-via apps/web/tests/unit/components/organisms/AuthShell.flag.test.tsx
 
+import dynamic from 'next/dynamic';
 import type { ReactNode } from 'react';
 import { useMemo } from 'react';
 import { usePreviewPanelState } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
@@ -19,7 +20,14 @@ import type { AppShellSection } from '@/types/app-shell';
 import type { DashboardBreadcrumbItem } from '@/types/dashboard';
 import { AppShellFrame } from './AppShellFrame';
 import { OperatorMobileNavigation } from './OperatorMobileNavigation';
-import { PersistentAudioBar } from './PersistentAudioBar';
+
+// The idle dock has no server markup. Keep its client-only transport UI out
+// of every route's initial shell bundle, while mounting it once for the shell.
+const PersistentAudioBar = dynamic(
+  () =>
+    import('./PersistentAudioBar').then(module => module.PersistentAudioBar),
+  { ssr: false }
+);
 export interface AuthShellProps {
   readonly section: AppShellSection;
   readonly breadcrumbs: DashboardBreadcrumbItem[];

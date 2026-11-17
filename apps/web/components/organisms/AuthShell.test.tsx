@@ -11,6 +11,7 @@ import { AuthShell } from './AuthShell';
 const mocks = vi.hoisted(() => ({
   headerRenders: 0,
   togglePreviewPanel: () => {},
+  audioAction: vi.fn(),
 }));
 
 vi.mock('@/hooks/useBreakpoint', () => ({
@@ -26,17 +27,20 @@ vi.mock('./AppShellFrame', () => ({
     header,
     main,
     mobileBottomNav,
+    audioPlayer,
   }: {
     sidebar: ReactNode;
     header?: ReactNode;
     main: ReactNode;
     mobileBottomNav?: ReactNode;
+    audioPlayer?: ReactNode;
   }) => (
     <div data-testid='auth-shell-frame'>
       {sidebar}
       {header}
       <main>{main}</main>
       {mobileBottomNav}
+      {audioPlayer}
     </div>
   ),
 }));
@@ -75,7 +79,11 @@ vi.mock('@/components/features/chat/Composer', () => ({
   useComposerFocus: () => ({ isComposerFocused: false }),
 }));
 vi.mock('./PersistentAudioBar', () => ({
-  PersistentAudioBar: () => null,
+  PersistentAudioBar: () => (
+    <button type='button' onClick={mocks.audioAction}>
+      Audio playback toggle
+    </button>
+  ),
 }));
 vi.mock('@/components/shell/RuntimeUpdateProvider', () => ({
   RuntimeUpdateProvider: ({ children }: { children: ReactNode }) => children,
@@ -124,6 +132,25 @@ function Shell({
 }
 
 describe('AuthShell', () => {
+  it('retains the loaded audio controls and focus through route updates', async () => {
+    const user = userEvent.setup();
+    const { rerender } = render(<Shell />);
+    const transport = await screen.findByRole('button', {
+      name: 'Audio playback toggle',
+    });
+    await user.click(transport);
+    expect(transport).toHaveFocus();
+    const actions = mocks.audioAction.mock.calls.length;
+
+    rerender(<Shell breadcrumbs={[{ label: 'Tasks' }]} />);
+    expect(screen.getByRole('button', { name: 'Audio playback toggle' })).toBe(
+      transport
+    );
+    expect(transport).toHaveFocus();
+    await user.keyboard('{Enter}');
+    expect(mocks.audioAction).toHaveBeenCalledTimes(actions + 1);
+  });
+
   it('pins a collapsed sidebar from the header toggle and reports the change', async () => {
     const user = userEvent.setup();
     const onSidebarOpenChange = vi.fn();
