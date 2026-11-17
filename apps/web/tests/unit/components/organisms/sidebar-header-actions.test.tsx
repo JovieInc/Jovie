@@ -292,7 +292,7 @@ describe('sidebar header actions row', () => {
     }
   });
 
-  it('keeps the unread dot on the bell', () => {
+  it('shows the earned inbox count on the bell', () => {
     renderHeader({
       data: { inboxNavigation: { state: 'available', pendingCount: 3 } },
     });
@@ -300,7 +300,9 @@ describe('sidebar header actions row', () => {
     expect(controls.bell).toHaveAttribute('href', APP_ROUTES.DASHBOARD);
     expect(controls.bell).toHaveAttribute('data-inbox-attention', 'available');
     expect(controls.bell).toHaveAccessibleName(/^Inbox — /);
-    expect(controls.bell.querySelector('span.bg-accent')).not.toBeNull();
+    const count = controls.bell.querySelector('[data-inbox-count]');
+    expect(count).toHaveClass('app-shell-count-badge');
+    expect(count).toHaveTextContent('3');
   });
 });
 

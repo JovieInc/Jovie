@@ -146,12 +146,13 @@ def route_js_shrink_decision(text):
 def plain_button_decision(text):
     """Repair record for the PlainButton scope guard. None when it did not fail.
 
-    Button cannot take a headless row's classes (shadcn/no-restyle), and
-    plain-button-scope.json is already at maxFiles. Use the native button.
+    plain-button-scope.json is already at maxFiles. A raw button fails the
+    component certificate, and Button rejects restyle classes. Use @jovie/ui
+    Button with layout-only classes.
     """
     if PLAIN_BUTTON_SCOPE.search(text) is None:
         return None
-    return {'repair': 'replace-with-native-button', 'forbid': 'grow-allowlist'}
+    return {'repair': 'replace-with-ui-button', 'forbid': 'grow-allowlist'}
 
 
 # Exact-head Coverage compares apps/web/scripts/route-render-modes.json with

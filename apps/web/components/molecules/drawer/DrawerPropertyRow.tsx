@@ -1,5 +1,6 @@
 'use client';
 
+import { Button } from '@jovie/ui';
 import { Check, Copy } from 'lucide-react';
 import { type CSSProperties, type ReactNode, useMemo } from 'react';
 import { useClipboard } from '@/hooks/useClipboard';
@@ -100,8 +101,10 @@ export function DrawerPropertyRow({
   );
 
   const valueContent = isCopyable ? (
-    <button
+    <Button
       type='button'
+      variant='link'
+      size='sm'
       aria-label={`Copy ${typeof label === 'string' ? label : 'value'}: ${value}`}
       title='Click to copy'
       data-copy-value={isSuccess ? 'success' : isError ? 'error' : 'idle'}
@@ -109,25 +112,23 @@ export function DrawerPropertyRow({
         event.stopPropagation();
         void copy(copyText ?? value);
       }}
-      className={cn(
-        'group/copy relative inline-flex min-w-0 max-w-full items-center gap-1 rounded-sm text-left',
-        'before:absolute before:left-1/2 before:top-1/2 before:h-full before:min-h-11 before:w-full before:min-w-11 before:-translate-x-1/2 before:-translate-y-1/2 before:content-empty',
-        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:ring-offset-surface-page'
-      )}
+      className='max-w-full'
     >
-      <span className='min-w-0 truncate'>{value}</span>
-      {isSuccess ? (
-        <Check
-          className='h-3 w-3 shrink-0 text-primary-token'
-          aria-hidden='true'
-        />
-      ) : (
-        <Copy
-          className='h-3 w-3 shrink-0 text-tertiary-token opacity-0 transition-opacity duration-subtle group-hover/copy:opacity-100 focus-visible:opacity-100 motion-reduce:opacity-60'
-          aria-hidden='true'
-        />
-      )}
-    </button>
+      <span className='group/copy inline-flex min-w-0 max-w-full items-center gap-1'>
+        <span className='min-w-0 truncate'>{value}</span>
+        {isSuccess ? (
+          <Check
+            className='h-3 w-3 shrink-0 text-primary-token'
+            aria-hidden='true'
+          />
+        ) : (
+          <Copy
+            className='h-3 w-3 shrink-0 text-tertiary-token opacity-0 transition-opacity duration-subtle group-hover/copy:opacity-100 focus-visible:opacity-100 motion-reduce:opacity-60'
+            aria-hidden='true'
+          />
+        )}
+      </span>
+    </Button>
   ) : (
     value
   );
