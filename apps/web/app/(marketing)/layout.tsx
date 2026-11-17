@@ -1,3 +1,8 @@
+// Chrome CSS is owned by the layouts that render the marketing chrome, not by
+// the root layout (which would ship it to every route). Keep it ahead of the
+// route styles so the cascade order matches the former root-layout import.
+import '@/components/organisms/HeaderNav.css';
+import '@/components/site/MarketingFooter.css';
 import '../(home)/home.css';
 import '../../components/marketing/MarketingSnapRail.css';
 import '../../components/marketing/artist-profile/ArtistProfileLandingPage.css';

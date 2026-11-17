@@ -231,6 +231,28 @@ describe('PublicPageShell', () => {
   });
 });
 
+describe('PublicPageShell chrome CSS ownership', () => {
+  it('imports the header and footer stylesheets itself, so boundaries that render the shell are styled without the root layout', async () => {
+    const { readFileSync } = await import('node:fs');
+    const { resolve } = await import('node:path');
+    const shellSource = readFileSync(
+      resolve(process.cwd(), 'components/site/PublicPageShell.tsx'),
+      'utf8'
+    );
+    expect(shellSource).toContain(
+      "import '@/components/organisms/HeaderNav.css';"
+    );
+    expect(shellSource).toContain("import './MarketingFooter.css';");
+
+    const rootLayoutSource = readFileSync(
+      resolve(process.cwd(), 'app/layout.tsx'),
+      'utf8'
+    );
+    expect(rootLayoutSource).not.toContain('HeaderNav.css');
+    expect(rootLayoutSource).not.toContain('MarketingFooter.css');
+  });
+});
+
 describe('prerendered homepage pathname', () => {
   it('MarketingPageContractMarkers.tsx reads "/index" as "/" via usePublicPathname', async () => {
     const { readFileSync } = await import('node:fs');

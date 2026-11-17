@@ -5,13 +5,6 @@ import { APP_NAME, BASE_URL } from '@/constants/app';
 import { COMPANY_IDENTITY } from '@/data/companyIdentity';
 import { BRAND_ION_BLUE } from '@/lib/brand/tokens';
 import './globals.css';
-// JOV-2145: HeaderNav.css is imported here so that the marketing-glass-header
-// visibility rules load on EVERY route, not just pages inside the (home) and
-// (marketing) route groups. The component-side import in HeaderNav.tsx is the
-// canonical declaration; Next.js's not-found.tsx CSS extraction doesn't always
-// traverse client-component CSS imports, so we ground the bundle here too.
-import '@/components/organisms/HeaderNav.css';
-import '@/components/site/MarketingFooter.css';
 import { AcquisitionCapture } from '@/components/features/tracking/AcquisitionCapture';
 import { CookieBannerMount } from '@/components/organisms/CookieBannerMount';
 import { GoogleAnalytics } from '@/components/providers/GoogleAnalytics';

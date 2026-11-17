@@ -616,7 +616,7 @@ export function HeaderNav({
             presentation === 'homepage-embedded' || isMarketingGlass
               ? 'transparent'
               : 'var(--linear-bg-header)',
-          zIndex: 100,
+          zIndex: 'var(--z-index-site-header)',
           backdropFilter:
             presentation === 'homepage-embedded' || isMarketingGlass
               ? 'none'

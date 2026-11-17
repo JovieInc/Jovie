@@ -20,7 +20,7 @@ def compose_actions(actions: list[str]) -> list[str]:
     order = (
         classes.SYNC_MAIN, classes.STAMP_CHANGELOG, classes.REPAIR_WIN, classes.WIRE_CI_FAST, classes.RENUMBER,
         classes.SNAP_SPACING, classes.STRIP_CACHE, classes.MERGE_NARROWED, classes.REGISTER_DOMAIN,
-        classes.ATOMIC_WRITE, classes.REPAIR_SCREEN_CERT, classes.BALANCE_HEADINGS, classes.UI_FEEL,
+        classes.ATOMIC_WRITE, classes.HEADER_ZINDEX, classes.REPAIR_SCREEN_CERT, classes.BALANCE_HEADINGS, classes.UI_FEEL,
         fix_red_render_modes.ACTION, classes.SPLIT_SIZE, classes.BIOME_FORMAT, classes.RERUN)
     rank = {name: index for index, name in enumerate(order)}
     chosen: list[str] = []
@@ -47,6 +47,12 @@ def deterministic_fixer(lane, action: str):
     """Resolve leaf fixers on the owning runner, including after a loader rebind."""
     import fix_red_classes as classes
 
+    if action == classes.HEADER_ZINDEX:
+        return lambda host, pr, route, worktree, log, receipt: lane.fix_red_rewrite.rewrite_commit_push(
+            lane.sh, pr, worktree, log, receipt, ("apps/web", "scripts/invariants"),
+            classes.rewrite_header_site_zindex,
+            "fix(web): point header chrome at the site-header z-index token",
+            "rewrote-header-zindex", "rewroteFiles")
     import fix_red_render_modes
 
     table = lane.fix_red_screen_cert.dispatch(classes, lane.sh, {

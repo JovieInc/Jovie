@@ -120,6 +120,54 @@
       "rule": "arbitrary-value",
       "value": "text-[clamp(2.5rem,16cqi,5.75rem)]",
       "reason": "JOV-11623: desktop artist-name sizing follows the height-bounded cover content width rather than viewport width. Retains the existing 5.75rem ceiling; 2.5rem is the existing 40px type step. 16cqi preserves single-line UNMARKED across verified short/tall desktop cases; wrap-anywhere handles longer or enlarged names. Scoped containment repair; no Pen approval claimed. No existing token expresses this content-width formula."
+    },
+    {
+      "file": "apps/web/components/organisms/RootNotFoundFooter.tsx",
+      "rule": "arbitrary-value",
+      "value": "grid-cols-[minmax(0,1fr)_minmax(0,2.6fr)]",
+      "reason": "Root 404 lean chrome: server-rendered twin of MarketingFooter, which is a client component and so cannot be rendered by app/not-found.tsx without shipping its client graph to every route. The value is copied verbatim from the owner (apps/web/components/site/MarketingFooter.tsx, already baselined) and tests/unit/app/root-not-found-chrome-parity.test.tsx holds the two markups equal, so this is not a new visual value. Retire together with the owner's identity."
+    },
+    {
+      "file": "apps/web/components/organisms/RootNotFoundFooter.tsx",
+      "rule": "arbitrary-value",
+      "value": "leading-[1.45]",
+      "reason": "Root 404 lean chrome: server-rendered twin of MarketingFooter, which is a client component and so cannot be rendered by app/not-found.tsx without shipping its client graph to every route. The value is copied verbatim from the owner (apps/web/components/site/MarketingFooter.tsx, already baselined) and tests/unit/app/root-not-found-chrome-parity.test.tsx holds the two markups equal, so this is not a new visual value. Retire together with the owner's identity."
+    },
+    {
+      "file": "apps/web/components/organisms/RootNotFoundFooter.tsx",
+      "rule": "arbitrary-value",
+      "value": "mt-[clamp(3.25rem,5vw,4.6rem)]",
+      "reason": "Root 404 lean chrome: server-rendered twin of MarketingFooter, which is a client component and so cannot be rendered by app/not-found.tsx without shipping its client graph to every route. The value is copied verbatim from the owner (apps/web/components/site/MarketingFooter.tsx, already baselined) and tests/unit/app/root-not-found-chrome-parity.test.tsx holds the two markups equal, so this is not a new visual value. Retire together with the owner's identity."
+    },
+    {
+      "file": "apps/web/components/organisms/RootNotFoundFooter.tsx",
+      "rule": "arbitrary-value",
+      "value": "pb-[clamp(2.5rem,4vw,3.5rem)]",
+      "reason": "Root 404 lean chrome: server-rendered twin of MarketingFooter, which is a client component and so cannot be rendered by app/not-found.tsx without shipping its client graph to every route. The value is copied verbatim from the owner (apps/web/components/site/MarketingFooter.tsx, already baselined) and tests/unit/app/root-not-found-chrome-parity.test.tsx holds the two markups equal, so this is not a new visual value. Retire together with the owner's identity."
+    },
+    {
+      "file": "apps/web/components/organisms/RootNotFoundFooter.tsx",
+      "rule": "arbitrary-value",
+      "value": "tracking-[-0.005em]",
+      "reason": "Root 404 lean chrome: server-rendered twin of MarketingFooter, which is a client component and so cannot be rendered by app/not-found.tsx without shipping its client graph to every route. The value is copied verbatim from the owner (apps/web/components/site/MarketingFooter.tsx, already baselined) and tests/unit/app/root-not-found-chrome-parity.test.tsx holds the two markups equal, so this is not a new visual value. Retire together with the owner's identity."
+    },
+    {
+      "file": "apps/web/components/organisms/RootNotFoundHeader.tsx",
+      "rule": "linear-namespace",
+      "value": "--linear-bg-header",
+      "reason": "Root 404 lean chrome: server-rendered twin of the minimal HeaderNav presentation, which is a client component and so cannot be rendered by app/not-found.tsx without shipping its client graph to every route. The token is copied verbatim from the owner (apps/web/components/organisms/HeaderNav.tsx, already baselined) and tests/unit/app/root-not-found-chrome-parity.test.tsx holds the two markups equal, so this is not a new System A adoption. Retire together with the owner's identity."
+    },
+    {
+      "file": "apps/web/components/organisms/RootNotFoundHeader.tsx",
+      "rule": "linear-namespace",
+      "value": "--linear-border-default",
+      "reason": "Root 404 lean chrome: server-rendered twin of the minimal HeaderNav presentation, which is a client component and so cannot be rendered by app/not-found.tsx without shipping its client graph to every route. The token is copied verbatim from the owner (apps/web/components/organisms/HeaderNav.tsx, already baselined) and tests/unit/app/root-not-found-chrome-parity.test.tsx holds the two markups equal, so this is not a new System A adoption. Retire together with the owner's identity."
+    },
+    {
+      "file": "apps/web/components/organisms/RootNotFoundHeader.tsx",
+      "rule": "linear-namespace",
+      "value": "--linear-header-height",
+      "reason": "Root 404 lean chrome: server-rendered twin of the minimal HeaderNav presentation, which is a client component and so cannot be rendered by app/not-found.tsx without shipping its client graph to every route. The token is copied verbatim from the owner (apps/web/components/organisms/HeaderNav.tsx, already baselined) and tests/unit/app/root-not-found-chrome-parity.test.tsx holds the two markups equal, so this is not a new System A adoption. Retire together with the owner's identity."
     }
   ],
   "notes": "Documented escapes only. Each identity is file<TAB>rule<TAB>value (or {file, rule, value}). Prefer deleting the debt over adding an escape. The JOV-[1-9] entry is a zod issue-key validation regex in that route (identifier: /^JOV-[1-9][0-9]*$/u), not a style token; no canonical design token applies."

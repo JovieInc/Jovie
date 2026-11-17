@@ -103,7 +103,9 @@ describe('NotFoundPageContent', () => {
       readFile(marketingRoutePath, 'utf8'),
     ]);
 
-    expect(rootRoute).toContain("variant='minimal'");
+    // The root 404 draws the minimal header from its server-only twin; the
+    // parity test holds it equal to `<MarketingHeader variant='minimal' />`.
+    expect(rootRoute).toContain('<RootNotFoundHeader />');
     expect(rootRoute).toContain('system-b-root-not-found-main');
     expect(rootRoute).toContain(
       "<NotFoundPageContent variant='generic' surface='root' />"
