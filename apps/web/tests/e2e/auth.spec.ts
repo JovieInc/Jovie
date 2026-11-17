@@ -99,7 +99,8 @@ async function waitForClerkAuthUi(page: Page): Promise<void> {
         bodyText.includes('continue') ||
         bodyText.includes('google') ||
         bodyText.includes('sign in to jovie') ||
-        bodyText.includes('request access')
+        bodyText.includes('request access') ||
+        bodyText.includes('request an invite')
       );
     },
     undefined,
@@ -312,6 +313,7 @@ test.describe('Auth pages: content and CTA routing (JOV-2065, JOV-2066)', () => 
       const hasSignupCopy =
         (bodyText ?? '').toLowerCase().includes('sign up') ||
         (bodyText ?? '').toLowerCase().includes('request access') ||
+        (bodyText ?? '').toLowerCase().includes('request an invite') ||
         (bodyText ?? '').toLowerCase().includes('create') ||
         (bodyText ?? '').toLowerCase().includes('get started');
       expect(

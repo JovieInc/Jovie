@@ -132,6 +132,11 @@ rules:
         # mechanical codemods opt out with the `big-pr` label.
         - context: 'PR Size Guard'
 
+        # Company Guards: shared company guard suite (size baselines, etc. from
+        # JovieInc/ci canon). Runs on pull_request, merge_group and push, so it
+        # reports on queue entries and never starves them.
+        - context: 'Company guards'
+
   # Match live ruleset deletion protection. This applies to the main ref only.
   - type: 'deletion'
 

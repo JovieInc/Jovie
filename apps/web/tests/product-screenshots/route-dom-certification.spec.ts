@@ -23,14 +23,15 @@ import {
   isExternalBaseUrl,
   primeOriginBoundVercelBypass,
 } from '../helpers/vercel-preview';
+import { registerBlankMediaFixtures } from './route-dom-blank-media-fixtures';
 import {
   axisSection,
   busyImg,
   certificationScope,
   deploymentId,
   exactBaseUrl,
+  expectAtomicContrastCapture,
   expectDeliberateRed,
-  flatImg,
   isTasteKind,
   markupKinds,
   outputRoot,
@@ -40,7 +41,6 @@ import {
   profileStates,
   profileViewports,
   safeName,
-  slowImageBlankMedia,
   sourceGitSha,
   tasteBaseline,
   tasteBaselinePath,
@@ -295,30 +295,7 @@ test.describe('Route DOM detector deliberate-red fixtures', () => {
     page_ref = page;
   });
 
-  test('blank-media: flags a near-uniform image in a designed section', async () => {
-    expect(
-      await kindsOf(
-        `<main><section data-pen-section="hero"><h1>Product</h1><img src="${flatImg}" width="600" height="400" alt="Dashboard"></section></main>`
-      )
-    ).toContain('blank-media');
-  });
-
-  test('blank-media: ignores a busy image and a data-decorative image', async () => {
-    expect(
-      await kindsOf(
-        `<main><section data-pen-section="hero"><h1>Product</h1><img src="${busyImg}" width="600" height="400" alt="Dashboard"></section></main>`
-      )
-    ).not.toContain('blank-media');
-    expect(
-      await kindsOf(
-        `<main><section data-pen-section="hero"><h1>Product</h1><img data-decorative src="${flatImg}" width="600" height="400" alt=""></section></main>`
-      )
-    ).not.toContain('blank-media');
-  });
-
-  test('blank-media: judges a slow image once it has loaded, not its empty slot', async () => {
-    expect(await slowImageBlankMedia(page_ref)).not.toContain('blank-media');
-  });
+  registerBlankMediaFixtures();
 
   test('placeholder-copy: flags common placeholders in text, alt and aria', async () => {
     for (const html of [
@@ -471,9 +448,7 @@ test.describe('Route DOM detector deliberate-red fixtures', () => {
     expect(snapshot.findings).toEqual([]);
   });
 
-  // JOV-6916: text-aware-contrast deliberate-red. R01 painted a bright
-  // upper-right corner exactly where the docked header renders Log in and
-  // the primary CTA; light glyphs over that corner must reproduce red.
+  // JOV-6916: light glyphs over R01's bright header corner must reproduce red.
   test('reproduces the R01 bright header corner behind Log in and the CTA', async ({
     page,
   }) => {
@@ -498,6 +473,12 @@ test.describe('Route DOM detector deliberate-red fixtures', () => {
     expect(snapshot.findings).toEqual([]);
     expect(snapshot.receipts.length).toBeGreaterThan(0);
     expect(snapshot.receipts.every(receipt => receipt.pass)).toBe(true);
+  });
+
+  test('hides control ink at capture while retaining each candidate box (JOV-11623)', async ({
+    page,
+  }) => {
+    await expectAtomicContrastCapture(page);
   });
 
   // JOV-INV-019 (2026-09-29): a real /unfazed pass surfaced three detector

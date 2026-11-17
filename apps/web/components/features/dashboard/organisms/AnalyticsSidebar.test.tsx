@@ -296,12 +296,11 @@ describe('FunnelStage (regression: JOV-4158 / #13819 skeleton layout parity)', (
       <FunnelStage {...stageProps} rate='40%' loading={false} />
     );
 
-    expect(withoutRate.firstElementChild?.className).toBe(
-      FUNNEL_STAGE_OUTER_CLASS
-    );
-    expect(withRate.firstElementChild?.className).toBe(
-      FUNNEL_STAGE_OUTER_CLASS
-    );
+    for (const stage of [withoutRate, withRate]) {
+      expect(stage.firstElementChild?.className).toBe(FUNNEL_STAGE_OUTER_CLASS);
+      // Every stage holds the fixed rate column (see the funnel-rate test).
+      expect(stage.querySelector('[data-funnel-rate]')).toHaveClass('w-8');
+    }
     expect(withoutRate.firstElementChild?.firstElementChild?.className).toBe(
       FUNNEL_STAGE_METRIC_ROW_CLASS
     );

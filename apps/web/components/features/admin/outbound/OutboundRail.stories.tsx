@@ -116,3 +116,15 @@ export const DecisionFailed: Story = {
 export const Empty: Story = {
   args: { row: null, certification: null },
 };
+
+export const NeedsJudge: Story = {
+  args: {
+    row: outboundFixtureRow({
+      view: 'needs_judge',
+      nextAction: 'await_judge',
+      message: null,
+    }),
+    certification: certification('certified_for_outreach'),
+    activeFactKey: null,
+  },
+};

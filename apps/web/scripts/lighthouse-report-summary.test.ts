@@ -149,6 +149,74 @@ describe('Lighthouse report summary', () => {
     ]);
   });
 
+  it('names the modules inside the dominant chunk when the report has treemap depth', () => {
+    const withTreemap = {
+      ...releasesReport,
+      audits: {
+        ...releasesReport.audits,
+        'script-treemap-data': {
+          details: {
+            nodes: [
+              {
+                name: 'http://localhost:3000/_next/static/chunks/small.js',
+                resourceBytes: 1_024,
+              },
+              {
+                name: 'http://localhost:3000/_next/static/chunks/app.js',
+                resourceBytes: 260_000,
+                children: [
+                  {
+                    name: 'file:///home/runner/work/Jovie/Jovie/apps/web/components/features/dashboard/HeavyPanel.tsx',
+                    resourceBytes: 96_000,
+                  },
+                  {
+                    name: 'file:///home/runner/work/Jovie/Jovie/apps/web/lib/tanstack-table.ts',
+                    resourceBytes: 12_000,
+                  },
+                  {
+                    name: 'http://localhost:3000/_next/static/chunks/app.js',
+                    resourceBytes: 2_000,
+                  },
+                ],
+              },
+            ],
+          },
+        },
+      },
+    };
+    expect(summarizeReport(withTreemap)).toEqual(
+      expect.arrayContaining([
+        '  Dominant chunk by module (largest first):',
+        `    93.8 KiB /home/runner/work/Jovie/Jovie/apps/web/components/features/dashboard/HeavyPanel.tsx`,
+        '    11.7 KiB /home/runner/work/Jovie/Jovie/apps/web/lib/tanstack-table.ts',
+      ])
+    );
+  });
+
+  it('says so when the heavy chunk has no source-map attribution', () => {
+    const withoutTreemap = {
+      ...releasesReport,
+      audits: {
+        ...releasesReport.audits,
+        'script-treemap-data': {
+          details: {
+            nodes: [
+              {
+                name: 'http://localhost:3000/_next/static/chunks/app.js',
+                resourceBytes: 260_000,
+              },
+            ],
+          },
+        },
+      },
+    };
+    expect(summarizeReport(withoutTreemap)).toEqual(
+      expect.arrayContaining([
+        '  Dominant chunk attribution: report has no source-map depth; enable source maps for the Lighthouse build to name the modules.',
+      ])
+    );
+  });
+
   it('summarizes only the median run of each page', () => {
     const directory = mkdtempSync(join(tmpdir(), 'jovie-lh-summary-'));
     directories.push(directory);

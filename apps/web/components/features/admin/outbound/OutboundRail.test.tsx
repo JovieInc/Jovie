@@ -52,6 +52,25 @@ function renderRail(overrides: Partial<OutboundRailProps> = {}) {
 }
 
 describe('OutboundRail', () => {
+  it('explains a judge-blocked draft without offering message actions', () => {
+    const props = renderRail({
+      row: outboundFixtureRow({
+        view: 'needs_judge',
+        nextAction: 'await_judge',
+        message: null,
+      }),
+    });
+    expect(screen.getByTestId('outbound-message-empty')).toHaveTextContent(
+      'Draft hidden until the page and onboarding pass the dogfood judge.'
+    );
+    expect(screen.queryByLabelText('Message Body')).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Approve' })
+    ).not.toBeInTheDocument();
+    act(() => sendOutboundRailCommand('approve'));
+    expect(props.onApprove).not.toHaveBeenCalled();
+  });
+
   it('blocks approval and says so when no recipient is on file (A17)', () => {
     renderRail({ row: outboundFixtureRow({ channel: null }) });
     expect(screen.getByRole('button', { name: 'Approve' })).toBeDisabled();
@@ -77,6 +96,37 @@ describe('OutboundRail', () => {
     const box = screen.getByTestId('outbound-eligibility');
     expect(box).toHaveTextContent('Looks like a label or distributor');
     expect(box).toHaveTextContent('Needs evidence: dsp, search.');
+  });
+
+  it('shows the existing-relationship hold with no draft to approve', () => {
+    const hold = 'Existing relationship: flag to Tim, no cold outreach';
+    renderRail({
+      row: outboundFixtureRow({
+        view: 'held',
+        flags: ['existing_relationship'],
+        relationshipHold: hold,
+        message: null,
+      }),
+    });
+    expect(screen.getByTestId('outbound-message-empty')).toHaveTextContent(
+      hold
+    );
+    expect(screen.getByTestId('outbound-relationship-hold')).toHaveTextContent(
+      hold
+    );
+    expect(screen.queryByRole('button', { name: 'Approve' })).toBeNull();
+  });
+
+  it('shows a relationship tag beside a draft that stays approvable', () => {
+    renderRail({
+      row: outboundFixtureRow({
+        relationshipNotes: ["Relationship: Armada Music, Tim's vocalist deals"],
+      }),
+    });
+    expect(screen.getByTestId('outbound-eligibility')).toHaveTextContent(
+      "Relationship: Armada Music, Tim's vocalist deals"
+    );
+    expect(screen.getByRole('button', { name: 'Approve' })).toBeEnabled();
   });
 
   it('blocks approval until the current facts are certified', () => {

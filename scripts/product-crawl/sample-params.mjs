@@ -276,8 +276,13 @@ export function repoSamples({ read, list, exists, handle }) {
   return { samples, reserved };
 }
 
+// A playlist's own page; the index and the genre and mood hubs carry the
+// site's default keywords, which are not tags.
+const PLAYLIST_PAGE = /^\/playlists\/(?!genre\/|mood\/)[^/?#]+$/;
+
 /** Genres and moods a playlist page names (app/(dynamic)/playlists/[slug]). */
 export function playlistTags(page) {
+  if (!PLAYLIST_PAGE.test(page.url ?? '')) return { genres: [], moods: [] };
   const genres = [];
   const walk = v => {
     if (Array.isArray(v)) v.forEach(walk);

@@ -590,8 +590,8 @@ describe('proxy.ts middleware', () => {
       expect(cookies.homepage_region).toBe('');
     });
 
-    it('sets jv_cc_required=1 for US California (CCPA)', async () => {
-      mocks.isCookieBannerRequired.mockReturnValue(true);
+    it('sets jv_cc_required=0 for US California opt-out choices', async () => {
+      mocks.isCookieBannerRequired.mockReturnValue(false);
 
       const req = createUnauthenticatedRequest({
         pathname: '/',
@@ -604,7 +604,7 @@ describe('proxy.ts middleware', () => {
 
       expect(mocks.isCookieBannerRequired).toHaveBeenCalledWith('US', 'CA');
       const cookies = getResponseCookies(res);
-      expect(cookies.jv_cc_required).toBe('1');
+      expect(cookies.jv_cc_required).toBe('0');
     });
 
     it('sets jv_cc_required=0 for US Texas (no state law)', async () => {

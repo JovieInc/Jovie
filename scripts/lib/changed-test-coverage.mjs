@@ -142,6 +142,7 @@ function assertExactShas({ base, head, repoRoot }) {
     );
   }
   execFileSync('git', ['cat-file', '-e', `${base}^{commit}`], {
+    maxBuffer: 256 * 1024 * 1024,
     cwd: repoRoot,
     stdio: 'ignore',
   });

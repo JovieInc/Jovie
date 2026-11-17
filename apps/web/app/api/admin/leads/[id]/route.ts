@@ -1,10 +1,15 @@
 import { eq } from 'drizzle-orm';
-import { type NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import {
   acquisitionFunnelAttribution,
   captureAcquisitionRejection,
   experimentIdForLeadSource,
 } from '@/lib/acquisition';
+import {
+  type OperatorRouteInput,
+  operatorAccess,
+} from '@/lib/api/route-access';
+import { defineRoute } from '@/lib/api/route-pipeline';
 import { db } from '@/lib/db';
 import { leads } from '@/lib/db/schema/leads';
 import { captureError, getSafeErrorMessage } from '@/lib/error-tracking';
@@ -12,7 +17,6 @@ import { parseJsonBody } from '@/lib/http/parse-json';
 import { approveLead } from '@/lib/leads/approve-lead';
 import { pipelineLog } from '@/lib/leads/pipeline-logger';
 import { recordLeadRejectionEvent } from '@/lib/leads/rejection-event';
-import { getOvieOperatorEntitlements } from '@/lib/ovie/privacy-lock/access';
 import { leadStatusUpdateSchema } from '@/lib/validation/lead-schemas';
 
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
@@ -22,24 +26,10 @@ export const runtime = 'nodejs';
 /**
  * PATCH /api/admin/leads/[id] — Update lead status (approve/reject).
  */
-export async function PATCH(
-  request: NextRequest,
+async function patchHandler(
+  { request }: OperatorRouteInput,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const entitlements = await getOvieOperatorEntitlements({ session: 'fresh' });
-  if (!entitlements.isAuthenticated) {
-    return NextResponse.json(
-      { error: 'Unauthorized' },
-      { status: 401, headers: NO_STORE_HEADERS }
-    );
-  }
-  if (!entitlements.isAdmin) {
-    return NextResponse.json(
-      { error: 'Forbidden' },
-      { status: 403, headers: NO_STORE_HEADERS }
-    );
-  }
-
   try {
     const { id } = await params;
     const parsed = await parseJsonBody(request, {
@@ -136,9 +126,20 @@ export async function PATCH(
       .limit(1);
 
     return NextResponse.json(
-      { ...updated, ingestion: result.ingestion, routing: result.routing },
       {
-        status: 200,
+        ...updated,
+        ingestion: result.ingestion,
+        routing: result.routing,
+        ...(result.relationshipHold
+          ? {
+              error: result.relationshipHold.label,
+              code: 'EXISTING_RELATIONSHIP',
+              relationshipHold: result.relationshipHold,
+            }
+          : {}),
+      },
+      {
+        status: result.relationshipHold ? 409 : 200,
         headers: NO_STORE_HEADERS,
       }
     );
@@ -155,27 +156,22 @@ export async function PATCH(
   }
 }
 
+export const PATCH = defineRoute(
+  {
+    route: '/api/admin/leads/[id]',
+    access: operatorAccess({ session: 'fresh' }),
+    legacy: { cache: 'pipeline-responses-only', unhandledErrors: 'rethrow' },
+  },
+  patchHandler
+);
+
 /**
  * DELETE /api/admin/leads/[id] — Remove a lead.
  */
-export async function DELETE(
-  _request: NextRequest,
+async function deleteHandler(
+  _input: OperatorRouteInput,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const entitlements = await getOvieOperatorEntitlements({ session: 'fresh' });
-  if (!entitlements.isAuthenticated) {
-    return NextResponse.json(
-      { error: 'Unauthorized' },
-      { status: 401, headers: NO_STORE_HEADERS }
-    );
-  }
-  if (!entitlements.isAdmin) {
-    return NextResponse.json(
-      { error: 'Forbidden' },
-      { status: 403, headers: NO_STORE_HEADERS }
-    );
-  }
-
   try {
     const { id } = await params;
     const [deleted] = await db
@@ -206,3 +202,12 @@ export async function DELETE(
     );
   }
 }
+
+export const DELETE = defineRoute(
+  {
+    route: '/api/admin/leads/[id]',
+    access: operatorAccess({ session: 'fresh' }),
+    legacy: { cache: 'pipeline-responses-only', unhandledErrors: 'rethrow' },
+  },
+  deleteHandler
+);

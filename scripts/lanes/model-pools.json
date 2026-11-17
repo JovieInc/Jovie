@@ -1,0 +1,180 @@
+{
+  "schema": "jovie.model-pools/v1",
+  "about": "The one table of the fleet's model pools: every provider the lanes use, the quota or credit behind it, and where its reset or expiry is read from. Two rules live here. (1) Tim, 2026-11-11: Anthropic models (Fable, Opus, Sonnet, Haiku, any claude-*) run only on the Claude subscription that is already paid for, or on Hyperagent; never the Vercel AI Gateway or a metered API key. (2) Among available routes of one capability class, the pool whose unused allowance is lost first takes the run. Read by scripts/lanes/model_pools.py: `check` is the CI guard, `command_guard` and `refusal` are the runtime checks, `balanced` is the selector, `utilization` is the per-pool summary. Product chat has its own fail-closed allowlist (apps/web/lib/ai/sdk.ts, JOV-7119). Summer carries the same Anthropic rule in JovieInc/summer-config apps/summer/agent/lib/model-pools.ts.",
+  "anthropic": {
+    "idPattern": "(?i)(?<![a-z])(claude|fable|opus|sonnet|haiku|anthropic)(?![a-z])",
+    "tiers": ["fable", "opus", "sonnet", "haiku"],
+    "runners": ["claude"]
+  },
+  "agentRunners": [
+    "codex",
+    "claude",
+    "grok",
+    "hyperagent",
+    "devin",
+    "kimi",
+    "gemini",
+    "opencode",
+    "aider",
+    "cursor-agent"
+  ],
+  "pools": {
+    "claude-subscription": {
+      "anthropic": "allowed",
+      "label": "Claude subscription (Claude Code sessions)",
+      "signals": ["claude-subscription", "subscription-claude", "claude-code"],
+      "executors": ["claude_lane.py"],
+      "requireCostClass": "subscription",
+      "expiry": {
+        "source": "claude-lane-window",
+        "note": "Local 5 hour run window from claude-quota.json, read only while a window is open; an idle lane has no expiry. The registry has no provider quota read path for the Claude subscription, so weekly reset data does not exist."
+      },
+      "quota": "Flat-rate subscription; 5 hour usage window, soft cap from ops/registry/capacity.json anthropic-claude limits",
+      "registryProvider": "anthropic-claude"
+    },
+    "hyperagent": {
+      "anthropic": "allowed",
+      "label": "Hyperagent credits (Founding 500)",
+      "signals": ["hyperagent-credits", "hyperagent", "credits:hyperagent"],
+      "executors": ["hyperagent"],
+      "expiry": {
+        "source": "hyperagent-daily-cap-and-credits",
+        "note": "Daily run cap (HYPERAGENT_RUNS_PER_DAY, per UTC day) and the credit expiry in ops/registry/capacity.json."
+      },
+      "quota": "Given credits (Founding 500) with a daily run cap (HYPERAGENT_RUNS_PER_DAY)",
+      "registryProvider": "hyperagent",
+      "modelEnv": ["HYPERAGENT_MODEL"]
+    },
+    "codex-subscription": {
+      "anthropic": "forbidden",
+      "label": "OpenAI Codex (ChatGPT Pro seats)",
+      "signals": ["chatgpt-oauth"],
+      "executors": ["codex_lane.py"],
+      "quota": "Shared weekly subscription window per account",
+      "registryProvider": "openai-codex",
+      "expiry": {
+        "source": "registry-quota-reset",
+        "note": "Earliest future resetsAt across active accounts, from the live overlay (capacity-live.json) or the registry snapshot. A reading whose reset is already past gives no expiry."
+      },
+      "fix": "Codex seats run OpenAI models. Run Anthropic models on the Claude lane or on Hyperagent.",
+      "modelEnv": ["CODEX_LANE_MODEL"]
+    },
+    "grok-subscription": {
+      "anthropic": "forbidden",
+      "label": "xAI Grok (SuperGrok Heavy)",
+      "signals": [],
+      "executors": ["grok"],
+      "quota": "Weekly capped quota; promo price until 2026-12-01",
+      "registryProvider": "xai-grok",
+      "expiry": {
+        "source": "registry-quota-reset",
+        "note": "Weekly resetsAt from the Grok usage reader (live overlay) or the registry snapshot."
+      },
+      "fix": "Grok runs xAI models. Run Anthropic models on the Claude lane or on Hyperagent."
+    },
+    "devin-free": {
+      "anthropic": "forbidden",
+      "label": "Devin (free SWE-2)",
+      "signals": [],
+      "executors": ["devin"],
+      "quota": "Free tier, bounded by providers.json freeOnly.stopBefore",
+      "registryProvider": "devin",
+      "expiry": {
+        "source": "lane-free-window",
+        "note": "freeOnly.stopBefore on the lane. Once that date has passed there is no expiry to chase."
+      },
+      "fix": "Devin runs its free model only. Run Anthropic models on the Claude lane or on Hyperagent."
+    },
+    "kimi": {
+      "anthropic": "forbidden",
+      "label": "Kimi plan",
+      "signals": [],
+      "executors": ["kimi"],
+      "quota": "Capped plan; status unverified in ops/registry/capacity.json",
+      "registryProvider": "kimi",
+      "expiry": {
+        "source": "none",
+        "note": "No reset or expiry is recorded for this plan."
+      },
+      "fix": "Kimi runs Moonshot models. Run Anthropic models on the Claude lane or on Hyperagent."
+    },
+    "vercel-ai-gateway": {
+      "anthropic": "forbidden",
+      "label": "Vercel AI Gateway (metered)",
+      "signals": [
+        "gateway",
+        "gateway-allowlist",
+        "gateway-image",
+        "vercel-gateway",
+        "vercel-ai-gateway",
+        "api:gateway"
+      ],
+      "hosts": ["ai-gateway.vercel.sh"],
+      "fix": "Run it on the Claude lane (scripts/lanes/claude_lane.py, subscription login) or on Hyperagent.",
+      "quota": "Prepaid metered credits (pay per token)",
+      "registryProvider": "vercel-ai-gateway",
+      "expiry": {
+        "source": "none",
+        "note": "Pay per token: nothing is lost by not using it."
+      }
+    },
+    "anthropic-api": {
+      "anthropic": "forbidden",
+      "label": "Metered Anthropic API key",
+      "signals": ["api", "vendor-api", "anthropic-api"],
+      "hosts": ["api.anthropic.com"],
+      "credentials": [
+        "ANTHROPIC_API_KEY",
+        "ANTHROPIC_AUTH_TOKEN",
+        "ANTHROPIC_BASE_URL",
+        "CLAUDE_CODE_USE_BEDROCK",
+        "CLAUDE_CODE_USE_VERTEX"
+      ],
+      "fix": "Remove the API key route. Run it on the Claude lane (subscription login) or on Hyperagent.",
+      "quota": "Metered API key",
+      "expiry": {
+        "source": "none",
+        "note": "Pay per token: nothing is lost by not using it."
+      }
+    }
+  },
+  "guard": {
+    "structured": [
+      "scripts/lanes/providers.json",
+      "scripts/lanes/routing.json",
+      "scripts/lanes/reason.json",
+      "scripts/hyperagent/models.json",
+      "scripts/backlog-orchestrator/config/model-registry.json",
+      "ops/models/task-registry.json",
+      "ops/registry/capacity.json"
+    ],
+    "commands": ["scripts/lanes/providers.json", "scripts/lanes/reason.json"],
+    "workflows": [".github/workflows", ".github/actions"],
+    "sources": [
+      "scripts/lanes",
+      "scripts/hyperagent",
+      "scripts/swarm",
+      "scripts/apiclient",
+      "scripts/signals",
+      "scripts/capacity",
+      "ops/agents"
+    ]
+  },
+  "exceptions": [
+    {
+      "path": "ops/models/task-registry.json",
+      "rule": "anthropic-on-forbidden-pool",
+      "match": "screenshot-bug-loop",
+      "reason": "The screenshot bug loop calls claude-haiku with a metered ANTHROPIC_API_KEY. The registry row already notes the conflict with JOV-7119.",
+      "owner": "ops",
+      "removeWhen": "The loop moves to a Workers AI vision model or a subscription route."
+    },
+    {
+      "path": "ops/agents/summer-improvement-loop/claude-lock.json",
+      "rule": "metered-anthropic-host",
+      "reason": "The Summer improvement loop is a Claude Managed Agents session on api.anthropic.com, paid from the monthly Claude API credit (ops/registry/spend.json managed-agents-loop, capped at $150 a month).",
+      "owner": "gem-lanes",
+      "removeWhen": "Tim decides whether the monthly API credit counts as an allowed pool, or the loop moves to the Claude lane."
+    }
+  ]
+}

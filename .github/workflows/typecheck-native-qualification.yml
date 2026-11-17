@@ -1,0 +1,49 @@
+name: Native Typecheck Qualification
+
+# JOV-8258: explicit qualification only; no automatic source or queue workload.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  qualification:
+    name: Qualify tsrs against TS6 and its Microsoft upstream
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - name: Checkout exact dispatched head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 1
+          persist-credentials: false
+      - uses: ./.github/actions/setup-node-pnpm
+      - name: Install the isolated, integrity-pinned compiler tools
+        shell: bash
+        run: |
+          set -euo pipefail
+          NATIVE_TYPECHECK_OUTPUT="$RUNNER_TEMP/native-typecheck-qualification"
+          printf 'NATIVE_TYPECHECK_OUTPUT=%s\n' "$NATIVE_TYPECHECK_OUTPUT" >> "$GITHUB_ENV"
+          mkdir -p "$NATIVE_TYPECHECK_OUTPUT"
+          tools_dir=$(mktemp -d "$RUNNER_TEMP/native-typecheck-tools.XXXXXX")
+          cp .github/ci-harness/typecheck-native-tools/package.json "$tools_dir/"
+          cp .github/ci-harness/typecheck-native-tools/pnpm-lock.yaml "$tools_dir/"
+          printf 'NATIVE_TYPECHECK_TOOLS=%s\n' "$tools_dir" >> "$GITHUB_ENV"
+          date -u +%Y-%m-%dT%H:%M:%S.%3NZ > "$NATIVE_TYPECHECK_OUTPUT/tools-install-started-at.txt"
+          pnpm --dir "$tools_dir" install --frozen-lockfile --ignore-scripts \
+            --registry=https://registry.npmjs.org --store-dir "$tools_dir/.store"
+          date -u +%Y-%m-%dT%H:%M:%S.%3NZ > "$NATIVE_TYPECHECK_OUTPUT/tools-install-finished-at.txt"
+      - name: Run bounded web and UI qualification
+        env:
+          NATIVE_TYPECHECK_EXPECTED_SHA: ${{ github.sha }}
+        run: node scripts/typecheck-native-qualification.mjs --run --tools "$NATIVE_TYPECHECK_TOOLS" --output "$NATIVE_TYPECHECK_OUTPUT/results"
+      - name: Preserve qualification receipts and raw logs
+        if: ${{ always() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: native-typecheck-qualification
+          path: ${{ env.NATIVE_TYPECHECK_OUTPUT }}
+          if-no-files-found: error
+          retention-days: 14

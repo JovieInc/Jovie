@@ -30,7 +30,6 @@ import {
   postStripeWebhook,
   sendSubscriptionWebhook,
 } from './helpers/stripe-helpers';
-import { measureWebVitals } from './utils/performance-test-utils';
 
 /**
  * $12/month self-serve artist profile (EVENT: Tim, 2026-10-20):
@@ -43,17 +42,10 @@ import { measureWebVitals } from './utils/performance-test-utils';
  * with Stripe's documented test PaymentMethod and the signed event goes
  * through the real webhook route.
  */
-// A paying artist must not watch the claim or unlock screen jump around.
-// 0.1 is the Web Vitals "good" ceiling for cumulative layout shift.
-async function expectStableLayout(page: Page, screen: string): Promise<void> {
-  await page.waitForTimeout(1500); // let late shifts land
-  const { cls = 0 } = await measureWebVitals(page);
-  test
-    .info()
-    .annotations.push({ type: 'cls', description: `${screen} ${cls}` });
-  // Soft, so a shift is reported without hiding the payment checks after it.
-  expect.soft(cls, `${screen} layout shift`).toBeLessThan(0.1);
-}
+// One spec asserts one class: this file is the functional journey only.
+// The layout-shift budget for /claim and /billing/success lives in
+// claim-checkout-layout.perf.spec.ts and reports as its own check, so a
+// layout regression never turns the revenue canary red (docs/ON_CALL_PROCESS.md).
 
 test.describe('Self-serve artist profile checkout', () => {
   test.use({ storageState: { cookies: [], origins: [] } });
@@ -104,7 +96,6 @@ test.describe('Self-serve artist profile checkout', () => {
     );
 
     await page.goto('/claim', { waitUntil: 'domcontentloaded' });
-    await expectStableLayout(page, '/claim');
     const { sessionId } = await createCheckoutSession(page, priceId, {
       source: 'onboarding',
       returnTo: '/chat?from=onboarding',
@@ -170,7 +161,6 @@ test.describe('Self-serve artist profile checkout', () => {
       await expect(page.getByText(/You're on .+: unlocked/)).toBeVisible({
         timeout: 30_000,
       });
-      await expectStableLayout(page, '/billing/success');
 
       // An existing subscriber is never charged twice.
       const again = await page.request.get('/claim/start?new=1', {
@@ -270,12 +260,24 @@ test.describe('Claim checkout dogfood', () => {
         `/${DOGFOOD_LOW_REACH_ARTIST.handle}/claim?next=auth`
       );
 
-      // At or above it: the buyer's own sign-up and checkout, never a dead end.
+      // At or above it: the buyer's own sign-up and checkout, never a dead
+      // end. One front door (Tim, 2026-11-09): anonymous claim start hands
+      // off into the /start onboarding chat with the artist context; the
+      // Pro-monthly intent rides the plan-intent cookies, not the URL.
       await options.filter({ hasText: DOGFOOD_HIGH_REACH_ARTIST.name }).click();
-      await expect(page).toHaveURL(/\/signup\?.*plan=pro/, { timeout: 30_000 });
+      await expect(page).toHaveURL(/\/start\?.*starter_prompt=/, {
+        timeout: 30_000,
+      });
       expect(decodeURIComponent(page.url())).toContain(
         DOGFOOD_HIGH_REACH_ARTIST.id
       );
+      const planIntentCookies = await page.context().cookies();
+      expect(
+        planIntentCookies.find(c => c.name === 'jovie_plan_intent')?.value
+      ).toBe('pro');
+      expect(
+        planIntentCookies.find(c => c.name === 'jv_claim_flow')?.value
+      ).toBe('1');
 
       await expect
         .poll(() => readFunnelStages(acquisitionId), { timeout: 15_000 })

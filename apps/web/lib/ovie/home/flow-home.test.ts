@@ -117,7 +117,7 @@ describe('buildStageStrip', () => {
 });
 
 describe('flow pulse tiles', () => {
-  it('reads queue ejections and ownerless PRs from the flow block', () => {
+  it('reads queue ejections and ownerless issues from the flow block', () => {
     const byKey = Object.fromEntries(
       buildPulse(withLanes({ flow: FLOW })).map(tile => [tile.key, tile])
     );

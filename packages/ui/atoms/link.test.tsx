@@ -166,9 +166,9 @@ describe('Link', () => {
 
     const link = screen.getByTestId('active-link');
     expect(link).toHaveAttribute('data-state', 'active');
-    expect(link.className).toContain('active:text-(--color-accent)');
+    expect(link.className).toContain('active:text-(--color-link-hover)');
     expect(link.className).toContain(
-      'data-[state=active]:text-(--color-accent)'
+      'data-[state=active]:text-(--color-link-hover)'
     );
   });
 

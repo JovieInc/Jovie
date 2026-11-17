@@ -1,6 +1,10 @@
 /*
  * Framer-like platform spec bento. Title accents are blue / pink / purple
  * only. Product shots sit in a dark stage.
+ *
+ * Titles read on the tile surface, so they use the accent TEXT variants
+ * (darkened per theme where the raw accent fails 4.5:1 — axe
+ * color-contrast). Fills keep the raw accents.
  */
 
 .m-spec-bento {
@@ -14,11 +18,11 @@
 }
 
 .m-spec-bento__title--blue {
-  color: var(--color-accent-blue);
+  color: var(--color-accent-blue-text);
 }
 
 .m-spec-bento__title--pink {
-  color: var(--color-accent-pink);
+  color: var(--color-accent-pink-text);
 }
 
 .m-spec-bento__title--purple {

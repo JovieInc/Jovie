@@ -55,7 +55,9 @@ export const Partial: Story = {
 /** A large backlog caps the badge at 99 so the bell keeps its size. */
 export const LongContent: Story = {
   args: {
-    label: 'Inbox, 140 pending items',
+    // The badge caps its visible count at 99+; the accessible name must
+    // describe what is rendered (label-content-name-mismatch otherwise).
+    label: 'Inbox, 99+ pending items',
     attention: 'available',
     pendingCount: 140,
   },

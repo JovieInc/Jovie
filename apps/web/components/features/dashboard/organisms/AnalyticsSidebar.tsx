@@ -154,11 +154,12 @@ export function FunnelStage({
           <span className='tabular-nums text-mid font-semibold leading-none tracking-tighter text-primary-token'>
             {numberFormatter.format(value)}
           </span>
-          {rate ? (
-            <span className='tabular-nums text-3xs font-caption text-tertiary-token'>
-              {rate}
-            </span>
-          ) : null}
+          <span
+            data-funnel-rate
+            className='w-8 text-right tabular-nums text-3xs font-caption text-tertiary-token'
+          >
+            {rate}
+          </span>
         </span>
       </div>
       <div className={cn('h-1.5 rounded-full', TRACK_BG)}>

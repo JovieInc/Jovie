@@ -14,9 +14,12 @@ build only; this module covers every gate the controller enforces, without a han
     completed controller runs, or a fleet-gate required check was red on two or more consecutive main commits.
     The issue names the gate, the failing job, the failing specs read from its log, the first bad SHA and the
     newest controller run id.
-  * `production-deploy:release-gate-new-blocker:<id>` (Urgent, P0): a controller run failed with a blocker reason
-    the previous completed run did not have, so a new gate surfaces on its first occurrence. It stays raised while
-    the latest controller run still carries that reason, and clears when it goes away.
+  * `production-deploy:release-gate-new-blocker:<workflow>:<gate>` (Urgent, P0): a controller run failed with a
+    blocker reason the previous completed run did not have, so a new gate surfaces on its first occurrence. The
+    alert key is the (workflow, failing gate) pair — never the raw log line, whose many error lines and volatile
+    details (timestamps, attempts, ANSI codes) once hashed into a fresh issue per line (2026-11-10 storm: 31
+    issues for one run). It stays raised while the latest controller run still carries that reason, and clears
+    when it goes away; at most NEW_BLOCKER_ALERT_CAP gates can alert per tick.
 
 Routed by the doctor: alert key -> Linear Triage issue -> Summer's detector loop.
 
@@ -24,7 +27,6 @@ api-budget: github-user-core 24/hr - doctor tick every 5 min cached 5 min: 2 con
 """
 from __future__ import annotations
 
-import hashlib
 import importlib.util
 import json
 import re
@@ -49,6 +51,11 @@ STATE_FILE = "release-gates.json"
 PROMOTION_SURFACE = "production-web"
 ERROR_LINE = re.compile(r"(?:##\[error\]|::error::)\s*(.+)")
 BLOCKERS_LINE = re.compile(r'"reason":\s*"required blockers:\s*([^"]+)"')
+ANSI_LINE = re.compile(r"\x1b\[[0-9;]*[A-Za-z]")
+# One failing gate is one blocker: however many error lines its log carries, one alert key
+# (and therefore one Linear issue) per (workflow, gate) per tick. A run of the migration job
+# once logged 30+ distinct error lines that hashed into 31 Urgent issues in 70 seconds.
+NEW_BLOCKER_ALERT_CAP = 3
 
 
 def slug(text: str) -> str:
@@ -139,7 +146,8 @@ def stale_red_checks(commits: list[dict], conclusions: dict[str, dict], streaks:
 
 
 def normalize_reason(text: str) -> str:
-    text = re.sub(r"^\S*Z\s+", "", text.strip())
+    text = ANSI_LINE.sub("", text.strip())
+    text = re.sub(r"^\S*Z\s+", "", text)
     text = re.sub(r"\b[0-9a-f]{40}\b", "<sha>", text)
     text = re.sub(r"\d{4}-\d\d-\d\dT[\d:.]+Z?", "<t>", text)
     text = re.sub(r"\d{4,}", "<n>", text)
@@ -428,10 +436,16 @@ def judge(sample_: dict | None, now: float) -> dict[str, str]:
                 f"{label} `{streak.get('gate')}` red on {streak['count']} {unit}; failing job {streak.get('newestJobUrl')}; "
                 f"failing: {specs}; first bad SHA {str(streak.get('firstBadSha'))[:12]} ({streak.get('firstBadAt')}){run_id}. "
                 f"Production promotion is blocked until it is green.")
+    grouped: dict[str, tuple[dict, list[str]]] = {}
     for sig, info in sorted((sample_.get("newBlockers") or {}).items()):
-        digest = hashlib.sha1(sig.encode()).hexdigest()[:10]
-        alerts[f"production-deploy:release-gate-new-blocker:{digest}"] = (
-            f"new release blocker on {str(info.get('workflow')).replace('.yml', '')} run {info.get('runId')} ({info.get('runUrl')}): "
-            f"gate `{info.get('gate')}` failed with `{sig}`, not seen in the previous run; SHA {str(info.get('sha'))[:12]}; "
-            f"job {info.get('jobUrl')}. A gate that was green is now blocking promotion.")
+        group = f"{slug(str(info.get('workflow')))}:{slug(str(info.get('gate')))[:60]}"
+        sigs, first = grouped.get(group, ([], info))
+        grouped[group] = (sigs + [sig], first)
+    for group, (sigs, first) in sorted(grouped.items())[:NEW_BLOCKER_ALERT_CAP]:
+        shown = "; ".join(f"`{sig}`" for sig in sigs[:NEW_BLOCKER_ALERT_CAP])
+        more = f" (+{len(sigs) - NEW_BLOCKER_ALERT_CAP} more log lines)" if len(sigs) > NEW_BLOCKER_ALERT_CAP else ""
+        alerts[f"production-deploy:release-gate-new-blocker:{group}"] = (
+            f"new release blocker on {str(first.get('workflow')).replace('.yml', '')} run {first.get('runId')} ({first.get('runUrl')}): "
+            f"gate `{first.get('gate')}` failed with {shown}{more}, not seen in the previous run; "
+            f"SHA {str(first.get('sha'))[:12]}; job {first.get('jobUrl')}. A gate that was green is now blocking promotion.")
     return alerts
