@@ -134,9 +134,10 @@ RENDER_MODE_SNAPSHOT = RenderModeSnapshotDrift()
 
 # PR Size Guard counts the PR head for repository hygiene and the merged tree
 # for the combined-tree budget. A head that has not yet merged a main prune
-# (drizzle snapshots, #25664) fails both while the live base tip is already
-# under budget. Sync main once; a head that is still over after that sync is
-# a real shrink, and claim_route will not sync it again.
+# (drizzle snapshots, #25664) fails while the live base tip is already under
+# budget. sync_claim allows one sync per head against that tip. The same tip
+# does not sync again. A later tip, after an up-to-date sync burned the old
+# key, gets its own claim. A head still over after that sync is a real shrink.
 _TREE_BYTE_LINE = re.compile(
     r'(?:##\[error\]|::error::)\s*\d+ bytes of tracked regular files '
     r'\(merged tree; base \d+ [+-]\d+\) exceeds the \d+-byte combined-tree budget')
@@ -172,6 +173,35 @@ class TreeByteBudget:
 
 
 TREE_BYTE_BUDGET = TreeByteBudget()
+
+
+def base_tip(pr) -> str:
+    """Current base branch tip, or "" when the pull request does not name one."""
+    if not isinstance(pr, dict):
+        return ""
+    ref = pr.get("baseRef")
+    oid = None
+    if isinstance(ref, dict):
+        target = ref.get("target")
+        if isinstance(target, dict):
+            oid = target.get("oid")
+    if not isinstance(oid, str):
+        oid = pr.get("baseRefOid")
+    return oid if isinstance(oid, str) and _SHA.fullmatch(oid) else ""
+
+
+def sync_claim(pr, action: str) -> str:
+    """Route claim key. sync-main is once per head and base tip.
+
+    A no-op sync records the unqualified key `sync-main` on that head. Main
+    can then land a prune without changing the head. The qualified key
+    `sync-main:<tip>` is free, so the lane merges the new tip instead of
+    dispatching a model. Other actions stay once per head.
+    """
+    if action != "sync-main":
+        return action
+    tip = base_tip(pr)
+    return f"sync-main:{tip}" if tip else action
 
 
 class SoleAliasReviewFailure:
