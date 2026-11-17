@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
+import { loadAll } from '../../capacity-registry.mjs';
 import { loadRegistry } from '../../credentials-spend-check.mjs';
+import { evaluateRegistry as evaluateCapacityRegistry } from '../capacity-registry.mjs';
 import {
   evaluateRegistry,
   validateSpendLedger,
@@ -103,5 +105,45 @@ describe('committed registry', () => {
       balanceUsd: 4.27,
       burnPerDayUsd: 0.59,
     });
+  });
+});
+
+describe('capacity freshness from frozen observations', () => {
+  it('flags a manual fact older than the threshold as stale and a live fact much sooner', () => {
+    const { registry, spend: recordedSpend } = loadAll();
+    const ledger = structuredClone(recordedSpend);
+    const NOW = Date.parse('2026-10-25T02:00:00Z');
+    const find = (view, id) =>
+      view.providers.find(provider => provider.id === id);
+    const gateway = ledger.providers.find(
+      entry => entry.id === 'vercel-ai-gateway-credits'
+    );
+    gateway.snapshot.observedAt = new Date(NOW).toISOString();
+    const boundary = NOW + registry.thresholds.manualMaxAgeDays * 86_400_000;
+    const fresh = evaluateCapacityRegistry(registry, {
+      now: boundary,
+      spend: ledger,
+    });
+    expect(find(fresh, 'vercel-ai-gateway').accounts[0].credits.freshness).toBe(
+      'fresh'
+    );
+    const view = evaluateCapacityRegistry(registry, {
+      now: boundary + 1,
+      spend: ledger,
+    });
+    expect(find(view, 'vercel-ai-gateway').accounts[0].credits.freshness).toBe(
+      'stale'
+    );
+    expect(view.totals.stale).toContain('openai-codex');
+    const dayAfter = evaluateCapacityRegistry(registry, {
+      now: NOW + 26 * 3_600_000,
+      spend: recordedSpend,
+    });
+    expect(find(dayAfter, 'openai-codex').accounts[0].quota.freshness).toBe(
+      'stale'
+    );
+    expect(find(dayAfter, 'hyperagent').accounts[0].credits.freshness).toBe(
+      'fresh'
+    );
   });
 });
