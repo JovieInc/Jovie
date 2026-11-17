@@ -1,4 +1,6 @@
 import sys
+import subprocess
+import tempfile
 import unittest
 from pathlib import Path
 from types import SimpleNamespace
@@ -49,6 +51,88 @@ describe('kept suite', () => {
 
 
 class SplitSizeTest(unittest.TestCase):
+    def test_unmodelled_setup_and_suites_preserve_the_original_by_refusing_a_split(self):
+        markers = ["label = 'main';", "expect(label).toBe('main');",
+                   "describe.each([1])('matrix', () => { it('keeps matrix', () => expect(label).toBe('main')); });",
+                   "describe.skip('skipped', () => { it('keeps skipped', () => expect(label).toBe('main')); });"]
+        for marker in markers:
+            with self.subTest(marker=marker):
+                text = _fat().replace("const label = 'main';", "let label = 'before';\n" + marker)
+                with tempfile.TemporaryDirectory() as temp:
+                    root = Path(temp)
+                    source = root / 'example.test.mjs'
+                    source.write_text(text)
+                    shell = Mock()
+                    self.assertIsNone(split.apply(shell, {'headRefName': 'glm/test'}, root,
+                                                  None, {}, ['example.test.mjs']))
+                    self.assertEqual(source.read_text(), text)
+                    self.assertEqual(list(root.iterdir()), [source])
+                    shell.assert_not_called()
+
+    def test_exit_annotations_keep_plain_size_routes_without_ignoring_real_errors(self):
+        path = 'scripts/lib/__tests__/example.test.mjs'
+        size = f'size-500: {path}: 631 lines, over 500 and not baselined\n'
+        grew = 'size-500: scripts/ci-fast-lanes.mjs: grew 3516 -> 3518\n'
+        exit_line = '2026-11-17T05:00:00Z ##[error]Process completed with exit code 1.\n'
+        for log in (size, grew):
+            expected = classes.classify(_pr(), {'Company guards': log})
+            got = classes.classify(_pr(), {'Company guards': log + exit_line})
+            self.assertEqual((got['cls'], got['action']), (expected['cls'], expected['action']))
+        with patch.object(split, 'apply', return_value='legacy') as apply:
+            self.assertEqual(split.bind(None, {'guard': size + exit_line})(
+                None, {}, {'files': [path]}, Path('.'), None, {}), 'legacy')
+            apply.assert_called_once()
+            apply.reset_mock()
+            self.assertIsNone(split.bind(None, {'guard': size + exit_line + '##[error]unexpected failure\n'})(
+                None, {}, {'files': [path]}, Path('.'), None, {}))
+            apply.assert_not_called()
+
+    def test_generated_syntax_is_checked_before_any_git_mutation(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            source = root / 'example.test.mjs'
+            source.write_text(_fat())
+            calls = []
+            receipt = {}
+
+            def shell(args, **kwargs):
+                calls.append(args)
+                if args[:2] == ['node', '--check']:
+                    return subprocess.run(args, cwd=kwargs['cwd'], capture_output=True)
+                return SimpleNamespace(returncode=0, stdout='example.test.mjs\n')
+
+            got = split.apply(shell, {'headRefName': 'glm/test'}, root, None, receipt, [source.name])
+            self.assertEqual(got.returncode, 0)
+            self.assertEqual([args[:2] for args in calls[:3]], [['node', '--check']] * 3)
+            self.assertEqual(receipt['resolution'], 'split-size-500')
+            self.assertEqual(calls[-1], ['git', 'push', '-q', 'origin', 'HEAD:glm/test'])
+
+    def test_invalid_generated_syntax_or_missing_validator_restores_all_outputs(self):
+        for missing_node in (False, True):
+            with self.subTest(missing_node=missing_node), tempfile.TemporaryDirectory() as temp:
+                root = Path(temp)
+                source = root / 'example.test.mjs'
+                original = _fat()
+                source.write_text(original)
+                pieces = split.split_unbaselined_vitest(original, source.name)
+                pieces['example.cases.mjs'] += '\nconst broken = ;\n'
+                calls = []
+
+                def shell(args, **kwargs):
+                    calls.append(args)
+                    if missing_node:
+                        raise FileNotFoundError('node')
+                    if args[:2] == ['node', '--check']:
+                        return subprocess.run(args, cwd=kwargs['cwd'], capture_output=True)
+                    return SimpleNamespace(returncode=0)
+
+                with patch.object(split, 'split_unbaselined_vitest', return_value=pieces):
+                    self.assertIsNone(split.apply(shell, {'headRefName': 'glm/test'}, root,
+                                                  None, {}, [source.name]))
+                self.assertEqual(source.read_text(), original)
+                self.assertEqual(list(root.iterdir()), [source])
+                self.assertFalse(any(args[0] == 'git' for args in calls))
+
     def test_over_500_moves_trailing_suites_and_keeps_titles(self):
         text = _fat()
         self.assertGreater(split.count_lines(text), split.LIMIT)

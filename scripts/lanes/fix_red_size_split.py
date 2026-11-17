@@ -9,9 +9,9 @@ test file stays the ci-fast entry.
 from __future__ import annotations
 
 import re
-import types
 from pathlib import Path
 
+import fix_red_size_500
 from atomic_state import atomic_write_text
 from fix_red_js_scan import code_names, parse_statements
 
@@ -47,7 +47,7 @@ def paths_from_log(log: str) -> list[str]:
 
 def legacy_hit(text: str, hit):
     """Plain legacy size logs outrank fixture quota text, never annotated validation."""
-    if "##[error]" not in text and (hit is None or hit[0] in {"quota-deferred", "platform-infra"}):
+    if not fix_red_size_500._errors(text) and (hit is None or hit[0] in {"quota-deferred", "platform-infra"}):
         if SIZE_500_NEW.search(text):
             return "size-500-new", "split-size-500"
         if SIZE_BASELINE_GREW.search(text):
@@ -216,7 +216,11 @@ def _assemble(filename, fixtures, cases, fixture_spec, cases_spec, statements, b
     for stmt in statements:
         if stmt.kind == "hook" or (stmt.kind == "binding" and stmt.names and stmt.names[0] not in exported):
             hook_stmts.append(stmt)
-        elif stmt.kind == "other" and not any(_name_in(name, stmt.text) for name in export_names):
+        elif stmt.kind == "other":
+            # Unmodelled setup or suites cannot be dropped or repeated in both
+            # installers. Leave the original intact for the normal repair route.
+            if any(_name_in(name, stmt.text) for name in export_names):
+                return None
             hook_stmts.append(stmt)
     mocks = [stmt for stmt in statements if stmt.kind == "mock"]
     installer = ""
@@ -274,13 +278,11 @@ def _assemble(filename, fixtures, cases, fixture_spec, cases_spec, statements, b
 
 def bind(sh, failed_logs):
     """Keep current annotated validation authoritative when serving legacy routes."""
-    import fix_red_size_500
-
     strict = fix_red_size_500.bind(sh, failed_logs)
 
     def fix(host, pr, route, worktree, log, receipt):
         text = fix_red_size_500._log_text(failed_logs, host, pr)
-        if "##[error]" in text:
+        if fix_red_size_500._errors(text):
             if set(paths_from_log(text)) - set(fix_red_size_500.paths(text)):
                 return None
             return strict(host, pr, route, worktree, log, receipt)
@@ -295,37 +297,35 @@ def bind(sh, failed_logs):
 def apply(sh, pr, worktree, log, receipt, files):
     """Split each listed vitest file in `worktree`, then commit and push. None when nothing applies."""
     root = Path(worktree)
+    branch = fix_red_size_500._branch_of(pr)
+    if branch is None:
+        return None
     changed: list[str] = []
-    for rel in files or []:
-        rel = str(rel).replace("\\", "/")
-        if not rel or rel.startswith("/") or ".." in Path(rel).parts:
-            continue
-        source = root / rel
-        if not source.is_file():
-            continue
-        pieces = split_unbaselined_vitest(source.read_text(), rel)
-        if not pieces:
-            continue
-        if any(name != rel and (root / name).exists() for name in pieces):
-            continue
-        for name, body in pieces.items():
-            if count_lines(body) > LIMIT:
-                return None
-            dest = root / name
-            dest.parent.mkdir(parents=True, exist_ok=True)
-            atomic_write_text(dest, body)
-            changed.append(name)
+    saved = {}
+    try:
+        for rel in files or []:
+            rel = str(rel).replace("\\", "/")
+            source = fix_red_size_500._safe(root, rel)
+            if source is None or not source.is_file():
+                continue
+            pieces = split_unbaselined_vitest(source.read_text(), rel)
+            if not pieces or any(name != rel and (root / name).exists() for name in pieces):
+                continue
+            for name, body in pieces.items():
+                dest = fix_red_size_500._safe(root, name)
+                if dest is None or count_lines(body) > LIMIT:
+                    fix_red_size_500._restore(saved)
+                    return None
+                saved.setdefault(dest, dest.read_text() if dest.is_file() else None)
+                dest.parent.mkdir(parents=True, exist_ok=True)
+                atomic_write_text(dest, body)
+                changed.append(name)
+    except OSError:
+        fix_red_size_500._restore(saved)
+        return None
     if not changed:
         return None
     message = "fix(ci): split unbaselined vitest files under the 500-line guard"
-    pushed = f"HEAD:{pr['headRefName']}"
-    steps = [
-        ["git", "add", "--", *changed],
-        ["git", "commit", "-q", "-m", message],
-        ["git", "push", "-q", "origin", pushed],
-    ]
-    for step in steps:
-        if sh(step, cwd=worktree, log=log, timeout=900).returncode:
-            return None
-    receipt.update(resolution="split-size-500", splitFiles=changed)
-    return types.SimpleNamespace(returncode=0)
+    return fix_red_size_500._land(
+        sh, root, log, branch, changed, saved, receipt, "split-size-500",
+        message=message, typescript=False, splitFiles=changed)
