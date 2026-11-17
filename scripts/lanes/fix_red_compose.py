@@ -21,7 +21,7 @@ def compose_actions(actions: list[str]) -> list[str]:
         classes.SYNC_MAIN, classes.STAMP_REPAIR, classes.STAMP_CHANGELOG, classes.REPAIR_WIN, classes.WIRE_CI_FAST, classes.RENUMBER,
         classes.SNAP_SPACING, classes.STRIP_CACHE, classes.MERGE_NARROWED, classes.REGISTER_DOMAIN,
         classes.ATOMIC_WRITE, classes.REPAIR_SCREEN_CERT, classes.BALANCE_HEADINGS, classes.UI_FEEL,
-        fix_red_render_modes.ACTION, classes.SPLIT_SIZE, classes.BIOME_FORMAT, classes.RERUN)
+        fix_red_render_modes.ACTION, classes.SPLIT_SIZE, classes.BIOME_FORMAT, classes.STRIP_FOCUS, classes.RERUN)
     rank = {name: index for index, name in enumerate(order)}
     chosen: list[str] = []
     for action in actions:
@@ -62,6 +62,8 @@ def deterministic_fixer(lane, action: str):
     table[fix_red_size_500.ACTION_EXTRACT] = fix_red_size_500.bind_self_growth(lane.sh, lane.failed_logs)
     import fix_red_biome
     table[classes.BIOME_FORMAT] = fix_red_biome.bind(lane.sh)
+    import fix_red_focus_canon
+    table[fix_red_focus_canon.ACTION] = fix_red_focus_canon.bind(lane.sh, lane.failed_logs)
     return table.get(action)
 
 
@@ -143,4 +145,8 @@ def repair_files(cls, action, names, logs, per_check):
     if "biome-format" in wanted and action in {classes.BIOME_FORMAT, classes.COMPOSE}:
         from fix_red_biome import cited_paths
         files = sorted(set(files) | set(cited_paths("\n".join(logs.get(name) or "" for name in names))))
+    if "focus-canon" in wanted and action in {classes.STRIP_FOCUS, classes.COMPOSE}:
+        import fix_red_focus_canon
+        files = sorted(set(files) | set(fix_red_focus_canon.paths(
+            "\n".join(logs.get(name) or "" for name in names))))
     return files

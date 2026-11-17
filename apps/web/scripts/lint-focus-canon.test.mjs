@@ -30,6 +30,30 @@ describe('findOffenders', () => {
     expect(findOffenders(`cn('input-focus-glow', x)`)).toHaveLength(1);
   });
 
+  it('ignores a legacy name that appears only in a comment', () => {
+    const src = `/**
+ * an always-on clip cut the ring of
+ * \`focus-ring-themed\` off the first control.
+ */
+export const stage = 'overflow-hidden';
+// focus-ring-themed
+const box = 'size-7'; /* input-focus-glow */`;
+    expect(findOffenders(src)).toEqual([]);
+  });
+
+  it('counts a string token once when a comment repeats it', () => {
+    expect(
+      findOffenders(`const c = 'focus-ring-themed'; // focus-ring-themed\n`)
+    ).toEqual([{ line: 1, snippet: 'focus-ring-themed' }]);
+  });
+
+  it('counts a template token and ignores a comment inside the interpolation', () => {
+    const src = 'const c = `focus-ring-themed ${/* focus-ring */ ""}`;\n';
+    expect(findOffenders(src).map(item => item.snippet)).toEqual([
+      'focus-ring-themed',
+    ]);
+  });
+
   it('leaves non-focus classes, focus backgrounds and peer cues alone', () => {
     expect(
       findOffenders(

@@ -10,12 +10,12 @@
  */
 
 /**
- * Geometry every header control shares: 28px square, rounded-md, themed focus
- * ring, no oversized pseudo target. The rail toggle is an IconButton, which
- * owns its color, so it takes only this half.
+ * Geometry every header control shares: 28px square, rounded-md, the keyboard
+ * outline from focus.css, no oversized pseudo target. The rail toggle is an
+ * IconButton, which owns its color, so it takes only this half.
  */
 export const SIDEBAR_HEADER_ICON_BOX_CLASS =
-  'focus-ring-themed relative inline-flex size-7 shrink-0 items-center justify-center rounded-md before:hidden';
+  'relative inline-flex size-7 shrink-0 items-center justify-center rounded-md before:hidden';
 
 /** Box plus sidebar tone, for the plain links (bell, search). */
 export const SIDEBAR_HEADER_ICON_BUTTON_CLASS = `${SIDEBAR_HEADER_ICON_BOX_CLASS} text-sidebar-item-foreground hover:bg-sidebar-accent focus-visible:bg-sidebar-accent`;

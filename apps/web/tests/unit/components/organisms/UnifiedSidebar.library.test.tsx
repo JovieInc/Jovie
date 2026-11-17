@@ -570,7 +570,8 @@ describe('UnifiedSidebar library route', () => {
     );
     // Bell and toggle share the same 28px box so the header reads as one row.
     for (const control of [bell, toggle]) {
-      expect(control).toHaveClass('size-7', 'rounded-md', 'focus-ring-themed');
+      expect(control).toHaveClass('size-7', 'rounded-md');
+      expect(control).not.toHaveClass('focus-ring-themed');
     }
   });
 

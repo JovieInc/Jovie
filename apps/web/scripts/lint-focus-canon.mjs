@@ -58,14 +58,116 @@ const CSS_FOCUS_SELECTOR = /:focus(?:-visible|-within)?\b/;
 const CSS_FOCUS_PAINT =
   /(?:^|[\s;])(?:box-shadow|outline|border(?:-color)?|--tw-ring-[a-z-]+)\s*:/;
 
+/**
+ * Blank // and block comments without moving any other character. A historical
+ * mention is not a class. Strings and template text stay, including a comment
+ * that sits inside ${}. CSS has no line comments, so those stay visible there.
+ * @returns {string}
+ */
+export function maskComments(source, { lineComments = true } = {}) {
+  const out = source.split('');
+  /** @type {{ kind: 'code' | 'squote' | 'dquote' | 'template' | 'line' | 'block', exit: number | null }[]} */
+  const stack = [{ kind: 'code', exit: null }];
+  let i = 0;
+  while (i < source.length) {
+    const frame = stack[stack.length - 1];
+    const current = source[i];
+    const next = source[i + 1];
+    if (frame.kind === 'line') {
+      if (current === '\n') stack.pop();
+      else out[i] = ' ';
+      i += 1;
+      continue;
+    }
+    if (frame.kind === 'block') {
+      if (current === '*' && next === '/') {
+        out[i] = ' ';
+        out[i + 1] = ' ';
+        stack.pop();
+        i += 2;
+        continue;
+      }
+      if (current !== '\n') out[i] = ' ';
+      i += 1;
+      continue;
+    }
+    if (frame.kind === 'squote' || frame.kind === 'dquote') {
+      if (current === '\\') {
+        i += i + 1 < source.length ? 2 : 1;
+        continue;
+      }
+      if (current === (frame.kind === 'squote' ? "'" : '"')) stack.pop();
+      i += 1;
+      continue;
+    }
+    if (frame.kind === 'template') {
+      if (current === '\\') {
+        i += i + 1 < source.length ? 2 : 1;
+        continue;
+      }
+      if (current === '`') {
+        stack.pop();
+        i += 1;
+        continue;
+      }
+      if (current === '$' && next === '{') {
+        stack.push({ kind: 'code', exit: 1 });
+        i += 2;
+        continue;
+      }
+      i += 1;
+      continue;
+    }
+    if (lineComments && current === '/' && next === '/') {
+      out[i] = ' ';
+      out[i + 1] = ' ';
+      stack.push({ kind: 'line', exit: null });
+      i += 2;
+      continue;
+    }
+    if (current === '/' && next === '*') {
+      out[i] = ' ';
+      out[i + 1] = ' ';
+      stack.push({ kind: 'block', exit: null });
+      i += 2;
+      continue;
+    }
+    if (current === "'") {
+      stack.push({ kind: 'squote', exit: null });
+      i += 1;
+      continue;
+    }
+    if (current === '"') {
+      stack.push({ kind: 'dquote', exit: null });
+      i += 1;
+      continue;
+    }
+    if (current === '`') {
+      stack.push({ kind: 'template', exit: null });
+      i += 1;
+      continue;
+    }
+    if (current === '{' && frame.exit !== null) frame.exit += 1;
+    if (current === '}' && frame.exit !== null) {
+      frame.exit -= 1;
+      if (frame.exit === 0) stack.pop();
+    }
+    i += 1;
+  }
+  return out.join('');
+}
+
 /** @returns {{ line: number, snippet: string }[]} */
 export function findOffenders(source, { css = false } = {}) {
+  const masked = maskComments(source, { lineComments: !css });
   const offenders = [];
   const lineOf = index => source.slice(0, index).split('\n').length;
   for (const pattern of [AD_HOC_FOCUS_CLASS, LEGACY_FOCUS_UTILITY]) {
-    for (const match of source.matchAll(pattern)) {
-      offenders.push({ line: lineOf(match.index), snippet: match[1] });
+    pattern.lastIndex = 0;
+    for (const match of masked.matchAll(pattern)) {
+      offenders.push({ line: lineOf(match.index ?? 0), snippet: match[1] });
     }
+    pattern.lastIndex = 0;
   }
   if (css) {
     const stripped = source.replace(/\/\*[\s\S]*?\*\//g, c =>
