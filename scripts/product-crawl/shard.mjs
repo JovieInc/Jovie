@@ -81,7 +81,11 @@ export function mergeReceipts(receipts) {
     overlayWalks: {
       walks: receipts.flatMap(r => r.overlayWalks?.walks ?? []),
       left: sum(receipts, r => r.overlayWalks?.left),
+      ...(receipts.some(r => r.overlayWalks?.skipped)
+        ? { skipped: receipts.flatMap(r => r.overlayWalks?.skipped ?? []) }
+        : {}),
     },
+    measurementReuses: sum(receipts, r => r.measurementReuses),
     pages: receipts.flatMap(r => r.pages ?? []),
   };
 }
@@ -94,12 +98,13 @@ export function summaryLines(receipt, verdict) {
   return [
     `## Product crawl: ${verdict.ready ? 'ready' : 'not ready'}`,
     '',
-    `${routes.length} page routes; ${pages.filter(p => p.identity === 'stranger').length} page loads as a stranger, ${pages.filter(p => p.identity === 'signed-in').length} signed in; ${uncovered.filter(u => !u.accepted).length} routes uncovered, ${uncovered.filter(u => u.accepted).length} reviewed exceptions; ${pages.filter(p => p.authGated).length} loads hit the sign-in wall.${receipt.shards > 1 ? ` Crawled in ${receipt.shards} parallel shards.` : ''}`,
+    `${routes.length} page routes; ${pages.filter(p => p.identity === 'stranger').length} page observations as a stranger, ${pages.filter(p => p.identity === 'signed-in').length} signed in; ${uncovered.filter(u => !u.accepted).length} routes uncovered, ${uncovered.filter(u => u.accepted).length} reviewed exceptions; ${pages.filter(p => p.authGated).length} loads hit the sign-in wall.${receipt.shards > 1 ? ` Crawled in ${receipt.shards} parallel shards.` : ''}`,
     '',
     overlayWalkSummary(
       receipt.overlayWalks ?? { walks: [], left: 0 },
       receipt.signedIn
     ),
+    `${receipt.measurementReuses ?? 0} cold measurements reused within this crawl.`,
     '',
     `Not ready because: ${verdict.reasons.join('; ') || 'nothing'}`,
     '',

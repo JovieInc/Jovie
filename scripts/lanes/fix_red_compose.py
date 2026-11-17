@@ -57,8 +57,8 @@ def deterministic_fixer(lane, action: str):
         "ui": lane.fix_red_screen_cert.bind_ui_feel(lane.sh, lane.failed_logs, classes),
     })
     table[fix_red_render_modes.ACTION] = fix_red_render_modes.bind(lane.sh, lane.failed_logs)
+    table[classes.SPLIT_SIZE] = lane.split_size_fix
     import fix_red_size_500
-    table[classes.SPLIT_SIZE] = fix_red_size_500.bind(lane.sh, lane.failed_logs)
     table[fix_red_size_500.ACTION_EXTRACT] = fix_red_size_500.bind_self_growth(lane.sh, lane.failed_logs)
     import fix_red_biome
     table[classes.BIOME_FORMAT] = fix_red_biome.bind(lane.sh)
@@ -132,6 +132,9 @@ def repair_files(cls, action, names, logs, per_check):
     if "size-500-unbaselined" in wanted and action in {classes.SPLIT_SIZE, classes.COMPOSE}:
         import fix_red_size_500
         files = sorted(set(files) | set(fix_red_size_500.paths(
+            "\n".join(logs.get(name) or "" for name in names))))
+    if "size-500-new" in wanted and action in {classes.SPLIT_SIZE, classes.COMPOSE}:
+        files = sorted(set(files) | set(classes.fix_red_size_split.paths_from_log(
             "\n".join(logs.get(name) or "" for name in names))))
     if cls == "size-500-self-growth":
         from fix_red_source_edits import size_500_grew

@@ -1,82 +1,61 @@
-/**
- * Routing attribution for the golden-path visual reviewer.
- *
- * The reviewer is Workers AI first (Cloudflare credits) with the Gateway
- * second, but the failover is invisible in its result, so a
- * `gateway-over-ceiling` drift finding (Cost Anomaly Gate) cannot say WHY a
- * sample landed on the Gateway: a 401 on every sample is a relay-bearer
- * problem (rotate GOLDEN_PATH_REVIEW_WORKERS_AI_TOKEN), while a few 429s
- * under a merge-queue burst are the fallback doing its job.
- * reviewKeyframeTraced wraps any provider attempt and returns the per-sample
- * provider and fallback reason; the reviewer aggregates them into
- * verdict.json `reviewers.routing`.
- *
- * This module is imported by the reviewer, so it imports nothing back: the
- * provider call is injected, and the verdict is matched structurally.
- */
+/** Cloudflare-only routing and attribution for the shipping visual reviewer. */
+import routingRegistry from '../lib/ai/routing.json';
 
-/** The part of a reviewer verdict the failover logic reads. */
+/** Use the existing routing authority; fail closed if this shipping route drifts. */
+const route = routingRegistry.callers.find(
+  c => c.id === 'ci.golden-path-review'
+);
+if (
+  route?.route !== 'workers-ai-only' ||
+  route.fallback !== null ||
+  route.models.length !== 1 ||
+  !route.models[0]?.startsWith('@cf/')
+) {
+  throw new Error('ci.golden-path-review must use only Workers AI');
+}
+export const WORKERS_AI_REVIEW_MODEL = route.models[0];
+
 export interface TrackedVerdict {
   readonly verdict: 'pass' | 'blocker' | 'unknown';
   readonly reason?: string;
 }
 
-/** Which provider served a keyframe sample, and why the relay did not. */
+interface UnavailableVerdict {
+  readonly verdict: 'unknown';
+  readonly reason: string;
+}
+
+/** Provider attempted; null means no request was made. Unknown is never served. */
 export interface TrackedModelReview<V = TrackedVerdict> {
-  readonly model: V;
-  readonly provider: 'workers-ai' | 'gateway';
-  /**
-   * Set whenever the relay did not serve the sample: 'not configured', or the
-   * relay failure reason that triggered the Gateway fallback.
-   */
-  readonly workersAiFallbackReason?: string;
+  readonly model: V | UnavailableVerdict;
+  readonly provider: 'workers-ai' | null;
 }
 
 /** The relay answers its own limiter with 429 (retry-after: 10). */
 const RELAY_RATE_LIMITED = /workers-ai 429/;
-/** One spaced retry keeps a merge-queue burst on Cloudflare credits. */
+/** Preserve the existing single spaced retry; never route around the limit. */
 export const RELAY_RETRY_DELAY_MS = 10_000;
-
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
-/**
- * Attempt the relay first, then the Gateway. The relay is retried once on a
- * 429: the shared limiter (300 req/min) is exactly what a bursty merge queue
- * produces, and honoring its backoff keeps that volume on Cloudflare credits
- * instead of compounding it onto paid Gateway credits. Any other relay
- * failure falls back to the Gateway immediately. `attempt` must return the
- * reviewer's own verdict object (including the `workers-ai <status>` reason
- * it reports for a non-ok relay response).
- */
+/** Return the relay's verdict, including unknown, after at most one 429 retry. */
 export async function reviewKeyframeTraced<V extends TrackedVerdict>(
-  attempt: (provider: 'workers-ai' | 'gateway') => Promise<V>,
+  attempt: (provider: 'workers-ai') => Promise<V>,
   relayConfigured: boolean,
   retryDelayMs = RELAY_RETRY_DELAY_MS
 ): Promise<TrackedModelReview<V>> {
   if (!relayConfigured) {
     return {
-      model: await attempt('gateway'),
-      provider: 'gateway',
-      workersAiFallbackReason: 'not configured',
+      model: { verdict: 'unknown', reason: 'workers-ai not configured' },
+      provider: null,
     };
   }
-  const viaRelay = () => attempt('workers-ai');
-  let viaWorkers = await viaRelay();
+  let model = await attempt('workers-ai');
   if (
-    viaWorkers.verdict === 'unknown' &&
-    RELAY_RATE_LIMITED.test(viaWorkers.reason ?? '')
+    model.verdict === 'unknown' &&
+    RELAY_RATE_LIMITED.test(model.reason ?? '')
   ) {
     await sleep(retryDelayMs);
-    viaWorkers = await viaRelay();
+    model = await attempt('workers-ai');
   }
-  if (viaWorkers.verdict !== 'unknown')
-    return { model: viaWorkers, provider: 'workers-ai' };
-  console.log(
-    `[golden-path-review] workers-ai unavailable (${viaWorkers.reason}); using the gateway`
-  );
-  return {
-    model: await attempt('gateway'),
-    provider: 'gateway',
-    workersAiFallbackReason: viaWorkers.reason,
-  };
+  return { model, provider: 'workers-ai' };
 }
