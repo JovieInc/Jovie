@@ -416,6 +416,20 @@ describe('ActionDial edge cases', () => {
     ).toBeInTheDocument();
     await expectNoA11yViolations(container);
   });
+  it('shows no hint for a lone service when the host passes none', () => {
+    render(
+      <ActionDial
+        options={OPTIONS.slice(0, 1)}
+        selectedId='spotify'
+        onSelect={vi.fn()}
+        actionLabel='Stream Now'
+        groupLabel='G'
+        hint={null}
+      />
+    );
+    expect(screen.queryByText(/Swipe to switch/)).not.toBeInTheDocument();
+    expect(link()).toHaveAttribute('href', 'https://open.spotify.com/song');
+  });
   it('follows an externally changed selection without a haptic', async () => {
     mockMotion(true);
     const vibrate = vi.fn();

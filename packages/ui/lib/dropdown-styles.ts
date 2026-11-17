@@ -74,7 +74,7 @@ export const TOOLTIP_SURFACE_BASE =
  * system instead of a one-off className restyle (JOV-6773).
  */
 export const TOOLTIP_SURFACE_DANGER =
-  'border border-error/30 bg-error-subtle text-error shadow-sm';
+  'border border-error/30 bg-error-subtle text-error-text shadow-sm';
 
 /**
  * The shared rounded rectangle used by wrapped overlay content.
@@ -321,6 +321,29 @@ export const MENU_BADGE_BASE =
   'inline-flex h-4 min-w-4 items-center justify-center rounded-full border border-subtle bg-surface-1 px-1.5 text-3xs font-medium tabular-nums text-tertiary-token';
 
 /**
+ * `scrollBody` menus: the content is a fixed column (search header pinned,
+ * rows scroll inside MenuScrollBody), so the surface itself never scrolls and
+ * the header hairline runs edge to edge.
+ */
+export const MENU_SCROLL_BODY_CONTENT = 'flex flex-col overflow-y-hidden p-0';
+
+/**
+ * Anchored motion: a subtle scale and fade from the trigger
+ * (DROPDOWN_TRANSFORM_ORIGIN). Enter uses the dropdown duration, exit the
+ * faster one. Reduced motion removes both states' animation.
+ */
+export const MENU_ANCHORED_MOTION =
+  'data-[state=open]:zoom-in-97 data-[state=closed]:zoom-out-97 ' +
+  'data-[state=open]:duration-subtle data-[state=closed]:duration-fast ease-out ' +
+  'motion-reduce:data-[state=open]:animate-none motion-reduce:data-[state=closed]:animate-none';
+
+/** `motion` preset for CommonDropdown: scale and fade from the trigger. */
+export const MENU_MOTION_ANCHORED = {
+  name: 'anchored',
+  className: MENU_ANCHORED_MOTION,
+} as const;
+
+/**
  * Search header and input styles shared by root menus and searchable submenus
  */
 export const MENU_SEARCH_HEADER_BASE = 'border-b border-subtle px-2 py-2';
@@ -332,7 +355,7 @@ export const MENU_SEARCH_INPUT_BASE =
   'h-7 w-full rounded-full border border-subtle bg-surface-1 py-1 ps-7 pe-7 text-xs text-primary-token placeholder:text-tertiary-token focus-visible:outline-none focus-visible:border-focus focus-visible:ring-2 focus-visible:ring-focus/25';
 
 export const MENU_SEARCH_CLEAR_BUTTON_BASE =
-  'absolute inset-y-0 end-1.5 my-auto inline-flex h-4 w-4 items-center justify-center rounded-full text-tertiary-token transition-colors duration-fast ease-interactive hover:bg-surface-2 hover:text-primary-token focus-visible:outline-none focus-visible:bg-surface-2 focus-visible:ring-1 focus-visible:ring-focus/35';
+  'absolute inset-y-0 end-1.5 my-auto inline-flex h-6 w-6 items-center justify-center rounded-full text-tertiary-token transition-colors duration-fast ease-interactive hover:bg-surface-2 hover:text-primary-token focus-visible:outline-none focus-visible:bg-surface-2 focus-visible:ring-1 focus-visible:ring-focus/35';
 
 /**
  * Empty and loading states inside menu surfaces
@@ -381,10 +404,15 @@ export const MENU_ICON_TRIGGER_BASE =
  * narrows into it instead of overflowing the screen edge.
  */
 export function submenuViewportFitStyle(
-  menu: 'dropdown-menu' | 'context-menu'
+  menu: 'dropdown-menu' | 'context-menu',
+  preferredMinWidth?: number | string
 ): { maxWidth: string; minWidth: string } {
   const available = `var(--radix-${menu}-content-available-width)`;
-  return { maxWidth: available, minWidth: `min(12rem, ${available})` };
+  const preferred =
+    typeof preferredMinWidth === 'number'
+      ? `${preferredMinWidth}px`
+      : (preferredMinWidth ?? '12rem');
+  return { maxWidth: available, minWidth: `min(${preferred}, ${available})` };
 }
 
 export const subMenuContentClasses = [

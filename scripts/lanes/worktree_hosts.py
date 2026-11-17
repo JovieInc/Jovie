@@ -22,7 +22,10 @@ runs are the primary host for the duration of the test, the same fixture
 """
 from __future__ import annotations
 
+import fcntl
 import os
+from contextlib import contextmanager
+from pathlib import Path
 import re
 
 HOSTS_ENV = "LANES_WORKTREE_HOSTS"
@@ -145,3 +148,54 @@ def status(host_name: str, repo, run, environ=None) -> dict:
         row["maxWorktrees"] = max_worktrees(host_name, environ)
         row["worktrees"] = count_worktrees(repo, run)
     return row
+
+
+class WorktreeHostHeld(RuntimeError):
+    """No checkout was created; the existing work item remains eligible."""
+
+
+@contextmanager
+def reserve_checkout(host_name: str, repo, run, environ=None):
+    """Serialize fallback count-to-creation using the repository's common Git dir.
+
+    Yield an idempotent release so a pooled checkout can drop this short lease
+    before installation or agent work. Primary hosts retain slot-based admission.
+    """
+    if role(host_name, environ) == "primary":
+        yield lambda: None
+        return
+    handle = None
+    def release():
+        nonlocal handle
+        if handle is not None:
+            os.close(handle)
+            handle = None
+    try:
+        reason = admission(host_name, repo, run, environ)
+        if reason:
+            raise WorktreeHostHeld(reason)
+        common = run(["git", "-C", str(repo), "rev-parse", "--path-format=absolute", "--git-common-dir"],
+                     capture_output=True, text=True, timeout=60)
+        path = Path(common.stdout.strip())
+        if common.returncode or not path.is_absolute() or not path.is_dir():
+            raise WorktreeHostHeld("worktree-lock-unavailable")
+        handle = os.open(path / "jovie-worktree-admission.lock",
+                         os.O_RDWR | os.O_CREAT | os.O_NOFOLLOW | os.O_CLOEXEC, 0o600)
+        try:
+            fcntl.flock(handle, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError as error:
+            raise WorktreeHostHeld("worktree-admission-busy") from error
+        # A previous creator may have filled the final seat before this lease.
+        reason = admission(host_name, repo, run, environ)
+        if reason:
+            raise WorktreeHostHeld(reason)
+    except OSError as error:
+        release()
+        raise WorktreeHostHeld("worktree-lock-unavailable") from error
+    except BaseException:
+        release()
+        raise
+    try:
+        yield release
+    finally:
+        release()

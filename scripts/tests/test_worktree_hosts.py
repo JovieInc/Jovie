@@ -10,6 +10,7 @@ from __future__ import annotations
 import importlib.util
 import os
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 from types import SimpleNamespace
@@ -27,6 +28,68 @@ def worktree_list(count):
     blocks = ["worktree /repo\nHEAD abc\nbranch refs/heads/main"]
     blocks += [f"worktree /state/worktrees/run{i}\nHEAD {'d' * 40}\ndetached" for i in range(count)]
     return SimpleNamespace(returncode=0, stdout="\n\n".join(blocks) + "\n", stderr="")
+
+
+class CheckoutReservationTest(unittest.TestCase):
+    ENV = {policy.HOSTS_ENV: "gem,mac", policy.MAX_WORKTREES_ENV: "1"}
+
+    def runner(self, common, counts):
+        def run(args, **kwargs):
+            if "--git-common-dir" in args:
+                return SimpleNamespace(returncode=0, stdout=str(common), stderr="")
+            return worktree_list(counts.pop(0) if len(counts) > 1 else counts[0])
+        return run
+
+    def test_fallback_reservation_excludes_a_second_creator_and_releases_early(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            run = self.runner(Path(tmp), [0])
+            with policy.reserve_checkout("mac", "/repo", run, self.ENV) as release:
+                with self.assertRaisesRegex(policy.WorktreeHostHeld, "worktree-admission-busy"):
+                    with policy.reserve_checkout("mac", "/repo", run, self.ENV):
+                        self.fail("two checkout creators held the same repository lease")
+                release()
+                release()
+                with policy.reserve_checkout("mac", "/repo", run, self.ENV):
+                    pass
+            with policy.reserve_checkout("mac", "/repo", run, self.ENV):
+                pass
+
+    def test_rechecks_count_inside_the_lease_before_creation(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            with self.assertRaisesRegex(policy.WorktreeHostHeld, "worktree-cap:1/1"):
+                with policy.reserve_checkout("mac", "/repo", self.runner(Path(tmp), [0, 1]), self.ENV):
+                    self.fail("a stale pre-lock observation admitted another checkout")
+            with policy.reserve_checkout("mac", "/repo", self.runner(Path(tmp), [0]), self.ENV):
+                pass
+
+    def test_primary_does_no_lock_io_and_unknown_lock_fails_closed(self):
+        def forbidden(*args, **kwargs):
+            self.fail("primary host must retain slot-based admission")
+        with policy.reserve_checkout("gem", "/repo", forbidden, self.ENV) as release:
+            release()
+        with self.assertRaisesRegex(policy.WorktreeHostHeld, "worktree-host-not-allowed"):
+            with policy.reserve_checkout("other", "/repo", forbidden, self.ENV):
+                pass
+        for path in ("relative", "/nonexistent-jovie-fixture"):
+            with self.assertRaisesRegex(policy.WorktreeHostHeld, "worktree-lock-unavailable"):
+                with policy.reserve_checkout("mac", "/repo", self.runner(Path(path), [0]), self.ENV):
+                    pass
+        with tempfile.TemporaryDirectory() as tmp, \
+                patch.object(policy.os, "open", side_effect=PermissionError("fixture")):
+            with self.assertRaisesRegex(policy.WorktreeHostHeld, "worktree-lock-unavailable"):
+                with policy.reserve_checkout("mac", "/repo", self.runner(Path(tmp), [0]), self.ENV):
+                    pass
+
+    def test_creation_errors_keep_their_identity_and_release_the_lease(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            run = self.runner(Path(tmp), [0])
+            error = OSError("fixture creation failed")
+            with self.assertRaises(OSError) as caught:
+                with policy.reserve_checkout("mac", "/repo", run, self.ENV):
+                    raise error
+            self.assertIs(caught.exception, error)
+            with policy.reserve_checkout("mac", "/repo", run, self.ENV):
+                pass
 
 
 class HostPolicyTest(unittest.TestCase):

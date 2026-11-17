@@ -1,9 +1,10 @@
 'use client';
 
-import { Button } from '@jovie/ui';
+import { Button, HostDrawnInput } from '@jovie/ui';
 import { FileAudio2, FileText, ImageIcon, Upload, Video } from 'lucide-react';
 import Link from 'next/link';
 import { type DragEvent, type ReactNode, useRef, useState } from 'react';
+import { ImageWithFallback } from '@/components/atoms/ImageWithFallback';
 import {
   type LibraryInspectorAssetKind,
   type ResolveStatefulAssetSlotInput,
@@ -75,12 +76,12 @@ export function StatefulAssetSlot({
   };
   const fileInput =
     onFile && accept ? (
-      <input
+      <HostDrawnInput
         ref={inputRef}
         type='file'
         accept={accept}
         disabled={disabled}
-        className='sr-only'
+        visuallyHidden
         aria-label={occupancy === 'populated' ? 'Replace' : acquireLabel}
         onChange={event => takeFile(event.target.files?.[0])}
       />
@@ -158,7 +159,14 @@ export function StatefulAssetSlot({
       <div className={cn(PANEL, 'flex items-center gap-3')}>
         <span className='grid h-8 w-8 shrink-0 place-items-center overflow-hidden rounded-md bg-surface-1 text-secondary-token'>
           {kind === 'artwork' && previewSrc ? (
-            <img src={previewSrc} alt='' className='h-8 w-8 object-contain' />
+            <ImageWithFallback
+              src={previewSrc}
+              alt=''
+              width={32}
+              height={32}
+              unoptimized
+              className='h-8 w-8 object-contain'
+            />
           ) : (
             <Icon className='h-4 w-4' strokeWidth={2.25} />
           )}

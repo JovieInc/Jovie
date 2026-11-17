@@ -979,16 +979,7 @@ describe('validation sync: facts', () => {
 });
 
 describe('batched closed-pull snapshot (repo quota, 2026-10-30)', () => {
-  const snapshotEntry = (number, merged) => ({
-    number,
-    title: 'feat(profile): editorial card',
-    body: '',
-    headRef: `codex/jov-1-card-${number}`,
-    merged,
-    mergedAt: merged ? '2026-10-03T10:00:00Z' : '',
-    mergeCommitSha: merged ? MAIN[1] : '',
-    baseRef: 'main',
-  });
+  const snapshotEntry = (number, merged) => ({ number, merged });
 
   const row = (number, overrides = {}) => ({
     number,
@@ -1040,13 +1031,9 @@ describe('batched closed-pull snapshot (repo quota, 2026-10-30)', () => {
       'https://api.github.com/repos/JovieInc/Jovie/pulls?state=closed&sort=updated&direction=desc&per_page=100&page=2'
     );
     expect(snapshot.size).toBe(4);
-    expect(snapshot.get(101)).toMatchObject({
-      merged: true,
-      mergedAt: '2026-10-03T10:00:00Z',
-      mergeCommitSha: MAIN[1],
-      baseRef: 'main',
-      headRef: 'codex/jov-1-card-101',
-    });
+    // The entry carries only what consumers read: number + merged (the
+    // binding path and lsm read `.merged`; JOV-12768 review).
+    expect(snapshot.get(101)).toEqual({ number: 101, merged: true });
     // Closed without merging, and a merged row whose sha is not a commit:
     // neither can be a binding merge.
     expect(snapshot.get(102)?.merged).toBe(false);

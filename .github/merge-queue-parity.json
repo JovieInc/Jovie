@@ -1,0 +1,287 @@
+{
+  "$comment": "Merge-queue parity policy (.github/MERGE_QUEUE.md \"Queue parity\"). Checked by scripts/ci-workflow-topology.test.mjs via scripts/lib/queue-parity.mjs.",
+  "statusProducers": {
+    "Fork PR Gate": {
+      "pull_request": "fork-pr-gate.yml#fork-gate"
+    }
+  },
+  "parity": {
+    "ci.yml#drizzle-migration-guard": {
+      "pr": "source-validation.yml#migration",
+      "command": "online-index-migrate.ts --validate-only"
+    },
+    "ci.yml#ci-lockfile-preflight": {
+      "pr": "source-validation.yml#deterministic",
+      "command": "node scripts/lockfile-specifier-preflight.mjs"
+    },
+    "ci.yml#ci-risk-classifier": {
+      "pr": "source-validation.yml#deterministic",
+      "command": "pnpm ci:harness:check"
+    },
+    "ci.yml#ci-secret-scan": {
+      "pr": "source-validation.yml#security",
+      "command": "verify-gitleaks-coverage.sh"
+    },
+    "ci.yml#ci-golden-path-lock": {
+      "pr": "source-validation.yml#security",
+      "command": "node scripts/golden-path-lock.mjs merge-gate"
+    },
+    "ci.yml#ci-exact-head-coverage-shard": {
+      "pr": "source-validation.yml#coverage",
+      "command": "pnpm --filter @jovie/web test:coverage"
+    },
+    "ci.yml#ci-exact-head-coverage": {
+      "pr": "source-validation.yml#coverage",
+      "command": "node scripts/check-changed-test-coverage.mjs"
+    }
+  },
+  "exemptions": [
+    {
+      "job": "ci.yml#ci-merge-group-workspace",
+      "kind": "combined-head",
+      "reason": "Installs the dependency workspace of the synthetic combined head; on a PR the head is the PR itself, so there is nothing separate to build.",
+      "createdOn": "2026-11-11",
+      "expiresOn": "2027-02-09"
+    },
+    {
+      "job": "ci.yml#ci-merge-group-admission",
+      "kind": "combined-head",
+      "reason": "Decides whether this exact merge_group entry is still current in the queue; queue membership does not exist before admission.",
+      "createdOn": "2026-11-11",
+      "expiresOn": "2027-02-09"
+    },
+    {
+      "job": "ci.yml#ci-path-changes",
+      "kind": "combined-head",
+      "reason": "Selects lanes from the combined diff against current main; the PR selects its own lanes inside Source Validation.",
+      "createdOn": "2026-11-11",
+      "expiresOn": "2027-02-09"
+    },
+    {
+      "job": "ci.yml#main-queue-provenance",
+      "kind": "combined-head",
+      "reason": "Only proves anything on a main push; on merge_group it emits neutral outputs that later jobs gate on.",
+      "createdOn": "2026-11-11",
+      "expiresOn": "2027-02-09"
+    },
+    {
+      "job": "ci.yml#ci-fast",
+      "kind": "combined-head",
+      "reason": "Aggregates the ci-fast lanes of the combined head; each lane is classified on its own below.",
+      "createdOn": "2026-11-11",
+      "expiresOn": "2027-02-09"
+    },
+    {
+      "job": "ci.yml#ci-product-lane-receipt",
+      "kind": "combined-head",
+      "reason": "Writes the product-lane receipt for the combined head that main release readiness later reads.",
+      "createdOn": "2026-11-11",
+      "expiresOn": "2027-02-09"
+    },
+    {
+      "job": "ci.yml#ci-merge-group-ready",
+      "kind": "combined-head",
+      "reason": "Aggregates the combined-head leaves into the PR Ready context on merge_group; the PR has its own aggregate in Source Validation.",
+      "createdOn": "2026-11-11",
+      "expiresOn": "2027-02-09"
+    },
+    {
+      "job": "ci.yml#ci-fast-typecheck",
+      "kind": "gap",
+      "reason": "The queue runs the typecheck lane of scripts/ci-fast-lanes.mjs; the PR runs a hand-copied typecheck in Source Validation, so a lane-only failure first shows in the queue.",
+      "createdOn": "2026-11-11",
+      "expiresOn": "2027-02-09"
+    },
+    {
+      "job": "ci.yml#ci-fast-remaining",
+      "kind": "gap",
+      "reason": "The queue runs the remaining ci-fast lanes (actionlint, incident contract, storybook, playwright guards); the PR runs only a hand-picked subset of them.",
+      "createdOn": "2026-11-11",
+      "expiresOn": "2027-02-09"
+    },
+    {
+      "job": "ci.yml#ci-profile-admission-browser",
+      "kind": "gap",
+      "reason": "The profile admission browser proof runs only in the queue; no PR job runs the same Playwright spec.",
+      "createdOn": "2026-11-11",
+      "expiresOn": "2027-02-09"
+    },
+    {
+      "job": "ci.yml#ci-fast-structural-python",
+      "kind": "gap",
+      "reason": "Structural python lanes run only in the queue; no PR job runs the same lane commands.",
+      "createdOn": "2026-11-11",
+      "expiresOn": "2027-02-09"
+    },
+    {
+      "job": "ci.yml#ci-fast-structural-web",
+      "kind": "gap",
+      "reason": "Structural web lanes run only in the queue; no PR job runs the same lane commands.",
+      "createdOn": "2026-11-11",
+      "expiresOn": "2027-02-09"
+    },
+    {
+      "job": "ci.yml#ci-fast-structural-lanes",
+      "kind": "gap",
+      "reason": "Structural lane-runner tests run only in the queue; no PR job runs the same lane commands.",
+      "createdOn": "2026-11-11",
+      "expiresOn": "2027-02-09"
+    },
+    {
+      "job": "ci.yml#ci-blog-content",
+      "kind": "gap",
+      "reason": "Blog-only qualification runs only in the queue; the PR has no blog content lane.",
+      "createdOn": "2026-11-11",
+      "expiresOn": "2027-02-09"
+    },
+    {
+      "job": "ci.yml#ci-unit-tests",
+      "kind": "gap",
+      "reason": "The queue runs all 14 web unit shards plus packages/ui; the PR runs only tests related to its diff. Moving the shards onto PRs costs hosted runner capacity and needs a founder decision.",
+      "createdOn": "2026-11-11",
+      "expiresOn": "2027-02-09"
+    },
+    {
+      "job": "ci.yml#ci-build-layout",
+      "kind": "gap",
+      "reason": "The PR coverage job builds and runs the route JS budget and SEO certification, but the layout guard Playwright pass runs only in the queue.",
+      "createdOn": "2026-11-11",
+      "expiresOn": "2027-02-09"
+    },
+    {
+      "job": "ci.yml#ci-build-ovie",
+      "kind": "gap",
+      "reason": "The Ovie production build runs only in the queue; the PR runs Ovie tests but not its build.",
+      "createdOn": "2026-11-11",
+      "expiresOn": "2027-02-09"
+    },
+    {
+      "job": "ci.yml#ci-typecheck-ovie",
+      "kind": "gap",
+      "reason": "The Ovie typecheck runs only in the queue; no PR job runs the same command.",
+      "createdOn": "2026-11-11",
+      "expiresOn": "2027-02-09"
+    },
+    {
+      "job": "ci.yml#ci-storybook-surfaces",
+      "kind": "gap",
+      "reason": "The Storybook surface matrix and the extension, ingest, canary and mesh package checks run only in the queue.",
+      "createdOn": "2026-11-11",
+      "expiresOn": "2027-02-09"
+    },
+    {
+      "job": "ci.yml#ci-ios",
+      "kind": "gap",
+      "reason": "Path-selected iOS unit and coverage run only in the queue; the PR runs only the portable iOS contract.",
+      "createdOn": "2026-11-11",
+      "expiresOn": "2027-02-09"
+    },
+    {
+      "job": "ci.yml#ci-macos",
+      "kind": "gap",
+      "reason": "Path-selected Mac build and test run only in the queue; no PR job runs them.",
+      "createdOn": "2026-11-11",
+      "expiresOn": "2027-02-09"
+    },
+    {
+      "job": "ci.yml#ci-cross-product-integration",
+      "kind": "gap",
+      "reason": "Cross-product contract package tests run only in the queue; no PR job runs them.",
+      "createdOn": "2026-11-11",
+      "expiresOn": "2027-02-09"
+    },
+    {
+      "job": "ci.yml#ci-promptfoo-evals",
+      "kind": "gap",
+      "reason": "Deterministic promptfoo evals run only in the queue; no PR job runs them.",
+      "createdOn": "2026-11-11",
+      "expiresOn": "2027-02-09"
+    },
+    {
+      "job": "ci.yml#ci-golden-eval-set",
+      "kind": "gap",
+      "reason": "The golden eval set runs only in the queue; no PR job runs it.",
+      "createdOn": "2026-11-11",
+      "expiresOn": "2027-02-09"
+    },
+    {
+      "job": "ci.yml#ci-visual-snapshot-compare",
+      "kind": "gap",
+      "reason": "The shared visual build and inventory run only in the queue; the rendered suites split from this job inherit the same gap and deadline below. The baselines lane owns closing it.",
+      "createdOn": "2026-11-11",
+      "expiresOn": "2027-02-09"
+    },
+    {
+      "job": "ci.yml#ci-visual-snapshot-homepage",
+      "kind": "gap",
+      "reason": "Homepage snapshot comparison inherits the queue-only runtime gap split from ci-visual-snapshot-compare; its commands and selection are unchanged. The baselines lane owns closing it.",
+      "createdOn": "2026-11-11",
+      "expiresOn": "2027-02-09"
+    },
+    {
+      "job": "ci.yml#ci-visual-marketing-dom",
+      "kind": "gap",
+      "reason": "Marketing DOM certification inherits the queue-only runtime gap split from ci-visual-snapshot-compare; its commands and selection are unchanged. The baselines lane owns closing it.",
+      "createdOn": "2026-11-11",
+      "expiresOn": "2027-02-09"
+    },
+    {
+      "job": "ci.yml#ci-visual-marketing-routes",
+      "kind": "gap",
+      "reason": "Marketing route capture inherits the queue-only runtime gap split from ci-visual-snapshot-compare; its commands and selection are unchanged. The baselines lane owns closing it.",
+      "createdOn": "2026-11-11",
+      "expiresOn": "2027-02-09"
+    },
+    {
+      "job": "ci.yml#neon-db",
+      "kind": "gap",
+      "reason": "Database certification on an isolated Neon branch runs only in the queue, path-gated on DB changes; the PR runs the static migration guard only.",
+      "createdOn": "2026-11-11",
+      "expiresOn": "2027-02-09"
+    },
+    {
+      "job": "ci.yml#ci-lighthouse-dashboard-pr",
+      "kind": "gap",
+      "reason": "The Lighthouse dashboard gate never runs on a PR (about 80 queue failures in 7 days); the Lighthouse lane owns closing it.",
+      "createdOn": "2026-11-11",
+      "expiresOn": "2027-02-09"
+    },
+    {
+      "job": "ci.yml#ci-lighthouse-onboarding-pr",
+      "kind": "gap",
+      "reason": "The Lighthouse onboarding gate never runs on a PR; the Lighthouse lane owns closing it.",
+      "createdOn": "2026-11-11",
+      "expiresOn": "2027-02-09"
+    }
+  ],
+  "prOnlyInputs": [
+    {
+      "job": "pr-size-guard.yml#merge-group-size",
+      "pr": "pr-size-guard.yml#size",
+      "why": "Re-measures each member diff against the PR size cap and its labels; the same cap is required on the PR head."
+    },
+    {
+      "job": "pr-size-guard.yml#merge-group-fork",
+      "pr": "fork-pr-gate.yml#fork-gate",
+      "why": "Re-reads the fork origin and approvals of each member; the same gate is required on the PR head."
+    },
+    {
+      "job": "pr-fleet-rules.yml#fleet",
+      "why": "PR Fleet Rules reads the PR body and labels (receipts, red-before-green); it runs on pull_request only."
+    }
+  ],
+  "prOnlyExemptions": [
+    {
+      "job": "pr-size-guard.yml#merge-group-size",
+      "reason": "Mostly a combined-head check: 41 of its 42 queue failures from 2026-11-04 to 2026-11-11 were the combined-tree byte budget and holds are read at admission. Only the per-member size cap is PR-only; it leaves the queue once the PR side re-checks a removed big-pr label.",
+      "createdOn": "2026-11-11",
+      "expiresOn": "2027-02-09"
+    },
+    {
+      "job": "pr-size-guard.yml#merge-group-fork",
+      "reason": "The ruleset requires a Fork PR Gate context on merge_group; it spends no API call and is decided from the size job reads. Dropping it needs a ruleset change.",
+      "createdOn": "2026-11-11",
+      "expiresOn": "2027-02-09"
+    }
+  ]
+}

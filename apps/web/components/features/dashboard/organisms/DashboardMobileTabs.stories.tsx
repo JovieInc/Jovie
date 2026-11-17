@@ -31,3 +31,14 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {};
+
+/** Right-to-left: the tab bar and its More menu mirror without clipping. */
+export const RtlTabs: Story = {
+  render: args => (
+    <div dir='rtl' lang='ar' className='flex min-h-screen items-end bg-base'>
+      <div className='w-full'>
+        <DashboardMobileTabs {...args} />
+      </div>
+    </div>
+  ),
+};

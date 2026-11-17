@@ -20,7 +20,8 @@ import { handleMutationError } from './mutation-utils';
  */
 export interface CheckoutInput {
   priceId: string;
-  source?: 'youtube_thumbnails';
+  source?: 'youtube_thumbnails' | 'in_app';
+  returnTo?: string;
 }
 
 /**
@@ -52,6 +53,7 @@ async function createCheckoutSession(
     body: JSON.stringify({
       priceId: input.priceId,
       source: input.source,
+      returnTo: input.returnTo,
       humanConfirmed: true,
     }),
   });

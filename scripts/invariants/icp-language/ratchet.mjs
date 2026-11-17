@@ -43,7 +43,11 @@ export function evaluateRatchet({ current, recorded, ancestor }) {
 }
 export function ancestorJson(repoRoot, relPath) {
   const git = (args, encoding) =>
-    spawnSync('git', args, { cwd: repoRoot, encoding });
+    spawnSync('git', args, {
+      maxBuffer: 256 * 1024 * 1024,
+      cwd: repoRoot,
+      encoding,
+    });
   const rev = git(['rev-parse', '--verify', 'origin/main'], 'utf8');
   if (rev.status !== 0) {
     return {

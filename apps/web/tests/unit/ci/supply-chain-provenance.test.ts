@@ -219,6 +219,34 @@ describe('supply chain provenance guardrails', () => {
     expect(verifyStep).toContain('GITHUB_STEP_SUMMARY');
   });
 
+  it('gates the osv SARIF upload on the shared installation quota (JOV-11801)', () => {
+    const workflow = readFileSync(securityWorkflowPath, 'utf8');
+    const gateStep = getStepBlock(
+      workflow,
+      'Check the installation quota before uploading osv SARIF'
+    );
+    const uploadStep = getStepBlock(workflow, 'Upload osv SARIF');
+    const scanStep = getStepBlock(workflow, 'Scan lockfiles with osv-scanner');
+
+    // The pinned upload action meets "API rate limit exceeded for
+    // installation" whenever the shared Actions token bucket is empty, which
+    // reddened main twelve times with no verdict on the code. The gate reads
+    // the bucket first and defers the upload visibly only while it cannot
+    // carry the upload's own calls; the upload itself stays fail-closed for
+    // every other error, and the scanner is never deferred.
+    expect(gateStep).toContain('id: osv_upload_gate');
+    expect(gateStep).toContain('.github/scripts/gh-api-hold.sh');
+    expect(gateStep).toContain('api rate_limit');
+    expect(gateStep).toContain('scripts/security/sarif-upload-gate.mjs');
+    expect(gateStep).toContain('GH_TOKEN');
+    expect(uploadStep).toContain(
+      "if: steps.osv_upload_gate.outputs.defer != 'true'"
+    );
+    expect(uploadStep).toContain('category: osv');
+    expect(uploadStep).not.toContain('continue-on-error');
+    expect(scanStep).not.toContain('continue-on-error');
+  });
+
   it('keeps commit signing audit-only until an explicit live cutover', () => {
     const ruleset = readFileSync(branchProtectionPath, 'utf8');
 

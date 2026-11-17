@@ -94,12 +94,12 @@ export function PublicProfileLayoutShell({
             className={cn(
               'h-full w-full',
               hasAmbientBg
-                ? 'bg-[radial-gradient(circle_at_50%_30%,var(--profile-stage-glow-a,rgba(255,255,255,0.18)),transparent_60%)] opacity-50'
+                ? 'bg-(image:--profile-stage-ambient-glow) opacity-50'
                 : 'bg-[radial-gradient(circle_at_top,var(--profile-stage-glow-a),transparent_44%)] opacity-50'
             )}
           />
         </div>
-        <div className='absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.06),transparent_26%),linear-gradient(180deg,rgba(6,8,13,0.34)_0%,rgba(7,8,10,0.82)_42%,rgba(8,9,10,0.98)_100%)]' />
+        <div className='absolute inset-0 bg-(image:--profile-stage-scrim)' />
       </div>
 
       <div

@@ -353,25 +353,4 @@ describe('POST /api/account/delete', () => {
       mockWithDbSessionTx.mock.invocationCallOrder[1]
     );
   });
-
-  it.skip('handles Clerk deletion failure gracefully (retired: no Clerk delete path)', async () => {
-    selectResults.queue.push([{ id: 'user_1', deletedAt: null }]);
-    selectResults.queue.push([]);
-
-    const clerkError = new Error('Clerk API error');
-    mockClerkClient.mockResolvedValue({
-      users: { deleteUser: vi.fn().mockRejectedValue(clerkError) },
-    });
-
-    const { POST } = await import('@/app/api/account/delete/route');
-    const response = await POST(makeRequest({ confirmation: 'DELETE' }));
-
-    // Should still succeed — Clerk failure is non-fatal
-    expect(response.status).toBe(200);
-    expect(mockCaptureError).toHaveBeenCalledWith(
-      'Failed to delete Clerk user during account deletion',
-      clerkError,
-      expect.objectContaining({ route: '/api/account/delete' })
-    );
-  });
 });

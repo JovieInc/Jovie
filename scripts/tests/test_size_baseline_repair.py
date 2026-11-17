@@ -23,14 +23,14 @@ def pr(name="Company guards"):
 
 
 class SizeBaselineRepairTest(unittest.TestCase):
-    def test_classify_names_the_grown_test_and_routes_shrink(self):
+    def test_current_size_route_and_legacy_path_parser_preserve_growth_evidence(self):
         log = ("##[error]size-500: scripts/tests/test_lane_runner.py: grew 17833 -> 17941\n"
                "##[warning]API rate limit exceeded inside a passing fixture\n"
                "##[error]size-500: scripts/lanes/lane_runner.py: grew 11721 -> 11729\n")
-        got = classes.classify(pr(), {"Company guards": log})
-        self.assertEqual((got["cls"], got["action"]), ("size-baseline", "shrink-size"))
-        self.assertIn(got["action"], classes.DETERMINISTIC)
-        self.assertEqual(got["files"], ["scripts/tests/test_lane_runner.py", "scripts/lanes/lane_runner.py"])
+        got = classes.size_500_route(log)
+        self.assertEqual(got, ("size-500-stale", "sync-main"))
+        self.assertIn(got[1], classes.DETERMINISTIC)
+        self.assertEqual(repair.paths(log), ["scripts/tests/test_lane_runner.py", "scripts/lanes/lane_runner.py"])
 
     def test_peel_drops_only_the_trailing_class_and_keeps_a_mid_file_main(self):
         text = ("class First(unittest.TestCase):\n    def test_a(self):\n        pass\n\n"

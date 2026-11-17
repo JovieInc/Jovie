@@ -144,6 +144,58 @@ class WorktreeHostGateTest(unittest.TestCase):
                 patch.object(lane, "sh", Mock(side_effect=AssertionError("no git should run"))):
             self.assertEqual(lane.deterministic_conflict_pass(self.host, []), [])
 
+    def test_a_host_hold_closes_only_the_unworked_local_fix_claim(self):
+        pr = {"number": 4, "headRefName": "codex/x", "headRefOid": "a" * 40}
+        self.state.mkdir(parents=True)
+        attempts = self.state / "fix-attempts.json"
+        original = {"sha": pr["headRefOid"], "count": 2, "at": 1, "fence": "preserved"}
+        attempts.write_text(json.dumps({"4": original, "5": {"count": 3}}))
+        with patch.object(lane, "HOST", "mac"), patch.dict(os.environ, {"LANES_WORKTREE_HOSTS": "gem"}), \
+                patch.object(lane, "note_breaker_run"), patch.object(lane, "run_agent") as agent:
+            receipt = lane._fix_red_pr(self.host, "codex", {"cmd": ["true"]}, pr)
+        final = json.loads(attempts.read_text())
+        self.assertEqual(final["4"]["count"], 1)
+        self.assertEqual(final["4"]["fence"], "preserved")
+        self.assertEqual(final["5"], {"count": 3})
+        self.assertTrue(final["4"]["endedAt"])
+        self.assertEqual(receipt["attemptRefunded"], "worktree-host-not-allowed:mac")
+        self.assertIn("worktree-host-held", lane.INTERRUPTED_VERDICTS)
+        agent.assert_not_called()
+        # Adoption owns a gate seat, not another local fix attempt.
+        with patch.object(lane, "HOST", "mac"), patch.dict(os.environ, {"LANES_WORKTREE_HOSTS": "gem"}):
+            lane._adopt_pr(self.host, "codex", pr, SimpleNamespace())
+        self.assertEqual(json.loads(attempts.read_text()), final)
+
+    def test_a_capped_worker_never_claims_or_bounces_an_issue(self):
+        slot = SimpleNamespace(release=Mock())
+        with patch.object(lane, "HOST", "mac"), \
+                patch.dict(os.environ, {"LANES_WORKTREE_HOSTS": "gem,mac", "LANES_MAX_WORKTREES": "1"}), \
+                patch.object(lane.disk_guard, "check", return_value={"admitted": True}), \
+                patch.object(lane, "worktree_count_run", return_value=SimpleNamespace(
+                    returncode=0, stdout="worktree /repo\n\nworktree /one\n")), \
+                patch.object(lane, "requeue_verified") as requeue, patch.object(lane, "Linear") as linear:
+            self.assertEqual(lane.worker_with_slot(self.host, "codex", {}, slot), 1)
+        slot.release.assert_called_once()
+        requeue.assert_not_called()
+        linear.assert_not_called()
+
+    def test_fallback_cleanup_removes_published_work_without_recycling_idle_slots(self):
+        path = self.state / "worktrees/done"
+        path.mkdir(parents=True)
+        calls = []
+        def shell(args, **kwargs):
+            calls.append(args)
+            if args[:3] == ["git", "worktree", "remove"]:
+                path.rmdir()  # only this test's empty checkout, never a real repository
+            text = "a" * 40 if args[:2] == ["git", "rev-parse"] else "0" if args[:2] == ["git", "rev-list"] else ""
+            return SimpleNamespace(returncode=0, stdout=text, stderr="")
+        with patch.object(lane, "HOST", "mac"), patch.dict(os.environ, {"LANES_WORKTREE_HOSTS": "gem,mac"}), \
+                patch.object(lane, "sh", side_effect=shell), patch.object(lane, "worktree_busy", return_value=None), \
+                patch.object(lane.git_housekeeping, "quiesce"), patch.object(lane.worktree_pool, "recycle") as recycle:
+            self.assertTrue(lane.remove_worktree(self.host, path))
+        recycle.assert_not_called()
+        self.assertIn(["git", "worktree", "remove", "--force", str(path)], calls)
+
 def _drop_inherited_tests() -> None:
     for value in list(globals().values()):
         if not isinstance(value, type) or not issubclass(value, unittest.TestCase):

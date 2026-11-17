@@ -22,6 +22,8 @@ export function outboundFixtureRow(
     fitBasis: 'scored',
     flags: [],
     entityNote: null,
+    relationshipHold: null,
+    relationshipNotes: [],
     missingEvidence: [],
     ability: 'unknown',
     intent: 'unknown',

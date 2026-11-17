@@ -2,8 +2,9 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const hoisted = vi.hoisted(() => ({
   requireAuthMock: vi.fn(),
+  getSessionContextMock: vi.fn(),
   getCurrentUserEntitlementsMock: vi.fn(),
-  getAiCrawlerAnalyticsForUserMock: vi.fn(),
+  getAiCrawlerAnalyticsForProfileMock: vi.fn(),
   cacheQueryMock: vi.fn(
     async (_key: string, fn: () => Promise<unknown>) => await fn()
   ),
@@ -11,6 +12,7 @@ const hoisted = vi.hoisted(() => ({
 
 vi.mock('@/lib/auth/session', () => ({
   requireAuth: hoisted.requireAuthMock,
+  getSessionContext: hoisted.getSessionContextMock,
 }));
 
 vi.mock('@/lib/entitlements/server', () => ({
@@ -18,7 +20,7 @@ vi.mock('@/lib/entitlements/server', () => ({
 }));
 
 vi.mock('@/lib/db/queries/ai-crawler-analytics', () => ({
-  getAiCrawlerAnalyticsForUser: hoisted.getAiCrawlerAnalyticsForUserMock,
+  getAiCrawlerAnalyticsForProfile: hoisted.getAiCrawlerAnalyticsForProfileMock,
 }));
 
 vi.mock('@/lib/db/cache', () => ({
@@ -28,11 +30,15 @@ vi.mock('@/lib/db/cache', () => ({
 describe('GET /api/dashboard/ai-crawlers', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    hoisted.getSessionContextMock.mockResolvedValue({
+      user: { id: 'user_123' },
+      profile: { id: 'profile-123', userId: 'user_123' },
+    });
     hoisted.requireAuthMock.mockResolvedValue('user_123');
     hoisted.getCurrentUserEntitlementsMock.mockResolvedValue({
       canAccessAdvancedAnalytics: true,
     });
-    hoisted.getAiCrawlerAnalyticsForUserMock.mockResolvedValue({
+    hoisted.getAiCrawlerAnalyticsForProfileMock.mockResolvedValue({
       totalRequests: 10,
       weeklyRequests: 3,
       crawlers: [],
@@ -50,8 +56,8 @@ describe('GET /api/dashboard/ai-crawlers', () => {
 
     expect(response.status).toBe(200);
     expect(body.isPro).toBe(true);
-    expect(hoisted.getAiCrawlerAnalyticsForUserMock).toHaveBeenCalledWith(
-      'user_123',
+    expect(hoisted.getAiCrawlerAnalyticsForProfileMock).toHaveBeenCalledWith(
+      expect.objectContaining({ userId: 'user_123', profileId: 'profile-123' }),
       { isPro: true }
     );
   });
@@ -60,7 +66,7 @@ describe('GET /api/dashboard/ai-crawlers', () => {
     hoisted.getCurrentUserEntitlementsMock.mockResolvedValue({
       canAccessAdvancedAnalytics: false,
     });
-    hoisted.getAiCrawlerAnalyticsForUserMock.mockResolvedValue({
+    hoisted.getAiCrawlerAnalyticsForProfileMock.mockResolvedValue({
       totalRequests: 8,
       weeklyRequests: 2,
       crawlers: [
@@ -83,8 +89,8 @@ describe('GET /api/dashboard/ai-crawlers', () => {
 
     expect(response.status).toBe(200);
     expect(body.isTeaser).toBe(true);
-    expect(hoisted.getAiCrawlerAnalyticsForUserMock).toHaveBeenCalledWith(
-      'user_123',
+    expect(hoisted.getAiCrawlerAnalyticsForProfileMock).toHaveBeenCalledWith(
+      expect.objectContaining({ userId: 'user_123', profileId: 'profile-123' }),
       { isPro: false }
     );
   });

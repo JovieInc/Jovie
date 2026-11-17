@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import React from 'react';
 import { describe, expect, it, vi } from 'vitest';
+import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import {
   type ChatMerchGenerationResult,
   ChatMerchOptionsCard,
@@ -284,5 +285,150 @@ describe('ChatMerchCard', () => {
       'Preview unavailable'
     );
     expect(screen.queryByAltText('Signal Tee mockup')).toBeNull();
+  });
+});
+
+describe('ChatMerchCard certificate states', () => {
+  const [signalTee, draftHoodie] = generationResult.options;
+  const withOptions = (
+    options: ChatMerchGenerationResult['options'],
+    nextStep?: string
+  ): ChatMerchGenerationResult => ({
+    success: true,
+    generationId: generationResult.generationId,
+    ...(nextStep ? { nextStep } : {}),
+    options,
+  });
+  const mockupFailed = {
+    ...signalTee,
+    id: '00000000-0000-4000-8000-000000000111',
+    mockup_urls: [],
+    sellability: {
+      sellable: false,
+      reasons: ['Printful mockup failed. Try generating this item again.'],
+    },
+  };
+  const partialOption = {
+    id: '00000000-0000-4000-8000-000000000121',
+    option_number: 1,
+    design_name: 'Signal Tee',
+    product_type: 'Premium Tee',
+    concept: 'A premium shirt with restrained artist typography.',
+  };
+  const longOption = {
+    ...signalTee,
+    design_name: 'The Extended Midnight Drive Sessions Deluxe Anniversary Tee',
+    printful_product_name:
+      'Unisex Garment-Dyed Heavyweight Premium Cotton T-Shirt',
+    colorway: 'washed vintage charcoal',
+  };
+
+  it.each([
+    ['options', generationResult],
+    ['empty options', withOptions([], 'No options came back.')],
+    ['mockup failed', withOptions([mockupFailed])],
+    ['partial option', withOptions([partialOption])],
+    ['long names and reasons', withOptions([longOption, draftHoodie])],
+  ] as const)('has no axe violations: %s', async (_state, result) => {
+    const { container } = render(<ChatMerchOptionsCard result={result} />);
+    await expectNoA11yViolations(container);
+  });
+
+  it('shows only the next-step line when no option came back', () => {
+    render(
+      <ChatMerchOptionsCard result={withOptions([], 'No options came back.')} />
+    );
+    expect(screen.getByText('No options came back.')).toBeInTheDocument();
+    expect(screen.queryAllByTestId('chat-merch-option-card')).toHaveLength(0);
+  });
+
+  it('keeps a partial option usable: default prompt, rendering slot, no pricing', () => {
+    render(<ChatMerchOptionsCard result={withOptions([partialOption])} />);
+    expect(screen.getByText('Pick one to save it to Work')).toBeInTheDocument();
+    expect(screen.getByTestId('chat-merch-mockup-fallback')).toHaveTextContent(
+      'Rendering mockup'
+    );
+    expect(screen.queryByTestId('merch-pricing-summary')).toBeNull();
+    expect(screen.getByText('Premium Tee')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Publish' })).toBeEnabled();
+  });
+
+  it('truncates long names to one line and keeps their full text', () => {
+    render(<ChatMerchOptionsCard result={withOptions([longOption])} />);
+    const heading = screen.getByRole('heading', {
+      name: 'The Extended Midnight Drive Sessions Deluxe Anniversary Tee',
+    });
+    expect(heading).toHaveClass('truncate');
+    expect(
+      screen.getByText(
+        'Unisex Garment-Dyed Heavyweight Premium Cotton T-Shirt · washed vintage charcoal'
+      )
+    ).toHaveClass('truncate');
+  });
+
+  it('has no axe violations for the saved card, draft and live', async () => {
+    const draft = render(
+      <ChatMerchSelectionCard
+        result={{
+          success: true,
+          merchCardId: '00000000-0000-4000-8000-000000000201',
+          status: 'draft',
+          selectedOptionId: draftHoodie.id,
+          title: 'Draft Hoodie',
+          publicUrl: null,
+          publishBlockedReasons: [
+            'Printful product cost must come from Printful before sale.',
+          ],
+        }}
+      />
+    );
+    await expectNoA11yViolations(draft.container);
+    draft.unmount();
+
+    const live = render(
+      <ChatMerchSelectionCard
+        result={{
+          success: true,
+          merchCardId: '00000000-0000-4000-8000-000000000202',
+          status: 'live',
+          selectedOptionId: signalTee.id,
+          title: 'Signal Tee',
+          publicUrl: 'https://jov.ie/signal/merch/signal-tee',
+        }}
+      />
+    );
+    expect(
+      screen.getByText('Live card is now available in Work.')
+    ).toBeVisible();
+    await expectNoA11yViolations(live.container);
+  });
+
+  it('renders right-to-left options and stays axe-clean', async () => {
+    const { container } = render(
+      <div dir='rtl' lang='ar'>
+        <ChatMerchOptionsCard
+          result={withOptions(
+            [{ ...signalTee, design_name: 'قميص الإشارة', colorway: 'أسود' }],
+            'اختر واحدًا لحفظه في العمل.'
+          )}
+        />
+      </div>
+    );
+    expect(
+      screen.getByRole('heading', { name: 'قميص الإشارة' })
+    ).toBeInTheDocument();
+    await expectNoA11yViolations(container);
+  });
+
+  it('keeps the chosen pricing preset through a re-render', () => {
+    const single = withOptions([signalTee]);
+    const { rerender } = render(<ChatMerchOptionsCard result={single} />);
+    fireEvent.click(screen.getByRole('radio', { name: 'Safe' }));
+    rerender(<ChatMerchOptionsCard result={withOptions([signalTee])} />);
+
+    expect(screen.getByRole('radio', { name: 'Safe' })).toBeChecked();
+    expect(screen.getByTestId('merch-pricing-summary')).toHaveTextContent(
+      '$42.00'
+    );
   });
 });

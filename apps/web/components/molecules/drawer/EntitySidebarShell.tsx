@@ -272,7 +272,13 @@ export function EntitySidebarShell({
                 variant={workspaceContentSurface}
                 className='overflow-hidden'
               >
-                <div className='border-b border-transparent bg-transparent backdrop-blur-[12px]'>
+                {/* The 1px bottom seam is padding, not a transparent border:
+                    same border-box geometry, and the card stays the only
+                    bordered surface around the title bar and tabs. */}
+                <div
+                  data-entity-sidebar-header-band=''
+                  className='bg-transparent pb-px backdrop-blur-[12px]'
+                >
                   {showMinimalHeaderBar ? (
                     <EntityHeader
                       layout='chrome'
