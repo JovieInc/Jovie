@@ -3,8 +3,6 @@ import { createHash } from 'node:crypto';
 import type { MarketingRegistryEntry } from '@/data/marketing/componentRegistry';
 import {
   CERTIFICATION_CERTIFIER_AUTHORITIES,
-  CERTIFICATION_OPERATIONAL_EVIDENCE_TIERS,
-  CERTIFICATION_TASTE_EVIDENCE_TIERS,
   type CertificationAdmission,
   type CertificationAuditEvent,
   type CertificationBlocker,
@@ -33,14 +31,10 @@ const COMPACT_AUDIT_AT = 40;
 export const MARKETING_CERTIFICATION_LEDGER_MAX_BYTES = 256 * 1024;
 
 /**
- * Per-identity packet shard rows: `${prefix}:${identityId}` (JOV-12830).
+ * Immutable packet shards: `${prefix}:${identityId}:${revision}` (JOV-12830).
  *
- * A full review packet is kilobytes, and the registry denominator is ~100
- * identities, so packets cannot live inline in the hot ledger row without
- * blowing the 256 KiB operating-KV budget on every write. The hot row keeps
- * only stamps, decisions and audit tails; packet payloads live in their own
- * shard rows and are rehydrated on read (one prefix scan via listRecords, or
- * per-identity gets on backends without it).
+ * Hot records atomically bind immutable packet revisions with their stamps,
+ * decisions and audit tails, keeping each operating-KV row below 256 KiB.
  */
 export const MARKETING_CERTIFICATION_PACKET_SHARD_PREFIX =
   `${MARKETING_CERTIFICATION_STORE_KEY}:packet:` as const;
@@ -49,17 +43,39 @@ export const MARKETING_CERTIFICATION_PACKET_SHARD_SCHEMA =
 
 import {
   type CertificationRecordBackend,
+  certificationPacketMeaning,
   certificationRecordJson,
+  createCertificationPacketStorage,
+  EVIDENCE_TIERS,
+  isCertificationReviewPacket,
   CERTIFICATION_CAS_ATTEMPTS as MAX_COMPARE_AND_SET_ATTEMPTS,
   CERTIFICATION_PERSISTENCE_TTL_SECONDS as PERSISTENCE_TTL_SECONDS,
 } from './certification-cas';
 
 export type { CertificationRecordBackend } from './certification-cas';
+export {
+  certificationPacketMeaning,
+  isCertificationReviewPacket,
+} from './certification-cas';
+
+const { hydrateLedger, serializeHotLedger, writePacketShard } =
+  createCertificationPacketStorage({
+    prefix: MARKETING_CERTIFICATION_PACKET_SHARD_PREFIX,
+    schema: MARKETING_CERTIFICATION_PACKET_SHARD_SCHEMA,
+    maxBytes: MARKETING_CERTIFICATION_LEDGER_MAX_BYTES,
+    missingPacket: missingPacketForEntry,
+    error: message => new MarketingCertificationPersistenceError(message),
+    registryError: message =>
+      new MarketingCertificationRegistryDriftError(message),
+  });
 
 export interface MarketingCertificationRecord {
   readonly identityId: string;
   readonly packet: CertificationReviewPacket;
   readonly packetUpdatedAt: string;
+  readonly packetRevision?: string;
+  /** Hydration diagnostic; never persisted in the hot row. */
+  readonly packetFailure?: string;
   readonly decisions: readonly FounderCertificationDecision[];
   readonly auditHistory: readonly CertificationAuditEvent[];
   /** Number of append-only audit chunks already moved out of this row (see compactAudit). */
@@ -356,17 +372,6 @@ const AUDIT_EVENT_TYPES = new Set([
   'transition_blocked',
   'transition_allowed',
 ]);
-const EVIDENCE_TIERS = new Set<string>([
-  ...CERTIFICATION_TASTE_EVIDENCE_TIERS,
-  ...CERTIFICATION_OPERATIONAL_EVIDENCE_TIERS,
-]);
-const EVIDENCE_STATUSES = new Set<string>([
-  'missing',
-  'pending',
-  'passed',
-  'failed',
-  'blocked',
-]);
 const ASSURANCE_PREREQUISITE_KINDS = new Set<string>([
   ...MARKETING_MANDATORY_ASSURANCE_DIMENSIONS,
   'written_invariant',
@@ -604,26 +609,6 @@ function assertAssuranceProfileShape(
   }
 }
 
-function isNullableString(value: unknown): value is string | null {
-  return value === null || typeof value === 'string';
-}
-
-function isEvidenceReceipt(value: unknown): boolean {
-  return (
-    isRecord(value) &&
-    typeof value.id === 'string' &&
-    value.id.length > 0 &&
-    typeof value.tier === 'string' &&
-    EVIDENCE_TIERS.has(value.tier) &&
-    typeof value.status === 'string' &&
-    EVIDENCE_STATUSES.has(value.status) &&
-    isNullableString(value.sourceSha) &&
-    typeof value.ref === 'string' &&
-    isNullableString(value.digest) &&
-    typeof value.summary === 'string'
-  );
-}
-
 function packetEvidenceReceipts(
   packet: CertificationReviewPacket
 ): CertificationEvidenceReceipt[] {
@@ -810,83 +795,6 @@ function assuranceProfilesBySubject(
   return result;
 }
 
-export function isCertificationReviewPacket(
-  value: unknown
-): value is CertificationReviewPacket {
-  if (
-    !isRecord(value) ||
-    typeof value.contract !== 'string' ||
-    !isRecord(value.subject) ||
-    typeof value.subject.id !== 'string' ||
-    typeof value.subject.kind !== 'string' ||
-    typeof value.subject.title !== 'string' ||
-    !Array.isArray(value.canonicalReferences) ||
-    !value.canonicalReferences.every(isEvidenceReceipt) ||
-    !Array.isArray(value.invariantEvaluation) ||
-    !value.invariantEvaluation.every(isEvidenceReceipt) ||
-    !Array.isArray(value.testsCoverage) ||
-    !value.testsCoverage.every(isEvidenceReceipt) ||
-    !Array.isArray(value.visualProof) ||
-    !value.visualProof.every(isEvidenceReceipt) ||
-    !Array.isArray(value.requiredVariants) ||
-    !value.requiredVariants.every(
-      variant =>
-        isRecord(variant) &&
-        typeof variant.id === 'string' &&
-        variant.id.length > 0 &&
-        typeof variant.label === 'string' &&
-        typeof variant.sourceSha === 'string' &&
-        (variant.proof === null || isEvidenceReceipt(variant.proof)) &&
-        Array.isArray(variant.requiredMediaIds) &&
-        variant.requiredMediaIds.every(id => typeof id === 'string')
-    ) ||
-    !Array.isArray(value.itemMedia) ||
-    !value.itemMedia.every(
-      media =>
-        isRecord(media) &&
-        typeof media.id === 'string' &&
-        media.id.length > 0 &&
-        typeof media.itemId === 'string' &&
-        isNullableString(media.variantId) &&
-        typeof media.status === 'string' &&
-        EVIDENCE_STATUSES.has(media.status) &&
-        isNullableString(media.sourceSha) &&
-        typeof media.ref === 'string' &&
-        isNullableString(media.digest) &&
-        typeof media.summary === 'string'
-    )
-  ) {
-    return false;
-  }
-
-  if (
-    value.source !== null &&
-    (!isRecord(value.source) ||
-      typeof value.source.repository !== 'string' ||
-      typeof value.source.ref !== 'string' ||
-      typeof value.source.sha !== 'string' ||
-      (value.source.expectedSha !== undefined &&
-        !isNullableString(value.source.expectedSha)) ||
-      !Array.isArray(value.source.paths) ||
-      !value.source.paths.every(path => typeof path === 'string') ||
-      (value.source.digest !== undefined &&
-        !isNullableString(value.source.digest)))
-  ) {
-    return false;
-  }
-
-  if (value.operational === undefined) return true;
-  if (!isRecord(value.operational)) return false;
-  const operational = value.operational;
-  return ['ci', 'queueMerge', 'deploy', 'runtimeDogfood'].every(key => {
-    const receipts = operational[key];
-    return (
-      receipts === undefined ||
-      (Array.isArray(receipts) && receipts.every(isEvidenceReceipt))
-    );
-  });
-}
-
 export function isPersistedFounderDecision(
   value: unknown,
   subjectId: string
@@ -964,6 +872,9 @@ function parseLedger(stored: unknown): MarketingCertificationHotLedger {
       !isRecord(record) ||
       record.identityId !== id ||
       (record.packet !== undefined && !isRecord(record.packet)) ||
+      (record.packetRevision !== undefined &&
+        (typeof record.packetRevision !== 'string' ||
+          !/^[a-f0-9]{64}$/.test(record.packetRevision))) ||
       typeof record.packetUpdatedAt !== 'string' ||
       Number.isNaN(Date.parse(record.packetUpdatedAt)) ||
       !Array.isArray(record.decisions) ||
@@ -1170,6 +1081,7 @@ function projectEntry(
   };
 
   try {
+    if (record.packetFailure) return failClosed(record.packetFailure);
     assertPacketMatchesEntry(record.packet, entry);
     const admission = evaluateCertificationAdmission({
       decisions: record.decisions,
@@ -1232,191 +1144,6 @@ function ledgerProjection(
     registryIds: [...ledger.registryIds],
     rows: entryOutcomes.map(outcome => outcome.row),
   };
-}
-
-function packetShardKey(identityId: string): string {
-  return `${MARKETING_CERTIFICATION_PACKET_SHARD_PREFIX}${identityId}`;
-}
-
-interface PacketShardPayload {
-  readonly evaluatedAt: string;
-  readonly packet: CertificationReviewPacket;
-}
-
-function parsePacketShard(raw: unknown): PacketShardPayload | null {
-  let value: unknown = raw;
-  if (typeof raw === 'string') {
-    try {
-      value = JSON.parse(raw);
-    } catch {
-      return null;
-    }
-  }
-  if (
-    !isRecord(value) ||
-    value.schema !== MARKETING_CERTIFICATION_PACKET_SHARD_SCHEMA ||
-    typeof value.identityId !== 'string' ||
-    typeof value.evaluatedAt !== 'string' ||
-    Number.isNaN(Date.parse(value.evaluatedAt)) ||
-    !isRecord(value.packet)
-  ) {
-    return null;
-  }
-  return {
-    evaluatedAt: value.evaluatedAt,
-    packet: value.packet as CertificationReviewPacket,
-  };
-}
-
-/**
- * Upsert one packet shard row. Shard rows are last-writer-wins by evaluation
- * time, so a stale racing producer write loses instead of resurrecting an
- * older packet.
- */
-async function writePacketShard(
-  backend: CertificationRecordBackend,
-  identityId: string,
-  evaluatedAt: string,
-  packet: CertificationReviewPacket
-): Promise<void> {
-  const key = packetShardKey(identityId);
-  const value = JSON.stringify({
-    schema: MARKETING_CERTIFICATION_PACKET_SHARD_SCHEMA,
-    identityId,
-    evaluatedAt,
-    packet,
-  });
-  for (let attempt = 0; attempt < MAX_COMPARE_AND_SET_ATTEMPTS; attempt += 1) {
-    const raw = await backend.get(key);
-    if (raw === null || raw === undefined) {
-      if (await backend.setIfAbsent(key, value, PERSISTENCE_TTL_SECONDS)) {
-        return;
-      }
-      continue;
-    }
-    const current = parsePacketShard(raw);
-    if (current && Date.parse(current.evaluatedAt) > Date.parse(evaluatedAt)) {
-      return;
-    }
-    if (
-      await backend.compareAndSet(
-        key,
-        certificationRecordJson(raw) as string,
-        value,
-        PERSISTENCE_TTL_SECONDS
-      )
-    ) {
-      return;
-    }
-  }
-  throw new MarketingCertificationPersistenceError(
-    `Certification packet shard ${identityId} lost compare-and-set repeatedly.`
-  );
-}
-
-/**
- * Drop each record's packet payload: the hot row keeps only stamps, decisions
- * and audit tails so it stays far under the operating-KV row budget
- * (JOV-12830). Every dropped payload must already live in its shard row (or be
- * the reconstructible placeholder) before the stripped row is committed.
- */
-function serializeHotLedger(
-  ledger: MarketingCertificationLedger
-): MarketingCertificationHotLedger {
-  const records: Record<string, MarketingCertificationHotRecord> = {};
-  for (const [id, record] of Object.entries(ledger.records)) {
-    const { packet: _packet, ...rest } = record;
-    records[id] = rest;
-  }
-  return { ...ledger, records };
-}
-
-function isPlaceholderPacket(
-  entry: MarketingRegistryEntry,
-  packet: CertificationReviewPacket
-): boolean {
-  return (
-    certificationPacketMeaning(packet) ===
-    certificationPacketMeaning(missingPacketForEntry(entry))
-  );
-}
-
-/**
- * Rehydrate packet payloads onto a parsed hot ledger: inline legacy packets
- * (pre-shard rows) stay authoritative and are reported as migration backlog;
- * packet-less records read their shard row, or fall back to the
- * reconstructible placeholder, which fails closed for that identity until a
- * producer posts evidence.
- */
-async function hydrateLedger(
-  backend: CertificationRecordBackend,
-  entryById: ReadonlyMap<string, MarketingRegistryEntry>,
-  hot: MarketingCertificationHotLedger
-): Promise<{
-  ledger: MarketingCertificationLedger;
-  inlineBacklog: ReadonlySet<string>;
-}> {
-  const idsNeedingRow = Object.values(hot.records)
-    .filter(record => record.packet === undefined)
-    .map(record => record.identityId);
-  const rows = new Map<string, PacketShardPayload>();
-  if (idsNeedingRow.length > 0) {
-    if (typeof backend.listRecords === 'function') {
-      let after: string | undefined;
-      for (;;) {
-        const page = await backend.listRecords(
-          MARKETING_CERTIFICATION_PACKET_SHARD_PREFIX,
-          after,
-          101
-        );
-        for (const row of page) {
-          const parsed = parsePacketShard(row.value);
-          if (parsed) {
-            rows.set(
-              row.key.slice(MARKETING_CERTIFICATION_PACKET_SHARD_PREFIX.length),
-              parsed
-            );
-          }
-        }
-        if (page.length < 101) break;
-        after = page[page.length - 1]?.key;
-        if (after === undefined) break;
-      }
-    } else {
-      await Promise.all(
-        idsNeedingRow.map(async id => {
-          const parsed = parsePacketShard(
-            await backend.get(packetShardKey(id))
-          );
-          if (parsed) rows.set(id, parsed);
-        })
-      );
-    }
-  }
-  const inlineBacklog = new Set<string>();
-  const records: Record<string, MarketingCertificationRecord> = {};
-  for (const [id, record] of Object.entries(hot.records)) {
-    const entry = entryById.get(id);
-    if (!entry) {
-      throw new MarketingCertificationRegistryDriftError(
-        `Certification ledger record ${id} is not in the marketing registry.`
-      );
-    }
-    if (record.packet === undefined) {
-      const row = rows.get(id);
-      const packet =
-        row && Date.parse(row.evaluatedAt) >= Date.parse(record.packetUpdatedAt)
-          ? row.packet
-          : missingPacketForEntry(entry);
-      records[id] = { ...record, packet };
-      continue;
-    }
-    if (!isPlaceholderPacket(entry, record.packet)) {
-      inlineBacklog.add(id);
-    }
-    records[id] = { ...record, packet: record.packet };
-  }
-  return { ledger: { ...hot, records }, inlineBacklog };
 }
 
 /**
@@ -1492,37 +1219,6 @@ function extendLedgerRegistry(
     },
     dirtyIds,
   };
-}
-
-/**
- * What a packet means, without the volatile bookkeeping (push SHA, run URL, per-run
- * digests). The producer re-posts every entry on nearly every main push; identical
- * meaning must not rewrite the MB-sized ledger or append audit noise.
- */
-export function certificationPacketMeaning(
-  packet: CertificationReviewPacket
-): string {
-  const receipts = (
-    list: readonly CertificationEvidenceReceipt[] | undefined
-  ) => (list ?? []).map(r => [r.id, r.tier, r.status, r.summary]);
-  const p = packet as unknown as Record<string, unknown>;
-  return JSON.stringify([
-    packet.subject,
-    // Without a content digest the commit SHA is the only identity, so it counts.
-    packet.source
-      ? [
-          (packet.source as { digest?: string }).digest ?? packet.source.sha,
-          packet.source.paths,
-        ]
-      : null,
-    receipts(packet.canonicalReferences),
-    receipts(packet.invariantEvaluation),
-    receipts(packet.testsCoverage),
-    receipts(packet.visualProof),
-    p.itemMedia,
-    p.requiredVariants,
-    p.operational,
-  ]);
 }
 
 export class MarketingCertificationStore {
@@ -1607,6 +1303,7 @@ export class MarketingCertificationStore {
         decisions: existing.decisions,
         identityId: entry.id,
         packet,
+        packetFailure: undefined,
         packetUpdatedAt: evaluatedAt,
         updatedAt: laterTimestamp(existing.updatedAt, evaluatedAt),
       };
@@ -1883,22 +1580,24 @@ export class MarketingCertificationStore {
         ]);
         if (extended === hydrated.ledger && pending.size === 0) return extended;
         assertLedgerMatchesRegistry(extended, this.entries, initializedAt);
+        const records = { ...extended.records };
         for (const id of pending) {
           const record = extended.records[id];
-          await writePacketShard(
+          const packetRevision = await writePacketShard(
             this.backend,
             id,
             record.packetUpdatedAt,
             record.packet
           );
+          records[id] = { ...record, packetRevision };
         }
         const updated = await this.backend.compareAndSet(
           MARKETING_CERTIFICATION_STORE_KEY,
           certificationRecordJson(raw) as string,
-          JSON.stringify(serializeHotLedger(extended)),
+          JSON.stringify(serializeHotLedger({ ...extended, records })),
           PERSISTENCE_TTL_SECONDS
         );
-        if (updated) return extended;
+        if (updated) return { ...extended, records };
         continue;
       }
 
@@ -1925,14 +1624,8 @@ export class MarketingCertificationStore {
       readonly result: Result;
     }
   ): Promise<Result> {
-    // One persisted read per attempt. The hot row carries no packet payloads
-    // (JOV-12830): hydration reads the per-identity shard rows once, update
-    // functions run against full in-memory records, packet shard rows are
-    // written BEFORE the hot-row CAS (a crash between the two leaves a newer
-    // shard row next to an older hot stamp, which hydration resolves forward;
-    // the reverse order could strand a packet), and the hot row is committed
-    // stripped. Registry extension happens in parse; a missing ledger is
-    // initialized by the helper.
+    // Write immutable packet revisions first, then atomically publish their pointers,
+    // stamps, decisions and audit history in the hot-row CAS. Losing writes stay invisible.
     for (
       let attempt = 0;
       attempt < MAX_COMPARE_AND_SET_ATTEMPTS;
@@ -1966,16 +1659,20 @@ export class MarketingCertificationStore {
         if (current.records[id] === undefined) dirty.add(id);
         else if (record.packet !== current.records[id].packet) dirty.add(id);
       }
+      const records = { ...next.ledger.records };
       for (const id of dirty) {
-        const record = next.ledger.records[id];
-        await writePacketShard(
+        const record = records[id];
+        const packetRevision = await writePacketShard(
           this.backend,
           id,
           record.packetUpdatedAt,
           record.packet
         );
+        records[id] = { ...record, packetRevision };
       }
-      const serialized = JSON.stringify(serializeHotLedger(next.ledger));
+      const serialized = JSON.stringify(
+        serializeHotLedger({ ...next.ledger, records })
+      );
       // Unchanged state skips the write; registry extension or the migration
       // backlog still persists.
       if (serialized === json && dirty.size === 0) return next.result;
