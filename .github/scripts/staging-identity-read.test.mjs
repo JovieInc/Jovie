@@ -28,6 +28,35 @@ const PRODUCTION_IDENTITY = JSON.stringify({
   environment: 'production',
 });
 
+test('controllers route canonical staging reads through the bounded reader', () => {
+  const staging = readFileSync(
+    '.github/workflows/staging-controller.yml',
+    'utf8'
+  );
+  const production = readFileSync(
+    '.github/workflows/production-controller.yml',
+    'utf8'
+  );
+  assert.match(
+    staging,
+    /sparse-checkout: \|[\s\S]*?^ {12}\.github\/scripts\/staging-identity-read\.sh$/m
+  );
+  for (const [workflow, reads] of [
+    [staging, 1],
+    [production, 3],
+  ]) {
+    assert.equal(
+      workflow.split('$(bash .github/scripts/staging-identity-read.sh)')
+        .length - 1,
+      reads
+    );
+    assert.doesNotMatch(
+      workflow,
+      /\$\(curl[^\n]*https:\/\/staging\.jov\.ie\/api\/health\/build-info/
+    );
+  }
+});
+
 // Sequence file: one JSON body per line; curl serves them in order and then
 // keeps repeating the last line. A line of exactly `FAIL` makes curl exit 7.
 function harness({ sequence, attempts = '4', backoff = '0' }) {
