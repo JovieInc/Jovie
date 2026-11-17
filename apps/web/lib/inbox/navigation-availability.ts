@@ -1,3 +1,5 @@
+import { pluralize } from '@/lib/utils/pluralize';
+
 /**
  * The shell receives this server-derived summary before the sidebar renders.
  * `unknown` deliberately fails open: a transient data failure must never hide
@@ -48,7 +50,5 @@ export function shouldShowInboxNavigation(
 
 /** Count-aware pending-work label — a lone item stays singular. */
 export function formatInboxPendingWorkLabel(pendingCount: number): string {
-  return pendingCount === 1
-    ? '1 Item Needs Attention'
-    : `${pendingCount} Items Need Attention`;
+  return `${pluralize(pendingCount, 'Item')} ${pendingCount === 1 ? 'Needs' : 'Need'} Attention`;
 }
