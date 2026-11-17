@@ -425,6 +425,9 @@ export function projectStewardshipEvidence(
     actionableExceptions: findings,
     summerQueue: findings,
     founderQueue: [],
-    drillDown: SNAPSHOT_PATH,
+    drillDown:
+      audit?.schemaVersion === HISTORICAL_SCHEMA
+        ? SNAPSHOT_PATH
+        : REGISTRY_PATH,
   };
 }

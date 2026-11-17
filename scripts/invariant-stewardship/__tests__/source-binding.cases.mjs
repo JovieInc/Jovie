@@ -152,7 +152,7 @@ test('CLI and Ovie projection omit healthy facts and suppress all unverified wor
   assert.equal(mixed.summary.candidates, 2);
   assert.equal(mixed.window, null);
   assert.deepEqual(verified.founderQueue, []);
-  assert.match(verified.drillDown, /invariant-stewardship.current-week.json$/);
+  assert.equal(verified.drillDown, 'canon/invariants.jsonl');
   /** @type {Array<[unknown, string | null]>} */
   const cases = [
     [receipt, null],
