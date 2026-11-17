@@ -138,7 +138,7 @@ describe('Noir Ion D — workspace state surfaces (JOV-4648)', () => {
       /system-b-table-row-focus-visible\):focus-visible[^{]*\{[^}]*box-shadow/
     );
     expect(readFileSync(join(WEB_ROOT, 'styles', 'focus.css'), 'utf8')).toMatch(
-      /\[role="grid"\][\s\S]*\.overflow-auto[\s\S]*\) :focus-visible/
+      /\[role="grid"\][\s\S]*\.overflow-auto[\s\S]*\)\s+:focus-visible\s*\{\s*outline-offset: calc\(var\(--focus-outline-width\) \* -1\) !important;/
     );
   });
 
