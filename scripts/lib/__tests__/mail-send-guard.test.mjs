@@ -259,18 +259,69 @@ describe('mailguard integration and immutable base evidence', () => {
   });
 
   it('reads base source counts and ratchets from the immutable original head', () => {
-    const base = '75b234d6bf55b4683d6a577e6e43aa19968b3986';
+    const cwd = fixtureRoot();
+    const env = { ...process.env };
+    for (const key of Object.keys(env))
+      if (key.startsWith('GIT_')) delete env[key];
+    Object.assign(env, {
+      GIT_CONFIG_NOSYSTEM: '1',
+      GIT_CONFIG_GLOBAL: '/dev/null',
+      GIT_AUTHOR_NAME: 'Mail Guard Test',
+      GIT_AUTHOR_EMAIL: 'mail-test@example.invalid',
+      GIT_AUTHOR_DATE: '2020-01-01T00:00:00Z',
+      GIT_COMMITTER_NAME: 'Mail Guard Test',
+      GIT_COMMITTER_EMAIL: 'mail-test@example.invalid',
+      GIT_COMMITTER_DATE: '2020-01-01T00:00:00Z',
+    });
+    const gitSpawn = (command, args, options) =>
+      spawnSync(command, args, { ...options, env });
+    const git = (...args) => {
+      const result = gitSpawn('git', args, { cwd, encoding: 'utf8' });
+      expect(result.status, result.stderr).toBe(0);
+      return result.stdout.trim();
+    };
+    const source = 'scripts/send-changelog-email.mjs';
+    const ratchet = 'scripts/lib/mail-send-guard.ratchet.gen.json';
+    mkdirSync(resolve(cwd, 'scripts/lib'), { recursive: true });
+    writeFileSync(
+      resolve(cwd, source),
+      "import { Resend } from 'resend';\nconst sender = new Resend(key);\n"
+    );
+    writeFileSync(
+      resolve(cwd, ratchet),
+      JSON.stringify({ entries: { [source]: { 'mail-sdk': 2 } } })
+    );
+    git('init', '-q');
+    git('add', source, ratchet);
+    git('-c', 'commit.gpgsign=false', 'commit', '-qm', 'fixture');
+    const base = git('rev-parse', 'HEAD');
+    writeFileSync(resolve(cwd, source), '// no mail SDK sites\n');
+    writeFileSync(resolve(cwd, ratchet), JSON.stringify({ entries: {} }));
+    git('add', source, ratchet);
+    git('-c', 'commit.gpgsign=false', 'commit', '-qm', 'remove mail sites');
+    const current = git('rev-parse', 'HEAD');
+    expect(current).not.toBe(base);
+    expect(scan(source, readFileSync(resolve(cwd, source), 'utf8'))).toEqual(
+      {}
+    );
+    expect(
+      JSON.parse(readFileSync(resolve(cwd, ratchet), 'utf8')).entries
+    ).toEqual({});
+    expect(mailBaseCountsAt(current, cwd, rules, [source], gitSpawn)).toEqual(
+      {}
+    );
+    expect(mailBaseRatchetAt(current, cwd, gitSpawn)).toEqual({});
     expect(
       mailBaseCountsAt(
         base,
-        root,
+        cwd,
         rules,
         ['scripts/send-changelog-email.mjs', 'missing.mjs'],
-        spawnSync
+        gitSpawn
       )['scripts/send-changelog-email.mjs']['mail-sdk']
     ).toBe(2);
     expect(
-      mailBaseRatchetAt(base, root, spawnSync)[
+      mailBaseRatchetAt(base, cwd, gitSpawn)[
         'scripts/send-changelog-email.mjs'
       ]['mail-sdk']
     ).toBe(2);

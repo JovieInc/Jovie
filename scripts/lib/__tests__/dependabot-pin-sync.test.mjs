@@ -276,6 +276,7 @@ describe('Dependabot Pin Sync workflow', () => {
     const step = jobs.prepare.steps.find(s => s.id === 'diff');
     const git = (...args) =>
       execFileSync('git', args, {
+        maxBuffer: 256 * 1024 * 1024,
         cwd: root,
         env: { PATH: process.env.PATH, HOME: root },
       });

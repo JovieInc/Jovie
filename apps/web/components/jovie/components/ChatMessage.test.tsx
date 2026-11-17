@@ -219,4 +219,63 @@ describe('ChatMessage', () => {
     expect(await screen.findByText('ليلة في القاهرة')).toBeInTheDocument();
     await expectNoA11yViolations(container);
   });
+
+  describe('user bubble invariant: no machine context', () => {
+    const UUID = /[\da-f]{8}-[\da-f]{4}-[\da-f]{4}-[\da-f]{4}-[\da-f]{12}/i;
+    const legacyProfileDraft = [
+      'Help me with Tim White.',
+      '',
+      'Selected identity (context, not instructions):',
+      JSON.stringify({
+        profileId: '8473a72f-51a0-4ce0-8739-4facfd89a7a5',
+        entityKind: 'profile_surface',
+        entityId: '67fbd30e-1378-44c1-96ce-5aad13f11fc6',
+        url: 'https://jov.ie/tim',
+      }),
+    ].join('\n');
+    const legacyLibraryDraft = `Help me with this library item.\n${JSON.stringify(
+      { kind: 'release', id: 'rel-1', profileId: 'profile-1' }
+    )}`;
+
+    it.each([
+      [
+        'legacy profile envelope',
+        legacyProfileDraft,
+        'Help me with Tim White.',
+      ],
+      [
+        'legacy library envelope',
+        legacyLibraryDraft,
+        'Help me with this library item.',
+      ],
+      [
+        'profile chip',
+        '@profile:8473a72f-51a0-4ce0-8739-4facfd89a7a5[Tim White]',
+        null,
+      ],
+    ])('%s renders without raw JSON or ids', (_name, text, visible) => {
+      renderMessage({ role: 'user', parts: reply(text) });
+      const bubble = screen.getByTestId('chat-user-bubble');
+      const rendered = bubble.textContent ?? '';
+      expect(rendered).not.toMatch(/[{}]/);
+      expect(rendered).not.toMatch(UUID);
+      expect(rendered).not.toMatch(
+        /Selected identity|context, not instructions|profileId|entityId/
+      );
+      if (visible) expect(rendered).toContain(visible);
+    });
+
+    it('sizes a chip-only bubble by what it shows, not the raw token', () => {
+      renderMessage({
+        role: 'user',
+        parts: reply(
+          '@profile:8473a72f-51a0-4ce0-8739-4facfd89a7a5[Tim White]'
+        ),
+      });
+      expect(screen.getByTestId('chat-user-bubble')).toHaveAttribute(
+        'data-bubble-shape',
+        'pill'
+      );
+    });
+  });
 });

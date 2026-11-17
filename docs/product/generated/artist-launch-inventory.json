@@ -998,6 +998,14 @@
       "classification": "C"
     },
     {
+      "source": "apps/web/app/[username]/profile-miss/page.tsx",
+      "kind": "page",
+      "route": "/[username]/profile-miss",
+      "methods": [],
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
       "source": "apps/web/app/[username]/profile-mode-render/[profileMode]/[marker]/page.tsx",
       "kind": "page",
       "route": "/[username]/profile-mode-render/[profileMode]/[marker]",
@@ -1017,6 +1025,14 @@
       "source": "apps/web/app/[username]/shop/page.tsx",
       "kind": "page",
       "route": "/[username]/shop",
+      "methods": [],
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
+      "source": "apps/web/app/[username]/tip/thank-you/page.tsx",
+      "kind": "page",
+      "route": "/[username]/tip/thank-you",
       "methods": [],
       "surface": "deferred",
       "classification": "C"
@@ -3361,6 +3377,14 @@
       "classification": "C"
     },
     {
+      "source": "apps/web/app/api/internal/ovie/component-certificate-evidence/route.ts",
+      "kind": "handler",
+      "route": "/api/internal/ovie/component-certificate-evidence",
+      "methods": ["OPTIONS", "POST"],
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
       "source": "apps/web/app/api/internal/ovie/customer-voice/[id]/reply/route.ts",
       "kind": "handler",
       "route": "/api/internal/ovie/customer-voice/[id]/reply",
@@ -3380,6 +3404,14 @@
       "source": "apps/web/app/api/internal/ovie/dogfood-judge-evidence/route.ts",
       "kind": "handler",
       "route": "/api/internal/ovie/dogfood-judge-evidence",
+      "methods": ["POST"],
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
+      "source": "apps/web/app/api/internal/ovie/fix-deploy-stamp/route.ts",
+      "kind": "handler",
+      "route": "/api/internal/ovie/fix-deploy-stamp",
       "methods": ["POST"],
       "surface": "deferred",
       "classification": "C"
@@ -5724,6 +5756,21 @@
       "source": "apps/web/app/app/(shell)/admin/revenue-lift/page.tsx",
       "kind": "page",
       "route": "/app/admin/revenue-lift",
+      "methods": [],
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
+      "source": "apps/web/app/app/(shell)/admin/room/actions.ts",
+      "kind": "action",
+      "export": "sendFleetRoomMessageAction",
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
+      "source": "apps/web/app/app/(shell)/admin/room/page.tsx",
+      "kind": "page",
+      "route": "/app/admin/room",
       "methods": [],
       "surface": "deferred",
       "classification": "C"

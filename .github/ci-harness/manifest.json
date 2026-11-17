@@ -126,6 +126,33 @@
       "remediation": "A missing visual baseline is a hard failure. Restore or commit the snapshot file. Do not pass --update-snapshots on the compare path; scheduled visual-regression.yml remains the refresh lane. Homepage PRs (run_homepage_visual) also run this compare on the source lane and PR Ready fails closed if it is skipped (JOV-5960)."
     },
     {
+      "id": "ci-visual-snapshot-homepage",
+      "name": "Visual Snapshot Compare (homepage)",
+      "tier": "fast-gate",
+      "mergeGate": true,
+      "gateStage": "merge-group",
+      "nextLocalCommand": "node scripts/visual-snapshot-compare.mjs compare",
+      "remediation": "Rendered homepage compare suite of the split visual lane (merge-time move 2). It downloads the shared build ci-visual-snapshot-compare publishes, so a failed build or missing artifact fails this suite closed. A missing visual baseline is a hard failure; never pass --update-snapshots on the compare path (JOV-5459/JOV-5960)."
+    },
+    {
+      "id": "ci-visual-marketing-dom",
+      "name": "Visual Snapshot Compare (marketing DOM)",
+      "tier": "fast-gate",
+      "mergeGate": true,
+      "gateStage": "merge-group",
+      "nextLocalCommand": "cd apps/web && pnpm exec playwright test tests/product-screenshots/route-dom-certification.spec.ts --config=playwright.config.screenshots.ts --project=screenshots --workers=1 --retries=0 -g 'deliberate-red|certifies every marketing route'",
+      "remediation": "Rendered marketing DOM certification suite of the split visual lane (merge-time move 2). It downloads the shared build ci-visual-snapshot-compare publishes; a failed build or missing artifact fails this suite closed. Taste-kind findings ratchet via route-dom-marketing-baseline.json; all other kinds are zero-tolerance."
+    },
+    {
+      "id": "ci-visual-marketing-routes",
+      "name": "Visual Snapshot Compare (marketing routes)",
+      "tier": "fast-gate",
+      "mergeGate": true,
+      "gateStage": "merge-group",
+      "nextLocalCommand": "cd apps/web && pnpm exec playwright test tests/product-screenshots/marketing-routes.spec.ts --config=playwright.config.screenshots.ts --project=screenshots --workers=4 --retries=0",
+      "remediation": "Exact marketing route capture suite of the split visual lane (merge-time move 2). It downloads the shared build ci-visual-snapshot-compare publishes and re-checks every registered marketing route for console errors, axe quality failures, and HTTP failures, with exact-head provenance and a clean source tree."
+    },
+    {
       "id": "drizzle-migration-guard",
       "name": "Migration Guard",
       "tier": "fast-gate",

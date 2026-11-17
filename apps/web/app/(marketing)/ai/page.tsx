@@ -15,6 +15,7 @@ export const metadata: Metadata = {
   title: documentTitle('Jovie AI Operating System'),
   description: 'How a Jovie profile decides what to lead with.',
   robots: NOINDEX_ROBOTS,
+  alternates: { canonical: APP_ROUTES.AI },
   twitter: {
     site: COMPANY_IDENTITY.xHandle,
     creator: COMPANY_IDENTITY.xHandle,

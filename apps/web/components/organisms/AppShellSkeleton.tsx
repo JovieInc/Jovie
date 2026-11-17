@@ -37,7 +37,7 @@ function DefaultSidebarSkeleton({
     >
       <div
         className={cn(
-          'flex h-(--app-shell-header-height) items-center gap-2 px-2.5 py-0.5',
+          'flex h-(--app-shell-header-height) items-center gap-2 px-(--app-shell-sidebar-inset) py-0.5',
           collapsed && 'justify-center'
         )}
       >
@@ -148,7 +148,7 @@ export function AppShellSkeleton({
             // matches the compact header token used by DashboardHeader so the
             // Suspense fallback doesn't shift the breadcrumb down a row.
             className={cn(
-              'flex h-(--app-shell-header-height) shrink-0 items-center gap-2 bg-(--app-shell-content-surface) px-2.5'
+              'flex h-(--app-shell-header-height) shrink-0 items-center gap-2 bg-(--app-shell-content-surface) px-app-header'
             )}
           >
             <div className='skeleton h-4 w-20 rounded' />

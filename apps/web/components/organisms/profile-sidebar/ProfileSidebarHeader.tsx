@@ -29,6 +29,14 @@ interface UseProfileHeaderPartsProps {
   readonly onClose?: () => void;
   /** Omit when a visible ShareableLinkRow already owns the same destination. */
   readonly showOpenAction?: boolean;
+  /**
+   * Reporter for a failed QR download; defaults to the error toast. The
+   * Storybook a11y lane renders the story in a different module realm from
+   * the test harness, so a module-scope spy on `toast` can never observe the
+   * call there — the owner-callback seam (the ShareableLinkRow convention) is
+   * the channel-forwarded way to assert the report.
+   */
+  readonly onQrDownloadError?: (message: string) => void;
 }
 
 function escapeVCardText(value: string): string {
@@ -60,6 +68,7 @@ export function useProfileHeaderParts({
   profilePath,
   onClose,
   showOpenAction = true,
+  onQrDownloadError,
 }: Readonly<UseProfileHeaderPartsProps>): UseProfileHeaderResult {
   const appleWalletEnabled = useAppFlag('APPLE_WALLET_PROFILE_PASS');
   const [supportsAppleWallet, setSupportsAppleWallet] = useState(false);
@@ -85,6 +94,8 @@ export function useProfileHeaderParts({
     toast.success('vCard downloaded');
   };
 
+  const reportQrDownloadError = onQrDownloadError ?? toast.error;
+
   const handleDownloadQRCode = async () => {
     try {
       // Generated locally — no third-party request for the QR image.
@@ -99,7 +110,7 @@ export function useProfileHeaderParts({
       downloadBlob(qrBlob, `${username}-qr.png`);
       toast.success('QR code downloaded');
     } catch {
-      toast.error('Unable to download QR code');
+      reportQrDownloadError('Unable to download QR code');
     }
   };
 

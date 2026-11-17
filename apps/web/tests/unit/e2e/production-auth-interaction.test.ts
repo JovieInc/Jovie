@@ -109,6 +109,25 @@ describe('production auth interaction hydration gate', () => {
       'load',
       'submit-enabled',
     ]);
+    // The hydration-survival gate carries its own patience floor (JOV-8495):
+    // postdeploy run 43620238651 timed out at 15s under runner contention
+    // while the same landed deployment hydrated in seconds on adjacent runs.
+    // Visibility stays fast-fail at the caller timeout; only survival gets
+    // the 45s floor, and an explicit larger caller timeout still wins.
+    expect(page.waitForFunction).toHaveBeenCalledWith(
+      expect.any(Function),
+      {
+        selector: 'form[data-auth-email-code-step="email"]',
+        inputSelector:
+          'input[name="identifier"], input[name="emailAddress"], input[type="email"], input[autocomplete="email"]',
+        expected: 'smoke@example.com',
+      },
+      { timeout: 45_000 }
+    );
+    expect(identifierInput.waitFor).toHaveBeenCalledWith({
+      state: 'visible',
+      timeout: 15_000,
+    });
   });
 
   it.each(['cleared email', 'disabled submit'])(

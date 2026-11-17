@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
 import {
+  chmodSync,
   existsSync,
   mkdtempSync,
   readFileSync,
@@ -199,6 +200,48 @@ test('real ZIP members stream as XML without artifact-controlled extraction', ()
     rmSync(root, { recursive: true, force: true });
   }
 });
+test('a GitHub quota 403 defers with exit 75 and the marker, never a verdict', () => {
+  const root = mkdtempSync(join(tmpdir(), 'queue-junit-quota-'));
+  try {
+    const bin = join(root, 'gh');
+    writeFileSync(
+      bin,
+      '#!/bin/sh\necho "gh: API rate limit exceeded for installation ID 6416. (403)" >&2\nexit 1\n'
+    );
+    chmodSync(bin, 0o755);
+    const eventPath = join(root, 'event.json');
+    writeFileSync(
+      eventPath,
+      JSON.stringify({
+        repository: { full_name: 'JovieInc/Jovie' },
+        workflow_run: {
+          id: 12,
+          run_attempt: 2,
+          workflow_id: 178737329,
+          head_sha: sha,
+        },
+      })
+    );
+    const result = spawnSync(
+      process.execPath,
+      ['.github/scripts/publish-queue-junit.mjs'],
+      {
+        encoding: 'utf8',
+        env: {
+          ...process.env,
+          PATH: `${root}:${process.env.PATH}`,
+          GITHUB_EVENT_NAME: 'workflow_run',
+          GITHUB_EVENT_PATH: eventPath,
+        },
+      }
+    );
+    assert.equal(result.status, 75);
+    assert.match(result.stderr, /github-quota-deferred/);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
 test('unbound publication CLI stops before any remote access', () => {
   const result = spawnSync(
     process.execPath,

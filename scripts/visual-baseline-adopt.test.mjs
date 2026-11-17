@@ -89,7 +89,11 @@ test('refuses to adopt a baseline for a route that has Pen stills', () => {
 // `/` is bound to Pen stills (refused above by planAdoption).
 
 function git(cwd, ...args) {
-  const result = spawnSync('git', args, { cwd, encoding: 'utf8' });
+  const result = spawnSync('git', args, {
+    maxBuffer: 256 * 1024 * 1024,
+    cwd,
+    encoding: 'utf8',
+  });
   assert.equal(result.status, 0, result.stderr);
   return result.stdout;
 }

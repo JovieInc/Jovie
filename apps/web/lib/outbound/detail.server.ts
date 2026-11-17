@@ -9,6 +9,7 @@ import type { ContactCertificationInspection } from '@/lib/contacts/certificatio
 import { contactDedupeKey } from '@/lib/contacts/lifecycle';
 import { db } from '@/lib/db';
 import { leads } from '@/lib/db/schema/leads';
+import { existingRelationshipHold } from '@/lib/leads/existing-relationships';
 import { resolveLeadClaimToken } from '@/lib/leads/lead-claim-token';
 import {
   type OutboundLeadIdentity,
@@ -35,6 +36,7 @@ export async function loadOutboundLead(
       claimTokenHash: leads.claimTokenHash,
       claimTokenExpiresAt: leads.claimTokenExpiresAt,
       avatarUrl: leads.avatarUrl,
+      bio: leads.bio,
     })
     .from(leads)
     .where(eq(leads.id, leadId))
@@ -88,6 +90,18 @@ export async function approveOutbound(input: {
 }): Promise<Result> {
   const lead = await loadOutboundLead(input.leadId);
   if (!lead) return { ok: false, reason: 'not_found' };
+  // Hard gate, ahead of certification and the judge: no approval for an
+  // artist Tim already works with. recordOutboundDecision refuses it too.
+  if (
+    existingRelationshipHold({
+      handle: lead.linktreeHandle,
+      displayName: lead.displayName,
+      contactEmail: lead.contactEmail,
+      instagramHandle: lead.instagramHandle,
+      bio: lead.bio,
+    })
+  )
+    return { ok: false, reason: 'existing_relationship' };
   if (input.copy.channel === 'email' && !lead.contactEmail)
     return { ok: false, reason: 'no_channel' };
   if (input.copy.channel === 'dm' && !lead.instagramHandle)

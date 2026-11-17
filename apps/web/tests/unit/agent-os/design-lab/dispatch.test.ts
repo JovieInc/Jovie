@@ -18,13 +18,14 @@ vi.mock('server-only', () => ({}));
 
 const mocks = vi.hoisted(() => ({
   dispatchHermesWorker: vi.fn(),
+  getHermesDispatchAvailability: vi.fn(),
   linkDesignLabDispatchToLinearIssue: vi.fn(),
   readDesignTasteMemoryExcerpt: vi.fn(),
 }));
 
 vi.mock('@/lib/hermes/dispatch', () => ({
   dispatchHermesWorker: mocks.dispatchHermesWorker,
-  getHermesDispatchAvailability: () => ({ available: true }),
+  getHermesDispatchAvailability: mocks.getHermesDispatchAvailability,
   HermesDispatchConfigurationError: class extends Error {},
 }));
 
@@ -83,6 +84,9 @@ describe('triggerDesignLabDispatch artifact lifecycle', () => {
       await mkdtemp(path.join(os.tmpdir(), 'design-lab-dispatch-'))
     );
     mocks.dispatchHermesWorker.mockReset().mockResolvedValue(undefined);
+    mocks.getHermesDispatchAvailability
+      .mockReset()
+      .mockReturnValue({ available: true });
     mocks.linkDesignLabDispatchToLinearIssue
       .mockReset()
       .mockResolvedValue(true);
@@ -194,6 +198,58 @@ describe('triggerDesignLabDispatch artifact lifecycle', () => {
       })
     );
   });
+
+  it.each(['unavailable', 'configuration error', 'request error'] as const)(
+    'keeps attempt evidence without reporting dispatch success for %s',
+    async failure => {
+      const { HermesDispatchConfigurationError } = await import(
+        '@/lib/hermes/dispatch'
+      );
+      if (failure === 'unavailable') {
+        mocks.getHermesDispatchAvailability.mockReturnValue({
+          available: false,
+          unavailableReason: 'Dispatch is not configured.',
+        });
+      } else {
+        mocks.dispatchHermesWorker.mockRejectedValue(
+          failure === 'configuration error'
+            ? new HermesDispatchConfigurationError(
+                'Dispatch is not configured.'
+              )
+            : new Error('Dispatch request timed out.')
+        );
+      }
+      const { triggerDesignLabDispatch } = await import(
+        '@/lib/agent-os/design-lab/dispatch'
+      );
+
+      const result = await triggerDesignLabDispatch({
+        amendmentNotes: 'Keep the approved direction.',
+        proposal,
+        requestedBy: 'test',
+      });
+
+      expect(result.triggered).toBe(false);
+      expect(result.dispatchId).toMatch(/^design-lab-/);
+      expect(mocks.dispatchHermesWorker).toHaveBeenCalledTimes(
+        failure === 'unavailable' ? 0 : 1
+      );
+      const manifest = JSON.parse(
+        await readFile(
+          path.join(tempRoot, 'dispatches', `${result.dispatchId}.json`),
+          'utf8'
+        )
+      );
+      expect(manifest).toMatchObject({
+        dispatchId: result.dispatchId,
+        proposalId: proposal.id,
+        amendmentNotes: 'Keep the approved direction.',
+      });
+      expect(mocks.linkDesignLabDispatchToLinearIssue).toHaveBeenCalledWith(
+        expect.objectContaining({ dispatchId: result.dispatchId })
+      );
+    }
+  );
 
   it('rejects a new dispatch when unknown symlinked output makes usage unknowable', async () => {
     const outside = await realpath(

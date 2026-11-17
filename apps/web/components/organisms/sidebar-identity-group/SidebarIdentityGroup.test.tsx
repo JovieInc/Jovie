@@ -132,10 +132,17 @@ describe('SidebarIdentityGroup', () => {
 
   it.each([false, true])('shares the nav inset when calm=%s', calm => {
     render(<SidebarIdentityGroup calm={calm} profileHref={undefined} />);
-    expect(screen.getByTestId(SIDEBAR_USER_PANEL_TEST_ID)).toHaveClass(
-      'px-(--app-shell-sidebar-inset)',
-      calm ? 'py-0' : 'py-1.5'
-    );
+    const panel = screen.getByTestId(SIDEBAR_USER_PANEL_TEST_ID);
+    if (calm) {
+      // 4px hover-surface inset + 8px row inset = the 12px nav inset, so the
+      // avatar column centres on the nav icon column.
+      expect(panel).toHaveClass('px-1', 'py-0');
+      expect(
+        panel.querySelector('[data-sidebar="identity-group"]')
+      ).toHaveClass('px-2');
+    } else {
+      expect(panel).toHaveClass('px-(--app-shell-sidebar-inset)', 'py-1.5');
+    }
     expect(screen.getByRole('button', { name: /Tim White/i })).toBeEnabled();
   });
 

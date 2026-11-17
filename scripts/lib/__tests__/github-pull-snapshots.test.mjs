@@ -1,0 +1,308 @@
+import { describe, expect, it } from 'vitest';
+import { githubClient, listMergedLinkedPulls } from '../validation-sync.mjs';
+import { REPO } from './fixtures/validation-world.mjs';
+
+// JOV-12768 / JOV-12717: pullRequestField nests every batch alias as
+// `repository { pullRequest } }`; batchPulls must unwrap it, or the binding
+// checks read `batchedPull.state` off the wrapper and silently drop MERGED
+// pulls. These tests prove the unwrap against the api-client's real wrapped
+// response shape, plus the caller logic with mocked batchPulls.
+const SELECTION =
+  'number state mergedAt mergeCommitSha title body base { ref }';
+// GitHub answers each alias with the pull the QUERY asked for, so the mock
+// keys its response by the alias -> number mapping in the request body
+// (numbers batch in descending order; the fixture object's own key order
+// would cross the answers).
+const wrappedGraphQL = (body, pullRequests) => ({
+  data: Object.fromEntries(
+    [
+      ...String(body).matchAll(
+        /(k\d+): repository\(owner: [^)]*\) \{\s*pullRequest\(number: (\d+)\)/g
+      ),
+    ].map(([, alias, number]) => [
+      alias,
+      { pullRequest: pullRequests[number] ?? null },
+    ])
+  ),
+});
+// The api-client reads response.text() and JSON.parses it (client.ts:
+// `json: <T>() => JSON.parse(text)`); response.json() is never called, and
+// classifyFailure needs a real Headers (Map.get returns undefined where
+// Headers.get returns null). Both merge-group failures came from mocking
+// the wrong surface. Proven by the plain-node repro in the PR thread.
+const graphqlResponse = payload => ({
+  ok: true,
+  status: 200,
+  text: async () => JSON.stringify(payload),
+  json: async () => payload,
+  headers: new Headers({ 'content-type': 'application/json' }),
+});
+
+describe('batchPulls unwraps the api-client response (JOV-12768)', () => {
+  it('returns flat pull entries, not the repository wrapper', async () => {
+    let posts = 0;
+    const fetchMock = async (url, init) => {
+      if (String(url).endsWith('/graphql')) {
+        posts += 1;
+        expect(init.method).toBe('POST');
+        expect(String(init.body)).toContain(
+          'pullRequest(number: 18293) { number state mergedAt mergeCommitSha title body base { ref } }'
+        );
+        return graphqlResponse(
+          wrappedGraphQL(init.body, {
+            18293: {
+              number: 18293,
+              state: 'MERGED',
+              mergedAt: '2026-11-01T00:00:00Z',
+              mergeCommitSha: 'a'.repeat(40),
+              title: 'fix(JOV-2)',
+              body: 'closes JOV-2',
+              base: { ref: 'main' },
+            },
+          })
+        );
+      }
+      throw new Error(`unexpected REST call ${url}`);
+    };
+    const out = await githubClient(fetchMock, 'tok').batchPulls(
+      REPO,
+      [18293],
+      SELECTION
+    );
+    expect(posts).toBe(1);
+    expect(out.get(18293)).toEqual({
+      state: 'MERGED',
+      mergedAt: '2026-11-01T00:00:00Z',
+      mergeCommitSha: 'a'.repeat(40),
+      title: 'fix(JOV-2)',
+      body: 'closes JOV-2',
+      baseRef: 'main',
+      headRef: '',
+    });
+    expect(Object.hasOwn(out.get(18293) ?? {}, 'pullRequest')).toBe(false);
+  });
+
+  it('keeps a MERGED pull bound end-to-end (not dropped) and skips OPEN', async () => {
+    const fetchMock = async (url, init) => {
+      if (String(url).endsWith('/graphql')) {
+        return graphqlResponse(
+          wrappedGraphQL(init.body, {
+            18293: {
+              number: 18293,
+              state: 'MERGED',
+              mergedAt: '2026-11-01T00:00:00Z',
+              mergeCommitSha: 'a'.repeat(40),
+              title: 'fix(JOV-2)',
+              body: 'closes JOV-2',
+              base: { ref: 'main' },
+            },
+            25500: {
+              number: 25500,
+              state: 'OPEN',
+              mergedAt: null,
+              mergeCommitSha: null,
+              title: 'wip',
+              body: '',
+              base: { ref: 'main' },
+            },
+          })
+        );
+      }
+      // A REST per-pull read here would mean the batch answer was ignored.
+      throw new Error(`REST read must not happen for ${url}`);
+    };
+    const merged = await listMergedLinkedPulls({
+      github: githubClient(fetchMock, 'tok'),
+      repository: REPO,
+      identifier: 'JOV-2',
+      attachmentUrls: [
+        `https://github.com/${REPO}/pull/18293`,
+        `https://github.com/${REPO}/pull/25500`,
+      ],
+    });
+    expect(merged).toHaveLength(1);
+    expect(merged[0].number).toBe(18293);
+    expect(merged[0].mergeSha).toBe('a'.repeat(40));
+  });
+
+  it('keeps GraphQL batching through the immutable cache wrapper: one batch call, zero REST pull reads', async () => {
+    const { mkdtempSync, rmSync } = await import('node:fs');
+    const { tmpdir } = await import('node:os');
+    const { join } = await import('node:path');
+    const dir = mkdtempSync(join(tmpdir(), 'batch-cache-'));
+    try {
+      let posts = 0;
+      let restPullReads = 0;
+      const fetchMock = async (url, init) => {
+        if (String(url).endsWith('/graphql')) {
+          posts += 1;
+          expect(init.method).toBe('POST');
+          return graphqlResponse(
+            wrappedGraphQL(init.body, {
+              18293: {
+                number: 18293,
+                state: 'MERGED',
+                mergedAt: '2026-11-01T00:00:00Z',
+                mergeCommitSha: 'a'.repeat(40),
+                title: 'fix(JOV-2)',
+                body: 'closes JOV-2',
+                base: { ref: 'main' },
+              },
+            })
+          );
+        }
+        if (/\/pulls\/\d+$/.test(String(url))) {
+          restPullReads += 1;
+          throw new Error(`REST pull read must not happen for ${url}`);
+        }
+        throw new Error(`unexpected call ${url}`);
+      };
+      const { immutableGithubCache } = await import('../validation-sync.mjs');
+      const cached = immutableGithubCache(githubClient(fetchMock, 'tok'), dir);
+      expect(typeof cached.batchPulls).toBe('function');
+      const merged = await listMergedLinkedPulls({
+        github: cached,
+        repository: REPO,
+        identifier: 'JOV-2',
+        attachmentUrls: [`https://github.com/${REPO}/pull/18293`],
+      });
+      expect(merged).toHaveLength(1);
+      expect(merged[0].number).toBe(18293);
+      expect(posts).toBe(1);
+      expect(restPullReads).toBe(0);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('maps a null alias (missing PR, no errors) to null so the caller falls back to REST', async () => {
+    const fetchMock = async (url, init) => {
+      if (String(url).endsWith('/graphql')) {
+        return graphqlResponse(wrappedGraphQL(init.body, { 18293: null }));
+      }
+      throw new Error(`unexpected call ${url}`);
+    };
+    const out = await githubClient(fetchMock, 'tok').batchPulls(
+      REPO,
+      [18293],
+      SELECTION
+    );
+    expect(out.get(18293)).toBeNull();
+  });
+});
+
+describe('GraphQL batched pull reads (JOV-12717)', () => {
+  it('answers out-of-window pulls with one batch and no REST reads', async () => {
+    let rest = 0;
+    let batches = 0;
+    const github = async path => {
+      rest += /\/pulls\/\d+$/.test(path) ? 1 : 0;
+      throw new Error(`REST read must not happen for ${path}`);
+    };
+    github.batchPulls = async (repository, numbers, selection) => {
+      batches += 1;
+      expect(repository).toBe(REPO);
+      expect(numbers).toEqual([25500, 18293]);
+      expect(selection).toContain('mergeCommitSha');
+      return new Map([
+        [
+          18293,
+          {
+            state: 'MERGED',
+            mergedAt: '2026-11-01T00:00:00Z',
+            mergeCommitSha: 'a'.repeat(40),
+            title: 'fix(JOV-2)',
+            body: 'closes JOV-2',
+            baseRef: 'main',
+          },
+        ],
+        [
+          25500,
+          {
+            state: 'OPEN',
+            mergedAt: '',
+            mergeCommitSha: '',
+            title: 'wip',
+            body: '',
+            baseRef: 'main',
+          },
+        ],
+      ]);
+    };
+    const merged = await listMergedLinkedPulls({
+      github,
+      repository: REPO,
+      identifier: 'JOV-2',
+      attachmentUrls: [
+        `https://github.com/${REPO}/pull/18293`,
+        `https://github.com/${REPO}/pull/25500`,
+      ],
+    });
+    expect(merged).toHaveLength(1);
+    expect(merged[0].number).toBe(18293);
+    expect(batches).toBe(1);
+    expect(rest).toBe(0);
+  });
+
+  it('falls back to the per-pull REST path when the batch fails', async () => {
+    const github = async () => ({
+      body: {
+        number: 18293,
+        merged_at: '2026-11-01T00:00:00Z',
+        merge_commit_sha: 'b'.repeat(40),
+        title: 'fix(JOV-3)',
+        body: 'closes JOV-3',
+        html_url: `https://github.com/${REPO}/pull/18293`,
+        base: { ref: 'main' },
+        head: { ref: 'x' },
+      },
+      link: '',
+    });
+    github.batchPulls = async () => {
+      throw new Error('GitHub GraphQL 403: rate limit');
+    };
+    const merged = await listMergedLinkedPulls({
+      github,
+      repository: REPO,
+      identifier: 'JOV-3',
+      attachmentUrls: [`https://github.com/${REPO}/pull/18293`],
+    });
+    expect(merged).toHaveLength(1);
+    expect(merged[0].mergeSha).toBe('b'.repeat(40));
+  });
+
+  it('never batches numbers the snapshot or open scan already answer', async () => {
+    let batches = 0;
+    const restBody = {
+      number: 18293,
+      merged_at: '2026-11-01T00:00:00Z',
+      merge_commit_sha: 'c'.repeat(40),
+      title: 'fix(JOV-4)',
+      body: 'closes JOV-4',
+      html_url: `https://github.com/${REPO}/pull/18293`,
+      base: { ref: 'main' },
+      head: { ref: 'x' },
+    };
+    const github = async path => {
+      if (/\/pulls\/18293$/.test(path)) return { body: restBody, link: '' };
+      throw new Error(`unexpected REST read ${path}`);
+    };
+    github.batchPulls = async () => {
+      batches += 1;
+      throw new Error('batch must not run');
+    };
+    const merged = await listMergedLinkedPulls({
+      github,
+      repository: REPO,
+      identifier: 'JOV-4',
+      attachmentUrls: [
+        `https://github.com/${REPO}/pull/18293`,
+        `https://github.com/${REPO}/pull/25500`,
+      ],
+      closedPulls: new Map([[18293, { number: 18293, merged: true }]]),
+      openPullNumbers: new Set([25500]),
+    });
+    expect(merged).toHaveLength(1);
+    expect(batches).toBe(0);
+  });
+});

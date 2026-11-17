@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { reviewMerchContent } from './content-review';
 import {
   buildMerchImagePrompt,
@@ -44,7 +44,7 @@ const merchMocks = vi.hoisted(() => ({
       artistPayoutPerUnitEstimateCents: 1500,
       jovieMarginPerUnitEstimateCents: 980,
       printfulCostSource: 'printful',
-      printfulCostUpdatedAt: new Date(Date.now() - 60_000).toISOString(),
+      printfulCostUpdatedAt: '2026-11-01T11:59:00.000Z',
     },
     providerWarnings: [],
   },
@@ -93,6 +93,20 @@ const dbHarness = vi.hoisted(() => {
 });
 
 vi.mock('@/lib/db', () => ({ db: dbHarness.db }));
+
+vi.mock('./concept-review-store', async () => {
+  const { evaluateMerchConceptPlan } = await import('./concept-review');
+  const { syntheticConceptReview } = await import(
+    './concept-review.test-support'
+  );
+  return {
+    getMerchConceptFeedback: async () => [],
+    reviewStoredMerchConceptPlan: async (
+      plan: Parameters<typeof evaluateMerchConceptPlan>[0],
+      now: Date
+    ) => evaluateMerchConceptPlan(plan, syntheticConceptReview(plan, now), now),
+  };
+});
 
 vi.mock('./catalog', () => ({
   resolveMerchCatalogSelection: vi.fn(
@@ -283,6 +297,15 @@ describe('resolveGenerationNextStep', () => {
 });
 
 describe('generateMerchDesigns mockup enrichment', () => {
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-11-01T12:00:00.000Z'));
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it('enriches a hoodie option with the hoodie catalog product, not the default tee', async () => {
     // Pre-claim reads, in queue order: artist profile (sync .limit shift),
     // recent strategy labels (sync .limit shift), model weights (bare-await

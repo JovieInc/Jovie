@@ -83,7 +83,7 @@ class PoolFeedReplayTest(unittest.TestCase):
         pool, claimed = list(self.pool), []
         # One worker pass per free seat, cheapest pool first: each claim removes the issue and the seat.
         for name in ("grok", "hyperagent", "hyperagent", "hyperagent", "hyperagent",
-                     "claude", "claude", "codex", "codex", "codex"):
+                     "codex", "codex", "codex"):
             free[name] -= 1  # this worker now holds one of its lane's seats
             router = self.fed(name, free)
             taken = lane.pick_issue(pool, {}, now=self.now, provider=name, route=router)
@@ -93,13 +93,13 @@ class PoolFeedReplayTest(unittest.TestCase):
             claimed.append((name, taken.identifier, (decision.get("feed") or {}).get("from")))
             pool.remove(taken)
         # Every seat is fed, strictly in backlog order, and each lane got exactly its seat count.
-        self.assertEqual([identifier for _, identifier, _ in claimed], [item.identifier for item in self.pool[:10]])
+        self.assertEqual([identifier for _, identifier, _ in claimed], [item.identifier for item in self.pool[:8]])
         self.assertEqual({name: sum(1 for row in claimed if row[0] == name) for name in free},
-                         self.replay["seats"])
+                         {**self.replay["seats"], "claude": 0})
         self.assertEqual(claimed[0][2], None)      # grok was the router's own choice
         self.assertEqual(claimed[1][2], "grok")    # hyperagent took what grok had no seat for
-        self.assertEqual(free, {"hyperagent": 0, "grok": 0, "claude": 0, "codex": 0})
-        # An eleventh worker has no seat to add: the plan seats nothing beyond the caps.
+        self.assertEqual(free, {"hyperagent": 0, "grok": 0, "claude": 2, "codex": 0})
+        # A ninth eligible worker has no seat to add: the plan seats nothing beyond the caps.
         plan = pool_feed.plan(pool, replay_router(self.replay), lane="hyperagent", free=free)
         self.assertEqual(plan["take"].identifier, pool[0].identifier)
         self.assertEqual({name: row["fed"] for name, row in plan["pools"].items()},
@@ -112,10 +112,10 @@ class PoolFeedReplayTest(unittest.TestCase):
         self.assertEqual(plan["decision"]["feed"], {"from": "grok", "skipped": [{"lane": "grok", "why": "no-free-seat"}]})
         self.assertEqual(plan["decision"]["chosen"]["model"], "z-ai/glm-5.3")
         self.assertEqual({name: (row["freeSeats"], row["fed"], row["reason"]) for name, row in plan["pools"].items()},
-                         {"grok": (1, 1, "fed"), "hyperagent": (4, 4, "fed"), "claude": (2, 2, "fed"),
+                         {"grok": (1, 1, "fed"), "hyperagent": (4, 4, "fed"), "claude": (2, 0, "no-backlog-for-this-pool"),
                           "codex": (3, 3, "fed")})
         self.assertEqual(plan["offers"][self.pool[0].identifier], "grok")
-        self.assertEqual(plan["offers"][self.pool[5].identifier], "claude")
+        self.assertEqual(plan["offers"][self.pool[5].identifier], "codex")
         self.assertEqual(plan["offers"][self.pool[7].identifier], "codex")
 
     def test_every_idle_seat_has_a_recorded_reason(self):
@@ -129,7 +129,6 @@ class PoolFeedReplayTest(unittest.TestCase):
         self.assertEqual({name: (pool["idle"], pool["reason"]) for name, pool in row["pools"].items()},
                          {"devin": (0, "unavailable:down"), "grok": (0, "fed"),
                           "hyperagent": (3, "backlog-covered-by-earlier-pools"),
-                          "claude": (2, "backlog-covered-by-earlier-pools"),
                           "codex": (3, "backlog-covered-by-earlier-pools")})
         # A banked pool and a capped pool keep their seats idle, and the record says which limit.
         capped = replay_router(self.replay, down={"claude", "hyperagent"},
@@ -137,7 +136,7 @@ class PoolFeedReplayTest(unittest.TestCase):
         router = self.fed("codex", {"hyperagent": 4, "grok": 0, "claude": 2, "codex": 2}, router=capped)
         self.assertEqual(lane.pick_issue(self.pool, {}, now=self.now, provider="codex", route=router), self.pool[0])
         pools = pool_feed.status(self.state)["passes"]["codex"]["pools"]
-        self.assertEqual(pools["claude"], {"freeSeats": 2, "fed": 0, "idle": 2, "reason": "unavailable:banked:usage-limit"})
+        self.assertNotIn("claude", pools)
         self.assertEqual(pools["hyperagent"]["reason"], "unavailable:window-cap 24/24")
         self.assertEqual(pools["codex"], {"freeSeats": 3, "fed": 3, "idle": 0, "reason": "fed"})
         # Nothing admissible at all.
@@ -158,11 +157,12 @@ class PoolFeedReplayTest(unittest.TestCase):
         # Frontier work is never downgraded, a pin is never overridden, and label, failure and
         # in-flight admission still run before the feed sees an issue.
         failures = {"JOV-30005": {"count": 99, "at": self.now}}
-        for name in ("hyperagent", "claude"):
+        for name in ("hyperagent", "claude", "codex"):
             picked = lane.pick_issue([frontier, pinned, excluded, failed], failures, now=self.now, provider=name,
                                      in_flight=frozenset(), route=self.fed(name, free))
-            self.assertEqual(getattr(picked, "identifier", None), "JOV-30001" if name == "claude" else None, name)
-        self.assertEqual(self.fed("claude", free).feed([frontier]), frontier)
+            self.assertEqual(getattr(picked, "identifier", None), "JOV-30001" if name == "codex" else None, name)
+        self.assertIsNone(self.fed("claude", free).feed([frontier]))
+        self.assertEqual(self.fed("codex", free).feed([frontier]), frontier)
         self.assertEqual(replay_router(self.replay)(frontier)["chosen"]["capability"], "frontier")
         held = replay_router(self.replay, down={"claude", "codex"})
         self.assertIsNone(lane.pick_issue([frontier], {}, now=self.now, provider="hyperagent",
@@ -234,8 +234,7 @@ class PoolFeedReplayTest(unittest.TestCase):
         router = self.fed("codex", free, idle_at=lambda: idle)
         self.assertEqual(lane.pick_issue(one, {}, now=self.now, provider="codex", route=router), one[0])
         self.assertEqual(router.decisions[issue]["feed"]["skipped"],
-                         [{"lane": "grok", "why": "declined"}, {"lane": "hyperagent", "why": "declined"},
-                          {"lane": "claude", "why": "no-free-seat"}])
+                         [{"lane": "grok", "why": "declined"}, {"lane": "hyperagent", "why": "declined"}])
         # The remembered passes are bounded and carried only while the issue stays in the backlog.
         many = {issue: {"lane": "claude", "at": "2027-01-15T08:00:00Z",
                         "declinedBy": [f"lane{index}" for index in range(20)]}}
@@ -292,11 +291,11 @@ class PoolFeedReplayTest(unittest.TestCase):
         self.assertEqual(pool_feed.mode({"LANES_POOL_FEED": "shadow"}), "observe")
 
     def test_expiry_order_hook_and_bounded_log(self):
-        # An expiry selector plugs in as `order`: here claude's window ends first, so it is fed first.
+        # An ordering hook cannot reintroduce the protected pool even if it would expire first.
         soonest = lambda rows: sorted(rows, key=lambda row: row["lane"] != "claude")
         plan = pool_feed.plan(self.pool[:1], replay_router(self.replay), lane="hyperagent",
                               free={"claude": 1, "grok": 1}, order=soonest)
-        self.assertEqual((plan["take"], plan["offers"]), (None, {self.pool[0].identifier: "claude"}))
+        self.assertEqual((plan["take"], plan["offers"]), (None, {self.pool[0].identifier: "grok"}))
         log = self.state / "runs/pool-feed.jsonl"
         log.parent.mkdir(parents=True)
         log.write_text("x" * 10 + "\n" + "y" * (pool_feed.LOG_MAX_BYTES + 1) + "\n{}\n")
@@ -338,8 +337,8 @@ class FreeIntakeSeatsTest(unittest.TestCase):
                                  ("hyperagent", "z-ai/glm-5.3", "subsidized", None))
                 plan = pool_feed.plan(backlog(2), replay_router(STRETCH["replay"]), lane="claude",
                                       free={"grok": 1}, providers=PROVIDERS)
-                self.assertEqual({key: plan["decision"]["chosen"][key] for key in ("lane", "alias", "costClass")},
-                                 {"lane": "claude", "alias": "sonnet", "costClass": "subscription"})
+                self.assertIsNone(plan["take"])
+                self.assertIsNone(plan["decision"])
 
 
 if __name__ == "__main__":
