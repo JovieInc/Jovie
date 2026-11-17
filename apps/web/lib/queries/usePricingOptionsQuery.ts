@@ -9,15 +9,11 @@
  */
 
 import { useQuery } from '@tanstack/react-query';
-import {
-  applyPriceLockToOptions,
-  type PriceLockView,
-} from '@/lib/billing/price-lock-view';
+import type { PriceLockView } from '@/lib/billing/price-lock-view';
 import { STABLE_CACHE } from './cache-strategies';
 import { createQueryFn } from './fetch';
 import { queryKeys } from './keys';
 import { createClassifiedRetry } from './retry-policy';
-import { fetchPriceLock } from './usePriceLockQuery';
 
 /**
  * Individual pricing option from the API.
@@ -59,13 +55,15 @@ async function fetchPricingOptions({
   signal?: AbortSignal;
 }): Promise<PricingOptionsResponse> {
   // Apply the lock here; a lock read failure fails the query, never a list price.
-  const [raw, priceLock] = await Promise.all([
+  const lockTools = import('./price-lock-pricing');
+  const [raw, priceLock, tools] = await Promise.all([
     fetchPricingOptionsRaw({ signal }),
-    fetchPriceLock({ signal }),
+    lockTools.then(module => module.fetchPriceLock({ signal })),
+    lockTools,
   ]);
   const listed = [...(raw.pricingOptions ?? []), ...(raw.options ?? [])];
   return {
-    options: applyPriceLockToOptions(listed, priceLock),
+    options: tools.applyPriceLockToOptions(listed, priceLock),
     priceLock,
   };
 }
