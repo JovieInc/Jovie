@@ -33,6 +33,14 @@ const WORKFLOWS = /^\.github\/(?:workflows|actions)\//;
 /** @type {readonly Guard[]} */
 export const SOURCE_VALIDATION_GUARDS = Object.freeze([
   {
+    id: 'web-eslint',
+    name: 'changed web ESLint (including hook dependencies)',
+    command:
+      'ESLINT_CHANGED_BASE="origin/{base}" pnpm --filter @jovie/web run lint:eslint:changed',
+    when: /^apps\/web\/.+\.tsx?$/,
+    covers: ['pnpm --filter @jovie/web run lint:eslint:changed'],
+  },
+  {
     id: 'wf:refs',
     name: 'workflow references',
     command: 'node scripts/verify-workflow-references.mjs',
@@ -289,12 +297,18 @@ export const coveredBy = atom =>
  * guards for checks PR CI leaves to the merge group (preflight-local-guards).
  */
 export function selectManifestGuards(paths, base = 'main') {
-  return [
-    ...SOURCE_VALIDATION_GUARDS.filter(g =>
-      paths.some(p => g.when.test(p))
-    ).map(g => ({ ...g, command: g.command.replaceAll('{base}', base) })),
-    ...selectLocalGuards(paths),
-  ];
+  // Supplemental local guards may refine a CI guard (for example, include
+  // uncommitted files in ESLint). Keep one command per ID in manifest order.
+  const guards = new Map(
+    [
+      ...SOURCE_VALIDATION_GUARDS.filter(g => paths.some(p => g.when.test(p))),
+      ...selectLocalGuards(paths),
+    ].map(g => [g.id, g])
+  );
+  return [...guards.values()].map(g => ({
+    ...g,
+    command: g.command.replaceAll('{base}', base),
+  }));
 }
 
 export function readRunScripts(workflowText, deriveSteps) {

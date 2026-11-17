@@ -959,6 +959,37 @@ Also in the same module and companions:
   (`pool-feed.json`, `runs/pool-feed.jsonl`, `pool_feed.py status`). `LANES_POOL_FEED=0` restores
   the old routing; `observe` records what it would do and claims as before.
 
+## Observed admission capacity
+
+`pr_wip.py admit` and `new_issue_budget` use the caller's matched shared quota ledger
+and the fresh runner backlog in `release-flow.json`. Producer PR counts and the
+November 1 WIP targets remain diagnostic. Historical merge dwell and quota-deferred
+head counts cannot hold new work after the current constraint clears.
+
+A known zero remains blocked until its provider reset. A passed reset needs a fresh
+observation; it does not imply a refilled bucket. An existing admission invocation may
+make one quota-free `/rate_limit` refresh through the shared client. Unknown quota or
+CI evidence retains the existing bounded base and repair seats and prevents growth.
+Actual calls reserve at the shared client, and PR creation makes one bounded attempt.
+Caller quota does not certify a separate Actions installation. Recorded WIP overrides
+cannot override real quota or CI saturation.
+
+After its normal body and diff qualification, `pr:open` uses the existing `repair`
+request priority for corrections with red-before-green evidence on the canonical CI,
+agent-control-plane, identity, payment or proxy risk surfaces. The same priority reaches
+the prospective gate and the single creation attempt. It can use the existing repair
+reserve; it cannot spend an empty bucket or override CI backlog.
+
+`pr:open open --no-repair-reserve` explicitly declines that reserve and uses `default`
+for both capacity admission and the single creation request. It is a boolean downgrade,
+not a free-form priority setting; automatic selection stays unchanged when omitted.
+The existing publication receipt records the automatic and effective priorities.
+Every quota, CI, source, body and publication-head gate still applies.
+
+Ship now: use observed capacity with the existing event and lanes invocation paths.
+Re-evaluate when: JOV-7514 runtime receipts show idle capacity or a wrong-bucket hold.
+Then: repair that evidence path under JOV-8754; do not add another controller.
+
 ## Tests
 
 ```sh

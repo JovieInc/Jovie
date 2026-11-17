@@ -1,5 +1,6 @@
 import '@/styles/system-b-app.css';
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
+import { Toaster } from 'sonner';
 import { expect, screen, userEvent } from 'storybook/test';
 import { FeedbackProvider } from '@/components/feedback';
 import { RightPanelProvider } from '@/contexts/RightPanelContext';
@@ -95,16 +96,30 @@ export const ErrorVerifyFailed: Story = {
     Story => (
       <FeedbackProvider>
         <Story />
+        {/* The harness's mock '/test' pathname is a profile route, where
+       FeedbackProvider mounts no Toaster — mount the lane's own renderer
+       (same sonner store) so the failure toast actually renders. */}
+        <Toaster position='bottom-right' />
       </FeedbackProvider>
     ),
   ],
   play: async () => {
-    await userEvent.click(
-      await screen.findByRole('button', { name: 'More actions' })
-    );
-    await userEvent.click(
-      await screen.findByRole('menuitem', { name: 'Verify Creator' })
-    );
+    // The system-b contextual-action affordance stays pointer-events:none
+    // until its row has contextual intent (hover, selection, or keyboard
+    // focus). user-event's synthetic pointer move cannot establish the CSS
+    // :hover state before its own pointer-events assertion runs, so a
+    // pointer click on the trigger dead-ends by construction. Focus the
+    // trigger instead — focus-within enables the affordance — and open the
+    // menu with the keyboard, the same channel keyboard users get.
+    const trigger = await screen.findByRole('button', {
+      name: 'More actions',
+    });
+    trigger.focus();
+    await userEvent.keyboard('[Enter]');
+    // The modal menu makes the page pointer-inert by design while it is
+    // open, so pointer-clicking the item dead-ends here; typeahead + Enter
+    // is the path keyboard users get and exercises the same select handler.
+    await userEvent.keyboard('V[Enter]');
     await expect(
       await screen.findByText('Failed to verify creator')
     ).toBeVisible();

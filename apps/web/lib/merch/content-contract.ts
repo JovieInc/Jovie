@@ -10,6 +10,8 @@
  * and publish all read the same stamp.
  */
 
+import { getMerchConceptPublicationBlockers } from './concept-contract';
+
 export const MERCH_CONTENT_CONTRACT_VERSION = 'merch-content/v1';
 
 export const MERCH_CONTENT_REVIEWER_VERSION = 'merch-person-reviewer/v1';
@@ -147,6 +149,8 @@ export function requiresMerchContentReview(
 export function getMerchContentReviewBlockers(
   qualityReview: Record<string, unknown> | null | undefined
 ): string[] {
+  const conceptBlockers = getMerchConceptPublicationBlockers(qualityReview);
+  if (conceptBlockers.length) return conceptBlockers;
   if (!requiresMerchContentReview(qualityReview)) return [];
   const review = readMerchContentReview(qualityReview);
   if (!review) return [MERCH_CONTENT_REVIEW_REQUIRED_BLOCKER];

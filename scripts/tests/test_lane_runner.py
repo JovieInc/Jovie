@@ -2899,24 +2899,39 @@ class HostHandoffAdmissionTest(unittest.TestCase):
                            "routes": [{"model": "remote", "capability": "frontier", "cost": 0}]},
         }
 
+    @staticmethod
+    def company_fallback():
+        return {"tier": 2, "slots": 1, "model": "company-standard", "accountClass": "hyperagent-credits",
+                "cmd": ["company-test", "{model}"], "routes": [
+                    {"model": "company-standard", "capability": "standard", "cost": 2},
+                    {"model": "company-frontier", "capability": "frontier", "cost": 4}]}
+
+    def test_company_frontier_handoff_selects_model_without_mutating_catalog(self):
+        providers = {**self.routed_providers(), "company": self.company_fallback()}
+        with patch.object(lane, "provider_healthy", return_value=True):
+            name, spec = lane.next_provider(self.host, {"codex"}, providers, issue=issue(labels=["route:frontier"]))
+        self.assertEqual((name, spec["model"]), ("company", "company-frontier"))
+        self.assertEqual(spec["route"]["required"], "frontier")
+        self.assertEqual(providers["company"]["model"], "company-standard")
+        self.assertEqual(lane.template(spec["cmd"], {"model": spec["model"]}), ["company-test", "company-frontier"])
+
     def test_issue_handoff_keeps_sensitive_and_codex_blocked_restrictions(self):
         providers = self.routed_providers()
         with patch.object(lane, "provider_healthy", return_value=True) as healthy:
             self.assertIsNone(lane.next_provider(self.host, {"codex"}, providers, issue=issue(labels=["auth"])))
             self.assertIsNone(lane.next_provider(self.host, set(), providers,
                                                 issue=issue(labels=["auth", "codex-blocked"])))
-            self.assertEqual(lane.next_provider(self.host, {"devin"}, providers,
-                                                issue=issue(labels=["codex-blocked"]))[0], "claude")
-        self.assertTrue(all(call.args[0] is providers["claude"] for call in healthy.call_args_list))
+            self.assertIsNone(lane.next_provider(self.host, {"devin"}, providers,
+                                                issue=issue(labels=["codex-blocked"])))
+        healthy.assert_not_called()
 
-    def test_frontier_handoff_selects_a_frontier_model_without_mutating_the_catalog(self):
+    def test_frontier_handoff_holds_when_only_protected_pool_remains(self):
         providers = self.routed_providers()
         with patch.object(lane, "provider_healthy", return_value=True):
-            name, spec = lane.next_provider(self.host, {"codex"}, providers, issue=issue(labels=["route:frontier"]))
-        self.assertEqual((name, spec["model"]), ("claude", "opus"))
-        self.assertEqual(spec["route"]["required"], "frontier")
+            self.assertIsNone(lane.next_provider(self.host, {"codex"}, providers,
+                                                 issue=issue(labels=["route:frontier"])))
         self.assertEqual(providers["claude"]["model"], "sonnet")
-        self.assertEqual(lane.template(spec["cmd"], {"model": spec["model"]}), ["claude-test", "opus"])
+        self.assertEqual(providers["claude"]["routes"][1]["capability"], "frontier")
 
     def test_handoff_requires_proven_route_capability(self):
         providers = {"devin": {"slots": 1, "model": "unknown", "cmd": ["devin-test"]}}
@@ -2924,14 +2939,14 @@ class HostHandoffAdmissionTest(unittest.TestCase):
             self.assertIsNone(lane.next_provider(self.host, set(), providers, issue=issue()))
 
     def test_handoff_cannot_drop_the_initial_floor_when_policy_is_unreadable(self):
-        providers = self.routed_providers()
+        providers = {**self.routed_providers(), "company": self.company_fallback()}
         with patch.object(lane, "provider_healthy", return_value=True), \
                 patch.object(lane, "read_json", return_value={}):
             name, spec = lane.next_provider(self.host, {"codex"}, providers, issue=issue(),
                                             minimum_capability="frontier")
-            self.assertEqual((name, spec["model"]), ("claude", "opus"))
+            self.assertEqual((name, spec["model"]), ("company", "company-frontier"))
             self.assertEqual(spec["route"]["required"], "frontier")
-            self.assertIsNone(lane.next_provider(self.host, {"codex", "claude"}, providers,
+            self.assertIsNone(lane.next_provider(self.host, {"codex", "company"}, providers,
                                                 issue=issue(), minimum_capability="frontier"))
             self.assertIsNone(lane.next_provider(self.host, set(), providers,
                                                 issue=issue(), minimum_capability="unknown"))
@@ -2939,8 +2954,8 @@ class HostHandoffAdmissionTest(unittest.TestCase):
     def test_issue_handoff_preserves_live_availability_and_remote_only_exclusions(self):
         for mode in ("disabled", "no-slots", "remote-only", "quota", "cooling", "unhealthy", "saturated"):
             with self.subTest(mode=mode):
-                providers = self.routed_providers()
-                spec = providers["claude"]
+                providers = {**self.routed_providers(), "company": self.company_fallback()}
+                spec = providers["company"]
                 if mode == "disabled":
                     spec["enabled"] = False
                 if mode == "no-slots":
@@ -2950,7 +2965,7 @@ class HostHandoffAdmissionTest(unittest.TestCase):
                 if mode == "quota":
                     spec["quota"] = {"source": "ledger", "maxRuns": 0}
                 with patch.object(lane, "provider_healthy", return_value=mode != "unhealthy"), \
-                        patch.object(lane, "cooling", side_effect=lambda host, name: mode == "cooling" and name == "claude"), \
+                        patch.object(lane, "cooling", side_effect=lambda host, name: mode == "cooling" and name == "company"), \
                         patch.object(lane, "slot_free", return_value=mode != "saturated"):
                     self.assertIsNone(lane.next_provider(self.host, {"codex"}, providers,
                                                         issue=issue(labels=["route:frontier"])))
@@ -3209,7 +3224,8 @@ class RunIssueTest(unittest.TestCase):
                     self.assertEqual((receipt["verdict"], receipt["finishedBy"]), ("landing", "devin"))
 
     def test_frontier_floor_applies_again_after_the_first_handoff_fails(self):
-        providers = HostHandoffAdmissionTest.routed_providers()
+        providers = {**HostHandoffAdmissionTest.routed_providers(),
+                     "company": HostHandoffAdmissionTest.company_fallback()}
         providers["sakana"] = {"tier": 3, "slots": 1, "cmd": ["sakana-test"],
                                "routes": [{"model": "standard", "capability": "standard", "cost": 4}]}
         seen = []
@@ -3225,8 +3241,9 @@ class RunIssueTest(unittest.TestCase):
                 patch.object(lane, "run_agent", side_effect=agent):
             receipt = lane.run_issue(self.host, "codex", providers["codex"], FakeLinear([]),
                                      issue(labels=["route:frontier"]))
-        self.assertEqual(seen, [["codex-test"], ["claude-test", "opus"]])
+        self.assertEqual(seen, [["codex-test"], ["company-test", "company-frontier"]])
         self.assertEqual(len(receipt["handoffs"]), 1)
+        self.assertEqual(receipt["handoffs"][0]["to"], "company")
         self.assertEqual(receipt["verdict"], "provider-error")
 
     def test_next_provider_takes_the_cheapest_enabled_healthy_uncooled_lane(self):
@@ -4714,20 +4731,22 @@ class WorkerTest(unittest.TestCase):
         self.assertFalse((self.host.state / "worker-idle.json").exists())
         self.assertEqual(self.linear.moves, [])
 
-    def test_a_lane_at_its_wip_cap_stops_claiming_new_work(self):
+    def test_capacity_controls_claiming_above_the_diagnostic_wip_cap(self):
         cap = lane.pr_wip.cap_for("devin", lane.pr_wip.load_policy())
         rows = lambda n: [{"number": i, "headRefName": f"devin/jov-{i}-20260927t000000", "isDraft": True} for i in range(1, n + 1)]
         lane.lane_prs, ran = (lambda name, fields="", *, inventory=None: []), []
         lane.run_issue = lambda *a: ran.append(1) or {"verdict": "landing", "prUrl": "u"}
         real = lane.new_issue_budget
-        for n, claimed in ((cap, []), (cap - 1, [1])):
-            with patch.object(lane, "read_new_issue_budget", side_effect=lambda name, slots, n=n: real(name, slots, rows(n))):
+        healthy = {"allowed": True, "known": True, "reason": "within-capacity"}
+        exhausted = {"allowed": False, "known": True, "reason": "github-quota:core"}
+        for capacity, claimed in ((exhausted, []), (healthy, [1])):
+            with patch.object(lane, "read_new_issue_budget", side_effect=lambda name, slots: real(name, slots, rows(cap + 4), capacity=capacity)):
                 lane.worker(self.host, "devin")
-            self.assertEqual(ran, claimed, "claims only under the cap")
-        self.assertEqual(json.loads((self.host.state / "worker-idle.json").read_text())["devin"]["reason"], "wip-cap")
+            self.assertEqual(ran, claimed, "claims only when actual capacity permits")
+        self.assertEqual(json.loads((self.host.state / "worker-idle.json").read_text())["devin"]["reason"], "github-quota:core")
 
     def test_new_issue_budget_uses_base_slots_not_autoscaled(self):
-        """JOV-7514: parked-PR caps stay on configured slots as autoscale capacity rises."""
+        """JOV-7514: intake retains the configured seat bound as autoscale capacity rises."""
         seen = []
         lane.read_new_issue_budget = lambda name, slots: seen.append(slots) or {"allowed": True}
         lane.run_issue = lambda *a: {"verdict": "landing", "prUrl": "u"}
@@ -4920,12 +4939,12 @@ class ExhaustedRepairPublicationTest(unittest.TestCase):
 
 
 class NewIssueBudgetTest(unittest.TestCase):
-    """2026-11-01: one ceiling, the per-producer WIP cap shared with pr-open; the slot caps stay gone."""
+    """Capacity governs admission; the legacy budget envelope and PR diagnostics remain stable."""
     def row(self, number=1, branch=None, draft=True, state="CLEAN", labels=()):
         return {"number": number, "headRefName": branch or f"codex/jov-{number}-20261002",
                 "isDraft": draft, "mergeStateStatus": state, "labels": [{"name": name} for name in labels]}
 
-    def test_only_the_wip_cap_refuses_new_issues_and_held_prs_do_not_count(self):
+    def test_counts_do_not_refuse_new_issues_and_held_prs_remain_diagnostic(self):
         cap = lane.pr_wip.cap_for("codex", lane.pr_wip.load_policy())
         parked = [self.row(n, labels=("hold",)) for n in range(1, 40)]
         active = [self.row(n, state="BLOCKED") for n in range(40, 40 + cap - 1)]
@@ -4934,7 +4953,8 @@ class NewIssueBudgetTest(unittest.TestCase):
                          (True, "within-budget", None, None))
         self.assertEqual((result["used"], result["terminal"], result["wip"]), (cap - 1, 39, cap - 1))
         full = lane.new_issue_budget("codex", 1, parked + active + [self.row(99, branch="codex/manual")])
-        self.assertEqual((full["allowed"], full["reason"], full["wipCap"]), (False, "wip-cap", cap))
+        self.assertEqual((full["allowed"], full["reason"], full["wipCap"]), (True, "within-budget", cap))
+        self.assertEqual((full["capacity"]["known"], full["capacity"]["reason"]), (False, "capacity-unknown"))
         self.assertEqual(lane.new_issue_budget("codex", 0, None)["reason"], "provider-disabled")
         self.assertFalse(hasattr(lane, "OPEN_PRS_PER_SLOT") or hasattr(lane, "TERMINAL_PRS_PER_SLOT")
                          or hasattr(lane, "over_budget"))
@@ -17749,6 +17769,7 @@ class FixNowTest(unittest.TestCase):
 
 
 class MixedBodyRepairTest(unittest.TestCase):
+    """Patch the canonical module: release discovery can reload pr_events after lane_runner."""
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
         self.host = lane.Host(state=Path(self.tmp.name))
@@ -17759,23 +17780,23 @@ class MixedBodyRepairTest(unittest.TestCase):
 
     def test_mixed_repairs_write_the_body_once_per_head(self):
         route = {"action": "agent", "cls": "mixed", "repairs": ["stamp-changelog", "red-before-green"]}
-        with patch.object(lane.pr_events, "ensure_red_before_green", return_value=True) as ensure:
+        with patch("pr_events.ensure_red_before_green", return_value=True) as ensure:
             reason = lane.deterministic_route_taken(self.host, self.pr, route)
         self.assertEqual(reason, "infra-rerun:mixed-body-repairs")
         ensure.assert_called_once_with(self.pr, "", customer_decision={"releaseWorthy": False})
-        with patch.object(lane.pr_events, "ensure_red_before_green", return_value=True) as again:
+        with patch("pr_events.ensure_red_before_green", return_value=True) as again:
             self.assertIsNone(lane.deterministic_route_taken(self.host, self.pr, route))
         again.assert_not_called()
 
     def test_agent_route_without_body_repairs_stays_on_the_model(self):
         route = {"action": "agent", "cls": "mixed", "repairs": []}
-        with patch.object(lane.pr_events, "ensure_red_before_green", return_value=True) as ensure:
+        with patch("pr_events.ensure_red_before_green", return_value=True) as ensure:
             self.assertIsNone(lane.deterministic_route_taken(self.host, self.pr, route))
         ensure.assert_not_called()
 
     def test_failed_body_edit_still_hands_the_head_to_the_model(self):
         route = {"action": "agent", "cls": "mixed", "repairs": ["stamp-changelog"]}
-        with patch.object(lane.pr_events, "ensure_red_before_green", return_value=False):
+        with patch("pr_events.ensure_red_before_green", return_value=False):
             self.assertIsNone(lane.deterministic_route_taken(self.host, self.pr, route))
 
     def test_single_class_changelog_keeps_the_primary_stamp_route(self):

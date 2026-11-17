@@ -64,13 +64,6 @@ vi.mock('@/lib/error-tracking', () => ({
   captureError: mockCaptureError,
 }));
 
-vi.mock('@/lib/utils/logger', () => ({
-  logger: {
-    info: vi.fn(),
-    error: vi.fn(),
-  },
-}));
-
 vi.mock('@/app/api/cron/billing-reconciliation/route', () => ({
   runReconciliation: mockRunReconciliation,
 }));
@@ -218,6 +211,9 @@ describe('GET /api/cron/daily-maintenance', () => {
       reconciled: 2,
       unavailable: 0,
       failed: 0,
+    });
+    mockAutostartDesignPartnerAutopilot.mockResolvedValue({
+      status: 'not-configured',
     });
     mockCleanupFounderReviewUploadLeases.mockResolvedValue({
       scanned: 1,
@@ -382,6 +378,39 @@ describe('GET /api/cron/daily-maintenance', () => {
         fingerprint: 'remediation:music-resolver-false-link',
       })
     );
+  });
+
+  it('reports an autopilot refusal and continues later maintenance jobs', async () => {
+    const refusal = new Error(
+      'Design-partner autopilot trigger refused: release-not-found'
+    );
+    mockAutostartDesignPartnerAutopilot.mockRejectedValueOnce(refusal);
+
+    const { GET } = await import('@/app/api/cron/daily-maintenance/route');
+    const response = await GET(
+      new Request('http://localhost/api/cron/daily-maintenance', {
+        headers: { Authorization: 'Bearer test-secret' },
+      })
+    );
+    const data = await response.json();
+
+    expect(response.status).toBe(207);
+    expect(data.success).toBe(false);
+    expect(data.results.designPartnerAutopilot).toEqual({
+      success: false,
+      error: refusal.message,
+    });
+    expect(mockCaptureError).toHaveBeenCalledWith(
+      'Daily maintenance: designPartnerAutopilot failed',
+      refusal,
+      {
+        route: '/api/cron/daily-maintenance',
+        subjob: 'designPartnerAutopilot',
+      }
+    );
+    expect(data.results.founderReviewUploadLeases.success).toBe(true);
+    expect(mockCleanupFounderReviewUploadLeases).toHaveBeenCalledTimes(1);
+    expect(data.results.dataRetention.success).toBe(true);
   });
 
   it('reports reconciliation failure without blocking later maintenance jobs', async () => {

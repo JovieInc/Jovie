@@ -36,6 +36,13 @@
       "semantic": "shrink-only",
       "check": "node scripts/company-guards/size-ratchet.mjs --no-raise origin/main",
       "tighten": "node scripts/company-guards/size-ratchet.mjs --tighten"
+    },
+    {
+      "id": "test-hygiene",
+      "baseline": "scripts/test-quality/test-hygiene-baseline.json",
+      "semantic": "shrink-only",
+      "check": "node scripts/test-hygiene.mjs",
+      "tighten": "node scripts/test-hygiene.mjs --tighten"
     }
   ],
   "combineSafe": {
