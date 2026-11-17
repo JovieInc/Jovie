@@ -6,8 +6,9 @@ Run with:
 """
 from __future__ import annotations
 
-import importlib.util
+import importlib
 import json
+import pickle
 import sys
 import tempfile
 import unittest
@@ -19,11 +20,7 @@ sys.path.insert(0, str(ROOT / "scripts/lanes"))
 
 
 def load(name):
-    spec = importlib.util.spec_from_file_location(name, ROOT / f"scripts/lanes/{name}.py")
-    module = importlib.util.module_from_spec(spec)
-    sys.modules[name] = module
-    spec.loader.exec_module(module)
-    return module
+    return importlib.import_module(name)
 
 
 stage_events = load("stage_events")
@@ -274,6 +271,15 @@ class ReasonCheckRows(unittest.TestCase):
             stage_events.ndjson(self.state / "runs/ledger.jsonl", T0 + 10)
 
 
+    def test_oversized_serialized_history_row_is_rejected_before_aggregation(self):
+        oversized = self.receipt(checkId="b" * 32, padding="x" * (1024 * 1024))
+        self.write([self.receipt(), oversized])
+        with self.assertRaisesRegex(OSError, "reason-check-history-incomplete"):
+            stage_events.reason_check_events(self.state, T0 + 10)
+        self.write([self.receipt()], tail=json.dumps(oversized))
+        with self.assertRaisesRegex(OSError, "reason-check-history-incomplete"):
+            stage_events.ndjson(self.state / "runs/ledger.jsonl", T0 + 10)
+
     def test_incomplete_history_cannot_upload_a_partial_statistical_feed(self):
         self.write([self.receipt()], tail=json.dumps(self.receipt(checkId="b" * 32)))
         doctor = load("doctor")
@@ -292,6 +298,14 @@ class ReasonCheckRows(unittest.TestCase):
         self.assertIn("action=restore complete daily receipts", str(failure.exception)[:120])
 
 class ManifestAndDoctor(unittest.TestCase):
+    def test_existing_module_and_pickle_identity_are_preserved(self):
+        for name, attribute in (("stage_events", "event"), ("doctor", "Tracker")):
+            with self.subTest(module=name):
+                canonical = importlib.import_module(name)
+                subject = getattr(canonical, attribute)
+                self.assertIs(load(name), canonical)
+                self.assertIs(pickle.loads(pickle.dumps(subject)), subject)
+
     def test_every_emitted_stage_is_registered(self):
         manifest = json.loads((ROOT / "docs/metrics/stage-manifest.json").read_text())
         for entity, ids in (("incident", {"undetected", "unfiled", "open", "cleared"}),

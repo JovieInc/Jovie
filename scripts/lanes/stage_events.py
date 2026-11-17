@@ -205,6 +205,10 @@ def ndjson(ledger: Path, now: float) -> str:
 
 # ------------------------------------------------------------------ native reason queue checks
 
+# At most 32 controls of at most 16 KiB each, plus receipt/provenance metadata.
+# One MiB leaves headroom for serialization while containing malformed-row memory.
+REASON_CHECK_MAX_LINE_BYTES = 1024 * 1024
+
 
 def _reason_check_rows(state: Path, now: float):
     """Stream selected UTC partitions; unreadable/incomplete input aborts this feed publication."""
@@ -227,13 +231,13 @@ def _reason_check_rows(state: Path, now: float):
         if not first <= day <= last:
             continue
         try:
-            with os.fdopen(os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK), encoding="utf-8") as handle:
+            with os.fdopen(os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK), "rb") as handle:
                 if not stat.S_ISREG(os.fstat(handle.fileno()).st_mode):
                     raise OSError("partition is not a regular file")
-                for line in handle:
-                    if not line.endswith("\n"):
-                        raise ValueError("incomplete receipt tail")
-                    item = json.loads(line)
+                for raw in iter(lambda: handle.readline(REASON_CHECK_MAX_LINE_BYTES + 1), b""):
+                    if len(raw) > REASON_CHECK_MAX_LINE_BYTES or not raw.endswith(b"\n"):
+                        raise ValueError("oversized or incomplete receipt row")
+                    item = json.loads(raw.decode("utf-8"))
                     if not isinstance(item, dict):
                         raise ValueError("receipt is not an object")
                     yield item
