@@ -1,5 +1,4 @@
 import 'server-only';
-
 import { eq, inArray, isNotNull } from 'drizzle-orm';
 import type Stripe from 'stripe';
 import type { DbOrTransaction } from '@/lib/db';
@@ -21,10 +20,8 @@ import {
   type ReconcileSummary,
   reconcilePriceLocks,
 } from './price-lock-reconcile';
-
 /** Per-run cap on individual Summer alarms; the aggregate alarm is uncapped. */
 export const MAX_INDIVIDUAL_ALARMS = 20;
-
 export function toReconcileSubscription(
   sub: Stripe.Subscription
 ): ReconcileSubscription {
@@ -40,13 +37,11 @@ export function toReconcileSubscription(
       interval === 'month' ? 'month' : interval === 'year' ? 'year' : null,
   };
 }
-
 export interface PriceLockReconcileResult {
   readonly backfill: PriceLockBackfillResult;
   readonly summary: ReconcileSummary;
   readonly alarmed: number;
 }
-
 /**
  * JOV-INV-048 consumer: daily price lock reconcile. Backfills, compares each
  * paying subscription with its lock, stamps verdicts, alarms plan_mismatch.
@@ -58,9 +53,7 @@ export async function runPriceLockReconcile(deps: {
 }): Promise<PriceLockReconcileResult> {
   const client = deps.client ?? db;
   const now = deps.now ?? new Date();
-
   const backfill = await backfillSubscriberPriceLocks(client, now);
-
   const rows = await client
     .select({
       userId: users.id,
@@ -70,12 +63,10 @@ export async function runPriceLockReconcile(deps: {
     .from(users)
     .leftJoin(priceLocks, eq(priceLocks.userId, users.id))
     .where(isNotNull(users.stripeSubscriptionId));
-
   const bySubscription = new Map<string, ReconcileSubscription>();
   for await (const sub of deps.listSubscriptions()) {
     bySubscription.set(sub.id, toReconcileSubscription(sub));
   }
-
   const candidates: ReconcileCandidate[] = rows.map(row => ({
     userId: row.userId,
     lock: row.lock ? rowToSnapshot(row.lock) : null,
@@ -83,12 +74,10 @@ export async function runPriceLockReconcile(deps: {
       ? (bySubscription.get(row.subscriptionId) ?? null)
       : null,
   }));
-
   const summary = reconcilePriceLocks(
     candidates,
     priceId => getPriceMappingDetails(priceId) !== null
   );
-
   // Stamp verdicts (one statement per verdict, not per user).
   for (const verdict of Object.keys(summary.counts) as Array<
     keyof typeof summary.counts
@@ -102,7 +91,6 @@ export async function runPriceLockReconcile(deps: {
       .set({ reconcileStatus: verdict, reconciledAt: now })
       .where(inArray(priceLocks.userId, ids));
   }
-
   let alarmed = 0;
   for (const finding of summary.alarms.slice(0, MAX_INDIVIDUAL_ALARMS)) {
     captureRevenueSpineFailure({
@@ -130,6 +118,5 @@ export async function runPriceLockReconcile(deps: {
       }
     );
   }
-
   return { backfill, summary, alarmed };
 }

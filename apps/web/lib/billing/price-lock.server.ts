@@ -19,7 +19,6 @@ import {
   type PriceLockSource,
   type StripePriceIdSnapshot,
 } from './price-versions';
-/** Ids the list price checks out with right now (env, via the one reader). */
 export function getListStripePriceIds(): StripePriceIdSnapshot {
   const ids = getStripePriceIds();
   return {
@@ -71,7 +70,6 @@ export async function getPriceLockForUser(
   const row = await getPriceLockRowForUser(userId, client);
   return row ? rowToSnapshot(row) : null;
 }
-/** Existing lock, else the current version snapshotted; idempotent, first write wins. */
 export async function ensurePriceLockForUser(
   userId: string,
   source: PriceLockSource,
@@ -93,7 +91,6 @@ export async function ensurePriceLockForUser(
   if (!created) throw new Error('price lock insert did not persist');
   return created;
 }
-/** For provisioning hooks: never fails sign-in; checkout re-ensures and fails closed. */
 export async function ensurePriceLockForUserSafely(
   userId: string,
   source: PriceLockSource
@@ -108,7 +105,6 @@ export async function ensurePriceLockForUserSafely(
     });
   }
 }
-/** Lock for a live subscription's price, or null when the price is unmapped. */
 export function snapshotFromSubscriptionPriceId(
   stripePriceId: string,
   now = new Date()
@@ -129,7 +125,6 @@ export interface PriceLockBackfillResult {
   readonly created: number;
   readonly unmapped: readonly string[];
 }
-/** Idempotent backfill: paying subscribers lock at the price they pay today. */
 export async function backfillSubscriberPriceLocks(
   client: DbOrTransaction = db,
   now = new Date(),
@@ -165,7 +160,6 @@ export async function backfillSubscriberPriceLocks(
   }
   return { scanned: rows.length, created, unmapped };
 }
-/** The price charged for a requested price id; creates the lock or fails closed. */
 export async function resolveCheckoutPriceForUser(
   userId: string,
   requestedPriceId: string

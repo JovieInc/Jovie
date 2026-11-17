@@ -9,6 +9,7 @@ import {
   buildFirstTouch,
   sealFirstTouchEnvelope,
 } from '@/lib/acquisition/first-touch-envelope';
+import * as errorTracking from '@/lib/error-tracking';
 import { supportedAgentDecision } from '@/tests/fixtures/agent-handoff';
 import { malformedJsonRequest } from '@/tests/helpers/malformed-json-request';
 
@@ -32,22 +33,13 @@ const mockIsMaxPlanEnabled = vi.hoisted(() => vi.fn());
 const mockIsMaxPriceId = vi.hoisted(() => vi.fn());
 const mockStripeSubscriptionsList = vi.hoisted(() => vi.fn());
 const mockWithStripeRetry = vi.hoisted(() => vi.fn());
-const mockCaptureCriticalError = vi.hoisted(() => vi.fn());
+const mockCaptureCriticalError = vi
+  .spyOn(errorTracking, 'captureCriticalError')
+  .mockResolvedValue(undefined);
 
 vi.mock('@/lib/auth/cached', () => ({
   getCachedAuth: mockGetCachedAuth,
 }));
-
-vi.mock('@/lib/error-tracking', async () => {
-  // Spy only on captureCriticalError (the fatal pager); keep the rest real.
-  const actual = await vi.importActual<typeof import('@/lib/error-tracking')>(
-    '@/lib/error-tracking'
-  );
-  return {
-    ...actual,
-    captureCriticalError: mockCaptureCriticalError,
-  };
-});
 
 vi.mock(
   '@/lib/billing/price-lock.server',

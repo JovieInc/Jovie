@@ -144,15 +144,6 @@ vi.mock('@sentry/nextjs', () => ({
   addBreadcrumb: vi.fn(),
 }));
 
-vi.mock('react', async importOriginal => {
-  const actual = await importOriginal<typeof import('react')>();
-  return {
-    ...actual,
-    // Disable request memoization so each call is independent in tests
-    cache: <T extends (...args: never[]) => unknown>(fn: T) => fn,
-  };
-});
-
 import { CanonicalUserState, resolveUserState } from '@/lib/auth/gate';
 
 /** Mimics the `.from().leftJoin().where().limit()` / `.from().where().limit()` /
