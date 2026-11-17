@@ -79,6 +79,7 @@ export async function pollSource(
   if (state?.etag) headers['if-none-match'] = state.etag;
   if (state?.last_modified) headers['if-modified-since'] = state.last_modified;
   const iso = now.toISOString();
+  const cutoff = new Date(now.getTime() - MAX_AGE_DAYS * 864e5).toISOString();
   let status = 0;
   try {
     const res = await fetch(src.url, { headers, redirect: 'follow' });
@@ -96,7 +97,7 @@ export async function pollSource(
     const body = await readCapped(res);
     let items: ParsedItem[] = [];
     let contentHash: string | null = null;
-    if (src.kind === 'feed') items = parseFeed(body);
+    if (src.kind === 'feed') items = parseFeed(body, 30, src.url);
     else if (src.kind === 'html-links')
       items = parseHtmlLinks(
         body,
@@ -131,7 +132,15 @@ export async function pollSource(
       const r = await env.DB.prepare(
         'INSERT OR IGNORE INTO items (id, source, title, url, published_at, first_seen_at, excerpt) VALUES (?,?,?,?,?,?,?)'
       )
-        .bind(id, src.id, it.title, it.url, it.publishedAt, iso, it.excerpt)
+        .bind(
+          id,
+          src.id,
+          it.title,
+          it.url,
+          it.publishedAt,
+          iso,
+          it.publishedAt && it.publishedAt < cutoff ? null : it.excerpt
+        )
         .run();
       if (r.meta.changes) added++;
     }
@@ -200,6 +209,13 @@ export async function triagePending(
   now = new Date()
 ): Promise<number> {
   const cutoff = new Date(now.getTime() - MAX_AGE_DAYS * 864e5).toISOString();
+  // Inputs which aged out during retries are no longer eligible for triage.
+  // Clear them in this existing pass, including rows from earlier versions.
+  await env.DB.prepare(
+    'UPDATE items SET excerpt=NULL WHERE excerpt IS NOT NULL AND COALESCE(published_at, first_seen_at) < ?'
+  )
+    .bind(cutoff)
+    .run();
   const { results } = await env.DB.prepare(
     `SELECT id, source, title, excerpt FROM items WHERE triaged_at IS NULL
        AND COALESCE(published_at, first_seen_at) >= ? ORDER BY COALESCE(published_at, first_seen_at) DESC LIMIT ?`

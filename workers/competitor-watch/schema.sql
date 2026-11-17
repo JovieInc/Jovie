@@ -1,3 +1,5 @@
+-- Existing tables without excerpt require the one-time legacy migration first;
+-- CREATE TABLE IF NOT EXISTS does not add columns. See README.md for the check.
 CREATE TABLE IF NOT EXISTS items (
   id TEXT PRIMARY KEY,
   source TEXT NOT NULL,

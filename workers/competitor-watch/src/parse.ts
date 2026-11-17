@@ -12,6 +12,15 @@ export interface ParsedItem {
 
 const MAX_EXCERPT = 600;
 
+function entityCodePoint(code: number): string {
+  return Number.isInteger(code) &&
+    code > 0 &&
+    code <= 0x10ffff &&
+    !(code >= 0xd800 && code <= 0xdfff)
+    ? String.fromCodePoint(code)
+    : '\uFFFD';
+}
+
 export function decodeEntities(s: string): string {
   return s
     .replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, '$1')
@@ -19,10 +28,8 @@ export function decodeEntities(s: string): string {
     .replace(/&gt;/g, '>')
     .replace(/&quot;/g, '"')
     .replace(/&#0?39;|&apos;/g, "'")
-    .replace(/&#x([0-9a-f]+);/gi, (_, h) =>
-      String.fromCodePoint(parseInt(h, 16))
-    )
-    .replace(/&#(\d+);/g, (_, d) => String.fromCodePoint(Number(d)))
+    .replace(/&#x([0-9a-f]+);/gi, (_, h) => entityCodePoint(parseInt(h, 16)))
+    .replace(/&#(\d+);/g, (_, d) => entityCodePoint(Number(d)))
     .replace(/&amp;/g, '&');
 }
 
@@ -62,15 +69,28 @@ function linkOf(block: string): string | null {
 }
 
 /** Parse RSS 2.0 or Atom. Tolerates a truncated tail: incomplete items are dropped. */
-export function parseFeed(xml: string, limit = 30): ParsedItem[] {
+export function parseFeed(
+  xml: string,
+  limit = 30,
+  baseUrl?: string
+): ParsedItem[] {
   const out: ParsedItem[] = [];
   const re = /<(item|entry)\b[^>]*>([\s\S]*?)<\/\1>/gi;
   let m: RegExpExecArray | null;
   while ((m = re.exec(xml)) && out.length < limit) {
     const block = m[2];
     const title = stripTags(tag(block, 'title') ?? '');
-    const url = linkOf(block);
-    if (!title || !url) continue;
+    const link = linkOf(block);
+    if (!title || !link) continue;
+    let url: string;
+    try {
+      const parsed = new URL(link, baseUrl);
+      if (!['http:', 'https:'].includes(parsed.protocol)) continue;
+      url = parsed.toString();
+    } catch {
+      // One broken vendor link must not discard the rest of the source.
+      continue;
+    }
     const body =
       tag(block, 'description') ??
       tag(block, 'summary') ??
