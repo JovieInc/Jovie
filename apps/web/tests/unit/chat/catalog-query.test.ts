@@ -236,21 +236,27 @@ describe('resolveChatRelease precedence', () => {
     metadata: {},
   });
 
-  it('a full-catalog exact match beats a loaded partial (remix) match', async () => {
-    // Loaded slice carries only "Midnight — Remix"; the exact "Midnight"
-    // sits beyond row 50. The remix must not win without querying.
-    const releases = [sliceRow('Midnight — Remix')];
-    pendingRows.push([{ ...releaseRow, title: 'Midnight' }], [linkRow]);
+  it.each([
+    ['Midnight', 'Midnight', 'any'],
+    ['ΟΣ', 'οσ', 'any'],
+    ['ΟΣ', 'οσ', 'exact'],
+  ] as const)(
+    'an owned SQL-exact %s beats a loaded remix (%s, %s)',
+    async (title, query, match) => {
+      const releases = [sliceRow(`${query} — Remix`)];
+      pendingRows.push([{ ...releaseRow, title }], [linkRow]);
 
-    const { resolveChatRelease } = await import('@/lib/chat/catalog-query');
-    const release = await resolveChatRelease('profile-1', releases, {
-      releaseTitle: 'Midnight',
-    });
+      const { resolveChatRelease } = await import('@/lib/chat/catalog-query');
+      const release = await resolveChatRelease('profile-1', releases, {
+        releaseTitle: query,
+        match,
+      });
 
-    expect(release?.title).toBe('Midnight');
-    // One owned resolution: the exact-title release read plus provider links.
-    expect(selectMock).toHaveBeenCalledTimes(2);
-  });
+      expect(release?.title).toBe(title);
+      // One owned resolution: the exact-title release read plus provider links.
+      expect(selectMock).toHaveBeenCalledTimes(2);
+    }
+  );
 
   it('a local exact match wins without a database query', async () => {
     const releases = [sliceRow('Midnight'), sliceRow('Midnight — Remix')];
