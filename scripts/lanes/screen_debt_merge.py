@@ -30,7 +30,7 @@ def _shrunk_criteria(base: str, ours: str, theirs: str) -> str | None:
 def resolve_subtractive_screen_debt(worktree, rel: str, sh) -> str | None:
     """Drop debt rows and criteria either side cleared, in main's order. Additions, reorders and other edits stay unresolved."""
     # Imported lazily: this module is loaded by fix_red_source_edits.
-    from fix_red_source_edits import _debt_rows, _load_json_object_stages
+    from fix_red_conflict_resolvers import _debt_rows, _load_json_object_stages
 
     if rel != "docs/design-system/cert-screens.json":
         return None

@@ -22,6 +22,11 @@ export interface WaitlistTableProps {
   readonly isFetchingNextPage?: boolean;
   readonly onLoadMore?: () => void;
   readonly integrity?: WaitlistIntegritySummary;
+  /** Reports the exact failure message alongside the error toast, so
+   * storybook lanes can assert bulk-action failures (the harness's mock
+   * pathname is a profile route, where FeedbackProvider mounts no
+   * Toaster). */
+  readonly onActionError?: (message: string) => void;
   // Optional external selection state (for bulk actions in parent)
   readonly externalSelection?: {
     readonly selectedIds: Set<string>;

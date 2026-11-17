@@ -1,4 +1,5 @@
 import type { ElementType } from 'react';
+import { BackgroundPattern } from '@/components/atoms/BackgroundPattern';
 import { Container } from '@/components/site/Container';
 import { cn } from '@/lib/utils';
 
@@ -43,9 +44,7 @@ export function Section({
       )}
       {...props}
     >
-      {withGridBg && (
-        <div className='absolute inset-0 bg-[linear-gradient(rgba(0,0,0,0.02)_1px,transparent_1px),linear-gradient(90deg,rgba(0,0,0,0.02)_1px,transparent_1px)] dark:bg-[linear-gradient(rgba(255,255,255,0.02)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.02)_1px,transparent_1px)] bg-[size:50px_50px]' />
-      )}
+      {withGridBg && <BackgroundPattern variant='grid' />}
       <Container
         size={containerSize}
         className={cn('relative', containerClassName)}

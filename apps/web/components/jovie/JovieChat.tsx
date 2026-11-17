@@ -26,17 +26,9 @@ import {
 } from '@/lib/chat/transcript-window';
 import type { OpportunityInboxCardViewModel } from '@/lib/connectors/opportunity-inbox-types';
 import { useAppFlag } from '@/lib/flags/client';
-import {
-  useInsightsSummaryQuery,
-  usePendingOpportunityCardsQuery,
-  usePlanGate,
-} from '@/lib/queries';
+import { usePendingOpportunityCardsQuery, usePlanGate } from '@/lib/queries';
 import { cn } from '@/lib/utils';
-import {
-  type ChatEmptyStateAction,
-  getChatEmptyStateFirstName,
-  resolveChatEmptyStateInsight,
-} from './chat-empty-greeting';
+import { getChatEmptyStateFirstName } from './chat-empty-greeting';
 import { DESKTOP_CONTENT_GRID_ANCHOR } from './chat-empty-starters';
 import { CHAT_CONTENT_SHELL_CLASSNAME } from './chat-layout';
 import { ChatDropZoneOverlay } from './components/ChatDropZoneOverlay';
@@ -72,8 +64,6 @@ import { findLastAssistantIndex, isWeeklyPlanLimitError } from './utils';
 const VIRTUALIZATION_THRESHOLD =
   CHAT_TRANSCRIPT_WINDOW.virtualizeAfterMessageCount;
 const CHAT_PICKER_THREAD_CLEARANCE = 'min(620px, calc(100vh - 8rem))';
-// Match the insights fetch deadline without waiting through query retries.
-const EMPTY_NEXT_STEP_TIMEOUT_MS = 10_000;
 
 export function JovieChat({
   profileId,
@@ -550,108 +540,15 @@ export function JovieChat({
   );
   const composerHasIntent =
     composerPickerOpen || hasDraftIntent || chipTray.chips.length > 0;
-  // JOV-7150: the empty state is one sentence — a real insight when one
-  // exists, otherwise a plain greeting — above the composer. No cards, no
+  // The empty state is the greeting above the composer. Only a result Jovie
+  // has already finished may sit under it (ChatEmptyStateResult); a chore
+  // like "Review your tip flow" never does. No cards, no
   // chips, no demo exchange, no competing CTA surface. While the composer
   // carries intent (typing, picker open, chips) even the greeting steps
   // back so the composer owns attention.
   const chatEmptyStateFirstName = getChatEmptyStateFirstName(displayName);
   const showEmptyGreeting =
     !showThreadView && !showHomeCanvas && !composerHasIntent;
-  const {
-    data: insightsSummary,
-    isLoading: insightsLoading,
-    isError: insightsError,
-    isEnabled: insightsEnabled,
-  } = useInsightsSummaryQuery({
-    enabled: showEmptyGreeting,
-  });
-  // Commit one next step per empty session. Refetches must not swap the user's
-  // visible task, and a failed query must not turn cached prose into a win.
-  const [emptyNextStep, setEmptyNextStep] = useState<{
-    readonly action: ChatEmptyStateAction | null;
-  } | null>(null);
-  useEffect(() => {
-    // An enabled query can have no data before its request starts. Wait for
-    // that summary, but a disabled or failed query can use the fallback now.
-    const insightsUnavailable = insightsEnabled === false || insightsError;
-    const insightsSettled =
-      insightsUnavailable ||
-      (!insightsLoading && insightsSummary !== undefined);
-    if (showThreadView) {
-      setEmptyNextStep(null);
-    } else if (showEmptyGreeting && insightsSettled && !emptyNextStep) {
-      setEmptyNextStep({
-        action: insightsUnavailable
-          ? null
-          : resolveChatEmptyStateInsight(insightsSummary?.insights ?? []),
-      });
-    }
-  }, [
-    showThreadView,
-    showEmptyGreeting,
-    insightsLoading,
-    insightsError,
-    insightsEnabled,
-    insightsSummary,
-    emptyNextStep,
-  ]);
-  useEffect(() => {
-    if (!showEmptyGreeting || emptyNextStep) return;
-    // Keep one deadline for this visible wait; query updates must not restart it.
-    const timer = setTimeout(() => {
-      setEmptyNextStep({ action: null });
-    }, EMPTY_NEXT_STEP_TIMEOUT_MS);
-    return () => clearTimeout(timer);
-  }, [showEmptyGreeting, emptyNextStep]);
-  const selectedEmptyAction = emptyNextStep?.action;
-  const currentEmptyInsight = insightsSummary?.insights.find(
-    insight => insight.id === selectedEmptyAction?.insightId
-  );
-  const activeEmptyAction = currentEmptyInsight
-    ? resolveChatEmptyStateInsight([currentEmptyInsight])
-    : null;
-  const usableEmptyAction =
-    activeEmptyAction?.prompt === selectedEmptyAction?.prompt
-      ? selectedEmptyAction
-      : null;
-  useEffect(() => {
-    if (!selectedEmptyAction) return;
-    // Expiration is a material context change, even with an idle query cache.
-    const timer = setTimeout(
-      () => {
-        setEmptyNextStep({ action: null });
-      },
-      Math.min(
-        2_147_483_647,
-        Math.max(0, selectedEmptyAction.expiresAt - Date.now())
-      )
-    );
-    return () => clearTimeout(timer);
-  }, [selectedEmptyAction]);
-  const handleEmptyNextStep = useCallback(
-    (prompt: string) => {
-      if (
-        !usableEmptyAction ||
-        usableEmptyAction.prompt !== prompt ||
-        usableEmptyAction.expiresAt <= Date.now() ||
-        draft.getSnapshot().trim() ||
-        composerPickerOpen ||
-        chipTray.chips.length > 0
-      )
-        return;
-      setInput(prompt);
-      inputRef.current?.focus();
-    },
-    [
-      usableEmptyAction,
-      draft,
-      composerPickerOpen,
-      chipTray.chips.length,
-      setInput,
-      inputRef,
-    ]
-  );
   const shouldReservePickerClearance = showBottomComposer && composerPickerOpen;
   const messageViewportPaddingBottom = shouldReservePickerClearance
     ? CHAT_PICKER_THREAD_CLEARANCE
@@ -992,9 +889,6 @@ export function JovieChat({
                       showEmptyGreeting ? (
                         <ChatEmptyStateGreeting
                           firstName={chatEmptyStateFirstName}
-                          action={usableEmptyAction}
-                          isLoading={!emptyNextStep}
-                          onSelectAction={handleEmptyNextStep}
                         />
                       ) : undefined
                     }

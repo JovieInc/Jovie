@@ -15,22 +15,21 @@ describe('SettingsSection', () => {
     mockMarkNavigationDestinationReady.mockReset();
   });
 
-  it('renders the heading and description', () => {
+  it('renders the page title without a description line', () => {
     render(
-      <SettingsSection
-        id='profile'
-        title='Artist Profile'
-        description='Photo, display name, and username.'
-      >
+      <SettingsSection id='profile' title='Artist Profile'>
         <div>Content</div>
       </SettingsSection>
     );
 
-    const heading = screen.getByRole('heading', { name: 'Artist Profile' });
+    const heading = screen.getByRole('heading', {
+      level: 1,
+      name: 'Artist Profile',
+    });
     expect(heading).toBeInTheDocument();
     expect(
-      screen.getByText('Photo, display name, and username.')
-    ).toBeVisible();
+      screen.queryByText('Photo, display name, and username.')
+    ).not.toBeInTheDocument();
     expect(mockMarkNavigationDestinationReady).toHaveBeenCalledExactlyOnceWith(
       'settings'
     );

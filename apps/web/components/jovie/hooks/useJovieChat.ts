@@ -142,7 +142,10 @@ interface SubmitChatMessageOptions {
   readonly interrupt?: boolean;
   /** Resend an unrecorded Summer turn under its original id (idempotent replay). */
   readonly clientTurnId?: string;
-  /** A retry can submit a failed message while a newer draft stays in the composer. */
+  /**
+   * Keep the composer as it is: a retry under a newer draft, or a quick
+   * action tapped while the person has typed text or staged chips.
+   */
   readonly preserveComposerDraft?: boolean;
 }
 
@@ -1538,9 +1541,14 @@ export function useJovieChatController({
       files,
       source,
       toolIntent,
+      preserveComposerDraft,
     }: { text: string; files?: FileUIPart[] } & SubmitChatMessageOptions) => {
-      const submitted = await doSubmit(text, files, { source, toolIntent });
-      if (submitted) {
+      const submitted = await doSubmit(text, files, {
+        source,
+        toolIntent,
+        preserveComposerDraft,
+      });
+      if (submitted && !preserveComposerDraft) {
         chipTray.clear();
       }
     },
@@ -1592,6 +1600,8 @@ export function useJovieChatController({
         text: prompt,
         source: 'quick_action',
         toolIntent: inferToolIntentFromPrompt(prompt),
+        // A tapped quick action never discards what the person typed or staged.
+        preserveComposerDraft: true,
       });
     },
     [rateLimitedSubmitter]

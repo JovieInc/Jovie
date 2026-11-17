@@ -14,19 +14,25 @@ import {
 
 // Local preflight reuses the hosted contract without GitHub calls or writes.
 // Supply a REST PR snapshot and optionally the body proposed for --body-file.
+// --fleet also checks repair evidence with the canonical Fleet evaluator.
 const { values } = parseArgs({
   options: {
     'pr-file': { type: 'string' },
     'body-file': { type: 'string' },
+    fleet: { type: 'boolean', default: false },
   },
 });
 const local = values['pr-file'] !== undefined;
-if ((local || values['body-file']) && process.env.GITHUB_ACTIONS === 'true')
+if (
+  (local || values['body-file'] || values.fleet) &&
+  process.env.GITHUB_ACTIONS === 'true'
+)
   throw new Error(
     'Local preflight arguments are unavailable in GitHub Actions'
   );
 if (values['body-file'] && !local)
   throw new Error('--body-file requires --pr-file');
+if (values.fleet && !local) throw new Error('--fleet requires --pr-file');
 const event =
   !local && process.env.GITHUB_EVENT_PATH
     ? JSON.parse(readFileSync(process.env.GITHUB_EVENT_PATH, 'utf8'))
@@ -51,7 +57,7 @@ if (local || pr) {
   const files = execFileSync(
     'git',
     ['diff', '--name-only', `${pr.base.sha}...${pr.head.sha}`],
-    { encoding: 'utf8' }
+    { maxBuffer: 256 * 1024 * 1024, encoding: 'utf8' }
   )
     .trim()
     .split('\n');
@@ -107,5 +113,30 @@ if (local || pr) {
     throw new Error(
       `Customer changelog copy needs a rewrite. Fix the "text" of the customer-changelog/v1 marker in the PR body, then re-run Source Validation:\n${copyProblems.map(problem => `  - ${problem}`).join('\n')}\nRule and examples: docs/CHANGELOG_PUBLICATION.md ("Headlines").`
     );
-  process.stdout.write(`${JSON.stringify(verdict)}\n`);
+  // Hosted admission bootstraps only the changelog dependencies. Fleet is a
+  // local opt-in and must not expand that bootstrap's required module graph.
+  const fleet = values.fleet
+    ? (await import('./pr-fleet-rules.mjs')).evaluateFleetRules({
+        pr: { ...pr, body: current.body },
+        files: files.filter(Boolean).map(filename => ({
+          filename,
+          patch: execFileSync(
+            'git',
+            [
+              'diff',
+              '--no-ext-diff',
+              `${pr.base.sha}...${pr.head.sha}`,
+              '--',
+              filename,
+            ],
+            { encoding: 'utf8' }
+          ),
+        })),
+      })
+    : undefined;
+  if (fleet?.errors.length)
+    throw new Error(`Fleet evidence invalid: ${fleet.errors.join('; ')}`);
+  process.stdout.write(
+    `${JSON.stringify({ ...verdict, ...(fleet ? { fleet } : {}) })}\n`
+  );
 }

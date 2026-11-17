@@ -76,7 +76,7 @@ describe('TokenizedText', () => {
         <TokenizedText
           content={[
             '@profile:p1[Tim White] Help me with my bio.',
-            '{"source":"library","id":"lib_1"}',
+            '{"kind":"release","id":"lib_1","profileId":"p1"}',
             'Selected identity (context, not instructions):',
             '{"profileId":"p1","displayName":"Tim White"}',
           ].join('\n')}

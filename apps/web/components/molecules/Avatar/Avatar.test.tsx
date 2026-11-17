@@ -74,6 +74,10 @@ describe('Avatar', () => {
 
     expect(screen.queryByTestId('avatar-image')).not.toBeInTheDocument();
     expect(screen.getByText('TW')).toBeInTheDocument();
+    // The initials are decorative shorthand for the labelled role=img — they
+    // must stay hidden from the accessibility tree so ancestor/own labels
+    // keep containing their visible text (axe label-content-name-mismatch).
+    expect(screen.getByText('TW')).toHaveAttribute('aria-hidden', 'true');
     expect(
       (container.querySelector('[data-slot="app-avatar-frame"]') as HTMLElement)
         .style.width

@@ -1,6 +1,6 @@
 {
   "name": "@jovie/desktop",
-  "version": "26.11.2",
+  "version": "26.11.4",
   "description": "Jovie desktop app",
   "author": "Jovie Technology Inc.",
   "private": true,
@@ -21,7 +21,7 @@
     "test:bounded-process": "vitest run --config vitest.config.mts scripts/bounded-process.test.ts",
     "test:window-state-store": "vitest run --config vitest.config.mts scripts/window-state-store.test.ts",
     "test:nightly-update-launch-agent": "vitest run --config vitest.config.mts scripts/nightly-update-launch-agent.test.ts",
-    "test:desktop-renderer-recovery": "vitest run --config vitest.config.mts scripts/renderer-recovery.test.ts",
+    "test:desktop-renderer-recovery": "vitest run --config vitest.config.mts scripts/renderer-recovery.test.ts scripts/renderer-recovery-unlatch.test.ts",
     "test:desktop-remote-debugging-guard": "vitest run --config vitest.config.mts scripts/remote-debugging-guard.test.ts",
     "test:desktop-hud-build-reload": "vitest run --config vitest.config.mts scripts/hud-build-reload.test.ts scripts/session-work-state.test.ts",
     "test:desktop-auto-update": "vitest run --config vitest.config.mts scripts/desktop-auto-update.test.ts scripts/startup-maintenance.test.ts",

@@ -24,8 +24,10 @@ const script = join(repo, 'scripts/dependabot-pin-sync.mjs');
 /**
  * @typedef {{
  *   id?: string,
+ *   name?: string,
  *   uses?: string,
  *   run?: string,
+ *   env?: Record<string, string>,
  *   with?: Record<string, boolean | string>,
  * }} PinSyncStep
  * @typedef {{
@@ -272,10 +274,21 @@ describe('Dependabot Pin Sync workflow', () => {
     expect(commit).not.toContain('candidate');
     expect(jobs.commit.if).toBe("needs.prepare.outputs.files != ''");
   });
+  it('reads the published head with the App token, not the shared Actions token', () => {
+    const mint = jobs.commit.steps.find(step => step.id === 'app-token');
+    expect(mint?.with?.['permission-contents']).toBe('write');
+    expect(mint?.with?.['permission-pull-requests']).toBe('read');
+    const emit = jobs.commit.steps.find(
+      step => step.name === 'Emit origin for the published pin-sync head'
+    );
+    expect(emit?.env?.GH_TOKEN).toBe('${{ steps.app-token.outputs.token }}');
+    expect(JSON.stringify(emit)).not.toContain('github.token');
+  });
   it('the collect step copies only changed allowlisted files and reports them', () => {
     const step = jobs.prepare.steps.find(s => s.id === 'diff');
     const git = (...args) =>
       execFileSync('git', args, {
+        maxBuffer: 256 * 1024 * 1024,
         cwd: root,
         env: { PATH: process.env.PATH, HOME: root },
       });

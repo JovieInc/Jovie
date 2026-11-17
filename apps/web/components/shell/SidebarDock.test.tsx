@@ -183,7 +183,9 @@ describe('SidebarDock', () => {
       );
       expect(cards(container)).toEqual(['update']);
       const card = container.querySelector('[data-dock-card="update"]');
-      expect(card?.className).toMatch(/\bmin-h-9\b/);
+      // The panel's fixed 32px row holds the control while its chunk loads.
+      expect(card?.querySelector('[data-dock-update-slot]')).toHaveClass('h-8');
+      expect(card?.children).toHaveLength(1);
       // The control is the card's only button: no collapse, no dismiss.
       expect(screen.getAllByRole('button')).toEqual([
         screen.getByRole('button', { name: 'Slotted control' }),

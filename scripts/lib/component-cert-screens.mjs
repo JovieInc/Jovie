@@ -138,6 +138,7 @@ export function readBaseScreens(root, rel, ref) {
   if (!ref) return null;
   const git = args =>
     execFileSync('git', args, {
+      maxBuffer: 256 * 1024 * 1024,
       cwd: root,
       encoding: 'utf8',
       stdio: ['ignore', 'pipe', 'ignore'],

@@ -1,8 +1,7 @@
 #!/usr/bin/env node
-// Files one bounded "strengthen test" Linear issue per module that has real
-// survivors, from the task JSON the sweep wrote. Kept separate from the sweep
-// so the only step that sees LINEAR_API_KEY never runs Stryker or repo tests.
-import { readdirSync, readFileSync } from 'node:fs';
+// Prepares reviewed survivor drafts from exact sweep evidence. The CLI never
+// posts; the legacy explicit intake API retains its shared-quota stop behavior.
+import { readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
@@ -14,8 +13,7 @@ import {
 import { buildSurvivorIssue } from './lib/mutation-sweep.mjs';
 
 /**
- * File one survivor issue for a task. Exported so tests (and the sweep's own
- * in-process filing) can drive the exact CLI behavior with a fake upsert.
+ * Build canonical per-module outbound text without posting it.
  * @param {{ file: string, survivors: unknown[], score?: number|null, valid?: number, tests?: string[], sha?: string }} task
  * @param {{ runUrl?: string | null }} [options]
  */
@@ -37,6 +35,9 @@ export function buildSurvivorTaskIssue(task, { runUrl = null } = {}) {
  * The filing loop. Stops at the first `linear_rate_limited` result: filing
  * more survivors cannot succeed, and every retry starves the Fleet Gate /
  * Triage consumers of the same shared credential for longer (JOV-12500).
+ * `filed` counts confirmed successful upserts. `unfiled` counts unsuccessful
+ * or dry-run task files plus the raw unattempted filename tail after quota;
+ * neither the task directory nor these counters prove missing Linear issues.
  * @param {{ tasksDir: string, runUrl?: string | null, upsert?: typeof upsertLinearIssueByTitleFingerprint, enabled?: boolean }} options
  * @returns {Promise<{ filed: number, unfiled: number }>}
  */
@@ -66,6 +67,7 @@ export async function fileSurvivorIssues(options) {
         key: 'mutation-survivors',
         fingerprint: issue.fingerprint,
       });
+      unfiled += 1;
       continue;
     }
     const res = await upsert({
@@ -80,16 +82,18 @@ export async function fileSurvivorIssues(options) {
       `Linear survivors issue (${task.file}): ${res.action ?? 'failed'} ${res.url ?? res.reason ?? ''}`
     );
     if (res.reason === 'linear_rate_limited') {
-      unfiled = names.length - index - 1;
+      const remainingFiles = names.length - index;
+      unfiled += remainingFiles;
       console.log(
-        `Linear shared credential is rate-limited; stopping filing so the Fleet/Triage consumers keep their budget (${unfiled} task file(s) left unfiled, resets at ${res.resetAt ?? 'an unknown time'}).`
+        `Linear shared credential is rate-limited; stopping filing so the Fleet/Triage consumers keep their budget (${remainingFiles} task filename(s), including the current rate-limited file and unattempted tail; resets at ${res.resetAt ?? 'an unknown time'}).`
       );
       break;
     }
-    filed += 1;
+    if (res.ok === true) filed += 1;
+    else unfiled += 1;
   }
   console.log(
-    `${filed} survivor issue(s) filed from ${names.length} task file(s).`
+    `${filed} survivor issue upsert(s) confirmed from ${names.length} task JSON filename(s); ${unfiled} task filename(s) not completed this pass (not a missing Linear issue count).`
   );
   return { filed, unfiled };
 }
@@ -99,11 +103,28 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
     options: {
       tasks: { type: 'string' },
       'run-url': { type: 'string' },
+      drafts: { type: 'string' },
+      state: { type: 'string' },
+      'existing-issues': { type: 'string' },
     },
   });
   if (!values.tasks) throw new Error('--tasks <dir> is required');
-  await fileSurvivorIssues({
-    tasksDir: values.tasks,
-    runUrl: values['run-url'] ?? null,
-  });
+  if (values.drafts) {
+    if (!values.state)
+      throw new Error('--state is required for reviewed survivor drafts');
+    const { prepareSurvivorDrafts } = await import(
+      './lib/mutation-survivor-draft-inputs.mjs'
+    );
+    const drafts = prepareSurvivorDrafts({
+      tasksDir: values.tasks,
+      statePath: values.state,
+      existingIssuesPath: values['existing-issues'],
+    });
+    writeFileSync(values.drafts, `${JSON.stringify(drafts, null, 2)}\n`);
+  } else
+    await fileSurvivorIssues({
+      tasksDir: values.tasks,
+      runUrl: values['run-url'] ?? null,
+      enabled: false, // CLI output is a preview; exact outbound text requires approval.
+    });
 }
