@@ -1571,6 +1571,17 @@ nodes:
       - workflow_dispatch
     terminalReceipt: job:warm
     jobCount: 1
+  - name: Native Typecheck Qualification
+    path: .github/workflows/typecheck-native-qualification.yml
+    active: true
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - workflow_dispatch
+    terminalReceipt: job:qualification
+    jobCount: 1
   - name: UI Story Coverage Audit
     path: .github/workflows/ui-story-coverage-audit.yml
     active: true
@@ -1631,7 +1642,7 @@ nodes:
       - schedule
       - workflow_dispatch
     terminalReceipt: job:report-scheduled-failure
-    jobCount: 3
+    jobCount: 6
   - name: VOC Mine
     path: .github/workflows/voc-mine.yml
     active: true

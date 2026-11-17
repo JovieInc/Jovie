@@ -25,6 +25,8 @@ test.describe('Opportunity Inbox', () => {
       page
         .getByRole('button', { name: 'Needs You', exact: true })
         .or(page.getByRole('heading', { name: 'Make Jovie Yours' }))
+        .or(page.getByRole('heading', { name: 'Plan Your Next Release' }))
+        .first()
     ).toBeVisible();
 
     const feed = page.getByTestId('opportunity-inbox-feed');
@@ -45,12 +47,22 @@ test.describe('Opportunity Inbox', () => {
       await expect(
         emptyState.getByRole('link', { name: 'Start A Chat' })
       ).toHaveAttribute('href', APP_ROUTES.CHAT);
-      await expect(emptyState.getByRole('progressbar')).toBeVisible();
-      const setupLink = emptyState.getByRole('link', {
-        name: /Complete Your Profile/,
-      });
-      await setupLink.focus();
-      await expect(setupLink).toBeFocused();
+      if (
+        (await emptyState.getAttribute('data-home-setup-state')) === 'complete'
+      ) {
+        // JOV-12615: finished setup is a quiet chip, not an open checklist.
+        await expect(emptyState.getByRole('progressbar')).toHaveCount(0);
+        await expect(
+          emptyState.getByRole('button', { name: 'Setup Complete' })
+        ).toBeVisible();
+      } else {
+        await expect(emptyState.getByRole('progressbar')).toBeVisible();
+        const setupLink = emptyState.getByRole('link', {
+          name: /Complete Your Profile/,
+        });
+        await setupLink.focus();
+        await expect(setupLink).toBeFocused();
+      }
     } else if (await emptyState.isVisible()) {
       // A clear queue has nothing to annotate, so no stray Notes line.
       await expect(emptyState).toContainText('Your Inbox Is Clear');

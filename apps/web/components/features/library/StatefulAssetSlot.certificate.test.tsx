@@ -4,6 +4,8 @@ import { describe, expect, it, vi } from 'vitest';
 import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import { StatefulAssetSlot } from './StatefulAssetSlot';
 
+vi.unmock('next/image');
+
 const baseSlot = {
   cardinality: 'single' as const,
   acquireMode: 'file' as const,
@@ -54,6 +56,7 @@ describe('StatefulAssetSlot certificate', () => {
     );
 
     const preview = container.querySelector('img');
+    expect(preview).toHaveAttribute('src', 'https://cdn.example.com/art.jpg');
     expect(preview).toHaveAttribute('width', '32');
     expect(preview).toHaveAttribute('height', '32');
     expect(screen.getByText('3000 by 3000 JPG')).toBeInTheDocument();

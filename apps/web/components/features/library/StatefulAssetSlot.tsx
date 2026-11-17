@@ -164,6 +164,7 @@ export function StatefulAssetSlot({
               alt=''
               width={32}
               height={32}
+              unoptimized
               className='h-8 w-8 object-contain'
             />
           ) : (

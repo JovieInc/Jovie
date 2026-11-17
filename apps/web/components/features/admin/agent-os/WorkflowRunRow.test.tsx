@@ -119,4 +119,12 @@ describe('WorkflowRunRow', () => {
     expect(screen.getByText(LONG_RUN_TITLE)).toBeInTheDocument();
     await expectNoA11yViolations(container);
   });
+
+  it('renders the human-gate badge with the AA status-text token', () => {
+    render(<WorkflowRunRow artifact={buildPendingApprovalArtifact()} />);
+
+    const badge = screen.getByText('Review Required');
+    expect(badge).toHaveClass('text-warning-text');
+    expect(badge).not.toHaveClass('text-warning');
+  });
 });

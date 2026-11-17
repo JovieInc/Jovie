@@ -141,8 +141,13 @@ export function ClaimArtistSearch() {
         />
       </div>
 
-      <div aria-live='polite' className='min-h-6'>
-        {state === 'loading' ? (
+      <div
+        aria-live='polite'
+        aria-busy={state === 'loading'}
+        className='min-h-6'
+      >
+        {/* Keep existing rows in place while the next search loads. */}
+        {state === 'loading' && results.length === 0 ? (
           <p className='text-xs text-tertiary-token'>Searching…</p>
         ) : null}
         {state === 'error' ? (
@@ -156,7 +161,10 @@ export function ClaimArtistSearch() {
           </p>
         ) : null}
         {results.length > 0 ? (
-          <ul className='space-y-2' data-testid='claim-artist-results'>
+          <ul
+            className={`space-y-2 transition-opacity duration-subtle motion-reduce:transition-none ${state === 'loading' ? 'opacity-90' : ''}`}
+            data-testid='claim-artist-results'
+          >
             {results.map(artist => (
               <ArtistRow key={artist.id} artist={artist} />
             ))}

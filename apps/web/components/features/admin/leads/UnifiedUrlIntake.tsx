@@ -10,9 +10,17 @@ import { useQueueLeadUrlsMutation } from '@/lib/queries';
 
 interface UnifiedUrlIntakeProps {
   readonly onSubmitted?: () => void;
+  /** Reports the exact failure message alongside the error toast, so
+   * storybook lanes can assert queue failures (the harness's mock
+   * pathname is a profile route, where FeedbackProvider mounts no
+   * Toaster). */
+  readonly onActionError?: (message: string) => void;
 }
 
-export function UnifiedUrlIntake({ onSubmitted }: UnifiedUrlIntakeProps) {
+export function UnifiedUrlIntake({
+  onSubmitted,
+  onActionError,
+}: UnifiedUrlIntakeProps) {
   const [input, setInput] = useState('');
   const queueUrlsMutation = useQueueLeadUrlsMutation();
 
@@ -35,7 +43,10 @@ export function UnifiedUrlIntake({ onSubmitted }: UnifiedUrlIntakeProps) {
       setInput('');
       onSubmitted?.();
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'URL intake failed');
+      const message =
+        error instanceof Error ? error.message : 'URL intake failed';
+      toast.error(message);
+      onActionError?.(message);
     }
   }
 
@@ -48,6 +59,8 @@ export function UnifiedUrlIntake({ onSubmitted }: UnifiedUrlIntakeProps) {
       />
       <div className='space-y-3 px-(--app-shell-content-padding-x) py-(--app-shell-content-padding-y)'>
         <Textarea
+          // ui-casing-allow: URLs abbreviation
+          aria-label='Lead URLs'
           rows={5}
           value={input}
           onChange={event => setInput(event.target.value)}
