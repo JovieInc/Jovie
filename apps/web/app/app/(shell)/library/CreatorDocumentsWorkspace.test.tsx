@@ -218,12 +218,10 @@ describe('CreatorDocumentsWorkspace', () => {
     render(<CreatorDocumentsWorkspace initialDocuments={[document]} />);
     fireEvent.click(screen.getByRole('button', { name: /A durable idea/ }));
 
-    const registeredPanel = vi
-      .mocked(useRegisterRightPanel)
-      .mock.calls.at(-1)?.[0];
-    expect(registeredPanel).toBeTruthy();
-    if (!registeredPanel) throw new Error('Expected a document panel');
-    render(registeredPanel);
+    const panel = vi.mocked(useRegisterRightPanel).mock.lastCall?.[0];
+    expect(panel).toBeTruthy();
+    if (!panel) throw new Error('Expected a document panel');
+    render(panel);
     expect(screen.getByLabelText('Document Title')).toBeInTheDocument();
   });
 
