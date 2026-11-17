@@ -109,8 +109,9 @@ export const SOURCE_VALIDATION_GUARDS = Object.freeze([
   {
     id: 'duplicate-literals',
     name: 'no copied owner values (prices, names, retention, limits)',
-    command: 'node scripts/invariants/duplicate-literals.mjs',
-    when: /^apps\/(?:web|docs)\/(?:app|components|data|content|lib)\//,
+    command:
+      'node scripts/invariants/duplicate-literals.mjs && node scripts/invariants/offer-claims/check.mjs && node scripts/invariants/validate.mjs',
+    when: /^apps\/(?:web|docs)\/(?:app|components|data|content|lib)\/|^scripts\/invariants\/offer-claims\//,
     covers: ['scripts/invariants/duplicate-literals.mjs'],
   },
   {
@@ -291,10 +292,27 @@ export const coveredBy = atom =>
   SOURCE_VALIDATION_GUARDS.some(g => g.covers.some(c => atom.includes(c))) ||
   NOT_LOCAL.some(n => atom.includes(n.match));
 
-/** Guards whose trigger matches the changed paths, `{base}` expanded. */
 /**
  * Guards for these changed paths: Source Validation's, then the pre-push-only
  * guards for checks PR CI leaves to the merge group (preflight-local-guards).
+ * `{base}` in a command expands to the base branch name.
+ *
+ * Local guards have no `covers` list. The return type keeps that field optional
+ * so a caller can read it on a Source Validation guard without a cast.
+ *
+ * @param {readonly string[]} paths
+ * @param {string} [base]
+ * @returns {Array<{
+ *   id: string,
+ *   name: string,
+ *   command: string,
+ *   when: RegExp | ((p: string) => boolean),
+ *   covers?: readonly string[],
+ *   heavy?: boolean,
+ *   workflow?: string,
+ *   phase?: number,
+ *   timeoutMs?: number,
+ * }>}
  */
 export function selectManifestGuards(paths, base = 'main') {
   // Supplemental local guards may refine a CI guard (for example, include

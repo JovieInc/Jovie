@@ -8,8 +8,9 @@ import subprocess
 
 # Inherited design identities removed on main need the existing one-sync-per-head
 # route before source repair. Accept the failed Vitest summary or the CLI's
-# failure plus a typed identity, never a passing title or fixture API error.
+# failure plus a typed identity or an error with zero baseline growth.
 DESIGN_SOURCE_CLI = re.compile(
+    r"(?:AssertionError: |##\[error\])\[design-system-source-ratchet\] FAIL — \d+ identities \(0 new / baseline \d+\)|"
     r"\bFAIL\b[^\n]*lib/__tests__/design-system-source-ratchet\.test\.mjs[^\n]*"
     r">[^\n]*exits zero from the CLI on the live tree|"
     r"\[design-system-source-ratchet\] FAIL[^\n]*\n[^\n]*new design identity: "

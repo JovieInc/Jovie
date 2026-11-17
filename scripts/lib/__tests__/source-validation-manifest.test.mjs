@@ -24,6 +24,31 @@ describe('Source Validation manifest parity', () => {
     expect(ids).toEqual([...new Set(ids)]);
   });
 
+  it('checks offer prose when a new billing helper has no direct guard import', () => {
+    const guard = selectManifestGuards([
+      'apps/web/lib/billing/price-versions.ts',
+    ]).find(g => g.id === 'duplicate-literals');
+    expect(guard?.command).toContain(
+      'node scripts/invariants/offer-claims/check.mjs'
+    );
+    expect(guard?.command).toContain('node scripts/invariants/validate.mjs');
+  });
+
+  it.each([
+    'apps/web/components/features/pricing/LockedPlanPrice.tsx',
+    'apps/web/components/features/pricing/LockedPlanPrice.stories.tsx',
+    'packages/ui/atoms/card.stories.ts',
+    'packages/ui/atoms/card.states.stories.tsx',
+  ])('runs the unchanged certificate gate for %s', path => {
+    const guard = selectManifestGuards([path]).find(
+      g => g.id === 'component-certificate'
+    );
+    expect(guard?.command).toBe(
+      'pnpm component-certificate:gate --screens-base origin/main'
+    );
+    expect(guard?.covers).toContain('pnpm component-certificate:gate');
+  });
+
   it('runs overlapping local and CI guards once, preserving the worktree-aware command', () => {
     const guards = selectManifestGuards(
       ['apps/web/app/[username]/tip/thank-you/page.tsx'],
