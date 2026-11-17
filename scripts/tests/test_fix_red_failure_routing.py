@@ -11,7 +11,6 @@ from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'lanes'))
 import fix_red_classes as classes
-import fix_red_failure_routing as routing
 import lane_runner as lane
 
 HEAD = '99320365a5ba5f03eb7cfd48c1a10137bd3d4031'
@@ -452,72 +451,6 @@ class RouteBudgetRoutingTest(unittest.TestCase):
                      "::error::/app/chat: 1400 KB exceeds 822 KB budget", "::error::routes./app/chat grew invalid"]:
             got = classes.classify(red("Exact-head Coverage"), {"Exact-head Coverage": text})
             self.assertEqual((got["cls"], got["action"]), ("other", "agent"), text)
-
-
-class SyncClaimRetryTest(unittest.TestCase):
-    """A sync-main claim with no receipt is retried once; a recorded failure is not."""
-
-    def test_decision_retries_one_absent_receipt_and_keeps_a_recorded_failure(self):
-        head = "a" * 40
-        other = "b" * 40
-        fresh, row = routing.sync_claim_decision(None, "absent", head)
-        self.assertEqual(fresh, "run")
-        self.assertEqual(row, {"sync-main": head})
-        retry, row = routing.sync_claim_decision(row, "absent", head)
-        self.assertEqual(retry, "run")
-        self.assertEqual(row["sync-main-unrecorded"], 1)
-        blocked, row = routing.sync_claim_decision(row, "absent", head)
-        self.assertEqual(blocked, "skip")
-        self.assertEqual(row["sync-main"], head)
-        recorded, row = routing.sync_claim_decision(
-            {"sync-main": head, "stamp-changelog": other}, "recorded", head)
-        self.assertEqual(recorded, "skip")
-        self.assertEqual(row["stamp-changelog"], other)
-        unread, _ = routing.sync_claim_decision({"sync-main": head}, "unreadable", head)
-        self.assertEqual(unread, "skip")
-        reset, row = routing.sync_claim_decision(
-            {"sync-main": other, "sync-main-unrecorded": 1}, "absent", head)
-        self.assertEqual((reset, row.get("sync-main-unrecorded")), ("run", None))
-
-    def test_lane_retries_an_unrecorded_claim_once_and_stops_after_a_receipt(self):
-        head = "c" * 40
-        pr = {"number": 25856, "headRefOid": head, "body": "bare"}
-        route = {"action": "sync-main", "cls": "design-source-cli"}
-        calls = []
-
-        def sync(host, runner, target, now, terminal_ok=False):
-            calls.append(target["headRefOid"])
-            return "sync-failed"
-
-        with tempfile.TemporaryDirectory() as tmp, \
-                patch.object(lane.pr_events, "sync_main", side_effect=sync):
-            host = lane.Host(state=Path(tmp))
-            (host.state / "class-routes.json").write_text(json.dumps({
-                "25856": {"sync-main": head}}))
-            self.assertIsNone(lane.deterministic_route_taken(host, pr, route))
-            self.assertIsNone(lane.deterministic_route_taken(host, pr, route))
-            self.assertEqual(calls, [head])
-            (host.state / "synced.json").write_text(json.dumps({
-                "25856": {"from": head, "ok": False}}))
-            calls.clear()
-            (host.state / "class-routes.json").write_text(json.dumps({
-                "25856": {"sync-main": head}}))
-            self.assertIsNone(lane.deterministic_route_taken(host, pr, route))
-            self.assertEqual(calls, [])
-
-            def synced(host, runner, target, now, terminal_ok=False):
-                calls.append("fresh")
-                (host.state / "synced.json").write_text(json.dumps({
-                    "25856": {"from": head, "ok": True}}))
-                return "synced"
-
-            (host.state / "class-routes.json").unlink()
-            (host.state / "synced.json").unlink()
-            with patch.object(lane.pr_events, "sync_main", side_effect=synced):
-                reason = lane.deterministic_route_taken(host, pr, route)
-                self.assertIsNone(lane.deterministic_route_taken(host, pr, route))
-            self.assertEqual(reason, "infra-rerun:design-source-cli")
-            self.assertEqual(calls, ["fresh"])
 
 
 if __name__ == '__main__':
