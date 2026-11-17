@@ -1,33 +1,18 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
-import { expect, fn, waitFor, within } from 'storybook/test';
-import { createSignedInApiMock } from '@/.storybook/signed-in-session';
+import { expect, waitFor, within } from 'storybook/test';
 import { JovieAuthValuesProvider } from '@/hooks/useJovieAuth';
+import {
+  type FixtureWindow,
+  installPricingStoryFixture,
+} from '@/tests/fixtures/billing/pricing-story';
 import { LockedPlanPrice } from './LockedPlanPrice';
 
-type FixtureWindow = Window & {
-  __jovieApiMock?: ReturnType<typeof createSignedInApiMock>;
-};
 const meta = {
   title: 'Features/Pricing/LockedPlanPrice',
   component: LockedPlanPrice,
   parameters: { layout: 'padded' },
   args: { price: '$12', cadence: '/mo' },
-  beforeEach: ({ parameters }) => {
-    const target = window as FixtureWindow;
-    const previous = target.__jovieApiMock;
-    const signedIn = createSignedInApiMock();
-    target.__jovieApiMock = fn(request =>
-      request.url.pathname === '/api/billing/price-lock'
-        ? Response.json(
-            { priceLock: null },
-            { status: parameters.status ?? 200 }
-          )
-        : signedIn(request)
-    );
-    return () => {
-      target.__jovieApiMock = previous;
-    };
-  },
+  beforeEach: ({ parameters }) => installPricingStoryFixture(parameters.status),
   decorators: [
     (Story, { parameters }) =>
       parameters.signedIn ? (
