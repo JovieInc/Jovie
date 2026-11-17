@@ -189,10 +189,12 @@ describe('wall-clock-test-guard', () => {
   it('skips the elapsed scan in a scripts-only checkout with no typescript', async () => {
     const errors = [];
     const cwd = mkdtempSync(join(tmpdir(), 'wall-clock-source-'));
-    const missing = new Error(
-      "Cannot find module 'typescript'\nRequire stack:\n- scripts/lib/wall-clock-assertions.mjs"
+    const missing = Object.assign(
+      new Error(
+        "Cannot find module 'typescript'\nRequire stack:\n- scripts/lib/wall-clock-assertions.mjs"
+      ),
+      { code: 'MODULE_NOT_FOUND' }
     );
-    missing.code = 'MODULE_NOT_FOUND';
     try {
       const code = await main(['--check'], {
         cwd,
@@ -212,8 +214,10 @@ describe('wall-clock-test-guard', () => {
   it('fails closed when an installed checkout cannot load typescript', async () => {
     const cwd = mkdtempSync(join(tmpdir(), 'wall-clock-installed-'));
     mkdirSync(join(cwd, 'node_modules'));
-    const missing = new Error("Cannot find package 'typescript'");
-    missing.code = 'ERR_MODULE_NOT_FOUND';
+    const missing = Object.assign(
+      new Error("Cannot find package 'typescript'"),
+      { code: 'ERR_MODULE_NOT_FOUND' }
+    );
     try {
       await expect(
         main(['--check'], {
