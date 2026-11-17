@@ -41,6 +41,7 @@ import { baseRefCandidates, resolveBaseRef } from './lib/git-base-ref.mjs';
 import {
   companionChecklist,
   explainShipGate,
+  guardScanScript,
   lintPrBody,
   PR_BODY_SKELETON,
   parseMergeConflicts,
@@ -456,7 +457,9 @@ export async function privateDataCheck(cwd, env, mergeBase) {
       : path.join(homedir(), '.cache');
   const cache = path.join(cacheRoot, 'jovie-preflight');
   mkdirSync(cache, { recursive: true });
-  const file = path.join(cache, `private-data-${m[2]}.py`);
+  // New name: caches written before JOV-12869 hold the wrong (base-fetch)
+  // block under the old key, so they must not be reused.
+  const file = path.join(cache, `private-data-scan-${m[2]}.py`);
   if (!existsSync(file)) {
     const r = ghClient(cwd, [
       'api',
@@ -467,12 +470,10 @@ export async function privateDataCheck(cwd, env, mergeBase) {
     if (r.status !== 0)
       return { skip: 'could not fetch the pinned guard (gh)' };
     const yaml = Buffer.from(r.stdout.trim(), 'base64').toString('utf8');
-    const py = yaml.match(/python3 - <<'PY'\n([\s\S]*?)\n\s*PY\n/);
-    if (!py) return { skip: 'guard script not found in pinned workflow' };
-    const lines = py[1].split('\n');
-    const indent = lines[0].match(/^\s*/)[0].length;
+    const picked = guardScanScript(yaml);
+    if (picked.fail) return { code: 1, out: picked.fail, ms: 0 };
     const { writeFileSync } = await import('node:fs');
-    writeFileSync(file, lines.map(l => l.slice(indent)).join('\n'));
+    writeFileSync(file, picked.script);
   }
   const w = job.with ?? {};
   const head = git(cwd, ['rev-parse', 'HEAD']);
