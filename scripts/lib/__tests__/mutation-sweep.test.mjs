@@ -361,6 +361,44 @@ describe('baseline shards', () => {
     ).toEqual({ 'lib/a.ts': 60, 'lib/b.ts': 70, 'lib/c.ts': 80 });
   });
 
+  it('lets a re-arm beat an older baseline score but not a newer one', () => {
+    const scored = at => ({ at, score: 70, status: 'scored' });
+    const rearmed = {
+      ...scored('2026-11-01T00:00:00Z'),
+      at: new Date(0).toISOString(),
+      rearmedAt: '2026-11-05T00:00:00Z',
+    };
+    const stateOf = entry => ({
+      ...emptyState(),
+      modules: { 'lib/a.ts': entry },
+    });
+    const old = stateOf(scored('2026-11-03T00:00:00Z'));
+    const current = stateOf(rearmed);
+    const newer = stateOf(scored('2026-11-06T00:00:00Z'));
+    for (const states of [
+      [current, old, old],
+      [old, current, old],
+      [old, old, current],
+    ]) {
+      const merged = mergeStates(...states);
+      expect(merged.modules['lib/a.ts']).toBe(rearmed);
+      expect(mergeStates(merged, old).modules['lib/a.ts']).toBe(rearmed);
+      for (const observations of [
+        [merged, newer],
+        [newer, merged],
+      ]) {
+        expect(mergeStates(...observations).modules['lib/a.ts']).toBe(
+          newer.modules['lib/a.ts']
+        );
+      }
+    }
+    const tiedScore = stateOf(scored(rearmed.rearmedAt));
+    expect(mergeStates(current, tiedScore).modules['lib/a.ts']).toBe(rearmed);
+    expect(mergeStates(tiedScore, current).modules['lib/a.ts']).toBe(
+      tiedScore.modules['lib/a.ts']
+    );
+  });
+
   it('keeps top-level fields from the first state that has them', () => {
     const merged = mergeStates(
       { ...emptyState(), modelFingerprint: 'f1', modelIds: ['m1'] },
