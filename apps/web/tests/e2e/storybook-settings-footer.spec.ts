@@ -8,9 +8,30 @@ for (const reducedMotion of ['no-preference', 'reduce'] as const) {
   }) => {
     await page.emulateMedia({ reducedMotion });
     await page.addInitScript(() => {
-      (
-        window as Window & { __settingsMatchMedia?: typeof window.matchMedia }
-      ).__settingsMatchMedia = window.matchMedia.bind(window);
+      // Install before mount so useReducedMotion and CSS see the same mode.
+      Object.defineProperty(window, 'matchMedia', {
+        configurable: false,
+        writable: false,
+        value: window.matchMedia.bind(window),
+      });
+      const phases = window as Window & { __settingsRailPhases?: string[] };
+      phases.__settingsRailPhases = [];
+      new MutationObserver(records => {
+        document
+          .querySelectorAll('[data-jovie-storybook-fixtures]')
+          .forEach(node => node.remove());
+        for (const record of records) {
+          if (record.target instanceof HTMLElement) {
+            const phase = record.target.dataset.railPhase;
+            if (phase) phases.__settingsRailPhases?.push(phase);
+          }
+        }
+      }).observe(document, {
+        childList: true,
+        subtree: true,
+        attributes: true,
+        attributeFilter: ['data-rail-phase'],
+      });
     });
     await page.goto(
       '/iframe.html?id=organisms-unifiedsidebar--settings&viewMode=story',
@@ -20,15 +41,6 @@ for (const reducedMotion of ['no-preference', 'reduce'] as const) {
       name: 'settings navigation',
     });
     await expect(settings).toBeVisible({ timeout: 60_000 });
-    // Exercise the product's CSS motion and actual media query. Storybook's
-    // snapshot fixture otherwise forces reduced motion in both scenarios.
-    await page.evaluate(() => {
-      document.querySelector('[data-jovie-storybook-fixtures]')?.remove();
-      const original = (
-        window as Window & { __settingsMatchMedia?: typeof window.matchMedia }
-      ).__settingsMatchMedia;
-      if (original) window.matchMedia = original;
-    });
     await expect
       .poll(() =>
         page.evaluate(
@@ -68,6 +80,18 @@ for (const reducedMotion of ['no-preference', 'reduce'] as const) {
       await expect(
         page.getByRole('link', { name: /^Public Profile/ })
       ).toBeVisible();
+    }
+    const phases = await page.evaluate(
+      () =>
+        (window as Window & { __settingsRailPhases?: string[] })
+          .__settingsRailPhases ?? []
+    );
+    if (reducedMotion === 'no-preference') {
+      expect(phases).toContain('closing');
+      expect(phases).toContain('opening');
+    } else {
+      expect(phases).not.toContain('closing');
+      expect(phases).not.toContain('opening');
     }
     // Record the real Better Auth client's local sign-out request and fulfill it
     // through the preview's documented API mock, then observe its hard navigation.

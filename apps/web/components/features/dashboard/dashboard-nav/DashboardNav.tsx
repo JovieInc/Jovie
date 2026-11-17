@@ -427,7 +427,7 @@ export function DashboardNav({
   // Memoize renderSection to prevent creating new functions on every render
   const renderSection = useCallback(
     (items: readonly NavItem[]) => (
-      <SidebarMenu className='gap-1'>
+      <SidebarMenu className='gap-1 lg:gap-px'>
         {items.map((item, index) => renderNavItem(item, index))}
       </SidebarMenu>
     ),
@@ -458,16 +458,16 @@ export function DashboardNav({
             </SidebarCollapsibleGroup>
           </>
         ) : (
-          <SidebarGroup className='p-0'>
+          <SidebarGroup className='p-0 lg:pt-1'>
             {newChatOwnsRow ? (
-              // Full 44px touch target; the row has free space around it.
+              // Keep creation on the shared navigation row and icon column.
               <div data-nav-section='create' className='[&_a]:after:-inset-y-2'>
                 {renderSection([NEW_CHAT_ROW_ITEM])}
               </div>
             ) : (
               commandSlot
             )}
-            <SidebarGroupContent className='pb-2 pt-5'>
+            <SidebarGroupContent className='pb-2 pt-5 lg:pt-px'>
               {navSections.map(section => (
                 <div key={section.key} data-nav-section={section.key}>
                   {renderSection(section.items)}

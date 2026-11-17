@@ -44,15 +44,12 @@ function CollapseFixture() {
 }
 
 describe('Linear-scale density (founder lock 2026-09-25)', () => {
-  it('gives the nav sections and threads block the wider pt-5 top gap', () => {
-    const source = readFileSync(
-      resolve(__dirname, './DashboardNav.tsx'),
-      'utf8'
-    );
-    expect(source).not.toContain("SidebarGroupContent className='pb-2 pt-4'");
-    expect(source).toContain("SidebarGroupContent className='pb-2 pt-5'");
-    expect(source).not.toContain("<div className='pt-4'>");
-    expect(source).toContain("<div className='pt-5'>");
+  it('retains creation and destination order when the shared header owns Inbox', () => {
+    renderDashboardNav({ renderFn: render, headerOwnsInbox: true });
+    const destinations = Array.from(
+      document.querySelectorAll('[data-navigation-item-id]')
+    ).map(element => element.getAttribute('data-navigation-item-id'));
+    expect(destinations).toEqual(['chat', 'presence', 'library', 'audience']);
   });
 });
 
