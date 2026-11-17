@@ -5411,7 +5411,7 @@ class DispatchTest(unittest.TestCase):
                 patch.object(lane, "provider_healthy", return_value=True), \
                 patch.object(lane, "claim_remediation_events", side_effect=RuntimeError("coordinator offline")), \
                 patch.object(lane.pr_events, "tick", return_value={}), \
-                patch.object(lane.reason_lane, "tick", side_effect=RuntimeError("credits unavailable")), \
+                patch.object(lane.reason_lane, "schedule_tick", side_effect=RuntimeError("reason launcher unavailable")), \
                 patch.object(lane.doctor, "run", side_effect=RuntimeError("coordinator offline")), \
                 patch.object(lane, "HOST", "gem"), \
                 patch.dict(os.environ, {"YC_CORPUS_OWNER": "gem"}), \
@@ -5549,7 +5549,7 @@ class DispatchTest(unittest.TestCase):
                     patch.object(lane, "ensure_full_history") as history, \
                     patch.object(lane.subprocess, "Popen") as spawn, \
                     patch.object(lane.pr_events, "tick") as events, \
-                    patch.object(lane.reason_lane, "tick") as reasoning, \
+                    patch.object(lane.reason_lane, "schedule_tick") as reasoning, \
                     patch.object(lane.doctor, "run") as doctor, \
                     patch.object(lane, "sh") as shell:
                 host = lane.Host(state=Path(tmp), repo=Path(tmp))
