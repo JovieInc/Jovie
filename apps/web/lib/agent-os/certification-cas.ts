@@ -338,7 +338,10 @@ export function createCertificationPacketStorage(config: {
     const records: Record<string, MarketingCertificationHotRecord> = {};
     for (const [id, record] of Object.entries(ledger.records)) {
       const { packet: _packet, packetFailure: _failure, ...hot } = record;
-      records[id] = hot;
+      // Keep malformed inline evidence until a valid producer explicitly replaces it.
+      records[id] = isCertificationReviewPacket(_packet)
+        ? hot
+        : { ...hot, packet: _packet };
     }
     const hot = { ...ledger, records };
     assertBudget(JSON.stringify(hot));
@@ -377,8 +380,9 @@ export function createCertificationPacketStorage(config: {
         );
       if (record.packet !== undefined) {
         if (
+          isCertificationReviewPacket(record.packet) &&
           certificationPacketMeaning(record.packet) !==
-          certificationPacketMeaning(config.missingPacket(entry))
+            certificationPacketMeaning(config.missingPacket(entry))
         )
           inlineBacklog.add(id);
         records[id] = { ...record, packet: record.packet };

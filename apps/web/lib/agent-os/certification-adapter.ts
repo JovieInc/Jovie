@@ -1274,6 +1274,7 @@ export class MarketingCertificationStore {
       }
       if (
         !isInitialPlaceholder &&
+        isCertificationReviewPacket(existing.packet) &&
         certificationPacketMeaning(existing.packet) ===
           certificationPacketMeaning(packet)
       ) {

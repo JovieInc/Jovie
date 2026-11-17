@@ -7,13 +7,13 @@ import {
 import type {
   CertificationEvidenceReceipt,
   CertificationEvidenceStatus,
-  CertificationReviewPacket,
+  CertificationReviewPacket as Packet,
 } from '@/lib/agent-os/certification';
 import {
   MarketingCertificationAssuranceError as AssuranceError,
   MARKETING_CERTIFICATION_AUDIT_ARCHIVE_PREFIX as AUDIT_PREFIX,
+  type CertificationRecordBackend as Backend,
   buildMarketingAssuranceProfileDigest,
-  type CertificationRecordBackend,
   evaluateMarketingAssurance,
   MARKETING_CERTIFICATION_HOT_AUDIT_PER_RECORD as HOT_AUDIT_LIMIT,
   type MarketingAssuranceEvidenceBinding,
@@ -21,6 +21,7 @@ import {
   MarketingCertificationPersistenceError as PersistenceError,
   MarketingCertificationRegistryDriftError as RegistryDriftError,
   MARKETING_CERTIFICATION_LEDGER_MAX_BYTES as ROW_BUDGET_BYTES,
+  type MarketingCertificationProjectionRow as Row,
   MARKETING_CERTIFICATION_PACKET_SHARD_PREFIX as SHARD_PREFIX,
   MARKETING_CERTIFICATION_PACKET_SHARD_SCHEMA as SHARD_SCHEMA,
   MARKETING_CERTIFICATION_STORE_KEY as STORE_KEY,
@@ -33,9 +34,7 @@ const REGISTRY = MARKETING_COMPONENT_REGISTRY.filter(
 ).slice(0, 2);
 const [FIRST, SECOND] = REGISTRY;
 const at = (time: string) => `2026-09-04T20:${time}.000Z`;
-function memoryBackend(
-  records = new Map<string, unknown>()
-): CertificationRecordBackend {
+function memoryBackend(records = new Map<string, unknown>()): Backend {
   return {
     async compareAndSet(key, expected, next) {
       if (records.get(key) !== expected) return false;
@@ -53,9 +52,7 @@ function memoryBackend(
   };
 }
 /** Production jsonb reads return decoded objects, retaining string CAS values. */
-function jsonbBackend(
-  records = new Map<string, unknown>()
-): CertificationRecordBackend {
+function jsonbBackend(records = new Map<string, unknown>()): Backend {
   const backend = memoryBackend(records);
   return {
     ...backend,
@@ -144,8 +141,8 @@ function assuranceProfile(
 function packetForProfile(
   entry: MarketingRegistryEntry,
   profile: MarketingAssuranceProfile,
-  overrides: Partial<CertificationReviewPacket> = {}
-): CertificationReviewPacket {
+  overrides: Partial<Packet> = {}
+): Packet {
   const candidate = packet(entry, overrides);
   return {
     ...candidate,
@@ -177,8 +174,8 @@ function ready(
 }
 function packet(
   entry: MarketingRegistryEntry,
-  overrides: Partial<CertificationReviewPacket> = {}
-): CertificationReviewPacket {
+  overrides: Partial<Packet> = {}
+): Packet {
   if (!entry.resolvedSource) throw new Error('source-backed fixture required');
   const mediaId = `${entry.id}-media`;
   const variantId = `${entry.id}-default`;
@@ -242,6 +239,7 @@ function packet(
     ...overrides,
   };
 }
+const digest = (row: Row) => row.admission.decisionEvidenceDigest!;
 function decision(digest: string, id = 'decision-1') {
   return {
     decision: 'approved' as const,
@@ -268,7 +266,7 @@ function approve(
 describe('MarketingCertificationStore', () => {
   it('inspects the exact registry without initializing durable state', async () => {
     const records = new Map<string, unknown>();
-    const backend: CertificationRecordBackend = {
+    const backend: Backend = {
       async get(key) {
         return records.get(key) ?? null;
       },
@@ -318,12 +316,7 @@ describe('MarketingCertificationStore', () => {
     const backend = jsonbBackend(records);
     const original = new Store(backend, REGISTRY.slice(0, 1));
     const first = await original.ingestPacket(packet(FIRST), at('01:00'));
-    await approve(
-      original,
-      FIRST,
-      first.admission.decisionEvidenceDigest!,
-      at('01:01')
-    );
+    await approve(original, FIRST, digest(first), at('01:01'));
     const before = JSON.parse(records.get(STORE_KEY)!);
     const expanded = new Store(backend, REGISTRY);
     const inspected = await expanded.inspectLedger(at('02:00'));
@@ -939,7 +932,7 @@ describe('MarketingCertificationStore', () => {
     const row = await store.ingestPacket(incomplete, at('02:50'));
     expect(row.admission.state).toBe('review_ready');
     await expect(
-      approve(store, entry, row.admission.decisionEvidenceDigest!, at('02:51'))
+      approve(store, entry, digest(row), at('02:51'))
     ).resolves.toMatchObject({
       assurance: {
         blockers: [{ code: 'assurance_receipt_missing' }],
@@ -956,34 +949,16 @@ describe('MarketingCertificationStore', () => {
     const second = await store.ingestPacket(packet(SECOND), at('03:01'));
     const sharedId = 'decision-shared';
     await expect(
-      approve(
-        store,
-        FIRST,
-        first.admission.decisionEvidenceDigest!,
-        at('03:02'),
-        sharedId
-      )
+      approve(store, FIRST, digest(first), at('03:02'), sharedId)
     ).resolves.toMatchObject({ ok: true });
     await expect(
-      approve(
-        store,
-        FIRST,
-        first.admission.decisionEvidenceDigest!,
-        at('03:03'),
-        'decision-2'
-      )
+      approve(store, FIRST, digest(first), at('03:03'), 'decision-2')
     ).resolves.toMatchObject({
       ok: false,
       reason: 'duplicate_founder_decision',
     });
     await expect(
-      approve(
-        store,
-        SECOND,
-        second.admission.decisionEvidenceDigest!,
-        at('03:03'),
-        sharedId
-      )
+      approve(store, SECOND, digest(second), at('03:03'), sharedId)
     ).resolves.toMatchObject({
       ok: false,
       reason: 'duplicate_founder_decision',
@@ -996,7 +971,7 @@ describe('MarketingCertificationStore', () => {
     const basePacket = packet(FIRST);
     const initial = await baseStore.ingestPacket(basePacket, at('04:00'));
     let race = true;
-    const racing: CertificationRecordBackend = {
+    const racing: Backend = {
       ...writable,
       async compareAndSet(key, expected, next, ttl) {
         if (race) {
@@ -1020,7 +995,7 @@ describe('MarketingCertificationStore', () => {
     const result = await new Store(racing, REGISTRY).recordFounderDecision({
       assuranceProfile: FIRST_PROFILE,
       decidedAt: at('04:02'),
-      decision: decision(initial.admission.decisionEvidenceDigest!),
+      decision: decision(digest(initial)),
       subjectId: FIRST.id,
     });
     expect(result).toMatchObject({
@@ -1035,7 +1010,7 @@ describe('MarketingCertificationStore', () => {
     const current = packet(FIRST);
     await store.ingestPacket(current, at('05:00'));
     let race = true;
-    const racing: CertificationRecordBackend = {
+    const racing: Backend = {
       ...writable,
       async compareAndSet(key, expected, next, ttl) {
         if (race) {
@@ -1075,7 +1050,7 @@ describe('MarketingCertificationStore', () => {
     const releaseNewer = deferred();
     const olderAt = at('05:01');
     const newerAt = at('05:02');
-    const racing = (at: string): CertificationRecordBackend => {
+    const racing = (at: string): Backend => {
       let intercepted = false;
       async function write(
         key: string,
@@ -1163,19 +1138,13 @@ describe('MarketingCertificationStore', () => {
       store.ingestPacket({
         ...valid,
         testsCoverage: [{ ...valid.testsCoverage[0], status: 'invented' }],
-      } as unknown as CertificationReviewPacket)
+      } as unknown as Packet)
     ).rejects.toThrow('invalid runtime shape');
+    await expect(approve(store, FIRST, digest(row), 'invalid')).rejects.toThrow(
+      'valid timestamp'
+    );
     await expect(
-      approve(store, FIRST, row.admission.decisionEvidenceDigest!, 'invalid')
-    ).rejects.toThrow('valid timestamp');
-    await expect(
-      approve(
-        store,
-        FIRST,
-        row.admission.decisionEvidenceDigest!,
-        at('05:59'),
-        ''
-      )
+      approve(store, FIRST, digest(row), at('05:59'), '')
     ).rejects.toThrow(/invalid|predates/);
   });
   it('rejects source, identity, unknown, and unresolved input drift', async () => {
@@ -1264,7 +1233,7 @@ describe('MarketingCertificationStore', () => {
     await approve(
       store,
       homepage,
-      admitted.admission.decisionEvidenceDigest!,
+      digest(admitted),
       at('11:01'),
       'homepage-lock'
     );
@@ -1345,12 +1314,7 @@ describe('MarketingCertificationStore', () => {
       const records = new Map<string, unknown>();
       const store = createStore(records);
       const admitted = await store.ingestPacket(packet(FIRST), at('07:00'));
-      await approve(
-        store,
-        FIRST,
-        admitted.admission.decisionEvidenceDigest!,
-        at('07:01')
-      );
+      await approve(store, FIRST, digest(admitted), at('07:01'));
       const ledger = hotLedger(records);
       if (corruption === 'decision')
         ledger.records[FIRST.id].decisions[0].subjectId = SECOND.id;
@@ -1373,12 +1337,7 @@ describe('MarketingCertificationStore', () => {
     const store = createStore();
     const base = packet(FIRST);
     const admitted = await store.ingestPacket(base, at('08:00'));
-    await approve(
-      store,
-      FIRST,
-      admitted.admission.decisionEvidenceDigest!,
-      at('08:01')
-    );
+    await approve(store, FIRST, digest(admitted), at('08:01'));
     const operational = await store.ingestPacket(
       {
         ...base,
@@ -1395,7 +1354,7 @@ describe('MarketingCertificationStore', () => {
     expect(operational.admission.currentDecision?.id).toBe('decision-1');
   });
   it('bounds initialization and update contention', async () => {
-    const neverInitializes: CertificationRecordBackend = {
+    const neverInitializes: Backend = {
       async compareAndSet() {
         return false;
       },
@@ -1412,7 +1371,7 @@ describe('MarketingCertificationStore', () => {
     const records = new Map<string, unknown>();
     const seed = createStore(records);
     await seed.projectLedger(at('09:00'));
-    const neverUpdates: CertificationRecordBackend = {
+    const neverUpdates: Backend = {
       async compareAndSet() {
         return false;
       },
@@ -1472,6 +1431,8 @@ describe('MarketingCertificationStore', () => {
         'time',
         'stamp',
         'hash',
+        'inline',
+        'inline-empty',
       ]) {
         const records = new Map<string, unknown>();
         const backend = memoryBackend(records);
@@ -1497,6 +1458,18 @@ describe('MarketingCertificationStore', () => {
           shard.packet.visualProof[0].summary = 'tampered';
         records.set(key, corruption === 'json' ? '{' : JSON.stringify(shard));
         if (corruption === 'missing') records.delete(key);
+        if (corruption.startsWith('inline')) {
+          const legacy = hotLedger(records);
+          legacy.records[FIRST.id].packet = {
+            ...packet(FIRST),
+            visualProof: {},
+          };
+          if (corruption === 'inline-empty') {
+            legacy.records[FIRST.id].auditHistory = [];
+            delete legacy.records[FIRST.id].packetRevision;
+          }
+          records.set(STORE_KEY, JSON.stringify(legacy));
+        }
         const hot = records.get(STORE_KEY);
         const projected = await store.inspectLedger();
         expect(records.get(STORE_KEY)).toBe(hot);
@@ -1504,6 +1477,10 @@ describe('MarketingCertificationStore', () => {
         expect(projected.rows[0].admission.blockers.length).toBeGreaterThan(0);
         expect(projected.rows[1].packet).toEqual(packet(SECOND));
         expect((await ready(store)).eligibleSubjectIds).not.toContain(FIRST.id);
+        await store.ingestPacket(packet(SECOND), at('00:02'));
+        expect((await store.inspectLedger()).entryOutcomes[0].evaluation).toBe(
+          'failed'
+        );
         const repaired = await store.ingestPacket(packet(FIRST), at('00:03'));
         expect(repaired.packet).toEqual(packet(FIRST));
         expect(repaired.admission.state).toBe('review_ready');
