@@ -86,4 +86,18 @@ describe('RuntimeUpdatePill', () => {
       )
     ).toHaveClass('truncate');
   });
+
+  it('leaves the announcement to the provider and is not a live region itself', () => {
+    render(
+      <RuntimeUpdatePill
+        title='Reload Jovie to update'
+        description='Reload when ready.'
+        busy={false}
+        onApply={vi.fn()}
+      />
+    );
+    expect(screen.getByTestId('runtime-update-pill')).not.toHaveAttribute(
+      'aria-live'
+    );
+  });
 });

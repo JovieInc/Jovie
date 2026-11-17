@@ -10,9 +10,11 @@ export function createUpgradeCheckoutFixture() {
     push: vi.fn(),
     pricing: {
       data: {
+        priceLock: null,
         options: [
           {
             priceId: 'price_presence',
+            plan: 'pro',
             amount: toCents(ARTIST_VISIBILITY_OFFER.pro.monthlyUsd),
             currency: ARTIST_VISIBILITY_OFFER.pro.currency,
             interval: 'month',

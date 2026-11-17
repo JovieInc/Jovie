@@ -25,6 +25,10 @@ import {
   normalizeArtistMetrics,
 } from '@/lib/onboarding/canonical-metrics';
 import {
+  decideQualification,
+  type QualificationDecision,
+} from '@/lib/waitlist/decision';
+import {
   decideGoldenPathAdmission,
   type GoldenPathAdmissionReason,
   type GoldenPathVerdict,
@@ -106,6 +110,8 @@ export interface AccessDecision {
   readonly goldenPathHold?: GoldenPathAdmissionReason;
   /** 0-100 confidence; useful for retroactive analysis of where to tune thresholds. */
   readonly score: number;
+  /** Rule-versioned capture disposition, separate from the routing rationale. */
+  readonly qualificationDecision?: QualificationDecision;
   /**
    * JOV-7144: Mom-Test coverage from the shared qualification contract. The
    * model asks one past-behavior question about `nextDimension` next.
@@ -179,13 +185,27 @@ export function evaluateAccessSignal(
     };
   }
 
-  // 3. Turn cap reached — force decision into waitlist. Self-reported audience
-  //    size never grants access on its own (JOV-7144): it is unverified.
+  // 3. Turn cap reached — run the qualification decision on what was captured
+  //    (Tim 2026-11-09): never a silent default waitlist. Self-reported
+  //    audience size never grants access on its own (JOV-7144): it is
+  //    unverified. At the cap the decision can only land queued (our turn
+  //    budget, needs stored) or disqualified — never `waitlisted` directly.
   if (turnCount >= MAX_INTERVIEW_TURNS_BEFORE_FORCE) {
+    const capDecision = decideQualification({
+      receipt,
+      answers: toQualificationInput(signal).answers,
+      turnCapReached: true,
+    });
     return {
+      // Keep the established routing rationale; the structured disposition
+      // retains the queued reason and captured needs without parsing that text.
       kind: 'waitlist',
-      rationale: `max_turns_reached_${turnCount}`,
-      score: 30,
+      rationale:
+        capDecision.outcome === 'disqualified'
+          ? capDecision.reason
+          : `max_turns_reached_${turnCount}`,
+      score: capDecision.outcome === 'disqualified' ? 20 : 30,
+      qualificationDecision: capDecision,
       qualification,
     };
   }

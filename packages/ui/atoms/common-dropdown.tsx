@@ -6,6 +6,7 @@ import { ChevronDown, MoreVertical } from 'lucide-react';
 import * as React from 'react';
 
 import {
+  CLOSED_MENU_ROOT_CLASS,
   contextMenuContentClasses,
   contextMenuContentCompactClasses,
   dropdownMenuContentClasses,
@@ -267,6 +268,7 @@ export function CommonDropdown(props: CommonDropdownProps) {
         data-motion={motion?.name ?? 'fade'}
         className={cn(
           dropdownContentBase,
+          !motion && CLOSED_MENU_ROOT_CLASS,
           scrollBody?.contentClassName,
           motion?.className,
           contentClassName
@@ -342,7 +344,11 @@ export function CommonDropdown(props: CommonDropdownProps) {
            role="group" (axe aria-allowed-attr). */
         role={searchable ? 'group' : 'menu'}
         aria-orientation={searchable ? undefined : 'vertical'}
-        className={cn(contextContentBase, contentClassName)}
+        className={cn(
+          contextContentBase,
+          !motion && CLOSED_MENU_ROOT_CLASS,
+          contentClassName
+        )}
         style={getContentStyle(minWidth, maxHeight, 'context')}
         onEscapeKeyDown={event => {
           if (searchQuery) {

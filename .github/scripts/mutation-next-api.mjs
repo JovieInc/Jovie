@@ -185,7 +185,14 @@ export async function transport(runId, runAttempt) {
   return { run, latestRun, jobs };
 }
 
-export async function publication(predecessor) {
+export const publication = predecessor => readPublication(predecessor, true);
+
+// Recovery authenticates retained publication bytes and successful Save history;
+// an evicted cache is not evidence that the historical measurement never ran.
+export const historicalPublication = predecessor =>
+  readPublication(predecessor, false);
+
+async function readPublication(predecessor, requireLiveCache) {
   const evidence = await transport(predecessor.runId, predecessor.runAttempt);
   const listed = await api(
     `${base}/actions/runs/${predecessor.runId}/artifacts?per_page=100`
@@ -205,25 +212,32 @@ export async function publication(predecessor) {
     const receipt = JSON.parse(zip.read('producer-receipt.json'));
     const stateText = zip.read('sweep-state.json'),
       historyText = zip.read('sweep-state.json.runs.jsonl', false);
-    const caches = await api(
-      `${base}/actions/caches?key=${encodeURIComponent(predecessor.cacheKey)}&ref=refs%2Fheads%2Fmain&per_page=100`
-    );
-    assert(
-      Array.isArray(caches.actions_caches) &&
-        caches.total_count === caches.actions_caches.length,
-      'cache evidence incomplete'
-    );
-    const exact = caches.actions_caches.filter(
-      c => c.key === predecessor.cacheKey && c.ref === 'refs/heads/main'
-    );
-    assert(exact.length === 1, 'exact predecessor cache missing or ambiguous');
+    let cache;
+    if (requireLiveCache) {
+      const caches = await api(
+        `${base}/actions/caches?key=${encodeURIComponent(predecessor.cacheKey)}&ref=refs%2Fheads%2Fmain&per_page=100`
+      );
+      assert(
+        Array.isArray(caches.actions_caches) &&
+          caches.total_count === caches.actions_caches.length,
+        'cache evidence incomplete'
+      );
+      const exact = caches.actions_caches.filter(
+        c => c.key === predecessor.cacheKey && c.ref === 'refs/heads/main'
+      );
+      assert(
+        exact.length === 1,
+        'exact predecessor cache missing or ambiguous'
+      );
+      [cache] = exact;
+    }
     return {
       ...evidence,
       artifact,
       receipt,
       stateText,
       historyText,
-      cache: exact[0],
+      cache,
       snapshotResult: optionalMember(zip, 'next-target-result.json'),
     };
   } finally {
