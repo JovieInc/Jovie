@@ -65,6 +65,7 @@ function fixture(): CanonicalArtistSiteCliOptions {
     navigationStatus: 'success',
     profileResultPath,
     outputPath: join(directory, 'certificate.json'),
+    gitRoot: directory,
   };
 }
 
