@@ -35,6 +35,24 @@ const receipt = pages => ({
   pages,
 });
 
+test('budget-stopped coverage fails readiness while unknown traffic costs stay unknown', () => {
+  const good = receipt([clean('/', 'stranger'), clean('/app', 'signed-in')]);
+  const accounting = { complete: false, absoluteAllNetworkCapEnforced: false };
+  assert.equal(
+    productReady({ ...good, traffic: { accounting } }, { now }).ready,
+    true
+  );
+  const stopped = productReady(
+    {
+      ...good,
+      traffic: { accounting, admission: { blocked: 1, visitsNotStarted: 2 } },
+    },
+    { now }
+  );
+  assert.equal(stopped.ready, false);
+  assert.match(stopped.reasons.join('; '), /admission budget/);
+});
+
 test('a clean crawl of every route, as a stranger and signed in, is ready', () => {
   const r = productReady(
     receipt([
