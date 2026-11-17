@@ -7,6 +7,11 @@ import type {
 } from '@/lib/db/schema/merch';
 import { getMerchContentReviewBlockers } from './content-contract';
 import {
+  MERCH_MOCKUP_FAILURE_PUBLISH_BLOCKER,
+  MERCH_MOCKUP_PENDING_PUBLISH_BLOCKER,
+  readOptionMockupStatus,
+} from './generation-contract';
+import {
   getMerchSellability,
   type MerchSellabilityOptions,
   type MerchSellabilityResult,
@@ -115,6 +120,54 @@ export function getMerchCardSellability(
   );
 
   return { sellable: reasons.length === 0, reasons };
+}
+
+/**
+ * Publish eligibility for the truthful-mockup lifecycle (JOV-4743): a card may
+ * only go live once its real Printful mockup is attached (`mockup_ready`).
+ * `pending_mockup` and `mockup_failed` cannot go live. Options generated
+ * before the mockup-status contract carry no stamp and keep their historical
+ * (publishable) behavior — a documented legacy carve-out so existing rows
+ * never deadlock.
+ */
+export function getMerchMockupPublishBlocker(
+  qualityReview: Record<string, unknown> | null | undefined
+): string | null {
+  const status = readOptionMockupStatus(qualityReview);
+  if (status === 'pending_mockup') {
+    return MERCH_MOCKUP_PENDING_PUBLISH_BLOCKER;
+  }
+  if (status === 'mockup_failed') {
+    return MERCH_MOCKUP_FAILURE_PUBLISH_BLOCKER;
+  }
+  return null;
+}
+
+export function isMerchMockupPublishable(
+  qualityReview: Record<string, unknown> | null | undefined
+): boolean {
+  return getMerchMockupPublishBlocker(qualityReview) === null;
+}
+
+/**
+ * The full publish gate for a merch card: checkout sellability plus the
+ * selected option's truthful-mockup lifecycle. Every publication entry point
+ * (select-with-publish, publishMerchCard, update-to-live, status → live)
+ * must go through this so a `pending_mockup` or `mockup_failed` option can
+ * never reach `live`.
+ */
+export function getMerchCardPublishBlockers(
+  card: MerchCardSellabilityInput,
+  qualityReview?: Record<string, unknown> | null
+): string[] {
+  const reasons = getMerchCardSellability({
+    ...card,
+    qualityReview: qualityReview ?? undefined,
+  }).reasons;
+  const mockupBlocker = getMerchMockupPublishBlocker(qualityReview);
+  return mockupBlocker && !reasons.includes(mockupBlocker)
+    ? [...reasons, mockupBlocker]
+    : reasons;
 }
 
 export function getMerchOrderSellability(
