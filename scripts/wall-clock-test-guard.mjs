@@ -21,6 +21,16 @@
  * is not flagged. Grandfathered files live in
  * scripts/lib/wall-clock-test-guard.ratchet.json (real-clock reads per file)
  * and only shrink.
+ *
+ * The default check also runs the JOV-10086 elapsed-time scan
+ * (scripts/lib/wall-clock-assertions.mjs) against
+ * scripts/lib/wall-clock-assertion-baseline.json. That scan used to run only
+ * inside the operations script-contract bundle, so a new `Date.now()` budget
+ * in an iOS test reached main and failed the next merge group that selected
+ * the lane. The TypeScript parser is imported only on that default path, so
+ * importers of `language` / `stripComments` do not load it. `--write` and
+ * `--bootstrap` still touch only the calendar ratchet, which only shrinks.
+ * The duration baseline stays shrink-only in no-wall-clock-assertions.test.mjs.
  */
 import { spawnSync } from 'node:child_process';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
@@ -29,6 +39,8 @@ import { pathToFileURL } from 'node:url';
 
 export const RATCHET_PATH = 'scripts/lib/wall-clock-test-guard.ratchet.json';
 export const RATCHET_SCHEMA = 'jovie.wall-clock-test-guard-ratchet/v1';
+export const DURATION_BASELINE_PATH =
+  'scripts/lib/wall-clock-assertion-baseline.json';
 
 const JS_TEST = /\.(?:test|spec)\.[cm]?[jt]sx?$/u;
 const PY_TEST = /(?:^|\/)(?:test_[^/]+|[^/]+_test)\.py$/u;
@@ -218,10 +230,35 @@ export const FIX_MESSAGE =
   'calendarDeadlineClock (apps/web/tests/utils/calendar-deadline-clock.ts), so the daily ' +
   'time-bomb scan files it for its owner a week ahead.';
 
-export function main(argv = process.argv.slice(2)) {
-  const cwd = root();
+export const DURATION_FIX_MESSAGE =
+  'Fix: assert order or state, or fire the deadline with a mock timer ' +
+  '(node:test mock.timers, vi.useFakeTimers). A real perf budget belongs in a ' +
+  '*.perf.test.* file. Do not raise scripts/lib/wall-clock-assertion-baseline.json. ' +
+  '`// wall-clock-ok: <reason>` is only for a detector false positive.';
+
+function loadDurationBaseline(cwd) {
+  const path = join(cwd, DURATION_BASELINE_PATH);
+  if (!existsSync(path)) return {};
+  const parsed = JSON.parse(readFileSync(path, 'utf8'));
+  return parsed.files ?? {};
+}
+
+/** Elapsed-time assertions above the shrink-only JOV-10086 baseline. */
+export async function durationViolations(cwd, io = {}) {
+  const baseline = Object.hasOwn(io, 'durationBaseline')
+    ? io.durationBaseline
+    : loadDurationBaseline(cwd);
+  const found = Object.hasOwn(io, 'durationHits')
+    ? io.durationHits
+    : (await import('./lib/wall-clock-assertions.mjs')).scanRepo(cwd);
+  return violations(found, baseline);
+}
+
+export async function main(argv = process.argv.slice(2), io = {}) {
+  const cwd = io.cwd ?? root();
   const path = join(cwd, RATCHET_PATH);
-  const counts = scan(cwd, trackedFiles(cwd));
+  const counts = scan(cwd, io.trackedFiles ?? trackedFiles(cwd));
+  const report = io.error ?? console.error;
   const save = entries =>
     writeFileSync(
       path,
@@ -229,7 +266,7 @@ export function main(argv = process.argv.slice(2)) {
     );
   if (argv.includes('--bootstrap')) {
     if (existsSync(path)) {
-      console.error(
+      report(
         'wall-clock-test-guard: ratchet exists; use --write to tighten it'
       );
       return 1;
@@ -246,16 +283,25 @@ export function main(argv = process.argv.slice(2)) {
   }
   const bad = violations(counts, ratchet);
   if (bad.length) {
-    console.error(
+    report(
       'wall-clock-test-guard: test reads the real clock and pins a calendar date without controlling the clock:'
     );
     for (const v of bad)
-      console.error(
+      report(
         `  ${v.file}: ${v.found} real-clock read(s), ${v.allowed} allowed`
       );
-    console.error(FIX_MESSAGE);
-    return 1;
+    report(FIX_MESSAGE);
   }
+  const elapsed = await durationViolations(cwd, io);
+  if (elapsed.length) {
+    report(
+      'wall-clock-test-guard: gating test asserts elapsed wall-clock time:'
+    );
+    for (const v of elapsed)
+      report(`  ${v.file}: ${v.found} assertion(s), ${v.allowed} allowed`);
+    report(DURATION_FIX_MESSAGE);
+  }
+  if (bad.length || elapsed.length) return 1;
   const slack = Object.entries(ratchet).filter(
     ([f, n]) => (counts[f] ?? 0) < n
   ).length;
@@ -266,5 +312,12 @@ export function main(argv = process.argv.slice(2)) {
   return 0;
 }
 
-if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href)
-  process.exit(main());
+if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
+  main().then(
+    code => process.exit(code),
+    error => {
+      console.error(error);
+      process.exit(1);
+    }
+  );
+}

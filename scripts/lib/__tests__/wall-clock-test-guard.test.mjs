@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest';
 import {
   countIn,
   language,
+  main,
   RATCHET_PATH,
   RATCHET_SCHEMA,
   scan,
@@ -151,6 +152,36 @@ describe('wall-clock-test-guard', () => {
       { file: 'b', found: 1, allowed: 0 },
     ]);
     expect(tighten({ a: 1 }, { a: 3, b: 1 })).toEqual({ a: 1 });
+  });
+
+  it('names the file when an elapsed assertion exceeds the duration baseline', async () => {
+    const errors = [];
+    const code = await main(['--check'], {
+      trackedFiles: [],
+      durationHits: { 'apps/ios/scripts/capture-budget.test.mjs': 1 },
+      durationBaseline: {},
+      error: line => errors.push(line),
+    });
+    expect(code).toBe(1);
+    expect(errors.join('\n')).toContain(
+      'apps/ios/scripts/capture-budget.test.mjs: 1 assertion(s), 0 allowed'
+    );
+  });
+
+  it('accepts elapsed counts that stay inside the duration baseline', async () => {
+    const code = await main(['--check'], {
+      trackedFiles: [],
+      durationHits: { 'apps/web/lib/dial/dial-physics.test.ts': 4 },
+      durationBaseline: { 'apps/web/lib/dial/dial-physics.test.ts': 4 },
+      error: () => {
+        throw new Error('duration check should not report');
+      },
+    });
+    expect(code).toBe(0);
+  });
+
+  it('scans the working tree for new elapsed assertions', async () => {
+    expect(await main(['--check'])).toBe(0);
   });
 
   it('keeps the committed ratchet at or above what the tree holds today', () => {
