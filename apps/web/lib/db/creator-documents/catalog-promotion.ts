@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, isNull, ne, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, isNull, ne, sql as drizzleSql } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import { discogReleases, providerLinks } from '@/lib/db/schema/content';
 import { libraryRelationships } from '@/lib/db/schema/library-content-graph';
@@ -47,8 +47,8 @@ export async function selectedReleaseDestinations(releaseId: string) {
 /** A selected work and its first private revision commit in the same statement. */
 export function promotionCaptureSql(profileId: string, releaseId: string) {
   return {
-    eligible: sql`exists (${selectedPromotionWork(profileId, releaseId)})`,
-    relationship: sql`, linked as (
+    eligible: drizzleSql`exists (${selectedPromotionWork(profileId, releaseId)})`,
+    relationship: drizzleSql`, linked as (
       insert into ${libraryRelationships} (
         creator_profile_id, kind, subject_type, subject_id, object_type, object_id, status, evidence
       )
@@ -57,7 +57,7 @@ export function promotionCaptureSql(profileId: string, releaseId: string) {
       from target_document where target_document.created
       returning subject_id
     )`,
-    confirmed: sql`where exists (select 1 from linked where subject_id = target_document.id::text)
+    confirmed: drizzleSql`where exists (select 1 from linked where subject_id = target_document.id::text)
       or exists (
         select 1 from ${libraryRelationships} r where r.creator_profile_id = ${profileId}
           and r.kind = 'release_context' and r.subject_type = 'creator_document'
