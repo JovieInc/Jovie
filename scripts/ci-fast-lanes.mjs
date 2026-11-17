@@ -1,7 +1,5 @@
 #!/usr/bin/env node
 /**
- * Run the cheap CI cluster as labeled lanes.
- *
  * Used by the dedicated `ci-fast-typecheck`, `ci-fast-remaining` and
  * `ci-fast-structural-web` jobs in `.github/workflows/ci.yml` (JOV-4477).
  * Each hosted job checks out and installs once, invokes one value from
@@ -1226,6 +1224,7 @@ export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/synthetic-monitoring-plan.test.mjs',
   'scripts/lib/__tests__/remediation-detector-plans.test.mjs',
   'scripts/lib/__tests__/docs-deploy-intake-quota.test.mjs',
+  'scripts/lib/__tests__/linear-rate-limit-retry.test.mjs',
   'scripts/lib/__tests__/mac-runner-route-contract.test.mjs',
   'scripts/lib/__tests__/mac-lane-script.test.mjs',
   'scripts/lib/__tests__/main-release-readiness.test.mjs',
@@ -1342,6 +1341,7 @@ export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/source-qualification-receipt.test.mjs',
   'scripts/lib/__tests__/workers-inventory.test.mjs',
   'scripts/lib/__tests__/setup-pinned-node.test.mjs',
+  'scripts/lib/__tests__/screen-proof-resolver.transport-retry.test.mjs',
   'scripts/lib/__tests__/child-process.test.mjs',
   'scripts/lib/__tests__/sentry-autofix-recurrence-retry.test.mjs', // JOV-6813 marker-503 retry.
 ]);
@@ -2750,7 +2750,7 @@ export async function runStructural(opts = {}) {
     API_CLIENT_PY_COMMAND,
     RESEARCH_TS_COMMAND,
     'node --test .github/scripts/publish-queue-junit.test.mjs scripts/record-quarantine-releases.test.mjs',
-    'node --test .github/scripts/dependency-parity-evidence.test.mjs',
+    'node --test .github/scripts/dependency-parity-evidence.test.mjs .github/scripts/staging-identity-read.test.mjs',
     'node --test --experimental-test-coverage --test-coverage-include=scripts/security/deepsec-native-controller.mjs --test-coverage-lines=95 --test-coverage-branches=85 --test-coverage-functions=95 scripts/security/deepsec-native-controller.test.mjs',
     'node --test --experimental-test-coverage --test-coverage-include=scripts/security/deepsec-native-reconcile.mjs --test-coverage-lines=95 --test-coverage-branches=85 --test-coverage-functions=95 scripts/security/deepsec-native-reconcile.test.mjs',
     'node --test --experimental-test-coverage --test-coverage-include=scripts/security/deepsec-native-run.mjs --test-coverage-lines=95 --test-coverage-branches=85 --test-coverage-functions=95 scripts/security/deepsec-native-run.test.mjs',
