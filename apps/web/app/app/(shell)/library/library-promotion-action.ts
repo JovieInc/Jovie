@@ -11,7 +11,7 @@ export function buildPrivatePromotionAction(
   if (!profileId || (asset.itemKind ?? 'release') !== 'release') return null;
   return {
     id: 'draft-promotion',
-    label: 'Draft a private promotion',
+    label: 'Draft Private Promotion',
     icon: FilePenLine,
     authority: 'profile-owner',
     disabled: false,
