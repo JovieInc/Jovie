@@ -13037,6 +13037,7 @@ class TimerInstallerNodePathTests(unittest.TestCase):
                 temp_dir = root / "private temp"
                 if temp_case == "insecure":
                     temp_dir.mkdir(mode=0o755)
+                    temp_dir.chmod(0o755)
                 if temp_case == "symlink":
                     target = root / "real-temp"
                     target.mkdir(mode=0o700)
