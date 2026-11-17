@@ -15,6 +15,7 @@ import {
   classifyFailure,
   type Failure,
   type HeaderBag,
+  type Observation,
   parseBudget,
 } from './headers.ts';
 import {
@@ -111,6 +112,11 @@ export function ghShape(args: readonly string[]): {
     );
     const effective = method ?? (hasFields ? 'POST' : 'GET');
     const write = effective !== 'GET' && effective !== 'HEAD';
+    if (
+      (target === 'rate_limit' || target === '/rate_limit') &&
+      effective === 'GET'
+    )
+      return { resource: 'core', write: false, idempotent: true, cost: 0 };
     return {
       resource: target.replace(/^\//, '').startsWith('search/')
         ? 'search'
@@ -169,6 +175,36 @@ export function ghCredential(env: NodeJS.ProcessEnv): string {
   return token ? hashCredential('github', token) : 'gh-cli-login';
 }
 
+/** Only the exact rate_limit response can describe other resources. */
+function quotaObservations(body: string): Observation[] {
+  let resources: Record<string, Record<string, number>>;
+  try {
+    resources = JSON.parse(body)?.resources;
+  } catch {
+    return [];
+  }
+  if (!resources || typeof resources !== 'object') return [];
+  const observations: Observation[] = [];
+  for (const resource of ['core', 'graphql', 'search']) {
+    const row = resources[resource];
+    if (
+      !row ||
+      !['limit', 'remaining', 'reset'].every(
+        key => Number.isSafeInteger(row[key]) && row[key]! >= 0
+      ) ||
+      row.remaining! > row.limit!
+    )
+      continue;
+    observations.push({
+      resource,
+      limit: row.limit!,
+      remaining: row.remaining!,
+      resetAt: row.reset! * 1000,
+    });
+  }
+  return observations;
+}
+
 export async function runGh(
   args: readonly string[],
   options: RunGhOptions = {}
@@ -180,6 +216,8 @@ export async function runGh(
   };
   const spec = providerSpec('github');
   const store = options.store ?? defaultStore(env);
+  const persistenceFailures = () =>
+    (store as LedgerStore & { unpersisted?: number }).unpersisted ?? 0;
   const credential = options.credential ?? ghCredential(env);
   const priority = options.priority ?? 'default';
   const now = options.now ?? Date.now;
@@ -220,12 +258,13 @@ export async function runGh(
     });
 
   for (let attempt = 0; ; ) {
+    const unpersisted = persistenceFailures();
     const decision = await inLedger((s, at) => {
       const d = decide(
         s,
         {
           priority,
-          costs: { [shape.resource]: shape.cost ?? 1 },
+          costs: shape.cost === 0 ? {} : { [shape.resource]: shape.cost ?? 1 },
           write: shape.write,
           minWriteIntervalMs: spec.minWriteIntervalMs,
         },
@@ -235,6 +274,8 @@ export async function runGh(
         bump(s, priority, d.action === 'shed' ? 'shed' : 'waited', at);
       return d;
     });
+    if (persistenceFailures() !== unpersisted)
+      return defer('ledger-admission-unpersisted', now() + 1000);
     if (decision.action === 'shed')
       return defer(`shed (${decision.reason})`, decision.until);
     if (decision.action === 'wait') {
@@ -272,8 +313,17 @@ export async function runGh(
         ? 'client'
         : failure.kind;
     const settled: Failure = { kind, retryAtMs: failure.retryAtMs };
+    const observations = parseBudget(spec, headers, at, shape.resource);
+    if (result.code === 0 && shape.cost === 0) {
+      const headerResources = new Set(observations.map(row => row.resource));
+      observations.push(
+        ...quotaObservations(body).filter(
+          row => !headerResources.has(row.resource)
+        )
+      );
+    }
     await inLedger((s, t) => {
-      observe(s, parseBudget(spec, headers, t, shape.resource), t);
+      observe(s, observations, t, true);
       return recordOutcome(
         s,
         {

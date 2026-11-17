@@ -6337,19 +6337,8 @@ def render_fix_prompt(pr: dict, excerpt: str) -> str:
 
 
 def regenerate_merged_generated(worktree: Path, paths, log, *, guard=lambda: None) -> bool:
-    """Restore main's generated copies, then regenerate from the merged source, including
-    outputs that Git merged cleanly. Also usable after an agent resolves source conflicts."""
-    generated = sorted(set(paths) & remediation.GENERATED_RESOLVERS.keys())
-    if not generated:
-        return True
-    if sh(["git", "checkout", "origin/main", "--", *generated], cwd=worktree, log=log).returncode:
-        return False
-    commands = dict.fromkeys(remediation.GENERATED_RESOLVERS[path] for path in generated)
-    for command in commands:
-        guard()
-        if sh(list(command), cwd=worktree, timeout=900, log=log).returncode:
-            return False
-    return sh(["git", "add", *generated], cwd=worktree, log=log).returncode == 0
+    return fix_red_source_edits.regenerate_merged_generated(
+        worktree, paths, log, resolvers=remediation.GENERATED_RESOLVERS, sh=sh, guard=guard)
 
 
 def union_merge_file(worktree: Path, path: str, log) -> bool:
@@ -8766,23 +8755,23 @@ def pr_is_terminal(pr: dict) -> bool:
                                                    pr_events.PREFIX + "escalating"}))
 
 
-def new_issue_budget(name: str, slots: int, inventory: list[dict] | None = None) -> dict:
-    """A lane's new-issue admission: its producer's WIP cap (pr-wip-policy.json, same rule as pr-open;
-    the retired JOV-6833/JOV-7514 slot caps stay gone). Repairs never consult it; unknown inventory admits."""
+def new_issue_budget(name: str, slots: int, inventory: list[dict] | None = None, *, capacity: dict | None = None) -> dict:
+    """New intake uses current quota/CI evidence; counts are diagnostics. Repairs never consult it."""
     if slots <= 0:
         return {"allowed": False, "reason": "provider-disabled", "used": 0, "cap": None, "terminal": 0, "terminalCap": None}
     dated = re.compile(rf"^{re.escape(name)}/jov-\d+-\d{{8}}")
     own = [pr for pr in inventory or [] if dated.match(pr.get("headRefName") or "")]
-    wip = pr_wip.admit(inventory, name)
-    return {"allowed": wip["allowed"], "reason": "within-budget" if wip["allowed"] else "wip-cap",
+    wip = pr_wip.admit(inventory, name, capacity=capacity)
+    return {"allowed": wip["allowed"], "reason": "within-budget" if wip["allowed"] else wip["reason"], "capacity": wip,
             "used": None if inventory is None else sum(not is_green(pr) and not pr_is_terminal(pr) for pr in own),
             "cap": None, "terminal": None if inventory is None else sum(pr_is_terminal(pr) for pr in own), "terminalCap": None, "wip": wip["used"], "wipCap": wip["cap"]}
 
 
 def read_new_issue_budget(name: str, slots: int) -> dict:
-    """The WIP count reads the shared open-PR summary (60 s cache); an unreadable one admits."""
+    """One local capacity observation; the shared PR summary is diagnostic only."""
     inventory = pr_wip.safe_inventory(open_prs_summary) if slots > 0 else None
-    return {**new_issue_budget(name, slots, inventory), "observedAt": now_iso(), "error": None}
+    capacity = pr_wip.observe_capacity(refresh=True) if slots > 0 else None
+    return {**new_issue_budget(name, slots, inventory, capacity=capacity), "observedAt": now_iso(), "error": None}
 
 
 def last_pushes() -> dict[int, float]:
