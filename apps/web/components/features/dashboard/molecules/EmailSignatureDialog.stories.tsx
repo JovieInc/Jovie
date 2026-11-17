@@ -42,6 +42,13 @@ export const Empty: Story = {
   },
 };
 
+/** Error: the profile failed to load, so the dialog asks to retry and copying stays off. */
+export const ErrorProfileUnavailable: Story = {
+  args: {
+    input: null,
+  },
+};
+
 export const LongContent: Story = {
   args: {
     input: {
