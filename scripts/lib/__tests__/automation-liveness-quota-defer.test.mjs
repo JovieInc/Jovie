@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   alertStateFor,
   observeGithubWorkflow,
+  observeGreenToEnqueue,
 } from '../../automation-liveness.mjs';
 import { selectSourceGuards } from '../../ci-fast-lanes.mjs';
 import {
@@ -240,5 +241,170 @@ describe('quota-defer CI admission', () => {
       );
       expect(refs.get(file)?.has('automation-registry')).toBe(true);
     }
+  });
+});
+
+describe('quota provenance and GraphQL error envelopes', () => {
+  const quotaDenied = () =>
+    new Response(
+      JSON.stringify({ message: 'API rate limit exceeded for installation' }),
+      {
+        status: 403,
+        headers: {
+          'x-ratelimit-limit': '5000',
+          'x-ratelimit-remaining': '0',
+          'x-ratelimit-reset': String(NOW / 1000 + 1800),
+        },
+      }
+    );
+  it('retains quota proof from required checks after a readable GraphQL list', async () => {
+    const observed = await observeGreenToEnqueue(
+      { repo: 'JovieInc/Jovie', requiredChecks: ['PR Ready'] },
+      {
+        token: 'actions-token',
+        nowMs: NOW,
+        fetchImpl: async (url, init) =>
+          String(url).endsWith('/graphql')
+            ? new Response(
+                JSON.stringify({
+                  data: {
+                    repository: {
+                      pullRequests: {
+                        nodes: [
+                          {
+                            number: 25378,
+                            isDraft: false,
+                            isInMergeQueue: false,
+                            baseRefName: 'main',
+                            headRefOid: 'a'.repeat(40),
+                            mergeStateStatus: 'CLEAN',
+                            labels: {
+                              nodes: [],
+                              pageInfo: { hasNextPage: false },
+                            },
+                          },
+                        ],
+                      },
+                    },
+                  },
+                }),
+                { status: 200 }
+              )
+            : init?.headers?.Authorization
+              ? quotaDenied()
+              : new Response('{}', { status: 404 }),
+      }
+    );
+    expect(observed).toMatchObject({
+      ok: false,
+      reason: 'github-quota-deferred',
+      quotaEvidence: {
+        status: 403,
+        observedAt: new Date(NOW).toISOString(),
+        retryAtMs: NOW + 1_801_000,
+      },
+      recoveryEvidence: { status: 404, credentialLeg: 'public' },
+    });
+  });
+  it.each([403, 404, 500])(
+    'retains primary quota proof after a public %s without inventing a verdict',
+    async status => {
+      const fetchImpl = vi.fn(async (_url, init) =>
+        init?.headers?.Authorization
+          ? quotaDenied()
+          : new Response('{}', { status })
+      );
+      const observed = await observeGithubWorkflow(spendGuardEntry().receipt, {
+        nowMs: NOW,
+        fetchImpl,
+        token: 'actions-token',
+      });
+
+      const report = evaluateLiveness(
+        only('lanes-clock:spend-guard'),
+        new Map([['lanes-clock:spend-guard', observed]]),
+        NOW
+      );
+      const row = report.results[0];
+      expect(row).toMatchObject({
+        status: 'unknown',
+        reason: 'github-quota-deferred',
+        quotaEvidence: {
+          provider: 'github',
+          credentialLeg: 'authenticated',
+          status: 403,
+          observedAt: new Date(NOW).toISOString(),
+          kind: 'primary-rate-limit',
+          headers: {
+            'x-ratelimit-remaining': '0',
+            'x-ratelimit-reset': String(NOW / 1000 + 1800),
+          },
+          retryAtMs: NOW + 1_801_000,
+        },
+        recoveryEvidence: {
+          credentialLeg: 'public',
+          status,
+          reason: `http-${status}`,
+        },
+      });
+      expect(row.quotaEvidence.message).toContain(
+        'API rate limit exceeded for installation'
+      );
+      expect(JSON.stringify(row)).not.toContain('actions-token');
+      expect(livenessDecisions(report)).toEqual([]);
+    }
+  );
+
+  it.each([null, { repository: { pullRequests: { nodes: [] } } }])(
+    'defers HTTP 200 GraphQL quota errors without trusting partial data (%j)',
+    async data => {
+      const observed = await observeGreenToEnqueue(
+        { repo: 'JovieInc/Jovie', requiredChecks: ['PR Ready'] },
+        {
+          token: 'actions-token',
+          nowMs: NOW,
+          fetchImpl: async () =>
+            new Response(
+              JSON.stringify({
+                data,
+                errors: [{ type: 'RATE_LIMITED', message: 'quota denied' }],
+              }),
+              { status: 200 }
+            ),
+        }
+      );
+      expect(observed).toMatchObject({
+        ok: false,
+        reason: 'github-quota-deferred',
+        quotaEvidence: {
+          status: 200,
+          kind: 'primary-rate-limit',
+          retryAtMs: null,
+          headers: {},
+        },
+      });
+    }
+  );
+
+  it('keeps mixed GraphQL quota and schema errors unreadable', async () => {
+    const observed = await observeGreenToEnqueue(
+      { repo: 'JovieInc/Jovie', requiredChecks: ['PR Ready'] },
+      {
+        token: 'actions-token',
+        nowMs: NOW,
+        fetchImpl: async () =>
+          new Response(
+            JSON.stringify({
+              data: { repository: { pullRequests: { nodes: [] } } },
+              errors: [
+                { type: 'RATE_LIMITED', message: 'quota denied' },
+                { type: 'GRAPHQL_VALIDATION_FAILED', message: 'unknown field' },
+              ],
+            }),
+            { status: 200 }
+          ),
+      }
+    );
+    expect(observed).toEqual({ ok: false, reason: 'green-enqueue-unreadable' });
   });
 });
