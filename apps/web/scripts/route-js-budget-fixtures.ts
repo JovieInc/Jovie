@@ -24,6 +24,43 @@ export function writeChunk(nextDir: string, name: string, bytes: number) {
   return `static/chunks/${name}`;
 }
 
+export function writeManifest(
+  nextDir: string,
+  segmentDir: string,
+  key: string,
+  entryJSFiles: Record<string, string[]>
+) {
+  const dir = join(nextDir, 'server', 'app', 'app', segmentDir);
+  mkdirSync(dir, { recursive: true });
+  writeFileSync(
+    join(dir, 'page_client-reference-manifest.js'),
+    `globalThis.__RSC_MANIFEST = globalThis.__RSC_MANIFEST || {};\n` +
+      `globalThis.__RSC_MANIFEST[${JSON.stringify(key)}] = ${JSON.stringify({ entryJSFiles })};\n`
+  );
+}
+
+export function buildFixture() {
+  const nextDir = mkdtempSync(join(tmpdir(), 'route-js-budget-'));
+  fixtureRoots.push(nextDir);
+  const main = writeChunk(nextDir, 'main.js', 20 * 1024);
+  const shell = writeChunk(nextDir, 'shell.js', 40 * 1024);
+  const heavy = writeChunk(nextDir, 'heavy.js', 100 * 1024);
+  writeFileSync(
+    join(nextDir, 'build-manifest.json'),
+    JSON.stringify({ rootMainFiles: [main], polyfillFiles: [] })
+  );
+  writeManifest(nextDir, '(shell)/settings', '/app/(shell)/settings/page', {
+    '[project]/app/layout': [main],
+    '[project]/app/app/(shell)/layout': [shell],
+    '[project]/app/app/(shell)/settings/page': [shell],
+  });
+  writeManifest(nextDir, '(shell)/chat', '/app/(shell)/chat/page', {
+    '[project]/app/app/(shell)/layout': [shell],
+    '[project]/app/app/(shell)/chat/page': [heavy],
+  });
+  return nextDir;
+}
+
 export const NOW = new Date('2026-10-22T00:00:00.000Z');
 
 export function firstLoadBudgets(
