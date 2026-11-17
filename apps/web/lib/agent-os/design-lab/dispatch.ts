@@ -219,7 +219,7 @@ export async function triggerDesignLabDispatch(params: {
         reason: availability.unavailableReason,
       }
     );
-    return { triggered: true, dispatchId };
+    return { triggered: false, dispatchId };
   }
 
   try {
@@ -248,7 +248,7 @@ export async function triggerDesignLabDispatch(params: {
           error: error.message,
         }
       );
-      return { triggered: true, dispatchId };
+      return { triggered: false, dispatchId };
     }
 
     logger.error(
@@ -258,8 +258,9 @@ export async function triggerDesignLabDispatch(params: {
         error,
       }
     );
-    return { triggered: true, dispatchId };
+    return { triggered: false, dispatchId };
   }
 
+  // GitHub accepted the request; this is not worker admission or execution.
   return { triggered: true, dispatchId };
 }

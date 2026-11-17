@@ -12,6 +12,8 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { load as parseYaml } from 'js-yaml';
 import { afterEach, describe, expect, it } from 'vitest';
+import { evaluateFleetRules, isLockedArea } from '../../pr-fleet-rules.mjs';
+import { HYGIENE_LIMITS } from '../repo-hygiene-limits.mjs';
 import {
   applyBaselineRefresh,
   main,
@@ -122,6 +124,105 @@ describe('visual baseline refresh (JOV-12638)', () => {
       '- `visual-suite-broken-1-1` (no readable suite receipt)'
     );
     expect(body).not.toContain('profile-visual-audit');
+    expect(body).toContain('## Blast radius');
+    expect(body).toContain('## Locked areas');
+    expect(body).toContain('GBrain: design/design-operating-system');
+  });
+
+  it('satisfies Fleet Rules for auth-visual baselines and omits the lock when none apply', () => {
+    expect(
+      isLockedArea(
+        'apps/web/tests/e2e/__snapshots__/auth-visual.spec.ts/signin-page-desktop.png'
+      )
+    ).toBe(true);
+    expect(
+      isLockedArea(
+        'apps/web/tests/e2e/__snapshots__/storybook-chat-history-switcher.spec.ts/open-dark.png'
+      )
+    ).toBe(false);
+
+    const storyPlan = planBaselineRefresh([
+      {
+        suite: 'storybook-chat-history-switcher',
+        spec: 'storybook-chat-history-switcher.spec.ts',
+        outcome: 'success',
+        baselines: true,
+        dir: 'unused',
+      },
+    ]);
+    const storyBody = renderBaselinePrBody({
+      plan: storyPlan,
+      sha: 'abcdef12',
+    });
+    expect(storyBody).toContain('## Blast radius');
+    expect(storyBody).not.toContain('## Locked areas');
+    const storyVerdict = evaluateFleetRules({
+      pr: {
+        title: 'chore: refresh visual regression baselines',
+        body: storyBody,
+        labels: [],
+      },
+      files: [
+        {
+          filename:
+            'apps/web/tests/e2e/__snapshots__/storybook-chat-history-switcher.spec.ts/open-dark.png',
+          status: 'added',
+        },
+      ],
+    });
+    expect(storyVerdict).toEqual({ errors: [], warnings: [] });
+
+    const authPlan = planBaselineRefresh([
+      {
+        suite: 'auth-visual',
+        spec: 'auth-visual.spec.ts',
+        outcome: 'success',
+        baselines: true,
+        dir: 'unused',
+      },
+    ]);
+    const authVerdict = evaluateFleetRules({
+      pr: {
+        title: 'chore: refresh visual regression baselines',
+        body: renderBaselinePrBody({ plan: authPlan, sha: 'abcdef12' }),
+        labels: [],
+      },
+      files: [
+        {
+          filename:
+            'apps/web/tests/e2e/__snapshots__/auth-visual.spec.ts/signin-page-desktop.png',
+          status: 'modified',
+        },
+      ],
+    });
+    expect(authVerdict).toEqual({ errors: [], warnings: [] });
+  });
+
+  it('refuses to publish when the snapshot directory exceeds the file budget', () => {
+    const root = tempRoot();
+    const snap = join(root, 'snap');
+    for (let index = 0; index <= HYGIENE_LIMITS.maxSnapshotFiles; index += 1) {
+      write(join(snap, `extra-${index}.png`), 'x');
+    }
+    suite(root, {
+      suite: 'visual-regression',
+      spec: 'visual-regression.spec.ts',
+      outcome: 'skipped',
+      baselines: false,
+    });
+    expect(() =>
+      main(
+        [
+          '--suites-dir',
+          join(root, 'suites'),
+          '--snapshot-dir',
+          snap,
+          '--body-file',
+          join(root, 'body.md'),
+        ],
+        {}
+      )
+    ).toThrow(/exceed the .*file budget/);
   });
 
   it('refuses receipts and baselines that could write outside the spec directory', () => {

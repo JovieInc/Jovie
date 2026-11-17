@@ -103,6 +103,21 @@ async function withLiveServer(
   }
 }
 
+// The 'Report run budget' step reads the shell clock ($(date +%s)). Node's
+// Date.now() moves under shift-clock.mjs and the shell clock does not, so a
+// STARTED derived from Date.now() becomes a day in the future for bash and
+// the over-budget branch can never fire.
+function shellEpochSeconds(): number {
+  const result = spawnSync('date', ['+%s'], { encoding: 'utf8' });
+  const epoch = Number(String(result.stdout).trim());
+  if (result.status !== 0 || !Number.isSafeInteger(epoch)) {
+    throw new Error(
+      `date +%s failed: ${result.stderr || result.stdout || result.status}`
+    );
+  }
+  return epoch;
+}
+
 describe('component story evidence producer lane (visual-a11y.yml)', () => {
   const visualA11y = loadWorkflow('visual-a11y.yml');
   const plan = visualA11y.jobs['story-evidence-plan'] as Job;
@@ -277,7 +292,7 @@ describe('component story evidence producer lane (visual-a11y.yml)', () => {
 
   it('warns, never fails, when a run is over its budget', () => {
     const run = String(step(evidence, 'Report run budget').step.run);
-    const now = Math.floor(Date.now() / 1000);
+    const now = shellEpochSeconds();
     const quick = runStep(
       run,
       {},

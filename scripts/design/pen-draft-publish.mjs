@@ -325,7 +325,7 @@ export async function publishDeferredNote(ctx, { deferred, runUrl }) {
     )
   );
   if (failed(found)) return found;
-  const issue = (found.data?.issues?.nodes ?? [])
+  let issue = (found.data?.issues?.nodes ?? [])
     .filter(node => node?.title === DEFERRED_TITLE)
     .sort(
       (a, b) =>
@@ -333,6 +333,7 @@ export async function publishDeferredNote(ctx, { deferred, runUrl }) {
           (TERMINAL_STATES.has(b?.state?.type) ? 1 : 0) ||
         String(b.createdAt ?? '').localeCompare(String(a.createdAt ?? ''))
     )[0];
+  const firstDeferral = !issue;
   if (!issue) {
     const created = await linearGraphql(
       ctx,
@@ -351,12 +352,9 @@ export async function publishDeferredNote(ctx, { deferred, runUrl }) {
     if (failed(created)) return created;
     if (!created.data?.issueCreate?.success)
       return { ok: false, reason: 'pen_issue_create_unsuccessful' };
-    return {
-      ok: true,
-      action: 'created',
-      identifier: created.data.issueCreate.issue?.identifier ?? null,
-    };
+    issue = created.data.issueCreate.issue;
   }
+  if (!issue?.id) return { ok: false, reason: 'pen_issue_id_missing' };
   const comment = await linearGraphql(
     ctx,
     'pen_comment_create',
@@ -373,7 +371,7 @@ export async function publishDeferredNote(ctx, { deferred, runUrl }) {
     return { ok: false, reason: 'pen_comment_create_unsuccessful' };
   return {
     ok: true,
-    action: 'commented',
+    action: firstDeferral ? 'created' : 'commented',
     identifier: issue.identifier ?? null,
   };
 }

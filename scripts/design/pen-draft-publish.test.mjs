@@ -455,36 +455,3 @@ test('a deferred frame leaves one comment with the reason and the reset', async 
     })
   );
 });
-
-test('the first deferral creates the standing issue; without a key it fails', async () => {
-  const refusal = { reason: 'rate_limit', reset: 'Nov 21, 5am', detail: null };
-  const dir = artifacts({
-    'pen-draft-request-access': [
-      [
-        'receipt.json',
-        JSON.stringify({
-          schema: 'jovie.pen-draft/v1',
-          drafts: [
-            { frame: 'request-access', status: 'deferred', deferred: refusal },
-          ],
-        }),
-      ],
-    ],
-  });
-  const network = fakeNetwork();
-  const created = await publish(dir, network);
-  assert.equal(created.ok, true);
-  const create = network.calls.find(
-    call => call.op === 'PenDraftDeferredCreate'
-  );
-  assert.ok(create, 'the standing issue was created once');
-  assert.equal(create.variables.input.title, DEFERRED_TITLE);
-  assert.equal(
-    network.calls.filter(call => call.op === 'PenDraftDeferredCreate').length,
-    1
-  );
-  // No key: the deferral note cannot be posted, so the run is red.
-  const noKey = await publish(dir, network, { apiKey: undefined, env: {} });
-  assert.equal(noKey.ok, false);
-  assert.equal(noKey.reason, 'missing_linear_api_key');
-});

@@ -1550,6 +1550,7 @@ jobs:
             packages/api-client/policy.ts
             packages/api-client/providers.json
             packages/api-client/store.ts
+            packages/api-client/types.ts
           sparse-checkout-cone-mode: false
       - name: Pre-promotion auth/billing journey gate
         id: journey-gate

@@ -5,7 +5,8 @@ import { appendFileSync } from 'node:fs';
 // failing with the same generic npx error. A quota refusal is the account's,
 // not the frame's, so the frame is deferred — visibly, with the reset the
 // agent itself reports — instead of failed and retried.
-const RATE_LIMIT_LINE = /\b(?:rate_limit|weekly limit|usage limit)\b/i;
+const RATE_LIMIT_LINE =
+  /(?:Agent failed:\s*rate_limit\b|You've hit your (?:weekly|usage) limit\b)/i;
 const RATE_LIMIT_RESET = /resets ([^\n\r]+)/i;
 
 /**

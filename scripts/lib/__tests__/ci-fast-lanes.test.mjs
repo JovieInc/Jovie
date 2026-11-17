@@ -212,6 +212,8 @@ describe('Shared fenced-attempt coverage contract', () => {
       '*/scripts/lanes/remediation.py" --fail-under=85'
     );
     expect(command).toContain('scripts/tests/test_lane_runner.py');
+    expect(command).toContain('scripts/tests/test_reason_dispatch.py');
+    expect(command).toContain('scripts/tests/test_reason_publication.py');
     expect(command).toContain('scripts/tests/test_design_gate.py');
     expect(command).toContain('scripts/tests/test_disk_guard.py');
     expect(command).toContain('scripts/tests/test_qualification_guard.py');
@@ -247,7 +249,7 @@ describe('Shared fenced-attempt coverage contract', () => {
   it('preserves the existing lane floor and enforces fenced-attempt coverage', () => {
     const command = STRUCTURAL_PYTHON_REGRESSION_COMMANDS[0];
     expect(command).toContain(
-      'lane_runner.py,*/scripts/lanes/pr_events.py,*/scripts/lanes/reason_lane.py,*/scripts/lanes/gbrain_catalog.py,*/scripts/lanes/design_gate.py,*/scripts/lanes/doctor.py,*/scripts/lanes/public_feed.py,*/scripts/lanes/disk_guard.py,*/scripts/lanes/continuity_clock.py" --fail-under=85'
+      'lane_runner.py,*/scripts/lanes/pr_events.py,*/scripts/lanes/reason_lane.py,*/scripts/lanes/reason_dispatch.py,*/scripts/lanes/reason_publication.py,*/scripts/lanes/gbrain_catalog.py,*/scripts/lanes/design_gate.py,*/scripts/lanes/doctor.py,*/scripts/lanes/public_feed.py,*/scripts/lanes/disk_guard.py,*/scripts/lanes/continuity_clock.py" --fail-under=85'
     );
     expect(command).toContain(
       '*/scripts/lanes/execution_attempt.py\" --fail-under=85'
@@ -2376,6 +2378,9 @@ describe('source-read guard selection', () => {
         ? ['lanes-selftest-changed-tests']
         : []),
       ...(path.startsWith('apps/web/') ? ['copy-leak'] : []),
+      ...(/\.(?:test|spec)\.(?:ts|tsx|mjs|js)$/u.test(path)
+        ? ['test-hygiene']
+        : []),
       'gate-weakening-detector',
     ]);
   });
@@ -2482,6 +2487,7 @@ describe('source-read guard selection', () => {
       'domain-write-guard',
       'copy-leak',
       'jump-policy-pin',
+      'test-hygiene',
     ];
     expect(selected('workflow_dispatch', ['README.md'])).toEqual(failClosed);
     expect(selected('', ['README.md'])).toEqual(all);

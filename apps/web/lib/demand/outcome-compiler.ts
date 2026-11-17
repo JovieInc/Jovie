@@ -8,6 +8,7 @@ import {
   compileOutcomeCommandSchema,
   PRESENCE_CURRENT_CONTRACT,
 } from './outcome-contract';
+import { projectSupplierFulfillment } from './outcome-fulfillment';
 
 export class OutcomeCompilerError extends Error {}
 const digest = (value: unknown) =>
@@ -87,6 +88,37 @@ export function compilePresenceOutcome(
   if (!Number.isFinite(time)) throw new OutcomeCompilerError('invalid-clock');
   if (command.demand.some(item => Date.parse(item.observedAt) > time))
     throw new OutcomeCompilerError('future-demand-evidence');
+  const scopedReceipts = [
+    ...(command.certifications ?? []),
+    ...(command.outcomes ?? []),
+  ];
+  if (scopedReceipts.some(item => !sameScope(item.scope, command.scope)))
+    throw new OutcomeCompilerError('capability-receipt-scope-mismatch');
+  if (
+    scopedReceipts.some(
+      item =>
+        !PRESENCE_CURRENT_CONTRACT.requirements.some(requirement =>
+          samePrimitive(item.primitive, requirement)
+        )
+    )
+  )
+    throw new OutcomeCompilerError('unsupported-capability-receipt');
+  if (
+    (command.certifications ?? []).some(
+      item =>
+        Date.parse(item.verifiedAt) > time ||
+        Date.parse(item.expiresAt) <= Date.parse(item.verifiedAt)
+    )
+  )
+    throw new OutcomeCompilerError('invalid-capability-certification-window');
+  if (
+    (command.outcomes ?? []).some(
+      item =>
+        Date.parse(item.startedAt) > Date.parse(item.completedAt) ||
+        Date.parse(item.completedAt) > time
+    )
+  )
+    throw new OutcomeCompilerError('invalid-capability-outcome-window');
   // Duplicate supplier identities could make matching or trial choice order-dependent.
   const keys = command.suppliers.map(item =>
     digest([item.scope, item.primitive, item.id, item.version])
@@ -113,7 +145,20 @@ export function compilePresenceOutcome(
         sameScope(item.scope, command.scope) &&
         samePrimitive(item.primitive, primitive)
     );
-    const trials = mergeReceipts(
+    // Receipts are immutable history; current supplier snapshots still govern revocation.
+    let certifications = mergeReceipts(
+      prior?.certifications ?? [],
+      (command.certifications ?? []).filter(item =>
+        samePrimitive(item.primitive, primitive)
+      )
+    );
+    let outcomes = mergeReceipts(
+      prior?.outcomes ?? [],
+      (command.outcomes ?? []).filter(item =>
+        samePrimitive(item.primitive, primitive)
+      )
+    );
+    let trials = mergeReceipts(
       prior?.trials ?? [],
       command.trials.filter(item =>
         suppliers.some(
@@ -121,6 +166,31 @@ export function compilePresenceOutcome(
         )
       )
     );
+    // Bound the evidence window without refusing terminal invalidation events.
+    // Advancing the floor invalidates older certificates as well as old receipts,
+    // so evicting a tombstone can never revive its prior consent/certification.
+    let receiptFloor = prior?.receiptFloor ?? null;
+    for (const times of [
+      certifications.map(item => item.verifiedAt),
+      outcomes.map(item => item.completedAt),
+      trials.map(item => item.completedAt),
+    ]) {
+      if (times.length <= 100) continue;
+      const discarded = times
+        .sort((a, b) => Date.parse(a) - Date.parse(b))
+        .slice(0, -100);
+      const floor = discarded.at(-1)!;
+      if (!receiptFloor || Date.parse(floor) > Date.parse(receiptFloor))
+        receiptFloor = floor;
+    }
+    if (receiptFloor) {
+      const floor = Date.parse(receiptFloor);
+      certifications = certifications.filter(
+        item => Date.parse(item.verifiedAt) > floor
+      );
+      outcomes = outcomes.filter(item => Date.parse(item.completedAt) > floor);
+      trials = trials.filter(item => Date.parse(item.completedAt) > floor);
+    }
     if (
       trials.some(
         item =>
@@ -139,13 +209,38 @@ export function compilePresenceOutcome(
         Date.parse(item.validUntil) > time &&
         Date.parse(item.validUntil) > Date.parse(item.reviewedAt)
     );
+    const fulfillmentFor = (supplier: CapabilitySupplier) =>
+      projectSupplierFulfillment(
+        supplier,
+        supplierDigest(supplier),
+        certifications,
+        outcomes,
+        now
+      );
     const freshFacts = facts.filter(
       item =>
         (item.supplierDigest === null
           ? item.sourceRef.startsWith('jovie:canonical:')
-          : eligible.some(
-              supplier => supplierDigest(supplier) === item.supplierDigest
-            )) &&
+          : eligible.some(supplier => {
+              if (
+                supplierDigest(supplier) !== item.supplierDigest ||
+                !['read', 'sync'].includes(supplier.authority ?? '')
+              )
+                return false;
+              const result = fulfillmentFor(supplier);
+              return (
+                result.newest &&
+                result.accepted.some(
+                  receipt =>
+                    receipt.id === result.newest?.id &&
+                    receipt.evidenceRefs.includes(item.evidenceRef) &&
+                    Date.parse(receipt.completedAt) >=
+                      Date.parse(item.observedAt) &&
+                    time - Date.parse(receipt.completedAt) <=
+                      command.budget.maxFreshnessSeconds * 1000
+                )
+              );
+            })) &&
         Date.parse(item.observedAt) <= time &&
         Date.parse(item.validUntil) > time &&
         Date.parse(item.validUntil) > Date.parse(item.observedAt) &&
@@ -155,29 +250,53 @@ export function compilePresenceOutcome(
     const known = freshFacts.some(
       item => item.state === 'known' && item.match === 'verified'
     );
-    if (known && !prior) return [];
+    if (known && !prior && !certifications.length && !outcomes.length)
+      return [];
     const measured = eligible
       .flatMap(supplier => {
-        const receipt = trials
-          .filter(item => item.supplierDigest === supplierDigest(supplier))
-          .sort(
-            (a, b) =>
-              Date.parse(b.completedAt) - Date.parse(a.completedAt) ||
-              a.id.localeCompare(b.id)
-          )[0];
+        const fulfillment = fulfillmentFor(supplier);
+        if (
+          fulfillment.summary.attemptedJobs &&
+          !fulfillment.accepted.some(item => item.id === fulfillment.newest?.id)
+        )
+          return [];
+        const receipt =
+          fulfillment.newest ??
+          trials
+            .filter(item => item.supplierDigest === supplierDigest(supplier))
+            .sort(
+              (a, b) =>
+                Date.parse(b.completedAt) - Date.parse(a.completedAt) ||
+                a.id.localeCompare(b.id)
+            )[0];
         if (
           !receipt ||
           time - Date.parse(receipt.completedAt) >
-            command.budget.maxFreshnessSeconds * 1000 ||
-          !meetsFloor(receipt.realized, command, primitive.kind)
+            command.budget.maxFreshnessSeconds * 1000
         )
           return [];
-        return [{ supplier, receipt }];
+        const metrics = fulfillment.summary.attemptedJobs
+          ? {
+              ...receipt.realized,
+              correctness: Math.min(
+                receipt.realized.correctness,
+                fulfillment.summary.correctCompletedJobs /
+                  fulfillment.summary.attemptedJobs
+              ),
+              fullyLoadedCostCents:
+                fulfillment.summary.costPerSuccessfulOutcomeCents ?? 0,
+              latencyMs:
+                fulfillment.summary.successfulOutcomeLatencyMs?.p95 ??
+                receipt.realized.latencyMs,
+            }
+          : receipt.realized;
+        return meetsFloor(metrics, command, primitive.kind)
+          ? [{ supplier, metrics }]
+          : [];
       })
       .sort(
         (a, b) =>
-          netValue(b.receipt.realized, command) -
-            netValue(a.receipt.realized, command) ||
+          netValue(b.metrics, command) - netValue(a.metrics, command) ||
           sourceRank(a.supplier) - sourceRank(b.supplier) ||
           a.supplier.id.localeCompare(b.supplier.id)
       );
@@ -185,7 +304,11 @@ export function compilePresenceOutcome(
     const challenger = eligible
       .filter(
         item =>
+          measured.length === 0 &&
           !trials.some(
+            receipt => receipt.supplierDigest === supplierDigest(item)
+          ) &&
+          !outcomes.some(
             receipt => receipt.supplierDigest === supplierDigest(item)
           ) &&
           trialSlots > 0 &&
@@ -198,7 +321,24 @@ export function compilePresenceOutcome(
           sourceRank(a) - sourceRank(b) ||
           a.id.localeCompare(b.id)
       )[0];
-    const selected = measured[0]?.supplier;
+    const selected = measured.find(
+      ({ supplier }) => fulfillmentFor(supplier).summary.certified
+    )?.supplier;
+    const evidenceSupplier =
+      selected ??
+      measured[0]?.supplier ??
+      eligible.find(supplier =>
+        outcomes.some(
+          receipt => receipt.supplierDigest === supplierDigest(supplier)
+        )
+      );
+    const fulfillment = projectSupplierFulfillment(
+      evidenceSupplier,
+      evidenceSupplier ? supplierDigest(evidenceSupplier) : null,
+      certifications,
+      outcomes,
+      now
+    ).summary;
     if (!known && !selected && challenger) {
       trialBudget -= challenger.trialCostCents;
       trialSlots -= 1;
@@ -214,7 +354,7 @@ export function compilePresenceOutcome(
             kind: 'promote',
             supplierDigest: supplierDigest(selected),
             reason:
-              'Measured route meets the contract and economic floor; registration remains disabled pending owner certification.',
+              'Owner-certified measured route meets the contract and economic floor; execution remains separately authorized.',
           }
         : challenger
           ? {
@@ -227,7 +367,7 @@ export function compilePresenceOutcome(
               kind: 'no_action',
               supplierDigest: null,
               reason:
-                'No permitted route has sufficient measured or expected value; retain unknown/partial.',
+                'No owner-certified route meets the measured floor or permitted experiment remains; retain unknown/partial.',
             };
     return [
       capabilityDraftSchema.parse({
@@ -247,6 +387,10 @@ export function compilePresenceOutcome(
         facts,
         suppliers,
         trials,
+        certifications,
+        outcomes,
+        receiptFloor,
+        fulfillment,
         budget: command.budget,
         decision,
       }),

@@ -167,6 +167,22 @@ The four wide public-profile baselines are the flag-on
 entry for that surface. No unreferenced file remained. Resulting tree: 112
 files (~8.2 MiB of the unchanged 12 MiB `maxSnapshotBytes` budget).
 
+Approved raise (measured 2026-11-15, visual-baseline auto-refresh PR #25751):
+`maxSnapshotFiles` 121 → 133 (+10%, the per-raise cap). Exact `origin/main`
+measured 119 canonical baselines — 98.3% of the prior budget — leaving 2
+slots. `storybook-chat-history-switcher.spec.ts` requests 14 new pngs (closed,
+open, searching, no-matches, empty, unread, and after-close, each in light and
+dark), so this refresh cannot land inside 121. Counts on `origin/main`: 100
+files on 2026-08-17, 106 on 2026-10-16, 119 on 2026-11-15 (8,524,351 bytes of
+the unchanged 12 MiB byte budget). 29 commits and 2 contributors touched that
+tree in those 90 days. A consumer audit against `ADMIN_RENDER_SURFACES` and
+`ADMIN_MOBILE_SNAPSHOT_SURFACES` found five unreferenced admin pngs
+(`admin-needs-you-desktop`, `admin-needs-you-mobile`, `admin-growth-mobile`,
+`admin-ops-mobile`, `admin-product-mobile`); no spec requests those names, so
+they are pruned here. Every remaining file, including the 14 new switcher
+baselines, is named by a live `toHaveScreenshot`. Resulting tree: 128 files.
+The publisher refuses a refresh whose canonical directory would exceed this cap.
+
 All must hold: exact-main is at least 90% of an absolute byte budget or two ordinary changes exceed a p99 delta; 30/90-day tree/new-blob, contributor, checkout, and CI measurements are included; Knip, hashes, generated paths, and owners prove no safe removal; increase is at most p99 +25% for deltas or 10% for payloads; tests and rationale change together. Larger changes require a separate decision and Linear issue. A number-only change fails review and never promotes rollout mode.
 
 ### Prune or archive

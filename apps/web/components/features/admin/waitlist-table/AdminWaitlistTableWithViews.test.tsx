@@ -1,27 +1,37 @@
 import { TooltipProvider } from '@jovie/ui';
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { WaitlistEntryRow } from '@/lib/admin/types';
 import { AdminWaitlistTableWithViews } from './AdminWaitlistTableWithViews';
 
-vi.mock('@/lib/queries', () => ({
-  QueryErrorBoundary: ({ children }: { children: ReactNode }) => children,
-  useAdminWaitlistInfiniteQuery: ({
-    initialData,
-  }: {
-    initialData: { rows: WaitlistEntryRow[]; total: number };
-  }) => ({
-    data: { pages: [initialData] },
-    fetchNextPage: vi.fn(),
-    hasNextPage: false,
-    isFetchingNextPage: false,
-  }),
-  useApproveWaitlistMutation: () => ({ mutateAsync: vi.fn() }),
-  useDisapproveWaitlistMutation: () => ({ mutateAsync: vi.fn() }),
-  useResendWaitlistInviteMutation: () => ({ mutateAsync: vi.fn() }),
-}));
+vi.mock('@/lib/queries', async () => {
+  const { useMemo } = await import('react');
+  const mutation = { mutateAsync: vi.fn() };
+  return {
+    QueryErrorBoundary: ({ children }: { children: ReactNode }) => children,
+    useAdminWaitlistInfiniteQuery: ({
+      initialData: { rows, total },
+    }: {
+      initialData: { rows: WaitlistEntryRow[]; total: number };
+    }) => ({
+      data: useMemo(() => ({ pages: [{ rows, total }] }), [rows, total]),
+      fetchNextPage: vi.fn(),
+      hasNextPage: false,
+      isFetchingNextPage: false,
+    }),
+    useApproveWaitlistMutation: () => mutation,
+    useDisapproveWaitlistMutation: () => mutation,
+    useResendWaitlistInviteMutation: () => mutation,
+  };
+});
+
+// Keep unrelated hook results stable so they cannot hide a stale bulk action.
+vi.mock('./useApproveEntry', () => {
+  const result = { approveStatuses: {}, approveEntry: vi.fn() };
+  return { useApproveEntry: () => result };
+});
 
 const entries: WaitlistEntryRow[] = [
   {
@@ -109,5 +119,95 @@ describe('AdminWaitlistTableWithViews', () => {
     expect(
       screen.getByRole('checkbox', { name: 'Select row 1' })
     ).not.toBeChecked();
+  });
+
+  it.each(['Emails', 'Names'])(
+    'reports failed Copy %s to the current owner after rerender',
+    async target => {
+      const user = userEvent.setup();
+      const previousOwner = vi.fn();
+      const currentOwner = vi.fn();
+      const table = (onActionError: (message: string) => void) => (
+        <TooltipProvider>
+          <AdminWaitlistTableWithViews
+            entries={entries}
+            page={1}
+            pageSize={25}
+            total={1}
+            onActionError={onActionError}
+          />
+        </TooltipProvider>
+      );
+      const { rerender } = render(table(previousOwner));
+      await user.click(screen.getByRole('checkbox', { name: 'Select row 1' }));
+      rerender(table(currentOwner));
+
+      const originalClipboard = navigator.clipboard;
+      const execCommand = document.execCommand;
+      document.execCommand = () => false;
+      Object.defineProperty(navigator, 'clipboard', {
+        configurable: true,
+        value: { writeText: () => Promise.reject(new Error('denied')) },
+      });
+      try {
+        await user.click(screen.getByRole('button', { name: 'Actions' }));
+        await user.click(
+          await screen.findByRole('menuitem', { name: `Copy ${target}` })
+        );
+        await waitFor(() =>
+          expect(currentOwner).toHaveBeenCalledWith(
+            `Failed to copy ${target.toLowerCase()}`
+          )
+        );
+        expect(previousOwner).not.toHaveBeenCalled();
+      } finally {
+        document.execCommand = execCommand;
+        Object.defineProperty(navigator, 'clipboard', {
+          configurable: true,
+          value: originalClipboard,
+        });
+      }
+    }
+  );
+
+  it('reports clipboard failures to the owner alongside the error toast', async () => {
+    const user = userEvent.setup();
+    const onActionError = vi.fn();
+    render(
+      <TooltipProvider>
+        <AdminWaitlistTableWithViews
+          entries={entries}
+          page={1}
+          pageSize={25}
+          total={1}
+          onActionError={onActionError}
+        />
+      </TooltipProvider>
+    );
+
+    const originalClipboard = navigator.clipboard;
+    const execCommand = document.execCommand;
+    document.execCommand = () => false;
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: { writeText: () => Promise.reject(new Error('denied')) },
+    });
+    try {
+      await user.click(screen.getByRole('checkbox', { name: 'Select row 1' }));
+      await user.click(screen.getByRole('button', { name: 'Actions' }));
+      await user.click(
+        await screen.findByRole('menuitem', { name: 'Copy Emails' })
+      );
+
+      await waitFor(() =>
+        expect(onActionError).toHaveBeenCalledWith('Failed to copy emails')
+      );
+    } finally {
+      document.execCommand = execCommand;
+      Object.defineProperty(navigator, 'clipboard', {
+        configurable: true,
+        value: originalClipboard,
+      });
+    }
   });
 });

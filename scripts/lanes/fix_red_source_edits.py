@@ -12,8 +12,53 @@ from __future__ import annotations
 
 import re
 from pathlib import Path
+from subprocess import TimeoutExpired
 
 from atomic_state import atomic_write_text
+
+# Generated conflicts restore main, then run each canonical generator once.
+SHIPPING_SNAPSHOT_COMMAND = ("node", "scripts/shipping-slo-report.mjs", "refresh-latest")
+GENERATED_RESOLVERS = {
+    **dict.fromkeys((f"docs/metrics/{name}-latest.json" for name in (
+        "blog-publish-latency", "review-escapes", "shipping-slo", "stage-timings")),
+        SHIPPING_SNAPSHOT_COMMAND),
+    "docs/REPOSITORY_SOURCES.md": ("python3", "scripts/repository_docs.py", "--write"),
+    "canon/SOURCES_OF_TRUTH.md": ("node", "scripts/sources-of-truth.mjs", "--write"),
+    ".github/workflow-topology.gen.yml": ("pnpm", "ci:topology:write"),
+    "pnpm-lock.yaml": ("pnpm", "install", "--lockfile-only", "--ignore-scripts"),
+    "scripts/agent-context/rule-scopes.json": ("node", "scripts/agent-context/rule-scopes.mjs", "--write"),
+}
+
+
+def regenerate_merged_generated(worktree: Path, paths, log, *, resolvers, sh, guard=lambda: None) -> bool:
+    """Restore and regenerate complete output families, including cleanly merged siblings."""
+    commands = dict.fromkeys(resolvers[path] for path in sorted(set(paths) & resolvers.keys()))
+    if not commands:
+        return True
+    generated = sorted(path for path, command in resolvers.items() if command in commands)
+    restore = ["git", "checkout", "origin/main", "--", *generated]
+    if sh(restore, cwd=worktree, log=log).returncode:
+        return False
+    for command in commands:
+        guard()
+        timeout = 900
+        if command == SHIPPING_SNAPSHOT_COMMAND:
+            # Use the trusted collector owner's deadline, not a second copied budget.
+            workflow = sh(["git", "show", "origin/main:.github/workflows/shipping-slo.yml"], cwd=worktree)
+            minutes = re.findall(r"(?m)^    timeout-minutes: ([1-9][0-9]*)\s*$", workflow.stdout)
+            if workflow.returncode or len(minutes) != 1:
+                return False
+            timeout = int(minutes[0]) * 60
+        try:
+            failed = sh(list(command), cwd=worktree, timeout=timeout, log=log, stream=True).returncode != 0
+        except TimeoutExpired:
+            failed = True
+        if failed:
+            # A partial write must not leave staged/unstaged differences blocking merge --abort.
+            sh(restore, cwd=worktree, log=log)
+            return False
+    return sh(["git", "add", *generated], cwd=worktree, log=log).returncode == 0
+
 from fix_red_statement_merge import contained_by_main, contained_by_main_file  # noqa: F401
 from fix_red_diff_edits import (  # noqa: F401
     balance_added_headings, balance_heading_line, snap_added_conservative_spacing, strip_added_legacy_cache_exports,
@@ -126,3 +171,10 @@ def size_500_stale_hit(text: object) -> tuple[str, str] | None:
     if not errors or any(_SIZE_500_ERROR.fullmatch(item) is None for item in errors):
         return None
     return ("size-500-stale", "sync-main")
+
+
+def size_500_route(text: object) -> tuple[str, str] | None:
+    """Unbaselined over-500 tests split. Growth-only logs sync main. Mixed logs stay with the model."""
+    from fix_red_size_500 import unbaselined_hit
+
+    return unbaselined_hit(text) or size_500_stale_hit(text)

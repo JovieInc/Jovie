@@ -140,14 +140,38 @@ export function enforceProjectedTreeBudget({
 export function runProjectedTreeBudget({
   env = process.env,
   git = localGit,
+  local = false,
   log = console.log,
 } = {}) {
+  // Local hooks have no Actions SHA environment. Resolve the committed branch
+  // against the fetched base; hosted CI keeps its explicit trusted bindings.
+  const refs = local
+    ? {
+        PR_BASE_SHA: git([
+          'rev-parse',
+          '--verify',
+          'refs/remotes/origin/main^{commit}',
+        ]).trim(),
+        PR_HEAD_SHA: git(['rev-parse', '--verify', 'HEAD^{commit}']).trim(),
+      }
+    : env;
+  if (local) {
+    refs.PR_MERGE_BASE = git([
+      'merge-base',
+      '--all',
+      refs.PR_BASE_SHA,
+      refs.PR_HEAD_SHA,
+    ])
+      .trim()
+      .split('\n')
+      .sort()[0];
+  }
   return enforceProjectedTreeBudget({
-    baseSha: env.PR_BASE_SHA,
+    baseSha: refs.PR_BASE_SHA,
     git,
-    headSha: env.PR_HEAD_SHA,
+    headSha: refs.PR_HEAD_SHA,
     log,
-    mergeBaseSha: env.PR_MERGE_BASE,
+    mergeBaseSha: refs.PR_MERGE_BASE,
   });
 }
 
@@ -156,7 +180,7 @@ if (
   import.meta.url === pathToFileURL(process.argv[1]).href
 ) {
   try {
-    runProjectedTreeBudget();
+    runProjectedTreeBudget({ local: process.argv.includes('--local') });
   } catch (error) {
     console.error(
       `::error::${error instanceof Error ? error.message : String(error)}`
