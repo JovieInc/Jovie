@@ -74,6 +74,19 @@ describe('LeadKeywordsManager', () => {
     keywordsState = { data: { keywords: [keyword(1)] }, isLoading: false };
   });
 
+  it.each([
+    [0, '0 Results'],
+    [1, '1 Result'],
+    [2, '2 Results'],
+  ])('renders %i matching results with an agreeing noun', (count, label) => {
+    keywordsState = {
+      data: { keywords: [{ ...keyword(1), resultsFoundTotal: Number(count) }] },
+      isLoading: false,
+    };
+    render(<LeadKeywordsManager />, { wrapper });
+    expect(screen.getByText(String(label), { exact: true })).toBeVisible();
+  });
+
   it('shows the loading line while keywords load', async () => {
     keywordsState = { isLoading: true };
     const { container } = render(<LeadKeywordsManager />, { wrapper });

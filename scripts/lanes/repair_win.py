@@ -50,8 +50,8 @@ _CERT_USES = re.compile(
 _CERT_REF = re.compile(r"^([+-])      ci-ref: ([0-9a-f]{40})\Z")
 
 
-def _forward_count(comparison, old: str, new: str, message: str) -> int:
-    url = f"https://github.com/JovieInc/ci/compare/{old}...{new}"
+def _forward_count(comparison, old: str, new: str, message: str, *, repository="JovieInc/ci") -> int:
+    url = f"https://github.com/{repository}/compare/{old}...{new}"
     count = comparison.get("ahead_by")
     commits = comparison.get("commits")
     if (comparison.get("html_url") != url or comparison.get("status") != "ahead"
@@ -69,9 +69,9 @@ def _forward_count(comparison, old: str, new: str, message: str) -> int:
     return count
 
 
-def _adopted_count(adopted, new: str, message: str) -> int:
+def _adopted_count(adopted, new: str, message: str, *, repository="JovieInc/ci") -> int:
     if (not isinstance(adopted, dict)
-            or adopted.get("html_url") != f"https://github.com/JovieInc/ci/compare/{new}...{new}"
+            or adopted.get("html_url") != f"https://github.com/{repository}/compare/{new}...{new}"
             or adopted.get("status") != "identical"
             or any(type(adopted.get(key)) is not int or adopted[key] != 0
                    for key in ("ahead_by", "behind_by", "total_commits"))
@@ -152,13 +152,55 @@ def pin_revisions(files) -> tuple[str, str, str | None]:
     return old, new, _cert_old(certs[0], new) if certs else None
 
 
-def _metric(name: str, count: int, after: int, old: str, new: str) -> str:
+def github_action_revisions(files) -> tuple[str, str, str]:
+    """Accept one root-action SHA replacement, optionally beside this repair machine."""
+    message = "action Win requires one modified workflow with only a consistent action pin bump"
+    if not isinstance(files, list) or any(not isinstance(file, dict) for file in files):
+        raise ValueError(message)
+    workflows = [file for file in files if not (
+        file.get("filename") in MACHINE_FILES and file.get("status") in {"added", "modified"})]
+    if (len(workflows) != 1 or workflows[0].get("status") != "modified"
+            or not re.fullmatch(r"\.github/workflows/[\w.-]+\.ya?ml", workflows[0].get("filename") or "")
+            or not isinstance(workflows[0].get("patch"), str)):
+        raise ValueError(message)
+    changed = [line for line in workflows[0]["patch"].splitlines() if line.startswith(("+", "-"))]
+    pattern = re.compile(
+        r"([+-])( +uses: )([A-Za-z0-9][A-Za-z0-9-]*/[A-Za-z0-9][A-Za-z0-9_.-]*)"
+        r"@([0-9a-f]{40})(?: +#.*)?")
+    pins = [pattern.fullmatch(line) for line in changed]
+    if len(pins) != 2 or any(pin is None for pin in pins):
+        raise ValueError(message)
+    old, new = pins
+    if (old[1] != "-" or new[1] != "+" or (old[2], old[3]) != (new[2], new[3]) or old[4] == new[4]):
+        raise ValueError(message)
+    return old[3], old[4], new[4]
+
+
+def _metric(name: str, count: int, after: int, old: str, new: str, *, repository="JovieInc/ci") -> str:
     return (
         f"- Metric: {name} | commits | lower | {count} | {after} | "
         "GitHub compare API, old pin versus adopted target | "
-        f"node packages/api-client/cli.ts gh --priority repair -- api repos/JovieInc/ci/compare/{old}...{new} --jq .ahead_by && "
-        f"node packages/api-client/cli.ts gh --priority repair -- api repos/JovieInc/ci/compare/{new}...{new} --jq .ahead_by"
+        f"node packages/api-client/cli.ts gh --priority repair -- api repos/{repository}/compare/{old}...{new} --jq .ahead_by && "
+        f"node packages/api-client/cli.ts gh --priority repair -- api repos/{repository}/compare/{new}...{new} --jq .ahead_by"
     )
+
+
+def github_action_pin(files, comparison, *, adopted_comparison) -> str:
+    """Prove upstream pin freshness, without inferring runtime or throughput gains."""
+    repository, old, new = github_action_revisions(files)
+    count = _forward_count(comparison, old, new, "action upstream comparison must match the forward pin bump",
+                           repository=repository)
+    after = _adopted_count(adopted_comparison, new, "action adopted target must prove zero remaining commits",
+                           repository=repository)
+    section = "\n".join([
+        "## Win", "", f"- Claim: Bring the {repository} pin up to the verified upstream target; "
+        "runtime or throughput improvement is not measured.",
+        "- Area: ci", "- Theme: dependency-maintenance",
+        _metric("upstream action commits behind target", count, after, old, new, repository=repository),
+        f"- Verify: https://github.com/{repository}/compare/{old}...{new}", "",
+    ])
+    validate(section)
+    return section
 
 
 def company_guard_pin(files: list[dict], comparison: dict, *, adopted_comparison: dict,

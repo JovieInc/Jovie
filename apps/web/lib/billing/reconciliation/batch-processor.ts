@@ -150,7 +150,8 @@ async function handleMismatch(
 export async function processSingleUser(
   db: DbOrTransaction,
   stripe: Stripe,
-  user: UserBatchItem
+  user: UserBatchItem,
+  onSubscription?: (subscription: Stripe.Subscription) => void
 ): Promise<ProcessUserResult> {
   // Skip users without subscription ID
   if (!user.stripeSubscriptionId) {
@@ -168,6 +169,8 @@ export async function processSingleUser(
   if (!subscription) {
     return { action: 'skipped' };
   }
+
+  onSubscription?.(subscription);
 
   // Check for and fix status mismatch
   const currentIsPro = user.isPro ?? false;

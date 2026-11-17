@@ -38,6 +38,7 @@ HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 from atomic_state import append_json_object
 from pr_body_markup import ANY_HEADING, quote_revision_references, red_section_bounds, repair_customer_decision, with_blast_radius, with_red_section
+from pr_repair_evidence import with_locking_pr
 import empty_review, red_repair, remediation  # noqa: E402  (classifier, red-repair admission, non-PR intake)
 REPO = os.environ.get("GITHUB_REPOSITORY", "JovieInc/Jovie")
 PREFIX = "lane-fix-"
@@ -1090,12 +1091,7 @@ def repair_evidence_body(pr: dict, body: str, excerpt: str = "", *, customer_dec
         if block:
             updated = with_red_section(updated, block)
     if locking_pr is not None:
-        if type(locking_pr) is not int or locking_pr < 1:
-            raise ValueError("locking PR requires an explicit positive PR number")
-        # Diagnostic examples are not the author's citation section. Use the
-        # same fence-aware boundaries as the canonical Fleet evidence parser.
-        if red_section_bounds(updated.split("\n"), re.compile(r"^#{1,6}\s+Locked areas\s*$", re.I)) is None:
-            updated = updated.rstrip("\n") + f"\n\n## Locked areas\n\nLocking PR: #{locking_pr}\n"
+        updated = with_locking_pr(updated, locking_pr)
     if previous_win_section is not None and not win_section:
         raise ValueError("Win replacement requires explicit measured win evidence")
     if win_section is not None and win_section != "":

@@ -2,7 +2,9 @@ import { lintCopy } from '@jovie/copy';
 import { z } from 'zod';
 import surfaceCensus from '@/data/designSystem/surfaceCensus.json';
 import { HOMEPAGE_EDITORIAL_COPY } from '@/data/homepageEditorialCopy';
+import { isHomepageStartCtaEnabled } from '@/data/homepageStartCta';
 import { MARKETING_SECTIONS } from '@/data/marketing/sections';
+import { getClaimProfileIntent } from '@/data/marketingCtaIntents';
 import icpLanguage from '../../../../scripts/invariants/icp-language/config.json';
 import { experimentSchema } from './experiment';
 import type { ContentKindDefinition } from './kind';
@@ -25,8 +27,8 @@ import type { ContentKindDefinition } from './kind';
 
 // 2026-11-07: the editorial invite-only homepage replaced the artist-profile
 // claim sections. A record stored with the old section variants no longer
-// validates, so `getLiveContent` serves the code default below (source
-// 'incompatible') until a valid version is published.
+// validates. Known retired slots migrate on read; unrecognized records keep
+// the incompatible default until a valid version is published.
 const MARKETING_PAGE_SPEC_SCHEMA_VERSION = 1;
 
 const line = (max: number) =>
@@ -150,7 +152,123 @@ export type MarketingPageSections = MarketingPageSpec['sections'];
 export const MARKETING_PAGE_KEYS = ['home'] as const;
 export type MarketingPageKey = (typeof MARKETING_PAGE_KEYS)[number];
 
-/** The code default: the editorial story, ending in the invitation form. */
+// These shapes were retired without a schema-version bump. Recognize the
+// complete record before replacing retired slots; never discard unknown data.
+const RetiredHeroSection = z
+  .object({
+    section: z.literal('hero'),
+    variant: z.literal('centered-handle-claim'),
+    copy: z
+      .object({
+        eyebrow: line(90).optional(),
+        headline: line(90),
+        subhead: line(220),
+      })
+      .strict(),
+  })
+  .strict();
+const LegacySectionsSchema = z
+  .array(
+    z.union([
+      MarketingPageSectionSchema,
+      RetiredHeroSection,
+      HeroSection.extend({ variant: z.literal('centered-none') }),
+      HeroSection.extend({
+        variant: z.literal('split-claim-card'),
+        copy: z.object({ subhead: line(220), claimAction: line(24) }).strict(),
+      }),
+      ProductGallerySection.extend({
+        variant: z.literal('profile-grid'),
+        copy: z.object({ headline: line(90) }).strict(),
+      }),
+      CtaSection.extend({
+        copy: CtaSection.shape.copy.extend({ plansLinkLabel: line(32) }),
+      }),
+    ])
+  )
+  .min(1)
+  .max(12);
+const LegacySpecSchema = z
+  .object({
+    sections: LegacySectionsSchema,
+    experiment: experimentSchema(LegacySectionsSchema).optional(),
+  })
+  .strict();
+
+function migrateSections(
+  stored: z.infer<typeof LegacySectionsSchema>,
+  codeDefault: MarketingPageSpec
+): MarketingPageSections | null {
+  const current = MarketingPageSpecSchema.safeParse({ sections: stored });
+  if (
+    current.success &&
+    marketingPageViolations(current.data, 'home').length === 0
+  ) {
+    return current.data.sections;
+  }
+  const ids = stored.map(entry => entry.section);
+  if (
+    ids[0] !== 'hero' ||
+    new Set(ids).size !== ids.length ||
+    (ids.includes('cta') && ids.at(-1) !== 'cta')
+  )
+    return null;
+  const sections = stored.map(entry => {
+    const parsed = MarketingPageSectionSchema.safeParse(entry);
+    const inviteClose =
+      entry.section === 'cta' &&
+      entry.copy.headline === HOMEPAGE_EDITORIAL_COPY.invite.headline &&
+      entry.copy.subhead === HOMEPAGE_EDITORIAL_COPY.invite.subhead;
+    return parsed.success && !inviteClose
+      ? parsed.data
+      : structuredClone(
+          codeDefault.sections.find(
+            section => section.section === entry.section
+          )!
+        );
+  });
+  for (const fallback of codeDefault.sections) {
+    if (ids.includes(fallback.section)) continue;
+    const close = sections.findIndex(entry => entry.section === 'cta');
+    sections.splice(
+      close === -1 ? sections.length : close,
+      0,
+      structuredClone(fallback)
+    );
+  }
+  return sections;
+}
+
+/** Pure compatibility for known retired slots, preserving each experiment arm. */
+export function migrateMarketingPageSpec(
+  stored: unknown,
+  codeDefault: MarketingPageSpec = DEFAULT_HOME_SPEC
+): MarketingPageSpec | null {
+  const current = MarketingPageSpecSchema.safeParse(stored);
+  if (
+    current.success &&
+    marketingPageViolations(current.data, 'home').length === 0
+  )
+    return current.data;
+  const legacy = LegacySpecSchema.safeParse(stored);
+  if (!legacy.success) return null;
+  const sections = migrateSections(legacy.data.sections, codeDefault);
+  if (!sections) return null;
+  const experiment = legacy.data.experiment;
+  const variants = experiment?.variants.map(variant => ({
+    ...variant,
+    body: migrateSections(variant.body, codeDefault),
+  }));
+  const spec = MarketingPageSpecSchema.safeParse({
+    sections,
+    ...(experiment ? { experiment: { ...experiment, variants } } : {}),
+  });
+  return spec.success && marketingPageViolations(spec.data, 'home').length === 0
+    ? spec.data
+    : null;
+}
+
+/** The code default: the editorial story, ending in the claim close. */
 export const DEFAULT_HOME_SPEC: MarketingPageSpec = {
   sections: [
     {
@@ -158,7 +276,13 @@ export const DEFAULT_HOME_SPEC: MarketingPageSpec = {
       variant: 'left-none',
       copy: {
         subhead: HOMEPAGE_EDITORIAL_COPY.hero.subhead,
-        primaryAction: HOMEPAGE_EDITORIAL_COPY.hero.primaryAction,
+        // Open signup (Tim, 2026-11-12: "Switch it"): the fallback copy
+        // carries the shared claim-profile action, the same label the hero
+        // renders while signup is open. No invite-only language in the
+        // fallback (JOV-12824). While the PUBLIC_SIGNUP_CLOSED kill switch is
+        // on, a published record fills this slot with the invitation form's
+        // own label instead.
+        primaryAction: getClaimProfileIntent().label,
         secondaryAction: HOMEPAGE_EDITORIAL_COPY.hero.secondaryAction,
       },
     },
@@ -182,8 +306,11 @@ export const DEFAULT_HOME_SPEC: MarketingPageSpec = {
       section: 'cta',
       variant: 'final-single-claim',
       copy: {
-        headline: HOMEPAGE_EDITORIAL_COPY.invite.headline,
-        subhead: HOMEPAGE_EDITORIAL_COPY.invite.subhead,
+        // The claim close (open signup), not the invitation copy: the
+        // invitation form's headline and subhead are published-record slots
+        // only (Tim, 2026-11-12: "Switch it"; JOV-12824).
+        headline: HOMEPAGE_EDITORIAL_COPY.claim.headline,
+        subhead: HOMEPAGE_EDITORIAL_COPY.claim.subhead,
       },
     },
   ],
@@ -297,7 +424,31 @@ export const MARKETING_PAGE_KIND: ContentKindDefinition<MarketingPageSpec> = {
   schemaVersion: MARKETING_PAGE_SPEC_SCHEMA_VERSION,
   schema: MarketingPageSpecSchema,
   keys: MARKETING_PAGE_KEYS,
-  defaultRecord: () => DEFAULT_HOME_SPEC,
+  defaultRecord: () =>
+    isHomepageStartCtaEnabled()
+      ? DEFAULT_HOME_SPEC
+      : {
+          sections: DEFAULT_HOME_SPEC.sections.map(entry => {
+            if (entry.section === 'hero')
+              return {
+                ...entry,
+                copy: {
+                  ...entry.copy,
+                  primaryAction: HOMEPAGE_EDITORIAL_COPY.hero.primaryAction,
+                },
+              };
+            if (entry.section === 'cta')
+              return {
+                ...entry,
+                copy: {
+                  headline: HOMEPAGE_EDITORIAL_COPY.invite.headline,
+                  subhead: HOMEPAGE_EDITORIAL_COPY.invite.subhead,
+                },
+              };
+            return entry;
+          }),
+        },
   validate: (spec, key) => marketingPageViolations(spec, key),
+  migrate: migrateMarketingPageSpec,
   livePaths: key => (key === 'home' ? ['/'] : []),
 };

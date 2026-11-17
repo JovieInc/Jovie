@@ -211,6 +211,38 @@ describe('vercel on-demand hard cap', () => {
     );
   });
 
+  it('does not authorize optional paid capacity from malformed money', () => {
+    for (const value of [undefined, NaN, Infinity, -1, '0'])
+      for (const field of ['actualUsd', 'projectedUsd']) {
+        const ledger = { actualUsd: 0, projectedUsd: 0, [field]: value };
+        assert.equal(
+          decide({ ledger, policy, project: pinned }).reason,
+          'spend-unknown'
+        );
+      }
+    for (const BilledCost of [null, '', false, 'unknown', -1])
+      assert.throws(
+        () =>
+          computeLedger({
+            deployments: [],
+            policy,
+            period,
+            now: Date.parse(policy.enabledAt) + DAY,
+            charges: [
+              {
+                ServiceName: 'Build Minutes',
+                Tags: { ProjectId: policy.projectId },
+                ChargePeriodEnd: new Date(
+                  Date.parse(policy.enabledAt) + DAY
+                ).toISOString(),
+                BilledCost,
+              },
+            ],
+          }),
+        /billed build cost/
+      );
+  });
+
   describe('against the Vercel API', () => {
     const now = Date.parse(policy.enabledAt) + 5 * DAY;
     const api = ({
@@ -220,6 +252,8 @@ describe('vercel on-demand hard cap', () => {
       failCharges = false,
       failDeployments = false,
       ignorePatch = false,
+      deploymentResult,
+      billingPeriod = period,
     }) => {
       const calls = [];
       const state = structuredClone(project);
@@ -241,11 +275,11 @@ describe('vercel on-demand hard cap', () => {
           return ok(structuredClone(state));
         }
         if (u.pathname.startsWith('/v2/teams/'))
-          return ok({ billing: { period } });
+          return ok({ billing: { period: billingPeriod } });
         if (u.pathname === '/v6/deployments') {
           return failDeployments
             ? { ok: false, status: 503 }
-            : ok({ deployments, pagination: {} });
+            : ok(deploymentResult ?? { deployments, pagination: {} });
         }
         if (u.pathname === '/v1/billing/charges') {
           return failCharges ? { ok: false, status: 404 } : ok(charges);
@@ -254,6 +288,57 @@ describe('vercel on-demand hard cap', () => {
       };
       return { fetchImpl, calls, state: () => state };
     };
+
+    it('falls back to the normal queue for malformed or incomplete listings', async () => {
+      for (const deploymentResult of [
+        {},
+        { deployments: {} },
+        { deployments: [null] },
+        { deployments: ['malformed'] },
+        { deployments: [{}] },
+        { deployments: [], pagination: { next: 1 } },
+        { deployments: [build(now)], pagination: { next: 1 } },
+        { deployments: [build(now)], pagination: { next: 'bad' } },
+      ]) {
+        const project = {
+          resourceConfig: {
+            ...pinned.resourceConfig,
+            elasticConcurrencyEnabled: true,
+          },
+        };
+        const v = api({ deploymentResult, project });
+        const result = await runLedger({
+          token: 't',
+          teamId: 'team_x',
+          policy,
+          fetchImpl: v.fetchImpl,
+          now,
+        });
+        assert.equal(result.ledger, null);
+        assert.equal(result.decision.reason, 'spend-unknown');
+        assert.equal(v.state().resourceConfig.elasticConcurrencyEnabled, false);
+        assert.ok(v.calls.filter(c => c === 'GET /v6/deployments').length <= 2);
+      }
+    });
+
+    it('rejects expired billing periods before querying deployments', async () => {
+      for (const billingPeriod of [
+        { start: now - DAY, end: now },
+        { start: 0, end: now + DAY },
+      ]) {
+        const v = api({ deployments: [], billingPeriod });
+        const result = await runLedger({
+          token: 't',
+          teamId: 'team_x',
+          policy,
+          fetchImpl: v.fetchImpl,
+          now,
+        });
+        assert.equal(result.decision.reason, 'spend-unknown');
+        assert.match(result.error, /billing period/);
+        assert.ok(!v.calls.includes('GET /v6/deployments'));
+      }
+    });
 
     it('enables on-demand with the one-build-per-branch queue and reads it back', async () => {
       const v = api({
@@ -377,12 +462,15 @@ describe('vercel on-demand hard cap', () => {
         VERCEL_ORG_ID: 'team_x',
         GITHUB_STEP_SUMMARY: join(dir, 's'),
       };
-      assert.equal(await runCli({ env, fetchImpl: stuck.fetchImpl }), null);
+      assert.equal(
+        await runCli({ env, fetchImpl: stuck.fetchImpl, now }),
+        null
+      );
       assert.equal(await runCli({ env: {} }), null);
       const ok = api({
         deployments: builds(42, Date.parse(policy.enabledAt), DAY / 14),
       });
-      const result = await runCli({ env, fetchImpl: ok.fetchImpl });
+      const result = await runCli({ env, fetchImpl: ok.fetchImpl, now });
       assert.equal(result.decision.enabled, true);
     });
   });

@@ -3,6 +3,7 @@ import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 import * as navigationConfig from '@/components/features/dashboard/dashboard-nav/config';
+import { getRailNavigation } from '@/components/features/dashboard/dashboard-nav/navigation-state';
 
 // The Storybook elevation spec runs only in merge groups. When a PR changes whether a
 // sidebar destination is gated (JOV-7733 removed Identity's requiredFlag) without
@@ -10,6 +11,11 @@ import * as navigationConfig from '@/components/features/dashboard/dashboard-nav
 // (`Identity` toHaveCount(0), 2026-10-26). This reads the spec from disk, so the
 // disk-reading source guard runs it at PR time whenever the spec or the nav config
 // changes.
+//
+// A destination may also leave the rail without a flag: when the header bell owns
+// the Inbox (the default customer sidebar the spec's dashboard story renders),
+// `getRailNavigation` drops the rail's Inbox row (2026-11-14). That exemption is
+// read from the real rail helper, so re-adding the row fails here too.
 const SPEC = readFileSync(
   resolve(__dirname, '../../e2e/storybook-elevation.spec.ts'),
   'utf8'
@@ -24,6 +30,13 @@ const navItems = (Object.values(navigationConfig) as unknown[]).filter(
     typeof (value as NavLike).name === 'string' &&
     typeof (value as NavLike).href === 'string'
 );
+
+const { canonicalSidebarNavigation } = navigationConfig;
+/** Rail rows of the default customer sidebar, where the header owns the Inbox. */
+const headerOwnedRail = getRailNavigation(canonicalSidebarNavigation, true);
+const isDroppedByHeaderOwnedInbox = (name: string) =>
+  canonicalSidebarNavigation.some(item => item.name === name) &&
+  !headerOwnedRail.some(item => item.name === name);
 
 const labelsExpectedHidden = [
   ...SPEC.matchAll(
@@ -45,13 +58,16 @@ describe('storybook-elevation sidebar expectations match the navigation config',
   });
 
   it.each(labelsExpectedHidden)(
-    'expects %s hidden only while its nav item is flag-gated',
+    'expects %s hidden only while flag-gated or dropped for the header-owned Inbox',
     name => {
       const items = navItems.filter(item => item.name === name);
       expect(
         items.length,
         `"${name}" is asserted hidden in the elevation spec but is not a nav item`
       ).toBeGreaterThan(0);
+      // Structural removal, not a gate: the header bell is the only `/app`
+      // entry, so the rail renders no row with this name.
+      if (isDroppedByHeaderOwnedInbox(name)) return;
       for (const item of items)
         expect(
           item.requiredFlag,
@@ -63,6 +79,10 @@ describe('storybook-elevation sidebar expectations match the navigation config',
   it.each(labelsExpectedVisible)(
     'expects $name visible only while its nav item is ungated and links to $href',
     ({ name, href }) => {
+      expect(
+        headerOwnedRail.some(item => item.name === name),
+        `"${name}" is not a rail row of the default sidebar; remove it from the elevation spec's destination list.`
+      ).toBe(true);
       for (const item of navItems.filter(entry => entry.name === name)) {
         expect(
           item.requiredFlag,

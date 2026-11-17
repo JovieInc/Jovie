@@ -11,6 +11,7 @@ import {
   sha,
   sorted,
 } from './native-typecheck-buildinfo.mjs';
+import { redirectCoverage } from './native-typecheck-redirect.mjs';
 
 const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 
@@ -41,6 +42,8 @@ export function assertGraphParity(
     status: 'equal',
     aliases: [],
     sharedAuxiliaryReferences: [],
+    programRedirects: [],
+    redirectAuxiliaryReferences: [],
     nodes: 0,
     edges: 0,
     ambient: [],
@@ -82,6 +85,10 @@ export function assertGraphParity(
       'Captured graph snapshot hash changed'
     );
     const raw = JSON.parse(bytes.toString());
+    check(
+      raw.version === graph.metadata.version,
+      'Captured graph version differs'
+    );
     const paths = raw.fileNames.map(name =>
       buildInfoPath(
         name,
@@ -116,9 +123,12 @@ export function assertGraphParity(
               incoming: incoming
                 .map(id => ({
                   path: paths[id - 1],
-                  format: info(raw.fileInfos[id - 1]).impliedFormat ?? null,
+                  format:
+                    info(raw.fileInfos[id - 1], raw.version).impliedFormat ??
+                    null,
                   global:
-                    info(raw.fileInfos[id - 1]).affectsGlobalScope ?? false,
+                    info(raw.fileInfos[id - 1], raw.version)
+                      .affectsGlobalScope ?? false,
                 }))
                 .sort((a, b) => a.path.localeCompare(b.path)),
             },
@@ -132,7 +142,7 @@ export function assertGraphParity(
       .forEach((name, index) =>
         values.set(
           resolve(dirname(graph.metadata.rawBuildInfoPath), name),
-          info(raw.fileInfos[index])
+          info(raw.fileInfos[index], raw.version)
         )
       );
     return values;
@@ -156,9 +166,20 @@ export function assertGraphParity(
     [actual, expected],
     [expected, actual],
   ]) {
+    const certified = redirectCoverage(
+      graph,
+      other,
+      auxiliaryContexts.get(graph),
+      graph === actual ? leftInfo : rightInfo,
+      graph === actual ? rightInfo : leftInfo
+    );
     for (const path of graph.dependencyFiles.filter(
       path => !other.dependencyFiles.includes(path)
     )) {
+      if (certified.semanticRedirects.has(path)) {
+        proof.programRedirects.push(certified.semanticRedirects.get(path));
+        continue;
+      }
       const target = counterpart(path, other.dependencyFiles);
       check(target, `Unproven physical dependency alias: ${path}`);
       queue.push([path, target]);
@@ -171,6 +192,12 @@ export function assertGraphParity(
           proof.sharedAuxiliaryReferences.push({ path, ...context });
         continue;
       }
+      if (certified.auxiliaryRedirects.has(path)) {
+        proof.redirectAuxiliaryReferences.push(
+          certified.auxiliaryRedirects.get(path)
+        );
+        continue;
+      }
       const target = counterpart(path, [
         ...graph.dependencyFiles,
         ...other.dependencyFiles,
@@ -180,7 +207,14 @@ export function assertGraphParity(
     }
   }
   check(performance.now() < end, 'Context proof time budget exceeded');
-  if (!queue.length) return proof;
+  if (!queue.length) {
+    if (
+      proof.programRedirects.length ||
+      proof.redirectAuxiliaryReferences.length
+    )
+      proof.status = 'program-redirect-proven';
+    return proof;
+  }
   bounded();
   const configured = configuration?.();
   compiler = configured?.compiler ?? compiler;
