@@ -6287,9 +6287,9 @@ def render_fix_prompt(pr: dict, excerpt: str) -> str:
                    "Other shell && chains are unioned by fix_red_classes.merge_and_chain",
                    "(base order, then head-only prefixes; node --test and vitest paths union).",
                    "Unknown hunks stay unresolved.",
-                   "A one-line comma-separated identifier list is unioned by",
-                   "fix_red_classes.merge_additive_identifier_list (main order, then head-only",
-                   "tokens). Unknown hunks stay unresolved.",
+                   "A one-line comma-separated identifier list uses merge_additive_identifier_list;",
+                   "a quoted scripts/tests/test_*.py list uses merge_pytest_file_list. Main order,",
+                   "then head-only tokens. Unknown hunks stay unresolved.",
                    "When both sides import different modules of the same extracted helpers,",
                    "split_helper_import.resolve_split_helper_conflict keeps main's identical",
                    "definitions and the head-only names. Unknown hunks stay unresolved.",
@@ -6490,7 +6490,7 @@ def resolve_additive_list_conflict(worktree: Path, branch: str, log, *, guard=la
 
 
 def resolve_identifier_list_conflict(worktree: Path, branch: str, log, *, guard=lambda: None) -> bool:
-    """Union one-line identifier lists when every conflict hunk with main is that shape.
+    """Union identifier lists and quoted pytest path lists when every hunk is that shape.
 
     Main's order stays, then head-only tokens. Prose or any other shape aborts and
     leaves the PR to the model. The push is a fast-forward of the PR branch."""
