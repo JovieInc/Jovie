@@ -24,7 +24,10 @@ import {
   getDisplaySpotifyFollowers,
   normalizeArtistMetrics,
 } from '@/lib/onboarding/canonical-metrics';
-import { decideQualification } from '@/lib/waitlist/decision';
+import {
+  decideQualification,
+  type QualificationDecision,
+} from '@/lib/waitlist/decision';
 import {
   decideGoldenPathAdmission,
   type GoldenPathAdmissionReason,
@@ -107,6 +110,8 @@ export interface AccessDecision {
   readonly goldenPathHold?: GoldenPathAdmissionReason;
   /** 0-100 confidence; useful for retroactive analysis of where to tune thresholds. */
   readonly score: number;
+  /** Rule-versioned capture disposition, separate from the routing rationale. */
+  readonly qualificationDecision?: QualificationDecision;
   /**
    * JOV-7144: Mom-Test coverage from the shared qualification contract. The
    * model asks one past-behavior question about `nextDimension` next.
@@ -192,14 +197,15 @@ export function evaluateAccessSignal(
       turnCapReached: true,
     });
     return {
-      // User-facing kind stays `waitlist` (no disqualified card exists); the
-      // durable decision rides the rationale into the persisted record.
+      // Keep the established routing rationale; the structured disposition
+      // retains the queued reason and captured needs without parsing that text.
       kind: 'waitlist',
       rationale:
         capDecision.outcome === 'disqualified'
           ? capDecision.reason
-          : `queued_${capDecision.reason}`,
+          : `max_turns_reached_${turnCount}`,
       score: capDecision.outcome === 'disqualified' ? 20 : 30,
+      qualificationDecision: capDecision,
       qualification,
     };
   }
