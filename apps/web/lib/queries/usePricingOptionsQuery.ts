@@ -9,15 +9,10 @@
  */
 
 import { useQuery } from '@tanstack/react-query';
-import {
-  applyPriceLockToOptions,
-  type PriceLockView,
-} from '@/lib/billing/price-lock-view';
+import type { PriceLockView } from '@/lib/billing/price-lock-view';
 import { STABLE_CACHE } from './cache-strategies';
-import { createQueryFn } from './fetch';
 import { queryKeys } from './keys';
 import { createClassifiedRetry } from './retry-policy';
-import { fetchPriceLock } from './usePriceLockQuery';
 
 /**
  * Individual pricing option from the API.
@@ -35,7 +30,7 @@ export interface PricingOption {
  * Raw response from the pricing options API.
  * The API returns both fields for backwards compatibility.
  */
-interface PricingOptionsRawResponse {
+export interface PricingOptionsRawResponse {
   pricingOptions?: PricingOption[];
   options?: PricingOption[];
 }
@@ -47,27 +42,6 @@ export interface PricingOptionsResponse {
   options: PricingOption[];
   /** The person's price lock; options already carry the locked price. */
   priceLock: PriceLockView | null;
-}
-
-const fetchPricingOptionsRaw = createQueryFn<PricingOptionsRawResponse>(
-  '/api/stripe/pricing-options'
-);
-
-async function fetchPricingOptions({
-  signal,
-}: {
-  signal?: AbortSignal;
-}): Promise<PricingOptionsResponse> {
-  // Apply the lock here; a lock read failure fails the query, never a list price.
-  const [raw, priceLock] = await Promise.all([
-    fetchPricingOptionsRaw({ signal }),
-    fetchPriceLock({ signal }),
-  ]);
-  const listed = [...(raw.pricingOptions ?? []), ...(raw.options ?? [])];
-  return {
-    options: applyPriceLockToOptions(listed, priceLock),
-    priceLock,
-  };
 }
 
 /**
@@ -90,7 +64,10 @@ export const pricingOptionsQueryOptions = {
   get queryKey() {
     return queryKeys.billing.pricingOptions();
   },
-  queryFn: fetchPricingOptions,
+  queryFn: (context: { signal?: AbortSignal }) =>
+    import('./usePriceLockQuery').then(module =>
+      module.fetchPricingOptions(context)
+    ),
   ...STABLE_CACHE,
   retry: createClassifiedRetry(0),
 };
