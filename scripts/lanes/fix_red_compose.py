@@ -21,7 +21,7 @@ def compose_actions(actions: list[str]) -> list[str]:
         classes.SYNC_MAIN, classes.STAMP_CHANGELOG, classes.REPAIR_WIN, classes.WIRE_CI_FAST, classes.RENUMBER,
         classes.SNAP_SPACING, classes.STRIP_CACHE, classes.MERGE_NARROWED, classes.REGISTER_DOMAIN,
         classes.ATOMIC_WRITE, classes.REPAIR_SCREEN_CERT, classes.BALANCE_HEADINGS, classes.UI_FEEL,
-        fix_red_render_modes.ACTION, classes.RERUN)
+        fix_red_render_modes.ACTION, classes.SPLIT_SIZE, classes.BIOME_FORMAT, classes.RERUN)
     rank = {name: index for index, name in enumerate(order)}
     chosen: list[str] = []
     for action in actions:
@@ -57,6 +57,10 @@ def deterministic_fixer(lane, action: str):
         "ui": lane.fix_red_screen_cert.bind_ui_feel(lane.sh, lane.failed_logs, classes),
     })
     table[fix_red_render_modes.ACTION] = fix_red_render_modes.bind(lane.sh, lane.failed_logs)
+    import fix_red_size_500
+    table[classes.SPLIT_SIZE] = fix_red_size_500.bind(lane.sh, lane.failed_logs)
+    import fix_red_biome
+    table[classes.BIOME_FORMAT] = fix_red_biome.bind(lane.sh)
     return table.get(action)
 
 
@@ -117,4 +121,11 @@ def repair_files(cls, action, names, logs, per_check):
         import fix_red_render_modes
         files = sorted(set(files) | set(fix_red_render_modes.routes_in(
             "\n".join(logs.get(name) or "" for name in names))))
+    if "size-500-unbaselined" in wanted and action in {classes.SPLIT_SIZE, classes.COMPOSE}:
+        import fix_red_size_500
+        files = sorted(set(files) | set(fix_red_size_500.paths(
+            "\n".join(logs.get(name) or "" for name in names))))
+    if "biome-format" in wanted and action in {classes.BIOME_FORMAT, classes.COMPOSE}:
+        from fix_red_biome import cited_paths
+        files = sorted(set(files) | set(cited_paths("\n".join(logs.get(name) or "" for name in names))))
     return files

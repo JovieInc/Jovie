@@ -37,7 +37,14 @@ export const LongContentFiftyEvents: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     await expect(canvas.getAllByText('Error').length).toBeGreaterThan(0);
-    await expect(canvas.getByText('50 minutes ago')).toBeInTheDocument();
+    // Every row's timestamp is unique ('{i + 2} minutes ago'), and the table
+    // renders desktop rows and mobile cards, so each timestamp text matches
+    // exactly twice. Assert the tail of the fifty rows rendered its
+    // timestamp instead of indexing the testid list (which counts both
+    // render sites, so index 49 is row 25, not row 50).
+    await expect(canvas.getAllByText('51 minutes ago').length).toBeGreaterThan(
+      0
+    );
   },
 };
 

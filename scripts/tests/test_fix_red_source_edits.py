@@ -490,6 +490,11 @@ class Size500StaleTest(unittest.TestCase):
         })
         self.assertEqual((got["cls"], got["action"]), ("mixed", "agent"))
 
+    def test_tracked_byte_stale_head_syncs_main(self):
+        fit = "PR head has 10 tracked regular-file bytes, exceeding the 8-byte repository budget, while the merged tree fits at 7 bytes"
+        over = "9 bytes of tracked regular files (merged tree; base 8 +1) exceeds the 8-byte combined-tree budget"
+        self.assertEqual(classes.classify(pr("PR Size Guard"), {"PR Size Guard": fit})["action"], "sync-main")
+        self.assertEqual(classes.classify(pr("PR Size Guard"), {"PR Size Guard": over})["action"], "agent")
 
 if __name__ == "__main__":
     unittest.main()

@@ -12,6 +12,7 @@ import {
 import { componentRenderBindings } from './component-render-closure.mjs';
 import {
   RENDER_INPUT_SCHEMA_V2,
+  renderBindingProblem,
   renderReceiptCurrent,
   snapshotRenderInputs,
 } from './component-render-inputs.mjs';
@@ -84,6 +85,31 @@ export async function verifiedStoryCacheKey(
   return `component-story-evidence-${run.id}-${run.run_attempt}`;
 }
 
+/**
+ * Why a capture receipt fails its currency check, for the failure message.
+ * The classes separate a capture bound to an older commit (the checkout
+ * moved past the capture; the admission red is the designed visible
+ * rejection) from an unusable receipt (invalid and needs a producer fix).
+ */
+function captureBindingProblem(receipt, sourceHash, expected) {
+  if (receipt?.schema !== STORY_EVIDENCE_SCHEMA)
+    return `receipt schema is ${receipt?.schema ?? 'missing'}, expected ${STORY_EVIDENCE_SCHEMA}`;
+  if (receipt.sourceHash !== sourceHash)
+    return 'the captured component source changed since the capture (source hash mismatch; the capture is bound to an older commit than the checkout)';
+  const bindingProblem = renderBindingProblem(receipt.renderInputs);
+  if (bindingProblem)
+    return `captured render binding unusable: ${bindingProblem}`;
+  if (!expected || renderBindingProblem(expected))
+    return `current render inputs unavailable: ${
+      expected ? renderBindingProblem(expected) : 'no binding'
+    }`;
+  if (receipt.renderInputs.schema !== expected.schema)
+    return `captured binding schema ${receipt.renderInputs.schema} does not match current ${expected.schema}`;
+  if (receipt.renderInputs.digest !== expected.digest)
+    return 'the captured render inputs changed since the capture (digest mismatch; the capture is bound to an older commit than the checkout)';
+  return 'receipt does not match the checkout';
+}
+
 /** Reject a stale notification before it can replace a current certificate. */
 export function requireCurrentStoryCache(root, directory) {
   const checkout = realpathSync(root);
@@ -140,10 +166,12 @@ export function requireCurrentStoryCache(root, directory) {
       const sourceHash = createHash('sha256')
         .update(readFileSync(file))
         .digest('hex');
-      requireProof(
+      const current =
         receipt.schema === STORY_EVIDENCE_SCHEMA &&
-          renderReceiptCurrent(receipt, sourceHash, expectedFor(path, receipt)),
-        'stale or invalid capture source/render binding'
+        renderReceiptCurrent(receipt, sourceHash, expectedFor(path, receipt));
+      requireProof(
+        current,
+        `stale or invalid capture source/render binding for ${path}: ${captureBindingProblem(receipt, sourceHash, expectedFor(path, receipt))}`
       );
     }
   }

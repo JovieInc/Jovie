@@ -24,6 +24,33 @@ import {
 } from './route-render-modes.mjs';
 
 describe('committed render-mode baseline', () => {
+  it('records the verified tip return as request-specific with scoped evidence', () => {
+    const committed = JSON.parse(
+      readFileSync(join(__dirname, 'route-render-modes.json'), 'utf8')
+    );
+    const route = '/[username]/tip/thank-you';
+    const baseline = snapshot({ ...SNAPSHOT_ROUTES });
+    if (committed.routes[route])
+      baseline.routes[route] = committed.routes[route];
+    baseline.overrides = { ...committed.overrides };
+    const addReturn = (build: ReturnType<typeof manifests>) => {
+      build.appPathRoutes[`${route}/page`] = route;
+    };
+    const result = judge(addReturn, baseline, snapshot());
+    expect(result.errors).toEqual([]);
+    expect(result.ok).toBe(true);
+    expect(baseline.routes[route]).toBe('dynamic');
+
+    // A missing or expired record must still fail the original ratchet.
+    delete baseline.overrides[route];
+    expect(judge(addReturn, baseline, snapshot()).ok).toBe(false);
+    baseline.overrides[route] = {
+      ...committed.overrides[route],
+      expiresOn: '2026-10-21',
+    };
+    expect(judge(addReturn, baseline, snapshot()).ok).toBe(false);
+  });
+
   it('records the existing dynamic publication-gate miss destination', () => {
     const committed = JSON.parse(
       readFileSync(join(__dirname, 'route-render-modes.json'), 'utf8')
