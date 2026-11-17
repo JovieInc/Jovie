@@ -93,6 +93,17 @@ describe('private promotion capture with an isolated PostgreSQL catalog', () => 
       stage: 'private_draft',
     });
     expect((await listCreatorDocuments(other)).documents).toEqual([]);
+    await database.open!.query(
+      'update discog_releases set deleted_at = now() where id = $1',
+      [work]
+    );
+    expect(await captureCreatorIdea(capture)).toEqual({
+      documentId: saved.documentId,
+      deduplicated: true,
+    });
+    await expect(
+      captureCreatorIdea({ ...capture, idempotencyKey: 'different-key' })
+    ).rejects.toThrow();
     const relationships = await database.open!.query(
       'select subject_id, object_id from library_relationships'
     );
