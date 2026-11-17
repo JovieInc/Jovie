@@ -5,12 +5,7 @@ import { useEffect, useMemo } from 'react';
 import { AuthenticatedAuthEntryGuard } from '@/components/features/auth/AuthenticatedAuthEntryGuard';
 import { toast } from '@/components/feedback';
 import { APP_ROUTES } from '@/constants/routes';
-import {
-  AuthLayout,
-  AuthOfferSummary,
-  AuthRoutePrefetch,
-  AuthShell,
-} from '@/features/auth';
+import { AuthLayout, AuthRoutePrefetch, AuthShell } from '@/features/auth';
 import { buildAuthRouteUrl } from '@/lib/auth/build-auth-route-url';
 import { getCentralAuthCallbackPath } from '@/lib/auth/central-auth-routing';
 import { sanitizeRedirectUrl } from '@/lib/auth/constants';
@@ -171,11 +166,7 @@ function getFallbackRedirectUrl(
   );
 }
 
-export function SignInPageClient({
-  showOfferSummary = false,
-}: Readonly<{
-  readonly showOfferSummary?: boolean;
-}> = {}) {
+export function SignInPageClient() {
   const searchParams = useSearchParams();
   const email = searchParams.get('email')?.trim() ?? '';
   const resetConfirmed = searchParams.get('reset') === '1';
@@ -221,7 +212,6 @@ export function SignInPageClient({
       >
         <AuthRoutePrefetch href={signUpUrl} />
         <SignInOauthErrorBanner />
-        {showOfferSummary ? <AuthOfferSummary mode='sign-in' enabled /> : null}
         <AuthShell
           mode='sign-in'
           forceOppositeModeHardNavigation

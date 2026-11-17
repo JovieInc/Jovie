@@ -55,7 +55,10 @@ class Shell:
         return [call for call in self.calls if tuple(call[:len(prefix)]) == prefix]
 
 
-class RedBeforeGreenEvidenceTests(unittest.TestCase):
+from .repair_customer_decision_cases import CustomerDecisionCases
+
+
+class RedBeforeGreenEvidenceTests(CustomerDecisionCases, unittest.TestCase):
     PR = {"number": 7, "headRefOid": "a" * 40, "statusCheckRollup": [
         {"name": "Source Validation", "conclusion": "FAILURE",
          "detailsUrl": "https://github.com/JovieInc/Jovie/actions/runs/123/job/456"}]}
@@ -221,9 +224,9 @@ console.log(JSON.stringify(bodies.map(body => evaluateFleetRules({
             self.WIN.replace("- Area: quality", "- Area: invented"),
         )
         for win in invalid:
-            with self.subTest(win=win), self.assertRaisesRegex(ValueError, "canonical Win validation"):
+            with self.subTest(win=win), self.assertRaisesRegex(ValueError, r"^measured win policy: "):
                 events.repair_evidence_body(self.PR, body, win_section=win)
-            with self.subTest(replacement=win), self.assertRaisesRegex(ValueError, "canonical Win validation"):
+            with self.subTest(replacement=win), self.assertRaisesRegex(ValueError, r"^measured win policy: "):
                 events.repair_evidence_body(self.PR, body + "\n" + self.WIN,
                                             win_section=win, previous_win_section=self.WIN)
 
@@ -370,27 +373,31 @@ console.log(JSON.stringify(JSON.parse(readFileSync(0, 'utf8')).map(body =>
         self.assertTrue(updated.endswith(following))
 
     def test_explicit_locking_pr_repairs_missing_provenance_and_passes_fleet(self):
-        body = events.red_before_green_block(self.PR)
-        updated = events.repair_evidence_body(self.PR, body, locking_pr=23295,
-                                              customer_decision={"releaseWorthy": False})
-        checked = subprocess.run(
-            ["node", "--input-type=module", "-e", r"""
-                import { evaluateFleetRules } from './scripts/pr-fleet-rules.mjs';
-                import { readFileSync } from 'node:fs';
-                const body = readFileSync(0, 'utf8');
-                const check = body => evaluateFleetRules({
-                    pr: { title: 'fix: repair secret metadata evidence', body },
-                    files: [{ filename: 'ops/registry/secrets-lint-baseline.json', status: 'added' }],
-                }).errors;
-                process.stdout.write(JSON.stringify({ repaired: check(body),
-                    missing: check(body.replace(/## Locked areas[\s\S]*/, '')) }));
-            """], cwd=ROOT, input=updated, text=True, capture_output=True, check=True,
-        )
-        result = json.loads(checked.stdout)
-        self.assertEqual(result["repaired"], [])
-        self.assertTrue(any(error.startswith("locked-areas:") for error in result["missing"]))
-        self.assertEqual(events.repair_evidence_body(self.PR, updated, locking_pr=23295), updated)
-        self.assertEqual(updated.count("customer-changelog/v1"), 1)
+        bodies = [events.red_before_green_block(self.PR)]
+        bodies += [bodies[0] + f"\n{fence}text\n## Locked areas\nGBrain: example/only\n{fence}\n"
+                   for fence in ("```", "~~~")]
+        for body in bodies:
+            updated = events.repair_evidence_body(self.PR, body, locking_pr=23295,
+                                                  customer_decision={"releaseWorthy": False})
+            checked = subprocess.run(
+                ["node", "--input-type=module", "-e", r"""
+                    import { evaluateFleetRules } from './scripts/pr-fleet-rules.mjs';
+                    import { readFileSync } from 'node:fs';
+                    const body = readFileSync(0, 'utf8');
+                    const check = body => evaluateFleetRules({
+                        pr: { title: 'fix: repair secret metadata evidence', body },
+                        files: [{ filename: 'ops/registry/secrets-lint-baseline.json', status: 'added' }],
+                    }).errors;
+                    process.stdout.write(JSON.stringify({ repaired: check(body),
+                        missing: check(body.replace(/## Locked areas[\s\S]*/, '')) }));
+                """], cwd=ROOT, input=updated, text=True, capture_output=True, check=True,
+            )
+            result = json.loads(checked.stdout)
+            self.assertEqual(result["repaired"], [])
+            self.assertTrue(any(error.startswith("locked-areas:") for error in result["missing"]))
+            self.assertEqual(events.repair_evidence_body(self.PR, updated, locking_pr=23295), updated)
+            self.assertEqual(updated.count("customer-changelog/v1"), 1)
+            self.assertIn(body, updated)
 
     def test_locking_reference_is_explicit_validated_and_never_overwrites_authority(self):
         body = events.red_before_green_block(self.PR)
@@ -404,7 +411,7 @@ console.log(JSON.stringify(JSON.parse(readFileSync(0, 'utf8')).map(body =>
 
     def test_public_decision_round_trips_without_comment_injection(self):
         decision = {"releaseWorthy": True, "text": "Choose a link --> continue"}
-        updated = events.repair_evidence_body(self.PR, "Summary", customer_decision=decision)
+        updated = events.repair_evidence_body(self.PR, "Summary: customer-changelog/v1 is missing", customer_decision=decision)
         marker = updated.split("<!-- customer-changelog/v1 ", 1)[1].split(" -->", 1)[0]
         self.assertEqual(json.loads(marker), decision)
         self.assertNotIn("Choose a link -->", updated)
@@ -473,8 +480,11 @@ console.log(JSON.stringify(JSON.parse(readFileSync(0, 'utf8')).map(body =>
             "gh run list --workflow=fleet-rules-evidence.yml\n"
             "- Verify: https://github.com/JovieInc/Jovie/actions/runs/123\n"
         )
-        for command, url in cases:
-            body = (f"## Summary\nKeep this.\n\n## Red-before-green\n"
+        cases = [(cmd, url, "## Red-before-green") for cmd, url in cases]
+        cases.extend(("node --test", run_url, heading) for heading in
+                     ("  ## Red-before-green", "##Red-before-green"))
+        for command, url, heading in cases:
+            body = (f"## Summary\nKeep this.\n\n{heading}\n"
                     f"- Failing command: `{command}`\n- Failing run (before fix): {url}\n"
                     "\n## Blast radius\nWhat could break: repair evidence.\nProof: regression tests.\n"
                     + win_section)
@@ -483,7 +493,7 @@ console.log(JSON.stringify(JSON.parse(readFileSync(0, 'utf8')).map(body =>
                 written.append(Path(args[-1]).read_text())
                 return (0, "")
             shell = Shell({("pr", "view"): (0, body), ("pr", "edit"): edit})
-            with self.subTest(command=command, url=url):
+            with self.subTest(command=command, url=url, heading=heading):
                 self.assertTrue(events.ensure_red_before_green(self.PR, sh=shell))
                 self.assertEqual(len(written), 1)
                 self.assertIn("## Summary\nKeep this.", written[0])

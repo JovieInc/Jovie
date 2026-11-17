@@ -13,18 +13,18 @@ describe('PROFILE_DESKTOP_SURFACE_ENABLED', () => {
     vi.unstubAllEnvs();
   });
 
-  it('is off when the build does not set the flag', async () => {
+  it('is on when the build does not set the flag (canonical desktop surface)', async () => {
     vi.stubEnv('NEXT_PUBLIC_FEATURE_PROFILE_DESKTOP_SURFACE', undefined);
-    expect(await loadFlag()).toBe(false);
+    expect(await loadFlag()).toBe(true);
   });
 
-  it.each(['0', 'false', 'yes', ''])('stays off for %j', async value => {
-    vi.stubEnv('NEXT_PUBLIC_FEATURE_PROFILE_DESKTOP_SURFACE', value);
-    expect(await loadFlag()).toBe(false);
-  });
-
-  it.each(['1', 'true'])('turns on for %j', async value => {
+  it.each(['1', 'true', 'yes'])('stays on for %j', async value => {
     vi.stubEnv('NEXT_PUBLIC_FEATURE_PROFILE_DESKTOP_SURFACE', value);
     expect(await loadFlag()).toBe(true);
+  });
+
+  it.each(['0', 'false', ''])('opts out for %j', async value => {
+    vi.stubEnv('NEXT_PUBLIC_FEATURE_PROFILE_DESKTOP_SURFACE', value);
+    expect(await loadFlag()).toBe(false);
   });
 });

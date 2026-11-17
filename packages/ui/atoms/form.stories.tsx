@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
-import { useForm } from 'react-hook-form';
+import { type FieldErrors, useForm } from 'react-hook-form';
 import { Button } from './button';
 import {
   Form,
@@ -96,12 +96,23 @@ export const LongValidationMessage: Story = {
   },
 };
 
+/**
+ * react-hook-form 7.90 re-applies useForm's errors option in an effect keyed
+ * on the prop's reference ([control, props.errors]). An inline literal is a
+ * fresh reference every render, so the effect fired on every render and
+ * looped this story to "Maximum update depth exceeded" until the Visual &
+ * A11y shard timed out (run 42709958968, shard 11, both attempts). The
+ * module-level constant is stable: the server error applies once and the
+ * rendered error state stays checkable.
+ */
+const SERVER_HANDLE_ERRORS = {
+  handle: { type: 'server', message: 'That handle is already taken.' },
+} satisfies FieldErrors<{ handle: string }>;
+
 function ServerErrorForm() {
   const form = useForm({
     defaultValues: { handle: 'jovie' },
-    errors: {
-      handle: { type: 'server', message: 'That handle is already taken.' },
-    },
+    errors: SERVER_HANDLE_ERRORS,
   });
   return (
     <Form {...form}>

@@ -175,13 +175,14 @@ function HomePageShell({ children }: { readonly children: React.ReactNode }) {
 /**
  * The homepage leads with "Jovie helps you move your music forward." (Tim,
  * 2026-11-03, `/` only) and tells one editorial story: the profile at
- * jov.ie/you, the releases workspace, then the role waitlist form. Signup is
- * invite-only (`PUBLIC_SIGNUP_CLOSED`), so the page has no signup link; the
- * hero action scrolls to the on-page form. The ORGANIZATION schema keeps the
- * general company identity.
+ * jov.ie/you, the releases workspace, then the claim close. Signup is open
+ * (Tim, 2026-11-12: "Switch it"), so the hero, header and close all enter
+ * `/start` with the shared claim-profile intent; only the
+ * `PUBLIC_SIGNUP_CLOSED` kill switch brings back the on-page invitation form.
+ * The ORGANIZATION schema keeps the general company identity.
  *
  * Section order and copy slots come from the published `marketing-page/home`
- * content record, so copy changes go live without a code deploy. The page
+ * content record (the claim actions always come from the shared intent), so copy changes go live without a code deploy. The page
  * stays static: the record is read at prerender and on publish-triggered
  * regeneration only (publish expires its cache tag), never per request, and
  * it falls back to the code default when nothing valid is published.

@@ -130,6 +130,16 @@ function chatState(overrides: Partial<HomeCanvasState> = {}): HomeCanvasState {
 }
 
 describe('OvieHomeCanvas', () => {
+  it('reserves the same shipping provenance layout before and after data arrives', () => {
+    shipping.data = undefined;
+    const loading = renderCanvas();
+    const layout = screen.getByTestId('home-loop-pulse').className;
+    loading.unmount();
+    shipping.data = snapshot();
+    renderCanvas();
+    expect(screen.getByTestId('home-loop-pulse').className).toBe(layout);
+  });
+
   const fetchMock = vi.fn();
   let inbox: OvieInbox;
   let companyResponses: Record<string, unknown>;

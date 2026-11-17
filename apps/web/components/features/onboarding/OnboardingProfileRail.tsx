@@ -250,14 +250,14 @@ function DspMatchStrip({
 
   return (
     <fieldset
-      className='flex items-center gap-1.5 rounded-full border border-white/15 bg-black/28 px-2 py-1.5 text-white shadow-[0_14px_30px_rgba(0,0,0,0.22)] backdrop-blur-xl dark:text-white'
+      className='flex items-center gap-1.5 rounded-full border border-on-media/15 bg-ink-on-media/28 px-2 py-1.5 text-on-media shadow-[0_14px_30px_rgba(0,0,0,0.22)] backdrop-blur-xl dark:text-on-media'
       data-testid='onboarding-dsp-match-strip'
       aria-label='Matched Music Services'
     >
       {visible.map(match => (
         <span
           key={match.id}
-          className='inline-flex h-7 w-7 items-center justify-center rounded-full bg-white text-black shadow-[0_6px_16px_rgba(0,0,0,0.18)] dark:bg-white dark:text-black'
+          className='inline-flex h-7 w-7 items-center justify-center rounded-full bg-on-media text-ink-on-media shadow-[0_6px_16px_rgba(0,0,0,0.18)] dark:bg-on-media dark:text-ink-on-media'
           title={match.label}
         >
           <SocialIcon
@@ -269,7 +269,7 @@ function DspMatchStrip({
         </span>
       ))}
       {overflow > 0 ? (
-        <span className='inline-flex h-7 items-center rounded-full bg-white px-2 text-2xs font-semibold text-black dark:bg-white dark:text-black'>
+        <span className='inline-flex h-7 items-center rounded-full bg-on-media px-2 text-2xs font-semibold text-ink-on-media dark:bg-on-media dark:text-ink-on-media'>
           +{overflow} others
         </span>
       ) : null}
@@ -379,10 +379,16 @@ export function OnboardingProfileRail({
       <div
         className={cn(
           'flex min-h-0 items-center justify-center',
-          isInline ? 'h-full px-0 py-2' : 'min-h-full lg:w-95 lg:px-4 lg:pb-4'
+          // JOV-12045: the side rail hands the rail's height down as a
+          // definite chain (h-full) so the preview bento can flex to it and
+          // its phone preview can fit the scrollport at rest instead of
+          // running past the fold.
+          isInline
+            ? 'h-full px-0 py-2'
+            : 'h-full min-h-full lg:w-95 lg:px-4 lg:pb-4'
         )}
       >
-        <div className='flex min-h-0 w-full flex-col items-center'>
+        <div className='flex h-full min-h-0 w-full flex-col items-center'>
           {isInline ? null : <OnboardingDraftProfileHeader />}
           <ProfilePreviewBento
             phoneContent={
@@ -428,17 +434,31 @@ export function OnboardingProfileRail({
             dataTestId='onboarding-profile-bento'
             phonePreviewTestId='onboarding-phone-preview'
             surfaceTestId='onboarding-profile-compact-surface'
-            className={cn('w-full', isInline ? 'max-w-86' : 'h-full max-w-87')}
+            className={cn(
+              'w-full',
+              // Side placement fills the rail's height around the draft
+              // header and tagline (JOV-12045) so the phone preview inside
+              // can size to the remaining hero box.
+              isInline ? 'max-w-86' : 'min-h-0 flex-1 max-w-87'
+            )}
             heroClassName={cn(
               'w-full rounded-3xl',
-              isInline ? 'min-h-114 p-4' : 'min-h-0 max-h-170 px-5'
+              isInline
+                ? 'min-h-114 p-4'
+                : 'system-b-onboarding-rail-hero min-h-0 max-h-170 px-5'
             )}
             // Width only: the screen keeps its 402:874 aspect, so a fixed frame
-            // height let it overflow the frame (JOV-7192).
-            phoneFrameClassName={isInline ? 'w-50 sm:w-57' : 'w-71'}
+            // height let it overflow the frame (JOV-7192). JOV-12045: the side
+            // width comes from .system-b-onboarding-rail-phone so the whole
+            // preview fits the rail at short viewports.
+            phoneFrameClassName={
+              isInline
+                ? 'w-50 sm:w-57'
+                : 'w-auto system-b-onboarding-rail-phone'
+            }
             topRight={
               <span
-                className='inline-flex h-6 items-center rounded-full border border-white/12 bg-black/60 px-2.5 text-2xs font-medium text-white backdrop-blur-md dark:text-white'
+                className='inline-flex h-6 items-center rounded-full border border-on-media/12 bg-ink-on-media/60 px-2.5 text-2xs font-medium text-on-media backdrop-blur-md dark:text-on-media'
                 data-testid='onboarding-profile-preview-badge'
               >
                 Preview

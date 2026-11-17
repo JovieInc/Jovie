@@ -28,7 +28,7 @@ export const HIDDEN_TOOLS: Readonly<Record<string, string>> = {
   checkHandle:
     'Onboarding-only follow-up after Spotify identity; not useful as a standalone slash command.',
   checkCanvasStatus:
-    'Diagnostic; results surface inside writeWorldClassBio / createPromoStrategy.',
+    'Diagnostic; results surface inside writeWorldClassBio and the promo-strategy skill.',
   confirmSpotifyArtist:
     'Onboarding-only continuation from the Spotify picker; requires a selected candidate.',
   createMerch:
@@ -37,12 +37,10 @@ export const HIDDEN_TOOLS: Readonly<Record<string, string>> = {
     'Follow-up from a saved merch card; shown as card/menu actions once a source design exists.',
   findMerchSources:
     'Merch source discovery is a conversational prerequisite for merch creation, not a root slash command.',
-  createPromoStrategy: 'Pro-only; surfaced via the release detail surface.',
   createRelease: 'Surfaced in the releases dashboard; chat tool is a fallback.',
   deleteOrArchiveMerchCard:
     'Merch lifecycle action shown from merch cards, not the root slash menu.',
   formatLyrics: 'Pro-only; surfaced via the lyrics surface, not slash.',
-  generateCanvasPlan: 'Pro-only; surfaced via the release detail surface.',
   importBioFromUrl:
     'Triggered conversationally from an explicit URL import request before profile-edit preview.',
   inspectPressSource:
@@ -88,12 +86,14 @@ export const HIDDEN_TOOLS: Readonly<Record<string, string>> = {
   showTopInsights: 'Surfaced as a home-screen card, not a slash command.',
   showUsage:
     'Usage details are triggered conversationally or from settings surfaces, not slash.',
-  suggestRelatedArtists:
-    'Always part of createPromoStrategy; never a standalone user action.',
   unpauseMerchCard:
     'Merch lifecycle action shown from merch cards, not the root slash menu.',
   writeWorldClassBio:
     'Pro-only; chat surfaces it conversationally rather than via slash.',
+  useSkill:
+    "Model-invoked to load a skill's steps; skills surface through the conversation, not slash.",
+  requestCapability:
+    "Model-invoked when Jovie can't do something yet; not a user command.",
   researchArtistPresence:
     'Onboarding presence-build system event; not a model-invoked or slash tool.',
   checkLinkDrift:

@@ -2,6 +2,7 @@ import { act, cleanup, render } from '@testing-library/react';
 import { StrictMode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { registerJovieWebMcpTools } from '@/lib/agent-ready/web-mcp';
+import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import { WebMcpTools } from './WebMcpTools';
 
 type ModelContext = Parameters<typeof registerJovieWebMcpTools>[0];
@@ -48,11 +49,12 @@ afterEach(() => {
 });
 
 describe('WebMcpTools', () => {
-  it('renders no UI and makes no request when WebMCP is unavailable', () => {
+  it('renders no UI and makes no request when WebMCP is unavailable', async () => {
     const { container } = render(<WebMcpTools />);
 
     expect(container).toBeEmptyDOMElement();
     expect(fetch).not.toHaveBeenCalled();
+    await expectNoA11yViolations(container);
   });
 
   it('registers the read-only tool on document before navigator', () => {
@@ -143,7 +145,7 @@ describe('WebMcpTools', () => {
     expect(signals.every(signal => signal?.aborted)).toBe(true);
   });
 
-  it('keeps the page mounted when registration throws', () => {
+  it('keeps the page mounted when registration throws', async () => {
     const context = createContext();
     context.registerTool.mockImplementation(() => {
       throw new Error('WebMCP registration unavailable');
@@ -154,6 +156,8 @@ describe('WebMcpTools', () => {
 
     expect(context.registerTool).toHaveBeenCalledTimes(1);
     expect(container).toBeEmptyDOMElement();
+    expect(fetch).not.toHaveBeenCalled();
+    await expectNoA11yViolations(container);
   });
 
   it('handles an asynchronous registration rejection without breaking the page', async () => {

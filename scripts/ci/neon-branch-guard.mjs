@@ -1,6 +1,6 @@
 // Single source of truth for "may CI delete this Neon branch?".
 //
-// Every Neon branch deleter (scheduled cleanup, PR-close cleanup, orphan
+// Every Neon branch deleter (scheduled cleanup, on-limit cleanup, orphan
 // reaper) must pass a branch through `evaluateBranchDeletion` using the live
 // Neon API record, not a caller-supplied name list. The decision fails closed:
 // unreadable flags, unknown branches and reserved names are all "keep".

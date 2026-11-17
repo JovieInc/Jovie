@@ -16,6 +16,7 @@ import { withSystemIngestionSession } from '@/lib/ingestion/session';
 import {
   handleMerchChargeRefunded,
   handleMerchCheckoutCompleted,
+  handleMerchCheckoutPaymentFailed,
 } from '@/lib/merch/orders';
 import { processStripeWebhookEvent } from '@/lib/stripe/webhooks/process-event';
 import {
@@ -245,6 +246,12 @@ export function parseStoredEvent(candidate: {
 
 async function dispatchStoredEvent(event: Stripe.Event): Promise<void> {
   if (isMerchCheckout(event)) {
+    if (event.type === 'checkout.session.async_payment_failed') {
+      await handleMerchCheckoutPaymentFailed(
+        event.data.object as Stripe.Checkout.Session
+      );
+      return;
+    }
     await handleMerchCheckoutCompleted(
       event.data.object as Stripe.Checkout.Session
     );
@@ -267,7 +274,13 @@ async function dispatchStoredEvent(event: Stripe.Event): Promise<void> {
 }
 
 function isMerchCheckout(event: Stripe.Event): boolean {
-  if (event.type !== 'checkout.session.completed') return false;
+  if (
+    event.type !== 'checkout.session.completed' &&
+    event.type !== 'checkout.session.async_payment_succeeded' &&
+    event.type !== 'checkout.session.async_payment_failed'
+  ) {
+    return false;
+  }
   const session = event.data.object as {
     metadata?: { merch_order_id?: string };
   };

@@ -298,3 +298,25 @@ test('a preflight deadline (exit 124) under overload is inconclusive, not a red'
   assert.equal(r.code, 0);
   assert.match(r.warn, /inconclusive/);
 });
+
+test('a busy Gem queue is infra: the hook moves on to hosted runners', async () => {
+  const {
+    DEFAULT_GEM_QUEUE_MAX_SEC,
+    SLOTS_BUSY_EXIT,
+    gemQueueMaxSec,
+    isBackendUnavailable,
+  } = await import('../prepush-offload.mjs');
+  assert.equal(isBackendUnavailable(SLOTS_BUSY_EXIT), true);
+  assert.equal(isBackendUnavailable(127), true);
+  assert.equal(isBackendUnavailable(255), true);
+  // A real red on Gem stays a verdict and is never retried elsewhere.
+  assert.equal(isBackendUnavailable(1), false);
+  assert.equal(isBackendUnavailable(0), false);
+  assert.equal(gemQueueMaxSec({}), DEFAULT_GEM_QUEUE_MAX_SEC);
+  assert.equal(gemQueueMaxSec({ JOVIE_PREPUSH_GEM_QUEUE_MAX_SEC: '0' }), 0);
+  assert.equal(gemQueueMaxSec({ JOVIE_PREPUSH_GEM_QUEUE_MAX_SEC: '30' }), 30);
+  assert.equal(
+    gemQueueMaxSec({ JOVIE_PREPUSH_GEM_QUEUE_MAX_SEC: 'x' }),
+    DEFAULT_GEM_QUEUE_MAX_SEC
+  );
+});

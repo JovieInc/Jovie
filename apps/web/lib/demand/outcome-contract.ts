@@ -11,6 +11,9 @@ const primitive = z.strictObject({
   version: z.literal(1),
   kind: z.enum(['fact', 'action']),
 });
+const authority = z.enum(['read', 'sync', 'draft', 'send']);
+const sha = z.string().regex(/^[a-f0-9]{40}$/);
+const supplierHash = z.string().regex(/^[a-f0-9]{64}$/);
 
 /** Requirements precede suppliers. Action availability never grants permission to act. */
 export const PRESENCE_CURRENT_CONTRACT = {
@@ -60,6 +63,9 @@ export const capabilitySupplierSchema = z.strictObject({
   privacy: z.enum(['approved', 'denied', 'unknown']),
   terms: z.enum(['approved', 'denied', 'unknown']),
   policyRef: ref,
+  /** Canonical owner and operation; receipts never grant execution authority. */
+  ownerRef: ref.optional(),
+  authority: authority.optional(),
   reviewedAt: timestamp,
   validUntil: timestamp,
   expected: sourceMetricsSchema,
@@ -71,6 +77,59 @@ const trial = z.strictObject({
   startedAt: timestamp,
   completedAt: timestamp,
   evidenceRefs: z.array(ref).min(1).max(20),
+  realized: sourceMetricsSchema,
+});
+export const capabilityCertificationSchema = z.strictObject({
+  id: ref,
+  scope,
+  primitive,
+  supplierDigest: supplierHash,
+  ownerRef: ref,
+  authority,
+  buildSha: sha,
+  verifiedAt: timestamp,
+  expiresAt: timestamp,
+  verdict: z.enum(['pass', 'fail']),
+  evidenceRefs: z.array(ref).min(1).max(20),
+  tests: z
+    .array(
+      z.strictObject({
+        id: z.enum([
+          'tenant-isolation',
+          'revocation',
+          'replay',
+          'failure-recovery',
+          'unsupported',
+        ]),
+        status: z.enum(['pass', 'fail']),
+        evidenceRef: ref,
+      })
+    )
+    .max(5),
+});
+export const capabilityOutcomeSchema = z.strictObject({
+  id: ref,
+  scope,
+  primitive,
+  supplierDigest: supplierHash,
+  certificationId: ref,
+  authority,
+  buildSha: sha,
+  /** Stable domain job identity coalesces webhook delivery and backfill. */
+  jobId: ref,
+  startedAt: timestamp,
+  completedAt: timestamp,
+  status: z.enum([
+    'correct_completed',
+    'partial',
+    'failed',
+    'unknown',
+    'revoked',
+    'deleted',
+    'unsupported',
+  ]),
+  evidenceRefs: z.array(ref).min(1).max(20),
+  /** Cumulative job cost, including retries, maintenance and review. */
   realized: sourceMetricsSchema,
 });
 const demand = z.strictObject({
@@ -132,6 +191,8 @@ export const compileOutcomeCommandSchema = z.strictObject({
   facts: z.array(fact).max(100),
   suppliers: z.array(capabilitySupplierSchema).max(100),
   trials: z.array(trial).max(100),
+  certifications: z.array(capabilityCertificationSchema).max(100).optional(),
+  outcomes: z.array(capabilityOutcomeSchema).max(100).optional(),
   budget,
 });
 export const capabilityDraftSchema = z.strictObject({
@@ -146,6 +207,27 @@ export const capabilityDraftSchema = z.strictObject({
   facts: z.array(fact).max(100),
   suppliers: z.array(capabilitySupplierSchema).max(100),
   trials: z.array(trial).max(100),
+  certifications: z.array(capabilityCertificationSchema).max(100).optional(),
+  outcomes: z.array(capabilityOutcomeSchema).max(100).optional(),
+  /** Discarded evidence cannot be replayed to restore an old certification. */
+  receiptFloor: timestamp.nullable().optional(),
+  fulfillment: z
+    .strictObject({
+      certified: z.boolean(),
+      attemptedJobs: z.number().int().nonnegative(),
+      correctCompletedJobs: z.number().int().nonnegative(),
+      fullyLoadedCostCents: count,
+      costPerSuccessfulOutcomeCents: count.nullable(),
+      successfulOutcomeLatencyMs: z
+        .strictObject({
+          n: z.number().int().nonnegative(),
+          p50: count.nullable(),
+          p95: count.nullable(),
+        })
+        .optional(),
+      latestOutcome: capabilityOutcomeSchema.shape.status.nullable(),
+    })
+    .optional(),
   budget,
   decision: z.strictObject({
     kind: z.enum(['reuse', 'trial', 'promote', 'no_action']),
@@ -156,3 +238,7 @@ export const capabilityDraftSchema = z.strictObject({
 export type CompileOutcomeCommand = z.infer<typeof compileOutcomeCommandSchema>;
 export type CapabilityDraft = z.infer<typeof capabilityDraftSchema>;
 export type CapabilitySupplier = z.infer<typeof capabilitySupplierSchema>;
+export type CapabilityCertification = z.infer<
+  typeof capabilityCertificationSchema
+>;
+export type CapabilityOutcome = z.infer<typeof capabilityOutcomeSchema>;

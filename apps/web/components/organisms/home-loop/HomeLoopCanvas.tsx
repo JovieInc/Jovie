@@ -28,6 +28,7 @@ export interface HomeLoopCanvasProps {
   readonly stages: readonly string[];
   readonly constraint: HomeLoopConstraint | null;
   readonly pulse: readonly HomeLoopTile[];
+  readonly reservePulseSourceCaption?: boolean;
   readonly asks: readonly HomeLoopAsk[];
   readonly rows: readonly HomeLoopRow[];
   readonly done: readonly HomeLoopDoneItem[];
@@ -84,6 +85,7 @@ export function HomeLoopCanvas({
   stages,
   constraint,
   pulse,
+  reservePulseSourceCaption = false,
   asks,
   rows,
   done,
@@ -160,7 +162,11 @@ export function HomeLoopCanvas({
           {pulseCaption}
         </h2>
       ) : null}
-      <HomeLoopPulse tiles={pulse} loading={loopStatus === 'loading'} />
+      <HomeLoopPulse
+        tiles={pulse}
+        loading={loopStatus === 'loading'}
+        reserveSourceCaption={reservePulseSourceCaption}
+      />
       {strip ? (
         <HomeLoopStageStrip
           title={copy.latencyTitle ?? 'Stage Time'}

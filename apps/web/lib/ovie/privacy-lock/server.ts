@@ -5,6 +5,8 @@ import { adminStepUpIdentifier } from '@/lib/admin/mfa';
 import { getFreshAuth } from '@/lib/auth/cached';
 import { getCachedDevTestAuthSession } from '@/lib/auth/dev-test-auth.server';
 import { db } from '@/lib/db';
+import { withRetry } from '@/lib/db/client/retry';
+import { QUERY_TIMEOUTS } from '@/lib/db/query-timeout';
 import { userSettings, users } from '@/lib/db/schema/auth';
 import { baPasskeys, baVerifications } from '@/lib/db/schema/better-auth';
 import { isVisualCaptureSyntheticAuthEnabled } from '@/lib/e2e/runtime';
@@ -15,6 +17,22 @@ import {
   resolveOviePrivacyState,
 } from './state';
 export type PrivacyAuth = { userId: string; sessionId: string };
+
+/**
+ * Ovie privacy reads are pure selects on the server render path of every
+ * /app/ov/* page (JOV-9909, Sentry JOVIE-WEB-Z0). A single transient Neon
+ * transport failure (cold start, idle-terminated pooled connection) surfaced
+ * there as an uncaught "Failed query: select" — the reads are not wrapped in
+ * a catch because a real policy failure must fail the render. Pure reads may
+ * replay once on a fresh connection (lib/db/client/retry read policy); a
+ * genuinely failing read still throws after the retry budget.
+ */
+const OVIE_PRIVACY_READ_RETRY = {
+  operation: 'read',
+  maxAttempts: 2,
+  retryBudgetMs: QUERY_TIMEOUTS.api,
+} as const;
+
 export type PrivacyAction = 'enable' | 'disable' | 'lock' | 'unlock';
 export class OviePrivacyLockError extends Error {
   constructor(
@@ -28,15 +46,20 @@ export class OviePrivacyLockError extends Error {
 export async function readOviePrivacyPolicy(
   userId: string
 ): Promise<OviePrivacyPolicy> {
-  const [row] = await db
-    .select({
-      enabled: userSettings.oviePrivacyLockEnabled,
-      version: userSettings.oviePrivacyLockVersion,
-      lockedAt: userSettings.oviePrivacyLockedAt,
-    })
-    .from(userSettings)
-    .where(eq(userSettings.userId, userId))
-    .limit(1);
+  const [row] = await withRetry(
+    () =>
+      db
+        .select({
+          enabled: userSettings.oviePrivacyLockEnabled,
+          version: userSettings.oviePrivacyLockVersion,
+          lockedAt: userSettings.oviePrivacyLockedAt,
+        })
+        .from(userSettings)
+        .where(eq(userSettings.userId, userId))
+        .limit(1),
+    `oviePrivacyPolicy(${userId})`,
+    OVIE_PRIVACY_READ_RETRY
+  );
   return row ?? { enabled: false, version: 0, lockedAt: null };
 }
 function privacyReceiptId(sessionId: string) {
@@ -46,14 +69,19 @@ export async function getOviePrivacyLockState(auth: PrivacyAuth) {
   const policy = await readOviePrivacyPolicy(auth.userId);
   if (!policy.enabled)
     return resolveOviePrivacyState(policy, undefined, auth.userId);
-  const [receipt] = await db
-    .select({
-      value: baVerifications.value,
-      expiresAt: baVerifications.expiresAt,
-    })
-    .from(baVerifications)
-    .where(eq(baVerifications.id, privacyReceiptId(auth.sessionId)))
-    .limit(1);
+  const [receipt] = await withRetry(
+    () =>
+      db
+        .select({
+          value: baVerifications.value,
+          expiresAt: baVerifications.expiresAt,
+        })
+        .from(baVerifications)
+        .where(eq(baVerifications.id, privacyReceiptId(auth.sessionId)))
+        .limit(1),
+    `oviePrivacyReceipt(${auth.sessionId})`,
+    OVIE_PRIVACY_READ_RETRY
+  );
   return resolveOviePrivacyState(policy, receipt, auth.userId);
 }
 /** Server-side data boundaries call this before loading/serializing Ovie data. */

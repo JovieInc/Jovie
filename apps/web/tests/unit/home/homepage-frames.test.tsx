@@ -6,20 +6,6 @@ import { resolve } from 'node:path';
 import { render } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-const gate = vi.hoisted(() => ({ WAITLIST_ENABLED: true }));
-vi.mock('@/lib/flags/marketing-static', async importOriginal => {
-  const actual =
-    await importOriginal<typeof import('@/lib/flags/marketing-static')>();
-  return {
-    ...actual,
-    FEATURE_FLAGS: new Proxy(actual.FEATURE_FLAGS, {
-      get: (target, key) =>
-        key === 'WAITLIST_ENABLED'
-          ? gate.WAITLIST_ENABLED
-          : target[key as keyof typeof target],
-    }),
-  };
-});
 vi.mock('@/lib/analytics', () => ({ track: vi.fn(), page: vi.fn() }));
 vi.mock('@/lib/content-records/store.server', async () => {
   const { MARKETING_PAGE_KIND } = await import(

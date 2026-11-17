@@ -1,0 +1,114 @@
+{
+  "gates": {
+    "apps/web/components/features/profile/AboutSection.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/profile/AlertsSettingsView.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/profile/ProfileAboutShare.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/profile/ProfilePaymentsCard.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/profile/ProfileUnifiedDrawer.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/profile/UtmBuilderDialog.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/profile/nav/BottomTabBar.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/profile/views/MenuView.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/profile/views/ProfileIntentPage.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ]
+  },
+  "waivers": {
+    "apps/web/components/features/profile/AboutSection.tsx": {
+      "loading": "No loading state: the detector matched the image attribute loading={index < 2 ? 'eager' : 'lazy'} on the press photo grid.",
+      "error": "No error UI exists: when a press photo download fails, the catch block falls back to globalThis.open(photo.blobUrl, '_blank', 'noopener,noreferrer'), which AboutSection.certificate.test.tsx covers.",
+      "offline": "No offline UI exists: the only request is the press photo fetch(, and an offline failure takes the same catch fallback that opens the original photo in a new tab."
+    },
+    "apps/web/components/features/profile/ProfileAboutShare.tsx": {
+      "empty": "The share button renders no collection; the detector matched the items-center class in its className.",
+      "error": "No error UI exists: share and clipboard failures end in the catch marked '// Silent failure — matches the hero share control.', which ProfileAboutShare.test.tsx covers."
+    },
+    "apps/web/components/features/profile/ProfilePrimaryCTA.tsx": {
+      "long-content": "Labels are fixed copy ('Listen now', 'Find tickets', 'Shop merch', 'Open in Spotify'); no caller text reaches the buttons.",
+      "offline": "The CTA makes no request; the detector matched loading in the comment about shipping the animated skeleton from `loading.tsx`."
+    },
+    "apps/web/components/features/profile/ProfileUnifiedDrawer.tsx": {
+      "offline": "The drawer makes no request; the detector matched the comment '// Intentionally do NOT mutate `view` when capability flips false.'",
+      "permission-denied": "The drawer has no permission branch; the detector matched the comment that rows must not claim `role=\"menuitem\"` (axe aria-required-parent)."
+    },
+    "apps/web/components/features/profile/nav/BottomTabBar.tsx": {
+      "empty": "The tab set cannot be empty: const visibleTabs = getPermittedPublicProfileNavigation(); returns the fixed public profile destinations."
+    },
+    "apps/web/components/features/profile/views/MenuView.tsx": {
+      "long-content": "Entry labels are fixed registry titles ('Share Profile', 'Pay', 'Contact') plus the constant 'Release credits'; no caller text reaches the menu.",
+      "permission-denied": "The menu has no permission branch; the detector matched the ARIA attributes role='menu' and role='menuitem'."
+    },
+    "apps/web/components/features/profile/views/ProfileIntentPage.tsx": {
+      "permission-denied": "The page has no permission branch; the detector matched the word plan in the doc comment '(plan spec for SEO internal linking on mobile'."
+    }
+  }
+}

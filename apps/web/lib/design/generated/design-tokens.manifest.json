@@ -23,6 +23,18 @@
       "emittedBy": "styles/generated/design-tokens.css"
     },
     {
+      "cssVar": "--brand-mask-reveal",
+      "value": "white",
+      "status": "canonical",
+      "emittedBy": "styles/generated/design-tokens.css"
+    },
+    {
+      "cssVar": "--brand-mask-conceal",
+      "value": "black",
+      "status": "canonical",
+      "emittedBy": "styles/generated/design-tokens.css"
+    },
+    {
       "cssVar": "--gray1",
       "value": "hsl(0, 0%, 99%)",
       "status": "canonical",
