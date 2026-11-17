@@ -1,0 +1,148 @@
+{
+  "gates": {
+    "apps/web/components/features/home/HomeNotificationCard.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/home/HomeStatQuoteSection.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/home/label-logos.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/library-asset-share/LibraryAssetShareSurface.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/library-asset-share/LibraryAssetShareUrlCell.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/library-share/LibraryShareAssetCard.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/library-share/LibraryShareDropHeader.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/library/StatefulAssetSlot.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/opportunity-inbox/FounderReviewRecorderControls.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/pay/EmptyStates.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/pitch/InvestorBrief.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/pmf-survey/PmfSurveyCard.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ]
+  },
+  "waivers": {
+    "apps/web/components/features/home/HomeNotificationCard.tsx": {
+      "long-content": "The card takes no props and renders the fixed HOME_AUTO_NOTIFY_CONTENT sender and release line; there is no caller text to lengthen."
+    },
+    "apps/web/components/features/home/HomeStatQuoteSection.tsx": {
+      "empty": "The section owns no collection: the detector matched `{ARC_OFFSETS.map((y, i) => (`, six fixed decorative arcs."
+    },
+    "apps/web/components/features/home/label-logos.tsx": {
+      "empty": "The lockups own no collection: the detector matched the class in `'inline-flex items-center justify-center select-none text-on-media/92'`.",
+      "partial": "Each lockup takes only className (and the image logo a style); there is no optional content that could be missing.",
+      "long-content": "The marks are fixed brand wordmarks (disco:wax, Blanco y Negro, rec play) with no caller-supplied text to lengthen.",
+      "permission-denied": "No gated action: the detector matched `role='img'` on each lockup."
+    },
+    "apps/web/components/features/library-asset-share/LibraryAssetShareSurface.tsx": {
+      "empty": "The page shows one shared asset and owns no collection: the detector matched the class in `'inline-flex w-fit items-center gap-1.5 rounded-full border px-2.5 py-1 text-2xs'`. Missing artwork, preview and link are the partial state (PartialNoArtworkPublic)."
+    },
+    "apps/web/components/features/library-asset-share/LibraryAssetShareUrlCell.tsx": {
+      "error": "A failed clipboard write shows no error UI: `} catch {\\n        setCopied(false);` leaves the idle copy button, which LibraryAssetShareUrlCell.test.tsx covers."
+    },
+    "apps/web/components/features/library-share/LibraryShareAssetCard.tsx": {
+      "empty": "The card renders one asset and owns no collection: the detector matched the class in `'flex flex-wrap items-center gap-2'`. The empty press kit belongs to LibraryShareAssetLayouts."
+    },
+    "apps/web/components/features/pay/EmptyStates.tsx": {
+      "partial": "The optional props are className, animate and rows; the heading, description and illustration are fixed per type, so no content can be partly present.",
+      "long-content": "The heading and description are fixed copy from EMPTY_STATE_CONFIG; there is no caller-supplied text to lengthen.",
+      "offline": "The card and skeleton are presentational and fetch nothing: the detector matched the words in `LoadingSkeleton` and `TippingMetricsSkeleton`."
+    },
+    "apps/web/components/features/pitch/InvestorBrief.tsx": {
+      "empty": "The lists map the checked-in fundraisingRegistry (coreSlides, operatingLoop, risks, appendix), which is never empty at build time; there is no runtime collection to empty.",
+      "permission-denied": "The brief renders only inside the gated portal route, which owns the access check and its not-found response; the body has no gated state of its own. The detector matched the comment `Gated with the portal`."
+    },
+    "apps/web/components/features/pmf-survey/PmfSurveyCard.tsx": {
+      "empty": "The card owns no collection that can be empty: the detector matched `{CHOICES.map(option => {`, the three fixed survey answers.",
+      "permission-denied": "Every signed-in user can answer or dismiss the survey; there is no gated action. The detector matched `role='region'` on the card."
+    }
+  }
+}
