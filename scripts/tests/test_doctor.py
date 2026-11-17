@@ -118,13 +118,14 @@ class FactoryStayUpWatchdogTest(unittest.TestCase):
 
     def test_operator_alert_reopens_within_the_cool_off_and_opens_past_it(self):
         import lane_runner
-        now = time.time()
+        now = 1_800_000_000.0
         record = {"status": "decision-required", "reasons": ["admission-denied"], "attempts": [],
                   "alert": {"status": "pending", "attempts": 0, "nextAttemptAt": 0,
                             "reuseIssueId": "ISSUE-X", "reuseSince": now - 60}}
         tracker = mock.Mock()
         tracker.reopen.return_value = True
-        with mock.patch.object(doctor, "Tracker", return_value=tracker), \
+        with mock.patch.object(sys.modules["doctor"], "Tracker", return_value=tracker), \
+                mock.patch.object(factory_watchdog.time, "time", return_value=now), \
                 mock.patch.object(lane_runner, "Linear"), mock.patch.object(lane_runner, "Host"):
             self.assertEqual(factory_watchdog.operator_alert(record), "ISSUE-X")
             self.assertEqual(tracker.reopen.call_args.args[0], "ISSUE-X")
