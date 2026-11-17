@@ -94,6 +94,9 @@ class VisibilityObserver {
     );
   }
 }
+function releaseButton() {
+  return screen.getByRole('button', { name: 'Open actual release' });
+}
 let shown: ArrivalRowsPresentation;
 let actions: ArrivalRowActions;
 function FixtureRows() {
@@ -141,6 +144,10 @@ const proposal = {
   approved_archetype_or_exception:
     'Synthetic gate fixture, not founder approval.',
 };
+const benefitReceipt = Object.freeze({
+  verified: true as const,
+  source: 'synthetic-test-only',
+});
 beforeEach(() => {
   resetCacheIsolationForTests();
   applyCacheScope({
@@ -163,9 +170,7 @@ afterEach(() => {
 describe('LibraryFirstArrivalAdapter', () => {
   it('keeps rows usable and unknown metrics null when authoritative ports are absent', () => {
     mount({ projection: null, onEvent: undefined });
-    expect(
-      screen.getByRole('button', { name: 'Open actual release' })
-    ).toBeEnabled();
+    expect(releaseButton()).toBeEnabled();
     expect(shown.showIntroduction).toBe(false);
     expect(shown.availableCount).toBeNull();
     expect(shown.metric).toBeNull();
@@ -207,7 +212,7 @@ describe('LibraryFirstArrivalAdapter', () => {
   it('emits content-visible once only after a committed connected row intersects', () => {
     const { props } = mount();
     const io = VisibilityObserver.instances.at(-1)!;
-    const node = screen.getByRole('button', { name: 'Open actual release' });
+    const node = releaseButton();
     expect(props.onEvent).not.toHaveBeenCalled();
     act(() => io.emit(node, false));
     expect(props.onEvent).not.toHaveBeenCalled();
@@ -224,7 +229,7 @@ describe('LibraryFirstArrivalAdapter', () => {
     const { props, rerender, unmount } = mount();
     const previousObserver = VisibilityObserver.instances.at(-1)!;
     const previousNavigation = actions.onNavigateAway;
-    const row = screen.getByRole('button', { name: 'Open actual release' });
+    const row = releaseButton();
     const projection = partial();
     rerender(
       <LibraryFirstArrivalAdapter
@@ -258,7 +263,7 @@ describe('LibraryFirstArrivalAdapter', () => {
     attribute => {
       const { props, container } = mount();
       const ancestor = container.firstElementChild!;
-      const row = screen.getByRole('button', { name: 'Open actual release' });
+      const row = releaseButton();
       const io = VisibilityObserver.instances.at(-1)!;
       ancestor.setAttribute(
         attribute,
@@ -275,7 +280,7 @@ describe('LibraryFirstArrivalAdapter', () => {
     const visibility = vi.spyOn(document, 'visibilityState', 'get');
     visibility.mockReturnValue('visible');
     const { props } = mount();
-    const row = screen.getByRole('button', { name: 'Open actual release' });
+    const row = releaseButton();
     const io = VisibilityObserver.instances.at(-1)!;
     const initial = io.observations;
     visibility.mockReturnValue('hidden');
@@ -289,7 +294,7 @@ describe('LibraryFirstArrivalAdapter', () => {
   });
   it('rejects a removed virtualized node and does not mistake unrelated content for a row', () => {
     const { props, rerender } = mount();
-    const old = screen.getByRole('button', { name: 'Open actual release' });
+    const old = releaseButton();
     const io = VisibilityObserver.instances.at(-1)!;
     rerender(
       <LibraryFirstArrivalAdapter {...props}>
@@ -324,16 +329,14 @@ describe('LibraryFirstArrivalAdapter', () => {
       },
     });
     expect(shown.availableCount).toBeNull();
-    fireEvent.pointerDown(
-      screen.getByRole('button', { name: 'Open actual release' })
-    );
+    fireEvent.pointerDown(releaseButton());
     expect(props.onEvent).not.toHaveBeenCalled();
   });
   it('does not equate core identityId with profileId, and fences stale profile/cache callbacks', () => {
     const { props } = mount();
     expect(shown.availableCount).toBe(1);
     const io = VisibilityObserver.instances.at(-1)!;
-    const node = screen.getByRole('button', { name: 'Open actual release' });
+    const node = releaseButton();
     act(() => {
       advanceCacheGeneration('manual');
       io.emit(node);
@@ -357,13 +360,8 @@ describe('LibraryFirstArrivalAdapter', () => {
   );
   it('forwards interaction, skip and navigation without blocking or inventing import events', () => {
     const { props } = mount();
-    fireEvent.pointerDown(
-      screen.getByRole('button', { name: 'Open actual release' })
-    );
-    fireEvent.keyDown(
-      screen.getByRole('button', { name: 'Open actual release' }),
-      { key: 'Enter' }
-    );
+    fireEvent.pointerDown(releaseButton());
+    fireEvent.keyDown(releaseButton(), { key: 'Enter' });
     const skip = screen.getByRole('button', { name: 'Skip introduction' });
     fireEvent.pointerDown(skip);
     fireEvent.click(skip);
@@ -415,27 +413,18 @@ describe('LibraryFirstArrivalAdapter', () => {
     {
       motionApproved: true,
       motionProposal: { ...proposal, material_benefit_uncertain: true },
-      materialBenefitReceipt: {
-        verified: true as const,
-        source: 'synthetic-test-only',
-      },
+      materialBenefitReceipt: benefitReceipt,
     },
     {
       motionApproved: true,
       motionProposal: proposal,
-      materialBenefitReceipt: {
-        verified: true as const,
-        source: 'synthetic-test-only',
-      },
+      materialBenefitReceipt: benefitReceipt,
       otherActiveDelights: 1,
     },
     {
       motionApproved: true,
       motionProposal: { ...proposal, repeats_during_routine_use: true },
-      materialBenefitReceipt: {
-        verified: true as const,
-        source: 'synthetic-test-only',
-      },
+      materialBenefitReceipt: benefitReceipt,
     },
   ])(
     'requires an actual complete motion gate; no default decorative motion %#',
@@ -449,10 +438,7 @@ describe('LibraryFirstArrivalAdapter', () => {
     const options = {
       motionApproved: true,
       motionProposal: proposal,
-      materialBenefitReceipt: {
-        verified: true as const,
-        source: 'synthetic-test-only',
-      },
+      materialBenefitReceipt: benefitReceipt,
     };
     const { props, rerender } = mount({
       ...options,
@@ -474,14 +460,8 @@ describe('LibraryFirstArrivalAdapter', () => {
         throw new Error('effect port unavailable');
       },
     });
-    expect(() =>
-      fireEvent.pointerDown(
-        screen.getByRole('button', { name: 'Open actual release' })
-      )
-    ).not.toThrow();
-    expect(
-      screen.getByRole('button', { name: 'Open actual release' })
-    ).toBeEnabled();
+    expect(() => fireEvent.pointerDown(releaseButton())).not.toThrow();
+    expect(releaseButton()).toBeEnabled();
     expect(shown.showIntroduction).toBe(false);
     expect(shown.eventDelivery).toBe('failed');
     expect(onEventError).toHaveBeenCalledWith(
@@ -500,16 +480,12 @@ describe('LibraryFirstArrivalAdapter', () => {
       onEventError,
     });
     await act(async () => {
-      fireEvent.pointerDown(
-        screen.getByRole('button', { name: 'Open actual release' })
-      );
+      fireEvent.pointerDown(releaseButton());
       await Promise.resolve();
     });
     expect(onEventError).toHaveBeenCalledOnce();
     expect(shown.eventDelivery).toBe('failed');
     expect(shown.showIntroduction).toBe(false);
-    expect(
-      screen.getByRole('button', { name: 'Open actual release' })
-    ).toBeEnabled();
+    expect(releaseButton()).toBeEnabled();
   });
 });

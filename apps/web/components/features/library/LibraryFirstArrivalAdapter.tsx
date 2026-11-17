@@ -115,6 +115,11 @@ export interface ArrivalEventFailure {
   readonly error: unknown;
 }
 
+export interface ArrivalMaterialBenefitReceipt {
+  readonly verified: true;
+  readonly source: string;
+}
+
 export interface LibraryFirstArrivalAdapterProps {
   readonly scope: ArrivalScope;
   readonly context: ArrivalQueryContext;
@@ -126,10 +131,7 @@ export interface LibraryFirstArrivalAdapterProps {
   readonly onEventError?: (failure: ArrivalEventFailure) => void;
   readonly motionApproved?: boolean;
   readonly motionProposal?: DominantDelightProposal;
-  readonly materialBenefitReceipt?: {
-    readonly verified: true;
-    readonly source: string;
-  };
+  readonly materialBenefitReceipt?: ArrivalMaterialBenefitReceipt;
   readonly otherActiveDelights?: number;
   readonly children: (presentation: ArrivalRowsPresentation) => ReactNode;
 }
