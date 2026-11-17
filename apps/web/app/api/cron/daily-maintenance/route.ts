@@ -46,7 +46,7 @@ import { runMusicResolverParityCorpus } from '@/lib/music-resolver/shadow';
 import { runOnboardingScriptAggregation } from '@/lib/onboarding/script-aggregation';
 import { getLybDailyMrr } from '@/lib/ovie/lyb-mrr.server';
 import { runProfileSearchMonitoring } from '@/lib/profile-search/runner';
-import { autostartDesignPartnerAutopilot } from '@/lib/release-to-revenue/autostart';
+import { runDesignPartnerAutopilotSubJob } from '@/lib/release-to-revenue/autostart';
 import { reconcileReleaseWorkflowRunOutcomes } from '@/lib/release-to-revenue/outcome-reconciliation';
 import { logger } from '@/lib/utils/logger';
 import {
@@ -212,7 +212,7 @@ export async function GET(request: Request) {
   //      none ran in the last window (JOV-7140 dogfood proof).
   results.designPartnerAutopilot = await runSubJob(
     'designPartnerAutopilot',
-    () => autostartDesignPartnerAutopilot()
+    () => runDesignPartnerAutopilotSubJob()
   );
 
   // 11. Expired founder-review audio uploads that never bound to a receipt.

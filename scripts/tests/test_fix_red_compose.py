@@ -75,6 +75,29 @@ class ComposeRouteTest(unittest.TestCase):
 
 
 class ComposeExecutionTest(unittest.TestCase):
+    def test_fleet_evidence_is_stamped_before_checkout_repairs_and_failure_stops_them(self):
+        order = []
+        route = {"actions": ["wire-ci-fast", "stamp-repair-evidence"], "files": []}
+        def stamp(host, pr):
+            order.append("fleet")
+            return "stamped-fleet-body"
+        def wire(*args):
+            order.append("wire")
+            return SimpleNamespace(returncode=0)
+        with patch.object(lane, "stamp_fleet_body", side_effect=stamp), \
+                patch.object(lane, "wire_ci_fast_fix", side_effect=wire), \
+                patch.object(lane, "run_agent") as agent:
+            receipt = {}
+            done = lane.compose_deterministic_fix(None, {}, route, Path("."), None, receipt)
+        self.assertEqual(order, ["fleet", "wire"])
+        self.assertEqual(done.returncode, 0)
+        self.assertEqual(receipt["composedActions"], ["stamp-repair-evidence", "wire-ci-fast"])
+        agent.assert_not_called()
+        with patch.object(lane, "stamp_fleet_body", return_value=None), \
+                patch.object(lane, "wire_ci_fast_fix") as wire:
+            self.assertIsNone(lane.compose_deterministic_fix(None, {}, route, Path("."), None, {}))
+        wire.assert_not_called()
+
     def test_composed_route_stamps_the_body_before_wiring_and_does_not_call_the_model(self):
         order = []
         route = {"action": "compose", "cls": "composed",

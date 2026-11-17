@@ -31,10 +31,11 @@ const TIM_WHITE_REFERENCE_RELEASE = new URL(
 
 function hasCanonicalArtistReturn(html: string, url: string): boolean {
   const dom = new JSDOM(html, { url });
-  const found = [...dom.window.document.querySelectorAll('a[href]')].some(
+  const links =
+    dom.window.document.querySelectorAll<HTMLAnchorElement>('a[href]');
+  const found = [...links].some(
     link =>
-      new URL(link.getAttribute('href') ?? '', url).href ===
-        TIM_WHITE_PROFILE.publicProfileUrl &&
+      link.href === TIM_WHITE_PROFILE.publicProfileUrl &&
       (link.getAttribute('aria-label') ===
         `Back to ${TIM_WHITE_PROFILE.name}` ||
         link.textContent?.trim() === `Back to ${TIM_WHITE_PROFILE.name}`)
@@ -74,12 +75,7 @@ async function referenceReleaseFields(
   return { canonicalArtistReturn: hasCanonicalArtistReturn(html, pageUrl) };
 }
 
-/**
- * Redirects the codebase declares on purpose: the stable `/artists/:id`
- * entity route (survives claims and renames), route-config redirect sinks,
- * and the closed-signup waitlist handoff. Only these get one followed hop,
- * and only to a same-origin 200. Every other redirect still fails.
- */
+/** Stable artist routes, redirect sinks and signup handoffs get one same-origin hop. */
 export function isDeclaredRedirect(
   url: URL,
   handle: string,
@@ -93,8 +89,7 @@ export function isDeclaredRedirect(
   ) {
     return true;
   }
-  // Closed public signup (canon/PRODUCT.md, 2026-11-02, PR #24224): /start +
-  // /signup 307 to /waitlist; malformed Location throws to the link catch.
+  // Closed signup hands off to /waitlist; malformed Location still fails.
   if (!/^\/(?:start|signup)$/.test(url.pathname) || !location) return false;
   return (
     new URL(location, TIM_WHITE_PROFILE.publicProfileUrl).pathname ===
@@ -282,6 +277,21 @@ async function certifyDiscovery(
   }
 }
 
+/** One retry for thrown requests; HTTP and semantic failures remain decisive. */
+async function probeWithRetry(fetcher: typeof fetch, url: string) {
+  const probe = () =>
+    fetcher(url, {
+      signal: AbortSignal.timeout(15_000),
+      redirect: 'manual',
+    });
+  try {
+    return await probe();
+  } catch {
+    await new Promise(resolve => setTimeout(resolve, 1_000));
+    return probe();
+  }
+}
+
 export async function certifyArtistProfile(
   args: string[],
   fetcher: typeof fetch = fetch
@@ -348,6 +358,7 @@ export async function certifyArtistProfile(
     redirectedTo?: string;
     finalStatus?: number | null;
     canonicalArtistReturn?: boolean;
+    error?: 'link_probe_failed';
   }[] = [];
   const origin = new URL(snapshot.profileUrl).origin;
   const handle = new URL(snapshot.profileUrl).pathname.slice(1);
@@ -356,11 +367,14 @@ export async function certifyArtistProfile(
     linkChecks.push(
       ...(await Promise.all(
         internalLinks.slice(offset, offset + 4).map(async url => {
+          const check: (typeof linkChecks)[number] = {
+            url,
+            status: null,
+            observedAt: new Date().toISOString(),
+          };
           try {
-            const result = await fetcher(url, {
-              signal: AbortSignal.timeout(15_000),
-              redirect: 'manual',
-            });
+            const result = await probeWithRetry(fetcher, url);
+            check.status = result.status;
             const location = result.headers.get('location');
             if (
               result.status >= 300 &&
@@ -370,45 +384,31 @@ export async function certifyArtistProfile(
             ) {
               await result.body?.cancel();
               const target = new URL(location, url);
-              if (target.origin !== origin) {
-                return {
-                  url,
-                  status: result.status,
-                  observedAt: new Date().toISOString(),
-                  redirectedTo: target.href,
-                  finalStatus: null,
-                };
+              check.redirectedTo = target.href;
+              check.finalStatus = null;
+              if (target.origin === origin) {
+                const final = await probeWithRetry(fetcher, target.href);
+                check.finalStatus = final.status;
+                Object.assign(
+                  check,
+                  await referenceReleaseFields(
+                    final,
+                    target.href,
+                    deferredSurfaceIds
+                  )
+                );
               }
-              const final = await fetcher(target.href, {
-                signal: AbortSignal.timeout(15_000),
-                redirect: 'manual',
-              });
-              return {
-                url,
-                status: result.status,
-                observedAt: new Date().toISOString(),
-                redirectedTo: target.href,
-                finalStatus: final.status,
-                ...(await referenceReleaseFields(
-                  final,
-                  target.href,
-                  deferredSurfaceIds
-                )),
-              };
+            } else {
+              Object.assign(
+                check,
+                await referenceReleaseFields(result, url, deferredSurfaceIds)
+              );
             }
-            return {
-              url,
-              status: result.status,
-              observedAt: new Date().toISOString(),
-              ...(await referenceReleaseFields(
-                result,
-                url,
-                deferredSurfaceIds
-              )),
-            };
           } catch {
-            return { url, status: null, observedAt: new Date().toISOString() };
+            check.error = 'link_probe_failed';
           }
+          check.observedAt = new Date().toISOString();
+          return check;
         })
       ))
     );
@@ -447,18 +447,15 @@ export async function certifyArtistProfile(
       'Only declared redirects (stable /artists/:id, route-config redirect-sinks) are followed, one same-origin hop to a 200; any other redirect fails.',
     ],
   };
-  await mkdir(output, { recursive: true });
-  await writeFile(join(output, `${id}.html`), html, { flag: 'wx' });
-  await writeFile(
-    join(output, `${id}.snapshot.json`),
-    `${JSON.stringify(snapshot, null, 2)}\n`,
-    { flag: 'wx' }
-  );
-  await writeFile(
-    join(output, `${id}.report.json`),
-    `${JSON.stringify(report, null, 2)}\n`,
-    { flag: 'wx' }
-  );
+  for (const [extension, content] of Object.entries({
+    html,
+    'snapshot.json': `${JSON.stringify(snapshot, null, 2)}\n`,
+    'report.json': `${JSON.stringify(report, null, 2)}\n`,
+  })) {
+    await writeFile(join(output, `${id}.${extension}`), content, {
+      flag: 'wx',
+    });
+  }
   return {
     reportPath: join(output, `${id}.report.json`),
     snapshotPath: join(output, `${id}.snapshot.json`),
@@ -477,9 +474,11 @@ export async function certifyArtistProfile(
       discovery?.failed === true ||
       snapshot.checks.some(check => check.status !== 'pass') ||
       linkChecks.some(
-        check => check.status !== 200 && check.finalStatus !== 200
-      ) ||
-      linkChecks.some(check => check.canonicalArtistReturn === false),
+        check =>
+          check.error === 'link_probe_failed' ||
+          (check.status !== 200 && check.finalStatus !== 200) ||
+          check.canonicalArtistReturn === false
+      ),
   };
 }
 if (

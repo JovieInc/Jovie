@@ -13,7 +13,9 @@ import { loadLinksWorkspaceData } from './links-data';
 export const runtime = 'nodejs';
 
 export const metadata: Metadata = {
-  title: 'Links | Jovie',
+  // Title carries the route name only; the root layout template (`%s | Jovie`)
+  // supplies the single brand suffix.
+  title: 'Links',
   description:
     'Jovie finds your stuff, creates trackable links, and measures what happens when they are shared.',
 };

@@ -63,8 +63,8 @@ describe('JOV-INV-038 proximal-proof evaluator (homepage hero)', () => {
     const target = container.querySelector(`#${HOMEPAGE_INVITE_ANCHOR}`);
     expect(target).not.toBeNull();
     expect(
-      within(target as HTMLElement).getByTestId('homepage-close-cta')
-    ).toHaveAttribute('href', intent.href);
+      within(target as HTMLElement).getByTestId('homepage-claim-entry')
+    ).toHaveAttribute('action', intent.href);
   });
 
   it('offers one claim link and shows no person capture or unlabeled proof', () => {
