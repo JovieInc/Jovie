@@ -6862,7 +6862,7 @@ function evaluateAlbumArtProviderContract(vars: EvalVars) {
       chatRouteSource.replaceAll(/\s+/g, ' '),
       [
         'if (!isAlbumArtGatewayConfigured())',
-        'const target = await resolveAlbumArtReleaseTarget( params.profileId, params.releases,',
+        'const target = await resolveAlbumArtReleaseTarget( params.profileId, params.releases, {',
         'const burstLimit = await albumArtGenerationBurstLimiter.limit',
         'const generated = await generateAlbumArtBackgrounds',
       ]

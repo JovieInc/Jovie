@@ -123,9 +123,13 @@ const currentRoute = readFileSync(
 );
 
 describe('album art deterministic provider-order contract', () => {
-  let provider: InstanceType<
-    typeof import('../../eval/promptfoo/jovie-chat-provider').default
-  >;
+  interface ContractProvider {
+    callApi(
+      prompt: string,
+      context: { vars: { target: string } }
+    ): Promise<{ output?: unknown }>;
+  }
+  let provider: ContractProvider;
   const guard = 'if (!isAlbumArtGatewayConfigured()) {}';
   const lookup = `const target = await resolveAlbumArtReleaseTarget(
     params.profileId, params.releases, {});`;
@@ -145,9 +149,10 @@ describe('album art deterministic provider-order contract', () => {
     vi.spyOn(globalThis, 'fetch').mockRejectedValue(
       new Error('network disabled in source contract test')
     );
-    const { default: Provider } = await import(
-      '../../eval/promptfoo/jovie-chat-provider'
-    );
+    // Application test types exclude these standalone eval scripts.
+    const { default: Provider } = await vi.importActual<{
+      default: new () => ContractProvider;
+    }>('../../eval/promptfoo/jovie-chat-provider');
     provider = new Provider();
   });
   afterEach(() => {
@@ -192,6 +197,10 @@ describe('album art deterministic provider-order contract', () => {
   it.each([
     ['missing provider check', [lookup, burst, daily, generation]],
     ['provider check after lookup', [lookup, guard, burst, daily, generation]],
+    [
+      'missing input object',
+      [guard, lookup.replace(', {}', ', undefined'), burst, daily, generation],
+    ],
     [
       'unawaited lookup',
       [guard, lookup.replace('await ', ''), burst, daily, generation],
