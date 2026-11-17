@@ -1,4 +1,4 @@
-import { fireEvent, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import { fastRender } from '@/tests/utils/fast-render';
@@ -166,5 +166,167 @@ describe('ProfileEditPreviewCard', () => {
     expect(onCancel).toHaveBeenCalledOnce();
     expect(mockMutate).not.toHaveBeenCalled();
     await expectNoA11yViolations(container);
+  });
+
+  it('names the Jovie bio as the apply destination for bio edits (regression)', () => {
+    renderCard({
+      field: 'bio',
+      fieldLabel: 'Artist bio/description',
+      currentValue: 'Old bio',
+      newValue: 'New bio about the artist',
+    });
+
+    // The apply affordance must name Jovie explicitly: a Spotify drafting
+    // request must not read as if Apply pushes the bio to Spotify.
+    expect(
+      screen.getByRole('button', { name: 'Apply to Jovie Bio' })
+    ).toBeInTheDocument();
+  });
+
+  it('keeps the generic Apply label for non-bio fields', () => {
+    renderCard();
+
+    expect(screen.getByRole('button', { name: 'Apply' })).toBeInTheDocument();
+  });
+  it('requires the Jovie bio action before saving and lets Cancel discard the preview', () => {
+    const onApply = vi.fn();
+    const onCancel = vi.fn();
+    fastRender(
+      <ProfileEditPreviewCard
+        preview={{
+          field: 'bio',
+          fieldLabel: 'Artist bio/description',
+          currentValue: 'Old bio',
+          newValue: 'Draft originally written for Spotify',
+        }}
+        profileId='profile-123'
+        onApply={onApply}
+        onCancel={onCancel}
+      />
+    );
+
+    expect(
+      screen.getByRole('button', { name: 'Apply to Jovie Bio' })
+    ).toBeEnabled();
+    expect(mockMutate).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+    expect(mockMutate).not.toHaveBeenCalled();
+    expect(onApply).not.toHaveBeenCalled();
+    expect(onCancel).toHaveBeenCalledOnce();
+    expect(screen.getByText('Cancelled')).toBeInTheDocument();
+  });
+
+  it('submits only the confirmed Jovie bio edit and reports success after the mutation succeeds', () => {
+    const onApply = vi.fn();
+    fastRender(
+      <ProfileEditPreviewCard
+        preview={{
+          field: 'bio',
+          fieldLabel: 'Artist bio/description',
+          currentValue: 'Old bio',
+          newValue: 'Approved artist bio',
+          sourceUrl: 'https://example.com/artist',
+          sourceTitle: 'Artist press kit',
+        }}
+        profileId='profile-123'
+        onApply={onApply}
+      />
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Apply to Jovie Bio' }));
+    expect(mockMutate).toHaveBeenCalledOnce();
+    expect(mockMutate.mock.calls[0][0]).toEqual({
+      profileId: 'profile-123',
+      field: 'bio',
+      newValue: 'Approved artist bio',
+    });
+    expect(onApply).not.toHaveBeenCalled();
+    expect(screen.queryByText('Updated')).not.toBeInTheDocument();
+
+    act(() => mockMutate.mock.calls[0][1].onSuccess());
+    expect(onApply).toHaveBeenCalledOnce();
+    expect(screen.getByText('Updated')).toBeInTheDocument();
+    expect(screen.queryByRole('button')).not.toBeInTheDocument();
+  });
+
+  it('prevents applying or cancelling again while the confirmed edit is pending', () => {
+    mutationState = { isPending: true };
+    renderCard({
+      field: 'bio',
+      fieldLabel: 'Artist bio/description',
+      currentValue: 'Old bio',
+      newValue: 'Approved artist bio',
+    });
+
+    const apply = screen.getByRole('button', { name: 'Applying...' });
+    const cancel = screen.getByRole('button', { name: 'Cancel' });
+    expect(apply).toBeDisabled();
+    expect(cancel).toBeDisabled();
+    fireEvent.click(apply);
+    fireEvent.click(cancel);
+    expect(mockMutate).not.toHaveBeenCalled();
+    expect(screen.queryByText('Cancelled')).not.toBeInTheDocument();
+  });
+
+  it('keeps an interrupted bio edit available for an explicit retry without reporting success', () => {
+    const onApply = vi.fn();
+    const preview: ProfileEditPreview = {
+      field: 'bio',
+      fieldLabel: 'Artist bio/description',
+      currentValue: 'Old bio',
+      newValue: 'Approved artist bio',
+    };
+    const card = () => (
+      <ProfileEditPreviewCard
+        preview={preview}
+        profileId='profile-123'
+        onApply={onApply}
+      />
+    );
+    const { rerender } = fastRender(card());
+
+    fireEvent.click(screen.getByRole('button', { name: 'Apply to Jovie Bio' }));
+    mutationState = { isPending: true };
+    rerender(card());
+    fireEvent.click(screen.getByRole('button', { name: 'Applying...' }));
+    expect(mockMutate).toHaveBeenCalledOnce();
+
+    // A rejected or interrupted request clears pending without calling onSuccess.
+    mutationState = { isPending: false };
+    rerender(card());
+    expect(screen.getByText('Approved artist bio')).toBeInTheDocument();
+    expect(screen.queryByText('Updated')).not.toBeInTheDocument();
+    expect(onApply).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: 'Apply to Jovie Bio' }));
+    expect(mockMutate).toHaveBeenCalledTimes(2);
+    expect(mockMutate.mock.calls[1][0]).toEqual({
+      profileId: 'profile-123',
+      field: 'bio',
+      newValue: 'Approved artist bio',
+    });
+    act(() => mockMutate.mock.calls[1][1].onSuccess());
+    expect(onApply).toHaveBeenCalledOnce();
+    expect(screen.getByText('Updated')).toBeInTheDocument();
+    expect(screen.queryByRole('button')).not.toBeInTheDocument();
+  });
+
+  it('keeps a cancelled bio preview discarded across rerenders', () => {
+    const onCancel = vi.fn();
+    const card = () => (
+      <ProfileEditPreviewCard
+        preview={{ ...basePreview, field: 'bio', newValue: 'Draft bio' }}
+        profileId='profile-123'
+        onCancel={onCancel}
+      />
+    );
+    const { rerender } = fastRender(card());
+
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+    rerender(card());
+
+    expect(screen.getByText('Cancelled')).toBeInTheDocument();
+    expect(screen.queryByRole('button')).not.toBeInTheDocument();
+    expect(onCancel).toHaveBeenCalledOnce();
+    expect(mockMutate).not.toHaveBeenCalled();
   });
 });
