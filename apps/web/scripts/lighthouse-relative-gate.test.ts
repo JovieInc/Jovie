@@ -108,6 +108,56 @@ describe('relative Lighthouse gate flow', () => {
     ]);
   });
 
+  it('accounts separately for initial collections and paired rechecks, including unsuccessful attempts', async () => {
+    const { options } = harness({
+      verdicts: { onboarding: [{ passed: false, retryable: true }] },
+      failCollect: (side, _suite, runs) => side === 'base' && runs === 2,
+    });
+    let elapsed = 0;
+    const result = await decide({
+      ...options,
+      now: () => elapsed,
+      collect: (
+        side: string,
+        suite: { name: string },
+        count: number | null
+      ) => {
+        elapsed += count === null ? 100 : 200;
+        return options.collect(side, suite, count);
+      },
+      hasBaseline: true,
+      extraRuns: 2,
+    });
+    expect(result.passed).toBe(false);
+    const initial = result.collections.filter(row => row.phase === 'initial');
+    expect(initial.map(row => [row.side, row.suite])).toEqual([
+      ['head', 'dashboard'],
+      ['head', 'chat'],
+      ['head', 'onboarding'],
+      ['base', 'dashboard'],
+      ['base', 'onboarding'],
+    ]);
+    expect(initial.every(row => row.elapsedMs === 100 && row.completed)).toBe(
+      true
+    );
+    expect(result.collections.filter(row => row.phase === 'recheck')).toEqual([
+      {
+        suite: 'onboarding',
+        side: 'head',
+        phase: 'recheck',
+        elapsedMs: 200,
+        completed: true,
+      },
+      {
+        suite: 'onboarding',
+        side: 'base',
+        phase: 'recheck',
+        elapsedMs: 200,
+        completed: false,
+      },
+    ]);
+  });
+
   it('without a baseline enforces the configured budgets and never rechecks', async () => {
     const { calls, evaluated, options } = harness({
       verdicts: { dashboard: [{ passed: false, retryable: true }] },
