@@ -22,6 +22,7 @@
 
 import AxeBuilder from '@axe-core/playwright';
 import { expect, test } from '@playwright/test';
+import { APP_ROUTES } from '@/constants/routes';
 import {
   disabledRuleIds,
   wcag22AaAxeOptions,
@@ -346,4 +347,57 @@ test.describe('Authenticated dashboard axe', () => {
       'Dashboard navigation must have at least 3 keyboard-reachable nav elements'
     ).toBeGreaterThanOrEqual(3);
   });
+});
+
+// ---------------------------------------------------------------------------
+// Document titles — shell routes announce the route and the brand exactly once
+// ---------------------------------------------------------------------------
+//
+// The document title is the first thing a screen reader announces on a page
+// and the label a browser/Electron window shows. The root app layout owns
+// `title: { template: '%s | Jovie' }`, so shell pages must export their bare
+// route name: a child title that already names Jovie renders the announcement
+// twice ('Links | Jovie | Jovie'), and a page without metadata falls back to
+// the bare default and never names the route (dogfooded 2026-11-10).
+//
+// Fail-closed: these assertions need the authenticated shell, so they throw
+// when no auth path is configured instead of silently passing.
+
+test.describe('Shell route document titles announce the route once', () => {
+  test.setTimeout(120_000);
+
+  const SHELL_TITLE_ROUTES = [
+    { path: APP_ROUTES.LINKS, title: 'Links | Jovie' },
+    { path: APP_ROUTES.TOUR_DATES, title: 'Tour Dates | Jovie' },
+    { path: APP_ROUTES.CHATS, title: 'Chats | Jovie' },
+    { path: APP_ROUTES.INSIGHTS, title: 'Insights | Jovie' },
+  ] as const;
+
+  test.beforeEach(async ({ page }) => {
+    if (
+      process.env.E2E_USE_TEST_AUTH_BYPASS !== '1' &&
+      !hasClerkCredentials()
+    ) {
+      throw new Error(
+        'Shell document-title assertions need E2E_USE_TEST_AUTH_BYPASS=1 ' +
+          '(or Clerk credentials) — the shell routes are authenticated and ' +
+          'must fail closed rather than silently pass when unrunnable.'
+      );
+    }
+    await ensureSignedInUser(page);
+  });
+
+  for (const route of SHELL_TITLE_ROUTES) {
+    test(`${route.path} announces Jovie exactly once`, async ({ page }) => {
+      await smokeNavigateWithRetry(page, route.path, { timeout: 60_000 });
+      await waitForHydration(page);
+
+      const title = await page.title();
+      expect(
+        title,
+        `${route.path} document title must be exactly '${route.title}' — ` +
+          'the root layout template owns the single `| Jovie` suffix'
+      ).toBe(route.title);
+    });
+  }
 });
