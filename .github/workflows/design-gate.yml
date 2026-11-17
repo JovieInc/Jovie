@@ -1,7 +1,6 @@
-# Changed paths come from the pull_request merge commit: HEAD^1 is the base
-# tip, so the diff is this PR. The pulls files endpoint returns HTTP 403 once
-# the Actions installation REST budget is exhausted, which failed this check
-# before the brief ran. This job reads the checkout instead.
+# Changed paths come from the exact pull_request merge and source ancestry.
+# A complete local diff retains renamed and deleted gated paths without
+# depending on GitHub API pagination or installation quota.
 name: Design gate
 
 # Warns when a PR touches a marketing or landing surface without a completed
@@ -45,16 +44,11 @@ jobs:
       - name: Check out
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          # Default pull_request ref is the synthetic merge. Depth 2 includes
-          # that commit and its first parent (the base tip).
-          fetch-depth: 2
+          ref: ${{ github.sha }}
+          # Complete ancestry proves the event merge-base and source head.
+          fetch-depth: 0
+          filter: blob:none
           persist-credentials: false
-
-      - name: Changed files
-        run: |
-          set -euo pipefail
-          git rev-parse --verify HEAD^1 >/dev/null
-          git diff --name-only HEAD^1 HEAD > "$RUNNER_TEMP/design-gate-files.txt"
 
       - name: Check the design brief
         env:
@@ -63,5 +57,5 @@ jobs:
         run: |
           python3 scripts/lanes/design_gate_check.py \
             --event "$GITHUB_EVENT_PATH" \
-            --files-from "$RUNNER_TEMP/design-gate-files.txt" \
+            --git-diff \
             --repo .
